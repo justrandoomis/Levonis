@@ -38,7 +38,7 @@ function baseRow() {
   };
 }
 
-test('TXT export/import preserves product delivery rules and partial edits merge safely', () => {
+test('the retired per-product delivery keys: never exported, ignored on import with ONE warning', () => {
   const doc = parseProductRow({
     ...baseRow(),
     ops_policy: JSON.stringify({
@@ -49,34 +49,14 @@ test('TXT export/import preserves product delivery rules and partial edits merge
     }),
   });
   const exported = exportProduct(doc);
-  assert.match(exported, /^standard_delivery_quantity_step=10$/m);
-  assert.match(exported, /^personal_delivery_fee_iqd=50000$/m);
-  const roundTrip = validateProductDoc(toDocBody(parseTemplate(exported), doc, { needs_review: [] }).body);
-  assert.deepEqual(roundTrip.delivery_options, doc.delivery_options);
+  assert.doesNotMatch(exported, /_delivery_(enabled|quantity_step|fee_iqd)=/, 'delivery is priced by «إدارة التوصيل»');
 
-  const partial = parseTemplate('template_version=2\nstandard_delivery_fee_iqd=7000\n');
-  const edited = validateProductDoc(toDocBody(partial, doc, { needs_review: [] }).body);
-  assert.deepEqual(edited.delivery_options, {
-    standard: { enabled: true, quantity_step: 10, fee_iqd: 7000 },
-    personal: { enabled: true, quantity_step: 1, fee_iqd: 50000 },
-  });
-});
-
-test('a partial TXT shipping edit inherits enabled legacy methods, preserving explicit restrictions', () => {
-  const legacy = parseProductRow(baseRow());
-  assert.equal(legacy.delivery_options, null);
-  const feeOnly = parseTemplate('template_version=2\nstandard_delivery_fee_iqd=7000\n');
-  const edited = validateProductDoc(toDocBody(feeOnly, legacy, { needs_review: [] }).body);
-  assert.deepEqual(edited.delivery_options, {
-    standard: { enabled: true, quantity_step: 1, fee_iqd: 7000 },
-    personal: { enabled: true, quantity_step: 1, fee_iqd: 10000 },
-  });
-  const disabled = validateProductDoc(toDocBody(parseTemplate('template_version=2\nstandard_delivery_enabled=false\n'), legacy, { needs_review: [] }).body);
-  assert.equal(disabled.delivery_options?.standard.enabled, false);
-  assert.equal(disabled.delivery_options?.personal.enabled, true);
-  const further = validateProductDoc(toDocBody(feeOnly, disabled, { needs_review: [] }).body);
-  assert.equal(further.delivery_options?.standard.enabled, false, 'a stored restriction is never silently enabled');
-  assert.equal(further.delivery_options?.personal.enabled, true);
+  const old = parseTemplate('template_version=2\nstandard_delivery_fee_iqd=7000\nstandard_delivery_enabled=false\npersonal_delivery_fee_iqd=1\n');
+  assert.deepEqual(old.errors, []);
+  assert.equal(old.warnings.filter((w) => w.includes('إدارة التوصيل')).length, 1);
+  assert.deepEqual(old.unknown_keys, []);
+  const body = toDocBody(old, doc, { needs_review: [] }).body as Record<string, unknown>;
+  assert.equal(body.delivery_options, undefined, 'the file says nothing about delivery any more');
 });
 
 /**

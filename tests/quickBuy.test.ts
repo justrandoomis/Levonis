@@ -194,7 +194,9 @@ test('§23 scenario 1: activate in two steps, printer, filament from another pag
   assert.equal(order.payment_method_id, 'wallet');
   assert.equal(order.total_iqd, 625_000);
   assert.equal(order.shipping_iqd, 0);
-  assert.equal(order.shipping_before_benefit_iqd, 10_000);
+  // «إدارة التوصيل» (owner, 2026-10-18): the printers rule (10,000 a piece) plus the filament rule
+  // (5,000 a block of 10) — the sum of the groups present, the same figure the checkout charges.
+  assert.equal(order.shipping_before_benefit_iqd, 15_000);
   assert.equal(JSON.parse(order.benefit_snapshot).wallet_free_delivery.applied, true);
   assert.equal(order.due_on_delivery_iqd, 0);
   assert.equal(JSON.parse(order.address_snapshot).id, 'addr');

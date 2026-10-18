@@ -73,8 +73,8 @@ function setup() {
     INSERT INTO products (id,slug,name,name_ar,price_iqd,status,stock,options,colors,selling_type,sale_types,preorder_transports,direct_surcharge_iqd,images)
       VALUES ('p_x1','x1-printer','Printer X1','طابعة X1',${PRINTER_IQD},'active',5,'[]','[]','direct_sale','["direct_sale"]','[]',NULL,'[]'),
              ('p_pla','pla-basic','PLA Basic','PLA أساسي',25000,'active',50,'[]','[]','direct_sale','["direct_sale"]','[]',NULL,'[]');
-    INSERT INTO catalogs (id, slug, name_ar, is_printer_catalog) VALUES ('cat_p','test-printers','طابعات',1);
-    INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES ('p_x1','cat_p',0);
+    -- Filed under the seeded printers section, so «إدارة التوصيل»'s printers rule (0201) prices it.
+    INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES ('p_x1','cat_printers_fdm',0);
   `);
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }

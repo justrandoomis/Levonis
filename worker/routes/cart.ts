@@ -34,7 +34,9 @@ import { requireAuth, badRequest, conflict, notFound, int, str, oneOf, HttpError
 import { newId } from '../lib/crypto';
 import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
 import { AddToCartV1 } from '@levonis/contracts/events/v1/AddToCart';
-import { getSettings } from '../lib/settings';
+import { getSetting, getSettings } from '../lib/settings';
+import { resolveDeliveryGroup, type DeliveryPolicy, type DeliveryRuleGroup } from '../lib/storeDelivery';
+import { normalizeGovernorate } from '../lib/iraqGovernorates';
 import { canonicalProductMediaUrl, parseProductRow, publicColor, publicOption, publicPreorderRoutes, type ProductDoc } from '../lib/productModel';
 import { customerAvailability, customerLinePrice, withoutUsdTwins, type CustomerLinePrice } from '../lib/customerPricing';
 import { isUsdCents } from '@levonis/pricing/usdCents';
@@ -149,7 +151,7 @@ import { bumpMetric, metricStatement } from '../lib/compositionAnalytics';
  *  be counted as one (§12). */
 const OOS_REFUSALS = new Set(['OUT_OF_STOCK', 'QTY_UNAVAILABLE', 'MYSTERY_NO_ELIGIBLE_STOCK', 'BUNDLE_OPTIONAL_UNAVAILABLE']);
 import { supportEligibleProductIds } from '../lib/membershipOps';
-import { isPrinterProduct, printerProductIds } from '../lib/printerIdentity';
+import { isPrinterProduct, printerProductIds, productCatalogPlacements } from '../lib/printerIdentity';
 import { pricedPlans, refuseNonPrinterWarranty } from '../lib/warrantyPlans';
 import { productImageForSelection } from '../lib/productSelectionImage';
 import {
@@ -701,15 +703,26 @@ function compositionCartItem(
   mystery?: MysteryContext,
   /** The customer's own language, for the ONE server-rendered sentence a
    *  mystery line carries — the reveal milestone in words (§13.3). */
-  lang = 'ar'
+  lang = 'ar',
+  /** The delivery-policy group that prices a product (null = the default). */
+  deliveryGroupOf: (doc: ProductDoc) => DeliveryRuleGroup | null = () => null
 ) {
   const unit = b.pricing.unit_subtotal_iqd + componentFeesIqd(b);
   const usd = compositionUsdTwins(b, unit);
   const qty = Number(row.qty) || 1;
-  const deliveryDocs = b.doc.composition === 'mystery' ? [b.doc] : b.components.filter((k) => k.included).map((k) => k.doc);
+  // Fixed bundles ship their included components, each priced by its own
+  // group; a mystery offer by the OFFER's (the anti-leak rule in orders.ts).
+  const deliveryDocs: Array<{ doc: ProductDoc; units: number }> =
+    b.doc.composition === 'mystery'
+      ? [{ doc: b.doc, units: 1 }]
+      : b.components.filter((k) => k.included).map((k) => ({ doc: k.doc, units: Math.max(1, k.qty_per_bundle) }));
+  const deliveryParts = deliveryDocs.map(({ doc, units }) => {
+    const group = deliveryGroupOf(doc);
+    return { product_id: doc.id, rule_id: group?.id ?? null, units_per_line: units, stopped: group?.mode === 'stopped' };
+  });
   const deliveryAvailability = {
-    standard: deliveryDocs.every((d) => !d.delivery_options || d.delivery_options.standard.enabled),
-    personal: deliveryDocs.every((d) => !d.delivery_options || d.delivery_options.personal.enabled),
+    standard: deliveryParts.every((d) => !d.stopped),
+    personal: false,
   };
   return {
     id: row.cart_item_id,
@@ -774,6 +787,7 @@ function compositionCartItem(
     preorder_transports: [],
     shipping_methods: [],
     delivery_availability: deliveryAvailability,
+    delivery_parts: deliveryParts.map(({ product_id, rule_id, units_per_line }) => ({ product_id, rule_id, units_per_line })),
   };
 }
 
@@ -847,6 +861,19 @@ function unavailableCartLine(row: Record<string, unknown>, catalogOnly = false):
     image,
     code: catalogOnly ? 'PRICE_NOT_AVAILABLE' : 'PRODUCT_CURRENTLY_UNAVAILABLE',
     slug: catalogOnly ? text(row.slug) || null : null,
+  };
+}
+
+/** What the cart page needs to estimate standard delivery with `deliveryCharge`. */
+function deliveryTariffFor(policy: DeliveryPolicy, governorate: string) {
+  const gr = governorate ? policy.governorates[governorate] : undefined;
+  return {
+    default_fee_iqd: gr && 'fee_iqd' in gr ? gr.fee_iqd : policy.default_fee_iqd,
+    governorate,
+    governorate_stopped: !!gr && 'stopped' in gr,
+    groups: policy.groups
+      .filter((g) => g.enabled)
+      .map((g) => ({ id: g.id, mode: g.mode, fee_iqd: g.fee_iqd, block_size: g.block_size, name: g.name })),
   };
 }
 
@@ -996,10 +1023,46 @@ async function loadCart(c: Context<AppContext>) {
     standard: new Set<string>(),
     personal: new Set<string>(),
   };
-  const constrainDelivery = (doc: Pick<ProductDoc, 'id' | 'delivery_options'>) => {
-    if (!doc.delivery_options) return; // legacy global tariff supports both
-    if (!doc.delivery_options.standard.enabled) unavailableDelivery.standard.add(doc.id);
-    if (!doc.delivery_options.personal.enabled) unavailableDelivery.personal.add(doc.id);
+  /**
+   * «إدارة التوصيل»: which group prices a product, from the product ROW's
+   * sections (never the browser's word). A «لا يُوصَّل» group makes standard
+   * unavailable for it; personal delivery is cancelled.
+   */
+  const deliveryProductIds = [
+    ...results.map((r) => String(r.id ?? '')),
+    ...[...resolvedBundles.values()].flatMap((b) => [String(b.doc.id), ...b.components.map((k) => String(k.doc.id))]),
+  ];
+  const [deliveryPolicy, deliveryAncestry, defaultGovernorate, placements] = await Promise.all([
+    getSetting(c.env.DB, 'deliveryPolicy'),
+    ctx.catalogAncestry ? Promise.resolve(ctx.catalogAncestry) : catalogAncestry(c.env.DB),
+    c.env.DB.prepare('SELECT governorate FROM addresses WHERE user_id = ? AND is_default = 1 LIMIT 1')
+      .bind(user.id)
+      .first<{ governorate: string | null }>()
+      .then((r) => normalizeGovernorate(r?.governorate))
+      .catch(() => ''),
+    productCatalogPlacements(c.env.DB, deliveryProductIds),
+  ]);
+  const deliveryGroupOf = (doc: Pick<ProductDoc, 'id' | 'category_id' | 'sub_category_id'>) =>
+    resolveDeliveryGroup(
+      {
+        product_id: doc.id,
+        category_path: [
+          ...(ancestryFor(deliveryAncestry, doc.category_id ?? null, doc.sub_category_id ?? null) ?? []),
+          ...(placements.get(doc.id) ?? []).flatMap((id) => deliveryAncestry.get(id) ?? [id]),
+        ],
+      },
+      deliveryPolicy
+    );
+  const constrainDelivery = (doc: Pick<ProductDoc, 'id' | 'category_id' | 'sub_category_id'>) => {
+    if (deliveryGroupOf(doc)?.mode === 'stopped') unavailableDelivery.standard.add(doc.id);
+    unavailableDelivery.personal.add(doc.id);
+  };
+  const singlePart = (doc: Pick<ProductDoc, 'id' | 'category_id' | 'sub_category_id'>) => {
+    const group = deliveryGroupOf(doc);
+    return {
+      delivery_parts: [{ product_id: doc.id, rule_id: group?.id ?? null, units_per_line: 1 }],
+      delivery_availability: { standard: group?.mode !== 'stopped', personal: false },
+    };
   };
   const unavailableLines: UnavailableCartLine[] = [];
   for (const row of results) {
@@ -1013,7 +1076,7 @@ async function loadCart(c: Context<AppContext>) {
         coarseStock: poolMemberIds.has(String(row.id ?? '')),
       });
       if (row.status === 'active') constrainDelivery(gift.doc);
-      items.push(gift.item);
+      items.push({ ...gift.item, ...singlePart(gift.doc) });
       continue;
     }
     if (row.status !== 'active') {
@@ -1034,7 +1097,7 @@ async function loadCart(c: Context<AppContext>) {
       if (b.doc.composition === 'mystery') constrainDelivery(b.doc);
       else b.components.filter((k) => k.included).forEach((k) => constrainDelivery(k.doc));
       items.push(
-        compositionCartItem(row, b, bundlePrinterIds, mysteryCtxs.get(String(row.cart_item_id)), user.locale ?? 'ar')
+        compositionCartItem(row, b, bundlePrinterIds, mysteryCtxs.get(String(row.cart_item_id)), user.locale ?? 'ar', deliveryGroupOf)
       );
       continue;
     }
@@ -1189,11 +1252,7 @@ async function loadCart(c: Context<AppContext>) {
       // Which routes exist — never their commission (V2-0, C5).
       preorder_transports: publicPreorderRoutes(doc.preorder_transports),
       shipping_methods: safeParse(row.shipping_methods, []), // legacy UI compatibility
-      delivery_options: doc.delivery_options ?? null,
-      delivery_availability: {
-        standard: !doc.delivery_options || doc.delivery_options.standard.enabled,
-        personal: !doc.delivery_options || doc.delivery_options.personal.enabled,
-      },
+      ...singlePart(doc),
     });
   }
   /**
@@ -1250,6 +1309,12 @@ async function loadCart(c: Context<AppContext>) {
       personal: { available: unavailableDelivery.personal.size === 0, unavailable_product_ids: [...unavailableDelivery.personal] },
       pickup: { available: true, unavailable_product_ids: [] as string[] },
     },
+    /**
+     * The cart page's delivery ESTIMATE inputs (the checkout quote stays the
+     * authority): the default after the default address's governorate, and
+     * every group the lines' `delivery_parts` can name.
+     */
+    delivery_tariff: deliveryTariffFor(deliveryPolicy, defaultGovernorate),
   };
 }
 
@@ -1355,7 +1420,7 @@ cartRoutes.get('/', async (c) => {
   // holding only a store's goods answered `scope: null`, the cart page never
   // rendered the store cart — the only way to /store-checkout — and the badge
   // was reset to 0 over a full cart.
-  const [{ items, unavailable_lines, tier, tierActive, delivery_methods, membership }, allLines] = await Promise.all([
+  const [{ items, unavailable_lines, tier, tierActive, delivery_methods, delivery_tariff, membership }, allLines] = await Promise.all([
     loadCart(c),
     c.env.DB
       .prepare('SELECT seller_type, merchant_id, store_id, qty FROM cart_items WHERE user_id = ? ORDER BY created_at, id')
@@ -1392,6 +1457,7 @@ cartRoutes.get('/', async (c) => {
     // page states it instead of subtracting two numbers and hoping.
     membership,
     delivery_methods,
+    delivery_tariff,
     shipping_type: shippingType,
     scope: cartSellerScope(lines),
     /**
@@ -2067,11 +2133,8 @@ function giftCartItem(
       warranty_plans: [],
       preorder_transports: [],
       shipping_methods: [],
-      delivery_options: doc.delivery_options ?? null,
-      delivery_availability: {
-        standard: !doc.delivery_options || doc.delivery_options.standard.enabled,
-        personal: !doc.delivery_options || doc.delivery_options.personal.enabled,
-      },
+      // delivery_parts / delivery_availability are added by the caller,
+      // which holds the delivery policy.
     },
   };
 }

@@ -21,11 +21,6 @@ import type {
  */
 export type EditorDoc = ProductDocV2 & { catalog_ids: string[]; printer_fit_ids: string[] };
 
-export const defaultProductDeliveryOptions = () => ({
-  standard: { enabled: true, quantity_step: 1, fee_iqd: 5000 },
-  personal: { enabled: true, quantity_step: 1, fee_iqd: 10000 },
-});
-
 let localCounter = 0;
 export function uid(prefix: string): string {
   localCounter += 1;
@@ -69,7 +64,8 @@ export function blankDoc(): EditorDoc {
     // un-graded the listing" from "this client never had the field".
     condition: null,
     dimensions: emptyDimensions(),
-    delivery_options: defaultProductDeliveryOptions(),
+    // Retired (owner, 2026-10-18): delivery is priced by «إدارة التوصيل».
+    delivery_options: null,
     content_blocks: [],
     translation_meta: {},
     is_featured: false,

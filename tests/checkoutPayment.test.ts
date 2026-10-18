@@ -111,8 +111,8 @@ function setup() {
     )
     .run(SEA, SEA);
   raw.exec(`
-    INSERT INTO catalogs (id, slug, name_ar, is_printer_catalog) VALUES ('cat_test_printers','test-printers','طابعات',1);
-    INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES ('p_x1','cat_test_printers',0);
+    -- Filed under the seeded printers section, so «إدارة التوصيل»'s printers rule (0201) prices it.
+    INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES ('p_x1','cat_printers_fdm',0);
   `);
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }

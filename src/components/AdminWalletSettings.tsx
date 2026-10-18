@@ -3,7 +3,6 @@ import { useWallet, PaymentMethod } from '../WalletContext';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import RoundingDriftTool from './adminWallet/RoundingDriftTool';
-import CourierTaxPanel from './adminWallet/CourierTaxPanel';
 import { api, ApiError, formatIqd, type PayoutMethod } from '../lib/api';
 import { Check, Edit2, Plus, Trash2, Video, DollarSign, CreditCard, Save, AlertTriangle, ArrowUpFromLine, Banknote } from 'lucide-react';
 
@@ -329,7 +328,12 @@ export default function AdminWalletSettings() {
           </div>
         </div>
 
-        <CourierTaxPanel />
+        {/* «ضريبة شركة التوصيل» moved to «إدارة التوصيل» (owner, 2026-10-18). */}
+        <p className="lv-surface p-4 text-sm text-text-secondary" data-courier-tax-link>
+          {loc('ضريبة شركة التوصيل تُعدَّل الآن من ', 'The delivery company tax is now edited in ', 'باجی کۆمپانیای گەیاندن ئێستا لە ')}
+          <a className="font-semibold underline" href="/admin?tab=delivery_pricing">{loc('إدارة التوصيل', 'Delivery management', 'بەڕێوەبردنی گەیاندن')}</a>
+          {loc('.', '.', ' دەستکاری دەکرێت.')}
+        </p>
 
         {/* THE WITHDRAWAL COMMISSION. Deducted from the requested amount —
             the worked example below is there so that cannot be read the other

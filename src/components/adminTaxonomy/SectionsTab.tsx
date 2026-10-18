@@ -6,8 +6,7 @@
  * or sub-sections still use it, and says so).
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Plus, Pencil, Trash2, Power, CornerDownRight, Printer, Image as ImageIcon, Upload, RefreshCw, Truck, GalleryHorizontal, ArrowUp, ArrowDown, Moon, Sun, Monitor, Smartphone, Lock, ScanLine } from 'lucide-react';
-import { SectionDeliveryDialog, deliveryRuleSummary } from './SectionDeliveryDialog';
+import { Plus, Pencil, Trash2, Power, CornerDownRight, Printer, Image as ImageIcon, Upload, RefreshCw, GalleryHorizontal, ArrowUp, ArrowDown, Moon, Sun, Monitor, Smartphone, Lock, ScanLine } from 'lucide-react';
 import * as T from '../adminProducts/theme';
 import { ApiError, api } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
@@ -76,7 +75,6 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
   const [edit, setEdit] = useState<EditState | null>(null);
   const [del, setDel] = useState<CatalogNode | null>(null);
   const [picture, setPicture] = useState<{ node: CatalogNode; kind: PictureKind } | null>(null);
-  const [deliveryFor, setDeliveryFor] = useState<CatalogNode | null>(null);
   const [busyId, setBusyId] = useState('');
   // The button a dialog would restore focus to is inside the row it deletes,
   // so focus would land on <body>. It goes to the tab's own action instead.
@@ -190,12 +188,6 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
               <span className="tabular-nums" data-tax-position>{`#${siblingsOf(c).findIndex((x) => x.id === c.id) + 1}`}</span>
               {altNames(c, lang) ? ` · ${altNames(c, lang)}` : ''}
             </div>
-            {deliveryRuleSummary(c.delivery_rules, loc) && (
-              <div className="text-[11.5px] text-[var(--ap-accent)] truncate" data-tax-delivery-summary>
-                <Truck className="inline w-3.5 h-3.5 me-1 align-[-2px]" aria-hidden />
-                {deliveryRuleSummary(c.delivery_rules, loc)}
-              </div>
-            )}
           </div>
         </div>
       </td>
@@ -271,16 +263,6 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
           >
             <GalleryHorizontal className="w-4 h-4" aria-hidden />
           </button>
-          <button
-            type="button"
-            className={T.btnIcon}
-            onClick={() => setDeliveryFor(c)}
-            aria-label={loc('قاعدة توصيل القسم', 'Section delivery rule')}
-            title={loc('رسم توصيل موحّد لكل القسم حسب العدد', 'One quantity-based delivery fee for the whole section')}
-            data-tax-action="delivery"
-          >
-            <Truck className="w-4 h-4" aria-hidden />
-          </button>
           <button type="button" className={T.btnIcon} onClick={() => void toggle(c)} disabled={busyId === c.id} aria-label={c.active ? loc('تعطيل', 'Deactivate') : loc('تفعيل', 'Activate')} title={c.active ? loc('تعطيل', 'Deactivate') : loc('تفعيل', 'Activate')} data-tax-action="toggle">
             <Power className="w-4 h-4" aria-hidden />
           </button>
@@ -336,23 +318,6 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
             setEdit(null);
             await reload();
             notify('ok', created ? loc(`أُضيف القسم «${name}».`, `Section "${name}" added.`) : loc(`حُفظ القسم «${name}».`, `Section "${name}" saved.`));
-          }}
-        />
-      )}
-
-      {deliveryFor && (
-        <SectionDeliveryDialog
-          node={deliveryFor}
-          onClose={() => {
-            setDeliveryFor(null);
-            restoreFocus();
-          }}
-          onSaved={async () => {
-            const name = nameOf(deliveryFor, lang);
-            setDeliveryFor(null);
-            restoreFocus();
-            await reload();
-            notify('ok', loc(`حُفظت قاعدة توصيل «${name}».`, `Delivery rule for "${name}" saved.`));
           }}
         />
       )}

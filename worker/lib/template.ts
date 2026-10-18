@@ -16,6 +16,7 @@
  */
 
 import { newId } from './crypto';
+import { RETIRED_DELIVERY_KEY, RETIRED_DELIVERY_WARNING } from './retiredDeliveryColumns';
 import { localizableSlots } from './translationSlots';
 import { isMixed } from './availability';
 import { normalizeCheapestBase } from './cheapestBase';
@@ -236,7 +237,6 @@ export const TEMPLATE_GROUPS: Array<{ id: string; titleAr: string; titleEn: stri
   { id: 'pricing',         titleAr: 'التسعير',               titleEn: 'Pricing' },
   { id: 'classification',  titleAr: 'التصنيف',               titleEn: 'Classification' },
   { id: 'selling',         titleAr: 'البيع والمخزون',        titleEn: 'Selling & stock' },
-  { id: 'delivery',        titleAr: 'خيارات التوصيل',        titleEn: 'Delivery options' },
   { id: 'transports',      titleAr: 'شحن الطلب المسبق',      titleEn: 'Pre-order transports' },
   { id: 'media',           titleAr: 'الوسائط',               titleEn: 'Media' },
   { id: 'options',         titleAr: 'الخيارات',              titleEn: 'Options' },
@@ -316,15 +316,6 @@ const SCALAR_FIELDS: FieldSpec[] = [
   // owner's complaint about the numbers in the export.
   f('direct_surcharge_iqd', 'iqd', 'selling', 'قديم للاستيراد فقط — زيادة البيع المباشر تُكتب لكل خيار في options.N.direct.price_iqd', { nullable: true, min: 0, max: IQD_MAX, plusIsPlain: true, exported: false }),
   f('payment_options', 'csv', 'selling', 'معرفات طرق الدفع المسموحة — allowed checkout payment method ids, comma-separated'),
-  // Product-owned last-mile delivery. All six values are folded into the
-  // single canonical `delivery_options` document below; omitted lines keep a
-  // legacy product on the existing global tariff.
-  f('standard_delivery_enabled', 'bool', 'delivery', 'إتاحة التوصيل العادي لهذا المنتج — enable standard delivery for this product'),
-  f('standard_delivery_quantity_step', 'int', 'delivery', 'عدد القطع التي يغطيها كل رسم توصيل عادي — integer >= 1', { min: 1, max: 1_000_000 }),
-  f('standard_delivery_fee_iqd', 'iqd', 'delivery', 'رسم كل شريحة كمية للتوصيل العادي بالدينار — integer IQD >= 0', { min: 0, max: IQD_MAX }),
-  f('personal_delivery_enabled', 'bool', 'delivery', 'إتاحة التوصيل الشخصي لهذا المنتج — enable personal delivery for this product'),
-  f('personal_delivery_quantity_step', 'int', 'delivery', 'عدد القطع التي يغطيها كل رسم توصيل شخصي — integer >= 1', { min: 1, max: 1_000_000 }),
-  f('personal_delivery_fee_iqd', 'iqd', 'delivery', 'رسم كل شريحة كمية للتوصيل الشخصي بالدينار — integer IQD >= 0', { min: 0, max: IQD_MAX }),
   // device coverage (stored in products.ops_policy) — the base the extended
   // warranty adds to, and whether a unit is recorded per physical device
   f('warranty_base_months', 'int', 'warranty', 'مدة الضمان الأساسي بالأشهر من التسليم — للطابعات 12 افتراضيًا (التمديد +12 → 24 إجمالًا، +24 → 36)؛ __NULL__ = غير مُعدّة', { nullable: true, min: 1, max: 240 }),
@@ -1250,9 +1241,16 @@ export function parseTemplate(text: string): ParsedTemplate {
    * reach here, and `spec.capacity` — a spec-sheet field id, which may legally
    * be called anything — is taken by the `spec.` branch long before this.
    */
+  let retiredDelivery = false;
   const ignoreKey = (line: number, key: string) => {
     if (key.slice(key.lastIndexOf('.') + 1) === 'capacity') {
       err(line, key, MISPLACED_CAPACITY);
+      return;
+    }
+    // The six retired per-product delivery keys (owner, 2026-10-18): one
+    // warning for the whole file, never one per key.
+    if (RETIRED_DELIVERY_KEY.test(key)) {
+      retiredDelivery = true;
       return;
     }
     out.unknown_keys.push(key);
@@ -1533,6 +1531,7 @@ export function parseTemplate(text: string): ParsedTemplate {
   for (const key of out.unknown_keys) {
     out.warnings.push(`unknown key "${key}" was ignored`);
   }
+  if (retiredDelivery) out.warnings.push(RETIRED_DELIVERY_WARNING);
   return out;
 }
 
@@ -1725,17 +1724,6 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   );
   if (opts.inventoryMode !== undefined) push('inventory_mode', opts.inventoryMode ?? '');
   push('payment_options', doc.payment_options.join(','));
-  // A null delivery_options is an intentional legacy state. Do not emit six
-  // invented values into an export: omitting them means a round-trip keeps
-  // the global tariff exactly as it was.
-  if (doc.delivery_options) {
-    push('standard_delivery_enabled', boolStr(doc.delivery_options.standard.enabled));
-    push('standard_delivery_quantity_step', String(doc.delivery_options.standard.quantity_step));
-    push('standard_delivery_fee_iqd', String(doc.delivery_options.standard.fee_iqd));
-    push('personal_delivery_enabled', boolStr(doc.delivery_options.personal.enabled));
-    push('personal_delivery_quantity_step', String(doc.delivery_options.personal.quantity_step));
-    push('personal_delivery_fee_iqd', String(doc.delivery_options.personal.fee_iqd));
-  }
   // Device coverage — written whenever the product states it. A product that
   // never said whether it is serialized exports no `serialized` line, so a
   // re-import keeps the stored answer instead of turning silence into false.
@@ -3376,14 +3364,6 @@ export function toDocBody(
       case 'light_image':
         body.light_image = typeof pf.value === 'string' ? pf.value : '';
         break;
-      case 'standard_delivery_enabled':
-      case 'standard_delivery_quantity_step':
-      case 'standard_delivery_fee_iqd':
-      case 'personal_delivery_enabled':
-      case 'personal_delivery_quantity_step':
-      case 'personal_delivery_fee_iqd':
-        // Folded into body.delivery_options immediately after this loop.
-        break;
       default:
         if (DIMENSION_KEY_SET.has(spec.key)) {
           const dimensions = body.dimensions && typeof body.dimensions === 'object'
@@ -3395,37 +3375,6 @@ export function toDocBody(
           body[spec.key] = pf.value;
         }
     }
-  }
-
-  const deliveryKeys = [
-    'standard_delivery_enabled',
-    'standard_delivery_quantity_step',
-    'standard_delivery_fee_iqd',
-    'personal_delivery_enabled',
-    'personal_delivery_quantity_step',
-    'personal_delivery_fee_iqd',
-  ] as const;
-  if (deliveryKeys.some((key) => parsed.fields[key])) {
-    const previous = existing?.delivery_options ?? {
-      // A partial edit of a legacy product inherits the normal enabled
-      // methods, just like the product editor. Only an explicit false disables.
-      standard: { enabled: true, quantity_step: 1, fee_iqd: 5000 },
-      personal: { enabled: true, quantity_step: 1, fee_iqd: 10000 },
-    };
-    const value = <T,>(key: typeof deliveryKeys[number], fallback: T): T =>
-      (parsed.fields[key]?.value === undefined ? fallback : parsed.fields[key].value) as T;
-    body.delivery_options = {
-      standard: {
-        enabled: value('standard_delivery_enabled', previous.standard.enabled),
-        quantity_step: value('standard_delivery_quantity_step', previous.standard.quantity_step),
-        fee_iqd: value('standard_delivery_fee_iqd', previous.standard.fee_iqd),
-      },
-      personal: {
-        enabled: value('personal_delivery_enabled', previous.personal.enabled),
-        quantity_step: value('personal_delivery_quantity_step', previous.personal.quantity_step),
-        fee_iqd: value('personal_delivery_fee_iqd', previous.personal.fee_iqd),
-      },
-    };
   }
 
   // ---- §10 spec sheet -----------------------------------------------------

@@ -44,6 +44,8 @@
  * printer fees in mixed carts, carton-fee interaction with the waiver.
  */
 
+import { DELIVERY_POLICY_FALLBACK, deliveryCharge, type DeliveryMode, type DeliveryPolicy } from './storeDelivery';
+
 export interface ShippingConfig {
   ordinary_iqd: number;
   printer_small_iqd: number | null;
@@ -71,68 +73,16 @@ export interface ShippingItem {
   /** filament spools count toward the carton threshold */
   is_spool?: boolean;
   /**
-   * Product-owned last-mile rules. `undefined` is deliberately different
-   * from an object whose methods are disabled: undefined is a legacy product
-   * and keeps the pre-existing global tariff, while an explicit object is the
-   * product's authoritative allow-list for standard/personal delivery.
-   */
-  delivery?: ProductDeliveryOptions;
-  /**
    * The catalog sections this line is filed under, NEAREST FIRST: the
    * sub-section, its parents, then the main section and its parents (the
-   * worker builds it with `ancestryFor`). Only read to find a category-level
-   * delivery rule; omitted by legacy callers, which then never meet one.
+   * worker builds it with `ancestryFor`). Read to find the delivery policy
+   * group that prices the line (storeDelivery.ts); omitted by legacy callers,
+   * which then fall to the default.
    */
   category_path?: string[];
 }
 
-/**
- * A CATEGORY-LEVEL QUANTITY DELIVERY RULE (migration 0135).
- *
- * Owner, 2026-09-25: «أي فلمنت من أي نوع بغض النظر عن نوع المنتج او الخيار او
- * اللون … التوصيل خمسة آلاف لكل خمسة عشر بكرة». The per-product rule counts
- * each cart line on its own, so three colours of one filament paid three
- * started blocks. A category rule POOLS every unit filed under the section (or
- * any of its sub-sections) across the whole order and charges
- * ceil(total units / quantity_step) × fee_iqd — the same formula, and the same
- * "the first block is charged" semantics, as `productDeliveryFeeIqd`.
- */
-export interface CategoryDeliveryRule {
-  catalog_id: string;
-  method: ProductDeliveryMethod;
-  enabled: boolean;
-  /** Units covered by one fee block. Integer >= 1. */
-  quantity_step: number;
-  /** Integer IQD charged for each started block. */
-  fee_iqd: number;
-}
-
-/**
- * The category rule that prices this line for `method`, or null.
- *
- * NEAREST SECTION WINS: a rule on the sub-section beats one on its main
- * section, so an owner can price «PETG» apart from the rest of «FDM filament».
- * Every line resolved to the same rule shares one pool.
- */
-export function categoryRuleFor(
-  item: Pick<ShippingItem, 'category_path'>,
-  rules: readonly CategoryDeliveryRule[] | undefined,
-  method: ProductDeliveryMethod | undefined
-): CategoryDeliveryRule | null {
-  if (!method || !rules || rules.length === 0 || !item.category_path) return null;
-  for (const id of item.category_path) {
-    const hit = rules.find((r) => r.enabled && r.method === method && r.catalog_id === id);
-    if (hit) return hit;
-  }
-  return null;
-}
-
 export type ProductDeliveryMethod = 'standard' | 'personal';
-
-/** One standard consignment, regardless of quantity or number of products. */
-export function standardDeliveryFeeIqd(containsPrinter: boolean): number {
-  return containsPrinter ? 10_000 : 5_000;
-}
 
 export interface ProductDeliveryRule {
   enabled: boolean;
@@ -148,7 +98,9 @@ export interface ProductDeliveryOptions {
 }
 
 export interface ShippingComponent {
-  kind: 'ordinary' | 'product' | 'category' | 'protected' | 'printer_small' | 'printer_large' | 'carton';
+  /** 'rule' is a delivery-policy group (storeDelivery.ts). 'product' and
+   *  'category' are retired and stay only so old order snapshots still type. */
+  kind: 'ordinary' | 'rule' | 'product' | 'category' | 'protected' | 'printer_small' | 'printer_large' | 'carton';
   fee_iqd: number;
   waived: boolean;
   units: number;
@@ -162,6 +114,12 @@ export interface ShippingComponent {
   method?: ProductDeliveryMethod;
   quantity_step?: number;
   fee_per_step_iqd?: number;
+  /** Delivery-policy components: the group id ('default' for the default). */
+  rule_id?: string;
+  mode?: DeliveryMode;
+  block_size?: number;
+  /** The default component's price: the governorate's own, or the default. */
+  fee_source?: 'governorate' | 'default';
 }
 
 export interface ShippingQuote {
@@ -198,6 +156,14 @@ export interface ShippingQuote {
   needs_config: string[];       // honest blockers (e.g. printer fee mapping)
   assumptions: string[];        // defaulted unresolved rules, surfaced
   reasons: string[];            // human-readable why lines (for the UI)
+  /** Standard method only: which policy priced it, frozen with the order. */
+  delivery_policy?: {
+    updated_at: string;
+    governorate: string;
+    governorate_rule: 'default' | 'price' | 'stopped';
+  };
+  /** Standard method only: delivery to the address's governorate is stopped. */
+  delivery_unavailable?: 'governorate_stopped';
 }
 
 /** Integer-only implementation of ceil(qty / step) * fee. */
@@ -207,21 +173,6 @@ export function productDeliveryFeeIqd(quantity: number, rule: ProductDeliveryRul
   const step = Math.max(1, Math.trunc(rule.quantity_step));
   const fee = Math.max(0, Math.trunc(rule.fee_iqd));
   return Math.ceil(qty / step) * fee;
-}
-
-/**
- * Whether a cart can use a product-scoped delivery method. Legacy items do
- * not constrain the method because they are priced by the existing global
- * policy. A configured product is an explicit allow-list and fails closed.
- */
-export function productDeliveryMethodAvailable(
-  items: ShippingItem[],
-  method: ProductDeliveryMethod
-): { available: boolean; unavailable_product_ids: string[] } {
-  const unavailable = items
-    .filter((item) => item.qty > 0 && item.delivery !== undefined && item.delivery[method]?.enabled !== true)
-    .map((item) => item.product_id);
-  return { available: unavailable.length === 0, unavailable_product_ids: [...new Set(unavailable)] };
 }
 
 /**
@@ -295,12 +246,12 @@ export function quoteShipping(input: {
    */
   membershipShipping?: MembershipShippingDecision;
   /**
-   * Admin-configured category rules (migration 0135). A line whose
-   * `category_path` meets an enabled rule for `deliveryMethod` is priced by
-   * the pooled category fee INSTEAD of its product rule, the ordinary flat fee,
-   * the printer freight and the carton count — never on top of them.
+   * THE STORE'S DELIVERY POLICY («إدارة التوصيل», storeDelivery.ts). Prices
+   * the standard method; omitted, the code fallback (the pre-policy tariff).
    */
-  categoryRules?: CategoryDeliveryRule[];
+  deliveryPolicy?: DeliveryPolicy;
+  /** The address's governorate id (IRAQ_GOVERNORATES), '' when unknown. */
+  governorate?: string;
   config: ShippingConfig;
 }): ShippingQuote {
   const { config } = input;
@@ -308,48 +259,19 @@ export function quoteShipping(input: {
   const assumptions: string[] = [];
   const reasons: string[] = [];
   const components: ShippingComponent[] = [];
-  // Owner, 2026-10-03: standard delivery is ONE tariff for the shipment.
-  // Product/category quantity blocks must not make mixed ordinary orders 10k/15k.
+  // Owner, 2026-10-18: standard delivery is priced by the delivery policy
+  // (storeDelivery.ts). The size-class/carton tariff below is the legacy
+  // no-method quote, kept for old pure callers only.
   const standardShipment = input.deliveryMethod === 'standard';
 
   const printers = { printer_small: 0, printer_large: 0 };
   let ordinaryUnits = 0;
   let spoolUnits = 0;
-  /**
-   * Lines priced by a category rule, keyed by that rule's section. A line
-   * whose product disables the chosen method stays OUT of the pool: the
-   * product's allow-list still decides availability (and the checkout refuses
-   * it), a category rule only decides the price.
-   */
-  const categoryPools = new Map<string, { rule: CategoryDeliveryRule; units: number; products: string[] }>();
-  const pooled = new Set<ShippingItem>();
-  for (const it of input.items) {
-    const catRule = standardShipment ? null : categoryRuleFor(it, input.categoryRules, input.deliveryMethod);
-    if (!catRule || it.qty <= 0) continue;
-    if (it.delivery !== undefined && input.deliveryMethod && it.delivery[input.deliveryMethod]?.enabled !== true) continue;
-    const pool = categoryPools.get(catRule.catalog_id) ?? { rule: catRule, units: 0, products: [] };
-    pool.units += Math.max(0, Math.trunc(it.qty));
-    if (!pool.products.includes(it.product_id)) pool.products.push(it.product_id);
-    categoryPools.set(catRule.catalog_id, pool);
-    pooled.add(it);
-  }
-  for (const it of input.items) {
+  for (const it of standardShipment ? [] : input.items) {
     const qty = Math.max(0, Math.trunc(it.qty));
-    // A pooled line is priced by its category rule alone.
-    if (pooled.has(it)) continue;
-    if (standardShipment) {
-      if (it.is_printer || it.size_class === 'printer_small' || it.size_class === 'printer_large') {
-        printers[it.size_class === 'printer_large' ? 'printer_large' : 'printer_small'] += qty;
-      } else ordinaryUnits += qty;
-      continue;
-    }
-    // A product with explicit delivery options is priced below by its own
-    // rule. It must never also enter the legacy ordinary/printer tariff.
-    if (it.delivery === undefined) {
-      if (it.size_class === 'printer_small') printers.printer_small += qty;
-      else if (it.size_class === 'printer_large') printers.printer_large += qty;
-      else ordinaryUnits += qty;
-    }
+    if (it.size_class === 'printer_small') printers.printer_small += qty;
+    else if (it.size_class === 'printer_large') printers.printer_large += qty;
+    else ordinaryUnits += qty;
     if (it.is_spool) spoolUnits += qty;
   }
 
@@ -412,7 +334,7 @@ export function quoteShipping(input: {
   }
   const independent = input.independentFreeDelivery === true;
   /**
-   * The waiver a product- or category-rule fee gets. PREMIUM covers standard
+   * The waiver a delivery-policy fee gets. PREMIUM covers standard
    * delivery only; PRO covers a personal rule only when the owner's policy
    * says "all". A membership rule ALREADY tested the method
    * (`method_not_covered` above), so a rule-driven waiver needs no second
@@ -426,85 +348,49 @@ export function quoteShipping(input: {
         ? waiverOrdinary
         : proEligible && config.pro_waiver_covers === 'all');
 
-  // Product-owned fees. The server supplies deliveryMethod from the selected
-  // checkout method; callers that omit it keep the historical quote exactly.
-  if (input.deliveryMethod && !standardShipment) {
-    for (const item of input.items) {
-      if (item.delivery === undefined || item.qty <= 0 || pooled.has(item)) continue;
-      /**
-       * NAMED `methodRule`, NOT `rule`. It used to be `rule`, which shadowed
-       * the membership decision declared above — and the waiver below asks
-       * `rule ? …` meaning "did the admin configure a benefit rule?". Shadowed,
-       * that question was answered by the PRODUCT's own delivery rule, which
-       * the `!enabled` guard immediately below guarantees is truthy, so the
-       * test was always true and the two branches under it were dead code. One
-       * identifier reused eight lines apart silently deleted the only place
-       * that asked which delivery METHOD a waiver covers.
-       */
-      const methodRule = item.delivery[input.deliveryMethod];
-      if (!methodRule?.enabled) {
-        needs.push(`product:${item.product_id}:${input.deliveryMethod}_unavailable`);
-        reasons.push(`${input.deliveryMethod} delivery is unavailable for product ${item.product_id}.`);
-        continue;
-      }
-      const fee = productDeliveryFeeIqd(item.qty, methodRule);
-      const waived = ruleFeeWaived;
-      components.push({
-        kind: 'product',
-        product_id: item.product_id,
-        method: input.deliveryMethod,
-        quantity_step: Math.max(1, Math.trunc(methodRule.quantity_step)),
-        fee_per_step_iqd: Math.max(0, Math.trunc(methodRule.fee_iqd)),
-        fee_iqd: fee,
-        waived,
-        units: Math.max(0, Math.trunc(item.qty)),
-        advance_required: false,
-      });
-    }
-  }
-
+  let deliveryPolicyNote: ShippingQuote['delivery_policy'];
+  let deliveryUnavailable: ShippingQuote['delivery_unavailable'];
   if (standardShipment) {
-    const availability = productDeliveryMethodAvailable(input.items, 'standard');
-    for (const id of availability.unavailable_product_ids) {
+    const policy = input.deliveryPolicy ?? DELIVERY_POLICY_FALLBACK;
+    const charge = deliveryCharge({
+      parts: input.items.map((it) => ({
+        product_id: it.product_id,
+        qty: it.qty,
+        category_path: it.category_path,
+        is_printer: it.is_printer === true || it.size_class === 'printer_small' || it.size_class === 'printer_large',
+      })),
+      policy,
+      governorate: input.governorate ?? '',
+    });
+    deliveryPolicyNote = { updated_at: policy.updated_at, governorate: charge.governorate, governorate_rule: charge.governorate_rule };
+    if (charge.governorate_rule === 'stopped') {
+      deliveryUnavailable = 'governorate_stopped';
+      needs.push(`governorate:${charge.governorate}:stopped`);
+      reasons.push('Delivery to this governorate is currently stopped.');
+    }
+    for (const id of charge.stopped_product_ids) {
       needs.push(`product:${id}:standard_unavailable`);
       reasons.push(`Standard delivery is unavailable for product ${id}.`);
     }
-    const printerUnits = printers.printer_small + printers.printer_large;
-    if (ordinaryUnits + printerUnits > 0) {
+    for (const part of charge.components) {
       components.push({
-        kind: printerUnits ? (printers.printer_large ? 'printer_large' : 'printer_small') : 'ordinary',
-        fee_iqd: standardDeliveryFeeIqd(printerUnits > 0),
+        kind: part.kind,
+        rule_id: part.rule_id,
+        mode: part.mode,
+        block_size: part.block_size,
+        fee_per_step_iqd: part.fee_per_step_iqd,
+        ...(part.fee_source ? { fee_source: part.fee_source } : {}),
+        fee_iqd: part.fee_iqd,
         waived: ruleFeeWaived,
-        units: ordinaryUnits + printerUnits,
+        units: part.units,
         method: 'standard',
-        product_ids: [...new Set(input.items.filter((i) => i.qty > 0).map((i) => i.product_id))],
-        advance_required: printerUnits > 0 && config.printer_advance_required,
-      });
-      reasons.push(printerUnits ? 'One standard printer shipment: 10,000 IQD.' : 'One standard ordinary shipment: 5,000 IQD.');
-    }
-  }
-
-  // Category-rule pools: one component per section, over the whole order.
-  if (input.deliveryMethod) {
-    for (const pool of categoryPools.values()) {
-      const step = Math.max(1, Math.trunc(pool.rule.quantity_step));
-      const perStep = Math.max(0, Math.trunc(pool.rule.fee_iqd));
-      components.push({
-        kind: 'category',
-        catalog_id: pool.rule.catalog_id,
-        product_ids: pool.products,
-        method: input.deliveryMethod,
-        quantity_step: step,
-        fee_per_step_iqd: perStep,
-        fee_iqd: productDeliveryFeeIqd(pool.units, { enabled: true, quantity_step: step, fee_iqd: perStep }),
-        waived: ruleFeeWaived,
-        units: pool.units,
-        advance_required: false,
+        product_ids: part.product_ids,
+        advance_required: part.contains_printer && config.printer_advance_required,
       });
     }
   }
 
-  // Ordinary component: one flat fee per order when any ordinary unit ships.
+  // Ordinary component (legacy no-method quote): one flat fee per order.
   if (ordinaryUnits > 0 && !standardShipment) {
     const waived = waiverOrdinary || independent;
     components.push({ kind: 'ordinary', fee_iqd: config.ordinary_iqd, waived, units: ordinaryUnits, advance_required: false });
@@ -669,5 +555,7 @@ export function quoteShipping(input: {
     needs_config: needs,
     assumptions,
     reasons,
+    ...(deliveryPolicyNote ? { delivery_policy: deliveryPolicyNote } : {}),
+    ...(deliveryUnavailable ? { delivery_unavailable: deliveryUnavailable } : {}),
   };
 }

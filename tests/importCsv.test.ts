@@ -460,7 +460,7 @@ test('export then import reproduces every field, order and relation', () => {
   assert.equal(p.direct_surcharge_iqd, sample.direct_surcharge_iqd);
   assert.equal(p.stock, sample.stock);
   assert.equal(p.low_stock_threshold, sample.low_stock_threshold);
-  assert.deepEqual(p.delivery_options, sample.delivery_options);
+  assert.equal(p.delivery_options, null, 'retired: delivery is priced by «إدارة التوصيل»');
   assert.deepEqual(p.payment_options, sample.payment_options);
   assert.equal(p.how_to_use, sample.how_to_use);
   assert.equal(p.usage_url, sample.usage_url);
@@ -544,26 +544,23 @@ const parseOne = (rows: string[][]) => parseImport(toCsv([devices.columns, ...ro
 /** Builds one row from a partial map of column -> value. */
 const row = (v: Record<string, string>) => devices.columns.map((c) => v[c] ?? '');
 
-test('per-product delivery columns parse and validate both methods', () => {
-  const res = parseOne([row({
-    row_type: 'product', key: 'SHIP-1', name: 'Shipping product', price_iqd: '1000',
-    standard_delivery_enabled: 'yes', standard_delivery_quantity_step: '10', standard_delivery_fee_iqd: '5000',
-    personal_delivery_enabled: 'no', personal_delivery_quantity_step: '1', personal_delivery_fee_iqd: '50000',
-  })]);
+test('the retired per-product delivery columns are ignored with ONE warning per file', () => {
+  assert.equal(devices.columns.some((c) => c.startsWith('standard_delivery_') || c.startsWith('personal_delivery_')), false, 'not in the template');
+  const columns = [...devices.columns, 'standard_delivery_enabled', 'standard_delivery_quantity_step', 'personal_delivery_fee_iqd'];
+  const res = parseImport(
+    toCsv([
+      columns,
+      columns.map((c) => ({ row_type: 'product', key: 'SHIP-1', name: 'Shipping product', price_iqd: '1000', standard_delivery_enabled: 'yes', standard_delivery_quantity_step: '0', personal_delivery_fee_iqd: 'x' })[c] ?? ''),
+      columns.map((c) => ({ row_type: 'product', key: 'SHIP-2', name: 'Second', price_iqd: '1000', standard_delivery_enabled: 'no' })[c] ?? ''),
+    ]),
+    devices
+  );
   assert.deepEqual(res.issues.filter((i) => i.severity === 'error'), []);
-  assert.deepEqual(res.products[0].delivery_options, {
-    standard: { enabled: true, quantity_step: 10, fee_iqd: 5000 },
-    personal: { enabled: false, quantity_step: 1, fee_iqd: 50000 },
-  });
-});
-
-test('invalid or partial delivery tiers are refused with their column names', () => {
-  const res = parseOne([row({
-    row_type: 'product', key: 'SHIP-BAD', name: 'Bad shipping', price_iqd: '1000',
-    standard_delivery_enabled: 'yes', standard_delivery_quantity_step: '0', standard_delivery_fee_iqd: '5000',
-  })]);
-  assert.ok(res.issues.some((i) => i.message.includes('standard_delivery_quantity_step')));
-  assert.ok(res.issues.some((i) => i.message.includes('personal_delivery_enabled')));
+  const warnings = res.issues.filter((i) => i.message.includes('إدارة التوصيل'));
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0].severity, 'warning');
+  assert.deepEqual(res.unknownColumns, []);
+  assert.ok(res.products.every((p) => p.delivery_options === null));
 });
 
 test('old CSV files without delivery columns remain backward compatible', () => {
@@ -1187,7 +1184,8 @@ test('every field of the product form is expressible in the sheet', () => {
     price_iqd: 'price_iqd', prime_price_iqd: 'prime_price_iqd', pro_price_iqd: 'pro_price_iqd',
     product_cost_iqd: 'cost_iqd', direct_surcharge_iqd: 'direct_surcharge_iqd',
     stock: 'stock', low_stock_threshold: 'low_stock_threshold', payment_options: 'payment_options',
-    delivery_options: 'standard_delivery_enabled',
+    // Retired (owner, 2026-10-18): delivery is priced by «إدارة التوصيل», not per product.
+    delivery_options: 'derived',
     // One column, three doc fields — exactly as `description` works: the sheet
     // carries the ENGLISH source and the local engine writes the other two on
     // apply (worker/lib/importApply.ts hands the doc to localizeRespectingAuthored).

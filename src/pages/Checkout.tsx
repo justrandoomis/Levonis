@@ -321,7 +321,7 @@ interface CheckoutQuoteDto {
   /** Every configured delivery method priced for THIS cart by the server —
    *  so a card can print a true fee before anything is selected.
    *  `fee_iqd: null` + `available: false` = the cart cannot use that method. */
-  delivery_method_fees?: Array<{ id: string; fee_iqd: number | null; available: boolean; reason?: 'needs_configuration' }>;
+  delivery_method_fees?: Array<{ id: string; fee_iqd: number | null; available: boolean; reason?: 'needs_configuration' | 'governorate_stopped' }>;
   shipping: ShippingQuoteDto;
   is_pickup: boolean;
   /** The protected-delivery add-on: offered only when the owner priced it. */
@@ -2391,7 +2391,15 @@ export default function Checkout() {
                           link would also select the method, which is a
                           delivery choice the customer did not make.
                         */}
-                        {pickupMapUrl ? (
+                        {serverFee?.reason === 'governorate_stopped' ? (
+                          <p data-governorate-stopped className="mt-1 text-[11px] font-medium text-text-secondary">
+                            {loc(
+                              'التوصيل متوقف حالياً إلى هذه المحافظة — اختر عنواناً آخر أو الاستلام من المتجر',
+                              'Delivery to this governorate is currently stopped — choose another address or store pickup',
+                              'گەیاندن بۆ ئەم پارێزگایە ئێستا ڕاگیراوە — ناونیشانێکی تر یان وەرگرتن لە فرۆشگا هەڵبژێرە'
+                            )}
+                          </p>
+                        ) : pickupMapUrl ? (
                           <a
                             href={pickupMapUrl}
                             target="_blank"
@@ -2413,7 +2421,7 @@ export default function Checkout() {
                               : memberWaiver
                               ? loc('ميزة توصيل الأعضاء مطبّقة', 'Member delivery benefit applied', 'سوودی گەیاندنی ئەندام جێبەجێ کرا')
                               : method.id === 'standard'
-                                ? loc('رسم واحد للشحنة كاملة', 'One fee for the whole consignment', 'یەک کرێ بۆ هەموو بارەکە')
+                                ? loc('محسوب حسب قواعد التوصيل', 'Calculated by the delivery rules', 'بەپێی یاساکانی گەیاندن هەژمار کراوە')
                                 : loc('محسوب حسب القطع والكمية', 'Calculated for items and quantity', 'بەپێی پارچە و بڕ هەژمار کراوە')}
                           </p>
                         ) : selected && !isPickupMethod && !quoteError ? (
@@ -2435,7 +2443,10 @@ export default function Checkout() {
                     >
                       {unavailable
                         ? serverFee?.reason === 'needs_configuration'
-                          ? loc('غير مهيأ', 'Not configured', 'ڕێکنەخراوە') : loc('غير متاح', 'Unavailable', 'بەردەست نییە')
+                          ? loc('غير مهيأ', 'Not configured', 'ڕێکنەخراوە')
+                          : serverFee?.reason === 'governorate_stopped'
+                            ? loc('متوقف لهذه المحافظة', 'Stopped for this governorate', 'بۆ ئەم پارێزگایە ڕاگیراوە')
+                            : loc('غير متاح', 'Unavailable', 'بەردەست نییە')
                         : displayedPrice === null
                           ? '—'
                           : displayedPrice === 0

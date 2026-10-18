@@ -1285,27 +1285,12 @@ export function validateForm(input: {
   publishing: boolean;
   /** The extended-warranty block (printers only); omitted = not checked. */
   warranty?: WarrantyFormInput;
-  delivery_options?: {
-    standard: { enabled: boolean; quantity_step: number; fee_iqd: number };
-    personal: { enabled: boolean; quantity_step: number; fee_iqd: number };
-  } | null;
 }): FormErrors {
   const e: FormErrors = {};
   if (input.warranty) warrantyRules(input.warranty, e);
   if (!input.name_en.trim()) e.name_en = 'الاسم الإنجليزي مطلوب';
   if (input.publishing && !input.category_id) e.category_id = 'القسم الرئيسي مطلوب للنشر';
   if (input.sale_types.length === 0) e.sale_types = 'اختر نوع بيع واحدًا على الأقل';
-  if (input.delivery_options) {
-    for (const method of ['standard', 'personal'] as const) {
-      const rule = input.delivery_options[method];
-      if (!Number.isInteger(rule.quantity_step) || rule.quantity_step < 1) {
-        e[`delivery:${method}:quantity_step`] = 'عدد القطع لكل شريحة يجب أن يكون عددًا صحيحًا 1 أو أكثر';
-      }
-      if (!Number.isInteger(rule.fee_iqd) || rule.fee_iqd < 0) {
-        e[`delivery:${method}:fee_iqd`] = 'رسم شريحة التوصيل يجب أن يكون عددًا صحيحًا موجبًا أو صفرًا';
-      }
-    }
-  }
 
   // NO PRICE IS CHECKED HERE ANY MORE (Pricing V2, the clean start: DECISIONS row 222). The form types
   // no dinar price; the dollar prices are judged by the server's V2 evaluation (section ٣'s readiness).

@@ -83,6 +83,7 @@ const AdminUsers = React.lazy(() => import('../components/AdminUsers'));
 const AdminWalletRequests = React.lazy(() => import('../components/AdminWalletRequests'));
 const AdminWalletSettings = React.lazy(() => import('../components/AdminWalletSettings'));
 const AdminStoreSettings = React.lazy(() => import('../components/AdminStoreSettings'));
+const DeliveryManagement = React.lazy(() => import('../components/adminDeliveryPricing/DeliveryManagement'));
 const AdminChannels = React.lazy(() => import('../components/AdminChannels'));
 const AdminReviews = React.lazy(() => import('../components/AdminReviews'));
 const AdminGifts = React.lazy(() => import('../components/adminGifts/AdminGifts'));
@@ -163,6 +164,7 @@ type AdminTab =
   | 'wallet_requests'
   | 'wallet_settings'
   | 'store_settings'
+  | 'delivery_pricing'
   | 'channels'
   | 'ads'
   | 'serials'
@@ -191,7 +193,7 @@ type AdminTab =
  * `?tab=offers` is «فتح في العروض الخاصة» on the product form's «تخفيض السعر»
  * card (docs/ux/PRODUCT-DISCOUNT.md §6.4).
  */
-const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'price_protection', 'finance', 'inventory', 'earnings', 'pricing', 'products', 'offers', 'security'];
+const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'price_protection', 'finance', 'inventory', 'earnings', 'pricing', 'products', 'offers', 'security', 'delivery_pricing'];
 
 function initialAdminTab(): AdminTab {
   try {
@@ -333,6 +335,7 @@ export default function Admin() {
     { id: 'home_settings', icon: LayoutList, label: loc('إعدادات الرئيسية', 'Home settings'), ...section('settings', 'الإعدادات', 'Settings', 'ڕێکخستنەکان') },
     { id: 'wallet_settings', icon: Wallet, label: loc('إعدادات المحفظة', 'Wallet settings'), ...section('settings', 'الإعدادات', 'Settings') },
     { id: 'store_settings', icon: Settings, label: loc('إعدادات المتجر', 'Store settings'), ...section('settings', 'الإعدادات', 'Settings') },
+    { id: 'delivery_pricing', icon: Truck, label: loc('إدارة التوصيل', 'Delivery management', 'بەڕێوەبردنی گەیاندن'), ...section('settings', 'الإعدادات', 'Settings') },
     // Not "notification settings" — there is nothing to set here. It answers
     // one question the owner actually has: will an order confirmation reach
     // the customer today, on each of the three channels.
@@ -418,6 +421,10 @@ export default function Admin() {
 
         {activeTab === 'store_settings' && (
            <AdminStoreSettings />
+        )}
+
+        {activeTab === 'delivery_pricing' && (
+           <DeliveryManagement />
         )}
 
         {activeTab === 'channels' && (

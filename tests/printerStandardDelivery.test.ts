@@ -1,38 +1,32 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { freshDb, asD1, stubApp, post, get, json, row, count, pending } from './fixtures/app';
 import { acceptedPolicies } from './lib/policies';
 import { cartRoutes } from '../worker/routes/cart';
 import { orderRoutes } from '../worker/routes/orders';
 import { SETTING_DEFAULTS } from '../worker/lib/settings';
 import { PRINTER_STANDARD_DELIVERY_POLICY, chooseDeliveryMethod } from '../packages/shipping/src/printerDeliveryPolicy';
-import type { ProductDeliveryOptions } from '../packages/shipping/src/shipping';
-import DeliveryAvailabilityNotice from '../src/components/adminProducts/DeliveryAvailabilityNotice';
 import { seedCatalogue, addBundle, orderBody as bundleOrderBody } from './lib/bundles';
 
 const acceptance = { version: PRINTER_STANDARD_DELIVERY_POLICY.version, accepted: true };
-const enabled: ProductDeliveryOptions = {
-  standard: { enabled: true, quantity_step: 1, fee_iqd: 0 },
-  personal: { enabled: true, quantity_step: 1, fee_iqd: 12000 },
-};
-
-function fixture(product = 'printer', opts: { prime?: boolean; rules?: ProductDeliveryOptions; size?: string } = {}) {
+function fixture(product = 'printer', opts: { prime?: boolean; stopped?: boolean; size?: string } = {}) {
   const raw = freshDb();
   raw.exec(`
     INSERT INTO users(id,name,email,password_hash,role) VALUES('buyer','Sara','buyer@x.co','h','customer');
     INSERT INTO addresses(id,user_id,label,name,phone,address,is_default) VALUES('address','buyer','Home','Sara','+9647701234567','Baghdad, Karrada',1);
     INSERT INTO wallet_transactions(id,user_id,type,currency,amount,status) VALUES('deposit','buyer','deposit','USD',100000,'approved');
-    INSERT INTO catalogs(id,slug,name_ar,is_printer_catalog) VALUES('test_print','test-printer','طابعات',1);
     INSERT INTO products(id,slug,name,name_ar,price_iqd,status,stock,options,colors,selling_type,sale_types,images)
       VALUES('printer','test-printer','Printer','طابعة',200000,'active',30,'[]','[]','direct_sale','["direct_sale"]','[]'),
             ('ordinary','test-ordinary','Filament','فلمنت',200000,'active',30,'[]','[]','direct_sale','["direct_sale"]','[]');
-    INSERT INTO product_catalogs(product_id,catalog_id,position) VALUES('printer','test_print',0);
+    INSERT INTO product_catalogs(product_id,catalog_id,position) VALUES('printer','cat_printers_fdm',0);
     INSERT INTO cart_items(id,user_id,product_id,option_id,option_value_ids,color_id,shipping_method_id,transport_method,warranty_plan_id,qty)
       VALUES('cart','buyer','${product}','','[]','','','','',2);
   `);
-  if (opts.rules || opts.size) raw.prepare('UPDATE products SET ops_policy=? WHERE id=?').run(JSON.stringify({ delivery_options: opts.rules, size_class: opts.size }), product);
+  if (opts.size) raw.prepare('UPDATE products SET ops_policy=? WHERE id=?').run(JSON.stringify({ size_class: opts.size }), product);
+  // «لا يُوصَّل» is a rule group of the delivery policy (0201's g_stopped), not a product field.
+  if (opts.stopped) {
+    raw.prepare("UPDATE admin_settings SET value=json_set(value,'$.groups[3].product_ids',json(?)) WHERE key='deliveryPolicy'").run(JSON.stringify([product]));
+  }
   if (opts.prime) raw.exec(`INSERT INTO memberships(id,user_id,plan_id,tier,state,duration_months,price_paid_iqd,starts_at,expires_at)
     VALUES('membership','buyer','prime_12mo','prime','active',12,199000,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z')`);
   const app = stubApp(asD1(raw), { id: 'buyer', role: 'customer', email: 'buyer@x.co' }, (a) => a.route('/api/cart', cartRoutes).route('/api/orders', orderRoutes));
@@ -45,17 +39,18 @@ function order(body: Record<string, unknown>, extra: Record<string, unknown> = {
   return { ...body, idempotencyKey: `printer-policy-${++sequence}`, policyAcceptance: acceptedPolicies(), ...extra };
 }
 
-test('legacy products inherit delivery availability; explicit disables are honored independently of a zero fee', async () => {
-  for (const rules of [undefined, enabled, { ...enabled, standard: { ...enabled.standard, enabled: false } }]) {
-    const { raw, app, body } = fixture('ordinary', { rules });
+test('a product in the «لا يُوصَّل» group makes standard unavailable; every other product keeps it', async () => {
+  for (const stopped of [false, true]) {
+    const { raw, app, body } = fixture('ordinary', { stopped });
     const cart = await json(await get(app, '/api/cart'));
-    assert.equal(cart.items[0].delivery_availability.standard, rules?.standard.enabled !== false);
+    assert.equal(cart.items[0].delivery_availability.standard, !stopped);
+    assert.equal(cart.delivery_methods.standard.available, !stopped);
     const quote = await json(await post(app, '/api/orders/quote', body));
-    if (rules?.standard.enabled === false) {
+    if (stopped) {
       assert.equal(quote.code, 'DELIVERY_METHOD_UNAVAILABLE');
-      const personal = await json(await post(app, '/api/orders/quote', { ...body, deliveryMethodId: 'personal' }));
-      assert.ok(personal.quote, JSON.stringify(personal));
-      assert.deepEqual(personal.quote.delivery_method_fees.find((m: { id: string }) => m.id === 'standard'), { id: 'standard', fee_iqd: null, available: false });
+      const pickup = await json(await post(app, '/api/orders/quote', { ...body, deliveryMethodId: 'pickup' }));
+      assert.ok(pickup.quote, JSON.stringify(pickup));
+      assert.deepEqual(pickup.quote.delivery_method_fees.find((m: { id: string }) => m.id === 'standard'), { id: 'standard', fee_iqd: null, available: false });
     } else {
       assert.ok(quote.quote, JSON.stringify(quote));
       assert.deepEqual(quote.quote.delivery_method_fees.find((m: { id: string }) => m.id === 'standard'), { id: 'standard', fee_iqd: 5000, available: true });
@@ -88,7 +83,7 @@ test('an option/color selection with no product delivery override inherits the n
             INSERT INTO product_colors (id,product_id,name_en,name_ar,hex,sort,active) VALUES ('color','ordinary','Black','أسود','#000',0,1);`);
   raw.exec(`UPDATE cart_items SET option_id='opt',option_value_ids='["opt"]',color_id='color' WHERE id='cart'`);
   const cart = await json(await get(app, '/api/cart'));
-  assert.deepEqual(cart.items[0].delivery_availability, { standard: true, personal: true });
+  assert.deepEqual(cart.items[0].delivery_availability, { standard: true, personal: false });
   const q = await json(await post(app, '/api/orders/quote', body));
   assert.ok(q.quote, JSON.stringify(q));
   assert.equal(q.quote.shipping.total_iqd, 5000);
@@ -110,7 +105,7 @@ test('printer standard delivery needs no transport acknowledgment: no warning on
   const { raw, app, body } = fixture();
   const q = await json(await post(app, '/api/orders/quote', body));
   assert.equal(q.quote.printer_standard_warning, undefined);
-  assert.equal(q.quote.shipping.total_iqd, 10000, 'one printer consignment for two printers');
+  assert.equal(q.quote.shipping.total_iqd, 20000, 'the printers rule: 10,000 per piece (owner, 2026-10-18)');
   const placed = await json(await post(app, '/api/orders', order(body)));
   assert.equal(placed.success, true, JSON.stringify(placed));
   assert.equal(placed.order.delivery_method.printer_standard_transport_acceptance, undefined);
@@ -150,7 +145,7 @@ test('an older client still sending the acceptance is ignored, never frozen; rep
 
 test('membership-free printer delivery places with no acknowledgment on any method', async () => {
   for (const method of ['standard', 'personal', 'pickup']) {
-    const { raw, app, body } = fixture('printer', { prime: true, rules: enabled });
+    const { raw, app, body } = fixture('printer', { prime: true });
     const input = { ...body, deliveryMethodId: method };
     const q = await json(await post(app, '/api/orders/quote', input));
     assert.ok(q.quote, JSON.stringify(q));
@@ -170,7 +165,7 @@ test('unconfigured personal printer shipping is unavailable rather than falsely 
   const { raw, app, body } = fixture('printer', { size: 'printer_small' });
   const q = await json(await post(app, '/api/orders/quote', body));
   assert.deepEqual(q.quote.delivery_method_fees.find((m: { id: string }) => m.id === 'personal'), { id: 'personal', fee_iqd: null, available: false, reason: 'needs_configuration' });
-  assert.deepEqual(q.quote.delivery_method_fees.find((m: { id: string }) => m.id === 'standard'), { id: 'standard', fee_iqd: 10000, available: true });
+  assert.deepEqual(q.quote.delivery_method_fees.find((m: { id: string }) => m.id === 'standard'), { id: 'standard', fee_iqd: 20000, available: true });
   const configured = { ...SETTING_DEFAULTS.shippingPolicy, printer_small_iqd: 25000 };
   raw.prepare('INSERT OR REPLACE INTO admin_settings(key,value) VALUES(?,?)').run('shippingPolicy', JSON.stringify(configured));
   const changed = await json(await post(app, '/api/orders/quote', body));
@@ -203,19 +198,4 @@ test('all-unconfigured quote fees keep a stable visible selection; a priced meth
     { id: 'standard', available: true, fee_iqd: 0 }, { id: 'pickup', available: true, fee_iqd: 0 },
   ] as Array<{ id: string; available: boolean; fee_iqd: number }>), 'standard', 'zero is a fee, not an availability signal');
   assert.equal(chooseDeliveryMethod('standard', ['standard', 'pickup'], missing), 'standard', 'a valid explicit choice is preserved');
-});
-
-test('admin shipping preview: a disabled standard delivery leaves no home delivery, names the repair, never changes the rules', () => {
-  const options = { standard: { ...enabled.standard, enabled: false }, personal: { ...enabled.personal, enabled: false } };
-  const markup = renderToStaticMarkup(createElement(DeliveryAvailabilityNotice, { options, printer: false }));
-  assert.match(markup, /role="alert"/);
-  assert.match(markup, /كل طرق التوصيل للمنزل معطّلة/);
-  assert.match(markup, /استخدام التعرفة العامة/);
-  assert.match(markup, /ثم احفظ المنتج/);
-  assert.doesNotMatch(markup, /التوصيل الشخصي/, 'personal delivery was cancelled; the preview no longer names it');
-  assert.equal(options.standard.enabled, false);
-  assert.equal(options.personal.enabled, false);
-  const legacy = renderToStaticMarkup(createElement(DeliveryAvailabilityNotice, { options: null, printer: true }));
-  assert.match(legacy, /10,000/);
-  assert.doesNotMatch(legacy, /role="alert"/);
 });

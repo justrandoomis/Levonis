@@ -24,7 +24,7 @@ import { requireMoneyAuthority } from '../lib/moneyAuthority';
 import { completenessMessage } from '@levonis/contracts/productCompleteness';
 import { assertCostRead, assertCostWrite, ownerEmailUnverified, ownerOnly, requireFreshSession } from '../lib/costAccess';
 import { acceptedCodTaxField } from '../lib/codTax';
-import { degradeIfSchemaMissing, isSchemaMissing } from '../lib/membershipBenefits';
+import { ancestryFor, catalogAncestry, degradeIfSchemaMissing, isSchemaMissing } from '../lib/membershipBenefits';
 import { normalizeText } from '../lib/search/normalize';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import { validateHomeBento } from '../lib/homeBento';
@@ -54,6 +54,8 @@ import { resolveOrderExpiry } from '../lib/orderExpiry';
 import { getSetting, getSettings, normalizePayoutMethods, normalizeSerialPrepGate, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
 import { getOfficialUsdRate } from '../lib/fx/officialRate';
 import { validateWalletFreeDelivery } from '../lib/walletFreeDelivery';
+import { productCatalogPlacements } from '../lib/printerIdentity';
+import { deliveryGroupSummary, deliveryPolicyTargets, resolveDeliveryGroup, validateDeliveryPolicy } from '../lib/storeDelivery';
 import { afterCatalogueWrite, afterSettingsWrite } from '../lib/edgePolicy';
 import { CLAIM_ALREADY_OPEN_DESK, type CreateUnitsResult } from '../lib/deviceOps';
 import { originStarts, unitIdentity } from '../lib/deviceCustody';
@@ -4088,6 +4090,70 @@ adminRoutes.delete('/site-media/:slot', async (c) => {
   return c.json({ success: true, media: resolveSiteMedia(stored) });
 });
 
+/**
+ * «قاعدة التوصيل» for the product form: which delivery-policy group prices a
+ * product (or an unsaved product filed under the given sections), and how.
+ */
+adminRoutes.get('/delivery-policy/resolve', async (c) => {
+  const productId = (c.req.query('product_id') ?? '').trim();
+  let categoryId = (c.req.query('category_id') ?? '').trim() || null;
+  let subCategoryId = (c.req.query('sub_category_id') ?? '').trim() || null;
+  if (productId && !categoryId && !subCategoryId) {
+    const row = await c.env.DB.prepare('SELECT category_id, sub_category_id FROM products WHERE id = ?')
+      .bind(productId)
+      .first<{ category_id: string | null; sub_category_id: string | null }>();
+    categoryId = row?.category_id ?? null;
+    subCategoryId = row?.sub_category_id ?? null;
+  }
+  const [policy, index, placements] = await Promise.all([
+    getSetting(c.env.DB, 'deliveryPolicy'),
+    catalogAncestry(c.env.DB),
+    productCatalogPlacements(c.env.DB, productId ? [productId] : []),
+  ]);
+  const path = [
+    ...(ancestryFor(index, categoryId, subCategoryId) ?? []),
+    ...(placements.get(productId) ?? []).flatMap((id) => index.get(id) ?? [id]),
+  ];
+  const group = resolveDeliveryGroup({ product_id: productId, category_path: path }, policy);
+  return c.json({
+    success: true,
+    group: group ? { id: group.id, name: group.name, mode: group.mode, fee_iqd: group.fee_iqd, block_size: group.block_size } : null,
+    default_fee_iqd: policy.default_fee_iqd,
+    summary: deliveryGroupSummary(group, policy),
+    /** The sections the line is matched on, nearest first (the page's simulator). */
+    category_path: path,
+  });
+});
+
+/**
+ * «إدارة التوصيل»: the policy as stored (normalized), plus the names and
+ * sections of every product it names, so the page shows names, not ids.
+ */
+adminRoutes.get('/delivery-policy', async (c) => {
+  const policy = await getSetting(c.env.DB, 'deliveryPolicy');
+  const ids = deliveryPolicyTargets(policy).product_ids;
+  const products: Record<string, { name_ar: string; name_en: string; name_ckb: string; category_id: string | null; sub_category_id: string | null }> = {};
+  // D1 binds at most 100 parameters per statement.
+  for (let i = 0; i < ids.length; i += 90) {
+    const chunk = ids.slice(i, i + 90);
+    const rows = await c.env.DB.prepare(
+      `SELECT id, name, name_ar, name_ku, category_id, sub_category_id FROM products WHERE id IN (${chunk.map(() => '?').join(',')})`
+    )
+      .bind(...chunk)
+      .all<{ id: string; name: string | null; name_ar: string | null; name_ku: string | null; category_id: string | null; sub_category_id: string | null }>();
+    for (const r of rows.results ?? []) {
+      products[String(r.id)] = {
+        name_ar: r.name_ar ?? '',
+        name_en: r.name ?? '',
+        name_ckb: r.name_ku ?? '',
+        category_id: r.category_id ?? null,
+        sub_category_id: r.sub_category_id ?? null,
+      };
+    }
+  }
+  return c.json({ success: true, policy, products });
+});
+
 adminRoutes.put('/settings/:key', async (c) => {
   const adminUser = c.get('user')!;
   const key = c.req.param('key') as SettingKey;
@@ -4305,13 +4371,43 @@ adminRoutes.put('/settings/:key', async (c) => {
       }
     }
     value = checked.value;
+  } else if (key === 'deliveryPolicy') {
+    // «إدارة التوصيل» (owner, 2026-10-18). Strict, like walletFreeDelivery:
+    // a rule naming a section or product that does not exist could never be
+    // met and would look configured, so every id is checked.
+    const checked = validateDeliveryPolicy(value);
+    if (!checked.ok) {
+      const m = checked.error.message;
+      throw badRequest(`${m.ar} / ${m.en} / ${m.ckb}`, 'DELIVERY_POLICY_INVALID', { field: checked.error.field, message: m });
+    }
+    const targets = deliveryPolicyTargets(checked.policy);
+    for (const [table, ids] of [['catalogs', targets.catalog_ids], ['products', targets.product_ids]] as const) {
+      const found = new Set<string>();
+      // D1 binds at most 100 parameters per statement.
+      for (let i = 0; i < ids.length; i += 90) {
+        const chunk = ids.slice(i, i + 90);
+        const rows = await c.env.DB.prepare(`SELECT id FROM ${table} WHERE id IN (${chunk.map(() => '?').join(',')})`)
+          .bind(...chunk)
+          .all<{ id: string }>();
+        for (const r of rows.results ?? []) found.add(String(r.id));
+      }
+      const missing = ids.find((id) => !found.has(id));
+      if (missing) {
+        const message =
+          table === 'catalogs'
+            ? { ar: `القسم غير موجود: ${missing}`, en: `Unknown section: ${missing}`, ckb: `بەش نییە: ${missing}` }
+            : { ar: `المنتج غير موجود: ${missing}`, en: `Unknown product: ${missing}`, ckb: `بەرهەم نییە: ${missing}` };
+        throw badRequest(`${message.ar} / ${message.en} / ${message.ckb}`, 'DELIVERY_POLICY_TARGET', { id: missing, message });
+      }
+    }
+    value = { ...checked.policy, updated_at: new Date().toISOString(), updated_by: adminUser.id };
   }
 
   await setSetting(c.env.DB, key, value);
   // A delivery fee the shop stops charging is money, and so is the courier
   // tax: the audit keeps the whole value as saved, not just the key.
   await audit(c.env.DB, adminUser.id, 'settings.update', key,
-    key === 'walletFreeDelivery' || key === 'serialPrepGate' || key === 'codTaxPerBlockIqd' || key === 'codTaxBlockIqd' ? { value } : {});
+    key === 'walletFreeDelivery' || key === 'deliveryPolicy' || key === 'serialPrepGate' || key === 'codTaxPerBlockIqd' || key === 'codTaxBlockIqd' ? { value } : {});
   // P2a: the cached public answers this key feeds, and the isolate's pricing inputs.
   await afterSettingsWrite(c, key);
   return c.json({ success: true });

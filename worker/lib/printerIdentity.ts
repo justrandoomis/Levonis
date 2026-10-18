@@ -44,3 +44,30 @@ export async function printerProductIds(db: D1Database, productIds: Iterable<str
 export async function isPrinterProduct(db: D1Database, productId: string): Promise<boolean> {
   return (await printerProductIds(db, [productId])).has(productId);
 }
+
+/**
+ * Every catalog a product is PLACED in (product_catalogs), per product — the
+ * delivery policy's rule groups match these after the product's own sections,
+ * so a section rule reaches a product filed there by placement too (the same
+ * table the printer identity above reads). Batched like it.
+ */
+export async function productCatalogPlacements(db: D1Database, productIds: Iterable<string>): Promise<Map<string, string[]>> {
+  const wanted = [...new Set([...productIds].filter((id) => typeof id === 'string' && id !== ''))];
+  const out = new Map<string, string[]>();
+  for (let i = 0; i < wanted.length; i += CHUNK) {
+    const chunk = wanted.slice(i, i + CHUNK);
+    const { results } = await db
+      .prepare(
+        `SELECT product_id, catalog_id FROM product_catalogs
+          WHERE product_id IN (${chunk.map(() => '?').join(',')})
+          ORDER BY product_id, position, catalog_id`
+      )
+      .bind(...chunk)
+      .all<{ product_id: string; catalog_id: string }>();
+    for (const r of results ?? []) {
+      const id = String(r.product_id);
+      out.set(id, [...(out.get(id) ?? []), String(r.catalog_id)]);
+    }
+  }
+  return out;
+}

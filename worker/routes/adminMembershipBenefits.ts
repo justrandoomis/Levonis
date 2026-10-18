@@ -6,6 +6,7 @@ import { newId } from '../lib/crypto';
 import { getSettings } from '../lib/settings';
 import { shippingConfigFrom } from './orders';
 import { quoteShipping } from '../lib/shipping';
+import type { DeliveryPolicy } from '../lib/storeDelivery';
 import { codDeliveryTaxIqd } from '../lib/codTax';
 import { resolveUnitPrice, proPolicyFrom } from '../lib/pricing';
 import { parseProductRow } from '../lib/productModel';
@@ -901,7 +902,7 @@ adminMembershipBenefitRoutes.post('/simulate', async (c: Context<AppContext>) =>
       .all<Record<string, unknown>>(),
     allBenefitRules(c.env.DB),
     catalogAncestry(c.env.DB),
-    getSettings(c.env.DB, ['proPricingPolicy', 'shippingPolicy', 'checkoutDeliveryMethods', 'codTaxPerBlockIqd', 'codTaxBlockIqd']),
+    getSettings(c.env.DB, ['proPricingPolicy', 'shippingPolicy', 'checkoutDeliveryMethods', 'codTaxPerBlockIqd', 'codTaxBlockIqd', 'deliveryPolicy']),
   ]);
   const byId = new Map((rows ?? []).map((r) => [String(r.id), r]));
   const missing = ids.filter((id) => !byId.has(id));
@@ -964,14 +965,17 @@ adminMembershipBenefitRoutes.post('/simulate', async (c: Context<AppContext>) =>
   });
   const merchandiseAfter = Math.max(0, merchandise - benefits.line_discount_iqd);
 
-  const methods = (settings.checkoutDeliveryMethods as DeliveryMethod[] | undefined) ?? [];
-  const method = methods.find((m) => m.id === deliveryMethodId);
   const shippingConfig = shippingConfigFrom(settings.shippingPolicy);
-  const ordinary = method && Number.isInteger(method.price_iqd) && (method.price_iqd as number) >= 0
-    ? (method.price_iqd as number)
-    : shippingConfig.ordinary_iqd;
+  // The standard fee comes from the delivery policy, exactly as at checkout
+  // (the method's stored price_iqd is display-only).
   const shipping = quoteShipping({
-    items: lines.map((l) => ({ product_id: l.product_id, qty: l.qty, size_class: 'ordinary' as const })),
+    items: lines.map((l) => ({
+      product_id: l.product_id,
+      qty: l.qty,
+      size_class: 'ordinary' as const,
+      category_path: l.benefit.ancestry ?? [],
+    })),
+    deliveryPolicy: settings.deliveryPolicy as DeliveryPolicy,
     deliveryMethod: deliveryMethodId === 'personal' ? 'personal' : 'standard',
     merchandiseIqd: merchandiseAfter,
     primeMerchandiseIqd: merchandiseAfter,
@@ -984,7 +988,7 @@ adminMembershipBenefitRoutes.post('/simulate', async (c: Context<AppContext>) =>
     // response rather than silently denying the benefit being tested.
     atApprovedDefaultAddress: true,
     membershipShipping: benefits.shipping,
-    config: { ...shippingConfig, ordinary_iqd: ordinary },
+    config: shippingConfig,
   });
 
   const payable = Math.max(0, merchandiseAfter + shipping.total_iqd);
