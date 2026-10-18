@@ -16,18 +16,29 @@ import { iqdToUsdCentsExact, readCachedDisplayRate, rememberDisplayRate, usableR
  * إعداد عملة عرض لكل حساب». This is that setting.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * THE DINAR IS THE PRICE. THE DOLLAR IS A READING OF IT.
+ * THE DOLLAR IS THE PRICE WHEREVER THE SHOP SET ONE; ONLY DINAR-NATIVE AMOUNTS
+ * ARE READ AT THE DISPLAY RATE (DECISIONS row 247, amending row 243).
  *
- * Every price in this shop is stored, charged, refunded and reported in IQD.
- * Nothing here changes that, and nothing here is ever sent to the server: this
- * context converts a number on its way to the screen and stops. A cart line
+ * The owner, 2026-10-17: «الدولار هو الاساس كما اتفقنا وليس العكس … الدولار هو
+ * الثابت والدينار العراقي هو المتغير بسعر الصرف». Pricing V2 builds every price
+ * from dollars and derives the dinar from them at the applied rate, rounded UP
+ * (row 245). Dividing that rounded dinar back by a rate turned the round-up
+ * into extra cents — the shop's $15.20 → $14.00 read as $15.66 → $14.45. So
+ * the server now sends the shop's own dollar price beside every figure that
+ * has one (`*_usd_cents`), and in dollars `money(iqd, usdCents)` prints THAT.
+ * Only a figure without one — delivery, COD tax, warranty, points, coupons, a
+ * member price, a dinar-typed offer, a bundle, a merchant's product, an older
+ * order — is converted at the display rate, and a total is the sum of the
+ * dollar prices plus ONE conversion of the dinar remainder (`usdTotal`).
+ *
+ * THE DINAR IS STILL WHAT IS CHARGED. Every price is stored, charged, refunded
+ * and reported in IQD; nothing here is ever sent to the server. A cart line
  * posts the same body, a checkout charges the same total, an order records the
  * same figure, whichever way the switch is set.
  *
  * That is also why the CHECKOUT keeps the dinar on screen even in USD (see
  * `moneyBoth`). A customer about to commit money must be able to read the
- * number their bank will see, and a converted figure — at a rate the shop sets
- * and can change tomorrow — is not that number.
+ * number their bank will see.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * PER DEVICE, NOT PER ACCOUNT, and deliberately.
@@ -201,15 +212,27 @@ interface CurrencyContextValue {
    * shows dinars. The stored choice is kept: dollars return with the rate.
    */
   usdUnavailable: boolean;
-  /** An IQD amount, formatted in the currency the customer chose. */
-  money: (iqd: number) => string;
   /**
-   * THE DINAR, ALWAYS, plus the conversion when one is being shown. For the
+   * An IQD amount, formatted in the currency the customer chose. In dollars,
+   * the shop's own dollar price (`usdCents`, from the server) when the figure
+   * has one, else the dinars read at the display rate.
+   */
+  money: (iqd: number, usdCents?: number | null) => string;
+  /**
+   * THE DINAR, ALWAYS, plus the dollar figure when one is being shown. For the
    * few places where money is committed or recorded — the checkout total, an
    * order, a receipt — where the number the bank will see must be on screen
    * whatever the switch says.
    */
-  moneyBoth: (iqd: number) => string;
+  moneyBoth: (iqd: number, usdCents?: number | null) => string;
+  /**
+   * A TOTAL IN DOLLARS (DECISIONS row 247): the sum of each line's dollar
+   * price, plus ONE conversion of the dinar remainder (delivery, fees, points,
+   * coupons, member discounts and lines without a dollar price). Null when
+   * prices are not being read in dollars. Pass it to `money` / `moneyBoth`
+   * beside the dinar total.
+   */
+  usdTotal: (totalIqd: number, lines: readonly UsdLine[]) => number | null;
   /**
    * A WALLET AMOUNT — a balance, an amount applied, a remainder, a shortfall,
    * a wallet debit. In dollars it is the LEDGER'S OWN CENTS (the wallet's rate,
@@ -222,6 +245,67 @@ interface CurrencyContextValue {
 
 const CurrencyContext = createContext<CurrencyContextValue | undefined>(undefined);
 
+/** One line of a total: its dinars, and its dollar price in cents when it has one (null/absent = none). */
+export interface UsdLine {
+  iqd: number;
+  usdCents?: number | null;
+}
+
+/** A dollar figure the server sent: whole, non-negative, safe cents. Anything else is no figure. */
+export function isUsdCents(v: unknown): v is number {
+  return typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
+}
+
+/**
+ * THE DOLLAR TOTAL, PURE (see `usdTotal`): Σ the lines' dollar prices + one
+ * conversion, at the display rate, of what the dinar total holds beyond the
+ * lines that had one. Sign-aware: a remainder below zero (points, a coupon
+ * larger than the fees) is subtracted as the conversion of its size. Null with
+ * no usable rate.
+ */
+export function usdTotalCents(totalIqd: number, lines: readonly UsdLine[], rateText: string | null | undefined): number | null {
+  if (!Number.isFinite(totalIqd)) return null;
+  let baseCents = 0;
+  let baseIqd = 0;
+  for (const l of lines) {
+    if (!isUsdCents(l.usdCents) || !Number.isFinite(l.iqd)) continue;
+    baseCents += l.usdCents;
+    baseIqd += l.iqd;
+  }
+  const rest = iqdToUsdCentsExact(totalIqd - baseIqd, rateText);
+  return rest === null ? null : baseCents + rest;
+}
+
+/**
+ * THE «−N٪» BESIDE A STRUCK PAIR: the server's percent of the DOLLAR pair when
+ * the pair is read in dollars and it sent one, else its percent of the dinar
+ * pair — always the percent of the two numbers on screen (rule D9).
+ */
+export function shownSavingPercent(
+  converted: boolean,
+  iqdPercent: number | null | undefined,
+  usdPercent: number | null | undefined
+): number | null {
+  if (converted && typeof usdPercent === 'number' && usdPercent >= 1) return usdPercent;
+  return typeof iqdPercent === 'number' && iqdPercent >= 1 ? iqdPercent : null;
+}
+
+/**
+ * A STRUCK PAIR IS NEVER HALF BASE AND HALF CONVERSION (DECISIONS row 247).
+ * With a struck price beside it, the dollar prices are used only when BOTH
+ * exist; otherwise both sides are converted. Alone, a price keeps its own.
+ */
+export function pairedUsd(
+  priceUsd: number | null | undefined,
+  struckUsd: number | null | undefined,
+  struck: boolean
+): { price: number | null; struck: number | null } {
+  const price = isUsdCents(priceUsd) ? priceUsd : null;
+  if (!struck) return { price, struck: null };
+  const before = isUsdCents(struckUsd) ? struckUsd : null;
+  return price !== null && before !== null && before > price ? { price, struck: before } : { price: null, struck: null };
+}
+
 /** Build the context value. Exported for the tests, which render screens in either currency. */
 export function currencyValue(
   currency: DisplayCurrency,
@@ -229,13 +313,15 @@ export function currencyValue(
   rate: DisplayRate | null,
   settingsLoaded = true
 ): CurrencyContextValue {
-  const usdOf = (iqd: number): string | null => {
+  // The shop's own dollar price when the figure has one (DECISIONS row 247), else the dinars read at the rate.
+  const usdOf = (iqd: number, usdCents?: number | null): string | null => {
     if (!rate) return null;
+    if (isUsdCents(usdCents)) return formatUsdCents(usdCents);
     const cents = iqdToUsdCentsExact(iqd, rate.text);
     return cents === null ? null : formatUsdCents(cents);
   };
   const converted = currency === 'USD' && rate !== null;
-  const money = (iqd: number) => (converted ? usdOf(iqd) ?? formatIqd(iqd) : formatIqd(iqd));
+  const money = (iqd: number, usdCents?: number | null) => (converted ? usdOf(iqd, usdCents) ?? formatIqd(iqd) : formatIqd(iqd));
   return {
     currency,
     setCurrency,
@@ -244,11 +330,12 @@ export function currencyValue(
     settingsLoaded,
     usdUnavailable: settingsLoaded && rate === null,
     money,
-    // «1,750,000 د.ع · ‎$1,250.00» — the charge first, the reading after it.
-    moneyBoth: (iqd: number) => {
-      const usd = converted ? usdOf(iqd) : null;
+    // «1,750,000 د.ع · ‎$1,250.00» — the charge first, the dollars after it.
+    moneyBoth: (iqd: number, usdCents?: number | null) => {
+      const usd = converted ? usdOf(iqd, usdCents) : null;
       return usd ? `${formatIqd(iqd)} · ${usd}` : formatIqd(iqd);
     },
+    usdTotal: (totalIqd: number, lines: readonly UsdLine[]) => (converted ? usdTotalCents(totalIqd, lines, rate!.text) : null),
     walletMoney: (iqd: number, usdCents?: number | null) =>
       currency === 'USD' && typeof usdCents === 'number' && Number.isFinite(usdCents) ? formatUsdCents(usdCents) : formatIqd(iqd),
     walletCharge: (iqd: number) => formatIqd(iqd),

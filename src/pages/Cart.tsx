@@ -36,7 +36,7 @@ import {
 } from '../lib/supportRef';
 import MerchantCartView from '../components/merchant/MerchantCartView';
 import { isPaidTier, tierLabel } from '../components/subscription/tierMeta';
-import { useMoney } from '../CurrencyContext';
+import { pairedUsd, shownSavingPercent, useMoney } from '../CurrencyContext';
 import OfferBadge, { StruckMoney, offerPercentSr, offerPercentText } from '../components/ui/OfferBadge';
 import VariantImg from '../components/ui/VariantImg';
 import { cartEmptyText } from '../lib/cartEmptyText';
@@ -361,7 +361,7 @@ interface CartWriteResponse {
 const PREMIUM_LABEL = tierLabel('prime');
 
 export default function Cart() {
-  const { money } = useMoney();
+  const { money, moneyBoth, usdTotal, converted } = useMoney();
   const navigate = useNavigate();
   const { t, lang, dir, loc } = useLanguage();
   const sc = SUPPORT_STRINGS[lang] ?? SUPPORT_STRINGS.ar;
@@ -1222,6 +1222,25 @@ export default function Cart() {
   // membership has already reduced.
   const pointsDiscount = usePoints ? Math.min(pointBalance, merchandise) : 0;
   const total = merchandise + shipping - pointsDiscount;
+  /**
+   * THE SAME FIGURES IN THE SHOP'S DOLLARS (DECISIONS row 247): Σ each selected line's dollar price ×
+   * quantity, and ONE conversion of everything else the dinar figure holds (lines without a dollar
+   * price, the membership, points, delivery). Null while prices are read in dinars.
+   */
+  const usdLines = selectedItems.map((item) => ({
+    iqd: item.unit_price_iqd * item.qty,
+    usdCents: item.kind !== 'gift' && typeof item.unit_price_usd_cents === 'number' ? item.unit_price_usd_cents * item.qty : null,
+  }));
+  const totalUsd = usdTotal(total, usdLines);
+  // The struck subtotal is at the regular price: a line keeps its dollars only where regular = applied.
+  const totalOriginalPriceUsd = usdTotal(
+    totalOriginalPrice,
+    selectedItems.map((item, i) => {
+      const b = item.breakdown;
+      const off = b && item.kind !== 'gift' ? Math.max(0, b.regular_iqd - b.applied_iqd) * item.qty : 0;
+      return { iqd: usdLines[i].iqd + off, usdCents: off === 0 ? usdLines[i].usdCents : null };
+    })
+  );
 
   /** A delivery method in the store's OWN configured words (a setting, never a
    *  label typed here), in the reader's language — Sorani included, which a
@@ -1487,9 +1506,18 @@ export default function Cart() {
     const regularUnit = item.breakdown?.offer_before_iqd ?? item.breakdown?.regular_iqd ?? null;
     const appliedUnit = item.breakdown?.applied_iqd ?? null;
     const hasSale = regularUnit !== null && appliedUnit !== null && appliedUnit < regularUnit;
-    const discountPct = hasSale
+    const discountPctIqd = hasSale
       ? item.breakdown?.offer_saving_percent ?? Math.round((1 - (appliedUnit as number) / (regularUnit as number)) * 100)
       : 0;
+    // The shop's dollar prices (DECISIONS row 247): the struck pair in dollars only when both exist, and
+    // then the badge is the server's percent of the dollar pair.
+    const lineUsd = pairedUsd(
+      item.unit_price_usd_cents,
+      typeof item.breakdown?.offer_before_iqd === 'number' ? item.breakdown?.offer_before_usd_cents : item.breakdown?.regular_usd_cents,
+      hasSale
+    );
+    const discountPct =
+      lineUsd.struck !== null ? (shownSavingPercent(converted, discountPctIqd, item.breakdown?.offer_saving_percent_usd) ?? 0) : discountPctIqd;
     /**
      * WHAT THE MEMBERSHIP TOOK OFF THIS LINE — the server's figure for
      * this row, not the difference between two unit prices.
@@ -1654,12 +1682,12 @@ export default function Cart() {
           </div>
 
           <div className="min-w-0 flex flex-wrap items-baseline gap-1.5 mb-2 mt-1">
-            <span className="max-w-full text-text-primary font-semibold text-[15px] sm:text-[17px] tabular-nums">{money(item.unit_price_iqd)}</span>
+            <span className="max-w-full text-text-primary font-semibold text-[15px] sm:text-[17px] tabular-nums">{money(item.unit_price_iqd, lineUsd.price)}</span>
             {hasSale && (
               <>
                 <span className="sr-only">{loc('بدل', 'instead of', 'لە جیاتی')} </span>
                 {/* Only the figure is LTR; «د.ع» sits where the unit price's does (review, bidi). */}
-                <StruckMoney iqd={regularUnit as number} className="text-text-muted text-[12px]" />
+                <StruckMoney iqd={regularUnit as number} usdCents={lineUsd.struck} className="text-text-muted text-[12px]" />
                 {discountPct >= 1 ? (
                   <OfferBadge tone="saving">
                     <bdi dir="ltr" aria-hidden>{offerPercentText(discountPct, lang === 'en' || lang === 'ckb' ? lang : 'ar')}</bdi>
@@ -2466,7 +2494,7 @@ export default function Cart() {
 
           <div className="flex justify-between items-center">
             <span className="text-text-secondary text-[14px]">{loc('المجموع الفرعي', 'Subtotal', 'کۆی بەشی')}</span>
-            <span className="text-text-primary text-[14px] font-medium">{money(totalOriginalPrice)}</span>
+            <span className="text-text-primary text-[14px] font-medium">{money(totalOriginalPrice, totalOriginalPriceUsd)}</span>
           </div>
 
           {otherDiscounts > 0 && (
@@ -2591,7 +2619,8 @@ export default function Cart() {
 
           <div className="flex justify-between items-center">
             <span className="text-text-primary font-bold text-[15px]">{loc('المجموع الكلي', 'Total', 'کۆی گشتی')}</span>
-            <span className="text-text-primary font-bold text-[17px]">{money(total)}</span>
+            {/* The charge in dinars first, then the dollars (DECISIONS row 247) — as the checkout prints it. */}
+            <span className="text-text-primary font-bold text-[17px]">{moneyBoth(total, totalUsd)}</span>
           </div>
         </div>
         </div>
@@ -2653,7 +2682,7 @@ export default function Cart() {
 
             <div className="flex flex-col items-end flex-1 min-w-0 pe-1">
               <span className="text-text-primary font-bold text-[17px] tabular-nums truncate w-full text-end">
-                {money(total)}
+                {money(total, totalUsd)}
               </span>
               {/* Always present, only sometimes visible — the row cannot
                   change the bar's height by appearing. */}
@@ -2855,7 +2884,7 @@ export default function Cart() {
                   <div className="w-20 h-20 rounded-lg bg-surface-selected" />
                 )}
                 <div>
-                  <p className="text-text-primary font-bold text-lg tabular-nums">{money(variantView.unit_price_iqd)}</p>
+                  <p className="text-text-primary font-bold text-lg tabular-nums">{money(variantView.unit_price_iqd, variantView.unit_price_usd_cents)}</p>
                   {(() => {
                     // The SHELF for this exact selection — `availability.stock`,
                     // never the legacy `stock` (the base row, a different number

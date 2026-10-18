@@ -123,9 +123,11 @@ test('the detail opening price and availability equal a fresh quote for that exa
     qty: 1, optionId: selection.option_id, optionValueIds: selection.option_value_ids,
     colorId: selection.color_id || undefined, fulfillmentType: selection.fulfillment_type,
   }));
-  const { qty, line_total_iqd, ...price } = quoted.quote;
+  const { qty, line_total_iqd, line_total_usd_cents, ...price } = quoted.quote;
   assert.equal(qty, 1);
   assert.equal(line_total_iqd, detail.pricing.unit_subtotal_iqd);
+  // The same line in the shop's dollars (DECISIONS row 247), where it has them.
+  assert.equal(line_total_usd_cents, detail.pricing.unit_subtotal_usd_cents);
   assert.deepEqual(price, detail.pricing, 'opening details already contain the complete authoritative quote');
   assert.deepEqual(quoted.availability, detail.availability, 'skipping a duplicate opening quote does not skip stock validation');
   const changed = await json(await post(app, '/api/products/a1/quote', {

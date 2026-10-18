@@ -39,7 +39,12 @@ import {
   currencyValue,
   resolveDisplayRate,
   CurrencyValueProvider,
+  pairedUsd,
+  shownSavingPercent,
+  usdTotalCents,
 } from '../src/CurrencyContext';
+import CardPrice from '../src/components/CardPrice';
+import type { ApiProduct } from '../src/lib/api';
 import { iqdToUsdCents as walletIqdToUsdCents, formatIqd } from '../src/lib/api';
 import {
   DISPLAY_RATE_CACHE_KEY,
@@ -279,13 +284,16 @@ test('the checkout total keeps the dinar, whatever the switch says', () => {
   // The screen with the pay button on it is the last place to be
   // approximate: a converted figure at a rate the shop can change tomorrow is
   // not the number the customer's bank will see.
-  assert.match(src, /data-testid="checkout-order-total"[\s\S]{0,200}\{moneyBoth\(orderTotal\)\}/);
-  assert.match(src, /const \{ money, moneyBoth, walletMoney, walletCharge \} = useMoney\(\);/);
+  // In dollars the total is Σ the lines' dollar prices + one conversion of the rest (DECISIONS row 247),
+  // printed after the dinars it is charged in.
+  assert.match(src, /data-testid="checkout-order-total"[\s\S]{0,200}\{moneyBoth\(orderTotal, orderTotalUsd\)\}/);
+  assert.match(src, /const \{ money, moneyBoth, walletMoney, walletCharge, usdTotal \} = useMoney\(\);/);
+  assert.match(src, /const orderTotalUsd = usdTotal\(orderTotal, usdLines\);/);
 });
 
 test('an order’s total keeps the dinar too — it is a record of a charge', () => {
   const src = read('src/components/orders/PaymentBreakdown.tsx');
-  assert.match(src, /<Row label=\{s\.total\} value=\{moneyBoth\(f\.total_iqd\)\} strong \/>/);
+  assert.match(src, /<Row label=\{s\.total\} value=\{moneyBoth\(f\.total_iqd, totalUsd\)\} strong \/>/);
 });
 
 test('moneyBoth really shows both, and the charge first', () => {
@@ -511,4 +519,101 @@ test('in USD mode no screen shows one charge in two dollar figures at different 
   assert.match(checkout, /−\{walletMoney\(walletDiscount\)\}/);
   // The profile's balance card: the ledger's cents in dollars.
   assert.match(read('src/pages/Profile.tsx'), /currency === 'USD' \? <bdi dir="ltr">\{walletMoney\(balanceIqd, balanceUsdCents\)\}<\/bdi>/);
+});
+
+// ------------------------------------- the dollar is the base (DECISIONS row 247)
+
+/**
+ * The owner, 2026-10-17: «الدولار هو الاساس … الدولار هو الثابت والدينار العراقي هو المتغير بسعر الصرف».
+ * His eSUN PLA+ form reads «26,000 د.ع · ≈ $15.20 → $14.00 · 24,000 د.ع», and the storefront read
+ * $15.66 → $14.45: the rounded dinars divided back by the public 1,660. A figure the server sends a dollar
+ * price for prints THAT; only a figure without one is converted.
+ */
+test('a figure with the shop’s dollar price prints it; one without is read at the display rate', () => {
+  const usd = currencyValue('USD', noop, shop('1660'));
+  assert.equal(usd.money(26_000, 1520), '$15.20');
+  assert.equal(usd.money(24_000, 1400), '$14.00');
+  assert.equal(usd.money(26_000), '$15.66', 'no dollar price: the reading, exactly as before');
+  assert.equal(usd.money(26_000, null), '$15.66');
+  // Only whole, non-negative cents are a dollar price.
+  for (const bad of [15.2, -1, Number.NaN, Number.POSITIVE_INFINITY]) assert.equal(usd.money(26_000, bad), '$15.66');
+  assert.equal(usd.moneyBoth(24_000, 1400), `${formatIqd(24_000)} · $14.00`, 'the charge first');
+  // In dinars the dollar price is ignored.
+  const iqd = currencyValue('IQD', noop, shop('1660'));
+  assert.equal(iqd.money(26_000, 1520), formatIqd(26_000));
+  assert.equal(iqd.moneyBoth(26_000, 1520), formatIqd(26_000));
+  // No usable rate: dinars, even with a dollar price (totals need the rate — all or nothing).
+  const none = currencyValue('USD', noop, null);
+  assert.equal(none.money(26_000, 1520), formatIqd(26_000));
+  assert.equal(none.usdUnavailable, true);
+});
+
+test('a total in dollars is Σ the lines’ dollar prices plus ONE conversion of the dinar remainder', () => {
+  // Two units of the $14.00 / 24,000 line and a 5,000 IQD delivery: 2,800 + floor(5,000 × 100 / 1,660) = 2,800 + 301.
+  const lines = [{ iqd: 48_000, usdCents: 2800 }];
+  assert.equal(usdTotalCents(53_000, lines, '1660'), 3101);
+  const usd = currencyValue('USD', noop, shop('1660'));
+  assert.equal(usd.money(53_000, usd.usdTotal(53_000, lines)), '$31.01');
+  // Points worth more than the fees: a negative remainder is subtracted symmetrically.
+  assert.equal(usdTotalCents(48_000 - 5_000, lines, '1660'), 2800 - 301);
+  // A line without a dollar price is converted with the rest, once.
+  assert.equal(usdTotalCents(48_000 + 26_000, [...lines, { iqd: 26_000, usdCents: null }], '1660'), 2800 + 1566);
+  // Not read in dollars: no total.
+  assert.equal(currencyValue('IQD', noop, shop('1660')).usdTotal(53_000, lines), null);
+  assert.equal(usdTotalCents(53_000, lines, null), null);
+});
+
+test('a struck pair is never half base and half conversion, and its «−N٪» is the pair’s', () => {
+  assert.deepEqual(pairedUsd(1400, 1520, true), { price: 1400, struck: 1520 });
+  assert.deepEqual(pairedUsd(1400, undefined, true), { price: null, struck: null }, 'one side without dollars: both converted');
+  assert.deepEqual(pairedUsd(undefined, 1520, true), { price: null, struck: null });
+  assert.deepEqual(pairedUsd(1400, 1300, true), { price: null, struck: null }, 'a struck price below the price is not a pair');
+  assert.deepEqual(pairedUsd(1400, undefined, false), { price: 1400, struck: null }, 'alone, a price keeps its own');
+  assert.equal(shownSavingPercent(true, 8, 8), 8);
+  assert.equal(shownSavingPercent(true, 8, 7), 7, 'in dollars, the dollar pair’s percent');
+  assert.equal(shownSavingPercent(false, 8, 7), 8, 'in dinars, the dinar pair’s percent');
+  assert.equal(shownSavingPercent(true, 8, null), 8, 'no dollar pair: the dinar pair’s');
+});
+
+const ESUN_CARD = {
+  id: 'p-esun', slug: 'esun-pla-plus', name: 'eSUN PLA+ Filament 1 kg', price_iqd: 26_000, price_status: 'priced',
+  display_price_iqd: 24_000, display_regular_iqd: 24_000, display_applied_tier: 'regular',
+  display_offer_before_iqd: 26_000, display_offer_saving_percent: 8,
+  display_price_usd_cents: 1400, display_regular_usd_cents: 1400,
+  display_offer_before_usd_cents: 1520, display_offer_saving_percent_usd: 8,
+  display_prime_iqd: null, display_pro_iqd: null, display_from: false,
+} as unknown as ApiProduct;
+
+function renderCard(currency: 'USD' | 'IQD', p: ApiProduct, density: 'regular' | 'compact' = 'regular'): string {
+  return renderToStaticMarkup(
+    createElement(LanguageProvider, {
+      children: createElement(CurrencyValueProvider, { value: currencyValue(currency, noop, shop('1660')), children: createElement(CardPrice, { p, density }) }),
+    })
+  );
+}
+
+test('the eSUN card in dollars: $14.00 with $15.20 struck — never $14.45 / $15.66', () => {
+  for (const density of ['regular', 'compact'] as const) {
+    const html = renderCard('USD', ESUN_CARD, density);
+    assert.match(html, /\$14\.00/, density);
+    assert.match(html, /\$15\.20/, density);
+    assert.doesNotMatch(html, /\$14\.45|\$15\.66/, density);
+  }
+  // In dinars nothing moves.
+  const iqd = renderCard('IQD', ESUN_CARD);
+  assert.ok(iqd.includes(formatIqd(24_000)) && iqd.includes(formatIqd(26_000)));
+  // An older server (no dollar fields): the reading, exactly as before.
+  const old = { ...ESUN_CARD, display_price_usd_cents: undefined, display_regular_usd_cents: undefined, display_offer_before_usd_cents: undefined } as ApiProduct;
+  const html = renderCard('USD', old);
+  assert.match(html, /\$14\.45/);
+  assert.match(html, /\$15\.66/);
+  // Half a pair is no pair: both sides converted.
+  const half = renderCard('USD', { ...ESUN_CARD, display_offer_before_usd_cents: undefined } as ApiProduct);
+  assert.match(half, /\$14\.45/);
+  assert.match(half, /\$15\.66/);
+});
+
+test('the card’s −N% badge reads the dollar pair in dollars (src/components/home/ProductCard.tsx)', () => {
+  const src = read('src/components/home/ProductCard.tsx');
+  assert.match(src, /shownSavingPercent\(converted, p\.display_offer_saving_percent, p\.display_offer_saving_percent_usd\)/);
 });

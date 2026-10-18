@@ -19,6 +19,7 @@ import type { Env } from './types';
 import type { CostSubject } from './costAccess';
 import { procurementExact, compareProcurementExact, addProcurementExact, mulProcurementExact, type ProcurementExact } from '@levonis/contracts/procurementCost';
 import type { OfferWindow } from './offers';
+import { usdCeilCentsOfExact } from '@levonis/pricing/usdCents';
 import { offerSavingPercent, offerUsdInstalled, usdCentsFor, usdTextOfCents, type OfferUsdPrice } from './offerUsd';
 import { loadPreviewContext, loadProducts, type LoadedProduct } from './pricingEngine/load';
 import { sellableSkus, unitNamesOf } from './pricingEngine/legacy';
@@ -211,11 +212,9 @@ export function usdScopes(d: DiscountContext): { available: boolean; reason: Usd
   return { available: false, reason: notDirect || !anyDirect ? 'NOT_DIRECT' : 'MIXED_PRICES', scopes: [] };
 }
 
-/** A dollar figure (2 decimals), rounded UP to the cent, exact. */
+/** A dollar figure (2 decimals), rounded UP to the cent, exact — the storefront's own rounding (`usdCeilCentsOfExact`). */
 function usdCeilCents(exact: ProcurementExact): string {
-  const scaled = exact.num * 100n;
-  const cents = scaled / exact.den + (scaled % exact.den > 0n ? 1n : 0n);
-  return usdTextOfCents(Number(cents));
+  return usdTextOfCents(usdCeilCentsOfExact(exact));
 }
 
 /** The row's own published dollars (its `usd_ceil6`, the writer's display figure) as 2 decimals. */

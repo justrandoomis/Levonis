@@ -2,7 +2,7 @@ import React from 'react';
 import { Sparkles, Star } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { type ApiProduct } from '../lib/api';
-import { splitMoney, useMoney } from '../CurrencyContext';
+import { pairedUsd, splitMoney, useMoney } from '../CurrencyContext';
 import { memberLine } from '../lib/productCard';
 import { isUnpriced, UNPRICED_TEXT } from '../lib/priceStatus';
 
@@ -72,6 +72,12 @@ function RegularPrice({ p, compact }: { p: ApiProduct; compact: boolean }) {
   // A LIVE OFFER strikes the published price it replaced (docs/ux/PRODUCT-DISCOUNT.md §8.2, F1) — the
   // server's number, never `regular`, which already IS the offer price; a member saving strikes as before.
   const struck = typeof p.display_offer_before_iqd === 'number' ? p.display_offer_before_iqd : main < regular ? regular : null;
+  // The shop's dollar prices (DECISIONS row 247): the struck pair in dollars only when both exist.
+  const usd = pairedUsd(
+    p.display_price_usd_cents,
+    typeof p.display_offer_before_iqd === 'number' ? p.display_offer_before_usd_cents : p.display_regular_usd_cents,
+    struck !== null
+  );
   const from = !!p.display_from;
 
   const teasers: Array<{ label: string; price: number }> = [];
@@ -114,10 +120,10 @@ function RegularPrice({ p, compact }: { p: ApiProduct; compact: boolean }) {
           ) : (
             memberPrice && <Star aria-hidden className="w-3 h-3 fill-gold" />
           )}
-          {money(main)}
+          {money(main, usd.price)}
         </span>
         {struck !== null && (
-          <span className="text-zinc-500/80 text-[10.5px] line-through truncate">{money(struck)}</span>
+          <span className="text-zinc-500/80 text-[10.5px] line-through truncate">{money(struck, usd.struck)}</span>
         )}
       </div>
       {teasers.map((t) => (
@@ -156,10 +162,12 @@ function CompactPrice({ p }: { p: ApiProduct }) {
   const main = (p.display_price_iqd ?? p.price_iqd) as number;
   const regular = (p.display_regular_iqd ?? p.price_iqd) as number;
   const applied = p.display_applied_tier ?? 'regular';
-  const [amount, unit] = splitMoney(money(main));
   const offerBefore = typeof p.display_offer_before_iqd === 'number' ? p.display_offer_before_iqd : null;
   const line = offerBefore === null ? memberLine(p) : null;
   const struck = offerBefore ?? (!line && main < regular ? regular : null);
+  // The shop's dollar prices (DECISIONS row 247): the struck pair in dollars only when both exist.
+  const usd = pairedUsd(p.display_price_usd_cents, offerBefore !== null ? p.display_offer_before_usd_cents : p.display_regular_usd_cents, struck !== null);
+  const [amount, unit] = splitMoney(money(main, usd.price));
   const amountTone =
     applied === 'pro' ? 'text-coral' : applied === 'regular' ? 'text-text-primary' : 'text-gold';
 
@@ -195,7 +203,7 @@ function CompactPrice({ p }: { p: ApiProduct }) {
           <>
             {/* «بدل» — instead of; its own Sorani (F6). */}
             <span className="sr-only">{loc('بدل', 'instead of', 'لە جیاتی')} </span>
-            <bdi dir="ltr" className="text-text-muted line-through tabular-nums">{splitMoney(money(struck))[0]}</bdi>
+            <bdi dir="ltr" className="text-text-muted line-through tabular-nums">{splitMoney(money(struck, usd.struck))[0]}</bdi>
           </>
         ) : null}
       </div>

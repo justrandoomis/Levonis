@@ -13,7 +13,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, Truck, Star, XCircle, Clock, Gift, Zap } from 'lucide-react';
-import type { ApiOrder } from '../../lib/api';
+import { orderItemUsdCents, type ApiOrder } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import SafeImage from '../ui/SafeImage';
 import OrderTracker from '../OrderTracker';
@@ -157,13 +157,15 @@ export default function OrderCard({
   onCancel: (order: ApiOrder, anchor: HTMLElement | null) => void;
   onReview: (order: ApiOrder, anchor: HTMLElement | null) => void;
 }) {
-  const { money } = useMoney();
+  const { money, usdTotal } = useMoney();
   const { lang } = useLanguage();
   const s = STRINGS[asLang(lang)];
   const count = countItems(order.items, order.item_count);
   const stack = order.items.slice(0, 3);
   const extraLines = Math.max(0, order.items.length - 1);
   const due = dueOnDelivery(order);
+  // The total in dollars (DECISIONS row 247): the lines' frozen dollar prices, the rest converted once.
+  const totalUsd = usdTotal(order.total_iqd, order.items.map((it) => ({ iqd: it.line_total_iqd, usdCents: orderItemUsdCents(it)?.line ?? null })));
   const bnplDue = order.status === 'cancelled' ? 0 : Number(order.financial?.bnpl_due_iqd ?? order.bnpl_due_iqd) || 0;
   /**
    * The review verb, and the honest alternative to hiding it.
@@ -259,7 +261,7 @@ export default function OrderCard({
         <div className="mt-3 flex items-end justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] text-text-muted">{s.total}</p>
-            <p className="text-text-primary font-bold text-[15px] tabular-nums">{money(order.total_iqd)}</p>
+            <p className="text-text-primary font-bold text-[15px] tabular-nums">{money(order.total_iqd, totalUsd)}</p>
             {due > 0 && (
               <p className="text-[11.5px] text-text-secondary tabular-nums">
                 {s.due}: {money(due)}

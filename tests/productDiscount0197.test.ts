@@ -128,11 +128,12 @@ test('a V1 read carries no rate: a dollar sale prices nothing there', async () =
   // With the V2 results: the row carries its rate, the sale prices.
   const doc = (await loadProducts(w.db, [PID])).get(PID)!.doc;
   const r = resolveUnitPrice({ product: doc, optionId: M1, fulfillmentType: 'direct_sale', tier: 'free', tierActive: false });
-  assert.deepEqual(fixedUsdAnswerFor(r, window, doc), { kind: 'price', regular_iqd: 750_000 });
+  // A direct line sells at the typed dollars exactly (DECISIONS row 247).
+  assert.deepEqual(fixedUsdAnswerFor(r, window, doc), { kind: 'price', regular_iqd: 750_000, regular_usd_cents: 50_000 });
   // Without them (the V1 fallback read): no rate on any row — no sale, never a guessed price.
   w.raw.exec('DROP TABLE pricing_v2_sku_results');
   const view = (await loadRelationsViews(w.db, [{ id: PID, inventory_mode: 'OPTION' }])).get(PID)!;
-  assert.ok((view.sku_prices ?? []).every((row) => !('usd_iqd_rate' in row)));
+  assert.ok((view.sku_prices ?? []).every((row) => !('usd_iqd_rate' in row) && !('usd_cents' in row)));
   const v1doc = { ...doc, sku_prices: view.sku_prices };
   assert.deepEqual(fixedUsdAnswerFor(r, window, v1doc), { kind: 'none' });
 });

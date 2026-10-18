@@ -30,8 +30,11 @@ import { parseV2Usd } from '@levonis/pricing/priceV2';
 /* ------------------------------------------------------------ the maths -- */
 
 export type FixedUsdAnswer =
-  /** The line's offer regular price. */
-  | { kind: 'price'; regular_iqd: number }
+  /**
+   * The line's offer regular price, and its dollar twin (DECISIONS row 247) when one exists: the typed
+   * cents on a direct line, `route − (direct − typed)` in cents on a prepaid route. Absent otherwise.
+   */
+  | { kind: 'price'; regular_iqd: number; regular_usd_cents?: number }
   /** No sale on this line: the line sells at its regular price, with no strike and no error. */
   | { kind: 'none' }
   /** The route would reach 0 or less: the line does not sell (DERIVED_PRICE_BELOW_FLOOR). */
@@ -75,6 +78,15 @@ export function fixedUsdLine(i: {
   rate: string | null;
   directIqd: number | null;
   channelIqd: number;
+  /**
+   * THE DOLLAR TWIN (DECISIONS row 247). `direct`: the line is read on the SKU's direct row (a direct
+   * sale, or a COD pre-order priced as direct) — its dollar after-price is exactly the typed cents.
+   * Otherwise the line is a prepaid route: the same saving comes off the route's own dollars,
+   * `channelUsdCents − (directUsdCents − cents)`, when both are known and the result is above zero.
+   */
+  direct?: boolean;
+  directUsdCents?: number | null;
+  channelUsdCents?: number | null;
 }): FixedUsdAnswer {
   if (i.cents === null || i.rate === null || i.directIqd === null) return NONE;
   if (!Number.isSafeInteger(i.directIqd) || i.directIqd <= 0 || !Number.isSafeInteger(i.channelIqd)) return NONE;
@@ -83,7 +95,18 @@ export function fixedUsdLine(i: {
   const saving = i.directIqd - afterDirect;
   const regular = i.channelIqd - saving;
   if (regular < 1) return { kind: 'below_floor' };
-  return { kind: 'price', regular_iqd: regular };
+  const usd = fixedUsdTwin(i);
+  return usd !== null ? { kind: 'price', regular_iqd: regular, regular_usd_cents: usd } : { kind: 'price', regular_iqd: regular };
+}
+
+/** The dollar after-price of a `fixed_usd` line (see `fixedUsdLine`), or null when it has no dollar base. */
+function fixedUsdTwin(i: { cents: number | null; direct?: boolean; directUsdCents?: number | null; channelUsdCents?: number | null }): number | null {
+  const ok = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 1;
+  if (!ok(i.cents)) return null;
+  if (i.direct === true) return i.cents;
+  if (!ok(i.directUsdCents) || !ok(i.channelUsdCents)) return null;
+  const route = i.channelUsdCents - (i.directUsdCents - i.cents);
+  return route >= 1 ? route : null;
 }
 
 /** D9: the «−N٪» of a saving, rounded to the nearest whole percent; null below 1 or without a before price. */

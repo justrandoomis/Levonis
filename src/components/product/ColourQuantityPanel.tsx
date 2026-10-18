@@ -36,6 +36,7 @@ import { ColourSwatch, ColourTag } from './ColourTag';
 import ShippingConflictDialog from '../cart/ShippingConflictDialog';
 import { toast } from '../../lib/toastStore';
 import { groupedNumber } from '../../lib/localeNumber';
+import { pairedUsd } from '../../CurrencyContext';
 import { refusalText, stockRefusal } from '../../lib/refusalStrings';
 import { LINE_QTY_MAX } from '../../../packages/pricing/src/quantity';
 import {
@@ -69,6 +70,9 @@ export interface ColourRow {
   levelUnit: number | null;
   levelRegular: number | null;
   levelApplied: number | null;
+  /** The same level prices in the shop's dollars (DECISIONS row 247); absent/null = converted. */
+  levelUnitUsd?: number | null;
+  levelRegularUsd?: number | null;
 }
 
 export interface ColourQuantityPanelProps {
@@ -103,7 +107,9 @@ export interface ColourQuantityPanelProps {
   panelSlot: HTMLElement | null;
   /** The desktop layout is on screen: the summary rides in the panel slot; on a phone it sits under the list. */
   wide?: boolean;
-  money: (iqd: number) => string;
+  money: (iqd: number, usdCents?: number | null) => string;
+  /** The page's dollar total (`useMoney().usdTotal`, DECISIONS row 247): Σ the rows' dollar prices. */
+  usdTotal?: (totalIqd: number, lines: ReadonlyArray<{ iqd: number; usdCents?: number | null }>) => number | null;
   /** Quick Buy was on in single mode: ⚡ steps aside here, and says why. */
   quickBuyOn?: boolean;
   /** The page's own sentence for a refusal code ('' when it has none). */
@@ -114,6 +120,9 @@ interface RowQuote {
   unit: number;
   regular: number;
   applied: number;
+  /** The shop's dollar prices of the unit and the regular price (DECISIONS row 247); null = converted. */
+  unitUsd: number | null;
+  regularUsd: number | null;
   maxQty: number;
   tracked: boolean;
   scope: string;
@@ -125,7 +134,14 @@ interface RowQuote {
 
 interface QuoteAnswer {
   price_status?: 'priced' | 'unpriced';
-  quote: { unit_subtotal_iqd: number; regular_iqd: number; applied_iqd: number; errors?: string[] } | null;
+  quote: {
+    unit_subtotal_iqd: number;
+    regular_iqd: number;
+    applied_iqd: number;
+    unit_subtotal_usd_cents?: number;
+    regular_usd_cents?: number;
+    errors?: string[];
+  } | null;
   availability: {
     mode?: string;
     stock?: { tracked?: boolean; scope?: string; available?: number | null; max_qty?: number };
@@ -177,6 +193,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
     panelSlot,
     wide = false,
     money,
+    usdTotal,
     quickBuyOn = false,
     reasonFor,
   } = props;
@@ -257,6 +274,8 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
               unit: res.quote?.unit_subtotal_iqd ?? 0,
               regular: res.quote?.regular_iqd ?? 0,
               applied: res.quote?.applied_iqd ?? 0,
+              unitUsd: res.quote?.unit_subtotal_usd_cents ?? null,
+              regularUsd: res.quote?.regular_usd_cents ?? null,
               maxQty: unpriced ? 0 : Math.max(0, Math.trunc(stock?.max_qty ?? LINE_QTY_MAX)),
               tracked: stock?.tracked === true,
               scope: String(stock?.scope ?? ''),
@@ -371,6 +390,11 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
 
   /** Shown only when the rows' prices differ (§3.3). */
   const unitOf = (r: ColourRow): number | null => freshQuote(r.id)?.unit ?? r.levelUnit;
+  /** The same unit in the shop's dollars, from the answer the dinar unit came from. */
+  const unitUsdOf = (r: ColourRow): number | null => {
+    const q = freshQuote(r.id);
+    return q ? q.unitUsd : (r.levelUnitUsd ?? null);
+  };
   const priceDiffers = new Set(rows.filter((r) => r.offered).map(unitOf).filter((u): u is number => u !== null)).size > 1;
 
   // ------------------------------------------------------------- totals
@@ -379,12 +403,24 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
   const total = live.every((r) => unitOf(r) !== null) && live.length > 0
     ? live.reduce((sum, r) => sum + (unitOf(r) ?? 0) * (quantities[r.id] ?? 0), 0)
     : null;
+  // In dollars: Σ each row's dollar price × its quantity, and only rows without one converted (DECISIONS row 247).
+  const totalUsd =
+    total !== null && usdTotal
+      ? usdTotal(
+          total,
+          live.map((r) => {
+            const q = quantities[r.id] ?? 0;
+            const usd = unitUsdOf(r);
+            return { iqd: (unitOf(r) ?? 0) * q, usdCents: usd === null ? null : usd * q };
+          })
+        )
+      : null;
   const [announced, setAnnounced] = useState('');
   useEffect(() => {
     if (live.length === 0) return;
     // Written 600 ms after the last change, so holding + is not read out on every step.
     const t = window.setTimeout(
-      () => setAnnounced(cs.announceTotal(pieces, live.length, total === null ? '—' : money(total))),
+      () => setAnnounced(cs.announceTotal(pieces, live.length, total === null ? '—' : money(total, totalUsd))),
       600
     );
     return () => window.clearTimeout(t);
@@ -637,7 +673,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
         aria-busy={pending || undefined}
         className={`text-text-primary font-black text-[15px] tabular-nums truncate transition-opacity duration-200 ${pending ? 'opacity-55' : 'opacity-100'}`}
       >
-        {total !== null ? money(total) : '—'}
+        {total !== null ? money(total, totalUsd) : '—'}
       </div>
     </div>
   );
@@ -673,6 +709,11 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
           const unit = unitOf(r);
           const regular = q ? q.regular : r.levelRegular;
           const applied = q ? q.applied : r.levelApplied;
+          const rowUsd = pairedUsd(
+            unitUsdOf(r),
+            q ? q.regularUsd : (r.levelRegularUsd ?? null),
+            regular !== null && applied !== null && applied < regular
+          );
           const zero = r.offered && ceiling === 0;
           const facts: React.ReactNode[] = [];
           if (r.chip && !zero && !r.soldOut) facts.push(<span key="chip" className={r.chip.cls}>{r.chip.text}</span>);
@@ -681,9 +722,9 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
           if (priceDiffers && unit !== null && !r.noPrice) {
             facts.push(
               <span key="price" className="tabular-nums">
-                {money(unit)}
+                {money(unit, rowUsd.price)}
                 {regular !== null && applied !== null && applied < regular ? (
-                  <span className="ms-1 line-through text-text-muted">{money(regular)}</span>
+                  <span className="ms-1 line-through text-text-muted">{money(regular, rowUsd.struck)}</span>
                 ) : null}
               </span>
             );

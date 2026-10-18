@@ -32,7 +32,8 @@ import { getSetting, getSettings, PUBLIC_SETTING_KEYS, projectPublicSettings, pu
 import { getPublicDisplayRate } from '../lib/fx/displayRate';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import { DIMENSION_FIELDS, parseProductRow, projectPublic, projectAdmin } from '../lib/productModel';
-import { customerAvailability, customerLinePrice, offerFigures, offerLabelTier } from '../lib/customerPricing';
+import { customerAvailability, customerLinePrice, customerUsdTwins, offerFigures, offerLabelTier } from '../lib/customerPricing';
+import { isUsdCents } from '@levonis/pricing/usdCents';
 import type { ProductDoc } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom, DEFAULT_PRO_POLICY, type MemberFallback } from '../lib/pricing';
 import type { Tier, ProPricingPolicy, ResolvedPrice } from '../lib/pricing';
@@ -2112,15 +2113,21 @@ export function withLiveOffer(
  * chooser adds its fee beside them. Selection-validity errors (a colour on
  * the wrong option) are not this function's business — only the numbers.
  */
+/** One way to buy: its unit price, and the shop's dollar price of it when it has one (DECISIONS row 247). */
+export interface ModePrice {
+  unit_subtotal_iqd: number;
+  unit_subtotal_usd_cents?: number;
+}
+
 export interface PricingModes {
   /** A direct sale of this selection, or null when the line cannot be fulfilled from stock. */
-  direct: { unit_subtotal_iqd: number } | null;
+  direct: ModePrice | null;
   preorder: Array<{
     method: string;
     /** Paid in advance: the configured pre-order price. null = commission unconfigured. */
-    prepaid: { unit_subtotal_iqd: number } | null;
+    prepaid: ModePrice | null;
     /** Paid cash on delivery: priced as a direct sale WHEN the product has a direct premium. */
-    cod: { unit_subtotal_iqd: number } | null;
+    cod: ModePrice | null;
     /** The two figures above differ. */
     cod_reprices: boolean;
   }>;
@@ -2157,8 +2164,13 @@ export function pricingModes(
       preorderPricing,
       isPrinter,
     }), doc, ctx, offer, now);
+  // The unit price of one way to buy, with its dollar twin where it has one (DECISIONS row 247).
+  const modePrice = (r: ResolvedPrice): ModePrice =>
+    isUsdCents(r.unit_subtotal_usd_cents)
+      ? { unit_subtotal_iqd: r.unit_subtotal_iqd, unit_subtotal_usd_cents: r.unit_subtotal_usd_cents }
+      : { unit_subtotal_iqd: r.unit_subtotal_iqd };
   const d = resolve(null, 'prepaid');
-  const direct = d.errors.includes('TRANSPORT_REQUIRED') ? null : { unit_subtotal_iqd: d.unit_subtotal_iqd };
+  const direct = d.errors.includes('TRANSPORT_REQUIRED') ? null : modePrice(d);
   const unusable = new Set(['TRANSPORT_NOT_APPLICABLE', 'TRANSPORT_NOT_OFFERED', 'TRANSPORT_COMMISSION_UNCONFIGURED']);
   const preorder: PricingModes['preorder'] = [];
   /**
@@ -2184,8 +2196,8 @@ export function pricingModes(
     const cod = resolve(t.method, 'cod');
     preorder.push({
       method: t.method,
-      prepaid: { unit_subtotal_iqd: prepaid.unit_subtotal_iqd },
-      cod: { unit_subtotal_iqd: cod.unit_subtotal_iqd },
+      prepaid: modePrice(prepaid),
+      cod: modePrice(cod),
       cod_reprices: cod.unit_subtotal_iqd !== prepaid.unit_subtotal_iqd,
     });
   }
@@ -2317,6 +2329,16 @@ export interface PriceLevel {
    */
   offer_before_iqd?: number | null;
   offer_saving_percent?: number | null;
+  /**
+   * THE SHOP'S DOLLAR PRICES OF THIS LEVEL (DECISIONS row 247), whole cents: the twins of the figures
+   * above, each present only where it has a dollar base; the struck pair in dollars only when both
+   * twins exist. A level without them is converted at the display rate.
+   */
+  regular_usd_cents?: number;
+  applied_usd_cents?: number;
+  unit_subtotal_usd_cents?: number;
+  offer_before_usd_cents?: number;
+  offer_saving_percent_usd?: number | null;
 }
 
 export interface PriceLevels {
@@ -2375,7 +2397,7 @@ export function levelPrice(
     memberFallback: benefitFallbackFor(ctx, doc),
   });
   r = withLiveOffer(r, doc, ctx, offer, now);
-  const figures = offerFigures(r.offer_before_iqd, r.applied_iqd);
+  const figures = offerFigures(r.offer_before_iqd, r.applied_iqd, r.offer_before_usd_cents, r.applied_usd_cents);
   return {
     applied_iqd: r.applied_iqd,
     regular_iqd: r.regular_iqd,
@@ -2383,6 +2405,8 @@ export function levelPrice(
     // The F5 label (display only, §9.4); `r.applied_tier` stays the price class.
     applied_tier: offerLabelTier(r),
     ...(figures.offer_before_iqd !== null ? figures : {}),
+    // The shop's dollars (DECISIONS row 247), where this level has them.
+    ...customerUsdTwins(r),
   };
 }
 
@@ -2670,6 +2694,14 @@ export function catalogOnlyCard(doc: ProductDoc, coarse = false): Record<string,
  * member prices across levels, for the card's faint tier teasers; null =
  * that tier has no explicit price anywhere on the product.
  */
+/** The card's dollar twins (DECISIONS row 247): what a composition's own display block clears. */
+const CARD_USD_KEYS = [
+  'display_price_usd_cents',
+  'display_regular_usd_cents',
+  'display_offer_before_usd_cents',
+  'display_offer_saving_percent_usd',
+] as const;
+
 export function publicWithDisplayPrice(
   row: Record<string, unknown>,
   ctx: PricingCtx,
@@ -2816,15 +2848,37 @@ export function publicWithDisplayPrice(
   // levels (review of §8.2, O4) — never one level's own before price beside another level's figure.
   let preRegular: number | null = null;
   let postRegular: number | null = null;
+  /**
+   * THE DOLLAR TWINS OF THE CARD'S FIGURES (DECISIONS row 247), carried with the figures they belong
+   * to. A figure two levels reach with DIFFERENT dollars (or one with dollars and one without) is
+   * ambiguous: it gets no twin and the card converts it — never one level's dollars beside another's.
+   */
+  const AMBIGUOUS = -1;
+  const twinOf = (held: number | undefined | null, next: number | undefined): number | null =>
+    held === undefined ? (next ?? null) : held === (next ?? null) ? held : AMBIGUOUS;
+  let bestApplied: number | null | undefined;
+  let bestRegular: number | null | undefined;
+  let preRegularUsd: number | null | undefined;
   for (const x of counted) {
     const r = x.r;
-    if (!bestLevel || r.applied_iqd < bestLevel.r.applied_iqd) bestLevel = x;
+    if (!bestLevel || r.applied_iqd < bestLevel.r.applied_iqd) {
+      bestLevel = x;
+      bestApplied = undefined;
+      bestRegular = undefined;
+    }
+    if (r.applied_iqd === bestLevel.r.applied_iqd) {
+      bestApplied = twinOf(bestApplied, r.applied_usd_cents);
+      if (r.regular_iqd === bestLevel.r.regular_iqd) bestRegular = twinOf(bestRegular, r.regular_usd_cents);
+    }
     if (r.applied_iqd > maxApplied) maxApplied = r.applied_iqd;
     if (r.prime_iqd !== null) primeMin = primeMin === null ? r.prime_iqd : Math.min(primeMin, r.prime_iqd);
     if (r.pro_iqd !== null) proMin = proMin === null ? r.pro_iqd : Math.min(proMin, r.pro_iqd);
+    if (preRegular === null || x.base.regular_iqd < preRegular) preRegularUsd = undefined;
+    if (preRegular === null || x.base.regular_iqd <= preRegular) preRegularUsd = twinOf(preRegularUsd, x.base.regular_usd_cents);
     preRegular = preRegular === null ? x.base.regular_iqd : Math.min(preRegular, x.base.regular_iqd);
     postRegular = postRegular === null ? r.regular_iqd : Math.min(postRegular, r.regular_iqd);
   }
+  const usdTwin = (v: number | null | undefined): number | null => (typeof v === 'number' && v !== AMBIGUOUS && isUsdCents(v) ? v : null);
   const resolved = bestLevel!.r;
   /**
    * THE SALE LOWERED THE CARD'S OWN «FROM» (O4): a level the window priced, and the card's regular
@@ -2965,6 +3019,21 @@ export function publicWithDisplayPrice(
   const offerBefore = offerLowered ? preRegular : null;
   out.display_offer_before_iqd = offerBefore;
   out.display_offer_saving_percent = offerSavingPercent(offerBefore, resolved.applied_iqd);
+  /**
+   * THE SAME FIGURES IN THE SHOP'S DOLLARS (DECISIONS row 247), each present only where it has a
+   * dollar base: what a customer reading dollars is shown instead of the dinars divided by a rate. The
+   * struck dollar price and the dollar «−N٪» only as a pair. No dollar for a member teaser (a PRO price
+   * comes from dinar rules) — the card converts that one.
+   */
+  const priceUsd = usdTwin(bestApplied);
+  const regularUsd = usdTwin(bestRegular);
+  const beforeUsd = offerBefore !== null ? usdTwin(preRegularUsd) : null;
+  if (priceUsd !== null) out.display_price_usd_cents = priceUsd;
+  if (regularUsd !== null) out.display_regular_usd_cents = regularUsd;
+  if (beforeUsd !== null && priceUsd !== null && beforeUsd > priceUsd) {
+    out.display_offer_before_usd_cents = beforeUsd;
+    out.display_offer_saving_percent_usd = offerSavingPercent(beforeUsd, priceUsd);
+  }
   // The card's faint member teasers: never PREMIUM (it carries no discount
   // since 0145), and no PRO while PRO is paused — «إخفاء السعر البرو في بطاقة
   // المنتجات».
@@ -2977,6 +3046,8 @@ export function publicWithDisplayPrice(
   // figures and the offer-scoped PLUS rung replace the cached ladder entirely.
   if (composition && (doc.composition ?? '') !== '') {
     Object.assign(out, composition);
+    // A composition's figures have no dollar base: none of the twins above may describe them.
+    for (const k of CARD_USD_KEYS) delete out[k];
     // The same two rules for a bundle's own ladder.
     out.display_prime_iqd = null;
     if (ctx.proPaused) out.display_pro_iqd = null;
@@ -3189,9 +3260,16 @@ const CARD_FIELDS = [
   'direct_stock_available',
   // Set alongside `offer` when a live window has a PLUS rung.
   'display_plus_iqd',
-  // A live offer's struck before price and its «−N٪» (docs/ux/PRODUCT-DISCOUNT.md §8.1): IQD only.
+  // A live offer's struck before price and its «−N٪» (docs/ux/PRODUCT-DISCOUNT.md §8.1).
   'display_offer_before_iqd',
   'display_offer_saving_percent',
+  // The shop's dollar prices of the figures above (DECISIONS row 247): whole cents, each present only
+  // where the figure has a dollar base — what a customer reading dollars is shown instead of the dinars
+  // divided back by a rate. Never the rate, `usd_ceil6` or the typed model rows.
+  'display_price_usd_cents',
+  'display_regular_usd_cents',
+  'display_offer_before_usd_cents',
+  'display_offer_saving_percent_usd',
   // The countdown and the members-only lock chip.
   'offer',
   /**
@@ -4691,6 +4769,8 @@ productRoutes.post('/:slug/quote', async (c) => {
       ...customerLinePrice(priced),
       qty,
       line_total_iqd: priced.unit_subtotal_iqd * qty,
+      // The line in the shop's dollars (DECISIONS row 247): exact integer cents × quantity.
+      ...(isUsdCents(priced.unit_subtotal_usd_cents) ? { line_total_usd_cents: priced.unit_subtotal_usd_cents * qty } : {}),
     },
     // §8/§9: what PREMIUM and PRO pay for THIS selection, from the live rules.
     // The page shows the viewer's own line as a price, and the other tier's as

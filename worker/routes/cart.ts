@@ -37,6 +37,7 @@ import { AddToCartV1 } from '@levonis/contracts/events/v1/AddToCart';
 import { getSettings } from '../lib/settings';
 import { canonicalProductMediaUrl, parseProductRow, publicColor, publicOption, publicPreorderRoutes, type ProductDoc } from '../lib/productModel';
 import { customerAvailability, customerLinePrice, type CustomerLinePrice } from '../lib/customerPricing';
+import { isUsdCents } from '@levonis/pricing/usdCents';
 import {
   applyRelations,
   capacityFrom,
@@ -1158,6 +1159,8 @@ async function loadCart(c: Context<AppContext>) {
       // prices a pre-order line as PREPAID (its configured pre-order price);
       // the checkout quote re-prices it once a payment method is chosen.
       unit_price_iqd: resolved.unit_subtotal_iqd,
+      // The same unit in the shop's dollars (DECISIONS row 247), where it has a dollar base.
+      ...(isUsdCents(resolved.unit_subtotal_usd_cents) ? { unit_price_usd_cents: resolved.unit_subtotal_usd_cents } : {}),
       breakdown: publicBreakdown(resolved),
       // Legacy field: the base row. `availability.stock` is the authoritative
       // figure for THIS selection. Null for a mystery-pool member — the cart

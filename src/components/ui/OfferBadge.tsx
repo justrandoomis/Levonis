@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLanguage } from '../../LanguageContext';
-import { splitMoney, useMoney } from '../../CurrencyContext';
+import { shownSavingPercent, splitMoney, useMoney } from '../../CurrencyContext';
 
 /**
  * THE ONE SALE / SAVING BADGE (docs/BUNDLES_MYSTERY.md §13.2).
@@ -95,9 +95,10 @@ export const SALE_PRICE = { ar: 'سعر العرض', en: 'Sale price', ckb: 'ن�
  * Latin (an English-locale phone reading the Arabic or Sorani site): «−17٪ 900,000 د.ع | د.ع 750,000».
  * A dollar reading («$1,050.00») has no unit and is isolated whole.
  */
-export function StruckMoney({ iqd, className = '' }: { iqd: number; className?: string }) {
+export function StruckMoney({ iqd, usdCents, className = '' }: { iqd: number; usdCents?: number | null; className?: string }) {
   const { money } = useMoney();
-  const [amount, unit] = splitMoney(money(iqd));
+  // The shop's dollar price when the caller has one for this figure (DECISIONS row 247).
+  const [amount, unit] = splitMoney(money(iqd, usdCents));
   return (
     <span className={[className, 'line-through tabular-nums'].filter(Boolean).join(' ')}>
       <bdi dir="ltr">{amount}</bdi>
@@ -109,22 +110,33 @@ export function StruckMoney({ iqd, className = '' }: { iqd: number; className?: 
 export function OfferSaving({
   beforeIqd,
   percent,
+  beforeUsdCents,
+  percentUsd,
   className = '',
 }: {
   /** The struck amount (a unit price, or unit × qty on a line total). */
   beforeIqd: number;
   /** The server's percent; null or < 1 shows the strike alone. */
   percent: number | null | undefined;
+  /**
+   * The struck amount in the shop's dollars (DECISIONS row 247) — passed only when the price beside it
+   * is read in dollars too (`pairedUsd`); then the badge is the server's percent of the dollar pair.
+   */
+  beforeUsdCents?: number | null;
+  percentUsd?: number | null;
   className?: string;
 }) {
   const { lang } = useLanguage();
+  const { converted } = useMoney();
   const l: OfferLang = lang === 'en' || lang === 'ckb' ? lang : 'ar';
   if (!(beforeIqd > 0)) return null;
-  const n = typeof percent === 'number' && percent >= 1 ? Math.round(percent) : null;
+  const dollarPair = typeof beforeUsdCents === 'number';
+  const shown = dollarPair ? shownSavingPercent(converted, percent, percentUsd) : percent;
+  const n = typeof shown === 'number' && shown >= 1 ? Math.round(shown) : null;
   return (
     <span data-offer-saving className={`inline-flex min-w-0 items-center gap-1.5 ${className}`}>
       <span className="sr-only">{INSTEAD_OF[l]} </span>
-      <StruckMoney iqd={beforeIqd} className="truncate text-[11px] text-text-muted" />
+      <StruckMoney iqd={beforeIqd} usdCents={dollarPair ? beforeUsdCents : null} className="truncate text-[11px] text-text-muted" />
       {n !== null ? (
         <OfferBadge tone="saving">
           <bdi dir="ltr" aria-hidden>

@@ -9,7 +9,8 @@ import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { safeParse } from '../lib/types';
 import { stripFinancials } from '../lib/adminScope';
 import { stripInventoryProvenance } from '../lib/inventoryProvenancePrivacy';
-import { customerOrderPricing, customerOrderTransport, customerWarranty } from '../lib/customerPricing';
+import { customerOrderPricing, customerOrderTransport, customerWarranty, withoutUsdTwins } from '../lib/customerPricing';
+import { isUsdCents } from '@levonis/pricing/usdCents';
 import { requireAuth, badRequest, conflict, notFound, str, int, unavailable, HttpError } from '../lib/http';
 import { cartLineSelect } from '../lib/cartLineProjection';
 import { newId, newOrderId } from '../lib/crypto';
@@ -1591,7 +1592,8 @@ function priceCompositionLine(
           })
         : null,
     breakdown: {
-      ...publicBreakdown(b.pricing.resolved),
+      // A composition's figures have no dollar base (DECISIONS row 247): its line carries no twin.
+      ...withoutUsdTwins(publicBreakdown(b.pricing.resolved)),
       applied_iqd: bundlePrice,
       // `ResolvedPrice.applied_tier` is a SHARED type and is deliberately not
       // widened to carry PLUS (§4.4): the four-value tier lives on the
@@ -4198,12 +4200,21 @@ function quoteLines(lines: ComputedLine[]) {
         qty: l.qty,
         unit_price_iqd: l.unit,
         line_total_iqd: l.line,
+        // The line in the shop's dollars (DECISIONS row 247): only while the unit charged IS the
+        // breakdown's unit (never a gift's 0 or a bundle's own figure), exact cents × quantity.
+        ...(isUsdCents(l.breakdown?.unit_subtotal_usd_cents) && l.unit === l.breakdown.unit_subtotal_iqd && l.line === l.unit * l.qty
+          ? { unit_price_usd_cents: l.breakdown.unit_subtotal_usd_cents, line_total_usd_cents: l.breakdown.unit_subtotal_usd_cents * l.qty }
+          : {}),
         is_printer: l.is_printer,
         breakdown: l.breakdown,
         // A live offer that lowered this line (docs/ux/PRODUCT-DISCOUNT.md §8.1, §8.5): the struck UNIT
         // before price and its «−N٪», beside the bundle's two figures — IQD only.
         ...(l.breakdown && typeof l.breakdown.offer_before_iqd === 'number'
           ? { offer_before_iqd: l.breakdown.offer_before_iqd, offer_saving_percent: l.breakdown.offer_saving_percent }
+          : {}),
+        // …and in the shop's dollars, only as the pair the breakdown carries (DECISIONS row 247).
+        ...(l.breakdown && typeof l.breakdown.offer_before_iqd === 'number' && isUsdCents(l.breakdown.offer_before_usd_cents)
+          ? { offer_before_usd_cents: l.breakdown.offer_before_usd_cents, offer_saving_percent_usd: l.breakdown.offer_saving_percent_usd ?? null }
           : {}),
         // A gift (0175): 0 IQD, with what it is worth and which gift it is.
         ...(l.gift ? { kind: 'gift' as const, is_gift: true, gift: { id: l.gift.gift_id, level: l.gift.level, value_iqd: l.gift.value_iqd } } : {}),

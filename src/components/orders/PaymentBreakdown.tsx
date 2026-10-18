@@ -8,7 +8,7 @@
  * a payment that already happened.
  */
 import { Coins, Clock, CheckCircle2, Ban } from 'lucide-react';
-import type { ApiOrder, ApiOrderItem, OrderFinancial } from '../../lib/api';
+import { orderItemUsdCents, type ApiOrder, type ApiOrderItem, type OrderFinancial } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { asLang, formatDate } from './format';
 import { useMoney } from '../../CurrencyContext';
@@ -145,7 +145,7 @@ function Row({ label, value, strong = false, muted = false, negative = false }: 
 
 export default function PaymentBreakdown({ order, financial }: { order: ApiOrder; financial: OrderFinancial }) {
   // What the wallet paid is a WALLET AMOUNT: at the wallet's own rate, never the market's (Q5; FX-1 review #6).
-  const { money, moneyBoth, walletMoney } = useMoney();
+  const { money, moneyBoth, walletMoney, usdTotal } = useMoney();
   const { lang } = useLanguage();
   const s = STRINGS[asLang(lang)];
   const f = financial;
@@ -164,6 +164,10 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
   // legacy order with no snapshots keeps the generic label.
   const feeKinds = feeKindsOf(order.items);
   const feesLabel = feeKinds.length > 0 ? s.feesOf(feeKinds.map((k) => s.feeKinds[k]).join(' · ')) : s.fees;
+  // In dollars (DECISIONS row 247): the lines' frozen dollar prices, everything else converted once.
+  const usdLines = order.items.map((it) => ({ iqd: it.line_total_iqd, usdCents: orderItemUsdCents(it)?.line ?? null }));
+  const merchandiseUsd = usdTotal(f.merchandise_iqd, usdLines);
+  const totalUsd = usdTotal(f.total_iqd, usdLines);
 
   return (
     <section className="lv-surface p-4" aria-labelledby="payment-title">
@@ -175,7 +179,7 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
       </div>
 
       <dl className="mt-3 divide-y divide-border-subtle">
-        <Row label={s.merchandise} value={money(f.merchandise_iqd)} />
+        <Row label={s.merchandise} value={money(f.merchandise_iqd, merchandiseUsd)} />
         {f.fees_iqd > 0 && <Row label={feesLabel} value={money(f.fees_iqd)} />}
         {f.coupon_discount_iqd > 0 && <Row label={`${s.coupon}${couponCode}`} value={money(f.coupon_discount_iqd)} negative />}
         {f.points_value_iqd > 0 && <Row label={`${s.pointsUsed} (${f.points_used})`} value={money(f.points_value_iqd)} negative />}
@@ -192,7 +196,7 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
             the customer's chosen currency; the total keeps the dinar, because
             this is a record of money that already moved and the figure has to
             reconcile against a receipt and a bank. */}
-        <Row label={s.total} value={moneyBoth(f.total_iqd)} strong />
+        <Row label={s.total} value={moneyBoth(f.total_iqd, totalUsd)} strong />
       </dl>
 
       <dl className="mt-3 pt-3 border-t border-border-subtle divide-y divide-border-subtle">
@@ -210,7 +214,7 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
             to itemise for — the row above already names the payment, so this
             would restate the same money under a second label. */}
         {f.wallet_applied_iqd <= 0 && (f.gini_paid_iqd ?? 0) <= 0 && (f.collected_iqd === null || f.collected_iqd === undefined) && f.outstanding_iqd <= 0 && (
-          <Row label={s.state[f.payment_state] ?? f.payment_state} value={money(f.total_iqd)} muted />
+          <Row label={s.state[f.payment_state] ?? f.payment_state} value={money(f.total_iqd, totalUsd)} muted />
         )}
       </dl>
 

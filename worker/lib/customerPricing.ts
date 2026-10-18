@@ -34,6 +34,7 @@
  */
 import type { ResolvedPrice, ResolvedWarranty } from './pricing';
 import { offerSavingPercent } from './offerUsd';
+import { isUsdCents } from '@levonis/pricing/usdCents';
 
 /**
  * Arithmetic a customer payload must never carry: the steps of a price, not
@@ -60,8 +61,11 @@ export const CUSTOMER_ARITHMETIC_KEYS = [
   'regular_adjust_iqd',
   'prime_adjust_iqd',
   'pro_adjust_iqd',
-  // a dollar sale price (docs/ux/PRODUCT-DISCOUNT.md §11): a customer is shown dinars only — the typed
-  // dollars (÷ the dinars = the approved rate), the rate itself and the model rows never reach them
+  // a dollar sale price (docs/ux/PRODUCT-DISCOUNT.md §11): the rate itself, the model rows and the
+  // working of a dollar price never reach a customer. DECISIONS row 247 (amending row 243): the customer
+  // IS shown the shop's dollar price, but only as whole cents beside the dinar price
+  // (`*_usd_cents`, `*_saving_percent_usd`) — never the rate, `usd_ceil6`, the typed model rows or
+  // the form's before_usd / after_usd
   'usd_iqd_rate',
   'offer_usd_prices',
   'usd_prices',
@@ -153,6 +157,43 @@ export interface CustomerLinePrice {
   offer_before_iqd: number | null;
   /** D9: round((before − applied) × 100 / before) of the two figures printed together; null below 1. */
   offer_saving_percent: number | null;
+  /**
+   * THE SHOP'S DOLLAR PRICES OF THIS LINE (DECISIONS row 247), whole cents, each present only where
+   * its dinar figure has a dollar base (`ResolvedPrice`); a customer reading dollars is shown these,
+   * and every figure without one is converted at the display rate.
+   */
+  regular_usd_cents?: number;
+  applied_usd_cents?: number;
+  unit_subtotal_usd_cents?: number;
+  /** The struck price in dollars and the «−N٪» of the dollar pair — present only when BOTH twins exist. */
+  offer_before_usd_cents?: number;
+  offer_saving_percent_usd?: number | null;
+}
+
+/** A customer line with every dollar twin removed — for a figure that has no dollar base (a composition). */
+export function withoutUsdTwins(p: CustomerLinePrice): CustomerLinePrice {
+  const {
+    regular_usd_cents: _r,
+    applied_usd_cents: _a,
+    unit_subtotal_usd_cents: _u,
+    offer_before_usd_cents: _b,
+    offer_saving_percent_usd: _p,
+    ...rest
+  } = p;
+  return rest;
+}
+
+/** The dollar twins of a line's three figures that a customer may read: whole, non-negative cents only. */
+export function customerUsdTwins(r: {
+  regular_usd_cents?: unknown;
+  applied_usd_cents?: unknown;
+  unit_subtotal_usd_cents?: unknown;
+}): Pick<CustomerLinePrice, 'regular_usd_cents' | 'applied_usd_cents' | 'unit_subtotal_usd_cents'> {
+  return {
+    ...(isUsdCents(r.regular_usd_cents) ? { regular_usd_cents: r.regular_usd_cents } : {}),
+    ...(isUsdCents(r.applied_usd_cents) ? { applied_usd_cents: r.applied_usd_cents } : {}),
+    ...(isUsdCents(r.unit_subtotal_usd_cents) ? { unit_subtotal_usd_cents: r.unit_subtotal_usd_cents } : {}),
+  };
 }
 
 /**
@@ -207,14 +248,28 @@ export function customerLinePrice(r: ResolvedPrice): CustomerLinePrice {
     transport: r.transport ? { method: r.transport.method } : null,
     warranty: customerWarranty(r.warranty),
     errors: r.errors.filter((e) => !CUSTOMER_HIDDEN_ERRORS.has(e)),
-    ...offerFigures(r.offer_before_iqd, r.applied_iqd),
+    ...offerFigures(r.offer_before_iqd, r.applied_iqd, r.offer_before_usd_cents, r.applied_usd_cents),
+    ...customerUsdTwins(r),
   };
 }
 
-/** The struck before price and its percent, from the two numbers a customer is shown (§8.1, D9). */
-export function offerFigures(before: unknown, applied: number): { offer_before_iqd: number | null; offer_saving_percent: number | null } {
+/**
+ * The struck before price and its percent, from the two numbers a customer is shown (§8.1, D9).
+ *
+ * In dollars too (DECISIONS row 247), and only as a PAIR: the struck dollar price and the dollar
+ * «−N٪» are added only when the dinar pair is struck and BOTH dollar twins exist with the before
+ * above the after — so a percent is always the percent of the two numbers printed beside it.
+ */
+export function offerFigures(
+  before: unknown,
+  applied: number,
+  beforeUsdCents?: unknown,
+  appliedUsdCents?: unknown
+): { offer_before_iqd: number | null; offer_saving_percent: number | null; offer_before_usd_cents?: number; offer_saving_percent_usd?: number | null } {
   const b = typeof before === 'number' && Number.isSafeInteger(before) && before > applied ? before : null;
-  return { offer_before_iqd: b, offer_saving_percent: b === null ? null : offerSavingPercent(b, applied) };
+  const out = { offer_before_iqd: b, offer_saving_percent: b === null ? null : offerSavingPercent(b, applied) };
+  if (b === null || !isUsdCents(beforeUsdCents) || !isUsdCents(appliedUsdCents) || !(beforeUsdCents > appliedUsdCents)) return out;
+  return { ...out, offer_before_usd_cents: beforeUsdCents, offer_saving_percent_usd: offerSavingPercent(beforeUsdCents, appliedUsdCents) };
 }
 
 /**
@@ -229,11 +284,14 @@ export function customerOrderPricing(snapshot: unknown): Record<string, unknown>
   for (const k of ['regular_iqd', 'applied_iqd', 'unit_subtotal_iqd'] as const) {
     if (num(s[k]) !== null) out[k] = s[k];
   }
+  // The line's dollar prices, FROZEN when it sold (DECISIONS row 247): whole cents only, and only
+  // where the snapshot has them — a line sold before them has none and is converted.
+  Object.assign(out, customerUsdTwins(s));
   // The frozen class becomes the label the buyer reads — the same F5 rule the page applied (§9.4).
   if (typeof s.applied_tier === 'string') out.applied_tier = s.applied_tier === 'pro' || s.applied_tier === 'prime' ? offerLabelTier(s) : s.applied_tier;
   // The offer the line was sold under (§8.1): the FROZEN before price, and the percent recomputed from
   // it and the frozen applied price — never the typed dollars, the model row or a rate.
-  if (num(s.applied_iqd) !== null) Object.assign(out, offerFigures(s.offer_before_iqd, s.applied_iqd as number));
+  if (num(s.applied_iqd) !== null) Object.assign(out, offerFigures(s.offer_before_iqd, s.applied_iqd as number, s.offer_before_usd_cents, s.applied_usd_cents));
   const f = rec(s.fulfillment);
   if (f && (f.type === 'direct_sale' || f.type === 'pre_order')) {
     out.fulfillment = {

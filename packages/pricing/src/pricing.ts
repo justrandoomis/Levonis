@@ -591,6 +591,59 @@ export interface ResolvedPrice {
    * published price of that SKU and channel at this instant. Frozen into the order snapshot.
    */
   offer_before_iqd?: number;
+  /**
+   * THE SHOP'S DOLLAR PRICE OF THIS LINE, in whole cents (DECISIONS row 247: the dollar is the base,
+   * the dinar is derived from it through the rate). Each is the twin of the `*_iqd` figure of the same
+   * name and is ABSENT — never null — wherever that figure has no dollar base, so a ladder, V1 or
+   * legacy answer is byte-identical to what it was:
+   *  - `regular_usd_cents`: the `usd_ceil6` of the V2 row that priced the line, ceiled to the cent
+   *    (`SkuPriceRow.usd_cents`); on a ladder answer, the cents every live V2 row at exactly that
+   *    dinar price agrees on (`unanimousUsdCents`), else absent.
+   *  - `applied_usd_cents`: the regular twin, only while the buyer pays the regular price — a PRO or
+   *    PRIME price comes from dinar benefit rules and has no dollar base.
+   *  - `unit_subtotal_usd_cents`: the applied twin, only while no fee is added on top.
+   *  - `offer_before_usd_cents`: a live offer's struck price in dollars (`applyOfferToResolved`).
+   * The dinar figures are still what is charged and stored; these are what a customer reading dollars
+   * is shown, frozen into the order snapshot with the rest of the answer.
+   */
+  regular_usd_cents?: number;
+  applied_usd_cents?: number;
+  unit_subtotal_usd_cents?: number;
+  offer_before_usd_cents?: number;
+}
+
+/**
+ * The dollar twins of a line's three figures, by the rule `ResolvedPrice` states: the applied twin
+ * only while applied = regular, the unit-subtotal twin only while it equals the applied price. Each
+ * key is present only when defined. Shared by the resolver and the offer resolver.
+ */
+export function usdTwins(
+  regularUsdCents: number | null | undefined,
+  figures: { regular_iqd: number; applied_iqd: number; unit_subtotal_iqd: number }
+): Pick<ResolvedPrice, 'regular_usd_cents' | 'applied_usd_cents' | 'unit_subtotal_usd_cents'> {
+  if (typeof regularUsdCents !== 'number' || !Number.isSafeInteger(regularUsdCents) || regularUsdCents < 1) return {};
+  if (figures.applied_iqd !== figures.regular_iqd) return { regular_usd_cents: regularUsdCents };
+  if (figures.unit_subtotal_iqd !== figures.applied_iqd) return { regular_usd_cents: regularUsdCents, applied_usd_cents: regularUsdCents };
+  return { regular_usd_cents: regularUsdCents, applied_usd_cents: regularUsdCents, unit_subtotal_usd_cents: regularUsdCents };
+}
+
+/**
+ * THE DOLLAR OF A LADDER FIGURE (DECISIONS row 247). A base, option or colour level has no single V2
+ * row: the ladder columns are the min / max of the rows' dinar prices. The figure gets a dollar twin
+ * only when EVERY live row of the product at exactly that dinar price is a V2 row carrying cents, and
+ * all of them carry the SAME cents. Anything else — no such row, a V1 row, two rows that share the
+ * dinar but not the dollar — answers null and the figure is converted. It never guesses.
+ */
+export function unanimousUsdCents(rows: readonly SkuPriceRow[] | null | undefined, regularIqd: number): number | null {
+  if (!rows || !rows.length || !Number.isSafeInteger(regularIqd) || regularIqd <= 0) return null;
+  let cents: number | null = null;
+  for (const r of rows) {
+    if (r.regular_price_iqd !== regularIqd) continue;
+    if (r.v2 !== true || typeof r.usd_cents !== 'number') return null;
+    if (cents !== null && cents !== r.usd_cents) return null;
+    cents = r.usd_cents;
+  }
+  return cents;
 }
 
 /** How a pre-order line is being paid, which decides its availability fee. */
@@ -892,6 +945,13 @@ export interface SkuPriceRow {
    * converts a dollar sale price at it. Server-side only; a FINANCIAL_FIELDS key, never projected.
    */
   usd_iqd_rate?: string;
+  /**
+   * PRICING V2 rows only (DECISIONS row 247): the shop's dollar price of this SKU × channel — the
+   * `usd_ceil6` of the row's own `pricing_v2_sku_results` twin, ceiled to the whole cent
+   * (`usdCeilCentsOf`), as the product form prints it. Server-side: the row itself is never projected;
+   * the resolver turns it into the line's `*_usd_cents` twins. Absent when unknown.
+   */
+  usd_cents?: number;
 }
 
 /**
@@ -1124,6 +1184,7 @@ export function resolveUnitPrice(input: {
   const skuChannel =
     pricingType === 'direct_sale' ? 'direct_sale' : SKU_ROUTES.has(method) ? `pre_order_${method}` : null;
   const skuRegular = skuRegularOf(product.sku_prices, skuKey, skuChannel);
+  const skuRow = skuRegular !== null ? skuRowOf(product.sku_prices, skuKey, skuChannel) : null;
   let regular = ladder;
   let proExplicit = proLadder;
   let primeExplicit = primeLadder;
@@ -1403,6 +1464,10 @@ export function resolveUnitPrice(input: {
   const warrantyFee = warranty ? warranty.fee_iqd : 0;
   const directFee = direct && !direct.waived ? direct.surcharge_iqd : 0;
   const unitSubtotal = appliedIqd + commissionEffective + directFee + warrantyFee;
+  // THE DOLLAR BASE (DECISIONS row 247): the V2 row that answered, else the unanimous rows at this
+  // dinar price; absent (the figure is converted) when neither speaks.
+  const regularUsdCents =
+    skuRow !== null ? (skuRow.v2 === true && typeof skuRow.usd_cents === 'number' ? skuRow.usd_cents : null) : unanimousUsdCents(product.sku_prices, regularIqd);
 
   return {
     regular_iqd: regularIqd,
@@ -1441,6 +1506,7 @@ export function resolveUnitPrice(input: {
     pricing_basis: pricingBasis,
     warranty,
     unit_subtotal_iqd: unitSubtotal,
+    ...usdTwins(regularUsdCents, { regular_iqd: regularIqd, applied_iqd: appliedIqd, unit_subtotal_iqd: unitSubtotal }),
     // The SKU rung's identity, when it answered (docs/ux/PRODUCT-DISCOUNT.md §4.1).
     // Absent (not null) when the ladder answered, so a ladder line's answer is unchanged.
     ...(skuRegular !== null && skuChannel !== null

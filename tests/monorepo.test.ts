@@ -76,6 +76,8 @@ const PURE_PACKAGE_IMPORTS: Record<string, readonly string[]> = {
   'packages/pricing/src/priceV2.ts': ['@levonis/contracts/procurementCost', '@levonis/contracts/pricingIssues'],
   // The one price rounding rule (DECISIONS row 245): the same exact arithmetic, nothing else.
   'packages/pricing/src/priceRounding.ts': ['@levonis/contracts/procurementCost'],
+  // The shop's dollar price in whole cents (DECISIONS row 247): the same exact arithmetic, nothing else.
+  'packages/pricing/src/usdCents.ts': ['@levonis/contracts/procurementCost'],
 };
 
 test('the pricing engine maths declares its one contracts dependency', () => {

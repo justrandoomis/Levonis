@@ -14,6 +14,7 @@ import { useLanguage } from '../../LanguageContext';
 import { conditionKindLabel } from '../../lib/condition';
 import { cardHref, cardKnowledgeLine, cardName, compareTypeOf, type CardProduct } from '../../lib/productCard';
 import { isUnpriced } from '../../lib/priceStatus';
+import { shownSavingPercent, useOptionalMoney } from '../../CurrencyContext';
 
 /**
  * THE PHOTO BADGE (docs/ux/PRODUCT-DISCOUNT.md §8.2): a live offer's «−17٪» (the server's percent of the
@@ -23,7 +24,9 @@ import { isUnpriced } from '../../lib/priceStatus';
 function SaleBadge({ p, hasSale }: { p: ApiProduct; hasSale: boolean }) {
   const { lang } = useLanguage();
   const l = lang === 'en' || lang === 'ckb' ? lang : 'ar';
-  const n = typeof p.display_offer_saving_percent === 'number' && p.display_offer_saving_percent >= 1 ? p.display_offer_saving_percent : null;
+  // In dollars, the percent of the dollar pair the card prints (DECISIONS row 247).
+  const converted = useOptionalMoney()?.converted === true;
+  const n = shownSavingPercent(converted, p.display_offer_saving_percent, p.display_offer_saving_percent_usd);
   if (n !== null) {
     return (
       <OfferBadge className="absolute top-2 end-2">

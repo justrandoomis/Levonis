@@ -30,7 +30,8 @@
  * the same two-layer contract the coupons already follow.
  */
 
-import { clampMemberLadder, TIER_RANK, type ResolvedPrice, type SkuPriceRow, type Tier } from './pricing';
+import { clampMemberLadder, TIER_RANK, usdTwins, type ResolvedPrice, type SkuPriceRow, type Tier } from './pricing';
+import { percentOffUsdCents } from '@levonis/pricing/usdCents';
 import { fixedUsdLine, loadOfferUsdPrices, usdTextOfCents, type FixedUsdAnswer, type OfferUsdPrice } from './offerUsd';
 import { roundPriceIqd } from '@levonis/pricing/priceRounding';
 import { benefits, tierInherits, TIER_INHERITANCE, type TierStatus } from './entitlements';
@@ -739,13 +740,14 @@ export function applyOfferToResolved(
 ): { resolved: ResolvedPrice; offer_id: string | null; source: 'ladder' | 'offer'; plus_iqd: number | null } {
   const window = view?.window ?? null;
   if (!window) return { resolved, offer_id: null, source: 'ladder', plus_iqd: null };
+  const usdAnswer = window.offer_price_mode === 'fixed_usd' ? fixedUsdAnswerFor(resolved, window, doc ?? null) : null;
   const priced = resolveOfferPrice({
     base: resolved,
     window,
     scheduleState: scheduleState(window.starts_at, window.ends_at, nowMs),
     tier,
     tierActive,
-    ...(window.offer_price_mode === 'fixed_usd' ? { usd: fixedUsdAnswerFor(resolved, window, doc ?? null) } : {}),
+    ...(usdAnswer ? { usd: usdAnswer } : {}),
   });
   if (priced.source === 'ladder') {
     // A window whose price fell below the floor contributes NO price, and says
@@ -759,9 +761,23 @@ export function applyOfferToResolved(
     return { resolved: resolvedOut, offer_id: priced.offer_id, source: 'ladder', plus_iqd: null };
   }
   const fees = Math.max(0, resolved.unit_subtotal_iqd - resolved.applied_iqd);
+  const usd = offerUsdTwins(resolved, window, usdAnswer, {
+    regular_iqd: priced.regular_iqd,
+    applied_iqd: priced.applied_iqd,
+    unit_subtotal_iqd: priced.applied_iqd + fees,
+  });
+  // The pre-window line's dollar twins never survive the window: a sale with a dollar base re-states
+  // them below, any other sale leaves the line with none at all (DECISIONS row 247).
+  const {
+    regular_usd_cents: _regularUsd,
+    applied_usd_cents: _appliedUsd,
+    unit_subtotal_usd_cents: _subtotalUsd,
+    offer_before_usd_cents: _beforeUsd,
+    ...ladderLine
+  } = resolved;
   return {
     resolved: {
-      ...resolved,
+      ...ladderLine,
       regular_iqd: priced.regular_iqd,
       prime_iqd: priced.prime_iqd,
       pro_iqd: priced.pro_iqd,
@@ -786,11 +802,47 @@ export function applyOfferToResolved(
       // it — by D4 always strictly above the offer regular. Every surface strikes this, never a typed
       // number; it is frozen into the order snapshot with the rest of the answer.
       offer_before_iqd: resolved.regular_iqd,
+      ...usd,
     },
     offer_id: priced.offer_id,
     source: 'offer',
     plus_iqd: priced.plus_iqd,
   };
+}
+
+/**
+ * THE DOLLAR SIDE OF A LIVE SALE (DECISIONS row 247): the struck price and the sale price in the
+ * shop's dollars, so a customer reading dollars sees $15.20 → $14.00 — the figures the product form
+ * shows — and not the rounded dinars divided back by a rate.
+ *
+ *  - `fixed_usd`: the typed cents on a direct line (or a COD line priced as direct); on a prepaid
+ *    route, the route's dollars less the same dollar saving (`fixedUsdLine`).
+ *  - `discount_percent`: the percent off the line's dollar price, rounded UP to the cent — the twin of
+ *    the dinar side's round-up.
+ *  - `fixed` / `discount_iqd` (typed in dinars): no dollar base, so NO twin at all, the struck price
+ *    included — a pair is never half base and half conversion.
+ *
+ * Both the before and the after must have a base, or neither is emitted. The applied and
+ * unit-subtotal twins then follow the resolver's own equality rule (`usdTwins`).
+ */
+function offerUsdTwins(
+  resolved: ResolvedPrice,
+  window: OfferWindow,
+  usdAnswer: FixedUsdAnswer | null,
+  figures: { regular_iqd: number; applied_iqd: number; unit_subtotal_iqd: number }
+): Pick<ResolvedPrice, 'regular_usd_cents' | 'applied_usd_cents' | 'unit_subtotal_usd_cents' | 'offer_before_usd_cents'> {
+  const before = resolved.regular_usd_cents;
+  if (typeof before !== 'number') return {};
+  let after: number | null = null;
+  if (window.offer_price_mode === 'fixed_usd') {
+    after = usdAnswer && usdAnswer.kind === 'price' && typeof usdAnswer.regular_usd_cents === 'number' ? usdAnswer.regular_usd_cents : null;
+  } else if (window.offer_price_mode === 'discount_percent') {
+    // The same clamp `resolveOfferPrice` applies to the dinar side.
+    const p = Math.min(90, Math.max(1, Math.trunc(window.discount_percent ?? 0)));
+    after = percentOffUsdCents(before, p);
+  }
+  if (after === null) return {};
+  return { offer_before_usd_cents: before, ...usdTwins(after, figures) };
 }
 
 /**
@@ -815,6 +867,11 @@ export function fixedUsdAnswerFor(
     rate: direct?.usd_iqd_rate ?? null,
     directIqd: direct ? direct.regular_price_iqd : null,
     channelIqd: resolved.regular_iqd,
+    // The dollar twin (DECISIONS row 247): a line read on the direct row sells at the typed cents; a
+    // route line takes the same dollar saving off its own row's dollars.
+    direct: sku.channel === 'direct_sale',
+    directUsdCents: direct?.usd_cents ?? null,
+    channelUsdCents: resolved.regular_usd_cents ?? null,
   });
 }
 

@@ -38,6 +38,7 @@ import type {
 } from './pricing';
 import { parsePhysicalDimensions } from './physicalDimensions';
 import { PRODUCT_SKU_ROW_KEY, skuKeyOfStored } from '@levonis/pricing/skuChannel';
+import { usdCeilCentsOf } from '@levonis/pricing/usdCents';
 import {
   foldSwatches,
   liveValues,
@@ -252,6 +253,8 @@ interface SkuPriceReadRow {
   v2?: number | null;
   /** V2 rows: the rate of the row's own V2 result (docs/ux/PRODUCT-DISCOUNT.md §4.3). Absent on the V1 read. */
   usd_iqd_rate?: string | null;
+  /** V2 rows: the `usd_ceil6` of the row's own V2 result — the shop's dollar price (DECISIONS row 247). Absent on the V1 read. */
+  usd_ceil6?: string | null;
 }
 
 interface SkuRead {
@@ -292,6 +295,7 @@ async function skuPriceRows(
         strict.add(String(r.product_id));
         continue;
       }
+      const usdCents = usdCeilCentsOf(r.usd_ceil6);
       const row: SkuPriceDbRow = {
         product_id: String(r.product_id),
         // The option-less product's stored key `o:*` is the canonical `''` everywhere else (spec C-3).
@@ -302,6 +306,9 @@ async function skuPriceRows(
         // The rate travels with a V2 row only: a V1 row (or the V1 fallback read) carries none, so a
         // dollar sale price prices nothing there — an honest "no sale" (PRODUCT-DISCOUNT §4.3).
         ...(Number(r.v2) === 1 && typeof r.usd_iqd_rate === 'string' && r.usd_iqd_rate ? { usd_iqd_rate: r.usd_iqd_rate } : {}),
+        // The shop's dollar price travels the same way, as whole cents ceiled exactly as the product form
+        // prints it (DECISIONS row 247). An unparseable figure is no figure: the price is converted.
+        ...(Number(r.v2) === 1 && usdCents !== null ? { usd_cents: usdCents } : {}),
       };
       if (Number.isSafeInteger(row.regular_price_iqd) && row.regular_price_iqd > 0) out.push(row);
     }
@@ -333,12 +340,13 @@ function skuFields(read: SkuRead | SkuPriceDbRow[] | 'absent' | 'failed', produc
   const rows = Array.isArray(read) ? read : read.rows;
   const strict = !Array.isArray(read) && productId !== undefined && read.strict.has(productId);
   return {
-    sku_prices: rows.map(({ combo_key, channel, regular_price_iqd, v2, usd_iqd_rate }) => ({
+    sku_prices: rows.map(({ combo_key, channel, regular_price_iqd, v2, usd_iqd_rate, usd_cents }) => ({
       combo_key,
       channel,
       regular_price_iqd,
       ...(v2 ? { v2 } : {}),
       ...(v2 && usd_iqd_rate ? { usd_iqd_rate } : {}),
+      ...(v2 && typeof usd_cents === 'number' ? { usd_cents } : {}),
     })),
     ...(strict ? { sku_strict: true as const } : {}),
   };
@@ -377,11 +385,23 @@ const SKU_ROW_RATE_V2 = `(SELECT r.usd_iqd_rate FROM pricing_v2_sku_results r
     AND r.combo_key = CASE product_sku_prices.combo_key WHEN '${PRODUCT_SKU_ROW_KEY}' THEN '' ELSE product_sku_prices.combo_key END
     AND r.channel = product_sku_prices.channel AND r.final_price_iqd = product_sku_prices.regular_price_iqd)`;
 
-/** The V2-aware read: the live rows (V1 or V2, each flagged, V2 with its rate) and one marker row per V2 product, in one statement. */
-const skuRowsV2Sql = (where: string) => `SELECT ${SKU_PRICE_COLUMNS}, (${SKU_ROW_LIVE_V2}) AS v2, ${SKU_ROW_RATE_V2} AS usd_iqd_rate FROM product_sku_prices WHERE ${where}
+/**
+ * THE SHOP'S DOLLAR PRICE OF A LIVE V2 ROW (DECISIONS row 247): the `usd_ceil6` of the very result
+ * `SKU_ROW_LIVE_V2` matches, written in the same batch as its dinar price, so the two never disagree.
+ * Correlated exactly as SKU_ROW_RATE_V2 (a probe of the results' primary key); null on a V1 row. The
+ * figure is turned into ceiled cents on the way out (`skuPriceRows`) and is never projected as read.
+ */
+const SKU_ROW_USD_V2 = `(SELECT r.usd_ceil6 FROM pricing_v2_sku_results r
+   JOIN product_pricing_state s ON s.product_id = r.product_id AND s.mode = 'engine' AND s.pricing_method IS NOT NULL
+  WHERE r.product_id = product_sku_prices.product_id
+    AND r.combo_key = CASE product_sku_prices.combo_key WHEN '${PRODUCT_SKU_ROW_KEY}' THEN '' ELSE product_sku_prices.combo_key END
+    AND r.channel = product_sku_prices.channel AND r.final_price_iqd = product_sku_prices.regular_price_iqd)`;
+
+/** The V2-aware read: the live rows (V1 or V2, each flagged, V2 with its rate and dollars) and one marker row per V2 product, in one statement. */
+const skuRowsV2Sql = (where: string) => `SELECT ${SKU_PRICE_COLUMNS}, (${SKU_ROW_LIVE_V2}) AS v2, ${SKU_ROW_RATE_V2} AS usd_iqd_rate, ${SKU_ROW_USD_V2} AS usd_ceil6 FROM product_sku_prices WHERE ${where}
   AND (${SKU_ROW_LIVE} OR ${SKU_ROW_LIVE_V2})
 UNION ALL
-SELECT product_id, NULL, NULL, NULL, 2, NULL FROM product_pricing_state
+SELECT product_id, NULL, NULL, NULL, 2, NULL, NULL FROM product_pricing_state
   WHERE ${where} AND mode = 'engine' AND pricing_method IS NOT NULL
 ORDER BY product_id, combo_key, channel`;
 

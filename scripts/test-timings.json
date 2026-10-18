@@ -1011,6 +1011,8 @@
     "tests/urlList.test.ts": 0.2,
     "tests/usageGuide.test.ts": 0.5,
     "tests/usageGuideMedia.test.ts": 14.2,
+    "tests/usdBaseCard.test.ts": 17.7,
+    "tests/usdBaseResolver.test.ts": 1,
     "tests/usdPricingSavePrivacy.test.ts": 5,
     "tests/userPatchPolicy.test.ts": 0.2,
     "tests/usernameRuleParity.test.ts": 0.3,

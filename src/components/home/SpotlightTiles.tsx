@@ -6,7 +6,7 @@ import { type ApiProduct } from '../../lib/api';
 import SafeImage from '../ui/SafeImage';
 import { productPrimaryImage } from '../../lib/productImage';
 import { rankByAffinity, readRecentlyViewed } from '../../lib/recentlyViewed';
-import { useMoney } from '../../CurrencyContext';
+import { pairedUsd, useMoney } from '../../CurrencyContext';
 import { isUnpriced } from '../../lib/priceStatus';
 
 /**
@@ -107,6 +107,12 @@ function PricePlate({ p }: { p: ApiProduct }) {
   // Commercial tiles are SELLABLE-only (rule R4, rows 239-240); a null price is never drawn as 0.
   if (display == null || isUnpriced(p)) return null;
   const discounted = display < (regular ?? display);
+  // The shop's dollar prices (DECISIONS row 247): the struck pair in dollars only when both exist.
+  const usd = pairedUsd(
+    p.display_price_usd_cents,
+    typeof p.display_offer_before_iqd === 'number' ? p.display_offer_before_usd_cents : p.display_regular_usd_cents,
+    discounted
+  );
   return (
     // `min-h` reserves the second line so a wrapping price cannot change the
     // tile's height when the set rotates. `flex-wrap` rather than `truncate`:
@@ -123,7 +129,7 @@ function PricePlate({ p }: { p: ApiProduct }) {
           discounted ? 'text-gold' : 'text-text-primary'
         }`}
       >
-        {money(display)}
+        {money(display, usd.price)}
       </span>
       {/* The struck regular price needs about 58px of its own and there are
           only ~74 in a phone slot, so it is held back to `sm`. On a phone the
@@ -131,7 +137,7 @@ function PricePlate({ p }: { p: ApiProduct }) {
           signal, in the space that exists. */}
       {discounted && (
         <span className="hidden sm:inline text-[10px] leading-4 text-text-secondary line-through tabular-nums whitespace-nowrap">
-          {money(regular)}
+          {money(regular, usd.struck)}
         </span>
       )}
     </span>

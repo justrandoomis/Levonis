@@ -520,6 +520,15 @@ export interface ApiProduct {
    *  published price, and the server's «−N٪» of the two. Null otherwise. IQD only. */
   display_offer_before_iqd?: number | null;
   display_offer_saving_percent?: number | null;
+  /**
+   * THE SHOP'S DOLLAR PRICES OF THE FIGURES ABOVE (DECISIONS row 247), whole cents: present only
+   * where the figure has a dollar base. A customer reading dollars is shown these; a figure without
+   * one is converted at the display rate. The struck dollar price and its «−N٪» come only as a pair.
+   */
+  display_price_usd_cents?: number;
+  display_regular_usd_cents?: number;
+  display_offer_before_usd_cents?: number;
+  display_offer_saving_percent_usd?: number | null;
   /** Cheapest explicit PRIME / PRO price across levels; null = none exists.
    *  Feed the card's faint tier-teaser lines. */
   display_prime_iqd?: number | null;
@@ -641,6 +650,8 @@ export interface CartItem {
   /** The cart prices a pre-order line as PREPAID; the checkout quote is the
    *  authority once a payment method is chosen. */
   unit_price_iqd: number;
+  /** The same unit in the shop's dollars (DECISIONS row 247), whole cents; absent = converted. */
+  unit_price_usd_cents?: number;
   /** Server-resolved price breakdown for this line. `regular_iqd` vs
    *  `applied_iqd` is the only honest saving to display (§4 retired
    *  compare-at). */
@@ -658,6 +669,12 @@ export interface CartItem {
      *  its «−N٪», from the server. Null otherwise. */
     offer_before_iqd?: number | null;
     offer_saving_percent?: number | null;
+    /** The shop's dollar prices of this line (DECISIONS row 247), whole cents, where it has them. */
+    regular_usd_cents?: number;
+    applied_usd_cents?: number;
+    unit_subtotal_usd_cents?: number;
+    offer_before_usd_cents?: number;
+    offer_saving_percent_usd?: number | null;
   };
   /** The chosen extended-warranty plan id ('' = none). One plan per line,
    *  applied to every unit of the line. */
@@ -864,6 +881,12 @@ export interface OrderItemPricing {
    *  paid cash on delivery); 'preorder' = the transport commission applied. */
   pricing_basis?: 'direct' | 'preorder' | string;
   unit_subtotal_iqd?: number;
+  /** The line's dollar prices, frozen when it sold (DECISIONS row 247), whole cents; absent = converted. */
+  regular_usd_cents?: number;
+  applied_usd_cents?: number;
+  unit_subtotal_usd_cents?: number;
+  offer_before_usd_cents?: number;
+  offer_saving_percent_usd?: number | null;
   price_source?: string;
   /** 0175: on a gift line only — the gift, and its value (regular price × qty, never charged). */
   gift?: { gift_id: string; level: number; value_iqd: number } | null;
@@ -2020,6 +2043,19 @@ export function pickText(t: LocalizedText | undefined, lang: string): string {
 /** Format an IQD integer amount for display. */
 export function formatIqd(amount: number): string {
   return `${Math.round(amount).toLocaleString()} د.ع`;
+}
+
+/**
+ * A PAST ORDER LINE IN THE SHOP'S DOLLARS (DECISIONS row 247): the unit dollar price frozen when it sold
+ * (`pricing.unit_subtotal_usd_cents`), only while the unit charged is that unit — never on a gift line,
+ * never on a line sold before the dollar was frozen. Null = the line is converted.
+ */
+export function orderItemUsdCents(it: Pick<ApiOrderItem, 'qty' | 'unit_price_iqd' | 'line_total_iqd' | 'pricing' | 'is_gift'>): { unit: number; line: number } | null {
+  const p = it.pricing;
+  const unit = p?.unit_subtotal_usd_cents;
+  if (it.is_gift || !p || typeof unit !== 'number' || !Number.isSafeInteger(unit) || unit < 0) return null;
+  if (p.unit_subtotal_iqd !== it.unit_price_iqd || it.line_total_iqd !== it.unit_price_iqd * it.qty) return null;
+  return { unit, line: unit * it.qty };
 }
 
 /** Format USD cents for display. */

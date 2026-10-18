@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight, Landmark, Truck, MessageSquare, Repeat, Gift, Zap } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useWallet } from '../WalletContext';
-import { api } from '../lib/api';
+import { api, orderItemUsdCents } from '../lib/api';
 import Note from '../components/ui/Note';
 import BundleContents from '../components/bundles/BundleContents';
 import MysteryReveal from '../components/offers/MysteryReveal';
@@ -29,7 +29,7 @@ import StoreReceipt from '../components/orders/StoreReceipt';
 import PriceApprovalCard from '../components/orders/PriceApprovalCard';
 import { apiRefusal } from '../lib/refusalStrings';
 import { asLang, countItems, formatDate, itemCountLabel, monthsLabel, orderStatusLabel, statusStyle } from '../components/orders/format';
-import { useMoney } from '../CurrencyContext';
+import { pairedUsd, useMoney } from '../CurrencyContext';
 import type { Claim } from '../components/warranty/types';
 import VariantImg from '../components/ui/VariantImg';
 import { OfferSaving } from '../components/ui/OfferBadge';
@@ -249,7 +249,7 @@ const TILE =
   'lv-surface flex items-center gap-3 px-4 min-h-[52px] hover:bg-surface-raised transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
 
 export default function OrderDetail() {
-  const { money } = useMoney();
+  const { money, usdTotal } = useMoney();
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -459,6 +459,11 @@ export default function OrderDetail() {
   // loaded; the six-value legacy label is the fallback, never a guess.
   const pillLabel = tracking?.steps.find((st) => st.current)?.label ?? (order ? orderStatusLabel(lang, order) : '');
   const notFound = orderError !== null && classifyError(orderError) === 'not-found';
+  // The total in dollars (DECISIONS row 247): Σ the lines' frozen dollar prices, plus one conversion of the
+  // rest at today's display rate (delivery, fees, points, lines sold before the dollar was frozen).
+  const orderTotalUsd = order
+    ? usdTotal(order.total_iqd, order.items.map((it) => ({ iqd: it.line_total_iqd, usdCents: orderItemUsdCents(it)?.line ?? null })))
+    : null;
 
   return (
     <div className="w-full pb-24 text-text-secondary min-h-screen">
@@ -538,7 +543,7 @@ export default function OrderDetail() {
               <div className="mt-3 flex items-end justify-between gap-3">
                 <div>
                   <p className="text-[11px] text-text-muted">{s.total}</p>
-                  <p className="text-gold font-bold text-[17px] tabular-nums">{money(order.total_iqd)}</p>
+                  <p className="text-gold font-bold text-[17px] tabular-nums">{money(order.total_iqd, orderTotalUsd)}</p>
                 </div>
                 <p className="text-[12px] text-text-muted text-end">
                   {itemCountLabel(countItems(order.items, order.item_count), lang)}
@@ -671,6 +676,13 @@ export default function OrderDetail() {
                       const itemUnits = unitsByItem.get(it.id) ?? [];
                       const reviewedThis = !!it.product_id && !!reviewed?.has(it.product_id);
                       const unitPrice = it.pricing?.unit_subtotal_iqd ?? it.unit_price_iqd;
+                      // The line's dollars, frozen when it sold (DECISIONS row 247); null = converted at today's rate.
+                      const lineUsd = orderItemUsdCents(it);
+                      const offerUsd = pairedUsd(
+                        lineUsd?.unit,
+                        it.pricing?.offer_before_usd_cents,
+                        typeof it.pricing?.offer_before_iqd === 'number' && it.pricing.offer_before_iqd > 0
+                      );
                       const extras: string[] = [];
                       const months = it.warranty?.duration_months;
                       if (it.warranty && typeof months === 'number' && months > 0) {
@@ -722,12 +734,18 @@ export default function OrderDetail() {
                               )}
                               {it.variant && <p className="text-[12px] text-text-muted truncate">{it.variant}</p>}
                               <p className="text-[12px] text-text-secondary tabular-nums mt-0.5">
-                                × {it.qty} · {money(Number(unitPrice) || 0)}
+                                × {it.qty} · {money(Number(unitPrice) || 0, offerUsd.price)}
                               </p>
                               {/* A LIVE OFFER (docs/ux/PRODUCT-DISCOUNT.md §8.6): the frozen unit price it replaced,
                                   struck, and its percent. A gift line never carries one. */}
                               {!it.is_gift && typeof it.pricing?.offer_before_iqd === 'number' && it.pricing.offer_before_iqd > 0 ? (
-                                <OfferSaving className="mt-0.5" beforeIqd={it.pricing.offer_before_iqd} percent={it.pricing.offer_saving_percent} />
+                                <OfferSaving
+                                  className="mt-0.5"
+                                  beforeIqd={it.pricing.offer_before_iqd}
+                                  percent={it.pricing.offer_saving_percent}
+                                  beforeUsdCents={offerUsd.struck}
+                                  percentUsd={it.pricing.offer_saving_percent_usd}
+                                />
                               ) : null}
                               {/* A GIFT LINE (0175): given, not bought — «هدية — 0 د.ع» with its value. */}
                               {it.is_gift && (
@@ -745,7 +763,7 @@ export default function OrderDetail() {
                               )}
                               {extras.length > 0 && <p className="text-[11px] text-text-muted truncate">{extras.join(' · ')}</p>}
                             </div>
-                            <p className="text-[13.5px] text-text-primary font-bold tabular-nums shrink-0">{money(it.line_total_iqd)}</p>
+                            <p className="text-[13.5px] text-text-primary font-bold tabular-nums shrink-0">{money(it.line_total_iqd, lineUsd?.line)}</p>
                           </div>
 
                           {/* A bundle is ONE item here too, with its parts

@@ -99,7 +99,7 @@ import {
 } from '../components/product/stockAlertTargets';
 import { conditionKindLabel, type ConditionEntry } from '../lib/condition';
 import { resolveOrderType, resolveTransport, routeIsUsable } from '../lib/productSelection';
-import { useMoney } from '../CurrencyContext';
+import { pairedUsd, useMoney } from '../CurrencyContext';
 import { CommunityStoreLink } from './community/access';
 import CompareBadge from '../components/compare/CompareBadge';
 import PrinterFitsLine, { type FitPrinterRef } from '../components/product/PrinterFitsLine';
@@ -595,6 +595,8 @@ interface ProductDetail {
    *  the same number the card showed. Never `price_iqd`, which is the base
    *  row and may be a price nobody is charged. */
   display_price_iqd?: number;
+  /** The same figure in the shop's dollars (DECISIONS row 247), whole cents; absent = converted. */
+  display_price_usd_cents?: number;
   /** True only when the variants GENUINELY differ in price; the server proved
    *  it by resolving every one of them. This is what «يبدأ من» is allowed to
    *  key off — the page must never infer it from not having a quote yet. */
@@ -721,6 +723,13 @@ interface Quote {
   /** A live offer lowered this selection (docs/ux/PRODUCT-DISCOUNT.md §8.3): the struck price and its percent. */
   offer_before_iqd?: number | null;
   offer_saving_percent?: number | null;
+  /** The shop's dollar prices of these figures (DECISIONS row 247), whole cents, where they have them. */
+  regular_usd_cents?: number;
+  applied_usd_cents?: number;
+  unit_subtotal_usd_cents?: number;
+  offer_before_usd_cents?: number;
+  offer_saving_percent_usd?: number | null;
+  line_total_usd_cents?: number;
 }
 
 /**
@@ -730,12 +739,18 @@ interface Quote {
  * number at all. The page lays these out and computes none of them — the PRO
  * exemptions are already applied exactly as the checkout applies them.
  */
+/** One way to buy: its unit price, and the shop's dollar price of it when it has one (DECISIONS row 247). */
+interface ModePrice {
+  unit_subtotal_iqd: number;
+  unit_subtotal_usd_cents?: number;
+}
+
 interface PricingModes {
-  direct: { unit_subtotal_iqd: number } | null;
+  direct: ModePrice | null;
   preorder: Array<{
     method: string;
-    prepaid: { unit_subtotal_iqd: number } | null;
-    cod: { unit_subtotal_iqd: number } | null;
+    prepaid: ModePrice | null;
+    cod: ModePrice | null;
     cod_reprices: boolean;
   }>;
   cod_reprices: boolean;
@@ -766,6 +781,12 @@ interface PriceLevel {
   /** Present only when a live offer lowered this level (§8.1). */
   offer_before_iqd?: number | null;
   offer_saving_percent?: number | null;
+  /** The shop's dollar prices of these figures (DECISIONS row 247), whole cents, where they have them. */
+  regular_usd_cents?: number;
+  applied_usd_cents?: number;
+  unit_subtotal_usd_cents?: number;
+  offer_before_usd_cents?: number;
+  offer_saving_percent_usd?: number | null;
 }
 
 interface PriceLevels {
@@ -994,7 +1015,7 @@ function readPathSlug(): string {
 const readPathSlugServer = (): string => '';
 
 export default function Product() {
-  const { money, moneyBoth } = useMoney();
+  const { money, moneyBoth, usdTotal } = useMoney();
   const { slug } = useParams();
   const location = useLocation();
   const urlSlug = useSyncExternalStore(subscribeToPath, readPathSlug, readPathSlugServer);
@@ -2781,6 +2802,12 @@ export default function Product() {
     /** The struck price of a live offer for THIS selection, and its percent (docs/ux/PRODUCT-DISCOUNT.md §8.3). */
     before: number | null;
     savingPercent: number | null;
+    /** The shop's dollar prices of the figures above (DECISIONS row 247); null = converted. */
+    unitUsd: number | null;
+    regularUsd: number | null;
+    appliedUsd: number | null;
+    beforeUsd: number | null;
+    savingPercentUsd: number | null;
   } | null =
     quoteFresh && quoteErrors.length === 0
       ? {
@@ -2791,6 +2818,11 @@ export default function Product() {
           settled: true,
           before: quote!.offer_before_iqd ?? null,
           savingPercent: quote!.offer_saving_percent ?? null,
+          unitUsd: quote!.unit_subtotal_usd_cents ?? null,
+          regularUsd: quote!.regular_usd_cents ?? null,
+          appliedUsd: quote!.applied_usd_cents ?? null,
+          beforeUsd: quote!.offer_before_usd_cents ?? null,
+          savingPercentUsd: quote!.offer_saving_percent_usd ?? null,
         }
       : levelPrice
         ? {
@@ -2801,10 +2833,27 @@ export default function Product() {
             settled: levelIsFinal && !quoteLoading && quoteErrors.length === 0,
             before: levelPrice.offer_before_iqd ?? null,
             savingPercent: levelPrice.offer_saving_percent ?? null,
+            unitUsd: levelPrice.unit_subtotal_usd_cents ?? null,
+            regularUsd: levelPrice.regular_usd_cents ?? null,
+            appliedUsd: levelPrice.applied_usd_cents ?? null,
+            beforeUsd: levelPrice.offer_before_usd_cents ?? null,
+            savingPercentUsd: levelPrice.offer_saving_percent_usd ?? null,
           }
         : null;
   /** A live offer lowered what is on screen: the struck line, the «سعر العرض» label and the clock (§8.3). */
   const offerBefore = shownPrice && typeof shownPrice.before === 'number' && shownPrice.before > shownPrice.applied ? shownPrice.before : null;
+  /**
+   * THE SAME FIGURES IN THE SHOP'S DOLLARS (DECISIONS row 247): the price and the struck price beside it
+   * (the offer's, else a member's regular), in dollars only when both have one — never half base and
+   * half conversion.
+   */
+  const shownUsd = shownPrice
+    ? pairedUsd(
+        shownPrice.unitUsd,
+        offerBefore !== null ? shownPrice.beforeUsd : shownPrice.regularUsd,
+        offerBefore !== null || shownPrice.applied < shownPrice.regular
+      )
+    : { price: null, struck: null };
   /** A figure is on screen but the server has not confirmed THIS selection. */
   const priceIsPending = !!shownPrice && !shownPrice.settled;
 
@@ -2819,6 +2868,10 @@ export default function Product() {
   // The worker's own arithmetic (`unit_subtotal_iqd * qty`), done here so the
   // stepper is instant.
   const lineTotal = unitPrice === null ? null : unitPrice * qty;
+  // …and in the shop's dollars (DECISIONS row 247): exact integer cents × quantity.
+  // The unit's dollars as printed above (`shownUsd`), so the line total never mixes base and conversion.
+  const unitPriceUsd = shownUsd.price;
+  const lineTotalUsd = unitPriceUsd === null ? null : unitPriceUsd * qty;
   const isPro = viewerTier?.tier === 'pro' && viewerTier.active;
   const isPrime = viewerTier?.tier === 'prime' && viewerTier.active;
 
@@ -3119,6 +3172,19 @@ export default function Product() {
       .filter((n): n is number => n !== null);
     return finals.length ? Math.min(...finals) : null;
   })();
+  // The same figures in the shop's dollars (DECISIONS row 247), null where a figure has none.
+  const directFinalUsd: number | null = pricingModes?.direct?.unit_subtotal_usd_cents ?? null;
+  const transportFinalUsd = (t: TransportView): number | null =>
+    t.configured ? pricingModes?.preorder.find((m) => m.method === t.method)?.prepaid?.unit_subtotal_usd_cents ?? null : null;
+  /** «يبدأ من» in dollars: the dollars of the cheapest route, only when every route at that price agrees. */
+  const preorderFromFinalUsd = (() => {
+    if (preorderFromFinal === null) return null;
+    const twins = new Set(
+      (availability?.preorder.transports ?? []).filter((t) => transportFinal(t) === preorderFromFinal).map((t) => transportFinalUsd(t))
+    );
+    const [only] = [...twins];
+    return twins.size === 1 && typeof only === 'number' ? only : null;
+  })();
   // Cash on delivery changes the pre-order price ONLY when the product has a
   // direct premium this customer pays (H1: with none, the commission stays).
   // The explanation appears only where the number would actually move.
@@ -3144,7 +3210,7 @@ export default function Product() {
                 priceIsPending ? 'opacity-55' : 'opacity-100'
               }`}
             >
-              {money(unitPrice!)}
+              {money(unitPrice!, shownUsd.price)}
             </span>
             {appliedMemberTier ? (
               /* §8 — NAMED BY TIER, from tierMeta: «سعر PRO» / «سعر PREMIUM». */
@@ -3177,7 +3243,12 @@ export default function Product() {
               price, in dinars, exactly as below. */}
           {offerBefore !== null ? (
             <div data-testid="product-offer-saving" className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <OfferSaving beforeIqd={offerBefore} percent={shownPrice.savingPercent} />
+              <OfferSaving
+                beforeIqd={offerBefore}
+                percent={shownPrice.savingPercent}
+                beforeUsdCents={shownUsd.struck}
+                percentUsd={shownPrice.savingPercentUsd}
+              />
               {product.offer?.ends_at && product.offer.schedule_state !== 'upcoming' ? (
                 <Countdown target={product.offer.ends_at} kind="ends" className="text-[11.5px] text-text-secondary" />
               ) : null}
@@ -3203,7 +3274,7 @@ export default function Product() {
               numbers or to discover the benefit at checkout. */}
           {offerBefore === null && shownPrice.applied < shownPrice.regular ? (
             <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span className="text-text-muted text-[12px] line-through tabular-nums">{money(shownPrice.regular)}</span>
+              <span className="text-text-muted text-[12px] line-through tabular-nums">{money(shownPrice.regular, shownUsd.struck)}</span>
               {memberSavingIqd !== null ? (
                 <span
                   data-testid="product-member-saving"
@@ -3217,7 +3288,7 @@ export default function Product() {
           {isPro && viewerTier?.pro_benefits_context === false ? <ProAddressNotice className="mt-2.5" /> : null}
           {qty > 1 && colourMode !== 'many' ? (
             <div className="text-text-secondary text-[13px] mt-2">
-              {s.lineTotal}: <span className="text-text-primary font-bold tabular-nums">{money(lineTotal!)}</span>
+              {s.lineTotal}: <span className="text-text-primary font-bold tabular-nums">{money(lineTotal!, lineTotalUsd)}</span>
             </div>
           ) : null}
         </>
@@ -3236,7 +3307,7 @@ export default function Product() {
               <span className="text-text-secondary text-[12px] font-bold">{s.from}</span>
             ) : null}
             <span className="text-text-primary font-bold text-xl tabular-nums opacity-80">
-              {money(product.display_price_iqd ?? product.price_iqd)}
+              {money(product.display_price_iqd ?? product.price_iqd, typeof product.display_price_iqd === 'number' ? product.display_price_usd_cents : null)}
             </span>
           </div>
           <p className="text-text-secondary text-[13px] mt-2">{quoteLoading ? s.updatingPrice : s.priceUnavailable}</p>
@@ -3424,6 +3495,8 @@ export default function Product() {
               levelUnit: level?.unit_subtotal_iqd ?? null,
               levelRegular: level?.regular_iqd ?? null,
               levelApplied: level?.applied_iqd ?? null,
+              levelUnitUsd: level?.unit_subtotal_usd_cents ?? null,
+              levelRegularUsd: level?.regular_usd_cents ?? null,
             };
           })
       : orderedColors.map((col) => {
@@ -3443,6 +3516,8 @@ export default function Product() {
             levelUnit: level?.unit_subtotal_iqd ?? null,
             levelRegular: level?.regular_iqd ?? null,
             levelApplied: level?.applied_iqd ?? null,
+            levelUnitUsd: level?.unit_subtotal_usd_cents ?? null,
+            levelRegularUsd: level?.regular_usd_cents ?? null,
           };
         });
     // The rows that can take a quantity first, by the same stable rule as the chips.
@@ -3705,6 +3780,7 @@ export default function Product() {
             panelSlot={multiPanelSlot}
             wide={wideLayout}
             money={money}
+            usdTotal={usdTotal}
             quickBuyOn={quickBuyFor === product.id}
             reasonFor={(code) => {
               const said = reasonText(s, code);
@@ -3827,7 +3903,7 @@ export default function Product() {
                 <span className="block">{s.directSale}</span>
                 <span className="block text-[11px] text-text-secondary font-medium leading-snug">{s.fulfilDirectSub}</span>
                 {directUsable && directFinal !== null ? (
-                  <span className="block tabular-nums text-[14px] font-bold mt-1" data-direct-final>{money(directFinal)}</span>
+                  <span className="block tabular-nums text-[14px] font-bold mt-1" data-direct-final>{money(directFinal, directFinalUsd)}</span>
                 ) : null}
                 {/* CLOSED, AND IT SAYS WHY. Never a dead chip with no sentence. */}
                 {!directUsable ? (
@@ -3857,7 +3933,7 @@ export default function Product() {
                 {preUsable && preorderFromFinal !== null ? (
                   <span className="block tabular-nums text-[14px] font-bold mt-1">
                     <span className="text-[10px] font-medium text-text-secondary me-1">{s.from}</span>
-                    {money(preorderFromFinal)}
+                    {money(preorderFromFinal, preorderFromFinalUsd)}
                   </span>
                 ) : null}
                 {!preUsable ? (
@@ -3929,6 +4005,7 @@ export default function Product() {
             {availability!.preorder.transports.map((t) => {
               const selected = effectiveTransport === t.method;
               const final = transportFinal(t);
+              const finalUsd = transportFinalUsd(t);
               /**
                * 0075 — A FULL ROUTE IS NOT OFFERED, AND THE OTHERS STILL ARE.
                * The route that ran out is the one that closes: a sea quota of
@@ -3961,7 +4038,7 @@ export default function Product() {
                       : !usable
                         ? s.routeQuotaFull
                         : final !== null
-                          ? money(final)
+                          ? money(final, finalUsd)
                           : s.transportUnset}
                   </span>
                 </button>
@@ -5628,7 +5705,7 @@ export default function Product() {
                 priceIsPending ? 'opacity-55' : 'opacity-100'
               }`}
             >
-              {lineTotal !== null ? money(lineTotal) : '—'}
+              {lineTotal !== null ? money(lineTotal, lineTotalUsd) : '—'}
             </div>
           </div>
           {barStepper}

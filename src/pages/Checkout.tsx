@@ -88,7 +88,7 @@ import { motion } from 'motion/react';
  * on a tier id or spells a label out.
  */
 import { isPaidTier, tierLabel } from '../components/subscription/tierMeta';
-import { useMoney } from '../CurrencyContext';
+import { pairedUsd, useMoney } from '../CurrencyContext';
 import VariantImg from '../components/ui/VariantImg';
 
 /** Its own chunk: fetched only after an order is placed, drawn only for a printer with parts. */
@@ -181,10 +181,21 @@ interface CheckoutQuoteLineDto {
     transport?: { method: string } | null;
     offer_before_iqd?: number | null;
     offer_saving_percent?: number | null;
+    unit_subtotal_usd_cents?: number;
+    offer_before_usd_cents?: number;
+    offer_saving_percent_usd?: number | null;
   };
   /** A live offer lowered this line (docs/ux/PRODUCT-DISCOUNT.md §8.5): the struck UNIT before price and its percent. */
   offer_before_iqd?: number | null;
   offer_saving_percent?: number | null;
+  /**
+   * The line in the shop's dollars (DECISIONS row 247), whole cents: its unit and line total, and the
+   * struck unit price with the percent of the dollar pair. Absent = converted.
+   */
+  unit_price_usd_cents?: number;
+  line_total_usd_cents?: number;
+  offer_before_usd_cents?: number;
+  offer_saving_percent_usd?: number | null;
 }
 
 /**
@@ -567,6 +578,24 @@ function offerLineOf(beforeUnit: number | null | undefined, percent: number | nu
     : { offerBeforeIqd: null, offerSavingPercent: null };
 }
 
+/**
+ * THE SAME LINE IN THE SHOP'S DOLLARS (DECISIONS row 247): its total (unit cents × qty), and the struck
+ * total with the percent of the dollar pair. Null where the server sent no dollar price.
+ */
+function usdLineOf(
+  unitUsd: number | null | undefined,
+  beforeUnitUsd: number | null | undefined,
+  percentUsd: number | null | undefined,
+  qty: number
+): { lineTotalUsd: number | null; offerBeforeUsd: number | null; offerSavingPercentUsd: number | null } {
+  const n = Math.max(1, qty);
+  return {
+    lineTotalUsd: typeof unitUsd === 'number' ? unitUsd * n : null,
+    offerBeforeUsd: typeof beforeUnitUsd === 'number' ? beforeUnitUsd * n : null,
+    offerSavingPercentUsd: typeof percentUsd === 'number' ? percentUsd : null,
+  };
+}
+
 function counterNamed(code: string): string {
   if (code === 'PREORDER_CAPACITY_EXHAUSTED') {
     return loc(
@@ -629,7 +658,7 @@ function offeredCheckoutDays(
 }
 
 export default function Checkout() {
-  const { money, moneyBoth, walletMoney, walletCharge } = useMoney();
+  const { money, moneyBoth, walletMoney, walletCharge, usdTotal } = useMoney();
   const navigate = useNavigate();
   const location = useLocation();
   const { lang, dir, loc } = useLanguage();
@@ -1137,6 +1166,10 @@ export default function Checkout() {
     colourOrder: Array<{ id: string }>;
     qty: number;
     lineTotal: number;
+    /** The line total in the shop's dollars, and the struck total of a live offer (DECISIONS row 247). */
+    lineTotalUsd: number | null;
+    offerBeforeUsd: number | null;
+    offerSavingPercentUsd: number | null;
     isPrinter: boolean;
     /** A bundle's parts, for the same disclosure the cart uses. */
     included?: BundleContentLine[];
@@ -1191,6 +1224,8 @@ export default function Checkout() {
             savingPercent: l.saving_percent ?? cartLine?.composition?.saving_percent ?? null,
             // The same rule for a live offer: the quote's figures, the cart line only as the fallback.
             ...offerLineOf(l.offer_before_iqd ?? cartLine?.breakdown?.offer_before_iqd ?? null, l.offer_saving_percent ?? cartLine?.breakdown?.offer_saving_percent ?? null, l.qty),
+            // The quote's dollars only, beside the quote's own dinars — never the cart line's (one basis per screen).
+            ...usdLineOf(l.unit_price_usd_cents, l.offer_before_usd_cents, l.offer_saving_percent_usd, l.qty),
             mysterySpools: l.mystery ? l.mystery.spools : (cartLine?.composition?.mystery?.spool_qty ?? null),
           };
         })
@@ -1221,6 +1256,12 @@ export default function Checkout() {
           componentTotalIqd: i.composition?.component_total_iqd ?? null,
           savingPercent: i.composition?.saving_percent ?? null,
           ...offerLineOf(i.breakdown?.offer_before_iqd ?? null, i.breakdown?.offer_saving_percent ?? null, i.qty),
+          ...usdLineOf(
+            i.kind === 'gift' ? null : i.unit_price_usd_cents,
+            i.breakdown?.offer_before_usd_cents,
+            i.breakdown?.offer_saving_percent_usd,
+            i.qty
+          ),
         }));
   // A pre-order cart: which pricing rule is in force, said once, in one line,
   // and ONLY when there is something to say. Read from the quote, never
@@ -1385,6 +1426,18 @@ export default function Checkout() {
   const localPoints = usePoints ? Math.min(pointBalance, beforeDiscounts) : 0;
   const pointsDiscount = quote ? quote.points.applied_iqd : localPoints;
   const orderTotal = quote ? quote.total_iqd : beforeDiscounts - localPoints;
+  /**
+   * THE TOTALS IN THE SHOP'S DOLLARS (DECISIONS row 247): Σ each line's dollar price, plus ONE
+   * conversion of what the dinar figure holds beyond them (delivery, COD tax, warranty, points, a
+   * coupon, a membership, lines without one). Null while prices are read in dinars. The order total is
+   * still printed in dinars first (`moneyBoth`): the dinar is what is charged.
+   */
+  const usdLines = summaryLines.map((l) => ({ iqd: l.lineTotal, usdCents: l.gift ? null : l.lineTotalUsd }));
+  const subtotalUsd = usdTotal(total, usdLines);
+  const orderTotalUsd = usdTotal(orderTotal, usdLines);
+  /** A colour group's total in dollars: the sum of its lines' (they are its whole dinar total). */
+  const groupUsd = (lines: ReadonlyArray<{ lineTotal: number; lineTotalUsd: number | null }>) =>
+    usdTotal(lines.reduce((n, l) => n + l.lineTotal, 0), lines.map((l) => ({ iqd: l.lineTotal, usdCents: l.lineTotalUsd })));
 
   // Advance payment logic: "pay in advance" is the wallet method (the legacy
   // `full_advance` id means the same thing), and it covers the whole total —
@@ -2597,13 +2650,13 @@ export default function Checkout() {
                               <span className="min-w-0 truncate text-text-secondary">{line.variant} × {line.qty}</span>
                             )}
                             {/* The server's line total, never recomputed from a unit price. */}
-                            <span className="shrink-0 font-medium tabular-nums text-text-primary">{money(line.lineTotal)}</span>
+                            <span className="shrink-0 font-medium tabular-nums text-text-primary">{money(line.lineTotal, line.lineTotalUsd)}</span>
                           </div>
                           {line.colourTag && line.optionsLabel ? <p className="ps-5 text-[12px] text-text-muted truncate">{line.optionsLabel}</p> : null}
                         </li>
                       ))}
                     </ul>
-                    <p className="mt-1.5 text-sm font-medium tabular-nums text-text-primary">{money(entry.items.reduce((n, l) => n + l.lineTotal, 0))}</p>
+                    <p className="mt-1.5 text-sm font-medium tabular-nums text-text-primary">{money(entry.items.reduce((n, l) => n + l.lineTotal, 0), groupUsd(entry.items))}</p>
                   </div>
                 </div>
               ) : (
@@ -2632,9 +2685,18 @@ export default function Checkout() {
                     ) : line.variant ? (
                       <p className="text-xs text-text-muted mb-1.5 font-light">{line.variant}</p>
                     ) : null}
-                    <span className="text-sm font-medium text-text-primary tabular-nums">{money(line.lineTotal)}</span>
+                    {/* A struck pair in dollars only when both have one (DECISIONS row 247). */}
+                    <span className="text-sm font-medium text-text-primary tabular-nums">
+                      {money(line.lineTotal, pairedUsd(line.lineTotalUsd, line.offerBeforeUsd, !!line.offerBeforeIqd).price)}
+                    </span>
                     {line.offerBeforeIqd ? (
-                      <OfferSaving className="mt-0.5" beforeIqd={line.offerBeforeIqd} percent={line.offerSavingPercent} />
+                      <OfferSaving
+                        className="mt-0.5"
+                        beforeIqd={line.offerBeforeIqd}
+                        percent={line.offerSavingPercent}
+                        beforeUsdCents={pairedUsd(line.lineTotalUsd, line.offerBeforeUsd, true).struck}
+                        percentUsd={line.offerSavingPercentUsd}
+                      />
                     ) : null}
                     {line.gift && (
                       <span className="mt-1 flex flex-wrap items-center gap-1.5" data-checkout-gift-line={line.key}>
@@ -2725,7 +2787,7 @@ export default function Checkout() {
 
             <div className="flex justify-between items-center text-text-secondary">
               <span className="font-light">{loc('المجموع الفرعي', 'Subtotal', 'کۆی لاوەکی')}</span>
-              <span className="text-text-primary font-normal tabular-nums">{money(total)}</span>
+              <span className="text-text-primary font-normal tabular-nums">{money(total, subtotalUsd)}</span>
             </div>
 
             {/*
@@ -3498,7 +3560,7 @@ export default function Checkout() {
                   on it is the last place to be approximate.
                 */}
                 <span data-testid="checkout-order-total" className="text-2xl font-black text-text-primary tabular-nums">
-                  {moneyBoth(orderTotal)}
+                  {moneyBoth(orderTotal, orderTotalUsd)}
                 </span>
               </div>
 
@@ -3649,7 +3711,7 @@ export default function Checkout() {
           <div className="flex items-center gap-3">
             <div className="min-w-0 basis-[8.5rem] shrink-0">
               <div className="text-[11px] text-text-muted">{loc('إجمالي الطلب', 'Order total', 'کۆی داواکاری')}</div>
-              <div className="text-text-primary font-black text-[15px] tabular-nums truncate">{money(orderTotal)}</div>
+              <div className="text-text-primary font-black text-[15px] tabular-nums truncate">{money(orderTotal, orderTotalUsd)}</div>
             </div>
             <div className="flex-1 min-w-0">{orderButton}</div>
           </div>
