@@ -2,10 +2,12 @@
  * THE OWNER'S VIEW OF THE CATALOGUE IMPORT — `/api/admin/catalog-import/*`
  * (Bambu import spec §H.1, §H.3; DECISIONS row 241).
  *
- * OWNER ONLY (`requireOwner`, worker/lib/costAccess.ts) and READ-ONLY: GET
- * routes only. There is no skip, no "advance cursor", no retry button: an item
- * moves only through the runner's ops door, and a blocked item is resumed by
- * workflow 60 (the resume instruction says so in ar / en / ckb).
+ * OWNER ONLY (`requireOwner`, worker/lib/costAccess.ts) and READ-ONLY for the
+ * import itself: there is no skip, no "advance cursor", no retry button: an
+ * item moves only through the runner's ops door, and a blocked item is resumed
+ * by workflow 60 (the resume instruction says so in ar / en / ckb). The one
+ * write, outside any import batch, is the owner's fill of the package measures
+ * from the imported logistics rows (worker/lib/catalogImport/packageMeasures.ts).
  *
  *   GET /runs                       every run with its counts by state
  *   GET /runs/:id                   the run, its §H.3 progress, the current item, the rate (an estimate)
@@ -13,6 +15,9 @@
  *   GET /items/:id                  one item: events, media, conflicts, missing info, d1_checks next to edge_evidence
  *   GET /runs/:id/report.json       §H.3, streamed from D1 (counts and public URLs only)
  *   GET /runs/:id/report.csv        the same table as CSV
+ *   POST /fill-package-measures     «تعبئة أبعاد الشحن من بيانات الاستيراد»: package.* → the empty
+ *                                   package columns of the product, its options and colours; the
+ *                                   counts and the imported products still missing a weight or box
  *
  * Nothing here returns a protected digest, a lease token, a token hash, a cost,
  * a price or a source URL. A database without migration 0195 answers empty
@@ -21,10 +26,13 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireOwner } from '../lib/costAccess';
-import { notFound } from '../lib/http';
+import { HttpError, notFound } from '../lib/http';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { currentAndNext, csvCell, ITEM_REPORT_COLUMNS, itemReportRows, lastVerifiedUrl, measuredRate, runProgress, stageTimings, stateCounts } from '../lib/catalogImport/report';
 import { stageDataOf } from '../lib/catalogImport/items';
+import { audit } from '../lib/audit';
+import { afterProductsChanged } from '../lib/completenessHooks';
+import { fillPackageMeasures, importGuardPresent, isImportGuardRefusal } from '../lib/catalogImport/packageMeasures';
 
 export const adminCatalogImportRoutes = new Hono<AppContext>();
 adminCatalogImportRoutes.use('*', requireOwner);
@@ -239,4 +247,36 @@ adminCatalogImportRoutes.get('/runs/:id/report.csv', async (c) => {
   return new Response(stream, {
     headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'private, no-store', 'Content-Disposition': `attachment; filename="${id}-report.csv"` },
   });
+});
+
+/**
+ * «تعبئة أبعاد الشحن من بيانات الاستيراد» (owner request 2026-10-18): the imported products' verified
+ * package.* rows fill their EMPTY package columns — the product, its option values, its colours — and never an
+ * owner-entered one (worker/lib/catalogImport/packageMeasures.ts). Refused while the import's batch guard
+ * stands, so the owner retries once it is idle. No price moves: the next reviewed publish reads the measures.
+ */
+const importBusy = () =>
+  new HttpError(409, 'The catalogue import is writing right now. Nothing was filled; try again in a minute.', 'CATALOG_IMPORT_BUSY');
+
+adminCatalogImportRoutes.post('/fill-package-measures', async (c) => {
+  const db = c.env.DB;
+  if (await importGuardPresent(db)) throw importBusy();
+  let result: Awaited<ReturnType<typeof fillPackageMeasures>>;
+  try {
+    result = await fillPackageMeasures(db);
+  } catch (e) {
+    if (isImportGuardRefusal(e)) throw importBusy();
+    throw e;
+  }
+  const { touched, ...report } = result;
+  await audit(db, c.get('user')!.id, 'catalog_import.fill_package_measures', 'catalog-import', {
+    imported_products: report.imported_products,
+    products_filled: report.products_filled,
+    filled: report.filled,
+    skipped: report.skipped,
+    still_missing: report.still_missing_total,
+  });
+  // The «ناقص» flags and a product that just became sellable, at once for the first ones; the sweep does the rest.
+  if (touched.length) await afterProductsChanged(c, touched);
+  return c.json({ success: true, ...report });
 });

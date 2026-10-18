@@ -3,10 +3,12 @@
  * spec §H.1; DECISIONS row 241; the vocabulary is in ./_types.ts, the test is
  * tests/costRouteClassification.test.ts).
  *
- * OWNER ONLY AND READ-ONLY. Every route sits behind `requireOwner`: the
- * verified owner alone; every other admin hears 403 OWNER_ONLY before anything
- * is read. The answers are counts, states, codes, ids and public URLs — no
- * price, cost, stock fact, token hash or protected digest.
+ * OWNER ONLY. Every route sits behind `requireOwner`: the verified owner
+ * alone; every other admin hears 403 OWNER_ONLY before anything is read. The
+ * answers are counts, states, codes, ids, names and public URLs — no price,
+ * cost, stock fact, token hash or protected digest. The one write is the
+ * owner's fill of the empty package measures from the imported logistics rows
+ * (worker/lib/catalogImport/packageMeasures.ts; tests/catalogImportPackageFill.test.ts).
  *
  * The runner's ops door (`/api/ops/catalog-import`) is not an admin mount and is
  * not classified here: it has no session class at all (a bearer token on the run
@@ -32,6 +34,7 @@ export default {
         'GET /items/:id': OWNER,
         'GET /runs/:id/report.json': OWNER,
         'GET /runs/:id/report.csv': OWNER,
+        'POST /fill-package-measures': OWNER,
       },
     },
   ],

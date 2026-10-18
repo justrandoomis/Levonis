@@ -113,6 +113,7 @@
     "tests/catalogHideIncomplete.test.ts": 37.9,
     "tests/catalogHideIncompleteDefault.test.ts": 7.4,
     "tests/catalogImportGuards.test.ts": 38.2,
+    "tests/catalogImportPackageFill.test.ts": 19.5,
     "tests/catalogImportTransitions.test.ts": 22.5,
     "tests/catalogListingQuery.test.ts": 0.3,
     "tests/catalogMigration.test.ts": 6.8,

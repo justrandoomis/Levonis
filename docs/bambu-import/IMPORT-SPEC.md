@@ -879,6 +879,8 @@ Each omission writes a `region_value` or `spec_sources_disagree` conflict naming
 
 **Never written:** `products.net_weight_g`, `package_*_mm`, `package_weight_g`, and the option and variant dimension columns (0099). They are Pricing V2 freight inputs (§1 row 10), and the guard triggers refuse them.
 
+**The owner's fill (owner request 2026-10-18).** Outside any import batch, the owner's dashboard action «تعبئة أبعاد الشحن من بيانات الاستيراد» (`POST /api/admin/catalog-import/fill-package-measures`, `worker/lib/catalogImport/packageMeasures.ts`) copies the verified, conflict-free `package.weight` and full `package.length/width/height` rows of COMPLETE items into the EMPTY `package_weight_g` and `package_depth_mm/width_mm/height_mm` (L, W, H) of the product, its option values and its colours (a variant whose combination is one colour or one value). It never overwrites a value, never reads `product.*`, `shipment.*` or `carton.*`, refuses while the guard row stands, and touches no price. The import itself still never writes them.
+
 ### B.8 Deterministic ids and keys (the stable upsert keys of §13)
 
 `H(x)` is `sha256(x)` as hex, cut to 24 characters.

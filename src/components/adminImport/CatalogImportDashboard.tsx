@@ -24,7 +24,7 @@
  * defensively — a field the server does not send is simply not drawn — and a
  * 404 (the router not deployed yet) is a sentence, never a broken screen.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle, ExternalLink, FileDown, RefreshCw, X } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
@@ -216,7 +216,8 @@ const when = (iso: string, lang: ImportLang): string => {
 
 type Load<T> = { state: 'loading' } | { state: 'absent' } | { state: 'failed' } | { state: 'ready'; data: T };
 
-export default function CatalogImportDashboard() {
+/** `children`: the owner's catalogue acts beside the import (the package measures fill), drawn under the header. */
+export default function CatalogImportDashboard({ children }: { children?: ReactNode } = {}) {
   const { lang: rawLang, dir } = useLanguage();
   const lang: ImportLang = rawLang === 'en' || rawLang === 'ckb' ? rawLang : 'ar';
   const [runs, setRuns] = useState<Load<RunView[]>>({ state: 'loading' });
@@ -270,6 +271,8 @@ export default function CatalogImportDashboard() {
           {tri(S.retry, lang)}
         </button>
       </header>
+
+      {children}
 
       {runs.state === 'loading' ? (
         <div className="space-y-2" aria-busy="true">
