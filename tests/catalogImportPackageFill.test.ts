@@ -9,19 +9,24 @@
  *      is that colour) are filled from their package.* rows: L → depth,
  *      W → width, H → height; the answer counts them and lists what is still
  *      missing, with the audit row;
- *   2. an owner-entered value is never overwritten; a partial box, a row in
- *      conflict, an unverified row and product.* (net) measures are never
- *      used; a product the import did not complete is not touched; no price
- *      moves;
+ *   2. an owner-entered value is never overwritten, nor a scope whose freight
+ *      measure a pricing row holds; a PRICED product is never written (counted
+ *      and listed for the product form), even one priced between the read and
+ *      the write; a partial box, a row in conflict, an unverified row and
+ *      product.* (net) measures are never used; a product the import did not
+ *      complete is not touched; no price moves;
  *   3. a second run fills nothing;
  *   4. an editor or an assistant hears 403; while the import's batch guard
  *      stands the owner hears 409 CATALOG_IMPORT_BUSY and nothing is written;
- *   5. the button's answer is read defensively, in three languages.
+ *   5. the button's answer is read defensively, in three languages, and its
+ *      editor link opens the product form at «الأبعاد والوزن» (section 4).
  *
  * Run: node --import tsx --test tests/catalogImportPackageFill.test.ts
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -29,6 +34,8 @@ import { all, asD1, freshDb, json, post, row, stubApp, withoutTriggers, type Stu
 import { ASSISTANT, FULL_ADMIN, OWNER, seedCatalog, seedProduct } from './fixtures/completeness';
 import { adminCatalogImportRoutes } from '../worker/routes/adminCatalogImport';
 import { FILL_STRINGS, FillResult, editorHref, readFillReport } from '../src/components/adminImport/PackageMeasuresFill';
+import { readEditLink } from '../src/components/adminProducts/editLink';
+import { ROOT } from './fixtures/d1';
 
 const PATH = '/api/admin/catalog-import/fill-package-measures';
 const RUN = 'cir_0123456789abcdef01234567';
@@ -52,6 +59,12 @@ function spec(
     .run(`sv_${++seq}`, productId, key, o.group ?? 'logistics', o.kind ?? 'product', o.id ?? '', value, `${value} ${unit}`, unit, o.status ?? 'verified', o.conflict ?? '');
 }
 
+/** The owner's V2 method, as the pricing-mode door records it (its guard row, 0189). */
+const priceIt = (raw: DatabaseSync, pid: string) =>
+  raw.exec(`INSERT INTO ops_guards (id, ok) VALUES ('pricing-mode:${pid}', 1);
+            INSERT INTO product_pricing_state (product_id, mode, pricing_method) VALUES ('${pid}', 'engine', 'cost');
+            DELETE FROM ops_guards WHERE id = 'pricing-mode:${pid}';`);
+
 const box = (raw: DatabaseSync, productId: string, [l, w, h]: [number, number, number], scope: { kind?: 'product' | 'option_value' | 'variant'; id?: string } = {}) => {
   spec(raw, productId, 'package.length', l, scope);
   spec(raw, productId, 'package.width', w, scope);
@@ -71,6 +84,9 @@ function world() {
   seedProduct(raw, { id: 'p_partial', slug: 'partial', name: 'Partial', ...bare });
   // p_native: not imported (no COMPLETE item), with package rows all the same.
   seedProduct(raw, { id: 'p_native', slug: 'native', name: 'Native', ...bare });
+  // p_priced: imported, then priced by the owner (an engine state): never written, listed for the form.
+  seedProduct(raw, { id: 'p_priced', slug: 'priced', name: 'Priced', ...bare });
+  priceIt(raw, 'p_priced');
   raw.exec(`
     INSERT INTO product_option_groups (id, product_id, name_en, sort, active) VALUES ('g1', 'p_imp', 'Model', 0, 1);
     INSERT INTO product_option_values (id, product_id, group_id, name_en, sort, active) VALUES ('v1', 'p_imp', 'g1', 'Standard', 0, 1);
@@ -80,6 +96,8 @@ function world() {
     INSERT INTO product_variants (id, product_id, combo_key) VALUES ('pv_c1', 'p_imp', 'c:c1');
     INSERT INTO product_variants (id, product_id, combo_key) VALUES ('pv_v3', 'p_imp', 'o:v3');
     INSERT INTO product_variants (id, product_id, combo_key) VALUES ('pv_multi', 'p_imp', 'o:v1|c:c1');
+    INSERT INTO product_option_values (id, product_id, group_id, name_en, sort, active) VALUES ('v4', 'p_imp', 'g1', 'Pro', 3, 1);
+    INSERT INTO pricing_inputs (product_id, scope, scope_id, origin, shipping_weight_g, updated_at) VALUES ('p_imp', 'option', 'v4', 'SOURCE', 1800, '${STAMP}');
   `);
 
   // The ams-2-pro-feeder-unit shape: 100 × 135 × 45 mm at product scope (L, W, H), a fractional weight.
@@ -107,11 +125,17 @@ function world() {
   spec(raw, 'p_partial', 'package.weight', 1200, { conflict: 'spec_sources_disagree' });
   for (const [k, v] of [['product.net_weight', 5000], ['product.length', 300], ['product.width', 300], ['product.height', 300]] as const) spec(raw, 'p_partial', k, v);
 
+  // v4's freight measure lives in a pricing row (a purchase's, before row 247): the owner's, kept.
+  box(raw, 'p_imp', [40, 40, 40], { kind: 'option_value', id: 'v4' });
+  spec(raw, 'p_imp', 'package.weight', 450, { kind: 'option_value', id: 'v4' });
+  box(raw, 'p_priced', [70, 80, 90]);
+  spec(raw, 'p_priced', 'package.weight', 700);
+
   box(raw, 'p_native', [5, 6, 7]);
   spec(raw, 'p_native', 'package.weight', 600);
 
   raw.exec(`INSERT INTO catalog_import_runs (id, source, state) VALUES ('${RUN}', 'bambu_us', 'closed')`);
-  ['p_imp', 'p_owned', 'p_partial'].forEach((pid, i) =>
+  ['p_imp', 'p_owned', 'p_partial', 'p_priced'].forEach((pid, i) =>
     withoutTriggers(
       raw,
       ['trg_cii_insert'],
@@ -141,15 +165,20 @@ test('the product, its option values and a colour are filled from package.* (L �
   assert.deepEqual(dims(w.raw, 'product_colors', 'c1'), { w: 250, d: 80, wd: 90, h: 100 }, 'a one-colour variant is that colour');
 
   assert.deepEqual(body.filled, { product: { weight: 1, box: 1 }, option: { weight: 2, box: 2 }, color: { weight: 1, box: 1 } });
-  assert.equal(body.imported_products, 3);
+  assert.equal(body.imported_products, 4);
   assert.equal(body.products_filled, 1);
   assert.equal(body.skipped.partial_box, 1);
   assert.equal(body.skipped.conflict, 1);
   assert.equal(body.skipped.unverified, 1);
-  assert.equal(body.skipped.kept_existing, 3, "v2's weight, p_owned's weight and box");
+  assert.equal(body.skipped.kept_existing, 5, "v2's weight, p_owned's weight and box, v4's pricing-held weight and box");
+  assert.equal(body.skipped_priced, 1);
+  assert.deepEqual(body.priced_products, [{ id: 'p_priced', slug: 'priced', name_en: 'Priced', name_ar: 'منتج priced', name_ckb: 'بەرهەمی priced' }]);
   assert.equal(body.skipped.unmapped_scope, 1, 'a variant of two choices is no single row');
-  assert.deepEqual(body.still_missing, [{ id: 'p_partial', slug: 'partial', name_en: 'Partial', name_ar: 'منتج partial', name_ckb: 'بەرهەمی partial', weight: true, box: true }]);
-  assert.equal(body.still_missing_total, 1);
+  assert.deepEqual(body.still_missing, [
+    { id: 'p_partial', slug: 'partial', name_en: 'Partial', name_ar: 'منتج partial', name_ckb: 'بەرهەمی partial', weight: true, box: true },
+    { id: 'p_priced', slug: 'priced', name_en: 'Priced', name_ar: 'منتج priced', name_ckb: 'بەرهەمی priced', weight: true, box: true },
+  ]);
+  assert.equal(body.still_missing_total, 2);
 
   // The version moved for the filled product only (an open form saves no stale copy).
   assert.notEqual(row<{ u: string }>(w.raw, 'SELECT updated_at AS u FROM products WHERE id = ?', 'p_imp')!.u, STAMP);
@@ -162,7 +191,8 @@ test('the product, its option values and a colour are filled from package.* (L �
   const detail = JSON.parse(audits[0]!.detail) as Record<string, unknown>;
   assert.deepEqual(detail.filled, body.filled);
   assert.equal(detail.products_filled, 1);
-  assert.equal(detail.still_missing, 1);
+  assert.equal(detail.still_missing, 2);
+  assert.equal(detail.skipped_priced, 1);
 });
 
 test('never an owner value, a partial box, a conflict, an unverified row, product.* or a product the import did not complete; no price moves', async () => {
@@ -175,6 +205,9 @@ test('never an owner value, a partial box, a conflict, an unverified row, produc
   assert.deepEqual(dims(w.raw, 'product_option_values', 'v2'), { w: 900, d: 11, wd: 22, h: 33 }, 'the owner’s weight stays; the empty box is filled');
   assert.deepEqual(dims(w.raw, 'products', 'p_partial'), { w: null, d: null, wd: null, h: null }, 'a partial box, a conflict, an unverified edge and product.* fill nothing');
   assert.deepEqual(dims(w.raw, 'products', 'p_native'), { w: null, d: null, wd: null, h: null }, 'not imported: not touched');
+  assert.deepEqual(dims(w.raw, 'products', 'p_priced'), { w: null, d: null, wd: null, h: null }, 'priced: left for the form’s reviewed save');
+  assert.equal(row<{ u: string }>(w.raw, 'SELECT updated_at AS u FROM products WHERE id = ?', 'p_priced')!.u, STAMP);
+  assert.deepEqual(dims(w.raw, 'product_option_values', 'v4'), { w: null, d: null, wd: null, h: null }, 'a pricing row holds its measure');
   assert.deepEqual(
     { ...row<Record<string, unknown>>(w.raw, 'SELECT net_weight_g AS n, width_mm AS w FROM products WHERE id = ?', 'p_partial') },
     { n: null, w: null },
@@ -191,7 +224,8 @@ test('a second run fills nothing', async () => {
   const again = await json(await post(w.as(OWNER), PATH));
   assert.deepEqual(again.filled, { product: { weight: 0, box: 0 }, option: { weight: 0, box: 0 }, color: { weight: 0, box: 0 } });
   assert.equal(again.products_filled, 0);
-  assert.equal(again.still_missing_total, 1);
+  assert.equal(again.still_missing_total, 2);
+  assert.equal(again.skipped_priced, 1);
   assert.deepEqual(all(w.raw, `SELECT id, ${DIMS}, updated_at FROM products ORDER BY id`), before);
 });
 
@@ -240,6 +274,32 @@ test('a guard that appears between the check and the write rolls the fill back: 
   assert.deepEqual(dims(w.raw, 'product_option_values', 'v1'), { w: null, d: null, wd: null, h: null });
 });
 
+test('a product priced between the read and the write is not touched', async () => {
+  const w = world();
+  let priced = false;
+  const pricedOnce = new Proxy(asD1(w.raw), {
+    get(target, prop, receiver) {
+      if (prop === 'batch') {
+        return (statements: D1PreparedStatement[]) => {
+          if (!priced) priceIt(w.raw, 'p_imp');
+          priced = true;
+          return target.batch(statements);
+        };
+      }
+      const v = Reflect.get(target, prop, receiver) as unknown;
+      return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(target) : v;
+    },
+  });
+  const res = await post(stubApp(pricedOnce, OWNER, (a) => a.route('/api/admin/catalog-import', adminCatalogImportRoutes)), PATH);
+  assert.equal(res.status, 200);
+  const body = await json(res);
+  assert.deepEqual(body.filled, { product: { weight: 0, box: 0 }, option: { weight: 0, box: 0 }, color: { weight: 0, box: 0 } });
+  for (const [table, id] of [['products', 'p_imp'], ['product_option_values', 'v1'], ['product_colors', 'c1']] as const) {
+    assert.deepEqual(dims(w.raw, table, id), { w: null, d: null, wd: null, h: null }, `${table} ${id}`);
+  }
+  assert.equal(row<{ u: string }>(w.raw, 'SELECT updated_at AS u FROM products WHERE id = ?', 'p_imp')!.u, STAMP, 'its version stays too');
+});
+
 test('the button’s answer is read defensively and drawn in three languages, each product linked to its editor', () => {
   for (const [k, v] of Object.entries(FILL_STRINGS)) {
     assert.ok(v.ar && v.en && v.ckb, k);
@@ -250,6 +310,8 @@ test('the button’s answer is read defensively and drawn in three languages, ea
     products_filled: 1,
     filled: { product: { weight: 1, box: 1 }, option: { weight: 2, box: 'x' }, color: { weight: -4, box: 1 } },
     skipped: { kept_existing: 3, conflict: 1, unverified: 1, invalid: 0, partial_box: 1 },
+    skipped_priced: 1,
+    priced_products: [{ id: 'p_priced', slug: 'priced', name_en: 'Priced', name_ar: 'مسعّر', name_ckb: 'نرخدانراو' }, { id: 'bad id' }],
     still_missing: [
       { id: 'p_partial', slug: 'partial', name_en: 'Partial', name_ar: 'جزئي', name_ckb: 'بەشێک', weight: true, box: true },
       { id: '"><script>', slug: 'x', weight: true },
@@ -260,13 +322,30 @@ test('the button’s answer is read defensively and drawn in three languages, ea
   assert.equal(view.unused, 3);
   assert.deepEqual(view.missing.map((m) => m.id), ['p_partial'], 'an unsafe id draws no link');
   assert.equal(view.missingTotal, 7);
+  assert.deepEqual(view.priced.map((m) => m.id), ['p_priced']);
+  assert.equal(view.pricedTotal, 1);
   assert.equal(editorHref('p_partial'), '/admin?tab=products&edit=p_partial&section=4');
   for (const lang of ['ar', 'en', 'ckb'] as const) {
     const html = renderToStaticMarkup(createElement(FillResult, { view, lang }));
     assert.match(html, /href="\/admin\?tab=products&amp;edit=p_partial&amp;section=4"/);
-    assert.ok(html.includes(FILL_STRINGS.stillMissing[lang]), lang);
+    assert.match(html, /data-fill-priced-id="p_priced"[^>]*><a [^>]*href="\/admin\?tab=products&amp;edit=p_priced&amp;section=4"/);
+    assert.ok(html.includes(FILL_STRINGS.priced[lang]) && html.includes(FILL_STRINGS.stillMissing[lang]), lang);
     assert.ok(html.includes(FILL_STRINGS.weight[lang]) && html.includes(FILL_STRINGS.box[lang]), lang);
   }
   const none = renderToStaticMarkup(createElement(FillResult, { view: readFillReport({}), lang: 'ckb' }));
   assert.ok(none.includes(FILL_STRINGS.noneMissing.ckb));
+});
+
+test('the editor link reaches the product form: «الأبعاد والوزن» (section 4) opens first', () => {
+  assert.deepEqual(readEditLink(new URL(editorHref('p_partial'), 'https://levonis-iq.com').search), { id: 'p_partial', section: 4 });
+  assert.deepEqual(readEditLink('?tab=products&edit=p_x'), { id: 'p_x', section: null });
+  assert.deepEqual(readEditLink('?tab=products&edit=p_x&section=9'), { id: 'p_x', section: null });
+  assert.equal(readEditLink('?tab=products&edit=%22%3E'), null);
+  // The list hands the section to the form, which opens it first and scrolls to it once loaded.
+  const list = readFileSync(join(ROOT, 'src/components/AdminProducts.tsx'), 'utf8');
+  assert.match(list, /readEditLink\(window\.location\.search\)/);
+  assert.match(list, /initialSection=\{editing\.section \?\? null\}/);
+  const form = readFileSync(join(ROOT, 'src/components/adminProducts/ProductForm.tsx'), 'utf8');
+  assert.match(form, /useState\(initialSection \?\? 1\)/);
+  assert.match(form, /\[data-section="\$\{initialSection\}"\]/);
 });

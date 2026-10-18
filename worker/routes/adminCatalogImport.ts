@@ -16,8 +16,9 @@
  *   GET /runs/:id/report.json       §H.3, streamed from D1 (counts and public URLs only)
  *   GET /runs/:id/report.csv        the same table as CSV
  *   POST /fill-package-measures     «تعبئة أبعاد الشحن من بيانات الاستيراد»: package.* → the empty
- *                                   package columns of the product, its options and colours; the
- *                                   counts and the imported products still missing a weight or box
+ *                                   package columns of an unpriced product, its options and colours;
+ *                                   the counts, the priced products left for the product form, and
+ *                                   the imported products still missing a weight or box
  *
  * Nothing here returns a protected digest, a lease token, a token hash, a cost,
  * a price or a source URL. A database without migration 0195 answers empty
@@ -252,8 +253,9 @@ adminCatalogImportRoutes.get('/runs/:id/report.csv', async (c) => {
 /**
  * «تعبئة أبعاد الشحن من بيانات الاستيراد» (owner request 2026-10-18): the imported products' verified
  * package.* rows fill their EMPTY package columns — the product, its option values, its colours — and never an
- * owner-entered one (worker/lib/catalogImport/packageMeasures.ts). Refused while the import's batch guard
- * stands, so the owner retries once it is idle. No price moves: the next reviewed publish reads the measures.
+ * owner-entered one, nor one a pricing row holds (worker/lib/catalogImport/packageMeasures.ts). A PRICED
+ * product is never written — its measures change only through the product form's reviewed save — and is
+ * listed for that form. Refused while the import's batch guard stands, so the owner retries once it is idle.
  */
 const importBusy = () =>
   new HttpError(409, 'The catalogue import is writing right now. Nothing was filled; try again in a minute.', 'CATALOG_IMPORT_BUSY');
@@ -274,6 +276,7 @@ adminCatalogImportRoutes.post('/fill-package-measures', async (c) => {
     products_filled: report.products_filled,
     filled: report.filled,
     skipped: report.skipped,
+    skipped_priced: report.skipped_priced,
     still_missing: report.still_missing_total,
   });
   // The «ناقص» flags and a product that just became sellable, at once for the first ones; the sweep does the rest.

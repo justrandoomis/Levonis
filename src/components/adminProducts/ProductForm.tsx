@@ -173,10 +173,13 @@ function relationsCarryCost(relations: RelationsRead): boolean {
 
 export default function ProductForm({
   productId,
+  initialSection = null,
   onBack,
   onListChanged,
 }: {
   productId: string | null;
+  /** The section a deep link opens first (`&section=`, adminProducts/editLink.ts), scrolled to once loaded. */
+  initialSection?: number | null;
   onBack: () => void;
   onListChanged: () => void;
 }) {
@@ -294,7 +297,7 @@ export default function ProductForm({
     else setDoc((d) => ({ ...d, sub_category_id: node.id }));
   };
 
-  const [open, setOpen] = useState(1);
+  const [open, setOpen] = useState(initialSection ?? 1);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saveNote, setSaveNote] = useState<string | null>(null);
@@ -746,6 +749,13 @@ export default function ProductForm({
       document.querySelector(n === 3 ? '[data-form="pricing-v2"]' : '[data-section="5"]')?.scrollIntoView({ block: 'start', behavior: 'smooth' })
     );
   };
+  /** A deep link's section (`initialSection`): opened from the start, scrolled to once the product has loaded. */
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (loading || deepLinked.current || !initialSection) return;
+    deepLinked.current = true;
+    requestAnimationFrame(() => document.querySelector(`[data-section="${initialSection}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  }, [loading, initialSection]);
 
   const errors: FormErrors = useMemo(
     () =>

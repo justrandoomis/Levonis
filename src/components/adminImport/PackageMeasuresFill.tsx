@@ -2,9 +2,11 @@
  * «تعبئة أبعاد الشحن من بيانات الاستيراد» — the owner's button on the import
  * dashboard (owner request 2026-10-18): POST /api/admin/catalog-import/fill-package-measures
  * copies the imported products' verified packaged weight and box into their
- * EMPTY package fields (the product, its options, its colours) and answers the
- * counts and the imported products still missing a weight or box, each with a
- * link to its editor.
+ * EMPTY package fields (the product, its options, its colours) — never of a
+ * priced product, whose measures change only through the product form's
+ * reviewed save — and answers the counts, the priced products left for that
+ * form and the imported products still missing a weight or box, each with a
+ * link to its editor at «الأبعاد والوزن».
  *
  * Kept apart from CatalogImportDashboard.tsx: that screen only reads the
  * import (tests/catalogImportDashboard.test.ts), and this act is not an import
@@ -24,9 +26,9 @@ const t = (ar: string, en: string, ckb: string): Tri => ({ ar, en, ckb });
 export const FILL_STRINGS = {
   title: t('تعبئة أبعاد الشحن من بيانات الاستيراد', 'Fill shipping measures from the import data', 'پڕکردنەوەی قەبارە و کێشی ناردن لە زانیاری هاوردەکردنەوە'),
   intro: t(
-    'ينسخ الوزن مع التغليف وأبعاد الصندوق المؤكدة من بيانات المصدر إلى المنتجات المستوردة وخياراتها وألوانها — في الخانات الفارغة فقط. لا يغيّر قيمة أدخلتها ولا أي سعر.',
-    'Copies the verified packaged weight and box size from the source data into the imported products, their options and colours — into empty fields only. It never changes a value you entered, nor any price.',
-    'کێشی لەگەڵ بەستەبەندی و قەبارەی سندوقی پشتڕاستکراوە لە زانیاری سەرچاوەوە دەگوازێتەوە بۆ بەرهەمە هاوردەکراوەکان و هەڵبژاردە و ڕەنگەکانیان — تەنها بۆ خانە بەتاڵەکان. هیچ بەهایەک کە تۆ نووسیوتە و هیچ نرخێک ناگۆڕێت.'
+    'ينسخ الوزن مع التغليف وأبعاد الصندوق المؤكدة من بيانات المصدر إلى المنتجات المستوردة غير المسعّرة وخياراتها وألوانها — في الخانات الفارغة فقط، ولا يكتب فوق قيمة أدخلتها هنا أو في التسعير. المنتج المسعّر لا يُعبّأ: راجع أبعاده من نموذج المنتج.',
+    'Copies the verified packaged weight and box size from the source data into imported products that are not priced yet, their options and colours — into empty fields only, never over a value you entered here or in pricing. A priced product is not filled: review its dimensions in the product form.',
+    'کێشی لەگەڵ بەستەبەندی و قەبارەی سندوقی پشتڕاستکراوە لە زانیاری سەرچاوەوە دەگوازێتەوە بۆ ئەو بەرهەمە هاوردەکراوانەی هێشتا نرخیان بۆ دانەنراوە و هەڵبژاردە و ڕەنگەکانیان — تەنها بۆ خانە بەتاڵەکان، و هەرگیز بەسەر بەهایەکدا نانووسێت کە لێرە یان لە نرخداناندا نووسیوتە. بەرهەمی نرخدانراو پڕناکرێتەوە: قەبارەکانی لە فۆرمی بەرهەمەکەدا پێداچوونەوە بکە.'
   ),
   run: t('تعبئة الآن', 'Fill now', 'ئێستا پڕی بکەرەوە'),
   running: t('جارٍ التعبئة…', 'Filling…', 'پڕدەکرێتەوە…'),
@@ -54,6 +56,11 @@ export const FILL_STRINGS = {
     'Imported products still missing a weight or box — complete them by hand:',
     'بەرهەمە هاوردەکراوەکان کە هێشتا کێش یان سندوقیان نییە — بە دەست تەواویان بکە:'
   ),
+  priced: t(
+    'منتجات مسعّرة لم تُعبّأ — راجع الأبعاد من نموذج المنتج:',
+    'Priced products not filled — review the dimensions in the product form:',
+    'بەرهەمە نرخدانراوەکان کە پڕنەکرانەوە — قەبارەکان لە فۆرمی بەرهەمەکەدا پێداچوونەوە بکە:'
+  ),
   noneMissing: t('لا ينقص أي منتج مستورد وزنٌ أو صندوق.', 'No imported product is missing a weight or box.', 'هیچ بەرهەمێکی هاوردەکراو کێش یان سندوقی کەم نییە.'),
   more: t('ومنتجات أخرى لم تُعرض:', 'More not shown:', 'بەرهەمی تری نیشاننەدراو:'),
   edit: t('تعديل', 'Edit', 'دەستکاری'),
@@ -70,6 +77,8 @@ export interface FillView {
   filled: { product: FillKindCounts; option: FillKindCounts; color: FillKindCounts };
   kept: number;
   unused: number;
+  priced: Array<{ id: string; slug: string; name: Tri }>;
+  pricedTotal: number;
   missing: Array<{ id: string; slug: string; name: Tri; weight: boolean; box: boolean }>;
   missingTotal: number;
 }
@@ -85,16 +94,21 @@ export function readFillReport(raw: unknown): FillView {
   const filled = obj(r.filled);
   const kind = (k: string): FillKindCounts => ({ weight: n(obj(filled[k]).weight), box: n(obj(filled[k]).box) });
   const skipped = obj(r.skipped);
-  const missing = (Array.isArray(r.still_missing) ? r.still_missing : [])
-    .map(obj)
-    .filter((m) => ID.test(s(m.id)))
-    .map((m) => ({ id: s(m.id), slug: s(m.slug), name: { ar: s(m.name_ar), en: s(m.name_en), ckb: s(m.name_ckb) }, weight: m.weight === true, box: m.box === true }));
+  const refs = (v: unknown) =>
+    (Array.isArray(v) ? v : [])
+      .map(obj)
+      .filter((m) => ID.test(s(m.id)))
+      .map((m) => ({ m, ref: { id: s(m.id), slug: s(m.slug), name: { ar: s(m.name_ar), en: s(m.name_en), ckb: s(m.name_ckb) } } }));
+  const missing = refs(r.still_missing).map(({ m, ref }) => ({ ...ref, weight: m.weight === true, box: m.box === true }));
+  const priced = refs(r.priced_products).map(({ ref }) => ref);
   return {
     imported: n(r.imported_products),
     productsFilled: n(r.products_filled),
     filled: { product: kind('product'), option: kind('option'), color: kind('color') },
     kept: n(skipped.kept_existing),
     unused: n(skipped.conflict) + n(skipped.unverified) + n(skipped.invalid) + n(skipped.partial_box),
+    priced,
+    pricedTotal: Math.max(n(r.skipped_priced), priced.length),
     missing,
     missingTotal: Math.max(n(r.still_missing_total), missing.length),
   };
@@ -147,6 +161,25 @@ export function FillResult({ view, lang }: { view: FillView; lang: ImportLang })
           ))}
         </tbody>
       </table>
+      {view.pricedTotal > 0 ? (
+        <div className="space-y-1.5" data-fill-priced>
+          <p className="text-[13px] font-bold">
+            {tri(FILL_STRINGS.priced, lang)} <span className="tabular-nums">{view.pricedTotal}</span>
+          </p>
+          <ul className="max-h-[240px] space-y-1 overflow-y-auto text-[13px]">
+            {view.priced.map((m) => (
+              <li key={m.id} className="flex flex-wrap items-center gap-2" data-fill-priced-id={m.id}>
+                <a className="font-medium underline underline-offset-2" href={editorHref(m.id)}>
+                  {tri(m.name, lang) || m.slug || m.id}
+                </a>
+                <a className={`${T.btnGhostSm} ms-auto`} href={editorHref(m.id)}>
+                  {tri(FILL_STRINGS.edit, lang)}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {view.missingTotal === 0 ? (
         <p className="flex items-center gap-1.5 text-[13px]" data-fill-none-missing>
           <Check className="h-4 w-4" aria-hidden />

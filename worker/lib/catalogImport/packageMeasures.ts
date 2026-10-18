@@ -29,8 +29,20 @@
  *     read; `shipment.*` and `carton.*` (multi-box and master-carton rows) are
  *     ignored.
  *   - A row in conflict (`conflict` not empty) or not `verified` is left out.
- *   - No price is touched: the products are imported unpriced, and the next
- *     reviewed Pricing V2 publish reads the new measures.
+ *   - A PRICED product is never written (`skipped_priced`, listed for the
+ *     product form): an engine pricing state or a published V2 result. Its
+ *     package measures are freight inputs, and a change to them must go
+ *     through the owner's reviewed save (the form's gateV2); written here, they
+ *     would move no `inputs_seq`, so the next FX tick or sweep could publish
+ *     new prices unreviewed. An unpriced product has no price to move: its
+ *     first reviewed publish reads the new measures.
+ *   - A scope whose freight measure the owner holds in `pricing_inputs`
+ *     (before DECISIONS row 247 an own-cost model's weight and box lived only
+ *     there; a purchase still writes them) is the owner's: kept, never
+ *     overridden by a package written here.
+ *   - Both refusals are tested again in the UPDATE itself (NOT EXISTS), so a
+ *     product priced, or a measure entered, between the read and the write
+ *     stays as it is.
  *
  * THE IMPORT'S GUARD. While `ops_guards('catalog-import-batch')` exists, the
  * 0195 triggers refuse any package write; the route refuses first with a
@@ -80,6 +92,15 @@ export interface MissingProduct {
   box: boolean;
 }
 
+/** A priced product the fill left for the product form. */
+export interface ProductRef {
+  id: string;
+  slug: string;
+  name_en: string;
+  name_ar: string;
+  name_ckb: string;
+}
+
 export interface FillReport {
   imported_products: number;
   /** Products with at least one value written (on itself, an option or a colour). */
@@ -94,11 +115,14 @@ export interface FillReport {
     invalid: number;
     /** Scopes with one or two box edges only. */
     partial_box: number;
-    /** Values already on the row (the owner's): kept. */
+    /** Values already on the row, or held in its pricing inputs (the owner's): kept. */
     kept_existing: number;
     /** Rows scoped to a value, colour or variant the product no longer has, or a multi-choice variant. */
     unmapped_scope: number;
   };
+  /** Priced products with a measure to offer, left untouched for the product form's reviewed save. */
+  skipped_priced: number;
+  priced_products: ProductRef[];
   still_missing: MissingProduct[];
   still_missing_total: number;
 }
@@ -123,6 +147,8 @@ const emptyReport = (): FillReport => ({
   products_filled: 0,
   filled: { product: { weight: 0, box: 0 }, option: { weight: 0, box: 0 }, color: { weight: 0, box: 0 } },
   skipped: { conflict: 0, unverified: 0, invalid: 0, partial_box: 0, kept_existing: 0, unmapped_scope: 0 },
+  skipped_priced: 0,
+  priced_products: [],
   still_missing: [],
   still_missing_total: 0,
 });
@@ -182,6 +208,47 @@ async function readByIds<T>(db: D1Database, sql: string, ids: readonly string[])
 
 const DIM_COLUMNS = 'id, product_id, package_weight_g, package_width_mm, package_depth_mm, package_height_mm';
 
+/** The pricing tables this database has (0181, 0189): a clause on a table it lacks is left out. */
+interface PricingTables {
+  state: boolean;
+  results: boolean;
+  inputs: boolean;
+}
+
+async function pricingTables(db: D1Database): Promise<PricingTables> {
+  const { results } = await db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('product_pricing_state', 'pricing_v2_sku_results', 'pricing_inputs')")
+    .all<{ name: string }>();
+  const names = new Set((results ?? []).map((r) => String(r.name)));
+  return { state: names.has('product_pricing_state'), results: names.has('pricing_v2_sku_results'), inputs: names.has('pricing_inputs') };
+}
+
+/**
+ * The product `pid` (an SQL expression) is PRICED: an engine pricing state (a V2 method chosen, or the
+ * engine's own) or any published V2 result. `needsPricingIds` is the narrower «يحتاج تسعيرًا» read; this one
+ * also keeps out an engine product not published yet, whose next reviewed publish must see its inputs as saved.
+ */
+const pricedSql = (pid: string, t: PricingTables): string => {
+  const parts: string[] = [];
+  if (t.state) parts.push(`EXISTS (SELECT 1 FROM product_pricing_state ps WHERE ps.product_id = ${pid} AND ps.mode = 'engine')`);
+  if (t.results) parts.push(`EXISTS (SELECT 1 FROM pricing_v2_sku_results pr WHERE pr.product_id = ${pid})`);
+  return parts.length ? `(${parts.join(' OR ')})` : '0';
+};
+
+/** A freight measure the owner holds in a pricing row (any origin: the owner's, a purchase's). */
+const HELD_MEASURE =
+  'pi.pricing_weight_g IS NOT NULL OR pi.shipping_weight_g IS NOT NULL OR pi.shipping_length_mm IS NOT NULL OR pi.shipping_width_mm IS NOT NULL OR pi.shipping_height_mm IS NOT NULL OR pi.manual_cbm IS NOT NULL';
+const PRICING_SCOPE: Record<FillKind, string> = { product: 'base', option: 'option', color: 'color' };
+
+/** The row of `table` (a fill kind) has its freight measure held in `pricing_inputs`. */
+const heldSql = (kind: FillKind, t: PricingTables): string => {
+  if (!t.inputs) return '0';
+  const table = TABLE[kind];
+  const pid = kind === 'product' ? `${table}.id` : `${table}.product_id`;
+  const scopeId = kind === 'product' ? "''" : `${table}.id`;
+  return `EXISTS (SELECT 1 FROM pricing_inputs pi WHERE pi.product_id = ${pid} AND pi.scope = '${PRICING_SCOPE[kind]}' AND pi.scope_id = ${scopeId} AND (${HELD_MEASURE}))`;
+};
+
 /**
  * Plan and write the fill, then list the imported products still missing a
  * packaged weight or box. Returns the report and the products written to
@@ -189,14 +256,17 @@ const DIM_COLUMNS = 'id, product_id, package_weight_g, package_width_mm, package
  */
 export async function fillPackageMeasures(db: D1Database): Promise<FillReport & { touched: string[] }> {
   const report = emptyReport();
-  let products: Array<DimRow & { slug: string }>;
+  let products: Array<DimRow & { slug: string; name: string; name_ar: string; name_ku: string }>;
   let specRows: SpecRow[];
   try {
     products = ((
       await db
-        .prepare(`SELECT id, id AS product_id, slug, package_weight_g, package_width_mm, package_depth_mm, package_height_mm FROM products WHERE id IN (${IMPORTED})`)
-        .all<DimRow & { slug: string }>()
-    ).results ?? []) as Array<DimRow & { slug: string }>;
+        .prepare(
+          `SELECT id, id AS product_id, slug, name, name_ar, name_ku, package_weight_g, package_width_mm, package_depth_mm, package_height_mm
+             FROM products WHERE id IN (${IMPORTED})`
+        )
+        .all<DimRow & { slug: string; name: string; name_ar: string; name_ku: string }>()
+    ).results ?? []) as typeof products;
     specRows = ((
       await db
         .prepare(
@@ -214,6 +284,19 @@ export async function fillPackageMeasures(db: D1Database): Promise<FillReport & 
     throw e;
   }
   report.imported_products = products.length;
+
+  // The priced products and the scopes whose freight measure a pricing row holds: never written.
+  const tables = await pricingTables(db);
+  const priced = new Set(
+    ((await db.prepare(`SELECT p.id FROM products p WHERE p.id IN (${IMPORTED}) AND ${pricedSql('p.id', tables)}`).all<{ id: string }>()).results ?? []).map((r) => String(r.id))
+  );
+  const held = new Set<string>();
+  if (tables.inputs) {
+    const { results } = await db
+      .prepare(`SELECT pi.scope, pi.scope_id, pi.product_id FROM pricing_inputs pi WHERE pi.product_id IN (${IMPORTED}) AND pi.scope IN ('base', 'option', 'color') AND (${HELD_MEASURE})`)
+      .all<{ scope: string; scope_id: string; product_id: string }>();
+    for (const r of results ?? []) held.add(r.scope === 'base' ? `product:${r.product_id}` : `${r.scope}:${r.scope_id}`);
+  }
 
   // 1. The usable measures of each scope, by region.
   type ScopeEntry = { productId: string; kind: string; id: string; byRegion: Map<string, Partial<Record<MeasureKey, number>>> };
@@ -319,8 +402,18 @@ export async function fillPackageMeasures(db: D1Database): Promise<FillReport & 
   // 3. Only where the row is empty: the weight alone, the box whole.
   const weights: Record<FillKind, Array<[string, number]>> = { product: [], option: [], color: [] };
   const boxes: Record<FillKind, Array<[string, number, number, number]>> = { product: [], option: [], color: [] };
+  const pricedOffered = new Set<string>();
   for (const t of targets.values()) {
     const row = rowOf(t.kind, t.id)!;
+    const offers = (t.weight !== null ? 1 : 0) + (t.box !== null ? 1 : 0);
+    if (priced.has(t.productId)) {
+      if (offers) pricedOffered.add(t.productId);
+      continue;
+    }
+    if (held.has(`${t.kind}:${t.id}`)) {
+      report.skipped.kept_existing += offers;
+      continue;
+    }
     if (t.weight !== null) {
       if (empty(row.package_weight_g)) weights[t.kind].push([t.id, t.weight]);
       else report.skipped.kept_existing++;
@@ -331,7 +424,14 @@ export async function fillPackageMeasures(db: D1Database): Promise<FillReport & 
     }
   }
 
-  // 4. The writes: conditional, so a value typed meanwhile stays; the product's version moves with them.
+  report.skipped_priced = pricedOffered.size;
+  report.priced_products = products
+    .filter((p) => pricedOffered.has(String(p.id)))
+    .map((p) => ({ id: String(p.id), slug: String(p.slug ?? ''), name_en: String(p.name ?? ''), name_ar: String(p.name_ar ?? ''), name_ckb: String(p.name_ku ?? '') }))
+    .sort((a, b) => (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0));
+
+  // 4. The writes: conditional — a value typed meanwhile, a product priced meanwhile, a pricing row's measure
+  // entered meanwhile all stay — and the product's version moves with them.
   const now = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
   const pick = (table: string, i: number) => `(SELECT json_extract(j.value, '$[${i}]') FROM json_each(?1) j WHERE json_extract(j.value, '$[0]') = ${table}.id)`;
   const ids = 'id IN (SELECT json_extract(value, \'$[0]\') FROM json_each(?1))';
@@ -339,9 +439,11 @@ export async function fillPackageMeasures(db: D1Database): Promise<FillReport & 
   for (const kind of ['product', 'option', 'color'] as const) {
     const table = TABLE[kind];
     const stamp = kind === 'product' ? `, updated_at = ${now}` : '';
+    const pid = kind === 'product' ? `${table}.id` : `${table}.product_id`;
+    const free = `NOT ${pricedSql(pid, tables)} AND NOT ${heldSql(kind, tables)}`;
     for (const part of chunks(weights[kind], FILL_CHUNK)) {
       statements.push({
-        stmt: db.prepare(`UPDATE ${table} SET package_weight_g = ${pick(table, 1)}${stamp} WHERE ${ids} AND COALESCE(package_weight_g, 0) <= 0`).bind(JSON.stringify(part)),
+        stmt: db.prepare(`UPDATE ${table} SET package_weight_g = ${pick(table, 1)}${stamp} WHERE ${ids} AND COALESCE(package_weight_g, 0) <= 0 AND ${free}`).bind(JSON.stringify(part)),
         count: { kind, field: 'weight' },
       });
     }
@@ -350,7 +452,7 @@ export async function fillPackageMeasures(db: D1Database): Promise<FillReport & 
         stmt: db
           .prepare(
             `UPDATE ${table} SET package_depth_mm = ${pick(table, 1)}, package_width_mm = ${pick(table, 2)}, package_height_mm = ${pick(table, 3)}${stamp}
-              WHERE ${ids} AND COALESCE(package_depth_mm, 0) <= 0 AND COALESCE(package_width_mm, 0) <= 0 AND COALESCE(package_height_mm, 0) <= 0`
+              WHERE ${ids} AND COALESCE(package_depth_mm, 0) <= 0 AND COALESCE(package_width_mm, 0) <= 0 AND COALESCE(package_height_mm, 0) <= 0 AND ${free}`
           )
           .bind(JSON.stringify(part)),
         count: { kind, field: 'box' },
@@ -363,7 +465,10 @@ export async function fillPackageMeasures(db: D1Database): Promise<FillReport & 
     for (const [id] of [...weights[kind], ...boxes[kind]]) planned.add(rowOf(kind, id)!.product_id);
   }
   for (const part of chunks([...planned], FILL_CHUNK)) {
-    statements.push({ stmt: db.prepare(`UPDATE products SET updated_at = ${now} WHERE id IN (SELECT value FROM json_each(?1))`).bind(JSON.stringify(part)), count: null });
+    statements.push({
+      stmt: db.prepare(`UPDATE products SET updated_at = ${now} WHERE id IN (SELECT value FROM json_each(?1)) AND NOT ${pricedSql('products.id', tables)}`).bind(JSON.stringify(part)),
+      count: null,
+    });
   }
 
   const touched = new Set<string>();

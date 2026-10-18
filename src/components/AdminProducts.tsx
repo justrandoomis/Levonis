@@ -44,6 +44,7 @@ import { COMPLETENESS_UI, tri } from './adminProducts/completeness';
 import HideIncompleteCard, { ListMissingBadge } from './adminProducts/HideIncompleteCard';
 import VariantImg from './ui/VariantImg';
 import NeedsPricingQueue from './adminProducts/NeedsPricingQueue';
+import { readEditLink } from './adminProducts/editLink';
 import { INFO_WORDS, InfoCompletenessCell } from './adminProducts/InfoCompleteness';
 import { activeTileSub as activeSub, hiddenBanner, NEEDS_PRICING, statusBadgeKind, tri as triQ } from './adminProducts/needsPricingStrings';
 import { PRICE_REQUEST_ADMIN_TEXT, requestersText } from '../../packages/contracts/src/priceRequests';
@@ -266,10 +267,11 @@ export default function AdminProducts() {
   // «صيغ الأرقام التسلسلية»'s list of products that need a serial but have no
   // brand (owner decision 2). Read for the first render only; closing the
   // editor drops it from the address.
-  const [editing, setEditing] = useState<{ open: boolean; id: string | null }>(() => {
+  // `&section=<1–8>` opens that form section first (adminProducts/editLink.ts).
+  const [editing, setEditing] = useState<{ open: boolean; id: string | null; section?: number | null }>(() => {
     try {
-      const id = new URLSearchParams(window.location.search).get('edit') ?? '';
-      return /^[A-Za-z0-9_-]{1,80}$/.test(id) ? { open: true, id } : { open: false, id: null };
+      const link = readEditLink(window.location.search);
+      return link ? { open: true, id: link.id, section: link.section } : { open: false, id: null };
     } catch {
       return { open: false, id: null };
     }
@@ -561,12 +563,14 @@ export default function AdminProducts() {
       <Suspense fallback={<LazyFallback label={t.loading} />}>
         <ProductForm
           productId={editing.id}
+          initialSection={editing.section ?? null}
           onBack={() => {
             setEditing({ open: false, id: null });
             try {
               const url = new URL(window.location.href);
-              if (url.searchParams.has('edit')) {
+              if (url.searchParams.has('edit') || url.searchParams.has('section')) {
                 url.searchParams.delete('edit');
+                url.searchParams.delete('section');
                 window.history.replaceState(window.history.state, '', url);
               }
             } catch {
