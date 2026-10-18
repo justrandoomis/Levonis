@@ -130,10 +130,13 @@ test('merchant administration is NOT under /api/admin', () => {
   const index = code(read('worker/index.ts'));
   assert.match(index, /app\.route\(\s*['"]\/api\/merchant['"]/, 'merchant routes are not mounted');
   assert.equal(
-    /['"]\/api\/admin\/merchant/.test(index),
+    /['"]\/api\/admin\/merchant['"/]/.test(index),
     false,
     'merchant routes must not be mounted under the platform admin prefix'
   );
+  // The merchant's OWN routers never sit under /api/admin. The platform's review of merchant
+  // APPLICATIONS (`/api/admin/merchant-applications`, Community V3 push 1.2) is admin work and does.
+  assert.doesNotMatch(index, /app\.route\(\s*'\/api\/admin[^']*'\s*,\s*merchant\w*Routes\s*\)/);
 });
 
 // ------------------------------------------------------ host resolution

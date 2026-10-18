@@ -11,6 +11,8 @@
  * (docs/DECISIONS.md row 183: a Sorani slot never carries the Arabic), so
  * every entry has all three spellings — tests/merchantWorkspaceShell.test.ts.
  */
+import { APPROVAL_PILL } from '../../merchantApplication/approvalPill';
+
 export type Loc = (ar: string, en: string, ckb?: string) => string;
 
 /** A label as its three hand-written spellings (ckb absent = not written yet). */
@@ -71,6 +73,10 @@ export const W = {
   suspended: ['موقوف', 'Suspended', 'هەڵپەسێردراو'],
   lapsed: ['PLUS منتهٍ', 'PLUS lapsed', 'PLUS بەسەرچوو'],
   restricted: ['مقيّد', 'Restricted', 'سنووردارکراو'],
+  // The approval axis (Community V3 push 1.2, DECISIONS row 257): the pill
+  // word and its one-sentence why, owned by the merchant application module.
+  approval: APPROVAL_PILL.label,
+  approvalWhy: APPROVAL_PILL.why,
 } as const satisfies Record<string, Words>;
 
 /** Why the store cannot sell, in the merchant's words (StoreCta.tsx `reasonText`, verbatim). */

@@ -88,6 +88,7 @@ const AdminChannels = React.lazy(() => import('../components/AdminChannels'));
 const AdminReviews = React.lazy(() => import('../components/AdminReviews'));
 const AdminGifts = React.lazy(() => import('../components/adminGifts/AdminGifts'));
 const AdminKyc = React.lazy(() => import('../components/AdminKyc'));
+const AdminMerchantApplications = React.lazy(() => import('../components/merchantApplication/AdminMerchantApplications'));
 const AdminMemberships = React.lazy(() => import('../components/AdminMemberships'));
 /**
  * «لا توجد صفحة في الادارة للرد على رسائل المستخدمين والشكاوى والتذاكر.»
@@ -171,6 +172,7 @@ type AdminTab =
   | 'reviews'
   | 'gifts'
   | 'kyc'
+  | 'merchant_applications'
   | 'memberships'
   | 'support'
   | 'price_reports'
@@ -257,6 +259,13 @@ export default function Admin() {
    * `/admin?tab=security` opens it.
    */
   const canSeeSecurity = user?.is_owner === true && user?.owner_email_unverified !== true;
+  /**
+   * «طلبات اعتماد التجار» (Community V3 push 1.2, DECISIONS row 257): the
+   * owner, full admins, and an assistant holding the owner's MERCHANT_REVIEW
+   * grant (owner decision C5). `=== true` like every hint: an older server's
+   * missing flag hides the tab. The router re-checks every request.
+   */
+  const canReviewMerchants = user?.can_review_merchants === true;
   /** «استيراد Bambu Lab»: the verified owner only, as the API (requireOwner) and «الأمان». */
   const canSeeCatalogImport = canSeeSecurity;
 
@@ -314,6 +323,9 @@ export default function Admin() {
     { id: 'support', icon: LifeBuoy, label: loc('الدعم والرسائل', 'Support inbox', 'ڕیزی پشتگیری'), badge: supportWaiting, ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
     { id: 'users', icon: Users, label: t('adminUsers'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
     { id: 'kyc', icon: ShieldCheck, label: loc('التحقق والعناوين', 'KYC & addresses'), ...section('administration', 'الإدارة', 'Administration') },
+    ...(canReviewMerchants
+      ? [{ id: 'merchant_applications', icon: Store, label: loc('طلبات اعتماد التجار', 'Merchant applications', 'داواکارییەکانی پەسەندکردنی بازرگان'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') }]
+      : []),
     { id: 'reviews', icon: Star, label: loc('المراجعات', 'Reviews', 'هەڵسەنگاندنەکان'), ...section('administration', 'الإدارة', 'Administration') },
     // «الهدايا» (0175): five levels of real store products, grants to
     // customers and their journey to delivery — beside the reviews whose
@@ -448,6 +460,10 @@ export default function Admin() {
 
         {activeTab === 'kyc' && (
            <AdminKyc />
+        )}
+
+        {activeTab === 'merchant_applications' && canReviewMerchants && (
+           <AdminMerchantApplications />
         )}
 
         {activeTab === 'memberships' && (

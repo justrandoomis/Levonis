@@ -518,6 +518,8 @@
     "tests/merchantOrdersSearch.test.ts": 30.2,
     "tests/merchantPayoutRequests.test.ts": 22.6,
     "tests/merchantPayouts.test.ts": 8.6,
+    "tests/merchantReview.test.ts": 60.0,
+    "tests/merchantReviewUi.test.ts": 1.0,
     "tests/merchantRoutes.test.ts": 0.3,
     "tests/merchantSanctionsModeration.test.ts": 41.6,
     "tests/merchantSearchPhoneOracle.test.ts": 14.7,

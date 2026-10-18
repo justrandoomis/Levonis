@@ -217,6 +217,29 @@ export function canSeeFullSerial(env: Env, user: CostSubject | null | undefined)
   return exhaustive;
 }
 
+/** The 0204 capability that opens merchant review to an assistant admin (owner decision C5). */
+export const MERCHANT_REVIEW_GRANT = 'MERCHANT_REVIEW';
+
+/**
+ * WHO MAY REVIEW MERCHANT APPLICATIONS, AS A SESSION HINT (Community V3 push
+ * 1.2, DECISIONS row 257). The rule of `canReviewMerchants`
+ * (worker/lib/merchantApproval.ts) — the owner and full-scope admins by
+ * default, an assistant only with a live MERCHANT_REVIEW grant — over the
+ * grants the session loader read for this request (`capability_grants`, set
+ * for assistant admins only, never read off a row). It only HIDES a tab; every
+ * reviewer route asks `canReviewMerchants`, which reads the grant table itself.
+ * Nothing financial: it never feeds canViewCost / canWriteCost / canMoveMoney.
+ */
+export function canReviewMerchantsHint(
+  env: Env,
+  user: (CostSubject & { capability_grants?: readonly string[] | null }) | null | undefined
+): boolean {
+  if (!user || user.role !== 'admin') return false;
+  if (isOwner(env, user)) return true;
+  if (normalizeAdminScope(user.admin_scope) !== 'assistant') return true;
+  return Array.isArray(user.capability_grants) && user.capability_grants.includes(MERCHANT_REVIEW_GRANT);
+}
+
 export type ViewerClass =
   | 'guest'
   | 'customer'

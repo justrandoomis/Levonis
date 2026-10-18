@@ -1,7 +1,7 @@
 import type { HostInfo } from './hosts';
 import { computeCompletion } from './profileCompletion';
 import { maskPhone } from './phone';
-import { canMoveMoney, canViewCost, canWriteCost, isOwner, isUnverifiedOwner, normalizeAdminScope } from './adminScope';
+import { canMoveMoney, canReviewMerchantsHint, canViewCost, canWriteCost, isOwner, isUnverifiedOwner, normalizeAdminScope } from './adminScope';
 
 export interface Env {
   DB: D1Database;
@@ -203,6 +203,9 @@ export interface SessionUser {
   /** 0177 private grants, set ONLY by the session loader and always [] while
    *  PRIVATE_DELEGATION_ENABLED is false. Never read off a row. */
   private_grants?: readonly string[];
+  /** 0204 capability grants (MERCHANT_REVIEW), set ONLY by the session loader
+   *  and only for an assistant admin. A hint's input, never a gate's. */
+  capability_grants?: readonly string[];
   subscription_expiry: number;
   subscription_cost_iqd: number;
   subscription_days: number;
@@ -307,6 +310,10 @@ export function publicUser(u: SessionUser, env: Pick<Env, 'INITIAL_ADMIN_EMAIL'>
     can_view_cost: canViewCost(ownerEnv, u),
     can_write_cost: canWriteCost(ownerEnv, u),
     can_move_money: canMoveMoney(ownerEnv, u),
+    // «طلبات اعتماد التجار» (Community V3 push 1.2): the owner, full admins,
+    // and an assistant holding a live MERCHANT_REVIEW grant (owner decision
+    // C5). Hides the tab only; every reviewer route re-checks the grant table.
+    can_review_merchants: canReviewMerchantsHint(ownerEnv, u),
     // LEGACY ALIAS OF COST, not of money: a client build from before S1 reads
     // this to show the finance tab, and must hide it from a full admin now.
     can_view_financials: canViewCost(ownerEnv, u),

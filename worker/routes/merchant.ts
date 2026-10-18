@@ -39,7 +39,7 @@ import {
   type StoreContext,
 } from '../lib/merchantAuth';
 import { checkSlug, suggestSlug, SLUG_RESERVATION_DAYS } from '../lib/merchantOps';
-import { applicationRequiredRefusal, merchantApprovalOf } from '../lib/merchantApproval';
+import { applicationRequiredRefusal, applicationSummaryOf, merchantApprovalOf } from '../lib/merchantApproval';
 import { merchantBalance } from '../lib/escrowOps';
 import { orderCreditStateSql } from '../lib/merchantLedger';
 import { normalizeGovernorate } from '../lib/iraqGovernorates';
@@ -167,9 +167,19 @@ merchantRoutes.get('/me', async (c) => {
   const tier = await getTierStatus(c.env.DB, user.id);
   const root = rootDomainFrom(c.env);
   const ctx = await storeForUser(c.env.DB, user.id);
+  // The approval axis (Community V3 push 1.2, DECISIONS row 257): whether a
+  // reviewer approved this merchant, and where their application stands —
+  // its state, revision and the reviewer's PUBLIC reason only (never the
+  // internal note, never a sealed value). No 0204 reads as not approved.
+  const [approval, application] = await Promise.all([
+    merchantApprovalOf(c.env.DB, user.id),
+    applicationSummaryOf(c.env.DB, user.id),
+  ]);
 
   return c.json({
     success: true,
+    approved: approval.approved,
+    application,
     eligible: benefits.merchantStore(tier),
     tier: tier.tier,
     tier_active: tier.active,

@@ -325,13 +325,22 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
                   data-selling-off={status.key}
                   className="lv-alert lv-alert-warning mb-5 text-[13px] leading-relaxed text-text-secondary"
                 >
-                  {status.reason(loc)}{' '}
-                  {/* The data is never what stops: said once, under the reason. */}
-                  {loc(
-                    'البيع متوقّف حاليًا، لكن كل بياناتك وطلباتك وأرباحك محفوظة ويمكنك متابعتها.',
-                    'Selling is paused, but all your data, orders and earnings are kept and still visible.',
-                    'فرۆشتن ڕاگیراوە، بەڵام هەموو داتاکانت پارێزراون.'
-                  )}
+                  {/* The approval axis: the reason IS the way to the application, on the main site. */}
+                  {status.key === 'approval' ? (
+                    <a href={mainHref('/merchant/start')} className="font-semibold text-gold underline" data-approval-link>
+                      {status.reason(loc)}
+                    </a>
+                  ) : (
+                    status.reason(loc)
+                  )}{' '}
+                  {/* The data is never what stops: said once, under the reason —
+                      and only when selling has actually stopped. */}
+                  {!me.selling?.canSell &&
+                    loc(
+                      'البيع متوقّف حاليًا، لكن كل بياناتك وطلباتك وأرباحك محفوظة ويمكنك متابعتها.',
+                      'Selling is paused, but all your data, orders and earnings are kept and still visible.',
+                      'فرۆشتن ڕاگیراوە، بەڵام هەموو داتاکانت پارێزراون.'
+                    )}
                 </p>
               )}
               {current && section !== 'home' && (

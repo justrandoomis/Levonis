@@ -25,9 +25,8 @@
  * host for it.
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight, Store } from 'lucide-react';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import { Store } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 // `/api/merchant/me` is spelled out: a value import of lib/merchant made the
 // whole merchant client module part of the workspace FRAME's closure (W6).
@@ -37,6 +36,9 @@ import { useStore } from '../StoreContext';
 import { ErrorState } from '../components/ui/AsyncStates';
 import MerchantShell from '../components/merchant/shell/MerchantShell';
 import { onOwnHost } from '../components/merchant/shell/ownHost';
+
+/** The no-store answer: where the merchant application stands (lazy — the frame has a byte budget). */
+const NoStoreApplication = lazy(() => import('../components/merchantApplication/NoStoreApplication'));
 
 export default function MerchantDashboardPage() {
   const { loc } = useLanguage();
@@ -92,26 +94,34 @@ export default function MerchantDashboardPage() {
   }
 
   // No store yet: point at the one thing that fixes it.
+  /**
+   * NO STORE YET — WHERE THE APPROVAL STANDS (Community V3 push 1.2, DECISIONS
+   * row 257). A store opens only after a reviewer approves the merchant
+   * application, and applying needs no PLUS (owner decision C3), so this never
+   * sends anyone to /subscription: an unapproved account sees its
+   * application's state (and the reviewer's public reason) with the one step
+   * that moves it forward; an approved one creates its store at
+   * /merchant/start, which says what selling still needs.
+   */
   if (!me.store) {
     return (
-      <div className="flex h-[100dvh] w-full flex-1 items-center justify-center px-6">
+      <div
+        className="flex h-[100dvh] w-full flex-1 items-center justify-center px-6"
+        data-merchant-no-store={me.approved === true ? 'approved' : (me.application?.state ?? 'none')}
+      >
         <div className="max-w-sm text-center">
           <Store aria-hidden="true" className="mx-auto mb-4 h-10 w-10 text-text-muted" />
           <h1 className="mb-2 text-lg font-bold text-text-primary">
             {loc('ليس لديك متجر بعد', 'You do not have a store yet', 'هێشتا فرۆشگات نییە')}
           </h1>
-          <Link to={me.eligible ? '/merchant/start' : '/subscription'} className="lv-button lv-button-primary mt-4">
-            {me.eligible
-              ? loc('أنشئ متجرك', 'Create your store', 'فرۆشگاکەت دروست بکە')
-              : loc('اشترك في PLUS', 'Subscribe to PLUS', 'بەشداری PLUS بکە')}
-            <ArrowRight aria-hidden="true" className="h-4 w-4 rtl:rotate-180" />
-          </Link>
+          <Suspense fallback={null}>
+            <NoStoreApplication me={me} />
+          </Suspense>
         </div>
       </div>
     );
   }
 
-  // Any of the three means StorefrontApp is serving this page: the workspace lives under /admin here.
   const storeHost = !!hostStore || hostUnknown || hostUnavailable;
   if (!onOwnHost(me.store, { storeId: hostStore?.id ?? null, storeHost }, window.location.host)) {
     const ownAdmin = /^https?:\/\//.test(me.store.url) ? `${me.store.url}/admin` : '/merchant';

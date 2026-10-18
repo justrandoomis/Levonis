@@ -9,9 +9,9 @@
  * short of suspension. Pure, for the tests.
  */
 import type { MerchantMe } from '../../../lib/merchant';
-import { sellingReason, W, type Loc, type Words } from './strings';
+import { say, sellingReason, W, type Loc, type Words } from './strings';
 
-export type StoreStatusKey = 'open' | 'paused' | 'suspended' | 'lapsed' | 'restricted';
+export type StoreStatusKey = 'open' | 'paused' | 'suspended' | 'lapsed' | 'restricted' | 'approval';
 
 export interface StoreStatus {
   key: StoreStatusKey;
@@ -21,12 +21,25 @@ export interface StoreStatus {
   reason: (loc: Loc) => string;
 }
 
-export function storeStatus(me: Pick<MerchantMe, 'store' | 'selling'>): StoreStatus {
+export function storeStatus(me: Pick<MerchantMe, 'store' | 'selling'> & Partial<Pick<MerchantMe, 'approved' | 'application'>>): StoreStatus {
   const store = me.store;
   const merchantStatus = store?.merchant?.status ?? 'active';
   if (store?.status === 'suspended' || merchantStatus === 'suspended') {
     const code = store?.status === 'suspended' ? 'store_suspended' : 'merchant_suspended';
     return { key: 'suspended', tone: 'danger', label: W.suspended, reason: (loc) => sellingReason(code, loc) };
+  }
+  // THE APPROVAL AXIS (Community V3, DECISIONS rows 256–257), right after
+  // Levonis's own suspension: a merchant no reviewer approved yet — every
+  // merchant from before the gate included (owner decision C1) — is told where
+  // the application stands, with the reviewer's public reason. Only an
+  // explicit `false` from the server: an older answer without the field says
+  // nothing about approval.
+  if (me.approved === false) {
+    // One short sentence (the frame has a byte budget, tests/bundleBudget.test.ts),
+    // plus the reviewer's own public words when they asked for changes or refused.
+    const app = me.application;
+    const said = app && (app.state === 'changes_requested' || app.state === 'rejected') ? app.reason_public.trim() : '';
+    return { key: 'approval', tone: 'warning', label: W.approval, reason: (loc) => `${say(loc, W.approvalWhy)}${said ? ` ${said}` : ''}` };
   }
   if (store?.status === 'paused') return { key: 'paused', tone: 'warning', label: W.paused, reason: (loc) => sellingReason('store_paused', loc) };
   const why = me.selling?.reason ?? '';

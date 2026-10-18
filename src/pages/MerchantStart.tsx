@@ -1,6 +1,14 @@
 /**
  * Merchant onboarding — /merchant/start.
  *
+ * APPROVAL FIRST (Community V3 push 1.2, DECISIONS rows 256–257). A person
+ * becomes a merchant when a human reviewer approves their merchant
+ * application. Until `/api/merchant/me` says `approved === true`, this page IS
+ * the application form and its tracker (MerchantApplicationPanel) — for every
+ * account, subscribed or not: applying needs no PLUS (owner decision C3), so
+ * nothing here sells a subscription before the application. Once approved,
+ * the page is the store setup below, and selling still needs PLUS.
+ *
  * Two things get the care here: the ADDRESS and the honesty of the gate.
  *
  * The address becomes a real hostname a customer will type and a link printed
@@ -27,6 +35,7 @@ import { merchantApi, slugMessage, type MerchantMe, type SlugRejection } from '.
 import { GOVERNORATES } from '../lib/governorates';
 import { CommunityClosedCard, useCommunityAccess } from './community/access';
 import { ErrorState } from '../components/ui/AsyncStates';
+import MerchantApplicationPanel from '../components/merchantApplication/MerchantApplicationPanel';
 
 type SlugState =
   | { kind: 'idle' }
@@ -64,8 +73,10 @@ export default function MerchantStart() {
         if (!alive) return;
         setMe(d);
         setLoadError(null);
-        // Already have a store? There is nothing to create.
-        if (d.store) navigate('/merchant', { replace: true });
+        // Already have a store AND an approval? There is nothing to create. A
+        // store that predates the approval gate stays here: its owner applies
+        // like everyone else (owner decision C1).
+        if (d.store && d.approved === true) navigate('/merchant', { replace: true });
         if (d.suggested_slug) setSlug((current) => current || d.suggested_slug || '');
       })
       .catch((e: unknown) => alive && setLoadError(e))
@@ -186,8 +197,25 @@ export default function MerchantStart() {
     );
   }
 
-  // Not eligible: say so and point at the thing that fixes it, rather than
-  // showing a form that the server will refuse.
+  // NOT APPROVED YET: the application, never a store form the server refuses
+  // (MERCHANT_APPLICATION_REQUIRED) and never a PLUS upsell (C3). Approval
+  // comes back from the server; the panel's «تابع إلى إعداد المتجر» reads /me
+  // again, and an approved answer opens the setup below.
+  if (me && me.approved !== true) {
+    return (
+      <div className="min-h-screen text-text-secondary">
+        <MerchantApplicationPanel
+          onApproved={() => {
+            setLoading(true);
+            setAttempt((n) => n + 1);
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Approved, not subscribed: selling needs PLUS (C3). Say so and point at the
+  // thing that fixes it, rather than showing a form that the server will refuse.
   if (!me?.eligible) {
     return (
       <Gate

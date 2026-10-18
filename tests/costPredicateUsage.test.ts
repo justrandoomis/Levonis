@@ -218,7 +218,9 @@ test('S8: requireOwner is verification-aware and has no cost-route callers', () 
   // canViewCost's projection, never this door.
   // The Bambu import's dashboard (import spec §H.1, DECISIONS row 241): read-only counts, states, codes and public
   // URLs of the import run — no cost, price or stock fact (tests/catalogImportE2E.test.ts scans its answers).
-  for (const f of ['worker/routes/adminCompleteness.ts', 'worker/routes/adminCatalogImport.ts']) allowed.add(f);
+  // The owner's MERCHANT_REVIEW grants (Community V3 push 1.2, DECISIONS row 257): issuing and revoking an
+  // assistant's merchant-review access — no cost, price, wallet or stock fact is read there.
+  for (const f of ['worker/routes/adminCompleteness.ts', 'worker/routes/adminCatalogImport.ts', 'worker/routes/adminMerchantApplications.ts']) allowed.add(f);
   assert.deepEqual(callers.filter((f) => !allowed.has(f)), [], 'requireOwner guards no cost route');
   for (const r of COST_ROUTERS) assert.doesNotMatch(code(r.file), /\brequireOwner\b/, `${r.file} uses the cost door, not requireOwner`);
 });

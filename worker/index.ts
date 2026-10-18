@@ -147,6 +147,7 @@ import { storeOrderRoutes } from './routes/storeOrders';
 import { communityReviewRoutes } from './routes/merchantReviews';
 import { communityFavoriteRoutes } from './routes/communityFavorites';
 import { adminCommunityRoutes } from './routes/adminCommunity';
+import { adminMerchantApplicationRoutes } from './routes/adminMerchantApplications';
 import { adminChatRoutes } from './routes/adminChats';
 import { adminWalletAdjustRoutes } from './routes/adminWalletAdjust';
 import { bundlesRoutes } from './routes/bundles';
@@ -568,6 +569,10 @@ app.route('/api/admin/membership-benefits', adminMembershipBenefitRoutes);
 app.route('/api/warranty', warrantyPublicRoutes);
 app.route('/api/admin/warranties', warrantyAdminRoutes);
 app.route('/api/admin/community', adminCommunityRoutes);
+// «طلبات اعتماد التجار» (Community V3 push 1.2, DECISIONS row 257): the
+// reviewer's side of the merchant application, in its own router — never
+// inside adminCommunity, whose money routes sit behind requireFinancialScope.
+app.route('/api/admin/merchant-applications', adminMerchantApplicationRoutes);
 // The printer-model economics editor (Admin → مجتمع ليفو → تسعير الطباعة).
 app.route('/api/admin/print-quote', adminPrintQuoteRoutes);
 // «الرسائل» in the support console: the shop's order threads and the three

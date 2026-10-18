@@ -3,7 +3,7 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import type { AppContext, SessionUser } from './types';
 import { randomToken, sha256Hex } from './crypto';
 import { rootDomainFrom, sessionCookieDomain } from './hosts';
-import { PRIVATE_DELEGATION_ENABLED, isOwner } from './adminScope';
+import { MERCHANT_REVIEW_GRANT, PRIVATE_DELEGATION_ENABLED, isOwner, normalizeAdminScope } from './adminScope';
 import { loadPrivateGrants } from './costAccess';
 import { HttpError } from './http';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
@@ -224,9 +224,40 @@ export async function loadSessionUser(c: Context<AppContext>): Promise<void> {
     PRIVATE_DELEGATION_ENABLED && user.role === 'admin' && !isOwner(c.env, user as unknown as SessionUser)
       ? await loadPrivateGrants(c.env.DB, String(user.id))
       : [];
+  /**
+   * CAPABILITY GRANTS (0204, owner decision C5), the same way: always set here,
+   * never read off the row, and read from the table only for an ASSISTANT
+   * admin — the one account a grant can change anything for (the owner and
+   * full admins review by default). They feed one session hint only,
+   * `can_review_merchants` (publicUser); every reviewer route re-reads the
+   * grant table itself (`canReviewMerchants`).
+   */
+  (user as Record<string, unknown>).capability_grants =
+    user.role === 'admin' &&
+    normalizeAdminScope(user.admin_scope) === 'assistant' &&
+    !isOwner(c.env, user as unknown as SessionUser)
+      ? await loadCapabilityGrants(c.env.DB, String(user.id))
+      : [];
   c.set('user', user as unknown as SessionUser);
   c.set('sessionId', String(session_id));
   c.set('sessionCreatedAt', session_created ? String(session_created) : null);
+}
+
+/**
+ * The live capability grants of one assistant admin, for the session hint.
+ * Only known keys; any failure (a database without 0204, a transient D1
+ * error) is [] — fails closed, the tab stays hidden and the routes decide.
+ */
+async function loadCapabilityGrants(db: D1Database, userId: string): Promise<string[]> {
+  try {
+    const { results } = await db
+      .prepare('SELECT grant_key FROM admin_capability_grants WHERE user_id = ? AND revoked_at IS NULL')
+      .bind(userId)
+      .all<{ grant_key: string }>();
+    return (results ?? []).map((r) => String(r.grant_key)).filter((k) => k === MERCHANT_REVIEW_GRANT);
+  } catch {
+    return [];
+  }
 }
 
 /** The window in which "you just signed in" still counts as proof of presence. */

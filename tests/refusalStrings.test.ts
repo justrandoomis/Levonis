@@ -257,6 +257,8 @@ test('every code the table translates is one the server can actually emit', () =
     'worker/lib/merchantApproval.ts',
     'worker/routes/merchantApplication.ts',
     'worker/routes/kyc.ts',
+    // …and its reviewer side (push 1.2, row 257): scope, revision, reason, the owner's grants.
+    'worker/routes/adminMerchantApplications.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

@@ -37,6 +37,9 @@ import { variantSrcSet } from '../packages/contracts/src/imageSizing';
 const ALLOWED_RAW: Record<string, Record<string, string>> = {
   'src/pages/Product.tsx': { 'activeMedia?.url': 'the zoom (lightbox) shows the stored original itself' },
   'src/components/AdminKyc.tsx': { '`/api/kyc/admin/cases/${shownCase.id}/evidence/${i}`': 'private KYC evidence through its own authorised route' },
+  'src/components/merchantApplication/AdminMerchantApplications.tsx': {
+    'reviewApi.photoUrl(shown.id)': 'the private merchant-review photo through its own audited reviewer route (no variants exist for it)',
+  },
   'src/components/AdminSerials.tsx': { 'ev.url': 'private warranty evidence, served whole after the access check', 'm.file_url': 'a private claim-thread file' },
   'src/components/adminSupport/MessageMedia.tsx': { url: 'a private support attachment' },
   'src/components/adminTradeIn/TradeInDetail.tsx': { 'p.url': 'private trade-in photographs (inspection evidence)', photo: 'the trade-in photo viewer: the original, for inspection' },

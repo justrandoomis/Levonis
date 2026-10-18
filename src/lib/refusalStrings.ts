@@ -776,6 +776,32 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The photo could not be read. Try another one.',
     ckb: 'وێنەکە نەخوێندرایەوە. وێنەیەکی تر تاقی بکەرەوە.',
   },
+  // The reviewer's side of the merchant application (Community V3 push 1.2, DECISIONS row 257).
+  MERCHANT_REVIEW_FORBIDDEN: {
+    ar: 'مراجعة طلبات اعتماد التجار ليست ضمن صلاحياتك. يمنحها المالك للمساعدين.',
+    en: 'Reviewing merchant applications is not within your access. The owner grants it to assistants.',
+    ckb: 'پێداچوونەوە بە داواکارییەکانی پەسەندکردنی بازرگان لە دەسەڵاتەکانی تۆدا نییە. خاوەن بە یاریدەدەرەکانی دەدات.',
+  },
+  APPLICATION_REVISION_REQUIRED: {
+    ar: 'حدّث الطلب ثم قرّر على المراجعة التي تراها.',
+    en: 'Refresh the application, then decide on the revision you see.',
+    ckb: 'داواکارییەکە نوێ بکەرەوە، پاشان لەسەر ئەو پێداچوونەوەیەی دەیبینیت بڕیار بدە.',
+  },
+  DECISION_REASON_REQUIRED: {
+    ar: 'اكتب سببًا يقرؤه مقدّم الطلب (5 أحرف على الأقل).',
+    en: 'Write a reason the applicant will read (at least 5 characters).',
+    ckb: 'هۆکارێک بنووسە کە پێشکەشکار دەیخوێنێتەوە (بەلایەنی کەمەوە ٥ پیت).',
+  },
+  CAPABILITY_GRANT_TARGET_INVALID: {
+    ar: 'يُمنح إذن مراجعة طلبات التجار لمساعد إداري فقط.',
+    en: 'Merchant-review access is granted to an assistant admin only.',
+    ckb: 'مۆڵەتی پێداچوونەوەی داواکارییەکانی بازرگان تەنها بە یاریدەدەرێکی بەڕێوەبەر دەدرێت.',
+  },
+  CAPABILITY_GRANT_NOT_NEEDED: {
+    ar: 'المدير الكامل يراجع طلبات التجار دون إذن إضافي.',
+    en: 'A full admin reviews merchant applications without an extra grant.',
+    ckb: 'بەڕێوەبەری تەواو بەبێ مۆڵەتی زیادە پێداچوونەوە بە داواکارییەکانی بازرگان دەکات.',
+  },
   // Every reviewer door (KYC's two decisions, the merchant application): nobody decides their own.
   SELF_DECISION_FORBIDDEN: {
     ar: 'لا يمكنك البتّ في طلبك أنت؛ يقرّره مراجع آخر.',

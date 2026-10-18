@@ -267,7 +267,33 @@ export interface CommunityOrderRow {
 }
 
 /** Everything the server says this account may do in the community. */
+/** The seven states of a merchant application (worker/lib/merchantApproval.ts). */
+export type ApplicationState =
+  | 'draft'
+  | 'submitted'
+  | 'in_review'
+  | 'changes_requested'
+  | 'approved'
+  | 'rejected'
+  | 'withdrawn';
+
+/** What `/api/merchant/me` says about the caller's application: never a private value. */
+export interface ApplicationSummary {
+  state: ApplicationState;
+  revision: number;
+  /** The reviewer's reason addressed to the applicant ('' until a reviewer decided). */
+  reason_public: string;
+}
+
 export interface MerchantMe {
+  /**
+   * A reviewer approved this merchant (Community V3, DECISIONS rows 256–257).
+   * Absent from an older server: read it as `=== true` to open the store
+   * setup, and as `=== false` before showing anything about approval.
+   */
+  approved?: boolean;
+  /** The caller's live application, else their newest finished one, else null. */
+  application?: ApplicationSummary | null;
   eligible: boolean;
   tier: string;
   tier_active: boolean;

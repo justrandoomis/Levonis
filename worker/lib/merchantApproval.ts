@@ -578,6 +578,51 @@ export function submittedNoticeText(applicationId: string, revision: number): st
   return `⚡ New merchant application awaiting review\nApplication: ${applicationId}\nRevision: ${revision}`;
 }
 
+/**
+ * A reviewer's move, for the same topic: ids, the revision and the action —
+ * nothing else (no name, no reason, no reviewer). There is no decision command
+ * in Telegram; the decision is taken in the audited admin panel only.
+ */
+export function reviewerNoticeText(applicationId: string, revision: number, action: EventAction): string {
+  return `🧾 Merchant application ${action.replace(/_/g, ' ')}\nApplication: ${applicationId}\nRevision: ${revision}`;
+}
+
+// ------------------------------------------------- the applicant's summary
+
+/** What `/api/merchant/me` says about the caller's application: no value, no internal note. */
+export interface ApplicationSummary {
+  state: ApplicationState;
+  revision: number;
+  /** The reviewer's reason addressed to the applicant, only once a reviewer decided. */
+  reason_public: string;
+}
+
+/**
+ * The caller's live application, else their newest finished one, else null —
+ * the same choice as the applicant's own GET. A database without 0204 answers
+ * null (nothing to show; the gate itself fails closed elsewhere).
+ */
+export async function applicationSummaryOf(db: D1Database, userId: string): Promise<ApplicationSummary | null> {
+  let row: { state: ApplicationState; revision: number; reason_public: string } | null;
+  try {
+    row = await db
+      .prepare(
+        `SELECT state, revision, reason_public FROM merchant_applications WHERE user_id = ?
+          ORDER BY CASE WHEN state IN ('draft','submitted','in_review','changes_requested') THEN 0 ELSE 1 END,
+                   created_at DESC, rowid DESC
+          LIMIT 1`
+      )
+      .bind(userId)
+      .first<{ state: ApplicationState; revision: number; reason_public: string }>();
+  } catch (e) {
+    if (isMissingSchema(e)) return null;
+    throw e;
+  }
+  if (!row) return null;
+  const decided = row.state === 'changes_requested' || row.state === 'approved' || row.state === 'rejected';
+  return { state: row.state, revision: Number(row.revision), reason_public: decided ? String(row.reason_public ?? '') : '' };
+}
+
 // --------------------------------------------------------------- retention
 
 export interface RetentionReport {

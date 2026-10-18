@@ -364,6 +364,10 @@ export interface ApiUser {
   can_view_cost?: boolean;
   can_write_cost?: boolean;
   can_move_money?: boolean;
+  /** «طلبات اعتماد التجار»: the owner, full admins and an assistant holding the
+   *  owner's MERCHANT_REVIEW grant (owner decision C5). Hides the tab only;
+   *  read as `=== true`. */
+  can_review_merchants?: boolean;
   /**
    * The owner's OWN session while the account's address is not verified yet
    * (DECISIONS row 185, amendment of 2026-10-08): cost stays shut, and the

@@ -124,6 +124,7 @@ import { legacyGiftRoutes } from '../../worker/routes/gifts';
 import { policiesRoutes } from '../../worker/routes/policies';
 import { kycRoutes } from '../../worker/routes/kyc';
 import { merchantApplicationRoutes } from '../../worker/routes/merchantApplication';
+import { adminMerchantApplicationRoutes } from '../../worker/routes/adminMerchantApplications';
 import { referralRoutes } from '../../worker/routes/referrals';
 import { studioRoutes } from '../../worker/routes/studio';
 import { merchantCustomerRoutes } from '../../worker/routes/merchantCustomers';
@@ -237,6 +238,7 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/warranty', warrantyPublicRoutes as Router],
   ['/api/admin/warranties', warrantyAdminRoutes as Router],
   ['/api/admin/community', adminCommunityRoutes as Router],
+  ['/api/admin/merchant-applications', adminMerchantApplicationRoutes as Router],
   ['/api/admin/chats', adminChatRoutes as Router],
   ['/api/admin/wallet-adjust', adminWalletAdjustRoutes as Router],
   ['/api/admin/import', adminImportRoutes as Router],

@@ -591,9 +591,18 @@ test('the storefront owns at most 47 KB gzip and its complete app payload stays 
  * primitive and the nav icons). The budgets are that plus ~4 KB, so pulling
  * any screen back into the frame (the smallest, CustomersSection, is 1 KB; a
  * typical one 5–10 KB) fails the same day.
+ *
+ * THE APPROVAL AXIS (Community V3 push 1.2, DECISIONS row 257). The frame had
+ * grown to 32,727 bytes of its 32,768 by then. The workspace now says when a
+ * merchant is not approved — the «بانتظار الاعتماد» pill, its one sentence in
+ * three languages and the link to the application — a measured +0.3 KB (33,034 bytes) after
+ * the no-store answer moved OUT of the frame into a lazy chunk
+ * (merchantApplication/NoStoreApplication.tsx). The closure budget moves by
+ * half a kilobyte, so a screen pulled back into the frame (1 KB at the
+ * smallest) still fails the same day.
  */
 const WORKSPACE_SHELL_BUDGET = 25 * KB;
-const WORKSPACE_CLOSURE_BUDGET = 32 * KB;
+const WORKSPACE_CLOSURE_BUDGET = 32.5 * KB;
 /** The screens: each must have a chunk of its own and none may be a static import of the frame. */
 const WORKSPACE_SCREENS = [
   'CommandCenter', 'SalesTabs', 'CatalogTabs', 'ProductsManager', 'PrintersTab', 'CostingTab', 'StoreSettingsTab',
