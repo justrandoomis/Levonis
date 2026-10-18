@@ -802,6 +802,11 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'A full admin reviews merchant applications without an extra grant.',
     ckb: 'بەڕێوەبەری تەواو بەبێ مۆڵەتی زیادە پێداچوونەوە بە داواکارییەکانی بازرگان دەکات.',
   },
+  APPROVAL_REVOKE_STORE_EXISTS: {
+    ar: 'فتح هذا التاجر متجره بالفعل، فلا يُسحب اعتماده. أوقف التاجر من إدارة المجتمع بدلًا من ذلك.',
+    en: 'This merchant has already opened a store, so the approval cannot be revoked. Suspend the merchant from community administration instead.',
+    ckb: 'ئەم بازرگانە پێشتر فرۆشگاکەی کردووەتەوە، بۆیە پەسەندکردنەکەی ناکێشرێتەوە. لە جیاتی ئەوە بازرگانەکە لە بەڕێوەبردنی کۆمەڵگاوە ڕابگرە.',
+  },
   // Every reviewer door (KYC's two decisions, the merchant application): nobody decides their own.
   SELF_DECISION_FORBIDDEN: {
     ar: 'لا يمكنك البتّ في طلبك أنت؛ يقرّره مراجع آخر.',

@@ -184,16 +184,20 @@ test('the state machine: every legal move, and every other move is illegal', () 
     start_review: { submitted: 'in_review' },
     request_changes: { in_review: 'changes_requested' },
     approve: { in_review: 'approved' },
-    reject: { in_review: 'rejected' },
+    // From 'approved': REVOKING the approval (row 257) — the store-less rule is in the write, see merchantReview.test.ts.
+    reject: { in_review: 'rejected', approved: 'rejected' },
   };
   for (const action of Object.keys(TRANSITIONS) as ApplicationAction[]) {
     for (const from of APPLICATION_STATES) {
       assert.equal(nextState(action, from), legal[action][from] ?? null, `${action} from ${from}`);
     }
   }
-  // A finished application never moves again.
-  for (const done of ['approved', 'rejected', 'withdrawn']) {
+  // A finished application never moves again; an approved one only by a reviewer's revoke.
+  for (const done of ['rejected', 'withdrawn']) {
     for (const action of Object.keys(TRANSITIONS) as ApplicationAction[]) assert.equal(nextState(action, done), null);
+  }
+  for (const action of Object.keys(TRANSITIONS) as ApplicationAction[]) {
+    assert.equal(nextState(action, 'approved'), action === 'reject' ? 'rejected' : null, `${action} from approved`);
   }
 });
 

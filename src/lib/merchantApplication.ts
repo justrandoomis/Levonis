@@ -98,6 +98,8 @@ export interface ReviewDetail extends Omit<ReviewQueueRow, 'review'> {
   reason_public: string;
   note_internal: string;
   retention_until: string | null;
+  /** The applicant opened a store: an approval is revocable only before one exists. */
+  has_store: boolean;
   review: { governorate: string; activity_kind: string; activity_description: string };
   private: {
     legal_name: { given: string; father: string; grandfather: string } | null;
@@ -113,6 +115,13 @@ export interface ReviewDetail extends Omit<ReviewQueueRow, 'review'> {
 }
 
 export type ReviewAction = 'start-review' | 'request-changes' | 'approve' | 'reject';
+
+/**
+ * A decision's answer: always the id, state and revision; the queue row's
+ * public fields only while the current revision is one the applicant sent
+ * (a replay, or a reopen landing first, answers with the three alone).
+ */
+export type ReviewDecisionAnswer = Pick<ReviewQueueRow, 'id' | 'state' | 'revision'> & Partial<ReviewQueueRow>;
 
 export interface ReviewerRow {
   id: string;
@@ -134,8 +143,8 @@ export const reviewApi = {
   decide: (
     id: string,
     action: ReviewAction,
-    body: { revision: number; operation_id: string; reason_public?: string; note_internal?: string }
-  ) => api.post<{ success: true; replay: boolean; application: ReviewQueueRow }>(`${REVIEW_BASE}/${encodeURIComponent(id)}/${action}`, body),
+    body: { revision: number; operation_id: string; reason_public?: string; note_internal?: string; revoke?: true }
+  ) => api.post<{ success: true; replay: boolean; application: ReviewDecisionAnswer }>(`${REVIEW_BASE}/${encodeURIComponent(id)}/${action}`, body),
   reviewers: () => api.get<{ success: true; available: boolean; reviewers: ReviewerRow[] }>(`${REVIEW_BASE}/reviewers`),
   grant: (userId: string, operationId: string) =>
     api.post<{ success: true; granted: boolean; already: boolean }>(`${REVIEW_BASE}/reviewers/${encodeURIComponent(userId)}/grant`, {

@@ -96,6 +96,7 @@ interface TransitionRule {
  *                                                    └─request_changes→ changes_requested
  *   submitted | changes_requested ─reopen (applicant edits, revision+1)→ draft
  *   draft | submitted | in_review | changes_requested ─withdraw→ withdrawn
+ *   approved ─reject (REVOKE, only while the user has no store)→ rejected
  *
  * A DRAFT'S REVISION WAS NEVER SENT: submit freezes a revision without
  * bumping it and reopen always bumps, so a draft never has a 'submitted' event
@@ -104,10 +105,22 @@ interface TransitionRule {
  * (`revisionSentSql`), so nothing is kept: its C7 clock is due at once and the
  * withdraw purges it (`purgeDueApplication`).
  *
- * A finished application (approved, rejected, withdrawn) never moves again; a
- * rejected applicant re-applies at once with a NEW application (owner
- * decision C8 — no cooldown). Revocation after approval is the existing
- * suspension (sanction axis), never a state here.
+ * A finished application (rejected, withdrawn) never moves again; a rejected
+ * applicant re-applies at once with a NEW application (owner decision C8 — no
+ * cooldown).
+ *
+ * APPROVED IS FINAL ONCE THERE IS A STORE. Before that, an approval made in
+ * error (or fraud found later) is REVOKED by the reviewer's own 'reject',
+ * named as a revoke (`revoke: true`, so a late reject never revokes) —
+ * reason required, revision- and operation-guarded, audited — and only while
+ * no `merchant_stores` row exists for the user, checked IN the conditional
+ * UPDATE (`applyTransition`), so a revoke and an /onboard racing each other
+ * cannot both win. The revoked application is 'rejected' like any other: it
+ * no longer counts in `merchantApprovalOf`, the stamp it put on an existing
+ * merchant row is cleared, /onboard refuses MERCHANT_APPLICATION_REQUIRED and
+ * the applicant may re-apply at once (C8). Once a store exists, revocation is
+ * the existing suspension (sanction axis), never a state here
+ * (APPROVAL_REVOKE_STORE_EXISTS).
  */
 export const TRANSITIONS: Readonly<Record<ApplicationAction, TransitionRule>> = {
   submit: { from: ['draft'], to: 'submitted', actor: 'applicant', event: 'submitted' },
@@ -116,8 +129,21 @@ export const TRANSITIONS: Readonly<Record<ApplicationAction, TransitionRule>> = 
   start_review: { from: ['submitted'], to: 'in_review', actor: 'reviewer', event: 'review_started' },
   request_changes: { from: ['in_review'], to: 'changes_requested', actor: 'reviewer', event: 'changes_requested', decision: true },
   approve: { from: ['in_review'], to: 'approved', actor: 'reviewer', event: 'approved', decision: true },
-  reject: { from: ['in_review'], to: 'rejected', actor: 'reviewer', event: 'rejected', decision: true, retention: true },
+  reject: { from: ['in_review', 'approved'], to: 'rejected', actor: 'reviewer', event: 'rejected', decision: true, retention: true },
 };
+
+/** A reviewer's 'reject' of an APPROVED application: revoking the approval (store-less users only). */
+export function isRevocation(action: ApplicationAction, from: string): boolean {
+  return action === 'reject' && from === 'approved';
+}
+
+/** The correlated rule the revocation's UPDATE carries: the application's user has no store. */
+const NO_STORE_YET_SQL = `NOT EXISTS (SELECT 1 FROM merchant_stores WHERE merchant_stores.user_id = merchant_applications.user_id)`;
+
+async function storeExistsFor(db: D1Database, userId: string): Promise<boolean> {
+  const row = await db.prepare('SELECT 1 AS x FROM merchant_stores WHERE user_id = ? LIMIT 1').bind(userId).first();
+  return !!row;
+}
 
 /** The state an action leads to from `from`, or null when the move is illegal. */
 export function nextState(action: ApplicationAction, from: string): ApplicationState | null {
@@ -202,8 +228,9 @@ export interface MerchantApprovalState {
 
 /**
  * Where this user stands on the approval axis. Approved is the merchant
- * row's stamp OR an application in state 'approved' (a finished state that
- * never moves again): approving a NEW applicant writes no public row — the
+ * row's stamp OR an application in state 'approved' (final once a store
+ * exists; before that a reviewer's revoke moves it to 'rejected' and clears
+ * the stamp it made, so neither counts): approving a NEW applicant writes no public row — the
  * row is born with its store at /onboard, stamped from that application — so
  * nothing appears in «المتاجر» before there is a store to show.
  *
@@ -308,11 +335,28 @@ export interface TransitionRequest {
   reasonPublic?: string;
   /** Staff only; never serialised to the applicant. */
   noteInternal?: string;
+  /**
+   * 'reject' of an APPROVED application — revoking it — is SAID, never
+   * inferred: approve keeps the revision, so a reject clicked on a review
+   * another reviewer approved meanwhile would otherwise revoke that approval.
+   * A reject from 'approved' without it, or with it from any other state, is
+   * APPLICATION_STATE_INVALID.
+   */
+  revoke?: boolean;
 }
 
 export type TransitionOutcome =
   | { ok: true; replay: boolean; state: ApplicationState; revision: number }
-  | { ok: false; code: 'APPLICATION_STATE_INVALID' | 'APPLICATION_CHANGED' | 'SELF_DECISION_FORBIDDEN' | 'OPERATION_REUSED' | 'OPERATION_ID_INVALID' };
+  | {
+      ok: false;
+      code:
+        | 'APPLICATION_STATE_INVALID'
+        | 'APPLICATION_CHANGED'
+        | 'SELF_DECISION_FORBIDDEN'
+        | 'OPERATION_REUSED'
+        | 'OPERATION_ID_INVALID'
+        | 'APPROVAL_REVOKE_STORE_EXISTS';
+    };
 
 /** The stored shape of an operation id: a client's, or one of the server's own (`srv:…`, `create:…`, `purge:…`). */
 const OPERATION_ID = /^[A-Za-z0-9:_-]{8,80}$/;
@@ -389,6 +433,14 @@ export function eventStatement(
  * application, and /onboard creates the merchant row with its store, stamped
  * from it. So approval creates no store and publishes nothing — no
  * store-less card in «المتاجر» (final check, row 257).
+ *
+ * REVOKE ('reject' from 'approved') is the same batch with one more rule in
+ * the conditional UPDATE — the user has no store (`NO_STORE_YET_SQL`) — and
+ * one more statement: the stamp this application put on an existing merchant
+ * row is cleared. An /onboard that commits first makes the UPDATE match
+ * nothing, the fence rolls the revoke back, and the reviewer hears
+ * APPROVAL_REVOKE_STORE_EXISTS; a revoke that commits first fails /onboard's
+ * own approval fence (merchant.ts). Exactly one of them wins.
  */
 export async function applyTransition(db: D1Database, req: TransitionRequest): Promise<TransitionOutcome> {
   if (!validOperationId(req.operationId)) return { ok: false, code: 'OPERATION_ID_INVALID' };
@@ -402,6 +454,10 @@ export async function applyTransition(db: D1Database, req: TransitionRequest): P
   // NO SELF-DECISION: a reviewer never moves their own application.
   if (rule.actor === 'reviewer' && req.actor.id === app.user_id) return { ok: false, code: 'SELF_DECISION_FORBIDDEN' };
   if (!(rule.from as readonly string[]).includes(app.state)) return { ok: false, code: 'APPLICATION_STATE_INVALID' };
+  const revoke = isRevocation(req.action, app.state);
+  if (req.action === 'reject' && revoke !== (req.revoke === true)) return { ok: false, code: 'APPLICATION_STATE_INVALID' };
+  // The early, honest answer; the rule that decides is the one IN the UPDATE below.
+  if (revoke && (await storeExistsFor(db, app.user_id))) return { ok: false, code: 'APPROVAL_REVOKE_STORE_EXISTS' };
 
   const now = req.now ?? new Date().toISOString();
   const revision = rule.bumpRevision ? app.revision + 1 : app.revision;
@@ -428,7 +484,9 @@ export async function applyTransition(db: D1Database, req: TransitionRequest): P
   const complete =
     req.action === 'submit'
       ? ` AND length(trim(public_name)) >= 2 AND legal_name_enc <> '' AND dob_enc <> '' AND social_link_enc <> '' AND photo_key IS NOT NULL`
-      : '';
+      : revoke
+        ? ` AND ${NO_STORE_YET_SQL}`
+        : '';
   const statements: D1PreparedStatement[] = [
     db
       .prepare(`UPDATE merchant_applications SET ${sets.join(', ')} WHERE id = ? AND state = ? AND revision = ?${complete}`)
@@ -456,6 +514,17 @@ export async function applyTransition(db: D1Database, req: TransitionRequest): P
         .bind(now, app.id, app.id)
     );
   }
+  if (revoke) {
+    // The stamp this approval put on a merchant row from before the gate goes with it.
+    statements.push(
+      db
+        .prepare(
+          `UPDATE community_merchants SET approved_at = NULL, approved_application_id = NULL
+            WHERE user_id = ? AND approved_application_id = ?`
+        )
+        .bind(app.user_id, app.id)
+    );
+  }
   const { statements: auditRows } = await auditStatements(
     db,
     req.actor.id,
@@ -473,6 +542,8 @@ export async function applyTransition(db: D1Database, req: TransitionRequest): P
     if (isLostRace(e) || /UNIQUE constraint failed: merchant_application_events\.operation_id/.test(msg)) {
       const after = await replayOf(db, req);
       if (after) return after;
+      // A store opened between the early check and this batch: the revoke lost to /onboard.
+      if (revoke && isLostRace(e) && (await storeExistsFor(db, app.user_id))) return { ok: false, code: 'APPROVAL_REVOKE_STORE_EXISTS' };
       return { ok: false, code: 'APPLICATION_CHANGED' };
     }
     throw e;
@@ -497,6 +568,12 @@ export function transitionRefusal(code: Exclude<TransitionOutcome, { ok: true }>
       return new HttpError(
         409,
         'تغيّر الطلب للتو؛ حدّث الصفحة ثم أعد المحاولة / The application just changed; refresh and try again',
+        code
+      );
+    case 'APPROVAL_REVOKE_STORE_EXISTS':
+      return new HttpError(
+        409,
+        'فتح هذا التاجر متجره بالفعل فلا يُسحب اعتماده؛ أوقف التاجر من إدارة المجتمع بدلًا من ذلك / This merchant already opened a store, so the approval cannot be revoked; suspend the merchant from community administration instead',
         code
       );
     default:

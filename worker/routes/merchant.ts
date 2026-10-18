@@ -40,6 +40,7 @@ import {
 } from '../lib/merchantAuth';
 import { checkSlug, suggestSlug, SLUG_RESERVATION_DAYS } from '../lib/merchantOps';
 import { applicationRequiredRefusal, applicationSummaryOf, merchantApprovalOf } from '../lib/merchantApproval';
+import { isLostRace } from '../lib/gifts/fence';
 import { merchantBalance } from '../lib/escrowOps';
 import { orderCreditStateSql } from '../lib/merchantLedger';
 import { normalizeGovernorate } from '../lib/iraqGovernorates';
@@ -143,6 +144,10 @@ function isUniqueViolation(e: unknown): boolean {
  * nothing half-landed; the only question is which race was lost.
  */
 async function onboardRace(db: D1Database, userId: string, e: unknown): Promise<unknown> {
+  // The approval fence: a reviewer revoked the approval between the check and the batch, which wrote nothing.
+  if (isLostRace(e)) {
+    return (await storeForUser(db, userId)) ? conflict('You already have a store', 'STORE_EXISTS') : applicationRequiredRefusal();
+  }
   if (!isUniqueViolation(e)) return e;
   if (await storeForUser(db, userId)) return conflict('You already have a store', 'STORE_EXISTS');
   return conflict('That store address was just taken — choose another', 'SLUG_UNAVAILABLE');
@@ -276,8 +281,24 @@ merchantRoutes.post('/onboard', async (c) => {
   // the gate, which the approval stamped) takes the store's name and
   // governorate only; its stamp is filled only if it had none — never
   // overwritten — and `status` and the sanctions are never touched.
+  //
+  // THE APPROVAL IS READ AGAIN IN THE WRITE (row 257): a reviewer may revoke
+  // an approval while there is no store yet. A revoke landing between the
+  // check above and this batch would otherwise still open a public store, so
+  // the batch's first statement fails it (`ops_guards` CHECK ok = 1) unless
+  // the user is approved NOW — the same rule as `merchantApprovalOf`. The
+  // revoke's own UPDATE requires that no store exists, so of the two racing
+  // writes exactly one wins.
+  const approvalGuard = newId('guard');
   try {
     await c.env.DB.batch([
+      c.env.DB.prepare(
+        `INSERT INTO ops_guards (id, ok)
+         SELECT ?1, CASE WHEN EXISTS (SELECT 1 FROM community_merchants WHERE user_id = ?2 AND approved_at IS NOT NULL)
+                          OR EXISTS (SELECT 1 FROM merchant_applications WHERE user_id = ?2 AND state = 'approved')
+                         THEN 1 ELSE 0 END`
+      ).bind(approvalGuard, user.id),
+      c.env.DB.prepare('DELETE FROM ops_guards WHERE id = ?').bind(approvalGuard),
       c.env.DB.prepare(
         `INSERT INTO community_merchants (id, user_id, name, bio, governorate, status, approved_at, approved_application_id)
          VALUES (?1, ?2, ?3, ?4, ?5, 'active',

@@ -37,7 +37,9 @@ import {
  *   POST /:id/start-review          submitted → in_review
  *   POST /:id/request-changes       in_review → changes_requested (reason_public required)
  *   POST /:id/approve               in_review → approved (stamps an existing merchant row; NO store, NO new row)
- *   POST /:id/reject                in_review → rejected (reason_public required)
+ *   POST /:id/reject                in_review → rejected (reason_public required); with
+ *                                   `revoke: true`, approved → rejected: REVOKING an approval,
+ *                                   only while the user has no store (APPROVAL_REVOKE_STORE_EXISTS after)
  *
  *   GET  /reviewers                 the owner: assistant admins and their MERCHANT_REVIEW grant
  *   POST /reviewers/:userId/grant   the owner issues MERCHANT_REVIEW to an assistant admin
@@ -61,7 +63,10 @@ import {
  * reviewers on one revision cannot both win; a replayed operation id writes
  * nothing and answers with the state it produced; nobody decides their own
  * application (SELF_DECISION_FORBIDDEN). The answer is the server's state,
- * which the panel waits for before it shows anything.
+ * which the panel waits for before it shows anything — and it shows the
+ * application's public fields only under the same SENT rule as every other
+ * door: a replay, or an applicant's reopen landing before the re-read, is
+ * answered with the id, state and revision alone.
  *
  * PRIVATE BY CONSTRUCTION. The sealed values leave the server only in the
  * audited detail, to a reviewer, and the audit row is written BEFORE anything
@@ -422,7 +427,7 @@ adminMerchantApplicationRoutes.get('/:id', async (c) => {
   await db.batch(auditRows);
 
   const secret = c.env.KYC_ENC_KEY;
-  const [nameJson, dob, socialLink, applicant, proIdentity, phone, events] = await Promise.all([
+  const [nameJson, dob, socialLink, applicant, proIdentity, phone, events, store] = await Promise.all([
     opened(secret, row.legal_name_enc),
     opened(secret, row.dob_enc),
     opened(secret, row.social_link_enc),
@@ -436,6 +441,7 @@ adminMerchantApplicationRoutes.get('/:id', async (c) => {
       )
       .bind(id)
       .all<{ revision: number; actor_kind: string; action: string; reason_public: string; at: string }>(),
+    db.prepare('SELECT 1 AS x FROM merchant_stores WHERE user_id = ? LIMIT 1').bind(row.user_id).first(),
   ]);
   const legalName = nameJson ? safeParse<LegalName | null>(nameJson, null) : null;
   const sealedPresent = !!(row.legal_name_enc || row.dob_enc || row.social_link_enc);
@@ -451,6 +457,8 @@ adminMerchantApplicationRoutes.get('/:id', async (c) => {
       // admin who applied never reads it on their own application either.
       note_internal: own ? '' : row.note_internal,
       retention_until: row.retention_until,
+      // Whether the applicant opened a store: an approval is revocable only before one exists.
+      has_store: !!store,
       review: { governorate: row.governorate, activity_kind: row.activity_kind, activity_description: row.activity_description },
       private: {
         legal_name: legalName,
@@ -573,6 +581,8 @@ for (const d of DECISIONS) {
         operationId,
         reasonPublic: d.action === 'start_review' ? undefined : reasonPublic,
         noteInternal: d.action === 'start_review' ? undefined : noteInternal,
+        // Revoking an approval is said, never inferred from the state read above.
+        revoke: d.action === 'reject' && body?.revoke === true,
       })
     );
     if (!out.ok) throw transitionRefusal(out.code);
@@ -581,7 +591,18 @@ for (const d of DECISIONS) {
       const event = d.action === 'start_review' ? 'review_started' : d.action === 'request_changes' ? 'changes_requested' : d.action === 'approve' ? 'approved' : 'rejected';
       announceAfterResponse(c, 'merchant_verification', reviewerNoticeText(id, out.revision, event));
     }
-    const after = await db.prepare(`SELECT ${LIST_COLUMNS} FROM merchant_applications WHERE id = ?`).bind(id).first<ListRow>();
-    return c.json({ success: true, replay: out.replay, application: listView(after!, reviewer.id) });
+    // The re-read obeys the SENT rule like every other door: a replay (the
+    // application may have been reopened and edited since) or a reopen landing
+    // before this read answers with what the transition knows — never the
+    // public fields, governorate or activity of a revision never sent.
+    const after = out.replay
+      ? null
+      : await db
+          .prepare(`SELECT ${LIST_COLUMNS} FROM merchant_applications a WHERE id = ? AND ${SENT}`)
+          .bind(id)
+          .first<ListRow>();
+    const application =
+      after && after.state !== 'draft' ? listView(after, reviewer.id) : { id, state: out.state, revision: out.revision };
+    return c.json({ success: true, replay: out.replay, application });
   });
 }

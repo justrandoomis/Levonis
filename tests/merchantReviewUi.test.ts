@@ -123,6 +123,7 @@ test('every new refusal is written in three languages', () => {
     'DECISION_REASON_REQUIRED',
     'CAPABILITY_GRANT_TARGET_INVALID',
     'CAPABILITY_GRANT_NOT_NEEDED',
+    'APPROVAL_REVOKE_STORE_EXISTS',
   ]) {
     const s = REFUSAL_STRINGS[c]!;
     assert.ok(s, c);
@@ -220,6 +221,15 @@ test('the reviewer screen: decisions wait for the server; the photo is the prote
   assert.match(ui, /reason_public: reason, note_internal: noteInternal\.trim\(\)/);
   assert.match(ui, /t\.proIdentity\}: <span className="font-bold">\{shown\.checks\.pro_identity_verified \? t\.yes : t\.no\}/);
   assert.match(ui, /user\?\.is_owner === true && <ReviewerGrants \/>/);
+  // Revoking an approval (row 257): offered only for an approved application with no store, behind an
+  // inline confirmation, and SAID as a revoke so a late reject never revokes.
+  assert.match(ui, /const canRevoke = shown\?\.state === 'approved' && shown\.has_store === false;/);
+  assert.match(ui, /\{canRevoke && \(\s*<button onClick=\{\(\) => setConfirming\('revoke'\)\}/);
+  assert.match(ui, /confirming === 'revoke' \? t\.revokeApprovalConfirm/);
+  assert.match(ui, /\.\.\.\(revoke \? \{ revoke: true as const \} : \{\}\)/);
+  for (const lang of ['ar', 'en', 'ckb'] as const) assert.ok(REVIEWER_STRINGS[lang].revokeApproval.trim());
+  assert.equal(REVIEWER_STRINGS.ar.revokeApproval, 'سحب الاعتماد');
+  assert.equal(REVIEWER_STRINGS.en.revokeApproval, 'Revoke approval');
   assert.doesNotMatch(ui, /window\.(confirm|prompt|alert)|\balert\(/);
   assert.doesNotMatch(ui, /wallet|escrow|payout|cost_iqd|finance/i);
   assert.doesNotMatch(ui, /localStorage|sessionStorage/);

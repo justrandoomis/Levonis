@@ -20,7 +20,11 @@ import { REVIEWER_STRINGS } from './reviewerStrings';
  * row 257). Modelled on AdminKyc.tsx: a queue, an audited detail in a solid
  * Overlay, a protected <img> for the review photo, and the four reviewer
  * moves — start review, request changes, approve, reject — each with a public
- * reason (the applicant reads it) and an internal note (reviewers only).
+ * reason (the applicant reads it) and an internal note (reviewers only). An
+ * APPROVED application whose owner has opened no store yet offers one more:
+ * «سحب الاعتماد» (the server's 'reject' from 'approved'), with the same
+ * reason and an inline confirmation; once a store exists the server refuses
+ * it and the sanction is suspension, in community administration.
  *
  * THE SERVER DECIDES, THE SCREEN WAITS. No decision is drawn before the server
  * answers: the buttons go quiet, «بانتظار ردّ الخادم…» shows, and the state on
@@ -50,7 +54,7 @@ const STATE_STYLE: Record<string, string> = {
   withdrawn: 'bg-white/[0.06] text-text-secondary',
 };
 
-type Confirming = null | 'approve' | 'reject';
+type Confirming = null | 'approve' | 'reject' | 'revoke';
 
 export default function AdminMerchantApplications() {
   const { lang } = useLanguage();
@@ -118,14 +122,18 @@ export default function AdminMerchantApplications() {
   };
 
   const operationFor = (app: ReviewDetail, action: ReviewAction): string => {
-    const key = `${app.id}:${app.revision}:${action}`;
+    // The state is part of the key: a reject on a review and a revoke of an approval are two moves.
+    const key = `${app.id}:${app.revision}:${app.state}:${action}`;
     if (operation.current?.key !== key) operation.current = { key, id: newOperationId() };
     return operation.current.id;
   };
 
-  const decide = async (action: ReviewAction) => {
+  const decide = async (move: ReviewAction | 'revoke') => {
     const app = detail;
     if (!app || busy) return;
+    // Revoking an approval is the server's 'reject' from 'approved', SAID as a revoke: a late reject never revokes.
+    const revoke = move === 'revoke';
+    const action: ReviewAction = revoke ? 'reject' : move;
     setActionError('');
     setNotice('');
     const reason = reasonPublic.trim();
@@ -139,6 +147,7 @@ export default function AdminMerchantApplications() {
         revision: app.revision,
         operation_id: operationFor(app, action),
         ...(action === 'start-review' ? {} : { reason_public: reason, note_internal: noteInternal.trim() }),
+        ...(revoke ? { revoke: true as const } : {}),
       });
       // The SERVER's state, never an assumed one.
       resetDecisionArea();
@@ -168,6 +177,9 @@ export default function AdminMerchantApplications() {
 
   const canStart = shown?.state === 'submitted';
   const canDecide = shown?.state === 'in_review';
+  // Revoking an approval is a 'reject' from 'approved', offered only while no store exists (the server re-checks).
+  const canRevoke = shown?.state === 'approved' && shown.has_store === false;
+  const needsReason = canDecide || canRevoke;
 
   return (
     <div className="max-w-4xl" data-admin-merchant-applications>
@@ -374,10 +386,11 @@ export default function AdminMerchantApplications() {
             {notice && <p className="lv-alert text-[12.5px] text-text-primary" role="status">{notice}</p>}
             {actionError && detail && <p className="lv-alert lv-alert-danger text-[12.5px] text-text-primary" role="alert">{actionError}</p>}
 
-            {(canStart || canDecide) && !shown.own && (
+            {(canStart || canDecide || canRevoke) && !shown.own && (
               <section className="border-t border-border-subtle pt-4" data-decision-area>
                 <p className="text-[12px] font-bold text-text-secondary mb-2">{t.decisions}</p>
-                {canDecide && (
+                {canRevoke && <p className="text-[12px] text-text-muted mb-3 leading-relaxed">{t.revokeApprovalHint}</p>}
+                {needsReason && (
                   <div className="space-y-3 mb-3">
                     <label className="block">
                       <span className="block text-[12px] text-text-secondary mb-1">{t.reasonPublic}</span>
@@ -408,7 +421,9 @@ export default function AdminMerchantApplications() {
                   <p className="text-text-muted text-[12.5px]" role="status" aria-live="polite">{t.waiting}</p>
                 ) : confirming ? (
                   <div className="space-y-2">
-                    <p className="text-[12.5px] text-text-primary">{confirming === 'approve' ? t.approveConfirm : t.rejectConfirm}</p>
+                    <p className="text-[12.5px] text-text-primary">
+                      {confirming === 'approve' ? t.approveConfirm : confirming === 'revoke' ? t.revokeApprovalConfirm : t.rejectConfirm}
+                    </p>
                     <div className="flex gap-2">
                       <button
                         onClick={() => void decide(confirming)}
@@ -440,6 +455,11 @@ export default function AdminMerchantApplications() {
                           <ShieldCheck className="w-4 h-4" /> {t.approve}
                         </button>
                       </>
+                    )}
+                    {canRevoke && (
+                      <button onClick={() => setConfirming('revoke')} className="lv-button lv-button-danger lv-button-sm" data-revoke-approval>
+                        <UserX className="w-4 h-4" /> {t.revokeApproval}
+                      </button>
                     )}
                   </div>
                 )}

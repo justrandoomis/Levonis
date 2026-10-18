@@ -25,8 +25,16 @@
  *   - a revision never SENT is never a reviewer's — a draft, a draft
  *     withdrawn unsent, values edited after a reopen and then withdrawn —
  *     and such a withdrawal is purged at once (final check, row 257);
+ *   - a decision's answer obeys the same SENT rule: a replayed operation id
+ *     after the applicant reopened and edited, or a reopen landing before the
+ *     re-read, answers id, state and revision — no unsent public value;
  *   - approve creates NO store and no public merchant row (the row is born
  *     with the store at /onboard);
+ *   - an approval is REVOKED ('reject' from 'approved') only while the user
+ *     has no store: /onboard then refuses, the approval and the stamp no
+ *     longer count, the applicant re-applies at once (C8); with a store the
+ *     reviewer hears APPROVAL_REVOKE_STORE_EXISTS; a revoke racing /onboard —
+ *     exactly one wins;
  *   - Telegram notices carry ids only; a database without 0204 fails closed.
  *
  * Fixtures are anonymised: invented names, a placeholder link, a key minted
@@ -311,13 +319,13 @@ test('the review grant opens nothing financial: a reviewing assistant is still r
  * a Promise.all of two requests would only serialise; this is the
  * interleaving a real race reduces to.)
  */
-function racing(db: D1Database, meanwhile: () => Promise<unknown>): D1Database {
+function racing(db: D1Database, meanwhile: () => Promise<unknown>, write: RegExp = /UPDATE merchant_applications SET/): D1Database {
   let fired = false;
   return new Proxy(db, {
     get(target, prop) {
       if (prop === 'batch') {
         return async (stmts: Array<{ sql?: string }>) => {
-          if (!fired && stmts.some((st) => /UPDATE merchant_applications SET/.test(st.sql ?? ''))) {
+          if (!fired && stmts.some((st) => write.test(st.sql ?? ''))) {
             fired = true;
             await meanwhile();
           }
@@ -403,6 +411,86 @@ test('a replayed operation id writes nothing and answers the state it produced; 
     assert.equal((await json(res)).code, 'DECISION_REASON_REQUIRED');
   }
   assert.equal(appState(w.raw, id)!.state, 'in_review');
+});
+
+/** Runs `meanwhile` right AFTER the first batch carrying a transition, before the route reads again. */
+function afterTransition(db: D1Database, meanwhile: () => Promise<unknown>): D1Database {
+  let fired = false;
+  return new Proxy(db, {
+    get(target, prop) {
+      if (prop === 'batch') {
+        return async (stmts: Array<{ sql?: string }>) => {
+          const out = await (target as unknown as { batch: (x: unknown) => Promise<unknown> }).batch(stmts);
+          if (!fired && stmts.some((st) => /UPDATE merchant_applications SET/.test(st.sql ?? ''))) {
+            fired = true;
+            await meanwhile();
+          }
+          return out;
+        };
+      }
+      const v = Reflect.get(target, prop);
+      return typeof v === 'function' ? v.bind(target) : v;
+    },
+  }) as D1Database;
+}
+
+// Values only the applicant's UNSENT revision holds: any of them in a reviewer's answer is a leak.
+const UNSENT = { public_name: 'Unsent Draft Name', public_bio: 'Unsent draft bio text.', governorate: 'basra', activity_kind: 'products' };
+
+test("a decision's answer never carries an unsent revision: a replay after the applicant reopened and edited is id, state and revision only", async () => {
+  const w = world();
+  const id = await submitted(w);
+  const startOp = op('start');
+  assert.equal((await post(w.appAs(OWNER), `${BASE}/${id}/start-review`, { revision: 1, operation_id: startOp })).status, 200);
+  const rcOp = op('rc');
+  const decided = await post(w.appAs(OWNER), `${BASE}/${id}/request-changes`, { revision: 1, operation_id: rcOp, reason_public: 'Add your activity link' });
+  assert.equal(decided.status, 200);
+  // The SENT revision: its public fields are the reviewer's, as on every other door.
+  assert.equal((await json(decided)).application.public.name, 'Orbit Prints');
+
+  // The applicant reopens by editing: revision 2, never sent.
+  const edited = await put(w.appAs(APPLICANT), '/api/merchant-application', UNSENT);
+  assert.equal(edited.status, 200, await edited.clone().text());
+  assert.equal(appState(w.raw, id)!.revision, 2);
+
+  for (const [path, opId, body] of [
+    ['request-changes', rcOp, { reason_public: 'Add your activity link' }],
+    ['start-review', startOp, {}],
+  ] as const) {
+    const replay = await post(w.appAs(OWNER), `${BASE}/${id}/${path}`, { revision: 1, operation_id: opId, ...body });
+    assert.equal(replay.status, 200, path);
+    const text = await replay.clone().text();
+    for (const v of [...Object.values(UNSENT), 'Orbit Prints', 'Prints to order.']) assert.ok(!text.includes(v), `${path} replay carries «${v}»`);
+    const answer = await json(replay);
+    assert.equal(answer.replay, true);
+    assert.deepEqual(answer.application, { id, state: 'draft', revision: 2 }, 'the three the transition knows, nothing more');
+  }
+  // Withdrawn as that unsent draft, a replay still says nothing of it.
+  assert.equal((await post(w.appAs(APPLICANT), '/api/merchant-application/withdraw', { operation_id: op('wd') })).status, 200);
+  const late = await post(w.appAs(OWNER), `${BASE}/${id}/start-review`, { revision: 1, operation_id: startOp });
+  const lateText = await late.clone().text();
+  for (const v of Object.values(UNSENT)) assert.ok(!lateText.includes(v), `withdrawn replay carries «${v}»`);
+  assert.deepEqual((await json(late)).application, { id, state: 'withdrawn', revision: 2 });
+});
+
+test("a decision's answer when the applicant's reopen lands before the route reads again: the transition's state, no draft value", async () => {
+  const w = world();
+  const id = await submitted(w);
+  assert.equal((await decide(w, OWNER, id, 'start-review')).status, 200);
+  const reviewer = stubApp(
+    afterTransition(w.db, async () => {
+      assert.equal((await put(w.appAs(APPLICANT), '/api/merchant-application', UNSENT)).status, 200);
+    }),
+    OWNER,
+    (a) => a.route(BASE, adminMerchantApplicationRoutes),
+    { env: w.env }
+  );
+  const res = await post(reviewer, `${BASE}/${id}/request-changes`, { revision: 1, operation_id: op('rc'), reason_public: 'Add your activity link' });
+  assert.equal(res.status, 200, await res.clone().text());
+  const text = await res.clone().text();
+  for (const v of Object.values(UNSENT)) assert.ok(!text.includes(v), `the answer carries «${v}»`);
+  assert.deepEqual((await json(res)).application, { id, state: 'changes_requested', revision: 1 });
+  assert.equal(appState(w.raw, id)!.state, 'draft', 'the reopen did land');
 });
 
 // ------------------------------------------------------------------ privacy
@@ -656,16 +744,23 @@ test('approve creates NO store and NO public merchant row; /api/merchant/me then
   assert.equal(me.application.state, 'approved');
   assert.ok(!JSON.stringify(me).includes(NOTE));
 
-  // A finished application never moves again.
-  const late = await decide(w, FULL, id, 'reject', { reason_public: 'Changed my mind' });
-  assert.equal(late.status, 409);
-  assert.equal((await json(late)).code, 'APPLICATION_STATE_INVALID');
+  // Approved moves no further through review — a plain reject included: only a reject SAID as a revoke
+  // (below) takes it back, before a store.
+  for (const action of ['start-review', 'request-changes', 'approve', 'reject']) {
+    const late = await decide(w, FULL, id, action, action === 'start-review' ? {} : { reason_public: 'Changed my mind' });
+    assert.equal(late.status, 409);
+    assert.equal((await json(late)).code, 'APPLICATION_STATE_INVALID');
+  }
 });
 
 test('reject lets the applicant apply again at once (C8) and starts the C7 clock', async () => {
   const w = world();
   const id = await submitted(w);
   assert.equal((await decide(w, OWNER, id, 'start-review')).status, 200);
+  // A revoke is for an approval only: said on a review in progress, it rejects nothing.
+  const misnamed = await decide(w, OWNER, id, 'reject', { revoke: true, reason_public: 'The link shows no activity' });
+  assert.equal((await json(misnamed)).code, 'APPLICATION_STATE_INVALID');
+  assert.equal(appState(w.raw, id)!.state, 'in_review');
   assert.equal((await decide(w, OWNER, id, 'reject', { reason_public: 'The link shows no activity' })).status, 200);
   const r = row<{ retention_until: string | null }>(w.raw, 'SELECT retention_until FROM merchant_applications WHERE id = ?', id)!;
   assert.ok(r.retention_until, 'the 90-day clock starts');
@@ -678,6 +773,171 @@ test('reject lets the applicant apply again at once (C8) and starts the C7 clock
   const fresh = (await json(again)).application;
   assert.notEqual(fresh.id, id);
   assert.equal(fresh.state, 'draft');
+});
+
+// ------------------------------------------------------------------ revoke
+
+const ONBOARD = { name: 'Orbit Prints', slug: 'orbit-prints', governorate: 'baghdad' };
+
+/** The community is open and `userId` holds PLUS: only the approval decides whether /onboard opens a store. */
+function storeReady(w: World, userId = APPLICANT.id) {
+  w.raw.exec(`
+    INSERT INTO admin_settings (key, value) VALUES ('communityGate', '{"open":true}')
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+    INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,starts_at,expires_at)
+      VALUES ('mem_${userId}','${userId}','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z');
+  `);
+}
+
+async function approvedApplication(w: World, who: StubUser = APPLICANT, name = 'Orbit Prints'): Promise<string> {
+  const id = await submitted(w, who, name);
+  assert.equal((await decide(w, OWNER, id, 'start-review')).status, 200);
+  assert.equal((await decide(w, OWNER, id, 'approve', { reason_public: 'Welcome' })).status, 200);
+  return id;
+}
+
+const REVOKE_REASON = 'Approved in error: the activity link is not theirs';
+const decisions = (raw: DatabaseSync, id: string, action: string) =>
+  count(raw, 'SELECT COUNT(*) AS n FROM merchant_application_events WHERE application_id = ? AND action = ?', id, action);
+
+test('revoking an approval before a store: /onboard refuses, the approval no longer counts, the applicant re-applies at once (C8)', async () => {
+  const w = world();
+  storeReady(w);
+  const id = await approvedApplication(w);
+  assert.equal((await json(await get(w.appAs(OWNER), `${BASE}/${id}`))).application.has_store, false, 'the panel may offer the revoke');
+
+  // The same door and the same rules as a rejection: a reason the applicant reads, the revision seen, an operation id.
+  const bare = await decide(w, FULL, id, 'reject', { revoke: true, reason_public: 'no' });
+  assert.equal(bare.status, 400);
+  assert.equal((await json(bare)).code, 'DECISION_REASON_REQUIRED');
+  const stale = await decide(w, FULL, id, 'reject', { revoke: true, revision: 2, reason_public: REVOKE_REASON });
+  assert.equal((await json(stale)).code, 'APPLICATION_CHANGED');
+  // A revoke is said, never inferred: a plain reject (a late click on the review screen) does not revoke.
+  const unsaid = await decide(w, FULL, id, 'reject', { reason_public: REVOKE_REASON });
+  assert.equal(unsaid.status, 409);
+  assert.equal((await json(unsaid)).code, 'APPLICATION_STATE_INVALID');
+  assert.equal(appState(w.raw, id)!.state, 'approved');
+
+  const revokeOp = op('revoke');
+  const revoked = await post(w.appAs(FULL), `${BASE}/${id}/reject`, { revision: 1, operation_id: revokeOp, revoke: true, reason_public: REVOKE_REASON, note_internal: NOTE });
+  assert.equal(revoked.status, 200, await revoked.clone().text());
+  assert.equal((await json(revoked)).application.state, 'rejected');
+  const st = appState(w.raw, id)!;
+  assert.equal(st.state, 'rejected');
+  assert.equal(st.decided_by, FULL.id);
+  assert.equal(st.reason_public, REVOKE_REASON);
+  assert.equal(decisions(w.raw, id, 'approved'), 1, 'the approval stays in the history');
+  assert.equal(decisions(w.raw, id, 'rejected'), 1);
+  const audited = row<{ actor_id: string; detail: string }>(w.raw, "SELECT actor_id, detail FROM audit_log WHERE action = 'merchant_application.rejected' AND target = ?", id)!;
+  assert.equal(audited.actor_id, FULL.id);
+  assert.match(audited.detail, /"from":"approved"/);
+  assert.ok(!audited.detail.includes(REVOKE_REASON) && !audited.detail.includes(NOTE), 'the audit row names the move, not the words');
+  // A replay of the same revoke writes nothing.
+  const replay = await post(w.appAs(FULL), `${BASE}/${id}/reject`, { revision: 1, operation_id: revokeOp, revoke: true, reason_public: REVOKE_REASON });
+  assert.equal((await json(replay)).replay, true);
+  assert.equal(decisions(w.raw, id, 'rejected'), 1);
+
+  // Nothing counts it any more: /me, the applicant's GET, and /onboard.
+  const me = await json(await get(w.appAs(APPLICANT), '/api/merchant/me'));
+  assert.equal(me.approved, false);
+  assert.equal(me.application.state, 'rejected');
+  assert.equal(me.application.reason_public, REVOKE_REASON);
+  assert.ok(!JSON.stringify(me).includes(NOTE));
+  const onboard = await post(w.appAs(APPLICANT), '/api/merchant/onboard', ONBOARD);
+  assert.equal(onboard.status, 403);
+  assert.equal((await json(onboard)).code, 'MERCHANT_APPLICATION_REQUIRED');
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM merchant_stores'), 0);
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM community_merchants WHERE user_id = ?', APPLICANT.id), 0);
+  const mine = await json(await get(w.appAs(APPLICANT), '/api/merchant-application'));
+  assert.equal(mine.approved, false);
+  assert.equal(mine.can.apply, true, 'C8: again at once, no cooldown');
+  const again = await put(w.appAs(APPLICANT), '/api/merchant-application', { public_name: 'Orbit Prints 2' });
+  assert.equal(again.status, 200, await again.clone().text());
+  assert.notEqual((await json(again)).application.id, id);
+
+  // A merchant row from before the gate: the stamp this approval put on it goes with the revoke.
+  storeReady(w, APPLICANT2.id);
+  w.raw.exec("INSERT INTO community_merchants (id, user_id, name) VALUES ('cm_old2', 'u_app2', 'Old Profile')");
+  const id2 = await approvedApplication(w, APPLICANT2, 'Nebula Parts');
+  assert.ok(row<{ approved_at: string | null }>(w.raw, "SELECT approved_at FROM community_merchants WHERE id = 'cm_old2'")!.approved_at);
+  assert.equal((await decide(w, OWNER, id2, 'reject', { revoke: true, reason_public: REVOKE_REASON })).status, 200);
+  const cleared = row<{ approved_at: string | null; approved_application_id: string | null; status: string }>(w.raw, "SELECT approved_at, approved_application_id, status FROM community_merchants WHERE id = 'cm_old2'")!;
+  assert.equal(cleared.approved_at, null);
+  assert.equal(cleared.approved_application_id, null);
+  assert.equal(cleared.status, 'active', 'the sanction axis is untouched');
+  const old = await post(w.appAs(APPLICANT2), '/api/merchant/onboard', { ...ONBOARD, slug: 'nebula-parts' });
+  assert.equal((await json(old)).code, 'MERCHANT_APPLICATION_REQUIRED');
+});
+
+test('once a store exists the approval is not revoked: APPROVAL_REVOKE_STORE_EXISTS, nothing written — suspension stays the sanction', async () => {
+  const w = world();
+  storeReady(w);
+  const id = await approvedApplication(w);
+  assert.equal((await post(w.appAs(APPLICANT), '/api/merchant/onboard', ONBOARD)).status, 201);
+  assert.equal((await json(await get(w.appAs(OWNER), `${BASE}/${id}`))).application.has_store, true, 'the panel offers no revoke');
+  const stampBefore = row<{ approved_at: string | null }>(w.raw, 'SELECT approved_at FROM community_merchants WHERE user_id = ?', APPLICANT.id)!.approved_at;
+  assert.ok(stampBefore);
+
+  const res = await decide(w, OWNER, id, 'reject', { revoke: true, reason_public: 'Fraud found later on' });
+  assert.equal(res.status, 409);
+  assert.equal((await json(res)).code, 'APPROVAL_REVOKE_STORE_EXISTS');
+  assert.equal(appState(w.raw, id)!.state, 'approved');
+  assert.equal(decisions(w.raw, id, 'rejected'), 0);
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action = 'merchant_application.rejected' AND target = ?", id), 0);
+  assert.equal(row<{ approved_at: string | null }>(w.raw, 'SELECT approved_at FROM community_merchants WHERE user_id = ?', APPLICANT.id)!.approved_at, stampBefore);
+  assert.equal((await json(await get(w.appAs(APPLICANT), '/api/merchant/me'))).approved, true);
+});
+
+test('a revoke racing /onboard: exactly one wins, whichever commits first', async () => {
+  // (1) The store opens between the revoke's check and its write: the revoke's UPDATE matches nothing.
+  {
+    const w = world();
+    storeReady(w);
+    const id = await approvedApplication(w);
+    let onboarded = 0;
+    const reviewer = stubApp(
+      racing(w.db, async () => {
+        onboarded = (await post(w.appAs(APPLICANT), '/api/merchant/onboard', ONBOARD)).status;
+      }),
+      OWNER,
+      (a) => a.route(BASE, adminMerchantApplicationRoutes),
+      { env: w.env }
+    );
+    const lost = await post(reviewer, `${BASE}/${id}/reject`, { revision: 1, operation_id: op('revoke-race'), revoke: true, reason_public: REVOKE_REASON });
+    assert.equal(onboarded, 201, 'the store landed first');
+    assert.equal(lost.status, 409, await lost.clone().text());
+    assert.equal((await json(lost)).code, 'APPROVAL_REVOKE_STORE_EXISTS');
+    assert.equal(appState(w.raw, id)!.state, 'approved');
+    assert.equal(decisions(w.raw, id, 'rejected'), 0, 'the revoke rolled back whole');
+    assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM merchant_stores WHERE user_id = ?', APPLICANT.id), 1);
+  }
+  // (2) The revoke lands between /onboard's check and its write: /onboard's approval fence fails it.
+  {
+    const w = world();
+    storeReady(w);
+    const id = await approvedApplication(w);
+    let revoked = 0;
+    const applicant = stubApp(
+      racing(
+        w.db,
+        async () => {
+          revoked = (await decide(w, OWNER, id, 'reject', { revoke: true, reason_public: REVOKE_REASON })).status;
+        },
+        /INSERT INTO merchant_stores/
+      ),
+      APPLICANT,
+      (a) => a.route('/api/merchant', merchantRoutes),
+      { env: w.env }
+    );
+    const lost = await post(applicant, '/api/merchant/onboard', ONBOARD);
+    assert.equal(revoked, 200, 'the revoke landed first');
+    assert.equal(lost.status, 403, await lost.clone().text());
+    assert.equal((await json(lost)).code, 'MERCHANT_APPLICATION_REQUIRED');
+    assert.equal(appState(w.raw, id)!.state, 'rejected');
+    assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM merchant_stores'), 0, 'no store');
+    assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM community_merchants WHERE user_id = ?', APPLICANT.id), 0, 'no merchant row');
+    assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM merchant_store_slugs WHERE slug = 'orbit-prints'"), 0, 'no slug held');
+  }
 });
 
 // ------------------------------------------------------------- notices, schema
