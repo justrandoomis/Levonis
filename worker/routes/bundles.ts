@@ -128,7 +128,8 @@ export async function listBundles(
 ): Promise<{ ctx: PricingCtx; bundles: ResolvedBundle[] }> {
   const { kind, search, categoryId, family, featured, limit, offset } = f;
   const params: unknown[] = [];
-  // Listed to customers (worker/lib/listing.ts) — a composition too: hidden until it has a V2 price (Q7).
+  // Listed to customers (worker/lib/listing.ts) — a composition too: priced like an ordinary product
+  // (DECISIONS row 250), hidden until its first complete V2 write, then listed for every visitor.
   let where = (await listing(db)).sellable('p');
   if (kind === 'bundle' || kind === 'mystery') {
     where += ' AND p.composition = ?';

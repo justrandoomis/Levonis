@@ -32,7 +32,8 @@ import { orderRoutes } from '../worker/routes/orders';
 import { returnRoutes, priceProtectionRoutes } from '../worker/routes/returns';
 import { deductOrderStock } from '../worker/lib/orderInventory';
 import { addBundle, seedCatalogue, orderBody } from './lib/bundles';
-import { q7Test } from './fixtures/q7';
+import { repriceV2 } from './fixtures/v2Publish';
+import { test } from 'node:test';
 
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
 const admin: StubUser = { id: 'boss', role: 'admin', email: 'a@x.co' };
@@ -80,7 +81,7 @@ async function deliveredBundle(raw: DatabaseSync, opts: { couponCode?: string; q
 
 // --------------------------------------------------------- the arithmetic
 
-q7Test('case 12 — a whole-bundle return refunds the parent’s line total NET of coupon and points, never 0 and never the gross', async () => {
+test('case 12 — a whole-bundle return refunds the parent’s line total NET of coupon and points, never 0 and never the gross', async () => {
   const raw = seedCatalogue();
   raw.exec(
     `INSERT INTO coupons (id,code,kind,value,min_total_iqd,active) VALUES ('cp1','SAVE10','percent',10,0,1)`
@@ -133,7 +134,7 @@ q7Test('case 12 — a whole-bundle return refunds the parent’s line total NET 
   assert.ok(spendable(raw, 'buyer') > before);
 });
 
-q7Test('case 12 — the points reversal uses the same basis, so a returned bundle reverses what it accrued', async () => {
+test('case 12 — the points reversal uses the same basis, so a returned bundle reverses what it accrued', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw);
   const parent = itemsOf(raw, orderId).find((r) => r.bundle_parent_item_id === null)!;
@@ -154,7 +155,7 @@ q7Test('case 12 — the points reversal uses the same basis, so a returned bundl
   assert.ok(reversedBasis > 0);
 });
 
-q7Test('case 12 — a partial-qty return of a multi-qty bundle scales by kase.qty / order_items.qty', async () => {
+test('case 12 — a partial-qty return of a multi-qty bundle scales by kase.qty / order_items.qty', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw, { qty: 2 });
   const rows = itemsOf(raw, orderId);
@@ -191,7 +192,7 @@ q7Test('case 12 — a partial-qty return of a multi-qty bundle scales by kase.qt
 
 // ------------------------------------------------------------ stock, case 12
 
-q7Test('case 12 — the restore goes through the LEDGER onto the colour row, never products.stock', async () => {
+test('case 12 — the restore goes through the LEDGER onto the colour row, never products.stock', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw);
   const before = row<{ stock: number }>(raw, "SELECT stock FROM product_colors WHERE id='pc_black'")!;
@@ -222,7 +223,7 @@ q7Test('case 12 — the restore goes through the LEDGER onto the colour row, nev
   );
 });
 
-q7Test('cancellation releases every component in the same batch as the status flip', async () => {
+test('cancellation releases every component in the same batch as the status flip', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 400_000 });
   const db = asD1(raw);
@@ -256,7 +257,7 @@ q7Test('cancellation releases every component in the same batch as the status fl
 
 // ------------------------------------------------------------ the grouping
 
-q7Test('a component case names the bundle it came from and its siblings', async () => {
+test('a component case names the bundle it came from and its siblings', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw);
   const parent = itemsOf(raw, orderId).find((r) => r.bundle_parent_item_id === null)!;
@@ -287,7 +288,7 @@ q7Test('a component case names the bundle it came from and its siblings', async 
  * round is a legitimately planned restore whose expected equals its actual —
  * so the bound has to be the quota itself.
  */
-q7Test('a whole-bundle return consumes the quota: the same bundle cannot be returned twice', async () => {
+test('a whole-bundle return consumes the quota: the same bundle cannot be returned twice', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw);
   const parent = itemsOf(raw, orderId).find((r) => r.bundle_parent_item_id === null)!;
@@ -302,7 +303,7 @@ q7Test('a whole-bundle return consumes the quota: the same bundle cannot be retu
     'the refused round opened no case at all — the fan-out stays all-or-nothing');
 });
 
-q7Test('a rejected case frees the quota again, and a two-qty bundle can be returned one at a time', async () => {
+test('a rejected case frees the quota again, and a two-qty bundle can be returned one at a time', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw, { qty: 2 });
   const parent = itemsOf(raw, orderId).find((r) => r.bundle_parent_item_id === null)!;
@@ -321,7 +322,7 @@ q7Test('a rejected case frees the quota again, and a two-qty bundle can be retur
   assert.equal(again.success, true, JSON.stringify(again));
 });
 
-q7Test('a price-protection claim on the bundle PARENT is refused by name, not with a misleading NO_ELIGIBLE_DROP', async () => {
+test('a price-protection claim on the bundle PARENT is refused by name, not with a misleading NO_ELIGIBLE_DROP', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw);
   const parent = itemsOf(raw, orderId).find((r) => r.bundle_parent_item_id === null)!;
@@ -351,7 +352,7 @@ q7Test('a price-protection claim on the bundle PARENT is refused by name, not wi
  * the refund basis, so a refund and a price-protection credit cannot disagree
  * about what one component cost.
  */
-q7Test('a component price-protection claim is anchored on the PAID share, and can never exceed it', async () => {
+test('a component price-protection claim is anchored on the PAID share, and can never exceed it', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw);
   const printer = itemsOf(raw, orderId).find((r) => r.product_id === 'p_printer')!;
@@ -364,26 +365,26 @@ q7Test('a component price-protection claim is anchored on the PAID share, and ca
   // buyer paid inside the bundle, so there is no eligible drop. Anchoring on
   // `component_value_iqd` would have credited 50,000 for a price the customer
   // never reached.
-  raw.exec("UPDATE products SET price_iqd = 350000 WHERE id = 'p_printer'");
+  await repriceV2(raw, 'p_printer', 350_000);
   const none = await json(await post(appFor(db), '/api/price-protection/claims', { orderItemId: printer.id }));
   assert.equal(none.code, 'NO_ELIGIBLE_DROP', JSON.stringify(none));
 
   // A drop BELOW the paid share is a real drop, and it is measured from it.
-  raw.exec("UPDATE products SET price_iqd = 300000 WHERE id = 'p_printer'");
+  await repriceV2(raw, 'p_printer', 300_000);
   const res = await json(await post(appFor(db), '/api/price-protection/claims', { orderItemId: printer.id }));
   assert.equal(res.success, true, JSON.stringify(res));
   assert.equal(res.claim.original_unit_iqd, paid, 'the anchor is the paid share, never the undiscounted value');
   assert.equal(res.claim.observed_unit_iqd, 300_000);
 });
 
-q7Test('a catastrophic catalogue drop cannot credit more than the component cost inside the bundle', async () => {
+test('a catastrophic catalogue drop cannot credit more than the component cost inside the bundle', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw);
   const order = row<Record<string, unknown>>(raw, 'SELECT * FROM orders WHERE id = ?', orderId)!;
   const printer = itemsOf(raw, orderId).find((r) => r.product_id === 'p_printer')!;
   const paid = Number(printer.component_alloc_iqd);
 
-  raw.exec("UPDATE products SET price_iqd = 20000 WHERE id = 'p_printer'");
+  await repriceV2(raw, 'p_printer', 20_000);
   const claim = await json(await post(appFor(db), '/api/price-protection/claims', { orderItemId: printer.id }));
   assert.equal(claim.success, true, JSON.stringify(claim));
 

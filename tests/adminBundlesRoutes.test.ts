@@ -33,6 +33,7 @@ import { refusalIssues } from '../src/components/adminProducts/applyResult';
 import type { ApplyVerifyFailure } from '../src/components/adminProducts/types';
 import { fixtureWebp, productMediaFixtureEnv } from './fixtures/productMedia';
 import { pendingMediaCleanup, runMediaCleanup } from '../worker/lib/productDeletion';
+import { FIXTURE_U, publishV2, usdReproducing } from './fixtures/v2Publish';
 
 const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null };
 const ASSISTANT = { id: 'usr_asst', role: 'admin' as const, email: 'asst@x.co', admin_scope: 'assistant' };
@@ -94,10 +95,10 @@ function setup(user: typeof OWNER | typeof ASSISTANT = OWNER, env: Record<string
   return { raw, db, app: stubApp(db, user, mount, { env }) };
 }
 
+// No dinar price: a bundle is priced like an ordinary product, in section ٣ (DECISIONS row 250).
 const KIT = {
   name_en: 'Starter kit',
   name_ar: 'حزمة البداية',
-  price_iqd: 850000,
   status: 'draft',
   components: [
     { member_product_id: 'prd_printer', qty: 1, sort: 0 },
@@ -232,11 +233,14 @@ test('bundle create rejects a missing local WebP before any catalogue row is wri
 });
 
 test("the preview is the scarcest component, computed by the storefront's own function", async () => {
-  const { app } = setup();
+  const { raw, app } = setup();
   const made = await create(app);
-  const preview = made.body.preview as Record<string, unknown>;
   // printer 5/1 = 5 · spool floor(6/2) = 3 · nozzle 20/1 = 20 → min = 3
-  assert.equal((preview.availability as Record<string, unknown>).max_bundles, 3);
+  assert.equal(((made.body.preview as Record<string, unknown>).availability as Record<string, unknown>).max_bundles, 3);
+  // Priced like any product (DECISIONS row 250): the preview quotes its V2 price.
+  const id = made.body.product.id as string;
+  await publishV2(raw, id, { usd: usdReproducing(850_000, FIXTURE_U) });
+  const preview = (await json(await get(app, `/api/admin/bundles/${id}/preview`))).preview as Record<string, unknown>;
   assert.equal(preview.component_total_iqd, 900000 + 2 * 20000 + 5000);
   assert.equal(preview.bundle_price_iqd, 850000);
   assert.equal(preview.discount_iqd, 945000 - 850000);
@@ -291,36 +295,44 @@ const refusal = async (app: App, body: Record<string, unknown>) => {
   return { status: res.status, body: b, codes: ((b.details?.errors ?? []) as Array<{ code: string }>).map((e) => e.code) };
 };
 
-test('a discount at or above the component total is REFUSED — a free bundle is never published', async () => {
+test('DECISIONS row 250: the retired dinar rule an older client sends is stored inert — it prices nothing and refuses nothing', async () => {
   const { raw, app } = setup();
-  const out = await refusal(app, { config: { price_mode: 'discount_iqd', discount_iqd: 2_000_000, max_qty_per_order: 5 } });
-  assert.equal(out.status, 400);
-  assert.equal(out.body.code, 'BUNDLE_VALIDATION');
-  assert.ok(out.codes.includes('BUNDLE_DISCOUNT_EXCEEDS_TOTAL'), JSON.stringify(out.body));
+  const made = await create(app, { config: { price_mode: 'discount_iqd', discount_iqd: 2_000_000, discount_percent: 200, plus_price_iqd: 1, min_price_iqd: 9_000_000, max_qty_per_order: 4 } });
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  const cfg = row<Record<string, unknown>>(raw, 'SELECT * FROM bundle_config WHERE product_id = ?', made.body.product.id)!;
+  assert.deepEqual(
+    [cfg.price_mode, cfg.discount_percent, cfg.discount_iqd, cfg.plus_price_iqd, cfg.min_price_iqd, cfg.max_qty_per_order],
+    ['fixed', null, null, null, 1, 4],
+    'only the per-order cap is still the panel\'s'
+  );
+});
+
+test('DECISIONS row 250: a typed dinar price is refused by name, PRICING_V2_MANAGED, and nothing is written', async () => {
+  const { raw, app } = setup();
+  for (const field of ['price_iqd', 'prime_price_iqd', 'pro_price_iqd', 'original_price_iqd']) {
+    const res = await post(app, '/api/admin/bundles', { ...KIT, [field]: 850_000 });
+    const body = await json(res);
+    assert.equal(res.status, 409, `${field}: ${JSON.stringify(body)}`);
+    assert.equal(body.code, 'PRICING_V2_MANAGED');
+    assert.equal(body.details.section, 3);
+  }
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM products WHERE composition <> ''"), 0, 'nothing was written');
 });
 
-test('discount_percent = 200 is refused, and so is setting both discount kinds at once', async () => {
-  const { app } = setup();
-  const pct = await refusal(app, { config: { price_mode: 'discount_percent', discount_percent: 200, max_qty_per_order: 5 } });
-  assert.equal(pct.status, 400);
-  assert.match(JSON.stringify(pct.body), /between 1 and 90/);
-
-  const both = await refusal(app, {
-    config: { price_mode: 'discount_percent', discount_percent: 10, discount_iqd: 5000, max_qty_per_order: 5 },
-  });
-  assert.equal(both.status, 400);
-  assert.match(JSON.stringify(both.body), /never both/);
-});
-
-test('a window price beside a derived bundle price is refused with OFFER_PRICE_CONFLICT', async () => {
-  const { app } = setup();
-  const out = await refusal(app, {
-    config: { price_mode: 'discount_percent', discount_percent: 10, max_qty_per_order: 5 },
-    offer: { offer_price_mode: 'fixed', offer_price_iqd: 700000, active: true },
-  });
-  assert.equal(out.status, 400);
-  assert.ok(out.codes.includes('OFFER_PRICE_CONFLICT'), JSON.stringify(out.body));
+test('DECISIONS row 250: a fixed dinar offer price or a PLUS price is refused by name, as on an ordinary product', async () => {
+  const { raw, app } = setup();
+  for (const offer of [
+    { offer_price_mode: 'fixed', offer_price_iqd: 700000, active: true },
+    { offer_price_mode: 'discount_percent', discount_percent: 10, plus_price_iqd: 650000, active: true },
+  ]) {
+    const out = await refusal(app, { offer });
+    assert.equal(out.status, 400, JSON.stringify(out.body));
+    assert.ok(out.codes.includes('OFFER_DINAR_PRICE_RETIRED'), JSON.stringify(out.body));
+  }
+  // A percent off is an ordinary product's offer, and it saves.
+  const ok = await create(app, { offer: { offer_price_mode: 'discount_percent', discount_percent: 10, active: true } });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM products WHERE composition <> ''"), 1);
 });
 
 test('a direct + pre-order composition is refused with BUNDLE_SHIPPING_MIXED naming both components', async () => {
@@ -418,24 +430,6 @@ test('a composition that would exceed MAX_PHYSICAL_LINES in one order is refused
   assert.ok(out.codes.includes('COMPOSITION_TOO_LARGE'), JSON.stringify(out.body));
 });
 
-test('an inverted member ladder is refused — the product ladder by validateProductDoc, the PLUS rung by the planner', async () => {
-  const { app } = setup();
-  // The three product rungs are already the document's own rule, and reusing
-  // it is the point: a bundle IS a product, so there is no second ladder.
-  const product = await refusal(app, { price_iqd: 500000, pro_price_iqd: 600000 });
-  assert.equal(product.status, 400);
-  assert.match(product.body.error as string, /PRO <= PRIME <= Regular/);
-
-  // The PLUS rung is offer-scoped, so nothing else in the tree knows it.
-  const plus = await refusal(app, {
-    price_iqd: 500000,
-    pro_price_iqd: 400000,
-    config: { price_mode: 'fixed', max_qty_per_order: 5, plus_price_iqd: 300000 },
-  });
-  assert.equal(plus.status, 400);
-  assert.ok(plus.codes.includes('MEMBER_LADDER_INVERTED'), JSON.stringify(plus.body));
-});
-
 test('an inverted schedule is refused', async () => {
   const { app } = setup();
   const out = await refusal(app, {
@@ -449,7 +443,7 @@ test('an inverted schedule is refused', async () => {
 
 test('every refusal reaches a human: refusalIssues renders it, and never prints "undefined"', async () => {
   const { app } = setup();
-  const out = await refusal(app, { config: { price_mode: 'discount_iqd', discount_iqd: 2_000_000, max_qty_per_order: 5 } });
+  const out = await refusal(app, { offer: { offer_price_mode: 'fixed', offer_price_iqd: 1000, active: true } });
   const lines = refusalIssues(out.body.details as ApplyVerifyFailure);
   assert.ok(lines.length > 0, 'the refusal carried no row-level line at all');
   assert.equal(
@@ -470,7 +464,6 @@ test('the success-path warnings survive strList — a list of objects would vani
   // The spool has 6 units and the bundle needs 8 of them.
   const made = await create(app, {
     components: [{ member_product_id: 'prd_spool', qty: 8 }],
-    price_iqd: 100000,
   });
   assert.equal(made.status, 200, JSON.stringify(made.body));
   const warnings = made.body.warnings as unknown[];
@@ -494,36 +487,36 @@ test('the success-path warnings survive strList — a list of objects would vani
 test('a bundle priced above its parts warns, and an inactive member warns — neither is repaired', async () => {
   const { raw, app } = setup();
   raw.prepare("UPDATE products SET status='draft' WHERE id='prd_nozzle'").run();
-  const made = await create(app, { price_iqd: 2_000_000 });
+  const made = await create(app);
   assert.equal(made.status, 200, JSON.stringify(made.body));
-  const codes = (made.body.warning_details as Array<{ code: string }>).map((w) => w.code);
+  const id = made.body.product.id as string;
+  // Priced like any product (DECISIONS row 250), above its parts (945,000).
+  await publishV2(raw, id, { usd: usdReproducing(2_000_000, FIXTURE_U) });
+  const read = await json(await get(app, `/api/admin/bundles/${id}`));
+  const codes = (read.warning_details as Array<{ code: string }>).map((w) => w.code);
   assert.ok(codes.includes('PRICE_ABOVE_COMPONENTS'), JSON.stringify(codes));
   assert.ok(codes.includes('COMPONENT_PRODUCT_INACTIVE'), JSON.stringify(codes));
-  assert.equal(made.body.product.price_iqd, 2_000_000, 'the price the admin typed is NOT rewritten');
+  assert.equal(codes.includes('COMPOSITION_NEEDS_PRICING'), false, 'a priced bundle is not «يحتاج تسعيرًا»');
+  assert.equal(read.needs_pricing, false);
+  assert.equal(read.product.price_iqd, 2_000_000, 'the V2 price is NOT rewritten');
 });
 
-test('a derived price that drifts from the stored key warns about the KEY, not about the charge', async () => {
-  const { app } = setup();
-  const made = await create(app, {
-    price_iqd: 100000,
-    config: { price_mode: 'discount_percent', discount_percent: 10, max_qty_per_order: 5 },
-  });
-  assert.equal(made.status, 200, JSON.stringify(made.body));
-  const drift = (made.body.warning_details as Array<Record<string, string>>).find((w) => w.code === 'DERIVED_PRICE_DRIFT')!;
-  assert.ok(drift, JSON.stringify(made.body.warning_details));
-  assert.match(drift.en, /sort and search key only/);
-  // The preview quotes the DERIVED figure, which is what the door will charge.
-  assert.equal(made.body.preview.bundle_price_iqd, Math.floor((945000 * 90) / 100));
-});
+// ================================================== unpriced compositions
 
-// ================================================== migrated legacy drafts
-
-test('a migrated legacy bundle shows MIGRATED_NEEDS_PRICE, and publishing it is refused', async () => {
+test('DECISIONS row 250: an unpriced bundle — new, or migrated with its old dinar figure — saves and publishes, hidden «يحتاج تسعيرًا»', async () => {
   const { raw, app } = setup();
+  // A new bundle is born at 0, priced in section ٣ afterwards.
+  const made = await create(app, { status: 'active' });
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  assert.equal(made.body.product.status, 'active');
+  assert.equal(row<Record<string, unknown>>(raw, 'SELECT price_iqd FROM products WHERE id = ?', made.body.product.id)!.price_iqd, 0);
+  assert.ok((made.body.warning_details as Array<{ code: string }>).some((w) => w.code === 'COMPOSITION_NEEDS_PRICING'), JSON.stringify(made.body.warning_details));
+
+  // A migrated legacy bundle keeps its archived dinar figure — no price moves silently.
   raw
     .prepare(
       `INSERT INTO products (id, slug, status, name, name_ar, price_iqd, stock, inventory_mode, composition, selling_type, sale_types, images)
-       VALUES ('prd_bnd_old','bundle-old','draft','Old kit','حزمة قديمة',0,NULL,'BASE','bundle','bundle','["bundle"]','[]')`
+       VALUES ('prd_bnd_old','bundle-old','draft','Old kit','حزمة قديمة',450000,NULL,'BASE','bundle','bundle','["bundle"]','[]')`
     )
     .run();
   raw.prepare("INSERT INTO bundle_config (product_id, price_mode, max_qty_per_order) VALUES ('prd_bnd_old','fixed',5)").run();
@@ -535,15 +528,14 @@ test('a migrated legacy bundle shows MIGRATED_NEEDS_PRICE, and publishing it is 
 
   const listed = await json(await get(app, '/api/admin/bundles'));
   const card = (listed.bundles as Array<Record<string, unknown>>).find((b) => b.id === 'prd_bnd_old')!;
-  assert.ok((card.warnings as string[]).some((w) => /display list with no price/.test(w)), JSON.stringify(card.warnings));
+  assert.equal(card.needs_pricing, true);
+  assert.ok((card.warnings as string[]).some((w) => /needs pricing/.test(w)), JSON.stringify(card.warnings));
   assert.equal(card.component_count, 1);
 
   const published = await patch(app, '/api/admin/bundles/prd_bnd_old/status', { action: 'enable' });
-  const body = await json(published);
-  assert.equal(published.status, 400, JSON.stringify(body));
-  assert.equal(body.code, 'BUNDLE_VALIDATION');
-  assert.ok((body.details.errors as Array<{ code: string }>).some((e) => e.code === 'MIGRATED_NEEDS_PRICE'));
-  assert.equal(row<Record<string, unknown>>(raw, "SELECT status FROM products WHERE id='prd_bnd_old'")!.status, 'draft');
+  assert.equal(published.status, 200, await published.text());
+  const after = row<Record<string, unknown>>(raw, "SELECT status, price_iqd FROM products WHERE id='prd_bnd_old'")!;
+  assert.deepEqual([after.status, Number(after.price_iqd)], ['active', 450_000], 'published, its archive untouched');
 });
 
 // ================================================================ lifecycle

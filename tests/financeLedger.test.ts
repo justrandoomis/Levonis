@@ -31,7 +31,6 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { q7Test } from './fixtures/q7';
 import type { DatabaseSync } from 'node:sqlite';
 import { asD1, stubApp, post, patch, get, send, json, all, row, type StubUser } from './fixtures/app';
 import { cartRoutes } from '../worker/routes/cart';
@@ -197,7 +196,7 @@ test('costSnapshot refuses a cost that is not whole dinars rather than storing o
 
 // ═════════════════════════════════════════ a bundle: goods on the components
 
-q7Test('a bundle records its cost on the COMPONENT rows and zero on the parent, so nothing is counted twice', async () => {
+test('a bundle records its cost on the COMPONENT rows and zero on the parent, so nothing is counted twice', async () => {
   const raw = seedCatalogue();
   raw.exec(`
     UPDATE products SET product_cost_iqd = 200000 WHERE id = 'p_printer';
@@ -228,11 +227,14 @@ q7Test('a bundle records its cost on the COMPONENT rows and zero on the parent, 
   assert.equal(parent.cost_basis, COST_BASIS.composed, 'the parent carries the money, not the goods');
   assert.equal(parent.cost_iqd, null, "the bundle product's own typed cost must not be recorded");
   assert.equal(components.length, 2);
+  // Each component is an ordinary line (DECISIONS row 250: the bundle is priced, and costed, like a product):
+  // since the clean start a new line takes no legacy `product_cost_iqd` (A.9), so each reads exactly as a
+  // standalone line of that product would — and the parent still records none of its own.
   assert.deepEqual(
     components.map((r) => [r.product_id, r.cost_iqd, r.cost_basis]).sort(),
     [
-      ['p_pla', 9000, COST_BASIS.snapshot],
-      ['p_printer', 200000, COST_BASIS.snapshot],
+      ['p_pla', null, COST_BASIS.unpriced],
+      ['p_printer', null, COST_BASIS.unpriced],
     ].sort()
   );
 
@@ -583,7 +585,7 @@ test('a Worker deployed AHEAD of migration 0095 refuses checkout honestly instea
 
 // ══════════════════════════════════════ the gap 0096 CLOSED
 
-q7Test('a mystery spool freezes the drawn filament\u2019s cost at the draw, and still hides the pick', async () => {
+test('a mystery spool freezes the drawn filament\u2019s cost at the draw, and still hides the pick', async () => {
   const raw = seedCatalogue();
   seedMysteryPool(raw);
   // Every pool member has a real cost, and migration 0096 now freezes it onto

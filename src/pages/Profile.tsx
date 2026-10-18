@@ -170,14 +170,13 @@ export default function Profile() {
   }, []);
 
   useEffect(() => {
-    // Any active paid tier sees bundles now (PLUS/PRIME/PRO) — the server
-    // route re-checks the entitlement, this only skips a pointless call.
-    if (!planActive) { setBundles([]); return; }
+    // Bundles and mystery boxes are open to every visitor (DECISIONS row 250): the shelf no longer waits for a
+    // paid tier. A gate an admin sets on one promotion is still the server's (a locked card), never this page's.
     api
       .get<{ entitled: boolean; bundles: BundleShelfCard[] }>('/api/bundles')
-      .then((res) => setBundles(res.entitled ? (res.bundles || []).slice(0, 4) : []))
+      .then((res) => setBundles((res.bundles || []).slice(0, 4)))
       .catch(() => setBundles([]));
-  }, [planActive]);
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -742,13 +741,13 @@ export default function Profile() {
         </div>
         )}
 
-        {/* Fifth Card: member bundles (PLUS/PRIME/PRO — server-gated) */}
-        {planActive && (
+        {/* Fifth Card: bundles and mystery boxes — open to everyone (DECISIONS row 250) */}
+        {bundles.length > 0 && (
           <div className="lv-surface p-3 mb-3 text-text-primary">
             <div className="flex justify-between items-center mb-3">
               <h2 className="font-bold text-[14px] flex items-center gap-1 text-scarlet">
                 <span className="italic font-black text-base">BUNDLES</span>
-                <span className="ms-1 text-[13px] text-text-primary">{loc('مركز الخصومات الحصرية', 'Exclusive Discounts', 'داشکاندنە تایبەتەکان')}</span>
+                <span className="ms-1 text-[13px] text-text-primary">{loc('الحزم والصناديق الغامضة', 'Bundles and mystery boxes', 'پاکێج و سندووقە نهێنییەکان')}</span>
               </h2>
               <button type="button" className="text-[11px] text-text-muted min-h-[44px] px-2 -mx-2 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-lg hover:text-text-secondary" onClick={() => navigate('/bundles')}>{loc('المزيد', 'More', 'زیاتر')} {dir === 'rtl' ? '‹' : '›'}</button>
             </div>

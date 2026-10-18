@@ -30,7 +30,7 @@ import type { PricingContext } from '../../../routes/cart';
 import { sha256Hex } from '../../crypto';
 import { mergedInputs, mergedRules } from '../fromPurchase';
 import { evaluateLegacy, unitColorId, unitComboKey, unitOptionIds, type LegacyEvaluation, type ModelToday } from '../legacy';
-import type { LoadedProduct } from '../load';
+import { pricedAsProduct, type LoadedProduct } from '../load';
 import { canonical, unitRuleTarget } from '../procurementPreview';
 import type { PricingRates } from '../rates';
 import { chainOfUnit, type InputWrite, type ProductPricingData, type RuleWrite, type StoredInputRow } from '../store';
@@ -240,8 +240,10 @@ const sameSet = (a: ReadonlyArray<Record<string, string>>, b: ReadonlyArray<Reco
 
 export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluation> {
   // 1. Never on a failed read of the SKU rung (FX-7 gaps): the writer replaces those rows.
-  refuseUnreadSkus(a.loaded);
-  const pid = a.loaded.id;
+  // A bundle or a mystery box is priced as an ordinary product (DECISIONS row 250): one SKU, sold direct.
+  const loaded = pricedAsProduct(a.loaded);
+  refuseUnreadSkus(loaded);
+  const pid = loaded.id;
   const rates = a.rates;
   const u = rates?.usd_iqd ?? null;
   const storedMethod = a.stored.state?.mode === 'engine' ? (a.stored.state.pricing_method ?? null) : null;
@@ -253,11 +255,11 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
   if (rates?.derived_stale) codes.add('FX_DERIVED_STALE');
   if (a.control.paused) codes.add('PRICING_ENGINE_PAUSED');
   if (a.v2 === null) codes.add('PRICING_NOT_INSTALLED');
-  const skuTable = skuTableOf(a.loaded);
+  const skuTable = skuTableOf(loaded);
   if (!skuTable) codes.add('PRICE_SHAPE_UNSUPPORTED');
 
   // 2. The units: every sellable SKU (V2 is always per SKU), and its structural channels.
-  const legacy = evaluateLegacy(pid, a.loaded.doc, a.loaded.view, a.ctx, { perSku: true });
+  const legacy = evaluateLegacy(pid, loaded.doc, loaded.view, a.ctx, { perSku: true });
   const units = legacy.units;
   // 3. The SKUs of the V2 maths: their chain (cost inputs, optional price-first) and T (required
   //    cost-first; price-first only for the owner's below-minimum-profit warning, Q3).
@@ -322,14 +324,14 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
   // Nothing left to sell because every SKU is sold out without a supplier price: the product needs pricing.
   if (!prices.length && stockUnpriced.length) codes.add('V2_STOCK_SOLD_OUT');
   const plan = planWritesFromUnits(
-    a.loaded,
+    loaded,
     legacy,
     prices,
     { skuTable, v2: { blocked, acceptBlocked: a.acceptBlocked === true || alreadyBlocked || costBlocked.length === 0 } },
     codes
   );
   for (const c of plan.codes) codes.add(c);
-  const verification: Verification = codes.size ? { ok: false, mismatches: [], rows: [] } : verifyPlan(a.loaded, legacy, plan, a.ctx);
+  const verification: Verification = codes.size ? { ok: false, mismatches: [], rows: [] } : verifyPlan(loaded, legacy, plan, a.ctx);
   if (!codes.size && !verification.ok) codes.add('RESOLVER_MISMATCH');
   const complete = codes.size === 0;
 

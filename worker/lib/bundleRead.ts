@@ -63,6 +63,7 @@ import { offerEligible, windowFromRow, type OfferCheck, type OfferWindow } from 
 import { resolveForOrderType, resolveStock } from './inventory';
 import type { InventorySnapshot, StockResolution } from './inventory';
 import { resolveUnitPrice, clampMemberLadder } from './pricing';
+import { roundPriceIqd } from '@levonis/pricing/priceRounding';
 import type { MemberFallback, PreorderPricing, ProPricingPolicy, ResolvedPrice, Tier } from './pricing';
 import { tierInherits, type TierStatus } from './entitlements';
 import { effectiveAvailability } from '@levonis/pricing/availability';
@@ -848,17 +849,21 @@ function componentState(c: ResolvedComponentView, bundleState: CompositionState)
 // ------------------------------------------------------------------ pricing
 
 /**
- * EXACTLY ONE PRICE SOURCE (§4.5, §4.6).
+ * PRICED LIKE AN ORDINARY PRODUCT (DECISIONS row 250, amending §4.5 and §4.6).
  *
- * A subject may carry `bundle_config.price_mode` or an `offer_windows` price,
- * never both — the two together are refused at admin save with
- * `OFFER_PRICE_CONFLICT`, and a row that reached this state anyway does not
- * sell rather than being priced by whichever branch ran first.
+ * The composition's price is its own Pricing V2 price — what the V2 writer
+ * keeps on the row — resolved by the same `resolveUnitPrice` with the same
+ * membership benefit an ordinary product gets. `bundle_config`'s dinar rule
+ * (a derived discount, a PLUS price, a floor) no longer prices anything
+ * (`resolveBundlePrice`), and an offer window prices it exactly as it prices
+ * an ordinary product since the clean start: a percent or an amount off; a
+ * typed dinar `fixed` offer price or PLUS price is inert. A composition with
+ * no complete V2 write is never listed or sold (worker/lib/listing.ts).
  */
 function resolvePricing(
   doc: ProductDoc,
   config: BundleConfig,
-  window: OfferWindow | null,
+  rawWindow: OfferWindow | null,
   components: ResolvedComponentView[],
   viewer: CompositionViewer
 ): BundlePricingView {
@@ -868,7 +873,10 @@ function resolvePricing(
     tierActive: viewer.tierActive,
     proPolicy: viewer.proPolicy,
     transportDefaults: viewer.transportDefaults,
+    ...(viewer.memberFallbackFor ? { memberFallback: viewer.memberFallbackFor(doc) } : {}),
   });
+  // A typed dinar offer price ('fixed', below) or PLUS price is the old rule's: inert, as on an ordinary product.
+  const window: OfferWindow | null = rawWindow ? { ...rawWindow, plus_price_iqd: null } : null;
 
   const componentTotal = components
     .filter((c) => c.included)
@@ -879,38 +887,24 @@ function resolvePricing(
   const windowPrices =
     !!window &&
     window.active &&
-    (window.offer_price_mode === 'fixed' || window.offer_price_mode === 'discount_percent' || window.offer_price_mode === 'discount_iqd');
-  const derived = config.price_mode !== 'fixed';
-  if (windowPrices && derived) {
-    return {
-      applied_iqd: base.applied_iqd,
-      regular_iqd: base.regular_iqd,
-      prime_iqd: base.prime_iqd,
-      pro_iqd: base.pro_iqd,
-      plus_iqd: null,
-      applied_tier: base.applied_tier === 'pro' || base.applied_tier === 'prime' ? base.applied_tier : 'regular',
-      component_total_iqd: componentTotal,
-      discount_iqd: 0,
-      saving_percent: 0,
-      unit_subtotal_iqd: base.unit_subtotal_iqd,
-      source: 'ladder',
-      resolved: base,
-      errors: ['OFFER_PRICE_CONFLICT', 'OFFER_INACTIVE'],
-    };
+    (window.offer_price_mode === 'discount_percent' || window.offer_price_mode === 'discount_iqd');
+  // The window's after-price on THE ONE ROUNDING RULE (DECISIONS row 245), exactly as an ordinary product's
+  // (worker/lib/offers.ts `resolveOfferPrice`): rounded up, and never at or above the before price — then
+  // there is no sale, no strike and no error: the composition sells at its own price (D4).
+  const before = Number.isFinite(base.regular_iqd) ? Math.trunc(base.regular_iqd) : 0;
+  let offerRegular = before;
+  if (windowPrices && window.offer_price_mode === 'discount_percent') {
+    const p = Math.min(90, Math.max(1, Math.trunc(window.discount_percent ?? 0)));
+    offerRegular = before > 0 ? roundPriceIqd({ num: BigInt(before) * BigInt(100 - p), den: 100n }) : 0;
+  } else if (windowPrices && window.offer_price_mode === 'discount_iqd') {
+    const raw = before - Math.max(0, Math.trunc(window.discount_iqd ?? 0));
+    offerRegular = Number.isSafeInteger(raw) && raw >= 1 ? roundPriceIqd(raw) : raw;
   }
-
-  if (windowPrices) {
+  if (windowPrices && offerRegular < before) {
     // The window's own price, with the member rungs clamped against IT — the
     // anchor is the offer price, never the row's stored `price_iqd`.
     const w = window as OfferWindow;
-    let regular = base.regular_iqd;
-    if (w.offer_price_mode === 'fixed') regular = Math.max(0, Math.trunc(w.offer_price_iqd ?? base.regular_iqd));
-    else if (w.offer_price_mode === 'discount_percent') {
-      const p = Math.min(90, Math.max(1, Math.trunc(w.discount_percent ?? 0)));
-      regular = Math.max(0, Math.floor((base.regular_iqd * (100 - p)) / 100));
-    } else if (w.offer_price_mode === 'discount_iqd') {
-      regular = base.regular_iqd - Math.max(0, Math.trunc(w.discount_iqd ?? 0));
-    }
+    const regular = offerRegular;
     // THE WINDOW PRICE OBEYS `bundle_config.min_price_iqd` TOO (§4.3).
     // Both of §4.3's floors were written for `bundle_config.price_mode`, and
     // §4.6 then made a live window the SOLE price source — so a window
@@ -919,7 +913,8 @@ function resolvePricing(
     // it silent: it turned an impossible price into a free one. A price under
     // the floor does not clamp and does not sell — `refuseComposition` already
     // refuses on `OFFER_INACTIVE`, and the card reads the same error list.
-    const floorIqd = Math.max(1, Math.trunc(config.min_price_iqd || 1));
+    // DECISIONS row 250: `bundle_config.min_price_iqd` is the retired dinar rule's — the floor is an ordinary product's.
+    const floorIqd = 1;
     if (regular < floorIqd) {
       return {
         applied_iqd: base.applied_iqd,
@@ -974,7 +969,7 @@ function resolvePricing(
     discount_iqd: priced.discount_iqd,
     saving_percent: priced.saving_percent,
     unit_subtotal_iqd: priced.unit_subtotal_iqd,
-    source: derived ? 'derived' : 'ladder',
+    source: 'ladder',
     resolved: base,
     errors: priced.errors,
   };
@@ -1207,7 +1202,7 @@ export async function loadCompositionBySlug(
   slug: string
 ): Promise<Record<string, unknown> | null> {
   // Listed to customers only (worker/lib/listing.ts): a composition is a platform product like any other,
-  // and under the clean start it stays hidden until it has a V2 price (owner question Q7).
+  // priced like one (DECISIONS row 250) — hidden until its first complete V2 write, then shown to everyone.
   const listed = (await listing(db)).sellable('p');
   const rows = await compositionSelect(
     db,

@@ -20,9 +20,10 @@
  *    one-promotion-model dividend of §10 is silently lost and every bundle
  *    becomes subscriber-only again.
  *
- *  - THE CARD QUOTES THE NUMBER THE DOOR WILL CHARGE. A PLUS member is shown
- *    the PLUS rung; a derived-mode bundle is shown the FRESHLY DERIVED price
- *    and never the cached `products.price_iqd` the admin save wrote.
+ *  - PRICED LIKE AN ORDINARY PRODUCT (DECISIONS row 250). The card and the
+ *    detail quote the bundle's own V2 price — a typed PLUS price or a derived
+ *    discount over the parts prices nothing — and a bundle with no V2 price
+ *    is neither listed nor shown.
  *
  *  - THE COOKIE NEVER SHARES A CACHE ENTRY. A request carrying a session
  *    cookie never receives `Cache-Control: public`; the anonymous variant
@@ -41,7 +42,7 @@ import { freshDb, stubApp, get, post, json, type StubUser } from './fixtures/app
 import { bundlesRoutes } from '../worker/routes/bundles';
 import { productRoutes } from '../worker/routes/products';
 import { addMysteryOffer, seedMysteryPool } from './lib/mysteryOffer';
-import { q7Test } from './fixtures/q7';
+import { repriceV2 } from './fixtures/v2Publish';
 
 // ------------------------------------------------------------------ fixture
 
@@ -215,7 +216,7 @@ const PRIME: StubUser = { id: 'u_prime', role: 'customer', email: 'n@x.co' };
 
 // ------------------------------------------------------- the listing payload
 
-q7Test('the listing carries the card facts of §10 and preserves the 0034 response keys', async () => {
+test('the listing carries the card facts of §10 and preserves the 0034 response keys', async () => {
   const raw = seed();
   addBundle(raw, { id: 'b1', slug: 'starter', priceIqd: 400_000 });
   const res = await get(appFor(new SqliteD1(raw) as unknown as D1Database, null), '/api/bundles');
@@ -251,7 +252,7 @@ q7Test('the listing carries the card facts of §10 and preserves the 0034 respon
   );
 });
 
-q7Test('bundle cards and details use active product_images and quarantine suppresses the stale JSON mirror', async () => {
+test('bundle cards and details use active product_images and quarantine suppresses the stale JSON mirror', async () => {
   const raw = seed();
   addBundle(raw, { id: 'b1', slug: 'starter' });
   addBundle(raw, { id: 'b2', slug: 'quarantined-only' });
@@ -285,7 +286,7 @@ q7Test('bundle cards and details use active product_images and quarantine suppre
   assert.equal(wire.includes('bad.example'), false, 'quarantine provenance is never public media');
 });
 
-q7Test('the listing leaks no count, no component list, no pool and no weight — asserted on the serialized JSON', async () => {
+test('the listing leaks no count, no component list, no pool and no weight — asserted on the serialized JSON', async () => {
   const raw = seed();
   addBundle(raw, { id: 'b1', slug: 'starter' });
   const res = await get(appFor(new SqliteD1(raw) as unknown as D1Database, null), '/api/bundles');
@@ -320,7 +321,7 @@ q7Test('the listing leaks no count, no component list, no pool and no weight —
 
 // ------------------------------------------------------------ eligibility §9
 
-q7Test('an ungated bundle is public: a signed-out visitor and a free account both see it and can open it', async () => {
+test('an ungated bundle is public: a signed-out visitor and a free account both see it and can open it', async () => {
   const raw = seed();
   addBundle(raw, { id: 'b1', slug: 'starter', window: { required_tiers: '[]' } });
   const db = new SqliteD1(raw) as unknown as D1Database;
@@ -339,7 +340,7 @@ q7Test('an ungated bundle is public: a signed-out visitor and a free account bot
   }
 });
 
-q7Test('a gated bundle locks with a 200 and the §9 ALLOW-LIST — the stripped key list is what is asserted', async () => {
+test('a gated bundle locks with a 200 and the §9 ALLOW-LIST — the stripped key list is what is asserted', async () => {
   const raw = seed();
   addBundle(raw, {
     id: 'b1',
@@ -399,7 +400,7 @@ q7Test('a gated bundle locks with a 200 and the §9 ALLOW-LIST — the stripped 
  * explicitly: "never the member price a non-member cannot get". So the
  * stripped-key assertion is made against every door, not one.
  */
-q7Test('§15.4 case 9: the product listing, search and quote strip the same keys as the bundles route', async () => {
+test('§15.4 case 9: the product listing, search and quote strip the same keys as the bundles route', async () => {
   const raw = seed();
   addBundle(raw, {
     id: 'b1',
@@ -446,7 +447,7 @@ q7Test('§15.4 case 9: the product listing, search and quote strip the same keys
   assert.equal(JSON.stringify(quote).includes('380000'), false);
 });
 
-q7Test('an ENTITLED viewer still gets a real composition quote from the product quote door', async () => {
+test('an ENTITLED viewer still gets a real composition quote from the product quote door', async () => {
   const raw = seed();
   addBundle(raw, {
     id: 'b1',
@@ -479,7 +480,7 @@ q7Test('an ENTITLED viewer still gets a real composition quote from the product 
  * `max_qty` stays, because §10 requires it so the stepper disables at the
  * limit, and it is clamped by `bundle_config.max_qty_per_order`.
  */
-q7Test('§8.2 row 13: the mystery detail publishes no pool supply count', async () => {
+test('§8.2 row 13: the mystery detail publishes no pool supply count', async () => {
   const raw = seed();
   seedMysteryPool(raw);
   addMysteryOffer(raw, { spoolQty: 2, maxQtyPerOrder: 5 });
@@ -498,7 +499,7 @@ q7Test('§8.2 row 13: the mystery detail publishes no pool supply count', async 
   }
 });
 
-q7Test('a locked card carries a price teaser ONLY when locked_preview is on', async () => {
+test('a locked card carries a price teaser ONLY when locked_preview is on', async () => {
   const raw = seed();
   addBundle(raw, { id: 'b1', slug: 'plus-only', window: { required_tiers: '["plus"]', locked_preview: 0 } });
   const body = await json(await get(appFor(new SqliteD1(raw) as unknown as D1Database, FREE), '/api/bundles'));
@@ -506,7 +507,7 @@ q7Test('a locked card carries a price teaser ONLY when locked_preview is on', as
   assert.equal(body.bundles[0].locked, true);
 });
 
-q7Test('PREMIUM inherits a PLUS gate — the same verdict on card and detail', async () => {
+test('PREMIUM inherits a PLUS gate — the same verdict on card and detail', async () => {
   const raw = seed();
   addBundle(raw, { id: 'b1', slug: 'plus-only', window: { required_tiers: '["plus"]' } });
   const db = new SqliteD1(raw) as unknown as D1Database;
@@ -523,7 +524,7 @@ q7Test('PREMIUM inherits a PLUS gate — the same verdict on card and detail', a
 
 // ------------------------------------------------------------------ pricing
 
-q7Test('a PLUS member sees the PLUS rung on the card and the same number on the detail', async () => {
+test('DECISIONS row 250: a typed PLUS price prices nothing — every viewer sees the bundle\'s own V2 price, card and detail alike', async () => {
   const raw = seed();
   addBundle(raw, { id: 'b1', slug: 'starter', priceIqd: 400_000, config: { plus_price_iqd: 360_000 } });
   const db = new SqliteD1(raw) as unknown as D1Database;
@@ -533,56 +534,42 @@ q7Test('a PLUS member sees the PLUS rung on the card and the same number on the 
   assert.equal(free.bundles[0].display_applied_tier, 'regular');
 
   const plus = await json(await get(appFor(db, PLUS), '/api/bundles'));
-  assert.equal(plus.bundles[0].display_price_iqd, 360_000);
-  assert.equal(plus.bundles[0].display_applied_tier, 'plus');
+  assert.equal(plus.bundles[0].display_price_iqd, 400_000, 'the retired dinar PLUS price still priced the bundle');
   assert.equal(plus.bundles[0].display_regular_iqd, 400_000);
 
   const detail = await json(await get(appFor(db, PLUS), '/api/bundles/starter'));
-  assert.equal(
-    detail.bundle.display_price_iqd,
-    plus.bundles[0].display_price_iqd,
-    'the card and the page quoted a PLUS member two different prices'
-  );
+  assert.equal(detail.bundle.display_price_iqd, plus.bundles[0].display_price_iqd, 'the card and the page quoted a PLUS member two different prices');
 });
 
-q7Test('a derived-mode bundle serves the FRESHLY derived price, not the cached products.price_iqd', async () => {
+test('DECISIONS row 250: a legacy derived-mode bundle is priced by its own V2 price, never derived from its components', async () => {
   const raw = seed();
-  // The cached row price is deliberately stale: the admin save wrote 999,999.
-  addBundle(raw, {
-    id: 'b1',
-    slug: 'ten-off',
-    priceIqd: 999_999,
-    config: { price_mode: 'discount_percent', discount_percent: 10 },
-  });
+  addBundle(raw, { id: 'b1', slug: 'ten-off', priceIqd: 400_000, config: { price_mode: 'discount_percent', discount_percent: 10 } });
   const db = new SqliteD1(raw) as unknown as D1Database;
 
   const card = (await json(await get(appFor(db, null), '/api/bundles'))).bundles[0];
-  assert.equal(card.display_price_iqd, Math.floor((455_000 * 90) / 100));
-  assert.equal(card.display_regular_iqd, card.display_price_iqd);
-  assert.notEqual(card.display_price_iqd, 999_999);
-  assert.equal(card.composition.saving_percent, 10);
+  assert.equal(card.display_price_iqd, 400_000, 'the bundle was priced from its parts, not as a product');
+  assert.equal(card.composition.component_total_iqd, 455_000);
+  assert.equal(card.composition.saving_percent, Math.round(((455_000 - 400_000) * 100) / 455_000));
 
-  // A component gets cheaper: the next read follows it, with no admin action.
-  raw.prepare('UPDATE products SET price_iqd = ? WHERE id = ?').run(10_000, 'p_pla');
+  // A component gets cheaper (its own V2 price): the bundle's price does not follow it — only the saving shown does.
+  await repriceV2(raw, 'p_pla', 10_000);
   const after = (await json(await get(appFor(db, null), '/api/bundles'))).bundles[0];
   assert.equal(after.composition.component_total_iqd, 425_000);
-  assert.equal(after.display_price_iqd, Math.floor((425_000 * 90) / 100));
+  assert.equal(after.display_price_iqd, 400_000);
 });
 
-q7Test('a derived price below its floor does not clamp and does not sell', async () => {
+test('DECISIONS row 250: a bundle with no V2 price is not listed, not shown and not sold', async () => {
   const raw = seed();
-  addBundle(raw, {
-    id: 'b1',
-    slug: 'free-bundle',
-    config: { price_mode: 'discount_iqd', discount_iqd: 500_000, min_price_iqd: 1000 },
-  });
-  const card = (await json(await get(appFor(new SqliteD1(raw) as unknown as D1Database, null), '/api/bundles'))).bundles[0];
-  assert.equal(card.availability_state, 'ended', 'a bundle whose derived price fell through the floor was still on sale');
+  // No dinar price to reproduce: the fixture publishes nothing, exactly as an existing composition waits for the owner.
+  addBundle(raw, { id: 'b1', slug: 'unpriced', priceIqd: 0 });
+  const db = new SqliteD1(raw) as unknown as D1Database;
+  assert.equal((await json(await get(appFor(db, null), '/api/bundles'))).bundles.length, 0);
+  assert.equal((await get(appFor(db, PLUS), '/api/bundles/unpriced')).status, 404);
 });
 
 // ------------------------------------------------------------- availability
 
-q7Test('the coarse state follows the scarcest component, and a dead component sells nothing', async () => {
+test('the coarse state follows the scarcest component, and a dead component sells nothing', async () => {
   const raw = seed();
   addBundle(raw, { id: 'b1', slug: 'starter' });
   const db = new SqliteD1(raw) as unknown as D1Database;
@@ -599,7 +586,7 @@ q7Test('the coarse state follows the scarcest component, and a dead component se
   assert.equal((await json(await get(appFor(db, null), '/api/bundles'))).bundles[0].availability_state, 'sold_out');
 });
 
-q7Test('the detail exposes max_qty for the stepper and never a raw component count', async () => {
+test('the detail exposes max_qty for the stepper and never a raw component count', async () => {
   const raw = seed();
   addBundle(raw, { id: 'b1', slug: 'starter', config: { max_qty_per_order: 9 } });
   const body = await json(await get(appFor(new SqliteD1(raw) as unknown as D1Database, null), '/api/bundles/starter'));
@@ -614,7 +601,7 @@ q7Test('the detail exposes max_qty for the stepper and never a raw component cou
   }
 });
 
-q7Test('an upcoming and an ended window produce their own card states, with the schedule but no price change', async () => {
+test('an upcoming and an ended window produce their own card states, with the schedule but no price change', async () => {
   const raw = seed();
   addBundle(raw, { id: 'b_up', slug: 'soon', window: { starts_at: FUTURE } });
   addBundle(raw, { id: 'b_gone', slug: 'gone', window: { ends_at: '2020-01-01T00:00:00.000Z' } });
@@ -627,7 +614,7 @@ q7Test('an upcoming and an ended window produce their own card states, with the 
 
 // ----------------------------------------------------------------- filtering
 
-q7Test('kind, search, category, family and featured all filter the listing', async () => {
+test('kind, search, category, family and featured all filter the listing', async () => {
   const raw = seed();
   addBundle(raw, { id: 'b1', slug: 'starter', name: 'Starter Bundle', featured: true, family: 'printers' });
   addBundle(raw, { id: 'b2', slug: 'pro-kit', name: 'Pro Kit' });
@@ -652,7 +639,7 @@ test('a composition row with no components is not advertised at all', async () =
 
 // ---------------------------------------------------- the product endpoints
 
-q7Test('the default product listing hides bundles, type=bundle shows them, and search still finds them', async () => {
+test('the default product listing hides bundles, type=bundle shows them, and search still finds them', async () => {
   const raw = seed();
   addBundle(raw, { id: 'b1', slug: 'starter', name: 'Starter Bundle' });
   const db = new SqliteD1(raw) as unknown as D1Database;
@@ -665,7 +652,7 @@ q7Test('the default product listing hides bundles, type=bundle shows them, and s
   assert.ok((await ids('?search=Starter')).includes('b1'), 'search stopped finding bundles');
 });
 
-q7Test('an old /product/<slug> link to a bundle answers with the bundle payload and its canonical location', async () => {
+test('an old /product/<slug> link to a bundle answers with the bundle payload and its canonical location', async () => {
   const raw = seed();
   addBundle(raw, { id: 'b1', slug: 'starter' });
   const res = await get(appFor(new SqliteD1(raw) as unknown as D1Database, null), '/api/products/starter');
@@ -713,7 +700,7 @@ test('a request carrying a session cookie is never publicly cacheable; the anony
 
 // ------------------------------------------------------------- the four reads
 
-q7Test('one page of 24 bundles costs the same four composition reads as a page of two', async () => {
+test('one page of 24 bundles costs the same four composition reads as a page of two', async () => {
   const measure = async (count: number) => {
     const raw = seed();
     for (let i = 0; i < count; i += 1) addBundle(raw, { id: `b${i}`, slug: `bundle-${i}` });
@@ -728,7 +715,9 @@ q7Test('one page of 24 bundles costs the same four composition reads as a page o
 
   // §14's four: the composition products (with config and window joined on),
   // the components with their allow-lists, the member products, and ONE
-  // relations pass over those members.
+  // relations pass over those members — plus, since the clean start, ONE
+  // listing read of which members are not sellable (worker/lib/listing.ts
+  // `unsellableIdsOf`), a constant for the page like the others.
   const composition = (sql: string[]) => ({
     products: sql.filter((s) => /FROM products/i.test(s)).length,
     components: sql.filter((s) => /FROM bundle_components/i.test(s)).length,
@@ -737,7 +726,7 @@ q7Test('one page of 24 bundles costs the same four composition reads as a page o
     config: sql.filter((s) => /FROM bundle_config/i.test(s)).length,
   });
   const seen = composition(page);
-  assert.equal(seen.products, 2, 'the page read products more than twice — that is an N+1');
+  assert.equal(seen.products, 3, 'the page read products more than three times — that is an N+1');
   assert.equal(seen.components, 1);
   assert.equal(seen.choices, 0, 'the allow-lists cost a second round trip');
   assert.equal(seen.windows, 0, 'the offer windows were read separately instead of joined');

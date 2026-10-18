@@ -46,7 +46,6 @@ import { COST_REFUSALS, serverMessage } from '../packages/contracts/src/costRefu
 import { seedCatalogue, addBundle, orderBody } from './lib/bundles';
 import { cartRoutes } from '../worker/routes/cart';
 import { orderRoutes } from '../worker/routes/orders';
-import { q7Test } from './fixtures/q7';
 
 type World = ReturnType<typeof world>;
 
@@ -387,7 +386,7 @@ test('F6: when the serial story fails on a migrated database the page answers 50
 const KIT = {
   name_en: 'Printer kit',
   name_ar: 'حزمة طابعة',
-  price_iqd: 850000,
+  // No dinar price: a bundle is priced like an ordinary product, in section ٣ (DECISIONS row 250).
   status: 'draft',
   components: [{ member_product_id: 'prd_printer', qty: 1, sort: 0 }, { member_product_id: 'prd_spool', qty: 2, sort: 1 }],
   config: { price_mode: 'fixed', max_qty_per_order: 5, min_price_iqd: 1 },
@@ -445,7 +444,8 @@ test('F7: the bundle editor judges a non-owner\'s serial word and filing like ev
 
 test('F7: the mystery-offer editor judges a non-owner\'s serial word too', async () => {
   const w = compositionWorld();
-  const offer = { name_en: 'Mystery Filament', name_ar: 'فتيل عشوائي', price_iqd: 30_000, status: 'draft', spool_qty: 1, max_qty_per_order: 3 };
+  // No dinar price: a mystery box is priced like an ordinary product, in section ٣ (DECISIONS row 250).
+  const offer = { name_en: 'Mystery Filament', name_ar: 'فتيل عشوائي', status: 'draft', spool_qty: 1, max_qty_per_order: 3 };
   for (const who of ['adm', 'ast'] as const) {
     const on = await post(w.app(who), '/api/admin/mystery/offers', { ...offer, serialized: true });
     assert.equal(on.status, 403, `${who}: ${await on.clone().text()}`);
@@ -459,7 +459,7 @@ test('F7: the mystery-offer editor judges a non-owner\'s serial word too', async
   assert.equal(owner.status, 200, await owner.clone().text());
 });
 
-q7Test('F7: a bundle PARENT never gets warranty units of its own — its components carry the devices', async () => {
+test('F7: a bundle PARENT never gets warranty units of its own — its components carry the devices', async () => {
   const raw = seedCatalogue();
   raw.exec(`
     INSERT OR IGNORE INTO catalogs (id,slug,name_ar,name_en,is_printer_catalog) VALUES ('cat_pr','printers-test','طابعات','Printers',1);

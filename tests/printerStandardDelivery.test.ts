@@ -11,7 +11,6 @@ import { PRINTER_STANDARD_DELIVERY_POLICY, chooseDeliveryMethod } from '../packa
 import type { ProductDeliveryOptions } from '../packages/shipping/src/shipping';
 import DeliveryAvailabilityNotice from '../src/components/adminProducts/DeliveryAvailabilityNotice';
 import { seedCatalogue, addBundle, orderBody as bundleOrderBody } from './lib/bundles';
-import { q7Test } from './fixtures/q7';
 
 const acceptance = { version: PRINTER_STANDARD_DELIVERY_POLICY.version, accepted: true };
 const enabled: ProductDeliveryOptions = {
@@ -119,7 +118,7 @@ test('printer standard delivery needs no transport acknowledgment: no warning on
   raw.close();
 });
 
-q7Test('a printer inside a bundle places by standard delivery with no acknowledgment', async () => {
+test('a printer inside a bundle places by standard delivery with no acknowledgment', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_bundle', slug: 'test-policy-bundle', priceIqd: 400000 });
   const app = stubApp(asD1(raw), { id: 'buyer', role: 'customer', email: 'buyer@x.co' }, (a) => a.route('/api/cart', cartRoutes).route('/api/orders', orderRoutes));

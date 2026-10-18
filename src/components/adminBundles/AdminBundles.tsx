@@ -61,6 +61,7 @@ import {
 import { TriText } from '../adminProducts/ui';
 import ProductPicker from '../adminProducts/form/ProductPicker';
 import VariantImg from '../ui/VariantImg';
+import CompositionPricing from './CompositionPricing';
 
 // ------------------------------------------------------------------- types
 
@@ -163,6 +164,8 @@ interface BundleCard {
   max_bundles: number | null;
   availability_state: string;
   offer: OfferInput | null;
+  /** No complete Pricing V2 write yet (DECISIONS row 250): hidden from customers, «يحتاج تسعيرًا». */
+  needs_pricing?: boolean;
   warnings: string[];
   warning_details: BundleIssue[];
 }
@@ -382,6 +385,22 @@ export default function AdminBundles() {
     [relations]
   );
 
+  // «يحتاج تسعيرًا» links here (`?tab=bundles&edit=<id>&section=3`): the bundle opens on its section.
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (deepLinked.current) return;
+    deepLinked.current = true;
+    const q = new URLSearchParams(window.location.search);
+    const id = q.get('edit');
+    if (!id) return;
+    const section = Number(q.get('section'));
+    void openExisting(id).then(() => {
+      if (section >= 1 && section <= 5) setOpenSection(section);
+    });
+    // Once, on arrival: `openExisting` reads the bundle fresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const openNew = async () => {
     setEditing({ doc: blankDoc(), config: blankConfig(), components: [blankComponent(0)], offer: null });
     setPreview(null);
@@ -444,7 +463,7 @@ export default function AdminBundles() {
     setIssues([]);
     setOk(null);
     try {
-      const body = {
+      const body: Record<string, unknown> = {
         ...editing.doc,
         images: editing.doc.images.map((url) => ({ url })),
         media: editing.doc.images.map((url, i) => ({ id: `img_${i}`, url, primary: i === 0 })),
@@ -453,6 +472,9 @@ export default function AdminBundles() {
         offer: editing.offer,
         ...(editing.doc.id ? { expected_updated_at: editing.doc.updated_at } : {}),
       };
+      // DECISIONS row 250: the panel types no dinar price — the bundle is priced in section ٣ (Pricing V2),
+      // and an absent price keeps the stored one (a new bundle is born «يحتاج تسعيرًا»).
+      for (const k of ['price_iqd', 'original_price_iqd', 'prime_price_iqd', 'pro_price_iqd']) delete body[k];
       const res = editing.doc.id
         ? await api.put<{ product: Record<string, unknown>; preview: Preview; warning_details: BundleIssue[] }>(
             `/api/admin/bundles/${editing.doc.id}`,
@@ -614,6 +636,11 @@ export default function AdminBundles() {
                         >
                           {loc(state.ar, state.en, state.ckb)}
                         </span>
+                        {b.needs_pricing && (
+                          <span className={`${T.badgeBase} lv-chip border-transparent [--chip:var(--color-warning)]`} data-bundle-needs-pricing>
+                            {loc('يحتاج تسعيرًا', 'Needs pricing', 'پێویستی بە نرخدانانە')}
+                          </span>
+                        )}
                         {b.offer && b.offer.required_tiers.length > 0 && (
                           <span className={`${T.badgeBase} lv-chip border-transparent [--chip:var(--color-gold)]`}>
                             {b.offer.required_tiers.join(' · ').toUpperCase()}
@@ -627,9 +654,11 @@ export default function AdminBundles() {
                         <span>
                           {loc('قيمة المكوّنات', 'Parts value', 'نرخی پارچەکان')}: {formatIqd(b.component_total_iqd)}
                         </span>
-                        <span>
-                          {loc('سعر الحزمة', 'Bundle price', 'نرخی پاکێج')}: {formatIqd(b.bundle_price_iqd)}
-                        </span>
+                        {!b.needs_pricing && (
+                          <span>
+                            {loc('سعر الحزمة', 'Bundle price', 'نرخی پاکێج')}: {formatIqd(b.bundle_price_iqd)}
+                          </span>
+                        )}
                         {b.saving_percent > 0 && (
                           <span className="text-emerald-400">
                             {loc('توفير', 'Saving', 'پاشەکەوت')} {b.saving_percent}%
@@ -1013,49 +1042,20 @@ export default function AdminBundles() {
         open={openSection === 3}
         onToggle={() => setOpenSection(openSection === 3 ? 0 : 3)}
       >
+        {/* DECISIONS row 250: priced like an ordinary product — the product form's own section ٣. */}
+        {doc.id ? (
+          <CompositionPricing productId={doc.id} loc={loc} onSaved={() => void (async () => { await reload(); await openExisting(doc.id!); })()} />
+        ) : (
+          <p className="lv-alert lv-alert-info mb-3 px-3 py-2 text-[12px] leading-snug text-text-primary" data-bundle-price-after-save>
+            {loc(
+              'احفظ الحزمة أولًا، ثم سعّرها هنا كأي منتج: من التكلفة أو بسعر بالدولار. لا يراها الزبائن حتى تُسعَّر.',
+              'Save the bundle first, then price it here like any product: from cost or a dollar price. Customers do not see it until it is priced.',
+              'سەرەتا پاکێجەکە پاشەکەوت بکە، پاشان لێرە وەک هەر بەرهەمێک نرخی بۆ دابنێ: لە تێچوونەوە یان بە نرخێکی دۆلار. تا نرخی بۆ دانەنرێت کڕیاران نایبینن.'
+            )}
+          </p>
+        )}
+        <div className="h-3" />
         <Grid cols={3}>
-          <Field ar="طريقة التسعير" en="Price mode">
-            <Select
-              value={config.price_mode}
-              onChange={(e) => setConfig({ price_mode: e.target.value as ConfigInput['price_mode'] })}
-            >
-              <option value="fixed">{loc('سعر ثابت', 'Fixed price', 'نرخی جێگیر')}</option>
-              <option value="discount_percent">{loc('خصم نسبة من قيمة المكوّنات', 'Percent off the parts', 'ڕێژە داشکاندن')}</option>
-              <option value="discount_iqd">{loc('خصم مبلغ من قيمة المكوّنات', 'Dinars off the parts', 'دینار داشکاندن')}</option>
-            </Select>
-          </Field>
-          <Field ar="السعر العادي" en="Regular price" required>
-            <Money value={doc.price_iqd} onChange={(v) => setDoc({ price_iqd: v ?? 0 })} required />
-          </Field>
-          <Field ar="سعر المقارنة" en="Compare-at">
-            <Money value={doc.original_price_iqd} onChange={(v) => setDoc({ original_price_iqd: v })} />
-          </Field>
-          {config.price_mode === 'discount_percent' && (
-            <Field ar="نسبة الخصم %" en="Discount %" hint="1–90">
-              <Qty value={config.discount_percent} onChange={(v) => setConfig({ discount_percent: v })} placeholder="10" />
-            </Field>
-          )}
-          {config.price_mode === 'discount_iqd' && (
-            <Field ar="مبلغ الخصم" en="Discount (IQD)">
-              <Money value={config.discount_iqd} onChange={(v) => setConfig({ discount_iqd: v })} />
-            </Field>
-          )}
-          <Field
-            ar="الحد الأدنى للسعر"
-            en="Minimum price"
-            hint={loc('لا تُباع الحزمة تحته', 'below it the bundle is not sold', 'لە خوارتریدا نافرۆشرێت')}
-          >
-            <Money value={config.min_price_iqd} onChange={(v) => setConfig({ min_price_iqd: v ?? 1 })} required />
-          </Field>
-          <Field ar="سعر PLUS" en="PLUS price" hint={loc('خاص بالعروض', 'offer-scoped', 'تایبەت بە ئۆفەر')}>
-            <Money value={config.plus_price_iqd} onChange={(v) => setConfig({ plus_price_iqd: v })} />
-          </Field>
-          <Field ar="سعر PRIME" en="PRIME price">
-            <Money value={doc.prime_price_iqd} onChange={(v) => setDoc({ prime_price_iqd: v })} />
-          </Field>
-          <Field ar="سعر PRO" en="PRO price">
-            <Money value={doc.pro_price_iqd} onChange={(v) => setDoc({ pro_price_iqd: v })} />
-          </Field>
           <Field ar="أقصى كمية في الطلب" en="Max qty per order">
             <Qty value={config.max_qty_per_order} onChange={(v) => setConfig({ max_qty_per_order: v ?? 5 })} placeholder="5" />
           </Field>
@@ -1135,16 +1135,10 @@ export default function AdminBundles() {
                   onChange={(e) => setOffer({ offer_price_mode: e.target.value as OfferInput['offer_price_mode'] })}
                 >
                   <option value="">{loc('لا يغيّر السعر', 'changes no price', 'نرخ ناگۆڕێت')}</option>
-                  <option value="fixed">{loc('سعر ثابت', 'Fixed', 'جێگیر')}</option>
                   <option value="discount_percent">{loc('نسبة', 'Percent', 'ڕێژە')}</option>
                   <option value="discount_iqd">{loc('مبلغ', 'Dinars', 'دینار')}</option>
                 </Select>
               </Field>
-              {offer.offer_price_mode === 'fixed' && (
-                <Field ar="سعر العرض" en="Offer price">
-                  <Money value={offer.offer_price_iqd} onChange={(v) => setOffer({ offer_price_iqd: v })} />
-                </Field>
-              )}
               {offer.offer_price_mode === 'discount_percent' && (
                 <Field ar="نسبة الخصم %" en="Discount %" hint="1–90">
                   <Qty value={offer.discount_percent} onChange={(v) => setOffer({ discount_percent: v })} />

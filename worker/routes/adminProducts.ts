@@ -1414,13 +1414,14 @@ adminProductsRoutes.get('/printer-options', async (c) => {
 // fields are enforced per field and every answer is built from an allow-list
 // (v2/dto.ts). Private and never stored. A preview writes nothing.
 
-const COMPOSITION_REFUSAL = () => new HttpError(409, serverMessage('COMPOSITION_NOT_PRICEABLE'), 'COMPOSITION_NOT_PRICEABLE', { section: 3 });
-
-/** The stored product as V2 reads it; 404 for an unknown id, 409 for a bundle (never V2-priced). */
+/**
+ * The stored product as V2 reads it; 404 for an unknown id. A bundle or a mystery box too (DECISIONS
+ * row 250): it is priced like an ordinary product, through these same three doors — the bundles panel
+ * shows the same section ٣ and saves it with the prices-only apply (`PUT /:id/pricing`).
+ */
 async function v2ReadOf(c: Context<AppContext>, id: string): Promise<V2Read> {
   const read = await loadV2Read(c.env.DB, id);
   if (!read) throw notFound('Product not found');
-  if ((read.loaded.doc.composition ?? '') !== '') throw COMPOSITION_REFUSAL();
   return read;
 }
 
@@ -1857,7 +1858,9 @@ adminProductsRoutes.post('/', async (c) => {
   // product created V2 from birth, or an existing product's FIRST V2 write (the clean start, DECISIONS
   // row 222, addendum A.7) — writes its structure INSIDE the V2 writer's batch, with its prices. The
   // price fields of the document are not the client's: the stored ladder stays until the V2 writer
-  // replaces it in the same batch, and no route carries a commission. A bundle is never V2-priced (Q7).
+  // replaces it in the same batch, and no route carries a commission. A bundle is priced like an ordinary
+  // product (DECISIONS row 250) but never saved by this route: the bundles panel owns its structure, and its
+  // prices go through the prices-only apply (`PUT /:id/pricing`).
   const v2Block = body.pricing_v2;
   const v2Sent = v2Block !== undefined && v2Block !== null;
   if (v2Sent && (doc.composition ?? '') !== '') {

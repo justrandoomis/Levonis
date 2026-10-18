@@ -31,7 +31,6 @@ import { bundlesRoutes, adminCompositionAnalyticsRoutes } from '../worker/routes
 import { bundleAnalytics, metricStatement, mysteryAnalytics, utcDay } from '../worker/lib/compositionAnalytics';
 import { seedCatalogue, addBundle, orderBody, DEFAULT_COMPONENTS } from './lib/bundles';
 import { addMysteryOffer, seedMysteryPool } from './lib/mysteryOffer';
-import { q7Test } from './fixtures/q7';
 
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
 const boss: StubUser = { id: 'boss', role: 'admin', email: 'a@x.co' };
@@ -94,7 +93,7 @@ test('the counters are idempotent per (day, subject): many taps, one row', async
   assert.equal(metricStatement(db, '', 'views'), null);
 });
 
-q7Test('the view counter is SIGNED-IN only and refuses an unvalidated subject', async () => {
+test('the view counter is SIGNED-IN only and refuses an unvalidated subject', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'p_bundle', priceIqd: 400000, components: DEFAULT_COMPONENTS });
   const db = asD1(raw);
@@ -120,7 +119,7 @@ q7Test('the view counter is SIGNED-IN only and refuses an unvalidated subject', 
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM composition_daily_metrics'), 1);
 });
 
-q7Test('a successful add counts once, in the same batch as the line it counts', async () => {
+test('a successful add counts once, in the same batch as the line it counts', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'p_bundle', priceIqd: 400000, components: DEFAULT_COMPONENTS });
   const db = asD1(raw);
@@ -146,7 +145,7 @@ q7Test('a successful add counts once, in the same batch as the line it counts', 
   assert.equal(after.oos_blocks, 1);
 });
 
-q7Test('a membership lock is not counted as a stock problem', async () => {
+test('a membership lock is not counted as a stock problem', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'p_locked',
@@ -166,7 +165,7 @@ q7Test('a membership lock is not counted as a stock problem', async () => {
 
 // -------------------------------------------------------- the derived side
 
-q7Test('revenue and savings are DERIVED from the parent rows, never counted twice', async () => {
+test('revenue and savings are DERIVED from the parent rows, never counted twice', async () => {
   const raw = seedCatalogue();
   // Components total 400000 + 2×25000 + 5000 = 455000; the bundle sells at
   // 400000, so the saving is 55000 and it is on the PARENT's snapshot.
@@ -197,7 +196,7 @@ q7Test('revenue and savings are DERIVED from the parent rows, never counted twic
   assert.equal(bundleRow.adds, 1);
 });
 
-q7Test('the mystery figures come from the view, and name no customer', async () => {
+test('the mystery figures come from the view, and name no customer', async () => {
   const raw = seedCatalogue();
   seedMysteryPool(raw);
   addMysteryOffer(raw);

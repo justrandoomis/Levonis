@@ -2697,11 +2697,10 @@ export async function planProductSave(
   // and template applies and the CSV import (whose price cells are put back to
   // the stored value and reported, while their other columns apply). A new
   // product is born at 0 with no ladder, compare-at, fee or cost cell: hidden
-  // until its first complete V2 write. Compositions keep their own typed
-  // prices (Q7, the bundles panel).
-  const ordinary = nextComposition === '' && prevComposition === '';
+  // until its first complete V2 write. A bundle or a mystery box too (DECISIONS
+  // row 250: priced like an ordinary product): the bundles panel types no price.
   const moneyPinned: string[] = [];
-  if (doc && ordinary) moneyPinned.push(...pinLegacyDocMoney(doc, prev, actor.money));
+  if (doc) moneyPinned.push(...pinLegacyDocMoney(doc, prev, actor.money));
 
   // ---- §11: cost is written with cost write only (the owner, decision 2) ---
   //
@@ -2765,15 +2764,13 @@ export async function planProductSave(
     // Without cost write, a row created for a legacy document-only option or
     // colour takes the cost the stored document holds (S1 review L2).
     if (prev && !actor.money) snap.documentCosts = documentRowCosts(prev);
-    if (ordinary) {
-      moneyPinned.push(
-        ...pinLegacyRelationMoney(
-          intent.relations,
-          selectorsOf(snap.existing, snap.existingVariants as unknown as Array<Record<string, unknown>>),
-          actor.money
-        )
-      );
-    }
+    moneyPinned.push(
+      ...pinLegacyRelationMoney(
+        intent.relations,
+        selectorsOf(snap.existing, snap.existingVariants as unknown as Array<Record<string, unknown>>),
+        actor.money
+      )
+    );
     // The base stock a document states must still cover what is reserved.
     if (doc && doc.stock !== null && doc.stock < snap.baseReserved) {
       throw badRequest(

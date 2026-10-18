@@ -76,7 +76,7 @@ export const NEEDS_PRICING = {
   loadFailed: { ar: 'تعذّر تحميل القائمة.', en: 'The list could not be loaded.', ckb: 'لیستەکە بار نەکرا.' },
   retry: { ar: 'إعادة المحاولة', en: 'Retry', ckb: 'دووبارە هەوڵبدەوە' },
   back: { ar: 'كل المنتجات', en: 'All products', ckb: 'هەموو بەرهەمەکان' },
-  composition: { ar: 'حزمة — بانتظار قرار التسعير', en: 'Bundle — awaiting a pricing decision', ckb: 'پاکێج — چاوەڕێی بڕیاری نرخدانانە' },
+  composition: { ar: 'حزمة أو صندوق غامض — يُسعَّر كأي منتج', en: 'Bundle or mystery box — priced like any product', ckb: 'پاکێج یان سندووقی نهێنی — وەک هەر بەرهەمێک نرخی بۆ دادەنرێت' },
   page: { ar: 'صفحة', en: 'Page', ckb: 'پەڕە' },
   prev: { ar: 'السابق', en: 'Previous', ckb: 'پێشوو' },
   next: { ar: 'التالي', en: 'Next', ckb: 'پەڕەی دواتر' },

@@ -17,7 +17,6 @@ import { cartRoutes } from '../worker/routes/cart';
 import { galleryForSelection } from '../src/lib/productGallery';
 import { seedCatalogue, orderBody } from './lib/bundles';
 import { addMysteryOffer } from './lib/mysteryOffer';
-import { q7Test } from './fixtures/q7';
 
 const DIMENSIONS = {
   net_weight_g: 8300,
@@ -408,7 +407,7 @@ test('checkout ignores an inactive exact variant when freezing physical dimensio
   );
 });
 
-q7Test('mystery checkout freezes the drawn candidate exact dimensions without exposing them', async () => {
+test('mystery checkout freezes the drawn candidate exact dimensions without exposing them', async () => {
   const raw = seedCatalogue();
   raw.exec(`
     INSERT INTO products

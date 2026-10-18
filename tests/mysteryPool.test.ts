@@ -153,9 +153,9 @@ test('every unsellable entry is excluded, and the admin is told exactly why', as
   assert.equal(reasons.get('mpe_zero'), 'ZERO_WEIGHT');
   assert.equal(reasons.get('mpe_off'), 'ENTRY_INACTIVE');
   assert.equal(reasons.get('mpe_white'), 'SELECTION_INACTIVE', 'a deactivated colour is not sellable');
-  // Never a bundle inside a mystery pool. Until the owner answers Q7 (addendum A.14) a composition is not
-  // listed at all, so it is excluded one step earlier; once it is listed again the reason is COMPOSITION_NESTED.
-  assert.equal(reasons.get('mpe_nested'), 'PRODUCT_INACTIVE', 'never a bundle inside a mystery pool');
+  // Never a bundle inside a mystery pool. A composition is priced and listed like any product (DECISIONS
+  // row 250), so it is refused for what it is.
+  assert.equal(reasons.get('mpe_nested'), 'COMPOSITION_NESTED', 'never a bundle inside a mystery pool');
 
   assert.deepEqual(
     set.candidates.map((c) => c.entry_id).sort(),

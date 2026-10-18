@@ -50,7 +50,6 @@ import {
 import { clampMemberLadder, resolveUnitPrice, type ProPricingPolicy, type ResolvedPrice, type Tier } from './pricing';
 import { effectiveAvailability } from '@levonis/pricing/availability';
 import { typeForTransport, type ShippingType } from '@levonis/pricing/shippingType';
-import { tierInherits } from './entitlements';
 import type { OfferCheck } from './offers';
 import { newId } from './crypto';
 import { HttpError } from './http';
@@ -461,55 +460,29 @@ export function resolveBundlePrice(input: {
    *  difference (§2.2). Merchandise deliberately excludes them. */
   componentFeesIqd?: number;
 }): BundlePriceResult {
-  const { resolved, config } = input;
+  const { resolved } = input;
   const errors: string[] = [];
   const componentTotal = Math.max(0, Math.trunc(input.componentTotalIqd));
-  const floorIqd = Math.max(1, Math.trunc(config.min_price_iqd || 1));
 
-  // ---- the regular price: the row's own, or DERIVED from the live total ----
-  let regular = Math.max(0, Math.trunc(resolved.regular_iqd));
-  let derived = false;
-  if (config.price_mode === 'discount_percent') {
-    derived = true;
-    const p = Math.trunc(config.discount_percent ?? 0);
-    if (!(p >= 1 && p <= 90)) errors.push('BUNDLE_VALIDATION');
-    const pct = Math.min(90, Math.max(1, p));
-    regular = Math.max(0, Math.floor((componentTotal * (100 - pct)) / 100));
-  } else if (config.price_mode === 'discount_iqd') {
-    derived = true;
-    const d = Math.max(0, Math.trunc(config.discount_iqd ?? 0));
-    regular = componentTotal - d;
-  }
-
-  // A DERIVED price below the floor does not clamp and does not sell.
-  if (derived && regular < floorIqd) {
-    errors.push('DERIVED_PRICE_BELOW_FLOOR', 'OFFER_INACTIVE');
-    regular = Math.max(0, regular);
-  }
+  // ---- the regular price: the row's own, as an ordinary product's ----------
+  // DECISIONS row 250 (the owner, 2026-10-18): a bundle or a mystery box is priced like an ordinary product —
+  // its own Pricing V2 price (cost-first or a dollar price, minimum profit, the rounding rule, the dollar as the
+  // base), which the V2 writer keeps on the row. `bundle_config`'s dinar rule (a discount derived from the
+  // components' total, a typed PLUS price, a dinar floor) prices nothing any more: `config` is read for its
+  // stock and reveal fields only.
+  const regular = Math.max(0, Math.trunc(resolved.regular_iqd));
 
   // ---- the member ladder, clamped against THAT regular ---------------------
   const { prime, pro } = clampMemberLadder(regular, resolved.prime_iqd, resolved.pro_iqd);
-  let plus: number | null =
-    config.plus_price_iqd === null || config.plus_price_iqd === undefined
-      ? null
-      : Math.max(0, Math.trunc(config.plus_price_iqd));
-  if (plus !== null) {
-    plus = Math.min(plus, regular);
-    if (prime !== null) plus = Math.max(plus, prime);
-    if (pro !== null) plus = Math.max(plus, pro);
-  }
 
   let applied = regular;
   let appliedTier: BundlePriceResult['applied_tier'] = 'regular';
-  if (input.tier === 'pro' && input.tierActive && (pro !== null || prime !== null || plus !== null)) {
-    applied = pro ?? prime ?? plus!;
+  if (input.tier === 'pro' && input.tierActive && (pro ?? prime) !== null) {
+    applied = (pro ?? prime) as number;
     appliedTier = 'pro';
-  } else if (input.tier === 'prime' && input.tierActive && (prime !== null || plus !== null)) {
-    applied = prime ?? plus!;
+  } else if (input.tier === 'prime' && input.tierActive && prime !== null) {
+    applied = prime;
     appliedTier = 'prime';
-  } else if (input.tierActive && tierInherits(input.tier, 'plus') && plus !== null) {
-    applied = plus;
-    appliedTier = 'plus';
   }
 
   // The fees the resolver already computed for this line, kept exactly as it
@@ -525,7 +498,7 @@ export function resolveBundlePrice(input: {
     regular_iqd: regular,
     prime_iqd: prime,
     pro_iqd: pro,
-    plus_iqd: plus,
+    plus_iqd: null,
     applied_tier: appliedTier,
     component_total_iqd: componentTotal,
     discount_iqd: discount,
@@ -788,6 +761,16 @@ const ISSUE_TEXT: Record<string, { ar: string; en: string; ckb: string }> = {
     ar: 'هذه الحزمة أغلى من شراء مكوّناتها منفردة',
     en: 'this bundle costs more than buying the parts',
     ckb: 'ئەم پاکێجە گرانترە لە کڕینی پارچەکانی بە جیا',
+  },
+  OFFER_DINAR_PRICE_RETIRED: {
+    ar: 'سعر العرض الثابت بالدينار وسعر PLUS لم يعودا متاحين — الحزمة تُسعَّر كأي منتج؛ استخدم خصمًا بالنسبة أو بالمبلغ',
+    en: 'a fixed dinar offer price and a PLUS price are no longer available — the bundle is priced like any product; use a percent or an amount off',
+    ckb: 'نرخی جێگیری ئۆفەر بە دینار و نرخی PLUS چیتر بەردەست نین — پاکێجەکە وەک هەر بەرهەمێک نرخی بۆ دادەنرێت؛ داشکاندن بە ڕێژە یان بە بڕ بەکاربهێنە',
+  },
+  COMPOSITION_NEEDS_PRICING: {
+    ar: 'يحتاج تسعيرًا — سعّره كأي منتج (من التكلفة أو سعر بالدولار)؛ لا يراه الزبائن ولا يُباع حتى يُسعَّر',
+    en: 'needs pricing — price it like any product (from cost or a dollar price); customers do not see it and it is not sold until it is priced',
+    ckb: 'پێویستی بە نرخدانانە — وەک هەر بەرهەمێک نرخی بۆ دابنێ (لە تێچوونەوە یان نرخێک بە دۆلار)؛ تا نرخی بۆ دانەنرێت کڕیاران نایبینن و نافرۆشرێت',
   },
   MIGRATED_NEEDS_PRICE: {
     ar: 'هذه الحزمة كانت قائمة عرض بلا سعر — حدّد سعرًا قبل النشر',
@@ -1365,37 +1348,25 @@ export async function resolveComposition(
 }
 
 /**
- * The four price-shaped warnings a composition can carry, computed from the
- * stored document, its config and the server's own preview. Shared by the
- * save, the single-bundle preview and the listing, so one screen can never
- * warn about a bundle the next screen calls fine.
+ * The price-shaped warnings a composition can carry, from the server's own
+ * preview and its Pricing V2 state. Shared by the save, the single-bundle
+ * preview and the listing, so one screen can never warn about a bundle the
+ * next screen calls fine.
+ *
+ * DECISIONS row 250: a composition is priced like an ordinary product. Until
+ * its first complete V2 write it is «يحتاج تسعيرًا» — hidden from customers and
+ * never sold (worker/lib/listing.ts) — and its stored dinar figure is an
+ * archive, not a price: nothing is compared with it.
  */
 export function compositionPriceWarnings(
-  doc: Pick<ProductDoc, 'price_iqd'>,
-  config: BundleConfigInput,
-  preview: Pick<CompositionPreview, 'component_total_iqd' | 'regular_iqd'>
+  preview: Pick<CompositionPreview, 'component_total_iqd' | 'regular_iqd'>,
+  needsPricing: boolean
 ): BundleIssue[] {
-  const out: BundleIssue[] = [];
-  if (config.price_mode === 'fixed' && doc.price_iqd <= 0) {
-    out.push(bundleIssue('MIGRATED_NEEDS_PRICE', {}, { key: 'price_iqd' }));
-  }
+  if (needsPricing) return [bundleIssue('COMPOSITION_NEEDS_PRICING', {}, { key: 'pricing' })];
   if (preview.component_total_iqd > 0 && preview.regular_iqd > preview.component_total_iqd) {
-    out.push(bundleIssue('PRICE_ABOVE_COMPONENTS', {}, { key: 'price_iqd' }));
+    return [bundleIssue('PRICE_ABOVE_COMPONENTS', {}, { key: 'price_iqd' })];
   }
-  if (config.price_mode !== 'fixed') {
-    // About the SORT AND SEARCH KEY only: the card and the door already quote
-    // the derived figure (§4.3), so this is never a customer-visible
-    // discrepancy — and it is never silently reconciled either.
-    if (preview.regular_iqd !== doc.price_iqd) {
-      out.push(
-        bundleIssue('DERIVED_PRICE_DRIFT', { stored: doc.price_iqd, derived: preview.regular_iqd }, { key: 'price_iqd' })
-      );
-    }
-    if (preview.regular_iqd < Math.max(1, config.min_price_iqd)) {
-      out.push(bundleIssue('DERIVED_PRICE_BELOW_FLOOR', {}, { key: 'min_price_iqd' }));
-    }
-  }
-  return out;
+  return [];
 }
 
 /**
@@ -1424,6 +1395,8 @@ export async function planBundleComposition(
     nowMs: number;
     /** The status this save is asking for — a publish is stricter than a draft. */
     publishing: boolean;
+    /** No complete Pricing V2 write yet (DECISIONS row 250): the save says «يحتاج تسعيرًا». */
+    needsPricing?: boolean;
   }
 ): Promise<BundleCompositionPlan> {
   const errors: BundleIssue[] = [];
@@ -1465,6 +1438,11 @@ export async function planBundleComposition(
   if (opts.offer) {
     const { starts_at: s, ends_at: e } = opts.offer;
     if (s && e && Date.parse(e) <= Date.parse(s)) errors.push(bundleIssue('SCHEDULE_INVERTED', {}, { key: 'ends_at' }));
+    // DECISIONS row 250: an offer prices a composition as it prices an ordinary product — a percent or an
+    // amount off. A typed dinar offer price or PLUS price is the retired rule's, refused by name.
+    if (opts.offer.offer_price_mode === 'fixed' || (opts.offer.plus_price_iqd ?? null) !== null) {
+      errors.push(bundleIssue('OFFER_DINAR_PRICE_RETIRED', {}, { key: opts.offer.offer_price_mode === 'fixed' ? 'offer.offer_price_iqd' : 'offer.plus_price_iqd' }));
+    }
     if (opts.offer.offer_price_mode === 'discount_percent') {
       const p = opts.offer.discount_percent;
       if (p === null || !(p >= 1 && p <= 90)) {
@@ -1473,22 +1451,6 @@ export async function planBundleComposition(
     }
   }
 
-  // ---- the member ladder never inverts (§4.7) -----------------------------
-  const regular = opts.doc.price_iqd;
-  const rungs: Array<[string, number | null]> = [
-    ['pro', opts.doc.pro_price_iqd],
-    ['prime', opts.doc.prime_price_iqd],
-    ['plus', config.plus_price_iqd],
-  ];
-  const pro = opts.doc.pro_price_iqd;
-  const prime = opts.doc.prime_price_iqd;
-  const plus = config.plus_price_iqd;
-  const inverted =
-    rungs.some(([, v]) => v !== null && v > regular) ||
-    (pro !== null && prime !== null && pro > prime) ||
-    (plus !== null && prime !== null && plus < prime) ||
-    (plus !== null && pro !== null && plus < pro);
-  if (inverted) errors.push(bundleIssue('MEMBER_LADDER_INVERTED', {}, { key: 'prices' }));
 
   // ---- the components, resolved against the real catalogue ---------------
   const res = await resolveComposition(db, {
@@ -1504,21 +1466,9 @@ export async function planBundleComposition(
   errors.push(...res.errors);
   warnings.push(...res.warnings);
 
-  const total = res.preview.component_total_iqd;
-  // ONE typed zero must not publish a free bundle. Refused at save, not
-  // clamped at read: `max(min_price, …)` alone satisfies "never negative" at
-  // the letter and loses it at the intent (§4.3).
-  if (config.price_mode === 'discount_iqd' && config.discount_iqd !== null && config.discount_iqd >= total) {
-    errors.push(bundleIssue('BUNDLE_DISCOUNT_EXCEEDS_TOTAL', { discount: config.discount_iqd, total }, { key: 'discount_iqd' }));
-  }
-  // The same four price warnings the listing and the preview show, from the
-  // same function — so a bundle cannot be warned about on one screen and
-  // silent on another. A fixed-price bundle with no price is honest as a
-  // DRAFT (the migrated legacy rows are exactly that) and REFUSED on publish.
-  for (const w of compositionPriceWarnings(opts.doc, config, res.preview)) {
-    if (w.code === 'MIGRATED_NEEDS_PRICE' && opts.publishing) errors.push(w);
-    else warnings.push(w);
-  }
+  // DECISIONS row 250: the price is the composition's own Pricing V2 price — never refused here; an
+  // unpriced composition saves, stays hidden and is «يحتاج تسعيرًا» until its first complete V2 write.
+  warnings.push(...compositionPriceWarnings(res.preview, opts.needsPricing ?? false));
 
   if (errors.length) return { errors };
 

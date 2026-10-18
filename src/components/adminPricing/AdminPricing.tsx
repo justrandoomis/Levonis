@@ -32,7 +32,7 @@ const V2_CARD = {
   published: { ar: 'منشور للزبائن', en: 'Published to customers', ckb: 'بۆ کڕیاران بڵاوکراوەتەوە' },
   hidden: { ar: 'مخفي حتى يُسعَّر', en: 'Hidden until priced', ckb: 'شاراوەیە تا نرخی بۆ دادەنرێت' },
   saved: { ar: 'محفوظ، غير مكتمل', en: 'Saved, not complete', ckb: 'پاشەکەوتکراوە، تەواو نییە' },
-  bundles: { ar: 'حزم بانتظار قرار التسعير', en: 'Bundles awaiting a pricing decision', ckb: 'پاکێجەکان چاوەڕێی بڕیاری نرخدانانن' },
+  bundles: { ar: 'حزم وصناديق تحتاج تسعيرًا', en: 'Bundles and mystery boxes needing pricing', ckb: 'پاکێج و سندووقەکان کە پێویستیان بە نرخدانانە' },
   allPublished: {
     ar: 'كل المنتجات العادية مسعّرة ومنشورة.',
     en: 'Every ordinary product is priced and published.',

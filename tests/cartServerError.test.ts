@@ -37,7 +37,6 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { q7Test } from './fixtures/q7';
 import { DatabaseSync } from 'node:sqlite';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -370,7 +369,7 @@ test('the ckb strings for the new states are the ARABIC text, awaiting the owner
 const NO_0060 = { tables: ['offer_windows', 'offer_limits', 'offer_redemptions'] };
 const NO_0061 = { tables: ['mystery_pool_entries', 'mystery_pools', 'mystery_offers'] };
 
-q7Test('a cart holding a BUNDLE still loads when the offers table is not installed', async () => {
+test('a cart holding a BUNDLE still loads when the offers table is not installed', async () => {
   const raw = seed();
   raw.exec(`
     INSERT INTO products (id,slug,name,name_ar,price_iqd,status,stock,options,colors,

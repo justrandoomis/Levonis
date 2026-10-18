@@ -26,16 +26,20 @@ import { selectionLabel } from '../../priceRequests';
 import { loadShelves } from './shelf';
 
 
-/** How many ordinary products are V2-published, and how many still need pricing (codes and counts only). */
+/**
+ * How many products are V2-published, and how many still need pricing (codes and counts only). Bundles and
+ * mystery boxes are priced like ordinary products (DECISIONS row 250) and counted with them; `compositions`
+ * is how many of those still need pricing.
+ */
 export async function v2PublicationCounts(db: D1Database): Promise<{ published: number; needs_pricing: number; saved: number; compositions: number }> {
   try {
     const row = await db
       .prepare(
         `SELECT
-           SUM(CASE WHEN COALESCE(p.composition, '') = '' AND pub.ok = 1 THEN 1 ELSE 0 END) AS published,
-           SUM(CASE WHEN COALESCE(p.composition, '') = '' AND pub.ok = 0 THEN 1 ELSE 0 END) AS needs_pricing,
-           SUM(CASE WHEN COALESCE(p.composition, '') = '' AND pub.ok = 0 AND pub.method = 1 THEN 1 ELSE 0 END) AS saved,
-           SUM(CASE WHEN COALESCE(p.composition, '') <> '' THEN 1 ELSE 0 END) AS compositions
+           SUM(CASE WHEN pub.ok = 1 THEN 1 ELSE 0 END) AS published,
+           SUM(CASE WHEN pub.ok = 0 THEN 1 ELSE 0 END) AS needs_pricing,
+           SUM(CASE WHEN pub.ok = 0 AND pub.method = 1 THEN 1 ELSE 0 END) AS saved,
+           SUM(CASE WHEN COALESCE(p.composition, '') <> '' AND pub.ok = 0 THEN 1 ELSE 0 END) AS compositions
          FROM products p
          JOIN (SELECT q.id AS id,
                       EXISTS (SELECT 1 FROM product_pricing_state s WHERE s.product_id = q.id AND s.mode = 'engine' AND s.pricing_method IS NOT NULL
@@ -54,7 +58,7 @@ export async function v2PublicationCounts(db: D1Database): Promise<{ published: 
     // A database before 0189: nothing is published, everything needs pricing.
     if (!/no such (table|column)/i.test(e instanceof Error ? e.message : String(e))) throw e;
     const row = await db
-      .prepare("SELECT SUM(CASE WHEN COALESCE(composition, '') = '' THEN 1 ELSE 0 END) AS n, SUM(CASE WHEN COALESCE(composition, '') <> '' THEN 1 ELSE 0 END) AS c FROM products")
+      .prepare("SELECT COUNT(*) AS n, SUM(CASE WHEN COALESCE(composition, '') <> '' THEN 1 ELSE 0 END) AS c FROM products")
       .first<{ n: number | null; c: number | null }>();
     return { published: 0, needs_pricing: Number(row?.n ?? 0), saved: 0, compositions: Number(row?.c ?? 0) };
   }
@@ -96,7 +100,7 @@ export const ROUNDING_PENDING_SQL = `EXISTS (SELECT 1 FROM pricing_v2_sku_result
   AND rr.final_price_iqd - CAST(rr.exact_iqd AS REAL) >= CASE WHEN CAST(rr.exact_iqd AS REAL) > 1000 THEN 250 ELSE 1 END)`;
 
 /** `published`: only on the owner's below-minimum-profit and purchase-review filters (a listed product). */
-export type QueueState = 'needs_pricing' | 'saved' | 'ready' | 'composition_pending' | 'published';
+export type QueueState = 'needs_pricing' | 'saved' | 'ready' | 'published';
 
 /** Several products' V2 reads in a bounded number of statements: one load per kind, chunked (never two batches at once). */
 export async function loadQueueReads(db: D1Database, ids: readonly string[]): Promise<Map<string, V2Read>> {
@@ -317,19 +321,20 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
   const requestsOf = (cand: Candidate): QueueRequests | null =>
     cand.requesters === null ? null : { people: cand.requesters, last_at: cand.last_request_at, selections: [] };
   const { rows: candidates, truncated, requestsInstalled } = await queueCandidates(db, owner, filter === 'most_requested', filter === 'rounding');
-  const reads = await loadQueueReads(db, candidates.filter((r) => r.composition === '').map((r) => r.id));
+  const reads = await loadQueueReads(db, candidates.map((r) => r.id));
   const rates = reads.values().next().value?.rates ?? (await loadPricingRates(db));
   const now = new Date().toISOString();
   const o = { viewer, env: c.env, user, now };
 
   const rows: QueueRow[] = [];
   for (const cand of candidates) {
-    const link = `/admin?tab=products&edit=${encodeURIComponent(cand.id)}&section=3`;
+    // A bundle or a mystery box is priced like an ordinary product (DECISIONS row 250), in the bundles panel's
+    // own section ٣ (the product form never opens one).
+    const link =
+      cand.composition !== ''
+        ? `/admin?tab=bundles&edit=${encodeURIComponent(cand.id)}&section=3`
+        : `/admin?tab=products&edit=${encodeURIComponent(cand.id)}&section=3`;
     const names = { ar: cand.name_ar, en: cand.name_en, ckb: cand.name_ckb };
-    if (cand.composition !== '') {
-      rows.push({ id: cand.id, slug: cand.slug, names, image: '', status: cand.status, composition: cand.composition, state: 'composition_pending', method: null, default_method: 'usd', can_finish: false, sellable_skus: 0, channels: [], missing: [], requests: requestsOf(cand), link });
-      continue;
-    }
     const read = reads.get(cand.id);
     if (!read) continue;
     const stored = storedMethodOf(read);
@@ -339,7 +344,7 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
       ev = await evaluateDesired(read, desiredFor(read, owner && !stored ? { method, sent: ['method'] } : { sent: [] }, o));
     } catch {
       // A product the engine cannot read yet (a malformed legacy row) is still listed, with nothing to say but its name.
-      rows.push({ id: cand.id, slug: cand.slug, names, image: '', status: cand.status, composition: '', state: stored ? 'saved' : 'needs_pricing', method: stored, default_method: method, can_finish: owner || method === 'usd', sellable_skus: 0, channels: [], missing: [], requests: requestsOf(cand), link });
+      rows.push({ id: cand.id, slug: cand.slug, names, image: '', status: cand.status, composition: cand.composition, state: stored ? 'saved' : 'needs_pricing', method: stored, default_method: method, can_finish: owner || method === 'usd', sellable_skus: 0, channels: [], missing: [], requests: requestsOf(cand), link });
       continue;
     }
     const answer = v2EditorAnswer(ev);
@@ -358,7 +363,7 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
       // a fingerprint of every old dinar price of the product — not a picture (review 2026-10-14).
       image: '',
       status: cand.status,
-      composition: '',
+      composition: cand.composition,
       state,
       method: stored,
       default_method: method,
@@ -377,7 +382,7 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
     hidden: hiddenRows.length,
     ready: hiddenRows.filter((r) => r.state === 'ready').length,
     saved: hiddenRows.filter((r) => r.state === 'saved').length,
-    editor_can_finish: hiddenRows.filter((r) => r.composition === '' && (r.method ?? 'usd') === 'usd').length,
+    editor_can_finish: hiddenRows.filter((r) => (r.method ?? 'usd') === 'usd').length,
     owner_only: hiddenRows.filter((r) => r.method === 'cost').length,
   };
   if (owner) {
@@ -401,7 +406,7 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
       case 'saved':
         return !published.has(r.id) && r.state === 'saved';
       case 'usd':
-        return !published.has(r.id) && r.composition === '' && (r.method ?? r.default_method) === 'usd';
+        return !published.has(r.id) && (r.method ?? r.default_method) === 'usd';
       case 'cost':
         return !published.has(r.id) && (r.method ?? r.default_method) === 'cost';
       case 'below_min_profit':

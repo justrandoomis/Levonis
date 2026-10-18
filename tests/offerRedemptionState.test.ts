@@ -33,7 +33,7 @@ import { adminRoutes } from '../worker/routes/admin';
 import { moveOrderStage } from '../worker/lib/orderStageOps';
 import { addBundle, seedCatalogue, orderBody } from './lib/bundles';
 import { seedMysteryPool, addMysteryOffer } from './lib/mysteryOffer';
-import { q7Test } from './fixtures/q7';
+import { test } from 'node:test';
 
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
 const admin: StubUser = { id: 'boss', role: 'admin', email: 'a@x.co' };
@@ -87,7 +87,7 @@ async function boughtMystery(raw: DatabaseSync, revealStage: 'paid' | 'confirmed
 
 // ------------------------------------------------- rule 3: the bundle slot
 
-q7Test('cancelling a normal bundle order releases its redemption, and the customer may buy again', async () => {
+test('cancelling a normal bundle order releases its redemption, and the customer may buy again', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await boughtBundle(raw);
 
@@ -113,7 +113,7 @@ q7Test('cancelling a normal bundle order releases its redemption, and the custom
   assert.equal(again.success, true, `the freed slot must be spendable: ${JSON.stringify(again)}`);
 });
 
-q7Test('an ADMIN cancellation frees it too — one statement builder, both routes', async () => {
+test('an ADMIN cancellation frees it too — one statement builder, both routes', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await boughtBundle(raw);
 
@@ -124,7 +124,7 @@ q7Test('an ADMIN cancellation frees it too — one statement builder, both route
 
 // --------------------------------------- rule 4: a failed checkout consumes nothing
 
-q7Test('a checkout that fails writes no redemption row at all', async () => {
+test('a checkout that fails writes no redemption row at all', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 400_000, limits: { max_per_user: 1 } });
   const { failing, db } = failingD1(raw);
@@ -149,7 +149,7 @@ q7Test('a checkout that fails writes no redemption row at all', async () => {
 
 // ------------------------------------------------ rules 1 and 5: no re-roll
 
-q7Test('cancelling a MYSTERY order never frees its slot — not even before the reveal', async () => {
+test('cancelling a MYSTERY order never frees its slot — not even before the reveal', async () => {
   const raw = seedCatalogue();
   const { db, orderId, productId } = await boughtMystery(raw, 'delivered');
   // 'delivered' reveal: nothing is revealed yet, so the customer's own cancel
@@ -168,7 +168,7 @@ q7Test('cancelling a MYSTERY order never frees its slot — not even before the 
   assert.equal(reroll.code, 'PER_USER_LIMIT_REACHED');
 });
 
-q7Test('a REVEALED mystery refuses the customer cancel, and an admin cancel still frees nothing', async () => {
+test('a REVEALED mystery refuses the customer cancel, and an admin cancel still frees nothing', async () => {
   const raw = seedCatalogue();
   const { db, orderId, productId } = await boughtMystery(raw, 'confirmed');
   const env = { DB: db } as unknown as Parameters<typeof moveOrderStage>[0];
@@ -185,7 +185,7 @@ q7Test('a REVEALED mystery refuses the customer cancel, and an admin cancel stil
   assert.equal(redemption(raw, productId)!.state, 'active', 'a revealed mystery NEVER restores its slot');
 });
 
-q7Test('a mixed order holding a bundle AND a mystery frees neither', async () => {
+test('a mixed order holding a bundle AND a mystery frees neither', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 400_000, limits: { max_per_user: 1 } });
   seedMysteryPool(raw);
@@ -204,7 +204,7 @@ q7Test('a mixed order holding a bundle AND a mystery frees neither', async () =>
 
 // ------------------------------------------------------------- the re-open
 
-q7Test('re-opening an unpaid cash-pickup bundle order takes its slot back', async () => {
+test('re-opening an unpaid cash-pickup bundle order takes its slot back', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await boughtBundle(raw, 1, 'pickup');
 
@@ -218,7 +218,7 @@ q7Test('re-opening an unpaid cash-pickup bundle order takes its slot back', asyn
   assert.equal(back.released_at, null);
 });
 
-q7Test('a re-open whose freed slot was spent meanwhile is refused, and the order stays cancelled', async () => {
+test('a re-open whose freed slot was spent meanwhile is refused, and the order stays cancelled', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await boughtBundle(raw, 1, 'pickup');
 
@@ -243,7 +243,7 @@ q7Test('a re-open whose freed slot was spent meanwhile is refused, and the order
   assert.equal(row(raw, 'SELECT status FROM orders WHERE id=?', orderId)?.status, 'cancelled');
 });
 
-q7Test('the stage machine re-opens an unpaid cash-pickup bundle with the same rule', async () => {
+test('the stage machine re-opens an unpaid cash-pickup bundle with the same rule', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await boughtBundle(raw, 1, 'pickup');
   const env = { DB: db } as unknown as Parameters<typeof moveOrderStage>[0];
@@ -256,7 +256,7 @@ q7Test('the stage machine re-opens an unpaid cash-pickup bundle with the same ru
   assert.equal(redemption(raw, 'prd_b1')!.state, 'active', 'a stage re-open reclaims the slot too');
 });
 
-q7Test('a bundle whose advance was refunded cannot be reopened through either door', async () => {
+test('a bundle whose advance was refunded cannot be reopened through either door', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await boughtBundle(raw);
   assert.ok(Number(row(raw, 'SELECT wallet_applied_usd_cents FROM orders WHERE id=?', orderId)?.wallet_applied_usd_cents) > 0);
@@ -279,7 +279,7 @@ q7Test('a bundle whose advance was refunded cannot be reopened through either do
 
 // ------------------------------------------------------------ the mechanism
 
-q7Test('the limit trigger and the friendly advice both count ACTIVE rows only', async () => {
+test('the limit trigger and the friendly advice both count ACTIVE rows only', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await boughtBundle(raw, 1);
   await json(await post(appFor(db), `/api/orders/${orderId}/cancel`, {}));

@@ -22,7 +22,7 @@ import { missingLabel } from './form/v2/missingLabel';
 import { v2Strings } from './form/v2/v2Strings';
 
 type Filter = 'all' | 'most_requested' | 'ready' | 'saved' | 'usd' | 'cost' | 'below_min_profit' | 'purchase_review' | 'rounding';
-type State = 'needs_pricing' | 'saved' | 'ready' | 'composition_pending' | 'published';
+type State = 'needs_pricing' | 'saved' | 'ready' | 'published';
 
 interface Names {
   ar: string;
@@ -124,11 +124,9 @@ function StateChip({ p, lang }: { p: QueueProduct; lang: QueueLang }) {
       ? S.ready
       : p.state === 'saved'
         ? S.saved
-        : p.state === 'composition_pending'
-          ? S.awaitingDecision
-          : p.state === 'published'
-            ? S.published
-            : S.badge;
+        : p.state === 'published'
+          ? S.published
+          : S.badge;
   const tone =
     p.state === 'ready' || p.state === 'published'
       ? 'lv-chip [--chip:var(--color-success)]'
@@ -302,9 +300,8 @@ export default function NeedsPricingQueue({ owner, onOpen, onBack }: { owner: bo
                         <span className="lv-chip [--chip:var(--color-info)] shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold" data-queue-rounding-chip>{tri(S.filters.rounding, lang)}</span>
                       )}
                     </div>
-                    {p.composition !== '' ? (
-                      <p className={`text-[12px] ${T.text2}`}>{tri(S.composition, lang)}</p>
-                    ) : !p.can_finish ? (
+                    {p.composition !== '' ? <p className={`text-[12px] ${T.text2}`}>{tri(S.composition, lang)}</p> : null}
+                    {!p.can_finish ? (
                       <p className={`text-[12px] ${T.text2}`}>{tri(S.ownerOnly, lang)}</p>
                     ) : line ? (
                       <p className={`text-[12px] ${T.text2} break-words`} data-queue-missing>{line}</p>
@@ -312,7 +309,12 @@ export default function NeedsPricingQueue({ owner, onOpen, onBack }: { owner: bo
                     {p.requests && p.requests.people > 0 ? <RequestsLine r={p.requests} lang={lang} /> : null}
                   </div>
                 </div>
-                {p.composition === '' && (
+                {/* A bundle or a mystery box is priced in the bundles panel's own section ٣ (DECISIONS row 250). */}
+                {p.composition !== '' ? (
+                  <a href={p.link} className={`${T.btnPrimary} w-full sm:w-auto`} data-queue-open={p.id}>
+                    {tri(S.priceNow, lang)}
+                  </a>
+                ) : (
                   <button type="button" className={`${T.btnPrimary} w-full sm:w-auto`} onClick={() => onOpen(p.id)} data-queue-open={p.id}>
                     {tri(S.priceNow, lang)}
                   </button>

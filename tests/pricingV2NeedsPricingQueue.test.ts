@@ -2,7 +2,8 @@
  * «يحتاج تسعيرًا» — THE QUEUE (spec addendum A.8, A.12.4; DECISIONS row 222).
  *
  *   - every product not V2-published is listed with its state; a published
- *     product leaves the queue; compositions are `composition_pending` (Q7);
+ *     product leaves the queue; a bundle or a mystery box is queued like any
+ *     product (DECISIONS row 250, tests/bundlesAsProducts.test.ts);
  *   - a price editor's projection: no cost code's name (a cost-first product's
  *     gaps are one OWNER_DATA item), no owner-only filter, `can_finish` false
  *     on cost-first and true on price-first;
@@ -42,7 +43,7 @@ async function allRows(app: ReturnType<typeof stubApp>, filter = 'all'): Promise
   return { rows, first };
 }
 
-test('every product not V2-published is in the queue; a published one leaves it; compositions wait for Q7', async () => {
+test('every product not V2-published is in the queue; a published one leaves it', async () => {
   const { raw, ids, appAs } = await world();
   const owner = appAs(OWNER);
   const before = await allRows(owner);
@@ -51,7 +52,7 @@ test('every product not V2-published is in the queue; a published one leaves it;
   assert.equal((before.first.counts as Record<string, number>).hidden, before.rows.length);
   // No approved USD/IQD yet: the banner says nothing can be published.
   assert.equal(before.first.rate_ready, false);
-  assert.ok(before.rows.every((r) => ['needs_pricing', 'saved', 'ready', 'composition_pending'].includes(r.state)));
+  assert.ok(before.rows.every((r) => ['needs_pricing', 'saved', 'ready'].includes(r.state)));
   assert.ok(before.rows.length <= 200);
   await publishV2(raw, ids[0]!);
   const after = await allRows(owner);

@@ -88,6 +88,21 @@ export async function loadProducts(db: D1Database, ids: readonly string[]): Prom
   return out;
 }
 
+/**
+ * A BUNDLE OR A MYSTERY BOX AS PRICING V2 SEES IT (DECISIONS row 250): an ordinary product with one SKU
+ * sold direct — its own cost or dollar price, minimum profit, rounding and the dollar as the base, set in
+ * the same section ٣. Its row says `sale_types ["bundle"]` with no stock of its own (what it can sell is
+ * its components', `bundleAvailability`), which no channel of the V2 maths reads; so the engine prices
+ * the composition's one price on the direct channel. Only the pricing read changes: what is inside, the
+ * stock, the redemption slots and the reveal stay the composition's. An ordinary product is returned as is.
+ */
+export function pricedAsProduct(loaded: LoadedProduct): LoadedProduct {
+  if ((loaded.doc.composition ?? '') === '') return loaded;
+  const row: Record<string, unknown> = { ...loaded.row, composition: '', selling_type: 'direct_sale', sale_types: '["direct_sale"]', stock: null };
+  const doc = loaded.view ? applyRelations(parseProductRow(row), loaded.view) : parseProductRow(row);
+  return { id: loaded.id, row, doc, view: loaded.view };
+}
+
 // ------------------------------------------------------------ the rate reference
 
 /**

@@ -32,7 +32,6 @@ import { returnRoutes } from '../worker/routes/returns';
 import { deductOrderStock } from '../worker/lib/orderInventory';
 import { addBundle, seedCatalogue, orderBody } from './lib/bundles';
 import { seedMysteryPool, addMysteryOffer } from './lib/mysteryOffer';
-import { q7Test } from './fixtures/q7';
 
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
 const appFor = (db: unknown, user: StubUser = buyer) =>
@@ -74,7 +73,7 @@ function standardBundle(raw: DatabaseSync) {
 
 // ------------------------------------------------------------- the carve-out
 
-q7Test('a DEFECT on one component opens a case; a change of mind on the same component does not', async () => {
+test('a DEFECT on one component opens a case; a change of mind on the same component does not', async () => {
   const raw = seedCatalogue();
   standardBundle(raw);
   const { db, orderId } = await deliveredBundle(raw);
@@ -101,7 +100,7 @@ q7Test('a DEFECT on one component opens a case; a change of mind on the same com
   }
 });
 
-q7Test('the faulty part keeps its own identity: its case is priced on what that part cost', async () => {
+test('the faulty part keeps its own identity: its case is priced on what that part cost', async () => {
   const raw = seedCatalogue();
   standardBundle(raw);
   const { db, orderId } = await deliveredBundle(raw);
@@ -119,7 +118,7 @@ q7Test('the faulty part keeps its own identity: its case is priced on what that 
   assert.ok(Number(printer.component_alloc_iqd) > 0, 'the component carries its own share of the price');
 });
 
-q7Test('one part under claim does not make the whole-bundle door lie about the quantity', async () => {
+test('one part under claim does not make the whole-bundle door lie about the quantity', async () => {
   const raw = seedCatalogue();
   standardBundle(raw);
   const { db, orderId } = await deliveredBundle(raw);
@@ -138,7 +137,7 @@ q7Test('one part under claim does not make the whole-bundle door lie about the q
   assert.match(String(whole.error), /PLA/i, 'and say which part');
 });
 
-q7Test('a bundle returned in full still answers QTY_EXCEEDED, not the component message', async () => {
+test('a bundle returned in full still answers QTY_EXCEEDED, not the component message', async () => {
   const raw = seedCatalogue();
   standardBundle(raw);
   const { db, orderId } = await deliveredBundle(raw);
@@ -152,7 +151,7 @@ q7Test('a bundle returned in full still answers QTY_EXCEEDED, not the component 
 
 // --------------------------------------------------------- the reveal fence
 
-q7Test('a mystery spool cannot be claimed as faulty before its reveal — the carve-out is not a leak', async () => {
+test('a mystery spool cannot be claimed as faulty before its reveal — the carve-out is not a leak', async () => {
   const raw = seedCatalogue();
   seedMysteryPool(raw);
   const mysteryId = addMysteryOffer(raw, { revealStage: 'delivered', spoolQty: 1 });
@@ -204,7 +203,7 @@ test('the app offers the per-part claim, or the carve-out is unreachable from a 
  * as spent, and the commercial reason gate refuses the child on its own. The
  * fault report cost them their refund right.
  */
-q7Test('a component case resolved as repair or replacement leaves the whole-bundle return open', async () => {
+test('a component case resolved as repair or replacement leaves the whole-bundle return open', async () => {
   for (const resolution of ['repair', 'replacement', 'declined'] as const) {
     const raw = seedCatalogue();
     standardBundle(raw);
@@ -233,7 +232,7 @@ q7Test('a component case resolved as repair or replacement leaves the whole-bund
   }
 });
 
-q7Test('a component case that was REFUNDED does consume it, and the refusal says so honestly', async () => {
+test('a component case that was REFUNDED does consume it, and the refusal says so honestly', async () => {
   const raw = seedCatalogue();
   standardBundle(raw);
   const { db, orderId } = await deliveredBundle(raw);

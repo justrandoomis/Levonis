@@ -43,6 +43,7 @@ import { requireAdmin, badRequest, notFound, int, str, oneOf, HttpError } from '
 import { newId } from '../lib/crypto';
 import { auditStatements } from '../lib/audit';
 import { canWriteCost, isOwner, projectForAdmin } from '../lib/adminScope';
+import { holdLegacyDocMoney } from '../lib/pricingEngine/v2/legacyMoney';
 import { compositionSerializedVerdict, serialAnswerFence, type SerialAnswerFence } from '../lib/serialPolicy';
 import { isLostRace } from '../lib/gifts/fence';
 import { refuse as serialRefuse } from '../lib/serialAssignments';
@@ -761,6 +762,10 @@ async function writeOffer(c: Context<AppContext>, mode: 'create' | 'update', pro
   }
 
   const id = prev ? prev.id : newId('prd');
+  // DECISIONS row 250: a mystery box is priced like an ordinary product (section ٣, Pricing V2) — this panel
+  // types no dinar price: an absent price keeps the stored one (a new box is born «يحتاج تسعيرًا»), an echo
+  // passes, a moved one is 409 PRICING_V2_MANAGED.
+  holdLegacyDocMoney(b, prev, { costs: canWriteCost(c.env, admin) });
   const doc = mysteryDocFrom(b, id);
   // §29 (serial scan, 0178; landing round 3 F7): the offer row's serial word
   // and its classification are judged like every product door's. This panel

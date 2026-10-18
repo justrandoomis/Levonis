@@ -258,8 +258,9 @@ test('no second discount table exists: the whole feature is offer_windows + offe
 
 test('the offers panel refuses the two dishonest configurations, verbatim', async () => {
   const raw = seedCatalogue();
-  // A derived-price BUNDLE cannot also carry a window price: two live sources
-  // on one subject, never summed and never resolved by whichever ran first.
+  // DECISIONS row 250: a bundle is priced like an ordinary product. Its legacy
+  // derived rule prices nothing, so a window beside it is no conflict — and a
+  // typed dinar `fixed` offer price is refused exactly as on an ordinary product.
   raw
     .prepare(
       "INSERT INTO products (id,slug,name,name_ar,price_iqd,status,stock,options,colors,selling_type,sale_types,preorder_transports,images,inventory_mode,composition) VALUES ('p_derived','derived','D','د',0,'active',NULL,'[]','[]','bundle','[\"bundle\"]','[]','[]','BASE','bundle')"
@@ -273,23 +274,15 @@ test('the offers panel refuses the two dishonest configurations, verbatim', asyn
   const db = asD1(raw);
   const admin = appFor(db, boss);
 
-  const conflict = await json(
-    await stubApp(db, boss, (a) => a.route('/api/admin/offers', adminOffersRoutes)).request('/api/admin/offers/p_derived', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ offer_price_mode: 'fixed', offer_price_iqd: 1000 }),
-    })
-  );
-  assert.equal(conflict.success, false);
-  assert.equal(conflict.code, 'OFFER_PRICE_CONFLICT');
-  // Trilingual and with a `message`, so both existing admin decoders render it
-  // rather than printing the literal string "undefined" (§11.3).
-  const issue = conflict.details.errors[0];
-  for (const k of ['code', 'message', 'ar', 'en', 'ckb']) {
-    assert.equal(typeof issue[k], 'string', `the refusal has no ${k}`);
-    assert.ok(issue[k].length > 0);
-  }
-  assert.ok(!JSON.stringify(conflict).includes('undefined'));
+  const offersApp = stubApp(db, boss, (a) => a.route('/api/admin/offers', adminOffersRoutes));
+  const putOffer = async (body: Record<string, unknown>) =>
+    json(await offersApp.request('/api/admin/offers/p_derived', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }));
+  const dinar = await putOffer({ offer_price_mode: 'fixed', offer_price_iqd: 1000 });
+  assert.equal(dinar.success, false);
+  assert.equal(dinar.code, 'PRICING_V2_MANAGED', JSON.stringify(dinar).slice(0, 300));
+  assert.ok(!JSON.stringify(dinar).includes('undefined'));
+  const percent = await putOffer({ offer_price_mode: 'discount_percent', discount_percent: 10 });
+  assert.notEqual(percent.code, 'OFFER_PRICE_CONFLICT', 'the retired derived rule still refused a window');
 
   const inverted = await json(
     await post(admin, '/api/admin/offers', {

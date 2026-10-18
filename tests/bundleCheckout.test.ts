@@ -42,7 +42,7 @@ import { cartRoutes } from '../worker/routes/cart';
 import { orderRoutes } from '../worker/routes/orders';
 import { eligibleMerchandiseIqd } from '../worker/lib/pointsOps';
 import { addBundle, seedCatalogue, orderBody, DEFAULT_COMPONENTS, PAST } from './lib/bundles';
-import { q7Test } from './fixtures/q7';
+import { test } from 'node:test';
 
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
 const appFor = (db: unknown, user: StubUser = buyer) =>
@@ -64,7 +64,7 @@ async function addBundleToCart(db: unknown, body: Record<string, unknown>, user:
 
 // ------------------------------------------------------ the money invariants
 
-q7Test('the parent carries the money, the components carry zero, and every sum ties out', async () => {
+test('the parent carries the money, the components carry zero, and every sum ties out', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 400_000 });
   const db = asD1(raw);
@@ -107,17 +107,16 @@ q7Test('the parent carries the money, the components carry zero, and every sum t
   );
 });
 
-q7Test('points accrue on the parent only, and on the number ACTUALLY charged — in a derived price mode too', async () => {
+test('points accrue on the parent only, and on the number ACTUALLY charged — its own V2 price, whatever the retired dinar rule says', async () => {
   for (const mode of ['fixed', 'derived'] as const) {
     const raw = seedCatalogue();
     addBundle(raw, {
       id: 'prd_b1',
       slug: 'starter',
-      // The cached `products.price_iqd` is deliberately WRONG in the derived
-      // case: §4.3 lets it drift and makes the live component total the
-      // charged price, so this is exactly where a snapshot that copied the
-      // resolver's `applied_iqd` would freeze the wrong number.
-      priceIqd: mode === 'fixed' ? 400_000 : 999_999,
+      // DECISIONS row 250: a bundle is priced like an ordinary product. A legacy
+      // derived rule left in `bundle_config` prices nothing, so the snapshot,
+      // the merchandise and the points all read the bundle's own V2 price.
+      priceIqd: 400_000,
       config: mode === 'fixed' ? {} : { price_mode: 'discount_percent', discount_percent: 20 },
     });
     const db = asD1(raw);
@@ -129,7 +128,7 @@ q7Test('points accrue on the parent only, and on the number ACTUALLY charged —
 
     const parent = rows.find((r) => r.bundle_parent_item_id === null)!;
     const snapshot = JSON.parse(String(parent.pricing_snapshot)) as Record<string, number>;
-    const expected = mode === 'fixed' ? 400_000 : Math.floor((400000 + 50000 + 5000) * 0.8);
+    const expected = 400_000;
     assert.equal(snapshot.applied_iqd, expected, `${mode}: the parent's snapshot is pinned to the charged price`);
     assert.equal(snapshot.regular_iqd, expected);
     for (const k of rows.filter((r) => r.bundle_parent_item_id !== null)) {
@@ -156,7 +155,7 @@ q7Test('points accrue on the parent only, and on the number ACTUALLY charged —
   }
 });
 
-q7Test('case 6 — a body carrying prices, savings and a tier changes nothing about what is stored', async () => {
+test('case 6 — a body carrying prices, savings and a tier changes nothing about what is stored', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 400_000 });
   const db = asD1(raw);
@@ -187,7 +186,7 @@ q7Test('case 6 — a body carrying prices, savings and a tier changes nothing ab
 
 // ------------------------------------------------------ availability, case 1
 
-q7Test('case 1 at the door — the scarcest component decides: qty 3 is sold, qty 4 is refused', async () => {
+test('case 1 at the door — the scarcest component decides: qty 3 is sold, qty 4 is refused', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', config: { max_qty_per_order: 9 } });
   const db = asD1(raw);
@@ -209,7 +208,7 @@ q7Test('case 1 at the door — the scarcest component decides: qty 3 is sold, qt
   });
 });
 
-q7Test('case 1 aggregated — a bundle and a bare product of the same row are summed, and refused at PLAN time', async () => {
+test('case 1 aggregated — a bundle and a bare product of the same row are summed, and refused at PLAN time', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -230,7 +229,7 @@ q7Test('case 1 aggregated — a bundle and a bare product of the same row are su
 
 // ------------------------------------------------------- atomicity, case 2
 
-q7Test('case 2 — a component taken between the plan and the commit rolls the WHOLE order back', async () => {
+test('case 2 — a component taken between the plan and the commit rolls the WHOLE order back', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter' });
   const { failing, db } = failingD1(raw);
@@ -259,7 +258,7 @@ q7Test('case 2 — a component taken between the plan and the commit rolls the W
   assert.deepEqual(row(raw, 'SELECT stock_reserved FROM products WHERE id = ?', 'p_printer'), { stock_reserved: 0 });
 });
 
-q7Test('every component reserves in the order’s own batch, and the fence counts them', async () => {
+test('every component reserves in the order’s own batch, and the fence counts them', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter' });
   const db = asD1(raw);
@@ -295,7 +294,7 @@ q7Test('every component reserves in the order’s own batch, and the fence count
 
 // ------------------------------------------------------ idempotency, case 17
 
-q7Test('case 17 — a double tap, a retry and a replay all produce exactly one order and one set of ledger rows', async () => {
+test('case 17 — a double tap, a retry and a replay all produce exactly one order and one set of ledger rows', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', limits: { max_per_user: 5 } });
   const db = asD1(raw);
@@ -319,7 +318,7 @@ q7Test('case 17 — a double tap, a retry and a replay all produce exactly one o
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM order_items'), 4);
 });
 
-q7Test('two lines of ONE bundle write exactly one offer_redemptions row with the summed quantity', async () => {
+test('two lines of ONE bundle write exactly one offer_redemptions row with the summed quantity', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -338,7 +337,7 @@ q7Test('two lines of ONE bundle write exactly one offer_redemptions row with the
   assert.equal(Number(redemptions[0].qty), 3, 'the quantity is summed across both lines');
 });
 
-q7Test('the per-user limit is the database’s decision, and its refusal is mapped', async () => {
+test('the per-user limit is the database’s decision, and its refusal is mapped', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', limits: { max_per_user: 1 } });
   const db = asD1(raw);
@@ -353,7 +352,7 @@ q7Test('the per-user limit is the database’s decision, and its refusal is mapp
 
 // -------------------------------------------------------- the quote, case 20
 
-q7Test('case 20 — a four-component bundle is ONE quote line with its parts nested, and the printer note still fires', async () => {
+test('case 20 — a four-component bundle is ONE quote line with its parts nested, and the printer note still fires', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -381,7 +380,7 @@ q7Test('case 20 — a four-component bundle is ONE quote line with its parts nes
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM inventory_ledger'), 0);
 });
 
-q7Test('the customer’s order payload shows ONE item with its parts nested underneath', async () => {
+test('the customer’s order payload shows ONE item with its parts nested underneath', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter' });
   const db = asD1(raw);
@@ -403,19 +402,20 @@ q7Test('the customer’s order payload shows ONE item with its parts nested unde
 // ------------------------------------------------- re-validation, case 11
 
 const MUTATIONS: Array<{ name: string; sql: string; code: string }> = [
-  { name: 'the bundle is hidden', sql: "UPDATE products SET status='hidden' WHERE id='prd_b1'", code: 'OFFER_INACTIVE' },
+  // Refused as an ordinary product is (DECISIONS row 250): the listing's own door, by name.
+  { name: 'the bundle is hidden', sql: "UPDATE products SET status='hidden' WHERE id='prd_b1'", code: 'PRODUCT_CURRENTLY_UNAVAILABLE' },
   { name: 'the offer window is switched off', sql: "UPDATE offer_windows SET active=0 WHERE subject_id='prd_b1'", code: 'OFFER_INACTIVE' },
   { name: 'the window has not opened', sql: "UPDATE offer_windows SET starts_at='2099-01-01T00:00:00.000Z' WHERE subject_id='prd_b1'", code: 'OFFER_WINDOW_NOT_STARTED' },
   { name: 'the window has closed', sql: `UPDATE offer_windows SET ends_at='${PAST}' WHERE subject_id='prd_b1'`, code: 'OFFER_WINDOW_EXPIRED' },
   { name: 'a tier gate appears', sql: `UPDATE offer_windows SET required_tiers='["plus"]' WHERE subject_id='prd_b1'`, code: 'MEMBERSHIP_REQUIRED' },
   { name: 'a component sells out', sql: "UPDATE products SET stock=0 WHERE id='p_pla'", code: 'OUT_OF_STOCK' },
   { name: 'a component is hidden', sql: "UPDATE products SET status='hidden' WHERE id='p_nozzle'", code: 'OUT_OF_STOCK' },
-  { name: 'a component becomes a pre-order beside a direct one', sql: `UPDATE products SET sale_types='["pre_order"]', selling_type='pre_order', preorder_transports='[{"method":"air","active":true}]' WHERE id='p_nozzle'`, code: 'BUNDLE_SHIPPING_MIXED' },
+  { name: 'a component becomes a pre-order beside a direct one', sql: `UPDATE products SET sale_types='["pre_order"]', selling_type='pre_order', preorder_transports='[{"method":"air","active":true,"commission_iqd":0}]' WHERE id='p_nozzle'`, code: 'BUNDLE_SHIPPING_MIXED' },
   { name: 'the per-order cap drops below the line', sql: "UPDATE bundle_config SET max_qty_per_order=1 WHERE product_id='prd_b1'", code: 'BUNDLE_QTY_LIMIT' },
 ];
 
 for (const m of MUTATIONS) {
-  q7Test(`case 11 — ${m.name} AFTER the cart row is written ⇒ refused at the door, writing nothing`, async () => {
+  test(`case 11 — ${m.name} AFTER the cart row is written ⇒ refused at the door, writing nothing`, async () => {
     const raw = seedCatalogue();
     addBundle(raw, { id: 'prd_b1', slug: 'starter', window: { active: 1 } });
     const db = asD1(raw);
@@ -430,7 +430,7 @@ for (const m of MUTATIONS) {
   });
 }
 
-q7Test('case 11 — a chosen colour deactivated after the cart row is written is refused by name', async () => {
+test('case 11 — a chosen colour deactivated after the cart row is written is refused by name', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -446,7 +446,7 @@ q7Test('case 11 — a chosen colour deactivated after the cart row is written is
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM orders'), 0);
 });
 
-q7Test('case 11 — an opted-in optional component that cannot be satisfied is REFUSED by name, never dropped', async () => {
+test('case 11 — an opted-in optional component that cannot be satisfied is REFUSED by name, never dropped', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -468,7 +468,7 @@ q7Test('case 11 — an opted-in optional component that cannot be satisfied is R
 
 // ------------------------------------------------------- case 4, pre-order
 
-q7Test('case 4 — a pre-order bundle sells with no physical stock, on the 14-stage path, and reserves nothing', async () => {
+test('case 4 — a pre-order bundle sells with no physical stock, on the 14-stage path, and reserves nothing', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_pre',
@@ -492,14 +492,14 @@ q7Test('case 4 — a pre-order bundle sells with no physical stock, on the 14-st
 
   const rows = items(raw, res.order.id);
   const parent = rows.find((r) => r.bundle_parent_item_id === null)!;
-  // The components' commissions are charged ON THE PARENT — the store never
-  // eats the air-versus-sea difference — while merchandise stays the bundle
-  // price so the points basis and the coupon minimum are unaffected.
-  assert.equal(Number(parent.unit_price_iqd), 90_000 + 3000 * 2);
+  // Priced like an ordinary product (DECISIONS row 250): the bundle's own V2
+  // price, and — as on every V2 product since the clean start — no route
+  // carries a commission, so nothing is added on the parent for the journey.
+  assert.equal(Number(parent.unit_price_iqd), 90_000);
   assert.equal(Number(order.merchandise_iqd), 90_000);
   const transport = JSON.parse(String(parent.transport_snapshot)) as { method: string; commission_iqd: number };
   assert.equal(transport.method, 'sea');
-  assert.equal(transport.commission_iqd, 6000);
+  assert.equal(transport.commission_iqd, 0);
 
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM inventory_ledger WHERE kind='reserve'"), 0, 'nothing physical is held');
   assert.deepEqual(
@@ -511,7 +511,7 @@ q7Test('case 4 — a pre-order bundle sells with no physical stock, on the 14-st
 
 // ------------------------------------------------------------ case 8, money
 
-q7Test('case 8 — a coupon applies once, to merchandise that already contains the bundle price', async () => {
+test('case 8 — a coupon applies once, to merchandise that already contains the bundle price', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 400_000 });
   raw.exec(
@@ -533,23 +533,26 @@ q7Test('case 8 — a coupon applies once, to merchandise that already contains t
   );
 });
 
-q7Test('case 8 — a derived price that falls below its floor stops the sale rather than selling at nothing', async () => {
+test('case 8 — a legacy derived rule cannot drag a bundle to nothing: it prices nothing, the bundle sells at its own V2 price', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
     slug: 'starter',
+    priceIqd: 9_000,
+    // DECISIONS row 250: the retired dinar rule — a discount at the component total.
     config: { price_mode: 'discount_iqd', discount_iqd: 400_000, min_price_iqd: 1000 },
     components: [{ id: 'bc_nozzle', product: 'p_nozzle', qty: 1 }],
   });
   const db = asD1(raw);
   const res = await json(await post(appFor(db), '/api/cart/items', { productId: 'prd_b1', qty: 1 }));
-  assert.equal(res.code, 'OFFER_INACTIVE', 'a component that went free must not drag the bundle to zero');
-  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM cart_items'), 0);
+  assert.equal(res.success, true, JSON.stringify(res));
+  assert.equal(res.items[0].unit_price_iqd, 9_000);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM cart_items'), 1);
 });
 
 // ------------------------------------------------------------ case 9, tiers
 
-q7Test('case 9 — a PLUS member is charged the offer’s PLUS rung, and the ladder never inverts', async () => {
+test('case 9 — a PLUS member pays the bundle\'s own V2 price: a typed PLUS / PRIME / PRO dinar price prices nothing (DECISIONS row 250)', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -566,19 +569,19 @@ q7Test('case 9 — a PLUS member is charged the offer’s PLUS rung, and the lad
   const res = await json(await post(appFor(db, plus), '/api/orders', orderBody({ addressId: 'addr_p' })));
   assert.equal(res.success, true, JSON.stringify(res));
   const order = orderRow(raw, res.order.id);
-  assert.equal(Number(order.merchandise_iqd), 390_000, 'the door charges the same PLUS number the card showed');
+  assert.equal(Number(order.merchandise_iqd), 400_000, 'the retired dinar PLUS price still priced the bundle');
   const parent = items(raw, res.order.id).find((r) => r.bundle_parent_item_id === null)!;
   const snapshot = JSON.parse(String(parent.pricing_snapshot)) as {
     applied_iqd: number;
     applied_tier: string;
     composition: { applied_tier: string };
   };
-  assert.equal(snapshot.applied_iqd, 390_000);
-  assert.equal(snapshot.composition.applied_tier, 'plus', 'the four-value tier lives on the composition block');
+  assert.equal(snapshot.applied_iqd, 400_000);
+  assert.equal(snapshot.composition.applied_tier, 'regular');
   assert.equal(snapshot.applied_tier, 'regular', 'the shared ResolvedPrice tier union is not widened');
 });
 
-q7Test('a printer bought INSIDE a bundle still gets its device unit and its warranty clock', async () => {
+test('a printer bought INSIDE a bundle still gets its device unit and its warranty clock', async () => {
   // The proof of §6.2's claim that device units, warranty coverage, return
   // cases and price-protection claims all key on `order_items.id` — and that
   // the COMPONENT row is the one naming the real product, so none of them
@@ -605,12 +608,10 @@ q7Test('a printer bought INSIDE a bundle still gets its device unit and its warr
   assert.equal(String(unit.product_id), 'p_printer');
 });
 
-q7Test('case 4 — a pre-order bundle paid CASH ON DELIVERY is priced by the direct-sale rules, and the quote says so', async () => {
-  // The owner's rule: «إذا اختار الزبون الدفع عند الاستلام فيجب أن يتبع السعر
-  // نفس قواعد البيع المباشر». For a bundle the money that changes is its
-  // COMPONENTS' transport commissions — they ride on the parent (§2.2) — so a
-  // bundle resolved only at the prepaid basis would collect an air-freight
-  // commission on an order paying cash at the door.
+test('case 4 — a pre-order bundle costs the same paid in advance or cash on delivery: its own V2 price, no fee (DECISIONS row 250)', async () => {
+  // The owner's rule «إذا اختار الزبون الدفع عند الاستلام فيجب أن يتبع السعر نفس قواعد البيع المباشر» is kept
+  // trivially: a bundle is priced like an ordinary V2 product, whose routes carry no commission and whose
+  // direct-sale extra is retired, so neither basis adds anything to the bundle's one price.
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_pre',
@@ -621,30 +622,19 @@ q7Test('case 4 — a pre-order bundle paid CASH ON DELIVERY is priced by the dir
   raw.exec(
     `INSERT INTO admin_settings (key, value) VALUES ('preorderTransportDefaults', '[{"method":"air","commission_iqd":7000},{"method":"sea","commission_iqd":3000}]')`
   );
-  // "Priced as a direct sale" needs a direct-sale premium to price WITH: a
-  // pre-order product with none configured keeps its commission under cash on
-  // delivery, deliberately, so the door is never cheaper than the wallet.
-  raw.exec("UPDATE products SET direct_surcharge_iqd = 5000 WHERE id = 'p_pre'");
   const db = asD1(raw);
   await addBundleToCart(db, { productId: 'prd_pre', qty: 1, transportMethod: 'air' });
 
   const prepaid = await json(await post(appFor(db), '/api/orders/quote', orderBody({ paymentMethodId: 'wallet' })));
   const cod = await json(await post(appFor(db), '/api/orders/quote', orderBody({ paymentMethodId: 'cash' })));
-  assert.equal(prepaid.quote.lines[0].unit_price_iqd, 90_000 + 7000 * 2, 'prepaid pays the commission on both spools');
-  assert.equal(
-    cod.quote.lines[0].unit_price_iqd,
-    90_000 + 5000 * 2,
-    'cash on delivery pays the DIRECT premium instead of the transport commission'
-  );
-  assert.equal(cod.quote.cod_reprices, true, 'and the screen is told the number really does move');
-  // Merchandise is the bundle price either way: the points basis, the coupon
-  // minimum and the accrual never see a fee.
+  assert.equal(prepaid.quote.lines[0].unit_price_iqd, 90_000, 'a route commission was charged on a V2 bundle');
+  assert.equal(cod.quote.lines[0].unit_price_iqd, 90_000);
   assert.equal(prepaid.quote.merchandise_iqd, 90_000);
   assert.equal(cod.quote.merchandise_iqd, 90_000);
 
   const res = await json(await post(appFor(db), '/api/orders', orderBody({ paymentMethodId: 'cash' })));
   assert.equal(res.success, true, JSON.stringify(res));
   const parent = items(raw, res.order.id).find((r) => r.bundle_parent_item_id === null)!;
-  assert.equal(Number(parent.unit_price_iqd), 90_000 + 5000 * 2, 'the order charges what the cash quote showed');
+  assert.equal(Number(parent.unit_price_iqd), 90_000, 'the order charges what the cash quote showed');
   assert.equal(orderRow(raw, res.order.id).shipping_type, 'preorder_air', 'and it is still a pre-order on its journey');
 });

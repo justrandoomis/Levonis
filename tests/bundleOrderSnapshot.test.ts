@@ -23,12 +23,12 @@
  */
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { asD1, stubApp, post, get, json, all, row, type StubUser } from './fixtures/app';
+import { asD1, stubApp, post, get, json, all, row, withoutTriggers, type StubUser } from './fixtures/app';
 import { cartRoutes } from '../worker/routes/cart';
 import { orderRoutes } from '../worker/routes/orders';
 import { createInvoiceForOrder } from '../worker/lib/invoices';
 import { addBundle, seedCatalogue, orderBody } from './lib/bundles';
-import { q7Test } from './fixtures/q7';
+import { test } from 'node:test';
 
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
 const appFor = (db: unknown) =>
@@ -37,9 +37,14 @@ const appFor = (db: unknown) =>
     a.route('/api/orders', orderRoutes);
   });
 
-/** Everything about the catalogue that a snapshot must survive. */
+/**
+ * Everything about the catalogue that a snapshot must survive. Every product here is V2-priced (the
+ * bundle too, DECISIONS row 250), so the engine's price guards are lifted for this vandalism only: it
+ * stands for every later change, priced through the writer or not.
+ */
 function breakTheCatalogue(raw: DatabaseSync): void {
-  raw.exec(`
+  const guards = (raw.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('products', 'product_colors')").all() as Array<{ name: string }>).map((t) => t.name);
+  withoutTriggers(raw, guards, `
     UPDATE products SET price_iqd = price_iqd * 3, name = 'RENAMED', name_ar = 'مغيّر'
       WHERE id IN ('p_printer','p_pla','p_nozzle','p_color');
     UPDATE products SET price_iqd = 1, name = 'Bundle RENAMED', status = 'hidden' WHERE id = 'prd_b1';
@@ -70,7 +75,7 @@ async function buyOne(raw: DatabaseSync) {
   return { db, orderId: res.order.id as string, before: res.order };
 }
 
-q7Test('case 7 — the order is unchanged after every component is repriced, renamed and deactivated', async () => {
+test('case 7 — the order is unchanged after every component is repriced, renamed and deactivated', async () => {
   const raw = seedCatalogue();
   const { db, orderId, before } = await buyOne(raw);
   const beforeDetail = await json(await get(appFor(db), `/api/orders/${orderId}`));
@@ -91,7 +96,7 @@ q7Test('case 7 — the order is unchanged after every component is repriced, ren
   assert.equal(before.items[0].unit_price_iqd, 400_000);
 });
 
-q7Test('bundle cart, quote, order and invoice freeze the active relational primary, never stale or quarantined media', async () => {
+test('bundle cart, quote, order and invoice freeze the active relational primary, never stale or quarantined media', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 400_000 });
   const image = '/files/products/prd_b1/gallery/primary.webp';
@@ -142,7 +147,7 @@ q7Test('bundle cart, quote, order and invoice freeze the active relational prima
   assert.equal(wire.includes('bad.example'), false);
 });
 
-q7Test('case 7 — the invoice is unchanged too, and lists the parts under the priced line', async () => {
+test('case 7 — the invoice is unchanged too, and lists the parts under the priced line', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await buyOne(raw);
   const env = { DB: db } as unknown as Parameters<typeof createInvoiceForOrder>[0];
@@ -168,7 +173,7 @@ q7Test('case 7 — the invoice is unchanged too, and lists the parts under the p
   assert.deepEqual(again, snapshot);
 });
 
-q7Test('the composition block answers what was bought, at what price, under which offer — and carries no cost', async () => {
+test('the composition block answers what was bought, at what price, under which offer — and carries no cost', async () => {
   const raw = seedCatalogue();
   const { orderId } = await buyOne(raw);
   const rows = all<Record<string, unknown>>(raw, 'SELECT * FROM order_items WHERE order_id = ? ORDER BY rowid', orderId);
@@ -222,7 +227,7 @@ q7Test('the composition block answers what was bought, at what price, under whic
   }
 });
 
-q7Test('the parent option_snapshot is DATA ONLY — no prose, no count, no English sentence', async () => {
+test('the parent option_snapshot is DATA ONLY — no prose, no count, no English sentence', async () => {
   const raw = seedCatalogue();
   const { orderId } = await buyOne(raw);
   const parent = all<Record<string, unknown>>(
@@ -238,7 +243,7 @@ q7Test('the parent option_snapshot is DATA ONLY — no prose, no count, no Engli
   assert.ok(!/\bincludes\b/i.test(snap));
 });
 
-q7Test('a bundle line keeps its own transport snapshot and its components keep theirs', async () => {
+test('a bundle line keeps its own transport snapshot and its components keep theirs', async () => {
   const raw = seedCatalogue();
   raw.exec(
     `INSERT INTO admin_settings (key, value) VALUES ('preorderTransportDefaults', '[{"method":"sea","commission_iqd":3000}]')`
@@ -266,6 +271,7 @@ q7Test('a bundle line keeps its own transport snapshot and its components keep t
     components: Array<{ component_id: string; commission_iqd: number; qty: number }>;
   };
   assert.equal(transport.method, 'sea');
-  assert.equal(transport.commission_iqd, 3000 * 3, 'three spools, three commissions, charged on the parent');
+  // Priced like an ordinary V2 product (DECISIONS rows 222, 250): no route carries a commission.
+  assert.equal(transport.commission_iqd, 0, 'a V2 bundle was charged a route commission');
   assert.equal(transport.components.length, 2, 'the per-component fee facts are recorded, not just their sum');
 });

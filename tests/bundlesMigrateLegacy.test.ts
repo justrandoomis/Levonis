@@ -47,19 +47,23 @@ function applyBefore(db: DatabaseSync, stop: string) {
   }
 }
 
-function applyFrom(db: DatabaseSync, start: string) {
+function applyFrom(db: DatabaseSync, start: string, stop?: string) {
   for (const f of files()) {
     if (f < start) continue;
+    if (stop && f >= stop) break;
     db.exec(sqlOf(f));
   }
 }
+
+/** DECISIONS row 250: the migration that opened the section to every visitor. */
+const OPEN = '0201_compositions_open_to_everyone.sql';
 
 const MS_CREATED = Date.UTC(2024, 4, 17, 9, 30, 0);
 const MS_UPDATED = Date.UTC(2025, 0, 3, 18, 5, 0);
 
 /** A database carrying two legacy bundles exactly as 0034's admin CRUD wrote
  *  them, with the backfill and everything after it applied on top. */
-function migrated() {
+function migrated(stop?: string) {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON;');
   applyBefore(db, BACKFILL);
@@ -78,7 +82,7 @@ function migrated() {
   db.prepare('INSERT INTO bundle_items (bundle_id, product_id, qty, sort) VALUES (?,?,?,?)').run('bnd_live', 'prd_printer', 1, 0);
   db.prepare('INSERT INTO bundle_items (bundle_id, product_id, qty, sort) VALUES (?,?,?,?)').run('bnd_live', 'prd_spool', 2, 1);
 
-  applyFrom(db, BACKFILL);
+  applyFrom(db, BACKFILL, stop);
   return db;
 }
 
@@ -137,14 +141,20 @@ test('epoch milliseconds become ISO text — `bundles` wrote Date.now(), `produc
   assert.equal(p.updated_at, new Date(MS_UPDATED).toISOString());
 });
 
-test("today's members-only gate is preserved exactly, as a SET and not a ladder minimum", () => {
+test("0063 preserved the old members-only gate exactly, as a SET — and 0201 opens it to every visitor (DECISIONS row 250)", () => {
+  const before = migrated(OPEN);
+  // exclusiveSections is PLUS or PRIME or PRO — all three, written as a set.
+  assert.equal(
+    row<Record<string, unknown>>(before, "SELECT required_tiers FROM offer_windows WHERE subject_id='prd_bnd_bnd_live'")!.required_tiers,
+    '["plus","prime","pro"]'
+  );
+  // The owner's decision of 2026-10-18: the section is shown to everyone; only the gate moves.
   const db = migrated();
   const w = row<Record<string, unknown>>(
     db,
     "SELECT * FROM offer_windows WHERE subject_type='product' AND subject_id='prd_bnd_bnd_live'"
   )!;
-  // exclusiveSections is PLUS or PRIME or PRO — all three, written as a set.
-  assert.equal(w.required_tiers, '["plus","prime","pro"]');
+  assert.equal(w.required_tiers, '[]');
   assert.equal(w.id, 'ofw_bnd_bnd_live');
   assert.equal(w.active, 1, "the legacy `active` flag rides onto the window");
   assert.equal(w.offer_price_mode, '', 'the migration invents no price');

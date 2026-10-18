@@ -9,8 +9,8 @@
  * (`publishV2`, price-first, reproducing its current direct price at the
  * fixture U = 1,500), so a seeded catalogue stays sellable and every price on
  * a rounding step stays exact. A product with no dinar price, or one the writer
- * cannot publish (an incomplete structure), stays hidden, as on the live site. Compositions
- * wait for Q7 and are never published.
+ * cannot publish (an incomplete structure), stays hidden, as on the live site. A bundle or
+ * a mystery box is published the same way (DECISIONS row 250: priced like an ordinary product).
  *
  * Opt out with `stubApp(…, { publishV2: false })` — the cut-over tests that
  * prove the hiding itself do.
@@ -40,7 +40,7 @@ function installed(raw: DatabaseSync): boolean {
   return ok;
 }
 
-/** Publish every unpublished ordinary product of the test database (the raw rows behind a SqliteD1). */
+/** Publish every unpublished product (a composition too) of the test database (the raw rows behind a SqliteD1). */
 export async function autoPublishV2(db: unknown): Promise<void> {
   const raw = rawOf(db);
   if (raw) await publishSeededV2(raw);
@@ -56,10 +56,9 @@ export async function publishSeededV2(raw: DatabaseSync): Promise<void> {
   const rows = raw
     .prepare(
       `SELECT p.id FROM products p
-        WHERE COALESCE(p.composition, '') = ''
           -- A product with no dinar price anywhere has nothing to reproduce: it waits for the owner's dollar
           -- price, hidden, as on the live site (never published at an invented number).
-          AND (COALESCE(p.price_iqd, 0) > 0
+        WHERE (COALESCE(p.price_iqd, 0) > 0
                OR EXISTS (SELECT 1 FROM product_option_values v WHERE v.product_id = p.id AND COALESCE(v.regular_price_iqd, 0) > 0)
                OR EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = p.id AND COALESCE(pv.regular_price_iqd, 0) > 0))
           AND NOT EXISTS (SELECT 1 FROM product_pricing_state s WHERE s.product_id = p.id AND s.mode = 'engine' AND s.pricing_method IS NOT NULL

@@ -40,7 +40,7 @@ import { asD1, stubApp, post, patch, get, json, all, count, row, type StubUser }
 import { cartRoutes, resolveCartBundles, selectionFromCartRow, resolveCartLine, refuseIncompleteSelection } from '../worker/routes/cart';
 import { saleAvailability } from '../worker/routes/products';
 import { addBundle, seedCatalogue, DEFAULT_COMPONENTS, FUTURE, PAST } from './lib/bundles';
-import { q7Test } from './fixtures/q7';
+import { test } from 'node:test';
 
 const appFor = (db: unknown, user: StubUser) =>
   stubApp(db, user, (a) => {
@@ -53,7 +53,7 @@ const cartOf = (raw: DatabaseSync) =>
 
 // ------------------------------------------------- one item, four contents
 
-q7Test('a four-component bundle is ONE cart item with four contents and four stored choices', async () => {
+test('a four-component bundle is ONE cart item with four contents and four stored choices', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -89,7 +89,7 @@ q7Test('a four-component bundle is ONE cart item with four contents and four sto
   assert.equal(line.composition.bundle_price_iqd, 400_000);
 });
 
-q7Test('case 10b — a composition line derives an EMPTY selection, so neither the resolver nor saleAvailability sees OPTION_NOT_FOUND', async () => {
+test('case 10b — a composition line derives an EMPTY selection, so neither the resolver nor saleAvailability sees OPTION_NOT_FOUND', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter' });
   const db = asD1(raw);
@@ -137,7 +137,7 @@ q7Test('case 10b — a composition line derives an EMPTY selection, so neither t
 
 // ------------------------------------------------------------- identities
 
-q7Test('two adds with the SAME choices merge into one line; two different colours are two lines', async () => {
+test('two adds with the SAME choices merge into one line; two different colours are two lines', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -165,7 +165,7 @@ q7Test('two adds with the SAME choices merge into one line; two different colour
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM cart_bundle_choices'), 2);
 });
 
-q7Test('a client-supplied composition key, price or tier is ignored', async () => {
+test('a client-supplied composition key, price or tier is ignored', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 400_000 });
   const db = asD1(raw);
@@ -189,7 +189,7 @@ q7Test('a client-supplied composition key, price or tier is ignored', async () =
 
 // ---------------------------------------------------------------- refusals
 
-q7Test('a choice that is not on the allow-list is refused, and a choice for a PINNED dimension is refused', async () => {
+test('a choice that is not on the allow-list is refused, and a choice for a PINNED dimension is refused', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -228,7 +228,7 @@ q7Test('a choice that is not on the allow-list is refused, and a choice for a PI
   assert.equal(cartOf(raw).length, 0, 'a refused add writes nothing');
 });
 
-q7Test('a component that does not belong to this bundle is refused as a changed composition', async () => {
+test('a component that does not belong to this bundle is refused as a changed composition', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter' });
   const db = asD1(raw);
@@ -242,7 +242,7 @@ q7Test('a component that does not belong to this bundle is refused as a changed 
   assert.equal(res.code, 'BUNDLE_COMPOSITION_CHANGED');
 });
 
-q7Test('a PLUS bundle refuses a free account and admits inherited PREMIUM/PRO members', async () => {
+test('a PLUS bundle refuses a free account and admits inherited PREMIUM/PRO members', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', window: { required_tiers: '["plus"]' } });
   const db = asD1(raw);
@@ -269,7 +269,7 @@ q7Test('a PLUS bundle refuses a free account and admits inherited PREMIUM/PRO me
   assert.equal(prime.success, true);
 });
 
-q7Test('an expired window and an unopened one are refused by their own codes', async () => {
+test('an expired window and an unopened one are refused by their own codes', async () => {
   const raw = seedCatalogue();
   // Two bundles in one database, so their component ids must differ — the
   // surrogate `bundle_components.id` is a real primary key, not a label.
@@ -292,7 +292,7 @@ q7Test('an expired window and an unopened one are refused by their own codes', a
   assert.equal(cartOf(raw).length, 0);
 });
 
-q7Test('the per-order cap is REFUSED with its number, never clamped — on the add and on the merge', async () => {
+test('the per-order cap is REFUSED with its number, never clamped — on the add and on the merge', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', config: { max_qty_per_order: 2 } });
   const db = asD1(raw);
@@ -308,7 +308,7 @@ q7Test('the per-order cap is REFUSED with its number, never clamped — on the a
   assert.equal(cartOf(raw)[0].qty, 2, 'the refused merge changed nothing');
 });
 
-q7Test('case 5 at the door — a bundle that became shipping-mixed after it was saved is refused at add-to-cart', async () => {
+test('case 5 at the door — a bundle that became shipping-mixed after it was saved is refused at add-to-cart', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -324,7 +324,7 @@ q7Test('case 5 at the door — a bundle that became shipping-mixed after it was 
   assert.equal(cartOf(raw).length, 0);
 });
 
-q7Test('a pre-order bundle stores the chosen transport on its OWN cart row, and refuses a method a component does not offer', async () => {
+test('a pre-order bundle stores the chosen transport on its OWN cart row, and refuses a method a component does not offer', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_pre',
@@ -347,11 +347,13 @@ q7Test('a pre-order bundle stores the chosen transport on its OWN cart row, and 
   assert.equal(ok.shipping_type ?? ok.items[0].transport_method, 'sea');
 });
 
-q7Test('an optional component the buyer declines lowers the price and leaves the order', async () => {
+test('an optional component the buyer declines leaves the order; the bundle keeps its own V2 price (DECISIONS row 250)', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
     slug: 'starter',
+    priceIqd: 9_000,
+    // The retired dinar rule: it prices nothing any more.
     config: { price_mode: 'discount_percent', discount_percent: 10 },
     components: [
       { id: 'bc_nozzle', product: 'p_nozzle', qty: 1 },
@@ -369,14 +371,14 @@ q7Test('an optional component the buyer declines lowers the price and leaves the
   assert.equal(res.success, true);
   const line = res.items[0];
   assert.equal(line.composition.component_total_iqd, 5000, 'a declined component is worth nothing to the total');
-  assert.equal(line.unit_price_iqd, 4500);
+  assert.equal(line.unit_price_iqd, 9_000, 'the bundle is priced like a product, never derived from its parts');
   assert.equal(
     row<{ included: number }>(raw, "SELECT included FROM cart_bundle_choices WHERE component_id = 'bc_pla'")!.included,
     0
   );
 });
 
-q7Test('a required component cannot be declined', async () => {
+test('a required component cannot be declined', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter' });
   const db = asD1(raw);
@@ -392,7 +394,7 @@ q7Test('a required component cannot be declined', async () => {
 
 // ------------------------------------------------------------------ PATCH
 
-q7Test('PATCH refuses a quantity above the cap and above the scarcest component, and never clamps', async () => {
+test('PATCH refuses a quantity above the cap and above the scarcest component, and never clamps', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', config: { max_qty_per_order: 9 } });
   const db = asD1(raw);
@@ -412,7 +414,7 @@ q7Test('PATCH refuses a quantity above the cap and above the scarcest component,
   assert.equal(ok.items[0].composition.max_qty, 3);
 });
 
-q7Test('a PATCH that changes a choice onto an existing twin merges the two lines and says so', async () => {
+test('a PATCH that changes a choice onto an existing twin merges the two lines and says so', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -444,7 +446,7 @@ q7Test('a PATCH that changes a choice onto an existing twin merges the two lines
 
 // --------------------------------------------------- the resolution itself
 
-q7Test('resolveCartBundles keys by CART LINE, so two lines of one bundle keep their own components', async () => {
+test('resolveCartBundles keys by CART LINE, so two lines of one bundle keep their own components', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -473,7 +475,7 @@ q7Test('resolveCartBundles keys by CART LINE, so two lines of one bundle keep th
   assert.deepEqual(colours, ['pc_black', 'pc_white']);
 });
 
-q7Test('GET /api/cart renders the bundle as one expandable line with no per-component stock count', async () => {
+test('GET /api/cart renders the bundle as one expandable line with no per-component stock count', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter' });
   const db = asD1(raw);

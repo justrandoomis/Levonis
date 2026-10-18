@@ -87,6 +87,8 @@ import {
   invalidateMediaCache,
 } from '../lib/productDeletion';
 import { runGuardedMediaCleanupJobs } from '../lib/mediaRefs';
+import { needsPricingIds } from '../lib/needsPricing';
+import { holdLegacyDocMoney } from '../lib/pricingEngine/v2/legacyMoney';
 
 export const adminBundlesRoutes = new Hono<AppContext>();
 adminBundlesRoutes.use('*', requireAdmin);
@@ -306,6 +308,8 @@ adminBundlesRoutes.get('/', async (c) => {
 
   const ctx = await ctxFor(c);
   const nowMs = Date.now();
+  // DECISIONS row 250: priced like an ordinary product — one read says which are still «يحتاج تسعيرًا».
+  const unpriced = await needsPricingIds(c.env.DB, ids);
   const bundles = [];
   for (const row of results) {
     const id = String(row.id);
@@ -330,7 +334,7 @@ adminBundlesRoutes.get('/', async (c) => {
     const gatedTiers = requiredTiersOf(offer);
     const warnings = [
       ...res.warnings,
-      ...compositionPriceWarnings(doc, configFromRow(configById.get(id)), res.preview),
+      ...compositionPriceWarnings(res.preview, unpriced.has(id)),
       ...(gatedTiers.length ? [bundleMembersOnlyNotice(gatedTiers)] : []),
     ];
     bundles.push({
@@ -358,6 +362,7 @@ adminBundlesRoutes.get('/', async (c) => {
       // survives an instruction to make the feature general.
       members_only: gatedTiers.length > 0,
       required_tiers: gatedTiers,
+      needs_pricing: unpriced.has(id),
       // A refusal-shaped issue is still a warning on a LISTING: the row exists
       // and the admin must be told why it cannot sell, not shown an error page.
       ...warningBody([...warnings, ...res.errors]),
@@ -405,6 +410,7 @@ async function previewOf(c: Context<AppContext>, id: string) {
     ctx,
     nowMs: Date.now(),
   });
+  const needsPricing = (await needsPricingIds(c.env.DB, [id])).has(id);
   // The gate rides on EVERY read, not only on the listing: an admin who opens
   // one bundle to ask why a guest cannot buy it is the reader this sentence
   // was written for, and a warning that appears on one screen and not the
@@ -413,9 +419,10 @@ async function previewOf(c: Context<AppContext>, id: string) {
   return {
     loaded,
     preview: res.preview,
+    needsPricing,
     issues: [
       ...res.warnings,
-      ...compositionPriceWarnings(loaded.doc, loaded.config, res.preview),
+      ...compositionPriceWarnings(res.preview, needsPricing),
       ...(gatedTiers.length ? [bundleMembersOnlyNotice(gatedTiers)] : []),
       ...res.errors,
     ],
@@ -424,7 +431,7 @@ async function previewOf(c: Context<AppContext>, id: string) {
 
 adminBundlesRoutes.get('/:productId', async (c) => {
   const id = c.req.param('productId');
-  const { loaded, preview, issues } = await previewOf(c, id);
+  const { loaded, preview, issues, needsPricing } = await previewOf(c, id);
   const stored = await reloadForVerification(c.env.DB, id);
   return c.json({
     success: true,
@@ -434,6 +441,7 @@ adminBundlesRoutes.get('/:productId', async (c) => {
       components: loaded.components,
       offer: loaded.offer,
       preview,
+      needs_pricing: needsPricing,
       updated_at: String(loaded.row.updated_at ?? ''),
       ...warningBody(issues),
     }),
@@ -478,19 +486,16 @@ function readComponents(body: Record<string, unknown>): BundleComponentInput[] {
   });
 }
 
+/**
+ * DECISIONS row 250: a composition is priced like an ordinary product (Pricing V2, section ٣), so the dinar
+ * rule `bundle_config` used to carry — a derived discount, a typed PLUS price, a dinar floor — is retired:
+ * whatever a client sends there, the stored rule is the inert one (`fixed`, no discount, no PLUS price,
+ * floor 1). Only the per-order cap is still the panel's.
+ */
 function readConfig(body: Record<string, unknown>): BundleConfigInput {
   const raw = (body.config ?? {}) as Record<string, unknown>;
-  const nullableInt = (v: unknown, name: string, max: number): number | null =>
-    v === null || v === undefined || v === '' ? null : int(v, name, { min: 0, max });
   return {
-    price_mode: oneOf(raw.price_mode ?? 'fixed', 'config.price_mode', ['fixed', 'discount_percent', 'discount_iqd'] as const),
-    // A wide shape bound on purpose: 1..90 is a DOMAIN rule, and it is
-    // refused by `planBundleComposition` in three languages rather than by a
-    // generic "must be between 0 and 100" that no admin can act on.
-    discount_percent: nullableInt(raw.discount_percent, 'config.discount_percent', 100_000),
-    discount_iqd: nullableInt(raw.discount_iqd, 'config.discount_iqd', 100_000_000),
-    min_price_iqd: int(raw.min_price_iqd, 'config.min_price_iqd', { min: 1, max: 100_000_000, def: 1 }),
-    plus_price_iqd: nullableInt(raw.plus_price_iqd, 'config.plus_price_iqd', 100_000_000),
+    ...DEFAULT_CONFIG,
     max_qty_per_order: int(raw.max_qty_per_order, 'config.max_qty_per_order', { min: 1, max: 99, def: 5 }),
   };
 }
@@ -596,6 +601,7 @@ async function planSave(
     ctx,
     nowMs: Date.now(),
     publishing: doc.status === 'active',
+    needsPricing: !prev || (await needsPricingIds(c.env.DB, [doc.id])).has(doc.id),
   });
   // `statements` is the discriminant: a refusal carries none, and the errors
   // travel as OBJECTS because `refusalIssues` renders `${line}${key}${message}`.
@@ -682,6 +688,10 @@ async function writeBundle(c: Context<AppContext>, mode: 'create' | 'update', pr
 
   const kind: 'bundle' | 'mystery' = prev ? (prev.composition as 'bundle' | 'mystery') : 'bundle';
   const id = prev ? prev.id : newId('prd');
+  // DECISIONS row 250: a composition is priced like an ordinary product (section ٣, Pricing V2), so this
+  // panel types no dinar price — the product form's rule: an absent price keeps the stored one (a new
+  // bundle is born at 0, «يحتاج تسعيرًا»), an echo passes, a moved one is 409 PRICING_V2_MANAGED.
+  holdLegacyDocMoney(body, prev, { costs: canWriteCost(c.env, admin) });
   const doc = bundleDocFrom(body, kind, id);
   // §29 (serial scan, 0178; landing round 3 F7): whether this row's units
   // need a serial — its own word, or the filing this save writes — is the
@@ -798,7 +808,16 @@ adminBundlesRoutes.post('/:productId/duplicate', async (c) => {
     null
   );
   const ctx = await ctxFor(c);
-  const offer = source.offer ? { ...source.offer, max_per_user: null, max_global: null } : null;
+  // DECISIONS row 250: the copy is priced like an ordinary product — born «يحتاج تسعيرًا», with no dinar rule.
+  const offer = source.offer
+    ? {
+        ...source.offer,
+        max_per_user: null,
+        max_global: null,
+        plus_price_iqd: null,
+        ...(source.offer.offer_price_mode === 'fixed' ? { offer_price_mode: '' as const, offer_price_iqd: null } : {}),
+      }
+    : null;
   const saveIntent: ProductWriteIntent = {
     mode: 'create',
     doc,
@@ -813,8 +832,8 @@ adminBundlesRoutes.post('/:productId/duplicate', async (c) => {
     id,
     // The surrogate ids are dropped: a copy gets its own component rows, so a
     // cart line pointing at the original is never re-pointed at the copy.
-    { components: source.components.map((x) => ({ ...x, id: undefined })), config: source.config },
-    { doc, offer, offerCheck: adminOfferCheck(offer), ctx, nowMs: Date.now(), publishing: false }
+    { components: source.components.map((x) => ({ ...x, id: undefined })), config: { ...DEFAULT_CONFIG, max_qty_per_order: source.config.max_qty_per_order } },
+    { doc, offer, offerCheck: adminOfferCheck(offer), ctx, nowMs: Date.now(), publishing: false, needsPricing: true }
   );
   if (!comp.statements) {
     throw new HttpError(400, 'this bundle cannot be duplicated as configured', 'BUNDLE_VALIDATION', {

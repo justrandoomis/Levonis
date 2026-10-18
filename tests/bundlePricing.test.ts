@@ -1,23 +1,17 @@
 /**
- * THE BUNDLE PRICE — docs/BUNDLES_MYSTERY.md §4.2–§4.4.
+ * THE BUNDLE PRICE — docs/BUNDLES_MYSTERY.md §4.2–§4.4, as amended by DECISIONS row 250.
  *
- * Case 8 of the owner's seventeen ("no negative total, no invalid stacking"),
- * at the level where the arithmetic actually lives. The three properties that
- * carry money:
+ * The owner's decision of 2026-10-18: a bundle or a mystery box is priced like
+ * an ordinary product. Its price is the product row's own (the Pricing V2
+ * write's), resolved by the untouched `resolveUnitPrice`; the old dinar rule of
+ * `bundle_config` — a discount derived from the live component total, a typed
+ * PLUS rung, a dinar floor — prices nothing any more. What still carries money
+ * here:
  *
- *   1. THE LADDER'S ANCHOR IS THE DERIVED REGULAR PRICE. `resolveUnitPrice`
- *      computes a policy PRO price from the row's STORED regular price and
- *      clamps against the same stored number. In a discount mode the real
- *      regular price comes from the live component total instead, so once the
- *      components get cheaper the derived regular can fall BELOW the stored PRO
- *      price — and a PRO member would be charged more than a regular buyer with
- *      no clamp able to see it. Derive, then clamp.
- *   2. A DERIVED PRICE BELOW THE FLOOR DOES NOT SELL. It is not clamped up and
- *      it is not sold at 0: the offer answers OFFER_INACTIVE and the admin gets
- *      a loud warning. One typed zero must not publish a free bundle.
- *   3. THE PLUS RUNG IS OFFER-SCOPED. `packages/pricing` has three rungs and no
- *      PLUS price; the fourth value exists on the composition block only, and a
- *      PLUS member is never charged more than a PRIME or PRO member.
+ *   1. THE ROW'S OWN LADDER, CLAMPED: a member price (a configured benefit or
+ *      the PRO policy) is never above the regular price.
+ *   2. THE SAVING IS STATED, NEVER NEGATIVE: against the components' total.
+ *   3. THE FEES THE RESOLVER COMPUTED SURVIVE, outside merchandise.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -67,56 +61,29 @@ test('fixed mode charges the product row’s own ladder, and states the saving a
   assert.deepEqual(out.errors, []);
 });
 
-test('discount_percent derives the price from the LIVE component total, at every read', () => {
-  const out = resolveBundlePrice({
-    resolved: resolved('free', false),
-    config: config({ price_mode: 'discount_percent', discount_percent: 20 }),
-    componentTotalIqd: 200_000,
-    tier: 'free',
-    tierActive: false,
-  });
-  assert.equal(out.bundle_price_iqd, 160_000, 'floor(200000 * 80 / 100)');
-  assert.equal(out.regular_iqd, 160_000, 'the stored 145,000 is a sort key, not a price');
-  assert.equal(out.discount_iqd, 40_000);
+test('DECISIONS row 250: a derived rule prices nothing — the bundle charges its own row price, whatever bundle_config says', () => {
+  for (const cfg of [
+    config({ price_mode: 'discount_percent', discount_percent: 20 }),
+    config({ price_mode: 'discount_iqd', discount_iqd: 200_000, min_price_iqd: 1000 }),
+    config({ price_mode: 'discount_percent', discount_percent: 200 }),
+  ]) {
+    const out = resolveBundlePrice({ resolved: resolved('free', false), config: cfg, componentTotalIqd: 200_000, tier: 'free', tierActive: false });
+    assert.equal(out.bundle_price_iqd, 145_000, `${cfg.price_mode}: the row's own price`);
+    assert.equal(out.regular_iqd, 145_000);
+    assert.equal(out.discount_iqd, 55_000, 'the saving is stated against the parts');
+    assert.deepEqual(out.errors, [], 'the retired rule neither refuses nor repairs anything');
+  }
 });
 
-test('discount_iqd subtracts from the component total', () => {
-  const out = resolveBundlePrice({
-    resolved: resolved('free', false),
-    config: config({ price_mode: 'discount_iqd', discount_iqd: 45_000 }),
-    componentTotalIqd: 190_000,
-    tier: 'free',
-    tierActive: false,
-  });
-  assert.equal(out.bundle_price_iqd, 145_000);
-});
-
-test('a derived price below min_price_iqd REFUSES — it is never clamped up and never sold at 0', () => {
-  // A component went free, or an admin typed 200000 for 20000.
-  const out = resolveBundlePrice({
-    resolved: resolved('free', false),
-    config: config({ price_mode: 'discount_iqd', discount_iqd: 200_000, min_price_iqd: 1000 }),
-    componentTotalIqd: 190_000,
-    tier: 'free',
-    tierActive: false,
-  });
-  assert.ok(out.errors.includes('DERIVED_PRICE_BELOW_FLOOR'));
-  assert.ok(out.errors.includes('OFFER_INACTIVE'), 'the sale stops rather than being repaired');
-  assert.ok(out.bundle_price_iqd >= 0, 'and never negative');
-});
-
-test('the member ladder is anchored on the DERIVED regular price: pro <= prime <= plus <= regular', () => {
-  // Stored regular 145,000 with a 30% store-wide PRO policy → a stored PRO
-  // price of 101,500. The components then get much cheaper and the derived
-  // regular falls to 40,000 — below that stored PRO price.
+test('the member ladder is the row\'s own, clamped: a PRO is never charged more than a regular buyer', () => {
+  // Stored regular 145,000 with a 30% store-wide PRO policy → a PRO price of 101,500.
   const base = resolveUnitPrice({
     product: bundleRow() as never,
     tier: 'pro',
     tierActive: true,
     proPolicy: { mode: 'global_percent', percent: 30 },
   });
-  assert.equal(base.pro_iqd, 101_500, 'the resolver’s own PRO price, from the STORED regular');
-
+  assert.equal(base.pro_iqd, 101_500, 'the resolver’s own PRO price');
   const out = resolveBundlePrice({
     resolved: base,
     config: config({ price_mode: 'discount_percent', discount_percent: 50 }),
@@ -124,9 +91,9 @@ test('the member ladder is anchored on the DERIVED regular price: pro <= prime <
     tier: 'pro',
     tierActive: true,
   });
-  assert.equal(out.regular_iqd, 40_000);
+  assert.equal(out.regular_iqd, 145_000);
   assert.ok(out.pro_iqd !== null && out.pro_iqd <= out.regular_iqd, 'a PRO is never charged more than a regular buyer');
-  assert.equal(out.bundle_price_iqd, 40_000);
+  assert.equal(out.bundle_price_iqd, 101_500);
   assert.equal(out.applied_tier, 'pro');
 });
 
@@ -157,38 +124,14 @@ test('the whole ladder is ordered for every tier, in both price modes', () => {
   }
 });
 
-test('the PLUS rung applies to active PLUS and every inheriting tier', () => {
+test('DECISIONS row 250: a typed PLUS price prices nothing — a PLUS or PRIME member with no member price pays the regular price', () => {
   const cfg = config({ plus_price_iqd: 130_000 });
-  const plus = resolveBundlePrice({
-    resolved: resolved('plus', true),
-    config: cfg,
-    componentTotalIqd: 190_000,
-    tier: 'plus',
-    tierActive: true,
-  });
-  assert.equal(plus.bundle_price_iqd, 130_000);
-  assert.equal(plus.applied_tier, 'plus');
-
-  const lapsed = resolveBundlePrice({
-    resolved: resolved('plus', false),
-    config: cfg,
-    componentTotalIqd: 190_000,
-    tier: 'plus',
-    tierActive: false,
-  });
-  assert.equal(lapsed.bundle_price_iqd, 145_000, 'an inactive membership pays the regular price');
-  assert.equal(lapsed.applied_tier, 'regular');
-
-  // PREMIUM inherits the PLUS rung when no better PREMIUM price is configured.
-  const prime = resolveBundlePrice({
-    resolved: resolved('prime', true),
-    config: cfg,
-    componentTotalIqd: 190_000,
-    tier: 'prime',
-    tierActive: true,
-  });
-  assert.equal(prime.bundle_price_iqd, 130_000);
-  assert.equal(prime.applied_tier, 'prime', 'the inherited price is presented as the member’s PREMIUM tier');
+  for (const tier of ['plus', 'prime'] as Tier[]) {
+    const out = resolveBundlePrice({ resolved: resolved(tier, true), config: cfg, componentTotalIqd: 190_000, tier, tierActive: true });
+    assert.equal(out.bundle_price_iqd, 145_000, `${tier}: the retired PLUS rung still priced the bundle`);
+    assert.equal(out.plus_iqd, null);
+    assert.equal(out.applied_tier, 'regular');
+  }
 });
 
 test('a PRO away from the approved default address pays the regular price (tierActive is the context, not the tier)', () => {
@@ -232,15 +175,4 @@ test('the fees the resolver computed survive, and merchandise never includes the
   });
   assert.equal(out.bundle_price_iqd, 145_000, 'merchandise');
   assert.equal(out.unit_subtotal_iqd, 157_000, 'what the line costs');
-});
-
-test('an out-of-range discount percent is reported, never silently repaired into a sale', () => {
-  const out = resolveBundlePrice({
-    resolved: resolved('free', false),
-    config: config({ price_mode: 'discount_percent', discount_percent: 200 }),
-    componentTotalIqd: 190_000,
-    tier: 'free',
-    tierActive: false,
-  });
-  assert.ok(out.errors.includes('BUNDLE_VALIDATION'));
 });

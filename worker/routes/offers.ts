@@ -14,10 +14,9 @@
  *
  * TWO THINGS IT REFUSES RATHER THAN REPAIRS (§4.7, §11.3):
  *
- *  - a window price beside a non-`fixed` `bundle_config.price_mode` on the
- *    same subject — two live price sources on one product, never summed and
- *    never resolved by whichever branch happened to run first
- *    (`OFFER_PRICE_CONFLICT`);
+ *  - a typed dinar `fixed` offer price or PLUS price, on an ordinary product
+ *    and — since DECISIONS row 250, a composition being priced like one — on a
+ *    bundle or a mystery box too (`PRICING_V2_MANAGED`);
  *  - a schedule whose end precedes its start (`SCHEDULE_INVERTED`).
  *
  * AND IT WRITES ITS AUDIT ROW INSIDE THE BATCH. A tier gate and an offer price
@@ -531,8 +530,8 @@ async function planOffer(
   }
   // 3. The clean start (addendum A.6, DECISIONS row 222): an ordinary product's price is its V2 write's.
   // A typed DINAR offer price (or PLUS price) on one is refused; its dollar sale price is `fixed_usd`
-  // (below); percent and amount discounts stay. A composition keeps its typed prices (Q7).
-  if (p.composition === '' && (input.offer_price_mode === 'fixed' || (input.plus_price_iqd ?? null) !== null)) {
+  // (below); percent and amount discounts stay. A composition too (DECISIONS row 250: priced like an ordinary product).
+  if (input.offer_price_mode === 'fixed' || (input.plus_price_iqd ?? null) !== null) {
     const managed = v2Managed(3);
     throw costRefusal(managed.status, 'PRICING_V2_MANAGED', { ...(managed.details ?? {}) });
   }
@@ -570,8 +569,8 @@ async function planOffer(
    *
    * The anchor is `products.price_iqd`, which is the subject's regular ladder
    * price — and for a composition subject it is also the only anchor that can
-   * reach here, since a derived `bundle_config.price_mode` beside a window
-   * price is already refused as `OFFER_PRICE_CONFLICT` just below.
+   * reach here, since a derived `bundle_config.price_mode` prices nothing
+   * (DECISIONS row 250) and a typed dinar `fixed` price is refused above.
    */
   if (input.offer_price_mode === 'fixed' && (input.offer_price_iqd ?? 0) < 1) {
     refuse('OFFER_PRICE_BELOW_FLOOR');
@@ -585,18 +584,9 @@ async function planOffer(
     if ((input.discount_iqd ?? 0) >= regular) refuse('BUNDLE_DISCOUNT_EXCEEDS_TOTAL');
   }
 
-  // 6. TWO PRICE SOURCES ON ONE SUBJECT ARE REFUSED, NEVER SUMMED (§4.5, §4.6).
-  // `resolveOfferPrice` is the only price a live window contributes, and a
-  // derived `bundle_config.price_mode` is the only price its own mode
-  // contributes; a subject carrying both does not sell rather than being
-  // priced by whichever branch ran first.
-  if (input.offer_price_mode !== '') {
-    const cfg = await c.env.DB
-      .prepare('SELECT price_mode FROM bundle_config WHERE product_id = ?')
-      .bind(productId)
-      .first<{ price_mode: string }>();
-    if (cfg && cfg.price_mode && cfg.price_mode !== 'fixed') refuse('OFFER_PRICE_CONFLICT');
-  }
+  // 6. (Retired by DECISIONS row 250.) A composition is priced like an ordinary product: a derived
+  // `bundle_config.price_mode` prices nothing any more, so a window beside one is no longer two price
+  // sources — the window is the only one, exactly as on an ordinary product.
 
   // 7. THE PREVIEW ON THE STORED PUBLISHED ROWS (§5.2) — a dollar price and a percent alike. A sale
   // that lowers nothing is refused, a route at 0 or below is refused; a model it does not lower and a

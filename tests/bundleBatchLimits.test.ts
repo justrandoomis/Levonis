@@ -24,7 +24,7 @@ import { orderRoutes } from '../worker/routes/orders';
 import { MAX_PHYSICAL_LINES } from '../worker/lib/bundleComposition';
 import { addBundle, seedCatalogue, orderBody, type ComponentSpec } from './lib/bundles';
 import type { DatabaseSync } from 'node:sqlite';
-import { q7Test } from './fixtures/q7';
+import { test } from 'node:test';
 
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
 const appFor = (db: unknown) =>
@@ -50,7 +50,7 @@ function manyMembers(raw: DatabaseSync, n: number): ComponentSpec[] {
   return out;
 }
 
-q7Test('a MAXIMAL legal order commits — the ceiling is not theatre', async () => {
+test('a MAXIMAL legal order commits — the ceiling is not theatre', async () => {
   const raw = seedCatalogue();
   const components = manyMembers(raw, 24);
   addBundle(raw, {
@@ -74,7 +74,7 @@ q7Test('a MAXIMAL legal order commits — the ceiling is not theatre', async () 
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM inventory_ledger'), 0);
 });
 
-q7Test('one line over the ceiling is refused with COMPOSITION_TOO_LARGE, naming the limit, writing nothing', async () => {
+test('one line over the ceiling is refused with COMPOSITION_TOO_LARGE, naming the limit, writing nothing', async () => {
   const raw = seedCatalogue();
   const components = manyMembers(raw, 26);
   addBundle(raw, {
@@ -94,7 +94,7 @@ q7Test('one line over the ceiling is refused with COMPOSITION_TOO_LARGE, naming 
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM cart_items'), 0);
 });
 
-q7Test('the ceiling is judged across the WHOLE order, not one line at a time', async () => {
+test('the ceiling is judged across the WHOLE order, not one line at a time', async () => {
   const raw = seedCatalogue();
   const components = manyMembers(raw, 24);
   addBundle(raw, {
@@ -125,7 +125,7 @@ q7Test('the ceiling is judged across the WHOLE order, not one line at a time', a
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM inventory_ledger'), 0);
 });
 
-q7Test('a maximal TRACKED order stays inside D1’s bound-parameter budget', async () => {
+test('a maximal TRACKED order stays inside D1’s bound-parameter budget', async () => {
   // Every member tracked, so `planInventory` really does bind one placeholder
   // per (move × target) in its pre-read and really does write two guarded
   // statements per target — the shape the parameter cap applies to.

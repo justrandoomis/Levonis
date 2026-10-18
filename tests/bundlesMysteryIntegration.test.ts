@@ -42,7 +42,7 @@
  */
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { asD1, stubApp, post, get, json, all, row, count, type App, type StubUser } from './fixtures/app';
+import { asD1, stubApp, post, get, json, all, row, count, withoutTriggers, type App, type StubUser } from './fixtures/app';
 import { cartRoutes } from '../worker/routes/cart';
 import { orderRoutes } from '../worker/routes/orders';
 import { productRoutes } from '../worker/routes/products';
@@ -55,7 +55,9 @@ import { moveOrderStage } from '../worker/lib/orderStageOps';
 import { eligibleMerchandiseIqd } from '../worker/lib/pointsOps';
 import { seedCatalogue, orderBody } from './lib/bundles';
 import { POOL_PRODUCTS, forbiddenTokens } from './lib/mysteryOffer';
-import { q7Test } from './fixtures/q7';
+import { FIXTURE_U, publishV2, usdReproducing } from './fixtures/v2Publish';
+import { publishSeededV2 } from './fixtures/autoPublish';
+import { test } from 'node:test';
 
 const boss: StubUser = { id: 'boss', role: 'admin', email: 'a@x.co' };
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
@@ -112,7 +114,7 @@ const reservedEverywhere = (raw: DatabaseSync) => ({
 // JOURNEY ONE — a bundle, from the admin panel to the cancelled order
 // =====================================================================
 
-q7Test('a bundle walks the whole mandate: composed, listed, gated, carted, reserved, snapshotted, cancelled', async () => {
+test('a bundle walks the whole mandate: composed, listed, gated, carted, reserved, snapshotted, cancelled', async () => {
   const raw = seedCatalogue();
   const db = asD1(raw);
 
@@ -126,7 +128,6 @@ q7Test('a bundle walks the whole mandate: composed, listed, gated, carted, reser
       name_ar: 'حزمة البداية',
       name_ku: 'پاکێجی دەستپێک',
       description: 'A printer, two spools and a nozzle.',
-      price_iqd: 400_000,
       status: 'active',
       components: [
         { member_product_id: 'p_printer', qty: 1, sort: 0 },
@@ -155,7 +156,13 @@ q7Test('a bundle walks the whole mandate: composed, listed, gated, carted, reser
   assert.equal(availability.state, 'low');
   assert.equal(availability.member_exclusive, true, 'an entitled viewer of a gated offer');
   assert.equal(preview.component_total_iqd, 400_000 + 25_000 * 2 + 5_000);
-  assert.equal(preview.bundle_price_iqd, 400_000);
+  // DECISIONS row 250: a bundle is priced like an ordinary product. The panel types no dinar price: the new
+  // bundle is «يحتاج تسعيرًا» until the owner prices it in section ٣ — here at 400,000 (a dollar price at U).
+  assert.ok(
+    (created.warning_details as Array<{ code: string }>).some((w) => w.code === 'COMPOSITION_NEEDS_PRICING'),
+    JSON.stringify(created.warning_details)
+  );
+  await publishV2(raw, bundleId, { usd: usdReproducing(400_000, FIXTURE_U) });
 
   // The pins of §1.2, read back from the table rather than from the response.
   const stored = row<Record<string, unknown>>(raw, 'SELECT * FROM products WHERE id = ?', bundleId)!;
@@ -372,9 +379,10 @@ q7Test('a bundle walks the whole mandate: composed, listed, gated, carted, reser
   const asPlaced = await json(await get(appAs(db, plus), `/api/orders/${orderId}`));
   assert.equal((asPlaced.order.items as unknown[]).length, 1, 'the customer sees one line, not four');
 
-  // Now break the catalogue underneath it. The snapshot must not move.
-  raw.prepare("UPDATE products SET price_iqd = 999999, name = 'Renamed' WHERE id = 'p_pla'").run();
-  raw.prepare("UPDATE products SET status = 'draft' WHERE id = 'p_nozzle'").run();
+  // Now break the catalogue underneath it. The snapshot must not move. (Every product is V2-priced, so the
+  // engine's price guards are lifted for this vandalism only: it stands for any later change.)
+  const guards = all<{ name: string }>(raw, "SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'products'").map((t) => t.name);
+  withoutTriggers(raw, guards, "UPDATE products SET price_iqd = 999999, name = 'Renamed' WHERE id = 'p_pla'; UPDATE products SET status = 'draft' WHERE id = 'p_nozzle';");
   const afterEdit = await json(await get(appAs(db, plus), `/api/orders/${orderId}`));
   assert.deepEqual(afterEdit.order.items, asPlaced.order.items, 'the order snapshot is immutable');
 
@@ -441,9 +449,11 @@ function seedFilaments(raw: DatabaseSync): void {
   }
 }
 
-q7Test('a mystery offer walks the whole mandate: pooled, published, bought, permanent, packed, revealed on time', async () => {
+test('a mystery offer walks the whole mandate: pooled, published, bought, permanent, packed, revealed on time', async () => {
   const raw = seedCatalogue();
   seedFilaments(raw);
+  // The pool's filaments are ordinary products, V2-priced (the admin doors publish nothing by themselves).
+  await publishSeededV2(raw);
   const db = asD1(raw);
   const adminApp = appAs(db, boss);
 
@@ -482,7 +492,6 @@ q7Test('a mystery offer walks the whole mandate: pooled, published, bought, perm
       name_en: 'Mystery Filament Box',
       name_ar: 'صندوق فتيل عشوائي',
       name_ku: 'سندووقی نهێنی',
-      price_iqd: 60_000,
       status: 'active',
       direct_pool_id: poolId,
       spool_qty: 2,
@@ -496,6 +505,8 @@ q7Test('a mystery offer walks the whole mandate: pooled, published, bought, perm
   assert.equal(offer.success, true, JSON.stringify(offer));
   const offerId = String(offer.product.id);
   const offerSlug = String(offer.product.slug);
+  // DECISIONS row 250: priced like an ordinary product — the owner's dollar price, 60,000 at U.
+  await publishV2(raw, offerId, { usd: usdReproducing(60_000, FIXTURE_U) });
 
   // ---------------------------------- 2. the shop lists it, revealing nothing
   const list = await json(await get(appAs(db, buyer), '/api/bundles?kind=mystery'));
@@ -656,24 +667,27 @@ q7Test('a mystery offer walks the whole mandate: pooled, published, bought, perm
 // The seam the two journeys share: one refusal vocabulary, one gate
 // =====================================================================
 
-q7Test('the composition surface refuses the same way everywhere: the panel, the shop and the door agree', async () => {
+test('the composition surface refuses the same way everywhere: the panel, the shop and the door agree', async () => {
   const raw = seedCatalogue();
   const db = asD1(raw);
 
-  // An unpriced publish is refused BY THE PANEL, verbatim and in three
-  // languages — never repaired into a free bundle (§4.7, §11.3).
+  // A retired dinar price is refused BY THE PANEL, verbatim and in three
+  // languages (DECISIONS row 250: a bundle is priced like any product, in
+  // section ٣ — an offer takes a percent or an amount off, never a typed
+  // dinar price).
   const refused = await post(appAs(db, boss), '/api/admin/bundles', {
     name_en: 'Free box',
     name_ar: 'صندوق',
-    price_iqd: 0,
     status: 'active',
     components: [{ member_product_id: 'p_nozzle', qty: 1, sort: 0 }],
     config: { price_mode: 'fixed' },
+    offer: { offer_price_mode: 'fixed', offer_price_iqd: 1000, active: true },
   });
   const refusedBody = await json(refused);
   assert.equal(refused.status, 400, JSON.stringify(refusedBody));
   assert.equal(refusedBody.code, 'BUNDLE_VALIDATION');
-  const issue = (refusedBody.details.errors as Record<string, unknown>[])[0];
+  const issue = (refusedBody.details.errors as Record<string, unknown>[]).find((e) => e.code === 'OFFER_DINAR_PRICE_RETIRED')!;
+  assert.ok(issue, JSON.stringify(refusedBody.details.errors));
   for (const lang of ['ar', 'en', 'ckb']) {
     assert.equal(typeof issue[lang], 'string', `a refusal carries ${lang}`);
     assert.ok(String(issue[lang]).length > 0);
@@ -687,7 +701,6 @@ q7Test('the composition surface refuses the same way everywhere: the panel, the 
     await post(appAs(db, boss), '/api/admin/bundles', {
       name_en: 'Quiet box',
       name_ar: 'صندوق هادئ',
-      price_iqd: 50_000,
       status: 'draft',
       components: [{ member_product_id: 'p_nozzle', qty: 1, sort: 0 }],
       config: { price_mode: 'fixed' },
@@ -695,6 +708,8 @@ q7Test('the composition surface refuses the same way everywhere: the panel, the 
   );
   assert.equal(draft.success, true, JSON.stringify(draft));
   const draftId = String(draft.product.id);
+  // Priced like any product (section ٣): a price alone does not list a draft.
+  await publishV2(raw, draftId, { usd: usdReproducing(50_000, FIXTURE_U) });
   const listed = await json(await get(appAs(db, buyer), '/api/bundles'));
   assert.equal((listed.bundles as Record<string, unknown>[]).some((b) => b.id === draftId), false);
   const blocked = await post(appAs(db, buyer), '/api/cart/items', { productId: draftId, qty: 1 });
@@ -707,7 +722,6 @@ q7Test('the composition surface refuses the same way everywhere: the panel, the 
     await put(appAs(db, boss), `/api/admin/bundles/${draftId}`, {
       name_en: 'Quiet box',
       name_ar: 'صندوق هادئ',
-      price_iqd: 50_000,
       status: 'active',
       components: [{ member_product_id: 'p_nozzle', qty: 1, sort: 0 }],
       config: { price_mode: 'fixed' },

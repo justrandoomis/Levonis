@@ -45,7 +45,7 @@ import { moveOrderStage } from '../worker/lib/orderStageOps';
 import { baghdadDay } from '../worker/lib/baghdadTime';
 import { seedCatalogue, orderBody } from './lib/bundles';
 import { POOL_PRODUCTS } from './lib/mysteryOffer';
-import { q7Test } from './fixtures/q7';
+import { FIXTURE_U, publishV2, usdReproducing } from './fixtures/v2Publish';
 
 const boss: StubUser = { id: 'boss', role: 'admin', email: 'a@x.co' };
 /** `boss` is the OWNER here: cost and the profit report are the owner's alone (owner decision 2). */
@@ -136,7 +136,6 @@ async function composeOffer(db: unknown, over: Record<string, unknown> = {}) {
       name_en: 'Mystery Filament Box',
       name_ar: 'صندوق فتيل عشوائي',
       name_ku: 'سندووقی نهێنی',
-      price_iqd: 60_000,
       status: 'active',
       direct_pool_id: poolId,
       spool_qty: 2,
@@ -148,6 +147,8 @@ async function composeOffer(db: unknown, over: Record<string, unknown> = {}) {
     })
   );
   assert.equal(offer.success, true, JSON.stringify(offer).slice(0, 400));
+  // DECISIONS row 250: a mystery box is priced like an ordinary product — the owner's dollar price, 60,000 at U.
+  await publishV2((db as { db: DatabaseSync }).db, String(offer.product.id), { usd: usdReproducing(60_000, FIXTURE_U) });
   return { poolId, offerId: String(offer.product.id), offerSlug: String(offer.product.slug), saveResponse: offer };
 }
 
@@ -155,7 +156,7 @@ async function composeOffer(db: unknown, over: Record<string, unknown> = {}) {
 //  C1 — PUBLIC, NOT MEMBERS-ONLY
 // ===========================================================================
 
-q7Test('a signed-out visitor and a non-member both see the random filament, and the non-member buys it', async () => {
+test('a signed-out visitor and a non-member both see the random filament, and the non-member buys it', async () => {
   const raw = seedCatalogue();
   seedFilaments(raw);
   const db = asD1(raw);
@@ -199,7 +200,7 @@ q7Test('a signed-out visitor and a non-member both see the random filament, and 
   );
 });
 
-q7Test('a per-offer restriction the owner sets deliberately still refuses a non-member', async () => {
+test('a per-offer restriction the owner sets deliberately still refuses a non-member', async () => {
   const raw = seedCatalogue();
   seedFilaments(raw);
   const db = asD1(raw);
@@ -325,7 +326,7 @@ async function buyOneBox(raw: DatabaseSync, db: unknown, offerId: string) {
   return { orderId, allocations, spools, drawn: allocations.map((a) => String(a.product_id)) };
 }
 
-q7Test('the draw records the cost of what it took off the shelf, on the spool row, at the instant of the draw', async () => {
+test('the draw records the cost of what it took off the shelf, on the spool row, at the instant of the draw', async () => {
   const raw = seedCatalogue();
   seedFilaments(raw);
   const db = asD1(raw);
@@ -378,7 +379,7 @@ q7Test('the draw records the cost of what it took off the shelf, on the spool ro
   assert.deepEqual(after, before, 'a later supplier-price edit cannot rewrite a sale that already happened');
 });
 
-q7Test('a pool nobody has priced is recorded as UNKNOWN, and never as free goods', async () => {
+test('a pool nobody has priced is recorded as UNKNOWN, and never as free goods', async () => {
   const raw = seedCatalogue();
   seedFilaments(raw);
   // The owner never typed a cost for any of these filaments.
@@ -404,7 +405,7 @@ q7Test('a pool nobody has priced is recorded as UNKNOWN, and never as free goods
   assert.equal(totals.gross_margin_percent, null, 'no margin can be computed from goods nobody priced');
 });
 
-q7Test('the cost of the drawn filament never reaches the customer, before the reveal or after it', async () => {
+test('the cost of the drawn filament never reaches the customer, before the reveal or after it', async () => {
   const raw = seedCatalogue();
   seedFilaments(raw);
   const db = asD1(raw);
@@ -467,7 +468,7 @@ async function mysteryTotals(raw: DatabaseSync, db: unknown) {
   return r.totals as Record<string, number | null>;
 }
 
-q7Test('the finance report stops treating mystery revenue as costless, and files the cost under the offer that earned it', async () => {
+test('the finance report stops treating mystery revenue as costless, and files the cost under the offer that earned it', async () => {
   const raw = seedCatalogue();
   seedFilaments(raw);
   const db = asD1(raw);

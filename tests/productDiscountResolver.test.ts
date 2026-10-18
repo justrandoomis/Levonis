@@ -431,7 +431,8 @@ test('windowFromRow keeps fixed_usd; an unknown mode reads as no price', () => {
 test('the bundle mirror never prices a fixed_usd window (a stray row is inert on a composition)', () => {
   const src = readFileSync('worker/lib/bundleRead.ts', 'utf8');
   const decl = /const windowPrices =([\s\S]*?);/.exec(src)?.[1] ?? '';
-  assert.match(decl, /'fixed'/);
+  // DECISIONS row 250: priced like an ordinary product — a typed dinar `fixed` offer price is the retired rule's.
+  assert.doesNotMatch(decl, /'fixed'/, 'a dinar fixed offer price still priced a composition');
   assert.match(decl, /'discount_percent'/);
   assert.match(decl, /'discount_iqd'/);
   assert.doesNotMatch(decl, /fixed_usd|!== ''/, 'the mirror lists the dinar modes, never "any mode"');

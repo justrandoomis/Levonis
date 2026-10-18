@@ -234,12 +234,12 @@ export function isV2Published(raw: DatabaseSync, productId: string): boolean {
 }
 
 /**
- * Publish every ordinary product of the database not yet V2-published (or the
- * ids given). Compositions (bundles, mystery offers) have no V2 method yet
- * (owner question Q7): they stay hidden and are skipped. Returns the ids published.
+ * Publish every product of the database not yet V2-published (or the ids
+ * given) — a bundle or a mystery box too (DECISIONS row 250: priced like an
+ * ordinary product). Returns the ids published.
  */
 export async function publishAllV2(raw: DatabaseSync, o: PublishOptions & { ids?: readonly string[] } = {}): Promise<string[]> {
-  const rows = raw.prepare("SELECT id FROM products WHERE COALESCE(composition, '') = '' ORDER BY id").all() as Array<{ id: string }>;
+  const rows = raw.prepare('SELECT id FROM products ORDER BY id').all() as Array<{ id: string }>;
   const wanted = o.ids ? new Set(o.ids) : null;
   const done: string[] = [];
   for (const { id } of rows) {
