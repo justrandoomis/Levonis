@@ -27,8 +27,9 @@ import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { asD1, freshDb, get, json, post, put, row, stubApp, type StubUser } from './fixtures/app';
 import { applyRate, OWNER_ROW_SQL } from './fixtures/fx';
-import { v2App, writeV2 } from './fixtures/pricingV2';
+import { seedOptionless, v2App, writeV2 } from './fixtures/pricingV2';
 import { priceProductV2, type V2Discount, type V2PricePoint, type V2Sku } from '@levonis/pricing/priceV2';
+import { resolveSkuInputs } from '@levonis/pricing/costToPrice';
 import { roundPriceIqd } from '../packages/pricing/src/priceRounding';
 import {
   FOLLOW_MODEL,
@@ -50,6 +51,7 @@ import {
 import { lineNotes } from '../src/components/adminProducts/form/v2/ResultBar';
 import { V2_STRINGS } from '../src/components/adminProducts/form/v2/v2Strings';
 import { adminProductsRoutes } from '../worker/routes/adminProducts';
+import { chainOfUnit, packagedMeasureOf, type StoredInputRow, type UnitSelection } from '../worker/lib/pricingEngine/store';
 
 /* ------------------------------------------------------- 1. the engine, pure -- */
 
@@ -233,7 +235,7 @@ const EDITOR: StubUser = { id: 'usr_editor', role: 'admin', email: 'editor@x.co'
 const sql = (v: unknown): string => (v === null || v === undefined ? 'NULL' : typeof v === 'number' ? String(v) : `'${String(v).replace(/'/g, "''")}'`);
 
 /** The owner's A1, OPTION stock, both models sold direct and by land; the Combo's «أبعاد الخيار» packed 13.5 kg, 56 × 54 × 43. */
-async function world() {
+async function world(o: { shelf?: boolean } = {}) {
   const raw: DatabaseSync = freshDb();
   raw.exec(OWNER_ROW_SQL);
   raw.exec("INSERT INTO users (id,name,email,password_hash,role,email_verified_at) VALUES ('usr_editor','Editor','editor@x.co','h','admin','2026-01-01T00:00:00.000Z')");
@@ -263,12 +265,12 @@ async function world() {
   );
   // The Combo's batches (row 244): 685,831 / 689,581 / 690,062; A1's at 500,346.
   let seq = 0;
-  for (const [model, cost] of [
+  for (const [model, cost] of o.shelf === false ? [] : ([
     [COMBO, 685_831],
     [COMBO, 689_581],
     [COMBO, 690_062],
     [A1, 500_346],
-  ] as const) {
+  ] as const)) {
     seq += 1;
     raw.exec(`INSERT INTO inventory_lots (id, product_id, scope, scope_id, qty_received, qty_remaining, unit_cost_iqd, cost_basis, received_at)
               VALUES ('lot_${seq}', ${sql(PID)}, 'option', ${sql(model)}, 2, 2, ${cost}, 'received', '2026-09-0${seq}T00:00:00.000Z')`);
@@ -564,6 +566,86 @@ test('the model card reads its colour-less line, else a colour that follows its 
   assert.equal(lineWithOption(rows, 'a1'), null);
 });
 
+/* ------------------- 3. the packaged measure in every model mode (the owner, 2026-10-18; DECISIONS row 247) -- */
+
+test('the measure chain: the model’s and the colour’s own packaged weight and box decide their levels — SKU row → colour → model → product', () => {
+  assert.deepEqual(packagedMeasureOf({ package_weight_g: 13_500, package_depth_mm: 560, package_width_mm: 540, package_height_mm: 430 }), { weight_g: 13_500, box: [560, 540, 430] });
+  assert.equal(packagedMeasureOf({ net_weight_g: 12_000, package_depth_mm: 560 }), null, 'net weight is never used; a partial box inherits');
+  assert.equal(packagedMeasureOf(null), null);
+  const inputs = [
+    { scope: 'base', scope_id: '', origin: 'MANUAL_OVERRIDE', supplier_cost_amount: '269', supplier_cost_currency: 'EUR', shipping_profile: 'CHINA_AIR', shipping_weight_g: 6240, shipping_length_mm: 400, shipping_width_mm: 300, shipping_height_mm: 200 },
+    // A value saved in pricing only, and an imported manual CBM: the option's own package decides over both.
+    { scope: 'option', scope_id: 'combo', origin: 'MANUAL_OVERRIDE', shipping_weight_g: 9000 },
+    { scope: 'option', scope_id: 'combo', origin: 'SOURCE', manual_cbm: '0.5', unresolved_fields: '[]' },
+    { scope: 'sku', scope_id: 'o:combo|c:heavy', origin: 'MANUAL_OVERRIDE', shipping_weight_g: 15_000 },
+  ] as unknown as StoredInputRow[];
+  const COMBO_PACK = { weight_g: 13_500, box: [560, 540, 430] as const };
+  const measure = (unit: Partial<UnitSelection>) => {
+    const r = resolveSkuInputs(chainOfUnit(inputs, { option_value_ids: ['combo'], color_id: null, combo_key: null, ...unit })).inputs;
+    const b = r.cbm?.box;
+    return { g: r.weight?.value ?? null, at: r.weight?.level ?? null, box: b ? [b.length_mm, b.width_mm, b.height_mm] : null, boxAt: r.cbm?.level ?? null, cbm: r.cbm?.effective ?? null };
+  };
+  // The A1 Combo, whatever its price mode: its «أبعاد الخيار» — never the pricing-only 9,000 g, never the manual CBM.
+  assert.deepEqual(measure({ packaged: { model: COMBO_PACK } }), { g: 13_500, at: 'option', box: [560, 540, 430], boxAt: 'option', cbm: '0.130032' });
+  // No package of its own: its pricing row as before (row 247: a pricing-only value is never cleared silently).
+  assert.deepEqual(measure({}), { g: 9000, at: 'option', box: null, boxAt: 'option', cbm: '0.5' });
+  // A model with nothing: the product's measure.
+  assert.deepEqual(measure({ option_value_ids: ['a1'] }), { g: 6240, at: 'base', box: [400, 300, 200], boxAt: 'base', cbm: '0.024' });
+  // A colour with its own package is the more specific level: it beats the model's, field by field (weight, box).
+  const RED = { weight_g: 14_200, box: [600, 560, 450] as const };
+  assert.deepEqual(measure({ color_id: 'red', combo_key: 'o:combo|c:red', packaged: { model: COMBO_PACK, color: RED } }), { g: 14_200, at: 'color', box: [600, 560, 450], boxAt: 'color', cbm: '0.1512' });
+  assert.deepEqual(measure({ color_id: 'red', combo_key: 'o:combo|c:red', packaged: { model: COMBO_PACK, color: { weight_g: 14_200, box: null } } }), { g: 14_200, at: 'color', box: [560, 540, 430], boxAt: 'option', cbm: '0.130032' });
+  // A colour package on a model with none: the colour's; the SKU's own pricing row beats both.
+  assert.equal(measure({ option_value_ids: ['a1'], color_id: 'red', combo_key: 'o:a1|c:red', packaged: { color: RED } }).g, 14_200);
+  assert.deepEqual(measure({ color_id: 'heavy', combo_key: 'o:combo|c:heavy', packaged: { model: COMBO_PACK, color: RED } }).g, 15_000);
+  // Only the model (the first value) carries the model's package: a second group's value never conflicts with it.
+  assert.equal(measure({ option_value_ids: ['combo', 'size_l'], packaged: { model: COMBO_PACK } }).g, 13_500);
+});
+
+test('the owner 2026-10-18: the A1 Combo on «يتبع المنتج» and on «زيادة» ships at its «أبعاد الخيار» — 13,500 g, box 560 × 540 × 430 mm; A1 (none) at the product’s', async () => {
+  const w = await world({ shelf: false }); // no batch: the supplier's cost prices both models (row 244)
+  const route = (ev: Awaited<ReturnType<typeof writeV2>>, model: string, channel = 'pre_order_land') =>
+    ev.result!.skus.find((s) => s.combo_key === `o:${model}`)!.channels.find((c) => c.channel === channel)!.replacement!;
+  const base = { method: 'cost' as const, minimumProfitUsd: '143.9', discounts: [{ scope: 'product' as const, scope_id: '', usd: '35' }], dryRun: true };
+  const DELTA: V2PricePoint = { scope: 'option', scope_id: COMBO, kind: 'delta', usd: '40' };
+  for (const points of [[], [DELTA]]) {
+    const ev = await writeV2(w.db, PID, { ...base, points });
+    assert.equal(route(ev, COMBO).effective_weight_g, 13_500, points.length ? '«زيادة»' : '«يتبع المنتج»');
+    assert.equal(route(ev, A1).effective_weight_g, 6240, 'a model with no package of its own: the product’s measure');
+  }
+  // Stocked by sea, the box prices the direct sale: the Combo's 560 × 540 × 430, A1 the product's 400 × 300 × 200.
+  const sea = await writeV2(w.db, PID, { ...base, inputs: { shipping_profile: 'CHINA_SEA', shipping_length_mm: 400, shipping_width_mm: 300, shipping_height_mm: 200 } });
+  assert.equal(route(sea, COMBO, 'direct_sale').effective_cbm, '0.130032');
+  assert.equal(route(sea, A1, 'direct_sale').effective_cbm, '0.024');
+  // The form's preview prices the same (the engine at 13.5 kg on «يتبع المنتج» and «زيادة»; A1 at 6,240 g).
+  const followed = await previewOf(w.app, {});
+  assert.deepEqual([at(followed.table, COMBO, 'direct_sale'), at(followed.table, COMBO, 'pre_order_land')], pair(price(combo({ own: BOX_13_5, shelf: null }))));
+  assert.deepEqual([at(followed.table, A1, 'direct_sale'), at(followed.table, A1, 'pre_order_land')], pair(price(combo({ shelf: null }))));
+  const delta = await previewOf(w.app, { points: [{ scope: 'option', id: COMBO, kind: 'delta', usd: '40' }] });
+  assert.deepEqual(
+    [at(delta.table, COMBO, 'direct_sale'), at(delta.table, COMBO, 'pre_order_land')],
+    pair(price(combo({ own: BOX_13_5, shelf: null }), [{ scope: 'option', scope_id: 'combo', kind: 'delta', usd: '40' }]))
+  );
+  // Nothing published moved: the stored prices change only through a reviewed publish or the automatic repricing.
+  assert.equal(row<{ n: number }>(w.raw, "SELECT COUNT(*) AS n FROM pricing_inputs WHERE product_id = ? AND scope = 'option'", PID)!.n, 0, 'no second store: the dimensions are the measure');
+});
+
+test('a colour with its own packaged dimensions ships on them; a colour with none on the product’s', async () => {
+  const w = await world();
+  seedOptionless(w.raw, 'p_col', { colours: 2 });
+  w.raw.exec("UPDATE product_colors SET package_weight_g = 2500, package_depth_mm = 500, package_width_mm = 400, package_height_mm = 300 WHERE id = 'p_col_c0'");
+  const inputs = { supplier_cost_amount: '100', supplier_cost_currency: 'USD' as const, shipping_profile: 'CHINA_AIR' as const, shipping_weight_g: 1000 };
+  const o = { method: 'cost' as const, minimumProfitUsd: '10', inputs, dryRun: true };
+  const route = (ev: Awaited<ReturnType<typeof writeV2>>, colour: string) =>
+    ev.result!.skus.find((s) => s.combo_key.includes(colour))!.channels.find((c) => c.channel === 'direct_sale')!.replacement!;
+  const air = await writeV2(w.db, 'p_col', o);
+  assert.equal(route(air, 'p_col_c0').effective_weight_g, 2500);
+  assert.equal(route(air, 'p_col_c1').effective_weight_g, 1000);
+  const sea = await writeV2(w.db, 'p_col', { ...o, inputs: { ...inputs, shipping_profile: 'CHINA_SEA', shipping_length_mm: 400, shipping_width_mm: 300, shipping_height_mm: 200 } });
+  assert.equal(route(sea, 'p_col_c0').effective_cbm, '0.06');
+  assert.equal(route(sea, 'p_col_c1').effective_cbm, '0.024');
+});
+
 test('the new words, in Arabic, English and real Sorani', () => {
   const sorani = /[ڕڵێۆە]/;
   for (const k of ['shelfOwnCostNote', 'minProfitFrom', 'profitBlocked', 'currencyChoose', 'currencyRequired'] as const) {
@@ -574,7 +656,7 @@ test('the new words, in Arabic, English and real Sorani', () => {
   // The hints quote the option's dimensions heading as the form shows it — in every language (a Sorani reader finds it).
   const heading = optionDimsHeading('A1 Combo');
   assert.equal(heading, 'أبعاد A1 Combo / Option dimensions');
-  for (const k of ['optionMeasureFrom', 'savedPricingOnly', 'measurePending', 'optionDimsNotPricing'] as const) {
+  for (const k of ['optionMeasureFrom', 'savedPricingOnly', 'measurePending', 'optionDimsPricing'] as const) {
     for (const lang of ['ar', 'en', 'ckb'] as const) assert.ok(V2_STRINGS[lang][k](heading).includes(`«${heading}»`), `${lang}.${k}`);
     assert.notEqual(V2_STRINGS.ckb[k](heading), V2_STRINGS.ar[k](heading));
     assert.match(V2_STRINGS.ckb[k]('X'), sorani, k);

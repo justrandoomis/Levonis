@@ -10,7 +10,7 @@
  */
 import type { DatabaseSync } from 'node:sqlite';
 import { asD1, freshDb, get, json, post, put, stubApp, type StubUser } from './app';
-import { seedLegacyCatalogue, seedProfileRates } from './legacyCatalogue';
+import { legacyProductId, seedLegacyCatalogue, seedProfileRates } from './legacyCatalogue';
 import { OWNER_ROW_SQL, applyRate } from './fx';
 import { adminPricingRoutes } from '../../worker/routes/adminPricing';
 import { adminProcurementRoutes } from '../../worker/routes/adminProcurement';
@@ -26,6 +26,10 @@ export function pricingWorld(opts: { rates?: boolean; raw?: DatabaseSync; user?:
     raw.exec(OWNER_ROW_SQL);
     seedLegacyCatalogue(raw);
     seedProfileRates(raw);
+    // The census gives the AMS HT's and the AMS 2 Pro's model its own package (1,200 g), its freight in every
+    // price mode (DECISIONS row 247, the owner 2026-10-18). The pricing worlds price both cost-first at the
+    // product's 2,500 g: their models inherit.
+    raw.exec(`UPDATE product_option_values SET package_weight_g = NULL WHERE product_id IN ('${AMS}', '${legacyProductId('bambu-lab-ams-2-pro')}')`);
   }
   if (opts.rates !== false && !opts.raw) {
     applyRate(raw, 'USD_IQD', '1600');

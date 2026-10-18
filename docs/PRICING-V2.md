@@ -126,7 +126,7 @@ are always both shown (fixes P4/P15).
 | Level | Choices (one selector) | Effect on D (P follows through Δ) |
 |---|---|---|
 | Product | method + inputs (1.2) | base D |
-| Model | «يتبع المنتج» · «تكلفة مختلفة» (cost-first, owner: own supplier cost + the option's packaged weight and box from «أبعاد الخيار» + an optional minimum-profit exception, row 247) · «فرق في السعر ± $» · «سعر خاص $» | replaces or adjusts D |
+| Model | «يتبع المنتج» · «تكلفة مختلفة» (cost-first, owner: own supplier cost + an optional minimum-profit exception, row 247) · «فرق في السعر ± $» · «سعر خاص $» — every mode ships on the option's packaged weight and box from «أبعاد الخيار» (row 247, 2026-10-18) | replaces or adjusts D |
 | Colour | «يتبع الموديل» · «± $ فوق الموديل» (Decision C) | adds to every model's D for that colour |
 | SKU (model × colour) | in «التفاصيل» only: «سعر خاص $» | replaces D for that SKU |
 
@@ -148,9 +148,22 @@ are always both shown (fixes P4/P15).
   option-scope `target_profit` rule (migration 0181, no new column); a stored option rule in dinars
   or BLOCKED is shown as it is, never as «يتبع المنتج». «رجوع للموروث» clears the own cost and sends
   the model's minimum profit back to INHERIT.
-- **The option's dimensions price «تكلفة مختلفة» only.** A model on «يتبع المنتج» or «فرق في السعر»
-  is freighted on the product's pricing measure even when its option has its own package (the card
-  says so); making the option's package the pricing measure in every mode awaits the owner (row 247).
+- **The option's and the colour's own package is the freight measure in every mode** (the owner,
+  2026-10-18, row 247: «the weight for models is the box weight for shipping, with packaging — A1
+  Combo's box weighs 13.5 kg»). Every SKU of a model on «يتبع المنتج», «تكلفة مختلفة», «فرق في السعر»
+  or «سعر خاص» ships on its option's packaged weight and box, and a colour's own package the same; the
+  product's measure prices only what has none. It is resolved on the server, in the measure chain
+  (`chainOfUnit` with `packagedMeasureOf`, read from the document priced — the form's draft on a
+  preview), so the preview, the save, the automatic repricing and the cart agree. Precedence is the
+  chain's: the SKU's pricing row → the colour's package → the model's package (the selection's first
+  value only) → the product, field by field (weight, then the whole box) — an option and a colour that
+  both have one: the colour, the more specific level, wins, as the cart's dimensions do. A level's
+  package decides that level (its weight before any pricing-row weight, its full box before any box or
+  manual CBM); what it does not hold stays its pricing row's; a partial box is no package; net weight
+  is never used. The own-cost mirror above stays (it keeps the stored row in step and clears it with
+  the dimensions); the dimensions are the one source. A follow / difference / special-price card whose
+  option has a package says it ships on it. Published prices move only through a reviewed publish (a
+  save that moves a price needs the review sheet) or the automatic repricing (large changes held).
 
 ### 1.5 Rounding (one rule, one place)
 

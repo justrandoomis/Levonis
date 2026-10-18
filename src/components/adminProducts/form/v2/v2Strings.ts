@@ -190,8 +190,8 @@ export interface V2Strings {
   savedPricingOnly: Fill;
   /** The option's measure the preview prices on, not in the pricing row yet: written by the next save (quotes the heading). */
   measurePending: Fill;
-  /** A follow / difference model whose option has its own package: those dimensions do not price it (quotes the heading). */
-  optionDimsNotPricing: Fill;
+  /** A follow / difference / special-price model whose option has its own package: it ships on it (quotes the heading; row 247). */
+  optionDimsPricing: Fill;
   /** The label of the model's minimum-profit choice (the amount beside it keeps «الحد الأدنى للربح ($)»). */
   minProfitFrom: string;
   /** A stored model minimum profit in dinars (legacy), kept as it is. */
@@ -365,7 +365,7 @@ const AR: V2Strings = {
   inheritsProductMeasure: (v) => `يرث من المنتج: ${v}`,
   savedPricingOnly: (h) => `محفوظ في التسعير فقط — اكتبه في «${h}»`,
   measurePending: (h) => `السعر المعروض محسوب بوزن «${h}» وصندوقها — يُحفظ في التسعير مع الحفظ التالي`,
-  optionDimsNotPricing: (h) => `«${h}» لا تدخل في تسعير هذا الموديل: يُسعَّر بوزن المنتج وصندوقه ما لم تختر «تكلفة مختلفة»`,
+  optionDimsPricing: (h) => `يُشحن هذا الموديل بالوزن والصندوق من «${h}» (مع التغليف)، لا بوزن المنتج وصندوقه`,
   minProfitFrom: 'مصدر الحد الأدنى للربح',
   profitKeptIqd: (v) => `استثناء محفوظ: ${v} د.ع`,
   profitBlocked: 'محجوز — يوقف تسعير هذا الموديل',
@@ -531,7 +531,7 @@ const EN: V2Strings = {
   inheritsProductMeasure: (v) => `Inherits the product: ${v}`,
   savedPricingOnly: (h) => `Saved in pricing only — enter it in «${h}»`,
   measurePending: (h) => `The price shown uses the weight and box of «${h}» — written to pricing by the next save`,
-  optionDimsNotPricing: (h) => `«${h}» do not price this model: it is priced on the product's weight and box unless you choose «Different cost»`,
+  optionDimsPricing: (h) => `This model ships on the weight and box of «${h}» (packaged), not the product's`,
   minProfitFrom: 'Minimum profit from',
   profitKeptIqd: (v) => `Saved exception: ${v} IQD`,
   profitBlocked: "Blocked — stops this model's pricing",
@@ -698,7 +698,7 @@ const CKB: V2Strings = {
   inheritsProductMeasure: (v) => `لە بەرهەمەکەوە وەردەگیرێت: ${v}`,
   savedPricingOnly: (h) => `تەنها لە نرخداناندا پاشەکەوت کراوە — لە «${h}»دا بینووسە`,
   measurePending: (h) => `نرخی پیشاندراو بە کێش و سندوقی «${h}» هەژمار کراوە — لە پاشەکەوتکردنی داهاتوودا لە نرخداناندا پاشەکەوت دەکرێت`,
-  optionDimsNotPricing: (h) => `«${h}» بەشداری لە نرخدانانی ئەم مۆدێلەدا ناکات: بە کێش و سندوقی بەرهەمەکە نرخی بۆ دادەنرێت مەگەر «تێچووی جیاواز» هەڵبژێریت`,
+  optionDimsPricing: (h) => `ئەم مۆدێلە بە کێش و سندوقی «${h}» (پاکێجکراو) دەنێردرێت، نەک بە هی بەرهەمەکە`,
   minProfitFrom: 'سەرچاوەی کەمترین قازانج',
   profitKeptIqd: (v) => `حاڵەتی تایبەتی پاشەکەوتکراو: ${v} دینار`,
   profitBlocked: 'ڕاگیراوە — نرخدانانی ئەم مۆدێلە ڕادەگرێت',

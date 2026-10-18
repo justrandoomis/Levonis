@@ -192,8 +192,9 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
   // The stored rule as it is (the stored draft's, so switching away and back finds it again).
   const storedModel = v2.storedDraft?.models[id];
   const keptProfit = storedModel?.profit === 'kept' ? (storedModel.profit_iqd !== null ? s.profitKeptIqd(iqdText(storedModel.profit_iqd)) : s.profitBlocked) : null;
-  // A follow / difference model whose option has its own package: those dimensions do not price it (row 247 (و)).
-  const dimsUnused = owner && d.method === 'cost' && m.price !== 'own_cost' && (optionPackageWeight(measure.dims) !== null || optionPackageBox(measure.dims) !== null);
+  // A follow / difference / special-price model whose option has its own package: it ships on it, as in every mode
+  // (the server's measure chain, row 247 — the owner 2026-10-18); the card says so (no field: the dimensions edit it).
+  const dimsPricing = owner && d.method === 'cost' && m.price !== 'own_cost' && (optionPackageWeight(measure.dims) !== null || optionPackageBox(measure.dims) !== null);
   // «تكلفة مختلفة»: the product's values every empty field inherits, shown in grey (§2.1 rule 2).
   const productCost = d.cost.supplier_amount ? `${d.cost.supplier_amount} ${d.cost.supplier_currency || ''}`.trim() : null;
   const inheritedT = v2.inheritedMinimumProfit;
@@ -311,9 +312,9 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
           </div>
         </div>
       ) : null}
-      {dimsUnused && isModel ? (
-        <p className="text-[11px] text-text-muted" dir="auto" data-v2-model-dims-unused={id}>
-          {s.optionDimsNotPricing(measure.heading)}
+      {dimsPricing && isModel ? (
+        <p className="text-[11px] text-text-muted" dir="auto" data-v2-model-dims-pricing={id}>
+          {s.optionDimsPricing(measure.heading)}
         </p>
       ) : null}
       {isModel ? (

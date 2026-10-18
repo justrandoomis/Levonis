@@ -33,7 +33,7 @@ import { evaluateLegacy, unitColorId, unitComboKey, unitOptionIds, type LegacyEv
 import { pricedAsProduct, type LoadedProduct } from '../load';
 import { canonical, unitRuleTarget } from '../procurementPreview';
 import type { PricingRates } from '../rates';
-import { chainOfUnit, type InputWrite, type ProductPricingData, type RuleWrite, type StoredInputRow } from '../store';
+import { chainOfUnit, packagedMeasureOf, type InputWrite, type ProductPricingData, type RuleWrite, type StoredInputRow } from '../store';
 import { planWritesFromUnits, structuralChannel, verifyPlan, type BlockedChannel, type PlannedPrice, type PricePlan, type Verification } from '../writer';
 import { refuseUnreadSkus, skuTableOf, type EngineControl } from '../engineWrite';
 import { discountsOf, pointsOf, type StoredV2Result, type V2Store } from './store';
@@ -263,17 +263,22 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
   const units = legacy.units;
   // 3. The SKUs of the V2 maths: their chain (cost inputs, optional price-first) and T (required
   //    cost-first; price-first only for the owner's below-minimum-profit warning, Q3).
+  // The model's and the colour's own packaged weight and box are their freight measure in every mode (row 247,
+  // the owner 2026-10-18) — read from the document priced (the draft's on a preview), never a second store.
+  const optionDims = new Map(a.loaded.doc.options.map((o) => [o.id, o]));
+  const colourDims = new Map(a.loaded.doc.colors.map((c) => [c.id, c]));
   const skus: V2Sku[] = units.map((unit) => {
     const ids = unitOptionIds(unit);
     const colorId = unitColorId(unit);
     const combo = unitComboKey(unit);
+    const packaged = { model: packagedMeasureOf(optionDims.get(ids[0] ?? '')), color: packagedMeasureOf(colorId ? colourDims.get(colorId) : null) };
     return {
       combo_key: combo,
       model_id: ids[0] ?? null,
       option_value_ids: ids,
       color_id: colorId,
       channels: unit.channels.filter(structuralChannel).map((c) => c.channel),
-      chain: chainOfUnit(inputs, { option_value_ids: ids, color_id: colorId, combo_key: combo || null }),
+      chain: chainOfUnit(inputs, { option_value_ids: ids, color_id: colorId, combo_key: combo || null, packaged }),
       target: resolveRuleAt(rules, 'target_profit', unitRuleTarget(pid, { option_value_ids: ids, color_id: colorId }), { usdIqdRate: u }),
       // Row 244: cost-first, the direct sale of a SKU with stock is priced from its costliest batch on the shelf —
       // in dollars at today's U (row 249; a batch with no purchase rate in dinars as paid).

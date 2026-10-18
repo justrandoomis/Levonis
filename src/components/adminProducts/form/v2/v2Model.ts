@@ -430,9 +430,11 @@ export function optionPackageBox(dims: ProductDimensionsV2 | null | undefined): 
 
 /**
  * «تكلفة مختلفة»'s weight and box ARE the option's packaged dimensions («أبعاد الخيار», DECISIONS row 247):
- * one source. For each own-cost model whose option has its own package weight, that weight replaces the
- * draft's; whose option has its own full box, that box replaces the draft's — so the pricing row
- * (`pricing_inputs`, scope option) is a mirror the save writes in the same batch as the dimensions.
+ * one source. The server prices every model mode on them (`chainOfUnit`'s packaged measure, the owner
+ * 2026-10-18); this only keeps the own-cost fields and their stored row in step. For each own-cost model
+ * whose option has its own package weight, that weight replaces the draft's; whose option has its own full
+ * box, that box replaces the draft's — so the pricing row (`pricing_inputs`, scope option) is a mirror the
+ * save writes in the same batch as the dimensions.
  *
  * An option that has no package of its own: a stored pricing value equal to the option's SAVED package
  * (`saved`, the form's baseline) is that mirror, and it follows the dimensions — cleared with them (the save

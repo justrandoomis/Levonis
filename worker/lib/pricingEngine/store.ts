@@ -27,6 +27,7 @@ import type { PricingInputRow, SkuInputChain, SupplierCurrency } from '@levonis/
 import type { PricingRuleKind, PricingRuleRow, PricingRuleScope, PricingRuleState, PricingRuleSource } from '@levonis/pricing/ruleResolution';
 import type { DirectPurchaseOverlay } from './directPurchase';
 import type { ShippingProfile } from '@levonis/pricing/skuChannel';
+import { isPositivePhysicalDimension, type PhysicalDimensionOverrides } from '@levonis/pricing/physicalDimensions';
 import { fence } from '../operations';
 import { newId } from '../crypto';
 
@@ -220,24 +221,63 @@ export interface UnitSelection {
   color_id: string | null;
   /** The SKU's own key — null for a model, whose SKU level is its option level. */
   combo_key: string | null;
+  /** The model's (the first option value's) and the colour's own packaged measure (`packagedMeasureOf`). */
+  packaged?: { model?: PackagedMeasure | null; color?: PackagedMeasure | null };
 }
 
-const scopeInputs = (inputs: readonly Partial<StoredInputRow>[], scope: string, scopeId: string) => ({
-  scope_id: scopeId,
-  source: e1Row(rowAt(inputs, scope, scopeId, 'SOURCE')),
-  override: e1Row(rowAt(inputs, scope, scopeId, 'MANUAL_OVERRIDE')),
-});
+/**
+ * A level's own shipping measure: its dimensions section's weight WITH packaging and its box
+ * (DECISIONS row 247, the owner 2026-10-18 — «أبعاد الخيار» / the colour's dimensions).
+ */
+export interface PackagedMeasure {
+  weight_g: number | null;
+  /** [L, W, H] = [depth, width, height] in mm — the three axes or none (the box is atomic). */
+  box: readonly [number, number, number] | null;
+}
+
+/** The packaged measure a model's or a colour's dimensions hold, or null (it inherits). Net weight is never used. */
+export function packagedMeasureOf(d: PhysicalDimensionOverrides | null | undefined): PackagedMeasure | null {
+  const weight_g = isPositivePhysicalDimension(d?.package_weight_g) ? d!.package_weight_g! : null;
+  const [l, w, h] = [d?.package_depth_mm, d?.package_width_mm, d?.package_height_mm];
+  const box = isPositivePhysicalDimension(l) && isPositivePhysicalDimension(w) && isPositivePhysicalDimension(h) ? ([l, w, h] as const) : null;
+  return weight_g === null && !box ? null : { weight_g, box };
+}
+
+const scopeInputs = (inputs: readonly Partial<StoredInputRow>[], scope: string, scopeId: string, packaged?: PackagedMeasure | null) => {
+  const level = {
+    scope_id: scopeId,
+    source: e1Row(rowAt(inputs, scope, scopeId, 'SOURCE')),
+    override: e1Row(rowAt(inputs, scope, scopeId, 'MANUAL_OVERRIDE')),
+  };
+  if (!packaged) return level;
+  // The packaged measure decides its level whole (one source: the dimensions section): its weight before any
+  // pricing row's, its box before any box or manual CBM of either row. What it does not hold stays the row's.
+  const override: PricingInputRow = { ...(level.override ?? {}) };
+  let source = level.source;
+  if (packaged.weight_g !== null) Object.assign(override, { pricing_weight_g: packaged.weight_g, shipping_weight_g: null });
+  if (packaged.box) {
+    const [shipping_length_mm, shipping_width_mm, shipping_height_mm] = packaged.box;
+    Object.assign(override, { shipping_length_mm, shipping_width_mm, shipping_height_mm, manual_cbm: null });
+    if (source?.manual_cbm != null) source = { ...source, manual_cbm: null };
+  }
+  return { ...level, source, override };
+};
 
 /**
  * The input chain of one unit (FX-7, E1's levels): the product, every selected
  * option value (one per group), the colour, and the exact SKU — empty levels
  * inherit, the most specific value wins (a supplier difference adds up).
+ *
+ * The freight measure (row 247, the owner 2026-10-18): the model's and the colour's own packaged
+ * weight and box (`unit.packaged`) are their levels' measure in every model mode, so the order stays
+ * the chain's — SKU row → colour → model → product; a level without its own package keeps its
+ * pricing row, and the product's measure prices only what no level holds.
  */
 export function chainOfUnit(inputs: readonly Partial<StoredInputRow>[], unit: UnitSelection): SkuInputChain {
   return {
     base: { source: e1Row(rowAt(inputs, 'base', '', 'SOURCE')), override: e1Row(rowAt(inputs, 'base', '', 'MANUAL_OVERRIDE')) },
-    options: unit.option_value_ids.filter(Boolean).map((id) => scopeInputs(inputs, 'option', id)),
-    ...(unit.color_id ? { color: scopeInputs(inputs, 'color', unit.color_id) } : {}),
+    options: unit.option_value_ids.filter(Boolean).map((id, i) => scopeInputs(inputs, 'option', id, i === 0 ? unit.packaged?.model : null)),
+    ...(unit.color_id ? { color: scopeInputs(inputs, 'color', unit.color_id, unit.packaged?.color) } : {}),
     ...(unit.combo_key ? { sku: scopeInputs(inputs, 'sku', unit.combo_key) } : {}),
   };
 }
