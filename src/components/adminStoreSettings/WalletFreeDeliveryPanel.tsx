@@ -40,14 +40,16 @@ export const WALLET_FREE_DEFAULTS: WalletFreeDeliveryConfig = {
 };
 
 /** The GET already returns the server-normalised value; this only guards the
- *  shape so a missing row renders the defaults instead of nothing. */
+ *  shape so a missing row renders the defaults instead of nothing. Personal
+ *  delivery is cancelled, so a stale 'personal' entry is dropped here and the
+ *  next save stores only what the screen shows. */
 export function walletFreeFrom(raw: unknown): WalletFreeDeliveryConfig {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Partial<WalletFreeDeliveryConfig>;
   return {
     enabled: typeof r.enabled === 'boolean' ? r.enabled : WALLET_FREE_DEFAULTS.enabled,
     require_full_wallet:
       typeof r.require_full_wallet === 'boolean' ? r.require_full_wallet : WALLET_FREE_DEFAULTS.require_full_wallet,
-    methods: Array.isArray(r.methods) ? r.methods.filter((m) => m === 'standard' || m === 'personal') : [...WALLET_FREE_DEFAULTS.methods],
+    methods: Array.isArray(r.methods) ? r.methods.filter((m) => m === 'standard') : [...WALLET_FREE_DEFAULTS.methods],
     rules: Array.isArray(r.rules)
       ? r.rules.map((x) => ({
           catalog_id: String(x?.catalog_id ?? ''),
@@ -133,7 +135,7 @@ export default function WalletFreeDeliveryPanel({ initial }: { initial: unknown 
     const c = catalogs.find((x) => x.id === id);
     return c ? `${c.name_ar || c.name_en}${c.active ? '' : ' (غير مفعّل)'}` : id;
   };
-  const toggleMethod = (m: 'standard' | 'personal', on: boolean) =>
+  const toggleMethod = (m: 'standard', on: boolean) =>
     edit((v) => ({ ...v, methods: on ? [...new Set([...v.methods, m])] : v.methods.filter((x) => x !== m) }));
 
   return (

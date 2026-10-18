@@ -1604,7 +1604,6 @@ export default function ProductForm({
         summary={summarize([
           doc.delivery_options ? 'توصيل مخصص' : 'تعرفة التوصيل العامة',
           doc.delivery_options?.standard.enabled === false ? 'العادي معطّل' : undefined,
-          doc.delivery_options?.personal.enabled === false ? 'الشخصي معطّل' : undefined,
           isPrinterCatalog && doc.warranty_plans.some((p) => p.active)
             ? `ضمان ممدد ${doc.warranty_plans.filter((p) => p.active).map((p) => `+${p.duration_months}`).join(' / ')}`
             : undefined,
