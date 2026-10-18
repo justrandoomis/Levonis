@@ -128,7 +128,10 @@ test('ONE PRIMARY ACTION on the order screen: the next step is the only primary;
   assert.match(detail, /const forward = next\.filter\(\(to\) => to !== 'cancelled'\);/);
   assert.match(actions, /variant=\{i === 0 \? 'primary' : 'secondary'\}/);
   assert.match(actions, /data-order-primary=\{i === 0 \? 'true' : undefined\}/);
-  assert.match(actions, /className=\{i === 0 \? 'min-w-0 flex-1 sm:flex-none' : ''\}/, 'wide under a thumb on a phone, its own size above');
+  // Wide under a thumb on a phone: a full line of its own (a flex-1 with a zero basis only took what print left over,
+  // so print was the widest target in the row), its own size above.
+  assert.match(actions, /className=\{i === 0 \? 'w-full sm:w-auto' : ''\}/, 'wide under a thumb on a phone, its own size above');
+  assert.doesNotMatch(actions, /flex-1/, 'no zero-basis primary that shrinks to the space print leaves');
   assert.equal((actions.match(/variant="primary"|'primary'/g) ?? []).length, 1, 'exactly one primary in the row');
   // Print is a secondary in the same row (it left the top bar).
   assert.match(actions, /<Button variant="secondary" icon=\{<Printer [^\n]*onClick=\{\(\) => window\.print\(\)\} data-print-order>/);

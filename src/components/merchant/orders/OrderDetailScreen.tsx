@@ -190,12 +190,13 @@ export default function OrderDetailScreen({ id, backHref }: { id: string; /** Th
         <p className="mt-1 text-[12.5px] text-text-muted">
           {loc('وصل في', 'Placed')} <bdi>{when(order.created_at)}</bdi>
         </p>
+        {/* On a phone the next step has a line of its own, full width; print and the cancel sit below it. */}
         <div className="mt-4 flex flex-wrap items-center gap-2" data-order-actions>
           {forward.map((to, i) => (
             <Button
               key={to}
               variant={i === 0 ? 'primary' : 'secondary'}
-              className={i === 0 ? 'min-w-0 flex-1 sm:flex-none' : ''}
+              className={i === 0 ? 'w-full sm:w-auto' : ''}
               loading={moving === to}
               disabled={moving !== '' && moving !== to}
               onClick={() => move(to)}

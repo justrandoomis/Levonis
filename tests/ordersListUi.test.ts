@@ -39,7 +39,7 @@ import { ORDERS_STRINGS, ordersCount, moveLabel, fill, type OrdersLang } from '.
 import {
   applyMoves, baghdadDay, bulkOutcome, bulkPlan, csvHref, exportRange, listParams, mapLimit, readPages, searchTerm, type OrderListRow,
 } from '../src/components/merchant/orders/bulk';
-import { LIST_PAGES_MAX } from '../src/components/merchant/orders/ordersView';
+import { LIST_PAGES_MAX, ordersViewHref, readOrdersView } from '../src/components/merchant/orders/ordersView';
 import {
   locIn, orderMoveLabel, orderPayment, orderPaymentLabel, orderPaymentTone, paymentMark, type OrderPayment,
 } from '../src/components/merchant/orders/labels';
@@ -162,6 +162,17 @@ test('searchTerm, listParams and csvHref: the server\'s words, the server\'s bou
   assert.equal(searchTerm(' نور '), 'نور');
   assert.equal(searchTerm('x'.repeat(60)), 'x'.repeat(60));
   assert.equal(searchTerm('x'.repeat(61)), null);
+  // One rule with the list's address: a pasted spreadsheet row's tab (or any control character) is a space, so the
+  // search the list runs is always one the address writes and reads back — never refused there and then erased by it.
+  assert.equal(searchTerm('ORD-12\tعلي'), 'ORD-12 علي');
+  assert.equal(searchTerm(' a\t\t b\u0000c\u007f '), 'a b c');
+  assert.equal(searchTerm('\t\r\n\u0001'), '');
+  for (const typed of ['ORD-12\tعلي', 'نور\t\t0770', 'a\r\nb', 'x\u001fy', `${'x'.repeat(30)}\t${'y'.repeat(29)}`]) {
+    const term = searchTerm(typed);
+    assert.ok(term, JSON.stringify(typed));
+    assert.equal(readOrdersView(ordersViewHref({ q: term }).split('?')[1] ?? '').q, term, JSON.stringify(typed));
+    assert.equal(readOrdersView(ordersViewHref({ status: 'pending', q: term }).split('?')[1] ?? '').q, term, JSON.stringify(typed));
+  }
   assert.equal(listParams({ status: 'pending', q: 'نور', cursor: 'a|b' }).toString(), 'status=pending&q=%D9%86%D9%88%D8%B1&cursor=a%7Cb');
   assert.equal(csvHref({}), '/api/merchant/orders/export.csv');
   assert.equal(csvHref({ status: 'shipped', q: '#A1' }), '/api/merchant/orders/export.csv?status=shipped&q=%23A1');
@@ -332,6 +343,18 @@ test('THE SCREEN\'S FRAME: the search field, the CSV door that carries the filte
   assert.match(src, /const range = exportRange\(period, days\);/);
   assert.match(src, /<Select value=\{period\} onChange=\{\(e\) => setPeriod\(e\.target\.value as ExportPeriod\)\} data-orders-period>/, 'the period is the platform\'s own select (the system picker on a phone)');
   assert.match(src, /EXPORT_PERIODS\.map\(/);
+  // A closed native select clips its label with no ellipsis. Its field is w-44 (176px): less lv-input's 14px start
+  // padding, the Select's pe-10 and the border, 120px of text at the 16px a phone forces. Measured in Cairo 16px:
+  // 'Between two dates' 131px and 'لە بەروارێکەوە تا بەروارێک' 156px were cut; 'Custom dates' 93px,
+  // 'من تاريخ إلى تاريخ' 111px and 'بەرواری دیاریکراو' 105px fit. Bounded here by script (Latin letters are wider).
+  assert.match(src, /<Field label=\{s\.exportPeriod\} className="w-44">/, 'the width the label budget below is measured against');
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const t = ORDERS_STRINGS[lang];
+    for (const label of [t.periodAll, t.periodThisMonth, t.periodLastMonth, t.periodCustom]) {
+      const latin = /^[\x20-\x7e]+$/.test(label);
+      assert.ok([...label].length <= (latin ? 14 : 18), `${lang} «${label}» fits the closed period select`);
+    }
+  }
   assert.match(src, /\{period === 'custom' && \(/, 'two days appear only for a custom period');
   assert.match(src, /<Input ltr type="date" value=\{days\.from\} max=\{days\.to \|\| today\}/);
   assert.match(src, /<Input ltr type="date" value=\{days\.to\} min=\{days\.from \|\| undefined\} max=\{today\}/);

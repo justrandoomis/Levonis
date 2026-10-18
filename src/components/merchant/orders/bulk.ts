@@ -12,7 +12,8 @@
  *                   «تأكيد» to a selection that has nothing to confirm.
  *   bulkOutcome     the sentence a bulk answer earns: all done, some refused,
  *                   none moved.
- *   searchTerm      the typed text as the server accepts it: trimmed, at most
+ *   searchTerm      the typed text as the server accepts it: control
+ *                   characters made spaces, spaces collapsed, trimmed, at most
  *                   SEARCH_MAX characters — null says «too long», '' says
  *                   «everything».
  *   mapLimit        N slips fetched a few at a time, not fifty at once.
@@ -167,9 +168,16 @@ export function exportRange(
   return { ...(from ? { from } : {}), ...(to ? { to } : {}) };
 }
 
-/** The typed search as sent: '' for nothing, null when it is too long to send. */
+/**
+ * The typed search as sent: '' for nothing, null when it is too long to send.
+ * A control character (a tab pasted from the exported spreadsheet) becomes a
+ * space and runs of space become one, so the search is always one the list's
+ * address takes back (ordersView.ts `readOrdersView` refuses control
+ * characters) — the address and the list never disagree about it.
+ */
 export function searchTerm(text: string): string | null {
-  const t = text.trim();
+  // eslint-disable-next-line no-control-regex
+  const t = text.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
   if (!t) return '';
   return [...t].length > SEARCH_MAX ? null : t;
 }
