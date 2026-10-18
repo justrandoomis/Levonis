@@ -224,25 +224,26 @@ merchantRoutes.post('/onboard', async (c) => {
   /**
    * E1 — APPROVAL BEFORE A STORE (Community V3 push 1.1, DECISIONS row 256).
    *
-   * A store is opened only by someone a reviewer approved: the approve
-   * transition writes `community_merchants.approved_at`, and this door reads
-   * it. A user with no merchant row at all is a NEW merchant and is refused
-   * with MERCHANT_APPLICATION_REQUIRED — subscribing is not approval (owner
-   * decision C3: applying needs no PLUS; selling still does, below).
+   * A store is opened only by someone a reviewer approved — the merchant
+   * row's stamp, or an approved application (`merchantApprovalOf`). Anyone
+   * else is refused with MERCHANT_APPLICATION_REQUIRED — subscribing is not
+   * approval (owner decision C3: applying needs no PLUS; selling still does,
+   * below). That includes a store-less merchant ROW from the old /my-store
+   * door: a profile is not a store, and opening one now goes through review
+   * like everyone else (owner decision C2, final check row 257).
    *
-   * A merchant row that predates the gate (no stamp) keeps working until the
-   * enforcing push (1.4) moves every existing merchant through review. An
-   * older database without the column reads as "not approved", so only that
-   * pre-existing row can pass there — never a new merchant.
+   * An EXISTING STORE keeps working until the enforcing push (1.4) moves
+   * every existing merchant through review: it is answered STORE_EXISTS,
+   * below, exactly as before. An older database without 0204 reads as "not
+   * approved", so there too only an existing store passes this line.
    */
-  const approval = await merchantApprovalOf(c.env.DB, user.id);
-  if (!approval.approved && !approval.merchant) throw applicationRequiredRefusal();
+  const [approval, existing] = await Promise.all([merchantApprovalOf(c.env.DB, user.id), storeForUser(c.env.DB, user.id)]);
+  if (!approval.approved && !existing) throw applicationRequiredRefusal();
   const tier = await getTierStatus(c.env.DB, user.id);
   if (!benefits.merchantStore(tier)) {
     throw forbidden('An active LEVO PLUS subscription is required to open a store');
   }
 
-  const existing = await storeForUser(c.env.DB, user.id);
   // STORE_EXISTS, the code the onboarding page already answers by going to
   // the workspace — the race path below said it; the plain second visit said
   // CONFLICT, and the page read «تعذّر إنشاء المتجر» on every retry.
@@ -267,18 +268,28 @@ merchantRoutes.post('/onboard', async (c) => {
   // One batch: a store without its merchant, or a slug reservation without
   // its store, is a broken half-state a retry would then trip over.
   //
-  // The merchant row is an UPSERT: an approved applicant already HAS it (the
-  // approve transition created it with `approved_at`), and the conflict branch
-  // takes the store's name and governorate only — never `approved_at`,
-  // `status` or the sanctions.
+  // The merchant row is an UPSERT, and this is where a NEW approved merchant's
+  // row is born — with its store, never before (approval publishes nothing):
+  // it is stamped from the user's approved application. Only an approved
+  // caller reaches this batch (an existing store answered STORE_EXISTS above),
+  // so 0204's columns exist here. A row that already exists (one from before
+  // the gate, which the approval stamped) takes the store's name and
+  // governorate only; its stamp is filled only if it had none — never
+  // overwritten — and `status` and the sanctions are never touched.
   try {
     await c.env.DB.batch([
       c.env.DB.prepare(
-        `INSERT INTO community_merchants (id, user_id, name, bio, governorate, status)
-         VALUES (?, ?, ?, ?, ?, 'active')
+        `INSERT INTO community_merchants (id, user_id, name, bio, governorate, status, approved_at, approved_application_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'active',
+                 (SELECT decided_at FROM merchant_applications WHERE user_id = ?2 AND state = 'approved' ORDER BY decided_at DESC LIMIT 1),
+                 (SELECT id FROM merchant_applications WHERE user_id = ?2 AND state = 'approved' ORDER BY decided_at DESC LIMIT 1))
          ON CONFLICT(user_id) DO UPDATE SET name = excluded.name,
            governorate = CASE WHEN excluded.governorate <> '' THEN excluded.governorate
-                              ELSE community_merchants.governorate END`
+                              ELSE community_merchants.governorate END,
+           approved_at = COALESCE(community_merchants.approved_at, excluded.approved_at),
+           approved_application_id = CASE WHEN community_merchants.approved_at IS NULL
+                                          THEN excluded.approved_application_id
+                                          ELSE community_merchants.approved_application_id END`
       ).bind(merchantId, user.id, name, tagline, governorate),
       c.env.DB.prepare(
         `INSERT INTO merchant_stores

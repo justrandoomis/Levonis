@@ -131,24 +131,53 @@ test('every new refusal is written in three languages', () => {
   }
 });
 
-test('the workspace pill: an explicit false is «بانتظار الاعتماد» with the reason; an older answer is not', () => {
+test('the workspace pill keeps the store\'s REAL state; approval is its own notice beside it, never the pill', () => {
   const me = (extra: Partial<MerchantMe>) =>
     ({ store: { status: 'active', merchant: { status: 'active' } }, selling: { canSell: true, reason: '' }, ...extra }) as unknown as MerchantMe;
   const loc: Loc = (ar, en) => en || ar;
-  assert.equal(storeStatus(me({})).key, 'open', 'no field from the server: nothing said about approval');
-  assert.equal(storeStatus(me({ approved: true })).key, 'open');
+  assert.equal(storeStatus(me({})).key, 'open');
+  assert.equal(storeStatus(me({})).approval, null, 'no field from the server: nothing said about approval');
+  assert.equal(storeStatus(me({ approved: true })).approval, null);
+
+  // A merchant from before the gate (C1), not approved yet, in every operational state:
+  // the pill — and the open/pause switch's word — is the store's own state, and the
+  // approval notice rides beside it in every one of them.
+  const unapproved = { approved: false, application: null } as Partial<MerchantMe>;
+  const cases: Array<[string, Partial<MerchantMe>, string, string]> = [
+    ['open', {}, 'open', 'success'],
+    ['paused', { store: { status: 'paused', merchant: { status: 'active' } } } as unknown as Partial<MerchantMe>, 'paused', 'warning'],
+    ['lapsed', { selling: { canSell: false, reason: 'subscription_inactive' } } as unknown as Partial<MerchantMe>, 'lapsed', 'warning'],
+    ['restricted', { store: { status: 'active', merchant: { status: 'restricted' } } } as unknown as Partial<MerchantMe>, 'restricted', 'warning'],
+    ['suspended', { store: { status: 'suspended', merchant: { status: 'active' } } } as unknown as Partial<MerchantMe>, 'suspended', 'danger'],
+  ];
+  for (const [name, extra, key, tone] of cases) {
+    const st = storeStatus(me({ ...unapproved, ...extra }));
+    assert.equal(st.key, key, `${name}: the operational key comes first`);
+    assert.equal(st.tone, tone, `${name}: its own tone`);
+    assert.notEqual(st.label, W.approval, `${name}: the pill never reads «بانتظار الاعتماد»`);
+    assert.equal(st.approval?.(loc), 'Your store needs merchant approval; follow your application.', `${name}: the approval notice is still there`);
+    // The same answer with approval says exactly the same about the store.
+    const approved = storeStatus(me({ approved: true, ...extra }));
+    assert.equal(approved.key, st.key);
+    assert.equal(approved.reason(loc), st.reason(loc), `${name}: the reason is the store's, not the application's`);
+    assert.equal(approved.approval, null);
+  }
+  assert.match(storeStatus(me({ ...unapproved, selling: { canSell: false, reason: 'subscription_inactive' } } as Partial<MerchantMe>)).reason(loc), /PLUS/, 'a lapsed PLUS still says PLUS');
+
   const waiting = storeStatus(me({ approved: false, application: { state: 'changes_requested', revision: 2, reason_public: 'Add a clearer photo' } }));
-  assert.equal(waiting.key, 'approval');
-  assert.equal(waiting.tone, 'warning');
-  assert.match(waiting.reason(loc), /needs merchant approval.*Add a clearer photo/);
-  assert.equal(storeStatus(me({ approved: false, application: null })).reason(loc), 'Your store needs merchant approval; follow your application.');
+  assert.equal(waiting.key, 'open');
+  assert.match(waiting.approval!(loc), /needs merchant approval.*Add a clearer photo/);
   // A reason is the reviewer's public words only once they asked for changes or refused.
-  assert.doesNotMatch(storeStatus(me({ approved: false, application: { state: 'in_review', revision: 1, reason_public: 'stale words' } })).reason(loc), /stale/);
+  assert.doesNotMatch(storeStatus(me({ approved: false, application: { state: 'in_review', revision: 1, reason_public: 'stale words' } })).approval!(loc), /stale/);
   const ckb: Loc = (_ar, _en, c) => c ?? 'MISSING';
-  assert.match(waiting.reason(ckb), SORANI_ONLY);
-  // Levonis's own suspension still comes first.
-  const suspended = storeStatus({ ...me({ approved: false }), store: { status: 'suspended', merchant: { status: 'active' } } } as unknown as MerchantMe);
-  assert.equal(suspended.key, 'suspended');
+  assert.match(waiting.approval!(ckb), SORANI_ONLY);
+
+  // The shell says it in its own notice, with the link to the application; the
+  // switch reads the operational label; Today's pulse never sees an approval key.
+  const shell = code('src/components/merchant/shell/MerchantShell.tsx');
+  assert.match(shell, /status\.approval && \(/);
+  assert.match(shell, /data-approval-notice[\s\S]{0,400}data-approval-link[\s\S]{0,80}status\.approval\(loc\)/);
+  assert.doesNotMatch(code('src/components/merchant/shell/status.ts'), /key: 'approval'/);
 });
 
 test('the browser checks what it can before the server does: three name parts, a real date, 18+, a social link', () => {

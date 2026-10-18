@@ -319,20 +319,26 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
             className="min-h-0 flex-1 overflow-y-auto overflow-x-clip overscroll-contain focus:outline-none"
           >
             <div className="mx-auto w-full max-w-6xl px-4 pb-10 pt-5 sm:px-6 lg:px-8 lg:pt-7">
+              {/* The approval axis, in its own notice on every screen (Today's pulse
+                  speaks only of the store): the sentence IS the way to the application,
+                  on the main site. The pill and the open/pause switch keep the store's
+                  real state (DECISIONS row 257). */}
+              {status.approval && (
+                <p role="note" data-approval-notice className="lv-alert lv-alert-warning mb-5 text-[13px] leading-relaxed text-text-secondary">
+                  <span className="font-semibold text-text-primary">{say(loc, W.approval)}</span>
+                  {' — '}
+                  <a href={mainHref('/merchant/start')} className="font-semibold text-gold underline" data-approval-link>
+                    {status.approval(loc)}
+                  </a>
+                </p>
+              )}
               {status.key !== 'open' && section !== 'home' && (
                 <p
                   role="note"
                   data-selling-off={status.key}
                   className="lv-alert lv-alert-warning mb-5 text-[13px] leading-relaxed text-text-secondary"
                 >
-                  {/* The approval axis: the reason IS the way to the application, on the main site. */}
-                  {status.key === 'approval' ? (
-                    <a href={mainHref('/merchant/start')} className="font-semibold text-gold underline" data-approval-link>
-                      {status.reason(loc)}
-                    </a>
-                  ) : (
-                    status.reason(loc)
-                  )}{' '}
+                  {status.reason(loc)}{' '}
                   {/* The data is never what stops: said once, under the reason —
                       and only when selling has actually stopped. */}
                   {!me.selling?.canSell &&

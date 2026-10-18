@@ -17,6 +17,7 @@ import {
   baghdadToday,
   canReviewMerchantsHere,
   isMissingSchema,
+  revisionSentSql,
   reviewerNoticeText,
   transitionRefusal,
   validClientOperationId,
@@ -35,7 +36,7 @@ import {
  *   GET  /:id/photo                 the review photo: no-store, audited, scope-checked
  *   POST /:id/start-review          submitted → in_review
  *   POST /:id/request-changes       in_review → changes_requested (reason_public required)
- *   POST /:id/approve               in_review → approved (stamps community_merchants; NO store)
+ *   POST /:id/approve               in_review → approved (stamps an existing merchant row; NO store, NO new row)
  *   POST /:id/reject                in_review → rejected (reason_public required)
  *
  *   GET  /reviewers                 the owner: assistant admins and their MERCHANT_REVIEW grant
@@ -156,23 +157,33 @@ function listView(r: ListRow, reviewerId: string) {
  * A DRAFT IS NEVER A REVIEWER'S: it was never sent (or was reopened by its
  * applicant and is being edited). No filter lists it, and neither the detail
  * nor the photo opens it — its private values stay the applicant's alone.
+ *
+ * NOR IS ANY REVISION THAT WAS NEVER SENT (final check, row 257). The state
+ * alone is not the rule: a draft can be WITHDRAWN, and then its state is no
+ * longer 'draft'. Every door below asks `revisionSentSql` — is there a
+ * 'submitted' event at the application's CURRENT revision? — so a draft
+ * withdrawn unsent, or one whose values were edited after a reopen and then
+ * withdrawn, is listed nowhere and opens nowhere. The sealed columns hold
+ * only the latest values, so the earlier, sent revision is not shown in its
+ * place either: nothing is.
  */
 const QUEUE_FILTERS = ['queue', 'all', ...APPLICATION_STATES.filter((s) => s !== 'draft')] as const;
+const SENT = revisionSentSql('a');
 
 adminMerchantApplicationRoutes.get('/', async (c) => {
   await requireReviewer(c);
   const reviewer = c.get('user')!;
   const raw = c.req.query('state') ?? 'queue';
   if (!(QUEUE_FILTERS as readonly string[]).includes(raw)) throw badRequest('Unknown state filter', 'STATE_FILTER_INVALID');
-  let sql = `SELECT ${LIST_COLUMNS} FROM merchant_applications`;
+  let sql = `SELECT ${LIST_COLUMNS} FROM merchant_applications a`;
   const binds: unknown[] = [];
   if (raw === 'queue') {
     // What waits on a reviewer: submitted and in review, oldest first.
-    sql += ` WHERE state IN ('submitted','in_review') ORDER BY COALESCE(submitted_at, created_at) ASC LIMIT 200`;
+    sql += ` WHERE state IN ('submitted','in_review') AND ${SENT} ORDER BY COALESCE(submitted_at, created_at) ASC LIMIT 200`;
   } else if (raw === 'all') {
-    sql += ` WHERE state <> 'draft' ORDER BY updated_at DESC LIMIT 200`;
+    sql += ` WHERE state <> 'draft' AND ${SENT} ORDER BY updated_at DESC LIMIT 200`;
   } else {
-    sql += ` WHERE state = ? ORDER BY updated_at DESC LIMIT 200`;
+    sql += ` WHERE state = ? AND ${SENT} ORDER BY updated_at DESC LIMIT 200`;
     binds.push(raw);
   }
   let rows: ListRow[];
@@ -392,12 +403,12 @@ adminMerchantApplicationRoutes.get('/:id', async (c) => {
       .prepare(
         `SELECT ${LIST_COLUMNS}, legal_name_enc, dob_enc, social_link_enc, photo_key, activity_description,
                 reason_public, note_internal, decided_by, decided_revision, retention_until
-           FROM merchant_applications WHERE id = ?`
+           FROM merchant_applications a WHERE id = ? AND ${SENT}`
       )
       .bind(id)
       .first<DetailRow>()
   );
-  // A draft was never sent: nothing of it is opened, not even its existence.
+  // A revision never sent — a draft, or one withdrawn as a draft — opens nothing, not even its existence.
   if (!row || row.state === 'draft') throw notFound('Application not found');
   // A reviewer reading their OWN application is its applicant here: no staff note.
   const own = row.user_id === reviewer.id;
@@ -477,7 +488,10 @@ adminMerchantApplicationRoutes.get('/:id/photo', async (c) => {
   const id = applicationIdParam(c);
   const db = c.env.DB;
   const row = await guarded(() =>
-    db.prepare('SELECT state, photo_key FROM merchant_applications WHERE id = ?').bind(id).first<{ state: string; photo_key: string | null }>()
+    db
+      .prepare(`SELECT state, photo_key FROM merchant_applications a WHERE id = ? AND ${SENT}`)
+      .bind(id)
+      .first<{ state: string; photo_key: string | null }>()
   );
   if (!row || row.state === 'draft') throw notFound('Application not found');
   const key = row.photo_key ?? '';

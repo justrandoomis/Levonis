@@ -22,7 +22,11 @@
  *     to its application's prefix;
  *   - `note_internal` never reaches the applicant (their GET, their writes,
  *     /api/merchant/me);
- *   - approve stamps community_merchants and creates NO store;
+ *   - a revision never SENT is never a reviewer's — a draft, a draft
+ *     withdrawn unsent, values edited after a reopen and then withdrawn —
+ *     and such a withdrawal is purged at once (final check, row 257);
+ *   - approve creates NO store and no public merchant row (the row is born
+ *     with the store at /onboard);
  *   - Telegram notices carry ids only; a database without 0204 fails closed.
  *
  * Fixtures are anonymised: invented names, a placeholder link, a key minted
@@ -76,7 +80,13 @@ function world(opts: { through?: string } = {}) {
       ('u_assist', 9100003, 9100003, '+9647700000002', '2026-01-01T00:00:00.000Z'),
       ('u_assist2', 9100004, 9100004, '+9647700000003', '2026-01-01T00:00:00.000Z');
   `);
-  const bucket = memoryBucket();
+  // With R2's prefix listing, which the C7 purge reads (a withdrawn draft is purged in its own request).
+  const bucket = Object.assign(memoryBucket(), {
+    async list(o: { prefix?: string } = {}) {
+      const objects = [...bucket.objects.keys()].filter((k) => !o.prefix || k.startsWith(o.prefix)).sort().map((key) => ({ key }));
+      return { objects, truncated: false as const, delimitedPrefixes: [] as string[] };
+    },
+  });
   const images = imagesDouble();
   const env: Record<string, unknown> = { BUCKET: memoryBucket(), KYC_ENC_KEY: KEY, R2_PRIVATE: bucket, IMAGES: images.binding };
   const db = asD1(raw);
@@ -534,6 +544,85 @@ test('a DRAFT is never a reviewer\'s: no filter lists it, the detail and the pho
   assert.equal((await get(w.appAs(OWNER), `${BASE}/${id}/photo`)).status, 404);
 });
 
+/** Nothing of an application, for every reviewer: not listed under any filter, detail and photo 404, no value in any answer. */
+async function closedToReviewers(w: World, id: string, secrets: string[]) {
+  for (const who of [OWNER, FULL, ASSIST]) {
+    for (const f of ['queue', 'all', 'withdrawn']) {
+      const res = await get(w.appAs(who), `${BASE}?state=${f}`);
+      assert.equal(res.status, 200);
+      const text = await res.text();
+      assert.ok(!(JSON.parse(text).applications as Array<{ id: string }>).some((a) => a.id === id), `${who.id}: ?state=${f} lists it`);
+      for (const v of secrets) assert.ok(!text.includes(v), `${who.id}: ?state=${f} carries an unsent value`);
+    }
+    const detail = await get(w.appAs(who), `${BASE}/${id}`);
+    assert.equal(detail.status, 404, `${who.id}: detail`);
+    const body = await detail.text();
+    for (const v of secrets) assert.ok(!body.includes(v), `${who.id}: the detail carries an unsent value`);
+    assert.equal((await get(w.appAs(who), `${BASE}/${id}/photo`)).status, 404, `${who.id}: photo`);
+  }
+}
+
+test('a draft WITHDRAWN without ever being sent is still never a reviewer\'s: listed nowhere, opened nowhere, purged at once', async () => {
+  const w = world();
+  grant(w.raw, ASSIST.id);
+  const app = w.appAs(APPLICANT);
+  const saved = await put(app, '/api/merchant-application', { legal_name: NAME, dob: DOB, social_link: LINK, public_name: 'Never Sent Prints' });
+  assert.equal(saved.status, 200, await saved.clone().text());
+  const id = (await json(saved)).application.id as string;
+  assert.equal((await app.request('/api/merchant-application/photo', { method: 'POST', body: photoForm() })).status, 200);
+  const out = await post(app, '/api/merchant-application/withdraw', { operation_id: op('withdraw-draft') });
+  assert.equal(out.status, 200, await out.clone().text());
+  assert.equal((await json(out)).application.state, 'withdrawn');
+
+  await closedToReviewers(w, id, [...PII, 'Never Sent Prints']);
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action IN ('merchant_application.view','merchant_application.photo_view')"), 0, 'nothing was opened');
+  // And nothing of it is kept for the 90 days: there is no reviewer it could be kept for.
+  const r = row<{ legal_name_enc: string; dob_enc: string; social_link_enc: string; photo_key: string | null; purged_at: string | null }>(
+    w.raw,
+    'SELECT legal_name_enc, dob_enc, social_link_enc, photo_key, purged_at FROM merchant_applications WHERE id = ?',
+    id
+  )!;
+  assert.ok(r.purged_at);
+  assert.deepEqual([r.legal_name_enc, r.dob_enc, r.social_link_enc, r.photo_key], ['', '', '', null]);
+  assert.deepEqual([...w.bucket.objects.keys()].filter((k) => k.startsWith(`merchant-review/${id}/`)), []);
+});
+
+test('submitted, reopened by an edit, then withdrawn: the reviewer sees NOTHING of the unsent revision — and nothing older in its place', async () => {
+  const w = world();
+  grant(w.raw, ASSIST.id);
+  const id = await submitted(w);
+  const app = w.appAs(APPLICANT);
+  // While it was sent, a reviewer could open it.
+  assert.equal((await get(w.appAs(OWNER), `${BASE}/${id}`)).status, 200);
+  const views = count(w.raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action = 'merchant_application.view'");
+  // The applicant edits: revision 2, values no reviewer was ever sent.
+  const UNSENT = { given: 'Unsentgiven', father: 'Unsentfather', grandfather: 'Unsentgrand' };
+  const edited = await put(app, '/api/merchant-application', { legal_name: UNSENT, public_name: 'Unsent Rename Prints' });
+  assert.equal(edited.status, 200, await edited.clone().text());
+  assert.equal((await json(edited)).application.revision, 2);
+  assert.equal((await post(app, '/api/merchant-application/withdraw', { operation_id: op('withdraw-reopened') })).status, 200);
+
+  // The sealed columns hold only the LATEST values, so the sent revision 1 cannot be shown
+  // instead: the withdrawn application is closed to reviewers altogether.
+  await closedToReviewers(w, id, [UNSENT.given, UNSENT.father, UNSENT.grandfather, 'Unsent Rename Prints', ...PII]);
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action = 'merchant_application.view'"), views, 'no new view');
+  assert.ok(row<{ purged_at: string | null }>(w.raw, 'SELECT purged_at FROM merchant_applications WHERE id = ?', id)!.purged_at, 'purged at once');
+});
+
+test('withdrawn from a SENT revision, the application stays a reviewer\'s for the C7 period', async () => {
+  const w = world();
+  const id = await submitted(w);
+  assert.equal((await post(w.appAs(APPLICANT), '/api/merchant-application/withdraw', { operation_id: op('withdraw-sent') })).status, 200);
+  const list = await json(await get(w.appAs(OWNER), `${BASE}?state=withdrawn`));
+  assert.ok((list.applications as Array<{ id: string }>).some((a) => a.id === id), 'listed under withdrawn');
+  const detail = await json(await get(w.appAs(OWNER), `${BASE}/${id}`));
+  assert.deepEqual(detail.application.private.legal_name, NAME, 'the revision the applicant sent');
+  assert.equal((await get(w.appAs(OWNER), `${BASE}/${id}/photo`)).status, 200);
+  const r = row<{ retention_until: string; purged_at: string | null }>(w.raw, 'SELECT retention_until, purged_at FROM merchant_applications WHERE id = ?', id)!;
+  assert.equal(r.purged_at, null);
+  assert.ok(Date.parse(r.retention_until) > Date.now() + 89 * 86_400_000, 'kept the 90 days');
+});
+
 test("a reviewer's operation id never takes a server namespace ('purge:', 'create:', 'srv:')", async () => {
   const w = world();
   const id = await submitted(w);
@@ -547,7 +636,7 @@ test("a reviewer's operation id never takes a server namespace ('purge:', 'creat
 
 // ------------------------------------------------------------------ approve
 
-test('approve stamps the merchant row and creates NO store; /api/merchant/me then says approved', async () => {
+test('approve creates NO store and NO public merchant row; /api/merchant/me then says approved', async () => {
   const w = world();
   const id = await submitted(w);
   const stores = () => count(w.raw, 'SELECT COUNT(*) AS n FROM merchant_stores');
@@ -557,14 +646,8 @@ test('approve stamps the merchant row and creates NO store; /api/merchant/me the
   assert.equal(approved.status, 200, await approved.clone().text());
   assert.equal((await json(approved)).application.state, 'approved');
   assert.equal(stores(), before, 'approval opens no store');
-  const merchant = row<{ approved_at: string | null; approved_application_id: string | null; name: string }>(
-    w.raw,
-    'SELECT approved_at, approved_application_id, name FROM community_merchants WHERE user_id = ?',
-    APPLICANT.id
-  )!;
-  assert.ok(merchant.approved_at);
-  assert.equal(merchant.approved_application_id, id);
-  assert.equal(merchant.name, 'Orbit Prints', 'from the PUBLIC draft only');
+  // The approval lives on the application; the merchant row is born with the store at /onboard.
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM community_merchants WHERE user_id = ?', APPLICANT.id), 0, 'no card in «المتاجر» before a store');
   assert.equal(appState(w.raw, id)!.decided_by, OWNER.id);
 
   const me = await json(await get(w.appAs(APPLICANT), '/api/merchant/me'));

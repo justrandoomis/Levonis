@@ -714,9 +714,10 @@ communityRoutes.post('/my-store', requireAuth, async (c) => {
    *
    * This branch inserted a store-less community merchant for any PLUS member:
    * a public profile in «المتاجر» that no human had approved. A merchant row is
-   * now created only by the approve transition of a merchant application
-   * (worker/lib/merchantApproval.ts), so a user without one is refused with the
-   * same code as /api/merchant/onboard. The update branch above is untouched:
+   * now created only by /api/merchant/onboard, WITH its store, for someone a
+   * reviewer approved (worker/lib/merchantApproval.ts; approval itself writes
+   * no public row — DECISIONS row 257), so a user without one is refused here
+   * with the same code as /api/merchant/onboard. The update branch above is untouched:
    * an existing merchant keeps editing their profile. The community gate
    * still answers first, as it does at /onboard: a closed community is the
    * same 503 for everyone.

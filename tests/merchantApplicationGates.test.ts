@@ -3,9 +3,11 @@
  * DECISIONS row 256; gap §3.4 rows E1/E2, §3.6 «old product link»).
  *
  *   E1  POST /api/merchant/onboard opens a store only for an APPROVED
- *       applicant (403 MERCHANT_APPLICATION_REQUIRED otherwise), and UPSERTS
- *       the merchant row the approval wrote. Selling still needs PLUS (C3).
- *       A merchant row that predates the gate keeps working until push 1.4.
+ *       applicant (403 MERCHANT_APPLICATION_REQUIRED otherwise), and creates
+ *       the merchant row WITH the store, stamped from the approved
+ *       application — approval itself publishes no card in «المتاجر». Selling
+ *       still needs PLUS (C3). A store-less profile row from the old door is
+ *       no approval (C2); an existing STORE keeps working until push 1.4.
  *   E2  POST /api/community/my-store no longer creates a store-less merchant;
  *       its update branch is untouched.
  *   GET /api/products/:slug serves a community product only under the feed's
@@ -77,20 +79,53 @@ test('E1: a new merchant without approval cannot open a store — PLUS or not', 
   }
 });
 
-test('E1: an approved applicant opens a store, and /onboard UPSERTS the row the approval wrote', async () => {
+test('E1: an approved applicant opens a store, and the merchant row is born WITH it, stamped from the application', async () => {
   const raw = seed();
   await approveAli(raw);
-  const approved = row<{ id: string; approved_at: string }>(raw, "SELECT id, approved_at FROM community_merchants WHERE user_id = 'ali'")!;
-  assert.ok(approved.approved_at);
+  // Approval writes no public row: nothing to show in «المتاجر» before there is a store.
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM community_merchants WHERE user_id = 'ali'"), 0);
+  const decidedAt = row<{ decided_at: string }>(raw, "SELECT decided_at FROM merchant_applications WHERE id = 'mapp_ali'")!.decided_at;
 
   const res = await post(merchantApp(raw), '/api/merchant/onboard', ONBOARD);
   assert.equal(res.status, 201, JSON.stringify(await json(res.clone())));
-  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM community_merchants WHERE user_id = 'ali'"), 1, 'one merchant row, not two');
-  const after = row<{ id: string; approved_at: string; approved_application_id: string; status: string }>(raw, "SELECT * FROM community_merchants WHERE user_id = 'ali'")!;
-  assert.equal(after.id, approved.id, 'the store hangs off the approved row');
-  assert.equal(after.approved_at, approved.approved_at, 'onboarding never touches the stamp');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM community_merchants WHERE user_id = 'ali'"), 1, 'one merchant row');
+  const after = row<{ id: string; approved_at: string; approved_application_id: string; status: string; name: string }>(raw, "SELECT * FROM community_merchants WHERE user_id = 'ali'")!;
+  assert.equal(after.approved_at, decidedAt, 'stamped with the approval, never by the client');
   assert.equal(after.approved_application_id, 'mapp_ali');
-  assert.equal(row<{ merchant_id: string }>(raw, "SELECT merchant_id FROM merchant_stores WHERE user_id = 'ali'")!.merchant_id, approved.id);
+  assert.equal(after.status, 'active');
+  assert.equal(row<{ merchant_id: string }>(raw, "SELECT merchant_id FROM merchant_stores WHERE user_id = 'ali'")!.merchant_id, after.id);
+});
+
+test('a guest sees no card for an approved applicant until the store exists — and then exactly one', async () => {
+  const raw = seed();
+  const guest = stubApp(asD1(raw), null, (a) => a.route('/api/community', communityRoutes));
+  const names = async () => ((await json(await get(guest, '/api/community/merchants'))).merchants as Array<{ name: string; store_slug: string | null }>);
+  await approveAli(raw);
+  assert.deepEqual(await names(), [], 'approved, no store: no store-less card in «المتاجر»');
+  assert.equal((await json(await get(guest, '/api/community/merchants'))).total, 0);
+  assert.equal((await post(merchantApp(raw), '/api/merchant/onboard', ONBOARD)).status, 201);
+  const listed = await names();
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0]!.store_slug, 'orbit-prints');
+});
+
+test('approving a merchant from before the gate stamps THEIR row and keeps their listing as it was', async () => {
+  const raw = seed();
+  raw.exec("INSERT INTO community_merchants (id, user_id, name) VALUES ('cm_old', 'ali', 'Old Profile')");
+  const guest = stubApp(asD1(raw), null, (a) => a.route('/api/community', communityRoutes));
+  const before = (await json(await get(guest, '/api/community/merchants'))).merchants as Array<{ name: string }>;
+  assert.deepEqual(before.map((m) => m.name), ['Old Profile'], 'listed today (the old door made it)');
+  await approveAli(raw);
+  const stamped = row<{ id: string; approved_at: string | null; approved_application_id: string | null; name: string }>(raw, "SELECT * FROM community_merchants WHERE user_id = 'ali'")!;
+  assert.equal(stamped.id, 'cm_old', 'no second row');
+  assert.ok(stamped.approved_at);
+  assert.equal(stamped.approved_application_id, 'mapp_ali');
+  assert.deepEqual(((await json(await get(guest, '/api/community/merchants'))).merchants as Array<{ name: string }>).map((m) => m.name), ['Old Profile'], 'approval hides nobody');
+  const res = await post(merchantApp(raw), '/api/merchant/onboard', ONBOARD);
+  assert.equal(res.status, 201, JSON.stringify(await json(res.clone())));
+  const after = row<{ id: string; approved_at: string }>(raw, "SELECT id, approved_at FROM community_merchants WHERE user_id = 'ali'")!;
+  assert.equal(after.id, 'cm_old', 'the store hangs off the existing row');
+  assert.equal(after.approved_at, stamped.approved_at, 'onboarding never moves a stamp');
 });
 
 test('C3: approval does not replace PLUS — an approved applicant without PLUS still cannot sell', async () => {
@@ -102,14 +137,28 @@ test('C3: approval does not replace PLUS — an approved applicant without PLUS 
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM merchant_stores'), 0);
 });
 
-test('E1 is for NEW merchants: a merchant row from before the gate keeps working until push 1.4', async () => {
+test('C2: a store-less profile row from the old /my-store door opens no store without review', async () => {
   const raw = seed();
   raw.exec("INSERT INTO community_merchants (id, user_id, name) VALUES ('cm_old', 'ali', 'Old Profile')");
   const res = await post(merchantApp(raw), '/api/merchant/onboard', ONBOARD);
-  assert.equal(res.status, 201, JSON.stringify(await json(res.clone())));
+  assert.equal(res.status, 403);
+  assert.equal((await json(res)).code, 'MERCHANT_APPLICATION_REQUIRED', 'a profile is not a store: it applies like everyone else');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM merchant_stores'), 0);
 });
 
-test('E1 on a database without 0204: a new merchant is refused (fails closed), an existing row still onboards', async () => {
+test('an existing STORE keeps working until push 1.4: onboarding again is STORE_EXISTS, never the application refusal', async () => {
+  const raw = seed();
+  raw.exec(`INSERT INTO community_merchants (id, user_id, name) VALUES ('cm_old', 'ali', 'Old Profile');
+            INSERT INTO merchant_stores (id, merchant_id, user_id, slug, name) VALUES ('str_old', 'cm_old', 'ali', 'old-shop', 'Old Shop');`);
+  const res = await post(merchantApp(raw), '/api/merchant/onboard', ONBOARD);
+  assert.equal(res.status, 409);
+  assert.equal((await json(res)).code, 'STORE_EXISTS');
+  const me = await json(await get(merchantApp(raw), '/api/merchant/me'));
+  assert.equal(me.store?.slug, 'old-shop', 'the store is still theirs to run');
+  assert.equal(me.approved, false);
+});
+
+test('E1 on a database without 0204: a new merchant and a store-less row are refused (fails closed), an existing store is STORE_EXISTS', async () => {
   const fresh = seed(dbThrough('0203'));
   const refused = await post(merchantApp(fresh), '/api/merchant/onboard', ONBOARD);
   assert.equal(refused.status, 403);
@@ -117,19 +166,31 @@ test('E1 on a database without 0204: a new merchant is refused (fails closed), a
 
   const legacy = seed(dbThrough('0203'));
   legacy.exec("INSERT INTO community_merchants (id, user_id, name) VALUES ('cm_old', 'ali', 'Old Profile')");
-  assert.equal((await post(merchantApp(legacy), '/api/merchant/onboard', ONBOARD)).status, 201);
+  const profileOnly = await post(merchantApp(legacy), '/api/merchant/onboard', ONBOARD);
+  assert.equal(profileOnly.status, 403);
+  assert.equal((await json(profileOnly)).code, 'MERCHANT_APPLICATION_REQUIRED');
+
+  legacy.exec("INSERT INTO merchant_stores (id, merchant_id, user_id, slug, name) VALUES ('str_old', 'cm_old', 'ali', 'old-shop', 'Old Shop')");
+  const store = await post(merchantApp(legacy), '/api/merchant/onboard', ONBOARD);
+  assert.equal(store.status, 409);
+  assert.equal((await json(store)).code, 'STORE_EXISTS');
 });
 
 // ------------------------------------------------------------------------ E2
 
-test('E2: /my-store creates no merchant any more; an existing merchant keeps editing', async () => {
+test('E2: /my-store creates no merchant any more — not even for an approved applicant; an existing merchant keeps editing', async () => {
   const raw = seed();
   const refused = await post(merchantApp(raw), '/api/community/my-store', { name: 'Orbit Prints', bio: '' });
   assert.equal(refused.status, 403);
   assert.equal((await json(refused)).code, 'MERCHANT_APPLICATION_REQUIRED');
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM community_merchants'), 0);
 
+  // Approval does not reopen this door: the row is born with the store, at /onboard.
   await approveAli(raw);
+  assert.equal((await post(merchantApp(raw), '/api/community/my-store', { name: 'Orbit Prints', bio: '' })).status, 403);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM community_merchants'), 0);
+
+  raw.exec("INSERT INTO community_merchants (id, user_id, name) VALUES ('cm_old', 'ali', 'Old Profile')");
   const kept = await post(merchantApp(raw), '/api/community/my-store', { name: 'Orbit Prints 2', bio: 'New bio' });
   assert.equal(kept.status, 200);
   assert.equal(row<{ name: string }>(raw, "SELECT name FROM community_merchants WHERE user_id = 'ali'")!.name, 'Orbit Prints 2');

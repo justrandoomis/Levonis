@@ -73,8 +73,9 @@ export const W = {
   suspended: ['موقوف', 'Suspended', 'هەڵپەسێردراو'],
   lapsed: ['PLUS منتهٍ', 'PLUS lapsed', 'PLUS بەسەرچوو'],
   restricted: ['مقيّد', 'Restricted', 'سنووردارکراو'],
-  // The approval axis (Community V3 push 1.2, DECISIONS row 257): the pill
-  // word and its one-sentence why, owned by the merchant application module.
+  // The approval axis (Community V3 push 1.2, DECISIONS row 257): its own
+  // notice's heading and one-sentence why — never the pill, which keeps the
+  // store's real state — owned by the merchant application module.
   approval: APPROVAL_PILL.label,
   approvalWhy: APPROVAL_PILL.why,
 } as const satisfies Record<string, Words>;

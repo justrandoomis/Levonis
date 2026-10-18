@@ -5,6 +5,7 @@
  * or staging). Uses the same cookie-jar client + PROMOTE_CMD contract.
  */
 import { execSync } from 'node:child_process';
+import { deflateSync } from 'node:zlib';
 
 const BASE = process.env.API_BASE || 'http://127.0.0.1:8787';
 
@@ -20,11 +21,16 @@ async function loadPolicyAcceptance() {
       .map((p) => ({ key: p.key, version: p.version }));
   } catch { POLICY_ACC = []; }
 }
-let passed = 0, failed = 0;
+let passed = 0, failed = 0, skipped = 0;
 const failures = [];
 function check(name, cond, extra = '') {
   if (cond) { passed++; console.log(`  ok  ${name}`); }
   else { failed++; failures.push(name + (extra ? ` — ${extra}` : '')); console.log(`FAIL  ${name} ${extra}`); }
+}
+/** A step this run cannot take safely: said, with why — never counted as a pass. */
+function skip(name, reason) {
+  skipped++;
+  console.log(`SKIP  ${name} — ${reason}`);
 }
 
 class Client {
@@ -47,6 +53,113 @@ class Client {
   post(p, b) { return this.req('POST', p, b); }
   put(p, b) { return this.req('PUT', p, b); }
   patch(p, b) { return this.req('PATCH', p, b); }
+}
+
+/** Runs one SQL statement through PROMOTE_CMD (the suite's test-fixture channel). */
+function runSql(sql) {
+  const tpl = process.env.PROMOTE_CMD || 'npx wrangler d1 execute levonis-db --local --command {SQL}';
+  execSync(tpl.replace('{SQL}', JSON.stringify(sql)), { cwd: new URL('..', import.meta.url).pathname, stdio: 'pipe' });
+}
+
+/** A tiny solid-colour PNG made here — no file, nobody's photograph — for the review-photo upload. */
+function tinyPng(w = 32, h = 32) {
+  const table = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = (buf) => {
+    let c = 0xffffffff;
+    for (const b of buf) c = table[(c ^ b) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const sum = Buffer.alloc(4);
+    sum.writeUInt32BE(crc(body));
+    return Buffer.concat([len, body, sum]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 2; // truecolour
+  const row = Buffer.alloc(1 + w * 3);
+  for (let x = 0; x < w; x++) row.set([200, 160, 60], 1 + x * 3);
+  const pixels = Buffer.concat(Array.from({ length: h }, () => row));
+  return new Uint8Array(Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr), chunk('IDAT', deflateSync(pixels)), chunk('IEND', Buffer.alloc(0)),
+  ]));
+}
+
+/**
+ * THE STORE CHAIN UNDER THE APPROVAL GATE (Community V3, DECISIONS rows
+ * 256–257): apply → submit → a reviewer approves → onboard. Submitting needs
+ * a phone verified through Telegram, which a throwaway account cannot get
+ * over HTTP; ALLOW_PHONE_FIXTURE=1 (LOCAL ONLY, like ALLOW_LAUNCH_ACTIVATION)
+ * writes that link through the SQL channel. Anywhere else the chain stops at
+ * that refusal, withdraws the never-sent application (purged at once) and
+ * says the rest is skipped — it never forges a Telegram link on a shared
+ * database, where a made-up chat id could message a real person.
+ */
+async function approvalChain({ applicant, admin, applicantId, rnd, storeBody }) {
+  const draft = await applicant.put('/api/merchant-application', {
+    legal_name: { given: 'Verification', father: 'Run', grandfather: 'Levonis' },
+    dob: '1990-01-01',
+    social_link: 'https://www.instagram.com/levonis.verification.example',
+    public_name: storeBody.name,
+    public_bio: 'Automated verification run.',
+  });
+  if (draft.status === 503) {
+    skip('apply → approve → onboard', `this server does not take merchant applications yet (${draft.data?.code ?? draft.status})`);
+    return;
+  }
+  check('applying needs no PLUS: the draft application is saved (C3)', draft.status === 200, JSON.stringify(draft.data).slice(0, 160));
+  if (draft.status !== 200) return;
+  const withdraw = async (tag) => {
+    const w = await applicant.post('/api/merchant-application/withdraw', { operation_id: `v2-withdraw-${tag}-${rnd}` });
+    check('the never-sent application is withdrawn and purged at once', w.status === 200 && w.data?.application?.purged === true,
+      JSON.stringify(w.data?.application ?? w.data).slice(0, 160));
+  };
+  const form = new FormData();
+  form.append('file', new File([tinyPng()], 'verification.png', { type: 'image/png' }));
+  const photo = await applicant.req('POST', '/api/merchant-application/photo', form);
+  if (photo.status === 503) {
+    await withdraw('nophoto');
+    skip('apply → approve → onboard', `the review photo cannot be stored on this server (${photo.data?.code ?? photo.status})`);
+    return;
+  }
+  check('the review photo is accepted', photo.status === 200 && photo.data?.application?.provided?.photo === true, JSON.stringify(photo.data).slice(0, 160));
+  if (photo.status !== 200) return withdraw('photo');
+
+  if (process.env.ALLOW_PHONE_FIXTURE === '1') {
+    const tg = 900000000 + Math.floor(Math.random() * 90000000);
+    runSql(`INSERT INTO telegram_links (user_id, telegram_user_id, chat_id, phone_e164, verified_at) VALUES ('${applicantId}', ${tg}, ${tg}, '+96477${String(tg).slice(-8)}', strftime('%Y-%m-%dT%H:%M:%fZ','now'))`);
+    console.log('      (verified the test account\'s phone via SQL — ALLOW_PHONE_FIXTURE, local only)');
+  }
+  const sent = await applicant.post('/api/merchant-application/submit', { operation_id: `v2-submit-${rnd}` });
+  if (sent.status !== 200 && sent.data?.code === 'PHONE_NOT_VERIFIED') {
+    check('submit asks for a Telegram-verified phone first', true);
+    await withdraw('unsent');
+    skip('approve → onboard',
+      'submitting needs a phone verified through Telegram, which a throwaway account cannot get over HTTP, and this suite never forges one on a shared database (ALLOW_PHONE_FIXTURE=1 covers it on a LOCAL run)');
+    return;
+  }
+  check('the application is submitted', sent.status === 200, JSON.stringify(sent.data).slice(0, 200));
+  if (sent.status !== 200) return;
+  const id = sent.data?.application?.id;
+  const revision = sent.data?.application?.revision;
+  let r = await admin.post(`/api/admin/merchant-applications/${id}/start-review`, { revision, operation_id: `v2-start-${rnd}` });
+  check('a reviewer starts the review', r.status === 200, JSON.stringify(r.data).slice(0, 160));
+  r = await admin.post(`/api/admin/merchant-applications/${id}/approve`, { revision, operation_id: `v2-approve-${rnd}` });
+  check('a reviewer approves it', r.status === 200 && r.data?.application?.state === 'approved', JSON.stringify(r.data).slice(0, 160));
+  r = await applicant.get('/api/merchant/me');
+  check('/api/merchant/me says approved — and still no store', r.data?.approved === true && r.data?.store === null, JSON.stringify({ a: r.data?.approved, s: r.data?.store }).slice(0, 120));
+  r = await applicant.post('/api/merchant/onboard', storeBody);
+  check('the approved account opens its store', r.status === 201, JSON.stringify(r.data).slice(0, 200));
 }
 
 function promoteAdmin(email) {
@@ -217,15 +330,25 @@ async function main() {
   r = await admin.post('/api/admin/extract-v2', { url: 'http://127.0.0.1/x' });
   check('extract-v2 removed (404 — nothing is ever fetched)', r.status === 404);
 
-  console.log('\n— community PLUS gate');
+  // A subscription is not a store any more (owner decisions C2, C3;
+  // DECISIONS rows 256–257): every new merchant is approved by a reviewer
+  // first, PLUS or not, and the old /my-store door creates nobody.
+  console.log('\n— community: the merchant approval gate');
   const freeUser = new Client();
   await freeUser.post('/api/auth/register', { email: `v2free-${rnd}@test.local`, username: `v2f${rnd}`, name: 'Free', password: 'free-user-pass-1' });
   r = await freeUser.post('/api/community/my-store', { name: 'متجر مجاني', bio: '' });
-  check('free tier blocked from creating a store', r.status === 403, JSON.stringify(r.data).slice(0, 120));
+  check('free tier: the old door creates no merchant (403 MERCHANT_APPLICATION_REQUIRED)',
+    r.status === 403 && r.data?.code === 'MERCHANT_APPLICATION_REQUIRED', JSON.stringify(r.data).slice(0, 120));
   r = await buyer.post('/api/community/my-store', { name: 'متجر برو', bio: 'اختبار' });
-  check('active PRO can create a store', r.status === 200);
+  check('an active paid account without approval: the old door creates no merchant (403 MERCHANT_APPLICATION_REQUIRED)',
+    r.status === 403 && r.data?.code === 'MERCHANT_APPLICATION_REQUIRED', JSON.stringify(r.data).slice(0, 120));
+  const storeBody = { name: `V2 Store ${rnd}`, slug: `v2s${rnd}`, tagline: 'verification run' };
+  r = await buyer.post('/api/merchant/onboard', storeBody);
+  check('an active paid account without approval cannot open a store (403 MERCHANT_APPLICATION_REQUIRED)',
+    r.status === 403 && r.data?.code === 'MERCHANT_APPLICATION_REQUIRED', JSON.stringify(r.data).slice(0, 120));
+  await approvalChain({ applicant: buyer, admin, applicantId: buyerId, rnd, storeBody });
 
-  console.log(`\n${passed} passed, ${failed} failed`);
+  console.log(`\n${passed} passed, ${failed} failed${skipped ? `, ${skipped} skipped` : ''}`);
   if (failures.length) {
     console.log('Failures:');
     for (const f of failures) console.log(' -', f);

@@ -13,8 +13,10 @@
  *   and the seller conflict. Everything a visitor can do. It creates one
  *   throwaway account and nothing else.
  *
- *   PHASE 2 — the money path: buy PLUS, open a store, publish a product,
- *   place an order, hold and settle escrow. This WRITES TO THE LIVE LEDGER,
+ *   PHASE 2 — the money path: buy PLUS, apply and be approved as a merchant
+ *   (DECISIONS rows 256–257 — submitting needs a Telegram-verified phone, so a
+ *   throwaway account stops there and the store steps report BLOCKED), open
+ *   a store, publish a product, place an order, hold and settle escrow. This WRITES TO THE LIVE LEDGER,
  *   so it runs only when ALLOW_FINANCIAL=1 is passed explicitly. Without it
  *   every step reports BLOCKED with that reason — never as a pass, and never
  *   silently skipped.
@@ -32,6 +34,7 @@
  *   node scripts/e2e-subdomains.mjs
  */
 import { randomBytes } from 'node:crypto';
+import { deflateSync } from 'node:zlib';
 
 const APEX = (process.env.APEX || 'https://levonis-iq.com').replace(/\/$/, '');
 const APEX_URL = new URL(APEX);
@@ -539,9 +542,29 @@ async function main() {
   check('the server says this account may operate a store', me.json?.can?.store === true,
     `tier=${me.json?.tier} can=${JSON.stringify(me.json?.can ?? {})}`);
 
-  const onboard = await merchant.req('POST', APEX, '/api/merchant/onboard', {
-    slug: SLUG, name: `E2E Store ${RUN}`, tagline: 'verification run',
-  });
+  // PLUS IS NOT A STORE (owner decisions C2, C3; DECISIONS rows 256–257):
+  // a new merchant is approved by a reviewer first, subscribed or not.
+  const storeBody = { slug: SLUG, name: `E2E Store ${RUN}`, tagline: 'verification run' };
+  const unapproved = await merchant.req('POST', APEX, '/api/merchant/onboard', storeBody);
+  check('an unapproved PLUS account cannot open a store (403 MERCHANT_APPLICATION_REQUIRED)',
+    unapproved.status === 403 && unapproved.json?.code === 'MERCHANT_APPLICATION_REQUIRED',
+    `status ${unapproved.status} ${unapproved.json?.code ?? ''}`);
+  const approval = await applyAndApprove(merchant, admin);
+  if (!approval.ok) {
+    // The same situation as a run without an admin: no store can be created
+    // here. A store somebody already opened still proves the store host.
+    await verifyAnExistingStore(shopper);
+    for (const step of [
+      'a store is created on a real subdomain',
+      'the owner reaches their own /admin on the store host',
+      'the merchant chain past this point',
+    ]) {
+      blocked(step, approval.reason);
+    }
+    return report();
+  }
+
+  const onboard = await merchant.req('POST', APEX, '/api/merchant/onboard', storeBody);
   check('a store is created on a real subdomain', onboard.status < 400,
     `status ${onboard.status} ${onboard.json?.error ?? ''} slug=${SLUG}`);
   if (onboard.status >= 400) return report();
@@ -1013,6 +1036,103 @@ async function finish(admin, shopper, ...txnIds) {
  * NO MONEY MOVES. A cart line is not a ledger entry. The order and escrow
  * steps that do move money stay behind ALLOW_FINANCIAL, untouched.
  */
+/** A tiny solid-colour PNG made here — no file, nobody's photograph — for the review-photo upload. */
+function tinyPng(w = 32, h = 32) {
+  const table = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = (buf) => {
+    let c = 0xffffffff;
+    for (const b of buf) c = table[(c ^ b) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const sum = Buffer.alloc(4);
+    sum.writeUInt32BE(crc(body));
+    return Buffer.concat([len, body, sum]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 2; // truecolour
+  const row = Buffer.alloc(1 + w * 3);
+  for (let x = 0; x < w; x++) row.set([200, 160, 60], 1 + x * 3);
+  const pixels = Buffer.concat(Array.from({ length: h }, () => row));
+  return new Uint8Array(Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr), chunk('IDAT', deflateSync(pixels)), chunk('IEND', Buffer.alloc(0)),
+  ]));
+}
+
+/**
+ * THE APPROVAL GATE, ON THE REAL DEPLOYMENT: apply (a draft and a generated
+ * review photo), submit, and let the signed-in admin start the review and
+ * approve it through /api/admin/merchant-applications.
+ *
+ * Submitting needs a phone verified through Telegram. A throwaway account
+ * cannot get one over HTTP, and this script has no other channel — so on a
+ * live deployment the chain stops there, honestly: the never-sent
+ * application is withdrawn (which purges it at once) and the rest is
+ * reported BLOCKED with that reason. Answers `{ ok, reason }`.
+ */
+async function applyAndApprove(merchant, admin) {
+  const draft = await merchant.req('PUT', APEX, '/api/merchant-application', {
+    legal_name: { given: 'Verification', father: 'Run', grandfather: 'Levonis' },
+    dob: '1990-01-01',
+    social_link: 'https://www.instagram.com/levonis.verification.example',
+    public_name: `E2E Store ${RUN}`,
+    public_bio: 'Automated verification run.',
+  });
+  if (draft.status === 503) return { ok: false, reason: `this deployment does not take merchant applications yet (${draft.json?.code ?? 503})` };
+  check('applying needs no PLUS: the draft application is saved (C3)', draft.status === 200,
+    `status ${draft.status} ${draft.json?.code ?? ''}`);
+  if (draft.status !== 200) return { ok: false, reason: `the application could not be saved (${draft.status})` };
+  const withdraw = async () => {
+    const w = await merchant.req('POST', APEX, '/api/merchant-application/withdraw', { operation_id: `e2ewithdraw${RUN}` });
+    check('the never-sent application is withdrawn and purged at once',
+      w.status === 200 && w.json?.application?.purged === true, `status ${w.status} purged=${w.json?.application?.purged}`);
+  };
+  const photo = await merchant.upload(APEX, '/api/merchant-application/photo', {
+    file: { bytes: tinyPng(), name: 'verification.png', type: 'image/png' },
+  });
+  if (photo.status !== 200) {
+    await withdraw();
+    if (photo.status === 503) return { ok: false, reason: `the review photo cannot be stored on this deployment (${photo.json?.code ?? 503})` };
+    check('the review photo is accepted', false, `status ${photo.status} ${photo.json?.code ?? ''}`);
+    return { ok: false, reason: `the review photo was refused (${photo.status})` };
+  }
+  ok('the review photo is accepted');
+  const sent = await merchant.req('POST', APEX, '/api/merchant-application/submit', { operation_id: `e2esubmit${RUN}` });
+  if (sent.status !== 200) {
+    if (sent.json?.code === 'PHONE_NOT_VERIFIED') {
+      ok('submit asks for a Telegram-verified phone first');
+      await withdraw();
+      return {
+        ok: false,
+        reason: 'submitting a merchant application needs a phone verified through Telegram; a throwaway account cannot get one over HTTP, and this script forges nothing on a live database',
+      };
+    }
+    bad('the application is submitted', `status ${sent.status} ${sent.json?.code ?? ''}`);
+    return { ok: false, reason: `the application could not be submitted (${sent.status})` };
+  }
+  ok('the application is submitted');
+  const id = sent.json?.application?.id;
+  const revision = sent.json?.application?.revision;
+  const started = await admin.req('POST', APEX, `/api/admin/merchant-applications/${id}/start-review`, { revision, operation_id: `e2estart${RUN}` });
+  check('a reviewer starts the review', started.status === 200, `status ${started.status} ${started.json?.code ?? ''}`);
+  const approved = await admin.req('POST', APEX, `/api/admin/merchant-applications/${id}/approve`, { revision, operation_id: `e2eapprove${RUN}` });
+  check('a reviewer approves it', approved.status === 200 && approved.json?.application?.state === 'approved',
+    `status ${approved.status} ${approved.json?.code ?? ''}`);
+  if (approved.status !== 200) return { ok: false, reason: `the approval was refused (${approved.status} ${approved.json?.code ?? ''})` };
+  return { ok: true, reason: '' };
+}
+
 async function verifyAnExistingStore(shopper) {
   const anon = new Client('anon2');
 

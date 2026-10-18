@@ -27,6 +27,7 @@ import {
   parseLegalName,
   parsePublicLinks,
   parseSocialLink,
+  purgeDueApplication,
   submittedNoticeText,
   transitionRefusal,
   type LegalName,
@@ -40,7 +41,7 @@ import {
  *   PUT  /api/merchant-application           save the draft (creates one; re-applies after a rejection — C8)
  *   POST /api/merchant-application/photo     the private review photo (WebP re-encode strips EXIF)
  *   POST /api/merchant-application/submit    draft → submitted (verified phone + 18+, C6)
- *   POST /api/merchant-application/withdraw  any live state → withdrawn
+ *   POST /api/merchant-application/withdraw  any live state → withdrawn (a never-sent draft is purged at once)
  *
  * NEVER PLUS-GATED (owner decision C3): applying is open to every signed-in
  * account; selling after approval still needs PLUS at /onboard.
@@ -593,9 +594,16 @@ merchantApplicationRoutes.post('/submit', async (c) => {
 // ----------------------------------------------------------------- withdraw
 
 /**
- * Withdraw from any live state. The private values stay sealed for the C7
- * period (90 days, `retention_until`) and are then blanked by the scheduled
- * sweep, the photo deleted. Re-applying needs no wait (C8).
+ * Withdraw from any live state. Re-applying needs no wait (C8).
+ *
+ *   - From a SENT revision (submitted, in review, changes requested): the
+ *     private values stay sealed for the C7 period (90 days,
+ *     `retention_until`), then the scheduled sweep blanks them and deletes
+ *     the photo. A reviewer may still open that revision meanwhile.
+ *   - From a DRAFT — a first draft never sent, or values edited after a
+ *     reopen — no reviewer ever had this revision and none ever will
+ *     (`revisionSentSql`): the purge is due at once and runs here, in this
+ *     request. If any part of it fails, the next scheduled sweep finishes it.
  */
 merchantApplicationRoutes.post('/withdraw', async (c) => {
   await rateLimit(c, 'merchant-application-withdraw', 10, 3600);
@@ -609,5 +617,7 @@ merchantApplicationRoutes.post('/withdraw', async (c) => {
     applyTransition(db, { application: app, action: 'withdraw', actor: { id: user.id, kind: 'applicant' }, operationId })
   );
   if (!out.ok) throw transitionRefusal(out.code);
+  // A no-op unless the C7 clock is already due (withdrawn from a draft — or a replay of one whose purge failed).
+  await purgeDueApplication(c.env, app.id).catch(() => console.error('merchant application: withdrawn draft left for the scheduled purge', app.id));
   return c.json({ success: true, application: applicantView(await applicationById(db, app.id)) });
 });

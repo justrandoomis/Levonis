@@ -4,8 +4,11 @@
  * Approval is a fourth axis beside sanction (`community_merchants.status`),
  * store operation (`merchant_stores.status`) and subscription (memberships),
  * written into none of them. A person becomes a merchant when a human
- * reviewer approves their merchant application; the one flag every gate reads
- * is `community_merchants.approved_at`, and NULL fails closed.
+ * reviewer approves their merchant application; the flag the public
+ * predicates read is `community_merchants.approved_at`, and NULL fails
+ * closed. A NEW merchant's row does not exist until /onboard creates it with
+ * the store, stamped from the approved application — until then
+ * `merchantApprovalOf` reads that application (row 257, final check).
  *
  * This module is the single place that knows:
  *   - the application's states and the only legal transitions between them,
@@ -94,6 +97,13 @@ interface TransitionRule {
  *   submitted | changes_requested ─reopen (applicant edits, revision+1)→ draft
  *   draft | submitted | in_review | changes_requested ─withdraw→ withdrawn
  *
+ * A DRAFT'S REVISION WAS NEVER SENT: submit freezes a revision without
+ * bumping it and reopen always bumps, so a draft never has a 'submitted' event
+ * at its own revision. Withdrawn from a draft — a first draft, or values
+ * edited after a reopen — nothing in the sealed columns was ever a reviewer's
+ * (`revisionSentSql`), so nothing is kept: its C7 clock is due at once and the
+ * withdraw purges it (`purgeDueApplication`).
+ *
  * A finished application (approved, rejected, withdrawn) never moves again; a
  * rejected applicant re-applies at once with a NEW application (owner
  * decision C8 — no cooldown). Revocation after approval is the existing
@@ -162,6 +172,22 @@ export function merchantPublicSql(a: string): string {
   return `${merchantUnsanctionedSql(a)} AND ${alias(a)}.approved_at IS NOT NULL`;
 }
 
+/**
+ * WAS THE APPLICATION'S CURRENT REVISION EVER SENT? (final check, row 257.)
+ * The sealed columns hold only the LATEST values, so a reviewer may open an
+ * application only while its current revision is one the applicant
+ * submitted: a 'submitted' event at exactly that revision. A draft never
+ * qualifies, and neither does a withdrawn application whose last revision
+ * was a draft — a first draft never sent, or values edited after a reopen.
+ * Nothing older is shown in their place: the earlier revision's values are
+ * not stored anywhere, so the answer is nothing at all.
+ */
+export function revisionSentSql(a: string): string {
+  return `EXISTS (SELECT 1 FROM merchant_application_events sent
+                   WHERE sent.application_id = ${alias(a)}.id AND sent.revision = ${alias(a)}.revision
+                     AND sent.action = 'submitted')`;
+}
+
 /** PUBLIC STORE (gap §3.6): not suspended; paused stays visible (C10). */
 export function storePublicSql(s: string): string {
   return storeUnsanctionedSql(s);
@@ -170,22 +196,31 @@ export function storePublicSql(s: string): string {
 export interface MerchantApprovalState {
   /** The user already has a `community_merchants` row. */
   merchant: boolean;
-  /** …and it carries an approval stamp. */
+  /** A reviewer approved them: the row's stamp, or an approved application not yet turned into a store. */
   approved: boolean;
 }
 
 /**
- * Where this user stands on the approval axis. An older database without
- * `approved_at` answers "not approved" (fails closed) while still telling an
- * existing merchant row apart from none.
+ * Where this user stands on the approval axis. Approved is the merchant
+ * row's stamp OR an application in state 'approved' (a finished state that
+ * never moves again): approving a NEW applicant writes no public row — the
+ * row is born with its store at /onboard, stamped from that application — so
+ * nothing appears in «المتاجر» before there is a store to show.
+ *
+ * An older database without 0204 answers "not approved" (fails closed) while
+ * still telling an existing merchant row apart from none.
  */
 export async function merchantApprovalOf(db: D1Database, userId: string): Promise<MerchantApprovalState> {
   try {
     const row = await db
-      .prepare('SELECT id, approved_at FROM community_merchants WHERE user_id = ?')
+      .prepare(
+        `SELECT (SELECT id FROM community_merchants WHERE user_id = ?1) AS id,
+                (SELECT approved_at FROM community_merchants WHERE user_id = ?1) AS approved_at,
+                EXISTS (SELECT 1 FROM merchant_applications WHERE user_id = ?1 AND state = 'approved') AS application_approved`
+      )
       .bind(userId)
-      .first<{ id: string; approved_at: string | null }>();
-    return { merchant: !!row, approved: merchantApproved(row) };
+      .first<{ id: string | null; approved_at: string | null; application_approved: number }>();
+    return { merchant: !!row?.id, approved: merchantApproved(row) || Number(row?.application_approved ?? 0) === 1 };
   } catch (e) {
     if (!isMissingSchema(e)) throw e;
     const row = await db.prepare('SELECT id FROM community_merchants WHERE user_id = ?').bind(userId).first();
@@ -348,10 +383,12 @@ export function eventStatement(
  * of the same operation id answers with the state it produced and writes
  * nothing.
  *
- * APPROVE upserts `community_merchants(user_id)` with `approved_at` and
- * `approved_application_id` (name, bio and governorate from the PUBLIC draft
- * only, and only when the row is new). It creates no store and publishes
- * nothing: the merchant then opens a store at /onboard.
+ * APPROVE stamps `approved_at` and `approved_application_id` on the user's
+ * EXISTING merchant row (one from before the gate keeps its listing exactly
+ * as it was) and creates none: a new applicant's approval lives on the
+ * application, and /onboard creates the merchant row with its store, stamped
+ * from it. So approval creates no store and publishes nothing — no
+ * store-less card in «المتاجر» (final check, row 257).
  */
 export async function applyTransition(db: D1Database, req: TransitionRequest): Promise<TransitionOutcome> {
   if (!validOperationId(req.operationId)) return { ok: false, code: 'OPERATION_ID_INVALID' };
@@ -380,7 +417,9 @@ export async function applyTransition(db: D1Database, req: TransitionRequest): P
   }
   if (rule.retention) {
     sets.push('retention_until = ?');
-    binds.push(retentionUntil(now));
+    // Withdrawn from a draft, no reviewer ever had this revision (see TRANSITIONS):
+    // nothing is kept for the C7 period — the purge is due now.
+    binds.push(req.action === 'withdraw' && app.state === 'draft' ? now : retentionUntil(now));
   }
 
   // SUBMIT re-checks completeness IN the write: a draft save keeps the revision,
@@ -407,16 +446,14 @@ export async function applyTransition(db: D1Database, req: TransitionRequest): P
     }),
   ];
   if (req.action === 'approve') {
+    // An existing merchant row only: a new applicant gets theirs at /onboard, with the store.
     statements.push(
       db
         .prepare(
-          `INSERT INTO community_merchants (id, user_id, name, bio, governorate, status, approved_at, approved_application_id)
-           SELECT ?, a.user_id, a.public_name, a.public_bio, a.governorate, 'active', ?, a.id
-             FROM merchant_applications a WHERE a.id = ?
-           ON CONFLICT(user_id) DO UPDATE SET approved_at = excluded.approved_at,
-                                              approved_application_id = excluded.approved_application_id`
+          `UPDATE community_merchants SET approved_at = ?, approved_application_id = ?
+            WHERE user_id = (SELECT user_id FROM merchant_applications WHERE id = ?)`
         )
-        .bind(newId('cm'), now, app.id)
+        .bind(now, app.id, app.id)
     );
   }
   const { statements: auditRows } = await auditStatements(
@@ -673,17 +710,42 @@ export async function sweepMerchantApplicationRetention(
   now: string = new Date().toISOString(),
   limit = 25
 ): Promise<RetentionReport> {
+  return purgeDue(env, now, limit, '');
+}
+
+/**
+ * THE SAME PURGE FOR ONE APPLICATION, NOW — when its C7 clock is already due.
+ * The withdraw route calls it: an application withdrawn from a draft was
+ * never a reviewer's and is due at once (see TRANSITIONS), so its sealed
+ * values and photo go in the same request instead of waiting for the next
+ * scheduled sweep. Anything that fails here is left for that sweep (its
+ * `retention_until` is already due); an application not yet due is untouched.
+ */
+export async function purgeDueApplication(
+  env: Pick<Env, 'DB' | 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE'>,
+  applicationId: string,
+  now: string = new Date().toISOString()
+): Promise<RetentionReport> {
+  return purgeDue(env, now, 1, applicationId);
+}
+
+async function purgeDue(
+  env: Pick<Env, 'DB' | 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE'>,
+  now: string,
+  limit: number,
+  only: string
+): Promise<RetentionReport> {
   const report: RetentionReport = { scanned: 0, purged: 0, photo_failures: 0, failures: 0 };
   let rows: Array<{ id: string; revision: number; photo_key: string | null }>;
   try {
     rows = (
       await env.DB.prepare(
         `SELECT id, revision, photo_key FROM merchant_applications
-          WHERE retention_until IS NOT NULL AND retention_until <= ? AND purged_at IS NULL
-            AND state IN ('rejected','withdrawn')
-          ORDER BY retention_until LIMIT ?`
+          WHERE retention_until IS NOT NULL AND retention_until <= ?1 AND purged_at IS NULL
+            AND state IN ('rejected','withdrawn') AND (?3 = '' OR id = ?3)
+          ORDER BY retention_until LIMIT ?2`
       )
-        .bind(now, limit)
+        .bind(now, limit, only)
         .all<{ id: string; revision: number; photo_key: string | null }>()
     ).results;
   } catch (e) {

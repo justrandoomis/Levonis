@@ -16,8 +16,11 @@
  *   - a date of birth round-trips as the same ten characters; compound names
  *     («عبد الله») are one part; under-18 and an unverified phone are refused;
  *   - applying needs no PLUS (owner decision C3);
- *   - the C7 retention sweep; the append-only event trail; a database
- *     without 0204 fails closed.
+ *   - the C7 retention sweep (90 days after a SENT revision is withdrawn or
+ *     rejected; at once, in the withdraw request, for a revision never sent —
+ *     a first draft or values edited after a reopen); the append-only event
+ *     trail; a database without 0204 fails closed;
+ *   - approval publishes nothing: no store and no merchant row until /onboard.
  *
  * Fixtures are anonymised: invented names, a placeholder link, a key minted
  * per run.
@@ -144,6 +147,14 @@ async function completeDraft(w: ReturnType<typeof world>) {
   const photo = await uploadPhoto(w.app);
   assert.equal(photo.status, 200, await photo.clone().text());
   return (await json(saved)).application as { id: string };
+}
+
+/** A complete application, SUBMITTED: a revision a reviewer had, which a withdrawal keeps for the C7 period. */
+async function sentApplication(w: ReturnType<typeof world>) {
+  const app = await completeDraft(w);
+  const sent = await post(w.app, '/api/merchant-application/submit', {});
+  assert.equal(sent.status, 200, await sent.clone().text());
+  return app;
 }
 
 /** Every text value in every table, as one string. */
@@ -308,11 +319,10 @@ test('an approved merchant cannot open a second application', async () => {
   assert.equal((await post(w.app, '/api/merchant-application/submit', {})).status, 200);
   await applyTransition(w.db, { application: appRow(w.raw, id)!, action: 'start_review', actor: { id: 'u_rev', kind: 'reviewer' }, operationId: 'op-ap-start' });
   await applyTransition(w.db, { application: appRow(w.raw, id)!, action: 'approve', actor: { id: 'u_rev', kind: 'reviewer' }, operationId: 'op-ap-approve' });
-  assert.deepEqual(await merchantApprovalOf(w.db, 'u_app'), { merchant: true, approved: true });
-  const m = row<{ approved_application_id: string; name: string; status: string }>(w.raw, "SELECT * FROM community_merchants WHERE user_id = 'u_app'")!;
-  assert.equal(m.approved_application_id, id);
-  assert.equal(m.name, 'Orbit Prints', 'the merchant row takes the PUBLIC name, never the legal one');
-  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM merchant_stores'), 0, 'approval creates no store and publishes nothing');
+  // Approved on the application; no merchant row yet — it is born with the store at /onboard.
+  assert.deepEqual(await merchantApprovalOf(w.db, 'u_app'), { merchant: false, approved: true });
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM community_merchants'), 0, 'approval publishes nothing — no card in «المتاجر»');
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM merchant_stores'), 0, 'approval creates no store');
   const again = await put(w.app, '/api/merchant-application', { public_name: 'Second' });
   assert.equal(again.status, 409);
   assert.equal((await json(again)).code, 'MERCHANT_ALREADY_APPROVED');
@@ -498,7 +508,7 @@ test('C3: applying needs no PLUS — an account with no membership applies and s
 
 test('C7: 90 days after a withdrawal the sealed values are blanked, the photo deleted, the trail kept', async () => {
   const w = world();
-  const { id } = await completeDraft(w);
+  const { id } = await sentApplication(w);
   const photo = appRow(w.raw, id)!.photo_key!;
   const out = await json(await post(w.app, '/api/merchant-application/withdraw', { operation_id: 'op-withdraw-01' }));
   assert.equal(out.application.state, 'withdrawn');
@@ -521,7 +531,7 @@ test('C7: 90 days after a withdrawal the sealed values are blanked, the photo de
   assert.equal(await w.bucket.head(photo), null, 'the photo object is deleted');
   assert.deepEqual(
     all<{ action: string }>(w.raw, 'SELECT action FROM merchant_application_events WHERE application_id = ? ORDER BY at, rowid', id).map((e) => e.action),
-    ['created', 'withdrawn', 'purged']
+    ['created', 'submitted', 'withdrawn', 'purged']
   );
   // A second pass finds nothing; a live application is never touched.
   assert.equal((await sweepMerchantApplicationRetention({ ...w.env, DB: w.db } as never, new Date(Date.parse(until) + 5000).toISOString())).scanned, 0);
@@ -535,7 +545,7 @@ const after = (until: string, ms = 1000) => new Date(Date.parse(until) + ms).toI
 
 test("C7: no client takes the sweep's operation id — a withdraw sent as 'purge:<id>' is still purged", async () => {
   const w = world();
-  const { id } = await completeDraft(w);
+  const { id } = await sentApplication(w);
   // A client id never carries ':' — every server id lives in a ':' namespace.
   for (const reserved of [`purge:${id}`, `create:${id}`, 'srv:abcdefgh1234']) assert.equal(validClientOperationId(reserved), false, reserved);
   assert.equal(validClientOperationId('op-withdraw-01'), true);
@@ -563,7 +573,7 @@ test("C7: no client takes the sweep's operation id — a withdraw sent as 'purge
 
 test('C7: a blanking that fails for any reason but a lost race is REPORTED and retried, never counted as purged', async () => {
   const w = world();
-  const { id } = await completeDraft(w);
+  const { id } = await sentApplication(w);
   assert.equal((await post(w.app, '/api/merchant-application/withdraw', { operation_id: 'op-withdraw-fail' })).status, 200);
   const until = appRow(w.raw, id)!.retention_until!;
   w.raw.exec(`CREATE TRIGGER fail_purged_event BEFORE INSERT ON merchant_application_events
@@ -577,7 +587,7 @@ test('C7: a blanking that fails for any reason but a lost race is REPORTED and r
 
 test("C7: the purge empties the application's whole private prefix, not only the current photo", async () => {
   const w = world();
-  const { id } = await completeDraft(w);
+  const { id } = await sentApplication(w);
   // An object a failed replace-delete or a lost upload race left behind.
   await w.bucket.put(`merchant-review/${id}/photo/leftover01.webp`, new Uint8Array([1, 2, 3]));
   assert.equal(keysUnder(w, id).length, 2);
@@ -585,6 +595,81 @@ test("C7: the purge empties the application's whole private prefix, not only the
   const until = appRow(w.raw, id)!.retention_until!;
   assert.equal((await sweepAt(w, after(until))).purged, 1);
   assert.deepEqual(keysUnder(w, id), [], 'no photograph of this person survives');
+});
+
+test('withdrawn from a DRAFT nothing is kept: a never-sent draft is purged in the same request, the trail kept', async () => {
+  const w = world();
+  const { id } = await completeDraft(w);
+  const photo = appRow(w.raw, id)!.photo_key!;
+  const out = await post(w.app, '/api/merchant-application/withdraw', { operation_id: 'op-withdraw-draft' });
+  assert.equal(out.status, 200, await out.clone().text());
+  const body = await json(out);
+  assert.equal(body.application.state, 'withdrawn');
+  assert.equal(body.application.purged, true, 'the applicant is told nothing of it is kept');
+  assert.deepEqual(body.application.provided, { legal_name: false, dob: false, social_link: false, photo: false });
+  const r = appRow(w.raw, id)!;
+  assert.ok(r.purged_at, 'purged now, not in 90 days');
+  assert.ok(Date.parse(r.retention_until!) <= Date.now(), 'its C7 clock was due at once');
+  assert.equal(r.legal_name_enc, '');
+  assert.equal(r.dob_enc, '');
+  assert.equal(r.social_link_enc, '');
+  assert.equal(r.photo_key, null);
+  assert.equal(await w.bucket.head(photo), null, 'the photo object is deleted');
+  assert.deepEqual(keysUnder(w, id), []);
+  assert.deepEqual(
+    all<{ action: string }>(w.raw, 'SELECT action FROM merchant_application_events WHERE application_id = ? ORDER BY at, rowid', id).map((e) => e.action),
+    ['created', 'withdrawn', 'purged']
+  );
+  // A replay of the same withdraw answers the same, and purges nothing twice.
+  const again = await post(w.app, '/api/merchant-application/withdraw', { operation_id: 'op-withdraw-draft' });
+  assert.equal(again.status, 200);
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM merchant_application_events WHERE application_id = ? AND action = 'purged'", id), 1);
+  // Re-applying needs no wait (C8).
+  const fresh = await put(w.app, '/api/merchant-application', { public_name: 'Orbit Prints' });
+  assert.equal(fresh.status, 200);
+  assert.notEqual((await json(fresh)).application.id, id);
+});
+
+test('withdrawn after a REOPEN: the edited, never-sent values are purged at once too', async () => {
+  const w = world();
+  const { id } = await sentApplication(w);
+  // Editing reopens it as a draft at revision 2 — values no reviewer was sent.
+  const edited = await put(w.app, '/api/merchant-application', { legal_name: { given: 'Unsentgiven', father: 'Unsentfather', grandfather: 'Unsentgrand' } });
+  assert.equal(edited.status, 200, await edited.clone().text());
+  assert.equal((await json(edited)).application.revision, 2);
+  assert.equal((await post(w.app, '/api/merchant-application/withdraw', { operation_id: 'op-withdraw-reopened' })).status, 200);
+  const r = appRow(w.raw, id)!;
+  assert.equal(r.state, 'withdrawn');
+  assert.ok(r.purged_at);
+  assert.equal(r.legal_name_enc, '');
+  assert.equal(r.photo_key, null);
+  assert.deepEqual(keysUnder(w, id), []);
+});
+
+test('a withdrawn draft whose purge fails in the request is finished by the next scheduled sweep', async () => {
+  const w = world();
+  const { id } = await completeDraft(w);
+  const realList = w.bucket.list.bind(w.bucket);
+  let fail = true;
+  w.bucket.list = async (o) => {
+    if (fail) {
+      fail = false;
+      throw new Error('simulated listing failure');
+    }
+    return realList(o);
+  };
+  const realError = console.error;
+  console.error = () => {};
+  try {
+    const out = await post(w.app, '/api/merchant-application/withdraw', { operation_id: 'op-withdraw-later' });
+    assert.equal(out.status, 200, 'the withdrawal itself never fails on the purge');
+  } finally {
+    console.error = realError;
+  }
+  assert.equal(appRow(w.raw, id)!.purged_at, null);
+  assert.deepEqual(await sweepAt(w, after(new Date().toISOString())), { scanned: 1, purged: 1, photo_failures: 0, failures: 0 });
+  assert.ok(appRow(w.raw, id)!.purged_at);
+  assert.deepEqual(keysUnder(w, id), []);
 });
 
 test('two overlapping photo uploads: one wins, the loser deletes its own object — nothing is left unreferenced', async () => {
