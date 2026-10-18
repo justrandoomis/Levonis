@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import {
-  all, asD1, count, ctx, freshDb, json, memoryBucket, post, row, stubApp, type App, type MemoryBucket, type Mount,
+  MemoryBucket, all, asD1, count, ctx, freshDb, json, memoryBucket, pending, post, row, stubApp, type App, type Mount,
 } from './fixtures/app';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { printRequestRoutes } from '../worker/routes/printRequests';
@@ -28,6 +28,7 @@ import { uploadSessionRoutes } from '../worker/routes/uploadSessions';
 import { MEASURE_LATER_CODE, MEASURE_MAX_BYTES, insertRequestFile } from '../worker/lib/requestFileHooks';
 import { MAX_FILES_PER_REQUEST } from '../worker/lib/requestFileRoom';
 import { HttpError } from '../worker/lib/http';
+import { drainMatchQueue } from '../worker/lib/printMatchingStore';
 
 const MiB = 1024 * 1024;
 const RATE = 1400;
@@ -117,7 +118,7 @@ function stlCube(s = 10): Uint8Array {
 const viaSimpleDoor = (raw: DatabaseSync, bucket: MemoryBucket, id: string, name: string, bytes: Uint8Array) => {
   const form = new FormData();
   form.append('file', new File([bytes as unknown as BlobPart], name));
-  return as(raw, 'buyer', bucket).request(`/api/marketplace/requests/${id}/files`, { method: 'POST', body: form });
+  return as(raw, 'buyer', bucket).request(`/api/marketplace/requests/${id}/files`, { method: 'POST', body: form }, undefined, ctx);
 };
 
 /** Open a session for `bytes` on request `id` and send every part — not yet complete. */
@@ -323,6 +324,8 @@ test('R2: the whole-body door and the session door leave identical side effects 
       ? await viaSimpleDoor(raw, bucket, id, 'bracket.stl', stlCube(20))
       : await viaSessionDoor(raw, bucket, id, 'bracket.stl', stlCube(20));
     assert.ok(res.status === 200 || res.status === 201, `${door}: ${await res.text()}`);
+    // The whole-body door measures after its answer, under waitUntil.
+    await Promise.all(pending);
     return { effects: sideEffects(raw, id), bucket };
   };
   const simple = await run('simple');
@@ -369,6 +372,155 @@ test('R2: a model completed through a session is measured and stored the way /an
   assert.equal(an.status, 200);
   assert.equal(answer.cached, true);
   assert.equal(answer.analysis.measured, true);
+});
+
+// ------------------------------------------------------------ R2: the commit outlives the client
+
+const queued = (raw: DatabaseSync, id: string) =>
+  count(raw, "SELECT COUNT(*) AS n FROM community_match_queue WHERE kind = 'request' AND subject_id = ?", id);
+const matchesOn = (raw: DatabaseSync, id: string, revision: number) =>
+  count(raw, 'SELECT COUNT(*) AS n FROM community_request_matches WHERE request_id = ? AND revision = ?', id, revision);
+
+/** An ExecutionContext that keeps what the route hands to `waitUntil`. */
+function watchingCtx(): { ctx: ExecutionContext; handed: Promise<unknown>[] } {
+  const handed: Promise<unknown>[] = [];
+  return {
+    handed,
+    ctx: { waitUntil: (p: Promise<unknown>) => { handed.push(p.catch(() => undefined)); }, passThroughOnException() {} } as unknown as ExecutionContext,
+  };
+}
+
+/**
+ * A bucket that holds the viewer mesh's write until the test lets it go —
+ * the measurement's slowest step standing still — and notes what was already
+ * recorded the moment it arrived.
+ */
+class MeshGateBucket extends MemoryBucket {
+  release: () => void = () => undefined;
+  private readonly gate = new Promise<void>((resolve) => { this.release = resolve; });
+  private reached: (seen: Record<string, number>) => void = () => undefined;
+  readonly arrived = new Promise<Record<string, number>>((resolve) => { this.reached = resolve; });
+  constructor(private readonly look: () => Record<string, number> = () => ({})) {
+    super();
+  }
+  override async put(key: string, value: ArrayBuffer | ArrayBufferView | string, options?: { httpMetadata?: { contentType?: string } }) {
+    if (key.startsWith('request-previews/')) {
+      this.reached(this.look());
+      await this.gate;
+    }
+    return super.put(key, value, options);
+  }
+}
+
+test('R2: the re-match is queued in the insert’s own batch — an invocation cut off right after the commit is finished by the sweep', async () => {
+  const raw = seed();
+  const bucket = memoryBucket();
+  const { id, offerId } = await publishedWithOffer(raw, bucket);
+  const db = asD1(raw) as unknown as D1Database;
+  assert.equal(queued(raw, id), 0);
+  const file = (fid: string, requestId: string) => ({
+    id: fid, requestId, ownerId: 'buyer', key: `requests/buyer/${fid}.png`, name: `${fid}.png`, mime: 'image/png', bytes: 256, kind: 'reference',
+  });
+
+  // The batch alone: the invocation ends before a single hook runs.
+  await insertRequestFile(db, file('crf_cut', id));
+  assert.equal(row<{ state: string }>(raw, 'SELECT state FROM community_offers WHERE id = ?', offerId)!.state, 'superseded');
+  assert.equal(queued(raw, id), 1, 'the re-match rode the batch that superseded the offer');
+  assert.equal(row<{ reason: string }>(raw, "SELECT reason FROM community_match_queue WHERE kind = 'request' AND subject_id = ?", id)!.reason, 'files');
+  assert.equal(matchesOn(raw, id, 2), 0);
+
+  // The sweep finishes it: the verdicts are decided again on revision 2.
+  const report = await drainMatchQueue({ DB: db } as never, { limit: 5 });
+  assert.equal(report.requests, 1, JSON.stringify(report));
+  assert.equal(queued(raw, id), 0);
+  assert.ok(matchesOn(raw, id, 2) >= 1);
+
+  // A draft queues nothing; a refused row queues nothing.
+  const draft = await newDraft(raw, bucket);
+  await insertRequestFile(db, file('crf_draft', draft));
+  assert.equal(queued(raw, draft), 0, 'a draft is never matched');
+  raw.prepare(`UPDATE community_requests SET state = 'cancelled' WHERE id = ?`).run(id);
+  await assert.rejects(insertRequestFile(db, file('crf_late', id)), (e: unknown) => e instanceof HttpError && e.code === 'REQUEST_NOT_EDITABLE');
+  assert.equal(queued(raw, id), 0, 'the queue row rode the aborted batch');
+});
+
+test('R2: the revision, both notices and the re-match are recorded before the model is measured, and the chain is handed to waitUntil', async () => {
+  const raw = seed();
+  let id = '';
+  const bucket = new MeshGateBucket(() => ({
+    revision: count(raw, 'SELECT COUNT(*) AS n FROM community_request_revisions WHERE request_id = ? AND revision = 2', id),
+    offer_stale: noticeCount(raw, 'owner', 'offer_stale'),
+    request_files: noticeCount(raw, 'owner', 'request_files'),
+    matched: matchesOn(raw, id, 2) > 0 ? 1 : 0,
+    queued: queued(raw, id),
+  }));
+  try {
+    ({ id } = await publishedWithOffer(raw, bucket));
+    const sessionId = await openAndSend(raw, bucket, id, 'bracket.stl', stlCube(20));
+    const watch = watchingCtx();
+    const done = as(raw, 'buyer', bucket).request(
+      `/api/uploads/sessions/${sessionId}/complete`,
+      { method: 'POST', headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' }, body: '{}' },
+      undefined,
+      watch.ctx
+    );
+
+    // The mesh write stands still: everything the commit means is already there.
+    const seen = await bucket.arrived;
+    assert.deepEqual(seen, { revision: 1, offer_stale: 1, request_files: 1, matched: 1, queued: 0 });
+    assert.equal(watch.handed.length, 1, 'the chain is the runtime’s to finish, whatever the client does');
+    assert.equal(
+      row<{ state: string }>(raw, 'SELECT state FROM upload_sessions WHERE id = ?', sessionId)!.state,
+      'completed',
+      'completed with its row: a retry cannot land the file twice'
+    );
+
+    bucket.release();
+    const res = await done;
+    assert.equal(res.status, 200, await res.text());
+    const stored = row<{ analysis: string; preview_key: string }>(raw, 'SELECT analysis, preview_key FROM community_request_files WHERE request_id = ?', id)!;
+    assert.equal(JSON.parse(stored.analysis).measured, true, 'the measurement still lands, last');
+    assert.ok(stored.preview_key);
+  } finally {
+    bucket.release();
+  }
+});
+
+test('R2: the whole-body door answers before it parses a model — the measurement runs after the answer, under waitUntil, from one copy', async () => {
+  const raw = seed();
+  const bucket = new MeshGateBucket();
+  try {
+    const { id, offerId } = await publishedWithOffer(raw, bucket);
+    const watch = watchingCtx();
+    const form = new FormData();
+    form.append('file', new File([stlCube(20) as unknown as BlobPart], 'bracket.stl'));
+    const answered = await Promise.race([
+      as(raw, 'buyer', bucket).request(`/api/marketplace/requests/${id}/files`, { method: 'POST', body: form }, undefined, watch.ctx),
+      new Promise<'waited'>((resolve) => setTimeout(() => resolve('waited'), 5_000)),
+    ]);
+    assert.notEqual(answered, 'waited', 'the answer waited for the measurement');
+    const res = answered as Response;
+    const body = await json(res);
+    assert.equal(res.status, 201, JSON.stringify(body));
+
+    // Answered with the commit's meaning done and the model not yet parsed.
+    assert.equal(row<{ state: string }>(raw, 'SELECT state FROM community_offers WHERE id = ?', offerId)!.state, 'superseded');
+    assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM community_request_revisions WHERE request_id = ? AND revision = 2', id), 1);
+    assert.equal(noticeCount(raw, 'owner', 'offer_stale'), 1);
+    assert.equal(noticeCount(raw, 'owner', 'request_files'), 1);
+    assert.equal(row<{ analysis: string }>(raw, 'SELECT analysis FROM community_request_files WHERE id = ?', body.file.id)!.analysis, '');
+    assert.equal(watch.handed.length, 2, 'the hooks, and the measurement after the answer');
+
+    // Then the deferred measurement reaches the mesh, and lands.
+    await bucket.arrived;
+    bucket.release();
+    await Promise.all(watch.handed);
+    const stored = row<{ analysis: string; preview_key: string }>(raw, 'SELECT analysis, preview_key FROM community_request_files WHERE id = ?', body.file.id)!;
+    assert.equal(JSON.parse(stored.analysis).measured, true);
+    assert.equal(stored.preview_key, `request-previews/${id}/${body.file.id}.lvm`);
+  } finally {
+    bucket.release();
+  }
 });
 
 // ------------------------------------------------------------ R3

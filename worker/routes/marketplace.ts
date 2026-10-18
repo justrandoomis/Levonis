@@ -113,7 +113,10 @@ import { fileClass, fileReadStatement, fileReader, mayReadBytes, previewGrantFor
 // rows on a close or a revision, and the timeline's «started» row.
 import { writeRequestSystemUpdate } from './requestDiscussion';
 // One file on a request, whichever door it came through (DECISIONS row 257).
-import { afterFilesChanged, afterRequestFileAdded, insertRequestFile, rematchAfterFiles, reviseStatements } from '../lib/requestFileHooks';
+import {
+  afterFilesChanged, afterRequestFileAdded, insertRequestFile, measureAfterResponse, outliveClient, rematchAfterFiles, reviseStatements,
+} from '../lib/requestFileHooks';
+import { waitUntilFrom } from '../lib/eventBus';
 import { assertRequestTakesFiles } from '../lib/requestFileRoom';
 import { recordOrderEvent } from './communityOrderTimeline';
 // Offers V2 (0159, §9.5): a file key is the caller's own private upload or nothing.
@@ -401,7 +404,11 @@ marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {
   // where the row is written (`insertRequestFile`).
   await assertRequestTakesFiles(c.env.DB, id, user.id);
 
-  const form = await c.req.formData().catch(() => null);
+  // The raw request's FormData, not Hono's cached one: only this handler holds
+  // the upload, so it is gone once the handler returns and the model is
+  // measured after the answer from one copy (`measureAfterResponse`). A body a
+  // middleware already read is only reachable through Hono's cache.
+  const form = await (c.req.raw.bodyUsed ? c.req.formData() : c.req.raw.formData()).catch(() => null);
   if (!form) throw badRequest('Expected multipart form data');
   const file = form.get('file');
   if (!(file instanceof File)) throw badRequest('No file uploaded');
@@ -455,8 +462,12 @@ marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {
     await deleteMediaObject(c.env, 'private', key).catch(() => {});
     throw e;
   }
-  // The same hooks, in the same order, as the resumable session's `complete`.
-  await afterRequestFileAdded(c.env, added, user, kind.kind === 'model' ? { bytes: buf } : null);
+  // The same hooks, in the same order, as the resumable session's `complete`,
+  // out of a dropped client's reach — but no model is parsed while this
+  // handler still holds the upload twice: it is measured after the answer.
+  const waitUntil = waitUntilFrom(c);
+  await outliveClient(waitUntil, afterRequestFileAdded(c.env, added, user, null));
+  if (kind.kind === 'model') measureAfterResponse(waitUntil, c.env, added, buf);
 
   return c.json({
     success: true,

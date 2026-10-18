@@ -14,10 +14,15 @@
  *   assertRequestTakesFiles  (worker/lib/uploadEntity.ts) the request is the
  *                            caller's, still takes files and has room
  *   insertRequestFile        the row, GUARDED in SQL by the same three facts,
- *                            in one batch with the revision and the supersede
- *   afterRequestFileAdded    measure a model (stored the way /analyze stores
- *                            it), record the revision, notify, re-match —
- *                            never throws: the file has already landed
+ *                            in one batch with the revision, the supersede
+ *                            and the re-match's queue row
+ *   afterRequestFileAdded    record the revision, notify, re-match, and only
+ *                            THEN measure a model (stored the way /analyze
+ *                            stores it) — never throws: the file has landed
+ *   outliveClient            the chain under `waitUntil` AND awaited, so a
+ *                            dropped connection cannot cut it off
+ *   measureAfterResponse     the whole-body door's measurement, after its
+ *                            answer, holding one copy of the bytes
  *   measureRequestModel      the measurement and the viewer mesh on the file
  *                            row — /analyze's own writer
  *   readModelWithin          a stored model's bytes, or null past the cap,
@@ -31,7 +36,7 @@ import { MAX_FILES_PER_REQUEST, REQUEST_FILE_STATES, assertRequestTakesFiles } f
 import { offerCountStatement, staleOfferNotifications } from './communityRequests';
 import { composeSnapshot, recordRevisionStatement, reviseIfOfferedStatement, supersedeStatement } from './requestRevisions';
 import { notifyGrouped, peopleAr, stampGroupedCkb } from './notifications';
-import { rematchNow } from './printMatchingStore';
+import { enqueuePublishedRequestStatement, rematchNow } from './printMatchingStore';
 import { merchantHref } from '@levonis/contracts/merchantRoutes';
 import { writeRequestSystemUpdate } from '../routes/requestDiscussion';
 
@@ -209,17 +214,27 @@ function guardedInsertStatement(db: D1Database, f: NewRequestFile): D1PreparedSt
  * Write one attachment row — and, in the SAME batch, revise a published job
  * so every offer priced without this file is superseded until its merchant
  * re-confirms. `alongside` rides in the batch too (the session door's ledger
- * row), so a refusal leaves none of it behind. Throws REQUEST_NOT_EDITABLE,
- * REQUEST_FILES_FULL or 404 when the request no longer takes the file; the
- * caller deletes the object it stored.
+ * row and its «completed»), so a refusal leaves none of it behind. Throws
+ * REQUEST_NOT_EDITABLE, REQUEST_FILES_FULL or 404 when the request no longer
+ * takes the file; the caller deletes the object it stored.
+ *
+ * The re-match's queue row rides in the same batch (published jobs only): once
+ * the offers are superseded, the sweep finishes the re-match even if this
+ * invocation never reaches `rematchNow` (DECISIONS row 257).
  */
 export async function insertRequestFile(
   db: D1Database,
   f: NewRequestFile,
   alongside: D1PreparedStatement[] = []
 ): Promise<void> {
+  const ts = nowIso();
   try {
-    await db.batch([guardedInsertStatement(db, f), ...alongside, ...reviseStatements(db, f.requestId, nowIso())]);
+    await db.batch([
+      guardedInsertStatement(db, f),
+      ...alongside,
+      ...reviseStatements(db, f.requestId, ts),
+      enqueuePublishedRequestStatement(db, f.requestId, 'files', ts),
+    ]);
   } catch (e) {
     // Only the GUARD's own abort is read as a refusal; any other failure (a
     // ledger CHECK, an outage) is what it is, and the caller cleans up.
@@ -276,44 +291,97 @@ export async function measureRequestModel(
   return analysis;
 }
 
+type AddedRequestFile = Pick<NewRequestFile, 'id' | 'requestId' | 'ownerId' | 'name' | 'kind'>;
+type MeasureEnv = Pick<Env, 'DB' | 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE'>;
+type WaitUntil = ((p: Promise<unknown>) => void) | undefined;
+
+/**
+ * A model that came with its bytes (≤ MEASURE_MAX_BYTES) is measured and its
+ * answer stored on the row, so the wizard's `/analyze` answers from the row.
+ * Never throws: `/analyze` measures it on the wizard's next pass.
+ */
+export async function measureOnArrival(
+  env: MeasureEnv,
+  f: AddedRequestFile,
+  model?: { bytes: Uint8Array; analysis?: ModelAnalysis } | null
+): Promise<void> {
+  if (f.kind !== 'model' || !model || model.bytes.byteLength > MEASURE_MAX_BYTES) return;
+  try {
+    await measureRequestModel(env, {
+      requestId: f.requestId,
+      fileId: f.id,
+      fileName: f.name,
+      ownerId: f.ownerId,
+      bytes: model.bytes,
+      analysis: model.analysis,
+    });
+  } catch (e) {
+    console.error('request model not measured on upload for', f.requestId, e instanceof Error ? e.message : String(e));
+  }
+}
+
 /**
  * EVERYTHING A NEW ATTACHMENT MEANS, after its row committed — the same for
- * both doors, in the same order:
- *   1. a model that came with its bytes (≤ MEASURE_MAX_BYTES) is measured and
- *      stored, so the wizard's `/analyze` answers from the row;
- *   2. a published job records the revision and tells the merchants whose
+ * both doors, in the same order, what the commit means FIRST:
+ *   1. a published job records the revision and tells the merchants whose
  *      offers it superseded (`afterFilesChanged`);
- *   3. the workshops on its matches hear «أضاف … ملفات», grouped (0158) —
+ *   2. the workshops on its matches hear «أضاف … ملفات», grouped (0158) —
  *      BEFORE the re-match: the ones who were weighing the job as it stood
  *      are the ones the change concerns; a workshop the new file makes
  *      eligible gets the engine's own «طلب يناسب ورشتك» from the re-match;
- *   4. the re-match.
+ *   3. the re-match (its queue row committed with the file, so the sweep
+ *      finishes it if this pass never ends);
+ *   4. LAST, the measurement — the slowest step, and the only one a memory
+ *      limit can kill outright. Nothing above needs it: the revision and the
+ *      matcher read the request's own analysis, never the file row's.
  * Never throws: the file is stored whatever the bell or the parser does.
  */
 export async function afterRequestFileAdded(
   env: Env,
-  f: Pick<NewRequestFile, 'id' | 'requestId' | 'ownerId' | 'name' | 'kind'>,
+  f: AddedRequestFile,
   actor: { id: string; name?: string | null; username?: string | null },
   model?: { bytes: Uint8Array; analysis?: ModelAnalysis } | null
 ): Promise<void> {
-  if (f.kind === 'model' && model && model.bytes.byteLength <= MEASURE_MAX_BYTES) {
-    try {
-      await measureRequestModel(env, {
-        requestId: f.requestId,
-        fileId: f.id,
-        fileName: f.name,
-        ownerId: f.ownerId,
-        bytes: model.bytes,
-        analysis: model.analysis,
-      });
-    } catch (e) {
-      // `/analyze` measures it on the wizard's next pass.
-      console.error('request model not measured on upload for', f.requestId, e instanceof Error ? e.message : String(e));
-    }
-  }
   await afterFilesChanged(env.DB, f.requestId, f.ownerId);
   await notifyRequestFiles(env.DB, f.requestId, actor);
   await rematchAfterFiles(env, f.requestId);
+  await measureOnArrival(env, f, model);
+}
+
+/**
+ * THE HOOKS OUTLIVE THE CLIENT. A request's pending work is cancelled when
+ * its client disconnects — a customer on mobile data, the case the session
+ * door exists for — unless it was handed to `waitUntil`. Once the batch has
+ * committed (the revision moved, the offers superseded) the chain is handed
+ * there AND awaited: the answer still reports a file whose notices are sent,
+ * and a dropped connection cannot leave a superseded offer with nobody told.
+ * Without an execution context (a unit test) it is simply awaited.
+ */
+export async function outliveClient(waitUntil: WaitUntil, work: Promise<void>): Promise<void> {
+  waitUntil?.(work);
+  await work;
+}
+
+/**
+ * THE WHOLE-BODY DOOR MEASURES AFTER ITS ANSWER. While its handler runs it
+ * holds the upload twice — the multipart File and the copy it classified —
+ * and a 40 MiB model parsed on top of both (twice: the analysis and the
+ * viewer mesh) passes a Worker's 128 MB, a kill no try/catch sees. So the
+ * door answers first, and this runs under `waitUntil` a timer turn after the
+ * handler returned, holding nothing but `bytes` — /analyze's own footprint.
+ * Without an execution context nothing is measured here; `/analyze` does it
+ * when it is asked.
+ */
+export function measureAfterResponse(waitUntil: WaitUntil, env: MeasureEnv, f: AddedRequestFile, bytes: Uint8Array): void {
+  if (!waitUntil || f.kind !== 'model' || bytes.byteLength > MEASURE_MAX_BYTES) return;
+  waitUntil(
+    (async () => {
+      // A timer, not a microtask: the parse starts once the handler — and the
+      // FormData only it referenced — is gone.
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      await measureOnArrival(env, f, { bytes });
+    })()
+  );
 }
 
 /**

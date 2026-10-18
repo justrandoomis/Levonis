@@ -667,6 +667,25 @@ export function enqueueMatchStatement(db: D1Database, kind: MatchSubject, subjec
     .bind(kind, subjectId, reason.slice(0, 40), ts);
 }
 
+/**
+ * Queue a REQUEST's re-match only while it is published (open or receiving
+ * offers) — a statement for the very batch that changed it, so the sweep
+ * finishes the re-match even when the invocation ends before `rematchNow` is
+ * reached (DECISIONS row 257). A draft queues nothing. Same row, same
+ * coalescing as `enqueueMatchStatement`.
+ */
+export function enqueuePublishedRequestStatement(db: D1Database, requestId: string, reason: string, ts: string = nowIso()): D1PreparedStatement {
+  return db
+    .prepare(
+      `INSERT INTO community_match_queue (kind, subject_id, reason, queued_at, attempts, last_error)
+       SELECT 'request', ?1, ?2, ?3, 0, ''
+        WHERE EXISTS (SELECT 1 FROM community_requests WHERE id = ?1 AND state IN ('open','receiving_offers'))
+       ON CONFLICT (kind, subject_id) DO UPDATE SET
+         reason = excluded.reason, queued_at = excluded.queued_at, attempts = 0, last_error = ''`
+    )
+    .bind(requestId, reason.slice(0, 40), ts);
+}
+
 async function runSubject(env: Env, kind: MatchSubject, id: string): Promise<void> {
   if (kind === 'request') await matchRequest(env, id, { notify: true });
   else await matchMerchant(env, id);

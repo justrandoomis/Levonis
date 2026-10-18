@@ -52,7 +52,8 @@ import {
 import { mp4IsFastStart, sniffVideo } from '../lib/videoSniff';
 import { rasterDimensions } from '../lib/imageMetadata';
 import { analyseModel, type ModelAnalysis } from '../lib/modelGeometry';
-import { MEASURE_MAX_BYTES, afterRequestFileAdded, insertRequestFile } from '../lib/requestFileHooks';
+import { MEASURE_MAX_BYTES, afterRequestFileAdded, insertRequestFile, outliveClient } from '../lib/requestFileHooks';
+import { waitUntilFrom } from '../lib/eventBus';
 import { assertRequestFileRoom, assertRequestTakesFiles } from '../lib/requestFileRoom';
 import { HEIF_REFUSAL, isHeifBytes, sniff } from './uploads';
 import {
@@ -138,11 +139,14 @@ function resumeUpload(env: Env, s: Pick<SessionRow, 'object_key' | 'r2_upload_id
   return mediaBucket(env, visibilityForKey(s.object_key)).resumeMultipartUpload(s.object_key, s.r2_upload_id);
 }
 
-async function markSession(db: D1Database, id: string, state: SessionRow['state'], from: SessionRow['state'] = 'open'): Promise<boolean> {
-  const r = await db
+function markSessionStatement(db: D1Database, id: string, state: SessionRow['state'], from: SessionRow['state'] = 'open'): D1PreparedStatement {
+  return db
     .prepare('UPDATE upload_sessions SET state = ?, updated_at = ? WHERE id = ? AND state = ?')
-    .bind(state, nowIso(), id, from)
-    .run();
+    .bind(state, nowIso(), id, from);
+}
+
+async function markSession(db: D1Database, id: string, state: SessionRow['state'], from: SessionRow['state'] = 'open'): Promise<boolean> {
+  const r = await markSessionStatement(db, id, state, from).run();
   return (r.meta?.changes ?? 0) > 0;
 }
 
@@ -658,9 +662,10 @@ uploadSessionRoutes.post('/:id/complete', async (c) => {
   // A request answers with its FILE ROW, the way the marketplace route does,
   // so the wizard lists it without ever holding a key — and the row lands
   // THE WAY THE MARKETPLACE'S DOES (DECISIONS row 257): guarded in SQL by the
-  // request's state and room, in one batch with the ledger row, the revision
-  // and the supersede; then the same hooks — the model's measurement stored,
-  // the revision recorded, the workshops told, the match decided again.
+  // request's state and room, in one batch with the ledger row, the revision,
+  // the supersede, the re-match's queue row and the session's «completed»;
+  // then the same hooks — the revision recorded, the workshops told, the match
+  // decided again, and last the model's measurement stored.
   let file: Record<string, unknown> | null = null;
   if (s.purpose === 'request') {
     const kind = verdict.mime.startsWith('image/') ? 'reference' : verdict.mime === 'application/pdf' ? 'document' : 'model';
@@ -675,25 +680,33 @@ uploadSessionRoutes.post('/:id/complete', async (c) => {
       kind,
     };
     try {
-      await insertRequestFile(c.env.DB, added, [ledger]);
+      // The session is «completed» in the same batch as its row: an invocation
+      // that ends after the commit leaves no open session whose retry would
+      // land the file a second time.
+      await insertRequestFile(c.env.DB, added, [ledger, markSessionStatement(c.env.DB, s.id, 'completed')]);
     } catch (error) {
       // Refused where the row is written: nothing names the object, so it goes.
       await deleteMediaObject(c.env, visibility, s.object_key).catch(() => undefined);
       await markSession(c.env.DB, s.id, 'aborted');
       throw error;
     }
-    await afterRequestFileAdded(
-      c.env,
-      added,
-      user,
-      kind === 'model' && verdict.modelBytes ? { bytes: verdict.modelBytes, analysis: verdict.analysis } : null
+    // Under `waitUntil` and awaited: a dropped connection cannot cut off the
+    // revision, the notices or the re-match; the measurement comes last.
+    await outliveClient(
+      waitUntilFrom(c),
+      afterRequestFileAdded(
+        c.env,
+        added,
+        user,
+        kind === 'model' && verdict.modelBytes ? { bytes: verdict.modelBytes, analysis: verdict.analysis } : null
+      )
     );
     file = { id: added.id, file_name: originalName, content_type: verdict.mime, size_bytes: s.declared_bytes, kind };
   } else {
     await ledger.run();
+    await markSession(c.env.DB, s.id, 'completed');
   }
 
-  await markSession(c.env.DB, s.id, 'completed');
   return c.json({
     success: true,
     ...(KEY_PURPOSES.has(s.purpose) ? { key: s.object_key } : {}),
