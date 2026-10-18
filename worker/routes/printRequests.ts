@@ -271,7 +271,7 @@ printRequestRoutes.post('/requests/:id/files/:fileId/analyze', requireAuth, asyn
     return c.json({ success: true, file_id: fileId, analysis: parseJson<ModelAnalysis | null>(file.analysis, null), cached: true });
   }
 
-  // TOO LARGE TO MEASURE HERE (R3, DECISIONS row 257): a Worker holds 128 MB,
+  // TOO LARGE TO MEASURE HERE (R3, DECISIONS row 258): a Worker holds 128 MB,
   // and a session may store a 300 MB model. Above MEASURE_MAX_BYTES — by the
   // row's size, by the object's own size, or by the bytes as they stream in —
   // the model is not read into memory: it stays on the request as a reference,

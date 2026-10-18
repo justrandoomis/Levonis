@@ -671,7 +671,7 @@ export function enqueueMatchStatement(db: D1Database, kind: MatchSubject, subjec
  * Queue a REQUEST's re-match only while it is published (open or receiving
  * offers) — a statement for the very batch that changed it, so the sweep
  * finishes the re-match even when the invocation ends before `rematchNow` is
- * reached (DECISIONS row 257). A draft queues nothing. Same row, same
+ * reached (DECISIONS row 258). A draft queues nothing. Same row, same
  * coalescing as `enqueueMatchStatement`.
  */
 export function enqueuePublishedRequestStatement(db: D1Database, requestId: string, reason: string, ts: string = nowIso()): D1PreparedStatement {

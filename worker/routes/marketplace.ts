@@ -112,7 +112,7 @@ import { fileClass, fileReadStatement, fileReader, mayReadBytes, previewGrantFor
 // Phase 5b (docs/COMMUNITY_ECOSYSTEM.md §9.5): the discussion's server-written
 // rows on a close or a revision, and the timeline's «started» row.
 import { writeRequestSystemUpdate } from './requestDiscussion';
-// One file on a request, whichever door it came through (DECISIONS row 257).
+// One file on a request, whichever door it came through (DECISIONS row 258).
 import {
   afterFilesChanged, afterRequestFileAdded, insertRequestFile, measureAfterResponse, outliveClient, rematchAfterFiles, reviseStatements,
 } from '../lib/requestFileHooks';
@@ -389,7 +389,7 @@ async function requestForFiles(c: Context<AppContext>, id: string, userId: strin
  * WHAT A NEW OR REMOVED ATTACHMENT MEANS — the revision, the supersede, the
  * workshops' notice, the re-match — lives in worker/lib/requestFileHooks.ts,
  * shared with the resumable session's `complete` so the two doors cannot
- * drift (DECISIONS row 257).
+ * drift (DECISIONS row 258).
  */
 
 marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {

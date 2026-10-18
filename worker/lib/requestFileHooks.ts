@@ -1,11 +1,11 @@
 /**
  * ONE FILE ON A REQUEST, WHICHEVER DOOR IT CAME THROUGH (Community V3 R2,
- * docs/DECISIONS.md row 257).
+ * docs/DECISIONS.md row 258).
  *
  * A request's attachment arrives through one of two doors: the whole-body
  * route (`POST /api/marketplace/requests/:id/files`, worker/routes/
  * marketplace.ts) and the resumable session's `complete` (worker/routes/
- * uploadSessions.ts). Until row 257 only the first did what a new file on a
+ * uploadSessions.ts). Until row 258 only the first did what a new file on a
  * PUBLISHED job means — revise it, supersede the offers priced without the
  * file, tell the workshops, decide the match again — and neither re-checked
  * the request at the moment the row was written. Both doors now run THESE
@@ -220,7 +220,7 @@ function guardedInsertStatement(db: D1Database, f: NewRequestFile): D1PreparedSt
  *
  * The re-match's queue row rides in the same batch (published jobs only): once
  * the offers are superseded, the sweep finishes the re-match even if this
- * invocation never reaches `rematchNow` (DECISIONS row 257).
+ * invocation never reaches `rematchNow` (DECISIONS row 258).
  */
 export async function insertRequestFile(
   db: D1Database,

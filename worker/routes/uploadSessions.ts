@@ -628,7 +628,7 @@ uploadSessionRoutes.post('/:id/complete', async (c) => {
   const limits = await getSetting(c.env.DB, 'uploadLimits');
   let verdict: Verdict;
   try {
-    // A REQUEST IS ASKED AGAIN (DECISIONS row 257): the session was opened
+    // A REQUEST IS ASKED AGAIN (DECISIONS row 258): the session was opened
     // while it took files and had room; since then an offer may have been
     // accepted, or another upload may have taken the sixth slot.
     if (s.purpose === 'request') await assertRequestTakesFiles(c.env.DB, s.entity_id, s.owner_id);
@@ -661,7 +661,7 @@ uploadSessionRoutes.post('/:id/complete', async (c) => {
 
   // A request answers with its FILE ROW, the way the marketplace route does,
   // so the wizard lists it without ever holding a key — and the row lands
-  // THE WAY THE MARKETPLACE'S DOES (DECISIONS row 257): guarded in SQL by the
+  // THE WAY THE MARKETPLACE'S DOES (DECISIONS row 258): guarded in SQL by the
   // request's state and room, in one batch with the ledger row, the revision,
   // the supersede, the re-match's queue row and the session's «completed»;
   // then the same hooks — the revision recorded, the workshops told, the match

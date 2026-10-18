@@ -3,7 +3,7 @@
  * (the whole-body route in worker/routes/marketplace.ts, the resumable
  * session at open and again at complete in worker/routes/uploadSessions.ts)
  * and the SQL guard in `insertRequestFile` (worker/lib/requestFileHooks.ts)
- * asks once more where the row is written (DECISIONS row 257).
+ * asks once more where the row is written (DECISIONS row 258).
  *
  * A LEAF on purpose: it imports nothing but the HTTP errors, so the route
  * modules that share it cannot be pulled into an import cycle through it.
@@ -49,7 +49,7 @@ export async function assertRequestFileRoom(db: D1Database, requestId: string): 
  * ONE MORE FILE MAY LAND ON THIS REQUEST — asked by BOTH doors (the
  * whole-body route and the resumable session, at open AND at complete) and
  * asked again in SQL by `insertRequestFile` (worker/lib/requestFileHooks.ts)
- * at the moment the row is written (DECISIONS row 257).
+ * at the moment the row is written (DECISIONS row 258).
  */
 export async function assertRequestTakesFiles(db: D1Database, requestId: string, userId: string): Promise<void> {
   await assertRequestFilesOpen(db, requestId, userId);

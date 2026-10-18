@@ -185,7 +185,7 @@ test('every code the table translates is one the server can actually emit', () =
     'worker/routes/uploadSessions.ts',
     'worker/lib/uploadEntity.ts',
     // A request's file room and state, asked by both upload doors and by the
-    // guarded insert where the row lands (DECISIONS row 257).
+    // guarded insert where the row lands (DECISIONS row 258).
     'worker/lib/requestFileRoom.ts',
     'worker/lib/requestFileHooks.ts',
     // Eligibility as data (W5-B): the offer gate, the printer and stock routes,

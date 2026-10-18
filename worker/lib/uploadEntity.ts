@@ -92,7 +92,7 @@ export interface UploadActor {
 export const ORDER_UPDATE_LIVE_STATES: ReadonlySet<string> = new Set(['funded', 'in_progress', 'merchant_marked_delivered']);
 
 // A request's attachment checks live in a leaf module both doors share
-// (worker/lib/requestFileRoom.ts, DECISIONS row 257); re-exported here for
+// (worker/lib/requestFileRoom.ts, DECISIONS row 258); re-exported here for
 // the callers that always read them from this file.
 export { MAX_FILES_PER_REQUEST, assertRequestFileRoom } from './requestFileRoom';
 
