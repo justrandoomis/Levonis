@@ -1,4 +1,4 @@
--- 0201 — «إدارة التوصيل»: THE STORE'S DELIVERY POLICY (owner decisions 2026-10-18, DECISIONS row 250;
+-- 0203 — «إدارة التوصيل»: THE STORE'S DELIVERY POLICY (owner decisions 2026-10-18, DECISIONS row 253;
 -- packages/shipping/src/storeDelivery.ts)
 --
 -- DATA ONLY, NO SCHEMA CHANGE. One admin_settings document, `deliveryPolicy`, prices standard delivery:
@@ -34,7 +34,7 @@ SELECT 'deliveryPolicy', json_object(
   'default_fee_iqd', 5000,
   'governorates', json('{}'),
   'updated_at', strftime('%Y-%m-%dT%H:%M:%SZ', 'now'),
-  'updated_by', 'migration:0201',
+  'updated_by', 'migration:0203',
   'groups', json_array(
     json_object(
       'id', 'g_printers',

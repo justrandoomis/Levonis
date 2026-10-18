@@ -61,6 +61,48 @@ test('a stopped governorate refuses standard in three languages; pickup still wo
   raw.close();
 });
 
+test('the door holds for EVERY home-delivery method: personal cannot reach a stopped governorate or a «لا يُوصَّل» product', async () => {
+  const stoppedGov = fixture({ governorate: 'anbar', policy: (p) => (p.governorates = { anbar: { stopped: true } }) });
+  const viaPersonal = await post(stoppedGov.app, '/api/orders', order({ ...stoppedGov.body, deliveryMethodId: 'personal' }));
+  assert.equal(viaPersonal.status, 400);
+  assert.equal((await json(viaPersonal)).code, 'DELIVERY_GOVERNORATE_STOPPED');
+  assert.equal(row(stoppedGov.raw, 'SELECT COUNT(*) AS n FROM orders')?.n, 0);
+  stoppedGov.raw.close();
+
+  const stoppedProduct = fixture({
+    policy: (p) =>
+      (p.groups = [
+        { id: 'g_stopped', name: { ar: 'لا يُوصَّل', en: 'Not delivered', ckb: 'ناگەیەندرێت' }, enabled: true, mode: 'stopped', fee_iqd: 0, block_size: 1, catalog_ids: [], product_ids: ['spool'] },
+      ]),
+  });
+  const refused = await post(stoppedProduct.app, '/api/orders/quote', { ...stoppedProduct.body, deliveryMethodId: 'personal' });
+  assert.equal(refused.status, 400);
+  const r = await json(refused);
+  assert.equal(r.code, 'DELIVERY_METHOD_UNAVAILABLE');
+  assert.deepEqual(r.details?.unavailable_product_ids, ['spool']);
+  assert.equal(r.details?.delivery_method_id, 'personal');
+  stoppedProduct.raw.close();
+});
+
+test('a printer by the owner\'s catalog flag that no rule names pays the printers rule, not the default', async () => {
+  const { raw, app, body } = fixture();
+  // «أجهزة الليزر» itself is a printer catalog (0102) the seeded printers rule leaves out.
+  raw.exec(`
+    INSERT INTO products(id,slug,name,name_ar,price_iqd,status,stock,options,colors,selling_type,sale_types,images,category_id)
+      VALUES('lz','test-laser','Laser','ليزر',900000,'active',10,'[]','[]','direct_sale','["direct_sale"]','[]','cat_laser');
+    INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES ('lz','cat_laser',0);
+    UPDATE cart_items SET product_id='lz', qty=2 WHERE id='cart';
+  `);
+  const q = await json(await post(app, '/api/orders/quote', body));
+  assert.ok(q.quote, JSON.stringify(q));
+  assert.equal(q.quote.shipping.total_iqd, 20_000);
+  const part = q.quote.shipping.components.find((c: { rule_id?: string }) => c.rule_id === 'g_printers');
+  assert.ok(part, JSON.stringify(q.quote.shipping.components));
+  assert.equal(part.rule_name.ar, 'الطابعات');
+  await Promise.allSettled(pending.splice(0));
+  raw.close();
+});
+
 test('the order freezes the matched rule, its mode and block, and the governorate answer', async () => {
   const { raw, app, body } = fixture({ qty: 12 });
   const q = await json(await post(app, '/api/orders/quote', body));

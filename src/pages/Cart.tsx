@@ -347,9 +347,10 @@ interface CartDeliveryTariff {
  * the checkout prices with, over the lines' server-resolved groups. An older
  * server without a tariff gets the pre-policy figure (10,000 with a printer).
  */
-function cartDeliveryEstimate(items: CartItem[], tariff: CartDeliveryTariff | null): number {
+function cartDeliveryEstimate(items: CartItem[], tariff: CartDeliveryTariff | null): number | null {
   if (!tariff) return items.some((item) => item.is_printer) ? 10_000 : 5_000;
-  if (tariff.governorate_stopped) return 0;
+  // null = standard delivery is impossible here (the checkout refuses it), never «مجاني».
+  if (tariff.governorate_stopped) return null;
   const policy: DeliveryPolicy = {
     version: 1,
     default_fee_iqd: tariff.default_fee_iqd,
@@ -365,7 +366,10 @@ function cartDeliveryEstimate(items: CartItem[], tariff: CartDeliveryTariff | nu
       qty: p.units_per_line * (Number(item.qty) || 0),
     }))
   );
-  return deliveryCharge({ parts, policy }).total_iqd;
+  const charge = deliveryCharge({ parts, policy });
+  // A «لا يُوصَّل» part makes the checkout refuse standard delivery for the order.
+  if (charge.stopped_product_ids.length > 0) return null;
+  return charge.total_iqd;
 }
 
 interface CartResponse {
@@ -1268,7 +1272,7 @@ export default function Cart() {
   // §5: points come after the membership, against the merchandise the
   // membership has already reduced.
   const pointsDiscount = usePoints ? Math.min(pointBalance, merchandise) : 0;
-  const total = merchandise + shipping - pointsDiscount;
+  const total = merchandise + (shipping ?? 0) - pointsDiscount;
   /**
    * THE SAME FIGURES IN THE SHOP'S DOLLARS (DECISIONS row 248): Σ each selected line's dollar price ×
    * quantity, and ONE conversion of everything else the dinar figure holds (lines without a dollar
@@ -2595,7 +2599,9 @@ export default function Cart() {
               {loc('التوصيل (يُحدد عند الدفع)', 'Shipping (final at checkout)', 'گەیاندن (لە کاتی پارەدان دیاری دەکرێت)')}
             </span>
             <span className="text-text-primary text-[14px] font-medium">
-              {shipping === 0 ? (
+              {shipping === null ? (
+                <span className="text-text-secondary" data-cart-delivery-unavailable>{loc('غير متاح', 'Unavailable', 'بەردەست نییە')}</span>
+              ) : shipping === 0 ? (
                 <span className="text-gold">{loc('مجاني', 'Free', 'بەخۆڕایی')}</span>
               ) : (
                 money(shipping)

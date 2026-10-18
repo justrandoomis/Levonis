@@ -1050,6 +1050,8 @@ async function loadCart(c: Context<AppContext>) {
           ...(ancestryFor(deliveryAncestry, doc.category_id ?? null, doc.sub_category_id ?? null) ?? []),
           ...(placements.get(doc.id) ?? []).flatMap((id) => deliveryAncestry.get(id) ?? [id]),
         ],
+        // The owner's printer flag: a printer no group names is priced by the printers group.
+        is_printer: printerIds.has(doc.id) || bundlePrinterIds.has(doc.id),
       },
       deliveryPolicy
     );

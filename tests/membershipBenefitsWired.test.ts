@@ -700,6 +700,27 @@ test('the subscription page reads live configuration, never a string in the bund
 
 /* ------------------------------------------------------------ the simulator */
 
+test('the simulator matches delivery rules on catalog placements, exactly as checkout does', async () => {
+  const { raw, db } = setup();
+  const admin = appAs(db, 'boss', 'admin');
+  // A printer with no own section, filed only by placement in a seeded printers catalog.
+  raw.exec(`
+    INSERT INTO products (id,slug,name,name_ar,price_iqd,status,stock,options,colors,selling_type,sale_types,preorder_transports,images,category_id,sub_category_id)
+      VALUES ('pp','mb-placed-printer','Resin','رزن',900000,'active',5,'[]','[]','direct_sale','["direct_sale"]','[]','[]',NULL,NULL);
+    INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES ('pp','cat_printers_resin',0);
+  `);
+  const sim = await json(
+    await send(admin, 'POST', '/api/admin/membership-benefits/simulate', {
+      tier: 'prime',
+      items: [{ product_id: 'pp', qty: 2 }],
+      delivery_method_id: 'standard',
+      payment_method_id: 'cash',
+    })
+  );
+  assert.equal(sim.success, true, JSON.stringify(sim));
+  assert.equal(sim.totals.shipping_before_benefit_iqd, 20_000, 'the printers rule, 10,000 a piece');
+});
+
 test('the simulator answers through the same functions the checkout uses, and writes nothing', async () => {
   const { raw, db } = setup();
   const admin = appAs(db, 'boss', 'admin');

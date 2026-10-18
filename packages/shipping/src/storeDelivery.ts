@@ -70,9 +70,22 @@ const TARGET_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
 const GOVERNORATE_IDS = new Set(IRAQ_GOVERNORATES.map((g) => g.id));
 
 /**
+ * THE PRINTERS GROUP. A line that IS a printer — the owner's catalog flag
+ * (`is_printer_catalog`, reached through any placement) or a printer size
+ * class, the identity the pre-policy tariff charged its 10,000 on — and that
+ * no group names by product or section is priced by this group when it is
+ * enabled, instead of falling to the default. So a printer filed in a mixed
+ * section the seeded rule leaves out (e.g. «أجهزة الليزر» itself), or in a
+ * catalog flagged as a printer catalog later, still pays the printer charge.
+ */
+export const PRINTER_DELIVERY_GROUP_ID = 'g_printers';
+
+/**
  * USED ONLY WHEN THE SETTING ROW IS MISSING. It reproduces the tariff that
  * was live before the delivery management: 5,000 per order, or 10,000 when a
  * printer is in the shipment (one flat printer charge, whatever the count).
+ * "A printer" is the printer fact on the line (see PRINTER_DELIVERY_GROUP_ID),
+ * so a printer outside the three catalog ids below is still charged 10,000.
  */
 export const DELIVERY_POLICY_FALLBACK: DeliveryPolicy = {
   version: 1,
@@ -400,10 +413,11 @@ export interface DeliveryLine {
 /**
  * THE GROUP THAT PRICES A LINE: the first enabled group naming the product,
  * else the first enabled group naming the nearest section on its path, else
- * null (the default). Product > sub-section > section > default.
+ * — for a printer — the enabled printers group, else null (the default).
+ * Product > sub-section > section > printer fact > default.
  */
 export function resolveDeliveryGroup(
-  item: Pick<DeliveryLine, 'product_id' | 'category_path'>,
+  item: Pick<DeliveryLine, 'product_id' | 'category_path' | 'is_printer'>,
   policy: DeliveryPolicy
 ): DeliveryRuleGroup | null {
   const groups = policy.groups.filter((g) => g.enabled);
@@ -413,6 +427,7 @@ export function resolveDeliveryGroup(
     const hit = groups.find((g) => g.catalog_ids.includes(id));
     if (hit) return hit;
   }
+  if (item.is_printer === true) return groups.find((g) => g.id === PRINTER_DELIVERY_GROUP_ID) ?? null;
   return null;
 }
 
@@ -444,6 +459,8 @@ export interface DeliveryChargeComponent {
   product_ids: string[];
   fee_iqd: number;
   contains_printer: boolean;
+  /** A rule component: its group's name in the three languages (the checkout's breakdown row). */
+  rule_name?: DeliveryName;
   fee_source?: 'governorate' | 'default';
 }
 
@@ -510,6 +527,7 @@ export function deliveryCharge(input: {
         product_ids: pool.products,
         fee_iqd: groupChargeIqd(pool.group, pool.units),
         contains_printer: pool.printer,
+        rule_name: pool.group.name,
       });
     }
     if (def.units > 0 && pools.size === 0) {

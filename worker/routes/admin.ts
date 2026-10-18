@@ -54,7 +54,7 @@ import { resolveOrderExpiry } from '../lib/orderExpiry';
 import { getSetting, getSettings, normalizePayoutMethods, normalizeSerialPrepGate, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
 import { getOfficialUsdRate } from '../lib/fx/officialRate';
 import { validateWalletFreeDelivery } from '../lib/walletFreeDelivery';
-import { productCatalogPlacements } from '../lib/printerIdentity';
+import { printerProductIds, productCatalogPlacements } from '../lib/printerIdentity';
 import { deliveryGroupSummary, deliveryPolicyTargets, resolveDeliveryGroup, validateDeliveryPolicy } from '../lib/storeDelivery';
 import { afterCatalogueWrite, afterSettingsWrite } from '../lib/edgePolicy';
 import { CLAIM_ALREADY_OPEN_DESK, type CreateUnitsResult } from '../lib/deviceOps';
@@ -4105,16 +4105,17 @@ adminRoutes.get('/delivery-policy/resolve', async (c) => {
     categoryId = row?.category_id ?? null;
     subCategoryId = row?.sub_category_id ?? null;
   }
-  const [policy, index, placements] = await Promise.all([
+  const [policy, index, placements, printers] = await Promise.all([
     getSetting(c.env.DB, 'deliveryPolicy'),
     catalogAncestry(c.env.DB),
     productCatalogPlacements(c.env.DB, productId ? [productId] : []),
+    printerProductIds(c.env.DB, productId ? [productId] : []),
   ]);
   const path = [
     ...(ancestryFor(index, categoryId, subCategoryId) ?? []),
     ...(placements.get(productId) ?? []).flatMap((id) => index.get(id) ?? [id]),
   ];
-  const group = resolveDeliveryGroup({ product_id: productId, category_path: path }, policy);
+  const group = resolveDeliveryGroup({ product_id: productId, category_path: path, is_printer: printers.has(productId) }, policy);
   return c.json({
     success: true,
     group: group ? { id: group.id, name: group.name, mode: group.mode, fee_iqd: group.fee_iqd, block_size: group.block_size } : null,

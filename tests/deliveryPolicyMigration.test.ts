@@ -1,5 +1,5 @@
 /**
- * MIGRATION 0201 — «إدارة التوصيل»: the owner's starting rules are seeded from
+ * MIGRATION 0203 — «إدارة التوصيل»: the owner's starting rules are seeded from
  * the live catalogue facts, the retired per-product stop moves into
  * «لا يُوصَّل», the old field is cleared, and a second run changes nothing.
  *
@@ -13,7 +13,7 @@ import { ROOT } from './fixtures/d1';
 import { dbThrough } from './fixtures/app';
 import { normalizeDeliveryPolicy, type DeliveryRuleGroup } from '../worker/lib/storeDelivery';
 
-const SQL = readFileSync(join(ROOT, 'migrations/0201_delivery_policy.sql'), 'utf8');
+const SQL = readFileSync(join(ROOT, 'migrations/0203_delivery_policy.sql'), 'utf8');
 const H2S = 'prd_65182590e9284a97a3e2';
 const H2D = 'prd_7387063972434aab9f92';
 
@@ -34,14 +34,14 @@ function seed(withH2S = true) {
 const stored = (raw: ReturnType<typeof dbThrough>) =>
   JSON.parse((raw.prepare("SELECT value FROM admin_settings WHERE key='deliveryPolicy'").get() as { value: string }).value);
 
-test('0201 seeds the exact starting rules and clears delivery_options', () => {
+test('0203 seeds the exact starting rules and clears delivery_options', () => {
   const raw = seed();
   raw.exec(SQL);
   const v = stored(raw);
   assert.equal(v.version, 1);
   assert.equal(v.default_fee_iqd, 5000);
   assert.deepEqual(v.governorates, {});
-  assert.equal(v.updated_by, 'migration:0201');
+  assert.equal(v.updated_by, 'migration:0203');
   const byId = Object.fromEntries((v.groups as DeliveryRuleGroup[]).map((g) => [g.id, g]));
   assert.deepEqual(byId.g_printers, {
     id: 'g_printers', name: { ar: 'الطابعات', en: 'Printers', ckb: 'پرینتەرەکان' },

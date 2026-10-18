@@ -8,6 +8,7 @@ import { shippingConfigFrom } from './orders';
 import { quoteShipping } from '../lib/shipping';
 import type { DeliveryPolicy } from '../lib/storeDelivery';
 import { codDeliveryTaxIqd } from '../lib/codTax';
+import { printerProductIds, productCatalogPlacements } from '../lib/printerIdentity';
 import { resolveUnitPrice, proPolicyFrom } from '../lib/pricing';
 import { parseProductRow } from '../lib/productModel';
 import type { DeliveryMethod } from '../lib/settings';
@@ -896,13 +897,17 @@ adminMembershipBenefitRoutes.post('/simulate', async (c: Context<AppContext>) =>
   if (items.length === 0) throw badRequest('Add at least one product to simulate', 'VALIDATION');
 
   const ids = [...new Set(items.map((i) => i.product_id))];
-  const [{ results: rows }, rules, ancestry, settings] = await Promise.all([
+  const [{ results: rows }, rules, ancestry, settings, placements, printers] = await Promise.all([
     c.env.DB.prepare(`SELECT * FROM products WHERE id IN (${ids.map(() => '?').join(',')})`)
       .bind(...ids)
       .all<Record<string, unknown>>(),
     allBenefitRules(c.env.DB),
     catalogAncestry(c.env.DB),
     getSettings(c.env.DB, ['proPricingPolicy', 'shippingPolicy', 'checkoutDeliveryMethods', 'codTaxPerBlockIqd', 'codTaxBlockIqd', 'deliveryPolicy']),
+    // The delivery policy matches a line on its catalog placements and the
+    // printer flag too, exactly as at checkout.
+    productCatalogPlacements(c.env.DB, ids),
+    printerProductIds(c.env.DB, ids),
   ]);
   const byId = new Map((rows ?? []).map((r) => [String(r.id), r]));
   const missing = ids.filter((id) => !byId.has(id));
@@ -973,7 +978,13 @@ adminMembershipBenefitRoutes.post('/simulate', async (c: Context<AppContext>) =>
       product_id: l.product_id,
       qty: l.qty,
       size_class: 'ordinary' as const,
-      category_path: l.benefit.ancestry ?? [],
+      category_path: [
+        ...new Set([
+          ...(l.benefit.ancestry ?? []),
+          ...(placements.get(l.product_id) ?? []).flatMap((id) => ancestry.get(id) ?? [id]),
+        ]),
+      ],
+      is_printer: printers.has(l.product_id),
     })),
     deliveryPolicy: settings.deliveryPolicy as DeliveryPolicy,
     deliveryMethod: deliveryMethodId === 'personal' ? 'personal' : 'standard',

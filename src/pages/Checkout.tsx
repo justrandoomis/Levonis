@@ -120,6 +120,11 @@ interface ShippingQuoteDto {
     product_name?: string;
     delivery_method?: 'standard' | 'personal';
     quantity_step?: number;
+    /** «إدارة التوصيل» group components: the group's name and how it charges. */
+    rule_name?: { ar: string; en: string; ckb: string };
+    mode?: 'flat' | 'per_piece' | 'per_block' | 'stopped';
+    block_size?: number;
+    fee_per_step_iqd?: number;
   }>;
   total_iqd: number;
   total_before_waiver_iqd: number;
@@ -3013,14 +3018,34 @@ export default function Checkout() {
                       printer_large: ['توصيل طابعة كبيرة', 'Large printer delivery', 'گەیاندنی پرینتەری گەورە'],
                       carton: ['كرتونة كمية إضافية', 'Extra quantity carton', 'کارتۆنی بڕی زیادە'],
                       product: ['توصيل حسب المنتج', 'Product delivery', 'گەیاندن بەپێی بەرهەم'],
+                      rule: ['توصيل حسب قاعدة التوصيل', 'Delivery rule', 'گەیاندن بەپێی یاسای گەیاندن'],
                     };
-                    const name = component.product_name
-                      ? [component.product_name, component.product_name, component.product_name]
-                      : names[component.kind] ?? [component.kind, component.kind, component.kind];
+                    const name: [string, string, string] = component.rule_name
+                      ? [component.rule_name.ar, component.rule_name.en, component.rule_name.ckb]
+                      : component.product_name
+                        ? [component.product_name, component.product_name, component.product_name]
+                        : names[component.kind] ?? names.ordinary;
+                    // How the rule charges: «5,000 لكل 10 قطع» / «10,000 لكل قطعة».
+                    const step = component.kind === 'rule' && component.fee_per_step_iqd !== undefined
+                      ? component.mode === 'per_block' && (component.block_size ?? 0) > 1
+                        ? loc(
+                            `${money(component.fee_per_step_iqd)} لكل ${component.block_size} قطع`,
+                            `${money(component.fee_per_step_iqd)} per ${component.block_size} pieces`,
+                            `${money(component.fee_per_step_iqd)} بۆ هەر ${component.block_size} پارچە`
+                          )
+                        : component.mode === 'per_piece'
+                          ? loc(
+                              `${money(component.fee_per_step_iqd)} لكل قطعة`,
+                              `${money(component.fee_per_step_iqd)} per piece`,
+                              `${money(component.fee_per_step_iqd)} بۆ هەر پارچەیەک`
+                            )
+                          : ''
+                      : '';
                     return (
                       <div key={`${component.kind}:${index}`} className="flex items-center justify-between gap-3">
                         <span className="text-text-muted">
                           {loc(name[0], name[1], name[2])}
+                          {step ? ` — ${step}` : ''}
                           {component.units > 1 ? ` × ${component.units}` : ''}
                         </span>
                         <span className={`tabular-nums ${component.waived ? 'text-emerald-400' : 'text-text-secondary'}`}>
