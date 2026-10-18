@@ -8,7 +8,10 @@
  *     by an ORDER id, never a user id), and each screen is its own lazy chunk;
  *   - the prompt dialog refuses an empty required answer and a bad number in
  *     place, and trims;
- *   - the community admin has no native prompt left.
+ *   - the community admin has no native prompt left;
+ *   - the order screen has ONE primary action (the next step), print is
+ *     secondary, the cancel stands apart behind a destructive confirm, and
+ *     the payment chip sits apart from the status.
  *
  * Run: node --import tsx --test tests/merchantOrderDetailUi.test.ts
  */
@@ -18,7 +21,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { eventText, actorText } from '../src/components/merchant/orders/timelineText';
 import type { TimelineEvent } from '../src/components/merchant/orders/api';
-import { ORDER_FLOW, orderStatusLabel } from '../src/components/merchant/orders/labels';
+import { ORDER_FLOW, locIn, orderMoveLabel, orderStatusLabel } from '../src/components/merchant/orders/labels';
 import { checkPromptValue } from '../src/components/ui/PromptDialog';
 import { searchTerm } from '../src/components/merchant/customers/api';
 import { merchantHref, parseMerchantPath } from '../packages/contracts/src/merchantRoutes';
@@ -116,4 +119,39 @@ test('the community admin asks in the panel\'s own dialog: seven prompts, none n
   assert.doesNotMatch(src, /window\.prompt|[^.\w]prompt\(\s*t\(/);
   assert.equal((src.match(/await prompt\(\{/g) ?? []).length, 7);
   assert.equal((src.match(/\{promptDialog\}/g) ?? []).length, 3, 'each asking component renders its dialog once');
+});
+
+test('ONE PRIMARY ACTION on the order screen: the next step is the only primary; print is secondary; the cancel stands apart and asks as a destructive move', () => {
+  const detail = read('src/components/merchant/orders/OrderDetailScreen.tsx');
+  const actions = detail.slice(detail.indexOf('data-order-actions'), detail.indexOf('</header>', detail.indexOf('data-order-actions')));
+  // The forward moves never include the cancel, and only the first is primary.
+  assert.match(detail, /const forward = next\.filter\(\(to\) => to !== 'cancelled'\);/);
+  assert.match(actions, /variant=\{i === 0 \? 'primary' : 'secondary'\}/);
+  assert.match(actions, /data-order-primary=\{i === 0 \? 'true' : undefined\}/);
+  assert.match(actions, /className=\{i === 0 \? 'min-w-0 flex-1 sm:flex-none' : ''\}/, 'wide under a thumb on a phone, its own size above');
+  assert.equal((actions.match(/variant="primary"|'primary'/g) ?? []).length, 1, 'exactly one primary in the row');
+  // Print is a secondary in the same row (it left the top bar).
+  assert.match(actions, /<Button variant="secondary" icon=\{<Printer [^\n]*onClick=\{\(\) => window\.print\(\)\} data-print-order>/);
+  // The cancel: quiet, red, at the row's end, and still behind the destructive confirm.
+  assert.match(actions, /\{canCancel && \(\s*<Button\s+variant="ghost"\s+className="ms-auto text-danger"/);
+  assert.match(actions, /onClick=\{\(\) => move\('cancelled'\)\}/);
+  assert.match(detail, /const cancel = to === 'cancelled';[\s\S]*?destructive: true,/, 'a cancel refunds: it asks as a destructive move');
+  // The move's words are verbs, the tray's own.
+  assert.match(actions, /\{orderMoveLabel\(to, loc\)\}/);
+  assert.match(detail, /confirmLabel: orderMoveLabel\(to, loc\),/);
+  // Beside the number: the status, and apart from it, the payment.
+  const header = detail.slice(detail.indexOf('<header className="lv-surface p-4 print:hidden">'), detail.indexOf('data-order-actions'));
+  assert.match(header, /<bdi dir="ltr">\{id\}<\/bdi>[\s\S]*<StatusChip tone=\{orderStatusTone\(order\.status\)\}>[\s\S]*<PaymentChip order=\{order\} loc=\{loc\} \/>/);
+  // The slip says what to collect in its header too.
+  assert.match(detail, /<span className="order-print-pay" data-slip-pay=\{pay\}>/);
+  assert.match(detail, /const pay = paymentMark\(order\);/);
+});
+
+test('every move the flow offers has a verb in three languages, no two alike', () => {
+  for (const to of new Set(Object.values(ORDER_FLOW).flat())) {
+    if (to === 'cancelled') continue;
+    const words = (['ar', 'en', 'ckb'] as const).map((l) => orderMoveLabel(to, locIn(l)));
+    // «ناردن» (ship) is Sorani without a letter Arabic lacks, so the test is that no two languages share a word.
+    assert.equal(new Set(words).size, 3, `${to}: ${words.join(' / ')}`);
+  }
 });

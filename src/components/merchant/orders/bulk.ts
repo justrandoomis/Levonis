@@ -16,6 +16,11 @@
  *                   SEARCH_MAX characters — null says «too long», '' says
  *                   «everything».
  *   mapLimit        N slips fetched a few at a time, not fifty at once.
+ *   readPages       the list as deep as it was open (the address's `pages`),
+ *                   one page after another — each needs the last one's cursor.
+ *   exportRange     the CSV's day range from a preset (this month, last
+ *                   month) or two typed days, as the server reads them:
+ *                   Baghdad days, `from` and `to` both inclusive.
  */
 import { api } from '../../../lib/api';
 import type { OrderRecord } from './api';
@@ -34,6 +39,8 @@ export interface OrderListRow {
   tracking_no: string;
   credit_state: string | null;
   release_after: string | null;
+  /** How the customer paid — shown as its own chip, apart from the status (./labels.ts `orderPayment`). */
+  payment_method_id?: string | null;
 }
 
 export interface OrderListPage {
@@ -106,9 +113,58 @@ export function listParams(f: { status?: string; q?: string; cursor?: string | n
   return qs;
 }
 
-/** Where the current filter downloads as a spreadsheet (GET, the session's cookie carries the auth). */
-export function csvHref(f: { status?: string; q?: string }): string {
-  return `/api/merchant/orders/export.csv${withQuery(listParams(f))}`;
+/**
+ * Where the current filter downloads as a spreadsheet (GET, the session's
+ * cookie carries the auth) — with a day range when one is chosen: the
+ * server's `from` / `to` (worker/routes/merchant.ts `csvDay`), YYYY-MM-DD.
+ */
+export function csvHref(f: { status?: string; q?: string; from?: string; to?: string }): string {
+  const qs = listParams(f);
+  if (f.from && DAY_RE.test(f.from)) qs.set('from', f.from);
+  if (f.to && DAY_RE.test(f.to)) qs.set('to', f.to);
+  return `/api/merchant/orders/export.csv${withQuery(qs)}`;
+}
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The CSV's period choices — `all` is no range at all, as before. */
+export const EXPORT_PERIODS = ['all', 'this_month', 'last_month', 'custom'] as const;
+export type ExportPeriod = (typeof EXPORT_PERIODS)[number];
+
+/** Today in Baghdad (UTC+3 all year — Iraq keeps no daylight saving), as YYYY-MM-DD: the server's day. */
+export function baghdadDay(now = Date.now()): string {
+  return new Date(now + 3 * 3_600_000).toISOString().slice(0, 10);
+}
+
+/** A typed day that is a real calendar day, or ''. */
+function realDay(v: string | undefined): string {
+  if (!v || !DAY_RE.test(v)) return '';
+  const t = Date.parse(`${v}T00:00:00.000Z`);
+  return Number.isFinite(t) && new Date(t).toISOString().slice(0, 10) === v ? v : '';
+}
+
+/**
+ * The day range a period exports. A month is a calendar month in Baghdad;
+ * «this month» runs to today. Two typed days come back in order (a range
+ * typed backwards is the same range), and one alone is an open end.
+ */
+export function exportRange(
+  period: ExportPeriod,
+  custom: { from?: string; to?: string } = {},
+  today = baghdadDay()
+): { from?: string; to?: string } {
+  if (period === 'this_month') return { from: `${today.slice(0, 7)}-01`, to: today };
+  if (period === 'last_month') {
+    const [y, m] = today.split('-').map(Number);
+    const first = new Date(Date.UTC(y, m - 2, 1));
+    const last = new Date(Date.UTC(y, m - 1, 0));
+    return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) };
+  }
+  if (period !== 'custom') return {};
+  let from = realDay(custom.from);
+  let to = realDay(custom.to);
+  if (from && to && from > to) [from, to] = [to, from];
+  return { ...(from ? { from } : {}), ...(to ? { to } : {}) };
 }
 
 /** The typed search as sent: '' for nothing, null when it is too long to send. */
@@ -177,6 +233,33 @@ export function applyMoves(
   return rows.map((r) =>
     set.has(r.id) ? { ...r, status: to, ...(to === 'shipped' && trackingNo ? { tracking_no: trackingNo } : {}) } : r
   );
+}
+
+/**
+ * The list read `pages` pages deep, one page after another — each page needs
+ * the cursor the last one ended on. Stops early when the list ends; a row
+ * that two pages both carry is shown once. Says how many pages it read.
+ */
+export async function readPages(
+  page: (cursor: string | null) => Promise<OrderListPage>,
+  pages: number
+): Promise<{ rows: OrderListRow[]; cursor: string | null; pages: number }> {
+  const want = Math.max(1, Math.floor(pages) || 1);
+  const rows: OrderListRow[] = [];
+  const ids = new Set<string>();
+  let cursor: string | null = null;
+  let read = 0;
+  do {
+    const d = await page(cursor);
+    read++;
+    for (const r of d.orders) {
+      if (ids.has(r.id)) continue;
+      ids.add(r.id);
+      rows.push(r);
+    }
+    cursor = d.next_cursor;
+  } while (cursor && read < want);
+  return { rows, cursor, pages: read };
 }
 
 /** `fn` over `items`, at most `limit` in flight; the answers in the items' order, a failure as `null`. */

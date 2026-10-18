@@ -16,6 +16,14 @@
  * is said in the merchant's words (shell/refusal.ts), never the raw reply.
  * «Print» prints a packing slip only (./orderPrint.css), not the workspace.
  *
+ * ONE PRIMARY ACTION. The order's next step (confirm, start preparing, ship,
+ * delivered) is the single prominent button, wide under a thumb on a phone;
+ * printing is secondary beside it; a cancel refunds, so it stands apart at
+ * the row's end, quiet and red, and asks first with a destructive confirm.
+ * Beside the order number: its status chip and, apart from it, how it is
+ * paid (./PaymentChip.tsx). «All orders» returns to the list as it was left
+ * (`backHref`, from the section).
+ *
  * OWNER: Sorani to be written by hand (every new line on this screen).
  */
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
@@ -38,14 +46,15 @@ import { useWorkspace } from '../shell/context';
 import { merchantRefusal } from '../shell/refusal';
 import { dateLocale } from '../../orders/format';
 import { orderDetailApi, type OrderRecord, type OrderTimeline } from './api';
-import { ORDER_FLOW, orderStatusLabel, orderStatusTone } from './labels';
+import { ORDER_FLOW, orderMoveLabel, orderPaymentLabel, orderStatusLabel, orderStatusTone, paymentMark } from './labels';
+import { PaymentChip } from './PaymentChip';
 import { eventText, ledgerLineText } from './timelineText';
 import './orderPrint.css';
 import VariantImg from '../../ui/VariantImg';
 
 type Lang = 'ar' | 'en' | 'ckb';
 
-export default function OrderDetailScreen({ id }: { id: string }) {
+export default function OrderDetailScreen({ id, backHref }: { id: string; /** The list as it was left; the plain list without one. */ backHref?: string }) {
   const { loc, lang, dir } = useLanguage();
   const ws = useWorkspace();
   const toast = useToast();
@@ -75,7 +84,7 @@ export default function OrderDetailScreen({ id }: { id: string }) {
     new Intl.DateTimeFormat(dateLocale(L), { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
   const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
   const back = (
-    <Link to={ws.href(merchantHref.orders())} className="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-semibold text-text-secondary hover:text-text-primary" data-order-back>
+    <Link to={backHref ?? ws.href(merchantHref.orders())} className="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-semibold text-text-secondary hover:text-text-primary" data-order-back>
       <Back aria-hidden="true" className="h-4 w-4" />
       {loc('كل الطلبات', 'All orders')}
     </Link>
@@ -101,6 +110,9 @@ export default function OrderDetailScreen({ id }: { id: string }) {
   }
 
   const next = ORDER_FLOW[order.status] ?? [];
+  // The forward step is the one primary; the cancel is never a peer of it.
+  const forward = next.filter((to) => to !== 'cancelled');
+  const canCancel = next.includes('cancelled');
   const move = async (to: string) => {
     const cancel = to === 'cancelled';
     const ok = await confirm({
@@ -124,7 +136,7 @@ export default function OrderDetailScreen({ id }: { id: string }) {
                     'Your money arrives when the customer confirms receipt — or automatically after 3 days unless a complaint is opened. The customer is told.'
                   )
                 : loc('يُبلَّغ الزبون بالحالة الجديدة.', 'The customer is told about the new status.'),
-            confirmLabel: orderStatusLabel(to, loc),
+            confirmLabel: orderMoveLabel(to, loc),
           }),
     });
     if (!ok) return;
@@ -164,43 +176,51 @@ export default function OrderDetailScreen({ id }: { id: string }) {
 
   return (
     <div className="space-y-4" data-order-detail={id}>
-      <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
-        {back}
-        <Button variant="ghost" size="sm" icon={<Printer className="h-4 w-4" aria-hidden="true" />} onClick={() => window.print()} data-print-order>
-          {loc('طباعة ملصق الشحن', 'Print packing slip')}
-        </Button>
-      </div>
+      <div className="print:hidden">{back}</div>
 
-      {/* ---- header */}
+      {/* ---- header: the number with its status and, apart, its payment; then ONE primary action */}
       <header className="lv-surface p-4 print:hidden">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-[18px] font-bold leading-tight text-text-primary">
-              <bdi dir="ltr">{id}</bdi>
-            </h1>
-            <p className="mt-1 text-[12.5px] text-text-muted">
-              {loc('وصل في', 'Placed')} <bdi>{when(order.created_at)}</bdi>
-            </p>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="me-1 text-[18px] font-bold leading-tight text-text-primary">
+            <bdi dir="ltr">{id}</bdi>
+          </h1>
           <StatusChip tone={orderStatusTone(order.status)}>{orderStatusLabel(order.status, loc)}</StatusChip>
+          <PaymentChip order={order} loc={loc} />
         </div>
-        {next.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2" data-order-actions>
-            {next.map((s) => (
-              <Button
-                key={s}
-                variant={s === 'cancelled' ? 'ghost' : 'primary'}
-                className={s === 'cancelled' ? 'text-danger' : ''}
-                loading={moving === s}
-                disabled={moving !== '' && moving !== s}
-                onClick={() => move(s)}
-                data-order-move={s}
-              >
-                {s === 'cancelled' ? loc('إلغاء الطلب', 'Cancel order', 'هەڵوەشاندنەوەی داواکاری') : orderStatusLabel(s, loc)}
-              </Button>
-            ))}
-          </div>
-        )}
+        <p className="mt-1 text-[12.5px] text-text-muted">
+          {loc('وصل في', 'Placed')} <bdi>{when(order.created_at)}</bdi>
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-2" data-order-actions>
+          {forward.map((to, i) => (
+            <Button
+              key={to}
+              variant={i === 0 ? 'primary' : 'secondary'}
+              className={i === 0 ? 'min-w-0 flex-1 sm:flex-none' : ''}
+              loading={moving === to}
+              disabled={moving !== '' && moving !== to}
+              onClick={() => move(to)}
+              data-order-move={to}
+              data-order-primary={i === 0 ? 'true' : undefined}
+            >
+              {orderMoveLabel(to, loc)}
+            </Button>
+          ))}
+          <Button variant="secondary" icon={<Printer className="h-4 w-4" aria-hidden="true" />} onClick={() => window.print()} data-print-order>
+            {loc('طباعة ملصق الشحن', 'Print packing slip', 'چاپکردنی ئێتیکێتی ناردن')}
+          </Button>
+          {canCancel && (
+            <Button
+              variant="ghost"
+              className="ms-auto text-danger"
+              loading={moving === 'cancelled'}
+              disabled={moving !== '' && moving !== 'cancelled'}
+              onClick={() => move('cancelled')}
+              data-order-move="cancelled"
+            >
+              {loc('إلغاء الطلب', 'Cancel order', 'هەڵوەشاندنەوەی داواکاری')}
+            </Button>
+          )}
+        </div>
       </header>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px] print:hidden">
@@ -332,7 +352,7 @@ export default function OrderDetailScreen({ id }: { id: string }) {
               )}
               <Row label={loc('التوصيل', 'Delivery', 'گەیاندن')} value={<Money iqd={order.shipping_iqd} />} />
               <Row label={loc('دفع الزبون', 'The customer paid')} value={<Money iqd={order.total_iqd} />} strong />
-              <Row label={loc('طريقة الدفع', 'Payment')} value={order.payment_method_id === 'wallet' ? loc('محفظة (مدفوع)', 'Wallet (paid)') : loc('عند الاستلام', 'Cash on delivery', 'لە گەیاندن')} />
+              <Row label={loc('طريقة الدفع', 'Payment', 'شێوازی پارەدان')} value={<PaymentChip order={order} loc={loc} fallback="—" always />} />
             </dl>
             <div className="my-3 h-px bg-border-subtle" />
             {story.money ? (
@@ -426,10 +446,18 @@ function PackingSlip({
   order, story, storeName, gov, addressText, lang,
 }: { order: OrderRecord; story: OrderTimeline; storeName: string; gov: string | null; addressText: string; lang: Lang }) {
   const { loc } = useLanguage();
+  const pay = paymentMark(order);
   return (
     <section className="order-print-slip" aria-hidden="true" data-print-slip>
       <header>
         <strong>{storeName}</strong>
+        {pay && (
+          <span className="order-print-pay" data-slip-pay={pay}>
+            {order.due_on_delivery_iqd > 0
+              ? `${loc('يُحصَّل عند الاستلام', 'Collect on delivery', 'لە کاتی وەرگرتندا وەردەگیرێت')}: ${formatMoney(order.due_on_delivery_iqd, lang)}`
+              : orderPaymentLabel(pay, loc)}
+          </span>
+        )}
         <span dir="ltr">{order.id}</span>
       </header>
       <p>

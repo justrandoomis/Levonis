@@ -13,7 +13,17 @@
  * a selection whose tray moves many at once (never a cancel — it refunds,
  * and stays one at a time on the order screen); packing slips for the
  * selection, printed from the browser (./orderPrint.css); the current filter
- * as a CSV.
+ * as a CSV, over all time or a period (this month, last month, two days).
+ *
+ * PAYMENT IS NOT A STATUS. Each row carries a second chip — paid from the
+ * wallet, cash at the door, instalments (./PaymentChip.tsx) — and each slip
+ * says in its header what the courier collects. Display only.
+ *
+ * THE LIST'S STATE IS ITS ADDRESS. The status tab, the search and how many
+ * pages are open arrive as props from `?status&q&pages` and every change goes
+ * back out through `onViewChange` (the section writes it, replacing the
+ * entry). The last list seen is kept in memory with its scroll depth, so
+ * Back from an order shows it at once, where it was, while it re-reads.
  *
  * THE TRAY IS IN FLOW. It is `DataList`'s selection bar, above the rows, an
  * `m.div` toolbar that arrives with `m.spring('ui')` — never pinned to the
@@ -27,7 +37,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 // `m` + <MotionFeatures>, never the `motion` proxy: the proxy would pull the
 // animation-features chunk into the orders screen for a tray and a chip.
 import * as Motion from 'motion/react-m';
-import { Download, Printer, Search } from 'lucide-react';
+import { CalendarRange, Download, Printer, Search } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { ApiError } from '../../../lib/api';
 import { formatMoney } from '../../../lib/money';
@@ -35,7 +45,7 @@ import { useMotion } from '../../../lib/motion';
 import { MotionFeatures } from '../../../lib/motionFeatures';
 import { governorateName } from '../../../../packages/shipping/src/iraqGovernorates';
 import { DataList, type DataListColumn } from '../../ui/DataList';
-import { Field, Input } from '../../ui/Field';
+import { Field, Input, Select } from '../../ui/Field';
 import { Button } from '../../ui/Button';
 import { Badge, StatusChip } from '../../ui/Badge';
 import { Segmented } from '../../ui/Segmented';
@@ -46,10 +56,12 @@ import { usePrompt } from '../../ui/PromptDialog';
 import { useToast } from '../../ui/Toast';
 import { merchantRefusal } from '../shell/refusal';
 import { dateLocale, itemCountLabel } from '../../orders/format';
-import { ORDER_FLOW, orderStatusLabel, orderStatusTone } from './labels';
+import type { OrdersView } from './ordersView';
+import { locIn, ORDER_FLOW, orderPaymentLabel, orderStatusLabel, orderStatusTone, paymentMark } from './labels';
+import { PaymentChip } from './PaymentChip';
 import {
-  applyMoves, bulkOutcome, bulkPlan, csvHref, listParams, mapLimit, ordersListApi, searchTerm,
-  TRACKING_NO_MAX, type BulkAnswer, type BulkStep, type OrderListRow, type SlipOrder,
+  applyMoves, baghdadDay, bulkOutcome, bulkPlan, csvHref, EXPORT_PERIODS, exportRange, listParams, mapLimit, ordersListApi,
+  readPages, searchTerm, TRACKING_NO_MAX, type BulkAnswer, type BulkStep, type ExportPeriod, type OrderListRow, type SlipOrder,
 } from './bulk';
 import { fill, moveLabel, ordersCount, ordersLang, useOrdersStrings, type OrdersLang, type OrdersStrings } from './strings';
 import './orderPrint.css';
@@ -60,10 +72,18 @@ const STATUS_FILTERS = ['', 'pending', 'confirmed', 'processing', 'shipped', 'de
 export interface OrdersListProps {
   /** The list opened on one status — a workspace address's `?status=`. */
   initialStatus?: string;
+  /** The search the address carries (`?q=`). */
+  initialQuery?: string;
+  /** How many pages the address says were open (`?pages=`); the list re-reads that deep. */
+  initialPages?: number;
+  /** The tab, the search or the depth changed: the section writes it to the address. */
+  onViewChange?: (view: OrdersView) => void;
   /** The order's own screen: the row's title links to it. */
   orderHref: (orderId: string) => string;
   /** On the packing slips' header. */
   storeName: string;
+  /** Whose list it is: the remembered list is only ever this store's. */
+  storeId?: string;
   /** The attention counts on the stages that need the merchant (badges on the filter). */
   stageCounts?: Partial<Record<string, number>>;
   /** After a move landed: the shell re-counts what needs the merchant. */
@@ -82,9 +102,10 @@ export function since(iso: string, lang: OrdersLang, now = Date.now()): string {
 }
 
 /**
- * The list's columns — the same six on a card and in the table (the primitive
- * re-casts them): the order number (the row's link), the customer, the lines
- * and the governorate, the amount, the status chip, and how long ago.
+ * The list's columns — the same seven on a card and in the table (the
+ * primitive re-casts them): the order number (the row's link), the customer,
+ * the lines and the governorate, the amount, how it is paid (its own chip,
+ * beside the amount on a card), the status chip, and how long ago.
  * `chip` is the screen's own, so a just-moved row's chip can arrive with a
  * spring; a pure caller passes a plain one.
  */
@@ -105,6 +126,7 @@ export function orderColumns(
       card: 'meta',
     },
     { id: 'total', header: s.colAmount, cell: (r) => <Money iqd={r.total_iqd} />, numeric: true },
+    { id: 'payment', header: s.colPayment, cell: (r) => <PaymentChip order={r} loc={loc} fallback="—" />, width: '10rem' },
     { id: 'status', header: s.colStatus, cell: chip, card: 'badge', width: '9rem' },
     { id: 'since', header: s.colSince, cell: (r) => since(r.created_at, lang), card: 'meta', width: '7rem' },
   ];
@@ -162,10 +184,18 @@ export function PackingSlips({ slips, storeName, s, lang }: { slips: SlipOrder[]
         const line = [gov ? governorateName(gov, lang) : '', text(addr.area), text(addr.address) || text(addr.line1), text(addr.city), text(addr.landmark)]
           .filter(Boolean)
           .join('، ');
+        // What the courier collects, in the header where it cannot be missed.
+        const pay = paymentMark(order);
+        const due = order.due_on_delivery_iqd > 0 ? order.due_on_delivery_iqd : 0;
         return (
           <article key={order.id} style={{ breakAfter: 'page' }} data-print-slip={order.id}>
             <header>
               <strong>{storeName}</strong>
+              {pay && (
+                <span className="order-print-pay" data-slip-pay={pay}>
+                  {due ? `${s.slipCollect}: ${formatMoney(due, lang)}` : orderPaymentLabel(pay, locIn(lang))}
+                </span>
+              )}
               <span dir="ltr">{order.id}</span>
             </header>
             <p>
@@ -202,7 +232,27 @@ export function PackingSlips({ slips, storeName, s, lang }: { slips: SlipOrder[]
   );
 }
 
-export default function OrdersList({ initialStatus = '', orderHref, storeName, stageCounts, onChanged }: OrdersListProps) {
+/** The last list this tab showed — its rows, its depth and where it was scrolled. Memory only, never stored. */
+interface SeenList {
+  key: string;
+  rows: OrderListRow[];
+  cursor: string | null;
+  pages: number;
+  scrollTop: number;
+}
+let seen: SeenList | null = null;
+const viewKey = (store: string, status: string, q: string) => `${store}|${listParams({ status, q }).toString()}`;
+/**
+ * The deepest the list re-reads — ./ordersView.ts `LIST_PAGES_MAX`, repeated
+ * (tests/ordersListUi.test.ts holds them equal) so the address module stays
+ * the section's alone: shared, it would be one more chunk the shell names.
+ */
+const PAGES_MAX = 10;
+const clampPages = (n: number | undefined) => Math.min(Math.max(1, Math.floor(Number(n)) || 1), PAGES_MAX);
+
+export default function OrdersList({
+  initialStatus = '', initialQuery = '', initialPages = 1, onViewChange, orderHref, storeName, storeId = '', stageCounts, onChanged,
+}: OrdersListProps) {
   const { loc, lang } = useLanguage();
   const L = ordersLang(lang);
   const s = useOrdersStrings();
@@ -213,23 +263,18 @@ export default function OrdersList({ initialStatus = '', orderHref, storeName, s
 
   const known = (v: string) => (STATUS_FILTERS as readonly string[]).includes(v);
   const [filter, setFilter] = useState(() => (known(initialStatus) ? initialStatus : ''));
-  useEffect(() => {
-    if (known(initialStatus)) setFilter(initialStatus);
-  }, [initialStatus]);
-
-  const [text, setText] = useState('');
-  const [q, setQ] = useState('');
-  // The search is the server's; typing waits a beat before asking.
-  useEffect(() => {
-    const term = searchTerm(text);
-    if (term === null) return;
-    const t = window.setTimeout(() => setQ(term), 300);
-    return () => window.clearTimeout(t);
-  }, [text]);
-  const tooLong = searchTerm(text) === null;
-
-  const [rows, setRows] = useState<OrderListRow[] | null>(null);
-  const [cursor, setCursor] = useState<string | null>(null);
+  const [text, setText] = useState(initialQuery);
+  const [q, setQ] = useState(() => searchTerm(initialQuery) ?? '');
+  /** How deep the next full read goes: the address's depth on arrival, one page after a new tab or search. */
+  const depth = useRef(clampPages(initialPages));
+  const [pages, setPages] = useState(depth.current);
+  /** The same list, seen moments ago (Back from an order): shown at once, then re-read underneath. */
+  const [restored] = useState(() => {
+    const hit = seen && seen.key === viewKey(storeId, filter, q) && seen.pages === depth.current ? seen : null;
+    return hit ? { rows: hit.rows, cursor: hit.cursor, scrollTop: hit.scrollTop } : null;
+  });
+  const [rows, setRows] = useState<OrderListRow[] | null>(() => restored?.rows ?? null);
+  const [cursor, setCursor] = useState<string | null>(() => restored?.cursor ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [more, setMore] = useState<'idle' | 'loading' | 'error'>('idle');
@@ -238,22 +283,75 @@ export default function OrdersList({ initialStatus = '', orderHref, storeName, s
   const [refused, setRefused] = useState<BulkAnswer['refused']>([]);
   const [slips, setSlips] = useState<SlipOrder[]>([]);
   const [printing, setPrinting] = useState(false);
+  const [period, setPeriod] = useState<ExportPeriod>('all');
+  const [days, setDays] = useState({ from: '', to: '' });
   /** A list answer that lands after the filter or the search changed is dropped, not shown. */
   const seq = useRef(0);
   /** Rows whose status chip should arrive with a spring: the ones the merchant just moved. */
   const justMoved = useRef(new Set<string>());
   const printPending = useRef(false);
 
+  const now = useRef({ filter, q });
+  now.current = { filter, q };
+
+  // The address changed under the list (a link from Today, the menu): it wins.
+  useEffect(() => {
+    const status = known(initialStatus) ? initialStatus : '';
+    const term = searchTerm(initialQuery) ?? '';
+    if (status === now.current.filter && term === now.current.q) return;
+    depth.current = 1;
+    setPages(1);
+    if (status !== now.current.filter) {
+      setRows(null);
+      setCursor(null);
+      setSelected(new Set());
+    }
+    setFilter(status);
+    if (term !== now.current.q) {
+      setText(term);
+      setQ(term);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialStatus, initialQuery]);
+
+  // The search is the server's; typing waits a beat before asking.
+  useEffect(() => {
+    const term = searchTerm(text);
+    if (term === null || term === now.current.q) return;
+    const t = window.setTimeout(() => {
+      depth.current = 1;
+      setPages(1);
+      setQ(term);
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [text]);
+  const tooLong = searchTerm(text) === null;
+
+  // Every change of tab, search or depth goes back to the address (the section replaces the entry).
+  const viewChange = useRef(onViewChange);
+  useEffect(() => {
+    viewChange.current = onViewChange;
+  });
+  const written = useRef(`${filter}\n${q}\n${pages}`);
+  useEffect(() => {
+    const key = `${filter}\n${q}\n${pages}`;
+    if (key === written.current) return;
+    written.current = key;
+    viewChange.current?.({ status: filter || undefined, q: q || undefined, pages: pages > 1 ? pages : undefined });
+  }, [filter, q, pages]);
+
+  /** The whole list, as deep as it is open — a refresh after a move keeps the pages the merchant had. */
   const load = useCallback(() => {
     const mine = ++seq.current;
     setLoading(true);
     setError(null);
-    ordersListApi
-      .list(listParams({ status: filter, q }))
+    readPages((at) => ordersListApi.list(listParams({ status: filter, q, cursor: at })), depth.current)
       .then((d) => {
         if (mine !== seq.current) return;
-        setRows(d.orders);
-        setCursor(d.next_cursor);
+        setRows(d.rows);
+        setCursor(d.cursor);
+        depth.current = d.pages;
+        setPages(d.pages);
         setMore('idle');
       })
       .catch((e: unknown) => mine === seq.current && setError(e))
@@ -269,10 +367,12 @@ export default function OrdersList({ initialStatus = '', orderHref, storeName, s
       const d = await ordersListApi.list(listParams({ status: filter, q, cursor }));
       if (mine !== seq.current) return;
       setRows((prev) => {
-        const seen = new Set((prev ?? []).map((r) => r.id));
-        return [...(prev ?? []), ...d.orders.filter((r) => !seen.has(r.id))];
+        const seenIds = new Set((prev ?? []).map((r) => r.id));
+        return [...(prev ?? []), ...d.orders.filter((r) => !seenIds.has(r.id))];
       });
       setCursor(d.next_cursor);
+      depth.current = clampPages(depth.current + 1);
+      setPages(depth.current);
       setMore('idle');
     } catch {
       if (mine === seq.current) setMore('error');
@@ -281,11 +381,38 @@ export default function OrdersList({ initialStatus = '', orderHref, storeName, s
 
   const changeFilter = (next: string) => {
     if (next === filter) return;
+    depth.current = 1;
+    setPages(1);
     setRows(null);
     setCursor(null);
     setSelected(new Set());
     setFilter(next);
   };
+
+  // The list as it stands is the one Back returns to; the scroll owner (the
+  // shell's) says how far down it was. Restored a frame after mount, once the
+  // shell has put a new screen at its top.
+  const root = useRef<HTMLDivElement | null>(null);
+  const scrolled = useRef(restored?.scrollTop ?? 0);
+  useEffect(() => {
+    if (rows && !loading) seen = { key: viewKey(storeId, filter, q), rows, cursor, pages, scrollTop: scrolled.current };
+  }, [rows, cursor, pages, filter, q, loading, storeId]);
+  useEffect(() => {
+    const owner = root.current?.closest<HTMLElement>('[data-scroll-owner]');
+    if (!owner) return;
+    const onScroll = () => {
+      if (root.current?.isConnected) scrolled.current = owner.scrollTop;
+    };
+    owner.addEventListener('scroll', onScroll, { passive: true });
+    const top = restored?.scrollTop ?? 0;
+    const frame = top > 0 ? window.requestAnimationFrame(() => owner.scrollTo({ top })) : 0;
+    return () => {
+      owner.removeEventListener('scroll', onScroll);
+      window.cancelAnimationFrame(frame);
+      if (seen) seen.scrollTop = scrolled.current;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** The tracking number a ship may carry — asked in the prompt dialog; null when the merchant backed out. */
   const askTracking = (description: string) =>
@@ -430,20 +557,48 @@ export default function OrdersList({ initialStatus = '', orderHref, storeName, s
       ? { title: s.emptyFilter }
       : { title: s.emptyAll, description: s.emptyAllHint };
 
+  const range = exportRange(period, days);
+  const today = baghdadDay();
+  const periodLabel: Record<ExportPeriod, string> = {
+    all: s.periodAll, this_month: s.periodThisMonth, last_month: s.periodLastMonth, custom: s.periodCustom,
+  };
+
   return (
-    <div className="space-y-3" data-orders-list>
+    <div ref={root} className="space-y-3" data-orders-list>
       <div className="flex flex-wrap items-end gap-2">
-        <Field label={s.search} error={tooLong ? s.searchTooLong : undefined} className="min-w-0 max-w-md flex-1">
+        <Field label={s.search} error={tooLong ? s.searchTooLong : undefined} className="min-w-0 max-w-md flex-1 basis-60">
           <div className="relative">
             <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
             <Input type="search" inputMode="search" enterKeyHint="search" value={text} onChange={(e) => setText(e.target.value)} className="ps-9" data-orders-search />
           </div>
         </Field>
-        {/* A GET the session's cookie authorises: the filter as a spreadsheet, opened by the browser's own download. */}
-        <a href={csvHref({ status: filter, q })} download className="lv-button lv-button-secondary lv-button-sm" title={s.exportHint} data-orders-csv>
-          <Download className="h-4 w-4" aria-hidden="true" />
-          {s.exportCsv}
-        </a>
+        {/* The CSV: the current filter over a period — none (all time), a month, or two typed days. */}
+        <div className="flex min-w-0 flex-wrap items-end gap-2" data-orders-export>
+          <Field label={s.exportPeriod} className="w-44">
+            <Select value={period} onChange={(e) => setPeriod(e.target.value as ExportPeriod)} data-orders-period>
+              {EXPORT_PERIODS.map((p) => (
+                <option key={p} value={p}>
+                  {periodLabel[p]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          {period === 'custom' && (
+            <>
+              <Field label={s.exportFrom} className="w-40">
+                <Input ltr type="date" value={days.from} max={days.to || today} onChange={(e) => setDays((d) => ({ ...d, from: e.target.value }))} data-orders-from />
+              </Field>
+              <Field label={s.exportTo} className="w-40">
+                <Input ltr type="date" value={days.to} min={days.from || undefined} max={today} onChange={(e) => setDays((d) => ({ ...d, to: e.target.value }))} data-orders-to />
+              </Field>
+            </>
+          )}
+          {/* A GET the session's cookie authorises: opened by the browser's own download. */}
+          <a href={csvHref({ status: filter, q, ...range })} download className="lv-button lv-button-secondary lv-button-sm" title={s.exportHint} data-orders-csv>
+            {range.from || range.to ? <CalendarRange className="h-4 w-4" aria-hidden="true" /> : <Download className="h-4 w-4" aria-hidden="true" />}
+            {s.exportCsv}
+          </a>
+        </div>
       </div>
 
       {/* Seven chips do not fit a phone's width; the row scrolls, as the old tab's did. */}

@@ -21,12 +21,24 @@
   }
   .order-print-slip header {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: space-between;
+    gap: 6pt 12pt;
     border-bottom: 1px solid #000;
     padding-bottom: 6pt;
     margin-bottom: 8pt;
     font-size: 14pt;
   }
+  /* How it is paid, boxed in the header: cash to collect is the heavy box. */
+  .order-print-slip .order-print-pay {
+    border: 1pt solid #000;
+    border-radius: 4pt;
+    padding: 1pt 6pt;
+    font-size: 12pt;
+    font-weight: 700;
+  }
+  .order-print-slip .order-print-pay[data-slip-pay='cod'] { border-width: 2.5pt; }
   .order-print-slip p { margin: 4pt 0; }
   .order-print-slip table { width: 100%; border-collapse: collapse; margin: 8pt 0; }
   .order-print-slip th, .order-print-slip td { border: 1px solid #000; padding: 4pt 6pt; text-align: start; }

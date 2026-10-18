@@ -18,8 +18,10 @@ import {
   isMerchantLink,
   merchantHref,
   parseMerchantPath,
+  readWorkspaceQuery,
   type MerchantSection,
 } from '../packages/contracts/src/merchantRoutes';
+import { LIST_PAGES_MAX, LIST_SEARCH_MAX, ordersViewHref, readOrdersView } from '../src/components/merchant/orders/ordersView';
 
 test('every destination the plan lists (§4.6) has a builder, and the builders say what the brief says', () => {
   assert.equal(merchantHref.home(), '/merchant');
@@ -92,4 +94,51 @@ test('the SPA uses the same module, and every section lands on a screen of the w
   const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8');
   assert.match(app, /path="\/merchant\/\*"/, 'the apex serves the tree');
   assert.match(app, /path="\/admin\/\*"/, 'a store host serves the tree under /admin');
+});
+
+test('THE ORDERS LIST\'S STATE IS ITS ADDRESS: tab, search and open pages write and read back the same, and nothing else gets in', () => {
+  // The writer (src/components/merchant/orders/ordersView.ts) writes only what the reader takes back.
+  assert.equal(ordersViewHref({}), '/merchant/orders');
+  assert.equal(ordersViewHref({ status: 'pending' }), merchantHref.ordersInStatus('pending'), 'the Command Center\'s door and the list\'s own address are one spelling');
+  assert.equal(ordersViewHref({ status: 'shipped', q: 'نور', pages: 3 }), '/merchant/orders?status=shipped&q=%D9%86%D9%88%D8%B1&pages=3');
+  assert.equal(ordersViewHref({ status: 'evil', q: '   ', pages: 1 }), '/merchant/orders', 'an unknown tab, an empty search and one page are no words at all');
+  assert.equal(ordersViewHref({ pages: 99 }), `/merchant/orders?pages=${LIST_PAGES_MAX}`, 'a depth is clamped, never unbounded');
+  assert.equal(ordersViewHref({ q: 'x'.repeat(LIST_SEARCH_MAX + 1) }), '/merchant/orders', 'a search the server would refuse is not written');
+  assert.equal(ordersViewHref({ q: '#A1&status=x' }), '/merchant/orders?q=%23A1%26status%3Dx', 'a search is one encoded word — it cannot add a second');
+
+  // Round trip: what the list writes, the address gives back — and the shell's reader agrees on the tab.
+  for (const view of [{ status: 'confirmed' as const }, { q: 'ORD-1A' }, { status: 'delivered' as const, q: '0770 12', pages: 4 }]) {
+    const link = ordersViewHref(view);
+    assert.ok(parseMerchantPath(link), link);
+    assert.deepEqual(readOrdersView(link.split('?')[1]), view, link);
+    assert.equal(readWorkspaceQuery(link.split('?')[1]).status, 'status' in view ? view.status : undefined, 'the shell reads the same tab');
+    assert.equal(hostPath(link, true).startsWith('/admin/orders'), true, 'a store host serves the same list under /admin');
+  }
+
+  // The reader's bounds: the closed status list; trimmed, at most LIST_SEARCH_MAX characters, no control characters; pages 2..max.
+  assert.deepEqual(readOrdersView('?status=evil&x=1'), {});
+  assert.equal(LIST_SEARCH_MAX, 60, 'the server\'s own bound (worker/routes/merchantWorkspace.ts SEARCH_MAX)');
+  assert.equal(readOrdersView('?q=%20%20n%C5%ABr%20').q, 'nūr');
+  assert.equal(readOrdersView(`?q=${'x'.repeat(LIST_SEARCH_MAX)}`).q, 'x'.repeat(LIST_SEARCH_MAX));
+  assert.equal(readOrdersView(`?q=${'x'.repeat(LIST_SEARCH_MAX + 1)}`).q, undefined);
+  assert.equal(readOrdersView('?q=a%0Ab').q, undefined, 'a control character is no search');
+  assert.equal(readOrdersView('?q=').q, undefined);
+  assert.equal(readOrdersView('?pages=1').pages, undefined, 'one page is the default and is never carried');
+  assert.equal(readOrdersView('?pages=3').pages, 3);
+  assert.equal(readOrdersView('?pages=500').pages, LIST_PAGES_MAX);
+  for (const bad of ['0', '-2', '2.5', 'x', '1e3', '9999']) assert.equal(readOrdersView(`?pages=${bad}`).pages, undefined, bad);
+  // The contract's own words are untouched: the shell's reader still knows only its closed lists.
+  assert.deepEqual(readWorkspaceQuery('?status=pending&q=x&pages=3'), { create: false, status: 'pending' });
+});
+
+test('the orders section writes the list\'s state with replace (a typed search is not a history step), and the order screen goes back to it', () => {
+  const section = readFileSync(join(ROOT, 'src/components/merchant/shell/sections/OrdersSection.tsx'), 'utf8');
+  assert.match(section, /onViewChange=\{\(view: OrdersView\) => ws\.go\(ordersViewHref\(view\), \{ replace: true \}\)\}/);
+  assert.match(section, /const query = useMemo\(\(\) => readOrdersView\(search\), \[search\]\);/, 'the section reads the list\'s words from the address on every change');
+  assert.match(section, /initialQuery=\{query\.q \?\? ''\}/);
+  assert.match(section, /initialPages=\{query\.pages \?\? 1\}/);
+  assert.match(section, /backHref=\{ws\.href\(back\)\}/, 'the order screen\'s «all orders» is the list as it was left');
+  assert.match(section, /lastList\?\.store === ws\.store\.id/, 'and only ever this store\'s list');
+  const detail = readFileSync(join(ROOT, 'src/components/merchant/orders/OrderDetailScreen.tsx'), 'utf8');
+  assert.match(detail, /<Link to=\{backHref \?\? ws\.href\(merchantHref\.orders\(\)\)\}/);
 });

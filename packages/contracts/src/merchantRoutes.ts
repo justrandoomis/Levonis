@@ -149,6 +149,12 @@ export const merchantHref = {
  * THE FEW QUERY WORDS A WORKSPACE ADDRESS MAY CARRY — each from a closed list,
  * so a stored or typed link can open a list on a filter, or a «new» form, and
  * nothing else. Anything outside the lists is dropped, never passed on.
+ *
+ * The orders list's own state (its tab, its search, its open pages) is read
+ * and written by src/components/merchant/orders/ordersView.ts with this same
+ * closed status list — there and not here, because this module rides in the
+ * workspace shell's closure (tests/bundleBudget.test.ts) and only the orders
+ * section needs those words.
  */
 export const ORDER_STATUS_FILTERS = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'] as const;
 export type OrderStatusFilter = (typeof ORDER_STATUS_FILTERS)[number];
