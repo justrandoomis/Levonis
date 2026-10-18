@@ -15,7 +15,7 @@
  * TWO THINGS IT REFUSES RATHER THAN REPAIRS (§4.7, §11.3):
  *
  *  - a typed dinar `fixed` offer price or PLUS price, on an ordinary product
- *    and — since DECISIONS row 250, a composition being priced like one — on a
+ *    and — since DECISIONS row 251, a composition being priced like one — on a
  *    bundle or a mystery box too (`PRICING_V2_MANAGED`);
  *  - a schedule whose end precedes its start (`SCHEDULE_INVERTED`).
  *
@@ -530,7 +530,7 @@ async function planOffer(
   }
   // 3. The clean start (addendum A.6, DECISIONS row 222): an ordinary product's price is its V2 write's.
   // A typed DINAR offer price (or PLUS price) on one is refused; its dollar sale price is `fixed_usd`
-  // (below); percent and amount discounts stay. A composition too (DECISIONS row 250: priced like an ordinary product).
+  // (below); percent and amount discounts stay. A composition too (DECISIONS row 251: priced like an ordinary product).
   if (input.offer_price_mode === 'fixed' || (input.plus_price_iqd ?? null) !== null) {
     const managed = v2Managed(3);
     throw costRefusal(managed.status, 'PRICING_V2_MANAGED', { ...(managed.details ?? {}) });
@@ -570,7 +570,7 @@ async function planOffer(
    * The anchor is `products.price_iqd`, which is the subject's regular ladder
    * price — and for a composition subject it is also the only anchor that can
    * reach here, since a derived `bundle_config.price_mode` prices nothing
-   * (DECISIONS row 250) and a typed dinar `fixed` price is refused above.
+   * (DECISIONS row 251) and a typed dinar `fixed` price is refused above.
    */
   if (input.offer_price_mode === 'fixed' && (input.offer_price_iqd ?? 0) < 1) {
     refuse('OFFER_PRICE_BELOW_FLOOR');
@@ -584,7 +584,7 @@ async function planOffer(
     if ((input.discount_iqd ?? 0) >= regular) refuse('BUNDLE_DISCOUNT_EXCEEDS_TOTAL');
   }
 
-  // 6. (Retired by DECISIONS row 250.) A composition is priced like an ordinary product: a derived
+  // 6. (Retired by DECISIONS row 251.) A composition is priced like an ordinary product: a derived
   // `bundle_config.price_mode` prices nothing any more, so a window beside one is no longer two price
   // sources — the window is the only one, exactly as on an ordinary product.
 

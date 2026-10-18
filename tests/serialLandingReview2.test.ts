@@ -386,7 +386,7 @@ test('F6: when the serial story fails on a migrated database the page answers 50
 const KIT = {
   name_en: 'Printer kit',
   name_ar: 'حزمة طابعة',
-  // No dinar price: a bundle is priced like an ordinary product, in section ٣ (DECISIONS row 250).
+  // No dinar price: a bundle is priced like an ordinary product, in section ٣ (DECISIONS row 251).
   status: 'draft',
   components: [{ member_product_id: 'prd_printer', qty: 1, sort: 0 }, { member_product_id: 'prd_spool', qty: 2, sort: 1 }],
   config: { price_mode: 'fixed', max_qty_per_order: 5, min_price_iqd: 1 },
@@ -444,7 +444,7 @@ test('F7: the bundle editor judges a non-owner\'s serial word and filing like ev
 
 test('F7: the mystery-offer editor judges a non-owner\'s serial word too', async () => {
   const w = compositionWorld();
-  // No dinar price: a mystery box is priced like an ordinary product, in section ٣ (DECISIONS row 250).
+  // No dinar price: a mystery box is priced like an ordinary product, in section ٣ (DECISIONS row 251).
   const offer = { name_en: 'Mystery Filament', name_ar: 'فتيل عشوائي', status: 'draft', spool_qty: 1, max_qty_per_order: 3 };
   for (const who of ['adm', 'ast'] as const) {
     const on = await post(w.app(who), '/api/admin/mystery/offers', { ...offer, serialized: true });

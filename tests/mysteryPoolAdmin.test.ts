@@ -305,7 +305,7 @@ test('a pool an offer or a past draw names is deactivated, never deleted', async
 const OFFER_BODY = {
   name_en: 'Mystery Filament',
   name_ar: 'فتيل عشوائي',
-  // No dinar price: a mystery box is priced like an ordinary product, in section ٣ (DECISIONS row 250).
+  // No dinar price: a mystery box is priced like an ordinary product, in section ٣ (DECISIONS row 251).
   status: 'draft',
   spool_qty: 2,
   duplicate_policy: 'forbid',

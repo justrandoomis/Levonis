@@ -227,7 +227,7 @@ test('a bundle records its cost on the COMPONENT rows and zero on the parent, so
   assert.equal(parent.cost_basis, COST_BASIS.composed, 'the parent carries the money, not the goods');
   assert.equal(parent.cost_iqd, null, "the bundle product's own typed cost must not be recorded");
   assert.equal(components.length, 2);
-  // Each component is an ordinary line (DECISIONS row 250: the bundle is priced, and costed, like a product):
+  // Each component is an ordinary line (DECISIONS row 251: the bundle is priced, and costed, like a product):
   // since the clean start a new line takes no legacy `product_cost_iqd` (A.9), so each reads exactly as a
   // standalone line of that product would — and the parent still records none of its own.
   assert.deepEqual(

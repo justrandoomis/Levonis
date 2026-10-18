@@ -258,7 +258,7 @@ test('no second discount table exists: the whole feature is offer_windows + offe
 
 test('the offers panel refuses the two dishonest configurations, verbatim', async () => {
   const raw = seedCatalogue();
-  // DECISIONS row 250: a bundle is priced like an ordinary product. Its legacy
+  // DECISIONS row 251: a bundle is priced like an ordinary product. Its legacy
   // derived rule prices nothing, so a window beside it is no conflict — and a
   // typed dinar `fixed` offer price is refused exactly as on an ordinary product.
   raw

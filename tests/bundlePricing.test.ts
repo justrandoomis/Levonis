@@ -1,5 +1,5 @@
 /**
- * THE BUNDLE PRICE — docs/BUNDLES_MYSTERY.md §4.2–§4.4, as amended by DECISIONS row 250.
+ * THE BUNDLE PRICE — docs/BUNDLES_MYSTERY.md §4.2–§4.4, as amended by DECISIONS row 251.
  *
  * The owner's decision of 2026-10-18: a bundle or a mystery box is priced like
  * an ordinary product. Its price is the product row's own (the Pricing V2
@@ -61,7 +61,7 @@ test('fixed mode charges the product row’s own ladder, and states the saving a
   assert.deepEqual(out.errors, []);
 });
 
-test('DECISIONS row 250: a derived rule prices nothing — the bundle charges its own row price, whatever bundle_config says', () => {
+test('DECISIONS row 251: a derived rule prices nothing — the bundle charges its own row price, whatever bundle_config says', () => {
   for (const cfg of [
     config({ price_mode: 'discount_percent', discount_percent: 20 }),
     config({ price_mode: 'discount_iqd', discount_iqd: 200_000, min_price_iqd: 1000 }),
@@ -124,7 +124,7 @@ test('the whole ladder is ordered for every tier, in both price modes', () => {
   }
 });
 
-test('DECISIONS row 250: a typed PLUS price prices nothing — a PLUS or PRIME member with no member price pays the regular price', () => {
+test('DECISIONS row 251: a typed PLUS price prices nothing — a PLUS or PRIME member with no member price pays the regular price', () => {
   const cfg = config({ plus_price_iqd: 130_000 });
   for (const tier of ['plus', 'prime'] as Tier[]) {
     const out = resolveBundlePrice({ resolved: resolved(tier, true), config: cfg, componentTotalIqd: 190_000, tier, tierActive: true });

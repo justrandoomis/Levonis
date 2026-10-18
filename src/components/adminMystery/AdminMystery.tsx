@@ -68,7 +68,9 @@ interface OfferCard {
   name_ar: string;
   name_ku: string;
   status: string;
-  price_iqd: number;
+  /** Null while it needs pricing (DECISIONS row 251): the archived dinar figure is not a price. */
+  price_iqd: number | null;
+  needs_pricing?: boolean;
   spool_qty: number;
   direct_pool_id: string | null;
   preorder_pool_id: string | null;
@@ -426,9 +428,20 @@ export default function AdminMystery() {
                     </p>
                     <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-[var(--ap-text-3)]">
                       <span className={T.badge[o.status === 'active' ? 'active' : 'draft']}>{o.status}</span>
-                      <span>
-                        {loc('السعر', 'Price', 'نرخ')}: {formatIqd(o.price_iqd)}
-                      </span>
+                      {/* Priced like an ordinary product, in the bundles panel's section ٣ (DECISIONS row 251). */}
+                      {o.needs_pricing || o.price_iqd === null ? (
+                        <a
+                          href={`/admin?tab=bundles&edit=${encodeURIComponent(o.id)}&section=3`}
+                          className={`${T.badgeBase} lv-chip border-transparent [--chip:var(--color-warning)]`}
+                          data-mystery-needs-pricing
+                        >
+                          {loc('يحتاج تسعيرًا', 'Needs pricing', 'پێویستی بە نرخدانانە')}
+                        </a>
+                      ) : (
+                        <span>
+                          {loc('السعر', 'Price', 'نرخ')}: {formatIqd(o.price_iqd)}
+                        </span>
+                      )}
                       <span>
                         {loc('عدد القطع', 'Spools', 'پارچە')}: {o.spool_qty}
                       </span>

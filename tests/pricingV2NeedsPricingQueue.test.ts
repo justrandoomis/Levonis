@@ -3,7 +3,7 @@
  *
  *   - every product not V2-published is listed with its state; a published
  *     product leaves the queue; a bundle or a mystery box is queued like any
- *     product (DECISIONS row 250, tests/bundlesAsProducts.test.ts);
+ *     product (DECISIONS row 251, tests/bundlesAsProducts.test.ts);
  *   - a price editor's projection: no cost code's name (a cost-first product's
  *     gaps are one OWNER_DATA item), no owner-only filter, `can_finish` false
  *     on cost-first and true on price-first;

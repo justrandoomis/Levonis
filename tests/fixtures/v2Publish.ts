@@ -235,7 +235,7 @@ export function isV2Published(raw: DatabaseSync, productId: string): boolean {
 
 /**
  * Publish every product of the database not yet V2-published (or the ids
- * given) — a bundle or a mystery box too (DECISIONS row 250: priced like an
+ * given) — a bundle or a mystery box too (DECISIONS row 251: priced like an
  * ordinary product). Returns the ids published.
  */
 export async function publishAllV2(raw: DatabaseSync, o: PublishOptions & { ids?: readonly string[] } = {}): Promise<string[]> {

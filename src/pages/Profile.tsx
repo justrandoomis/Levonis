@@ -170,7 +170,7 @@ export default function Profile() {
   }, []);
 
   useEffect(() => {
-    // Bundles and mystery boxes are open to every visitor (DECISIONS row 250): the shelf no longer waits for a
+    // Bundles and mystery boxes are open to every visitor (DECISIONS row 251): the shelf no longer waits for a
     // paid tier. A gate an admin sets on one promotion is still the server's (a locked card), never this page's.
     api
       .get<{ entitled: boolean; bundles: BundleShelfCard[] }>('/api/bundles')
@@ -741,7 +741,7 @@ export default function Profile() {
         </div>
         )}
 
-        {/* Fifth Card: bundles and mystery boxes — open to everyone (DECISIONS row 250) */}
+        {/* Fifth Card: bundles and mystery boxes — open to everyone (DECISIONS row 251) */}
         {bundles.length > 0 && (
           <div className="lv-surface p-3 mb-3 text-text-primary">
             <div className="flex justify-between items-center mb-3">

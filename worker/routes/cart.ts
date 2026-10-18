@@ -36,7 +36,7 @@ import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../
 import { AddToCartV1 } from '@levonis/contracts/events/v1/AddToCart';
 import { getSettings } from '../lib/settings';
 import { canonicalProductMediaUrl, parseProductRow, publicColor, publicOption, publicPreorderRoutes, type ProductDoc } from '../lib/productModel';
-import { customerAvailability, customerLinePrice, type CustomerLinePrice } from '../lib/customerPricing';
+import { customerAvailability, customerLinePrice, withoutUsdTwins, type CustomerLinePrice } from '../lib/customerPricing';
 import { isUsdCents } from '@levonis/pricing/usdCents';
 import {
   applyRelations,
@@ -111,6 +111,7 @@ import { compositionKey, loadBundleComponents, type BundleComponentRow } from '.
 import {
   resolveCompositionLines,
   compositionMaxQty,
+  compositionUsdTwins,
   type ComponentChoice,
   type CompositionLineInput,
   type ResolvedBundle,
@@ -703,6 +704,7 @@ function compositionCartItem(
   lang = 'ar'
 ) {
   const unit = b.pricing.unit_subtotal_iqd + componentFeesIqd(b);
+  const usd = compositionUsdTwins(b, unit);
   const qty = Number(row.qty) || 1;
   const deliveryDocs = b.doc.composition === 'mystery' ? [b.doc] : b.components.filter((k) => k.included).map((k) => k.doc);
   const deliveryAvailability = {
@@ -734,13 +736,18 @@ function compositionCartItem(
     is_printer: b.components.some((k) => k.included && printerIds.has(k.member_product_id)),
     cod_reprices: false,
     unit_price_iqd: unit,
+    // The same unit in the shop's dollars (DECISIONS rows 248, 251), where it has a dollar base.
+    ...(usd.unit_subtotal_usd_cents !== undefined ? { unit_price_usd_cents: usd.unit_subtotal_usd_cents } : {}),
     // The same shape an ordinary line carries — `publicBreakdown`, with the
     // figures actually charged written over the resolver's. `applied_tier`
     // stays inside the shared three-value union: the PLUS rung is
     // offer-scoped and is named on the composition block, never on a field
-    // every other line in the cart also carries (§4.4).
+    // every other line in the cart also carries (§4.4). The dollar twins are
+    // the composition's own (`compositionUsdTwins`), never the resolver's
+    // beside figures written over them.
     breakdown: {
-      ...publicBreakdown(b.pricing.resolved),
+      ...withoutUsdTwins(publicBreakdown(b.pricing.resolved)),
+      ...usd,
       applied_iqd: b.pricing.applied_iqd,
       applied_tier: b.pricing.applied_tier === 'plus' ? 'regular' : b.pricing.applied_tier,
       regular_iqd: b.pricing.regular_iqd,

@@ -147,7 +147,7 @@ async function composeOffer(db: unknown, over: Record<string, unknown> = {}) {
     })
   );
   assert.equal(offer.success, true, JSON.stringify(offer).slice(0, 400));
-  // DECISIONS row 250: a mystery box is priced like an ordinary product — the owner's dollar price, 60,000 at U.
+  // DECISIONS row 251: a mystery box is priced like an ordinary product — the owner's dollar price, 60,000 at U.
   await publishV2((db as { db: DatabaseSync }).db, String(offer.product.id), { usd: usdReproducing(60_000, FIXTURE_U) });
   return { poolId, offerId: String(offer.product.id), offerSlug: String(offer.product.slug), saveResponse: offer };
 }

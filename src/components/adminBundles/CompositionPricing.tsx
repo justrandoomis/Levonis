@@ -1,6 +1,6 @@
 /**
  * ٣ «السعر» OF A BUNDLE OR A MYSTERY BOX — THE PRODUCT FORM'S OWN SECTION ٣
- * (the owner's decision of 2026-10-18, DECISIONS row 250).
+ * (the owner's decision of 2026-10-18, DECISIONS row 251).
  *
  * A composition is priced like an ordinary product: from its cost («من
  * التكلفة») or a dollar price («سعر بالدولار»), with its minimum profit, the

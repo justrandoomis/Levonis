@@ -309,7 +309,7 @@ export default function NeedsPricingQueue({ owner, onOpen, onBack }: { owner: bo
                     {p.requests && p.requests.people > 0 ? <RequestsLine r={p.requests} lang={lang} /> : null}
                   </div>
                 </div>
-                {/* A bundle or a mystery box is priced in the bundles panel's own section ٣ (DECISIONS row 250). */}
+                {/* A bundle or a mystery box is priced in the bundles panel's own section ٣ (DECISIONS row 251). */}
                 {p.composition !== '' ? (
                   <a href={p.link} className={`${T.btnPrimary} w-full sm:w-auto`} data-queue-open={p.id}>
                     {tri(S.priceNow, lang)}

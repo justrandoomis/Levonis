@@ -438,6 +438,19 @@ test('the storefront never recomputes: only the owner pricing router, the engine
     'worker/lib/offerDiscount.ts': ['./pricingEngine/legacy', './pricingEngine/load', './pricingEngine/v2/api'],
     'worker/routes/offers.ts': ['../lib/pricingEngine/v2/api', '../lib/pricingEngine/v2/bell'],
   };
+  // Bundles and mystery boxes are priced like products (DECISIONS row 251): their admin doors keep only V2's
+  // refusal of a typed dinar price (`holdLegacyDocMoney`) — a write guard that computes no price.
+  const COMPOSITION_DOORS: Readonly<Record<string, readonly string[]>> = {
+    'worker/routes/adminBundles.ts': ['../lib/pricingEngine/v2/legacyMoney'],
+    'worker/routes/mystery.ts': ['../lib/pricingEngine/v2/legacyMoney'],
+  };
+  for (const [f, modules] of Object.entries(COMPOSITION_DOORS)) {
+    const src = files.find((x) => x.f === f)!.src;
+    const engine = [...src.matchAll(/from\s+['"]([^'"]*(?:\/pricingEngine\/[^'"]+|\/costToPrice|\/fxChain))['"]/g)].map((m) => m[1]).sort();
+    assert.deepEqual(engine, [...modules].sort(), f);
+    const names = /import\s*\{([^}]*)\}\s*from\s*['"][^'"]*\/pricingEngine\/v2\/legacyMoney['"]/.exec(src)![1]!;
+    assert.deepEqual(names.split(',').map((x) => x.trim()).filter(Boolean), ['holdLegacyDocMoney'], `${f} keeps the dinar-price refusal and nothing else`);
+  }
   for (const [f, modules] of Object.entries(PRODUCT_DISCOUNT)) {
     const src = files.find((x) => x.f === f)!.src;
     const engine = [...src.matchAll(/from\s+['"]([^'"]*(?:\/pricingEngine\/[^'"]+|\/costToPrice|\/fxChain))['"]/g)].map((m) => m[1]).sort();
@@ -455,5 +468,5 @@ test('the storefront never recomputes: only the owner pricing router, the engine
   for (const f of ['worker/routes/products.ts', 'worker/routes/cart.ts', 'worker/routes/orders.ts', 'worker/routes/catalog.ts', 'worker/routes/compare.ts', 'worker/routes/seo.ts', 'worker/lib/listing.ts', 'worker/lib/publicApi/resources/products.ts']) {
     assert.doesNotMatch(files.find((x) => x.f === f)!.src, /from\s+['"][^'"]*\/adminProducts['"]/, `${f} reaches no admin product router`);
   }
-  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !(f in V2_PRODUCT_SAVE) && !(f in CLEAN_START_DOORS) && !(f in PURCHASE_RATE) && !(f in TRADE_IN_RATE) && !(f in CATALOG_ONLY_STRUCTURE) && !(f in PRODUCT_DISCOUNT) && !OWNER_TOOLS.includes(f)), []);
+  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !(f in V2_PRODUCT_SAVE) && !(f in CLEAN_START_DOORS) && !(f in PURCHASE_RATE) && !(f in TRADE_IN_RATE) && !(f in CATALOG_ONLY_STRUCTURE) && !(f in PRODUCT_DISCOUNT) && !(f in COMPOSITION_DOORS) && !OWNER_TOOLS.includes(f)), []);
 });

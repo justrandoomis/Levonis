@@ -145,7 +145,7 @@ export interface EngineStateRow {
 // The clean start (DECISIONS row 222, spec addendum A.6): only V2 products are repriced. A V1 engine
 // product is hidden until it is priced in dollars, and repricing it would write `price_history` rows that
 // price protection reads as engine observations — an old dinar price published by the back door. A V2 bundle or
-// mystery box is repriced with them (DECISIONS row 250: priced like an ordinary product, the dollar as the base).
+// mystery box is repriced with them (DECISIONS row 251: priced like an ordinary product, the dollar as the base).
 const engineStatesSql = (shelf = true) => `SELECT s.product_id, p.slug, s.inputs_seq, s.priced_inputs_seq, s.write_seq, s.reprice_blocked_code, s.reprice_blocked_at, s.pricing_method,${
   shelf ? ` s.shelf_sig, p.inventory_mode AS shelf_mode, CASE WHEN s.pricing_method = 'cost' THEN ${shelfItemsSql('s.product_id')} END AS shelf_now,` : ''
 }

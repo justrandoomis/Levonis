@@ -89,7 +89,7 @@ export async function loadProducts(db: D1Database, ids: readonly string[]): Prom
 }
 
 /**
- * A BUNDLE OR A MYSTERY BOX AS PRICING V2 SEES IT (DECISIONS row 250): an ordinary product with one SKU
+ * A BUNDLE OR A MYSTERY BOX AS PRICING V2 SEES IT (DECISIONS row 251): an ordinary product with one SKU
  * sold direct — its own cost or dollar price, minimum profit, rounding and the dollar as the base, set in
  * the same section ٣. Its row says `sale_types ["bundle"]` with no stock of its own (what it can sell is
  * its components', `bundleAvailability`), which no channel of the V2 maths reads; so the engine prices

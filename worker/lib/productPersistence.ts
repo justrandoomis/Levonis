@@ -2698,7 +2698,7 @@ export async function planProductSave(
   // the stored value and reported, while their other columns apply). A new
   // product is born at 0 with no ladder, compare-at, fee or cost cell: hidden
   // until its first complete V2 write. A bundle or a mystery box too (DECISIONS
-  // row 250: priced like an ordinary product): the bundles panel types no price.
+  // row 251: priced like an ordinary product): the bundles panel types no price.
   const moneyPinned: string[] = [];
   if (doc) moneyPinned.push(...pinLegacyDocMoney(doc, prev, actor.money));
 

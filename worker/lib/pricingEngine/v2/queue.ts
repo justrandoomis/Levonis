@@ -28,7 +28,7 @@ import { loadShelves } from './shelf';
 
 /**
  * How many products are V2-published, and how many still need pricing (codes and counts only). Bundles and
- * mystery boxes are priced like ordinary products (DECISIONS row 250) and counted with them; `compositions`
+ * mystery boxes are priced like ordinary products (DECISIONS row 251) and counted with them; `compositions`
  * is how many of those still need pricing.
  */
 export async function v2PublicationCounts(db: D1Database): Promise<{ published: number; needs_pricing: number; saved: number; compositions: number }> {
@@ -328,7 +328,7 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
 
   const rows: QueueRow[] = [];
   for (const cand of candidates) {
-    // A bundle or a mystery box is priced like an ordinary product (DECISIONS row 250), in the bundles panel's
+    // A bundle or a mystery box is priced like an ordinary product (DECISIONS row 251), in the bundles panel's
     // own section ٣ (the product form never opens one).
     const link =
       cand.composition !== ''

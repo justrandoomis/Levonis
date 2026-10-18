@@ -9,7 +9,7 @@
  *   3. `publishAllV2` publishes every census product through the real V2
  *      writer: each SKU's direct price stays the seeded one (to the step), its
  *      cheapest route stays under it, route fees are 0, a bundle is published
- *      like any product (DECISIONS row 250) and a second call publishes nothing.
+ *      like any product (DECISIONS row 251) and a second call publishes nothing.
  *
  * LOCAL ONLY: in-memory SQLite, no network.
  *
@@ -117,7 +117,7 @@ test('publishAllV2: every census product is published by the real V2 writer at U
   assert.deepEqual(await publishAllV2(raw), [], 'a second call publishes nothing');
 });
 
-test('publishAllV2 publishes a bundle like any product (DECISIONS row 250): its one direct price is its own', async () => {
+test('publishAllV2 publishes a bundle like any product (DECISIONS row 251): its one direct price is its own', async () => {
   const raw = freshDb();
   raw.exec(`INSERT INTO products (id, slug, name, status, price_iqd, stock, composition) VALUES ('b1', 'bundle-1', 'Bundle', 'active', 50000, 3, 'bundle')`);
   raw.exec(`INSERT INTO products (id, slug, name, status, price_iqd, stock) VALUES ('p1', 'plain-1', 'Plain', 'active', 12345, 3)`);

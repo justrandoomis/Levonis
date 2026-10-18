@@ -236,8 +236,10 @@ export function tierHighlights(
     if (has('communityOffers')) {
       out.push(loc('تقديم عروض احترافية على طلبات المجتمع', 'Professional merchant offers on Community requests', 'پێشکەشکردنی ئۆفەری پیشەیی لە داواکارییەکانی کۆمەڵگە'));
     }
+    // Bundles and mystery boxes are open to everyone (DECISIONS row 251): what the benefit still opens is an
+    // offer the owner gates to members on purpose (`offerEligible`, worker/lib/offers.ts).
     if (has('exclusiveSections')) {
-      out.push(loc('الوصول إلى البندلات وأدواتها المؤهلة', 'Access to Bundles and eligible bundle tools', 'دەستگەیشتن بە پاکێج و ئامرازە گونجاوەکانی'));
+      out.push(loc('عروض حصرية للأعضاء', 'Members-only offers', 'ئۆفەری تایبەت بە ئەندامان'));
     }
     return out.slice(0, 3);
   }

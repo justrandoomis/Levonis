@@ -20,7 +20,7 @@
  *    one-promotion-model dividend of §10 is silently lost and every bundle
  *    becomes subscriber-only again.
  *
- *  - PRICED LIKE AN ORDINARY PRODUCT (DECISIONS row 250). The card and the
+ *  - PRICED LIKE AN ORDINARY PRODUCT (DECISIONS row 251). The card and the
  *    detail quote the bundle's own V2 price — a typed PLUS price or a derived
  *    discount over the parts prices nothing — and a bundle with no V2 price
  *    is neither listed nor shown.
@@ -524,7 +524,7 @@ test('PREMIUM inherits a PLUS gate — the same verdict on card and detail', asy
 
 // ------------------------------------------------------------------ pricing
 
-test('DECISIONS row 250: a typed PLUS price prices nothing — every viewer sees the bundle\'s own V2 price, card and detail alike', async () => {
+test('DECISIONS row 251: a typed PLUS price prices nothing — every viewer sees the bundle\'s own V2 price, card and detail alike', async () => {
   const raw = seed();
   addBundle(raw, { id: 'b1', slug: 'starter', priceIqd: 400_000, config: { plus_price_iqd: 360_000 } });
   const db = new SqliteD1(raw) as unknown as D1Database;
@@ -541,7 +541,7 @@ test('DECISIONS row 250: a typed PLUS price prices nothing — every viewer sees
   assert.equal(detail.bundle.display_price_iqd, plus.bundles[0].display_price_iqd, 'the card and the page quoted a PLUS member two different prices');
 });
 
-test('DECISIONS row 250: a legacy derived-mode bundle is priced by its own V2 price, never derived from its components', async () => {
+test('DECISIONS row 251: a legacy derived-mode bundle is priced by its own V2 price, never derived from its components', async () => {
   const raw = seed();
   addBundle(raw, { id: 'b1', slug: 'ten-off', priceIqd: 400_000, config: { price_mode: 'discount_percent', discount_percent: 10 } });
   const db = new SqliteD1(raw) as unknown as D1Database;
@@ -558,7 +558,7 @@ test('DECISIONS row 250: a legacy derived-mode bundle is priced by its own V2 pr
   assert.equal(after.display_price_iqd, 400_000);
 });
 
-test('DECISIONS row 250: a bundle with no V2 price is not listed, not shown and not sold', async () => {
+test('DECISIONS row 251: a bundle with no V2 price is not listed, not shown and not sold', async () => {
   const raw = seed();
   // No dinar price to reproduce: the fixture publishes nothing, exactly as an existing composition waits for the owner.
   addBundle(raw, { id: 'b1', slug: 'unpriced', priceIqd: 0 });

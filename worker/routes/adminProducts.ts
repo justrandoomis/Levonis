@@ -1416,7 +1416,7 @@ adminProductsRoutes.get('/printer-options', async (c) => {
 
 /**
  * The stored product as V2 reads it; 404 for an unknown id. A bundle or a mystery box too (DECISIONS
- * row 250): it is priced like an ordinary product, through these same three doors — the bundles panel
+ * row 251): it is priced like an ordinary product, through these same three doors — the bundles panel
  * shows the same section ٣ and saves it with the prices-only apply (`PUT /:id/pricing`).
  */
 async function v2ReadOf(c: Context<AppContext>, id: string): Promise<V2Read> {
@@ -1859,7 +1859,7 @@ adminProductsRoutes.post('/', async (c) => {
   // row 222, addendum A.7) — writes its structure INSIDE the V2 writer's batch, with its prices. The
   // price fields of the document are not the client's: the stored ladder stays until the V2 writer
   // replaces it in the same batch, and no route carries a commission. A bundle is priced like an ordinary
-  // product (DECISIONS row 250) but never saved by this route: the bundles panel owns its structure, and its
+  // product (DECISIONS row 251) but never saved by this route: the bundles panel owns its structure, and its
   // prices go through the prices-only apply (`PUT /:id/pricing`).
   const v2Block = body.pricing_v2;
   const v2Sent = v2Block !== undefined && v2Block !== null;

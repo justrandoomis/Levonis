@@ -56,7 +56,7 @@ import {
   verifyGiftCartLines,
   type GiftPricingBlock,
 } from '../lib/gifts/cartLine';
-import type { ResolvedBundle } from '../lib/bundleRead';
+import { compositionUsdTwins, type ResolvedBundle } from '../lib/bundleRead';
 import {
   allocateComponentValue,
   loadCompositionMembers,
@@ -1542,7 +1542,16 @@ function priceCompositionLine(
    * "zero COGS by construction" rather than "cost unknown" and never estimates
    * a parent against the catalogue.
    */
-  const { cost_iqd, ...bundleSnapshot } = b.pricing.resolved;
+  // The resolver's dollar twins describe ITS figures, which the snapshot writes over: the composition's
+  // own (`compositionUsdTwins`, DECISIONS row 251) go in their place.
+  const {
+    cost_iqd,
+    regular_usd_cents: _regularUsd,
+    applied_usd_cents: _appliedUsd,
+    unit_subtotal_usd_cents: _unitUsd,
+    offer_before_usd_cents: _beforeUsd,
+    ...bundleSnapshot
+  } = b.pricing.resolved;
   void cost_iqd;
   const parent: ComputedLine = {
     cart_item_id: String(row.cart_item_id),
@@ -1576,6 +1585,7 @@ function priceCompositionLine(
       prime_iqd: b.pricing.prime_iqd,
       pro_iqd: b.pricing.pro_iqd,
       unit_subtotal_iqd: unit,
+      ...compositionUsdTwins(b, unit),
       applied_tier: b.pricing.applied_tier === 'plus' ? 'regular' : b.pricing.applied_tier,
       composition,
     }),
@@ -1591,8 +1601,10 @@ function priceCompositionLine(
           })
         : null,
     breakdown: {
-      // A composition's figures have no dollar base (DECISIONS row 248): its line carries no twin.
+      // The composition's own dollar twins (DECISIONS rows 248, 251), never the resolver's beside the
+      // figures written over them: the same the cart line and the card carry.
       ...withoutUsdTwins(publicBreakdown(b.pricing.resolved)),
+      ...compositionUsdTwins(b, unit),
       applied_iqd: bundlePrice,
       // `ResolvedPrice.applied_tier` is a SHARED type and is deliberately not
       // widened to carry PLUS (§4.4): the four-value tier lives on the

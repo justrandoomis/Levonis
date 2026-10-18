@@ -44,6 +44,7 @@ import { newId } from '../lib/crypto';
 import { auditStatements } from '../lib/audit';
 import { canWriteCost, isOwner, projectForAdmin } from '../lib/adminScope';
 import { holdLegacyDocMoney } from '../lib/pricingEngine/v2/legacyMoney';
+import { needsPricingIds } from '../lib/needsPricing';
 import { compositionSerializedVerdict, serialAnswerFence, type SerialAnswerFence } from '../lib/serialPolicy';
 import { isLostRace } from '../lib/gifts/fence';
 import { refuse as serialRefuse } from '../lib/serialAssignments';
@@ -762,7 +763,7 @@ async function writeOffer(c: Context<AppContext>, mode: 'create' | 'update', pro
   }
 
   const id = prev ? prev.id : newId('prd');
-  // DECISIONS row 250: a mystery box is priced like an ordinary product (section ٣, Pricing V2) — this panel
+  // DECISIONS row 251: a mystery box is priced like an ordinary product (section ٣, Pricing V2) — this panel
   // types no dinar price: an absent price keeps the stored one (a new box is born «يحتاج تسعيرًا»), an echo
   // passes, a moved one is 409 PRICING_V2_MANAGED.
   holdLegacyDocMoney(b, prev, { costs: canWriteCost(c.env, admin) });
@@ -918,9 +919,13 @@ adminMysteryRoutes.get('/offers', async (c) => {
       ORDER BY p.display_order, p.created_at DESC
       LIMIT 200`
   ).all<Record<string, unknown>>();
+  // DECISIONS row 251: priced like an ordinary product — a box with no complete V2 write is «يحتاج تسعيرًا»,
+  // and its archived dinar figure is not a price it sells at, so the list carries none.
+  const unpriced = await needsPricingIds(c.env.DB, results.map((r) => String(r.id)));
   return c.json({
     success: true,
     offers: results.map((r) => {
+      const needsPricing = unpriced.has(String(r.id));
       // Parsed ONCE per row and read twice: the tier list and the boolean must
       // never be able to disagree about one offer.
       const tiers = parseRequiredTiers(r.required_tiers);
@@ -931,7 +936,8 @@ adminMysteryRoutes.get('/offers', async (c) => {
         name_ar: r.name_ar,
         name_ku: r.name_ku,
         status: r.status,
-        price_iqd: r.price_iqd,
+        price_iqd: needsPricing ? null : r.price_iqd,
+        needs_pricing: needsPricing,
         spool_qty: r.spool_qty ?? 1,
         direct_pool_id: r.direct_pool_id ?? null,
         preorder_pool_id: r.preorder_pool_id ?? null,

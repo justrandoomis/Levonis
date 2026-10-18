@@ -347,7 +347,7 @@ test('a pre-order bundle stores the chosen transport on its OWN cart row, and re
   assert.equal(ok.shipping_type ?? ok.items[0].transport_method, 'sea');
 });
 
-test('an optional component the buyer declines leaves the order; the bundle keeps its own V2 price (DECISIONS row 250)', async () => {
+test('an optional component the buyer declines leaves the order; the bundle keeps its own V2 price (DECISIONS row 251)', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',

@@ -66,6 +66,7 @@ import {
   type ProductSavePlan,
 } from '../lib/productPersistence';
 import {
+  bundleIssue,
   compositionPriceWarnings,
   loadBundleComponents,
   loadCompositionMembers,
@@ -147,6 +148,23 @@ function offerFromView(view: OfferView | undefined): BundleOfferInput | null {
     active: w.active,
     max_per_user: view.limits?.max_per_user ?? null,
     max_global: view.limits?.max_global ?? null,
+  };
+}
+
+/**
+ * THE OFFER AS THE PANEL CAN SAVE IT (DECISIONS row 251). A window stored before the clean start may still
+ * hold a typed dinar `fixed` offer price or a PLUS price: inert at every door, and refused by name on a save
+ * (OFFER_DINAR_PRICE_RETIRED). Served as stored, the panel — which has no field for either any more — would
+ * resend them, so every save, even a components-only edit, was refused. The read and the duplicate serve
+ * them dropped; `retired` says one was, so the read can tell the owner once.
+ */
+function editableOffer(offer: BundleOfferInput | null): { offer: BundleOfferInput | null; retired: boolean } {
+  if (!offer) return { offer, retired: false };
+  const fixed = offer.offer_price_mode === 'fixed';
+  if (!fixed && (offer.plus_price_iqd ?? null) === null) return { offer, retired: false };
+  return {
+    offer: { ...offer, plus_price_iqd: null, ...(fixed ? { offer_price_mode: '' as const, offer_price_iqd: null } : {}) },
+    retired: true,
   };
 }
 
@@ -308,7 +326,7 @@ adminBundlesRoutes.get('/', async (c) => {
 
   const ctx = await ctxFor(c);
   const nowMs = Date.now();
-  // DECISIONS row 250: priced like an ordinary product — one read says which are still «يحتاج تسعيرًا».
+  // DECISIONS row 251: priced like an ordinary product — one read says which are still «يحتاج تسعيرًا».
   const unpriced = await needsPricingIds(c.env.DB, ids);
   const bundles = [];
   for (const row of results) {
@@ -433,17 +451,18 @@ adminBundlesRoutes.get('/:productId', async (c) => {
   const id = c.req.param('productId');
   const { loaded, preview, issues, needsPricing } = await previewOf(c, id);
   const stored = await reloadForVerification(c.env.DB, id);
+  const offer = editableOffer(loaded.offer);
   return c.json({
     success: true,
     ...projectForAdmin(c.env, c.get('user'), {
       product: stored ? projectAdmin(stored.document) : projectAdmin(loaded.doc),
       config: loaded.config,
       components: loaded.components,
-      offer: loaded.offer,
+      offer: offer.offer,
       preview,
       needs_pricing: needsPricing,
       updated_at: String(loaded.row.updated_at ?? ''),
-      ...warningBody(issues),
+      ...warningBody(offer.retired ? [...issues, bundleIssue('OFFER_DINAR_PRICE_RETIRED', {}, { key: 'offer' })] : issues),
     }),
   });
 });
@@ -487,7 +506,7 @@ function readComponents(body: Record<string, unknown>): BundleComponentInput[] {
 }
 
 /**
- * DECISIONS row 250: a composition is priced like an ordinary product (Pricing V2, section ٣), so the dinar
+ * DECISIONS row 251: a composition is priced like an ordinary product (Pricing V2, section ٣), so the dinar
  * rule `bundle_config` used to carry — a derived discount, a typed PLUS price, a dinar floor — is retired:
  * whatever a client sends there, the stored rule is the inert one (`fixed`, no discount, no PLUS price,
  * floor 1). Only the per-order cap is still the panel's.
@@ -688,7 +707,7 @@ async function writeBundle(c: Context<AppContext>, mode: 'create' | 'update', pr
 
   const kind: 'bundle' | 'mystery' = prev ? (prev.composition as 'bundle' | 'mystery') : 'bundle';
   const id = prev ? prev.id : newId('prd');
-  // DECISIONS row 250: a composition is priced like an ordinary product (section ٣, Pricing V2), so this
+  // DECISIONS row 251: a composition is priced like an ordinary product (section ٣, Pricing V2), so this
   // panel types no dinar price — the product form's rule: an absent price keeps the stored one (a new
   // bundle is born at 0, «يحتاج تسعيرًا»), an echo passes, a moved one is 409 PRICING_V2_MANAGED.
   holdLegacyDocMoney(body, prev, { costs: canWriteCost(c.env, admin) });
@@ -808,16 +827,9 @@ adminBundlesRoutes.post('/:productId/duplicate', async (c) => {
     null
   );
   const ctx = await ctxFor(c);
-  // DECISIONS row 250: the copy is priced like an ordinary product — born «يحتاج تسعيرًا», with no dinar rule.
-  const offer = source.offer
-    ? {
-        ...source.offer,
-        max_per_user: null,
-        max_global: null,
-        plus_price_iqd: null,
-        ...(source.offer.offer_price_mode === 'fixed' ? { offer_price_mode: '' as const, offer_price_iqd: null } : {}),
-      }
-    : null;
+  // DECISIONS row 251: the copy is priced like an ordinary product — born «يحتاج تسعيرًا», with no dinar rule.
+  const kept = editableOffer(source.offer).offer;
+  const offer = kept ? { ...kept, max_per_user: null, max_global: null } : null;
   const saveIntent: ProductWriteIntent = {
     mode: 'create',
     doc,

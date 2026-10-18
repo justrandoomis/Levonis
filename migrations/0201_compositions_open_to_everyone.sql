@@ -1,5 +1,5 @@
 -- 0201 — BUNDLES AND MYSTERY BOXES ARE OPEN TO EVERY VISITOR (the owner's decision of 2026-10-18,
--- DECISIONS row 250, amending addendum A.14 / Q7 and §17 decision 2)
+-- DECISIONS row 251, amending addendum A.14 / Q7 and §17 decision 2)
 --
 -- «واجعل القسم ايضا يظهر للكل (حاليا منحصر لدى المشتركين فقط)». The section was members-only through
 -- one thing alone: the `required_tiers` set 0063 wrote onto every migrated bundle's offer window,

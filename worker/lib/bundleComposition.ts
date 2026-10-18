@@ -465,7 +465,7 @@ export function resolveBundlePrice(input: {
   const componentTotal = Math.max(0, Math.trunc(input.componentTotalIqd));
 
   // ---- the regular price: the row's own, as an ordinary product's ----------
-  // DECISIONS row 250 (the owner, 2026-10-18): a bundle or a mystery box is priced like an ordinary product —
+  // DECISIONS row 251 (the owner, 2026-10-18): a bundle or a mystery box is priced like an ordinary product —
   // its own Pricing V2 price (cost-first or a dollar price, minimum profit, the rounding rule, the dollar as the
   // base), which the V2 writer keeps on the row. `bundle_config`'s dinar rule (a discount derived from the
   // components' total, a typed PLUS price, a dinar floor) prices nothing any more: `config` is read for its
@@ -1353,7 +1353,7 @@ export async function resolveComposition(
  * preview and the listing, so one screen can never warn about a bundle the
  * next screen calls fine.
  *
- * DECISIONS row 250: a composition is priced like an ordinary product. Until
+ * DECISIONS row 251: a composition is priced like an ordinary product. Until
  * its first complete V2 write it is «يحتاج تسعيرًا» — hidden from customers and
  * never sold (worker/lib/listing.ts) — and its stored dinar figure is an
  * archive, not a price: nothing is compared with it.
@@ -1395,7 +1395,7 @@ export async function planBundleComposition(
     nowMs: number;
     /** The status this save is asking for — a publish is stricter than a draft. */
     publishing: boolean;
-    /** No complete Pricing V2 write yet (DECISIONS row 250): the save says «يحتاج تسعيرًا». */
+    /** No complete Pricing V2 write yet (DECISIONS row 251): the save says «يحتاج تسعيرًا». */
     needsPricing?: boolean;
   }
 ): Promise<BundleCompositionPlan> {
@@ -1438,7 +1438,7 @@ export async function planBundleComposition(
   if (opts.offer) {
     const { starts_at: s, ends_at: e } = opts.offer;
     if (s && e && Date.parse(e) <= Date.parse(s)) errors.push(bundleIssue('SCHEDULE_INVERTED', {}, { key: 'ends_at' }));
-    // DECISIONS row 250: an offer prices a composition as it prices an ordinary product — a percent or an
+    // DECISIONS row 251: an offer prices a composition as it prices an ordinary product — a percent or an
     // amount off. A typed dinar offer price or PLUS price is the retired rule's, refused by name.
     if (opts.offer.offer_price_mode === 'fixed' || (opts.offer.plus_price_iqd ?? null) !== null) {
       errors.push(bundleIssue('OFFER_DINAR_PRICE_RETIRED', {}, { key: opts.offer.offer_price_mode === 'fixed' ? 'offer.offer_price_iqd' : 'offer.plus_price_iqd' }));
@@ -1466,7 +1466,7 @@ export async function planBundleComposition(
   errors.push(...res.errors);
   warnings.push(...res.warnings);
 
-  // DECISIONS row 250: the price is the composition's own Pricing V2 price — never refused here; an
+  // DECISIONS row 251: the price is the composition's own Pricing V2 price — never refused here; an
   // unpriced composition saves, stays hidden and is «يحتاج تسعيرًا» until its first complete V2 write.
   warnings.push(...compositionPriceWarnings(res.preview, opts.needsPricing ?? false));
 

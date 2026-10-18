@@ -156,7 +156,7 @@ test('a bundle walks the whole mandate: composed, listed, gated, carted, reserve
   assert.equal(availability.state, 'low');
   assert.equal(availability.member_exclusive, true, 'an entitled viewer of a gated offer');
   assert.equal(preview.component_total_iqd, 400_000 + 25_000 * 2 + 5_000);
-  // DECISIONS row 250: a bundle is priced like an ordinary product. The panel types no dinar price: the new
+  // DECISIONS row 251: a bundle is priced like an ordinary product. The panel types no dinar price: the new
   // bundle is «يحتاج تسعيرًا» until the owner prices it in section ٣ — here at 400,000 (a dollar price at U).
   assert.ok(
     (created.warning_details as Array<{ code: string }>).some((w) => w.code === 'COMPOSITION_NEEDS_PRICING'),
@@ -505,7 +505,7 @@ test('a mystery offer walks the whole mandate: pooled, published, bought, perman
   assert.equal(offer.success, true, JSON.stringify(offer));
   const offerId = String(offer.product.id);
   const offerSlug = String(offer.product.slug);
-  // DECISIONS row 250: priced like an ordinary product — the owner's dollar price, 60,000 at U.
+  // DECISIONS row 251: priced like an ordinary product — the owner's dollar price, 60,000 at U.
   await publishV2(raw, offerId, { usd: usdReproducing(60_000, FIXTURE_U) });
 
   // ---------------------------------- 2. the shop lists it, revealing nothing
@@ -672,7 +672,7 @@ test('the composition surface refuses the same way everywhere: the panel, the sh
   const db = asD1(raw);
 
   // A retired dinar price is refused BY THE PANEL, verbatim and in three
-  // languages (DECISIONS row 250: a bundle is priced like any product, in
+  // languages (DECISIONS row 251: a bundle is priced like any product, in
   // section ٣ — an offer takes a percent or an amount off, never a typed
   // dinar price).
   const refused = await post(appAs(db, boss), '/api/admin/bundles', {

@@ -1,6 +1,6 @@
 /**
  * BUNDLES AND MYSTERY BOXES, PRICED AND OPENED LIKE ORDINARY PRODUCTS
- * (the owner's decision of 2026-10-18, DECISIONS row 250, amending addendum A.14 / Q7).
+ * (the owner's decision of 2026-10-18, DECISIONS row 251, amending addendum A.14 / Q7).
  *
  *   1. a bundle priced FROM COST gets exactly the price an ordinary product with the
  *      same cost and minimum profit gets (the same V2 maths, the same rounding rule);
@@ -33,6 +33,7 @@ import { bundlesRoutes } from '../worker/routes/bundles';
 import { cartRoutes } from '../worker/routes/cart';
 import { adminBundlesRoutes } from '../worker/routes/adminBundles';
 import { adminProductsRoutes } from '../worker/routes/adminProducts';
+import { adminMysteryRoutes } from '../worker/routes/mystery';
 import { repriceStaleEngineProducts } from '../worker/lib/pricingEngine/autoReprice';
 import { statementBudget } from '../worker/lib/fx/budget';
 import type { Env } from '../worker/lib/types';
@@ -56,6 +57,7 @@ const admin = (raw: DatabaseSync) =>
   stubApp(asD1(raw), OWNER, (a) => {
     a.route('/api/admin/bundles', adminBundlesRoutes);
     a.route('/api/admin/products-v2', adminProductsRoutes);
+    a.route('/api/admin/mystery', adminMysteryRoutes);
   });
 
 const directPrice = (raw: DatabaseSync, id: string): number => {
@@ -114,6 +116,35 @@ test('a bundle priced FROM A DOLLAR PRICE is the dollar × U on the rounding rul
   const card = (await json(await get(shop(raw, GUEST), '/api/bundles'))).bundles[0];
   assert.equal(card.display_price_iqd, 375_250);
   assert.equal(card.composition.component_total_iqd, 400_000 + 2 * 25_000 + 5_000);
+
+  // The store's dollar price (DECISIONS row 248) on the card, the detail and the cart line alike — never the
+  // dinars divided by a display rate on the page beside $250.10 in the cart.
+  assert.equal(card.display_price_usd_cents, 25_010);
+  assert.equal(card.display_regular_usd_cents, 25_010);
+  const detail = (await json(await get(shop(raw, GUEST), '/api/bundles/starter'))).bundle;
+  assert.equal(detail.display_price_usd_cents, 25_010);
+  const added = await json(await post(shop(raw, BUYER), '/api/cart/items', { productId: 'prd_b1', qty: 1 }));
+  assert.equal(added.success, true, JSON.stringify(added).slice(0, 300));
+  assert.equal(added.items[0].breakdown.applied_usd_cents, 25_010);
+  assert.equal(added.items[0].unit_price_usd_cents, 25_010);
+});
+
+test('a live percent offer moves a composition\'s dinars off its V2 row: no dollar twin anywhere, the page converts', async () => {
+  const raw = seedCatalogue();
+  ensureUsdRate(raw, '1500');
+  addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 0, window: {} });
+  raw.exec("UPDATE offer_windows SET offer_price_mode = 'discount_percent', discount_percent = 10 WHERE id = 'ofw_prd_b1'");
+  await publishAllV2(raw, { ids: COMPONENTS });
+  await publishV2(raw, 'prd_b1', { usd: '250.10' });
+  const card = (await json(await get(shop(raw, GUEST), '/api/bundles'))).bundles[0];
+  assert.ok(card.display_price_iqd < 375_250, JSON.stringify(card).slice(0, 300));
+  assert.equal(card.display_price_usd_cents, undefined);
+  assert.equal(card.display_regular_usd_cents, undefined);
+  const added = await json(await post(shop(raw, BUYER), '/api/cart/items', { productId: 'prd_b1', qty: 1 }));
+  assert.equal(added.success, true, JSON.stringify(added).slice(0, 300));
+  assert.equal(added.items[0].breakdown.applied_iqd, card.display_price_iqd);
+  assert.equal(added.items[0].breakdown.applied_usd_cents, undefined);
+  assert.equal(added.items[0].unit_price_usd_cents, undefined);
 });
 
 test('the dollar stays the base: when U moves, the automatic repricing moves a bundle\'s dinar price as it moves a product\'s', async () => {
@@ -139,9 +170,17 @@ test('a mystery box is priced like a product: its own dollar price, listed and q
   await publishAllV2(raw, { ids: raw.prepare("SELECT id FROM products WHERE COALESCE(composition, '') = ''").all().map((r) => String((r as { id: string }).id)) });
   assert.equal(isV2Published(raw, 'p_mystery'), false);
   assert.equal((await json(await get(shop(raw, GUEST), '/api/bundles?kind=mystery'))).bundles.length, 0, 'an unpriced mystery box was listed');
+  // The mystery panel says «يحتاج تسعيرًا» too, and shows no archived dinar figure as its price.
+  const listed = async () => (await json(await get(admin(raw), '/api/admin/mystery/offers'))).offers.find((o: { id: string }) => o.id === 'p_mystery');
+  const unpricedRow = await listed();
+  assert.equal(unpricedRow.needs_pricing, true);
+  assert.equal(unpricedRow.price_iqd, null);
 
   await publishV2(raw, 'p_mystery', { usd: '40' });
   assert.equal(directPrice(raw, 'p_mystery'), 60_000);
+  const pricedRow = await listed();
+  assert.equal(pricedRow.needs_pricing, false);
+  assert.notEqual(pricedRow.price_iqd, null);
   const card = (await json(await get(shop(raw, GUEST), '/api/bundles?kind=mystery'))).bundles[0];
   assert.equal(card.display_price_iqd, 60_000);
   assert.equal((await json(await get(shop(raw, GUEST), '/api/bundles/mystery-box'))).bundle.display_price_iqd, 60_000);

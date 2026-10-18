@@ -62,7 +62,7 @@ import {
 import { offerEligible, windowFromRow, type OfferCheck, type OfferWindow } from './offers';
 import { resolveForOrderType, resolveStock } from './inventory';
 import type { InventorySnapshot, StockResolution } from './inventory';
-import { resolveUnitPrice, clampMemberLadder } from './pricing';
+import { resolveUnitPrice, clampMemberLadder, usdTwins } from './pricing';
 import { roundPriceIqd } from '@levonis/pricing/priceRounding';
 import type { MemberFallback, PreorderPricing, ProPricingPolicy, ResolvedPrice, Tier } from './pricing';
 import { tierInherits, type TierStatus } from './entitlements';
@@ -849,7 +849,7 @@ function componentState(c: ResolvedComponentView, bundleState: CompositionState)
 // ------------------------------------------------------------------ pricing
 
 /**
- * PRICED LIKE AN ORDINARY PRODUCT (DECISIONS row 250, amending §4.5 and §4.6).
+ * PRICED LIKE AN ORDINARY PRODUCT (DECISIONS row 251, amending §4.5 and §4.6).
  *
  * The composition's price is its own Pricing V2 price — what the V2 writer
  * keeps on the row — resolved by the same `resolveUnitPrice` with the same
@@ -913,7 +913,7 @@ function resolvePricing(
     // it silent: it turned an impossible price into a free one. A price under
     // the floor does not clamp and does not sell — `refuseComposition` already
     // refuses on `OFFER_INACTIVE`, and the card reads the same error list.
-    // DECISIONS row 250: `bundle_config.min_price_iqd` is the retired dinar rule's — the floor is an ordinary product's.
+    // DECISIONS row 251: `bundle_config.min_price_iqd` is the retired dinar rule's — the floor is an ordinary product's.
     const floorIqd = 1;
     if (regular < floorIqd) {
       return {
@@ -1013,6 +1013,7 @@ function memberLadder(
  * charge.
  */
 export function displayOverride(b: ResolvedBundle) {
+  const usd = compositionUsdTwins(b);
   return {
     display_price_iqd: b.pricing.applied_iqd,
     display_regular_iqd: b.pricing.regular_iqd,
@@ -1020,7 +1021,27 @@ export function displayOverride(b: ResolvedBundle) {
     display_pro_iqd: b.pricing.pro_iqd,
     display_applied_tier: b.pricing.applied_tier,
     display_from: false,
+    ...(usd.applied_usd_cents !== undefined ? { display_price_usd_cents: usd.applied_usd_cents } : {}),
+    ...(usd.regular_usd_cents !== undefined ? { display_regular_usd_cents: usd.regular_usd_cents } : {}),
   };
+}
+
+/**
+ * THE COMPOSITION'S DOLLAR TWINS (DECISIONS rows 248, 251) — one rule for the card, the detail, the
+ * cart line and the order snapshot. Priced like an ordinary product, a composition shows the store's
+ * dollar price its own V2 row keeps, but only while the figure IS that row's: a live window moved it
+ * (`source: 'offer'`), or its regular price is not the resolver's — those dinars have no dollar base,
+ * and the page converts them. The applied and unit twins then follow the resolver's own equality rule
+ * (`usdTwins`): a member rung, or a fee on top (`unitIqd`), drops them as on an ordinary product.
+ */
+export function compositionUsdTwins(b: ResolvedBundle, unitIqd: number = b.pricing.unit_subtotal_iqd) {
+  const base = b.pricing.resolved;
+  if (b.pricing.source !== 'ladder' || b.pricing.regular_iqd !== base.regular_iqd) return {};
+  return usdTwins(base.regular_usd_cents, {
+    regular_iqd: b.pricing.regular_iqd,
+    applied_iqd: b.pricing.applied_iqd,
+    unit_subtotal_iqd: unitIqd,
+  });
 }
 
 /** `max_qty` for a composition row: the scarcest component, the offer's own
@@ -1202,7 +1223,7 @@ export async function loadCompositionBySlug(
   slug: string
 ): Promise<Record<string, unknown> | null> {
   // Listed to customers only (worker/lib/listing.ts): a composition is a platform product like any other,
-  // priced like one (DECISIONS row 250) — hidden until its first complete V2 write, then shown to everyone.
+  // priced like one (DECISIONS row 251) — hidden until its first complete V2 write, then shown to everyone.
   const listed = (await listing(db)).sellable('p');
   const rows = await compositionSelect(
     db,

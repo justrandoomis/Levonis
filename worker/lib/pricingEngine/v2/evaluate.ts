@@ -240,7 +240,7 @@ const sameSet = (a: ReadonlyArray<Record<string, string>>, b: ReadonlyArray<Reco
 
 export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluation> {
   // 1. Never on a failed read of the SKU rung (FX-7 gaps): the writer replaces those rows.
-  // A bundle or a mystery box is priced as an ordinary product (DECISIONS row 250): one SKU, sold direct.
+  // A bundle or a mystery box is priced as an ordinary product (DECISIONS row 251): one SKU, sold direct.
   const loaded = pricedAsProduct(a.loaded);
   refuseUnreadSkus(loaded);
   const pid = loaded.id;

@@ -164,7 +164,7 @@ interface BundleCard {
   max_bundles: number | null;
   availability_state: string;
   offer: OfferInput | null;
-  /** No complete Pricing V2 write yet (DECISIONS row 250): hidden from customers, «يحتاج تسعيرًا». */
+  /** No complete Pricing V2 write yet (DECISIONS row 251): hidden from customers, «يحتاج تسعيرًا». */
   needs_pricing?: boolean;
   warnings: string[];
   warning_details: BundleIssue[];
@@ -472,7 +472,7 @@ export default function AdminBundles() {
         offer: editing.offer,
         ...(editing.doc.id ? { expected_updated_at: editing.doc.updated_at } : {}),
       };
-      // DECISIONS row 250: the panel types no dinar price — the bundle is priced in section ٣ (Pricing V2),
+      // DECISIONS row 251: the panel types no dinar price — the bundle is priced in section ٣ (Pricing V2),
       // and an absent price keeps the stored one (a new bundle is born «يحتاج تسعيرًا»).
       for (const k of ['price_iqd', 'original_price_iqd', 'prime_price_iqd', 'pro_price_iqd']) delete body[k];
       const res = editing.doc.id
@@ -1042,7 +1042,7 @@ export default function AdminBundles() {
         open={openSection === 3}
         onToggle={() => setOpenSection(openSection === 3 ? 0 : 3)}
       >
-        {/* DECISIONS row 250: priced like an ordinary product — the product form's own section ٣. */}
+        {/* DECISIONS row 251: priced like an ordinary product — the product form's own section ٣. */}
         {doc.id ? (
           <CompositionPricing productId={doc.id} loc={loc} onSaved={() => void (async () => { await reload(); await openExisting(doc.id!); })()} />
         ) : (

@@ -39,7 +39,7 @@ const appFor = (db: unknown) =>
 
 /**
  * Everything about the catalogue that a snapshot must survive. Every product here is V2-priced (the
- * bundle too, DECISIONS row 250), so the engine's price guards are lifted for this vandalism only: it
+ * bundle too, DECISIONS row 251), so the engine's price guards are lifted for this vandalism only: it
  * stands for every later change, priced through the writer or not.
  */
 function breakTheCatalogue(raw: DatabaseSync): void {
@@ -271,7 +271,7 @@ test('a bundle line keeps its own transport snapshot and its components keep the
     components: Array<{ component_id: string; commission_iqd: number; qty: number }>;
   };
   assert.equal(transport.method, 'sea');
-  // Priced like an ordinary V2 product (DECISIONS rows 222, 250): no route carries a commission.
+  // Priced like an ordinary V2 product (DECISIONS rows 222, 251): no route carries a commission.
   assert.equal(transport.commission_iqd, 0, 'a V2 bundle was charged a route commission');
   assert.equal(transport.components.length, 2, 'the per-component fee facts are recorded, not just their sum');
 });

@@ -55,7 +55,7 @@ function applyFrom(db: DatabaseSync, start: string, stop?: string) {
   }
 }
 
-/** DECISIONS row 250: the migration that opened the section to every visitor. */
+/** DECISIONS row 251: the migration that opened the section to every visitor. */
 const OPEN = '0201_compositions_open_to_everyone.sql';
 
 const MS_CREATED = Date.UTC(2024, 4, 17, 9, 30, 0);
@@ -141,7 +141,7 @@ test('epoch milliseconds become ISO text — `bundles` wrote Date.now(), `produc
   assert.equal(p.updated_at, new Date(MS_UPDATED).toISOString());
 });
 
-test("0063 preserved the old members-only gate exactly, as a SET — and 0201 opens it to every visitor (DECISIONS row 250)", () => {
+test("0063 preserved the old members-only gate exactly, as a SET — and 0201 opens it to every visitor (DECISIONS row 251)", () => {
   const before = migrated(OPEN);
   // exclusiveSections is PLUS or PRIME or PRO — all three, written as a set.
   assert.equal(

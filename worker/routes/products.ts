@@ -2731,7 +2731,7 @@ export function catalogOnlyCard(doc: ProductDoc, coarse = false): Record<string,
  * member prices across levels, for the card's faint tier teasers; null =
  * that tier has no explicit price anywhere on the product.
  */
-/** The card's dollar twins (DECISIONS row 248): what a composition's own display block clears. */
+/** The card's dollar twins (DECISIONS row 248): what a composition's own display block replaces. */
 const CARD_USD_KEYS = [
   'display_price_usd_cents',
   'display_regular_usd_cents',
@@ -2773,6 +2773,9 @@ export function publicWithDisplayPrice(
     display_pro_iqd: number | null;
     display_applied_tier: 'regular' | 'plus' | 'prime' | 'pro';
     display_from: boolean;
+    /** Its own V2 row's dollars, only where its figure is that row's (`compositionUsdTwins`, DECISIONS row 251). */
+    display_price_usd_cents?: number;
+    display_regular_usd_cents?: number;
   },
   /**
    * A SCHEDULED SPECIAL OFFER ON AN ORDINARY PRODUCT (§9, §10, §12).
@@ -3088,9 +3091,10 @@ export function publicWithDisplayPrice(
   // A composition row's block is OVERWRITTEN, never merged: the freshly derived
   // figures and the offer-scoped PLUS rung replace the cached ladder entirely.
   if (composition && (doc.composition ?? '') !== '') {
-    Object.assign(out, composition);
-    // A composition's figures have no dollar base: none of the twins above may describe them.
+    // None of the twins above describes the composition's figures: it carries its own, where its figure has a
+    // dollar base (its V2 row's, DECISIONS row 251) — so the card, the detail and the cart line agree.
     for (const k of CARD_USD_KEYS) delete out[k];
+    Object.assign(out, composition);
     // The same two rules for a bundle's own ladder.
     out.display_prime_iqd = null;
     if (ctx.proPaused) out.display_pro_iqd = null;

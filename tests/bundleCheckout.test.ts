@@ -113,7 +113,7 @@ test('points accrue on the parent only, and on the number ACTUALLY charged — i
     addBundle(raw, {
       id: 'prd_b1',
       slug: 'starter',
-      // DECISIONS row 250: a bundle is priced like an ordinary product. A legacy
+      // DECISIONS row 251: a bundle is priced like an ordinary product. A legacy
       // derived rule left in `bundle_config` prices nothing, so the snapshot,
       // the merchandise and the points all read the bundle's own V2 price.
       priceIqd: 400_000,
@@ -402,7 +402,7 @@ test('the customer’s order payload shows ONE item with its parts nested undern
 // ------------------------------------------------- re-validation, case 11
 
 const MUTATIONS: Array<{ name: string; sql: string; code: string }> = [
-  // Refused as an ordinary product is (DECISIONS row 250): the listing's own door, by name.
+  // Refused as an ordinary product is (DECISIONS row 251): the listing's own door, by name.
   { name: 'the bundle is hidden', sql: "UPDATE products SET status='hidden' WHERE id='prd_b1'", code: 'PRODUCT_CURRENTLY_UNAVAILABLE' },
   { name: 'the offer window is switched off', sql: "UPDATE offer_windows SET active=0 WHERE subject_id='prd_b1'", code: 'OFFER_INACTIVE' },
   { name: 'the window has not opened', sql: "UPDATE offer_windows SET starts_at='2099-01-01T00:00:00.000Z' WHERE subject_id='prd_b1'", code: 'OFFER_WINDOW_NOT_STARTED' },
@@ -492,7 +492,7 @@ test('case 4 — a pre-order bundle sells with no physical stock, on the 14-stag
 
   const rows = items(raw, res.order.id);
   const parent = rows.find((r) => r.bundle_parent_item_id === null)!;
-  // Priced like an ordinary product (DECISIONS row 250): the bundle's own V2
+  // Priced like an ordinary product (DECISIONS row 251): the bundle's own V2
   // price, and — as on every V2 product since the clean start — no route
   // carries a commission, so nothing is added on the parent for the journey.
   assert.equal(Number(parent.unit_price_iqd), 90_000);
@@ -539,7 +539,7 @@ test('case 8 — a legacy derived rule cannot drag a bundle to nothing: it price
     id: 'prd_b1',
     slug: 'starter',
     priceIqd: 9_000,
-    // DECISIONS row 250: the retired dinar rule — a discount at the component total.
+    // DECISIONS row 251: the retired dinar rule — a discount at the component total.
     config: { price_mode: 'discount_iqd', discount_iqd: 400_000, min_price_iqd: 1000 },
     components: [{ id: 'bc_nozzle', product: 'p_nozzle', qty: 1 }],
   });
@@ -552,7 +552,7 @@ test('case 8 — a legacy derived rule cannot drag a bundle to nothing: it price
 
 // ------------------------------------------------------------ case 9, tiers
 
-test('case 9 — a PLUS member pays the bundle\'s own V2 price: a typed PLUS / PRIME / PRO dinar price prices nothing (DECISIONS row 250)', async () => {
+test('case 9 — a PLUS member pays the bundle\'s own V2 price: a typed PLUS / PRIME / PRO dinar price prices nothing (DECISIONS row 251)', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -608,7 +608,7 @@ test('a printer bought INSIDE a bundle still gets its device unit and its warran
   assert.equal(String(unit.product_id), 'p_printer');
 });
 
-test('case 4 — a pre-order bundle costs the same paid in advance or cash on delivery: its own V2 price, no fee (DECISIONS row 250)', async () => {
+test('case 4 — a pre-order bundle costs the same paid in advance or cash on delivery: its own V2 price, no fee (DECISIONS row 251)', async () => {
   // The owner's rule «إذا اختار الزبون الدفع عند الاستلام فيجب أن يتبع السعر نفس قواعد البيع المباشر» is kept
   // trivially: a bundle is priced like an ordinary V2 product, whose routes carry no commission and whose
   // direct-sale extra is retired, so neither basis adds anything to the bundle's one price.

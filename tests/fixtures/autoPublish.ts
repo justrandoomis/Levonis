@@ -10,7 +10,7 @@
  * fixture U = 1,500), so a seeded catalogue stays sellable and every price on
  * a rounding step stays exact. A product with no dinar price, or one the writer
  * cannot publish (an incomplete structure), stays hidden, as on the live site. A bundle or
- * a mystery box is published the same way (DECISIONS row 250: priced like an ordinary product).
+ * a mystery box is published the same way (DECISIONS row 251: priced like an ordinary product).
  *
  * Opt out with `stubApp(…, { publishV2: false })` — the cut-over tests that
  * prove the hiding itself do.

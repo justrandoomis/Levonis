@@ -95,7 +95,7 @@ function setup(user: typeof OWNER | typeof ASSISTANT = OWNER, env: Record<string
   return { raw, db, app: stubApp(db, user, mount, { env }) };
 }
 
-// No dinar price: a bundle is priced like an ordinary product, in section ٣ (DECISIONS row 250).
+// No dinar price: a bundle is priced like an ordinary product, in section ٣ (DECISIONS row 251).
 const KIT = {
   name_en: 'Starter kit',
   name_ar: 'حزمة البداية',
@@ -237,7 +237,7 @@ test("the preview is the scarcest component, computed by the storefront's own fu
   const made = await create(app);
   // printer 5/1 = 5 · spool floor(6/2) = 3 · nozzle 20/1 = 20 → min = 3
   assert.equal(((made.body.preview as Record<string, unknown>).availability as Record<string, unknown>).max_bundles, 3);
-  // Priced like any product (DECISIONS row 250): the preview quotes its V2 price.
+  // Priced like any product (DECISIONS row 251): the preview quotes its V2 price.
   const id = made.body.product.id as string;
   await publishV2(raw, id, { usd: usdReproducing(850_000, FIXTURE_U) });
   const preview = (await json(await get(app, `/api/admin/bundles/${id}/preview`))).preview as Record<string, unknown>;
@@ -295,7 +295,7 @@ const refusal = async (app: App, body: Record<string, unknown>) => {
   return { status: res.status, body: b, codes: ((b.details?.errors ?? []) as Array<{ code: string }>).map((e) => e.code) };
 };
 
-test('DECISIONS row 250: the retired dinar rule an older client sends is stored inert — it prices nothing and refuses nothing', async () => {
+test('DECISIONS row 251: the retired dinar rule an older client sends is stored inert — it prices nothing and refuses nothing', async () => {
   const { raw, app } = setup();
   const made = await create(app, { config: { price_mode: 'discount_iqd', discount_iqd: 2_000_000, discount_percent: 200, plus_price_iqd: 1, min_price_iqd: 9_000_000, max_qty_per_order: 4 } });
   assert.equal(made.status, 200, JSON.stringify(made.body));
@@ -307,7 +307,7 @@ test('DECISIONS row 250: the retired dinar rule an older client sends is stored 
   );
 });
 
-test('DECISIONS row 250: a typed dinar price is refused by name, PRICING_V2_MANAGED, and nothing is written', async () => {
+test('DECISIONS row 251: a typed dinar price is refused by name, PRICING_V2_MANAGED, and nothing is written', async () => {
   const { raw, app } = setup();
   for (const field of ['price_iqd', 'prime_price_iqd', 'pro_price_iqd', 'original_price_iqd']) {
     const res = await post(app, '/api/admin/bundles', { ...KIT, [field]: 850_000 });
@@ -319,7 +319,7 @@ test('DECISIONS row 250: a typed dinar price is refused by name, PRICING_V2_MANA
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM products WHERE composition <> ''"), 0, 'nothing was written');
 });
 
-test('DECISIONS row 250: a fixed dinar offer price or a PLUS price is refused by name, as on an ordinary product', async () => {
+test('DECISIONS row 251: a fixed dinar offer price or a PLUS price is refused by name, as on an ordinary product', async () => {
   const { raw, app } = setup();
   for (const offer of [
     { offer_price_mode: 'fixed', offer_price_iqd: 700000, active: true },
@@ -333,6 +333,37 @@ test('DECISIONS row 250: a fixed dinar offer price or a PLUS price is refused by
   const ok = await create(app, { offer: { offer_price_mode: 'discount_percent', discount_percent: 10, active: true } });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM products WHERE composition <> ''"), 1);
+});
+
+test('DECISIONS row 251: a window stored with a dinar fixed price and a PLUS price opens without them, says so once, and saves', async () => {
+  const { raw, app } = setup();
+  const made = await create(app, { offer: { offer_price_mode: 'discount_percent', discount_percent: 10, active: true } });
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  const id = made.body.product.id as string;
+  // As a window written before the clean start holds it.
+  raw.prepare("UPDATE offer_windows SET offer_price_mode = 'fixed', offer_price_iqd = 700000, plus_price_iqd = 650000 WHERE subject_id = ?").run(id);
+
+  const opened = await json(await get(app, `/api/admin/bundles/${id}`));
+  assert.equal(opened.offer.offer_price_mode, '');
+  assert.equal(opened.offer.offer_price_iqd, null);
+  assert.equal(opened.offer.plus_price_iqd, null);
+  assert.ok((opened.warning_details as Array<{ code: string }>).some((w) => w.code === 'OFFER_DINAR_PRICE_RETIRED'), JSON.stringify(opened.warning_details));
+
+  // A components-only edit resends what the panel holds — and saves.
+  const saved = await put(app, `/api/admin/bundles/${id}`, {
+    ...KIT,
+    components: opened.components,
+    offer: opened.offer,
+    expected_updated_at: opened.updated_at,
+  });
+  assert.equal(saved.status, 200, await saved.text());
+  const w = row<Record<string, unknown>>(raw, 'SELECT offer_price_mode, offer_price_iqd, plus_price_iqd FROM offer_windows WHERE subject_id = ?', id)!;
+  assert.deepEqual([w.offer_price_mode, w.offer_price_iqd, w.plus_price_iqd], ['', null, null]);
+  assert.equal(
+    ((await json(await get(app, `/api/admin/bundles/${id}`))).warning_details as Array<{ code: string }>).some((x) => x.code === 'OFFER_DINAR_PRICE_RETIRED'),
+    false,
+    'said once: a clean window says nothing'
+  );
 });
 
 test('a direct + pre-order composition is refused with BUNDLE_SHIPPING_MIXED naming both components', async () => {
@@ -490,7 +521,7 @@ test('a bundle priced above its parts warns, and an inactive member warns — ne
   const made = await create(app);
   assert.equal(made.status, 200, JSON.stringify(made.body));
   const id = made.body.product.id as string;
-  // Priced like any product (DECISIONS row 250), above its parts (945,000).
+  // Priced like any product (DECISIONS row 251), above its parts (945,000).
   await publishV2(raw, id, { usd: usdReproducing(2_000_000, FIXTURE_U) });
   const read = await json(await get(app, `/api/admin/bundles/${id}`));
   const codes = (read.warning_details as Array<{ code: string }>).map((w) => w.code);
@@ -503,7 +534,7 @@ test('a bundle priced above its parts warns, and an inactive member warns — ne
 
 // ================================================== unpriced compositions
 
-test('DECISIONS row 250: an unpriced bundle — new, or migrated with its old dinar figure — saves and publishes, hidden «يحتاج تسعيرًا»', async () => {
+test('DECISIONS row 251: an unpriced bundle — new, or migrated with its old dinar figure — saves and publishes, hidden «يحتاج تسعيرًا»', async () => {
   const { raw, app } = setup();
   // A new bundle is born at 0, priced in section ٣ afterwards.
   const made = await create(app, { status: 'active' });
