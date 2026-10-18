@@ -429,7 +429,7 @@ const STRINGS = {
     codDirectPricing: 'اختيار الدفع عند الاستلام يُسعَّر كبيع مباشر؛ يبقى طلبك طلبًا مسبقًا بمراحله ووسيلة نقله كما هي.',
     prepaidPreorder: 'الدفع مقدمًا يُبقي تسعير الطلب المسبق كما هو مُعدّ.',
     prepaidByWallet: 'مدفوع بالكامل من محفظتك — يُطبَّق تسعير الطلب المسبق.',
-    printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} مقدماً من المحفظة.`,
+    printerNote: (v: string) => `عند طلب توصيل الطابعات إلى المنزل يُدفع ${v} لكل طابعة مقدماً من المحفظة.`,
     printerAdvanceShort: (need: string, have: string) => `رصيد محفظتك ${have} ولا يغطي الدفعة المقدمة ${need}. اشحن المحفظة أو اختر الاستلام من المتجر.`,
     // ── «خدمه اقساطي على تطبيق جني» ───────────────────────────────────────
     giniRow: 'طلبتها أقساط من تطبيق جني؟',
@@ -483,7 +483,7 @@ const STRINGS = {
     codDirectPricing: 'Cash on delivery is priced as a direct sale; your order stays a pre-order, on its journey and its stages.',
     prepaidPreorder: 'Paying in advance keeps the configured pre-order pricing.',
     prepaidByWallet: 'Paid in full from your wallet — pre-order pricing applies.',
-    printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid in advance from your wallet.`,
+    printerNote: (v: string) => `When home delivery is requested for printers, ${v} per printer is paid in advance from your wallet.`,
     printerAdvanceShort: (need: string, have: string) => `Your wallet holds ${have}, which does not cover the ${need} advance. Top up your wallet, or choose store pickup.`,
     // ── Gini instalments (Qi Card / Rafidain Bank) ────────────────────────
     giniRow: 'Ordered it in instalments from the Gini app?',
@@ -541,7 +541,7 @@ const STRINGS = {
     codDirectPricing: 'پارەدان لە کاتی گەیاندن وەک فرۆشتنی ڕاستەوخۆ نرخ دەکرێت؛ داواکارییەکەت وەک پێش-داواکاری دەمێنێتەوە بە قۆناغەکانی و شێوازی گواستنەوەی خۆی.',
     prepaidPreorder: 'پارەدانی پێشوەخت نرخی پێش-داواکاری وەک ڕێکخراوە دەهێڵێتەوە.',
     prepaidByWallet: 'بە تەواوی لە جزدانەکەتەوە دراوە — نرخی پێش-داواکاری جێبەجێ دەبێت.',
-    printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} پێشوەخت لە جزدانەکەتەوە دەدرێت.`,
+    printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، بۆ هەر پرینتەرێک ${v} پێشوەخت لە جزدانەکەتەوە دەدرێت.`,
     printerAdvanceShort: (need: string, have: string) => `جزدانەکەت ${have} هەیە، کە ${need}ی پێشەکی ناگرێتەوە. جزدان پڕ بکەرەوە یان وەرگرتن لە فرۆشگا هەڵبژێرە.`,
     // ── قیست لە ڕێگەی ئەپی جینی ───────────────────────────────────────────
     giniRow: 'بە قیست لە ئەپی جینی داوات کردووە؟',

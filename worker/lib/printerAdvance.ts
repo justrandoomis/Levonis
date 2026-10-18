@@ -41,6 +41,11 @@ export interface PrinterAdvanceInput {
    * displayed note, so the screen and the charge can never disagree.
    */
   noteIqd: number | null;
+  /**
+   * How many printer UNITS the order holds (the owner, 2026-10-18: the advance is PER PRINTER, not per
+   * order). Missing or below 1 counts as one, so an old caller keeps today's single advance.
+   */
+  printerUnits?: number;
 }
 
 /** What must be in the wallet before this order may be created, in IQD. */
@@ -49,7 +54,8 @@ export function printerHomeDeliveryAdvanceIqd(input: PrinterAdvanceInput): numbe
   if (input.isPickup) return 0;
   const amount = input.noteIqd;
   if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0) return 0;
-  return amount;
+  const units = Number.isSafeInteger(input.printerUnits) && (input.printerUnits as number) > 1 ? (input.printerUnits as number) : 1;
+  return amount * units;
 }
 
 /**

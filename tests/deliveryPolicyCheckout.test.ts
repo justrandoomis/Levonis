@@ -193,3 +193,16 @@ test('the admin save is strict: unknown targets and duplicates are refused in th
   assert.match(resolved.summary.ckb, /پارچە/);
   raw.close();
 });
+
+test('the printer advance on cash on delivery is 50,000 PER PRINTER (the owner, 2026-10-18)', async () => {
+  const { raw, app, body } = fixture({ qty: 6, price: 900000 });
+  raw.exec("UPDATE products SET category_id = 'cat_printers' WHERE id = 'spool'");
+  // A printer is a product placed in a printer catalog (worker/lib/printerIdentity.ts).
+  raw.exec("INSERT INTO product_catalogs(product_id, catalog_id, position) VALUES('spool', 'cat_printers', (SELECT COALESCE(MAX(position), 0) + 1 FROM product_catalogs WHERE catalog_id = 'cat_printers'))");
+  const res = await json(await post(app, '/api/orders/quote', body));
+  assert.ok(res.quote, JSON.stringify(res));
+  // Six printers at 10,000 a piece ask 60,000 in delivery; the advance is 50,000 for each printer: 300,000.
+  assert.equal(res.quote.shipping.total_iqd, 60_000);
+  assert.equal(res.quote.wallet.required_advance_iqd, 300_000);
+  assert.equal(res.quote.notes.printer_home_delivery_iqd, 50_000, 'the note names the amount per printer');
+});

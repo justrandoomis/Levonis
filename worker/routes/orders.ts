@@ -3604,10 +3604,13 @@ export async function computeCheckout(
       ? 0
       : printerHomeDeliveryAdvanceIqd({
           hasPrinterLine: p.lines.some((l) => l.is_printer),
+          printerUnits: p.lines.reduce((n, l) => n + (l.is_printer ? Math.max(0, Math.trunc(l.qty)) : 0), 0),
           isPickup,
           noteIqd: printerNoteIqdFrom(settings.printerHomeDeliveryNoteIqd),
         });
 
+    // THE PRINTER ADVANCE IS PER PRINTER (the owner, 2026-10-18; DECISIONS row 253): the note's amount (50,000)
+    // for each printer unit in the order — `printerUnits` above.
     requiredAdvance = Math.min(Math.max(requiredAdvance, shipping.advance_due_iqd, printerAdvance), afterPoints);
     /**
      * NOTHING IS REQUIRED IN ADVANCE FOR A GINI ORDER, from any rule.
