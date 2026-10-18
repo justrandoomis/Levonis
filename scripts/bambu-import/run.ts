@@ -102,6 +102,11 @@ const MEDIA_SPACING_MS = 1000;
 const HELLO_EVERY = 50;
 /** The wait before the run status is read again after /lease refused a queued item (another one is in flight). */
 const LEASE_CLASH_WAIT_MS = 30_000;
+/**
+ * auto_withdraw's wait before the second fetch: the Worker takes an automatic withdrawal whose second fetch is at
+ * least 60 s after the block (§1 row 20); the 10 s above it absorb the two clocks' difference.
+ */
+export const AUTO_WITHDRAW_WAIT_MS = 70_000;
 /** The Worker's lease is 15 minutes; the runner renews it before 10 have passed since the last item call. */
 /**
  * Catalog-only is live when the public context document (worker/lib/publicApi/meta.ts,
@@ -157,6 +162,8 @@ export interface RunConfig {
   resume: boolean;
   chain: boolean;
   chainCount: number;
+  /** mode=run only: the owner's standing approval (2026-10-18) withdraws a page gone at the source and goes on. */
+  autoWithdraw: boolean;
   item: string;
   siteOrigin: string;
   storeOrigin: string;
@@ -182,6 +189,8 @@ export function configFromEnv(env: NodeJS.ProcessEnv, root: string): RunConfig {
   if (!/^([0-9]|1[0-2])$/.test(chainCount)) throw new ConfigError('chain_count is not 0 to 12');
   // A bounded job (the canary, an audit class) is reviewed before the next one (§K.4): it never chains.
   if (mode === 'run' && env.IN_CHAIN === 'true' && Number(maxItems) !== 0) throw new ConfigError('chain runs only with max_items 0');
+  const autoWithdraw = env.IN_AUTO_WITHDRAW === 'true';
+  if (autoWithdraw && mode !== 'run') throw new ConfigError('auto_withdraw runs only in mode run');
   const item = env.IN_ITEM ?? '';
   if (item && !/^[0-9]{1,20}$/.test(item)) throw new ConfigError('item is not a source product id');
   const sealKey = env.IN_SEAL_PUBKEY ?? '';
@@ -197,6 +206,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv, root: string): RunConfig {
     resume: env.IN_RESUME === 'true',
     chain: env.IN_CHAIN === 'true',
     chainCount: Number(chainCount),
+    autoWithdraw,
     item,
     siteOrigin,
     storeOrigin,
@@ -332,6 +342,9 @@ type ItemOutcome =
   | { kind: 'blocked'; code: string }
   | { kind: 'deadline' }
   | { kind: 'skip' };
+
+/** A withdrawal's evidence (§1 row 20): the second fetch of the page, and whether the sitemap no longer lists it. */
+type WithdrawEvidence = { second: { at: string; outcome: string; status: number }; absent: boolean };
 
 class JobStop extends Error {
   constructor(
@@ -625,6 +638,21 @@ export class Importer {
         this.items.push({ position: row.queue_position, handle: row.handle, outcome: 'deadline' });
         this.writeSummary(true);
         return { more: true, blocked: false };
+      }
+      if (outcome.code === 'SOURCE_WITHDRAWN' && this.cfg.autoWithdraw) {
+        // The owner's standing approval (2026-10-18): a page gone at the source is withdrawn and the queue goes on.
+        const auto = await this.autoWithdraw(row);
+        if (auto === 'deadline') {
+          this.items.push({ position: row.queue_position, handle: row.handle, outcome: 'deadline' });
+          this.writeSummary(true);
+          return { more: true, blocked: false };
+        }
+        if (auto === 'withdrawn') {
+          this.items.push({ position: row.queue_position, handle: row.handle, outcome: 'withdrawn' });
+          this.status = await this.ops.status().catch(() => this.status);
+          this.writeSummary(true);
+          continue;
+        }
       }
       this.items.push({ position: row.queue_position, handle: row.handle, outcome: 'blocked', code: outcome.code });
       this.status = await this.ops.status().catch(() => this.status);
@@ -1499,26 +1527,12 @@ export class Importer {
     await this.hello();
     const row = this.deps.bundle.bySid.get(this.cfg.item);
     if (!row) throw new JobStop('REVIEWED_SCOPE_REFUSED', true);
-    // The second fetch: the page is gone (404/410 or a redirect away) and the sitemap no longer lists it.
-    const robots = await this.ensureRobots();
-    let second: { at: string; outcome: string; status: number } = { at: this.now(), outcome: 'present', status: 200 };
-    if (robotsAllows(robots, `/products/${rawHandleOf(row)}`)) {
-      try {
-        const page = await this.store.productPage(rawHandleOf(row));
-        second = { at: this.now(), outcome: 'present', status: page.status };
-      } catch (err) {
-        if (!(err instanceof ImportStop) || err.code !== 'SOURCE_WITHDRAWN') throw err;
-        second = { at: this.now(), outcome: 'withdrawn', status: err.detail.status ?? 0 };
-      }
-    }
-    // The sitemap's absence is evidence only after a real read of it: a robots.txt Disallow is a policy stop
-    // (§J.1), never an empty sitemap — the withdrawal is refused and nothing is sent.
-    if (!robotsAllows(robots, '/sitemap_products_1.xml')) {
+    const found = await this.withdrawEvidence(row);
+    if (!found) {
       this.log.error('note', { code: 'SITEMAP_DISALLOWED' });
       return 1;
     }
-    const listed = productHandles(parseSitemap(await this.store.sitemap('/sitemap_products_1.xml')));
-    const absent = !listed.includes(row.handle);
+    const { second, absent } = found;
     if (second.outcome !== 'withdrawn' || !absent) {
       this.log.error('note', { code: 'SOURCE_STILL_PRESENT' });
       return 1;
@@ -1542,6 +1556,69 @@ export class Importer {
     }
     this.log.item(row.queue_position, row.handle, 'WITHDRAW', 'withdrawn', { state: a.state });
     return a.state === 'WITHDRAWN_AT_SOURCE' ? 0 : 1;
+  }
+
+  /**
+   * A withdrawal's evidence: the second fetch (the page gone: 404/410 or a redirect away) and a real read of the
+   * sitemap, whose handles are compared decoded (a non-ASCII handle is percent-encoded there). null when robots.txt
+   * disallows the sitemap: a policy stop (§J.1), never an empty sitemap — nothing is withdrawn.
+   */
+  private async withdrawEvidence(row: ManifestRow): Promise<WithdrawEvidence | null> {
+    const robots = await this.ensureRobots();
+    let second: WithdrawEvidence['second'] = { at: this.now(), outcome: 'present', status: 200 };
+    if (robotsAllows(robots, `/products/${rawHandleOf(row)}`)) {
+      try {
+        const page = await this.store.productPage(rawHandleOf(row));
+        second = { at: this.now(), outcome: 'present', status: page.status };
+      } catch (err) {
+        if (!(err instanceof ImportStop) || err.code !== 'SOURCE_WITHDRAWN') throw err;
+        second = { at: this.now(), outcome: 'withdrawn', status: err.detail.status ?? 0 };
+      }
+    }
+    if (!robotsAllows(robots, '/sitemap_products_1.xml')) return null;
+    const listed = productHandles(parseSitemap(await this.store.sitemap('/sitemap_products_1.xml')));
+    return { second, absent: !listed.includes(row.handle.normalize('NFC')) };
+  }
+
+  /**
+   * mode=run with auto_withdraw (the owner's standing approval of 2026-10-18, §1 row 20): an item BLOCKED
+   * SOURCE_WITHDRAWN is fetched again AUTO_WITHDRAW_WAIT_MS later, at the store's pace, and withdrawn when the page
+   * is still gone and the sitemap no longer lists it. Anything less — the page back, still listed, a fetch that did
+   * not settle, a refusal at the door — keeps it BLOCKED ('kept'), and the queue stops as without it.
+   */
+  private async autoWithdraw(row: ManifestRow): Promise<'withdrawn' | 'kept' | 'deadline'> {
+    const log = (t: Parameters<ImportLog['item']>[3], p: Parameters<ImportLog['item']>[4] = {}) => this.log.item(row.queue_position, row.handle, 'WITHDRAW', t, p);
+    // The wait and two store reads must fit: else the next job (the chain carries auto_withdraw) meets it BLOCKED.
+    if (!this.deadline.fits(AUTO_WITHDRAW_WAIT_MS, 2 * WORST.EXTRACT)) return 'deadline';
+    log('withdraw_auto_wait', { seconds: AUTO_WITHDRAW_WAIT_MS / 1000 });
+    await this.pause(AUTO_WITHDRAW_WAIT_MS);
+    let found: WithdrawEvidence | null;
+    try {
+      found = await this.withdrawEvidence(row);
+    } catch (err) {
+      if (!(err instanceof ImportStop)) throw err;
+      this.log.error('note', { code: err.code });
+      return 'kept';
+    }
+    if (!found) {
+      this.log.error('note', { code: 'SITEMAP_DISALLOWED' });
+      return 'kept';
+    }
+    if (found.second.outcome !== 'withdrawn' || !found.absent) {
+      log('withdraw_auto_kept', { what: found.second.outcome, status: found.second.status, absent: found.absent });
+      return 'kept';
+    }
+    const approval = `workflow-60-run-${this.cfg.githubRunId || 'local'}-auto`;
+    try {
+      const a = await this.ops.withdraw(row.source_product_id, approval, { second_fetch: found.second, sitemap_absent: true, auto: true });
+      log('withdrawn_auto', { state: a.state });
+      return a.state === 'WITHDRAWN_AT_SOURCE' ? 'withdrawn' : 'kept';
+    } catch (err) {
+      // As in mode withdraw: a refusal is reported, never sent again on a guess.
+      if (!(err instanceof OpsError) || (err.kind !== 'stale' && err.code !== 'IMPORT_WITHDRAW_REFUSED')) throw err;
+      log('withdraw_auto_refused', { code: err.code });
+      return 'kept';
+    }
   }
 }
 

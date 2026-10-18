@@ -834,6 +834,7 @@ export class World {
       resume: false,
       chain: true,
       chainCount: 0,
+      autoWithdraw: false,
       item: '',
       siteOrigin: SITE,
       storeOrigin: STORE,

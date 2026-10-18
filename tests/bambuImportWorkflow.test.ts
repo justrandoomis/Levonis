@@ -188,7 +188,7 @@ const envOf = (step: Map) => (step.env === undefined ? {} : map(step.env, `env o
 /** Lines that are not comments: what GitHub actually reads. */
 const ACTIVE = TEXT.split('\n').filter((line) => !/^\s*#/.test(line));
 
-const INPUTS = ['mode', 'run_id', 'max_items', 'resume', 'chain', 'chain_count', 'item', 'seal_pubkey', 'confirm'];
+const INPUTS = ['mode', 'run_id', 'max_items', 'resume', 'chain', 'chain_count', 'auto_withdraw', 'item', 'seal_pubkey', 'confirm'];
 const MODES = ['snapshot', 'preflight', 'open', 'run', 'close', 'report', 'dryrun', 'withdraw', 'revoke', 'translations'];
 const envName = (input: string) => `IN_${input.toUpperCase()}`;
 const DEFAULT_BRANCH_ONLY = "${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}";
@@ -236,7 +236,7 @@ test('the inputs are exactly those of §K.3, with their defaults', () => {
   for (const [name, fallback] of [['run_id', ''], ['max_items', '1'], ['chain_count', '0'], ['item', ''], ['confirm', '']] as const) {
     assert.equal(map(inputs[name], name).default, fallback, name);
   }
-  for (const name of ['resume', 'chain']) {
+  for (const name of ['resume', 'chain', 'auto_withdraw']) {
     assert.equal(map(inputs[name], name).type, 'boolean');
     assert.equal(map(inputs[name], name).default, false);
   }
@@ -303,6 +303,7 @@ test('inputs reach the shell only through the job env, and no run script holds a
     `if: ${String(CHAIN.if)}`,
     'COUNT: ${{ inputs.chain_count }}',
     'KEY: ${{ inputs.seal_pubkey }}',
+    'AUTO: ${{ inputs.auto_withdraw }}',
   ]);
   for (const step of CHAIN_STEPS) assert.doesNotMatch(run(step), /\$\{\{/);
   assert.doesNotMatch(TEXT, /github\.event\.inputs/);
@@ -480,13 +481,13 @@ test('every mode runs exactly the steps it needs, in a safe order', () => {
 
 test('the chain step, run under bash: it validates what it dispatches and sends one dispatch of mode run', () => {
   const step = CHAIN_STEPS[0];
-  assert.deepEqual(Object.keys(envOf(step)).sort(), ['COUNT', 'DEFAULT_BRANCH', 'GH_TOKEN', 'KEY', 'REF', 'REPO', 'RUN_ID']);
+  assert.deepEqual(Object.keys(envOf(step)).sort(), ['AUTO', 'COUNT', 'DEFAULT_BRANCH', 'GH_TOKEN', 'KEY', 'REF', 'REPO', 'RUN_ID']);
   assert.equal(envOf(step).GH_TOKEN, '${{ github.token }}');
   const dir = mkdtempSync(join(tmpdir(), 'levonis-wf60-chain-'));
   try {
     const curl = join(dir, 'curl');
     writeFileSync(curl, `#!/bin/bash\nprintf '%s\\0' "$@" > "${join(dir, 'args')}"\n`, { mode: 0o755 });
-    const good = { RUN_ID: RUN, COUNT: '3', KEY, REPO: 'owner/repo', REF: 'claude/new-session-2hq4ci', DEFAULT_BRANCH: 'claude/new-session-2hq4ci', GH_TOKEN: 'ghs_planted', PATH: `${dir}:${process.env.PATH}` };
+    const good = { RUN_ID: RUN, COUNT: '3', KEY, AUTO: 'false', REPO: 'owner/repo', REF: 'claude/new-session-2hq4ci', DEFAULT_BRANCH: 'claude/new-session-2hq4ci', GH_TOKEN: 'ghs_planted', PATH: `${dir}:${process.env.PATH}` };
     const runStep = (env: Record<string, string>) => spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', '-c', run(step)], { encoding: 'utf8', timeout: 10_000, env });
     const ok = runStep(good);
     assert.equal(ok.status, 0, ok.stderr);
@@ -495,11 +496,15 @@ test('the chain step, run under bash: it validates what it dispatches and sends 
     const body = JSON.parse(args[args.indexOf('-d') + 1]);
     assert.deepEqual(body, {
       ref: 'claude/new-session-2hq4ci',
-      inputs: { mode: 'run', run_id: RUN, max_items: '0', resume: 'false', chain: 'true', chain_count: '4', seal_pubkey: KEY, confirm: 'IMPORT-LIVE' },
+      inputs: { mode: 'run', run_id: RUN, max_items: '0', resume: 'false', chain: 'true', chain_count: '4', auto_withdraw: 'false', seal_pubkey: KEY, confirm: 'IMPORT-LIVE' },
     });
     assert.ok(!ok.stdout.includes('ghs_planted'), 'the GitHub token is never printed');
     rmSync(join(dir, 'args'));
-    for (const bad of [{ RUN_ID: '' }, { RUN_ID: `${RUN}' x` }, { COUNT: '12' }, { COUNT: '1;id' }, { KEY: 'short' }, { REF: 'feature', DEFAULT_BRANCH: 'main' }, { REPO: 'a/b c' }]) {
+    // The owner's standing approval (auto_withdraw) is carried to the next job of the chain.
+    assert.equal(runStep({ ...good, AUTO: 'true' }).status, 0);
+    assert.equal(JSON.parse(readFileSync(join(dir, 'args'), 'utf8').split('\0').filter(Boolean).at(-1)!).inputs.auto_withdraw, 'true');
+    rmSync(join(dir, 'args'));
+    for (const bad of [{ RUN_ID: '' }, { RUN_ID: `${RUN}' x` }, { COUNT: '12' }, { COUNT: '1;id' }, { KEY: 'short' }, { AUTO: 'yes' }, { AUTO: '' }, { REF: 'feature', DEFAULT_BRANCH: 'main' }, { REPO: 'a/b c' }]) {
       const r = runStep({ ...good, ...bad });
       assert.equal(r.status, 1, JSON.stringify(bad));
       assert.match(r.stdout, /^::error::/m);
@@ -533,7 +538,7 @@ function bash(script: string, env: Record<string, string>) {
 const KEY = generateSealKeys().publicKey as string;
 const GOOD: Record<string, string> = {
   IN_MODE: 'snapshot', IN_RUN_ID: '', IN_MAX_ITEMS: '1', IN_RESUME: 'false', IN_CHAIN: 'false',
-  IN_CHAIN_COUNT: '0', IN_ITEM: '', IN_SEAL_PUBKEY: KEY, IN_CONFIRM: '',
+  IN_CHAIN_COUNT: '0', IN_AUTO_WITHDRAW: 'false', IN_ITEM: '', IN_SEAL_PUBKEY: KEY, IN_CONFIRM: '',
 };
 const RUN = 'cir_0123456789abcdef01234567';
 
@@ -543,6 +548,7 @@ test('the validation step accepts the valid dispatches and sets the deadline 330
     GOOD,
     { ...GOOD, IN_MODE: 'revoke', IN_RUN_ID: RUN },
     { ...GOOD, IN_MODE: 'run', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE', IN_MAX_ITEMS: '0', IN_CHAIN: 'true', IN_CHAIN_COUNT: '12', IN_RESUME: 'true' },
+    { ...GOOD, IN_MODE: 'run', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE', IN_MAX_ITEMS: '0', IN_CHAIN: 'true', IN_AUTO_WITHDRAW: 'true' },
     { ...GOOD, IN_MODE: 'withdraw', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE', IN_ITEM: '552709760709906432' },
     { ...GOOD, IN_MODE: 'open', IN_CONFIRM: 'IMPORT-LIVE', IN_MAX_ITEMS: '9999' },
     { ...GOOD, IN_MODE: 'dryrun' },
@@ -570,6 +576,7 @@ test('the validation step refuses every malformed or hostile input, and never ec
     ['IN_RUN_ID', 'cir_0123'], ['IN_RUN_ID', `${RUN}0`], ['IN_RUN_ID', RUN.toUpperCase()], ['IN_RUN_ID', `${RUN}' OR '1'='1`], ['IN_RUN_ID', '$(id)'],
     ['IN_MAX_ITEMS', ''], ['IN_MAX_ITEMS', '10000'], ['IN_MAX_ITEMS', '-1'], ['IN_MAX_ITEMS', '1 '], ['IN_MAX_ITEMS', '0x10'],
     ['IN_RESUME', 'yes'], ['IN_RESUME', ''], ['IN_CHAIN', 'True'], ['IN_CHAIN', '1'],
+    ['IN_AUTO_WITHDRAW', 'yes'], ['IN_AUTO_WITHDRAW', ''], ['IN_AUTO_WITHDRAW', 'TRUE'],
     ['IN_CHAIN_COUNT', '13'], ['IN_CHAIN_COUNT', '012'], ['IN_CHAIN_COUNT', ''], ['IN_CHAIN_COUNT', '-1'],
     ['IN_ITEM', 'abc'], ['IN_ITEM', '1'.repeat(21)], ['IN_ITEM', '12;id'],
     ['IN_SEAL_PUBKEY', KEY.slice(0, 42)], ['IN_SEAL_PUBKEY', `${KEY}A`], ['IN_SEAL_PUBKEY', `${KEY.slice(0, 42)}=`], ['IN_SEAL_PUBKEY', `${KEY.slice(0, 42)}+`],
@@ -595,6 +602,9 @@ test('the validation step refuses every malformed or hostile input, and never ec
     assert.equal(bash(script, { ...GOOD, IN_MODE: mode, IN_CONFIRM: 'IMPORT-LIVE', IN_ITEM: '1' }).status, 1, `${mode} without run_id`);
   }
   assert.equal(bash(script, { ...GOOD, IN_MODE: 'report' }).status, 1, 'report without run_id');
+  for (const mode of ['withdraw', 'close', 'snapshot']) {
+    assert.equal(bash(script, { ...GOOD, IN_MODE: mode, IN_RUN_ID: mode === 'snapshot' ? '' : RUN, IN_CONFIRM: 'IMPORT-LIVE', IN_ITEM: '1', IN_AUTO_WITHDRAW: 'true' }).status, 1, `auto_withdraw in mode ${mode}`);
+  }
   assert.equal(bash(script, { ...GOOD, IN_MODE: 'withdraw', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE' }).status, 1, 'withdraw without the item');
   assert.equal(bash(script, { ...GOOD, IN_MODE: 'open', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE' }).status, 1, 'open with a run_id');
   assert.equal(bash(script, { ...GOOD, IN_MODE: 'snapshot', IN_CONFIRM: 'IMPORT-LIVE' }).status, 0, 'a read may carry the phrase');

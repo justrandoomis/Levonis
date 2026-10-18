@@ -388,17 +388,23 @@ export async function finishRun(db: D1Database, run: ImportRun, bundle: Pick<Rev
 
 /** The second fetch's distance from the block: 6 h (the owner, 2026-10-18; it was 24 h, IMPORT-SPEC §1 row 20). */
 const WITHDRAW_GAP_MS = 6 * 3_600_000;
-const APPROVAL = /^workflow-60-run-(?:\d{1,20}|local)$/;
+/** The owner's standing approval (2026-10-18, §1 row 20): workflow 60's auto_withdraw, a second fetch ≥ 60 s later. */
+const AUTO_WITHDRAW_GAP_MS = 60_000;
+const APPROVAL = /^workflow-60-run-(?:\d{1,20}|local)(-auto)?$/;
 const WITHDRAWN_STATUS = new Set([301, 302, 303, 307, 308, 404, 410]);
 
 /**
  * BLOCKED SOURCE_WITHDRAWN → WITHDRAWN_AT_SOURCE (§1 row 20): the owner's approval reference (workflow 60's run),
  * a second fetch at least 6 h after the block that still finds the page gone, and the sitemap no longer listing
- * it. Terminal: never COMPLETE.
+ * it. Or automatic, under the owner's standing approval: the approval reference's `-auto` form, evidence.auto, and
+ * the same evidence with a second fetch at least 60 s after the block. Terminal: never COMPLETE.
  */
 export async function withdrawItem(db: D1Database, run: ImportRun, item: ItemRow, body: Record<string, unknown>): Promise<{ state: string }> {
   const approval = typeof body.approval_ref === 'string' && APPROVAL.test(body.approval_ref) ? body.approval_ref : '';
   const ev = body.evidence && typeof body.evidence === 'object' ? (body.evidence as Record<string, unknown>) : {};
+  // The auto form of the reference and evidence.auto go together: either one alone is refused.
+  const auto = approval.endsWith('-auto');
+  if (auto !== (ev.auto === true)) throw new OpsRefusal(409, 'IMPORT_WITHDRAW_REFUSED', [item.id]);
   const second = ev.second_fetch && typeof ev.second_fetch === 'object' ? (ev.second_fetch as Record<string, unknown>) : {};
   const secondAt = typeof second.at === 'string' ? Date.parse(second.at) : NaN;
   if (item.processing_state !== 'BLOCKED' || item.blocker_code !== 'SOURCE_WITHDRAWN' || !approval) throw new OpsRefusal(409, 'IMPORT_WITHDRAW_REFUSED', [item.id]);
@@ -410,14 +416,19 @@ export async function withdrawItem(db: D1Database, run: ImportRun, item: ItemRow
   const ok =
     Number.isFinite(firstAt) &&
     Number.isFinite(secondAt) &&
-    secondAt - firstAt >= WITHDRAW_GAP_MS &&
+    secondAt - firstAt >= (auto ? AUTO_WITHDRAW_GAP_MS : WITHDRAW_GAP_MS) &&
     secondAt <= Date.now() + 60_000 &&
     second.outcome === 'withdrawn' &&
     typeof second.status === 'number' &&
     WITHDRAWN_STATUS.has(second.status) &&
     ev.sitemap_absent === true;
   if (!ok) throw new OpsRefusal(409, 'IMPORT_WITHDRAW_REFUSED', [item.id]);
-  const evidence = { first_at: new Date(firstAt).toISOString(), second_fetch: { at: new Date(secondAt).toISOString(), outcome: 'withdrawn', status: second.status }, sitemap_absent: true };
+  const evidence = {
+    first_at: new Date(firstAt).toISOString(),
+    second_fetch: { at: new Date(secondAt).toISOString(), outcome: 'withdrawn', status: second.status },
+    sitemap_absent: true,
+    ...(auto ? { auto: true } : {}),
+  };
   // Fenced on the state this call read: an item that moved meanwhile gets no 'withdrawn' event (409, stale).
   const [fenceIn, fenceOut] = fence(db, `EXISTS (SELECT 1 FROM catalog_import_items WHERE id = ? AND processing_state = 'BLOCKED' AND blocker_code = 'SOURCE_WITHDRAWN')`, [item.id]);
   try {

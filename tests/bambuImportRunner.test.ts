@@ -625,6 +625,76 @@ test('mode withdraw: only with the second fetch gone and the sitemap no longer l
   }
 });
 
+test('auto_withdraw (the owner\'s standing approval): a page gone at the source is fetched again after the pause, withdrawn, and the NEXT item runs in the same job', async () => {
+  const gone = { storePage: (h: string) => (h === 'filament-buffer' ? new Response('gone', { status: 404 }) : null), sitemapExclude: ['filament-buffer'] };
+  const w = new World(gone);
+  try {
+    assert.equal(await w.importer({ autoWithdraw: true }).main(), 0, w.logLines.join('\n'));
+    assert.equal(w.item('filament-buffer').state, 'WITHDRAWN_AT_SOURCE');
+    assert.equal(w.item('ams-2-pro').state, 'COMPLETE', 'the queue went on');
+    assert.deepEqual(w.outputs, { more: 'false', blocked: 'false', run_id: RUN_ID });
+    const blockedAt = w.calls.find((c) => /\/event$/.test(c.path) && c.body?.outcome === 'blocked')!.at;
+    const [call] = callsTo(w, /\/withdraw$/);
+    assert.equal(call.body!.approval_ref, 'workflow-60-run-123-auto');
+    const ev = call.body!.evidence as { second_fetch: { at: string; outcome: string; status: number }; sitemap_absent: boolean; auto: boolean };
+    assert.equal(ev.auto, true);
+    assert.equal(ev.sitemap_absent, true);
+    assert.deepEqual([ev.second_fetch.outcome, ev.second_fetch.status], ['withdrawn', 404]);
+    assert.ok(Date.parse(ev.second_fetch.at) - blockedAt >= 60_000, 'the second fetch is at least 60 s after the block');
+    const pages = w.storeRequests.filter((r) => r.path === '/products/filament-buffer');
+    assert.equal(pages.length, 2, 'the page, then the second fetch');
+    assert.ok(w.storeRequests.some((r) => r.path === '/sitemap_products_1.xml' && r.seq > pages[1].seq), 'the sitemap read after the second fetch');
+    assert.ok(w.logLines.some((l) => l === '[import] #1 filament-buffer WITHDRAW: withdrawn at the source (auto): state WITHDRAWN_AT_SOURCE'), w.logLines.join('\n'));
+  } finally {
+    w.dispose();
+  }
+  // An item already BLOCKED SOURCE_WITHDRAWN (#75 today) is withdrawn the same way when the job meets it.
+  const b = new World({ ...gone, items: { '6945416380552': { state: 'BLOCKED', last_completed: '', blocker_code: 'SOURCE_WITHDRAWN' } } });
+  try {
+    assert.equal(await b.importer({ autoWithdraw: true }).main(), 0, b.logLines.join('\n'));
+    assert.equal(b.item('filament-buffer').state, 'WITHDRAWN_AT_SOURCE');
+    assert.equal(b.item('ams-2-pro').state, 'COMPLETE');
+    assert.equal(callsTo(b, /\/withdraw$/)[0].body!.approval_ref, 'workflow-60-run-123-auto');
+  } finally {
+    b.dispose();
+  }
+});
+
+test('auto_withdraw off: a page gone at the source blocks the item and the queue stops, as before', async () => {
+  const w = new World({ storePage: (h: string) => (h === 'filament-buffer' ? new Response('gone', { status: 404 }) : null), sitemapExclude: ['filament-buffer'] });
+  try {
+    assert.equal(await w.importer().main(), 0);
+    assert.equal(w.item('filament-buffer').state, 'BLOCKED');
+    assert.equal(w.item('ams-2-pro').state, 'DISCOVERED', 'the queue stopped');
+    assert.deepEqual(w.outputs, { more: 'false', blocked: 'true', run_id: RUN_ID });
+    assert.equal(callsTo(w, /\/withdraw$/).length, 0);
+    assert.equal(w.storeRequests.filter((r) => r.path === '/products/filament-buffer').length, 1, 'no second fetch');
+  } finally {
+    w.dispose();
+  }
+});
+
+test('auto_withdraw: a page that comes back, or one the sitemap still lists, is not withdrawn: BLOCKED, the queue stops', async () => {
+  const cases: Array<[string, ConstructorParameters<typeof World>[0]]> = [
+    ['the page is back', { storePage: (h, attempt) => (h === 'filament-buffer' && attempt === 1 ? new Response('gone', { status: 404 }) : null), sitemapExclude: ['filament-buffer'] }],
+    ['still in the sitemap', { storePage: (h) => (h === 'filament-buffer' ? new Response('gone', { status: 410 }) : null) }],
+  ];
+  for (const [label, opts] of cases) {
+    const w = new World(opts);
+    try {
+      await w.importer({ autoWithdraw: true }).main();
+      assert.equal(w.item('filament-buffer').state, 'BLOCKED', label);
+      assert.equal(w.item('ams-2-pro').state, 'DISCOVERED', label);
+      assert.deepEqual(w.outputs, { more: 'false', blocked: 'true', run_id: RUN_ID }, label);
+      assert.equal(callsTo(w, /\/withdraw$/).length, 0, label);
+      assert.equal(w.storeRequests.filter((r) => r.path === '/products/filament-buffer').length, 2, `${label}: the second fetch was made`);
+      assert.ok(w.logLines.some((l) => /^\[import\] #1 filament-buffer WITHDRAW: not withdrawn \(auto\)/.test(l)), `${label}: ${w.logLines.join('\n')}`);
+    } finally {
+      w.dispose();
+    }
+  }
+});
+
 test('verification: a stale public answer is purged again and waited for, then VERIFY_FAILED_PERSISTENT; COMPLETE is never sent', async () => {
   const w = new World({
     handles: ['filament-buffer'],

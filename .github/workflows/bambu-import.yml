@@ -43,6 +43,10 @@
 #             none BLOCKED — its deadline or a parked wait — at most 12 in a
 #             row). A bounded job (the canary, an audit class) never chains:
 #             it is reviewed (§K.4) before the next one is dispatched.
+#             auto_withdraw (run only; the owner's standing approval of
+#             2026-10-18): a product whose store page is gone is fetched
+#             again ~60 s later and, still gone and absent from the sitemap,
+#             withdrawn at the source; the queue goes on. The chain carries it.
 #   close     (confirm=IMPORT-LIVE, run_id) the end-of-run audit (§I.3), the
 #             protected snapshot `after`, /run/finish (closed or partial),
 #             the old token now answers 404, the sealed close report.
@@ -151,6 +155,11 @@ on:
         description: 'jobs chained so far, 0 to 12'
         required: false
         default: '0'
+      auto_withdraw:
+        description: "run only: withdraw a product whose store page is gone (a second fetch ~60 s later, absent from the sitemap) and go on (the owner's standing approval, 2026-10-18)"
+        type: boolean
+        required: false
+        default: false
       item:
         description: 'source product id (withdraw only)'
         required: false
@@ -194,6 +203,7 @@ jobs:
       IN_RESUME: ${{ inputs.resume }}
       IN_CHAIN: ${{ inputs.chain }}
       IN_CHAIN_COUNT: ${{ inputs.chain_count }}
+      IN_AUTO_WITHDRAW: ${{ inputs.auto_withdraw }}
       IN_ITEM: ${{ inputs.item }}
       IN_SEAL_PUBKEY: ${{ inputs.seal_pubkey }}
       IN_CONFIRM: ${{ inputs.confirm }}
@@ -210,6 +220,7 @@ jobs:
           [[ "$IN_RESUME" =~ ^(true|false)$ ]] || fail 'resume is true or false'
           [[ "$IN_CHAIN" =~ ^(true|false)$ ]] || fail 'chain is true or false'
           [[ "$IN_CHAIN_COUNT" =~ ^([0-9]|1[0-2])$ ]] || fail 'chain_count is a whole number from 0 to 12'
+          [[ "$IN_AUTO_WITHDRAW" =~ ^(true|false)$ ]] || fail 'auto_withdraw is true or false'
           [[ -z "$IN_ITEM" || "$IN_ITEM" =~ ^[0-9]{1,20}$ ]] || fail 'item is a source product id (digits only), or empty'
           [[ "$IN_SEAL_PUBKEY" =~ ^[A-Za-z0-9_-]{43}$ ]] || fail 'seal_pubkey is a one-time X25519 public key of 43 base64url characters'
           [[ -z "$IN_CONFIRM" || "$IN_CONFIRM" == "IMPORT-LIVE" ]] || fail 'confirm is IMPORT-LIVE or empty'
@@ -221,6 +232,7 @@ jobs:
             open) [[ -z "$IN_RUN_ID" ]] || fail 'open creates a new run: run_id must be empty' ;;
           esac
           if [[ "$IN_MODE" == "withdraw" ]]; then [[ -n "$IN_ITEM" ]] || fail 'withdraw needs the item (a source product id)'; fi
+          if [[ "$IN_AUTO_WITHDRAW" == "true" ]]; then [[ "$IN_MODE" == "run" ]] || fail 'auto_withdraw runs only in mode run'; fi
           if [[ "$IN_MODE" == "run" && "$IN_CHAIN" == "true" ]]; then [[ "$IN_MAX_ITEMS" == "0" ]] || fail 'chain runs only with max_items 0: a bounded job is reviewed before the next one'; fi
           echo "inputs valid: mode $IN_MODE"
 
@@ -350,6 +362,7 @@ jobs:
           RUN_ID: ${{ needs.import.outputs.run_id }}
           COUNT: ${{ inputs.chain_count }}
           KEY: ${{ inputs.seal_pubkey }}
+          AUTO: ${{ inputs.auto_withdraw }}
           REPO: ${{ github.repository }}
           REF: ${{ github.ref_name }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
@@ -358,10 +371,11 @@ jobs:
           [[ "$RUN_ID" =~ ^cir_[0-9a-f]{24}$ ]] || fail 'the import job named no run'
           [[ "$COUNT" =~ ^([0-9]|1[01])$ ]] || fail 'chain_count must be below 12 to chain again'
           [[ "$KEY" =~ ^[A-Za-z0-9_-]{43}$ ]] || fail 'seal_pubkey is not a one-time public key'
+          [[ "$AUTO" =~ ^(true|false)$ ]] || fail 'auto_withdraw is true or false'
           [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || fail 'the repository name is malformed'
           [[ -n "$REF" && "$REF" == "$DEFAULT_BRANCH" ]] || fail 'the chain runs on the default branch only'
-          body=$(jq -nc --arg ref "$REF" --arg run "$RUN_ID" --arg c "$((COUNT + 1))" --arg k "$KEY" \
-            '{ref: $ref, inputs: {mode: "run", run_id: $run, max_items: "0", resume: "false", chain: "true", chain_count: $c, seal_pubkey: $k, confirm: "IMPORT-LIVE"}}')
+          body=$(jq -nc --arg ref "$REF" --arg run "$RUN_ID" --arg c "$((COUNT + 1))" --arg k "$KEY" --arg a "$AUTO" \
+            '{ref: $ref, inputs: {mode: "run", run_id: $run, max_items: "0", resume: "false", chain: "true", chain_count: $c, auto_withdraw: $a, seal_pubkey: $k, confirm: "IMPORT-LIVE"}}')
           curl -fsS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/$REPO/actions/workflows/bambu-import.yml/dispatches" -d "$body"
           echo "dispatched job $((COUNT + 1)) of run $RUN_ID"

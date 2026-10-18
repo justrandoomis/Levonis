@@ -125,6 +125,46 @@ test('withdraw: BLOCKED SOURCE_WITHDRAWN, workflow 60\'s approval, a second fetc
   assert.equal(l.json.lease_token, '');
 });
 
+test('withdraw, auto (the owner\'s standing approval, 2026-10-18): the -auto reference, evidence.auto, a second fetch ≥ 60 s after the block, the sitemap no longer listing it', async () => {
+  const w = opsWorld();
+  const x = sample('ams-2-pro-feeder-unit');
+  setBundle(bundleTexts({ manifestRows: [manifestRowOf(x, 1)], matches: [] }));
+  openRun(w.raw);
+  await post(w, '/manifest', { rows: [row(manifestRowOf(x, 1))] });
+  const sid = x.sourceProductId;
+  const t = String((await post(w, `/items/${sid}/lease`, { lease_token: '' })).json.lease_token);
+  await event(w, sid, t, 'EXTRACTING', 'start');
+  await event(w, sid, t, 'BLOCKED', 'blocked', 'SOURCE_WITHDRAWN');
+  // The block happened 90 s ago.
+  const blockedAt = Date.now() - 90_000;
+  w.raw.prepare("UPDATE catalog_import_events SET at = ? WHERE outcome = 'blocked'").run(new Date(blockedAt).toISOString());
+  const at = (ms: number) => new Date(blockedAt + ms).toISOString();
+  const evidence = (second: string, extra: Record<string, unknown> = {}) => ({ second_fetch: { at: second, outcome: 'withdrawn', status: 404 }, sitemap_absent: true, auto: true, ...extra });
+  const withdraw = (body: unknown) => post(w, `/items/${sid}/withdraw`, body);
+  for (const [label, body] of [
+    ['under 60 s after the block', { approval_ref: 'workflow-60-run-77-auto', evidence: evidence(at(59_000)) }],
+    ['the sitemap still lists it', { approval_ref: 'workflow-60-run-77-auto', evidence: evidence(at(70_000), { sitemap_absent: false }) }],
+    ['no sitemap evidence', { approval_ref: 'workflow-60-run-77-auto', evidence: { second_fetch: { at: at(70_000), outcome: 'withdrawn', status: 404 }, auto: true } }],
+    ['the manual reference (its 6 h rule)', { approval_ref: 'workflow-60-run-77', evidence: evidence(at(70_000)) }],
+    ['the auto reference without evidence.auto', { approval_ref: 'workflow-60-run-77-auto', evidence: evidence(at(70_000), { auto: false }) }],
+    ['another reference', { approval_ref: 'auto', evidence: evidence(at(70_000)) }],
+    ['the page is back', { approval_ref: 'workflow-60-run-77-auto', evidence: { second_fetch: { at: at(70_000), outcome: 'present', status: 200 }, sitemap_absent: true, auto: true } }],
+  ] as const) {
+    const r = await withdraw(body);
+    assert.equal(r.status, 409, label);
+    assert.equal(r.json.code, 'IMPORT_WITHDRAW_REFUSED', label);
+    assert.equal((w.raw.prepare('SELECT processing_state AS s FROM catalog_import_items').get() as { s: string }).s, 'BLOCKED', label);
+  }
+  const ok = await withdraw({ approval_ref: 'workflow-60-run-77-auto', evidence: evidence(at(70_000)) });
+  assert.deepEqual(ok.json, { state: 'WITHDRAWN_AT_SOURCE' });
+  const item = w.raw.prepare('SELECT processing_state AS s, withdrawn_by AS by, withdrawn_evidence AS e FROM catalog_import_items').get() as { s: string; by: string; e: string };
+  assert.equal(item.s, 'WITHDRAWN_AT_SOURCE');
+  assert.equal(item.by, 'workflow-60-run-77-auto');
+  assert.deepEqual(JSON.parse(item.e), { first_at: new Date(blockedAt).toISOString(), second_fetch: { at: at(70_000), outcome: 'withdrawn', status: 404 }, sitemap_absent: true, auto: true });
+  // Terminal, and only from BLOCKED SOURCE_WITHDRAWN: a second auto withdrawal is refused.
+  assert.equal((await withdraw({ approval_ref: 'workflow-60-run-77-auto', evidence: evidence(at(80_000)) })).json.code, 'IMPORT_WITHDRAW_REFUSED');
+});
+
 test('readback: the write\'s own verifyApplied and the live ownership checks; a vanished object or a foreign binding is a mismatch', async () => {
   const w = newWorld();
   const s = stage(w, 'h2d');
