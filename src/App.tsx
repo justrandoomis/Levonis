@@ -9,7 +9,7 @@ import { Routes, Route, useLocation, useNavigationType } from 'react-router-dom'
  */
 import NavigationRouter from './components/NavigationRouter';
 import { StoreProvider, useStore } from './StoreContext';
-import { sanitizeNextPath } from './components/auth/nextPath';
+import { storeHandoffUrl } from './components/auth/nextPath';
 import { isLocalHost } from './lib/canonicalHost';
 import ChunkBoundary from './components/ChunkBoundary';
 import { afterCriticalPaint, allowsSpeculativeLoads } from './lib/afterCriticalPaint';
@@ -266,7 +266,7 @@ function useIdlePrefetch() {
     return detach;
   }, []);
 }
-import { LanguageProvider, useLanguage } from './LanguageContext';
+import { LanguageProvider, chosenLang, useLanguage } from './LanguageContext';
 import { WalletProvider } from './WalletContext';
 import { CurrencyProvider } from './CurrencyContext';
 import { AuthProvider, useAuth } from './AuthContext';
@@ -593,17 +593,12 @@ function StoreHostAuthHandoff() {
     // `mainSite` is always https and portless, which a local run
     // (levonis.test:8787, docs/SUBDOMAIN_ARCHITECTURE.md) is not: stay here.
     if (!mainSite || isLocalHost(window.location.hostname)) return null;
-    // Everything else the link carried (a referral code, …) travels as it
-    // came; `next` is sanitized here and `store` is only ever the server's.
-    const q = new URLSearchParams(location.search);
-    q.set('next', sanitizeNextPath(from ?? q.get('next') ?? '/'));
-    q.delete('store');
-    if (slug) q.set('store', slug);
-    // The language is this origin's storage; the apex has its own. Carried so
-    // the sign-in page, the code e-mail and a new account are in the reader's
-    // language (src/LanguageContext.tsx `authLinkLang`).
-    q.set('lang', lang);
-    return `${mainSite}/auth?${q.toString()}`;
+    // The language is this origin's storage; the apex has its own. A chosen
+    // one is carried, so the sign-in page, the code e-mail and a new account
+    // are in the reader's language (src/LanguageContext.tsx `authLinkLang`).
+    return storeHandoffUrl(mainSite, location.search, from, slug, chosenLang());
+    // `lang` is a dependency only to re-read the stored choice after a switch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mainSite, slug, from, location.search, lang]);
   React.useEffect(() => {
     if (target) window.location.replace(target);

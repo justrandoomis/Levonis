@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
-import { sanitizeNextPath } from '../src/components/auth/nextPath';
+import { sanitizeNextPath, storeHandoffUrl } from '../src/components/auth/nextPath';
 import { storeReturnUrl } from '../src/components/auth/storeReturn';
 
 test('same-origin relative paths pass through unchanged', () => {
@@ -93,11 +93,9 @@ test('a shop hands /auth to the apex, and the apex sends the person back afterwa
   assert.doesNotMatch(storefront, /<Route path="\/auth" element=\{<Auth \/>\}/, 'a shop never renders the sign-in page itself');
 
   const handoff = app.slice(app.indexOf('function StoreHostAuthHandoff('), app.indexOf('function StorefrontApp('));
-  assert.match(handoff, /sanitizeNextPath\(/, 'the destination is sanitized before it travels');
-  assert.match(handoff, /q\.set\('store', slug\)/, 'the slug comes from the server-resolved store');
+  assert.match(handoff, /storeHandoffUrl\(mainSite, location\.search, from, slug, chosenLang\(\)\)/, 'the server\'s slug, and only a CHOSEN language');
   assert.match(handoff, /window\.location\.replace\(target\)/);
   assert.match(handoff, /if \(!target\) return <Auth \/>;/, 'no root domain configured: the ordinary page, without Google');
-  assert.match(handoff, /const \{ lang \} = useLanguage\(\);[\s\S]*q\.set\('lang', lang\);/, 'the reader\'s language travels to the apex');
   assert.match(handoff, /if \(!mainSite \|\| isLocalHost\(window\.location\.hostname\)\) return null;/, 'a local run (levonis.test:8787) stays on its own host');
   // App.tsx puts nextPath.ts in the entry chunk; the host table stays out of it.
   assert.doesNotMatch(readFileSync(join(ROOT, 'src/components/auth/nextPath.ts'), 'utf8'), /worker\/lib\/hosts/, 'storeReturnUrl lives in its own module');
@@ -106,4 +104,22 @@ test('a shop hands /auth to the apex, and the apex sends the person back afterwa
   assert.match(auth, /const back = storeReturnUrl\(storeFromQuery, mainSite, dest\);/);
   assert.match(auth, /!onStoreHost &&/, 'Google is never offered on a shop host');
   assert.match(auth, /googleUsable && googleClientId \? <GoogleOAuthProvider/, 'Google\'s script is not loaded where the button cannot be used');
+});
+
+test('storeHandoffUrl: a sanitized next, the server\'s slug, and a language only when the reader chose one', () => {
+  const at = (href: string) => new URL(href);
+  const u = at(storeHandoffUrl(MAIN, '?ref=ALI7&store=evil&lang=ar', '/checkout?step=2', 'ali3d', 'ckb'));
+  assert.equal(u.origin + u.pathname, `${MAIN}/auth`);
+  assert.equal(u.searchParams.get('next'), '/checkout?step=2');
+  assert.equal(u.searchParams.get('store'), 'ali3d', 'the server-resolved slug, never the query\'s');
+  assert.equal(u.searchParams.get('lang'), 'ckb', 'the chosen language, never the query\'s');
+  assert.equal(u.searchParams.get('ref'), 'ALI7', 'everything else travels as it came');
+  // A first visit to the shop chose nothing: no lang, so the apex keeps its own.
+  const fresh = at(storeHandoffUrl(MAIN, '?lang=ar', undefined, 'ali3d', null));
+  assert.equal(fresh.searchParams.get('lang'), null);
+  assert.equal(fresh.searchParams.get('next'), '/');
+  // Hostile destinations and unknown languages do not travel.
+  assert.equal(at(storeHandoffUrl(MAIN, '?next=%2F%2Fevil.com', undefined, '', 'fr')).searchParams.get('next'), '/');
+  assert.equal(at(storeHandoffUrl(MAIN, '', '/x', '', 'fr')).searchParams.get('lang'), null);
+  assert.equal(at(storeHandoffUrl(MAIN, '', '/x', '', null)).searchParams.get('store'), null, 'an unknown shop names none');
 });

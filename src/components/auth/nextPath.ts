@@ -49,3 +49,28 @@ export function sanitizeNextPath(raw: unknown): string {
 
   return candidate;
 }
+
+/**
+ * Where a shop's /auth sends the visitor: the apex's /auth (src/App.tsx
+ * `StoreHostAuthHandoff`). Everything else the link carried (a referral code,
+ * …) travels as it came; `next` is sanitized here, `store` is only ever the
+ * slug the SERVER resolved for this host, and `lang` only a language the
+ * reader CHOSE on the shop (src/LanguageContext.tsx `chosenLang`) — a first
+ * visit's default must not overwrite the apex's own stored choice. Without a
+ * `lang` the apex simply keeps what it has.
+ */
+export function storeHandoffUrl(
+  mainSite: string,
+  search: string,
+  from: unknown,
+  slug: string,
+  chosenLang: string | null
+): string {
+  const q = new URLSearchParams(search);
+  q.set('next', sanitizeNextPath(from ?? q.get('next') ?? '/'));
+  q.delete('store');
+  if (slug) q.set('store', slug);
+  q.delete('lang');
+  if (chosenLang === 'ar' || chosenLang === 'en' || chosenLang === 'ckb') q.set('lang', chosenLang);
+  return `${mainSite}/auth?${q.toString()}`;
+}

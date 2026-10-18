@@ -1492,7 +1492,6 @@ export default function Auth() {
             next={dest}
             referralCode={referralCode}
             store={onStoreHost ? '' : storeFromQuery}
-            lang={lang}
           />
         )}
       </>

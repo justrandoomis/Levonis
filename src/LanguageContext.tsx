@@ -35,7 +35,9 @@ let currentLang: Language = 'ar';
  * (src/lib/inAppBrowser.ts `externalAuthUrl`). The language lives in each
  * origin's own storage, so the apex — or the other browser — would greet a
  * Sorani or English reader in Arabic, and send the code e-mail and create
- * the account (`users.locale`) in Arabic too. Both links carry `lang=`.
+ * the account (`users.locale`) in Arabic too. Both links carry `lang=` — but
+ * only a language the reader CHOSE (`chosenLang`): a first visit's default
+ * must never overwrite a choice the other origin already holds.
  *
  * Read on /auth ONLY: elsewhere `?lang=` already means something else (a
  * policy document's language, src/pages/Policies.tsx) and must not switch the
@@ -52,11 +54,46 @@ export function authLinkLang(href: string): Language | null {
   }
 }
 
+/**
+ * The language the reader CHOSE on this origin — a switch (`setLang`), or one
+ * a sign-in link carried here — or null when nothing was chosen and the page
+ * shows the default. What a link to another origin may carry: a default is
+ * not a choice, and handing it over would overwrite the other origin's own.
+ */
+export function chosenLang(): Language | null {
+  try {
+    const stored = localStorage.getItem(LANG_KEY);
+    if (stored === 'ku') return 'ckb';
+    return stored === 'ar' || stored === 'en' || stored === 'ckb' ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * ADOPTED ONCE, THEN GONE FROM THE ADDRESS. Left in the URL, `?lang=` would be
+ * adopted again by a reload — or by a tab the browser discarded during the
+ * Telegram round trip — undoing a switch made on the sign-in page itself.
+ * Runs before the router reads the address (LanguageProvider sits above
+ * NavigationRouter), so the router never sees it; every other parameter stays.
+ */
+function dropAuthLinkLang(): void {
+  try {
+    const url = new URL(window.location.href);
+    if ((url.pathname !== '/auth' && url.pathname !== '/auth/') || !url.searchParams.has('lang')) return;
+    url.searchParams.delete('lang');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  } catch {
+    /* no history to edit — nothing worse than a second adoption */
+  }
+}
+
 function initialLang(): Language {
   // Adopted once, at mount, and kept the way `setLang` keeps a choice (this
   // origin's storage). Nobody is signed in yet at this point, so there is no
   // account to write it to; the sign-up and code requests send it themselves.
   const linked = typeof window === 'undefined' ? null : authLinkLang(window.location.href);
+  if (typeof window !== 'undefined') dropAuthLinkLang();
   if (linked) {
     try {
       localStorage.setItem(LANG_KEY, linked);

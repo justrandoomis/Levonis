@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Compass, Copy, Check, ExternalLink } from 'lucide-react';
-import { useLanguage } from '../../LanguageContext';
+import { chosenLang, useLanguage } from '../../LanguageContext';
 import { copyText } from '../../lib/copyText';
 import {
   IN_APP_NAMES,
@@ -75,17 +75,18 @@ export interface InAppBrowserNoticeProps {
   /** The shop that handed sign-in to this page (`?store=`), so the other
    *  browser still goes back to it afterwards. Validated again in the URL builder. */
   store?: string;
-  /** The language being read, so the other browser opens in it too. */
-  lang?: string;
 }
 
-export default function InAppBrowserNotice({ info, next, referralCode = '', store = '', lang: carryLang }: InAppBrowserNoticeProps) {
+export default function InAppBrowserNotice({ info, next, referralCode = '', store = '' }: InAppBrowserNoticeProps) {
   const { lang } = useLanguage();
   // OWNER: Sorani to be written by hand. (ckb reads the Arabic until then.)
   const s = lang === 'en' ? EN : AR;
   const [copyState, setCopyState] = useState<'idle' | 'done' | 'failed'>('idle');
 
-  const url = externalAuthUrl(window.location.origin, next, referralCode, { store, lang: carryLang ?? lang });
+  // Only a language the reader CHOSE travels (src/LanguageContext.tsx
+  // `chosenLang`): the WebView's default must not overwrite the other
+  // browser's own stored choice.
+  const url = externalAuthUrl(window.location.origin, next, referralCode, { store, lang: chosenLang() ?? undefined });
   const appName = info.app ? IN_APP_NAMES[info.app] : '';
   const why = appName ? s.whyNamed.replace('{app}', appName) : s.whyGeneric;
   const safari = info.os === 'ios' ? safariSchemeUrl(url) : null;

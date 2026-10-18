@@ -143,11 +143,12 @@ test('a shop visitor who switches browser still goes back to the shop, in their 
   for (const lang of ['fr', 'ku', 'AR', '', 'en;x']) {
     assert.equal(new URL(externalAuthUrl(O, '/', '', { lang })).searchParams.get('lang'), null, `lang ${lang}`);
   }
-  // The banner passes both from the page.
+  // The banner carries the page's store, and only a language the reader CHOSE:
+  // the WebView's default must not overwrite the other browser's own choice.
   const notice = readFileSync(new URL('../src/components/auth/InAppBrowserNotice.tsx', import.meta.url), 'utf8');
-  assert.match(notice, /externalAuthUrl\(window\.location\.origin, next, referralCode, \{ store, lang: carryLang \?\? lang \}\)/);
+  assert.match(notice, /externalAuthUrl\(window\.location\.origin, next, referralCode, \{ store, lang: chosenLang\(\) \?\? undefined \}\)/);
   const auth = readFileSync(new URL('../src/pages/Auth.tsx', import.meta.url), 'utf8');
-  assert.match(auth, /<InAppBrowserNotice[\s\S]*?store=\{onStoreHost \? '' : storeFromQuery\}[\s\S]*?lang=\{lang\}/);
+  assert.match(auth, /<InAppBrowserNotice[\s\S]*?store=\{onStoreHost \? '' : storeFromQuery\}\s*\/>/);
 });
 
 // ------------------------------------------------------------- wiring
