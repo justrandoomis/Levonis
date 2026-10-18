@@ -154,6 +154,42 @@ test('with a market figure: the reading is the rate in force (DECISIONS row 252)
   assert.deepEqual(await getPublicDisplayRate(asD1(lone) as unknown as D1Database), { displayUsdRate: '1700', displayUsdRateAttributed: false, exchangeRate: 1700 });
 });
 
+test('back on AUTO before the market rebuilds the rate: a typed rate stays the shop’s own, uncredited; a paused market rate is credited again', async () => {
+  // Market 1,660 + the owner's 20 = 1,680 in force, built from the market.
+  const raw = freshDb();
+  raw.exec(OWNER_ROW_SQL);
+  raw.exec("UPDATE fx_rate_pairs SET market_adjustment_iqd = '20' WHERE pair = 'USD_IQD'");
+  applyRate(raw, 'USD_IQD', '1680');
+  raw.exec("UPDATE fx_rate_pairs SET market_rate = '1660' WHERE pair = 'USD_IQD'");
+  const { owner, publicSettings, typeRate } = apps(raw);
+  const ov = () => Number(pairOf(raw, 'USD_IQD').owner_version);
+  const setMode = async (mode: 'AUTO' | 'MANUAL') => {
+    const spy = cacheSpy();
+    try {
+      const res = await put(owner, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ov(), mode });
+      assert.equal(res.status, 200, await res.clone().text());
+    } finally {
+      spy.restore();
+    }
+  };
+  // «إيقاف» then back to AUTO with no fetch: U is still the market-built 1,680 — credited again.
+  await setMode('MANUAL');
+  for (const s of await publicSettings()) assert.deepEqual([s.displayUsdRate, s.displayUsdRateAttributed], ['1680', false]);
+  await setMode('AUTO');
+  for (const s of await publicSettings()) assert.deepEqual([s.displayUsdRate, s.displayUsdRateAttributed, s.exchangeRate], ['1680', true, 1680]);
+  // The owner types 1,700, then goes back to AUTO; the market has not rebuilt U (no fetch, held, or the dead band).
+  await typeRate('1700');
+  await setMode('AUTO');
+  const usd = pairOf(raw, 'USD_IQD');
+  assert.deepEqual([usd.mode, usd.manual_rate, usd.effective_rate], ['AUTO', null, '1700'], 'control: AUTO, the typed rate still in force');
+  for (const s of await publicSettings())
+    assert.deepEqual([s.displayUsdRate, s.displayUsdRateAttributed, s.exchangeRate], ['1700', false, 1700], 'the owner-typed 1,700 is never credited to IQWealth');
+  // An adjustment on AUTO shifts the typed rate; it is still the shop's own.
+  const adj = await put(owner, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ov(), market_adjustment_iqd: '25' });
+  assert.equal(adj.status, 200, await adj.clone().text());
+  for (const s of await publicSettings()) assert.deepEqual([s.displayUsdRate, s.displayUsdRateAttributed], ['1705', false]);
+});
+
 test('back on AUTO with still no market figure: the rate in force is still the reading (DECISIONS row 252) — an adjustment there moves it, purged, uncredited', async () => {
   const raw = manualWorld();
   const { owner, publicSettings, typeRate } = apps(raw);

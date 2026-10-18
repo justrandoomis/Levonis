@@ -18,10 +18,14 @@
  * (worker/lib/fx/officialRate.ts), which overrides the legacy setting of that
  * name in the public answer, so the wallet the browser draws reads U too.
  *
- * `displayUsdRateAttributed`, one flag and no figure: true when U was built
- * from the provider's market reading (the menu reads «the shop's rate, based
- * on IQWealth data»), false when the owner typed it on MANUAL or no market
- * reading exists («a rate set by the shop», no credit).
+ * `displayUsdRateAttributed`, one flag and no figure: true when the rate in
+ * force was built from the provider's market reading (`effective_source`
+ * 'provider' or 'review_approved', the menu reads «the shop's rate, based on
+ * IQWealth data»), false when the owner typed it («a rate set by the shop», no
+ * credit) — on MANUAL, and on AUTO too while U is still the rate he typed (a
+ * back-to-AUTO fetch that failed, was held or moved nothing keeps
+ * `effective_source` 'manual'; an adjustment shifts U and keeps it). Whether a
+ * market reading merely exists says nothing about where U came from.
  *
  * Null (and no `exchangeRate`, so the legacy setting stands) until the owner
  * approves or types the first USD/IQD value, and on a database without
@@ -59,27 +63,24 @@ export async function getPublicDisplayRate(db: D1Database): Promise<PublicDispla
   try {
     const row = await db
       .prepare(
-        `SELECT r.rate_iqd,
-                (SELECT market_rate FROM fx_rate_pairs WHERE pair = 'USD_IQD') AS last_market,
-                (SELECT manual_rate FROM fx_rate_pairs WHERE pair = 'USD_IQD') AS typed_rate,
-                l.effective_after AS built_rate,
-                l.market_adjustment_iqd AS built_adjustment
+        `SELECT r.rate_iqd, p.manual_rate AS typed_rate, p.effective_rate, p.effective_source
            FROM pricing_fx_rates r
-           LEFT JOIN (SELECT effective_after, market_adjustment_iqd FROM fx_rate_log
-                       WHERE pair = 'USD_IQD' AND result = 'APPLIED'
-                         AND event IN ('apply', 'review_approved', 'review_cleared')
-                         AND effective_after IS NOT NULL AND market_adjustment_iqd IS NOT NULL
-                       ORDER BY created_at DESC, rowid DESC LIMIT 1) l ON 1 = 1
+           LEFT JOIN fx_rate_pairs p ON p.pair = 'USD_IQD'
           WHERE r.currency = 'USD'`
       )
-      .first<{ rate_iqd: unknown; last_market: unknown; typed_rate: unknown; built_rate: unknown; built_adjustment: unknown }>();
+      .first<{ rate_iqd: unknown; typed_rate: unknown; effective_rate: unknown; effective_source: unknown }>();
     // No applied rate yet: nothing is published (the first value waits for the owner).
     if (!row || !usable(row.rate_iqd)) return none;
     const whole = wholeDinarRate(row.rate_iqd);
     if (whole === null) return none;
     // MANUAL: the rate in force IS `manual_rate` (the table's CHECK) — the shop's own, never credited.
     const typed = usable(row.typed_rate) && sameRate(row.rate_iqd, row.typed_rate);
-    const fromMarket = usable(row.built_rate) || usable(row.last_market);
+    // Credited only when the rate in force is the pair's market-built one: its source says how U was
+    // made (a typed rate stays 'manual' back on AUTO until the market replaces it).
+    const fromMarket =
+      (row.effective_source === 'provider' || row.effective_source === 'review_approved') &&
+      usable(row.effective_rate) &&
+      sameRate(row.rate_iqd, row.effective_rate);
     return { displayUsdRate: row.rate_iqd, displayUsdRateAttributed: fromMarket && !typed, exchangeRate: whole };
   } catch {
     return none;

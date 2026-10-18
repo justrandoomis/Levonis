@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useWallet, PaymentMethod } from '../WalletContext';
 import { useLanguage } from '../LanguageContext';
+import { useAuth } from '../AuthContext';
 import RoundingDriftTool from './adminWallet/RoundingDriftTool';
 import CourierTaxPanel from './adminWallet/CourierTaxPanel';
 import { api, ApiError, formatIqd, type PayoutMethod } from '../lib/api';
@@ -72,6 +73,13 @@ export default function AdminWalletSettings() {
   // «التسعير والشحن». Read-only here — the legacy `exchangeRate` setting no longer drives anything
   // while an applied rate exists. `displayUsdRate` is that rate exactly; null while none is set.
   const officialRate = settings?.displayUsdRate ?? null;
+  // The wallet counts whole dinars: `exchangeRate` is U to the nearest dinar (worker/lib/fx/officialRate.ts).
+  // Said beside U whenever U carries a fraction, so the screen never claims an exactness the wallet lacks.
+  const walletRateDiffers = officialRate !== null && Number(officialRate) !== exchangeRate;
+  // The pricing tab exists only for the owner (Admin.tsx `canSeePricing`, or the verify card while his
+  // email is unverified): anyone else is told where the rate lives, never sent to an empty tab.
+  const { user } = useAuth();
+  const canOpenPricing = user?.can_write_cost === true || user?.owner_email_unverified === true;
 
   const [urlInput, setUrlInput] = useState<string>('');
   const [urlState, setUrlState] = useState<SaveState>('idle');
@@ -297,12 +305,27 @@ export default function AdminWalletSettings() {
                 : loc(
                     'لا يوجد سعر صرف رسمي بعد — تستعمل المحفظة هذا السعر القديم إلى أن يعتمد المالك سعراً في «التسعير والشحن».',
                     'No official exchange rate yet — the wallet uses this older rate until the owner approves one in «Pricing & shipping».',
-                    'هێشتا نرخی فەرمیی ئاڵوگۆڕ نییە — جزدان ئەم نرخە کۆنە بەکاردەهێنێت تا خاوەن لە «نرخدانان و گواستنەوە» نرخێک پەسەند دەکات.'
+                    'هێشتا نرخی فەرمیی ئاڵوگۆڕ نییە — جزدان ئەم نرخە کۆنە بەکاردەهێنێت تا خاوەن لە «نرخدانان و ناردنی بەرهەم» نرخێک پەسەند دەکات.'
                   )}
             </p>
-            <a href="/admin?tab=pricing" className="inline-flex min-h-11 items-center px-1 text-sm font-bold underline underline-offset-2 text-text-primary">
-              {loc('تغيير سعر الصرف في «التسعير والشحن»', 'Change the rate in «Pricing & shipping»', 'گۆڕینی نرخ لە «نرخدانان و گواستنەوە»')}
-            </a>
+            {walletRateDiffers && (
+              <p className="text-[11px] font-bold text-text-secondary" data-wallet-whole-rate>
+                {loc(
+                  `المحفظة تعدّ بالدينار الكامل: تحسب بهذا السعر مقرَّباً إلى أقرب دينار — 1 USD = ${exchangeRate.toLocaleString('en-US')} IQD.`,
+                  `The wallet counts whole dinars: it converts at this rate to the nearest dinar — 1 USD = ${exchangeRate.toLocaleString('en-US')} IQD.`,
+                  `جزدان بە دیناری تەواو دەژمێرێت: بەم نرخە دەگۆڕێت، نزیککراوە بۆ نزیکترین دینار — 1 USD = ${exchangeRate.toLocaleString('en-US')} IQD.`
+                )}
+              </p>
+            )}
+            {canOpenPricing ? (
+              <a href="/admin?tab=pricing" className="inline-flex min-h-11 items-center px-1 text-sm font-bold underline underline-offset-2 text-text-primary">
+                {loc('تغيير سعر الصرف في «التسعير والشحن»', 'Change the rate in «Pricing & shipping»', 'گۆڕینی نرخ لە «نرخدانان و ناردنی بەرهەم»')}
+              </a>
+            ) : (
+              <p className="text-[11px] text-text-muted">
+                {loc('يضبط المالك سعر الصرف في «التسعير والشحن».', 'The owner sets the rate in «Pricing & shipping».', 'خاوەن نرخی ئاڵوگۆڕ لە «نرخدانان و ناردنی بەرهەم» دیاری دەکات.')}
+              </p>
+            )}
           </div>
         </div>
 

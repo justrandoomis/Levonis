@@ -52,7 +52,7 @@ export const NEEDS_PRICING = {
   rateMissing: {
     ar: 'لا يوجد سعر صرف معتمد للدولار بعد — لا يمكن نشر أي سعر حتى يعتمده المالك في «التسعير والشحن».',
     en: 'No approved dollar exchange rate yet — no price can be published until the owner approves one in «Pricing & shipping».',
-    ckb: 'هێشتا نرخی ئاڵوگۆڕی پەسەندکراوی دۆلار نییە — هیچ نرخێک بڵاو ناکرێتەوە تا خاوەن لە «نرخدانان و گواستنەوە» پەسەندی دەکات.',
+    ckb: 'هێشتا نرخی ئاڵوگۆڕی پەسەندکراوی دۆلار نییە — هیچ نرخێک بڵاو ناکرێتەوە تا خاوەن لە «نرخدانان و ناردنی بەرهەم» پەسەندی دەکات.',
   },
   missingPrefix: { ar: 'ناقص', en: 'Missing', ckb: 'کەموکوڕی' },
   ownerData: { ar: 'بيانات المالك', en: "Owner's data", ckb: 'زانیاریی خاوەن' },
