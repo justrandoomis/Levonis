@@ -1,6 +1,6 @@
 /**
  * INCOMING STOCK LINKED TO THE PRODUCT (owner report 2026-10-17; DECISIONS
- * row 247): what a purchase carries to the product — the supplier price, the
+ * row 249): what a purchase carries to the product — the supplier price, the
  * shipping weight, the CBM and the extras — per model, colour and variant
  * exactly as bought, and when.
  *
@@ -19,7 +19,19 @@
  *   (H) a local dinar purchase is offered as USD (IQD_CONVERTED, once, at U);
  *   (I) a received batch is its dollars on the shelf, priced at today's U;
  *   (J) the stock level never changes under batches on the shelf;
- *   (K) the next purchase's prefill learns only a final cost.
+ *   (K) the next purchase's prefill learns only a final cost;
+ *   (L) two variants (and two colours) of one model confirmed BEFORE the owner
+ *       reviews either: each review names its own bought level, neither replaces
+ *       the other, applied in either order each level keeps what it was bought
+ *       at; the broader level takes the first seed only, in the fold too;
+ *   (M) a purchase that replaced another's review, then cancelled or taken back
+ *       to estimated, gives that review back: the purchase really bought still
+ *       reaches the owner, and its arrival rings;
+ *   (N) at an unchanged U a rated batch is its dinars as paid, never one more;
+ *   (O) the stock-level guard: the fulfillment route refuses, the form's derived
+ *       level is kept (with a note) instead of freezing the save;
+ *   (P) the purchase card's preview of a dinar purchase says what its confirm
+ *       will carry.
  *
  * LOCAL ONLY: in-memory SQLite, no network.
  *
@@ -38,7 +50,11 @@ import { reviewView, type PurchaseReviewRow } from '../worker/lib/pricingEngine/
 import { PURCHASE_ARRIVED_EVENT } from '../worker/lib/pricingEngine/v2/bell';
 import { loadShelves, shelfOfSku } from '../worker/lib/pricingEngine/v2/shelf';
 import { loadRelationsSnapshot, planRelationsWriteFrom } from '../worker/lib/productPersistence';
-import type { ProductPricingData, StoredInputRow } from '../worker/lib/pricingEngine/store';
+import { adminProductRelationsRoutes } from '../worker/routes/adminProductRelations';
+import { pendingReviewsOf, reviewFoldInputs } from '../worker/lib/pricingEngine/v2/firstWrite';
+import { chainOfUnit, loadProductsPricing, type ProductPricingData, type StoredInputRow } from '../worker/lib/pricingEngine/store';
+import { resolveSkuInputs } from '../packages/pricing/src/costToPrice';
+import { asD1, freshDb } from './fixtures/app';
 
 type World = ReturnType<typeof pricingWorld>;
 
@@ -215,7 +231,7 @@ test('(D) a purchase closed with nothing received takes its review with it; a re
   assert.equal(applied.status, 200, JSON.stringify(applied.body).slice(0, 300));
 });
 
-test('(E) bambu-lab-pla-cf: variant o0|c0 at €10, then o0|c1 at €12 → the model stays €10 (seeded once), the bought SKU carries €12, o0|c0 still €10', async () => {
+test('(E) bambu-lab-pla-cf: variant o0|c0 at €10, then o0|c1 at €12 → the model stays €10 (seeded once), each bought SKU carries what it was bought at', async () => {
   const w = pricingWorld();
   const CF = legacyProductId('bambu-lab-pla-cf');
   await publishV2(w.raw, CF);
@@ -234,6 +250,7 @@ test('(E) bambu-lab-pla-cf: variant o0|c0 at €10, then o0|c1 at €12 → the 
     .map((r) => ({ ...r }));
   assert.deepEqual(rows, [
     { scope: 'option', scope_id: o0, supplier_cost_amount: '10' },
+    { scope: 'sku', scope_id: v0.combo_key, supplier_cost_amount: '10' },
     { scope: 'sku', scope_id: v1.combo_key, supplier_cost_amount: '12' },
   ]);
 });
@@ -322,8 +339,10 @@ test('(I) a received batch is its dollars on the shelf: its dinars ÷ the purcha
   const shelf = (await loadShelves(w.db, [AMS])).get(AMS)!;
   const sku = { option_value_ids: [AMS_MODEL], color_id: null, combo_key: `o:${AMS_MODEL}` };
   assert.equal(shelf.identities[0]!.cost_usd_micro, micro);
-  assert.deepEqual(shelfOfSku(shelf, sku, '1600'), { state: 'on_shelf', cost_iqd: Math.ceil((micro * 1600) / 1_000_000), units: 2 });
-  assert.deepEqual(shelfOfSku(shelf, sku, '1700'), { state: 'on_shelf', cost_iqd: Math.ceil((micro * 1700) / 1_000_000), units: 2 });
+  // The same U: the dinars as paid. Another U: the batch's dinars × today's U ÷ its U, rounded up, exactly.
+  const at = (u: bigint) => Number((BigInt(lot.unit_cost_iqd) * u + 1599n) / 1600n);
+  assert.deepEqual(shelfOfSku(shelf, sku, '1600'), { state: 'on_shelf', cost_iqd: lot.unit_cost_iqd, units: 2 });
+  assert.deepEqual(shelfOfSku(shelf, sku, '1700'), { state: 'on_shelf', cost_iqd: at(1700n), units: 2 });
 });
 
 test('(J) the stock level never changes under units on the shelf (INVENTORY_MODE_HAS_STOCK); with the shelf empty and nothing open it may', async () => {
@@ -347,4 +366,159 @@ test('(K) the next purchase’s prefill learns a FINAL cost only', async () => {
   assert.deepEqual(defaults(), [], 'an estimate is never the last price');
   await edit(w, id, { cost_state: 'final' });
   assert.deepEqual(defaults(), [{ source_unit_amount: 450 }]);
+});
+
+/** The supplier price each of the product's SKUs resolves, by combo key. */
+const resolvedSupplier = async (w: World, pid: string, units: Array<{ option: string; color: string; combo: string }>) => {
+  const stored = (await loadProductsPricing(w.db, [pid])).get(pid)!;
+  return Object.fromEntries(
+    units.map((u) => [u.combo, resolveSkuInputs(chainOfUnit(stored.inputs, { option_value_ids: [u.option], color_id: u.color, combo_key: u.combo })).inputs.supplier?.amount ?? null])
+  );
+};
+
+const ownRows = (w: World, pid: string) =>
+  w.raw
+    .prepare("SELECT scope, scope_id, supplier_cost_amount FROM pricing_inputs WHERE product_id = ? AND origin = 'MANUAL_OVERRIDE' AND supplier_cost_amount IS NOT NULL ORDER BY scope, scope_id")
+    .all(pid)
+    .map((r) => ({ ...r }));
+
+for (const order of ['first', 'second'] as const) {
+  test(`(L) two variants of one model confirmed before any review (€10 then €12), the ${order} applied first → each SKU keeps its own price`, async () => {
+    const w = pricingWorld();
+    const CF = legacyProductId('bambu-lab-pla-cf');
+    await publishV2(w.raw, CF);
+    const o0 = legacyOptionId('bambu-lab-pla-cf', 0);
+    const [v0, v1] = (w.raw.prepare('SELECT id, combo_key FROM product_variants WHERE product_id = ? ORDER BY id').all(CF) as Array<{ id: string; combo_key: string }>).filter((v) =>
+      v.combo_key.startsWith(`o:${o0}|c:`)
+    );
+    const line = (variant: string, eur: number) => ({ product_id: CF, scope: 'variant', scope_id: variant, qty_ordered: 2, source_unit_amount: eur, weight_g: 1200, volume_mm3: 0 });
+    const p1 = await w.save(w.draft({ lines: [line(v0!.id, 10)] }));
+    const p2 = await w.save(w.draft({ lines: [line(v1!.id, 12)] }));
+    const list = reviews(w, CF);
+    assert.deepEqual(list.map((r) => r.state), ['pending', 'pending'], 'a colour or variant bought never replaces another one’s review');
+    for (const [r, combo] of [[list[0]!, v0!.combo_key], [list[1]!, v1!.combo_key]] as const) {
+      const inputs = JSON.parse(r.inputs_json) as Array<{ scope: string; scope_id: string; seed?: boolean }>;
+      assert.deepEqual(inputs.map((i) => [i.scope, i.scope_id, !!i.seed]), [['option', o0, true], ['sku', combo, false]], 'the bought level is named, the model only seeded');
+    }
+    const ids = order === 'first' ? [list[0]!.id, list[1]!.id] : [list[1]!.id, list[0]!.id];
+    for (const id of ids) assert.equal((await applyReview(w, CF, id)).status, 200);
+    const units = [v0!, v1!].map((v) => ({ option: o0, color: v.combo_key.split('|c:')[1]!, combo: v.combo_key }));
+    assert.deepEqual(await resolvedSupplier(w, CF, units), { [v0!.combo_key]: '10', [v1!.combo_key]: '12' });
+    // The model took the seed of the review applied first, and only that one.
+    assert.deepEqual(ownRows(w, CF).find((r) => r.scope === 'option'), { scope: 'option', scope_id: o0, supplier_cost_amount: order === 'first' ? '10' : '12' });
+    assert.ok(p1 && p2);
+  });
+}
+
+test('(L) two colours (COLOR mode) confirmed before any review: both wait, both ring on arrival, each colour keeps its own; the needs-pricing fold seeds the product once', async () => {
+  const w = pricingWorld();
+  const CF = legacyProductId('bambu-lab-pla-cf');
+  w.raw.prepare("UPDATE products SET inventory_mode = 'COLOR' WHERE id = ?").run(CF);
+  await publishV2(w.raw, CF);
+  const c0 = `${CF}_c0`, c1 = `${CF}_c1`, o0 = legacyOptionId('bambu-lab-pla-cf', 0);
+  const line = (colour: string, eur: number) => ({ product_id: CF, scope: 'color', scope_id: colour, qty_ordered: 2, source_unit_amount: eur, weight_g: 1200, volume_mm3: 0 });
+  const p1 = await w.save(w.draft({ lines: [line(c0, 10)] }));
+  const p2 = await w.save(w.draft({ lines: [line(c1, 12)] }));
+  assert.deepEqual(reviews(w, CF).map((r) => r.state), ['pending', 'pending']);
+  // The needs-pricing fold of the same two reviews: the product takes the first seed, each colour its own.
+  const stored = (await loadProductsPricing(w.db, [CF])).get(CF)!;
+  const fold = reviewFoldInputs(stored, await pendingReviewsOf(w.db, CF), () => true).map((x) => [x.scope, x.scope_id, x.set.supplier_cost_amount ?? null]);
+  assert.deepEqual(fold, [['base', '', '10'], ['color', c0, '10'], ['color', c1, '12']]);
+  for (const [p, op] of [[p1, 'op_llcolourxxxx1'], [p2, 'op_llcolourxxxx2']] as const) {
+    const rec = await w.receive(p, op);
+    assert.equal(rec.status, 200, JSON.stringify(rec.body).slice(0, 300));
+    assert.deepEqual(rec.body.price_reviews, [{ product_id: CF, state: 'pending' }]);
+  }
+  assert.deepEqual(bells(w).map((b) => JSON.parse(b.meta).purchase_id), [p1, p2], 'each arrival rings for its own review');
+  // Applied newest first: the product is seeded by the €12 colour, the €10 colour's seed finds it filled.
+  for (const r of reviews(w, CF).reverse()) assert.equal((await applyReview(w, CF, r.id)).status, 200);
+  assert.deepEqual(ownRows(w, CF), [
+    { scope: 'base', scope_id: '', supplier_cost_amount: '12' },
+    { scope: 'color', scope_id: c0, supplier_cost_amount: '10' },
+    { scope: 'color', scope_id: c1, supplier_cost_amount: '12' },
+  ]);
+  const units = [c0, c1].map((c) => ({ option: o0, color: c, combo: `o:${o0}|c:${c}` }));
+  assert.deepEqual(await resolvedSupplier(w, CF, units), { [`o:${o0}|c:${c0}`]: '10', [`o:${o0}|c:${c1}`]: '12' });
+});
+
+for (const how of ['closed with nothing received', 'taken back to estimated'] as const) {
+  test(`(M) P2 replaced P1's review of the same model, then was ${how} → P1's review is back; its arrival rings and its cost reaches the product`, async () => {
+    const w = pricingWorld();
+    await publishV2(w.raw, AMS);
+    const line = (eur: number) => [{ ...(w.draft().lines as Array<Record<string, unknown>>)[0]!, source_unit_amount: eur }];
+    const p1 = await w.save(w.draft({ lines: line(450) }));
+    const p2 = await w.save(w.draft({ lines: line(500) }));
+    assert.deepEqual(reviews(w, AMS).map((r) => [r.purchase_id === p1 ? 'P1' : 'P2', r.state]), [['P1', 'superseded'], ['P2', 'pending']]);
+    if (how === 'closed with nothing received') {
+      const closed = await post(w.app, `/api/admin/procurement/documents/${p2}/close`, { reason: 'supplier cancelled' });
+      assert.equal(closed.status, 200, JSON.stringify(await json(closed)).slice(0, 300));
+    } else await edit(w, p2, { lines: line(500), cost_state: 'estimated' });
+    const pending = reviews(w, AMS).filter((r) => r.state === 'pending');
+    assert.deepEqual(pending.map((r) => r.purchase_id), [p1], 'the purchase really bought still awaits the owner');
+    assert.match(pending[0]!.inputs_json, /"supplier_cost_amount":"450"/);
+    const rec = await w.receive(p1, 'op_mmmmmmmmmmmm1');
+    assert.deepEqual(rec.body.price_reviews, [{ product_id: AMS, state: 'pending' }]);
+    assert.equal(bells(w).length, 1, 'its arrival rings the owner');
+    const read = await json(await get(owner(w), `/api/admin/products-v2/${AMS}/purchase-review`));
+    assert.deepEqual((read.purchase_reviews as Array<{ purchase_id: string }>).map((r) => r.purchase_id), [p1]);
+    assert.equal((await applyReview(w, AMS, pending[0]!.id)).status, 200);
+    assert.deepEqual(ownRows(w, AMS), [{ scope: 'option', scope_id: AMS_MODEL, supplier_cost_amount: '450' }]);
+    // P2 back to final: it replaces nothing the owner already applied, and asks for its own figures.
+    if (how === 'taken back to estimated') {
+      await edit(w, p2, { lines: line(500), cost_state: 'final' });
+      assert.deepEqual(reviews(w, AMS).filter((r) => r.state === 'pending').map((r) => r.purchase_id), [p2]);
+    }
+  });
+}
+
+test('(N) a rated batch at an unchanged U is priced at its dinars as paid — never one dinar more', async () => {
+  const raw = freshDb();
+  for (const [i, cost] of [690063, 500347, 123457, 999999, 685831, 689581].entries()) {
+    raw.exec(`INSERT INTO products (id, slug, name, name_ar, name_ku, status, price_iqd, stock, selling_type, sale_types, preorder_transports, inventory_mode)
+              VALUES ('p${i}', 'p${i}', 'P', 'P', 'P', 'active', 700000, 9, 'direct_sale', '["direct_sale"]', '[]', 'BASE')`);
+    raw.exec(`INSERT INTO inventory_lots (id, product_id, scope, scope_id, qty_received, qty_remaining, unit_cost_iqd, cost_basis, received_at, snapshot_version, snapshot_source, calculated_at, usd_iqd_rate_at_purchase, fx_snapshot_source)
+              VALUES ('l${i}', 'p${i}', 'base', '', 2, 2, ${cost}, 'received', '2026-09-01T00:00:00Z', 1, 'adjustment', '2026-09-01T00:00:00Z', '1310', 'central')`);
+    const shelf = (await loadShelves(asD1(raw), [`p${i}`])).get(`p${i}`)!;
+    const sku = { option_value_ids: [], color_id: null, combo_key: '' };
+    assert.deepEqual(shelfOfSku(shelf, sku, '1310'), { state: 'on_shelf', cost_iqd: cost, units: 2 }, `${cost} at 1,310 → 1,310`);
+    assert.deepEqual(shelfOfSku(shelf, sku, '1400'), { state: 'on_shelf', cost_iqd: Number((BigInt(cost) * 1400n + 1309n) / 1310n), units: 2 }, `${cost} at 1,310 → 1,400`);
+  }
+});
+
+test('(O) the fulfillment route refuses a stock-level change under batches on the shelf; the form’s derived level is kept with a note', async () => {
+  const w = pricingWorld();
+  const CF = legacyProductId('bambu-lab-pla-cf');
+  const v = w.raw.prepare('SELECT id FROM product_variants WHERE product_id = ? ORDER BY id LIMIT 1').get(CF) as { id: string };
+  const id = await w.save(w.draft({ lines: [{ product_id: CF, scope: 'variant', scope_id: v.id, qty_ordered: 2, source_unit_amount: 10, weight_g: 1200, volume_mm3: 0 }] }));
+  assert.equal((await w.receive(id, 'op_oooooooooooo1')).status, 200);
+  const app = stubApp(w.db, OWNER_USER, (a) => a.route('/api/admin/products', adminProductRelationsRoutes));
+  const res = await put(app, `/api/admin/products/${CF}/fulfillment`, {
+    fulfillments: [0, 1].map((j) => ({ option_id: legacyOptionId('bambu-lab-pla-cf', j), fulfillment_type: 'direct_sale', enabled: true, transports: [] })),
+    direct_stock: [0, 1].map((j) => ({ scope: 'option', id: legacyOptionId('bambu-lab-pla-cf', j), stock: 0, low_stock_threshold: null })),
+    inventory_mode: 'OPTION',
+  });
+  assert.equal(res.status, 409);
+  assert.equal((await json(res)).code, 'INVENTORY_MODE_HAS_STOCK');
+  assert.equal((w.raw.prepare('SELECT inventory_mode FROM products WHERE id = ?').get(CF) as { inventory_mode: string }).inventory_mode, 'VARIANT_COMBINATION');
+  // A BASE product with a base batch on the shelf: the form derives OPTION from a typed option stock; the
+  // save goes through at BASE and says why, instead of freezing every edit of the product.
+  w.raw.prepare("UPDATE products SET inventory_mode = 'BASE' WHERE id = ?").run(AMS);
+  w.raw.exec(`INSERT INTO inventory_lots (id, product_id, scope, scope_id, qty_received, qty_remaining, unit_cost_iqd, cost_basis, received_at, snapshot_version, snapshot_source, calculated_at)
+              VALUES ('lot_o_base', '${AMS}', 'base', '', 2, 2, 700000, 'received', '2026-09-01T00:00:00Z', 1, 'adjustment', '2026-09-01T00:00:00Z')`);
+  const plan = await planRelationsWriteFrom(w.db, await loadRelationsSnapshot(w.db, AMS), { inventory_mode: 'OPTION', groups: [], colors: [], variants: [], images: [] }, { money: true });
+  assert.ok('mode' in plan && plan.mode !== undefined, JSON.stringify(plan.errors));
+  assert.equal(plan.mode, 'BASE');
+  assert.ok(plan.warnings.some((x: string) => /inventory_mode stays BASE/.test(x) && /بقي مستوى المخزون/.test(x) && /ئاستی کۆگا/.test(x)), JSON.stringify(plan.warnings));
+});
+
+test('(P) the purchase card’s preview of a dinar purchase carries what its confirm will (the same U)', async () => {
+  const w = pricingWorld();
+  await publishV2(w.raw, AMS);
+  const manual = { cost_profile_id: undefined, cost_profile_version: undefined, shipping_rate_iqd: undefined };
+  const line: Record<string, unknown> = { ...(w.draft().lines as Array<Record<string, unknown>>)[0]!, source_unit_amount: 720_000 };
+  const draft = w.draft({ ...manual, currency: 'IQD', exchange_rate: 1, lines: [line] });
+  const preview = await w.preview({ draft, pricing: { manual_line_opt_in: [`${line.product_id}:${line.scope}:${line.scope_id}`] } });
+  const entries = (preview.body.products as Array<{ entries: Array<{ changes: Record<string, { after: unknown }> }> }>)[0]?.entries ?? [];
+  assert.equal(entries[0]?.changes.supplier_cost_amount?.after, '450', JSON.stringify(preview.body).slice(0, 400));
+  assert.equal(entries[0]?.changes.supplier_cost_currency?.after, 'USD');
 });

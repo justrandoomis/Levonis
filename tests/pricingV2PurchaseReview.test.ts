@@ -203,7 +203,7 @@ test('the purchase document names the products whose review waits — ids and st
   assert.deepEqual(doc.price_reviews, [{ product_id: AMS, state: 'pending' }]);
 });
 
-test('a manual purchase (no supplier route) in a supplier currency writes a review too; an IQD purchase writes its own, converted once to USD (row 247)', async () => {
+test('a manual purchase (no supplier route) in a supplier currency writes a review too; an IQD purchase writes its own, converted once to USD (row 249)', async () => {
   const w = pricingWorld();
   await publishV2(w.raw, AMS);
   const manual = { cost_profile_id: undefined, cost_profile_version: undefined, shipping_rate_iqd: undefined };
@@ -213,7 +213,7 @@ test('a manual purchase (no supplier route) in a supplier currency writes a revi
   const inputs = JSON.parse(list[0]!.inputs_json) as Array<{ set: Record<string, unknown> }>;
   assert.ok(inputs.some((i) => i.set.supplier_cost_amount === '450' && i.set.supplier_cost_currency === 'USD'), JSON.stringify(inputs));
   await w.save(w.draft({ ...manual, currency: 'IQD', exchange_rate: 1 }));
-  // Row 247 («الدولار هو الأساس»): the dinars are converted once to USD at the purchase's U (1,600), with the
+  // Row 249 («الدولار هو الأساس»): the dinars are converted once to USD at the purchase's U (1,600), with the
   // conversion's snapshot; the USD purchase's review goes only because this one names the same model.
   const after = reviews(w);
   assert.deepEqual(after.map((r) => r.state), ['superseded', 'pending']);

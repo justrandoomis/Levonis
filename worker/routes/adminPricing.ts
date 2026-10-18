@@ -116,7 +116,7 @@ import {
 import { lineSummary, previewProduct, type PreviewOptions, type ProductPreview } from '../lib/pricingEngine/procurementPreview';
 import { lineDto, productPreviewDto, ratesHeadDto } from '../lib/pricingEngine/procurementDto';
 import { parseProcurementDraft } from '../lib/procurementDraft';
-import { committedPurchaseForPricing, draftForPricing } from '../lib/pricingEngine/purchaseRead';
+import { committedPurchaseForPricing, draftForPricing, purchaseUsdIqd, purchaseUsdIqdSnapshotOf } from '../lib/pricingEngine/purchaseRead';
 import { FX_GUARD_CHANGED, recordSecurityEvent } from '../lib/securityEvents';
 import { previewRateAct, type RateMove, type RatePreview } from '../lib/pricingEngine/ratePreview';
 import { FRESH_SESSION_SECONDS, sessionAgeSeconds } from '../lib/session';
@@ -744,6 +744,9 @@ adminPricingRoutes.post('/procurement/preview', async (c) => {
     purchase = await committedPurchaseForPricing(db, purchaseId);
     if (!purchase) throw notFound('Purchase not found');
   }
+  // Row 249: a dinar purchase is offered at the U its confirm counts (its snapshot, else the central U), so
+  // the card's preview says what the confirm's review will carry.
+  if (purchase.currency === 'IQD') purchase = { ...purchase, usd_iqd: await purchaseUsdIqd(db, await purchaseUsdIqdSnapshotOf(db, purchaseId), new Date().toISOString()) };
   const { rates, products, lines } = await procurementPreview(c, purchase, body.pricing);
   return c.json({ success: true, rates: ratesHeadDto(rates), lines, products });
 });

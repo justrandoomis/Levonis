@@ -97,7 +97,7 @@ export interface V2Read {
   rates: PricingRates | null;
   control: EngineControl;
   image: string;
-  /** A product with no method yet: its pending purchase reviews (D1, row 247), folded into the owner's prefill. */
+  /** A product with no method yet: its pending purchase reviews (D1, row 249), folded into the owner's prefill. */
   review?: FirstWriteReview | null;
   /** The product's shelf (DECISIONS row 244): cost-first, a model with stock is priced from its costliest batch. */
   shelf?: ProductShelf | null;
@@ -521,7 +521,7 @@ export function v2Answer(i: AnswerInput): Record<string, unknown> {
       // placeholder «يرث ($40.00)»), resolved as the maths resolves it — never a guess.
       inherited_minimum_profit: inheritedMinimumProfit(ev.stored.rules, ev.product_id, read.rates?.usd_iqd ?? null),
       // D1: a needs-pricing product's prefill carries its pending purchase reviews (its first write applies them;
-      // row 247: one per purchase, the newest named first for the older readers).
+      // row 249: one per purchase, the newest named first for the older readers).
       ...(!storedMethod && read.review ? { purchase_review_id: read.review.id, purchase_review_ids: [...read.review.ids] } : {}),
     };
   }

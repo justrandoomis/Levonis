@@ -253,7 +253,7 @@ export const pricingBody = (c: PricingChoices) => ({
 });
 
 /**
- * What the purchase card's preview reads besides the purchase (DECISIONS row 247): no typed minimum
+ * What the purchase card's preview reads besides the purchase (DECISIONS row 249): no typed minimum
  * profit (the product's prices section is its one source) and no per-line tick — every line counts,
  * as the confirm's review counts it, so the preview equals the commit.
  */

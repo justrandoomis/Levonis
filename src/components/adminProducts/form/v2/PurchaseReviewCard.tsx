@@ -1,9 +1,9 @@
 /**
  * «● تكلفة شراء جديدة بانتظار مراجعتك» — D1 IN SECTION ٣ (the clean start,
- * addendum A.10; DECISIONS rows 221 D1, 222 and 247). Owner-only.
+ * addendum A.10; DECISIONS rows 221 D1, 222 and 249). Owner-only.
  *
  * Every confirmed stock purchase of the product leaves its own pending review
- * (row 247: one per purchase — purchases of different models or colours never
+ * (row 249: one per purchase — purchases of different models or colours never
  * erase each other), listed oldest first. Each names its purchase and the
  * inputs it carries per level — the product, a model, a colour or a variant
  * exactly as bought: the supplier price and its currency, the shipping weight,
@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, formatIqd } from '../../../../lib/api';
 import { useLanguage } from '../../../../LanguageContext';
 import { Button } from '../../../ui/Button';
+import { contractRefusal, refusalLang } from '../../../../lib/refusalStrings';
 import { channelName, useV2Lang } from './v2Ui';
 import type { V2Channel } from './v2Model';
 
@@ -27,6 +28,8 @@ interface ReviewInput {
   name?: Names | null;
   fields: Record<string, string | number | null>;
   iqd?: { original_input_amount: string; conversion_rate_snapshot: string } | null;
+  /** Row 249: offered to an empty level only (a colour or variant bought, its broader level still empty). */
+  seed?: boolean;
 }
 interface Shadowed {
   scope: string;
@@ -81,6 +84,7 @@ const T = {
   converted: { ar: 'محوَّل مرة واحدة من الدينار', en: 'Converted once from dinars', ckb: 'یەک جار لە دینارەوە گۆڕدراوە' },
   shadowFrom: { ar: 'لن تصل هذه التكلفة إلى:', en: 'This cost will not reach:', ckb: 'ئەم تێچووە ناگاتە:' },
   shadowWhy: { ar: '— لها تكلفة خاصة', en: '— they have their own cost', ckb: '— تێچووی تایبەتی خۆیان هەیە' },
+  seed: { ar: '(يُكتب فقط ما دام هذا المستوى فارغًا)', en: '(written only while this level is empty)', ckb: '(تەنها تا ئەم ئاستە بەتاڵ بێت دەنووسرێت)' },
 } as const;
 type Key = keyof typeof T;
 
@@ -136,6 +140,7 @@ export default function PurchaseReviewCard({ productId, onApplied }: { productId
 
 function ReviewItem({ review, base, onDone }: { review: Review; base: string; onDone: (k: 'applied' | 'kept') => void }) {
   const { t, nameOf } = useText();
+  const { lang } = useLanguage();
   const v2Lang = useV2Lang();
   const [preview, setPreview] = useState<Preview | null>(null);
   const [tick, setTick] = useState(false);
@@ -150,7 +155,8 @@ function ReviewItem({ review, base, onDone }: { review: Review; base: string; on
     } catch (e) {
       const p = e instanceof ApiError ? (e.details?.preview as Preview | undefined) : undefined;
       if (p) setPreview(p);
-      setError(e instanceof Error ? e.message : String(e));
+      // A contract code (PRICING_REVIEW_PURCHASE_CANCELLED, …) in the reader's language, Sorani included.
+      setError(contractRefusal(e, refusalLang(lang), e instanceof Error ? e.message : String(e)));
     } finally {
       setBusy(false);
     }
@@ -172,6 +178,7 @@ function ReviewItem({ review, base, onDone }: { review: Review; base: string; on
             <span className="font-semibold" dir="auto">
               {levelOf(i.scope, i.name)}
             </span>
+            {i.seed ? <span className="text-text-muted"> {t('seed')}</span> : null}
             <span className="flex flex-wrap gap-x-3 text-text-secondary">
               {i.fields.supplier_cost_amount != null ? (
                 <span>

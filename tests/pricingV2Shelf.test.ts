@@ -66,7 +66,7 @@ const sql = (v: unknown): string => (v === null || v === undefined ? 'NULL' : ty
 let lotSeq = 0;
 /**
  * A batch on the shelf, as the receiving door writes one (the effective cost is its unit_cost_iqd). With
- * `rate`, it carries its purchase-time U (0182's snapshot): row 247 then prices it in dollars at today's U.
+ * `rate`, it carries its purchase-time U (0182's snapshot): row 249 then prices it in dollars at today's U.
  */
 function lot(raw: DatabaseSync, model: string, qty: number, unitCost: number | null, remaining = qty, rate?: string): string {
   const id = `lot_${++lotSeq}`;
@@ -252,13 +252,13 @@ test('the engine, pure: the shelf prices the direct sale in dinars as paid, the 
   // Two stocked options: a unit takes one of each, so the costs add and the units are the fewest.
   const two = { mode: 'OPTION' as const, identities: [asPaid('m1', 500_000, 4), asPaid('n1', 20_000, 2)] };
   assert.deepEqual(shelfOfSku(two, { option_value_ids: ['m1', 'n1'], color_id: null, combo_key: 'o:m1|o:n1' }, '1500'), { state: 'on_shelf', cost_iqd: 520_000, units: 2 });
-  // Row 247: a batch with a purchase rate is its dollars at today's U — and with no U today, the supplier prices it.
+  // Row 249: a batch with a purchase rate is its dollars at today's U — and with no U today, the supplier prices it.
   const rated = { mode: 'OPTION' as const, identities: [{ ...asPaid('m1', 690_000, 2), cost_usd_micro: 460_000_000, cost_iqd_unrated: null }] };
   assert.deepEqual(shelfOfSku(rated, { option_value_ids: ['m1'], color_id: null, combo_key: 'o:m1' }, '1600'), { state: 'on_shelf', cost_iqd: 736_000, units: 2 });
   assert.equal(shelfOfSku(rated, { option_value_ids: ['m1'], color_id: null, combo_key: 'o:m1' }, null), null);
 });
 
-test('row 247 — the dollar is the anchor: a batch bought at U 1,500 for 690,000 IQD is $460, priced at today’s U; a batch with no purchase rate stays as paid; the signature ignores U', async () => {
+test('row 249 — the dollar is the anchor: a batch bought at U 1,500 for 690,000 IQD is $460, priced at today’s U; a batch with no purchase rate stays as paid; the signature ignores U', async () => {
   const w = await world();
   const combo = { option_value_ids: [COMBO], color_id: null, combo_key: `o:${COMBO}` };
   // A batch with its purchase-time U, costlier in dollars than the unrated ones (690,062 IQD as paid).

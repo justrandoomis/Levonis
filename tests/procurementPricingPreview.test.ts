@@ -144,7 +144,7 @@ const colourPurchase = (amount: number, weight: number): PurchaseForPricing => (
   charges: [],
 });
 
-test('a colour line only seeds the product’s value (row 247): never lowered, never raised, unless the owner prefers this purchase', () => {
+test('a colour line only seeds the product’s value (row 249): never lowered, never raised, unless the owner prefers this purchase', () => {
   const stored = storedWith([{ supplier_cost_amount: '500', supplier_cost_currency: 'EUR', supplier_input_mode: 'SOURCE_CURRENCY', shipping_weight_g: 3000 }]);
   const lower = deriveProductEntries(colourPurchase(400, 2000), 'p1', stored, { optIn: new Set(), prefer: false, usePurchase: true, rates: null });
   const e = lower.entries[0]!;
@@ -156,7 +156,7 @@ test('a colour line only seeds the product’s value (row 247): never lowered, n
   const preferred = deriveProductEntries(colourPurchase(400, 2000), 'p1', stored, { optIn: new Set(), prefer: true, usePurchase: true, rates: null });
   assert.equal(preferred.entries[0]!.write.set.supplier_cost_amount, '400');
   assert.equal(preferred.entries[0]!.write.set.shipping_weight_g, 2000);
-  // Row 247: a costlier colour never raises what every other colour inherits (its own level carries it).
+  // Row 249: a costlier colour never raises what every other colour inherits (its own level carries it).
   const higher = deriveProductEntries(colourPurchase(600, 4000), 'p1', stored, { optIn: new Set(), prefer: false, usePurchase: true, rates: null });
   assert.equal(higher.entries[0]!.write.set.supplier_cost_amount, undefined);
   assert.equal(higher.entries[0]!.write.set.shipping_weight_g, undefined);

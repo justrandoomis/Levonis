@@ -45,7 +45,7 @@ for (const [name, table] of [
   });
 }
 
-test('the purchase card types no minimum profit and no per-line tick any more (row 247); the old reference price is gone in all three languages', () => {
+test('the purchase card types no minimum profit and no per-line tick any more (row 249); the old reference price is gone in all three languages', () => {
   for (const k of ['fieldLabel', 'fieldHint', 'manualOptIn']) assert.equal(k in PROCUREMENT_PRICING_STRINGS.ar, false, k);
   for (const lang of ['ar', 'en', 'ckb'] as const) {
     const all = Object.values(PROCUREMENT_PRICING_STRINGS[lang]).map(text).join('\n');

@@ -4,7 +4,7 @@
  * 221 D1 and 222).
  *
  *   - WHEN: EVERY save that leaves the procurement document `ordered` with a
- *     FINAL cost (DECISIONS row 247) — the confirm, an estimated → final edit,
+ *     FINAL cost (DECISIONS row 249) — the confirm, an estimated → final edit,
  *     a cost or quantity edit before receipt — in that same batch. For every
  *     ordinary product on the purchase, `deriveProductEntries` (reused) computes
  *     the cost-input writes the purchase implies, per model, colour and variant
@@ -13,10 +13,13 @@
  *       · the same inputs as this purchase's pending review → nothing (its id stays);
  *       · otherwise that pending review is `superseded` and a new one inserted;
  *       · another purchase's pending review of the product is superseded only
- *         when every (scope, scope_id) it names is named by the new one — so
- *         purchases of different models or colours never erase each other;
+ *         when the new one BOUGHT every level that one bought (a seed of an empty
+ *         broader level is not one) — so purchases of different models, colours
+ *         or variants never erase each other, whatever order they are confirmed in;
  *       · a save that leaves the document draft or estimated, and a close with
- *         nothing received (cancelled), supersede this purchase's pending reviews.
+ *         nothing received (cancelled), supersede this purchase's pending reviews,
+ *         and give back the reviews it had replaced whose purchase is still bought
+ *         (`reviveStatements`).
  *     No price or input moves. The receive writes stock only; when it lands
  *     units of a product whose review of this purchase waits, it rings the
  *     owner's bell once (bell.ts `purchaseReviewArrivedBell`, no figure).
@@ -49,11 +52,12 @@ import { newId } from '../../crypto';
 import { fence } from '../../operations';
 import { auditStatements } from '../../audit';
 import { cleanStartInstalled } from '../../engineInstalled';
-import { deriveProductEntries, purchaseIneligibility, shadowedOf, type PurchaseForPricing, type PurchaseSkuLevels } from '../fromPurchase';
-import { loadPricingRates } from '../rates';
+import { deriveProductEntries, openSeedFields, purchaseIneligibility, shadowedOf, type PurchaseForPricing, type PurchaseSkuLevels } from '../fromPurchase';
+import { committedPurchaseForPricing, purchaseUsdIqd, purchaseUsdIqdSnapshotOf } from '../purchaseRead';
+import { loadPricingRates, type PricingRates } from '../rates';
 import { loadProducts, type LoadedProduct } from '../load';
 import { purchaseSkuLevels } from '../procurementPreview';
-import { inputWriteIsNoop, loadProductsPricing, ownerRow, type InputWrite, type IqdSnapshot, type StoredInputRow } from '../store';
+import { inputWriteIsNoop, loadProductsPricing, ownerRow, type InputWrite, type IqdSnapshot, type ProductPricingData, type StoredInputRow } from '../store';
 import { inputInvalid } from '../whatIf';
 import { parseSkuComboKey } from '@levonis/pricing/skuChannel';
 import { desiredFor, evaluateDesired, gateV2, loadV2Read, storedMethodOf, v2Answer, v2BatchOutcome, v2ViewerOf } from './api';
@@ -65,8 +69,14 @@ export interface ReviewInput {
   scope_id: string;
   set: InputWrite['set'];
   source_ref: string;
-  /** A dinar purchase's conversion (row 247): the supplier cost in `set` is its USD. */
+  /** A dinar purchase's conversion (row 249): the supplier cost in `set` is its USD. */
   iqd?: IqdSnapshot;
+  /**
+   * Row 249: a SEED of an empty broader level (a colour or variant line's figures, offered to the product or
+   * the model while nothing resolves there). Applied only while that is still so (`openSeedFields`); never
+   * one of the levels the purchase BOUGHT, which alone decide what this review replaces.
+   */
+  seed?: boolean;
 }
 
 export interface PurchaseReviewRow {
@@ -81,7 +91,7 @@ export interface PurchaseReviewRow {
   purchase_status?: string | null;
 }
 
-/** The statuses a purchase's cost may still be applied from (row 247): units ordered or arrived at that cost. */
+/** The statuses a purchase's cost may still be applied from (row 249): units ordered or arrived at that cost. */
 const APPLIABLE: ReadonlySet<string> = new Set(['ordered', 'partial', 'received']);
 
 const missingTable = (e: unknown) => /no such table/i.test(e instanceof Error ? e.message : String(e));
@@ -91,6 +101,44 @@ export const supersedePurchaseReviews = (db: D1Database, purchaseId: string, act
   db.prepare("UPDATE pricing_v2_purchase_reviews SET state = 'superseded', decided_at = ?, decided_by = ? WHERE purchase_id = ? AND state = 'pending'").bind(now, actor, purchaseId);
 
 const scopeKey = (i: Pick<ReviewInput, 'scope' | 'scope_id'>) => `${i.scope}:${i.scope === 'base' ? '' : i.scope_id}`;
+
+/** The levels a review BOUGHT: its writes that are not seeds (a review stored before row 249's seeds names them all). */
+const boughtKeys = (inputs: readonly ReviewInput[]): Set<string> => {
+  const bought = inputs.filter((i) => !i.seed);
+  return new Set((bought.length ? bought : inputs).map(scopeKey));
+};
+
+/** Does a review that bought `cover` replace one that bought `theirs`? Only when it bought every level that one did. */
+const replaces = (cover: ReadonlySet<string>, theirs: readonly ReviewInput[]): boolean => {
+  const keys = boughtKeys(theirs);
+  return keys.size > 0 && [...keys].every((k) => cover.has(k));
+};
+
+/** The review inputs one purchase implies for one product, as the save writes them (see the file header). */
+function reviewInputsFor(purchase: PurchaseForPricing, pid: string, data: ProductPricingData, product: LoadedProduct | undefined, rates: PricingRates | null): ReviewInput[] {
+  const lines = purchase.lines.filter((l) => l.product_id === pid);
+  // Every line counts (the procurement screen's per-line tick went with its price step): the review IS
+  // the owner's decision, and nothing moves before it. A colour or a variant line feeds its own level
+  // (FX-7, row 249), as the procurement preview reads it.
+  const derived = deriveProductEntries(purchase, pid, data, {
+    optIn: new Set(lines.map((l) => l.key)),
+    prefer: false,
+    usePurchase: true,
+    rates,
+    levels: product ? purchaseSkuLevels(product) : undefined,
+  });
+  // A write that changes nothing stored (the owner applied these figures already) is not asked again.
+  return derived.entries
+    .filter((e) => Object.keys(e.write.set).length > 0 && !inputWriteIsNoop(e.write))
+    .map((e) => ({
+      scope: e.write.scope,
+      scope_id: e.write.scope_id,
+      set: e.write.set,
+      source_ref: e.write.source_ref,
+      ...(e.write.iqd ? { iqd: e.write.iqd } : {}),
+      ...(e.seed ? { seed: true } : {}),
+    }));
+}
 
 /** Every field of `inputs` is, with the same value, in the decided review's inputs (the owner answered these figures). */
 const coveredBy = (inputs: readonly ReviewInput[], decidedJson: string): boolean => {
@@ -127,7 +175,11 @@ export async function purchaseReviewStatements(db: D1Database, purchase: Purchas
   // The owner's latest decision on this purchase per product (applied or kept): the same figures again ask nothing.
   const decided = new Map<string, string>();
   for (const r of rows) if (r.purchase_id === purchaseId && (r.state === 'applied' || r.state === 'dismissed')) decided.set(r.product_id, r.inputs_json);
-  if (purchaseIneligibility({ status: purchase.status, cost_state: purchase.cost_state, lines: purchase.lines })) return ownPending.length ? [supersedePurchaseReviews(db, purchaseId, actor, now)] : [];
+  // Ineligible (draft, estimated, no line): this purchase's reviews go, and those it had replaced come back.
+  if (purchaseIneligibility({ status: purchase.status, cost_state: purchase.cost_state, lines: purchase.lines }))
+    return ownPending.length
+      ? [supersedePurchaseReviews(db, purchaseId, actor, now), ...(await reviveStatements(db, purchaseId, [...new Set(ownPending.map((r) => r.product_id))], new Map(), actor, now))]
+      : [];
   const ordinary = ids.length
     ? new Set(
         ((await db.prepare("SELECT id FROM products WHERE id IN (SELECT value FROM json_each(?)) AND COALESCE(composition, '') = ''").bind(JSON.stringify(ids)).all<{ id: string }>()).results ?? []).map(
@@ -143,31 +195,19 @@ export async function purchaseReviewStatements(db: D1Database, purchase: Purchas
   const supersede = (id: string) =>
     db.prepare("UPDATE pricing_v2_purchase_reviews SET state = 'superseded', decided_at = ?, decided_by = ? WHERE id = ? AND state = 'pending'").bind(now, actor, id);
   const kept = new Set<string>();
+  // This purchase's pending review per product once the batch has run (the same one kept, or the new one).
+  const after = new Map<string, ReviewInput[]>();
   for (const pid of pids) {
     const data = stored.get(pid);
     if (!data) continue;
-    const lines = purchase.lines.filter((l) => l.product_id === pid);
-    // Every line counts (the procurement screen's per-line tick went with its price step): the review IS
-    // the owner's decision, and nothing moves before it. A colour or a variant line feeds its own level
-    // (FX-7, row 247), as the procurement preview reads it.
-    const product = loaded.get(pid);
-    const derived = deriveProductEntries(purchase, pid, data, {
-      optIn: new Set(lines.map((l) => l.key)),
-      prefer: false,
-      usePurchase: true,
-      rates,
-      levels: product ? purchaseSkuLevels(product) : undefined,
-    });
-    // A write that changes nothing stored (the owner applied these figures already) is not asked again.
-    const inputs: ReviewInput[] = derived.entries
-      .filter((e) => Object.keys(e.write.set).length > 0 && !inputWriteIsNoop(e.write))
-      .map((e) => ({ scope: e.write.scope, scope_id: e.write.scope_id, set: e.write.set, source_ref: e.write.source_ref, ...(e.write.iqd ? { iqd: e.write.iqd } : {}) }));
+    const inputs = reviewInputsFor(purchase, pid, data, loaded.get(pid), rates);
     if (!inputs.length) continue;
     const json = JSON.stringify(inputs);
     const mine = ownPending.find((r) => r.product_id === pid);
     if (mine && mine.inputs_json === json) {
       // The same figures again: the review the owner may already be reading stays, id and all.
       kept.add(mine.id);
+      after.set(pid, inputs);
       continue;
     }
     if (!mine && decided.has(pid) && coveredBy(inputs, decided.get(pid)!)) continue;
@@ -175,12 +215,12 @@ export async function purchaseReviewStatements(db: D1Database, purchase: Purchas
       out.push(supersede(mine.id));
       kept.add(mine.id);
     }
-    // Another purchase's pending review of the product goes only when this one names every level it names.
-    const names = new Set(inputs.map(scopeKey));
+    // Another purchase's pending review of the product goes only when this one BOUGHT every level that one
+    // bought (row 249): a seed of an empty broader level never replaces another colour's or variant's review.
+    const names = boughtKeys(inputs);
     for (const other of pending) {
       if (other.product_id !== pid || other.purchase_id === purchaseId) continue;
-      const theirs = reviewInputsOf(other as PurchaseReviewRow);
-      if (theirs.length && theirs.every((i) => names.has(scopeKey(i)))) out.push(supersede(other.id));
+      if (replaces(names, reviewInputsOf(other as PurchaseReviewRow))) out.push(supersede(other.id));
     }
     out.push(
       db
@@ -190,21 +230,139 @@ export async function purchaseReviewStatements(db: D1Database, purchase: Purchas
         )
         .bind(newId('pvr'), pid, purchaseId, json, now, actor)
     );
+    after.set(pid, inputs);
   }
   // A product this purchase no longer prices (a line removed, nothing left to write): its review goes.
   for (const r of ownPending) if (!kept.has(r.id)) out.push(supersede(r.id));
+  // Where this purchase's pending review went or changed, a review it had replaced may be due again.
+  const released = [...new Set(ownPending.filter((r) => !(after.get(r.product_id) && JSON.stringify(after.get(r.product_id)) === r.inputs_json)).map((r) => r.product_id))];
+  out.push(...(await reviveStatements(db, purchaseId, released, after, actor, now)));
   return out;
 }
 
+/**
+ * A purchase closed with nothing received (cancelled, row 249): its pending reviews are superseded, and the
+ * reviews it had replaced come back (`reviveStatements`) — the cost of a purchase really bought still waits.
+ */
+export async function cancelledPurchaseReviewStatements(db: D1Database, purchaseId: string, actor: string, now: string): Promise<D1PreparedStatement[]> {
+  let own: Array<{ product_id: string }>;
+  try {
+    own = (await db.prepare("SELECT product_id FROM pricing_v2_purchase_reviews WHERE purchase_id = ? AND state = 'pending'").bind(purchaseId).all<{ product_id: string }>()).results ?? [];
+  } catch (e) {
+    if (missingTable(e)) return [];
+    throw e;
+  }
+  if (!own.length) return [];
+  return [supersedePurchaseReviews(db, purchaseId, actor, now), ...(await reviveStatements(db, purchaseId, [...new Set(own.map((r) => r.product_id))], new Map(), actor, now))];
+}
+
+/**
+ * Row 249: a review this purchase replaced is not lost when this purchase stops claiming its levels — it is
+ * cancelled, taken back to draft or estimated, or its figures no longer name them. For each product named,
+ * another purchase's review comes back — recomputed from that purchase as it is now, a fresh pending row —
+ * when (a) its newest review of the product is `superseded`, (b) that purchase is still ordered, partly or
+ * fully received with a final cost, and (c) no later review of another purchase that bought every level it
+ * bought is pending after this batch (`after`: this purchase's own), applied or kept by the owner — that one
+ * replaced it, or the owner decided over it. The newest come back first, so an older review a revived one
+ * had replaced stays replaced. A review the owner already answered with the same figures is not asked again.
+ */
+async function reviveStatements(
+  db: D1Database,
+  purchaseId: string,
+  productIds: readonly string[],
+  after: ReadonlyMap<string, ReviewInput[]>,
+  actor: string,
+  now: string
+): Promise<D1PreparedStatement[]> {
+  if (!productIds.length) return [];
+  type Row = { id: string; product_id: string; purchase_id: string; inputs_json: string; state: PurchaseReviewRow['state']; purchase_status: string | null; purchase_cost_state: string | null };
+  const rows =
+    (
+      await db
+        .prepare(
+          `SELECT r.id, r.product_id, r.purchase_id, r.inputs_json, r.state, p.status AS purchase_status, p.cost_state AS purchase_cost_state
+             FROM pricing_v2_purchase_reviews r LEFT JOIN purchase_orders p ON p.id = r.purchase_id
+            WHERE r.product_id IN (SELECT value FROM json_each(?)) ORDER BY r.created_at, r.id`
+        )
+        .bind(JSON.stringify(productIds))
+        .all<Row>()
+    ).results ?? [];
+  const out: D1PreparedStatement[] = [];
+  const purchases = new Map<string, PurchaseForPricing | null>();
+  const revived: Array<{ pid: string; purchase: PurchaseForPricing; inputs: ReviewInput[] }> = [];
+  for (const pid of productIds) {
+    const list = rows.filter((r) => r.product_id === pid);
+    // Reviews that hold their levels after this batch: another purchase's pending, applied or kept one; this
+    // purchase's applied or kept one; this purchase's pending one as `after` leaves it (newest of all).
+    const holds = (r: Row) => (r.purchase_id === purchaseId ? r.state === 'applied' || r.state === 'dismissed' : r.state !== 'superseded');
+    const covers: Array<{ at: number; keys: Set<string> }> = list.flatMap((r, at) => (holds(r) ? [{ at, keys: boughtKeys(reviewInputsOf(r as unknown as PurchaseReviewRow)) }] : []));
+    const mine = after.get(pid);
+    if (mine) covers.push({ at: list.length, keys: boughtKeys(mine) });
+    // Each other purchase's newest review of the product, newest first.
+    const newest = new Map<string, number>();
+    list.forEach((r, at) => newest.set(r.purchase_id, at));
+    const candidates = [...newest.entries()]
+      .filter(([qid, at]) => qid !== purchaseId && list[at]!.state === 'superseded' && APPLIABLE.has(list[at]!.purchase_status ?? '') && list[at]!.purchase_cost_state === 'final')
+      .sort((a, b) => b[1] - a[1]);
+    for (const [qid, at] of candidates) {
+      const replaced = (inputs: readonly ReviewInput[]) => covers.some((c) => c.at > at && replaces(c.keys, inputs));
+      if (replaced(reviewInputsOf(list[at]! as unknown as PurchaseReviewRow))) continue;
+      if (!purchases.has(qid)) {
+        const q = await committedPurchaseForPricing(db, qid);
+        purchases.set(qid, q && q.currency === 'IQD' ? { ...q, usd_iqd: await purchaseUsdIqd(db, await purchaseUsdIqdSnapshotOf(db, qid), now) } : q);
+      }
+      const q = purchases.get(qid);
+      if (!q || purchaseIneligibility(q) || !q.lines.some((l) => l.product_id === pid)) continue;
+      revived.push({ pid, purchase: q, inputs: [] });
+      // Held in place for the newer-first rule: an older candidate this one replaced stays replaced.
+      covers.push({ at: at + 0.5, keys: boughtKeys(reviewInputsOf(list[at]! as unknown as PurchaseReviewRow)) });
+    }
+  }
+  if (!revived.length) return out;
+  const pids = [...new Set(revived.map((r) => r.pid))];
+  const ordinary = new Set(
+    ((await db.prepare("SELECT id FROM products WHERE id IN (SELECT value FROM json_each(?)) AND COALESCE(composition, '') = ''").bind(JSON.stringify(pids)).all<{ id: string }>()).results ?? []).map((r) => r.id)
+  );
+  // One after another, as the save's own reads (each may be a batch of its own).
+  const stored = await loadProductsPricing(db, pids);
+  const loaded = await loadProducts(db, pids);
+  const rates = await loadPricingRates(db);
+  for (const r of revived) {
+    const data = stored.get(r.pid);
+    if (!data || !ordinary.has(r.pid)) continue;
+    const inputs = reviewInputsFor(r.purchase, r.pid, data, loaded.get(r.pid), rates);
+    if (!inputs.length) continue;
+    // The owner's own answer to these very figures (applied or kept) is not asked again.
+    const decided = rows.filter((x) => x.product_id === r.pid && x.purchase_id === r.purchase.purchase_id && (x.state === 'applied' || x.state === 'dismissed')).pop();
+    if (decided && coveredBy(inputs, decided.inputs_json)) continue;
+    out.push(
+      db
+        .prepare(
+          `INSERT INTO pricing_v2_purchase_reviews (id, product_id, purchase_id, inputs_json, state, created_at, created_by)
+           VALUES (?, ?, ?, ?, 'pending', ?, ?)`
+        )
+        .bind(newId('pvr'), r.pid, r.purchase.purchase_id, JSON.stringify(inputs), now, actor)
+    );
+  }
+  return out;
+}
+
+/** A review the owner may still act on: its purchase not cancelled (or taken back) — pendingReviewsOf reads the same. */
+const APPLIABLE_SQL = "(p.id IS NULL OR p.status IN ('ordered','partial','received'))";
+
 const REVIEW_COLUMNS = 'r.id, r.product_id, r.purchase_id, r.inputs_json, r.state, r.created_at, p.invoice_no AS purchase_name, p.status AS purchase_status';
 
-/** Every pending review of the product, oldest first, with its purchase's name and status. A database before 0190 has none. */
+/**
+ * Every pending review of the product, oldest first, with its purchase's name and status. A review left
+ * pending by a purchase cancelled before row 249 superseded on close is not listed: it can never be applied.
+ * A database before 0190 has none.
+ */
 export async function loadPurchaseReviews(db: D1Database, productId: string): Promise<PurchaseReviewRow[]> {
   try {
     return (
       (
         await db
-          .prepare(`SELECT ${REVIEW_COLUMNS} FROM pricing_v2_purchase_reviews r LEFT JOIN purchase_orders p ON p.id = r.purchase_id WHERE r.product_id = ? AND r.state = 'pending' ORDER BY r.created_at, r.id`)
+          .prepare(`SELECT ${REVIEW_COLUMNS} FROM pricing_v2_purchase_reviews r LEFT JOIN purchase_orders p ON p.id = r.purchase_id WHERE r.product_id = ? AND r.state = 'pending' AND ${APPLIABLE_SQL} ORDER BY r.created_at, r.id`)
           .bind(productId)
           .all<PurchaseReviewRow>()
       ).results ?? []
@@ -224,7 +382,7 @@ export async function loadPurchaseReview(db: D1Database, productId: string, revi
           .bind(reviewId, productId)
           .first<PurchaseReviewRow>()
       : await db
-          .prepare(`SELECT ${REVIEW_COLUMNS} FROM pricing_v2_purchase_reviews r LEFT JOIN purchase_orders p ON p.id = r.purchase_id WHERE r.product_id = ? AND r.state = 'pending' ORDER BY r.created_at DESC, r.id DESC LIMIT 1`)
+          .prepare(`SELECT ${REVIEW_COLUMNS} FROM pricing_v2_purchase_reviews r LEFT JOIN purchase_orders p ON p.id = r.purchase_id WHERE r.product_id = ? AND r.state = 'pending' AND ${APPLIABLE_SQL} ORDER BY r.created_at DESC, r.id DESC LIMIT 1`)
           .bind(productId)
           .first<PurchaseReviewRow>();
   } catch (e) {
@@ -232,6 +390,13 @@ export async function loadPurchaseReview(db: D1Database, productId: string, revi
     throw e;
   }
 }
+
+/** A review's inputs as they land on `stored` now (`openSeedFields`): a filled level's seed fields dropped. */
+export const openReviewInputs = (stored: readonly StoredInputRow[], inputs: readonly ReviewInput[]): ReviewInput[] =>
+  inputs.flatMap((i) => {
+    const open = openSeedFields(stored, i);
+    return open ? [open] : [];
+  });
 
 export const reviewInputsOf = (row: PurchaseReviewRow): ReviewInput[] => {
   try {
@@ -303,11 +468,12 @@ export async function purchaseReviewContext(db: D1Database, productId: string): 
 
 /**
  * The review as the owner reads it (FINANCIAL_FIELDS `purchase_review`): the purchase by name, each
- * input with its level's name, and (row 247) `shadowed` — the levels whose own cost the purchase will
+ * input with its level's name, and (row 249) `shadowed` — the levels whose own cost the purchase will
  * not reach, read from the stored inputs as they are now.
  */
 export const reviewView = (row: PurchaseReviewRow, cx?: ReviewContext) => {
-  const inputs = reviewInputsOf(row);
+  // What would land now: a seed whose level was filled since is not shown (nor applied).
+  const inputs = cx ? openReviewInputs(cx.stored, reviewInputsOf(row)) : reviewInputsOf(row);
   const shadowed = cx
     ? shadowedOf(
         cx.stored,
@@ -321,7 +487,7 @@ export const reviewView = (row: PurchaseReviewRow, cx?: ReviewContext) => {
     purchase_name: row.purchase_name ?? null,
     state: row.state,
     created_at: row.created_at,
-    inputs: inputs.map((i) => ({ scope: i.scope, scope_id: i.scope_id, name: cx ? cx.names(i.scope, i.scope_id) : null, fields: i.set, ...(i.iqd ? { iqd: i.iqd } : {}) })),
+    inputs: inputs.map((i) => ({ scope: i.scope, scope_id: i.scope_id, name: cx ? cx.names(i.scope, i.scope_id) : null, fields: i.set, ...(i.iqd ? { iqd: i.iqd } : {}), ...(i.seed ? { seed: true } : {}) })),
     shadowed,
   };
 };
@@ -340,7 +506,9 @@ async function reviewEvaluation(c: Context<AppContext>, productId: string, row: 
   const viewer = v2ViewerOf(c.env, user);
   const now = new Date().toISOString();
   const desired = desiredFor(read, { sent: [] }, { viewer, env: c.env, user, now });
-  desired.inputWrites = reviewInputsOf(row).map((i) => ({
+  // Row 249: a seed lands only where its level is still empty NOW — another review or the owner may have
+  // filled it since this review was computed.
+  desired.inputWrites = openReviewInputs(read.stored.inputs, reviewInputsOf(row)).map((i) => ({
     scope: i.scope,
     scope_id: i.scope_id,
     existing: ownerRow(read.stored.inputs, i.scope, i.scope_id),
@@ -369,7 +537,7 @@ export async function applyPurchaseReview(c: Context<AppContext>, productId: str
     if (row.state === 'applied') return { success: true, already: true };
     throw refusal(409, 'PRICING_REVIEW_DECIDED');
   }
-  // Row 247: a cost the owner never actually bought at never reaches the product.
+  // Row 249: a cost the owner never actually bought at never reaches the product.
   if (!APPLIABLE.has(row.purchase_status ?? '')) throw refusal(409, 'PRICING_REVIEW_PURCHASE_CANCELLED');
   if (body.confirm_large_change !== undefined && typeof body.confirm_large_change !== 'boolean') throw inputInvalid('confirm_large_change');
   const { read, ev, viewer, now } = await reviewEvaluation(c, productId, row);

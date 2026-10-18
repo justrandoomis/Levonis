@@ -926,7 +926,7 @@ const requireReviewOwner = (c: Context<AppContext>) => {
 };
 adminProductsRoutes.get('/:id/purchase-review', limitRoute('pricing-read', 1200), async (c) => {
   requireReviewOwner(c);
-  // Row 247: every pending review, one per purchase, oldest first; `purchase_review` (the newest) stays for older readers.
+  // Row 249: every pending review, one per purchase, oldest first; `purchase_review` (the newest) stays for older readers.
   const rows = await loadPurchaseReviews(c.env.DB, c.req.param('id'));
   const cx = rows.length ? await purchaseReviewContext(c.env.DB, c.req.param('id')) : undefined;
   const views = rows.map((r) => reviewView(r, cx));

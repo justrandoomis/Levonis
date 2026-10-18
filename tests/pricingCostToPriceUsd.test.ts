@@ -351,7 +351,7 @@ test('the storefront never recomputes: only the owner pricing router, the engine
     'worker/routes/adminProductRelations.ts': ['../lib/pricingEngine/v2/legacyMoney'],
     'worker/routes/template.ts': ['../lib/pricingEngine/v2/legacyMoney'],
     // ...and the approved central rate helper of V2-0 F4 (PURCHASE_RATE below), the one other engine module it reads;
-    // and (DECISIONS row 247) the owner's bell when a received purchase's cost awaits review — a notice, no price.
+    // and (DECISIONS row 249) the owner's bell when a received purchase's cost awaits review — a notice, no price.
     'worker/routes/adminProcurement.ts': ['../lib/pricingEngine/purchaseRead', '../lib/pricingEngine/v2/purchaseReview', '../lib/pricingEngine/procurementRate', '../lib/pricingEngine/v2/bell'],
   };
   for (const [f, modules] of Object.entries(CLEAN_START_DOORS)) {

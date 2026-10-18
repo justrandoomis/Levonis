@@ -157,7 +157,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   // «تغيير الاسم» on a saved purchase: the name being typed (null = closed).
   const [renaming, setRenaming] = useState<string | null>(null);
   // The card's pricing (USD design §5): the server's summary per line and the per-product choices.
-  // DECISIONS row 247: no minimum profit is typed here (the product's prices section is its one
+  // DECISIONS row 249: no minimum profit is typed here (the product's prices section is its one
   // source), and every line counts — the preview reads the purchase exactly as its confirm does.
   const [pricing, setPricing] = useState<PricingPreview | null>(null),
     [pricingBusy, setPricingBusy] = useState(false),

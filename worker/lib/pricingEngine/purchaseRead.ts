@@ -136,3 +136,45 @@ export async function committedPurchaseForPricing(db: D1Database, id: string): P
     }),
   };
 }
+
+/** A purchase's FX snapshot as the price review reads it (FX-1 0179, FX-6 0182); absent columns read as none. */
+export interface PurchaseUsdIqdSnapshot {
+  fx_snapshot_at?: unknown;
+  fx_usd_iqd_at_purchase?: unknown;
+  fx_usd_iqd_version_at_purchase?: unknown;
+}
+
+/** The purchase's FX snapshot columns, or null (no purchase, or a database before 0179/0182). */
+export async function purchaseUsdIqdSnapshotOf(db: D1Database, purchaseId: string | null): Promise<PurchaseUsdIqdSnapshot | null> {
+  if (!purchaseId) return null;
+  try {
+    return await db
+      .prepare('SELECT fx_snapshot_at, fx_usd_iqd_at_purchase, fx_usd_iqd_version_at_purchase FROM purchase_orders WHERE id = ?')
+      .bind(purchaseId)
+      .first<PurchaseUsdIqdSnapshot>();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A dinar document's U for its price review (DECISIONS row 249): the purchase's own FX snapshot once it
+ * has one (with its version), else the central effective USD/IQD the confirm snapshots. Null when no rate
+ * or version is known — the dinar lines then offer no supplier cost (no rate is guessed). The save, the
+ * purchase card's preview and a revived review all read it here, so the three agree.
+ */
+export async function purchaseUsdIqd(db: D1Database, snapshot: PurchaseUsdIqdSnapshot | null | undefined, now: string): Promise<{ rate: string; version: number; at: string } | null> {
+  const version = (v: unknown) => (Number.isSafeInteger(Number(v)) && Number(v) > 0 ? Number(v) : null);
+  if (snapshot?.fx_snapshot_at) {
+    const rate = snapshot.fx_usd_iqd_at_purchase,
+      v = version(snapshot.fx_usd_iqd_version_at_purchase);
+    return rate != null && v !== null ? { rate: String(rate), version: v, at: String(snapshot.fx_snapshot_at) } : null;
+  }
+  try {
+    const r = await db.prepare("SELECT effective_rate, effective_version FROM fx_rate_pairs WHERE pair = 'USD_IQD'").first<{ effective_rate: string | null; effective_version: number | null }>();
+    const v = version(r?.effective_version);
+    return r?.effective_rate != null && v !== null ? { rate: String(r.effective_rate), version: v, at: now } : null;
+  } catch {
+    return null;
+  }
+}

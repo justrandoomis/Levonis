@@ -458,9 +458,6 @@ const productCosts = (raw: DatabaseSync) => ({
 async function formBodyFor(a: ReturnType<typeof app>, cookie: string, raw: DatabaseSync) {
   // A direct-sale model needs a stock figure to save at all (a rule of the form, not of cost).
   raw.exec("UPDATE product_option_values SET stock = 2 WHERE id = 'v_a1'");
-  // That stock moves this BASE product to OPTION on save; since DECISIONS row 247 the stock level never moves from
-  // under units on the shelf or open purchases, so the role matrix's base batch and purchase lines are emptied.
-  raw.exec("UPDATE inventory_lots SET qty_remaining = 0 WHERE product_id = 'p_a1'; UPDATE incoming_inventory SET status = 'cancelled' WHERE product_id = 'p_a1'");
   const got = await call(a, cookie, 'GET', '/api/admin/products-v2/p_a1');
   assert.equal(got.status, 200, got.text.slice(0, 300));
   const rel = await call(a, cookie, 'GET', '/api/admin/products/p_a1/relations');

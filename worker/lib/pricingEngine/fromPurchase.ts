@@ -9,7 +9,7 @@
  * `received` — quick receive included) with a FINAL cost, and it is on a route
  * document, or a manual line (supplier cost only), and the owner kept «استعمل
  * هذا الشراء لتسعير هذا المنتج». A manual line in USD/EUR/CNY feeds in its
- * currency. A local dinar purchase (IQD) feeds too (DECISIONS row 247, «الدولار
+ * currency. A local dinar purchase (IQD) feeds too (DECISIONS row 249, «الدولار
  * هو الأساس»): its unit dinars are converted ONCE to USD at the purchase's U
  * (its FX snapshot, `usd_iqd`) and offered as an IQD_CONVERTED supplier cost
  * with that conversion's snapshot — the same rule as a typed dinar supplier
@@ -31,11 +31,13 @@
  * Scopes: base → base, option → option, variant → its first option, colour →
  * base. A line NARROWER than its pricing scope (a colour, a variant) lands at
  * its own level (below); its broader scope is only SEEDED — a field is written
- * there only while nothing resolves for it yet (DECISIONS row 247), and never
+ * there only while nothing resolves for it yet (DECISIONS row 249), and never
  * raised or lowered, so a sibling colour or variant never moves because another
  * was bought (unless the owner ticks «استعمل قيمة هذا الشراء حتى لو كانت أقل من
- * الحالية», the old preview's replace). Several lines on one scope take the
- * maximum.
+ * الحالية», the old preview's replace). A seed is marked (`seed`) and read again
+ * where it lands — at apply and in the needs-pricing fold (`openSeedFields`) —
+ * so one computed against an emptier store never overwrites what another
+ * review or the owner wrote since. Several lines on one scope take the maximum.
  *
  * FX-7 gaps — THE COLOUR'S AND THE VARIANT'S OWN LEVEL (with the SKU rung,
  * 0183): a colour line ALSO feeds its colour, and a variant line its SKU
@@ -43,7 +45,8 @@
  * not a neighbour. Inheritance is respected: a field is written at that level
  * only where it holds a value of its own already, or where the purchase's value
  * differs from what every one of the level's SKUs inherits (product → model →
- * colour, after this purchase's broader writes) — a colour bought at its
+ * colour, after this purchase's broader writes — never its seeds, so the bought
+ * level always carries what was bought, the review self-contained) — a colour bought at its
  * product's own cost keeps inheriting instead of pinning a copy; a shipping
  * weight is never written above the owner's pricing weight it would beat. The
  * double-freight guard is the same: the level's extra is fed only by charges
@@ -111,7 +114,7 @@ export interface PurchaseForPricing {
   lines: PurchaseLineForPricing[];
   charges: PurchaseChargeForPricing[];
   /**
-   * An IQD document's U (row 247): the central USD/IQD of its FX snapshot (or of the save that writes
+   * An IQD document's U (row 249): the central USD/IQD of its FX snapshot (or of the save that writes
    * it) with its version and time. Absent or null: an IQD line does not feed (no rate is guessed).
    */
   usd_iqd?: { rate: string; version: number; at: string } | null;
@@ -133,7 +136,7 @@ export function purchaseIneligibility(p: Pick<PurchaseForPricing, 'status' | 'co
   return null;
 }
 
-/** A dinar document's U and version, when both are known (row 247); null otherwise. */
+/** A dinar document's U and version, when both are known (row 249); null otherwise. */
 const iqdRateOf = (p: Pick<PurchaseForPricing, 'currency' | 'usd_iqd'>): { rate: string; version: number; at: string } | null => {
   if (p.currency !== 'IQD' || !p.usd_iqd) return null;
   const { rate, version, at } = p.usd_iqd;
@@ -145,7 +148,7 @@ const iqdRateOf = (p: Pick<PurchaseForPricing, 'currency' | 'usd_iqd'>): { rate:
   }
 };
 
-/** The line feeds pricing by its kind: a route document, or a ticked manual line in USD/EUR/CNY — or IQD at a known U (row 247). */
+/** The line feeds pricing by its kind: a route document, or a ticked manual line in USD/EUR/CNY — or IQD at a known U (row 249). */
 export function lineFeeds(p: PurchaseForPricing, line: PurchaseLineForPricing, optIn: ReadonlySet<string>): boolean {
   if (!SUPPLIER.has(p.currency) && !iqdRateOf(p)) return false;
   return p.profile !== null || optIn.has(line.key);
@@ -213,7 +216,7 @@ export function supplierUnitText(line: Pick<PurchaseLineForPricing, 'cost_mode' 
 interface LineFields {
   supplier_cost_amount?: string;
   supplier_cost_currency?: SupplierCurrency;
-  /** An IQD line's conversion (row 247): the supplier cost above is then its USD. */
+  /** An IQD line's conversion (row 249): the supplier cost above is then its USD. */
   iqd?: IqdSnapshot;
   shipping_weight_g?: number;
   manual_cbm?: string;
@@ -229,7 +232,7 @@ function lineFields(p: PurchaseForPricing, line: PurchaseLineForPricing, manual:
   }
   const u = iqdRateOf(p);
   if (supplier && u) {
-    // Row 247: the dinars (whole, rounded up) converted once to USD at the purchase's U, rounded UP at 6 places.
+    // Row 249: the dinars (whole, rounded up) converted once to USD at the purchase's U, rounded UP at 6 places.
     try {
       const dinars = procurementExactText(ceilToPlaces(procurementExact(supplier), 0));
       const usd = ceilToPlaces(quotientProcurementExact(procurementExact(dinars), procurementExact(u.rate)), 6);
@@ -279,6 +282,12 @@ export interface DerivedEntry {
   narrow: boolean;
   /** Fields kept at the stored (higher) value because the line was narrower. */
   kept_higher: Array<keyof InputFields>;
+  /**
+   * Row 249: a SEED — a narrower line's figures offered to its empty broader level. Written only while
+   * nothing resolves there (`openSeedFields`, read again at apply and in the needs-pricing fold); never the
+   * level that was bought, so it never decides which other purchase's review this one replaces.
+   */
+  seed?: boolean;
 }
 
 export interface DerivedProduct {
@@ -295,7 +304,7 @@ export interface DerivedProduct {
 /**
  * The input writes one purchase derives for one product (see the file header).
  * `stored` is the product's store as read; `rates` is kept for the callers
- * (a narrow line no longer compares currencies: it only seeds, row 247).
+ * (a narrow line no longer compares currencies: it only seeds, row 249).
  */
 export function deriveProductEntries(
   p: PurchaseForPricing,
@@ -318,7 +327,7 @@ export function deriveProductEntries(
     if (line.line_id) g.ids.push(line.line_id);
     // Several lines on one scope: the maximum per field (the details name the lines).
     const supplier = maxDecimal(g.fields.supplier_cost_amount, fields.supplier_cost_amount) ?? g.fields.supplier_cost_amount;
-    // The dinar conversion travels with the line whose USD won (row 247).
+    // The dinar conversion travels with the line whose USD won (row 249).
     if (fields.supplier_cost_amount !== undefined && supplier === fields.supplier_cost_amount) {
       if (fields.iqd) g.fields.iqd = fields.iqd;
       else delete g.fields.iqd;
@@ -350,7 +359,7 @@ export function deriveProductEntries(
     const existing = ownerRow(stored.inputs, g.scope, g.scope_id);
     const set: Partial<InputFields> = {};
     const kept: Array<keyof InputFields> = [];
-    // Row 247: a narrower line (a colour, a variant) only SEEDS its broader scope — a field is written there
+    // Row 249: a narrower line (a colour, a variant) only SEEDS its broader scope — a field is written there
     // only while nothing resolves for it yet; it is never raised or lowered (the bought level carries the
     // purchase, skuLevelEntries). The old preview's «use this purchase's value» still replaces.
     const seedOnly = g.narrow && !opts.prefer;
@@ -385,6 +394,7 @@ export function deriveProductEntries(
       line_ids: g.ids,
       narrow: g.narrow,
       kept_higher: kept,
+      ...(seedOnly ? { seed: true } : {}),
     });
   }
 
@@ -403,7 +413,7 @@ export function deriveProductEntries(
   // FX-7 gaps: each colour's and variant's own level, against what its SKUs inherit after the writes above.
   if (opts.levels && exact.size) skuLevelEntries(out, [...exact.values()], stored, opts.levels, sourceRef);
 
-  // Shadowing: a value written that a more specific level's own row holds (row 247), or a shipping weight the
+  // Shadowing: a value written that a more specific level's own row holds (row 249), or a shipping weight the
   // owner's pricing weight beats.
   for (const s of shadowedOf(stored.inputs, out.entries.map((e) => e.write), opts.levels)) {
     if (!out.shadowed.some((x) => x.scope === s.scope && x.scope_id === s.scope_id && x.field === s.field)) out.shadowed.push(s);
@@ -425,7 +435,7 @@ export interface ShadowedWrite {
 
 /**
  * The fields of `writes` that a MORE SPECIFIC level's own row holds already, so
- * the price of some SKU will not use them (row 247): a product write under a
+ * the price of some SKU will not use them (row 249): a product write under a
  * model's, a colour's or a SKU's row; a model write under the row of a colour
  * one of its SKUs has (any colour row without the SKU rung) or a SKU row whose
  * selection includes it; a colour write under a SKU row of that colour. A
@@ -480,7 +490,9 @@ function skuLevelEntries(
   sourceRef: string
 ): void {
   // What the level's SKUs inherit: the store after this purchase's broader writes, the level's own rows left out.
-  const after = mergedInputs(stored.inputs, out.entries.map((e) => e.write));
+  // A SEED is not one of them (row 249): it lands only while its level is empty, which another review or the
+  // owner may change before this one is applied — so the bought level carries what was bought, self-contained.
+  const after = mergedInputs(stored.inputs, out.entries.filter((e) => !e.seed).map((e) => e.write));
   const ordered = [...groups].sort((a, b) => (a.scope === b.scope ? (a.scope_id < b.scope_id ? -1 : a.scope_id > b.scope_id ? 1 : 0) : a.scope === 'color' ? -1 : 1));
   for (const g of ordered) {
     out.raw.push({
@@ -533,6 +545,47 @@ function skuLevelEntries(
       kept_higher: [],
     });
   }
+}
+
+/** A write as a review stores it, for `openSeedFields`. */
+export interface SeedableWrite {
+  scope: InputScope;
+  scope_id: string;
+  set: Partial<InputFields>;
+  iqd?: IqdSnapshot;
+  seed?: boolean;
+}
+
+/**
+ * Row 249: a review's write as it lands on `rows` NOW (the stored set at apply, or the needs-pricing fold so
+ * far). A SEED keeps only the fields its level still resolves nothing for — from itself or above — and its own
+ * row does not hold, so a seed computed against an earlier, emptier store never overwrites a value another
+ * review or the owner set since. A route's shipping profile is a proposal the same way on any write: dropped
+ * once the level resolves one. Null when nothing is left to write.
+ */
+export function openSeedFields<T extends SeedableWrite>(rows: readonly Partial<StoredInputRow>[], w: T): T | null {
+  if (w.scope !== 'base' && w.scope !== 'option') return Object.keys(w.set).length ? w : null;
+  const scopeId = w.scope === 'base' ? '' : w.scope_id;
+  const held = resolveSkuInputs(chainOf(rows, w.scope === 'option' ? scopeId : '')).inputs;
+  const own = rows.find((r) => r.scope === w.scope && (r.scope_id ?? '') === scopeId && r.origin === 'MANUAL_OVERRIDE');
+  const set: Partial<InputFields> = { ...w.set };
+  let iqd = w.iqd;
+  if (w.seed) {
+    if ('supplier_cost_amount' in set && (held.supplier !== null || own?.supplier_cost_amount != null || own?.supplier_cost_delta != null)) {
+      delete set.supplier_cost_amount;
+      delete set.supplier_cost_currency;
+      iqd = undefined;
+    }
+    if ('shipping_weight_g' in set && (held.weight !== null || own?.shipping_weight_g != null)) delete set.shipping_weight_g;
+    if ('additional_cost_iqd' in set && (held.additional_cost_iqd !== null || own?.additional_cost_iqd != null)) delete set.additional_cost_iqd;
+    if ('manual_cbm' in set && (held.cbm !== null || own?.manual_cbm != null)) delete set.manual_cbm;
+  }
+  if ('shipping_profile' in set && held.shipping_profile !== null) delete set.shipping_profile;
+  if (!Object.keys(set).length) return null;
+  const next = { ...w, set } as T;
+  if (iqd) next.iqd = iqd;
+  else delete next.iqd;
+  return next;
 }
 
 /** The store as it would be after the writes (rows of the owner's origin replaced or added). */

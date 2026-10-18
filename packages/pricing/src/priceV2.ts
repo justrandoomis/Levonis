@@ -35,10 +35,10 @@
  * A pre-order-only SKU has no discount (C-8, §7 default 3): every route sells at D
  * and a stored Δ that would apply raises V2_DISCOUNT_IGNORED.
  *
- * THE SHELF (cost-first only; DECISIONS rows 244 and 247, docs/PRICING-V2.md §10).
+ * THE SHELF (cost-first only; DECISIONS rows 244 and 249, docs/PRICING-V2.md §10).
  * A SKU whose stock is on the shelf carries `shelf` = the HIGHEST landed unit
  * cost, in whole dinars, among the batches still on its shelf (the worker reads
- * it from `inventory_lots`). That cost is R_stock of the DIRECT price. Row 247:
+ * it from `inventory_lots`). That cost is R_stock of the DIRECT price. Row 249:
  * the worker hands it as the batch's DOLLARS at today's U (its dinars ÷ its
  * purchase-time U, × U, rounded up to the dinar) — dinars as paid only for a
  * batch with no purchase rate; the maths here are unchanged, and the minimum

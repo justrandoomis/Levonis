@@ -135,9 +135,6 @@ async function mixedRead(raw: DatabaseSync) {
 test('product form: a verification between the two answers leaves the form "read without cost", and its save keeps every row cost', async () => {
   const raw = seededCopyUnverifiedOwner();
   raw.exec("UPDATE product_option_values SET stock = 2 WHERE id = 'v_a1'");
-  // The option stock moves this BASE product to OPTION on save; since DECISIONS row 247 the stock level never moves
-  // from under units on the shelf or open purchases, so the role matrix's base batch and purchase lines are emptied.
-  raw.exec("UPDATE inventory_lots SET qty_remaining = 0 WHERE product_id = 'p_a1'; UPDATE incoming_inventory SET status = 'cancelled' WHERE product_id = 'p_a1'");
   const before = stored(raw);
   const { a, cookie, product, rel, body } = await mixedRead(raw);
   assert.equal(carriesCost(product), true, 'the product answer alone says "with cost" — the old rule');

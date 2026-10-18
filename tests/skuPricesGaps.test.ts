@@ -96,8 +96,10 @@ test('purchase lines per colour feed the colour’s own level: what differs from
   // c1 differs from what it inherits (500 EUR, 3 kg, 5,000): its own values; the freight never.
   assert.deepEqual(at('color', 'c1').write.set, { supplier_cost_amount: '450', supplier_cost_currency: 'EUR', shipping_weight_g: 2000, additional_cost_iqd: 3_000 });
   assert.equal(at('color', 'c1').narrow, false);
-  // c2 is exactly what it inherits: it keeps inheriting.
-  assert.deepEqual(at('color', 'c2').write.set, {});
+  // c2's supplier and weight are exactly what it inherits from the store, so they keep inheriting; its own
+  // packaging is written at its level, because the product's 5,000 above is only a seed of this purchase
+  // (row 249: a review is self-contained per bought colour — never compared against a seed the owner may not apply).
+  assert.deepEqual(at('color', 'c2').write.set, { additional_cost_iqd: 5_000 });
   for (const e of d.entries) assert.notEqual(e.write.set.additional_cost_iqd, 16_000, 'route freight never feeds pricing');
   assert.deepEqual(d.proposals, [], 'no profile proposed at a colour (the product resolves one)');
 

@@ -132,10 +132,10 @@ export async function offerBelowCostBell(
   return [stmt];
 }
 
-/* --------------------------------------- stock arrived, its cost awaits review (row 247) -- */
+/* --------------------------------------- stock arrived, its cost awaits review (row 249) -- */
 
 /**
- * INCOMING STOCK ARRIVED WITH A PURCHASE COST AWAITING THE OWNER (DECISIONS row 247). Confirming the
+ * INCOMING STOCK ARRIVED WITH A PURCHASE COST AWAITING THE OWNER (DECISIONS row 249). Confirming the
  * arrival of a purchase whose cost review is still pending rings the verified owner's bell once per
  * product and purchase (a second receipt of the same purchase rings nothing more: the event key). The
  * product id and name only, never a figure; nothing moves before the owner applies the review in

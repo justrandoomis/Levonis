@@ -1,6 +1,6 @@
-import { purchaseReviewStatements, supersedePurchaseReviews } from '../lib/pricingEngine/v2/purchaseReview';
+import { cancelledPurchaseReviewStatements, purchaseReviewStatements } from '../lib/pricingEngine/v2/purchaseReview';
 import { productNameOf, purchaseReviewArrivedBell } from '../lib/pricingEngine/v2/bell';
-import { draftForPricing } from '../lib/pricingEngine/purchaseRead';
+import { draftForPricing, purchaseUsdIqd } from '../lib/pricingEngine/purchaseRead';
 import { Hono, type Context } from 'hono';
 import { allocateProcurementCharges, exactProcurementUnitDefault, procurementSelectionKey } from '../../packages/contracts/src/procurementCost';
 import type { AppContext } from '../lib/types';
@@ -297,7 +297,7 @@ adminProcurementRoutes.get('/documents', async (c) => {
  * D1 (the clean start, addendum A.10): which products of a purchase have a
  * price review from its confirm, and its state — product ids and states only,
  * never a figure (the review's cost stays behind the owner's review routes).
- * Row 247: a purchase refreshes its review on every save, so each product is
+ * Row 249: a purchase refreshes its review on every save, so each product is
  * named once — by its pending review, else its latest one. A database before
  * 0190 has none.
  */
@@ -435,26 +435,6 @@ async function fxSnapshotStatements(db: D1Database, id: string, now: string): Pr
       )
       .bind(of('USD_IQD'), of('EUR_USD'), of('CNY_USD'), now, id),
   ];
-}
-
-/**
- * A dinar document's U for its price review (DECISIONS row 247): the purchase's own FX snapshot once it
- * has one (with its version), else the central effective USD/IQD the confirm in this same batch snapshots.
- * Null when no rate or version is known — the dinar lines then offer no supplier cost (no rate is guessed).
- */
-async function purchaseUsdIqd(db: D1Database, previous: Purchase | undefined, now: string): Promise<{ rate: string; version: number; at: string } | null> {
-  const version = (v: unknown) => (Number.isSafeInteger(Number(v)) && Number(v) > 0 ? Number(v) : null);
-  if (previous?.fx_snapshot_at) {
-    const rate = previous.fx_usd_iqd_at_purchase, v = version(previous.fx_usd_iqd_version_at_purchase);
-    return rate != null && v !== null ? { rate: String(rate), version: v, at: String(previous.fx_snapshot_at) } : null;
-  }
-  try {
-    const r = await db.prepare("SELECT effective_rate, effective_version FROM fx_rate_pairs WHERE pair = 'USD_IQD'").first<{ effective_rate: string | null; effective_version: number | null }>();
-    const v = version(r?.effective_version);
-    return r?.effective_rate != null && v !== null ? { rate: String(r.effective_rate), version: v, at: now } : null;
-  } catch {
-    return null;
-  }
 }
 
 async function planDocument(
@@ -613,7 +593,7 @@ async function planDocument(
   // (UNKNOWN), and its next edit must not record the edit day's rates as its
   // purchase-time rates (FX-1 correctness review C7; FX-6's L10 reads them).
   if (status === 'ordered' && previous?.status !== 'ordered') statements.push(...(await fxSnapshotStatements(db, id, now)));
-  // D1 (the clean start, addendum A.10; DECISIONS row 247): EVERY save that leaves the document ordered
+  // D1 (the clean start, addendum A.10; DECISIONS row 249): EVERY save that leaves the document ordered
   // creates or refreshes its pending purchase review per product, in this batch — the confirm, an
   // estimated → final edit, a cost edit before receipt — never a price or an input; the owner decides each
   // from the product. A save that takes an ordered document back to draft or estimated supersedes its reviews.
@@ -690,7 +670,7 @@ async function planDocument(
       purchaseId: id, incomingId: incoming, productId: l.sel.product_id,
       scope: l.sel.scope, scopeId: l.sel.scope_id, units: origins[lineIndex], actorId: actor,
     }));
-    // The next purchase's prefill learns only a FINAL cost (row 247): an estimate is never offered as the last price.
+    // The next purchase's prefill learns only a FINAL cost (row 249): an estimate is never offered as the last price.
     if (profile && status === 'ordered' && state === 'final') statements.push(db.prepare(`INSERT INTO procurement_selection_cost_defaults(profile_id,product_id,scope,scope_id,source_unit_amount,weight_g,volume_mm3,updated_by,updated_at)
       VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(profile_id,product_id,scope,scope_id) DO UPDATE SET source_unit_amount=excluded.source_unit_amount,weight_g=excluded.weight_g,volume_mm3=excluded.volume_mm3,updated_by=excluded.updated_by,updated_at=excluded.updated_at`)
       .bind(profile.id, l.sel.product_id, l.sel.scope, l.sel.scope_id, l.costMode === 'total' ? exactProcurementUnitDefault(l.sourceTotal!, l.qty) : l.source, l.weight, l.volume, actor, now));
@@ -892,7 +872,7 @@ adminProcurementRoutes.patch('/documents/:id/unit-origins', async (c) => {
 });
 
 /**
- * DECISIONS row 247: confirming the arrival of units whose purchase cost still waits for the owner's
+ * DECISIONS row 249: confirming the arrival of units whose purchase cost still waits for the owner's
  * review rings his bell once per product and purchase (bell.ts, no figure), in the receive's own batch.
  * One read; nothing on a database before 0190.
  */
@@ -1176,9 +1156,10 @@ adminProcurementRoutes.post('/documents/:id/close', async (c) => {
       now,
       id,
     ),
-    // Row 247: a purchase closed with nothing received was never bought at that cost — its reviews go with it.
+    // Row 249: a purchase closed with nothing received was never bought at that cost — its reviews go with it.
     // A close after a partial receipt keeps them: those units arrived at that cost.
-    ...(cancelled && (await cleanStartInstalled(c.env.DB)) ? [supersedePurchaseReviews(c.env.DB, id, user.id, now)] : []),
+    // A review this purchase had replaced (another purchase of the same levels, still bought) comes back.
+    ...(cancelled && (await cleanStartInstalled(c.env.DB)) ? await cancelledPurchaseReviewStatements(c.env.DB, id, user.id, now) : []),
   ]);
   await audit(c.env.DB, user.id, 'purchase.remainder_closed', id, { reason });
   return c.json({ success: true });

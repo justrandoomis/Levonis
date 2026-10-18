@@ -299,7 +299,7 @@ export interface RelationsSnapshot {
   productId: string;
   baseLadder: Ladder;
   inventoryMode: InventoryMode;
-  /** DECISIONS row 247: units on the shelf or purchase lines open under `inventoryMode` (the level cannot change then). */
+  /** DECISIONS row 249: units on the shelf or purchase lines open under `inventoryMode` (the level cannot change then). */
   strandedStock?: boolean;
   saleTypes: string[];
   baseReserved: number;
@@ -628,12 +628,12 @@ export type RelationsPlan =
 const STOCK_SCOPE_OF_MODE: Readonly<Record<InventoryMode, string>> = { BASE: 'base', OPTION: 'option', COLOR: 'color', VARIANT_COMBINATION: 'variant' };
 
 /**
- * DECISIONS row 247: are units on the shelf (`inventory_lots.qty_remaining > 0`) or purchase lines still open
+ * DECISIONS row 249: are units on the shelf (`inventory_lots.qty_remaining > 0`) or purchase lines still open
  * (`incoming_inventory` incoming/partial, not all received) under the level the product counts today? A
  * stock-level change is then refused. One statement, read with the snapshot's relations (no wave of its own); a
  * database without either table strands nothing.
  */
-async function strandedStock(db: D1Database, productId: string, current: InventoryMode): Promise<boolean> {
+export async function strandedStock(db: D1Database, productId: string, current: InventoryMode): Promise<boolean> {
   const scope = STOCK_SCOPE_OF_MODE[current];
   try {
     const r = await db
@@ -1310,12 +1310,22 @@ export async function planRelationsWriteFrom(
             ? 'OPTION'
             : null
           : null;
-  const mode: InventoryMode = isInventoryMode(body.inventory_mode)
+  let mode: InventoryMode = isInventoryMode(body.inventory_mode)
     ? body.inventory_mode
     : (preservedMode ?? derivedMode);
-  // DECISIONS row 247: the stock level never moves from under batches still on the shelf or purchase lines
+  // DECISIONS row 249: the stock level never moves from under batches still on the shelf or purchase lines
   // still open — the shelf, FIFO and the receive read the CURRENT level only, so they would be stranded.
-  if (mode !== snap.inventoryMode && snap.strandedStock) throw new HttpError(409, serverMessage('INVENTORY_MODE_HAS_STOCK'), 'INVENTORY_MODE_HAS_STOCK');
+  // The form states the level it DERIVES from the stock numbers typed (never a choice of its own), so a save
+  // is not refused for it: while the stored level still has its rows after this save it is KEPT, and the
+  // owner is told why; the level moves on a later save, once those units are sold and those lines closed.
+  // Only a save that leaves the stored level nothing to count on is refused.
+  if (mode !== snap.inventoryMode && snap.strandedStock) {
+    if (snap.inventoryMode !== 'BASE' && preservedMode !== snap.inventoryMode) throw new HttpError(409, serverMessage('INVENTORY_MODE_HAS_STOCK'), 'INVENTORY_MODE_HAS_STOCK');
+    warnings.push(
+      `inventory_mode stays ${snap.inventoryMode} (not ${mode}): units on the shelf or purchase lines still open are counted there — it moves once they are sold and closed / بقي مستوى المخزون ${snap.inventoryMode} لأن فيه وحدات على الرف أو مشتريات مفتوحة، وينتقل بعد بيعها وإغلاقها / ئاستی کۆگا ${snap.inventoryMode} دەمێنێتەوە چونکە یەکەی سەر ڕەف یان کڕینی کراوەی تێدایە، دوای فرۆشتن و داخستنیان دەگوازرێتەوە`
+    );
+    mode = snap.inventoryMode;
+  }
   if (!isInventoryMode(body.inventory_mode) && preservedMode === null && snap.inventoryMode !== derivedMode) {
     warnings.push(
       `inventory_mode moved from ${snap.inventoryMode} to ${derivedMode} — the stock level it named has no rows left / تغيّر مستوى المخزون`

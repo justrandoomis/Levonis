@@ -568,7 +568,7 @@ The customer's past orders are read in USD at the order's own snapshot, not at t
 Decision D. The recommended option writes the purchase's supplier cost into the **same**
 product inputs the form edits. Pre-order follows through Δ. The 0186 overlay and the 0188
 direct-only locks retire. When the review is born, refreshed and dropped, and at which level each
-line lands, is §11 (DECISIONS row 247).
+line lands, is §11 (DECISIONS row 249).
 
 ### 4.6 Smaller finance fixes in the same programme
 
@@ -862,7 +862,7 @@ Every sweep pass begins with one guarded, idempotent statement that does the sam
 moved; FX-5's automatic writes lay nothing in their budgeted batches and are covered by it. Telling the
 customer stays the sweep's, with the same sellable-and-priced check.
 
-## 10. Pricing from the shelf (DECISIONS rows 244 and 247, migration 0198)
+## 10. Pricing from the shelf (DECISIONS rows 244, 247 and 249, migration 0198)
 
 **The owner's decisions (2026-10-17).** (1) A cost-first («من التكلفة») model with units on the shelf
 is priced, for the DIRECT sale, from the **highest unit cost among its batches still on the shelf**
@@ -872,19 +872,20 @@ while the shelf sells: it moves only when a costlier batch arrives or the costli
 (2) A model whose shelf is sold out goes back to the supplier calculation (§1.2); without a supplier
 price it is «يحتاج تسعيرًا» — not sold — and the owner's bell rings. Never a silent stale price.
 
-**The formula — the dollar is the anchor (row 247, modifying row 244).** The owner, 2026-10-17:
+**The formula — the dollar is the anchor (row 249, modifying row 244).** The owner, 2026-10-17:
 «الدولار هو الأساس كما اتفقنا وليس العكس … الدولار هو الثابت والدينار العراقي هو المتغير بسعر الصرف».
 Each batch's effective dinars are divided by ITS purchase-time U (`inventory_lots.usd_iqd_rate_at_purchase`,
 0182) into dollars; the batches compare in dollars and the highest is priced at today's U. A batch with no
 purchase rate (an opening batch, or one received before 0182) keeps its dinars as paid, and the shelf's
 cost is the higher of the two:
 
-    R_shelf = max( ceil(max_usd × U_today), max_iqd_unrated )
+    R_shelf = max( ceil(iqd_c × U_today ÷ U_c), max_iqd_unrated )   c = the rated batch of the highest USD
     E_D = R_shelf + T × U + (Σ option ± + colour ±) × U      never below R_shelf + T × U
     D   = round(E_D)   (the engine's one rounding, roundPriceIqd, row 245)  so D − R_shelf ≥ T × U at publication
 
 The micro-dollars are one SQL expression (`lotUsdMicroSql`) the shelf read and the sweep's signature
-share; the engine maths are unchanged (the worker hands it whole dinars). A fixed price (SKU or model) on
+share; they only CHOOSE the costliest batch, whose own dinars and U then price it exactly — at an unchanged
+U it is its dinars as paid, never one more; the engine maths are unchanged (the worker hands it whole dinars). A fixed price (SKU or model) on
 a cost-first product is floored at R_shelf + T × U as at §1.3. A change of U moves the whole direct price
 of a stocked model (the `USD` reason, as today). The owner's example: A1 Combo's batches at 685,831 /
 689,581 / 690,062 IQD, T = $40, U = 1,500 → D = round(690,062 + 60,000) = 750,250; a batch of 690,000 IQD
@@ -923,7 +924,7 @@ stopped, and prices the model once the shelf is empty. The blocks are temporary:
 on, the SKU simply has no row on it, and nothing needs the owner's preview.
 
 **Recomputed by the existing queue.** Every V2 write stores the shelf it priced at as a hash
-(`product_pricing_state.shelf_sig`, migration 0198, value format `shelf:v2` since row 247: each shelf
+(`product_pricing_state.shelf_sig`, migration 0198, value format `shelf:v2` since row 249: each shelf
 identity's highest known cost in micro-dollars and in unrated dinars, «unknown» or «sold out» — never a
 unit count and never today's U, so a rate move is the `USD` reason, not `STOCK`; a `v1` signature stored
 before reads as one shelf move and is repriced once). The quarter-hour sweep (`autoReprice.ts`) reads the
@@ -949,7 +950,7 @@ price editor and a customer read final prices only.
 **Deploy order.** Additive: a database without 0198 still prices from the shelf on every save and
 preview, but stores no signature and detects no `STOCK` move; an older Worker never reads the column.
 
-## 11. Incoming stock linked to the product (DECISIONS row 247)
+## 11. Incoming stock linked to the product (DECISIONS row 249)
 
 **The owner's report (2026-10-17).** «When the admin enters incoming stock and its arrival is then
 confirmed and it is added to the product, it carries data that may change — the cost, the price, the
@@ -960,8 +961,12 @@ review (`pricing_v2_purchase_reviews`, 0190) is keyed by (product, purchase) and
 refreshed by **every** save that leaves the document `ordered` with a FINAL cost — the confirm, an
 estimated → final edit, a cost or quantity edit before receipt. The same figures again write nothing
 (the review id stays). New figures supersede that purchase's pending review and insert a fresh one. A
-pending review of ANOTHER purchase is superseded only when every (scope, scope_id) it names is named by
-the new one, so purchases of different models or colours keep their own reviews; the owner sees all of
+pending review of ANOTHER purchase is superseded only when the new one BOUGHT every level that one
+bought (a seed of a broader level is not a bought level), so purchases of different models, colours or
+variants keep their own reviews — confirmed in any order, before the owner reviews either. When the
+purchase that superseded it is cancelled, taken back to draft or estimated, or no longer names those
+levels, that review comes back, recomputed from its purchase as it is now, if that purchase is still
+ordered/partial/received with a final cost and no later pending review or owner decision covers it; the owner sees all of
 them oldest first (`GET /:id/purchase-review` → `purchase_reviews`, `purchase_review` = the newest).
 A save back to draft or estimated, and a close with nothing received (cancelled), supersede the
 purchase's pending reviews in the same batch; an apply refuses a purchase that is not
@@ -978,7 +983,9 @@ section ٣).
 a colour line on its colour, a variant line on its SKU (with the SKU rung, 0183). The broader level (the
 product for a colour, the model for a variant) is only SEEDED: a field is written there while nothing
 resolves for it yet, and it is never raised or lowered by a narrower line. The bought level is written
-whenever it differs from what it inherits after that seed. A sibling bought cheaper therefore never
+whenever it differs from what it inherits WITHOUT that seed, so each review is self-contained; the seed is
+marked (`seed`) and read again where it lands — at the apply and in the needs-pricing fold — so it is
+dropped once the level has a value (another review's or the owner's). A sibling bought cheaper therefore never
 moves when a costlier sibling is bought. The review card names, per input, the level and its name, the
 supplier price and currency, the shipping weight, the CBM and the extra cost, and the colours or
 variants whose own cost the purchase will not reach («لن تصل هذه التكلفة إلى: … — لها تكلفة خاصة»).
@@ -993,5 +1000,8 @@ the product's prices section only, and the preview reads every line as the confi
 purchase's prefill (`procurement_selection_cost_defaults`) learns a FINAL cost only.
 
 **The stock level.** A product's `inventory_mode` does not change while units sit on the shelf or
-purchase lines are open under the current level (`INVENTORY_MODE_HAS_STOCK`): the shelf, FIFO and the
-receive read the current level only.
+purchase lines are open under the current level (`INVENTORY_MODE_HAS_STOCK`, also on
+`PUT /:id/fulfillment`): the shelf, FIFO and the receive read the current level only. The product form
+derives the level from the stock typed, so its save is not refused for it: the stored level is kept while
+it still has rows, with a note in the three languages, and moves on a later save once those units are sold
+and those lines closed. Only a save that leaves the stored level nothing to count on is refused.

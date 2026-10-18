@@ -99,11 +99,6 @@ function legacy(raw: DatabaseSync) {
   // always was: on a printer shelf an assistant's save would also be a serial
   // policy change, refused for a reason that has nothing to do with cost.
   raw.exec("UPDATE products SET category_id = NULL, sub_category_id = NULL WHERE id = 'p_a1'");
-  // The form's first save moves this legacy product from BASE to OPTION (its options carry stock). Since
-  // DECISIONS row 247 the stock level never moves from under units on the shelf or open purchases, so the
-  // role matrix's base batch and purchase lines are emptied first — as the owner would before reshaping it.
-  raw.exec(`UPDATE inventory_lots SET qty_remaining = 0 WHERE product_id = 'p_a1';
-            UPDATE incoming_inventory SET status = 'cancelled' WHERE product_id = 'p_a1';`);
 }
 
 type Costs = Record<string, { cost_iqd: unknown; cost_adjust_iqd: unknown }>;

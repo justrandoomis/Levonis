@@ -27,9 +27,11 @@ import {
   preflightProductSave,
   planProductSave,
   saveProductAtomic,
+  strandedStock,
   type ProductWriteIntent,
   type RelationsPlan,
 } from '../lib/productPersistence';
+import { serverMessage } from '@levonis/contracts/costRefusals';
 import { isActiveProductImageRow, isValidProductImageQuarantine } from '../lib/productOverlay';
 import {
   ProductMediaIngestError,
@@ -41,6 +43,7 @@ import {
   assertMovesApplied,
   isInventoryMode,
   resolveStock,
+  type InventoryMode,
   type InventorySnapshot,
   type StockTarget,
 } from '../lib/inventory';
@@ -656,6 +659,12 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
           );
         }
       }
+    }
+    // DECISIONS row 249: the stock level never moves from under batches still on the shelf or purchase
+    // lines still open under the current level (the shelf, FIFO and the receive read that level only).
+    const currentMode: InventoryMode = isInventoryMode(existing.inventory_mode) ? existing.inventory_mode : 'BASE';
+    if (requestedMode !== currentMode && (await strandedStock(c.env.DB, productId, currentMode))) {
+      throw new HttpError(409, serverMessage('INVENTORY_MODE_HAS_STOCK'), 'INVENTORY_MODE_HAS_STOCK');
     }
     stockStatements.push(
       c.env.DB.prepare('UPDATE products SET inventory_mode = ? WHERE id = ?').bind(requestedMode, productId)

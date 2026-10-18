@@ -502,7 +502,7 @@ export const FINANCIAL_FIELDS = [
   'estimated_usd_iqd_rate',
   'estimated_fx_version',
   'purchase_review',
-  // DECISIONS row 247: every pending review of a product, one per purchase.
+  // DECISIONS row 249: every pending review of a product, one per purchase.
   'purchase_reviews',
   'v2_purchase_inputs',
   // -- The shelf (DECISIONS row 244): a cost-first direct price read from the costliest batch on the shelf

@@ -20,13 +20,14 @@
  * PRIVATE: the inputs are the owner's; nothing here is logged.
  */
 import { directPurchaseStore } from '../directPurchase';
+import { mergedInputs, openSeedFields } from '../fromPurchase';
 import { INPUT_FIELD_NAMES, ownerRow, type InputFields, type InputScope, type InputWrite, type IqdSnapshot, type ProductPricingData } from '../store';
 
 /**
  * D1 on a product still in «يحتاج تسعيرًا» (addendum A.10: "a needs-pricing
  * product's review feeds its prefill"): the product's PENDING purchase
  * reviews — the cost inputs its confirmed stock purchases imply, one per
- * purchase (DECISIONS row 247: purchases of different models or colours each
+ * purchase (DECISIONS row 249: purchases of different models or colours each
  * keep their own), folded oldest first so a later purchase's field wins. They
  * are laid over the prefill the OWNER prices from (never an editor's: an
  * editor never reads or writes a cost), and the owner's first complete V2
@@ -40,7 +41,7 @@ export interface FirstWriteReview {
   /** Every folded review, oldest first. */
   ids: readonly string[];
   /** The reviews' inputs, oldest review first. */
-  inputs: ReadonlyArray<{ scope: InputScope; scope_id: string; set: Partial<InputFields>; source_ref: string; iqd?: IqdSnapshot }>;
+  inputs: ReadonlyArray<{ scope: InputScope; scope_id: string; set: Partial<InputFields>; source_ref: string; iqd?: IqdSnapshot; seed?: boolean }>;
 }
 
 export async function pendingReviewsOf(db: D1Database, productId: string): Promise<FirstWriteReview | null> {
@@ -80,13 +81,18 @@ export async function pendingReviewsOf(db: D1Database, productId: string): Promi
 /**
  * The reviews' writes over the stored set, one write per scope (a later review's field wins; a scope
  * the product no longer has is dropped). A dinar purchase's conversion travels with its supplier cost.
+ * A SEED (row 249: a colour or variant line's figures offered to its empty broader level) lands only where
+ * neither the stored set nor an earlier folded review already gives that level a value (`openSeedFields`),
+ * so two colours bought at two costs each keep their own and the product takes the first.
  */
 export function reviewFoldInputs(stored: ProductPricingData, review: FirstWriteReview | null | undefined, live: (scope: Exclude<InputScope, 'base'>, id: string) => boolean): InputWrite[] {
   if (!review) return [];
   const known = new Set<string>(INPUT_FIELD_NAMES);
   const out = new Map<string, InputWrite>();
-  for (const i of review.inputs) {
-    if (i.scope !== 'base' && !live(i.scope, i.scope_id)) continue;
+  for (const raw of review.inputs) {
+    if (raw.scope !== 'base' && !live(raw.scope, raw.scope_id)) continue;
+    const i = raw.seed ? openSeedFields(mergedInputs(stored.inputs, [...out.values()]), raw) : raw;
+    if (!i) continue;
     const set = Object.fromEntries(Object.entries(i.set).filter(([k]) => known.has(k))) as Partial<InputFields>;
     if (!Object.keys(set).length) continue;
     const key = `${i.scope}\u0000${i.scope === 'base' ? '' : i.scope_id}`;
