@@ -196,7 +196,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ...owned('fulfilment', ['order_status_history', 'delivery_status_map', 'order_fulfilment']),
   ...owned('ledger', [
     'wallet_transactions', 'wallet_holds', 'wallet_adjustments', 'ledger_balances', 'ledger_idempotency', 'wallet_withdrawals',
-    'wallet_deposit_meta', 'wallet_review_requests', 'admin_tg_identities', 'bnpl_accounts', 'bnpl_ledger', 'points_accruals',
+    'wallet_deposit_meta', 'wallet_review_requests', 'wallet_rate_rebase', 'wallet_rate_rebase_entries', 'admin_tg_identities', 'bnpl_accounts', 'bnpl_ledger', 'points_accruals',
     'points_reservations', 'points_awards', 'reward_claims', 'browse_sessions', 'mission_streaks', 'ticket_ledger', 'game_sessions',
     // 0095 — THE OPERATING-EXPENSE LEDGER: «تكاليف اخرى ... خاصه في لوحه الادمن».
     // Rent, salaries, advertising, customs. They belong to no product and no

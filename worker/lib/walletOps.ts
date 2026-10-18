@@ -48,7 +48,7 @@ import { PaymentFailedV1 } from '@levonis/contracts/events/v1/PaymentFailed';
 // ---------------------------------------------------------------- SQL pieces
 
 /** Settled USD ledger balance for the user bound at `u` (a placeholder). */
-const settledUsdSql = (u: string) => `(SELECT COALESCE(SUM(CASE WHEN t.type='deposit' THEN t.amount ELSE -t.amount END),0)
+export const settledUsdSql = (u: string) => `(SELECT COALESCE(SUM(CASE WHEN t.type='deposit' THEN t.amount ELSE -t.amount END),0)
        FROM wallet_transactions t
       WHERE t.user_id = ${u} AND t.currency = 'USD' AND t.status = 'approved')`;
 

@@ -167,6 +167,7 @@ import { farmRoutes } from './routes/farm';
 // session to its order without an administrator (DECISIONS row 188).
 import { quickBuyRoutes } from './routes/quickBuy';
 import { finalizeDueQuickBuySessions } from './lib/quickBuy/finalize';
+import { runWalletRateRebase } from './lib/fx/walletRateRebase';
 import { publicApiRoutes } from './routes/publicApi';
 import { farmAdminRoutes } from './routes/farmAdmin';
 import { configureEventBus } from './lib/eventBus';
@@ -1233,6 +1234,13 @@ export default {
       ctx.waitUntil(
         finalizeDueQuickBuySessions(env, ctx).catch((error) => {
           console.error('scheduled quick buy finalisation rejected:', error);
+        })
+      );
+      // The one-time wallet rebase onto the official rate (DECISIONS row 252): within a minute of the
+      // deploy that brings it, once — its marker makes every later tick a cached no-op.
+      ctx.waitUntil(
+        runWalletRateRebase(env).catch((error) => {
+          console.error('scheduled wallet rate rebase rejected:', error instanceof Error ? error.message : 'unknown');
         })
       );
       return;

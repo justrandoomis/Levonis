@@ -1025,6 +1025,7 @@
     "tests/walletNotify.test.ts": 0.4,
     "tests/walletOps.test.ts": 0.5,
     "tests/walletPageCompact.test.ts": 0.7,
+    "tests/walletRateRebase.test.ts": 20.8,
     "tests/walletReturnCredits.test.ts": 7.2,
     "tests/walletSpendGuard.test.ts": 0.6,
     "tests/walletTransactionDisplay.test.ts": 0.3,

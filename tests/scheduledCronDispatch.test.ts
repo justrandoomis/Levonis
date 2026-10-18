@@ -40,7 +40,7 @@ function fakeCtx() {
 
 /** How many jobs each cron this commit knows hands to waitUntil today. */
 const KNOWN: Readonly<Record<string, number>> = {
-  '* * * * *': 2, // order finance recovery, Quick Buy finalisation
+  '* * * * *': 3, // order finance recovery, Quick Buy finalisation, the one-time wallet rate rebase (a no-op once done)
   '*/15 * * * *': 5, // staff reconciliation, durable jobs, upload-session sweep, the image copy sweep (no D1), the engine repricing sweep (FX-5)
   '0 */6 * * *': 1, // the FX scheduler (FX-1), alone (tests/fxCron.test.ts pins what it runs)
 };

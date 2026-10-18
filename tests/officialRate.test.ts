@@ -41,6 +41,7 @@ import { cartRoutes } from '../worker/routes/cart';
 import { runFxScheduler } from '../worker/lib/fx/scheduler';
 import { getSetting } from '../worker/lib/settings';
 import { getOfficialUsdRate } from '../worker/lib/fx/officialRate';
+import { runWalletRateRebase } from '../worker/lib/fx/walletRateRebase';
 import { getPublicDisplayRate } from '../worker/lib/fx/displayRate';
 
 /** The legacy admin setting — the fallback only while no applied rate exists. */
@@ -169,6 +170,45 @@ test('after the 1,680 apply, the wallet balance, a deposit typed in dinars and a
   assert.equal(debit!.amount, Math.floor((applied * 100) / 1680), 'the debit converts at 1,680');
   assert.equal(debit!.amount_iqd, applied);
   assert.equal(debit!.exchange_rate_snapshot, 1680);
+});
+
+test('a shop that held wallet money: the wallet waits at 1,400 after the 1,680 apply until the rebase, then reads the same dinars and a wallet checkout converts at 1,680 (DECISIONS row 252)', async () => {
+  const raw = seed();
+  raw.exec('DELETE FROM wallet_rate_rebase'); // the state migration 0202 meets on a shop holding money
+  const buyer = stubApp(asD1(raw), BUYER, (a) => {
+    a.route('/api/wallet', walletRoutes);
+    a.route('/api/orders', orderRoutes);
+  });
+  await approveUsdAt1680(raw);
+  assert.equal(await getOfficialUsdRate(asD1(raw)), LEGACY, 'deployed, not rebased: nothing moved');
+  const before = await json(await get(buyer, '/api/wallet'));
+  assert.equal(before.balance_iqd, Math.floor((100_000 * LEGACY) / 100));
+
+  assert.equal((await runWalletRateRebase({ DB: asD1(raw) })).status, 'rebased');
+  assert.equal(await getOfficialUsdRate(asD1(raw)), 1680);
+  const after = await json(await get(buyer, '/api/wallet'));
+  assert.equal(after.balance_iqd, before.balance_iqd, 'the balance keeps its dinars');
+  assert.equal(after.balance_usd_cents, Math.floor((100_000 * LEGACY) / 1680));
+
+  const order = await post(buyer, '/api/orders', {
+    addressId: 'addr_b',
+    deliveryMethodId: 'standard',
+    paymentMethodId: 'wallet',
+    useWallet: true,
+    usePoints: false,
+    itemIds: [],
+    idempotencyKey: `wrr-${Date.now()}`,
+    policyAcceptance: acceptedPolicies(),
+  });
+  const body = await json(order);
+  assert.equal(order.status, 200, JSON.stringify(body));
+  const applied = body.order.wallet_applied_iqd as number;
+  assert.ok(applied > 0, 'the wallet paid');
+  const o = row<{ exchange_rate: number; wallet_applied_usd_cents: number }>(raw, 'SELECT exchange_rate, wallet_applied_usd_cents FROM orders WHERE id = ?', body.order.id)!;
+  assert.deepEqual([o.exchange_rate, o.wallet_applied_usd_cents], [1680, Math.floor((applied * 100) / 1680)]);
+  // Paid its dinars: what is left is the balance less the payment, within the one cent the cents cannot resolve (0108).
+  const left = (await json(await get(buyer, '/api/wallet'))).balance_iqd as number;
+  assert.ok(left >= before.balance_iqd - applied && left < before.balance_iqd - applied + Math.ceil(1680 / 100), String(left));
 });
 
 test('no applied rate: the legacy setting, then its default — never 0; a fractional applied rate counts in whole dinars', async () => {

@@ -87,6 +87,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     quickBuyHeld: 'منها محجوز لطلب الشراء السريع',
     orderQuickBuy: 'شراء سريع',
     orderGift: 'هدية',
+    rateRebase: 'تحويل الرصيد إلى سعر الصرف الرسمي — قيمته بالدينار كما هي',
     addFunds: 'إضافة رصيد',
     withdraw: 'سحب رصيد',
     activity: 'العمليات',
@@ -204,6 +205,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     quickBuyHeld: 'Of which held for your Quick Buy order',
     orderQuickBuy: 'Quick Buy',
     orderGift: 'Gift',
+    rateRebase: 'Balance moved to the official exchange rate — its dinar value unchanged',
     addFunds: 'Add funds',
     withdraw: 'Withdraw',
     activity: 'Operations',
@@ -321,6 +323,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     quickBuyHeld: 'لەوە گیراوە بۆ داواکاری کڕینی خێرا',
     orderQuickBuy: 'کڕینی خێرا',
     orderGift: 'دیاری',
+    rateRebase: 'باڵانس گوازرایەوە بۆ نرخی فەرمیی ئاڵوگۆڕ — بەهاکەی بە دینار وەک خۆیەتی',
     addFunds: 'زیادکردنی باڵانس',
     withdraw: 'کێشانەوە',
     activity: 'کردارەکان',
@@ -412,6 +415,8 @@ interface TxView {
   status: 'pending' | 'approved' | 'rejected';
   date: string;
   note: string;
+  /** The related record; `RATE_REBASE` marks the one-time move to the official rate (DECISIONS row 252). */
+  ref?: string;
   adminNote?: string;
   receiptUrl: string | null;
   number: string;
@@ -1314,7 +1319,7 @@ export default function Wallet() {
                         </div>
                         <div className="min-w-0">
                           <h3 className="text-text-primary font-bold text-[14px] truncate">
-                            {tx?.note || (isDeposit ? s.filterDeposit : s.filterWithdrawal)}
+                            {tx?.ref === 'RATE_REBASE' ? s.rateRebase : tx?.note || (isDeposit ? s.filterDeposit : s.filterWithdrawal)}
                           </h3>
                           <div className="text-text-secondary text-[11px] mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span dir="ltr">{tx?.number ?? w?.number}</span>
