@@ -58,7 +58,7 @@ import { notifyCustomer, notificationLang, reachFor, NOTIFY_LANG_SELECT, type No
 import { enqueue } from './outbox';
 import type { EmailLang } from './emailTemplates';
 import { availableUsdSql, walletLedgerDinarsReady } from './walletOps';
-import { refundCentsAcrossRebase } from './fx/officialRate';
+import { dinarsBeforeRebase, refundCentsAcrossRebase } from './fx/officialRate';
 import { planDinarLegs, type DinarLeg } from './walletAdjust';
 import { multipliedPointsSql } from './pointsMultiplier';
 import { answerCallbackQuery, editMessageText, sendMessageToChat } from './telegram';
@@ -435,31 +435,44 @@ async function refundLegsFor(
   const recordedRate = debitRate > 0 ? debitRate : Math.trunc(Number(order.exchange_rate) || 0);
   if (orderWalletCents <= 0 || recordedRate <= 0) return null;
   // Paid before the one-time wallet rebase: the cents left on the order are legacy cents, worth
-  // legacy / U of today's (worker/lib/fx/officialRate.ts). The refund is planned in today's cents at U.
+  // legacy / U of today's (worker/lib/fx/officialRate.ts). The refund is planned in today's cents at U,
+  // for the dinars the same cut showed just before the rebase (`dinarsBeforeRebase`: its cents at the
+  // debit's rate, read at L, plus their remainder) — a payment taken at a legacy rate above L would
+  // otherwise get back more than it gave. The order's legacy cents fall by the credit's cents × U / L,
+  // rounded up: the exact figure the cancel repair converts back (orderCancelRepair.ts).
   const back = await refundCentsAcrossRebase(env.DB, orderWalletCents, debit?.created_at ?? order.created_at, recordedRate);
   const walletCents = back.cents;
   const rate = back.rate ?? recordedRate;
+  const legacy = back.rescaled ? back.legacyRate : null;
+  const refundIqd = legacy
+    ? dinarsBeforeRebase(
+        plan.walletRefundIqd,
+        plan.newWalletIqd === 0 ? orderWalletCents : Math.min(orderWalletCents, Math.floor((plan.walletRefundIqd * 100) / recordedRate)),
+        recordedRate,
+        legacy
+      )
+    : plan.walletRefundIqd;
   const toOrderCents = (net: number) =>
     net >= walletCents ? orderWalletCents
-      : back.rescaled ? Math.min(orderWalletCents, Math.ceil((net * orderWalletCents) / walletCents)) : net;
+      : legacy ? Math.min(orderWalletCents, Math.floor((net * rate + legacy - 1) / legacy)) : net;
   const withDinars = (Number(debit?.amount_iqd) || 0) > 0 && debitRate > 0 && (await walletLedgerDinarsReady(env.DB));
 
   if (plan.newWalletIqd === 0) {
     return {
-      legs: [{ type: 'deposit', cents: walletCents, amountIqd: plan.walletRefundIqd }],
+      legs: [{ type: 'deposit', cents: walletCents, amountIqd: refundIqd }],
       withDinars, rate, netCents: walletCents, orderCents: orderWalletCents,
     };
   }
   if (!withDinars) {
-    const cents = Math.min(walletCents, Math.max(1, Math.floor((plan.walletRefundIqd * 100) / rate)));
-    return { legs: [{ type: 'deposit', cents, amountIqd: plan.walletRefundIqd }], withDinars, rate, netCents: cents, orderCents: toOrderCents(cents) };
+    const cents = Math.min(walletCents, Math.max(1, Math.floor((refundIqd * 100) / rate)));
+    return { legs: [{ type: 'deposit', cents, amountIqd: refundIqd }], withDinars, rate, netCents: cents, orderCents: toOrderCents(cents) };
   }
-  let legs = planDinarLegs(plan.walletRefundIqd, rate);
+  let legs = planDinarLegs(refundIqd, rate);
   let net = legs.reduce((n, l) => n + (l.type === 'deposit' ? l.cents : -l.cents), 0);
   if (net > walletCents) {
     // The checkout capped its debit below the dinars' conversion (a wallet
     // holding remainders); never hand back more cents than were taken.
-    legs = [{ type: 'deposit', cents: walletCents, amountIqd: plan.walletRefundIqd }];
+    legs = [{ type: 'deposit', cents: walletCents, amountIqd: refundIqd }];
     net = walletCents;
   }
   return { legs, withDinars, rate, netCents: net, orderCents: toOrderCents(net) };

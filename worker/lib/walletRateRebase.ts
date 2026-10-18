@@ -61,11 +61,10 @@
  * wallet still waits on someone. Without an applied rate there is nothing to
  * move to and it waits; with U equal to L it only writes the marker.
  */
-import type { Env } from '../types';
-import { effectiveHoldsUsdSql, settledUsdSql, availableUsdSql, walletDustIqdSql } from '../walletOps';
-import { getAppliedUsdRate, wholeDinarRate } from './displayRate';
-import { legacyUsdRate, walletRateRebased } from './officialRate';
-import { isSchemaMissing } from '../membershipBenefits';
+import type { Env } from './types';
+import { effectiveHoldsUsdSql, settledUsdSql, availableUsdSql, walletDustIqdSql } from './walletOps';
+import { appliedWholeDinarRate, legacyUsdRate, walletRateRebased } from './fx/officialRate';
+import { isSchemaMissing } from './membershipBenefits';
 
 export const RATE_REBASE_REF = 'RATE_REBASE';
 const NOTE = 'Official exchange rate: balance kept in dinars';
@@ -131,12 +130,17 @@ function rebaseStatements(): string[] {
     // 3. Holds that still reserve money (exactly the ones `effectiveHoldsUsdSql` counts), rounded up.
     `UPDATE wallet_holds SET amount_cents = ${UP('amount_cents')}, updated_at = ?3
       WHERE ${RESCALED_HOLD('wallet_holds')}`,
-    // 3b. An escrow's hold-time rate and cents live in its `held` event (`heldAtRate`, escrowOps.ts):
+    // 3b. An escrow's hold-time rate and cents live in its `held` event (`heldEscrowRate`, escrowOps.ts):
     //     they follow its rescaled hold, or a settlement or partial refund would price U-cents at L.
+    //     The hold-time pair is kept beside them (`held_rate`, `held_cents`) with L: a settlement then
+    //     records the dinars the hold was worth just before the rebase (`dinarsBeforeRebase`), not its
+    //     gross — a hold taken at a legacy rate above L reserved less than its gross reads at U.
     `UPDATE community_escrow_events
         SET reason = 'rate=' || ?2 || ';cents=' || (SELECT h.amount_cents FROM community_escrows c
                                                      JOIN wallet_holds h ON h.id = c.hold_id
                                                     WHERE c.id = community_escrow_events.escrow_id)
+                     || ';' || REPLACE(REPLACE(reason, 'rate=', 'held_rate='), 'cents=', 'held_cents=')
+                     || ';legacy_rate=' || ?1
       WHERE kind = 'held' AND reason LIKE 'rate=%'
         AND escrow_id IN (SELECT c.id FROM community_escrows c JOIN wallet_holds h ON h.id = c.hold_id
                            WHERE ${RESCALED_HOLD('h')})`,
@@ -207,7 +211,7 @@ const maxParam = (sql: string) => Math.max(0, ...[...sql.matchAll(/\?(\d+)/g)].m
 export async function runWalletRateRebase(env: Pick<Env, 'DB'>, now = new Date()): Promise<WalletRateRebaseResult> {
   const db = env.DB;
   if (await walletRateRebased(db)) return { status: 'already' };
-  const official = wholeDinarRate(await getAppliedUsdRate(db));
+  const official = await appliedWholeDinarRate(db);
   if (official === null) return { status: 'no_official_rate' };
   const legacy = await legacyUsdRate(db);
   const values = [legacy, official, now.toISOString(), NOTE];

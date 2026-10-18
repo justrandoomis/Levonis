@@ -1,6 +1,7 @@
 import type { Env } from './types';
 import { cancelledOrderRefundStatements } from './orderCancelOps';
 import { auditStatements } from './audit';
+import { walletRebaseMovedValue } from './fx/officialRate';
 
 export interface CancelledRefundRepairReport {
   scanned: number;
@@ -15,7 +16,23 @@ export interface CancelledRefundRepairReport {
 // returns, unrelated credits and delivered orders need their own workflow.
 // These predicates are repeated inside the write transaction, not just used
 // to select candidates before a competing cancellation/reopening can run.
-const ELIGIBLE = `o.status='cancelled' AND COALESCE(o.seller_type,'platform')<>'merchant'
+//
+// ONE UNIT ACROSS THE ONE-TIME WALLET REBASE. An order paid before it keeps
+// its `wallet_applied_usd_cents` in legacy cents, and a price cut made after
+// it credits U cents while lowering the order by ceil(cents × U / L)
+// (orderPriceAdjust.ts). Such a cut row is read back in legacy cents by that
+// same rounding, or the equality never holds and the order is never repaired.
+type Rebase = Awaited<ReturnType<typeof walletRebaseMovedValue>>;
+const cutCentsSql = (rb: Rebase) => {
+  if (!rb) return 't.amount';
+  const at = `julianday((SELECT rebased_at FROM wallet_rate_rebase WHERE id=1))`;
+  const paidAt = `COALESCE((SELECT MIN(d.created_at) FROM wallet_transactions d WHERE d.ref=o.id AND d.user_id=o.user_id
+      AND d.type='withdrawal' AND d.currency='USD' AND d.status='approved'), o.created_at)`;
+  const [U, L] = [Math.trunc(rb.officialRate), Math.trunc(rb.legacyRate)];
+  return `CASE WHEN julianday(t.created_at) > ${at} AND COALESCE(julianday(${paidAt}) > ${at}, 0) = 0
+    THEN (t.amount*${U}+${L - 1})/${L} ELSE t.amount END`;
+};
+const eligibleSql = (rb: Rebase) => `o.status='cancelled' AND COALESCE(o.seller_type,'platform')<>'merchant'
   AND NULLIF(o.delivered_at,'') IS NULL AND o.gini_paid_iqd=0
   AND NOT EXISTS(SELECT 1 FROM return_cases r WHERE r.order_id=o.id)
   AND NOT EXISTS(SELECT 1 FROM wallet_transactions t WHERE t.ref=o.id AND t.user_id=o.user_id
@@ -24,7 +41,7 @@ const ELIGIBLE = `o.status='cancelled' AND COALESCE(o.seller_type,'platform')<>'
   AND (o.wallet_applied_usd_cents=0 OR o.wallet_applied_usd_cents =
     (SELECT COALESCE(SUM(t.amount),0) FROM wallet_transactions t WHERE t.ref=o.id
       AND t.user_id=o.user_id AND t.type='withdrawal' AND t.currency='USD' AND t.status='approved')
-    - (SELECT COALESCE(SUM(CASE WHEN t.type='deposit' THEN t.amount ELSE -t.amount END),0)
+    - (SELECT COALESCE(SUM(CASE WHEN t.type='deposit' THEN 1 ELSE -1 END * ${cutCentsSql(rb)}),0)
       FROM wallet_transactions t WHERE t.ref='order-price:'||o.id
         AND t.user_id=o.user_id AND t.currency='USD' AND t.status='approved'))
   AND (o.points_discount_iqd=0 OR o.points_discount_iqd =
@@ -40,6 +57,7 @@ export async function repairCancelledOrderRefunds(
   env: Env, nowIso = new Date().toISOString(), limit = 30,
 ): Promise<CancelledRefundRepairReport> {
   const report: CancelledRefundRepairReport = { scanned: 0, repaired: 0, skipped: 0, errors: 0 };
+  const ELIGIBLE = eligibleSql(await walletRebaseMovedValue(env.DB));
   const orders = await env.DB.prepare(
     `SELECT o.* FROM orders o WHERE ${ELIGIBLE} ORDER BY o.updated_at,o.id LIMIT ?`
   ).bind(Math.min(100, Math.max(1, Math.trunc(limit) || 30))).all<Record<string, unknown>>();

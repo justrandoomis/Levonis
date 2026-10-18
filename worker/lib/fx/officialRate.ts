@@ -24,7 +24,7 @@
  * NOT BEFORE THE WALLET IS REBASED (owner 2026-10-18, «keep the existing
  * balances' value in dinars»). Wallet cents were credited at the legacy rate;
  * read at U they would be worth U / legacy more dinars. So until the one-time
- * rebase (worker/lib/fx/walletRateRebase.ts) has rescaled every wallet and
+ * rebase (worker/lib/walletRateRebase.ts) has rescaled every wallet and
  * written its marker in the same batch, this keeps returning the legacy rate,
  * and deploying the code moves no balance. A database that held no wallet
  * money when migration 0202 applied is born rebased.
@@ -34,6 +34,11 @@ import { isSchemaMissing } from '../membershipBenefits';
 import { getAppliedUsdRate, wholeDinarRate } from './displayRate';
 
 export { wholeDinarRate };
+
+/** U as the rebase moves to it: the applied USD/IQD as a whole-dinar rate, null when none is applied. */
+export async function appliedWholeDinarRate(db: D1Database): Promise<number | null> {
+  return wholeDinarRate(await getAppliedUsdRate(db));
+}
 
 /** The legacy admin setting: the wallet's rate until the rebase, and the fallback while no applied rate exists. */
 export async function legacyUsdRate(db: D1Database): Promise<number> {
@@ -155,17 +160,53 @@ async function rebaseBefore(db: D1Database, paidAt: PaidAt): Promise<{ legacyRat
  * The cents a refund of `cents` taken from a wallet at `paidAt` credits, and
  * the rate it records beside its dinars: unchanged (`rate`) for a payment made
  * after the rebase; floor(cents × L / U), at least one, recorded at U for one
- * made before it — the recorded dinars still read back exactly.
+ * made before it, whose dinars are then `dinarsBeforeRebase` (`legacyRate` is L).
  */
 export async function refundCentsAcrossRebase(
   db: D1Database,
   cents: number,
   paidAt: PaidAt,
   rate: number | null
-): Promise<{ cents: number; rate: number | null; rescaled: boolean }> {
+): Promise<{ cents: number; rate: number | null; rescaled: boolean; legacyRate: number | null }> {
   const rb = cents > 0 ? await rebaseBefore(db, paidAt) : null;
-  if (!rb) return { cents, rate, rescaled: false };
-  return { cents: Math.max(1, Math.floor((cents * rb.legacyRate) / rb.officialRate)), rate: rb.officialRate, rescaled: true };
+  if (!rb) return { cents, rate, rescaled: false, legacyRate: null };
+  return {
+    cents: Math.max(1, Math.floor((cents * rb.legacyRate) / rb.officialRate)),
+    rate: rb.officialRate,
+    rescaled: true,
+    legacyRate: rb.legacyRate,
+  };
+}
+
+/**
+ * THE DINARS A RESCALED REFUND RECORDS: what the same refund showed just
+ * before the rebase — its `legacyCents` read at L, plus the remainder its
+ * `dinars` carried at the payment's own rate `paidRate` (0108) — never more
+ * than those dinars. Equal to `dinars` when the payment was taken at L.
+ *
+ * Copying the payment's dinars instead overpays whenever the payment was taken
+ * at a legacy rate R above today's L (the setting moved after checkout): the
+ * wallet gave up floor(c × L / 100) of its reading, and a refund recording all
+ * D dinars at U hands back D × (1 − L / R) more — 50,000 paid at 1,450 came
+ * back as 50,001 where the same cancel a minute before the rebase gave 48,276.
+ * SQL twin: `orderCancelOps` (the cancel refund's dinars).
+ */
+export function dinarsBeforeRebase(dinars: number, legacyCents: number, paidRate: number, legacyRate: number): number {
+  const c = Math.max(0, Math.trunc(legacyCents));
+  return Math.min(dinars, Math.floor((c * legacyRate) / 100) + Math.max(0, dinars - Math.floor((c * paidRate) / 100)));
+}
+
+/**
+ * The rebase's marker when it moved value (L and U both known and different),
+ * else null: what a reader comparing pre-rebase legacy cents with post-rebase
+ * U cents converts by (`orderCancelRepair`).
+ */
+export async function walletRebaseMovedValue(
+  db: D1Database
+): Promise<{ legacyRate: number; officialRate: number; rebasedAt: string } | null> {
+  const m = await rebaseMarker(db);
+  if (!m || m.legacyRate === null || m.officialRate === null || m.legacyRate === m.officialRate) return null;
+  return { legacyRate: m.legacyRate, officialRate: m.officialRate, rebasedAt: m.rebasedAt };
 }
 
 /**

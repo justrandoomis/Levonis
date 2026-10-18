@@ -33,7 +33,7 @@
 
 import { newId } from './crypto';
 import { escrowCreditStatements, merchantSuspendedSql } from './merchantLedger';
-import { getOfficialUsdRate } from './fx/officialRate';
+import { dinarsBeforeRebase, getOfficialUsdRate } from './fx/officialRate';
 import {
   assertHoldStateStatement,
   availableUsdSql,
@@ -125,8 +125,11 @@ async function settlementDinars(
 ): Promise<{ amountIqd: number | null; exchangeRateSnapshot: number | null }> {
   const none = { amountIqd: null, exchangeRateSnapshot: null };
   if (!(Number.isInteger(iqd) && iqd > 0) || !(await walletLedgerDinarsReady(db))) return none;
-  const rate = await heldAtRate(db, esc.id);
-  return rate ? { amountIqd: iqd, exchangeRateSnapshot: rate } : none;
+  const held = await heldEscrowRate(db, esc.id);
+  if (!held) return none;
+  // Held before the one-time wallet rebase: the dinars its whole hold showed then, not its gross.
+  const prior = held.beforeRebase;
+  return { amountIqd: prior ? dinarsBeforeRebase(iqd, prior.cents, prior.rate, prior.legacyRate) : iqd, exchangeRateSnapshot: held.rate };
 }
 
 /**
@@ -140,14 +143,24 @@ async function settlementDinars(
  * the wrong rate the day the owner moves it). No recognisable rate → null, and
  * the debit is written without dinars, exactly as before.
  */
-async function heldAtRate(db: D1Database, escrowId: string): Promise<number | null> {
+async function heldEscrowRate(
+  db: D1Database,
+  escrowId: string
+): Promise<{ rate: number; beforeRebase: { rate: number; cents: number; legacyRate: number } | null } | null> {
   const ev = await db
     .prepare("SELECT reason FROM community_escrow_events WHERE escrow_id = ? AND kind = 'held' ORDER BY created_at LIMIT 1")
     .bind(escrowId)
     .first<{ reason: string | null }>();
-  const m = /(?:^|;)rate=(\d+)(?:;|$)/.exec(ev?.reason ?? '');
-  const n = m ? Number(m[1]) : NaN;
-  return Number.isInteger(n) && n > 0 ? n : null;
+  const field = (k: string) => {
+    const m = new RegExp(`(?:^|;)${k}=(\\d+)(?:;|$)`).exec(ev?.reason ?? '');
+    const n = m ? Number(m[1]) : NaN;
+    return Number.isInteger(n) && n > 0 ? n : null;
+  };
+  const rate = field('rate');
+  if (!rate) return null;
+  // Written by the one-time wallet rebase (walletRateRebase.ts, step 3b) beside the rescaled pair.
+  const [heldRate, heldCents, legacyRate] = [field('held_rate'), field('held_cents'), field('legacy_rate')];
+  return { rate, beforeRebase: heldRate && heldCents && legacyRate ? { rate: heldRate, cents: heldCents, legacyRate } : null };
 }
 
 /** The authoritative rate: the shop's ONE official USD/IQD, the one checkout reads (DECISIONS row 252). */
@@ -303,7 +316,7 @@ export async function reserveEscrowFunds(db: D1Database, p: HoldEscrowInput): Pr
  * belong to (`community_escrows.community_order_id` references it, so they go
  * AFTER the order's INSERT). The `held` event carries the hold-time rate and
  * cents (`rate=…;cents=…`), which is the only place that rate is recorded and
- * what every settlement reads back (`heldAtRate`).
+ * what every settlement reads back (`heldEscrowRate`).
  */
 export function escrowRecordStatements(
   db: D1Database,
@@ -767,8 +780,14 @@ export async function refundEscrow(db: D1Database, p: RefundInput): Promise<Escr
       .bind(esc.hold_id)
       .first<{ amount_cents: number }>();
     const holdCents = Number(holdRow?.amount_cents) || 0;
-    const refundCents = Math.max(1, Math.min(Math.floor((amount * 100) / Math.max(1, rate)), holdCents || Number.MAX_SAFE_INTEGER));
     const refundDinars = debitDinars.exchangeRateSnapshot !== null;
+    // Held before the one-time wallet rebase: the dinars this partial refund showed just before it
+    // (its cents at the hold-time rate, read at L, plus their remainder), as the debit above does.
+    const prior = refundDinars ? (await heldEscrowRate(db, esc.id))?.beforeRebase : null;
+    const refundIqd = prior
+      ? dinarsBeforeRebase(amount, Math.max(1, Math.min(Math.floor((amount * 100) / prior.rate), prior.cents)), prior.rate, prior.legacyRate)
+      : amount;
+    const refundCents = Math.max(1, Math.min(Math.floor((refundIqd * 100) / Math.max(1, rate)), holdCents || Number.MAX_SAFE_INTEGER));
     statements.push(
       ...commitHoldStatements(db, {
         holdId: esc.hold_id,
@@ -793,7 +812,7 @@ export async function refundEscrow(db: D1Database, p: RefundInput): Promise<Escr
           ...[
             esc.hold_id, debitTx,
             `wtx_escrow_refund_${esc.id}`, esc.customer_id, refundCents, esc.community_order_id, ts,
-            ...(refundDinars ? [amount, rate] : []),
+            ...(refundDinars ? [refundIqd, rate] : []),
           ]
         ),
       db

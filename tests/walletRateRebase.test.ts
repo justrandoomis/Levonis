@@ -20,9 +20,12 @@ import { ROOT } from './fixtures/d1';
 import { walletRoutes } from '../worker/routes/wallet';
 import { createDepositRequest, releaseHold } from '../worker/lib/walletOps';
 import { getOfficialUsdRate } from '../worker/lib/fx/officialRate';
-import { runWalletRateRebase } from '../worker/lib/fx/walletRateRebase';
+import { runWalletRateRebase } from '../worker/lib/walletRateRebase';
 import { holdEscrow, refundEscrow, releaseEscrow } from '../worker/lib/escrowOps';
 import { orderRoutes } from '../worker/routes/orders';
+import { membershipsRoutes } from '../worker/routes/memberships';
+import { proposePriceAdjustment, decidePriceAdjustment } from '../worker/lib/orderPriceAdjust';
+import { repairCancelledOrderRefunds } from '../worker/lib/orderCancelRepair';
 import { iqdToUsdCents } from '../src/lib/api';
 
 const L = 1400;
@@ -135,7 +138,7 @@ test('a 50,000 د.ع balance credited at 1,400 reads 50,000 before and after the
 
 /** Run the batch directly, as a racing tick that did not see the marker would. */
 async function runWalletRateRebaseBypassingCache(raw: DatabaseSync) {
-  const { walletRateRebaseSql } = await import('../worker/lib/fx/walletRateRebase');
+  const { walletRateRebaseSql } = await import('../worker/lib/walletRateRebase');
   const db = asD1(raw);
   const values = [L, U, new Date().toISOString(), 'x'];
   const maxParam = (sql: string) => Math.max(0, ...[...sql.matchAll(/\?(\d+)/g)].map((m) => Number(m[1])));
@@ -279,8 +282,8 @@ test('an escrow held at 1,400 and settled after the rebase: its recorded rate an
     const hold = row<{ amount_cents: number }>(raw, 'SELECT h.amount_cents FROM wallet_holds h JOIN community_escrows c ON c.hold_id = h.id')!;
     assert.equal(
       row<{ reason: string }>(raw, "SELECT reason FROM community_escrow_events WHERE kind = 'held'")!.reason,
-      `rate=${U};cents=${hold.amount_cents}`,
-      'the hold-time record moved with the hold'
+      `rate=${U};cents=${hold.amount_cents};held_rate=${L};held_cents=${Math.floor((50_000 * 100) / L)};legacy_rate=${L}`,
+      'the hold-time record moved with the hold, and keeps what it was'
     );
     const free = (await wallet(app(db))).balance_iqd as number;
     if (settle === 'partial') {
@@ -325,6 +328,135 @@ test('an order paid from the wallet before the rebase and cancelled after it giv
   assert.deepEqual([refund.amount, refund.amount_iqd, refund.exchange_rate_snapshot], [Math.floor((3572 * L) / U), 50_000, U]);
   const back = ((await wallet(app(db))).balance_iqd as number) - before;
   // The 50,000 paid, to the dinar the reading's own floor allows (one cent at U is 16.8 دينار).
+  assert.ok(back >= 50_000 && back <= 50_001, `gave back ${back}`);
+});
+
+/**
+ * THE SAME REFUND A MINUTE BEFORE OR A MINUTE AFTER THE REBASE. A payment taken while the legacy
+ * setting stood at R = 1,450 (it moved to L = 1,400 later) took 3,448 cents for 50,000 د.ع: the
+ * wallet gave up 48,272 at L plus a 4 دينار remainder. Refunded after the rebase it gives back those
+ * 48,276, not the 50,000 its dinars say — that copy handed the customer 1,725 they never had.
+ */
+const R = 1450;
+const PAID_AT_R = Math.floor((50_000 * 100) / R);
+const balance = async (db: D1Database) => (await wallet(app(db))).balance_iqd as number;
+
+/** Wallet money at L, U applied, no marker yet; 70,000 د.ع topped up, 50,000 of it paid at `rate` under `ref`. */
+async function paidAt(rate: number, cents: number, ref: string, debitId: string, sql: string) {
+  const { raw, db } = setup();
+  raw.exec("INSERT INTO users (id,name,email,password_hash,role) VALUES ('boss','Boss','boss@x.co','h','admin')");
+  holdingMoneyAtU(raw);
+  await topUp(db, raw, 'buyer', 60_000, 'pay');
+  await topUp(db, raw, 'buyer', 10_000, 'left');
+  raw.exec(`${sql};
+    INSERT INTO wallet_transactions(id,user_id,type,currency,amount,status,ref,amount_iqd,exchange_rate_snapshot)
+      VALUES ('${debitId}','buyer','withdrawal','USD',${cents},'approved','${ref}',50000,${rate});`);
+  return { raw, db };
+}
+
+const walletOrder = (rate: number, cents: number) =>
+  paidAt(rate, cents, 'ORD1', 'wtx_ord_ORD1_usd', `INSERT INTO orders(id,user_id,status,stage,shipping_type,address_snapshot,delivery_method_id,
+      delivery_method_snapshot,payment_method_id,subtotal_iqd,shipping_iqd,points_discount_iqd,
+      wallet_applied_iqd,wallet_applied_usd_cents,exchange_rate,total_iqd,due_on_delivery_iqd,idempotency_key)
+    VALUES('ORD1','buyer','pending','received','preorder_land','{}','pickup','{}','wallet',50000,0,0,50000,${cents},${rate},50000,0,'ord1')`);
+
+async function cutPrice(db: D1Database, newTotalIqd: number, key: string) {
+  const env = { DB: db } as never;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async () => new Response('{"ok":true,"result":{"message_id":1,"chat":{"id":1}}}')) as typeof fetch;
+  try {
+    const p = await proposePriceAdjustment(env, { orderId: 'ORD1', adminId: 'boss', newTotalIqd, reason: 'supplier', note: '', idempotencyKey: key });
+    const d = await decidePriceAdjustment(env, { adjustmentId: p.adjustment.id, decision: 'approve', actorUserId: 'buyer', via: 'web' });
+    assert.equal(d.outcome, 'approved');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
+async function cancelOrder(db: D1Database) {
+  const buyer = stubApp(db, { id: 'buyer', role: 'customer', email: 'buyer@x.co' }, (a) => a.route('/api/orders', orderRoutes));
+  const res = await post(buyer, '/api/orders/ORD1/cancel', {});
+  assert.equal(res.status, 200, JSON.stringify(await json(res)));
+}
+
+test('an order paid at a legacy rate above L, cancelled after the rebase, gives back what the same cancel gave just before it — and so does a price cut then a cancel', async () => {
+  for (const cut of [null, 30_000]) {
+    const gains: number[] = [];
+    for (const rebaseFirst of [false, true]) {
+      const { raw, db } = await walletOrder(R, PAID_AT_R);
+      if (rebaseFirst) assert.equal((await runWalletRateRebase({ DB: db })).status, 'rebased');
+      const before = await balance(db);
+      if (cut) await cutPrice(db, cut, 'cut');
+      await cancelOrder(db);
+      gains.push((await balance(db)) - before);
+      if (rebaseFirst && !cut) {
+        assert.deepEqual(
+          row(raw, "SELECT amount, amount_iqd, exchange_rate_snapshot FROM wallet_transactions WHERE id = 'wtx_refund_ORD1_usd'"),
+          { amount: Math.floor((PAID_AT_R * L) / U), amount_iqd: Math.floor((PAID_AT_R * L) / 100) + 50_000 - Math.floor((PAID_AT_R * R) / 100), exchange_rate_snapshot: U }
+        );
+      }
+    }
+    const [pre, after] = gains;
+    assert.ok(pre! < 50_000, `before the rebase the cancel gave back ${pre}`);
+    // The cut credits its own rounded cents, then the cancel the rest: one cent at U of rounding, never 1,700 دينار.
+    assert.ok(Math.abs(after! - pre!) <= (cut ? Math.ceil(U / 100) : 1), `${cut ? 'cut then cancel' : 'cancel'}: ${pre} before, ${after} after`);
+  }
+});
+
+test('a membership charged at a legacy rate above L and refunded after the rebase gives back what the same refund gave just before it', async () => {
+  const gains: number[] = [];
+  for (const rebaseFirst of [false, true]) {
+    const { db } = await paidAt(R, PAID_AT_R, 'mem1', 'wtx_mem1', `INSERT INTO memberships
+        (id, user_id, plan_id, tier, state, duration_months, price_paid_iqd, starts_at, expires_at, source, wallet_tx_id)
+      VALUES ('mem1','buyer','plus_12mo','plus','active',12,50000,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z','purchase','wtx_mem1')`);
+    if (rebaseFirst) assert.equal((await runWalletRateRebase({ DB: db })).status, 'rebased');
+    const before = await balance(db);
+    const boss = stubApp(db, { id: 'boss', role: 'admin', email: 'boss@x.co' }, (a) => a.route('/api/memberships', membershipsRoutes));
+    const res = await post(boss, '/api/memberships/admin/mem1/cancel', { refund: true });
+    assert.equal(res.status, 200, JSON.stringify(await json(res)));
+    gains.push((await balance(db)) - before);
+  }
+  const [pre, after] = gains;
+  assert.ok(pre! < 50_000 && Math.abs(after! - pre!) <= 1, `${pre} before, ${after} after`);
+});
+
+test('an escrow held at a legacy rate above L and settled after the rebase spends what the same settlement spent just before it', async () => {
+  for (const settle of ['partial', 'release'] as const) {
+    const moved: number[] = [];
+    for (const rebaseFirst of [false, true]) {
+      const { raw, db } = setup();
+      communityOrder(raw);
+      holdingMoneyAtU(raw);
+      await topUp(db, raw, 'buyer', 100_000, 'esc');
+      raw.exec(`UPDATE admin_settings SET value = '${R}' WHERE key = 'exchangeRate'`);
+      const held = await holdCommunityOrder(db);
+      assert.equal(held.ok, true, JSON.stringify(held));
+      const escrowId = (held as { escrowId: string }).escrowId;
+      raw.exec(`UPDATE admin_settings SET value = '${L}' WHERE key = 'exchangeRate'`);
+      if (rebaseFirst) assert.equal((await runWalletRateRebase({ DB: db })).status, 'rebased');
+      const before = await balance(db);
+      const done = settle === 'partial'
+        ? await refundEscrow(db, { escrowId, actorId: 'boss', actorRole: 'admin', amountIqd: 20_000, idempotencyKey: 'prf' })
+        : await releaseEscrow(db, { escrowId, actorId: 'buyer', actorRole: 'customer', idempotencyKey: 'rel' });
+      assert.equal(done.ok, true, JSON.stringify(done));
+      moved.push((await balance(db)) - before);
+    }
+    const [pre, after] = moved;
+    // Within the stated cost of releasing a rounded-up hold: one cent at U (DECISIONS row 252).
+    assert.ok(Math.abs(after! - pre!) <= Math.ceil(U / 100), `${settle}: ${pre} before, ${after} after`);
+  }
+});
+
+test('the cancel repair still finds an order paid before the rebase, price-cut after it and cancelled without its refund — and gives back its dinars once', async () => {
+  const { raw, db } = await walletOrder(L, 3572);
+  const before = await balance(db);
+  assert.equal((await runWalletRateRebase({ DB: db })).status, 'rebased');
+  await cutPrice(db, 30_000, 'cut');
+  // The historical shape the repair exists for: cancelled with no refund posted.
+  raw.exec("UPDATE orders SET status = 'cancelled', stage = 'cancelled' WHERE id = 'ORD1'");
+  assert.deepEqual(await repairCancelledOrderRefunds({ DB: db } as never), { scanned: 1, repaired: 1, skipped: 0, errors: 0 });
+  assert.equal((await repairCancelledOrderRefunds({ DB: db } as never)).scanned, 0);
+  const back = (await balance(db)) - before;
   assert.ok(back >= 50_000 && back <= 50_001, `gave back ${back}`);
 });
 

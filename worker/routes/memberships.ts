@@ -12,7 +12,7 @@ import { requireAuth, requireAdmin, requireMainHost, badRequest, forbidden, notF
 import { canMoveMoney } from '../lib/adminScope';
 import { sha256Hex } from '../lib/crypto';
 import { getSetting, setSetting, SETTING_DEFAULTS } from '../lib/settings';
-import { getOfficialUsdRate, refundCentsAcrossRebase } from '../lib/fx/officialRate';
+import { dinarsBeforeRebase, getOfficialUsdRate, refundCentsAcrossRebase } from '../lib/fx/officialRate';
 import {
   ENTITLEMENT_MINIMUM_TIER,
   dailyRewardMultiplierX100,
@@ -1734,11 +1734,15 @@ membershipsRoutes.post('/admin/:id/cancel', async (c) => {
             ? (tx.exchange_rate_snapshot as number)
             : null;
         if (refundRate === null) refundIqd = null;
-        // Charged before the one-time wallet rebase: legacy cents, given back rescaled to U
-        // and recorded at U, so the copied dinars still read back exactly (fx/officialRate.ts).
+        // Charged before the one-time wallet rebase: legacy cents, given back rescaled to U and
+        // recorded at U with the dinars the same refund showed just before it (fx/officialRate.ts):
+        // a charge taken at a legacy rate above L must not come back as all of its dinars.
         const back = await refundCentsAcrossRebase(db, cents, tx.created_at, refundRate);
+        if (back.rescaled && refundIqd !== null && refundRate !== null && back.legacyRate !== null) {
+          refundIqd = dinarsBeforeRebase(refundIqd, cents, refundRate, back.legacyRate);
+          refundRate = back.rate;
+        }
         cents = back.cents;
-        if (back.rescaled && refundIqd !== null) refundRate = back.rate;
       }
     }
     if (cents === 0 && Number(m.price_paid_iqd) > 0) {

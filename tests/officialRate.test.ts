@@ -41,7 +41,7 @@ import { cartRoutes } from '../worker/routes/cart';
 import { runFxScheduler } from '../worker/lib/fx/scheduler';
 import { getSetting } from '../worker/lib/settings';
 import { getOfficialUsdRate } from '../worker/lib/fx/officialRate';
-import { runWalletRateRebase } from '../worker/lib/fx/walletRateRebase';
+import { runWalletRateRebase } from '../worker/lib/walletRateRebase';
 import { getPublicDisplayRate } from '../worker/lib/fx/displayRate';
 
 /** The legacy admin setting — the fallback only while no applied rate exists. */

@@ -167,7 +167,7 @@ import { farmRoutes } from './routes/farm';
 // session to its order without an administrator (DECISIONS row 188).
 import { quickBuyRoutes } from './routes/quickBuy';
 import { finalizeDueQuickBuySessions } from './lib/quickBuy/finalize';
-import { runWalletRateRebase } from './lib/fx/walletRateRebase';
+import { runWalletRateRebase } from './lib/walletRateRebase';
 import { publicApiRoutes } from './routes/publicApi';
 import { farmAdminRoutes } from './routes/farmAdmin';
 import { configureEventBus } from './lib/eventBus';
