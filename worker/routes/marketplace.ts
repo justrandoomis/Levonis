@@ -84,7 +84,6 @@ import {
   onPublicBoard,
   requestMovedFence,
   revokeViewerTokensStatement,
-  staleOfferNotifications,
   type RequestForAccess,
 } from '../lib/communityRequests';
 import {
@@ -97,18 +96,14 @@ import {
   contactSnapshot,
   publicEstimate,
   recordOfferRevisionStatement,
-  recordRevisionStatement,
-  reviseIfOfferedStatement,
-  supersedeStatement,
 } from '../lib/requestRevisions';
 import { getSetting } from '../lib/settings';
 import { feedCursor, nextFeedCursor } from '../lib/feedCursor';
 import { requestBoardVisible } from '../lib/requestBoard';
 import { likePattern } from '../lib/sqlLike';
-import { notifyStatement, notifyGrouped, peopleAr, stampGroupedCkb } from '../lib/notifications';
-import { merchantHref } from '@levonis/contracts/merchantRoutes';
+import { notifyStatement } from '../lib/notifications';
 // Eligibility as data (W5-B): the offer gate, the file matrix and the re-match.
-import { assertMayOffer, eligibleVerdictSql, liveVerdict, rematchNow } from '../lib/printMatchingStore';
+import { assertMayOffer, eligibleVerdictSql, liveVerdict } from '../lib/printMatchingStore';
 // A request addressed to ONE store (0151): its store quotes it without matching.
 import { assertMayQuote, directRequest } from '../lib/directRequests';
 import { isDirectMerchant } from '../lib/communityRequests';
@@ -117,6 +112,9 @@ import { fileClass, fileReadStatement, fileReader, mayReadBytes, previewGrantFor
 // Phase 5b (docs/COMMUNITY_ECOSYSTEM.md §9.5): the discussion's server-written
 // rows on a close or a revision, and the timeline's «started» row.
 import { writeRequestSystemUpdate } from './requestDiscussion';
+// One file on a request, whichever door it came through (DECISIONS row 257).
+import { afterFilesChanged, afterRequestFileAdded, insertRequestFile, rematchAfterFiles, reviseStatements } from '../lib/requestFileHooks';
+import { assertRequestTakesFiles } from '../lib/requestFileRoom';
 import { recordOrderEvent } from './communityOrderTimeline';
 // Offers V2 (0159, §9.5): a file key is the caller's own private upload or nothing.
 import { ownedFileObject } from '../lib/fileOwnership';
@@ -372,8 +370,6 @@ marketplaceRoutes.get('/requests/:id', requireCommunityOpen, async (c) => {
  * costs storage rather than a row pointing at nothing that breaks a page.
  */
 
-const MAX_FILES_PER_REQUEST = 6;
-
 /** Where an attachment lives. Deliberately outside every public prefix. */
 const attachmentKey = (userId: string, ext: string) => `requests/${userId}/${newId()}.${ext}`;
 
@@ -387,139 +383,23 @@ async function requestForFiles(c: Context<AppContext>, id: string, userId: strin
 }
 
 /**
- * A PUBLISHED JOB'S ATTACHMENTS CHANGED (migrations 0116, 0130). If a merchant
- * has a pending offer on the current revision, the revision moves and those
- * offers are superseded — in the same batch as the file row. If nobody has
- * priced it, the revision stays and its snapshot is rewritten afterwards
- * (`recordFilesRevision`). Conditional on the request taking offers, so a
- * DRAFT (the wizard uploading its files) revises nothing.
+ * WHAT A NEW OR REMOVED ATTACHMENT MEANS — the revision, the supersede, the
+ * workshops' notice, the re-match — lives in worker/lib/requestFileHooks.ts,
+ * shared with the resumable session's `complete` so the two doors cannot
+ * drift (DECISIONS row 257).
  */
-function reviseStatements(db: D1Database, requestId: string, ts: string): D1PreparedStatement[] {
-  return [
-    reviseIfOfferedStatement(db, requestId, ts),
-    supersedeStatement(db, requestId, ts),
-    offerCountStatement(db, requestId),
-  ];
-}
-
-/**
- * After an attachment change on a published job: record the revision as it
- * now stands, and tell every merchant whose offer it superseded. Never throws —
- * the file change itself has already committed.
- */
-async function afterFilesChanged(db: D1Database, requestId: string, userId: string): Promise<void> {
-  try {
-    const row = await db
-      .prepare(`SELECT revision FROM community_requests WHERE id = ? AND state IN ('open','receiving_offers')`)
-      .bind(requestId)
-      .first<{ revision: number }>();
-    if (!row) return;
-    const snap = await composeSnapshot(db, requestId);
-    const stmts = await staleOfferNotifications(db, requestId, Number(row.revision));
-    if (snap) stmts.unshift(recordRevisionStatement(db, requestId, snap, 'files', userId, nowIso()));
-    if (stmts.length) await db.batch(stmts);
-    // «تغيّر الطلب» in the discussion (§9.5) — after the revision committed.
-    if (snap) await writeRequestSystemUpdate(db, requestId, 'revised', { change: 'files', revision: Number(row.revision) });
-  } catch (e) {
-    console.error('revision after a file change not recorded for', requestId, e instanceof Error ? e.message : String(e));
-  }
-}
-
-/**
- * A PUBLISHED JOB'S FILES CHANGED: its verdicts are decided again (W5-B) — a
- * new model may be bigger than it was, and a new revision retires the old
- * verdicts. Inline and bounded, with a queue row the sweep finishes if this
- * pass cannot; never throws.
- */
-async function rematchAfterFiles(env: Env, requestId: string): Promise<void> {
-  const row = await env.DB.prepare(`SELECT 1 AS x FROM community_requests WHERE id = ? AND state IN ('open','receiving_offers')`)
-    .bind(requestId)
-    .first()
-    .catch(() => null);
-  if (row) await rematchNow(env, 'request', requestId, 'files');
-}
-
-/**
- * «أضاف سارة ملفات إلى الطلب» — GROUPED FILE NOTIFICATIONS TO THE WORKSHOPS
- * (0158, docs/COMMUNITY_ECOSYSTEM.md §9.4). The merchants ON A REQUEST'S
- * MATCHES hear that its files changed: the owners of the workshops the
- * eligibility engine marked eligible (`community_request_matches`) and of
- * those standing behind a live offer — never the whole workshop list, and
- * never the customer's own account. ONE row per owner keyed
- * `request_files:<requestId>` (`notifyGrouped`, counted by people like every
- * grouped kind), the Sorani stamped into `meta` after the count is known.
- * Never throws: the file is stored whatever the bell does.
- */
-async function notifyRequestFiles(
-  db: D1Database,
-  requestId: string,
-  actor: { id: string; name?: string | null; username?: string | null }
-): Promise<void> {
-  try {
-    const req = await db.prepare('SELECT title FROM community_requests WHERE id = ?').bind(requestId).first<{ title: string }>();
-    const { results } = await db
-      .prepare(
-        `SELECT DISTINCT m.user_id FROM community_merchants m
-          WHERE m.user_id <> ?1 AND (
-            m.id IN (SELECT rm.merchant_id FROM community_request_matches rm WHERE rm.request_id = ?2 AND rm.eligible = 1)
-            OR m.id IN (SELECT o.merchant_id FROM community_offers o WHERE o.request_id = ?2 AND o.state IN ('pending','superseded','accepted'))
-          )`
-      )
-      .bind(actor.id, requestId)
-      .all<{ user_id: string }>();
-    const title = String(req?.title ?? '').trim();
-    const name = actor.name || actor.username || '';
-    const aboutAr = title ? ` «${title}»` : '';
-    const aboutEn = title ? ` “${title}”` : '';
-    for (const r of results ?? []) {
-      const written = await notifyGrouped(db, {
-        userId: String(r.user_id),
-        kind: 'request_files',
-        groupKey: `request_files:${requestId}`,
-        actor: { id: actor.id, name },
-        title: (n, a) => ({
-          ar: n === 1 ? `أضاف ${a} ملفات إلى الطلب${aboutAr}` : `أضاف ${peopleAr(n)} ملفات إلى الطلب${aboutAr}`,
-          en: n === 1 ? `${a} added files to the request${aboutEn}` : `${n} people added files to the request${aboutEn}`,
-        }),
-        body: { ar: 'راجع الملفات الجديدة قبل تأكيد عرضك.', en: 'Review the new files before you confirm your offer.' },
-        link: merchantHref.request(requestId),
-        entity_type: 'request',
-        entity_id: requestId,
-      });
-      if (written) {
-        await stampGroupedCkb(db, written.id, {
-          title_ckb:
-            written.count === 1
-              ? `${name} فایلی زیاد کرد بۆ داواکارییەکە${aboutAr}`
-              : `${written.count} کەس فایلیان زیاد کرد بۆ داواکارییەکە${aboutAr}`,
-          body_ckb: 'پێش پشتڕاستکردنەوەی ئۆفەرەکەت فایلە نوێیەکان بپشکنە.',
-        });
-      }
-    }
-  } catch (e) {
-    console.error('request file notice not written for', requestId, e instanceof Error ? e.message : String(e));
-  }
-}
 
 marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {
   await rateLimit(c, 'request-file', 40, 3600);
   const user = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
-  const r = await requestForFiles(c, id, user.id);
 
   // Attachments are part of what merchants priced against. Adding one after
   // an offer was accepted would change the job under a signed contract, so
-  // the window closes when the request stops taking offers.
-  if (!REQUEST_OPEN_STATES.includes(r.state as RequestState) && r.state !== 'draft') {
-    throw conflict('This request is no longer open, so its attachments cannot change', 'REQUEST_NOT_EDITABLE');
-  }
-
-  const existing = await c.env.DB.prepare(
-    'SELECT COUNT(*) AS n FROM community_request_files WHERE request_id = ?'
-  ).bind(id).first<{ n: number }>();
-  if (Number(existing?.n ?? 0) >= MAX_FILES_PER_REQUEST) {
-    throw badRequest(`A request may have at most ${MAX_FILES_PER_REQUEST} attachments`);
-  }
+  // the window closes when the request stops taking offers; and a request
+  // carries six at most. Asked here before a byte is read, and again in SQL
+  // where the row is written (`insertRequestFile`).
+  await assertRequestTakesFiles(c.env.DB, id, user.id);
 
   const form = await c.req.formData().catch(() => null);
   if (!form) throw badRequest('Expected multipart form data');
@@ -564,30 +444,19 @@ marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {
 
   const fileId = newId('crf');
   const name = safeFileName(file.name, kind.ext);
-  const ts = nowIso();
+  const added = { id: fileId, requestId: id, ownerId: user.id, key, name, mime: kind.mime, bytes: buf.byteLength, kind: kind.kind };
   try {
-    await c.env.DB.batch([
-      c.env.DB.prepare(
-        `INSERT INTO community_request_files (id, request_id, file_key, file_name, content_type, size_bytes, kind)
-         VALUES (?,?,?,?,?,?,?)`
-      ).bind(fileId, id, key, name, kind.mime, buf.byteLength, kind.kind),
-      // A PUBLISHED job changed: revise it in the same write, so every offer
-      // priced without this file is superseded until its merchant re-confirms.
-      ...reviseStatements(c.env.DB, id, ts),
-    ]);
+    // A PUBLISHED job changed: revised in the same write, so every offer
+    // priced without this file is superseded until its merchant re-confirms.
+    await insertRequestFile(c.env.DB, added);
   } catch (e) {
     // The row is what makes the object reachable. If it cannot be written,
     // delete the object rather than leaving a file nothing points at.
     await deleteMediaObject(c.env, 'private', key).catch(() => {});
     throw e;
   }
-  await afterFilesChanged(c.env.DB, id, user.id);
-  // The workshops on this request's matches hear «أضاف … ملفات», grouped (0158)
-  // — BEFORE the re-match: the ones who were weighing the job as it stood are
-  // the ones the change concerns; a workshop the new file makes eligible gets
-  // the engine's own «طلب يناسب ورشتك» from the re-match itself.
-  await notifyRequestFiles(c.env.DB, id, user);
-  await rematchAfterFiles(c.env, id);
+  // The same hooks, in the same order, as the resumable session's `complete`.
+  await afterRequestFileAdded(c.env, added, user, kind.kind === 'model' ? { bytes: buf } : null);
 
   return c.json({
     success: true,

@@ -14,7 +14,8 @@ import {
   type AccessorySelection,
   type PrintAccessory,
 } from '../lib/printAccessories';
-import { analyseModel, viewerMesh, FORMAT_CAPABILITIES, type ModelAnalysis } from '../lib/modelGeometry';
+import { FORMAT_CAPABILITIES, type ModelAnalysis } from '../lib/modelGeometry';
+import { MEASURE_LATER_CODE, MEASURE_MAX_BYTES, measureRequestModel, readModelWithin } from '../lib/requestFileHooks';
 import {
   quotePrint,
   type PrintMaterial,
@@ -242,11 +243,13 @@ printRequestRoutes.get('/catalog', (c) => anonymousCached(c, {}, async () => {
 /**
  * Measure one already-uploaded attachment.
  *
- * The file arrived through the marketplace's own upload route, which already
- * proved the caller owns the request and that the bytes are a model rather than
- * something renamed to look like one. This reads it back out of R2 and records
- * what it is — and caches the viewer mesh at the same time, because parsing a
- * 40MB model twice for the same never-changing file is waste.
+ * The file arrived through one of the two upload doors, which already proved
+ * the caller owns the request and that the bytes are a model rather than
+ * something renamed to look like one — and which measure a model on arrival
+ * (worker/lib/requestFileHooks.ts), so this usually answers from the row. A
+ * file not measured yet is read back out of R2, up to MEASURE_MAX_BYTES and
+ * never past it (R3), and recorded with its viewer mesh at the same time,
+ * because parsing a 40MB model twice for the same never-changing file is waste.
  */
 printRequestRoutes.post('/requests/:id/files/:fileId/analyze', requireAuth, async (c) => {
   await rateLimit(c, 'model-analyze', 60, 3600);
@@ -268,46 +271,30 @@ printRequestRoutes.post('/requests/:id/files/:fileId/analyze', requireAuth, asyn
     return c.json({ success: true, file_id: fileId, analysis: parseJson<ModelAnalysis | null>(file.analysis, null), cached: true });
   }
 
+  // TOO LARGE TO MEASURE HERE (R3, DECISIONS row 257): a Worker holds 128 MB,
+  // and a session may store a 300 MB model. Above MEASURE_MAX_BYTES — by the
+  // row's size, by the object's own size, or by the bytes as they stream in —
+  // the model is not read into memory: it stays on the request as a reference,
+  // and the answer says «measure later» instead of failing.
+  const measureLater = () =>
+    c.json({
+      success: true,
+      file_id: fileId,
+      analysis: null,
+      cached: false,
+      measure: 'later',
+      code: MEASURE_LATER_CODE,
+      limit_bytes: MEASURE_MAX_BYTES,
+    });
+  if (Number(file.size_bytes) > MEASURE_MAX_BYTES) return measureLater();
   const object = await getMediaObject(c.env, 'private', file.file_key);
   if (!object) throw notFound('The stored file is no longer available');
-  const bytes = new Uint8Array(await object.arrayBuffer());
+  const bytes = await readModelWithin(object, MEASURE_MAX_BYTES);
+  if (!bytes) return measureLater();
 
-  const analysis = analyseModel(bytes, file.file_name);
-
-  // The preview is derived once and stored beside the original under a prefix
-  // `/files/*` refuses, so the viewer route never parses and never touches the
-  // customer's file.
-  let previewKey = '';
-  if (analysis.capability.previewable) {
-    const mesh = viewerMesh(bytes, file.file_name);
-    if (mesh) {
-      previewKey = `request-previews/${requestId}/${fileId}.lvm`;
-      await putMediaObject(
-        c.env,
-        {
-          key: previewKey,
-          visibility: 'private',
-          domain: 'print-requests',
-          mime: 'application/octet-stream',
-          bytes: mesh.byteLength,
-          ownerId: user.id,
-          entityId: requestId,
-        },
-        mesh,
-        { httpMetadata: { contentType: 'application/octet-stream', cacheControl: 'private, max-age=0' } }
-      );
-    }
-  }
-
-  await c.env.DB.prepare(
-    `UPDATE community_request_files
-        SET analysis = ?, model_format = ?, preview_key = ?,
-            analysed_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-      WHERE id = ? AND request_id = ?`
-  )
-    .bind(JSON.stringify(analysis), analysis.format, previewKey, fileId, requestId)
-    .run();
-
+  // The same writer the upload doors use: the analysis, the format, and the
+  // viewer mesh derived once and stored beside the original.
+  const analysis = await measureRequestModel(c.env, { requestId, fileId, fileName: file.file_name, ownerId: user.id, bytes });
   return c.json({ success: true, file_id: fileId, analysis, cached: false });
 });
 

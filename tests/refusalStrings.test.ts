@@ -184,6 +184,10 @@ test('every code the table translates is one the server can actually emit', () =
     // the archive bound, the per-purpose quota and the configurable ceilings.
     'worker/routes/uploadSessions.ts',
     'worker/lib/uploadEntity.ts',
+    // A request's file room and state, asked by both upload doors and by the
+    // guarded insert where the row lands (DECISIONS row 257).
+    'worker/lib/requestFileRoom.ts',
+    'worker/lib/requestFileHooks.ts',
     // Eligibility as data (W5-B): the offer gate, the printer and stock routes,
     // and the private request costing.
     'worker/lib/printMatchingStore.ts',

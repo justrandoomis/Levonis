@@ -558,6 +558,11 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The attachments of this request can no longer change.',
     ckb: 'چیتر ناتوانرێت پاشکۆکانی ئەم داواکارییە بگۆڕدرێن.',
   },
+  REQUEST_FILES_FULL: {
+    ar: 'يحمل هذا الطلب أقصى عدد من المرفقات (6). احذف ملفًا لتضيف غيره.',
+    en: 'This request already carries the most attachments it can (6). Remove one to add another.',
+    ckb: 'ئەم داواکارییە زۆرترین ژمارەی پاشکۆی هەیە (٦). فایلێک بسڕەوە بۆ ئەوەی یەکێکی تر زیاد بکەیت.',
+  },
   REQUEST_CHANGED: {
     ar: 'تغيّر هذا الطلب أثناء العملية. حدّث الصفحة وحاول مرة أخرى.',
     en: 'This request changed while you were working on it. Refresh the page and try again.',

@@ -51,14 +51,15 @@ import {
 } from '../lib/attachments';
 import { mp4IsFastStart, sniffVideo } from '../lib/videoSniff';
 import { rasterDimensions } from '../lib/imageMetadata';
-import { analyseModel } from '../lib/modelGeometry';
+import { analyseModel, type ModelAnalysis } from '../lib/modelGeometry';
+import { MEASURE_MAX_BYTES, afterRequestFileAdded, insertRequestFile } from '../lib/requestFileHooks';
+import { assertRequestFileRoom, assertRequestTakesFiles } from '../lib/requestFileRoom';
 import { HEIF_REFUSAL, isHeifBytes, sniff } from './uploads';
 import {
   KEY_PURPOSES,
   MiB,
   SESSION_PURPOSES,
   assertQuota,
-  assertRequestFileRoom,
   assertUploadEntity,
   chunkBytesFor,
   kindLimitBytes,
@@ -73,8 +74,11 @@ const HEAD_BYTES = 64 * 1024;
 const CENTRAL_DIRECTORY_CAP = 4 * MiB;
 /** A glTF's JSON is parsed whole, so it has a ceiling of its own. */
 const GLTF_JSON_CAP = 4 * MiB;
-/** `analyseModel` holds the mesh in memory; above this the file is stored unmeasured. */
-const ANALYSIS_MAX_BYTES = 40 * MiB;
+/**
+ * `analyseModel` holds the mesh in memory; above this the file is stored
+ * unmeasured. The same cap `/analyze` holds (worker/lib/requestFileHooks.ts, R3).
+ */
+const ANALYSIS_MAX_BYTES = MEASURE_MAX_BYTES;
 /** R2's own ceiling on parts per upload. */
 const MAX_PARTS = 10_000;
 const SHA256_RE = /^[0-9a-f]{64}$/;
@@ -337,7 +341,9 @@ interface Verdict {
   width: number | null;
   height: number | null;
   warnings: string[];
-  analysis?: unknown;
+  analysis?: ModelAnalysis;
+  /** The model's bytes, when they were read to be measured — a request stores the mesh from them. */
+  modelBytes?: Uint8Array;
 }
 
 /**
@@ -445,15 +451,18 @@ async function inspectStoredObject(env: Env, s: SessionRow, visibility: MediaVis
       // a JPEG whose frame header sits past the head: stored without dimensions
     }
   }
-  let analysis: unknown;
+  let analysis: ModelAnalysis | undefined;
+  let modelBytes: Uint8Array | undefined;
   if (uploadKindForMime(mime) === 'model' && size <= ANALYSIS_MAX_BYTES) {
     try {
-      analysis = analyseModel(await readRange(env, visibility, key, 0, size), s.file_name);
+      modelBytes = await readRange(env, visibility, key, 0, size);
+      analysis = analyseModel(modelBytes, s.file_name);
     } catch {
       analysis = undefined;
+      modelBytes = undefined;
     }
   }
-  return { mime, ext, width, height, warnings, analysis };
+  return { mime, ext, width, height, warnings, analysis, modelBytes };
 }
 
 // ------------------------------------------------------------ the routes
@@ -615,6 +624,10 @@ uploadSessionRoutes.post('/:id/complete', async (c) => {
   const limits = await getSetting(c.env.DB, 'uploadLimits');
   let verdict: Verdict;
   try {
+    // A REQUEST IS ASKED AGAIN (DECISIONS row 257): the session was opened
+    // while it took files and had room; since then an offer may have been
+    // accepted, or another upload may have taken the sixth slot.
+    if (s.purpose === 'request') await assertRequestTakesFiles(c.env.DB, s.entity_id, s.owner_id);
     // The quota, asked again with this session left out of the count: two
     // sessions opened in the same instant both passed it once; only the first
     // to complete may land (UPLOAD_QUOTA_EXCEEDED for the other).
@@ -628,7 +641,7 @@ uploadSessionRoutes.post('/:id/complete', async (c) => {
 
   const domain = s.object_key.split('/')[0] as MediaDomain;
   const originalName = safeFileName(s.file_name, verdict.ext);
-  await c.env.DB.prepare(
+  const ledger = c.env.DB.prepare(
     `INSERT INTO file_objects
        (object_key, visibility, domain, owner_id, entity_id, mime_type, byte_size, width, height, original_name, sha256, purpose)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -640,22 +653,44 @@ uploadSessionRoutes.post('/:id/complete', async (c) => {
     .bind(
       s.object_key, visibility, domain, s.owner_id, s.entity_id || s.owner_id, verdict.mime, s.declared_bytes,
       verdict.width, verdict.height, originalName, s.sha256, s.purpose
-    )
-    .run();
+    );
 
   // A request answers with its FILE ROW, the way the marketplace route does,
-  // so the wizard lists it without ever holding a key.
+  // so the wizard lists it without ever holding a key — and the row lands
+  // THE WAY THE MARKETPLACE'S DOES (DECISIONS row 257): guarded in SQL by the
+  // request's state and room, in one batch with the ledger row, the revision
+  // and the supersede; then the same hooks — the model's measurement stored,
+  // the revision recorded, the workshops told, the match decided again.
   let file: Record<string, unknown> | null = null;
   if (s.purpose === 'request') {
     const kind = verdict.mime.startsWith('image/') ? 'reference' : verdict.mime === 'application/pdf' ? 'document' : 'model';
-    const fileId = newId('crf');
-    await c.env.DB.prepare(
-      `INSERT INTO community_request_files (id, request_id, file_key, file_name, content_type, size_bytes, kind)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    )
-      .bind(fileId, s.entity_id, s.object_key, originalName, verdict.mime, s.declared_bytes, kind)
-      .run();
-    file = { id: fileId, file_name: originalName, content_type: verdict.mime, size_bytes: s.declared_bytes, kind };
+    const added = {
+      id: newId('crf'),
+      requestId: s.entity_id,
+      ownerId: s.owner_id,
+      key: s.object_key,
+      name: originalName,
+      mime: verdict.mime,
+      bytes: s.declared_bytes,
+      kind,
+    };
+    try {
+      await insertRequestFile(c.env.DB, added, [ledger]);
+    } catch (error) {
+      // Refused where the row is written: nothing names the object, so it goes.
+      await deleteMediaObject(c.env, visibility, s.object_key).catch(() => undefined);
+      await markSession(c.env.DB, s.id, 'aborted');
+      throw error;
+    }
+    await afterRequestFileAdded(
+      c.env,
+      added,
+      user,
+      kind === 'model' && verdict.modelBytes ? { bytes: verdict.modelBytes, analysis: verdict.analysis } : null
+    );
+    file = { id: added.id, file_name: originalName, content_type: verdict.mime, size_bytes: s.declared_bytes, kind };
+  } else {
+    await ledger.run();
   }
 
   await markSession(c.env.DB, s.id, 'completed');

@@ -10,7 +10,7 @@
  * check itself reads the database.
  */
 import type { MediaDomain, MediaVisibility } from './mediaStorage';
-import { HttpError, badRequest, conflict, forbidden, notFound, str } from './http';
+import { HttpError, badRequest, forbidden, notFound, str } from './http';
 import { storeForUser } from './merchantAuth';
 import { assertMayWriteInThread } from '../routes/chats';
 import { getSetting, type UploadLimits, type UploadQuotas } from './settings';
@@ -18,6 +18,7 @@ import type { UploadKind } from './attachments';
 import type { Env } from './types';
 import { onPublicBoard } from './communityRequests';
 import { liveVerdictForUser } from './printMatchingStore';
+import { assertRequestFilesOpen } from './requestFileRoom';
 
 export const MiB = 1024 * 1024;
 export const GiB = 1024 * MiB;
@@ -90,9 +91,10 @@ export interface UploadActor {
  */
 export const ORDER_UPDATE_LIVE_STATES: ReadonlySet<string> = new Set(['funded', 'in_progress', 'merchant_marked_delivered']);
 
-/** A request may carry this many attachments (the marketplace's own cap). */
-export const MAX_FILES_PER_REQUEST = 6;
-const REQUEST_FILE_STATES = new Set(['draft', 'open', 'receiving_offers']);
+// A request's attachment checks live in a leaf module both doors share
+// (worker/lib/requestFileRoom.ts, DECISIONS row 257); re-exported here for
+// the callers that always read them from this file.
+export { MAX_FILES_PER_REQUEST, assertRequestFileRoom } from './requestFileRoom';
 
 /**
  * Verify the entity a purpose files under, and return its id ('' for the
@@ -179,14 +181,7 @@ export async function assertUploadEntity(
      */
     case 'request': {
       const requestId = entity(true);
-      const r = await db
-        .prepare('SELECT id, customer_id, state FROM community_requests WHERE id = ?')
-        .bind(requestId)
-        .first<{ id: string; customer_id: string; state: string }>();
-      if (!r || r.customer_id !== user.id) throw notFound('Request not found');
-      if (!REQUEST_FILE_STATES.has(r.state)) {
-        throw conflict('This request is no longer open, so its attachments cannot change', 'REQUEST_NOT_EDITABLE');
-      }
+      await assertRequestFilesOpen(db, requestId, user.id);
       return requestId;
     }
 
@@ -281,17 +276,6 @@ async function offerAuthorOnRequest(db: D1Database, requestId: string, merchantI
     .first()
     .catch(() => null);
   return !!draft;
-}
-
-/** The room left on a request for one more attachment — the marketplace's cap of six. */
-export async function assertRequestFileRoom(db: D1Database, requestId: string): Promise<void> {
-  const existing = await db
-    .prepare('SELECT COUNT(*) AS n FROM community_request_files WHERE request_id = ?')
-    .bind(requestId)
-    .first<{ n: number }>();
-  if (Number(existing?.n ?? 0) >= MAX_FILES_PER_REQUEST) {
-    throw badRequest(`A request may have at most ${MAX_FILES_PER_REQUEST} attachments`);
-  }
 }
 
 /**

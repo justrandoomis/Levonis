@@ -170,8 +170,13 @@ export const requestsApi = {
     api.put<{ draft: DraftShape }>(`/api/marketplace/print/requests/${encodeURIComponent(id)}/draft`, b),
   publish: (id: string, b: WizardPayload | Record<string, never>) =>
     api.post<PublishResult>(`/api/marketplace/print/requests/${encodeURIComponent(id)}/publish`, b),
+  /**
+   * `measure: 'later'` (code MODEL_MEASURE_LATER): the model is above the
+   * size a Worker measures (`limit_bytes`); it stays on the request as a
+   * reference and the customer may type an approximate size (R3).
+   */
   analyze: (id: string, fileId: string) =>
-    api.post<{ analysis: ModelAnalysis | null }>(
+    api.post<{ analysis: ModelAnalysis | null; measure?: 'later'; code?: string; limit_bytes?: number }>(
       `/api/marketplace/print/requests/${encodeURIComponent(id)}/files/${encodeURIComponent(fileId)}/analyze`
     ),
   removeFile: (id: string, fileId: string) =>

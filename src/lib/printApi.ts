@@ -253,8 +253,11 @@ const BASE = '/api/marketplace/print';
 export const printApi = {
   catalog: () => api.get<PrintCatalog>(`${BASE}/catalog`),
 
+  /** `analysis` is null with `measure: 'later'` when the model is above the size a Worker measures (R3). */
   analyze: (requestId: string, fileId: string) =>
-    api.post<{ analysis: ModelAnalysis }>(`${BASE}/requests/${requestId}/files/${fileId}/analyze`),
+    api.post<{ analysis: ModelAnalysis | null; measure?: 'later'; code?: string; limit_bytes?: number }>(
+      `${BASE}/requests/${requestId}/files/${fileId}/analyze`
+    ),
 
   link: (url: string) => api.post<LinkResult>(`${BASE}/link`, { url }),
 

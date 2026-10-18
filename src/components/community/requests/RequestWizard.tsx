@@ -78,6 +78,8 @@ const FILE_STEP = {
     uploading: 'ملفات قيد الرفع',
     takePhoto: 'التقط صورة',
     resume: (name: string) => `رفع «${name}» لم يكتمل — اختر الملف نفسه مرة أخرى ليُستأنف من حيث توقف.`,
+    measureLater: 'يُقاس لاحقًا',
+    measureLaterHint: 'المجسمات الأكبر من 40 ميغابايت لا تُقاس هنا: تصل إلى الورش كمرجع، ويمكنك كتابة مقاسها التقريبي.',
   },
   en: {
     modelHint: 'Large models upload in parts and resume if the connection drops. We measure it — you do not need to know its size.',
@@ -85,6 +87,8 @@ const FILE_STEP = {
     uploading: 'Files uploading',
     takePhoto: 'Take a photo',
     resume: (name: string) => `“${name}” did not finish uploading — pick the same file again to resume where it stopped.`,
+    measureLater: 'Measured later',
+    measureLaterHint: 'Models over 40 MB are not measured here: they reach the workshops as a reference, and you can type the approximate size.',
   },
   ckb: {
     modelHint: 'مۆدێلە گەورەکان بە بەش باردەکرێن و ئەگەر هێڵەکە بپچڕێت بەردەوام دەبنەوە. ئێمە دەیپێوین — پێویست ناکات قەبارەکەی بزانیت.',
@@ -92,6 +96,8 @@ const FILE_STEP = {
     uploading: 'فایلەکان باردەکرێن',
     takePhoto: 'وێنەیەک بگرە',
     resume: (name: string) => `بارکردنی «${name}» تەواو نەبووە — هەمان فایل دووبارە هەڵبژێرە بۆ ئەوەی لەو شوێنەوە بەردەوام بێت کە وەستاوە.`,
+    measureLater: 'دواتر دەپێورێت',
+    measureLaterHint: 'ئەو مۆدێلانەی لە ٤٠ مێگابایت گەورەترن لێرە ناپێورێن: وەک سەرچاوە دەگەنە وۆرکشۆپەکان، و دەتوانیت قەبارە نزیکەکەی بنووسیت.',
   },
 } as const;
 
@@ -234,6 +240,8 @@ export default function RequestWizard({
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [pending, setPending] = useState<File[]>([]);
   const [files, setFiles] = useState<DraftFile[]>([]);
+  // The models /analyze answered «measure later» for (R3): too large to measure here.
+  const [measureLater, setMeasureLater] = useState<ReadonlySet<string>>(() => new Set());
   const [busy, setBusy] = useState<'' | 'next' | 'save' | 'publish' | 'load'>(initialId ? 'load' : '');
   const [error, setError] = useState('');
   const [errors, setErrors] = useState<Partial<Record<'title' | 'description' | 'source' | 'deadline', string>>>({});
@@ -410,17 +418,20 @@ export default function RequestWizard({
       const back = await requestsApi.draft(id);
       const fresh = back.draft.files;
       // Measure every model not measured yet — the price is built on it.
+      const later: string[] = [];
       const measuredFiles = await Promise.all(
         fresh.map(async (f) => {
           if (f.kind !== 'model' || f.analysis) return f;
           try {
             const r = await requestsApi.analyze(id, f.id);
+            if (r.measure === 'later') later.push(f.id);
             return { ...f, analysis: r.analysis };
           } catch {
             return f;
           }
         })
       );
+      if (later.length) setMeasureLater((prev) => new Set([...prev, ...later]));
       setFiles(measuredFiles);
     }
     return id;
@@ -684,6 +695,9 @@ export default function RequestWizard({
                               {Math.round(f.analysis.dimensions_mm.x)}×{Math.round(f.analysis.dimensions_mm.y)}×{Math.round(f.analysis.dimensions_mm.z)} mm
                             </span>
                           )}
+                          {!f.analysis?.measured && measureLater.has(f.id) && (
+                            <span className="shrink-0 text-text-muted" data-wizard="measure-later">{fs.measureLater}</span>
+                          )}
                           <button
                             type="button"
                             onClick={() => removeFile(f)}
@@ -724,6 +738,11 @@ export default function RequestWizard({
                           </li>
                         ))}
                     </ul>
+                  )}
+                  {files.some((f) => !f.analysis?.measured && measureLater.has(f.id)) && (
+                    <p className="mt-2 text-[11.5px] text-text-muted" role="status" data-wizard="measure-later-hint">
+                      {fs.measureLaterHint}
+                    </p>
                   )}
                 </div>
               )}
@@ -880,6 +899,11 @@ export default function RequestWizard({
                   <legend className="mb-2 text-[13px] font-semibold text-text-secondary">
                     {loc('المقاس التقريبي (ملم)', 'Approximate size (mm)')} <span className="font-normal text-text-muted">{loc('— اختياري', '— optional')}</span>
                   </legend>
+                  {primary && measureLater.has(primary.id) && (
+                    <p className="mb-2 text-[11.5px] text-text-muted" role="status" data-wizard="measure-later-size">
+                      {fs.measureLaterHint}
+                    </p>
+                  )}
                   <div className="grid grid-cols-3 gap-2">
                     {(['x', 'y', 'z'] as const).map((k) => (
                       <Field key={k} label={k === 'x' ? loc('الطول', 'Length') : k === 'y' ? loc('العرض', 'Width') : loc('الارتفاع', 'Height')}>
