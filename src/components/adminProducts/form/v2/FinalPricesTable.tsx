@@ -29,6 +29,8 @@ function sourceText(line: SkuLine, s: V2Strings, modelName: string): string {
       return s.sourceModelCost(modelName);
     case 'colour_delta':
       return s.sourceColourDelta;
+    case 'colour_cost':
+      return s.sourceColourCost;
     case 'sku_fixed':
       return s.sourceSkuFixed;
     default:

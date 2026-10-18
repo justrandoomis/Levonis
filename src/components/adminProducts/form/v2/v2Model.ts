@@ -122,7 +122,8 @@ export interface V2DraftWire {
 }
 
 /** `stock` (the owner's alone, DECISIONS row 244): the direct price is read from the costliest batch on the shelf. */
-export type V2Source = 'product' | 'model_fixed' | 'model_delta' | 'model_cost' | 'colour_delta' | 'sku_fixed' | 'stock';
+/** `colour_cost` (row 254): cost-first, the SKU is priced from its colour's own supplier cost. */
+export type V2Source = 'product' | 'model_fixed' | 'model_delta' | 'model_cost' | 'colour_delta' | 'colour_cost' | 'sku_fixed' | 'stock';
 /** Why a channel is not sold (the owner's alone): the floor, or the shelf's (row 244). */
 export type V2BlockCode = 'V2_ROUTE_BELOW_COST' | 'V2_ROUTE_NO_SUPPLIER' | 'V2_ROUTE_SHELF_CHEAPER' | 'V2_STOCK_SOLD_OUT';
 export type V2DiscountFrom = 'product' | 'model' | 'colour' | 'sku' | 'none' | 'preorder_only';
@@ -866,7 +867,8 @@ export function channelsOf(table: readonly V2TableRow[]): V2Channel[] {
   return V2_CHANNELS.filter((c) => seen.has(c));
 }
 
-const differs = (l: SkuLine) => l.source === 'colour_delta' || l.source === 'sku_fixed' || Object.values(l.channels).some((r) => r?.blocked);
+/** A SKU priced apart from its model — a colour's difference or own cost (row 254), its own price, or a blocked channel. */
+const differs = (l: SkuLine) => l.source === 'colour_delta' || l.source === 'colour_cost' || l.source === 'sku_fixed' || Object.values(l.channels).some((r) => r?.blocked);
 
 /** One block per model: its first SKU leads, the SKUs that differ are shown, the rest fold (§2.2). */
 export function modelBlocks(table: readonly V2TableRow[], modelNames: (id: string) => V2Names | null): ModelBlock[] {
@@ -903,13 +905,13 @@ export function firstLineOf(table: readonly V2TableRow[], modelId: string | null
 
 /**
  * The SKU line a model's (or any option value's) card shows: its own colour-less line, else a colour-less
- * line it is in, else a combination whose colour follows its model (no colour difference — `colours`, the
- * draft's, when given; else the server's source), else its first combination. The card names the colour
- * when the line has one, so a colour's price is never read as the model's.
+ * line it is in, else a combination whose colour follows its model (no colour difference and no colour cost of
+ * its own, row 254 — `colours`, the draft's, when given; else the server's source), else its first combination.
+ * The card names the colour when the line has one, so a colour's price is never read as the model's.
  */
 export function lineWithOption(table: readonly V2TableRow[], optionId: string, colours?: Readonly<Record<string, ColourDraft>>): SkuLine | null {
   const lines = skuLines(table).filter((l) => l.option_value_ids.includes(optionId));
-  const follows = (l: SkuLine) => (colours ? (colours[l.color_id ?? '']?.price ?? 'follow') !== 'delta' : l.source !== 'colour_delta');
+  const follows = (l: SkuLine) => !colourApart(l, colours);
   return (
     lines.find((l) => l.model_id === optionId && l.color_id === null) ??
     lines.find((l) => l.color_id === null) ??
@@ -917,6 +919,16 @@ export function lineWithOption(table: readonly V2TableRow[], optionId: string, c
     lines[0] ??
     null
   );
+}
+
+/**
+ * Is this line's colour priced apart from its model — a colour difference, or (row 254) the colour's own cost?
+ * From the draft's colours when given, else the server's source.
+ */
+function colourApart(l: SkuLine, colours?: Readonly<Record<string, ColourDraft>>): boolean {
+  if (!colours) return l.source === 'colour_delta' || l.source === 'colour_cost';
+  const c = colours[l.color_id ?? ''];
+  return (c?.price ?? 'follow') === 'delta' || (c?.cost ?? 'follow') === 'own';
 }
 
 /** The SKU lines a colour takes, one per model it shows with. */
@@ -1026,18 +1038,22 @@ export function profitForFinal(typed: string, base: string): { ok: true; usd: st
  * (the draft's points, as `draftRows` sends them). On a special price the server takes max(the price, cost + T)
  * (C-9), so «final − T» there is not the cost.
  */
-const finalFromCost = (draft: Pick<PriceDraft, 'models' | 'skus'>, l: SkuLine): boolean => {
+/** The draft a final price reads (`colours` optional: without it the server's source decides a colour's own cost). */
+type FinalDraft = Pick<PriceDraft, 'models' | 'skus'> & { colours?: PriceDraft['colours'] };
+const finalFromCost = (draft: FinalDraft, l: SkuLine): boolean => {
   const m = l.model_id ? draft.models[l.model_id] : undefined;
   if (m?.price === 'fixed' && cleanUsd(m.usd)) return false;
+  // Row 254: a colour on its own cost is priced from that cost — never the reference of a model's or the product's T.
+  if (l.color_id !== null && (draft.colours ? (draft.colours[l.color_id]?.cost ?? 'follow') === 'own' : l.source === 'colour_cost')) return false;
   return !cleanUsd(draft.skus[l.combo_key]?.fixed_usd ?? '') && finalUsdOf(l) !== null;
 };
 
 /**
  * The product's reference SKU for its final price: the result bar's line when it takes the product's minimum
  * profit and is priced from cost, else the first that is — a model in «تكلفة مختلفة» with its own (or a kept)
- * minimum profit never is, nor a SKU on a special price.
+ * minimum profit never is, nor a SKU on a special price, nor a colour on its own cost (row 254).
  */
-export function productFinalLine(table: readonly V2TableRow[], lead: SkuLine | null, draft: Pick<PriceDraft, 'models' | 'skus'>): SkuLine | null {
+export function productFinalLine(table: readonly V2TableRow[], lead: SkuLine | null, draft: FinalDraft): SkuLine | null {
   const follows = (l: SkuLine) => {
     const m = l.model_id ? draft.models[l.model_id] : undefined;
     return !(m && m.cost === 'own' && m.profit !== 'follow') && finalFromCost(draft, l);
@@ -1046,7 +1062,7 @@ export function productFinalLine(table: readonly V2TableRow[], lead: SkuLine | n
 }
 
 /** A model's («تكلفة مختلفة») reference SKU for its own final price: its card's line when priced from cost, else its first that is. */
-export function modelFinalLine(table: readonly V2TableRow[], line: SkuLine | null, modelId: string, draft: Pick<PriceDraft, 'models' | 'skus'>): SkuLine | null {
+export function modelFinalLine(table: readonly V2TableRow[], line: SkuLine | null, modelId: string, draft: FinalDraft): SkuLine | null {
   if (line && line.model_id === modelId && finalFromCost(draft, line)) return line;
   return skuLines(table).find((l) => l.model_id === modelId && finalFromCost(draft, l)) ?? null;
 }

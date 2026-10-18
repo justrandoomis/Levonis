@@ -437,7 +437,14 @@ function sourceOf(ev: V2Evaluation, row: V2Evaluation['rows'][number], viewer: V
   if (anchor === 'model_fixed') return 'model_fixed';
   const model = row.option_value_ids[0] ?? null;
   if (anchor === 'product_fixed') return model && ev.points.some((p) => p.scope === 'option' && p.kind === 'delta' && row.option_value_ids.includes(p.scope_id)) ? 'model_delta' : 'product';
-  if (anchor === 'cost') return model && ev.inputs.some((r) => r.scope === 'option' && r.scope_id === model) ? 'model_cost' : 'product';
+  if (anchor === 'cost') {
+    // Row 254: a colour's own supplier cost prices every model in that colour (the chain SKU → colour → model →
+    // product) — unless the SKU's own row holds a supplier cost, which wins over it.
+    const supplier = (r: V2Evaluation['inputs'][number]) => r.supplier_cost_amount != null || r.supplier_cost_delta != null;
+    const skuOwn = ev.inputs.some((r) => r.scope === 'sku' && r.scope_id === row.combo_key && supplier(r));
+    if (!skuOwn && row.color_id !== null && ev.inputs.some((r) => r.scope === 'color' && r.scope_id === row.color_id && supplier(r))) return 'colour_cost';
+    return model && ev.inputs.some((r) => r.scope === 'option' && r.scope_id === model) ? 'model_cost' : 'product';
+  }
   return 'product';
 }
 
@@ -517,8 +524,8 @@ export function v2Answer(i: AnswerInput): Record<string, unknown> {
           scope_id: r.scope_id ?? '',
           ...Object.fromEntries(FORM_INPUT_FIELDS.map((k) => [k, (r as Record<string, unknown>)[k] ?? null])),
           // Row 254: a cost typed in dinars reads back as typed — the dinars (the stored amount is their USD at the
-          // rate of that save). The owner's alone (`v2_cost_inputs` is a FINANCIAL field). A preview's rows keep the
-          // stored row's mode: the form draws its fields from the stored answer only.
+          // rate of that save). The owner's alone (`v2_cost_inputs` is a FINANCIAL field). The rows are the merged
+          // store (`mergedInputs`): a fold or an edit that replaced the supplier cost left SOURCE_CURRENCY, no snapshot.
           supplier_input_mode: r.supplier_input_mode ?? null,
           original_input_amount: r.supplier_input_mode === 'IQD_CONVERTED' ? (r.original_input_amount ?? null) : null,
         })),

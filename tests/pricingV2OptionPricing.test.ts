@@ -23,7 +23,10 @@
  *      the wire sends a model's own cost price-first too, a colour's as scope
  *      color, dinars as `supplier_cost_iqd` alone (read back as typed), and
  *      nothing for a price editor; the server takes them on a price-first
- *      product, moves no price, and the owner's reading follows them.
+ *      product, moves no price, and the owner's reading follows them; a
+ *      purchase fold over a cost typed in dinars reads back as the fold's
+ *      amount (never the old dinars); a colour on its own cost is labelled
+ *      «من تكلفة اللون», shown apart, and never a model's reference line.
  *
  * Run: node --import tsx --test tests/pricingV2OptionPricing.test.ts
  */
@@ -45,6 +48,9 @@ import {
   draftWire,
   lineWithOption,
   measurePendingOf,
+  modelBlocks,
+  modelFinalLine,
+  productFinalLine,
   docWithoutLegacyMoney,
   optionDimsHeading,
   preorderOffOf,
@@ -65,7 +71,8 @@ import { V2_STRINGS } from '../src/components/adminProducts/form/v2/v2Strings';
 import { hydrateRelations, relationsToWire, type RelationsState } from '../src/components/adminProducts/form/model';
 import { toEditorDoc } from '../src/components/adminProducts/types';
 import { adminProductsRoutes } from '../worker/routes/adminProducts';
-import { chainOfUnit, packagedMeasureOf, type StoredInputRow, type UnitSelection } from '../worker/lib/pricingEngine/store';
+import { chainOfUnit, packagedMeasureOf, type InputWrite, type StoredInputRow, type UnitSelection } from '../worker/lib/pricingEngine/store';
+import { mergedInputs } from '../worker/lib/pricingEngine/fromPurchase';
 
 /* ------------------------------------------------------- 1. the engine, pure -- */
 
@@ -923,4 +930,127 @@ test('row 254, the server: a colour’s own cost in dinars — converted once, p
   assert.equal(theirs.status, 200);
   const text = await theirs.text();
   assert.doesNotMatch(text, /v2_cost_inputs|original_input_amount|supplier_input_mode|300000/);
+});
+
+/* --------- 5. the review of row 254: a fold over dinars, and a colour on its own cost (the coordinator's three findings) -- */
+
+const IQD_BASE = {
+  product_id: 'p_x', scope: 'base', scope_id: '', origin: 'MANUAL_OVERRIDE', supplier_cost_amount: '1000', supplier_cost_delta: null, supplier_cost_currency: 'USD',
+  shipping_profile: 'GERMANY_LAND', pricing_weight_g: null, shipping_weight_g: 2000, shipping_length_mm: null, shipping_width_mm: null, shipping_height_mm: null, manual_cbm: null,
+  additional_cost_iqd: null, supplier_input_mode: 'IQD_CONVERTED', original_input_amount: '1500000', original_input_currency: 'IQD', conversion_rate_snapshot: '1500',
+  conversion_fx_version: 1, canonical_supplier_cost_usd: '1000', converted_at: '2026-10-01T00:00:00.000Z',
+} as unknown as StoredInputRow;
+const writeOf = (set: InputWrite['set'], iqd?: InputWrite['iqd']): InputWrite => ({ scope: 'base', scope_id: '', existing: IQD_BASE, set, source_ref: 'test', ...(iqd ? { iqd } : {}) });
+
+test('the merged store keeps each row self-consistent: a supplier cost replaced leaves dinars; untouched, the snapshot stands', () => {
+  // A purchase fold (or an owner's edit) that sets the supplier cost: SOURCE_CURRENCY, the snapshot cleared.
+  const [fold] = mergedInputs([IQD_BASE], [writeOf({ supplier_cost_amount: '900', supplier_cost_currency: 'EUR' })]);
+  assert.deepEqual([fold!.supplier_cost_amount, fold!.supplier_cost_currency, fold!.supplier_input_mode, fold!.original_input_amount, fold!.canonical_supplier_cost_usd], ['900', 'EUR', 'SOURCE_CURRENCY', null, null]);
+  // A currency alone touches the supplier cost too.
+  assert.equal(mergedInputs([IQD_BASE], [writeOf({ supplier_cost_currency: 'EUR' })])[0]!.supplier_input_mode, 'SOURCE_CURRENCY');
+  // Another field only: the conversion stands, byte for byte.
+  const [weight] = mergedInputs([IQD_BASE], [writeOf({ shipping_weight_g: 2500 })]);
+  assert.deepEqual([weight!.supplier_input_mode, weight!.original_input_amount, weight!.canonical_supplier_cost_usd, weight!.shipping_weight_g], ['IQD_CONVERTED', '1500000', '1000', 2500]);
+  // New dinars converted: the write's own snapshot.
+  const snap = { original_input_amount: '3000000', conversion_rate_snapshot: '1500', conversion_fx_version: 2, converted_at: '2026-10-18T00:00:00.000Z' };
+  const [dinars] = mergedInputs([IQD_BASE], [writeOf({ supplier_cost_amount: '2000', supplier_cost_currency: 'USD' }, snap)]);
+  assert.deepEqual([dinars!.supplier_input_mode, dinars!.original_input_amount, dinars!.canonical_supplier_cost_usd, dinars!.conversion_fx_version], ['IQD_CONVERTED', '3000000', '2000', 2]);
+  // Cleared: no supplier, no mode, no snapshot.
+  const [cleared] = mergedInputs([IQD_BASE], [writeOf({ supplier_cost_amount: null, supplier_cost_currency: null })]);
+  assert.deepEqual([cleared!.supplier_input_mode, cleared!.original_input_amount], [null, null]);
+});
+
+test('a needs-pricing product whose dinar cost a pending purchase replaced reads back as the purchase’s amount — never the old dinars', async () => {
+  const FOLD = 'p_fold254';
+  const raw: DatabaseSync = freshDb();
+  raw.exec(OWNER_ROW_SQL);
+  applyRate(raw, 'USD_IQD', '1500');
+  applyRate(raw, 'EUR_USD', '1.1');
+  applyRate(raw, 'CNY_USD', '0.14');
+  raw.exec("UPDATE pricing_shipping_rates SET rate_iqd = '3200', version = version + 1 WHERE profile = 'GERMANY_LAND'");
+  seedOptionless(raw, FOLD, { routes: ['land'] });
+  raw.exec(`INSERT INTO pricing_inputs (product_id, scope, scope_id, origin, supplier_cost_amount, supplier_cost_currency, shipping_profile, shipping_weight_g,
+     supplier_input_mode, original_input_amount, original_input_currency, conversion_rate_snapshot, conversion_fx_version, canonical_supplier_cost_usd, converted_at, source_ref, version, updated_at)
+     VALUES ('${FOLD}','base','','MANUAL_OVERRIDE','1000','USD','GERMANY_LAND',2000,'IQD_CONVERTED','1500000','IQD','1500',1,'1000','2026-10-01T00:00:00.000Z','x',1,'2026-10-01T00:00:00.000Z')`);
+  raw.exec(`INSERT INTO pricing_rules (id, product_id, kind, scope, scope_id, state, amount_usd, source, version, updated_at) VALUES ('r_fold','${FOLD}','target_profit','product','','ACTIVE','50','OWNER',1,'2026-10-01T00:00:00.000Z')`);
+  raw.exec(`INSERT INTO pricing_v2_purchase_reviews (id, product_id, purchase_id, inputs_json, state, created_at)
+     VALUES ('pvr_fold','${FOLD}','po_x','[{"scope":"base","scope_id":"","set":{"supplier_cost_amount":"900","supplier_cost_currency":"EUR"},"source_ref":"purchase"}]','pending','2026-10-02T00:00:00.000Z')`);
+  const app = v2App(raw);
+  const a = (await json(await get(app, `/api/admin/products-v2/${FOLD}/pricing`))) as V2Answer;
+  assert.equal(a.needs_pricing, true);
+  const base = a.v2_cost_inputs!.inputs.find((r) => r.scope === 'base')!;
+  // The row the answer prices (the fold's 900 EUR) — its mode and snapshot describe it, not the old 1,500,000 dinars.
+  assert.deepEqual([base.supplier_cost_amount, base.supplier_cost_currency, base.supplier_input_mode, base.original_input_amount], ['900', 'EUR', 'SOURCE_CURRENCY', null]);
+  const d = draftOf(a);
+  assert.deepEqual([d.cost.supplier_amount, d.cost.supplier_currency], ['900', 'EUR']);
+  // Switching the currency names the currency alone (900 USD) — never 1,500,000 USD.
+  const live: V2LiveIds = { options: new Set(), models: new Set(), colours: new Set(), skus: new Set(a.table.map((r) => r.combo_key)) };
+  const switched = draftWire(d, { ...d, cost: { ...d.cost, supplier_currency: 'USD' } }, dollarsOf(a), live, { ...OPTS, needsMethod: true });
+  assert.deepEqual(switched.cost?.inputs, [{ scope: 'base', supplier_cost_currency: 'USD' }]);
+  // Saved untouched: the store holds what the answer showed.
+  const wire = draftWire(d, d, dollarsOf(a), live, { ...OPTS, needsMethod: true });
+  const pre = (await json(await post(app, '/api/admin/products-v2/pricing/preview', { product_id: FOLD, pricing: wire }))) as V2Answer & { review_hash: string };
+  const saved = await put(app, `/api/admin/products-v2/${FOLD}/pricing`, { seq: pre.seq, pricing: wire, preview_hash: pre.review_hash });
+  assert.equal(saved.status, 200, (await saved.clone().text()).slice(0, 400));
+  const stored = row<{ supplier_cost_amount: string; supplier_cost_currency: string; supplier_input_mode: string; original_input_amount: string | null }>(
+    raw,
+    "SELECT supplier_cost_amount, supplier_cost_currency, supplier_input_mode, original_input_amount FROM pricing_inputs WHERE product_id = ? AND scope = 'base' AND origin = 'MANUAL_OVERRIDE'",
+    FOLD
+  );
+  assert.deepEqual({ ...stored }, { supplier_cost_amount: '900', supplier_cost_currency: 'EUR', supplier_input_mode: 'SOURCE_CURRENCY', original_input_amount: null });
+});
+
+test('a colour on its own cost is never a model card’s line, nor the reference of its final price (or the product’s)', () => {
+  // T $50: red on its own cost ($290) → $340; black follows the Combo's own cost ($370) → $420.
+  const ref = (combo_key: string, ceil6: string, source: V2TableRow['source'] = 'model_cost') => tableRow(combo_key, 'direct_sale', 1, { v2_usd_ceil6: ceil6, v2_profit_usd: '50' }, { source });
+  const rows = [ref('o:combo|c:red', '340', 'colour_cost'), ref('o:combo|c:black', '420')];
+  const colours = { red: { ...FOLLOW_COLOUR, cost: 'own' as const, supplier_amount: '290', supplier_currency: 'USD' as const } };
+  assert.equal(lineWithOption(rows, 'combo', colours)!.combo_key, 'o:combo|c:black', 'the draft says red has its own cost');
+  assert.equal(lineWithOption(rows, 'combo')!.combo_key, 'o:combo|c:black', 'the server says so (colour_cost)');
+  const red = skuLines(rows)[0]!;
+  const draft = { models: { combo: { ...FOLLOW_MODEL, cost: 'own' as const, supplier_amount: '370', supplier_currency: 'USD' as const, profit: 'exception' as const, profit_usd: '50' } }, skus: {}, colours };
+  assert.equal(modelFinalLine(rows, red, 'combo', draft)!.combo_key, 'o:combo|c:black', 'the model’s T is read on the model’s own cost');
+  assert.equal(productFinalLine(rows, red, { models: {}, skus: {}, colours })!.combo_key, 'o:combo|c:black');
+  // Only own-cost colours: no reference at all (the field waits), never a colour's cost read as the model's.
+  assert.equal(modelFinalLine([rows[0]!], red, 'combo', draft), null);
+  // A colour that follows again is a reference again.
+  assert.equal(modelFinalLine(rows, red, 'combo', { ...draft, colours: { red: { ...FOLLOW_COLOUR } } })!.combo_key, 'o:combo|c:red');
+});
+
+test('cost-first, a colour on its own cost is «من تكلفة اللون» — shown apart from its model, never folded under it', async () => {
+  const raw: DatabaseSync = freshDb();
+  raw.exec(OWNER_ROW_SQL);
+  applyRate(raw, 'USD_IQD', '1500');
+  applyRate(raw, 'EUR_USD', '1.1');
+  applyRate(raw, 'CNY_USD', '0.14');
+  raw.exec("UPDATE pricing_shipping_rates SET rate_iqd = '3200', version = version + 1 WHERE profile = 'GERMANY_LAND'");
+  seedOptionless(raw, COL, { colours: 3, routes: ['land'] });
+  await writeV2(asD1(raw), COL, {
+    method: 'cost',
+    inputs: { supplier_cost_amount: '100', supplier_cost_currency: 'USD', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 2000 },
+    minimumProfitUsd: '50',
+  });
+  const app = v2App(raw);
+  const stored = (await json(await get(app, `/api/admin/products-v2/${COL}/pricing`))) as V2Answer;
+  const [c0, c1, c2] = [0, 1, 2].map((k) => `${COL}_c${k}`) as [string, string, string];
+  const live: V2LiveIds = { options: new Set(), models: new Set(), colours: new Set([c0, c1, c2]), skus: new Set(stored.table.map((r) => r.combo_key)) };
+  const base = draftOf(stored);
+  const wire = draftWire(base, withColour(base, c1, { cost: 'own', supplier_amount: '110', supplier_currency: 'USD' }), dollarsOf(stored), live, OPTS);
+  const res = await post(app, '/api/admin/products-v2/pricing/preview', { product_id: COL, pricing: wire });
+  const pre = (await json(res)) as V2Answer;
+  assert.equal(res.status, 200, JSON.stringify(pre).slice(0, 400));
+  const sourceOf = (id: string) => [...new Set(pre.table.filter((r) => r.color_id === id).map((r) => r.source))];
+  assert.deepEqual(sourceOf(c1), ['colour_cost']);
+  assert.deepEqual(sourceOf(c0), ['product']);
+  assert.deepEqual(sourceOf(c2), ['product']);
+  // Its price differs ($110 + $50 against $100 + $50): the table shows it, and folds only the colours that follow.
+  assert.ok(directOf(pre.table, (r) => r.color_id === c1).price_iqd! > directOf(pre.table, (r) => r.color_id === c2).price_iqd!);
+  const [block] = modelBlocks(pre.table, () => null);
+  assert.equal(block!.lead.color_id, c0);
+  assert.deepEqual(block!.shown.map((l) => l.color_id), [c1]);
+  assert.deepEqual(block!.folded.map((l) => l.color_id), [c2]);
+  // Its label, in Arabic, English and real Sorani.
+  assert.deepEqual([V2_STRINGS.ar.sourceColourCost, V2_STRINGS.en.sourceColourCost], ['من تكلفة اللون', "From the colour's cost"]);
+  assert.notEqual(V2_STRINGS.ckb.sourceColourCost, V2_STRINGS.ar.sourceColourCost);
+  assert.match(V2_STRINGS.ckb.sourceColourCost, /[ڕڵێۆە]/);
 });

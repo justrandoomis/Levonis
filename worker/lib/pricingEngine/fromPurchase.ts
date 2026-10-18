@@ -590,7 +590,22 @@ export function openSeedFields<T extends SeedableWrite>(rows: readonly Partial<S
   return next;
 }
 
-/** The store as it would be after the writes (rows of the owner's origin replaced or added). */
+/** The IQD snapshot columns of a row (0181): written by a conversion, cleared when the supplier cost leaves dinars. */
+const NO_IQD_SNAPSHOT = {
+  original_input_amount: null,
+  original_input_currency: null,
+  conversion_rate_snapshot: null,
+  conversion_fx_version: null,
+  canonical_supplier_cost_usd: null,
+  converted_at: null,
+} as const;
+
+/**
+ * The store as it would be after the writes (rows of the owner's origin replaced or added). Each row stays
+ * self-consistent the way `nextInputRow` stores it (DECISIONS row 254): a write that sets the supplier cost without
+ * converting dinars leaves SOURCE_CURRENCY and no snapshot — a stored IQD_CONVERTED snapshot never describes an
+ * amount a purchase fold or an owner's edit replaced; a write that converts dinars (`w.iqd`) carries its own.
+ */
 export function mergedInputs(stored: readonly StoredInputRow[], writes: readonly InputWrite[]): Array<Partial<StoredInputRow>> {
   const rows: Array<Partial<StoredInputRow>> = stored.map((r) => ({ ...r }));
   for (const w of writes) {
@@ -599,6 +614,25 @@ export function mergedInputs(stored: readonly StoredInputRow[], writes: readonly
     const base = at >= 0 ? rows[at]! : { scope: w.scope, scope_id: scopeId, origin: 'MANUAL_OVERRIDE' as const };
     const next: Partial<StoredInputRow> = { ...base, ...w.set };
     if (w.set.supplier_cost_amount != null) next.supplier_cost_delta = null;
+    // The supplier-mode rules of `nextInputRow`, on the merged row.
+    const supplierTouched = 'supplier_cost_amount' in w.set || 'supplier_cost_delta' in w.set || 'supplier_cost_currency' in w.set;
+    const hasSupplier = next.supplier_cost_amount != null || next.supplier_cost_delta != null;
+    const wasConverted = base.supplier_input_mode === 'IQD_CONVERTED';
+    if (w.iqd && hasSupplier) {
+      Object.assign(next, {
+        supplier_input_mode: 'IQD_CONVERTED',
+        original_input_amount: w.iqd.original_input_amount,
+        original_input_currency: 'IQD',
+        conversion_rate_snapshot: w.iqd.conversion_rate_snapshot,
+        conversion_fx_version: w.iqd.conversion_fx_version,
+        canonical_supplier_cost_usd: next.supplier_cost_amount ?? null,
+        converted_at: w.iqd.converted_at,
+      });
+    } else {
+      const mode = !hasSupplier ? null : wasConverted && !supplierTouched ? 'IQD_CONVERTED' : 'SOURCE_CURRENCY';
+      next.supplier_input_mode = mode;
+      if (wasConverted && mode !== 'IQD_CONVERTED') Object.assign(next, NO_IQD_SNAPSHOT);
+    }
     if (at >= 0) rows[at] = next;
     else rows.push(next);
   }

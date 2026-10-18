@@ -123,6 +123,8 @@ export interface V2Strings {
   sourceModelDelta: string;
   sourceModelCost: Fill;
   sourceColourDelta: string;
+  /** Row 254: cost-first, the SKU is priced from its colour's own supplier cost. */
+  sourceColourCost: string;
   sourceSkuFixed: string;
   discountNone: string;
   readinessTitle: string;
@@ -336,6 +338,7 @@ const AR: V2Strings = {
   sourceModelDelta: 'فرق الموديل',
   sourceModelCost: (m) => `تكلفة ${m}`,
   sourceColourDelta: 'فرق اللون',
+  sourceColourCost: 'من تكلفة اللون',
   sourceSkuFixed: 'سعر خاص لهذا الصف',
   discountNone: 'بلا خصم',
   readinessTitle: 'ما ينقص لحساب الأسعار',
@@ -518,6 +521,7 @@ const EN: V2Strings = {
   sourceModelDelta: "The model's difference",
   sourceModelCost: (m) => `${m}'s cost`,
   sourceColourDelta: "The colour's difference",
+  sourceColourCost: "From the colour's cost",
   sourceSkuFixed: "This row's own price",
   discountNone: 'No discount',
   readinessTitle: 'What pricing still needs',
@@ -700,6 +704,7 @@ const CKB: V2Strings = {
   sourceModelDelta: 'جیاوازیی مۆدێل',
   sourceModelCost: (m) => `تێچووی ${m}`,
   sourceColourDelta: 'جیاوازیی ڕەنگ',
+  sourceColourCost: 'لە تێچووی ڕەنگەکەوە',
   sourceSkuFixed: 'نرخی تایبەتی ئەم ڕیزە',
   discountNone: 'بێ داشکاندن',
   readinessTitle: 'ئەوەی بۆ نرخدانان کەمە',
