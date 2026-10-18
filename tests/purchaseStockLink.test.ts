@@ -17,6 +17,7 @@
  *   (F) a colour line never changes the product's own value once it has one;
  *   (G) the review names the colour whose own cost the purchase will not reach;
  *   (H) a local dinar purchase is offered as USD (IQD_CONVERTED, once, at U);
+ *   (I) a received batch is its dollars on the shelf, priced at today's U;
  *   (J) the stock level never changes under batches on the shelf;
  *   (K) the next purchase's prefill learns only a final cost.
  *
@@ -27,7 +28,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { get, json, post, put, stubApp } from './fixtures/app';
-import { AMS, OWNER_USER, pricingWorld } from './fixtures/procurementPricing';
+import { AMS, AMS_MODEL, OWNER_USER, pricingWorld } from './fixtures/procurementPricing';
 import { legacyOptionId, legacyProductId } from './fixtures/legacyCatalogue';
 import { publishV2 } from './fixtures/v2Publish';
 import { adminProductsRoutes } from '../worker/routes/adminProducts';
@@ -35,6 +36,7 @@ import { adminProcurementRoutes } from '../worker/routes/adminProcurement';
 import { deriveProductEntries, shadowedOf, type PurchaseForPricing } from '../worker/lib/pricingEngine/fromPurchase';
 import { reviewView, type PurchaseReviewRow } from '../worker/lib/pricingEngine/v2/purchaseReview';
 import { PURCHASE_ARRIVED_EVENT } from '../worker/lib/pricingEngine/v2/bell';
+import { loadShelves, shelfOfSku } from '../worker/lib/pricingEngine/v2/shelf';
 import { loadRelationsSnapshot, planRelationsWriteFrom } from '../worker/lib/productPersistence';
 import type { ProductPricingData, StoredInputRow } from '../worker/lib/pricingEngine/store';
 
@@ -307,6 +309,21 @@ test('(H) a local dinar purchase is offered as USD — converted once at U (1,60
     .prepare("SELECT supplier_cost_amount, supplier_cost_currency, supplier_input_mode, original_input_amount, conversion_rate_snapshot FROM pricing_inputs WHERE product_id = ? AND source_ref = ?")
     .get(AMS, `purchase:${id}`) as Record<string, unknown>;
   assert.deepEqual({ ...stored }, { supplier_cost_amount: '450', supplier_cost_currency: 'USD', supplier_input_mode: 'IQD_CONVERTED', original_input_amount: '720000', conversion_rate_snapshot: '1600' });
+});
+
+test('(I) a received batch is its dollars on the shelf: its dinars ÷ the purchase’s U, priced at today’s U', async () => {
+  const w = pricingWorld();
+  const id = await w.save(w.draft());
+  const rec = await w.receive(id, 'op_iiiiiiiiiiii1');
+  assert.equal(rec.status, 200, JSON.stringify(rec.body).slice(0, 300));
+  const lot = w.raw.prepare('SELECT unit_cost_iqd, usd_iqd_rate_at_purchase FROM inventory_lots WHERE product_id = ?').get(AMS) as { unit_cost_iqd: number; usd_iqd_rate_at_purchase: string };
+  assert.equal(lot.usd_iqd_rate_at_purchase, '1600', 'the EUR purchase carries the central U it was confirmed at');
+  const micro = Math.round((lot.unit_cost_iqd * 1_000_000) / 1600);
+  const shelf = (await loadShelves(w.db, [AMS])).get(AMS)!;
+  const sku = { option_value_ids: [AMS_MODEL], color_id: null, combo_key: `o:${AMS_MODEL}` };
+  assert.equal(shelf.identities[0]!.cost_usd_micro, micro);
+  assert.deepEqual(shelfOfSku(shelf, sku, '1600'), { state: 'on_shelf', cost_iqd: Math.ceil((micro * 1600) / 1_000_000), units: 2 });
+  assert.deepEqual(shelfOfSku(shelf, sku, '1700'), { state: 'on_shelf', cost_iqd: Math.ceil((micro * 1700) / 1_000_000), units: 2 });
 });
 
 test('(J) the stock level never changes under units on the shelf (INVENTORY_MODE_HAS_STOCK); with the shelf empty and nothing open it may', async () => {

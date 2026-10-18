@@ -8,8 +8,10 @@
  * nothing («—», «ما ينقص: …»). Proves, through the real V2 writer, the real
  * quarter-hour sweep and the real routes:
  *   - the max-of-shelf rule, per model: Combo's direct cost is 690,062, A1's
- *     500,346, D = round(cost + T × U) by the one rounding rule
- *     (`roundPriceIqd`, row 245), stored with its R;
+ *     500,346, D = round(cost + T × U) (row 245), stored with its R;
+ *   - row 249: a batch with its purchase-time U is its dollars at today's U (a
+ *     rate move reprices it, reason USD; the signature ignores U); a batch
+ *     without one stays in dinars as paid;
  *   - selling a unit that leaves the costliest batch, or receiving a cheaper
  *     one, moves nothing (not even stale); the costliest sold out reprices DOWN
  *     to the next max, a costlier batch received reprices UP — through the
@@ -36,9 +38,9 @@ import { all, asD1, count, freshDb, get, json, row, stubApp, type StubUser } fro
 import { applyRate, fxEnv, OWNER_ROW_SQL } from './fixtures/fx';
 import { cartGrid, v2App, writeV2 } from './fixtures/pricingV2';
 import { priceProductV2, type V2Sku } from '@levonis/pricing/priceV2';
-import { roundPriceIqd } from '../packages/pricing/src/priceRounding';
+import { roundPriceIqd } from '@levonis/pricing/priceRounding';
 import { PRICING_ISSUES } from '@levonis/contracts/pricingIssues';
-import { loadShelves, shelfOfSku } from '../worker/lib/pricingEngine/v2/shelf';
+import { loadShelves, shelfItemsSql, shelfOfSku, shelfSignature, shelfSignatureOfItems } from '../worker/lib/pricingEngine/v2/shelf';
 import { sweepStaleEnginePrices } from '../worker/lib/fx/reprice';
 import { statementBudget } from '../worker/lib/fx/budget';
 import { STOCK_REVIEW_NOTICE, STOCK_SOLD_OUT_NOTICE } from '../worker/lib/fx/notify';
@@ -54,20 +56,24 @@ const OWNER: StubUser = { id: 'usr_owner', role: 'admin', email: 'boss@x.co' };
 const EDITOR: StubUser = { id: 'usr_editor', role: 'admin', email: 'editor@x.co' };
 /** U = 1,500 and a minimum profit of $40: T × U = 60,000 IQD. */
 const TU = 60_000;
-/** The engine's own rounding (never a step written here): every expected price goes through it. */
+/** The engine's own rounding (never a step written here; DECISIONS row 245): every expected price goes through it. */
 const D = (iqd: number) => roundPriceIqd(iqd);
 /** The owner's figures: A1 Combo from its costliest batch, A1 from its one. */
-const COMBO_D = D(690_062 + TU); // 750,250
+const COMBO_D = D(690_062 + TU); // 750,250 (row 245)
 const A1_D = D(500_346 + TU); // 560,500
 const sql = (v: unknown): string => (v === null || v === undefined ? 'NULL' : typeof v === 'number' ? String(v) : `'${String(v).replace(/'/g, "''")}'`);
 
 let lotSeq = 0;
-/** A batch on the shelf, as the receiving door writes one (the effective cost is its unit_cost_iqd). */
-function lot(raw: DatabaseSync, model: string, qty: number, unitCost: number | null, remaining = qty): string {
+/**
+ * A batch on the shelf, as the receiving door writes one (the effective cost is its unit_cost_iqd). With
+ * `rate`, it carries its purchase-time U (0182's snapshot): row 247 then prices it in dollars at today's U.
+ */
+function lot(raw: DatabaseSync, model: string, qty: number, unitCost: number | null, remaining = qty, rate?: string): string {
   const id = `lot_${++lotSeq}`;
   const at = new Date(Date.UTC(2026, 8, 1) + lotSeq * 60_000).toISOString();
-  raw.exec(`INSERT INTO inventory_lots (id, product_id, scope, scope_id, qty_received, qty_remaining, unit_cost_iqd, cost_basis, received_at)
-            VALUES (${sql(id)}, ${sql(PID)}, 'option', ${sql(model)}, ${qty}, ${remaining}, ${sql(unitCost)}, ${unitCost === null ? "'opening_unpriced'" : "'received'"}, ${sql(at)})`);
+  const fx = rate ? [', snapshot_version, snapshot_source, calculated_at, usd_iqd_rate_at_purchase, fx_snapshot_source', `, 1, 'adjustment', ${sql(at)}, ${sql(rate)}, 'central'`] : ['', ''];
+  raw.exec(`INSERT INTO inventory_lots (id, product_id, scope, scope_id, qty_received, qty_remaining, unit_cost_iqd, cost_basis, received_at${fx[0]})
+            VALUES (${sql(id)}, ${sql(PID)}, 'option', ${sql(model)}, ${qty}, ${remaining}, ${sql(unitCost)}, ${unitCost === null ? "'opening_unpriced'" : "'received'"}, ${sql(at)}${fx[1]})`);
   return id;
 }
 /** FIFO's own move on a sale or a stock-out: the batch gives up units (worker/lib/inventoryLots.ts). */
@@ -140,8 +146,8 @@ test('the max-of-shelf rule, per model: A1 Combo 685,831 / 689,581 / 690,062 →
   const shelves = await loadShelves(w.db, [PID]);
   const shelf = shelves.get(PID)!;
   assert.equal(shelf.mode, 'OPTION');
-  assert.deepEqual(shelfOfSku(shelf, { option_value_ids: [COMBO], color_id: null, combo_key: `o:${COMBO}` }), { state: 'on_shelf', cost_iqd: 690_062, units: 6 });
-  assert.deepEqual(shelfOfSku(shelf, { option_value_ids: [A1], color_id: null, combo_key: `o:${A1}` }), { state: 'on_shelf', cost_iqd: 500_346, units: 3 });
+  assert.deepEqual(shelfOfSku(shelf, { option_value_ids: [COMBO], color_id: null, combo_key: `o:${COMBO}` }, '1500'), { state: 'on_shelf', cost_iqd: 690_062, units: 6 });
+  assert.deepEqual(shelfOfSku(shelf, { option_value_ids: [A1], color_id: null, combo_key: `o:${A1}` }, '1500'), { state: 'on_shelf', cost_iqd: 500_346, units: 3 });
 
   // Complete, and published: D = round(max + T × U) per model.
   assert.equal(w.ev.complete, true, w.ev.codes.join(','));
@@ -238,16 +244,45 @@ test('the engine, pure: the shelf prices the direct sale in dinars as paid, the 
   assert.equal(usd.channels.find((c) => c.channel === 'direct_sale')!.shelf, null);
 
   // An unknown-cost batch: the highest KNOWN cost sets the price; a shelf of unknown costs prices from the supplier.
-  const mixed = { mode: 'OPTION' as const, identities: [{ scope: 'option' as const, scope_id: 'm1', combo_key: null, cost_iqd: 500_000, units: 4 }] };
-  assert.deepEqual(shelfOfSku(mixed, { option_value_ids: ['m1'], color_id: null, combo_key: 'o:m1' }), { state: 'on_shelf', cost_iqd: 500_000, units: 4 });
-  const unknown = { mode: 'OPTION' as const, identities: [{ scope: 'option' as const, scope_id: 'm1', combo_key: null, cost_iqd: null, units: 4 }] };
-  assert.equal(shelfOfSku(unknown, { option_value_ids: ['m1'], color_id: null, combo_key: 'o:m1' }), null);
+  const asPaid = (scope_id: string, cost: number | null, units: number) => ({ scope: 'option' as const, scope_id, combo_key: null, cost_iqd: cost, cost_usd_micro: null, cost_iqd_unrated: cost, units });
+  const mixed = { mode: 'OPTION' as const, identities: [asPaid('m1', 500_000, 4)] };
+  assert.deepEqual(shelfOfSku(mixed, { option_value_ids: ['m1'], color_id: null, combo_key: 'o:m1' }, '1500'), { state: 'on_shelf', cost_iqd: 500_000, units: 4 });
+  const unknown = { mode: 'OPTION' as const, identities: [asPaid('m1', null, 4)] };
+  assert.equal(shelfOfSku(unknown, { option_value_ids: ['m1'], color_id: null, combo_key: 'o:m1' }, '1500'), null);
   // Two stocked options: a unit takes one of each, so the costs add and the units are the fewest.
-  const two = { mode: 'OPTION' as const, identities: [
-    { scope: 'option' as const, scope_id: 'm1', combo_key: null, cost_iqd: 500_000, units: 4 },
-    { scope: 'option' as const, scope_id: 'n1', combo_key: null, cost_iqd: 20_000, units: 2 },
-  ] };
-  assert.deepEqual(shelfOfSku(two, { option_value_ids: ['m1', 'n1'], color_id: null, combo_key: 'o:m1|o:n1' }), { state: 'on_shelf', cost_iqd: 520_000, units: 2 });
+  const two = { mode: 'OPTION' as const, identities: [asPaid('m1', 500_000, 4), asPaid('n1', 20_000, 2)] };
+  assert.deepEqual(shelfOfSku(two, { option_value_ids: ['m1', 'n1'], color_id: null, combo_key: 'o:m1|o:n1' }, '1500'), { state: 'on_shelf', cost_iqd: 520_000, units: 2 });
+  // Row 247: a batch with a purchase rate is its dollars at today's U — and with no U today, the supplier prices it.
+  const rated = { mode: 'OPTION' as const, identities: [{ ...asPaid('m1', 690_000, 2), cost_usd_micro: 460_000_000, cost_iqd_unrated: null }] };
+  assert.deepEqual(shelfOfSku(rated, { option_value_ids: ['m1'], color_id: null, combo_key: 'o:m1' }, '1600'), { state: 'on_shelf', cost_iqd: 736_000, units: 2 });
+  assert.equal(shelfOfSku(rated, { option_value_ids: ['m1'], color_id: null, combo_key: 'o:m1' }, null), null);
+});
+
+test('row 247 — the dollar is the anchor: a batch bought at U 1,500 for 690,000 IQD is $460, priced at today’s U; a batch with no purchase rate stays as paid; the signature ignores U', async () => {
+  const w = await world();
+  const combo = { option_value_ids: [COMBO], color_id: null, combo_key: `o:${COMBO}` };
+  // A batch with its purchase-time U, costlier in dollars than the unrated ones (690,062 IQD as paid).
+  lot(w.raw, COMBO, 2, 690_000, 2, '1500');
+  const shelf = (await loadShelves(w.db, [PID])).get(PID)!;
+  const identity = shelf.identities.find((i) => i.scope_id === COMBO)!;
+  assert.equal(identity.cost_usd_micro, 460_000_000, '690,000 ÷ 1,500 = $460');
+  assert.equal(identity.cost_iqd_unrated, 690_062, 'the batches without a rate, as paid');
+  // U today = the purchase U: the old figures (the higher of 690,000 and 690,062).
+  assert.deepEqual(shelfOfSku(shelf, combo, '1500'), { state: 'on_shelf', cost_iqd: 690_062, units: 8 });
+  // U today 1,600: $460 × 1,600 = 736,000 — the dollar holds, the dinar moves.
+  assert.deepEqual(shelfOfSku(shelf, combo, '1600'), { state: 'on_shelf', cost_iqd: 736_000, units: 8 });
+  // The signature the sweep computes in SQL is the one the shelf read gives, and today's U is not in it.
+  const items = row<{ items: string | null; mode: string }>(w.raw, `SELECT ${shelfItemsSql('p.id')} AS items, p.inventory_mode AS mode FROM products p WHERE p.id = ?`, PID)!;
+  assert.equal(await shelfSignatureOfItems(items.mode, items.items), await shelfSignature(shelf));
+  // Through the sweep: a move of U reprices the stocked model from its batch's dollars (reason USD, not STOCK).
+  await sweep(w);
+  assert.equal((await directOf(w, COMBO)).prepaid, COMBO_D, 'at U 1,500 the dinar figures stand');
+  const sigBefore = row<{ shelf_sig: string }>(w.raw, 'SELECT shelf_sig FROM product_pricing_state WHERE product_id = ?', PID)!.shelf_sig;
+  applyRate(w.raw, 'USD_IQD', '1600');
+  await sweep(w);
+  assert.equal((await directOf(w, COMBO)).prepaid, D(736_000 + 40 * 1600), 'D follows U through the batch’s dollars');
+  assert.equal((await directOf(w, A1)).prepaid, D(500_346 + 40 * 1600), 'a batch with no purchase rate stays in dinars as paid');
+  assert.equal(row<{ shelf_sig: string }>(w.raw, 'SELECT shelf_sig FROM product_pricing_state WHERE product_id = ?', PID)!.shelf_sig, sigBefore, 'a U move is not a shelf move');
 });
 
 test('the shelf moves: a sale leaving the costliest batch moves nothing; its sell-out reprices DOWN to the next max; a costlier batch reprices UP', async () => {

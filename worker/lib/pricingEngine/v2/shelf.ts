@@ -1,6 +1,6 @@
 /**
  * PRICING V2 — THE SHELF A COST-FIRST PRICE IS READ FROM (owner decisions of
- * 2026-10-17, DECISIONS row 244; docs/PRICING-V2.md §10).
+ * 2026-10-17, DECISIONS rows 244 and 247; docs/PRICING-V2.md §10).
  *
  *   1. A model with units on the shelf is priced, for the DIRECT sale, from the
  *      HIGHEST landed unit cost among its batches still on the shelf
@@ -12,6 +12,16 @@
  *   2. A shelf that is sold out goes back to the supplier calculation; without
  *      one the model is not sold (priceV2.ts V2_STOCK_SOLD_OUT) and the owner's
  *      bell rings — never a silent stale price.
+ *   3. THE DOLLAR IS THE ANCHOR (row 247, modifying row 244's formula: «الدولار
+ *      هو الأساس … والدينار هو المتغير بسعر الصرف»). A batch's effective dinars
+ *      are divided by ITS purchase-time U (`inventory_lots.usd_iqd_rate_at_purchase`,
+ *      0182) into micro-dollars — in SQL, one expression (`lotUsdMicroSql`) the
+ *      shelf read and the sweep's signature share, so the two can never disagree —
+ *      and the highest is priced at TODAY's U: R_shelf = ceil(max USD × U). A batch
+ *      with no purchase rate (an opening batch, or one received before 0182)
+ *      keeps its dinars as paid; the shelf's cost is the higher of the two. The
+ *      maths (priceV2) receive whole dinars as before, so D − R_shelf ≥ T × U
+ *      still holds at publication.
  *
  * WHICH BATCHES ARE A SKU'S SHELF is the cart's own stock rule
  * (worker/lib/inventory.ts `resolveStock`), by the product's CURRENT inventory
@@ -29,8 +39,10 @@
  *
  * WHEN IT IS READ AGAIN. Every V2 evaluation reads the shelf as it is (the
  * owner's preview, a save, the automatic repricing). The automatic repricing
- * (autoReprice.ts) knows a shelf moved by its SIGNATURE: a hash of each shelf
- * identity's state (its highest known cost, «unknown», or «sold out») stored
+ * (autoReprice.ts) knows a shelf moved by its SIGNATURE (`shelf:v2`): a hash of
+ * each shelf identity's state (its highest known cost in micro-dollars and in
+ * unrated dinars, «unknown», or «sold out» — never today's U, so a rate move is
+ * the `USD` reason, not `STOCK`) stored
  * on `product_pricing_state.shelf_sig` (migration 0198) by every V2 write,
  * against today's — computed inside the sweep's one states read
  * (`shelfItemsSql`), so a tick with nothing to do costs no statement more.
@@ -43,6 +55,7 @@
  * unit count or a signature's input; the stored signature is a hash.
  */
 import { sha256Hex } from '../../crypto';
+import { ceilToPlaces, mulProcurementExact, procurementExact, procurementExactText, quotientProcurementExact } from '@levonis/contracts/procurementCost';
 import { isInventoryMode, type InventoryMode } from '../../inventory';
 import type { V2Shelf } from '@levonis/pricing/priceV2';
 
@@ -52,8 +65,12 @@ export interface ShelfIdentity {
   scope_id: string;
   /** VARIANT_COMBINATION: the variant's combo_key (the SKU identity); null otherwise. */
   combo_key: string | null;
-  /** The highest known unit cost (whole dinars) among its batches still on the shelf; null when none is known. */
+  /** The highest known unit cost (whole dinars as paid) among its batches still on the shelf; null when none is known (display). */
   cost_iqd: number | null;
+  /** Row 247: the highest known cost in micro-dollars among its batches with a purchase rate; null when none. */
+  cost_usd_micro: number | null;
+  /** Row 247: the highest known cost (dinars as paid) among its batches WITHOUT a purchase rate; null when none. */
+  cost_iqd_unrated: number | null;
   /** Units still on the shelf (every batch, known cost or not). */
   units: number;
 }
@@ -88,18 +105,40 @@ const whole = (v: unknown): number | null => {
  */
 export const shelfReads = (n: number): number => Math.ceil(Math.max(0, n) / CHUNK);
 
-const VERSIONED_COST = 'COALESCE((SELECT v.unit_cost_iqd FROM inventory_lot_cost_versions v WHERE v.lot_id = l.id ORDER BY v.version DESC LIMIT 1), l.unit_cost_iqd)';
+/** A batch's effective dinars: its newest cost version (0165), as FIFO's. */
+const versionedCostSql = (lot: string) =>
+  `COALESCE((SELECT v.unit_cost_iqd FROM inventory_lot_cost_versions v WHERE v.lot_id = ${lot}.id ORDER BY v.version DESC LIMIT 1), ${lot}.unit_cost_iqd)`;
+/** Row 247: the batch carries its purchase-time U (0182). */
+const ratedSql = (lot: string) => `(${lot}.usd_iqd_rate_at_purchase IS NOT NULL AND CAST(${lot}.usd_iqd_rate_at_purchase AS REAL) > 0)`;
+/**
+ * Row 247: a rated batch's cost in whole micro-dollars — its dinars ÷ its purchase-time U. THE one expression
+ * of it: the shelf read and the sweep's signature items both use it (SQLite's own REAL division, never
+ * recomputed in JS), so their signatures always agree.
+ */
+export const lotUsdMicroSql = (lot: string, cost: string) => `CAST(ROUND(${cost} * 1000000.0 / CAST(${lot}.usd_iqd_rate_at_purchase AS REAL)) AS INTEGER)`;
+
+/** The schema the shelf read is attempted against, newest first (0165's cost versions, 0182's purchase rate). */
+const SHELF_SCHEMAS: ReadonlyArray<{ cost: string; rated: boolean }> = [
+  { cost: versionedCostSql('l'), rated: true },
+  { cost: 'l.unit_cost_iqd', rated: true },
+  { cost: versionedCostSql('l'), rated: false },
+  { cost: 'l.unit_cost_iqd', rated: false },
+];
 
 export async function loadShelves(db: D1Database, ids: readonly string[]): Promise<Map<string, ProductShelf>> {
-  try {
-    return await readShelves(db, ids, VERSIONED_COST);
-  } catch (e) {
-    if (!/no such table: inventory_lot_cost_versions/i.test(e instanceof Error ? e.message : String(e))) throw e;
-    return readShelves(db, ids, 'l.unit_cost_iqd');
+  for (const [i, schema] of SHELF_SCHEMAS.entries()) {
+    try {
+      return await readShelves(db, ids, schema.cost, schema.rated);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // An older database: without 0165 the batch's own cost, without 0182 dinars as paid (no batch has a rate).
+      if (i === SHELF_SCHEMAS.length - 1 || !/no such table: inventory_lot_cost_versions|no such column: l\.usd_iqd_rate_at_purchase/i.test(msg)) throw e;
+    }
   }
+  return new Map();
 }
 
-async function readShelves(db: D1Database, ids: readonly string[], cost: string): Promise<Map<string, ProductShelf>> {
+async function readShelves(db: D1Database, ids: readonly string[], cost: string, rated: boolean): Promise<Map<string, ProductShelf>> {
   const out = new Map<string, ProductShelf>();
   const unique = [...new Set(ids.filter((id) => typeof id === 'string' && id.length > 0))];
   if (!unique.length) return out;
@@ -110,6 +149,8 @@ async function readShelves(db: D1Database, ids: readonly string[], cost: string)
         `SELECT l.product_id AS product_id, p.inventory_mode AS mode, l.scope AS scope, l.scope_id AS scope_id,
                 MAX(v.combo_key) AS combo_key,
                 MAX(CASE WHEN l.qty_remaining > 0 THEN ${cost} END) AS cost_iqd,
+                ${rated ? `MAX(CASE WHEN l.qty_remaining > 0 AND ${ratedSql('l')} THEN ${lotUsdMicroSql('l', cost)} END)` : 'NULL'} AS cost_usd_micro,
+                ${rated ? `MAX(CASE WHEN l.qty_remaining > 0 AND NOT ${ratedSql('l')} THEN ${cost} END)` : `MAX(CASE WHEN l.qty_remaining > 0 THEN ${cost} END)`} AS cost_iqd_unrated,
                 SUM(CASE WHEN l.qty_remaining > 0 THEN l.qty_remaining ELSE 0 END) AS units
            FROM inventory_lots l
            JOIN products p ON p.id = l.product_id
@@ -131,13 +172,15 @@ async function readShelves(db: D1Database, ids: readonly string[], cost: string)
           scope_id: String(r.scope_id ?? ''),
           combo_key: r.combo_key === null || r.combo_key === undefined ? null : String(r.combo_key),
           cost_iqd: whole(r.cost_iqd),
+          cost_usd_micro: whole(r.cost_usd_micro),
+          cost_iqd_unrated: whole(r.cost_iqd_unrated),
           units: whole(r.units) ?? 0,
         });
         out.set(pid, shelf);
       }
     }
   } catch (e) {
-    if (/no such table: inventory_lot_cost_versions/i.test(e instanceof Error ? e.message : String(e))) throw e;
+    if (/no such table: inventory_lot_cost_versions|no such column: l\.usd_iqd_rate_at_purchase/i.test(e instanceof Error ? e.message : String(e))) throw e;
     if (isMissing(e)) return new Map();
     throw e;
   }
@@ -159,40 +202,73 @@ function identitiesOf(shelf: ProductShelf, sku: { option_value_ids: readonly str
 }
 
 /**
+ * Row 247: one identity's cost in whole dinars at today's U — the higher of its rated batches' highest
+ * micro-dollars × U (rounded UP to the dinar) and its unrated batches' dinars as paid. Null: no known cost,
+ * or rated batches only and no U today (the supplier calculation then prices it).
+ */
+function identityIqd(i: ShelfIdentity, u: string | null): number | null {
+  let usd: number | null = null;
+  if (i.cost_usd_micro !== null) {
+    if (!u) return null;
+    try {
+      const at = ceilToPlaces(quotientProcurementExact(mulProcurementExact(procurementExact(i.cost_usd_micro), procurementExact(u)), procurementExact(1_000_000)), 0);
+      const n = Number(procurementExactText(at));
+      usd = Number.isSafeInteger(n) && n >= 0 ? n : null;
+    } catch {
+      usd = null;
+    }
+    if (usd === null) return null;
+  }
+  if (usd === null) return i.cost_iqd_unrated;
+  return i.cost_iqd_unrated === null ? usd : Math.max(usd, i.cost_iqd_unrated);
+}
+
+/**
  * One SKU's shelf for the maths (priceV2.ts `V2Shelf`), or null (no batch, or
  * units whose cost is not known — the supplier calculation then prices it).
+ * `u` is the evaluation's USD/IQD: a rated batch is priced at it (row 247).
  * Several identities (OPTION mode, more than one stocked option): a unit takes
  * one from each, so the costs add and the units are the fewest; one sold out
  * leaves the SKU sold out.
  */
-export function shelfOfSku(shelf: ProductShelf | null | undefined, sku: { option_value_ids: readonly string[]; color_id: string | null; combo_key: string }): V2Shelf | null {
+export function shelfOfSku(
+  shelf: ProductShelf | null | undefined,
+  sku: { option_value_ids: readonly string[]; color_id: string | null; combo_key: string },
+  u: string | null
+): V2Shelf | null {
   if (!shelf) return null;
   const ids = identitiesOf(shelf, sku);
   if (!ids.length) return null;
   if (ids.some((i) => i.units <= 0)) return { state: 'sold_out' };
-  if (ids.some((i) => i.cost_iqd === null)) return null;
-  const cost = ids.reduce((n, i) => n + (i.cost_iqd as number), 0);
+  const costs = ids.map((i) => identityIqd(i, u));
+  if (costs.some((c) => c === null)) return null;
+  const cost = costs.reduce((n: number, c) => n + (c as number), 0);
   if (!Number.isSafeInteger(cost)) return null;
   return { state: 'on_shelf', cost_iqd: cost, units: Math.min(...ids.map((i) => i.units)) };
 }
 
 /**
  * The product's shelf signature: a hash of each identity's state under the
- * current mode — its highest known cost, 'u' (units, no known cost) or 's'
- * (sold out). Units are left out on purpose: selling from the shelf without
- * emptying the costliest batch moves nothing. Null when the product has no
- * batch (nothing to price from). The same hash as `shelfSignatureOfItems`
- * over the states read's `SHELF_ITEMS_SQL`.
+ * current mode — `<micro-dollars|->/<unrated dinars|->` of its highest known
+ * costs (row 247), 'u' (units, no known cost) or 's' (sold out). Units are
+ * left out on purpose: selling from the shelf without emptying the costliest
+ * batch moves nothing; today's U is left out too (a rate move is the `USD`
+ * reason). Null when the product has no batch (nothing to price from). The
+ * same hash as `shelfSignatureOfItems` over the states read's `shelfItemsSql`.
  */
 export async function shelfSignature(shelf: ProductShelf | null | undefined): Promise<string | null> {
   if (!shelf || !shelf.identities.length) return null;
+  const known = (n: number | null) => (n === null ? '-' : String(n));
   return signatureOf(
     shelf.mode,
-    shelf.identities.map((i) => `${i.scope}:${i.scope_id}=${i.units <= 0 ? 's' : i.cost_iqd === null ? 'u' : String(i.cost_iqd)}`)
+    shelf.identities.map(
+      (i) => `${i.scope}:${i.scope_id}=${i.units <= 0 ? 's' : i.cost_usd_micro === null && i.cost_iqd_unrated === null ? 'u' : `${known(i.cost_usd_micro)}/${known(i.cost_iqd_unrated)}`}`
+    )
   );
 }
 
-const signatureOf = (mode: InventoryMode, items: string[]): Promise<string> => sha256Hex(`shelf:v1|${mode}|${[...items].sort().join(',')}`);
+/** `v2`: row 247's USD-anchored items (a `v1` signature stored before it reads as a shelf move once). */
+const signatureOf = (mode: InventoryMode, items: string[]): Promise<string> => sha256Hex(`shelf:v2|${mode}|${[...items].sort().join(',')}`);
 
 /** The items `SHELF_ITEMS_SQL` joins (unit separator). */
 const ITEM_SEPARATOR = '\u001e';
@@ -212,19 +288,22 @@ export const shelfItemsHaveUnits = (items: string | null | undefined): boolean =
 
 /**
  * One SQL expression (a correlated subquery) of a product's shelf as signature
- * items, `scope:scope_id=<highest known cost | u | s>`, joined by the unit
- * separator — so the sweep's one states read also says whether any shelf moved
- * (no statement of its own, no figure leaving the database but as a hash).
- * The batches' effective cost is their newest cost version (0165), as FIFO's.
+ * items, `scope:scope_id=<micro-dollars|->/<unrated dinars|-> | u | s>`, joined
+ * by the unit separator — so the sweep's one states read also says whether any
+ * shelf moved (no statement of its own, no figure leaving the database but as a
+ * hash). The batches' effective cost is their newest cost version (0165), as
+ * FIFO's; the micro-dollars are `lotUsdMicroSql`, as the shelf read's. The
+ * states read needs 0198, so 0165 and 0182 are there.
  */
 export function shelfItemsSql(productExpr: string): string {
-  const cost = 'COALESCE((SELECT v.unit_cost_iqd FROM inventory_lot_cost_versions v WHERE v.lot_id = sl.id ORDER BY v.version DESC LIMIT 1), sl.unit_cost_iqd)';
-  const known = `MAX(CASE WHEN sl.qty_remaining > 0 THEN ${cost} END)`;
+  const cost = versionedCostSql('sl');
+  const usd = `MAX(CASE WHEN sl.qty_remaining > 0 AND ${ratedSql('sl')} THEN ${lotUsdMicroSql('sl', cost)} END)`;
+  const iqd = `MAX(CASE WHEN sl.qty_remaining > 0 AND NOT ${ratedSql('sl')} THEN ${cost} END)`;
   return `(SELECT group_concat(item, char(30)) FROM (
       SELECT sl.scope || ':' || sl.scope_id || '=' ||
              CASE WHEN SUM(CASE WHEN sl.qty_remaining > 0 THEN sl.qty_remaining ELSE 0 END) <= 0 THEN 's'
-                  WHEN ${known} IS NULL THEN 'u'
-                  ELSE CAST(${known} AS INTEGER) END AS item
+                  WHEN ${usd} IS NULL AND ${iqd} IS NULL THEN 'u'
+                  ELSE COALESCE(CAST(CAST(${usd} AS INTEGER) AS TEXT), '-') || '/' || COALESCE(CAST(CAST(${iqd} AS INTEGER) AS TEXT), '-') END AS item
         FROM inventory_lots sl JOIN products sp ON sp.id = sl.product_id
        WHERE sl.product_id = ${productExpr}
          AND sl.scope = CASE sp.inventory_mode WHEN 'OPTION' THEN 'option' WHEN 'COLOR' THEN 'color' WHEN 'VARIANT_COMBINATION' THEN 'variant' ELSE 'base' END

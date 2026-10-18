@@ -862,7 +862,7 @@ Every sweep pass begins with one guarded, idempotent statement that does the sam
 moved; FX-5's automatic writes lay nothing in their budgeted batches and are covered by it. Telling the
 customer stays the sweep's, with the same sellable-and-priced check.
 
-## 10. Pricing from the shelf (DECISIONS row 244, migration 0198)
+## 10. Pricing from the shelf (DECISIONS rows 244 and 247, migration 0198)
 
 **The owner's decisions (2026-10-17).** (1) A cost-first («من التكلفة») model with units on the shelf
 is priced, for the DIRECT sale, from the **highest unit cost among its batches still on the shelf**
@@ -872,16 +872,23 @@ while the shelf sells: it moves only when a costlier batch arrives or the costli
 (2) A model whose shelf is sold out goes back to the supplier calculation (§1.2); without a supplier
 price it is «يحتاج تسعيرًا» — not sold — and the owner's bell rings. Never a silent stale price.
 
-**The formula — the stock cost stays in dinars.** The landed cost was paid in dinars; it is never
-re-expressed through a rate:
+**The formula — the dollar is the anchor (row 247, modifying row 244).** The owner, 2026-10-17:
+«الدولار هو الأساس كما اتفقنا وليس العكس … الدولار هو الثابت والدينار العراقي هو المتغير بسعر الصرف».
+Each batch's effective dinars are divided by ITS purchase-time U (`inventory_lots.usd_iqd_rate_at_purchase`,
+0182) into dollars; the batches compare in dollars and the highest is priced at today's U. A batch with no
+purchase rate (an opening batch, or one received before 0182) keeps its dinars as paid, and the shelf's
+cost is the higher of the two:
 
+    R_shelf = max( ceil(max_usd × U_today), max_iqd_unrated )
     E_D = R_shelf + T × U + (Σ option ± + colour ±) × U      never below R_shelf + T × U
-    D   = roundPriceIqd(E_D)   (the engine's one rounding, row 245)  so D − R_shelf ≥ T × U at publication
+    D   = round(E_D)   (the engine's one rounding, roundPriceIqd, row 245)  so D − R_shelf ≥ T × U at publication
 
-A fixed price (SKU or model) on a cost-first product is floored at R_shelf + T × U as at §1.3. A
-change of U moves the profit and the differences only (the `USD` reason, as today). The owner's
-example: A1 Combo's batches at 685,831 / 689,581 / 690,062 IQD, T = $40, U = 1,500 → D =
-roundPriceIqd(690,062 + 60,000) = 750,250; when the 690,062 batch sells out, 749,750.
+The micro-dollars are one SQL expression (`lotUsdMicroSql`) the shelf read and the sweep's signature
+share; the engine maths are unchanged (the worker hands it whole dinars). A fixed price (SKU or model) on
+a cost-first product is floored at R_shelf + T × U as at §1.3. A change of U moves the whole direct price
+of a stocked model (the `USD` reason, as today). The owner's example: A1 Combo's batches at 685,831 /
+689,581 / 690,062 IQD, T = $40, U = 1,500 → D = round(690,062 + 60,000) = 750,250; a batch of 690,000 IQD
+bought at U 1,500 is $460, so at U 1,600 it costs 736,000.
 
 **Which batches are a SKU's shelf** — the cart's own stock rule (`resolveStock`) under the product's
 CURRENT inventory mode: BASE the product's batches; OPTION the batches of each option value the SKU
@@ -916,8 +923,10 @@ stopped, and prices the model once the shelf is empty. The blocks are temporary:
 on, the SKU simply has no row on it, and nothing needs the owner's preview.
 
 **Recomputed by the existing queue.** Every V2 write stores the shelf it priced at as a hash
-(`product_pricing_state.shelf_sig`, migration 0198: each shelf identity's highest known cost,
-«unknown» or «sold out» — never a unit count). The quarter-hour sweep (`autoReprice.ts`) reads the
+(`product_pricing_state.shelf_sig`, migration 0198, value format `shelf:v2` since row 247: each shelf
+identity's highest known cost in micro-dollars and in unrated dinars, «unknown» or «sold out» — never a
+unit count and never today's U, so a rate move is the `USD` reason, not `STOCK`; a `v1` signature stored
+before reads as one shelf move and is repriced once). The quarter-hour sweep (`autoReprice.ts`) reads the
 shelves of the cost-first products in one statement; a signature that differs makes the product stale
 with the reason `STOCK` — a batch received, FIFO consumption on order confirmation, an adjustment, a
 return or a cost correction. It is evaluated and written exactly as an FX move, `engine_owner` in the

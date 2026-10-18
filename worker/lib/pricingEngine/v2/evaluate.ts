@@ -273,8 +273,9 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
       channels: unit.channels.filter(structuralChannel).map((c) => c.channel),
       chain: chainOfUnit(inputs, { option_value_ids: ids, color_id: colorId, combo_key: combo || null }),
       target: resolveRuleAt(rules, 'target_profit', unitRuleTarget(pid, { option_value_ids: ids, color_id: colorId }), { usdIqdRate: u }),
-      // Row 244: cost-first, the direct sale of a SKU with stock is priced from its costliest batch on the shelf.
-      shelf: a.method === 'cost' ? shelfOfSku(a.shelf, { option_value_ids: ids, color_id: colorId, combo_key: combo }) : null,
+      // Row 244: cost-first, the direct sale of a SKU with stock is priced from its costliest batch on the shelf —
+      // in dollars at today's U (row 247; a batch with no purchase rate in dinars as paid).
+      shelf: a.method === 'cost' ? shelfOfSku(a.shelf, { option_value_ids: ids, color_id: colorId, combo_key: combo }, u) : null,
     };
   });
 
