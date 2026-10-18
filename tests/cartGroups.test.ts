@@ -69,7 +69,7 @@ test('the cart and the checkout both group through it, and the checkout total is
   assert.match(cart, /role="checkbox"\s+aria-checked=\{state\}/, 'the group header is a tri-state checkbox');
   assert.match(cart, /aria-label=\{colourWords\.groupSelect\(name\)\}/);
   assert.match(checkout, /groupCartLines\(\s*summaryLines\.map/);
-  // …and, in dollars, the lines' own dollar prices (DECISIONS row 247).
+  // …and, in dollars, the lines' own dollar prices (DECISIONS row 248).
   assert.match(checkout, /money\(entry\.items\.reduce\(\(n, l\) => n \+ l\.lineTotal, 0\), groupUsd\(entry\.items\)\)/, 'the group total sums the server\'s line totals');
   // The colour is a tag at body size, not the last word of the grey label.
   assert.match(cart, /data-cart-colour-tag/);

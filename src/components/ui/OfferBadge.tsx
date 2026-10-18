@@ -97,7 +97,7 @@ export const SALE_PRICE = { ar: 'سعر العرض', en: 'Sale price', ckb: 'ن�
  */
 export function StruckMoney({ iqd, usdCents, className = '' }: { iqd: number; usdCents?: number | null; className?: string }) {
   const { money } = useMoney();
-  // The shop's dollar price when the caller has one for this figure (DECISIONS row 247).
+  // The shop's dollar price when the caller has one for this figure (DECISIONS row 248).
   const [amount, unit] = splitMoney(money(iqd, usdCents));
   return (
     <span className={[className, 'line-through tabular-nums'].filter(Boolean).join(' ')}>
@@ -119,7 +119,7 @@ export function OfferSaving({
   /** The server's percent; null or < 1 shows the strike alone. */
   percent: number | null | undefined;
   /**
-   * The struck amount in the shop's dollars (DECISIONS row 247) — passed only when the price beside it
+   * The struck amount in the shop's dollars (DECISIONS row 248) — passed only when the price beside it
    * is read in dollars too (`pairedUsd`); then the badge is the server's percent of the dollar pair.
    */
   beforeUsdCents?: number | null;

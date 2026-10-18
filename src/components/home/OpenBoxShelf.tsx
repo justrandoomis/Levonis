@@ -96,7 +96,7 @@ function OpenBoxCard({ p, lang }: { p: ApiProduct; lang: string }) {
         ) : null}
 
         <span className="mt-0.5 flex flex-col">
-          <span className="text-[14px] font-bold text-white tabular-nums">{money(price)}</span>
+          <span className="text-[14px] font-bold text-white tabular-nums">{money(price, typeof p.display_price_iqd === 'number' ? p.display_price_usd_cents : null)}</span>
           {/* The NEW product's current price, not a compare-at on this row.
               Present only when the server found an honest saving. */}
           {reference ? (

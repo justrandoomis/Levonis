@@ -1592,7 +1592,7 @@ function priceCompositionLine(
           })
         : null,
     breakdown: {
-      // A composition's figures have no dollar base (DECISIONS row 247): its line carries no twin.
+      // A composition's figures have no dollar base (DECISIONS row 248): its line carries no twin.
       ...withoutUsdTwins(publicBreakdown(b.pricing.resolved)),
       applied_iqd: bundlePrice,
       // `ResolvedPrice.applied_tier` is a SHARED type and is deliberately not
@@ -2092,12 +2092,21 @@ export interface CheckoutSource {
 function lockUnitPrice<T extends { applied_iqd: number; unit_subtotal_iqd: number }>(r: T, ceiling: number | undefined): T {
   if (ceiling === undefined || !Number.isFinite(ceiling) || r.unit_subtotal_iqd <= ceiling) return r;
   const cut = Math.min(r.unit_subtotal_iqd - Math.max(0, Math.trunc(ceiling)), r.applied_iqd);
+  if (cut <= 0) return r;
+  // The locked price is the dinar figure the buyer was quoted; the live dollar price describes the higher
+  // price it replaced, so it leaves with it and the locked line is converted (DECISIONS row 248). The
+  // regular twin stays: the regular price is unchanged.
+  const { applied_usd_cents: _applied, unit_subtotal_usd_cents: _unit, offer_before_usd_cents: _before, ...live } = r as T & {
+    applied_usd_cents?: number;
+    unit_subtotal_usd_cents?: number;
+    offer_before_usd_cents?: number;
+  };
   return {
-    ...r,
+    ...live,
     applied_iqd: r.applied_iqd - cut,
     unit_subtotal_iqd: r.unit_subtotal_iqd - cut,
     quick_buy_lock: { live_unit_iqd: r.unit_subtotal_iqd, locked_unit_iqd: r.unit_subtotal_iqd - cut },
-  } as T;
+  } as unknown as T;
 }
 
 /** Credit a purchase's OWN reserved units back to the counters it holds them on. */
@@ -4200,9 +4209,9 @@ function quoteLines(lines: ComputedLine[]) {
         qty: l.qty,
         unit_price_iqd: l.unit,
         line_total_iqd: l.line,
-        // The line in the shop's dollars (DECISIONS row 247): only while the unit charged IS the
+        // The line in the shop's dollars (DECISIONS row 248): only while the unit charged IS the
         // breakdown's unit (never a gift's 0 or a bundle's own figure), exact cents × quantity.
-        ...(isUsdCents(l.breakdown?.unit_subtotal_usd_cents) && l.unit === l.breakdown.unit_subtotal_iqd && l.line === l.unit * l.qty
+        ...(!l.gift && isUsdCents(l.breakdown?.unit_subtotal_usd_cents) && l.unit === l.breakdown.unit_subtotal_iqd && l.line === l.unit * l.qty
           ? { unit_price_usd_cents: l.breakdown.unit_subtotal_usd_cents, line_total_usd_cents: l.breakdown.unit_subtotal_usd_cents * l.qty }
           : {}),
         is_printer: l.is_printer,
@@ -4212,7 +4221,7 @@ function quoteLines(lines: ComputedLine[]) {
         ...(l.breakdown && typeof l.breakdown.offer_before_iqd === 'number'
           ? { offer_before_iqd: l.breakdown.offer_before_iqd, offer_saving_percent: l.breakdown.offer_saving_percent }
           : {}),
-        // …and in the shop's dollars, only as the pair the breakdown carries (DECISIONS row 247).
+        // …and in the shop's dollars, only as the pair the breakdown carries (DECISIONS row 248).
         ...(l.breakdown && typeof l.breakdown.offer_before_iqd === 'number' && isUsdCents(l.breakdown.offer_before_usd_cents)
           ? { offer_before_usd_cents: l.breakdown.offer_before_usd_cents, offer_saving_percent_usd: l.breakdown.offer_saving_percent_usd ?? null }
           : {}),

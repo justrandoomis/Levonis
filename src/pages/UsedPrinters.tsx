@@ -373,7 +373,11 @@ function GradedCard({ p, lang }: { p: GradedProduct; lang: string }) {
               {loc(UNPRICED_TEXT.ar, UNPRICED_TEXT.en, UNPRICED_TEXT.ckb)}
             </span>
           ) : (
-            <span className="text-[14px] leading-5 font-bold text-text-primary tabular-nums">{money(price)}</span>
+            <span className="text-[14px] leading-5 font-bold text-text-primary tabular-nums">
+              {/* The shop's dollar price (DECISIONS row 248), as the card and the product page print it; the
+                  new-unit reference below is a comparison price and stays converted. */}
+              {money(price, typeof p.display_price_iqd === 'number' ? p.display_price_usd_cents : null)}
+            </span>
           )}
           {reference ? (
             <span className="text-[11px] leading-4 text-text-muted line-through tabular-nums">

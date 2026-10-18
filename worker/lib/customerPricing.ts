@@ -62,7 +62,7 @@ export const CUSTOMER_ARITHMETIC_KEYS = [
   'prime_adjust_iqd',
   'pro_adjust_iqd',
   // a dollar sale price (docs/ux/PRODUCT-DISCOUNT.md §11): the rate itself, the model rows and the
-  // working of a dollar price never reach a customer. DECISIONS row 247 (amending row 243): the customer
+  // working of a dollar price never reach a customer. DECISIONS row 248 (amending row 243): the customer
   // IS shown the shop's dollar price, but only as whole cents beside the dinar price
   // (`*_usd_cents`, `*_saving_percent_usd`) — never the rate, `usd_ceil6`, the typed model rows or
   // the form's before_usd / after_usd
@@ -158,7 +158,7 @@ export interface CustomerLinePrice {
   /** D9: round((before − applied) × 100 / before) of the two figures printed together; null below 1. */
   offer_saving_percent: number | null;
   /**
-   * THE SHOP'S DOLLAR PRICES OF THIS LINE (DECISIONS row 247), whole cents, each present only where
+   * THE SHOP'S DOLLAR PRICES OF THIS LINE (DECISIONS row 248), whole cents, each present only where
    * its dinar figure has a dollar base (`ResolvedPrice`); a customer reading dollars is shown these,
    * and every figure without one is converted at the display rate.
    */
@@ -256,7 +256,7 @@ export function customerLinePrice(r: ResolvedPrice): CustomerLinePrice {
 /**
  * The struck before price and its percent, from the two numbers a customer is shown (§8.1, D9).
  *
- * In dollars too (DECISIONS row 247), and only as a PAIR: the struck dollar price and the dollar
+ * In dollars too (DECISIONS row 248), and only as a PAIR: the struck dollar price and the dollar
  * «−N٪» are added only when the dinar pair is struck and BOTH dollar twins exist with the before
  * above the after — so a percent is always the percent of the two numbers printed beside it.
  */
@@ -284,7 +284,7 @@ export function customerOrderPricing(snapshot: unknown): Record<string, unknown>
   for (const k of ['regular_iqd', 'applied_iqd', 'unit_subtotal_iqd'] as const) {
     if (num(s[k]) !== null) out[k] = s[k];
   }
-  // The line's dollar prices, FROZEN when it sold (DECISIONS row 247): whole cents only, and only
+  // The line's dollar prices, FROZEN when it sold (DECISIONS row 248): whole cents only, and only
   // where the snapshot has them — a line sold before them has none and is converted.
   Object.assign(out, customerUsdTwins(s));
   // The frozen class becomes the label the buyer reads — the same F5 rule the page applied (§9.4).

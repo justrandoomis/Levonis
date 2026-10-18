@@ -107,7 +107,7 @@ function PricePlate({ p }: { p: ApiProduct }) {
   // Commercial tiles are SELLABLE-only (rule R4, rows 239-240); a null price is never drawn as 0.
   if (display == null || isUnpriced(p)) return null;
   const discounted = display < (regular ?? display);
-  // The shop's dollar prices (DECISIONS row 247): the struck pair in dollars only when both exist.
+  // The shop's dollar prices (DECISIONS row 248): the struck pair in dollars only when both exist.
   const usd = pairedUsd(
     p.display_price_usd_cents,
     typeof p.display_offer_before_iqd === 'number' ? p.display_offer_before_usd_cents : p.display_regular_usd_cents,

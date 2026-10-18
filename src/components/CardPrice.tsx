@@ -72,7 +72,7 @@ function RegularPrice({ p, compact }: { p: ApiProduct; compact: boolean }) {
   // A LIVE OFFER strikes the published price it replaced (docs/ux/PRODUCT-DISCOUNT.md §8.2, F1) — the
   // server's number, never `regular`, which already IS the offer price; a member saving strikes as before.
   const struck = typeof p.display_offer_before_iqd === 'number' ? p.display_offer_before_iqd : main < regular ? regular : null;
-  // The shop's dollar prices (DECISIONS row 247): the struck pair in dollars only when both exist.
+  // The shop's dollar prices (DECISIONS row 248): the struck pair in dollars only when both exist.
   const usd = pairedUsd(
     p.display_price_usd_cents,
     typeof p.display_offer_before_iqd === 'number' ? p.display_offer_before_usd_cents : p.display_regular_usd_cents,
@@ -165,7 +165,7 @@ function CompactPrice({ p }: { p: ApiProduct }) {
   const offerBefore = typeof p.display_offer_before_iqd === 'number' ? p.display_offer_before_iqd : null;
   const line = offerBefore === null ? memberLine(p) : null;
   const struck = offerBefore ?? (!line && main < regular ? regular : null);
-  // The shop's dollar prices (DECISIONS row 247): the struck pair in dollars only when both exist.
+  // The shop's dollar prices (DECISIONS row 248): the struck pair in dollars only when both exist.
   const usd = pairedUsd(p.display_price_usd_cents, offerBefore !== null ? p.display_offer_before_usd_cents : p.display_regular_usd_cents, struck !== null);
   const [amount, unit] = splitMoney(money(main, usd.price));
   const amountTone =

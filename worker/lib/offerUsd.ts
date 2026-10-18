@@ -31,7 +31,7 @@ import { parseV2Usd } from '@levonis/pricing/priceV2';
 
 export type FixedUsdAnswer =
   /**
-   * The line's offer regular price, and its dollar twin (DECISIONS row 247) when one exists: the typed
+   * The line's offer regular price, and its dollar twin (DECISIONS row 248) when one exists: the typed
    * cents on a direct line, `route − (direct − typed)` in cents on a prepaid route. Absent otherwise.
    */
   | { kind: 'price'; regular_iqd: number; regular_usd_cents?: number }
@@ -79,7 +79,7 @@ export function fixedUsdLine(i: {
   directIqd: number | null;
   channelIqd: number;
   /**
-   * THE DOLLAR TWIN (DECISIONS row 247). `direct`: the line is read on the SKU's direct row (a direct
+   * THE DOLLAR TWIN (DECISIONS row 248). `direct`: the line is read on the SKU's direct row (a direct
    * sale, or a COD pre-order priced as direct) — its dollar after-price is exactly the typed cents.
    * Otherwise the line is a prepaid route: the same saving comes off the route's own dollars,
    * `channelUsdCents − (directUsdCents − cents)`, when both are known and the result is above zero.

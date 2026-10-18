@@ -284,10 +284,10 @@ test('the checkout total keeps the dinar, whatever the switch says', () => {
   // The screen with the pay button on it is the last place to be
   // approximate: a converted figure at a rate the shop can change tomorrow is
   // not the number the customer's bank will see.
-  // In dollars the total is Σ the lines' dollar prices + one conversion of the rest (DECISIONS row 247),
+  // In dollars the total is Σ the lines' dollar prices + one conversion of the rest (DECISIONS row 248),
   // printed after the dinars it is charged in.
   assert.match(src, /data-testid="checkout-order-total"[\s\S]{0,200}\{moneyBoth\(orderTotal, orderTotalUsd\)\}/);
-  assert.match(src, /const \{ money, moneyBoth, walletMoney, walletCharge, usdTotal \} = useMoney\(\);/);
+  assert.match(src, /const \{ money, moneyBoth, walletMoney, walletCharge, usdTotal, usdWith \} = useMoney\(\);/);
   assert.match(src, /const orderTotalUsd = usdTotal\(orderTotal, usdLines\);/);
 });
 
@@ -521,7 +521,7 @@ test('in USD mode no screen shows one charge in two dollar figures at different 
   assert.match(read('src/pages/Profile.tsx'), /currency === 'USD' \? <bdi dir="ltr">\{walletMoney\(balanceIqd, balanceUsdCents\)\}<\/bdi>/);
 });
 
-// ------------------------------------- the dollar is the base (DECISIONS row 247)
+// ------------------------------------- the dollar is the base (DECISIONS row 248)
 
 /**
  * The owner, 2026-10-17: «الدولار هو الاساس … الدولار هو الثابت والدينار العراقي هو المتغير بسعر الصرف».

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight, Landmark, Truck, MessageSquare, Repeat, Gift, Zap } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useWallet } from '../WalletContext';
-import { api, orderItemUsdCents } from '../lib/api';
+import { api, orderItemUsdBase } from '../lib/api';
 import Note from '../components/ui/Note';
 import BundleContents from '../components/bundles/BundleContents';
 import MysteryReveal from '../components/offers/MysteryReveal';
@@ -249,7 +249,7 @@ const TILE =
   'lv-surface flex items-center gap-3 px-4 min-h-[52px] hover:bg-surface-raised transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
 
 export default function OrderDetail() {
-  const { money, usdTotal } = useMoney();
+  const { money, usdTotal, usdWith } = useMoney();
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -459,10 +459,10 @@ export default function OrderDetail() {
   // loaded; the six-value legacy label is the fallback, never a guess.
   const pillLabel = tracking?.steps.find((st) => st.current)?.label ?? (order ? orderStatusLabel(lang, order) : '');
   const notFound = orderError !== null && classifyError(orderError) === 'not-found';
-  // The total in dollars (DECISIONS row 247): Σ the lines' frozen dollar prices, plus one conversion of the
+  // The total in dollars (DECISIONS row 248): Σ the lines' frozen dollar prices, plus one conversion of the
   // rest at today's display rate (delivery, fees, points, lines sold before the dollar was frozen).
   const orderTotalUsd = order
-    ? usdTotal(order.total_iqd, order.items.map((it) => ({ iqd: it.line_total_iqd, usdCents: orderItemUsdCents(it)?.line ?? null })))
+    ? usdTotal(order.total_iqd, order.items.flatMap((it) => orderItemUsdBase(it)?.line ?? []))
     : null;
 
   return (
@@ -676,13 +676,16 @@ export default function OrderDetail() {
                       const itemUnits = unitsByItem.get(it.id) ?? [];
                       const reviewedThis = !!it.product_id && !!reviewed?.has(it.product_id);
                       const unitPrice = it.pricing?.unit_subtotal_iqd ?? it.unit_price_iqd;
-                      // The line's dollars, frozen when it sold (DECISIONS row 247); null = converted at today's rate.
-                      const lineUsd = orderItemUsdCents(it);
-                      const offerUsd = pairedUsd(
-                        lineUsd?.unit,
-                        it.pricing?.offer_before_usd_cents,
-                        typeof it.pricing?.offer_before_iqd === 'number' && it.pricing.offer_before_iqd > 0
-                      );
+                      // The line's dollars, frozen when it sold (DECISIONS row 248); null = converted at today's rate.
+                      // A warranty on top is converted once; the struck price is paired with the applied price.
+                      const lineBase = orderItemUsdBase(it);
+                      const lineUsd = lineBase
+                        ? { unit: usdWith(Number(unitPrice) || 0, lineBase.unit), line: usdWith(it.line_total_iqd, lineBase.line) }
+                        : null;
+                      const struckShown = typeof it.pricing?.offer_before_iqd === 'number' && it.pricing.offer_before_iqd > 0;
+                      const offerPair = pairedUsd(lineBase?.appliedUnit, it.pricing?.offer_before_usd_cents, struckShown);
+                      const offerUsd =
+                        struckShown && offerPair.struck === null ? { price: null, struck: null } : { price: lineUsd?.unit ?? null, struck: offerPair.struck };
                       const extras: string[] = [];
                       const months = it.warranty?.duration_months;
                       if (it.warranty && typeof months === 'number' && months > 0) {

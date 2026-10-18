@@ -36,7 +36,7 @@ import { ColourSwatch, ColourTag } from './ColourTag';
 import ShippingConflictDialog from '../cart/ShippingConflictDialog';
 import { toast } from '../../lib/toastStore';
 import { groupedNumber } from '../../lib/localeNumber';
-import { pairedUsd } from '../../CurrencyContext';
+import { pairedUsd, scaleUsdLine, unitUsdBase, type UsdLine } from '../../CurrencyContext';
 import { refusalText, stockRefusal } from '../../lib/refusalStrings';
 import { LINE_QTY_MAX } from '../../../packages/pricing/src/quantity';
 import {
@@ -70,8 +70,10 @@ export interface ColourRow {
   levelUnit: number | null;
   levelRegular: number | null;
   levelApplied: number | null;
-  /** The same level prices in the shop's dollars (DECISIONS row 247); absent/null = converted. */
+  /** The same level prices in the shop's dollars (DECISIONS row 248); absent/null = converted. */
   levelUnitUsd?: number | null;
+  /** The level's applied price in dollars: the base under a fee on top (`unitUsdBase`). */
+  levelAppliedUsd?: number | null;
   levelRegularUsd?: number | null;
 }
 
@@ -108,7 +110,7 @@ export interface ColourQuantityPanelProps {
   /** The desktop layout is on screen: the summary rides in the panel slot; on a phone it sits under the list. */
   wide?: boolean;
   money: (iqd: number, usdCents?: number | null) => string;
-  /** The page's dollar total (`useMoney().usdTotal`, DECISIONS row 247): Σ the rows' dollar prices. */
+  /** The page's dollar total (`useMoney().usdTotal`, DECISIONS row 248): Σ the rows' dollar prices. */
   usdTotal?: (totalIqd: number, lines: ReadonlyArray<{ iqd: number; usdCents?: number | null }>) => number | null;
   /** Quick Buy was on in single mode: ⚡ steps aside here, and says why. */
   quickBuyOn?: boolean;
@@ -120,8 +122,12 @@ interface RowQuote {
   unit: number;
   regular: number;
   applied: number;
-  /** The shop's dollar prices of the unit and the regular price (DECISIONS row 247); null = converted. */
-  unitUsd: number | null;
+  /**
+   * The shop's dollar prices (DECISIONS row 248): the unit's dollar base (`unitUsdBase` — its own twin, or
+   * its applied price under a fee on top), the applied and the regular price; null = converted.
+   */
+  unitBase: UsdLine | null;
+  appliedUsd: number | null;
   regularUsd: number | null;
   maxQty: number;
   tracked: boolean;
@@ -139,6 +145,7 @@ interface QuoteAnswer {
     regular_iqd: number;
     applied_iqd: number;
     unit_subtotal_usd_cents?: number;
+    applied_usd_cents?: number;
     regular_usd_cents?: number;
     errors?: string[];
   } | null;
@@ -274,7 +281,8 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
               unit: res.quote?.unit_subtotal_iqd ?? 0,
               regular: res.quote?.regular_iqd ?? 0,
               applied: res.quote?.applied_iqd ?? 0,
-              unitUsd: res.quote?.unit_subtotal_usd_cents ?? null,
+              unitBase: unitUsdBase(res.quote),
+              appliedUsd: res.quote?.applied_usd_cents ?? null,
               regularUsd: res.quote?.regular_usd_cents ?? null,
               maxQty: unpriced ? 0 : Math.max(0, Math.trunc(stock?.max_qty ?? LINE_QTY_MAX)),
               tracked: stock?.tracked === true,
@@ -390,10 +398,17 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
 
   /** Shown only when the rows' prices differ (§3.3). */
   const unitOf = (r: ColourRow): number | null => freshQuote(r.id)?.unit ?? r.levelUnit;
-  /** The same unit in the shop's dollars, from the answer the dinar unit came from. */
-  const unitUsdOf = (r: ColourRow): number | null => {
+  /** The same unit's dollar base, from the answer the dinar unit came from (`unitUsdBase`). */
+  const unitBaseOf = (r: ColourRow): UsdLine | null => {
     const q = freshQuote(r.id);
-    return q ? q.unitUsd : (r.levelUnitUsd ?? null);
+    if (q) return q.unitBase;
+    return unitUsdBase({ unit_subtotal_iqd: r.levelUnit, unit_subtotal_usd_cents: r.levelUnitUsd, applied_iqd: r.levelApplied, applied_usd_cents: r.levelAppliedUsd });
+  };
+  /** The unit in the shop's dollars: the base's cents plus one conversion of a fee on top; null = converted. */
+  const unitUsdOf = (r: ColourRow): number | null => {
+    const unit = unitOf(r);
+    const base = unitBaseOf(r);
+    return unit === null || !base || !usdTotal ? null : usdTotal(unit, [base]);
   };
   const priceDiffers = new Set(rows.filter((r) => r.offered).map(unitOf).filter((u): u is number => u !== null)).size > 1;
 
@@ -403,16 +418,13 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
   const total = live.every((r) => unitOf(r) !== null) && live.length > 0
     ? live.reduce((sum, r) => sum + (unitOf(r) ?? 0) * (quantities[r.id] ?? 0), 0)
     : null;
-  // In dollars: Σ each row's dollar price × its quantity, and only rows without one converted (DECISIONS row 247).
+  // In dollars: Σ each row's dollar price × its quantity, and only rows without one converted (DECISIONS row 248).
   const totalUsd =
     total !== null && usdTotal
       ? usdTotal(
           total,
-          live.map((r) => {
-            const q = quantities[r.id] ?? 0;
-            const usd = unitUsdOf(r);
-            return { iqd: (unitOf(r) ?? 0) * q, usdCents: usd === null ? null : usd * q };
-          })
+          // Each row's dollar base × its quantity; every fee on top and every row without one is the remainder.
+          live.map((r) => scaleUsdLine(unitBaseOf(r), quantities[r.id] ?? 0)).filter((l): l is UsdLine => l !== null)
         )
       : null;
   const [announced, setAnnounced] = useState('');
@@ -709,11 +721,10 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
           const unit = unitOf(r);
           const regular = q ? q.regular : r.levelRegular;
           const applied = q ? q.applied : r.levelApplied;
-          const rowUsd = pairedUsd(
-            unitUsdOf(r),
-            q ? q.regularUsd : (r.levelRegularUsd ?? null),
-            regular !== null && applied !== null && applied < regular
-          );
+          // The struck regular is paired with the applied price it is compared with (DECISIONS row 248).
+          const rowStruck = regular !== null && applied !== null && applied < regular;
+          const rowPair = pairedUsd(q ? q.appliedUsd : (r.levelAppliedUsd ?? null), q ? q.regularUsd : (r.levelRegularUsd ?? null), rowStruck);
+          const rowUsd = rowStruck && rowPair.struck === null ? { price: null, struck: null } : { price: unitUsdOf(r), struck: rowPair.struck };
           const zero = r.offered && ceiling === 0;
           const facts: React.ReactNode[] = [];
           if (r.chip && !zero && !r.soldOut) facts.push(<span key="chip" className={r.chip.cls}>{r.chip.text}</span>);

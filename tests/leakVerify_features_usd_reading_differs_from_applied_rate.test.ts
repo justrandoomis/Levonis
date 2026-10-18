@@ -4,18 +4,24 @@
  *
  * The FX programme prices in USD and charges in dinars at the APPLIED rate
  * (`pricing_fx_rates.rate_iqd`, market + the owner's adjustment). Row 220
- * publishes the market sell (to hide the adjustment), and until row 247 every
+ * publishes the market sell (to hide the adjustment), and until row 248 every
  * dollar reading was the dinar price at that market rate: with the owner's
  * own example (1,660 + 20) a $100 product read $101.20.
  *
- * THE OWNER'S RULING (DECISIONS row 247, 2026-10-17): «الدولار هو الاساس …
+ * THE OWNER'S RULING (DECISIONS row 248, 2026-10-17): «الدولار هو الاساس …
  * الدولار هو الثابت والدينار العراقي هو المتغير بسعر الصرف». A product the
  * shop priced at $100 reads $100.00: the server sends the shop's own dollar
  * price beside the dinar price (`*_usd_cents`), and the client prints it.
- * The owner accepts what that reveals (a dollar price beside its dinar price
- * is that row's applied rate; on AUTO with an adjustment, the adjustment).
  * Only a DINAR-NATIVE amount — a fee, points, a coupon — is still read at the
  * public display rate, and the public figure itself still gives nothing away.
+ *
+ * WHAT IS STILL OPEN (DECISIONS row 248 (7), row 220 (ز)). A dollar price
+ * beside its dinar price IS that row's applied rate (dinars ÷ dollars), and
+ * the applied rate less IQWealth's public sell IS the owner's private
+ * adjustment (or his markup over the market, on a typed rate). The owner's
+ * instruction asks for exactly the figure that reveals it, so it ships; his
+ * explicit word on that consequence is still awaited, and the third test
+ * below stays a `todo` until he gives it.
  *
  * LOCAL ONLY: in-memory SQLite, the real misc router (/api/settings/public),
  * the client's own exact converter (src/lib/displayRate.ts) and money()
@@ -64,4 +70,16 @@ test('a product the shop priced at $100 (168,000 IQD at the applied 1,680) reads
   assert.equal(view.money(100 * 1680), '$101.20');
   // In dinars nothing moves.
   assert.equal(currencyValue('IQD', () => {}, { text: settings.displayUsdRate, source: 'shop' }).money(100 * 1680, cents), '168,000 د.ع');
+});
+
+const OWNER_RULING =
+  'OWNER RULING NEEDED (DECISIONS rows 220 (ز) and 248 (7)): the dollar price beside its dinar price is the applied rate, and the applied rate less the public market sell is the private adjustment — shipped on the owner’s instruction «الدولار هو الاساس», his confirmation of this consequence is awaited';
+
+test('no public pair of figures gives the owner’s adjustment away', { todo: OWNER_RULING }, async () => {
+  const { settings } = await world();
+  // What any visitor can read: the dinar price, the shop's dollar price of it, and the public figure.
+  const dinars = 100 * 1680;
+  const cents = usdCeilCentsOf('100.000000')!;
+  const derivedApplied = dinars / (cents / 100);
+  assert.equal(derivedApplied - Number(settings.displayUsdRate), 0, 'the adjustment derivable from public payloads');
 });

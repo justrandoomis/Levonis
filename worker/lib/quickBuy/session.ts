@@ -34,6 +34,7 @@ import { assertHoldStateStatement, purchaseHoldInsertStatement, releaseHoldState
 import { walletFreeDeliveryPublic, WALLET_FREE_DELIVERY_LABEL } from '../walletFreeDelivery';
 import { PRINTER_STANDARD_DELIVERY_POLICY, isPrinterStandardAcceptance } from '@levonis/shipping/printerDeliveryPolicy';
 import { CART_LINE_COLUMNS } from '../cartLineProjection';
+import { isUsdCents } from '@levonis/pricing/usdCents';
 import {
   checkoutInputFrom,
   computeCheckout,
@@ -163,6 +164,29 @@ interface ItemSnapshot {
   slug?: string;
   regular_unit_iqd?: number;
   membership_discount_iqd?: number;
+  /**
+   * THE UNIT'S DOLLAR BASE when the line was priced (DECISIONS row 248): the part of the unit the shop
+   * priced in dollars (`usd_base_iqd` dinars = `usd_base_cents`), and the unit it belongs to
+   * (`usd_unit_iqd`). The session card shows it only while the line's unit is still that unit.
+   */
+  usd_unit_iqd?: number;
+  usd_base_iqd?: number;
+  usd_base_cents?: number;
+}
+
+/**
+ * A line's dollar base (DECISIONS row 248): the unit's own twin, or — under a warranty on top — its applied
+ * price's. Only while the unit charged is the breakdown's unit (never a gift's 0 or a bundle); absent otherwise.
+ */
+function usdBaseOfLine(l: Pick<ComputedLine, 'unit' | 'line' | 'qty' | 'breakdown'> & { gift?: unknown }): Pick<ItemSnapshot, 'usd_unit_iqd' | 'usd_base_iqd' | 'usd_base_cents'> {
+  const b = l.breakdown as { unit_subtotal_iqd?: unknown; unit_subtotal_usd_cents?: unknown; applied_iqd?: unknown; applied_usd_cents?: unknown } | null | undefined;
+  if (l.gift || !b || b.unit_subtotal_iqd !== l.unit || l.line !== l.unit * l.qty || !(l.unit > 0)) return {};
+  if (isUsdCents(b.unit_subtotal_usd_cents)) return { usd_unit_iqd: l.unit, usd_base_iqd: l.unit, usd_base_cents: b.unit_subtotal_usd_cents };
+  const applied = b.applied_iqd;
+  if (isUsdCents(b.applied_usd_cents) && typeof applied === 'number' && Number.isSafeInteger(applied) && applied > 0 && applied <= l.unit) {
+    return { usd_unit_iqd: l.unit, usd_base_iqd: applied, usd_base_cents: b.applied_usd_cents };
+  }
+  return {};
 }
 
 export async function sessionView(db: D1Database, s: QuickBuySessionRow, nowMs = Date.now(), lang: string = 'ar') {
@@ -220,6 +244,16 @@ export async function sessionView(db: D1Database, s: QuickBuySessionRow, nowMs =
         max_qty: ceilings[i],
         unit_price_iqd: it.unit_price_iqd,
         line_total_iqd: it.line_total_iqd,
+        // The unit's dollar base (DECISIONS row 248), only while the line still sells at the unit it was
+        // frozen with: the client prints the base's cents plus one conversion of a fee on top.
+        ...(snap.usd_unit_iqd === it.unit_price_iqd &&
+        it.line_total_iqd === it.unit_price_iqd * it.qty &&
+        isUsdCents(snap.usd_base_cents) &&
+        typeof snap.usd_base_iqd === 'number' &&
+        snap.usd_base_iqd > 0 &&
+        snap.usd_base_iqd <= it.unit_price_iqd
+          ? { unit_base_iqd: snap.usd_base_iqd, unit_base_usd_cents: snap.usd_base_cents }
+          : {}),
         option_value_ids: parseJson<string[]>(it.option_value_ids, []),
         color_id: it.color_id,
         warranty_plan_id: it.warranty_plan_id,
@@ -433,6 +467,7 @@ function itemSnapshot(l: ComputedLine, product: Record<string, unknown> | undefi
     slug: typeof product?.slug === 'string' ? (product.slug as string) : '',
     regular_unit_iqd: typeof breakdown.regular_iqd === 'number' ? breakdown.regular_iqd : undefined,
     membership_discount_iqd: membershipDiscount,
+    ...usdBaseOfLine(l),
   };
   return JSON.stringify(snap);
 }

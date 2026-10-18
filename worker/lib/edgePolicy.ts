@@ -114,7 +114,7 @@ export const ANONYMOUS_CACHE_CONTROL = cacheControlFor(ANONYMOUS_LIFETIME);
  * answer's compatibility is one item per label with `more`, and the imported
  * English carries the translation memory's words — a pre-release copy would
  * still show the repeated chips.
- * 2026-10-17 (DECISIONS row 247): cards, levels and quotes carry the shop's
+ * 2026-10-17 (DECISIONS row 248): cards, levels and quotes carry the shop's
  * dollar prices (`*_usd_cents`) — a body cached before would keep reading the
  * dinar price divided back by a rate. */
 export const PUBLIC_PROJECTION_REVISION = 'usd-base-2026-10';

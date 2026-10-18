@@ -2113,10 +2113,16 @@ export function withLiveOffer(
  * chooser adds its fee beside them. Selection-validity errors (a colour on
  * the wrong option) are not this function's business — only the numbers.
  */
-/** One way to buy: its unit price, and the shop's dollar price of it when it has one (DECISIONS row 247). */
+/**
+ * One way to buy: its unit price, and the shop's dollar price of it when it has one (DECISIONS row 248).
+ * With a dinar fee on top of a dollar price (a route commission, a direct premium) the unit has no twin
+ * of its own: the applied price and its twin travel instead, and the client converts only the fee.
+ */
 export interface ModePrice {
   unit_subtotal_iqd: number;
   unit_subtotal_usd_cents?: number;
+  applied_iqd?: number;
+  applied_usd_cents?: number;
 }
 
 export interface PricingModes {
@@ -2164,11 +2170,13 @@ export function pricingModes(
       preorderPricing,
       isPrinter,
     }), doc, ctx, offer, now);
-  // The unit price of one way to buy, with its dollar twin where it has one (DECISIONS row 247).
+  // The unit price of one way to buy, with its dollar twin where it has one (DECISIONS row 248).
   const modePrice = (r: ResolvedPrice): ModePrice =>
     isUsdCents(r.unit_subtotal_usd_cents)
       ? { unit_subtotal_iqd: r.unit_subtotal_iqd, unit_subtotal_usd_cents: r.unit_subtotal_usd_cents }
-      : { unit_subtotal_iqd: r.unit_subtotal_iqd };
+      : isUsdCents(r.applied_usd_cents) && r.applied_iqd > 0 && r.applied_iqd < r.unit_subtotal_iqd
+        ? { unit_subtotal_iqd: r.unit_subtotal_iqd, applied_iqd: r.applied_iqd, applied_usd_cents: r.applied_usd_cents }
+        : { unit_subtotal_iqd: r.unit_subtotal_iqd };
   const d = resolve(null, 'prepaid');
   const direct = d.errors.includes('TRANSPORT_REQUIRED') ? null : modePrice(d);
   const unusable = new Set(['TRANSPORT_NOT_APPLICABLE', 'TRANSPORT_NOT_OFFERED', 'TRANSPORT_COMMISSION_UNCONFIGURED']);
@@ -2330,7 +2338,7 @@ export interface PriceLevel {
   offer_before_iqd?: number | null;
   offer_saving_percent?: number | null;
   /**
-   * THE SHOP'S DOLLAR PRICES OF THIS LEVEL (DECISIONS row 247), whole cents: the twins of the figures
+   * THE SHOP'S DOLLAR PRICES OF THIS LEVEL (DECISIONS row 248), whole cents: the twins of the figures
    * above, each present only where it has a dollar base; the struck pair in dollars only when both
    * twins exist. A level without them is converted at the display rate.
    */
@@ -2405,7 +2413,7 @@ export function levelPrice(
     // The F5 label (display only, §9.4); `r.applied_tier` stays the price class.
     applied_tier: offerLabelTier(r),
     ...(figures.offer_before_iqd !== null ? figures : {}),
-    // The shop's dollars (DECISIONS row 247), where this level has them.
+    // The shop's dollars (DECISIONS row 248), where this level has them.
     ...customerUsdTwins(r),
   };
 }
@@ -2694,7 +2702,7 @@ export function catalogOnlyCard(doc: ProductDoc, coarse = false): Record<string,
  * member prices across levels, for the card's faint tier teasers; null =
  * that tier has no explicit price anywhere on the product.
  */
-/** The card's dollar twins (DECISIONS row 247): what a composition's own display block clears. */
+/** The card's dollar twins (DECISIONS row 248): what a composition's own display block clears. */
 const CARD_USD_KEYS = [
   'display_price_usd_cents',
   'display_regular_usd_cents',
@@ -2849,13 +2857,19 @@ export function publicWithDisplayPrice(
   let preRegular: number | null = null;
   let postRegular: number | null = null;
   /**
-   * THE DOLLAR TWINS OF THE CARD'S FIGURES (DECISIONS row 247), carried with the figures they belong
-   * to. A figure two levels reach with DIFFERENT dollars (or one with dollars and one without) is
-   * ambiguous: it gets no twin and the card converts it — never one level's dollars beside another's.
+   * THE DOLLAR TWINS OF THE CARD'S FIGURES (DECISIONS row 248), carried with the figures they belong
+   * to. Two levels that reach the same dinar figure with different dollars (SKUs a few cents apart under
+   * one 250-IQD step) give the LOWEST — a real SKU's dollar price at the dinar figure shown, as the
+   * «from» is. One with dollars and one without is ambiguous: no twin, and the card converts it —
+   * never a figure no level has.
    */
   const AMBIGUOUS = -1;
-  const twinOf = (held: number | undefined | null, next: number | undefined): number | null =>
-    held === undefined ? (next ?? null) : held === (next ?? null) ? held : AMBIGUOUS;
+  const twinOf = (held: number | undefined | null, next: number | undefined): number | null => {
+    if (held === undefined) return next ?? null;
+    if (held === AMBIGUOUS) return AMBIGUOUS;
+    if (held === null || next === undefined) return held === null && next === undefined ? null : AMBIGUOUS;
+    return Math.min(held, next);
+  };
   let bestApplied: number | null | undefined;
   let bestRegular: number | null | undefined;
   let preRegularUsd: number | null | undefined;
@@ -3020,7 +3034,7 @@ export function publicWithDisplayPrice(
   out.display_offer_before_iqd = offerBefore;
   out.display_offer_saving_percent = offerSavingPercent(offerBefore, resolved.applied_iqd);
   /**
-   * THE SAME FIGURES IN THE SHOP'S DOLLARS (DECISIONS row 247), each present only where it has a
+   * THE SAME FIGURES IN THE SHOP'S DOLLARS (DECISIONS row 248), each present only where it has a
    * dollar base: what a customer reading dollars is shown instead of the dinars divided by a rate. The
    * struck dollar price and the dollar «−N٪» only as a pair. No dollar for a member teaser (a PRO price
    * comes from dinar rules) — the card converts that one.
@@ -3263,7 +3277,7 @@ const CARD_FIELDS = [
   // A live offer's struck before price and its «−N٪» (docs/ux/PRODUCT-DISCOUNT.md §8.1).
   'display_offer_before_iqd',
   'display_offer_saving_percent',
-  // The shop's dollar prices of the figures above (DECISIONS row 247): whole cents, each present only
+  // The shop's dollar prices of the figures above (DECISIONS row 248): whole cents, each present only
   // where the figure has a dollar base — what a customer reading dollars is shown instead of the dinars
   // divided back by a rate. Never the rate, `usd_ceil6` or the typed model rows.
   'display_price_usd_cents',
@@ -4769,7 +4783,7 @@ productRoutes.post('/:slug/quote', async (c) => {
       ...customerLinePrice(priced),
       qty,
       line_total_iqd: priced.unit_subtotal_iqd * qty,
-      // The line in the shop's dollars (DECISIONS row 247): exact integer cents × quantity.
+      // The line in the shop's dollars (DECISIONS row 248): exact integer cents × quantity.
       ...(isUsdCents(priced.unit_subtotal_usd_cents) ? { line_total_usd_cents: priced.unit_subtotal_usd_cents * qty } : {}),
     },
     // §8/§9: what PREMIUM and PRO pay for THIS selection, from the live rules.

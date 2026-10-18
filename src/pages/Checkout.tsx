@@ -88,7 +88,7 @@ import { motion } from 'motion/react';
  * on a tier id or spells a label out.
  */
 import { isPaidTier, tierLabel } from '../components/subscription/tierMeta';
-import { pairedUsd, useMoney } from '../CurrencyContext';
+import { pairedUsd, scaleUsdLine, unitUsdBase, useMoney, type UnitUsdFigures, type UsdLine } from '../CurrencyContext';
 import VariantImg from '../components/ui/VariantImg';
 
 /** Its own chunk: fetched only after an order is placed, drawn only for a printer with parts. */
@@ -181,6 +181,7 @@ interface CheckoutQuoteLineDto {
     transport?: { method: string } | null;
     offer_before_iqd?: number | null;
     offer_saving_percent?: number | null;
+    applied_usd_cents?: number;
     unit_subtotal_usd_cents?: number;
     offer_before_usd_cents?: number;
     offer_saving_percent_usd?: number | null;
@@ -189,7 +190,7 @@ interface CheckoutQuoteLineDto {
   offer_before_iqd?: number | null;
   offer_saving_percent?: number | null;
   /**
-   * The line in the shop's dollars (DECISIONS row 247), whole cents: its unit and line total, and the
+   * The line in the shop's dollars (DECISIONS row 248), whole cents: its unit and line total, and the
    * struck unit price with the percent of the dollar pair. Absent = converted.
    */
   unit_price_usd_cents?: number;
@@ -579,21 +580,60 @@ function offerLineOf(beforeUnit: number | null | undefined, percent: number | nu
 }
 
 /**
- * THE SAME LINE IN THE SHOP'S DOLLARS (DECISIONS row 247): its total (unit cents × qty), and the struck
- * total with the percent of the dollar pair. Null where the server sent no dollar price.
+ * THE SAME LINE IN THE SHOP'S DOLLARS (DECISIONS row 248): its dollar base × qty (`unitUsdBase` — the unit's
+ * own twin, or its applied price under a warranty or a route fee, which is then converted once), the line
+ * total that base gives, the applied price × qty the struck total is paired with, and the struck total with
+ * the percent of the dollar pair. Null where the server sent no dollar price — and always on a gift, which
+ * is charged 0.
  */
 function usdLineOf(
-  unitUsd: number | null | undefined,
-  beforeUnitUsd: number | null | undefined,
-  percentUsd: number | null | undefined,
-  qty: number
-): { lineTotalUsd: number | null; offerBeforeUsd: number | null; offerSavingPercentUsd: number | null } {
-  const n = Math.max(1, qty);
+  line: {
+    gift: boolean;
+    unitIqd: number;
+    lineIqd: number;
+    qty: number;
+    unitUsd?: number | null;
+    figures?: UnitUsdFigures | null;
+    beforeUnitUsd?: number | null;
+    percentUsd?: number | null;
+  },
+  usdWith: (iqd: number, base: UsdLine | null | undefined) => number | null
+): {
+  lineUsdBase: UsdLine | null;
+  lineTotalUsd: number | null;
+  lineAppliedUsd: number | null;
+  offerBeforeUsd: number | null;
+  offerSavingPercentUsd: number | null;
+} {
+  const none = { lineUsdBase: null, lineTotalUsd: null, lineAppliedUsd: null, offerBeforeUsd: null, offerSavingPercentUsd: null };
+  const n = Math.max(1, line.qty);
+  if (line.gift || line.lineIqd !== line.unitIqd * n) return none;
+  const unitBase =
+    typeof line.unitUsd === 'number'
+      ? unitUsdBase({ unit_subtotal_iqd: line.unitIqd, unit_subtotal_usd_cents: line.unitUsd })
+      : unitUsdBase(line.figures, line.unitIqd);
+  const lineUsdBase = scaleUsdLine(unitBase, n);
+  const applied = line.figures?.applied_usd_cents;
   return {
-    lineTotalUsd: typeof unitUsd === 'number' ? unitUsd * n : null,
-    offerBeforeUsd: typeof beforeUnitUsd === 'number' ? beforeUnitUsd * n : null,
-    offerSavingPercentUsd: typeof percentUsd === 'number' ? percentUsd : null,
+    lineUsdBase,
+    lineTotalUsd: usdWith(line.lineIqd, lineUsdBase),
+    lineAppliedUsd: typeof applied === 'number' ? applied * n : typeof line.unitUsd === 'number' ? line.unitUsd * n : null,
+    offerBeforeUsd: typeof line.beforeUnitUsd === 'number' ? line.beforeUnitUsd * n : null,
+    offerSavingPercentUsd: typeof line.percentUsd === 'number' ? line.percentUsd : null,
   };
+}
+
+/**
+ * A line's total in dollars beside a struck total: the struck total is paired with the APPLIED total it is
+ * compared with (a warranty on top never decides it); both in dollars, or both converted.
+ */
+function struckLineUsd(line: { lineTotalUsd: number | null; lineAppliedUsd: number | null; offerBeforeUsd: number | null; offerBeforeIqd?: number | null }): {
+  price: number | null;
+  struck: number | null;
+} {
+  if (!line.offerBeforeIqd) return { price: line.lineTotalUsd, struck: null };
+  const pair = pairedUsd(line.lineAppliedUsd, line.offerBeforeUsd, true);
+  return pair.struck === null ? { price: null, struck: null } : { price: line.lineTotalUsd, struck: pair.struck };
 }
 
 function counterNamed(code: string): string {
@@ -658,7 +698,7 @@ function offeredCheckoutDays(
 }
 
 export default function Checkout() {
-  const { money, moneyBoth, walletMoney, walletCharge, usdTotal } = useMoney();
+  const { money, moneyBoth, walletMoney, walletCharge, usdTotal, usdWith } = useMoney();
   const navigate = useNavigate();
   const location = useLocation();
   const { lang, dir, loc } = useLanguage();
@@ -1166,8 +1206,13 @@ export default function Checkout() {
     colourOrder: Array<{ id: string }>;
     qty: number;
     lineTotal: number;
-    /** The line total in the shop's dollars, and the struck total of a live offer (DECISIONS row 247). */
+    /**
+     * The line in the shop's dollars (DECISIONS row 248): its dollar base (for the totals), its total, the
+     * applied price × qty a struck total is paired with, and the struck total of a live offer.
+     */
+    lineUsdBase: UsdLine | null;
     lineTotalUsd: number | null;
+    lineAppliedUsd: number | null;
     offerBeforeUsd: number | null;
     offerSavingPercentUsd: number | null;
     isPrinter: boolean;
@@ -1225,7 +1270,19 @@ export default function Checkout() {
             // The same rule for a live offer: the quote's figures, the cart line only as the fallback.
             ...offerLineOf(l.offer_before_iqd ?? cartLine?.breakdown?.offer_before_iqd ?? null, l.offer_saving_percent ?? cartLine?.breakdown?.offer_saving_percent ?? null, l.qty),
             // The quote's dollars only, beside the quote's own dinars — never the cart line's (one basis per screen).
-            ...usdLineOf(l.unit_price_usd_cents, l.offer_before_usd_cents, l.offer_saving_percent_usd, l.qty),
+            ...usdLineOf(
+              {
+                gift: !!l.gift || l.kind === 'gift' || cartLine?.kind === 'gift',
+                unitIqd: l.unit_price_iqd,
+                lineIqd: l.line_total_iqd,
+                qty: l.qty,
+                unitUsd: l.unit_price_usd_cents,
+                figures: l.breakdown,
+                beforeUnitUsd: l.offer_before_usd_cents,
+                percentUsd: l.offer_saving_percent_usd,
+              },
+              usdWith
+            ),
             mysterySpools: l.mystery ? l.mystery.spools : (cartLine?.composition?.mystery?.spool_qty ?? null),
           };
         })
@@ -1257,10 +1314,17 @@ export default function Checkout() {
           savingPercent: i.composition?.saving_percent ?? null,
           ...offerLineOf(i.breakdown?.offer_before_iqd ?? null, i.breakdown?.offer_saving_percent ?? null, i.qty),
           ...usdLineOf(
-            i.kind === 'gift' ? null : i.unit_price_usd_cents,
-            i.breakdown?.offer_before_usd_cents,
-            i.breakdown?.offer_saving_percent_usd,
-            i.qty
+            {
+              gift: i.kind === 'gift',
+              unitIqd: i.unit_price_iqd,
+              lineIqd: i.unit_price_iqd * i.qty,
+              qty: i.qty,
+              unitUsd: i.unit_price_usd_cents,
+              figures: i.breakdown,
+              beforeUnitUsd: i.breakdown?.offer_before_usd_cents,
+              percentUsd: i.breakdown?.offer_saving_percent_usd,
+            },
+            usdWith
           ),
         }));
   // A pre-order cart: which pricing rule is in force, said once, in one line,
@@ -1427,17 +1491,21 @@ export default function Checkout() {
   const pointsDiscount = quote ? quote.points.applied_iqd : localPoints;
   const orderTotal = quote ? quote.total_iqd : beforeDiscounts - localPoints;
   /**
-   * THE TOTALS IN THE SHOP'S DOLLARS (DECISIONS row 247): Σ each line's dollar price, plus ONE
+   * THE TOTALS IN THE SHOP'S DOLLARS (DECISIONS row 248): Σ each line's dollar price, plus ONE
    * conversion of what the dinar figure holds beyond them (delivery, COD tax, warranty, points, a
    * coupon, a membership, lines without one). Null while prices are read in dinars. The order total is
    * still printed in dinars first (`moneyBoth`): the dinar is what is charged.
    */
-  const usdLines = summaryLines.map((l) => ({ iqd: l.lineTotal, usdCents: l.gift ? null : l.lineTotalUsd }));
+  // Each line's dollar BASE: every fee on top of it, and every line without one, is the converted remainder.
+  const usdLines = summaryLines.map((l) => (l.gift ? null : l.lineUsdBase)).filter((l): l is UsdLine => l !== null);
   const subtotalUsd = usdTotal(total, usdLines);
   const orderTotalUsd = usdTotal(orderTotal, usdLines);
   /** A colour group's total in dollars: the sum of its lines' (they are its whole dinar total). */
-  const groupUsd = (lines: ReadonlyArray<{ lineTotal: number; lineTotalUsd: number | null }>) =>
-    usdTotal(lines.reduce((n, l) => n + l.lineTotal, 0), lines.map((l) => ({ iqd: l.lineTotal, usdCents: l.lineTotalUsd })));
+  const groupUsd = (lines: ReadonlyArray<{ lineTotal: number; lineUsdBase: UsdLine | null; gift?: unknown }>) =>
+    usdTotal(
+      lines.reduce((n, l) => n + l.lineTotal, 0),
+      lines.map((l) => (l.gift ? null : l.lineUsdBase)).filter((l): l is UsdLine => l !== null)
+    );
 
   // Advance payment logic: "pay in advance" is the wallet method (the legacy
   // `full_advance` id means the same thing), and it covers the whole total —
@@ -2685,16 +2753,16 @@ export default function Checkout() {
                     ) : line.variant ? (
                       <p className="text-xs text-text-muted mb-1.5 font-light">{line.variant}</p>
                     ) : null}
-                    {/* A struck pair in dollars only when both have one (DECISIONS row 247). */}
+                    {/* A struck pair in dollars only when both have one (DECISIONS row 248). */}
                     <span className="text-sm font-medium text-text-primary tabular-nums">
-                      {money(line.lineTotal, pairedUsd(line.lineTotalUsd, line.offerBeforeUsd, !!line.offerBeforeIqd).price)}
+                      {money(line.lineTotal, struckLineUsd(line).price)}
                     </span>
                     {line.offerBeforeIqd ? (
                       <OfferSaving
                         className="mt-0.5"
                         beforeIqd={line.offerBeforeIqd}
                         percent={line.offerSavingPercent}
-                        beforeUsdCents={pairedUsd(line.lineTotalUsd, line.offerBeforeUsd, true).struck}
+                        beforeUsdCents={struckLineUsd(line).struck}
                         percentUsd={line.offerSavingPercentUsd}
                       />
                     ) : null}

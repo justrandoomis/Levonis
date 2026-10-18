@@ -1,5 +1,5 @@
 /**
- * THE DOLLAR IS THE BASE — THE PURE RESOLVER (DECISIONS row 247).
+ * THE DOLLAR IS THE BASE — THE PURE RESOLVER (DECISIONS row 248).
  *
  * The owner, 2026-10-17: «الدولار هو الاساس كما اتفقنا وليس العكس … الدولار هو الثابت والدينار العراقي هو
  * المتغير بسعر الصرف». His eSUN PLA+ product form reads «الآن 26,000 د.ع · ≈ $15.20» and «بعد الخصم $14.00 ·
@@ -121,7 +121,7 @@ test('the line reads the row of its own channel: a prepaid route its route row, 
   assert.equal(cod.regular_usd_cents, 1520);
 });
 
-test('a ladder figure gets the dollars only when every live row at that dinar price agrees', () => {
+test('a ladder figure gets the dollars only when every live row at that dinar price is a V2 row with cents — the lowest of them', () => {
   // A colour product read with no colour: the ladder's 26,000 matches the one row at 26,000.
   const colours = (rows: SkuPriceRow[]) =>
     esun(rows, { sku_strict: false, colors: [{ id: 'c1', name_en: 'Red', active: true }, { id: 'c2', name_en: 'Blue', active: true }] });
@@ -129,9 +129,11 @@ test('a ladder figure gets the dollars only when every live row at that dinar pr
   assert.equal(one.price_source === 'sku', false, 'the ladder answered');
   assert.equal(one.regular_iqd, 26_000);
   assert.equal(one.regular_usd_cents, 1520);
-  // Two rows share the dinar price but not the dollar: ambiguous, so converted.
-  const two = line(colours([row('c:c1', 'direct_sale', 26_000, 1520), row('c:c2', 'direct_sale', 26_000, 1521)]));
-  assert.deepEqual(usdKeysOf(two), []);
+  // Two rows share the dinar price but not the dollar (a colour a cent dearer under one 250-IQD step): the
+  // lowest — a real SKU's price at the dinar figure shown — never the rounded dinars divided back.
+  const two = line(colours([row('c:c1', 'direct_sale', 26_000, 1521), row('c:c2', 'direct_sale', 26_000, 1520)]));
+  assert.equal(two.regular_usd_cents, 1520);
+  assert.equal(unanimousUsdCents([row('c:c1', 'direct_sale', 26_000, 1525), row('c:c2', 'direct_sale', 26_000, 1520)], 26_000), 1520);
   // A row at that price without dollars (an unparseable usd_ceil6) or a V1 row: no twin.
   assert.deepEqual(usdKeysOf(line(colours([row('c:c1', 'direct_sale', 26_000, 1520), row('c:c2', 'direct_sale', 26_000)]))), []);
   const v1 = { combo_key: 'c:c1', channel: 'direct_sale', regular_price_iqd: 26_000 };

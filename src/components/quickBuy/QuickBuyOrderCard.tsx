@@ -47,7 +47,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { MapPin, RefreshCw, Trash2, Truck, Zap } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
-import { useMoney } from '../../CurrencyContext';
+import { scaleUsdLine, useMoney, type UsdLine } from '../../CurrencyContext';
 import { ApiError } from '../../lib/api';
 import {
   cancelQuickBuySession,
@@ -218,11 +218,23 @@ function SessionClock({
   );
 }
 
+/**
+ * A SESSION LINE'S DOLLAR BASE (DECISIONS row 248): the part of its unit the shop priced in dollars, as the
+ * server froze it when the line was priced; null = the line is converted.
+ */
+function quickBuyUsdBase(item: QuickBuyItemView): UsdLine | null {
+  const iqd = item.unit_base_iqd;
+  const cents = item.unit_base_usd_cents;
+  return typeof iqd === 'number' && iqd > 0 && iqd <= item.unit_price_iqd && typeof cents === 'number' && Number.isSafeInteger(cents) && cents >= 0
+    ? { iqd, usdCents: cents }
+    : null;
+}
+
 export default function QuickBuyOrderCard() {
   const { lang } = useLanguage();
   const { user } = useAuth();
   const owner = user?.id ?? null;
-  const { money, moneyBoth } = useMoney();
+  const { money, moneyBoth, usdTotal, usdWith } = useMoney();
   const m = useMotion();
   const t = quickBuyStrings(lang);
   const snap = useQuickBuySnapshot(owner);
@@ -363,6 +375,8 @@ export default function QuickBuyOrderCard() {
   // The server's own words for the waiver, in the reader's language (all three travel with the view).
   const freeLabel = freeDeliveryLabel(session.free_delivery, lang, t.freeDelivery);
   const itemCount = session.items.reduce((n, it) => n + (Number(it.qty) || 0), 0);
+  // Each line's dollar base × quantity (DECISIONS row 248); delivery, discounts and lines without one convert once.
+  const usdBases = session.items.map((it) => scaleUsdLine(quickBuyUsdBase(it), it.qty)).filter((l): l is UsdLine => l !== null);
   // The pill says what the session is doing NOW: collecting, or sending (the
   // window closed and the order is being written).
   const pill = timeUp
@@ -445,7 +459,7 @@ export default function QuickBuyOrderCard() {
                       aria-busy={pending || undefined}
                       className={`shrink-0 whitespace-nowrap text-[14px] font-black tabular-nums text-text-primary transition-opacity ${pending ? 'opacity-50' : ''}`}
                     >
-                      {money(item.line_total_iqd)}
+                      {money(item.line_total_iqd, usdWith(item.line_total_iqd, scaleUsdLine(quickBuyUsdBase(item), item.qty)))}
                     </span>
                   </div>
                   {variant ? (
@@ -453,7 +467,7 @@ export default function QuickBuyOrderCard() {
                       <bdi>{variant}</bdi>
                     </p>
                   ) : null}
-                  <p className="mt-0.5 text-[12px] tabular-nums text-text-muted">{t.each(money(item.unit_price_iqd))}</p>
+                  <p className="mt-0.5 text-[12px] tabular-nums text-text-muted">{t.each(money(item.unit_price_iqd, usdWith(item.unit_price_iqd, quickBuyUsdBase(item))))}</p>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <QuantityInput
                       value={draft ?? item.qty}
@@ -484,7 +498,7 @@ export default function QuickBuyOrderCard() {
 
       <div className="border-t border-border-subtle p-4">
         <dl className="space-y-1.5 text-[13px]">
-          <Row label={t.subtotal} value={money(session.items_iqd)} />
+          <Row label={t.subtotal} value={money(session.items_iqd, usdTotal(session.items_iqd, usdBases))} />
           {session.discount_iqd > 0 ? <Row label={t.discount} value={`−${money(session.discount_iqd)}`} tone="success" /> : null}
           {free ? (
             <Row
@@ -506,7 +520,7 @@ export default function QuickBuyOrderCard() {
           ) : (
             <Row label={t.delivery} value={money(session.shipping_iqd)} />
           )}
-          <Row label={t.total} value={moneyBoth(session.total_iqd)} strong />
+          <Row label={t.total} value={moneyBoth(session.total_iqd, usdTotal(session.total_iqd, usdBases))} strong />
           <Row label={t.held} value={moneyBoth(session.held_iqd)} />
         </dl>
       </div>

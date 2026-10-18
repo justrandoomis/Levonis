@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import SafeImage from '../ui/SafeImage';
 import CardPrice from '../CardPrice';
+import { unitUsdBase, useMoney } from '../../CurrencyContext';
 import { isUnpriced } from '../../lib/priceStatus';
 import AvailabilityLine from '../product/AvailabilityLine';
 import { productMainImage, productPrimaryImage } from '../../lib/productImage';
@@ -32,11 +33,26 @@ export interface ResultCardProps {
  */
 function useCardBits(result: FinderResult, lang: FinderLang) {
   const base = result.card as CardProduct;
+  const { usdWith } = useMoney();
   // A catalog-only machine (rows 239-240) carries no configuration price: its own card says so.
   const variant = isUnpriced(base) ? null : (result.variant ?? null);
+  // THE CONFIGURATION'S OWN DOLLARS (DECISIONS row 248): the product card's dollar keys describe its «from»
+  // (often another configuration, or a cheaper route), so none of them survive the override; the
+  // configuration's own base (its applied price's twin, a premium on top converted) takes their place.
+  const variantUsd = variant
+    ? usdWith(variant.price_iqd, unitUsdBase({ applied_iqd: variant.applied_iqd, applied_usd_cents: variant.applied_usd_cents }, variant.price_iqd))
+    : null;
+  const {
+    display_price_usd_cents: _priceUsd,
+    display_regular_usd_cents: _regularUsd,
+    display_offer_before_usd_cents: _beforeUsd,
+    display_offer_saving_percent_usd: _percentUsd,
+    ...baseWithoutUsd
+  } = base;
   const p: CardProduct = variant
     ? ({
-        ...base,
+        ...baseWithoutUsd,
+        ...(variantUsd !== null ? { display_price_usd_cents: variantUsd, display_regular_usd_cents: variantUsd } : {}),
         display_price_iqd: variant.price_iqd,
         display_regular_iqd: variant.price_iqd,
         display_prime_iqd: null,

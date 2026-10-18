@@ -24,7 +24,7 @@ import { shownSavingPercent, useOptionalMoney } from '../../CurrencyContext';
 function SaleBadge({ p, hasSale }: { p: ApiProduct; hasSale: boolean }) {
   const { lang } = useLanguage();
   const l = lang === 'en' || lang === 'ckb' ? lang : 'ar';
-  // In dollars, the percent of the dollar pair the card prints (DECISIONS row 247).
+  // In dollars, the percent of the dollar pair the card prints (DECISIONS row 248).
   const converted = useOptionalMoney()?.converted === true;
   const n = shownSavingPercent(converted, p.display_offer_saving_percent, p.display_offer_saving_percent_usd);
   if (n !== null) {

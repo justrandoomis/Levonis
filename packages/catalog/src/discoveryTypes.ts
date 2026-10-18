@@ -239,6 +239,14 @@ export interface FinderVariant {
    * «يبدأ من» figure. Absent from an older server: one price.
    */
   from?: boolean;
+  /**
+   * THE CONFIGURATION'S OWN DOLLAR BASE (DECISIONS row 248): its applied price and the shop's dollar price
+   * of it, whole cents — `price_iqd` minus any direct premium on top, which the client converts. Absent
+   * when the configuration has no dollar price (and from an older server): the card converts `price_iqd`.
+   * Never the product card's own «from» dollars, which may be another configuration's.
+   */
+  applied_iqd?: number;
+  applied_usd_cents?: number;
 }
 
 export interface FinderResult<Card = unknown> {

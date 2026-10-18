@@ -36,7 +36,7 @@ import {
 } from '../lib/supportRef';
 import MerchantCartView from '../components/merchant/MerchantCartView';
 import { isPaidTier, tierLabel } from '../components/subscription/tierMeta';
-import { pairedUsd, shownSavingPercent, useMoney } from '../CurrencyContext';
+import { pairedUsd, scaleUsdLine, shownSavingPercent, unitUsdBase, useMoney, type UsdLine } from '../CurrencyContext';
 import OfferBadge, { StruckMoney, offerPercentSr, offerPercentText } from '../components/ui/OfferBadge';
 import VariantImg from '../components/ui/VariantImg';
 import { cartEmptyText } from '../lib/cartEmptyText';
@@ -360,8 +360,18 @@ interface CartWriteResponse {
  */
 const PREMIUM_LABEL = tierLabel('prime');
 
+/**
+ * A CART LINE'S DOLLAR BASE (DECISIONS row 248): the unit's own twin, or — under a warranty or a route fee —
+ * its applied price's (`unitUsdBase`). Never a gift's: the server charges it 0.
+ */
+function cartLineUsdBase(item: Pick<CartItem, 'kind' | 'unit_price_iqd' | 'unit_price_usd_cents' | 'breakdown'>): UsdLine | null {
+  if (item.kind === 'gift') return null;
+  if (typeof item.unit_price_usd_cents === 'number') return unitUsdBase({ unit_subtotal_iqd: item.unit_price_iqd, unit_subtotal_usd_cents: item.unit_price_usd_cents });
+  return unitUsdBase(item.breakdown, item.unit_price_iqd);
+}
+
 export default function Cart() {
-  const { money, moneyBoth, usdTotal, converted } = useMoney();
+  const { money, moneyBoth, usdTotal, usdWith, converted } = useMoney();
   const navigate = useNavigate();
   const { t, lang, dir, loc } = useLanguage();
   const sc = SUPPORT_STRINGS[lang] ?? SUPPORT_STRINGS.ar;
@@ -1223,23 +1233,24 @@ export default function Cart() {
   const pointsDiscount = usePoints ? Math.min(pointBalance, merchandise) : 0;
   const total = merchandise + shipping - pointsDiscount;
   /**
-   * THE SAME FIGURES IN THE SHOP'S DOLLARS (DECISIONS row 247): Σ each selected line's dollar price ×
+   * THE SAME FIGURES IN THE SHOP'S DOLLARS (DECISIONS row 248): Σ each selected line's dollar price ×
    * quantity, and ONE conversion of everything else the dinar figure holds (lines without a dollar
    * price, the membership, points, delivery). Null while prices are read in dinars.
    */
-  const usdLines = selectedItems.map((item) => ({
-    iqd: item.unit_price_iqd * item.qty,
-    usdCents: item.kind !== 'gift' && typeof item.unit_price_usd_cents === 'number' ? item.unit_price_usd_cents * item.qty : null,
-  }));
-  const totalUsd = usdTotal(total, usdLines);
+  // Each line's dollar BASE × quantity (`cartLineUsdBase`): a warranty or a route fee on top of it is part of
+  // the converted remainder, never a reason to convert the whole line.
+  const usdBases = selectedItems.map((item) => scaleUsdLine(cartLineUsdBase(item), item.qty));
+  const totalUsd = usdTotal(total, usdBases.filter((l): l is UsdLine => l !== null));
   // The struck subtotal is at the regular price: a line keeps its dollars only where regular = applied.
   const totalOriginalPriceUsd = usdTotal(
     totalOriginalPrice,
-    selectedItems.map((item, i) => {
-      const b = item.breakdown;
-      const off = b && item.kind !== 'gift' ? Math.max(0, b.regular_iqd - b.applied_iqd) * item.qty : 0;
-      return { iqd: usdLines[i].iqd + off, usdCents: off === 0 ? usdLines[i].usdCents : null };
-    })
+    selectedItems
+      .map((item, i) => {
+        const b = item.breakdown;
+        const off = b && item.kind !== 'gift' ? Math.max(0, b.regular_iqd - b.applied_iqd) * item.qty : 0;
+        return off === 0 ? usdBases[i] : null;
+      })
+      .filter((l): l is UsdLine => l !== null)
   );
 
   /** A delivery method in the store's OWN configured words (a setting, never a
@@ -1509,13 +1520,19 @@ export default function Cart() {
     const discountPctIqd = hasSale
       ? item.breakdown?.offer_saving_percent ?? Math.round((1 - (appliedUnit as number) / (regularUnit as number)) * 100)
       : 0;
-    // The shop's dollar prices (DECISIONS row 247): the struck pair in dollars only when both exist, and
-    // then the badge is the server's percent of the dollar pair.
-    const lineUsd = pairedUsd(
-      item.unit_price_usd_cents,
+    // The shop's dollar prices (DECISIONS row 248): the struck pair in dollars only when both exist, and
+    // then the badge is the server's percent of the dollar pair. The struck unit is paired with the APPLIED
+    // price it is compared with; the unit itself is its dollar base plus one conversion of a fee on top (a
+    // warranty, a route commission).
+    const linePair = pairedUsd(
+      item.breakdown?.applied_usd_cents,
       typeof item.breakdown?.offer_before_iqd === 'number' ? item.breakdown?.offer_before_usd_cents : item.breakdown?.regular_usd_cents,
       hasSale
     );
+    const lineUsd =
+      hasSale && linePair.struck === null
+        ? { price: null, struck: null }
+        : { price: usdWith(item.unit_price_iqd, cartLineUsdBase(item)), struck: linePair.struck };
     const discountPct =
       lineUsd.struck !== null ? (shownSavingPercent(converted, discountPctIqd, item.breakdown?.offer_saving_percent_usd) ?? 0) : discountPctIqd;
     /**
@@ -2619,7 +2636,7 @@ export default function Cart() {
 
           <div className="flex justify-between items-center">
             <span className="text-text-primary font-bold text-[15px]">{loc('المجموع الكلي', 'Total', 'کۆی گشتی')}</span>
-            {/* The charge in dinars first, then the dollars (DECISIONS row 247) — as the checkout prints it. */}
+            {/* The charge in dinars first, then the dollars (DECISIONS row 248) — as the checkout prints it. */}
             <span className="text-text-primary font-bold text-[17px]">{moneyBoth(total, totalUsd)}</span>
           </div>
         </div>
@@ -2884,7 +2901,7 @@ export default function Cart() {
                   <div className="w-20 h-20 rounded-lg bg-surface-selected" />
                 )}
                 <div>
-                  <p className="text-text-primary font-bold text-lg tabular-nums">{money(variantView.unit_price_iqd, variantView.unit_price_usd_cents)}</p>
+                  <p className="text-text-primary font-bold text-lg tabular-nums">{money(variantView.unit_price_iqd, usdWith(variantView.unit_price_iqd, cartLineUsdBase(variantView)))}</p>
                   {(() => {
                     // The SHELF for this exact selection — `availability.stock`,
                     // never the legacy `stock` (the base row, a different number

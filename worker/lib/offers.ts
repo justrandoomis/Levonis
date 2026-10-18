@@ -767,7 +767,7 @@ export function applyOfferToResolved(
     unit_subtotal_iqd: priced.applied_iqd + fees,
   });
   // The pre-window line's dollar twins never survive the window: a sale with a dollar base re-states
-  // them below, any other sale leaves the line with none at all (DECISIONS row 247).
+  // them below, any other sale leaves the line with none at all (DECISIONS row 248).
   const {
     regular_usd_cents: _regularUsd,
     applied_usd_cents: _appliedUsd,
@@ -811,7 +811,7 @@ export function applyOfferToResolved(
 }
 
 /**
- * THE DOLLAR SIDE OF A LIVE SALE (DECISIONS row 247): the struck price and the sale price in the
+ * THE DOLLAR SIDE OF A LIVE SALE (DECISIONS row 248): the struck price and the sale price in the
  * shop's dollars, so a customer reading dollars sees $15.20 → $14.00 — the figures the product form
  * shows — and not the rounded dinars divided back by a rate.
  *
@@ -867,7 +867,7 @@ export function fixedUsdAnswerFor(
     rate: direct?.usd_iqd_rate ?? null,
     directIqd: direct ? direct.regular_price_iqd : null,
     channelIqd: resolved.regular_iqd,
-    // The dollar twin (DECISIONS row 247): a line read on the direct row sells at the typed cents; a
+    // The dollar twin (DECISIONS row 248): a line read on the direct row sells at the typed cents; a
     // route line takes the same dollar saving off its own row's dollars.
     direct: sku.channel === 'direct_sale',
     directUsdCents: direct?.usd_cents ?? null,

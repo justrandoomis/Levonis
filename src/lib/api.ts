@@ -521,7 +521,7 @@ export interface ApiProduct {
   display_offer_before_iqd?: number | null;
   display_offer_saving_percent?: number | null;
   /**
-   * THE SHOP'S DOLLAR PRICES OF THE FIGURES ABOVE (DECISIONS row 247), whole cents: present only
+   * THE SHOP'S DOLLAR PRICES OF THE FIGURES ABOVE (DECISIONS row 248), whole cents: present only
    * where the figure has a dollar base. A customer reading dollars is shown these; a figure without
    * one is converted at the display rate. The struck dollar price and its «−N٪» come only as a pair.
    */
@@ -650,7 +650,7 @@ export interface CartItem {
   /** The cart prices a pre-order line as PREPAID; the checkout quote is the
    *  authority once a payment method is chosen. */
   unit_price_iqd: number;
-  /** The same unit in the shop's dollars (DECISIONS row 247), whole cents; absent = converted. */
+  /** The same unit in the shop's dollars (DECISIONS row 248), whole cents; absent = converted. */
   unit_price_usd_cents?: number;
   /** Server-resolved price breakdown for this line. `regular_iqd` vs
    *  `applied_iqd` is the only honest saving to display (§4 retired
@@ -669,7 +669,7 @@ export interface CartItem {
      *  its «−N٪», from the server. Null otherwise. */
     offer_before_iqd?: number | null;
     offer_saving_percent?: number | null;
-    /** The shop's dollar prices of this line (DECISIONS row 247), whole cents, where it has them. */
+    /** The shop's dollar prices of this line (DECISIONS row 248), whole cents, where it has them. */
     regular_usd_cents?: number;
     applied_usd_cents?: number;
     unit_subtotal_usd_cents?: number;
@@ -881,7 +881,7 @@ export interface OrderItemPricing {
    *  paid cash on delivery); 'preorder' = the transport commission applied. */
   pricing_basis?: 'direct' | 'preorder' | string;
   unit_subtotal_iqd?: number;
-  /** The line's dollar prices, frozen when it sold (DECISIONS row 247), whole cents; absent = converted. */
+  /** The line's dollar prices, frozen when it sold (DECISIONS row 248), whole cents; absent = converted. */
   regular_usd_cents?: number;
   applied_usd_cents?: number;
   unit_subtotal_usd_cents?: number;
@@ -2046,16 +2046,27 @@ export function formatIqd(amount: number): string {
 }
 
 /**
- * A PAST ORDER LINE IN THE SHOP'S DOLLARS (DECISIONS row 247): the unit dollar price frozen when it sold
- * (`pricing.unit_subtotal_usd_cents`), only while the unit charged is that unit — never on a gift line,
- * never on a line sold before the dollar was frozen. Null = the line is converted.
+ * A PAST ORDER LINE'S DOLLAR BASE (DECISIONS row 248), frozen when it sold: the unit's own twin
+ * (`pricing.unit_subtotal_usd_cents`), or — under a warranty or a route fee — its applied price's
+ * (`pricing.applied_usd_cents`, with the fee then converted once at today's rate). Each as `{ iqd, usdCents }`
+ * for one unit and for the line; `appliedUnit` is the applied price's cents (what a struck price is paired
+ * with). Only while the unit charged is the frozen unit — never on a gift line, never on a line sold before
+ * the dollar was frozen. Null = the line is converted whole.
  */
-export function orderItemUsdCents(it: Pick<ApiOrderItem, 'qty' | 'unit_price_iqd' | 'line_total_iqd' | 'pricing' | 'is_gift'>): { unit: number; line: number } | null {
+export function orderItemUsdBase(
+  it: Pick<ApiOrderItem, 'qty' | 'unit_price_iqd' | 'line_total_iqd' | 'pricing' | 'is_gift'>
+): { unit: { iqd: number; usdCents: number }; line: { iqd: number; usdCents: number }; appliedUnit: number | null } | null {
   const p = it.pricing;
-  const unit = p?.unit_subtotal_usd_cents;
-  if (it.is_gift || !p || typeof unit !== 'number' || !Number.isSafeInteger(unit) || unit < 0) return null;
-  if (p.unit_subtotal_iqd !== it.unit_price_iqd || it.line_total_iqd !== it.unit_price_iqd * it.qty) return null;
-  return { unit, line: unit * it.qty };
+  if (it.is_gift || !p || p.unit_subtotal_iqd !== it.unit_price_iqd || it.line_total_iqd !== it.unit_price_iqd * it.qty) return null;
+  const cents = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
+  const appliedUnit = cents(p.applied_usd_cents) ? p.applied_usd_cents : null;
+  let unit: { iqd: number; usdCents: number } | null = null;
+  if (cents(p.unit_subtotal_usd_cents)) unit = { iqd: it.unit_price_iqd, usdCents: p.unit_subtotal_usd_cents };
+  else if (appliedUnit !== null && typeof p.applied_iqd === 'number' && p.applied_iqd > 0 && p.applied_iqd <= it.unit_price_iqd) {
+    unit = { iqd: p.applied_iqd, usdCents: appliedUnit };
+  }
+  if (!unit) return null;
+  return { unit, line: { iqd: unit.iqd * it.qty, usdCents: unit.usdCents * it.qty }, appliedUnit };
 }
 
 /** Format USD cents for display. */

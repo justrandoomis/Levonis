@@ -22,6 +22,7 @@ import { liveItems, sessionView } from '../worker/lib/quickBuy/session';
 import { QUICK_BUY_FINALIZE_MAX_ATTEMPTS, type QuickBuySessionRow } from '../worker/lib/quickBuy/model';
 import type { Env } from '../worker/lib/types';
 import { repriceV2 } from './fixtures/v2Publish';
+import { usdCeilCentsOf } from '../packages/pricing/src/usdCents';
 
 const RATE = 1400;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- rows are read field by field
@@ -386,6 +387,11 @@ test('price and delivery changes after the add: the customer never pays more tha
   await json(await add(raw, 'p_pla', 2));
   const held = session(raw).held_iqd;
   assert.equal(held, 50_000, 'filament from the wallet: free delivery');
+  // The open session carries the line's dollar base (DECISIONS row 248): the shop's dollars of 25,000 IQD.
+  const liveRow = row<Row>(raw, "SELECT usd_ceil6 FROM pricing_v2_sku_results WHERE product_id = 'p_pla' AND channel = 'direct_sale'")!;
+  const open = (await json(await get(as(raw), '/api/quick-buy/session'))).session.items[0];
+  assert.equal(open.unit_base_iqd, 25_000);
+  assert.equal(open.unit_base_usd_cents, usdCeilCentsOf(liveRow.usd_ceil6));
   // The owner raises the price and switches the free delivery off mid-session.
   await repriceV2(raw, 'p_pla', 40_000); // the clean start: a price moves through the V2 writer
   const admin = as(raw, 'boss', 'admin');
@@ -400,6 +406,15 @@ test('price and delivery changes after the add: the customer never pays more tha
   const order = row<Row>(raw, 'SELECT * FROM orders WHERE id = ?', s.order_id)!;
   assert.equal(order.total_iqd, 50_000, 'the locked unit price and the quoted delivery fee');
   assert.equal(order.shipping_iqd, 0);
+  // The lock cut the dinars to what was quoted, so the live (higher) dollar price leaves with it: the locked
+  // line carries no dollar figure of what is paid, and is converted (DECISIONS row 248).
+  const snap = JSON.parse(row<Row>(raw, 'SELECT pricing_snapshot FROM order_items WHERE order_id = ?', s.order_id)!.pricing_snapshot);
+  assert.equal(snap.unit_subtotal_iqd, 25_000);
+  assert.equal(snap.applied_usd_cents, undefined);
+  assert.equal(snap.unit_subtotal_usd_cents, undefined);
+  const mine = await json(await get(as(raw), `/api/orders/${s.order_id}`));
+  assert.equal(mine.order.items[0].pricing.unit_subtotal_usd_cents, undefined);
+  assert.equal(mine.order.items[0].pricing.applied_usd_cents, undefined);
   assertMoneyAgrees(raw);
 });
 

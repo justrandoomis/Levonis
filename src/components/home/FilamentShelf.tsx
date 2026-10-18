@@ -68,7 +68,7 @@ export default function FilamentShelf({ products }: { products: ApiProduct[] }) 
                 {p.name}
               </span>
               <span className="block text-[11px] font-bold text-white tabular-nums truncate">
-                {money(price)}
+                {money(price, typeof p.display_price_iqd === 'number' ? p.display_price_usd_cents : null)}
               </span>
             </Link>
           );

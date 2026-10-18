@@ -592,7 +592,7 @@ export interface ResolvedPrice {
    */
   offer_before_iqd?: number;
   /**
-   * THE SHOP'S DOLLAR PRICE OF THIS LINE, in whole cents (DECISIONS row 247: the dollar is the base,
+   * THE SHOP'S DOLLAR PRICE OF THIS LINE, in whole cents (DECISIONS row 248: the dollar is the base,
    * the dinar is derived from it through the rate). Each is the twin of the `*_iqd` figure of the same
    * name and is ABSENT — never null — wherever that figure has no dollar base, so a ladder, V1 or
    * legacy answer is byte-identical to what it was:
@@ -628,11 +628,13 @@ export function usdTwins(
 }
 
 /**
- * THE DOLLAR OF A LADDER FIGURE (DECISIONS row 247). A base, option or colour level has no single V2
+ * THE DOLLAR OF A LADDER FIGURE (DECISIONS row 248). A base, option or colour level has no single V2
  * row: the ladder columns are the min / max of the rows' dinar prices. The figure gets a dollar twin
- * only when EVERY live row of the product at exactly that dinar price is a V2 row carrying cents, and
- * all of them carry the SAME cents. Anything else — no such row, a V1 row, two rows that share the
- * dinar but not the dollar — answers null and the figure is converted. It never guesses.
+ * only when EVERY live row of the product at exactly that dinar price is a V2 row carrying cents —
+ * and then the LOWEST of their cents: two SKUs a few cents apart can share one rounded dinar price
+ * (a colour at +$0.05 under one 250-IQD step), and the lowest is a real SKU's dollar price at the
+ * dinar figure shown, the same «from» rule as the dinar side. Anything else — no such row, a V1 row
+ * beside them — answers null and the figure is converted. It never guesses.
  */
 export function unanimousUsdCents(rows: readonly SkuPriceRow[] | null | undefined, regularIqd: number): number | null {
   if (!rows || !rows.length || !Number.isSafeInteger(regularIqd) || regularIqd <= 0) return null;
@@ -640,8 +642,7 @@ export function unanimousUsdCents(rows: readonly SkuPriceRow[] | null | undefine
   for (const r of rows) {
     if (r.regular_price_iqd !== regularIqd) continue;
     if (r.v2 !== true || typeof r.usd_cents !== 'number') return null;
-    if (cents !== null && cents !== r.usd_cents) return null;
-    cents = r.usd_cents;
+    if (cents === null || r.usd_cents < cents) cents = r.usd_cents;
   }
   return cents;
 }
@@ -946,7 +947,7 @@ export interface SkuPriceRow {
    */
   usd_iqd_rate?: string;
   /**
-   * PRICING V2 rows only (DECISIONS row 247): the shop's dollar price of this SKU × channel — the
+   * PRICING V2 rows only (DECISIONS row 248): the shop's dollar price of this SKU × channel — the
    * `usd_ceil6` of the row's own `pricing_v2_sku_results` twin, ceiled to the whole cent
    * (`usdCeilCentsOf`), as the product form prints it. Server-side: the row itself is never projected;
    * the resolver turns it into the line's `*_usd_cents` twins. Absent when unknown.
@@ -1464,7 +1465,7 @@ export function resolveUnitPrice(input: {
   const warrantyFee = warranty ? warranty.fee_iqd : 0;
   const directFee = direct && !direct.waived ? direct.surcharge_iqd : 0;
   const unitSubtotal = appliedIqd + commissionEffective + directFee + warrantyFee;
-  // THE DOLLAR BASE (DECISIONS row 247): the V2 row that answered, else the unanimous rows at this
+  // THE DOLLAR BASE (DECISIONS row 248): the V2 row that answered, else the unanimous rows at this
   // dinar price; absent (the figure is converted) when neither speaks.
   const regularUsdCents =
     skuRow !== null ? (skuRow.v2 === true && typeof skuRow.usd_cents === 'number' ? skuRow.usd_cents : null) : unanimousUsdCents(product.sku_prices, regularIqd);

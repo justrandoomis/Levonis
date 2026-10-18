@@ -1,5 +1,5 @@
 /**
- * THE SHOP'S DOLLAR PRICE, IN WHOLE CENTS (DECISIONS row 247; the owner,
+ * THE SHOP'S DOLLAR PRICE, IN WHOLE CENTS (DECISIONS row 248; the owner,
  * 2026-10-17: «الدولار هو الاساس … الدولار هو الثابت والدينار العراقي هو
  * المتغير بسعر الصرف»).
  *

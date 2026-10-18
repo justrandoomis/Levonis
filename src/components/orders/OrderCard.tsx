@@ -13,7 +13,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, Truck, Star, XCircle, Clock, Gift, Zap } from 'lucide-react';
-import { orderItemUsdCents, type ApiOrder } from '../../lib/api';
+import { orderItemUsdBase, type ApiOrder } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import SafeImage from '../ui/SafeImage';
 import OrderTracker from '../OrderTracker';
@@ -164,8 +164,8 @@ export default function OrderCard({
   const stack = order.items.slice(0, 3);
   const extraLines = Math.max(0, order.items.length - 1);
   const due = dueOnDelivery(order);
-  // The total in dollars (DECISIONS row 247): the lines' frozen dollar prices, the rest converted once.
-  const totalUsd = usdTotal(order.total_iqd, order.items.map((it) => ({ iqd: it.line_total_iqd, usdCents: orderItemUsdCents(it)?.line ?? null })));
+  // The total in dollars (DECISIONS row 248): the lines' frozen dollar prices, the rest converted once.
+  const totalUsd = usdTotal(order.total_iqd, order.items.flatMap((it) => orderItemUsdBase(it)?.line ?? []));
   const bnplDue = order.status === 'cancelled' ? 0 : Number(order.financial?.bnpl_due_iqd ?? order.bnpl_due_iqd) || 0;
   /**
    * The review verb, and the honest alternative to hiding it.

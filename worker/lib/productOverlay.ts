@@ -253,7 +253,7 @@ interface SkuPriceReadRow {
   v2?: number | null;
   /** V2 rows: the rate of the row's own V2 result (docs/ux/PRODUCT-DISCOUNT.md §4.3). Absent on the V1 read. */
   usd_iqd_rate?: string | null;
-  /** V2 rows: the `usd_ceil6` of the row's own V2 result — the shop's dollar price (DECISIONS row 247). Absent on the V1 read. */
+  /** V2 rows: the `usd_ceil6` of the row's own V2 result — the shop's dollar price (DECISIONS row 248). Absent on the V1 read. */
   usd_ceil6?: string | null;
 }
 
@@ -307,7 +307,7 @@ async function skuPriceRows(
         // dollar sale price prices nothing there — an honest "no sale" (PRODUCT-DISCOUNT §4.3).
         ...(Number(r.v2) === 1 && typeof r.usd_iqd_rate === 'string' && r.usd_iqd_rate ? { usd_iqd_rate: r.usd_iqd_rate } : {}),
         // The shop's dollar price travels the same way, as whole cents ceiled exactly as the product form
-        // prints it (DECISIONS row 247). An unparseable figure is no figure: the price is converted.
+        // prints it (DECISIONS row 248). An unparseable figure is no figure: the price is converted.
         ...(Number(r.v2) === 1 && usdCents !== null ? { usd_cents: usdCents } : {}),
       };
       if (Number.isSafeInteger(row.regular_price_iqd) && row.regular_price_iqd > 0) out.push(row);
@@ -386,7 +386,7 @@ const SKU_ROW_RATE_V2 = `(SELECT r.usd_iqd_rate FROM pricing_v2_sku_results r
     AND r.channel = product_sku_prices.channel AND r.final_price_iqd = product_sku_prices.regular_price_iqd)`;
 
 /**
- * THE SHOP'S DOLLAR PRICE OF A LIVE V2 ROW (DECISIONS row 247): the `usd_ceil6` of the very result
+ * THE SHOP'S DOLLAR PRICE OF A LIVE V2 ROW (DECISIONS row 248): the `usd_ceil6` of the very result
  * `SKU_ROW_LIVE_V2` matches, written in the same batch as its dinar price, so the two never disagree.
  * Correlated exactly as SKU_ROW_RATE_V2 (a probe of the results' primary key); null on a V1 row. The
  * figure is turned into ceiled cents on the way out (`skuPriceRows`) and is never projected as read.

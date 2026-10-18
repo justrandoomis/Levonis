@@ -184,8 +184,11 @@ export function giftPricingBlock(v: GiftLineVerdict, regularUnitIqd: number, qty
  * cost, never pure margin.
  */
 export function zeroGiftPrice(resolved: ResolvedPrice): ResolvedPrice {
+  // A gift is charged 0: no dollar price may describe what the buyer pays (DECISIONS row 248). The
+  // regular twin stays — it is the gift's value, as `regular_iqd` is.
+  const { applied_usd_cents: _applied, unit_subtotal_usd_cents: _unit, offer_before_usd_cents: _before, ...priced } = resolved;
   return {
-    ...resolved,
+    ...priced,
     applied_iqd: 0,
     applied_tier: 'regular',
     pro_iqd: null,

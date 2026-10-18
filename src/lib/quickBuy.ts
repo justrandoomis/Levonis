@@ -103,6 +103,12 @@ export interface QuickBuyItemView {
   qty: number;
   unit_price_iqd: number;
   line_total_iqd: number;
+  /**
+   * THE UNIT'S DOLLAR BASE (DECISIONS row 248), whole cents: the part of the unit the shop priced in
+   * dollars (`unit_base_iqd` of it), a warranty on top converted. Absent = the line is converted.
+   */
+  unit_base_iqd?: number;
+  unit_base_usd_cents?: number;
   /** The «+» ceiling: what the line holds plus what the shelf has free now, at most 99. */
   max_qty: number;
 }

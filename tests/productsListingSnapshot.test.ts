@@ -31,7 +31,7 @@ import { FIXTURE_U, usdReproducing } from './fixtures/v2Publish';
 // `display_offer_before_iqd` and `display_offer_saving_percent` (docs/ux/PRODUCT-DISCOUNT.md §8.1): the struck
 // price of a live offer and its «−N٪» — null on every card here, since the live catalogue has no offer window
 // (asserted below before they are set aside).
-// `display_*_usd_cents` and `display_offer_saving_percent_usd` (DECISIONS row 247): the shop's dollar prices
+// `display_*_usd_cents` and `display_offer_saving_percent_usd` (DECISIONS row 248): the shop's dollar prices
 // of the same figures, present only where a figure has a dollar base.
 const NEW_CARD_FIELDS = [
   'sale_types',

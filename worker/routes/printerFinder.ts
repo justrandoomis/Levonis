@@ -38,6 +38,7 @@ import { hasLaserModule, runFinder, techGroup, type FinderCandidate } from '../l
 import { pricingCtx, resolveProductCards, resolveVariantPricing } from './products';
 import { multicolorBadge, multicolorProfile, variantSheet } from '../lib/multicolor';
 import { hasAnySpec } from './compare';
+import { isUsdCents } from '@levonis/pricing/usdCents';
 
 export const printerFinderRoutes = new Hono<AppContext>();
 
@@ -145,6 +146,10 @@ async function loadCandidates(c: Context<AppContext>): Promise<Loaded> {
           others: variants.length - 1,
           // FX-7: the lowest of the configuration's own SKUs when they differ («يبدأ من»).
           ...(v.from ? { from: true } : {}),
+          // The configuration's own dollars (DECISIONS row 248): its applied price's twin, never the card's «from».
+          ...(isUsdCents(v.level.applied_usd_cents) && v.level.applied_iqd > 0 && v.level.applied_iqd <= v.level.unit_subtotal_iqd
+            ? { applied_iqd: v.level.applied_iqd, applied_usd_cents: v.level.applied_usd_cents }
+            : {}),
         },
       });
     }

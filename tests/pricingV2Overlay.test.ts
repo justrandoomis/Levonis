@@ -70,7 +70,7 @@ test('V2 rows count while their result says the price; o:* is the product itself
   assert.equal(v1.sku_strict, undefined);
   // A V2 row carries the rate of its own result (docs/ux/PRODUCT-DISCOUNT.md §4.3) — server-side only.
   assert.deepEqual(v2.sku_prices, [
-    // Each V2 row carries its own dollar price, ceiled to the cent (DECISIONS row 247).
+    // Each V2 row carries its own dollar price, ceiled to the cent (DECISIONS row 248).
     { combo_key: '', channel: 'direct_sale', regular_price_iqd: 800_000, v2: true, usd_iqd_rate: '1600', usd_cents: 50_000 },
     { combo_key: '', channel: 'pre_order_land', regular_price_iqd: 760_000, v2: true, usd_iqd_rate: '1600', usd_cents: 47_500 },
   ]);

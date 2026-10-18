@@ -99,7 +99,7 @@ import {
 } from '../components/product/stockAlertTargets';
 import { conditionKindLabel, type ConditionEntry } from '../lib/condition';
 import { resolveOrderType, resolveTransport, routeIsUsable } from '../lib/productSelection';
-import { pairedUsd, useMoney } from '../CurrencyContext';
+import { pairedUsd, scaleUsdLine, unitUsdBase, useMoney, type UsdLine } from '../CurrencyContext';
 import { CommunityStoreLink } from './community/access';
 import CompareBadge from '../components/compare/CompareBadge';
 import PrinterFitsLine, { type FitPrinterRef } from '../components/product/PrinterFitsLine';
@@ -595,7 +595,7 @@ interface ProductDetail {
    *  the same number the card showed. Never `price_iqd`, which is the base
    *  row and may be a price nobody is charged. */
   display_price_iqd?: number;
-  /** The same figure in the shop's dollars (DECISIONS row 247), whole cents; absent = converted. */
+  /** The same figure in the shop's dollars (DECISIONS row 248), whole cents; absent = converted. */
   display_price_usd_cents?: number;
   /** True only when the variants GENUINELY differ in price; the server proved
    *  it by resolving every one of them. This is what «يبدأ من» is allowed to
@@ -723,7 +723,7 @@ interface Quote {
   /** A live offer lowered this selection (docs/ux/PRODUCT-DISCOUNT.md §8.3): the struck price and its percent. */
   offer_before_iqd?: number | null;
   offer_saving_percent?: number | null;
-  /** The shop's dollar prices of these figures (DECISIONS row 247), whole cents, where they have them. */
+  /** The shop's dollar prices of these figures (DECISIONS row 248), whole cents, where they have them. */
   regular_usd_cents?: number;
   applied_usd_cents?: number;
   unit_subtotal_usd_cents?: number;
@@ -739,10 +739,15 @@ interface Quote {
  * number at all. The page lays these out and computes none of them — the PRO
  * exemptions are already applied exactly as the checkout applies them.
  */
-/** One way to buy: its unit price, and the shop's dollar price of it when it has one (DECISIONS row 247). */
+/**
+ * One way to buy: its unit price, and the shop's dollar price of it when it has one (DECISIONS row 248) —
+ * the unit's own twin, or the applied price's beside a route fee on top (`unitUsdBase`).
+ */
 interface ModePrice {
   unit_subtotal_iqd: number;
   unit_subtotal_usd_cents?: number;
+  applied_iqd?: number;
+  applied_usd_cents?: number;
 }
 
 interface PricingModes {
@@ -781,7 +786,7 @@ interface PriceLevel {
   /** Present only when a live offer lowered this level (§8.1). */
   offer_before_iqd?: number | null;
   offer_saving_percent?: number | null;
-  /** The shop's dollar prices of these figures (DECISIONS row 247), whole cents, where they have them. */
+  /** The shop's dollar prices of these figures (DECISIONS row 248), whole cents, where they have them. */
   regular_usd_cents?: number;
   applied_usd_cents?: number;
   unit_subtotal_usd_cents?: number;
@@ -1015,7 +1020,7 @@ function readPathSlug(): string {
 const readPathSlugServer = (): string => '';
 
 export default function Product() {
-  const { money, moneyBoth, usdTotal } = useMoney();
+  const { money, moneyBoth, usdTotal, usdWith } = useMoney();
   const { slug } = useParams();
   const location = useLocation();
   const urlSlug = useSyncExternalStore(subscribeToPath, readPathSlug, readPathSlugServer);
@@ -2802,7 +2807,12 @@ export default function Product() {
     /** The struck price of a live offer for THIS selection, and its percent (docs/ux/PRODUCT-DISCOUNT.md §8.3). */
     before: number | null;
     savingPercent: number | null;
-    /** The shop's dollar prices of the figures above (DECISIONS row 247); null = converted. */
+    /**
+     * The shop's dollar prices of the figures above (DECISIONS row 248); null = converted. `unitBase` is
+     * the part of the unit with a dollar price (`unitUsdBase`): the unit's own twin, or its applied price
+     * under a warranty / route fee, which is then the converted remainder.
+     */
+    unitBase: UsdLine | null;
     unitUsd: number | null;
     regularUsd: number | null;
     appliedUsd: number | null;
@@ -2818,7 +2828,8 @@ export default function Product() {
           settled: true,
           before: quote!.offer_before_iqd ?? null,
           savingPercent: quote!.offer_saving_percent ?? null,
-          unitUsd: quote!.unit_subtotal_usd_cents ?? null,
+          unitBase: unitUsdBase(quote),
+          unitUsd: usdWith(quote!.unit_subtotal_iqd, unitUsdBase(quote)),
           regularUsd: quote!.regular_usd_cents ?? null,
           appliedUsd: quote!.applied_usd_cents ?? null,
           beforeUsd: quote!.offer_before_usd_cents ?? null,
@@ -2833,7 +2844,8 @@ export default function Product() {
             settled: levelIsFinal && !quoteLoading && quoteErrors.length === 0,
             before: levelPrice.offer_before_iqd ?? null,
             savingPercent: levelPrice.offer_saving_percent ?? null,
-            unitUsd: levelPrice.unit_subtotal_usd_cents ?? null,
+            unitBase: unitUsdBase(levelPrice),
+            unitUsd: usdWith(levelPrice.unit_subtotal_iqd, unitUsdBase(levelPrice)),
             regularUsd: levelPrice.regular_usd_cents ?? null,
             appliedUsd: levelPrice.applied_usd_cents ?? null,
             beforeUsd: levelPrice.offer_before_usd_cents ?? null,
@@ -2843,17 +2855,18 @@ export default function Product() {
   /** A live offer lowered what is on screen: the struck line, the «سعر العرض» label and the clock (§8.3). */
   const offerBefore = shownPrice && typeof shownPrice.before === 'number' && shownPrice.before > shownPrice.applied ? shownPrice.before : null;
   /**
-   * THE SAME FIGURES IN THE SHOP'S DOLLARS (DECISIONS row 247): the price and the struck price beside it
+   * THE SAME FIGURES IN THE SHOP'S DOLLARS (DECISIONS row 248): the price and the struck price beside it
    * (the offer's, else a member's regular), in dollars only when both have one — never half base and
-   * half conversion.
+   * half conversion. The struck price is paired with the APPLIED price it is compared with (a warranty
+   * or a route fee on top is the converted remainder of the headline, never a reason to drop the base).
    */
-  const shownUsd = shownPrice
-    ? pairedUsd(
-        shownPrice.unitUsd,
-        offerBefore !== null ? shownPrice.beforeUsd : shownPrice.regularUsd,
-        offerBefore !== null || shownPrice.applied < shownPrice.regular
-      )
-    : { price: null, struck: null };
+  const shownUsd = ((): { price: number | null; struck: number | null } => {
+    if (!shownPrice) return { price: null, struck: null };
+    const struckShown = offerBefore !== null || shownPrice.applied < shownPrice.regular;
+    const pair = pairedUsd(shownPrice.appliedUsd, offerBefore !== null ? shownPrice.beforeUsd : shownPrice.regularUsd, struckShown);
+    if (struckShown && pair.struck === null) return { price: null, struck: null };
+    return { price: shownPrice.unitUsd, struck: pair.struck };
+  })();
   /** A figure is on screen but the server has not confirmed THIS selection. */
   const priceIsPending = !!shownPrice && !shownPrice.settled;
 
@@ -2868,10 +2881,11 @@ export default function Product() {
   // The worker's own arithmetic (`unit_subtotal_iqd * qty`), done here so the
   // stepper is instant.
   const lineTotal = unitPrice === null ? null : unitPrice * qty;
-  // …and in the shop's dollars (DECISIONS row 247): exact integer cents × quantity.
+  // …and in the shop's dollars (DECISIONS row 248): exact integer cents × quantity.
   // The unit's dollars as printed above (`shownUsd`), so the line total never mixes base and conversion.
-  const unitPriceUsd = shownUsd.price;
-  const lineTotalUsd = unitPriceUsd === null ? null : unitPriceUsd * qty;
+  // A fee on top is converted once for the whole line, beside the base's exact cents × quantity.
+  const lineTotalUsd =
+    shownUsd.price === null || lineTotal === null ? null : usdWith(lineTotal, scaleUsdLine(shownPrice?.unitBase ?? null, qty));
   const isPro = viewerTier?.tier === 'pro' && viewerTier.active;
   const isPrime = viewerTier?.tier === 'prime' && viewerTier.active;
 
@@ -3172,10 +3186,12 @@ export default function Product() {
       .filter((n): n is number => n !== null);
     return finals.length ? Math.min(...finals) : null;
   })();
-  // The same figures in the shop's dollars (DECISIONS row 247), null where a figure has none.
-  const directFinalUsd: number | null = pricingModes?.direct?.unit_subtotal_usd_cents ?? null;
+  // The same figures in the shop's dollars (DECISIONS row 248), null where a figure has none.
+  // A route's commission (or a direct premium) on top of a dollar price is its converted remainder.
+  const modeUsd = (m: ModePrice | null | undefined): number | null => (m ? usdWith(m.unit_subtotal_iqd, unitUsdBase(m)) : null);
+  const directFinalUsd: number | null = modeUsd(pricingModes?.direct);
   const transportFinalUsd = (t: TransportView): number | null =>
-    t.configured ? pricingModes?.preorder.find((m) => m.method === t.method)?.prepaid?.unit_subtotal_usd_cents ?? null : null;
+    t.configured ? modeUsd(pricingModes?.preorder.find((m) => m.method === t.method)?.prepaid) : null;
   /** «يبدأ من» in dollars: the dollars of the cheapest route, only when every route at that price agrees. */
   const preorderFromFinalUsd = (() => {
     if (preorderFromFinal === null) return null;
@@ -3496,6 +3512,7 @@ export default function Product() {
               levelRegular: level?.regular_iqd ?? null,
               levelApplied: level?.applied_iqd ?? null,
               levelUnitUsd: level?.unit_subtotal_usd_cents ?? null,
+              levelAppliedUsd: level?.applied_usd_cents ?? null,
               levelRegularUsd: level?.regular_usd_cents ?? null,
             };
           })
@@ -3517,6 +3534,7 @@ export default function Product() {
             levelRegular: level?.regular_iqd ?? null,
             levelApplied: level?.applied_iqd ?? null,
             levelUnitUsd: level?.unit_subtotal_usd_cents ?? null,
+            levelAppliedUsd: level?.applied_usd_cents ?? null,
             levelRegularUsd: level?.regular_usd_cents ?? null,
           };
         });

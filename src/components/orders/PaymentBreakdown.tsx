@@ -8,7 +8,7 @@
  * a payment that already happened.
  */
 import { Coins, Clock, CheckCircle2, Ban } from 'lucide-react';
-import { orderItemUsdCents, type ApiOrder, type ApiOrderItem, type OrderFinancial } from '../../lib/api';
+import { orderItemUsdBase, type ApiOrder, type ApiOrderItem, type OrderFinancial } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { asLang, formatDate } from './format';
 import { useMoney } from '../../CurrencyContext';
@@ -164,8 +164,8 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
   // legacy order with no snapshots keeps the generic label.
   const feeKinds = feeKindsOf(order.items);
   const feesLabel = feeKinds.length > 0 ? s.feesOf(feeKinds.map((k) => s.feeKinds[k]).join(' · ')) : s.fees;
-  // In dollars (DECISIONS row 247): the lines' frozen dollar prices, everything else converted once.
-  const usdLines = order.items.map((it) => ({ iqd: it.line_total_iqd, usdCents: orderItemUsdCents(it)?.line ?? null }));
+  // In dollars (DECISIONS row 248): the lines' frozen dollar prices, everything else converted once.
+  const usdLines = order.items.flatMap((it) => orderItemUsdBase(it)?.line ?? []);
   const merchandiseUsd = usdTotal(f.merchandise_iqd, usdLines);
   const totalUsd = usdTotal(f.total_iqd, usdLines);
 

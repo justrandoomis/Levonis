@@ -17,7 +17,7 @@ import { iqdToUsdCentsExact, readCachedDisplayRate, rememberDisplayRate, usableR
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * THE DOLLAR IS THE PRICE WHEREVER THE SHOP SET ONE; ONLY DINAR-NATIVE AMOUNTS
- * ARE READ AT THE DISPLAY RATE (DECISIONS row 247, amending row 243).
+ * ARE READ AT THE DISPLAY RATE (DECISIONS row 248, amending row 243).
  *
  * The owner, 2026-10-17: «الدولار هو الاساس كما اتفقنا وليس العكس … الدولار هو
  * الثابت والدينار العراقي هو المتغير بسعر الصرف». Pricing V2 builds every price
@@ -226,13 +226,21 @@ interface CurrencyContextValue {
    */
   moneyBoth: (iqd: number, usdCents?: number | null) => string;
   /**
-   * A TOTAL IN DOLLARS (DECISIONS row 247): the sum of each line's dollar
+   * A TOTAL IN DOLLARS (DECISIONS row 248): the sum of each line's dollar
    * price, plus ONE conversion of the dinar remainder (delivery, fees, points,
    * coupons, member discounts and lines without a dollar price). Null when
    * prices are not being read in dollars. Pass it to `money` / `moneyBoth`
    * beside the dinar total.
    */
   usdTotal: (totalIqd: number, lines: readonly UsdLine[]) => number | null;
+  /**
+   * ONE FIGURE IN DOLLARS FROM ITS DOLLAR BASE (DECISIONS row 248): the base's
+   * own cents plus one conversion of what the figure holds beyond it — a unit
+   * with a warranty, a route commission or a direct premium on top of a price
+   * the shop set in dollars (`unitUsdBase`). Null without a base, or when
+   * prices are not being read in dollars (the figure is then converted whole).
+   */
+  usdWith: (iqd: number, base: UsdLine | null | undefined) => number | null;
   /**
    * A WALLET AMOUNT — a balance, an amount applied, a remainder, a shortfall,
    * a wallet debit. In dollars it is the LEDGER'S OWN CENTS (the wallet's rate,
@@ -276,6 +284,50 @@ export function usdTotalCents(totalIqd: number, lines: readonly UsdLine[], rateT
   return rest === null ? null : baseCents + rest;
 }
 
+/** The dinar and dollar figures a unit's dollar base is read from (a quote, a level, a cart or order line). */
+export interface UnitUsdFigures {
+  unit_subtotal_iqd?: number | null;
+  unit_subtotal_usd_cents?: number | null;
+  applied_iqd?: number | null;
+  applied_usd_cents?: number | null;
+}
+
+/**
+ * THE DOLLAR BASE OF A UNIT (DECISIONS row 248): the part of the unit the shop
+ * priced in dollars, as `{ iqd, usdCents }`. The whole unit when it has its
+ * own twin; otherwise its APPLIED price — the product itself — when that has
+ * one and a dinar-native fee sits on top of it (the extended warranty, a
+ * pre-order route's commission, a direct premium). The fee is then the
+ * remainder `usdWith` / `usdTotal` convert, so a warranty never takes the
+ * printer's own dollar price away with it. `unitIqd` is the unit actually
+ * charged: a line whose unit is not the figures' unit (a gift's 0, a bundle,
+ * a locked price) has no base. Null = the unit is converted whole.
+ */
+export function unitUsdBase(f: UnitUsdFigures | null | undefined, unitIqd?: number | null): UsdLine | null {
+  if (!f) return null;
+  const unit = typeof unitIqd === 'number' ? unitIqd : f.unit_subtotal_iqd;
+  if (typeof unit !== 'number' || !Number.isSafeInteger(unit) || unit <= 0) return null;
+  if (typeof f.unit_subtotal_iqd === 'number' && f.unit_subtotal_iqd !== unit) return null;
+  if (isUsdCents(f.unit_subtotal_usd_cents)) return { iqd: unit, usdCents: f.unit_subtotal_usd_cents };
+  const applied = f.applied_iqd;
+  if (isUsdCents(f.applied_usd_cents) && typeof applied === 'number' && Number.isSafeInteger(applied) && applied > 0 && applied <= unit) {
+    return { iqd: applied, usdCents: f.applied_usd_cents };
+  }
+  return null;
+}
+
+/** A unit's dollar base for `qty` units: exact integer cents × quantity. */
+export function scaleUsdLine(base: UsdLine | null | undefined, qty: number): UsdLine | null {
+  if (!base || !isUsdCents(base.usdCents) || !Number.isSafeInteger(qty) || qty < 0) return null;
+  return { iqd: base.iqd * qty, usdCents: base.usdCents * qty };
+}
+
+/** `usdWith`, pure: the base's cents plus one conversion of the rest; null without a base or a usable rate. */
+export function usdWithBaseCents(iqd: number, base: UsdLine | null | undefined, rateText: string | null | undefined): number | null {
+  if (!base || !isUsdCents(base.usdCents)) return null;
+  return usdTotalCents(iqd, [base], rateText);
+}
+
 /**
  * THE «−N٪» BESIDE A STRUCK PAIR: the server's percent of the DOLLAR pair when
  * the pair is read in dollars and it sent one, else its percent of the dinar
@@ -291,7 +343,7 @@ export function shownSavingPercent(
 }
 
 /**
- * A STRUCK PAIR IS NEVER HALF BASE AND HALF CONVERSION (DECISIONS row 247).
+ * A STRUCK PAIR IS NEVER HALF BASE AND HALF CONVERSION (DECISIONS row 248).
  * With a struck price beside it, the dollar prices are used only when BOTH
  * exist; otherwise both sides are converted. Alone, a price keeps its own.
  */
@@ -313,7 +365,7 @@ export function currencyValue(
   rate: DisplayRate | null,
   settingsLoaded = true
 ): CurrencyContextValue {
-  // The shop's own dollar price when the figure has one (DECISIONS row 247), else the dinars read at the rate.
+  // The shop's own dollar price when the figure has one (DECISIONS row 248), else the dinars read at the rate.
   const usdOf = (iqd: number, usdCents?: number | null): string | null => {
     if (!rate) return null;
     if (isUsdCents(usdCents)) return formatUsdCents(usdCents);
@@ -336,6 +388,7 @@ export function currencyValue(
       return usd ? `${formatIqd(iqd)} · ${usd}` : formatIqd(iqd);
     },
     usdTotal: (totalIqd: number, lines: readonly UsdLine[]) => (converted ? usdTotalCents(totalIqd, lines, rate!.text) : null),
+    usdWith: (iqd: number, base: UsdLine | null | undefined) => (converted ? usdWithBaseCents(iqd, base, rate!.text) : null),
     walletMoney: (iqd: number, usdCents?: number | null) =>
       currency === 'USD' && typeof usdCents === 'number' && Number.isFinite(usdCents) ? formatUsdCents(usdCents) : formatIqd(iqd),
     walletCharge: (iqd: number) => formatIqd(iqd),

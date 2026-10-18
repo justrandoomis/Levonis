@@ -1,5 +1,5 @@
 /**
- * THE DOLLAR IS THE BASE — EVERY CUSTOMER DOOR, END TO END (DECISIONS row 247).
+ * THE DOLLAR IS THE BASE — EVERY CUSTOMER DOOR, END TO END (DECISIONS row 248).
  *
  * The owner, 2026-10-17: «الدولار هو الاساس كما اتفقنا وليس العكس … الدولار هو الثابت والدينار العراقي هو
  * المتغير بسعر الصرف». The storefront read his eSUN PLA+ at $15.66 → $14.45 (the rounded dinars ÷ the public
@@ -12,6 +12,10 @@
  *  - no payload carries the rate, `usd_ceil6`, the typed model rows or any other working;
  *  - a database without the V2 results serves no dollar key at all (the client converts, as before).
  *
+ *  - a fee on top of a dollar price (a warranty) is the only part converted; a gift (0 IQD) and a configuration
+ *    in the printer finder never carry another figure's dollars; SKUs a few cents apart under one dinar price
+ *    show the lowest.
+ *
  * Run: npx tsx --test tests/usdBaseCard.test.ts
  */
 import { test } from 'node:test';
@@ -21,6 +25,19 @@ import { applyRate } from './fixtures/fx';
 import { discountWorld, M1, M2, PID, SLUG, COST_PID, COST_SLUG, option, off, type DiscountWorld } from './fixtures/productDiscount';
 import { seedOptionless, writeV2 } from './fixtures/pricingV2';
 import { usdCeilCentsOf } from '../packages/pricing/src/usdCents';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
+import { asD1, post, stubApp } from './fixtures/app';
+import { apps, giftInCart, giftWorld, placeOrder, quoteBody } from './fixtures/giftWorld';
+import { printerFinderRoutes } from '../worker/routes/printerFinder';
+import { currencyValue, CurrencyValueProvider, scaleUsdLine, unitUsdBase } from '../src/CurrencyContext';
+import { iqdToUsdCentsExact } from '../src/lib/displayRate';
+import { orderItemUsdBase } from '../src/lib/api';
+import { LanguageProvider } from '../src/LanguageContext';
+import { ResultRow } from '../src/components/finder/ResultCards';
+import { acceptedPolicies } from './lib/policies';
+import { PRINTER_STANDARD_DELIVERY_POLICY } from '../packages/shipping/src/printerDeliveryPolicy';
 
 const ESUN = 'p_esun';
 const ESUN_SLUG = `slug-${ESUN}`;
@@ -181,4 +198,132 @@ test('a database without the V2 results serves no dollar key at all', async () =
   for (const [label, payload] of [['list', list], ['page', page]] as const) {
     assert.deepEqual(dollarKeys(payload), [], `${label}: no dollar key`);
   }
+});
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- payloads are read field by field
+type J = Record<string, any>;
+
+/** A dollar reader at a display rate: the client's own money(), usdWith() and the pure helpers. */
+const dollarsAt = (rate: string) => currencyValue('USD', () => {}, { text: rate, source: 'shop' });
+
+test('a warranty on a V2 printer keeps the printer’s dollar price: only the fee is converted, on every door', async () => {
+  const w = await discountWorld({ rate: '1700' });
+  w.raw.exec(`INSERT INTO catalogs (id, slug, name_ar, is_printer_catalog) VALUES ('cat_pr', 'usd-printers', 'الطابعات', 1);`);
+  const plan = { id: 'wp_ext12', title_ar: 'ضمان', title_en: 'Warranty', title_ckb: 'گەرەنتی', terms_ar: '', terms_en: '', terms_ckb: '', duration_months: 12, duration_kind: 'extension', fee_iqd: 0, fee_percent: 7.5, order: 0, active: true };
+  w.raw.prepare(`UPDATE products SET category_id = 'cat_pr', warranty_plans = ? WHERE id = ?`).run(JSON.stringify([plan]), PID);
+  w.raw.exec(`INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES ('${PID}', 'cat_pr', 0)`);
+  // $601.37 × 1,700 = 1,022,329 → 1,022,500 IQD; the 7.5% warranty is 76,688 IQD on top.
+  await writeV2(w.db, PID, { method: 'usd', points: [option(M1, '601.37'), option(M2, '750')], discounts: [] });
+  const body = { qty: 1, optionId: M1, optionValueIds: [M1], fulfillmentType: 'direct_sale', warrantyPlanId: 'wp_ext12' };
+  const q = (await w.call(w.guest, 'POST', `/api/products/${SLUG}/quote`, body)).body.quote;
+  assertClean('warranty quote', q);
+  assert.equal(q.applied_iqd, 1_022_500);
+  assert.equal(q.applied_usd_cents, 60_137);
+  assert.equal(q.unit_subtotal_usd_cents, undefined, 'the unit has no twin of its own');
+  const fee = q.unit_subtotal_iqd - q.applied_iqd;
+  assert.equal(fee, q.warranty.fee_iqd);
+  // The headline is the printer's dollars plus the fee converted once — so it adds up with the fee row.
+  for (const rate of ['1700', '1660']) {
+    const v = dollarsAt(rate);
+    const base = unitUsdBase(q);
+    assert.deepEqual(base, { iqd: 1_022_500, usdCents: 60_137 });
+    const feeCents = iqdToUsdCentsExact(fee, rate)!;
+    assert.equal(v.usdWith(q.unit_subtotal_iqd, base), 60_137 + feeCents, `at ${rate}`);
+    assert.equal(v.usdWith(q.unit_subtotal_iqd * 2, scaleUsdLine(base, 2)), 2 * 60_137 + iqdToUsdCentsExact(2 * fee, rate)!);
+  }
+
+  // The cart, the checkout line and the frozen order carry the same base.
+  assert.equal((await w.addToCart({ productId: PID, optionId: M1, optionValueIds: [M1], qty: 1, fulfillmentType: 'direct_sale', warrantyPlanId: 'wp_ext12' })).status, 200);
+  const item = (await w.cart()).body.items[0];
+  assert.equal(item.unit_price_usd_cents, undefined);
+  assert.deepEqual(unitUsdBase(item.breakdown, item.unit_price_iqd), { iqd: 1_022_500, usdCents: 60_137 });
+  const checkout = await w.quote();
+  const l = checkout.body.quote?.lines?.[0] ?? checkout.body.lines?.[0];
+  assertClean('warranty checkout', checkout.body);
+  assert.deepEqual(unitUsdBase(l.breakdown, l.unit_price_iqd), { iqd: 1_022_500, usdCents: 60_137 });
+  // A printer: the standard-delivery warning is accepted, as the checkout asks.
+  const placed = await w.call(w.buyer, 'POST', '/api/orders', {
+    addressId: 'addr_b',
+    deliveryMethodId: 'standard',
+    paymentMethodId: 'cash',
+    useWallet: false,
+    usePoints: false,
+    itemIds: [],
+    idempotencyKey: 'usd-base-warranty-1',
+    policyAcceptance: acceptedPolicies(),
+    printerStandardDeliveryAcceptance: { version: PRINTER_STANDARD_DELIVERY_POLICY.version, accepted: true },
+  });
+  assert.equal(placed.status, 200, JSON.stringify(placed.body).slice(0, 300));
+  const mine = await json(await get(w.buyer, `/api/orders/${String(placed.body.order.id)}`));
+  const base = orderItemUsdBase(mine.order.items[0]);
+  assert.deepEqual(base?.unit, { iqd: 1_022_500, usdCents: 60_137 });
+  assert.equal(base?.appliedUnit, 60_137);
+});
+
+test('colours a few cents apart under one dinar price: the card and the opening level show the lowest SKU’s dollars', async () => {
+  const w = await discountWorld({ rate: '1700' });
+  const ID = 'p_fil';
+  seedOptionless(w.raw, ID, { price: 26_000, saleTypes: ['direct_sale'], routes: [], colours: 2 });
+  await writeV2(w.db, ID, {
+    method: 'usd',
+    points: [{ scope: 'product', scope_id: '', kind: 'fixed', usd: '15.20' }, { scope: 'color', scope_id: `${ID}_c1`, kind: 'delta', usd: '+0.05' }],
+    discounts: [],
+  });
+  const card = await cardOf(w, `slug-${ID}`);
+  assert.equal(card.display_price_iqd, 26_000);
+  assert.equal(card.display_price_usd_cents, 1520, 'a real SKU’s $15.20, never 26,000 ÷ the rate');
+  const page = await json(await get(w.guest, `/api/products/slug-${ID}`));
+  assert.equal(page.price_levels.base.unit_subtotal_usd_cents, 1520);
+  assert.equal(page.price_levels.color[`${ID}_c1`].unit_subtotal_usd_cents, 1525);
+});
+
+test('a gift is charged 0 and carries no dollar price of what is paid — cart, checkout line and the frozen order', async () => {
+  const raw = giftWorld();
+  const a = apps(raw);
+  await giftInCart(a);
+  const cart = await json(await get(a.buyer, '/api/cart'));
+  const gift = (cart.items as J[]).find((i) => i.kind === 'gift')!;
+  assert.equal(gift.unit_price_iqd, 0);
+  assert.equal(gift.unit_price_usd_cents, undefined);
+  assert.equal(gift.breakdown.applied_usd_cents, undefined);
+  assert.equal(gift.breakdown.unit_subtotal_usd_cents, undefined);
+  const quote = await json(await post(a.buyer, '/api/orders/quote', quoteBody()));
+  const line = (quote.quote.lines as J[]).find((x) => x.kind === 'gift')!;
+  assert.equal(line.line_total_iqd, 0);
+  assert.equal(line.unit_price_usd_cents, undefined);
+  assert.equal(line.line_total_usd_cents, undefined);
+  assert.equal(unitUsdBase(line.breakdown, line.unit_price_iqd), null);
+  const order = await placeOrder(a.buyer);
+  const snap = JSON.parse(row<{ pricing_snapshot: string }>(raw, 'SELECT pricing_snapshot FROM order_items WHERE order_id = ?', order.id)!.pricing_snapshot);
+  assert.equal(snap.applied_iqd, 0);
+  assert.equal(snap.applied_usd_cents, undefined);
+  assert.equal(snap.unit_subtotal_usd_cents, undefined);
+});
+
+test('a printer-finder configuration card prints that configuration’s dollars, never the product card’s «from»', async () => {
+  const w = await discountWorld();
+  w.raw.exec(`UPDATE products SET category_id = 'cat_printers', sub_category_id = 'cat_printers_fdm',
+                spec_fields = '{"build_volume":"256x256x256","max_speed":"500","warranty":"12"}' WHERE id = '${PID}';`);
+  const finder = stubApp(asD1(w.raw), null, (x) => x.route('/api/printer-finder', printerFinderRoutes));
+  const answer = await json(await get(finder, '/api/printer-finder?use=unsure&tech=any&budget=any&sale=any&prio=none&level=beginner'));
+  assertClean('finder', answer);
+  const result = ((answer.results ?? []) as J[]).find((r) => r.variant && r.card?.id === PID);
+  assert.ok(result, 'a configuration result');
+  const page = await json(await get(w.guest, `/api/products/${SLUG}`));
+  const level = page.price_levels.option[result!.variant.option_id];
+  assert.equal(result!.variant.price_iqd, level.unit_subtotal_iqd);
+  assert.equal(result!.variant.applied_usd_cents, level.applied_usd_cents);
+  assert.notEqual(result!.card.display_price_usd_cents, level.applied_usd_cents, 'the card’s «from» is another figure');
+  // Rendered in dollars at a display rate that differs from the applied one: the configuration's own dollars.
+  const html = renderToStaticMarkup(
+    createElement(MemoryRouter, null,
+      createElement(LanguageProvider, {
+        children: createElement(CurrencyValueProvider, {
+          value: dollarsAt('1460'),
+          children: createElement(ResultRow, { result: result as never, lang: 'en', saved: false, saveBusy: false, onSave: null }),
+        }),
+      })
+    )
+  );
+  assert.deepEqual(html.match(/\$[0-9,]+\.[0-9]{2}/g), [`$${(level.applied_usd_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]);
 });
