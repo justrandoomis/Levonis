@@ -25,7 +25,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { APEX, MERCHANT_HOST, asD1, freshDb, json, post, row, stubApp } from './fixtures/app';
+import { APEX, MERCHANT_HOST, asD1, freshDb, json, pending, post, row, stubApp } from './fixtures/app';
 import { authRoutes } from '../worker/routes/auth';
 import {
   AUTH_OTP_RESEND_COOLDOWN_SECONDS,
@@ -597,6 +597,116 @@ test('the code sign-in works from a MERCHANT host, exactly like every other sign
       { 'CF-Connecting-IP': '10.9.9.8' }
     );
     assert.equal(r2.status, 200);
+  } finally {
+    p.restore();
+  }
+});
+
+// =========================================================================
+// THE E-MAIL SIGN-UP FINISHED IN THIS BROWSER (sign-in fix, 2026-10-18)
+// =========================================================================
+
+test('SIGN-UP — the «check your inbox» screen can finish with a code: a session HERE, the password works, the old link answers ALREADY_REGISTERED', async () => {
+  // The emailed link opens the account in whichever browser opens it — from a
+  // mail app, often not the one the person signed up in, which then stays a
+  // guest. The pending screen offers the existing code path instead:
+  // /otp/start (signup) → /otp/verify (allow_signup) → /signup/otp-complete
+  // with the password, which opens the session in the CALLING browser.
+  const raw = freshDb();
+  const p = stubProviders();
+  const NEW = 'fresh-signup@example.com';
+  const PW = 'Str0ng-passw0rd';
+  try {
+    const a = app(raw);
+    // 1. The ordinary e-mail-first sign-up: nothing is created, a link is mailed.
+    const reg = await post(a, '/api/auth/register', { email: NEW, username: 'freshone', name: 'Fresh One', locale: 'ar' }, {
+      'CF-Connecting-IP': '10.7.0.1',
+    });
+    assert.equal(reg.status, 200);
+    assert.equal((await json(reg)).pending_email, true);
+    await Promise.allSettled(pending);
+    const link = row<{ payload: string }>(
+      raw,
+      "SELECT payload FROM outbox WHERE recipient = ? AND payload LIKE '%auth?finish=%' ORDER BY rowid DESC LIMIT 1",
+      NEW
+    );
+    const linkToken = link ? /auth\?finish=([A-Za-z0-9_-]+)/.exec(link.payload)?.[1] : undefined;
+    assert.ok(linkToken, 'the sign-up link was queued');
+    assert.equal(row(raw, 'SELECT id FROM users WHERE email = ?', NEW), undefined, 'no account before a proof');
+
+    // 2. «Enter a code here instead»: the code really goes out on the sign-up path.
+    const before = p.sent.length;
+    const s1 = await start(a, { channel: 'email', identifier: NEW, intent: 'signup' });
+    assert.equal(s1.status, 200);
+    const mailed = p.sent.slice(before).find((m) => m.channel === 'email' && m.to === NEW && m.code);
+    assert.ok(mailed?.code, 'a six-digit code reached the new address');
+
+    const v = await verify(a, { channel: 'email', identifier: NEW, code: mailed!.code, allow_signup: true });
+    assert.equal(v.status, 200);
+    const vb = await json(v);
+    assert.equal(vb.signup, true);
+    assert.equal(typeof vb.ticket, 'string');
+    assert.equal(v.headers.get('set-cookie'), null, 'a ticket is not a session');
+
+    // 3. The profile step, with the password the link would have asked for.
+    const done = await post(
+      a,
+      '/api/auth/signup/otp-complete',
+      { ticket: vb.ticket, name: 'Fresh One', username: 'freshone', lang: 'ar', password: PW },
+      { 'CF-Connecting-IP': '10.7.0.2' }
+    );
+    assert.equal(done.status, 200);
+    const db = await json(done);
+    assert.equal(db.created, true);
+    assert.equal(db.user.email, NEW);
+    const cookie = done.headers.get('set-cookie') ?? '';
+    assert.match(cookie, /HttpOnly/i, 'the session opens in THIS browser');
+    assert.match(cookie, /Secure/i);
+    const account = row<{ id: string; email_verified_at: string | null; password_hash: string | null }>(
+      raw,
+      'SELECT id, email_verified_at, password_hash FROM users WHERE email = ?',
+      NEW
+    );
+    assert.ok(account?.email_verified_at, 'receiving the code proved the mailbox');
+    assert.ok(account?.password_hash, 'the chosen password is the account\'s');
+
+    // 4. That password signs in like any other.
+    const login = await post(a, '/api/auth/login', { identifier: NEW, password: PW }, { 'CF-Connecting-IP': '10.7.0.3' });
+    assert.equal(login.status, 200);
+    assert.equal((await json(login)).user.id, account!.id);
+
+    // 5. The emailed link, opened later anywhere, says so visibly — never a
+    //    second account and never a silent guest.
+    const late = await post(a, '/api/auth/signup/complete', { token: linkToken, password: 'Another-passw0rd' }, {
+      'CF-Connecting-IP': '10.7.0.4',
+    });
+    assert.equal(late.status, 409);
+    assert.equal((await json(late)).code, 'ALREADY_REGISTERED');
+    assert.equal(row<{ n: number }>(raw, 'SELECT COUNT(*) AS n FROM users WHERE email = ?', NEW)?.n, 1);
+  } finally {
+    p.restore();
+  }
+});
+
+test('SIGN-UP — the code path refuses a short password before spending the ticket', async () => {
+  const raw = freshDb();
+  const p = stubProviders();
+  const NEW = 'short-pw@example.com';
+  try {
+    const a = app(raw);
+    await start(a, { channel: 'email', identifier: NEW, intent: 'signup' });
+    const code = p.sent.find((m) => m.to === NEW)?.code;
+    const v = await json(await verify(a, { channel: 'email', identifier: NEW, code, allow_signup: true }));
+    const short = await post(a, '/api/auth/signup/otp-complete', { ticket: v.ticket, name: 'Short', password: 'short' }, {
+      'CF-Connecting-IP': '10.7.1.1',
+    });
+    assert.equal(short.status, 400);
+    assert.equal(row(raw, 'SELECT id FROM users WHERE email = ?', NEW), undefined);
+    // The ticket survived: the same proof still opens the account.
+    const ok = await post(a, '/api/auth/signup/otp-complete', { ticket: v.ticket, name: 'Short', password: 'Long-enough-1' }, {
+      'CF-Connecting-IP': '10.7.1.2',
+    });
+    assert.equal(ok.status, 200);
   } finally {
     p.restore();
   }

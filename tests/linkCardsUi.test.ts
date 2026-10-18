@@ -60,9 +60,10 @@ const auth = (isAuthenticated: boolean) => ({
   isAuthenticated,
   user: isAuthenticated ? { id: 'u1', username: 'eve', name: 'Eve' } : null,
   login: async () => {},
-  loginWithGoogle: async () => {},
+  loginWithGoogle: async () => 'ok' as const,
   register: async () => {},
   refreshUser: async () => {},
+  adoptSession: async () => 'ok' as const,
   logout: async () => {},
   isLoaded: true,
 });

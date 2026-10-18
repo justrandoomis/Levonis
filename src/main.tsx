@@ -25,9 +25,11 @@ import { watchServiceWorkerUpdates } from './lib/serviceWorkerUpdates';
  */
 
 /**
- * `www.` IS NOT A SECOND HOME (src/lib/canonicalHost.ts). A visit there moves
- * to the apex before anything renders — before Google's script can load on an
- * origin its client id does not allow — and nothing else runs on the way out.
+ * `www.` IS NOT A SECOND HOME, AND PLAIN HTTP IS NOT A HOME AT ALL
+ * (src/lib/canonicalHost.ts). A visit to either moves to `https://` on the
+ * apex before anything renders — before Google's script can load on an origin
+ * its client id does not allow, and before a sign-in can be attempted where the
+ * Secure session cookie is never kept — and nothing else runs on the way out.
  */
 const apex = typeof window === 'undefined' ? null : apexUrlFor(window.location.href);
 if (apex) {

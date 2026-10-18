@@ -4,9 +4,10 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { motion, AnimatePresence } from 'motion/react';
 import { useMotion } from '../lib/motion';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { useAuth } from '../AuthContext';
+import { useAuth, type SessionAdoption } from '../AuthContext';
+import { useStore } from '../StoreContext';
 import { useLanguage } from '../LanguageContext';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, type ApiUser } from '../lib/api';
 import AuthShell from '../components/auth/AuthShell';
 import AuthDivider from '../components/auth/AuthDivider';
 import CountryPicker from '../components/auth/CountryPicker';
@@ -17,6 +18,8 @@ import SocialAuthButton, { TelegramIcon } from '../components/auth/SocialAuthBut
 import CodeAuth from '../components/auth/CodeAuth';
 import TelegramAuth from '../components/auth/TelegramAuth';
 import { sanitizeNextPath } from '../components/auth/nextPath';
+import { storeReturnUrl } from '../components/auth/storeReturn';
+import { sessionNotKeptText } from '../components/auth/sessionStrings';
 import InAppBrowserNotice from '../components/auth/InAppBrowserNotice';
 import { detectInAppBrowser } from '../lib/inAppBrowser';
 import FillButton, {
@@ -77,7 +80,15 @@ import { onboardingStrings, usernameReasonLabel } from '../components/onboarding
  * - POST /api/auth/forgot-password { email, lang } · POST /api/auth/reset-password
  *
  * Return-to-destination: `location.state.from` or `?next=` AFTER
- * sanitizeNextPath() — same-origin relative paths only, else "/".
+ * sanitizeNextPath() — same-origin relative paths only, else "/". A shop
+ * sends its visitors here with `?store=<slug>` too (src/App.tsx
+ * `StoreHostAuthHandoff`), and they go back to that shop afterwards
+ * (src/components/auth/storeReturn.ts `storeReturnUrl`).
+ *
+ * Every sign-in ends in `adoptSession` (src/AuthContext.tsx): a fresh /me
+ * from this browser must show the same account before the page says
+ * «signed in». When it does not, the session cookie was not kept, and the
+ * page says THAT instead of quietly leaving the person a guest.
  */
 
 const STRINGS = {
@@ -204,6 +215,10 @@ const STRINGS = {
     finishDeadTitle: 'هذا الرابط لم يعد صالحًا',
     finishDeadBody: 'روابط إكمال التسجيل تصلح لمرة واحدة ولمدة 24 ساعة، ويلغيها طلب تسجيل أحدث بنفس البريد. أعد إنشاء الحساب لتصلك رسالة جديدة.',
     signUpAgain: 'إنشاء الحساب من جديد',
+    errHttpsRequired: 'هذا الاتصال غير آمن. افتح الموقع عبر https:// ثم أعد المحاولة.',
+    pendingUseCode: 'أدخل رمزًا هنا بدل فتح الرابط',
+    pendingCodeHint: 'فتح الرابط من تطبيق البريد قد يفتح متصفحًا آخر، فيبقى هذا المتصفح غير مسجَّل. اطلب رمزًا من 6 أرقام وأكمل التسجيل هنا.',
+    finishOtherBrowserHint: 'إن بدأت التسجيل في متصفح آخر أو من تطبيق الشاشة الرئيسية، فسجّل الدخول هناك بعد ذلك بهذا البريد وكلمة المرور التي تختارها الآن.',
   },
   en: {
     signInTitle: 'Welcome back',
@@ -327,6 +342,10 @@ const STRINGS = {
     finishDeadTitle: 'This link no longer works',
     finishDeadBody: 'Sign-up links work once, expire after 24 hours, and are replaced by a newer sign-up with the same address. Sign up again to get a fresh message.',
     signUpAgain: 'Sign up again',
+    errHttpsRequired: 'This connection is not secure. Open the site with https:// and try again.',
+    pendingUseCode: 'Enter a code here instead of opening the link',
+    pendingCodeHint: 'Opening the link from your mail app may open a different browser and leave this one signed out. Get a 6-digit code and finish signing up here.',
+    finishOtherBrowserHint: 'If you started signing up in another browser or in the home-screen app, sign in there afterwards with this email and the password you choose now.',
   },
   ckb: {
     signInTitle: 'بەخێربێیتەوە',
@@ -450,6 +469,10 @@ const STRINGS = {
     finishDeadTitle: 'ئەم بەستەرە چیتر کار ناکات',
     finishDeadBody: 'بەستەرەکانی تەواوکردنی خۆتۆمارکردن تەنها جارێک و بۆ ٢٤ کاتژمێر کاردەکەن، و تۆمارکردنێکی نوێتر بە هەمان ئیمەیل جێیان دەگرێتەوە. دووبارە هەژمار دروست بکە بۆ وەرگرتنی پەیامی نوێ.',
     signUpAgain: 'دووبارە هەژمار دروست بکە',
+    errHttpsRequired: 'ئەم پەیوەندییە پارێزراو نییە. ماڵپەڕەکە بە https:// بکەرەوە و دووبارە هەوڵ بدە.',
+    pendingUseCode: 'لەبری کردنەوەی بەستەرەکە، لێرە کۆدێک بنووسە',
+    pendingCodeHint: 'کردنەوەی بەستەرەکە لە ئەپی ئیمەیلەوە لەوانەیە وێبگەڕێکی تر بکاتەوە و لەم وێبگەڕەدا نەچیتە ژوورەوە. کۆدێکی ٦ ژمارەیی وەربگرە و خۆتۆمارکردنەکە لێرە تەواو بکە.',
+    finishOtherBrowserHint: 'ئەگەر خۆتۆمارکردنەکەت لە وێبگەڕێکی تر یان لە ئەپی سەر شاشەی سەرەکی دەست پێکردووە، دواتر لەوێ بەم ئیمەیلە و ئەو وشەی نهێنییەی ئێستا هەڵیدەبژێریت بچۆرە ژوورەوە.',
   },
 };
 
@@ -506,7 +529,11 @@ export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { loginWithGoogle, refreshUser } = useAuth();
+  const { loginWithGoogle, adoptSession } = useAuth();
+  // A shop host (`<slug>.levonis-iq.com`, or a host that looked like one):
+  // Google never runs there — it accepts only the apex as an origin.
+  const { store, unknownStore, unavailableStore, mainSite } = useStore();
+  const onStoreHost = !!store || unknownStore || unavailableStore;
   const { lang, dir } = useLanguage();
   const s = STRINGS[lang];
   const ob = onboardingStrings(lang);
@@ -546,6 +573,10 @@ export default function Auth() {
   const [refFromLink] = useState(() => !!searchParams.get('ref'));
   // ?next= return destination, captured once for the same reason.
   const [nextFromQuery] = useState(() => searchParams.get('next') || '');
+  // ?store=<slug>: a shop handed sign-in to this page and wants the person
+  // back (src/App.tsx `StoreHostAuthHandoff`). Only ever a slug — the address
+  // is built by `storeReturnUrl`, never read from the query.
+  const [storeFromQuery] = useState(() => searchParams.get('store') || '');
   // ProtectedRoute redirects can pass location.state.from (string or location
   // object). Sanitized to a same-origin relative path; falls back to "/".
   const stateFrom = (location.state as { from?: unknown } | null)?.from;
@@ -569,6 +600,10 @@ export default function Auth() {
   // Email-first sign-up: the server queued a link and created nothing yet;
   // the page shows "check your inbox" instead of moving on.
   const [pendingEmail, setPendingEmail] = useState(false);
+  // The «check your inbox» screen's other road: finish with a six-digit code
+  // in THIS browser instead of opening the link, which a mail app may open
+  // in a different one (and the session with it).
+  const [codeFromPending, setCodeFromPending] = useState(false);
   // The finish screen (/auth?finish=TOKEN): the pending profile behind the
   // link, read once so the person sees which address they are opening.
   const [finishInfo, setFinishInfo] = useState<{ email: string; name: string; username: string | null } | null>(null);
@@ -625,7 +660,14 @@ export default function Auth() {
       maxTouchPoints: typeof navigator !== 'undefined' ? navigator.maxTouchPoints : 0,
     })
   );
-  const googleUsable = googleConfigured && !inApp.inApp;
+  // Not on a shop (Google refuses that origin; the server withholds the id
+  // there too), and never outside a secure context: on plain http Google
+  // refuses the origin and the Secure session cookie would not be kept.
+  const googleUsable =
+    googleConfigured &&
+    !inApp.inApp &&
+    !onStoreHost &&
+    (typeof window === 'undefined' || window.isSecureContext !== false);
   const resetConfigured = caps?.passwordReset ?? false;
   const telegramConfigured = caps?.telegram ?? false;
   const emailCodeConfigured = caps?.emailOtp ?? false;
@@ -716,6 +758,7 @@ export default function Auth() {
     TOKEN_EXPIRED: s.errResetLink,
     ALREADY_REGISTERED: s.errAlreadyRegistered,
     RATE_LIMITED: s.errTooMany,
+    HTTPS_REQUIRED: s.errHttpsRequired,
   };
 
   const errMsg = (err: unknown): string => {
@@ -742,7 +785,29 @@ export default function Auth() {
       window.location.assign(dest);
       return;
     }
+    // Signed in for a shop: back to it, on its own host — the cookie is the
+    // parent domain's, so the shop already sees the session. Only from the
+    // platform's own page; a slug that fails the rules answers null and the
+    // person simply stays here.
+    if (!onStoreHost) {
+      const back = storeReturnUrl(storeFromQuery, mainSite, dest);
+      if (back) {
+        window.location.assign(back);
+        return;
+      }
+    }
     navigate(dest, { replace: true });
+  };
+
+  /**
+   * The browser has to have KEPT the session before anything says «signed
+   * in» (src/lib/sessionCheck.ts). False means it did not: the reason is on
+   * screen and the page stays where it is.
+   */
+  const sessionKept = (outcome: SessionAdoption): boolean => {
+    if (outcome === 'ok') return true;
+    setServerError(sessionNotKeptText(lang));
+    return false;
   };
 
   const clearMessages = () => {
@@ -756,6 +821,7 @@ export default function Auth() {
   const switchView = (next: AuthView) => {
     clearMessages();
     setPendingEmail(false);
+    setCodeFromPending(false);
     setPanel('form');
     setStep(1);
     setView(next);
@@ -768,7 +834,16 @@ export default function Auth() {
 
   const openCodePanel = (next: 'code-email' | 'code-whatsapp') => {
     clearMessages();
+    setCodeFromPending(false);
     setPanel(next);
+  };
+
+  /** From the «check your inbox» screen: the same address, a code instead of the link. */
+  const openPendingCode = () => {
+    clearMessages();
+    setCodeFromPending(true);
+    setPendingEmail(false);
+    setPanel('code-email');
   };
 
   const openPhonePanel = () => {
@@ -958,9 +1033,9 @@ export default function Auth() {
       // Auth-server contract: identifier = email | username | phone. The
       // legacy `email` field carries the same value so the current server
       // keeps working until that slice lands.
-      await api.post('/api/auth/login', { identifier, email: identifier, password });
-      await refreshUser();
-      setSucceeded(true); // the server answered — this is not an assumption
+      const r = await api.post<{ user?: ApiUser }>('/api/auth/login', { identifier, email: identifier, password });
+      if (!sessionKept(await adoptSession(r?.user))) return;
+      setSucceeded(true); // the server answered AND this browser kept the session
       finishAuth();
     } catch (err) {
       setServerError(errMsg(err));
@@ -998,7 +1073,7 @@ export default function Auth() {
     setVia('form');
     setSubmitting(true);
     try {
-      const created = await api.post<{ pending_email?: boolean }>('/api/auth/register', {
+      const created = await api.post<{ pending_email?: boolean; user?: ApiUser }>('/api/auth/register', {
         username: trimmedUsername,
         name: trimmedName,
         email: trimmedEmail,
@@ -1009,15 +1084,17 @@ export default function Auth() {
         ...(country ? { country } : {}),
         ...(referral ? { referralCode: referral } : {}),
       });
-      setSucceeded(true);
       // With a mail service the server created nothing yet: the account opens
       // from the link in the inbox, and the answer is the same whether or not
       // the address already had an account (see worker/routes/auth.ts).
       if (created.pending_email) {
+        setSucceeded(true);
+        setCodeFromPending(false);
         setPendingEmail(true);
         return;
       }
-      await refreshUser();
+      if (!sessionKept(await adoptSession(created.user))) return;
+      setSucceeded(true);
       finishAuth(true);
     } catch (err) {
       setServerError(errMsg(err));
@@ -1041,14 +1118,16 @@ export default function Auth() {
     setVia('google');
     setSubmitting(true);
     try {
+      let outcome: SessionAdoption;
       if (referral) {
         // Same server route the context uses, plus the referral code the
         // person chose (server-resolved; unknown codes never block).
-        await api.post('/api/auth/google', { credential, referralCode: referral });
-        await refreshUser();
+        const r = await api.post<{ user?: ApiUser }>('/api/auth/google', { credential, referralCode: referral });
+        outcome = await adoptSession(r?.user);
       } else {
-        await loginWithGoogle(credential);
+        outcome = await loginWithGoogle(credential);
       }
+      if (!sessionKept(outcome)) return;
       setSucceeded(true);
       // The register/login distinction is the server's: Google can create an
       // account on the sign-in view too, and either way the account's own
@@ -1125,10 +1204,16 @@ export default function Auth() {
     try {
       // referralCode is sent even when empty: an empty string REMOVES a code
       // the person did not want, whereas an absent field would keep it.
-      await api.post('/api/auth/signup/complete', { token: finishToken, password, referralCode: finishReferral.trim() });
+      const r = await api.post<{ user?: ApiUser }>('/api/auth/signup/complete', {
+        token: finishToken,
+        password,
+        referralCode: finishReferral.trim(),
+      });
       setPassword('');
       setConfirmPassword('');
-      await refreshUser();
+      // The account exists now whatever this browser does with the cookie, so
+      // a session that was not kept is a reason to sign in, not to retry here.
+      if (!sessionKept(await adoptSession(r?.user))) return;
       setSucceeded(true);
       finishAuth(true);
     } catch (err) {
@@ -1419,20 +1504,40 @@ export default function Auth() {
    * no account by handing back a ticket, and CodeAuth's own third screen asks
    * the one question a code cannot answer, which is what to call the person.
    */
-  const codePanel = (signup: boolean) => (
-    <div>
-      {backLink(() => setPanel('form'))}
-      {heading(SHEET.code, signup ? s.signUpTitle : s.codeSignInTitle)}
-      {errorSummary}
-      <CodeAuth
-        channel={panel === 'code-email' ? 'email' : 'whatsapp'}
-        mode={signup ? 'signup' : 'signin'}
-        referralCode={referralCode}
-        onSuccess={(created) => finishAuth(created)}
-        onSwitchMode={signup ? undefined : switchView}
-      />
-    </div>
-  );
+  const codePanel = (signup: boolean) => {
+    // Reached from the «check your inbox» screen: the address, name and handle
+    // typed a moment ago are carried in, the code is sent at once, and the
+    // password the link would have asked for is asked here instead.
+    const fromPending = signup && codeFromPending && panel === 'code-email';
+    return (
+      <div>
+        {backLink(() => {
+          if (fromPending) {
+            clearMessages();
+            setCodeFromPending(false);
+            setPendingEmail(true);
+          }
+          setPanel('form');
+        })}
+        {heading(SHEET.code, signup ? s.signUpTitle : s.codeSignInTitle)}
+        {errorSummary}
+        <CodeAuth
+          channel={panel === 'code-email' ? 'email' : 'whatsapp'}
+          mode={signup ? 'signup' : 'signin'}
+          referralCode={referralCode}
+          onSuccess={(created) => finishAuth(created)}
+          onSwitchMode={signup ? undefined : switchView}
+          {...(fromPending
+            ? {
+                initialEmail: trimmedEmail,
+                initialProfile: { name: trimmedName, username: trimmedUsername, country },
+                askPassword: { label: s.password, hint: s.hintPassword, reveal: { show: s.showPassword, hide: s.hidePassword } },
+              }
+            : {})}
+        />
+      </div>
+    );
+  };
 
   /**
    * THE PHONE PANEL — one number, then one choice of road.
@@ -1597,6 +1702,7 @@ export default function Auth() {
             {passwordField('new-password')}
             {confirmField}
           </div>
+          <p className="lv-sub">{s.finishOtherBrowserHint}</p>
           <div className="lv-cta">
             <FillButton
               id="finish-submit"
@@ -1747,6 +1853,17 @@ export default function Auth() {
             <p>{s.pendingBody(trimmedEmail)}</p>
           </div>
           <p className="lv-sub">{s.pendingSpam}</p>
+          {/* The link opens the account in whichever browser opens it — from a
+              mail app, often not this one, which then stays signed out. A code
+              finishes the sign-up HERE; the link keeps working until then. */}
+          {emailCodeConfigured && (
+            <div style={{ margin: '14px 0' }}>
+              <p className="lv-sub">{s.pendingCodeHint}</p>
+              <button type="button" onClick={openPendingCode} className="lv-btn-gold">
+                {s.pendingUseCode}
+              </button>
+            </div>
+          )}
           <button type="button" onClick={() => switchView('signin')} className="lv-link">
             {s.pendingSignIn}
           </button>
@@ -2007,10 +2124,13 @@ export default function Auth() {
   }
 
   // The Google provider is mounted ONCE for the page, only when a client id
-  // is configured, and never inside the animated screen (remounting the GIS
-  // iframe on every switch would flicker and re-request the script).
+  // is configured AND the button can be used here (not on a shop, not in an
+  // in-app browser, not on http) — so Google's script never loads on a page
+  // whose origin it would refuse — and never inside the animated screen
+  // (remounting the GIS iframe on every switch would flicker and re-request
+  // the script).
   const withGoogle = (node: React.ReactNode) =>
-    googleClientId ? <GoogleOAuthProvider clientId={googleClientId}>{node}</GoogleOAuthProvider> : node;
+    googleUsable && googleClientId ? <GoogleOAuthProvider clientId={googleClientId}>{node}</GoogleOAuthProvider> : node;
 
   return withGoogle(
     <AuthShell dir={dir}>

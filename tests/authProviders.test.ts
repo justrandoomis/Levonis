@@ -81,6 +81,32 @@ test('a configured Google client id is reported, and it IS the client id', async
   assert.equal(body.googleClientId, GOOGLE_ID);
 });
 
+test('Google is offered only where Google accepts the origin: never on a shop or system host', async () => {
+  // Google's Authorized JavaScript origins are exact (no wildcards) and name
+  // the apex. A shop sends sign-in to the apex instead (src/App.tsx
+  // StoreHostAuthHandoff), so its capabilities withhold the id as well — the
+  // page never loads Google's script on an origin Google would refuse.
+  const { d1 } = db();
+  const a = app({ DB: d1, GOOGLE_CLIENT_ID: GOOGLE_ID, STORE_ROOT_DOMAIN: 'levonis-iq.com', APP_ORIGIN: 'https://levonis-iq.com' });
+  const caps = async (host: string) => {
+    const res = await a.request(`https://${host}/api/auth/capabilities`, { headers: { Host: host } });
+    assert.equal(res.status, 200, host);
+    return (await res.json()) as Record<string, unknown>;
+  };
+  for (const host of ['somestore.levonis-iq.com', 'studio.levonis-iq.com', 'a.b.levonis-iq.com']) {
+    const body = await caps(host);
+    assert.equal(body.google, false, `${host} must not offer Google`);
+    assert.equal(body.googleClientId, '', `${host} must not carry the client id`);
+    // Everything else is unchanged on a shop.
+    assert.equal(body.emailPassword, true, host);
+  }
+  for (const host of ['levonis-iq.com', 'www.levonis-iq.com', 'localhost', 'levonis-staging.example.workers.dev']) {
+    const body = await caps(host);
+    assert.equal(body.google, true, `${host} keeps Google`);
+    assert.equal(body.googleClientId, GOOGLE_ID, host);
+  }
+});
+
 test('mail turns on password reset AND verification together, because they are one provider', async () => {
   const { d1 } = db();
   const on = await app({ DB: d1, EMAIL_API_KEY: 'k', EMAIL_FROM: 'a@b.co' }).request('/api/auth/capabilities');

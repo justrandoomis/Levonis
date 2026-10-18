@@ -41,7 +41,7 @@ export async function requireAuth(c: Context<AppContext>, next: Next) {
  * the configured root domain, so the admin host rule below never depends on
  * a middleware someone remembered to install.
  */
-function requestHost(c: Context<AppContext>): HostInfo {
+export function requestHost(c: Context<AppContext>): HostInfo {
   return c.get('host') ?? classifyHost(c.req.header('Host'), rootDomainFrom(c.env ?? {}));
 }
 

@@ -125,7 +125,7 @@ import { kycRoutes } from './routes/kyc';
 import { supportRoutes } from './routes/support';
 import { referralRoutes } from './routes/referrals';
 import { studioRoutes } from './routes/studio';
-import { apexRedirectFor, classifyHost, rootDomainFrom } from './lib/hosts';
+import { apexRedirectFor, classifyHost, httpsUpgradeFor, rootDomainFrom } from './lib/hosts';
 import { merchantRoutes } from './routes/merchant';
 import { storeLayoutRoutes } from './routes/storeLayout';
 import { merchantFinanceRoutes, merchantPayoutRoutes } from './routes/merchantFinance';
@@ -203,6 +203,23 @@ setEdgeRefreshDispatcher((request, env, ctx) => app.fetch(request, env, ctx as n
 // NOT_VIA_GATEWAY and never calls `next()`, and Hono composes in registration
 // order, so registering it FIRST meant that refusal carried no CSP and no HSTS.
 app.use('*', securityHeaders());
+// PLAIN HTTP NEVER REACHES A ROUTE (worker/lib/hosts.ts `httpsUpgradeFor`): a
+// GET or HEAD moves to https (www straight to the apex), anything else is a
+// 403 HTTPS_REQUIRED. The session cookie is Secure, so a sign-in answered on
+// http "worked" and left the browser a guest; now none is ever answered there.
+// Inside securityHeaders(), so the 301 and the 403 still carry HSTS.
+app.use('*', async (c, next) => {
+  const up = httpsUpgradeFor(c.req.url, c.req.header('CF-Visitor'), rootDomainFrom(c.env), c.req.method);
+  if (!up) return next();
+  if (up === 'refuse') {
+    throw new HttpError(
+      403,
+      'هذا الاتصال غير آمن — افتح الموقع عبر https. / This connection is not secure — open the site over https.',
+      'HTTPS_REQUIRED'
+    );
+  }
+  return c.redirect(up.redirect, 301);
+});
 app.use('*', gatewayAssertion);
 app.use('*', originCheck());
 

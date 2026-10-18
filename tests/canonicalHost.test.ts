@@ -22,7 +22,7 @@ import { ROOT } from './fixtures/d1';
 import { freshDb, asD1, ctx, APEX, MERCHANT_HOST } from './fixtures/app';
 import worker from '../worker/index';
 import { apexUrlFor } from '../src/lib/canonicalHost';
-import { apexRedirectFor } from '../worker/lib/hosts';
+import { apexRedirectFor, isLocalHostname } from '../worker/lib/hosts';
 
 const WWW = `www.${APEX}`;
 
@@ -36,7 +36,41 @@ test('a www page moves to the apex with its path, query and fragment', () => {
     `https://${APEX}/auth?next=%2Fcommunity%2Frequests&x=1#top`
   );
   assert.equal(apexUrlFor(`https://WWW.LEVONIS-IQ.COM/chats/c1`), `https://${APEX}/chats/c1`, 'the host is case-insensitive');
-  assert.equal(apexUrlFor(`http://${WWW}:8080/x`), `http://${APEX}:8080/x`, 'scheme and port are kept');
+  // Plain http is upgraded in the same move (sign-in fix, 2026-10-18); an
+  // explicit port is kept.
+  assert.equal(apexUrlFor(`http://${WWW}:8080/x`), `https://${APEX}:8080/x`, 'http is upgraded, the port is kept');
+});
+
+test('plain http moves to https before anything renders — www to the apex in the same move', () => {
+  assert.equal(apexUrlFor(`http://${APEX}/auth?next=%2Fcart#x`), `https://${APEX}/auth?next=%2Fcart#x`);
+  assert.equal(apexUrlFor(`http://${APEX}/`), `https://${APEX}/`);
+  assert.equal(apexUrlFor(`http://${WWW}/auth?next=%2Fprofile`), `https://${APEX}/auth?next=%2Fprofile`);
+  // A shop is upgraded on its own host: only www ever changes host.
+  assert.equal(apexUrlFor(`http://ali3d.${APEX}/`), `https://ali3d.${APEX}/`);
+  assert.equal(apexUrlFor(`http://${MERCHANT_HOST}/p/x?y=1`), `https://${MERCHANT_HOST}/p/x?y=1`);
+});
+
+test('local development stays on http: localhost, *.localhost, *.local and IP literals', () => {
+  for (const href of [
+    'http://localhost:5173/auth',
+    'http://app.localhost:5173/',
+    'http://127.0.0.1:8787/',
+    'http://[::1]:3000/',
+    'http://box.local/',
+    'http://192.168.1.4:4173/',
+    `https://${APEX}/auth`,
+  ]) {
+    assert.equal(apexUrlFor(href), null, `${href} must be left alone`);
+  }
+});
+
+test('the SPA and the Worker draw the same line around local hosts', () => {
+  // canonicalHost.ts keeps its own copy (the entry must not carry the host
+  // table); this is what keeps the copy honest.
+  for (const host of ['localhost', 'app.localhost', 'box.local', '127.0.0.1', '192.168.1.4', '[::1]', APEX, WWW, MERCHANT_HOST, 'levonis-staging.example.workers.dev', 'localhost.evil.com', 'local']) {
+    const spaLeavesIt = apexUrlFor(`http://${host}/`) === null;
+    assert.equal(spaLeavesIt, isLocalHostname(host), host);
+  }
 });
 
 test('nothing but www moves: the apex, shops, system hosts and local development stay', () => {

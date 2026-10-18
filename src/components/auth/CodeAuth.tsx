@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, MessageCircle, AlertCircle } from 'lucide-react';
-import { api, ApiError, isNotConfigured, isServiceOutage } from '../../lib/api';
+import { api, ApiError, isNotConfigured, isServiceOutage, type ApiUser } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
 import OtpBoxes from './OtpBoxes';
 import PhoneField, { emptyPhoneValue, type PhoneValue } from './PhoneField';
 import AuthTextField from './AuthTextField';
-import FillButton, { lengthProgress } from './FillButton';
+import FillButton, { combineFillProgress, lengthProgress } from './FillButton';
+import { sessionNotKeptText } from './sessionStrings';
 import { refusalText } from '../../lib/refusalStrings';
 import { OWNER_FIRST_PROOF_REQUIRED, OWNER_FIRST_PROOF_STRINGS, announceOwnerFirstProof } from '../../lib/ownerFirstProof';
 
@@ -224,6 +225,16 @@ interface CodeAuthProps {
   initialPhone?: PhoneValue | null;
   /** Carried into the account this flow may create. */
   referralCode?: string;
+  /** An address already typed on the screen before this one (the e-mail
+   *  sign-up's «check your inbox» screen). Like `initialPhone`, it skips the
+   *  destination step and the code is sent once, on mount. */
+  initialEmail?: string;
+  /** The profile already typed for that sign-up, carried into the account. */
+  initialProfile?: { name?: string; username?: string; country?: string };
+  /** Ask for the account's password on the profile step (8+ characters) — the
+   *  password the e-mailed link would otherwise have asked for. The labels
+   *  are the caller's, so the page keeps one wording for «password». */
+  askPassword?: { label: string; hint: string; reveal?: { show: string; hide: string } };
   onSuccess?: (created: boolean) => void;
   onSwitchMode?: (view: 'signup') => void;
 }
@@ -235,23 +246,28 @@ export default function CodeAuth({
   mode = 'signin',
   initialPhone = null,
   referralCode = '',
+  initialEmail = '',
+  initialProfile,
+  askPassword,
   onSuccess,
   onSwitchMode,
 }: CodeAuthProps) {
   const { lang } = useLanguage();
   const s = STRINGS[lang] || STRINGS.ar;
-  const { refreshUser } = useAuth();
+  const { adoptSession } = useAuth();
   const navigate = useNavigate();
 
   const signup = mode === 'signup';
   const [phase, setPhase] = useState<Phase>('target');
-  const [emailValue, setEmailValue] = useState('');
+  const [emailValue, setEmailValue] = useState(() => (channel === 'email' ? initialEmail.trim() : ''));
   const [phone, setPhone] = useState<PhoneValue>(() => initialPhone ?? emptyPhoneValue());
   const [code, setCode] = useState('');
   /** The proof, once the code is spent. Never a session — see the note. */
   const [ticket, setTicket] = useState('');
-  const [newName, setNewName] = useState('');
-  const [newUsername, setNewUsername] = useState('');
+  const [newName, setNewName] = useState(() => initialProfile?.name ?? '');
+  const [newUsername, setNewUsername] = useState(() => initialProfile?.username ?? '');
+  /** Only when `askPassword`: memory only, never stored, sent once. */
+  const [newPassword, setNewPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -361,7 +377,8 @@ export default function CodeAuth({
    */
   const sentOnce = useRef(false);
   useEffect(() => {
-    if (!initialPhone?.valid || sentOnce.current) return;
+    const preset = channel === 'email' ? targetReady && initialEmail.trim() !== '' : !!initialPhone?.valid;
+    if (!preset || sentOnce.current) return;
     sentOnce.current = true;
     void send();
     // `send` is stable enough for this one-shot; re-running on its identity
@@ -374,7 +391,7 @@ export default function CodeAuth({
     setBusy(true);
     setError('');
     try {
-      const res = await api.post<{ signup?: boolean; ticket?: string; owner_first_proof?: unknown }>('/api/auth/otp/verify', {
+      const res = await api.post<{ signup?: boolean; ticket?: string; owner_first_proof?: unknown; user?: ApiUser }>('/api/auth/otp/verify', {
         channel,
         identifier,
         code,
@@ -395,11 +412,17 @@ export default function CodeAuth({
         setPhase('profile');
         return;
       }
-      await refreshUser();
+      const kept = await adoptSession(res?.user);
+      if (!mounted.current) return;
+      if (kept === 'not_kept') {
+        // The server signed the person in; this browser did not keep it.
+        setError(sessionNotKeptText(lang));
+        setCode('');
+        return;
+      }
       // The code was the first proof of the main admin's address, accepted a
       // moment ago: say what it ended before the page moves on.
       announceOwnerFirstProof(res);
-      if (!mounted.current) return;
       setPhase('done');
       if (onSuccess) onSuccess(false);
       else navigate('/');
@@ -419,7 +442,7 @@ export default function CodeAuth({
     } finally {
       if (mounted.current) setBusy(false);
     }
-  }, [code, busy, identifier, channel, refreshUser, onSuccess, navigate, describeError, signup]);
+  }, [code, busy, identifier, channel, adoptSession, lang, onSuccess, navigate, describeError, signup]);
 
   /**
    * Spend the ticket. The destination is NOT sent: the server reads it from the
@@ -428,18 +451,29 @@ export default function CodeAuth({
    */
   const createAccount = useCallback(async () => {
     if (busy || !ticket) return;
+    if (askPassword && newPassword.length < 8) return;
     setBusy(true);
     setError('');
     try {
-      await api.post('/api/auth/signup/otp-complete', {
+      const res = await api.post<{ user?: ApiUser }>('/api/auth/signup/otp-complete', {
         ticket,
         name: newName.trim(),
         username: newUsername.trim() || undefined,
         lang,
         referral_code: referralCode || undefined,
+        ...(initialProfile?.country ? { country: initialProfile.country } : {}),
+        // The server hashes it (and checks the same 8-character rule); it is
+        // never kept here past this request.
+        ...(askPassword ? { password: newPassword } : {}),
       });
-      await refreshUser();
+      const kept = await adoptSession(res?.user);
       if (!mounted.current) return;
+      if (kept === 'not_kept') {
+        // The account exists now; it is THIS browser that did not keep the
+        // session. Signing in again is the way on, not a second account.
+        setError(sessionNotKeptText(lang));
+        return;
+      }
       setPhase('done');
       if (onSuccess) onSuccess(true);
       else navigate('/');
@@ -448,7 +482,7 @@ export default function CodeAuth({
     } finally {
       if (mounted.current) setBusy(false);
     }
-  }, [busy, ticket, newName, newUsername, lang, referralCode, refreshUser, onSuccess, navigate, describeError]);
+  }, [busy, ticket, newName, newUsername, newPassword, askPassword, initialProfile, lang, referralCode, adoptSession, onSuccess, navigate, describeError]);
 
   if (notConfigured) {
     return (
@@ -468,6 +502,12 @@ export default function CodeAuth({
    * works without one.
    */
   if (phase === 'profile') {
+    const nameOk = newName.trim().length >= 2;
+    const passwordOk = !askPassword || newPassword.length >= 8;
+    const fill = combineFillProgress([
+      { progress: lengthProgress(newName.trim(), 2), valid: nameOk },
+      ...(askPassword ? [{ progress: lengthProgress(newPassword, 8), valid: passwordOk }] : []),
+    ]);
     return (
       <div>
         <h2 className="lv-title" style={{ fontSize: 22 }}>
@@ -504,6 +544,25 @@ export default function CodeAuth({
               spellCheck={false}
               disabled={busy}
             />
+            {askPassword ? (
+              <AuthTextField
+                id="otp-signup-password"
+                label={askPassword.label}
+                type="password"
+                value={newPassword}
+                onChange={setNewPassword}
+                autoComplete="new-password"
+                minLength={8}
+                maxLength={128}
+                valueDir="ltr"
+                autoCapitalize="none"
+                spellCheck={false}
+                disabled={busy}
+                revealLabels={askPassword.reveal}
+                help={askPassword.hint}
+                helpTone={newPassword.length === 0 ? 'neutral' : passwordOk ? 'ok' : 'bad'}
+              />
+            ) : null}
           </div>
           {error ? (
             <p className="lv-notice" role="alert">
@@ -516,10 +575,10 @@ export default function CodeAuth({
               label={s.createCta}
               workingLabel={s.creating}
               successLabel={s.createdLabel}
-              progress={lengthProgress(newName.trim(), 2)}
-              ready={newName.trim().length >= 2}
+              progress={fill.progress}
+              ready={fill.ready}
               status={busy ? 'submitting' : 'idle'}
-              hint={newName.trim().length >= 2 ? '' : s.nameRequired}
+              hint={!nameOk ? s.nameRequired : !passwordOk ? askPassword?.hint ?? '' : ''}
             />
           </div>
         </form>

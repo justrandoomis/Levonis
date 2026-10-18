@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Send, CheckCircle2, AlertCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
-import { api, ApiError, isNotConfigured } from '../../lib/api';
+import { api, ApiError, isNotConfigured, type ApiUser } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
 import OtpBoxes from './OtpBoxes';
 import PhoneField, { emptyPhoneValue, type PhoneValue } from './PhoneField';
 import FillButton, { combineFillProgress, lengthProgress } from './FillButton';
 import TelegramOpen from './TelegramOpen';
+import { sessionNotKeptText } from './sessionStrings';
 
 /**
  * Telegram-verified phone + OTP registration & sign-in (§4), embedded by the
@@ -290,7 +291,7 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
   const { lang } = useLanguage();
   const s = STRINGS[lang] || STRINGS.ar;
   const navigate = useNavigate();
-  const { refreshUser } = useAuth();
+  const { adoptSession } = useAuth();
 
   const purpose: Purpose = mode === 'signup' ? 'signup' : 'login';
 
@@ -314,6 +315,9 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
   const [showPassword, setShowPassword] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
+  /** The server signed the person in and this browser did not keep the
+   *  session (src/lib/sessionCheck.ts). Shown above whatever screen follows. */
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
   const [resendIn, setResendIn] = useState(0);
   const [resending, setResending] = useState(false);
@@ -347,14 +351,21 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [purpose]);
 
-  const finish = useCallback(async () => {
+  const finish = useCallback(async (postUser?: ApiUser | null) => {
     storeFlow(null);
-    await refreshUser();
+    const kept = await adoptSession(postUser);
     if (!mountedRef.current) return;
+    if (kept === 'not_kept') {
+      // The challenge is spent; a new attempt starts from the number again,
+      // with the reason on screen instead of a «done» that is not.
+      reset();
+      setSessionError(sessionNotKeptText(lang));
+      return;
+    }
     setPhase('done');
     if (onSuccess) onSuccess();
     else navigate('/');
-  }, [refreshUser, onSuccess, navigate]);
+  }, [adoptSession, reset, lang, onSuccess, navigate]);
 
   const fetchStatus = useCallback(async () => {
     const f = flowRef.current;
@@ -443,6 +454,7 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
     e.preventDefault();
     if (starting) return;
     setStartError(null);
+    setSessionError(null);
     if (!phoneLooksValid(phone)) {
       setStartError(s.phoneInvalid);
       return;
@@ -503,8 +515,8 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
         // server stored the column's English default for every phone account.
         body.lang = lang;
       }
-      await api.post('/api/auth/telegram/complete', body);
-      await finish();
+      const done = await api.post<{ user?: ApiUser }>('/api/auth/telegram/complete', body);
+      await finish(done?.user);
     } catch (err) {
       completingRef.current = false;
       if (!mountedRef.current) return;
@@ -574,6 +586,13 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
         <div className="lv-notice lv-notice--warn" role="status">
           <AlertCircle />
           <p>{s.notConfigured}</p>
+        </div>
+      )}
+
+      {sessionError && (
+        <div className="lv-tg__inline-alert" role="alert">
+          <AlertCircle />
+          <p>{sessionError}</p>
         </div>
       )}
 

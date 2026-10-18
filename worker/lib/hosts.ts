@@ -251,6 +251,77 @@ export function apexRedirectFor(
 }
 
 /**
+ * A development machine's own address — never upgraded to https.
+ *
+ * `localhost` and its subdomains, mDNS `.local` names, and IP literals (an
+ * IPv6 literal is bracketed in `URL.hostname`). Local runs and e2e serve plain
+ * http on these (vite on 127.0.0.1, `wrangler dev` on localhost:8787), and a
+ * test's `app.request('/api/…')` resolves to `http://localhost`.
+ */
+export function isLocalHostname(hostname: string): boolean {
+  const h = hostname.trim().toLowerCase().replace(/\.$/, '');
+  if (!h) return false;
+  if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local')) return true;
+  if (h.startsWith('[')) return true;
+  return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(h);
+}
+
+export type HttpsUpgrade = { redirect: string } | 'refuse' | null;
+
+/**
+ * PLAIN HTTP IS NEVER SERVED — the sign-in fix of 2026-10-18.
+ *
+ * `http://levonis-iq.com` answered 200 with no upgrade. Three symptoms had
+ * that one cause: Google refuses the `http://` origin (`origin_mismatch`), and
+ * the session cookie is `Secure`, so a browser on http never stores it — the
+ * sign-in "succeeds" and the next page is a guest again, every time.
+ *
+ * Decided on the REQUEST URL's scheme, never on the Host header:
+ *   - not `http:`                         → null (nothing to do)
+ *   - a `CF-Visitor` header whose scheme
+ *     is not "http"                       → null (Cloudflare saw https; a
+ *                                           redirect here could only loop)
+ *   - a local host (`isLocalHostname`)    → null
+ *   - GET or HEAD                         → 301 to https, `www.` straight to
+ *                                           the apex in the same hop
+ *   - any other method                    → 'refuse': a 403 before any route
+ *                                           runs, so a password sent over http
+ *                                           never opens a session and no
+ *                                           cookie is ever set on http. A
+ *                                           redirected POST would lose its body.
+ *
+ * The target host is the request's own, so this can never point elsewhere.
+ */
+export function httpsUpgradeFor(
+  href: string,
+  cfVisitor: string | null | undefined,
+  rootDomain: string | null | undefined,
+  method: string
+): HttpsUpgrade {
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'http:') return null;
+  if (cfVisitor) {
+    let scheme: unknown = null;
+    try {
+      scheme = (JSON.parse(cfVisitor) as { scheme?: unknown } | null)?.scheme;
+    } catch {
+      scheme = null;
+    }
+    if (scheme !== 'http') return null;
+  }
+  if (isLocalHostname(url.hostname)) return null;
+  const verb = method.toUpperCase();
+  if (verb !== 'GET' && verb !== 'HEAD') return 'refuse';
+  const apex = apexRedirectFor(url.hostname, rootDomain, verb, url.pathname, url.search);
+  return { redirect: apex ?? `https://${url.hostname}${url.pathname}${url.search}` };
+}
+
+/**
  * May platform administration be served on this host?
  *
  * THE THREAT: a page served from `evil.levonis-iq.com` is same-origin with
@@ -285,6 +356,23 @@ export function adminAllowedOn(info: HostInfo): boolean {
   if (info.kind === 'main') return true;
   if (info.kind === 'system' || info.kind === 'merchant') return false;
   return !info.underRoot;
+}
+
+/**
+ * May Google sign-in be offered on this host?
+ *
+ * Google's Authorized JavaScript origins name exact origins — no wildcards —
+ * and only the apex is listed. A shop (`<slug>.levonis-iq.com`), a system host
+ * or anything deeper is an origin Google refuses with `origin_mismatch`, so
+ * the button is not offered there; a shop sends sign-in to the apex's /auth
+ * instead (src/App.tsx `StoreHostAuthHandoff`). Hosts outside the root domain
+ * (workers.dev, localhost, no root configured) keep it, exactly as for
+ * administration: whether Google accepts them is the console's business.
+ * Same relationship to the root domain as `adminAllowedOn`, for a different
+ * reason.
+ */
+export function googleAllowedOn(info: HostInfo): boolean {
+  return adminAllowedOn(info);
 }
 
 /**

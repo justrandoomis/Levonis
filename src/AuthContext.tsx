@@ -3,6 +3,11 @@ import { api, ApiUser, clearApiSessionRequests } from './lib/api';
 import { clearPageCache } from './lib/pageCache';
 import { AUTH_ME_PATH, clearPrimedRequests, takePrimedJson } from './lib/bootFetch';
 import { privateDrafts, purgeLegacyPrivateDrafts } from './lib/privateDrafts';
+import { decideSession, type MeCheck } from './lib/sessionCheck';
+
+/** What a sign-in caller learns from `adoptSession`: 'not_kept' means the
+ *  server signed the person in and THIS browser did not keep the session. */
+export type SessionAdoption = 'ok' | 'not_kept';
 
 /**
  * Authentication state. The session lives in a Secure HttpOnly cookie managed
@@ -14,9 +19,15 @@ interface AuthContextType {
   isAuthenticated: boolean;
   user: ApiUser | null;
   login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: (credential: string) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<SessionAdoption>;
   register: (username: string, name: string, email: string, password: string) => Promise<void>;
   refreshUser: () => Promise<void>;
+  /**
+   * After a sign-in request succeeded: ask /me afresh and publish the account
+   * only if this browser really carries its session (src/lib/sessionCheck.ts).
+   * Pass the user the sign-in answered with, when it named one.
+   */
+  adoptSession: (postUser?: ApiUser | null) => Promise<SessionAdoption>;
   logout: () => Promise<void>;
   isLoaded: boolean;
 }
@@ -76,6 +87,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [setUser]);
 
+  /**
+   * THE SIGN-IN IS NOT DONE UNTIL THE BROWSER PROVES IT KEPT THE SESSION.
+   *
+   * Requests already in flight belong to the guest that is leaving, so they
+   * are cancelled first (and the boot-time primed /me is dropped). The check
+   * carries its own AbortSignal, which is what keeps it out of the GET
+   * coalescer: it can never join an anonymous /me that started before the
+   * cookie existed. Only `refreshUser`'s background callers keep the old,
+   * forgiving behaviour.
+   */
+  const adoptSession = useCallback(
+    async (postUser?: ApiUser | null): Promise<SessionAdoption> => {
+      clearApiSessionRequests();
+      clearPrimedRequests();
+      let me: MeCheck<ApiUser>;
+      try {
+        const data = await api.get<{ user?: ApiUser | null }>(AUTH_ME_PATH, { signal: new AbortController().signal });
+        me = { ok: true, user: data?.user ?? null };
+      } catch {
+        me = { ok: false };
+      }
+      const decision = decideSession(postUser ?? null, me);
+      if (decision.status === 'not_kept') return 'not_kept';
+      if (decision.publish !== 'keep') setUser(decision.publish);
+      return 'ok';
+    },
+    [setUser]
+  );
+
   const login = useCallback(async (email: string, password: string) => {
     const data = await api.post<{ user: ApiUser }>('/api/auth/login', { email, password });
     clearPrimedRequests();
@@ -83,10 +123,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [setUser]);
 
   const loginWithGoogle = useCallback(async (credential: string) => {
-    const data = await api.post<{ user: ApiUser }>('/api/auth/google', { credential });
-    clearPrimedRequests();
-    setUser(data.user);
-  }, [setUser]);
+    const data = await api.post<{ user?: ApiUser }>('/api/auth/google', { credential });
+    return adoptSession(data.user);
+  }, [adoptSession]);
 
   const register = useCallback(async (username: string, name: string, email: string, password: string) => {
     // Email-first sign-up (mail configured) answers pending_email with no
@@ -106,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated: !!user, user, login, loginWithGoogle, register, refreshUser, logout, isLoaded }}
+      value={{ isAuthenticated: !!user, user, login, loginWithGoogle, register, refreshUser, adoptSession, logout, isLoaded }}
     >
       {children}
     </AuthContext.Provider>

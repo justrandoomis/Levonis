@@ -16,7 +16,9 @@ import {
   displayName,
   oneOf,
   requireMainHost,
+  requestHost,
 } from '../lib/http';
+import { googleAllowedOn } from '../lib/hosts';
 import { assertDecent } from '../lib/decency';
 import { degradeIfSchemaMissing } from '../lib/membershipBenefits';
 import { consumeTicketStatement, findSignupTicket, issueSignupTicket } from '../lib/signupTicket';
@@ -409,6 +411,11 @@ export function pickSignupReferralSource(
  */
 authRoutes.get('/capabilities', async (c) => {
   const clientId = (c.env.GOOGLE_CLIENT_ID || '').trim();
+  // Google is offered only where Google can accept the origin: never on a
+  // shop, system or deeper subdomain (worker/lib/hosts.ts `googleAllowedOn`).
+  // A shop hands sign-in to the apex instead. The id is withheld there too, so
+  // the page never loads Google's script on an origin that cannot use it.
+  const googleHere = clientId.length > 0 && googleAllowedOn(requestHost(c));
   const mail = emailConfigured(c.env);
   // getBotUsername answers from an in-memory cache, then a persisted one, and
   // returns null rather than guessing — so `telegram: true` means a bot that
@@ -432,8 +439,8 @@ authRoutes.get('/capabilities', async (c) => {
      * is true; a server in this mode ignores a password it is sent anyway.
      */
     emailFirstSignup: mail,
-    google: clientId.length > 0,
-    googleClientId: clientId,
+    google: googleHere,
+    googleClientId: googleHere ? clientId : '',
     telegram: !!botUsername,
     telegramBot: botUsername ?? '',
     /**

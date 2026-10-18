@@ -74,7 +74,7 @@ test('bento eagerly loads the large tile while preserving cropped image resoluti
 test('a 148px rail requests a rail-sized variant while grid slots retain responsive sizes', () => {
   const p = { id: 'p', slug: 'p', name: 'Printer', images: ['/files/products/p.webp'], price_iqd: 5000, membership_prices: {}, options: [], colors: [] } as unknown as ApiProduct;
   const card = (width: 'rail' | 'fill') => renderToStaticMarkup(createElement(AuthContext.Provider, {
-    value: { isAuthenticated: false, user: null, isLoaded: true, login: async () => {}, loginWithGoogle: async () => {}, register: async () => {}, refreshUser: async () => {}, logout: async () => {} },
+    value: { isAuthenticated: false, user: null, isLoaded: true, login: async () => {}, loginWithGoogle: async () => 'ok' as const, register: async () => {}, refreshUser: async () => {}, adoptSession: async () => 'ok' as const, logout: async () => {} },
     children: createElement(WalletProvider, { children: createElement(CurrencyProvider, { children: createElement(LanguageProvider, { children: createElement(MemoryRouter, null, createElement(ProductCard, { p, density: 'compact', width })) }) }) }),
   }));
   assert.match(card('rail'), /sizes="148px"/);
@@ -167,7 +167,7 @@ test('returning to a catalogue paints its saved products before effects run', ()
   const p = { id: 'p', slug: 'p2s', name: 'Bambu P2S saved shelf', images: [], price_iqd: 5000, membership_prices: {}, options: [], colors: [] } as unknown as ApiProduct;
   writePageCache('products:|printers', { products: [p], category: { id: 'printers', name_ar: 'طابعات', name_en: 'Printers', name_ckb: 'چاپکەر' } });
   const html = renderToStaticMarkup(createElement(AuthContext.Provider, {
-    value: { isAuthenticated: false, user: null, isLoaded: true, login: async () => {}, loginWithGoogle: async () => {}, register: async () => {}, refreshUser: async () => {}, logout: async () => {} },
+    value: { isAuthenticated: false, user: null, isLoaded: true, login: async () => {}, loginWithGoogle: async () => 'ok' as const, register: async () => {}, refreshUser: async () => {}, adoptSession: async () => 'ok' as const, logout: async () => {} },
     children: createElement(WalletProvider, { children: createElement(CurrencyProvider, { children: createElement(LanguageProvider, {
       children: createElement(MemoryRouter, { initialEntries: ['/products?category=printers'] }, createElement(Products)),
     }) }) }),

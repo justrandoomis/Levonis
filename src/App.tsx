@@ -9,6 +9,7 @@ import { Routes, Route, useLocation, useNavigationType } from 'react-router-dom'
  */
 import NavigationRouter from './components/NavigationRouter';
 import { StoreProvider, useStore } from './StoreContext';
+import { sanitizeNextPath } from './components/auth/nextPath';
 import ChunkBoundary from './components/ChunkBoundary';
 import { afterCriticalPaint, allowsSpeculativeLoads } from './lib/afterCriticalPaint';
 import { INLINE_RESOLVE_ID, navigationCategoryOpening, navigationDataPath, primeGet, readInlineJson } from './lib/bootFetch';
@@ -565,6 +566,45 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 }
 
 /**
+ * A SHOP NEVER SIGNS ANYONE IN ON ITS OWN HOST (sign-in fix, 2026-10-18).
+ *
+ * Google accepts only the apex as an origin, so a sign-in begun on
+ * `<slug>.levonis-iq.com` ended in `origin_mismatch`. Every way into /auth on a
+ * shop — ProtectedRoute and AdminRoute, the storefront's own sign-in links,
+ * checkout — lands on this one route, which hands the visitor to the apex's
+ * /auth with where they were going (`next`, sanitized) and which shop to come
+ * back to (`store`, the slug the SERVER resolved for this host). After sign-in
+ * the apex sends them back (src/pages/Auth.tsx `finishAuth`,
+ * src/components/auth/storeReturn.ts `storeReturnUrl`), already signed in: the
+ * session cookie is scoped to the parent domain.
+ *
+ * With no root domain configured (`mainSite` empty) there is no apex to go
+ * to, and the ordinary page is shown — without Google, which the server and
+ * Auth.tsx both withhold on a shop.
+ */
+function StoreHostAuthHandoff() {
+  const { store, mainSite } = useStore();
+  const location = useLocation();
+  const slug = store?.slug ?? '';
+  const from = (location.state as { from?: unknown } | null)?.from;
+  const target = React.useMemo(() => {
+    if (!mainSite) return null;
+    // Everything else the link carried (a referral code, …) travels as it
+    // came; `next` is sanitized here and `store` is only ever the server's.
+    const q = new URLSearchParams(location.search);
+    q.set('next', sanitizeNextPath(from ?? q.get('next') ?? '/'));
+    q.delete('store');
+    if (slug) q.set('store', slug);
+    return `${mainSite}/auth?${q.toString()}`;
+  }, [mainSite, slug, from, location.search]);
+  React.useEffect(() => {
+    if (target) window.location.replace(target);
+  }, [target]);
+  if (!target) return <Auth />;
+  return <RouteFallback />;
+}
+
+/**
  * When the hostname IS a store, the whole application is that store.
  *
  * This branch sits above every other route on purpose. A merchant subdomain
@@ -603,7 +643,8 @@ function StorefrontApp() {
         <Route path="/store-checkout" element={<ProtectedRoute><StoreCheckout /></ProtectedRoute>} />
         <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
         <Route path="/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
-        <Route path="/auth" element={<Auth />} />
+        {/* Sign-in happens on the apex, the one origin Google accepts. */}
+        <Route path="/auth" element={<StoreHostAuthHandoff />} />
         {/* The merchant workspace on the store's own host: the same tree as
             `/merchant/*` on the platform (a notification's `/merchant/orders/<id>`
             opens here as `/admin/orders/<id>`). ONE splat route — it matches
