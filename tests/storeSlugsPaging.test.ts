@@ -45,6 +45,13 @@ function withStore(raw: ReturnType<typeof freshDb>) {
   return raw;
 }
 
+/** The owner as an APPROVED applicant with no store yet — /onboard opens a store only then (DECISIONS row 256). */
+function approved(raw: ReturnType<typeof freshDb>) {
+  raw.exec(`INSERT INTO community_merchants (id,user_id,name,approved_at,approved_application_id)
+            VALUES ('m1','owner','Ali 3D','2026-01-01T00:00:00.000Z','mapp_owner')`);
+  return raw;
+}
+
 const merchant = (db: D1Database, user: StubUser = OWNER) =>
   stubApp(db, user, (a) => {
     a.route('/api/merchant', merchantRoutes);
@@ -113,7 +120,7 @@ test('B23: every literal segment of the storefront router is a reserved slug (an
 // ============================================================ B24 — races
 
 test('B24: onboarding that loses the slug race answers 409 SLUG_UNAVAILABLE — never a raw 500', async () => {
-  const raw = seed();
+  const raw = approved(seed());
   const { failing, db } = failingD1(raw);
   failing.beforeBatch = (stmts) => {
     if (stmts.some((s) => /INSERT INTO merchant_stores/.test(s.sql))) {
@@ -128,12 +135,11 @@ test('B24: onboarding that loses the slug race answers 409 SLUG_UNAVAILABLE — 
 });
 
 test('B24: a double-tapped onboarding answers 409 STORE_EXISTS', async () => {
-  const raw = seed();
+  const raw = approved(seed());
   const { failing, db } = failingD1(raw);
   failing.beforeBatch = (stmts) => {
     if (stmts.some((s) => /INSERT INTO merchant_stores/.test(s.sql))) {
-      raw.exec(`INSERT INTO community_merchants (id,user_id,name) VALUES ('m1','owner','Ali 3D');
-                INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('s1','m1','owner','first-tap','Ali 3D');`);
+      raw.exec(`INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('s1','m1','owner','first-tap','Ali 3D');`);
     }
   };
   const res = await post(merchant(db), '/api/merchant/onboard', { name: 'Ali 3D', slug: 'second-tap' });
@@ -157,7 +163,7 @@ test('B24: a slug change that loses the race answers 409, and the old address is
 });
 
 test('a slug whose parking has LAPSED onboards cleanly (its history row is taken over, not a PK 500)', async () => {
-  const raw = seed();
+  const raw = approved(seed());
   raw.exec(`
     INSERT INTO users (id,name,email,password_hash) VALUES ('gone','G','g@x.co','h');
     INSERT INTO community_merchants (id,user_id,name) VALUES ('mg','gone','Gone');
@@ -263,12 +269,12 @@ test('B27: the governorate is stored as a closed-list id; a legacy free-text val
 });
 
 test('B27: onboarding stores the id on the store and on the merchant', async () => {
-  const raw = seed();
+  const raw = approved(seed());
   const res = await post(merchant(asD1(raw)), '/api/merchant/onboard', { name: 'Ali 3D', slug: 'ali3d', governorate: 'Erbil' });
   assert.equal(res.status, 201, JSON.stringify(await json(res)));
   assert.equal(row<{ governorate: string }>(raw, "SELECT governorate FROM merchant_stores WHERE user_id = 'owner'")!.governorate, 'erbil');
   assert.equal(row<{ governorate: string }>(raw, "SELECT governorate FROM community_merchants WHERE user_id = 'owner'")!.governorate, 'erbil');
-  const refused = await post(merchant(asD1(seed())), '/api/merchant/onboard', { name: 'Ali 3D', slug: 'ali3d', governorate: 'Atlantis' });
+  const refused = await post(merchant(asD1(approved(seed()))), '/api/merchant/onboard', { name: 'Ali 3D', slug: 'ali3d', governorate: 'Atlantis' });
   assert.equal(refused.status, 400);
   assert.equal((await json(refused)).code, 'GOVERNORATE_INVALID');
 });

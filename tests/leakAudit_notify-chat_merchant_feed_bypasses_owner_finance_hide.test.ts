@@ -93,6 +93,15 @@ for (const roleName of ['full', 'legacy_null'] as const) {
       INSERT INTO admin_settings (key, value) VALUES ('communityGate', '{"open":true}')
         ON CONFLICT(key) DO UPDATE SET value = excluded.value;
     `);
+    // The admin is an APPROVED applicant (approved by another reviewer — no
+    // self-approval): /onboard opens a store only after approval (DECISIONS row 256).
+    raw
+      .prepare(
+        `INSERT INTO community_merchants (id, user_id, name, approved_at, approved_application_id)
+         VALUES (?, ?, 'Admin Shop', '2026-01-01T00:00:00.000Z', ?)
+         ON CONFLICT(user_id) DO UPDATE SET approved_at = excluded.approved_at`
+      )
+      .run(`cm_${user.id}`, user.id, `mapp_${user.id}`);
 
     // Precondition: this caller may not see cost (the role matrix's premise).
     const env = { DB: asD1(raw), INITIAL_ADMIN_EMAIL: 'boss@x.co' } as unknown as Env;
@@ -103,7 +112,7 @@ for (const roleName of ['full', 'legacy_null'] as const) {
     );
     assert.equal(canViewCost(env, { admin_scope: null, email_verified_at: '2026-01-01T00:00:00.000Z', ...OWNER } as never), true, 'the owner is');
 
-    // 1) The admin opens a store through the REAL onboarding route — no admin is refused.
+    // 1) The approved admin opens a store through the REAL onboarding route.
     const shop = stubApp(asD1(raw), user, (a) => a.route('/api/merchant', merchantRoutes), { env: ENV });
     const onboard = await post(shop, '/api/merchant/onboard', { name: 'Admin Shop', slug: `shop-${roleName.replace('_', '')}` });
     assert.equal(onboard.status, 201, `${roleName} opened a store: ${JSON.stringify(await onboard.clone().json())}`);

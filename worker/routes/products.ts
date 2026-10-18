@@ -126,6 +126,7 @@ import {
   canonicalOptionValueIds as canonicalSelectionOptionValueIds,
   optionValueIdsInRelationOrder,
 } from '../lib/cartSelectionIdentity';
+import { merchantUnsanctionedSql, storeUnsanctionedSql } from '../lib/merchantApproval';
 
 export const productRoutes = new Hono<AppContext>();
 
@@ -4572,11 +4573,25 @@ async function productDetail(c: Context<AppContext>): Promise<Response> {
     return c.json({ success: true, product, source, favorite: !!favRow, ...rest });
   }
 
-  // Community products share the product-detail page (kept as-is).
+  /**
+   * Community products share the product-detail page — UNDER THE FEED'S RULE.
+   *
+   * This read checked `cp.status` alone, so the old product link of a
+   * suspended merchant or a suspended store kept serving its name, pictures
+   * and price after every listing had dropped it (Community V3 gap §3.6, the
+   * «old product link» leak; DECISIONS row 256). It now asks exactly what the
+   * feed asks (`communityProductsVisible`): a live listing of a merchant who
+   * is not suspended, in a store that is not suspended. Anything else is the
+   * same plain 404 an unknown slug gets — the public never learns why.
+   * Approval joins this predicate at the enforcing push (1.4).
+   */
   const cp = await c.env.DB.prepare(
     `SELECT cp.*, cm.name AS merchant_name, cm.verified AS merchant_verified, cm.id AS m_id
-       FROM community_products cp JOIN community_merchants cm ON cm.id = cp.merchant_id
-      WHERE cp.slug = ? AND cp.status = 'active'`
+       FROM community_products cp
+       JOIN community_merchants cm ON cm.id = cp.merchant_id
+       LEFT JOIN merchant_stores s ON s.id = cp.store_id
+      WHERE cp.slug = ? AND cp.status = 'active' AND cp.lifecycle = 'active'
+        AND ${merchantUnsanctionedSql('cm')} AND ${storeUnsanctionedSql('s')}`
   )
     .bind(slug)
     .first<Record<string, unknown>>();

@@ -252,6 +252,11 @@ test('every code the table translates is one the server can actually emit', () =
     // the dollar sale price's refusals, the lost update and the two warnings the card renders.
     'worker/routes/offers.ts',
     'worker/lib/offerDiscount.ts',
+    // The merchant approval gate (DECISIONS row 256): the applicant's routes,
+    // the transition refusals, and KYC's self-decision guard.
+    'worker/lib/merchantApproval.ts',
+    'worker/routes/merchantApplication.ts',
+    'worker/routes/kyc.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

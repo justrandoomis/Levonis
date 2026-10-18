@@ -123,6 +123,7 @@ import { reviewRoutes } from '../../worker/routes/reviews';
 import { legacyGiftRoutes } from '../../worker/routes/gifts';
 import { policiesRoutes } from '../../worker/routes/policies';
 import { kycRoutes } from '../../worker/routes/kyc';
+import { merchantApplicationRoutes } from '../../worker/routes/merchantApplication';
 import { referralRoutes } from '../../worker/routes/referrals';
 import { studioRoutes } from '../../worker/routes/studio';
 import { merchantCustomerRoutes } from '../../worker/routes/merchantCustomers';
@@ -257,6 +258,7 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/reviews', legacyGiftRoutes as Router],
   ['/api/policies', policiesRoutes as Router],
   ['/api/kyc', kycRoutes as Router],
+  ['/api/merchant-application', merchantApplicationRoutes as Router],
   ['/api/referrals', referralRoutes as Router],
   ['/api/studio', studioRoutes as Router],
   ['/api/merchant/customers', merchantCustomerRoutes as Router],

@@ -83,7 +83,11 @@ export async function bnplEligibility(
       .bind(userId)
       .first<{ state: string; credit_limit_iqd: number }>(),
     db
-      .prepare("SELECT id FROM kyc_cases WHERE user_id = ? AND state = 'verified' ORDER BY decided_at DESC LIMIT 1")
+      // case_type = 'identity': a verified PHONE-CHANGE case is not an identity
+      // (Community V3 push 1.1, DECISIONS row 256).
+      .prepare(
+        "SELECT id FROM kyc_cases WHERE user_id = ? AND case_type = 'identity' AND state = 'verified' ORDER BY decided_at DESC LIMIT 1"
+      )
       .bind(userId)
       .first<{ id: string }>(),
     bnplOutstanding(db, userId),

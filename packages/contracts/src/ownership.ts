@@ -251,6 +251,9 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'merchant_payout_ledger', 'community_merchants', 'merchant_stores', 'merchant_store_slugs', 'reserved_slugs',
     'merchant_notification_preferences', 'community_products', 'merchant_store_sections', 'merchant_services', 'merchant_showcase',
     'merchant_coupons', 'merchant_reviews', 'merchant_reputation_events',
+    // 0204 — the merchant approval gate (Community V3 phase 1, DECISIONS row 256):
+    // the private application and its append-only decision trail.
+    'merchant_applications', 'merchant_application_events',
     // 0153 — what the community MAKES (docs/COMMUNITY_ECOSYSTEM.md Phase 1): a
     // maker's projects and posts, and their pictures. Marketplace, because a
     // project is the door into a store, a product and a print request.
@@ -359,7 +362,9 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ]),
   // 0177 (owner decision 2): `admin_private_grants` is access configuration
   // beside `ops_permissions`; `security_events` is the owner's refusal log.
-  ...owned('config', ['admin_settings', 'feature_flags', 'config_versions', 'ops_permissions', 'admin_private_grants']),
+  // 0204: `admin_capability_grants` (MERCHANT_REVIEW, owner decision C5) is the
+  // same kind of access configuration, a sibling of the private grants.
+  ...owned('config', ['admin_settings', 'feature_flags', 'config_versions', 'ops_permissions', 'admin_private_grants', 'admin_capability_grants']),
   ...owned('audit', ['audit_log', 'audit_events', 'audit_chain_heads', 'security_events']),
   ...owned('analytics', [
     'merchant_store_analytics_daily', 'analytics_events', 'analytics_daily_platform', 'analytics_daily_merchant',

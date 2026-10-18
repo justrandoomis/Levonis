@@ -54,7 +54,21 @@ export function storeWorld() {
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','1400');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  // Ali is an APPROVED merchant before he opens his store: since the approval
+  // gate (DECISIONS row 256) /onboard opens a store only for an approved
+  // applicant, and approval is what writes this row (merchantApproval.ts).
+  approvedMerchant(raw, 'ali', 'Ali 3D');
   return { raw, db: limitD1(raw) };
+}
+
+/** A merchant row with an approval stamp, as the approve transition leaves it (0204). */
+export function approvedMerchant(raw: DatabaseSync, userId: string, name: string, id = `cm_${userId}`): void {
+  raw
+    .prepare(
+      `INSERT INTO community_merchants (id, user_id, name, approved_at, approved_application_id)
+       VALUES (?, ?, ?, '2026-01-01T00:00:00.000Z', ?)`
+    )
+    .run(id, userId, name, `mapp_${userId}`);
 }
 
 export const buyerApp = (db: D1Database, id = 'buyer') =>

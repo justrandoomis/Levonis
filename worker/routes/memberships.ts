@@ -1079,7 +1079,8 @@ membershipsRoutes.post('/bnpl/request', requireAuth, async (c) => {
   const [status, identity, address] = await Promise.all([
     getTierStatus(c.env.DB, user.id),
     c.env.DB
-      .prepare("SELECT id FROM kyc_cases WHERE user_id = ? AND state = 'verified' LIMIT 1")
+      // Only an IDENTITY case proves an identity — never a phone change (row 256).
+      .prepare("SELECT id FROM kyc_cases WHERE user_id = ? AND case_type = 'identity' AND state = 'verified' LIMIT 1")
       .bind(user.id)
       .first(),
     defaultAddressOf(c.env.DB, user.id),
@@ -1302,7 +1303,10 @@ membershipsRoutes.put('/admin/bnpl/:userId', async (c) => {
   if (state === 'approved') {
     const [status, identity, address] = await Promise.all([
       getTierStatus(c.env.DB, userId),
-      c.env.DB.prepare("SELECT id FROM kyc_cases WHERE user_id = ? AND state = 'verified' LIMIT 1").bind(userId).first(),
+      // Only an IDENTITY case proves an identity — never a phone change (row 256).
+      c.env.DB.prepare("SELECT id FROM kyc_cases WHERE user_id = ? AND case_type = 'identity' AND state = 'verified' LIMIT 1")
+        .bind(userId)
+        .first(),
       defaultAddressOf(c.env.DB, userId),
     ]);
     if (!benefits.bnpl(status)) throw badRequest('Only an active PRO member can receive a BNPL limit', 'PRO_REQUIRED');

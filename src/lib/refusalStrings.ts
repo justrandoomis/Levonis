@@ -703,6 +703,85 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'You paused your store. Re-open it from store settings.',
     ckb: 'فرۆشگاکەت لەلایەن خۆتەوە ڕاگیراوە. لە ڕێکخستنەکانەوە بیکەرەوە.',
   },
+  // The merchant approval gate (Community V3 push 1.1, DECISIONS row 256): a
+  // store opens only after a human reviewer approves a merchant application.
+  // None of these names a person, a value or another applicant's state.
+  MERCHANT_APPLICATION_REQUIRED: {
+    ar: 'قدّم طلب اعتماد التاجر أولًا. بعد موافقة المراجعة تستطيع فتح متجرك.',
+    en: 'Apply to become a merchant first. Once the review approves you, you can open your store.',
+    ckb: 'سەرەتا داواکاریی پەسەندکردنی بازرگان پێشکەش بکە. دوای ئەوەی پێداچوونەوەکە پەسەندی کرد دەتوانیت فرۆشگاکەت بکەیتەوە.',
+  },
+  MERCHANT_ALREADY_APPROVED: {
+    ar: 'أنت تاجر معتمد بالفعل. افتح متجرك من صفحة التاجر.',
+    en: 'You are already an approved merchant. Open your store from the merchant page.',
+    ckb: 'تۆ پێشتر وەک بازرگان پەسەند کراویت. فرۆشگاکەت لە پەڕەی بازرگانەوە بکەرەوە.',
+  },
+  MERCHANT_APPLICATIONS_UNAVAILABLE: {
+    ar: 'طلبات اعتماد التجار غير متاحة الآن. حاول لاحقًا.',
+    en: 'Merchant applications are not available right now. Try again later.',
+    ckb: 'ئێستا داواکاریی پەسەندکردنی بازرگان بەردەست نییە. دواتر هەوڵ بدەرەوە.',
+  },
+  MERCHANT_REVIEW_NOT_CONFIGURED: {
+    ar: 'لا يمكن استقبال طلبات اعتماد التجار الآن لأن أحد إعدادات الحماية غير مكتمل. حاول لاحقًا.',
+    en: 'Merchant applications cannot be received right now because a protection setting is incomplete. Try again later.',
+    ckb: 'ئێستا ناتوانرێت داواکاریی بازرگان وەربگیرێت، چونکە یەکێک لە ڕێکخستنەکانی پاراستن تەواو نییە. دواتر هەوڵ بدەرەوە.',
+  },
+  APPLICATION_LOCKED: {
+    ar: 'طلبك قيد المراجعة الآن ولا يمكن تعديله حتى يصدر القرار.',
+    en: 'Your application is being reviewed and cannot be edited until a decision is made.',
+    ckb: 'داواکارییەکەت ئێستا لە ژێر پێداچوونەوەدایە و تا بڕیار نەدرێت دەستکاری ناکرێت.',
+  },
+  APPLICATION_CHANGED: {
+    ar: 'تغيّر الطلب للتو. حدّث الصفحة ثم أعد المحاولة.',
+    en: 'The application just changed. Refresh the page and try again.',
+    ckb: 'داواکارییەکە ئێستا گۆڕا. پەڕەکە نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
+  },
+  APPLICATION_STATE_INVALID: {
+    ar: 'لا يمكن تنفيذ هذا الإجراء على الطلب في حالته الحالية. حدّث الصفحة.',
+    en: "This action is not possible in the application's current state. Refresh the page.",
+    ckb: 'ئەم کارە لە دۆخی ئێستای داواکارییەکەدا ناکرێت. پەڕەکە نوێ بکەرەوە.',
+  },
+  APPLICATION_INCOMPLETE: {
+    ar: 'الطلب غير مكتمل: أكمل الاسم الثلاثي وتاريخ الميلاد ورابط النشاط والصورة الشخصية والاسم العام ثم أرسله.',
+    en: 'The application is not complete: add the three-part name, date of birth, activity link, personal photo and public name, then send it.',
+    ckb: 'داواکارییەکە تەواو نییە: ناوی سیانی، ڕێکەوتی لەدایکبوون، بەستەری چالاکی، وێنەی کەسی و ناوی گشتی تەواو بکە، پاشان بینێرە.',
+  },
+  APPLICATION_FIELD_INVALID: {
+    ar: 'أحد حقول الطلب غير صالح. راجعه ثم احفظ.',
+    en: 'One of the application fields is not valid. Check it, then save.',
+    ckb: 'یەکێک لە خانەکانی داواکارییەکە دروست نییە. بیپشکنە و پاشان پاشەکەوت بکە.',
+  },
+  APPLICANT_UNDER_18: {
+    ar: 'يجب أن يكون عمر مقدّم طلب اعتماد التاجر 18 سنة على الأقل.',
+    en: 'You must be at least 18 years old to apply as a merchant.',
+    ckb: 'بۆ پێشکەشکردنی داواکاریی بازرگان دەبێت تەمەنت لانیکەم 18 ساڵ بێت.',
+  },
+  PHONE_NOT_VERIFIED: {
+    ar: 'وثّق رقم هاتفك عبر تيليغرام أولًا من الإعدادات ← الأمان.',
+    en: 'Verify your phone number through Telegram first (Settings → Security).',
+    ckb: 'سەرەتا ژمارەی تەلەفۆنەکەت لە ڕێگەی تەلەگرامەوە پشتڕاست بکەرەوە (ڕێکخستنەکان ← ئاسایش).',
+  },
+  PHOTO_TYPE_UNSUPPORTED: {
+    ar: 'ارفع صورة شخصية بصيغة JPEG أو PNG.',
+    en: 'Upload a personal photo as a JPEG or PNG.',
+    ckb: 'وێنەیەکی کەسی بە شێوەی JPEG یان PNG بار بکە.',
+  },
+  PHOTO_TOO_LARGE: {
+    ar: 'الصورة أكبر من 8 ميغابايت. اختر صورة أصغر.',
+    en: 'The photo is larger than 8 MB. Choose a smaller one.',
+    ckb: 'وێنەکە لە 8 مێگابایت گەورەترە. وێنەیەکی بچووکتر هەڵبژێرە.',
+  },
+  PHOTO_UNREADABLE: {
+    ar: 'تعذّرت قراءة الصورة. جرّب صورة أخرى.',
+    en: 'The photo could not be read. Try another one.',
+    ckb: 'وێنەکە نەخوێندرایەوە. وێنەیەکی تر تاقی بکەرەوە.',
+  },
+  // Every reviewer door (KYC's two decisions, the merchant application): nobody decides their own.
+  SELF_DECISION_FORBIDDEN: {
+    ar: 'لا يمكنك البتّ في طلبك أنت؛ يقرّره مراجع آخر.',
+    en: 'You cannot decide your own request; another reviewer decides it.',
+    ckb: 'ناتوانیت بڕیار لەسەر داواکاریی خۆت بدەیت؛ پێداچەرەوەیەکی تر بڕیاری لەسەر دەدات.',
+  },
   SUBSCRIPTION_INACTIVE: {
     ar: 'اشتراك PLUS غير فعّال. متجرك وسجلّه محفوظان — جدّد الاشتراك للبيع من جديد.',
     en: 'Your PLUS subscription is not active. Your store and its history are kept — renew to sell again.',

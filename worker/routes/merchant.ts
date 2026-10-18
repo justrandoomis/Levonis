@@ -39,6 +39,7 @@ import {
   type StoreContext,
 } from '../lib/merchantAuth';
 import { checkSlug, suggestSlug, SLUG_RESERVATION_DAYS } from '../lib/merchantOps';
+import { applicationRequiredRefusal, merchantApprovalOf } from '../lib/merchantApproval';
 import { merchantBalance } from '../lib/escrowOps';
 import { orderCreditStateSql } from '../lib/merchantLedger';
 import { normalizeGovernorate } from '../lib/iraqGovernorates';
@@ -210,6 +211,22 @@ merchantRoutes.post('/onboard', async (c) => {
   // merchant from /api/community/my-store (owner, 2026-09-23; DECISIONS 110).
   // A store that already exists is untouched: it runs on its own address.
   if (!communityMayEnter(await readCommunityGate(c.env.DB), user)) throw communityClosedRefusal();
+  /**
+   * E1 — APPROVAL BEFORE A STORE (Community V3 push 1.1, DECISIONS row 256).
+   *
+   * A store is opened only by someone a reviewer approved: the approve
+   * transition writes `community_merchants.approved_at`, and this door reads
+   * it. A user with no merchant row at all is a NEW merchant and is refused
+   * with MERCHANT_APPLICATION_REQUIRED — subscribing is not approval (owner
+   * decision C3: applying needs no PLUS; selling still does, below).
+   *
+   * A merchant row that predates the gate (no stamp) keeps working until the
+   * enforcing push (1.4) moves every existing merchant through review. An
+   * older database without the column reads as "not approved", so only that
+   * pre-existing row can pass there — never a new merchant.
+   */
+  const approval = await merchantApprovalOf(c.env.DB, user.id);
+  if (!approval.approved && !approval.merchant) throw applicationRequiredRefusal();
   const tier = await getTierStatus(c.env.DB, user.id);
   if (!benefits.merchantStore(tier)) {
     throw forbidden('An active LEVO PLUS subscription is required to open a store');
@@ -239,12 +256,19 @@ merchantRoutes.post('/onboard', async (c) => {
 
   // One batch: a store without its merchant, or a slug reservation without
   // its store, is a broken half-state a retry would then trip over.
+  //
+  // The merchant row is an UPSERT: an approved applicant already HAS it (the
+  // approve transition created it with `approved_at`), and the conflict branch
+  // takes the store's name and governorate only — never `approved_at`,
+  // `status` or the sanctions.
   try {
     await c.env.DB.batch([
       c.env.DB.prepare(
         `INSERT INTO community_merchants (id, user_id, name, bio, governorate, status)
          VALUES (?, ?, ?, ?, ?, 'active')
-         ON CONFLICT(user_id) DO UPDATE SET name = excluded.name`
+         ON CONFLICT(user_id) DO UPDATE SET name = excluded.name,
+           governorate = CASE WHEN excluded.governorate <> '' THEN excluded.governorate
+                              ELSE community_merchants.governorate END`
       ).bind(merchantId, user.id, name, tagline, governorate),
       c.env.DB.prepare(
         `INSERT INTO merchant_stores

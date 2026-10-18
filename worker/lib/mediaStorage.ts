@@ -34,7 +34,12 @@ export type MediaDomain =
   | 'link-cards'
   /** 0160 — a community order's progress photos: `community-orders/<order id>/updates/…`,
    *  private, served only by the order's own file route (worker/routes/communityOrderTimeline.ts). */
-  | 'community-orders';
+  | 'community-orders'
+  /** 0204 — a merchant applicant's personal review photo:
+   *  `merchant-review/<application id>/photo/…`, private, re-encoded to WebP
+   *  (no EXIF). /files serves no such prefix; only the audited reviewer route
+   *  (Community V3 push 1.2) streams it. DECISIONS row 256. */
+  | 'merchant-review';
 
 export interface MediaKeyInput {
   visibility: MediaVisibility;

@@ -9,6 +9,7 @@ import {
   unavailable,
   str,
   oneOf,
+  HttpError,
 } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { seal, unseal, sealboxConfigured } from '../lib/sealbox';
@@ -147,6 +148,15 @@ function requireConfigured(env: { KYC_ENC_KEY?: string }): void {
       'KYC_NOT_CONFIGURED'
     );
   }
+}
+
+/** One sentence for both decision doors; it names nobody and carries no value. */
+function selfDecisionRefusal(): HttpError {
+  return new HttpError(
+    403,
+    'لا يمكنك البتّ في طلبك أنت؛ يقرّره أدمن آخر / You cannot decide your own request; another admin decides it',
+    'SELF_DECISION_FORBIDDEN'
+  );
 }
 
 async function getTelegramLink(db: D1Database, userId: string) {
@@ -843,6 +853,9 @@ kycRoutes.post('/admin/cases/:id/decision', async (c) => {
   const db = c.env.DB;
   const row = await db.prepare('SELECT * FROM kyc_cases WHERE id = ?').bind(id).first<KycCaseRow>();
   if (!row) throw notFound('Case not found');
+  // NO SELF-DECISION (Community V3 push 1.1, DECISIONS row 256): an admin never
+  // reviews, verifies or rejects their own identity. Another admin decides.
+  if (row.user_id === admin.id) throw selfDecisionRefusal();
   if (row.state !== 'submitted' && row.state !== 'reviewing') {
     throw badRequest(`No decision possible from state '${row.state}'`, 'INVALID_TRANSITION');
   }
@@ -943,6 +956,7 @@ kycRoutes.post('/admin/address/:id/decision', async (c) => {
   const db = c.env.DB;
   const row = await db.prepare('SELECT * FROM approved_addresses WHERE id = ?').bind(id).first<ApprovedAddressRow>();
   if (!row) throw notFound('Request not found');
+  if (row.user_id === admin.id) throw selfDecisionRefusal();
   if (row.state !== 'pending') throw badRequest(`Request is already '${row.state}'`, 'INVALID_TRANSITION');
 
   const now = new Date().toISOString();

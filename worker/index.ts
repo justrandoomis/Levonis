@@ -122,6 +122,7 @@ import { giftRoutes, legacyGiftRoutes } from './routes/gifts';
 import { returnRoutes, priceProtectionRoutes } from './routes/returns';
 import { policiesRoutes } from './routes/policies';
 import { kycRoutes } from './routes/kyc';
+import { merchantApplicationRoutes } from './routes/merchantApplication';
 import { supportRoutes } from './routes/support';
 import { referralRoutes } from './routes/referrals';
 import { studioRoutes } from './routes/studio';
@@ -613,6 +614,8 @@ app.route('/api/returns', returnRoutes);
 app.route('/api/price-protection', priceProtectionRoutes);
 app.route('/api/policies', policiesRoutes);
 app.route('/api/kyc', kycRoutes);
+// The merchant approval gate, the applicant's side (Community V3 push 1.1, DECISIONS row 256).
+app.route('/api/merchant-application', merchantApplicationRoutes);
 app.route('/api/support', supportRoutes);
 // Referrals & support codes (integrated mandate §3). Signup invites and
 // purchase support codes live behind /api/referrals; the module itself keeps

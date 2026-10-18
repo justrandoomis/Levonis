@@ -793,6 +793,7 @@ export const NOT_LIBRARY_HOLDERS: Readonly<Record<string, string>> = {
       'review_rewards.instagram_evidence', 'wallet_transactions.receipt_key', 'chat_messages.file_key', 'claim_messages.file_key',
       'community_complaint_messages.file_key', 'support_ticket_messages.file_key', 'warranty_claims.evidence', 'return_cases.evidence',
       'trade_in_photos.file_key', 'restriction_cases.evidence', 'kyc_cases.evidence_keys', 'kyc_cases.payload',
+      'merchant_applications.photo_key',
       'community_request_files.file_key', 'community_request_files.preview_key', 'community_offer_files.file_key',
       'community_offer_drafts.files_json', 'community_order_updates.file_key', 'product_files.file_key', 'product_files.preview_key',
       'community_post_files.file_key', 'community_post_files.preview_key', 'viewer_grants.file_key', 'print_analyses.file_key',

@@ -1,14 +1,13 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, badRequest, notFound, forbidden, str, int, HttpError } from '../lib/http';
+import { requireAuth, badRequest, notFound, str, int, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
-import { getTierStatus, benefits, membershipBadges } from '../lib/entitlements';
+import { membershipBadges } from '../lib/entitlements';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { feedCursor, nextFeedCursor } from '../lib/feedCursor';
 import { requestBoardVisible } from '../lib/requestBoard';
-import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { communityAdminDoor, communityClosedRefusal, communityGate, communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { audit } from '../lib/audit';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
@@ -19,6 +18,7 @@ import { publicRequest } from './marketplace';
 import { eligibleVerdictSql, publicWorkshopFacts } from '../lib/printMatchingStore';
 import { storeForUser } from '../lib/merchantAuth';
 import { merchantTakesNewWork } from '../lib/communityRequests';
+import { applicationRequiredRefusal } from '../lib/merchantApproval';
 
 export const communityRoutes = new Hono<AppContext>();
 
@@ -709,47 +709,20 @@ communityRoutes.post('/my-store', requireAuth, async (c) => {
       .run();
     return c.json({ success: true, id: existing.id });
   }
-  // A NEW community merchant is a way INTO the community, so it waits while
-  // the community is under maintenance (owner, 2026-09-23 — docs/DECISIONS.md).
-  // The branch above is untouched: an existing merchant keeps editing theirs.
-  if (!communityMayEnter(await readCommunityGate(c.env.DB), user)) throw communityClosedRefusal();
-  // Creating a NEW merchant profile is a PLUS benefit inherited by PREMIUM
-  // and PRO — server-side tier check, never a client flag.
-  // server-side tier check, never a client flag. Existing merchants above
-  // are grandfathered for updates and product management.
-  const status = await getTierStatus(c.env.DB, user.id);
-  if (!benefits.merchantProfile(status)) {
-    throw forbidden('يتطلب عضوية LEVO PLUS أو PREMIUM أو PRO / Requires an active LEVO PLUS, PREMIUM, or PRO membership');
-  }
-
-  const id = newId('cm');
-  // verified stays 0 — the stored flag is the admin's mark. A PRO owner's
-  // badge is resolved from the memberships ledger on every read instead
-  // (proBadgeOwners), so it follows the membership and never goes stale.
-  await c.env.DB.prepare('INSERT INTO community_merchants (id, user_id, name, bio) VALUES (?, ?, ?, ?)')
-    .bind(id, user.id, name, bio)
-    .run();
   /**
-   * «⚡ Merchants verification» GETS ITS TRAFFIC.
+   * E2 — NO NEW MERCHANT FROM THIS DOOR (Community V3 push 1.1, DECISIONS row 256).
    *
-   * `verified` stays 0 above — the flag is the admin's mark, deliberately — so
-   * this row is a person WAITING on a human. Nothing told that human. A new
-   * merchant sat unverified for as long as it took somebody to notice, and an
-   * unverified merchant is one whose customers see no badge on a store they
-   * are being asked to pay.
-   *
-   * The name is a shopfront the merchant chose to publish, so it is the one
-   * customer-supplied string that belongs here; the bio is not, because it is
-   * 500 characters of prose and the id opens all of it in the admin panel.
+   * This branch inserted a store-less community merchant for any PLUS member:
+   * a public profile in «المتاجر» that no human had approved. A merchant row is
+   * now created only by the approve transition of a merchant application
+   * (worker/lib/merchantApproval.ts), so a user without one is refused with the
+   * same code as /api/merchant/onboard. The update branch above is untouched:
+   * an existing merchant keeps editing their profile. The community gate
+   * still answers first, as it does at /onboard: a closed community is the
+   * same 503 for everyone.
    */
-  announceAfterResponse(
-    c,
-    'merchant_verification',
-    `⚡ New merchant profile awaiting verification` +
-      `\nMerchant: ${id}` +
-      `\nName: ${name.slice(0, 80)}`
-  );
-  return c.json({ success: true, id });
+  if (!communityMayEnter(await readCommunityGate(c.env.DB), user)) throw communityClosedRefusal();
+  throw applicationRequiredRefusal();
 });
 
 /**
@@ -780,13 +753,13 @@ communityRoutes.get('/profile-status', requireAuth, async (c) => {
   const merchant = await c.env.DB.prepare('SELECT id FROM community_merchants WHERE user_id = ?')
     .bind(user.id)
     .first();
-  // merchant_allowed: existing merchants are grandfathered; new stores need
-  // an active paid membership (server-side inherited entitlement check).
-  const status = await getTierStatus(c.env.DB, user.id);
+  // merchant_allowed: an existing merchant keeps editing their profile. A NEW
+  // merchant is created only by an approved merchant application (DECISIONS
+  // row 256), never from this profile, so a membership no longer allows it.
   return c.json({
     success: true,
     complete: !!(user.username && user.name),
     hasStore: !!merchant,
-    merchant_allowed: !!merchant || benefits.merchantProfile(status),
+    merchant_allowed: !!merchant,
   });
 });

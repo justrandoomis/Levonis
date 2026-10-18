@@ -197,7 +197,9 @@ test('a second onboarding is STORE_EXISTS — the code the page answers by openi
 
 test('onboarding names a too-short store name by field, like the settings do', async () => {
   const raw = seed();
-  raw.exec("DELETE FROM merchant_store_slugs; DELETE FROM merchant_stores; DELETE FROM community_merchants;");
+  // An approved applicant with no store yet: /onboard opens a store only after approval (DECISIONS row 256).
+  raw.exec(`DELETE FROM merchant_store_slugs; DELETE FROM merchant_stores;
+            UPDATE community_merchants SET approved_at = '2026-01-01T00:00:00.000Z' WHERE user_id = 'owner';`);
   const res = await refused(await post(app(raw), '/api/merchant/onboard', { name: 'A', slug: 'a-new-shop' }));
   assert.equal(res.code, 'STORE_FIELD_INVALID');
   assert.equal(res.details.field, 'name');

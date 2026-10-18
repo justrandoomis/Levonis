@@ -392,6 +392,8 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   { table: 'restriction_cases', column: 'evidence', kind: 'json', why: 'private evidence keys' },
   { table: 'kyc_cases', column: 'evidence_keys', kind: 'json', why: 'identity documents under the private kyc/ prefix' },
   { table: 'kyc_cases', column: 'payload', kind: 'json', why: 'the case payload references the same documents' },
+  // 0204 — a merchant applicant's private review photo (merchant-review/…).
+  { table: 'merchant_applications', column: 'photo_key', kind: 'text', why: 'the private photo a merchant reviewer checks (0204)' },
 
   // ---- the community's projects and posts (0153) --------------------------
   { table: 'community_post_media', column: 'media_key', kind: 'text', why: "a project's picture or video, the author's own public media" },
@@ -702,6 +704,9 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'quick_buy_items.stock_targets': 'inventory counter ids',
   'quick_buy_items.snapshot': 'names, option labels, SKU and prices — no image',
   'quick_buy_actions.response_json': 'an idempotent replay answer (ids and quantities)',
+  // 0204 — the merchant approval gate (DECISIONS row 256).
+  'admin_capability_grants.grant_key': 'a capability code (MERCHANT_REVIEW, 0204), not a picture',
+  'merchant_applications.public_links': 'the https links an applicant chose to publish (0204) — off-platform pages, never an R2 key',
   // 0177 — owner decision 2 (cost access and the security-event log).
   'admin_private_grants.grant_key': 'ids/codes/integers; no media (PRICING_PRIVATE_READ or PRICING_PRIVATE_WRITE)',
   'security_events.detail': 'ids/codes/integers; no media (allowlisted refusal context, never a body or a value)',

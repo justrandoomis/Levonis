@@ -22,6 +22,7 @@ import type { SupportGiftReconciliation } from './membershipOps';
 import { sweepBnplOverdue, type BnplOverdueReport } from './bnpl';
 import { sweepAutomaticReviews, type AutomaticReviewSweepReport } from './reviewAutoSweep';
 import { runCommunitySweeps } from './communityRequests';
+import { sweepMerchantApplicationRetention } from './merchantApproval';
 import { drainMatchQueue } from './printMatchingStore';
 import { runStoreOrderSweeps } from './storeOrderOps';
 import { runMerchantSweeps } from './merchantSweeps';
@@ -616,6 +617,8 @@ export async function runDurableJobs(env: Env, opts: DurableJobsOptions = {}): P
   await step('merchant_badges', async () => { await refreshStaleMerchantBadges(env.DB); });
   // 14c. Custom requests: stranded acceptances healed, request/offer expiry, the «يتأكد تلقائيًا» clock (communityRequests.ts).
   await step('community_requests', async () => { report.errors.push(...(await runCommunitySweeps(env, nowIso)).errors.map((e) => `community_requests: ${e}`)); });
+  // 14c''. Merchant applications rejected or withdrawn 90 days ago: sealed values blanked, review photo deleted (owner decision C7, DECISIONS row 256).
+  await step('merchant_application_retention', async () => { const r = await sweepMerchantApplicationRetention(env, nowIso); if (r.photo_failures) report.errors.push(`merchant_application_retention: ${r.photo_failures} photo(s) not deleted yet (retried next run)`); });
   // 14c'. Eligibility re-matches an inline pass left (a request revision, a workshop's printers/stock/prefs/delivery; W5-B).
   await step('request_rematch', async () => { const r = await drainMatchQueue(env, { limit: 25 }); report.errors.push(...r.errors.map((e) => `request_rematch: ${e}`)); });
   // 14d. Store orders: the sale credit three days after delivery (no open complaint), and orphaned checkout holds (storeOrderOps.ts).
