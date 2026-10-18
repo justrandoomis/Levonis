@@ -872,6 +872,63 @@ export function usdText(text: string | null | undefined): string {
   return `${sign}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/* The final price (the owner's, 2026-10-18): dollars as whole micro-dollars, so no float decides a cent. */
+const microsOf = (text: string | null | undefined): bigint | null => {
+  const m = typeof text === 'string' ? /^(\d{1,12})(?:\.(\d{1,6}))?$/.exec(text.trim()) : null;
+  return m ? BigInt(m[1]) * 1_000_000n + BigInt((m[2] ?? '').padEnd(6, '0')) : null;
+};
+const centsUp = (micros: bigint): bigint => (micros + 9_999n) / 10_000n;
+const centsText = (cents: bigint): string => `${cents / 100n}.${String(cents % 100n).padStart(2, '0')}`;
+/** A cost-first SKU's dollars as the customer reads them: its `usd_ceil6` rounded UP to the cent (row 248). */
+export function usdCentsUp(text: string | null | undefined): string | null {
+  const micros = microsOf(text);
+  return micros === null ? null : centsText(centsUp(micros));
+}
+
+/**
+ * THE FINAL PRICE — A TWO-WAY EDITOR OF THE MINIMUM PROFIT T (the owner's, 2026-10-18; T stays the one stored
+ * figure). On a cost-first SKU the direct dollars are ceil6((R + T×U + differences×U) ÷ U), R the supplier route
+ * or the shelf (row 244): T moves them one for one, so the dollars without profit (`base`) are the CURRENT
+ * preview's figure less its own T. `final` is what the customer reads: rounded UP to the cent (row 248). Null
+ * when the SKU has no such figure (not priced yet, or its minimum profit is a dinar rule).
+ */
+export function finalUsdOf(line: SkuLine | null | undefined): { final: string; base: string; cost: string; profit: string } | null {
+  const o = line?.channels.direct_sale?.owner;
+  const total = microsOf(o?.v2_usd_ceil6);
+  const t = microsOf(o?.v2_profit_usd);
+  if (!o || total === null || t === null || t > total) return null;
+  return { final: centsText(centsUp(total)), base: String(total - t), cost: centsText(centsUp(total - t)), profit: o.v2_profit_usd! };
+}
+
+/**
+ * A typed final price → the minimum profit that shows it: T = final − base, down to the cent, so the price the
+ * customer reads (rounded up to the cent) is the one typed. Refused at or below the base — the cost: T is never
+ * 0 or less (an empty minimum profit inherits). Null while nothing is typed.
+ */
+export function profitForFinal(typed: string, base: string): { ok: true; usd: string } | { ok: false; reason: 'below_cost' | 'too_large' } | null {
+  const t = toAscii(typed).trim().replace(/,/g, '');
+  if (!/\d/.test(t)) return null;
+  const x = cleanUsd(t, { zero: true });
+  if (x === null) return { ok: false, reason: 'too_large' };
+  const over = microsOf(x)! - BigInt(base);
+  if (over < 10_000n) return { ok: false, reason: 'below_cost' };
+  const usd = cleanUsd(centsText(over / 10_000n));
+  return usd === null ? { ok: false, reason: 'too_large' } : { ok: true, usd };
+}
+
+/**
+ * The product's reference SKU for its final price: the result bar's line when it takes the product's minimum
+ * profit and is priced, else the first that is — a model in «تكلفة مختلفة» with its own (or a kept) minimum
+ * profit never is.
+ */
+export function productFinalLine(table: readonly V2TableRow[], lead: SkuLine | null, models: Readonly<Record<string, ModelDraft>>): SkuLine | null {
+  const follows = (l: SkuLine) => {
+    const m = l.model_id ? models[l.model_id] : undefined;
+    return !(m && m.price === 'own_cost' && m.profit !== 'follow') && finalUsdOf(l) !== null;
+  };
+  return lead && follows(lead) ? lead : (skuLines(table).find(follows) ?? null);
+}
+
 /** A signed dollar difference as typed («+2», «−25»). Display only. */
 export const signedUsd = (text: string): string => (text.startsWith('-') ? `−$${text.slice(1)}` : `+$${text.replace(/^\+/, '')}`);
 

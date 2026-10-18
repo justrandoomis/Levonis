@@ -21,7 +21,7 @@
  */
 import { useMemo } from 'react';
 import type { ProductDimensionsV2 } from '../../../../lib/productTypes';
-import { draftOf, firstLineOf, withPackageMeasure, type V2Names } from './v2Model';
+import { draftOf, firstLineOf, productFinalLine, withPackageMeasure, type V2Names } from './v2Model';
 import { useV2 } from './useV2Pricing';
 import MethodToggle from './MethodToggle';
 import CostCard from './CostCard';
@@ -115,7 +115,17 @@ export default function PricesSectionV2({
         ) : (
           <div className="mb-3 grid min-w-0 gap-3 [grid-template-columns:minmax(0,1fr)] lg:[grid-template-columns:repeat(2,minmax(0,1fr))]">
             {v2.owner ? <CostCard cost={d.cost} onChange={setCost} optional={false} fromPackage={fromPackage} /> : null}
-            <ProfitDiscountCard draft={d} setDraft={v2.setDraft} owner={v2.owner} direct={lead?.channels.direct_sale?.price_iqd ?? null} preorder={pre?.price_iqd ?? null} modelNames={modelNames} onJump={onJump} inheritedMinProfit={a?.v2_cost_inputs?.inherited_minimum_profit ?? null} />
+            <ProfitDiscountCard
+              draft={d}
+              setDraft={v2.setDraft}
+              owner={v2.owner}
+              direct={lead?.channels.direct_sale?.price_iqd ?? null}
+              preorder={pre?.price_iqd ?? null}
+              modelNames={modelNames}
+              onJump={onJump}
+              inheritedMinProfit={a?.v2_cost_inputs?.inherited_minimum_profit ?? null}
+              finalLine={v2.owner ? productFinalLine(table, lead, d.models) : null}
+            />
           </div>
         )
       ) : null}

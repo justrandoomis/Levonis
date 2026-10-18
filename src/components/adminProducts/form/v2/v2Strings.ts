@@ -38,6 +38,12 @@ export interface V2Strings {
   change: string;
   extras: string;
   minProfit: string;
+  /** The owner's final dollar price: a two-way editor of the minimum profit (2026-10-18). */
+  finalPrice: string;
+  finalPriceHint: string;
+  finalPriceWaiting: string;
+  finalBelowCost: Fill;
+  finalTooLarge: string;
   discount: string;
   discountHint: string;
   directPrice: string;
@@ -221,6 +227,11 @@ const AR: V2Strings = {
   change: 'غيّر',
   extras: 'تكاليف إضافية للقطعة (د.ع)',
   minProfit: 'الحد الأدنى للربح ($)',
+  finalPrice: 'السعر النهائي ($)',
+  finalPriceHint: 'يضبط الحد الأدنى للربح من المعاينة الحالية؛ قد ترفع قاعدة التقريب سعر الدينار قليلاً.',
+  finalPriceWaiting: 'يظهر بعد أن تحسب المعاينة السعر من التكلفة.',
+  finalBelowCost: (v) => `السعر النهائي يجب أن يزيد على التكلفة (${v}).`,
+  finalTooLarge: 'السعر النهائي أكبر من الحد المسموح ($100,000).',
   discount: 'خصم الطلب المسبق ($)',
   discountHint: 'يُطرح من سعر البيع المباشر',
   directPrice: 'سعر البيع المباشر',
@@ -383,6 +394,11 @@ const EN: V2Strings = {
   change: 'Change',
   extras: 'Extra cost per unit (IQD)',
   minProfit: 'Minimum profit ($)',
+  finalPrice: 'Final price ($)',
+  finalPriceHint: 'Sets the minimum profit from the current preview; the rounding rule may lift the dinar price slightly.',
+  finalPriceWaiting: 'Shown once the preview prices it from cost.',
+  finalBelowCost: (v) => `The final price must be above the cost (${v}).`,
+  finalTooLarge: 'The final price is above the allowed maximum ($100,000).',
   discount: 'Pre-order discount ($)',
   discountHint: 'Taken off the direct-sale price',
   directPrice: 'Direct-sale price',
@@ -545,6 +561,11 @@ const CKB: V2Strings = {
   change: 'گۆڕین',
   extras: 'تێچووی زیادە بۆ هەر پارچەیەک (دینار)',
   minProfit: 'کەمترین قازانج ($)',
+  finalPrice: 'نرخی کۆتایی ($)',
+  finalPriceHint: 'کەمترین قازانج لە پێشبینینی ئێستاوە دادەنێت؛ یاسای خڕکردنەوە لەوانەیە نرخی دینار کەمێک بەرز بکاتەوە.',
+  finalPriceWaiting: 'دوای ئەوەی پێشبینین نرخەکە لە تێچووەوە هەژمار دەکات دەردەکەوێت.',
+  finalBelowCost: (v) => `نرخی کۆتایی دەبێت لە تێچوو (${v}) زیاتر بێت.`,
+  finalTooLarge: 'نرخی کۆتایی لە سنووری ڕێگەپێدراو ($100,000) زیاترە.',
   discount: 'داشکاندنی پێشداواکردن ($)',
   discountHint: 'لە نرخی فرۆشتنی ڕاستەوخۆ کەم دەکرێتەوە',
   directPrice: 'نرخی فرۆشتنی ڕاستەوخۆ',

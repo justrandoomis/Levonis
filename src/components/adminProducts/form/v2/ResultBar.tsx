@@ -13,7 +13,7 @@
  * (the discount withdrawn on a route, below cost, below cost + the minimum
  * profit) sit under it, codes turned into words — never a figure to anyone else.
  */
-import { firstPreorder, iqdText, nameIn, shelfOf, usdText, type SkuLine, type V2Names } from './v2Model';
+import { firstPreorder, iqdText, nameIn, shelfOf, usdCentsUp, usdText, type SkuLine, type V2Names } from './v2Model';
 import { channelName, Readout, useV2Lang, useV2Strings } from './v2Ui';
 import type { V2Strings } from './v2Strings';
 
@@ -69,7 +69,7 @@ export default function ResultBar({ line, owner, title }: { line: SkuLine | null
           <>
             <Readout label={s.cost} value={o?.v2_replacement_iqd !== null && o?.v2_replacement_iqd !== undefined ? iqdText(o.v2_replacement_iqd) : '—'} tone="muted" data="cost" />
             <Readout label={s.minProfit} value={o?.v2_profit_usd ? `+${usdText(o.v2_profit_usd)}` : '—'} tone="muted" data="profit" />
-            <Readout label={s.finalUsd} value={priceFirst ? usdText(direct?.editor_usd_price) : usdText(o?.v2_usd_ceil6)} data="usd" />
+            <Readout label={s.finalUsd} value={priceFirst ? usdText(direct?.editor_usd_price) : usdText(usdCentsUp(o?.v2_usd_ceil6))} data="usd" />
             <Readout label={s.direct} value={iqdText(direct?.price_iqd)} data="direct" />
           </>
         ) : (
@@ -91,7 +91,7 @@ export default function ResultBar({ line, owner, title }: { line: SkuLine | null
       ) : null}
       {owner && pre ? (
         <p className="mt-1.5 text-[11px] text-text-secondary" dir="auto" data-v2-preorder-line>
-          {s.preorderLine(priceFirst ? usdText(pre.editor_usd_price) : usdText(pre.owner?.v2_usd_ceil6), iqdText(pre.price_iqd))}
+          {s.preorderLine(priceFirst ? usdText(pre.editor_usd_price) : usdText(usdCentsUp(pre.owner?.v2_usd_ceil6)), iqdText(pre.price_iqd))}
         </p>
       ) : null}
       {warnings.length ? (

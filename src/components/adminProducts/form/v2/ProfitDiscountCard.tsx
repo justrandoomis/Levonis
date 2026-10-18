@@ -3,8 +3,9 @@
  * docs/PRICING-V2.md §1.2, §1.3, §2.2; owner decisions A1, B1; the owner's
  * answer Q2 of DECISIONS row 222).
  *
- *   - From cost (the owner): the minimum profit in dollars (T: D = R + T) and
- *     the pre-order discount;
+ *   - From cost (the owner): the minimum profit in dollars (T: D = R + T), its
+ *     two-way editor «السعر النهائي ($)» (FinalPriceField, 2026-10-18) and the
+ *     pre-order discount;
  *   - a dollar price (the owner and every price editor): «سعر البيع المباشر
  *     [$] → د.ع» and the pre-order discount;
  *   - the exceptions in one line — «استثناءات: Combo −25$ [اعرض ↘]» — each
@@ -12,7 +13,8 @@
  * The dinars beside a field are the server's answer for the product's first
  * SKU; nothing is multiplied here.
  */
-import { inheritPlaceholder, iqdText, nameIn, signedUsd, type PriceDraft, type V2Names } from './v2Model';
+import { inheritPlaceholder, iqdText, nameIn, signedUsd, type PriceDraft, type SkuLine, type V2Names } from './v2Model';
+import FinalPriceField from './FinalPriceField';
 import { useV2Lang, useV2Strings, UsdInput, V2Field } from './v2Ui';
 
 export default function ProfitDiscountCard({
@@ -24,6 +26,7 @@ export default function ProfitDiscountCard({
   modelNames,
   onJump,
   inheritedMinProfit = null,
+  finalLine = null,
 }: {
   draft: PriceDraft;
   setDraft: (fn: (d: PriceDraft) => PriceDraft) => void;
@@ -36,6 +39,8 @@ export default function ProfitDiscountCard({
   onJump: (section: 3 | 5) => void;
   /** The owner's answer: what the minimum profit inherits when the field is empty (§2.1 rule 2). */
   inheritedMinProfit?: { amount_usd: string | null; amount_iqd: number | null } | null;
+  /** From cost: the SKU whose final dollars the final-price field reads and sets (`productFinalLine`). */
+  finalLine?: SkuLine | null;
 }) {
   const s = useV2Strings();
   const lang = useV2Lang();
@@ -50,11 +55,14 @@ export default function ProfitDiscountCard({
             {(id) => <UsdInput id={id} value={draft.product_usd} onChange={(product_usd) => setDraft((d) => ({ ...d, product_usd }))} data="product-usd" />}
           </V2Field>
         ) : owner ? (
-          <V2Field label={s.minProfit}>
-            {(id) => (
-              <UsdInput id={id} value={draft.min_profit_usd} placeholder={inheritPlaceholder(s.inherit, inheritedMinProfit)} onChange={(min_profit_usd) => setDraft((d) => ({ ...d, min_profit_usd }))} data="min-profit" />
-            )}
-          </V2Field>
+          <div className="grid min-w-0 gap-3 [grid-template-columns:minmax(0,1fr)] sm:[grid-template-columns:minmax(0,1fr)_minmax(0,1fr)]">
+            <V2Field label={s.minProfit}>
+              {(id) => (
+                <UsdInput id={id} value={draft.min_profit_usd} placeholder={inheritPlaceholder(s.inherit, inheritedMinProfit)} onChange={(min_profit_usd) => setDraft((d) => ({ ...d, min_profit_usd }))} data="min-profit" />
+              )}
+            </V2Field>
+            <FinalPriceField line={finalLine} profit={draft.min_profit_usd} onProfit={(min_profit_usd) => setDraft((d) => ({ ...d, min_profit_usd }))} data="final-usd" />
+          </div>
         ) : null}
         <V2Field label={s.discount} hint={<>{s.discountHint}{preorder !== null ? ` · → ${iqdText(preorder)}` : ''}</>}>
           {(id) => <UsdInput id={id} value={draft.discount_usd} placeholder="0" onChange={(discount_usd) => setDraft((d) => ({ ...d, discount_usd }))} data="discount" />}

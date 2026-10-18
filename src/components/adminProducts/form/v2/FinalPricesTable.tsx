@@ -12,7 +12,7 @@
  * the per-SKU «سعر خاص $» and «خصم $» — an SKU's own price and discount.
  */
 import { useState, type ReactNode } from 'react';
-import { channelsOf, inheritedSkuDiscount, iqdText, modelBlocks, nameIn, shelfOf, usdText, type PriceDraft, type SkuLine, type V2Channel, type V2Names, type V2TableRow } from './v2Model';
+import { channelsOf, inheritedSkuDiscount, iqdText, modelBlocks, nameIn, shelfOf, usdCentsUp, usdText, type PriceDraft, type SkuLine, type V2Channel, type V2Names, type V2TableRow } from './v2Model';
 import { channelName, UsdInput, useV2Lang, useV2Strings, V2Field } from './v2Ui';
 import type { V2Strings } from './v2Strings';
 
@@ -224,7 +224,7 @@ export default function FinalPricesTable({
                               <>
                                 {o.v2_replacement_iqd !== null ? <span>{s.replacement}: <span dir="ltr">{iqdText(o.v2_replacement_iqd)}</span></span> : null}
                                 {o.v2_profit_usd ? <span>{s.minProfit}: <span dir="ltr">{usdText(o.v2_profit_usd)}</span></span> : null}
-                                {!r.editor_usd_price ? <span dir="ltr">{usdText(o.v2_usd_ceil6)}</span> : null}
+                                {!r.editor_usd_price ? <span dir="ltr">{usdText(usdCentsUp(o.v2_usd_ceil6))}</span> : null}
                                 {o.v2_floor === 'discount_withdrawn' ? <span className="text-amber-300">{s.floorWithdrawn}</span> : null}
                                 {o.v2_floor === 'direct_min_profit' ? <span className="text-amber-300">{s.floorMinProfit}</span> : null}
                                 {o.v2_below_cost ? <span className="text-amber-300">{s.belowCost}</span> : null}

@@ -86,6 +86,12 @@ There are two ways to set it, chosen per product (Decision A):
     of a unit on the shelf.
   - D_usd = R/U + T, where T is the minimum profit.
   - The guarantee D − R ≥ T (row 187) now applies to the **direct** price.
+  - **«السعر النهائي ($)»** (the owner's, 2026-10-18) sits beside T, at the product and in a
+    model's «تكلفة مختلفة» exception. It is a two-way editor of T, not a stored figure: typing
+    X stores T = X − (the reference SKU's D_usd − T, from the current preview), taken down to
+    the cent, so the customer's dollars (rounded up to the cent, row 248) are X. A typed T moves
+    it on the next preview. At or below cost it is refused. The dinars may still be lifted by
+    the rounding rule (row 245).
 - **«سعر بالدولار» (price-first):** the owner types D_usd. Cost inputs become optional and serve
   profit reports and estimates only.
 

@@ -41,6 +41,7 @@ import {
 import { useV2 } from './useV2Pricing';
 import { boxOf, UnitInput } from './CostCard';
 import { lineNotes } from './ResultBar';
+import FinalPriceField from './FinalPriceField';
 import { useEffect, useState } from 'react';
 import { channelName, Chip, UsdInput, useV2Lang, useV2Strings, V2Field } from './v2Ui';
 
@@ -304,6 +305,8 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
                 )}
               </V2Field>
             ) : null}
+            {/* The model's final price: a two-way editor of its own minimum profit (2026-10-18). */}
+            {m.profit === 'exception' ? <FinalPriceField line={line} profit={m.profit_usd} onProfit={(profit_usd) => set({ profit_usd })} data={`model-final-usd:${id}`} /> : null}
           </div>
         </div>
       ) : null}
