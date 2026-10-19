@@ -854,6 +854,33 @@ test('a failed swatch for a value the owner hid since, or a value of a hidden gr
   }
 });
 
+test('a media item whose product the completeness switch still holds after /publish-finish (a catalog-blocking gap): the public answer is 404, nothing is expected, COMPLETE (never VERIFY_FAILED_PERSISTENT)', async () => {
+  const { w, sid, productId } = await closedRunWithFailures('pla-basic-filament', PICK_PLA);
+  const payload = mediaOnlyPayload(buildFor(w, 'pla-basic-filament').payload);
+  const item = await deltaItem(w, RUN_B, sid);
+  const plan = await planMediaRetry(w.db, item, payload);
+  for (const m of plan.media) storeFor(w, RUN_B, sid, m.source_media_id, m.role, m.source_url);
+  walk(w, item.id, 'WRITING');
+  const writing = await itemBySource(w.db, RUN_B, sid);
+  const a = await attachRetriedMedia(envOf(w), runOf(RUN_B), writing, w.bundle, { payload_sha256: writing.payload_sha256, payload });
+  assert.ok(a.rows.length > 0);
+  await finishPublishing(w.db, runOf(RUN_B), await itemBySource(w.db, RUN_B, sid));
+  // Held for a category the owner deleted (status still 'active'): visibleProductBySlug answers no product.
+  w.raw
+    .prepare(`INSERT OR REPLACE INTO product_completeness (product_id, complete, held, missing_json, missing_count, computed_at) VALUES (?, 0, 1, '[{"c":"CATEGORY"}]', 1, '2026-10-19T00:00:00.000Z')`)
+    .run(productId);
+  const verifying = await itemBySource(w.db, RUN_B, sid);
+  const env = { DB: w.db, BUCKET: w.bucket as never, R2_PUBLIC: w.bucket as never, R2_PRIVATE: w.media.R2_PRIVATE as never };
+  const live = `${ORIGIN}/product/${verifying.slug}`;
+  const done = await completeMediaRetry(env, `${ORIGIN}/api/ops/catalog-import/x`, runOf(RUN_B), verifying, {
+    lease_token: LEASE,
+    live_url: live,
+    edge_evidence: { version: 1, live_url: live, round: 1, status: 404, rows_seen: 0, swatches_seen: 0 },
+  });
+  assert.equal(done.state, 'COMPLETE', JSON.stringify(done.d1_checks));
+  assert.equal((done.d1_checks.media_retry as Record<string, unknown>).product_shown, false);
+});
+
 test('a media item whose page no longer reads as its product (a renamed store handle) is moot: nothing fetched or attached, COMPLETE, and a later delta takes it again', async () => {
   const { w, sid, productId } = await closedRunWithFailures('pla-basic-filament', PICK_PLA);
   const before = productState(w, productId);

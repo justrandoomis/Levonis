@@ -24,7 +24,11 @@
  *   VERIFYING_LIVE   POST /items/:sid/content-complete: the runner's anonymous reads (`/api/products/<slug>`: the block
  *                    on `/files/<key>`; `/api/products/<slug>/knowledge`: `in_the_box[].image`) and the Worker's own
  *                    recompute (each inserted picture still held in D1, every object in R2). What the owner removed
- *                    since, or a product hidden since, is not expected.
+ *                    since, or a product the storefront no longer shows (hidden, or held), is not expected.
+ *
+ * The batch gives each new description picture what the writer gives its own (its alt is an authored override there):
+ * the alt `approved` in `translation_meta` (appended, every byte of the meta read kept) and its `review_needed` row.
+ * Without them the owner's next save would put the English title in place of the authored Arabic and Sorani alt.
  *
  * "AS THE IMPORT WROTE IT" is rebuilt, never stored: the writer's own functions (`contentBlocksOf`,
  * `upgradeContentBlocks`, `boxValueListOf`) over the rebuilt payload, a picture present exactly where the closed run
@@ -40,7 +44,7 @@ import { newId } from '../crypto';
 import { fence, isFenceMiss } from '../operations';
 import { loadRelationsResponse } from '../productPersistence';
 import { upgradeContentBlocks, type ContentBlockV2 } from '../productModel';
-import { TRANSLATION_VERSION } from '../translate';
+import { hashSource, TRANSLATION_VERSION } from '../translate';
 import { isSpecStatus } from '../knowledge/labels';
 import { assertImportPayload, type ImportPayload, type PayloadBoxItem, type PayloadContentBlock, type PayloadSpec } from '@levonis/catalog/bambuImport/payload';
 import { specRowId } from '@levonis/catalog/bambuImport/specs';
@@ -49,7 +53,7 @@ import { canonicalJson } from '@levonis/catalog/bambuImport/fingerprint';
 import { stripQuery } from '@levonis/catalog/bambuImport/normalize';
 import { altText } from '@levonis/catalog/bambuImport/registry/labels';
 import { NOW_SQL, OpsRefusal, type ImportRun } from './auth';
-import { liveUrlOf } from './complete';
+import { liveUrlOf, shownToCustomers } from './complete';
 import {
   CONTENT_FINAL,
   CONTENT_OUTCOMES,
@@ -67,8 +71,20 @@ import {
 import { stageDataOf, type ItemRow } from './items';
 import { importObjectHead } from './media';
 import { IMPORT_GUARD_ID } from './protectedTables';
-import { payloadSha256, type ReviewedBundle } from './reviewed';
-import { boxValueListOf, ckbNotCopy, contentBlocksOf, ImportWriteRefused, mapScopeOf, mergeMapping, readbackTargetOf, refusalOfBatch, type MergeMapping } from './writer';
+import { payloadSha256, taxonomyOfRow, type ReviewedBundle } from './reviewed';
+import {
+  boxValueListOf,
+  ckbNotCopy,
+  contentBlocksOf,
+  ImportWriteRefused,
+  mapScopeOf,
+  mergeMapping,
+  placementTemplate,
+  readbackTargetOf,
+  refusalOfBatch,
+  specFieldMirror,
+  type MergeMapping,
+} from './writer';
 
 export { CONTENT_FINAL, CONTENT_OUTCOMES, CONTENT_PASSING, CONTENT_ROLES, CONTENT_RULE, contentQueue, contentSettledElsewhere, contentSettledIds };
 export type { ContentOutcome };
@@ -130,6 +146,8 @@ export interface BoxRow {
 export interface EarlierInserted {
   blocks: Map<string, string>;
   box: Map<string, string>;
+  /** Block id → the WRITTEN event time of the content item whose batch put it in (its alt row was written then). */
+  writtenAt: Map<string, string>;
 }
 
 /** Everything the proof of "as the import wrote it" reads, as read (pure functions below decide on it). */
@@ -140,6 +158,8 @@ export interface ContentState {
   t0: string;
   m0: string;
   specFields: string;
+  /** The `src_rev` the save path gives an authored slot of this product (localizeRespectingAuthored: its content_rev). */
+  srcRev: number;
   /** product_source_refs.fingerprint: the extraction the import wrote from. */
   fingerprint: string;
   /** The closed item's conflicts: the merge kept the owner's description; an aux medium was not stored (HEAD). */
@@ -147,8 +167,13 @@ export interface ContentState {
   headConflict: boolean;
   /** stage_data.written.content_blocks of the closed item (null: not recorded). */
   writtenBlocks: number | null;
-  /** The closed item's WRITTEN event time ('' when none). */
+  /** The closed item's latest WRITTEN event time ('' when none). */
   writtenAt: string;
+  /**
+   * Every ok WRITTEN event time of the closed item: a merge whose VERIFY failed is written again on resume
+   * (merge.ts rewritesOnResume), and that write fills nothing, so its block rows keep the first write's time.
+   */
+  writtenTimes: readonly string[];
   /** The write's readback target's description, when it still survives (JSON text), else null. */
   readbackBlocks: string | null;
   closedMedia: ReadonlyMap<string, ClosedMedium>;
@@ -160,6 +185,12 @@ export interface ContentState {
   /** A merge's reviewed value map applied to the product as it stands (null: a create, or not mapped). */
   mapping: MergeMapping | null;
   mergeOk: boolean;
+  /**
+   * Whether the write mirrored the box into `spec_fields.in_the_box` (writer.ts specFieldMirror: only when the
+   * placement's template declares the field): from the readback target when it survives, else from the reviewed
+   * placement's template as D1 holds it; null when neither can say (an absent mirror is then not provable).
+   */
+  mirrorExpected: boolean | null;
 }
 
 const unchangedPage = (state: Pick<ContentState, 'fingerprint'>, payload: ImportPayload): boolean => !!state.fingerprint && payload.extraction_sha256 === state.fingerprint;
@@ -226,9 +257,12 @@ export function expectedBlocks(payload: ImportPayload, keyBySid: ReadonlyMap<str
  *      blocks never recorded, a merge whose description held nothing the import filled → `not_imported`;
  *   2. the stored text itself: canonical JSON of blocks with exactly the model's keys, orders 0..n-1, unique ids;
  *   3. DURABLE evidence, whatever the page says: every stored block the import wrote against the import's own
- *      translation row (written in the WRITTEN batch: same English, Arabic and Sorani, `review_needed`, this
- *      translation version, the write's time) and its `translation_meta` as the import left it; a block an earlier
- *      pass put in carries neither → `owner_edited` (a row from before the write: `not_imported`, the merge's);
+ *      translation row (written in a WRITTEN batch of the closed item: same English, Arabic and Sorani,
+ *      `review_needed`, this translation version, within the margin of one of its writes — a merge rewritten on
+ *      resume fills nothing and keeps the first write's rows) and its `translation_meta` as the import left it; a
+ *      picture an earlier pass put in, against what that pass's batch wrote with it (the authored alt `approved`
+ *      in the meta, its `review_needed` row at that item's WRITTEN time) → else `owner_edited` (a row from before
+ *      the first write: `not_imported`, the merge's); a picture the field does not hold carries no record yet;
  *   4. the write's readback target, when it survives: byte for byte;
  *   5. the rebuild: the import's blocks count is the one the write recorded, and the stored text is byte for byte the
  *      expected one → else `owner_edited` when the store page is unchanged (its extraction fingerprint is the one the
@@ -272,15 +306,13 @@ export function proveDescription(state: ContentState, payload: ImportPayload): D
     return fail('owner_edited', 'meta');
   }
   if (!isObj(meta)) return fail('owner_edited', 'meta');
-  const writtenAt = Date.parse(state.writtenAt);
+  const writes = state.writtenTimes.map((t) => Date.parse(t)).filter((t) => Number.isFinite(t));
   for (const b of raw as Array<Record<string, unknown>>) {
     const id = String(b.id);
-    const slotsOf = BLOCK_SLOTS.map((sl) => `block:${id}:${sl}`);
-    if (state.earlier.blocks.has(id)) {
-      // An earlier pass's picture: exactly as its batch left it — no translation row, no meta (an owner's save adds both).
-      if (slotsOf.some((k) => k in meta || state.translations.has(k))) return fail('owner_edited', 'meta');
-      continue;
-    }
+    // An earlier pass's picture carries exactly what its batch wrote, as the writer gives its own pictures: the
+    // authored alt approved in the meta and its review_needed row, written with that content item's WRITTEN event.
+    const earlierAt = state.earlier.blocks.has(id) ? Date.parse(state.earlier.writtenAt.get(id) ?? '') : null;
+    if (earlierAt !== null && b.kind !== 'image') return fail('owner_edited', 'json');
     const wanted = b.kind === 'text' ? 'body' : b.kind === 'image' ? 'alt' : '';
     for (const sl of BLOCK_SLOTS) {
       const k = `block:${id}:${sl}`;
@@ -290,10 +322,17 @@ export function proveDescription(state: ContentState, payload: ImportPayload): D
         if (row || k in meta) return fail('owner_edited', 'meta');
         continue;
       }
-      if (!row) return fail(state.merge ? 'not_imported' : 'owner_edited', 'translation');
+      if (!row) return fail(state.merge && earlierAt === null ? 'not_imported' : 'owner_edited', 'translation');
       const at = Date.parse(row.updated_at);
-      if (!Number.isFinite(at) || at > writtenAt + TRANSLATION_MARGIN_MS) return fail('owner_edited', 'translation');
-      if (at < writtenAt - TRANSLATION_MARGIN_MS) return fail(state.merge ? 'not_imported' : 'owner_edited', 'translation');
+      if (earlierAt !== null) {
+        if (!Number.isFinite(at) || !Number.isFinite(earlierAt) || Math.abs(at - earlierAt) > TRANSLATION_MARGIN_MS) return fail('owner_edited', 'translation');
+      } else {
+        // Within the margin of one of the closed item's writes (a merge rewritten on resume keeps the first write's
+        // rows); after the last one: rewritten since; before the first: a merge's rows the import did not write.
+        const timing = rowTiming(at, writes);
+        if (timing === 'before') return fail(state.merge ? 'not_imported' : 'owner_edited', 'translation');
+        if (timing !== 'at_write') return fail('owner_edited', 'translation');
+      }
       if (row.status !== 'review_needed' || Number(row.translation_version) !== TRANSLATION_VERSION) return fail('owner_edited', 'translation');
       if (row.source_en !== en || row.text_ar !== b[`${sl}_ar`] || row.text_ckb !== b[`${sl}_ckb`]) return fail('owner_edited', 'lang');
       const status = b.kind === 'image' ? 'approved' : 'imported';
@@ -337,7 +376,22 @@ export function proveDescription(state: ContentState, payload: ImportPayload): D
     const s = languageFingerprints(raw as Array<Record<string, unknown>>);
     return changed(a.en !== s.en ? 'en' : a.ar !== s.ar ? 'ar' : a.ckb !== s.ckb ? 'ckb' : 'structure');
   }
+  // A picture the field does not hold carries no record yet (the batch writes its meta and row with it): anything
+  // there is not the import's, and the batch's insert-only row and appended meta key could not be the writer's.
+  for (const b of payload.content_blocks) {
+    if (b.kind !== 'image' || stored.has(b.id)) continue;
+    if (BLOCK_SLOTS.some((sl) => `block:${b.id}:${sl}` in meta || state.translations.has(`block:${b.id}:${sl}`))) return fail('owner_edited', 'meta');
+  }
   return out(true, 'owner_edited', '');
+}
+
+/** Where a translation row's time sits against the import's writes (`TRANSLATION_MARGIN_MS` either side of one). */
+export function rowTiming(at: number, writes: readonly number[]): 'at_write' | 'before' | 'after' | 'between' {
+  if (!Number.isFinite(at) || !writes.length) return 'between';
+  if (writes.some((t) => Math.abs(at - t) <= TRANSLATION_MARGIN_MS)) return 'at_write';
+  if (at < Math.min(...writes) - TRANSLATION_MARGIN_MS) return 'before';
+  if (at > Math.max(...writes) + TRANSLATION_MARGIN_MS) return 'after';
+  return 'between';
 }
 
 /** The description with `inserted` block ids taken out and `order` renumbered: what an undo writes back. */
@@ -372,21 +426,30 @@ const mirroredBox = (payload: ImportPayload): PayloadSpec | undefined =>
  * region; `import_run_id` the closed run), and whether that row is byte for byte the writer's mapping of the rebuilt
  * spec (`boxValueListOf`, a key where the closed run stored the picture or an earlier pass put it) with the same text.
  * A curated list (plain strings), a scope the merge does not map, a row the closed run did not write: `not_imported`;
- * the in-the-box mirror (spec_fields.in_the_box) no longer the row's text: `owner_edited` (a merge: `not_imported`,
- * it filled the mirror only when it was empty); a row not as rebuilt: `owner_edited` / `source_changed` by the page.
+ * the in-the-box mirror (spec_fields.in_the_box) no longer the row's text — or gone where the write mirrored it, or
+ * gone with no evidence of what the write did (`mirrorExpected`) — `owner_edited` (a merge: `not_imported`, it filled
+ * the mirror only when it was empty); a row not as rebuilt: `owner_edited` / `source_changed` by the page.
  */
 export function proveBox(state: ContentState, payload: ImportPayload): BoxProof[] {
   const out: BoxProof[] = [];
   const mirrored = mirroredBox(payload);
+  // The mirror as stored: its text, absent (no key), or not readable. An absent key is the import's only where the
+  // write never mirrored this box (`mirrorExpected` false): one it mirrored and the owner removed since (the form
+  // drops a field outside the section's template when emptied; the JSON editor can too) is not the import's field,
+  // and with no evidence of what the write did an absent key proves nothing.
   let mirror: string | null = null;
   let mirrorBad = false;
+  let mirrorAbsent = false;
   try {
     const sf = JSON.parse(state.specFields || '{}') as unknown;
-    if (isObj(sf) && sf.in_the_box !== undefined) mirror = typeof sf.in_the_box === 'string' ? sf.in_the_box : null;
-    if (isObj(sf) && sf.in_the_box !== undefined && typeof sf.in_the_box !== 'string') mirrorBad = true;
+    if (!isObj(sf)) mirrorBad = true;
+    else if (!Object.prototype.hasOwnProperty.call(sf, 'in_the_box')) mirrorAbsent = true;
+    else if (typeof sf.in_the_box === 'string') mirror = sf.in_the_box;
+    else mirrorBad = true;
   } catch {
     mirrorBad = true;
   }
+  const mirrorLost = mirrorAbsent && state.mirrorExpected !== false;
   const changed = unchangedPage(state, payload) ? 'owner_edited' : 'source_changed';
   for (const s of payload.specs) {
     if (s.key !== 'package.contents' || !s.value_list.some(isObj)) continue;
@@ -443,7 +506,7 @@ export function proveBox(state: ContentState, payload: ImportPayload): BoxProof[
       out.push({ ...p, label: changed, reason: 'row_text' });
       continue;
     }
-    if (s === mirrored && (mirrorBad || (mirror !== null && mirror !== s.value_text.trim().slice(0, 2000)))) {
+    if (s === mirrored && (mirrorBad || mirrorLost || (mirror !== null && mirror !== s.value_text.trim().slice(0, 2000)))) {
       out.push({ ...p, label: state.merge ? 'not_imported' : 'owner_edited', reason: 'mirror' });
       continue;
     }
@@ -478,8 +541,9 @@ export interface ContentPlan {
 }
 
 /**
- * Pure: the plan of a content item over its state and the rebuilt payload. A product that is not public (hidden, or
- * gone) gets nothing (`product_not_public`); every other failed medium is placed by the payload — a description
+ * Pure: the plan of a content item over its state and the rebuilt payload. A product that is not public (hidden, held
+ * by the owner's completeness switch — `active` is the storefront's own test, complete.ts shownToCustomers — or gone)
+ * gets nothing (`product_not_public`); every other failed medium is placed by the payload — a description
  * picture at its image block, an in-the-box picture at every item showing it — and planned only where its field is
  * provable; what the field already holds is `already_present`, what an earlier pass put there and the field no longer
  * holds is `owner_removed` (never put back).
@@ -561,6 +625,7 @@ export interface ContentContext {
   /** The product's slug as it stands now (the owner may have renamed it), else the closed item's. */
   slug: string;
   merge: boolean;
+  /** The storefront shows the product (active, and not held for a catalog-blocking gap: complete.ts shownToCustomers). */
   active: boolean;
   /** The product the closed run wrote is gone, or no longer carries the source. */
   gone: boolean;
@@ -581,7 +646,10 @@ export interface ContentCheckpoint {
   reasons: Record<string, string>;
   inserted: { blocks: Array<{ id: string; r2_key: string }>; box: Array<{ row_id: string; index: number; r2_key: string }> };
   fp: { before: { en: string; ar: string; ckb: string } | null; after: { en: string; ar: string; ckb: string } | null };
-  sha: { t0: string; t1: string; box: Array<{ row_id: string; v0: string; v1: string }> };
+  /** sha256 of each field before and after: the description, translation_meta (m: '' when not written), each box row. */
+  sha: { t0: string; t1: string; m0: string; m1: string; box: Array<{ row_id: string; v0: string; v1: string }> };
+  /** The exact text the batch appended to translation_meta (the new pictures' alt entries; '' when none). */
+  meta_added: string;
   stored_not_written: number;
 }
 
@@ -651,10 +719,11 @@ export async function contentContext(db: D1Database, item: ItemRow): Promise<Con
   const productId = ref.product_id;
   const rowBytes = Object.values(product).reduce<number>((n, v) => n + (typeof v === 'string' ? utf8(v) : v === null ? 0 : 8), 0);
   const { results: conflicts } = await db.prepare('SELECT kind, field FROM catalog_import_conflicts WHERE item_id = ?').bind(closed.id).all<{ kind: string; field: string }>();
-  const written = await db
-    .prepare("SELECT MAX(at) AS at FROM catalog_import_events WHERE item_id = ? AND stage = 'WRITTEN' AND outcome = 'ok'")
+  const { results: writtenRows } = await db
+    .prepare("SELECT at FROM catalog_import_events WHERE item_id = ? AND stage = 'WRITTEN' AND outcome = 'ok' ORDER BY at")
     .bind(closed.id)
-    .first<{ at: string | null }>();
+    .all<{ at: string }>();
+  const writtenTimes = (writtenRows ?? []).map((r) => String(r.at ?? '')).filter((at) => Number.isFinite(Date.parse(at)));
   const { results: media } = await db
     .prepare('SELECT source_media_id, status, r2_key FROM catalog_import_media WHERE run_id = ? AND source_product_id = ?')
     .bind(mark.fromRun, item.source_product_id)
@@ -676,14 +745,21 @@ export async function contentContext(db: D1Database, item: ItemRow): Promise<Con
     .all<BoxRow>();
   // What every earlier content pass put in for this product (any closed run's pass: the fields are the product's).
   const { results: earlierItems } = await db
-    .prepare(`SELECT stage_data, levonis_product_id FROM catalog_import_items WHERE run_id <> ? AND source = 'bambu_us' AND source_product_id = ? AND discovery_sources LIKE '%"content_media:%'`)
+    .prepare(
+      `SELECT i.stage_data, i.levonis_product_id,
+              (SELECT MAX(e.at) FROM catalog_import_events e WHERE e.item_id = i.id AND e.stage = 'WRITTEN' AND e.outcome = 'ok') AS written_at
+         FROM catalog_import_items i WHERE i.run_id <> ? AND i.source = 'bambu_us' AND i.source_product_id = ? AND i.discovery_sources LIKE '%"content_media:%'`
+    )
     .bind(item.run_id, item.source_product_id)
-    .all<{ stage_data: string; levonis_product_id: string }>();
-  const earlier: EarlierInserted = { blocks: new Map(), box: new Map() };
+    .all<{ stage_data: string; levonis_product_id: string; written_at: string | null }>();
+  const earlier: EarlierInserted = { blocks: new Map(), box: new Map(), writtenAt: new Map() };
   for (const e of earlierItems ?? []) {
     if (e.levonis_product_id && e.levonis_product_id !== productId) continue;
     const ins = insertedOf(e.stage_data);
-    for (const b of ins.blocks) earlier.blocks.set(b.id, b.r2_key);
+    for (const b of ins.blocks) {
+      earlier.blocks.set(b.id, b.r2_key);
+      earlier.writtenAt.set(b.id, String(e.written_at ?? ''));
+    }
     for (const b of ins.box) earlier.box.set(`${b.row_id}#${b.index}`, b.r2_key);
   }
   let writtenBlocks: number | null = null;
@@ -694,18 +770,24 @@ export async function contentContext(db: D1Database, item: ItemRow): Promise<Con
     writtenBlocks = null;
   }
   const target = readbackTargetOf(closed.stage_data);
-  const targetBlocks = target && isObj(target.doc) && Array.isArray((target.doc as unknown as Record<string, unknown>).content_blocks) ? JSON.stringify((target.doc as unknown as Record<string, unknown>).content_blocks) : null;
+  const targetDoc = target && isObj(target.doc) ? (target.doc as unknown as Record<string, unknown>) : null;
+  const targetBlocks = targetDoc && Array.isArray(targetDoc.content_blocks) ? JSON.stringify(targetDoc.content_blocks) : null;
+  const targetMirror = targetDoc && isObj(targetDoc.spec_fields) ? Object.prototype.hasOwnProperty.call(targetDoc.spec_fields, 'in_the_box') : null;
+  // localizeRespectingAuthored's src_rev for an authored slot: the document's content_rev (the model reads 1 when unset).
+  const rev = typeof product.content_rev === 'number' && Number.isInteger(product.content_rev) && product.content_rev >= 0 ? product.content_rev : 1;
   const state: ContentState = {
     productId,
     merge,
     t0: typeof product.content_blocks === 'string' ? product.content_blocks : '',
     m0: typeof product.translation_meta === 'string' ? product.translation_meta : '',
     specFields: typeof product.spec_fields === 'string' ? product.spec_fields : '',
+    srcRev: Math.max(0, rev),
     fingerprint: String(ref.fingerprint ?? ''),
     keptExisting: (conflicts ?? []).some((c) => c.kind === 'field_kept_existing' && c.field === 'content_blocks'),
     headConflict: (conflicts ?? []).some((c) => c.kind === 'image_review' && c.field === 'media.not_stored'),
     writtenBlocks,
-    writtenAt: String(written?.at ?? ''),
+    writtenAt: writtenTimes[writtenTimes.length - 1] ?? '',
+    writtenTimes,
     readbackBlocks: targetBlocks,
     closedMedia: new Map((media ?? []).map((m) => [String(m.source_media_id), { status: m.status, r2_key: String(m.r2_key ?? '') }])),
     translations: new Map((translations ?? []).map((t) => [t.field, t])),
@@ -713,13 +795,14 @@ export async function contentContext(db: D1Database, item: ItemRow): Promise<Con
     earlier,
     mapping: null,
     mergeOk: !merge,
+    mirrorExpected: targetMirror,
   };
   return {
     ...base,
     productId,
     slug: String(product.slug ?? closed.slug ?? ''),
     merge,
-    active: product.status === 'active',
+    active: product.status === 'active' && (await shownToCustomers(db, productId)),
     gone: false,
     state,
     rowBytes,
@@ -727,14 +810,35 @@ export async function contentContext(db: D1Database, item: ItemRow): Promise<Con
   };
 }
 
-/** A merge's reviewed map applied to the product as it stands (the box rows of a value or variant scope). */
-async function withMapping(db: D1Database, ctx: ContentContext, payload: ImportPayload, bundle: Pick<ReviewedBundle, 'matches'>, sid: string): Promise<void> {
-  if (!ctx.state || !ctx.merge) return;
-  const match = bundle.matches.bySourceId.get(sid) ?? null;
-  const ok = !!match && (match.decision === 'merge' || match.decision === 'merge_publish') && match.levonis_product_id === ctx.productId;
-  const rel = ok ? await loadRelationsResponse(db, ctx.productId) : null;
-  ctx.state.mergeOk = ok && !!rel;
-  ctx.state.mapping = ok && rel ? mergeMapping(payload, match!, rel) : null;
+/** What the proof reads of the reviewed bundle: the matches, the placement map and the manifest. */
+export type ContentBundle = Pick<ReviewedBundle, 'matches' | 'taxonomy' | 'manifest'>;
+
+/**
+ * What the proof needs of the reviewed bundle: a merge's reviewed map applied to the product as it stands (the box
+ * rows of a value or variant scope), and — when no readback target says it — whether the write mirrored the box into
+ * `spec_fields.in_the_box`: the writer's own `specFieldMirror` over the rebuilt rows under the template of the
+ * placement the row was reviewed for (the reviewed manifest row; a delta's new product: the store route its row was
+ * built from), as D1 holds it. A placement D1 no longer resolves leaves it unknown.
+ */
+export async function withReviewed(db: D1Database, ctx: ContentContext, payload: ImportPayload, bundle: ContentBundle, item: Pick<ItemRow, 'id' | 'source_product_id' | 'handle'>): Promise<void> {
+  if (!ctx.state) return;
+  if (ctx.merge) {
+    const match = bundle.matches.bySourceId.get(item.source_product_id) ?? null;
+    const ok = !!match && (match.decision === 'merge' || match.decision === 'merge_publish') && match.levonis_product_id === ctx.productId;
+    const rel = ok ? await loadRelationsResponse(db, ctx.productId) : null;
+    ctx.state.mergeOk = ok && !!rel;
+    ctx.state.mapping = ok && rel ? mergeMapping(payload, match!, rel) : null;
+  }
+  if (ctx.state.mirrorExpected !== null || !mirroredBox(payload)) return;
+  const reviewed = bundle.manifest.bySourceId.get(item.source_product_id);
+  let tax = reviewed && reviewed.handle === item.handle ? taxonomyOfRow(bundle, reviewed) : null;
+  if (!reviewed) {
+    const row = await db.prepare('SELECT breadcrumbs FROM catalog_import_items WHERE id = ?').bind(item.id).first<{ breadcrumbs: string }>();
+    const route = String(row?.breadcrumbs ?? '');
+    tax = route ? taxonomyOfRow(bundle, { handle: item.handle, currentAllIdRoute: route }) : null;
+  }
+  const template = tax ? await placementTemplate(db, tax) : null;
+  if (template) ctx.state.mirrorExpected = specFieldMirror(payload.specs, template.family, template.slugs).in_the_box !== undefined;
 }
 
 // ---------------------------------------------------------------- the payload
@@ -806,7 +910,7 @@ export const CONTENT_PLAN_STATES = new Set(['VALIDATING', 'INGESTING_MEDIA', 'WR
 export async function planContentMedia(
   db: D1Database,
   item: ItemRow,
-  bundle: Pick<ReviewedBundle, 'matches'>,
+  bundle: ContentBundle,
   raw: unknown,
   moot?: unknown
 ): Promise<{ payload_sha256: string; media: ContentRequest[]; skipped: ContentCounts; failed: number; stored_not_written: number }> {
@@ -820,7 +924,7 @@ export async function planContentMedia(
     plan = { outcomes: new Map(ctx.failed.map((f) => [f.source_media_id, moot as ContentOutcome])), reasons: new Map(), requests: [], description: null, box: [], occurrences: new Map(), storedNotWritten: 0 };
   } else {
     const payload = contentPayloadOf(raw, item, ctx);
-    await withMapping(db, ctx, payload, bundle, item.source_product_id);
+    await withReviewed(db, ctx, payload, bundle, item);
     sha = payloadSha256(payload);
     plan = planContent(ctx.state, payload, ctx.failed, ctx.active && !ctx.gone);
   }
@@ -860,8 +964,49 @@ export interface ContentWrite {
   inserted: ContentCheckpoint['inserted'];
   t0: string;
   t1: string | null;
+  /** translation_meta as read, and with the new pictures' alt entries appended (null when the description is not written). */
+  m0: string;
+  m1: string | null;
+  /** The review_needed row of each new picture's alt slot, as the writer writes it (inserted, never upserted). */
+  altRows: AltRow[];
   boxWrites: Array<{ rowId: string; v0: string; v1: string }>;
   checkpoint: ContentCheckpoint;
+}
+
+/** A new picture's alt translation row (writer.ts translationRows: `review_needed`, this translation version). */
+export interface AltRow {
+  field: string;
+  source_en: string;
+  source_hash: string;
+  text_ar: string;
+  text_ckb: string;
+}
+
+/**
+ * `m0` with `entries` appended, every byte of `m0` kept (its own keys, order and spacing): the meta the batch writes.
+ * null when `m0` is not a JSON object, or already names one of the keys (the proof refuses both before).
+ */
+export function metaWith(m0: string, entries: Readonly<Record<string, unknown>>): { text: string; added: string } | null {
+  const keys = Object.keys(entries);
+  const base = m0.trim() === '' ? '{}' : m0;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(base);
+  } catch {
+    return null;
+  }
+  if (!isObj(parsed) || keys.some((k) => Object.prototype.hasOwnProperty.call(parsed, k))) return null;
+  if (!keys.length) return { text: m0, added: '' };
+  const end = base.lastIndexOf('}');
+  const body = keys.map((k) => `${JSON.stringify(k)}:${JSON.stringify(entries[k])}`).join(',');
+  const added = `${Object.keys(parsed).length ? ',' : ''}${body}`;
+  const text = `${base.slice(0, end)}${added}${base.slice(end)}`;
+  try {
+    if (canonicalJson(JSON.parse(text)) !== canonicalJson({ ...parsed, ...entries })) return null;
+  } catch {
+    return null;
+  }
+  return { text, added };
 }
 
 /** The new keys of the planned media: this run's own stored rows whose object R2 holds as WebP. */
@@ -892,8 +1037,12 @@ export function contentWriteOf(state: ContentState | null, payload: ImportPayloa
   const reasons = new Map(plan.reasons);
   const inserted: ContentCheckpoint['inserted'] = { blocks: [], box: [] };
   let t1: string | null = null;
+  let m1: string | null = null;
+  let metaAdded = '';
+  const altRows: AltRow[] = [];
   const boxWrites: ContentWrite['boxWrites'] = [];
   const t0 = state?.t0 ?? '';
+  const m0 = state?.m0 ?? '';
   let fpAfter: ContentCheckpoint['fp']['after'] = null;
   const bad = () => new OpsRefusal(500, 'IMPORT_INTERNAL');
   if (state && payload) {
@@ -927,13 +1076,30 @@ export function contentWriteOf(state: ContentState | null, payload: ImportPayloa
         if (b.kind !== 'image' || !k || b.url !== `/files/${k}` || b.media_key !== k || b.alt_en !== alt.en || b.alt_ar !== alt.ar || b.alt_ckb !== ckbNotCopy(alt.ar, alt.ckb)) throw bad();
       }
       if (blocks.filter((b) => insertedIds.has(b.id)).length !== added.size) throw bad();
-      if (rowBytes - utf8(t0) + utf8(text) > PRODUCT_ROW_LIMIT) {
+      // The writer's bookkeeping of each new picture's alt, as for its own pictures (writer.ts: an authored override):
+      // `approved` for Arabic and Sorani at the document's src_rev, appended to the meta as read (every byte of it
+      // kept), and the slot's review_needed row. Without them the owner's next save would put the English title in
+      // place of the authored Arabic and Sorani alt, and every later pass would read the field as edited.
+      const entries: Record<string, unknown> = {};
+      const rows: AltRow[] = [];
+      for (const b of blocks) {
+        if (!insertedIds.has(b.id) || !b.alt_en.trim()) continue;
+        const field = `block:${b.id}:alt`;
+        entries[field] = { ar: { status: 'approved', src_rev: state.srcRev }, ckb: { status: 'approved', src_rev: state.srcRev } };
+        rows.push({ field, source_en: b.alt_en, source_hash: hashSource(b.alt_en), text_ar: b.alt_ar, text_ckb: b.alt_ckb });
+      }
+      const meta = metaWith(m0, entries);
+      if (!meta) throw bad();
+      if (rowBytes - utf8(t0) + utf8(text) - utf8(m0) + utf8(meta.text) > PRODUCT_ROW_LIMIT) {
         for (const sid of added.keys()) {
           outcomes.set(sid, 'not_stored');
           reasons.set(sid, 'row_size');
         }
       } else {
         t1 = text;
+        m1 = meta.text;
+        metaAdded = meta.added;
+        altRows.push(...rows);
         for (const [sid, k] of added) {
           outcomes.set(sid, 'attached');
           const b = payload.content_blocks.find((x) => x.kind === 'image' && x.source_media_id === sid)!;
@@ -996,10 +1162,17 @@ export function contentWriteOf(state: ContentState | null, payload: ImportPayloa
     reasons: Object.fromEntries(reasons),
     inserted,
     fp: { before: fpBefore, after: fpAfter },
-    sha: { t0: sha256Hex(t0), t1: t1 === null ? '' : sha256Hex(t1), box: boxWrites.map((w) => ({ row_id: w.rowId, v0: sha256Hex(w.v0), v1: sha256Hex(w.v1) })) },
+    sha: {
+      t0: sha256Hex(t0),
+      t1: t1 === null ? '' : sha256Hex(t1),
+      m0: m1 === null ? '' : sha256Hex(m0),
+      m1: m1 === null ? '' : sha256Hex(m1),
+      box: boxWrites.map((w) => ({ row_id: w.rowId, v0: sha256Hex(w.v0), v1: sha256Hex(w.v1) })),
+    },
+    meta_added: metaAdded,
     stored_not_written: plan.storedNotWritten,
   };
-  return { counts, media, reasons: Object.fromEntries(reasons), inserted, t0, t1, boxWrites, checkpoint };
+  return { counts, media, reasons: Object.fromEntries(reasons), inserted, t0, t1, m0, m1, altRows, boxWrites, checkpoint };
 }
 
 /**
@@ -1008,7 +1181,7 @@ export function contentWriteOf(state: ContentState | null, payload: ImportPayloa
  * nothing and moves on the same way. A batch the guard aborts (a field changed between the read and the batch) is
  * decided once more on a fresh read while the item still holds this lease at WRITING; a second abort is transient.
  */
-export async function attachContentMedia(env: ContentEnv, run: ImportRun, item: ItemRow, bundle: Pick<ReviewedBundle, 'matches'>, body: Record<string, unknown>): Promise<ContentAttachAnswer> {
+export async function attachContentMedia(env: ContentEnv, run: ImportRun, item: ItemRow, bundle: ContentBundle, body: Record<string, unknown>): Promise<ContentAttachAnswer> {
   const db = env.DB;
   if (item.processing_state !== 'WRITING') throw new OpsRefusal(409, 'IMPORT_ILLEGAL_TRANSITION', [item.id]);
   if (typeof body.payload_sha256 !== 'string' || body.payload_sha256 !== item.payload_sha256) throw new OpsRefusal(409, 'IMPORT_NOT_STAGED', [item.id]);
@@ -1025,7 +1198,7 @@ export async function attachContentMedia(env: ContentEnv, run: ImportRun, item: 
     } else {
       const payload = contentPayloadOf(body.payload, item, ctx);
       if (payloadSha256(payload) !== item.payload_sha256) throw new OpsRefusal(409, 'IMPORT_NOT_STAGED', [item.id]);
-      await withMapping(db, ctx, payload, bundle, item.source_product_id);
+      await withReviewed(db, ctx, payload, bundle, item);
       const plan = planContent(ctx.state, payload, ctx.failed, ctx.active && !ctx.gone);
       const keys = await newKeysOf(env, run.id, item, plan);
       write = contentWriteOf(ctx.state, payload, plan, keys, ctx.rowBytes);
@@ -1061,7 +1234,9 @@ export async function attachContentMedia(env: ContentEnv, run: ImportRun, item: 
  *      read, its block translation rows unchanged (count and latest time);
  *   2. per touched box row, the guard fenced on that row's text (one statement each, so no statement nears D1's 100
  *      parameters however many rows);
- *   3. the description: `content_blocks` compare-and-set, `updated_at` bumped (an editor opened before reloads);
+ *   3. the description: `content_blocks` and `translation_meta` compare-and-set on the texts read (the meta gains
+ *      only the new pictures' alt entries, appended), `updated_at` bumped (an editor opened before reloads); each new
+ *      picture's alt `review_needed` translation row, inserted (never upserted) — what the writer gives its own;
  *   4. per touched box row: its `value_list` compare-and-set, nothing else of it;
  *   5. the lease-fenced WRITTEN event; the checkpoint; the guard row removed.
  *
@@ -1072,7 +1247,7 @@ export function contentBatch(
   run: Pick<ImportRun, 'id' | 'github_run_id'>,
   item: Pick<ItemRow, 'id' | 'lease_token' | 'payload_sha256'>,
   ctx: Pick<ContentContext, 'productId' | 'slug' | 'mark' | 'state' | 'translationsDigest'>,
-  w: Pick<ContentWrite, 't0' | 't1' | 'boxWrites' | 'inserted' | 'counts' | 'checkpoint'>
+  w: Pick<ContentWrite, 't0' | 't1' | 'm0' | 'm1' | 'altRows' | 'boxWrites' | 'inserted' | 'counts' | 'checkpoint'>
 ): D1PreparedStatement[] {
   const writes = w.t1 !== null || w.boxWrites.length > 0;
   const state = ctx.state;
@@ -1103,9 +1278,24 @@ export function contentBatch(
       );
     }
     if (w.t1 !== null) {
+      if (w.m1 === null) throw new OpsRefusal(500, 'IMPORT_INTERNAL');
       statements.push(
-        db.prepare(`UPDATE products SET content_blocks = ?1, updated_at = ${NOW_SQL} WHERE id = ?2 AND content_blocks IS ?3`).bind(w.t1, ctx.productId, w.t0)
+        db
+          .prepare(`UPDATE products SET content_blocks = ?1, translation_meta = ?2, updated_at = ${NOW_SQL} WHERE id = ?3 AND content_blocks IS ?4 AND translation_meta IS ?5`)
+          .bind(w.t1, w.m1, ctx.productId, w.t0, w.m0)
       );
+      // Insert-only: the proof found no row for a new picture's slot and the guard fenced the rows as read; a row there
+      // now fails the whole batch on the key, never overwritten.
+      for (const r of w.altRows) {
+        statements.push(
+          db
+            .prepare(
+              `INSERT INTO product_translations (product_id, field, source_en, source_hash, text_ar, text_ckb, status, translation_version)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'review_needed', ?7)`
+            )
+            .bind(ctx.productId, r.field, r.source_en, r.source_hash, r.text_ar, r.text_ckb, TRANSLATION_VERSION)
+        );
+      }
     }
     for (const b of w.boxWrites) {
       statements.push(
@@ -1242,7 +1432,8 @@ export async function completeContentMedia(
     const x = listOf.get(b.row_id)![b.index] as Record<string, unknown>;
     return r.visibility === 'public' && Number(r.live) === 1 && isSpecStatus(r.status) && b.index < 100 && typeof x.text === 'string' && x.text.trim() !== '';
   });
-  const shown = product?.status === 'active';
+  // Shown as the storefront decides (catalog hold included): a product hidden or held since the attach is not expected.
+  const shown = product?.status === 'active' && (await shownToCustomers(db, item.levonis_product_id));
   let objects = 0;
   const keys = [...new Set([...keptBlocks.map((b) => b.r2_key), ...keptBox.map((b) => b.r2_key)])];
   for (const key of keys) {
@@ -1319,18 +1510,41 @@ export async function completeContentMedia(
 
 /**
  * Pure: what undoing an item's content pass would write, from its checkpoint and the fields as they stand: the
- * description without the inserted blocks (orders renumbered) — only when that gives back exactly the text the pass
- * replaced (its sha256) — and each box row without the keys it added, under the same proof. null for a field that
- * moved since (an undo is then the owner's decision, never automatic).
+ * description without the inserted blocks (orders renumbered) and translation_meta without the entries it appended —
+ * only when both give back exactly the texts the pass replaced (their sha256), and then the alt rows it inserted to
+ * delete — and each box row without the keys it added, under the same proof. null for a field that moved since (an
+ * undo is then the owner's decision, never automatic).
  */
 export function contentUndoOf(
-  checkpoint: Pick<ContentCheckpoint, 'inserted' | 'sha'>,
-  fields: { content_blocks: string; rows: ReadonlyMap<string, string> }
-): { content_blocks: string | null; rows: Array<{ row_id: string; from: string; to: string }> } {
+  checkpoint: Pick<ContentCheckpoint, 'inserted' | 'sha'> & Partial<Pick<ContentCheckpoint, 'meta_added'>>,
+  fields: { content_blocks: string; translation_meta?: string; rows: ReadonlyMap<string, string> }
+): {
+  content_blocks: string | null;
+  translation_meta: string | null;
+  /** The alt rows the pass inserted, to delete with the description (only when it is undone). */
+  translations: string[];
+  rows: Array<{ row_id: string; from: string; to: string }>;
+} {
   let content: string | null = null;
+  let meta: string | null = null;
+  let translations: string[] = [];
   if (checkpoint.inserted.blocks.length && checkpoint.sha.t1 && sha256Hex(fields.content_blocks) === checkpoint.sha.t1) {
     const back = undoBlocks(fields.content_blocks, new Set(checkpoint.inserted.blocks.map((b) => b.id)));
-    if (sha256Hex(back) === checkpoint.sha.t0) content = back;
+    // The meta the pass appended to goes back with it, under the same proof (both fields or neither).
+    const added = checkpoint.meta_added ?? '';
+    const now = fields.translation_meta ?? '';
+    let metaBack: string | null = null;
+    if (!checkpoint.sha.m1) metaBack = '';
+    else if (sha256Hex(now) === checkpoint.sha.m1 && added && now.lastIndexOf(added) >= 0) {
+      const i = now.lastIndexOf(added);
+      const m = `${now.slice(0, i)}${now.slice(i + added.length)}`;
+      if (sha256Hex(m) === checkpoint.sha.m0) metaBack = m;
+    }
+    if (sha256Hex(back) === checkpoint.sha.t0 && metaBack !== null) {
+      content = back;
+      meta = checkpoint.sha.m1 ? metaBack : null;
+      translations = checkpoint.sha.m1 ? checkpoint.inserted.blocks.map((b) => `block:${b.id}:alt`) : [];
+    }
   }
   const rows: Array<{ row_id: string; from: string; to: string }> = [];
   for (const w of checkpoint.sha.box) {
@@ -1346,5 +1560,5 @@ export function contentUndoOf(
     const back = JSON.stringify(list);
     if (sha256Hex(back) === w.v0) rows.push({ row_id: w.row_id, from: now, to: back });
   }
-  return { content_blocks: content, rows };
+  return { content_blocks: content, translation_meta: meta, translations, rows };
 }

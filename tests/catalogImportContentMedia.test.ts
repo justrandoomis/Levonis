@@ -39,9 +39,13 @@ import {
   planContentMedia,
   proveBox,
   proveDescription,
+  withReviewed,
   type ContentCheckpoint,
 } from '../worker/lib/catalogImport/contentMedia';
 import { contentOnlyPayload, resumeTargetOf } from '../scripts/bambu-import/run';
+import { parseProductRow } from '../worker/lib/productModel';
+import { localizeRespectingAuthored, planProductSave, saveProductAtomic } from '../worker/lib/productPersistence';
+import { payloadSha256 } from '../worker/lib/catalogImport/reviewed';
 
 const RUN_B = 'cir_bbbbbbbbbbbbbbbbbbbbbbbb';
 const RUN_C = 'cir_cccccccccccccccccccccccc';
@@ -192,7 +196,7 @@ const checkpointOf = (w: World, runId: string, sid: string) => JSON.parse((w.raw
 
 // ---------------------------------------------------------------- the write
 
-test('a content item puts the failed description and box pictures where the import meant them; only content_blocks, updated_at and the box row move; T1 is the writer\'s own field with every picture stored; the undo gives T0 back', async () => {
+test('a content item puts the failed description and box pictures where the import meant them; only content_blocks (with its meta and the new alt rows), updated_at and the box row move; T1, its meta and rows are the writer\'s own with every picture stored; the undo gives T0 back', async () => {
   const { w, sid, productId, failed, payload } = await closedRun(AMS(), PICK_AMS);
   const before = dump(w, productId);
   const t0 = productRow(w, productId).content_blocks;
@@ -203,7 +207,12 @@ test('a content item puts the failed description and box pictures where the impo
   assert.equal(a.counts.attached, 3);
   assert.deepEqual([a.counts.blocks, a.counts.box], [2, 1]);
   const after = dump(w, productId);
-  assert.deepEqual(moved(before, after), ['products.content_blocks', 'products.updated_at', 'specs.value_list']);
+  // The description, its translation meta (the new pictures' alt entries appended) and the new pictures' alt rows.
+  assert.deepEqual(moved(before, after), ['products.content_blocks', 'products.translation_meta', 'products.updated_at', 'specs.value_list', 'translations:rows']);
+  const m0 = String(before.products[0].translation_meta);
+  const m1 = productRow(w, productId).translation_meta;
+  assert.ok(m1.startsWith(m0.slice(0, -1)), 'every byte of the meta read is kept; the entries are appended');
+  assert.equal(after.translations.length, before.translations.length + 2);
   // The box row: the same items, the failed one now with its key, nothing else.
   const v1 = boxRow(w, productId);
   const x0 = JSON.parse(v0[0].value_list) as Array<Record<string, unknown>>;
@@ -241,14 +250,24 @@ test('a content item puts the failed description and box pictures where the impo
       .run(RUN_ID, sid, id, key);
   }
   await write(b, s);
-  const written = (b.raw.prepare('SELECT content_blocks, spec_fields FROM products WHERE id = ?').get(productId) as { content_blocks: string }).content_blocks;
-  assert.equal(t1, written, 'T1 is byte for byte the writer\'s field with every picture stored');
+  const written = b.raw.prepare('SELECT content_blocks, translation_meta FROM products WHERE id = ?').get(productId) as { content_blocks: string; translation_meta: string };
+  assert.equal(t1, written.content_blocks, 'T1 is byte for byte the writer\'s field with every picture stored');
   assert.deepEqual(boxRow(b, productId).map((r) => r.value_list), v1.map((r) => r.value_list), 'the box row too');
+  // The bookkeeping too: the same meta entries (the alt approved at the same src_rev) and the same block rows.
+  const canon = (t: string) => JSON.stringify(Object.entries(JSON.parse(t) as Record<string, unknown>).sort(([a], [z]) => (a < z ? -1 : 1)));
+  assert.equal(canon(m1), canon(written.translation_meta), 'the meta is the writer\'s');
+  const blockRows = (x: World) =>
+    x.raw.prepare("SELECT field, source_en, source_hash, text_ar, text_ckb, status, translation_version FROM product_translations WHERE product_id = ? AND field LIKE 'block:%' ORDER BY field").all(productId);
+  assert.deepEqual(blockRows(w), blockRows(b), 'the block translation rows are the writer\'s');
 
-  // Reversible: the undo of the checkpoint gives T0 and V0 back exactly.
-  const undo = contentUndoOf(cp, { content_blocks: t1, rows: new Map(v1.map((r) => [r.id, r.value_list])) });
+  // Reversible: the undo of the checkpoint gives T0, M0 and V0 back exactly, and names the rows it inserted.
+  const undo = contentUndoOf(cp, { content_blocks: t1, translation_meta: m1, rows: new Map(v1.map((r) => [r.id, r.value_list])) });
   assert.equal(undo.content_blocks, t0);
+  assert.equal(undo.translation_meta, m0);
+  assert.deepEqual(undo.translations.sort(), cp.inserted.blocks.map((x) => `block:${x.id}:alt`).sort());
   assert.deepEqual(undo.rows.map((r) => r.to), v0.map((r) => r.value_list));
+  // An owner's change to the meta since: no automatic undo of the description either.
+  assert.equal(contentUndoOf(cp, { content_blocks: t1, translation_meta: `${m1} `, rows: new Map() }).content_blocks, null);
 });
 
 test('VERIFY: COMPLETE on the public answers the item needed; only blocks inserted needs no knowledge answer; a box row the owner hid since is not expected', async () => {
@@ -285,7 +304,7 @@ test('only description pictures inserted: COMPLETE with no knowledge answer at a
 
 // ---------------------------------------------------------------- idempotency and never putting back
 
-test('a second pass after an attach: the inserted blocks (no meta, no row) still prove the field; the picture that failed again is taken and attached; then nothing is queued', async () => {
+test('a second pass after an attach: the inserted blocks (their alt meta and row as the batch wrote them) still prove the field; the picture that failed again is taken and attached; then nothing is queued', async () => {
   const { w, sid, productId, failed, payload } = await closedRun(AMS(), PICK_AMS);
   const again = failed[1].id;
   const first = await pass(w, RUN_B, sid, payload, { skip: (id) => id === again });
@@ -307,6 +326,30 @@ test('a second pass after an attach: the inserted blocks (no meta, no row) still
   const r = await acceptDeltaRows(w.db, runOf(RUN_E), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'content', source_product_id: sid, discovered_at: AT }] });
   assert.deepEqual([r.content, r.skipped.content_already_settled], [0, 1]);
   void productId;
+});
+
+test('an owner\'s unchanged save after a pass keeps every picture\'s authored Arabic and Sorani alt, and the field stays provable: a later pass takes the picture that failed again', async () => {
+  const { w, sid, productId, failed, payload } = await closedRun(AMS(), PICK_AMS);
+  await pass(w, RUN_B, sid, payload, { skip: (id) => id === failed[1].id });
+  const cp = checkpointOf(w, RUN_B, sid);
+  // The admin route's save (adminProducts.ts): the localiser over the stored document with nothing typed, the plan, the batch.
+  const stored = w.raw.prepare('SELECT * FROM products WHERE id = ?').get(productId) as Record<string, unknown>;
+  const doc = parseProductRow(stored);
+  const prev = parseProductRow(stored);
+  const localized = localizeRespectingAuthored(doc, prev, {});
+  const slot = `block:${cp.inserted.blocks[0].id}:alt`;
+  assert.deepEqual(localized.kept.filter((k) => k.startsWith(slot)).sort(), [`${slot}.ar`, `${slot}.ckb`], 'the inserted alt is authored: its stored copy is kept');
+  const plan = await planProductSave(w.db, { mode: 'update', doc, prev, relations: null as never, actor: { adminId: 'owner', money: false }, translations: localized.fields } as Parameters<typeof planProductSave>[1]);
+  await saveProductAtomic(w.db, plan);
+  const now = productRow(w, productId);
+  assert.equal(now.content_blocks, stored.content_blocks, 'the save leaves the description byte for byte');
+  assert.equal(now.translation_meta, stored.translation_meta, 'and its meta');
+  const ins = (JSON.parse(now.content_blocks) as Array<Record<string, unknown>>).find((b) => b.id === cp.inserted.blocks[0].id)!;
+  assert.deepEqual([ins.alt_ar, ins.alt_ckb], [`صورة ${payload.product.title_en}`, `وێنەی ${payload.product.title_en}`]);
+  w.raw.prepare("UPDATE catalog_import_runs SET state = 'closed' WHERE id = ?").run(RUN_B);
+  const second = await pass(w, RUN_C, sid, payload);
+  assert.deepEqual(second.plan.media.map((m) => m.source_media_id), [failed[1].id], 'not owner_edited: the retry is still taken');
+  assert.equal(second.a.counts.attached, 1);
 });
 
 test('what an earlier pass put in and the owner removed is never put back (owner_removed); the field is then not the import\'s for the rest', async () => {
@@ -444,6 +487,46 @@ test('a merge: the description it kept (the owner\'s own) is not_imported; one i
   }
 });
 
+test('a merge rewritten on resume an hour after its first write (VERIFY failed): the description it filled is still provable — its rows are dated by the first write, any of the item\'s writes counts', async () => {
+  const w = newWorld();
+  w.raw.prepare(`INSERT INTO products (id, slug, name, name_ar, name_ku, status, price_iqd, category_id, options, colors, images, content_blocks)
+    VALUES ('p_amsm', 'ams-2-pro-m', 'AMS 2 Pro', 'AMS 2 Pro', 'AMS 2 Pro', 'active', 0, 'cat_printers', '[]', '[]', '[]', '[]')`).run();
+  const x = buildFor(w, AMS(), { writeMode: 'merge', mergeProductId: 'p_amsm' }).payload;
+  w.matches.push({ source_product_id: x.source_product_id, source_handle: x.handle, levonis_product_id: 'p_amsm', decision: 'merge', value_map: {}, unmapped_variants: [], reason: 'same_model', reviewed_by: 't', reviewed_at: 'd' } as never);
+  const failed = PICK_AMS(buildFor(w, AMS(), { writeMode: 'merge', mergeProductId: 'p_amsm' }).payload);
+  const ids = new Set(failed.map((f) => f.id));
+  const s = stage(w, AMS(), { writeMode: 'merge', mergeProductId: 'p_amsm', skipMedia: (id) => ids.has(id) });
+  await write(w, s);
+  // The first write happened an hour ago (its block rows and its WRITTEN event).
+  w.raw.prepare("UPDATE product_translations SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 hour') WHERE product_id = 'p_amsm'").run();
+  w.raw.prepare("UPDATE catalog_import_events SET at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 hour') WHERE item_id = ? AND stage = 'WRITTEN'").run(s.itemId);
+  // VERIFY failed, BLOCKED, resumed (merge.ts rewritesOnResume): the write runs again now and fills nothing.
+  w.raw.prepare("UPDATE catalog_import_items SET processing_state = 'VERIFYING_LIVE', last_completed_stage = 'PUBLISHING' WHERE id = ?").run(s.itemId);
+  w.raw.prepare("UPDATE catalog_import_items SET processing_state = 'BLOCKED', blocker_code = 'VERIFY_FAILED_PERSISTENT', resume_instruction = 'x' WHERE id = ?").run(s.itemId);
+  w.raw
+    .prepare("UPDATE catalog_import_items SET processing_state = 'WRITING', last_completed_stage = 'INGESTING_MEDIA', blocker_code = '', resume_instruction = '', lease_token = ?, lease_until = strftime('%Y-%m-%dT%H:%M:%fZ','now','+15 minutes'), payload_sha256 = ? WHERE id = ?")
+    .run(LEASE, payloadSha256(s.payload), s.itemId);
+  await write(w, s);
+  assert.equal((w.raw.prepare("SELECT COUNT(*) AS n FROM catalog_import_events WHERE item_id = ? AND stage = 'WRITTEN' AND outcome = 'ok'").get(s.itemId) as { n: number }).n, 2);
+  const sid = s.payload.source_product_id;
+  for (const f of failed) {
+    w.raw.prepare("INSERT INTO catalog_import_media (run_id, source_product_id, source_media_id, role, source_url, status, error_code) VALUES (?, ?, ?, ?, ?, 'failed', 'IMAGE_CONVERT_FAILED')").run(RUN_ID, sid, f.id, f.role, f.url);
+  }
+  complete(w, s.itemId);
+  w.raw.prepare("UPDATE catalog_import_runs SET state = 'partial' WHERE id = ?").run(RUN_ID);
+  const { ctx, p } = await planned(w, sid, s.payload);
+  assert.equal(p.description?.ok, true, p.description?.reason);
+  assert.deepEqual([p.outcomes.get(failed[0].id), p.outcomes.get(failed[1].id)], ['planned', 'planned']);
+  // Against the same writes: a row dated between them (neither write's) was rewritten since; one before the first is
+  // the owner's own, the merge's not_imported.
+  const state = ctx.state!;
+  const [first, last] = state.writtenTimes.map((t) => Date.parse(t));
+  const dated = (ms: number) => new Map([...state.translations].map(([k, r]) => [k, { ...r, updated_at: new Date(ms).toISOString() }]));
+  assert.deepEqual([proveDescription({ ...state, translations: dated((first + last) / 2) }, s.payload).label, proveDescription({ ...state, translations: dated((first + last) / 2) }, s.payload).reason], ['owner_edited', 'translation']);
+  assert.equal(proveDescription({ ...state, translations: dated(first - 3_600_000) }, s.payload).label, 'not_imported');
+  assert.equal(proveDescription({ ...state, translations: dated(last + 3_600_000) }, s.payload).label, 'owner_edited');
+});
+
 // ---------------------------------------------------------------- the box
 
 test('the box: V0 is the stored row byte for byte; a curated string row is not_imported; the in-the-box mirror edited is owner_edited', async () => {
@@ -462,6 +545,47 @@ test('the box: V0 is the stored row byte for byte; a curated string row is not_i
   const mirrored = { ...ctx.state!, specFields: JSON.stringify({ ...sf, in_the_box: 'The owner\'s list' }) };
   assert.deepEqual([proveBox(mirrored, payload)[0].label, proveBox(mirrored, payload)[0].reason], ['owner_edited', 'mirror']);
   assert.equal(planContent(mirrored, payload, ctx.failed, true).outcomes.get(failed[2].id), 'owner_edited');
+  // The mirror's key deleted (the form drops a field outside the section's template when emptied): the import's field
+  // only where the write never mirrored this box; one it mirrored, or with no evidence of what it did, is not.
+  const { in_the_box: _gone, ...rest } = sf;
+  void _gone;
+  const deleted = { ...ctx.state!, specFields: JSON.stringify(rest) };
+  for (const [expected, label] of [[true, 'owner_edited'], [null, 'owner_edited'], [false, '']] as const) {
+    const p = proveBox({ ...deleted, mirrorExpected: expected }, payload)[0];
+    assert.deepEqual([p.ok, p.ok ? '' : p.label, p.ok ? '' : p.reason], [label === '', label, label ? 'mirror' : ''], String(expected));
+  }
+});
+
+test('the mirror\'s evidence: the readback target when it survives, else the reviewed placement\'s template; a deleted mirror the write made is owner_edited, nothing written', async () => {
+  const { w, s, sid, productId, failed, payload } = await closedRun(AMS(), PICK_AMS);
+  // No readback target survives (the readback ran): the reviewed placement's template declares in_the_box.
+  const item = await contentItem(w, RUN_B, sid);
+  const ctx = await contentContext(w.db, item);
+  assert.equal(ctx.state!.mirrorExpected, null);
+  await withReviewed(w.db, ctx, payload, w.bundle, item);
+  assert.equal(ctx.state!.mirrorExpected, true, 'the AMS 2 Pro\'s template mirrors the box');
+  // The owner deletes the key: the box picture is owner_edited at the plan and at the attach, the row untouched.
+  const sf = JSON.parse(productRow(w, productId).spec_fields) as Record<string, string>;
+  delete sf.in_the_box;
+  w.raw.prepare('UPDATE products SET spec_fields = ? WHERE id = ?').run(JSON.stringify(sf), productId);
+  const v0 = boxRow(w, productId);
+  const plan = await planContentMedia(w.db, item, w.bundle, contentOnlyPayload(payload));
+  assert.deepEqual(plan.media.map((m) => m.role).sort(), ['description', 'description']);
+  assert.equal(plan.skipped.owner_edited, 1);
+  for (const m of plan.media) storeFor(w, RUN_B, sid, m.source_media_id, m.role, m.source_url);
+  walk(w, item.id, 'WRITING');
+  const writing = await itemBySource(w.db, RUN_B, sid);
+  const a = await attachContentMedia(envOf(w), runOf(RUN_B), writing, w.bundle, { payload_sha256: writing.payload_sha256, payload: contentOnlyPayload(payload) });
+  assert.deepEqual([a.counts.box, a.counts.owner_edited], [0, 1]);
+  assert.deepEqual(boxRow(w, productId), v0, 'the box row untouched');
+  assert.equal(checkpointOf(w, RUN_B, sid).media[failed[2].id], 'owner_edited');
+  // A surviving readback target says it directly: one whose document had no in_the_box (the write never mirrored it).
+  const target = { v: 1, product_id: productId, doc: { content_blocks: [], spec_fields: { other: 'x' } }, requested: null, catalog_ids: null, printer_fits: null, money: false };
+  w.raw.prepare("UPDATE catalog_import_items SET stage_data = json_set(stage_data, '$.readback_target', json(?)) WHERE id = ?").run(JSON.stringify(target), s.itemId);
+  assert.equal((await contentContext(w.db, writing)).state!.mirrorExpected, false);
+  target.doc.spec_fields = { in_the_box: 'Bambu AMS 2 Pro' } as never;
+  w.raw.prepare("UPDATE catalog_import_items SET stage_data = json_set(stage_data, '$.readback_target', json(?)) WHERE id = ?").run(JSON.stringify(target), s.itemId);
+  assert.equal((await contentContext(w.db, writing)).state!.mirrorExpected, true);
 });
 
 test('one box picture shown in several rows: every row gets its key, each row compare-and-set on its own text', async () => {
@@ -512,9 +636,19 @@ test('a 25-row box: every statement of the batch stays at 100 parameters or fewe
       state: { t0: '[]', m0: '{}', specFields: '{}' } as never,
       translationsDigest: '0:',
     },
-    { t0: '[]', t1: '[1]', boxWrites: rows, inserted: { blocks: [], box: [] }, counts: {} as never, checkpoint: {} as never }
+    {
+      t0: '[]',
+      t1: '[1]',
+      m0: '{}',
+      m1: '{"block:cb_1:alt":{}}',
+      altRows: [1, 2].map((i) => ({ field: `block:cb_${i}:alt`, source_en: 'x', source_hash: 'h', text_ar: 'ع', text_ckb: 'ک' })),
+      boxWrites: rows,
+      inserted: { blocks: [], box: [] },
+      counts: {} as never,
+      checkpoint: {} as never,
+    }
   );
-  assert.equal(statements.length, 1 + 25 + 1 + 25 + 3);
+  assert.equal(statements.length, 1 + 25 + 1 + 2 + 25 + 3);
   assert.ok(Math.max(...binds) <= 100, `max ${Math.max(...binds)}`);
   assert.ok(Math.max(...binds) <= 10);
 });
@@ -588,6 +722,42 @@ test('an object R2 no longer holds at the attach is not_stored (a later pass tak
     const { plan, a } = await pass(w, RUN_B, sid, payload);
     assert.deepEqual([plan.media.length, a.counts.product_not_public], [0, 3]);
     assert.deepEqual(moved(before, dump(w, productId)), []);
+  }
+});
+
+/** The owner's completeness switch holding the product for a catalog-blocking gap (status stays 'active'). */
+const hold = (w: World, productId: string, code: 'IMAGE' | 'CATEGORY') =>
+  w.raw
+    .prepare(`INSERT OR REPLACE INTO product_completeness (product_id, complete, held, missing_json, missing_count, computed_at) VALUES (?, 0, 1, ?, 1, '2026-10-19T00:00:00.000Z')`)
+    .run(productId, JSON.stringify([{ c: code }]));
+
+test('a product the completeness switch holds (active, but 404 on both public answers) is not public: nothing is inserted, the item COMPLETEs; one held after the attach COMPLETEs on 404s too (never VERIFY_FAILED_PERSISTENT)', async () => {
+  {
+    const { w, sid, productId, payload } = await closedRun(AMS(), PICK_AMS);
+    hold(w, productId, 'IMAGE');
+    const before = dump(w, productId);
+    const { plan, a } = await pass(w, RUN_B, sid, payload);
+    assert.deepEqual([plan.media.length, a.counts.product_not_public, a.counts.attached], [0, 3, 0]);
+    assert.deepEqual(moved(before, dump(w, productId)), [], 'nothing written');
+    await finishPublishing(w.db, runOf(RUN_B), await itemBySource(w.db, RUN_B, sid));
+    const v = await itemBySource(w.db, RUN_B, sid);
+    const url = `${ORIGIN}/product/${v.slug}`;
+    const done = await completeContentMedia(envOf(w), `${ORIGIN}/api/ops`, runOf(RUN_B), v, { live_url: url, edge_evidence: { version: 1, live_url: url, round: 1, status: 0, knowledge_status: 0, blocks_seen: 0, box_seen: 0 } });
+    assert.equal(done.state, 'COMPLETE', JSON.stringify(done.d1_checks));
+    assert.deepEqual(Object.values(checkpointOf(w, RUN_B, sid).media), ['product_not_public', 'product_not_public', 'product_not_public'], 'passing: a later pass takes them again');
+  }
+  {
+    const { w, sid, productId, payload } = await closedRun(AMS(), PICK_AMS);
+    const { a } = await pass(w, RUN_B, sid, payload);
+    assert.equal(a.counts.attached, 3);
+    await finishPublishing(w.db, runOf(RUN_B), await itemBySource(w.db, RUN_B, sid));
+    hold(w, productId, 'CATEGORY');
+    const v = await itemBySource(w.db, RUN_B, sid);
+    const url = `${ORIGIN}/product/${v.slug}`;
+    const ev = (round: number) => ({ live_url: url, edge_evidence: { version: 1, live_url: url, round, status: 404, knowledge_status: 404, blocks_seen: 0, box_seen: 0 } });
+    const done = await completeContentMedia(envOf(w), `${ORIGIN}/api/ops`, runOf(RUN_B), v, ev(1));
+    assert.equal(done.state, 'COMPLETE', JSON.stringify(done.d1_checks));
+    assert.equal((done.d1_checks.content_media as Record<string, unknown>).product_shown, false);
   }
 });
 

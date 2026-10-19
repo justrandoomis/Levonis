@@ -359,10 +359,14 @@ function importerOf(
   store: { listed: string[]; redirects?: Record<string, string>; seen: string[] },
   opened = DELTA
 ) {
+  const calls: string[] = [];
   const fetchLike = async (url: string, init: RequestInit) => {
     const u = new URL(url);
     if (u.origin === STORE) return storeAnswer(u.pathname, store.listed, store.seen, store.redirects);
-    if (u.origin === SITE) return ops.fetch(url, init);
+    if (u.origin === SITE) {
+      calls.push(u.pathname);
+      return ops.fetch(url, init);
+    }
     return new Response('no', { status: 404 });
   };
   const lines: string[] = [];
@@ -386,7 +390,7 @@ function importerOf(
     openedRunId: cfg.mode === 'delta' ? opened : undefined,
     browser: async () => ({ check: async () => assert.fail('a media item never opens the browser'), close: async () => {} }),
   });
-  return { importer, lines, outputs };
+  return { importer, lines, outputs, calls };
 }
 
 test('mode=delta: the media item\'s own page renamed at the store (its handle 301s to another) is moot — COMPLETE with nothing attached — and the delta run closes', async () => {
@@ -528,6 +532,17 @@ test('mode=delta item=content end to end: the description and box pictures put b
     const dataDir = writeBundle(w, dir);
     installCdnDouble(ops);
     openRun(w.raw, { id: DELTA });
+    // The owner deleted the empty categories the bulk run created since (adminTaxonomy's DELETE FROM catalogs).
+    const deleted = (
+      w.raw
+        .prepare(
+          `SELECT id FROM catalogs c WHERE id LIKE 'cat_bi_%' AND NOT EXISTS (SELECT 1 FROM catalogs k WHERE k.parent_id = c.id)
+             AND NOT EXISTS (SELECT 1 FROM product_catalogs pc WHERE pc.catalog_id = c.id) AND NOT EXISTS (SELECT 1 FROM products p WHERE p.category_id = c.id OR p.sub_category_id = c.id)`
+        )
+        .all() as Array<{ id: string }>
+    ).map((r) => r.id);
+    assert.ok(deleted.length > 0);
+    for (const id of deleted) w.raw.prepare('DELETE FROM catalogs WHERE id = ?').run(id);
     const before = everything(w, productId);
     const clock = new FakeClock(Date.now());
     const store = { listed: [] as string[], seen: [] as string[] };
@@ -546,7 +561,14 @@ test('mode=delta item=content end to end: the description and box pictures put b
     assert.match(log, /content pass: 3 put back \(2 description, 1 in the box\)/);
     assert.match(log, /content pass verify: 2\/2 description and 1\/1 in-the-box pictures on the public answers \(HTTP 200\/200\)/);
     assert.doesNotMatch(log, /bblcdn|https:\/\/us\.store|p_[0-9a-f]{20}|products\/import|content:[0-9a-f]|box:[0-9a-f]/);
-    assert.deepEqual(movedColumns(before, everything(w, productId)), ['products.content_blocks', 'products.updated_at', 'specs.value_list']);
+    // The description (with its alt meta and the new pictures' alt rows) and the box row; nothing else of the product.
+    assert.deepEqual(movedColumns(before, everything(w, productId)), ['products.content_blocks', 'products.translation_meta', 'products.updated_at', 'specs.value_list', 'translations:rows']);
+    // No taxonomy is prepared: a content item creates no product, and the owner's deleted categories, brand and
+    // synonyms stay deleted.
+    assert.ok(!a.calls.some((p) => p.endsWith('/run/prepare-taxonomy')), a.calls.join(' '));
+    assert.doesNotMatch(log, /prepare-taxonomy/);
+    assert.ok(a.calls.some((p) => p.endsWith('/run/protect-snapshot')), 'the protected snapshot is still taken');
+    assert.equal((w.raw.prepare("SELECT COUNT(*) AS n FROM catalogs WHERE id IN (SELECT value FROM json_each(?))").get(JSON.stringify(deleted)) as { n: number }).n, 0, 'the deleted categories stay deleted');
 
     // The run closes the normal way; a second content delta from the same closed run queues nothing.
     const c = importerOf(w, ops, dataDir, dir, clock, { mode: 'close', runId: DELTA, fromRun: '' }, store);
@@ -567,7 +589,7 @@ test('mode=delta item=content end to end: the description and box pictures put b
   }
 });
 
-test('mode=delta item=content: an owner\'s Arabic edit since the import leaves the description untouched (owner_edited) while the box picture goes in; a store page gone is moot (source_gone): COMPLETE, nothing written', async () => {
+test('mode=delta item=content: an owner\'s Arabic edit since the import leaves the description untouched (owner_edited) while the box picture goes in; a store page gone is moot (source_gone): COMPLETE, nothing written; a hidden product renamed since completes without its address in the log', async () => {
   {
     const { w, sid, productId } = await closedRunContent((world, id) => {
       const row = world.raw.prepare('SELECT content_blocks FROM products WHERE id = ?').get(id) as { content_blocks: string };
@@ -622,6 +644,34 @@ test('mode=delta item=content: an owner\'s Arabic edit since the import leaves t
       assert.deepEqual(Object.values(JSON.parse(item.stage_data).content_media.media), ['source_gone', 'source_gone', 'source_gone'], 'passing: a later pass takes them again');
     } finally {
       PAGES['ams-2-pro'] = page;
+      rmSync(dir, { recursive: true, force: true });
+      restoreFetch();
+    }
+  }
+  {
+    // The owner hid the product and gave it a new slug since the bulk run: nothing is written, the item completes,
+    // and the log never prints the address (a slug that was never public, §A.8).
+    const { w, sid, productId } = await closedRunContent();
+    w.raw.prepare("UPDATE products SET status = 'hidden', slug = 'owner-private-renamed' WHERE id = ?").run(productId);
+    const dir = mkdtempSync(join(tmpdir(), 'levonis-delta-content-hidden-'));
+    try {
+      const ops = opsOf(w);
+      const dataDir = writeBundle(w, dir);
+      installCdnDouble(ops);
+      openRun(w.raw, { id: DELTA });
+      const before = everything(w, productId);
+      const a = importerOf(w, ops, dataDir, dir, new FakeClock(Date.now()), { deltaPass: 'content' }, { listed: [], seen: [] });
+      const code = await a.importer.main();
+      const log = a.lines.join('\n');
+      assert.equal(code, 0, log);
+      assert.match(log, /product not public 3/);
+      assert.match(log, /COMPLETE \(a delta item whose product was not verified public: its address is not printed\)/);
+      assert.doesNotMatch(log, /owner-private-renamed/);
+      assert.deepEqual(a.outputs.blocked, 'false');
+      assert.deepEqual(movedColumns(before, everything(w, productId)), []);
+      const item = w.raw.prepare('SELECT processing_state FROM catalog_import_items WHERE run_id = ? AND source_product_id = ?').get(DELTA, sid) as Record<string, string>;
+      assert.equal(item.processing_state, 'COMPLETE', log);
+    } finally {
       rmSync(dir, { recursive: true, force: true });
       restoreFetch();
     }

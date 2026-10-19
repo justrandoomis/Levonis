@@ -637,7 +637,8 @@ export function report(context, { runId, publicKey, outDir }) {
   if (!tableExists(context, 'catalog_import_runs')) throw new CfError('catalog_import_runs is not in the live database (migration 0195)');
   const statements = {
     run: `SELECT id, state, manifest_total, started_at, closed_at, reviewed_bundle_sha256, sitemap_fingerprint, code_commit, github_run_id FROM catalog_import_runs WHERE id = '${runId}'`,
-    items: `SELECT source_product_id, handle, queue_position, product_type, curated_scope, hold_code, processing_state, last_completed_stage, attempts, stage_attempts, retry_at, last_error_code, blocker_code, match_kind, levonis_product_id, slug, live_url, unpublished_on_block, quality, d1_checks, edge_evidence, source_sold_out_variants, verified_at, completed_at, updated_at FROM catalog_import_items WHERE run_id = '${runId}' ORDER BY queue_position`,
+    // A content item's per-picture outcomes (§O.6: its checkpoint's counts, every failed picture in exactly one code).
+    items: `SELECT source_product_id, handle, queue_position, product_type, curated_scope, hold_code, processing_state, last_completed_stage, attempts, stage_attempts, retry_at, last_error_code, blocker_code, match_kind, levonis_product_id, slug, live_url, unpublished_on_block, quality, d1_checks, edge_evidence, source_sold_out_variants, verified_at, completed_at, updated_at, CASE WHEN json_valid(stage_data) THEN json_extract(stage_data, '$.content_media.counts') END AS content_media_counts FROM catalog_import_items WHERE run_id = '${runId}' ORDER BY queue_position`,
     media: `SELECT role, status, COUNT(*) AS n FROM catalog_import_media WHERE run_id = '${runId}' GROUP BY role, status ORDER BY role, status`,
     conflicts: `SELECT kind, resolved, COUNT(*) AS n FROM catalog_import_conflicts WHERE run_id = '${runId}' GROUP BY kind, resolved ORDER BY kind`,
     events: `SELECT stage, outcome, COUNT(*) AS n FROM catalog_import_events WHERE run_id = '${runId}' GROUP BY stage, outcome ORDER BY stage, outcome`,
@@ -650,7 +651,21 @@ export function report(context, { runId, publicKey, outDir }) {
   for (const [state, n] of Object.entries(byState).sort()) {
     if (/^[A-Z_]{3,32}$/.test(state)) context.log(`report: ${state}: ${n}`);
   }
-  const clear = Buffer.from(JSON.stringify({ format: REPORT_FORMAT, database: DATABASE, taken_at: new Date().toISOString(), run_id: runId, by_state: byState, tables }));
+  // The content pass's per-picture outcomes summed over the run's items (codes and counts only): what reconciles
+  // with the failed pictures its open counted.
+  const content = {};
+  for (const item of tables.items) {
+    let counts = null;
+    try {
+      counts = item.content_media_counts ? JSON.parse(item.content_media_counts) : null;
+    } catch {
+      counts = null;
+    }
+    if (!counts || typeof counts !== 'object' || Array.isArray(counts)) continue;
+    for (const [k, n] of Object.entries(counts)) if (/^[a-z][a-z_]{2,31}$/.test(k) && Number.isInteger(n) && n > 0) content[k] = (content[k] ?? 0) + n;
+  }
+  for (const [k, n] of Object.entries(content).sort()) context.log(`report: content ${k}: ${n}`);
+  const clear = Buffer.from(JSON.stringify({ format: REPORT_FORMAT, database: DATABASE, taken_at: new Date().toISOString(), run_id: runId, by_state: byState, content_outcomes: content, tables }));
   const sealed = sealBuffer(publicKey, clear);
   clear.fill(0);
   writeFileSync(`${target}.partial`, sealed, { flag: 'wx', mode: 0o600 });
@@ -666,6 +681,9 @@ export function report(context, { runId, publicKey, outDir }) {
       .filter(([state]) => /^[A-Z_]{3,32}$/.test(state))
       .sort()
       .map(([state, n]) => `| ${state} | ${n} |`),
+    ...(Object.keys(content).length
+      ? ['', '| description / in-the-box picture outcome | pictures |', '|---|---|', ...Object.entries(content).sort().map(([k, n]) => `| ${k} | ${n} |`)]
+      : []),
     '',
     `Artifact \`bambu-import-sealed\` holds \`${REPORT_FILE}\`: ${sealed.length} bytes, SHA-256 \`${digest}\`.`,
   ]);

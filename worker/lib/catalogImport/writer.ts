@@ -602,6 +602,21 @@ async function resolveCatalogs(db: D1Database, tax: TaxonomyResolution): Promise
   };
 }
 
+/**
+ * The template the writer mirrors `spec_fields` with for a reviewed placement — its family and root / leaf slugs, read
+ * from D1 exactly as `resolveCatalogs` reads them — or null when a node of the placement is no longer in D1 (the
+ * content pass, contentMedia.ts, then cannot prove what the write mirrored).
+ */
+export async function placementTemplate(db: D1Database, tax: TaxonomyResolution): Promise<{ family: 'devices' | 'materials' | null; slugs: string[] } | null> {
+  try {
+    const r = await resolveCatalogs(db, tax);
+    return { family: r.template_family, slugs: r.slugs };
+  } catch (e) {
+    if (e instanceof ImportWriteRefused) return null;
+    throw e;
+  }
+}
+
 async function brandId(db: D1Database): Promise<string> {
   const row = await db.prepare('SELECT id FROM brands WHERE slug = ?').bind(BRAND_SLUG).first<{ id: string }>();
   if (!row) throw new ImportWriteRefused('TAXONOMY_UNMAPPED', 'TAXONOMY_UNMAPPED', 409, 'brand_not_prepared');

@@ -31,6 +31,7 @@
 import type { Env } from '../types';
 import { newId } from '../crypto';
 import { fence, isFenceMiss } from '../operations';
+import { optimisticVisible, runListed } from '../listing';
 import { NOW_SQL, OpsRefusal, type ImportRun } from './auth';
 import { stageDataOf, type ItemRow } from './items';
 import type { ReviewedBundle } from './reviewed';
@@ -68,6 +69,17 @@ const numbers = (v: unknown): Record<string, number> => {
   return out;
 };
 const slugText = (v: unknown): string => (typeof v === 'string' && v.length <= 200 ? v : '');
+
+/**
+ * Whether the storefront shows the product: the predicate `visibleProductBySlug` runs for `/api/products/<slug>` and
+ * its `/knowledge` (active, and not held by the owner's completeness switch for a catalog-blocking gap), never the
+ * bare status. The delta's VERIFY doors (contentMedia.ts, mediaRetry.ts) expect a picture on the public answers only
+ * when this holds (a 404 there could never clear), and the content pass gives a product it does not hold nothing.
+ */
+export async function shownToCustomers(db: D1Database, productId: string): Promise<boolean> {
+  const row = await runListed(db, `SELECT 1 AS x FROM products p WHERE p.id = ? AND ${optimisticVisible(db, 'p')}`, (q) => db.prepare(q).bind(productId).first<{ x: number }>());
+  return !!row;
+}
 
 /** The live URL the runner names must be this item's page on the origin it called. */
 export function liveUrlOf(raw: unknown, requestUrl: string, slug: string): string | null {

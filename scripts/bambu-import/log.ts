@@ -83,6 +83,7 @@ export const TEMPLATES = {
   verify_done: 'verified: {passed} of {total} checks passed',
   cache_wait: 'verify: a stale answer; purge again and wait {seconds} s',
   complete: 'COMPLETE: {url}',
+  complete_unnamed: 'COMPLETE (a delta item whose product was not verified public: its address is not printed)',
   retrying: 'retrying {code}: wait {seconds} s (stage attempt {attempt})',
   deadline_exit: 'deadline: {need} s needed, {left} s left; the lease is released and the job exits (more)',
   parked: 'parked {code}: retry in {seconds} s, in a later job; the lease is released and the job exits (more)',
@@ -135,7 +136,7 @@ export const TEMPLATES = {
     'content pass: {failed} description and in-the-box pictures failed in the closed run; {requests} fetched again; edited since the import {owner_edited}, not written by the import {not_imported}, store page changed {source_changed}, no longer on the page {not_on_page}, already there {already_present}, removed by the owner {owner_removed}, product not public {product_not_public}, page no longer this product {identity_changed}, store page gone {source_gone}; stored but never written {stored_not_written}',
   content_moot: 'content pass: the page reads {what}; nothing is fetched or written, the item completes and a later pass takes it again',
   content_attached:
-    'content pass: {attached} put back ({blocks} description, {box} in the box); already there {already_present}, removed by the owner {owner_removed}, edited {owner_edited}, not written by the import {not_imported}, store page changed {source_changed}, not stored {not_stored}',
+    'content pass: {attached} put back ({blocks} description, {box} in the box); already there {already_present}, removed by the owner {owner_removed}, edited {owner_edited}, not written by the import {not_imported}, store page changed {source_changed}, not stored {not_stored}, no longer on the page {not_on_page}, product not public {product_not_public}, page no longer this product {identity_changed}, store page gone {source_gone}',
   content_seen: 'content pass verify: {blocks_seen}/{blocks} description and {box_seen}/{box} in-the-box pictures on the public answers (HTTP {status}/{knowledge_status})',
 } as const;
 export type TemplateKey = keyof typeof TEMPLATES;

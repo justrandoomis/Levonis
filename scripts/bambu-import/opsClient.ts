@@ -459,6 +459,11 @@ export function contentInsertedOf(raw: unknown): ContentInserted | null {
   return { blocks, box };
 }
 
+/** The per-medium outcome counts a content checkpoint recorded (stage_data.content_media.counts); null when absent. */
+export function contentCountsOf(raw: unknown): Record<string, number> | null {
+  return isRec(raw) && isRec(raw.counts) ? numbers(raw.counts) : null;
+}
+
 function deltaRowOf(v: unknown): DeltaRowView | null {
   if (!isRec(v)) return null;
   // A kind this runner does not read stays a row of its own (`unknown`), so its item is never worked as an ordinary one.

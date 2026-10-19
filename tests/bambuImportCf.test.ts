@@ -691,6 +691,31 @@ test('revoke ignores the job deadline: run in always() after the importer used i
   }
 });
 
+test('report: a content run\'s per-picture outcomes summed from the checkpoints, codes and counts only (they reconcile with the failed pictures)', () => {
+  const f = fixture();
+  try {
+    withRun(f, 'running');
+    const raw = new DatabaseSync(f.db);
+    const cp = (counts: Record<string, number>) => JSON.stringify({ content_media: { rule: 1, counts, media: { 'content:PLANTED-HIDDEN-NAME': 'attached' } } });
+    raw.exec(`INSERT INTO catalog_import_items (id, run_id, source, source_product_id, handle, canonical_url, queue_position, discovered_at, processing_state, slug, stage_data)
+      VALUES ('cii_1', '${RUN_A}', 'bambu_us', '1', 'a1', 'https://us.store.bambulab.com/products/a1', 1, '2026-10-16', 'DISCOVERED', 'planted-hidden-slug', '${cp({ attached: 2, owner_edited: 1, not_stored: 0 })}'),
+             ('cii_2', '${RUN_A}', 'bambu_us', '2', 'a2', 'https://us.store.bambulab.com/products/a2', 2, '2026-10-16', 'DISCOVERED', 'x', '${cp({ attached: 1, not_imported: 3, 'PLANTED-HIDDEN-NAME': 9 } as never)}'),
+             ('cii_3', '${RUN_A}', 'bambu_us', '3', 'a3', 'https://us.store.bambulab.com/products/a3', 3, '2026-10-16', 'DISCOVERED', 'y', 'not json')`);
+    raw.close();
+    const r = f.run(['report', '--run', RUN_A, '--seal', f.keys.publicKey, '--out', f.out]);
+    assert.equal(r.status, 0, r.stderr);
+    const content = r.stdout.split('\n').filter((l) => l.startsWith('report: content '));
+    assert.deepEqual(content, ['report: content attached: 3', 'report: content not_imported: 3', 'report: content owner_edited: 1']);
+    for (const secret of PLANTED) assert.ok(!r.stdout.includes(secret) && !readFileSync(f.summary, 'utf8').includes(secret), secret);
+    assert.match(readFileSync(f.summary, 'utf8'), /\| attached \| 3 \|/);
+    const doc = JSON.parse(unsealBuffer(f.keys.privateKeyPem, readFileSync(join(f.out, 'report.sealed'))).toString());
+    assert.deepEqual(doc.content_outcomes, { attached: 3, owner_edited: 1, not_imported: 3 });
+    assert.equal(JSON.parse(doc.tables.items[0].content_media_counts).attached, 2, 'per item, in the sealed report');
+  } finally {
+    f.dispose();
+  }
+});
+
 test('report: the run ledger sealed in memory; counts by state in the log, nothing else', () => {
   const f = fixture();
   try {

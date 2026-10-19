@@ -120,7 +120,16 @@ export interface SummaryInput {
   more: boolean;
   /** The close's /run/finish answer: closed, partial, or unconfirmed (its answer was lost, run.ts finishSettled). */
   closedState?: string;
+  /** The content pass (§O.6): the items this job finished and their per-picture outcomes summed (codes and counts). */
+  content?: { items: number; counts: Readonly<Record<string, number>> };
 }
+
+/** The content pass's line label, in the three languages. */
+const CONTENT_LINE = {
+  ar: 'صور الوصف ومحتويات العلبة في هذه المهمة',
+  en: 'Description and in-the-box pictures, this job',
+  ckb: 'وێنەکانی وەسف و ناوەڕۆکی سندوق لەم کارەدا',
+} as const;
 
 export function renderSummary(inp: SummaryInput): string {
   const log = new ImportLog(() => {}, { siteOrigin: inp.siteOrigin });
@@ -179,6 +188,15 @@ export function renderSummary(inp: SummaryInput): string {
   if (held.length) {
     lines.push('', '### Held by the reviewed manifest');
     for (const h of held) lines.push(`- HELD \`${ImportLog.handle(h.handle)}\` ${code(h.code)}`);
+  }
+  if (inp.content && inp.content.items > 0) {
+    // One line, codes and counts only: every failed picture of the items is in exactly one code.
+    const shown = Object.entries(inp.content.counts)
+      .filter(([k, n]) => /^[a-z][a-z_]{2,31}$/.test(k) && typeof n === 'number' && Number.isInteger(n) && n > 0)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    const parts = shown.map(([k, n]) => `${k} ${count(n)}`);
+    const total = shown.reduce((a, [, n]) => a + n, 0);
+    lines.push('', `${CONTENT_LINE.en} — ${CONTENT_LINE.ar} — ${CONTENT_LINE.ckb}: ${count(inp.content.items)} items, ${count(total)} pictures: ${parts.join(', ') || '-'}.`);
   }
   lines.push('', `More to do: ${inp.more ? 'yes' : 'no'}.`);
   return `${lines.join('\n')}\n`;

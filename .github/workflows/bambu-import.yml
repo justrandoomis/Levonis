@@ -88,8 +88,11 @@
 #             guarded batch, compare-and-set on that field — and only where the
 #             field is still byte for byte what the import wrote, in every
 #             language; a field anyone edited since is counted, never touched.
-#             No sitemap is read; robots.txt and each product page at the
-#             store's pace. Run it with run_id = the bulk run (the run whose
+#             No sitemap is read and no taxonomy is prepared (a category,
+#             the brand or a synonym the owner deleted stays deleted);
+#             robots.txt and each product page at the store's pace; a product
+#             the storefront does not show (hidden, or held) gets nothing.
+#             Run it with run_id = the bulk run (the run whose
 #             media failed), max_items 1 first, review, then mode=run on the new
 #             run (max_items 0, chain), then mode=close.
 #   revoke    the kill switch: clears catalog_import_runs.token_sha256 of

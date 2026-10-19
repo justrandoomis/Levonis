@@ -275,14 +275,54 @@ test('the content pass\'s log lines (§O.6) carry counts, codes, the run id and 
   log.info('delta_content_code', { code: 'https://store.bblcdn.com/a.png', failed: 'content:abc' as never });
   log.item(4, 'ams-2-pro', 'EXTRACTING', 'content_moot', { what: 'source_gone' });
   log.item(4, 'ams-2-pro', 'EXTRACTING', 'content_moot', { what: 'products/import/gallery/x.webp' });
-  log.item(4, 'ams-2-pro', 'WRITING', 'content_attached', { attached: 3, blocks: 2, box: 1, already_present: 0, owner_removed: 0, owner_edited: 0, not_imported: 0, source_changed: 0, not_stored: 0 });
+  log.item(4, 'ams-2-pro', 'WRITING', 'content_attached', {
+    attached: 3,
+    blocks: 2,
+    box: 1,
+    already_present: 0,
+    owner_removed: 0,
+    owner_edited: 0,
+    not_imported: 0,
+    source_changed: 0,
+    not_stored: 0,
+    not_on_page: 0,
+    product_not_public: 2,
+    identity_changed: 0,
+    source_gone: 0,
+  });
   log.info('delta_content_plan', { run: 'cir_0123456789abcdef01234567', content_failed_total: 358, content_items: 189 });
   assert.equal(lines[0], '[import] content pass: 3 of the pictures to put back failed with IMAGE_CONVERT_FAILED');
   assert.equal(lines[1], '[import] content pass: [?] of the pictures to put back failed with [?]');
   assert.match(lines[2], /the page reads source_gone;/);
   assert.match(lines[3], /the page reads \[\?\];/);
-  assert.equal(lines[4], '[import] #4 ams-2-pro WRITING: content pass: 3 put back (2 description, 1 in the box); already there 0, removed by the owner 0, edited 0, not written by the import 0, store page changed 0, not stored 0');
+  // Every outcome of the attach, so the plan's "fetched again" are accounted for whatever the fresh read found.
+  assert.equal(
+    lines[4],
+    '[import] #4 ams-2-pro WRITING: content pass: 3 put back (2 description, 1 in the box); already there 0, removed by the owner 0, edited 0, not written by the import 0, store page changed 0, not stored 0, no longer on the page 0, product not public 2, page no longer this product 0, store page gone 0'
+  );
   assert.match(lines[5], /^\[import\] content pass from run cir_0123456789abcdef01234567: 358 description and in-the-box pictures failed in the closed run; 189 items/);
+  // A delta item that completed on a product not verified public: no address at all.
+  log.item(4, 'ams-2-pro', 'COMPLETE', 'complete_unnamed');
+  assert.equal(lines[6], '[import] #4 ams-2-pro COMPLETE: COMPLETE (a delta item whose product was not verified public: its address is not printed)');
+});
+
+test('the summary\'s content line: the job\'s per-picture outcomes summed, codes and counts only, in the three languages', () => {
+  const text = renderSummary({
+    mode: 'run',
+    runId: 'cir_0123456789abcdef01234567',
+    siteOrigin: 'https://levonis-iq.com',
+    status: null,
+    items: [],
+    blocked: [],
+    withdrawn: [],
+    more: true,
+    content: { items: 2, counts: { attached: 3, owner_edited: 2, not_stored: 0, 'https://x': 4, product_not_public: 1 } },
+  });
+  const line = text.split('\n').find((l) => l.startsWith('Description and in-the-box pictures, this job'))!;
+  assert.equal(
+    line,
+    'Description and in-the-box pictures, this job — صور الوصف ومحتويات العلبة في هذه المهمة — وێنەکانی وەسف و ناوەڕۆکی سندوق لەم کارەدا: 2 items, 6 pictures: attached 3, owner_edited 2, product_not_public 1.'
+  );
 });
 
 test('the summary: §H.3 counts only, "partial" names the BLOCKED items, never «تم» or "100 %"', () => {

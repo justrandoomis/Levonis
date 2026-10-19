@@ -73,6 +73,7 @@ import { blockedStop, HostFetcher, ImportStop, StoreFetcher, transientStop, type
 import { ImportLog, type LogStage } from './log';
 import {
   attachedMediaOf,
+  contentCountsOf,
   contentInsertedOf,
   OpsClient,
   OpsError,
@@ -468,7 +469,27 @@ interface ItemWork {
   mootCode?: 'identity_changed' | 'source_gone';
   /** A content item's inserted pictures: this job's /content-attach answer, or stage_data.content_media on a resume. */
   inserted: ContentInserted | null;
+  /**
+   * A content item's final per-medium outcomes (every failed medium in exactly one): the /content-attach answer,
+   * recomputed on a fresh read, or the checkpoint's on a resume (stage_data.content_media.counts); null before the attach.
+   */
+  contentCounts: Record<string, number> | null;
 }
+
+/** The content outcome counts of an attach answer, without the totals it adds (blocks, box, stored_not_written). */
+const contentOutcomeCounts = (counts: Record<string, number>): Record<string, number> => {
+  const { blocks: _b, box: _x, stored_not_written: _s, ...outcomes } = counts;
+  void _b;
+  void _x;
+  void _s;
+  return outcomes;
+};
+
+/** /content-complete's or /media-complete's `d1_checks.<key>.product_shown`: the Worker found the product shown. */
+const productShownOf = (d1Checks: Record<string, unknown>, key: 'content_media' | 'media_retry'): boolean => {
+  const c = d1Checks[key];
+  return !!c && typeof c === 'object' && (c as Record<string, unknown>).product_shown === true;
+};
 
 const stageFpEqualOf = (stageData: Record<string, unknown>): boolean | null =>
   typeof stageData.before_fp_equal === 'boolean' ? stageData.before_fp_equal : null;
@@ -506,6 +527,8 @@ export class Importer {
   private siteBudgetEnd: number | null = null;
   private browserChecker: BrowserLike | null | undefined;
   private readonly items: SummaryItem[] = [];
+  /** The content items this job finished (COMPLETE or BLOCKED after their attach), their outcomes summed (§O.6). */
+  private readonly contentTally: { items: number; counts: Record<string, number> } = { items: 0, counts: {} };
   private status: StatusAnswer | null = null;
   /** The held items /run/finish named (close): the summary names them. */
   private finishedHeld: HeldRef[] | null = null;
@@ -621,6 +644,7 @@ export class Importer {
         held,
         more,
         closedState,
+        content: this.contentTally.items ? this.contentTally : undefined,
       })
     );
   }
@@ -882,6 +906,7 @@ export class Importer {
       kind,
       attached: attachedMediaOf(lease.stage_data.media_retry),
       inserted: contentInsertedOf(lease.stage_data.content_media),
+      contentCounts: contentCountsOf(lease.stage_data.content_media),
     };
     const pos = row.queue_position;
     const log = (stage: LogStage, t: Parameters<ImportLog['item']>[3], p: Parameters<ImportLog['item']>[4] = {}) => this.log.item(pos, row.handle, stage, t, p);
@@ -1002,6 +1027,8 @@ export class Importer {
     if (attached) w.attached = attached;
     const inserted = contentInsertedOf(lease.stage_data.content_media);
     if (inserted) w.inserted = inserted;
+    const contentCounts = contentCountsOf(lease.stage_data.content_media);
+    if (contentCounts) w.contentCounts = contentCounts;
   }
 
   /**
@@ -1049,9 +1076,13 @@ export class Importer {
       // A re-lease after an ambiguous call can report a state the runner did not set itself.
       if (w.state === 'COMPLETE') {
         this.gate.noteComplete(w.sid, null);
-        this.log.item(w.row.queue_position, w.row.handle, 'COMPLETE', 'complete', { url: this.liveUrl(w) });
+        // A delta's media or content item may complete on a product that is not shown (hidden or held): its address
+        // is printed only when its own VERIFY said the product is public, never after an ambiguous answer (§A.8).
+        const url = w.kind === 'media' || w.kind === 'content' ? '' : this.liveUrl(w);
+        if (url) this.log.item(w.row.queue_position, w.row.handle, 'COMPLETE', 'complete', { url });
+        else this.log.item(w.row.queue_position, w.row.handle, 'COMPLETE', 'complete_unnamed');
         this.sealItem(w, { outcome: 'complete' });
-        return { kind: 'complete', url: this.liveUrl(w) };
+        return { kind: 'complete', url };
       }
       if (w.state === 'BLOCKED') {
         this.gate.release();
@@ -1581,10 +1612,25 @@ export class Importer {
   private sealItem(w: ItemWork, end: Record<string, unknown>): void {
     const name = `item-${String(w.row.queue_position).padStart(4, '0')}`;
     const b = w.build;
+    // A content item's outcomes, on every end (COMPLETE either way, BLOCKED after its attach): the plan, and the
+    // attach's final per-medium counts — every failed medium in exactly one — which the job summary also sums.
+    let content: Record<string, unknown> | null = null;
+    if (w.kind === 'content') {
+      content = {
+        plan: w.content ? { failed: w.content.failed, requests: w.content.requests.length, skipped: w.content.skipped, stored_not_written: w.content.storedNotWritten } : null,
+        outcomes: w.contentCounts,
+        inserted: w.inserted ? { blocks: w.inserted.blocks.length, box: w.inserted.box.length } : null,
+      };
+      if (w.contentCounts) {
+        this.contentTally.items++;
+        for (const [k, n] of Object.entries(w.contentCounts)) this.contentTally.counts[k] = (this.contentTally.counts[k] ?? 0) + n;
+      }
+    }
     this.seal(`${name}.json`, {
       source_product_id: w.sid,
       handle: w.row.handle,
       queue_position: w.row.queue_position,
+      ...(content ? { content } : {}),
       ...end,
       product_id: w.productId,
       slug: w.slug,
@@ -1878,9 +1924,12 @@ export class Importer {
       if (done.state === 'COMPLETE') {
         this.gate.noteComplete(w.sid, done.seq);
         w.state = 'COMPLETE';
-        this.log.item(w.row.queue_position, w.row.handle, 'COMPLETE', 'complete', { url: this.liveUrl(w) });
+        // The address only for a product the Worker found shown (§A.8: never a slug that is not public).
+        const url = productShownOf(done.d1_checks, 'media_retry') ? this.liveUrl(w) : '';
+        if (url) this.log.item(w.row.queue_position, w.row.handle, 'COMPLETE', 'complete', { url });
+        else this.log.item(w.row.queue_position, w.row.handle, 'COMPLETE', 'complete_unnamed');
         this.sealItem(w, { outcome: 'complete', media_only: true, plan: w.retry ? { failed: w.retry.failed, requests: w.retry.requests.length, skipped: w.retry.skipped } : null, attached: { rows: att.rows.length, swatches: att.swatches.length }, d1_checks: done.d1_checks });
-        return { kind: 'complete', url: this.liveUrl(w) };
+        return { kind: 'complete', url };
       }
       if (round === 2) break;
       if (!this.deadline.fits(wait, AFTER_CACHE_WAIT)) throw new ImportStop('DEADLINE_EXIT', 'deadline', 'the cache wait does not fit', { needMs: wait });
@@ -1897,8 +1946,9 @@ export class Importer {
    * mode=delta item=content: the NEW run's queue is the closed run's content items only (cf.mjs opened the run and
    * minted this job's token). robots.txt (no sitemap is read, no new product's page); /delta/plan with the content
    * pass, its parts reconciled against the closed run's failures (every failed description and in-the-box medium in
-   * exactly one part, or the job stops before registering anything); /delta/manifest; the reviewed taxonomy (insert-
-   * only) and the protected snapshot `before`; the sealed open report; then the queue as in mode=run.
+   * exactly one part, or the job stops before registering anything); /delta/manifest; the protected snapshot `before`
+   * (never /run/prepare-taxonomy: nothing here creates a product, and the owner may have deleted a category, the brand
+   * or a synonym since); the sealed open report; then the queue as in mode=run.
    */
   private async deltaContent(): Promise<{ more: boolean; blocked: boolean }> {
     await this.hello();
@@ -1925,8 +1975,8 @@ export class Importer {
       skipped.content_already_settled += a.skipped.content_already_settled;
     }
     this.log.info('delta_content_registered', { content: registered.content, calls, product_gone: skipped.media_product_gone, settled: skipped.content_already_settled });
-    const tax = await this.ops.prepareTaxonomy();
-    this.log.info('taxonomy', { nodes: tax.created_nodes, brand: tax.brand_created, synonyms: tax.synonyms_inserted });
+    // No /run/prepare-taxonomy (§O.6): a content item creates no product and reads no taxonomy, and its insert-only
+    // statements would bring back a category, the brand or a search synonym the owner deleted since the bulk run.
     const snap = await this.ops.protectSnapshot('before');
     this.log.info('protect', { phase: 'before', subjects: snap.subjects });
     this.status = await this.ops.status();
@@ -1940,7 +1990,7 @@ export class Importer {
       registered,
       skipped,
       reviewed_bundle_sha256: bundleDigest(this.deps.bundle.sha256),
-      taxonomy: tax,
+      taxonomy: null,
       protect_before: snap,
       status: this.status,
     });
@@ -2051,10 +2101,13 @@ export class Importer {
     const plan = w.content!;
     const a = await this.ops.contentAttach(w.sid, w.leaseToken, plan.sha, plan.payload, w.mootCode ?? 'identity_changed');
     w.inserted = a.inserted;
+    w.contentCounts = contentOutcomeCounts(a.counts);
     w.productId = a.product_id || w.productId;
     w.slug = a.slug || w.slug;
     w.state = 'PUBLISHING';
     w.lastCompleted = 'WRITING';
+    // The attach's own outcomes (recomputed on a fresh read, superseding the plan), every one of them: the plan line's
+    // "fetched again" are here as put back, not stored, or what the fresh read found instead.
     const c = a.counts;
     this.log.item(w.row.queue_position, w.row.handle, 'WRITING', 'content_attached', {
       attached: c.attached ?? 0,
@@ -2066,6 +2119,10 @@ export class Importer {
       not_imported: c.not_imported ?? 0,
       source_changed: c.source_changed ?? 0,
       not_stored: c.not_stored ?? 0,
+      not_on_page: c.not_on_page ?? 0,
+      product_not_public: c.product_not_public ?? 0,
+      identity_changed: c.identity_changed ?? 0,
+      source_gone: c.source_gone ?? 0,
     });
   }
 
@@ -2139,15 +2196,17 @@ export class Importer {
       if (done.state === 'COMPLETE') {
         this.gate.noteComplete(w.sid, done.seq);
         w.state = 'COMPLETE';
-        this.log.item(w.row.queue_position, w.row.handle, 'COMPLETE', 'complete', { url: this.liveUrl(w) });
+        // The address only for a product the Worker found shown (§A.8: never a slug that is not public).
+        const url = productShownOf(done.d1_checks, 'content_media') ? this.liveUrl(w) : '';
+        if (url) this.log.item(w.row.queue_position, w.row.handle, 'COMPLETE', 'complete', { url });
+        else this.log.item(w.row.queue_position, w.row.handle, 'COMPLETE', 'complete_unnamed');
         this.sealItem(w, {
           outcome: 'complete',
           content_only: true,
-          plan: w.content ? { failed: w.content.failed, requests: w.content.requests.length, skipped: w.content.skipped, stored_not_written: w.content.storedNotWritten } : null,
           inserted: { blocks: ins.blocks.length, box: ins.box.length },
           d1_checks: done.d1_checks,
         });
-        return { kind: 'complete', url: this.liveUrl(w) };
+        return { kind: 'complete', url };
       }
       if (round === 2) break;
       wait = wait || cacheWaitOfHeaders(new Headers());

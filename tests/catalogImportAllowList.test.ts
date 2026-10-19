@@ -227,26 +227,33 @@ test('the content pass writes only its two picture fields, its own item, its eve
     'UPDATE ops_guards',
     'DELETE FROM ops_guards',
     'UPDATE products',
+    'INSERT INTO product_translations',
     'UPDATE product_spec_values',
     'INSERT INTO catalog_import_events',
     'UPDATE catalog_import_items',
   ]);
-  assert.ok(writes.length >= 7, writes.join(', '));
+  assert.ok(writes.length >= 8, writes.join(', '));
   for (const w of writes) assert.ok(allowed.has(w), `a write the content pass may not make: ${w}`);
-  // The product: its description (compare-and-set) and the time an open editor checks, nothing else.
+  // The product: its description and the meta of its slots (both compare-and-set) and the time an open editor
+  // checks, nothing else.
   const products = [...src.matchAll(/UPDATE products SET ([\s\S]*?) WHERE ([\s\S]*?)`/g)];
   assert.equal(products.length, 1);
-  assert.equal(products[0][1].replace(/\s+/g, ' ').trim(), 'content_blocks = ?1, updated_at = ${NOW_SQL}');
-  assert.match(products[0][2], /content_blocks IS \?3/, 'compare-and-set on the text read');
+  assert.equal(products[0][1].replace(/\s+/g, ' ').trim(), 'content_blocks = ?1, translation_meta = ?2, updated_at = ${NOW_SQL}');
+  assert.match(products[0][2], /content_blocks IS \?4 AND translation_meta IS \?5/, 'compare-and-set on the texts read');
+  // A new picture's alt row: inserted, never upserted or replaced (a row there fails the batch on its key).
+  const inserts = [...src.matchAll(/INSERT INTO product_translations ([\s\S]*?)`/g)];
+  assert.equal(inserts.length, 1);
+  assert.doesNotMatch(inserts[0][1], /ON CONFLICT|SELECT/);
+  assert.match(inserts[0][1], /'review_needed'/);
   // A box row: its value_list only, compare-and-set, the closed run's own row.
   const rows = [...src.matchAll(/UPDATE product_spec_values SET ([\s\S]*?) WHERE ([\s\S]*?)`/g)];
   assert.equal(rows.length, 1);
   assert.equal(rows[0][1].trim(), 'value_list = ?1');
   assert.match(rows[0][2], /canonical_key = 'package\.contents' AND import_run_id = \?4 AND value_list IS \?5/);
-  // Nothing is ever deleted but the guard row; product_translations, translation_meta, spec_fields and the images are
-  // read (fenced), never written: the two SET clauses above are the whole of what moves.
+  // Nothing is ever deleted but the guard row; an existing translation row, spec_fields and the images are read
+  // (fenced), never written: the two SET clauses above and the alt rows' insert are the whole of what moves.
   assert.deepEqual(writes.filter((w) => w.startsWith('DELETE')), ['DELETE FROM ops_guards']);
-  assert.ok(!/\b(?:INTO|UPDATE)\s+(?:product_translations|product_images|product_option_values|product_variants|product_documents)\b/.test(src));
+  assert.ok(!/\bUPDATE\s+product_translations\b|\b(?:INTO|UPDATE)\s+(?:product_images|product_option_values|product_variants|product_documents)\b/.test(src));
 });
 
 test('the import\'s translation rows are written by the writer and the translation store only, and the store leaves a row whose English did not move as it is', () => {
@@ -259,9 +266,10 @@ test('the import\'s translation rows are written by the writer and the translati
     }
   };
   walk('worker');
-  // The content pass (§O.6) trusts a row the import wrote only while these two are its only writers: a third (a
-  // backfill, a bulk re-translation) must fail here first and be judged against that proof.
-  assert.deepEqual(offenders.sort(), ['worker/lib/catalogImport/writer.ts', 'worker/lib/translate/store.ts']);
+  // The content pass (§O.6) trusts a row the import wrote only while these are its only writers: a fourth (a
+  // backfill, a bulk re-translation) must fail here first and be judged against that proof. The content pass's own
+  // write is an insert of a new picture's alt row in its guarded batch (its proof dates it by that item's WRITTEN).
+  assert.deepEqual(offenders.sort(), ['worker/lib/catalogImport/contentMedia.ts', 'worker/lib/catalogImport/writer.ts', 'worker/lib/translate/store.ts']);
   const store = codeOf('worker/lib/translate/store.ts');
   assert.match(store, /if \(prev && prev\.source_hash === t\.source_hash\) \{[\s\S]*?continue;\s*\}/, 'an unchanged source is skipped, never rewritten');
 });

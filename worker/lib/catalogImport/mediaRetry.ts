@@ -44,7 +44,7 @@ import type { ProductDoc } from '../productModel';
 import { assertImportPayload, type ImportPayload } from '@levonis/catalog/bambuImport/payload';
 import { collapseContentDuplicates } from '@levonis/catalog/bambuImport/mediaCollapse';
 import { NOW_SQL, OpsRefusal, type ImportRun } from './auth';
-import { liveUrlOf } from './complete';
+import { liveUrlOf, shownToCustomers } from './complete';
 import { DELTA_ITEM_SQL, deltaMarkOf, type DeltaMark } from './delta';
 import { stageDataOf, type ItemRow } from './items';
 import { importObjectHead } from './media';
@@ -665,7 +665,9 @@ export async function completeMediaRetry(
   const keptRows = attached.rows.filter((r) => imageKey.get(r.id) === r.r2_key);
   const keptSwatches = attached.swatches.filter((s) => swatchKey.get(s.option_value_id) === s.r2_key);
   const product = await db.prepare('SELECT status FROM products WHERE id = ?').bind(item.levonis_product_id).first<{ status: string }>();
-  const shown = product?.status === 'active';
+  // Shown as the storefront decides (complete.ts shownToCustomers: the catalog hold included). A product the
+  // completeness switch still holds after /publish-finish's recompute answers 404 on every round: not expected.
+  const shown = product?.status === 'active' && (await shownToCustomers(db, item.levonis_product_id));
   let objects = 0;
   const keys = [...new Set([...keptRows.map((r) => r.r2_key), ...keptSwatches.map((s) => s.r2_key)])];
   for (const key of keys) {
