@@ -3548,6 +3548,9 @@ const LISTING_PARAM_KEYS = [
  */
 export const LISTING_CANDIDATE_CAP = 1_000;
 
+/** The ids a search answer ranks: the engine looks at three times as many when hidden products are in the way. */
+export const SEARCH_RESULT_LIMIT = 200;
+
 /**
  * How many candidate KEYS one listing reads — the deepest `offset` the route
  * accepts. Past it the rest are not listed, and the listing says
@@ -4376,9 +4379,23 @@ export async function listCatalogProducts(
   const rawSearch = typeof q.search === 'string' ? q.search : '';
   const typingLastWord = !/\s$/u.test(rawSearch);
   if (search) {
+    /**
+     * HIDDEN PRODUCTS TAKE NO RANKING SLOT (docs/SEARCH.md). The engine
+     * ranks every product it indexed, and this route's WHERE drops the ones a
+     * shopper may not see — so a hidden product in the top 200 cost a visible
+     * one its place. When more than 200 match, the engine asks this which of
+     * its best 600 are listed (the same `listedScope` as the read below), and
+     * cuts to 200 after.
+     */
+    const listedIds = async (ids: string[]): Promise<ReadonlySet<string>> => {
+      const { results } = await runListed(db, `SELECT id FROM products WHERE ${listedScope} AND id IN (SELECT value FROM json_each(?))`, (q) =>
+        db.prepare(q).bind(JSON.stringify(ids)).all<{ id: string }>()
+      );
+      return new Set((results ?? []).map((r) => String(r.id)));
+    };
     const hits = await degradeIfSchemaMissing(
       'search index (migration 0089)',
-      () => searchProducts(db, search, { limit: 200, completeLast: typingLastWord }),
+      () => searchProducts(db, search, { limit: SEARCH_RESULT_LIMIT, completeLast: typingLastWord, visible: listedIds }),
       null as { ids: string[]; indexReady: boolean } | null
     );
     // A missing TABLE, or a table that exists and is still empty because the

@@ -134,6 +134,7 @@ import {
 import { runGuardedMediaCleanupJobs } from '../lib/mediaRefs';
 import { supportInboxCounts } from './adminChats';
 import { canHandleDisputes, canReviewKyc } from '../lib/staffCapabilities';
+import { searchIndexStatus } from '../lib/search/store';
 
 export const adminRoutes = new Hono<AppContext>();
 adminRoutes.use('*', requireAdmin);
@@ -4668,4 +4669,17 @@ adminRoutes.delete('/blocked-terms/:term', async (c) => {
   const res = await c.env.DB.prepare('DELETE FROM blocked_terms WHERE term = ?').bind(term).run();
   await audit(c.env.DB, admin.id, 'moderation.blocked_term.delete', term, { term });
   return c.json({ success: true, deleted: (res.meta.changes ?? 0) > 0 });
+});
+
+/**
+ * HOW MUCH OF THE CATALOGUE THE CURRENT SEARCH BUILDER HAS INDEXED
+ * (docs/SEARCH.md §6). A builder change (`INDEX_STAMP`,
+ * worker/lib/search/store.ts) is rolled out by the quarter-hour backfill, a
+ * pass at a time; until it is done the products it has not reached answer from
+ * their old rows. `coverage` 1 is the whole active catalogue on the current
+ * builder. Read-only, one statement; no cost, no customer data.
+ */
+adminRoutes.get('/search/index-status', async (c) => {
+  const status = await searchIndexStatus(c.env.DB);
+  return c.json({ success: true, ...status });
 });

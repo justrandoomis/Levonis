@@ -40,11 +40,12 @@
  *   products by the weights of the tokens they matched.
  */
 
-import { isUsefulToken, normalizeText, tokenize } from './normalize';
-import { bestMatches, candidatePrefix, prefixScore, SKELETON_MARK, type TokenMatch } from './match';
+import { extractMeasures, foldText, isUsefulToken, normalizeSearchText, tokenize } from './normalize';
+import { bestMatches, candidatePrefix, isMeasureToken, prefixScore, SKELETON_MARK, type TokenMatch } from './match';
 
 export { SKELETON_MARK };
 import { collapseSpelledLetters, hasArabicScript, loneSpelledLetter, romanize } from './translit';
+import { QUERY_STOPWORDS } from './vocabulary';
 
 /**
  * How much a token is worth, by where it was found.
@@ -96,6 +97,15 @@ export function buildIndexRows(doc: SearchDoc): IndexRow[] {
     for (const value of values ?? []) {
       for (const token of tokenize(value)) {
         add(token, weight);
+        // NO SKELETON FOR PROSE, AND NONE FOR A MEASURE (`#doc:6`). A skeleton
+        // is the bridge from a NAME in one script to a shopper typing in the
+        // other. A description word at weight 1 needs no bridge, and since the
+        // Arabic and Sorani descriptions are indexed their skeletons would
+        // fill every Latin range a query opens — `al…` alone would hold every
+        // Arabic word with the article — and push real words past the
+        // vocabulary cap. A measure (`0.4`, `6x2`) is digits: nothing to
+        // romanise, and `6x2` flattened to `~6x2` is a key nobody types.
+        if (field === 'description' || isMeasureToken(token)) continue;
         // The romanised skeleton, so a Latin query can reach an Arabic name
         // («بامبو» is stored as `bamba` beside itself, and "bambu" reaches it).
         // Stored at the same weight — it is the same word, not a weaker signal.
@@ -156,6 +166,16 @@ export interface ExpandedQuery {
    * even when the vocabulary holds them exactly; see `bestMatches`.
    */
   completing: ReadonlySet<string>;
+  /**
+   * The MEASURES the query names — `0.4`, `1.75`, `6x2` (./normalize.ts
+   * `extractMeasures`). Each one is matched exactly (./match.ts) and each one
+   * is REQUIRED: a product that does not carry it is not an answer, however
+   * well it matches the other words. «nozzle 0.4» listed every 0.2 nozzle
+   * under the 0.4 one, because "nozzle" alone covered half the query; a size
+   * is not half of what the shopper asked for, it is the question. Absent on
+   * an expansion built by hand (a unit test): nothing is required.
+   */
+  measures?: ReadonlySet<string>;
 }
 
 export interface ExpandOptions {
@@ -179,9 +199,27 @@ export function expandQuery(
   synonyms: ReadonlyMap<string, string>,
   opts: ExpandOptions = {}
 ): ExpandedQuery {
-  const normalized = normalizeText(raw);
-  if (!normalized) return { literal: [], lookup: [], origin: new Map(), completing: new Set() };
-  const literal = tokenize(normalized);
+  const normalized = normalizeSearchText(raw);
+  if (!normalized) return { literal: [], lookup: [], origin: new Map(), completing: new Set(), measures: new Set() };
+  /**
+   * TOKENISED FROM WHAT WAS TYPED, NOT FROM ITS NORMAL FORM. `normalizeText`
+   * turns the '.' of «0.4» and the '×' of «6×2» into spaces, and those are
+   * exactly what make them measures; `tokenize` folds the text itself and
+   * lifts the measures out first, the same way the index side does.
+   */
+  const all = tokenize(raw);
+  const measures = new Set(all.filter(isMeasureToken));
+  /**
+   * WHAT IS LOOKED FOR, AND WHAT IS ONLY GRAMMAR. A unit written against a
+   * measure («0.4mm», «0.4 ملم») is said by the measure already, and a
+   * stopword («في», "for", «بۆ») is not a word the query is about — see
+   * QUERY_STOPWORDS (./vocabulary.ts). Neither is looked up or counted toward
+   * coverage. A word the owner's dictionary gives a meaning to is never a
+   * stopword, and a query made of nothing else stays itself.
+   */
+  const units = measures.size > 0 ? new Set(extractMeasures(foldText(raw)).units) : new Set<string>();
+  const kept = all.filter((t) => !units.has(t) && !(QUERY_STOPWORDS.has(t) && !synonyms.has(t)));
+  const literal = kept.length > 0 ? kept : all;
   const lookup = new Set<string>(literal);
   const origin = new Map<string, string>(literal.map((l) => [l, l]));
   /** Look `token` up on behalf of the typed word `from`. First claim wins. */
@@ -233,8 +271,11 @@ export function expandQuery(
 
   // A MULTI-WORD synonym has to be tried before the words are split up:
   // «بامبو لاب» and «قطع غيار» mean one thing each, and neither half means it.
+  // ON WORD BOUNDARIES: a raw substring test let «قطع غيار» fire inside
+  // «مقطع غيارات», and any phrase inside a longer word it happened to touch.
+  const padded = ` ${normalized} `;
   for (const [term, canonical] of synonyms) {
-    if (term.includes(' ') && normalized.includes(term)) serve(canonical, term);
+    if (term.includes(' ') && padded.includes(` ${term} `)) serve(canonical, term);
   }
 
   for (const token of literal) {
@@ -256,8 +297,10 @@ export function expandQuery(
 
   // «اكس تو دي» → "x2d": Latin letters read aloud in Arabic, which no
   // romanisation can recover. Only attempted on an Arabic-script query.
+  // Over EVERY word typed, stopwords included: «في» is also the letter V, and
+  // a spelled run («بي في سي») must not lose its middle letter to grammar.
   if (hasArabicScript(normalized)) {
-    for (const collapsed of collapseSpelledLetters(literal)) {
+    for (const collapsed of collapseSpelledLetters(all)) {
       if (isUsefulToken(collapsed)) serve(collapsed, collapsed);
       const viaSynonym = synonyms.get(collapsed);
       if (viaSynonym) serve(viaSynonym, collapsed);
@@ -274,7 +317,7 @@ export function expandQuery(
      * "X" at a printer shop means. Only the letters that are not also Arabic
      * words are allowed through; see `loneSpelledLetter`.
      */
-    for (const token of literal) {
+    for (const token of all) {
       const letter = loneSpelledLetter(token);
       if (letter) serve(letter, token);
     }
@@ -295,6 +338,8 @@ export function expandQuery(
   if (opts.completeLast !== false && !/\s$/u.test(raw)) {
     const last = words[words.length - 1];
     for (const token of tokenize(last)) {
+      // A measure is never completed: `6x2` is a prefix of `6x20`.
+      if (isMeasureToken(token)) continue;
       completing.add(token);
       if (hasArabicScript(token)) {
         const skeleton = romanize(token);
@@ -306,7 +351,7 @@ export function expandQuery(
     }
   }
 
-  return { literal, lookup: [...lookup], origin, completing };
+  return { literal, lookup: [...lookup], origin, completing, measures };
 }
 
 /** The distinct prefixes a candidate-vocabulary lookup needs. */
@@ -358,8 +403,11 @@ export function scoreProducts(
   }
 
   const wanted = Math.max(1, expanded.literal.length);
+  const required = [...(expanded.measures ?? [])];
   const out: ScoredProduct[] = [];
   for (const [product_id, perWord] of byProduct) {
+    // A measure the product does not carry rules it out (`ExpandedQuery.measures`).
+    if (required.length > 0 && !required.every((m) => perWord.has(m))) continue;
     let score = 0;
     for (const v of perWord.values()) score += v;
     const coverage = Math.min(1, perWord.size / wanted);

@@ -1056,7 +1056,10 @@ test('PLAN_TOO_LARGE when the invocation has already spent what the write needs;
   const w = newWorld();
   const s = stage(w, 'pla-basic-filament');
   const ctx = importWriteContext(w.db, w.media as never);
-  ctx.counter.charge(400); // the route's own reads, a long lease history …
+  // The route's own reads, a long lease history … — all but a handful of the invocation. (This charged 400 while
+  // the search index cost one statement a row; since `#doc:6` it is a few statements a product, and the plan
+  // is far smaller — worker/lib/search/store.ts `INDEX_ROWS_PER_STATEMENT`.)
+  ctx.counter.charge(IMPORT_INVOCATION_LIMIT - 10);
   const e = await refused(
     () => planImportWrite(ctx, { mode: 'write', payload: s.payload, bundle: w.bundle, runId: RUN_ID, itemId: s.itemId, leaseToken: LEASE }),
     'PLAN_TOO_LARGE'

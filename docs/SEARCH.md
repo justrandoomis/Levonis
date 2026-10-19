@@ -56,25 +56,37 @@ search_tokens(product_id, token, weight)     PRIMARY KEY (product_id, token)
 search_synonyms(term, canonical, owner_added, created_at)
 ```
 
-**Every Arabic-script token is stored twice**: as itself, and as its romanised
-skeleton. That is the one line that lets «بامبو» and "bambu" meet. A LATIN
-token's skeleton is stored under a `~` mark (`~alaga` for "elegoo", stamp
-`#doc:4`) that only a query typed in Arabic letters looks up: bare, it made
-Latin words collide ("heat" and "hot" were both `hat`, "plate" was `plata`
-beside "pla"); without it, «اليجو» and «سونلو» found nothing unless the brand
-was in the synonym dictionary. `~` never survives `normalizeText`, and no
-range a Latin query opens reaches it.
+**Every Arabic-script token in a name is stored twice**: as itself, and as its
+romanised skeleton. That is the one line that lets «بامبو» and "bambu" meet. A
+LATIN token's skeleton is stored under a `~` mark (`~alaga` for "elegoo") that
+only a query typed in Arabic letters looks up: bare, it made Latin words
+collide ("heat" and "hot" were both `hat`, "plate" was `plata` beside "pla");
+without it, «اليجو» and «سونلو» found nothing unless the brand was in the
+synonym dictionary. `~` never survives `normalizeText`, and no range a Latin
+query opens reaches it.
+
+**Prose and measures carry no skeleton** (since `#doc:6`). A skeleton bridges a
+NAME across scripts; a description word at weight 1 needs no bridge, and with
+the Arabic and Sorani descriptions indexed their skeletons would fill every
+Latin range — `al…` would hold every Arabic word with the article.
 
 ### What is indexed, and how heavily
 
 | Field | Weight | Why |
 |---|---|---|
 | name (en / ar / ckb / sku) | 10 | The shopper naming the product |
-| brand | 8 | |
-| model & colour names | 6 | "Combo" is an OPTION name here, not part of the product name |
+| brand, in every language it is written in | 8 | |
+| model & colour names, variant SKUs, aliases (colour / part / SKU codes, identity model and series) | 6 | "Combo" is an OPTION name here, not part of the product name; a variant SKU is the code on one colour's box |
 | **hashtags** | 5 | The best signal in this database — see below |
-| section names | 4 | «طابعات» is a word about the section |
-| description | 1 | |
+| section names, in every language | 4 | «طابعات» is a word about the section |
+| description (en / ar / ckb) | 1 | |
+
+The brand and section names used to be read in ONE language (English, or
+Arabic when there was none), and only the English description was indexed;
+`#doc:6` reads all three, so a shopper's Sorani word for a section or an
+Arabic word from a translated description finds the product. Variant SKUs come
+from `product_variants.sku` (active variants only), read by the backfill's own
+selection as `variant_skus` — no statement of its own.
 
 The **hashtags** are not an afterthought. The owner tags richly — the X2D
 carries `#x2d`, `#x2d-combo`, `#bambu-lab`, `#dual-nozzle`, `#ams-2-pro`,
@@ -92,8 +104,10 @@ one — the classic failure of a naive index, and the reason weights exist.
 
 ```
 «بمبو اكس تو دي»
-  → normalize    فold hamza/ta-marbuta, strip diacritics + tatweel
-  → tokenize     [بمبو, اكس, تو, دي]
+  → normalize    fold hamza/ta-marbuta, strip diacritics + tatweel,
+                 Arabic-Indic and Eastern digits (٤ ۴ → 4, ٫ → .)
+  → tokenize     measures first (§4a), then the words: [بمبو, اكس, تو, دي]
+  → grammar      stopwords and a measure's unit dropped (§4b)
   → expand       synonyms  (بمبو → bambu)
                  romanise  (بمبو → bmbw)
                  collapse spelled-out Latin letters (اكس تو دي → x2d)
@@ -112,9 +126,46 @@ one — the classic failure of a naive index, and the reason weights exist.
 **Coverage is a multiplier, not a bonus.** A product matching both query words
 beats one matching either, however heavily weighted. Without it, "bambu x2d"
 ranks every Bambu product above the X2D — which is the single most important
-line in `scoreProducts`.
+line in `scoreProducts`. A typed word whose every range was cut by
+`MAX_PREFIXES` is not counted: it could not have been found.
 
-### The cost
+### 4a. Measures: «0.4», «1.75», «6×2»
+
+'.' and '×' were separators like any other punctuation, and a token needs two
+characters, so «0.4» tokenised to nothing, «0.4mm» to `4mm`, «1.75» to `75` and
+«6×2» to nothing at all: the live search for «0.2» returned nothing and «nozzle
+0.4» returned every nozzle and wiper. A pass over the folded text now lifts the
+measures out whole, before the punctuation goes, and writes them one way:
+
+| Typed | Token(s) |
+|---|---|
+| «0.4», «0.40», «.4», «٠٫٤», «۰.۴» | `0.4` |
+| «1.75mm», «PLA1.75» | `1.75` (and `mm`, `pla` as words) |
+| «6×2», «6x2», «6*2», «6 x 2», «٦x٢» | `6x2` |
+| «20×20×2» | `20x20x2` |
+| «2.0» | `2` — an ordinary number again |
+| «m3x8» | `m3x8` — a dimension glued to a word stays the word |
+
+On the query side a measure is **exact and required**: never completed (`6x2`
+is a prefix of `6x20`), never forgiven a typo (`6x3` is one edit away), and a
+product that does not carry it is not an answer, however well it matches the
+other words. «nozzle 0.3», where nobody sells a 0.3, answers nothing.
+
+### 4b. A query's grammar
+
+* **Stopwords** (`QUERY_STOPWORDS`, worker/lib/search/vocabulary.ts) — «في»,
+  «من», "for", "the", «بۆ», «لە» … — are dropped from the query, never from the
+  index. With the Arabic descriptions indexed, «في» is a word in nearly every
+  product, and counting it let every product "cover" half of «نوزل في
+  الطابعة». A word the owner's dictionary gives a meaning to is never a
+  stopword, a query of nothing but stopwords stays itself, and a spelled-out
+  run («بي في سي») still sees its middle letter.
+* **A unit written against a measure** («0.4mm», «0.4 ملم») is said by the
+  measure and is not looked up.
+* **Multi-word synonyms match on word boundaries.** «قطع غيار» fires on those
+  two words, not inside «مقطع غيارات».
+
+### 4c. The cost
 
 Two reads, whatever the query, neither growing with the catalogue the way a
 `LIKE '%…%'` scan does:
@@ -134,6 +185,21 @@ what makes typo tolerance affordable at all.
 one edit apart and are a plastic and a filament changer. A shopper shown an AMS
 when they searched for ABS has been misled; being wrong is worse than finding
 nothing.
+
+**A token with a digit in it gets no typo budget either**, whatever its length.
+It is a code, a model or a size, and one edit away is a different one: one
+edit scored 0.55, so the unknown colour code «10102» answered with the colours
+10100 and 10101. And a number is completed only while it is being typed:
+«1010» may offer 10100 and 10101, «1010 » (finished) and a tool's lookup never
+do. A model fragment with letters in it («x2» in «bambu x2 combo») still
+reaches `x2d` by prefix — that is what it begins, not a typo of it.
+
+**The Arabic article is not the word's first two letters.** «ال» (and «وال»,
+«بال», «فال», «كال», «لل») begins most nouns in an Arabic description, so the
+range «ال» holds thousands of words and the vocabulary read stops at its cap in
+token order. A query token that starts with the article narrows on the article
+and the stem's first letter (`candidatePrefix`, «الطابعه» → «الط»): the same
+"first two letters" rule, applied to the word rather than to its article.
 
 A MISSPELLING INSIDE THE FIRST TWO LETTERS is not forgiven either, and that is
 a consequence of the cost model rather than an oversight. The candidate
@@ -164,6 +230,17 @@ completed from the names of the products it ranked first
 (`worker/lib/search/complete.ts`). The storefront draws the rest of it in grey
 inside the field; Space (only while it is showing), Tab or the arrow toward
 the end of the text takes it (`src/components/search/`).
+
+### Hidden products take no ranking slot
+
+The index holds every product, hidden and draft ones included, and the route
+filters what the engine hands it. A hidden product ranked in the top 200 cost a
+visible one its place — «H» or a brand on a shop with hidden stock answered
+with fewer, and worse, products than it had. When more than 200 products match,
+the engine now asks the route which of its best **600** (3×) are listed — the
+same `listedScope` the listing reads with — and cuts to 200 after
+(`SearchOptions.visible`, `VISIBILITY_OVERFETCH`). One extra read, only on a
+search that ranks more than 200 products.
 
 ### The hit list is ONE bound parameter
 
@@ -197,10 +274,26 @@ D1 stand-in that refuses what D1 refuses.
   `tests/deployAheadOfMigrations.test.ts` pins both halves.
 * **The backfill is a cron job, not the migration.** Indexing needs the brand
   and section *names* and the tokeniser — work SQL cannot do — and a shop with
-  thousands of products cannot be indexed inside one invocation. `runDurableJobs`
-  takes fifty unindexed products per run and reports `search_indexed`. It
-  commits in groups of ten; a product it cannot write is marked `#fail:<v>`,
-  reported, and skipped, so one bad row cannot stall the rest.
+  thousands of products cannot be indexed inside one invocation. It takes the
+  products that do not carry the current **stamp** (`INDEX_STAMP`, a weight-0
+  row `#doc:<n>`; `#doc:6` today), which is "never indexed" and "indexed by an
+  older builder" in one predicate. The quarter-hour tick runs it after its
+  jobs, with what they left of D1's 1,000 statements, charging every statement
+  before it sends it (`backfillSearchIndex`, DECISIONS row 201): up to **200**
+  products a pass; every unbudgeted caller takes fifty. It commits in groups of
+  ten; a product it cannot write is marked `#fail:<n>`, reported, and skipped,
+  so one bad row cannot stall the rest.
+* **A product is a few statements, not one a token.** Its rows go in as JSON
+  arrays, `INDEX_ROWS_PER_STATEMENT` (500) to an `INSERT … SELECT … FROM
+  json_each(?)`, the stamp in the last one: a product is its DELETE and one
+  INSERT per 500 rows. One statement a row made a stamp bump take days of
+  ticks; now a few ticks rewrite the catalogue.
+* **The rollout is visible.** `GET /api/admin/search/index-status` answers the
+  stamp, the active products, how many are `current`, still on an `older`
+  builder's rows, `missing` or `failed`, the `coverage` (current / active) and
+  the passes left. Coverage 1 is the whole active catalogue on the current
+  builder. Until then a product on older rows still answers by its old tokens,
+  and is not an answer to a measure it was not yet indexed with.
 * **A brand or section rename reindexes its products.** The index holds the
   NAMES; the rename deletes the affected products' stamps in the same batch and
   rewrites the first fifty at once — the cron does the rest.
@@ -233,13 +326,15 @@ Both sides are stored **normalised**, which is why one row covers «طابعة»
 
 | File | What it is |
 |---|---|
-| `worker/lib/search/normalize.ts` | Orthography: folding, diacritics, tokenisation |
+| `worker/lib/search/normalize.ts` | Orthography: folding (letters and digits), diacritics, measures, tokenisation |
 | `worker/lib/search/translit.ts` | Romanisation, and Latin letters spelled out in Arabic |
-| `worker/lib/search/vocabulary.ts` | The seed dictionary |
+| `worker/lib/search/vocabulary.ts` | The seed dictionary, and the query stopwords |
 | `worker/lib/search/match.ts` | Bounded edit distance and the budget |
 | `worker/lib/search/index.ts` | Index rows, query expansion, scoring |
 | `worker/lib/search/document.ts` | What of a product is searchable |
 | `worker/lib/search/complete.ts` | The grey completion: which word, and how much of it is left |
 | `worker/lib/search/store.ts` | The only part that touches D1 |
 | `migrations/0089_search_index.sql` | The two tables and the seed |
-| `tests/search.test.ts` | The owner's own examples, as acceptance criteria |
+| `tests/search.test.ts` | The owner's own examples, and acceptance rows 1–4 and 13 of the assistant plan |
+| `tests/searchLive.test.ts` | A realistic catalogue through the route on D1's parameter ceiling; hidden products; the `#doc:6` rollout and its status |
+| `tests/searchBackfillBudget.test.ts` | The catch-up within a statement budget |

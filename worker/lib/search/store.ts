@@ -30,6 +30,7 @@ import { normalizeText } from './normalize';
 import { toSearchDoc, variantNamesFrom } from './document';
 import { aliasReadCount, loadSearchAliases } from './aliases';
 import { catalogKnowledgeInstalled, catalogKnowledgeKnown } from '../catalogKnowledge';
+import { candidatePrefix } from './match';
 import {
   buildIndexRows,
   candidatePrefixes,
@@ -66,7 +67,7 @@ const MAX_POSTINGS = 4000;
  * SO THE INDEX CARRIES ITS OWN VERSION, one row per product, weight 0. The
  * backfill takes the products that do not carry the CURRENT stamp, which is
  * "never indexed" and "indexed by an older builder" in one predicate, and it
- * rewrites them fifty per cron run until the whole catalogue matches. Bump
+ * rewrites them a budgeted pass at a time (up to 200 per quarter-hour) until the whole catalogue matches. Bump
  * `INDEX_STAMP` whenever the document builder starts reading a field it did
  * not read before, and the shop repairs itself over the next few hours of
  * cron without a migration, a deploy step or an admin button.
@@ -87,7 +88,7 @@ const MAX_POSTINGS = 4000;
  * search_tokens WHERE product_id = ?` above takes it with the rest of the
  * product's rows, so it is never stale.
  */
-export const INDEX_STAMP = '#doc:5';
+export const INDEX_STAMP = '#doc:6';
 
 /*
  * THE STAMP'S HISTORY, because each bump rewrote the whole catalogue and the
@@ -115,6 +116,15 @@ export const INDEX_STAMP = '#doc:5';
  *          code, a part code, a SKU code and the identity model and series of
  *          a product, read by one loader that both writers use. On a database
  *          without 0194 the rewritten rows are the #doc:4 rows exactly.
+ *   #doc:6 — measures are tokens: «0.4», «1.75» and
+ *          «6×2» are written `0.4`, `1.75`, `6x2`, with the unit as its own
+ *          word, and the Arabic-Indic and Eastern digits are folded to ASCII
+ *          (./normalize.ts). The Arabic and Sorani descriptions, the brand and
+ *          section names in every language and the variant SKUs are indexed;
+ *          prose and measures carry no skeleton. The rows are written 500 to a
+ *          statement (`INDEX_ROWS_PER_STATEMENT`), so the backfill that
+ *          rewrites the catalogue costs a few statements a product, not one a
+ *          token. `GET /api/admin/search/index-status` reports how far it is.
  */
 
 /**
@@ -150,34 +160,49 @@ const SEARCH_INDEX_FAILED_SQL =
   'NOT EXISTS (SELECT 1 FROM search_tokens f WHERE f.product_id = p.id AND f.token = ?)';
 
 /**
- * Replace a product's index rows with exactly these.
+ * INDEX ROWS PER STATEMENT. Each product's rows go in as one JSON array per
+ * statement (`json_each`), not one statement per row.
+ *
+ * One statement a row made a product cost two statements plus one per token,
+ * and D1 allows 1,000 statements per invocation: the quarter-hour catch-up
+ * rewrote a handful of products a tick, and a product with a long description
+ * in three languages could not fit one tick at all. A whole catalogue's
+ * rewrite after an `INDEX_STAMP` bump took days. Now a product is its DELETE
+ * and one INSERT per 500 rows (the stamp rides in the last one): two or three
+ * statements, so a tick rewrites a couple of hundred products.
+ *
+ * Two bound parameters whatever the size — D1's 100-parameter refusal never
+ * comes near — and 500 rows is a few tens of kilobytes of JSON, far under
+ * D1's limits on a bound value.
+ */
+export const INDEX_ROWS_PER_STATEMENT = 500;
+
+const INSERT_INDEX_ROWS_SQL = `INSERT OR REPLACE INTO search_tokens (product_id, token, weight)
+  SELECT ?1, json_extract(j.value, '$[0]'), json_extract(j.value, '$[1]') FROM json_each(?2) j`;
+
+/**
+ * Replace a product's index rows with exactly these rows, and its stamp.
  *
  * Returns STATEMENTS rather than running them, so the caller can put them in
  * the same batch as the product write. A search index updated in a second
  * transaction is an index that disagrees with the catalogue whenever the
  * second one fails.
  */
-export function planSearchIndex(db: D1Database, doc: SearchDoc): D1PreparedStatement[] {
-  const rows = buildIndexRows(doc);
-  const stmts: D1PreparedStatement[] = [
-    db.prepare('DELETE FROM search_tokens WHERE product_id = ?').bind(doc.productId),
-  ];
-  // One statement per row rather than a giant multi-VALUES insert: D1 batches
-  // are cheap and a 900-parameter statement is where the binding limit bites.
-  for (const row of rows) {
-    stmts.push(
-      db
-        .prepare('INSERT OR REPLACE INTO search_tokens (product_id, token, weight) VALUES (?, ?, ?)')
-        .bind(row.product_id, row.token, row.weight)
-    );
+export function planSearchIndexRows(db: D1Database, productId: string, rows: readonly IndexRow[]): D1PreparedStatement[] {
+  const stmts: D1PreparedStatement[] = [db.prepare('DELETE FROM search_tokens WHERE product_id = ?').bind(productId)];
+  // And the stamp that says WHICH BUILDER wrote these rows (see INDEX_STAMP),
+  // written by the same statement as the last of them.
+  const pairs: [string, number][] = rows.map((r) => [r.token, r.weight]);
+  pairs.push([INDEX_STAMP, 0]);
+  for (let i = 0; i < pairs.length; i += INDEX_ROWS_PER_STATEMENT) {
+    stmts.push(db.prepare(INSERT_INDEX_ROWS_SQL).bind(productId, JSON.stringify(pairs.slice(i, i + INDEX_ROWS_PER_STATEMENT))));
   }
-  // And the stamp that says WHICH BUILDER wrote these rows. See INDEX_STAMP.
-  stmts.push(
-    db
-      .prepare('INSERT OR REPLACE INTO search_tokens (product_id, token, weight) VALUES (?, ?, 0)')
-      .bind(doc.productId, INDEX_STAMP)
-  );
   return stmts;
+}
+
+/** `planSearchIndexRows` for a document: the rows `buildIndexRows` makes of it. */
+export function planSearchIndex(db: D1Database, doc: SearchDoc): D1PreparedStatement[] {
+  return planSearchIndexRows(db, doc.productId, buildIndexRows(doc));
 }
 
 /**
@@ -198,6 +223,8 @@ export const SEARCH_DOC_COLUMNS = [
   'name_ar',
   'name_ku',
   'description',
+  'description_ar',
+  'description_ku',
   'hashtags',
   'sku',
   'brand_id',
@@ -207,9 +234,22 @@ export const SEARCH_DOC_COLUMNS = [
   'colors',
 ] as const;
 
-/** `SEARCH_DOC_COLUMNS` as a SELECT list, optionally under a table alias. */
+/**
+ * `SEARCH_DOC_COLUMNS` as a SELECT list, optionally under a table alias —
+ * and the product's VARIANT SKUS beside them, as `variant_skus` (a JSON
+ * array). A shopper holding a box types the code printed on it, and that code
+ * is the variant's, in `product_variants`, which no index writer read. A
+ * correlated subquery rather than a read of its own: the selection that
+ * already pays for the rows brings them, so the budgeted backfill spends no
+ * statement on them. `product_variants` is migration 0018's.
+ */
 export function searchDocColumns(alias = ''): string {
-  return SEARCH_DOC_COLUMNS.map((c) => (alias ? `${alias}.${c}` : c)).join(', ');
+  const owner = alias || 'products';
+  return [
+    ...SEARCH_DOC_COLUMNS.map((c) => (alias ? `${alias}.${c}` : c)),
+    `(SELECT json_group_array(v.sku) FROM product_variants v
+       WHERE v.product_id = ${owner}.id AND v.active = 1 AND v.sku IS NOT NULL AND v.sku <> '') AS variant_skus`,
+  ].join(', ');
 }
 
 /**
@@ -291,15 +331,18 @@ export async function searchDocsForRows(
   opts: { aliasesInstalled?: boolean } = {}
 ): Promise<SearchDoc[]> {
   if (rows.length === 0) return [];
-  const names = new Map<string, string>();
+  // EVERY LANGUAGE THE NAME IS WRITTEN IN (`#doc:6`). This read the English
+  // name, or the Arabic when there was none — so «بامبو لاب» reached a Bambu
+  // product only through the romanised bridge, and a Sorani section name never.
+  const names = new Map<string, string[]>();
   const collect = async (table: 'brands' | 'catalogs', ids: string[]): Promise<void> => {
     for (const part of inChunks(ids)) {
       const ph = part.map(() => '?').join(',');
       const { results } = await db
-        .prepare(`SELECT id, COALESCE(NULLIF(name_en,''), name_ar) AS n FROM ${table} WHERE id IN (${ph})`)
+        .prepare(`SELECT id, name_en, name_ar, name_ckb FROM ${table} WHERE id IN (${ph})`)
         .bind(...part)
-        .all<{ id: string; n: string }>();
-      for (const r of results ?? []) names.set(String(r.id), String(r.n ?? ''));
+        .all<{ id: string; name_en: string | null; name_ar: string | null; name_ckb: string | null }>();
+      for (const r of results ?? []) names.set(String(r.id), namesOf(r.name_en, r.name_ar, r.name_ckb));
     }
   };
   const ids = nameIdsOf(rows);
@@ -312,6 +355,7 @@ export async function searchDocsForRows(
     rows.map((r) => String(r.id)),
     opts.aliasesInstalled === undefined ? {} : { installed: opts.aliasesInstalled }
   );
+  const named = (id: unknown): string[] => names.get(String(id ?? '')) ?? [];
   return rows.map((r) =>
     toSearchDoc({
       id: String(r.id),
@@ -319,16 +363,34 @@ export async function searchDocsForRows(
       name_ar: r.name_ar,
       name_ku: r.name_ku,
       description: r.description,
+      description_ar: r.description_ar,
+      description_ku: r.description_ku,
       hashtags: r.hashtags,
       sku: r.sku,
-      brandName: names.get(String(r.brand_id ?? '')) ?? null,
-      categoryNames: [names.get(String(r.category_id ?? '')) ?? '', names.get(String(r.sub_category_id ?? '')) ?? ''].filter(
-        Boolean
-      ),
+      brandNames: named(r.brand_id),
+      categoryNames: [...named(r.category_id), ...named(r.sub_category_id)],
       variantNames: variantNamesFrom(r.options, r.colors),
+      variantSkus: jsonStrings(r.variant_skus),
       aliases: aliases.get(String(r.id)) ?? [],
     })
   );
+}
+
+/** A name's distinct, non-empty spellings across the three languages. */
+export function namesOf(...values: unknown[]): string[] {
+  return [...new Set(values.filter((v): v is string => typeof v === 'string' && v.trim() !== '').map((v) => v.trim()))];
+}
+
+/** A JSON array of strings (`json_group_array`), read defensively. */
+export function jsonStrings(v: unknown): string[] {
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === 'string' && x.trim() !== '');
+  if (typeof v !== 'string' || !v.startsWith('[')) return [];
+  try {
+    const parsed: unknown = JSON.parse(v);
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string' && x.trim() !== '') : [];
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -444,10 +506,36 @@ export interface SearchResult {
  * "something" is how a search engine starts showing people things they did not
  * ask for, and the caller's own empty state is honest about it.
  */
+/**
+ * How many ranked candidates a search with a `visible` check looks at for each
+ * id it returns. See `SearchOptions.visible`.
+ */
+export const VISIBILITY_OVERFETCH = 3;
+
+export interface SearchOptions {
+  limit?: number;
+  synonyms?: ReadonlyMap<string, string>;
+  completeLast?: boolean;
+  /**
+   * WHICH OF THESE IDS A SHOPPER MAY SEE (docs/SEARCH.md, «Hidden products
+   * take no ranking slot»). The index holds every product, hidden and draft
+   * ones included, and the caller filters what
+   * it is handed — so a hidden product ranked in the top `limit` took a slot
+   * and the visible product it pushed out was simply never returned: «H» or
+   * "bambu" on a shop with hidden stock answered with fewer, and worse,
+   * products than it had. With this, when more products match than `limit`,
+   * the best `limit × VISIBILITY_OVERFETCH` are asked about and the list is
+   * cut to `limit` AFTER the hidden ones are gone. One extra read, and only
+   * on a search that ranks more than `limit` products; a failed read keeps
+   * today's cut (the caller still filters).
+   */
+  visible?: (ids: string[]) => Promise<ReadonlySet<string>>;
+}
+
 export async function searchProducts(
   db: D1Database,
   rawQuery: string,
-  opts: { limit?: number; synonyms?: ReadonlyMap<string, string>; completeLast?: boolean } = {}
+  opts: SearchOptions = {}
 ): Promise<SearchResult> {
   const limit = opts.limit ?? 50;
   const synonyms = opts.synonyms ?? (await synonymsFor(db));
@@ -469,6 +557,18 @@ export async function searchProducts(
   //    pattern has no leading wildcard, and the range form cannot be broken by
   //    a stray `%` or `_` in a shopper's query.
   const prefixes = candidatePrefixes(expanded.lookup).slice(0, MAX_PREFIXES);
+  /**
+   * A WORD WHOSE EVERY RANGE WAS CUT CANNOT BE FOUND, SO IT IS NOT COUNTED.
+   * `MAX_PREFIXES` drops the ranges past the twelfth, and every typed word
+   * still counted toward coverage — a long query ranked every product down
+   * for words it had not even looked for. A word counts when at least one of
+   * its lookups (itself, a synonym, a skeleton) is in a range that is read.
+   */
+  const read = new Set(prefixes);
+  const servable = new Set<string>();
+  for (const t of expanded.lookup) if (read.has(candidatePrefix(t))) servable.add(expanded.origin.get(t) ?? t);
+  const counted = expanded.literal.filter((l) => servable.has(l));
+  const scoring = counted.length === expanded.literal.length ? expanded : { ...expanded, literal: counted };
   const ranges = prefixes.map(() => '(token >= ? AND token < ?)').join(' OR ');
   const rangeParams: string[] = [];
   for (const p of prefixes) {
@@ -549,8 +649,14 @@ export async function searchProducts(
     .bind(JSON.stringify(tokens))
     .all<IndexRow>();
 
-  const scored: ScoredProduct[] = scoreProducts(expanded, matched, postings ?? []);
-  return { ids: scored.slice(0, limit).map((s) => s.product_id), understood: tokens, indexReady: true };
+  const scored: ScoredProduct[] = scoreProducts(scoring, matched, postings ?? []);
+  let ids = scored.slice(0, limit).map((s) => s.product_id);
+  if (opts.visible && scored.length > limit) {
+    const pool = scored.slice(0, limit * VISIBILITY_OVERFETCH).map((s) => s.product_id);
+    const shown = await opts.visible(pool).catch(() => null);
+    if (shown) ids = pool.filter((id) => shown.has(id)).slice(0, limit);
+  }
+  return { ids, understood: tokens, indexReady: true };
 }
 
 /**
@@ -612,16 +718,17 @@ export interface BackfillResult {
 
 /**
  * How many products share one `db.batch`. Small on purpose: a batch is all or
- * nothing, and a product with a long description is a couple of thousand
- * statements on its own. Ten keeps a healthy chunk cheap and a bad one's blast
- * radius at nine innocent products, which are then retried one by one.
+ * nothing, and a product with a long description in three languages is
+ * thousands of rows on its own. Ten keeps a healthy chunk cheap and a bad
+ * one's blast radius at nine innocent products, which are then retried one by
+ * one.
  */
 const BACKFILL_GROUP = 10;
 
 /**
  * INDEX THE PRODUCTS WHOSE ROWS ARE MISSING OR STALE, a bounded pass at a time.
  *
- * The cron runs it over the whole catalogue (fifty per run); a brand or
+ * The cron runs it over the whole catalogue (up to 200 a budgeted pass, fifty without a budget); a brand or
  * section rename runs it over the products that carry that name (`scope`), so
  * the new name is findable the moment the rename returns rather than at the
  * next cron tick.
@@ -637,8 +744,9 @@ const BACKFILL_GROUP = 10;
  * it stays findable by whatever it was findable by before.
  *
  * WITH A STATEMENT BUDGET (the quarter-hour cron, worker/index.ts): D1 allows
- * 1,000 statements per invocation and a product costs two plus one per index
- * row, so fifty products can cost more than a whole tick. Every statement is
+ * 1,000 statements per invocation and a product costs its DELETE and one
+ * INSERT per `INDEX_ROWS_PER_STATEMENT` rows (one per row before `#doc:6`, when
+ * fifty products could cost more than a whole tick). Every statement is
  * charged BEFORE it is sent — the selection, the name reads
  * (`searchDocReadCount`), the alias reads and their presence probe
  * (`aliasReadCount`, worker/lib/catalogKnowledge.ts), each group's batch,
@@ -811,4 +919,88 @@ export function planSearchRestamp(db: D1Database, scope: { sql: string; params: 
           AND product_id IN (SELECT p.id FROM products p WHERE ${scope.sql})`
     )
     .bind(INDEX_STAMP, ...scope.params);
+}
+
+/**
+ * PRODUCTS ONE BACKFILL PASS SELECTS. The quarter-hour catch-up runs with a
+ * statement budget and takes up to 200 (docs/SEARCH.md §6): with the rows written
+ * 500 to a statement a product costs two or three, so the budget — not this
+ * number — is what paces a tick, and a stamp bump is repaired in a few ticks
+ * instead of days. Every unbudgeted caller (a cron path that shares its
+ * invocation with other jobs, a rename's immediate pass) keeps fifty.
+ */
+export const SEARCH_BACKFILL_BUDGETED_LIMIT = 200;
+export const SEARCH_BACKFILL_LIMIT = 50;
+
+/** How far the index is from describing the whole active catalogue with the current builder. */
+export interface SearchIndexStatus {
+  /** False on a database without migration 0089: nothing is indexed and nothing can be. */
+  installed: boolean;
+  /** The builder version the backfill writes (`INDEX_STAMP`). */
+  stamp: string;
+  /** Active products: what the backfill indexes. */
+  active: number;
+  /** Indexed by the current builder. */
+  current: number;
+  /** Still answering from an older builder's rows, waiting for the backfill. */
+  older: number;
+  /** No rows at all yet. */
+  missing: number;
+  /** Marked by the backfill as impossible to write with this builder (reported on the cron). */
+  failed: number;
+  /** `current / active` (1 for an empty catalogue). Coverage is complete at 1. */
+  coverage: number;
+  /** The pace that closes the gap: products per budgeted pass, one pass a quarter-hour. */
+  backfill: { per_pass: number; every_minutes: number; passes_left: number };
+}
+
+/**
+ * THE COVERAGE OF THE CURRENT BUILDER — `GET /api/admin/search/index-status`.
+ *
+ * A stamp bump (`#doc:6` here) is repaired by the cron, quietly, a pass at a
+ * time; until it finishes, the products it has not reached still answer from
+ * their old rows and lack whatever the new builder adds (a measure token, an
+ * Arabic description). This is the number that says when the repair is done:
+ * coverage 1 is every active product indexed by this builder. One statement,
+ * a primary-key probe per product.
+ */
+export async function searchIndexStatus(db: D1Database): Promise<SearchIndexStatus> {
+  const pace = (left: number) => ({
+    per_pass: SEARCH_BACKFILL_BUDGETED_LIMIT,
+    every_minutes: 15,
+    passes_left: Math.ceil(left / SEARCH_BACKFILL_BUDGETED_LIMIT),
+  });
+  if (!(await searchIndexInstalled(db))) {
+    return { installed: false, stamp: INDEX_STAMP, active: 0, current: 0, older: 0, missing: 0, failed: 0, coverage: 0, backfill: pace(0) };
+  }
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS active,
+              COALESCE(SUM(CASE WHEN cur THEN 1 ELSE 0 END ), 0) AS current,
+              COALESCE(SUM(CASE WHEN NOT cur AND fail THEN 1 ELSE 0 END ), 0) AS failed,
+              COALESCE(SUM(CASE WHEN NOT cur AND NOT fail AND old THEN 1 ELSE 0 END ), 0) AS older
+         FROM (SELECT EXISTS (SELECT 1 FROM search_tokens t WHERE t.product_id = p.id AND t.token = ?1) AS cur,
+                      EXISTS (SELECT 1 FROM search_tokens f WHERE f.product_id = p.id AND f.token = ?2) AS fail,
+                      EXISTS (SELECT 1 FROM search_tokens o WHERE o.product_id = p.id AND o.token >= '#doc:' AND o.token < '#doc;') AS old
+                 FROM products p
+                WHERE p.status = 'active')`
+    )
+    .bind(INDEX_STAMP, INDEX_FAILED_MARK)
+    .first<{ active: number; current: number; failed: number; older: number }>();
+  const active = Number(row?.active ?? 0);
+  const current = Number(row?.current ?? 0);
+  const failed = Number(row?.failed ?? 0);
+  const older = Number(row?.older ?? 0);
+  const missing = Math.max(0, active - current - failed - older);
+  return {
+    installed: true,
+    stamp: INDEX_STAMP,
+    active,
+    current,
+    older,
+    missing,
+    failed,
+    coverage: active === 0 ? 1 : current / active,
+    backfill: pace(older + missing),
+  };
 }

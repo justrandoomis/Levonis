@@ -22,6 +22,22 @@
  */
 
 /**
+ * True for a token the measure pass wrote (./normalize.ts `extractMeasures`):
+ * a number with a dot (`0.4`, `1.75`) or a dimension (`6x2`, `20x20x2`).
+ * These are matched exactly, never completed and never forgiven a typo.
+ *
+ * HERE, NOT IN ./normalize.ts: the storefront's entry chunk carries
+ * `normalizeText` (the grey completion, src/components/search/ghost.ts), and a
+ * helper defined there rides along into it for every page; this module only
+ * reaches the policy reader's chunk.
+ */
+export const isMeasureToken = (t: string): boolean =>
+  /^\d+(?:\.\d+)+$/.test(t) || /^\d+(?:\.\d+)?(?:x\d+(?:\.\d+)?){1,2}$/.test(t);
+
+/** True for a token with a digit in it: a model, a code, a size. */
+export const hasDigit = (t: string): boolean => /\d/.test(t);
+
+/**
  * Levenshtein distance between `a` and `b`, abandoned once it exceeds `max`.
  *
  * Returns `max + 1` for "further than you care about" rather than the true
@@ -67,6 +83,11 @@ export function boundedDistance(a: string, b: string, max: number): number {
  * who searches for ABS and is shown an AMS has been misled by the shop.
  */
 export function editBudget(token: string): number {
+  // A TOKEN WITH A DIGIT IN IT IS A CODE, A MODEL OR A SIZE, and one edit
+  // away is a different one: «10102» is not the colour 10101, «x1c» is not
+  // «x2c», «6x3» is not «6x2». One edit scored 0.55, so an unknown colour code
+  // answered with its neighbours' colours. A code is right or it is not there.
+  if (hasDigit(token)) return 0;
   if (token.length <= 3) return 0;
   if (token.length <= 6) return 1;
   return 2;
@@ -86,8 +107,21 @@ export function candidatePrefix(token: string): string {
   // narrows on the SKELETON's own prefix, with the mark kept in front: `~` on
   // its own would be a range over every Latin skeleton in the shop.
   if (token.startsWith(SKELETON_MARK)) return SKELETON_MARK + candidatePrefix(token.slice(SKELETON_MARK.length));
+  // THE ARABIC ARTICLE IS NOT THE WORD'S FIRST TWO LETTERS. «ال» (and «وال»,
+  // «بال», «فال», «كال», «لل») begins most of the nouns in an Arabic
+  // description, and the descriptions are indexed (`#doc:6`): the range «ال»
+  // holds thousands of words, and the vocabulary read stops at
+  // MAX_VOCABULARY in token order — «الطابعه» could be cut before it was
+  // ever compared. The range is narrowed to the article and the stem's first
+  // letter, which is the same "first two letters" rule applied to the word
+  // rather than to its article.
+  const article = ARTICLE.exec(token)?.[0];
+  if (article && token.length >= article.length + 2) return token.slice(0, article.length + 1);
   return token.slice(0, token.length <= 3 ? 1 : 2);
 }
+
+/** The definite article and the particles written onto it (normalised: no hamza). */
+const ARTICLE = /^(?:[وفبك]?ال|لل)/;
 
 /**
  * The mark in front of a Latin word's skeleton in the index. Defined here, not
@@ -149,15 +183,26 @@ export function bestMatches(
   opts: MatchOptions = {}
 ): TokenMatch[] {
   const exact = vocabulary.includes(queryToken);
+  // A MEASURE IS EXACT OR NOTHING — never completed, never forgiven. `6x2` is
+  // a prefix of `6x20` and one edit from `6x3`, `0.4` a prefix of `0.45`, and
+  // each of those is a different part (./normalize.ts `extractMeasures`).
+  if (isMeasureToken(queryToken)) return exact ? [{ token: queryToken, score: 1 }] : [];
   if (exact && !opts.complete) return [{ token: queryToken, score: 1 }];
 
   // The mark on a skeleton key is not a letter anybody typed.
-  const budget = editBudget(queryToken.startsWith(SKELETON_MARK) ? queryToken.slice(SKELETON_MARK.length) : queryToken);
+  const bare = queryToken.startsWith(SKELETON_MARK) ? queryToken.slice(SKELETON_MARK.length) : queryToken;
+  const budget = editBudget(bare);
+  // A NUMBER IS COMPLETED ONLY WHILE IT IS BEING TYPED. «1010» on its way to
+  // a colour code may offer 10100 and 10101; «1010 », finished — or a code a
+  // tool looks up, which never completes — is that number or nothing. A model
+  // fragment with letters in it («x2» in «bambu x2 combo») still reaches its
+  // model: it has no typo budget (above), but `x2d` IS what `x2` begins.
+  const completes = !/^\d+$/.test(bare) || opts.complete === true;
   const out: TokenMatch[] = [];
   for (const candidate of vocabulary) {
     if (candidate === queryToken) continue;
     if (candidate.startsWith(queryToken)) {
-      out.push({ token: candidate, score: prefixScore(queryToken, candidate) });
+      if (completes) out.push({ token: candidate, score: prefixScore(queryToken, candidate) });
       continue;
     }
     if (exact || budget === 0) continue;

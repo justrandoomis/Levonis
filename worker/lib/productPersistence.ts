@@ -77,7 +77,8 @@ import {
 } from './productModel';
 import { productsHaveColumn, productsHaveConditionDoc } from './conditionProjection';
 import { withClassificationPlacements } from './catalogMembership';
-import { planSearchIndex } from './search/store';
+import { jsonStrings, planSearchIndexRows } from './search/store';
+import { buildIndexRows } from './search/index';
 import { tableColumns } from './schemaColumns';
 import { toSearchDoc } from './search/document';
 import { loadSearchAliases } from './search/aliases';
@@ -3230,15 +3231,19 @@ export async function planProductSave(
   // its own probe (`searchIndexInstalled`), charged to the quarter-hour budget statement for statement.
   if (doc && (((await tableColumns(db, 'search_tokens'))?.size ?? 0) > 0)) {
     // The names and the stored aliases are independent reads: sent together.
+    // Every language each name is written in (`#doc:6`), and the SKUs of the
+    // variants already stored — one statement, as before.
     const [nameRows, storedAliases] = await Promise.all([
       db
         .prepare(
-          `SELECT (SELECT COALESCE(NULLIF(b.name_en, ''), b.name_ar) FROM brands b WHERE b.id = ?) AS brand,
-                  (SELECT COALESCE(NULLIF(c.name_en, ''), c.name_ar) FROM catalogs c WHERE c.id = ?) AS main,
-                  (SELECT COALESCE(NULLIF(c2.name_en, ''), c2.name_ar) FROM catalogs c2 WHERE c2.id = ?) AS sub`
+          `SELECT (SELECT json_array(b.name_en, b.name_ar, b.name_ckb) FROM brands b WHERE b.id = ?1) AS brand,
+                  (SELECT json_array(c.name_en, c.name_ar, c.name_ckb) FROM catalogs c WHERE c.id = ?2) AS main,
+                  (SELECT json_array(c2.name_en, c2.name_ar, c2.name_ckb) FROM catalogs c2 WHERE c2.id = ?3) AS sub,
+                  (SELECT json_group_array(v.sku) FROM product_variants v
+                    WHERE v.product_id = ?4 AND v.active = 1 AND v.sku IS NOT NULL AND v.sku <> '') AS skus`
         )
-        .bind(doc.brand_id ?? '', doc.category_id ?? '', doc.sub_category_id ?? '')
-        .first<{ brand: string | null; main: string | null; sub: string | null }>(),
+        .bind(doc.brand_id ?? '', doc.category_id ?? '', doc.sub_category_id ?? '', productId)
+        .first<{ brand: string | null; main: string | null; sub: string | null; skus: string | null }>(),
       intent.searchAliases ? Promise.resolve(null) : loadSearchAliases(db, [productId]),
     ]);
     // Model and colour names in all three languages: "X2D Combo" is an OPTION
@@ -3251,24 +3256,34 @@ export async function planProductSave(
     // The aliases the backfill writes too (one loader, both writers): what the
     // caller is about to write, or what is stored. None without migration 0194.
     const aliases = intent.searchAliases ?? storedAliases?.get(productId) ?? [];
-    const indexStmts = planSearchIndex(
-      db,
+    // THE VARIANT SKUS THIS SAVE LEAVES BEHIND: the planned rows when the save
+    // writes the variants (a removed one is gone, a new one is there), the
+    // stored rows when it does not touch them.
+    const variantSkus = relations
+      ? relations.requested.variants
+          .filter((v) => v.active === 1 && typeof v.sku === 'string' && v.sku.trim() !== '')
+          .map((v) => v.sku as string)
+      : jsonStrings(nameRows?.skus);
+    const indexRows = buildIndexRows(
       toSearchDoc({
         id: productId,
         name: doc.name_en,
         name_ar: doc.name_ar,
         name_ckb: doc.name_ckb,
         description: doc.description_en,
+        description_ar: doc.description_ar,
+        description_ckb: doc.description_ckb,
         hashtags: doc.hashtags,
         sku: doc.sku,
-        brandName: nameRows?.brand ?? null,
-        categoryNames: [nameRows?.main ?? '', nameRows?.sub ?? ''].filter(Boolean),
+        brandNames: jsonStrings(nameRows?.brand),
+        categoryNames: [...jsonStrings(nameRows?.main), ...jsonStrings(nameRows?.sub)],
         variantNames,
+        variantSkus,
         aliases,
       })
     );
-    statements.push(...indexStmts);
-    searchTokens = Math.max(0, indexStmts.length - 1);
+    statements.push(...planSearchIndexRows(db, productId, indexRows));
+    searchTokens = indexRows.length;
   }
 
   // ---- translations -------------------------------------------------------

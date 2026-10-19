@@ -85,6 +85,12 @@ const LATIN_FOLD = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g,
  *
  * Digits are KEPT and never folded — "X2D" and "X1C" differ only by them, and
  * a printer model is mostly digits.
+ *
+ * THE STOREFRONT SHIPS THIS FUNCTION in its entry chunk (the grey completion,
+ * src/components/search/ghost.ts → ./complete.ts), which is why the search's
+ * digit folding lives in `foldText` / `normalizeSearchText` below and not
+ * here: the entry chunk is at its budget (tests/bundleBudget.test.ts), and no
+ * caller outside the search engine compares digits typed on two keyboards.
  */
 export function normalizeText(input: unknown): string {
   if (typeof input !== 'string' || input === '') return '';
@@ -95,6 +101,142 @@ export function normalizeText(input: unknown): string {
   // Everything that is not a letter or a digit is a separator. `\p{L}` keeps
   // Arabic, Kurdish and Latin alike without listing ranges.
   return out.replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
+/**
+ * THE DIGITS A SHOPPER'S KEYBOARD TYPES, AS THE CATALOGUE WRITES THEM.
+ *
+ * An Arabic keyboard types «٠.٤» (U+0660–U+0669, Arabic-Indic) and a Sorani or
+ * Persian one «۰.۴» (U+06F0–U+06F9, Extended Arabic-Indic); the catalogue
+ * writes 0.4. They are the same number, so the search makes them the same
+ * characters before anything else looks at them, on the index side and the
+ * query side alike (`tokenize`). The Arabic decimal separator «٫» (U+066B)
+ * becomes the '.' a measure is written with (see `extractMeasures`).
+ *
+ * NOT IN `FOLD`, deliberately: worker/lib/sqlFold.ts generates the admin
+ * order board's SQL fold from that table, character for character, and a
+ * digit there is twenty more nested REPLACE calls on a column of names.
+ */
+const DIGIT_FOLD = /[٠-٩۰-۹٫]/g;
+// Both digit blocks start on a multiple of 16 (U+0660, U+06F0): a digit's
+// value is its code point's low four bits.
+const foldDigit = (ch: string): string => (ch === '٫' ? '.' : String(ch.charCodeAt(0) & 15));
+
+/**
+ * The search's own fold: `normalizeText`'s letters, the digits folded to
+ * ASCII — and the punctuation KEPT, because the measure pass
+ * (`extractMeasures`) reads this form: the '.' in «0.4» and the '×' in «6×2»
+ * are exactly what makes them measures.
+ */
+export function foldText(input: unknown): string {
+  if (typeof input !== 'string' || input === '') return '';
+  let s = LATIN_FOLD(input.toLowerCase());
+  s = s.replace(ARABIC_DIACRITICS, '').replace(TATWEEL, '');
+  let out = '';
+  for (const ch of s) out += FOLD[ch] ?? ch;
+  return out.replace(DIGIT_FOLD, foldDigit);
+}
+
+/** Everything that is not a letter or a digit is a separator. */
+const stripPunctuation = (s: string): string => s.replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+/** `normalizeText` with the digits folded (`foldText`): the form a query is compared in. */
+export const normalizeSearchText = (input: unknown): string => stripPunctuation(foldText(input));
+
+// =========================================================================
+// MEASURES: «0.4», «1.75», «6×2»
+// =========================================================================
+
+/**
+ * A NUMBER WITH A DOT IN IT IS ONE THING, NOT TWO.
+ *
+ * '.' and '×' were separators like any other punctuation, and a token needs
+ * two characters, so «0.4» tokenised to NOTHING ('0' and '4' are one character
+ * each), «0.4mm» to `4mm`, «1.75» to `75`, and «6×2» to nothing at all. The
+ * live search for «0.2» answered with nothing, «nozzle 0.4» answered with
+ * every nozzle and wiper, and the 6×2 magnet could not be told from the 6×3.
+ *
+ * So a pass over the folded text — before the punctuation goes — lifts the
+ * measures out whole and writes each one canonically:
+ *
+ *   «0.4», «0.40», «.4», «٠٫٤»   → `0.4`
+ *   «1.75mm»                      → `1.75`, and `mm` stays behind as a word
+ *   «6×2», «6x2», «6*2», «6 x 2»  → `6x2`        «20×20×2» → `20x20x2`
+ *   «2.0»                         → `2`, an ordinary number again
+ *
+ * The span is then removed from the text, so the fragments it used to leave
+ * behind (`4mm`, `75`) are never written either: a 0.4mm nozzle is not a
+ * "4mm" anything.
+ *
+ * A measure is matched EXACTLY on the query side (./match.ts `bestMatches`):
+ * `6x2` is a prefix of `6x20` and one edit from `6x3`, and both are different
+ * products.
+ */
+// Regex LITERALS, not `new RegExp(…)`: the storefront bundles this module for
+// `normalizeText` (src/lib/policyReader.ts) and a literal is dropped with the
+// rest of the measure pass when nothing there uses it.
+/** «6×2», «6 x 2», «6*2», «20x20x2». Not glued to a word in front: «m3x8» stays the word it is. */
+const DIMENSION = /(?<![\p{L}\p{N}.])\d+(?:\.\d+)?(?:\s*[x×*]\s*\d+(?:\.\d+)?){1,2}(?![\p{N}])/gu;
+/** «0.4», «1.75», «PLA1.75», a version «1.5.2»; «.4» only where no word is glued to the dot. */
+const DECIMAL = /(?:(?<![\p{N}.])\d+(?:\.\d+)+|(?<![\p{L}\p{N}.])\.\d+)(?![\p{N}])/gu;
+/** A dimension's own parts, once the whole run has been matched. */
+const DIMENSION_PART = /\d+(?:\.\d+)?/g;
+
+/** One number, written the one way the index holds it: `0.40` → `0.4`, `.4` → `0.4`, `06` → `6`. */
+function canonicalNumber(n: string): string {
+  const parts = n.split('.');
+  // A version or a code with two dots («1.5.2») is kept exactly as written.
+  if (parts.length > 2) return parts.map((p) => p || '0').join('.');
+  const int = (parts[0] ?? '').replace(/^0+(?=\d)/, '') || '0';
+  const frac = (parts[1] ?? '').replace(/0+$/, '');
+  return frac ? `${int}.${frac}` : int;
+}
+
+/**
+ * The words that only say WHICH UNIT a measure is in. Indexed like any word
+ * (a shopper may type «mm» on its own), but on the query side a unit written
+ * against a measure («0.4mm», «0.4 ملم») is already said by the measure, and
+ * counting it as a second word would rank a product down for not repeating it.
+ */
+export const MEASURE_UNITS: ReadonlySet<string> = /* @__PURE__ */ new Set([
+  // Written already folded (lower case; no letter `foldText` would change).
+  'mm', 'cm', 'ml', 'kg', 'gr', 'gram', 'grams', 'inch',
+  'ملم', 'مم', 'ملي', 'ميلي', 'سم', 'سانتي', 'سانت', 'كغ', 'كيلو', 'غرام', 'غم',
+]);
+
+export interface Measures {
+  /** The measures found, canonical (`0.4`, `6x2`), in the order they were written. */
+  measures: string[];
+  /** The folded text with every measure taken out, for the ordinary word pass. */
+  rest: string;
+  /** Unit words written right after a measure («0.4mm» → `mm`). */
+  units: string[];
+}
+
+/** Lift the measures out of FOLDED text (`foldText`) — see the block above. */
+export function extractMeasures(folded: string): Measures {
+  const measures: string[] = [];
+  const units: string[] = [];
+  const unitAfter = (text: string, end: number) => {
+    const m = /^\s*([\p{L}]+)/u.exec(text.slice(end));
+    if (m && MEASURE_UNITS.has(m[1])) units.push(m[1]);
+  };
+  let rest = folded.replace(DIMENSION, (whole: string, offset: number) => {
+    const parts = whole.match(DIMENSION_PART) ?? [];
+    measures.push(parts.map(canonicalNumber).join('x'));
+    unitAfter(folded, offset + whole.length);
+    return ' ';
+  });
+  const afterDims = rest;
+  rest = afterDims.replace(DECIMAL, (whole: string, offset: number) => {
+    const canonical = canonicalNumber(whole);
+    // «2.0» is the number 2: back into the text as one, for the word pass.
+    if (!canonical.includes('.')) return canonical;
+    measures.push(canonical);
+    unitAfter(afterDims, offset + whole.length);
+    return ' ';
+  });
+  return { measures, rest, units };
 }
 
 /** The longest token worth indexing. Longer strings are ids, not words. */
@@ -123,9 +265,14 @@ const MIN_TOKEN = 2;
  * beat a product that merely contains a "2".
  */
 export function tokenize(input: unknown): string[] {
-  const norm = normalizeText(input);
-  if (!norm) return [];
-  const out = new Set<string>();
+  const folded = foldText(input);
+  if (!folded) return [];
+  // The measures first («0.4», «6×2»), lifted out whole before the
+  // punctuation that makes them measures is turned into spaces.
+  const { measures, rest } = extractMeasures(folded);
+  const out = new Set<string>(measures.filter((m) => m.length >= MIN_TOKEN && m.length <= MAX_TOKEN));
+  const norm = stripPunctuation(rest);
+  if (!norm) return [...out];
   for (const word of norm.split(' ')) {
     if (word.length >= MIN_TOKEN && word.length <= MAX_TOKEN) out.add(word);
     // Split a mixed letter/digit run into its parts: "x2d" → x, 2, d → the

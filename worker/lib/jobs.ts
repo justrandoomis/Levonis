@@ -40,7 +40,13 @@ import {
 import { runGuardedMediaCleanup } from './mediaRefs';
 import { convertLegacyProducts } from './catalog/legacy';
 import { checkSchemaDrift, type DriftAlarmReport } from './schemaDriftAlarm';
-import { backfillSearchIndex, searchIndexInstalled, type PassBudget } from './search/store';
+import {
+  backfillSearchIndex,
+  SEARCH_BACKFILL_BUDGETED_LIMIT,
+  SEARCH_BACKFILL_LIMIT,
+  searchIndexInstalled,
+  type PassBudget,
+} from './search/store';
 
 /**
  * Durable scheduled jobs (final-phase §11): one entrypoint the Worker wires
@@ -238,8 +244,10 @@ export async function catchUpSearchIndex(
   // cannot write, so ONE bad product is reported here and skipped rather
   // than failing the whole fifty and being selected first again next run,
   // which is how a single row could have stopped the backfill for good.
+  // Two hundred a pass with a budget (the budget is what paces it), fifty
+  // without one — see SEARCH_BACKFILL_BUDGETED_LIMIT.
   const run = await backfillSearchIndex(env.DB, {
-    limit: 50,
+    limit: opts.budget ? SEARCH_BACKFILL_BUDGETED_LIMIT : SEARCH_BACKFILL_LIMIT,
     ...(opts.budget ? { budget: opts.budget, ...(opts.ceiling === undefined ? {} : { ceiling: opts.ceiling }) } : {}),
   });
   out.indexed = run.indexed;
@@ -392,9 +400,11 @@ export async function runDurableJobs(env: Env, opts: DurableJobsOptions = {}): P
    * would mean a backfill that silently stops halfway.
    *
    * Bounded per run and resumable: it takes the products that do not carry the
-   * current `INDEX_STAMP`, oldest id first, and does fifty. A shop of any size
-   * converges in a few hours of cron, and a shop that is already indexed does
-   * one cheap indexed query that returns nothing.
+   * current `INDEX_STAMP`, oldest id first — two hundred a budgeted pass, fifty
+   * unbudgeted, a product costing its DELETE and one INSERT per 500 rows. A
+   * shop of any size converges in a few quarter-hours of cron (coverage at
+   * `GET /api/admin/search/index-status`), and a shop that is already indexed
+   * does one cheap indexed query that returns nothing.
    *
    * "DOES NOT CARRY THE STAMP" RATHER THAN "HAS NO ROWS AT ALL", and the
    * difference is the whole reason the stamp exists. This step used to compose

@@ -42,8 +42,13 @@ import {
   INDEX_FAILED_MARK,
   INDEX_STAMP,
   planSearchIndex,
+  planSearchIndexRows,
+  SEARCH_BACKFILL_BUDGETED_LIMIT,
   searchProducts,
 } from '../worker/lib/search/store';
+import { catchUpSearchIndex } from '../worker/lib/jobs';
+import { statementBudget } from '../worker/lib/fx/budget';
+import { countingD1 } from '../worker/lib/d1Count';
 
 // =========================================================================
 // A D1 THAT REFUSES WHAT D1 REFUSES
@@ -505,4 +510,139 @@ test('a product the backfill cannot write is marked and skipped, and the rest ar
   await inner.batch(planSearchIndex(asD1(raw), toSearchDoc({ id: 'p_00', name: 'Widget 0' })) as unknown as SqliteStatement[]);
   const after = raw.prepare('SELECT COUNT(*) n FROM search_tokens WHERE product_id = ? AND token = ?').get('p_00', INDEX_FAILED_MARK) as { n: number };
   assert.equal(after.n, 0);
+});
+
+
+// =========================================================================
+// THROUGH THE ROUTE: MEASURES, AND HIDDEN PRODUCTS THAT TOOK RANKING SLOTS (docs/SEARCH.md)
+// =========================================================================
+
+/** The nozzles and magnets of acceptance rows 1–3, as the route sees them, on D1's parameter ceiling. */
+async function sizedShop(): Promise<DatabaseSync> {
+  const raw = freshDb();
+  const db = asD1(raw);
+  const add = async (id: string, name: string, name_ar = '', status = 'active') => {
+    raw
+      .prepare(`INSERT INTO products (id, slug, name, name_ar, description, price_iqd, status) VALUES (?, ?, ?, ?, '', 1000, ?)`)
+      .run(id, id, name, name_ar, status);
+    await db.batch(planSearchIndex(db, toSearchDoc({ id, name, name_ar })));
+  };
+  await add('n_02', 'Hardened Steel Nozzle 0.2mm', 'نوزل فولاذ 0.2 ملم');
+  await add('n_04', 'Hardened Steel Nozzle 0.4mm', 'نوزل فولاذ 0.4 ملم');
+  await add('n_06', 'Hardened Steel Nozzle 0.6mm', 'نوزل فولاذ 0.6 ملم');
+  await add('n_wiper', 'Nozzle Wiper', 'ماسحة نوزل');
+  await add('m_62', 'Neodymium Magnet 6×2', 'مغناطيس 6×2');
+  await add('m_63', 'Neodymium Magnet 6×3', 'مغناطيس 6×3');
+  return raw;
+}
+
+const routeIds = async (db: D1Database, q: string) => {
+  const res = await listing(db, `search=${encodeURIComponent(q)}&limit=50`);
+  assert.equal(res.status, 200, `${q}: ${JSON.stringify(res.body).slice(0, 200)}`);
+  return (res.body.products as { id: string }[]).map((p) => p.id);
+};
+
+test('through the route: rows 1–3 — a size is matched exactly, and a product without it is not an answer', async () => {
+  const raw = await sizedShop();
+  const db = ceilingD1(raw);
+  for (const q of ['نوزل 0.4', 'nozzle 0.4mm', 'نوزل ٠.٤']) assert.deepEqual(await routeIds(db, q), ['n_04'], q);
+  assert.deepEqual(await routeIds(db, '0.2'), ['n_02']);
+  for (const q of ['مغناطيس 6×2', '6*2', '6 x 2', '٦x٢']) assert.deepEqual(await routeIds(db, q), ['m_62'], q);
+  assert.deepEqual(await routeIds(db, '0.3'), [], 'nobody sells 0.3: an honest empty answer');
+  assert.deepEqual((await routeIds(db, 'nozzle')).sort(), ['n_02', 'n_04', 'n_06', 'n_wiper'], 'without a size, every nozzle');
+});
+
+test('a hidden product takes no ranking slot: the engine looks at three times the page and cuts after the visibility filter', async () => {
+  const raw = freshDb();
+  const db0 = asD1(raw);
+  // 220 HIDDEN products NAMED "Gizmo" (weight 10) rank above 30 visible ones that only carry the hashtag (5).
+  for (let i = 0; i < 250; i++) {
+    const id = `g_${String(i).padStart(3, '0')}`;
+    const hidden = i < 220;
+    raw
+      .prepare(`INSERT INTO products (id, slug, name, description, price_iqd, status) VALUES (?, ?, ?, '', 1000, ?)`)
+      .run(id, id, hidden ? `Gizmo Pro ${i}` : `Widget ${i}`, hidden ? 'hidden' : 'active');
+    await db0.batch(planSearchIndex(db0, toSearchDoc({ id, name: hidden ? `Gizmo Pro ${i}` : `Widget ${i}`, hashtags: hidden ? [] : ['gizmo'] })));
+  }
+  const engine = (await searchProducts(db0, 'gizmo', { limit: 200 })).ids;
+  assert.equal(engine.length, 200);
+  assert.ok(engine.every((id) => Number(id.slice(2)) < 220), 'the engine alone: 200 slots, every one hidden');
+
+  const db = ceilingD1(raw);
+  const res = await listing(db, 'search=gizmo&limit=50');
+  assert.equal(res.status, 200);
+  const shown = (res.body.products as { id: string }[]).map((p) => p.id);
+  assert.equal(shown.length, 30, `the 30 visible products, not an empty page (${shown.length})`);
+  assert.ok(shown.every((id) => Number(id.slice(2)) >= 220));
+  assert.ok(Math.max(...db.log) <= 100, `no statement bound more than 100 parameters (worst ${Math.max(...db.log)})`);
+});
+
+// =========================================================================
+// THE #doc:6 ROLLOUT: COVERAGE, AND HOW IT REACHES 100%
+// =========================================================================
+
+async function statusApp(db: D1Database, user: typeof ADMIN | null) {
+  const { adminRoutes } = await import('../worker/routes/admin');
+  return stubApp(db as never, user, (a) => a.route('/api/admin', adminRoutes), { host: APEX, env: { DB: db } });
+}
+
+test('GET /api/admin/search/index-status counts the builder’s coverage, and the quarter-hour catch-up takes it to 1 on its own', async () => {
+  const raw = freshDb();
+  raw.prepare("INSERT INTO users (id, name, email, password_hash) VALUES ('usr_boss','Boss','boss@x.co','h')").run();
+  const db = asD1(raw);
+  const N = 260;
+  for (let i = 0; i < N; i++) {
+    const id = `c_${String(i).padStart(3, '0')}`;
+    raw
+      .prepare(`INSERT INTO products (id, slug, name, description, price_iqd, status) VALUES (?, ?, ?, ?, 1000, 'active')`)
+      .run(id, id, `Nozzle ${i % 2 ? '0.4' : '0.2'}mm part ${i}`, `A nozzle for printing, number ${i}.`);
+    // The catalogue as #doc:5 left it: rows, an OLDER stamp, and none of the measure tokens.
+    if (i < 200) {
+      await db.batch(planSearchIndexRows(db, id, [{ product_id: id, token: 'nozzle', weight: 10 }]));
+      raw.prepare("UPDATE search_tokens SET token = '#doc:5' WHERE product_id = ? AND token = ?").run(id, INDEX_STAMP);
+    }
+  }
+  // Products never indexed (i ≥ 200) — one of them marked by the PREVIOUS builder as impossible to write.
+  raw.prepare("INSERT INTO search_tokens (product_id, token, weight) VALUES ('c_259', '#fail:5', 0)").run();
+
+  const read = async () => {
+    const res = await (await statusApp(db, ADMIN)).request('/api/admin/search/index-status', {}, undefined, ctx);
+    assert.equal(res.status, 200);
+    return (await res.json()) as Record<string, unknown> & { coverage: number; backfill: { passes_left: number } };
+  };
+  const before = await read();
+  assert.deepEqual(
+    { stamp: before.stamp, active: before.active, current: before.current, older: before.older, missing: before.missing, failed: before.failed, coverage: before.coverage },
+    { stamp: '#doc:6', active: N, current: 0, older: 200, missing: 60, failed: 0, coverage: 0 }
+  );
+  assert.equal(before.backfill.passes_left, Math.ceil(N / SEARCH_BACKFILL_BUDGETED_LIMIT));
+  // In the window, a product on the old rows is not an answer to a size it has not been indexed with.
+  assert.deepEqual((await searchProducts(db, 'nozzle 0.4', { limit: 200 })).ids, []);
+
+  // The quarter-hour tick's catch-up, with the share of D1's 1,000 its jobs leave it: two passes cover 260 products.
+  const counted = countingD1(db);
+  const env = { DB: counted.db } as unknown as Env;
+  let passes = 0;
+  for (; passes < 5 && (await read()).coverage < 1; passes++) {
+    const budget = statementBudget(900);
+    const start = counted.executed;
+    const run = await catchUpSearchIndex(env, { budget, ceiling: 900 });
+    assert.ok(counted.executed - start <= 900, 'within the tick');
+    assert.ok(run.indexed > 0, 'progress every pass');
+  }
+  const after = await read();
+  assert.equal(after.coverage, 1, JSON.stringify(after));
+  assert.equal(after.current, N, 'a stamp bump retries the product the previous builder could not write');
+  assert.equal(passes, 2, 'two quarter-hours, not days');
+  assert.equal((await searchProducts(db, 'nozzle 0.4', { limit: 200 })).ids.length, N / 2, 'every 0.4 nozzle, and only those');
+
+  // A product THIS builder cannot write is counted apart, so a coverage short of 1 says why.
+  raw.prepare('DELETE FROM search_tokens WHERE product_id = ?').run('c_000');
+  raw.prepare('INSERT INTO search_tokens (product_id, token, weight) VALUES (?, ?, 0)').run('c_000', INDEX_FAILED_MARK);
+  const marked = await read();
+  assert.deepEqual({ current: marked.current, failed: marked.failed, missing: marked.missing }, { current: N - 1, failed: 1, missing: 0 });
+
+  // Staff only.
+  const anon = await (await statusApp(db, null)).request('/api/admin/search/index-status', {}, undefined, ctx);
+  assert.ok(anon.status === 401 || anon.status === 403, `a visitor is refused (${anon.status})`);
 });

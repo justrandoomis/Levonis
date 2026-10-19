@@ -36,11 +36,25 @@ export interface IndexableProduct {
   name_ku?: unknown;
   name_ckb?: unknown;
   description?: unknown;
+  /** The Arabic and Sorani descriptions (`#doc:6`): `products.description_ar`
+   *  and `description_ku` (ProductDoc's `description_ckb`). */
+  description_ar?: unknown;
+  description_ku?: unknown;
+  description_ckb?: unknown;
   hashtags?: unknown;
   sku?: unknown;
   /** Resolved by the caller — the index holds names, not ids. */
   brandName?: string | null;
+  /** The brand's name in every language it is written in (`#doc:6`). */
+  brandNames?: string[];
+  /** Section names, every language of each. */
   categoryNames?: string[];
+  /**
+   * The SKUs of the product's active variants (`product_variants.sku`): the
+   * code on the box of one colour or one size. Indexed at the option names'
+   * weight, since a variant is what they name.
+   */
+  variantSkus?: string[];
   /** Option and colour names: "Combo", "Dual nozzle", "Jade White". */
   variantNames?: string[];
   /**
@@ -78,13 +92,22 @@ export function toSearchDoc(p: IndexableProduct): SearchDoc {
       // and Kurdish names are the only place an Arabic-speaking customer's own
       // words for it are written down.
       name: [...text(p.name), ...text(p.name_ar), ...text(p.name_ku), ...text(p.name_ckb), ...text(p.sku)],
-      brand: p.brandName ? [p.brandName] : [],
-      // Model and option names, and the aliases a shopper types for the product
-      // itself (a colour code, a part code, the model it belongs to).
-      model: [...(p.variantNames ?? []), ...(p.aliases ?? []).filter((a) => typeof a === 'string' && a.trim() !== '')],
+      brand: [...(p.brandName ? [p.brandName] : []), ...(p.brandNames ?? []).filter((b) => typeof b === 'string' && b.trim() !== '')],
+      // Model and option names, the variants' own SKUs, and the aliases a
+      // shopper types for the product itself (a colour code, a part code, the
+      // model it belongs to).
+      model: [
+        ...(p.variantNames ?? []),
+        ...(p.variantSkus ?? []).filter((v) => typeof v === 'string' && v.trim() !== ''),
+        ...(p.aliases ?? []).filter((a) => typeof a === 'string' && a.trim() !== ''),
+      ],
       hashtag: list(p.hashtags),
-      category: p.categoryNames ?? [],
-      description: text(p.description),
+      category: (p.categoryNames ?? []).filter((c) => typeof c === 'string' && c.trim() !== ''),
+      // EVERY LANGUAGE THE PRODUCT IS DESCRIBED IN (`#doc:6`). Only the English
+      // description was read, so a shopper's Arabic or Sorani words for what a
+      // product DOES («مقاوم للحرارة», «بۆ چاپکردن») found nothing the shop had
+      // translated. Still weight 1, so prose never outranks a name.
+      description: [...text(p.description), ...text(p.description_ar), ...text(p.description_ku), ...text(p.description_ckb)],
     },
   };
 }

@@ -222,3 +222,35 @@ export function synonymSeedValues(): string {
     .map((r) => `('${esc(r.term)}', '${esc(r.canonical)}')`)
     .join(',\n  ');
 }
+
+/**
+ * WORDS A QUERY IS WRITTEN WITH AND NOT ABOUT (docs/SEARCH.md §4b).
+ *
+ * «نوزل في الطابعة», "nozzle for the X1C", «نۆزڵ بۆ X1C»: the shopper is
+ * naming a nozzle and a printer, and «في» / "for" / «بۆ» are grammar. Since
+ * the Arabic and Sorani descriptions are indexed (`#doc:6`), «في» and «من» are
+ * words in almost every product's index, so counting them as words the query
+ * is MADE of let every product "cover" them and diluted the coverage that
+ * ranks the nozzle first. They are dropped from the query — never from the
+ * index, so nothing that is written down stops being findable.
+ *
+ * NOT DROPPED: a query made of nothing else (it stays itself), and a word the
+ * owner's dictionary gives a meaning to (the dictionary wins). Stored
+ * normalised, like every term in this module.
+ */
+const QUERY_STOPWORD_SOURCE: readonly string[] = [
+  // English
+  'the', 'an', 'and', 'or', 'for', 'with', 'of', 'to', 'in', 'on', 'at', 'by', 'from', 'is', 'are', 'it', 'its',
+  'this', 'that', 'these', 'those', 'please', 'want', 'need', 'my', 'me', 'any', 'some',
+  // Arabic, with the Iraqi forms a shopper actually types
+  'في', 'من', 'على', 'الى', 'إلى', 'عن', 'مع', 'او', 'أو', 'ثم', 'هل', 'هذا', 'هذه', 'ذلك', 'تلك', 'التي', 'الذي',
+  'اللي', 'اريد', 'أريد', 'ابي', 'أبي', 'ابغى', 'بدي', 'اكو', 'عندكم', 'عدكم', 'عندك', 'يوجد', 'شنو', 'شي', 'لو',
+  'رجاء', 'رجاءا', 'ممكن', 'لكن', 'بس',
+  // Sorani (ckb)
+  'بۆ', 'لە', 'لەگەڵ', 'یان', 'لەسەر', 'ئەم', 'ئەو', 'ئەمە', 'ئەوە', 'کە', 'بە', 'تا', 'هەیە', 'دەمەوێت', 'دەوێت', 'چی',
+  'تکایە',
+];
+
+export const QUERY_STOPWORDS: ReadonlySet<string> = new Set(
+  QUERY_STOPWORD_SOURCE.map((w) => normalizeText(w)).filter((w) => w !== '' && !w.includes(' '))
+);

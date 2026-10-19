@@ -22,12 +22,19 @@ import { asD1, dbThrough, freshDb } from './fixtures/app';
 import { runDurableJobs } from '../worker/lib/jobs';
 import { rewriteHashtag } from '../worker/lib/hashtags';
 import type { Env } from '../worker/lib/types';
-import { normalizeText, tokenize } from '../worker/lib/search/normalize';
+import { MEASURE_UNITS, normalizeSearchText, normalizeText, tokenize } from '../worker/lib/search/normalize';
 import { collapseSpelledLetters, romanize } from '../worker/lib/search/translit';
-import { boundedDistance, editBudget } from '../worker/lib/search/match';
-import { buildIndexRows, FIELD_WEIGHT } from '../worker/lib/search/index';
+import { boundedDistance, candidatePrefix, editBudget, isMeasureToken } from '../worker/lib/search/match';
+import { buildIndexRows, expandQuery, FIELD_WEIGHT } from '../worker/lib/search/index';
 import { toSearchDoc } from '../worker/lib/search/document';
-import { INDEX_STAMP, planSearchIndex, searchDocsForRows, searchProducts } from '../worker/lib/search/store';
+import {
+  INDEX_ROWS_PER_STATEMENT,
+  INDEX_STAMP,
+  planSearchIndex,
+  searchDocColumns,
+  searchDocsForRows,
+  searchProducts,
+} from '../worker/lib/search/store';
 import { normalizedSynonymSeed, SYNONYM_SEED } from '../worker/lib/search/vocabulary';
 
 type Raw = ReturnType<typeof freshDb>;
@@ -349,10 +356,12 @@ test('a mixed letter/digit run keeps the whole token and the pieces worth keepin
   assert.ok(t.includes('x2d'));
   assert.deepEqual(t.filter((x) => x.length < 2), [], 'single characters are debris, not tokens');
   // Where a piece is a real word, it survives and is what makes the match:
-  // "PLA1.75" must be findable by "pla".
+  // "PLA1.75" must be findable by "pla" — and by its diameter, WHOLE (`#doc:6`):
+  // «1.75» used to survive only as `75`, which «2.75» and «75 mm» shared.
   const spool = tokenize('PLA1.75');
   assert.ok(spool.includes('pla'), 'the part a shopper actually types');
-  assert.ok(spool.includes('75'));
+  assert.ok(spool.includes('1.75'), 'the diameter, as one token');
+  assert.ok(!spool.includes('75'), 'and not the fragment it used to leave behind');
 });
 
 test('romanisation puts «بامبو» and "bambu" within reach of each other', () => {
@@ -873,7 +882,7 @@ test('RENAMING A HASHTAG across a wide catalogue does not exceed the parameter l
   );
 });
 
-test('an exact code reaches EVERY product that carries it; a code nobody carries falls to a one-edit neighbour', async () => {
+test('an exact code reaches EVERY product that carries it; a code nobody carries is nobody’s — never a one-edit neighbour', async () => {
   // The live «10100» answer (2026-10-17) was the second line, not a short-circuit: no product's index held 10100
   // (the PLA Basic merge had stored none of its codes), so the typo tolerance offered PLA Basic Gradient's own
   // «10900». Once a product carries the code, the exact hit ends the search — every carrier, and no neighbour.
@@ -897,5 +906,217 @@ test('an exact code reaches EVERY product that carries it; a code nobody carries
   assert.deepEqual(await ids(shopWith, '10900'), ['p_gradient'], 'the Gradient keeps its own code');
   assert.equal((await ids(shopWith, 'A00-W1-1.75-1000-SPLFREE'))[0], 'p_basic');
   const shopWithout = await build(false);
-  assert.deepEqual(await ids(shopWithout, '10100'), ['p_gradient'], 'no carrier: the typo tolerance answers with 10900');
+  // This line used to read ['p_gradient']: the typo tolerance answered an unknown code with its neighbour 10900,
+  // which is how the live «10102» came back as the 10100/10101 colours (docs/SEARCH.md §5). A code is right or absent.
+  assert.deepEqual(await ids(shopWithout, '10100'), [], 'no carrier: no answer, not a neighbour’s colour');
+  assert.deepEqual(await ids(shopWithout, '10100 '), [], 'finished or not');
+  assert.deepEqual(await ids(shopWithout, '1090'), ['p_gradient'], 'a code still being typed is completed — while it is typed');
+  assert.deepEqual(await ids(shopWithout, '1090 '), [], 'and a finished one is not');
+});
+
+
+// =========================================================================
+// MEASURES, DIGITS AND A QUERY'S GRAMMAR (docs/SEARCH.md §4a–§5; the assistant’s acceptance rows 1–4 and 13)
+// =========================================================================
+//
+// The live search could not tell 0.2 from 0.4 or 6×2 from 6×3: '.' and '×'
+// were separators, a token needed two characters, so «0.4» tokenised to
+// nothing and «nozzle 0.4» answered with every nozzle and wiper. And a code
+// one edit from another (10102 / 10101) was "close enough". Each row below
+// pins what MUST match and what must NOT.
+
+/** Nozzles in three sizes, a kit that sells all three, magnets in three sizes, ABS and an AMS, two diameters. */
+async function measureShop(): Promise<Raw> {
+  const raw = freshDb();
+  const db = asD1(raw);
+  const add = async (id: string, name: string, over: Partial<Parameters<typeof toSearchDoc>[0]> = {}) => {
+    raw.prepare(`INSERT INTO products (id, slug, name, description, price_iqd, status) VALUES (?, ?, ?, '', 1000, 'active')`).run(id, id, name);
+    await db.batch(planSearchIndex(db, toSearchDoc({ id, name, ...over })));
+  };
+  for (const size of ['0.2', '0.4', '0.6']) {
+    await add(`p_noz${size.replace('.', '')}`, `Hardened Steel Nozzle ${size}mm`, {
+      name_ar: `نوزل فولاذ مقوى ${size} ملم`,
+      hashtags: ['nozzle'],
+    });
+  }
+  await add('p_nozkit', 'Nozzle Kit', { name_ar: 'طقم نوزلات', variantNames: ['0.2mm', '0.4mm', '0.6mm'], hashtags: ['nozzle'] });
+  await add('p_wiper', 'Nozzle Wiper', { name_ar: 'ماسحة نوزل', hashtags: ['nozzle'] });
+  await add('p_mag62', 'Neodymium Magnet 6×2 mm', { name_ar: 'مغناطيس 6×2' });
+  await add('p_mag63', 'Neodymium Magnet 6x3 mm', { name_ar: 'مغناطيس 6x3' });
+  await add('p_mag620', 'Neodymium Magnet 6x20 mm', { name_ar: 'مغناطيس 6x20' });
+  await add('p_abs', 'ABS Filament', { hashtags: ['abs'] });
+  await add('p_ams', 'AMS 2 Pro', { hashtags: ['ams'] });
+  await add('p_pla175', 'PLA Basic 1.75mm', { hashtags: ['pla'] });
+  await add('p_pla285', 'PLA Basic 2.85mm', { hashtags: ['pla'] });
+  await add('p_basic', 'Bambu Lab PLA Basic Filament 1kg', { aliases: ['10100', '10101'] });
+  return raw;
+}
+
+test('row 1: «نوزل 0.4», «nozzle 0.4mm», «نوزل ٠.٤» — the 0.4 nozzle and the kit that sells one; never a 0.2 or 0.6', async () => {
+  const raw = await measureShop();
+  for (const q of ['نوزل 0.4', 'nozzle 0.4mm', 'نوزل ٠.٤', 'نوزل ۰٫۴ ملم', 'Nozzle 0.40 mm', 'nozzle .4']) {
+    const got = await ids(raw, q);
+    assert.deepEqual([...got].sort(), ['p_noz04', 'p_nozkit'], `${q}: ${got.join(' ')}`);
+    assert.equal(got[0], 'p_noz04', `${q}: the nozzle NAMED 0.4 first`);
+  }
+});
+
+test('row 2: bare «0.2» finds the 0.2 items and nothing else; a size nobody sells is an honest none', async () => {
+  const raw = await measureShop();
+  assert.deepEqual((await ids(raw, '0.2')).sort(), ['p_noz02', 'p_nozkit']);
+  assert.deepEqual((await ids(raw, '0.2 ')).sort(), ['p_noz02', 'p_nozkit'], 'finished or still typed');
+  assert.deepEqual(await ids(raw, '0.3'), [], 'no 0.3 is sold: nothing, not the nearest size');
+  assert.deepEqual(await ids(raw, 'nozzle 0.3'), [], 'and not every nozzle because the word "nozzle" matched');
+});
+
+test('row 3: «مغناطيس 6×2», «6*2», «6 x 2», «٦x٢» — only the 6×2 magnet; never the 6×3, never the 6×20', async () => {
+  const raw = await measureShop();
+  for (const q of ['مغناطيس 6×2', '6*2', '6 x 2', '٦x٢', '6x2', 'magnet 6X2mm', '6.0×2']) {
+    assert.deepEqual(await ids(raw, q), ['p_mag62'], q);
+  }
+  assert.deepEqual(await ids(raw, '6x3'), ['p_mag63']);
+  assert.deepEqual(await ids(raw, '6x4'), [], 'one edit from 6x3 is a different magnet, not a typo');
+});
+
+test('row 4: «ABS» and «AMS» each find their own and never the other', async () => {
+  const raw = await measureShop();
+  assert.deepEqual(await ids(raw, 'ABS'), ['p_abs']);
+  assert.deepEqual(await ids(raw, 'AMS'), ['p_ams']);
+  assert.deepEqual(await ids(raw, 'abs '), ['p_abs']);
+  assert.deepEqual(await ids(raw, 'ams '), ['p_ams']);
+});
+
+test('row 13: «1.75» and «2.85» each find that diameter only', async () => {
+  const raw = await measureShop();
+  assert.deepEqual(await ids(raw, '1.75'), ['p_pla175']);
+  assert.deepEqual(await ids(raw, '2.85'), ['p_pla285']);
+  assert.deepEqual(await ids(raw, 'pla 1.75mm'), ['p_pla175']);
+  assert.deepEqual(await ids(raw, 'PLA ١٫٧٥'), ['p_pla175'], 'Arabic-Indic digits and the Arabic decimal separator');
+});
+
+test('an unknown colour code is nobody’s; a known one is its carrier’s — never a one-edit neighbour', async () => {
+  const raw = await measureShop();
+  assert.deepEqual(await ids(raw, '10101'), ['p_basic']);
+  assert.deepEqual(await ids(raw, '10102'), [], '10102 is not 10101 or 10100');
+  assert.deepEqual(await ids(raw, '10102 '), []);
+  assert.deepEqual(await ids(raw, '١٠١٠١'), ['p_basic'], 'typed on an Arabic keyboard');
+});
+
+test('the measure pass: canonical tokens, the unit kept as a word, no fragments, folded digits', () => {
+  assert.deepEqual(tokenize('Nozzle 0.4mm'), ['0.4', 'nozzle', 'mm']);
+  for (const typed of ['6×2', '6x2', '6*2', '6 x 2', '٦x٢', '۶×۲', '6.0 × 2.00']) assert.deepEqual(tokenize(typed), ['6x2'], typed);
+  assert.deepEqual(tokenize('20×20×2mm'), ['20x20x2', 'mm']);
+  assert.deepEqual(tokenize('0.40'), ['0.4']);
+  assert.deepEqual(tokenize('.4mm'), ['0.4', 'mm']);
+  assert.deepEqual(tokenize('2.0mm'), ['2mm', 'mm'], '«2.0» is the number 2, an ordinary word again');
+  assert.deepEqual(tokenize('m3x8'), ['m3x8'], 'a dimension glued to a word stays the word it was');
+  assert.equal(normalizeSearchText('٠١٢٣٤٥٦٧٨٩ ۰۱۲۳۴۵۶۷۸۹'), '0123456789 0123456789');
+  assert.deepEqual(tokenize('PLA ١٧٥ ۲۸۵'), ['pla', '175', '285'], 'the index and the query fold them alike');
+  assert.ok(isMeasureToken('0.4') && isMeasureToken('6x2') && isMeasureToken('1.75') && isMeasureToken('20x20x2'));
+  assert.ok(!isMeasureToken('x2d') && !isMeasureToken('10101') && !isMeasureToken('a1'));
+  for (const unit of MEASURE_UNITS) assert.equal(normalizeText(unit), unit, `${unit}: units are written folded`);
+});
+
+test('a code or a size gets no typo budget, and a measure is never completed', () => {
+  assert.equal(editBudget('10102'), 0);
+  assert.equal(editBudget('x1c'), 0);
+  assert.equal(editBudget('a00w1'), 0);
+  assert.equal(editBudget('hardened'), 2, 'a word keeps its budget');
+  const e = expandQuery('magnet 6x2', new Map());
+  assert.deepEqual([...(e.measures ?? [])], ['6x2']);
+  assert.ok(!e.completing.has('6x2'), '6x2 is a prefix of 6x20 and must not be completed');
+});
+
+test('a finished model fragment still reaches its model — no typo budget, but `x2d` is what `x2` begins', async () => {
+  const raw = await shop();
+  assert.equal(await first(raw, 'bambu x2 combo'), 'p_x2d');
+  assert.equal(await first(raw, 'x2 '), 'p_x2d');
+  assert.deepEqual(await ids(raw, 'x3d'), [], 'one edit from x2d is another model, not a typo');
+});
+
+test('a query’s grammar is not what it is about: stopwords and a measure’s unit are not looked up', () => {
+  const syn = new Map<string, string>([['نوزل', 'nozzle'], ['قطع غيار', 'spare']]);
+  assert.deepEqual(expandQuery('nozzle for the x1c', syn).literal, ['nozzle', 'x1c']);
+  assert.deepEqual(expandQuery('نوزل في الطابعة', syn).literal, ['نوزل', 'الطابعه']);
+  assert.deepEqual(expandQuery('نۆزڵ بۆ X1C', syn).literal, ['نۆزڵ', 'x1c'], 'Sorani «بۆ» is "for"');
+  assert.deepEqual(expandQuery('nozzle 0.4 mm', syn).literal, ['0.4', 'nozzle'], 'the unit is said by the measure');
+  assert.deepEqual(expandQuery('mm', syn).literal, ['mm'], 'a unit on its own is a word');
+  assert.deepEqual(expandQuery('في', syn).literal, ['في'], 'a query of nothing but grammar stays itself');
+  assert.ok(expandQuery('بي في سي', syn).lookup.includes('bvc'), 'a spelled run keeps its middle letter');
+  assert.ok(expandQuery('قطع غيار', syn).lookup.includes('spare'), 'a phrase on its own words');
+  assert.ok(!expandQuery('مقطع غيارات', syn).lookup.includes('spare'), 'and not inside longer words');
+});
+
+test('the Arabic article does not open the whole «ال» shelf', () => {
+  assert.equal(candidatePrefix('الطابعه'), 'الط');
+  assert.equal(candidatePrefix('والطابعه'), 'والط');
+  assert.equal(candidatePrefix('طابعه'), 'طا');
+  assert.equal(candidatePrefix('ال'), 'ا', 'a short word keeps the one-letter, weight-first range');
+});
+
+test('the document carries every language: Arabic and Sorani descriptions, brand and section names, variant SKUs', () => {
+  const rows = buildIndexRows(
+    toSearchDoc({
+      id: 'p',
+      name: 'Hotend',
+      description: 'Fits the printer.',
+      description_ar: 'مقاوم للحرارة',
+      description_ku: 'بۆ چاپکردن',
+      brandNames: ['Bambu Lab', 'بامبو لاب', 'بامبو لاب'],
+      categoryNames: ['Spare Parts', 'قطع غيار', 'پارچە یەدەگ'],
+      variantSkus: ['HE-X1-04'],
+    })
+  );
+  const weightOf = (t: string) => rows.find((r) => r.token === normalizeText(t))?.weight;
+  assert.equal(weightOf('مقاوم'), FIELD_WEIGHT.description, 'the Arabic description, at prose weight');
+  assert.equal(weightOf('چاپکردن'), FIELD_WEIGHT.description, 'the Sorani description');
+  assert.equal(weightOf('بامبو'), FIELD_WEIGHT.brand, 'the brand in Arabic');
+  assert.equal(weightOf('پارچە'), FIELD_WEIGHT.category, 'the section in Sorani');
+  assert.equal(weightOf('he'), FIELD_WEIGHT.model, 'a variant SKU, at the option names’ weight');
+  assert.equal(weightOf('04'), FIELD_WEIGHT.model);
+  // No skeleton for prose: an Arabic description word does not become a Latin key.
+  assert.ok(!rows.some((r) => r.token === romanize(normalizeText('مقاوم'))), 'prose carries no skeleton');
+  assert.ok(rows.some((r) => r.token === romanize(normalizeText('بامبو'))), 'a name still does');
+});
+
+test('a product is a few statements, not one a token: its DELETE and one INSERT per 500 rows, the stamp in the last', async () => {
+  const raw = freshDb();
+  const db = asD1(raw);
+  raw.prepare(`INSERT INTO products (id, slug, name, description, price_iqd, status) VALUES ('p_long', 'p_long', 'Long', '', 1000, 'active')`).run();
+  const words = Array.from({ length: INDEX_ROWS_PER_STATEMENT + 20 }, (_, i) => `wo${i.toString(36).padStart(4, 'a')}`).join(' ');
+  const doc = toSearchDoc({ id: 'p_long', name: 'Long', description: words });
+  const stmts = planSearchIndex(db, doc);
+  assert.equal(stmts.length, 1 + Math.ceil((buildIndexRows(doc).length + 1) / INDEX_ROWS_PER_STATEMENT));
+  assert.equal(stmts.length, 3);
+  await db.batch(stmts);
+  const n = (raw.prepare("SELECT COUNT(*) AS n FROM search_tokens WHERE product_id = 'p_long'").get() as { n: number }).n;
+  assert.equal(n, buildIndexRows(doc).length + 1, 'every row and the stamp');
+  assert.deepEqual(await ids(raw, 'wo00a9'), ['p_long']);
+});
+
+test('the backfill reads every language of a name and the variant SKUs, with no statement of its own for them', async () => {
+  const raw = freshDb();
+  raw.prepare("INSERT INTO brands (id, slug, name_ar, name_en, name_ckb) VALUES ('brd_b','b','بامبو لاب','Bambu Lab','بامبۆ لاب')").run();
+  raw.prepare("INSERT INTO catalogs (id, slug, name_ar, name_en, name_ckb) VALUES ('cat_n','n','نوزلات','Nozzles','نۆزڵەکان')").run();
+  raw
+    .prepare(
+      `INSERT INTO products (id, slug, name, description, description_ar, description_ku, price_iqd, status, brand_id, category_id)
+       VALUES ('p_n', 'p_n', 'Hardened Nozzle', 'Tough.', 'مقاوم للتآكل', 'بەرگەگرە', 1000, 'active', 'brd_b', 'cat_n')`
+    )
+    .run();
+  raw.prepare("INSERT INTO product_variants (id, product_id, combo_key, sku, active) VALUES ('v1', 'p_n', 'k1', 'HN-04-QX', 1), ('v2', 'p_n', 'k2', 'HN-02-ZZ', 0)").run();
+  await runDurableJobs({ DB: asD1(raw) } as unknown as Env);
+  const rows = raw.prepare(`SELECT ${searchDocColumns()} FROM products WHERE id = 'p_n'`).all() as Record<string, unknown>[];
+  assert.deepEqual(JSON.parse(String(rows[0].variant_skus)), ['HN-04-QX'], 'the active variant’s SKU, by the selection itself');
+  for (const [q, why] of [
+    ['بامبۆ', 'the brand in Sorani'],
+    ['نۆزڵەکان', 'the section in Sorani'],
+    ['nozzles', 'the section in English'],
+    ['للتاكل', 'the Arabic description'],
+    ['بەرگەگرە', 'the Sorani description'],
+    ['qx', 'an active variant’s SKU'],
+  ] as const) {
+    assert.deepEqual(await ids(raw, q), ['p_n'], `${q}: ${why}`);
+  }
+  assert.deepEqual(await ids(raw, 'zz'), [], 'an inactive variant’s SKU is not a way in');
 });

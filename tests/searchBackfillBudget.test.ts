@@ -20,6 +20,11 @@
  *     it is sent, and one statement per 90 products — none without 0194;
  *   - without a budget the pass is what it was (`deferred` stays 0).
  *
+ * Since `#doc:6` a product's rows go in `INDEX_ROWS_PER_STATEMENT` to a
+ * statement (worker/lib/search/store.ts), so a plan is its DELETE and one
+ * INSERT per 500 rows: the fixtures size descriptions in quarters of that to
+ * keep plans of different sizes, and the huge product is twelve INSERTs' worth.
+ *
  * Run: node --import tsx --test tests/searchBackfillBudget.test.ts
  */
 import { test } from 'node:test';
@@ -34,6 +39,7 @@ import { toSearchDoc } from '../worker/lib/search/document';
 import {
   backfillSearchIndex,
   INDEX_FAILED_MARK,
+  INDEX_ROWS_PER_STATEMENT,
   INDEX_STAMP,
   planSearchIndex,
   searchDocColumns,
@@ -56,11 +62,17 @@ const word = (i: number) => {
   return `qu${s.padStart(3, 'a')}`;
 };
 
-/** Thirty active products, descriptions of 0–14 words, so plans differ in size. */
-function seedCatalogue(raw: DatabaseSync, opts: { huge?: string } = {}) {
+/**
+ * Thirty active products, descriptions of 0–14 words — or, `long`, of 0–14
+ * quarters of an INSERT's rows, so plans differ in size: the rows go in
+ * `INDEX_ROWS_PER_STATEMENT` to a statement (`#doc:6`), and a short product is
+ * its DELETE and one INSERT. `huge` is a product no budgeted pass can write.
+ */
+function seedCatalogue(raw: DatabaseSync, opts: { huge?: string; long?: boolean } = {}) {
+  const quarter = Math.ceil(INDEX_ROWS_PER_STATEMENT / 4);
   for (let i = 0; i < 30; i++) {
     const id = `p_${String(i).padStart(2, '0')}`;
-    const words = id === opts.huge ? 400 : i % 15;
+    const words = id === opts.huge ? INDEX_ROWS_PER_STATEMENT * 12 : (i % 15) * (opts.long ? quarter : 1);
     const description = Array.from({ length: words }, (_, j) => word(i * 1000 + j)).join(' ');
     raw
       .prepare("INSERT INTO products (id, slug, name, description, price_iqd, status) VALUES (?, ?, ?, ?, 1000, 'active')")
@@ -90,18 +102,19 @@ async function planSizes(raw: DatabaseSync): Promise<Map<string, number>> {
 
 test('a budgeted pass executes exactly what it charged, defers what does not fit, and pass after pass ends at the unbudgeted index', async () => {
   const reference = freshDb();
-  seedCatalogue(reference);
+  seedCatalogue(reference, { long: true });
   const ref = await backfillSearchIndex(asD1(reference), { limit: 50 });
   assert.equal(ref.indexed, 30);
   assert.equal(ref.deferred, 0, 'no budget, nothing deferred');
   assert.equal(staleIndex(reference), 0);
 
   const raw = freshDb();
-  seedCatalogue(raw);
+  seedCatalogue(raw, { long: true });
   const sizes = await planSizes(raw);
   const largest = Math.max(...sizes.values());
-  const LIMIT = 60;
-  assert.ok(largest <= LIMIT - 2 && largest > 10, `plans of 3..${largest} statements, every one within a pass of ${LIMIT}`);
+  const LIMIT = 20;
+  assert.equal(Math.min(...sizes.values()), 2, 'a short product: its DELETE and one INSERT, the stamp in it');
+  assert.ok(largest <= LIMIT - 2 && largest >= 5, `plans of 2..${largest} statements, every one within a pass of ${LIMIT}`);
 
   const counted = countingD1(asD1(raw));
   let passes = 0;
@@ -159,7 +172,7 @@ test('a product too large for ANY budgeted pass is marked and reported once — 
   const raw = freshDb();
   seedCatalogue(raw, { huge: 'p_00' });
   const sizes = await planSizes(raw);
-  const CEILING = 200;
+  const CEILING = 12;
   assert.ok(sizes.get('p_00')! > CEILING, `the huge product needs ${sizes.get('p_00')} statements`);
 
   const counted = countingD1(asD1(raw));
@@ -175,7 +188,7 @@ test('a product too large for ANY budgeted pass is marked and reported once — 
     'written down'
   );
   // Every pass after: the huge product is never selected again; the rest finish.
-  for (let i = 0; i < 10 && staleIndex(raw) > 0; i++) {
+  for (let i = 0; i < 40 && staleIndex(raw) > 0; i++) {
     const run = await backfillSearchIndex(counted.db, { limit: 50, budget: statementBudget(CEILING), ceiling: CEILING });
     assert.deepEqual(run.failed, [], 'reported once');
   }
