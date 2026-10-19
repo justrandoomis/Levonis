@@ -76,8 +76,10 @@ export function approvalReason(app: ApplicationSummary | null | undefined, loc: 
 export function applicationCta(app: ApplicationSummary | null | undefined, loc: Loc): string {
   switch (app?.state) {
     case 'draft':
-    case 'changes_requested':
       return loc('أكمل طلبك', 'Complete your application', 'داواکارییەکەت تەواو بکە');
+    case 'changes_requested':
+      // The reviewer asked for changes (push 1.3, Today's approval card): the verb is to edit.
+      return loc('عدّل الطلب', 'Edit your application', 'داواکارییەکە دەستکاری بکە');
     case 'submitted':
     case 'in_review':
       return loc('تابع طلبك', 'Track your application', 'بەدواداچوون بۆ داواکارییەکەت');

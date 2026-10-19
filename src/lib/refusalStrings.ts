@@ -713,11 +713,17 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   },
   // Push 1.4 (DECISIONS row 259): a store exists, but no reviewer approved the
   // account, so nothing new is published, priced or promised. The merchant
-  // alone hears it; the public sees only STORE_UNAVAILABLE (C9).
+  // alone hears it; the public sees only STORE_UNAVAILABLE (C9). Push 1.3
+  // (row 260): the ONE sentence every held control already shows beside it —
+  // the words of src/lib/approvalGate.ts `APPROVAL_GATE_WORDS`, so a toast and
+  // a disabled button never say two different things. Written out, not
+  // imported: an import would make the gate a chunk every lazy import of this
+  // table preloads (tests/bundleBudget.test.ts); tests/merchantApprovalWave1Ui
+  // .test.ts holds the two equal.
   MERCHANT_NOT_APPROVED: {
-    ar: 'لم يُعتمد حسابك تاجرًا بعد. قدّم طلب الاعتماد أو تابعه من صفحة التاجر؛ طلباتك الحالية وأرباحك كما هي.',
-    en: 'Your merchant account is not approved yet. Apply, or follow your application, from the merchant page; your current orders and earnings are unaffected.',
-    ckb: 'هەژماری بازرگانییەکەت هێشتا پەسەند نەکراوە. لە پەڕەی بازرگانەوە داواکاریی پەسەندکردن پێشکەش بکە یان بەدوایدا بچۆ؛ داواکارییەکانی ئێستا و قازانجەکەت وەک خۆیانن.',
+    ar: 'يُفعَّل بعد اعتماد متجرك',
+    en: 'Available once your store is approved',
+    ckb: 'دوای پەسەندکردنی فرۆشگاکەت چالاک دەبێت',
   },
   MERCHANT_ALREADY_APPROVED: {
     ar: 'أنت تاجر معتمد بالفعل. افتح متجرك من صفحة التاجر.',

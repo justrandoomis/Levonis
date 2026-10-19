@@ -42,6 +42,7 @@ import { Button, IconButton } from '../../ui/Button';
 import { ErrorState } from '../../ui/AsyncStates';
 import { refusalText } from '../../../lib/refusalStrings';
 import { merchantHref } from '../../../lib/merchantRoutes';
+import { approvalGateText } from '../../../lib/approvalGate';
 import { WorkspaceContext } from '../shell/context';
 import { offersV2Api, type RequestPrefsV2 } from '../../community/requests/api';
 import { fillWorkshop, useWorkshopStrings, workshopLang, type WorkshopStrings } from './strings';
@@ -150,6 +151,11 @@ function settingsRefusal(e: unknown, loc: Loc): string {
       return loc('لم يُحفظ شيء: حساب التاجر موقوف، فلا يُفتح المتجر. أطفئ «مفتوح» ثم احفظ، وتواصل مع الدعم.', 'Nothing was saved: your merchant account is suspended, so the store cannot open. Switch «Open» off, save, and contact support.'); // OWNER: Sorani to be written by hand.
     case 'SUBSCRIPTION_INACTIVE':
       return loc('لم يُحفظ شيء: اشتراكك غير فعّال فلا يُعاد فتح المتجر. جدّده، أو أطفئ «مفتوح» واحفظ بقية التغييرات.', 'Nothing was saved: your subscription is not active, so the store cannot re-open. Renew it, or switch «Open» off and save the rest.'); // OWNER: Sorani to be written by hand.
+    // Community V3 push 1.3: re-opening (E8) or switching direct sales or custom
+    // requests on (E9) before approval refuses the whole save — the gate's one
+    // sentence (src/lib/approvalGate.ts), after the screen's «nothing was saved».
+    case 'MERCHANT_NOT_APPROVED':
+      return `${loc('لم يُحفظ شيء', 'Nothing was saved', 'هیچ شتێک پاشەکەوت نەکرا')}: ${approvalGateText(loc)}`;
     case 'GOVERNORATE_INVALID':
       return loc('اختر المحافظة من القائمة.', 'Choose a governorate from the list.'); // OWNER: Sorani to be written by hand.
     case 'DELIVERY_NO_COVERAGE':

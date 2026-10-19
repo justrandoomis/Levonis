@@ -62,6 +62,7 @@ import PulseRow from '../../counter/PulseRow';
 import QuickDock from '../../counter/QuickDock';
 import type { RestockTarget } from '../../counter/RestockSheet';
 import StatusStrip, { openStateSentence } from '../../counter/StatusStrip';
+import ApprovalCard from '../../counter/ApprovalCard';
 import { fill, useCounterStrings, type CounterLang, type CounterStrings } from '../../counter/strings';
 
 type Setup = NonNullable<Attention['setup']>;
@@ -255,6 +256,8 @@ export default function CommandCenter() {
           <p className="text-[13px] text-text-muted">{s.today.subtitle}</p>
         </div>
         <StatusStrip />
+        {/* Where the application stands (push 1.3): Today's card in place of the shell's one-line notice. */}
+        <ApprovalCard me={ws.me} href={ws.mainHref('/merchant/start')} />
       </header>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">

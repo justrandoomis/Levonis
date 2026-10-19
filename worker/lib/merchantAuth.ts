@@ -208,6 +208,18 @@ export async function requireWithdrawPrivileges(c: Context<AppContext>): Promise
   return sellingGate(c, false);
 }
 
+/**
+ * A DRAFT IS NOT A PROMISE (Community V3 push 1.3, wave 1). Writing a product
+ * that stays a DRAFT asks what selling asks EXCEPT approval — the same line as
+ * a store-page draft (E10): nothing in it reaches a customer, so a merchant
+ * under review prepares their catalogue while the reviewer decides. The
+ * caller refuses MERCHANT_NOT_APPROVED itself the moment the write would
+ * leave a product published (worker/routes/merchantCatalog.ts).
+ */
+export async function requireDraftPrivileges(c: Context<AppContext>): Promise<StoreContext> {
+  return sellingGate(c, false);
+}
+
 async function sellingGate(c: Context<AppContext>, approvalRequired: boolean): Promise<StoreContext> {
   const ctx = await requireStoreOwner(c);
   const user = c.get('user')!;
@@ -284,6 +296,24 @@ export async function sellingStatus(
 }
 
 /**
+ * MAY THIS MERCHANT WRITE DRAFTS? `requireDraftPrivileges` as a question, for
+ * the workspace to keep «new product» open under review (push 1.3): selling's
+ * answer, or — when the ONLY thing missing is approval — selling's answer with
+ * the approval line set aside. A sanction, a pause or a lapsed PLUS still says
+ * no, exactly as the draft gate does.
+ */
+export async function draftStatus(
+  db: D1Database,
+  ctx: StoreContext,
+  ownerUserId: string,
+  selling: { canSell: boolean; reason: string }
+): Promise<boolean> {
+  if (selling.canSell) return true;
+  if (selling.reason !== 'not_approved') return false;
+  return (await sellingVerdict(db, ctx, ownerUserId, undefined, { approval: false })).canSell;
+}
+
+/**
  * THE SAME ANSWER, FOR A NAMED ACCOUNT RATHER THAN THE SIGNED-IN ONE.
  *
  * `sellingStatus` asks it of the session user — right on the merchant's own
@@ -298,12 +328,14 @@ export async function sellingVerdict(
   ownerUserId: string,
   // The owner's tier when the caller already read it this request — the same
   // `getTierStatus` answer, judged by the same rule, read once (P2a).
-  ownerTier?: TierStatus
+  ownerTier?: TierStatus,
+  // `approval: false` sets the approval line aside — ONLY for `draftStatus`.
+  opts: { approval?: boolean } = {}
 ): Promise<{ canSell: boolean; reason: string }> {
   if (ctx.merchant.status === 'suspended') return { canSell: false, reason: 'merchant_suspended' };
   if (ctx.store.status === 'suspended') return { canSell: false, reason: 'store_suspended' };
   // E5: an unapproved merchant's store takes no new order (the buyer hears STORE_CLOSED).
-  if (!merchantApproved(ctx.merchant)) return { canSell: false, reason: 'not_approved' };
+  if (opts.approval !== false && !merchantApproved(ctx.merchant)) return { canSell: false, reason: 'not_approved' };
   if (ctx.store.status === 'paused') return { canSell: false, reason: 'store_paused' };
   const tier = ownerTier ?? (await getTierStatus(db, ownerUserId));
   if ((tier.gated_benefits ?? []).includes('merchantStore')) {

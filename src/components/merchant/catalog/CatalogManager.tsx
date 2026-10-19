@@ -32,6 +32,7 @@ import { StateChip, readRefusal } from './parts';
 import BulkValueSheet, { type BulkValueKind } from './BulkValueSheet';
 import { bulkInverse, type UndoStep } from './bulkUndo';
 import VariantImg from '../../ui/VariantImg';
+import { gateHint, isApprovalGate } from '../../../lib/approvalGate';
 
 const ProductEditorSheet = lazy(() => import('./ProductEditorSheet'));
 const InsightsSheet = lazy(() => import('./InsightsSheet'));
@@ -43,6 +44,13 @@ type StateFilter = '' | 'published' | 'draft' | 'hidden' | 'archived';
 
 export interface CatalogManagerProps {
   canSell: boolean;
+  /**
+   * May write DRAFTS (push 1.3): selling, or approval its only lack — «new
+   * product» and editing stay open under review. Absent: `canSell`.
+   */
+  canDraft?: boolean;
+  /** Why selling is off (`selling.reason`): the approval gate's sentence goes on every held control. */
+  sellingReason?: string;
   store: MerchantStore;
   /**
    * The product a workspace address names (`/merchant/products/<id>`) — its
@@ -56,9 +64,13 @@ export interface CatalogManagerProps {
   onEditorClose?: () => void;
 }
 
-export function CatalogManager({ canSell, store, focusProductId = null, initialState, initialStock, onEditorClose }: CatalogManagerProps) {
+export function CatalogManager({ canSell, canDraft, sellingReason, store, focusProductId = null, initialState, initialStock, onEditorClose }: CatalogManagerProps) {
   const { loc, lang } = useLanguage();
   const s = catalogStrings(loc);
+  const drafts = canDraft ?? canSell;
+  // A held control stays in its menu and says why (never a silent grey item).
+  const held = canSell ? undefined : gateHint(sellingReason, loc);
+  const gated = !canSell && isApprovalGate(sellingReason);
   const toast = useToast();
   const mainHref = useMainSiteHref();
   const [confirm, confirmDialog] = useConfirm();
@@ -86,9 +98,9 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
   useEffect(() => {
     if (!focusProductId) return;
     if (focusProductId === 'new') {
-      if (canSell) setEditing({ id: null });
+      if (drafts) setEditing({ id: null });
     } else setEditing({ id: focusProductId });
-  }, [focusProductId, canSell]);
+  }, [focusProductId, drafts]);
   const [insightsFor, setInsightsFor] = useState<CatalogProduct | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [bulkValue, setBulkValue] = useState<BulkValueKind | null>(null);
@@ -342,18 +354,18 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
     const list: MenuEntry[] = [
       { id: 'edit', label: s.edit, icon: <Pencil className="h-4 w-4" />, onSelect: () => setEditing({ id: p.id }) },
       { id: 'insights', label: s.insights, icon: <BarChart3 className="h-4 w-4" />, onSelect: () => setInsightsFor(p) },
-      { id: 'duplicate', label: s.duplicate, icon: <Copy className="h-4 w-4" />, onSelect: () => duplicate(p), disabled: !canSell },
+      { id: 'duplicate', label: s.duplicate, icon: <Copy className="h-4 w-4" />, onSelect: () => duplicate(p), disabled: !canSell, hint: held },
     ];
     if (p.state === 'published' && !admin) {
       list.push({ id: 'open', label: s.openInStore, icon: <ExternalLink className="h-4 w-4" />, href: storefrontUrl(p) });
       list.push({ id: 'copy_link', label: s.copyLink, icon: <Link2 className="h-4 w-4" />, onSelect: () => void copyLink(p) });
     }
     list.push({ id: 'sep1', separator: true });
-    if (p.state !== 'published') list.push({ id: 'publish', label: s.publish, icon: <Eye className="h-4 w-4" />, onSelect: () => bulk('publish', [p.id]), disabled: !canSell || admin });
+    if (p.state !== 'published') list.push({ id: 'publish', label: s.publish, icon: <Eye className="h-4 w-4" />, onSelect: () => bulk('publish', [p.id]), disabled: !canSell || admin, hint: admin ? undefined : held });
     if (p.state === 'published') list.push({ id: 'hide', label: s.hide, icon: <EyeOff className="h-4 w-4" />, onSelect: () => bulk('hide', [p.id]) });
     list.push(p.featured
       ? { id: 'unfeature', label: s.unfeature, icon: <Star className="h-4 w-4" />, onSelect: () => bulk('unfeature', [p.id]) }
-      : { id: 'feature', label: s.feature, icon: <Star className="h-4 w-4" />, onSelect: () => bulk('feature', [p.id]), disabled: !canSell });
+      : { id: 'feature', label: s.feature, icon: <Star className="h-4 w-4" />, onSelect: () => bulk('feature', [p.id]), disabled: !canSell, hint: held });
     if (p.state !== 'archived') list.push({ id: 'archive', label: s.archive, icon: <Archive className="h-4 w-4" />, onSelect: () => bulk('archive', [p.id]) });
     list.push({ id: 'sep2', separator: true });
     list.push({ id: 'delete', label: s.remove, icon: <Trash2 className="h-4 w-4" />, destructive: true, onSelect: () => remove(p) });
@@ -364,12 +376,12 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
   const bulkMenu: MenuEntry[] = [
     { id: 'draft', label: s.toDraft, onSelect: () => bulk('draft', ids) },
     { id: 'archive', label: s.archive, onSelect: () => bulk('archive', ids) },
-    { id: 'feature', label: s.feature, onSelect: () => bulk('feature', ids), disabled: !canSell },
+    { id: 'feature', label: s.feature, onSelect: () => bulk('feature', ids), disabled: !canSell, hint: held },
     { id: 'unfeature', label: s.unfeature, onSelect: () => bulk('unfeature', ids) },
     { id: 'sep', separator: true },
-    { id: 'price', label: s.setPrice, onSelect: () => setBulkValue('price'), disabled: !canSell },
-    { id: 'stock', label: s.setStock, onSelect: () => setBulkValue('stock'), disabled: !canSell },
-    { id: 'add', label: s.addToCollection, onSelect: () => setBulkValue('add_to_collection'), disabled: !canSell },
+    { id: 'price', label: s.setPrice, onSelect: () => setBulkValue('price'), disabled: !canSell, hint: held },
+    { id: 'stock', label: s.setStock, onSelect: () => setBulkValue('stock'), disabled: !canSell, hint: held },
+    { id: 'add', label: s.addToCollection, onSelect: () => setBulkValue('add_to_collection'), disabled: !canSell, hint: held },
     { id: 'removec', label: s.removeFromCollection, onSelect: () => setBulkValue('remove_from_collection') },
     { id: 'sep2', separator: true },
     { id: 'delete', label: s.remove, destructive: true, onSelect: () => bulkDelete(ids) },
@@ -389,18 +401,22 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
             label={s.importExport}
             items={[
               { id: 'export', label: s.exportCsv, icon: <Download className="h-4 w-4" />, onSelect: exportCsv },
-              { id: 'import', label: s.importCsv, icon: <FileUp className="h-4 w-4" />, onSelect: () => setImportOpen(true), disabled: !canSell },
+              { id: 'import', label: s.importCsv, icon: <FileUp className="h-4 w-4" />, onSelect: () => setImportOpen(true), disabled: !canSell, hint: held },
               { id: 'refresh', label: s.refresh, icon: <RefreshCcw className="h-4 w-4" />, onSelect: reload },
             ]}
             trigger={(props) => <IconButton {...props} label={s.importExport} variant="secondary" icon={<MoreHorizontal className="h-4 w-4" />} />}
           />
-          <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ id: null })} disabled={!canSell} data-new-product>
+          <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ id: null })} disabled={!drafts} data-new-product>
             {s.newProduct}
           </Button>
         </div>
       </div>
 
-      {!canSell && <p className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-[12.5px] text-text-primary" role="note">{s.cannotSell}</p>}
+      {!canSell && (
+        <p className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-[12.5px] text-text-primary" role="note" data-approval-gate={gated || undefined}>
+          {gated ? `${held} — ${s.draftsUnderReview}` : s.cannotSell}
+        </p>
+      )}
 
       <div className="space-y-2">
         <div className="relative">
@@ -452,14 +468,14 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
         empty={
           filtered
             ? { title: s.noMatch }
-            : { title: s.noProducts, description: s.noProductsHint, action: canSell ? <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ id: null })}>{s.newProduct}</Button> : undefined }
+            : { title: s.noProducts, description: s.noProductsHint, action: drafts ? <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ id: null })}>{s.newProduct}</Button> : undefined }
         }
         selection={{
           selected,
           onChange: setSelected,
           actions: (
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="secondary" onClick={() => bulk('publish', ids)} disabled={busy || !canSell}>{s.publish}</Button>
+              <Button size="sm" variant="secondary" onClick={() => bulk('publish', ids)} disabled={busy || !canSell} title={held} data-approval-gate={gated || undefined}>{s.publish}</Button>
               <Button size="sm" variant="secondary" onClick={() => bulk('hide', ids)} disabled={busy}>{s.hide}</Button>
               <Menu label={s.bulkMore} items={bulkMenu} trigger={(props) => <Button {...props} size="sm" variant="ghost" disabled={busy}>{s.bulkMore}</Button>} />
             </div>
@@ -485,6 +501,7 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
             open={!!editing}
             productId={editing.id}
             canSell={canSell}
+            gated={gated}
             collections={collections}
             onClose={() => {
               setEditing(null);

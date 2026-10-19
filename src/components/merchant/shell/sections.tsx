@@ -61,6 +61,8 @@ export const SECTIONS: Readonly<Record<MerchantSection, Section>> = {
     (m, { id }, ws) => (
       <m.ProductsManager
         canSell={ws.canSell}
+        canDraft={ws.canDraft}
+        sellingReason={ws.me.selling.reason}
         store={ws.store}
         focusProductId={ws.query.create ? 'new' : id ?? null}
         initialState={ws.query.state}

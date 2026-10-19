@@ -820,6 +820,54 @@ export async function notifyStoreStatusChanged(
   });
 }
 
+/**
+ * «متجرك يحتاج اعتماد التاجر» — EVERY EXISTING MERCHANT APPLIES (Community V3
+ * push 1.3, owner decision C1; DECISIONS row 260). Migration 0205 started a
+ * draft application for each merchant from before the gate; this is the one
+ * notice that tells them, written ONCE per merchant (the event key) on their
+ * next workspace load (GET /api/merchant/me) — no migration in this repository
+ * writes a notification.
+ *
+ * ID-ONLY (gap §3.7): fixed words in three languages, the merchant's id as the
+ * entity, and a link to the application. No name, no store, no reason, no
+ * state — nothing a reader of the row could learn the person from. In-app
+ * only: the outside channels are not used for it.
+ */
+export const APPROVAL_REQUIRED_LINK = '/merchant/start';
+
+export function approvalRequiredNotice(merchantId: string): MerchantNotice {
+  return {
+    kind: 'store_status_changed',
+    title_ar: 'متجرك يحتاج اعتماد التاجر',
+    title_en: 'Your store needs merchant approval',
+    body_ar: 'قدّم طلب اعتماد التاجر الآن من صفحة التاجر؛ طلباتك الحالية وأرباحك كما هي.',
+    body_en: 'Apply for merchant approval now from the merchant page; your current orders and earnings are unaffected.',
+    link: APPROVAL_REQUIRED_LINK,
+    entity_type: 'store',
+    entity_id: merchantId,
+    meta: {
+      scope: 'merchant',
+      status: 'approval_required',
+      title_ckb: 'فرۆشگاکەت پێویستی بە پەسەندکردنی بازرگان هەیە',
+      body_ckb: 'ئێستا لە پەڕەی بازرگانەوە داواکاریی پەسەندکردنی بازرگان پێشکەش بکە؛ داواکارییەکانی ئێستا و قازانجەکەت وەک خۆیانن.',
+    },
+    eventKey: `approval_required:${merchantId}`,
+  };
+}
+
+/** Write it, once; true only when this call wrote the row. Never throws (a notifier never fails its page). */
+export async function notifyApprovalRequired(db: D1Database, userId: string): Promise<boolean> {
+  try {
+    const m = await db.prepare('SELECT id FROM community_merchants WHERE user_id = ?').bind(userId).first<{ id: string }>();
+    if (!m) return false;
+    const res = await merchantNotificationStatement(db, userId, approvalRequiredNotice(m.id)).run();
+    return (res.meta?.changes ?? 0) > 0;
+  } catch (e) {
+    console.error('approval notice not written', e instanceof Error ? e.message : String(e));
+    return false;
+  }
+}
+
 // ------------------------------------------------------ the feed (the API)
 
 export interface MerchantFeedRow {

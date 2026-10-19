@@ -12,6 +12,7 @@
  * every entry has all three spellings — tests/merchantWorkspaceShell.test.ts.
  */
 import { APPROVAL_PILL } from '../../merchantApplication/approvalPill';
+import { approvalGateText } from '../../../lib/approvalGate';
 
 export type Loc = (ar: string, en: string, ckb?: string) => string;
 
@@ -103,12 +104,9 @@ export function sellingReason(reason: string, loc: Loc): string {
         'فرۆشگاکە لەلایەن LEVONIS ڕاگیراوە. پەیوەندی بە پشتیوانییەوە بکە.'
       );
     case 'not_approved':
-      // Community V3 push 1.4 (DECISIONS row 259): the approval axis, in the merchant's own words.
-      return loc(
-        'لا يمكن البيع قبل اعتماد حسابك تاجرًا. تابع طلب الاعتماد من صفحة التاجر — متجرك وسجلّه محفوظان.',
-        'You can sell once your merchant account is approved. Follow your application from the merchant page — your store and its history are kept.',
-        'دوای پەسەندکردنی هەژماری بازرگانییەکەت دەتوانیت بفرۆشیت. لە پەڕەی بازرگانەوە بەدوای داواکارییەکەتدا بچۆ — فرۆشگا و مێژووەکەی پارێزراون.'
-      );
+      // Community V3 (DECISIONS rows 259–260): the gate's ONE sentence — the pill's
+      // reason and every held control's hint (quick create) say the same words.
+      return approvalGateText(loc);
     case 'benefit_restricted':
       return loc(
         'تم تقييد ميزة المتجر مؤقتًا. اشتراكك المدفوع لم يُلغَ — تواصل مع الدعم.',

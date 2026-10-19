@@ -14,7 +14,7 @@
  *     same pure function once `next_change_at` has passed, so a tab left open
  *     over closing time flips its own word without a fetch.
  */
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Store } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { api } from '../../../lib/api';
@@ -27,6 +27,10 @@ import { storeStatus } from '../shell/status';
 import { say } from '../shell/strings';
 import { fill, useCounterStrings, type CounterLang, type CounterStrings } from './strings';
 import VariantImg from '../../ui/VariantImg';
+import { opensThroughReadiness } from './readiness';
+
+/** «قبل أن تفتح متجرك» (push 1.3): its chunk loads the first time an approved merchant opens a closed store. */
+const ReadinessSheet = lazy(() => import('./ReadinessSheet'));
 
 /** The two hour fields the server adds to the store shape (worker/routes/merchant.ts `storePublicShape`). */
 export type StoreHoursState = Pick<MerchantStore, 'business_hours'> & { open_now?: boolean | null; next_change_at?: string | null };
@@ -110,6 +114,8 @@ export default function StatusStrip() {
   const status = storeStatus(ws.me);
   const store = ws.store as MerchantStore & StoreHoursState;
   const [busy, setBusy] = useState(false);
+  const [readiness, setReadiness] = useState(false);
+  const [readinessMounted, setReadinessMounted] = useState(false);
   const now = Date.now();
   const resolved = resolveOpenState(store, now);
   useClockTick(resolved.next_change_at);
@@ -118,11 +124,12 @@ export default function StatusStrip() {
   const suspended = status.key === 'suspended';
   const sentence = openStateSentence(s, store, lang as CounterLang, now);
 
-  const flip = async (next: boolean) => {
+  const apply = async (next: boolean) => {
     setBusy(true);
     try {
       await api.patch('/api/merchant/store', { open: next });
       toast.success(next ? s.status.opened : s.status.pausedToast);
+      setReadiness(false);
       ws.reloadMe();
       ws.attention.refresh(true);
     } catch (e) {
@@ -132,6 +139,18 @@ export default function StatusStrip() {
     } finally {
       setBusy(false);
     }
+  };
+  // OPENING IS A DELIBERATE TAP (push 1.3, gap row 1): an approved merchant
+  // switching a closed store on first sees what a customer will find — the
+  // readiness verdict — and opens from there. Pausing is never held.
+  const flip = (next: boolean) => {
+    if (opensThroughReadiness(next, ws.me.approved, store.status)) {
+      setReadinessMounted(true);
+      setReadiness(true);
+      ws.attention.refresh(true);
+      return;
+    }
+    void apply(next);
   };
 
   return (
@@ -159,6 +178,11 @@ export default function StatusStrip() {
         description={<span className="sr-only">{suspended ? s.status.switchSuspended : checked ? s.status.switchOn : s.status.switchOff}</span>}
         className="shrink-0 gap-2"
       />
+      {readinessMounted && (
+        <Suspense fallback={null}>
+          <ReadinessSheet open={readiness} busy={busy} onClose={() => setReadiness(false)} onOpenStore={() => void apply(true)} />
+        </Suspense>
+      )}
     </section>
   );
 }

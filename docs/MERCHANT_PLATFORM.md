@@ -46,7 +46,14 @@ These come from the owner. Engineering may choose *how*; it may not change *what
 8. **Pricing, stock, commission, payments and permissions are decided by the server.**
 9. **A custom print request is not a cart product** — different domain model,
    different path. They may share a unified order-history *view* later.
-10. **Verification is independent of PRO.** Never gate one on the other.
+10. **Approval comes first, and only from a human reviewer** (Community V3,
+    DECISIONS rows 256–260). No merchant sells, offers or is shown to the public
+    before a reviewer approves their merchant application — existing merchants
+    included, with no legacy approval (owner decisions C1, C2). Applying needs no
+    PLUS; selling after approval still does (C3). The public sees one generic
+    `STORE_UNAVAILABLE` / 404 for any store that is not public (C9). Approval is
+    its own axis: independent of PRO, of PLUS, of the sanctions and of the
+    optional `verified` mark (C4) — never gate one on another.
 11. **Every merchant has an independent store** — identity, subdomain, PWA.
 12. **The Store Builder never allows arbitrary code** — no HTML, JS, event handlers,
     iframes of arbitrary origin, or free CSS. Allow-listed schema only.

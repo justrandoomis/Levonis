@@ -10,6 +10,7 @@
  * `// OWNER: Sorani to be written by hand.`
  */
 import type { PublishState } from './catalogApi';
+import { approvalGateText } from '../../../lib/approvalGate';
 
 export type Loc = (ar: string, en: string, ckb?: string) => string;
 
@@ -30,6 +31,13 @@ export function catalogStrings(loc: Loc) {
       'New products cannot be published right now. Your existing products and their history are kept.',
       'ناتوانیت بەرهەمی نوێ بڵاو بکەیتەوە.'
     ),
+    // Community V3 push 1.3: under review, products are prepared as drafts.
+    draftsUnderReview: loc(
+      'جهّز منتجاتك الآن مسودات؛ لا يراها أحد غيرك حتى تُنشر.',
+      'Prepare your products as drafts now; nobody but you sees them until they are published.',
+      'ئێستا بەرهەمەکانت وەک ڕەشنووس ئامادە بکە؛ تا بڵاو نەکرێنەوە کەس جگە لە تۆ نایانبینێت.'
+    ),
+    publishing: loc('النشر', 'Publishing', 'بڵاوکردنەوە'),
     noProducts: loc('لا توجد منتجات بعد', 'No products yet', 'هێشتا بەرهەم نییە'),
     noProductsHint: loc('أضف منتجك الأول: الاسم والسعر والصورة تكفي للبدء.', 'Add your first product: a name, a price and a photo are enough to start.'), // OWNER: Sorani to be written by hand.
     noMatch: loc('لا نتائج مطابقة للتصفية', 'Nothing matches these filters', 'هیچ ئەنجامێک نییە'),
@@ -322,6 +330,8 @@ export function catalogRefusalText(code: string | undefined, loc: Loc, fallback:
     case 'VARIANTS_HAVE_OWN_STOCK': return loc('له أنواع بمخزون خاص؛ عدّله من المنتج.', 'It has variants with their own stock — edit it in the product.'); // OWNER: Sorani to be written by hand.
     case 'PRODUCT_HAS_ORDERS': return loc('له طلبات سابقة؛ أرشفه بدل الحذف.', 'It has past orders — archive it instead.'); // OWNER: Sorani to be written by hand.
     case 'NOT_FOUND': return loc('لم يعد موجودًا.', 'It no longer exists.'); // OWNER: Sorani to be written by hand.
+    // Community V3 push 1.3: the approval gate's one sentence (src/lib/approvalGate.ts).
+    case 'MERCHANT_NOT_APPROVED': return approvalGateText(loc);
     case 'STORE_SUSPENDED':
     case 'SELLING_DISABLED': return loc('البيع موقوف في متجرك الآن.', 'Selling is paused in your store right now.'); // OWNER: Sorani to be written by hand.
     case 'CSV_HEADER': return loc('الملف يحتاج عمودي name و price_iqd على الأقل.', 'The file needs at least the name and price_iqd columns.'); // OWNER: Sorani to be written by hand.

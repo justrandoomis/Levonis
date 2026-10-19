@@ -69,16 +69,25 @@ export interface Attention {
   payouts?: { in_flight: number; amount_iqd: number; link: string };
   coupons?: { ending_soon: number; first_ends_at: string | null; within_days: number; link: string };
   store?: { problems: Array<{ code: StoreProblem; link: string }> };
-  /** «جهّز متجرك»: what a new store still lacks (GET /api/merchant/attention). */
+  /**
+   * «جهّز متجرك»: what a new store still lacks (GET /api/merchant/attention) —
+   * and the readiness verdict before opening (push 1.3, ../counter/readiness.ts):
+   * approval, the governorates the delivery reaches, pickup and the services
+   * count ride the same read (absent from an older server).
+   */
   setup?: {
+    approved?: boolean;
     logo: boolean;
     banner: boolean;
     about: boolean;
     phone: boolean;
     delivery: boolean;
+    reach?: number;
+    pickup?: boolean;
     products: number;
+    services?: number;
     design: boolean;
-    links: { settings: string; delivery: string; products: string; design: string };
+    links: { settings: string; delivery: string; products: string; services?: string; design: string };
   };
   /**
    * «سرعة متجري» (P4): PRESENT ONLY when the phone LCP p75 bucket was poor on

@@ -176,6 +176,7 @@ export function HistoryPanel({
   onView,
   onRestore,
   onMore,
+  gate = null,
 }: {
   revisions: LayoutRevision[];
   count: number;
@@ -184,6 +185,8 @@ export function HistoryPanel({
   onView: (revision: number | null) => Promise<void>;
   onRestore: (revision: number, publish: boolean) => Promise<unknown>;
   onMore: (() => Promise<void>) | null;
+  /** The approval gate's sentence when it holds publishing (push 1.3): «استعد وانشر» stays, disabled, saying it. */
+  gate?: string | null;
 }) {
   const { loc, lang } = useLanguage();
   const [confirm, dialog] = useConfirm();
@@ -254,9 +257,10 @@ export function HistoryPanel({
                     <Button size="sm" variant="secondary" loading={busy === `${r.revision}:false`} disabled={!!busy} onClick={() => restore(r, false)}>
                       {loc('استعد إلى المسودة', 'Restore to draft')}
                     </Button>
-                    <Button size="sm" variant="ghost" loading={busy === `${r.revision}:true`} disabled={!!busy} onClick={() => restore(r, true)}>
+                    <Button size="sm" variant="ghost" loading={busy === `${r.revision}:true`} disabled={!!busy || !!gate} title={gate ?? undefined} onClick={() => restore(r, true)} data-approval-gate={gate ? true : undefined}>
                       {loc('استعد وانشر', 'Restore and publish')}
                     </Button>
+                    {gate && <span className="basis-full text-[11.5px] text-text-muted">{gate}</span>}
                   </>
                 )}
               </div>

@@ -308,7 +308,11 @@ export interface MerchantMe {
     subdomain: boolean;
   };
   store: MerchantStore | null;
-  selling: { canSell: boolean; reason: string };
+  /**
+   * `canDraft` (Community V3 push 1.3): product drafts may be written — selling,
+   * or approval its only lack. Absent from an older server: read it as `canSell`.
+   */
+  selling: { canSell: boolean; reason: string; canDraft?: boolean };
   suggested_slug: string | null;
   /** The domain store addresses live under, from the server's configuration;
    *  null when none is configured (audit 01 B19). */

@@ -173,10 +173,12 @@ test('the workspace pill keeps the store\'s REAL state; approval is its own noti
   const ckb: Loc = (_ar, _en, c) => c ?? 'MISSING';
   assert.match(waiting.approval!(ckb), SORANI_ONLY);
 
-  // The shell says it in its own notice, with the link to the application; the
-  // switch reads the operational label; Today's pulse never sees an approval key.
+  // The shell says it in its own notice, with the link to the application —
+  // on every screen but Today, where the approval card says it instead (push
+  // 1.3, tests/merchantApprovalWave1Ui.test.ts); the switch reads the
+  // operational label; Today's pulse never sees an approval key.
   const shell = code('src/components/merchant/shell/MerchantShell.tsx');
-  assert.match(shell, /status\.approval && \(/);
+  assert.match(shell, /status\.approval && section !== 'home' && \(/);
   assert.match(shell, /data-approval-notice[\s\S]{0,400}data-approval-link[\s\S]{0,80}status\.approval\(loc\)/);
   assert.doesNotMatch(code('src/components/merchant/shell/status.ts'), /key: 'approval'/);
 });

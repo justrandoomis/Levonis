@@ -24,14 +24,39 @@ relationship happens to hold today (§5).
 read. It is never the authorisation on its own: every mutation joins through
 the store row and compares against the session user.
 
-### PLUS ≠ verified
+### PLUS ≠ approved ≠ verified
 
-Two different questions, two different columns, never merged (§43):
+Three different questions, three different places, never merged (§43;
+Community V3, DECISIONS rows 256–260):
 
+- **Approved** (`community_merchants.approved_at`, from a human reviewer's
+  decision on a `merchant_applications` row) — *has Levonis accepted this
+  person as a merchant?* NULL is «no» and fails closed, everywhere.
 - **PLUS** (`memberships`) — *may this account operate a store?*
-- **`community_merchants.verified`** — *has Levonis checked this merchant?*
+- **`community_merchants.verified`** — *an optional extra mark an admin sets*;
+  the public «مزوّد معتمد» label comes from approval, not from it (owner
+  decision C4).
 
-A brand-new PLUS member can sell. Only an admin can verify.
+**Nobody sells before approval, and subscribing is not approval.** Applying is
+open to every signed-in account, with or without PLUS (C3); selling after
+approval still needs PLUS. A store is opened (`/onboard`) only by an approved
+applicant. **Every existing merchant applies too** (C1, C2): there is no legacy
+approval and no exception — migration 0205 gave each merchant from before the
+gate a DRAFT application pre-filled with what their store already shows the
+public (name, bio, public links — never a private value), and their next
+workspace load tells them once, in-app, by ids only.
+
+Until a reviewer approves them, a merchant's store is hidden from the public
+(one generic answer, `STORE_UNAVAILABLE` / 404 — never «under review» or
+«rejected», C9), and nothing NEW is promised from it: no publishing, no offer,
+no cart, no checkout (`MERCHANT_NOT_APPROVED` to the merchant, whose every held
+control says «يُفعَّل بعد اعتماد متجرك»). Drafts stay open — product drafts and
+the store-page draft. **Finishing existing work stays open**: orders already
+placed, payouts, disputes, offer withdrawal and review replies; nothing is
+frozen, deleted or cancelled automatically, and no money, escrow or commission
+rule changes. An approved store its merchant PAUSED stays listed with
+«مغلق مؤقتًا» (C10); on a database without the approval column every reader
+fails closed, public lists included (C11).
 
 ---
 

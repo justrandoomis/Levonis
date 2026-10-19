@@ -23,6 +23,7 @@ export default function WorkspacePalette({
   base,
   storeUrl,
   canSell,
+  canDraft = canSell,
   href,
   recentKey,
 }: {
@@ -31,6 +32,8 @@ export default function WorkspacePalette({
   base: string;
   storeUrl: string;
   canSell: boolean;
+  /** Product drafts stay open under review (Community V3 push 1.3): «new product» follows them. */
+  canDraft?: boolean;
   href: (link: string) => string;
   recentKey: string;
 }) {
@@ -67,9 +70,9 @@ export default function WorkspacePalette({
   }, [query, open]);
 
   const actions: QuickAction[] = [
+    ...(canDraft ? [{ id: 'new-product', label: say(loc, W.newProduct), href: href(merchantHref.newProduct()), icon: <Plus className="h-4 w-4" /> }] : []),
     ...(canSell
       ? [
-          { id: 'new-product', label: say(loc, W.newProduct), href: href(merchantHref.newProduct()), icon: <Plus className="h-4 w-4" /> },
           { id: 'new-coupon', label: say(loc, W.newCoupon), href: href(merchantHref.newCoupon()), icon: <Plus className="h-4 w-4" /> },
           { id: 'new-collection', label: say(loc, W.newCollection), href: href(merchantHref.newCollection()), icon: <Plus className="h-4 w-4" /> },
         ]

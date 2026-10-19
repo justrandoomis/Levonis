@@ -81,6 +81,7 @@ import { NotFoundState } from '../../components/ui/AsyncStates';
 import { Skeleton, SkeletonGroup } from '../../components/ui/Skeleton';
 import { useToast } from '../../components/ui/Toast';
 import { CommunityLoadError } from './access';
+import { approvalGateText } from '../../lib/approvalGate';
 
 /** The wizard finishes a draft or edits the request in place (a lazy chunk: most visitors never edit). */
 const RequestWizard = lazy(() => import('../../components/community/requests/RequestWizard'));
@@ -763,6 +764,7 @@ export function RequestDetail({
                 offers={offers}
                 draft={myDraft}
                 canOffer={canOffer}
+                gate={me?.store && me.approved === false ? approvalGateText(loc) : null}
                 takingOffers={open}
                 materials={materials}
                 defaultQuantity={current.quantity}
