@@ -1,0 +1,218 @@
+{
+  "origin": "http://127.0.0.1:8799",
+  "run": "93fbaa41",
+  "desktopSimple": {
+    "mode": "simple",
+    "sidebar": "none",
+    "tools": {
+      "tool-arrange": "none",
+      "tool-orient": "none",
+      "tool-cut": "none",
+      "tool-boolean": "none",
+      "tool-negative": "none",
+      "tool-seam": "none",
+      "tool-mmu": "none",
+      "tool-text": "none",
+      "tool-measure": "none",
+      "tool-varlayer": "none"
+    },
+    "deleteTool": "flex",
+    "booleanDisabled": true,
+    "bedWarn": null
+  },
+  "desktopBedWarning": {
+    "mode": "simple",
+    "sidebar": "none",
+    "tools": {
+      "tool-arrange": "none",
+      "tool-orient": "none",
+      "tool-cut": "none",
+      "tool-boolean": "none",
+      "tool-negative": "none",
+      "tool-seam": "none",
+      "tool-mmu": "none",
+      "tool-text": "none",
+      "tool-measure": "none",
+      "tool-varlayer": "none"
+    },
+    "deleteTool": "flex",
+    "booleanDisabled": true,
+    "bedWarn": {
+      "display": "block",
+      "text": "⚠ Beyond the bed by X 172.0mm · Y 22.0mm · height 40.0mm"
+    }
+  },
+  "importNotice": "Files were added to the project.",
+  "desktopSliceMessage": "X2D: the model or generated path exceeds the selected build volume. The result was rejected and cannot be exported.",
+  "desktopAdvanced": {
+    "mode": "advanced",
+    "sidebar": "flex",
+    "tools": {
+      "tool-arrange": "flex",
+      "tool-orient": "flex",
+      "tool-cut": "flex",
+      "tool-boolean": "flex",
+      "tool-negative": "flex",
+      "tool-seam": "flex",
+      "tool-mmu": "flex",
+      "tool-text": "flex",
+      "tool-measure": "flex",
+      "tool-varlayer": "flex"
+    },
+    "deleteTool": "flex",
+    "booleanDisabled": true,
+    "bedWarn": null
+  },
+  "phoneSimple": {
+    "mode": "simple",
+    "sidebar": "none",
+    "tools": {
+      "tool-arrange": "none",
+      "tool-orient": "none",
+      "tool-cut": "none",
+      "tool-boolean": "none",
+      "tool-negative": "none",
+      "tool-seam": "none",
+      "tool-mmu": "none",
+      "tool-text": "none",
+      "tool-measure": "none",
+      "tool-varlayer": "none"
+    },
+    "deleteTool": "flex",
+    "booleanDisabled": true,
+    "bedWarn": null
+  },
+  "checks": [
+    {
+      "ok": true,
+      "m": "a first visit opens in Simple",
+      "detail": "simple"
+    },
+    {
+      "ok": true,
+      "m": "the engine side panel is not displayed at desktop width",
+      "detail": "none"
+    },
+    {
+      "ok": true,
+      "m": "every dead engine control is hidden",
+      "detail": "{\"tool-arrange\":\"none\",\"tool-orient\":\"none\",\"tool-cut\":\"none\",\"tool-boolean\":\"none\",\"tool-negative\":\"none\",\"tool-seam\":\"none\",\"tool-mmu\":\"none\",\"tool-text\":\"none\",\"tool-measure\":\"none\",\"tool-varlayer\":\"none\"}"
+    },
+    {
+      "ok": true,
+      "m": "a working engine control stays",
+      "detail": "flex"
+    },
+    {
+      "ok": true,
+      "m": "the header carries the slice action in Simple"
+    },
+    {
+      "ok": true,
+      "m": "the side-panel toggle is gone in Simple"
+    },
+    {
+      "ok": true,
+      "m": "the engine's bed warning shows in Simple",
+      "detail": "⚠ Beyond the bed by X 172.0mm · Y 22.0mm · height 40.0mm"
+    },
+    {
+      "ok": true,
+      "m": "the side panel stays hidden with a model loaded",
+      "detail": "none"
+    },
+    {
+      "ok": true,
+      "m": "slicing an over-bed model in Simple shows the refusal in the shell",
+      "detail": "X2D: the model or generated path exceeds the selected build volume. The result was rejected and cannot be exported."
+    },
+    {
+      "ok": true,
+      "m": "…and it is the over-bed warning",
+      "detail": "X2D: the model or generated path exceeds the selected build volume. The result was rejected and cannot be exported."
+    },
+    {
+      "ok": true,
+      "m": "the side panel was never needed to see it",
+      "detail": "none"
+    },
+    {
+      "ok": true,
+      "m": "Advanced shows the engine side panel at desktop width",
+      "detail": "flex"
+    },
+    {
+      "ok": true,
+      "m": "Advanced shows the dead controls, disabled, as before"
+    },
+    {
+      "ok": true,
+      "m": "the side-panel toggle is back in Advanced"
+    },
+    {
+      "ok": true,
+      "m": "a guest's choice survives a reload (local mirror)"
+    },
+    {
+      "ok": true,
+      "m": "Simple on a phone: no side panel",
+      "detail": "simple / none"
+    },
+    {
+      "ok": true,
+      "m": "the header slice action is desktop-only"
+    },
+    {
+      "ok": true,
+      "m": "the phone keeps its own slice action"
+    },
+    {
+      "ok": true,
+      "m": "Settings opens the Setup sheet (with the mode switch) in Simple"
+    },
+    {
+      "ok": true,
+      "m": "…and never a side panel that Simple hides",
+      "detail": "none"
+    },
+    {
+      "ok": true,
+      "m": "account A opens in Simple (never chose)",
+      "detail": "simple"
+    },
+    {
+      "ok": true,
+      "m": "the choice is stored on the account (PUT /api/prefs 200, same-origin)",
+      "detail": "200"
+    },
+    {
+      "ok": true,
+      "m": "device 2 of account A opens in Advanced, from the server"
+    },
+    {
+      "ok": true,
+      "m": "account B still opens in Simple",
+      "detail": "simple"
+    },
+    {
+      "ok": true,
+      "m": "a forged levonis_session beside the Studio cookie: the Studio session still works",
+      "detail": "simple-b-93fbaa41"
+    },
+    {
+      "ok": true,
+      "m": "the main-site cookie alone signs nobody in to Studio"
+    },
+    {
+      "ok": true,
+      "m": "a write from a store subdomain is refused (403)",
+      "detail": "403"
+    },
+    {
+      "ok": true,
+      "m": "…and changed nothing"
+    }
+  ],
+  "passed": 28,
+  "total": 28
+}

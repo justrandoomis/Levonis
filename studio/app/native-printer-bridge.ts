@@ -170,21 +170,50 @@ export async function discoverNativePrinters() {
   return (await requirePlugin().discoverPrinters()).printers;
 }
 
-export async function connectNativePrinter(options: LevoPrinterConnection) {
-  if (!isPrivatePrinterAddress(options.ip)) throw new Error("Enter a private LAN address or a .local host name.");
+/**
+ * The words the connect flow shows, taken from the active Studio dictionary
+ * (P1-10). The certificate-trust question used to be a hard-coded English
+ * `window.confirm`, the one prompt in the Studio an Arabic or Sorani reader
+ * could not read — and it is the prompt that decides whether a printer's
+ * certificate is pinned. The port numbers and the fingerprints stay Latin:
+ * they are what the printer's own screen shows.
+ */
+export interface PrinterConnectCopy {
+  /** Template with a `{fingerprints}` placeholder. */
+  trustPrompt: string;
+  fileUnavailable: string;
+  trustCancelled: string;
+  addressInvalid: string;
+  accessCodeInvalid: string;
+  serialRequired: string;
+}
+
+function groupFingerprint(value: string): string {
+  return value.match(/.{1,2}/g)?.join(":") ?? value;
+}
+
+/** The full trust question for one printer, in the reader's language. */
+export function certificateTrustMessage(
+  copy: Pick<PrinterConnectCopy, "trustPrompt" | "fileUnavailable">,
+  certificateFingerprint: string,
+  fileTransferFingerprint?: string | null
+): string {
+  const fingerprints = fileTransferFingerprint
+    ? `MQTT 8883:\n${groupFingerprint(certificateFingerprint)}\n\nFTPS 990:\n${groupFingerprint(fileTransferFingerprint)}`
+    : `MQTT 8883:\n${groupFingerprint(certificateFingerprint)}\n\nFTPS 990: ${copy.fileUnavailable}`;
+  return copy.trustPrompt.split("{fingerprints}").join(fingerprints);
+}
+
+export async function connectNativePrinter(options: LevoPrinterConnection, copy: PrinterConnectCopy) {
+  if (!isPrivatePrinterAddress(options.ip)) throw new Error(copy.addressInvalid);
   const accessCode = options.accessCode.trim();
-  if (accessCode.length < 6 || accessCode.length > 32) throw new Error("The printer access code is invalid.");
+  if (accessCode.length < 6 || accessCode.length > 32) throw new Error(copy.accessCodeInvalid);
   const serial = options.serial?.trim();
-  if (!serial || !/^[a-z0-9_-]{6,64}$/i.test(serial)) throw new Error("Enter the printer serial number shown on its Device screen.");
+  if (!serial || !/^[a-z0-9_-]{6,64}$/i.test(serial)) throw new Error(copy.serialRequired);
   const first = await requirePlugin().connect({ ...options, ip: options.ip.trim(), accessCode, serial, remember: false });
   if (!first.requiresTrust || !first.certificateFingerprint) return first;
-  const grouped = first.certificateFingerprint.match(/.{1,2}/g)?.join(":") ?? first.certificateFingerprint;
-  const fileGrouped = first.fileTransferFingerprint?.match(/.{1,2}/g)?.join(":") ?? first.fileTransferFingerprint;
-  const fingerprints = fileGrouped
-    ? `MQTT 8883:\n${grouped}\n\nFTPS 990:\n${fileGrouped}`
-    : `MQTT 8883:\n${grouped}\n\nFTPS 990: unavailable (status-only connection)`;
-  const approved = window.confirm(`Verify this printer's encrypted LAN certificates:\n\n${fingerprints}\n\nOnly continue if the IP and serial match the printer in front of you.`);
-  if (!approved) throw new Error("Printer certificate approval was cancelled.");
+  const approved = window.confirm(certificateTrustMessage(copy, first.certificateFingerprint, first.fileTransferFingerprint));
+  if (!approved) throw new Error(copy.trustCancelled);
   return requirePlugin().connect({
     ...options,
     ip: options.ip.trim(),

@@ -18,7 +18,7 @@
   `.github/workflows/deploy-studio-*.yml`؛ بيئة staging منفصلة كليًا عن
   الإنتاج (worker وقاعدة وسلة مستقلة).
 
-## المخطط (`studio/db/schema.ts` → `studio/drizzle/0000_studio_projects.sql` + `0001_project_archive_pins.sql`)
+## المخطط (`studio/db/schema.ts` → `studio/drizzle/0000_studio_projects.sql` + `0001_project_archive_pins.sql` + `0002_user_prefs.sql`)
 
 | جدول | الأعمدة الأساسية | ملاحظات |
 |---|---|---|
@@ -28,6 +28,8 @@
 | `studio_sessions` | (طبقة الدخول — انظر `docs/STUDIO_AUTH.md`) | نفس DDL في `worker/auth/session.ts` |
 | `project_archive` (P1-09) | `project_id PK → projects, archived_at` | وجود الصف = مؤرشف. الأرشفة **ليست حذفًا** |
 | `project_revision_pins` (P1-09) | `id, revision_id → project_revisions, pinned_at, pin_reason, pin_ref` | `UNIQUE(revision_id, pin_reason, pin_ref)`؛ صف لكل جهة تمسك النسخة؛ النسخة المثبتة لا تُحذف أبدًا |
+| `studio_user_prefs` (P1-10) | `owner_id PK, mode, updated_at` | وضع المحرر بسيط/متقدم (قرارا المالك S6/S7). غياب الصف = **بسيط**، الافتراضي للجميع. لا CHECK على `mode` عمدًا (وضع جديد لا يحتاج إعادة بناء الجدول)؛ القيمة تُتحقق في `worker/api/prefs.ts` وأي قيمة مجهولة تُقرأ «بسيط» |
+| `studio_rate_limits` (P1-10) | `key PK, window_start, count` | نافذة ثابتة في D1 بنمط الموقع الرئيسي (`worker/api/ratelimit.ts`)؛ المفتاح `<bucket>:u:<userId>`؛ cron التنظيف يحذف النوافذ الأقدم من يوم |
 
 **لماذا جداول جانبية لا أعمدة؟** خطة P1-09 سمّت الأعمدة
 `projects.archived_at` و`project_revisions.pinned_at/pin_reason/pin_ref`، لكن
@@ -121,6 +123,9 @@
 | مهلة pending قبل التنظيف | 24 ساعة | `STUDIO_PENDING_TTL_HOURS` |
 | احتفاظ المحذوف ناعمًا | 30 يومًا | `STUDIO_DELETED_RETENTION_DAYS` |
 | revisions معتمدة محفوظة لكل مشروع | 20 | `STUDIO_KEEP_COMMITTED_REVISIONS` |
+| حد الطلبات — طول النافذة (P1-10) | 60 ثانية | `STUDIO_RATE_LIMIT_WINDOW_SECONDS` |
+| حد الطلبات — قراءات (GET/HEAD) لكل حساب في النافذة | 1200 | `STUDIO_RATE_LIMIT_READS` |
+| حد الطلبات — كتابات لكل حساب في النافذة | 600 | `STUDIO_RATE_LIMIT_WRITES` |
 
 الحصة تُحتسب شاملة حجوزات pending (منع التجاوز عبر OPENs متوازية) والنسخ
 المثبتة. `GET /api/quota` يعرض الاستخدام والحدود الفعلية — لا «غير محدود»
@@ -128,6 +133,13 @@
 لازم للحفظ، وأكبر ملف يبقى 64 MiB** (`DEFAULT_USER_QUOTA_BYTES` في
 `worker/api/quota.ts`)؛ المتغير `STUDIO_USER_QUOTA_BYTES` ما زال يتجاوزها لكل
 بيئة. بقية الأرقام افتراضات معلنة تُعرض كحدود حالية لا كوعود.
+
+**حد الطلبات (P1-10)** ليس حصة منتج بل حماية للسعة: يُحسب على نداءات الحساب
+المسجّل فقط (هي التي تصل D1 وR2)؛ نداء الضيف يُرفض بـ 401 قبل أي عمل في القاعدة،
+و`/api/health` مجاني. القراءات والكتابات في دلوين منفصلين كما في `limitByMethod`
+على الموقع. الأرقام أعلى بكثير مما يفعله المحرر نفسه (حفظ تلقائي كل 2.5 ثانية
+على الأكثر = OPEN + PUT لكل ملف متغير + COMMIT)، وتتجاوزها 429 مع `Retry-After`
+و`code: RATE_LIMITED`، ويعاملها عميل المزامنة كخطأ مؤقت يُعاد.
 
 ## طبقة العميل (S5 — `studio/app/project-store.ts` + `project-sync.ts`)
 

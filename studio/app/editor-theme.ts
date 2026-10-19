@@ -103,9 +103,54 @@ const ABOVE_BAR = `calc(${MOBILE_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) 
 const ABOVE_BAR_TIGHT = `calc(${MOBILE_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + 6px)`;
 
 /**
+ * SIMPLE MODE: THE ENGINE CONTROLS IT HIDES (P1-10; GAP-MAP conflict 23).
+ *
+ * The engine's object toolbar renders every action in its table, and the ten
+ * below have no implementation behind them in the installed build: they are
+ * drawn as disabled buttons (no `run`, so `disabled` is set). Spec section 10
+ * and rule 18 ask that a person be shown only what really works, so Simple
+ * mode removes them. Advanced keeps the engine exactly as it is.
+ *
+ * Arrange, Orient and Cut are on this list because the ENGINE's buttons are
+ * the dead ones: the working versions are the shell's own (the desktop
+ * shell-actions strip and the mobile tool tray), visible in both modes.
+ *
+ * tests/editor-capabilities.test.mjs reads the installed engine and fails the
+ * moment one of these gains a `run` — a control that starts working must not
+ * stay hidden by a list nobody re-reads.
+ */
+export const SIMPLE_MODE_HIDDEN_ENGINE_TOOLS = [
+  "tool-arrange",
+  "tool-orient",
+  "tool-cut",
+  "tool-boolean",
+  "tool-negative",
+  "tool-seam",
+  "tool-mmu",
+  "tool-text",
+  "tool-measure",
+  "tool-varlayer",
+] as const;
+
+const SIMPLE_HIDDEN_SELECTOR = SIMPLE_MODE_HIDDEN_ENGINE_TOOLS
+  .map((id) => `:host([data-levo-mode="simple"]) [data-testid="${id}"]`)
+  .join(", ");
+
+/**
+ * The toolbar's group separators that only introduced a hidden group, so
+ * Simple does not end the toolbar in a row of empty dividers. Its own rule:
+ * an engine without `:has()` drops only this cosmetic rule, never the one
+ * that hides the controls.
+ */
+const SIMPLE_ORPHAN_SEPARATOR_SELECTOR = SIMPLE_MODE_HIDDEN_ENGINE_TOOLS
+  .map((id) => `:host([data-levo-mode="simple"]) .vtt-sep:has(+ [data-testid="${id}"])`)
+  .join(", ");
+
+/**
  * Injected into the engine's shadow roots by the S4 adapter. Includes the
  * responsive sidebar rules driven by the `data-levo-sidebar` host attribute
- * (set through `EngineAdapter#setHostAttribute`).
+ * and the Simple-mode rules driven by `data-levo-mode` (both set through
+ * `EngineAdapter#setHostAttribute`).
  */
 export const EDITOR_SHADOW_CSS = `
   :host { color-scheme: dark; background: ${T.shell} !important; color: ${T.text} !important; font-family: ${LEVONIS_TOKENS.fontSans}; }
@@ -204,4 +249,17 @@ export const EDITOR_SHADOW_CSS = `
   @media (min-width: 900px) {
     .sidebar { display: flex !important; }
   }
+  /* SIMPLE MODE (P1-10, owner decision S6: the default for everyone). The
+     engine side panel goes at EVERY width: these rules come last and the
+     host-attribute selector outranks both width rules above, the desktop
+     one marked important included. What stays, in both modes: the stats card
+     (the slicing estimate and the over-bed warning), the bed warning, the
+     status line and the plate bar, which all live outside the side panel,
+     and the shell's own messages, stale banner and slice action. Slicing
+     still runs: the shell drives the engine through the adapter, which does
+     not need the panel to be visible. Plain prose only in this comment, see
+     the note near the top of this stylesheet. */
+  :host([data-levo-mode="simple"]) .sidebar { display: none !important; }
+  ${SIMPLE_HIDDEN_SELECTOR} { display: none !important; }
+  ${SIMPLE_ORPHAN_SEPARATOR_SELECTOR} { display: none !important; }
 `;

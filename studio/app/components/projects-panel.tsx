@@ -156,6 +156,7 @@ const TEXT = {
     pinOther: "محفوظة",
     historyConflict: "تغيّر المشروع على جهاز آخر. أعد تحميل السجل ثم حاول مجددًا.",
     quotaExceeded: "امتلأت مساحة التخزين في حسابك.",
+    rateLimited: "طلبات كثيرة خلال وقت قصير. انتظر دقيقة ثم حاول مجددًا.",
     guestWorkTitle: "عمل من هذا الجهاز قبل تسجيل الدخول",
     guestWorkBody: "أُنشئ هذا العمل كضيف. يبقى على هذا الجهاز، ولا يُحفظ في حسابك إلا إذا اخترت ذلك.",
     adoptGuest: "احفظ عملك في حسابي",
@@ -242,6 +243,7 @@ const TEXT = {
     pinOther: "Held",
     historyConflict: "This project changed on another device. Reload the history and try again.",
     quotaExceeded: "Your account storage is full.",
+    rateLimited: "Too many requests in a short time. Wait a minute and try again.",
     guestWorkTitle: "Work from this device before you signed in",
     guestWorkBody: "This was made as a guest. It stays on this device and is saved to your account only if you choose.",
     adoptGuest: "Save this work to my account",
@@ -328,6 +330,7 @@ const TEXT = {
     pinOther: "هەڵگیراوە",
     historyConflict: "ئەم پڕۆژەیە لە ئامێرێکی ترەوە گۆڕاوە. مێژووەکە نوێ بکەرەوە و دووبارە هەوڵبدەرەوە.",
     quotaExceeded: "شوێنی هەڵگرتنی هەژمارەکەت پڕ بووە.",
+    rateLimited: "لە ماوەیەکی کورتدا داواکاریی زۆر نێردراوە. خولەکێک چاوەڕێ بکە و دووبارە هەوڵبدەرەوە.",
     guestWorkTitle: "کارەکانی ئەم ئامێرە پێش چوونەژوورەوە",
     guestWorkBody: "ئەم کارە وەک میوان دروستکراوە. لەسەر ئەم ئامێرە دەمێنێتەوە و تەنها ئەگەر خۆت هەڵیبژێریت لە هەژمارەکەت پاشەکەوت دەکرێت.",
     adoptGuest: "کارەکەم لە هەژمارەکەمدا پاشەکەوت بکە",
@@ -364,6 +367,7 @@ function describeError(error: unknown, t: PanelText): string {
     if (error.code === "REVISION_CONFLICT") return t.historyConflict;
     if (error.code === "QUOTA_EXCEEDED" || error.status === 413) return t.quotaExceeded;
     if (error.code === "RETENTION_EXPIRED" || error.status === 410) return t.trashExpired;
+    if (error.code === "RATE_LIMITED" || error.status === 429) return t.rateLimited;
     if (error.status === 401) return t.guestTitle;
   }
   return t.actionFailed;

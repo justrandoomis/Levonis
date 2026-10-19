@@ -137,6 +137,7 @@ class FakeR2 {
 
 const MIGRATION_SQL = readFileSync(new URL("../drizzle/0000_studio_projects.sql", import.meta.url), "utf8");
 const MIGRATION_0001_SQL = readFileSync(new URL("../drizzle/0001_project_archive_pins.sql", import.meta.url), "utf8");
+const MIGRATION_0002_SQL = readFileSync(new URL("../drizzle/0002_user_prefs.sql", import.meta.url), "utf8");
 
 function applySql(raw, sql) {
   for (const part of sql.split("--> statement-breakpoint")) {
@@ -154,7 +155,10 @@ function makeEnv({ applyMigration = true, vars = {} } = {}) {
   raw.exec("PRAGMA foreign_keys = ON");
   if (applyMigration) {
     applySql(raw, MIGRATION_SQL);
-    if (applyMigration === true) applySql(raw, MIGRATION_0001_SQL);
+    if (applyMigration === true) {
+      applySql(raw, MIGRATION_0001_SQL);
+      applySql(raw, MIGRATION_0002_SQL);
+    }
   }
   resetEnsuredTablesForTests();
   const bucket = new FakeR2();

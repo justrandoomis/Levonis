@@ -18,6 +18,7 @@
  *           POST /api/projects/:id/archive|unarchive|restore,
  *           POST /api/projects/:id/revisions/:revId/restore (new head),
  *           POST|DELETE /api/projects/:id/revisions/:revId/pin (pins.ts)
+ *   PREFS (P1-10) GET|PUT /api/prefs                (prefs.ts — Simple/Advanced)
  *   CLEANUP runCleanup / scheduled handler         (cleanup.ts — never
  *           prunes or purges a pinned revision)
  *
@@ -29,11 +30,17 @@
  *   - Optimistic concurrency via base revision: conflicting commits get 409
  *     with the server head, never a silent clobber.
  *   - All /api responses are `Cache-Control: private, no-store` (mandate §13).
+ *   - P1-10: a non-GET call whose Origin is not the Studio's own is refused
+ *     (403 CROSS_ORIGIN_REFUSED) before anything else — the same rule as
+ *     POST /auth/logout (isCrossOriginWrite) — and every signed-in account
+ *     call is charged against a D1 fixed-window rate limit (ratelimit.ts).
  */
-import type { StudioSession } from "../auth/session";
+import { type StudioSession, isCrossOriginWrite } from "../auth/session";
 import { handleProjectsRoute } from "./projects";
 import { handleUploadRoute } from "./uploads";
 import { handleQuotaRoute } from "./quota";
+import { handlePrefsRoute } from "./prefs";
+import { chargeStudioRateLimit, isReadMethod } from "./ratelimit";
 
 // Environment contract ---------------------------------------------------------
 
@@ -56,6 +63,10 @@ export interface StudioApiEnv {
   STUDIO_PENDING_TTL_HOURS?: string;
   STUDIO_DELETED_RETENTION_DAYS?: string;
   STUDIO_KEEP_COMMITTED_REVISIONS?: string;
+  /** P1-10 rate limit (ratelimit.ts): window length and per-window budgets. */
+  STUDIO_RATE_LIMIT_WINDOW_SECONDS?: string;
+  STUDIO_RATE_LIMIT_READS?: string;
+  STUDIO_RATE_LIMIT_WRITES?: string;
 }
 
 /** Minimal execution-context surface the API uses (structural match). */
@@ -142,11 +153,12 @@ export function requireBucket(env: StudioApiEnv): R2Bucket | Response {
 // same DDL) only exists so `wrangler dev`/preview databases that never ran
 // the migration pipeline fail soft instead of 500ing — the same pattern
 // worker/auth/session.ts uses for studio_sessions. Keep it byte-equivalent
-// to drizzle/0000_studio_projects.sql + 0001_project_archive_pins.sql; tests
-// exercise both paths. The 0001 side tables are also how every P1-09 read
-// tolerates a database the 0001 migration has not reached yet: the first API
-// call of an isolate creates them (the migration itself is IF NOT EXISTS for
-// exactly that reason), so no query ever meets them absent.
+// to drizzle/0000_studio_projects.sql + 0001_project_archive_pins.sql +
+// 0002_user_prefs.sql; tests exercise both paths. The 0001 and 0002 tables
+// are also how every P1-09/P1-10 read tolerates a database those migrations
+// have not reached yet: the first API call of an isolate creates them (the
+// migrations themselves are IF NOT EXISTS for exactly that reason), so no
+// query ever meets them absent.
 
 const TABLE_SQL: string[] = [
   `CREATE TABLE IF NOT EXISTS projects (
@@ -214,6 +226,18 @@ const TABLE_SQL: string[] = [
     FOREIGN KEY (revision_id) REFERENCES project_revisions(id)
   )`,
   "CREATE UNIQUE INDEX IF NOT EXISTS uq_project_revision_pins_holder ON project_revision_pins (revision_id,pin_reason,pin_ref)",
+  // 0002_user_prefs (P1-10).
+  `CREATE TABLE IF NOT EXISTS studio_user_prefs (
+    owner_id text PRIMARY KEY NOT NULL,
+    mode text DEFAULT 'simple' NOT NULL,
+    updated_at text NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS studio_rate_limits (
+    key text PRIMARY KEY NOT NULL,
+    window_start integer NOT NULL,
+    count integer DEFAULT 0 NOT NULL
+  )`,
+  "CREATE INDEX IF NOT EXISTS idx_studio_rate_limits_window ON studio_rate_limits (window_start)",
 ];
 
 let tablesEnsured = false;
@@ -243,9 +267,40 @@ function requireSession(session: StudioSession | null): Response | StudioSession
 }
 
 /**
+ * A page on another origin — a community-store subdomain is same-SITE, so the
+ * Lax cookie rides along — must not be able to write through this API. The
+ * 403 for such a write, or null. worker/index.ts calls it BEFORE loading the
+ * session (so a refused write costs no session lookup), and apiRouter calls
+ * it again so the rule holds for any caller of the router.
+ */
+export function refuseCrossOriginApiWrite(request: Request): Response | null {
+  if (isReadMethod(request.method)) return null;
+  if (!isCrossOriginWrite(request, new URL(request.url).origin)) return null;
+  return apiError(403, "CROSS_ORIGIN_REFUSED", "Cross-origin request refused");
+}
+
+type AccountRoute = "quota" | "projects" | "uploads" | "prefs";
+
+function accountRouteOf(rest: string[]): AccountRoute | null {
+  if (rest.length === 1 && rest[0] === "quota") return "quota";
+  if (rest[0] === "projects") return "projects";
+  if (rest[0] === "uploads" && rest.length === 2) return "uploads";
+  if (rest.length === 1 && rest[0] === "prefs") return "prefs";
+  return null;
+}
+
+/**
  * Entry point mounted by worker/index.ts. The caller has already stripped
- * untrusted `oai-` / `x-levo-` prefixed headers and wraps the returned
- * response with the global security headers.
+ * untrusted `oai-` / `x-levo-` prefixed headers and every cookie the Studio
+ * does not own (sanitizeRequestHeaders — `levonis_session` never gets here),
+ * and wraps the returned response with the global security headers.
+ *
+ * Order, each step before the next can cost anything:
+ *   1. a cross-origin write is refused (no session lookup, no database);
+ *   2. health answers without a session;
+ *   3. an account route needs a session (401 for guests, still no database);
+ *   4. the signed-in call is charged against the rate limit (429 when over);
+ *   5. the handler runs.
  */
 export async function apiRouter(
   request: Request,
@@ -259,6 +314,9 @@ export async function apiRouter(
   if (segments[0] !== "api") return apiError(404, "NOT_FOUND", "Not found");
   const rest = segments.slice(1);
 
+  const refused = refuseCrossOriginApiWrite(request);
+  if (refused) return refused;
+
   try {
     if (rest.length === 1 && rest[0] === "health") {
       if (request.method !== "GET" && request.method !== "HEAD") return methodNotAllowed("GET, HEAD");
@@ -266,29 +324,26 @@ export async function apiRouter(
       return jsonResponse({ success: true, service: "levo-studio-api", d1: Boolean(env.DB), r2: Boolean(env.BUCKET) });
     }
 
-    if (rest.length === 1 && rest[0] === "quota") {
-      const s = requireSession(session);
-      if (s instanceof Response) return s;
-      if (request.method !== "GET") return methodNotAllowed("GET");
-      await ensureStudioTables(env.DB);
-      return handleQuotaRoute(env, s);
-    }
+    const route = accountRouteOf(rest);
+    if (!route) return apiError(404, "NOT_FOUND", "Not found");
 
-    if (rest[0] === "projects") {
-      const s = requireSession(session);
-      if (s instanceof Response) return s;
-      await ensureStudioTables(env.DB);
-      return handleProjectsRoute(request, env, ctx, s, rest.slice(1));
-    }
+    const s = requireSession(session);
+    if (s instanceof Response) return s;
+    if (route === "quota" && request.method !== "GET") return methodNotAllowed("GET");
+    await ensureStudioTables(env.DB);
+    const limited = await chargeStudioRateLimit(env, request, s);
+    if (limited) return limited;
 
-    if (rest[0] === "uploads" && rest.length === 2) {
-      const s = requireSession(session);
-      if (s instanceof Response) return s;
-      await ensureStudioTables(env.DB);
-      return handleUploadRoute(request, env, s, rest[1]);
+    switch (route) {
+      case "quota":
+        return handleQuotaRoute(env, s);
+      case "projects":
+        return handleProjectsRoute(request, env, ctx, s, rest.slice(1));
+      case "uploads":
+        return handleUploadRoute(request, env, s, rest[1]);
+      case "prefs":
+        return handlePrefsRoute(request, env, s);
     }
-
-    return apiError(404, "NOT_FOUND", "Not found");
   } catch (error) {
     // Never leak internals (and there are no tokens to log here by design).
     console.error("studio api error:", request.method, url.pathname, error);

@@ -7,7 +7,8 @@
  * between R2 and D1 writes) R2 objects with no row. This module reclaims all
  * of it on a schedule:
  *
- *   1. expired studio_sessions rows,
+ *   1. expired studio_sessions rows, and rate-limit windows older than a
+ *      day (P1-10, worker/api/ratelimit.ts),
  *   2. 'abandoned' revisions and 'pending' revisions older than the
  *      configured TTL (default 24h) — R2 objects first, then rows,
  *   3. soft-deleted projects past the retention window (default 30 days),
@@ -37,9 +38,12 @@
 import { type StudioApiCtx, type StudioApiEnv, ensureStudioTables, nowIso } from "./router";
 import { studioLimits } from "./quota";
 import { isRevisionPinned } from "./pins";
+import { purgeStaleRateLimitWindows } from "./ratelimit";
 
 export interface CleanupReport {
   expired_sessions: number;
+  /** P1-10: rate-limit windows older than a day. */
+  expired_rate_limit_windows: number;
   purged_revisions: number;
   purged_files: number;
   purged_projects: number;
@@ -149,6 +153,7 @@ export async function runCleanup(env: StudioApiEnv, now: number = Date.now()): P
   const limits = studioLimits(env);
   const report: CleanupReport = {
     expired_sessions: 0,
+    expired_rate_limit_windows: 0,
     purged_revisions: 0,
     purged_files: 0,
     purged_projects: 0,
@@ -169,6 +174,7 @@ export async function runCleanup(env: StudioApiEnv, now: number = Date.now()): P
   } catch {
     /* studio_sessions not provisioned yet — nothing to clean */
   }
+  report.expired_rate_limit_windows = await purgeStaleRateLimitWindows(db, now);
 
   if (!bucket) return report; // Without R2 there are no objects to reclaim.
 

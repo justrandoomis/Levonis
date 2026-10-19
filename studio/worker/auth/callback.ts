@@ -35,6 +35,7 @@ import {
   destroyStudioSession,
   forgetMainSessionLiveness,
   handoffCookie,
+  isCrossOriginWrite,
   loadStudioSession,
   mainSiteOrigin,
   normalizeLocale,
@@ -163,6 +164,27 @@ async function redeemCode(env: StudioAuthEnv, code: string, dest: string): Promi
   }
 }
 
+/*
+ * THE CODE IN THE LOGS — a recorded trade-off (P1-10; GAP-MAP conflict 59).
+ *
+ * The handoff code arrives as `?code=` on a GET, so the request URL that
+ * Workers Logs records for this invocation (observability is on in
+ * studio/wrangler.jsonc) contains it, unscrubbed. Nothing in this module
+ * logs it; the platform's own invocation record does, and the Worker cannot
+ * edit that record.
+ *
+ * Why that is accepted rather than fixed by moving the code into a POST
+ * auto-submit form: by the time a log line can be read, the code is dead.
+ * It is single-use (consumed atomically by the redeem below, before the
+ * session is minted), lives 60 seconds, is bound to this exact destination
+ * origin, and can only be redeemed server-to-server with the shared secret
+ * — a code copied out of a log redeems nothing. A POST form would also need
+ * an inline script or a click on a page the main site renders, which is
+ * exactly the extra surface this flow avoids. What still matters is that no
+ * LONG-LIVED secret reaches a log: the Studio session token is only ever in
+ * a Set-Cookie response header, and the main site's session cookie is
+ * stripped before this code runs (sanitizeRequestHeaders, owner decision Q8).
+ */
 async function handleCallback(request: Request, env: StudioAuthEnv, url: URL): Promise<Response> {
   if (!mainOrigin(env) || !env.STUDIO_HANDOFF_SECRET) return notConfigured();
 
@@ -221,10 +243,10 @@ function wantsHtmlNavigation(request: Request): boolean {
 
 async function handleLogout(request: Request, env: StudioAuthEnv, url: URL): Promise<Response> {
   if (request.method === 'POST') {
-    // Same-origin check for the mutating form: browsers send Origin on
-    // cross-site POSTs; the Lax cookie would not accompany them anyway.
-    const origin = request.headers.get('Origin');
-    if (origin && origin !== url.origin) {
+    // Same-origin check for the mutating form — the SAME rule every non-GET
+    // /api call goes through (isCrossOriginWrite, P1-10). A same-site store
+    // subdomain carries the Lax cookie, so its Origin is what refuses it.
+    if (isCrossOriginWrite(request, url.origin)) {
       return json({ success: false, error: 'Cross-origin request rejected' }, 403);
     }
   } else if (request.method === 'GET') {

@@ -466,6 +466,8 @@ function classifyApiError(error: unknown): { kind: SyncFailureKind; message: str
       return { kind: "quota", message: error.message, retryable: false };
     }
     if (error.status === 409) return { kind: "conflict", message: error.message, retryable: false };
+    // P1-10 rate limit: a busy minute, not a broken save — retried like a 5xx.
+    if (error.status === 429) return { kind: "server", message: error.message, retryable: true };
     if (error.status >= 500) return { kind: "server", message: error.message, retryable: true };
     return { kind: "server", message: error.message, retryable: false };
   }

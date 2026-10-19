@@ -221,27 +221,100 @@ export async function destroyUserStudioSessions(env: StudioAuthEnv, userId: stri
 // Request hygiene ------------------------------------------------------------
 
 /**
+ * The MAIN site's session cookie (worker/lib/session.ts SESSION_COOKIE_NAME).
+ *
+ * Owner decision Q8 (P1-10; GAP-MAP conflict 54): `levonis_session` stays on
+ * `Domain=.levonis-iq.com`, so the browser also sends it to
+ * studio.levonis-iq.com — and the Studio never needs it. Studio identity is
+ * its OWN host-scoped cookie, minted by the single-use handoff; the
+ * main-site cookie is presented only to the main worker, during the handoff
+ * redirect, on the main origin. So the Studio worker removes it (and every
+ * other cookie it does not own) from the request before anything reads it:
+ * no Studio code, no SSR render and no Studio log line ever holds a live
+ * main-site session token.
+ */
+export const MAIN_SITE_SESSION_COOKIE = 'levonis_session';
+
+/**
+ * Cookies the Studio owns. Everything else on the Cookie header is dropped
+ * (an allow-list, not a deny-list: a cookie the parent domain adds tomorrow
+ * is isolated without anyone remembering to list it). A new Studio cookie
+ * must carry this prefix or it will never arrive.
+ */
+export const STUDIO_COOKIE_PREFIX = 'levo_studio_';
+
+/**
+ * The Cookie header with only the Studio's own cookies left, or null when
+ * none remain. Split on `;` and on `,` — a cookie value may contain neither
+ * (RFC 6265 cookie-octet), and a runtime that folds two Cookie headers with
+ * ", " must not smuggle `levonis_session=` through as part of a kept value.
+ */
+export function studioOwnedCookieHeader(header: string | null): string | null {
+  if (!header) return null;
+  const kept: string[] = [];
+  for (const part of header.split(/[;,]/)) {
+    const pair = part.trim();
+    const eq = pair.indexOf('=');
+    if (eq <= 0) continue;
+    if (pair.slice(0, eq).trim().startsWith(STUDIO_COOKIE_PREFIX)) kept.push(pair);
+  }
+  return kept.length ? kept.join('; ') : null;
+}
+
+function isStrippedHeader(lower: string): boolean {
+  return lower.startsWith('oai-') || lower.startsWith('x-levo-');
+}
+
+/**
  * Strips every inbound `oai-*` header (legacy-hosting identity headers any
- * client can forge — mandate §3 forbids trusting them) and every inbound
- * `x-levo-*` header (reserved for the worker's own post-validation use).
+ * client can forge — mandate §3 forbids trusting them), every inbound
+ * `x-levo-*` header (reserved for the worker's own post-validation use), and
+ * every cookie the Studio does not own — `levonis_session` first among them
+ * (owner decision Q8, see MAIN_SITE_SESSION_COOKIE).
  * Runs BEFORE any routing or session handling.
  */
 export function sanitizeRequestHeaders(request: Request): Request {
   let dirty = false;
   for (const name of request.headers.keys()) {
-    const lower = name.toLowerCase();
-    if (lower.startsWith('oai-') || lower.startsWith('x-levo-')) {
+    if (isStrippedHeader(name.toLowerCase())) {
       dirty = true;
       break;
     }
   }
+  const rawCookie = request.headers.get('Cookie');
+  const cookie = studioOwnedCookieHeader(rawCookie);
+  if (rawCookie !== null && cookie !== rawCookie) dirty = true;
   if (!dirty) return request;
   const headers = new Headers(request.headers);
   for (const name of [...headers.keys()]) {
-    const lower = name.toLowerCase();
-    if (lower.startsWith('oai-') || lower.startsWith('x-levo-')) headers.delete(name);
+    if (isStrippedHeader(name.toLowerCase())) headers.delete(name);
   }
+  if (cookie) headers.set('Cookie', cookie);
+  else headers.delete('Cookie');
   return new Request(request, { headers });
+}
+
+/**
+ * Is this state-changing request coming from somewhere other than the
+ * Studio's own pages? Shared by POST /auth/logout and every non-GET /api
+ * call (P1-10: the logout check, now one rule for both).
+ *
+ *   - `Origin` present: it must equal `selfOrigin` exactly. Browsers send it
+ *     on every cross-origin request and on same-origin non-GET fetches, and
+ *     "null" (sandboxed frames, opaque redirects) is refused like any other
+ *     foreign value. This is what stops a community-store subdomain: it is
+ *     SAME-SITE with studio.levonis-iq.com, so the Lax session cookie rides
+ *     along, but its Origin is not ours.
+ *   - `Origin` absent: an old client or a non-browser caller (which carries
+ *     no ambient cookie of ours). `Sec-Fetch-Site`, when the browser sends
+ *     it, still settles the question: only same-origin (or a user-typed
+ *     navigation, "none") passes.
+ */
+export function isCrossOriginWrite(request: Request, selfOrigin: string): boolean {
+  const origin = request.headers.get('Origin');
+  if (origin !== null) return origin !== selfOrigin;
+  const site = request.headers.get('Sec-Fetch-Site');
+  return site === 'cross-site' || site === 'same-site';
 }
 
 /** Attaches the validated identity for the SSR app (after sanitization only). */
@@ -326,6 +399,22 @@ export function resetLivenessCacheForTests(): void {
  * Revocation is total. A user whose main-site session is gone loses ALL their
  * Studio sessions, not just the one that happened to make the call, so a
  * second browser is not a way to keep a revoked session alive.
+ *
+ * THE TRADE-OFF, RECORDED (P1-10; GAP-MAP conflict 55). Spec §27 asks that a
+ * main-site logout take effect in Studio. It does, with two stated limits:
+ *   1. FAIL-OPEN. While the main site cannot answer (handoff unconfigured,
+ *      unreachable, a 5xx, a malformed body) a Studio session already minted
+ *      stays usable for the rest of its 14 days or until the main site
+ *      answers again, whichever comes first. What it can reach is that one
+ *      account's own projects; it never reaches the main site (the main-site
+ *      cookie is stripped here, Q8) and it cannot mint anything new — a new
+ *      sign-in still needs a live main-site session at the handoff.
+ *   2. UP TO A MINUTE. A verdict is cached per isolate for LIVENESS_TTL_MS, so
+ *      a logout lands in Studio within a minute of the next API call or page
+ *      load, not instantly. A Studio-side logout is instant
+ *      (forgetMainSessionLiveness + the row delete).
+ * Both are availability choices made on purpose; changing either is a
+ * product decision, not a bug fix.
  */
 export async function isStudioSessionStillAuthorized(
   env: StudioAuthEnv,

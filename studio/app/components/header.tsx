@@ -131,6 +131,14 @@ export interface StudioHeaderProps {
   importBusy: boolean;
   printReady: boolean;
   sidebarOpen: boolean;
+  /**
+   * P1-10 Simple mode (the default for everyone). The engine side panel does
+   * not exist in Simple, so its toggle goes, and the slice action that lives
+   * in that panel on a desktop is offered here instead — the same action the
+   * mobile bar's primary button already runs.
+   */
+  simpleMode: boolean;
+  sliceAction: { label: string; busy: boolean; disabled: boolean; onClick: () => void };
   onPickFiles: (files: File[]) => void;
   onNewProject: () => void;
   onOpenProjects: () => void;
@@ -171,6 +179,16 @@ export default function StudioHeader(props: StudioHeaderProps) {
         <button className="new-project-action" onClick={props.onNewProject} title={t.newProject}><Icon name="plus" /><span>{t.newProject}</span></button>
         <button onClick={props.onOpenProjects} title={t.projects}><Icon name="save" /><span>{t.projects}</span></button>
         {props.printReady && <button className="header-print-action" onClick={props.onOpenPrintCenter}><Icon name="print" /><span>{t.print}</span></button>}
+        {props.simpleMode && !props.printReady && (
+          <button
+            className={`header-slice-action ${props.sliceAction.busy ? "busy" : ""}`}
+            onClick={props.sliceAction.onClick}
+            disabled={props.sliceAction.disabled}
+            data-levo-action="simple-slice"
+          >
+            <Icon name="slice" /><span>{props.sliceAction.label}</span>
+          </button>
+        )}
         <button className="connect-action" onClick={props.onOpenConnect} title={t.connectPrinter}><Icon name="print" /><span>{t.connectPrinter}</span></button>
         {!props.nativeApp && (props.user
           ? (
@@ -190,7 +208,7 @@ export default function StudioHeader(props: StudioHeaderProps) {
         <button className="profile-button" onClick={props.onOpenSetup} title={t.settings}>
           <b>{props.profileShortName}</b><small>{props.qualityLayer.toFixed(2)}</small>
         </button>
-        <button className={`panel-button ${props.sidebarOpen ? "active" : ""}`} onClick={props.onToggleSidebar} aria-label={t.panel}><Icon name="layers" /></button>
+        {!props.simpleMode && <button className={`panel-button ${props.sidebarOpen ? "active" : ""}`} onClick={props.onToggleSidebar} aria-label={t.panel}><Icon name="layers" /></button>}
         <button className="about-button" onClick={props.onOpenAbout} aria-label={t.about}><Icon name="info" /></button>
         <label className="language-select" aria-label={t.language}>
           <select value={props.locale} onChange={(event) => props.onLocaleChange(event.target.value as Locale)} aria-label={t.language}>

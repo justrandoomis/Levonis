@@ -734,3 +734,27 @@ test("a restored layout is protected on every route, not only the shell's", asyn
   // all-or-nothing, and seating half a project would be worse than none.
   assert.match(adapter, /if \(!allOnSpawnRow\) return \{ ok: false, reason: "restored-layout"/);
 });
+
+/** Engine toolbar actions that work and that the shell or the person uses. */
+const ENGINE_ACTION_IDS_IN_USE = ["tool-add", "tool-delete", "tool-delete-all", "tool-duplicate", "tool-split", "tool-onbed"];
+
+test("Simple mode hides only engine controls that are really dead in the installed build (P1-10, conflict 23)", async () => {
+  const engine = await readFile(engineUrl, "utf8");
+  const { SIMPLE_MODE_HIDDEN_ENGINE_TOOLS } = await import("../app/editor-theme.ts");
+  assert.ok(SIMPLE_MODE_HIDDEN_ENGINE_TOOLS.length > 0);
+  // Every toolbar action renders through `tool-${id}` and is disabled exactly
+  // when it has no `run` (and no `disabled` callback of its own).
+  assert.match(engine, /disabled: \(\(r = n\.disabled\) == null \? void 0 : r\.call\(n\)\) \?\? !n\.run/);
+  for (const testId of SIMPLE_MODE_HIDDEN_ENGINE_TOOLS) {
+    const id = testId.replace(/^tool-/, "");
+    const definition = new RegExp(`\\{ id: "${id}", [^}]*\\}`).exec(engine);
+    assert.ok(definition, `engine action ${id} is missing — drop it from the Simple-mode list`);
+    assert.doesNotMatch(definition[0], /\brun:/, `engine action ${id} now has an implementation — show it again in Simple mode`);
+    assert.doesNotMatch(definition[0], /\bdisabled:/, `engine action ${id} decides its own availability now — re-check it`);
+  }
+  // And none of the working controls the shell drives is on the list.
+  for (const used of ENGINE_ACTION_IDS_IN_USE) {
+    assert.ok(!SIMPLE_MODE_HIDDEN_ENGINE_TOOLS.includes(used), `${used} works and must stay visible`);
+  }
+});
+

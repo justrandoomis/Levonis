@@ -81,6 +81,7 @@ import {
   type StoredLevoProject,
 } from "./project-store";
 import { useProjectPersistence } from "./hooks/use-project-persistence";
+import { useStudioMode } from "./hooks/use-studio-mode";
 import ProjectsPanel from "./components/projects-panel";
 import { captureEngineThumbnail } from "./thumbnail";
 
@@ -714,6 +715,23 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   useEffect(() => {
     adapter.setHostAttribute("data-levo-sidebar", sidebarOpen ? "open" : "closed");
   }, [adapter, sidebarOpen]);
+
+  /*
+   * SIMPLE / ADVANCED (P1-10; owner decisions S6/S7).
+   *
+   * Simple is the default for everyone and hides the engine side panel at
+   * every width plus the engine controls that do not work (the rules are in
+   * app/editor-theme.ts, keyed on this host attribute). Nothing that warns or
+   * prices is in that panel's way: engine errors and notices arrive as events
+   * and land in the shell's own message row, the stale-result banner and the
+   * slice action are the shell's, and the stats card with the over-bed
+   * warning sits outside the panel — all of them identical in both modes.
+   */
+  const studioMode = useStudioMode(user?.id ?? null);
+  const simpleMode = studioMode.mode === "simple";
+  useEffect(() => {
+    adapter.setHostAttribute("data-levo-mode", studioMode.mode);
+  }, [adapter, studioMode.mode]);
 
   // -- locale ----------------------------------------------------------------
   useEffect(() => { setLocale(readStoredLocale()); }, []);
@@ -1497,10 +1515,13 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       } catch {
         /* the session still ends; the drafts stay namespaced to this account */
       }
+      // The mode mirror is keyed by this account too: a shared device keeps
+      // no trace of it once the person asked for their drafts to go.
+      studioMode.clearLocalMirror();
     }
     window.location.assign(SIGN_OUT_HREF);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [persistence.purgeLocalDraftsForSignOut]);
+  }, [persistence.purgeLocalDraftsForSignOut, studioMode.clearLocalMirror]);
 
   // Create an account project, link the session, and push the current editor
   // content as its first revision.
@@ -1537,6 +1558,13 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         accessCode: lanAccessCode,
         serial: lanSerial.trim() || undefined,
         remember: false,
+      }, {
+        trustPrompt: t.certTrustPrompt,
+        fileUnavailable: t.certFileUnavailable,
+        trustCancelled: t.certTrustCancelled,
+        addressInvalid: t.lanAddressInvalid,
+        accessCodeInvalid: t.lanAccessCodeInvalid,
+        serialRequired: t.lanSerialRequired,
       });
       setPrinterStatus(connected);
       if (connected.connected) {
@@ -1549,7 +1577,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     } finally {
       setLanAction("idle");
     }
-  }, [lanAccessCode, lanAction, lanIp, lanSerial, nativeEnvironment.capabilities.lanConnection, t.actionUnavailable, t.connectedPrinter]);
+  }, [lanAccessCode, lanAction, lanIp, lanSerial, nativeEnvironment.capabilities.lanConnection, t]);
 
   const disconnectLan = useCallback(async () => {
     if (lanAction !== "idle") return;
@@ -2346,6 +2374,13 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         importBusy={Boolean(importProgress)}
         printReady={printReady}
         sidebarOpen={sidebarOpen}
+        simpleMode={simpleMode}
+        sliceAction={{
+          label: status === "slicing" ? `${t.cancel} ${Math.round(slicing.progress * 100)}%` : t.slice,
+          busy: status === "slicing",
+          disabled: !objects.length,
+          onClick: primaryAction,
+        }}
         onPickFiles={handlePickedFiles}
         onNewProject={newProject}
         onOpenProjects={() => void openProjects()}
@@ -2587,7 +2622,16 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
             <Icon name={printReady ? "print" : "slice"} /><span>{status === "slicing" ? `${t.cancel} ${Math.round(slicing.progress * 100)}%` : printReady ? t.print : t.slice}</span>
           </button>
           <button className={`mobile-nav-item ${canvasMode === "preview" ? "active" : ""}`} onClick={() => clickControl(canvasMode === "preview" ? "mode-prepare" : "mode-preview")} disabled={!objects.length}><Icon name="layers" /><span>{canvasMode === "preview" ? t.prepare : t.preview}</span></button>
-          <button className={`mobile-nav-item ${sidebarOpen ? "active" : ""}`} onClick={() => { setToolTrayOpen(false); setSidebarOpen((value) => !value); }}><Icon name="settings" /><span>{t.settings}</span></button>
+          {/* Simple mode has no engine panel to open, so Settings is the Setup
+              sheet — the essentials, and the switch to Advanced. */}
+          <button
+            className={`mobile-nav-item ${(simpleMode ? sheet === "setup" : sidebarOpen) ? "active" : ""}`}
+            onClick={() => {
+              setToolTrayOpen(false);
+              if (simpleMode) setSheet("setup");
+              else setSidebarOpen((value) => !value);
+            }}
+          ><Icon name="settings" /><span>{t.settings}</span></button>
         </div>
       </section>
 
@@ -2667,7 +2711,15 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
               onStrength={setStrength}
               onInfill={setInfill}
               onSupport={setSupport}
-              onOpenAdvanced={() => { setSheet(null); setSidebarOpen(true); }}
+              mode={studioMode.mode}
+              onMode={studioMode.setMode}
+              onOpenAdvanced={() => {
+                setSheet(null);
+                // In Simple mode "all settings" means Advanced: the panel it
+                // opens does not exist in Simple at any width.
+                if (simpleMode) studioMode.setMode("advanced");
+                setSidebarOpen(true);
+              }}
               onClose={() => setSheet(null)}
             />
           ) : sheet === "projects" ? (

@@ -193,3 +193,33 @@ export const studioSessions = sqliteTable(
     index("idx_studio_sessions_expires").on(t.expiresAt),
   ]
 );
+
+/**
+ * Studio user preferences (P1-10; owner decisions S6/S7, worker/api/prefs.ts).
+ * One row per account that has ever chosen; no row means Simple, the default
+ * for everyone. `mode` is validated in code, deliberately without a CHECK: a
+ * future mode must not need a table rebuild (the migration gate admits CREATE
+ * only). The migration is hand-adjusted to IF NOT EXISTS because the API
+ * bootstrap (worker/api/router.ts) may create the table first.
+ */
+export const studioUserPrefs = sqliteTable("studio_user_prefs", {
+  ownerId: text("owner_id").primaryKey(),
+  mode: text("mode").notNull().default("simple"),
+  updatedAt: text("updated_at").notNull(),
+});
+
+/**
+ * D1 fixed-window rate limit (P1-10, worker/api/ratelimit.ts) — the main
+ * site's `rate_limits` shape. `key` is `<bucket>:u:<userId>` (or
+ * `<bucket>:<ip>`); `window_start` is epoch seconds. Windows older than a day
+ * are deleted by the cleanup cron.
+ */
+export const studioRateLimits = sqliteTable(
+  "studio_rate_limits",
+  {
+    key: text("key").primaryKey(),
+    windowStart: integer("window_start").notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (t) => [index("idx_studio_rate_limits_window").on(t.windowStart)]
+);

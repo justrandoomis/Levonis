@@ -3,12 +3,16 @@
  *
  * Request pipeline (order matters — STUDIO_PLAN decisions 3 & 5):
  *   1. Strip untrusted inbound headers (`oai-*` legacy-hosting identity,
- *      internal `x-levo-*`) before ANY processing.
+ *      internal `x-levo-*`) and every cookie the Studio does not own — the
+ *      main site's parent-domain `levonis_session` first among them (owner
+ *      decision Q8, P1-10) — before ANY processing. Nothing below this line,
+ *      auth, API or the vinext app, ever sees a main-site session token.
  *   2. /auth/* (and the legacy sign-in paths) are handled here, same-origin,
  *      BEFORE vinext delegation — no connect-src widening, no COOP/COEP
  *      weakening for sign-in.
  *   3. /api/* goes to the storage API router with the validated Studio
- *      session (or null for guests).
+ *      session (or null for guests). The router refuses a cross-origin
+ *      write first and charges signed-in calls to a D1 rate limit (P1-10).
  *   4. Everything else renders through vinext; document requests carry the
  *      validated identity to the SSR app via the internal x-levo-user
  *      header (trustworthy only because step 1 stripped inbound copies).
@@ -18,7 +22,7 @@
  */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
-import { apiRouter } from "./api/router";
+import { apiRouter, refuseCrossOriginApiWrite } from "./api/router";
 import { scheduledCleanup } from "./api/cleanup";
 import { handleAuthRoute, isAuthRoute } from "./auth/callback";
 import { isMemoryConstrainedApple } from "./platform";
@@ -131,8 +135,9 @@ function isDocumentRequest(request: Request): boolean {
 
 const worker = {
   async fetch(rawRequest: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    // Defense in depth FIRST: forged legacy-hosting identity headers and
-    // reserved internal headers never survive past this line.
+    // Defense in depth FIRST: forged legacy-hosting identity headers,
+    // reserved internal headers and foreign cookies (levonis_session, Q8)
+    // never survive past this line.
     const request = sanitizeRequestHeaders(rawRequest);
     const url = new URL(request.url);
 
@@ -145,6 +150,9 @@ const worker = {
     // every handler can enforce ownership; guests get null (editing without
     // an account keeps working — only account features need sign-in).
     if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
+      // P1-10: a cross-origin write is refused before the session lookup.
+      const refused = refuseCrossOriginApiWrite(request);
+      if (refused) return withSecurityHeaders(refused, request);
       // Studio's own session lasts 14 days, so without the liveness rule a
       // main-site logout would leave the account signed in here for a
       // fortnight. The answer is cached for a minute and only a definite

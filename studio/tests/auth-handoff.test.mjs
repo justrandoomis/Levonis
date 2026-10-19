@@ -410,6 +410,102 @@ if (!canImportTs) {
     );
   });
 
+  // Owner decision Q8 (P1-10): levonis_session stays on .levonis-iq.com, so a
+  // real browser sends it to the Studio host too. The Studio strips it first.
+  test("Q8: the parent-domain levonis_session is stripped before any Studio code — and Studio's own sign-in keeps working", async () => {
+    const mainToken = mainSession.cookie.split("=")[1];
+    // A recording D1 in front of the Studio database: every value any Studio
+    // code binds into a query is captured, so "never reaches app code" is a
+    // measurement, not a reading of the source.
+    const bound = [];
+    const recordingDb = {
+      prepare(sql) {
+        const inner = studioEnv.DB.prepare(sql);
+        const wrap = (statement) => ({
+          bind(...args) {
+            bound.push(...args.map(String));
+            return wrap(statement.bind(...args));
+          },
+          first: (...a) => statement.first(...a),
+          run: (...a) => statement.run(...a),
+          all: (...a) => statement.all(...a),
+        });
+        return wrap(inner);
+      },
+      batch: (s) => studioEnv.DB.batch(s),
+      exec: (s) => studioEnv.DB.exec(s),
+    };
+    const spyEnv = { ...studioEnv, DB: recordingDb };
+    // What the browser sends to studio.levonis-iq.com: the main-site cookie
+    // (parent domain) beside the Studio's own (host-only).
+    const viaWorker = (path, cookie, init = {}) =>
+      sanitizeRequestHeaders(new Request(`${STUDIO_ORIGIN}${path}`, { ...init, headers: { ...(init.headers || {}), Cookie: cookie } }));
+
+    // The full round trip with the main cookie riding along on every Studio hop.
+    const login = await handleAuthRoute(viaWorker("/auth/login?return_to=%2F", mainSession.cookie), spyEnv);
+    const handoffCookie = getCookiePair(login, "levo_studio_handoff");
+    const startUrl = new URL(login.headers.get("Location"));
+    const start = await mainFetch(startUrl.pathname + startUrl.search, { headers: { Cookie: mainSession.cookie } });
+    const callbackUrl = new URL(start.headers.get("Location"));
+    const callback = await handleAuthRoute(
+      viaWorker(callbackUrl.pathname + callbackUrl.search, `${mainSession.cookie}; ${handoffCookie}`),
+      spyEnv
+    );
+    assert.equal(callback.status, 302);
+    const studioCookie = getCookiePair(callback, "levo_studio_session");
+    assert.ok(studioCookie, "Studio's own session is minted with the main cookie present");
+
+    const jar = `${mainSession.cookie}; ${studioCookie}; lv_pref=tag`;
+    const cleaned = viaWorker("/auth/me", jar);
+    assert.equal(cleaned.headers.get("Cookie"), studioCookie, "only the Studio's own cookie survives");
+    const me = await handleAuthRoute(cleaned, spyEnv);
+    assert.equal((await me.json()).user.id, USER_ID, "Studio identity keeps working");
+    // The API path and the SSR document path see the same cleaned request.
+    const live = await loadLiveStudioSession(viaWorker("/api/projects", jar), spyEnv);
+    assert.equal(live.user.id, USER_ID);
+    const ssr = withUserHeader(viaWorker("/", jar, { headers: { Accept: "text/html" } }), live.user);
+    assert.doesNotMatch(ssr.headers.get("Cookie") || "", /levonis_session/);
+
+    // The main-site cookie alone authenticates nothing here.
+    const mainOnly = viaWorker("/auth/me", mainSession.cookie);
+    assert.equal(mainOnly.headers.get("Cookie"), null, "no Studio cookie left — the header is gone");
+    assert.equal((await (await handleAuthRoute(mainOnly, spyEnv)).json()).user, null);
+
+    // A runtime that folds two Cookie headers with ", " cannot smuggle it in.
+    const folded = sanitizeRequestHeaders(new Request(`${STUDIO_ORIGIN}/`, { headers: { Cookie: `${studioCookie}, ${mainSession.cookie}` } }));
+    assert.equal(folded.headers.get("Cookie"), studioCookie);
+
+    assert.ok(bound.length > 0, "the spy saw the Studio's queries");
+    assert.ok(!bound.some((value) => value.includes(mainToken)), "the main-site token never reached a Studio query");
+  });
+
+  test("Q8 wiring: the worker entry sanitizes the raw request before anything else touches it", () => {
+    const entry = readFileSync(fileURLToPath(new URL("../worker/index.ts", import.meta.url)), "utf8");
+    const fetchBody = entry.slice(entry.indexOf("async fetch(rawRequest"));
+    const uses = fetchBody.match(/rawRequest/g) || [];
+    assert.equal(uses.length, 2, "rawRequest appears in the signature and in sanitizeRequestHeaders(rawRequest) only");
+    assert.match(fetchBody.slice(0, 400), /const request = sanitizeRequestHeaders\(rawRequest\);/);
+  });
+
+  test("a logout POST from a same-site store subdomain is refused (shared origin rule)", async () => {
+    const { callback } = await signInThroughHandoff("/");
+    const sessionCookie = getCookiePair(callback, "levo_studio_session");
+    for (const origin of ["https://ali3d.levonis-iq.com", "null"]) {
+      const attack = await studioFetch("/auth/logout", {
+        method: "POST",
+        headers: { Cookie: sessionCookie, Origin: origin },
+      });
+      assert.equal(attack.status, 403, origin);
+    }
+    const noOrigin = await studioFetch("/auth/logout", {
+      method: "POST",
+      headers: { Cookie: sessionCookie, "Sec-Fetch-Site": "same-site" },
+    });
+    assert.equal(noOrigin.status, 403);
+    const me = await studioFetch("/auth/me", { headers: { Cookie: sessionCookie } });
+    assert.equal((await me.json()).user.id, USER_ID, "the session must survive the forged logouts");
+  });
+
   test("redeem and introspect require the shared secret", async () => {
     const noAuth = await mainFetch("/api/studio/handoff/redeem", {
       method: "POST",

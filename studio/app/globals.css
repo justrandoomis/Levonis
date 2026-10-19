@@ -319,6 +319,11 @@ button:disabled { cursor: not-allowed; }
 .connect-action { border-color: var(--line) !important; background: transparent !important; }
 .connect-action:hover { background: var(--surface) !important; }
 .header-print-action { border-color: var(--accent-strong) !important; background: var(--accent) !important; color: var(--accent-ink) !important; font-weight: 850; }
+/* P1-10 Simple mode: the desktop slice action. In Advanced it lives in the
+   engine side panel, which Simple hides; the phone bar has its own. */
+.header-slice-action { border-color: var(--accent-strong) !important; background: var(--panel) !important; color: var(--accent) !important; font-weight: 850; }
+.header-slice-action.busy { color: var(--text) !important; }
+.header-slice-action:disabled { opacity: 0.5; cursor: not-allowed; }
 .profile-button { padding-inline: 9px !important; flex-direction: column; gap: 1px !important; line-height: 1 !important; }
 .profile-button b { color: var(--accent); font-size: 12px; }
 .profile-button small { color: var(--muted); font-size: var(--text-caption); }
@@ -666,6 +671,9 @@ button:disabled { cursor: not-allowed; }
 .segmented-control button.active { border-color: var(--accent-strong); background: var(--accent-tint); color: var(--accent); }
 .segmented-control strong { font-size: 11px; }
 .segmented-control span { color: var(--muted); font-size: var(--text-caption); }
+/* P1-10 editor mode: two choices, and the line under them says what stays. */
+.segmented-control.mode-control { grid-template-columns: repeat(2, 1fr); }
+.mode-help { margin: 8px 0 0; color: var(--muted); font-size: var(--text-caption); line-height: 1.55; }
 .support-row { min-height: 66px; padding: 0 3px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
 .support-row > span { display: flex; flex-direction: column; gap: 4px; }
 .support-row strong { font-size: 13px; }
@@ -904,7 +912,7 @@ button:disabled { cursor: not-allowed; }
   .studio-actions { gap: 2px; }
   .studio-actions > :is(button, a, .file-select-control, .language-select) { min-width: 40px; width: 40px; height: 40px; padding: 0; }
   .studio-actions > :is(button, a, .file-select-control) > span { display: none; }
-  .studio-actions .new-project-action, .studio-actions .panel-button, .studio-actions .header-print-action { display: none; }
+  .studio-actions .new-project-action, .studio-actions .panel-button, .studio-actions .header-print-action, .studio-actions .header-slice-action { display: none; }
   .studio-actions svg { width: 18px; height: 18px; }
   .language-select { width: 52px !important; }
   .language-select select { max-width: 52px; padding: 0 4px; font-size: var(--text-caption); }

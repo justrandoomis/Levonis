@@ -15,6 +15,13 @@
       "when": 1792419868426,
       "tag": "0001_project_archive_pins",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792423387595,
+      "tag": "0002_user_prefs",
+      "breakpoints": true
     }
   ]
 }

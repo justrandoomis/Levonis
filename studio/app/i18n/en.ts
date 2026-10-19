@@ -166,6 +166,20 @@ export const en = {
   apply: "Done",
   advanced: "All settings, colors and objects",
   advancedHelp: "Shown inside the complete editor panel.",
+  /*
+   * EDITOR MODE (P1-10; owner decisions S6/S7). Simple is the default for
+   * everyone; the choice is kept on the account and mirrored on the device.
+   * The help lines say what stays in Simple, because what a mode hides is
+   * the first thing anyone wants to know about it.
+   */
+  modeTitle: "Editor mode",
+  modeSimple: "Simple",
+  modeSimpleShort: "The essentials",
+  modeAdvanced: "Advanced",
+  modeAdvancedShort: "Every engine setting",
+  modeSimpleHelp: "Printer, quality, strength, infill and support only. Warnings, the outdated-result alert and the print estimate always show.",
+  modeAdvancedHelp: "Adds the engine side panel: every setting, the object list and colors. Engine controls that do not work yet stay visible but disabled.",
+  modeSwitchHelp: "Opens the full engine panel and switches to Advanced mode.",
   close: "Close",
   collapse: "Shrink the panel",
   expand: "Grow the panel",
@@ -266,6 +280,18 @@ export const en = {
   sendingLanPrint: "Transferring the print job…",
   lanPrintQueued: "The printer acknowledged the job and the bridge confirmed it was queued.",
   confirmLanPrint: "Confirm sending {file} to {printer}\nPayload: {profile} · Plate {plate}\nSHA-256: {checksum}\n\nThis is a local Developer Mode G-code path. Verify the build plate, nozzle, filament and AMS on the printer before continuing.",
+  /*
+   * The certificate-trust question the native bridge asks before it pins a
+   * printer (app/native-printer-bridge.ts). MQTT 8883 and FTPS 990 and the
+   * fingerprints themselves stay Latin: they are what the printer's own
+   * screen shows.
+   */
+  certTrustPrompt: "Verify this printer's encrypted network certificates:\n\n{fingerprints}\n\nContinue only if the IP address and serial number match the printer in front of you.",
+  certFileUnavailable: "not available (status-only connection)",
+  certTrustCancelled: "Printer certificate approval was cancelled.",
+  lanAddressInvalid: "Enter a private LAN address or a .local host name.",
+  lanAccessCodeInvalid: "The printer access code is invalid.",
+  lanSerialRequired: "Enter the printer serial number shown on its Device screen.",
   cloudTitle: "MakerWorld from your phone",
   cloudHelp: "Export the 3MF project, upload it privately to MakerWorld yourself, then confirm the printer and AMS in Bambu Handy.",
   usbTitle: "Print from USB storage",

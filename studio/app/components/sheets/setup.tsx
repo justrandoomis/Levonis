@@ -12,6 +12,7 @@
 import { INFILL, PROFILES, PROFILE_IDS, QUALITY, STRENGTH, type InfillId, type ProfileId, type QualityId, type StrengthId } from "../../printer-profiles";
 import type { MissingPreset } from "../../profile-loader";
 import { templateText, type StudioDictionary } from "../../i18n";
+import { STUDIO_MODES, type StudioMode } from "../../studio-mode";
 import { Icon } from "../header";
 
 export interface SetupSheetProps {
@@ -29,6 +30,9 @@ export interface SetupSheetProps {
   onStrength: (id: StrengthId) => void;
   onInfill: (id: InfillId) => void;
   onSupport: (value: boolean) => void;
+  /** P1-10: Simple (the default for everyone) or Advanced. */
+  mode: StudioMode;
+  onMode: (mode: StudioMode) => void;
   onOpenAdvanced: () => void;
   onClose: () => void;
 }
@@ -138,8 +142,33 @@ export default function SetupSheet(props: SetupSheetProps) {
         <span><strong>{t.support}</strong><small>{props.support ? t.auto : t.off}</small></span>
         <button className={`switch ${props.support ? "on" : ""}`} role="switch" aria-checked={props.support} onClick={() => props.onSupport(!props.support)}><i /></button>
       </div>
+      {/*
+        EDITOR MODE (P1-10). Directly above "all settings", because that is the
+        question it answers: in Simple, "all settings" IS the switch to
+        Advanced — the panel it opens does not exist in Simple at any width.
+        The help line under the choice says what stays visible in Simple.
+      */}
+      <fieldset className="mode-fieldset">
+        <legend>{t.modeTitle}</legend>
+        <div className="segmented-control mode-control" role="radiogroup" aria-label={t.modeTitle}>
+          {STUDIO_MODES.map((id) => (
+            <button
+              key={id}
+              role="radio"
+              aria-checked={props.mode === id}
+              className={props.mode === id ? "active" : ""}
+              data-levo-mode-option={id}
+              onClick={() => props.onMode(id)}
+            >
+              <strong>{id === "simple" ? t.modeSimple : t.modeAdvanced}</strong>
+              <span>{id === "simple" ? t.modeSimpleShort : t.modeAdvancedShort}</span>
+            </button>
+          ))}
+        </div>
+        <p className="mode-help">{props.mode === "simple" ? t.modeSimpleHelp : t.modeAdvancedHelp}</p>
+      </fieldset>
       <button className="advanced-button" onClick={props.onOpenAdvanced}>
-        <span><Icon name="settings" /><b>{t.advanced}</b><small>{t.advancedHelp}</small></span>
+        <span><Icon name="settings" /><b>{t.advanced}</b><small>{props.mode === "simple" ? t.modeSwitchHelp : t.advancedHelp}</small></span>
         <Icon name="layers" />
       </button>
       <p className="file-limit">{t.fileLimit}</p>
