@@ -268,6 +268,16 @@ export function applyFilters(items: ListingItem[], f: ListingFilters, except: Fi
 const byRank = (a: ListingItem, b: ListingItem) => a.rank - b.rank;
 
 /**
+ * THE NAME ORDER'S ONE COLLATOR. `localeCompare(b, 'en', options)` builds an ICU
+ * collator on EVERY comparison (V8 caches one only when no options are passed):
+ * the name sort of a listing's every candidate (`pagedListing`, up to 10,000)
+ * cost ~200 ms of CPU at 1,200 products and ~1 s at 5,000. One shared collator
+ * gives the same order (`localeCompare` with these arguments is specified as
+ * `new Intl.Collator('en', options).compare`) at a thirtieth of the cost.
+ */
+export const NAME_COLLATOR = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
+
+/**
  * The seven orders. Every one is STABLE on `rank` (the SQL / search order), so
  * two equal prices keep the merchandiser's order and a page boundary never
  * reshuffles between two requests.
@@ -294,7 +304,7 @@ export function sortItems(items: ListingItem[], sort: ListingSort, hasSearch: bo
     case 'price_desc':
       return out.sort(byPrice(-1));
     case 'name':
-      return out.sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base', numeric: true }) || byRank(a, b));
+      return out.sort((a, b) => NAME_COLLATOR.compare(a.name, b.name) || byRank(a, b));
     case 'available':
       return out.sort(
         (a, b) =>
@@ -460,6 +470,17 @@ export function sortReadsResolved(sort: ListingSort, hasSearch: boolean): boolea
  */
 export function filtersReadResolved(f: ListingFilters): boolean {
   return f.avail || f.sale !== null || f.price !== null || f.offer || f.member;
+}
+
+/**
+ * The filters with every RESOLVED one cleared — what a candidate's KEYS alone
+ * answer: brand, «يناسب طابعة», the spec facets. The listing chooses the
+ * candidates it prices to order with these (`pagedListing`), so that choice is
+ * the same wherever the stored-key filters ran (in SQL without the counts, in
+ * memory with them).
+ */
+export function storedKeyFilters<T extends ListingFilters>(f: T): T {
+  return { ...f, avail: false, sale: null, price: null, offer: false, member: false };
 }
 
 /** The whole listing step: filter, sort, count. Paging is the caller's. */

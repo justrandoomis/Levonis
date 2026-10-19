@@ -48,11 +48,15 @@ import { cardGallery } from '../lib/cardGallery';
 import { isConditionColumnMissing } from '../lib/conditionProjection';
 import { catalogSubtreeFilter, homeCategoryTree } from '../lib/catalogMembership';
 import { FACET_FIELD_IDS, parseListingParams, type ListingState } from '@levonis/catalog/discovery';
+import type { FacetSet } from '@levonis/catalog/discoveryTypes';
 import {
   applyFilters,
+  facetCounts,
   filtersReadResolved,
   runListing,
+  sortItems,
   sortReadsResolved,
+  storedKeyFilters,
   type BrandInfo,
   type ListingItem,
   type PrinterInfo,
@@ -3527,10 +3531,14 @@ const LISTING_PARAM_KEYS = [
  *   - a catalog-only product is never resolved to be ordered or counted: its
  *     listing item is exact from its keys (no price, no stock, no sale type —
  *     DECISIONS row 240), so it is priced only when it is on the page;
- *   - a resolved order (relevance, price, available, direct), a resolved
- *     filter or the facet counts resolve the SELLABLE candidates — at most this
- *     many, in the shelf order — and `truncated: true` says when more were
- *     sellable than that.
+ *   - a resolved order (relevance, price, available, direct) or a resolved
+ *     filter resolves the SELLABLE candidates that pass the stored-key filters
+ *     (brand, «يناسب طابعة», specs) — at most this many, in the shelf order,
+ *     the same set with or without the counts — and `partial_order: true`
+ *     says when more were sellable than that;
+ *   - the facet counts resolve the first this-many sellable candidates of the
+ *     whole scope beside them (so at most twice this many with a brand or
+ *     printer chip), and `partial_counts: true` says when more were sellable.
  * Measured (tests/listingPaging.test.ts notes; docs/PERFORMANCE_LOG.md): with
  * the offers and the mystery-pool reads one statement each, the resolve is a
  * constant number of statements and ONE wave at any size, and its cost is the
@@ -3542,7 +3550,8 @@ export const LISTING_CANDIDATE_CAP = 1_000;
 
 /**
  * How many candidate KEYS one listing reads — the deepest `offset` the route
- * accepts. Past it the listing says `truncated: true`.
+ * accepts. Past it the rest are not listed, and the listing says
+ * `cut_off: true` (and `truncated: true`).
  */
 export const LISTING_KEYS_CAP = 10_000;
 
@@ -3618,6 +3627,8 @@ export interface ListingKeyRow {
   brand_slug?: unknown;
   /** JSON of the brand (id, slug, three names) on ONE row per brand, only when facets are counted. */
   brand_info?: unknown;
+  /** 1 when it fits one of the chosen printers — read only with the counts and a «يناسب طابعة» chip. */
+  fits_chosen?: unknown;
 }
 
 /**
@@ -3884,34 +3895,47 @@ function learnProductColumns(db: D1Database, row: Record<string, unknown> | unde
  * READ 1 — THE KEYS of every candidate (≤ `LISTING_KEYS_CAP`), in the shelf
  * order made total by the id, with nothing a card needs: id, name, date,
  * brand (its slug, and its names on one row per brand when facets are
- * counted), the SELLABLE flag, and the spec sheet only when a spec facet is
- * filtered or counted.
+ * counted), the SELLABLE flag, the spec sheet only when a spec facet is
+ * filtered or counted, and — with the counts and a «يناسب طابعة» chip —
+ * whether it fits one of the chosen printers.
  *
  * Then the listing knows, before it prices anything, what it must resolve:
  *   - a stored-key order (newest, name) over stored-key filters (brand, fits,
- *     specs) without facets: the order of ALL candidates comes from their keys
+ *     specs): the order of ALL candidates comes from their keys, sorted ONCE,
  *     and only the PAGE is resolved — 24 cards at any depth;
- *   - a resolved order (relevance, price, available, direct), a resolved filter
- *     or the facet counts: the SELLABLE candidates are resolved, the first
- *     `LISTING_CANDIDATE_CAP` of them in the shelf order. A CATALOG-ONLY
- *     candidate is exact from its keys (`keyedListingItem`) and is resolved
- *     only when it is on the page. In the shelf order every sellable row comes
- *     before every catalog-only one and every resolved order keeps it so (R1,
- *     R3), so which catalog-only rows are on the page is known from the keys.
+ *   - a resolved order (relevance, price, available, direct) or a resolved
+ *     filter: THE HEAD — the first `LISTING_CANDIDATE_CAP` SELLABLE candidates,
+ *     in the shelf order, that PASS THE STORED-KEY FILTERS — is resolved. The
+ *     head is the same whether those filters ran in SQL (no counts) or in
+ *     memory (`facets=1`, so the brand and printer counts see the others): the
+ *     client's page 1 carries the counts and its «عرض المزيد» does not, and two
+ *     heads would rank two different sets (products skipped and repeated).
+ *     A CATALOG-ONLY candidate is exact from its keys (`keyedListingItem`) and
+ *     is resolved only when it is on the page. In the shelf order every
+ *     sellable row comes before every catalog-only one and every resolved order
+ *     keeps it so (R1, R3), so which catalog-only rows are on the page is known
+ *     from the keys;
+ *   - the facet counts: the first `LISTING_CANDIDATE_CAP` sellable candidates
+ *     of the whole scope (the brand and printer counts must see the brands and
+ *     printers not chosen), beside the head. They move no order: under a
+ *     resolved order every one of them that passes the stored-key filters is
+ *     in the head already, and a stored-key order is the keys' own.
  *
- * PAST THE CAP NOTHING IS HIDDEN. A sellable candidate beyond it is kept as
- * its keyed item: an order puts it after the resolved ones, in the shelf
+ * PAST THE CAP NOTHING IS HIDDEN. A sellable candidate beyond the head is kept
+ * as its keyed item: an order puts it after the resolved ones, in the shelf
  * order, before the catalog-only ones; a resolved filter cannot vouch for it
- * and leaves it out; the counts do not see its price or stock. The answer then
- * says `truncated: true`. Paging stays exact: the order of a request never
- * depends on `facets`, `limit` or `offset`, so consecutive pages neither
- * repeat nor skip a product.
+ * and leaves it out. The answer says which (`partial_order`: the price/stock
+ * order or filter covered the head only; `partial_counts`: the counts did not
+ * see every sellable price; `cut_off`: more candidates than the keys read, the
+ * rest not listed). Paging stays exact: the order of a request never depends
+ * on `facets`, `limit` or `offset`, so consecutive pages neither repeat nor
+ * skip a product.
  *
  * READ 2 — the resolve: the chosen rows (without the long text no card
  * carries, `LISTING_UNREAD_COLUMNS`), their relations, offers and pools, and
  * (with facets) the printers each candidate fits, in ONE wave. A third wave
- * happens only when the page could not be foreseen (facets with a «يناسب
- * طابعة» chip) and holds a card not yet resolved.
+ * happens only when a card on the page was not foreseen (a row that changed
+ * between the reads).
  *
  * `total` is every match, `has_more` whether another page exists.
  */
@@ -3937,7 +3961,16 @@ async function pagedListing(
   const specFiltered = Object.values(state.specs ?? {}).some((v) => Array.isArray(v) && v.length > 0);
   const resolvedFilter = filtersReadResolved(state);
   const resolvedSort = sortReadsResolved(state.sort, false);
-  const needResolved = wantsFacets || resolvedFilter || resolvedSort;
+  /** The order or a filter reads a price or a stock: the head is resolved to answer it. */
+  const orderResolved = resolvedFilter || resolvedSort;
+  /**
+   * «يناسب طابعة» WITH THE COUNTS is applied in memory (its own counts must see
+   * the other printers), so the keys say whether each candidate fits a chosen
+   * printer — the SQL narrowing's own predicate — and the head is chosen with
+   * it. Before 0148 nothing fits (the narrowing answers nothing either).
+   */
+  const fitsFlagged = wantsFacets && state.fits.length > 0;
+  const fitsReadable = fitsFlagged && (await printerFitsInstalled(db));
 
   const keyCols = [
     'products.id AS id',
@@ -3950,6 +3983,15 @@ async function pagedListing(
     // The slug the brand filter is re-applied with in memory (one primary-key probe per row).
     '(SELECT kb.slug FROM brands kb WHERE kb.id = products.brand_id) AS brand_slug',
   ];
+  // Bound before the WHERE's own parameters: the select list comes first.
+  const selectParams: unknown[] = [];
+  if (fitsReadable) {
+    keyCols.push(
+      'products.id IN (SELECT f.product_id FROM product_printer_fits f JOIN products pr ON pr.id = f.printer_id' +
+        ` WHERE ${optimisticVisible(db, 'pr')} AND pr.slug IN (SELECT value FROM json_each(?))) AS fits_chosen`
+    );
+    selectParams.push(JSON.stringify(state.fits));
+  }
   if (wantsFacets || specFiltered) keyCols.push('products.spec_fields AS spec_fields');
   // The brand facet's names, on ONE row per brand — the facet costs no statement of its own.
   if (wantsFacets) {
@@ -3961,54 +4003,66 @@ async function pagedListing(
   const keysSql =
     o.whereSql.replace(o.selectList, `SELECT ${keyCols.join(', ')} FROM products`) +
     ' ORDER BY sellable_now DESC, products.display_order ASC, products.created_at DESC, products.id ASC LIMIT ?';
-  const keysParams = [...o.whereParams, keysCap + 1];
+  const keysParams = [...selectParams, ...o.whereParams, keysCap + 1];
   const { results: fetchedKeys } = await runListed(db, keysSql, (q) => db.prepare(q).bind(...keysParams).all<ListingKeyRow>());
   const keysOverflow = fetchedKeys.length > keysCap;
   const keys = keysOverflow ? fetchedKeys.slice(0, keysCap) : fetchedKeys;
 
   const sellable = (k: ListingKeyRow) => sellableNowOf(k as unknown as Record<string, unknown>);
   const all = keys.map((key, rank) => ({ key, rank, id: String(key.id), sellable: sellable(key) }));
-  // The sellable candidates resolved to be ordered, filtered or counted: the first ones in the shelf order.
-  const resolvedForOrder = new Set<string>();
-  let sellableCount = 0;
-  if (needResolved) {
-    for (const c of all) {
-      if (!c.sellable) continue;
-      sellableCount += 1;
-      if (resolvedForOrder.size < candidateCap) resolvedForOrder.add(c.id);
-    }
-  }
-  const pastCap = sellableCount > resolvedForOrder.size;
-
   const brandSlugOf = (k: ListingKeyRow) => (typeof k.brand_slug === 'string' && k.brand_slug ? k.brand_slug : null);
   // «يناسب طابعة» without facets was applied IN SQL — the same predicate as the in-memory one — so every
-  // candidate fits one of the chosen printers: the memory re-check passes, and no read is spent on it.
+  // candidate fits one of the chosen printers. With facets the keys' flag says it.
   const keyedFits = !wantsFacets && state.fits.length > 0 ? state.fits : [];
-  const keyed = (c: (typeof all)[number], fits: string[] = keyedFits) => keyedListingItem(c.key, c.rank, brandSlugOf(c.key), fits);
+  const filterFitsOf = (c: (typeof all)[number]): string[] =>
+    fitsFlagged ? (Number(c.key.fits_chosen) === 1 ? state.fits : []) : keyedFits;
+  // Every candidate's keyed item, made ONCE (its spec sheet parsed once), in the shelf order.
+  const keyedItems = all.map((c) => keyedListingItem(c.key, c.rank, brandSlugOf(c.key), filterFitsOf(c)));
+  // The candidates the stored-key filters keep — decided from the keys, wherever those filters ran.
+  const passing = new Set(applyFilters(keyedItems, storedKeyFilters(state)).map((i) => i.id));
+
+  // THE HEAD: the first sellable candidates, in the shelf order, that pass the stored-key filters.
+  const head = new Set<string>();
+  let sellablePassing = 0;
+  // THE COUNTS' SET: the first sellable candidates of the whole scope (every brand, every printer).
+  const counted = new Set<string>();
+  let sellableAll = 0;
+  for (const c of all) {
+    if (!c.sellable) continue;
+    sellableAll += 1;
+    if (wantsFacets && counted.size < candidateCap) counted.add(c.id);
+    if (!orderResolved || !passing.has(c.id)) continue;
+    sellablePassing += 1;
+    if (head.size < candidateCap) head.add(c.id);
+  }
+  // Every counted candidate that passes the stored-key filters is in the head (it has fewer sellable
+  // passing ones before it than the cap), so resolving the counted ones moves no order.
+  const resolvedSet = new Set([...head, ...counted]);
+  const partialOrder = sellablePassing > head.size;
+  const partialCounts = wantsFacets && (sellableAll > resolvedSet.size || keysOverflow);
 
   /**
-   * WHICH CANDIDATES ARE ON THE PAGE, FROM THE KEYS — null when that needs the
-   * printers each one fits (facets with a «يناسب طابعة» chip, applied in memory).
+   * THE ORDER AND THE PAGE, FROM THE KEYS. A stored-key order is the whole
+   * order (sorted once, and the answer's own list). Under a resolved one the
+   * head comes first however it sorts or filters; then, in the shelf order, the
+   * sellable candidates past it and the catalog-only ones — which a resolved
+   * filter leaves out (R3).
    */
-  let foreseen: string[] | null = null;
-  if (!(wantsFacets && state.fits.length > 0)) {
-    if (!resolvedSort && !resolvedFilter) {
-      // A stored-key order over stored-key filters: the whole order is in the keys.
-      foreseen = runListing(all.map((c) => keyed(c)), state, { facets: false, brands: new Map() })
-        .items.slice(offset, offset + limit)
-        .map((i) => i.id);
-    } else {
-      // The resolved candidates (however they sort or filter) come first; then, in the shelf order, the
-      // sellable ones past the cap and the catalog-only ones — which a resolved filter leaves out (R3).
-      const head = all.filter((c) => resolvedForOrder.has(c.id));
-      const headPassing = resolvedFilter ? null : applyFilters(head.map((c) => keyed(c)), state).length;
-      const tail = resolvedFilter ? [] : applyFilters(all.filter((c) => !resolvedForOrder.has(c.id)).map((c) => keyed(c)), state);
-      // Under a resolved filter only head rows can be on the page, and every head row is resolved anyway.
-      foreseen =
-        headPassing === null
-          ? []
-          : tail.slice(Math.max(0, offset - headPassing), Math.max(0, offset + limit - headPassing)).map((i) => i.id);
-    }
+  let keyedOrder: ListingItem[] | null = null;
+  let foreseen: string[];
+  if (!orderResolved) {
+    keyedOrder = sortItems(
+      keyedItems.filter((i) => passing.has(i.id)),
+      state.sort,
+      false
+    );
+    foreseen = keyedOrder.slice(offset, offset + limit).map((i) => i.id);
+  } else if (resolvedFilter) {
+    // Only head rows can be on the page, and every head row is resolved anyway.
+    foreseen = [];
+  } else {
+    const tail = keyedItems.filter((i) => passing.has(i.id) && !head.has(i.id));
+    foreseen = tail.slice(Math.max(0, offset - head.size), Math.max(0, offset + limit - head.size)).map((i) => i.id);
   }
 
   const byId = new Map(all.map((c) => [c.id, c] as const));
@@ -4040,21 +4094,27 @@ async function pagedListing(
 
   // READ 2: the resolve and (with facets) every candidate's printers, side by side.
   const [resolved, fitsByProduct] = await Promise.all([
-    resolveIds([...new Set([...resolvedForOrder, ...(foreseen ?? [])])]),
+    resolveIds([...new Set([...resolvedSet, ...foreseen])]),
     wantsFacets ? activeFitsFor(db, all.map((c) => c.id)) : Promise.resolve(new Map<string, FitPrinter[]>()),
   ]);
   const fitsOf = (id: string) => (wantsFacets ? (fitsByProduct.get(id) ?? []).map((p) => p.slug) : keyedFits);
 
-  // A resolved candidate is its resolved item; every other one is exact from its keys for what this
-  // request reads. A sellable row that left between the two reads (an admin hid it) is not listed.
+  /**
+   * What the resolved order and the counts read: a resolved candidate is its
+   * resolved item; every other one is exact from its keys for what this request
+   * reads (with facets, with the printers it really fits, for their counts). A
+   * sellable row that left between the two reads (an admin hid it) is not listed.
+   */
   const items: ListingItem[] = [];
-  for (const c of all) {
-    if (resolvedForOrder.has(c.id)) {
-      const r = resolved.get(c.id);
-      if (r) items.push(listingItemOf(r.row, r.card, c.rank, brandSlugOf(c.key), fitsOf(c.id)));
-    } else {
-      items.push(keyed(c, fitsOf(c.id)));
-    }
+  if (orderResolved || wantsFacets) {
+    all.forEach((c, i) => {
+      if (resolvedSet.has(c.id)) {
+        const r = resolved.get(c.id);
+        if (r) items.push(listingItemOf(r.row, r.card, c.rank, brandSlugOf(c.key), fitsOf(c.id)));
+      } else {
+        items.push(wantsFacets ? { ...keyedItems[i], fits: fitsOf(c.id) } : keyedItems[i]);
+      }
+    });
   }
 
   const brands = new Map<string, BrandInfo>();
@@ -4070,10 +4130,20 @@ async function pagedListing(
       if (!printers.has(p.slug)) printers.set(p.slug, { id: p.id, slug: p.slug, name_ar: p.name_ar, name_en: p.name_en, name_ckb: p.name_ckb });
     }
   }
-  const run = runListing(items, state, { facets: wantsFacets, brands, printers });
-  const page = run.items.slice(offset, offset + limit);
+  // A stored-key order is the keys' order, already sorted — never sorted a second time.
+  let listed: ListingItem[];
+  let facets: FacetSet | undefined;
+  if (keyedOrder) {
+    listed = keyedOrder;
+    if (wantsFacets) facets = facetCounts(items, state, brands, printers);
+  } else {
+    const run = runListing(items, state, { facets: wantsFacets, brands, printers });
+    listed = run.items;
+    facets = run.facets;
+  }
+  const page = listed.slice(offset, offset + limit);
 
-  // Only when the page could not be foreseen: its cards not resolved yet, in a third wave.
+  // Only when the page was not foreseen: its cards not resolved yet, in a third wave.
   const pageCards: Resolved = new Map();
   for (const i of page) {
     const r = resolved.get(i.id);
@@ -4087,11 +4157,14 @@ async function pagedListing(
     body: {
       ...o.categoryField,
       products,
-      total: run.items.length,
-      truncated: keysOverflow || pastCap,
-      has_more: offset + page.length < run.items.length,
+      total: listed.length,
+      // The LIST is not exact: a partial price/stock order or filter, or candidates past the keys' cap.
+      truncated: partialOrder || keysOverflow,
+      partial_order: partialOrder,
+      cut_off: keysOverflow,
+      has_more: offset + page.length < listed.length,
       sort: state.sort,
-      ...(run.facets ? { facets: run.facets } : {}),
+      ...(facets ? { facets, partial_counts: partialCounts } : {}),
     },
     rows: new Map([...pageCards].map(([id, r]) => [id, r.row] as const)),
   };
@@ -4302,7 +4375,7 @@ export async function listCatalogProducts(
       return { body: {
         products: [],
         ...categoryField,
-        ...(listing ? { total: 0, truncated: false, has_more: false, sort: listingState.sort } : {}),
+        ...(listing ? { total: 0, truncated: false, partial_order: false, cut_off: false, has_more: false, sort: listingState.sort } : {}),
       }, rows: new Map() };
     } else {
       /**
@@ -4409,7 +4482,10 @@ export async function listCatalogProducts(
    */
   if (listing && !wantsFacets && listingState.fits.length) {
     if (!(await printerFitsInstalled(db))) {
-      return { body: { products: [], ...categoryField, total: 0, truncated: false, has_more: false, sort: listingState.sort }, rows: new Map() };
+      return {
+        body: { products: [], ...categoryField, total: 0, truncated: false, partial_order: false, cut_off: false, has_more: false, sort: listingState.sort },
+        rows: new Map(),
+      };
     }
     sql +=
       ' AND id IN (SELECT f.product_id FROM product_printer_fits f JOIN products pr ON pr.id = f.printer_id' +
@@ -4552,9 +4628,12 @@ export async function listCatalogProducts(
     products: page.map((i) => i.card),
     total: run.items.length,
     truncated,
+    // A search or a bundle listing reads its candidates whole up to the cap: past it they are not listed.
+    partial_order: false,
+    cut_off: truncated,
     has_more: offset + page.length < run.items.length,
     sort: listingState.sort,
-    ...(run.facets ? { facets: run.facets } : {}),
+    ...(run.facets ? { facets: run.facets, partial_counts: truncated } : {}),
   }, rows: rowsById };
 }
 

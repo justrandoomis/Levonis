@@ -185,13 +185,19 @@ export interface FacetSet {
 export interface ListingMeta {
   /** Matches after every filter, before paging — every candidate, to the last page. */
   total: number;
-  /**
-   * Some candidates were not fully considered: more sellable ones than the cap
-   * (1,000) under a price/stock order, a price/stock filter or the counts — the
-   * ones past it follow in the shelf order, a price/stock filter leaves them out,
-   * the counts do not see their price — or more than 10,000 candidates at all.
-   */
+  /** The LIST is not exact: `partial_order || cut_off` (the counts have their own flag). */
   truncated: boolean;
+  /**
+   * The price/stock ORDER or FILTER covered only the first sellable candidates
+   * that pass the brand, printer and spec filters (the cap, 1,000): under an
+   * order the rest follow in the shelf order, a filter leaves them out. The
+   * same on every page of one list, with or without the counts.
+   */
+  partial_order?: boolean;
+  /** With the counts: they did not see every sellable candidate's price and stock (more than the cap). */
+  partial_counts?: boolean;
+  /** More candidates than the listing reads (10,000; a search or bundle list: the cap): the rest are not listed. */
+  cut_off?: boolean;
   /** Another page follows this one (`offset + products.length < total`). */
   has_more?: boolean;
   sort: ListingSort;
