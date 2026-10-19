@@ -18,8 +18,10 @@
  *                    reviewed value map (merge), their `product_option_source_refs`, and swatches for a value that
  *                    has none — then the lease-fenced WRITTEN event and the checkpoint. Never an UPDATE or DELETE of
  *                    a product, image, option, variant, price or stock row: an existing image is never moved,
- *                    re-bound or removed, the primary never changes. A row whose id is already there, or whose
- *                    picture the product already shows, is counted and left out: the stage is idempotent;
+ *                    re-bound or removed, the primary never changes. A row whose id is already there (quarantined
+ *                    included), or whose picture the product already shows for the same binding, is counted and
+ *                    left out: the stage is idempotent. A product deleted since the closed run gets nothing (its
+ *                    plan is empty) and the item completes, so it never stops the queue;
  *   PUBLISHING       the ordinary /publish-finish (recompute, purge);
  *   VERIFYING_LIVE   POST /items/:sid/media-complete: the runner's public read of the product (every attached
  *                    picture shown) and the Worker's own recompute (every attached row in D1, every object in R2).
@@ -123,6 +125,12 @@ export interface RetryContext {
   merge: boolean;
   /** The product is active: a hidden one gets nothing (COMPLETE needs public evidence of what was attached). */
   active: boolean;
+  /**
+   * The product the closed run wrote is gone (deleted since, or no longer carrying this source): nothing to attach to.
+   * The item is still worked to COMPLETE with nothing attached (every planned medium `product_not_public`), so it can
+   * never stop the queue behind it; its id, slug and write mode are the closed run's item's.
+   */
+  gone: boolean;
   failed: FailedMedium[];
 }
 
@@ -135,21 +143,26 @@ export async function retryContext(db: D1Database, item: ItemRow): Promise<Retry
   const mark = deltaMarkOf(row?.discovery_sources ?? '');
   if (!mark || mark.kind !== 'media') throw new OpsRefusal(409, 'IMPORT_DELTA_REFUSED', [item.id]);
   const from = await db
-    .prepare("SELECT levonis_product_id FROM catalog_import_items WHERE run_id = ? AND source = 'bambu_us' AND source_product_id = ? AND processing_state = 'COMPLETE'")
+    .prepare("SELECT levonis_product_id, slug, match_kind FROM catalog_import_items WHERE run_id = ? AND source = 'bambu_us' AND source_product_id = ? AND processing_state = 'COMPLETE'")
     .bind(mark.fromRun, item.source_product_id)
-    .first<{ levonis_product_id: string }>();
+    .first<{ levonis_product_id: string; slug: string; match_kind: string }>();
+  if (!from?.levonis_product_id) throw new OpsRefusal(409, 'IMPORT_DELTA_REFUSED', [item.id]);
   const ref = await db
     .prepare("SELECT r.product_id, r.match_kind, p.slug, p.status FROM product_source_refs r JOIN products p ON p.id = r.product_id WHERE r.source = 'bambu_us' AND r.source_product_id = ?")
     .bind(item.source_product_id)
     .first<{ product_id: string; match_kind: string; slug: string; status: string }>();
-  if (!from?.levonis_product_id || !ref || ref.product_id !== from.levonis_product_id || (ref.match_kind !== 'created' && ref.match_kind !== 'merged')) {
-    throw new OpsRefusal(409, 'IMPORT_DELTA_REFUSED', [item.id]);
-  }
   const { results } = await db
     .prepare("SELECT source_media_id, role FROM catalog_import_media WHERE run_id = ? AND source_product_id = ? AND status = 'failed' ORDER BY source_media_id")
     .bind(mark.fromRun, item.source_product_id)
     .all<FailedMedium>();
-  return { mark, productId: ref.product_id, slug: ref.slug, merge: ref.match_kind === 'merged', active: ref.status === 'active', failed: results ?? [] };
+  const failed = results ?? [];
+  if (!ref || ref.product_id !== from.levonis_product_id || (ref.match_kind !== 'created' && ref.match_kind !== 'merged')) {
+    // The owner deleted the product after the closed run (productDeletion.ts removes its source ref with it), or the
+    // source now names another product: nothing of this item can be attached, and a refusal here would block it
+    // for good (a resume plans again; it is not SOURCE_WITHDRAWN, so it cannot be withdrawn).
+    return { mark, productId: from.levonis_product_id, slug: String(from.slug ?? ''), merge: from.match_kind === 'merged', active: false, gone: true, failed };
+  }
+  return { mark, productId: ref.product_id, slug: ref.slug, merge: ref.match_kind === 'merged', active: ref.status === 'active', gone: false, failed };
 }
 
 /** The plan for this item: `retryPlan`, and nothing at all for a product that is not public. */
@@ -174,7 +187,8 @@ export function retryPayloadOf(raw: unknown, item: ItemRow, ctx: RetryContext): 
     payload.source_product_id !== item.source_product_id ||
     payload.handle !== item.handle ||
     payload.product_id !== ctx.productId ||
-    payload.write_mode !== (ctx.merge ? 'merge' : 'create')
+    // A gone product gets nothing written: its write mode proves nothing (an older item may not record it).
+    (!ctx.gone && payload.write_mode !== (ctx.merge ? 'merge' : 'create'))
   ) {
     throw new OpsRefusal(409, 'IMPORT_IDENTITY_AMBIGUOUS', [item.id]);
   }
@@ -265,16 +279,32 @@ export async function attachRetriedMedia(env: MediaEnv, run: ImportRun, item: It
   const productId = ctx.productId;
 
   // The product as it stands: its images (every one, so a picture it already shows is never added twice), values
-  // and variants (a create's rows name only ids the original write gave it).
-  const rel = await loadRelationsResponse(db, productId);
-  if (!rel) throw new OpsRefusal(409, 'IMPORT_DELTA_REFUSED', [item.id]);
-  const existingIds = new Set(rel.images.map((i) => String(i.id)));
-  const existingKeys = new Set(rel.images.map((i) => String(i.r2_key ?? '')).filter(Boolean));
-  const ownValues = new Set(rel.values.map((v) => String(v.id)));
-  const ownVariants = new Set(rel.variants.map((v) => String(v.id)));
+  // and variants (a create's rows name only ids the original write gave it). A gone product has none: its plan is
+  // empty (planFor), so nothing below adds a row, and the checkpoint records nothing attached.
+  const loaded = ctx.gone ? null : await loadRelationsResponse(db, productId);
+  if (!loaded && !ctx.gone) throw new OpsRefusal(409, 'IMPORT_DELTA_REFUSED', [item.id]);
+  const rel = loaded;
+  const relImages = rel?.images ?? [];
+  // A quarantined row keeps its id (its key is cleared): re-inserting its id is a no-op, never an attach.
+  const existingIds = new Set([...relImages, ...(rel?.quarantined_images ?? [])].map((i) => String(i.id)));
+  const existingKeys = new Set(relImages.map((i) => String(i.r2_key ?? '')).filter(Boolean));
+  // The writer's own duplicate rule (mergeImages, collapseContentDuplicates): a picture is "already shown" for a
+  // binding only when the same key is shown under the same binding.
+  const bindingOf = (r: { r2_key?: unknown; option_value_id?: unknown; variant_id?: unknown; color_id?: unknown }) =>
+    `${String(r.r2_key ?? '')}|${String(r.option_value_id ?? '')}|${String(r.variant_id ?? '')}|${String(r.color_id ?? '')}`;
+  const existingBindings = new Set(relImages.map(bindingOf));
+  /** The earliest slot a key is shown at (a bound copy of it joins that slot, as the writer's collapse puts it). */
+  const firstSlotOfKey = new Map<string, number>();
+  for (const i of relImages) {
+    const k = String(i.r2_key ?? '');
+    const at = Number(i.sort_order) || 0;
+    if (k && (!firstSlotOfKey.has(k) || at < firstSlotOfKey.get(k)!)) firstSlotOfKey.set(k, at);
+  }
+  const ownValues = new Set((rel?.values ?? []).map((v) => String(v.id)));
+  const ownVariants = new Set((rel?.variants ?? []).map((v) => String(v.id)));
   const match = ctx.merge ? bundle.matches.bySourceId.get(item.source_product_id) ?? null : null;
   const mergeOk = !ctx.merge || (!!match && (match.decision === 'merge' || match.decision === 'merge_publish') && match.levonis_product_id === productId);
-  const mapping = ctx.merge && mergeOk ? mergeMapping(payload, match!, rel) : null;
+  const mapping = ctx.merge && mergeOk && rel ? mergeMapping(payload, match!, rel) : null;
 
   // ---- the gallery rows
   const galleryIds = new Set(plan.requests.filter((r) => r.role === 'gallery').map((r) => r.source_media_id));
@@ -295,7 +325,7 @@ export async function attachRetriedMedia(env: MediaEnv, run: ImportRun, item: It
   if (!mergeOk) {
     for (const r of rows) note(r.source_media_id, 'target_missing');
     rows = [];
-  } else if (mapping) {
+  } else if (mapping && rel) {
     // A merge: bound only through the reviewed value map, appended after the product's own pictures (§E.2).
     const m = mergeImages(rows, mapping, rel);
     const kept = new Set(m.rows.map((r) => r.id));
@@ -317,12 +347,26 @@ export async function attachRetriedMedia(env: MediaEnv, run: ImportRun, item: It
     for (const r of scoped) if (!kept.has(r.id)) note(r.source_media_id, 'duplicate_content');
     rows = collapsed.rows.map((r) => ({ ...r, is_primary: false }));
   }
-  // Never twice: an id already written (this stage ran before), or a picture the product already shows.
+  // Never twice: an id already written (this stage ran before), or a picture the product already shows for the same
+  // binding — a general row whose picture is shown at all, a bound row whose picture is shown under that binding.
+  // A bound row whose picture is shown only under ANOTHER binding is what the original write would have kept
+  // (collapseContentDuplicates keeps each binding once; mergeImages dedupes on key and binding): it goes in, as
+  // the writer's collapse has it — `content_duplicate` (a representative or a reviewed override keeps its rule) and,
+  // for a create, in the slot the picture is already shown at.
   const fresh: ImportImageRow[] = [];
   for (const r of rows) {
+    const bound = !!(r.option_value_id || r.variant_id || r.color_id);
     if (existingIds.has(r.id)) note(r.source_media_id, 'already_present');
-    else if (existingKeys.has(r.r2_key)) note(r.source_media_id, 'duplicate_content');
-    else fresh.push(r);
+    else if (existingBindings.has(bindingOf(r)) || (!bound && existingKeys.has(r.r2_key))) note(r.source_media_id, 'duplicate_content');
+    else if (existingKeys.has(r.r2_key)) {
+      const keeps = r.binding_rule === 'representative' || r.binding_rule === 'reviewed_override';
+      fresh.push({
+        ...r,
+        sort_order: mapping ? r.sort_order : firstSlotOfKey.get(r.r2_key) ?? r.sort_order,
+        binding_rule: keeps ? r.binding_rule : 'content_duplicate',
+        via_variant_id: keeps ? r.via_variant_id : '',
+      });
+    } else fresh.push(r);
   }
   // An id the product does not hold but another product does cannot be inserted (ids are per product, §B.8).
   const elsewhere = new Set<string>();

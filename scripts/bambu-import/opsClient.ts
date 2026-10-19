@@ -729,11 +729,23 @@ export class OpsClient {
     };
   }
 
-  /** Idempotent: a row registered already keeps its position (the Worker answers it accepted again). */
-  async deltaManifest(fromRun: string, rows: readonly Rec[]): Promise<{ accepted: number; new: number; media: number }> {
+  /**
+   * Idempotent: a row registered already keeps its position (the Worker answers it accepted again). A row the Worker
+   * finds moot is left out and counted in `skipped` (counts only).
+   */
+  async deltaManifest(
+    fromRun: string,
+    rows: readonly Rec[]
+  ): Promise<{ accepted: number; new: number; media: number; skipped: { known: number; media_product_gone: number; media_already_retried: number } }> {
     if (rows.length > 100) throw new OpsError('delta/manifest', 'permanent', 'MANIFEST_BATCH_TOO_LARGE', 0);
     const a = await this.send('delta/manifest', 'POST', '/delta/manifest', { from_run: fromRun, rows: rows as Rec[] }, true);
-    return { accepted: num(a.accepted), new: num(a.new), media: num(a.media) };
+    const k = isRec(a.skipped) ? a.skipped : {};
+    return {
+      accepted: num(a.accepted),
+      new: num(a.new),
+      media: num(a.media),
+      skipped: { known: num(k.known), media_product_gone: num(k.media_product_gone), media_already_retried: num(k.media_already_retried) },
+    };
   }
 
   async deltaRows(): Promise<DeltaRowView[]> {

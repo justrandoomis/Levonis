@@ -2393,18 +2393,20 @@ After the bulk run closed (`partial`: 1,112 COMPLETE, 3 WITHDRAWN_AT_SOURCE), tw
 
 The run is then closed the normal way: `mode=close` with the new run id (§A.9: the end-of-run audit, the protected snapshot `after`, `/run/finish`, the old token answers 404, the sealed close report). `mode=report` reads its ledger.
 
-If the registration itself does not finish (a door that never settles, the deadline), the job ends blocked and never chains: the items registered so far are worked by `mode=run` on the new run and closed; a later delta from the same closed run builds the same queue again, and what was already attached is counted `already_present`.
+If the registration itself does not finish (a door that never settles, the deadline), the job ends blocked and never chains: the items registered so far are worked by `mode=run` on the new run and closed; a later delta from the same closed run builds the same queue again — less the media items an earlier delta already took to COMPLETE (counted `media_already_retried`: their pictures are attached, and one the owner removed since must not come back) — and what an unfinished item already attached is counted `already_present`.
 
 ### O.2 The queue (`worker/lib/catalogImport/delta.ts`, `deltaQueue`, pure)
 
-1. **New products:** the handles the sitemaps list that no item of any earlier run holds (by handle; then by source id, below). A withdrawn product the sitemap lists again is counted (`withdrawn_listed`), never queued: it is held by an earlier run's item, so the owner decides.
-2. **Media items:** the closed run's `COMPLETE` items with at least one `failed` medium, in their queue order. An item that is not COMPLETE (withdrawn, blocked) is never retried (`failed_not_complete` is counted); one the reviewed manifest does not hold (a new product of an earlier delta) is counted `media_not_reviewed`.
+1. **New products:** the handles the sitemaps list that no item of any earlier run holds, no `product_source_refs` row carries and the reviewed manifest does not name (by handle; then by source id, below). A withdrawn product the sitemap lists again is counted (`withdrawn_listed`), never queued: it is held by an earlier run's item, so the owner decides.
+2. **Media items:** the closed run's `COMPLETE` items with at least one `failed` medium, in their queue order. An item that is not COMPLETE (withdrawn, blocked) is never retried (`failed_not_complete` is counted); one the reviewed manifest does not hold (a new product of an earlier delta) is counted `media_not_reviewed`; one whose product is gone — the owner deleted it after the closed run (the deletion removes its `product_source_refs` row too), or its source now names another product — is counted `media_product_gone` (the test `/media-plan` applies); one an earlier delta run already took to COMPLETE as a media item of the same closed run is counted `media_already_retried`.
 
-`/delta/manifest` checks every row against D1 and refuses the whole call (`IMPORT_DELTA_REFUSED`) otherwise:
+`/delta/manifest` checks every row against D1 and refuses the whole call (`IMPORT_DELTA_REFUSED`) when one breaks a rule:
 
 - a media row: a COMPLETE item of the closed run with a product and a failed medium, in the reviewed manifest (its row, handle and type are the reviewed ones; it takes its new position in the delta run);
-- a new row: a well-formed handle and route; a source id and handle no earlier run's item holds, no `product_source_refs` row carries, and the reviewed manifest does not name; at most 20 new products in one run;
+- a new row: a well-formed handle and route; at most 20 new products in one run;
 - the run holds delta items only, all of the same closed run.
+
+A row the store or the owner made moot since the plan is **left out and counted** (`skipped`), never refused — a refusal would take every other row of the call with it and stop every later delta the same way: a new row whose source id or handle an earlier run's item holds, a `product_source_refs` row carries or the reviewed manifest names (`known`: a store handle renamed reads as new by handle, and its page gives the source id an earlier run held), a media row whose product is gone (`media_product_gone`) or that an earlier delta completed (`media_already_retried`). The runner sends the media rows in their own calls first and the new rows in theirs after them, one row per product (two listed handles whose pages give the same source id: `delta_new_skipped same_product`), and logs the counts left out.
 
 The kind is durable on the item: `discovery_sources` carries `delta_new`, or `media_retry:<closed run>`. These markers are reserved: `/manifest` refuses them. `/hello` answers `run.delta` so a `mode=run` job reads `/delta/rows` before its queue.
 
@@ -2426,6 +2428,7 @@ The failed media are recorded per product in the closed run's `catalog_import_me
 | no longer on the page | counted `not_in_source` |
 | the payload now makes it the primary | counted `primary_unchanged` (the primary never changes here) |
 | the product is not active | counted `product_not_public` (COMPLETE needs public evidence) |
+| the product is gone (deleted after the item was queued, or its source now names another product) | counted `product_not_public`: nothing is fetched or written, and the item completes with nothing attached, so it never stops the queue behind it |
 
 Its stages walk the ordinary graph (§B.3): EXTRACTING (the page) → ENRICHING (nothing is enriched: no text is sent) → VALIDATING (`/media-plan` records the payload's digest) → INGESTING_MEDIA (the ordinary `/media`, which for a media item takes only the planned failed media; store.bblcdn.com only, the CDN rendition retry of §C.4, the app's own conversion and content-addressed keys) → WRITING (`/media-attach`) → PUBLISHING (the ordinary `/publish-finish`: recompute and purge) → VERIFYING_LIVE (`/media-complete`).
 
@@ -2433,7 +2436,8 @@ Its stages walk the ordinary graph (§B.3): EXTRACTING (the page) → ENRICHING 
 
 - **A created product:** each row keeps the payload's own deterministic id, binding and `sort_order` — the slot the original write gave it, between the rows it did write — when the product still has that value or variant (else `target_missing`); byte-identical new copies collapse as the writer collapses them (§C.4 step 1).
 - **A merged product:** bound only through the reviewed value map and appended after the product's own pictures (§E.2, the writer's own `mergeImages`).
-- **Never twice:** a row whose id is already there (`already_present`), or whose picture the product already shows under any row (`duplicate_content`), is left out. Running the stage again — in the same run after a lost answer, or in a later delta — changes nothing.
+- **Never twice:** a row whose id is already there, a quarantined row's included (`already_present`), or whose picture the product already shows for the same binding (`duplicate_content`: a general row whose picture is shown at all, a bound row whose picture is shown under that same value, variant or colour) is left out — the writer's own rule (`collapseContentDuplicates` keeps each binding once; `mergeImages` dedupes on key and binding). A bound row whose picture is shown only under **another** binding is what the original write would have kept: it goes in as `content_duplicate` (a representative or a reviewed override keeps its rule), for a created product in the slot the picture is already shown at. Running the stage again — in the same run after a lost answer, or in a later delta — changes nothing.
+- **Resume:** a media item BLOCKED after its attach resumes at the stage after the last one completed (`VERIFYING_LIVE` after `PUBLISHING`), whatever its product: it never rewrites (the rewrite of a merge VERIFY failed, `rewritesOnResume`, is for an item `/write` wrote; a media item records no `match_kind`, and the runner's `resumeTargetOf` asks for the stage the Worker expects).
 
 `/media-complete` moves the item to COMPLETE only when the runner saw every attached picture on the anonymous product answer (`/api/products/<slug>`: its image rows, its values' swatches; the cache rule of §I.1.9 once) and the Worker finds every attached row in D1 and every object in R2. A product's page that is gone at the source blocks `SOURCE_WITHDRAWN` like any item, and `auto_withdraw` withdraws the media item (only the item: the product is untouched).
 

@@ -11,8 +11,13 @@
  *                    that failed — same ids, bindings, slots and alt texts — and NOTHING else of the product moves
  *                    (its row, groups, values, variants, specs, documents, relations, translations, search tokens,
  *                    its other images); the batch runs under the import guard row; a second delta changes nothing
- *                    (every medium already_present); a merged product's pictures are appended after its own
+ *                    (every medium already_present); a merged product's pictures are appended after its own; a
+ *                    picture shown only under another value is attached for its own value (content_duplicate)
  *   COMPLETE         only when the runner saw every attached picture and D1 and R2 hold them
+ *   moot rows        a known source id (a renamed handle), a product the owner deleted, an item an earlier delta
+ *                    completed: left out and counted at /delta/plan and /delta/manifest, never a refusal; an item
+ *                    queued before its product was deleted completes with nothing attached
+ *   resume           a merged product's media item BLOCKED at VERIFY resumes at VERIFYING_LIVE (runner = Worker)
  *
  * Run: node --import tsx --test tests/catalogImportDelta.test.ts
  */
@@ -24,10 +29,11 @@ import { webpBytes } from './fixtures/imageDoubles';
 import type { ImportPayload } from '../packages/catalog/src/bambuImport/payload';
 import type { ImportRun } from '../worker/lib/catalogImport/auth';
 import { OpsRefusal } from '../worker/lib/catalogImport/auth';
-import { finishPublishing, itemBySource, type ItemRow } from '../worker/lib/catalogImport/items';
-import { acceptDeltaRows, DELTA_NEW_MAX, deltaMarkOf, deltaQueue, deltaSources, isReservedSource, withDeltaRows, deltaRowsOf } from '../worker/lib/catalogImport/delta';
+import { applyEvent, finishPublishing, itemBySource, type ItemRow } from '../worker/lib/catalogImport/items';
+import { acceptDeltaRows, DELTA_NEW_MAX, deltaMarkOf, deltaPlan, deltaQueue, deltaSources, isReservedSource, withDeltaRows, deltaRowsOf } from '../worker/lib/catalogImport/delta';
 import { attachRetriedMedia, completeMediaRetry, planMediaRetry, retryPlan } from '../worker/lib/catalogImport/mediaRetry';
-import { ConfigError, configFromEnv, DELTA_NEW_MAX as RUNNER_NEW_MAX, mediaOnlyPayload } from '../scripts/bambu-import/run';
+import { deleteProductPermanently } from '../worker/lib/productDeletion';
+import { ConfigError, configFromEnv, DELTA_NEW_MAX as RUNNER_NEW_MAX, mediaOnlyPayload, resumeTargetOf } from '../scripts/bambu-import/run';
 
 const RUN_B = 'cir_bbbbbbbbbbbbbbbbbbbbbbbb';
 const RUN_C = 'cir_cccccccccccccccccccccccc';
@@ -39,6 +45,9 @@ const sha = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
 const envOf = (w: World) => ({ DB: w.db, ...w.media }) as never;
 
 const runOf = (id: string): ImportRun => ({ id, state: 'open', token_expires_at: '', github_run_id: '', reviewed_bundle_sha256: '', code_commit: '', manifest_total: 0, started_at: AT });
+
+/** /delta/manifest's answer with nothing left out. */
+const NONE_SKIPPED = { known: 0, media_product_gone: 0, media_already_retried: 0 };
 
 // ---------------------------------------------------------------- the queue (pure)
 
@@ -65,10 +74,35 @@ test('queue construction: new vs completed vs withdrawn, by every earlier run', 
     { source_product_id: '6', handle: 'done-too', failed: 1 },
     { source_product_id: '1', handle: 'done-with-failures', failed: 3 },
   ], 'COMPLETE items of the closed run with failed media, in queue order');
-  assert.deepEqual(q.counts, { listed: 7, known: 4, new: 2, unusable_handles: 1, media_items: 2, media_failed: 4, failed_not_complete: 3, withdrawn_listed: 1 });
+  assert.deepEqual(q.counts, {
+    listed: 7, known: 4, new: 2, unusable_handles: 1, media_items: 2, media_failed: 4, failed_not_complete: 3, withdrawn_listed: 1, media_product_gone: 0, media_already_retried: 0,
+  });
   // Nothing new, nothing failed: an empty delta.
   const empty = deltaQueue({ listedHandles: ['done-clean'], prior, fromRun: A, failedBySid: new Map() });
   assert.deepEqual([empty.newHandles, empty.media], [[], []]);
+});
+
+test('queue construction: a handle a source ref or the reviewed manifest holds is never new; a gone product and an item an earlier delta completed are never retried', () => {
+  const A = 'cir_aaaaaaaaaaaaaaaaaaaaaaaa';
+  const prior = [
+    { run_id: A, source_product_id: '1', handle: 'still-here', state: 'COMPLETE', queue_position: 1, levonis_product_id: 'p_1' },
+    { run_id: A, source_product_id: '2', handle: 'deleted-by-owner', state: 'COMPLETE', queue_position: 2, levonis_product_id: 'p_2' },
+    { run_id: A, source_product_id: '3', handle: 'source-moved', state: 'COMPLETE', queue_position: 3, levonis_product_id: 'p_3' },
+    { run_id: A, source_product_id: '4', handle: 'retried-before', state: 'COMPLETE', queue_position: 4, levonis_product_id: 'p_4' },
+  ];
+  const q = deltaQueue({
+    listedHandles: ['still-here', 'carried-handle', 'reviewed-handle', 'truly-new'],
+    prior,
+    fromRun: A,
+    failedBySid: new Map([['1', 1], ['2', 2], ['3', 3], ['4', 4]]),
+    knownHandles: ['carried-handle', 'reviewed-handle'],
+    // '2' has no live product (deleted with its source ref); '3' is carried by another product now.
+    liveProductBySid: new Map([['1', 'p_1'], ['3', 'p_other'], ['4', 'p_4']]),
+    alreadyRetried: new Set(['4']),
+  });
+  assert.deepEqual(q.newHandles, ['truly-new']);
+  assert.deepEqual(q.media.map((m) => m.source_product_id), ['1']);
+  assert.deepEqual([q.counts.known, q.counts.new, q.counts.media_items, q.counts.media_failed, q.counts.media_product_gone, q.counts.media_already_retried], [3, 1, 1, 1, 2, 1]);
 });
 
 test('the delta markers are read back from discovery_sources, and reserved', () => {
@@ -205,7 +239,7 @@ async function closedRunWithFailures(handle: 'pla-basic-filament' | 'a1', pick: 
 async function deltaItem(w: World, runId: string, sid: string): Promise<ItemRow> {
   w.raw.prepare("INSERT INTO catalog_import_runs (id, source, state) VALUES (?, 'bambu_us', 'open')").run(runId);
   const r = await acceptDeltaRows(w.db, runOf(runId), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'media', source_product_id: sid, discovered_at: AT }] });
-  assert.deepEqual(r, { accepted: 1, new: 0, media: 1 });
+  assert.deepEqual(r, { accepted: 1, new: 0, media: 1, skipped: NONE_SKIPPED });
   const item = await itemBySource(w.db, runId, sid);
   walk(w, item.id, 'VALIDATING');
   return itemBySource(w.db, runId, sid);
@@ -312,9 +346,29 @@ test('the media-only stage attaches exactly what the original write would have, 
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM catalog_import_events WHERE run_id = ? AND stage = 'COMPLETED'", RUN_B), 1);
   w.raw.prepare("UPDATE catalog_import_runs SET state = 'closed' WHERE id = ?").run(RUN_B);
 
-  // IDEMPOTENT: a later delta from the same closed run attaches nothing, and the product does not move.
+  // A later delta from the same closed run does not queue it again: an earlier delta completed it (the owner may have
+  // removed one of its pictures since; it must not come back).
+  w.raw.prepare("INSERT INTO catalog_import_runs (id, source, state) VALUES (?, 'bambu_us', 'open')").run(RUN_C);
+  const planC = await deltaPlan(w.db, runOf(RUN_C), { from_run: RUN_ID, sitemap_handles: ['pla-basic-filament'] }, w.bundle);
+  assert.deepEqual([planC.media, planC.counts.media_already_retried, planC.counts.media_product_gone], [[], 1, 0]);
+  const regC = await acceptDeltaRows(w.db, runOf(RUN_C), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'media', source_product_id: sid, discovered_at: AT }] });
+  assert.deepEqual(regC, { accepted: 0, new: 0, media: 0, skipped: { ...NONE_SKIPPED, media_already_retried: 1 } });
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM catalog_import_items WHERE run_id = ?', RUN_C), 0);
+
+  // IDEMPOTENT all the same: a media item registered anyway (by hand here: a delta whose item never completed is the
+  // real case) attaches nothing, and the product does not move. A picture the owner quarantined since is not
+  // inserted again either (its id is there; the insert would be a no-op counted as attached).
+  const quarantined = added[0];
+  w.raw.prepare("UPDATE product_images SET quarantined = 1, quarantine_reason = 'owner_hidden', url = '', r2_key = '' WHERE id = ?").run(String(quarantined.id));
   const settled = productState(w, productId);
-  const again = await deltaItem(w, RUN_C, sid);
+  w.raw
+    .prepare(
+      `INSERT INTO catalog_import_items (id, run_id, source, source_product_id, handle, canonical_url, queue_position, discovery_sources, discovered_at)
+       VALUES ('cii_by_hand', ?, 'bambu_us', ?, 'pla-basic-filament', 'x', 1, ?, ?)`
+    )
+    .run(RUN_C, sid, JSON.stringify(deltaSources('media', RUN_ID)), AT);
+  walk(w, 'cii_by_hand', 'VALIDATING');
+  const again = await itemBySource(w.db, RUN_C, sid);
   const plan2 = await planMediaRetry(w.db, again, payload);
   for (const m of plan2.media) {
     const old = w.raw.prepare('SELECT r2_key FROM catalog_import_media WHERE run_id = ? AND source_product_id = ? AND source_media_id = ?').get(RUN_B, sid, m.source_media_id) as { r2_key: string };
@@ -356,23 +410,48 @@ test('the media-only stage refuses what is not its own: another payload, a stale
   await refuses({ from_run: 'cir_dddddddddddddddddddddddd', rows: [] });
   // From run B (the delta itself, now closed): its item is a media item, not COMPLETE.
   await refuses({ from_run: RUN_B, rows: [{ kind: 'media', source_product_id: sid, discovered_at: AT }] });
-  // A "new" product that run A already held (by id), or that a product carries as its source.
-  await refuses({ from_run: RUN_ID, rows: [{ kind: 'new', source_product_id: sid, handle: 'pla-basic-new', route: '1>2', discovered_at: AT }] });
-  await refuses({ from_run: RUN_ID, rows: [{ kind: 'new', source_product_id: '999', handle: 'pla-basic-filament', route: '1>2', discovered_at: AT }] });
+  // A "new" product that run A already held (by id: a store handle renamed), or by handle, or that a product carries
+  // as its source: left out and counted, never refused — a refusal would take the call's media rows with it.
+  const known = { ...NONE_SKIPPED, known: 1 };
+  assert.deepEqual(
+    await acceptDeltaRows(w.db, runOf(RUN_C), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'new', source_product_id: sid, handle: 'pla-basic-renamed', route: '1>2', discovered_at: AT }] }),
+    { accepted: 0, new: 0, media: 0, skipped: known }
+  );
+  assert.deepEqual(
+    await acceptDeltaRows(w.db, runOf(RUN_C), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'new', source_product_id: '999', handle: 'pla-basic-filament', route: '1>2', discovered_at: AT }] }),
+    { accepted: 0, new: 0, media: 0, skipped: known }
+  );
+  // In one call with a media row: the media row is registered, the known new row left out.
+  assert.deepEqual(
+    await acceptDeltaRows(w.db, runOf(RUN_C), w.bundle, {
+      from_run: RUN_ID,
+      rows: [
+        { kind: 'media', source_product_id: sid, discovered_at: AT },
+        { kind: 'new', source_product_id: '999', handle: 'pla-basic-filament', route: '1>2', discovered_at: AT },
+      ],
+    }),
+    { accepted: 1, new: 0, media: 1, skipped: known }
+  );
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM catalog_import_items WHERE run_id = ?', RUN_C), 1);
 });
 
-test('a merged product: the retried pictures are appended after its own, bound only through the reviewed map; again: nothing', async () => {
-  const setup = (w: World) => {
+/** The A1 merged into an owner product (an empty reviewed value map), two non-primary gallery pictures failed. */
+const A1_MERGE = {
+  writeMode: 'merge' as const,
+  mergeProductId: 'p_a1m',
+  setup: (w: World) => {
     w.raw.exec(`INSERT INTO products (id, slug, name, name_ar, name_ku, status, price_iqd, category_id, options, colors, images)
       VALUES ('p_a1m', 'bambu-a1-m', 'Bambu Lab A1', 'بامبو A1', 'بامبو A1', 'active', 0, 'cat_printers', '[]', '[]', '[]')`);
     w.raw.exec("INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES ('p_a1m', 'cat_printers', 1)");
     const x = buildFor(w, 'a1', { writeMode: 'merge', mergeProductId: 'p_a1m' }).payload;
     w.matches.push({ source_product_id: x.source_product_id, source_handle: x.handle, levonis_product_id: 'p_a1m', decision: 'merge', value_map: {}, unmapped_variants: [], reason: 'same_model', reviewed_by: 't', reviewed_at: 'd' });
-  };
-  const pick = (p: ImportPayload): Failed[] =>
-    [...new Map(notPrimary(p).map((i) => [i.source_media_id, i])).values()].slice(0, 2).map((i) => ({ id: i.source_media_id, role: 'gallery' as const, url: i.source_url }));
-  const opts = { writeMode: 'merge' as const, mergeProductId: 'p_a1m', setup };
-  const { w, sid } = await closedRunWithFailures('a1', pick, opts);
+  },
+};
+const PICK_A1 = (p: ImportPayload): Failed[] =>
+  [...new Map(notPrimary(p).map((i) => [i.source_media_id, i])).values()].slice(0, 2).map((i) => ({ id: i.source_media_id, role: 'gallery' as const, url: i.source_url }));
+
+test('a merged product: the retried pictures are appended after its own, bound only through the reviewed map; again: nothing', async () => {
+  const { w, sid } = await closedRunWithFailures('a1', PICK_A1, A1_MERGE);
   const before = productState(w, 'p_a1m');
   const maxSort = Math.max(...(before.images as Array<{ sort_order: number }>).map((i) => i.sort_order));
   const item = await deltaItem(w, RUN_B, sid);
@@ -400,7 +479,7 @@ test('a delta run\'s new product: the Worker\'s manifest row for it, placed by t
   const x = buildFor(w, 'ams-2-pro-feeder-unit');
   const route = String(x.row.currentAllIdRoute);
   const r = await acceptDeltaRows(w.db, runOf(RUN_B), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'new', source_product_id: x.payload.source_product_id, handle: x.payload.handle, route, discovered_at: AT }] });
-  assert.deepEqual(r, { accepted: 1, new: 1, media: 0 });
+  assert.deepEqual(r, { accepted: 1, new: 1, media: 0, skipped: NONE_SKIPPED });
   const rows = await deltaRowsOf(w.db, RUN_B);
   assert.equal(rows.length, 1);
   assert.equal(rows[0].kind, 'new');
@@ -421,4 +500,141 @@ test('a delta run\'s new product: the Worker\'s manifest row for it, placed by t
     () => acceptDeltaRows(w.db, runOf(RUN_B), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'new', source_product_id: '43', handle: 'another-one', route: route, discovered_at: AT }] }),
     (e: unknown) => e instanceof OpsRefusal && e.code === 'IMPORT_DELTA_REFUSED'
   );
+});
+
+test('a merged product\'s media item BLOCKED at VERIFY resumes where the Worker expects it (VERIFYING_LIVE), never at WRITING', async () => {
+  const { w, sid } = await closedRunWithFailures('a1', PICK_A1, A1_MERGE);
+  const item = await deltaItem(w, RUN_B, sid);
+  const payload = mediaOnlyPayload(buildFor(w, 'a1', { writeMode: 'merge', mergeProductId: 'p_a1m' }).payload);
+  const plan = await planMediaRetry(w.db, item, payload);
+  for (const m of plan.media) storeFor(w, RUN_B, sid, m.source_media_id, m.role, m.source_url);
+  walk(w, item.id, 'WRITING');
+  const writing = await itemBySource(w.db, RUN_B, sid);
+  await attachRetriedMedia(envOf(w), runOf(RUN_B), writing, w.bundle, { payload_sha256: writing.payload_sha256, payload });
+  await finishPublishing(w.db, runOf(RUN_B), await itemBySource(w.db, RUN_B, sid));
+  // The runner's VERIFY saw a picture missing after the purge and the wait: BLOCKED VERIFY_FAILED_PERSISTENT.
+  await applyEvent(w.db, runOf(RUN_B), await itemBySource(w.db, RUN_B, sid), { state: 'BLOCKED', outcome: 'blocked', code: 'VERIFY_FAILED_PERSISTENT', retry_at: '', release: false, detail: {} });
+  const blocked = await itemBySource(w.db, RUN_B, sid);
+  assert.deepEqual([blocked.processing_state, blocked.blocker_code, blocked.last_completed_stage, blocked.levonis_product_id], ['BLOCKED', 'VERIFY_FAILED_PERSISTENT', 'PUBLISHING', 'p_a1m']);
+  assert.equal(blocked.match_kind, '', 'a media item never records a write mode: /media-attach writes no product');
+  // The runner's rule, with what it knows of this item (the bundle says merge; the lease names the product).
+  const target = resumeTargetOf({ kind: 'media', merge: true, blockerCode: blocked.blocker_code, lastCompleted: blocked.last_completed_stage, productId: blocked.levonis_product_id });
+  assert.equal(target, 'VERIFYING_LIVE');
+  // The Worker refuses the rewrite edge for it, and takes the runner's target.
+  await assert.rejects(
+    () => applyEvent(w.db, runOf(RUN_B), blocked, { state: 'WRITING', outcome: 'resume', code: '', retry_at: '', release: false, detail: {} }),
+    (e: unknown) => e instanceof OpsRefusal && e.code === 'IMPORT_ILLEGAL_TRANSITION'
+  );
+  await applyEvent(w.db, runOf(RUN_B), blocked, { state: target!, outcome: 'resume', code: '', retry_at: '', release: false, detail: {} });
+  assert.equal((await itemBySource(w.db, RUN_B, sid)).processing_state, 'VERIFYING_LIVE');
+  // An ordinary merged item keeps the rewrite (the shared rule): only the media kind is exempt.
+  assert.equal(resumeTargetOf({ kind: 'item', merge: true, blockerCode: 'VERIFY_FAILED_PERSISTENT', lastCompleted: 'PUBLISHING', productId: 'p_a1m' }), 'WRITING');
+  assert.equal(resumeTargetOf({ kind: 'media', merge: false, blockerCode: 'IMAGE_STORAGE_FAILED', lastCompleted: 'VALIDATING', productId: '' }), 'INGESTING_MEDIA');
+});
+
+test('a product the owner deleted after the closed run: never queued; one already queued completes with nothing attached instead of blocking the queue', async () => {
+  // Queued before the deletion: registered, then the product deleted while the item waits its turn.
+  const early = await closedRunWithFailures('pla-basic-filament', PICK_PLA);
+  const item = await deltaItem(early.w, RUN_B, early.sid);
+  const closedSlug = (early.w.raw.prepare('SELECT slug FROM catalog_import_items WHERE run_id = ? AND source_product_id = ?').get(RUN_ID, early.sid) as { slug: string }).slug;
+  assert.equal((await deleteProductPermanently(early.w.db, early.productId)).product_deleted, true);
+  assert.equal(count(early.w.raw, "SELECT COUNT(*) AS n FROM product_source_refs WHERE source_product_id = ?", early.sid), 0, 'the source ref goes with the product');
+  const payload = mediaOnlyPayload(buildFor(early.w, 'pla-basic-filament').payload);
+  const plan = await planMediaRetry(early.w.db, item, payload);
+  assert.equal(plan.media.length, 0, 'nothing to fetch for a product that is gone');
+  assert.equal(plan.skipped.product_not_public, 3, 'the planned media are counted product_not_public');
+  walk(early.w, item.id, 'WRITING');
+  const writing = await itemBySource(early.w.db, RUN_B, early.sid);
+  const a = await attachRetriedMedia(envOf(early.w), runOf(RUN_B), writing, early.w.bundle, { payload_sha256: writing.payload_sha256, payload });
+  assert.deepEqual([a.rows, a.swatches, a.counts.attached, a.slug], [[], [], 0, closedSlug]);
+  assert.equal(count(early.w.raw, 'SELECT COUNT(*) AS n FROM product_images WHERE product_id = ?', early.productId), 0, 'nothing written for a product that is gone');
+  await finishPublishing(early.w.db, runOf(RUN_B), await itemBySource(early.w.db, RUN_B, early.sid));
+  const verifying = await itemBySource(early.w.db, RUN_B, early.sid);
+  const env = { DB: early.w.db, BUCKET: early.w.bucket as never, R2_PUBLIC: early.w.bucket as never, R2_PRIVATE: early.w.media.R2_PRIVATE as never };
+  const live = `${ORIGIN}/product/${verifying.slug}`;
+  const done = await completeMediaRetry(env, `${ORIGIN}/api/ops/catalog-import/x`, runOf(RUN_B), verifying, {
+    lease_token: LEASE,
+    live_url: live,
+    edge_evidence: { version: 1, live_url: live, round: 1, status: 0, rows_seen: 0, swatches_seen: 0 },
+  });
+  assert.equal(done.state, 'COMPLETE', 'the queue behind it is free');
+
+  // Planned after the deletion: /delta/plan and /delta/manifest leave it out, counted.
+  const late = await closedRunWithFailures('pla-basic-filament', PICK_PLA);
+  await deleteProductPermanently(late.w.db, late.productId);
+  late.w.raw.prepare("INSERT INTO catalog_import_runs (id, source, state) VALUES (?, 'bambu_us', 'open')").run(RUN_B);
+  const p = await deltaPlan(late.w.db, runOf(RUN_B), { from_run: RUN_ID, sitemap_handles: ['pla-basic-filament'] }, late.w.bundle);
+  assert.deepEqual([p.media, p.counts.media_items, p.counts.media_product_gone], [[], 0, 1]);
+  const r = await acceptDeltaRows(late.w.db, runOf(RUN_B), late.w.bundle, { from_run: RUN_ID, rows: [{ kind: 'media', source_product_id: late.sid, discovered_at: AT }] });
+  assert.deepEqual(r, { accepted: 0, new: 0, media: 0, skipped: { ...NONE_SKIPPED, media_product_gone: 1 } });
+  assert.equal(count(late.w.raw, 'SELECT COUNT(*) AS n FROM catalog_import_items WHERE run_id = ?', RUN_B), 0);
+});
+
+test('a retried picture byte-identical to one shown under ANOTHER value is attached for its own value, as the original write would have', async () => {
+  // Two non-primary pictures bound to different values (A earlier than B); B failed, and its bytes are A's.
+  let pair: { a: ImportPayload['images'][number]; b: ImportPayload['images'][number] } | null = null;
+  const pick = (p: ImportPayload): Failed[] => {
+    const rows = notPrimary(p).filter((i) => i.binding_rule === 'value' && i.option_value_id);
+    const single = rows.filter((i) => p.images.filter((x) => x.source_media_id === i.source_media_id).length === 1);
+    for (const a of single) {
+      const b = single.find((x) => x.source_media_id !== a.source_media_id && x.option_value_id !== a.option_value_id && x.sort_order > a.sort_order);
+      if (b) {
+        pair = { a, b };
+        break;
+      }
+    }
+    assert.ok(pair, 'the fixture has two value-bound pictures');
+    return [{ id: pair!.b.source_media_id, role: 'gallery', url: pair!.b.source_url }];
+  };
+  const { w, sid, productId } = await closedRunWithFailures('pla-basic-filament', pick);
+  const { a, b } = pair!;
+  const keyOfA = (w.raw.prepare('SELECT r2_key FROM catalog_import_media WHERE run_id = ? AND source_media_id = ?').get(RUN_ID, a.source_media_id) as { r2_key: string }).r2_key;
+
+  // The reference: the same product written with both stored, B's bytes being A's (one content-addressed key).
+  const ref = newWorld();
+  const refStaged = stage(ref, 'pla-basic-filament');
+  const refKeyOfA = (ref.raw.prepare('SELECT r2_key FROM catalog_import_media WHERE run_id = ? AND source_media_id = ?').get(RUN_ID, a.source_media_id) as { r2_key: string }).r2_key;
+  ref.raw.prepare('UPDATE catalog_import_media SET r2_key = ? WHERE run_id = ? AND source_media_id = ?').run(refKeyOfA, RUN_ID, b.source_media_id);
+  await write(ref, refStaged);
+  const refB = ref.raw.prepare('SELECT id, sort_order, option_value_id, variant_id FROM product_images WHERE product_id = ? AND id = ?').get(productId, b.id) as Record<string, unknown>;
+  const refRule = (ref.raw.prepare("SELECT binding_rule FROM product_option_source_refs WHERE product_id = ? AND kind = 'image' AND levonis_id = ?").get(productId, b.id) as { binding_rule: string }).binding_rule;
+  assert.ok(refB, 'the original write keeps the second binding of the same picture');
+  assert.equal(refRule, 'content_duplicate');
+
+  const item = await deltaItem(w, RUN_B, sid);
+  const payload = mediaOnlyPayload(buildFor(w, 'pla-basic-filament').payload);
+  const plan = await planMediaRetry(w.db, item, payload);
+  assert.deepEqual(plan.media.map((m) => m.source_media_id), [b.source_media_id]);
+  w.raw
+    .prepare("INSERT INTO catalog_import_media (run_id, source_product_id, source_media_id, role, source_url, status, r2_key, width, height) VALUES (?, ?, ?, 'gallery', ?, 'stored', ?, 64, 48)")
+    .run(RUN_B, sid, b.source_media_id, b.source_url, keyOfA);
+  walk(w, item.id, 'WRITING');
+  const writing = await itemBySource(w.db, RUN_B, sid);
+  const r = await attachRetriedMedia(envOf(w), runOf(RUN_B), writing, w.bundle, { payload_sha256: writing.payload_sha256, payload });
+  assert.deepEqual([r.counts.attached, r.counts.duplicate_content], [1, 0], 'not "the same picture already shown": it is not shown for this value');
+  const got = w.raw.prepare('SELECT id, sort_order, option_value_id, variant_id FROM product_images WHERE product_id = ? AND id = ?').get(productId, b.id) as Record<string, unknown>;
+  assert.deepEqual(got, refB, 'the row, binding and slot of the original write');
+  const rule = (w.raw.prepare("SELECT binding_rule FROM product_option_source_refs WHERE product_id = ? AND kind = 'image' AND levonis_id = ?").get(productId, b.id) as { binding_rule: string }).binding_rule;
+  assert.equal(rule, refRule);
+  // The same picture under the SAME value again is still left out (a later delta, registered by hand).
+  w.raw.prepare("UPDATE catalog_import_runs SET state = 'closed' WHERE id = ?").run(RUN_B);
+  w.raw.prepare("INSERT INTO catalog_import_runs (id, source, state) VALUES (?, 'bambu_us', 'open')").run(RUN_C);
+  w.raw
+    .prepare(
+      `INSERT INTO catalog_import_items (id, run_id, source, source_product_id, handle, canonical_url, queue_position, discovery_sources, discovered_at)
+       VALUES ('cii_again', ?, 'bambu_us', ?, 'pla-basic-filament', 'x', 1, ?, ?)`
+    )
+    .run(RUN_C, sid, JSON.stringify(deltaSources('media', RUN_ID)), AT);
+  w.raw.prepare('DELETE FROM product_images WHERE id = ?').run(b.id);
+  w.raw.prepare("INSERT INTO product_images (id, product_id, url, sort_order, is_primary, option_value_id, r2_key, source_url) VALUES ('pi_owner_copy', ?, ?, 99, 0, ?, ?, 'https://levonis-iq.com/x')").run(productId, `/files/${keyOfA}`, b.option_value_id, keyOfA);
+  walk(w, 'cii_again', 'VALIDATING');
+  const again = await itemBySource(w.db, RUN_C, sid);
+  await planMediaRetry(w.db, again, payload);
+  w.raw
+    .prepare("INSERT INTO catalog_import_media (run_id, source_product_id, source_media_id, role, source_url, status, r2_key, width, height) VALUES (?, ?, ?, 'gallery', ?, 'stored', ?, 64, 48)")
+    .run(RUN_C, sid, b.source_media_id, b.source_url, keyOfA);
+  walk(w, 'cii_again', 'WRITING');
+  const writing2 = await itemBySource(w.db, RUN_C, sid);
+  const r2 = await attachRetriedMedia(envOf(w), runOf(RUN_C), writing2, w.bundle, { payload_sha256: writing2.payload_sha256, payload });
+  assert.deepEqual([r2.counts.attached, r2.counts.duplicate_content], [0, 1], 'shown already under the same value: left out');
 });
