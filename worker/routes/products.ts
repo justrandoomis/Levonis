@@ -126,7 +126,7 @@ import {
   canonicalOptionValueIds as canonicalSelectionOptionValueIds,
   optionValueIdsInRelationOrder,
 } from '../lib/cartSelectionIdentity';
-import { merchantUnsanctionedSql, storeUnsanctionedSql } from '../lib/merchantApproval';
+import { merchantPublicSql, storePublicSql, withApprovalSchema } from '../lib/merchantApproval';
 
 export const productRoutes = new Hono<AppContext>();
 
@@ -4583,18 +4583,23 @@ async function productDetail(c: Context<AppContext>): Promise<Response> {
    * feed asks (`communityProductsVisible`): a live listing of a merchant who
    * is not suspended, in a store that is not suspended. Anything else is the
    * same plain 404 an unknown slug gets — the public never learns why.
-   * Approval joins this predicate at the enforcing push (1.4).
+   * Since push 1.4 the merchant must also be APPROVED and the product must
+   * sit in a store (`merchantPublicSql`/`storePublicSql`, an inner join — the
+   * feed's own rule); on a database without 0204 the second try finds
+   * nothing (C11).
    */
-  const cp = await c.env.DB.prepare(
-    `SELECT cp.*, cm.name AS merchant_name, cm.verified AS merchant_verified, cm.id AS m_id
-       FROM community_products cp
-       JOIN community_merchants cm ON cm.id = cp.merchant_id
-       LEFT JOIN merchant_stores s ON s.id = cp.store_id
-      WHERE cp.slug = ? AND cp.status = 'active' AND cp.lifecycle = 'active'
-        AND ${merchantUnsanctionedSql('cm')} AND ${storeUnsanctionedSql('s')}`
-  )
-    .bind(slug)
-    .first<Record<string, unknown>>();
+  const cp = await withApprovalSchema((schema) =>
+    c.env.DB.prepare(
+      `SELECT cp.*, cm.name AS merchant_name, cm.verified AS merchant_verified, cm.id AS m_id
+         FROM community_products cp
+         JOIN community_merchants cm ON cm.id = cp.merchant_id
+         JOIN merchant_stores s ON s.id = cp.store_id
+        WHERE cp.slug = ? AND cp.status = 'active' AND cp.lifecycle = 'active'
+          AND ${merchantPublicSql('cm', schema)} AND ${storePublicSql('s')}`
+    )
+      .bind(slug)
+      .first<Record<string, unknown>>()
+  );
   if (!cp) throw notFound('Product not found');
   return c.json({
     success: true,

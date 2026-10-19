@@ -19,7 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, failingD1, stubApp, post, json, count } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, failingD1, stubApp, post, json, count } from './fixtures/app';
 import { cartRoutes } from '../worker/routes/cart';
 
 const FUTURE = '2099-01-01T00:00:00.000Z';
@@ -45,6 +45,7 @@ function seed(raw: DatabaseSync) {
       ('mem_ali','ali','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','${FUTURE}'),
       ('mem_zain','zain','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','${FUTURE}');
   `);
+  approveMerchants(raw);
 }
 
 const merchantLine = (raw: DatabaseSync, id: string, user: string, merchant: string, store: string, product: string) =>

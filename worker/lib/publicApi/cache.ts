@@ -34,8 +34,14 @@
  *
  * 2026-10-15 (DECISIONS row 240): catalog-only products appear (an answer cached
  * before would hide them, or 404 their page), and every card carries `price_status`.
+ *
+ * 2026-10-18 (DECISIONS row 259, Community V3 push 1.4): the merchant approval
+ * gate is enforced. Every store page, directory, feed, search and share answer
+ * cached before the deploy still showed merchants no reviewer approved; under
+ * the new epoch every colo misses at once and answers through the public
+ * predicate (owner decisions C1/C2/C9).
  */
-export const CATALOG_CACHE_EPOCH = 'catalog-only-2026-10-15';
+export const CATALOG_CACHE_EPOCH = 'merchant-approval-2026-10-18';
 
 /** A cache key URL carrying the epoch (appended last, so the declared params keep their order). */
 export function withCacheEpoch(url: string): string {

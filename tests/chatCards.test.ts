@@ -20,7 +20,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, dbThrough, asD1, stubApp, post, get, json, all, count, row, hasColumn, type StubUser } from './fixtures/app';
+import { withApprovalColumns, approveMerchants, freshDb, dbThrough, asD1, stubApp, post, get, json, all, count, row, hasColumn, type StubUser } from './fixtures/app';
 import { chatRoutes } from '../worker/routes/chats';
 import { postSystemCard } from '../worker/lib/chatCards';
 import type { Env } from '../worker/lib/types';
@@ -49,6 +49,7 @@ function seed(raw: DatabaseSync = freshDb()) {
       ('mem_ali','ali','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','${FUTURE}'),
       ('mem_zain','zain','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','${FUTURE}');
   `);
+  approveMerchants(raw);
   return raw;
 }
 const as = (raw: DatabaseSync, user: StubUser) => stubApp(asD1(raw), user, (a) => a.route('/api/chats', chatRoutes));
@@ -337,7 +338,7 @@ test('{userId} never reuses a STORE\'s thread as the pair\'s personal conversati
 // ================================================================= deploy ahead of 0150
 
 test('a Worker ahead of 0150 still sends text and attachments; a card is a SERVICE_SETUP, never a half-card', async () => {
-  const raw = seed(dbThrough('0149'));
+  const raw = seed(withApprovalColumns(dbThrough('0149')));
   assert.equal(hasColumn(raw, 'chat_messages', 'card_type'), false);
   const chatId = await storeThread(raw);
   const text = await post(as(raw, BUYER), `/api/chats/${chatId}/messages`, { body: 'hello', client_id: 'tap-000000009' });

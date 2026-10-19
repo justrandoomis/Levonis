@@ -33,6 +33,7 @@ import { MODEL_MAX_BYTES } from './attachments';
 import type { PreviewGrant } from './requestFilePolicy';
 import type { FileKind } from './fileOwnership';
 import { blockedEither } from './userBlocks';
+import { merchantPublicSql, storeIsPublic, withApprovalSchema } from './merchantApproval';
 
 export type ViewerSourceType = 'product' | 'post';
 
@@ -134,6 +135,8 @@ interface GrantRow {
 interface ProductSourceRow {
   file_key: string; name: string; kind: string; mime: string; analysis: string | null; preview_key: string;
   lifecycle: string; status: string; audience_user_id: string | null; store_status: string; owner_id: string;
+  /** 1 when the store's merchant is public (not suspended AND approved, push 1.4). */
+  merchant_public: number;
 }
 
 interface PostSourceRow {
@@ -179,22 +182,25 @@ export async function resolveViewerGrant(
   }
 
   if (row.source_type === 'product') {
-    const src = await env.DB
+    const src = await withApprovalSchema((schema) => env.DB
       .prepare(
         `SELECT f.file_key, f.name, f.kind, f.mime, f.analysis, f.preview_key,
-                p.lifecycle, p.status, p.audience_user_id, s.status AS store_status, s.user_id AS owner_id
+                p.lifecycle, p.status, p.audience_user_id, s.status AS store_status, s.user_id AS owner_id,
+                ${merchantPublicSql('m', schema)} AS merchant_public
            FROM product_files f
            JOIN community_products p ON p.id = f.product_id
            JOIN merchant_stores s ON s.id = f.store_id
+           JOIN community_merchants m ON m.id = s.merchant_id
           WHERE f.id = ?`
       )
       .bind(row.source_id)
-      .first<ProductSourceRow>();
+      .first<ProductSourceRow>());
     if (!src || src.file_key !== row.file_key) return null;
     const owner = !!row.bound_user && row.bound_user === src.owner_id;
     if (!owner) {
       // The shopfront's own visibility rule (worker/routes/storefront.ts), re-asked now.
-      if (src.lifecycle !== 'active' || src.status !== 'active' || src.store_status === 'suspended') return null;
+      // …and, since push 1.4, a store whose merchant the public may see (`storeHiddenFromPublic`'s rule).
+      if (src.lifecycle !== 'active' || src.status !== 'active' || !storeIsPublic({ status: src.store_status }) || Number(src.merchant_public) !== 1) return null;
       if (src.audience_user_id && src.audience_user_id !== row.bound_user) return null;
     }
     return shape(row, src);

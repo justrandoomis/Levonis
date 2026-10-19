@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, get, patch, json, type StubUser, type Mount } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, get, patch, json, type StubUser, type Mount } from './fixtures/app';
 import { chatRoutes } from '../worker/routes/chats';
 import { chatCommerceRoutes } from '../worker/routes/chatCommerce';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
@@ -49,6 +49,7 @@ function seed() {
     INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status,note)
       VALUES ('wt_buyer','buyer','deposit','USD',${Math.ceil((500_000 * 100) / RATE)},'approved','test funding');
   `);
+  approveMerchants(raw);
   return raw;
 }
 

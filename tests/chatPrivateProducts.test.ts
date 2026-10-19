@@ -19,7 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, dbThrough, asD1, stubApp, post, patch, get, json, count, row, type StubUser, type Mount } from './fixtures/app';
+import { withApprovalColumns, approveMerchants, freshDb, dbThrough, asD1, stubApp, post, patch, get, json, count, row, type StubUser, type Mount } from './fixtures/app';
 import { chatRoutes } from '../worker/routes/chats';
 import { chatCommerceRoutes } from '../worker/routes/chatCommerce';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
@@ -73,6 +73,7 @@ function seed(raw: DatabaseSync = freshDb()) {
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','${RATE}');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   return raw;
 }
 const fund = (raw: DatabaseSync, user: string, iqd: number) =>
@@ -309,7 +310,7 @@ test('ATTACK: only the store makes one, for its own thread; a picture must be th
 // ================================================================ deploy window
 
 test('a Worker ahead of 0152 still sells an ordinary product end to end', async () => {
-  const raw = seed(dbThrough('0151'));
+  const raw = seed(withApprovalColumns(dbThrough('0151')));
   assert.equal((await post(as(raw, BUYER), '/api/cart/merchant-items', { productId: 'cp_vase', qty: 1 })).status, 201);
   const cart = await json(await get(as(raw, BUYER), '/api/cart/merchant'));
   assert.equal(cart.items[0].available, true);

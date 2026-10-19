@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, get, json, row, type Mount } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, get, json, row, type Mount } from './fixtures/app';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { printRequestRoutes, VIEWER_TOKEN_TTL_MINUTES } from '../worker/routes/printRequests';
 
@@ -66,6 +66,7 @@ function seed(opts: { gate?: string } = {}) {
               '{"dimensions_mm":{"x":10,"y":10,"z":10},"volume_mm3":1000}','stl','request-previews/r1/f1.lvm');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','${RATE}');
   `);
+  approveMerchants(raw);
   raw.prepare("INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate', ?)").run(opts.gate ?? '{"open":true}');
   const bucket = new MemoryBucket();
   void bucket.put('requests/buyer/x.stl', new Uint8Array(84));

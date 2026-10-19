@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freshDb, asD1, stubApp, patch, post, json, row, type StubUser } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, patch, post, json, row, type StubUser } from './fixtures/app';
 import { merchantRoutes } from '../worker/routes/merchant';
 
 const OWNER: StubUser = { id: 'owner', role: 'merchant', email: 'owner@x.co' };
@@ -35,6 +35,7 @@ function seed(status: 'active' | 'paused' = 'active') {
       VALUES ('s1','m1','owner','ali3d','Ali 3D','Prints that last','baghdad','${status}');
     INSERT INTO merchant_store_slugs (slug, store_id, active) VALUES ('ali3d','s1',1);
   `);
+  approveMerchants(raw);
   return raw;
 }
 

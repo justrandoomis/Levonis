@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import {
-  freshDb, dbThrough, asD1, stubApp, post, get, json, count, row, all, failingD1, type Mount,
+  freshDb, dbThrough, asD1, stubApp, post, get, json, count, row, all, failingD1, type Mount, approveMerchants,
 } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
@@ -69,6 +69,7 @@ function seed() {
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','${RATE}');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   return raw;
 }
 
@@ -318,6 +319,7 @@ test('H (live data): migration 0116 heals counts the old code inflated', async (
     INSERT INTO community_offers (id,request_id,merchant_id,price_iqd,state) VALUES
       ('o1','r1','m1',100,'withdrawn'), ('o2','r1','m1',100,'pending');
   `);
+  approveMerchants(raw);
   raw.exec(readFileSync(join(ROOT, 'migrations', '0116_community_request_integrity.sql'), 'utf8'));
   assert.equal(row<{ offer_count: number }>(raw, "SELECT offer_count FROM community_requests WHERE id = 'r1'")?.offer_count, 1);
   assert.deepEqual(row(raw, "SELECT revision, request_revision FROM community_offers WHERE id = 'o2'"), { revision: 1, request_revision: 1 });

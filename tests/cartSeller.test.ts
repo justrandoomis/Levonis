@@ -18,6 +18,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
+import { approveMerchants } from './fixtures/app';
 import {
   cartSellerScope,
   sellerConflict,
@@ -115,6 +116,7 @@ function freshDb(): DatabaseSync {
     INSERT INTO community_products (id,merchant_id,store_id,slug,name,price_iqd)
       VALUES ('cp1','m_ali','s_ali','b','B',5000);
   `);
+  approveMerchants(db);
   return db;
 }
 

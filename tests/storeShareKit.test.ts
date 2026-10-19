@@ -14,7 +14,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { APEX, MERCHANT_HOST, asD1, ctx, freshDb, get, json, patch, pending, stubApp, type StubUser } from './fixtures/app';
+import { approveMerchants, APEX, MERCHANT_HOST, asD1, ctx, freshDb, get, json, patch, pending, stubApp, type StubUser } from './fixtures/app';
 import { fixtureWebp, iconEnv, imagesStub } from './fixtures/storeIcons';
 import worker from '../worker/index';
 import { merchantRoutes } from '../worker/routes/merchant';
@@ -36,6 +36,7 @@ function seed(over: Partial<{ name: string; tagline: string; description: string
     INSERT INTO users (id,name,email,password_hash,role) VALUES ('u1','Ali','a@x.co','h','merchant'), ('u2','Omar','o@x.co','h','merchant');
     INSERT INTO community_merchants (id,user_id,name) VALUES ('m1','u1','Ali 3D');
   `);
+  approveMerchants(raw);
   raw
     .prepare(
       `INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name,tagline,description,logo_key,status)

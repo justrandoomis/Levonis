@@ -21,6 +21,7 @@ import { ROOT, SqliteD1 } from './fixtures/d1';
 import type { AppContext } from '../worker/lib/types';
 import { HttpError } from '../worker/lib/http';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
+import { approveMerchants } from './fixtures/app';
 
 // ---------------------------------------------------------------- harness
 
@@ -88,6 +89,7 @@ function setup() {
     -- so it runs with the community open. tests/communityGate.test.ts owns the gate.
     INSERT INTO admin_settings (key, value) VALUES ('communityGate', '{"open":true}');
   `);
+  approveMerchants(raw);
   return { raw, db: new SqliteD1(raw) as unknown as D1Database, bucket: new MemoryBucket() };
 }
 

@@ -27,7 +27,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, json, count, row, all, spendable, holds, pending, type Mount } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, json, count, row, all, spendable, holds, pending, type Mount } from './fixtures/app';
 import { serialD1 } from './fixtures/serialD1';
 import { RaceD1 } from './fixtures/raceD1';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
@@ -64,6 +64,7 @@ function seed() {
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','${RATE}');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   raw.exec(`INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status,note)
             VALUES ('wt1','buyer','deposit','USD',${Math.ceil((500_000 * 100) / RATE)},'approved','test funding')`);
   return raw;

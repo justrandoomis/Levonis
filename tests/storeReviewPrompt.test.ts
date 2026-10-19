@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { freshDb, asD1, stubApp, post, get, json, count, type StubUser } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, get, json, count, type StubUser } from './fixtures/app';
 import { communityReviewRoutes } from '../worker/routes/merchantReviews';
 import { keyOf, ofKind, reviewTarget, type EligibleReview } from '../src/components/community/reviews/eligible';
 
@@ -47,6 +47,7 @@ function seed() {
       VALUES ('co_done','rq1','of1','buyer','m1','s1','completed',5000,5000,'2026-09-20T10:00:00.000Z'),
              ('co_wait','rq2','of2','buyer','m1','s1','merchant_marked_delivered',5000,5000,NULL);
   `);
+  approveMerchants(raw);
   return raw;
 }
 

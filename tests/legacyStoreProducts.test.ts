@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { freshDb, asD1, stubApp, send, json, row, count, type StubUser } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, send, json, row, count, type StubUser } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 import { communityRoutes } from '../worker/routes/community';
 import { merchantRoutes } from '../worker/routes/merchant';
@@ -40,6 +40,7 @@ function seed() {
     INSERT INTO community_merchants (id,user_id,name) VALUES ('m1','owner','Ali 3D'), ('m_bare','bare','Sara Prints');
     INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('s1','m1','owner','ali3d','Ali 3D');
   `);
+  approveMerchants(raw);
   return raw;
 }
 

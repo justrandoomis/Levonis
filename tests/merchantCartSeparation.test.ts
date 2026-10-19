@@ -25,7 +25,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, get, json, count, row, holds, pending } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, get, json, count, row, holds, pending } from './fixtures/app';
 import { cartRoutes } from '../worker/routes/cart';
 import { storeOrderRoutes } from '../worker/routes/storeOrders';
 import { merchantRoutes } from '../worker/routes/merchant';
@@ -74,6 +74,7 @@ function seed(raw: DatabaseSync) {
       ('mem_ali','ali','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z'),
       ('mem_zain','zain','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z');
   `);
+  approveMerchants(raw);
 }
 
 /**

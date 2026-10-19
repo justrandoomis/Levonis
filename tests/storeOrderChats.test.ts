@@ -11,7 +11,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freshDb, asD1, stubApp, post, get, json, all, count, row, type StubUser } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, get, json, all, count, row, type StubUser } from './fixtures/app';
 import { chatRoutes } from '../worker/routes/chats';
 import { fileRoutes } from '../worker/routes/uploads';
 import { mergeNewestPage, prependOlder } from '../src/lib/chatPaging';
@@ -33,6 +33,7 @@ function seed() {
       VALUES ('ord1','buyer','pending',1000,'m1','s1','merchant','store_product','{}','d','{}','wallet',1000,1500,0),
              ('shop1','buyer','pending',1000,NULL,NULL,'levonis','platform','{}','d','{}','wallet',1000,1500,0);
   `);
+  approveMerchants(raw);
   return raw;
 }
 const as = (raw: ReturnType<typeof freshDb>, user: StubUser) =>

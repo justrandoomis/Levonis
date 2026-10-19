@@ -36,7 +36,8 @@ import {
   MODEL_MAX_BYTES,
 } from '../lib/attachments';
 import { getTierStatus, benefits, membershipBadges } from '../lib/entitlements';
-import { requireOfferPrivileges, requireSellingPrivileges, storeForUser } from '../lib/merchantAuth';
+import { requireOfferPrivileges, requireWithdrawPrivileges, storeForUser } from '../lib/merchantAuth';
+import { approvedAtSql, merchantApproved, withApprovalSchema } from '../lib/merchantApproval';
 import { feeFor, autoCompleteDays } from '../lib/merchantOps';
 import {
   escrowForOrder,
@@ -1451,10 +1452,15 @@ function offerWriteConflict(e: unknown): HttpError | null {
   return null;
 }
 
-/** Withdraw an offer — pending, or superseded by a change to the job. */
+/**
+ * Withdraw an offer — pending, or superseded by a change to the job. Taking a
+ * promise back is finishing existing work, so it stays open to a merchant no
+ * reviewer has approved (Community V3 push 1.4, E4): `requireWithdrawPrivileges`
+ * is the selling gate without the approval line.
+ */
 marketplaceRoutes.post('/offers/:id/withdraw', requireAuth, async (c) => {
   const user = c.get('user')!;
-  const ctx = await requireSellingPrivileges(c);
+  const ctx = await requireWithdrawPrivileges(c);
   const offerId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const offer = await c.env.DB.prepare('SELECT request_id FROM community_offers WHERE id = ? AND merchant_id = ?')
     .bind(offerId, ctx.merchant.id)
@@ -1956,6 +1962,7 @@ async function offerMerchantStanding(env: Env, offer: Record<string, unknown>): 
   const takesWork = await merchantTakesNewWork(env.DB, {
     merchantStatus: offer.m_status,
     storeStatus: offer.s_status,
+    merchantApproved: merchantApproved({ approved_at: offer.m_approved_at }),
     ownerUserId: String(offer.m_user_id ?? ''),
   });
   if (!takesWork) return 'unavailable';
@@ -1969,7 +1976,8 @@ async function offerMerchantStanding(env: Env, offer: Record<string, unknown>): 
 
 /** The offer, its request and its merchant — everything acceptance decides on. */
 async function offerForAcceptance(db: D1Database, offerId: string) {
-  return db
+  // The merchant's approval stamp rides along (E6); NULL on a database without 0204 — closed.
+  return withApprovalSchema((schema) => db
     .prepare(
       `SELECT o.*, r.customer_id, r.state AS request_state, r.id AS req_id, r.revision AS r_revision,
               r.expires_at AS r_expires_at, r.visibility AS r_visibility, r.title AS r_title,
@@ -1977,7 +1985,7 @@ async function offerForAcceptance(db: D1Database, offerId: string) {
               m.user_id AS m_user_id, m.name AS m_name, m.verified AS m_verified, m.badge AS m_badge,
               m.badge_override AS m_badge_override, m.rating_avg_x100 AS m_rating,
               m.rating_count AS m_rating_count, m.completed_orders AS m_completed,
-              m.status AS m_status, s.status AS s_status,
+              m.status AS m_status, s.status AS s_status, ${approvedAtSql('m', schema)} AS m_approved_at,
               s.slug AS s_slug
          FROM community_offers o
          JOIN community_requests r ON r.id = o.request_id
@@ -1986,7 +1994,7 @@ async function offerForAcceptance(db: D1Database, offerId: string) {
         WHERE o.id = ?`
     )
     .bind(offerId)
-    .first<Record<string, unknown>>();
+    .first<Record<string, unknown>>());
 }
 
 /**

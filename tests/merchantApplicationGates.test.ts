@@ -7,11 +7,13 @@
  *       the merchant row WITH the store, stamped from the approved
  *       application — approval itself publishes no card in «المتاجر». Selling
  *       still needs PLUS (C3). A store-less profile row from the old door is
- *       no approval (C2); an existing STORE keeps working until push 1.4.
+ *       no approval (C2); an existing STORE stays its merchant's to run, and
+ *       since push 1.4 (DECISIONS row 259) sells nothing until approved.
  *   E2  POST /api/community/my-store no longer creates a store-less merchant;
  *       its update branch is untouched.
  *   GET /api/products/:slug serves a community product only under the feed's
- *       rule: a merchant and a store that are not suspended.
+ *       rule: a merchant and a store that are not suspended (and, since push
+ *       1.4, an approved merchant).
  *   BNPL reads only an IDENTITY case as a verified identity.
  *   KYC: nobody decides their own case or address request.
  *
@@ -109,20 +111,23 @@ test('a guest sees no card for an approved applicant until the store exists — 
   assert.equal(listed[0]!.store_slug, 'orbit-prints');
 });
 
-test('approving a merchant from before the gate stamps THEIR row and keeps their listing as it was', async () => {
+test('approving a merchant from before the gate stamps THEIR row; «المتاجر» lists them once they have a store (push 1.4)', async () => {
   const raw = seed();
   raw.exec("INSERT INTO community_merchants (id, user_id, name) VALUES ('cm_old', 'ali', 'Old Profile')");
   const guest = stubApp(asD1(raw), null, (a) => a.route('/api/community', communityRoutes));
-  const before = (await json(await get(guest, '/api/community/merchants'))).merchants as Array<{ name: string }>;
-  assert.deepEqual(before.map((m) => m.name), ['Old Profile'], 'listed today (the old door made it)');
+  const listed = async () => ((await json(await get(guest, '/api/community/merchants'))).merchants as Array<{ name: string }>).map((m) => m.name);
+  // Push 1.4 (DECISIONS row 259): the directory lists approved merchants' STORES — a
+  // profile from the old door is no card, before approval or after it, until a store exists.
+  assert.deepEqual(await listed(), [], 'unapproved and store-less: not listed');
   await approveAli(raw);
   const stamped = row<{ id: string; approved_at: string | null; approved_application_id: string | null; name: string }>(raw, "SELECT * FROM community_merchants WHERE user_id = 'ali'")!;
   assert.equal(stamped.id, 'cm_old', 'no second row');
   assert.ok(stamped.approved_at);
   assert.equal(stamped.approved_application_id, 'mapp_ali');
-  assert.deepEqual(((await json(await get(guest, '/api/community/merchants'))).merchants as Array<{ name: string }>).map((m) => m.name), ['Old Profile'], 'approval hides nobody');
+  assert.deepEqual(await listed(), [], 'approved, still no store: no card yet');
   const res = await post(merchantApp(raw), '/api/merchant/onboard', ONBOARD);
   assert.equal(res.status, 201, JSON.stringify(await json(res.clone())));
+  assert.deepEqual(await listed(), ['Orbit Prints'], 'the approved merchant\'s store is listed (onboarding names the row)');
   const after = row<{ id: string; approved_at: string }>(raw, "SELECT id, approved_at FROM community_merchants WHERE user_id = 'ali'")!;
   assert.equal(after.id, 'cm_old', 'the store hangs off the existing row');
   assert.equal(after.approved_at, stamped.approved_at, 'onboarding never moves a stamp');
@@ -146,7 +151,7 @@ test('C2: a store-less profile row from the old /my-store door opens no store wi
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM merchant_stores'), 0);
 });
 
-test('an existing STORE keeps working until push 1.4: onboarding again is STORE_EXISTS, never the application refusal', async () => {
+test('an existing unapproved STORE stays its merchant\'s to run (finishing work, push 1.4): onboarding again is STORE_EXISTS, never the application refusal', async () => {
   const raw = seed();
   raw.exec(`INSERT INTO community_merchants (id, user_id, name) VALUES ('cm_old', 'ali', 'Old Profile');
             INSERT INTO merchant_stores (id, merchant_id, user_id, slug, name) VALUES ('str_old', 'cm_old', 'ali', 'old-shop', 'Old Shop');`);
@@ -207,7 +212,10 @@ test('GET /api/products/:slug hides a community product of a suspended merchant 
   `);
   const app = stubApp(asD1(raw), null, (a) => a.route('/api/products', productRoutes));
   const read = async () => (await app.request('/api/products/orbit-vase')).status;
-  assert.equal(await read(), 200, 'a live listing is served');
+  // Push 1.4 (DECISIONS row 259): the merchant must also be APPROVED.
+  assert.equal(await read(), 404, 'an unapproved merchant\'s listing is not served');
+  raw.exec("UPDATE community_merchants SET approved_at = '2026-10-18T00:00:00.000Z' WHERE id = 'cm1'");
+  assert.equal(await read(), 200, 'a live listing of an approved merchant is served');
 
   raw.exec("UPDATE community_merchants SET status = 'suspended' WHERE id = 'cm1'");
   assert.equal(await read(), 404, 'a suspended merchant\'s old product link no longer serves it');

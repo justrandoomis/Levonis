@@ -19,7 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { all, asD1, count, freshDb, json, pending, post, stubApp } from './fixtures/app';
+import { approveMerchants, all, asD1, count, freshDb, json, pending, post, stubApp } from './fixtures/app';
 import { cartRoutes } from '../worker/routes/cart';
 import { storeOrderRoutes } from '../worker/routes/storeOrders';
 
@@ -49,6 +49,7 @@ function seed(raw: DatabaseSync) {
     INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,starts_at,expires_at)
       VALUES ('mem_ali','ali','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','${FUTURE}');
   `);
+  approveMerchants(raw);
 }
 
 const buyerApp = (db: D1Database) =>

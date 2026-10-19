@@ -16,7 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, count } from './fixtures/app';
+import { approveMerchants, freshDb, count } from './fixtures/app';
 
 function seed(): DatabaseSync {
   const raw = freshDb();
@@ -26,6 +26,7 @@ function seed(): DatabaseSync {
     INSERT INTO merchant_ledger_entries (id,merchant_id,order_id,kind,bucket,amount_iqd,event_key) VALUES
       ('l1','m1','ORD-1','sale_gross','available',10000,'k1');
   `);
+  approveMerchants(raw);
   return raw;
 }
 

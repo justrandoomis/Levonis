@@ -41,6 +41,7 @@ import {
   communityWorks,
   requestBoardVisible,
 } from '../../../routes/community';
+import { withApprovalSchema } from '../../merchantApproval';
 import { int, isoOrNull, num, type PublicImage } from '../common';
 import { decodeCursor, pageFromSource, parseLimit } from '../paging';
 import { array, boolean, dateTime, enumOf, integer, nullable, number, object, ref, string, url, type JsonSchema } from '../schema';
@@ -126,19 +127,23 @@ async function communityProducts(req: PublicRequest): Promise<PublicResult> {
   const limit = parseLimit(query.limit);
   const offset = decodeCursor(query.cursor);
   const q = likePattern(query.q);
-  const where = `${communityProductsVisible('?1')} AND s.id IS NOT NULL`;
-  const [rows, total] = await Promise.all([
-    db
-      .prepare(
-        `SELECT p.*, s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo_key
-           ${COMMUNITY_PRODUCTS_FROM}
-          WHERE ${where}
-          ORDER BY p.created_at DESC, p.id DESC LIMIT ?2 OFFSET ?3`
-      )
-      .bind(q, limit, offset)
-      .all<Rec>(),
-    db.prepare(`SELECT COUNT(*) AS n ${COMMUNITY_PRODUCTS_FROM} WHERE ${where}`).bind(q).first<{ n: number }>(),
-  ]);
+  // The feed's own predicate (push 1.4: approved merchants' stores only); on a
+  // database without 0204 the second try lists nothing (C11).
+  const [rows, total] = await withApprovalSchema((schema) => {
+    const where = `${communityProductsVisible('?1', schema)} AND s.id IS NOT NULL`;
+    return Promise.all([
+      db
+        .prepare(
+          `SELECT p.*, s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo_key
+             ${COMMUNITY_PRODUCTS_FROM}
+            WHERE ${where}
+            ORDER BY p.created_at DESC, p.id DESC LIMIT ?2 OFFSET ?3`
+        )
+        .bind(q, limit, offset)
+        .all<Rec>(),
+      db.prepare(`SELECT COUNT(*) AS n ${COMMUNITY_PRODUCTS_FROM} WHERE ${where}`).bind(q).first<{ n: number }>(),
+    ]);
+  });
   const items = (rows.results ?? [])
     .filter((p) => typeof p.s_slug === 'string' && p.s_slug !== '')
     .map((p) => {
@@ -187,19 +192,22 @@ async function communityStores(req: PublicRequest): Promise<PublicResult> {
   const limit = parseLimit(query.limit);
   const offset = decodeCursor(query.cursor);
   const q = likePattern(query.q);
-  const where = `${communityDirectoryVisible('?1')} AND s.id IS NOT NULL AND COALESCE(s.slug, '') <> ''`;
-  const [rows, total] = await Promise.all([
-    db
-      .prepare(
-        `SELECT ${COMMUNITY_DIRECTORY_COLUMNS}
-           ${COMMUNITY_DIRECTORY_FROM}
-          WHERE ${where}
-          ORDER BY cm.created_at DESC, cm.id DESC LIMIT ?2 OFFSET ?3`
-      )
-      .bind(q, limit, offset)
-      .all<Rec>(),
-    db.prepare(`SELECT COUNT(*) AS n ${COMMUNITY_DIRECTORY_FROM} WHERE ${where}`).bind(q).first<{ n: number }>(),
-  ]);
+  // The directory's own predicate (push 1.4); on a database without 0204 the second try lists nothing (C11).
+  const [rows, total] = await withApprovalSchema((schema) => {
+    const where = `${communityDirectoryVisible('?1', schema)} AND s.id IS NOT NULL AND COALESCE(s.slug, '') <> ''`;
+    return Promise.all([
+      db
+        .prepare(
+          `SELECT ${COMMUNITY_DIRECTORY_COLUMNS}
+             ${COMMUNITY_DIRECTORY_FROM}
+            WHERE ${where}
+            ORDER BY cm.created_at DESC, cm.id DESC LIMIT ?2 OFFSET ?3`
+        )
+        .bind(q, limit, offset)
+        .all<Rec>(),
+      db.prepare(`SELECT COUNT(*) AS n ${COMMUNITY_DIRECTORY_FROM} WHERE ${where}`).bind(q).first<{ n: number }>(),
+    ]);
+  });
   const list = rows.results ?? [];
   const badges = await membershipBadges(db, list.map((m) => m.user_id));
   const items = list.map((m) => {

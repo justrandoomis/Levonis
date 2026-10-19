@@ -23,6 +23,7 @@ import { ROOT, SqliteD1 } from './fixtures/d1';
 import type { AppContext } from '../worker/lib/types';
 import { HttpError } from '../worker/lib/http';
 import { adminCommunityRoutes } from '../worker/routes/adminCommunity';
+import { approveMerchants } from './fixtures/app';
 
 // --------------------------------------------------------------- harness
 
@@ -70,6 +71,7 @@ function setup() {
       ('o1','r1','m1','s1',50000,'pending'),
       ('o2','r1','m2','s2',60000,'pending');
   `);
+  approveMerchants(raw);
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }
 

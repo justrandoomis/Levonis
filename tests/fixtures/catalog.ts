@@ -5,7 +5,7 @@
  * ledger says is a picture despite its .mp4 name, and one of Zain's).
  */
 import type { DatabaseSync } from 'node:sqlite';
-import { asD1, stubApp } from './app';
+import { approveMerchants, asD1, stubApp } from './app';
 import { merchantRoutes } from '../../worker/routes/merchant';
 import { merchantCatalogRoutes } from '../../worker/routes/merchantCatalog';
 import { storefrontRoutes } from '../../worker/routes/storefront';
@@ -30,6 +30,8 @@ export function seedCatalog(raw: DatabaseSync) {
       ('merchants/ali/public/dddd4444.mp4','public','merchants','ali','image/webp',10),
       ('merchants/zain/public/eeee5555.webp','public','merchants','zain','image/webp',10);
   `);
+  // Two shops that sell: approved merchants (push 1.4, DECISIONS row 259).
+  approveMerchants(raw);
 }
 
 export const merchantApp = (raw: DatabaseSync, id = 'ali') =>

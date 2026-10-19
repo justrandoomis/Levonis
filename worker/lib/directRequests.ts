@@ -22,6 +22,7 @@ import type { Env } from './types';
 import { HttpError, conflict, notFound } from './http';
 import { isSchemaMissing } from './membershipBenefits';
 import { isPast, merchantTakesNewWork } from './communityRequests';
+import { approvedAtSql, merchantApproved, withApprovalSchema } from './merchantApproval';
 import { assertMayOffer } from './printMatchingStore';
 
 export interface DirectRequestRow {
@@ -57,16 +58,18 @@ export async function directRequest(db: D1Database, requestId: string): Promise<
 // `isDirectMerchant` lives beside the other request access questions (worker/lib/communityRequests.ts).
 export { isDirectMerchant } from './communityRequests';
 
-/** The merchant behind a merchant id, with what `merchantTakesNewWork` asks. */
+/** The merchant behind a merchant id, with what `merchantTakesNewWork` asks (the approval stamp NULL on a database without 0204). */
 async function merchantStanding(db: D1Database, merchantId: string) {
-  return db
-    .prepare(
-      `SELECT m.id, m.status AS m_status, m.user_id, s.status AS s_status
-         FROM community_merchants m LEFT JOIN merchant_stores s ON s.merchant_id = m.id
-        WHERE m.id = ?`
-    )
-    .bind(merchantId)
-    .first<{ id: string; m_status: string; user_id: string; s_status: string | null }>();
+  return withApprovalSchema((schema) =>
+    db
+      .prepare(
+        `SELECT m.id, m.status AS m_status, m.user_id, s.status AS s_status, ${approvedAtSql('m', schema)} AS approved_at
+           FROM community_merchants m LEFT JOIN merchant_stores s ON s.merchant_id = m.id
+          WHERE m.id = ?`
+      )
+      .bind(merchantId)
+      .first<{ id: string; m_status: string; user_id: string; s_status: string | null; approved_at: string | null }>()
+  );
 }
 
 /**
@@ -87,7 +90,12 @@ export async function assertDirectStanding(env: Env, requestId: string, merchant
   const m = await merchantStanding(env.DB, merchantId);
   if (!m) throw notFound('Request not found');
   if (m.user_id === r.customer_id) throw new HttpError(400, 'You cannot quote your own request', 'OWN_REQUEST');
-  const takes = await merchantTakesNewWork(env.DB, { merchantStatus: m.m_status, storeStatus: m.s_status, ownerUserId: m.user_id });
+  const takes = await merchantTakesNewWork(env.DB, {
+    merchantStatus: m.m_status,
+    storeStatus: m.s_status,
+    merchantApproved: merchantApproved(m),
+    ownerUserId: m.user_id,
+  });
   if (!takes) {
     throw new HttpError(403, 'Your store is not taking new work right now', 'MERCHANT_UNAVAILABLE');
   }

@@ -19,7 +19,7 @@ import type { Context } from 'hono';
 import type { AppContext } from './types';
 import { trustedOrigin } from './appOrigin';
 import { rootDomainFrom, storeUrl } from './hosts';
-import { storeIsSuspended, type StoreContext } from './merchantAuth';
+import { storeHiddenFromPublic, storeSanctioned, type StoreContext } from './merchantAuth';
 import { resolveStorePreview } from './socialPreview';
 import {
   readStoreIconsQuietly,
@@ -66,16 +66,21 @@ export async function storeShareKit(c: Context<AppContext>, ctx: StoreContext): 
   const onOwnHost = /^https?:\/\//i.test(address);
   const url = onOwnHost ? address : `${trustedOrigin(c)}${address}`;
   const origin = new URL(url).origin;
-  const suspended = storeIsSuspended(ctx);
+  // `suspended` names the SANCTION to the merchant (the panel's own notice);
+  // `hidden` is whether the public sees the store at all — a sanction, or no
+  // reviewer approval yet (push 1.4). A hidden store's link unfurls as
+  // nothing of it, so no card is drawn and no icon is minted for it.
+  const suspended = storeSanctioned(ctx);
+  const hidden = storeHiddenFromPublic(ctx);
 
   const row = await readStoreIconsQuietly(c.env.DB, ctx.store.id);
   const status = storeIconStatus(c.env, ctx.store, row);
   // The merchant opening this panel is one more door to the lazy backfill —
   // and the one whose person is waiting to see the result.
-  if (status.due && !suspended) scheduleStoreIconRefresh(c, ctx.store);
+  if (status.due && !hidden) scheduleStoreIconRefresh(c, ctx.store);
 
   let card: StoreShareKit['card'] = null;
-  if (!suspended) {
+  if (!hidden) {
     try {
       const preview = await resolveStorePreview(
         c.env.DB,

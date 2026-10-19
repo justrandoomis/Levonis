@@ -42,7 +42,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { OWNER, asD1, freshDb, get, json, post, put, stubApp, type Mount, type StubUser } from './fixtures/app';
+import { approveMerchants, OWNER, asD1, freshDb, get, json, post, put, stubApp, type Mount, type StubUser } from './fixtures/app';
 import { leaks } from './fixtures/costlyProduct';
 import type { Context } from 'hono';
 import {
@@ -100,6 +100,7 @@ async function shop(): Promise<DatabaseSync> {
     INSERT INTO merchant_stores (id, merchant_id, user_id, slug, name) VALUES ('st-m-1','m-1','u-merchant','shop-m-1','Shop');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   const res = await put(stubApp(asD1(raw), OWNER, mount, { env: ENV }), '/api/admin/settings/printPricingConfig', {
     value: { ...DEFAULT_PRICING, target_margin_percent: OWNER_MARGIN_PERCENT },
   });

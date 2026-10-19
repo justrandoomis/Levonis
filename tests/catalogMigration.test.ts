@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { dbThrough, asD1, all, row, count } from './fixtures/app';
+import { approveMerchants, dbThrough, asD1, all, row, count } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 import { convertLegacyProducts } from '../worker/lib/catalog/legacy';
 import type { Env } from '../worker/lib/types';
@@ -41,6 +41,7 @@ function legacyWorld() {
       ('ci1','buyer','merchant','m1','s1','opts','m_id','أحمر',1),
       ('ci2','buyer','merchant','m1','s1','one','','',1);
   `);
+  approveMerchants(raw);
   // 'odd' was hidden BY LEVONIS while its merchant had it live: it stays hidden.
   raw.exec(sql('0126'));
   raw.exec(sql('0127'));

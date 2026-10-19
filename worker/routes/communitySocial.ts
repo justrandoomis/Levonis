@@ -53,8 +53,9 @@ import { loadOwnerTerms } from '../lib/decency';
 import { requestBoardVisible } from '../lib/requestBoard';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { COMMUNITY_PRODUCTS_FROM, communityProductsVisible } from './community';
+import { approvedAtSql, merchantIsPublic, merchantPublicSql, storeIsPublic, storePublicSql, withApprovalSchema } from '../lib/merchantApproval';
 import {
-  POST_COLUMNS,
+  postColumns,
   POST_FROM,
   POST_PUBLIC_SQL,
   postCard,
@@ -190,17 +191,19 @@ communitySocialRoutes.get('/saved', requireAuth, async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 48, def: 18 });
   const cursor = feedCursor(c.req.query('cursor'));
   const root = rootDomainFrom(c.env);
-  const { results } = await c.env.DB.prepare(
-    `SELECT ${POST_COLUMNS}, sv.created_at AS saved_at, sv.collection AS saved_collection
-       ${POST_FROM}
-       JOIN community_saves sv ON sv.post_id = p.id AND sv.user_id = ?1
-      WHERE (p.author_id = ?1 OR (p.state = 'published' AND p.visibility IN ('public','unlisted') AND p.admin_hidden_at IS NULL AND p.consent_status IN ('not_needed','granted')))
-        AND ${postExclusionSql('?1')}
-        AND (?2 = '' OR sv.created_at < ?2 OR (sv.created_at = ?2 AND sv.post_id < ?3))
-      ORDER BY sv.created_at DESC, sv.post_id DESC LIMIT ?4`
-  )
-    .bind(user.id, cursor.at, cursor.id, limit + 1)
-    .all<Record<string, unknown>>();
+  const { results } = await withApprovalSchema((schema) =>
+    c.env.DB.prepare(
+      `SELECT ${postColumns(schema)}, sv.created_at AS saved_at, sv.collection AS saved_collection
+         ${POST_FROM}
+         JOIN community_saves sv ON sv.post_id = p.id AND sv.user_id = ?1
+        WHERE (p.author_id = ?1 OR (p.state = 'published' AND p.visibility IN ('public','unlisted') AND p.admin_hidden_at IS NULL AND p.consent_status IN ('not_needed','granted')))
+          AND ${postExclusionSql('?1')}
+          AND (?2 = '' OR sv.created_at < ?2 OR (sv.created_at = ?2 AND sv.post_id < ?3))
+        ORDER BY sv.created_at DESC, sv.post_id DESC LIMIT ?4`
+    )
+      .bind(user.id, cursor.at, cursor.id, limit + 1)
+      .all<Record<string, unknown>>()
+  );
   const next_cursor = nextPostCursor(results, limit, 'saved_at');
   const cards = await withViewerFlags(c.env.DB, user.id, results.map((p) => postCard(p, root)));
   return c.json({
@@ -217,9 +220,10 @@ const COMMENT_MAX = 2000;
 /** Two comments by one person under one post are at least this far apart. */
 const COMMENT_COOLDOWN_MS = 10_000;
 
-const COMMENT_COLUMNS = `cm.id, cm.post_id, cm.parent_id, cm.body, cm.state, cm.created_at, cm.author_id,
+/** The author's merchant mark reads the one public predicate (push 1.4); `schema` as `postColumns`'. */
+const commentColumns = (schema = true) => `cm.id, cm.post_id, cm.parent_id, cm.body, cm.state, cm.created_at, cm.author_id,
        u.username AS a_username, u.name AS a_name, u.avatar_key AS a_avatar, u.creator_public AS a_public,
-       EXISTS (SELECT 1 FROM community_merchants acm WHERE acm.user_id = u.id AND acm.status <> 'suspended') AS a_merchant`;
+       EXISTS (SELECT 1 FROM community_merchants acm WHERE acm.user_id = u.id AND ${merchantPublicSql('acm', schema)}) AS a_merchant`;
 const COMMENT_FROM = 'FROM community_comments cm JOIN users u ON u.id = cm.author_id';
 
 function commentPublic(r: Record<string, unknown>, viewer: { id: string; role: string } | null, postAuthorId: string) {
@@ -292,14 +296,16 @@ communitySocialRoutes.get('/posts/:id/comments', async (c) => {
   // page — so the sheet's title and its «عرض المزيد» agree with its rows. The
   // card's counter (a trigger value) stays the post's own number.
   const [{ results }, total] = await Promise.all([
-    c.env.DB.prepare(
-      `SELECT ${COMMENT_COLUMNS} ${COMMENT_FROM}
-        WHERE cm.post_id = ?1 AND ${commentVisibleSql('?2', '?3')}
-          AND (?4 = '' OR cm.created_at > ?4 OR (cm.created_at = ?4 AND cm.id > ?5))
-        ORDER BY cm.created_at ASC, cm.id ASC LIMIT ?6`
-    )
-      .bind(id, v, admin, cursor.at, cursor.id, limit + 1)
-      .all<Record<string, unknown>>(),
+    withApprovalSchema((schema) =>
+      c.env.DB.prepare(
+        `SELECT ${commentColumns(schema)} ${COMMENT_FROM}
+          WHERE cm.post_id = ?1 AND ${commentVisibleSql('?2', '?3')}
+            AND (?4 = '' OR cm.created_at > ?4 OR (cm.created_at = ?4 AND cm.id > ?5))
+          ORDER BY cm.created_at ASC, cm.id ASC LIMIT ?6`
+      )
+        .bind(id, v, admin, cursor.at, cursor.id, limit + 1)
+        .all<Record<string, unknown>>()
+    ),
     c.env.DB.prepare(`SELECT COUNT(*) AS n FROM community_comments cm WHERE cm.post_id = ?1 AND cm.state = 'visible' AND ${commentAuthorOkSql('?2')}`)
       .bind(id, v)
       .first<{ n: number }>(),
@@ -314,15 +320,19 @@ communitySocialRoutes.get('/posts/:id/comments', async (c) => {
 });
 
 async function loadComment(c: Context<AppContext>, id: string) {
-  return c.env.DB.prepare(`SELECT ${COMMENT_COLUMNS} ${COMMENT_FROM} WHERE cm.id = ?`).bind(id).first<Record<string, unknown>>();
+  return withApprovalSchema((schema) =>
+    c.env.DB.prepare(`SELECT ${commentColumns(schema)} ${COMMENT_FROM} WHERE cm.id = ?`).bind(id).first<Record<string, unknown>>()
+  );
 }
 
 /** The comment this author already made under this post with this client id (0155) — a retry's answer. */
 async function storedClientComment(c: Context<AppContext>, postId: string, authorId: string, clientId: string) {
   if (!clientId) return null;
-  return c.env.DB.prepare(`SELECT ${COMMENT_COLUMNS} ${COMMENT_FROM} WHERE cm.post_id = ? AND cm.author_id = ? AND cm.client_id = ?`)
-    .bind(postId, authorId, clientId)
-    .first<Record<string, unknown>>();
+  return withApprovalSchema((schema) =>
+    c.env.DB.prepare(`SELECT ${commentColumns(schema)} ${COMMENT_FROM} WHERE cm.post_id = ? AND cm.author_id = ? AND cm.client_id = ?`)
+      .bind(postId, authorId, clientId)
+      .first<Record<string, unknown>>()
+  );
 }
 
 const isClientIdClash = (e: unknown) => {
@@ -478,13 +488,16 @@ communitySocialRoutes.delete('/comments/:id', requireAuth, async (c) => {
 
 /** An account that exists, with the columns the follow doors decide on. */
 async function personRow(c: Context<AppContext>, id: string) {
-  return c.env.DB.prepare(
-    `SELECT u.id, u.username, u.creator_public, u.follower_count,
-            EXISTS (SELECT 1 FROM community_merchants cm WHERE cm.user_id = u.id AND cm.status <> 'suspended') AS merchant
-       FROM users u WHERE u.id = ?`
-  )
-    .bind(id)
-    .first<{ id: string; username: string | null; creator_public: number; follower_count: number; merchant: number }>();
+  // A merchant has a page only once the public may see them (push 1.4).
+  return withApprovalSchema((schema) =>
+    c.env.DB.prepare(
+      `SELECT u.id, u.username, u.creator_public, u.follower_count,
+              EXISTS (SELECT 1 FROM community_merchants cm WHERE cm.user_id = u.id AND ${merchantPublicSql('cm', schema)}) AS merchant
+         FROM users u WHERE u.id = ?`
+    )
+      .bind(id)
+      .first<{ id: string; username: string | null; creator_public: number; follower_count: number; merchant: number }>()
+  );
 }
 
 const hasPage = (u: { creator_public: number; merchant: number } | null | undefined) => !!u && (Number(u.creator_public) === 1 || Number(u.merchant) === 1);
@@ -632,12 +645,16 @@ async function reportTargetExists(c: Context<AppContext>, type: (typeof REPORT_T
     case 'user':
       return hasPage(await personRow(c, id));
     case 'store':
-      return !!(await db
-        .prepare("SELECT 1 AS x FROM merchant_stores s JOIN community_merchants cm ON cm.id = s.merchant_id WHERE s.id = ? AND s.status <> 'suspended' AND cm.status <> 'suspended'")
-        .bind(id)
-        .first());
+      return !!(await withApprovalSchema((schema) =>
+        db
+          .prepare(`SELECT 1 AS x FROM merchant_stores s JOIN community_merchants cm ON cm.id = s.merchant_id WHERE s.id = ? AND ${storePublicSql('s')} AND ${merchantPublicSql('cm', schema)}`)
+          .bind(id)
+          .first()
+      ));
     case 'product':
-      return !!(await db.prepare(`SELECT 1 AS x ${COMMUNITY_PRODUCTS_FROM} WHERE p.id = ? AND ${communityProductsVisible("''")}`).bind(id).first());
+      return !!(await withApprovalSchema((schema) =>
+        db.prepare(`SELECT 1 AS x ${COMMUNITY_PRODUCTS_FROM} WHERE p.id = ? AND ${communityProductsVisible("''", schema)}`).bind(id).first()
+      ));
     case 'request':
       return !!(await db.prepare(`SELECT 1 AS x FROM community_requests r WHERE r.id = ?1 AND ${requestBoardVisible('?2', "''")}`).bind(id, new Date().toISOString()).first());
   }
@@ -700,14 +717,16 @@ communitySocialRoutes.get('/feed', async (c) => {
       ? `AND p.author_id IN (SELECT uf.user_id FROM user_follows uf WHERE uf.follower_id = ?1
                             UNION SELECT cm.user_id FROM follows f JOIN community_merchants cm ON cm.id = f.merchant_id WHERE f.user_id = ?1)`
       : '';
-  const { results } = await c.env.DB.prepare(
-    `SELECT ${POST_COLUMNS} ${POST_FROM}
-      WHERE ${POST_PUBLIC_SQL} AND ${postExclusionSql('?1')} ${scopeSql}
-        AND (?2 = '' OR p.published_at < ?2 OR (p.published_at = ?2 AND p.id < ?3))
-      ORDER BY p.published_at DESC, p.id DESC LIMIT ?4`
-  )
-    .bind(v, cursor.at, cursor.id, limit + 1)
-    .all<Record<string, unknown>>();
+  const { results } = await withApprovalSchema((schema) =>
+    c.env.DB.prepare(
+      `SELECT ${postColumns(schema)} ${POST_FROM}
+        WHERE ${POST_PUBLIC_SQL} AND ${postExclusionSql('?1')} ${scopeSql}
+          AND (?2 = '' OR p.published_at < ?2 OR (p.published_at = ?2 AND p.id < ?3))
+        ORDER BY p.published_at DESC, p.id DESC LIMIT ?4`
+    )
+      .bind(v, cursor.at, cursor.id, limit + 1)
+      .all<Record<string, unknown>>()
+  );
   const next_cursor = nextPostCursor(results, limit);
   return c.json({
     success: true,
@@ -729,10 +748,16 @@ export const CREATOR_SEARCH = ['u.name', 'u.username', 'u.bio'] as const;
  * placeholders holding the `likePattern` term and the viewer's id ('' for a
  * guest); `from` needs `u`, `cm` and `s` in scope and `withCounts` adds `pc`
  * (the public projects, one grouped read).
+ *
+ * THE CREATORS BACK DOOR (push 1.4): a merchant is a candidate only once the
+ * public may see them (`merchantPublicSql`: not suspended AND approved) —
+ * every merchant row used to be listed here, with its store link, while the
+ * directory hid it. `schema` as `postColumns`': false only on a database
+ * without 0204, where no merchant is a candidate (C11).
  */
-export function creatorListSql(q: string, v: string) {
+export function creatorListSql(q: string, v: string, schema = true) {
   const candidates = `(SELECT id FROM users WHERE creator_public = 1
-                       UNION SELECT user_id FROM community_merchants WHERE status <> 'suspended') cand`;
+                       UNION SELECT pm.user_id FROM community_merchants pm WHERE ${merchantPublicSql('pm', schema)}) cand`;
   const where = `u.username IS NOT NULL AND u.username <> ''
           AND (${q} = '' OR ${sqlLikeClause(CREATOR_SEARCH, q)})
           AND (${v} = '' OR NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.user_id = ${v} AND b.blocked_id = u.id) OR (b.user_id = u.id AND b.blocked_id = ${v})))`;
@@ -745,6 +770,7 @@ export function creatorListSql(q: string, v: string) {
                        FROM community_posts p WHERE ${POST_PUBLIC_SQL} GROUP BY p.author_id) pc ON pc.author_id = u.id`;
   const columns = `u.id, u.username, u.name, u.avatar_key, u.bio, u.follower_count,
               cm.id AS merchant_id, cm.status AS merchant_status, cm.verified AS merchant_verified,
+              ${approvedAtSql('cm', schema)} AS merchant_approved_at,
               s.id AS store_id, s.slug AS store_slug, s.name AS store_name, s.status AS store_status,
               COALESCE(pc.n, 0) AS projects,
               pc.last AS last_published,
@@ -754,8 +780,8 @@ export function creatorListSql(q: string, v: string) {
 
 /** One creator as the list draws them — the card the search and the trending rail reuse. */
 export function creatorCard(r: Record<string, unknown>, badges: { pro: Set<string>; premium: Set<string> }, root: string | null) {
-  const merchantOk = !!r.merchant_id && r.merchant_status !== 'suspended';
-  const storeOk = merchantOk && !!r.store_id && r.store_status !== 'suspended';
+  const merchantOk = !!r.merchant_id && merchantIsPublic({ status: r.merchant_status, approved_at: r.merchant_approved_at });
+  const storeOk = merchantOk && !!r.store_id && storeIsPublic({ status: r.store_status });
   const bio = String(r.bio ?? '');
   return {
     id: String(r.id),
@@ -800,20 +826,22 @@ communitySocialRoutes.get('/creators', async (c) => {
   const viewer = c.get('user') ?? null;
   const v = viewer?.id ?? '';
   const root = rootDomainFrom(c.env);
-  const { where, from, withCounts, columns } = creatorListSql('?1', '?2');
   const order = featured ? 'projects DESC, u.follower_count DESC, u.id DESC' : 'last_published DESC NULLS LAST, u.follower_count DESC, u.id DESC';
-  const [{ results }, total] = await Promise.all([
-    c.env.DB.prepare(
-      `SELECT ${columns}
-         ${withCounts}
-        WHERE ${where}
-        ORDER BY ${order}
-        LIMIT ?3 OFFSET ?4`
-    )
-      .bind(q, v, limit + 1, offset)
-      .all<Record<string, unknown>>(),
-    offset === 0 ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${from} WHERE ${where}`).bind(q, v).first<{ n: number }>() : Promise.resolve(null),
-  ]);
+  const [{ results }, total] = await withApprovalSchema((schema) => {
+    const { where, from, withCounts, columns } = creatorListSql('?1', '?2', schema);
+    return Promise.all([
+      c.env.DB.prepare(
+        `SELECT ${columns}
+           ${withCounts}
+          WHERE ${where}
+          ORDER BY ${order}
+          LIMIT ?3 OFFSET ?4`
+      )
+        .bind(q, v, limit + 1, offset)
+        .all<Record<string, unknown>>(),
+      offset === 0 ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${from} WHERE ${where}`).bind(q, v).first<{ n: number }>() : Promise.resolve(null),
+    ]);
+  });
   const more = results.length > limit;
   if (more) results.length = limit;
   const badges = await membershipBadges(c.env.DB, results.map((r) => r.id));

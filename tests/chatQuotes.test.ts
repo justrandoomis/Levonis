@@ -19,7 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, dbThrough, asD1, stubApp, post, patch, get, json, count, row, all, spendable, type StubUser, type Mount } from './fixtures/app';
+import { withApprovalColumns, approveMerchants, freshDb, dbThrough, asD1, stubApp, post, patch, get, json, count, row, all, spendable, type StubUser, type Mount } from './fixtures/app';
 import { chatRoutes } from '../worker/routes/chats';
 import { chatCommerceRoutes } from '../worker/routes/chatCommerce';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
@@ -50,6 +50,7 @@ function seed(raw: DatabaseSync = freshDb(), opts: { gate?: boolean } = {}) {
       ('mem_zain','zain','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','${FUTURE}');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','${RATE}');
   `);
+  approveMerchants(raw);
   if (opts.gate !== false) raw.exec(`INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}')`);
   return raw;
 }
@@ -362,7 +363,7 @@ test('the orders panel shows this store × this customer, both flows, to the two
 });
 
 test('a Worker ahead of 0151 still accepts a board offer — the direct-request reads degrade', async () => {
-  const raw = seed(dbThrough('0150'));
+  const raw = seed(withApprovalColumns(dbThrough('0150')));
   raw.exec(`
     INSERT INTO community_requests (id,customer_id,title,description,state,status,visibility,offer_count,expires_at)
       VALUES ('r1','buyer','Print a bracket','I need a bracket printed','receiving_offers','open','public',1,'${FUTURE}');

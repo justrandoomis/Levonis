@@ -18,7 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, get, put, send, json, count, row, type StubUser, type Mount } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, get, put, send, json, count, row, type StubUser, type Mount } from './fixtures/app';
 import { communityRoutes } from '../worker/routes/community';
 import { communityPostRoutes } from '../worker/routes/communityPosts';
 import { communitySocialRoutes } from '../worker/routes/communitySocial';
@@ -55,6 +55,7 @@ function seed() {
       ('merchants/ali/public/w1.webp','public','merchants','ali','ali','image/webp',1000,1000,1000);
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   return raw;
 }
 const as = (raw: DatabaseSync, user: StubUser | null) => stubApp(asD1(raw), user, mount);
@@ -652,6 +653,7 @@ test('a report confirms nothing the reporter could not already open: no page, no
       ('req_private','omar','A private gear','open','private'),
       ('req_closed','omar','A closed gear','closed','public');
   `);
+  approveMerchants(raw);
   const draftId = await draft(raw, SARA, 'Private draft');
   raw.exec(`INSERT INTO community_comments (id,post_id,author_id,body) VALUES ('cmt_draft','${draftId}','sara','note to self')`);
   const pubId = await published(raw, SARA);

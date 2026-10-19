@@ -17,7 +17,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { freshDb, asD1, stubApp, post, json, count, type StubUser } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, json, count, type StubUser } from './fixtures/app';
 import { communityRoutes } from '../worker/routes/community';
 import { communityReviewRoutes } from '../worker/routes/merchantReviews';
 import { isBottomNavHidden } from '../src/components/BottomNav';
@@ -82,7 +82,10 @@ function seed() {
     INSERT INTO users (id,name,email,password_hash,role) VALUES ('owner','Ali','o@x.co','h','merchant'), ('fan','Sara','f@x.co','h','customer'), ('bad','Zed','z@x.co','h','merchant');
     INSERT INTO admin_settings (key, value) VALUES ('communityGate', '{"open":true}');
     INSERT INTO community_merchants (id,user_id,name,status) VALUES ('m1','owner','Ali 3D','active'), ('m2','bad','Zed','suspended');
+    -- A shop to follow: since push 1.4 a follow is of a store the public may see.
+    INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('s1','m1','owner','ali3d','Ali 3D'), ('s2','m2','bad','zed','Zed');
   `);
+  approveMerchants(raw);
   return raw;
 }
 const app = (raw: ReturnType<typeof freshDb>, user: StubUser) =>

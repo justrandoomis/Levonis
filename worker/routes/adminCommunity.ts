@@ -66,6 +66,7 @@ import { requireFinancialScope } from '../lib/walletAdjust';
 import { canMoveMoney } from '../lib/adminScope';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { reconcileRefundUnrefunded, reconcileReverseCredit, storeOrderMoneyDrift } from '../lib/storeOrderOps';
+import { merchantUnsanctionedSql } from '../lib/merchantApproval';
 
 export const adminCommunityRoutes = new Hono<AppContext>();
 adminCommunityRoutes.use('*', requireAdmin);
@@ -101,7 +102,7 @@ adminCommunityRoutes.get('/overview', async (c) => {
     // is not suspended — a merchant sanction no longer rewrites the store row.
     c.env.DB.prepare(
       `SELECT COUNT(*) AS total,
-              SUM(CASE WHEN s.status = 'active' AND m.status <> 'suspended' THEN 1 ELSE 0 END) AS active
+              SUM(CASE WHEN s.status = 'active' AND ${merchantUnsanctionedSql('m')} THEN 1 ELSE 0 END) AS active
          FROM merchant_stores s JOIN community_merchants m ON m.id = s.merchant_id`
     ).first<Record<string, number>>(),
     c.env.DB.prepare(
@@ -521,7 +522,7 @@ adminCommunityRoutes.post('/merchants/:id/verify', async (c) => {
  * neither decision writes the other's:
  *
  *   - the shop of a suspended merchant is shut by the MERCHANT row — every
- *     reader asks both (`storeIsOpen`, `storeIsSuspended` in
+ *     reader asks both (`storeIsOpen`, `storeSanctioned` in
  *     worker/lib/merchantAuth.ts; the cart and checkout read `m.status`);
  *   - lifting the merchant sanction leaves the store exactly as it was: still
  *     suspended if an admin suspended it, still paused if its merchant paused
@@ -554,7 +555,7 @@ adminCommunityRoutes.post('/merchants/:id/status', async (c) => {
   const store = await c.env.DB.prepare('SELECT id, slug, status FROM merchant_stores WHERE merchant_id = ?')
     .bind(id)
     .first<{ id: string; slug: string; status: string }>();
-  // The shop of a suspended merchant is shut by THIS row (`storeIsSuspended`),
+  // The shop of a suspended merchant is shut by THIS row (`storeSanctioned`),
   // so its cached shopfront — name, logo, products, the inline resolve — is
   // dropped from this colo now, not served for another two minutes (P2 review).
   if (store) await afterStorefrontWrite(c, store);

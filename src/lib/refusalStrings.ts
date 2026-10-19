@@ -711,6 +711,14 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'Apply to become a merchant first. Once the review approves you, you can open your store.',
     ckb: 'سەرەتا داواکاریی پەسەندکردنی بازرگان پێشکەش بکە. دوای ئەوەی پێداچوونەوەکە پەسەندی کرد دەتوانیت فرۆشگاکەت بکەیتەوە.',
   },
+  // Push 1.4 (DECISIONS row 259): a store exists, but no reviewer approved the
+  // account, so nothing new is published, priced or promised. The merchant
+  // alone hears it; the public sees only STORE_UNAVAILABLE (C9).
+  MERCHANT_NOT_APPROVED: {
+    ar: 'لم يُعتمد حسابك تاجرًا بعد. قدّم طلب الاعتماد أو تابعه من صفحة التاجر؛ طلباتك الحالية وأرباحك كما هي.',
+    en: 'Your merchant account is not approved yet. Apply, or follow your application, from the merchant page; your current orders and earnings are unaffected.',
+    ckb: 'هەژماری بازرگانییەکەت هێشتا پەسەند نەکراوە. لە پەڕەی بازرگانەوە داواکاریی پەسەندکردن پێشکەش بکە یان بەدوایدا بچۆ؛ داواکارییەکانی ئێستا و قازانجەکەت وەک خۆیانن.',
+  },
   MERCHANT_ALREADY_APPROVED: {
     ar: 'أنت تاجر معتمد بالفعل. افتح متجرك من صفحة التاجر.',
     en: 'You are already an approved merchant. Open your store from the merchant page.',

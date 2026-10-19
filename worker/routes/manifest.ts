@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
-import { storeBySlug, storeIsSuspended, type StoreContext } from '../lib/merchantAuth';
+import { storeBySlug, storeHiddenFromPublic, type StoreContext } from '../lib/merchantAuth';
 import { getMediaObject } from '../lib/mediaStorage';
 import {
   PLATFORM_ICON_FOR_ROLE,
@@ -71,7 +71,7 @@ export async function webManifestRoute(c: Context<AppContext>): Promise<Response
       const ctx = await storeBySlug(c.env.DB, host.slug);
       // An ADMIN-SUSPENDED store (or a store whose merchant is suspended)
       // falls back to the platform identity — see the note below.
-      if (ctx && !storeIsSuspended(ctx)) {
+      if (ctx && !storeHiddenFromPublic(ctx)) {
         const icons = await servableIconsFor(c, ctx);
         const surface = storeSurface(ctx.store);
         identity = {
@@ -204,7 +204,7 @@ export async function storeIconRoute(c: Context<AppContext>): Promise<Response> 
   if (host.kind === 'merchant' && host.slug) {
     try {
       const ctx = await storeBySlug(c.env.DB, host.slug);
-      if (ctx && !storeIsSuspended(ctx)) {
+      if (ctx && !storeHiddenFromPublic(ctx)) {
         const icons = await servableIconsFor(c, ctx);
         if (icons) {
           const served = await serveRendition(c, icons, role);

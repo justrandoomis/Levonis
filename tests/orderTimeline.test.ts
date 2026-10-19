@@ -24,7 +24,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, get, json, count, row, all, memoryBucket, failingD1, type StubUser, type Mount } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, get, json, count, row, all, memoryBucket, failingD1, type StubUser, type Mount } from './fixtures/app';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { printRequestRoutes } from '../worker/routes/printRequests';
 import { communityOrderTimelineRoutes, TIMELINE_UPDATES_MAX } from '../worker/routes/communityOrderTimeline';
@@ -72,6 +72,7 @@ function seed() {
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','${RATE}');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   return raw;
 }
 

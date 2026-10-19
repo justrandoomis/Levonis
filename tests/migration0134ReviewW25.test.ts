@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { dbThrough, freshDb, asD1, row, count } from './fixtures/app';
+import { approveMerchants, dbThrough, freshDb, asD1, row, count } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 import { deleteCancelledOrder } from '../worker/lib/orderDeletion';
 
@@ -33,6 +33,7 @@ function seed() {
     INSERT INTO community_requests (id,customer_id,title,state) VALUES ('r1','buyer','Stand','in_progress'), ('r2','buyer','Gear','in_progress');
     INSERT INTO community_offers (id,request_id,merchant_id,store_id,price_iqd,state) VALUES ('o1','r1','m1','s1',40000,'accepted'), ('o2','r2','m2','s2',40000,'accepted');
   `);
+  approveMerchants(raw);
   raw.prepare(`INSERT INTO community_request_revisions (id,request_id,revision,estimate,reason) VALUES ('crv_r1_1','r1',1,?,'backfill')`).run(RAW_ESTIMATE);
   raw.prepare(`INSERT INTO community_request_revisions (id,request_id,revision,estimate,reason) VALUES ('crv_r2_1','r2',1,'{"price_iqd":1}','publish')`).run();
   const contact = (phone: string) => JSON.stringify({ customer: { name: 'Sara', phone: '0770' }, merchant: { name: 'x', phone }, delivery_method: 'merchant_delivery' });
@@ -73,6 +74,7 @@ test('0134 seals the old payout ledger: no insert, no update — only orderDelet
     INSERT INTO users (id,name,email,password_hash,role) VALUES ('buyer','Sara','b@x.co','h','customer'), ('ali','Ali','a@x.co','h','merchant');
     INSERT INTO community_merchants (id,user_id,name) VALUES ('m1','ali','Ali 3D');
   `);
+  approveMerchants(raw);
   assert.equal(count(raw, "SELECT COUNT(*) n FROM sqlite_master WHERE type='trigger' AND name LIKE 'trg_mpl_mirror_%'"), 0);
   assert.throws(
     () => raw.exec(`INSERT INTO merchant_payout_ledger (id,merchant_id,kind,amount_iqd,state) VALUES ('x','m1','sale_credit',100,'pending')`),

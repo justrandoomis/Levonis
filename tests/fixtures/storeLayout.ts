@@ -10,6 +10,7 @@
  * against a store that HAS every section.
  */
 import type { DatabaseSync } from 'node:sqlite';
+import { approveMerchants } from './app';
 
 export const OWNER = 'owner';
 export const OTHER = 'other';
@@ -130,4 +131,6 @@ export function seedLayoutStore(raw: DatabaseSync): void {
         materials,multicolor,enclosed,quality_max,machine_hour_iqd) VALUES
       ('pr1','m1','s1','X1C','fdm','Bambu Lab','X1 Carbon',256,256,256,'["pla","petg"]',1,1,'fine',${PRINTER_HOUR_IQD});
   `);
+  // Two shops the public sees: approved merchants (push 1.4, DECISIONS row 259).
+  approveMerchants(raw);
 }

@@ -25,6 +25,7 @@ import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { badgeFor } from '../lib/merchantOps';
 import { requireCommunityOpen } from '../lib/communityGate';
 import { ownedMediaUrls } from '../lib/mediaRefs';
+import { approvedAtSql, merchantIsPublic, publicMerchantById, storeIsPublic, withApprovalSchema } from '../lib/merchantApproval';
 
 export const communityReviewRoutes = new Hono<AppContext>();
 
@@ -368,12 +369,12 @@ communityReviewRoutes.post('/follow/:merchantId', requireCommunityOpen, requireA
   const user = c.get('user')!;
   const merchantId = str(c.req.param('merchantId'), 'merchantId', { min: 1, max: 60 });
 
-  const m = await c.env.DB.prepare('SELECT id, user_id, status FROM community_merchants WHERE id = ?')
-    .bind(merchantId)
-    .first<{ id: string; user_id: string; status: string }>();
-  // A store Levonis suspended takes no new followers; nobody follows their own
-  // (the pill showed on the owner's own page, and the follower count counted them).
-  if (!m || m.status === 'suspended') throw notFound('Store not found');
+  // A store the public may not see — Levonis suspended it, or (push 1.4) no
+  // reviewer approved its merchant — takes no new followers; nobody follows
+  // their own (the pill showed on the owner's own page, and the follower
+  // count counted them).
+  const m = await publicMerchantById(c.env.DB, merchantId);
+  if (!m) throw notFound('Store not found');
   if (m.user_id === user.id) throw badRequest('You cannot follow your own store', 'CANNOT_FOLLOW_OWN_STORE');
 
   await c.env.DB.prepare(
@@ -424,22 +425,26 @@ const FOLLOWING_LIMIT = 500;
 communityReviewRoutes.get('/following', requireCommunityOpen, requireAuth, async (c) => {
   const user = c.get('user')!;
   const one = str(c.req.query('merchant_id'), 'merchant_id', { min: 0, max: 60, required: false });
-  const { results } = await c.env.DB.prepare(
-    `SELECT m.id, m.name, m.verified, m.badge, m.badge_override, m.rating_avg_x100, m.rating_count,
-            m.status AS merchant_status, s.status AS store_status,
-            s.slug AS store_slug, s.logo_key, s.tagline,
-            f.notify_products, f.notify_offers, f.notify_updates, f.created_at
-       FROM follows f
-       JOIN community_merchants m ON m.id = f.merchant_id
-       LEFT JOIN merchant_stores s ON s.merchant_id = m.id
-      WHERE f.user_id = ?1 AND (?2 = '' OR f.merchant_id = ?2)
-      ORDER BY f.created_at DESC LIMIT ${FOLLOWING_LIMIT}`
-  ).bind(user.id, one).all<Record<string, unknown>>();
+  const { results } = await withApprovalSchema((schema) =>
+    c.env.DB.prepare(
+      `SELECT m.id, m.name, m.verified, m.badge, m.badge_override, m.rating_avg_x100, m.rating_count,
+              m.status AS merchant_status, s.status AS store_status, ${approvedAtSql('m', schema)} AS approved_at,
+              s.slug AS store_slug, s.logo_key, s.tagline,
+              f.notify_products, f.notify_offers, f.notify_updates, f.created_at
+         FROM follows f
+         JOIN community_merchants m ON m.id = f.merchant_id
+         LEFT JOIN merchant_stores s ON s.merchant_id = m.id
+        WHERE f.user_id = ?1 AND (?2 = '' OR f.merchant_id = ?2)
+        ORDER BY f.created_at DESC LIMIT ${FOLLOWING_LIMIT}`
+    ).bind(user.id, one).all<Record<string, unknown>>()
+  );
 
   return c.json({
     success: true,
     following: results.map((r) => {
-      const sanctioned = r.merchant_status === 'suspended' || r.store_status === 'suspended';
+      // Not public — sanctioned, or (push 1.4) not approved: a neutral row the customer can still unfollow.
+      const sanctioned =
+        !merchantIsPublic({ status: r.merchant_status, approved_at: r.approved_at }) || (!!r.store_status && !storeIsPublic({ status: r.store_status }));
       return {
         merchant_id: r.id,
         unavailable: sanctioned,

@@ -57,6 +57,7 @@ import { communityReviewRoutes } from '../worker/routes/merchantReviews';
 import { merchantRoutes } from '../worker/routes/merchant';
 import { merchantCatalogRoutes } from '../worker/routes/merchantCatalog';
 import { communityAccessOf } from '../src/pages/community/access';
+import { approveMerchants } from './fixtures/app';
 
 // ------------------------------------------------------------------ harness
 
@@ -73,9 +74,12 @@ function setup() {
     INSERT INTO users (id,name,email,password_hash,role,username,phone_e164) VALUES
       ('u_phone','Tester','p_964770@phone.levonis.invalid','h','customer',NULL,'+9647701234567');
     INSERT INTO community_merchants (id,user_id,name,bio) VALUES ('cm1','u2','Ali Prints','bio');
+    -- Its store: since push 1.4 the in-site store page shows an approved merchant's STORE.
+    INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('st1','cm1','u2','aliprints','Ali Prints');
     INSERT INTO community_products (id,merchant_id,slug,name,price_iqd) VALUES ('cp1','cm1','thing','Thing',5000);
     INSERT INTO community_requests (id,customer_id,title) VALUES ('creq1','u1','Need a bracket');
   `);
+  approveMerchants(raw);
   // No communityGate row on purpose: that IS the shipped state.
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }
@@ -333,10 +337,9 @@ test('a merchant keeps running their own shop while the community is shut', asyn
   assert.equal(handed.status, 307, 'a merchant may still add to their own catalogue — through the store API');
   assert.equal(handed.headers.get('location'), '/api/merchant/products');
 
-  // …which is outside the wall, and runs the store rules: with a store and a
-  // live PLUS, the product is added while the community is shut.
+  // …which is outside the wall, and runs the store rules: with its store (seeded)
+  // and a live PLUS, the product is added while the community is shut.
   raw.exec(`
-    INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('st1','cm1','u2','aliprints','Ali Prints');
     INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,starts_at,expires_at)
       VALUES ('mem_u2','u2','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z');
   `);
@@ -389,7 +392,8 @@ test('a NEW store from /merchant/start waits for the community too — the path 
   assert.equal(refused.status, 503);
   assert.equal((await json(refused)).code, 'COMMUNITY_CLOSED');
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM community_merchants'), before, 'no merchant row was created');
-  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM merchant_stores'), 0, 'no store was created');
+  // u2's store is the seed's own (push 1.4); u1 got none.
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM merchant_stores WHERE user_id = 'u1'"), 0, 'no store was created');
 
   // An allow-listed member is past the gate and on to the membership check —
   // the server's own answer, not the gate's.

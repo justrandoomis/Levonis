@@ -15,7 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { freshDb, asD1 } from './fixtures/app';
+import { approveMerchants, freshDb, asD1 } from './fixtures/app';
 import { publishSeededV2 } from './fixtures/autoPublish';
 import { ROOT } from './fixtures/d1';
 import { previewStoreRef, resolveProductPreview } from '../worker/lib/socialPreview';
@@ -34,6 +34,7 @@ function seed() {
       ('cp3','m1','s1','ali3d-draft','Draft','مسودة','','[]','hidden','draft',1000);
     INSERT INTO products (id, slug, name, name_ar, price_iqd, status) VALUES ('p1', 'filament-pla', 'PLA', 'خيط PLA', 100000, 'active');
   `);
+  approveMerchants(raw);
   return raw;
 }
 

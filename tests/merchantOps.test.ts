@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
 import { SqliteD1 } from './fixtures/d1';
 import { checkSlug, suggestSlug, splitFee, feeFor, feeSettings, badgeFor } from '../worker/lib/merchantOps';
+import { approveMerchants } from './fixtures/app';
 
 function db(): { raw: DatabaseSync; d1: D1Database } {
   const raw = new DatabaseSync(':memory:');
@@ -35,6 +36,7 @@ function seedStore(raw: DatabaseSync, id: string, slug: string): void {
     INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name)
       VALUES ('${id}','m_${id}','u_${id}','${slug}','S');
   `);
+  approveMerchants(raw);
 }
 
 // ------------------------------------------------------------------ slugs

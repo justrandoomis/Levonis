@@ -18,7 +18,17 @@ import { publicRequest } from './marketplace';
 import { eligibleVerdictSql, publicWorkshopFacts } from '../lib/printMatchingStore';
 import { storeForUser } from '../lib/merchantAuth';
 import { merchantTakesNewWork } from '../lib/communityRequests';
-import { applicationRequiredRefusal } from '../lib/merchantApproval';
+import {
+  applicationRequiredRefusal,
+  merchantApproved,
+  merchantIsPublic,
+  merchantPublicSql,
+  publicMerchantById,
+  publicStoreUnavailable,
+  storeIsPublic,
+  storePublicSql,
+  withApprovalSchema,
+} from '../lib/merchantApproval';
 
 export const communityRoutes = new Hono<AppContext>();
 
@@ -165,6 +175,9 @@ communityRoutes.use('*', communityGate());
  * the two in step). Nothing of a SANCTIONED shop — a suspended merchant, or a
  * suspended store — is served anywhere (owner decision 2026-09-24). The
  * merchant suspension no longer rewrites the store row, so both are asked.
+ * Since Community V3 push 1.4 the merchant must also be APPROVED, and the
+ * product must sit in a store (an inner join): one public predicate,
+ * `merchantPublicSql` / `storePublicSql` (worker/lib/merchantApproval.ts).
  *
  * Search used to be the page filtering the twenty rows it happened to hold,
  * which answered «لا توجد نتائج» for a product that was simply on page two.
@@ -182,10 +195,15 @@ const PRODUCT_SEARCH = ['p.name', 'p.name_ar', 'p.description', 'p.description_a
  */
 export const COMMUNITY_PRODUCTS_FROM = `FROM community_products p
        JOIN community_merchants m ON m.id = p.merchant_id
-       LEFT JOIN merchant_stores s ON s.id = p.store_id`;
+       JOIN merchant_stores s ON s.id = p.store_id`;
 
-export const communityProductsVisible = (q: string) => `p.lifecycle = 'active' AND p.status = 'active'
-        AND m.status <> 'suspended' AND COALESCE(s.status, '') <> 'suspended'
+/**
+ * `schema` is false only on `withApprovalSchema`'s second try, on a database
+ * without 0204: the merchant predicate is then FALSE, so the list is empty
+ * (owner decision C11) instead of a 500 — or, worse, open.
+ */
+export const communityProductsVisible = (q: string, schema = true) => `p.lifecycle = 'active' AND p.status = 'active'
+        AND ${merchantPublicSql('m', schema)} AND ${storePublicSql('s')}
         AND (${q} = '' OR ${sqlLikeClause(PRODUCT_SEARCH, q)})`;
 
 /**
@@ -208,20 +226,22 @@ communityRoutes.get('/products', async (c) => {
   const root = rootDomainFrom(c.env);
   const from = COMMUNITY_PRODUCTS_FROM;
   const viewer = c.get('user')?.id ?? '';
-  const visible = `${communityProductsVisible('?1')} AND ${merchantBlockSql('?5', 'm')}`;
-  const visibleCount = `${communityProductsVisible('?1')} AND ${merchantBlockSql('?2', 'm')}`;
-  const [{ results }, total] = await Promise.all([
-    c.env.DB.prepare(
-      `SELECT p.*, s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo_key
-         ${from}
-        WHERE ${visible}
-          AND (?2 = '' OR p.created_at < ?2 OR (p.created_at = ?2 AND p.id < ?3))
-        ORDER BY p.created_at DESC, p.id DESC LIMIT ?4`
-    ).bind(q, cursor.at, cursor.id, limit, viewer).all<Record<string, unknown>>(),
-    cursor.at === ''
-      ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${from} WHERE ${visibleCount}`).bind(q, viewer).first<{ n: number }>()
-      : Promise.resolve(null),
-  ]);
+  const [{ results }, total] = await withApprovalSchema((schema) => {
+    const visible = `${communityProductsVisible('?1', schema)} AND ${merchantBlockSql('?5', 'm')}`;
+    const visibleCount = `${communityProductsVisible('?1', schema)} AND ${merchantBlockSql('?2', 'm')}`;
+    return Promise.all([
+      c.env.DB.prepare(
+        `SELECT p.*, s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo_key
+           ${from}
+          WHERE ${visible}
+            AND (?2 = '' OR p.created_at < ?2 OR (p.created_at = ?2 AND p.id < ?3))
+          ORDER BY p.created_at DESC, p.id DESC LIMIT ?4`
+      ).bind(q, cursor.at, cursor.id, limit, viewer).all<Record<string, unknown>>(),
+      cursor.at === ''
+        ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${from} WHERE ${visibleCount}`).bind(q, viewer).first<{ n: number }>()
+        : Promise.resolve(null),
+    ]);
+  });
   return c.json({
     success: true,
     products: results.map((p) => communityFeedProduct(p, root)),
@@ -250,13 +270,20 @@ communityRoutes.get('/products', async (c) => {
  * suspended merchant or a suspended store is not in the directory at all —
  * its name, bio and avatar are exactly what the storefront no longer serves,
  * and a card linking to the in-site page would advertise them anyway.
+ *
+ * NOTHING OF AN UNAPPROVED ONE EITHER (Community V3 push 1.4; owner decisions
+ * C1/C2): the directory lists STORES of approved merchants — an inner join to
+ * the store, so a profile-only merchant from the pre-store era is not a card
+ * until a reviewer approved them and they opened a store. A merchant-PAUSED
+ * store stays listed and says it is closed (C10).
  */
 const MERCHANT_SEARCH = ['cm.name', 'cm.bio', 's.name', 's.tagline'] as const;
 
 /** The directory's rows, columns and visibility rule — shared with the public API, like the feed's. */
-export const COMMUNITY_DIRECTORY_FROM = 'FROM community_merchants cm LEFT JOIN merchant_stores s ON s.merchant_id = cm.id';
+export const COMMUNITY_DIRECTORY_FROM = 'FROM community_merchants cm JOIN merchant_stores s ON s.merchant_id = cm.id';
 
-export const communityDirectoryVisible = (q: string) => `cm.status <> 'suspended' AND COALESCE(s.status, '') <> 'suspended'
+/** `schema` as `communityProductsVisible`'s: false only on a database without 0204 — an empty directory (C11). */
+export const communityDirectoryVisible = (q: string, schema = true) => `${merchantPublicSql('cm', schema)} AND ${storePublicSql('s')}
         AND (${q} = '' OR ${sqlLikeClause(MERCHANT_SEARCH, q)})`;
 
 export const COMMUNITY_DIRECTORY_COLUMNS = `cm.*, s.id AS store_id, s.slug AS store_slug, s.status AS store_status,
@@ -279,11 +306,12 @@ export function directoryCard(m: Record<string, unknown>, badges: { pro: Set<str
   return {
     ...merchantPublic(m, badges),
     store_slug: m.store_slug ?? null,
-    // A suspended store — or a suspended merchant's store — is not
-    // advertised as a destination; the card falls back to the in-site page.
-    // Paused shops keep their address — the page itself says they are closed.
+    // A store the public may not see — suspended, or its merchant suspended
+    // or not approved — is not advertised as a destination; the card falls
+    // back to the in-site page. Paused shops keep their address — the page
+    // itself says they are closed (C10).
     store_url:
-      m.store_slug && m.store_status !== 'suspended' && m.status !== 'suspended'
+      m.store_slug && storeIsPublic({ status: m.store_status }) && merchantIsPublic(m)
         ? storeUrl(String(m.store_slug), root, String(m.store_id))
         : null,
     store_name: hasStore ? String(m.store_name ?? '') : null,
@@ -308,21 +336,23 @@ communityRoutes.get('/merchants', async (c) => {
   const root = rootDomainFrom(c.env);
   const viewer = c.get('user')?.id ?? '';
   const from = COMMUNITY_DIRECTORY_FROM;
-  const visible = `${communityDirectoryVisible('?1')} AND ${merchantBlockSql('?5')}`;
-  const visibleCount = `${communityDirectoryVisible('?1')} AND ${merchantBlockSql('?2')}`;
-  const [{ results }, total] = await Promise.all([
-    c.env.DB.prepare(
-      `SELECT ${COMMUNITY_DIRECTORY_COLUMNS},
-              EXISTS (SELECT 1 FROM follows f WHERE f.merchant_id = cm.id AND f.user_id = ?5) AS viewer_follows
-         ${from}
-        WHERE ${visible}
-          AND (?2 = '' OR cm.created_at < ?2 OR (cm.created_at = ?2 AND cm.id < ?3))
-        ORDER BY cm.created_at DESC, cm.id DESC LIMIT ?4`
-    ).bind(q, cursor.at, cursor.id, limit, viewer).all<Record<string, unknown>>(),
-    cursor.at === ''
-      ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${from} WHERE ${visibleCount}`).bind(q, viewer).first<{ n: number }>()
-      : Promise.resolve(null),
-  ]);
+  const [{ results }, total] = await withApprovalSchema((schema) => {
+    const visible = `${communityDirectoryVisible('?1', schema)} AND ${merchantBlockSql('?5')}`;
+    const visibleCount = `${communityDirectoryVisible('?1', schema)} AND ${merchantBlockSql('?2')}`;
+    return Promise.all([
+      c.env.DB.prepare(
+        `SELECT ${COMMUNITY_DIRECTORY_COLUMNS},
+                EXISTS (SELECT 1 FROM follows f WHERE f.merchant_id = cm.id AND f.user_id = ?5) AS viewer_follows
+           ${from}
+          WHERE ${visible}
+            AND (?2 = '' OR cm.created_at < ?2 OR (cm.created_at = ?2 AND cm.id < ?3))
+          ORDER BY cm.created_at DESC, cm.id DESC LIMIT ?4`
+      ).bind(q, cursor.at, cursor.id, limit, viewer).all<Record<string, unknown>>(),
+      cursor.at === ''
+        ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${from} WHERE ${visibleCount}`).bind(q, viewer).first<{ n: number }>()
+        : Promise.resolve(null),
+    ]);
+  });
   const badges = await membershipBadges(c.env.DB, results.map((m) => m.user_id));
   return c.json({
     success: true,
@@ -381,6 +411,7 @@ communityRoutes.get('/requests', async (c) => {
     const open = await merchantTakesNewWork(c.env.DB, {
       merchantStatus: mine.merchant.status,
       storeStatus: mine.store.status,
+      merchantApproved: merchantApproved(mine.merchant),
       ownerUserId: user.id,
     });
     const accepts = Number(mine.store.accepts_custom_requests ?? 1) === 1;
@@ -467,22 +498,27 @@ communityRoutes.get('/requests', async (c) => {
  * newest first across the community. It is the row a store's showcase already
  * serves in public (GET /api/storefront/:slug/showcase); nothing here is new
  * about any shop. At most three per store, so one prolific workshop cannot be
- * the whole rail; only works with a picture; nothing of a sanctioned shop.
+ * the whole rail; only works with a picture; nothing of a shop the public may
+ * not see — sanctioned, or its merchant not approved (E11, push 1.4: a work
+ * may still be CREATED before approval; it is shown only through the public
+ * predicate).
  */
 export async function communityWorks(db: D1Database, limit: number): Promise<Array<Record<string, unknown>>> {
-  const { results } = await db.prepare(
-    `SELECT * FROM (
-       SELECT w.id, w.title, w.details, w.image_key, w.created_at,
-              s.id AS store_id, s.slug AS store_slug, s.name AS store_name, s.logo_key AS store_logo_key,
-              ROW_NUMBER() OVER (PARTITION BY w.store_id ORDER BY w.created_at DESC, w.id DESC) AS nth
-         FROM merchant_showcase w
-         JOIN merchant_stores s ON s.id = w.store_id
-         JOIN community_merchants cm ON cm.id = s.merchant_id
-        WHERE w.kind = 'work' AND w.active = 1 AND COALESCE(w.image_key, '') <> ''
-          AND s.status <> 'suspended' AND cm.status <> 'suspended'
-     ) WHERE nth <= 3
-     ORDER BY created_at DESC, id DESC LIMIT ?1`
-  ).bind(limit).all<Record<string, unknown>>();
+  const { results } = await withApprovalSchema((schema) =>
+    db.prepare(
+      `SELECT * FROM (
+         SELECT w.id, w.title, w.details, w.image_key, w.created_at,
+                s.id AS store_id, s.slug AS store_slug, s.name AS store_name, s.logo_key AS store_logo_key,
+                ROW_NUMBER() OVER (PARTITION BY w.store_id ORDER BY w.created_at DESC, w.id DESC) AS nth
+           FROM merchant_showcase w
+           JOIN merchant_stores s ON s.id = w.store_id
+           JOIN community_merchants cm ON cm.id = s.merchant_id
+          WHERE w.kind = 'work' AND w.active = 1 AND COALESCE(w.image_key, '') <> ''
+            AND ${storePublicSql('s')} AND ${merchantPublicSql('cm', schema)}
+       ) WHERE nth <= 3
+       ORDER BY created_at DESC, id DESC LIMIT ?1`
+    ).bind(limit).all<Record<string, unknown>>()
+  );
   return results;
 }
 
@@ -560,16 +596,19 @@ communityRoutes.post('/requests/:id/close', requireAuth, (c) =>
 communityRoutes.get('/store/:id', async (c) => {
   const id = c.req.param('id');
   const merchant = await c.env.DB.prepare(
-    `SELECT m.*, (SELECT s.status FROM merchant_stores s WHERE s.merchant_id = m.id) AS store_status
-       FROM community_merchants m WHERE m.id = ?`
+    `SELECT m.*, s.id AS store_id, s.status AS store_status
+       FROM community_merchants m LEFT JOIN merchant_stores s ON s.merchant_id = m.id WHERE m.id = ?`
   )
     .bind(id)
     .first<Record<string, unknown>>();
   if (!merchant) throw notFound('Store not found');
-  // The in-site profile of a sanctioned shop answers what its storefront does:
-  // «المتجر غير متاح حاليًا», and nothing of the shop (worker/routes/storefront.ts).
-  if (merchant.status === 'suspended' || merchant.store_status === 'suspended') {
-    throw new HttpError(404, 'This store is not available right now', 'STORE_UNAVAILABLE');
+  // The in-site profile of a shop the public may not see answers what its
+  // storefront does: «المتجر غير متاح حاليًا», and nothing of the shop
+  // (worker/routes/storefront.ts) — sanctioned, not approved, or with no store
+  // to show yet (push 1.4; one generic answer, C9). `m.*` carries the
+  // approval stamp; a database without 0204 has none, so the page is closed.
+  if (!merchant.store_id || !storeIsPublic({ status: merchant.store_status }) || !merchantIsPublic(merchant)) {
+    throw publicStoreUnavailable();
   }
   const user = c.get('user');
   // ONE WAVE after the merchant (review 2026-09-30): the products, the
@@ -610,10 +649,9 @@ communityRoutes.post('/store/:id/follow', requireAuth, async (c) => {
   await rateLimit(c, 'follow', 60, 3600);
   const user = c.get('user')!;
   const id = c.req.param('id');
-  const merchant = await c.env.DB.prepare('SELECT id, user_id, status FROM community_merchants WHERE id = ?')
-    .bind(id)
-    .first<{ id: string; user_id: string; status: string }>();
-  if (!merchant || merchant.status === 'suspended') throw notFound('Store not found');
+  // A shop the public may not see takes no new followers (push 1.4).
+  const merchant = await publicMerchantById(c.env.DB, id ?? '');
+  if (!merchant) throw notFound('Store not found');
   if (merchant.user_id === user.id) throw badRequest('You cannot follow your own store', 'CANNOT_FOLLOW_OWN_STORE');
   await c.env.DB.prepare(
     'INSERT INTO follows (user_id, merchant_id) VALUES (?, ?) ON CONFLICT DO NOTHING'
@@ -653,10 +691,12 @@ communityRoutes.get('/followed', requireAuth, async (c) => {
   return c.json({
     success: true,
     merchants: results.map((m) =>
-      // A shop the customer follows that Levonis has since SANCTIONED stays
-      // in their list — so they can unfollow it — as a neutral card (review
-      // S5): its id and `unavailable`, and not one field the merchant wrote.
-      m.status === 'suspended' || m.store_status === 'suspended'
+      // A shop the customer follows that the public may no longer see —
+      // SANCTIONED, or (push 1.4) its merchant not approved — stays in their
+      // list, so they can unfollow it, as a neutral card (review S5): its id
+      // and `unavailable`, and not one field the merchant wrote. An approved
+      // merchant without a store keeps their profile card, as before.
+      !merchantIsPublic(m) || (!!m.store_id && !storeIsPublic({ status: m.store_status }))
         ? {
             id: m.id,
             unavailable: true,

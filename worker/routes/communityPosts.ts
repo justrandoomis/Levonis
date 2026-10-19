@@ -43,6 +43,7 @@ import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { communityGate } from '../lib/communityGate';
 import { membershipBadges } from '../lib/entitlements';
 import { storeForUser } from '../lib/merchantAuth';
+import { approvedAtSql, merchantIsPublic, merchantPublicSql, storeIsPublic, withApprovalSchema } from '../lib/merchantApproval';
 import { getMediaObject, isSafeMediaKey } from '../lib/mediaStorage';
 import { COMMUNITY_DIRECTORY_COLUMNS, directoryCard } from './community';
 // Post attachments (§9.4): a model or a document beside the pictures, viewed
@@ -93,7 +94,8 @@ function authorPublic(row: Record<string, unknown>) {
 
 /** A card of the feed: what a list needs and nothing a page keeps to itself. */
 export function postCard(p: Record<string, unknown>, root: string | null) {
-  const storeOk = typeof p.store_id === 'string' && p.store_id && p.s_status !== 'suspended';
+  // A store the public may see (push 1.4): not suspended, and its merchant public (`s_public`).
+  const storeOk = typeof p.store_id === 'string' && p.store_id && storeIsPublic({ status: p.s_status }) && Number(p.s_public) === 1;
   const productOk = typeof p.product_id === 'string' && p.product_id && p.pr_lifecycle === 'active' && p.pr_status === 'active' && storeOk;
   const body = String(p.body ?? '');
   return {
@@ -148,11 +150,19 @@ export function postCard(p: Record<string, unknown>, root: string | null) {
   };
 }
 
-/** The columns every post read joins — one query, one shape. */
-export const POST_COLUMNS = `p.*,
+/**
+ * The columns every post read joins — one query, one shape. The author's
+ * merchant mark and the tagged store's visibility read the ONE public
+ * predicate (push 1.4: not suspended AND approved); `schema` is false only on
+ * `withApprovalSchema`'s second try, on a database without 0204 — then no
+ * author is a merchant and no tagged store is shown (C11), and the post
+ * itself still reads.
+ */
+export const postColumns = (schema = true) => `p.*,
        u.username AS a_username, u.name AS a_name, u.avatar_key AS a_avatar, u.creator_public AS a_public,
-       EXISTS (SELECT 1 FROM community_merchants acm WHERE acm.user_id = u.id AND acm.status <> 'suspended') AS a_merchant,
+       EXISTS (SELECT 1 FROM community_merchants acm WHERE acm.user_id = u.id AND ${merchantPublicSql('acm', schema)}) AS a_merchant,
        s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo, s.status AS s_status,
+       EXISTS (SELECT 1 FROM community_merchants sm WHERE sm.id = s.merchant_id AND ${merchantPublicSql('sm', schema)}) AS s_public,
        cp.slug AS pr_slug, cp.name AS pr_name, cp.name_ar AS pr_name_ar, cp.price_iqd AS pr_price,
        cp.lifecycle AS pr_lifecycle, cp.status AS pr_status,
        pp.slug AS printer_slug, pp.name AS printer_product_name, pp.name_ar AS printer_product_name_ar, pp.status AS printer_status,
@@ -287,14 +297,16 @@ communityPostRoutes.get('/posts', async (c) => {
           AND (?5 = '' OR p.product_id = ?5)
           AND (?6 = '' OR EXISTS (SELECT 1 FROM json_each(p.tags) t WHERE lower(t.value) = ?6))`;
   const [{ results }, total] = await Promise.all([
-    c.env.DB.prepare(
-      `SELECT ${POST_COLUMNS} ${POST_FROM}
-        WHERE ${where}
-          AND (?7 = '' OR p.published_at < ?7 OR (p.published_at = ?7 AND p.id < ?8))
-        ORDER BY p.published_at DESC, p.id DESC LIMIT ?9`
-    )
-      .bind(q, kind, author, store, product, tag, cursor.at, cursor.id, limit + 1, viewerId, notKind)
-      .all<Record<string, unknown>>(),
+    withApprovalSchema((schema) =>
+      c.env.DB.prepare(
+        `SELECT ${postColumns(schema)} ${POST_FROM}
+          WHERE ${where}
+            AND (?7 = '' OR p.published_at < ?7 OR (p.published_at = ?7 AND p.id < ?8))
+          ORDER BY p.published_at DESC, p.id DESC LIMIT ?9`
+      )
+        .bind(q, kind, author, store, product, tag, cursor.at, cursor.id, limit + 1, viewerId, notKind)
+        .all<Record<string, unknown>>()
+    ),
     cursor.at === ''
       ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${POST_FROM} WHERE ${where}`).bind(q, kind, author, store, product, tag, '', '', 0, viewerId, notKind).first<{ n: number }>()
       : Promise.resolve(null),
@@ -314,20 +326,24 @@ communityPostRoutes.get('/posts/trending', async (c) => {
   const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
   const root = rootDomainFrom(c.env);
   const viewerId = c.get('user')?.id ?? '';
-  const { results } = await c.env.DB.prepare(
-    `SELECT ${POST_COLUMNS} ${POST_FROM}
-      WHERE ${POST_PUBLIC_SQL} AND p.published_at >= ?1 AND ${postExclusionSql('?3')}
-      ORDER BY (p.like_count * 3 + p.comment_count * 4 + p.save_count * 5 + p.view_count) DESC, p.published_at DESC, p.id DESC
-      LIMIT ?2`
-  )
-    .bind(since, limit, viewerId)
-    .all<Record<string, unknown>>();
+  const { results } = await withApprovalSchema((schema) =>
+    c.env.DB.prepare(
+      `SELECT ${postColumns(schema)} ${POST_FROM}
+        WHERE ${POST_PUBLIC_SQL} AND p.published_at >= ?1 AND ${postExclusionSql('?3')}
+        ORDER BY (p.like_count * 3 + p.comment_count * 4 + p.save_count * 5 + p.view_count) DESC, p.published_at DESC, p.id DESC
+        LIMIT ?2`
+    )
+      .bind(since, limit, viewerId)
+      .all<Record<string, unknown>>()
+  );
   return c.json({ success: true, posts: await withViewerFlags(c.env.DB, viewerId || null, results.map((p) => postCard(p, root))) });
 });
 
 /** One post with its media, for its page. */
 export async function loadPost(env: Env, id: string): Promise<Record<string, unknown> | null> {
-  return env.DB.prepare(`SELECT ${POST_COLUMNS} ${POST_FROM} WHERE p.id = ?`).bind(id).first<Record<string, unknown>>();
+  return withApprovalSchema((schema) =>
+    env.DB.prepare(`SELECT ${postColumns(schema)} ${POST_FROM} WHERE p.id = ?`).bind(id).first<Record<string, unknown>>()
+  );
 }
 
 /**
@@ -1109,14 +1125,16 @@ communityPostRoutes.get('/my-posts', requireAuth, async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 48, def: 24 });
   const cursor = feedCursor(c.req.query('cursor'));
   const root = rootDomainFrom(c.env);
-  const { results } = await c.env.DB.prepare(
-    `SELECT ${POST_COLUMNS} ${POST_FROM}
-      WHERE p.author_id = ?1
-        AND (?2 = '' OR p.created_at < ?2 OR (p.created_at = ?2 AND p.id < ?3))
-      ORDER BY p.created_at DESC, p.id DESC LIMIT ?4`
-  )
-    .bind(user.id, cursor.at, cursor.id, limit + 1)
-    .all<Record<string, unknown>>();
+  const { results } = await withApprovalSchema((schema) =>
+    c.env.DB.prepare(
+      `SELECT ${postColumns(schema)} ${POST_FROM}
+        WHERE p.author_id = ?1
+          AND (?2 = '' OR p.created_at < ?2 OR (p.created_at = ?2 AND p.id < ?3))
+        ORDER BY p.created_at DESC, p.id DESC LIMIT ?4`
+    )
+      .bind(user.id, cursor.at, cursor.id, limit + 1)
+      .all<Record<string, unknown>>()
+  );
   const next_cursor = nextPostCursor(results, limit, 'created_at');
   return c.json({
     success: true,
@@ -1153,20 +1171,29 @@ const SOCIAL_KEYS: ReadonlyArray<readonly [name: string, ...keys: string[]]> = [
 ];
 
 async function creatorRow(env: Env, username: string) {
-  return env.DB.prepare(
-    `SELECT u.id, u.username, u.name, u.avatar_key, u.bio, u.website, u.profile_json, u.country, u.created_at, u.creator_public,
-            u.follower_count, cm.id AS merchant_id, cm.status AS merchant_status
-       FROM users u LEFT JOIN community_merchants cm ON cm.user_id = u.id
-      WHERE u.username = ?`
-  )
-    .bind(username.trim().toLowerCase())
-    .first<Record<string, unknown>>();
+  return withApprovalSchema((schema) =>
+    env.DB.prepare(
+      `SELECT u.id, u.username, u.name, u.avatar_key, u.bio, u.website, u.profile_json, u.country, u.created_at, u.creator_public,
+              u.follower_count, cm.id AS merchant_id, cm.status AS merchant_status, ${approvedAtSql('cm', schema)} AS merchant_approved_at
+         FROM users u LEFT JOIN community_merchants cm ON cm.user_id = u.id
+        WHERE u.username = ?`
+    )
+      .bind(username.trim().toLowerCase())
+      .first<Record<string, unknown>>()
+  );
 }
+
+/** Is this account's merchant side public (push 1.4: not suspended AND approved)? */
+const creatorMerchantPublic = (u: Record<string, unknown>) =>
+  !!u.merchant_id && merchantIsPublic({ status: u.merchant_status, approved_at: u.merchant_approved_at });
 
 export function creatorVisible(u: Record<string, unknown>, viewer: { id: string; role: string } | null): boolean {
   if (viewer && (viewer.id === u.id || viewer.role === 'admin')) return true;
   if (Number(u.creator_public) === 1) return true;
-  return !!u.merchant_id && u.merchant_status !== 'suspended';
+  // THE CREATORS BACK DOOR (push 1.4): being a merchant gives a page only
+  // once a reviewer approved the merchant — an unapproved one was listed and
+  // linked here while the directory hid them.
+  return creatorMerchantPublic(u);
 }
 
 communityPostRoutes.get('/creators/:username', async (c) => {
@@ -1186,7 +1213,7 @@ communityPostRoutes.get('/creators/:username', async (c) => {
   const [projects, badges, store, following] = await Promise.all([
     c.env.DB.prepare(`SELECT COUNT(*) AS n FROM community_posts p WHERE p.author_id = ? AND ${POST_PUBLIC_SQL}`).bind(u.id).first<{ n: number }>(),
     membershipBadges(c.env.DB, [u.id]),
-    u.merchant_id && u.merchant_status !== 'suspended'
+    creatorMerchantPublic(u)
       ? c.env.DB.prepare(`SELECT ${COMMUNITY_DIRECTORY_COLUMNS} FROM community_merchants cm LEFT JOIN merchant_stores s ON s.merchant_id = cm.id WHERE cm.id = ?`)
           .bind(u.merchant_id)
           .first<Record<string, unknown>>()
@@ -1221,7 +1248,8 @@ communityPostRoutes.get('/creators/:username', async (c) => {
         completed_jobs: store ? Number(store.completed_orders ?? 0) : 0,
         followers: Number(u.follower_count ?? 0),
       },
-      store: store && store.store_status !== 'suspended' ? directoryCard(store, badges, root) : null,
+      // The maker profile's store card: only a store the public may see (push 1.4).
+      store: store && store.store_id && storeIsPublic({ status: store.store_status }) && merchantIsPublic(store) ? directoryCard(store, badges, root) : null,
       viewer: {
         mine: !!viewer && viewer.id === u.id,
         following: !!following,

@@ -13,7 +13,7 @@
  */
 import type { DatabaseSync } from 'node:sqlite';
 import assert from 'node:assert/strict';
-import { freshDb, stubApp, post, put, get, json, type Mount, type StubUser } from './app';
+import { approveMerchants, freshDb, stubApp, post, put, get, json, type Mount, type StubUser } from './app';
 import { limitD1 } from './d1Limits';
 import { variantBody } from './catalog';
 import { cartRoutes } from '../../worker/routes/cart';
@@ -180,7 +180,8 @@ export function seedB(): DatabaseSync {
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','1400');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
-  return raw;
+  // A shop that takes work: an approved merchant (push 1.4, DECISIONS row 259).
+  return approveMerchants(raw);
 }
 
 const mountB: Mount = (a) => {

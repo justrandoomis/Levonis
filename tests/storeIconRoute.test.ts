@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { APEX, MERCHANT_HOST, asD1, ctx, freshDb, pending } from './fixtures/app';
+import { approveMerchants, APEX, MERCHANT_HOST, asD1, ctx, freshDb, pending } from './fixtures/app';
 import { fixtureWebp, iconEnv, imagesStub } from './fixtures/storeIcons';
 import worker from '../worker/index';
 import { PLATFORM_ICON_FOR_ROLE, STORE_ICON_PATHS, refreshStoreIcons } from '../worker/lib/storeIcons';
@@ -42,6 +42,7 @@ function seed(status = 'active') {
   const raw = freshDb();
   raw.exec(`INSERT INTO users (id,name,email,password_hash) VALUES ('u1','A','a@x.co','h')`);
   raw.exec(`INSERT INTO community_merchants (id,user_id,name) VALUES ('m1','u1','Ali 3D')`);
+  approveMerchants(raw);
   raw
     .prepare(
       `INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name,logo_key,status) VALUES ('s1','m1','u1','somestore','Ali 3D',?,?)`

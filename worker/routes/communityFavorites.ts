@@ -19,6 +19,7 @@ import { requireAuth, notFound } from '../lib/http';
 import { rateLimit } from '../lib/ratelimit';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
+import { approvedAtSql, merchantIsPublic, storeIsPublic, withApprovalSchema } from '../lib/merchantApproval';
 
 export const communityFavoriteRoutes = new Hono<AppContext>();
 
@@ -49,21 +50,29 @@ communityFavoriteRoutes.get('/', requireAuth, async (c) => {
   const user = c.get('user')!;
   const db = c.env.DB;
   const root = rootDomainFrom(c.env);
-  const { results } = await db
-    .prepare(
-      `SELECT f.product_id, f.created_at AS saved_at,
-              p.slug, p.name, p.name_ar, p.images, p.price_iqd, p.original_price_iqd,
-              p.stock, p.track_stock,
-              s.slug AS store_slug, s.name AS store_name, s.id AS store_id, s.status AS store_status
-         FROM community_product_favorites f
-         JOIN community_products p ON p.id = f.product_id
-         JOIN merchant_stores s ON s.id = p.store_id
-        WHERE f.user_id = ? AND p.status = 'active' AND p.lifecycle = 'active'
-        ORDER BY f.created_at DESC
-        LIMIT 100`
-    )
-    .bind(user.id)
-    .all();
+  // The customer's own saved list: a product they saved stays in it, but its
+  // store is linked only while the public may see the store (push 1.4) — the
+  // merchant's status and approval stamp ride along (NULL on a database
+  // without 0204: no link, closed).
+  const { results } = await withApprovalSchema((schema) =>
+    db
+      .prepare(
+        `SELECT f.product_id, f.created_at AS saved_at,
+                p.slug, p.name, p.name_ar, p.images, p.price_iqd, p.original_price_iqd,
+                p.stock, p.track_stock,
+                s.slug AS store_slug, s.name AS store_name, s.id AS store_id, s.status AS store_status,
+                m.status AS merchant_status, ${approvedAtSql('m', schema)} AS merchant_approved_at
+           FROM community_product_favorites f
+           JOIN community_products p ON p.id = f.product_id
+           JOIN merchant_stores s ON s.id = p.store_id
+           JOIN community_merchants m ON m.id = s.merchant_id
+          WHERE f.user_id = ? AND p.status = 'active' AND p.lifecycle = 'active'
+          ORDER BY f.created_at DESC
+          LIMIT 100`
+      )
+      .bind(user.id)
+      .all()
+  );
   /**
    * The CATALOGUE side of the same screen. Read separately rather than
    * UNION'd: the two rows come from different products tables with different
@@ -118,7 +127,7 @@ communityFavoriteRoutes.get('/', requireAuth, async (c) => {
       store_slug: r.store_slug,
       store_name: r.store_name,
       store_url:
-        r.store_slug && r.store_status !== 'suspended'
+        r.store_slug && storeIsPublic({ status: r.store_status }) && merchantIsPublic({ status: r.merchant_status, approved_at: r.merchant_approved_at })
           ? storeUrl(String(r.store_slug), root, String(r.store_id))
           : null,
     };

@@ -18,7 +18,7 @@ import { sniffVideo } from '../worker/lib/videoSniff';
 import { verifyLayoutRefs } from '../worker/lib/storeLayout';
 import { storeById } from '../worker/lib/merchantAuth';
 import { normalizeLayout } from '../packages/storeLayout/src/normalize';
-import { freshDb, asD1 } from './fixtures/app';
+import { approveMerchants, freshDb, asD1 } from './fixtures/app';
 
 // ------------------------------------------------------------ byte builders
 
@@ -85,6 +85,7 @@ function uploadApp(userId: string) {
   raw.exec(`INSERT INTO users (id,name,email,password_hash,role) VALUES ('ali','Ali','ali@x.co','h','merchant'), ('zain','Zain','z@x.co','h','merchant');
             INSERT INTO community_merchants (id,user_id,name) VALUES ('m_ali','ali','Ali'), ('m_zain','zain','Zain');
             INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('s_ali','m_ali','ali','ali3d','Ali'), ('s_zain','m_zain','zain','zainprint','Zain');`);
+  approveMerchants(raw);
   const objects = new Map<string, { bytes: Uint8Array; contentType?: string }>();
   const bucket = {
     async put(key: string, value: ArrayBuffer | ArrayBufferView, options?: { httpMetadata?: { contentType?: string } }) {

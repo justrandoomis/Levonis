@@ -13,7 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, patch, json, row, count, pending, type Mount } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, patch, json, row, count, pending, type Mount } from './fixtures/app';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { printRequestRoutes } from '../worker/routes/printRequests';
 
@@ -47,6 +47,7 @@ function seed() {
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','${RATE}');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   return raw;
 }
 

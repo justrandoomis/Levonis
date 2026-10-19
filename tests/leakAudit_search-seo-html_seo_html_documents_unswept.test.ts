@@ -66,7 +66,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import worker from '../worker/index';
-import { APEX, asD1, ctx, row } from './fixtures/app';
+import { approveMerchants, APEX, asD1, ctx, row } from './fixtures/app';
 import { COST, SENTINELS, leaks } from './fixtures/costlyProduct';
 import { OWNER, ROLES, seededCopy } from './fixtures/roleMatrix';
 import { BATCH_SENTINELS, FX_SENTINELS, seedBatchSentinels, seedFxSentinels } from './fixtures/fxSentinels';
@@ -118,6 +118,7 @@ function world(): DatabaseSync {
       VALUES ('cp1', 'm1', 's1', 'ali3d-bracket', 'Bracket', 'حامل رف', 'حامل متين',
               '["/files/merchants/u_m/public/aaaa1111.webp"]', 'active', 'active', 7000);
   `);
+  approveMerchants(raw);
   return raw;
 }
 

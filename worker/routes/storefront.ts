@@ -23,7 +23,10 @@
  * A STORE UNDER AN ADMIN SANCTION RETURNS NOTHING OF ITSELF (owner decision,
  * 2026-09-24): every read below answers `STORE_UNAVAILABLE` for a suspended
  * store or a suspended merchant, and the page renders only «المتجر غير متاح
- * حاليًا».
+ * حاليًا». Since Community V3 push 1.4 the same answer covers a store whose
+ * merchant no reviewer has approved (`storeHiddenFromPublic`; owner decisions
+ * C1/C2/C9): one generic page, never "under review" or "rejected", and an
+ * old slug of a hidden store does not redirect.
  */
 
 import { Hono } from 'hono';
@@ -33,7 +36,8 @@ import { safeParse } from '../lib/types';
 import { HttpError, notFound, int, str, oneOf } from '../lib/http';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
-import { storeBySlug, storeById, storeIsSuspended, type StoreContext } from '../lib/merchantAuth';
+import { storeBySlug, storeById, storeHiddenFromPublic, type StoreContext } from '../lib/merchantAuth';
+import { publicStoreUnavailable } from '../lib/merchantApproval';
 import { storeTakesOrders } from '../lib/storeOrderOps';
 import { benefits, getTierStatus } from '../lib/entitlements';
 import { salesBadgeTier } from '../lib/salesBadge';
@@ -272,8 +276,7 @@ async function storefrontStore(db: D1Database, ctx: StoreContext, rootDomain: st
  * app older than this code renders its own "no store here" screen for a 404 —
  * still nothing of the shop — instead of a broken page.
  */
-const storeUnavailable = () =>
-  new HttpError(404, 'This store is not available right now', 'STORE_UNAVAILABLE');
+const storeUnavailable = publicStoreUnavailable;
 
 /**
  * The store a RETIRED slug was renamed away from, while nobody else holds it.
@@ -307,7 +310,7 @@ async function servableStore(c: Context<AppContext>, rawSlug: string | undefined
 export async function servableStoreBySlug(db: D1Database, slug: string): Promise<StoreContext> {
   const ctx = (await storeBySlug(db, slug)) ?? (await storeForRetiredSlug(db, slug));
   if (!ctx) throw notFound('Store not found');
-  if (storeIsSuspended(ctx)) throw storeUnavailable();
+  if (storeHiddenFromPublic(ctx)) throw storeUnavailable();
   return ctx;
 }
 
@@ -382,7 +385,7 @@ storefrontRoutes.get('/resolve', (c) => anonymousCached(c, {}, async () => {
     // …unless a sanction closed it (review S4). Its new address is a name
     // the merchant chose — possibly the very thing it was suspended for — and
     // a redirect would advertise it to everyone holding the old link.
-    if (moved && storeIsSuspended(moved)) return unavailable();
+    if (moved && storeHiddenFromPublic(moved)) return unavailable();
     if (moved) {
       return c.json(
         {
@@ -402,7 +405,7 @@ storefrontRoutes.get('/resolve', (c) => anonymousCached(c, {}, async () => {
     // which would make a typo silently look like the platform's own homepage.
     return c.json({ success: false, kind: 'merchant', store: null, error: 'No such store', root_domain }, 404);
   }
-  if (storeIsSuspended(ctx)) return unavailable();
+  if (storeHiddenFromPublic(ctx)) return unavailable();
   return c.json({
     success: true,
     kind: 'merchant',
@@ -834,6 +837,6 @@ storefrontRoutes.get('/by-id/:storeId', (c) => anonymousCached(c, {}, async () =
     if (row) ctx = await storeById(c.env.DB, row.id);
   }
   if (!ctx) throw notFound('Store not found');
-  if (storeIsSuspended(ctx)) throw storeUnavailable();
+  if (storeHiddenFromPublic(ctx)) throw storeUnavailable();
   return c.json({ success: true, store: await storefrontStore(c.env.DB, ctx, rootDomainFrom(c.env)) });
 }));

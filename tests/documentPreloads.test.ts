@@ -23,7 +23,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
-import { APEX, asD1, ctx, freshDb } from './fixtures/app';
+import { approveMerchants, APEX, asD1, ctx, freshDb } from './fixtures/app';
 import worker from '../worker/index';
 import {
   ARABIC_FONT_PRELOAD,
@@ -92,6 +92,7 @@ function seed() {
     INSERT INTO product_images (id, product_id, url, r2_key, is_primary, sort_order)
       VALUES ('pi1','p1','/files/products/filament-pla/main.webp','products/filament-pla/main.webp',1,0);
   `);
+  approveMerchants(raw);
   return raw;
 }
 

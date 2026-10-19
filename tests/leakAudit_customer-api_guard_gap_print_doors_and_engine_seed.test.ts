@@ -64,7 +64,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { DatabaseSync } from 'node:sqlite';
 import { ROOT } from './fixtures/d1';
-import { asD1 } from './fixtures/app';
+import { approveMerchants, asD1 } from './fixtures/app';
 import { leaks } from './fixtures/costlyProduct';
 import {
   NOT_A_COST,
@@ -367,6 +367,7 @@ test('B4 GUARD GAP, consequence: had the sweep reached the merchant payload, its
     INSERT OR IGNORE INTO community_merchants (id, user_id, name) VALUES ('cm_um', 'u_m', 'Matrix Merchant');
     INSERT OR IGNORE INTO merchant_stores (id, merchant_id, user_id, slug, name) VALUES ('st_um', 'cm_um', 'u_m', 'matrix-merchant', 'Matrix Merchant');
   `);
+  approveMerchants(raw);
   assert.ok(await storeForUser(asD1(raw), 'u_m'), 'the matrix merchant now owns a store');
   const app = appFor(raw, ROLES.merchant);
   const path = '/api/print-quote/grams-quote';

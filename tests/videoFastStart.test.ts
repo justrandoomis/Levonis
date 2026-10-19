@@ -22,7 +22,7 @@ import { uploadRoutes } from '../worker/routes/uploads';
 import { HttpError } from '../worker/lib/http';
 import { mp4IsFastStart, sniffVideo } from '../worker/lib/videoSniff';
 import { REFUSAL_STRINGS } from '../src/lib/refusalStrings';
-import { freshDb, asD1 } from './fixtures/app';
+import { approveMerchants, freshDb, asD1 } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 
 const u32 = (n: number) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
@@ -55,6 +55,7 @@ function uploadApp() {
   raw.exec(`INSERT INTO users (id,name,email,password_hash,role) VALUES ('ali','Ali','ali@x.co','h','merchant');
             INSERT INTO community_merchants (id,user_id,name) VALUES ('m_ali','ali','Ali');
             INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('s_ali','m_ali','ali','ali3d','Ali');`);
+  approveMerchants(raw);
   const objects = new Map<string, Uint8Array>();
   const bucket = {
     async put(key: string, value: ArrayBuffer | ArrayBufferView) {

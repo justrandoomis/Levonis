@@ -6,7 +6,7 @@
  * migrations, real routes — only the session is stubbed (./app.ts).
  */
 import type { DatabaseSync } from 'node:sqlite';
-import { asD1, freshDb, stubApp, type Mount, type StubUser } from './app';
+import { approveMerchants, asD1, freshDb, stubApp, type Mount, type StubUser } from './app';
 
 export const OWNER: StubUser = { id: 'owner', role: 'merchant', email: 'owner@x.co' };
 export const OWNER2: StubUser = { id: 'owner2', role: 'merchant', email: 'owner2@x.co' };
@@ -36,7 +36,8 @@ export function seedW2E(raw: DatabaseSync = freshDb()): DatabaseSync {
       ('cp3','m1','s1','ali3d-draft','Draft','hidden','draft',5000,5,1),
       ('cp9','m2','s2','zahra-cup','Cup','active','active',7000,5,1);
   `);
-  return raw;
+  // Two shops that sell: approved merchants (push 1.4, DECISIONS row 259).
+  return approveMerchants(raw);
 }
 
 /** A store order. `status` defaults to delivered; `at` to now. */

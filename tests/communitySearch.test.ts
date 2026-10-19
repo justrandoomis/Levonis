@@ -24,7 +24,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, get, json, pending, type StubUser, type Mount } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, get, json, pending, type StubUser, type Mount } from './fixtures/app';
 import { communityRoutes } from '../worker/routes/community';
 import { communityPostRoutes } from '../worker/routes/communityPosts';
 import { communitySocialRoutes } from '../worker/routes/communitySocial';
@@ -105,6 +105,7 @@ async function seed(): Promise<DatabaseSync> {
     INSERT INTO follows (user_id,merchant_id) VALUES ('eve','m_ali'),('omar','m_ali');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   // The catalogue index, as a product save writes it.
   for (const [id, name, name_ar] of [
     ['p_pla', 'PLA Dragon Red 1kg', 'خيط تنين أحمر 1 كغ'],

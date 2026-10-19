@@ -54,6 +54,7 @@ import { notifyGrouped, peopleAr, stampGroupedCkb } from '../lib/notifications';
 import { customOrderCustomerLink } from '../lib/customOrderNotify';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { merchantHref } from '@levonis/contracts/merchantRoutes';
+import { merchantPublicSql, withApprovalSchema } from '../lib/merchantApproval';
 
 export const requestDiscussionRoutes = new Hono<AppContext>();
 
@@ -139,10 +140,16 @@ async function discussionAccess(env: Env, r: RequestRow, user: SessionUser | nul
   return onPublicBoard(r) ? 'board' : null;
 }
 
-const COMMENT_COLUMNS = `c.id, c.request_id, c.parent_id, c.kind, c.body, c.state, c.admin_hidden_reason, c.created_at, c.author_id,
+/**
+ * The author's «تاجر» role and page link read the ONE public predicate (push
+ * 1.4: not suspended AND approved); `schema` is false only on
+ * `withApprovalSchema`'s second try, on a database without 0204 — then no
+ * author reads as a merchant (C11) and the thread itself still reads.
+ */
+const commentColumns = (schema = true) => `c.id, c.request_id, c.parent_id, c.kind, c.body, c.state, c.admin_hidden_reason, c.created_at, c.author_id,
        u.name AS a_name, u.username AS a_username, u.creator_public AS a_public,
        CASE WHEN c.author_id = r.customer_id THEN 1 ELSE 0 END AS a_customer,
-       EXISTS (SELECT 1 FROM community_merchants am WHERE am.user_id = c.author_id AND am.status <> 'suspended') AS a_merchant`;
+       EXISTS (SELECT 1 FROM community_merchants am WHERE am.user_id = c.author_id AND ${merchantPublicSql('am', schema)}) AS a_merchant`;
 const COMMENT_FROM = `FROM community_request_comments c
        JOIN community_requests r ON r.id = c.request_id
        LEFT JOIN users u ON u.id = c.author_id`;
@@ -207,7 +214,9 @@ function nextCursor(rows: Array<Record<string, unknown>>, limit: number): string
 }
 
 async function loadComment(db: D1Database, id: string): Promise<Record<string, unknown> | null> {
-  return db.prepare(`SELECT ${COMMENT_COLUMNS} ${COMMENT_FROM} WHERE c.id = ?`).bind(id).first<Record<string, unknown>>();
+  return withApprovalSchema((schema) =>
+    db.prepare(`SELECT ${commentColumns(schema)} ${COMMENT_FROM} WHERE c.id = ?`).bind(id).first<Record<string, unknown>>()
+  );
 }
 
 // ---------------------------------------------------------- system rows
@@ -277,15 +286,17 @@ requestDiscussionRoutes.get('/requests/:id/comments', requireCommunityOpen, asyn
    * cursor row's own rowid. `total` is the first page's business alone.
    */
   const [{ results }, total] = await Promise.all([
-    c.env.DB.prepare(
-      `SELECT ${COMMENT_COLUMNS} ${COMMENT_FROM}
-        WHERE c.request_id = ?1 AND (c.state = 'visible' OR (c.state = 'hidden' AND ?2 = 1))
-          AND (?3 = '' OR c.created_at > ?3
-               OR (c.created_at = ?3 AND c.rowid > (SELECT k.rowid FROM community_request_comments k WHERE k.id = ?4)))
-        ORDER BY c.created_at ASC, c.rowid ASC LIMIT ?5`
-    )
-      .bind(id, admin, cursor.at, cursor.id, limit + 1)
-      .all<Record<string, unknown>>(),
+    withApprovalSchema((schema) =>
+      c.env.DB.prepare(
+        `SELECT ${commentColumns(schema)} ${COMMENT_FROM}
+          WHERE c.request_id = ?1 AND (c.state = 'visible' OR (c.state = 'hidden' AND ?2 = 1))
+            AND (?3 = '' OR c.created_at > ?3
+                 OR (c.created_at = ?3 AND c.rowid > (SELECT k.rowid FROM community_request_comments k WHERE k.id = ?4)))
+          ORDER BY c.created_at ASC, c.rowid ASC LIMIT ?5`
+      )
+        .bind(id, admin, cursor.at, cursor.id, limit + 1)
+        .all<Record<string, unknown>>()
+    ),
     cursor.at === ''
       ? c.env.DB.prepare(
           `SELECT COUNT(*) AS n FROM community_request_comments c WHERE c.request_id = ?1 AND c.state = 'visible' AND c.kind <> 'system_update'`

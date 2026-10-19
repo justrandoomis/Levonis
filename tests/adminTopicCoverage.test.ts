@@ -28,7 +28,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, row, count, pending } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, row, count, pending } from './fixtures/app';
 import { BINDABLE_TOPIC_KEYS } from '../worker/lib/telegramAdmin';
 import { deviceRoutes } from '../worker/routes/devices';
 import { priceReportRoutes } from '../worker/routes/priceReports';
@@ -489,6 +489,7 @@ test('REQUEST PROMISE — an offer on a community request reaches the customer',
     INSERT INTO community_requests (id,customer_id,title,description) VALUES ('req_1','buyer','A gear for my mill','');
     INSERT INTO community_offers (id,request_id,merchant_id,price_iqd) VALUES ('off_1','req_1','cm_1',42000);
   `);
+  approveMerchants(raw);
   const env = { DB: asD1(raw) } as unknown as Env;
   await notifyOfferReceived(env, 'off_1');
 
@@ -518,6 +519,7 @@ test('REQUEST PROMISE — a second merchant bidding is a second message, and a r
     INSERT INTO community_offers (id,request_id,merchant_id,price_iqd) VALUES ('off_1','req_1','cm_1',42000);
     INSERT INTO community_offers (id,request_id,merchant_id,price_iqd) VALUES ('off_2','req_1','cm_2',39000);
   `);
+  approveMerchants(raw);
   const env = { DB: asD1(raw) } as unknown as Env;
   await notifyOfferReceived(env, 'off_1');
   await notifyOfferReceived(env, 'off_2');

@@ -176,14 +176,15 @@ function alias(a: string): string {
   return a;
 }
 
-/** The sanction rule the directory and the feed use today: a suspended merchant is shown nowhere. */
+/** The sanction rule alone: a suspended merchant is shown nowhere. Public lists use `merchantPublicSql`. */
 export function merchantUnsanctionedSql(a: string): string {
   return `${alias(a)}.status <> 'suspended'`;
 }
 
 /**
  * A store an admin suspended is shown nowhere. The alias may come from a LEFT
- * JOIN (a store-less row reads as not suspended), as the feed's rule does.
+ * JOIN (a store-less row reads as not suspended); a public list that SHOWS a
+ * store joins it (inner), so there the COALESCE never meets a NULL.
  * A merchant-PAUSED store stays listed with its label (owner decision C10).
  */
 export function storeUnsanctionedSql(s: string): string {
@@ -191,11 +192,38 @@ export function storeUnsanctionedSql(s: string): string {
 }
 
 /**
- * PUBLIC MERCHANT (gap §3.6): not suspended AND approved. Push 1.4 moves every
- * public surface onto this; until then only new code reads it.
+ * PUBLIC MERCHANT (gap §3.6, push 1.4): not suspended AND approved — the one
+ * definition every public surface reads instead of its own `<> 'suspended'`.
+ *
+ * `schema` is false only on the second try of `withApprovalSchema`, on a
+ * database without 0204's column: the predicate is then FALSE and names no
+ * column, so a list reads as empty and a mark as absent (owner decision C11:
+ * fail CLOSED everywhere, public lists included).
  */
-export function merchantPublicSql(a: string): string {
-  return `${merchantUnsanctionedSql(a)} AND ${alias(a)}.approved_at IS NOT NULL`;
+export function merchantPublicSql(a: string, schema = true): string {
+  return schema ? `(${merchantUnsanctionedSql(a)} AND ${alias(a)}.approved_at IS NOT NULL)` : '(0)';
+}
+
+/** The approval stamp as a SELECT expression: the column, or NULL (not approved) on a database without it. */
+export function approvedAtSql(a: string, schema = true): string {
+  return schema ? `${alias(a)}.approved_at` : 'NULL';
+}
+
+/**
+ * A READ THAT NAMES 0204's COLUMN, ON A DATABASE THAT MAY PREDATE IT
+ * (CLAUDE.md rule 2; gap §3.11). `run(true)` first — the normal case costs
+ * nothing extra; only a "no such column/table" answer re-runs it as
+ * `run(false)`, whose SQL uses `merchantPublicSql(a, false)` /
+ * `approvedAtSql(a, false)` and so never names the column. Approval then
+ * reads as absent: closed, never open.
+ */
+export async function withApprovalSchema<T>(run: (schema: boolean) => Promise<T>): Promise<T> {
+  try {
+    return await run(true);
+  } catch (e) {
+    if (!isMissingSchema(e)) throw e;
+    return run(false);
+  }
 }
 
 /**
@@ -216,7 +244,57 @@ export function revisionSentSql(a: string): string {
 
 /** PUBLIC STORE (gap §3.6): not suspended; paused stays visible (C10). */
 export function storePublicSql(s: string): string {
-  return storeUnsanctionedSql(s);
+  return `(${storeUnsanctionedSql(s)})`;
+}
+
+/** The same two rules for a row already read: a merchant row (status, approved_at) and a store row (status). */
+export function merchantIsPublic(m: { status?: unknown; approved_at?: unknown } | null | undefined): boolean {
+  return !!m && m.status !== 'suspended' && merchantApproved(m);
+}
+
+export function storeIsPublic(s: { status?: unknown } | null | undefined): boolean {
+  return !!s && s.status !== 'suspended';
+}
+
+/**
+ * THE ONE PUBLIC ANSWER (owner decision C9, gap §3.5). A store that is not
+ * public — never approved, under review, rejected, or suspended — is «غير
+ * متاح» to everyone but its merchant, in the same words, with the same code.
+ * Nothing in it names a state, a reason or a person.
+ */
+export function publicStoreUnavailable(): HttpError {
+  return new HttpError(404, 'This store is not available right now', 'STORE_UNAVAILABLE');
+}
+
+/**
+ * THE MERCHANT'S OWN REFUSAL (E3–E10). Only the merchant hears it: a store
+ * exists, but no reviewer has approved the account, so nothing NEW is
+ * promised from it. Finishing what is already promised stays open.
+ */
+export function merchantNotApprovedRefusal(): HttpError {
+  return new HttpError(
+    403,
+    'لم يُعتمد حسابك تاجرًا بعد؛ قدّم طلب الاعتماد أو تابعه من صفحة التاجر / Your merchant account is not approved yet; apply, or follow your application, from the merchant page',
+    'MERCHANT_NOT_APPROVED'
+  );
+}
+
+/**
+ * A merchant the public may see, by id — not suspended, approved, and with a
+ * store that is not suspended — or null. One read for the follow doors; on a
+ * database without 0204 nobody is public (C11).
+ */
+export async function publicMerchantById(db: D1Database, merchantId: string): Promise<{ id: string; user_id: string } | null> {
+  return withApprovalSchema((schema) =>
+    db
+      .prepare(
+        `SELECT cm.id, cm.user_id, ${approvedAtSql('cm', schema)} AS approved_at
+           FROM community_merchants cm JOIN merchant_stores s ON s.merchant_id = cm.id
+          WHERE cm.id = ? AND ${merchantPublicSql('cm', schema)} AND ${storePublicSql('s')}`
+      )
+      .bind(merchantId)
+      .first<{ id: string; user_id: string }>()
+  );
 }
 
 export interface MerchantApprovalState {

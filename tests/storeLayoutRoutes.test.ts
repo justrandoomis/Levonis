@@ -39,7 +39,7 @@ import {
   row,
   stubApp,
   type App,
-  type Mount,
+  type Mount, withApprovalColumns,
 } from './fixtures/app';
 import { SqliteD1, type SqliteStatement } from './fixtures/d1';
 import { serialD1 } from './fixtures/serialD1';
@@ -850,7 +850,7 @@ test('the media sweep sees every picture and video a draft or a kept revision us
 // ------------------------------------------------------------ deploy ahead
 
 test('a Worker deployed before migration 0122 serves the classic page on every storefront address', async () => {
-  const w = world(undefined, dbThrough('0121'));
+  const w = world(undefined, withApprovalColumns(dbThrough('0121')));
   for (const store of await publicStores(w)) {
     assert.equal(store.layout_source, 'default');
     assert.deepEqual(store.layout, defaultLayoutFromStore(null));

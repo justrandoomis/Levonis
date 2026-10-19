@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, get, json, all, row, pending } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, get, json, all, row, pending } from './fixtures/app';
 import { cartRoutes } from '../worker/routes/cart';
 import { storeOrderRoutes } from '../worker/routes/storeOrders';
 import { orderRoutes } from '../worker/routes/orders';
@@ -45,6 +45,7 @@ function seed(raw: DatabaseSync) {
       VALUES ('mem_ali','ali','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','${FUTURE}');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','1400');
   `);
+  approveMerchants(raw);
 }
 
 const buyer = (db: D1Database) =>

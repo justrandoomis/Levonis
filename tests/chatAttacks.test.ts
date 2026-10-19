@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, get, patch, json, count, row, type StubUser, type Mount } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, get, patch, json, count, row, type StubUser, type Mount } from './fixtures/app';
 import { chatRoutes } from '../worker/routes/chats';
 import { chatCommerceRoutes } from '../worker/routes/chatCommerce';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
@@ -92,6 +92,7 @@ function seed() {
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','${RATE}');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   return raw;
 }
 const fund = (raw: DatabaseSync, user: string, iqd: number) =>

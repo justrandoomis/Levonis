@@ -21,7 +21,7 @@ import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import {
   freshDb, asD1, stubApp, post, patch, put, get, json, count, row, all, pending, memoryBucket,
-  type App, type Mount, type StubUser,
+  type App, type Mount, type StubUser, approveMerchants,
 } from './fixtures/app';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { printRequestRoutes } from '../worker/routes/printRequests';
@@ -80,6 +80,7 @@ function seed() {
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','${RATE}');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   return raw;
 }
 

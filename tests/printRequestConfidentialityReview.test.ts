@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, get, json, row, type Mount, type StubUser } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, get, json, row, type Mount, type StubUser } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { printRequestRoutes } from '../worker/routes/printRequests';
@@ -55,6 +55,7 @@ function seed() {
     INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status,note)
       VALUES ('wt1','buyer','deposit','USD',${Math.ceil((500_000 * 100) / RATE)},'approved','test funding');
   `);
+  approveMerchants(raw);
   return raw;
 }
 const as = (raw: DatabaseSync, id: string | null, role: StubUser['role'] = 'customer') =>

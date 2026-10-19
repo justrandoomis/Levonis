@@ -61,6 +61,7 @@ import { DOCUMENT_CACHE_CONTROL } from './securityPolicy';
 import { variantSourceMime } from './imageConvert';
 import { STORE_GALLERY_SIZES, STORE_HERO_SIZES, variantSrcSet } from '../../packages/contracts/src/imageSizing';
 import { mediaAspect, productGallerySizes } from '../../packages/contracts/src/imageSizes';
+import { merchantPublicSql, storePublicSql, withApprovalSchema } from './merchantApproval';
 
 /** The four things a chat app reads off a link, already absolute and escaped. */
 export interface SocialPreview {
@@ -336,25 +337,28 @@ export async function resolveProductPreview(
    * id or merchant id — the page accepts all three). With a scope, only that
    * store's published product is a card: `/p/<any slug>` on ali3d's host used
    * to unfurl ANY merchant's product, or a catalogue product, under ali3d's
-   * address. A sanctioned store (suspended, or its merchant suspended) gives
-   * no card at all — its page is «المتجر غير متاح حاليًا».
+   * address. A store the public may not see (suspended, its merchant
+   * suspended, or — push 1.4 — its merchant not approved) gives no card at
+   * all — its page is «المتجر غير متاح حاليًا» (C9: the card is generic).
    */
   scope: { storeSlug?: string | null; storeRef?: string | null } = {}
 ): Promise<ProductPreview | null> {
   const storeKey = scope.storeSlug || scope.storeRef || '';
   if (storeKey) {
-    const scoped = await db
-      .prepare(
-        `SELECT p.name, p.name_ar, p.description, p.description_ar, p.images
-           FROM community_products p
-           JOIN merchant_stores s ON s.id = p.store_id
-           JOIN community_merchants m ON m.id = s.merchant_id
-          WHERE p.slug = ?1 AND p.status = 'active' AND p.lifecycle = 'active'
-            AND (s.slug = ?2 OR (?3 = 1 AND (s.id = ?2 OR s.merchant_id = ?2)))
-            AND s.status <> 'suspended' AND m.status <> 'suspended'`
-      )
-      .bind(slug, storeKey, scope.storeSlug ? 0 : 1)
-      .first<PreviewRow>();
+    const scoped = await withApprovalSchema((schema) =>
+      db
+        .prepare(
+          `SELECT p.name, p.name_ar, p.description, p.description_ar, p.images
+             FROM community_products p
+             JOIN merchant_stores s ON s.id = p.store_id
+             JOIN community_merchants m ON m.id = s.merchant_id
+            WHERE p.slug = ?1 AND p.status = 'active' AND p.lifecycle = 'active'
+              AND (s.slug = ?2 OR (?3 = 1 AND (s.id = ?2 OR s.merchant_id = ?2)))
+              AND ${storePublicSql('s')} AND ${merchantPublicSql('m', schema)}`
+        )
+        .bind(slug, storeKey, scope.storeSlug ? 0 : 1)
+        .first<PreviewRow>()
+    );
     return scoped ? previewFrom(scoped, null, origin, db) : null;
   }
   // `products` has `name`/`name_ar`/`name_ku` and no `_en` columns (0001):
@@ -368,18 +372,22 @@ export async function resolveProductPreview(
     )
     .bind(slug)
     .first<PreviewRow>();
+  // A community product unfurls only under the feed's own rule (push 1.4):
+  // live, in a store, of a merchant the public may see.
   const row = product ??
-    (await db
-      .prepare(
-        `SELECT p.name, p.name_ar, p.description, p.description_ar, p.images
-           FROM community_products p
-           JOIN community_merchants m ON m.id = p.merchant_id
-           LEFT JOIN merchant_stores s ON s.id = p.store_id
-          WHERE p.slug = ? AND p.status = 'active'
-            AND m.status <> 'suspended' AND COALESCE(s.status, '') <> 'suspended'`
-      )
-      .bind(slug)
-      .first<PreviewRow>());
+    (await withApprovalSchema((schema) =>
+      db
+        .prepare(
+          `SELECT p.name, p.name_ar, p.description, p.description_ar, p.images
+             FROM community_products p
+             JOIN community_merchants m ON m.id = p.merchant_id
+             JOIN merchant_stores s ON s.id = p.store_id
+            WHERE p.slug = ? AND p.status = 'active' AND p.lifecycle = 'active'
+              AND ${merchantPublicSql('m', schema)} AND ${storePublicSql('s')}`
+        )
+        .bind(slug)
+        .first<PreviewRow>()
+    ));
   if (!row) return null;
   return previewFrom(row, product, origin, db);
 }
@@ -522,17 +530,19 @@ export async function resolveStorePreview(
 ): Promise<StoreCard | null> {
   const storeKey = scope.storeSlug || scope.storeRef || '';
   if (!storeKey) return null;
-  const store = await db
-    .prepare(
-      `SELECT s.id, s.name, s.tagline, s.description, s.logo_key, s.accent
-         FROM merchant_stores s
-         JOIN community_merchants m ON m.id = s.merchant_id
-        WHERE (s.slug = ?1 OR (?2 = 1 AND (s.id = ?1 OR s.merchant_id = ?1)))
-          AND s.status <> 'suspended' AND m.status <> 'suspended'
-        LIMIT 1`
-    )
-    .bind(storeKey, scope.storeSlug ? 0 : 1)
-    .first<StoreCardRow>();
+  const store = await withApprovalSchema((schema) =>
+    db
+      .prepare(
+        `SELECT s.id, s.name, s.tagline, s.description, s.logo_key, s.accent
+           FROM merchant_stores s
+           JOIN community_merchants m ON m.id = s.merchant_id
+          WHERE (s.slug = ?1 OR (?2 = 1 AND (s.id = ?1 OR s.merchant_id = ?1)))
+            AND ${storePublicSql('s')} AND ${merchantPublicSql('m', schema)}
+          LIMIT 1`
+      )
+      .bind(storeKey, scope.storeSlug ? 0 : 1)
+      .first<StoreCardRow>()
+  );
   if (!store) return null;
 
   const title = cleanIdentityText(store.name, 60);

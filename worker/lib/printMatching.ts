@@ -211,10 +211,11 @@ function toPrinter(p: MerchantPrinter): CapabilityPrinter {
 }
 
 /**
- * A pre-W5-B candidate carried no plan, stock or delivery configuration, so
- * those dimensions are not judged for it (`plan_ok`, `untracked`,
- * `not_evaluated`) — exactly what this adapter's callers always got. The
- * routes never come through here: printMatchingStore.ts loads all three.
+ * A pre-W5-B candidate carried no plan, stock, delivery configuration or
+ * approval stamp, so those dimensions are not judged for it (`plan_ok`,
+ * `approved`, `untracked`, `not_evaluated`) — exactly what this adapter's
+ * callers always got. The routes never come through here:
+ * printMatchingStore.ts loads all four, the approval stamp included (push 1.4).
  */
 function toCandidate(m: MerchantCandidate): EligibilityCandidate {
   return {
@@ -225,6 +226,7 @@ function toCandidate(m: MerchantCandidate): EligibilityCandidate {
     store_id: m.store_id,
     accepts_custom_requests: m.accepts_custom_requests,
     plan_ok: true,
+    approved: true,
     printers: m.printers.map(toPrinter),
     stock: 'untracked',
     reach: 'not_evaluated',

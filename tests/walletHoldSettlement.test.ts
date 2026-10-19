@@ -22,7 +22,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import {
-  freshDb, asD1, failingD1, stubApp, post, get, json, ledger, holds, spendable, count, row, all, pending,
+  freshDb, asD1, failingD1, stubApp, post, get, json, ledger, holds, spendable, count, row, all, pending, approveMerchants,
 } from './fixtures/app';
 import { walletRoutes } from '../worker/routes/wallet';
 import { storeOrderRoutes } from '../worker/routes/storeOrders';
@@ -53,6 +53,7 @@ function seedStore(raw: DatabaseSync) {
     INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,starts_at,expires_at)
       VALUES ('mem1','mowner','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z');
   `);
+  approveMerchants(raw);
 }
 
 const buyerApp = (db: D1Database) =>
@@ -209,6 +210,7 @@ function seedEscrow(raw: DatabaseSync) {
     INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status,note)
       VALUES ('dep_cust','cust','deposit','USD',${DEP},'approved','seed funding');
   `);
+  approveMerchants(raw);
 }
 const escrowFor = (db: D1Database, key = 'accept:co1') =>
   holdEscrow(db, {

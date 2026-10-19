@@ -12,7 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  freshDb, asD1, failingD1, stubApp, post, patch, get, json, row, all, type StubUser,
+  freshDb, asD1, failingD1, stubApp, post, patch, get, json, row, all, type StubUser, approveMerchants,
 } from './fixtures/app';
 import { merchantRoutes } from '../worker/routes/merchant';
 import { merchantCatalogRoutes } from '../worker/routes/merchantCatalog';
@@ -42,6 +42,7 @@ function withStore(raw: ReturnType<typeof freshDb>) {
     INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name,governorate) VALUES ('s1','m1','owner','ali3d','Ali 3D','بغداد - الكرادة');
     INSERT INTO merchant_store_slugs (slug, store_id, active) VALUES ('ali3d','s1',1);
   `);
+  approveMerchants(raw);
   return raw;
 }
 
@@ -49,6 +50,7 @@ function withStore(raw: ReturnType<typeof freshDb>) {
 function approved(raw: ReturnType<typeof freshDb>) {
   raw.exec(`INSERT INTO community_merchants (id,user_id,name,approved_at,approved_application_id)
             VALUES ('m1','owner','Ali 3D','2026-01-01T00:00:00.000Z','mapp_owner')`);
+  approveMerchants(raw);
   return raw;
 }
 
@@ -90,6 +92,7 @@ test('B14: a slug another store has since CLAIMED is that store — never a redi
     INSERT INTO community_merchants (id,user_id,name) VALUES ('m2','rival','Zaid');
     INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('s2','m2','rival','oldname','Zaid Prints');
   `);
+  approveMerchants(raw);
   const res = await json(await get(host(raw, 'oldname.levonis-iq.com'), '/api/storefront/resolve'));
   assert.equal(res.store.name, 'Zaid Prints');
 });
@@ -126,6 +129,7 @@ test('B24: onboarding that loses the slug race answers 409 SLUG_UNAVAILABLE — 
     if (stmts.some((s) => /INSERT INTO merchant_stores/.test(s.sql))) {
       raw.exec(`INSERT INTO community_merchants (id,user_id,name) VALUES ('m2','rival','Zaid');
                 INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('s2','m2','rival','ali3d','Zaid');`);
+      approveMerchants(raw);
     }
   };
   const res = await post(merchant(db), '/api/merchant/onboard', { name: 'Ali 3D', slug: 'ali3d' });
@@ -154,6 +158,7 @@ test('B24: a slug change that loses the race answers 409, and the old address is
     if (stmts.some((s) => /UPDATE merchant_stores SET slug/.test(s.sql))) {
       raw.exec(`INSERT INTO community_merchants (id,user_id,name) VALUES ('m2','rival','Zaid');
                 INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('s2','m2','rival','wanted','Zaid');`);
+      approveMerchants(raw);
     }
   };
   const res = await post(merchant(db), '/api/merchant/store/slug', { slug: 'wanted' });
@@ -170,6 +175,7 @@ test('a slug whose parking has LAPSED onboards cleanly (its history row is taken
     INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('sg','mg','gone','gone-new','Gone');
     INSERT INTO merchant_store_slugs (slug, store_id, active, reserved_until) VALUES ('freed','sg',0,'2020-01-01T00:00:00.000Z');
   `);
+  approveMerchants(raw);
   const res = await post(merchant(asD1(raw)), '/api/merchant/onboard', { name: 'Ali 3D', slug: 'freed' });
   assert.equal(res.status, 201, JSON.stringify(await json(res)));
   const slugRow = row<{ store_id: string; active: number }>(raw, "SELECT store_id, active FROM merchant_store_slugs WHERE slug = 'freed'")!;

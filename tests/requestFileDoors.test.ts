@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import {
-  MemoryBucket, all, asD1, count, ctx, freshDb, json, memoryBucket, pending, post, row, stubApp, type App, type Mount,
+  MemoryBucket, all, asD1, count, ctx, freshDb, json, memoryBucket, pending, post, row, stubApp, type App, type Mount, approveMerchants,
 } from './fixtures/app';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { printRequestRoutes } from '../worker/routes/printRequests';
@@ -59,6 +59,7 @@ function seed(): DatabaseSync {
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','${RATE}');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   return raw;
 }
 

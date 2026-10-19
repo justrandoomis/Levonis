@@ -25,7 +25,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { asD1, count, ctx, freshDb, json, pending, post, row, stubApp, type StubUser } from './fixtures/app';
+import { approveMerchants, asD1, count, ctx, freshDb, json, pending, post, row, stubApp, type StubUser } from './fixtures/app';
 import { chatRoutes } from '../worker/routes/chats';
 import { adminChatRoutes } from '../worker/routes/adminChats';
 import { supportRoutes } from '../worker/routes/support';
@@ -146,6 +146,7 @@ function world(opts: { telegram?: boolean } = {}) {
       ('holder','Huda','h@x.co','h','customer');
     INSERT INTO community_merchants (id, user_id, name) VALUES ('m1','seller','Noor Prints');
   `);
+  approveMerchants(raw);
   const order = (id: string, user: string, merchant: string | null) =>
     raw
       .prepare(

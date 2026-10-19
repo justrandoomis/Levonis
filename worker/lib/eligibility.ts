@@ -200,6 +200,12 @@ export interface EligibilityCandidate {
   user_id: string;
   /** community_merchants.status */
   merchant_status: string;
+  /**
+   * A reviewer approved this merchant (`community_merchants.approved_at`,
+   * Community V3 push 1.4, E7). Required: an unapproved workshop takes no new
+   * work, so it is never eligible and never told about a request.
+   */
+  approved: boolean;
   /** merchant_stores.status; '' = no store row (which is not an active store). */
   store_status: string;
   store_id: string | null;
@@ -429,7 +435,7 @@ export function evaluateEligibility(
   const trade: ReasonCode[] = [];
   if (!req.on_board) trade.push('REQUEST_CLOSED');
   if (req.customer_id && req.customer_id === m.user_id) trade.push('OWN_REQUEST');
-  if (m.merchant_status !== 'active') trade.push('MERCHANT_INACTIVE');
+  if (m.merchant_status !== 'active' || m.approved !== true) trade.push('MERCHANT_INACTIVE');
   // An allow-list, as everywhere since review S2: a missing store is not an active one.
   if (m.store_status !== 'active') trade.push('STORE_UNAVAILABLE');
   if (!m.plan_ok) trade.push('PLAN_LAPSED');

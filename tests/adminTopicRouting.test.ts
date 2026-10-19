@@ -31,7 +31,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, pending } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, pending } from './fixtures/app';
 import {
   announceAfterResponse,
   announceToAdmins,
@@ -340,6 +340,7 @@ test('STORE REVIEW — a merchant review reaches the same Review topic', async (
                         subtotal_iqd,shipping_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,delivered_at,merchant_id)
       VALUES ('ORD-M','buyer','delivered','{}','standard','{}','cash',25000,0,1400,25000,0,'2026-09-18T00:00:00.000Z','mer_1');
   `);
+  approveMerchants(raw);
   bindGroup(raw);
   const tg = stubTelegram();
   try {
