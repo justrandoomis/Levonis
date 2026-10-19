@@ -8,6 +8,8 @@ import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { safeParse } from '../lib/types';
 import { stripFinancials } from '../lib/adminScope';
 import { stripInventoryProvenance } from '../lib/inventoryProvenancePrivacy';
+import { SESSION_CACHE_CONTROL } from '../lib/edgePolicy';
+import { OrderFilesNotFound, orderFilesFor } from '../lib/orderFiles';
 import { customerOrderPricing, customerOrderTransport, customerWarranty, withoutUsdTwins } from '../lib/customerPricing';
 import { isUsdCents } from '@levonis/pricing/usdCents';
 import { requireAuth, badRequest, conflict, notFound, str, int, unavailable, HttpError } from '../lib/http';
@@ -5903,6 +5905,27 @@ orderRoutes.get('/:id/units', async (c) => {
     };
   });
   return c.json({ success: true, order_id: id, units });
+});
+
+/**
+ * «ملفاتك» — the files the buyer paid for on THIS order (worker/lib/orderFiles.ts):
+ * the one screen that leads to a purchased download when the shopfront is
+ * hidden (push 1.4: a store not approved yet answers STORE_UNAVAILABLE to
+ * its product page, while the download door stays open to its buyer). The
+ * caller's own order only — anyone else's is the same «Order not found» a
+ * missing id gets — and only rows the download and viewer doors would serve
+ * to this buyer. Private: never cached anywhere.
+ */
+orderRoutes.get('/:id/files', async (c) => {
+  const user = c.get('user')!;
+  const id = c.req.param('id');
+  c.header('Cache-Control', SESSION_CACHE_CONTROL);
+  try {
+    return c.json({ success: true, order_id: id, files: await orderFilesFor(c.env.DB, user.id, id) });
+  } catch (e) {
+    if (e instanceof OrderFilesNotFound) throw notFound('Order not found');
+    throw e;
+  }
 });
 
 /**

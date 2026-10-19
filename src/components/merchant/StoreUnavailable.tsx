@@ -37,15 +37,19 @@ export default function StoreUnavailable() {
           <Store className="w-6 h-6 text-text-muted" strokeWidth={1.5} aria-hidden="true" />
         </div>
         <h1 className="text-text-primary text-[17px] font-bold leading-snug [text-wrap:balance]">
-          {loc('المتجر غير متاح حاليًا', 'This store is not available right now')}
-          {/* OWNER: Sorani to be written by hand. */}
+          {loc('المتجر غير متاح حاليًا', 'This store is not available right now', 'فرۆشگاکە ئێستا بەردەست نییە')}
         </h1>
+        {/* TRUE ABOUT FILES TOO: a paid download lives on the order
+            (src/components/orders/OrderFiles.tsx, GET /api/orders/:id/files),
+            so a buyer sent to «طلباتي» from here finds it there — «while
+            available», because a sanction closes the files with the shop and
+            this page never says which of the two it is (C9). */}
         <p className="mt-2 text-text-muted text-[13px] leading-relaxed [text-wrap:pretty]">
           {loc(
-            'إن كان لديك طلب من هذا المتجر فهو محفوظ في «طلباتي».',
-            'If you have an order from this store, it is kept in My orders.'
+            'إن كان لديك طلب من هذا المتجر فهو محفوظ في «طلباتي»، وتجد فيه الملفات التي اشتريتها ما دامت متاحة.',
+            'If you have an order from this store, it is kept in My orders. Files you bought are there too, as long as they remain available.',
+            'ئەگەر داواکارییەکت لەم فرۆشگایەوە هەیە، لە «داواکارییەکانم»دا پارێزراوە. ئەو فایلانەی کڕیوتن تا بەردەست بن لەوێن.'
           )}
-          {/* OWNER: Sorani to be written by hand. */}
         </p>
         <div className="mt-6 flex flex-col gap-2.5">
           {onStoreHost ? (
@@ -58,7 +62,7 @@ export default function StoreUnavailable() {
             </Link>
           )}
           <Link to="/orders" className="lv-button lv-button-ghost w-full">
-            {loc('طلباتي', 'My orders', 'داواکاریەکانم')}
+            {loc('طلباتي', 'My orders', 'داواکارییەکانم')}
           </Link>
         </div>
       </div>

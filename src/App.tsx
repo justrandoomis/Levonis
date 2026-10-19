@@ -646,6 +646,15 @@ function StorefrontApp() {
         <Route path="/store-checkout" element={<ProtectedRoute><StoreCheckout /></ProtectedRoute>} />
         <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
         <Route path="/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
+        {/* «View in 3D» from an order's files (OrderFiles) or a product's
+            files (ProductFiles) navigates to `/model-viewer/<token>` on the
+            host it is on. Without this route a store host fell through to
+            the splat below and showed the shop again — or «store
+            unavailable» on a hidden store, where the order is still the
+            buyer's to finish — and the minted token was wasted. Same page,
+            same token gate as the platform's route: no session check here
+            (see the platform route's note). */}
+        <Route path="/model-viewer/:token" element={<ModelViewer />} />
         {/* Sign-in happens on the apex, the one origin Google accepts. */}
         <Route path="/auth" element={<StoreHostAuthHandoff />} />
         {/* The merchant workspace on the store's own host: the same tree as

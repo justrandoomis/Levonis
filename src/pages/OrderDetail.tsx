@@ -36,6 +36,8 @@ import { OfferSaving } from '../components/ui/OfferBadge';
 
 /** Its own chunk: only an order with a printer that has parts draws it. */
 const MaintenanceShelf = React.lazy(() => import('../components/product/MaintenanceShelf'));
+/** Its own chunk: only a store order asks for its purchased files. */
+const OrderFiles = React.lazy(() => import('../components/orders/OrderFiles'));
 
 /**
  * ONE order, everything the customer can know or do about it.
@@ -623,6 +625,15 @@ export default function OrderDetail() {
                 }}
               />
             </section>
+
+            {/* «ملفاتك» — the files this store order paid for, reachable even
+                when the shop's own pages are not public (push 1.4). Draws
+                nothing while loading, when empty, or on a failed read. */}
+            {order.store && order.status !== 'cancelled' && (
+              <React.Suspense fallback={null}>
+                <OrderFiles orderId={order.id} />
+              </React.Suspense>
+            )}
 
             <TabStrip
               items={TABS.map((t) => ({ id: t, label: s.tabs[t] }))}

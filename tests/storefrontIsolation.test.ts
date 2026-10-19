@@ -15,6 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { matchRoutes } from 'react-router-dom';
 import { ROOT } from './fixtures/d1';
 
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -377,4 +378,35 @@ test('a cached storefront never carries viewer data: the routes that are cached 
     assert.match(p, /storefrontApi\s*\.deliveryToYou\(slug\)/, `${page} asks for the viewer's line`);
     assert.match(p, /delivery_to_you: quote/, `${page} merges it under the key the parts read`);
   }
+});
+
+test('a store host resolves /model-viewer/:token to the viewer, not to the shop or «store unavailable»', () => {
+  // «View in 3D» (OrderFiles, ProductFiles) navigates to `/model-viewer/<token>`
+  // on the host it is on. A buyer finishing an order on a HIDDEN store's own
+  // host is sent there by StoreUnavailable's «your orders» link; if the store
+  // tree has no viewer route, the splat renders Storefront, which renders
+  // StoreUnavailable again, and the minted token is wasted.
+  const app = code(read('src/App.tsx'));
+  const start = app.indexOf('function StorefrontApp(');
+  const end = app.indexOf('function AppBootstrapLayer(');
+  assert.ok(start > 0 && end > start, 'StorefrontApp is not where this test expects it');
+  const tree = app.slice(start, end);
+  // The route tree in declaration order, each path with its element (every
+  // store-host route is one line); none may slip past the parse.
+  const routes = [...tree.matchAll(/<Route\s+path="([^"]+)"\s+element=\{(.*)\}\s*\/>\s*$/gm)].map((m) => ({
+    path: m[1],
+    element: m[2],
+  }));
+  assert.equal(routes.length, (tree.match(/<Route\b/g) ?? []).length, 'a store-host route escaped the parse');
+  assert.ok(routes.some((r) => r.path === '*'), 'the store tree lost its splat; the parse below would prove nothing');
+  const matched = matchRoutes(routes, '/model-viewer/tok_abc123');
+  assert.ok(matched && matched.length === 1, 'no store-host route matches /model-viewer/<token>');
+  const hit = matched[0];
+  assert.equal(hit.route.path, '/model-viewer/:token', 'the viewer path falls through to another route on a store host');
+  assert.equal(hit.params.token, 'tok_abc123');
+  assert.match(hit.route.element, /^<ModelViewer \/>$/, 'the store-host viewer route renders something other than the viewer');
+  assert.doesNotMatch(hit.route.element, /ProtectedRoute/, 'the viewer is gated on its token, not on a session (same as the platform route)');
+  assert.match(app, /const ModelViewer = React\.lazy\(\(\) => import\('\.\/pages\/ModelViewer'\)\)/, 'the viewer stays a lazy chunk');
+  // The order pages the hidden-store sentence links to still resolve too.
+  assert.equal(matchRoutes(routes, '/orders/ORD-1')?.[0].route.path, '/orders/:id');
 });
