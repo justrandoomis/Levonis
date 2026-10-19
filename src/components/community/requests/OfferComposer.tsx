@@ -520,6 +520,13 @@ export interface MerchantOfferSectionProps {
   draft: OfferV2 | null;
   /** The account may make offers (plan, store and merchant state). */
   canOffer: boolean;
+  /**
+   * The approval gate's sentence while no reviewer has approved this merchant
+   * (Community V3 push 1.3; src/lib/approvalGate.ts): «قدّم عرضًا», «أرسل
+   * المسودة», edit and re-confirm stay on the card, disabled, saying it —
+   * withdrawing a standing offer stays open (E4).
+   */
+  gate?: string | null;
   takingOffers: boolean;
   materials: CatalogMaterial[];
   defaultQuantity?: number;
@@ -534,6 +541,7 @@ export function MerchantOfferSection({
   offers,
   draft,
   canOffer,
+  gate = null,
   takingOffers,
   materials,
   defaultQuantity,
@@ -555,11 +563,11 @@ export function MerchantOfferSection({
 
   // A costing handed over as «my offer»: a new offer, a new version of the standing one, or the draft.
   useEffect(() => {
-    if (!prefill || !takingOffers) return;
+    if (!prefill || !takingOffers || gate) return;
     if (live && (live.state === 'pending' || live.state === 'superseded')) setComposing('edit');
     else if (!live && draft) setComposing('draft');
     else if (!live && canOffer) setComposing('new');
-  }, [prefill, takingOffers, canOffer, live, draft]);
+  }, [prefill, takingOffers, canOffer, live, draft, gate]);
 
   // WHAT CHANGED since the revision this offer priced, in words, not field names.
   useEffect(() => {
@@ -620,6 +628,13 @@ export function MerchantOfferSection({
     }
   }
 
+  /** Under the held buttons: the reason, never a silent grey button. */
+  const gateNote = gate ? (
+    <p className="mt-2 text-[12.5px] text-text-muted" data-approval-gate>
+      {gate}
+    </p>
+  ) : null;
+
   const composer = (
     <OfferComposer
       open={!!composing}
@@ -658,14 +673,15 @@ export function MerchantOfferSection({
         <p className="mt-2 text-[12.5px] text-text-muted">{s.draftHint}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {takingOffers && canOffer && (
-            <Button variant="primary" size="sm" onClick={sendDraft} loadingLabel={s.sending} icon={<Send aria-hidden="true" className="h-4 w-4 rtl:-scale-x-100" />} data-offer-draft-send>
+            <Button variant="primary" size="sm" onClick={sendDraft} disabled={!!gate} loadingLabel={s.sending} icon={<Send aria-hidden="true" className="h-4 w-4 rtl:-scale-x-100" />} data-offer-draft-send>
               {s.sendDraft}
             </Button>
           )}
-          <Button variant="secondary" size="sm" onClick={() => setComposing('draft')} data-offer-draft-continue>
+          <Button variant="secondary" size="sm" onClick={() => setComposing('draft')} disabled={!!gate} data-offer-draft-continue>
             {s.continueDraft}
           </Button>
         </div>
+        {gateNote}
         {composer}
         {confirmDialog}
       </div>
@@ -681,9 +697,12 @@ export function MerchantOfferSection({
           </p>
         )}
         {takingOffers && canOffer ? (
-          <Button variant="primary" block onClick={() => setComposing('new')} icon={<Send aria-hidden="true" className="h-4 w-4 rtl:-scale-x-100" />} data-offer-make>
-            {s.makeOffer}
-          </Button>
+          <>
+            <Button variant="primary" block onClick={() => setComposing('new')} disabled={!!gate} icon={<Send aria-hidden="true" className="h-4 w-4 rtl:-scale-x-100" />} data-offer-make>
+              {s.makeOffer}
+            </Button>
+            {gateNote}
+          </>
         ) : (
           !latest && <p className="text-[12.5px] text-text-muted">{s.cannotOfferNow}</p>
         )}
@@ -730,12 +749,12 @@ export function MerchantOfferSection({
       ) : (
         <div className="mt-3 flex flex-wrap gap-2">
           {stale && takingOffers && (
-            <Button variant="primary" size="sm" onClick={reconfirm} data-offer-reconfirm={o.id}>
+            <Button variant="primary" size="sm" onClick={reconfirm} disabled={!!gate} data-offer-reconfirm={o.id}>
               {s.reconfirm}
             </Button>
           )}
           {(o.state === 'pending' || o.state === 'superseded') && takingOffers && (
-            <Button size="sm" variant={stale ? 'secondary' : 'primary'} onClick={() => setComposing('edit')} data-offer-edit={o.id}>
+            <Button size="sm" variant={stale ? 'secondary' : 'primary'} onClick={() => setComposing('edit')} disabled={!!gate} data-offer-edit={o.id}>
               {s.editOffer}
             </Button>
           )}
@@ -746,6 +765,7 @@ export function MerchantOfferSection({
           )}
         </div>
       )}
+      {o.state !== 'accepted' && (o.state === 'pending' || o.state === 'superseded') && takingOffers && gateNote}
       {composer}
       {confirmDialog}
     </div>

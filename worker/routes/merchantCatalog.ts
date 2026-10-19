@@ -34,7 +34,8 @@ import { rateLimit } from '../lib/ratelimit';
 import { requireAuth } from '../lib/http';
 import { audit } from '../lib/audit';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
-import { requireStoreOwner, requireSellingPrivileges, type StoreContext } from '../lib/merchantAuth';
+import { requireDraftPrivileges, requireStoreOwner, requireSellingPrivileges, type StoreContext } from '../lib/merchantAuth';
+import { merchantApproved, merchantNotApprovedRefusal } from '../lib/merchantApproval';
 import { purgeStorefrontAfterWrite } from '../lib/edgePolicy';
 // A product hidden, archived, drafted or deleted closes its 3D viewer links (§9.4).
 import { revokeProductViewerGrantsStatement } from '../lib/viewerGrants';
@@ -801,11 +802,19 @@ merchantCatalogRoutes.get('/products/:id', async (c) => {
   return c.json({ success: true, product });
 });
 
-/** Create — `state` defaults to published (the API's behaviour before 0126); the editor always sends one. */
+/**
+ * Create — `state` defaults to published (the API's behaviour before 0126); the editor always sends one.
+ *
+ * A DRAFT needs no approval (push 1.3, `requireDraftPrivileges`): a merchant
+ * under review builds their catalogue privately. Anything else — the default
+ * `published` included — is a new public listing, refused MERCHANT_NOT_APPROVED
+ * before a field is read.
+ */
 merchantCatalogRoutes.post('/products', async (c) => {
   await rateLimit(c, 'merchant-product-create', 60, 3600);
-  const ctx = await requireSellingPrivileges(c);
+  const ctx = await requireDraftPrivileges(c);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!merchantApproved(ctx.merchant) && body.state !== 'draft') throw merchantNotApprovedRefusal();
   const input = readProductInput(body, false);
   await verifyProductRefs(c, ctx, input);
   const state = input.state ?? 'published';
@@ -829,10 +838,15 @@ merchantCatalogRoutes.post('/products', async (c) => {
 /**
  * Edit. Only what the body sends changes; `variant_model`, `media` and
  * `collection_ids` each replace their whole set. One batch.
+ *
+ * Under review (push 1.3) a product may be edited while it is NOT published
+ * afterwards — a draft stays a draft, a published one may be taken down to a
+ * draft. Publishing it, or editing what stays published, is refused
+ * MERCHANT_NOT_APPROVED (E3).
  */
 merchantCatalogRoutes.patch('/products/:id', async (c) => {
   await rateLimit(c, 'merchant-product-update', 120, 3600);
-  const ctx = await requireSellingPrivileges(c);
+  const ctx = await requireDraftPrivileges(c);
   const db = c.env.DB;
   const id = c.req.param('id');
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -857,6 +871,7 @@ merchantCatalogRoutes.patch('/products/:id', async (c) => {
     .bind(id, ctx.merchant.id)
     .first<Record<string, unknown>>();
   if (!current) throw notFound('Product not found');
+  if (!merchantApproved(ctx.merchant) && (input.state ?? stateOf(current)) === 'published') throw merchantNotApprovedRefusal();
   await verifyProductRefs(c, ctx, input, safeParse<string[]>(current.image_keys, []));
 
   const currentState = stateOf(current);

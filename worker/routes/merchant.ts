@@ -31,6 +31,7 @@ import { getTierStatus, benefits } from '../lib/entitlements';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { afterStorefrontWrite, purgeStorefrontAfterWrite } from '../lib/edgePolicy';
 import {
+  draftStatus,
   requireStoreOwner,
   requireSellingPrivileges,
   reopenRefusal,
@@ -57,7 +58,7 @@ import { stageForLegacyStatus } from '../lib/orderStages';
 import { newHistoryId } from '../lib/orderStageOps';
 import { scheduleStoreIconRefresh } from '../lib/storeIcons';
 import { storeShareKit } from '../lib/storeShareKit';
-import { FORCED_PREFS, NOTIFICATION_PREF_KEYS, WIRED_PREFS, preferenceShape } from '../lib/merchantNotify';
+import { FORCED_PREFS, NOTIFICATION_PREF_KEYS, WIRED_PREFS, notifyApprovalRequired, preferenceShape } from '../lib/merchantNotify';
 import {
   deliveryConfigShape,
   isDeliveryVersionAbort,
@@ -70,6 +71,15 @@ import { deliveryCoverage, validateDeliveryConfig } from '@levonis/shipping/merc
 import { CUSTOM_ORDER_EARNED_SQL, CUSTOM_ORDER_KEPT_RECEIVABLE_SQL } from '../lib/communityStates';
 import { openNow } from '../lib/storeHours';
 import { BAGHDAD_OFFSET_MS } from '../lib/baghdadTime';
+
+/** Work that must not hold the response: `waitUntil` where there is one, else awaited (tests). */
+async function afterResponse(c: Context<AppContext>, work: Promise<unknown>): Promise<void> {
+  try {
+    c.executionCtx.waitUntil(work);
+  } catch {
+    await work;
+  }
+}
 
 export const merchantRoutes = new Hono<AppContext>();
 
@@ -181,6 +191,14 @@ merchantRoutes.get('/me', async (c) => {
     merchantApprovalOf(c.env.DB, user.id),
     applicationSummaryOf(c.env.DB, user.id),
   ]);
+  // EVERY EXISTING MERCHANT APPLIES (push 1.3, owner decision C1): a merchant
+  // row from before the gate holds the draft migration 0205 started for it,
+  // and is told so ONCE, in-app, by ids only — on this, their next workspace
+  // load, never by the migration. A replay is the unique event key's no-op.
+  if (approval.merchant && !approval.approved && application?.state === 'draft') {
+    await afterResponse(c, notifyApprovalRequired(c.env.DB, user.id));
+  }
+  const selling = ctx ? await sellingStatus(c, ctx) : { canSell: false, reason: 'no_store' };
 
   return c.json({
     success: true,
@@ -202,7 +220,9 @@ merchantRoutes.get('/me', async (c) => {
       subdomain: benefits.merchantSubdomain(tier),
     },
     store: ctx ? storePublicShape(ctx, root) : null,
-    selling: ctx ? await sellingStatus(c, ctx) : { canSell: false, reason: 'no_store' },
+    // `canDraft` (push 1.3): product drafts stay open under review — selling
+    // minus the approval line, the rule `requireDraftPrivileges` enforces.
+    selling: { ...selling, canDraft: ctx ? await draftStatus(c.env.DB, ctx, user.id, selling) : false },
     suggested_slug: ctx ? null : suggestSlug(String(user.name ?? '')),
     // The domain a store address lives under, from configuration — so
     // onboarding previews `<slug>.<this>` instead of a hard-coded domain

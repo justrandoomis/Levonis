@@ -195,6 +195,7 @@ function render(attention: Attention | null, over: Partial<MerchantMe['store'] &
     me: m,
     store: m.store!,
     canSell: true,
+    canDraft: true,
     base: '/merchant',
     onStoreHost: false,
     href: (l) => l,

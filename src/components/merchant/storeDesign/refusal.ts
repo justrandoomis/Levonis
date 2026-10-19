@@ -6,6 +6,7 @@
  */
 import type { Loc } from './catalog';
 import { fillSpeed, mediaStrings, type MediaStrings, type SpeedLang } from './strings';
+import { approvalGateText } from '../../../lib/approvalGate';
 
 export function codeOf(e: unknown): string {
   const c = (e as { code?: unknown } | null)?.code;
@@ -52,6 +53,9 @@ export function whereText(t: MediaStrings, kinds: readonly unknown[], lang: stri
 
 export function builderRefusal(e: unknown, loc: Loc): string {
   switch (codeOf(e)) {
+    // Community V3 push 1.3: the approval gate's one sentence (src/lib/approvalGate.ts).
+    case 'MERCHANT_NOT_APPROVED':
+      return approvalGateText(loc);
     case 'DRAFT_CHANGED':
       return loc('تغيّرت المسودة من مكان آخر.', 'The draft changed somewhere else.');
     case 'DRAFT_SAVE_FAILED':

@@ -78,6 +78,7 @@ import { builderRefusal } from './refusal';
 import { lazy, Suspense, useContext } from 'react';
 import { merchantHref } from '../../../lib/merchantRoutes';
 import { WorkspaceContext } from '../shell/context';
+import { approvalGateText } from '../../../lib/approvalGate';
 // Media everywhere (P5): the page's own keys count for publishing; «معاينة على هاتفي» opens the draft on the owner's phone.
 import { QrCode } from 'lucide-react';
 import { withPageChanges } from './panels';
@@ -149,6 +150,10 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
   const [tab, setTab] = useState<Tab>(() => (typeof window === 'undefined' ? 'sections' : tabFromSearch(window.location.search)));
   // The speed tab's doors out of the builder (store settings, products) go through the workspace when there is one.
   const ws = useContext(WorkspaceContext);
+  // E10 (push 1.4) as the builder shows it (push 1.3): drafts save as always,
+  // but Publish — and restore-and-publish — wait for the store's approval, and
+  // say so beside the button instead of greying it in silence.
+  const gate = ws?.me.approved === false ? approvalGateText(loc) : null;
   /** The speed report reads across the page at wide widths (storefront §3.10): the strip keeps its place, the panel spans both columns. */
   const speedWide = wide && tab === 'speed';
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -365,14 +370,19 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
           variant="primary"
           size="sm"
           icon={<Upload className="h-4 w-4" aria-hidden="true" />}
-          disabled={nothingToPublish || validation.fatal || status === 'conflict' || visible === 0}
-          title={visible === 0 ? loc('الصفحة تحتاج قسمًا ظاهرًا', 'The page needs a visible section') : undefined}
+          disabled={!!gate || nothingToPublish || validation.fatal || status === 'conflict' || visible === 0}
+          title={gate ?? (visible === 0 ? loc('الصفحة تحتاج قسمًا ظاهرًا', 'The page needs a visible section') : undefined)}
           onClick={() => setPublishOpen(true)}
           data-sd-publish
         >
           {loc('نشر', 'Publish')}
         </Button>
       </span>
+      {gate && (
+        <p className="w-full text-end text-[12px] text-text-muted" data-approval-gate>
+          {loc('نشر', 'Publish', 'بڵاوکردنەوە')}: {gate}
+        </p>
+      )}
       {status === 'conflict' && (
         <div role="alert" className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-warning/40 bg-warning/[0.07] px-3 py-2 text-[12.5px] text-text-secondary" data-sd-conflict>
           <AlertTriangle className="h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
@@ -515,6 +525,7 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
               toast.success(pub ? loc(`أُعيدت النسخة ${r} ونُشرت.`, `Version ${r} restored and published.`) : loc(`أُعيدت النسخة ${r} إلى المسودة.`, `Version ${r} restored to the draft.`));
             }}
             onMore={ed.revCursor !== null ? () => ed.loadMoreRevisions() : null}
+            gate={gate}
           />
         )}
         {tab === 'speed' && (

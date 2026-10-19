@@ -124,6 +124,8 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
   const isPhone = useIsPhone();
   const store = me.store!;
   const canSell = me.selling.canSell;
+  // Product drafts stay open under review (push 1.3); an older server answers without the field.
+  const canDraft = me.selling.canDraft ?? canSell;
   const base = onStoreHost ? STORE_HOST_BASE : MERCHANT_BASE;
 
   const route = resolveWorkspaceRoute(location.pathname, base);
@@ -256,6 +258,7 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
     me,
     store,
     canSell,
+    canDraft,
     base,
     onStoreHost,
     href,
@@ -291,6 +294,7 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
             status={status}
             collapsed={collapsed}
             canSell={canSell}
+            canDraft={canDraft}
             sellingReason={status.reason(loc)}
             onSearch={openPalette}
             bell={<MerchantNotificationBell onOpen={() => navigate(sectionPath('notifications', base))} unread={bellUnread} />}
@@ -323,7 +327,7 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
                   speaks only of the store): the sentence IS the way to the application,
                   on the main site. The pill and the open/pause switch keep the store's
                   real state (DECISIONS row 257). */}
-              {status.approval && (
+              {status.approval && section !== 'home' && (
                 <p role="note" data-approval-notice className="lv-alert lv-alert-warning mb-5 text-[13px] leading-relaxed text-text-secondary">
                   <span className="font-semibold text-text-primary">{say(loc, W.approval)}</span>
                   {' — '}
@@ -332,7 +336,7 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
                   </a>
                 </p>
               )}
-              {status.key !== 'open' && section !== 'home' && (
+              {status.key !== 'open' && section !== 'home' && me.selling.reason !== 'not_approved' && (
                 <p
                   role="note"
                   data-selling-off={status.key}
@@ -383,7 +387,7 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
         )}
         {paletteMounted && (
           <Suspense fallback={null}>
-            <WorkspacePalette open={paletteOpen} onOpenChange={setPaletteOpen} base={base} storeUrl={store.url} canSell={canSell} href={href} recentKey={`levo_merchant_palette_${store.id}`} />
+            <WorkspacePalette open={paletteOpen} onOpenChange={setPaletteOpen} base={base} storeUrl={store.url} canSell={canSell} canDraft={canDraft} href={href} recentKey={`levo_merchant_palette_${store.id}`} />
           </Suspense>
         )}
         <Toaster />
@@ -546,6 +550,7 @@ function TopBar({
   status,
   collapsed,
   canSell,
+  canDraft,
   sellingReason,
   onSearch,
   bell,
@@ -559,6 +564,7 @@ function TopBar({
   status: ReturnType<typeof storeStatus>;
   collapsed: boolean;
   canSell: boolean;
+  canDraft: boolean;
   sellingReason: string;
   onSearch: () => void;
   bell: ReactNode;
@@ -580,9 +586,11 @@ function TopBar({
   const statusText = say(loc, status.label);
   const statusName = `${say(loc, W.storeStatus)}: ${statusText}${status.key === 'open' ? '' : ` — ${status.reason(loc)}`}`;
   // Quick create — the section, with its «new» form open. Each one makes a
-  // new commitment, so with selling off it stays in the menu and says why.
+  // new commitment, so with selling off it stays in the menu and says why
+  // (under review: «يُفعَّل بعد اعتماد متجرك»). A product starts as a draft, so
+  // it stays open under review (push 1.3).
   const create: MenuEntry[] = [
-    { id: 'new-product', label: say(loc, W.newProduct), href: href(merchantHref.newProduct()), disabled: !canSell, hint: canSell ? undefined : sellingReason },
+    { id: 'new-product', label: say(loc, W.newProduct), href: href(merchantHref.newProduct()), disabled: !canDraft, hint: canDraft ? undefined : sellingReason },
     { id: 'new-coupon', label: say(loc, W.newCoupon), href: href(merchantHref.newCoupon()), disabled: !canSell, hint: canSell ? undefined : sellingReason },
     { id: 'new-collection', label: say(loc, W.newCollection), href: href(merchantHref.newCollection()), disabled: !canSell, hint: canSell ? undefined : sellingReason },
   ];

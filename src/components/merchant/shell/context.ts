@@ -13,6 +13,8 @@ export interface WorkspaceValue {
   store: MerchantStore;
   /** The server's answer (`/api/merchant/me` `selling.canSell`), never the page's own guess. */
   canSell: boolean;
+  /** May write product DRAFTS (`selling.canDraft`, push 1.3): selling, or approval its only lack. */
+  canDraft: boolean;
   /** `/merchant` on the platform's host, `/admin` on the store's own subdomain. */
   base: string;
   onStoreHost: boolean;

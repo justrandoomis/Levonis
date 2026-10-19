@@ -38,6 +38,7 @@ import {
 import { catalogStrings, productFilesStrings } from './strings';
 import { Disclosure, readRefusal } from './parts';
 import { MediaEditor } from './MediaEditor';
+import { approvalGateText } from '../../../lib/approvalGate';
 /** The product's files (§9.4) — its own chunk: the upload tile, the role menu and the doors ride only when the section is opened on a saved product. */
 const ProductFilesEditor = lazy(() => import('./ProductFilesEditor'));
 import {
@@ -127,6 +128,7 @@ export default function ProductEditorSheet({
   open,
   productId,
   canSell,
+  gated = false,
   collections,
   onClose,
   onSaved,
@@ -135,6 +137,12 @@ export default function ProductEditorSheet({
   /** null = a new product. */
   productId: string | null;
   canSell: boolean;
+  /**
+   * The approval gate holds publishing (push 1.3): the draft is the editor's
+   * whole world until a reviewer approves the store — «منشور» stays in the
+   * picker, disabled, with the gate's sentence under it.
+   */
+  gated?: boolean;
   collections: Collection[];
   onClose: () => void;
   onSaved: () => void;
@@ -268,7 +276,7 @@ export default function ProductEditorSheet({
 
   const stateItems = (['draft', 'published', 'hidden'] as PublishState[])
     .concat(form.state === 'archived' ? ['archived'] : [])
-    .map((id) => ({ id, label: s.state(id), disabled: id === 'published' && (hiddenByAdmin || (!canSell && original?.state !== 'published')) }));
+    .map((id) => ({ id, label: s.state(id), disabled: id === 'published' && (hiddenByAdmin || gated || (!canSell && original?.state !== 'published')) }));
 
   const summaryVariants = hasVariants
     ? s.variantsCount(Object.values(form.variants.variants).filter((v) => v.active).length)
@@ -347,6 +355,11 @@ export default function ProductEditorSheet({
 
           <Field label={s.visibility} hint={s.stateHint(form.state)} error={errors.state}>
             <Segmented items={stateItems} value={form.state} onChange={(id) => set('state', id as PublishState)} label={s.visibility} group="product-state" size="sm" />
+            {gated && (
+              <p className="mt-1.5 text-[12px] text-text-muted" data-approval-gate>
+                {s.publishing}: {approvalGateText(loc)}
+              </p>
+            )}
           </Field>
 
           <Disclosure

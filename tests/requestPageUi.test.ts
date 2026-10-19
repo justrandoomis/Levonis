@@ -39,6 +39,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { ROOT } from './fixtures/d1';
 import type { CommentsPage, OfferV2, RequestComment } from '../src/components/community/requests/api';
+import { APPROVAL_GATE_WORDS } from '../src/lib/approvalGate';
 
 // The app's windows portal into `document.body` even while closed — nothing
 // the server renderer can draw — so three modules are answered here with
@@ -421,6 +422,45 @@ test('the workshop: «قدّم عرضًا», its draft card with «أرسل ال
   assert.equal(count(stale, /data-offer-note="superseded"/g), 1);
   const won = text(html(createElement(MerchantOfferSection, { requestId: 'req_1', offers: [offer({ state: 'accepted' })], draft: null, canOffer: true, takingOffers: false, materials, onChanged: noop })));
   assert.ok(won.includes(s.acceptedByCustomer));
+});
+
+test('push 1.3: under review every NEW promise on the card stays there, disabled, saying «يُفعَّل بعد اعتماد متجرك» — withdraw stays open', () => {
+  const gate = APPROVAL_GATE_WORDS.ar;
+  /** The opening tag of the one element carrying `attr`. */
+  const tag = (h: string, attr: string) => {
+    const m = new RegExp(`<[a-z]+[^>]*${attr}[^>]*>`).exec(h);
+    assert.ok(m, `no element with ${attr}`);
+    return m![0];
+  };
+  const held = (h: string, attr: string) => assert.match(tag(h, attr), /\sdisabled=""/, `${attr} is held`);
+  const open = (h: string, attr: string) => assert.doesNotMatch(tag(h, attr), /\sdisabled=""/, `${attr} stays open`);
+
+  const none = html(createElement(MerchantOfferSection, { requestId: 'req_1', offers: [], draft: null, canOffer: true, gate, takingOffers: true, materials, onChanged: noop }));
+  held(none, 'data-offer-make');
+  assert.equal(count(none, /data-approval-gate/g), 1);
+  assert.ok(text(none).includes(gate), 'the reason is on the card, never a silent grey button');
+
+  const draft = offer({ id: 'ofd_1', state: 'draft', draft: true, revision: 0, merchant: null });
+  const d = html(createElement(MerchantOfferSection, { requestId: 'req_1', offers: [], draft, canOffer: true, gate, takingOffers: true, materials, onChanged: noop }));
+  held(d, 'data-offer-draft-send');
+  held(d, 'data-offer-draft-continue');
+  assert.ok(text(d).includes(gate));
+
+  const live = html(createElement(MerchantOfferSection, { requestId: 'req_1', offers: [offer({ revision: 2 })], draft: null, canOffer: true, gate, takingOffers: true, materials, onChanged: noop }));
+  held(live, 'data-offer-edit=');
+  open(live, 'data-offer-withdraw=');
+  assert.ok(text(live).includes(gate));
+  const stale = html(createElement(MerchantOfferSection, { requestId: 'req_1', offers: [offer({ state: 'superseded', stale: true })], draft: null, canOffer: true, gate, takingOffers: true, materials, onChanged: noop }));
+  held(stale, 'data-offer-reconfirm=');
+  open(stale, 'data-offer-withdraw=');
+
+  // An approved merchant (no gate) sees the same card open, and no gate line.
+  const approved = html(createElement(MerchantOfferSection, { requestId: 'req_1', offers: [], draft: null, canOffer: true, takingOffers: true, materials, onChanged: noop }));
+  open(approved, 'data-offer-make');
+  assert.equal(count(approved, /data-approval-gate/g), 0);
+
+  // The page hands the gate to the card from the server's answer, in the reader's language.
+  assert.match(code('src/pages/community/Request.tsx'), /gate=\{me\?\.store && me\.approved === false \? approvalGateText\(loc\) : null\}/);
 });
 
 test('the composer: «احفظ مسودة» and «أرسل العرض», the total previewed; an edit of a sent offer is a new version only', () => {

@@ -69,6 +69,9 @@ import { communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { merchantUnreadCounts } from '../lib/merchantNotify';
 import { merchantBuckets } from '../lib/merchantLedger';
 import { publishedLayout } from '../lib/storeLayout';
+import { merchantApproved } from '../lib/merchantApproval';
+import { loadDeliveryConfig } from '../lib/merchantDelivery';
+import { deliveryCoverage } from '@levonis/shipping/merchantDelivery';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { normalizeLayout } from '@levonis/storeLayout/normalize';
 import { inboxUnreadCounts } from './merchantInbox';
@@ -384,27 +387,43 @@ merchantAttentionRoutes.get('/', async (c) => {
     // «جهّز متجرك» (review of the merchant page, 2026-09-28): what a new store
     // still lacks, each with the screen where it is done. The store row
     // answers the first four; three counts the rest.
+    //
+    // THE SAME READ IS THE READINESS VERDICT BEFORE OPENING (Community V3
+    // push 1.3, wave 1; src/components/merchant/counter/readiness.ts): it also
+    // says whether a reviewer approved the merchant, how many services are
+    // listed, and how many governorates the delivery reaches — the coverage
+    // the re-open door itself checks (`deliveryCoverage`, PATCH /store
+    // {open}) — so the list and the door can never disagree.
     source('setup', async () => {
-      const row = await db
-        .prepare(
-          `SELECT (SELECT COUNT(*) FROM community_products p WHERE p.merchant_id = ?1 AND p.publish_state = 'published') AS products,
-                  (SELECT COUNT(*) FROM merchant_delivery_profiles d WHERE d.store_id = ?2) AS delivery,
-                  (SELECT COUNT(*) FROM store_layout_revisions r WHERE r.store_id = ?2) AS published`
-        )
-        .bind(merchantId, storeId)
-        .first<{ products: number; delivery: number; published: number }>();
+      const [row, delivery] = await Promise.all([
+        db
+          .prepare(
+            `SELECT (SELECT COUNT(*) FROM community_products p WHERE p.merchant_id = ?1 AND p.publish_state = 'published') AS products,
+                    (SELECT COUNT(*) FROM merchant_services v WHERE v.store_id = ?2 AND v.active = 1) AS services,
+                    (SELECT COUNT(*) FROM merchant_delivery_profiles d WHERE d.store_id = ?2) AS delivery,
+                    (SELECT COUNT(*) FROM store_layout_revisions r WHERE r.store_id = ?2) AS published`
+          )
+          .bind(merchantId, storeId)
+          .first<{ products: number; services: number; delivery: number; published: number }>(),
+        loadDeliveryConfig(db, ctx.store).then((cfg) => deliveryCoverage(cfg.profile, cfg.rules)),
+      ]);
       return {
+        approved: merchantApproved(ctx.merchant),
         logo: !!ctx.store.logo_key,
         banner: !!ctx.store.banner_key,
         about: !!String(ctx.store.description ?? '').trim(),
         phone: !!String(ctx.store.contact_phone ?? '').trim(),
         delivery: n(row?.delivery) > 0,
+        reach: delivery.served.length,
+        pickup: delivery.pickup,
         products: n(row?.products),
+        services: n(row?.services),
         design: n(row?.published) > 0,
         links: {
           settings: merchantHref.storeSettings(),
           delivery: merchantHref.storeDelivery(),
           products: merchantHref.newProduct(),
+          services: merchantHref.services(),
           design: merchantHref.storeDesign(),
         },
       };
