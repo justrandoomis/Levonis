@@ -344,8 +344,6 @@ interface LimitRow {
   max_global: number | null;
 }
 
-const CHUNK = 50;
-
 export function windowFromRow(r: WindowRow): OfferWindow {
   return {
     id: r.id,
@@ -402,8 +400,12 @@ const WINDOWS_SQL = (where: string) =>
     WHERE ${where}`;
 
 /**
- * Windows and limits for many subjects in TWO queries, chunked. A listing
- * resolves the whole page at once rather than one round trip per card.
+ * Windows and limits for many subjects in TWO queries per subject type, each
+ * list ONE bound parameter (json_each). A listing resolves the whole page at
+ * once rather than one round trip per card — and, since the listing pages its
+ * candidates (worker/routes/products.ts `listCatalogProducts`), a thousand
+ * subjects cost the same two statements and the same ONE wave as twenty-four:
+ * the old 50-subject chunks ran one after another, a dependent wave each.
  * Subjects with no row are absent from the map, and absent means "no offer",
  * never "an offer that refuses".
  */
@@ -422,14 +424,23 @@ export async function loadOffers(db: D1Database, subjects: Subject[]): Promise<M
     return fresh;
   };
 
-  for (let i = 0; i < list.length; i += CHUNK) {
-    const part = list.slice(i, i + CHUNK);
-    const where = part.map(() => '(subject_type = ? AND subject_id = ?)').join(' OR ');
-    const args = part.flatMap((s) => [s[0], s[1]]);
-    const [windows, limits] = await Promise.all([
-      db.prepare(WINDOWS_SQL(where)).bind(...args).all<WindowRow>(),
-      db.prepare(`SELECT * FROM offer_limits WHERE ${where}`).bind(...args).all<LimitRow>(),
-    ]);
+  const idsByType = new Map<string, string[]>();
+  for (const [type, id] of list) {
+    const ids = idsByType.get(type);
+    if (ids) ids.push(id);
+    else idsByType.set(type, [id]);
+  }
+  const read = await Promise.all(
+    [...idsByType].map(([type, ids]) => {
+      const where = 'subject_type = ? AND subject_id IN (SELECT value FROM json_each(?))';
+      const args = [type, JSON.stringify(ids)];
+      return Promise.all([
+        db.prepare(WINDOWS_SQL(where)).bind(...args).all<WindowRow>(),
+        db.prepare(`SELECT * FROM offer_limits WHERE ${where}`).bind(...args).all<LimitRow>(),
+      ]);
+    })
+  );
+  for (const [windows, limits] of read) {
     for (const r of windows.results) ensure(`${r.subject_type}:${r.subject_id}`).window = windowFromRow(r);
     for (const r of limits.results) {
       ensure(`${r.subject_type}:${r.subject_id}`).limits = {

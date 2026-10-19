@@ -6,8 +6,9 @@
  *   - R3: both price sorts put an unpriced product LAST; a price range, «عليها
  *     عرض» and «سعر أقل للأعضاء» exclude it;
  *   - R1: the default browse is a stable partition (priced first), and with
- *     350 unpriced products newer than 5 priced ones, the 300-candidate cap
- *     still returns every priced product, first;
+ *     350 unpriced products newer than 5 priced ones every priced product
+ *     still comes first (the listing pages every candidate now —
+ *     tests/listingPaging.test.ts);
  *   - R2: search keeps pure relevance — the order of the hits is the same
  *     whether the product is priced or not;
  *   - R4: the home's new arrivals take at most 5 catalog-only products, and
@@ -111,7 +112,7 @@ async function crowded(): Promise<DatabaseSync> {
   return raw;
 }
 
-test('R1 at scale: 350 newer unpriced products and the 300-candidate cap still return every priced one, first', async () => {
+test('R1 at scale: 350 newer unpriced products still leave every priced one first', async () => {
   const raw = await crowded();
   const app = stubApp(asD1(raw), null, mountCustomer, { publishV2: false });
   const body = await json(await get(app, '/api/products?limit=48'));

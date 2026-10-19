@@ -200,10 +200,14 @@ export default function ListingView({
         </div>
         {data.truncated ? (
           <p className="mt-4 text-center text-[12px] text-text-muted">
-            {loc('تعرض القائمة أول 300 منتج من هذا القسم. ضيّق البحث لترى ما بعدها.', 'This list covers the first 300 products here. Narrow it to see the rest.')}
+            {loc(
+              'في هذا القسم منتجات كثيرة: رُتّب جزء منها بالسعر والتوفر، ويليه الباقي بترتيب القسم. ضيّق البحث لترتيب أدق.',
+              'This section holds many products: part of them is sorted by price and stock, and the rest follow in shelf order. Narrow the list for an exact order.',
+              'ئەم بەشە بەرهەمی زۆری تێدایە: بەشێکیان بە پێی نرخ و بەردەستبوون ڕیزکراون، و ئەوانی تر بە ڕیزبەندیی بەشەکە دوایان دێن. لیستەکە تەسک بکەرەوە بۆ ڕیزبەندییەکی وردتر.'
+            )}
           </p>
         ) : null}
-        <LoadMore remaining={Math.max(0, data.total - data.products.length)} state={more} onMore={loadMore} />
+        <LoadMore remaining={data.hasMore === false ? 0 : Math.max(0, data.total - data.products.length)} state={more} onMore={loadMore} />
       </div>
     );
   }

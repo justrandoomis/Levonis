@@ -13,6 +13,12 @@ export interface ListingSnapshot {
   products: ApiProduct[];
   total: number;
   truncated: boolean;
+  /**
+   * The server's word on whether another page follows (`has_more`) — the
+   * listing pages to its last product. Absent from an older answer or snapshot:
+   * then `total` alone says how many remain.
+   */
+  hasMore?: boolean;
   facets: FacetSet | null;
 }
 
@@ -85,6 +91,8 @@ export function useListing(category: string | null) {
           products: [...fresh, ...extra],
           total: typeof res.total === 'number' ? res.total : fresh.length,
           truncated: !!res.truncated,
+          // With the kept pages the snapshot is longer than this answer: only `total` can speak for it.
+          ...(extra.length === 0 && typeof res.has_more === 'boolean' ? { hasMore: res.has_more } : {}),
           facets: res.facets ?? null,
         };
         setData(next);
@@ -116,7 +124,16 @@ export function useListing(category: string | null) {
       setData((have) => {
         if (!have) return have;
         const seen = new Set(have.products.map((p) => p.id));
-        const next = { ...have, products: [...have.products, ...(res.products ?? []).filter((p) => !seen.has(p.id))] };
+        const added = (res.products ?? []).filter((p) => !seen.has(p.id));
+        // The last page says so (`has_more: false`); a page that adds nothing ends the list too, so the
+        // button can never ask for the same empty page again.
+        const hasMore = added.length === 0 ? false : typeof res.has_more === 'boolean' ? res.has_more : have.hasMore;
+        const next: ListingSnapshot = {
+          ...have,
+          products: [...have.products, ...added],
+          ...(typeof res.total === 'number' ? { total: res.total } : {}),
+          ...(hasMore === undefined ? {} : { hasMore }),
+        };
         writePageCache(key, next);
         return next;
       });

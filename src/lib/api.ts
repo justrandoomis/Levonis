@@ -1825,6 +1825,8 @@ export interface ProductsListResponse {
    */
   total?: number;
   truncated?: boolean;
+  /** Another page follows (the listing pages to its last product). */
+  has_more?: boolean;
   sort?: import('./catalog/types').ListingSort;
   facets?: import('./catalog/types').FacetSet;
 }

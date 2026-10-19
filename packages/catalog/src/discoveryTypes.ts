@@ -183,10 +183,17 @@ export interface FacetSet {
 
 /** The additive envelope `/api/products` returns when any listing parameter is used. */
 export interface ListingMeta {
-  /** Matches after every filter, before paging. */
+  /** Matches after every filter, before paging — every candidate, to the last page. */
   total: number;
-  /** The candidate set hit its cap (300); totals and facets describe the cap. */
+  /**
+   * Some candidates were not fully considered: more sellable ones than the cap
+   * (1,000) under a price/stock order, a price/stock filter or the counts — the
+   * ones past it follow in the shelf order, a price/stock filter leaves them out,
+   * the counts do not see their price — or more than 10,000 candidates at all.
+   */
   truncated: boolean;
+  /** Another page follows this one (`offset + products.length < total`). */
+  has_more?: boolean;
   sort: ListingSort;
   facets?: FacetSet;
 }

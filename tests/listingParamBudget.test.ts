@@ -5,7 +5,8 @@
  * local engine allows 32,766 — so the budget is asserted by COUNTING what the
  * route binds. Three brands and five facets bind fewer than 20 on every
  * statement, because a list is one json_each parameter and spec facets are
- * applied in memory. And a section with more candidates than the cap says so.
+ * applied in memory. And a section with more sellable candidates than the cap
+ * says so — without hiding any of them (tests/listingPaging.test.ts).
  *
  * Run: node --import tsx --test tests/listingParamBudget.test.ts
  */
@@ -13,7 +14,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { asD1, freshDb, get, json, stubApp } from './fixtures/app';
 import { seedLiveCatalog } from './fixtures/liveCatalog';
-import { LISTING_CANDIDATE_CAP, productRoutes } from '../worker/routes/products';
+import { LISTING_CANDIDATE_CAP, listCatalogProducts, pricingCtxForUser, productRoutes } from '../worker/routes/products';
 
 /** A D1 whose every bound statement reports its parameter count. */
 function counting(db: D1Database) {
@@ -60,21 +61,32 @@ test('three brands and five facets bind fewer than 20 parameters on every statem
   }
 });
 
-test('above the candidate cap the listing says truncated:true, and pages inside the cap', async () => {
+test('above the candidate cap a price sort says truncated:true, hides nothing, and the plain listing is not capped', async () => {
   const raw = freshDb();
   const ins = raw.prepare(
     "INSERT INTO products (id, slug, name, description, price_iqd, status, category_id, sub_category_id, stock, display_order) VALUES (?, ?, ?, '', ?, 'active', 'cat_makers', 'cat_makers_tools', 1, ?)"
   );
-  for (let i = 0; i < LISTING_CANDIDATE_CAP + 5; i++) ins.run(`p${i}`, `tool-${i}`, `Tool ${i}`, 1000 + i, i);
+  const CAP = 12;
+  for (let i = 0; i < CAP + 5; i++) ins.run(`p${i}`, `tool-${i}`, `Tool ${i}`, 1000 + i, i);
   const app = stubApp(asD1(raw), null, (a) => a.route('/api/products', productRoutes));
-  const b = await json(await get(app, '/api/products?category=cat_makers&sort=price_desc&limit=5'));
+  // Published (sellable) through the route once, then the cap brought down to what a test can seed.
+  assert.equal((await get(app, '/api/products?category=cat_makers&limit=5')).status, 200);
+  const db = asD1(raw);
+  const capped = (q: Record<string, string>) => listCatalogProducts(db, q, pricingCtxForUser(db, null), { caps: { candidates: CAP } });
+  const b = (await capped({ category: 'cat_makers', sort: 'price_desc', limit: '5' })).body;
   assert.equal(b.truncated, true);
-  assert.equal(b.total, LISTING_CANDIDATE_CAP);
-  assert.equal(b.products.length, 5);
+  assert.equal(b.total, CAP + 5, 'past the cap nothing is hidden: the rest follow in the shelf order');
+  assert.equal((b.products as unknown[]).length, 5);
+  assert.equal(b.has_more, true);
+  // The route's own cap is the exported one, and a section under it is not truncated.
+  assert.ok(LISTING_CANDIDATE_CAP >= 1_000);
+  const whole = await json(await get(app, '/api/products?category=cat_makers&sort=price_desc&limit=5'));
+  assert.equal(whole.truncated, false);
+  assert.equal(whole.total, CAP + 5);
   const small = await json(await get(app, '/api/products?category=cat_makers_tools&avail=1&limit=5&search=nothing-matches-this'));
   assert.equal(small.truncated ?? false, false);
   // The plain listing is not capped and not annotated.
-  const plain = await json(await get(app, '/api/products?category=cat_makers&limit=5&offset=300'));
+  const plain = await json(await get(app, '/api/products?category=cat_makers&limit=5&offset=10'));
   assert.equal(plain.products.length, 5);
   assert.equal('truncated' in plain, false);
 });
