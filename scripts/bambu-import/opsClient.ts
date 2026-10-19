@@ -354,9 +354,12 @@ function itemRef(v: unknown): ItemRef | null {
 const SID = /^[0-9]{1,20}$/;
 const TOKEN = /^[0-9a-f]{64}$/;
 
-/** A delta run's item as `/delta/rows` answers it (the runner's view of rows the reviewed manifest may not hold). */
+/**
+ * A delta run's item as `/delta/rows` answers it (the runner's view of rows the reviewed manifest may not hold). A kind
+ * this runner does not know is `unknown`: never worked (fail closed), never mistaken for an ordinary item.
+ */
 export interface DeltaRowView {
-  kind: 'new' | 'media';
+  kind: 'new' | 'media' | 'content' | 'unknown';
   from_run: string;
   source_product_id: string;
   handle: string;
@@ -373,7 +376,32 @@ export interface DeltaPlanAnswer {
   from_run: string;
   new_handles: string[];
   media: Array<{ source_product_id: string; handle: string; failed: number }>;
+  /** pass=content (§O.6): the content items, and the queued failures by error code. */
+  content: Array<{ source_product_id: string; handle: string; failed: number }>;
+  failed_by_error: Record<string, number>;
   counts: Record<string, number>;
+}
+
+/** A content item's plan (/content-plan): the failed description and in-the-box media to fetch again. */
+export interface ContentPlanAnswer {
+  payload_sha256: string;
+  media: MediaRequest[];
+  skipped: Record<string, number>;
+  failed: number;
+  stored_not_written: number;
+}
+
+/** The pictures a content pass put in (stage_data.content_media.inserted, or the /content-attach answer). */
+export interface ContentInserted {
+  blocks: Array<{ id: string; r2_key: string }>;
+  box: Array<{ row_id: string; index: number; r2_key: string }>;
+}
+
+export interface ContentAttachAnswer {
+  product_id: string;
+  slug: string;
+  counts: Record<string, number>;
+  inserted: ContentInserted;
 }
 
 export interface MediaPlanAnswer {
@@ -414,9 +442,27 @@ export function attachedMediaOf(raw: unknown): AttachedMedia | null {
   return { rows, swatches };
 }
 
+/** The inserted pictures of stage_data.content_media (or of a /content-attach answer); null unless every entry is whole. */
+export function contentInsertedOf(raw: unknown): ContentInserted | null {
+  const ins = isRec(raw) && isRec(raw.inserted) ? raw.inserted : null;
+  if (!ins || !Array.isArray(ins.blocks) || !Array.isArray(ins.box)) return null;
+  const blocks: ContentInserted['blocks'] = [];
+  for (const b of ins.blocks) {
+    if (!isRec(b) || !str(b.id) || !str(b.r2_key)) return null;
+    blocks.push({ id: str(b.id), r2_key: str(b.r2_key) });
+  }
+  const box: ContentInserted['box'] = [];
+  for (const b of ins.box) {
+    if (!isRec(b) || !str(b.row_id) || !str(b.r2_key) || typeof b.index !== 'number' || !Number.isInteger(b.index) || b.index < 0) return null;
+    box.push({ row_id: str(b.row_id), index: b.index, r2_key: str(b.r2_key) });
+  }
+  return { blocks, box };
+}
+
 function deltaRowOf(v: unknown): DeltaRowView | null {
   if (!isRec(v)) return null;
-  const kind = v.kind === 'new' || v.kind === 'media' ? v.kind : null;
+  // A kind this runner does not read stays a row of its own (`unknown`), so its item is never worked as an ordinary one.
+  const kind = v.kind === 'new' || v.kind === 'media' || v.kind === 'content' ? v.kind : typeof v.kind === 'string' && v.kind ? 'unknown' : null;
   const sid = str(v.source_product_id);
   if (!kind || !SID.test(sid)) return null;
   return {
@@ -431,6 +477,15 @@ function deltaRowOf(v: unknown): DeltaRowView | null {
     leaf: str(v.leaf),
     also: Array.isArray(v.also) ? v.also.filter((x): x is string => typeof x === 'string') : [],
   };
+}
+
+function contentRequestOf(v: unknown): MediaRequest | null {
+  if (!isRec(v)) return null;
+  const role = str(v.role);
+  if (role !== 'description' && role !== 'in_the_box') return null;
+  const id = str(v.source_media_id);
+  const url = str(v.source_url);
+  return id && url ? { source_media_id: id, role, source_url: url } : null;
 }
 
 function mediaRequestOf(v: unknown): MediaRequest | null {
@@ -718,13 +773,18 @@ export class OpsClient {
 
   // ---------------------------------------------------------------- the delta run (§O)
 
-  async deltaPlan(fromRun: string, sitemapHandles: readonly string[]): Promise<DeltaPlanAnswer> {
-    const a = await this.send('delta/plan', 'POST', '/delta/plan', { from_run: fromRun, sitemap_handles: [...sitemapHandles] }, true);
-    const media = Array.isArray(a.media) ? a.media.filter(isRec) : [];
+  /** `pass: 'content'` (§O.6): the content queue, no sitemap. */
+  async deltaPlan(fromRun: string, sitemapHandles: readonly string[], pass?: 'content'): Promise<DeltaPlanAnswer> {
+    const body: Rec = pass ? { from_run: fromRun, pass } : { from_run: fromRun, sitemap_handles: [...sitemapHandles] };
+    const a = await this.send('delta/plan', 'POST', '/delta/plan', body, true);
+    const items = (v: unknown) =>
+      (Array.isArray(v) ? v.filter(isRec) : []).flatMap((m) => (SID.test(str(m.source_product_id)) ? [{ source_product_id: str(m.source_product_id), handle: str(m.handle), failed: num(m.failed) }] : []));
     return {
       from_run: str(a.from_run),
       new_handles: Array.isArray(a.new_handles) ? a.new_handles.filter((h): h is string => typeof h === 'string') : [],
-      media: media.flatMap((m) => (SID.test(str(m.source_product_id)) ? [{ source_product_id: str(m.source_product_id), handle: str(m.handle), failed: num(m.failed) }] : [])),
+      media: items(a.media),
+      content: items(a.content),
+      failed_by_error: Object.fromEntries(Object.entries(numbers(a.failed_by_error)).filter(([k]) => /^[A-Z][A-Z0-9_]{1,63}$/.test(k))),
       counts: numbers(a.counts),
     };
   }
@@ -736,7 +796,13 @@ export class OpsClient {
   async deltaManifest(
     fromRun: string,
     rows: readonly Rec[]
-  ): Promise<{ accepted: number; new: number; media: number; skipped: { known: number; media_product_gone: number; media_already_retried: number } }> {
+  ): Promise<{
+    accepted: number;
+    new: number;
+    media: number;
+    content: number;
+    skipped: { known: number; media_product_gone: number; media_already_retried: number; content_already_settled: number };
+  }> {
     if (rows.length > 100) throw new OpsError('delta/manifest', 'permanent', 'MANIFEST_BATCH_TOO_LARGE', 0);
     const a = await this.send('delta/manifest', 'POST', '/delta/manifest', { from_run: fromRun, rows: rows as Rec[] }, true);
     const k = isRec(a.skipped) ? a.skipped : {};
@@ -744,7 +810,8 @@ export class OpsClient {
       accepted: num(a.accepted),
       new: num(a.new),
       media: num(a.media),
-      skipped: { known: num(k.known), media_product_gone: num(k.media_product_gone), media_already_retried: num(k.media_already_retried) },
+      content: num(a.content),
+      skipped: { known: num(k.known), media_product_gone: num(k.media_product_gone), media_already_retried: num(k.media_already_retried), content_already_settled: num(k.content_already_settled) },
     };
   }
 
@@ -786,6 +853,40 @@ export class OpsClient {
 
   async mediaComplete(sid: string, leaseToken: string, liveUrl: string, evidence: Rec): Promise<{ state: string; seq: number | null; d1_checks: Rec }> {
     const a = await this.send('media-complete', 'POST', this.sidPath(sid, 'media-complete'), { lease_token: leaseToken, live_url: liveUrl, edge_evidence: evidence }, false);
+    return { state: str(a.state), seq: typeof a.seq === 'number' ? a.seq : null, d1_checks: isRec(a.d1_checks) ? a.d1_checks : {} };
+  }
+
+  /**
+   * Idempotent: it records the payload's digest again and answers the same plan for the same page. `null` with a moot
+   * code: the moot plan (`identity_changed`: the page no longer reads as this product; `source_gone`: the store page
+   * is gone; nothing is fetched or written, §O.6).
+   */
+  async contentPlan(sid: string, leaseToken: string, payload: ImportPayload | null, moot: 'identity_changed' | 'source_gone' = 'identity_changed'): Promise<ContentPlanAnswer> {
+    const body: Rec = payload ? { lease_token: leaseToken, payload: payload as unknown as Rec } : { lease_token: leaseToken, moot };
+    const a = await this.send('content-plan', 'POST', this.sidPath(sid, 'content-plan'), body, true);
+    return {
+      payload_sha256: str(a.payload_sha256),
+      media: (Array.isArray(a.media) ? a.media : []).flatMap((m) => {
+        const r = contentRequestOf(m);
+        return r ? [r] : [];
+      }),
+      skipped: numbers(a.skipped),
+      failed: num(a.failed),
+      stored_not_written: num(a.stored_not_written),
+    };
+  }
+
+  /** Not idempotent in the call: an ambiguous failure asks /lease what committed (the batch moves the item on). */
+  async contentAttach(sid: string, leaseToken: string, payloadSha256: string, payload: ImportPayload | null, moot: 'identity_changed' | 'source_gone' = 'identity_changed'): Promise<ContentAttachAnswer> {
+    const body: Rec = payload
+      ? { lease_token: leaseToken, payload_sha256: payloadSha256, payload: payload as unknown as Rec }
+      : { lease_token: leaseToken, payload_sha256: payloadSha256, moot };
+    const a = await this.send('content-attach', 'POST', this.sidPath(sid, 'content-attach'), body, false);
+    return { product_id: str(a.product_id), slug: str(a.slug), counts: numbers(a.counts), inserted: contentInsertedOf(a) ?? { blocks: [], box: [] } };
+  }
+
+  async contentComplete(sid: string, leaseToken: string, liveUrl: string, evidence: Rec): Promise<{ state: string; seq: number | null; d1_checks: Rec }> {
+    const a = await this.send('content-complete', 'POST', this.sidPath(sid, 'content-complete'), { lease_token: leaseToken, live_url: liveUrl, edge_evidence: evidence }, false);
     return { state: str(a.state), seq: typeof a.seq === 'number' ? a.seq : null, d1_checks: isRec(a.d1_checks) ? a.d1_checks : {} };
   }
 

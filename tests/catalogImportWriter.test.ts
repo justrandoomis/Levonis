@@ -1457,3 +1457,22 @@ test('a written printer shows no spec row for identity.family: the product_famil
     for (const v of [r.value_en, r.value_ar, r.value_ckb]) assert.notEqual(v, family.value_text, 'the code never reaches a spec row');
   }
 });
+
+test('the writer\'s own description and box mapping (contentBlocksOf, boxValueListOf), exported for the content pass (§O.6), rebuild what it stored byte for byte', async () => {
+  const { newWorld: freshWorld, stage: stageIt, write: writeIt } = await import('./fixtures/catalogImportWorld');
+  const { expectedBlocks } = await import('../worker/lib/catalogImport/contentMedia');
+  const { boxValueListOf } = await import('../worker/lib/catalogImport/writer');
+  const w = freshWorld();
+  const s = stageIt(w, 'a1');
+  const { result } = await writeIt(w, s);
+  const keys = new Map((w.raw.prepare('SELECT source_media_id, r2_key FROM catalog_import_media WHERE source_product_id = ?').all(s.payload.source_product_id) as Array<{ source_media_id: string; r2_key: string }>).map((r) => [r.source_media_id, r.r2_key]));
+  type Row = { field: string; source_en: string; text_ar: string; text_ckb: string; status: string; translation_version: number; updated_at: string };
+  const rows = w.raw.prepare("SELECT field, source_en, text_ar, text_ckb, status, translation_version, updated_at FROM product_translations WHERE product_id = ? AND field LIKE 'block:%'").all(result.product_id) as Row[];
+  const stored = (w.raw.prepare('SELECT content_blocks FROM products WHERE id = ?').get(result.product_id) as { content_blocks: string }).content_blocks;
+  assert.equal(JSON.stringify(expectedBlocks(s.payload, keys, new Map(rows.map((r) => [r.field, r])))), stored);
+  for (const spec of s.payload.specs.filter((x) => x.key === 'package.contents')) {
+    const row = w.raw.prepare('SELECT value_list FROM product_spec_values WHERE id = ?').get(spec.id) as { value_list: string } | undefined;
+    assert.ok(row, spec.id);
+    assert.equal(JSON.stringify(boxValueListOf(spec.value_list, (item) => (item.source_media_id ? keys.get(item.source_media_id) ?? '' : ''))), row.value_list);
+  }
+});

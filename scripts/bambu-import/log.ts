@@ -127,6 +127,16 @@ export const TEMPLATES = {
   media_moot:
     'media-only: the page no longer reads as this product ({what}); nothing is fetched or attached, the item completes and a later delta takes it again',
   media_seen: 'media-only verify: {rows_seen} of {rows} image rows and {swatches_seen} of {swatches} swatches on the public product (HTTP {status})',
+  delta_content_plan:
+    'content pass from run {run}: {content_failed_total} description and in-the-box pictures failed in the closed run; {content_items} items with {content_failed} to put back ({content_failed_description} description, {content_failed_in_the_box} in the box); not queued: {content_failed_not_complete} of items not complete or that wrote no product, {content_failed_product_gone} of {media_product_gone} items whose product is gone, {content_failed_not_reviewed} of {content_not_reviewed} items not in the reviewed manifest, {content_failed_settled} settled by an earlier content pass ({content_already_settled} items with nothing left); {content_items_unrecorded} queued items without a recorded description count',
+  delta_content_code: 'content pass: {failed} of the pictures to put back failed with {code}',
+  delta_content_registered: 'content queue registered: {content} items ({calls} calls); left out: {product_gone} items whose product is gone, {settled} items an earlier content pass settled',
+  content_plan:
+    'content pass: {failed} description and in-the-box pictures failed in the closed run; {requests} fetched again; edited since the import {owner_edited}, not written by the import {not_imported}, store page changed {source_changed}, no longer on the page {not_on_page}, already there {already_present}, removed by the owner {owner_removed}, product not public {product_not_public}, page no longer this product {identity_changed}, store page gone {source_gone}; stored but never written {stored_not_written}',
+  content_moot: 'content pass: the page reads {what}; nothing is fetched or written, the item completes and a later pass takes it again',
+  content_attached:
+    'content pass: {attached} put back ({blocks} description, {box} in the box); already there {already_present}, removed by the owner {owner_removed}, edited {owner_edited}, not written by the import {not_imported}, store page changed {source_changed}, not stored {not_stored}',
+  content_seen: 'content pass verify: {blocks_seen}/{blocks} description and {box_seen}/{box} in-the-box pictures on the public answers (HTTP {status}/{knowledge_status})',
 } as const;
 export type TemplateKey = keyof typeof TEMPLATES;
 

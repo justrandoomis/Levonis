@@ -29,16 +29,22 @@
  *
  * The delta run (workflow 60 mode=delta; spec §O, worker/lib/catalogImport/delta.ts and mediaRetry.ts):
  *
- *   POST /delta/plan                    the closed run and the sitemap's handles → the new handles, the media items
+ *   POST /delta/plan                    the closed run and the sitemap's handles → the new handles, the media items;
+ *                                       with `pass: 'content'` (no sitemap) → the content items (§O.6)
  *   POST /delta/manifest                ≤ 100 delta rows (new products, media items), each checked against D1
  *   GET  /delta/rows                    the run's delta items (the runner's view of rows the bundle does not hold)
  *   POST /items/:sid/media-plan         a media item: its rebuilt payload proved, the failed media still shown planned
  *   POST /items/:sid/media-attach       a media item: ONE guarded, INSERT-only batch of the pictures now stored
  *   POST /items/:sid/media-complete     a media item: the runner's public read + the Worker's recompute → COMPLETE
+ *   POST /items/:sid/content-plan       a content item (§O.6, contentMedia.ts): its rebuilt payload proved, the failed
+ *                                       description and in-the-box media planned where their field is provably the import's
+ *   POST /items/:sid/content-attach     a content item: ONE guarded batch, compare-and-set on each field as read
+ *   POST /items/:sid/content-complete   a content item: the runner's public reads + the Worker's recompute → COMPLETE
  *
  * A new product of a delta run goes through /stage, /write and /complete like any item, its manifest row the one the
- * Worker registered (the bundle extended by delta.ts runBundle), behind the §E.1 candidate gate; a media item never
- * does: those three refuse it.
+ * Worker registered (the bundle extended by delta.ts runBundle), behind the §E.1 candidate gate; a media or content
+ * item never does: those three refuse it — and so they refuse any item whose reserved marker this code does not read
+ * (fail closed), and /media takes for a media or content item only the closed run's failed media of its own roles.
  *
  * Every answer is `private, no-store`; every error `{code, message}` from the
  * fixed catalogue; no input, SQL text or stack is ever echoed.
@@ -80,8 +86,9 @@ import { ImportWriteRefused, planImportWrite, runImportWrite, type DocumentCheck
 import { republishAfterBlock } from '../lib/catalogImport/unpublish';
 import { loadTranslationPart, PART_NAME, purgeTranslatedProducts } from '../lib/catalogImport/translations';
 import { EXPECTED_MIGRATION } from '../lib/schemaVersion';
-import { acceptDeltaRows, deltaMatchGate, deltaPlan, deltaRowsView, itemMark, runBundle } from '../lib/catalogImport/delta';
+import { acceptDeltaRows, contentDeltaPlan, deltaMatchGate, deltaPlan, deltaRowsView, itemDoorKind, runBundle } from '../lib/catalogImport/delta';
 import { assertRetryRequests, attachRetriedMedia, completeMediaRetry, planMediaRetry, retryContext } from '../lib/catalogImport/mediaRetry';
+import { assertContentRequests, attachContentMedia, completeContentMedia, contentContext, planContentMedia } from '../lib/catalogImport/contentMedia';
 
 export const catalogImportOpsRoutes = new Hono<OpsEnv>();
 
@@ -127,11 +134,14 @@ function bundleOrRefuse(): ReviewedBundle {
 /** The bundle this run's item calls read: the reviewed one, plus the manifest rows of a delta run's new products. */
 const runBundleOf = (c: OpsContext): Promise<ReviewedBundle> => runBundle(c.env.DB, c.get('importRun').id, bundleOrRefuse());
 
-/** A media item of a delta run writes no product: /stage, /write and /complete refuse it. */
+/**
+ * Only an ordinary item and a delta's new product write a product: /stage, /write and /complete refuse a media item,
+ * a content item, and any item whose reserved marker this code does not read (fail closed).
+ */
 async function refuseMediaItem(c: OpsContext, item: ItemRow): Promise<'new' | null> {
-  const mark = await itemMark(c.env.DB, item.id);
-  if (mark?.kind === 'media') throw new OpsRefusal(409, 'IMPORT_DELTA_REFUSED', [item.id]);
-  return mark?.kind === 'new' ? 'new' : null;
+  const kind = await itemDoorKind(c.env.DB, item.id);
+  if (kind !== 'none' && kind !== 'new') throw new OpsRefusal(409, 'IMPORT_DELTA_REFUSED', [item.id]);
+  return kind === 'new' ? 'new' : null;
 }
 
 const sidOf = (c: OpsContext): string => {
@@ -326,8 +336,13 @@ catalogImportOpsRoutes.post(
     const run = c.get('importRun');
     const item = await holdLease(c.env.DB, run, sidOf(c), body.lease_token);
     const requests = mediaRequestsOf(body.media);
-    // A media item of a delta run fetches only the failed media of the closed run it retries (mediaRetry.ts).
-    if ((await itemMark(c.env.DB, item.id))?.kind === 'media') assertRetryRequests(await retryContext(c.env.DB, item), item, requests);
+    // A media item of a delta run fetches only the failed media of the closed run it retries (mediaRetry.ts); a content
+    // item only the closed run's failed description and in-the-box media (contentMedia.ts); a marker this code does
+    // not read, nothing.
+    const kind = await itemDoorKind(c.env.DB, item.id);
+    if (kind === 'media') assertRetryRequests(await retryContext(c.env.DB, item), item, requests);
+    else if (kind === 'content') assertContentRequests(await contentContext(c.env.DB, item), item, requests);
+    else if (kind !== 'none' && kind !== 'new') throw new OpsRefusal(409, 'IMPORT_DELTA_REFUSED', [item.id]);
     const media = await ingestImportMedia({ ...mediaEnv(c), DB: c.env.DB, CATALOG_IMPORT_MEDIA_ORIGIN: c.env.CATALOG_IMPORT_MEDIA_ORIGIN }, c.req.url, run, item, requests);
     return c.json({ media });
   })
@@ -340,8 +355,10 @@ catalogImportOpsRoutes.post(
     const run = c.get('importRun');
     const bundle = await runBundleOf(c);
     const item = await holdLease(c.env.DB, run, sidOf(c), body.lease_token);
+    // An item that writes no product is refused before anything else is read of the call.
+    const kind = await refuseMediaItem(c, item);
     if (typeof body.payload_sha256 !== 'string' || body.payload_sha256 !== item.payload_sha256) throw new OpsRefusal(409, 'IMPORT_NOT_STAGED', [item.id]);
-    if ((await refuseMediaItem(c, item)) === 'new') await deltaMatchGate(c.env.DB, bundle, item.id, body.payload);
+    if (kind === 'new') await deltaMatchGate(c.env.DB, bundle, item.id, body.payload);
     const ctx = writeContext(c);
     const plan = await planImportWrite(ctx, {
       mode: 'write',
@@ -410,6 +427,8 @@ catalogImportOpsRoutes.post(
   '/delta/plan',
   handle(async (c) => {
     const body = await readBody(c);
+    // `pass: 'content'`: the content pass's queue (§O.6); otherwise the pictures and new products of §O.1.
+    if (body.pass === 'content') return c.json(await contentDeltaPlan(c.env.DB, c.get('importRun'), body, bundleOrRefuse()));
     return c.json(await deltaPlan(c.env.DB, c.get('importRun'), body, bundleOrRefuse()));
   })
 );
@@ -454,6 +473,37 @@ catalogImportOpsRoutes.post(
     const run = c.get('importRun');
     const item = await holdLease(c.env.DB, run, sidOf(c), body.lease_token);
     return c.json(await completeMediaRetry({ ...mediaEnv(c), DB: c.env.DB }, c.req.url, run, item, body));
+  })
+);
+
+catalogImportOpsRoutes.post(
+  '/items/:sid/content-plan',
+  handle(async (c) => {
+    const body = await readBody(c);
+    const bundle = bundleOrRefuse();
+    const item = await holdLease(c.env.DB, c.get('importRun'), sidOf(c), body.lease_token);
+    return c.json(await planContentMedia(c.env.DB, item, bundle, body.payload, body.moot));
+  })
+);
+
+catalogImportOpsRoutes.post(
+  '/items/:sid/content-attach',
+  handle(async (c) => {
+    const body = await readBody(c);
+    const run = c.get('importRun');
+    const bundle = bundleOrRefuse();
+    const item = await holdLease(c.env.DB, run, sidOf(c), body.lease_token);
+    return c.json(await attachContentMedia({ ...mediaEnv(c), DB: c.env.DB }, run, item, bundle, body));
+  })
+);
+
+catalogImportOpsRoutes.post(
+  '/items/:sid/content-complete',
+  handle(async (c) => {
+    const body = await readBody(c);
+    const run = c.get('importRun');
+    const item = await holdLease(c.env.DB, run, sidOf(c), body.lease_token);
+    return c.json(await completeContentMedia({ ...mediaEnv(c), DB: c.env.DB }, c.req.url, run, item, body));
   })
 );
 

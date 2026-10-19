@@ -21,6 +21,13 @@
  *                 attached, and the delta run closes
  *   withdraw      a delta run's NEW product gone at the source: mode=withdraw finds its row (the Worker registered
  *                 it; the reviewed manifest never names it) and withdraws it
+ *   content       mode=delta item=content (§O.6): run A wrote the AMS 2 Pro with two description pictures and its box
+ *                 picture failed; the content pass reads robots.txt and the page only (no sitemap), puts the three back
+ *                 where the import meant them, VERIFY passes on /api/products/<slug> and its /knowledge, nothing else
+ *                 of the product moves, and a second content delta queues nothing; an owner's Arabic edit since the
+ *                 import leaves the description untouched (owner_edited) while the box picture goes in; a page gone
+ *                 at the store is moot (source_gone): COMPLETE, nothing written; the content doors refuse what is not
+ *                 a content item's, and an unknown delta marker fails closed
  *
  * Run: node --import tsx --test tests/catalogImportDeltaE2E.test.ts
  */
@@ -37,7 +44,8 @@ import { REVIEWED_FILES } from '../worker/lib/catalogImport/reviewed';
 import { loadReviewedBundle } from '../scripts/bambu-import/discover';
 import { ImportLog } from '../scripts/bambu-import/log';
 import { SummaryWriter } from '../scripts/bambu-import/summary';
-import { Importer, mediaOnlyPayload, type RunConfig } from '../scripts/bambu-import/run';
+import { contentOnlyPayload, Importer, mediaOnlyPayload, type RunConfig } from '../scripts/bambu-import/run';
+import type { PayloadBoxItem } from '../packages/catalog/src/bambuImport/payload';
 import { OpsClient } from '../scripts/bambu-import/opsClient';
 import { Deadline } from '../scripts/bambu-import/deadline';
 
@@ -341,7 +349,16 @@ test('mode=delta: a renamed store handle (its source id held by an earlier run) 
 });
 
 /** The real runner on the real Worker of `w`, against the fake store (`listed`, `redirects`, the committed pages). */
-function importerOf(w: World, ops: OpsWorld, dataDir: string, dir: string, clock: FakeClock, part: Partial<RunConfig>, store: { listed: string[]; redirects?: Record<string, string>; seen: string[] }) {
+function importerOf(
+  w: World,
+  ops: OpsWorld,
+  dataDir: string,
+  dir: string,
+  clock: FakeClock,
+  part: Partial<RunConfig>,
+  store: { listed: string[]; redirects?: Record<string, string>; seen: string[] },
+  opened = DELTA
+) {
   const fetchLike = async (url: string, init: RequestInit) => {
     const u = new URL(url);
     if (u.origin === STORE) return storeAnswer(u.pathname, store.listed, store.seen, store.redirects);
@@ -366,7 +383,7 @@ function importerOf(w: World, ops: OpsWorld, dataDir: string, dir: string, clock
       outputs[k] = v;
     },
     summary: new SummaryWriter(undefined),
-    openedRunId: cfg.mode === 'delta' ? DELTA : undefined,
+    openedRunId: cfg.mode === 'delta' ? opened : undefined,
     browser: async () => ({ check: async () => assert.fail('a media item never opens the browser'), close: async () => {} }),
   });
   return { importer, lines, outputs };
@@ -439,5 +456,237 @@ test('mode=withdraw: a delta run\'s NEW product gone at the source is found by t
     PAGES['filament-buffer'] = readFileSync(join(BAMBU_FIXTURES, 'filament-buffer.page.html'), 'utf8');
     rmSync(dir, { recursive: true, force: true });
     restoreFetch();
+  }
+});
+
+// ---------------------------------------------------------------- the content pass (§O.6)
+
+const DELTA2 = 'cir_d1d1d1d1d1d1d1d1d1d1d1d1';
+
+/** Run A for the content pass: the AMS 2 Pro written with two description pictures and its in-the-box picture failed. */
+async function closedRunContent(before?: (w: World, productId: string) => void) {
+  const w = newWorld();
+  const x = pageOf('ams-2-pro').extraction;
+  const { payload } = buildFor(w, x);
+  const images = payload.content_blocks.filter((b) => b.kind === 'image' && b.source_media_id);
+  const box = payload.specs
+    .filter((s) => s.key === 'package.contents')
+    .flatMap((s) => s.value_list)
+    .find((v): v is PayloadBoxItem => !!v && typeof v === 'object' && !!(v as PayloadBoxItem).source_media_id)!;
+  const failed = [
+    { id: images[1].source_media_id, role: 'description', url: images[1].source_url },
+    { id: images[4].source_media_id, role: 'description', url: images[4].source_url },
+    { id: box.source_media_id, role: 'in_the_box', url: box.source_url },
+  ];
+  const s = stage(w, x, { skipMedia: (id) => failed.some((f) => f.id === id) });
+  const { result } = await write(w, s);
+  for (const f of failed) {
+    w.raw
+      .prepare("INSERT INTO catalog_import_media (run_id, source_product_id, source_media_id, role, source_url, status, error_code) VALUES (?, ?, ?, ?, ?, 'failed', 'IMAGE_CONVERT_FAILED')")
+      .run(RUN_ID, x.sourceProductId, f.id, f.role, f.url);
+  }
+  complete(w, s.itemId);
+  before?.(w, result.product_id);
+  w.raw.prepare("UPDATE catalog_import_runs SET state = 'partial' WHERE id = ?").run(RUN_ID);
+  return { w, sid: x.sourceProductId, productId: result.product_id, failed, payload };
+}
+
+/** Every row of every table the import could write for the product, every column (the dump shows what moved). */
+function everything(w: World, productId: string): Record<string, unknown[]> {
+  const q = (sql: string) => w.raw.prepare(sql).all(productId);
+  return {
+    products: q('SELECT * FROM products WHERE id = ?'),
+    specs: q('SELECT * FROM product_spec_values WHERE product_id = ? ORDER BY id'),
+    translations: q('SELECT * FROM product_translations WHERE product_id = ? ORDER BY field'),
+    images: q('SELECT * FROM product_images WHERE product_id = ? ORDER BY id'),
+    values: q('SELECT * FROM product_option_values WHERE product_id = ? ORDER BY id'),
+    variants: q('SELECT * FROM product_variants WHERE product_id = ? ORDER BY id'),
+    documents: q('SELECT * FROM product_documents WHERE product_id = ? ORDER BY id'),
+    relations: q('SELECT * FROM product_relations WHERE product_id = ? ORDER BY id'),
+    refs: q('SELECT * FROM product_option_source_refs WHERE product_id = ? ORDER BY kind, source_id, levonis_id'),
+    sources: q('SELECT * FROM product_source_refs WHERE product_id = ?'),
+  };
+}
+
+function movedColumns(a: Record<string, unknown[]>, b: Record<string, unknown[]>): string[] {
+  const out = new Set<string>();
+  for (const t of Object.keys(a)) {
+    if (a[t].length !== b[t].length) out.add(`${t}:rows`);
+    else
+      a[t].forEach((row, i) => {
+        for (const [k, v] of Object.entries(row as Record<string, unknown>)) if (JSON.stringify(v) !== JSON.stringify((b[t][i] as Record<string, unknown>)[k])) out.add(`${t}.${k}`);
+      });
+  }
+  return [...out].sort();
+}
+
+test('mode=delta item=content end to end: the description and box pictures put back where the import meant them, verified on the public answers, nothing else moved; a second content delta queues nothing', async () => {
+  const { w, sid, productId, failed } = await closedRunContent();
+  const dir = mkdtempSync(join(tmpdir(), 'levonis-delta-content-'));
+  try {
+    const ops = opsOf(w);
+    const dataDir = writeBundle(w, dir);
+    installCdnDouble(ops);
+    openRun(w.raw, { id: DELTA });
+    const before = everything(w, productId);
+    const clock = new FakeClock(Date.now());
+    const store = { listed: [] as string[], seen: [] as string[] };
+    const a = importerOf(w, ops, dataDir, dir, clock, { deltaPass: 'content' }, store);
+    const code = await a.importer.main();
+    const log = a.lines.join('\n');
+    assert.equal(code, 0, log);
+    assert.deepEqual([a.outputs.more, a.outputs.blocked, a.outputs.run_id], ['false', 'false', DELTA], log);
+    // No sitemap, no other page: robots.txt and the product's own page, once.
+    assert.deepEqual(store.seen, ['/robots.txt', '/products/ams-2-pro']);
+    assert.deepEqual(ops.cdn.served.map((u) => u.split('?')[0]).sort(), failed.map((f) => f.url).sort(), 'only the three failed pictures fetched again');
+    const item = w.raw.prepare('SELECT processing_state, discovery_sources, match_kind FROM catalog_import_items WHERE run_id = ? AND source_product_id = ?').get(DELTA, sid) as Record<string, string>;
+    assert.deepEqual([item.processing_state, item.discovery_sources, item.match_kind], ['COMPLETE', `["content_media:${RUN_ID}"]`, ''], log);
+    assert.match(log, /content pass from run cir_0123456789abcdef01234567: 3 description and in-the-box pictures failed in the closed run; 1 items with 3 to put back \(2 description, 1 in the box\)/);
+    assert.match(log, /content pass: 3 of the pictures to put back failed with IMAGE_CONVERT_FAILED/);
+    assert.match(log, /content pass: 3 put back \(2 description, 1 in the box\)/);
+    assert.match(log, /content pass verify: 2\/2 description and 1\/1 in-the-box pictures on the public answers \(HTTP 200\/200\)/);
+    assert.doesNotMatch(log, /bblcdn|https:\/\/us\.store|p_[0-9a-f]{20}|products\/import|content:[0-9a-f]|box:[0-9a-f]/);
+    assert.deepEqual(movedColumns(before, everything(w, productId)), ['products.content_blocks', 'products.updated_at', 'specs.value_list']);
+
+    // The run closes the normal way; a second content delta from the same closed run queues nothing.
+    const c = importerOf(w, ops, dataDir, dir, clock, { mode: 'close', runId: DELTA, fromRun: '' }, store);
+    assert.equal(await c.importer.main(), 0, c.lines.join('\n'));
+    openRun(w.raw, { id: DELTA2 });
+    const again = everything(w, productId);
+    const b = importerOf(w, ops, dataDir, dir, clock, { deltaPass: 'content' }, store, DELTA2);
+    assert.equal(await b.importer.main(), 0, b.lines.join('\n'));
+    const log2 = b.lines.join('\n');
+    assert.deepEqual([b.outputs.more, b.outputs.blocked], ['false', 'false'], log2);
+    assert.match(log2, /1 items with nothing left/);
+    assert.match(log2, /content queue registered: 0 items/);
+    assert.equal(w.raw.prepare('SELECT COUNT(*) AS n FROM catalog_import_items WHERE run_id = ?').get(DELTA2)!.n, 0);
+    assert.deepEqual(movedColumns(again, everything(w, productId)), [], 'running it twice changes nothing');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    restoreFetch();
+  }
+});
+
+test('mode=delta item=content: an owner\'s Arabic edit since the import leaves the description untouched (owner_edited) while the box picture goes in; a store page gone is moot (source_gone): COMPLETE, nothing written', async () => {
+  {
+    const { w, sid, productId } = await closedRunContent((world, id) => {
+      const row = world.raw.prepare('SELECT content_blocks FROM products WHERE id = ?').get(id) as { content_blocks: string };
+      const blocks = JSON.parse(row.content_blocks) as Array<Record<string, unknown>>;
+      const t = blocks.find((b) => b.kind === 'text')!;
+      t.body_ar = 'وصف كتبه المالك بنفسه';
+      world.raw.prepare('UPDATE products SET content_blocks = ? WHERE id = ?').run(JSON.stringify(blocks), id);
+    });
+    const dir = mkdtempSync(join(tmpdir(), 'levonis-delta-content-edit-'));
+    try {
+      const ops = opsOf(w);
+      const dataDir = writeBundle(w, dir);
+      installCdnDouble(ops);
+      openRun(w.raw, { id: DELTA });
+      const t0 = (w.raw.prepare('SELECT content_blocks FROM products WHERE id = ?').get(productId) as { content_blocks: string }).content_blocks;
+      const a = importerOf(w, ops, dataDir, dir, new FakeClock(Date.now()), { deltaPass: 'content' }, { listed: [], seen: [] });
+      const code = await a.importer.main();
+      const log = a.lines.join('\n');
+      assert.equal(code, 0, log);
+      assert.match(log, /edited since the import 2/);
+      assert.match(log, /content pass: 1 put back \(0 description, 1 in the box\)/);
+      assert.equal((w.raw.prepare('SELECT content_blocks FROM products WHERE id = ?').get(productId) as { content_blocks: string }).content_blocks, t0, 'the owner\'s description untouched');
+      const item = w.raw.prepare('SELECT processing_state, stage_data FROM catalog_import_items WHERE run_id = ? AND source_product_id = ?').get(DELTA, sid) as Record<string, string>;
+      assert.equal(item.processing_state, 'COMPLETE', log);
+      assert.deepEqual(Object.values(JSON.parse(item.stage_data).content_media.media).sort(), ['attached', 'owner_edited', 'owner_edited']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      restoreFetch();
+    }
+  }
+  {
+    const { w, sid, productId } = await closedRunContent();
+    const dir = mkdtempSync(join(tmpdir(), 'levonis-delta-content-gone-'));
+    const page = PAGES['ams-2-pro'];
+    try {
+      const ops = opsOf(w);
+      const dataDir = writeBundle(w, dir);
+      installCdnDouble(ops);
+      openRun(w.raw, { id: DELTA });
+      const before = everything(w, productId);
+      delete PAGES['ams-2-pro'];
+      const a = importerOf(w, ops, dataDir, dir, new FakeClock(Date.now()), { deltaPass: 'content' }, { listed: [], seen: [] });
+      const code = await a.importer.main();
+      const log = a.lines.join('\n');
+      assert.equal(code, 0, log);
+      assert.deepEqual([a.outputs.more, a.outputs.blocked], ['false', 'false'], log);
+      assert.match(log, /the page reads source_gone/);
+      assert.match(log, /store page gone 3/);
+      const item = w.raw.prepare('SELECT processing_state, stage_data FROM catalog_import_items WHERE run_id = ? AND source_product_id = ?').get(DELTA, sid) as Record<string, string>;
+      assert.equal(item.processing_state, 'COMPLETE', log);
+      assert.deepEqual(movedColumns(before, everything(w, productId)), []);
+      assert.deepEqual(Object.values(JSON.parse(item.stage_data).content_media.media), ['source_gone', 'source_gone', 'source_gone'], 'passing: a later pass takes them again');
+    } finally {
+      PAGES['ams-2-pro'] = page;
+      rmSync(dir, { recursive: true, force: true });
+      restoreFetch();
+    }
+  }
+});
+
+test('the content doors: a content item never stages, writes or completes, fetches only its failed media of its roles; an unknown delta marker fails closed at every door', async () => {
+  const { w, sid } = await closedRunContent();
+  const ops = opsOf(w);
+  const dir = mkdtempSync(join(tmpdir(), 'levonis-delta-content-door-'));
+  try {
+    writeBundle(w, dir);
+    openRun(w.raw, { id: DELTA });
+    // /delta/plan for the content pass reads no sitemap: one given is refused.
+    const bad = await ops.call(`${OPS}/delta/plan`, { body: { from_run: RUN_ID, pass: 'content', sitemap_handles: ['ams-2-pro'] } });
+    assert.equal(bad.status, 400);
+    const plan = (await (await ops.call(`${OPS}/delta/plan`, { body: { from_run: RUN_ID, pass: 'content' } })).json()) as { content: Array<{ source_product_id: string; failed: number }>; counts: Record<string, number> };
+    assert.deepEqual(plan.content.map((c) => [c.source_product_id, c.failed]), [[sid, 3]]);
+    assert.equal(plan.counts.content_failed_total, 3);
+    // A content run never takes a media row, and a media run never a content row.
+    const mixed = await ops.call(`${OPS}/delta/manifest`, { body: { from_run: RUN_ID, rows: [{ kind: 'content', source_product_id: sid, discovered_at: '2026-10-19T00:00:00.000Z' }, { kind: 'new', source_product_id: '999', handle: 'x-y', route: '1', discovered_at: '2026-10-19T00:00:00.000Z' }] } });
+    assert.equal(mixed.status, 409);
+    assert.equal((await ops.call(`${OPS}/delta/manifest`, { body: { from_run: RUN_ID, rows: [{ kind: 'content', source_product_id: sid, discovered_at: '2026-10-19T00:00:00.000Z' }] } })).status, 200);
+    const media = await ops.call(`${OPS}/delta/manifest`, { body: { from_run: RUN_ID, rows: [{ kind: 'media', source_product_id: sid, discovered_at: '2026-10-19T00:00:00.000Z' }] } });
+    assert.equal(media.status, 409);
+    const lease = (await (await ops.call(`${OPS}/items/${sid}/lease`, { body: { lease_token: '' } })).json()) as { lease_token: string };
+    for (const [state, outcome] of [['EXTRACTING', 'start'], ['ENRICHING', 'ok'], ['VALIDATING', 'ok']]) {
+      assert.equal((await ops.call(`${OPS}/items/${sid}/event`, { body: { lease_token: lease.lease_token, state, outcome } })).status, 200, state);
+    }
+    const payload = buildFor(w, pageOf('ams-2-pro').extraction).payload;
+    // The content door takes the description and box rows only: the whole payload is refused, the content-only one planned.
+    assert.equal((await ops.call(`${OPS}/items/${sid}/content-plan`, { body: { lease_token: lease.lease_token, payload } })).status, 400);
+    const cplan = await ops.call(`${OPS}/items/${sid}/content-plan`, { body: { lease_token: lease.lease_token, payload: contentOnlyPayload(payload) } });
+    assert.equal(cplan.status, 200);
+    assert.equal(((await cplan.json()) as { media: unknown[] }).media.length, 3);
+    assert.equal((await ops.call(`${OPS}/items/${sid}/event`, { body: { lease_token: lease.lease_token, state: 'INGESTING_MEDIA', outcome: 'ok' } })).status, 200);
+    // The media doors of a media item are not a content item's.
+    assert.equal(((await (await ops.call(`${OPS}/items/${sid}/media-plan`, { body: { lease_token: lease.lease_token, payload: mediaOnlyPayload(payload) } })).json()) as { code: string }).code, 'IMPORT_DELTA_REFUSED');
+    for (const door of ['stage', 'write', 'complete']) {
+      const r = await ops.call(`${OPS}/items/${sid}/${door}`, { body: { lease_token: lease.lease_token, payload, payload_sha256: 'x' } });
+      assert.equal(r.status, 409, door);
+      assert.equal(((await r.json()) as { code: string }).code, 'IMPORT_DELTA_REFUSED', door);
+    }
+    const gallery = payload.images.find((i) => !i.is_primary)!;
+    const r = await ops.call(`${OPS}/items/${sid}/media`, { body: { lease_token: lease.lease_token, media: [{ source_media_id: gallery.source_media_id, role: 'gallery', source_url: gallery.source_url }] } });
+    assert.equal(((await r.json()) as { code: string }).code, 'IMPORT_DELTA_REFUSED', 'a gallery picture is never a content item\'s');
+
+    // An item with a reserved marker this code does not read: every door refuses it (never an ordinary item).
+    w.raw.prepare("UPDATE catalog_import_runs SET state = 'closed' WHERE id = ?").run(DELTA);
+    openRun(w.raw, { id: DELTA2 });
+    w.raw
+      .prepare(
+        `INSERT INTO catalog_import_items (id, run_id, source, source_product_id, handle, canonical_url, queue_position, discovery_sources, discovered_at)
+         VALUES ('cii_unknown', ?, 'bambu_us', '424242', 'ams-2-pro-x', 'x', 50, '["content_media:not-a-run"]', '2026-10-19T00:00:00.000Z')`
+      )
+      .run(DELTA2);
+    const l2 = (await (await ops.call(`${OPS}/items/424242/lease`, { body: { lease_token: '' } })).json()) as { lease_token: string };
+    for (const [state, outcome] of [['EXTRACTING', 'start'], ['ENRICHING', 'ok'], ['VALIDATING', 'ok']]) await ops.call(`${OPS}/items/424242/event`, { body: { lease_token: l2.lease_token, state, outcome } });
+    for (const door of ['stage', 'write', 'complete', 'media', 'content-plan', 'media-plan']) {
+      const body = door === 'media' ? { lease_token: l2.lease_token, media: [{ source_media_id: 'box:1', role: 'in_the_box', source_url: 'https://store.bblcdn.com/a.png' }] } : { lease_token: l2.lease_token, payload, payload_sha256: 'x' };
+      const x = await ops.call(`${OPS}/items/424242/${door}`, { body });
+      assert.equal(x.status, 409, door);
+      assert.equal(((await x.json()) as { code: string }).code, 'IMPORT_DELTA_REFUSED', door);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });

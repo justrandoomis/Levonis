@@ -608,6 +608,43 @@ async function brandId(db: D1Database): Promise<string> {
   return String(row.id);
 }
 
+// ---------------------------------------------------------------- the box items and the merge's scopes
+
+/**
+ * A `package.contents` row's `value_list` as the writer stores it (§C.6): a box item becomes `{text, qty, media_key?,
+ * section?}` — its picture's key only where `keyOf` names one (the object the write could prove stored), never a store
+ * URL — and a plain string stays as it is. The content pass (contentMedia.ts) rebuilds the row the import wrote through
+ * this same function, so "as the import wrote it" is byte for byte the writer's own mapping.
+ */
+export function boxValueListOf(
+  list: PayloadSpec['value_list'],
+  keyOf: (item: PayloadBoxItem, index: number) => string
+): Array<string | number | { text: string; qty: number | null; media_key?: string; section?: string }> {
+  return list.map((x, index) => {
+    if (!x || typeof x !== 'object') return x;
+    const item = x as PayloadBoxItem;
+    const key = keyOf(item, index);
+    return { text: item.text, qty: item.qty, ...(key ? { media_key: key } : {}), ...(item.section ? { section: item.section } : {}) };
+  });
+}
+
+/**
+ * A payload scope as the write stores it: a create keeps the payload's own; a merge maps a value or a variant through
+ * the reviewed value map (§E.2), and null is a scope the map does not merge (`variant_not_merged`).
+ */
+export function mapScopeOf(mapping: MergeMapping | null, kind: string, id: string): { kind: 'product' | 'option_value' | 'variant'; id: string } | null {
+  if (kind === 'product') return { kind: 'product', id: '' };
+  if (!mapping) return { kind: kind as 'option_value' | 'variant', id };
+  if (kind === 'option_value') {
+    const m = mapping.values.get(id);
+    return m?.optionValueId ? { kind: 'option_value', id: m.optionValueId } : null;
+  }
+  const m = mapping.variants.get(id);
+  if (m?.variantId) return { kind: 'variant', id: m.variantId };
+  if (m?.optionValueId) return { kind: 'option_value', id: m.optionValueId };
+  return null;
+}
+
 // ---------------------------------------------------------------- the spec mirrors (§C.6 "Mirrors written in the same batch")
 
 /** Spec rows the legacy mirrors carry: public, product-scoped, verified or unverified, never a US-only value. */
@@ -946,18 +983,7 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
     images = m.rows;
     alreadyWritten = m.written;
   }
-  const mapScope = (kind: string, id: string): { kind: 'product' | 'option_value' | 'variant'; id: string } | null => {
-    if (kind === 'product') return { kind: 'product', id: '' };
-    if (!mapping) return { kind: kind as 'option_value' | 'variant', id };
-    if (kind === 'option_value') {
-      const m = mapping.values.get(id);
-      return m?.optionValueId ? { kind: 'option_value', id: m.optionValueId } : null;
-    }
-    const m = mapping.variants.get(id);
-    if (m?.variantId) return { kind: 'variant', id: m.variantId };
-    if (m?.optionValueId) return { kind: 'option_value', id: m.optionValueId };
-    return null;
-  };
+  const mapScope = (kind: string, id: string) => mapScopeOf(mapping, kind, id);
 
   const conflicts: Mapped['conflicts'] = [];
   for (const n of payload.notes) if (CONFLICT_KINDS.has(n.kind)) conflicts.push({ kind: n.kind, field: n.field.slice(0, 120) });
@@ -973,13 +999,8 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
       conflicts.push({ kind: 'variant_not_merged', field: `spec:${s.key}` });
       continue;
     }
-    const valueList = s.value_list.map((x) => {
-      if (!x || typeof x !== 'object') return x;
-      const item = x as PayloadBoxItem;
-      boxItems++;
-      const m = item.source_media_id ? storedAux(item.source_media_id) : null;
-      return { text: item.text, qty: item.qty, ...(m ? { media_key: m.r2_key } : {}), ...(item.section ? { section: item.section } : {}) };
-    });
+    const valueList = boxValueListOf(s.value_list, (item) => (item.source_media_id ? storedAux(item.source_media_id)?.r2_key ?? '' : ''));
+    boxItems += s.value_list.filter((x) => !!x && typeof x === 'object').length;
     specs.push({
       ...s,
       id: scope.kind === s.scope_kind && scope.id === s.scope_id ? s.id : specRowId(productId, s.key, scope.kind, scope.id, s.region),
@@ -1707,7 +1728,7 @@ export function wireImage(i: ImportImageRow, alt: { en: string; ar: string; ckb:
  * (the package splits a section's text around each image or video, every piece carrying the section's title) —
  * images on their stored objects, YouTube embeds.
  */
-function contentBlocksOf(payload: ImportPayload, stored: (id: string) => MediaRow | null): ContentBlockV2[] {
+export function contentBlocksOf(payload: ImportPayload, stored: (id: string) => Pick<MediaRow, 'r2_key'> | null): ContentBlockV2[] {
   const out: ContentBlockV2[] = [];
   let shown = '';
   for (const b of payload.content_blocks) {

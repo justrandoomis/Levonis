@@ -563,6 +563,9 @@ test('the validation step accepts the valid dispatches and sets the deadline 330
     // The delta (§O): run_id names the CLOSED run; a bounded first job, or the whole queue chained with auto_withdraw.
     { ...GOOD, IN_MODE: 'delta', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE' },
     { ...GOOD, IN_MODE: 'delta', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE', IN_MAX_ITEMS: '0', IN_CHAIN: 'true', IN_AUTO_WITHDRAW: 'true' },
+    // The content pass (§O.6): the delta's `item` is `content`; the first job bounded, the rest chained.
+    { ...GOOD, IN_MODE: 'delta', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE', IN_ITEM: 'content' },
+    { ...GOOD, IN_MODE: 'delta', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE', IN_ITEM: 'content', IN_MAX_ITEMS: '0', IN_CHAIN: 'true' },
   ]) {
     const before = Math.floor(Date.now() / 1000);
     const result = bash(script, env);
@@ -612,6 +615,12 @@ test('the validation step refuses every malformed or hostile input, and never ec
     const r = bash(script, { ...GOOD, IN_MODE: 'delta', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE', IN_CHAIN: 'true', IN_MAX_ITEMS: max });
     assert.equal(r.status, 1, `delta chained with max_items ${max}`);
     assert.match(r.stdout, /^::error::chain runs only with max_items 0/m);
+  }
+  // `item=content` is the delta's content pass only; a delta takes no other item.
+  for (const [mode, item] of [['snapshot', 'content'], ['withdraw', 'content'], ['run', 'content'], ['delta', '1'], ['delta', 'Content'], ['delta', 'content ']]) {
+    const r = bash(script, { ...GOOD, IN_MODE: mode, IN_RUN_ID: mode === 'snapshot' ? '' : RUN, IN_CONFIRM: 'IMPORT-LIVE', IN_ITEM: item });
+    assert.equal(r.status, 1, `${mode} with item ${JSON.stringify(item)}`);
+    assert.match(r.stdout, /^::error::/m);
   }
   assert.equal(bash(script, { ...GOOD, IN_MODE: 'revoke' }).status, 1, 'revoke without run_id');
   for (const mode of ['run', 'close', 'withdraw', 'translations']) {

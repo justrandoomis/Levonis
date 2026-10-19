@@ -36,7 +36,9 @@
  * manifest, the taxonomy, the protected snapshot `before`), run, close (§A.9,
  * §I.3), withdraw, delta (§O: a NEW run whose queue is the closed run's
  * completed items with failed media — a media-only stage — then the products
- * the sitemaps list that no run ever held; then the queue, as in run).
+ * the sitemaps list that no run ever held; then the queue, as in run; with
+ * item=content, §O.6: a NEW run of content items only, the closed run's failed
+ * description and in-the-box pictures put where the import meant them).
  * snapshot, report, revoke and dryrun need no importer.
  *
  * Outputs (GITHUB_OUTPUT): more, blocked, run_id.
@@ -71,11 +73,14 @@ import { blockedStop, HostFetcher, ImportStop, StoreFetcher, transientStop, type
 import { ImportLog, type LogStage } from './log';
 import {
   attachedMediaOf,
+  contentInsertedOf,
   OpsClient,
   OpsError,
   writtenDocumentsOf,
   writtenImagesOf,
   type AttachedMedia,
+  type ContentInserted,
+  type ContentPlanAnswer,
   type DeltaRowView,
   type DocumentCheck,
   type HeldRef,
@@ -177,14 +182,19 @@ export function stageAfter(lastCompleted: string): Stage | null {
  * failed after its write (@levonis/catalog/bambuImport/merge `rewritesOnResume`, the Worker's own rule in items.ts
  * `resumeRewrites`): writing it again is what applies a writer fix to an item already written.
  *
- * A media item of a delta run (§O.4) never rewrites, whatever its product: it writes no product, /write refuses it,
- * and the Worker reads the merge from the item's own `match_kind`, which /media-attach never sets. Asking it for
- * WRITING would be refused as an illegal transition at every resume, and the item would stay BLOCKED for good.
+ * A media or content item of a delta run (§O.4, §O.6) never rewrites, whatever its product: it writes no product,
+ * /write refuses it, and the Worker reads the merge from the item's own `match_kind`, which /media-attach and
+ * /content-attach never set. Asking it for WRITING would be refused as an illegal transition at every resume, and
+ * the item would stay BLOCKED for good. Only an ordinary item (`kind === 'item'`) may rewrite: a positive test, so a
+ * kind added later never does by default.
  */
-export function resumeTargetOf(w: { kind: 'item' | 'media'; merge: boolean; blockerCode: string; lastCompleted: string; productId: string }): Stage | null {
-  if (w.kind !== 'media' && rewritesOnResume({ blocker_code: w.blockerCode, last_completed_stage: w.lastCompleted, merge: w.merge, product_id: w.productId })) return 'WRITING';
+export function resumeTargetOf(w: { kind: ItemKind; merge: boolean; blockerCode: string; lastCompleted: string; productId: string }): Stage | null {
+  if (w.kind === 'item' && rewritesOnResume({ blocker_code: w.blockerCode, last_completed_stage: w.lastCompleted, merge: w.merge, product_id: w.productId })) return 'WRITING';
   return stageAfter(w.lastCompleted);
 }
+
+/** What an item of the queue is: an ordinary item (or a delta's new product), a media-only item, a content item. */
+export type ItemKind = 'item' | 'media' | 'content';
 
 // ------------------------------------------------------------------ configuration
 
@@ -201,6 +211,8 @@ export interface RunConfig {
   autoWithdraw: boolean;
   /** mode=delta: the closed run the delta is taken from (workflow 60 passes it as run_id); the new run is the opened one. */
   fromRun: string;
+  /** mode=delta: '' or absent (pictures and new products, §O.1) or 'content' (the content pass, §O.6: item=content). */
+  deltaPass?: '' | 'content';
   item: string;
   siteOrigin: string;
   storeOrigin: string;
@@ -232,7 +244,12 @@ export function configFromEnv(env: NodeJS.ProcessEnv, root: string): RunConfig {
   if ((mode === 'run' || mode === 'delta') && env.IN_CHAIN === 'true' && Number(maxItems) !== 0) throw new ConfigError('chain runs only with max_items 0');
   const autoWithdraw = env.IN_AUTO_WITHDRAW === 'true';
   if (autoWithdraw && mode !== 'run' && mode !== 'delta') throw new ConfigError('auto_withdraw runs only in modes run and delta');
-  const item = env.IN_ITEM ?? '';
+  const rawItem = env.IN_ITEM ?? '';
+  // mode=delta reads `item` as its pass: empty (pictures and new products) or `content` (§O.6); nothing else.
+  const deltaPass = mode === 'delta' && rawItem === 'content' ? 'content' : '';
+  if (rawItem === 'content' && mode !== 'delta') throw new ConfigError('item=content runs only with mode delta');
+  if (mode === 'delta' && rawItem && rawItem !== 'content') throw new ConfigError('delta takes item empty or content');
+  const item = deltaPass ? '' : rawItem;
   if (item && !/^[0-9]{1,20}$/.test(item)) throw new ConfigError('item is not a source product id');
   const sealKey = env.IN_SEAL_PUBKEY ?? '';
   if (!/^[A-Za-z0-9_-]{43}$/.test(sealKey)) throw new ConfigError('seal_pubkey is not a one-time public key');
@@ -249,6 +266,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv, root: string): RunConfig {
     chainCount: Number(chainCount),
     autoWithdraw,
     fromRun,
+    deltaPass,
     item,
     siteOrigin,
     storeOrigin,
@@ -315,6 +333,15 @@ export function mediaOnlyPayload(p: ImportPayload): ImportPayload {
     external_ids: [],
     notes: [],
   };
+}
+
+/**
+ * What a content item sends (§O.6): the media-only payload WITH its description blocks whole and its
+ * `package.contents` rows (no other spec). The text travels only to PROVE where each picture goes: the Worker compares
+ * it with what the import wrote and never writes it.
+ */
+export function contentOnlyPayload(p: ImportPayload): ImportPayload {
+  return { ...mediaOnlyPayload(p), content_blocks: p.content_blocks, specs: p.specs.filter((s) => s.key === 'package.contents') };
 }
 
 /** The cache rule's wait from one answer (§I.1.9): its s-maxage + 60 s, at most 360 s (300 s when it names none). */
@@ -423,8 +450,9 @@ interface ItemWork {
   gallery?: Gallery;
   /** /publish-finish ran for this item in this job (it purges, and republishes a product hidden on a block). */
   publishedThisJob: boolean;
-  /** 'media': a delta run's media-only item (§O.3), whose stages write pictures and nothing else. */
-  kind: 'item' | 'media';
+  /** 'media': a delta run's media-only item (§O.3), whose stages write pictures and nothing else; 'content': a content
+   *  item (§O.6), whose stages put description and in-the-box pictures into the fields the import wrote. */
+  kind: ItemKind;
   /**
    * A media item's plan (/media-plan): the failed media to fetch again, and the payload digest the Worker recorded.
    * `payload` null: the moot plan (the page no longer reads as this product; nothing is fetched or attached).
@@ -434,6 +462,12 @@ interface ItemWork {
   moot?: boolean;
   /** A media item's attached rows: this job's /media-attach answer, or stage_data.media_retry on a resume. */
   attached: AttachedMedia | null;
+  /** A content item's plan (/content-plan); `payload` null: the moot plan (`mootCode`). */
+  content?: { sha: string; payload: ImportPayload | null; requests: MediaRequest[]; skipped: Record<string, number>; failed: number; storedNotWritten: number };
+  /** A content item's moot (the page no longer reads as its product, or the store page is gone). */
+  mootCode?: 'identity_changed' | 'source_gone';
+  /** A content item's inserted pictures: this job's /content-attach answer, or stage_data.content_media on a resume. */
+  inserted: ContentInserted | null;
 }
 
 const stageFpEqualOf = (stageData: Record<string, unknown>): boolean | null =>
@@ -788,15 +822,22 @@ export class Importer {
    * position in the new run; for a delta run's new product the row the Worker registered (never one the reviewed
    * manifest holds). null: the run names an item neither knows.
    */
-  private rowOf(sid: string): { row: ManifestRow; kind: 'item' | 'media' } | null {
+  private rowOf(sid: string): { row: ManifestRow; kind: ItemKind } | null {
     const delta = this.deltaView?.get(sid);
     const reviewed = this.deps.bundle.bySid.get(sid);
     if (delta?.kind === 'media') return reviewed ? { row: { ...reviewed, queue_position: delta.queue_position }, kind: 'media' } : null;
     if (delta?.kind === 'new') return reviewed ? null : { row: deltaManifestRowOf(delta), kind: 'item' };
+    // A content item: the reviewed row at its new position; a delta's new product's, the row its write was built from.
+    if (delta?.kind === 'content') {
+      if (reviewed) return { row: { ...reviewed, queue_position: delta.queue_position }, kind: 'content' };
+      return delta.route ? { row: deltaManifestRowOf(delta), kind: 'content' } : null;
+    }
+    // A delta kind this runner does not read is never worked as an ordinary item (fail closed).
+    if (delta) return null;
     return reviewed ? { row: reviewed, kind: 'item' } : null;
   }
 
-  private async processItem(row: ManifestRow, kind: 'item' | 'media' = 'item'): Promise<ItemOutcome> {
+  private async processItem(row: ManifestRow, kind: ItemKind = 'item'): Promise<ItemOutcome> {
     const sid = row.source_product_id;
     let lease;
     try {
@@ -840,6 +881,7 @@ export class Importer {
       publishedThisJob: false,
       kind,
       attached: attachedMediaOf(lease.stage_data.media_retry),
+      inserted: contentInsertedOf(lease.stage_data.content_media),
     };
     const pos = row.queue_position;
     const log = (stage: LogStage, t: Parameters<ImportLog['item']>[3], p: Parameters<ImportLog['item']>[4] = {}) => this.log.item(pos, row.handle, stage, t, p);
@@ -958,6 +1000,8 @@ export class Importer {
     if (inactive) w.stageDocumentsInactive = inactive;
     const attached = attachedMediaOf(lease.stage_data.media_retry);
     if (attached) w.attached = attached;
+    const inserted = contentInsertedOf(lease.stage_data.content_media);
+    if (inserted) w.inserted = inserted;
   }
 
   /**
@@ -1095,6 +1139,7 @@ export class Importer {
 
   private async runStage(w: ItemWork, stage: Stage): Promise<ItemOutcome | null> {
     if (w.kind === 'media') return this.runMediaStage(w, stage);
+    if (w.kind === 'content') return this.runContentStage(w, stage);
     switch (stage) {
       case 'EXTRACTING':
         await this.extract(w);
@@ -1568,6 +1613,7 @@ export class Importer {
    * behind it); the reviewed taxonomy (insert-only, as at open) and the protected snapshot `before`.
    */
   async delta(): Promise<{ more: boolean; blocked: boolean }> {
+    if (this.cfg.deltaPass === 'content') return this.deltaContent();
     await this.hello();
     const robots = await this.ensureRobots();
     if (SITEMAP_PATHS.some((path) => !robotsAllows(robots, path))) {
@@ -1633,7 +1679,7 @@ export class Importer {
     const mediaRows = plan.media.map((m) => ({ kind: 'media', source_product_id: m.source_product_id, discovered_at: at }));
     let calls = 0;
     const registered = { new: 0, media: 0 };
-    const skipped = { known: 0, media_product_gone: 0, media_already_retried: 0 };
+    const skipped = { known: 0, media_product_gone: 0, media_already_retried: 0, content_already_settled: 0 };
     for (const group of [mediaRows, fresh]) {
       for (let i = 0; i < group.length; i += 100) {
         const a = await this.ops.deltaManifest(this.cfg.fromRun, group.slice(i, i + 100));
@@ -1843,6 +1889,274 @@ export class Importer {
       await this.pause(wait);
     }
     throw blockedStop('VERIFY_FAILED_PERSISTENT', 'an attached picture is not on the public product after a purge and a wait');
+  }
+
+  // ---------------------------------------------------------------- the content pass (§O.6)
+
+  /**
+   * mode=delta item=content: the NEW run's queue is the closed run's content items only (cf.mjs opened the run and
+   * minted this job's token). robots.txt (no sitemap is read, no new product's page); /delta/plan with the content
+   * pass, its parts reconciled against the closed run's failures (every failed description and in-the-box medium in
+   * exactly one part, or the job stops before registering anything); /delta/manifest; the reviewed taxonomy (insert-
+   * only) and the protected snapshot `before`; the sealed open report; then the queue as in mode=run.
+   */
+  private async deltaContent(): Promise<{ more: boolean; blocked: boolean }> {
+    await this.hello();
+    await this.ensureRobots();
+    const plan = await this.ops.deltaPlan(this.cfg.fromRun, [], 'content');
+    const c = plan.counts;
+    this.log.info('delta_content_plan', { run: this.cfg.fromRun, ...c });
+    for (const [code, failed] of Object.entries(plan.failed_by_error).sort()) this.log.info('delta_content_code', { code, failed });
+    const parts = (c.content_failed ?? 0) + (c.content_failed_not_complete ?? 0) + (c.content_failed_product_gone ?? 0) + (c.content_failed_not_reviewed ?? 0) + (c.content_failed_settled ?? 0);
+    if (typeof c.content_failed_total !== 'number' || parts !== c.content_failed_total || plan.content.reduce((n, x) => n + x.failed, 0) !== (c.content_failed ?? -1)) {
+      this.log.error('note', { code: 'DELTA_PLAN_INCONSISTENT' });
+      throw new JobStop('DELTA_PLAN_INCONSISTENT', true);
+    }
+    const at = this.now();
+    const rows = plan.content.map((m) => ({ kind: 'content', source_product_id: m.source_product_id, discovered_at: at }));
+    let calls = 0;
+    const registered = { content: 0 };
+    const skipped = { media_product_gone: 0, content_already_settled: 0 };
+    for (let i = 0; i < rows.length; i += 100) {
+      const a = await this.ops.deltaManifest(this.cfg.fromRun, rows.slice(i, i + 100));
+      calls++;
+      registered.content += a.content;
+      skipped.media_product_gone += a.skipped.media_product_gone;
+      skipped.content_already_settled += a.skipped.content_already_settled;
+    }
+    this.log.info('delta_content_registered', { content: registered.content, calls, product_gone: skipped.media_product_gone, settled: skipped.content_already_settled });
+    const tax = await this.ops.prepareTaxonomy();
+    this.log.info('taxonomy', { nodes: tax.created_nodes, brand: tax.brand_created, synonyms: tax.synonyms_inserted });
+    const snap = await this.ops.protectSnapshot('before');
+    this.log.info('protect', { phase: 'before', subjects: snap.subjects });
+    this.status = await this.ops.status();
+    this.seal('delta-open-report.json', {
+      run_id: this.runId,
+      from_run: this.cfg.fromRun,
+      pass: 'content',
+      plan: plan.counts,
+      failed_by_error: plan.failed_by_error,
+      content_items: plan.content.map((x) => ({ sid: x.source_product_id, handle: this.deps.bundle.bySid.get(x.source_product_id)?.handle ?? x.handle, failed: x.failed })),
+      registered,
+      skipped,
+      reviewed_bundle_sha256: bundleDigest(this.deps.bundle.sha256),
+      taxonomy: tax,
+      protect_before: snap,
+      status: this.status,
+    });
+    this.deltaOpened = true;
+    return this.runQueue();
+  }
+
+  /**
+   * A content item (§O.6): the page read again and the payload rebuilt exactly as the importer builds it (never
+   * enriched), the plan the Worker proves (/content-plan), the planned media fetched again (/media, ≤ 4 a call), ONE
+   * guarded batch (/content-attach), the ordinary /publish-finish, and COMPLETE on the public answers
+   * (/content-complete).
+   */
+  private async runContentStage(w: ItemWork, stage: Stage): Promise<ItemOutcome | null> {
+    switch (stage) {
+      case 'EXTRACTING':
+        await this.extractContent(w);
+        await this.event(w, 'ENRICHING', 'ok', { detail: { source_fingerprint: w.payload?.extraction_sha256 ?? '', content_only: true } });
+        return null;
+      case 'ENRICHING':
+        await this.event(w, 'VALIDATING', 'ok', { detail: { content_only: true } });
+        return null;
+      case 'VALIDATING':
+        await this.contentPlan(w);
+        await this.event(w, 'INGESTING_MEDIA', 'ok', { detail: { content_only: true, failed: w.content!.failed, requests: w.content!.requests.length } });
+        return null;
+      case 'INGESTING_MEDIA':
+        if (!w.content) await this.contentPlan(w);
+        await this.fetchMedia(w, w.content!.requests);
+        this.logMediaDone(w, w.content!.requests.length);
+        await this.event(w, 'WRITING', 'ok', { detail: this.mediaDetail(w) });
+        return null;
+      case 'WRITING':
+        if (!w.content) await this.contentPlan(w);
+        if (w.media.size === 0) await this.fetchMedia(w, w.content!.requests);
+        await this.contentAttach(w);
+        return null;
+      case 'PUBLISHING':
+        await this.publish(w);
+        return null;
+      case 'VERIFYING_LIVE':
+        return this.verifyContent(w);
+    }
+  }
+
+  /**
+   * A content item's page, read again (once a job). A lasting identity change (as for a media item) makes the item
+   * moot `identity_changed`; a page gone at the store makes it moot `source_gone` — never BLOCKED: a content item
+   * writes nothing without proof, a block could never clear, and a later pass takes it again.
+   */
+  private async extractContent(w: ItemWork): Promise<void> {
+    if (w.payload || w.mootCode) return;
+    try {
+      await this.extract(w);
+      const errors = w.build!.report.errors;
+      if (errors.includes('IDENTITY_AMBIGUOUS') || errors.includes('DUPLICATE_VALUE_TEXT') || errors.includes('DUPLICATE_VARIANT')) throw blockedStop('IDENTITY_AMBIGUOUS', 'the options do not resolve');
+    } catch (err) {
+      if (!(err instanceof ImportStop) || (err.code !== 'IDENTITY_AMBIGUOUS' && err.code !== 'SOURCE_WITHDRAWN')) throw err;
+      this.makeContentMoot(w, err.code === 'SOURCE_WITHDRAWN' ? 'source_gone' : 'identity_changed');
+    }
+  }
+
+  private makeContentMoot(w: ItemWork, code: 'identity_changed' | 'source_gone'): void {
+    w.mootCode = code;
+    w.payload = undefined;
+    w.build = undefined;
+    w.extraction = undefined;
+    this.log.item(w.row.queue_position, w.row.handle, 'EXTRACTING', 'content_moot', { what: code });
+  }
+
+  /** /content-plan: the rebuilt payload (description blocks and box rows), proved by the Worker; what to fetch again. */
+  private async contentPlan(w: ItemWork): Promise<void> {
+    await this.extractContent(w);
+    let a: ContentPlanAnswer | null = null;
+    let payload: ImportPayload | null = null;
+    if (!w.mootCode) {
+      payload = contentOnlyPayload(w.payload!);
+      try {
+        a = await this.ops.contentPlan(w.sid, w.leaseToken, payload);
+      } catch (err) {
+        if (!(err instanceof OpsError) || err.kind !== 'permanent' || err.code !== 'IDENTITY_AMBIGUOUS') throw err;
+        this.makeContentMoot(w, 'identity_changed');
+        payload = null;
+      }
+    }
+    if (!a) a = await this.ops.contentPlan(w.sid, w.leaseToken, null, w.mootCode ?? 'identity_changed');
+    w.content = { sha: a.payload_sha256, payload, requests: a.media, skipped: a.skipped, failed: a.failed, storedNotWritten: a.stored_not_written };
+    w.stagedSha = a.payload_sha256;
+    const k = a.skipped;
+    this.log.item(w.row.queue_position, w.row.handle, 'VALIDATING', 'content_plan', {
+      failed: a.failed,
+      requests: a.media.length,
+      owner_edited: k.owner_edited ?? 0,
+      not_imported: k.not_imported ?? 0,
+      source_changed: k.source_changed ?? 0,
+      not_on_page: k.not_on_page ?? 0,
+      already_present: k.already_present ?? 0,
+      owner_removed: k.owner_removed ?? 0,
+      product_not_public: k.product_not_public ?? 0,
+      identity_changed: k.identity_changed ?? 0,
+      source_gone: k.source_gone ?? 0,
+      stored_not_written: a.stored_not_written,
+    });
+  }
+
+  /** /content-attach: one guarded batch; an ambiguous answer is settled by /lease (the batch moves the item on). */
+  private async contentAttach(w: ItemWork): Promise<void> {
+    const plan = w.content!;
+    const a = await this.ops.contentAttach(w.sid, w.leaseToken, plan.sha, plan.payload, w.mootCode ?? 'identity_changed');
+    w.inserted = a.inserted;
+    w.productId = a.product_id || w.productId;
+    w.slug = a.slug || w.slug;
+    w.state = 'PUBLISHING';
+    w.lastCompleted = 'WRITING';
+    const c = a.counts;
+    this.log.item(w.row.queue_position, w.row.handle, 'WRITING', 'content_attached', {
+      attached: c.attached ?? 0,
+      blocks: a.inserted.blocks.length,
+      box: a.inserted.box.length,
+      already_present: c.already_present ?? 0,
+      owner_removed: c.owner_removed ?? 0,
+      owner_edited: c.owner_edited ?? 0,
+      not_imported: c.not_imported ?? 0,
+      source_changed: c.source_changed ?? 0,
+      not_stored: c.not_stored ?? 0,
+    });
+  }
+
+  /**
+   * VERIFY of a content item: the anonymous product answer (each inserted block on its key) when blocks went in, the
+   * anonymous knowledge answer (each inserted box picture) when box items did, with the cache rule (§I.1.9: purge
+   * again, wait s-maxage + 60 s — the larger of the answers read —, once). What it saw goes to /content-complete every
+   * round; the Worker decides against what the product still holds and shows. Nothing inserted: nothing to see.
+   */
+  private async verifyContent(w: ItemWork): Promise<ItemOutcome> {
+    if (!w.slug || !w.inserted) await this.relearn(w);
+    const ins = w.inserted;
+    if (!w.slug || !ins) throw blockedStop('VERIFY_FAILED_PERSISTENT', 'the attach recorded nothing');
+    if (!w.publishedThisJob) {
+      await this.ops.publishFinish(w.sid, w.leaseToken);
+      w.publishedThisJob = true;
+    }
+    const occurrences = new Map<string, number>();
+    for (const b of ins.box) occurrences.set(b.r2_key, (occurrences.get(b.r2_key) ?? 0) + 1);
+    for (let round = 1; round <= 2; round++) {
+      let status = 0;
+      let knowledgeStatus = 0;
+      let blocksSeen = 0;
+      let boxSeen = 0;
+      let wait = 0;
+      if (ins.blocks.length + ins.box.length > 0) {
+        this.siteBudgetEnd = this.deps.clock.now() + (round === 1 ? WORST.VERIFY : AFTER_CACHE_WAIT);
+        try {
+          if (ins.blocks.length) {
+            const a = await this.site.read('GET', `/api/products/${encodeURIComponent(w.slug)}`);
+            status = a.status;
+            const doc = a.json && typeof a.json === 'object' ? (a.json as Record<string, unknown>) : {};
+            const product = doc.product && typeof doc.product === 'object' ? (doc.product as Record<string, unknown>) : doc;
+            const shown = Array.isArray(product.content_blocks) ? (product.content_blocks as unknown[]) : [];
+            blocksSeen = ins.blocks.filter((b) => shown.some((x) => !!x && typeof x === 'object' && (x as Record<string, unknown>).id === b.id && mediaPath(String((x as Record<string, unknown>).url ?? '')) === `/files/${b.r2_key}`)).length;
+            wait = Math.max(wait, cacheWaitOfHeaders(a.headers));
+          }
+          if (ins.box.length) {
+            const k = await this.site.read('GET', `/api/products/${encodeURIComponent(w.slug)}/knowledge`);
+            knowledgeStatus = k.status;
+            const box = k.json && Array.isArray((k.json as Record<string, unknown>).in_the_box) ? ((k.json as Record<string, unknown>).in_the_box as unknown[]) : [];
+            const seen = new Map<string, number>();
+            for (const it of box) {
+              const img = it && typeof it === 'object' ? String((it as Record<string, unknown>).image ?? '') : '';
+              if (img) seen.set(mediaPath(img), (seen.get(mediaPath(img)) ?? 0) + 1);
+            }
+            for (const [key, n] of occurrences) boxSeen += Math.min(n, seen.get(`/files/${key}`) ?? 0);
+            wait = Math.max(wait, cacheWaitOfHeaders(k.headers));
+          }
+        } finally {
+          this.siteBudgetEnd = null;
+        }
+      }
+      this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'content_seen', {
+        blocks_seen: blocksSeen,
+        blocks: ins.blocks.length,
+        box_seen: boxSeen,
+        box: ins.box.length,
+        status,
+        knowledge_status: knowledgeStatus,
+      });
+      const done = await this.ops.contentComplete(w.sid, w.leaseToken, this.liveUrl(w), {
+        version: 1,
+        live_url: this.liveUrl(w),
+        round,
+        status,
+        knowledge_status: knowledgeStatus,
+        blocks_seen: blocksSeen,
+        box_seen: boxSeen,
+      });
+      if (done.state === 'COMPLETE') {
+        this.gate.noteComplete(w.sid, done.seq);
+        w.state = 'COMPLETE';
+        this.log.item(w.row.queue_position, w.row.handle, 'COMPLETE', 'complete', { url: this.liveUrl(w) });
+        this.sealItem(w, {
+          outcome: 'complete',
+          content_only: true,
+          plan: w.content ? { failed: w.content.failed, requests: w.content.requests.length, skipped: w.content.skipped, stored_not_written: w.content.storedNotWritten } : null,
+          inserted: { blocks: ins.blocks.length, box: ins.box.length },
+          d1_checks: done.d1_checks,
+        });
+        return { kind: 'complete', url: this.liveUrl(w) };
+      }
+      if (round === 2) break;
+      wait = wait || cacheWaitOfHeaders(new Headers());
+      if (!this.deadline.fits(wait, AFTER_CACHE_WAIT)) throw new ImportStop('DEADLINE_EXIT', 'deadline', 'the cache wait does not fit', { needMs: wait });
+      this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'cache_wait', { seconds: Math.round(wait / 1000) });
+      await this.ops.publishFinish(w.sid, w.leaseToken);
+      await this.pause(wait);
+    }
+    throw blockedStop('VERIFY_FAILED_PERSISTENT', 'an inserted picture is not on the public answers after a purge and a wait');
   }
 
   // ---------------------------------------------------------------- close (§A.9, §I.3)

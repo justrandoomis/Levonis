@@ -30,7 +30,23 @@ import type { ImportPayload } from '../packages/catalog/src/bambuImport/payload'
 import type { ImportRun } from '../worker/lib/catalogImport/auth';
 import { OpsRefusal } from '../worker/lib/catalogImport/auth';
 import { applyEvent, finishPublishing, itemBySource, type ItemRow } from '../worker/lib/catalogImport/items';
-import { acceptDeltaRows, DELTA_NEW_MAX, deltaMarkOf, deltaPlan, deltaQueue, deltaSources, isReservedSource, retrySettled, withDeltaRows, deltaRowsOf } from '../worker/lib/catalogImport/delta';
+import {
+  acceptDeltaRows,
+  contentDeltaPlan,
+  contentPartsOf,
+  contentQueue,
+  DELTA_ITEM_SQL,
+  DELTA_NEW_MAX,
+  deltaDoorKindOf,
+  deltaMarkOf,
+  deltaPlan,
+  deltaQueue,
+  deltaSources,
+  isReservedSource,
+  retrySettled,
+  withDeltaRows,
+  deltaRowsOf,
+} from '../worker/lib/catalogImport/delta';
 import { attachRetriedMedia, completeMediaRetry, MOOT_IDENTITY, MOOT_SHA256, planMediaRetry, retryPlan } from '../worker/lib/catalogImport/mediaRetry';
 import { deleteProductPermanently } from '../worker/lib/productDeletion';
 import { ConfigError, configFromEnv, DELTA_NEW_MAX as RUNNER_NEW_MAX, mediaOnlyPayload, resumeTargetOf } from '../scripts/bambu-import/run';
@@ -47,7 +63,7 @@ const envOf = (w: World) => ({ DB: w.db, ...w.media }) as never;
 const runOf = (id: string): ImportRun => ({ id, state: 'open', token_expires_at: '', github_run_id: '', reviewed_bundle_sha256: '', code_commit: '', manifest_total: 0, started_at: AT });
 
 /** /delta/manifest's answer with nothing left out. */
-const NONE_SKIPPED = { known: 0, media_product_gone: 0, media_already_retried: 0 };
+const NONE_SKIPPED = { known: 0, media_product_gone: 0, media_already_retried: 0, content_already_settled: 0 };
 
 // ---------------------------------------------------------------- the queue (pure)
 
@@ -114,6 +130,97 @@ test('the delta markers are read back from discovery_sources, and reserved', () 
   assert.ok(isReservedSource('delta_new') && isReservedSource(`media_retry:${RUN_ID}`) && !isReservedSource('sitemap'));
   // Every media marker fits /manifest's 40-character discovery source.
   assert.ok(deltaSources('media', RUN_ID)[0].length <= 40);
+  // The content pass's marker (§O.6): its own kind, reserved, matched by the delta SQL; a malformed one fails closed.
+  assert.deepEqual(deltaSources('content', RUN_ID), [`content_media:${RUN_ID}`]);
+  assert.deepEqual(deltaMarkOf(JSON.stringify(deltaSources('content', RUN_ID))), { kind: 'content', fromRun: RUN_ID });
+  assert.ok(isReservedSource(`content_media:${RUN_ID}`) && isReservedSource('content_media:x'));
+  assert.ok(DELTA_ITEM_SQL.includes(`'%"content_media:%'`));
+  assert.equal(deltaDoorKindOf('["sitemap"]'), 'none');
+  assert.equal(deltaDoorKindOf(JSON.stringify(deltaSources('new'))), 'new');
+  assert.equal(deltaDoorKindOf(JSON.stringify(deltaSources('media', RUN_ID))), 'media');
+  assert.equal(deltaDoorKindOf(JSON.stringify(deltaSources('content', RUN_ID))), 'content');
+  assert.equal(deltaDoorKindOf('["content_media:cir_bad"]'), 'unknown', 'a marker this code does not read: refused at every door');
+  assert.equal(deltaDoorKindOf(JSON.stringify([...deltaSources('content', RUN_ID), ...deltaSources('media', RUN_ID)])), 'unknown', 'two kinds on one item');
+  assert.equal(deltaDoorKindOf('not json'), 'unknown');
+  const w = newWorld();
+  w.raw.exec(`INSERT INTO catalog_import_items (id, run_id, source, source_product_id, handle, canonical_url, queue_position, discovery_sources, discovered_at)
+    VALUES ('cii_c', '${RUN_ID}', 'bambu_us', '1', 'a', 'x', 1, '["content_media:${RUN_ID}"]', '${AT}')`);
+  assert.equal(count(w.raw, `SELECT COUNT(*) AS n FROM catalog_import_items WHERE ${DELTA_ITEM_SQL}`), 1);
+});
+
+test('the content queue (pure): the closed run\'s COMPLETE product writers with unsettled failed description or box media; every failed medium in exactly one part', () => {
+  const item = (sid: string, state = 'COMPLETE', kind: 'none' | 'new' | 'media' = 'none', pos = Number(sid)) => ({
+    source_product_id: sid, handle: `h-${sid}`, state, queue_position: pos, levonis_product_id: `p_${sid}`, kind, written_recorded: sid !== '6',
+  });
+  const f = (sid: string, id: string, role = 'description', code = 'IMAGE_CONVERT_FAILED') => ({ source_product_id: sid, source_media_id: id, role, error_code: code });
+  const q = contentQueue({
+    items: [item('1'), item('2'), item('3', 'BLOCKED'), item('4'), item('5'), item('6'), item('7', 'COMPLETE', 'new'), item('8', 'COMPLETE', 'media')],
+    failed: [
+      f('1', 'content:a'), f('1', 'box:b', 'in_the_box', 'IMAGE_SOURCE_TOO_LARGE'), f('1', 'gallery:x', 'gallery'),
+      f('2', 'content:c'), f('3', 'content:d'), f('4', 'content:e'), f('5', 'content:f'), f('5', 'box:g', 'in_the_box'), f('6', 'content:h'),
+      f('7', 'box:i', 'in_the_box'), f('8', 'content:j'), f('9', 'content:k'),
+    ],
+    liveProductBySid: new Map(['1', '2', '3', '5', '6', '7', '8'].map((s) => [s, `p_${s}`])),
+    // An earlier content pass settled media of 2 (all) and of 5 (one of two); a media item's role_not_attachable settles nothing.
+    settled: new Map([['2', new Set(['content:c'])], ['5', new Set(['content:f'])]]),
+    reviewed: () => true,
+  });
+  assert.deepEqual(q.content, [
+    { source_product_id: '1', handle: 'h-1', failed: 2 },
+    { source_product_id: '5', handle: 'h-5', failed: 1 },
+    { source_product_id: '6', handle: 'h-6', failed: 1 },
+    { source_product_id: '7', handle: 'h-7', failed: 1 },
+  ]);
+  assert.deepEqual(q.counts, {
+    content_failed_total: 11,
+    content_items: 4,
+    content_failed: 5,
+    content_failed_description: 2,
+    content_failed_in_the_box: 3,
+    content_failed_not_complete: 3,
+    media_product_gone: 1,
+    content_failed_product_gone: 1,
+    content_not_reviewed: 0,
+    content_failed_not_reviewed: 0,
+    content_failed_settled: 2,
+    content_already_settled: 1,
+    content_items_unrecorded: 1,
+  });
+  assert.equal(contentPartsOf(q.counts), q.counts.content_failed_total, 'the parts reconcile');
+  assert.deepEqual(q.failed_by_error, { IMAGE_CONVERT_FAILED: 4, IMAGE_SOURCE_TOO_LARGE: 1 });
+  // Not in the reviewed manifest: counted, never queued (a delta's new product needs no reviewed row).
+  const r = contentQueue({ items: [item('1'), item('7', 'COMPLETE', 'new')], failed: [f('1', 'content:a'), f('7', 'content:z')], liveProductBySid: new Map([['1', 'p_1'], ['7', 'p_7']]), settled: new Map(), reviewed: () => false });
+  assert.deepEqual([r.content.map((c) => c.source_product_id), r.counts.content_not_reviewed, r.counts.content_failed_not_reviewed], [['7'], 1, 1]);
+});
+
+test('content rows: registered only for a product writer of the closed run with failed content media; a content run takes content rows only, and a media run none', async () => {
+  const { w, sid } = await closedRunWithFailures('pla-basic-filament', (p) => {
+    const block = p.content_blocks.find((b) => b.kind === 'image' && b.source_media_id)!;
+    return [{ id: block.source_media_id, role: 'description', url: block.source_url }];
+  });
+  w.raw.prepare("INSERT INTO catalog_import_runs (id, source, state) VALUES (?, 'bambu_us', 'open')").run(RUN_B);
+  const plan = await contentDeltaPlan(w.db, runOf(RUN_B), { from_run: RUN_ID, pass: 'content' }, w.bundle);
+  assert.deepEqual(plan.content.map((c) => [c.source_product_id, c.failed]), [[sid, 1]]);
+  await assert.rejects(() => contentDeltaPlan(w.db, runOf(RUN_B), { from_run: RUN_ID, pass: 'content', sitemap_handles: ['x'] }, w.bundle), (e: unknown) => e instanceof OpsRefusal && e.status === 400);
+  await assert.rejects(() => deltaPlan(w.db, runOf(RUN_B), { from_run: RUN_ID, pass: 'content', sitemap_handles: [] }, w.bundle), (e: unknown) => e instanceof OpsRefusal && e.status === 400, 'the media plan is not the content pass');
+  const refuse = (e: unknown) => e instanceof OpsRefusal && e.code === 'IMPORT_DELTA_REFUSED';
+  const content = { kind: 'content', source_product_id: sid, discovered_at: AT };
+  await assert.rejects(() => acceptDeltaRows(w.db, runOf(RUN_B), w.bundle, { from_run: RUN_ID, rows: [content, { kind: 'new', source_product_id: '77', handle: 'new-thing', route: '1', discovered_at: AT }] }), refuse);
+  // A product without a failed content medium is no content row.
+  w.raw.prepare("UPDATE catalog_import_media SET role = 'gallery' WHERE run_id = ? AND status = 'failed'").run(RUN_ID);
+  await assert.rejects(() => acceptDeltaRows(w.db, runOf(RUN_B), w.bundle, { from_run: RUN_ID, rows: [content] }), refuse);
+  w.raw.prepare("UPDATE catalog_import_media SET role = 'description' WHERE run_id = ? AND status = 'failed'").run(RUN_ID);
+  assert.deepEqual(await acceptDeltaRows(w.db, runOf(RUN_B), w.bundle, { from_run: RUN_ID, rows: [content] }), { accepted: 1, new: 0, media: 0, content: 1, skipped: NONE_SKIPPED });
+  assert.deepEqual((await deltaRowsOf(w.db, RUN_B)).map((r) => [r.kind, r.from_run, r.source_product_id, r.route]), [['content', RUN_ID, sid, '']]);
+  await assert.rejects(() => acceptDeltaRows(w.db, runOf(RUN_B), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'media', source_product_id: sid, discovered_at: AT }] }), refuse, 'a content run takes no media row');
+  // A media run takes no content row.
+  w.raw.prepare("UPDATE catalog_import_runs SET state = 'closed' WHERE id = ?").run(RUN_B);
+  w.raw.prepare("INSERT INTO catalog_import_runs (id, source, state) VALUES (?, 'bambu_us', 'open')").run(RUN_C);
+  await acceptDeltaRows(w.db, runOf(RUN_C), w.bundle, { from_run: RUN_ID, rows: [] });
+  w.raw
+    .prepare(`INSERT INTO catalog_import_items (id, run_id, source, source_product_id, handle, canonical_url, queue_position, discovery_sources, discovered_at) VALUES ('cii_m', ?, 'bambu_us', '555', 'h', 'x', 1, ?, ?)`)
+    .run(RUN_C, JSON.stringify(deltaSources('media', RUN_ID)), AT);
+  await assert.rejects(() => acceptDeltaRows(w.db, runOf(RUN_C), w.bundle, { from_run: RUN_ID, rows: [content] }), refuse);
 });
 
 test('the importer\'s delta configuration: run_id is the CLOSED run, the run worked on is the one the job opened', () => {
@@ -239,7 +346,7 @@ async function closedRunWithFailures(handle: 'pla-basic-filament' | 'a1', pick: 
 async function deltaItem(w: World, runId: string, sid: string): Promise<ItemRow> {
   w.raw.prepare("INSERT INTO catalog_import_runs (id, source, state) VALUES (?, 'bambu_us', 'open')").run(runId);
   const r = await acceptDeltaRows(w.db, runOf(runId), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'media', source_product_id: sid, discovered_at: AT }] });
-  assert.deepEqual(r, { accepted: 1, new: 0, media: 1, skipped: NONE_SKIPPED });
+  assert.deepEqual(r, { accepted: 1, new: 0, media: 1, content: 0, skipped: NONE_SKIPPED });
   const item = await itemBySource(w.db, runId, sid);
   walk(w, item.id, 'VALIDATING');
   return itemBySource(w.db, runId, sid);
@@ -352,7 +459,7 @@ test('the media-only stage attaches exactly what the original write would have, 
   const planC = await deltaPlan(w.db, runOf(RUN_C), { from_run: RUN_ID, sitemap_handles: ['pla-basic-filament'] }, w.bundle);
   assert.deepEqual([planC.media, planC.counts.media_already_retried, planC.counts.media_product_gone], [[], 1, 0]);
   const regC = await acceptDeltaRows(w.db, runOf(RUN_C), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'media', source_product_id: sid, discovered_at: AT }] });
-  assert.deepEqual(regC, { accepted: 0, new: 0, media: 0, skipped: { ...NONE_SKIPPED, media_already_retried: 1 } });
+  assert.deepEqual(regC, { accepted: 0, new: 0, media: 0, content: 0, skipped: { ...NONE_SKIPPED, media_already_retried: 1 } });
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM catalog_import_items WHERE run_id = ?', RUN_C), 0);
 
   // IDEMPOTENT all the same: a media item registered anyway (by hand here: a delta whose item never completed is the
@@ -415,11 +522,11 @@ test('the media-only stage refuses what is not its own: another payload, a stale
   const known = { ...NONE_SKIPPED, known: 1 };
   assert.deepEqual(
     await acceptDeltaRows(w.db, runOf(RUN_C), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'new', source_product_id: sid, handle: 'pla-basic-renamed', route: '1>2', discovered_at: AT }] }),
-    { accepted: 0, new: 0, media: 0, skipped: known }
+    { accepted: 0, new: 0, media: 0, content: 0, skipped: known }
   );
   assert.deepEqual(
     await acceptDeltaRows(w.db, runOf(RUN_C), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'new', source_product_id: '999', handle: 'pla-basic-filament', route: '1>2', discovered_at: AT }] }),
-    { accepted: 0, new: 0, media: 0, skipped: known }
+    { accepted: 0, new: 0, media: 0, content: 0, skipped: known }
   );
   // In one call with a media row: the media row is registered, the known new row left out.
   assert.deepEqual(
@@ -430,7 +537,7 @@ test('the media-only stage refuses what is not its own: another payload, a stale
         { kind: 'new', source_product_id: '999', handle: 'pla-basic-filament', route: '1>2', discovered_at: AT },
       ],
     }),
-    { accepted: 1, new: 0, media: 1, skipped: known }
+    { accepted: 1, new: 0, media: 1, content: 0, skipped: known }
   );
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM catalog_import_items WHERE run_id = ?', RUN_C), 1);
 });
@@ -479,7 +586,7 @@ test('a delta run\'s new product: the Worker\'s manifest row for it, placed by t
   const x = buildFor(w, 'ams-2-pro-feeder-unit');
   const route = String(x.row.currentAllIdRoute);
   const r = await acceptDeltaRows(w.db, runOf(RUN_B), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'new', source_product_id: x.payload.source_product_id, handle: x.payload.handle, route, discovered_at: AT }] });
-  assert.deepEqual(r, { accepted: 1, new: 1, media: 0, skipped: NONE_SKIPPED });
+  assert.deepEqual(r, { accepted: 1, new: 1, media: 0, content: 0, skipped: NONE_SKIPPED });
   const rows = await deltaRowsOf(w.db, RUN_B);
   assert.equal(rows.length, 1);
   assert.equal(rows[0].kind, 'new');
@@ -566,7 +673,7 @@ test('a product the owner deleted after the closed run: never queued; one alread
   const p = await deltaPlan(late.w.db, runOf(RUN_B), { from_run: RUN_ID, sitemap_handles: ['pla-basic-filament'] }, late.w.bundle);
   assert.deepEqual([p.media, p.counts.media_items, p.counts.media_product_gone], [[], 0, 1]);
   const r = await acceptDeltaRows(late.w.db, runOf(RUN_B), late.w.bundle, { from_run: RUN_ID, rows: [{ kind: 'media', source_product_id: late.sid, discovered_at: AT }] });
-  assert.deepEqual(r, { accepted: 0, new: 0, media: 0, skipped: { ...NONE_SKIPPED, media_product_gone: 1 } });
+  assert.deepEqual(r, { accepted: 0, new: 0, media: 0, content: 0, skipped: { ...NONE_SKIPPED, media_product_gone: 1 } });
   assert.equal(count(late.w.raw, 'SELECT COUNT(*) AS n FROM catalog_import_items WHERE run_id = ?', RUN_B), 0);
 });
 
@@ -688,7 +795,7 @@ test('a picture or swatch an earlier delta attached is never put back once the o
   const planC = await deltaPlan(w.db, runOf(RUN_C), { from_run: RUN_ID, sitemap_handles: ['pla-basic-filament'] }, w.bundle);
   assert.deepEqual([planC.media, planC.counts.media_items, planC.counts.media_already_retried], [[], 0, 1]);
   const regC = await acceptDeltaRows(w.db, runOf(RUN_C), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'media', source_product_id: sid, discovered_at: AT }] });
-  assert.deepEqual(regC, { accepted: 0, new: 0, media: 0, skipped: { ...NONE_SKIPPED, media_already_retried: 1 } });
+  assert.deepEqual(regC, { accepted: 0, new: 0, media: 0, content: 0, skipped: { ...NONE_SKIPPED, media_already_retried: 1 } });
 
   // And an item registered anyway puts back neither: the image rows' source refs, and B's checkpoint for the
   // swatch, say the owner removed them.
@@ -784,7 +891,7 @@ test('a media item whose page no longer reads as its product (a renamed store ha
   assert.deepEqual([planC.media.map((m) => m.source_product_id), planC.counts.media_already_retried], [[sid], 0]);
   // There the page reads as the product again: the payload's plan, and the moot never stands in for it.
   const regC = await acceptDeltaRows(w.db, runOf(RUN_C), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'media', source_product_id: sid, discovered_at: AT }] });
-  assert.deepEqual(regC, { accepted: 1, new: 0, media: 1, skipped: NONE_SKIPPED });
+  assert.deepEqual(regC, { accepted: 1, new: 0, media: 1, content: 0, skipped: NONE_SKIPPED });
   walk(w, (await itemBySource(w.db, RUN_C, sid)).id, 'VALIDATING');
   const itemC = await itemBySource(w.db, RUN_C, sid);
   const planned = await planMediaRetry(w.db, itemC, payload);

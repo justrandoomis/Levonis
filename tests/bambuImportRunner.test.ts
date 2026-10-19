@@ -1547,3 +1547,49 @@ test('a local dry run: the importer\'s own requests reach 127.0.0.1 only — any
   assert.deepEqual(sent, ['http://127.0.0.1:8857/api/public/v1/products/x', 'http://127.0.0.1:8858/products/filament-buffer']);
   assert.equal(refused.count, 6);
 });
+
+// ---------------------------------------------------------------- the content pass (spec §O.6)
+
+test('the content pass\'s configuration: item=content only with mode delta; a delta takes no other item', async () => {
+  const { configFromEnv, ConfigError } = await import('../scripts/bambu-import/run');
+  const env = { IN_MODE: 'delta', IN_RUN_ID: RUN_ID, IN_MAX_ITEMS: '1', IN_ITEM: 'content', IN_SEAL_PUBKEY: 'A'.repeat(43), DEADLINE_EPOCH: String(Math.floor(Date.now() / 1000) + 3600) };
+  const cfg = configFromEnv(env, '/tmp');
+  assert.deepEqual([cfg.mode, cfg.fromRun, cfg.deltaPass, cfg.item], ['delta', RUN_ID, 'content', '']);
+  assert.equal(configFromEnv({ ...env, IN_ITEM: '' }, '/tmp').deltaPass, '');
+  assert.throws(() => configFromEnv({ ...env, IN_ITEM: '552709760709906432' }, '/tmp'), ConfigError, 'a delta takes no source id');
+  assert.throws(() => configFromEnv({ ...env, IN_MODE: 'run' }, '/tmp'), ConfigError, 'content is the delta\'s pass only');
+  assert.throws(() => configFromEnv({ ...env, IN_MODE: 'withdraw' }, '/tmp'), ConfigError);
+  assert.equal(configFromEnv({ ...env, IN_MODE: 'withdraw', IN_ITEM: '552709760709906432' }, '/tmp').item, '552709760709906432');
+});
+
+test('what a content item sends: the description blocks whole and the box rows, nothing else of the prose; it never rewrites on resume', async () => {
+  const { contentOnlyPayload, mediaOnlyPayload, resumeTargetOf } = await import('../scripts/bambu-import/run');
+  const { buildFor, newWorld } = await import('./fixtures/catalogImportWorld');
+  const { pageOf } = await import('./fixtures/bambu/load');
+  const p = buildFor(newWorld(), pageOf('ams-2-pro').extraction).payload;
+  const c = contentOnlyPayload(p);
+  assert.deepEqual(c.content_blocks, p.content_blocks);
+  assert.deepEqual(c.specs, p.specs.filter((s) => s.key === 'package.contents'));
+  assert.ok(c.specs.length > 0 && p.specs.length > c.specs.length);
+  const m = mediaOnlyPayload(p);
+  assert.deepEqual({ ...c, content_blocks: [], specs: [] }, m, 'everything else is the media-only payload');
+  for (const kind of ['media', 'content'] as const) {
+    assert.equal(resumeTargetOf({ kind, merge: true, blockerCode: 'VERIFY_FAILED_PERSISTENT', lastCompleted: 'PUBLISHING', productId: 'p_x' }), 'VERIFYING_LIVE', kind);
+  }
+  assert.equal(resumeTargetOf({ kind: 'item', merge: true, blockerCode: 'VERIFY_FAILED_PERSISTENT', lastCompleted: 'PUBLISHING', productId: 'p_x' }), 'WRITING');
+});
+
+test('the ops client: a delta row of a kind this runner does not read is `unknown` (never an ordinary item); the content checkpoint\'s pictures read back whole or not at all', async () => {
+  const { contentInsertedOf } = await import('../scripts/bambu-import/opsClient');
+  const clock = { now: () => 0, sleep: async () => {} };
+  const rows = [
+    { kind: 'content', from_run: RUN_ID, source_product_id: '1', handle: 'a', canonical_url: '', type: '', route: '', queue_position: 1, leaf: '', also: [] },
+    { kind: 'a_later_kind', from_run: RUN_ID, source_product_id: '2', handle: 'b', canonical_url: '', type: '', route: '', queue_position: 2, leaf: '', also: [] },
+  ];
+  const client = new OpsClient({ siteOrigin: 'https://levonis-iq.com', token: TOKEN, fetch: async () => json(200, { rows }), clock, deadline: new Deadline(1e12, clock) });
+  assert.deepEqual((await client.deltaRows()).map((r) => [r.source_product_id, r.kind]), [['1', 'content'], ['2', 'unknown']]);
+  assert.deepEqual(contentInsertedOf({ inserted: { blocks: [{ id: 'cb_1', r2_key: 'k' }], box: [{ row_id: 'sv_1', index: 0, r2_key: 'k' }] } }), { blocks: [{ id: 'cb_1', r2_key: 'k' }], box: [{ row_id: 'sv_1', index: 0, r2_key: 'k' }] });
+  assert.equal(contentInsertedOf({ inserted: { blocks: [{ id: 'cb_1' }], box: [] } }), null);
+  assert.equal(contentInsertedOf({ inserted: { blocks: [], box: [{ row_id: 'sv_1', index: -1, r2_key: 'k' }] } }), null);
+  assert.equal(contentInsertedOf({ media_retry: {} }), null);
+});

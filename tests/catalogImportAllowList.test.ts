@@ -30,6 +30,9 @@ import { FINANCIAL_FIELDS } from '../worker/lib/adminScope';
 import { GUARDED_ROW_TABLES, PROTECTED_TABLES } from '../worker/lib/catalogImport/protectedTables';
 import { ImportWriteRefused, runImportWrite } from '../worker/lib/catalogImport/writer';
 import { listing } from '../worker/lib/listing';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { ROOT } from './fixtures/d1';
 
 /** source-analysis §3.3 "Do not import" and §3.9: the store's money, stock and promotion keys. */
 const SOURCE_KEYS = [
@@ -206,4 +209,59 @@ test('end state: every imported product is unpriced, unstocked, not configured f
   }
   const states = await (await listing(w.db)).statesOf(ids);
   for (const id of ids) assert.equal(states.get(id), 'catalog_only', `${id}: visible, not sellable — price_status unpriced`);
+});
+
+// ---------------------------------------------------------------- the content pass (spec §O.6)
+
+/** The source of a file without its comments (a SQL word in a comment is no statement). */
+const codeOf = (file: string) =>
+  readFileSync(join(ROOT, file), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+
+test('the content pass writes only its two picture fields, its own item, its events and the guard row: every write statement of contentMedia.ts is on the allow-list', () => {
+  const src = codeOf('worker/lib/catalogImport/contentMedia.ts');
+  const writes = [...src.matchAll(/\b(INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE|DELETE\s+FROM|REPLACE\s+INTO)\s+(\w+)/g)].map((m) => `${m[1].replace(/\s+/g, ' ')} ${m[2]}`);
+  const allowed = new Set([
+    'INSERT INTO ops_guards',
+    'UPDATE ops_guards',
+    'DELETE FROM ops_guards',
+    'UPDATE products',
+    'UPDATE product_spec_values',
+    'INSERT INTO catalog_import_events',
+    'UPDATE catalog_import_items',
+  ]);
+  assert.ok(writes.length >= 7, writes.join(', '));
+  for (const w of writes) assert.ok(allowed.has(w), `a write the content pass may not make: ${w}`);
+  // The product: its description (compare-and-set) and the time an open editor checks, nothing else.
+  const products = [...src.matchAll(/UPDATE products SET ([\s\S]*?) WHERE ([\s\S]*?)`/g)];
+  assert.equal(products.length, 1);
+  assert.equal(products[0][1].replace(/\s+/g, ' ').trim(), 'content_blocks = ?1, updated_at = ${NOW_SQL}');
+  assert.match(products[0][2], /content_blocks IS \?3/, 'compare-and-set on the text read');
+  // A box row: its value_list only, compare-and-set, the closed run's own row.
+  const rows = [...src.matchAll(/UPDATE product_spec_values SET ([\s\S]*?) WHERE ([\s\S]*?)`/g)];
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0][1].trim(), 'value_list = ?1');
+  assert.match(rows[0][2], /canonical_key = 'package\.contents' AND import_run_id = \?4 AND value_list IS \?5/);
+  // Nothing is ever deleted but the guard row; product_translations, translation_meta, spec_fields and the images are
+  // read (fenced), never written: the two SET clauses above are the whole of what moves.
+  assert.deepEqual(writes.filter((w) => w.startsWith('DELETE')), ['DELETE FROM ops_guards']);
+  assert.ok(!/\b(?:INTO|UPDATE)\s+(?:product_translations|product_images|product_option_values|product_variants|product_documents)\b/.test(src));
+});
+
+test('the import\'s translation rows are written by the writer and the translation store only, and the store leaves a row whose English did not move as it is', () => {
+  const offenders: string[] = [];
+  const walk = (dir: string) => {
+    for (const name of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${name.name}`;
+      if (name.isDirectory()) walk(rel);
+      else if (/\.ts$/.test(name.name) && /(INSERT|UPDATE|DELETE|REPLACE)[^;'`]{0,40}product_translations/.test(codeOf(rel))) offenders.push(rel);
+    }
+  };
+  walk('worker');
+  // The content pass (§O.6) trusts a row the import wrote only while these two are its only writers: a third (a
+  // backfill, a bulk re-translation) must fail here first and be judged against that proof.
+  assert.deepEqual(offenders.sort(), ['worker/lib/catalogImport/writer.ts', 'worker/lib/translate/store.ts']);
+  const store = codeOf('worker/lib/translate/store.ts');
+  assert.match(store, /if \(prev && prev\.source_hash === t\.source_hash\) \{[\s\S]*?continue;\s*\}/, 'an unchanged source is skipped, never rewritten');
 });

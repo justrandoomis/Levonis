@@ -29,7 +29,7 @@ import { join } from 'node:path';
 import { createPrivateKey } from 'node:crypto';
 import { ROOT } from './fixtures/d1';
 import { SITE, TOKEN, World } from './fixtures/bambuImportWorld';
-import { ImportLog, scrub } from '../scripts/bambu-import/log';
+import { ImportLog, scrub, TEMPLATES } from '../scripts/bambu-import/log';
 import { renderSummary } from '../scripts/bambu-import/summary';
 import { fileSealer } from '../scripts/bambu-import/run';
 // @ts-expect-error - plain ESM helper run by workflow 60 and in the sandbox, no types
@@ -259,6 +259,30 @@ test('the logger prints only values of their own shape; exceptions are scrubbed'
   assert.equal(lines[7], '::error::[import] WRITING: Error: failed with Bearer [redacted] at https://[redacted] id [hex] [masked]');
   assert.equal(lines[8], '::error::[import] WRITING: Error: PLANTED-HIDDEN-NAME', 'a non-Error is printed only as scrubbed text (nothing of ours throws one)');
   assert.equal(scrub('x'.repeat(400)).length, 300);
+});
+
+test('the content pass\'s log lines (§O.6) carry counts, codes, the run id and a moot word only: every other value prints the marker', () => {
+  const keys = ['delta_content_plan', 'delta_content_code', 'delta_content_registered', 'content_plan', 'content_moot', 'content_attached', 'content_seen'] as const;
+  for (const k of keys) {
+    const names = [...TEMPLATES[k].matchAll(/\{([a-z_]+)\}/g)].map((x) => x[1]);
+    assert.ok(names.length > 0, k);
+    // A placeholder is a count, or one of the shaped words (a run id, an error code, a moot word): never text.
+    for (const n of names) assert.ok(!['url', 'handle', 'name', 'title', 'key', 'id', 'sid', 'slug', 'text'].includes(n), `${k}: {${n}}`);
+  }
+  const lines: string[] = [];
+  const log = new ImportLog((l) => lines.push(l), { siteOrigin: 'https://levonis-iq.com' });
+  log.info('delta_content_code', { code: 'IMAGE_CONVERT_FAILED', failed: 3 });
+  log.info('delta_content_code', { code: 'https://store.bblcdn.com/a.png', failed: 'content:abc' as never });
+  log.item(4, 'ams-2-pro', 'EXTRACTING', 'content_moot', { what: 'source_gone' });
+  log.item(4, 'ams-2-pro', 'EXTRACTING', 'content_moot', { what: 'products/import/gallery/x.webp' });
+  log.item(4, 'ams-2-pro', 'WRITING', 'content_attached', { attached: 3, blocks: 2, box: 1, already_present: 0, owner_removed: 0, owner_edited: 0, not_imported: 0, source_changed: 0, not_stored: 0 });
+  log.info('delta_content_plan', { run: 'cir_0123456789abcdef01234567', content_failed_total: 358, content_items: 189 });
+  assert.equal(lines[0], '[import] content pass: 3 of the pictures to put back failed with IMAGE_CONVERT_FAILED');
+  assert.equal(lines[1], '[import] content pass: [?] of the pictures to put back failed with [?]');
+  assert.match(lines[2], /the page reads source_gone;/);
+  assert.match(lines[3], /the page reads \[\?\];/);
+  assert.equal(lines[4], '[import] #4 ams-2-pro WRITING: content pass: 3 put back (2 description, 1 in the box); already there 0, removed by the owner 0, edited 0, not written by the import 0, store page changed 0, not stored 0');
+  assert.match(lines[5], /^\[import\] content pass from run cir_0123456789abcdef01234567: 358 description and in-the-box pictures failed in the closed run; 189 items/);
 });
 
 test('the summary: §H.3 counts only, "partial" names the BLOCKED items, never «تم» or "100 %"', () => {

@@ -80,6 +80,18 @@
 #             with the NEW run id, auto_withdraw). The run closes the normal way
 #             (mode=close with the new run id). The delta's open report (the new
 #             products' handles and titles) is sealed, never logged.
+#             With item=content (spec §O.6), the delta is the CONTENT PASS
+#             instead: a NEW run whose queue is only the closed run's COMPLETE
+#             items whose description or in-the-box pictures failed. Each
+#             picture goes back into the exact field the import wrote (an image
+#             block of the description, the picture of a box item), in one
+#             guarded batch, compare-and-set on that field — and only where the
+#             field is still byte for byte what the import wrote, in every
+#             language; a field anyone edited since is counted, never touched.
+#             No sitemap is read; robots.txt and each product page at the
+#             store's pace. Run it with run_id = the bulk run (the run whose
+#             media failed), max_items 1 first, review, then mode=run on the new
+#             run (max_items 0, chain), then mode=close.
 #   revoke    the kill switch: clears catalog_import_runs.token_sha256 of
 #             `run_id`, so every ops path answers 404, and marks the run
 #             stopped (notes = 'kill_switch'). Before migration 0195 there is
@@ -176,7 +188,7 @@ on:
         required: false
         default: false
       item:
-        description: 'source product id (withdraw only)'
+        description: 'withdraw: the source product id; delta: empty (pictures and new products) or content (the content pass, spec §O.6)'
         required: false
         default: ''
       seal_pubkey:
@@ -236,7 +248,7 @@ jobs:
           [[ "$IN_CHAIN" =~ ^(true|false)$ ]] || fail 'chain is true or false'
           [[ "$IN_CHAIN_COUNT" =~ ^([0-9]|1[0-2])$ ]] || fail 'chain_count is a whole number from 0 to 12'
           [[ "$IN_AUTO_WITHDRAW" =~ ^(true|false)$ ]] || fail 'auto_withdraw is true or false'
-          [[ -z "$IN_ITEM" || "$IN_ITEM" =~ ^[0-9]{1,20}$ ]] || fail 'item is a source product id (digits only), or empty'
+          [[ -z "$IN_ITEM" || "$IN_ITEM" =~ ^[0-9]{1,20}$ || ( "$IN_MODE" == "delta" && "$IN_ITEM" == "content" ) ]] || fail 'item is a source product id (digits only), content (delta only), or empty'
           [[ "$IN_SEAL_PUBKEY" =~ ^[A-Za-z0-9_-]{43}$ ]] || fail 'seal_pubkey is a one-time X25519 public key of 43 base64url characters'
           [[ -z "$IN_CONFIRM" || "$IN_CONFIRM" == "IMPORT-LIVE" ]] || fail 'confirm is IMPORT-LIVE or empty'
           case "$IN_MODE" in
@@ -248,6 +260,7 @@ jobs:
             open) [[ -z "$IN_RUN_ID" ]] || fail 'open creates a new run: run_id must be empty' ;;
           esac
           if [[ "$IN_MODE" == "withdraw" ]]; then [[ -n "$IN_ITEM" ]] || fail 'withdraw needs the item (a source product id)'; fi
+          if [[ "$IN_MODE" == "delta" ]]; then [[ -z "$IN_ITEM" || "$IN_ITEM" == "content" ]] || fail 'delta takes item empty (pictures and new products) or content (the content pass)'; fi
           if [[ "$IN_AUTO_WITHDRAW" == "true" ]]; then [[ "$IN_MODE" == "run" || "$IN_MODE" == "delta" ]] || fail 'auto_withdraw runs only in modes run and delta'; fi
           if [[ ( "$IN_MODE" == "run" || "$IN_MODE" == "delta" ) && "$IN_CHAIN" == "true" ]]; then [[ "$IN_MAX_ITEMS" == "0" ]] || fail 'chain runs only with max_items 0: a bounded job is reviewed before the next one'; fi
           echo "inputs valid: mode $IN_MODE"
