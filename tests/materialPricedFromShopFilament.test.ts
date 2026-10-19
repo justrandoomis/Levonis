@@ -30,7 +30,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { asD1, freshDb, json, post, stubApp, type App } from './fixtures/app';
+import { approveMerchants, asD1, freshDb, json, post, stubApp, type App } from './fixtures/app';
 import { printQuoteRoutes } from '../worker/routes/printQuote';
 import { loadMaterialPrices, productMaterialType } from '../worker/lib/printQuote/repository';
 import { resolveMaterialPrice } from '../worker/lib/printQuote/cost';
@@ -221,6 +221,7 @@ test('a merchant spool still outranks the shelf price', async () => {
     INSERT INTO users (id,name,email,password_hash,role) VALUES ('u1','تاجر','m@x.co','h','customer');
     INSERT INTO community_merchants (id,user_id,name) VALUES ('m1','u1','متجر');
   `);
+  approveMerchants(raw);
   raw
     .prepare(
       `INSERT INTO merchant_spools (id, merchant_id, material_id, purchase_iqd, original_grams, active)

@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, get, patch, json, count, row, type StubUser, type Mount } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, get, patch, json, count, row, type StubUser, type Mount } from './fixtures/app';
 import { communityRoutes } from '../worker/routes/community';
 import { communityPostRoutes } from '../worker/routes/communityPosts';
 import { profileRoutes } from '../worker/routes/profile';
@@ -61,6 +61,7 @@ function seed(open = true) {
     UPDATE community_requests SET accepted_offer_id = 'off_ali' WHERE id = 'req_eve';
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','${open ? '{"open":true}' : '{"open":false}'}');
   `);
+  approveMerchants(raw);
   return raw;
 }
 const as = (raw: DatabaseSync, user: StubUser | null) => stubApp(asD1(raw), user, mount);

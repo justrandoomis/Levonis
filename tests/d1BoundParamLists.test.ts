@@ -14,7 +14,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freshDb, stubApp, get, post, json } from './fixtures/app';
+import { approveMerchants, freshDb, stubApp, get, post, json } from './fixtures/app';
 import { limitD1, violations } from './fixtures/d1Limits';
 import { FUTURE } from './fixtures/reviewE2eWorld';
 import { usersWithEntitlement } from '../worker/lib/entitlements';
@@ -40,6 +40,7 @@ function seeded() {
       INSERT INTO community_merchants (id,user_id,name) VALUES ('mm${i}','u${i}','M${i}');
       INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('ss${i}','mm${i}','u${i}','shop${i}x','S${i}');
       INSERT INTO follows (user_id, merchant_id) VALUES ('buyer','mm${i}');`);
+    approveMerchants(raw);
     if (i % 3 === 0) {
       raw.exec(`INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,starts_at,expires_at)
         VALUES ('mem${i}','u${i}','pro_12mo','pro','active',12,'2026-01-01T00:00:00.000Z','${FUTURE}');`);

@@ -30,7 +30,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { asD1, get, json, pending, post, row, stubApp } from './fixtures/app';
+import { approveMerchants, asD1, get, json, pending, post, row, stubApp } from './fixtures/app';
 import { leaks, OWNER, ROLES, seedRoleMatrix } from './fixtures/roleMatrix';
 import { cartRoutes } from '../worker/routes/cart';
 import { storeOrderRoutes } from '../worker/routes/storeOrders';
@@ -101,6 +101,7 @@ function world() {
     INSERT INTO telegram_admin_topics (topic_key, message_thread_id, enabled, configured_by, configured_by_tg)
       VALUES ('orders_direct', ${ORDERS_DIRECT_THREAD}, 1, 'usr_owner', 1);
   `);
+  approveMerchants(raw);
   const db = asD1(raw);
   const buyer = stubApp(
     db,

@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { asD1, freshDb, row } from './fixtures/app';
+import { approveMerchants, asD1, freshDb, row } from './fixtures/app';
 import { fixtureWebp, iconEnv, imagesStub, pngOf } from './fixtures/storeIcons';
 import {
   PLATFORM_ICON_FOR_ROLE,
@@ -46,6 +46,7 @@ function seed(logo: string | null = LOGO) {
     INSERT INTO users (id,name,email,password_hash,role) VALUES ('owner1','Ali','a@x.co','h','merchant');
     INSERT INTO community_merchants (id,user_id,name) VALUES ('m1','owner1','Ali 3D');
   `);
+  approveMerchants(raw);
   raw
     .prepare(`INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name,logo_key) VALUES ('s1','m1','owner1','ali3d','Ali 3D',?)`)
     .run(logo);

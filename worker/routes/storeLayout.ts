@@ -51,6 +51,7 @@ import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAuth, HttpError } from '../lib/http';
 import { requireStoreOwner, type StoreContext } from '../lib/merchantAuth';
+import { merchantApproved, merchantNotApprovedRefusal } from '../lib/merchantApproval';
 import { rateLimit } from '../lib/ratelimit';
 import { auditStatements } from '../lib/audit';
 import { newId } from '../lib/crypto';
@@ -381,6 +382,18 @@ async function requireLayoutWriter(c: Context<AppContext>): Promise<StoreContext
   return ctx;
 }
 
+/**
+ * PUBLISHING NEEDS AN APPROVED MERCHANT (Community V3 push 1.4, E10). A draft
+ * is private, so an unapproved merchant keeps designing; making a page the
+ * public would see — a publish, or a restore that also publishes — waits for
+ * a reviewer's approval. The store is hidden from the public until then
+ * anyway (`storeHiddenFromPublic`); this says so to the merchant instead of
+ * publishing into nowhere.
+ */
+function requireLayoutPublisher(ctx: StoreContext): void {
+  if (!merchantApproved(ctx.merchant)) throw merchantNotApprovedRefusal();
+}
+
 storeLayoutRoutes.put('/draft', async (c) => {
   const ctx = await requireLayoutWriter(c);
   await rateLimit(c, 'store-layout-draft', 240, 900);
@@ -432,6 +445,7 @@ storeLayoutRoutes.put('/draft', async (c) => {
 
 storeLayoutRoutes.post('/publish', async (c) => {
   const ctx = await requireLayoutWriter(c);
+  requireLayoutPublisher(ctx);
   await rateLimit(c, 'store-layout-publish', 60, 3600);
   const body = await readBody(c);
   const expected = versionOf(body);
@@ -529,6 +543,8 @@ storeLayoutRoutes.post('/restore/:revision', async (c) => {
   const body = await readBody(c);
   const expected = versionOf(body);
   const publish = body.publish === true;
+  // A restore into the DRAFT stays open; a restore that also publishes asks what a publish asks.
+  if (publish) requireLayoutPublisher(ctx);
   const db = c.env.DB;
   const row = await revisionByNumber(db, ctx, c.req.param('revision'));
   // Checked up front so a stale editor is told before anything is written;

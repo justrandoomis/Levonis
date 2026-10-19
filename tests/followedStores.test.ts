@@ -20,7 +20,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { freshDb, asD1, stubApp, get, json, type StubUser } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, get, json, type StubUser } from './fixtures/app';
 import { communityRoutes, FOLLOWED_LIMIT } from '../worker/routes/community';
 import { communityReviewRoutes } from '../worker/routes/merchantReviews';
 import { storesLabel } from '../src/components/community/hub/copy';
@@ -46,6 +46,7 @@ function seed() {
     INSERT INTO follows (user_id, merchant_id) VALUES ('v','m_ali'), ('v','m_omar');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   return raw;
 }
 

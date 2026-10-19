@@ -28,6 +28,7 @@
 import { listing } from '../lib/listing';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
+import { merchantPublicSql, storePublicSql } from '../lib/merchantApproval';
 
 
 /**
@@ -281,16 +282,19 @@ export async function sitemapRoute(c: Context<AppContext>): Promise<Response> {
       // `lifecycle = 'active' AND status = 'active'` pair the storefront's own
       // listing uses (worker/routes/storefront.ts) — a sitemap that advertises
       // a draft is a sitemap that advertises a 404.
-      // …and never for a SANCTIONED store (suspended, or its merchant
-      // suspended): its page is «المتجر غير متاح حاليًا», so its products are
-      // not served anywhere, a sitemap included (owner decision 2026-09-24).
+      // …and never for a store the public may not see (suspended, its
+      // merchant suspended, or — push 1.4 — its merchant not approved): its
+      // page is «المتجر غير متاح حاليًا», so its products are not served
+      // anywhere, a sitemap included (owner decision 2026-09-24). On a
+      // database without 0204 the read fails and the catch below serves the
+      // sitemap without products — closed (C11).
       const { results } = await c.env.DB.prepare(
         `SELECT p.slug AS slug, p.updated_at AS updated_at
            FROM community_products p
            JOIN merchant_stores s ON s.id = p.store_id
            JOIN community_merchants m ON m.id = s.merchant_id
           WHERE s.slug = ? AND p.lifecycle = 'active' AND p.status = 'active' AND p.slug <> ''
-            AND s.status <> 'suspended' AND m.status <> 'suspended'
+            AND ${storePublicSql('s')} AND ${merchantPublicSql('m')}
           ORDER BY p.updated_at DESC
           LIMIT ${MAX_SITEMAP_URLS}`
       )

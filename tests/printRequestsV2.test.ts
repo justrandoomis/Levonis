@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, dbThrough, asD1, stubApp, post, patch, put, get, json, count, row, all, type Mount } from './fixtures/app';
+import { approveMerchants, freshDb, dbThrough, asD1, stubApp, post, patch, put, get, json, count, row, all, type Mount } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { printRequestRoutes } from '../worker/routes/printRequests';
@@ -64,6 +64,7 @@ function seed() {
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','${RATE}');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   return raw;
 }
 
@@ -560,6 +561,7 @@ test('migration 0130 backfills the current revision of every published request (
     INSERT INTO community_offers (id,request_id,merchant_id,price_iqd,state,revision,request_revision)
       VALUES ('o','pub','m',5000,'pending',2,3);
   `);
+  approveMerchants(raw);
   raw.exec(readFileSync(join(ROOT, 'migrations', '0130_request_revisions_offers_v2.sql'), 'utf8'));
   assert.deepEqual(all(raw, 'SELECT request_id, revision, reason FROM community_request_revisions').map((r) => ({ ...r })), [
     { request_id: 'pub', revision: 3, reason: 'backfill' },

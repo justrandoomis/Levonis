@@ -15,6 +15,7 @@ import { ROOT, SqliteD1 } from './fixtures/d1';
 import type { AppContext } from '../worker/lib/types';
 import { HttpError } from '../worker/lib/http';
 import { communityRoutes } from '../worker/routes/community';
+import { approveMerchants } from './fixtures/app';
 
 const FUTURE = '2099-01-01T00:00:00.000Z';
 const PAST = '2020-01-01T00:00:00.000Z';
@@ -40,6 +41,13 @@ function setup() {
       ('cm_manual','manual','Manual Store',1),
       ('cm_lapsed','lapsed','Lapsed Store',0),
       ('cm_gated','gated','Gated Store',0);
+    -- Their stores: since push 1.4 the directory lists approved merchants' STORES (DECISIONS row 259).
+    INSERT INTO merchant_stores (id, merchant_id, user_id, slug, name) VALUES
+      ('st_pro','cm_pro','pro','pro-store','Pro Store'),
+      ('st_plus','cm_plus','plus','plus-store','Plus Store'),
+      ('st_manual','cm_manual','manual','manual-store','Manual Store'),
+      ('st_lapsed','cm_lapsed','lapsed','lapsed-store','Lapsed Store'),
+      ('st_gated','cm_gated','gated','gated-store','Gated Store');
     INSERT INTO memberships (id, user_id, plan_id, tier, state, duration_months, price_paid_iqd, starts_at, expires_at, source) VALUES
       ('m_pro','pro','pro_12mo','pro','active',12,499000,'2026-01-01T00:00:00.000Z','${FUTURE}','purchase'),
       ('m_plus','plus','plus_12mo','plus','active',12,29000,'2026-01-01T00:00:00.000Z','${FUTURE}','purchase'),
@@ -48,6 +56,7 @@ function setup() {
     INSERT INTO restriction_cases (id, user_id, kind, state, reason, benefit_flags) VALUES
       ('rc1','gated','other','active','complaint','["verifiedMerchant"]');
   `);
+  approveMerchants(raw);
   /**
    * THE COMMUNITY DOOR IS OPENED HERE, DELIBERATELY, AND IT IS NOT THE
    * SUBJECT OF THIS FILE.

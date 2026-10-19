@@ -108,6 +108,8 @@ export type StoreClosedReason =
   | 'store_suspended'
   | 'merchant_suspended'
   | 'merchant_restricted'
+  /** No reviewer approved the store's merchant (Community V3 push 1.4, E5). */
+  | 'not_approved'
   | 'not_selling_products'
   | 'subscription_inactive'
   | 'benefit_restricted';
@@ -129,6 +131,11 @@ export type StoreSellingVerdict = { ok: true } | { ok: false; reason: StoreClose
  *   · a RESTRICTED merchant takes no new orders (the brief's rule; the
  *     dashboard answer is left to the sanctions work);
  *   · a store that switched off `sells_direct_products` sells none.
+ *
+ * And, since Community V3 push 1.4 (E5), a merchant no reviewer approved
+ * (`sellingVerdict`'s `not_approved`): their cart lines and checkout fail
+ * with the same STORE_CLOSED every closed store answers — the buyer never
+ * learns why. Orders already placed are untouched.
  *
  * AN ALLOW-LIST, not a deny-list: `community_merchants.status` is free text
  * with no CHECK, so anything other than exactly `active` is closed. A sanction

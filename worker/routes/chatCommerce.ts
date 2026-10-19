@@ -38,6 +38,7 @@ import { audit } from '../lib/audit';
 import { getSetting } from '../lib/settings';
 import { requireCommunityOpen } from '../lib/communityGate';
 import { requireOfferPrivileges, requireSellingPrivileges, requireStoreOwner, storeById } from '../lib/merchantAuth';
+import { merchantApproved } from '../lib/merchantApproval';
 import { storeTakesOrders } from '../lib/storeOrderOps';
 import { ownedMediaKey } from '../lib/mediaRefs';
 import { benefits, getTierStatus } from '../lib/entitlements';
@@ -161,6 +162,7 @@ chatCommerceRoutes.post('/:id/print-requests', requireCommunityOpen, async (c) =
   const takes = await merchantTakesNewWork(c.env.DB, {
     merchantStatus: ctx.merchant.status,
     storeStatus: ctx.store.status,
+    merchantApproved: merchantApproved(ctx.merchant),
     ownerUserId: ctx.store.user_id,
   });
   if (!takes) throw conflict('This store is not taking new work right now', 'MERCHANT_UNAVAILABLE');
@@ -212,6 +214,7 @@ chatCommerceRoutes.post('/:id/print-requests/:rid/send', requireCommunityOpen, a
   const takes = !!ctx && (await merchantTakesNewWork(c.env.DB, {
     merchantStatus: ctx.merchant.status,
     storeStatus: ctx.store.status,
+    merchantApproved: merchantApproved(ctx.merchant),
     ownerUserId: ctx.store.user_id,
   }));
   if (!takes) throw conflict('This store is not taking new work right now', 'MERCHANT_UNAVAILABLE');

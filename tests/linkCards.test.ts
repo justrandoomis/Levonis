@@ -13,7 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, get, json, count, row, memoryBucket, type StubUser, type Mount } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, get, json, count, row, memoryBucket, type StubUser, type Mount } from './fixtures/app';
 import { HttpError } from '../worker/lib/http';
 import { chatRoutes } from '../worker/routes/chats';
 import { linkCardRoutes } from '../worker/routes/linkCards';
@@ -57,6 +57,7 @@ function seed(): DatabaseSync {
     INSERT INTO chat_participants (chat_id,user_id) VALUES ('chat_1','sara'), ('chat_1','eve'), ('chat_1','zed');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   return raw;
 }
 

@@ -13,7 +13,7 @@ import { Hono } from 'hono';
 import type { AppContext } from '../worker/lib/types';
 import { uploadRoutes, MERCHANT_PUBLIC_VIDEO_QUOTA_BYTES } from '../worker/routes/uploads';
 import { HttpError } from '../worker/lib/http';
-import { freshDb, asD1 } from './fixtures/app';
+import { approveMerchants, freshDb, asD1 } from './fixtures/app';
 
 const u32 = (n: number) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
 const ascii = (s: string) => [...s].map((ch) => ch.charCodeAt(0));
@@ -34,6 +34,7 @@ function app(opts: { store: boolean }) {
   if (opts.store) {
     raw.exec(`INSERT INTO community_merchants (id,user_id,name) VALUES ('m1','u1','U 3D');
               INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('s1','m1','u1','u3d','U 3D');`);
+    approveMerchants(raw);
   }
   const objects = new Map<string, number>();
   const bucket = {

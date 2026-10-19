@@ -24,6 +24,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
+import { approveMerchants } from './fixtures/app';
 
 function db() {
   const raw = new DatabaseSync(':memory:');
@@ -47,6 +48,7 @@ function db() {
     INSERT INTO community_products (id, merchant_id, store_id, slug, name, price_iqd)
       VALUES ('cp1','m1','s1','ali3d-widget','Widget',5000);
   `);
+  approveMerchants(raw);
   return raw;
 }
 

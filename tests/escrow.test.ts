@@ -28,6 +28,7 @@ import {
   merchantBalance,
 } from '../worker/lib/escrowOps';
 import { createDepositRequest, readWalletDust, walletIqdAvailable, availableUsdSql } from '../worker/lib/walletOps';
+import { approveMerchants } from './fixtures/app';
 
 const RATE = 1400;
 
@@ -51,6 +52,7 @@ function setup(balanceIqd = 1_000_000) {
       VALUES ('co1','r1','o1','buyer','m1',50000,1000,5000,45000);
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','${RATE}');
   `);
+  approveMerchants(raw);
   // Fund the customer's wallet with an approved deposit, the way a real
   // balance arises — not by writing a balance column, because there isn't one.
   // A zero balance is no funding row at all: `CHECK (amount > 0)`.

@@ -33,6 +33,7 @@ import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { requireStoreOwner } from '../lib/merchantAuth';
+import { merchantApproved } from '../lib/merchantApproval';
 import { communityClosedRefusal, communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { merchantTakesNewWork, type RequestForAccess } from '../lib/communityRequests';
 import { getMediaObject } from '../lib/mediaStorage';
@@ -96,6 +97,7 @@ merchantWorkshopRoutes.get('/board', async (c) => {
   const open = await merchantTakesNewWork(c.env.DB, {
     merchantStatus: ctx.merchant.status,
     storeStatus: ctx.store.status,
+    merchantApproved: merchantApproved(ctx.merchant),
     ownerUserId: user.id,
   });
   const accepts = Number((ctx.store as unknown as Record<string, unknown>).accepts_custom_requests ?? 1) === 1;

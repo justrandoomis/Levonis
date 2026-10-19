@@ -21,7 +21,7 @@ import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import {
   freshDb, asD1, stubApp, post, patch, get, json, count, row, pending, spendable, holds, ledger, failingD1,
-  type StubUser,
+  type StubUser, approveMerchants,
 } from './fixtures/app';
 import { legacyLedgerWrite } from './fixtures/legacyLedger';
 import { serialD1 } from './fixtures/serialD1';
@@ -60,6 +60,7 @@ function seed(raw: DatabaseSync, depositCents = 100_000) {
       VALUES ('mem_ali','ali','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','${FUTURE}');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','1400');
   `);
+  approveMerchants(raw);
 }
 
 const buyerApp = (db: unknown) =>

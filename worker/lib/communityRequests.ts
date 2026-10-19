@@ -21,6 +21,7 @@ import type { Env, SessionUser } from './types';
 import { newId } from './crypto';
 import { communityMayEnter, readCommunityGate } from './communityGate';
 import { storeForUser } from './merchantAuth';
+import { merchantApproved } from './merchantApproval';
 import { benefits, getTierStatus } from './entitlements';
 import { escrowForOrder, releaseEscrow, releaseEscrowReservation } from './escrowOps';
 import { merchantSuspendedSql } from './merchantLedger';
@@ -109,6 +110,7 @@ export async function mayQuoteOnBoard(db: D1Database, userId: string): Promise<b
   return merchantTakesNewWork(db, {
     merchantStatus: ctx.merchant.status,
     storeStatus: ctx.store.status,
+    merchantApproved: merchantApproved(ctx.merchant),
     ownerUserId: userId,
   });
 }
@@ -124,14 +126,17 @@ export async function mayQuoteOnBoard(db: D1Database, userId: string): Promise<b
  * still mint a viewer link.
  *
  * An allow-list, like the buy path: the merchant exactly `active`, the store
- * exactly `active` (a missing store is not one), and the owner's plan carries
- * both the store and the community-offers benefit.
+ * exactly `active` (a missing store is not one), the merchant APPROVED by a
+ * reviewer (Community V3 push 1.4, E6 — a REQUIRED field, so no caller can
+ * forget to ask it), and the owner's plan carries both the store and the
+ * community-offers benefit.
  */
 export async function merchantTakesNewWork(
   db: D1Database,
-  p: { merchantStatus: unknown; storeStatus: unknown; ownerUserId: string }
+  p: { merchantStatus: unknown; storeStatus: unknown; merchantApproved: boolean; ownerUserId: string }
 ): Promise<boolean> {
   if (p.merchantStatus !== 'active' || p.storeStatus !== 'active') return false;
+  if (p.merchantApproved !== true) return false;
   const tier = await getTierStatus(db, p.ownerUserId);
   return benefits.merchantStore(tier) && benefits.communityOffers(tier);
 }

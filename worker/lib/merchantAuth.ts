@@ -25,6 +25,7 @@ import type { Context } from 'hono';
 import type { AppContext } from './types';
 import { forbidden, HttpError, notFound, unauthorized } from './http';
 import { getTierStatus, benefits, type TierStatus } from './entitlements';
+import { approvedAtSql, merchantApproved, merchantNotApprovedRefusal, withApprovalSchema } from './merchantApproval';
 
 export interface MerchantRow {
   id: string;
@@ -38,6 +39,12 @@ export interface MerchantRow {
   rating_avg_x100: number;
   rating_count: number;
   completed_orders: number;
+  /**
+   * 0204 — the approval stamp (Community V3 push 1.4). NULL until a reviewer
+   * approved this account; a database without the column reads NULL too, so
+   * every gate that asks `merchantApproved` fails CLOSED.
+   */
+  approved_at: string | null;
 }
 
 export interface StoreRow {
@@ -78,69 +85,70 @@ export interface StoreContext {
 
 /** Loads a store and its merchant by slug. Public read — no session needed. */
 export async function storeBySlug(db: D1Database, slug: string): Promise<StoreContext | null> {
-  const row = await db
-    .prepare(
-      `SELECT s.*, m.id AS m_id, m.user_id AS m_user_id, m.name AS m_name, m.status AS m_status,
-              m.verified AS m_verified, m.badge AS m_badge, m.badge_override AS m_badge_override,
-              m.reputation_score AS m_rep, m.rating_avg_x100 AS m_rating, m.rating_count AS m_rating_count,
-              m.completed_orders AS m_completed
-         FROM merchant_stores s
-         JOIN community_merchants m ON m.id = s.merchant_id
-        WHERE s.slug = ?`
-    )
-    .bind(slug)
-    .first<Record<string, unknown>>();
-  return row ? splitStoreRow(row) : null;
+  return storeContextWhere(db, 's.slug', slug);
 }
 
 /** Loads a store and its merchant by store id. */
 export async function storeById(db: D1Database, storeId: string): Promise<StoreContext | null> {
-  const row = await db
-    .prepare(
-      `SELECT s.*, m.id AS m_id, m.user_id AS m_user_id, m.name AS m_name, m.status AS m_status,
-              m.verified AS m_verified, m.badge AS m_badge, m.badge_override AS m_badge_override,
-              m.reputation_score AS m_rep, m.rating_avg_x100 AS m_rating, m.rating_count AS m_rating_count,
-              m.completed_orders AS m_completed
-         FROM merchant_stores s
-         JOIN community_merchants m ON m.id = s.merchant_id
-        WHERE s.id = ?`
-    )
-    .bind(storeId)
-    .first<Record<string, unknown>>();
-  return row ? splitStoreRow(row) : null;
+  return storeContextWhere(db, 's.id', storeId);
 }
 
-/** The merchant entity for a user, if they have one. */
+/** The merchant entity for a user, if they have one. `approved_at` is NULL on a database without 0204. */
 export async function merchantForUser(db: D1Database, userId: string): Promise<MerchantRow | null> {
-  return db
+  const row = await db
     .prepare('SELECT * FROM community_merchants WHERE user_id = ?')
     .bind(userId)
     .first<MerchantRow>();
+  return row ? { ...row, approved_at: merchantApproved(row) ? row.approved_at : null } : null;
 }
 
 /** The store owned by a user, if they have one. */
 export async function storeForUser(db: D1Database, userId: string): Promise<StoreContext | null> {
-  const row = await db
-    .prepare(
-      `SELECT s.*, m.id AS m_id, m.user_id AS m_user_id, m.name AS m_name, m.status AS m_status,
-              m.verified AS m_verified, m.badge AS m_badge, m.badge_override AS m_badge_override,
-              m.reputation_score AS m_rep, m.rating_avg_x100 AS m_rating, m.rating_count AS m_rating_count,
-              m.completed_orders AS m_completed
-         FROM merchant_stores s
-         JOIN community_merchants m ON m.id = s.merchant_id
-        WHERE s.user_id = ?`
-    )
-    .bind(userId)
-    .first<Record<string, unknown>>();
+  return storeContextWhere(db, 's.user_id', userId);
+}
+
+/**
+ * THE THREE STORE-CONTEXT READS, ONE QUERY (push 1.4): the store row, its
+ * merchant's columns, and the merchant's approval stamp — read by every gate
+ * through `merchantApproved(ctx.merchant)`. On a database without 0204 the
+ * stamp reads NULL (`withApprovalSchema`), so the store still loads for its
+ * owner's finishing routes while every new commitment and every public read
+ * is closed (C11).
+ */
+async function storeContextWhere(
+  db: D1Database,
+  column: 's.slug' | 's.id' | 's.user_id',
+  value: string
+): Promise<StoreContext | null> {
+  const row = await withApprovalSchema((schema) =>
+    db
+      .prepare(
+        `SELECT s.*, m.id AS m_id, m.user_id AS m_user_id, m.name AS m_name, m.status AS m_status,
+                m.verified AS m_verified, m.badge AS m_badge, m.badge_override AS m_badge_override,
+                m.reputation_score AS m_rep, m.rating_avg_x100 AS m_rating, m.rating_count AS m_rating_count,
+                m.completed_orders AS m_completed, ${approvedAtSql('m', schema)} AS m_approved_at
+           FROM merchant_stores s
+           JOIN community_merchants m ON m.id = s.merchant_id
+          WHERE ${column} = ?`
+      )
+      .bind(value)
+      .first<Record<string, unknown>>()
+  );
   return row ? splitStoreRow(row) : null;
 }
 
+/**
+ * NO PERMISSIVE DEFAULT (gap §3.4). A column the read did not return is not
+ * read as the friendly value: a missing status is '' (which no allow-list
+ * admits — `storeTakesOrders` and `merchantTakesNewWork` ask for exactly
+ * 'active'), and a missing stamp is NULL (not approved).
+ */
 function splitStoreRow(row: Record<string, unknown>): StoreContext {
   const merchant: MerchantRow = {
     id: String(row.m_id),
     user_id: String(row.m_user_id),
     name: String(row.m_name),
-    status: String(row.m_status ?? 'active'),
+    status: typeof row.m_status === 'string' ? row.m_status : '',
     verified: Number(row.m_verified ?? 0),
     badge: String(row.m_badge ?? 'new'),
     badge_override: String(row.m_badge_override ?? ''),
@@ -148,6 +156,7 @@ function splitStoreRow(row: Record<string, unknown>): StoreContext {
     rating_avg_x100: Number(row.m_rating ?? 0),
     rating_count: Number(row.m_rating_count ?? 0),
     completed_orders: Number(row.m_completed ?? 0),
+    approved_at: typeof row.m_approved_at === 'string' && row.m_approved_at.trim() !== '' ? row.m_approved_at : null,
   };
   const store = { ...row } as unknown as StoreRow;
   for (const k of Object.keys(row)) if (k.startsWith('m_')) delete (store as unknown as Record<string, unknown>)[k];
@@ -186,6 +195,20 @@ export async function requireStoreOwner(c: Context<AppContext>): Promise<StoreCo
  * able to see and finish both (§48).
  */
 export async function requireSellingPrivileges(c: Context<AppContext>): Promise<StoreContext> {
+  return sellingGate(c, true);
+}
+
+/**
+ * TAKING A PROMISE BACK (gap §3.4 E4). Withdrawing an offer asks what selling
+ * asks EXCEPT approval: an unapproved merchant's standing offers are exactly
+ * the existing work they must be able to close — nothing new is promised by
+ * withdrawing one.
+ */
+export async function requireWithdrawPrivileges(c: Context<AppContext>): Promise<StoreContext> {
+  return sellingGate(c, false);
+}
+
+async function sellingGate(c: Context<AppContext>, approvalRequired: boolean): Promise<StoreContext> {
   const ctx = await requireStoreOwner(c);
   const user = c.get('user')!;
 
@@ -198,6 +221,10 @@ export async function requireSellingPrivileges(c: Context<AppContext>): Promise<
   if (ctx.store.status === 'suspended') {
     throw new HttpError(403, 'This store is suspended by Levonis. Contact support.', 'STORE_SUSPENDED');
   }
+  // THE APPROVAL GATE (Community V3 push 1.4, E3; owner decisions C1/C2): no
+  // reviewer approved this account, so nothing new is published, priced or
+  // promised from its store — the merchant alone hears why.
+  if (approvalRequired && !merchantApproved(ctx.merchant)) throw merchantNotApprovedRefusal();
   if (ctx.store.status === 'paused') {
     throw new HttpError(403, 'Your store is paused. Re-open it in store settings to sell again.', 'STORE_PAUSED');
   }
@@ -275,6 +302,8 @@ export async function sellingVerdict(
 ): Promise<{ canSell: boolean; reason: string }> {
   if (ctx.merchant.status === 'suspended') return { canSell: false, reason: 'merchant_suspended' };
   if (ctx.store.status === 'suspended') return { canSell: false, reason: 'store_suspended' };
+  // E5: an unapproved merchant's store takes no new order (the buyer hears STORE_CLOSED).
+  if (!merchantApproved(ctx.merchant)) return { canSell: false, reason: 'not_approved' };
   if (ctx.store.status === 'paused') return { canSell: false, reason: 'store_paused' };
   const tier = ownerTier ?? (await getTierStatus(db, ownerUserId));
   if ((tier.gated_benefits ?? []).includes('merchantStore')) {
@@ -285,13 +314,33 @@ export async function sellingVerdict(
 }
 
 /**
+ * MAY THIS MERCHANT RE-OPEN THEIR PAUSED STORE? (gap §3.4 E8.) Re-opening is
+ * taking on new orders, so it is the selling rule itself — `sellingVerdict`
+ * — asked of the store as it would stand once open. The settings route kept
+ * an inline copy of it (merchant suspended, plan lapsed) that knew nothing of
+ * approval; the copy is gone. Null when it may.
+ */
+export async function reopenRefusal(db: D1Database, ctx: StoreContext): Promise<HttpError | null> {
+  const verdict = await sellingVerdict(db, { store: { ...ctx.store, status: 'active' }, merchant: ctx.merchant }, ctx.store.user_id);
+  if (verdict.canSell) return null;
+  switch (verdict.reason) {
+    case 'merchant_suspended':
+      return new HttpError(403, 'This merchant account is suspended. Contact support.', 'MERCHANT_SUSPENDED');
+    case 'not_approved':
+      return merchantNotApprovedRefusal();
+    default:
+      return new HttpError(403, 'Your store subscription is not active. Renew it to re-open the store.', 'SUBSCRIPTION_INACTIVE');
+  }
+}
+
+/**
  * Is a store open for business to the public?
  * A suspended or paused store still RESOLVES — its page renders and explains
  * itself, and its existing customers keep their orders and chats. It simply
  * cannot take new ones.
  */
 export function storeIsOpen(ctx: StoreContext): boolean {
-  return ctx.store.status === 'active' && ctx.merchant.status !== 'suspended';
+  return ctx.store.status === 'active' && !storeHiddenFromPublic(ctx);
 }
 
 /**
@@ -305,6 +354,19 @@ export function storeIsOpen(ctx: StoreContext): boolean {
  * both here, in one place. `paused` is NOT a sanction: it is the merchant's
  * own switch, and a paused shop stays visible and says it is closed.
  */
-export function storeIsSuspended(ctx: StoreContext): boolean {
+export function storeSanctioned(ctx: StoreContext): boolean {
   return ctx.store.status === 'suspended' || ctx.merchant.status === 'suspended';
+}
+
+/**
+ * MAY THE PUBLIC SEE THIS STORE AT ALL? (gap §3.6, push 1.4.) Not under a
+ * sanction (`storeSanctioned`), AND its merchant approved by a reviewer
+ * (owner decisions C1/C2). Every public read of one store — the subdomain,
+ * the slug and id pages, an old slug's redirect, the PWA manifest and icons,
+ * the share card — asks this, and a hidden store answers one generic
+ * `STORE_UNAVAILABLE` (C9): never "under review", never "rejected". A store
+ * its merchant PAUSED is not hidden: its page says it is closed (C10).
+ */
+export function storeHiddenFromPublic(ctx: StoreContext): boolean {
+  return storeSanctioned(ctx) || !merchantApproved(ctx.merchant);
 }

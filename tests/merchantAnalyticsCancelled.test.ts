@@ -9,7 +9,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freshDb, asD1, stubApp, get, json, type StubUser } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, get, json, type StubUser } from './fixtures/app';
 import { merchantRoutes } from '../worker/routes/merchant';
 import { merchantCustomerRoutes } from '../worker/routes/merchantCustomers';
 
@@ -37,6 +37,7 @@ function seed() {
       ('i2','o_x','cp2','B',1,90000,90000,'merchant'),
       ('i3','o_ghost','cp2','B',1,5000,5000,'merchant');
   `);
+  approveMerchants(raw);
   return raw;
 }
 

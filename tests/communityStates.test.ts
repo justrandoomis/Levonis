@@ -14,6 +14,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
+import { approveMerchants } from './fixtures/app';
 import {
   REQUEST_STATES,
   REQUEST_TRANSITIONS,
@@ -187,6 +188,7 @@ test('only one acceptance can win a request, even when two arrive', () => {
     INSERT INTO community_offers (id,request_id,merchant_id,price_iqd) VALUES
       ('o1','r1','m1',50000), ('o2','r1','m2',40000);
   `);
+  approveMerchants(db);
 
   const accept = (offerId: string) =>
     db

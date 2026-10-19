@@ -22,7 +22,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  freshDb, dbThrough, asD1, stubApp, post, send, get, json, row, count, all, pending, holds,
+  freshDb, dbThrough, asD1, stubApp, post, send, get, json, row, count, all, pending, holds, approveMerchants,
 } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 import { storefrontRoutes } from '../worker/routes/storefront';
@@ -53,6 +53,7 @@ function seedStore(raw: DatabaseSync) {
     INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,starts_at,expires_at)
       VALUES ('mem_ali','ali','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','${FUTURE}');
   `);
+  approveMerchants(raw);
 }
 const shopper = (raw: DatabaseSync) =>
   stubApp(asD1(raw), { id: 'buyer', role: 'customer', email: 'buyer@x.co' }, (a) => {
@@ -109,6 +110,7 @@ function seedRequest() {
     INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status,note)
       VALUES ('wt1','buyer','deposit','USD',${Math.ceil((60000 * 100) / RATE)},'approved','fund');
   `);
+  approveMerchants(raw);
   return raw;
 }
 const mp = (raw: DatabaseSync, id: string, env: Record<string, unknown> = {}) =>
@@ -165,6 +167,7 @@ function seedPreview(raw: DatabaseSync) {
     INSERT INTO community_request_files (id,request_id,file_key,file_name,content_type,size_bytes,kind,analysis,model_format,preview_key)
       VALUES ('f1','r1','requests/buyer/x.stl','x.stl','model/stl',84,'model','{}','stl','request-previews/r1/f1.lvm');
   `);
+  approveMerchants(raw);
 }
 
 test('S2 (probe P3 inverted): a RESTRICTED merchant, refused every new offer, cannot mint a 3D preview link either', async () => {
@@ -226,6 +229,7 @@ function seedStoreThread(raw: DatabaseSync) {
     INSERT INTO chats (id, order_id) VALUES ('chat1','ord1');
     INSERT INTO chat_participants (chat_id,user_id) VALUES ('chat1','buyer'), ('chat1','owner'), ('chat1','boss');
   `);
+  approveMerchants(raw);
 }
 
 test('S3 (probe P4 inverted): a legacy staff participant of a store thread is read-only on EVERY write door — message, typing, upload', async () => {
@@ -343,6 +347,7 @@ test('S5 (probe P7 inverted): the directory serves nothing of a sanctioned shop;
     INSERT INTO follows (user_id, merchant_id) VALUES ('v','m_ali'), ('v','m_omar');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   const a = stubApp(asD1(raw), { id: 'v', role: 'customer', email: 'v@x.co' }, (x) => x.route('/api/community', communityRoutes), { env: ENV });
   for (const sanction of [
     null,

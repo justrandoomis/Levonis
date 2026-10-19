@@ -25,7 +25,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, get, json, type Mount } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, get, json, type Mount } from './fixtures/app';
 import { communityRoutes } from '../worker/routes/community';
 
 const mount: Mount = (a) => {
@@ -71,6 +71,7 @@ function seed(): DatabaseSync {
 
     INSERT INTO follows (user_id, merchant_id) VALUES ('viewer','m1'), ('o2','m1');
   `);
+  approveMerchants(raw);
   return raw;
 }
 
@@ -82,7 +83,7 @@ const ids = (rows: unknown) => (rows as Row[]).map((r) => r.id);
 
 // --------------------------------------------------------------- products
 
-test('a product card opens its store\'s product page, and a pre-store listing keeps /product/:slug', async () => {
+test('a product card opens its store\'s product page; a pre-store listing with no store is not served (push 1.4)', async () => {
   const raw = seed();
   const body = await json(await get(as(raw, 'viewer'), '/api/community/products'));
   const byId = new Map((body.products as Row[]).map((p) => [p.id, p]));
@@ -101,10 +102,10 @@ test('a product card opens its store\'s product page, and a pre-store listing ke
   assert.equal(byId.get('p9')!.in_stock, true, 'an untracked product is always in stock');
   assert.equal('stock' in dragon, false, 'the count is never served');
 
-  const legacy = byId.get('p4')!;
-  assert.equal(legacy.url, '/product/legacy-thing');
-  assert.equal(legacy.store, null);
-  assert.equal(legacy.in_stock, null, 'no cart path, so no stock claim');
+  // Community V3 push 1.4 (DECISIONS row 259): the feed shows a product IN a
+  // store of an approved merchant (an inner join) — a pre-store listing of a
+  // profile-only merchant is no longer served.
+  assert.equal(byId.has('p4'), false);
 });
 
 test('with a root domain the SHOP is its own address, and the product card still opens in-site — no tab per product', async () => {
@@ -119,10 +120,11 @@ test('the feed lists what the storefront serves: published, not hidden by Levoni
   const raw = seed();
   const body = await json(await get(as(raw, null), '/api/community/products'));
   const listed = new Set(ids(body.products));
-  for (const shown of ['p1', 'p2', 'p3', 'p4', 'p9', 'p10']) assert.ok(listed.has(shown), `${shown} is listed`);
-  for (const gone of ['p5', 'p6', 'p7', 'p8']) assert.ok(!listed.has(gone), `${gone} is not listed`);
+  for (const shown of ['p1', 'p2', 'p3', 'p9', 'p10']) assert.ok(listed.has(shown), `${shown} is listed`);
+  // p4 has no store (push 1.4: a product is shown in a store of an approved merchant).
+  for (const gone of ['p4', 'p5', 'p6', 'p7', 'p8']) assert.ok(!listed.has(gone), `${gone} is not listed`);
   assert.ok(listed.has('p3'), 'a PAUSED store is not a sanction — its page says it is closed');
-  assert.equal(body.total, 6, 'the total counts the same rows');
+  assert.equal(body.total, 5, 'the total counts the same rows');
 });
 
 test('search is the server\'s, over every row, and a typed % is a percent sign, not a wildcard', async () => {
@@ -153,7 +155,7 @@ test('pages by (created_at, id): a row sharing a millisecond with the page bound
     const path: string = `/api/community/products?limit=1${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
     const page = await json(await get(app, path));
     seen.push(...ids(page.products));
-    if (first) assert.equal(page.total, 6, 'the first page carries the total');
+    if (first) assert.equal(page.total, 5, 'the first page carries the total');
     else assert.equal(page.total, null, 'later pages do not count again');
     first = false;
     cursor = page.next_cursor;
@@ -161,7 +163,7 @@ test('pages by (created_at, id): a row sharing a millisecond with the page bound
   }
   // Newest first; p9 and p10 share a millisecond and are ordered by id,
   // descending as TEXT ('p9' > 'p10').
-  assert.deepEqual(seen, ['p1', 'p2', 'p3', 'p4', 'p9', 'p10']);
+  assert.deepEqual(seen, ['p1', 'p2', 'p3', 'p9', 'p10']);
   assert.equal(new Set(seen).size, seen.length, 'no row twice');
 });
 
@@ -171,8 +173,9 @@ test('the directory shows each shop\'s own public header, and the viewer\'s own 
   const raw = seed();
   const body = await json(await get(as(raw, 'viewer'), '/api/community/merchants'));
   const byId = new Map((body.merchants as Row[]).map((m) => [m.id, m]));
-  assert.deepEqual([...byId.keys()].sort(), ['m1', 'm2', 'm3'], 'no suspended merchant, no merchant of a suspended store');
-  assert.equal(body.total, 3);
+  // …and no profile-only merchant (m3): since push 1.4 the directory lists STORES of approved merchants.
+  assert.deepEqual([...byId.keys()].sort(), ['m1', 'm2'], 'no suspended merchant, no merchant of a suspended store, no store-less profile');
+  assert.equal(body.total, 2);
 
   const ali = byId.get('m1')!;
   assert.equal(ali.store_name, 'Ali 3D Workshop');
@@ -193,12 +196,6 @@ test('the directory shows each shop\'s own public header, and the viewer\'s own 
   const noor = byId.get('m2')!;
   assert.equal(noor.rating, null, 'no reviews is «جديد», never a number');
   assert.equal(noor.following, false);
-
-  const legacy = byId.get('m3')!;
-  assert.equal(legacy.store_name, null);
-  assert.equal(legacy.governorate, '', 'a merchant row\'s own governorate was never public');
-  assert.equal(legacy.logoUrl, '/files/community/o3/avatar.webp');
-  assert.equal(legacy.product_count, 1, 'a pre-store merchant counts its own listings');
 });
 
 test('a guest follows nobody, and the directory searches store names and taglines', async () => {

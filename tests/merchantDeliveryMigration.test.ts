@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
-import { all, dbThrough, freshDb, hasColumn } from './fixtures/app';
+import { approveMerchants, all, dbThrough, freshDb, hasColumn } from './fixtures/app';
 import { normalizeStoredProfile, profileFromLegacySettings } from '../packages/shipping/src/merchantDelivery';
 
 const SQL = readFileSync(join(ROOT, 'migrations/0120_merchant_delivery.sql'), 'utf8');
@@ -33,6 +33,7 @@ function seed(raw: ReturnType<typeof freshDb>) {
   LEGACY.forEach(([id, json], i) => {
     raw.exec(`INSERT INTO users (id,name,email,password_hash,role) VALUES ('u${i}','U','u${i}@x.co','h','merchant')`);
     raw.exec(`INSERT INTO community_merchants (id,user_id,name,status) VALUES ('m${i}','u${i}','M','active')`);
+    approveMerchants(raw);
     raw.prepare(`INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name,delivery_settings) VALUES (?,?,?,?,?,?)`)
       .run(id, `m${i}`, `u${i}`, `slug${i}`, 'S', json);
   });

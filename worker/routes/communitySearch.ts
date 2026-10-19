@@ -79,8 +79,9 @@ import {
   directoryCard,
   merchantBlockSql,
 } from './community';
+import { withApprovalSchema } from '../lib/merchantApproval';
 import {
-  POST_COLUMNS,
+  postColumns,
   POST_FROM,
   POST_PUBLIC_SQL,
   POST_SEARCH,
@@ -272,57 +273,61 @@ function catalogueRow(r: Record<string, unknown>) {
 async function searchProjects({ db, like, viewer, limit, root }: SearchInput) {
   const where = `${POST_PUBLIC_SQL} AND ${postExclusionSql('?2')} AND (${sqlLikeClause(POST_SEARCH, '?1')})`;
   const [{ results }, total] = await Promise.all([
-    db.prepare(
-      `SELECT ${POST_COLUMNS} ${POST_FROM}
-        WHERE ${where}
-        ORDER BY (p.title LIKE ?1 ESCAPE '\\') DESC, p.published_at DESC, p.id DESC LIMIT ?3`
-    ).bind(like, viewer, limit).all<Record<string, unknown>>(),
+    withApprovalSchema((schema) =>
+      db.prepare(
+        `SELECT ${postColumns(schema)} ${POST_FROM}
+          WHERE ${where}
+          ORDER BY (p.title LIKE ?1 ESCAPE '\\') DESC, p.published_at DESC, p.id DESC LIMIT ?3`
+      ).bind(like, viewer, limit).all<Record<string, unknown>>()
+    ),
     boundedCount(db, `SELECT p.id FROM community_posts p WHERE ${where}`, [like, viewer]),
   ]);
   return { rows: await withViewerFlags(db, viewer || null, results.map((p) => postCard(p, root))), total };
 }
 
 async function searchStores({ db, like, viewer, limit, root }: SearchInput) {
-  const [{ results }, total] = await Promise.all([
+  const [{ results }, total] = await withApprovalSchema((schema) => Promise.all([
     db.prepare(
       `SELECT ${COMMUNITY_DIRECTORY_COLUMNS},
               EXISTS (SELECT 1 FROM follows f WHERE f.merchant_id = cm.id AND f.user_id = ?3) AS viewer_follows
          ${COMMUNITY_DIRECTORY_FROM}
-        WHERE ${communityDirectoryVisible('?1')} AND ${merchantBlockSql('?3')}
+        WHERE ${communityDirectoryVisible('?1', schema)} AND ${merchantBlockSql('?3')}
         ORDER BY (COALESCE(NULLIF(s.name, ''), cm.name) LIKE ?1 ESCAPE '\\') DESC,
                  cm.completed_orders DESC, cm.created_at DESC, cm.id DESC LIMIT ?2`
     ).bind(like, limit, viewer).all<Record<string, unknown>>(),
-    boundedCount(db, `SELECT cm.id ${COMMUNITY_DIRECTORY_FROM} WHERE ${communityDirectoryVisible('?1')} AND ${merchantBlockSql('?2')}`, [like, viewer]),
-  ]);
+    boundedCount(db, `SELECT cm.id ${COMMUNITY_DIRECTORY_FROM} WHERE ${communityDirectoryVisible('?1', schema)} AND ${merchantBlockSql('?2')}`, [like, viewer]),
+  ]));
   const badges = await membershipBadges(db, results.map((m) => m.user_id));
   return { rows: results.map((m) => ({ ...directoryCard(m, badges, root), following: !!m.viewer_follows })), total };
 }
 
 async function searchCreators({ db, like, viewer, limit, root }: SearchInput) {
-  const { where, from, withCounts, columns } = creatorListSql('?1', '?2');
-  const [{ results }, total] = await Promise.all([
-    db.prepare(
-      `SELECT ${columns} ${withCounts}
-        WHERE ${where}
-        ORDER BY (u.name LIKE ?1 ESCAPE '\\' OR u.username LIKE ?1 ESCAPE '\\') DESC,
-                 projects DESC, u.follower_count DESC, u.id DESC LIMIT ?3`
-    ).bind(like, viewer, limit).all<Record<string, unknown>>(),
-    boundedCount(db, `SELECT u.id ${from} WHERE ${where}`, [like, viewer]),
-  ]);
+  const [{ results }, total] = await withApprovalSchema((schema) => {
+    const { where, from, withCounts, columns } = creatorListSql('?1', '?2', schema);
+    return Promise.all([
+      db.prepare(
+        `SELECT ${columns} ${withCounts}
+          WHERE ${where}
+          ORDER BY (u.name LIKE ?1 ESCAPE '\\' OR u.username LIKE ?1 ESCAPE '\\') DESC,
+                   projects DESC, u.follower_count DESC, u.id DESC LIMIT ?3`
+      ).bind(like, viewer, limit).all<Record<string, unknown>>(),
+      boundedCount(db, `SELECT u.id ${from} WHERE ${where}`, [like, viewer]),
+    ]);
+  });
   const badges = await membershipBadges(db, results.map((r) => r.id));
   return { rows: results.map((r) => creatorCard(r, badges, root)), total };
 }
 
 async function searchCommunityProducts({ db, like, viewer, limit, root }: SearchInput) {
-  const [{ results }, total] = await Promise.all([
+  const [{ results }, total] = await withApprovalSchema((schema) => Promise.all([
     db.prepare(
       `SELECT p.*, s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo_key
          ${COMMUNITY_PRODUCTS_FROM}
-        WHERE ${communityProductsVisible('?1')} AND ${merchantBlockSql('?3', 'm')}
+        WHERE ${communityProductsVisible('?1', schema)} AND ${merchantBlockSql('?3', 'm')}
         ORDER BY (p.name LIKE ?1 ESCAPE '\\' OR p.name_ar LIKE ?1 ESCAPE '\\') DESC, p.created_at DESC, p.id DESC LIMIT ?2`
     ).bind(like, limit, viewer).all<Record<string, unknown>>(),
-    boundedCount(db, `SELECT p.id ${COMMUNITY_PRODUCTS_FROM} WHERE ${communityProductsVisible('?1')} AND ${merchantBlockSql('?2', 'm')}`, [like, viewer]),
-  ]);
+    boundedCount(db, `SELECT p.id ${COMMUNITY_PRODUCTS_FROM} WHERE ${communityProductsVisible('?1', schema)} AND ${merchantBlockSql('?2', 'm')}`, [like, viewer]),
+  ]));
   return { rows: results.map((p) => communityFeedProduct(p, root)), total };
 }
 
@@ -496,24 +501,28 @@ async function suggestions(db: D1Database, raw: string, viewer: string): Promise
   const prefix = likePattern(raw, 'prefix');
   const tagPrefix = likePattern(raw.toLowerCase(), 'prefix');
   const since = new Date(Date.now() - THIRTY_DAYS_MS).toISOString();
-  const creators = creatorListSql("''", '?3');
   const [projects, stores, makers, products, tags] = await Promise.all([
     db.prepare(
       `SELECT p.id, p.title FROM community_posts p
         WHERE ${POST_PUBLIC_SQL} AND ${postExclusionSql('?3')} AND p.title LIKE ?1 ESCAPE '\\'
         ORDER BY (p.title LIKE ?2 ESCAPE '\\') DESC, p.like_count DESC, p.published_at DESC, p.id DESC LIMIT ${SUGGEST_MAX}`
     ).bind(like, prefix, viewer).all<{ id: string; title: string }>(),
-    db.prepare(
-      `SELECT cm.id, COALESCE(NULLIF(s.name, ''), cm.name) AS text
-         ${COMMUNITY_DIRECTORY_FROM}
-        WHERE ${communityDirectoryVisible("''")} AND ${merchantBlockSql('?3')} AND (cm.name LIKE ?1 ESCAPE '\\' OR s.name LIKE ?1 ESCAPE '\\')
-        ORDER BY (COALESCE(NULLIF(s.name, ''), cm.name) LIKE ?2 ESCAPE '\\') DESC, cm.completed_orders DESC, cm.created_at DESC LIMIT ${SUGGEST_MAX}`
-    ).bind(like, prefix, viewer).all<{ id: string; text: string }>(),
-    db.prepare(
-      `SELECT u.name, u.username ${creators.from}
-        WHERE ${creators.where} AND (u.name LIKE ?1 ESCAPE '\\' OR u.username LIKE ?1 ESCAPE '\\')
-        ORDER BY (u.name LIKE ?2 ESCAPE '\\' OR u.username LIKE ?2 ESCAPE '\\') DESC, u.follower_count DESC, u.id LIMIT ${SUGGEST_MAX}`
-    ).bind(like, prefix, viewer).all<{ name: string; username: string }>(),
+    withApprovalSchema((schema) =>
+      db.prepare(
+        `SELECT cm.id, COALESCE(NULLIF(s.name, ''), cm.name) AS text
+           ${COMMUNITY_DIRECTORY_FROM}
+          WHERE ${communityDirectoryVisible("''", schema)} AND ${merchantBlockSql('?3')} AND (cm.name LIKE ?1 ESCAPE '\\' OR s.name LIKE ?1 ESCAPE '\\')
+          ORDER BY (COALESCE(NULLIF(s.name, ''), cm.name) LIKE ?2 ESCAPE '\\') DESC, cm.completed_orders DESC, cm.created_at DESC LIMIT ${SUGGEST_MAX}`
+      ).bind(like, prefix, viewer).all<{ id: string; text: string }>()
+    ),
+    withApprovalSchema((schema) => {
+      const creators = creatorListSql("''", '?3', schema);
+      return db.prepare(
+        `SELECT u.name, u.username ${creators.from}
+          WHERE ${creators.where} AND (u.name LIKE ?1 ESCAPE '\\' OR u.username LIKE ?1 ESCAPE '\\')
+          ORDER BY (u.name LIKE ?2 ESCAPE '\\' OR u.username LIKE ?2 ESCAPE '\\') DESC, u.follower_count DESC, u.id LIMIT ${SUGGEST_MAX}`
+      ).bind(like, prefix, viewer).all<{ name: string; username: string }>();
+    }),
     catalogueSuggestions(db, raw, like, prefix),
     // The tags of the last 30 days' public posts the viewer may see — the
     // trending window, so the walk over `json_each` is bounded by time, and
@@ -605,12 +614,14 @@ const TRENDING_CREATORS = 6;
 
 async function trendingProjects(db: D1Database, since: string, root: string | null) {
   // The existing /posts/trending, for a guest — the same score, the same window.
-  const { results } = await db.prepare(
-    `SELECT ${POST_COLUMNS} ${POST_FROM}
-      WHERE ${POST_PUBLIC_SQL} AND p.published_at >= ?1
-      ORDER BY (p.like_count * 3 + p.comment_count * 4 + p.save_count * 5 + p.view_count) DESC, p.published_at DESC, p.id DESC
-      LIMIT ?2`
-  ).bind(since, TRENDING_PROJECTS).all<Record<string, unknown>>();
+  const { results } = await withApprovalSchema((schema) =>
+    db.prepare(
+      `SELECT ${postColumns(schema)} ${POST_FROM}
+        WHERE ${POST_PUBLIC_SQL} AND p.published_at >= ?1
+        ORDER BY (p.like_count * 3 + p.comment_count * 4 + p.save_count * 5 + p.view_count) DESC, p.published_at DESC, p.id DESC
+        LIMIT ?2`
+    ).bind(since, TRENDING_PROJECTS).all<Record<string, unknown>>()
+  );
   return withViewerFlags(db, null, results.map((p) => postCard(p, root)));
 }
 
@@ -625,39 +636,45 @@ async function trendingTags(db: D1Database, since: string) {
 }
 
 async function trendingStores(db: D1Database, since: string, root: string | null) {
-  const { results } = await db.prepare(
-    `SELECT * FROM (
-       SELECT ${COMMUNITY_DIRECTORY_COLUMNS},
-              (SELECT COUNT(*) FROM community_orders o
-                WHERE o.merchant_id = cm.id AND o.state = 'completed' AND COALESCE(o.completed_at, o.created_at) >= ?1) AS orders_30d,
-              (SELECT COUNT(*) FROM follows f WHERE f.merchant_id = cm.id AND f.created_at >= ?1) AS follows_30d
-         ${COMMUNITY_DIRECTORY_FROM}
-        WHERE ${communityDirectoryVisible("''")}
-     ) ORDER BY (orders_30d + follows_30d) DESC, rating_avg_x100 DESC, completed_orders DESC, id LIMIT ?2`
-  ).bind(since, TRENDING_STORES).all<Record<string, unknown>>();
+  const { results } = await withApprovalSchema((schema) =>
+    db.prepare(
+      `SELECT * FROM (
+         SELECT ${COMMUNITY_DIRECTORY_COLUMNS},
+                (SELECT COUNT(*) FROM community_orders o
+                  WHERE o.merchant_id = cm.id AND o.state = 'completed' AND COALESCE(o.completed_at, o.created_at) >= ?1) AS orders_30d,
+                (SELECT COUNT(*) FROM follows f WHERE f.merchant_id = cm.id AND f.created_at >= ?1) AS follows_30d
+           ${COMMUNITY_DIRECTORY_FROM}
+          WHERE ${communityDirectoryVisible("''", schema)}
+       ) ORDER BY (orders_30d + follows_30d) DESC, rating_avg_x100 DESC, completed_orders DESC, id LIMIT ?2`
+    ).bind(since, TRENDING_STORES).all<Record<string, unknown>>()
+  );
   const badges = await membershipBadges(db, results.map((m) => m.user_id));
   // Viewer-independent by construction: `following` is the client's to overlay from /me/social.
   return results.map((m) => ({ ...directoryCard(m, badges, root), following: false }));
 }
 
 async function trendingCreators(db: D1Database, since: string, root: string | null) {
-  const { where, withCounts, columns } = creatorListSql("''", "''");
-  const { results } = await db.prepare(
-    `SELECT ${columns}, COALESCE(lk.n, 0) AS likes_30d
-       ${withCounts}
-       LEFT JOIN (SELECT p.author_id, COUNT(*) AS n
-                    FROM community_likes l JOIN community_posts p ON p.id = l.post_id
-                   WHERE ${POST_PUBLIC_SQL} AND l.created_at >= ?1 GROUP BY p.author_id) lk ON lk.author_id = u.id
-      WHERE ${where} AND (COALESCE(pc.n, 0) > 0 OR u.follower_count > 0)
-      ORDER BY likes_30d DESC, u.follower_count DESC, projects DESC, u.id LIMIT ?2`
-  ).bind(since, TRENDING_CREATORS).all<Record<string, unknown>>();
+  const { results } = await withApprovalSchema((schema) => {
+    const { where, withCounts, columns } = creatorListSql("''", "''", schema);
+    return db.prepare(
+      `SELECT ${columns}, COALESCE(lk.n, 0) AS likes_30d
+         ${withCounts}
+         LEFT JOIN (SELECT p.author_id, COUNT(*) AS n
+                      FROM community_likes l JOIN community_posts p ON p.id = l.post_id
+                     WHERE ${POST_PUBLIC_SQL} AND l.created_at >= ?1 GROUP BY p.author_id) lk ON lk.author_id = u.id
+        WHERE ${where} AND (COALESCE(pc.n, 0) > 0 OR u.follower_count > 0)
+        ORDER BY likes_30d DESC, u.follower_count DESC, projects DESC, u.id LIMIT ?2`
+    ).bind(since, TRENDING_CREATORS).all<Record<string, unknown>>();
+  });
   const badges = await membershipBadges(db, results.map((r) => r.id));
   return results.map((r) => creatorCard(r, badges, root));
 }
 
 /** How many shops the directory lists for a guest — the home's colophon, read once for everybody instead of once per visit. */
 async function directoryCount(db: D1Database): Promise<number> {
-  const r = await db.prepare(`SELECT COUNT(*) AS n ${COMMUNITY_DIRECTORY_FROM} WHERE ${communityDirectoryVisible("''")}`).first<{ n: number }>();
+  const r = await withApprovalSchema((schema) =>
+    db.prepare(`SELECT COUNT(*) AS n ${COMMUNITY_DIRECTORY_FROM} WHERE ${communityDirectoryVisible("''", schema)}`).first<{ n: number }>()
+  );
   return Number(r?.n ?? 0);
 }
 
@@ -714,9 +731,9 @@ async function recommendForPost(c: Context<AppContext>, id: string, limit: numbe
   const since = new Date(Date.now() - RECOMMEND_WINDOW_MS).toISOString();
   const sharesTag = `EXISTS (SELECT 1 FROM json_each(${jsonArr('p.tags')}) t
                       WHERE typeof(t.value) = 'text' AND lower(t.value) IN (SELECT value FROM json_each(?2)))`;
-  const { results } = await c.env.DB.prepare(
+  const { results } = await withApprovalSchema((schema) => c.env.DB.prepare(
     `SELECT * FROM (
-       SELECT ${POST_COLUMNS},
+       SELECT ${postColumns(schema)},
               3 * (SELECT COUNT(*) FROM json_each(${jsonArr('p.tags')}) t
                     WHERE typeof(t.value) = 'text' AND lower(t.value) IN (SELECT value FROM json_each(?2)))
               + 2 * (CASE WHEN ?3 <> '' AND p.material_product_id = ?3 THEN 1 ELSE 0 END)
@@ -726,7 +743,7 @@ async function recommendForPost(c: Context<AppContext>, id: string, limit: numbe
           AND ((?3 <> '' AND p.material_product_id = ?3) OR (?4 <> '' AND p.printer_product_id = ?4) OR ${sharesTag})
      ) WHERE score > 0
      ORDER BY score DESC, published_at DESC, id DESC LIMIT ?6`
-  ).bind(id, JSON.stringify(tags), material, printer, v, limit, since).all<Record<string, unknown>>();
+  ).bind(id, JSON.stringify(tags), material, printer, v, limit, since).all<Record<string, unknown>>());
   return { kind: 'projects' as const, rows: await withViewerFlags(c.env.DB, v || null, results.map((r) => postCard(r, root))) };
 }
 
@@ -738,16 +755,17 @@ async function recommendForPost(c: Context<AppContext>, id: string, limit: numbe
 async function recommendForStore(c: Context<AppContext>, id: string, limit: number) {
   const db = c.env.DB;
   const viewer = c.get('user')?.id ?? '';
-  const anchor = await db.prepare(
+  const anchor = await withApprovalSchema((schema) => db.prepare(
     `SELECT cm.id, s.governorate, s.categories ${COMMUNITY_DIRECTORY_FROM}
-      WHERE (cm.id = ?1 OR s.id = ?1) AND ${communityDirectoryVisible("''")} AND ${merchantBlockSql('?2')} LIMIT 1`
-  ).bind(id, viewer).first<{ id: string; governorate: string | null; categories: string | null }>();
+      WHERE (cm.id = ?1 OR s.id = ?1) AND ${communityDirectoryVisible("''", schema)} AND ${merchantBlockSql('?2')} LIMIT 1`
+  ).bind(id, viewer).first<{ id: string; governorate: string | null; categories: string | null }>());
   if (!anchor) throw anchorMissing('Store');
   const gov = String(anchor.governorate ?? '').trim();
   const cats = JSON.stringify(stringList(anchor.categories));
   const root = rootDomainFrom(c.env);
   const shared = `(SELECT COUNT(*) FROM json_each(${jsonArr('s.categories')}) a
                     WHERE typeof(a.value) = 'text' AND lower(a.value) IN (SELECT value FROM json_each(?3)))`;
+  // The anchor was public on this database, so the column is there: no second try is needed.
   const { results } = await db.prepare(
     `SELECT ${COMMUNITY_DIRECTORY_COLUMNS},
             EXISTS (SELECT 1 FROM follows f WHERE f.merchant_id = cm.id AND f.user_id = ?4) AS viewer_follows,
@@ -766,14 +784,15 @@ async function recommendForStore(c: Context<AppContext>, id: string, limit: numb
 async function recommendForProduct(c: Context<AppContext>, id: string, limit: number) {
   const db = c.env.DB;
   const viewer = c.get('user')?.id ?? '';
-  const anchor = await db.prepare(
+  const anchor = await withApprovalSchema((schema) => db.prepare(
     `SELECT p.id, p.merchant_id, p.category, p.material ${COMMUNITY_PRODUCTS_FROM}
-      WHERE p.id = ?1 AND ${communityProductsVisible("''")} AND ${merchantBlockSql('?2', 'm')} LIMIT 1`
-  ).bind(id, viewer).first<{ id: string; merchant_id: string; category: string | null; material: string | null }>();
+      WHERE p.id = ?1 AND ${communityProductsVisible("''", schema)} AND ${merchantBlockSql('?2', 'm')} LIMIT 1`
+  ).bind(id, viewer).first<{ id: string; merchant_id: string; category: string | null; material: string | null }>());
   if (!anchor) throw anchorMissing('Product');
   const cat = String(anchor.category ?? '').trim().toLowerCase();
   const mat = String(anchor.material ?? '').trim().toLowerCase();
   const root = rootDomainFrom(c.env);
+  // The anchor was public on this database, so the column is there: no second try is needed.
   const { results } = await db.prepare(
     `SELECT p.*, s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo_key,
             (CASE WHEN ?2 <> '' AND lower(COALESCE(p.category, '')) = ?2 THEN 1 ELSE 0 END)

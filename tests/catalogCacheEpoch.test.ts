@@ -15,9 +15,9 @@ import { CATALOG_CACHE_EPOCH, withCacheEpoch } from '../worker/lib/publicApi/cac
 import { canonicalKey } from '../worker/lib/edgePolicy';
 
 test('withCacheEpoch appends the epoch last, after any declared parameter', () => {
-  assert.equal(CATALOG_CACHE_EPOCH, 'catalog-only-2026-10-15');
-  assert.equal(withCacheEpoch('https://levonis-iq.com/api/catalog/tree'), 'https://levonis-iq.com/api/catalog/tree?__cv=catalog-only-2026-10-15');
-  assert.equal(withCacheEpoch('https://levonis-iq.com/api/products?page=2'), 'https://levonis-iq.com/api/products?page=2&__cv=catalog-only-2026-10-15');
+  assert.equal(CATALOG_CACHE_EPOCH, 'merchant-approval-2026-10-18');
+  assert.equal(withCacheEpoch('https://levonis-iq.com/api/catalog/tree'), 'https://levonis-iq.com/api/catalog/tree?__cv=merchant-approval-2026-10-18');
+  assert.equal(withCacheEpoch('https://levonis-iq.com/api/products?page=2'), 'https://levonis-iq.com/api/products?page=2&__cv=merchant-approval-2026-10-18');
   const key = canonicalKey('https://levonis-iq.com/api/products?page=2&junk=1', ['page']);
   assert.equal(new URL(key.url).searchParams.get('__cv'), CATALOG_CACHE_EPOCH);
   assert.equal(new URL(key.url).searchParams.get('junk'), null);

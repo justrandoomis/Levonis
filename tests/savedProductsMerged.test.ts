@@ -24,7 +24,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { asD1, freshDb, stubApp, get, json, type StubUser } from './fixtures/app';
+import { approveMerchants, asD1, freshDb, stubApp, get, json, type StubUser } from './fixtures/app';
 import { communityFavoriteRoutes } from '../worker/routes/communityFavorites';
 
 const buyer: StubUser = { id: 'u1', role: 'customer', email: 'b@x.co' };
@@ -63,6 +63,7 @@ function seed(raw: DatabaseSync): void {
     INSERT INTO favorites (user_id, product_id, created_at)
       VALUES ('u1', 'p1', '2026-02-01T00:00:00.000Z');
   `);
+  approveMerchants(raw);
 }
 
 async function list(raw: DatabaseSync): Promise<Item[]> {
@@ -168,6 +169,7 @@ test('the two saves are distinguishable even when the ids collide', async () => 
     INSERT INTO community_product_favorites (user_id, product_id) VALUES ('u1', 'same');
     INSERT INTO favorites (user_id, product_id) VALUES ('u1', 'same');
   `);
+  approveMerchants(raw);
   const items = await list(raw);
   assert.equal(items.length, 2, 'both survive — neither overwrites the other');
   assert.deepEqual([...items.map((i) => i.source)].sort(), ['catalog', 'store']);

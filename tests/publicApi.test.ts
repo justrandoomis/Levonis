@@ -28,7 +28,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { APEX, MERCHANT_HOST, asD1, ctx, freshDb, pending } from './fixtures/app';
+import { approveMerchants, APEX, MERCHANT_HOST, asD1, ctx, freshDb, pending } from './fixtures/app';
 import { seedLiveCatalog } from './fixtures/liveCatalog';
 import { validate } from './fixtures/jsonSchema';
 import worker from '../worker/index';
@@ -172,6 +172,7 @@ async function world(opts: { communityOpen?: boolean } = {}) {
   raw.exec(`INSERT INTO community_merchants (id, user_id, name, bio, governorate, phone, status, status_reason, verified, badge, rating_avg_x100, rating_count, completed_orders, created_at)
             VALUES ('mch_ali7q', 'usr_owner7q', 'Ali Prints', 'Honest prints', 'MERCHANT-GOV-SECRET', 'MERCHANT-PHONE-SECRET', 'active', '', 1, 'trusted', 450, 2, 7, '2026-08-01T00:00:00.000Z'),
                    ('mch_ban7q', 'usr_ban7q', 'SUSPENDED-SHOP-SECRET', '', '', '', 'suspended', 'SANCTION-REASON-SECRET', 0, 'new', 0, 0, 0, '2026-08-02T00:00:00.000Z')`);
+  approveMerchants(raw);
   raw.prepare(
     `INSERT INTO merchant_stores (id, merchant_id, user_id, slug, name, tagline, description, logo_key, banner_key, governorate,
                                  categories, service_areas, contact_phone, contact_phone_public, business_hours, policies, social_links,

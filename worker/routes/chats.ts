@@ -27,6 +27,7 @@ import {
   type StoreOpen,
 } from '../lib/chatCards';
 import { storeById } from '../lib/merchantAuth';
+import { approvedAtSql, merchantApproved, merchantIsPublic, publicStoreUnavailable, storeIsPublic, withApprovalSchema } from '../lib/merchantApproval';
 import { storeTakesOrders } from '../lib/storeOrderOps';
 import { merchantTakesNewWork } from '../lib/communityRequests';
 import { blockedEither } from './communityPosts';
@@ -408,6 +409,27 @@ export async function openStoreThread(
 }
 
 /**
+ * HAS THIS CUSTOMER ALREADY GOT BUSINESS WITH THIS MERCHANT? (E12.) A
+ * conversation both accounts are members of (the store's thread with them,
+ * a request's, or their personal one), a store order, or a community order.
+ * The question a new thread to a merchant the public may not see asks before
+ * refusing: existing work stays open.
+ */
+async function customerKnowsMerchant(db: D1Database, customerId: string, merchantId: string, merchantUserId: string): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT
+         EXISTS (SELECT 1 FROM chat_participants a JOIN chat_participants b ON b.chat_id = a.chat_id AND b.user_id = ?3
+                  WHERE a.user_id = ?1) AS thread,
+         EXISTS (SELECT 1 FROM orders o WHERE o.user_id = ?1 AND o.merchant_id = ?2) AS store_order,
+         EXISTS (SELECT 1 FROM community_orders co WHERE co.customer_id = ?1 AND co.merchant_id = ?2) AS community_order`
+    )
+    .bind(customerId, merchantId, merchantUserId)
+    .first<{ thread: number; store_order: number; community_order: number }>();
+  return !!row && (Number(row.thread) === 1 || Number(row.store_order) === 1 || Number(row.community_order) === 1);
+}
+
+/**
  * Opens (or returns) a chat.
  *
  * TWO KINDS, and the difference matters. `{userId}` is the general direct
@@ -575,13 +597,26 @@ chatRoutes.post('/open', async (c) => {
   let otherUserId: string;
   if (body.merchantId !== undefined && body.userId === undefined) {
     const merchantId = str(body.merchantId, 'merchantId', { min: 1, max: 60 });
-    const m = await c.env.DB.prepare(
-      'SELECT m.user_id, s.id AS store_id FROM community_merchants m LEFT JOIN merchant_stores s ON s.merchant_id = m.id WHERE m.id = ?'
-    )
-      .bind(merchantId)
-      .first<{ user_id: string; store_id: string | null }>();
+    const m = await withApprovalSchema((schema) =>
+      c.env.DB.prepare(
+        `SELECT m.user_id, m.status, ${approvedAtSql('m', schema)} AS approved_at, s.id AS store_id, s.status AS store_status
+           FROM community_merchants m LEFT JOIN merchant_stores s ON s.merchant_id = m.id WHERE m.id = ?`
+      )
+        .bind(merchantId)
+        .first<{ user_id: string; status: string; approved_at: string | null; store_id: string | null; store_status: string | null }>()
+    );
     if (!m) throw notFound('Store not found');
     if (m.user_id === user.id) throw badRequest('You cannot chat with yourself');
+    /*
+     * E12 (Community V3 push 1.4): A NEW conversation by merchant id only with
+     * a merchant the public may see — not suspended, approved, its store not
+     * suspended. Anyone else answers the one generic refusal the storefront
+     * gives (C9), UNLESS this customer already has business with them: an
+     * order, or a conversation already open. Those go on — finishing existing
+     * work is never closed.
+     */
+    const isPublic = merchantIsPublic(m) && (!m.store_id || storeIsPublic({ status: m.store_status }));
+    if (!isPublic && !(await customerKnowsMerchant(c.env.DB, user.id, merchantId, m.user_id))) throw publicStoreUnavailable();
     if (m.store_id) {
       const chatId = await openStoreThread(c.env.DB, {
         contextType: 'store',
@@ -682,6 +717,7 @@ chatRoutes.get('/:id', async (c) => {
         (await merchantTakesNewWork(c.env.DB, {
           merchantStatus: ctx.merchant.status,
           storeStatus: ctx.store.status,
+          merchantApproved: merchantApproved(ctx.merchant),
           ownerUserId: ctx.store.user_id,
         }));
       store = {

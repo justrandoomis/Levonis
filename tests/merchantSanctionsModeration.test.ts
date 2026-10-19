@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  freshDb, dbThrough, asD1, stubApp, post, patch, get, json, row, all, type StubUser,
+  freshDb, dbThrough, asD1, stubApp, post, patch, get, json, row, all, type StubUser, approveMerchants,
 } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 import { adminCommunityRoutes } from '../worker/routes/adminCommunity';
@@ -46,6 +46,7 @@ function seed(opts: { storeStatus?: string; merchantStatus?: string; plus?: bool
       VALUES ('od1','buyer','delivered',14000,'m1','s1','merchant','store_product','{}','d','{}','wallet',14000,1500,0);
     INSERT INTO merchant_reviews (id,merchant_id,customer_id,order_id,rating,body) VALUES ('rv1','m1','buyer','od1',5,'great');
   `);
+  approveMerchants(raw);
   if (opts.plus !== false) {
     raw.exec(`INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,starts_at,expires_at)
               VALUES ('mem1','owner','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','${FUTURE}')`);
@@ -314,6 +315,7 @@ test('migration 0118 hands a store the OLD cascade suspended back to its merchan
       ('boss','admin.product_hidden','pRepublished','{}','2026-05-01T00:00:00.000Z'),
       ('u3','merchant.product_updated','pRepublished','{}','2026-05-02T00:00:00.000Z');
   `);
+  approveMerchants(raw);
   raw.exec(readFileSync(join(ROOT, 'migrations/0118_sanctions_moderation_store_chats.sql'), 'utf8'));
 
   const stores = Object.fromEntries(

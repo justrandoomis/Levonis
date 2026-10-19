@@ -21,7 +21,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, put, get, patch, json, count, row, all, type Mount } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, put, get, patch, json, count, row, all, type Mount } from './fixtures/app';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { printRequestRoutes } from '../worker/routes/printRequests';
 import { merchantPrinterRoutes } from '../worker/routes/merchantPrinters';
@@ -96,6 +96,7 @@ function seed() {
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','${RATE}');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   return raw;
 }
 
@@ -568,6 +569,7 @@ test('the backfill ties a typed printer to its canonical machine and queues ever
     INSERT INTO community_request_matches (id,request_id,merchant_id,eligible,reject_reason) VALUES ('x','r','m',0,'MATERIAL');
     INSERT INTO model_view_tokens (token_hash,file_id,request_id,created_by,expires_at) SELECT 'h', 'f', 'r', 'c', '2099-01-01' WHERE 0;
   `);
+  approveMerchants(raw);
   for (const f of ['0132_eligibility_capability_stock.sql', '0133_eligibility_backfill.sql']) {
     const { readFileSync } = await import('node:fs');
     raw.exec(readFileSync(new URL(`../migrations/${f}`, import.meta.url), 'utf8'));

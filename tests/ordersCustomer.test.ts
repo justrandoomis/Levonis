@@ -22,6 +22,7 @@ import { ROOT, SqliteD1 } from './fixtures/d1';
 import type { AppContext } from '../worker/lib/types';
 import { HttpError } from '../worker/lib/http';
 import { orderRoutes } from '../worker/routes/orders';
+import { approveMerchants } from './fixtures/app';
 
 const ORDER_COLS = `id, user_id, status, stage, shipping_type, address_snapshot, delivery_method_id, delivery_method_snapshot,
   payment_method_id, subtotal_iqd, shipping_iqd, exchange_rate, total_iqd, due_on_delivery_iqd, delivered_at, created_at, updated_at`;
@@ -131,6 +132,7 @@ function storeOwned(raw: ReturnType<typeof setup>['raw'], orderId: string) {
       VALUES ('s_ali','m_ali','ali','ali3d','Ali 3D','active','{"fee_iqd":9999}','merchants/ali/public/logo0001.webp','07700000000',0);
     UPDATE orders SET seller_type = 'merchant', merchant_id = 'm_ali', store_id = 's_ali' WHERE id = '${orderId}';
   `);
+  approveMerchants(raw);
 }
 
 test('a store order carries the shop’s public identity on the list and the order; a platform order carries null', async () => {

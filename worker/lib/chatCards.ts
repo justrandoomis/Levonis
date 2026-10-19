@@ -31,6 +31,7 @@ import { HttpError, badRequest } from './http';
 import { newId } from './crypto';
 import { isSchemaMissing } from './membershipBenefits';
 import { threadRole, type StoreThread } from './chatThread';
+import { approvedAtSql, merchantIsPublic, storeIsPublic, withApprovalSchema } from './merchantApproval';
 
 export const CARD_TYPES = ['product', 'custom_product', 'print_request', 'quote', 'order', 'custom_order', 'store'] as const;
 export type CardType = (typeof CARD_TYPES)[number];
@@ -612,9 +613,18 @@ async function storeCurrents(
 ): Promise<Map<string, CardCurrent>> {
   const out = new Map<string, CardCurrent>();
   const ids = [...new Set(rows.map((r) => r.card_ref))];
-  const { results } = await env.DB.prepare('SELECT id, name, status FROM merchant_stores WHERE id IN (SELECT value FROM json_each(?))')
-    .bind(JSON.stringify(ids))
-    .all<{ id: string; name: string; status: string }>();
+  // The merchant's status and approval ride along (push 1.4): a store card
+  // offers «عرض» only to a store the public may see; NULL stamp on a database
+  // without 0204 — no link, closed.
+  const { results } = await withApprovalSchema((schema) =>
+    env.DB.prepare(
+      `SELECT s.id, s.name, s.status, m.status AS merchant_status, ${approvedAtSql('m', schema)} AS approved_at
+         FROM merchant_stores s JOIN community_merchants m ON m.id = s.merchant_id
+        WHERE s.id IN (SELECT value FROM json_each(?))`
+    )
+      .bind(JSON.stringify(ids))
+      .all<{ id: string; name: string; status: string; merchant_status: string; approved_at: string | null }>()
+  );
   const byId = new Map((results ?? []).map((s) => [s.id, s]));
   for (const r of rows) {
     const s = byId.get(r.card_ref);
@@ -622,9 +632,10 @@ async function storeCurrents(
       out.set(r.id, { status: 'unavailable', actions: [] });
       continue;
     }
-    // A suspended store is «غير متاح» to the customer — never why.
+    // A store the public may not see is «غير متاح» to the customer — never why.
     const open = s.status === 'active' && (await storeOpen(s.id));
-    out.set(r.id, { status: open ? 'open' : 'closed', actions: s.status === 'suspended' ? [] : ['view'], name: s.name });
+    const visible = storeIsPublic(s) && merchantIsPublic({ status: s.merchant_status, approved_at: s.approved_at });
+    out.set(r.id, { status: open ? 'open' : 'closed', actions: visible ? ['view'] : [], name: s.name });
   }
   return out;
 }

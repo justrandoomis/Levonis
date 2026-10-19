@@ -43,7 +43,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { OWNER, MemoryBucket, asD1, freshDb, get, json, post, stubApp, type App, type Mount, type StubUser } from './fixtures/app';
+import { approveMerchants, OWNER, MemoryBucket, asD1, freshDb, get, json, post, stubApp, type App, type Mount, type StubUser } from './fixtures/app';
 import { leaks } from './fixtures/costlyProduct';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { printRequestRoutes } from '../worker/routes/printRequests';
@@ -156,6 +156,7 @@ function shop(opts: { ownerTypedCard?: boolean } = {}): DatabaseSync {
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','1400');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   raw
     .prepare(`INSERT OR REPLACE INTO admin_settings (key, value) VALUES ('printPricingConfig', ?)`)
     .run(JSON.stringify({ ...DEFAULT_PRICING, machine_hour_iqd: { fdm: PLATFORM_HOUR_FDM, resin: PLATFORM_HOUR_RESIN } }));

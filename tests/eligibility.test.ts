@@ -41,7 +41,7 @@ const printer = (o: Partial<CapabilityPrinter> = {}): CapabilityPrinter => ({
 });
 const prefs = (o: Partial<MerchantPrefs> = {}): MerchantPrefs => ({ ...EMPTY_PREFS, ...o });
 const shop = (o: Partial<EligibilityCandidate> = {}): EligibilityCandidate => ({
-  merchant_id: 'm1', user_id: 'u1', merchant_status: 'active', store_status: 'active', store_id: 's1',
+  merchant_id: 'm1', user_id: 'u1', merchant_status: 'active', approved: true, store_status: 'active', store_id: 's1',
   accepts_custom_requests: true, plan_ok: true, printers: [printer()], stock: 'untracked',
   reach: { profile: { ...DEFAULT_DELIVERY_PROFILE, version: 1 }, rules: [] }, prefs: prefs(),
   request_opportunities: true, ...o,
@@ -67,6 +67,8 @@ const TABLE: Array<[string, EligibilityCandidate, EligibilityRequest, string]> =
   ['request left the board', shop(), job({ on_board: false }), 'REQUEST_CLOSED'],
   ['own request', shop({ user_id: 'c1' }), job(), 'OWN_REQUEST'],
   ['merchant restricted', shop({ merchant_status: 'restricted' }), job(), 'MERCHANT_INACTIVE'],
+  // Community V3 push 1.4 (E7): a workshop no reviewer approved takes no new work, so it is never eligible.
+  ['merchant not approved', shop({ approved: false }), job(), 'MERCHANT_INACTIVE'],
   ['store paused', shop({ store_status: 'paused' }), job(), 'STORE_UNAVAILABLE'],
   ['no store row at all', shop({ store_status: '' }), job(), 'STORE_UNAVAILABLE'],
   ['plan lapsed', shop({ plan_ok: false }), job(), 'PLAN_LAPSED'],

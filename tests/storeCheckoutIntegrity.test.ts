@@ -28,7 +28,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import {
-  freshDb, asD1, failingD1, stubApp, post, get, patch, json, count, row, all, holds, spendable, pending,
+  freshDb, asD1, failingD1, stubApp, post, get, patch, json, count, row, all, holds, spendable, pending, approveMerchants,
 } from './fixtures/app';
 import { cartRoutes } from '../worker/routes/cart';
 import { storeOrderRoutes } from '../worker/routes/storeOrders';
@@ -70,6 +70,7 @@ function seed(raw: DatabaseSync, opts: { aliDelivery?: string; aliPlus?: boolean
       ('dep_buyer','buyer','deposit','USD',${DEP},'approved','seed'),
       ('dep_ali','ali','deposit','USD',${DEP},'approved','seed');
   `);
+  approveMerchants(raw);
   // The store entitlement belongs to the OWNER (PLUS, PREMIUM or PRO).
   if (opts.aliPlus !== false) {
     raw.exec(`INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,starts_at,expires_at)

@@ -33,6 +33,7 @@ import {
   pendingOrderNotice,
 } from './merchantNotify';
 import { pruneStorefrontAnalytics } from './storefrontAnalytics';
+import { storeUnsanctionedSql } from './merchantApproval';
 
 export const COUPON_ENDING_DAYS = 3;
 export const PENDING_ORDER_HOURS = 24;
@@ -148,7 +149,7 @@ export async function runMerchantSweeps(env: Env, nowIso: string, opts: { forceD
           WHERE c.active = 1 AND c.ends_at IS NOT NULL AND c.ends_at <> ''
             AND c.ends_at > ?1 AND c.ends_at <= ?2
             AND (c.max_uses IS NULL OR c.used_count < c.max_uses)
-            AND s.status <> 'suspended'
+            AND ${storeUnsanctionedSql('s')}
           ORDER BY c.ends_at
           LIMIT ${BATCH}`
       )

@@ -20,7 +20,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, put, get, json, row, type App, type Mount, type StubUser } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, put, get, json, row, type App, type Mount, type StubUser } from './fixtures/app';
 import { merchantPrinterRoutes } from '../worker/routes/merchantPrinters';
 import { storefrontRoutes } from '../worker/routes/storefront';
 import { wavesD1 } from './fixtures/wavesD1';
@@ -52,6 +52,7 @@ function seed() {
       ('p1','m1','s1','P1S','fdm',256,256,250,'["pla","petg"]');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);
+  approveMerchants(raw);
   return raw;
 }
 

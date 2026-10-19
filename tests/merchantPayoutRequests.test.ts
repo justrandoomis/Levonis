@@ -20,7 +20,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, get, json, count, row, type StubUser } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, get, json, count, row, type StubUser } from './fixtures/app';
 import { serialD1 } from './fixtures/serialD1';
 import { merchantPayoutRoutes } from '../worker/routes/merchantFinance';
 import { adminCommunityRoutes } from '../worker/routes/adminCommunity';
@@ -35,6 +35,7 @@ function seed(available = 50_000): DatabaseSync {
     INSERT INTO community_merchants (id,user_id,name,status) VALUES ('m_ali','ali','Ali 3D','active'), ('m_zed','zed','Zed','active');
     INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name,status) VALUES ('s_ali','m_ali','ali','ali3d','Ali 3D','active'), ('s_zed','m_zed','zed','zed3d','Zed','active');
   `);
+  approveMerchants(raw);
   raw.prepare(
     `INSERT INTO merchant_ledger_entries (id,merchant_id,store_id,order_id,kind,bucket,amount_iqd,event_key)
      VALUES ('seed','m_ali','s_ali','ORD-S','sale_gross','available',?,'sale:ORD-S:gross')`

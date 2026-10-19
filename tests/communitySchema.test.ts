@@ -23,6 +23,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
+import { approveMerchants } from './fixtures/app';
 
 const MIGRATIONS = join(ROOT, 'migrations');
 const files = () => readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort();
@@ -149,6 +150,7 @@ function seedMerchant(db: DatabaseSync): void {
     INSERT INTO community_products (id,merchant_id,store_id,slug,name,price_iqd)
       VALUES ('cp1','m1','s1','bracket','Bracket',5000);
   `);
+  approveMerchants(db);
 }
 
 // -------------------------------------------------------------- cart rules

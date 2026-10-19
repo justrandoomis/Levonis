@@ -21,7 +21,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import { dbThrough, asD1, all, count, row } from './fixtures/app';
+import { approveMerchants, dbThrough, asD1, all, count, row } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 import { financeSummary, legacyParity, merchantBuckets } from '../worker/lib/merchantLedger';
 
@@ -64,6 +64,7 @@ function legacyDb(): DatabaseSync {
     INSERT INTO community_escrows (id,community_order_id,customer_id,merchant_id,gross_iqd,platform_fee_iqd,merchant_receivable_iqd,state) VALUES
       ('e1','co1','buyer','m1',50000,2500,47500,'released'), ('e2','co2','buyer','m1',20000,1000,19000,'partially_refunded');
   `);
+  approveMerchants(raw);
   // 1 · wave-1 sale, pending: goods 18,000 (after a 2,000 coupon), 5% = 900, delivery 3,000 → 20,100.
   storeOrder(raw, 'ORD-1', 'm1', 's1', 20000, 2000, 900, 3000);
   // 2 · pre-wave-1 sale released by the merchant's tap, delivery NOT credited: 10,000 − 500 = 9,500.

@@ -12,7 +12,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freshDb, asD1, stubApp, patch, post, json, row, type StubUser } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, patch, post, json, row, type StubUser } from './fixtures/app';
 import { merchantRoutes } from '../worker/routes/merchant';
 import { couponPhase, dayToIso, isoToDay, windowProblem } from '../src/components/merchant/dashboard/couponDates';
 
@@ -59,6 +59,7 @@ function seed() {
     INSERT INTO community_merchants (id,user_id,name) VALUES ('m1','owner','Ali 3D');
     INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name,status) VALUES ('s1','m1','owner','ali3d','Ali 3D','active');
   `);
+  approveMerchants(raw);
   return raw;
 }
 const app = (raw: ReturnType<typeof freshDb>) => stubApp(asD1(raw), OWNER, (a) => a.route('/api/merchant', merchantRoutes));

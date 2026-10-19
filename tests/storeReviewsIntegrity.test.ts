@@ -12,7 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  freshDb, asD1, stubApp, post, get, send, json, row, all, count, pending, type StubUser,
+  freshDb, asD1, stubApp, post, get, send, json, row, all, count, pending, type StubUser, approveMerchants,
 } from './fixtures/app';
 import { communityReviewRoutes, refreshStaleMerchantBadges } from '../worker/routes/merchantReviews';
 import { storefrontRoutes } from '../worker/routes/storefront';
@@ -37,6 +37,7 @@ function seed() {
       ('od_buyer','buyer','delivered',1000,'m1','s1','merchant','store_product','{}','d','{}','wallet',1000,1500,0),
       ('od_self','owner','delivered',1000,'m1','s1','merchant','store_product','{}','d','{}','wallet',1000,1500,0);
   `);
+  approveMerchants(raw);
   return raw;
 }
 
@@ -161,6 +162,7 @@ test('#24: a badge earned by completed orders is written by the scheduled sweep,
   raw.exec(`UPDATE community_merchants SET completed_orders = 10, rating_count = 5, rating_avg_x100 = 450, badge = 'new' WHERE id = 'm1'`);
   raw.exec(`INSERT INTO users (id,name,email,password_hash) VALUES ('u2','Z','z@x.co','h');
             INSERT INTO community_merchants (id,user_id,name,badge,badge_override,completed_orders) VALUES ('m2','u2','Pinned','new','elite',0);`);
+  approveMerchants(raw);
   const fixed = await refreshStaleMerchantBadges(asD1(raw));
   assert.equal(row<{ badge: string }>(raw, "SELECT badge FROM community_merchants WHERE id = 'm1'")!.badge, 'trusted');
   assert.equal(row<{ badge: string }>(raw, "SELECT badge FROM community_merchants WHERE id = 'm2'")!.badge, 'elite', 'an admin override wins');

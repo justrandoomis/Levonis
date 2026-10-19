@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, json, post, get, row, count, type App } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, json, post, get, row, count, type App } from './fixtures/app';
 import { applyRate } from './fixtures/fx';
 import { ROOT } from './fixtures/d1';
 import { walletRoutes } from '../worker/routes/wallet';
@@ -260,6 +260,7 @@ function communityOrder(raw: DatabaseSync) {
       (id,request_id,offer_id,customer_id,merchant_id,price_iqd,commission_percent_x100,platform_fee_iqd,merchant_receivable_iqd)
       VALUES ('co1','r1','o1','buyer','m1',50000,1000,5000,45000);
   `);
+  approveMerchants(raw);
 }
 
 const holdCommunityOrder = (db: D1Database) =>

@@ -24,7 +24,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { APEX, MERCHANT_HOST, asD1, ctx, freshDb, pending } from './fixtures/app';
+import { APEX, MERCHANT_HOST, approveMerchants, asD1, ctx, freshDb, pending } from './fixtures/app';
 import { fixtureWebp, iconEnv, imagesStub } from './fixtures/storeIcons';
 import worker from '../worker/index';
 import { buildWebManifest, PLATFORM_NAME, type WebManifest } from '../worker/lib/webManifest';
@@ -291,6 +291,8 @@ function seed(raw: DatabaseSync, over: Partial<{ name: string; tagline: string; 
        VALUES ('s1','m1','u1','somestore',?,?,?)`
     )
     .run(over.name ?? 'Ali 3D', over.tagline ?? '', over.logo === undefined ? 'merchants/u1/public/abc.webp' : over.logo);
+  // A shop the public sees: an approved merchant (push 1.4, DECISIONS row 259).
+  approveMerchants(raw);
 }
 
 /** A D1 that counts how many statements were prepared, so "no read" can be asserted. */

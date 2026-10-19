@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, get, send, json, row, count, all, pending, type Mount } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, get, send, json, row, count, all, pending, type Mount } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 import { communityRoutes } from '../worker/routes/community';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
@@ -42,6 +42,7 @@ function seed() {
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityRequestExpiryDays','30');
   `);
+  approveMerchants(raw);
   return raw;
 }
 

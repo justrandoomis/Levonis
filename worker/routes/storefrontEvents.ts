@@ -26,6 +26,7 @@ import { rateLimit } from '../lib/ratelimit';
 import { sha256Hex } from '../lib/crypto';
 import { baghdadDay } from '../lib/baghdadTime';
 import { rootDomainFrom } from '../lib/hosts';
+import { approvedAtSql, merchantIsPublic, storeIsPublic, withApprovalSchema } from '../lib/merchantApproval';
 import {
   PRODUCT_EVENTS,
   STOREFRONT_EVENTS,
@@ -123,8 +124,8 @@ storefrontEventRoutes.post('/', async (c) => {
   // Per minute, by account or by network — the network hashed, never stored raw.
   await rateLimit(c, 'storefront-events', 240, 60, user ? undefined : (await sha256Hex(`net\n${network}`)).slice(0, 24));
 
-  const store = await c.env.DB.prepare(
-    `SELECT s.id, s.slug, s.user_id, s.status, m.status AS merchant_status,
+  const store = await withApprovalSchema((schema) => c.env.DB.prepare(
+    `SELECT s.id, s.slug, s.user_id, s.status, m.status AS merchant_status, ${approvedAtSql('m', schema)} AS approved_at,
             (SELECT p.id FROM community_products p
               WHERE p.id = ?2 AND p.store_id = s.id AND p.status = 'active') AS product_id
        FROM merchant_stores s
@@ -132,11 +133,12 @@ storefrontEventRoutes.post('/', async (c) => {
       WHERE s.id = ?1`
   )
     .bind(storeId, productId)
-    .first<{ id: string; slug: string; user_id: string; status: string; merchant_status: string; product_id: string | null }>();
+    .first<{ id: string; slug: string; user_id: string; status: string; merchant_status: string; approved_at: string | null; product_id: string | null }>());
   if (!store) return noCount();
-  // A sanctioned store serves nothing of itself (owner decision 2026-09-24),
-  // so nothing about it is being viewed.
-  if (store.status === 'suspended' || store.merchant_status === 'suspended') return noCount();
+  // A store the public may not see serves nothing of itself (owner decision
+  // 2026-09-24; push 1.4: a sanction, or no approval), so nothing about it is
+  // being viewed.
+  if (!storeIsPublic(store) || !merchantIsPublic({ status: store.merchant_status, approved_at: store.approved_at })) return noCount();
   // The store's own owner looking at their shop is not traffic.
   if (user && user.id === store.user_id) return noCount();
   if (isProductEvent && store.product_id !== productId) return noCount();
@@ -228,17 +230,19 @@ async function ingestVitals(c: Context<AppContext>) {
   // read is harmless when the limit then refuses.
   const [, store] = await Promise.all([
     rateLimit(c, 'storefront-vitals', 120, 60, user ? undefined : (await sha256Hex(`net\n${network}`)).slice(0, 24)),
-    c.env.DB.prepare(
-      `SELECT s.id, s.user_id, s.status, m.status AS merchant_status
-         FROM merchant_stores s
-         JOIN community_merchants m ON m.id = s.merchant_id
-        WHERE s.id = ?1`
-    )
-      .bind(storeId)
-      .first<{ id: string; user_id: string; status: string; merchant_status: string }>(),
+    withApprovalSchema((schema) =>
+      c.env.DB.prepare(
+        `SELECT s.id, s.user_id, s.status, m.status AS merchant_status, ${approvedAtSql('m', schema)} AS approved_at
+           FROM merchant_stores s
+           JOIN community_merchants m ON m.id = s.merchant_id
+          WHERE s.id = ?1`
+      )
+        .bind(storeId)
+        .first<{ id: string; user_id: string; status: string; merchant_status: string; approved_at: string | null }>()
+    ),
   ]);
   if (!store) return noCount();
-  if (store.status === 'suspended' || store.merchant_status === 'suspended') return noCount();
+  if (!storeIsPublic(store) || !merchantIsPublic({ status: store.merchant_status, approved_at: store.approved_at })) return noCount();
   // The store's own owner measuring their own shop is not a visitor.
   if (user && user.id === store.user_id) return noCount();
 

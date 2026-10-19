@@ -33,6 +33,7 @@ import { onPublicBoard, type RequestForAccess } from './communityRequests';
 import { effectiveMaterial, effectiveProcess, parseDims } from './requestRevisions';
 import { safeParse } from './types';
 import { isSchemaMissing } from './membershipBenefits';
+import { approvedAtSql, merchantApproved, withApprovalSchema } from './merchantApproval';
 import {
   EMPTY_PREFS,
   QUALITIES,
@@ -251,39 +252,33 @@ async function plannedOwners(db: D1Database, userIds: string[]): Promise<Set<str
 }
 
 /**
- * Workshops with everything eligibility reads: status, store, plan, printers
- * (resolved), stock, delivery reach, preferences and the notification switch.
- * `merchantIds` = these merchants whatever their status (a live verdict must
- * be able to say MERCHANT_INACTIVE); omitted = every ACTIVE merchant (the
- * publish and the request re-match — an inactive one cannot be eligible).
+ * Workshops with everything eligibility reads: status, approval, store, plan,
+ * printers (resolved), stock, delivery reach, preferences and the
+ * notification switch. `merchantIds` = these merchants whatever their status
+ * (a live verdict must be able to say MERCHANT_INACTIVE); omitted = every
+ * ACTIVE, APPROVED merchant (the publish and the request re-match — an
+ * inactive or unapproved one cannot be eligible, so it is never told about a
+ * request: Community V3 push 1.4, E7). The approval stamp reads NULL on a
+ * database without 0204 — nobody is matched there (C11).
  */
 export async function loadCandidates(db: D1Database, merchantIds?: string[]): Promise<Candidate[]> {
-  const merchants = merchantIds
-    ? await db
-        .prepare(
-          `SELECT m.id, m.user_id, m.status, m.governorate, m.rating_avg_x100, m.rating_count, m.completed_orders,
+  const merchants = await withApprovalSchema((schema) => {
+    const columns = `m.id, m.user_id, m.status, ${approvedAtSql('m', schema)} AS approved_at, m.governorate, m.rating_avg_x100, m.rating_count, m.completed_orders,
                   s.id AS store_id, s.status AS store_status, s.accepts_custom_requests,
                   s.governorate AS store_governorate, s.delivery_settings,
                   COALESCE(np.request_opportunities, 1) AS request_opportunities
              FROM community_merchants m
              LEFT JOIN merchant_stores s ON s.merchant_id = m.id
-             LEFT JOIN merchant_notification_preferences np ON np.merchant_id = m.id
-            WHERE m.id IN (SELECT value FROM json_each(?))`
-        )
-        .bind(JSON.stringify([...new Set(merchantIds)]))
-        .all<Record<string, unknown>>()
-    : await db
-        .prepare(
-          `SELECT m.id, m.user_id, m.status, m.governorate, m.rating_avg_x100, m.rating_count, m.completed_orders,
-                  s.id AS store_id, s.status AS store_status, s.accepts_custom_requests,
-                  s.governorate AS store_governorate, s.delivery_settings,
-                  COALESCE(np.request_opportunities, 1) AS request_opportunities
-             FROM community_merchants m
-             LEFT JOIN merchant_stores s ON s.merchant_id = m.id
-             LEFT JOIN merchant_notification_preferences np ON np.merchant_id = m.id
-            WHERE m.status = 'active'`
-        )
-        .all<Record<string, unknown>>();
+             LEFT JOIN merchant_notification_preferences np ON np.merchant_id = m.id`;
+    return merchantIds
+      ? db
+          .prepare(`SELECT ${columns} WHERE m.id IN (SELECT value FROM json_each(?))`)
+          .bind(JSON.stringify([...new Set(merchantIds)]))
+          .all<Record<string, unknown>>()
+      : db
+          .prepare(`SELECT ${columns} WHERE m.status = 'active' AND ${schema ? 'm.approved_at IS NOT NULL' : '0'}`)
+          .all<Record<string, unknown>>();
+  });
   const rows = merchants.results ?? [];
   if (!rows.length) return [];
   const ids = JSON.stringify(rows.map((m) => String(m.id)));
@@ -353,6 +348,7 @@ export async function loadCandidates(db: D1Database, merchantIds?: string[]): Pr
       merchant_id: id,
       user_id: String(m.user_id),
       merchant_status: String(m.status ?? ''),
+      approved: merchantApproved(m),
       store_status: String(m.store_status ?? ''),
       store_id: storeId,
       accepts_custom_requests: m.accepts_custom_requests === null || m.accepts_custom_requests === undefined

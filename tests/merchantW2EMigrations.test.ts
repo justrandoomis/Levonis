@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { all, dbThrough, row, asD1, post, json, stubApp } from './fixtures/app';
+import { approveMerchants, all, dbThrough, row, asD1, post, json, stubApp } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 import { chatRoutes } from '../worker/routes/chats';
 
@@ -37,6 +37,7 @@ function legacy() {
       ('n4','buyer','chat_message','x','x','/chat/chat_s','chat','chat_s','chat_msg:m2'),
       ('n5','buyer','order_update','x','x','/orders/ORD-L','order','ORD-L','order.placed:ORD-L');
   `);
+  approveMerchants(raw);
   return raw;
 }
 

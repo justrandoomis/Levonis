@@ -107,6 +107,50 @@ export const hasColumn = (raw: DatabaseSync, table: string, column: string): boo
 
 export const asD1 = (raw: DatabaseSync) => new SqliteD1(raw) as unknown as D1Database;
 
+/** The approval stamp `approveMerchants` writes — a fixed instant, so a test's own reads compare stably. */
+export const FIXTURE_APPROVED_AT = '2026-01-01T00:00:00.000Z';
+
+/**
+ * THE MERCHANTS THIS TEST SEEDED ARE APPROVED (Community V3 push 1.4,
+ * DECISIONS row 259).
+ *
+ * Since the approval gate is enforced, a `community_merchants` row alone sells
+ * nothing and is shown nowhere (owner decision C1: missing approval is not
+ * approval). A test written about selling, offering, the directory, a
+ * storefront or a chat with a shop is about an APPROVED merchant, and says so
+ * by calling this after its seed: every merchant row present without a stamp
+ * gets one, as a reviewer's approval would leave it. Rows inserted later —
+ * by the test or by the code under test — are NOT stamped, so a door that
+ * creates a merchant without approval still reads as unapproved.
+ *
+ * A database built through a migration before 0204 has no column to stamp:
+ * nothing is written, and the code under test fails closed there (C11).
+ */
+export function approveMerchants<T extends DatabaseSync>(raw: T, at: string = FIXTURE_APPROVED_AT): T {
+  if (hasColumn(raw, 'community_merchants', 'approved_at')) {
+    raw.prepare('UPDATE community_merchants SET approved_at = ? WHERE approved_at IS NULL').run(at);
+  }
+  return raw;
+}
+
+/**
+ * A DEPLOY-AHEAD TEST ABOUT ANOTHER MIGRATION, ISOLATED FROM 0204.
+ *
+ * A database built through, say, 0149 lacks migration 0204's approval column
+ * too, and on such a database the approval gate fails CLOSED (owner decision
+ * C11, tests/merchantApprovalEnforcement.test.ts): no shop sells, none is
+ * shown. A test that proves the Worker tolerates the absence of 0150 (or any
+ * migration before 0204) adds back only 0204's two merchant columns, so the
+ * one absence it is about stays the only one; `approveMerchants` then stamps
+ * its shops as usual.
+ */
+export function withApprovalColumns<T extends DatabaseSync>(raw: T): T {
+  if (!hasColumn(raw, 'community_merchants', 'approved_at')) {
+    raw.exec('ALTER TABLE community_merchants ADD COLUMN approved_at TEXT; ALTER TABLE community_merchants ADD COLUMN approved_application_id TEXT;');
+  }
+  return raw;
+}
+
 // node:sqlite hands back null-prototype objects; spreading them gives plain
 // objects so `assert.deepEqual` against a literal compares values only.
 export const row = <T = Record<string, unknown>>(raw: DatabaseSync, sql: string, ...params: unknown[]) => {

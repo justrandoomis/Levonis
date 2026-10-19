@@ -33,13 +33,14 @@ import { afterStorefrontWrite, purgeStorefrontAfterWrite } from '../lib/edgePoli
 import {
   requireStoreOwner,
   requireSellingPrivileges,
+  reopenRefusal,
   sellingStatus,
   merchantForUser,
   storeForUser,
   type StoreContext,
 } from '../lib/merchantAuth';
 import { checkSlug, suggestSlug, SLUG_RESERVATION_DAYS } from '../lib/merchantOps';
-import { applicationRequiredRefusal, applicationSummaryOf, merchantApprovalOf } from '../lib/merchantApproval';
+import { applicationRequiredRefusal, applicationSummaryOf, merchantApprovalOf, merchantApproved, merchantNotApprovedRefusal } from '../lib/merchantApproval';
 import { isLostRace } from '../lib/gifts/fence';
 import { merchantBalance } from '../lib/escrowOps';
 import { orderCreditStateSql } from '../lib/merchantLedger';
@@ -387,6 +388,21 @@ merchantRoutes.patch('/store', async (c) => {
   if (body.contact_phone !== undefined)
     put('contact_phone', storeText(body.contact_phone, 'contact_phone', { min: 0, max: 32, required: false }));
   if (body.contact_phone_public !== undefined) put('contact_phone_public', body.contact_phone_public ? 1 : 0);
+  /*
+   * E9 (Community V3 push 1.4): switching direct sales or custom requests ON
+   * is a promise to take new work, so a merchant no reviewer has approved is
+   * told so plainly here — the cart, the checkout and the offer doors refuse
+   * them anyway (E5, E6). Switching either OFF, or the form echoing the value
+   * the store already has, is never refused: the rest of the save goes on.
+   */
+  const switchingOn = (v: unknown, current: unknown) => !!v && Number(current) !== 1;
+  if (
+    (switchingOn(body.accepts_custom_requests, ctx.store.accepts_custom_requests) ||
+      switchingOn(body.sells_direct_products, ctx.store.sells_direct_products)) &&
+    !merchantApproved(ctx.merchant)
+  ) {
+    throw merchantNotApprovedRefusal();
+  }
   if (body.accepts_custom_requests !== undefined)
     put('accepts_custom_requests', body.accepts_custom_requests ? 1 : 0);
   if (body.sells_direct_products !== undefined)
@@ -455,29 +471,28 @@ merchantRoutes.patch('/store', async (c) => {
       if (wantOpen) {
         throw new HttpError(403, 'This store is suspended by Levonis and cannot be re-opened from here', 'STORE_SUSPENDED');
       }
+    } else if (wantOpen && ctx.store.status === 'active') {
+      // «open» is what the store already is — the settings form echoes it on
+      // every save — so nothing is written and nothing is asked: the rest of
+      // the save goes on (the twin of the suspended branch above). Selling
+      // itself is still refused by every selling door to a merchant who may
+      // not sell (`requireSellingPrivileges`, `storeTakesOrders`).
     } else if (wantOpen) {
       // Re-opening is taking on new orders, so it asks what selling asks
-      // (worker/lib/merchantAuth.ts `requireSellingPrivileges`): a suspended
-      // merchant, or one whose store entitlement has lapsed (audit 01 B3), may
-      // pause and edit their shop but not re-open it.
-      if (ctx.merchant.status === 'suspended') {
-        throw new HttpError(403, 'This merchant account is suspended. Contact support.', 'MERCHANT_SUSPENDED');
-      }
-      if (!benefits.merchantStore(await getTierStatus(c.env.DB, ctx.store.user_id))) {
-        throw new HttpError(
-          403,
-          'Your store subscription is not active. Renew it to re-open the store.',
-          'SUBSCRIPTION_INACTIVE'
-        );
-      }
+      // (E8, push 1.4): the SHARED predicate `reopenRefusal`
+      // (worker/lib/merchantAuth.ts — `sellingVerdict` itself) instead of the
+      // inline copy this route kept, which knew nothing of approval. A
+      // suspended merchant, one whose store entitlement has lapsed (audit 01
+      // B3), or one no reviewer has approved may pause and edit their shop
+      // but not re-open it.
+      const refusal = await reopenRefusal(c.env.DB, ctx);
+      if (refusal) throw refusal;
       // An open store must be able to deliver somewhere, or offer pickup
       // (W2-A): re-opening a shop whose delivery is switched off everywhere
       // would take orders nobody can receive.
-      if (ctx.store.status !== 'active') {
-        const cfg = await loadDeliveryConfig(c.env.DB, ctx.store);
-        if (!deliveryCoverage(cfg.profile, cfg.rules).serviceable) {
-          throw new HttpError(409, 'Choose where you deliver, or offer pickup, before opening the store', 'DELIVERY_NO_COVERAGE');
-        }
+      const cfg = await loadDeliveryConfig(c.env.DB, ctx.store);
+      if (!deliveryCoverage(cfg.profile, cfg.rules).serviceable) {
+        throw new HttpError(409, 'Choose where you deliver, or offer pickup, before opening the store', 'DELIVERY_NO_COVERAGE');
       }
       put('status', 'active');
     } else {
