@@ -48,18 +48,18 @@ SELECT 'mapp_' || lower(hex(randomblob(10))),
            SELECT url FROM (
              SELECT trim(json_extract(w.value, '$.url')) AS url, 0 AS src, CAST(w.key AS INTEGER) AS ord
                FROM json_each(CASE WHEN json_valid(s.profile_links) AND json_type(s.profile_links) = 'array'
-                                   THEN s.profile_links ELSE '[]' END) w
+                                   THEN s.profile_links ELSE '[]' END ) w
               WHERE w.type = 'object' AND COALESCE(json_extract(w.value, '$.visible'), 1) <> 0
              UNION ALL
              SELECT trim(l.value), 1, 0
                FROM json_each(CASE WHEN json_valid(s.social_links) AND json_type(s.social_links) = 'object'
-                                   THEN s.social_links ELSE '{}' END) l
+                                   THEN s.social_links ELSE '{}' END ) l
               WHERE l.type = 'text'
            )
            WHERE url LIKE 'https://_%' AND length(url) <= 300 AND instr(url, ' ') = 0
              AND url NOT GLOB '*[0-9][0-9][0-9][0-9][0-9][0-9][0-9]*'
              AND instr(substr(url, 9, CASE WHEN instr(substr(url, 9), '/') > 0
-                                           THEN instr(substr(url, 9), '/') - 1 ELSE 300 END), '@') = 0
+                                           THEN instr(substr(url, 9), '/') - 1 ELSE 300 END ), '@') = 0
            GROUP BY url
            ORDER BY MIN(src), MIN(ord)
            LIMIT 5
