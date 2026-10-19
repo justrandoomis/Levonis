@@ -510,7 +510,9 @@ export function eventStatement(
  * as it was) and creates none: a new applicant's approval lives on the
  * application, and /onboard creates the merchant row with its store, stamped
  * from it. So approval creates no store and publishes nothing — no
- * store-less card in «المتاجر» (final check, row 257).
+ * store-less card in «المتاجر» (final check, row 257). The same batch queues
+ * that existing row for a re-match (`community_match_queue`), so the requests
+ * published while it waited for review reach its board.
  *
  * REVOKE ('reject' from 'approved') is the same batch with one more rule in
  * the conditional UPDATE — the user has no store (`NO_STORE_YET_SQL`) — and
@@ -590,6 +592,28 @@ export async function applyTransition(db: D1Database, req: TransitionRequest): P
             WHERE user_id = (SELECT user_id FROM merchant_applications WHERE id = ?)`
         )
         .bind(now, app.id, app.id)
+    );
+    // …and that row is queued for a RE-MATCH in the same batch. While it waited
+    // for review, every request published was matched without it (the
+    // publish-time candidates are approved workshops only), and its board
+    // re-matches only when nothing was ever decided for it or a re-match is
+    // queued — a workshop from before the gate always has old verdicts, so
+    // those requests would never reach its board, «for me» or its count. The
+    // row is the one `enqueueMatchStatement` (printMatchingStore.ts) writes,
+    // coalesced the same way; the route runs it after the response and the
+    // sweep finishes it if that pass is cut short. A new applicant has no
+    // merchant row yet: nothing is queued, and their first board visit matches
+    // them in full (`first_board`, merchantWorkshop.ts).
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO community_match_queue (kind, subject_id, reason, queued_at, attempts, last_error)
+           SELECT 'merchant', id, 'approved', ?, 0, '' FROM community_merchants
+            WHERE user_id = (SELECT user_id FROM merchant_applications WHERE id = ?)
+           ON CONFLICT (kind, subject_id) DO UPDATE SET
+             reason = excluded.reason, queued_at = excluded.queued_at, attempts = 0, last_error = ''`
+        )
+        .bind(now, app.id)
     );
   }
   if (revoke) {

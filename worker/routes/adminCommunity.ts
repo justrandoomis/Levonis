@@ -67,6 +67,7 @@ import { canMoveMoney } from '../lib/adminScope';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { reconcileRefundUnrefunded, reconcileReverseCredit, storeOrderMoneyDrift } from '../lib/storeOrderOps';
 import { merchantUnsanctionedSql } from '../lib/merchantApproval';
+import { enqueueMatchStatement, rematchAfterResponse } from '../lib/printMatchingStore';
 
 export const adminCommunityRoutes = new Hono<AppContext>();
 adminCommunityRoutes.use('*', requireAdmin);
@@ -545,9 +546,19 @@ adminCommunityRoutes.post('/merchants/:id/status', async (c) => {
     .first<{ id: string; status: string }>();
   if (!m) throw notFound('Merchant not found');
 
-  await c.env.DB.prepare(
+  // The sanction is a dimension of request eligibility: a change re-matches
+  // the workshop, as the merchant's own store switch does (merchant.ts). The
+  // publish-time match reads ACTIVE workshops only, so without it a lifted
+  // sanction left every request published meanwhile off the board, «for me»
+  // and the count for good (old verdicts mean the board never re-matches on
+  // its own). Queued in the same batch; run after the response.
+  const at = nowIso();
+  const changed = status !== m.status;
+  const update = c.env.DB.prepare(
     'UPDATE community_merchants SET status = ?, status_reason = ?, status_changed_at = ? WHERE id = ?'
-  ).bind(status, reason, nowIso(), id).run();
+  ).bind(status, reason, at, id);
+  await c.env.DB.batch(changed ? [update, enqueueMatchStatement(c.env.DB, 'merchant', id, 'sanction', at)] : [update]);
+  if (changed) rematchAfterResponse(c, 'merchant', id, 'sanction');
 
   await audit(c.env.DB, admin.id, 'admin.merchant_status', id, { status, reason, from: m.status });
   // The merchant is told of the sanction and its reason (W2-E; forced on, §61).
@@ -600,9 +611,9 @@ adminCommunityRoutes.post('/stores/:id/status', async (c) => {
   const reason = str(body.reason, 'reason', { min: 0, max: 500, required: false });
 
   const store = await c.env.DB.prepare(
-    'SELECT s.id, s.slug, s.merchant_id, m.status AS merchant_status FROM merchant_stores s ' +
+    'SELECT s.id, s.slug, s.status, s.merchant_id, m.status AS merchant_status FROM merchant_stores s ' +
     'JOIN community_merchants m ON m.id = s.merchant_id WHERE s.id = ?'
-  ).bind(id).first<{ id: string; slug: string; merchant_id: string; merchant_status: string }>();
+  ).bind(id).first<{ id: string; slug: string; status: string; merchant_id: string; merchant_status: string }>();
   if (!store) throw notFound('Store not found');
 
   // Re-opening a shop whose OWNER is suspended would contradict the merchant
@@ -613,9 +624,17 @@ adminCommunityRoutes.post('/stores/:id/status', async (c) => {
     throw conflict('That merchant is suspended — restore the merchant first');
   }
 
-  await c.env.DB.prepare(
+  // A store suspension writes ineligible verdicts (STORE_UNAVAILABLE) that its
+  // restore would otherwise leave standing: the change re-matches the
+  // workshop, queued in the same batch and run after the response (as the
+  // merchant's own open/pause switch does in merchant.ts).
+  const at = nowIso();
+  const changed = status !== store.status;
+  const update = c.env.DB.prepare(
     'UPDATE merchant_stores SET status = ?, status_reason = ?, updated_at = ? WHERE id = ?'
-  ).bind(status, reason, nowIso(), id).run();
+  ).bind(status, reason, at, id);
+  await c.env.DB.batch(changed ? [update, enqueueMatchStatement(c.env.DB, 'merchant', store.merchant_id, 'store_sanction', at)] : [update]);
+  if (changed) rematchAfterResponse(c, 'merchant', store.merchant_id, 'store_sanction');
 
   await audit(c.env.DB, admin.id, 'admin.store_status', id, {
     status, reason, merchant: store.merchant_id,

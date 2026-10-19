@@ -712,6 +712,24 @@ export async function rematchNow(env: Env, kind: MatchSubject, id: string, reaso
   }
 }
 
+/**
+ * `rematchNow` AFTER THE RESPONSE — for an admin decision that changes a
+ * workshop's eligibility (approval, a sanction set or lifted): the reviewer
+ * hears at once, and a workshop pass (up to MERCHANT_REMATCH_REQUESTS
+ * requests) runs under `waitUntil`. The decision's own batch has already
+ * queued the subject, so a pass the runtime cuts short — or a call path with
+ * no ExecutionContext — is finished by the sweep. Never throws.
+ */
+export function rematchAfterResponse(c: { env: Env }, kind: MatchSubject, id: string, reason: string): void {
+  const run = rematchNow(c.env, kind, id, reason).catch(() => false);
+  try {
+    const ctx = (c as { executionCtx?: ExecutionContext }).executionCtx;
+    if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(run);
+  } catch {
+    // No ExecutionContext on this call path: the pass is in flight and cannot reject.
+  }
+}
+
 export interface MatchQueueReport {
   requests: number;
   merchants: number;

@@ -8,6 +8,7 @@ import { auditStatements } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { getMediaObject } from '../lib/mediaStorage';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
+import { rematchAfterResponse } from '../lib/printMatchingStore';
 import { requireFreshSession, requireOwner } from '../lib/costAccess';
 import { MERCHANT_REVIEW_GRANT, isOwner, normalizeAdminScope } from '../lib/adminScope';
 import {
@@ -590,6 +591,19 @@ for (const d of DECISIONS) {
       // «توثيق التجار»: ids, revision and the action only (gap §3.7).
       const event = d.action === 'start_review' ? 'review_started' : d.action === 'request_changes' ? 'changes_requested' : d.action === 'approve' ? 'approved' : 'rejected';
       announceAfterResponse(c, 'merchant_verification', reviewerNoticeText(id, out.revision, event));
+      // A workshop from before the gate is re-matched after the response (the
+      // approve batch already queued it): the requests published while it
+      // waited for review reach its board, «for me» and its count, and it is
+      // told of them, without waiting for a board visit or the sweep. A new
+      // applicant has no merchant row yet — nothing to re-match.
+      if (d.action === 'approve') {
+        const merchant = await db
+          .prepare('SELECT id FROM community_merchants WHERE user_id = ?')
+          .bind(current.user_id)
+          .first<{ id: string }>()
+          .catch(() => null);
+        if (merchant) rematchAfterResponse(c, 'merchant', String(merchant.id), 'approved');
+      }
     }
     // The re-read obeys the SENT rule like every other door: a replay (the
     // application may have been reopened and edited since) or a reopen landing
