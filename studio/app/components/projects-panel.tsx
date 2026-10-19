@@ -15,6 +15,17 @@
  *    labeled as local — never presented as synced. Legacy drafts written by
  *    the old origin-wide store appear ONLY behind an explicit import action.
  *
+ * P1-09 lifecycle, all on the account tab:
+ *  - three lists — Projects / Archived / Trash. Archive is never a delete;
+ *    Delete moves to the Trash, which shows when each project will be removed
+ *    and restores it until then;
+ *  - a version-history view per project: every kept version, its pins, and
+ *    "restore as current" (a NEW head — history is never rewritten), "open
+ *    as a copy" (a separate local copy that never touches the project) and
+ *    the owner's own "keep this version";
+ *  - signed in with guest work left on this device: it is OFFERED, with one
+ *    explicit «احفظ عملك في حسابي» per draft, and adopted only on that click.
+ *
  * Trilingual (ar / en / ckb) with a local reviewed dictionary; the ckb
  * strings are flagged for S6's human translation review pass. Layout uses
  * logical properties so the app chrome's RTL/LTR direction applies.
@@ -22,7 +33,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   studioProjectsApi,
+  type ProjectView,
   type RemoteProjectSummary,
+  type RemoteRevision,
   type StudioProjectsApi,
   StudioApiError,
 } from "../project-sync";
@@ -51,6 +64,14 @@ export interface ProjectsPanelProps {
   onImportLegacy?: (id: string) => Promise<StoredLevoProject | undefined>;
   listLegacyDrafts?: () => Promise<StoredLevoProject[]>;
   onRequestSignIn?: () => void;
+  /** Signed in: guest drafts left on this device (offered, never auto-adopted). */
+  listGuestDrafts?: () => Promise<StoredLevoProject[]>;
+  /** EXPLICIT «احفظ عملك في حسابي» for one guest draft. */
+  onAdoptGuestDraft?: (id: string) => Promise<RemoteProjectSummary>;
+  /** History: open a kept version as a separate local copy. */
+  onOpenRevisionCopy?: (project: RemoteProjectSummary, revision: RemoteRevision) => void | Promise<void>;
+  /** History: a restore made a new head; the shell reloads it if that project is open. */
+  onRevisionRestored?: (project: RemoteProjectSummary) => void | Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +124,44 @@ const TEXT = {
     statusUploading: "جارٍ الرفع…",
     statusSynced: "متزامن",
     statusFailed: "فشل الحفظ — أعد المحاولة",
+    viewActive: "المشاريع",
+    viewArchived: "المؤرشفة",
+    viewTrash: "سلة المحذوفات",
+    archive: "أرشفة",
+    unarchive: "إلغاء الأرشفة",
+    archivedBadge: "مؤرشف",
+    confirmTrash: "نقل المشروع إلى سلة المحذوفات؟ يمكنك استعادته منها لفترة محدودة.",
+    confirmTrashYes: "نعم، انقله",
+    restore: "استعادة",
+    purgeAfter: "يُحذف نهائيًا في",
+    emptyArchived: "لا توجد مشاريع مؤرشفة.",
+    emptyTrash: "سلة المحذوفات فارغة.",
+    trashExpired: "انتهت مهلة استعادة هذا المشروع.",
+    history: "السجل",
+    historyTitle: "سجل النسخ",
+    historyBack: "رجوع",
+    historyNote: "تُحفظ أحدث {count} نسخ، مع آخر نسخة كاملة وكل نسخة تحتفظ بها أو يستخدمها طلب طباعة أو طلب شراء.",
+    historyEmpty: "لا توجد نسخ محفوظة بعد.",
+    versionLabel: "النسخة {n}",
+    currentBadge: "الحالية",
+    restoreVersion: "اجعلها النسخة الحالية",
+    confirmRestoreVersion: "جعل النسخة {n} هي النسخة الحالية؟ تبقى النسخة الحالية محفوظة في السجل.",
+    restoredNotice: "أصبحت النسخة {n} هي النسخة الحالية.",
+    openCopy: "افتح كنسخة منفصلة",
+    keepVersion: "احتفظ بهذه النسخة",
+    unkeepVersion: "إلغاء الاحتفاظ",
+    pinUser: "محفوظة بطلبك",
+    pinRequest: "مستخدمة في طلب طباعة",
+    pinOrder: "مستخدمة في طلب شراء",
+    pinOther: "محفوظة",
+    historyConflict: "تغيّر المشروع على جهاز آخر. أعد تحميل السجل ثم حاول مجددًا.",
+    quotaExceeded: "امتلأت مساحة التخزين في حسابك.",
+    guestWorkTitle: "عمل من هذا الجهاز قبل تسجيل الدخول",
+    guestWorkBody: "أُنشئ هذا العمل كضيف. يبقى على هذا الجهاز، ولا يُحفظ في حسابك إلا إذا اخترت ذلك.",
+    adoptGuest: "احفظ عملك في حسابي",
+    adopting: "جارٍ الحفظ في حسابك…",
+    adopted: "حُفظ العمل في حسابك.",
+    notNow: "ليس الآن",
     objects: "مجسمات",
     close: "إغلاق",
   },
@@ -151,6 +210,44 @@ const TEXT = {
     statusUploading: "Uploading…",
     statusSynced: "Synced",
     statusFailed: "Save failed — retry",
+    viewActive: "Projects",
+    viewArchived: "Archived",
+    viewTrash: "Trash",
+    archive: "Archive",
+    unarchive: "Unarchive",
+    archivedBadge: "Archived",
+    confirmTrash: "Move this project to the Trash? You can restore it from there for a limited time.",
+    confirmTrashYes: "Yes, move it",
+    restore: "Restore",
+    purgeAfter: "Removed permanently on",
+    emptyArchived: "No archived projects.",
+    emptyTrash: "The Trash is empty.",
+    trashExpired: "This project is past its restore window.",
+    history: "History",
+    historyTitle: "Version history",
+    historyBack: "Back",
+    historyNote: "Kept: the newest {count} saves, the latest full save, and every version you keep or a print request or order uses.",
+    historyEmpty: "No saved versions yet.",
+    versionLabel: "Version {n}",
+    currentBadge: "Current",
+    restoreVersion: "Make this the current version",
+    confirmRestoreVersion: "Make version {n} the current version? The current version stays in the history.",
+    restoredNotice: "Version {n} is now the current version.",
+    openCopy: "Open as a separate copy",
+    keepVersion: "Keep this version",
+    unkeepVersion: "Stop keeping",
+    pinUser: "Kept by you",
+    pinRequest: "Used by a print request",
+    pinOrder: "Used by an order",
+    pinOther: "Held",
+    historyConflict: "This project changed on another device. Reload the history and try again.",
+    quotaExceeded: "Your account storage is full.",
+    guestWorkTitle: "Work from this device before you signed in",
+    guestWorkBody: "This was made as a guest. It stays on this device and is saved to your account only if you choose.",
+    adoptGuest: "Save this work to my account",
+    adopting: "Saving to your account…",
+    adopted: "Saved to your account.",
+    notNow: "Not now",
     objects: "objects",
     close: "Close",
   },
@@ -199,6 +296,44 @@ const TEXT = {
     statusUploading: "بار دەکرێت…",
     statusSynced: "هاوکات کراوە",
     statusFailed: "پاشەکەوت سەرکەوتوو نەبوو — هەوڵبدەوە",
+    viewActive: "پڕۆژەکان",
+    viewArchived: "ئەرشیفکراوەکان",
+    viewTrash: "سەبەتەی سڕاوەکان",
+    archive: "ئەرشیفکردن",
+    unarchive: "دەرهێنان لە ئەرشیف",
+    archivedBadge: "ئەرشیفکراو",
+    confirmTrash: "ئەم پڕۆژەیە بگوازرێتەوە بۆ سەبەتەی سڕاوەکان؟ بۆ ماوەیەکی دیاریکراو دەتوانیت لەوێوە بیگەڕێنیتەوە.",
+    confirmTrashYes: "بەڵێ، بیگوازەرەوە",
+    restore: "گەڕاندنەوە",
+    purgeAfter: "بە یەکجاری دەسڕدرێتەوە لە",
+    emptyArchived: "هیچ پڕۆژەیەکی ئەرشیفکراو نییە.",
+    emptyTrash: "سەبەتەی سڕاوەکان بەتاڵە.",
+    trashExpired: "ماوەی گەڕاندنەوەی ئەم پڕۆژەیە تەواو بووە.",
+    history: "مێژوو",
+    historyTitle: "مێژووی وەشانەکان",
+    historyBack: "گەڕانەوە",
+    historyNote: "ئەمانە هەڵدەگیرێن: نوێترین {count} پاشەکەوت، دوایین پاشەکەوتی تەواو، و هەر وەشانێک کە خۆت هەڵیدەگریت یان داواکارییەکی چاپ یان کڕینێک بەکاری دەهێنێت.",
+    historyEmpty: "هێشتا هیچ وەشانێکی پاشەکەوتکراو نییە.",
+    versionLabel: "وەشانی {n}",
+    currentBadge: "وەشانی ئێستا",
+    restoreVersion: "بیکە بە وەشانی ئێستا",
+    confirmRestoreVersion: "وەشانی {n} ببێتە وەشانی ئێستا؟ وەشانی ئێستا لە مێژوودا دەمێنێتەوە.",
+    restoredNotice: "وەشانی {n} بوو بە وەشانی ئێستا.",
+    openCopy: "وەک لەبەرگیراوەیەکی جیا بیکەرەوە",
+    keepVersion: "ئەم وەشانە هەڵبگرە",
+    unkeepVersion: "هەڵمەگرە",
+    pinUser: "لەلایەن تۆوە هەڵگیراوە",
+    pinRequest: "لە داواکارییەکی چاپدا بەکارهاتووە",
+    pinOrder: "لە کڕینێکدا بەکارهاتووە",
+    pinOther: "هەڵگیراوە",
+    historyConflict: "ئەم پڕۆژەیە لە ئامێرێکی ترەوە گۆڕاوە. مێژووەکە نوێ بکەرەوە و دووبارە هەوڵبدەرەوە.",
+    quotaExceeded: "شوێنی هەڵگرتنی هەژمارەکەت پڕ بووە.",
+    guestWorkTitle: "کارەکانی ئەم ئامێرە پێش چوونەژوورەوە",
+    guestWorkBody: "ئەم کارە وەک میوان دروستکراوە. لەسەر ئەم ئامێرە دەمێنێتەوە و تەنها ئەگەر خۆت هەڵیبژێریت لە هەژمارەکەت پاشەکەوت دەکرێت.",
+    adoptGuest: "کارەکەم لە هەژمارەکەمدا پاشەکەوت بکە",
+    adopting: "لە هەژمارەکەتدا پاشەکەوت دەکرێت…",
+    adopted: "لە هەژمارەکەتدا پاشەکەوت کرا.",
+    notNow: "ئێستا نا",
     objects: "تەنەکان",
     close: "داخستن",
   },
@@ -217,6 +352,28 @@ function formatDate(value: string | number | null | undefined, locale: PanelLoca
   } catch {
     return date.toLocaleString("en");
   }
+}
+
+function fill(template: string, values: Record<string, string | number>): string {
+  return Object.entries(values).reduce((out, [key, value]) => out.split(`{${key}}`).join(String(value)), template);
+}
+
+/** Known API refusals in the user's language; anything else stays generic. */
+function describeError(error: unknown, t: PanelText): string {
+  if (error instanceof StudioApiError) {
+    if (error.code === "REVISION_CONFLICT") return t.historyConflict;
+    if (error.code === "QUOTA_EXCEEDED" || error.status === 413) return t.quotaExceeded;
+    if (error.code === "RETENTION_EXPIRED" || error.status === 410) return t.trashExpired;
+    if (error.status === 401) return t.guestTitle;
+  }
+  return t.actionFailed;
+}
+
+function pinLabel(reason: string, t: PanelText): string {
+  if (reason === "user") return t.pinUser;
+  if (reason === "request") return t.pinRequest;
+  if (reason === "order") return t.pinOrder;
+  return t.pinOther;
 }
 
 function statusLabel(state: PersistenceState, t: PanelText): string {
@@ -246,6 +403,7 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
   const t: PanelText = TEXT[locale] ?? TEXT.ar;
 
   const [tab, setTab] = useState<"account" | "device">(user ? "account" : "device");
+  const [view, setView] = useState<ProjectView>("active");
   const [query, setQuery] = useState("");
   const [remote, setRemote] = useState<RemoteProjectSummary[]>([]);
   const [remotePhase, setRemotePhase] = useState<LoadPhase>("loading");
@@ -261,6 +419,17 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [brokenThumbs, setBrokenThumbs] = useState<ReadonlySet<string>>(new Set());
+  const [notice, setNotice] = useState<string | null>(null);
+  // Version history (one project at a time).
+  const [historyFor, setHistoryFor] = useState<RemoteProjectSummary | null>(null);
+  const [history, setHistory] = useState<RemoteRevision[]>([]);
+  const [historyHeadId, setHistoryHeadId] = useState<string | null>(null);
+  const [historyKept, setHistoryKept] = useState<number | null>(null);
+  const [historyPhase, setHistoryPhase] = useState<LoadPhase>("loading");
+  const [confirmRestoreId, setConfirmRestoreId] = useState<string | null>(null);
+  // Guest work left on this device, offered after sign-in (never auto-adopted).
+  const [guestDrafts, setGuestDrafts] = useState<StoredLevoProject[]>([]);
+  const [guestDismissed, setGuestDismissed] = useState(false);
   const reloadTokenRef = useRef(0);
 
   // -- account project list (search debounced) ------------------------------
@@ -277,7 +446,7 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
       setRemotePhase("loading");
       setRemoteError(null);
       api
-        .listProjects({ q: q || undefined, limit: 100, signal: controller.signal })
+        .listProjects({ q: q || undefined, limit: 100, view, signal: controller.signal })
         .then((projects) => {
           if (reloadTokenRef.current !== token) return;
           setRemote(projects);
@@ -296,7 +465,7 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
         });
       return () => controller.abort();
     },
-    [api, t.guestTitle, t.loadError, user]
+    [api, t.guestTitle, t.loadError, user, view]
   );
 
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -333,6 +502,24 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
   useEffect(() => {
     void loadDraftsList();
   }, [loadDraftsList]);
+
+  // Guest work: listed for a signed-in user only, and only ever OFFERED. The
+  // panel is keyed by account, so a guest panel starts (and stays) empty.
+  const listGuestDrafts = props.listGuestDrafts;
+  useEffect(() => {
+    let active = true;
+    if (!user || !listGuestDrafts) return;
+    listGuestDrafts()
+      .then((list) => {
+        if (active) setGuestDrafts(list);
+      })
+      .catch(() => {
+        if (active) setGuestDrafts([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [listGuestDrafts, user]);
 
   // -- actions ---------------------------------------------------------------
 
@@ -397,6 +584,136 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
         setConfirmDeleteId(null);
       }),
     [api, runAction]
+  );
+
+  /** Lifecycle actions that take the project out of the current list. */
+  const runLifecycle = useCallback(
+    (project: RemoteProjectSummary, action: () => Promise<unknown>) => {
+      setBusyId(project.id);
+      setActionError(null);
+      setNotice(null);
+      action()
+        .then(() => setRemote((current) => current.filter((p) => p.id !== project.id)))
+        .catch((error: unknown) => setActionError(describeError(error, t)))
+        .finally(() => setBusyId(null));
+    },
+    [t]
+  );
+
+  const handleArchive = useCallback(
+    (project: RemoteProjectSummary, archived: boolean) =>
+      runLifecycle(project, () => api.archiveProject(project.id, archived)),
+    [api, runLifecycle]
+  );
+
+  const handleRestoreFromTrash = useCallback(
+    (project: RemoteProjectSummary) => runLifecycle(project, () => api.restoreProject(project.id)),
+    [api, runLifecycle]
+  );
+
+  // -- version history -------------------------------------------------------
+
+  const loadHistory = useCallback(
+    async (project: RemoteProjectSummary) => {
+      setHistoryPhase("loading");
+      try {
+        const result = await api.listRevisions(project.id, undefined, { committedOnly: true });
+        setHistory(result.revisions.filter((r) => r.state === "committed"));
+        setHistoryHeadId(result.head_revision_id);
+        setHistoryKept(typeof result.kept_committed_revisions === "number" ? result.kept_committed_revisions : null);
+        setHistoryPhase("ready");
+      } catch {
+        setHistory([]);
+        setHistoryPhase("error");
+      }
+    },
+    [api]
+  );
+
+  const openHistory = useCallback(
+    (project: RemoteProjectSummary) => {
+      setHistoryFor(project);
+      setConfirmRestoreId(null);
+      setActionError(null);
+      setNotice(null);
+      void loadHistory(project);
+    },
+    [loadHistory]
+  );
+
+  const closeHistory = useCallback(() => {
+    setHistoryFor(null);
+    setHistory([]);
+    setConfirmRestoreId(null);
+    loadRemote(query.trim());
+  }, [loadRemote, query]);
+
+  const handleRestoreRevision = useCallback(
+    (revision: RemoteRevision) => {
+      const project = historyFor;
+      if (!project) return;
+      const head = history.find((r) => r.id === historyHeadId);
+      setBusyId(revision.id);
+      setActionError(null);
+      setNotice(null);
+      api
+        .restoreRevision(project.id, revision.id, head ? head.revision : null)
+        .then(async () => {
+          setConfirmRestoreId(null);
+          setNotice(fill(t.restoredNotice, { n: revision.revision }));
+          const fresh = await api.getProject(project.id).catch(() => project);
+          setHistoryFor(fresh);
+          await loadHistory(fresh);
+          await props.onRevisionRestored?.(fresh);
+        })
+        .catch((error: unknown) => setActionError(describeError(error, t)))
+        .finally(() => setBusyId(null));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [api, history, historyFor, historyHeadId, loadHistory, props.onRevisionRestored, t]
+  );
+
+  const handleKeepRevision = useCallback(
+    (revision: RemoteRevision, keep: boolean) => {
+      const project = historyFor;
+      if (!project) return;
+      setBusyId(revision.id);
+      setActionError(null);
+      api
+        .setRevisionKept(project.id, revision.id, keep)
+        .then((result) =>
+          setHistory((current) =>
+            current.map((r) => (r.id === revision.id ? { ...r, pinned: result.pinned, pin_reasons: result.pin_reasons } : r))
+          )
+        )
+        .catch((error: unknown) => setActionError(describeError(error, t)))
+        .finally(() => setBusyId(null));
+    },
+    [api, historyFor, t]
+  );
+
+  // -- guest work adoption (explicit consent only) ---------------------------
+
+  const handleAdoptGuest = useCallback(
+    (draft: StoredLevoProject) => {
+      if (!props.onAdoptGuestDraft) return;
+      const adopt = props.onAdoptGuestDraft;
+      setBusyId(`guest:${draft.id}`);
+      setActionError(null);
+      setNotice(null);
+      adopt(draft.id)
+        .then((project) => {
+          setGuestDrafts((current) => current.filter((d) => d.id !== draft.id));
+          if (view === "active") setRemote((current) => [project, ...current.filter((p) => p.id !== project.id)]);
+          setNotice(t.adopted);
+          void loadDraftsList();
+        })
+        .catch((error: unknown) =>
+          setActionError(error instanceof StudioApiError ? describeError(error, t) : error instanceof Error ? error.message : t.actionFailed)
+        )
+        .finally(() => setBusyId(null));
+    },
+    [loadDraftsList, props.onAdoptGuestDraft, t, view]
   );
 
   const handleDeleteDraft = useCallback(
@@ -511,34 +828,54 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
               ? `${t.savedToAccount}: ${formatDate(project.last_saved_at, locale)} · ${t.revision} ${project.head_revision ?? "—"}`
               : t.neverSaved}
           </small>
+          {view === "trash" && project.purge_after ? (
+            <small className="lpp-meta lpp-purge">{t.purgeAfter}: {formatDate(project.purge_after, locale)}</small>
+          ) : null}
           <div className="lpp-badges">
             {kindBadge(project.head_snapshot_kind)}
+            {project.archived_at && view !== "archived" ? <span className="lpp-badge">{t.archivedBadge}</span> : null}
             {isActive && syncState ? (
               <span className={`lpp-badge lpp-status lpp-status-${syncState.status}`}>{statusLabel(syncState, t)}</span>
             ) : null}
           </div>
-          {confirmDeleteId === project.id ? (
-            <div className="lpp-confirm" role="alertdialog" aria-label={t.confirmDelete}>
-              <span>{t.confirmDelete}</span>
+          {view === "trash" ? (
+            <div className="lpp-actions">
+              <button type="button" className="lpp-primary" onClick={() => handleRestoreFromTrash(project)} disabled={busy}>
+                {t.restore}
+              </button>
+            </div>
+          ) : confirmDeleteId === project.id ? (
+            <div className="lpp-confirm" role="alertdialog" aria-label={t.confirmTrash}>
+              <span>{t.confirmTrash}</span>
               <button type="button" className="lpp-danger" onClick={() => void handleDelete(project)} disabled={busy}>
-                {t.confirmYes}
+                {t.confirmTrashYes}
               </button>
               <button type="button" onClick={() => setConfirmDeleteId(null)}>{t.confirmNo}</button>
             </div>
           ) : (
             <div className="lpp-actions">
               <button type="button" onClick={() => void props.onOpenRemote(project)} disabled={busy}>{t.open}</button>
-              <button
-                type="button"
-                onClick={() => {
-                  setRenamingId(project.id);
-                  setRenameValue(project.name);
-                }}
-                disabled={busy}
-              >
-                {t.rename}
+              {view === "active" ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRenamingId(project.id);
+                      setRenameValue(project.name);
+                    }}
+                    disabled={busy}
+                  >
+                    {t.rename}
+                  </button>
+                  <button type="button" onClick={() => void handleDuplicate(project)} disabled={busy}>{t.duplicate}</button>
+                </>
+              ) : null}
+              <button type="button" onClick={() => openHistory(project)} disabled={busy || !project.head_revision_id}>
+                {t.history}
               </button>
-              <button type="button" onClick={() => void handleDuplicate(project)} disabled={busy}>{t.duplicate}</button>
+              <button type="button" onClick={() => handleArchive(project, view !== "archived")} disabled={busy}>
+                {view === "archived" ? t.unarchive : t.archive}
+              </button>
               <button type="button" className="lpp-danger" onClick={() => setConfirmDeleteId(project.id)} disabled={busy}>
                 {t.del}
               </button>
@@ -596,6 +933,109 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
     );
   };
 
+  const historyView = (project: RemoteProjectSummary) => (
+    <div className="lpp-history" aria-label={t.historyTitle}>
+      <div className="lpp-history-head">
+        <button type="button" onClick={closeHistory}>{t.historyBack}</button>
+        <div>
+          <h3>{t.historyTitle}</h3>
+          <small className="lpp-meta">{project.name}</small>
+        </div>
+      </div>
+      {historyKept !== null ? <p className="lpp-notice">{fill(t.historyNote, { count: historyKept })}</p> : null}
+      {historyPhase === "loading" ? (
+        <p className="lpp-state" aria-busy="true">{t.loading}</p>
+      ) : historyPhase === "error" ? (
+        <div className="lpp-state lpp-state-error" role="alert">
+          <p>{t.loadError}</p>
+          <button type="button" onClick={() => void loadHistory(project)}>{t.retry}</button>
+        </div>
+      ) : history.length === 0 ? (
+        <p className="lpp-state">{t.historyEmpty}</p>
+      ) : (
+        <ul className="lpp-versions">
+          {history.map((revision) => {
+            const isHead = revision.id === historyHeadId;
+            const busy = busyId === revision.id;
+            const reasons = revision.pin_reasons ?? [];
+            const keptByUser = reasons.includes("user");
+            return (
+              <li key={revision.id} className={`lpp-version${isHead ? " lpp-card-active" : ""}`}>
+                <div className="lpp-version-line">
+                  <strong>{fill(t.versionLabel, { n: revision.revision })}</strong>
+                  <small className="lpp-meta">{formatDate(revision.committed_at ?? revision.created_at, locale)}</small>
+                </div>
+                <div className="lpp-badges">
+                  {isHead ? <span className="lpp-badge lpp-badge-full">{t.currentBadge}</span> : null}
+                  {kindBadge(revision.snapshot_kind)}
+                  {reasons.map((reason) => (
+                    <span key={reason} className="lpp-badge lpp-badge-pin">{pinLabel(reason, t)}</span>
+                  ))}
+                </div>
+                {confirmRestoreId === revision.id ? (
+                  <div className="lpp-confirm" role="alertdialog" aria-label={t.restoreVersion}>
+                    <span>{fill(t.confirmRestoreVersion, { n: revision.revision })}</span>
+                    <button type="button" className="lpp-primary" onClick={() => handleRestoreRevision(revision)} disabled={busy}>
+                      {t.restoreVersion}
+                    </button>
+                    <button type="button" onClick={() => setConfirmRestoreId(null)}>{t.cancel}</button>
+                  </div>
+                ) : (
+                  <div className="lpp-actions">
+                    {!isHead ? (
+                      <button type="button" onClick={() => setConfirmRestoreId(revision.id)} disabled={busy}>
+                        {t.restoreVersion}
+                      </button>
+                    ) : null}
+                    {props.onOpenRevisionCopy ? (
+                      <button type="button" onClick={() => void props.onOpenRevisionCopy?.(project, revision)} disabled={busy}>
+                        {t.openCopy}
+                      </button>
+                    ) : null}
+                    <button type="button" onClick={() => handleKeepRevision(revision, !keptByUser)} disabled={busy}>
+                      {keptByUser ? t.unkeepVersion : t.keepVersion}
+                    </button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+
+  const guestWork =
+    user && guestDrafts.length > 0 && !guestDismissed && props.onAdoptGuestDraft ? (
+      <div className="lpp-guestwork" role="region" aria-label={t.guestWorkTitle}>
+        <h3>{t.guestWorkTitle}</h3>
+        <p>{t.guestWorkBody}</p>
+        <ul className="lpp-grid">
+          {guestDrafts.map((draft) => {
+            const busy = busyId === `guest:${draft.id}`;
+            const kind = draft.snapshotKind ?? (draft.snapshotVersion === 2 ? "full" : "source-only");
+            return (
+              <li key={`guest:${draft.id}`} className="lpp-card">
+                <div className="lpp-card-body">
+                  <strong className="lpp-name">{draft.name}</strong>
+                  <small className="lpp-meta">{t.updated}: {formatDate(draft.updatedAt, locale)}</small>
+                  <div className="lpp-badges">{kindBadge(kind)}</div>
+                  <div className="lpp-actions">
+                    <button type="button" className="lpp-primary" onClick={() => handleAdoptGuest(draft)} disabled={busy || busyId !== null}>
+                      {busy ? t.adopting : t.adoptGuest}
+                    </button>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <button type="button" className="lpp-link" onClick={() => setGuestDismissed(true)}>{t.notNow}</button>
+      </div>
+    ) : null;
+
+  const emptyText = view === "archived" ? t.emptyArchived : view === "trash" ? t.emptyTrash : t.emptyAccount;
+
   return (
     <section className="levo-projects-panel" aria-label={t.title}>
       <style>{PANEL_CSS}</style>
@@ -624,10 +1064,32 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
       </header>
 
       {actionError ? <p className="lpp-error" role="alert">{actionError}</p> : null}
+      {notice ? <p className="lpp-ok" role="status">{notice}</p> : null}
 
       {tab === "account" ? (
-        user ? (
+        user && historyFor ? (
+          historyView(historyFor)
+        ) : user ? (
           <>
+            {guestWork}
+            <div className="lpp-views" role="tablist" aria-label={t.accountTab}>
+              {(["active", "archived", "trash"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="tab"
+                  aria-selected={view === v}
+                  className={view === v ? "lpp-tab-active" : ""}
+                  onClick={() => {
+                    setView(v);
+                    setConfirmDeleteId(null);
+                    setNotice(null);
+                  }}
+                >
+                  {v === "active" ? t.viewActive : v === "archived" ? t.viewArchived : t.viewTrash}
+                </button>
+              ))}
+            </div>
             <div className="lpp-toolbar">
               <input
                 type="search"
@@ -636,6 +1098,7 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
                 onChange={(e) => setQuery(e.target.value)}
                 aria-label={t.searchPlaceholder}
               />
+              {view === "active" ? (
               <div className="lpp-create">
                 <input
                   value={newName}
@@ -651,6 +1114,7 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
                   {creating ? t.creating : t.create}
                 </button>
               </div>
+              ) : null}
             </div>
             <p className="lpp-notice">{t.uploadNotice}</p>
             {remotePhase === "loading" ? (
@@ -662,8 +1126,8 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
               </div>
             ) : remote.length === 0 ? (
               <div className="lpp-state">
-                <p>{t.emptyAccount}</p>
-                <small>{t.emptyAccountHint}</small>
+                <p>{emptyText}</p>
+                {view === "active" ? <small>{t.emptyAccountHint}</small> : null}
               </div>
             ) : (
               <ul className="lpp-grid">{remote.map(remoteCard)}</ul>
@@ -754,5 +1218,19 @@ const PANEL_CSS = `
 .levo-projects-panel .lpp-rename input{min-height:36px;padding:5px 8px}
 .levo-projects-panel .lpp-legacy{border-top:1px dashed var(--levo-panel-border,#2a2f3a);padding-top:10px;display:flex;flex-direction:column;gap:6px}
 .levo-projects-panel .lpp-legacy p{margin:0;font-size:12px;opacity:.75}
+.levo-projects-panel .lpp-ok{margin:0;color:var(--levo-ok,#3fbf6f)}
+.levo-projects-panel .lpp-views{display:flex;gap:4px;flex-wrap:wrap}
+.levo-projects-panel .lpp-views button{min-height:36px;padding:5px 12px;font-size:12.5px}
+.levo-projects-panel .lpp-views .lpp-tab-active{background:var(--levo-accent,#3d6ef7);border-color:transparent;color:#fff}
+.levo-projects-panel .lpp-purge{color:var(--levo-warn,#e2a93b);opacity:1}
+.levo-projects-panel .lpp-badge-pin{border-color:var(--levo-accent,#3d6ef7);color:var(--levo-accent,#8fb0ff)}
+.levo-projects-panel .lpp-history{display:flex;flex-direction:column;gap:10px}
+.levo-projects-panel .lpp-history-head{display:flex;align-items:center;gap:10px}
+.levo-projects-panel .lpp-versions{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.levo-projects-panel .lpp-version{display:flex;flex-direction:column;gap:6px;background:var(--levo-panel-card,#171a20);border:1px solid var(--levo-panel-border,#2a2f3a);border-radius:12px;padding:10px}
+.levo-projects-panel .lpp-version-line{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;justify-content:space-between}
+.levo-projects-panel .lpp-guestwork{border:1px solid var(--levo-accent,#3d6ef7);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.levo-projects-panel .lpp-guestwork p{margin:0;font-size:12.5px;opacity:.85}
+.levo-projects-panel .lpp-link{align-self:flex-start;border:0;background:transparent;text-decoration:underline;min-height:36px}
 @media (max-width:520px){.levo-projects-panel .lpp-grid{grid-template-columns:1fr}}
 `;

@@ -121,6 +121,52 @@ export const projectFiles = sqliteTable(
 );
 
 /**
+ * Archive marker (P1-09). A row means "archived": the project leaves the
+ * default list but stays fully readable, and archiving NEVER deletes —
+ * archive and delete are separate states (delete is `projects.deleted_at`,
+ * restorable from the trash within the retention window).
+ *
+ * A side table rather than a `projects.archived_at` column: the Studio
+ * migration gate (scripts/check-migrations-additive.mjs, workflow 13) admits
+ * CREATE statements only and refuses every ALTER TABLE. The row is removed on
+ * unarchive, and when the cleanup cron purges the project.
+ */
+export const projectArchive = sqliteTable("project_archive", {
+  projectId: text("project_id")
+    .primaryKey()
+    .references(() => projects.id),
+  archivedAt: text("archived_at").notNull(),
+});
+
+/**
+ * Revision pins (P1-09; GAP-MAP conflict 19). A pinned revision is NEVER
+ * pruned by retention nor purged with a deleted project — a request, an order
+ * or the owner's own "keep this version" holds it. One row per holder, so
+ * releasing one holder (a withdrawn request) never unpins a revision another
+ * holder (an order) still needs.
+ *
+ *   pin_reason  'user' | 'request' | 'order' (validated in worker/api/pins.ts;
+ *               deliberately no CHECK — a new holder must not need a rebuild)
+ *   pin_ref     the holder's id ('' for the owner's own pin)
+ *
+ * The foreign key doubles as a database-level guard: with foreign keys on, a
+ * revision row that still has a pin cannot be deleted at all.
+ */
+export const projectRevisionPins = sqliteTable(
+  "project_revision_pins",
+  {
+    id: text("id").primaryKey(),
+    revisionId: text("revision_id")
+      .notNull()
+      .references(() => projectRevisions.id),
+    pinnedAt: text("pinned_at").notNull(),
+    pinReason: text("pin_reason").notNull(),
+    pinRef: text("pin_ref").notNull().default(""),
+  },
+  (t) => [uniqueIndex("uq_project_revision_pins_holder").on(t.revisionId, t.pinReason, t.pinRef)]
+);
+
+/**
  * Studio sessions (auth slice, worker/auth/session.ts). The table shape must
  * stay EXACTLY in sync with SESSION_TABLE_SQL there: the auth layer also
  * provisions it idempotently (CREATE TABLE IF NOT EXISTS) so sign-in never

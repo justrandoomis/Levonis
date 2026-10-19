@@ -11,19 +11,32 @@
  *   2. 'abandoned' revisions and 'pending' revisions older than the
  *      configured TTL (default 24h) — R2 objects first, then rows,
  *   3. soft-deleted projects past the retention window (default 30 days),
- *   4. committed-revision retention: keep the newest N per project (default
- *      20) but NEVER the head and NEVER the newest committed 'full' snapshot
- *      (mandate §4: the last full snapshot is protected),
+ *   4. committed-revision retention: keep the newest N unpinned revisions per
+ *      project (default 20) but NEVER the head and NEVER the newest committed
+ *      'full' snapshot (mandate §4: the last full snapshot is protected),
  *   5. low-frequency R2↔D1 reconciliation over the projects/ prefix,
  *      deleting objects >48h old that no project_files row references.
  *
- * Wiring: studio/worker/index.ts must export a `scheduled` handler calling
- * runCleanup (plus a cron in studio/wrangler.jsonc). Those two files belong
- * to other slices — until they are wired, cleanup honestly does not run on
- * its own; nothing here pretends otherwise.
+ * PINNED REVISIONS ARE NEVER PRUNED OR PURGED (P1-09, worker/api/pins.ts).
+ * A revision held by a request, an order or the owner's "keep this version"
+ * survives every step above: purgeRevisionById refuses it, retention keeps it
+ * outside the N count, and a deleted project past retention is purged only
+ * down to its pinned revisions — the project row stays behind as a deleted
+ * tombstone holding them (never listed, never restorable, still owner-scoped)
+ * and is not selected again until something unpinned is left to reclaim.
+ * The pins table's foreign key makes the database refuse such a delete too.
+ *
+ * Archived projects (project_archive) are NOT deleted and nothing here
+ * touches them; only their archive row goes when the project itself is
+ * purged after a delete.
+ *
+ * Wiring: studio/worker/index.ts exports the `scheduled` handler calling
+ * scheduledCleanup, and studio/wrangler.jsonc carries the hourly cron
+ * (`triggers.crons`).
  */
-import { type StudioApiCtx, type StudioApiEnv, nowIso } from "./router";
+import { type StudioApiCtx, type StudioApiEnv, ensureStudioTables, nowIso } from "./router";
 import { studioLimits } from "./quota";
+import { isRevisionPinned } from "./pins";
 
 export interface CleanupReport {
   expired_sessions: number;
@@ -31,6 +44,8 @@ export interface CleanupReport {
   purged_files: number;
   purged_projects: number;
   pruned_committed_revisions: number;
+  /** Revisions a step would have reclaimed but a pin held (never purged). */
+  kept_pinned_revisions: number;
   reconciled_orphan_objects: number;
 }
 
@@ -50,7 +65,8 @@ function isoAgo(now: number, ms: number): string {
  * Deletes one revision's R2 objects, then its file rows, then the revision
  * row (R2 first: a failed object delete leaves rows behind for the next run,
  * never the other way around). Refuses to purge a revision that is currently
- * a project head — the commit crash-recovery path owns that window.
+ * a project head — the commit crash-recovery path owns that window — and a
+ * revision that any holder pins (P1-09: pinned revisions are never purged).
  */
 export async function purgeRevisionById(db: D1Database, bucket: R2Bucket, revisionId: string): Promise<number> {
   const isHead = await db
@@ -58,6 +74,7 @@ export async function purgeRevisionById(db: D1Database, bucket: R2Bucket, revisi
     .bind(revisionId)
     .first();
   if (isHead) return 0;
+  if (await isRevisionPinned(db, revisionId)) return 0;
 
   const { results } = await db
     .prepare(`SELECT id, r2_key FROM project_files WHERE revision_id = ?`)
@@ -73,20 +90,43 @@ export async function purgeRevisionById(db: D1Database, bucket: R2Bucket, revisi
   return files.length;
 }
 
-async function purgeProject(db: D1Database, bucket: R2Bucket, projectId: string): Promise<number> {
+/**
+ * Purges a soft-deleted, past-retention project. Every unpinned revision goes;
+ * pinned revisions stay, and while any remains the project row stays as a
+ * deleted tombstone that owns them (the revision rows reference it).
+ */
+async function purgeProject(
+  db: D1Database,
+  bucket: R2Bucket,
+  projectId: string
+): Promise<{ files: number; purged: boolean; keptPinned: number }> {
   // Break the head reference first so purgeRevisionById can take every
   // revision of this (already soft-deleted, past-retention) project.
   await db.prepare(`UPDATE projects SET head_revision_id = NULL, thumbnail_key = NULL WHERE id = ?`).bind(projectId).run();
   const { results } = await db
-    .prepare(`SELECT id FROM project_revisions WHERE project_id = ?`)
+    .prepare(
+      `SELECT r.id, EXISTS (SELECT 1 FROM project_revision_pins k WHERE k.revision_id = r.id) AS pinned
+         FROM project_revisions r WHERE r.project_id = ?`
+    )
     .bind(projectId)
-    .all<{ id: string }>();
-  let purgedFiles = 0;
+    .all<{ id: string; pinned: number }>();
+  let files = 0;
+  let keptPinned = 0;
   for (const rev of results || []) {
-    purgedFiles += await purgeRevisionById(db, bucket, rev.id);
+    if (rev.pinned) {
+      keptPinned += 1;
+      continue;
+    }
+    files += await purgeRevisionById(db, bucket, rev.id);
   }
+  if (keptPinned > 0) return { files, purged: false, keptPinned };
+  await db.prepare(`DELETE FROM project_archive WHERE project_id = ?`).bind(projectId).run();
   await db.prepare(`DELETE FROM projects WHERE id = ?`).bind(projectId).run();
-  return purgedFiles;
+  return { files, purged: true, keptPinned: 0 };
+}
+
+async function revisionExists(db: D1Database, revisionId: string): Promise<boolean> {
+  return Boolean(await db.prepare(`SELECT 1 AS x FROM project_revisions WHERE id = ?`).bind(revisionId).first());
 }
 
 async function existingKeys(db: D1Database, keys: string[]): Promise<Set<string>> {
@@ -113,8 +153,14 @@ export async function runCleanup(env: StudioApiEnv, now: number = Date.now()): P
     purged_files: 0,
     purged_projects: 0,
     pruned_committed_revisions: 0,
+    kept_pinned_revisions: 0,
     reconciled_orphan_objects: 0,
   };
+
+  // The P1-09 side tables (pins, archive) may not exist yet on a database the
+  // 0001 migration has not reached; the API bootstrap creates them
+  // idempotently, and the cron must not depend on an API call having run.
+  await ensureStudioTables(db);
 
   // 1. Expired sessions (table owned by the auth layer; tolerate its absence).
   try {
@@ -133,6 +179,7 @@ export async function runCleanup(env: StudioApiEnv, now: number = Date.now()): P
       `SELECT id FROM project_revisions
         WHERE (state = 'abandoned' OR (state = 'pending' AND created_at < ?))
           AND id NOT IN (SELECT head_revision_id FROM projects WHERE head_revision_id IS NOT NULL)
+          AND id NOT IN (SELECT revision_id FROM project_revision_pins)
         LIMIT ${MAX_REVISIONS_PER_RUN}`
     )
     .bind(pendingCutoff)
@@ -142,44 +189,73 @@ export async function runCleanup(env: StudioApiEnv, now: number = Date.now()): P
     report.purged_revisions += 1;
   }
 
-  // 3. Soft-deleted projects past retention.
+  // 3. Soft-deleted projects past retention — only those with something left
+  //    to reclaim: a tombstone holding nothing but pinned revisions is not
+  //    selected again (it would starve the per-run cap forever).
   const deletedCutoff = isoAgo(now, limits.deletedRetentionMs);
   const { results: deadProjects } = await db
-    .prepare(`SELECT id FROM projects WHERE deleted_at IS NOT NULL AND deleted_at < ? LIMIT ${MAX_PROJECTS_PER_RUN}`)
+    .prepare(
+      `SELECT p.id FROM projects p
+        WHERE p.deleted_at IS NOT NULL AND p.deleted_at < ?
+          AND (p.head_revision_id IS NOT NULL
+               OR NOT EXISTS (SELECT 1 FROM project_revisions r
+                               WHERE r.project_id = p.id
+                                 AND r.id IN (SELECT revision_id FROM project_revision_pins))
+               OR EXISTS (SELECT 1 FROM project_revisions r
+                           WHERE r.project_id = p.id
+                             AND r.id NOT IN (SELECT revision_id FROM project_revision_pins)))
+        LIMIT ${MAX_PROJECTS_PER_RUN}`
+    )
     .bind(deletedCutoff)
     .all<{ id: string }>();
   for (const project of deadProjects || []) {
-    report.purged_files += await purgeProject(db, bucket, project.id);
-    report.purged_projects += 1;
+    const result = await purgeProject(db, bucket, project.id);
+    report.purged_files += result.files;
+    if (result.purged) report.purged_projects += 1;
+    report.kept_pinned_revisions += result.keptPinned;
   }
 
-  // 4. Committed-revision retention (keep newest N; head and the newest
-  //    committed 'full' snapshot are always protected).
+  // 4. Committed-revision retention: keep the newest N UNPINNED revisions;
+  //    pinned revisions sit outside that count and are always kept, as are
+  //    the head and the newest committed 'full' snapshot. Only projects with
+  //    more than N unpinned committed revisions are selected, so pins alone
+  //    can never keep a project in the queue.
   const { results: crowded } = await db
     .prepare(
       `SELECT project_id, COUNT(*) AS n FROM project_revisions
-        WHERE state = 'committed' GROUP BY project_id HAVING n > ? LIMIT ${MAX_RETENTION_PROJECTS_PER_RUN}`
+        WHERE state = 'committed' AND id NOT IN (SELECT revision_id FROM project_revision_pins)
+        GROUP BY project_id HAVING n > ? LIMIT ${MAX_RETENTION_PROJECTS_PER_RUN}`
     )
     .bind(limits.keepCommittedRevisions)
     .all<{ project_id: string; n: number }>();
   for (const entry of crowded || []) {
     const { results: committed } = await db
       .prepare(
-        `SELECT r.id, r.snapshot_kind, p.head_revision_id AS head_id
+        `SELECT r.id, r.snapshot_kind, p.head_revision_id AS head_id,
+                EXISTS (SELECT 1 FROM project_revision_pins k WHERE k.revision_id = r.id) AS pinned
            FROM project_revisions r JOIN projects p ON p.id = r.project_id
           WHERE r.project_id = ? AND r.state = 'committed'
           ORDER BY r.revision DESC`
       )
       .bind(entry.project_id)
-      .all<{ id: string; snapshot_kind: string; head_id: string | null }>();
+      .all<{ id: string; snapshot_kind: string; head_id: string | null; pinned: number }>();
     const rows = committed || [];
-    const keep = new Set<string>(rows.slice(0, limits.keepCommittedRevisions).map((r) => r.id));
+    const unpinned = rows.filter((r) => !r.pinned);
+    const keep = new Set<string>(unpinned.slice(0, limits.keepCommittedRevisions).map((r) => r.id));
+    for (const r of rows) if (r.pinned) keep.add(r.id);
     const newestFull = rows.find((r) => r.snapshot_kind === "full");
     if (newestFull) keep.add(newestFull.id);
     if (rows[0]?.head_id) keep.add(rows[0].head_id);
     for (const r of rows) {
       if (keep.has(r.id)) continue;
-      report.purged_files += await purgeRevisionById(db, bucket, r.id);
+      const files = await purgeRevisionById(db, bucket, r.id);
+      // purgeRevisionById re-checks head and pins at delete time; a revision
+      // pinned between the read above and now is kept, and counted as such.
+      if (await revisionExists(db, r.id)) {
+        report.kept_pinned_revisions += 1;
+        continue;
+      }
+      report.purged_files += files;
       report.pruned_committed_revisions += 1;
     }
   }

@@ -59,22 +59,32 @@
 
 ## 6. الحفظ والمشاريع (Saving / Projects)
 
+> **تحديث 2026-10-19 (P1-09).** الصفوف السابقة وصفت لقطة ما قبل الحفظ بالحساب
+> («لا جداول، لا R2، لا APIs»)، وصار ذلك غير صحيح منذ شرائح S3/S5. الجدول أدناه
+> يصف الشيفرة الحالية؛ التفاصيل في `docs/STUDIO_STORAGE.md`.
+
 | الوظيفة | حالتها الفعلية | ملف التنفيذ | النقص | طريقة التطوير | اختبار القبول |
 |---|---|---|---|---|---|
-| حفظ محلي | تعمل — محلي فقط | `studio/app/project-store.ts` (IndexedDB `levo-studio-projects`) | لا مالك، لا صورة مصغرة، لا revision، لا بصمة محتوى، لا فصل حسب المستخدم — المخزن على مستوى الأصل (origin) كله | يبقى مسودة/استرداد أعطال فقط (بند 4)، مع namespace لكل user_id + حقول `lastSyncedRevision`/`pendingUpload` | T5, T6 |
-| snapshot الحفظ التلقائي | جزئي — مضلل | `slicer-client.tsx` (L1314-1334, L1433-1454) | يختطف زر save-project في المحرك عبر Shadow DOM؛ عند فشله خلال 30 ثانية يحفظ ملفات المصدر الخام **ويعرض نفس حالة «autosaved»** — التحويلات/الألواح/التلوين تضيع عند الاستئناف دون تمييز (مخالف بند 4 صراحة) | تمييز `snapshot_kind: full / source-only` في الواجهة والتخزين، وحماية آخر snapshot كامل ناجح من الاستبدال | T6: عدم فقد آخر نسخة ناجحة عند فشل snapshot |
-| حفظ بالحساب على الخادم | لا — غير موجود إطلاقًا | `studio/db/schema.ts` (فارغ عمدًا، صفر migrations) | لا جداول، لا R2، لا APIs؛ «مشاريعي» بالحساب (بند 4) غير موجودة | مخطط D1 (projects / project_revisions / project_files) + R2 خاص + بروتوكول رفع مؤقت ← تحقق ← اعتماد revision — التفاصيل في `docs/STUDIO_PLAN.md` | T3, T4, T5, T6 |
-| استئناف المشروع | جزئي | `slicer-client.tsx` (L1248-1273) | يعيد إرسال الملفات عبر جسر input المزيف؛ الاستعادة الكاملة فقط إذا كان الملف 3MF snapshot v2 | ربط الاستئناف بمخطط revisions الجديد | T4: فتح من جهاز آخر واستعادة كل شيء |
+| حفظ محلي | تعمل — مسودة/استرداد أعطال فقط | `studio/app/project-store.ts` (IndexedDB v2 `drafts`) | — | namespace لكل حساب (`user:<id>` / `guest` / `legacy`)، `snapshotKind` صريح، وحماية آخر snapshot كامل (`fullSnapshot`)؛ المسودات القديمة تُستورد بفعل صريح فقط | T5, T6 |
+| snapshot الحفظ التلقائي | تعمل — بصدق | `studio/app/project-sync.ts` (`ProjectSyncController`) | — | خمس حالات مرئية؛ «متزامن» بعد COMMIT 200 فقط؛ الحفظ المتدهور يُسمى `source-only` ولا يستبدل آخر نسخة كاملة | T6 |
+| حفظ بالحساب على الخادم | تعمل | `studio/worker/api/projects.ts`، `uploads.ts`، `quota.ts`؛ `studio/db/schema.ts` | — | D1 منفصلة (`projects` / `project_revisions` / `project_files`) + R2 خاص؛ OPEN → UPLOAD (تحقق sha256) → COMMIT بـcompare-and-set؛ حصة 1 GiB لكل مستخدم (قرار المالك Q7) | T3, T4, T5, T6 |
+| أرشفة / سلة / سجل / تثبيت (P1-09) | تعمل | `projects.ts`، `pins.ts`، `cleanup.ts`؛ `studio/app/components/projects-panel.tsx` | دليل يدوي من جهازين ما زال معلقًا (01، 03) | الأرشفة ليست حذفًا؛ الحذف إلى سلة قابلة للاستعادة ضمن مدة الاحتفاظ؛ استعادة أي نسخة محفوظة كـhead جديد؛ النسخ المثبتة لا تُقلَّم ولا تُحذف | `studio/tests/api-projects.test.mjs` |
+| استئناف المشروع | تعمل | `project-sync.ts` (`openRemoteProject`)، `slicer-client.tsx` (`openAccountProjectInEditor`) | دليل يدوي من جهازين معلق | تنزيل head (أو نسخة محددة من السجل) مع وسم `full`/`source-only` بصدق | T4 |
+| عمل الضيف بعد الدخول (P1-09) | تعمل — بالموافقة فقط | `use-project-persistence.ts` (`adoptGuestDraftProject`)، `projects-panel.tsx` | — | مسودات الضيف تبقى وتُعرض؛ «احفظ عملك في حسابي» يرفعها كمشروع جديد ثم ينقلها؛ لا تبنٍّ تلقائي | `studio/tests/project-lifecycle.test.mjs`، `studio/tests/browser-account-switch.mjs` |
 
 ## 7. الدخول والحساب (Auth)
 
+> **تحديث 2026-10-19 (P1-09).** `chatgpt-auth.ts` وثقته بترويسات `oai-*` حُذفا
+> منذ شريحة S2؛ الجدول أدناه يصف الشيفرة الحالية (`docs/STUDIO_AUTH.md`).
+
 | الوظيفة | حالتها الفعلية | ملف التنفيذ | النقص | طريقة التطوير | اختبار القبول |
 |---|---|---|---|---|---|
-| المصادقة الحالية | لا — ثغرة انتحال | `studio/app/chatgpt-auth.ts` + `studio/app/page.tsx` | تثق بترويسات `oai-authenticated-user-*` القابلة للتزوير من أي عميل خارج الاستضافة القديمة، والهوية بريد إلكتروني لا user ID ثابت (مخالف بند 3 حرفيًا) | حذف/استبدال كامل بتبادل رمز أحادي الاستخدام خادم-لخادم مع الموقع الرئيسي + تجريد الترويسات `oai-*` في worker الاستوديو دفاعًا في العمق | T2: رفض رمز منتهٍ/مكرر ووجهة غير مسموحة وترويسات مزورة |
-| مسارات الدخول | لا — 404 | `slicer-client.tsx` (L1716) | روابط `/signin-with-chatgpt`/`/signout-with-chatgpt` لا يخدمها أي كود في المستودع — كانت مسارات منصة الاستضافة القديمة | مسارات `/auth/*` جديدة في worker الاستوديو | T2 |
-| جلسة Studio | لا — غير موجودة | — | لا كوكي جلسة خاصة؛ الموقع الرئيسي لديه نظام كامل (`worker/lib/session.ts`: كوكي `levonis_session` host-scoped + SHA-256 للرمز) يصلح قالبًا | جلسة studio host-scoped مطابقة للنمط، **بدون** `Domain=.levonis-iq.com` (بند 3 يمنع) | T2, T5 |
-| التحرير كضيف | تعمل | `page.tsx` (user يظل null) | المحرر كله يعمل بلا دخول — يُحافظ عليه (بند 3) مع توضيح أن المزامنة تتطلب دخولًا | إبقاء + رسالة توضيح | T4 |
-| حصر الوصول للبيانات | خطر تصميمي | `migrations/0001_init.sql` (قاعدة المتجر) | ربط `levonis-db` بworker الاستوديو يمنحه users/sessions/wallet/KYC كاملة — bindings D1 على مستوى القاعدة بلا grants للجداول | قاعدة D1 منفصلة `levonis-studio-db` لا تحوي إلا بيانات المشاريع؛ الهوية تُمرر كـ `owner_id` معتم | T3 |
+| المصادقة الحالية | تعمل | `studio/worker/auth/callback.ts`، `studio/app/studio-auth.ts` | — | تبادل رمز أحادي الاستخدام خادم-لخادم مع الموقع الرئيسي؛ الهوية `owner_id` معتم؛ كل ترويسة `oai-*`/`x-levo-*` واردة تُجرَّد في worker الاستوديو (`sanitizeRequestHeaders`) | T2 |
+| مسارات الدخول | تعمل | `/auth/login`، `/auth/callback`، `/auth/logout` | — | المسارات القديمة `/signin-with-chatgpt` و`/signout-with-chatgpt` تحول 302 إلى الجديدة | T2 |
+| جلسة Studio | تعمل | `studio/worker/auth/session.ts` | عزل كوكي `levonis_session` المشترك داخل worker الاستوديو مؤجل إلى P1-10 (Q8) | كوكي `levo_studio_session` host-scoped (بلا `Domain`)، SHA-256 للرمز، 14 يومًا، وفحص حيوية جلسة الموقع الرئيسي | T2, T5 |
+| الخروج وتبديل الحساب (P1-09) | تعمل | `studio/app/components/sheets/sign-out.tsx`، `projects-panel.tsx` | — | ورقة خروج بخيار غير مفعّل افتراضيًا لحذف مسودات الحساب من الجهاز؛ لوحة المشاريع مفتاحها الحساب فلا يرث حساب لاحق شيئًا | `studio/tests/browser-account-switch.mjs` |
+| التحرير كضيف | تعمل | `page.tsx` (user يظل null) | — | المحرر كله يعمل بلا دخول، والمزامنة تتطلب دخولًا | T4 |
+| حصر الوصول للبيانات | تعمل | `studio/wrangler.jsonc` | — | قاعدة D1 منفصلة `levonis-studio-db` لا تحوي إلا بيانات المشاريع؛ لا ربط بـ`levonis-db` | T3 |
 
 ## 8. MakerWorld والإخراج (Output)
 

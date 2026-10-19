@@ -222,7 +222,7 @@ test('the file limit states the real ceilings instead of denying they exist', ()
   const limit = /fileLimit: "([^"]+)"/.exec(en)![1];
   assert.match(limit, /500 MB/, 'MODEL_FILE_BYTES_CEILING refuses a model above 500 MB at selection');
   assert.match(limit, /64 MB/, 'the worker holds a saved project to 64 MiB per file');
-  assert.match(limit, /200 MB/, 'and to 200 MiB per account');
+  assert.match(limit, /1 GB/, 'and to 1 GiB per account (owner decision Q7, studio/worker/api/quota.ts)');
   assert.ok(!/no fixed/i.test(limit), 'the old copy promised no cap, which was false in three places at once');
 });
 

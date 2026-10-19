@@ -498,6 +498,19 @@ button:disabled { cursor: not-allowed; }
 .cut-apply { min-height: 46px; border: 1px solid var(--accent-strong); border-radius: var(--radius-sm); background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 850; cursor: pointer; }
 .cut-apply:disabled { opacity: 0.55; cursor: not-allowed; }
 
+/* Sign-out sheet (P1-09): the optional "remove my drafts from this device". */
+.signout-body { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px 16px; }
+.signout-help { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+.signout-purge { display: flex; align-items: flex-start; gap: 8px; font-size: var(--text-label); }
+.signout-purge input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); flex: 0 0 auto; }
+.signout-purge span { display: flex; flex-direction: column; gap: 3px; }
+.signout-purge small { font-size: 11px; line-height: 1.45; color: var(--muted); }
+.signout-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.signout-actions button { flex: 1 1 140px; min-height: var(--tap-min); border-radius: var(--radius-sm); font-size: 13px; font-weight: 800; cursor: pointer; }
+.signout-confirm { border: 1px solid var(--accent-strong); background: var(--accent); color: var(--accent-ink); }
+.signout-cancel { border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+.signout-actions button:disabled { opacity: 0.55; cursor: not-allowed; }
+
 /**
  * SHELL ACTIONS ON DESKTOP.
  *

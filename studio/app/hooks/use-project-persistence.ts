@@ -14,7 +14,12 @@
  *  - conflict resolution with a real user choice (overwrite-by-rebase or
  *    keep the server version) — never a silent overwrite;
  *  - opening account projects (download head revision, honestly labeled
- *    full vs source-only) and explicit import of legacy local drafts.
+ *    full vs source-only) and explicit import of legacy local drafts;
+ *  - P1-09: the guest work left on this device is offered back after sign-in
+ *    and adopted ONLY on the explicit «احفظ عملك في حسابي» action (nothing in
+ *    the user-change effect below touches the guest namespace), a kept
+ *    revision can be opened as a local copy, and an explicit sign-out may
+ *    remove this account's drafts from the device.
  *
  * The editor shell provides capture callbacks (engine 3MF export, source
  * files, canvas thumbnail, manifest) and receives files to dispatch — this
@@ -25,6 +30,7 @@ import {
   ProjectSyncController,
   openRemoteProject,
   studioProjectsApi,
+  uploadDraftToAccount,
   type ConflictResolution,
   type OpenedRemoteProject,
   type PersistenceState,
@@ -36,9 +42,16 @@ import {
   type StudioProjectsApi,
 } from "../project-sync";
 import {
+  GUEST_NAMESPACE,
+  adoptGuestDraft,
   importLegacyDraft,
+  isUserNamespace,
+  listGuestDrafts,
   listLegacyDrafts,
+  loadDraft,
   namespaceForUser,
+  purgeNamespaceDrafts,
+  resolveSnapshotKind,
   saveDraft,
   setActiveDraftNamespace,
   type StoredLevoProject,
@@ -114,6 +127,43 @@ export interface UseProjectPersistenceResult {
   listLegacyDraftProjects: () => Promise<StoredLevoProject[]>;
   /** EXPLICIT user action: move a legacy draft into the active namespace. */
   importLegacyDraftProject: (id: string) => Promise<StoredLevoProject | undefined>;
+  /** Signed in: the guest drafts left on this device (empty for a guest). */
+  listGuestDraftProjects: () => Promise<StoredLevoProject[]>;
+  /**
+   * EXPLICIT consent only («احفظ عملك في حسابي»): upload one guest draft as a
+   * new account project, then move the local draft into this user's
+   * namespace. Throws with a readable message on failure; the guest draft is
+   * then left exactly where it was.
+   */
+  adoptGuestDraftProject: (id: string) => Promise<RemoteProjectSummary>;
+  /** Download a specific kept revision (history "open as a copy"). Never links. */
+  openAccountRevision: (projectId: string, revisionId: string) => Promise<OpenedRemoteProject>;
+  /**
+   * Explicit sign-out choice: stop every timer/upload, then remove this
+   * account's drafts from the device. Returns how many were removed.
+   */
+  purgeLocalDraftsForSignOut: () => Promise<number>;
+}
+
+/** The manifest an adopted draft's first revision carries — only what the draft knows. */
+export function manifestForDraft(draft: StoredLevoProject): ProjectManifest {
+  const kind = resolveSnapshotKind(draft);
+  return {
+    version: 1,
+    generator: "levo-studio",
+    project: { name: draft.name || "LEVO Project" },
+    printer: { profileId: draft.profileId },
+    settings: {
+      quality: draft.quality,
+      strength: draft.strength,
+      support: Boolean(draft.support),
+      ...(typeof draft.infill === "string" ? { infill: draft.infill } : {}),
+      ...(draft.settings ? { global: draft.settings as unknown as Record<string, unknown> } : {}),
+    },
+    ...(typeof draft.plateCount === "number" ? { plates: { count: draft.plateCount } } : {}),
+    snapshot_kind: kind,
+    adopted_from: "guest-draft",
+  };
 }
 
 const INITIAL_STATE: PersistenceState = {
@@ -238,6 +288,55 @@ export function useProjectPersistence(options: UseProjectPersistenceOptions): Us
     [namespace]
   );
 
+  const listGuestDraftProjects = useCallback(
+    async () => (isUserNamespace(namespace) ? listGuestDrafts() : []),
+    [namespace]
+  );
+
+  const adoptGuestDraftProject = useCallback(
+    async (id: string): Promise<RemoteProjectSummary> => {
+      if (!isUserNamespace(namespace)) throw new Error("Sign in to save this work to your account.");
+      const draft = await loadDraft(GUEST_NAMESPACE, id);
+      if (!draft) throw new Error("This draft is no longer on this device.");
+      const snapshotKind = resolveSnapshotKind(draft);
+      const result = await uploadDraftToAccount(
+        {
+          name: draft.name,
+          files: draft.files,
+          snapshotKind,
+          thumbnail: draft.thumbnail ?? null,
+          manifest: manifestForDraft(draft),
+        },
+        { api }
+      );
+      if (!result.ok) throw new Error(result.message);
+      await adoptGuestDraft(id, namespace, {
+        projectId: result.project.id,
+        revision: result.revision,
+        revisionId: result.revisionId,
+        syncedAt: Date.now(),
+        contentHash: result.contentHash,
+        snapshotKind: result.snapshotKind,
+      });
+      return result.project;
+    },
+    [api, namespace]
+  );
+
+  const openAccountRevision = useCallback(
+    (projectId: string, revisionId: string) => openRemoteProject(projectId, { api, revisionId }),
+    [api]
+  );
+
+  const purgeLocalDraftsForSignOut = useCallback(async () => {
+    if (!isUserNamespace(namespace)) return 0;
+    // No pending autosave may write a draft back after the purge.
+    const controller = controllerRef.current;
+    controllerRef.current = null;
+    controller?.dispose();
+    return purgeNamespaceDrafts(namespace);
+  }, [namespace]);
+
   return {
     state,
     namespace,
@@ -251,5 +350,9 @@ export function useProjectPersistence(options: UseProjectPersistenceOptions): Us
     openAccountProject,
     listLegacyDraftProjects,
     importLegacyDraftProject,
+    listGuestDraftProjects,
+    adoptGuestDraftProject,
+    openAccountRevision,
+    purgeLocalDraftsForSignOut,
   };
 }

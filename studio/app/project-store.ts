@@ -15,6 +15,17 @@
  *     (importLegacyDraft), per the mandate ("لا تتبنَّ مشاريع ضيف أو مستخدم
  *     سابق تلقائيًا").
  *
+ * Guest work after sign-in (P1-09): signing in switches the active namespace
+ * from `guest` to `user:<id>` and NOTHING moves. The guest drafts stay on the
+ * device, untouched, and are offered back to the signed-in user with one
+ * explicit action — «احفظ عملك في حسابي» — which uploads the draft as a new
+ * account project and only then moves it (adoptGuestDraft). No code path
+ * adopts on sign-in by itself.
+ *
+ * Explicit logout (P1-09): the user may choose to remove their own drafts
+ * from this device as they sign out (purgeNamespaceDrafts on `user:<id>`);
+ * the guest namespace and other accounts' namespaces are never touched by it.
+ *
  * Honest snapshot kinds: a draft records whether its files are a full project
  * snapshot (3MF v2 — geometry + plates + transforms + settings) or raw source
  * files only. A source-only save NEVER overwrites the last successful full
@@ -156,6 +167,21 @@ export function mergeDraftForSave(
 }
 
 // ---------------------------------------------------------------------------
+// Storage engine. IndexedDB in the browser; the seam exists so node tests can
+// drive the real namespace logic below against an in-memory engine (node has
+// no IndexedDB). App code never swaps it.
+// ---------------------------------------------------------------------------
+
+export interface DraftBackend {
+  get(key: string): Promise<DraftRecord | undefined>;
+  /** Atomic read-modify-write of one record (one readwrite transaction). */
+  update(key: string, next: (existing: DraftRecord | undefined) => DraftRecord): Promise<void>;
+  delete(key: string): Promise<void>;
+  /** Every record whose `namespace` index equals `namespace`. */
+  listNamespace(namespace: string): Promise<DraftRecord[]>;
+}
+
+// ---------------------------------------------------------------------------
 // IndexedDB plumbing
 // ---------------------------------------------------------------------------
 
@@ -216,6 +242,61 @@ async function transact<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore
   }
 }
 
+const indexedDbBackend: DraftBackend = {
+  get(key) {
+    return transact<DraftRecord | undefined>("readonly", (store) =>
+      store.get(key) as IDBRequest<DraftRecord | undefined>
+    );
+  },
+  async update(key, next) {
+    const db = await database();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(DRAFTS_STORE, "readwrite");
+        const store = tx.objectStore(DRAFTS_STORE);
+        const getRequest = store.get(key);
+        getRequest.onsuccess = () => {
+          try {
+            store.put(next(getRequest.result as DraftRecord | undefined));
+          } catch (error) {
+            reject(error instanceof Error ? error : new Error(String(error)));
+          }
+        };
+        getRequest.onerror = () => reject(getRequest.error);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error ?? new Error("The draft save was aborted."));
+      });
+    } finally {
+      db.close();
+    }
+  },
+  async delete(key) {
+    await transact("readwrite", (store) => store.delete(key));
+  },
+  async listNamespace(namespace) {
+    const db = await database();
+    try {
+      return await new Promise<DraftRecord[]>((resolve, reject) => {
+        const tx = db.transaction(DRAFTS_STORE, "readonly");
+        const index = tx.objectStore(DRAFTS_STORE).index("namespace");
+        const request = index.getAll(namespace) as IDBRequest<DraftRecord[]>;
+        request.onsuccess = () => resolve(request.result ?? []);
+        request.onerror = () => reject(request.error);
+      });
+    } finally {
+      db.close();
+    }
+  },
+};
+
+let backend: DraftBackend = indexedDbBackend;
+
+/** Node tests only (no IndexedDB there): swap the engine; null restores IndexedDB. */
+export function setDraftBackendForTests(next: DraftBackend | null): void {
+  backend = next ?? indexedDbBackend;
+}
+
 // ---------------------------------------------------------------------------
 // Namespaced draft API (what the persistence hook + projects panel use)
 // ---------------------------------------------------------------------------
@@ -225,56 +306,73 @@ async function transact<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore
  * merge (get + put in one readwrite transaction).
  */
 export async function saveDraft(namespace: string, project: StoredLevoProject): Promise<void> {
-  const db = await database();
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(DRAFTS_STORE, "readwrite");
-      const store = tx.objectStore(DRAFTS_STORE);
-      const getRequest = store.get(draftKey(namespace, project.id));
-      getRequest.onsuccess = () => {
-        try {
-          store.put(mergeDraftForSave(getRequest.result as DraftRecord | undefined, project, namespace));
-        } catch (error) {
-          reject(error instanceof Error ? error : new Error(String(error)));
-        }
-      };
-      getRequest.onerror = () => reject(getRequest.error);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error ?? new Error("The draft save was aborted."));
-    });
-  } finally {
-    db.close();
-  }
+  await backend.update(draftKey(namespace, project.id), (existing) => mergeDraftForSave(existing, project, namespace));
 }
 
 export async function loadDraft(namespace: string, id: string): Promise<StoredLevoProject | undefined> {
-  const record = await transact<DraftRecord | undefined>("readonly", (store) =>
-    store.get(draftKey(namespace, id)) as IDBRequest<DraftRecord | undefined>
-  );
+  const record = await backend.get(draftKey(namespace, id));
   // Defence in depth: a record is only returned to its own namespace.
   if (record && record.namespace !== namespace) return undefined;
   return record;
 }
 
 export async function listDrafts(namespace: string): Promise<StoredLevoProject[]> {
-  const db = await database();
-  try {
-    const records = await new Promise<DraftRecord[]>((resolve, reject) => {
-      const tx = db.transaction(DRAFTS_STORE, "readonly");
-      const index = tx.objectStore(DRAFTS_STORE).index("namespace");
-      const request = index.getAll(namespace) as IDBRequest<DraftRecord[]>;
-      request.onsuccess = () => resolve(request.result ?? []);
-      request.onerror = () => reject(request.error);
-    });
-    return records.sort((a, b) => b.updatedAt - a.updatedAt);
-  } finally {
-    db.close();
-  }
+  const records = await backend.listNamespace(namespace);
+  // Same defence in depth as loadDraft: the index answer is re-checked.
+  return records.filter((record) => record.namespace === namespace).sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export async function deleteDraft(namespace: string, id: string): Promise<void> {
-  await transact("readwrite", (store) => store.delete(draftKey(namespace, id)));
+  await backend.delete(draftKey(namespace, id));
+}
+
+/** A signed-in user's own namespace — the only kind a sign-out purge may clear. */
+export function isUserNamespace(namespace: string): boolean {
+  return namespace.startsWith("user:") && namespace.length > "user:".length;
+}
+
+/**
+ * Explicit sign-out choice (P1-09): removes every draft of ONE signed-in
+ * user's namespace from this device. The guest and legacy namespaces, and
+ * every other account's drafts, are untouched — and a non-user namespace is
+ * refused outright. Returns how many drafts were removed.
+ */
+export async function purgeNamespaceDrafts(namespace: string): Promise<number> {
+  if (!isUserNamespace(namespace)) throw new Error("Only a signed-in user's own drafts can be purged.");
+  const records = await backend.listNamespace(namespace);
+  let removed = 0;
+  for (const record of records) {
+    if (record.namespace !== namespace) continue;
+    await backend.delete(record.key);
+    removed += 1;
+  }
+  return removed;
+}
+
+/** Drafts written while signed out — offered back after sign-in, never adopted silently. */
+export function listGuestDrafts(): Promise<StoredLevoProject[]> {
+  return listDrafts(GUEST_NAMESPACE);
+}
+
+/**
+ * EXPLICIT consent only («احفظ عملك في حسابي»): after the draft has been
+ * uploaded to the account, move it from the guest namespace into the user's,
+ * carrying the account link. Never called on sign-in by itself.
+ */
+export async function adoptGuestDraft(
+  id: string,
+  targetNamespace: string,
+  remote: NonNullable<StoredLevoProject["remote"]>
+): Promise<StoredLevoProject | undefined> {
+  if (!isUserNamespace(targetNamespace)) throw new Error("A guest draft can only be adopted into a signed-in account.");
+  const guest = await loadDraft(GUEST_NAMESPACE, id);
+  if (!guest) return undefined;
+  // Re-keyed by the account project id — the same key opening that project
+  // from the account writes its drafts under, so one project = one draft.
+  const adopted: StoredLevoProject = { ...guest, id: remote.projectId, remote };
+  await saveDraft(targetNamespace, adopted);
+  await deleteDraft(GUEST_NAMESPACE, id);
+  return adopted;
 }
 
 /** Drafts written by the old origin-wide store — shown ONLY behind an explicit import UI. */

@@ -106,6 +106,7 @@ import type {
   OpenedRemoteProject,
   ProjectManifest,
   RemoteProjectSummary,
+  RemoteRevision,
   SnapshotCapture,
 } from "./project-sync";
 import {
@@ -120,7 +121,8 @@ import {
   templateText,
   type Locale,
 } from "./i18n";
-import StudioHeader, { FileSelectControl, Icon, SIGN_IN_HREF } from "./components/header";
+import StudioHeader, { FileSelectControl, Icon, SIGN_IN_HREF, SIGN_OUT_HREF } from "./components/header";
+import SignOutSheet from "./components/sheets/sign-out";
 import SetupSheet from "./components/sheets/setup";
 import PrinterChoiceSheet from "./components/sheets/printer-choice";
 import PrintSheet from "./components/sheets/print";
@@ -128,7 +130,7 @@ import ConnectSheet, { type LanAction } from "./components/sheets/connect";
 import AboutSheet from "./components/sheets/about";
 import CutSheet from "./components/sheets/cut";
 
-type Sheet = "setup" | "printer" | "projects" | "print" | "connect" | "about" | "cut" | null;
+type Sheet = "setup" | "printer" | "projects" | "print" | "connect" | "about" | "cut" | "signout" | null;
 type EditorStatus = "loading" | "editing" | "slicing" | "ready" | "error";
 type CanvasMode = "prepare" | "preview";
 
@@ -268,6 +270,32 @@ const MB = 1024 * 1024;
  * shows, imported rather than restated.
  */
 const LOCALE_OPTIONS = LOCALES.map((id) => ({ id, label: LOCALE_NAMES[id] }));
+
+/**
+ * Turn an opened account revision into the editor's restore record. Shared
+ * by "open project" (the head, linked) and the history's "open as a copy"
+ * (a kept revision, NOT linked — see openRevisionCopyInEditor).
+ */
+function recordFromOpened(opened: OpenedRemoteProject, id: string, name: string): StoredLevoProject {
+  const manifest = opened.manifest;
+  const manifestProfile = manifest?.printer?.profileId;
+  return {
+    id,
+    name,
+    updatedAt: Date.now(),
+    files: opened.files,
+    profileId: typeof manifestProfile === "string" ? manifestProfile : DEFAULT_PROFILE_ID,
+    quality: typeof manifest?.settings?.quality === "string" ? manifest.settings.quality : "standard",
+    strength: typeof manifest?.settings?.strength === "string" ? manifest.settings.strength : "standard",
+    support: Boolean(manifest?.settings?.support),
+    infill: typeof manifest?.settings?.infill === "string" ? manifest.settings.infill : undefined,
+    settings: manifest?.settings?.global as SlicerSettings | undefined,
+    objectCount: manifest?.objects?.length,
+    plateCount: manifest?.plates?.count,
+    snapshotVersion: opened.snapshotKind === "full" ? 2 : undefined,
+    snapshotKind: opened.snapshotKind ?? "source-only",
+  };
+}
 
 export default function SlicerClient({ user = null }: { user?: { id?: string; displayName: string } | null }) {
   const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
@@ -1415,27 +1443,64 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       setNotice(t.actionUnavailable);
       return;
     }
-    const manifest = opened.manifest;
-    const manifestProfile = manifest?.printer?.profileId;
-    const record: StoredLevoProject = {
-      id: opened.project.id,
-      name: opened.project.name,
-      updatedAt: Date.now(),
-      files: opened.files,
-      profileId: typeof manifestProfile === "string" ? manifestProfile : DEFAULT_PROFILE_ID,
-      quality: typeof manifest?.settings?.quality === "string" ? manifest.settings.quality : "standard",
-      strength: typeof manifest?.settings?.strength === "string" ? manifest.settings.strength : "standard",
-      support: Boolean(manifest?.settings?.support),
-      infill: typeof manifest?.settings?.infill === "string" ? manifest.settings.infill : undefined,
-      settings: manifest?.settings?.global as SlicerSettings | undefined,
-      objectCount: manifest?.objects?.length,
-      plateCount: manifest?.plates?.count,
-      snapshotVersion: opened.snapshotKind === "full" ? 2 : undefined,
-      snapshotKind: opened.snapshotKind ?? "source-only",
-    };
-    await restoreProjectRecord(record, { relink: false });
+    await restoreProjectRecord(recordFromOpened(opened, opened.project.id, opened.project.name), { relink: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persistence.openAccountProject, restoreProjectRecord, t.actionUnavailable]);
+
+  /**
+   * History → "open as a copy" (P1-09). The kept revision opens as a NEW
+   * local project (fresh id, no account link): editing it can never become
+   * the account project's next head by accident — "make this the current
+   * version" is the explicit, server-side way to do that.
+   */
+  const openRevisionCopyInEditor = useCallback(async (summary: RemoteProjectSummary, revision: RemoteRevision) => {
+    let opened: OpenedRemoteProject;
+    try {
+      opened = await persistence.openAccountRevision(summary.id, revision.id);
+    } catch {
+      setNotice(t.actionUnavailable);
+      return;
+    }
+    const name = `${summary.name} · ${revision.revision}`.slice(0, 80);
+    await restoreProjectRecord(recordFromOpened(opened, crypto.randomUUID(), name));
+    setNotice(templateText(t.revisionCopyOpened, { n: revision.revision }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistence.openAccountRevision, restoreProjectRecord, t.actionUnavailable, t.revisionCopyOpened]);
+
+  /**
+   * History → "make this the current version" made a NEW head on the server.
+   * If that project is the one open here AND everything in the editor is
+   * already saved, reload it so the editor shows the restored version. With
+   * unsaved edits it is NOT reloaded — that would throw the edits away
+   * silently; the next save meets the moved head as an ordinary conflict and
+   * the person chooses (rebase, keep the server version, or fork).
+   */
+  const reloadAfterRevisionRestore = useCallback(async (summary: RemoteProjectSummary) => {
+    const sync = persistence.state;
+    if (sync.remoteProjectId !== summary.id) return;
+    if (sync.dirty || sync.status !== "synced") return;
+    await openAccountProjectInEditor(summary);
+  }, [persistence.state, openAccountProjectInEditor]);
+
+  /**
+   * Explicit sign-out (P1-09). Ticked, this account's drafts leave the device
+   * first — the hook disposes the autosave controller before purging, so no
+   * pending save can write one back. Either way the worker route ends the
+   * session; a purge failure never blocks the sign-out itself.
+   */
+  const [signingOut, setSigningOut] = useState(false);
+  const signOut = useCallback(async (purgeDrafts: boolean) => {
+    setSigningOut(true);
+    if (purgeDrafts) {
+      try {
+        await persistence.purgeLocalDraftsForSignOut();
+      } catch {
+        /* the session still ends; the drafts stay namespaced to this account */
+      }
+    }
+    window.location.assign(SIGN_OUT_HREF);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistence.purgeLocalDraftsForSignOut]);
 
   // Create an account project, link the session, and push the current editor
   // content as its first revision.
@@ -2250,7 +2315,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       : sheet === "print" ? t.printExport
         : sheet === "connect" ? t.connectTitle
           : sheet === "cut" ? t.cutTitle
-            : t.settings;
+            : sheet === "signout" ? t.signOut
+              : t.settings;
 
   const savedStateLabel = displaySavedKind === "full"
     ? t.savedLocalFull
@@ -2287,6 +2353,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         onOpenSetup={() => setSheet("setup")}
         onOpenConnect={() => setSheet("connect")}
         onOpenAbout={() => setSheet("about")}
+        onRequestSignOut={user?.id ? () => setSheet("signout") : undefined}
         onToggleSidebar={() => setSidebarOpen((value) => !value)}
       />
 
@@ -2562,7 +2629,9 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
             <button onClick={() => setSheet(null)} aria-label={t.close}><Icon name="close" /></button>
           </header>
 
-          {sheet === "cut" ? (
+          {sheet === "signout" ? (
+            <SignOutSheet t={t} busy={signingOut} onConfirm={(purge) => void signOut(purge)} onCancel={() => setSheet(null)} />
+          ) : sheet === "cut" ? (
             <CutSheet
               t={t}
               min={cutBounds.min}
@@ -2609,6 +2678,9 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
                 <small>{displaySavedAt ? `${savedStateLabel} · ${new Date(displaySavedAt).toLocaleTimeString(dateLocaleFor(locale))}` : t.guestSyncHint}</small>
               </label>
               <ProjectsPanel
+                // Keyed by account: a different user never inherits this
+                // panel's lists, thumbnails or history (P1-09, test 02).
+                key={user?.id ?? "guest"}
                 locale={locale}
                 user={user?.id ? { id: user.id, displayName: user.displayName } : null}
                 namespace={persistence.namespace}
@@ -2621,6 +2693,10 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
                 onImportLegacy={persistence.importLegacyDraftProject}
                 listLegacyDrafts={persistence.listLegacyDraftProjects}
                 onRequestSignIn={() => window.location.assign(SIGN_IN_HREF)}
+                listGuestDrafts={persistence.listGuestDraftProjects}
+                onAdoptGuestDraft={persistence.adoptGuestDraftProject}
+                onOpenRevisionCopy={(project, revision) => void openRevisionCopyInEditor(project, revision)}
+                onRevisionRestored={(project) => void reloadAfterRevisionRestore(project)}
               />
             </div>
           ) : sheet === "print" ? (

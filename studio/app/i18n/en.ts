@@ -30,6 +30,11 @@ export const en = {
   settings: "Settings",
   signIn: "Sign in",
   signOut: "Sign out",
+  signOutBody: "You will be signed out of LEVO Studio on this device. Projects saved to your account stay saved.",
+  signOutPurgeDrafts: "Also remove my local drafts from this device",
+  signOutPurgeHint: "Useful on a shared device. Drafts that were never saved to your account are lost.",
+  signingOut: "Signing out…",
+  revisionCopyOpened: "Version {n} opened as a separate copy on this device. The original project is unchanged.",
   about: "Platform status",
   language: "Language",
   loading: "Loading the editing engine…",
@@ -144,11 +149,11 @@ export const en = {
    * This said LEVO sets NO fixed cap. That was false in three places at once:
    * the editor refuses a model over 500 MB at selection
    * (MODEL_FILE_BYTES_CEILING, import-orchestrator.ts), and a saved project is
-   * held to 64 MiB per file and 200 MiB per account by the worker
-   * (studio/worker/api/quota.ts). A person hitting any of those met a refusal
-   * the copy had promised could not happen.
+   * held to 64 MiB per file and, by default, 1 GiB per account by the worker
+   * (studio/worker/api/quota.ts; 1 GiB is the owner's Q7 decision). A person
+   * hitting any of those met a refusal the copy had promised could not happen.
    */
-  fileLimit: "Up to 500 MB per file in the editor; a saved project allows 64 MB per file and 200 MB in total. Files stay on your device, and real capacity still depends on browser and device memory.",
+  fileLimit: "Up to 500 MB per file in the editor; a saved project allows 64 MB per file and 1 GB in total per account. Files stay on your device, and real capacity still depends on browser and device memory.",
   actionUnavailable: "This tool is unavailable in the current mode.",
   newConfirm: "Start a new project? Unsaved edits will be lost.",
 

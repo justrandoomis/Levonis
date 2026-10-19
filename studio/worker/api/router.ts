@@ -14,7 +14,12 @@
  *   UPLOAD  PUT  /api/uploads/:fileId              (uploads.ts)
  *   COMMIT  POST /api/projects/:id/revisions/:revId/commit
  *   READ    GET  /api/projects/:id/files/:fileId, /thumbnail, /revisions...
- *   CLEANUP runCleanup / scheduled handler         (cleanup.ts)
+ *   LIFECYCLE (P1-09) GET /api/projects?view=active|archived|trash,
+ *           POST /api/projects/:id/archive|unarchive|restore,
+ *           POST /api/projects/:id/revisions/:revId/restore (new head),
+ *           POST|DELETE /api/projects/:id/revisions/:revId/pin (pins.ts)
+ *   CLEANUP runCleanup / scheduled handler         (cleanup.ts — never
+ *           prunes or purges a pinned revision)
  *
  * Security invariants (mandate §4, tests T3/T6):
  *   - EVERY read/write/thumbnail/old-revision/export checks ownership in D1
@@ -137,7 +142,11 @@ export function requireBucket(env: StudioApiEnv): R2Bucket | Response {
 // same DDL) only exists so `wrangler dev`/preview databases that never ran
 // the migration pipeline fail soft instead of 500ing — the same pattern
 // worker/auth/session.ts uses for studio_sessions. Keep it byte-equivalent
-// to drizzle/0000_studio_projects.sql; tests exercise both paths.
+// to drizzle/0000_studio_projects.sql + 0001_project_archive_pins.sql; tests
+// exercise both paths. The 0001 side tables are also how every P1-09 read
+// tolerates a database the 0001 migration has not reached yet: the first API
+// call of an isolate creates them (the migration itself is IF NOT EXISTS for
+// exactly that reason), so no query ever meets them absent.
 
 const TABLE_SQL: string[] = [
   `CREATE TABLE IF NOT EXISTS projects (
@@ -190,6 +199,21 @@ const TABLE_SQL: string[] = [
   "CREATE UNIQUE INDEX IF NOT EXISTS project_files_r2_key_unique ON project_files (r2_key)",
   "CREATE INDEX IF NOT EXISTS idx_project_files_revision ON project_files (revision_id)",
   "CREATE INDEX IF NOT EXISTS idx_project_files_state_created ON project_files (state,created_at)",
+  // 0001_project_archive_pins (P1-09).
+  `CREATE TABLE IF NOT EXISTS project_archive (
+    project_id text PRIMARY KEY NOT NULL,
+    archived_at text NOT NULL,
+    FOREIGN KEY (project_id) REFERENCES projects(id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS project_revision_pins (
+    id text PRIMARY KEY NOT NULL,
+    revision_id text NOT NULL,
+    pinned_at text NOT NULL,
+    pin_reason text NOT NULL,
+    pin_ref text DEFAULT '' NOT NULL,
+    FOREIGN KEY (revision_id) REFERENCES project_revisions(id)
+  )`,
+  "CREATE UNIQUE INDEX IF NOT EXISTS uq_project_revision_pins_holder ON project_revision_pins (revision_id,pin_reason,pin_ref)",
 ];
 
 let tablesEnsured = false;

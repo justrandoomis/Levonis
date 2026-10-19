@@ -46,7 +46,15 @@ export interface RemoteProjectSummary {
   head_revision: number | null;
   head_snapshot_kind: SnapshotKind | null;
   head_committed_at: string | null;
+  /** Set while archived (P1-09) — archived is NOT deleted. */
+  archived_at?: string | null;
+  /** Trash only: when it was deleted and when the cron may purge it. */
+  deleted_at?: string;
+  purge_after?: string;
 }
+
+/** The three lifecycle lists (P1-09). */
+export type ProjectView = "active" | "archived" | "trash";
 
 export interface RemoteRevision {
   id: string;
@@ -62,6 +70,9 @@ export interface RemoteRevision {
   created_at: string;
   committed_at: string | null;
   manifest?: unknown;
+  /** History list only: held by a pin (never pruned or purged), and by what. */
+  pinned?: boolean;
+  pin_reasons?: string[];
 }
 
 export interface RemoteFile {
@@ -187,13 +198,44 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
 }
 
 export interface StudioProjectsApi {
-  listProjects(opts?: { q?: string; limit?: number; offset?: number; signal?: AbortSignal }): Promise<RemoteProjectSummary[]>;
+  listProjects(opts?: {
+    q?: string;
+    limit?: number;
+    offset?: number;
+    view?: ProjectView;
+    signal?: AbortSignal;
+  }): Promise<RemoteProjectSummary[]>;
   createProject(name: string, signal?: AbortSignal): Promise<RemoteProjectSummary>;
   getProject(id: string, signal?: AbortSignal): Promise<RemoteProjectSummary>;
   renameProject(id: string, name: string, signal?: AbortSignal): Promise<RemoteProjectSummary>;
   deleteProject(id: string, signal?: AbortSignal): Promise<void>;
   duplicateProject(id: string, name?: string, signal?: AbortSignal): Promise<RemoteProjectSummary>;
-  listRevisions(id: string, signal?: AbortSignal): Promise<{ head_revision_id: string | null; revisions: RemoteRevision[] }>;
+  listRevisions(
+    id: string,
+    signal?: AbortSignal,
+    opts?: { committedOnly?: boolean }
+  ): Promise<{ head_revision_id: string | null; revisions: RemoteRevision[]; kept_committed_revisions?: number }>;
+  /** Archive / unarchive (P1-09) — never a delete. */
+  archiveProject(id: string, archived: boolean, signal?: AbortSignal): Promise<RemoteProjectSummary>;
+  /** Restore from the trash while inside the retention window (410 after). */
+  restoreProject(id: string, signal?: AbortSignal): Promise<RemoteProjectSummary>;
+  /**
+   * Restore a kept revision as a NEW head. `baseRevision` is the caller's view
+   * of the current head; a moved head answers 409 (never a silent clobber).
+   */
+  restoreRevision(
+    projectId: string,
+    revisionId: string,
+    baseRevision: number | null,
+    signal?: AbortSignal
+  ): Promise<{ revision: number; revision_id: string; already?: boolean }>;
+  /** The owner's own "keep this version" pin (request/order pins are server-side). */
+  setRevisionKept(
+    projectId: string,
+    revisionId: string,
+    keep: boolean,
+    signal?: AbortSignal
+  ): Promise<{ pinned: boolean; pin_reasons: string[] }>;
   getRevision(projectId: string, revisionId: string, signal?: AbortSignal): Promise<{ revision: RemoteRevision; files: RemoteFile[] }>;
   openRevision(
     projectId: string,
@@ -238,6 +280,7 @@ export function createStudioProjectsApi(fetchImpl?: FetchLike): StudioProjectsAp
       if (opts.q) params.set("q", opts.q);
       if (opts.limit) params.set("limit", String(opts.limit));
       if (opts.offset) params.set("offset", String(opts.offset));
+      if (opts.view && opts.view !== "active") params.set("view", opts.view);
       const suffix = params.size ? `?${params}` : "";
       const body = await parseApiResponse<{ projects: RemoteProjectSummary[] }>(
         await doFetch(`${API_BASE}/projects${suffix}`, { signal: opts.signal })
@@ -275,8 +318,38 @@ export function createStudioProjectsApi(fetchImpl?: FetchLike): StudioProjectsAp
       );
       return body.project;
     },
-    async listRevisions(id, signal) {
-      return parseApiResponse(await doFetch(`${API_BASE}/projects/${enc(id)}/revisions`, { signal }));
+    async listRevisions(id, signal, opts = {}) {
+      const suffix = opts.committedOnly ? "?state=committed" : "";
+      return parseApiResponse(await doFetch(`${API_BASE}/projects/${enc(id)}/revisions${suffix}`, { signal }));
+    },
+    async archiveProject(id, archived, signal) {
+      const body = await parseApiResponse<{ project: RemoteProjectSummary }>(
+        await doFetch(`${API_BASE}/projects/${enc(id)}/${archived ? "archive" : "unarchive"}`, { method: "POST", signal })
+      );
+      return body.project;
+    },
+    async restoreProject(id, signal) {
+      const body = await parseApiResponse<{ project: RemoteProjectSummary }>(
+        await doFetch(`${API_BASE}/projects/${enc(id)}/restore`, { method: "POST", signal })
+      );
+      return body.project;
+    },
+    async restoreRevision(projectId, revisionId, baseRevision, signal) {
+      return parseApiResponse(
+        await doFetch(`${API_BASE}/projects/${enc(projectId)}/revisions/${enc(revisionId)}/restore`, {
+          method: "POST",
+          signal,
+          ...json({ base_revision: baseRevision }),
+        })
+      );
+    },
+    async setRevisionKept(projectId, revisionId, keep, signal) {
+      return parseApiResponse(
+        await doFetch(`${API_BASE}/projects/${enc(projectId)}/revisions/${enc(revisionId)}/pin`, {
+          method: keep ? "POST" : "DELETE",
+          signal,
+        })
+      );
     },
     async getRevision(projectId, revisionId, signal) {
       return parseApiResponse(
@@ -594,17 +667,22 @@ export interface OpenedRemoteProject {
  * worker per request). Full head → the single 3MF snapshot; source-only head
  * → the raw source files, honestly labeled so the caller can warn that
  * arrangement/painting are not part of a degraded save.
+ *
+ * `revisionId` opens a specific kept revision instead (the history sheet's
+ * "open as a copy"); the caller decides how to link it — opening an old
+ * revision must never silently become the project's next head.
  */
 export async function openRemoteProject(
   projectId: string,
-  options: { api?: StudioProjectsApi; signal?: AbortSignal } = {}
+  options: { api?: StudioProjectsApi; signal?: AbortSignal; revisionId?: string } = {}
 ): Promise<OpenedRemoteProject> {
   const api = options.api ?? studioProjectsApi;
   const project = await api.getProject(projectId, options.signal);
-  if (!project.head_revision_id) {
+  const revisionId = options.revisionId ?? project.head_revision_id;
+  if (!revisionId) {
     return { project, revision: null, manifest: null, snapshotKind: null, files: [] };
   }
-  const { revision, files } = await api.getRevision(projectId, project.head_revision_id, options.signal);
+  const { revision, files } = await api.getRevision(projectId, revisionId, options.signal);
   const manifest =
     revision.manifest && typeof revision.manifest === "object" ? (revision.manifest as ProjectManifest) : null;
   const nameFor = (file: RemoteFile, index: number): string => {
@@ -627,6 +705,99 @@ export async function openRemoteProject(
     );
   }
   return { project, revision, manifest, snapshotKind: revision.snapshot_kind, files: restored };
+}
+
+// ---------------------------------------------------------------------------
+// Guest draft → account («احفظ عملك في حسابي», P1-09)
+// ---------------------------------------------------------------------------
+
+/** What a local draft carries that the account copy needs. */
+export interface AdoptableDraft {
+  name: string;
+  files: File[];
+  snapshotKind: SnapshotKind;
+  thumbnail?: Blob | null;
+  manifest: ProjectManifest;
+}
+
+export type DraftUploadResult =
+  | {
+      ok: true;
+      project: RemoteProjectSummary;
+      revision: number;
+      revisionId: string;
+      contentHash: string;
+      snapshotKind: SnapshotKind;
+    }
+  | { ok: false; kind: SyncFailureKind; message: string };
+
+/**
+ * Saves one local draft into the account as a NEW project: create, then one
+ * OPEN → UPLOAD → COMMIT run with the draft's own files (its 3MF snapshot, or
+ * its source files honestly labeled source-only) and thumbnail. Called only
+ * from an explicit user action — sign-in itself never reaches this.
+ *
+ * A failed upload moves the just-created empty project to the trash (best
+ * effort) so a retry does not leave empty projects behind in the list.
+ */
+export async function uploadDraftToAccount(
+  draft: AdoptableDraft,
+  options: SnapshotUploadOptions = {}
+): Promise<DraftUploadResult> {
+  const api = options.api ?? studioProjectsApi;
+  if (draft.files.length === 0) {
+    return { ok: false, kind: "local", message: "This draft has no files to save." };
+  }
+  const files: SnapshotUploadFile[] =
+    draft.snapshotKind === "full"
+      ? [{ kind: "snapshot3mf", name: draft.files[0].name, blob: draft.files[0], contentType: "model/3mf" }]
+      : draft.files.map((file) => ({
+          kind: "source" as const,
+          name: file.name,
+          blob: file,
+          contentType: file.type || "application/octet-stream",
+        }));
+  if (draft.thumbnail instanceof Blob && draft.thumbnail.size > 0) {
+    files.push({ kind: "thumbnail", name: "thumbnail.png", blob: draft.thumbnail, contentType: draft.thumbnail.type || "image/png" });
+  }
+
+  let project: RemoteProjectSummary;
+  try {
+    project = await api.createProject(draft.name.trim().slice(0, 120) || "LEVO Project", options.signal);
+  } catch (error) {
+    const verdict = classifyApiError(error);
+    return { ok: false, kind: verdict.kind, message: verdict.message };
+  }
+
+  const result = await uploadSnapshotRevision(
+    {
+      projectId: project.id,
+      baseRevision: null,
+      snapshotKind: draft.snapshotKind,
+      manifest: draft.manifest,
+      files,
+    },
+    options
+  );
+  if (!result.ok) {
+    void api.deleteProject(project.id).catch(() => {});
+    const message = "message" in result && typeof result.message === "string" ? result.message : result.kind;
+    return { ok: false, kind: result.kind, message };
+  }
+  let fresh = project;
+  try {
+    fresh = await api.getProject(project.id, options.signal);
+  } catch {
+    /* the committed revision is real either way; the summary is cosmetic */
+  }
+  return {
+    ok: true,
+    project: fresh,
+    revision: result.revision,
+    revisionId: result.revisionId,
+    contentHash: result.contentHash,
+    snapshotKind: result.snapshotKind,
+  };
 }
 
 // ---------------------------------------------------------------------------

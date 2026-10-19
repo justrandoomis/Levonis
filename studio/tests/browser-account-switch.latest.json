@@ -1,0 +1,150 @@
+{
+  "target": "http://127.0.0.1:8799/",
+  "failures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "m": "A's account project is listed"
+    },
+    {
+      "ok": true,
+      "m": "A's real thumbnail is rendered for A"
+    },
+    {
+      "ok": true,
+      "m": "and it is served private, no-store",
+      "detail": "private, no-store"
+    },
+    {
+      "ok": true,
+      "m": "A's local draft is listed on the device tab"
+    },
+    {
+      "ok": true,
+      "m": "the guest work is OFFERED to the signed-in user"
+    },
+    {
+      "ok": true,
+      "m": "and stays a guest draft until someone says yes"
+    },
+    {
+      "ok": true,
+      "m": "the history lists both kept versions",
+      "detail": "2"
+    },
+    {
+      "ok": true,
+      "m": "the newest is marked current"
+    },
+    {
+      "ok": true,
+      "m": "the restore is a NEW head (version 3), history kept"
+    },
+    {
+      "ok": true,
+      "m": "keep-this-version pins it and the history says so"
+    },
+    {
+      "ok": true,
+      "m": "archive takes it out of the Projects list"
+    },
+    {
+      "ok": true,
+      "m": "and it is in Archived — not in the Trash"
+    },
+    {
+      "ok": true,
+      "m": "the Trash says when it will be removed"
+    },
+    {
+      "ok": true,
+      "m": "restored from the Trash back into Projects"
+    },
+    {
+      "ok": true,
+      "m": "the sign-out sheet offers the purge UNTICKED"
+    },
+    {
+      "ok": true,
+      "m": "B's own project is listed"
+    },
+    {
+      "ok": true,
+      "m": "no A project name anywhere in B's panel"
+    },
+    {
+      "ok": true,
+      "m": "no A thumbnail element in B's panel"
+    },
+    {
+      "ok": true,
+      "m": "and B's page never even requested A's thumbnail"
+    },
+    {
+      "ok": true,
+      "m": "A's thumbnail is not servable to B, not even from the HTTP cache",
+      "detail": "force-cache → 404"
+    },
+    {
+      "ok": true,
+      "m": "no cached A project list is served to B"
+    },
+    {
+      "ok": true,
+      "m": "no A draft on B's device tab"
+    },
+    {
+      "ok": true,
+      "m": "the guest work is offered to B"
+    },
+    {
+      "ok": true,
+      "m": "it is NOT in B's account before the click"
+    },
+    {
+      "ok": true,
+      "m": "after the click it is an account project of B's"
+    },
+    {
+      "ok": true,
+      "m": "with its bytes committed as revision 1"
+    },
+    {
+      "ok": true,
+      "m": "and it left the guest namespace"
+    },
+    {
+      "ok": true,
+      "m": "into B's namespace, linked to the new project"
+    },
+    {
+      "ok": true,
+      "m": "A's draft is still on the device (A did not ask to purge)"
+    },
+    {
+      "ok": true,
+      "m": "the sign-out sheet offers the purge UNTICKED"
+    },
+    {
+      "ok": true,
+      "m": "the sign-out sheet offers the purge UNTICKED"
+    },
+    {
+      "ok": true,
+      "m": "A's drafts are gone from the device"
+    },
+    {
+      "ok": true,
+      "m": "B's draft is untouched"
+    },
+    {
+      "ok": true,
+      "m": "guest work is untouched"
+    },
+    {
+      "ok": true,
+      "m": "and the session really ended",
+      "detail": "401"
+    }
+  ]
+}

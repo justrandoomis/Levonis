@@ -139,6 +139,11 @@ export interface StudioHeaderProps {
   onOpenConnect: () => void;
   onOpenAbout: () => void;
   onToggleSidebar: () => void;
+  /**
+   * P1-09: sign-out goes through a sheet that offers to remove this
+   * account's drafts from the device. Without it the plain link signs out.
+   */
+  onRequestSignOut?: () => void;
 }
 
 export default function StudioHeader(props: StudioHeaderProps) {
@@ -168,7 +173,19 @@ export default function StudioHeader(props: StudioHeaderProps) {
         {props.printReady && <button className="header-print-action" onClick={props.onOpenPrintCenter}><Icon name="print" /><span>{t.print}</span></button>}
         <button className="connect-action" onClick={props.onOpenConnect} title={t.connectPrinter}><Icon name="print" /><span>{t.connectPrinter}</span></button>
         {!props.nativeApp && (props.user
-          ? <a href={SIGN_OUT_HREF} title={props.user.displayName}><Icon name="check" /><span>{t.signOut}</span></a>
+          ? (
+            <a
+              href={SIGN_OUT_HREF}
+              title={props.user.displayName}
+              onClick={(event) => {
+                if (!props.onRequestSignOut) return;
+                event.preventDefault();
+                props.onRequestSignOut();
+              }}
+            >
+              <Icon name="check" /><span>{t.signOut}</span>
+            </a>
+          )
           : <a href={SIGN_IN_HREF}><Icon name="info" /><span>{t.signIn}</span></a>)}
         <button className="profile-button" onClick={props.onOpenSetup} title={t.settings}>
           <b>{props.profileShortName}</b><small>{props.qualityLayer.toFixed(2)}</small>

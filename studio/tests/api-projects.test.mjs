@@ -136,15 +136,25 @@ class FakeR2 {
 // ---------------------------------------------------------------------------
 
 const MIGRATION_SQL = readFileSync(new URL("../drizzle/0000_studio_projects.sql", import.meta.url), "utf8");
+const MIGRATION_0001_SQL = readFileSync(new URL("../drizzle/0001_project_archive_pins.sql", import.meta.url), "utf8");
 
+function applySql(raw, sql) {
+  for (const part of sql.split("--> statement-breakpoint")) {
+    const stmt = part.trim();
+    if (stmt) raw.exec(stmt);
+  }
+}
+
+/**
+ * applyMigration: true = every migration (the live database's shape), "0000"
+ * = a database the P1-09 migration has not reached yet, false = none at all.
+ */
 function makeEnv({ applyMigration = true, vars = {} } = {}) {
   const raw = new DatabaseSync(":memory:");
   raw.exec("PRAGMA foreign_keys = ON");
   if (applyMigration) {
-    for (const part of MIGRATION_SQL.split("--> statement-breakpoint")) {
-      const stmt = part.trim();
-      if (stmt) raw.exec(stmt);
-    }
+    applySql(raw, MIGRATION_SQL);
+    if (applyMigration === true) applySql(raw, MIGRATION_0001_SQL);
   }
   resetEnsuredTablesForTests();
   const bucket = new FakeR2();
@@ -700,4 +710,375 @@ test("storage without an R2 binding answers an honest 503, never a fake success"
   assert.equal(open.json.code, "STORAGE_NOT_CONFIGURED");
   const health = await call(env, ctx, null, "GET", "/api/health");
   assert.equal(health.json.r2, false);
+});
+
+// ---------------------------------------------------------------------------
+// P1-09: project lifecycle (archive ≠ delete, trash), revision history and
+// pinned revisions.
+// ---------------------------------------------------------------------------
+
+const pinsMod = await import("../worker/api/pins.ts");
+const quotaMod = await import("../worker/api/quota.ts");
+
+const DAY_MS = 86_400_000;
+const MiB = 1024 * 1024;
+
+async function committedFullRevision(env, ctx, session, projectId, base, label) {
+  const open = await openFullRevision(env, ctx, session, projectId, base, label);
+  assert.equal(open.response.status, 201, `OPEN ${label}`);
+  await uploadAll(env, ctx, session, open);
+  const done = await commit(env, ctx, session, projectId, open.json.revision_id);
+  assert.equal(done.response.status, 200, `COMMIT ${label}`);
+  return { id: open.json.revision_id, revision: open.json.revision, payloads: open.payloads, files: open.json.files };
+}
+
+async function listView(env, ctx, session, view) {
+  const { response, json } = await call(env, ctx, session, "GET", `/api/projects?view=${view}`);
+  assert.equal(response.status, 200, `list ${view}`);
+  return json;
+}
+
+/** No storage internals or other holders' ids in an owner-facing DTO. */
+function assertNoInternals(json, extraSecrets = []) {
+  const text = JSON.stringify(json);
+  for (const leak of ["owner_id", "thumbnail_key", "r2_key", "pin_ref", "projects/", ...extraSecrets]) {
+    assert.ok(!text.includes(leak), `response leaks ${leak}: ${text.slice(0, 300)}`);
+  }
+}
+
+test("archive is not delete: an archived project leaves the default list, stays readable, and cleanup never purges it", async () => {
+  const { env, raw, bucket } = makeEnv();
+  const ctx = makeCtx();
+  const id = await createProject(env, ctx, USER_A, "أرشيف");
+  await committedFullRevision(env, ctx, USER_A, id, null, "arch");
+  const stored = [...bucket.objects.keys()];
+  assert.ok(stored.length >= 3);
+
+  const archived = await call(env, ctx, USER_A, "POST", `/api/projects/${id}/archive`);
+  assert.equal(archived.response.status, 200);
+  assert.match(archived.json.project.archived_at, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(archived.json.project.deleted_at, undefined, "archiving never marks a delete");
+  const again = await call(env, ctx, USER_A, "POST", `/api/projects/${id}/archive`);
+  assert.equal(again.json.project.archived_at, archived.json.project.archived_at, "archive is idempotent");
+  assert.equal(raw.prepare("SELECT deleted_at FROM projects WHERE id = ?").get(id).deleted_at, null);
+
+  assert.equal((await listView(env, ctx, USER_A, "active")).projects.length, 0);
+  const archivedList = await listView(env, ctx, USER_A, "archived");
+  assert.deepEqual(archivedList.projects.map((p) => p.id), [id]);
+  assertNoInternals(archivedList);
+  assert.equal((await listView(env, ctx, USER_A, "trash")).projects.length, 0, "an archived project is not in the trash");
+
+  // Still fully readable: project, history, thumbnail.
+  assert.equal((await call(env, ctx, USER_A, "GET", `/api/projects/${id}`)).response.status, 200);
+  assert.equal((await call(env, ctx, USER_A, "GET", `/api/projects/${id}/revisions`)).response.status, 200);
+  assert.equal((await call(env, ctx, USER_A, "GET", `/api/projects/${id}/thumbnail`)).response.status, 200);
+
+  // Ten years of cron runs later, nothing of it is gone.
+  const report = await runCleanup(env, Date.now() + 3650 * DAY_MS);
+  assert.equal(report.purged_projects, 0);
+  assert.equal(report.purged_revisions, 0);
+  for (const key of stored) assert.ok(bucket.objects.has(key), "an archived project's objects are never reclaimed");
+
+  // Another user can neither see nor move it.
+  for (const action of ["archive", "unarchive", "restore"]) {
+    const { response } = await call(env, ctx, USER_B, "POST", `/api/projects/${id}/${action}`);
+    assert.equal(response.status, 404, `${action} must 404 for a non-owner`);
+  }
+  assert.equal((await listView(env, ctx, USER_B, "archived")).projects.length, 0);
+
+  // Delete is its own state: an archived project moved to the trash shows in
+  // the trash only, and a restore brings it back archived, as it was.
+  await call(env, ctx, USER_A, "DELETE", `/api/projects/${id}`);
+  assert.equal((await listView(env, ctx, USER_A, "archived")).projects.length, 0);
+  assert.deepEqual((await listView(env, ctx, USER_A, "trash")).projects.map((p) => p.id), [id]);
+  const restored = await call(env, ctx, USER_A, "POST", `/api/projects/${id}/restore`);
+  assert.equal(restored.response.status, 200);
+  assert.ok(restored.json.project.archived_at, "restore keeps the archive state");
+
+  // Unarchive returns it to the default list.
+  const back = await call(env, ctx, USER_A, "POST", `/api/projects/${id}/unarchive`);
+  assert.equal(back.response.status, 200);
+  assert.equal(back.json.project.archived_at, null);
+  assert.deepEqual((await listView(env, ctx, USER_A, "active")).projects.map((p) => p.id), [id]);
+
+  const badView = await call(env, ctx, USER_A, "GET", "/api/projects?view=everything");
+  assert.equal(badView.response.status, 400);
+});
+
+test("delete moves to the trash: restorable inside the retention window, 410 after it, then purged", async () => {
+  const { env, raw, bucket } = makeEnv({ vars: { STUDIO_DELETED_RETENTION_DAYS: "30" } });
+  const ctx = makeCtx();
+  const id = await createProject(env, ctx, USER_A, "سلة المحذوفات");
+  await committedFullRevision(env, ctx, USER_A, id, null, "trash");
+
+  const del = await call(env, ctx, USER_A, "DELETE", `/api/projects/${id}`);
+  assert.equal(del.response.status, 200);
+  assert.equal(Date.parse(del.json.purge_after) - Date.parse(del.json.deleted_at), 30 * DAY_MS);
+  assert.equal((await call(env, ctx, USER_A, "GET", `/api/projects/${id}`)).response.status, 404);
+  assert.equal((await listView(env, ctx, USER_A, "active")).projects.length, 0);
+  const trash = await listView(env, ctx, USER_A, "trash");
+  assert.equal(trash.retention_days, 30);
+  assert.equal(trash.projects.length, 1);
+  assert.equal(trash.projects[0].purge_after, del.json.purge_after);
+  assertNoInternals(trash);
+  assert.equal((await listView(env, ctx, USER_B, "trash")).projects.length, 0, "the trash is per owner");
+
+  const restored = await call(env, ctx, USER_A, "POST", `/api/projects/${id}/restore`);
+  assert.equal(restored.response.status, 200);
+  assert.equal(restored.json.project.head_revision, 1, "a restore brings back the saved head untouched");
+  assert.equal((await call(env, ctx, USER_A, "GET", `/api/projects/${id}`)).response.status, 200);
+  assert.equal((await call(env, ctx, USER_A, "POST", `/api/projects/${id}/restore`)).json.already, true);
+
+  // Past the window: not offered, not restorable, then purged by the cron.
+  await call(env, ctx, USER_A, "DELETE", `/api/projects/${id}`);
+  raw.prepare("UPDATE projects SET deleted_at = '2020-01-01T00:00:00.000Z' WHERE id = ?").run(id);
+  assert.equal((await listView(env, ctx, USER_A, "trash")).projects.length, 0);
+  const late = await call(env, ctx, USER_A, "POST", `/api/projects/${id}/restore`);
+  assert.equal(late.response.status, 410);
+  assert.equal(late.json.code, "RETENTION_EXPIRED");
+  const report = await runCleanup(env);
+  assert.equal(report.purged_projects, 1);
+  assert.equal(bucket.objects.size, 0);
+  assert.equal((await call(env, ctx, USER_A, "POST", `/api/projects/${id}/restore`)).response.status, 404);
+});
+
+test("a pinned revision survives retention, the deleted-project purge and every later cleanup run", async () => {
+  const { env, raw, bucket } = makeEnv({ vars: { STUDIO_KEEP_COMMITTED_REVISIONS: "1" } });
+  const ctx = makeCtx();
+  const id = await createProject(env, ctx, USER_A, "مثبت");
+  const rev1 = await committedFullRevision(env, ctx, USER_A, id, null, "r1");
+
+  // A (test) request holds revision 1 — server code, never a client route.
+  const pin = await pinsMod.pinRevision(env.DB, {
+    ownerId: USER_A.user.id,
+    projectId: id,
+    revisionId: rev1.id,
+    reason: "request",
+    ref: "REQ-test-1",
+  });
+  assert.equal(pin.ok, true);
+  const pinAgain = await pinsMod.pinRevision(env.DB, {
+    ownerId: USER_A.user.id,
+    projectId: id,
+    revisionId: rev1.id,
+    reason: "request",
+    ref: "REQ-test-1",
+  });
+  assert.equal(pinAgain.already, true, "pinning twice for the same holder is idempotent");
+  const rev1Keys = [...bucket.objects.keys()];
+
+  let base = rev1.revision;
+  const later = [];
+  for (const label of ["r2", "r3", "r4"]) {
+    const rev = await committedFullRevision(env, ctx, USER_A, id, base, label);
+    later.push(rev);
+    base = rev.revision;
+  }
+
+  // Retention keeps 1 unpinned revision (the head, r4): r2 and r3 go, the
+  // pinned r1 — older than all of them — stays with every byte.
+  const report = await runCleanup(env);
+  assert.equal(report.pruned_committed_revisions, 2);
+  const ids = raw.prepare("SELECT id FROM project_revisions ORDER BY revision").all().map((r) => r.id);
+  assert.deepEqual(ids, [rev1.id, later[2].id]);
+  for (const key of rev1Keys) assert.ok(bucket.objects.has(key), "a pinned revision keeps its objects");
+
+  // Still readable by its owner after the forced run (the P1-09 done-when).
+  const read = await call(env, ctx, USER_A, "GET", `/api/projects/${id}/revisions/${rev1.id}`);
+  assert.equal(read.response.status, 200);
+  const snap = read.json.files.find((f) => f.kind === "snapshot3mf");
+  const bytes = await call(env, ctx, USER_A, "GET", `/api/projects/${id}/files/${snap.id}`);
+  assert.equal(bytes.response.status, 200);
+  assert.deepEqual(new Uint8Array(await bytes.response.arrayBuffer()), rev1.payloads.snapshot);
+
+  // History reports the pin by reason only — never the holder's id.
+  const history = await call(env, ctx, USER_A, "GET", `/api/projects/${id}/revisions?state=committed`);
+  const entry = history.json.revisions.find((r) => r.id === rev1.id);
+  assert.equal(entry.pinned, true);
+  assert.deepEqual(entry.pin_reasons, ["request"]);
+  assert.equal(history.json.revisions.find((r) => r.id === later[2].id).pinned, false);
+  assertNoInternals(history.json, ["REQ-test-1"]);
+
+  // A second run finds nothing more to do (pins never keep a project queued).
+  const quiet = await runCleanup(env);
+  assert.equal(quiet.pruned_committed_revisions, 0);
+
+  // Deleted and past retention: everything unpinned goes, the pinned revision
+  // and a deleted tombstone that owns it stay.
+  await call(env, ctx, USER_A, "DELETE", `/api/projects/${id}`);
+  raw.prepare("UPDATE projects SET deleted_at = '2020-01-01T00:00:00.000Z' WHERE id = ?").run(id);
+  const purge = await runCleanup(env);
+  assert.equal(purge.purged_projects, 0, "a project holding a pinned revision is not purged");
+  assert.equal(purge.kept_pinned_revisions, 1);
+  assert.deepEqual(raw.prepare("SELECT id FROM project_revisions").all().map((r) => r.id), [rev1.id]);
+  const tomb = raw.prepare("SELECT deleted_at, head_revision_id FROM projects WHERE id = ?").get(id);
+  assert.ok(tomb.deleted_at);
+  assert.equal(tomb.head_revision_id, null);
+  assert.deepEqual([...bucket.objects.keys()].sort(), [...rev1Keys].sort());
+  assert.equal((await listView(env, ctx, USER_A, "trash")).projects.length, 0, "a tombstone is never offered");
+
+  // Later runs neither re-select the tombstone nor touch the pin.
+  const after = await runCleanup(env, Date.now() + 3650 * DAY_MS);
+  assert.equal(after.kept_pinned_revisions, 0);
+  assert.equal(after.purged_files, 0);
+  for (const key of rev1Keys) assert.ok(bucket.objects.has(key));
+
+  // Belt and braces: the purge helper refuses it, and so does the database.
+  assert.equal(await cleanupMod.purgeRevisionById(env.DB, bucket, rev1.id), 0);
+  assert.throws(() => raw.prepare("DELETE FROM project_revisions WHERE id = ?").run(rev1.id), /FOREIGN KEY/);
+
+  // Releasing the last holder hands it back to the cron.
+  const release = await pinsMod.unpinRevision(env.DB, {
+    ownerId: USER_A.user.id,
+    projectId: id,
+    revisionId: rev1.id,
+    reason: "request",
+    ref: "REQ-test-1",
+  });
+  assert.deepEqual(release, { ok: true, released: true });
+  const final = await runCleanup(env);
+  assert.equal(final.purged_projects, 1);
+  assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM projects").get().n, 0);
+  assert.equal(bucket.objects.size, 0);
+});
+
+test("pins: the owner's keep-this-version is the only pin a client can set or release", async () => {
+  const { env } = makeEnv();
+  const ctx = makeCtx();
+  const id = await createProject(env, ctx, USER_A, "احتفظ");
+  const rev1 = await committedFullRevision(env, ctx, USER_A, id, null, "k1");
+
+  const pinned = await call(env, ctx, USER_A, "POST", `/api/projects/${id}/revisions/${rev1.id}/pin`);
+  assert.equal(pinned.response.status, 200);
+  assert.deepEqual(pinned.json.pin_reasons, ["user"]);
+  assert.equal(await pinsMod.isRevisionPinned(env.DB, rev1.id), true);
+
+  // Non-owners: 404 on both verbs, and the pin is untouched.
+  for (const method of ["POST", "DELETE"]) {
+    const { response } = await call(env, ctx, USER_B, method, `/api/projects/${id}/revisions/${rev1.id}/pin`);
+    assert.equal(response.status, 404);
+  }
+  assert.equal(
+    (await pinsMod.pinRevision(env.DB, { ownerId: USER_B.user.id, projectId: id, revisionId: rev1.id, reason: "user" })).ok,
+    false
+  );
+
+  // A pending upload is not a version anyone can hold.
+  const pending = await openFullRevision(env, ctx, USER_A, id, 1, "pending");
+  const pendingPin = await call(env, ctx, USER_A, "POST", `/api/projects/${id}/revisions/${pending.json.revision_id}/pin`);
+  assert.equal(pendingPin.response.status, 409);
+  assert.equal(pendingPin.json.code, "NOT_COMMITTED");
+
+  // Server-side holders: a reason must be known and carry a holder id.
+  for (const bad of [
+    { reason: "forever", ref: "x" },
+    { reason: "request", ref: "" },
+    { reason: "order", ref: "has spaces" },
+  ]) {
+    const result = await pinsMod.pinRevision(env.DB, { ownerId: USER_A.user.id, projectId: id, revisionId: rev1.id, ...bad });
+    assert.equal(result.ok, false, JSON.stringify(bad));
+  }
+  await pinsMod.pinRevision(env.DB, { ownerId: USER_A.user.id, projectId: id, revisionId: rev1.id, reason: "order", ref: "ORD-1" });
+
+  // Releasing the owner's pin leaves the order's pin in place.
+  const released = await call(env, ctx, USER_A, "DELETE", `/api/projects/${id}/revisions/${rev1.id}/pin`);
+  assert.equal(released.response.status, 200);
+  assert.equal(released.json.pinned, true);
+  assert.deepEqual(released.json.pin_reasons, ["order"]);
+  assertNoInternals(released.json, ["ORD-1"]);
+});
+
+test("history: restoring a kept revision makes a NEW head with its content; history is never rewritten", async () => {
+  const { env, raw } = makeEnv();
+  const ctx = makeCtx();
+  const id = await createProject(env, ctx, USER_A, "سجل");
+  const rev1 = await committedFullRevision(env, ctx, USER_A, id, null, "r1");
+  const rev2 = await committedFullRevision(env, ctx, USER_A, id, 1, "r2");
+
+  const restore = await call(env, ctx, USER_A, "POST", `/api/projects/${id}/revisions/${rev1.id}/restore`, {
+    base_revision: 2,
+  });
+  assert.equal(restore.response.status, 201);
+  assert.equal(restore.json.revision, 3);
+  assert.deepEqual(restore.json.restored_from, { revision: 1, revision_id: rev1.id });
+
+  const project = await call(env, ctx, USER_A, "GET", `/api/projects/${id}`);
+  assert.equal(project.json.project.head_revision, 3);
+  assert.equal(project.json.project.head_revision_id, restore.json.revision_id);
+
+  // The new head carries revision 1's manifest and bytes, and points back.
+  const head = await call(env, ctx, USER_A, "GET", `/api/projects/${id}/revisions/${restore.json.revision_id}`);
+  assert.equal(head.json.revision.parent_revision, 2, "the restore is built on the head it replaced");
+  assert.equal(head.json.revision.manifest.label, "r1");
+  assert.equal(head.json.revision.manifest.restored_from.revision, 1);
+  const snap = head.json.files.find((f) => f.kind === "snapshot3mf");
+  const bytes = await call(env, ctx, USER_A, "GET", `/api/projects/${id}/files/${snap.id}`);
+  assert.deepEqual(new Uint8Array(await bytes.response.arrayBuffer()), rev1.payloads.snapshot);
+  const thumb = await call(env, ctx, USER_A, "GET", `/api/projects/${id}/thumbnail`);
+  assert.deepEqual(new Uint8Array(await thumb.response.arrayBuffer()), rev1.payloads.thumb);
+
+  // Nothing was rewritten: revisions 1 and 2 are still committed, with files.
+  const states = raw.prepare("SELECT id, state FROM project_revisions ORDER BY revision").all();
+  assert.deepEqual(
+    states.map((r) => r.state),
+    ["committed", "committed", "committed"]
+  );
+  assert.equal(states[1].id, rev2.id);
+
+  // A stale view of the head never clobbers: 409 with the fresh head.
+  const stale = await call(env, ctx, USER_A, "POST", `/api/projects/${id}/revisions/${rev2.id}/restore`, {
+    base_revision: 2,
+  });
+  assert.equal(stale.response.status, 409);
+  assert.equal(stale.json.head.revision, 3);
+  assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM project_revisions").get().n, 3, "a refused restore adds nothing");
+
+  // Restoring the head is a no-op; a pending or foreign revision is not found.
+  const same = await call(env, ctx, USER_A, "POST", `/api/projects/${id}/revisions/${restore.json.revision_id}/restore`, {});
+  assert.equal(same.json.already, true);
+  const pending = await openFullRevision(env, ctx, USER_A, id, 3, "p");
+  const pendingRestore = await call(env, ctx, USER_A, "POST", `/api/projects/${id}/revisions/${pending.json.revision_id}/restore`, {});
+  assert.equal(pendingRestore.response.status, 404);
+  const foreign = await call(env, ctx, USER_B, "POST", `/api/projects/${id}/revisions/${rev2.id}/restore`, {});
+  assert.equal(foreign.response.status, 404);
+
+  // The history sheet's list: committed only, newest first, pins reported.
+  const history = await call(env, ctx, USER_A, "GET", `/api/projects/${id}/revisions?state=committed`);
+  assert.deepEqual(
+    history.json.revisions.map((r) => r.revision),
+    [3, 2, 1]
+  );
+  assert.ok(history.json.revisions.every((r) => r.pinned === false && Array.isArray(r.pin_reasons)));
+  assert.equal(history.json.kept_committed_revisions, 20);
+  assertNoInternals(history.json);
+});
+
+test("migration 0001 is safe on every path: after 0000, after the bootstrap made its tables, and applied twice", async () => {
+  // A database at 0000 (the live shape before this push) serves the new code:
+  // the bootstrap creates the side tables, archive and pins just work.
+  const { env, raw } = makeEnv({ applyMigration: "0000" });
+  const ctx = makeCtx();
+  const id = await createProject(env, ctx, USER_A, "قبل الترحيل");
+  assert.equal((await call(env, ctx, USER_A, "POST", `/api/projects/${id}/archive`)).response.status, 200);
+  assert.equal((await listView(env, ctx, USER_A, "archived")).projects.length, 1);
+  // The workflow then applies 0001 over tables the worker already made.
+  assert.doesNotThrow(() => applySql(raw, MIGRATION_0001_SQL));
+  assert.doesNotThrow(() => applySql(raw, MIGRATION_0001_SQL));
+  assert.equal((await listView(env, ctx, USER_A, "archived")).projects.length, 1, "no data lost");
+  // And a cron run on a database no API call has touched yet still works.
+  const cold = makeEnv({ applyMigration: "0000" });
+  const report = await runCleanup(cold.env);
+  assert.equal(report.purged_projects, 0);
+});
+
+test("the per-user quota defaults to 1 GiB (owner decision Q7); the env override still wins; max file stays 64 MiB", async () => {
+  assert.equal(quotaMod.DEFAULT_USER_QUOTA_BYTES, 1024 * 1024 * 1024);
+  const { env } = makeEnv();
+  const ctx = makeCtx();
+  const quota = await call(env, ctx, USER_A, "GET", "/api/quota");
+  assert.equal(quota.json.quota_bytes, 1024 * 1024 * 1024);
+  assert.equal(quota.json.limits.max_file_bytes, 64 * MiB);
+  const small = makeEnv({ vars: { STUDIO_USER_QUOTA_BYTES: String(5 * MiB) } });
+  const overridden = await call(small.env, ctx, USER_A, "GET", "/api/quota");
+  assert.equal(overridden.json.quota_bytes, 5 * MiB);
 });

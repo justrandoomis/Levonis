@@ -13,6 +13,22 @@
  * moved; COMMIT re-checks and swaps the head with a compare-and-set UPDATE —
  * the loser of a race receives 409 plus the server head so the client can
  * rebase or fork. A newer version is never silently clobbered.
+ *
+ * Lifecycle (P1-09) — three separate states, never conflated:
+ *   active    the default list;
+ *   archived  POST /:id/archive · /:id/unarchive — out of the default list,
+ *             fully readable and writable, NEVER deleted by archiving
+ *             (project_archive side table);
+ *   trash     DELETE /:id (soft) · POST /:id/restore — restorable while
+ *             deleted_at is inside the retention window, after which the
+ *             cleanup cron purges it (pinned revisions excepted).
+ * GET /api/projects?view=active|archived|trash lists each one.
+ *
+ * Revision history (P1-09): GET /:id/revisions reports each revision's pins;
+ * POST /:id/revisions/:rev/restore copies a kept committed revision into a
+ * NEW head (never rewrites history, compare-and-set like COMMIT);
+ * POST|DELETE /:id/revisions/:rev/pin is the owner's own "keep this version"
+ * (worker/api/pins.ts — request/order pins are server-side only).
  */
 import type { StudioSession } from "../auth/session";
 import {
@@ -30,6 +46,7 @@ import {
 } from "./router";
 import { ownerUsageBytes, studioLimits } from "./quota";
 import { purgeRevisionById } from "./cleanup";
+import { pinReasonsFor, pinRevision, unpinRevision } from "./pins";
 
 // Row shapes -------------------------------------------------------------------
 
@@ -123,10 +140,25 @@ interface ProjectListRow extends ProjectRow {
   head_revision: number | null;
   head_snapshot_kind: string | null;
   head_committed_at: string | null;
+  archived_at: string | null;
 }
 
-function projectJson(row: ProjectListRow): Record<string, unknown> {
+/**
+ * Owner-facing project DTO. `deleted_at`/`purge_after` appear only for a
+ * project in the trash (the only reads that can see one), so the active and
+ * archived lists carry exactly the fields they always did plus archived_at.
+ */
+function projectJson(row: ProjectListRow, retentionMs?: number): Record<string, unknown> {
+  const trash: Record<string, unknown> = {};
+  if (row.deleted_at) {
+    trash.deleted_at = row.deleted_at;
+    const deletedMs = Date.parse(row.deleted_at);
+    if (retentionMs && Number.isFinite(deletedMs)) {
+      trash.purge_after = new Date(deletedMs + retentionMs).toISOString();
+    }
+  }
   return {
+    ...trash,
     id: row.id,
     name: row.name,
     schema_version: row.schema_version,
@@ -140,11 +172,14 @@ function projectJson(row: ProjectListRow): Record<string, unknown> {
     // a full snapshot (mandate §4).
     head_snapshot_kind: row.head_snapshot_kind,
     head_committed_at: row.head_committed_at,
+    archived_at: row.archived_at ?? null,
   };
 }
 
-function revisionJson(row: RevisionRow): Record<string, unknown> {
+function revisionJson(row: RevisionRow, pins?: string[]): Record<string, unknown> {
+  const pinInfo = pins === undefined ? {} : { pinned: pins.length > 0, pin_reasons: pins };
   return {
+    ...pinInfo,
     id: row.id,
     project_id: row.project_id,
     revision: row.revision,
@@ -173,9 +208,10 @@ function fileJson(row: FileRow): Record<string, unknown> {
 }
 
 const PROJECT_SELECT = `SELECT p.*, h.revision AS head_revision, h.snapshot_kind AS head_snapshot_kind,
-       h.committed_at AS head_committed_at
+       h.committed_at AS head_committed_at, a.archived_at AS archived_at
   FROM projects p
-  LEFT JOIN project_revisions h ON h.id = p.head_revision_id`;
+  LEFT JOIN project_revisions h ON h.id = p.head_revision_id
+  LEFT JOIN project_archive a ON a.project_id = p.id`;
 
 /** Owner-scoped project load; null ⇒ respond 404 (existence never revealed). */
 async function loadOwnedProject(
@@ -223,6 +259,16 @@ export async function handleProjectsRoute(
     return duplicateProject(request, env, session, projectId);
   }
 
+  if (rest.length === 2 && (rest[1] === "archive" || rest[1] === "unarchive")) {
+    if (request.method !== "POST") return methodNotAllowed("POST");
+    return setArchived(env, session, projectId, rest[1] === "archive");
+  }
+
+  if (rest.length === 2 && rest[1] === "restore") {
+    if (request.method !== "POST") return methodNotAllowed("POST");
+    return restoreFromTrash(env, session, projectId);
+  }
+
   if (rest.length === 2 && rest[1] === "thumbnail") {
     if (request.method !== "GET" && request.method !== "HEAD") return methodNotAllowed("GET, HEAD");
     return getThumbnail(request, env, session, projectId);
@@ -230,7 +276,7 @@ export async function handleProjectsRoute(
 
   if (rest[1] === "revisions") {
     if (rest.length === 2) {
-      if (request.method === "GET") return listRevisions(env, session, projectId);
+      if (request.method === "GET") return listRevisions(request, env, session, projectId);
       if (request.method === "POST") return openRevision(request, env, session, projectId);
       return methodNotAllowed("GET, POST");
     }
@@ -248,6 +294,15 @@ export async function handleProjectsRoute(
       if (request.method !== "POST") return methodNotAllowed("POST");
       return abandonRevision(env, ctx, session, projectId, revisionId);
     }
+    if (rest.length === 4 && rest[3] === "restore") {
+      if (request.method !== "POST") return methodNotAllowed("POST");
+      return restoreRevision(request, env, session, projectId, revisionId);
+    }
+    if (rest.length === 4 && rest[3] === "pin") {
+      if (request.method === "POST") return setUserPin(env, session, projectId, revisionId, true);
+      if (request.method === "DELETE") return setUserPin(env, session, projectId, revisionId, false);
+      return methodNotAllowed("POST, DELETE");
+    }
     return notFound();
   }
 
@@ -263,30 +318,49 @@ export async function handleProjectsRoute(
 
 // Projects ----------------------------------------------------------------------
 
+const PROJECT_VIEWS = new Set(["active", "archived", "trash"]);
+
+/**
+ * GET /api/projects?view=active|archived|trash (default active).
+ * The trash lists only what is still restorable (inside the retention window);
+ * anything older is the cleanup cron's, and never offered as restorable.
+ */
 async function listProjects(request: Request, env: StudioApiEnv, session: StudioSession): Promise<Response> {
   const url = new URL(request.url);
   const q = (url.searchParams.get("q") || "").trim().slice(0, 120);
   const limit = intParam(url.searchParams.get("limit"), 50, 1, 100);
   const offset = intParam(url.searchParams.get("offset"), 0, 0, 100_000);
+  const view = url.searchParams.get("view") || "active";
+  if (!PROJECT_VIEWS.has(view)) return apiError(400, "BAD_VIEW", "view must be active, archived or trash");
+  const limits = studioLimits(env);
 
-  const filters: string[] = ["p.owner_id = ?", "p.deleted_at IS NULL"];
+  const filters: string[] = ["p.owner_id = ?"];
   const binds: unknown[] = [session.user.id];
+  if (view === "trash") {
+    filters.push("p.deleted_at IS NOT NULL", "p.deleted_at >= ?");
+    binds.push(new Date(Date.now() - limits.deletedRetentionMs).toISOString());
+  } else {
+    filters.push("p.deleted_at IS NULL", view === "archived" ? "a.project_id IS NOT NULL" : "a.project_id IS NULL");
+  }
   if (q) {
     filters.push("p.name LIKE ? ESCAPE '\\'");
     binds.push(`%${escapeLike(q)}%`);
   }
+  const order = view === "trash" ? "p.deleted_at DESC" : view === "archived" ? "a.archived_at DESC" : "p.updated_at DESC";
 
   const { results } = await env.DB.prepare(
-    `${PROJECT_SELECT} WHERE ${filters.join(" AND ")} ORDER BY p.updated_at DESC LIMIT ? OFFSET ?`
+    `${PROJECT_SELECT} WHERE ${filters.join(" AND ")} ORDER BY ${order} LIMIT ? OFFSET ?`
   )
     .bind(...binds, limit, offset)
     .all<ProjectListRow>();
 
   return jsonResponse({
     success: true,
-    projects: (results || []).map(projectJson),
+    view,
+    projects: (results || []).map((row) => projectJson(row, limits.deletedRetentionMs)),
     limit,
     offset,
+    ...(view === "trash" ? { retention_days: Math.round(limits.deletedRetentionMs / 86_400_000) } : {}),
   });
 }
 
@@ -340,19 +414,79 @@ async function renameProject(
 }
 
 /**
- * Soft delete: the row is marked and disappears from every read; the cleanup
- * cron purges rows + R2 objects after the configured retention. There is no
- * user-facing undelete endpoint yet (the client confirms before calling).
+ * Soft delete (move to trash): the row is marked and disappears from every
+ * read except the trash list; POST /:id/restore brings it back while it is
+ * inside the retention window, after which the cleanup cron purges rows + R2
+ * objects (pinned revisions excepted). Archive is a different action and
+ * never reaches this path.
  */
 async function deleteProject(env: StudioApiEnv, session: StudioSession, projectId: string): Promise<Response> {
   const existing = await loadOwnedProject(env, session.user.id, projectId, { includeDeleted: true });
   if (!existing) return notFound();
-  if (existing.deleted_at) return jsonResponse({ success: true, already: true, deleted_at: existing.deleted_at });
+  const retentionMs = studioLimits(env).deletedRetentionMs;
+  const purgeAfter = (deletedAt: string) => new Date(Date.parse(deletedAt) + retentionMs).toISOString();
+  if (existing.deleted_at) {
+    return jsonResponse({
+      success: true,
+      already: true,
+      deleted_at: existing.deleted_at,
+      purge_after: purgeAfter(existing.deleted_at),
+    });
+  }
   const now = nowIso();
   await env.DB.prepare(`UPDATE projects SET deleted_at = ?, updated_at = ? WHERE id = ? AND owner_id = ?`)
     .bind(now, now, projectId, session.user.id)
     .run();
-  return jsonResponse({ success: true, deleted_at: now });
+  return jsonResponse({ success: true, deleted_at: now, purge_after: purgeAfter(now) });
+}
+
+/**
+ * Archive / unarchive. Only a live (not deleted) owned project; idempotent.
+ * Archiving changes no content, so updated_at — the active list's order —
+ * is left alone.
+ */
+async function setArchived(
+  env: StudioApiEnv,
+  session: StudioSession,
+  projectId: string,
+  archived: boolean
+): Promise<Response> {
+  const existing = await loadOwnedProject(env, session.user.id, projectId);
+  if (!existing) return notFound();
+  if (archived) {
+    await env.DB.prepare(`INSERT OR IGNORE INTO project_archive (project_id, archived_at) VALUES (?, ?)`)
+      .bind(projectId, nowIso())
+      .run();
+  } else {
+    await env.DB.prepare(`DELETE FROM project_archive WHERE project_id = ?`).bind(projectId).run();
+  }
+  const row = await loadOwnedProject(env, session.user.id, projectId);
+  return jsonResponse({ success: true, project: row ? projectJson(row) : { id: projectId } });
+}
+
+/**
+ * Restore from the trash, only inside the retention window. Past it the
+ * project belongs to the cleanup cron (which may already have purged it, or
+ * kept only its pinned revisions) and the honest answer is 410.
+ */
+async function restoreFromTrash(env: StudioApiEnv, session: StudioSession, projectId: string): Promise<Response> {
+  const existing = await loadOwnedProject(env, session.user.id, projectId, { includeDeleted: true });
+  if (!existing) return notFound();
+  if (!existing.deleted_at) {
+    return jsonResponse({ success: true, already: true, project: projectJson(existing) });
+  }
+  const cutoff = new Date(Date.now() - studioLimits(env).deletedRetentionMs).toISOString();
+  const result = await env.DB.prepare(
+    `UPDATE projects SET deleted_at = NULL, updated_at = ?
+      WHERE id = ? AND owner_id = ? AND deleted_at IS NOT NULL AND deleted_at >= ?`
+  )
+    .bind(nowIso(), projectId, session.user.id, cutoff)
+    .run();
+  if (!result.meta.changes) {
+    return apiError(410, "RETENTION_EXPIRED", "This project is past the restore window");
+  }
+  const row = await loadOwnedProject(env, session.user.id, projectId);
+  return jsonResponse({ success: true, project: row ? projectJson(row) : { id: projectId } });
 }
 
 /**
@@ -474,19 +608,255 @@ async function duplicateProject(
 
 // Revisions ----------------------------------------------------------------------
 
-async function listRevisions(env: StudioApiEnv, session: StudioSession, projectId: string): Promise<Response> {
+/**
+ * GET /:id/revisions[?state=committed] — newest first, each with its pins
+ * (reasons only). `state=committed` is what the history sheet asks for: the
+ * versions that can be opened or restored, without upload debris.
+ */
+async function listRevisions(
+  request: Request,
+  env: StudioApiEnv,
+  session: StudioSession,
+  projectId: string
+): Promise<Response> {
   const project = await loadOwnedProject(env, session.user.id, projectId);
   if (!project) return notFound();
+  const committedOnly = new URL(request.url).searchParams.get("state") === "committed";
   const { results } = await env.DB.prepare(
-    `SELECT * FROM project_revisions WHERE project_id = ? ORDER BY revision DESC LIMIT 100`
+    `SELECT * FROM project_revisions WHERE project_id = ?${committedOnly ? " AND state = 'committed'" : ""}
+      ORDER BY revision DESC LIMIT 100`
   )
     .bind(projectId)
     .all<RevisionRow>();
+  const rows = results || [];
+  const pins = await pinReasonsFor(
+    env.DB,
+    rows.map((r) => r.id)
+  );
   return jsonResponse({
     success: true,
     head_revision_id: project.head_revision_id,
-    revisions: (results || []).map(revisionJson),
+    kept_committed_revisions: studioLimits(env).keepCommittedRevisions,
+    revisions: rows.map((r) => revisionJson(r, pins.get(r.id) ?? [])),
   });
+}
+
+/**
+ * RESTORE a kept revision as a NEW head. History is never rewritten: the
+ * chosen revision's verified files are copied (R2 first, quota-checked) into
+ * a fresh revision whose parent is the CURRENT head, and the head moves by
+ * the same compare-and-set COMMIT uses — a head that moved meanwhile (another
+ * device) gets 409 with the fresh head, never a silent clobber. The client
+ * may send `base_revision` (its view of the head) to fail fast the same way.
+ */
+async function restoreRevision(
+  request: Request,
+  env: StudioApiEnv,
+  session: StudioSession,
+  projectId: string,
+  revisionId: string
+): Promise<Response> {
+  const bucket = requireBucket(env);
+  if (bucket instanceof Response) return bucket;
+  const body = await readJsonBody(request, 16 * 1024);
+  if (body instanceof Response) return body;
+
+  const project = await loadOwnedProject(env, session.user.id, projectId);
+  if (!project) return notFound();
+  const source = await env.DB.prepare(
+    `SELECT * FROM project_revisions WHERE id = ? AND project_id = ? AND state = 'committed'`
+  )
+    .bind(revisionId, projectId)
+    .first<RevisionRow>();
+  if (!source) return notFound();
+
+  const base = body.base_revision;
+  if (base !== undefined) {
+    if (!(base === null || (typeof base === "number" && Number.isInteger(base) && base >= 1))) {
+      return apiError(400, "BAD_BASE", "base_revision must be null or a positive integer");
+    }
+    if ((project.head_revision ?? null) !== base) {
+      return apiError(409, "REVISION_CONFLICT", "The project head moved since this base", {
+        head: { revision: project.head_revision, revision_id: project.head_revision_id },
+      });
+    }
+  }
+  if (project.head_revision_id === source.id) {
+    return jsonResponse({ success: true, already: true, revision: source.revision, revision_id: source.id });
+  }
+
+  const { results: srcFiles } = await env.DB.prepare(
+    `SELECT * FROM project_files WHERE revision_id = ? AND state = 'verified'`
+  )
+    .bind(source.id)
+    .all<FileRow>();
+  const files = srcFiles || [];
+  if (files.length === 0) return apiError(409, "NOTHING_TO_RESTORE", "This revision has no stored files");
+
+  const limits = studioLimits(env);
+  const totalSize = files.reduce((sum, f) => sum + f.size_bytes, 0);
+  const used = await ownerUsageBytes(env.DB, session.user.id);
+  if (used + totalSize > limits.userQuotaBytes) {
+    return apiError(413, "QUOTA_EXCEEDED", "Storage quota exceeded", {
+      usage_bytes: used,
+      quota_bytes: limits.userQuotaBytes,
+      requested_bytes: totalSize,
+    });
+  }
+
+  // The restored revision says where it came from; a manifest already at the
+  // size budget is carried over unchanged rather than refused.
+  let manifestJson = source.manifest_json;
+  try {
+    const parsed: unknown = JSON.parse(source.manifest_json);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const annotated = JSON.stringify({
+        ...(parsed as Record<string, unknown>),
+        restored_from: { revision: source.revision, revision_id: source.id },
+      });
+      if (annotated.length <= limits.maxManifestBytes) manifestJson = annotated;
+    }
+  } catch {
+    /* keep the stored manifest verbatim */
+  }
+
+  const newRevisionId = newId();
+  const now = nowIso();
+  const copies = files.map((f) => {
+    const fileId = newId();
+    return { src: f, newId: fileId, newKey: r2KeyFor(projectId, newRevisionId, fileId) };
+  });
+  const copiedKeys: string[] = [];
+  const dropCopies = async () => {
+    for (const k of copiedKeys) await bucket.delete(k).catch(() => {});
+  };
+  for (const copy of copies) {
+    const obj = await bucket.get(copy.src.r2_key);
+    if (!obj) {
+      await dropCopies();
+      return apiError(502, "SOURCE_OBJECT_MISSING", "A stored file is missing; this revision cannot be restored");
+    }
+    const data = await obj.arrayBuffer();
+    await bucket.put(copy.newKey, data, {
+      httpMetadata: copy.src.content_type ? { contentType: copy.src.content_type } : undefined,
+    });
+    copiedKeys.push(copy.newKey);
+  }
+
+  const headId = project.head_revision_id;
+  let revisionNumber = 0;
+  for (let attempt = 0; ; attempt++) {
+    const maxRow = await env.DB.prepare(
+      `SELECT COALESCE(MAX(revision), 0) AS max_rev FROM project_revisions WHERE project_id = ?`
+    )
+      .bind(projectId)
+      .first<{ max_rev: number }>();
+    revisionNumber = (maxRow?.max_rev ?? 0) + 1;
+    try {
+      await env.DB.batch([
+        env.DB.prepare(
+          `INSERT INTO project_revisions (id, project_id, revision, parent_revision, schema_version, engine_version, content_hash, size_bytes, manifest_json, snapshot_kind, state, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`
+        ).bind(
+          newRevisionId,
+          projectId,
+          revisionNumber,
+          project.head_revision ?? null,
+          source.schema_version,
+          source.engine_version,
+          source.content_hash,
+          totalSize,
+          manifestJson,
+          source.snapshot_kind,
+          now
+        ),
+        ...copies.map((c) =>
+          env.DB.prepare(
+            `INSERT INTO project_files (id, revision_id, kind, r2_key, sha256, size_bytes, content_type, state, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'verified', ?)`
+          ).bind(c.newId, newRevisionId, c.src.kind, c.newKey, c.src.sha256, c.src.size_bytes, c.src.content_type, now)
+        ),
+      ]);
+      break;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (attempt < 3 && /UNIQUE/i.test(message)) continue;
+      await dropCopies();
+      throw error;
+    }
+  }
+
+  const thumbnail = copies.find((c) => c.src.kind === "thumbnail");
+  const cas = await env.DB.prepare(
+    `UPDATE projects
+        SET head_revision_id = ?, last_saved_at = ?, updated_at = ?,
+            thumbnail_key = CASE WHEN ? IS NOT NULL THEN ? ELSE thumbnail_key END
+      WHERE id = ? AND owner_id = ? AND deleted_at IS NULL AND ${headId ? "head_revision_id = ?" : "head_revision_id IS NULL"}`
+  )
+    .bind(
+      newRevisionId,
+      now,
+      now,
+      thumbnail ? thumbnail.newKey : null,
+      thumbnail ? thumbnail.newKey : null,
+      projectId,
+      session.user.id,
+      ...(headId ? [headId] : [])
+    )
+    .run();
+  if (!cas.meta.changes) {
+    await env.DB.prepare(`UPDATE project_revisions SET state = 'abandoned' WHERE id = ? AND state = 'pending'`)
+      .bind(newRevisionId)
+      .run();
+    await purgeRevisionById(env.DB, bucket, newRevisionId).catch(() => 0);
+    const fresh = await loadOwnedProject(env, session.user.id, projectId);
+    return apiError(409, "REVISION_CONFLICT", "Another device committed first", {
+      head: fresh ? { revision: fresh.head_revision, revision_id: fresh.head_revision_id } : null,
+    });
+  }
+  await env.DB.prepare(`UPDATE project_revisions SET state = 'committed', committed_at = ? WHERE id = ? AND state = 'pending'`)
+    .bind(now, newRevisionId)
+    .run();
+
+  return jsonResponse(
+    {
+      success: true,
+      revision: revisionNumber,
+      revision_id: newRevisionId,
+      committed_at: now,
+      snapshot_kind: source.snapshot_kind,
+      restored_from: { revision: source.revision, revision_id: source.id },
+    },
+    201
+  );
+}
+
+/**
+ * The owner's own "keep this version" pin (reason 'user'). Releasing it never
+ * touches a request/order pin, which only server code can create or release.
+ */
+async function setUserPin(
+  env: StudioApiEnv,
+  session: StudioSession,
+  projectId: string,
+  revisionId: string,
+  pin: boolean
+): Promise<Response> {
+  const input = { ownerId: session.user.id, projectId, revisionId, reason: "user" as const };
+  if (pin) {
+    const result = await pinRevision(env.DB, input);
+    if (!result.ok) {
+      if (result.code === "NOT_COMMITTED") {
+        return apiError(409, "NOT_COMMITTED", "Only a committed revision can be kept");
+      }
+      return notFound();
+    }
+  } else {
+    const result = await unpinRevision(env.DB, input);
+    if (!result.ok) return notFound();
+  }
+  const reasons = (await pinReasonsFor(env.DB, [revisionId])).get(revisionId) ?? [];
+  return jsonResponse({ success: true, revision_id: revisionId, pinned: reasons.length > 0, pin_reasons: reasons });
 }
 
 interface OpenFileDecl {

@@ -4,18 +4,23 @@
  *
  * Every number below is CONFIGURABLE through wrangler vars (studio/
  * wrangler.jsonc "vars", overridable per environment) and ships with an
- * honest, conservative default. The final production numbers are a PENDING
- * OWNER DECISION — the plan's CLEANUP step places per-user quota and
- * committed-revision retention "ضمن قرارات المالك" (docs/STUDIO_PLAN.md,
- * decision 4; a register row for it belongs in docs/DECISIONS.md). Until the
- * owner decides, these defaults apply and the UI must present them as the
- * current limits, not as promises.
+ * honest default.
+ *
+ * The per-user quota is an OWNER DECISION (Q7, 2026-10-19): 1 GiB per user,
+ * with NO subscription gate on saving, and the largest single file stays
+ * 64 MiB. STUDIO_USER_QUOTA_BYTES still overrides it per environment. The
+ * other numbers (retention, revisions kept, TTLs) remain declared defaults
+ * that the UI presents as the current limits, not as promises.
+ *
+ * Pinned revisions (worker/api/pins.ts) are never pruned or purged, so their
+ * bytes keep counting against the owner's quota for as long as a holder pins
+ * them — the storage is genuinely still in use.
  */
 import type { StudioSession } from "../auth/session";
 import { type StudioApiEnv, jsonResponse } from "./router";
 
 export interface StudioLimits {
-  /** Total bytes of stored project files per user (default 200 MiB). */
+  /** Total bytes of stored project files per user (default 1 GiB — owner decision Q7). */
   userQuotaBytes: number;
   /** Largest single file accepted at OPEN (default 64 MiB — Workers-friendly). */
   maxFileBytes: number;
@@ -41,10 +46,14 @@ function intVar(raw: string | undefined, fallback: number, min: number, max: num
 }
 
 const MiB = 1024 * 1024;
+const GiB = 1024 * MiB;
+
+/** Owner decision Q7: 1 GiB per user, no subscription gate. Env-overridable. */
+export const DEFAULT_USER_QUOTA_BYTES = 1 * GiB;
 
 export function studioLimits(env: StudioApiEnv): StudioLimits {
   return {
-    userQuotaBytes: intVar(env.STUDIO_USER_QUOTA_BYTES, 200 * MiB, 1 * MiB, 100 * 1024 * MiB),
+    userQuotaBytes: intVar(env.STUDIO_USER_QUOTA_BYTES, DEFAULT_USER_QUOTA_BYTES, 1 * MiB, 100 * GiB),
     maxFileBytes: intVar(env.STUDIO_MAX_FILE_BYTES, 64 * MiB, 1024, 512 * MiB),
     thumbnailMaxBytes: intVar(env.STUDIO_THUMBNAIL_MAX_BYTES, 4 * MiB, 1024, 32 * MiB),
     maxFilesPerRevision: intVar(env.STUDIO_MAX_FILES_PER_REVISION, 64, 1, 512),
@@ -92,8 +101,8 @@ export async function handleQuotaRoute(env: StudioApiEnv, session: StudioSession
       max_manifest_bytes: limits.maxManifestBytes,
       kept_committed_revisions: limits.keepCommittedRevisions,
     },
-    // Honest provenance: defaults, adjustable per environment, final numbers
-    // pending an owner decision (docs/STUDIO_PLAN.md decision 4).
+    // Honest provenance: the quota is the owner's Q7 number (1 GiB unless an
+    // environment overrides it); every limit stays adjustable per environment.
     configurable: true,
   });
 }
