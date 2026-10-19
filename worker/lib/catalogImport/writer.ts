@@ -365,7 +365,7 @@ const message = (e: unknown) => String((e as Error)?.message ?? e);
 
 // ---------------------------------------------------------------- media and the content-duplicate collapse (§C.4 step 1)
 
-interface MediaRow {
+export interface MediaRow {
   status: string;
   r2_key: string;
   width: number | null;
@@ -548,7 +548,7 @@ async function hasV2Results(db: D1Database, productId: string): Promise<boolean>
 }
 
 /** One statement (STAGE_MEDIA_READS: /stage adds it to its estimate, so the two totals agree). */
-async function loadMedia(db: D1Database, runId: string, sourceProductId: string): Promise<Map<string, MediaRow>> {
+export async function loadMedia(db: D1Database, runId: string, sourceProductId: string): Promise<Map<string, MediaRow>> {
   const { results } = await db
     .prepare('SELECT source_media_id, status, r2_key, width, height, bytes FROM catalog_import_media WHERE run_id = ? AND source_product_id = ?')
     .bind(runId, sourceProductId)
@@ -718,7 +718,7 @@ export function optionFacetMirror(groups: ImportPayload['groups'], family: 'devi
 
 // ---------------------------------------------------------------- the merge mapping (§E.2, §E.3)
 
-interface MergeMapping {
+export interface MergeMapping {
   /** payload value id → the existing option value or colour it maps to. */
   values: Map<string, { optionValueId?: string; colorId?: string }>;
   /** payload variant id → the existing variant, value or colour it maps to. */
@@ -728,7 +728,7 @@ interface MergeMapping {
   merged: MergedSelections;
 }
 
-function mergeMapping(payload: ImportPayload, match: ExistingMatch, rel: RelationsResponse): MergeMapping {
+export function mergeMapping(payload: ImportPayload, match: ExistingMatch, rel: RelationsResponse): MergeMapping {
   const existingValues = new Set(rel.values.map((v) => String(v.id)));
   const existingColors = new Set(rel.colors.map((c) => String(c.id)));
   const variantByKey = new Map(rel.variants.map((v) => [String(v.combo_key), String(v.id)]));
@@ -1588,7 +1588,7 @@ function refusalOfPlanner(e: unknown): unknown {
   return e;
 }
 
-function imageRowOf(img: PayloadImage, key: string): ImportImageRow {
+export function imageRowOf(img: PayloadImage, key: string): ImportImageRow {
   return {
     id: img.id,
     source_media_id: img.source_media_id,
@@ -1605,7 +1605,7 @@ function imageRowOf(img: PayloadImage, key: string): ImportImageRow {
 }
 
 /** A merge's appended images: bound only through value_map (to an option value, a variant, or a colour), else product-level (§E.2). */
-function mergeImages(rows: ImportImageRow[], mapping: MergeMapping, rel: RelationsResponse): { rows: ImportImageRow[]; written: ImportImageRow[] } {
+export function mergeImages(rows: ImportImageRow[], mapping: MergeMapping, rel: RelationsResponse): { rows: ImportImageRow[]; written: ImportImageRow[] } {
   const existingIds = new Set(rel.images.map((i) => String(i.id)));
   const existingBindings = new Set(rel.images.map((i) => `${i.r2_key}|${i.option_value_id ?? ''}|${i.variant_id ?? ''}|${i.color_id ?? ''}`));
   let next = rel.images.reduce((m, i) => Math.max(m, Number(i.sort_order) || 0), -1) + 1;
@@ -1684,7 +1684,7 @@ function createRelationsWire(payload: ImportPayload, images: ImportImageRow[], a
   };
 }
 
-function wireImage(i: ImportImageRow, alt: { en: string; ar: string; ckb: string; source_url: string } | undefined): Record<string, unknown> {
+export function wireImage(i: ImportImageRow, alt: { en: string; ar: string; ckb: string; source_url: string } | undefined): Record<string, unknown> {
   return {
     id: i.id,
     url: i.url,

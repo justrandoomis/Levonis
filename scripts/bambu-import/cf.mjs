@@ -31,10 +31,11 @@
  *       Every job that writes starts here (§A.1, §K.2 step 11): the live
  *       migration count and last name equal the repository's, the 0195 table
  *       exists, and the Time Travel bookmark (the restore point) is printed. For
- *       preflight and open: no active run; for preflight also no CSV import
- *       lease. For run, close, withdraw and translations (the translation
- *       memory's loader, docs/bambu-import/I18N-DESIGN.md §A.4): the run exists
- *       and is active.
+ *       preflight, open and delta: no active run; for preflight also no CSV
+ *       import lease; for delta, --run names the CLOSED run the delta is taken
+ *       from (spec §O), which must be closed or partial. For run, close,
+ *       withdraw and translations (the translation memory's loader,
+ *       docs/bambu-import/I18N-DESIGN.md §A.4): the run exists and is active.
  *   node scripts/bambu-import/cf.mjs open --token-file <file> --run-file <file>
  *       Creates the run row (`cir_` + 24 hex, state open, the reviewed bundle's
  *       digest, the manifest size, the commit) with a fresh 256-bit token:
@@ -85,7 +86,7 @@ export const SNAPSHOT_FORMAT = 'levonis-bambu-snapshot/1';
 export const REPORT_FILE = 'report.sealed';
 export const REPORT_FORMAT = 'levonis-bambu-report/1';
 /** The modes workflow 60 runs cf.mjs preflight for. */
-export const PREFLIGHT_MODES = ['preflight', 'open', 'run', 'close', 'withdraw', 'translations'];
+export const PREFLIGHT_MODES = ['preflight', 'open', 'run', 'close', 'withdraw', 'translations', 'delta'];
 /** The modes that act on an existing, active run (its id is required, and it must be open, running or blocked). */
 const RUN_MODES = ['run', 'close', 'withdraw', 'translations'];
 /** The reviewed files the Worker bundles (scripts/bambu-import/discover.ts REVIEWED_FILES, §A.3). */
@@ -230,7 +231,7 @@ export function parseArgs(argv) {
   if (mode === 'preflight') {
     const given = options(['--mode', '--run']);
     if (!PREFLIGHT_MODES.includes(given['--mode'])) throw new CfError(`preflight: --mode must be one of ${PREFLIGHT_MODES.join(', ')}`);
-    const needsRun = RUN_MODES.includes(given['--mode']);
+    const needsRun = RUN_MODES.includes(given['--mode']) || given['--mode'] === 'delta';
     if (needsRun) runOf(given['--run'], `preflight for ${given['--mode']}`);
     else if (given['--run'] !== '' && !RUN_ID_PATTERN.test(given['--run'] ?? '')) throw new CfError('preflight: --run is a run id or empty');
     return { mode, forMode: given['--mode'], runId: given['--run'] };
@@ -512,7 +513,13 @@ export function preflight(context, { forMode, runId }) {
   if (!tableExists(context, 'catalog_import_runs')) throw new CfError('catalog_import_runs is not in the live database (migration 0195)');
   const active = Number(query(context, "SELECT COUNT(*) AS n FROM catalog_import_runs WHERE state IN ('open','running','blocked')").results[0]?.n);
   context.log(`preflight: active import runs: ${active}`);
-  if ((forMode === 'preflight' || forMode === 'open') && active !== 0) throw new CfError('an import run is already active');
+  if ((forMode === 'preflight' || forMode === 'open' || forMode === 'delta') && active !== 0) throw new CfError('an import run is already active');
+  if (forMode === 'delta') {
+    // The delta's source (spec §O): an earlier run that has finished, closed or partial. The new run is opened next.
+    const from = query(context, `SELECT COUNT(*) AS n FROM catalog_import_runs WHERE id = '${runId}' AND state IN ('closed','partial')`).results[0];
+    if (Number(from?.n) !== 1) throw new CfError(`run ${runId} is not a closed import run: a delta is taken from a closed or partial run`);
+    context.log(`preflight: the delta is taken from the closed run ${runId}`);
+  }
   let leases = 0;
   if (forMode === 'preflight' && tableExists(context, 'product_imports')) {
     leases = Number(query(context, "SELECT COUNT(*) AS n FROM product_imports WHERE apply_lease_until > strftime('%Y-%m-%dT%H:%M:%fZ','now')").results[0]?.n);

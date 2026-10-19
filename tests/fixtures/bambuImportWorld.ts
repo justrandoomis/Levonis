@@ -835,6 +835,7 @@ export class World {
       chain: true,
       chainCount: 0,
       autoWithdraw: false,
+      fromRun: '',
       item: '',
       siteOrigin: SITE,
       storeOrigin: STORE,

@@ -13,7 +13,7 @@
  * THE CALLS (method, path, request body keys → answer keys read):
  *
  *   POST /hello                         {protocol, github_run_id, code_commit}
- *                                       → {protocol, expected_migration, migrations_present{0193,0194,0195,0196}, reviewed{file: sha256}, run{id, state, cursor}, worker_build}
+ *                                       → {protocol, expected_migration, migrations_present{0193,0194,0195,0196}, reviewed{file: sha256}, run{id, state, cursor, delta}, worker_build}
  *   POST /manifest                      {rows: [≤ 100 × {source_product_id, handle, type, curated, hold_code, queue_position,
  *                                                      canonical_url, source_collections, breadcrumbs, discovery_sources, discovered_at}]}
  *                                       → {accepted}
@@ -42,6 +42,17 @@
  *                                       (one committed part of the translation memory, I18N-DESIGN §A.4: its exact text,
  *                                       proved by the Worker against its bundled index; idempotent by the part's ledger)
  *   GET  /run/status                                             → {run, counts, current, next, last_verified_url, …progress fields}
+ *
+ * The delta run (workflow 60 mode=delta, spec §O):
+ *
+ *   POST /delta/plan                    {from_run, sitemap_handles}  → {from_run, new_handles, media: [{source_product_id, handle, failed}], counts}
+ *   POST /delta/manifest                {from_run, rows: [≤ 100 × {kind, source_product_id, handle?, route?, discovered_at}]}
+ *                                       → {accepted, new, media}
+ *   GET  /delta/rows                                             → {rows: [{kind, from_run, source_product_id, handle, canonical_url,
+ *                                                                   type, route, queue_position, leaf, also}]}
+ *   POST /items/:sid/media-plan         {lease_token, payload}   → {payload_sha256, media: [{source_media_id, role, source_url}], skipped, failed}
+ *   POST /items/:sid/media-attach       {lease_token, payload_sha256, payload} → {product_id, slug, counts, rows, swatches}
+ *   POST /items/:sid/media-complete     {lease_token, live_url, edge_evidence} → {state, seq?, d1_checks?}
  *
  * Every body is JSON ≤ 2 MB. Errors are `{code, message}`; a token that is
  * revoked, expired or whose run is closed gets the uniform 404 `{error}`.
@@ -148,7 +159,8 @@ export interface HelloAnswer {
   expected_migration: string;
   migrations_present: Record<string, boolean>;
   reviewed: Record<string, string>;
-  run: { id: string; state: string; cursor: number | null };
+  /** `delta`: the run holds delta items (§O) — the runner reads /delta/rows before its queue. */
+  run: { id: string; state: string; cursor: number | null; delta: boolean };
   worker_build: string;
 }
 
@@ -342,6 +354,94 @@ function itemRef(v: unknown): ItemRef | null {
 const SID = /^[0-9]{1,20}$/;
 const TOKEN = /^[0-9a-f]{64}$/;
 
+/** A delta run's item as `/delta/rows` answers it (the runner's view of rows the reviewed manifest may not hold). */
+export interface DeltaRowView {
+  kind: 'new' | 'media';
+  from_run: string;
+  source_product_id: string;
+  handle: string;
+  canonical_url: string;
+  type: string;
+  route: string;
+  queue_position: number;
+  /** A new product's section: the reviewed map's resolution of its route (catalog ids); '' for a media item. */
+  leaf: string;
+  also: string[];
+}
+
+export interface DeltaPlanAnswer {
+  from_run: string;
+  new_handles: string[];
+  media: Array<{ source_product_id: string; handle: string; failed: number }>;
+  counts: Record<string, number>;
+}
+
+export interface MediaPlanAnswer {
+  payload_sha256: string;
+  media: MediaRequest[];
+  skipped: Record<string, number>;
+  failed: number;
+}
+
+/** The rows a media-only stage attached (stage_data.media_retry, or the /media-attach answer). */
+export interface AttachedMedia {
+  rows: Array<{ id: string; r2_key: string }>;
+  swatches: Array<{ option_value_id: string; r2_key: string }>;
+}
+
+export interface MediaAttachAnswer extends AttachedMedia {
+  product_id: string;
+  slug: string;
+  counts: Record<string, number>;
+}
+
+const numbers = (v: unknown): Record<string, number> =>
+  isRec(v) ? (Object.fromEntries(Object.entries(v).filter(([, x]) => typeof x === 'number' && Number.isFinite(x))) as Record<string, number>) : {};
+
+/** The attached rows of stage_data.media_retry or of a /media-attach answer; null unless every entry is whole. */
+export function attachedMediaOf(raw: unknown): AttachedMedia | null {
+  if (!isRec(raw) || !Array.isArray(raw.rows) || !Array.isArray(raw.swatches)) return null;
+  const rows: AttachedMedia['rows'] = [];
+  for (const r of raw.rows) {
+    if (!isRec(r) || !str(r.id) || !str(r.r2_key)) return null;
+    rows.push({ id: str(r.id), r2_key: str(r.r2_key) });
+  }
+  const swatches: AttachedMedia['swatches'] = [];
+  for (const r of raw.swatches) {
+    if (!isRec(r) || !str(r.option_value_id) || !str(r.r2_key)) return null;
+    swatches.push({ option_value_id: str(r.option_value_id), r2_key: str(r.r2_key) });
+  }
+  return { rows, swatches };
+}
+
+function deltaRowOf(v: unknown): DeltaRowView | null {
+  if (!isRec(v)) return null;
+  const kind = v.kind === 'new' || v.kind === 'media' ? v.kind : null;
+  const sid = str(v.source_product_id);
+  if (!kind || !SID.test(sid)) return null;
+  return {
+    kind,
+    from_run: str(v.from_run),
+    source_product_id: sid,
+    handle: str(v.handle),
+    canonical_url: str(v.canonical_url),
+    type: str(v.type),
+    route: str(v.route),
+    queue_position: num(v.queue_position, -1),
+    leaf: str(v.leaf),
+    also: Array.isArray(v.also) ? v.also.filter((x): x is string => typeof x === 'string') : [],
+  };
+}
+
+function mediaRequestOf(v: unknown): MediaRequest | null {
+  if (!isRec(v)) return null;
+  const role = str(v.role);
+  if (role !== 'gallery' && role !== 'swatch') return null;
+  const id = str(v.source_media_id);
+  const url = str(v.source_url);
+  return id && url ? { source_media_id: id, role, source_url: url } : null;
+}
+
 export interface OpsClientOptions {
   /** The public site origin (https://levonis-iq.com; http://127.0.0.1:<port> in a local dry run). */
   siteOrigin: string;
@@ -358,7 +458,7 @@ export interface OpsClientOptions {
 }
 
 /** The item calls that take or renew the lease (the Worker's holdLease / leaseItem). */
-const LEASE_CALL = /^\/items\/(\d{1,20})\/(?:lease|event|stage|media|write|publish-finish|complete)$/;
+const LEASE_CALL = /^\/items\/(\d{1,20})\/(?:lease|event|stage|media|write|publish-finish|complete|media-plan|media-attach|media-complete)$/;
 
 /** `/run/translations`'s answer, as far as the runner reads it (counts; the purged ids stay in the Worker's answer). */
 export interface TranslationsAnswer {
@@ -463,7 +563,7 @@ export class OpsClient {
       expected_migration: str(a.expected_migration),
       migrations_present: Object.fromEntries(Object.entries(present).map(([k, v]) => [k, v === true])),
       reviewed: Object.fromEntries(Object.entries(reviewed).filter(([, v]) => typeof v === 'string') as Array<[string, string]>),
-      run: { id: str(run.id), state: str(run.state), cursor: typeof run.cursor === 'number' ? run.cursor : null },
+      run: { id: str(run.id), state: str(run.state), cursor: typeof run.cursor === 'number' ? run.cursor : null, delta: run.delta === true },
       worker_build: str(a.worker_build),
     };
   }
@@ -614,6 +714,60 @@ export class OpsClient {
       purge_truncated: a.purge_truncated === true,
       purged_products: num(a.purged_products),
     };
+  }
+
+  // ---------------------------------------------------------------- the delta run (§O)
+
+  async deltaPlan(fromRun: string, sitemapHandles: readonly string[]): Promise<DeltaPlanAnswer> {
+    const a = await this.send('delta/plan', 'POST', '/delta/plan', { from_run: fromRun, sitemap_handles: [...sitemapHandles] }, true);
+    const media = Array.isArray(a.media) ? a.media.filter(isRec) : [];
+    return {
+      from_run: str(a.from_run),
+      new_handles: Array.isArray(a.new_handles) ? a.new_handles.filter((h): h is string => typeof h === 'string') : [],
+      media: media.flatMap((m) => (SID.test(str(m.source_product_id)) ? [{ source_product_id: str(m.source_product_id), handle: str(m.handle), failed: num(m.failed) }] : [])),
+      counts: numbers(a.counts),
+    };
+  }
+
+  /** Idempotent: a row registered already keeps its position (the Worker answers it accepted again). */
+  async deltaManifest(fromRun: string, rows: readonly Rec[]): Promise<{ accepted: number; new: number; media: number }> {
+    if (rows.length > 100) throw new OpsError('delta/manifest', 'permanent', 'MANIFEST_BATCH_TOO_LARGE', 0);
+    const a = await this.send('delta/manifest', 'POST', '/delta/manifest', { from_run: fromRun, rows: rows as Rec[] }, true);
+    return { accepted: num(a.accepted), new: num(a.new), media: num(a.media) };
+  }
+
+  async deltaRows(): Promise<DeltaRowView[]> {
+    const a = await this.send('delta/rows', 'GET', '/delta/rows', null, true);
+    return (Array.isArray(a.rows) ? a.rows : []).flatMap((r) => {
+      const row = deltaRowOf(r);
+      return row ? [row] : [];
+    });
+  }
+
+  /** Idempotent: it records the payload's digest again and answers the same plan for the same page. */
+  async mediaPlan(sid: string, leaseToken: string, payload: ImportPayload): Promise<MediaPlanAnswer> {
+    const a = await this.send('media-plan', 'POST', this.sidPath(sid, 'media-plan'), { lease_token: leaseToken, payload: payload as unknown as Rec }, true);
+    return {
+      payload_sha256: str(a.payload_sha256),
+      media: (Array.isArray(a.media) ? a.media : []).flatMap((m) => {
+        const r = mediaRequestOf(m);
+        return r ? [r] : [];
+      }),
+      skipped: numbers(a.skipped),
+      failed: num(a.failed),
+    };
+  }
+
+  /** Not idempotent in the call: an ambiguous failure asks /lease what committed (the batch moves the item on). */
+  async mediaAttach(sid: string, leaseToken: string, payloadSha256: string, payload: ImportPayload): Promise<MediaAttachAnswer> {
+    const a = await this.send('media-attach', 'POST', this.sidPath(sid, 'media-attach'), { lease_token: leaseToken, payload_sha256: payloadSha256, payload: payload as unknown as Rec }, false);
+    const rows = attachedMediaOf(a) ?? { rows: [], swatches: [] };
+    return { product_id: str(a.product_id), slug: str(a.slug), counts: numbers(a.counts), ...rows };
+  }
+
+  async mediaComplete(sid: string, leaseToken: string, liveUrl: string, evidence: Rec): Promise<{ state: string; seq: number | null; d1_checks: Rec }> {
+    const a = await this.send('media-complete', 'POST', this.sidPath(sid, 'media-complete'), { lease_token: leaseToken, live_url: liveUrl, edge_evidence: evidence }, false);
+    return { state: str(a.state), seq: typeof a.seq === 'number' ? a.seq : null, d1_checks: isRec(a.d1_checks) ? a.d1_checks : {} };
   }
 
   async status(): Promise<StatusAnswer> {

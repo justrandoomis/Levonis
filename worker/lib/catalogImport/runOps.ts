@@ -26,6 +26,7 @@ import { packedInserts } from './budget';
 import { currentAndNext } from './report';
 import { taxonomyNodeId, type ReviewedBundle, type TaxonomyCreateNode } from './reviewed';
 import { stageDataOf, type ItemRow } from './items';
+import { DELTA_ITEM_SQL, isReservedSource } from './delta';
 import { FINGERPRINT_QUERIES, readbackFromTarget } from './writer';
 import { forgetSearchSynonyms } from '../search/store';
 
@@ -57,7 +58,7 @@ export const WORKER_BUILD = `catalog-import-ops/${IMPORT_PROTOCOL};${EXPECTED_MI
  * Records the job on the run (its GitHub run id and commit, the reviewed bundle it runs under) and answers the
  * cursor: the queue position of the item in flight, else of the next one.
  */
-export async function helloRecord(db: D1Database, run: ImportRun, body: Record<string, unknown>, bundleDigest: string): Promise<{ cursor: number | null }> {
+export async function helloRecord(db: D1Database, run: ImportRun, body: Record<string, unknown>, bundleDigest: string): Promise<{ cursor: number | null; delta: boolean }> {
   if (body.protocol !== IMPORT_PROTOCOL) throw new OpsRefusal(409, 'IMPORT_PROTOCOL_MISMATCH');
   const gh = typeof body.github_run_id === 'string' && /^\d{1,20}$/.test(body.github_run_id) ? body.github_run_id : '';
   const commit = typeof body.code_commit === 'string' && /^[0-9a-f]{40}$/.test(body.code_commit) ? body.code_commit : '';
@@ -71,7 +72,9 @@ export async function helloRecord(db: D1Database, run: ImportRun, body: Record<s
     .bind(gh, gh, commit, commit, bundleDigest, bundleDigest, run.id)
     .run();
   const { current, next } = await currentAndNext(db, run.id);
-  return { cursor: current?.queue_position ?? next?.queue_position ?? null };
+  // A delta run (§O, delta.ts): the runner reads its rows (/delta/rows) before the queue.
+  const delta = await db.prepare(`SELECT 1 AS x FROM catalog_import_items WHERE run_id = ? AND ${DELTA_ITEM_SQL} LIMIT 1`).bind(run.id).first();
+  return { cursor: current?.queue_position ?? next?.queue_position ?? null, delta: !!delta };
 }
 
 // ---------------------------------------------------------------- /manifest
@@ -108,6 +111,8 @@ export async function acceptManifest(db: D1Database, run: ImportRun, bundle: Rev
     if (!same) throw new OpsRefusal(409, 'REVIEWED_SCOPE_REFUSED');
     const collections = strList(r.source_collections ?? [], 50, 200);
     const sources = strList(r.discovery_sources ?? [], 10, 40);
+    // The delta markers are written only by /delta/manifest (delta.ts): never through the reviewed manifest's door.
+    if (sources && sources.some(isReservedSource)) throw new OpsRefusal(400, 'IMPORT_BAD_REQUEST');
     const breadcrumbs = typeof r.breadcrumbs === 'string' && r.breadcrumbs.length <= 500 ? r.breadcrumbs : r.breadcrumbs === undefined ? '' : null;
     const discoveredAt = typeof r.discovered_at === 'string' && ISOISH.test(r.discovered_at) ? r.discovered_at : null;
     if (!collections || !sources || breadcrumbs === null || !discoveredAt) throw new OpsRefusal(400, 'IMPORT_BAD_REQUEST');
