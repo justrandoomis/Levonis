@@ -171,6 +171,20 @@ export function stageAfter(lastCompleted: string): Stage | null {
   return at >= 0 && at + 1 < STAGES.length ? STAGES[at + 1] : null;
 }
 
+/**
+ * Where a BLOCKED item resumes: the stage after the last completed one — or WRITING again for a merge that VERIFY
+ * failed after its write (@levonis/catalog/bambuImport/merge `rewritesOnResume`, the Worker's own rule in items.ts
+ * `resumeRewrites`): writing it again is what applies a writer fix to an item already written.
+ *
+ * A media item of a delta run (§O.4) never rewrites, whatever its product: it writes no product, /write refuses it,
+ * and the Worker reads the merge from the item's own `match_kind`, which /media-attach never sets. Asking it for
+ * WRITING would be refused as an illegal transition at every resume, and the item would stay BLOCKED for good.
+ */
+export function resumeTargetOf(w: { kind: 'item' | 'media'; merge: boolean; blockerCode: string; lastCompleted: string; productId: string }): Stage | null {
+  if (w.kind !== 'media' && rewritesOnResume({ blocker_code: w.blockerCode, last_completed_stage: w.lastCompleted, merge: w.merge, product_id: w.productId })) return 'WRITING';
+  return stageAfter(w.lastCompleted);
+}
+
 // ------------------------------------------------------------------ configuration
 
 export type RunMode = 'preflight' | 'open' | 'run' | 'close' | 'withdraw' | 'delta';
@@ -873,15 +887,10 @@ export class Importer {
     }
   }
 
-  /**
-   * Where a BLOCKED item resumes: the stage after the last completed one — or WRITING again for a merge that
-   * VERIFY failed after its write (@levonis/catalog/bambuImport/merge `rewritesOnResume`, the Worker's own rule in
-   * items.ts): writing it again is what applies a writer fix to an item already written.
-   */
+  /** Where a BLOCKED item resumes (`resumeTargetOf`: a media item never rewrites). */
   private blockedResumeTarget(w: ItemWork, blockerCode: string): Stage | null {
     const merge = writeModeOf(this.deps.bundle, w.sid).mode === 'merge';
-    if (rewritesOnResume({ blocker_code: blockerCode, last_completed_stage: w.lastCompleted, merge, product_id: w.productId })) return 'WRITING';
-    return stageAfter(w.lastCompleted);
+    return resumeTargetOf({ kind: w.kind, merge, blockerCode, lastCompleted: w.lastCompleted, productId: w.productId });
   }
 
   /** A merge's reviewed match, which the Worker's writer maps through; null without a map (VERIFY then expects every id). */
@@ -1602,19 +1611,35 @@ export class Importer {
         this.log.info('delta_new_skipped', { what: 'other_product' });
         continue;
       }
+      // Two listed handles that read as the same product (a renamed handle whose old one is still listed), or a new
+      // handle that is a media item's product: one row per product (the Worker refuses a call naming one twice).
+      if (fresh.some((f) => f.source_product_id === x.sourceProductId) || plan.media.some((m) => m.source_product_id === x.sourceProductId)) {
+        this.log.info('delta_new_skipped', { what: 'same_product' });
+        continue;
+      }
       fresh.push({ kind: 'new', source_product_id: x.sourceProductId, handle, route: x.route, discovered_at: at });
       newProducts.push({ handle, source_product_id: x.sourceProductId, title: x.title, route: x.route, type: productTypeOf(x.route) });
     }
-    const rows = [...plan.media.map((m) => ({ kind: 'media', source_product_id: m.source_product_id, discovered_at: at })), ...fresh];
+    // The media items in their own calls first, the new products after them in theirs: a new row can never take a
+    // media item down with it. A row the Worker finds moot (a new row whose source id an earlier run or a product
+    // already holds — a renamed store handle —, a media item whose product is gone or that an earlier delta already
+    // completed) is left out and counted, never refused.
+    const mediaRows = plan.media.map((m) => ({ kind: 'media', source_product_id: m.source_product_id, discovered_at: at }));
     let calls = 0;
     const registered = { new: 0, media: 0 };
-    for (let i = 0; i < rows.length; i += 100) {
-      const a = await this.ops.deltaManifest(this.cfg.fromRun, rows.slice(i, i + 100));
-      calls++;
-      registered.new += a.new;
-      registered.media += a.media;
+    const skipped = { known: 0, media_product_gone: 0, media_already_retried: 0 };
+    for (const group of [mediaRows, fresh]) {
+      for (let i = 0; i < group.length; i += 100) {
+        const a = await this.ops.deltaManifest(this.cfg.fromRun, group.slice(i, i + 100));
+        calls++;
+        registered.new += a.new;
+        registered.media += a.media;
+        skipped.known += a.skipped.known;
+        skipped.media_product_gone += a.skipped.media_product_gone;
+        skipped.media_already_retried += a.skipped.media_already_retried;
+      }
     }
-    this.log.info('delta_registered', { media: registered.media, new: registered.new, calls });
+    this.log.info('delta_registered', { media: registered.media, new: registered.new, calls, known: skipped.known, product_gone: skipped.media_product_gone, retried: skipped.media_already_retried });
     const tax = await this.ops.prepareTaxonomy();
     this.log.info('taxonomy', { nodes: tax.created_nodes, brand: tax.brand_created, synonyms: tax.synonyms_inserted });
     const snap = await this.ops.protectSnapshot('before');
@@ -1629,6 +1654,7 @@ export class Importer {
       new_products: newProducts,
       media_items: plan.media,
       registered,
+      skipped,
       reviewed_bundle_sha256: bundleDigest(this.deps.bundle.sha256),
       taxonomy: tax,
       protect_before: snap,

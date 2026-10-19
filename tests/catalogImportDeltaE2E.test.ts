@@ -15,6 +15,8 @@
  *   §E.1 gate     the new product's /stage: refused while an existing Bambu product is a candidate the reviewed
  *                 matches file does not settle (REVIEWED_SCOPE_REFUSED), staged once a reviewed `distinct` entry is
  *                 bundled
+ *   a rename      the sitemap lists a handle no run held whose page gives a source id run A holds (the store renamed
+ *                 the handle): the row is left out and counted, the media item is registered and worked all the same
  *
  * Run: node --import tsx --test tests/catalogImportDeltaE2E.test.ts
  */
@@ -72,7 +74,7 @@ function writeBundle(w: World, dir: string): string {
 }
 
 /** Run A: the AMS 2 Pro written with two non-primary gallery pictures failed, then the run closed partial. */
-async function closedRunA(): Promise<{ w: World; sid: string; productId: string; failed: string[] }> {
+async function closedRunA(before?: (w: World) => void): Promise<{ w: World; sid: string; productId: string; failed: string[] }> {
   const w = newWorld();
   const x = pageOf('ams-2-pro').extraction;
   const { payload } = buildFor(w, x);
@@ -87,6 +89,7 @@ async function closedRunA(): Promise<{ w: World; sid: string; productId: string;
       .run(RUN_ID, x.sourceProductId, id, url);
   }
   complete(w, s.itemId);
+  before?.(w);
   w.raw.prepare("UPDATE catalog_import_runs SET state = 'partial' WHERE id = ?").run(RUN_ID);
   return { w, sid: x.sourceProductId, productId: result.product_id, failed };
 }
@@ -263,6 +266,69 @@ test('mode=delta end to end: the media item COMPLETE with its failed pictures at
     token = (await client.lease(nid, token)).lease_token || token;
     const staged = await client.stage(nid, token, fb, []);
     assert.match(staged.payload_sha256, /^[0-9a-f]{64}$/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    restoreFetch();
+  }
+});
+
+test('mode=delta: a renamed store handle (its source id held by an earlier run) is left out and counted, never a refusal of the media items', async () => {
+  const fbSid = pageOf('filament-buffer').extraction.sourceProductId;
+  const { w, sid } = await closedRunA((world) => {
+    // Run A held the filament buffer under its old handle; the store renamed it, and its sitemap lists the new one.
+    world.raw
+      .prepare(
+        `INSERT INTO catalog_import_items (id, run_id, source, source_product_id, handle, canonical_url, queue_position, discovered_at)
+         VALUES ('cii_fb_old', ?, 'bambu_us', ?, 'filament-buffer-old', 'x', 999, '2026-10-15T00:00:00.000Z')`
+      )
+      .run(RUN_ID, fbSid);
+  });
+  const dir = mkdtempSync(join(tmpdir(), 'levonis-delta-rename-'));
+  try {
+    const ops = opsOf(w);
+    const dataDir = writeBundle(w, dir);
+    installCdnDouble(ops);
+    openRun(w.raw, { id: DELTA });
+    const clock = new FakeClock(Date.now());
+    const storeSeen: string[] = [];
+    const listed = ['ams-2-pro', 'filament-buffer'];
+    const fetchLike = async (url: string, init: RequestInit) => {
+      const u = new URL(url);
+      if (u.origin === STORE) return storeAnswer(u.pathname, listed, storeSeen);
+      if (u.origin === SITE) return ops.fetch(url, init);
+      return new Response('no', { status: 404 });
+    };
+    const lines: string[] = [];
+    const outputs: Record<string, string> = {};
+    const cfg: RunConfig = {
+      mode: 'delta', runId: '', fromRun: RUN_ID, maxItems: 1, resume: false, chain: false, chainCount: 0, autoWithdraw: false, item: '',
+      siteOrigin: SITE, storeOrigin: STORE, dataDir, outDir: join(dir, 'out'), sealKey: 'k'.repeat(43), githubRunId: '1', codeCommit: '', deadlineMs: clock.now() + 330 * 60_000,
+    };
+    const importer = new Importer(cfg, {
+      clock,
+      fetch: fetchLike,
+      log: new ImportLog((l) => lines.push(l), { siteOrigin: SITE }),
+      token: TOKEN,
+      bundle: loadReviewedBundle(dataDir),
+      seal: (_name, data) => data.length,
+      output: (k, v) => {
+        outputs[k] = v;
+      },
+      summary: new SummaryWriter(undefined),
+      openedRunId: DELTA,
+      browser: async () => ({ check: async () => assert.fail('a media item never opens the browser'), close: async () => {} }),
+    });
+    const code = await importer.main();
+    const log = lines.join('\n');
+    assert.equal(code, 0, log);
+    assert.equal(outputs.blocked, 'false', log);
+    // The plan saw the new handle; its page was read once and gave the source id run A holds.
+    assert.ok(storeSeen.includes('/products/filament-buffer'));
+    assert.match(log, /left out: 1 new rows whose product an earlier run or a product already holds, 0 media items whose product is gone, 0 media items an earlier delta already completed/);
+    // The media item registered and worked to COMPLETE; nothing registered for the renamed handle.
+    const items = w.raw.prepare('SELECT source_product_id, processing_state FROM catalog_import_items WHERE run_id = ? ORDER BY queue_position').all(DELTA) as Array<Record<string, string>>;
+    assert.deepEqual(items.map((i) => [i.source_product_id, i.processing_state]), [[sid, 'COMPLETE']]);
+    assert.match(log, /media-only: 2 media attached/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
     restoreFetch();

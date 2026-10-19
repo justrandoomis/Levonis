@@ -116,9 +116,10 @@ export const TEMPLATES = {
   local_only: 'local dry run: {refused} requests to a host other than 127.0.0.1 refused, never sent',
   note: '{code}',
   delta_plan:
-    'delta from run {run}: {listed} handles listed in the sitemaps, {new} new; {media_items} completed items with {media_failed} failed media to retry; {failed_not_complete} failed media of items not complete and {withdrawn_listed} withdrawn items listed again are not queued',
+    'delta from run {run}: {listed} handles listed in the sitemaps, {new} new; {media_items} completed items with {media_failed} failed media to retry; {failed_not_complete} failed media of items not complete, {withdrawn_listed} withdrawn items listed again, {media_product_gone} items whose product is gone and {media_already_retried} items an earlier delta already completed are not queued',
   delta_new_skipped: 'a new sitemap handle is not queued: {what}',
-  delta_registered: 'delta queue registered: {media} media-only items, then {new} new products ({calls} calls)',
+  delta_registered:
+    'delta queue registered: {media} media-only items, then {new} new products ({calls} calls); left out: {known} new rows whose product an earlier run or a product already holds, {product_gone} media items whose product is gone, {retried} media items an earlier delta already completed',
   media_plan:
     'media-only: {failed} media failed in the closed run; {requests} fetched again; not attachable (description, in the box) {role_not_attachable}, no longer on the page {not_in_source}, primary kept {primary_unchanged}, product not public {product_not_public}',
   media_attached:

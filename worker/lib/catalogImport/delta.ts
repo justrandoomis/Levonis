@@ -86,6 +86,8 @@ export interface PriorItem {
   handle: string;
   state: string;
   queue_position: number;
+  /** The product the item wrote (a COMPLETE item always names one). */
+  levonis_product_id?: string;
 }
 
 export interface DeltaQueueInput {
@@ -97,6 +99,19 @@ export interface DeltaQueueInput {
   fromRun: string;
   /** Failed media of `fromRun`, by source product id. */
   failedBySid: ReadonlyMap<string, number>;
+  /**
+   * Handles held elsewhere than by an earlier run's item: the `source_handle` of a `product_source_refs` row, a handle
+   * the reviewed manifest names. Never new.
+   */
+  knownHandles?: Iterable<string>;
+  /**
+   * The product each source id is carried by NOW (`product_source_refs` joined to a `products` row that exists). When
+   * given, a media item is queued only while its source is still carried by the product the closed run wrote: one the
+   * owner deleted since (or whose source ref went with it) is counted `media_product_gone`, never queued.
+   */
+  liveProductBySid?: ReadonlyMap<string, string>;
+  /** Source ids an earlier delta run already COMPLETEd as a media item of `fromRun`: counted, never queued again. */
+  alreadyRetried?: ReadonlySet<string>;
 }
 
 export interface DeltaQueue {
@@ -115,23 +130,35 @@ export interface DeltaQueue {
     failed_not_complete: number;
     /** Items withdrawn at the source that the sitemap lists again: reported, never queued (the owner decides). */
     withdrawn_listed: number;
+    /** COMPLETE items with failed media whose product is gone (deleted, or no longer carrying the source): not queued. */
+    media_product_gone: number;
+    /** COMPLETE items with failed media that an earlier delta already retried to COMPLETE: not queued again. */
+    media_already_retried: number;
   };
 }
 
 /**
- * The delta queue: (a) the listed handles absent from every earlier run's items, (b) the COMPLETE items of the closed
- * run whose media failed. A withdrawn or blocked item is neither new nor retried; a completed one without failures
- * is not touched.
+ * The delta queue: (a) the listed handles absent from every earlier run's items (and from every other handle known:
+ * a source ref's, the reviewed manifest's), (b) the COMPLETE items of the closed run whose media failed, whose product
+ * still carries the source and that no earlier delta already retried to COMPLETE. A withdrawn or blocked item is
+ * neither new nor retried; a completed one without failures is not touched.
  */
 export function deltaQueue(input: DeltaQueueInput): DeltaQueue {
   const listed = new Set(input.listedHandles);
-  const knownHandles = new Set(input.prior.map((p) => p.handle));
+  const knownHandles = new Set([...input.prior.map((p) => p.handle), ...(input.knownHandles ?? [])]);
   const fresh = [...listed].filter((h) => !knownHandles.has(h));
   const usable = fresh.filter((h) => DELTA_HANDLE.test(h)).sort();
   const fromItems = input.prior.filter((p) => p.run_id === input.fromRun);
-  const media = fromItems
+  const withFailures = fromItems
     .filter((p) => p.state === 'COMPLETE' && (input.failedBySid.get(p.source_product_id) ?? 0) > 0)
-    .sort((a, b) => a.queue_position - b.queue_position)
+    .sort((a, b) => a.queue_position - b.queue_position);
+  // The product the closed run wrote must still exist and still carry the source (the test /media-plan applies):
+  // a media item for a product the owner deleted would be refused at its turn and stop the queue for good.
+  const live = input.liveProductBySid;
+  const carried = withFailures.filter((p) => !live || (!!p.levonis_product_id && live.get(p.source_product_id) === p.levonis_product_id));
+  const retried = input.alreadyRetried;
+  const media = carried
+    .filter((p) => !retried?.has(p.source_product_id))
     .map((p) => ({ source_product_id: p.source_product_id, handle: p.handle, failed: input.failedBySid.get(p.source_product_id) ?? 0 }));
   const failedNotComplete = fromItems.filter((p) => p.state !== 'COMPLETE').reduce((n, p) => n + (input.failedBySid.get(p.source_product_id) ?? 0), 0);
   return {
@@ -146,6 +173,8 @@ export function deltaQueue(input: DeltaQueueInput): DeltaQueue {
       media_failed: media.reduce((n, m) => n + m.failed, 0),
       failed_not_complete: failedNotComplete,
       withdrawn_listed: fromItems.filter((p) => p.state === 'WITHDRAWN_AT_SOURCE' && listed.has(p.handle)).length,
+      media_product_gone: withFailures.length - carried.length,
+      media_already_retried: carried.length - media.length,
     },
   };
 }
@@ -163,6 +192,29 @@ export async function assertFromRun(db: D1Database, run: ImportRun, fromRun: unk
 /** The SQL condition of a delta item (its reserved discovery source); a superset that deltaMarkOf narrows. */
 export const DELTA_ITEM_SQL = `(discovery_sources LIKE '%"${DELTA_NEW}"%' OR discovery_sources LIKE '%"${MEDIA_RETRY}%')`;
 const DELTA_LIKE = DELTA_ITEM_SQL;
+
+/**
+ * The source ids an earlier delta run (any run but `runId`) already took to COMPLETE as a media item of `fromRun`:
+ * their pictures are attached, so a later delta from the same closed run never fetches them again (the owner may have
+ * removed one since; it must not come back). A media item such a run left unfinished (BLOCKED, never reached) is not
+ * here: a later delta retries it.
+ */
+async function retriedElsewhere(db: D1Database, runId: string, fromRun: string, sids?: readonly string[]): Promise<Set<string>> {
+  const { results } = await db
+    .prepare(
+      `SELECT source_product_id, discovery_sources FROM catalog_import_items
+        WHERE run_id <> ?1 AND processing_state = 'COMPLETE' AND discovery_sources LIKE ?2
+          AND (?3 IS NULL OR source_product_id IN (SELECT value FROM json_each(?3)))`
+    )
+    .bind(runId, `%"${MEDIA_RETRY}${fromRun}"%`, sids ? JSON.stringify(sids) : null)
+    .all<{ source_product_id: string; discovery_sources: string }>();
+  const out = new Set<string>();
+  for (const r of results ?? []) {
+    const mark = deltaMarkOf(r.discovery_sources);
+    if (mark?.kind === 'media' && mark.fromRun === fromRun) out.add(String(r.source_product_id));
+  }
+  return out;
+}
 
 // ---------------------------------------------------------------- /delta/plan
 
@@ -182,18 +234,32 @@ export async function deltaPlan(
     throw new OpsRefusal(400, 'IMPORT_BAD_REQUEST');
   }
   const { results: prior } = await db
-    .prepare('SELECT run_id, source_product_id, handle, processing_state AS state, queue_position FROM catalog_import_items WHERE run_id <> ?')
+    .prepare('SELECT run_id, source_product_id, handle, processing_state AS state, queue_position, levonis_product_id FROM catalog_import_items WHERE run_id <> ?')
     .bind(run.id)
     .all<PriorItem>();
   const { results: failed } = await db
     .prepare("SELECT source_product_id AS sid, COUNT(*) AS n FROM catalog_import_media WHERE run_id = ? AND status = 'failed' GROUP BY source_product_id")
     .bind(fromRun)
     .all<{ sid: string; n: number }>();
+  const { results: refHandles } = await db
+    .prepare("SELECT source_handle FROM product_source_refs WHERE source = 'bambu_us' AND source_handle <> ''")
+    .all<{ source_handle: string }>();
+  const { results: live } = await db
+    .prepare(
+      `SELECT r.source_product_id, r.product_id FROM product_source_refs r JOIN products p ON p.id = r.product_id
+        WHERE r.source = 'bambu_us' AND r.match_kind IN ('created','merged')
+          AND r.source_product_id IN (SELECT source_product_id FROM catalog_import_items WHERE run_id = ? AND processing_state = 'COMPLETE')`
+    )
+    .bind(fromRun)
+    .all<{ source_product_id: string; product_id: string }>();
   const q = deltaQueue({
     listedHandles: raw as string[],
-    prior: (prior ?? []).map((p) => ({ ...p, source_product_id: String(p.source_product_id), queue_position: Number(p.queue_position) })),
+    prior: (prior ?? []).map((p) => ({ ...p, source_product_id: String(p.source_product_id), queue_position: Number(p.queue_position), levonis_product_id: String(p.levonis_product_id ?? '') })),
     fromRun,
     failedBySid: new Map((failed ?? []).map((f) => [String(f.sid), Number(f.n)])),
+    knownHandles: [...(refHandles ?? []).map((r) => String(r.source_handle)), ...bundle.manifest.byHandle.keys()],
+    liveProductBySid: new Map((live ?? []).map((r) => [String(r.source_product_id), String(r.product_id)])),
+    alreadyRetried: await retriedElsewhere(db, run.id, fromRun),
   });
   // A media item is rebuilt from its REVIEWED manifest row (/delta/manifest refuses any other): one the bundle does
   // not hold (a new product of an earlier delta) is counted, not queued.
@@ -211,18 +277,37 @@ export interface DeltaRowIn {
   discovered_at: string;
 }
 
+/** The rows /delta/manifest leaves out, by reason (counts only). */
+export interface DeltaSkipped {
+  /** A new row whose source id or handle an earlier run's item holds, a product carries or the reviewed manifest names
+   *  (a store handle renamed: the new handle reads as new, the page gives the source id an earlier run held). */
+  known: number;
+  /** A media row whose product is gone: deleted since the closed run, or no longer carrying the source. */
+  media_product_gone: number;
+  /** A media row an earlier delta run already retried to COMPLETE. */
+  media_already_retried: number;
+}
+
 /**
- * POST /delta/manifest `{from_run, rows}` (≤ 100 rows). Each row is checked against D1 and the bundle, or the whole
- * call is refused (IMPORT_DELTA_REFUSED; the answer names no input):
+ * POST /delta/manifest `{from_run, rows}` (≤ 100 rows). Each row is checked against D1 and the bundle:
  *
  *   media  a COMPLETE item of `from_run` with a product and at least one failed medium, in the reviewed manifest;
- *   new    a well-formed handle and route, a source id and a handle that no earlier run's item holds, that no
- *          product carries as its source, that the reviewed manifest does not name; at most DELTA_NEW_MAX a run.
+ *   new    a well-formed handle and route; at most DELTA_NEW_MAX a run.
  *
- * The run must hold nothing but delta items (of the same closed run). A row already registered keeps its position;
- * a new one takes the next. Discovery fields change only while the item is DISCOVERED.
+ * A row that breaks one of those, or a run that holds anything but delta items (of the same closed run), refuses the
+ * whole call (IMPORT_DELTA_REFUSED; the answer names no input). A row the store or the owner made moot since the plan
+ * is LEFT OUT and counted (`skipped`), never refused — a refusal would take every other row of the call with it and
+ * stop every later delta the same way: a new row whose source id or handle is already held (an earlier run's item, a
+ * product's source ref, the reviewed manifest: spec §O.2 "by handle; then by source id"), a media row whose product
+ * is gone, or that an earlier delta already completed. A row already registered keeps its position; a new one takes
+ * the next. Discovery fields change only while the item is DISCOVERED.
  */
-export async function acceptDeltaRows(db: D1Database, run: ImportRun, bundle: ReviewedBundle, body: Record<string, unknown>): Promise<{ accepted: number; new: number; media: number }> {
+export async function acceptDeltaRows(
+  db: D1Database,
+  run: ImportRun,
+  bundle: ReviewedBundle,
+  body: Record<string, unknown>
+): Promise<{ accepted: number; new: number; media: number; skipped: DeltaSkipped }> {
   const fromRun = await assertFromRun(db, run, body.from_run);
   const rows = body.rows;
   if (!Array.isArray(rows) || rows.length > 100) throw new OpsRefusal(400, 'IMPORT_BAD_REQUEST');
@@ -243,7 +328,8 @@ export async function acceptDeltaRows(db: D1Database, run: ImportRun, bundle: Re
     return { kind, source_product_id: sid, discovered_at: at };
   });
   if (new Set(parsed.map((r) => r.source_product_id)).size !== parsed.length) throw new OpsRefusal(400, 'IMPORT_BAD_REQUEST');
-  if (!parsed.length) return { accepted: 0, new: 0, media: 0 };
+  const skipped: DeltaSkipped = { known: 0, media_product_gone: 0, media_already_retried: 0 };
+  if (!parsed.length) return { accepted: 0, new: 0, media: 0, skipped };
 
   // The run: delta items only, all of this closed run.
   const { results: mine } = await db
@@ -274,13 +360,17 @@ export async function acceptDeltaRows(db: D1Database, run: ImportRun, bundle: Re
     .bind(fromRun, JSON.stringify(sids))
     .all<{ sid: string; n: number }>();
   const failedBy = new Map((failed ?? []).map((f) => [String(f.sid), Number(f.n)]));
+  // The source refs: whether a product carries a new row's id or handle, and whether a media row's product (the one
+  // the closed run wrote) still exists and still carries its source — /media-plan's own test (mediaRetry.ts).
   const { results: refs } = await db
     .prepare(
-      `SELECT source_product_id, source_handle FROM product_source_refs
-        WHERE source = 'bambu_us' AND (source_product_id IN (SELECT value FROM json_each(?1)) OR source_handle IN (SELECT value FROM json_each(?2)))`
+      `SELECT r.source_product_id, r.source_handle, r.product_id, r.match_kind, p.id AS live_id FROM product_source_refs r LEFT JOIN products p ON p.id = r.product_id
+        WHERE r.source = 'bambu_us' AND (r.source_product_id IN (SELECT value FROM json_each(?1)) OR r.source_handle IN (SELECT value FROM json_each(?2)))`
     )
     .bind(JSON.stringify(sids), JSON.stringify(handles))
-    .all<{ source_product_id: string; source_handle: string }>();
+    .all<{ source_product_id: string; source_handle: string; product_id: string; match_kind: string; live_id: string | null }>();
+  const mediaSids = parsed.filter((r) => r.kind === 'media' && !own.has(r.source_product_id)).map((r) => r.source_product_id);
+  const retried = mediaSids.length ? await retriedElsewhere(db, run.id, fromRun, mediaSids) : new Set<string>();
 
   const values: unknown[][] = [];
   let next = Math.max(0, ...[...own.values()].map((o) => o.position)) + 1;
@@ -299,6 +389,19 @@ export async function acceptDeltaRows(db: D1Database, run: ImportRun, bundle: Re
       const from = (earlier ?? []).find((e) => e.run_id === fromRun && String(e.source_product_id) === sid);
       const reviewed = bundle.manifest.bySourceId.get(sid);
       if (!from || from.processing_state !== 'COMPLETE' || !from.levonis_product_id || (failedBy.get(sid) ?? 0) <= 0 || !reviewed) throw refuse();
+      if (!mineNow) {
+        const carried = (refs ?? []).some(
+          (x) => String(x.source_product_id) === sid && !!x.live_id && x.product_id === from.levonis_product_id && (x.match_kind === 'created' || x.match_kind === 'merged')
+        );
+        if (!carried) {
+          skipped.media_product_gone++;
+          continue;
+        }
+        if (retried.has(sid)) {
+          skipped.media_already_retried++;
+          continue;
+        }
+      }
       handle = reviewed.handle;
       canonical = reviewed.canonical_url;
       type = reviewed.type;
@@ -306,10 +409,15 @@ export async function acceptDeltaRows(db: D1Database, run: ImportRun, bundle: Re
     } else {
       handle = r.handle!;
       route = r.route!;
-      const seen = (earlier ?? []).some((e) => String(e.source_product_id) === sid || e.handle === handle);
-      const carried = (refs ?? []).some((x) => String(x.source_product_id) === sid || x.source_handle === handle);
-      if (seen || carried || bundle.manifest.bySourceId.has(sid) || bundle.manifest.byHandle.has(handle)) throw refuse();
-      if (!mineNow && ++newCount > DELTA_NEW_MAX) throw refuse();
+      if (!mineNow) {
+        const seen = (earlier ?? []).some((e) => String(e.source_product_id) === sid || e.handle === handle);
+        const carried = (refs ?? []).some((x) => String(x.source_product_id) === sid || x.source_handle === handle);
+        if (seen || carried || bundle.manifest.bySourceId.has(sid) || bundle.manifest.byHandle.has(handle)) {
+          skipped.known++;
+          continue;
+        }
+        if (++newCount > DELTA_NEW_MAX) throw refuse();
+      }
       canonical = `${STORE_PRODUCTS}${encodeURIComponent(handle)}`;
       type = productTypeOf(route);
       nNew++;
@@ -335,7 +443,7 @@ export async function acceptDeltaRows(db: D1Database, run: ImportRun, bundle: Re
       )
     );
   }
-  return { accepted: values.length, new: nNew, media: nMedia };
+  return { accepted: values.length, new: nNew, media: nMedia, skipped };
 }
 
 // ---------------------------------------------------------------- the run's delta rows and the bundle they extend
