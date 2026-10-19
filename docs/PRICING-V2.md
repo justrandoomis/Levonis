@@ -858,7 +858,8 @@ selection naming a value or colour no priced SKU carries (`namesUnpricedChoice`)
 `initial_selection` is always a priced SKU.
 
 **Order rules.** Browse lists (the listing without search, sections, home new arrivals, the finder)
-put sellable first (`sellable_now DESC` in SQL, so the 300-candidate cap keeps priced items); search
+put sellable first (`sellable_now DESC` in SQL; the listing pages every candidate and prices only the sellable
+ones an order needs — `pagedListing`, 2026-10-19); search
 keeps its relevance; both price sorts put unpriced last; price ranges, «عليها عرض» and «سعر أقل
 للأعضاء» exclude unpriced; commercial shelves (featured, discounted, flash, best sellers, open box,
 filament) are sellable only; new arrivals take at most 5 catalog-only products, only in slots fewer

@@ -47,8 +47,16 @@ import { withCardKnowledge } from '../lib/knowledge/cards';
 import { cardGallery } from '../lib/cardGallery';
 import { isConditionColumnMissing } from '../lib/conditionProjection';
 import { catalogSubtreeFilter, homeCategoryTree } from '../lib/catalogMembership';
-import { FACET_FIELD_IDS, parseListingParams } from '@levonis/catalog/discovery';
-import { runListing, type BrandInfo, type ListingItem, type PrinterInfo } from '../lib/listingFacets';
+import { FACET_FIELD_IDS, parseListingParams, type ListingState } from '@levonis/catalog/discovery';
+import {
+  applyFilters,
+  filtersReadResolved,
+  runListing,
+  sortReadsResolved,
+  type BrandInfo,
+  type ListingItem,
+  type PrinterInfo,
+} from '../lib/listingFacets';
 import {
   catalogIdForRetiredSlug,
   catalogIndexFor,
@@ -3505,18 +3513,43 @@ const LISTING_PARAM_KEYS = [
 ];
 
 /**
- * How many candidates the listing resolves in memory. The price a filter or a
- * sort reads is the VIEWER'S resolved price, which SQL does not hold, so the
- * route narrows in SQL by what it can (section, search, brand), resolves at
- * most this many through the pricing path, and says `truncated: true` when the
- * section held more. 300 is ~12 pages of 24 and one bounded request.
+ * How many candidates one listing request puts through the pricing path to
+ * order, filter or count them. The price a filter or a sort reads is the
+ * VIEWER'S resolved price (and «المتوفر الآن» the stock proved over the option
+ * graph), which SQL does not hold — so those need each candidate resolved first.
+ *
+ * WHAT IT BOUNDS NOW (owner, 2026-10-19: «browse ALL products»). The listing
+ * reads every candidate's KEYS first (`LISTING_KEYS_CAP`: id, name, date,
+ * brand, the SELLABLE flag — no price) and prices only what it must
+ * (`pagedListing`):
+ *   - a stored-key order (newest, name) with stored-key filters prices the
+ *     PAGE shown and nothing else, however long the list;
+ *   - a catalog-only product is never resolved to be ordered or counted: its
+ *     listing item is exact from its keys (no price, no stock, no sale type —
+ *     DECISIONS row 240), so it is priced only when it is on the page;
+ *   - a resolved order (relevance, price, available, direct), a resolved
+ *     filter or the facet counts resolve the SELLABLE candidates — at most this
+ *     many, in the shelf order — and `truncated: true` says when more were
+ *     sellable than that.
+ * Measured (tests/listingPaging.test.ts notes; docs/PERFORMANCE_LOG.md): with
+ * the offers and the mystery-pool reads one statement each, the resolve is a
+ * constant number of statements and ONE wave at any size, and its cost is the
+ * rows and the CPU — ~1,000 sellable candidates stay one bounded request. The
+ * search (the engine returns ≤ 200 ids) and `type=bundle` keep the one-read
+ * path under the same cap.
  */
-export const LISTING_CANDIDATE_CAP = 300;
+export const LISTING_CANDIDATE_CAP = 1_000;
+
+/**
+ * How many candidate KEYS one listing reads — the deepest `offset` the route
+ * accepts. Past it the listing says `truncated: true`.
+ */
+export const LISTING_KEYS_CAP = 10_000;
 
 const numOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
 /** A resolved card (ordinary or composition) → what the listing filters read. */
-function listingItemOf(
+export function listingItemOf(
   row: Record<string, unknown>,
   card: Record<string, unknown>,
   rank: number,
@@ -3567,6 +3600,59 @@ function listingItemOf(
     createdAt: String(row.created_at ?? ''),
     rank,
     scheduledOffer: !!offer && (offer.schedule_state === 'live' || offer.schedule_state === 'upcoming') && !liveButNotLowering,
+    specs: specs && typeof specs === 'object' && !Array.isArray(specs) ? specs : {},
+  };
+}
+
+/** One candidate's KEYS: what the listing's first read returns (`pagedListing`) — never a price. */
+export interface ListingKeyRow {
+  id: string;
+  name: unknown;
+  created_at: unknown;
+  brand_id: unknown;
+  inventory_mode: unknown;
+  composition: unknown;
+  sellable_now: unknown;
+  /** Read only when a spec facet is filtered or counted. */
+  spec_fields?: unknown;
+  brand_slug?: unknown;
+  /** JSON of the brand (id, slug, three names) on ONE row per brand, only when facets are counted. */
+  brand_info?: unknown;
+}
+
+/**
+ * A candidate's listing item from its KEYS alone — no card, no relation, no price.
+ *
+ * EXACT FOR A CATALOG-ONLY ROW: it is what `listingItemOf` makes of the row's
+ * `catalogOnlyCard` (tests/listingPaging.test.ts compares the two field by
+ * field) — no price, no stock, no sale type, no offer (DECISIONS row 240), the
+ * name the card carries (`parseProductRow`: the row's `name`, cut at 300), the
+ * row's own date, brand and spec sheet. So a catalog-only product is ordered,
+ * filtered and counted without ever being resolved.
+ *
+ * For a SELLABLE row it is exact only in what a stored-key order and the
+ * stored-key filters read (name, date, rank, brand, fits, specs), and the
+ * listing uses it for nothing else.
+ */
+export function keyedListingItem(row: ListingKeyRow, rank: number, brandSlug: string | null, fits: string[] = []): ListingItem {
+  const specs = safeParse<Record<string, unknown>>(String(row.spec_fields ?? '{}'), {});
+  return {
+    id: String(row.id),
+    card: {},
+    name: typeof row.name === 'string' ? row.name.slice(0, 300) : '',
+    price: null,
+    regular: null,
+    prime: null,
+    pro: null,
+    available: 0,
+    saleTypes: [],
+    priced: false,
+    brandId: row.brand_id ? String(row.brand_id) : null,
+    brandSlug,
+    fits,
+    createdAt: String(row.created_at ?? ''),
+    rank,
+    scheduledOffer: false,
     specs: specs && typeof specs === 'object' && !Array.isArray(specs) ? specs : {},
   };
 }
@@ -3677,11 +3763,352 @@ export interface CatalogListing {
   rows: Map<string, Record<string, unknown>>;
 }
 
+/**
+ * LISTED ROWS → CARDS, through the one pricing path (batched relations, batched
+ * offers, the mystery-pool coarse rule, the composition builder for a bundle
+ * row) — what the listing has always done for its candidates, as one step both
+ * of its reads share.
+ *
+ * `keys` names the rows (id, inventory_mode, composition) and `rowsOf` brings
+ * the full rows: the relations, the offers, the pools and a bundle's joined row
+ * need only the keys, so when the rows are a read of their own
+ * (`pagedListing`) all of it is ONE wave, not two.
+ */
+async function listedCards(
+  db: D1Database,
+  keys: ReadonlyArray<{ id?: unknown; inventory_mode?: unknown; composition?: unknown }>,
+  rowsOf: Promise<Record<string, unknown>[]>,
+  ctxPromise: Promise<PricingCtx>,
+  idxPromise: Promise<CatalogIndex | null>
+): Promise<Map<string, { row: Record<string, unknown>; card: Record<string, unknown> }>> {
+  const out = new Map<string, { row: Record<string, unknown>; card: Record<string, unknown> }>();
+  const ids = keys.map((k) => String(k.id));
+  const compositionIds = keys.filter((k) => String(k.composition ?? '') !== '').map((k) => String(k.id));
+  // One batched read for the whole set rather than N+1 per card — and one read of
+  // every scheduled offer on it, so a special offer costs the listing one query,
+  // not one per card (§14).
+  const [rows, views, offers, pooled, compositionJoined, ctx, idx] = await Promise.all([
+    rowsOf,
+    loadRelationsViews(db, keys.map((k) => ({ id: String(k.id), inventory_mode: k.inventory_mode }))),
+    degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(db, ids.map((id) => subjectOf(id))), EMPTY_OFFERS()),
+    // §8.2 row 18, for the LISTING too: a card carries `stock`, and a grid
+    // captured before and after a purchase is the same two GETs.
+    degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(db, ids), new Set<string>()),
+    // The JOINED rows: `bundle_config` and `offer_windows` are what decide the
+    // price mode and the lock, and the bare `products` row carries neither.
+    compositionIds.length ? loadCompositionRows(db, compositionIds).then((m) => [...m.values()]) : Promise.resolve([]),
+    ctxPromise,
+    idxPromise,
+  ]);
+  /**
+   * A COMPOSITION ROW IS SERIALIZED BY THE COMPOSITION BUILDER, HERE TOO (§9).
+   *
+   * `?type=bundle` and the search branch both select composition rows, and
+   * handing them to `publicWithDisplayPrice` published `price_iqd`,
+   * `display_price_iqd`, `display_prime_iqd` and `display_pro_iqd` for a
+   * GATED offer to a viewer who may not buy it — the exact keys §9's locked
+   * ALLOW-LIST names as the ones that must be stripped, and which
+   * `GET /api/bundles/:slug` already strips. One builder for both doors is
+   * the stated point of §10's redirect, so the listing uses it: a locked row
+   * comes back as `lockedCard`, an unlocked one as the same card the bundles
+   * grid renders, and neither can quote a member price a non-member cannot
+   * get.
+   */
+  const compositions = compositionJoined.length
+    ? (await resolveCompositionPageWithMystery(db, compositionJoined, ctx)).resolved
+    : new Map<string, ResolvedBundle>();
+  const cardOf = (p: Record<string, unknown>): Record<string, unknown> => {
+    const id = String(p.id);
+    const b = compositions.get(id);
+    // A composition card has its own narrow shape, and a LOCKED one has its
+    // member prices stripped in there. `cardShape` must not touch it.
+    if (b) return compositionCard(b, ctx);
+    return withCompareType(
+      cardShape(
+        publicWithDisplayPrice(
+          p,
+          ctx,
+          { sellable: sellableNowOf(p) },
+          views.get(id),
+          undefined,
+          offers.get(offerKey(subjectOf(id))),
+          pooled.has(id)
+        )
+      ),
+      p,
+      idx
+    );
+  };
+  for (const p of rows) out.set(String(p.id), { row: p, card: cardOf(p) });
+  return out;
+}
+
+/**
+ * The long text of a product row — descriptions, guides, content blocks, spec
+ * groups, the translation memory — which a listing CARD never carries
+ * (`CARD_FIELDS`: «it exists to stop … the usage guide and three languages of
+ * description riding on every tile») and which moves no price, stock, sale
+ * type or offer. The paged listing reads its rows without them, so pricing a
+ * thousand sellable candidates to order them does not haul their descriptions
+ * out of D1 (tests/listingPaging.test.ts: the cards are identical either way).
+ * The rule tests/cardProjection.test.ts pins still holds — the resolver sees
+ * every column that can move a price, the option ladder included; only text no
+ * resolver reads is left out, and only here.
+ */
+const LISTING_UNREAD_COLUMNS: ReadonlySet<string> = new Set([
+  'description', 'description_ar', 'description_ku',
+  'how_to_use', 'how_to_use_ar', 'how_to_use_ckb', 'usage_guide',
+  'content_blocks', 'description_images', 'description_videos',
+  'features', 'specifications', 'translation_meta',
+]);
+const SAFE_COLUMN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * The `products` columns, LEARNED from the first whole row a listing read on
+ * this binding (`SELECT *` names every column, NULL ones included) — so leaving
+ * the long text out costs no PRAGMA and no statement. Until then a row is read
+ * whole. A column added by a migration arrives with a fresh deploy, and so with
+ * fresh isolates.
+ */
+const LEARNED_PRODUCT_COLUMNS = new WeakMap<object, string[]>();
+function learnProductColumns(db: D1Database, row: Record<string, unknown> | undefined): void {
+  if (!row || LEARNED_PRODUCT_COLUMNS.has(db as object)) return;
+  const cols = Object.keys(row).filter((c) => c !== 'sellable_now');
+  if (cols.includes('id') && cols.every((c) => SAFE_COLUMN.test(c))) LEARNED_PRODUCT_COLUMNS.set(db as object, cols);
+}
+
+/**
+ * THE LISTING, PAGED OVER EVERY CANDIDATE (owner, 2026-10-19: «browse ALL
+ * products»; it stopped at 300 of the ~1,100 Bambu Lab products).
+ *
+ * READ 1 — THE KEYS of every candidate (≤ `LISTING_KEYS_CAP`), in the shelf
+ * order made total by the id, with nothing a card needs: id, name, date,
+ * brand (its slug, and its names on one row per brand when facets are
+ * counted), the SELLABLE flag, and the spec sheet only when a spec facet is
+ * filtered or counted.
+ *
+ * Then the listing knows, before it prices anything, what it must resolve:
+ *   - a stored-key order (newest, name) over stored-key filters (brand, fits,
+ *     specs) without facets: the order of ALL candidates comes from their keys
+ *     and only the PAGE is resolved — 24 cards at any depth;
+ *   - a resolved order (relevance, price, available, direct), a resolved filter
+ *     or the facet counts: the SELLABLE candidates are resolved, the first
+ *     `LISTING_CANDIDATE_CAP` of them in the shelf order. A CATALOG-ONLY
+ *     candidate is exact from its keys (`keyedListingItem`) and is resolved
+ *     only when it is on the page. In the shelf order every sellable row comes
+ *     before every catalog-only one and every resolved order keeps it so (R1,
+ *     R3), so which catalog-only rows are on the page is known from the keys.
+ *
+ * PAST THE CAP NOTHING IS HIDDEN. A sellable candidate beyond it is kept as
+ * its keyed item: an order puts it after the resolved ones, in the shelf
+ * order, before the catalog-only ones; a resolved filter cannot vouch for it
+ * and leaves it out; the counts do not see its price or stock. The answer then
+ * says `truncated: true`. Paging stays exact: the order of a request never
+ * depends on `facets`, `limit` or `offset`, so consecutive pages neither
+ * repeat nor skip a product.
+ *
+ * READ 2 — the resolve: the chosen rows (without the long text no card
+ * carries, `LISTING_UNREAD_COLUMNS`), their relations, offers and pools, and
+ * (with facets) the printers each candidate fits, in ONE wave. A third wave
+ * happens only when the page could not be foreseen (facets with a «يناسب
+ * طابعة» chip) and holds a card not yet resolved.
+ *
+ * `total` is every match, `has_more` whether another page exists.
+ */
+async function pagedListing(
+  db: D1Database,
+  o: {
+    /** The candidates' SQL, `selectList` + WHERE, before any ORDER BY. */
+    whereSql: string;
+    whereParams: unknown[];
+    selectList: string;
+    state: ListingState;
+    wantsFacets: boolean;
+    limit: number;
+    offset: number;
+    ctxPromise: Promise<PricingCtx>;
+    idxPromise: Promise<CatalogIndex | null>;
+    categoryField: Record<string, unknown>;
+    candidateCap: number;
+    keysCap: number;
+  }
+): Promise<CatalogListing> {
+  const { state, wantsFacets, limit, offset, candidateCap, keysCap } = o;
+  const specFiltered = Object.values(state.specs ?? {}).some((v) => Array.isArray(v) && v.length > 0);
+  const resolvedFilter = filtersReadResolved(state);
+  const resolvedSort = sortReadsResolved(state.sort, false);
+  const needResolved = wantsFacets || resolvedFilter || resolvedSort;
+
+  const keyCols = [
+    'products.id AS id',
+    'products.name AS name',
+    'products.created_at AS created_at',
+    'products.brand_id AS brand_id',
+    'products.inventory_mode AS inventory_mode',
+    'products.composition AS composition',
+    `${optimisticSellableFlag(db)} AS sellable_now`,
+    // The slug the brand filter is re-applied with in memory (one primary-key probe per row).
+    '(SELECT kb.slug FROM brands kb WHERE kb.id = products.brand_id) AS brand_slug',
+  ];
+  if (wantsFacets || specFiltered) keyCols.push('products.spec_fields AS spec_fields');
+  // The brand facet's names, on ONE row per brand — the facet costs no statement of its own.
+  if (wantsFacets) {
+    keyCols.push(
+      "CASE WHEN products.brand_id IS NOT NULL AND ROW_NUMBER() OVER (PARTITION BY products.brand_id) = 1 THEN (SELECT json_object('id', ib.id, 'slug', ib.slug, 'name_ar', ib.name_ar, 'name_en', ib.name_en, 'name_ckb', ib.name_ckb) FROM brands ib WHERE ib.id = products.brand_id) END AS brand_info"
+    );
+  }
+  // R1's shelf order (sellable first), made TOTAL by the id: two requests for two pages walk one order.
+  const keysSql =
+    o.whereSql.replace(o.selectList, `SELECT ${keyCols.join(', ')} FROM products`) +
+    ' ORDER BY sellable_now DESC, products.display_order ASC, products.created_at DESC, products.id ASC LIMIT ?';
+  const keysParams = [...o.whereParams, keysCap + 1];
+  const { results: fetchedKeys } = await runListed(db, keysSql, (q) => db.prepare(q).bind(...keysParams).all<ListingKeyRow>());
+  const keysOverflow = fetchedKeys.length > keysCap;
+  const keys = keysOverflow ? fetchedKeys.slice(0, keysCap) : fetchedKeys;
+
+  const sellable = (k: ListingKeyRow) => sellableNowOf(k as unknown as Record<string, unknown>);
+  const all = keys.map((key, rank) => ({ key, rank, id: String(key.id), sellable: sellable(key) }));
+  // The sellable candidates resolved to be ordered, filtered or counted: the first ones in the shelf order.
+  const resolvedForOrder = new Set<string>();
+  let sellableCount = 0;
+  if (needResolved) {
+    for (const c of all) {
+      if (!c.sellable) continue;
+      sellableCount += 1;
+      if (resolvedForOrder.size < candidateCap) resolvedForOrder.add(c.id);
+    }
+  }
+  const pastCap = sellableCount > resolvedForOrder.size;
+
+  const brandSlugOf = (k: ListingKeyRow) => (typeof k.brand_slug === 'string' && k.brand_slug ? k.brand_slug : null);
+  // «يناسب طابعة» without facets was applied IN SQL — the same predicate as the in-memory one — so every
+  // candidate fits one of the chosen printers: the memory re-check passes, and no read is spent on it.
+  const keyedFits = !wantsFacets && state.fits.length > 0 ? state.fits : [];
+  const keyed = (c: (typeof all)[number], fits: string[] = keyedFits) => keyedListingItem(c.key, c.rank, brandSlugOf(c.key), fits);
+
+  /**
+   * WHICH CANDIDATES ARE ON THE PAGE, FROM THE KEYS — null when that needs the
+   * printers each one fits (facets with a «يناسب طابعة» chip, applied in memory).
+   */
+  let foreseen: string[] | null = null;
+  if (!(wantsFacets && state.fits.length > 0)) {
+    if (!resolvedSort && !resolvedFilter) {
+      // A stored-key order over stored-key filters: the whole order is in the keys.
+      foreseen = runListing(all.map((c) => keyed(c)), state, { facets: false, brands: new Map() })
+        .items.slice(offset, offset + limit)
+        .map((i) => i.id);
+    } else {
+      // The resolved candidates (however they sort or filter) come first; then, in the shelf order, the
+      // sellable ones past the cap and the catalog-only ones — which a resolved filter leaves out (R3).
+      const head = all.filter((c) => resolvedForOrder.has(c.id));
+      const headPassing = resolvedFilter ? null : applyFilters(head.map((c) => keyed(c)), state).length;
+      const tail = resolvedFilter ? [] : applyFilters(all.filter((c) => !resolvedForOrder.has(c.id)).map((c) => keyed(c)), state);
+      // Under a resolved filter only head rows can be on the page, and every head row is resolved anyway.
+      foreseen =
+        headPassing === null
+          ? []
+          : tail.slice(Math.max(0, offset - headPassing), Math.max(0, offset + limit - headPassing)).map((i) => i.id);
+    }
+  }
+
+  const byId = new Map(all.map((c) => [c.id, c] as const));
+  type Resolved = Map<string, { row: Record<string, unknown>; card: Record<string, unknown> }>;
+  // The row read: every column but the long text no card carries, once the columns are known.
+  const learned = LEARNED_PRODUCT_COLUMNS.get(db as object);
+  const rowSelect = learned
+    ? `SELECT ${learned
+        .filter((c) => !LISTING_UNREAD_COLUMNS.has(c))
+        .map((c) => `products."${c}"`)
+        .join(', ')}, ${optimisticSellableFlag(db)} AS sellable_now FROM products`
+    : o.selectList;
+  const resolveIds = (ids: string[]): Promise<Resolved> =>
+    ids.length === 0
+      ? Promise.resolve(new Map())
+      : listedCards(
+          db,
+          ids.map((id) => byId.get(id)!.key),
+          runListed(db, `${rowSelect} WHERE products.id IN (SELECT value FROM json_each(?))`, (q) =>
+            db.prepare(q).bind(JSON.stringify(ids)).all<Record<string, unknown>>()
+          ).then((r) => {
+            const rows = r.results ?? [];
+            if (!learned) learnProductColumns(db, rows[0]);
+            return rows;
+          }),
+          o.ctxPromise,
+          o.idxPromise
+        );
+
+  // READ 2: the resolve and (with facets) every candidate's printers, side by side.
+  const [resolved, fitsByProduct] = await Promise.all([
+    resolveIds([...new Set([...resolvedForOrder, ...(foreseen ?? [])])]),
+    wantsFacets ? activeFitsFor(db, all.map((c) => c.id)) : Promise.resolve(new Map<string, FitPrinter[]>()),
+  ]);
+  const fitsOf = (id: string) => (wantsFacets ? (fitsByProduct.get(id) ?? []).map((p) => p.slug) : keyedFits);
+
+  // A resolved candidate is its resolved item; every other one is exact from its keys for what this
+  // request reads. A sellable row that left between the two reads (an admin hid it) is not listed.
+  const items: ListingItem[] = [];
+  for (const c of all) {
+    if (resolvedForOrder.has(c.id)) {
+      const r = resolved.get(c.id);
+      if (r) items.push(listingItemOf(r.row, r.card, c.rank, brandSlugOf(c.key), fitsOf(c.id)));
+    } else {
+      items.push(keyed(c, fitsOf(c.id)));
+    }
+  }
+
+  const brands = new Map<string, BrandInfo>();
+  if (wantsFacets) {
+    for (const k of keys) {
+      const b = safeParse<BrandInfo | null>(typeof k.brand_info === 'string' ? k.brand_info : 'null', null);
+      if (b && typeof b.id === 'string') brands.set(b.id, b);
+    }
+  }
+  const printers = new Map<string, PrinterInfo>();
+  for (const list of fitsByProduct.values()) {
+    for (const p of list) {
+      if (!printers.has(p.slug)) printers.set(p.slug, { id: p.id, slug: p.slug, name_ar: p.name_ar, name_en: p.name_en, name_ckb: p.name_ckb });
+    }
+  }
+  const run = runListing(items, state, { facets: wantsFacets, brands, printers });
+  const page = run.items.slice(offset, offset + limit);
+
+  // Only when the page could not be foreseen: its cards not resolved yet, in a third wave.
+  const pageCards: Resolved = new Map();
+  for (const i of page) {
+    const r = resolved.get(i.id);
+    if (r) pageCards.set(i.id, r);
+  }
+  const missing = page.map((i) => i.id).filter((id) => !pageCards.has(id));
+  if (missing.length) for (const [id, r] of await resolveIds(missing)) pageCards.set(id, r);
+
+  const products = page.map((i) => pageCards.get(i.id)?.card).filter((c): c is Record<string, unknown> => !!c);
+  return {
+    body: {
+      ...o.categoryField,
+      products,
+      total: run.items.length,
+      truncated: keysOverflow || pastCap,
+      has_more: offset + page.length < run.items.length,
+      sort: state.sort,
+      ...(run.facets ? { facets: run.facets } : {}),
+    },
+    rows: new Map([...pageCards].map(([id, r]) => [id, r.row] as const)),
+  };
+}
+
 export async function listCatalogProducts(
   db: D1Database,
   q: Record<string, string>,
   ctxPromise: Promise<PricingCtx>,
-  opts: { withTotal?: boolean } = {}
+  opts: {
+    withTotal?: boolean;
+    /**
+     * TESTS ONLY — the caps at a size a test can seed (`LISTING_CANDIDATE_CAP`,
+     * `LISTING_KEYS_CAP`); no request reaches them.
+     */
+    caps?: { candidates?: number; keys?: number };
+  } = {}
 ): Promise<CatalogListing> {
   const search = str(q.search, 'search', { max: 100, required: false });
   // A slug as long as /api/catalog/:slug takes (80): the admin's taxonomy
@@ -3689,7 +4116,15 @@ export async function listCatalogProducts(
   const category = str(q.category, 'category', { max: 80, required: false });
   const type = str(q.type, 'type', { max: 20, required: false }); // 'bundle' | 'discounted' | 'featured'
   const limit = int(q.limit, 'limit', { min: 1, max: 50, def: 20 });
-  const offset = int(q.offset, 'offset', { min: 0, max: 10_000, def: 0 });
+  /**
+   * `offset` is the paging parameter. `page` (1-based) is read only when no
+   * `offset` was sent — «?brand=bambu-lab&page=3» is what a person types, and it
+   * was silently ignored. Both land on the same depth bound (10,000).
+   */
+  const offset =
+    (q.offset === undefined || q.offset === '') && q.page !== undefined && q.page !== ''
+      ? Math.min(10_000, (int(q.page, 'page', { min: 1, max: 10_001, def: 1 }) - 1) * limit)
+      : int(q.offset, 'offset', { min: 0, max: 10_000, def: 0 });
 
   /**
    * THE SPECIALISED LISTING (catalog discovery S1). Parsed by the one grammar
@@ -3867,7 +4302,7 @@ export async function listCatalogProducts(
       return { body: {
         products: [],
         ...categoryField,
-        ...(listing ? { total: 0, truncated: false, sort: listingState.sort } : {}),
+        ...(listing ? { total: 0, truncated: false, has_more: false, sort: listingState.sort } : {}),
       }, rows: new Map() };
     } else {
       /**
@@ -3974,7 +4409,7 @@ export async function listCatalogProducts(
    */
   if (listing && !wantsFacets && listingState.fits.length) {
     if (!(await printerFitsInstalled(db))) {
-      return { body: { products: [], ...categoryField, total: 0, truncated: false, sort: listingState.sort }, rows: new Map() };
+      return { body: { products: [], ...categoryField, total: 0, truncated: false, has_more: false, sort: listingState.sort }, rows: new Map() };
     }
     sql +=
       ' AND id IN (SELECT f.product_id FROM product_printer_fits f JOIN products pr ON pr.id = f.printer_id' +
@@ -3990,6 +4425,28 @@ export async function listCatalogProducts(
    * the engine produced and pages through it, and everything else keeps the
    * shelf order it always had.
    */
+  /**
+   * THE LISTING OVER A SECTION, A BRAND OR THE WHOLE SHOP PAGES EVERY CANDIDATE
+   * (`pagedListing`): its keys first, then only what it must price. A search
+   * (the engine returns ≤ 200 ids, already ranked) and `type=bundle` (bundle
+   * rows only) keep the one read below.
+   */
+  if (listing && !search && type !== 'bundle') {
+    return pagedListing(db, {
+      whereSql: sql,
+      whereParams: params,
+      selectList,
+      state: listingState,
+      wantsFacets,
+      limit,
+      offset,
+      ctxPromise,
+      idxPromise: idxPromise.catch(() => null),
+      categoryField,
+      candidateCap: opts.caps?.candidates ?? LISTING_CANDIDATE_CAP,
+      keysCap: opts.caps?.keys ?? LISTING_KEYS_CAP,
+    });
+  }
   // One COUNT over the same WHERE, before ORDER BY and paging are appended.
   const countSql = !listing && opts.withTotal ? sql.replace(selectList, 'SELECT COUNT(*) AS n FROM products') : null;
   const countParams = countSql ? [...params] : [];
@@ -4006,57 +4463,22 @@ export async function listCatalogProducts(
     // R1 (DECISIONS row 240): browsing puts the sellable first, so the candidate cap keeps priced items.
     sql += ' ORDER BY sellable_now DESC, display_order ASC, created_at DESC LIMIT ? OFFSET ?';
   }
-  // The listing pages in MEMORY, after the viewer's prices are known, so SQL
-  // hands back the whole capped candidate set in its natural order (+1 row to
-  // learn whether the cap bit).
-  if (listing) params.push(LISTING_CANDIDATE_CAP + 1, 0);
+  // A search or a bundle listing pages in MEMORY, after the viewer's prices are
+  // known, so SQL hands back the whole capped candidate set in its natural order
+  // (+1 row to learn whether the cap bit).
+  const candidateCap = opts.caps?.candidates ?? LISTING_CANDIDATE_CAP;
+  if (listing) params.push(candidateCap + 1, 0);
   else params.push(limit, offset);
 
-  const [{ results: fetched }, ctx, idx, counted] = await Promise.all([
+  const [{ results: fetched }, counted] = await Promise.all([
     runListed(db, sql, (q) => db.prepare(q).bind(...params).all<Record<string, unknown>>()),
-    ctxPromise,
-    idxPromise.catch(() => null),
     countSql ? runListed(db, countSql, (q) => db.prepare(q).bind(...countParams).first<{ n: number }>()) : Promise.resolve(null),
   ]);
-  const truncated = listing && fetched.length > LISTING_CANDIDATE_CAP;
-  const results = truncated ? fetched.slice(0, LISTING_CANDIDATE_CAP) : fetched;
+  learnProductColumns(db, fetched[0]);
+  const truncated = listing && fetched.length > candidateCap;
+  const results = truncated ? fetched.slice(0, candidateCap) : fetched;
   const rowsById = new Map(results.map((r) => [String(r.id), r]));
-  // One batched read for the whole page rather than N+1 per card — and one
-  // chunked read of every scheduled offer on it, so a special offer costs the
-  // listing one query, not one per card (§14).
-  const [views, offers, pooled] = await Promise.all([
-    loadRelationsViews(
-      db,
-      results.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
-    ),
-    degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(db, results.map((r) => subjectOf(String(r.id)))), EMPTY_OFFERS()),
-    // §8.2 row 18, for the LISTING too: a card carries `stock`, and a grid
-    // captured before and after a purchase is the same two GETs.
-    degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(db, results.map((r) => String(r.id))), new Set<string>()),
-  ]);
-  /**
-   * A COMPOSITION ROW IS SERIALIZED BY THE COMPOSITION BUILDER, HERE TOO (§9).
-   *
-   * `?type=bundle` and the search branch both select composition rows, and
-   * handing them to `publicWithDisplayPrice` published `price_iqd`,
-   * `display_price_iqd`, `display_prime_iqd` and `display_pro_iqd` for a
-   * GATED offer to a viewer who may not buy it — the exact keys §9's locked
-   * ALLOW-LIST names as the ones that must be stripped, and which
-   * `GET /api/bundles/:slug` already strips. One builder for both doors is
-   * the stated point of §10's redirect, so the listing uses it: a locked row
-   * comes back as `lockedCard`, an unlocked one as the same card the bundles
-   * grid renders, and neither can quote a member price a non-member cannot
-   * get.
-   */
-  const compositionIds = results.filter((r) => String(r.composition ?? '') !== '').map((r) => String(r.id));
-  // The JOINED rows: `bundle_config` and `offer_windows` are what decide the
-  // price mode and the lock, and the bare `products` row carries neither.
-  const compositionJoined = compositionIds.length
-    ? [...(await loadCompositionRows(db, compositionIds)).values()]
-    : [];
-  const compositions = compositionJoined.length
-    ? (await resolveCompositionPageWithMystery(db, compositionJoined, ctx)).resolved
-    : new Map<string, ResolvedBundle>();
+  const resolved = await listedCards(db, results, Promise.resolve(results), ctxPromise, idxPromise.catch(() => null));
   /**
    * THE GREY COMPLETION IN THE SEARCH BOX («اقتراحات بلون رصاصي في الشريط
    * الكتابي نفسه»): the word the shopper is still typing, completed from the
@@ -4074,27 +4496,7 @@ export async function listCatalogProducts(
           : null,
       }
     : {};
-  const cards = results.map((p) => {
-    const b = compositions.get(String(p.id));
-    // A composition card has its own narrow shape, and a LOCKED one has its
-    // member prices stripped in there. `cardShape` must not touch it.
-    if (b) return compositionCard(b, ctx);
-    return withCompareType(
-      cardShape(
-        publicWithDisplayPrice(
-          p,
-          ctx,
-          { sellable: sellableNowOf(p) },
-          views.get(String(p.id)),
-          undefined,
-          offers.get(offerKey(subjectOf(String(p.id)))),
-          pooled.has(String(p.id))
-        )
-      ),
-      p,
-      idx
-    );
-  });
+  const cards = results.map((p) => resolved.get(String(p.id))!.card);
   if (!listing) {
     return { body: {
       ...categoryField,
@@ -4143,12 +4545,14 @@ export async function listCatalogProducts(
     )
   );
   const run = runListing(items, listingState, { facets: wantsFacets, brands, printers });
+  const page = run.items.slice(offset, offset + limit);
   return { body: {
     ...categoryField,
     ...suggestion,
-    products: run.items.slice(offset, offset + limit).map((i) => i.card),
+    products: page.map((i) => i.card),
     total: run.items.length,
     truncated,
+    has_more: offset + page.length < run.items.length,
     sort: listingState.sort,
     ...(run.facets ? { facets: run.facets } : {}),
   }, rows: rowsById };
@@ -4160,7 +4564,7 @@ export async function listCatalogProducts(
  * `listCatalogProducts` reads is here; a parameter it ignores cannot mint an
  * entry.
  */
-export const LISTING_CACHE_PARAMS: readonly string[] = ['search', 'category', 'type', 'limit', 'offset', ...LISTING_PARAM_KEYS];
+export const LISTING_CACHE_PARAMS: readonly string[] = ['search', 'category', 'type', 'limit', 'offset', 'page', ...LISTING_PARAM_KEYS];
 
 productRoutes.get('/', (c) =>
   // A GUEST'S listing is the same for every guest and is served from the

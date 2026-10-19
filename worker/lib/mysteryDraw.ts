@@ -322,20 +322,20 @@ export async function loadMysteryOffers(db: D1Database, productIds: string[]): P
 export async function activePoolProductIds(db: D1Database, productIds: string[]): Promise<Set<string>> {
   const out = new Set<string>();
   const ids = [...new Set(productIds)].filter(Boolean);
-  for (let i = 0; i < ids.length; i += CHUNK) {
-    const part = ids.slice(i, i + CHUNK);
-    const { results } = await db
-      .prepare(
-        `SELECT DISTINCT e.product_id AS product_id
-           FROM mystery_pool_entries e
-           JOIN mystery_pools p ON p.id = e.pool_id
-          WHERE e.active = 1 AND p.active = 1
-            AND e.product_id IN (${part.map(() => '?').join(', ')})`
-      )
-      .bind(...part)
-      .all<{ product_id: string }>();
-    for (const r of results) out.add(r.product_id);
-  }
+  if (ids.length === 0) return out;
+  // ONE statement for the whole list (json_each: one bound parameter): a listing that resolves a thousand
+  // candidates pays one wave here, not twenty dependent 50-id chunks (worker/routes/products.ts).
+  const { results } = await db
+    .prepare(
+      `SELECT DISTINCT e.product_id AS product_id
+         FROM mystery_pool_entries e
+         JOIN mystery_pools p ON p.id = e.pool_id
+        WHERE e.active = 1 AND p.active = 1
+          AND e.product_id IN (SELECT value FROM json_each(?))`
+    )
+    .bind(JSON.stringify(ids))
+    .all<{ product_id: string }>();
+  for (const r of results) out.add(r.product_id);
   return out;
 }
 

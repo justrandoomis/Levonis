@@ -8,9 +8,12 @@
  * availability is the direct-sale count proved over the option graph, and the
  * spec facets are free text read by the compare engine's own parsers. So the
  * route narrows in SQL by what SQL can answer (section, search, and — when no
- * counts are asked for — brand and sale type), resolves a CAPPED candidate set
- * through the one pricing path, and hands it here. At 14 products or 1,400 the
- * cap (300) keeps one request bounded, and `truncated` says when it bit.
+ * counts are asked for — brand and «يناسب طابعة»), reads every candidate's KEYS,
+ * resolves through the one pricing path only what an order, a filter or a count
+ * must see priced (the sellable candidates, up to a cap; a catalog-only one is
+ * exact from its keys), and hands the whole set here — so a listing pages to
+ * its last product (worker/routes/products.ts `pagedListing`), and `truncated`
+ * says when the cap left sellable candidates unpriced.
  *
  * DISJUNCTIVE COUNTS. A facet's counts are computed with every OTHER active
  * filter applied and its own ignored, so a shopper who ticked «Bambu Lab» still
@@ -171,17 +174,46 @@ export function facetTokensOf(field: FacetField, specs: Record<string, unknown>)
   }
 }
 
+/**
+ * READ ONCE PER PRODUCT AND FACET. The counts ask every candidate about every
+ * facet once per option and once per other filter, and the spec parsers
+ * (compareSpecs) were the listing's hottest code at a thousand candidates. A
+ * candidate's `specs` object is parsed once per request and never written, so
+ * its readings are kept beside it (weakly) and handed out read-only.
+ */
+const TOKENS = new WeakMap<Record<string, unknown>, Map<FacetField, readonly string[]>>();
+function tokensOf(field: FacetField, specs: Record<string, unknown>): readonly string[] {
+  let byField = TOKENS.get(specs);
+  if (!byField) {
+    byField = new Map();
+    TOKENS.set(specs, byField);
+  }
+  let tokens = byField.get(field);
+  if (!tokens) {
+    tokens = facetTokensOf(field, specs);
+    byField.set(field, tokens);
+  }
+  return tokens;
+}
+const MAX_COLORS = new WeakMap<Record<string, unknown>, number | null>();
+function maxColorsOf(specs: Record<string, unknown>): number | null {
+  if (MAX_COLORS.has(specs)) return MAX_COLORS.get(specs) ?? null;
+  const n = readNumber(specText(specs, 'max_colors'));
+  MAX_COLORS.set(specs, n);
+  return n;
+}
+
 /** Does this product satisfy ONE facet's selection (OR within the facet)? */
 function matchesFacet(field: FacetField, specs: Record<string, unknown>, selected: string[]): boolean {
   if (field === 'max_colors') {
-    const n = readNumber(specText(specs, 'max_colors'));
+    const n = maxColorsOf(specs);
     if (n === null) return false;
     return selected.some((t) => {
       const r = readRangeToken(t);
       return r !== null && n >= r.min && n <= r.max;
     });
   }
-  const mine = facetTokensOf(field, specs);
+  const mine = tokensOf(field, specs);
   return mine.some((t) => selected.includes(t));
 }
 
@@ -305,7 +337,7 @@ function specOptions(field: FacetField, all: ListingItem[]): Array<{ value: stri
     for (const bucket of MAX_COLOR_BUCKETS) {
       const r = readRangeToken(bucket)!;
       if (all.some((i) => {
-        const n = readNumber(specText(i.specs, 'max_colors'));
+        const n = maxColorsOf(i.specs);
         return n !== null && n >= r.min && n <= r.max;
       })) seen.set(bucket, bucket);
     }
@@ -313,7 +345,7 @@ function specOptions(field: FacetField, all: ListingItem[]): Array<{ value: stri
   }
   for (const item of all) {
     const words = field === 'color_name' ? pieces(specText(item.specs, field)) : [];
-    for (const t of facetTokensOf(field, item.specs)) {
+    for (const t of tokensOf(field, item.specs)) {
       if (seen.has(t)) continue;
       // The admin's own words for a free-text value; a piece of a multi-valued colour is its own label.
       const label =
@@ -401,6 +433,33 @@ export function facetCounts(
     member: forMember.filter(memberCheaper).length,
     specs,
   };
+}
+
+// ------------------------------------------------------------- what reads what
+
+/**
+ * WHETHER AN ORDER READS A RESOLVED FIELD — the viewer's price, the proved stock, the
+ * sale types, the priced state — or only what the row stores (its name, its date,
+ * its place in the SQL / search order). A stored-key order can be computed for EVERY
+ * candidate from a narrow read, and only the page shown is priced
+ * (worker/routes/products.ts `pagedListing`); a resolved one needs each candidate
+ * through the pricing path first.
+ */
+export function sortReadsResolved(sort: ListingSort, hasSearch: boolean): boolean {
+  if (sort === 'newest' || sort === 'name') return false;
+  // Relevance WITH a search is the engine's ranking, untouched (byRank).
+  if (sort === 'relevance') return !hasSearch;
+  return true;
+}
+
+/**
+ * Whether an active filter reads a resolved field. Every one of them — «المتوفر
+ * الآن», the sale type, a price range, «عليها عرض», «سعر أقل للأعضاء» — EXCLUDES a
+ * product with no price (R3, `passes`): a catalog-only product can never pass one.
+ * Brand, «يناسب طابعة» and the spec facets read stored fields only.
+ */
+export function filtersReadResolved(f: ListingFilters): boolean {
+  return f.avail || f.sale !== null || f.price !== null || f.offer || f.member;
 }
 
 /** The whole listing step: filter, sort, count. Paging is the caller's. */

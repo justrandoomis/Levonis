@@ -2398,3 +2398,49 @@ Lab (same set-up as above; interleaved, one `wrangler dev` per arm, the order ro
 | `/categories` | 2084 → 2172 → 2014 → **2004** | 3212 → 3190 → **3114** | 2855 → 993 |
 | `/categories/printers` | 2108 → 2316 → 2064 → **2026** | 4248 → 3930 → **3756** | 3481 → 1091 |
 | `/categories/printers/fdm-printers` | 2064 → 2284 → 2002 → **1958** | 4276 → 4046 → **3942** | 3321 → 990 |
+
+## 2026-10-19 — the listing pages every candidate (branch feat/listing-paging on b8233ee3)
+
+The owner: customers must be able to browse ALL products. `GET /api/products?brand=bambu-lab` answered
+`total: 300, truncated: true` for ~1,100 products, because every listing request put its first 300 candidates
+(catalog-only ones included) through the pricing path and paged in memory.
+
+**What changed** (`worker/routes/products.ts` `pagedListing`): a browse listing (a section, a brand, the whole
+shop, `type=featured|discounted|preorder`; not a search, not `type=bundle`) reads every candidate's KEYS first
+(id, name, date, brand, the sellable flag — no price) in the shelf order made total by the id, then resolves only
+what it must:
+
+| request | resolved |
+|---|---|
+| newest / name, stored-key filters (brand, fits, specs), no counts | the page (24) |
+| relevance / price / available / direct, a price or stock filter, or the counts | the sellable candidates (≤ `LISTING_CANDIDATE_CAP` = 1,000, shelf order) + the page's catalog-only cards |
+
+A catalog-only candidate is never priced to be ordered or counted: its listing item is exact from its keys
+(DECISIONS row 240: no price, no stock, no sale type), so which catalog-only cards are on the page is known before
+anything is priced. Past the cap nothing is hidden: the rest follow in the shelf order and `truncated: true` says
+so. The row read leaves out the long text no card carries (descriptions, guides, content blocks, spec groups,
+translation memory — the columns learned from the isolate's first whole row, no PRAGMA). The offers and the
+mystery-pool reads are one `json_each` statement each (they were 50-id chunks, a dependent wave per chunk).
+The answer carries `has_more`; `page` (1-based) is read when `offset` is absent and keys the edge cache.
+
+**Measured** — the real router over node:sqlite (`tests/fixtures/wavesD1.ts`, statements / dependent waves; ms is
+the in-process handler, warm, median of 3; before = b8233ee3):
+
+| world | request | before | after |
+|---|---|---|---|
+| 60 sellable + 1,140 catalog-only, one brand | `brand=…&facets=1` (page 1) | 30 / 9 · 228 ms · total 300, truncated | 15 / 2 · 133 ms · total 1,200 |
+| | `sort=relevance&offset=24` («عرض المزيد») | 29 / 8 · 120 ms | 14 / 2 · 32 ms |
+| | `sort=newest&offset=480` | 29 / 8 · 119 ms · **0 products** | 14 / 2 · 22 ms · 24 products |
+| | `sort=price_asc&facets=1` | 30 / 9 · 149 ms | 15 / 2 · 91 ms |
+| 1,000 sellable + 200 catalog-only | `brand=…&facets=1` | 30 / 9 · 215 ms · total 300 | 15 / 2 · 479 ms · total 1,200 |
+| | `sort=price_asc&offset=24` | 29 / 8 · 97 ms | 14 / 2 · 216 ms |
+| | `sort=newest&offset=480` | 29 / 8 · 104 ms · 0 products | 14 / 2 · 25 ms |
+| live catalogue (14), `tests/d1Waves.test.ts` | facets page / relevance / price_asc+facets / newest | waves 5/5/7 · 4/4/6 · 4/4/7 · 3/3/6 (warm/cold/member), 16 · 15 · 15 · 14 statements | waves 3/3/4 · 3/3/4 · 2/2/4 · 2/2/4, the same statements |
+
+The worst case — a thousand priced products under a price order — costs ~0.25 ms of CPU per sellable candidate
+(the pricing path; the facet counts read each candidate's spec sheet once now, `tokensOf`), and two round trips
+instead of eight or nine. Every other request prices 24 cards. The statements no longer grow with the
+catalogue (`tests/listingPaging.test.ts`: the same count at 120 and 1,200 products).
+
+**Client:** the truncated note says what it means now, in ar / en / ckb; «عرض المزيد» stops on `has_more: false`
+(or a page that adds nothing) and otherwise counts down `total` to the last product.
