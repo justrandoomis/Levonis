@@ -35,7 +35,7 @@ import { uiTree } from "three-slicer/data";
 import type { ViewportEvent, ViewportProps } from "three-slicer/viewer";
 import { registerExtendedModelLoaders } from "./model-loaders";
 import {
-  arrangeCurrentObjects, autoOrientObjects, createEngineAdapter, cutObject, cutRange, seatNewObjects,
+  arrangeCurrentObjects, autoOrientObjects, createEngineAdapter, cutObject, cutRange, isHeavyImport, seatNewObjects,
   type CutKeep, type EngineTestId,
 } from "./engine-adapter";
 import { currentDeviceProfile } from "./device-profile";
@@ -335,6 +335,18 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const [selectedPlate, setSelectedPlate] = useState(0);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  /**
+   * WARNINGS THE ENGINE KEEPS ONLY IN ITS SIDE PANEL. Simple hides that panel
+   * at every width, and neither of these is an engine event, so the shell
+   * carries both itself, in BOTH modes:
+   *  - the slow-slice warning when one import adds more than the engine's own
+   *    triangle threshold (app/engine-adapter.ts HEAVY_IMPORT_TRIANGLES);
+   *  - the engine's "simplified retry" offer after a failed slice: the error
+   *    TEXT it belongs to (the error row offers the retry only beside that
+   *    error) and the shell clicks the engine's own button through the adapter.
+   */
+  const [heavyImportTriangles, setHeavyImportTriangles] = useState<number | null>(null);
+  const [downgradeOfferFor, setDowngradeOfferFor] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<ImportProgressState | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [toolTrayOpen, setToolTrayOpen] = useState(false);
@@ -435,6 +447,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const selectedPlateRef = useRef(0);
   /** Object ids currently in the scene, so the shell can tell a spawn from a split. */
   const seenObjectIdsRef = useRef<Set<number>>(new Set());
+  /** Object ids the heavy-import check has already counted. */
+  const triangleCheckedIdsRef = useRef<Set<number>>(new Set());
   /**
    * Every id this session has EVER seen. The engine hands out object ids from
    * a counter that only increases, so an id that comes back is an object being
@@ -2011,6 +2025,36 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   // This runs on the engine's own `objects` event, so it covers every route
   // that spawns one: the toolbar button, the engine's context menu, Ctrl+K,
   // paste, and a file dropped straight onto the canvas.
+  /**
+   * The engine's slow-slice warning, carried by the shell (see
+   * heavyImportTriangles). Like the engine, it judges the objects ONE change
+   * added: a new import over the threshold raises it, any other import clears
+   * it, and a split or a delete (which removes ids) leaves it as it was.
+   */
+  const noteHeavyImport = useCallback((nextIds: readonly number[]) => {
+    const previous = triangleCheckedIdsRef.current;
+    const next = new Set(nextIds);
+    triangleCheckedIdsRef.current = next;
+    if (!next.size) {
+      setHeavyImportTriangles(null);
+      return;
+    }
+    for (const id of previous) if (!next.has(id)) return;
+    const appeared = [...next].filter((id) => !previous.has(id));
+    if (!appeared.length) return;
+    const triangles = adapter.triangleCountOf(appeared);
+    setHeavyImportTriangles(isHeavyImport(triangles) ? triangles : null);
+  }, [adapter]);
+
+  /** The engine's own "simplified retry", from the shell's error row. */
+  const simplifiedRetry = useCallback(() => {
+    setDowngradeOfferFor(null);
+    if (!adapter.clickControl("downgrade-retry")) return;
+    setError("");
+    setNotice("");
+    setStatus("editing");
+  }, [adapter]);
+
   const seatNewObjectsIfNeeded = useCallback((nextIds: readonly number[]) => {
     const previous = seenObjectIdsRef.current;
     const next = new Set(nextIds);
@@ -2064,6 +2108,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       if (importWaitRef.current && event.value.length > importWaitRef.current.baselineObjects) endImportWait();
       setObjects(event.value);
       const ids = event.value.map((object) => object.id);
+      noteHeavyImport(ids);
       orchestrator.notifyObjects(ids);
       seatNewObjectsIfNeeded(ids);
       if (event.value.length) setStatus((current) => current === "slicing" ? current : "editing");
@@ -2115,10 +2160,13 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       // coming, so the row must not sit there until its ceiling runs out.
       endImportWait();
       setError(event.value);
+      // The engine renders its retry offer in the same commit as this error,
+      // so its button is already in the (possibly hidden) side panel here.
+      setDowngradeOfferFor(event.value && adapter.isControlAvailable("downgrade-retry") ? event.value : null);
       setStatus("error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endImportWait, orchestrator, seatNewObjectsIfNeeded, slicing.handleViewportEvent]);
+  }, [adapter, endImportWait, noteHeavyImport, orchestrator, seatNewObjectsIfNeeded, slicing.handleViewportEvent]);
 
   const handleSliced = useCallback((payload: SlicePayload) => {
     const outcome = slicing.handleSliced(payload);
@@ -2449,13 +2497,19 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
 
         {(error || notice) && <div className={`editor-message ${error ? "error" : "notice"}`} role={error ? "alert" : "status"}>
           <span>{error || notice}</span>
+          {error && downgradeOfferFor === error && <button className="message-action" data-levo-action="simplified-retry" title={t.simplifiedRetryHelp} onClick={simplifiedRetry}>{t.simplifiedRetry}</button>}
           {!error && arrangeUndoAvailable && <button className="message-action" onClick={undoArrange}>{t.arrangeUndo}</button>}
           {!error && orientUndoAvailable && <button className="message-action" onClick={undoOrient}>{t.orientUndo}</button>}
           {!error && cutUndoAvailable && <button className="message-action" onClick={undoCut}>{t.cutUndo}</button>}
-          <button onClick={() => { setError(""); setNotice(""); if (status === "error") setStatus("editing"); }} aria-label={t.close}><Icon name="close" /></button>
+          <button onClick={() => { setError(""); setNotice(""); setDowngradeOfferFor(null); if (status === "error") setStatus("editing"); }} aria-label={t.close}><Icon name="close" /></button>
         </div>}
 
-        {currentStale && !error && !notice && status !== "slicing" && <div className="stale-banner" role="status">
+        {heavyImportTriangles !== null && !error && !notice && <div className="editor-message notice" role="status" data-levo-warning="heavy-import">
+          <span>{templateText(t.heavyModelWarning, { count: Math.round(heavyImportTriangles).toLocaleString(dateLocaleFor(locale)) })}</span>
+          <button onClick={() => setHeavyImportTriangles(null)} aria-label={t.close}><Icon name="close" /></button>
+        </div>}
+
+        {currentStale && !error && !notice && heavyImportTriangles === null && status !== "slicing" && <div className="stale-banner" role="status">
           <Icon name="warning" /><span>{t.staleHelp}</span>
           <button onClick={() => triggerSlice(false)}>{t.slice}</button>
         </div>}

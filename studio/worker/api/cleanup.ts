@@ -21,11 +21,25 @@
  * PINNED REVISIONS ARE NEVER PRUNED OR PURGED (P1-09, worker/api/pins.ts).
  * A revision held by a request, an order or the owner's "keep this version"
  * survives every step above: purgeRevisionById refuses it, retention keeps it
- * outside the N count, and a deleted project past retention is purged only
- * down to its pinned revisions — the project row stays behind as a deleted
+ * outside the N count. The pins table's foreign key makes the database refuse
+ * such a delete too.
+ *
+ * Deleted projects past retention (step 3): the OWNER's own pins are released
+ * when the owner's own deletion is purged — a "keep this version" on a project
+ * its owner then threw away and let expire in the trash protects nothing (no
+ * route can read a purged project's revisions) and would only eat the 1 GiB
+ * quota forever. Only pins other parties depend on ('request', 'order') hold a
+ * revision past that point: the project row then stays behind as a deleted
  * tombstone holding them (never listed, never restorable, still owner-scoped)
- * and is not selected again until something unpinned is left to reclaim.
- * The pins table's foreign key makes the database refuse such a delete too.
+ * and is not selected again until something those holders do not pin is left
+ * to reclaim.
+ *
+ * Pin vs purge is race-free: purgeRevisionById first CLAIMS the revision with
+ * one guarded UPDATE (state → 'abandoned' only while it is neither a head nor
+ * pinned), and pinRevision inserts only while the revision is still
+ * 'committed'. D1 runs each statement atomically, so a pin either lands before
+ * the claim (the purge refuses) or after it (the pin is refused) — it can never
+ * land on a revision whose files are being deleted.
  *
  * Archived projects (project_archive) are NOT deleted and nothing here
  * touches them; only their archive row goes when the project itself is
@@ -37,7 +51,6 @@
  */
 import { type StudioApiCtx, type StudioApiEnv, ensureStudioTables, nowIso } from "./router";
 import { studioLimits } from "./quota";
-import { isRevisionPinned } from "./pins";
 import { purgeStaleRateLimitWindows } from "./ratelimit";
 
 export interface CleanupReport {
@@ -71,14 +84,26 @@ function isoAgo(now: number, ms: number): string {
  * never the other way around). Refuses to purge a revision that is currently
  * a project head — the commit crash-recovery path owns that window — and a
  * revision that any holder pins (P1-09: pinned revisions are never purged).
+ *
+ * Both refusals are decided by ONE guarded UPDATE that claims the revision
+ * (state → 'abandoned') before anything is deleted. A pin (pinRevision only
+ * inserts while the revision is 'committed') or a head swap (COMMIT's CAS only
+ * moves the head onto a 'pending' revision) that loses the race to the claim
+ * is refused; one that wins it makes the claim change nothing, and nothing is
+ * deleted. A claimed revision whose R2 delete then fails stays 'abandoned',
+ * which step 2 of the next run reclaims.
  */
 export async function purgeRevisionById(db: D1Database, bucket: R2Bucket, revisionId: string): Promise<number> {
-  const isHead = await db
-    .prepare(`SELECT 1 AS x FROM projects WHERE head_revision_id = ? LIMIT 1`)
-    .bind(revisionId)
-    .first();
-  if (isHead) return 0;
-  if (await isRevisionPinned(db, revisionId)) return 0;
+  const claim = await db
+    .prepare(
+      `UPDATE project_revisions SET state = 'abandoned'
+        WHERE id = ?
+          AND id NOT IN (SELECT head_revision_id FROM projects WHERE head_revision_id IS NOT NULL)
+          AND NOT EXISTS (SELECT 1 FROM project_revision_pins k WHERE k.revision_id = ?)`
+    )
+    .bind(revisionId, revisionId)
+    .run();
+  if (!claim.meta.changes) return 0;
 
   const { results } = await db
     .prepare(`SELECT id, r2_key FROM project_files WHERE revision_id = ?`)
@@ -95,9 +120,17 @@ export async function purgeRevisionById(db: D1Database, bucket: R2Bucket, revisi
 }
 
 /**
- * Purges a soft-deleted, past-retention project. Every unpinned revision goes;
- * pinned revisions stay, and while any remains the project row stays as a
- * deleted tombstone that owns them (the revision rows reference it).
+ * Pin reasons that outlive their owner's own deletion: other parties depend
+ * on them. The owner's 'user' pin does not — it is released when the owner's
+ * deleted project is purged (see the header).
+ */
+const THIRD_PARTY_PIN_SQL = `SELECT revision_id FROM project_revision_pins WHERE pin_reason <> 'user'`;
+
+/**
+ * Purges a soft-deleted, past-retention project. The owner's own "keep this
+ * version" pins are released first; every revision no request/order pins then
+ * goes. While such a pinned revision remains, the project row stays as a
+ * deleted tombstone that owns it (the revision rows reference it).
  */
 async function purgeProject(
   db: D1Database,
@@ -107,6 +140,17 @@ async function purgeProject(
   // Break the head reference first so purgeRevisionById can take every
   // revision of this (already soft-deleted, past-retention) project.
   await db.prepare(`UPDATE projects SET head_revision_id = NULL, thumbnail_key = NULL WHERE id = ?`).bind(projectId).run();
+  // The owner deleted the project and let the trash window pass: their own
+  // pins end with it (no route can reach a purged project's revisions, so a
+  // kept tombstone would only hold quota nobody can see or release).
+  await db
+    .prepare(
+      `DELETE FROM project_revision_pins
+        WHERE pin_reason = 'user'
+          AND revision_id IN (SELECT id FROM project_revisions WHERE project_id = ?)`
+    )
+    .bind(projectId)
+    .run();
   const { results } = await db
     .prepare(
       `SELECT r.id, EXISTS (SELECT 1 FROM project_revision_pins k WHERE k.revision_id = r.id) AS pinned
@@ -196,8 +240,11 @@ export async function runCleanup(env: StudioApiEnv, now: number = Date.now()): P
   }
 
   // 3. Soft-deleted projects past retention — only those with something left
-  //    to reclaim: a tombstone holding nothing but pinned revisions is not
-  //    selected again (it would starve the per-run cap forever).
+  //    to reclaim: a tombstone holding nothing but request/order-pinned
+  //    revisions is not selected again (it would starve the per-run cap
+  //    forever). The owner's own pins do not hold a deleted project (they are
+  //    released by purgeProject), so they never keep it out of this queue —
+  //    including tombstones an earlier build left holding only a 'user' pin.
   const deletedCutoff = isoAgo(now, limits.deletedRetentionMs);
   const { results: deadProjects } = await db
     .prepare(
@@ -206,10 +253,10 @@ export async function runCleanup(env: StudioApiEnv, now: number = Date.now()): P
           AND (p.head_revision_id IS NOT NULL
                OR NOT EXISTS (SELECT 1 FROM project_revisions r
                                WHERE r.project_id = p.id
-                                 AND r.id IN (SELECT revision_id FROM project_revision_pins))
+                                 AND r.id IN (${THIRD_PARTY_PIN_SQL}))
                OR EXISTS (SELECT 1 FROM project_revisions r
                            WHERE r.project_id = p.id
-                             AND r.id NOT IN (SELECT revision_id FROM project_revision_pins)))
+                             AND r.id NOT IN (${THIRD_PARTY_PIN_SQL})))
         LIMIT ${MAX_PROJECTS_PER_RUN}`
     )
     .bind(deletedCutoff)
@@ -255,8 +302,9 @@ export async function runCleanup(env: StudioApiEnv, now: number = Date.now()): P
     for (const r of rows) {
       if (keep.has(r.id)) continue;
       const files = await purgeRevisionById(db, bucket, r.id);
-      // purgeRevisionById re-checks head and pins at delete time; a revision
-      // pinned between the read above and now is kept, and counted as such.
+      // purgeRevisionById claims the revision atomically against head and
+      // pins; a revision pinned between the read above and that claim is
+      // kept untouched, and counted as such.
       if (await revisionExists(db, r.id)) {
         report.kept_pinned_revisions += 1;
         continue;

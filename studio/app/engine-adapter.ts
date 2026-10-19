@@ -58,7 +58,25 @@ export const ENGINE_STATIC_TEST_IDS = [
   "undo",
   "redo",
   "layer-range",
+  // The engine's simplified-retry offer after a failed slice (simple infill,
+  // economy mode). It renders INSIDE the side panel Simple hides, so the
+  // shell offers the same retry on its own error row and clicks this.
+  "downgrade-retry",
 ] as const;
+
+/**
+ * The engine's slow-slice threshold: it warns "N triangles — slicing may take
+ * a while" when one import adds more than this many triangles (Viewport.js:
+ * `B > 1e5`). That warning lives only in the side panel Simple hides and is
+ * never an event, so the shell counts the triangles itself and shows its own
+ * ar/en/ckb warning, in both modes (tests/studio-mode.test.mjs pins the
+ * engine's number to this one).
+ */
+export const HEAVY_IMPORT_TRIANGLES = 100_000;
+
+export function isHeavyImport(triangles: number): boolean {
+  return triangles > HEAVY_IMPORT_TRIANGLES;
+}
 
 /**
  * Toolbar action test ids the engine renders through its `tool-${action.id}`
@@ -539,6 +557,21 @@ export class EngineAdapter {
   /** Current scene snapshots (empty when the engine is unavailable). */
   sceneSnapshot(): LevoSceneSnapshot[] {
     return this.api()?.sceneSnapshot() ?? [];
+  }
+
+  /**
+   * Triangles of the given objects. The engine keeps each object's local
+   * geometry as a non-indexed soup, 9 floats per triangle (the same count
+   * its own slow-slice warning adds up); the snapshot hands the array over
+   * by reference, so this copies nothing.
+   */
+  triangleCountOf(ids: readonly number[]): number {
+    const wanted = new Set(ids);
+    let total = 0;
+    for (const snapshot of this.sceneSnapshot()) {
+      if (wanted.has(snapshot.id)) total += Math.floor((snapshot.localPos?.length ?? 0) / 9);
+    }
+    return total;
   }
 
   placeObjectOnPlate(id: number, plateIndex: number, offsetX: number, offsetY: number): boolean {

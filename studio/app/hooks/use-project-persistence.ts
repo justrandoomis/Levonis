@@ -27,7 +27,9 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  DraftAdoptError,
   ProjectSyncController,
+  draftAdoptErrorFrom,
   openRemoteProject,
   studioProjectsApi,
   uploadDraftToAccount,
@@ -295,9 +297,13 @@ export function useProjectPersistence(options: UseProjectPersistenceOptions): Us
 
   const adoptGuestDraftProject = useCallback(
     async (id: string): Promise<RemoteProjectSummary> => {
-      if (!isUserNamespace(namespace)) throw new Error("Sign in to save this work to your account.");
+      // Typed failures only: the panel turns the reason into ar/en/ckb text
+      // (the messages below are diagnostics, never shown to the user).
+      if (!isUserNamespace(namespace)) {
+        throw new DraftAdoptError("signed-out", "Sign in to save this work to your account.");
+      }
       const draft = await loadDraft(GUEST_NAMESPACE, id);
-      if (!draft) throw new Error("This draft is no longer on this device.");
+      if (!draft) throw new DraftAdoptError("missing", "This draft is no longer on this device.");
       const snapshotKind = resolveSnapshotKind(draft);
       const result = await uploadDraftToAccount(
         {
@@ -309,7 +315,7 @@ export function useProjectPersistence(options: UseProjectPersistenceOptions): Us
         },
         { api }
       );
-      if (!result.ok) throw new Error(result.message);
+      if (!result.ok) throw draftAdoptErrorFrom(result);
       await adoptGuestDraft(id, namespace, {
         projectId: result.project.id,
         revision: result.revision,

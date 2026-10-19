@@ -255,10 +255,12 @@ export const EDITOR_SHADOW_CSS = `
      one marked important included. What stays, in both modes: the stats card
      (the slicing estimate and the over-bed warning), the bed warning, the
      status line and the plate bar, which all live outside the side panel,
-     and the shell's own messages, stale banner and slice action. Slicing
-     still runs: the shell drives the engine through the adapter, which does
-     not need the panel to be visible. Plain prose only in this comment, see
-     the note near the top of this stylesheet. */
+     and the shell's own messages, stale banner and slice action. What the
+     engine keeps only inside the panel (its slow-slice warning and its
+     simplified-retry offer) the shell carries itself, in both modes.
+     Slicing still runs: the shell drives the engine through the adapter,
+     which does not need the panel to be visible. Plain prose only in this
+     comment, see the note near the top of this stylesheet. */
   :host([data-levo-mode="simple"]) .sidebar { display: none !important; }
   ${SIMPLE_HIDDEN_SELECTOR} { display: none !important; }
   ${SIMPLE_ORPHAN_SEPARATOR_SELECTOR} { display: none !important; }

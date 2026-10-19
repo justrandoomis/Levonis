@@ -1086,3 +1086,290 @@ test("the per-user quota defaults to 1 GiB (owner decision Q7); the env override
   const overridden = await call(small.env, ctx, USER_A, "GET", "/api/quota");
   assert.equal(overridden.json.quota_bytes, 5 * MiB);
 });
+
+// ---------------------------------------------------------------------------
+// P1-10 review fixes: user pins end with the owner's purged deletion; pin vs
+// purge is atomic; restore and duplicate reserve their bytes before copying.
+// ---------------------------------------------------------------------------
+
+const KiB = 1024;
+
+function bytesOf(size, fill) {
+  const b = new Uint8Array(size);
+  b.fill(fill);
+  return b;
+}
+
+async function openSized(env, ctx, session, projectId, base, bytes) {
+  const sha = await sha256Hex(bytes);
+  return call(env, ctx, session, "POST", `/api/projects/${projectId}/revisions`, {
+    base_revision: base,
+    schema_version: 2,
+    engine_version: "three-slicer@0.2.2",
+    content_hash: sha,
+    snapshot_kind: "full",
+    manifest: { label: `sized-${bytes.byteLength}` },
+    files: [{ kind: "snapshot3mf", sha256: sha, size_bytes: bytes.byteLength, content_type: "model/3mf" }],
+  });
+}
+
+async function saveSized(env, ctx, session, projectId, base, bytes) {
+  const open = await openSized(env, ctx, session, projectId, base, bytes);
+  assert.equal(open.response.status, 201, JSON.stringify(open.json));
+  const up = await call(env, ctx, session, "PUT", open.json.files[0].upload_url, bytes);
+  assert.equal(up.response.status, 200);
+  const done = await commit(env, ctx, session, projectId, open.json.revision_id);
+  assert.equal(done.response.status, 200);
+  return open.json;
+}
+
+async function usageOf(env, ctx, session) {
+  return (await call(env, ctx, session, "GET", "/api/quota")).json.usage_bytes;
+}
+
+/** Runs `before` once, right before the first statement whose SQL matches. */
+function hookStatement(env, pattern, before) {
+  const original = env.DB.prepare.bind(env.DB);
+  let fired = false;
+  env.DB.prepare = (sql) => {
+    const stmt = original(sql);
+    if (fired || !pattern.test(sql)) return stmt;
+    const bindOriginal = stmt.bind.bind(stmt);
+    stmt.bind = (...params) => {
+      const bound = bindOriginal(...params);
+      const runOriginal = bound.run.bind(bound);
+      bound.run = async () => {
+        if (!fired) {
+          fired = true;
+          await before();
+        }
+        return runOriginal();
+      };
+      return bound;
+    };
+    return stmt;
+  };
+  return () => {
+    env.DB.prepare = original;
+    return fired;
+  };
+}
+
+test("a 'keep this version' pin ends with its owner's purged deletion: no unreachable tombstone keeps eating the quota", async () => {
+  const { env, raw, bucket } = makeEnv();
+  const ctx = makeCtx();
+
+  // The reported path: keep r1, delete the project, let the trash window pass.
+  const id = await createProject(env, ctx, USER_A, "احتفظ ثم احذف");
+  const rev1 = await committedFullRevision(env, ctx, USER_A, id, null, "k1");
+  await committedFullRevision(env, ctx, USER_A, id, 1, "k2");
+  const pinned = await call(env, ctx, USER_A, "POST", `/api/projects/${id}/revisions/${rev1.id}/pin`);
+  assert.deepEqual(pinned.json.pin_reasons, ["user"]);
+  assert.ok((await usageOf(env, ctx, USER_A)) > 0);
+  assert.equal((await call(env, ctx, USER_A, "DELETE", `/api/projects/${id}`)).response.status, 200);
+
+  // Inside the trash window the pin still stands (a restore brings it back).
+  const early = await runCleanup(env);
+  assert.equal(early.purged_projects, 0);
+  assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM project_revision_pins").get().n, 1);
+
+  raw.prepare("UPDATE projects SET deleted_at = '2020-01-01T00:00:00.000Z' WHERE id = ?").run(id);
+  const purge = await runCleanup(env);
+  assert.equal(purge.purged_projects, 1, "the owner's own pin does not hold the owner's purged deletion");
+  assert.equal(purge.kept_pinned_revisions, 0);
+  assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM projects").get().n, 0, "no tombstone is left");
+  assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM project_revision_pins").get().n, 0);
+  assert.equal(bucket.objects.size, 0);
+  assert.equal(await usageOf(env, ctx, USER_A), 0, "every byte is back in the 1 GiB");
+
+  // A tombstone an earlier build already left behind (head cleared, only a
+  // 'user' pin holding it) is selected again and reclaimed on the next run.
+  const legacy = await createProject(env, ctx, USER_A, "قديم");
+  const legacyRev = await committedFullRevision(env, ctx, USER_A, legacy, null, "old");
+  await call(env, ctx, USER_A, "POST", `/api/projects/${legacy}/revisions/${legacyRev.id}/pin`);
+  raw
+    .prepare("UPDATE projects SET head_revision_id = NULL, deleted_at = '2020-01-01T00:00:00.000Z' WHERE id = ?")
+    .run(legacy);
+  const reclaim = await runCleanup(env);
+  assert.equal(reclaim.purged_projects, 1);
+  assert.equal(await usageOf(env, ctx, USER_A), 0);
+  assert.equal(bucket.objects.size, 0);
+
+  // A request/order holder still keeps its revision (and only that one) past
+  // the deletion; the owner's pin on the same revision is released.
+  const shared = await createProject(env, ctx, USER_A, "طلب طباعة");
+  const held = await committedFullRevision(env, ctx, USER_A, shared, null, "held");
+  await committedFullRevision(env, ctx, USER_A, shared, 1, "after");
+  await call(env, ctx, USER_A, "POST", `/api/projects/${shared}/revisions/${held.id}/pin`);
+  const req = await pinsMod.pinRevision(env.DB, {
+    ownerId: USER_A.user.id,
+    projectId: shared,
+    revisionId: held.id,
+    reason: "request",
+    ref: "REQ-tomb-1",
+  });
+  assert.equal(req.ok, true);
+  await call(env, ctx, USER_A, "DELETE", `/api/projects/${shared}`);
+  raw.prepare("UPDATE projects SET deleted_at = '2020-01-01T00:00:00.000Z' WHERE id = ?").run(shared);
+  const third = await runCleanup(env);
+  assert.equal(third.purged_projects, 0, "a request pin keeps its tombstone");
+  assert.equal(third.kept_pinned_revisions, 1);
+  assert.deepEqual(raw.prepare("SELECT id FROM project_revisions").all().map((r) => r.id), [held.id]);
+  assert.deepEqual(
+    raw.prepare("SELECT pin_reason FROM project_revision_pins").all().map((r) => r.pin_reason),
+    ["request"]
+  );
+  const quiet = await runCleanup(env, Date.now() + 3650 * DAY_MS);
+  assert.equal(quiet.kept_pinned_revisions, 0, "the request-held tombstone is not re-selected");
+});
+
+test("pin vs purge: a pin can never land on a revision the cron is deleting, and one that lands first keeps every byte", async () => {
+  // (a) The pin arrives while the cron deletes the revision's R2 objects.
+  {
+    const { env, raw, bucket } = makeEnv({ vars: { STUDIO_KEEP_COMMITTED_REVISIONS: "1" } });
+    const ctx = makeCtx();
+    const id = await createProject(env, ctx, USER_A, "سباق");
+    const r1 = await committedFullRevision(env, ctx, USER_A, id, null, "r1");
+    const r2 = await committedFullRevision(env, ctx, USER_A, id, r1.revision, "r2");
+    await committedFullRevision(env, ctx, USER_A, id, r2.revision, "r3");
+
+    const originalDelete = bucket.delete.bind(bucket);
+    let pinDuringDelete = null;
+    bucket.delete = async (keys) => {
+      const list = Array.isArray(keys) ? keys : [keys];
+      if (!pinDuringDelete && list.some((k) => k.includes(r1.id))) {
+        pinDuringDelete = await call(env, ctx, USER_A, "POST", `/api/projects/${id}/revisions/${r1.id}/pin`);
+      }
+      return originalDelete(keys);
+    };
+    const report = await runCleanup(env); // must not throw on the pins foreign key
+    bucket.delete = originalDelete;
+
+    assert.ok(pinDuringDelete, "the race was exercised");
+    assert.equal(pinDuringDelete.response.status, 404, "a revision being deleted cannot be kept");
+    assert.equal(report.pruned_committed_revisions, 2);
+    assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM project_revision_pins").get().n, 0);
+    assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM project_revisions WHERE id = ?").get(r1.id).n, 0);
+    assert.ok(![...bucket.objects.keys()].some((k) => k.includes(r1.id)));
+    const history = await call(env, ctx, USER_A, "GET", `/api/projects/${id}/revisions?state=committed`);
+    assert.ok(!history.json.revisions.some((r) => r.id === r1.id), "no 'Kept by you' row without files");
+  }
+
+  // (b) The pin lands after retention picked the revision but before the
+  //     purge claims it: the purge refuses and every byte stays.
+  {
+    const { env, raw, bucket } = makeEnv({ vars: { STUDIO_KEEP_COMMITTED_REVISIONS: "1" } });
+    const ctx = makeCtx();
+    const id = await createProject(env, ctx, USER_A, "سباق ٢");
+    const r1 = await committedFullRevision(env, ctx, USER_A, id, null, "r1");
+    await committedFullRevision(env, ctx, USER_A, id, r1.revision, "r2");
+    const r1Keys = [...bucket.objects.keys()].filter((k) => k.includes(r1.id));
+    let pinFirst = null;
+    const unhook = hookStatement(env, /UPDATE project_revisions SET state = 'abandoned'/, async () => {
+      pinFirst = await call(env, ctx, USER_A, "POST", `/api/projects/${id}/revisions/${r1.id}/pin`);
+    });
+    const report = await runCleanup(env);
+    assert.equal(unhook(), true);
+    assert.equal(pinFirst.response.status, 200);
+    assert.equal(report.pruned_committed_revisions, 0);
+    assert.equal(report.kept_pinned_revisions, 1);
+    assert.equal(raw.prepare("SELECT state FROM project_revisions WHERE id = ?").get(r1.id).state, "committed");
+    for (const key of r1Keys) assert.ok(bucket.objects.has(key));
+    const restore = await call(env, ctx, USER_A, "POST", `/api/projects/${id}/revisions/${r1.id}/restore`, {});
+    assert.equal(restore.response.status, 201, "the kept version can still be made current");
+  }
+
+  // (c) A pending upload the cron claims (stale/abandoned) can never become
+  //     the head afterwards: COMMIT's CAS requires a still-pending revision.
+  {
+    const { env, raw, bucket } = makeEnv();
+    const ctx = makeCtx();
+    const id = await createProject(env, ctx, USER_A, "سباق ٣");
+    const open = await openFullRevision(env, ctx, USER_A, id, null, "p");
+    await uploadAll(env, ctx, USER_A, open);
+    const unhook = hookStatement(env, /UPDATE projects\s+SET head_revision_id/, async () => {
+      await cleanupMod.purgeRevisionById(env.DB, bucket, open.json.revision_id);
+    });
+    const done = await commit(env, ctx, USER_A, id, open.json.revision_id);
+    assert.equal(unhook(), true);
+    assert.equal(done.response.status, 409);
+    assert.equal(done.json.code, "REVISION_ABANDONED");
+    assert.equal(raw.prepare("SELECT head_revision_id FROM projects WHERE id = ?").get(id).head_revision_id, null);
+  }
+});
+
+test("restore and duplicate reserve their bytes before copying: a parallel OPEN during the copy cannot pass the quota", async () => {
+  for (const action of ["restore", "duplicate"]) {
+    const { env, raw, bucket } = makeEnv({ vars: { STUDIO_USER_QUOTA_BYTES: String(1024 * KiB) } });
+    const ctx = makeCtx();
+    const X = await createProject(env, ctx, USER_A, "X");
+    const Y = await createProject(env, ctx, USER_A, "Y");
+    const x1 = await saveSized(env, ctx, USER_A, X, null, bytesOf(100 * KiB, 1));
+    const x2 = await saveSized(env, ctx, USER_A, X, 1, bytesOf(100 * KiB, 2));
+    await saveSized(env, ctx, USER_A, Y, null, bytesOf(700 * KiB, 3));
+    assert.equal(await usageOf(env, ctx, USER_A), 900 * KiB);
+
+    // Hold the copy on its first R2 read (a slow multi-file copy).
+    const sourceRevision = action === "restore" ? x1.revision_id : x2.revision_id;
+    let release;
+    const gate = new Promise((resolve) => (release = resolve));
+    let started;
+    const copyStarted = new Promise((resolve) => (started = resolve));
+    const originalGet = bucket.get.bind(bucket);
+    bucket.get = async (key) => {
+      if (key.includes(sourceRevision)) {
+        started();
+        await gate;
+      }
+      return originalGet(key);
+    };
+    const pendingAction =
+      action === "restore"
+        ? call(env, ctx, USER_A, "POST", `/api/projects/${X}/revisions/${x1.revision_id}/restore`, {})
+        : call(env, ctx, USER_A, "POST", `/api/projects/${X}/duplicate`, {});
+    await copyStarted;
+
+    // Another tab autosaves 100 KiB into Y while the copy is in flight.
+    assert.equal(await usageOf(env, ctx, USER_A), 1000 * KiB, `${action}: the copy's bytes count during the copy`);
+    const parallel = await openSized(env, ctx, USER_A, Y, 1, bytesOf(100 * KiB, 4));
+    assert.equal(parallel.response.status, 413, `${action}: the parallel OPEN is refused`);
+    assert.equal(parallel.json.code, "QUOTA_EXCEEDED");
+
+    release();
+    const done = await pendingAction;
+    bucket.get = originalGet;
+    assert.equal(done.response.status, 201, `${action} completes`);
+    const usage = await usageOf(env, ctx, USER_A);
+    assert.equal(usage, 1000 * KiB);
+    assert.ok(usage <= 1024 * KiB, "the account never ends past its quota");
+    assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM project_files WHERE state <> 'verified'").get().n, 0);
+    assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM project_revisions WHERE state <> 'committed'").get().n, 0);
+  }
+
+  // A copy that fails releases its reservation: no pending rows, no copied
+  // objects, no empty duplicate shell, and the usage is back where it was.
+  for (const action of ["restore", "duplicate"]) {
+    const { env, raw, bucket } = makeEnv();
+    const ctx = makeCtx();
+    const X = await createProject(env, ctx, USER_A, "X");
+    const x1 = await saveSized(env, ctx, USER_A, X, null, bytesOf(10 * KiB, 5));
+    const x2 = await saveSized(env, ctx, USER_A, X, 1, bytesOf(10 * KiB, 6));
+    const before = await usageOf(env, ctx, USER_A);
+    const objectsBefore = bucket.objects.size;
+    const missing = (action === "restore" ? x1 : x2).files[0];
+    const sourceKey = raw.prepare("SELECT r2_key FROM project_files WHERE id = ?").get(missing.id).r2_key;
+    const stash = bucket.objects.get(sourceKey);
+    bucket.objects.delete(sourceKey);
+    const failed =
+      action === "restore"
+        ? await call(env, ctx, USER_A, "POST", `/api/projects/${X}/revisions/${x1.revision_id}/restore`, {})
+        : await call(env, ctx, USER_A, "POST", `/api/projects/${X}/duplicate`, {});
+    assert.equal(failed.response.status, 502, action);
+    assert.equal(failed.json.code, "SOURCE_OBJECT_MISSING");
+    bucket.objects.set(sourceKey, stash);
+    assert.equal(await usageOf(env, ctx, USER_A), before, `${action}: the reservation is released`);
+    assert.equal(bucket.objects.size, objectsBefore);
+    assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM project_revisions WHERE state <> 'committed'").get().n, 0);
+    assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM projects").get().n, 1, `${action}: no empty shell is left`);
+  }
+});

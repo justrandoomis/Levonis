@@ -426,3 +426,73 @@ test("manifestForDraft carries only what the draft knows", () => {
   assert.equal(manifest.plates.count, 2);
   assert.equal(manifest.objects, undefined, "no invented objects list");
 });
+
+// ---------------------------------------------------------------------------
+// Saving guest work: every failure reaches the user as ar/en/ckb text, never
+// as the server's English sentence or the browser's "Failed to fetch".
+// ---------------------------------------------------------------------------
+
+const panelErrors = await import("../app/panel-errors.ts");
+
+test("a failed «احفظ عملك في حسابي» is shown in the user's language: typed reasons, never error.message", async () => {
+  const { draftAdoptErrorFrom, DraftAdoptError } = sync;
+  const { panelErrorKey, PANEL_ERROR_KEYS } = panelErrors;
+  freshStore();
+  await saveDraft(GUEST_NAMESPACE, draft("guest-err", "مسودة"));
+  const loaded = await loadDraft(GUEST_NAMESPACE, "guest-err");
+  const input = { name: loaded.name, files: loaded.files, snapshotKind: "full", manifest: hook.manifestForDraft(loaded) };
+
+  const failWith = async (thrown) => {
+    const api = fakeApi({
+      openRevision() {
+        throw thrown;
+      },
+    });
+    const result = await uploadDraftToAccount(input, { api, sleep: async () => {} });
+    assert.equal(result.ok, false);
+    return draftAdoptErrorFrom(result);
+  };
+
+  const quota = await failWith(new StudioApiError(413, "QUOTA_EXCEEDED", "Storage quota exceeded"));
+  assert.equal(quota.reason, "quota");
+  assert.equal(panelErrorKey(quota), "quotaExceeded");
+
+  const limited = await failWith(new StudioApiError(429, "RATE_LIMITED", "Too many requests"));
+  assert.equal(limited.reason, "rate-limited");
+  assert.equal(limited.status, 429);
+  assert.equal(panelErrorKey(limited), "rateLimited");
+
+  const offline = await failWith(new TypeError("Failed to fetch"));
+  assert.equal(offline.reason, "network");
+  assert.equal(panelErrorKey(offline), "networkFailed");
+
+  const server = await failWith(new StudioApiError(500, "HTTP_ERROR", "Internal error"));
+  assert.equal(panelErrorKey(server), "actionFailed");
+
+  const empty = await uploadDraftToAccount({ ...input, files: [] }, { api: fakeApi() });
+  assert.equal(panelErrorKey(draftAdoptErrorFrom(empty)), "draftEmpty");
+  assert.equal(panelErrorKey(new DraftAdoptError("missing", "gone")), "draftMissing");
+  assert.equal(panelErrorKey(new DraftAdoptError("signed-out", "sign in")), "guestTitle");
+  // Plain API refusals and unknown errors map to keys too — never a message.
+  assert.equal(panelErrorKey(new StudioApiError(413, "QUOTA_EXCEEDED", "Storage quota exceeded")), "quotaExceeded");
+  assert.equal(panelErrorKey(new Error("Some English sentence")), "actionFailed");
+
+  // The hook throws only typed errors; the panel never renders error.message.
+  const hookSource = await readFile(new URL("../app/hooks/use-project-persistence.ts", import.meta.url), "utf8");
+  const adopt = hookSource.slice(hookSource.indexOf("const adoptGuestDraftProject"), hookSource.indexOf("const openAccountRevision"));
+  assert.ok(adopt.length > 0);
+  assert.doesNotMatch(adopt, /throw new Error\(/);
+  assert.match(adopt, /draftAdoptErrorFrom\(result\)/);
+  const panel = await readFile(new URL("../app/components/projects-panel.tsx", import.meta.url), "utf8");
+  const code = panel.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  assert.doesNotMatch(code, /error\.message|\.message\b/, "the panel shows dictionary text only");
+
+  // Every key exists in all three dictionaries, and ckb is never the Arabic.
+  const block = (loc, next) => panel.slice(panel.indexOf(`  ${loc}: {`), next ? panel.indexOf(`  ${next}: {`) : panel.indexOf("} as const;"));
+  const dicts = { ar: block("ar", "en"), en: block("en", "ckb"), ckb: block("ckb", null) };
+  const valueOf = (text, key) => (text.match(new RegExp(`\\n    ${key}: "([^"]*)"`)) || [])[1];
+  for (const key of PANEL_ERROR_KEYS) {
+    for (const loc of ["ar", "en", "ckb"]) assert.ok(valueOf(dicts[loc], key), `${loc}.${key} exists`);
+    assert.notEqual(valueOf(dicts.ckb, key), valueOf(dicts.ar, key), `ckb.${key} is not the Arabic`);
+  }
+});

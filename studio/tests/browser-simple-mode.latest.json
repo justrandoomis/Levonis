@@ -1,6 +1,6 @@
 {
   "origin": "http://127.0.0.1:8799",
-  "run": "93fbaa41",
+  "run": "5fdb50f0",
   "desktopSimple": {
     "mode": "simple",
     "sidebar": "none",
@@ -197,7 +197,7 @@
     {
       "ok": true,
       "m": "a forged levonis_session beside the Studio cookie: the Studio session still works",
-      "detail": "simple-b-93fbaa41"
+      "detail": "simple-b-5fdb50f0"
     },
     {
       "ok": true,

@@ -176,25 +176,29 @@ export default function StudioHeader(props: StudioHeaderProps) {
         <FileSelectControl className="import-action" label={t.files} disabled={!props.engineReady || props.importBusy} onFiles={props.onPickFiles}>
           <Icon name="file" /><span>{t.files}</span>
         </FileSelectControl>
-        <button className="new-project-action" onClick={props.onNewProject} title={t.newProject}><Icon name="plus" /><span>{t.newProject}</span></button>
-        <button onClick={props.onOpenProjects} title={t.projects}><Icon name="save" /><span>{t.projects}</span></button>
-        {props.printReady && <button className="header-print-action" onClick={props.onOpenPrintCenter}><Icon name="print" /><span>{t.print}</span></button>}
+        <button className="new-project-action" onClick={props.onNewProject} title={t.newProject} aria-label={t.newProject}><Icon name="plus" /><span>{t.newProject}</span></button>
+        <button className="projects-action" onClick={props.onOpenProjects} title={t.projects} aria-label={t.projects}><Icon name="save" /><span>{t.projects}</span></button>
+        {props.printReady && <button className="header-print-action" onClick={props.onOpenPrintCenter} title={t.print} aria-label={t.print}><Icon name="print" /><span>{t.print}</span></button>}
         {props.simpleMode && !props.printReady && (
           <button
             className={`header-slice-action ${props.sliceAction.busy ? "busy" : ""}`}
             onClick={props.sliceAction.onClick}
             disabled={props.sliceAction.disabled}
             data-levo-action="simple-slice"
+            title={props.sliceAction.label}
+            aria-label={props.sliceAction.label}
           >
             <Icon name="slice" /><span>{props.sliceAction.label}</span>
           </button>
         )}
-        <button className="connect-action" onClick={props.onOpenConnect} title={t.connectPrinter}><Icon name="print" /><span>{t.connectPrinter}</span></button>
+        <button className="connect-action" onClick={props.onOpenConnect} title={t.connectPrinter} aria-label={t.connectPrinter}><Icon name="print" /><span>{t.connectPrinter}</span></button>
         {!props.nativeApp && (props.user
           ? (
             <a
+              className="account-action"
               href={SIGN_OUT_HREF}
               title={props.user.displayName}
+              aria-label={t.signOut}
               onClick={(event) => {
                 if (!props.onRequestSignOut) return;
                 event.preventDefault();
@@ -204,7 +208,7 @@ export default function StudioHeader(props: StudioHeaderProps) {
               <Icon name="check" /><span>{t.signOut}</span>
             </a>
           )
-          : <a href={SIGN_IN_HREF}><Icon name="info" /><span>{t.signIn}</span></a>)}
+          : <a className="account-action" href={SIGN_IN_HREF} title={t.signIn} aria-label={t.signIn}><Icon name="info" /><span>{t.signIn}</span></a>)}
         <button className="profile-button" onClick={props.onOpenSetup} title={t.settings}>
           <b>{props.profileShortName}</b><small>{props.qualityLayer.toFixed(2)}</small>
         </button>

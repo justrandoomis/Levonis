@@ -3,9 +3,17 @@
  *
  * A pinned revision is held by something outside the editor — a print
  * request, an order, or the owner's own "keep this version" — and the cleanup
- * cron must therefore NEVER prune or purge it (worker/api/cleanup.ts asks
- * `isRevisionPinned` before deleting anything, and the foreign key from
- * project_revision_pins makes the database refuse the delete as well).
+ * cron must therefore NEVER prune or purge it (worker/api/cleanup.ts claims a
+ * revision with one UPDATE that refuses a pinned one before deleting
+ * anything, and the foreign key from project_revision_pins makes the database
+ * refuse the delete as well). The pin INSERT itself only lands while the
+ * revision is still 'committed', so a pin can never land on a revision the
+ * purge has already claimed (it would keep a 'Kept by you' label on a version
+ * whose files are gone).
+ *
+ * The owner's 'user' pin lasts as long as the owner keeps the project: when a
+ * DELETED project is purged after its trash window, cleanup releases the
+ * owner's own pins with it. Request/order pins outlive that deletion.
  *
  * Storage is the `project_revision_pins` side table (db/schema.ts): one row
  * per holder, keyed (revision_id, pin_reason, pin_ref), so releasing one
@@ -54,6 +62,26 @@ export async function pinRevision(
   // database the 0001 migration has not reached: the bootstrap is idempotent.
   await ensureStudioTables(db);
 
+  // ONE statement decides: the pin lands only while the revision is still a
+  // committed revision of the caller's live project. The cleanup cron claims
+  // a revision (committed → 'abandoned') before deleting its files, so a pin
+  // racing that purge is either in before the claim (the purge refuses) or
+  // refused here — never left on a revision whose files are gone.
+  const now = nowIso();
+  const insert = await db
+    .prepare(
+      `INSERT OR IGNORE INTO project_revision_pins (id, revision_id, pinned_at, pin_reason, pin_ref)
+       SELECT ?, ?, ?, ?, ?
+        WHERE EXISTS (SELECT 1 FROM project_revisions r JOIN projects p ON p.id = r.project_id
+                       WHERE r.id = ? AND r.project_id = ? AND p.owner_id = ? AND p.deleted_at IS NULL
+                         AND r.state = 'committed')`
+    )
+    .bind(newId(), input.revisionId, now, input.reason, ref, input.revisionId, input.projectId, input.ownerId)
+    .run();
+  if (insert.meta.changes) return { ok: true, pinned_at: now, already: false };
+
+  // Nothing inserted: either this holder already pins it, or the revision is
+  // not (or no longer) a committed revision of the caller's live project.
   const row = await db
     .prepare(
       `SELECT r.state FROM project_revisions r JOIN projects p ON p.id = r.project_id
@@ -62,17 +90,9 @@ export async function pinRevision(
     .bind(input.revisionId, input.projectId, input.ownerId)
     .first<{ state: string }>();
   if (!row) return { ok: false, code: "NOT_FOUND" };
+  // A claimed (abandoned) revision is on its way out: there is nothing to keep.
+  if (row.state === "abandoned") return { ok: false, code: "NOT_FOUND" };
   if (row.state !== "committed") return { ok: false, code: "NOT_COMMITTED" };
-
-  const now = nowIso();
-  const insert = await db
-    .prepare(
-      `INSERT OR IGNORE INTO project_revision_pins (id, revision_id, pinned_at, pin_reason, pin_ref)
-       VALUES (?, ?, ?, ?, ?)`
-    )
-    .bind(newId(), input.revisionId, now, input.reason, ref)
-    .run();
-  if (insert.meta.changes) return { ok: true, pinned_at: now, already: false };
   const existing = await db
     .prepare(`SELECT pinned_at FROM project_revision_pins WHERE revision_id = ? AND pin_reason = ? AND pin_ref = ?`)
     .bind(input.revisionId, input.reason, ref)
@@ -106,7 +126,7 @@ export async function unpinRevision(
   return { ok: true, released: Boolean(res.meta.changes) };
 }
 
-/** True while ANY holder pins the revision (the cleanup cron's guard). */
+/** True while ANY holder pins the revision. */
 export async function isRevisionPinned(db: D1Database, revisionId: string): Promise<boolean> {
   const row = await db
     .prepare(`SELECT 1 AS x FROM project_revision_pins WHERE revision_id = ? LIMIT 1`)

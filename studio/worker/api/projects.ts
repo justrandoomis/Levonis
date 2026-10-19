@@ -546,36 +546,27 @@ async function duplicateProject(
     });
   }
 
-  // Copy R2 objects FIRST; if anything fails, best-effort delete what was
-  // copied (the reconciliation pass catches stragglers) and report honestly.
+  // RESERVE BEFORE COPYING (as an OPEN does): the new project — headless,
+  // exactly like any new empty project — its 'pending' revision and 'pending'
+  // file rows go in right after the quota check, so ownerUsageBytes counts
+  // these bytes for the whole R2 copy window and a parallel OPEN, restore or
+  // duplicate cannot push the account past its quota. On any failure the
+  // reservation goes through the purge path and the empty shell is removed;
+  // a worker that dies mid-copy leaves a pending revision the cleanup cron
+  // reclaims (step 2) and an empty project the owner can see and delete.
   const newRevisionId = newId();
   const copies: Array<{ src: FileRow; newId: string; newKey: string }> = files.map((f) => {
     const fileId = newId();
     return { src: f, newId: fileId, newKey: r2KeyFor(newProjectId, newRevisionId, fileId) };
   });
-  const copiedKeys: string[] = [];
-  for (const copy of copies) {
-    const obj = await bucket.get(copy.src.r2_key);
-    if (!obj) {
-      for (const k of copiedKeys) await bucket.delete(k).catch(() => {});
-      return apiError(502, "SOURCE_OBJECT_MISSING", "A stored file is missing; the project cannot be duplicated");
-    }
-    const data = await obj.arrayBuffer();
-    await bucket.put(copy.newKey, data, {
-      httpMetadata: copy.src.content_type ? { contentType: copy.src.content_type } : undefined,
-    });
-    copiedKeys.push(copy.newKey);
-  }
-
   const thumbCopy = copies.find((c) => c.src.kind === "thumbnail");
-  const statements = [
+  await env.DB.batch([
     env.DB.prepare(
-      `INSERT INTO projects (id, owner_id, name, thumbnail_key, schema_version, head_revision_id, created_at, updated_at, last_saved_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(newProjectId, session.user.id, name, thumbCopy ? thumbCopy.newKey : null, src.schema_version, newRevisionId, now, now, now),
+      `INSERT INTO projects (id, owner_id, name, schema_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
+    ).bind(newProjectId, session.user.id, name, src.schema_version, now, now),
     env.DB.prepare(
-      `INSERT INTO project_revisions (id, project_id, revision, parent_revision, schema_version, engine_version, content_hash, size_bytes, manifest_json, snapshot_kind, state, created_at, committed_at)
-       VALUES (?, ?, 1, NULL, ?, ?, ?, ?, ?, ?, 'committed', ?, ?)`
+      `INSERT INTO project_revisions (id, project_id, revision, parent_revision, schema_version, engine_version, content_hash, size_bytes, manifest_json, snapshot_kind, state, created_at)
+       VALUES (?, ?, 1, NULL, ?, ?, ?, ?, ?, ?, 'pending', ?)`
     ).bind(
       newRevisionId,
       newProjectId,
@@ -585,22 +576,65 @@ async function duplicateProject(
       head.size_bytes,
       head.manifest_json,
       head.snapshot_kind,
-      now,
       now
     ),
     ...copies.map((c) =>
       env.DB.prepare(
         `INSERT INTO project_files (id, revision_id, kind, r2_key, sha256, size_bytes, content_type, state, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'verified', ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`
       ).bind(c.newId, newRevisionId, c.src.kind, c.newKey, c.src.sha256, c.src.size_bytes, c.src.content_type, now)
     ),
-  ];
+  ]);
+  const releaseReservation = async () => {
+    await purgeRevisionById(env.DB, bucket, newRevisionId).catch(() => 0);
+    // The empty shell goes too, unless something else landed in it meanwhile.
+    await env.DB.prepare(
+      `DELETE FROM projects WHERE id = ? AND owner_id = ? AND head_revision_id IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_revisions WHERE project_id = ?)
+          AND NOT EXISTS (SELECT 1 FROM project_archive WHERE project_id = ?)`
+    )
+      .bind(newProjectId, session.user.id, newProjectId, newProjectId)
+      .run()
+      .catch(() => undefined);
+  };
+
   try {
-    await env.DB.batch(statements);
+    for (const copy of copies) {
+      const obj = await bucket.get(copy.src.r2_key);
+      if (!obj) {
+        await releaseReservation();
+        return apiError(502, "SOURCE_OBJECT_MISSING", "A stored file is missing; the project cannot be duplicated");
+      }
+      const data = await obj.arrayBuffer();
+      await bucket.put(copy.newKey, data, {
+        httpMetadata: copy.src.content_type ? { contentType: copy.src.content_type } : undefined,
+      });
+    }
+    await env.DB.prepare(`UPDATE project_files SET state = 'verified' WHERE revision_id = ? AND state = 'pending'`)
+      .bind(newRevisionId)
+      .run();
   } catch (error) {
-    for (const k of copiedKeys) await bucket.delete(k).catch(() => {});
+    await releaseReservation();
     throw error;
   }
+
+  // The copy becomes the new project's head by the same guarded CAS COMMIT
+  // uses (a device that saved into the fresh project meanwhile wins).
+  const cas = await env.DB.prepare(
+    `UPDATE projects
+        SET head_revision_id = ?, thumbnail_key = ?, last_saved_at = ?, updated_at = ?
+      WHERE id = ? AND owner_id = ? AND head_revision_id IS NULL
+        AND EXISTS (SELECT 1 FROM project_revisions WHERE id = ? AND state = 'pending')`
+  )
+    .bind(newRevisionId, thumbCopy ? thumbCopy.newKey : null, now, now, newProjectId, session.user.id, newRevisionId)
+    .run();
+  if (!cas.meta.changes) {
+    await releaseReservation();
+    return apiError(409, "REVISION_CONFLICT", "The new project changed while it was being copied");
+  }
+  await env.DB.prepare(`UPDATE project_revisions SET state = 'committed', committed_at = ? WHERE id = ? AND state = 'pending'`)
+    .bind(now, newRevisionId)
+    .run();
 
   const row = await loadOwnedProject(env, session.user.id, newProjectId);
   return jsonResponse({ success: true, project: row ? projectJson(row) : { id: newProjectId, name } }, 201);
@@ -643,8 +677,9 @@ async function listRevisions(
 
 /**
  * RESTORE a kept revision as a NEW head. History is never rewritten: the
- * chosen revision's verified files are copied (R2 first, quota-checked) into
- * a fresh revision whose parent is the CURRENT head, and the head moves by
+ * chosen revision's verified files are copied into a fresh revision whose
+ * parent is the CURRENT head (quota-checked, and the bytes RESERVED as a
+ * pending revision before the first R2 copy — as an OPEN does), and the head moves by
  * the same compare-and-set COMMIT uses — a head that moved meanwhile (another
  * device) gets 409 with the fresh head, never a silent clobber. The client
  * may send `base_revision` (its view of the head) to fail fast the same way.
@@ -726,23 +761,13 @@ async function restoreRevision(
     const fileId = newId();
     return { src: f, newId: fileId, newKey: r2KeyFor(projectId, newRevisionId, fileId) };
   });
-  const copiedKeys: string[] = [];
-  const dropCopies = async () => {
-    for (const k of copiedKeys) await bucket.delete(k).catch(() => {});
-  };
-  for (const copy of copies) {
-    const obj = await bucket.get(copy.src.r2_key);
-    if (!obj) {
-      await dropCopies();
-      return apiError(502, "SOURCE_OBJECT_MISSING", "A stored file is missing; this revision cannot be restored");
-    }
-    const data = await obj.arrayBuffer();
-    await bucket.put(copy.newKey, data, {
-      httpMetadata: copy.src.content_type ? { contentType: copy.src.content_type } : undefined,
-    });
-    copiedKeys.push(copy.newKey);
-  }
 
+  // RESERVE BEFORE COPYING. ownerUsageBytes counts rows, so the pending
+  // revision and its 'pending' file rows go in right after the check above,
+  // exactly as an OPEN's do: for the whole R2 copy window these bytes count,
+  // and a parallel OPEN, duplicate or restore on another tab or device sees
+  // them and cannot push the account past its quota. Any failure from here on
+  // hands the reservation (rows and whatever was copied) to the purge path.
   const headId = project.head_revision_id;
   let revisionNumber = 0;
   for (let attempt = 0; ; attempt++) {
@@ -773,7 +798,7 @@ async function restoreRevision(
         ...copies.map((c) =>
           env.DB.prepare(
             `INSERT INTO project_files (id, revision_id, kind, r2_key, sha256, size_bytes, content_type, state, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 'verified', ?)`
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`
           ).bind(c.newId, newRevisionId, c.src.kind, c.newKey, c.src.sha256, c.src.size_bytes, c.src.content_type, now)
         ),
       ]);
@@ -781,9 +806,30 @@ async function restoreRevision(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (attempt < 3 && /UNIQUE/i.test(message)) continue;
-      await dropCopies();
       throw error;
     }
+  }
+  const releaseReservation = () => purgeRevisionById(env.DB, bucket, newRevisionId).catch(() => 0);
+
+  try {
+    for (const copy of copies) {
+      const obj = await bucket.get(copy.src.r2_key);
+      if (!obj) {
+        await releaseReservation();
+        return apiError(502, "SOURCE_OBJECT_MISSING", "A stored file is missing; this revision cannot be restored");
+      }
+      const data = await obj.arrayBuffer();
+      await bucket.put(copy.newKey, data, {
+        httpMetadata: copy.src.content_type ? { contentType: copy.src.content_type } : undefined,
+      });
+    }
+    // Copied byte-for-byte from verified sources: the copies are verified.
+    await env.DB.prepare(`UPDATE project_files SET state = 'verified' WHERE revision_id = ? AND state = 'pending'`)
+      .bind(newRevisionId)
+      .run();
+  } catch (error) {
+    await releaseReservation();
+    throw error;
   }
 
   const thumbnail = copies.find((c) => c.src.kind === "thumbnail");
@@ -791,7 +837,8 @@ async function restoreRevision(
     `UPDATE projects
         SET head_revision_id = ?, last_saved_at = ?, updated_at = ?,
             thumbnail_key = CASE WHEN ? IS NOT NULL THEN ? ELSE thumbnail_key END
-      WHERE id = ? AND owner_id = ? AND deleted_at IS NULL AND ${headId ? "head_revision_id = ?" : "head_revision_id IS NULL"}`
+      WHERE id = ? AND owner_id = ? AND deleted_at IS NULL AND ${headId ? "head_revision_id = ?" : "head_revision_id IS NULL"}
+        AND EXISTS (SELECT 1 FROM project_revisions WHERE id = ? AND state = 'pending')`
   )
     .bind(
       newRevisionId,
@@ -801,14 +848,12 @@ async function restoreRevision(
       thumbnail ? thumbnail.newKey : null,
       projectId,
       session.user.id,
-      ...(headId ? [headId] : [])
+      ...(headId ? [headId] : []),
+      newRevisionId
     )
     .run();
   if (!cas.meta.changes) {
-    await env.DB.prepare(`UPDATE project_revisions SET state = 'abandoned' WHERE id = ? AND state = 'pending'`)
-      .bind(newRevisionId)
-      .run();
-    await purgeRevisionById(env.DB, bucket, newRevisionId).catch(() => 0);
+    await releaseReservation();
     const fresh = await loadOwnedProject(env, session.user.id, projectId);
     return apiError(409, "REVISION_CONFLICT", "Another device committed first", {
       head: fresh ? { revision: fresh.head_revision, revision_id: fresh.head_revision_id } : null,
@@ -1138,12 +1183,16 @@ async function commitRevision(
 
   const thumbnail = files.find((f) => f.kind === "thumbnail");
   // Compare-and-set on the previous head id — the loser of a device race
-  // changes zero rows and gets the fresh head in a 409.
+  // changes zero rows and gets the fresh head in a 409. The head only moves
+  // onto a revision that is still 'pending': the cleanup cron claims a
+  // revision (→ 'abandoned') before deleting its files, and a claimed
+  // revision must never become a head.
   const cas = await env.DB.prepare(
     `UPDATE projects
         SET head_revision_id = ?, last_saved_at = ?, updated_at = ?,
             thumbnail_key = CASE WHEN ? IS NOT NULL THEN ? ELSE thumbnail_key END
-      WHERE id = ? AND owner_id = ? AND ${headId ? "head_revision_id = ?" : "head_revision_id IS NULL"}`
+      WHERE id = ? AND owner_id = ? AND ${headId ? "head_revision_id = ?" : "head_revision_id IS NULL"}
+        AND EXISTS (SELECT 1 FROM project_revisions WHERE id = ? AND state = 'pending')`
   )
     .bind(
       revisionId,
@@ -1153,10 +1202,17 @@ async function commitRevision(
       thumbnail ? thumbnail.r2_key : null,
       projectId,
       session.user.id,
-      ...(headId ? [headId] : [])
+      ...(headId ? [headId] : []),
+      revisionId
     )
     .run();
   if (!cas.meta.changes) {
+    const state = await env.DB.prepare(`SELECT state FROM project_revisions WHERE id = ?`)
+      .bind(revisionId)
+      .first<{ state: string }>();
+    if (!state || state.state === "abandoned") {
+      return apiError(409, "REVISION_ABANDONED", "This revision was abandoned and cannot be committed");
+    }
     const fresh = await loadOwnedProject(env, session.user.id, projectId);
     return apiError(409, "REVISION_CONFLICT", "Another device committed first", {
       head: fresh ? { revision: fresh.head_revision, revision_id: fresh.head_revision_id } : null,

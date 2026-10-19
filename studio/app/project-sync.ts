@@ -442,7 +442,14 @@ export type SnapshotUploadResult =
   | { ok: false; kind: "auth"; message?: string }
   | { ok: false; kind: "quota"; message?: string }
   | { ok: false; kind: "cancelled"; message?: string }
-  | { ok: false; kind: "network" | "server" | "local"; message: string; retryable: boolean };
+  | {
+      ok: false;
+      kind: "network" | "server" | "local";
+      message: string;
+      retryable: boolean;
+      /** HTTP status of the refusal when there was one (429 = rate limited). */
+      status?: number | null;
+    };
 
 export interface SnapshotUploadOptions {
   api?: StudioProjectsApi;
@@ -458,21 +465,27 @@ export interface SnapshotUploadOptions {
 const defaultRetryDelay = (attempt: number) => Math.min(15_000, 1_000 * 2 ** (attempt - 1));
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-function classifyApiError(error: unknown): { kind: SyncFailureKind; message: string; retryable: boolean } {
-  if (isAbortError(error)) return { kind: "cancelled", message: "Cancelled", retryable: false };
+function classifyApiError(error: unknown): {
+  kind: SyncFailureKind;
+  message: string;
+  retryable: boolean;
+  status: number | null;
+} {
+  if (isAbortError(error)) return { kind: "cancelled", message: "Cancelled", retryable: false, status: null };
   if (error instanceof StudioApiError) {
-    if (error.status === 401) return { kind: "auth", message: error.message, retryable: false };
-    if (error.status === 413 || error.code === "QUOTA_EXCEEDED") {
-      return { kind: "quota", message: error.message, retryable: false };
+    const status = error.status;
+    if (status === 401) return { kind: "auth", message: error.message, retryable: false, status };
+    if (status === 413 || error.code === "QUOTA_EXCEEDED") {
+      return { kind: "quota", message: error.message, retryable: false, status };
     }
-    if (error.status === 409) return { kind: "conflict", message: error.message, retryable: false };
+    if (status === 409) return { kind: "conflict", message: error.message, retryable: false, status };
     // P1-10 rate limit: a busy minute, not a broken save — retried like a 5xx.
-    if (error.status === 429) return { kind: "server", message: error.message, retryable: true };
-    if (error.status >= 500) return { kind: "server", message: error.message, retryable: true };
-    return { kind: "server", message: error.message, retryable: false };
+    if (status === 429) return { kind: "server", message: error.message, retryable: true, status };
+    if (status >= 500) return { kind: "server", message: error.message, retryable: true, status };
+    return { kind: "server", message: error.message, retryable: false, status };
   }
   const message = error instanceof Error ? error.message : String(error);
-  return { kind: "network", message, retryable: true };
+  return { kind: "network", message, retryable: true, status: null };
 }
 
 function conflictHead(error: StudioApiError): { revision: number | null; revision_id: string | null } | null {
@@ -589,7 +602,13 @@ export async function uploadSnapshotRevision(
     }
     if (verdict.kind === "cancelled") return { ok: false, kind: "cancelled" };
     if (verdict.kind === "auth" || verdict.kind === "quota") return { ok: false, kind: verdict.kind, message: verdict.message };
-    return { ok: false, kind: verdict.kind === "network" ? "network" : "server", message: verdict.message, retryable: verdict.retryable };
+    return {
+      ok: false,
+      kind: verdict.kind === "network" ? "network" : "server",
+      message: verdict.message,
+      retryable: verdict.retryable,
+      status: verdict.status,
+    };
   }
 
   const abandon = () => {
@@ -620,6 +639,7 @@ export async function uploadSnapshotRevision(
       kind: verdict.kind === "network" ? "network" : "server",
       message: verdict.message,
       retryable: verdict.retryable,
+      status: verdict.status,
     };
   }
 
@@ -647,6 +667,7 @@ export async function uploadSnapshotRevision(
       kind: verdict.kind === "network" ? "network" : "server",
       message: verdict.message,
       retryable: verdict.retryable,
+      status: verdict.status,
     };
   }
 }
@@ -731,7 +752,56 @@ export type DraftUploadResult =
       contentHash: string;
       snapshotKind: SnapshotKind;
     }
-  | { ok: false; kind: SyncFailureKind; message: string };
+  | {
+      ok: false;
+      kind: SyncFailureKind;
+      /** Diagnostic text only (server English or browser text) — never shown. */
+      message: string;
+      /** HTTP status of the refusal when there was one (429 = rate limited). */
+      status?: number | null;
+      /** The draft itself had nothing to upload. */
+      empty?: boolean;
+    };
+
+/**
+ * Why saving a guest draft into the account failed — a KIND the panel maps to
+ * its own ar/en/ckb sentence. The Error message is diagnostic English only and
+ * is never what the user reads (server and browser texts are not localized).
+ */
+export type DraftAdoptReason =
+  | "signed-out"
+  | "missing"
+  | "empty"
+  | "quota"
+  | "rate-limited"
+  | "auth"
+  | "conflict"
+  | "network"
+  | "server"
+  | "local"
+  | "cancelled";
+
+export class DraftAdoptError extends Error {
+  readonly reason: DraftAdoptReason;
+  readonly status: number | null;
+  constructor(reason: DraftAdoptReason, message: string, status: number | null = null) {
+    super(message);
+    this.name = "DraftAdoptError";
+    this.reason = reason;
+    this.status = status;
+  }
+}
+
+/** Maps a failed uploadDraftToAccount result to the typed adoption error. */
+export function draftAdoptErrorFrom(result: Extract<DraftUploadResult, { ok: false }>): DraftAdoptError {
+  const status = typeof result.status === "number" ? result.status : null;
+  let reason: DraftAdoptReason;
+  if (result.empty) reason = "empty";
+  else if (result.kind === "quota" || status === 413) reason = "quota";
+  else if (status === 429) reason = "rate-limited";
+  else reason = result.kind;
+  return new DraftAdoptError(reason, result.message, status);
+}
 
 /**
  * Saves one local draft into the account as a NEW project: create, then one
@@ -748,7 +818,7 @@ export async function uploadDraftToAccount(
 ): Promise<DraftUploadResult> {
   const api = options.api ?? studioProjectsApi;
   if (draft.files.length === 0) {
-    return { ok: false, kind: "local", message: "This draft has no files to save." };
+    return { ok: false, kind: "local", message: "This draft has no files to save.", empty: true };
   }
   const files: SnapshotUploadFile[] =
     draft.snapshotKind === "full"
@@ -768,7 +838,7 @@ export async function uploadDraftToAccount(
     project = await api.createProject(draft.name.trim().slice(0, 120) || "LEVO Project", options.signal);
   } catch (error) {
     const verdict = classifyApiError(error);
-    return { ok: false, kind: verdict.kind, message: verdict.message };
+    return { ok: false, kind: verdict.kind, message: verdict.message, status: verdict.status };
   }
 
   const result = await uploadSnapshotRevision(
@@ -784,7 +854,8 @@ export async function uploadDraftToAccount(
   if (!result.ok) {
     void api.deleteProject(project.id).catch(() => {});
     const message = "message" in result && typeof result.message === "string" ? result.message : result.kind;
-    return { ok: false, kind: result.kind, message };
+    const status = "status" in result && typeof result.status === "number" ? result.status : null;
+    return { ok: false, kind: result.kind, message, status };
   }
   let fresh = project;
   try {

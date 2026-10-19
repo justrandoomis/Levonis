@@ -14,7 +14,9 @@
  *
  * Pinned revisions (worker/api/pins.ts) are never pruned or purged, so their
  * bytes keep counting against the owner's quota for as long as a holder pins
- * them — the storage is genuinely still in use.
+ * them — the storage is genuinely still in use. The owner's own 'user' pin
+ * ends when the owner's deleted project is purged (worker/api/cleanup.ts), so
+ * it can never hold quota on something the owner can no longer see.
  */
 import type { StudioSession } from "../auth/session";
 import { type StudioApiEnv, jsonResponse } from "./router";

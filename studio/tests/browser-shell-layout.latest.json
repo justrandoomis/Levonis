@@ -637,8 +637,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": -135.9375,
-            "w": 86.4375,
+            "left": 12,
+            "w": 44,
             "h": 44,
             "text": "الملفات",
             "where": "header"
@@ -646,8 +646,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": -44.5,
-            "w": 113.46875,
+            "left": 61,
+            "w": 44,
             "h": 44,
             "text": "مشروع جديد",
             "where": "header"
@@ -655,8 +655,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 73.96875,
-            "w": 91.8125,
+            "left": 110,
+            "w": 44,
             "h": 44,
             "text": "المشاريع",
             "where": "header"
@@ -664,8 +664,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 170.78125,
-            "w": 75.765625,
+            "left": 159,
+            "w": 44,
             "h": 44,
             "text": "تقطيع",
             "where": "header"
@@ -673,8 +673,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 251.546875,
-            "w": 109.609375,
+            "left": 208,
+            "w": 44,
             "h": 44,
             "text": "ربط الطابعة",
             "where": "header"
@@ -682,8 +682,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 366.15625,
-            "w": 124.546875,
+            "left": 257,
+            "w": 44,
             "h": 44,
             "text": "تسجيل الدخول",
             "where": "header"
@@ -691,8 +691,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 495.703125,
-            "w": 44,
+            "left": 306,
+            "w": 45.09375,
             "h": 44,
             "text": "X2D0.20",
             "where": "header"
@@ -700,7 +700,7 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 544.703125,
+            "left": 356.09375,
             "w": 44,
             "h": 44,
             "text": "",
@@ -709,8 +709,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 593.703125,
-            "w": 91.3125,
+            "left": 405.09375,
+            "w": 110,
             "h": 44,
             "text": "العربيةEnglishکوردیی سۆرانی",
             "where": "header"
@@ -941,8 +941,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": -135.9375,
-            "w": 86.4375,
+            "left": 12,
+            "w": 44,
             "h": 44,
             "text": "الملفات",
             "where": "header"
@@ -950,8 +950,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": -44.5,
-            "w": 113.46875,
+            "left": 61,
+            "w": 44,
             "h": 44,
             "text": "مشروع جديد",
             "where": "header"
@@ -959,8 +959,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 73.96875,
-            "w": 91.8125,
+            "left": 110,
+            "w": 44,
             "h": 44,
             "text": "المشاريع",
             "where": "header"
@@ -968,8 +968,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 170.78125,
-            "w": 75.765625,
+            "left": 159,
+            "w": 44,
             "h": 44,
             "text": "تقطيع",
             "where": "header"
@@ -977,8 +977,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 251.546875,
-            "w": 109.609375,
+            "left": 208,
+            "w": 44,
             "h": 44,
             "text": "ربط الطابعة",
             "where": "header"
@@ -986,8 +986,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 366.15625,
-            "w": 124.546875,
+            "left": 257,
+            "w": 44,
             "h": 44,
             "text": "تسجيل الدخول",
             "where": "header"
@@ -995,8 +995,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 495.703125,
-            "w": 44,
+            "left": 306,
+            "w": 45.09375,
             "h": 44,
             "text": "X2D0.20",
             "where": "header"
@@ -1004,7 +1004,7 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 544.703125,
+            "left": 356.09375,
             "w": 44,
             "h": 44,
             "text": "",
@@ -1013,8 +1013,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 593.703125,
-            "w": 91.3125,
+            "left": 405.09375,
+            "w": 110,
             "h": 44,
             "text": "العربيةEnglishکوردیی سۆرانی",
             "where": "header"
@@ -1254,7 +1254,7 @@
             "top": 9,
             "bottom": 53,
             "left": 12,
-            "w": 87.359375,
+            "w": 99.90625,
             "h": 44,
             "text": "الملفات",
             "where": "header"
@@ -1262,8 +1262,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 104.359375,
-            "w": 114.78125,
+            "left": 116.90625,
+            "w": 44,
             "h": 44,
             "text": "مشروع جديد",
             "where": "header"
@@ -1271,8 +1271,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 224.140625,
-            "w": 92.828125,
+            "left": 165.90625,
+            "w": 44,
             "h": 44,
             "text": "المشاريع",
             "where": "header"
@@ -1280,8 +1280,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 321.96875,
-            "w": 76.546875,
+            "left": 214.90625,
+            "w": 87.015625,
             "h": 44,
             "text": "تقطيع",
             "where": "header"
@@ -1289,8 +1289,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 403.515625,
-            "w": 110.875,
+            "left": 306.921875,
+            "w": 44,
             "h": 44,
             "text": "ربط الطابعة",
             "where": "header"
@@ -1298,8 +1298,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 519.390625,
-            "w": 126.03125,
+            "left": 355.921875,
+            "w": 44,
             "h": 44,
             "text": "تسجيل الدخول",
             "where": "header"
@@ -1307,8 +1307,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 650.421875,
-            "w": 44,
+            "left": 404.921875,
+            "w": 45.09375,
             "h": 44,
             "text": "X2D0.20",
             "where": "header"
@@ -1316,7 +1316,7 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 699.421875,
+            "left": 455.015625,
             "w": 44,
             "h": 44,
             "text": "",
@@ -1325,8 +1325,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 748.421875,
-            "w": 92.609375,
+            "left": 504.015625,
+            "w": 110,
             "h": 44,
             "text": "العربيةEnglishکوردیی سۆرانی",
             "where": "header"
@@ -1558,7 +1558,7 @@
             "top": 9,
             "bottom": 53,
             "left": 12,
-            "w": 87.359375,
+            "w": 99.90625,
             "h": 44,
             "text": "الملفات",
             "where": "header"
@@ -1566,8 +1566,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 104.359375,
-            "w": 114.78125,
+            "left": 116.90625,
+            "w": 44,
             "h": 44,
             "text": "مشروع جديد",
             "where": "header"
@@ -1575,8 +1575,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 224.140625,
-            "w": 92.828125,
+            "left": 165.90625,
+            "w": 44,
             "h": 44,
             "text": "المشاريع",
             "where": "header"
@@ -1584,8 +1584,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 321.96875,
-            "w": 76.546875,
+            "left": 214.90625,
+            "w": 87.015625,
             "h": 44,
             "text": "تقطيع",
             "where": "header"
@@ -1593,8 +1593,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 403.515625,
-            "w": 110.875,
+            "left": 306.921875,
+            "w": 44,
             "h": 44,
             "text": "ربط الطابعة",
             "where": "header"
@@ -1602,8 +1602,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 519.390625,
-            "w": 126.03125,
+            "left": 355.921875,
+            "w": 44,
             "h": 44,
             "text": "تسجيل الدخول",
             "where": "header"
@@ -1611,8 +1611,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 650.421875,
-            "w": 44,
+            "left": 404.921875,
+            "w": 45.09375,
             "h": 44,
             "text": "X2D0.20",
             "where": "header"
@@ -1620,7 +1620,7 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 699.421875,
+            "left": 455.015625,
             "w": 44,
             "h": 44,
             "text": "",
@@ -1629,8 +1629,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 748.421875,
-            "w": 92.609375,
+            "left": 504.015625,
+            "w": 110,
             "h": 44,
             "text": "العربيةEnglishکوردیی سۆرانی",
             "where": "header"
@@ -1869,8 +1869,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": -26.9375,
-            "w": 86.4375,
+            "left": 12,
+            "w": 99.90625,
             "h": 44,
             "text": "الملفات",
             "where": "header"
@@ -1878,8 +1878,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 64.5,
-            "w": 113.46875,
+            "left": 116.90625,
+            "w": 44,
             "h": 44,
             "text": "مشروع جديد",
             "where": "header"
@@ -1887,8 +1887,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 182.96875,
-            "w": 91.8125,
+            "left": 165.90625,
+            "w": 44,
             "h": 44,
             "text": "المشاريع",
             "where": "header"
@@ -1896,8 +1896,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 279.78125,
-            "w": 75.765625,
+            "left": 214.90625,
+            "w": 87.015625,
             "h": 44,
             "text": "تقطيع",
             "where": "header"
@@ -1905,8 +1905,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 360.546875,
-            "w": 109.609375,
+            "left": 306.921875,
+            "w": 44,
             "h": 44,
             "text": "ربط الطابعة",
             "where": "header"
@@ -1914,8 +1914,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 475.15625,
-            "w": 124.546875,
+            "left": 355.921875,
+            "w": 44,
             "h": 44,
             "text": "تسجيل الدخول",
             "where": "header"
@@ -1923,8 +1923,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 604.703125,
-            "w": 44,
+            "left": 404.921875,
+            "w": 45.09375,
             "h": 44,
             "text": "X2D0.20",
             "where": "header"
@@ -1932,7 +1932,7 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 653.703125,
+            "left": 455.015625,
             "w": 44,
             "h": 44,
             "text": "",
@@ -1941,8 +1941,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 702.703125,
-            "w": 91.3125,
+            "left": 504.015625,
+            "w": 110,
             "h": 44,
             "text": "العربيةEnglishکوردیی سۆرانی",
             "where": "header"
@@ -2173,8 +2173,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": -26.9375,
-            "w": 86.4375,
+            "left": 12,
+            "w": 99.90625,
             "h": 44,
             "text": "الملفات",
             "where": "header"
@@ -2182,8 +2182,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 64.5,
-            "w": 113.46875,
+            "left": 116.90625,
+            "w": 44,
             "h": 44,
             "text": "مشروع جديد",
             "where": "header"
@@ -2191,8 +2191,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 182.96875,
-            "w": 91.8125,
+            "left": 165.90625,
+            "w": 44,
             "h": 44,
             "text": "المشاريع",
             "where": "header"
@@ -2200,8 +2200,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 279.78125,
-            "w": 75.765625,
+            "left": 214.90625,
+            "w": 87.015625,
             "h": 44,
             "text": "تقطيع",
             "where": "header"
@@ -2209,8 +2209,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 360.546875,
-            "w": 109.609375,
+            "left": 306.921875,
+            "w": 44,
             "h": 44,
             "text": "ربط الطابعة",
             "where": "header"
@@ -2218,8 +2218,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 475.15625,
-            "w": 124.546875,
+            "left": 355.921875,
+            "w": 44,
             "h": 44,
             "text": "تسجيل الدخول",
             "where": "header"
@@ -2227,8 +2227,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 604.703125,
-            "w": 44,
+            "left": 404.921875,
+            "w": 45.09375,
             "h": 44,
             "text": "X2D0.20",
             "where": "header"
@@ -2236,7 +2236,7 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 653.703125,
+            "left": 455.015625,
             "w": 44,
             "h": 44,
             "text": "",
@@ -2245,8 +2245,8 @@
           {
             "top": 9,
             "bottom": 53,
-            "left": 702.703125,
-            "w": 91.3125,
+            "left": 504.015625,
+            "w": 110,
             "h": 44,
             "text": "العربيةEnglishکوردیی سۆرانی",
             "where": "header"
@@ -3080,6 +3080,1808 @@
         "hostSeen": true
       },
       "collisions": 0
+    }
+  ],
+  "overflow": [
+    {
+      "viewport": "ipad-pro-landscape",
+      "width": 1366,
+      "locale": "ar",
+      "mode": "simple",
+      "lang": "ar",
+      "outside": [],
+      "controls": [
+        {
+          "name": "حالة المنصة",
+          "left": 1310,
+          "right": 1354
+        },
+        {
+          "name": "الملفات",
+          "left": 12,
+          "right": 111.90625
+        },
+        {
+          "name": "مشروع جديد",
+          "left": 116.90625,
+          "right": 249.5
+        },
+        {
+          "name": "المشاريع",
+          "left": 254.5,
+          "right": 360.921875
+        },
+        {
+          "name": "تقطيع",
+          "left": 365.921875,
+          "right": 452.9375
+        },
+        {
+          "name": "ربط الطابعة",
+          "left": 457.9375,
+          "right": 585.875
+        },
+        {
+          "name": "تسجيل الدخول",
+          "left": 590.875,
+          "right": 736.875
+        },
+        {
+          "name": "X2D0.20",
+          "left": 741.875,
+          "right": 786.96875
+        },
+        {
+          "name": "حالة المنصة",
+          "left": 791.96875,
+          "right": 835.96875
+        },
+        {
+          "name": "اللغة",
+          "left": 840.96875,
+          "right": 950.96875
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-pro-landscape",
+      "width": 1366,
+      "locale": "ar",
+      "mode": "advanced",
+      "lang": "ar",
+      "outside": [],
+      "controls": [
+        {
+          "name": "حالة المنصة",
+          "left": 1310,
+          "right": 1354
+        },
+        {
+          "name": "الملفات",
+          "left": 12,
+          "right": 111.90625
+        },
+        {
+          "name": "مشروع جديد",
+          "left": 116.90625,
+          "right": 249.5
+        },
+        {
+          "name": "المشاريع",
+          "left": 254.5,
+          "right": 360.921875
+        },
+        {
+          "name": "ربط الطابعة",
+          "left": 365.921875,
+          "right": 493.859375
+        },
+        {
+          "name": "تسجيل الدخول",
+          "left": 498.859375,
+          "right": 644.859375
+        },
+        {
+          "name": "X2D0.20",
+          "left": 649.859375,
+          "right": 694.953125
+        },
+        {
+          "name": "المجسمات والإعدادات",
+          "left": 699.953125,
+          "right": 743.953125
+        },
+        {
+          "name": "حالة المنصة",
+          "left": 748.953125,
+          "right": 792.953125
+        },
+        {
+          "name": "اللغة",
+          "left": 797.953125,
+          "right": 907.953125
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-pro-landscape",
+      "width": 1366,
+      "locale": "ckb",
+      "mode": "simple",
+      "lang": "ckb",
+      "outside": [],
+      "controls": [
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 1310,
+          "right": 1354
+        },
+        {
+          "name": "فایلەکان",
+          "left": 12,
+          "right": 111.3125
+        },
+        {
+          "name": "پڕۆژەی نوێ",
+          "left": 116.3125,
+          "right": 239.671875
+        },
+        {
+          "name": "پڕۆژەکان",
+          "left": 244.671875,
+          "right": 350.84375
+        },
+        {
+          "name": "پارچەکردن",
+          "left": 355.84375,
+          "right": 470.171875
+        },
+        {
+          "name": "بەستنەوەی چاپکەر",
+          "left": 475.171875,
+          "right": 638.421875
+        },
+        {
+          "name": "چوونەژوورەوە",
+          "left": 643.421875,
+          "right": 780.125
+        },
+        {
+          "name": "X2D0.20",
+          "left": 785.125,
+          "right": 829.125
+        },
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 834.125,
+          "right": 878.125
+        },
+        {
+          "name": "زمان",
+          "left": 883.125,
+          "right": 988.078125
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-pro-landscape",
+      "width": 1366,
+      "locale": "ckb",
+      "mode": "advanced",
+      "lang": "ckb",
+      "outside": [],
+      "controls": [
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 1310,
+          "right": 1354
+        },
+        {
+          "name": "فایلەکان",
+          "left": 12,
+          "right": 115.09375
+        },
+        {
+          "name": "پڕۆژەی نوێ",
+          "left": 120.09375,
+          "right": 248.421875
+        },
+        {
+          "name": "پڕۆژەکان",
+          "left": 253.421875,
+          "right": 363.71875
+        },
+        {
+          "name": "بەستنەوەی چاپکەر",
+          "left": 368.71875,
+          "right": 538.890625
+        },
+        {
+          "name": "چوونەژوورەوە",
+          "left": 543.890625,
+          "right": 686.203125
+        },
+        {
+          "name": "X2D0.20",
+          "left": 691.203125,
+          "right": 736.296875
+        },
+        {
+          "name": "تەنەکان و ڕێکخستنەکان",
+          "left": 741.296875,
+          "right": 785.296875
+        },
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 790.296875,
+          "right": 834.296875
+        },
+        {
+          "name": "زمان",
+          "left": 839.296875,
+          "right": 949.296875
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-pro-landscape",
+      "width": 1366,
+      "locale": "en",
+      "mode": "simple",
+      "lang": "en",
+      "outside": [],
+      "controls": [
+        {
+          "name": "Platform status",
+          "left": 12,
+          "right": 56
+        },
+        {
+          "name": "Files",
+          "left": 430.859375,
+          "right": 513.828125
+        },
+        {
+          "name": "New project",
+          "left": 518.828125,
+          "right": 658.25
+        },
+        {
+          "name": "Projects",
+          "left": 663.25,
+          "right": 772.6875
+        },
+        {
+          "name": "Slice",
+          "left": 777.6875,
+          "right": 864.453125
+        },
+        {
+          "name": "Connect printer",
+          "left": 869.453125,
+          "right": 1035.671875
+        },
+        {
+          "name": "Sign in",
+          "left": 1040.671875,
+          "right": 1139.90625
+        },
+        {
+          "name": "X2D0.20",
+          "left": 1144.90625,
+          "right": 1190
+        },
+        {
+          "name": "Platform status",
+          "left": 1195,
+          "right": 1239
+        },
+        {
+          "name": "Language",
+          "left": 1244,
+          "right": 1354
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-pro-landscape",
+      "width": 1366,
+      "locale": "en",
+      "mode": "advanced",
+      "lang": "en",
+      "outside": [],
+      "controls": [
+        {
+          "name": "Platform status",
+          "left": 12,
+          "right": 56
+        },
+        {
+          "name": "Files",
+          "left": 473.625,
+          "right": 556.59375
+        },
+        {
+          "name": "New project",
+          "left": 561.59375,
+          "right": 701.015625
+        },
+        {
+          "name": "Projects",
+          "left": 706.015625,
+          "right": 815.453125
+        },
+        {
+          "name": "Connect printer",
+          "left": 820.453125,
+          "right": 986.671875
+        },
+        {
+          "name": "Sign in",
+          "left": 991.671875,
+          "right": 1090.90625
+        },
+        {
+          "name": "X2D0.20",
+          "left": 1095.90625,
+          "right": 1141
+        },
+        {
+          "name": "Objects & settings",
+          "left": 1146,
+          "right": 1190
+        },
+        {
+          "name": "Platform status",
+          "left": 1195,
+          "right": 1239
+        },
+        {
+          "name": "Language",
+          "left": 1244,
+          "right": 1354
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-pro-portrait",
+      "width": 1024,
+      "locale": "ar",
+      "mode": "simple",
+      "lang": "ar",
+      "outside": [],
+      "controls": [
+        {
+          "name": "حالة المنصة",
+          "left": 968,
+          "right": 1012
+        },
+        {
+          "name": "الملفات",
+          "left": 12,
+          "right": 56
+        },
+        {
+          "name": "مشروع جديد",
+          "left": 61,
+          "right": 105
+        },
+        {
+          "name": "المشاريع",
+          "left": 110,
+          "right": 154
+        },
+        {
+          "name": "تقطيع",
+          "left": 159,
+          "right": 203
+        },
+        {
+          "name": "ربط الطابعة",
+          "left": 208,
+          "right": 252
+        },
+        {
+          "name": "تسجيل الدخول",
+          "left": 257,
+          "right": 301
+        },
+        {
+          "name": "X2D0.20",
+          "left": 306,
+          "right": 351.09375
+        },
+        {
+          "name": "حالة المنصة",
+          "left": 356.09375,
+          "right": 400.09375
+        },
+        {
+          "name": "اللغة",
+          "left": 405.09375,
+          "right": 515.09375
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-pro-portrait",
+      "width": 1024,
+      "locale": "ar",
+      "mode": "advanced",
+      "lang": "ar",
+      "outside": [],
+      "controls": [
+        {
+          "name": "حالة المنصة",
+          "left": 968,
+          "right": 1012
+        },
+        {
+          "name": "الملفات",
+          "left": 12,
+          "right": 56
+        },
+        {
+          "name": "مشروع جديد",
+          "left": 61,
+          "right": 105
+        },
+        {
+          "name": "المشاريع",
+          "left": 110,
+          "right": 154
+        },
+        {
+          "name": "ربط الطابعة",
+          "left": 159,
+          "right": 203
+        },
+        {
+          "name": "تسجيل الدخول",
+          "left": 208,
+          "right": 252
+        },
+        {
+          "name": "X2D0.20",
+          "left": 257,
+          "right": 302.09375
+        },
+        {
+          "name": "المجسمات والإعدادات",
+          "left": 307.09375,
+          "right": 351.09375
+        },
+        {
+          "name": "حالة المنصة",
+          "left": 356.09375,
+          "right": 400.09375
+        },
+        {
+          "name": "اللغة",
+          "left": 405.09375,
+          "right": 515.09375
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-pro-portrait",
+      "width": 1024,
+      "locale": "ckb",
+      "mode": "simple",
+      "lang": "ckb",
+      "outside": [],
+      "controls": [
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 968,
+          "right": 1012
+        },
+        {
+          "name": "فایلەکان",
+          "left": 12,
+          "right": 56
+        },
+        {
+          "name": "پڕۆژەی نوێ",
+          "left": 61,
+          "right": 105
+        },
+        {
+          "name": "پڕۆژەکان",
+          "left": 110,
+          "right": 154
+        },
+        {
+          "name": "پارچەکردن",
+          "left": 159,
+          "right": 203
+        },
+        {
+          "name": "بەستنەوەی چاپکەر",
+          "left": 208,
+          "right": 252
+        },
+        {
+          "name": "چوونەژوورەوە",
+          "left": 257,
+          "right": 301
+        },
+        {
+          "name": "X2D0.20",
+          "left": 306,
+          "right": 351.09375
+        },
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 356.09375,
+          "right": 400.09375
+        },
+        {
+          "name": "زمان",
+          "left": 405.09375,
+          "right": 515.09375
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-pro-portrait",
+      "width": 1024,
+      "locale": "ckb",
+      "mode": "advanced",
+      "lang": "ckb",
+      "outside": [],
+      "controls": [
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 968,
+          "right": 1012
+        },
+        {
+          "name": "فایلەکان",
+          "left": 12,
+          "right": 56
+        },
+        {
+          "name": "پڕۆژەی نوێ",
+          "left": 61,
+          "right": 105
+        },
+        {
+          "name": "پڕۆژەکان",
+          "left": 110,
+          "right": 154
+        },
+        {
+          "name": "بەستنەوەی چاپکەر",
+          "left": 159,
+          "right": 203
+        },
+        {
+          "name": "چوونەژوورەوە",
+          "left": 208,
+          "right": 252
+        },
+        {
+          "name": "X2D0.20",
+          "left": 257,
+          "right": 302.09375
+        },
+        {
+          "name": "تەنەکان و ڕێکخستنەکان",
+          "left": 307.09375,
+          "right": 351.09375
+        },
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 356.09375,
+          "right": 400.09375
+        },
+        {
+          "name": "زمان",
+          "left": 405.09375,
+          "right": 515.09375
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-pro-portrait",
+      "width": 1024,
+      "locale": "en",
+      "mode": "simple",
+      "lang": "en",
+      "outside": [],
+      "controls": [
+        {
+          "name": "Platform status",
+          "left": 12,
+          "right": 56
+        },
+        {
+          "name": "Files",
+          "left": 508.90625,
+          "right": 552.90625
+        },
+        {
+          "name": "New project",
+          "left": 557.90625,
+          "right": 601.90625
+        },
+        {
+          "name": "Projects",
+          "left": 606.90625,
+          "right": 650.90625
+        },
+        {
+          "name": "Slice",
+          "left": 655.90625,
+          "right": 699.90625
+        },
+        {
+          "name": "Connect printer",
+          "left": 704.90625,
+          "right": 748.90625
+        },
+        {
+          "name": "Sign in",
+          "left": 753.90625,
+          "right": 797.90625
+        },
+        {
+          "name": "X2D0.20",
+          "left": 802.90625,
+          "right": 848
+        },
+        {
+          "name": "Platform status",
+          "left": 853,
+          "right": 897
+        },
+        {
+          "name": "Language",
+          "left": 902,
+          "right": 1012
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-pro-portrait",
+      "width": 1024,
+      "locale": "en",
+      "mode": "advanced",
+      "lang": "en",
+      "outside": [],
+      "controls": [
+        {
+          "name": "Platform status",
+          "left": 12,
+          "right": 56
+        },
+        {
+          "name": "Files",
+          "left": 508.90625,
+          "right": 552.90625
+        },
+        {
+          "name": "New project",
+          "left": 557.90625,
+          "right": 601.90625
+        },
+        {
+          "name": "Projects",
+          "left": 606.90625,
+          "right": 650.90625
+        },
+        {
+          "name": "Connect printer",
+          "left": 655.90625,
+          "right": 699.90625
+        },
+        {
+          "name": "Sign in",
+          "left": 704.90625,
+          "right": 748.90625
+        },
+        {
+          "name": "X2D0.20",
+          "left": 753.90625,
+          "right": 799
+        },
+        {
+          "name": "Objects & settings",
+          "left": 804,
+          "right": 848
+        },
+        {
+          "name": "Platform status",
+          "left": 853,
+          "right": 897
+        },
+        {
+          "name": "Language",
+          "left": 902,
+          "right": 1012
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-air-landscape",
+      "width": 1180,
+      "locale": "ar",
+      "mode": "simple",
+      "lang": "ar",
+      "outside": [],
+      "controls": [
+        {
+          "name": "حالة المنصة",
+          "left": 1124,
+          "right": 1168
+        },
+        {
+          "name": "الملفات",
+          "left": 12,
+          "right": 111.90625
+        },
+        {
+          "name": "مشروع جديد",
+          "left": 116.90625,
+          "right": 160.90625
+        },
+        {
+          "name": "المشاريع",
+          "left": 165.90625,
+          "right": 209.90625
+        },
+        {
+          "name": "تقطيع",
+          "left": 214.90625,
+          "right": 301.921875
+        },
+        {
+          "name": "ربط الطابعة",
+          "left": 306.921875,
+          "right": 350.921875
+        },
+        {
+          "name": "تسجيل الدخول",
+          "left": 355.921875,
+          "right": 399.921875
+        },
+        {
+          "name": "X2D0.20",
+          "left": 404.921875,
+          "right": 450.015625
+        },
+        {
+          "name": "حالة المنصة",
+          "left": 455.015625,
+          "right": 499.015625
+        },
+        {
+          "name": "اللغة",
+          "left": 504.015625,
+          "right": 614.015625
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-air-landscape",
+      "width": 1180,
+      "locale": "ar",
+      "mode": "advanced",
+      "lang": "ar",
+      "outside": [],
+      "controls": [
+        {
+          "name": "حالة المنصة",
+          "left": 1124,
+          "right": 1168
+        },
+        {
+          "name": "الملفات",
+          "left": 12,
+          "right": 111.90625
+        },
+        {
+          "name": "مشروع جديد",
+          "left": 116.90625,
+          "right": 160.90625
+        },
+        {
+          "name": "المشاريع",
+          "left": 165.90625,
+          "right": 209.90625
+        },
+        {
+          "name": "ربط الطابعة",
+          "left": 214.90625,
+          "right": 258.90625
+        },
+        {
+          "name": "تسجيل الدخول",
+          "left": 263.90625,
+          "right": 307.90625
+        },
+        {
+          "name": "X2D0.20",
+          "left": 312.90625,
+          "right": 358
+        },
+        {
+          "name": "المجسمات والإعدادات",
+          "left": 363,
+          "right": 407
+        },
+        {
+          "name": "حالة المنصة",
+          "left": 412,
+          "right": 456
+        },
+        {
+          "name": "اللغة",
+          "left": 461,
+          "right": 571
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-air-landscape",
+      "width": 1180,
+      "locale": "ckb",
+      "mode": "simple",
+      "lang": "ckb",
+      "outside": [],
+      "controls": [
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 1124,
+          "right": 1168
+        },
+        {
+          "name": "فایلەکان",
+          "left": 12,
+          "right": 115.09375
+        },
+        {
+          "name": "پڕۆژەی نوێ",
+          "left": 120.09375,
+          "right": 164.09375
+        },
+        {
+          "name": "پڕۆژەکان",
+          "left": 169.09375,
+          "right": 213.09375
+        },
+        {
+          "name": "پارچەکردن",
+          "left": 218.09375,
+          "right": 336.9375
+        },
+        {
+          "name": "بەستنەوەی چاپکەر",
+          "left": 341.9375,
+          "right": 385.9375
+        },
+        {
+          "name": "چوونەژوورەوە",
+          "left": 390.9375,
+          "right": 434.9375
+        },
+        {
+          "name": "X2D0.20",
+          "left": 439.9375,
+          "right": 485.03125
+        },
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 490.03125,
+          "right": 534.03125
+        },
+        {
+          "name": "زمان",
+          "left": 539.03125,
+          "right": 649.03125
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-air-landscape",
+      "width": 1180,
+      "locale": "ckb",
+      "mode": "advanced",
+      "lang": "ckb",
+      "outside": [],
+      "controls": [
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 1124,
+          "right": 1168
+        },
+        {
+          "name": "فایلەکان",
+          "left": 12,
+          "right": 115.09375
+        },
+        {
+          "name": "پڕۆژەی نوێ",
+          "left": 120.09375,
+          "right": 164.09375
+        },
+        {
+          "name": "پڕۆژەکان",
+          "left": 169.09375,
+          "right": 213.09375
+        },
+        {
+          "name": "بەستنەوەی چاپکەر",
+          "left": 218.09375,
+          "right": 262.09375
+        },
+        {
+          "name": "چوونەژوورەوە",
+          "left": 267.09375,
+          "right": 311.09375
+        },
+        {
+          "name": "X2D0.20",
+          "left": 316.09375,
+          "right": 361.1875
+        },
+        {
+          "name": "تەنەکان و ڕێکخستنەکان",
+          "left": 366.1875,
+          "right": 410.1875
+        },
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 415.1875,
+          "right": 459.1875
+        },
+        {
+          "name": "زمان",
+          "left": 464.1875,
+          "right": 574.1875
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-air-landscape",
+      "width": 1180,
+      "locale": "en",
+      "mode": "simple",
+      "lang": "en",
+      "outside": [],
+      "controls": [
+        {
+          "name": "Platform status",
+          "left": 12,
+          "right": 56
+        },
+        {
+          "name": "Files",
+          "left": 583.171875,
+          "right": 666.140625
+        },
+        {
+          "name": "New project",
+          "left": 671.140625,
+          "right": 715.140625
+        },
+        {
+          "name": "Projects",
+          "left": 720.140625,
+          "right": 764.140625
+        },
+        {
+          "name": "Slice",
+          "left": 769.140625,
+          "right": 855.90625
+        },
+        {
+          "name": "Connect printer",
+          "left": 860.90625,
+          "right": 904.90625
+        },
+        {
+          "name": "Sign in",
+          "left": 909.90625,
+          "right": 953.90625
+        },
+        {
+          "name": "X2D0.20",
+          "left": 958.90625,
+          "right": 1004
+        },
+        {
+          "name": "Platform status",
+          "left": 1009,
+          "right": 1053
+        },
+        {
+          "name": "Language",
+          "left": 1058,
+          "right": 1168
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-air-landscape",
+      "width": 1180,
+      "locale": "en",
+      "mode": "advanced",
+      "lang": "en",
+      "outside": [],
+      "controls": [
+        {
+          "name": "Platform status",
+          "left": 12,
+          "right": 56
+        },
+        {
+          "name": "Files",
+          "left": 625.9375,
+          "right": 708.90625
+        },
+        {
+          "name": "New project",
+          "left": 713.90625,
+          "right": 757.90625
+        },
+        {
+          "name": "Projects",
+          "left": 762.90625,
+          "right": 806.90625
+        },
+        {
+          "name": "Connect printer",
+          "left": 811.90625,
+          "right": 855.90625
+        },
+        {
+          "name": "Sign in",
+          "left": 860.90625,
+          "right": 904.90625
+        },
+        {
+          "name": "X2D0.20",
+          "left": 909.90625,
+          "right": 955
+        },
+        {
+          "name": "Objects & settings",
+          "left": 960,
+          "right": 1004
+        },
+        {
+          "name": "Platform status",
+          "left": 1009,
+          "right": 1053
+        },
+        {
+          "name": "Language",
+          "left": 1058,
+          "right": 1168
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-mini-landscape",
+      "width": 1133,
+      "locale": "ar",
+      "mode": "simple",
+      "lang": "ar",
+      "outside": [],
+      "controls": [
+        {
+          "name": "حالة المنصة",
+          "left": 1077,
+          "right": 1121
+        },
+        {
+          "name": "الملفات",
+          "left": 12,
+          "right": 111.90625
+        },
+        {
+          "name": "مشروع جديد",
+          "left": 116.90625,
+          "right": 160.90625
+        },
+        {
+          "name": "المشاريع",
+          "left": 165.90625,
+          "right": 209.90625
+        },
+        {
+          "name": "تقطيع",
+          "left": 214.90625,
+          "right": 301.921875
+        },
+        {
+          "name": "ربط الطابعة",
+          "left": 306.921875,
+          "right": 350.921875
+        },
+        {
+          "name": "تسجيل الدخول",
+          "left": 355.921875,
+          "right": 399.921875
+        },
+        {
+          "name": "X2D0.20",
+          "left": 404.921875,
+          "right": 450.015625
+        },
+        {
+          "name": "حالة المنصة",
+          "left": 455.015625,
+          "right": 499.015625
+        },
+        {
+          "name": "اللغة",
+          "left": 504.015625,
+          "right": 614.015625
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-mini-landscape",
+      "width": 1133,
+      "locale": "ar",
+      "mode": "advanced",
+      "lang": "ar",
+      "outside": [],
+      "controls": [
+        {
+          "name": "حالة المنصة",
+          "left": 1077,
+          "right": 1121
+        },
+        {
+          "name": "الملفات",
+          "left": 12,
+          "right": 111.90625
+        },
+        {
+          "name": "مشروع جديد",
+          "left": 116.90625,
+          "right": 160.90625
+        },
+        {
+          "name": "المشاريع",
+          "left": 165.90625,
+          "right": 209.90625
+        },
+        {
+          "name": "ربط الطابعة",
+          "left": 214.90625,
+          "right": 258.90625
+        },
+        {
+          "name": "تسجيل الدخول",
+          "left": 263.90625,
+          "right": 307.90625
+        },
+        {
+          "name": "X2D0.20",
+          "left": 312.90625,
+          "right": 358
+        },
+        {
+          "name": "المجسمات والإعدادات",
+          "left": 363,
+          "right": 407
+        },
+        {
+          "name": "حالة المنصة",
+          "left": 412,
+          "right": 456
+        },
+        {
+          "name": "اللغة",
+          "left": 461,
+          "right": 571
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-mini-landscape",
+      "width": 1133,
+      "locale": "ckb",
+      "mode": "simple",
+      "lang": "ckb",
+      "outside": [],
+      "controls": [
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 1077,
+          "right": 1121
+        },
+        {
+          "name": "فایلەکان",
+          "left": 12,
+          "right": 115.09375
+        },
+        {
+          "name": "پڕۆژەی نوێ",
+          "left": 120.09375,
+          "right": 164.09375
+        },
+        {
+          "name": "پڕۆژەکان",
+          "left": 169.09375,
+          "right": 213.09375
+        },
+        {
+          "name": "پارچەکردن",
+          "left": 218.09375,
+          "right": 336.9375
+        },
+        {
+          "name": "بەستنەوەی چاپکەر",
+          "left": 341.9375,
+          "right": 385.9375
+        },
+        {
+          "name": "چوونەژوورەوە",
+          "left": 390.9375,
+          "right": 434.9375
+        },
+        {
+          "name": "X2D0.20",
+          "left": 439.9375,
+          "right": 485.03125
+        },
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 490.03125,
+          "right": 534.03125
+        },
+        {
+          "name": "زمان",
+          "left": 539.03125,
+          "right": 649.03125
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-mini-landscape",
+      "width": 1133,
+      "locale": "ckb",
+      "mode": "advanced",
+      "lang": "ckb",
+      "outside": [],
+      "controls": [
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 1077,
+          "right": 1121
+        },
+        {
+          "name": "فایلەکان",
+          "left": 12,
+          "right": 115.09375
+        },
+        {
+          "name": "پڕۆژەی نوێ",
+          "left": 120.09375,
+          "right": 164.09375
+        },
+        {
+          "name": "پڕۆژەکان",
+          "left": 169.09375,
+          "right": 213.09375
+        },
+        {
+          "name": "بەستنەوەی چاپکەر",
+          "left": 218.09375,
+          "right": 262.09375
+        },
+        {
+          "name": "چوونەژوورەوە",
+          "left": 267.09375,
+          "right": 311.09375
+        },
+        {
+          "name": "X2D0.20",
+          "left": 316.09375,
+          "right": 361.1875
+        },
+        {
+          "name": "تەنەکان و ڕێکخستنەکان",
+          "left": 366.1875,
+          "right": 410.1875
+        },
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 415.1875,
+          "right": 459.1875
+        },
+        {
+          "name": "زمان",
+          "left": 464.1875,
+          "right": 574.1875
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-mini-landscape",
+      "width": 1133,
+      "locale": "en",
+      "mode": "simple",
+      "lang": "en",
+      "outside": [],
+      "controls": [
+        {
+          "name": "Platform status",
+          "left": 12,
+          "right": 56
+        },
+        {
+          "name": "Files",
+          "left": 536.171875,
+          "right": 619.140625
+        },
+        {
+          "name": "New project",
+          "left": 624.140625,
+          "right": 668.140625
+        },
+        {
+          "name": "Projects",
+          "left": 673.140625,
+          "right": 717.140625
+        },
+        {
+          "name": "Slice",
+          "left": 722.140625,
+          "right": 808.90625
+        },
+        {
+          "name": "Connect printer",
+          "left": 813.90625,
+          "right": 857.90625
+        },
+        {
+          "name": "Sign in",
+          "left": 862.90625,
+          "right": 906.90625
+        },
+        {
+          "name": "X2D0.20",
+          "left": 911.90625,
+          "right": 957
+        },
+        {
+          "name": "Platform status",
+          "left": 962,
+          "right": 1006
+        },
+        {
+          "name": "Language",
+          "left": 1011,
+          "right": 1121
+        }
+      ]
+    },
+    {
+      "viewport": "ipad-mini-landscape",
+      "width": 1133,
+      "locale": "en",
+      "mode": "advanced",
+      "lang": "en",
+      "outside": [],
+      "controls": [
+        {
+          "name": "Platform status",
+          "left": 12,
+          "right": 56
+        },
+        {
+          "name": "Files",
+          "left": 578.9375,
+          "right": 661.90625
+        },
+        {
+          "name": "New project",
+          "left": 666.90625,
+          "right": 710.90625
+        },
+        {
+          "name": "Projects",
+          "left": 715.90625,
+          "right": 759.90625
+        },
+        {
+          "name": "Connect printer",
+          "left": 764.90625,
+          "right": 808.90625
+        },
+        {
+          "name": "Sign in",
+          "left": 813.90625,
+          "right": 857.90625
+        },
+        {
+          "name": "X2D0.20",
+          "left": 862.90625,
+          "right": 908
+        },
+        {
+          "name": "Objects & settings",
+          "left": 913,
+          "right": 957
+        },
+        {
+          "name": "Platform status",
+          "left": 962,
+          "right": 1006
+        },
+        {
+          "name": "Language",
+          "left": 1011,
+          "right": 1121
+        }
+      ]
+    },
+    {
+      "viewport": "desktop",
+      "width": 1680,
+      "locale": "ar",
+      "mode": "simple",
+      "lang": "ar",
+      "outside": [],
+      "controls": [
+        {
+          "name": "حالة المنصة",
+          "left": 1624,
+          "right": 1668
+        },
+        {
+          "name": "الملفات",
+          "left": 12,
+          "right": 111.90625
+        },
+        {
+          "name": "مشروع جديد",
+          "left": 116.90625,
+          "right": 249.5
+        },
+        {
+          "name": "المشاريع",
+          "left": 254.5,
+          "right": 360.921875
+        },
+        {
+          "name": "تقطيع",
+          "left": 365.921875,
+          "right": 452.9375
+        },
+        {
+          "name": "ربط الطابعة",
+          "left": 457.9375,
+          "right": 585.875
+        },
+        {
+          "name": "تسجيل الدخول",
+          "left": 590.875,
+          "right": 736.875
+        },
+        {
+          "name": "X2D0.20",
+          "left": 741.875,
+          "right": 786.96875
+        },
+        {
+          "name": "حالة المنصة",
+          "left": 791.96875,
+          "right": 835.96875
+        },
+        {
+          "name": "اللغة",
+          "left": 840.96875,
+          "right": 950.96875
+        }
+      ]
+    },
+    {
+      "viewport": "desktop",
+      "width": 1680,
+      "locale": "ar",
+      "mode": "advanced",
+      "lang": "ar",
+      "outside": [],
+      "controls": [
+        {
+          "name": "حالة المنصة",
+          "left": 1624,
+          "right": 1668
+        },
+        {
+          "name": "الملفات",
+          "left": 12,
+          "right": 111.90625
+        },
+        {
+          "name": "مشروع جديد",
+          "left": 116.90625,
+          "right": 249.5
+        },
+        {
+          "name": "المشاريع",
+          "left": 254.5,
+          "right": 360.921875
+        },
+        {
+          "name": "ربط الطابعة",
+          "left": 365.921875,
+          "right": 493.859375
+        },
+        {
+          "name": "تسجيل الدخول",
+          "left": 498.859375,
+          "right": 644.859375
+        },
+        {
+          "name": "X2D0.20",
+          "left": 649.859375,
+          "right": 694.953125
+        },
+        {
+          "name": "المجسمات والإعدادات",
+          "left": 699.953125,
+          "right": 743.953125
+        },
+        {
+          "name": "حالة المنصة",
+          "left": 748.953125,
+          "right": 792.953125
+        },
+        {
+          "name": "اللغة",
+          "left": 797.953125,
+          "right": 907.953125
+        }
+      ]
+    },
+    {
+      "viewport": "desktop",
+      "width": 1680,
+      "locale": "ckb",
+      "mode": "simple",
+      "lang": "ckb",
+      "outside": [],
+      "controls": [
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 1624,
+          "right": 1668
+        },
+        {
+          "name": "فایلەکان",
+          "left": 12,
+          "right": 115.09375
+        },
+        {
+          "name": "پڕۆژەی نوێ",
+          "left": 120.09375,
+          "right": 248.421875
+        },
+        {
+          "name": "پڕۆژەکان",
+          "left": 253.421875,
+          "right": 363.71875
+        },
+        {
+          "name": "پارچەکردن",
+          "left": 368.71875,
+          "right": 487.5625
+        },
+        {
+          "name": "بەستنەوەی چاپکەر",
+          "left": 492.5625,
+          "right": 662.734375
+        },
+        {
+          "name": "چوونەژوورەوە",
+          "left": 667.734375,
+          "right": 810.046875
+        },
+        {
+          "name": "X2D0.20",
+          "left": 815.046875,
+          "right": 860.140625
+        },
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 865.140625,
+          "right": 909.140625
+        },
+        {
+          "name": "زمان",
+          "left": 914.140625,
+          "right": 1024.140625
+        }
+      ]
+    },
+    {
+      "viewport": "desktop",
+      "width": 1680,
+      "locale": "ckb",
+      "mode": "advanced",
+      "lang": "ckb",
+      "outside": [],
+      "controls": [
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 1624,
+          "right": 1668
+        },
+        {
+          "name": "فایلەکان",
+          "left": 12,
+          "right": 115.09375
+        },
+        {
+          "name": "پڕۆژەی نوێ",
+          "left": 120.09375,
+          "right": 248.421875
+        },
+        {
+          "name": "پڕۆژەکان",
+          "left": 253.421875,
+          "right": 363.71875
+        },
+        {
+          "name": "بەستنەوەی چاپکەر",
+          "left": 368.71875,
+          "right": 538.890625
+        },
+        {
+          "name": "چوونەژوورەوە",
+          "left": 543.890625,
+          "right": 686.203125
+        },
+        {
+          "name": "X2D0.20",
+          "left": 691.203125,
+          "right": 736.296875
+        },
+        {
+          "name": "تەنەکان و ڕێکخستنەکان",
+          "left": 741.296875,
+          "right": 785.296875
+        },
+        {
+          "name": "دۆخی پلاتفۆرم",
+          "left": 790.296875,
+          "right": 834.296875
+        },
+        {
+          "name": "زمان",
+          "left": 839.296875,
+          "right": 949.296875
+        }
+      ]
+    },
+    {
+      "viewport": "desktop",
+      "width": 1680,
+      "locale": "en",
+      "mode": "simple",
+      "lang": "en",
+      "outside": [],
+      "controls": [
+        {
+          "name": "Platform status",
+          "left": 12,
+          "right": 56
+        },
+        {
+          "name": "Files",
+          "left": 744.859375,
+          "right": 827.828125
+        },
+        {
+          "name": "New project",
+          "left": 832.828125,
+          "right": 972.25
+        },
+        {
+          "name": "Projects",
+          "left": 977.25,
+          "right": 1086.6875
+        },
+        {
+          "name": "Slice",
+          "left": 1091.6875,
+          "right": 1178.453125
+        },
+        {
+          "name": "Connect printer",
+          "left": 1183.453125,
+          "right": 1349.671875
+        },
+        {
+          "name": "Sign in",
+          "left": 1354.671875,
+          "right": 1453.90625
+        },
+        {
+          "name": "X2D0.20",
+          "left": 1458.90625,
+          "right": 1504
+        },
+        {
+          "name": "Platform status",
+          "left": 1509,
+          "right": 1553
+        },
+        {
+          "name": "Language",
+          "left": 1558,
+          "right": 1668
+        }
+      ]
+    },
+    {
+      "viewport": "desktop",
+      "width": 1680,
+      "locale": "en",
+      "mode": "advanced",
+      "lang": "en",
+      "outside": [],
+      "controls": [
+        {
+          "name": "Platform status",
+          "left": 12,
+          "right": 56
+        },
+        {
+          "name": "Files",
+          "left": 787.625,
+          "right": 870.59375
+        },
+        {
+          "name": "New project",
+          "left": 875.59375,
+          "right": 1015.015625
+        },
+        {
+          "name": "Projects",
+          "left": 1020.015625,
+          "right": 1129.453125
+        },
+        {
+          "name": "Connect printer",
+          "left": 1134.453125,
+          "right": 1300.671875
+        },
+        {
+          "name": "Sign in",
+          "left": 1305.671875,
+          "right": 1404.90625
+        },
+        {
+          "name": "X2D0.20",
+          "left": 1409.90625,
+          "right": 1455
+        },
+        {
+          "name": "Objects & settings",
+          "left": 1460,
+          "right": 1504
+        },
+        {
+          "name": "Platform status",
+          "left": 1509,
+          "right": 1553
+        },
+        {
+          "name": "Language",
+          "left": 1558,
+          "right": 1668
+        }
+      ]
     }
   ]
 }

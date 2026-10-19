@@ -18,7 +18,13 @@
  *   - no LEVO control overlaps any engine control, at every iPad viewport;
  *   - the header sits at top 0 to begin with;
  *   - and it STILL sits at top 0 after the root is forcibly scrolled, which is
- *     the failure the owner hit.
+ *     the failure the owner hit;
+ *   - EVERY header control lies inside the window (left >= 0, right <=
+ *     innerWidth) at every viewport, in Arabic, Sorani and English, in Simple
+ *     and in Advanced. The header clips its overflow and cannot scroll, so in
+ *     RTL a too-wide action row runs off the LEFT edge and Files / New
+ *     project become unreachable — which P1-10's Simple slice action did at
+ *     1133px and 1024px before the header learned to narrow.
  *
  * NOT part of `npm test`: it needs a running Studio and a Chromium binary.
  *
@@ -172,7 +178,54 @@ for (const vp of VIEWPORTS) {
   await ctx.close();
 }
 
+// EVERY HEADER CONTROL INSIDE THE WINDOW, in each language and each mode.
+const LOCALE_KEY = "levo-studio-locale";
+const GUEST_MODE_KEY = "levo-studio-mode/guest";
+const overflow = [];
+for (const vp of VIEWPORTS) {
+  for (const locale of ["ar", "ckb", "en"]) {
+    for (const mode of ["simple", "advanced"]) {
+      const ctx = await browser.newContext({
+        viewport: { width: vp.width, height: vp.height },
+        deviceScaleFactor: 1,
+        isMobile: true,
+        hasTouch: true,
+      });
+      await ctx.addInitScript(([lk, lv, mk, mv]) => {
+        try {
+          window.localStorage.setItem(lk, lv);
+          window.localStorage.setItem(mk, mv);
+        } catch { /* ignore */ }
+      }, [LOCALE_KEY, locale, GUEST_MODE_KEY, mode]);
+      const page = await ctx.newPage();
+      await page.goto(target, { waitUntil: "networkidle" });
+      await page.waitForTimeout(3000);
+      const measured = await page.evaluate(() => {
+        const controls = [];
+        for (const el of document.querySelectorAll(".studio-header button, .studio-header a, .studio-header label")) {
+          const r = el.getBoundingClientRect();
+          if (r.width <= 0 || r.height <= 0) continue;
+          const name = (el.getAttribute("aria-label") || el.textContent || el.getAttribute("title") || "").trim().slice(0, 40);
+          controls.push({ name, left: r.left, right: r.right });
+        }
+        const sliceShown = Boolean(document.querySelector('[data-levo-action="simple-slice"]'));
+        return { controls, innerWidth: window.innerWidth, lang: document.documentElement.lang, sliceShown };
+      });
+      const outside = measured.controls.filter((c) => c.left < -0.5 || c.right > measured.innerWidth + 0.5);
+      const label = `${vp.name} ${vp.width}px ${locale} ${mode}`;
+      if (mode === "simple" && vp.width >= 900 && !measured.sliceShown) fail(`${label}: the Simple slice action is not in the header`);
+      if (outside.length === 0) ok(`${label}: ${measured.controls.length} header controls inside the window`);
+      else {
+        fail(`${label}: ${outside.length} header control(s) outside the window`);
+        for (const c of outside) console.log(`       «${c.name}» x ${c.left.toFixed(1)}..${c.right.toFixed(1)} of ${measured.innerWidth}`);
+      }
+      overflow.push({ viewport: vp.name, width: vp.width, locale, mode, lang: measured.lang, outside, controls: measured.controls });
+      await ctx.close();
+    }
+  }
+}
+
 await browser.close();
-writeFileSync(REPORT_PATH, JSON.stringify({ target, results }, null, 2));
+writeFileSync(REPORT_PATH, JSON.stringify({ target, results, overflow }, null, 2));
 console.log(`\n${failures === 0 ? "PASS" : `FAIL (${failures})`} — report: ${REPORT_PATH}`);
 process.exit(failures === 0 ? 0 : 1);

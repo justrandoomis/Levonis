@@ -900,6 +900,27 @@ button:disabled { cursor: not-allowed; }
   .project-row button { min-height: 48px; }
 }
 
+/* NARROW DESKTOPS, SPLIT WINDOWS AND TABLETS (900-1180px). The header is a
+   no-wrap grid whose action row is a no-wrap flex row, and the shell clips
+   overflow, so a row wider than the window runs off the edge where nothing
+   can scroll it back: in Arabic and Sorani (RTL) that is the LEFT edge, and
+   with the Simple slice action in the row, Files sat at x -27 at 1133px and
+   fully off-screen at 1024px. So the row narrows in two steps, before it
+   can overflow: first the secondary actions become icons, then (at 1099px
+   and below, which keeps Sorani's longer labels clear of the edge on an
+   iPad in portrait) every action does. Their names stay as aria-label and
+   tooltip.
+   tests/browser-shell-layout.mjs measures every header control inside the
+   window in ar, ckb and en, Simple and Advanced. */
+@media (max-width: 1180px) {
+  .studio-actions > :is(.new-project-action, .projects-action, .connect-action, .account-action) { padding: 0; }
+  .studio-actions > :is(.new-project-action, .projects-action, .connect-action, .account-action) > span { display: none; }
+}
+@media (max-width: 1099px) {
+  .studio-actions > :is(button, a, .file-select-control) { padding: 0; }
+  .studio-actions > :is(button, a, .file-select-control) > span { display: none; }
+}
+
 @media (max-width: 899px) {
   /* The tool tray owns these two below this width; one home each. */
   .shell-actions { display: none; }

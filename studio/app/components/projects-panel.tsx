@@ -40,6 +40,7 @@ import {
   StudioApiError,
 } from "../project-sync";
 import type { PersistenceState } from "../project-sync";
+import { panelErrorKey } from "../panel-errors";
 import { deleteDraft, listDrafts, type StoredLevoProject } from "../project-store";
 
 export type PanelLocale = "ar" | "en" | "ckb";
@@ -157,6 +158,9 @@ const TEXT = {
     historyConflict: "تغيّر المشروع على جهاز آخر. أعد تحميل السجل ثم حاول مجددًا.",
     quotaExceeded: "امتلأت مساحة التخزين في حسابك.",
     rateLimited: "طلبات كثيرة خلال وقت قصير. انتظر دقيقة ثم حاول مجددًا.",
+    networkFailed: "تعذر الوصول إلى الخادم. تحقق من اتصالك ثم حاول مجددًا.",
+    draftMissing: "لم تعد هذه المسودة موجودة على هذا الجهاز.",
+    draftEmpty: "لا توجد في هذه المسودة ملفات لحفظها.",
     guestWorkTitle: "عمل من هذا الجهاز قبل تسجيل الدخول",
     guestWorkBody: "أُنشئ هذا العمل كضيف. يبقى على هذا الجهاز، ولا يُحفظ في حسابك إلا إذا اخترت ذلك.",
     adoptGuest: "احفظ عملك في حسابي",
@@ -244,6 +248,9 @@ const TEXT = {
     historyConflict: "This project changed on another device. Reload the history and try again.",
     quotaExceeded: "Your account storage is full.",
     rateLimited: "Too many requests in a short time. Wait a minute and try again.",
+    networkFailed: "Couldn't reach the server. Check your connection and try again.",
+    draftMissing: "This draft is no longer on this device.",
+    draftEmpty: "This draft has no files to save.",
     guestWorkTitle: "Work from this device before you signed in",
     guestWorkBody: "This was made as a guest. It stays on this device and is saved to your account only if you choose.",
     adoptGuest: "Save this work to my account",
@@ -331,6 +338,9 @@ const TEXT = {
     historyConflict: "ئەم پڕۆژەیە لە ئامێرێکی ترەوە گۆڕاوە. مێژووەکە نوێ بکەرەوە و دووبارە هەوڵبدەرەوە.",
     quotaExceeded: "شوێنی هەڵگرتنی هەژمارەکەت پڕ بووە.",
     rateLimited: "لە ماوەیەکی کورتدا داواکاریی زۆر نێردراوە. خولەکێک چاوەڕێ بکە و دووبارە هەوڵبدەرەوە.",
+    networkFailed: "نەتوانرا بگەیتە ڕاژەکار. پەیوەندییەکەت بپشکنە و دووبارە هەوڵبدەرەوە.",
+    draftMissing: "ئەم ڕەشنووسە چیتر لەسەر ئەم ئامێرە نییە.",
+    draftEmpty: "ئەم ڕەشنووسە هیچ فایلێکی تێدا نییە بۆ پاشەکەوتکردن.",
     guestWorkTitle: "کارەکانی ئەم ئامێرە پێش چوونەژوورەوە",
     guestWorkBody: "ئەم کارە وەک میوان دروستکراوە. لەسەر ئەم ئامێرە دەمێنێتەوە و تەنها ئەگەر خۆت هەڵیبژێریت لە هەژمارەکەت پاشەکەوت دەکرێت.",
     adoptGuest: "کارەکەم لە هەژمارەکەمدا پاشەکەوت بکە",
@@ -361,16 +371,12 @@ function fill(template: string, values: Record<string, string | number>): string
   return Object.entries(values).reduce((out, [key, value]) => out.split(`{${key}}`).join(String(value)), template);
 }
 
-/** Known API refusals in the user's language; anything else stays generic. */
+/**
+ * Known refusals in the user's language; anything else stays generic. NEVER
+ * error.message (app/panel-errors.ts): server and browser texts are English.
+ */
 function describeError(error: unknown, t: PanelText): string {
-  if (error instanceof StudioApiError) {
-    if (error.code === "REVISION_CONFLICT") return t.historyConflict;
-    if (error.code === "QUOTA_EXCEEDED" || error.status === 413) return t.quotaExceeded;
-    if (error.code === "RETENTION_EXPIRED" || error.status === 410) return t.trashExpired;
-    if (error.code === "RATE_LIMITED" || error.status === 429) return t.rateLimited;
-    if (error.status === 401) return t.guestTitle;
-  }
-  return t.actionFailed;
+  return t[panelErrorKey(error)];
 }
 
 function pinLabel(reason: string, t: PanelText): string {
@@ -460,16 +466,16 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
           if (reloadTokenRef.current !== token || controller.signal.aborted) return;
           setRemotePhase("error");
           setRemoteError(
-            error instanceof StudioApiError && error.status === 401
-              ? t.guestTitle
-              : error instanceof Error
-                ? error.message
+            error instanceof StudioApiError && (error.status === 401 || error.status === 429)
+              ? describeError(error, t)
+              : panelErrorKey(error) === "networkFailed"
+                ? t.networkFailed
                 : t.loadError
           );
         });
       return () => controller.abort();
     },
-    [api, t.guestTitle, t.loadError, user, view]
+    [api, t, user, view]
   );
 
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -534,12 +540,12 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
       try {
         await action();
       } catch (error: unknown) {
-        setActionError(error instanceof Error ? error.message : t.actionFailed);
+        setActionError(describeError(error, t));
       } finally {
         setBusyId(null);
       }
     },
-    [t.actionFailed]
+    [t]
   );
 
   const handleCreate = useCallback(async () => {
@@ -552,12 +558,12 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
       setNewName("");
       loadRemote(query.trim());
     } catch (error: unknown) {
-      setActionError(error instanceof Error ? error.message : t.actionFailed);
+      setActionError(describeError(error, t));
     } finally {
       setCreating(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [creating, loadRemote, newName, props.onCreate, query, t.actionFailed]);
+  }, [creating, loadRemote, newName, props.onCreate, query, t]);
 
   const handleRename = useCallback(
     (project: RemoteProjectSummary) =>
@@ -712,9 +718,7 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
           setNotice(t.adopted);
           void loadDraftsList();
         })
-        .catch((error: unknown) =>
-          setActionError(error instanceof StudioApiError ? describeError(error, t) : error instanceof Error ? error.message : t.actionFailed)
-        )
+        .catch((error: unknown) => setActionError(describeError(error, t)))
         .finally(() => setBusyId(null));
     },
     [loadDraftsList, props.onAdoptGuestDraft, t, view]

@@ -5,7 +5,10 @@
  * shows), applies this device's mirror for the account at once, then the
  * server's answer when signed in — see app/studio-mode.ts for the rule. A
  * choice made while that answer is still in flight wins over it: the person
- * clicked last.
+ * clicked last, and the load then neither rewrites the mirror nor pushes its
+ * stale answer to the server. A choice the server did not receive stays
+ * pending on this device and is sent again when the browser is back online
+ * (and on the next load), so it is never silently reverted.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { namespaceForUser } from "../project-store";
@@ -14,6 +17,7 @@ import {
   clearModeMirror,
   createStudioPrefsApi,
   loadStudioMode,
+  pushPendingMode,
   readModeMirror,
   saveStudioMode,
   type StudioMode,
@@ -43,9 +47,19 @@ export function useStudioMode(userId: string | null): StudioModeControl {
     // Two answers, in order: this device's mirror (a microtask away, so the
     // editor is right before the network is), then the account's own.
     void Promise.resolve().then(() => apply(readModeMirror(namespace) ?? DEFAULT_STUDIO_MODE));
-    void loadStudioMode({ namespace, signedIn, api }).then(apply);
+    void loadStudioMode({
+      namespace,
+      signedIn,
+      api,
+      stillCurrent: () => active && choiceRef.current === choiceAtStart,
+    }).then(apply);
+    // A choice the server could not take (offline, 429, 5xx) goes up again
+    // as soon as the browser is back online.
+    const onOnline = () => void pushPendingMode({ namespace, signedIn, api });
+    if (typeof window !== "undefined") window.addEventListener("online", onOnline);
     return () => {
       active = false;
+      if (typeof window !== "undefined") window.removeEventListener("online", onOnline);
     };
   }, [api, namespace, signedIn]);
 

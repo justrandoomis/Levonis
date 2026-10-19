@@ -201,7 +201,7 @@ test("Simple hides the engine side panel at EVERY width — the rule outranks th
   assert.equal(opened, closed, "the Simple rule must be top-level, not inside a @media block");
 });
 
-test("Simple never hides a warning, the estimate, the status or the plate bar", () => {
+test("Simple's own rules name no warning, the estimate, the status or the plate bar (the panel's contents: see the containment test)", () => {
   const css = theme.EDITOR_SHADOW_CSS;
   const simpleRules = css
     .split("\n")
@@ -217,6 +217,144 @@ test("Simple never hides a warning, the estimate, the status or the plate bar", 
   assert.deepEqual(hidden, [...theme.SIMPLE_MODE_HIDDEN_ENGINE_TOOLS]);
   assert.match(ruleLines[1], /^\s*:host\(\[data-levo-mode="simple"\]\) \.vtt-sep:has\(\+ \[data-testid="tool-arrange"\]\)/);
   assert.equal(ruleLines.length, 2);
+});
+
+test("containment: no engine warning or recovery control is trapped inside the side panel Simple hides", async () => {
+  // Hiding the panel hides EVERYTHING inside it, so the CSS check above is
+  // not enough: walk the installed engine's render tree and list every
+  // warning, error, notice or recovery control inside <aside className:
+  // "sidebar">. Each one must also reach the person by another path — an
+  // engine event the shell shows, or the shell's own copy of it — in both
+  // modes. A new one the engine adds fails here until the shell carries it.
+  const { createRequire } = await import("node:module");
+  const acorn = createRequire(new URL("../package.json", import.meta.url))("acorn");
+  const [engine, client, adapterSource] = await Promise.all([
+    read("../node_modules/three-slicer/viewer/dist/Viewport.js"),
+    read("../app/slicer-client.tsx"),
+    read("../app/engine-adapter.ts"),
+  ]);
+  const ast = acorn.parse(engine, { ecmaVersion: "latest", sourceType: "module" });
+  const isElement = (node) =>
+    node?.type === "CallExpression" && node.callee.type === "MemberExpression" && node.callee.property.name === "createElement";
+  const literalProps = (node) => {
+    const out = {};
+    const props = node.arguments[1];
+    if (props?.type === "ObjectExpression") {
+      for (const prop of props.properties) {
+        if (prop.type === "Property" && prop.value.type === "Literal") out[prop.key.name ?? prop.key.value] = prop.value.value;
+      }
+    }
+    return out;
+  };
+  const walk = (node, visit) => {
+    if (!node || typeof node.type !== "string") return;
+    visit(node);
+    for (const value of Object.values(node)) {
+      if (Array.isArray(value)) for (const child of value) walk(child, visit);
+      else if (value && typeof value.type === "string") walk(value, visit);
+    }
+  };
+  const asides = [];
+  walk(ast, (node) => {
+    if (isElement(node) && node.arguments[0].value === "aside" && literalProps(node).className === "sidebar") asides.push(node);
+  });
+  assert.equal(asides.length, 1, "the engine's side panel was not found");
+
+  // The unlabelled side warning is the slow-slice one: its text is the state
+  // the engine exposes as setTriWarn.
+  const triWarnState = (node) => {
+    const child = node.arguments[3];
+    if (child?.type !== "Identifier") return false;
+    const setter = engine.match(new RegExp(`\\[${child.name}, (\\w+)\\] = \\w+\\(""\\)`))?.[1];
+    return Boolean(setter) && engine.includes(`setTriWarn: ${setter}`);
+  };
+  const found = [];
+  walk(asides[0], (node) => {
+    if (!isElement(node)) return;
+    const props = literalProps(node);
+    const cls = String(props.className ?? "");
+    const id = String(props["data-testid"] ?? "");
+    if (!/warn|err|notice/.test(cls) && !/warn|err|notice|retry/.test(id)) return;
+    found.push(id ? `testid:${id}` : triWarnState(node) ? "tri-warning" : `unlabelled:${cls}`);
+  });
+
+  const delivered = {
+    // Engine events the shell puts in its own message row.
+    "testid:slice-notice": () => {
+      assert.match(engine, /ft\(e, "notice", n\.notice\)/);
+      assert.match(client, /event\.type === "notice"\) \{[\s\S]{0,400}setNotice\(event\.value\)/);
+    },
+    "testid:slice-err": () => {
+      assert.match(engine, /ft\(e, "error", n\.error\)/);
+      assert.match(client, /event\.type === "error"\) \{[\s\S]{0,400}setError\(event\.value\)/);
+    },
+    // The retry offer: the shell's error row offers it and clicks the
+    // engine's own button through the adapter (a contract test id).
+    "testid:downgrade-retry": () => {
+      assert.ok(engine.includes("All plates failed to slice (economy mode included) — try the simplified retry"));
+      assert.match(adapterSource, /ENGINE_STATIC_TEST_IDS = \[[\s\S]*"downgrade-retry"[\s\S]*\] as const/);
+      assert.match(client, /adapter\.isControlAvailable\("downgrade-retry"\)/);
+      assert.match(client, /adapter\.clickControl\("downgrade-retry"\)/);
+      assert.match(client, /\{error && downgradeOfferFor === error && <button className="message-action" data-levo-action="simplified-retry"/);
+    },
+    // Never an event: the shell counts the triangles itself, against the
+    // engine's own threshold.
+    "tri-warning": () => {
+      assert.match(
+        engine,
+        /(\w+) > 1e5 && \w+\(`\$\{Math\.round\(\1\)\.toLocaleString\(\)\} triangles — slicing may take a while`\)/
+      );
+      assert.match(adapterSource, /export const HEAVY_IMPORT_TRIANGLES = 100_000;/);
+      assert.match(client, /noteHeavyImport\(ids\)/);
+      assert.match(client, /data-levo-warning="heavy-import"/);
+    },
+  };
+  assert.ok(found.length >= 4, `expected the engine's panel warnings, found ${found.join(", ")}`);
+  for (const entry of found) {
+    assert.ok(entry in delivered, `${entry} sits inside the side panel Simple hides and reaches the person by no other path`);
+    delivered[entry]();
+  }
+  // The shell's copies are shown in BOTH modes: nothing about them reads the mode.
+  for (const marker of ['data-levo-warning="heavy-import"', 'data-levo-action="simplified-retry"']) {
+    const at = client.indexOf(marker);
+    assert.doesNotMatch(client.slice(at - 300, at + 300), /simpleMode|studioMode/);
+  }
+});
+
+test("the shell's slow-slice warning counts what ONE import added, against the engine's threshold", async () => {
+  const adapterMod = await import("../app/engine-adapter.ts");
+  assert.equal(adapterMod.HEAVY_IMPORT_TRIANGLES, 100_000);
+  assert.equal(adapterMod.isHeavyImport(100_000), false, "the engine warns only ABOVE 1e5");
+  assert.equal(adapterMod.isHeavyImport(100_001), true);
+  const scene = [
+    { id: 1, name: "a", localPos: new Float32Array(9 * 60_000) },
+    { id: 2, name: "b", localPos: new Float32Array(9 * 50_000) },
+    { id: 3, name: "c", localPos: new Float32Array(9 * 10) },
+  ];
+  const hadWindow = "window" in globalThis;
+  const previous = globalThis.window;
+  globalThis.window = { __vpApi: () => ({ sceneSnapshot: () => scene }) };
+  try {
+    const adapter = adapterMod.createEngineAdapter();
+    assert.equal(adapter.triangleCountOf([1, 2]), 110_000);
+    assert.equal(adapter.triangleCountOf([3]), 10);
+    assert.equal(adapter.triangleCountOf([]), 0);
+    assert.equal(adapterMod.isHeavyImport(adapter.triangleCountOf([1, 2])), true);
+    assert.equal(adapterMod.isHeavyImport(adapter.triangleCountOf([1])), false);
+  } finally {
+    if (hadWindow) globalThis.window = previous;
+    else delete globalThis.window;
+  }
+  // The warning text exists in all three languages with its {count} slot.
+  const dictionaries = await import("../app/i18n/index.ts");
+  for (const locale of ["ar", "en", "ckb"]) {
+    const dict = dictionaries.DICTIONARIES[locale];
+    assert.match(dict.heavyModelWarning, /\{count\}/, locale);
+    assert.ok(dict.simplifiedRetry && dict.simplifiedRetryHelp, locale);
+  }
+  for (const key of ["heavyModelWarning", "simplifiedRetry", "simplifiedRetryHelp"]) {
+    assert.notEqual(dictionaries.DICTIONARIES.ckb[key], dictionaries.DICTIONARIES.ar[key], `ckb.${key} is not the Arabic`);
+  }
 });
 
 test("warnings reach the shell in Simple: engine errors and notices are events, the stats card sits outside the panel (acceptance 10)", async () => {
@@ -305,4 +443,90 @@ test("the certificate-trust prompt is built in the reader's language, fingerprin
   const source = await read("../app/native-printer-bridge.ts");
   assert.doesNotMatch(source, /window\.confirm\(`Verify/);
   assert.doesNotMatch(source, /new Error\("(Printer certificate|Enter a private|The printer access code|Enter the printer serial)/);
+});
+
+test("a choice the server did not take is never reverted, and a load in flight never undoes a newer click", async () => {
+  const storage = memoryStorage();
+  mode.setModeStorageForTests(storage);
+  try {
+    // (1) The account stored Simple earlier; switching to Advanced fails
+    //     (offline / 429 / 5xx). The next load must push Advanced, not
+    //     restore Simple over it.
+    const ns = namespaceForUser("usr_flaky");
+    const api = fakeApi({ stored: "simple" });
+    assert.equal(await mode.loadStudioMode({ namespace: ns, signedIn: true, api }), "simple");
+    assert.equal(mode.isModeMirrorPending(ns), false, "a value the server confirmed is not pending");
+    const down = fakeApi({ stored: "simple", fail: true });
+    assert.equal(await mode.saveStudioMode({ namespace: ns, signedIn: true, api: down, mode: "advanced" }), false);
+    assert.equal(mode.isModeMirrorPending(ns), true, "the unsent choice is marked pending");
+    api.calls.length = 0;
+    assert.equal(await mode.loadStudioMode({ namespace: ns, signedIn: true, api }), "advanced", "the last click stands");
+    assert.deepEqual(api.calls, [["GET"], ["PUT", "advanced"]]);
+    assert.equal(api.row, "advanced");
+    assert.equal(mode.readModeMirror(ns), "advanced");
+    assert.equal(mode.isModeMirrorPending(ns), false, "confirmed once the PUT succeeded");
+    // A later load with the server's stored value changes nothing.
+    assert.equal(await mode.loadStudioMode({ namespace: ns, signedIn: true, api }), "advanced");
+
+    // Back online: a pending choice goes up without waiting for a reload.
+    const ns2 = namespaceForUser("usr_reconnect");
+    await mode.saveStudioMode({ namespace: ns2, signedIn: true, api: fakeApi({ fail: true }), mode: "advanced" });
+    const online = fakeApi({ stored: "simple" });
+    assert.equal(await mode.pushPendingMode({ namespace: ns2, signedIn: true, api: online }), true);
+    assert.equal(online.row, "advanced");
+    assert.equal(mode.isModeMirrorPending(ns2), false);
+    assert.equal(await mode.pushPendingMode({ namespace: ns2, signedIn: true, api: online }), false, "nothing left to send");
+
+    // (2) The mirror holds an unsent Advanced; the person picks Simple while
+    //     the initial GET is still in flight. The load must neither rewrite
+    //     the mirror nor push its stale Advanced after the person's Simple.
+    const ns3 = namespaceForUser("usr_race");
+    await mode.saveStudioMode({ namespace: ns3, signedIn: true, api: fakeApi({ fail: true }), mode: "advanced" });
+    let row = null;
+    const order = [];
+    let releaseGet;
+    const slow = {
+      get() {
+        order.push("GET");
+        const answer = { mode: row ?? "simple", stored: row !== null };
+        return new Promise((resolve) => (releaseGet = () => resolve(answer)));
+      },
+      async put(next) {
+        order.push(`PUT ${next}`);
+        row = next;
+        return { mode: row, stored: true };
+      },
+    };
+    let choice = 0;
+    const loading = mode.loadStudioMode({
+      namespace: ns3,
+      signedIn: true,
+      api: slow,
+      stillCurrent: () => choice === 0,
+    });
+    await Promise.resolve();
+    choice += 1; // what use-studio-mode's setMode does before saving
+    assert.equal(await mode.saveStudioMode({ namespace: ns3, signedIn: true, api: slow, mode: "simple" }), true);
+    releaseGet();
+    assert.equal(await loading, "simple");
+    assert.deepEqual(order, ["GET", "PUT simple"], "the stale load pushed nothing");
+    assert.equal(row, "simple", "the server keeps the person's click");
+    assert.equal(mode.readModeMirror(ns3), "simple");
+    assert.equal(mode.isModeMirrorPending(ns3), false);
+
+    // The hook wires both halves: stillCurrent from its choice counter, and
+    // a re-send when the browser comes back online.
+    const hookSource = await read("../app/hooks/use-studio-mode.ts");
+    assert.match(hookSource, /stillCurrent:\s*\(\)\s*=>\s*active && choiceRef\.current === choiceAtStart/);
+    assert.match(hookSource, /addEventListener\("online"/);
+    assert.match(hookSource, /pushPendingMode\(/);
+
+    // The sign-out purge forgets the pending mark too.
+    mode.clearModeMirror(ns2);
+    await mode.saveStudioMode({ namespace: ns2, signedIn: true, api: fakeApi({ fail: true }), mode: "simple" });
+    mode.clearModeMirror(ns2);
+    assert.ok(![...storage.map.keys()].some((k) => k.includes("usr_reconnect")));
+  } finally {
+    mode.setModeStorageForTests(null);
+  }
 });
