@@ -241,7 +241,10 @@ const EXPECTED_CALLS: Record<string, { visible: number; sellable: number; states
   'worker/routes/priceReports.ts': { visible: 1, sellable: 1, states: 0 },
   'worker/routes/printerFinder.ts': { visible: 1, sellable: 1, states: 0 },
   // +1 VISIBLE: `/:slug/knowledge` is gated on the product page's own question (the Bambu import spec §G.1).
-  'worker/routes/products.ts': { visible: 8, sellable: 12, states: 0 },
+  // `pagedListing` (2026-10-19): +2 SELLABLE flag — the keys read and the row read carry `sellable_now`, so
+  // the page puts sellable first and prices only what an order needs; +1 VISIBLE — the keys' «يناسب طابعة»
+  // flag asks the chosen printer the SQL narrowing's own question.
+  'worker/routes/products.ts': { visible: 9, sellable: 14, states: 0 },
   // The knowledge answer's relation targets: a link only to a VISIBLE product (§B.6), else the label alone.
   'worker/lib/knowledge/productKnowledge.ts': { visible: 1, sellable: 0, states: 0 },
   'worker/routes/profile.ts': { visible: 2, sellable: 1, states: 0 },
