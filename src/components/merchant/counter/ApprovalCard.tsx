@@ -33,6 +33,8 @@ export default function ApprovalCard({ me, href }: { me: MerchantMe; href: strin
   if (me.approved !== false) return null;
   const app = me.application ?? null;
   const tone = approvalTone(app);
+  const drafts = me.selling.canDraft ?? me.selling.canSell;
+  const pausedByMerchant = me.store?.status === 'paused';
   return (
     <section
       aria-labelledby="cc-approval"
@@ -50,7 +52,12 @@ export default function ApprovalCard({ me, href }: { me: MerchantMe; href: strin
         <p role="status" className="text-[13px] leading-relaxed text-text-primary" data-approval-reason>
           {approvalReason(app, loc)}
         </p>
-        <p className="text-[12.5px] leading-relaxed text-text-muted">{s.approval.stillWorks}</p>
+        {/* «Product drafts» is promised only while drafts ARE open (review finding 7); a merchant
+            pause under review says that re-opening waits for approval (E8). */}
+        <p className="text-[12.5px] leading-relaxed text-text-muted" data-approval-still-works={drafts ? 'drafts' : 'no-drafts'}>
+          {drafts ? s.approval.stillWorks : s.approval.stillWorksNoDrafts}
+          {pausedByMerchant && ` ${s.approval.reopenAfterApproval}`}
+        </p>
       </div>
       <a href={href} className="lv-button lv-button-primary lv-button-sm shrink-0 self-start" data-approval-action={app?.state ?? 'none'}>
         {applicationCta(app, loc)}

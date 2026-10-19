@@ -18,7 +18,7 @@
  *     screen reader — never by colour alone.
  *   - Newest first, grouped by day; older pages by cursor («عرض المزيد»).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCheck, ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
@@ -38,14 +38,38 @@ export interface MerchantNotificationCenterProps {
   /** Told the new unread total after every change, e.g. to update a badge. */
   onUnreadChange?: (unread: number) => void;
   className?: string;
+  /**
+   * Where a stored link points from THIS host (the workspace's `resolveLink`):
+   * a workspace address through the router, a platform page — the merchant
+   * application at `/merchant/start` — out to the main site by a full
+   * navigation from a store's own subdomain (review finding 9). Absent: every
+   * link is a workspace address re-based by `hostPath`, as before.
+   */
+  resolveLink?: (link: string) => { internal: boolean; to: string };
+}
+
+type RowTarget = { internal: boolean; to: string };
+
+/** One row's door: the router for a workspace address, a plain link for another site. */
+function RowLink({ target, children, ...rest }: { target: RowTarget; children: ReactNode; onClick: () => void; className: string; 'data-merchant-notification': string; 'data-read': string }) {
+  return target.internal ? (
+    <Link to={target.to} {...rest}>
+      {children}
+    </Link>
+  ) : (
+    <a href={target.to} {...rest}>
+      {children}
+    </a>
+  );
 }
 
 type Filter = 'all' | 'unread';
 
-export default function MerchantNotificationCenter({ onUnreadChange, className = '' }: MerchantNotificationCenterProps) {
+export default function MerchantNotificationCenter({ onUnreadChange, className = '', resolveLink }: MerchantNotificationCenterProps) {
   const { loc, lang } = useLanguage();
   const { store: hostStore } = useStore();
   const onStoreHost = !!hostStore;
+  const target = (link: string): RowTarget => (resolveLink ? resolveLink(link) : { internal: true, to: hostPath(link, onStoreHost) });
   const toast = useToast();
   const [filter, setFilter] = useState<Filter>('all');
   const [rows, setRows] = useState<MerchantNotification[] | null>(null);
@@ -212,8 +236,8 @@ export default function MerchantNotificationCenter({ onUnreadChange, className =
                   const attention = ATTENTION_KINDS.has(n.kind);
                   return (
                     <li key={n.id}>
-                      <Link
-                        to={hostPath(n.link || '/merchant', onStoreHost)}
+                      <RowLink
+                        target={target(n.link || '/merchant')}
                         onClick={() => open(n)}
                         data-merchant-notification={n.kind}
                         data-read={n.read ? '1' : '0'}
@@ -247,7 +271,7 @@ export default function MerchantNotificationCenter({ onUnreadChange, className =
                           </>
                         )}
                         <ChevronLeft aria-hidden="true" className="mt-2 h-4 w-4 shrink-0 text-text-muted ltr:rotate-180" />
-                      </Link>
+                      </RowLink>
                     </li>
                   );
                 })}

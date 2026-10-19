@@ -24,7 +24,7 @@ import { ROOT } from './fixtures/d1';
 import { APPROVAL_GATE_CODE, APPROVAL_GATE_REASON, APPROVAL_GATE_WORDS, approvalGateText, gateHint, isApprovalGate } from '../src/lib/approvalGate';
 import { REFUSAL_STRINGS, refusalText } from '../src/lib/refusalStrings';
 import { merchantRefusal } from '../src/components/merchant/shell/refusal';
-import { sellingReason } from '../src/components/merchant/shell/strings';
+import { sellingReason, W } from '../src/components/merchant/shell/strings';
 import { storeStatus } from '../src/components/merchant/shell/status';
 import { catalogRefusalText, catalogStrings } from '../src/components/merchant/catalog/strings';
 import { builderRefusal } from '../src/components/merchant/storeDesign/refusal';
@@ -36,7 +36,8 @@ import { LanguageProvider } from '../src/LanguageContext';
 import { WorkspaceContext, type WorkspaceValue } from '../src/components/merchant/shell/context';
 import CommandCenter from '../src/components/merchant/shell/sections/CommandCenter';
 import type { ApplicationSummary, MerchantMe } from '../src/lib/merchant';
-import { approvalRequiredNotice } from '../worker/lib/merchantNotify';
+import { APPROVAL_REQUIRED_LINK, approvalRequiredNotice } from '../worker/lib/merchantNotify';
+import { workspaceLinkTarget } from '../src/components/merchant/shell/routeTable';
 
 type L = 'ar' | 'en' | 'ckb';
 const LANGS: L[] = ['ar', 'en', 'ckb'];
@@ -85,14 +86,46 @@ test('every toast mapper says the same words for a 403 MERCHANT_NOT_APPROVED', (
     assert.equal(builderRefusal(err, loc), want, `the store builder (${l})`);
     assert.equal(sellingReason('not_approved', loc), want, `the status pill and quick create (${l})`);
   }
-  // The pill keeps the store's real state; its reason is the gate.
-  const status = storeStatus({
-    store: { status: 'active', merchant: { status: 'active' } } as never,
-    selling: { canSell: false, reason: 'not_approved' },
-    approved: false,
-    application: null,
-  });
-  assert.equal(status.reason(locOf('ar')), APPROVAL_GATE_WORDS.ar);
+});
+
+/**
+ * REVIEW FINDING 6: the pill reads the store's OWN state — an open store of a
+ * merchant awaiting approval reads «open», never «paused» (a tap on the
+ * switch would then pause it for real, and re-opening is refused until
+ * approval). The KEY and the LABEL are asserted, not only the reason.
+ */
+test('the pill under review: an OPEN store reads open, a merchant pause reads paused and says the gate (re-opening waits for approval), a lapsed plan reads lapsed', () => {
+  const at = (status: string, selling: MerchantMe['selling']) =>
+    storeStatus({ store: { status, merchant: { status: 'active' } } as never, selling, approved: false, application: null });
+  const open = at('active', { canSell: false, reason: 'not_approved', canDraft: true, operational: '' });
+  assert.equal(open.key, 'open');
+  assert.deepEqual(open.label, W.open);
+  assert.equal(open.tone, 'success');
+  assert.equal(open.reason(locOf('ar')), '');
+  assert.ok(open.approval, 'approval is its own notice beside the pill');
+  // An older server without `operational`: the store's own status decides.
+  assert.equal(at('active', { canSell: false, reason: 'not_approved' }).key, 'open');
+
+  const paused = at('paused', { canSell: false, reason: 'not_approved', canDraft: false, operational: 'store_paused' });
+  assert.equal(paused.key, 'paused');
+  assert.deepEqual(paused.label, W.paused);
+  for (const l of LANGS) {
+    const why = paused.reason(locOf(l));
+    assert.notEqual(why, sellingReason('store_paused', locOf(l)), `${l}: never «re-open it from store settings» — that is refused`);
+    assert.equal(why, APPROVAL_GATE_WORDS[l], `${l}: the gate's one sentence`);
+  }
+
+  const lapsed = at('active', { canSell: false, reason: 'not_approved', canDraft: false, operational: 'subscription_inactive' });
+  assert.equal(lapsed.key, 'lapsed', 'a lapsed PLUS still reads lapsed under review');
+  assert.deepEqual(lapsed.label, W.lapsed);
+
+  // An APPROVED merchant's pause still says to re-open from settings.
+  const approvedPause = storeStatus({ store: { status: 'paused', merchant: { status: 'active' } } as never, selling: { canSell: false, reason: 'store_paused' }, approved: true, application: null });
+  assert.equal(approvedPause.reason(locOf('en')), sellingReason('store_paused', locOf('en')));
+
+  // The open/pause switch's word and Today's line are the pill's label.
+  const strip = code('src/components/merchant/counter/StatusStrip.tsx');
+  assert.match(strip, /say\(loc, status\.label\)/);
 });
 
 // ==================================================== every held control
@@ -103,7 +136,8 @@ test('quick create: a product (a DRAFT) stays open under review; coupon and sect
   assert.match(shell, /id: 'new-product'[^\n]*disabled: !canDraft, hint: canDraft \? undefined : sellingReason/);
   assert.match(shell, /id: 'new-coupon'[^\n]*disabled: !canSell, hint: canSell \? undefined : sellingReason/);
   assert.match(shell, /id: 'new-collection'[^\n]*disabled: !canSell, hint: canSell \? undefined : sellingReason/);
-  assert.match(shell, /sellingReason=\{status\.reason\(loc\)\}/, 'the hint is the pill reason — the gate for not_approved');
+  assert.match(shell, /sellingReason=\{heldHint\}/);
+  assert.match(shell, /const heldHint = gateHint\(me\.selling\.reason, loc, status\.reason\(loc\)\) \?\? '';/, 'the hint is the gate while approval holds selling — the pill reason ("" for open) never is');
   // The search palette's «new product» follows the same draft rule; coupons and sections stay with selling.
   assert.match(shell, /canSell=\{canSell\} canDraft=\{canDraft\}/);
   const palette = code('src/components/merchant/shell/WorkspacePalette.tsx');
@@ -123,7 +157,8 @@ test('the catalogue: Publish and every selling item carry the gate; «new produc
   }
   assert.match(cm, /onClick=\{\(\) => setEditing\(\{ id: null \}\)\} disabled=\{!drafts\} data-new-product/);
   assert.match(cm, /if \(drafts\) setEditing\(\{ id: null \}\)/, 'the quick-create door opens the editor under review');
-  assert.match(cm, /gated \? `\$\{held\} — \$\{s\.draftsUnderReview\}` : s\.cannotSell/);
+  // Drafts are offered only while they ARE open (review finding 7).
+  assert.match(cm, /gated \? `\$\{held\} — \$\{drafts \? s\.draftsUnderReview : store\.status === 'paused' \? s\.draftsAfterReopen : s\.cannotSell\}` : s\.cannotSell/);
   assert.match(cm, /\{ id: 'edit', label: s\.edit, [^\n]*onSelect: \(\) => setEditing\(\{ id: p\.id \}\) \}/, 'edit is never held');
   const sections = code('src/components/merchant/shell/sections.tsx');
   assert.match(sections, /canDraft=\{ws\.canDraft\}\s+sellingReason=\{ws\.me\.selling\.reason\}/);
@@ -288,10 +323,79 @@ test('Today\'s approval card: one card per state, the reviewer\'s PUBLIC reason,
   assert.deepEqual(attr(today(me(null, true)), 'data-approval-card'), [], 'an approved merchant has no card');
 });
 
+/**
+ * REVIEW FINDING 7: under review AND paused by the merchant, product drafts
+ * are held too (the pause) and re-opening waits for approval — the card
+ * promises no drafts and says so; while drafts ARE open it promises them.
+ */
+test('Today\'s approval card promises product drafts only while they are open; a merchant pause says re-opening waits for approval', () => {
+  const pausedMe = me({ state: 'in_review', revision: 1, reason_public: '' }, false);
+  pausedMe.selling = { canSell: false, reason: 'not_approved', canDraft: false, operational: 'store_paused' };
+  pausedMe.store = { ...pausedMe.store!, status: 'paused' };
+  const h = today(pausedMe);
+  assert.deepEqual(attr(h, 'data-approval-still-works'), ['no-drafts']);
+  assert.ok(text(h).includes(COUNTER_STRINGS.ar.approval.stillWorksNoDrafts));
+  assert.ok(!text(h).includes(COUNTER_STRINGS.ar.approval.stillWorks), 'never «product drafts» while they are held');
+  assert.ok(text(h).includes(COUNTER_STRINGS.ar.approval.reopenAfterApproval));
+
+  const openMe = today(me({ state: 'in_review', revision: 1, reason_public: '' }, false));
+  assert.deepEqual(attr(openMe, 'data-approval-still-works'), ['drafts']);
+  assert.ok(!text(openMe).includes(COUNTER_STRINGS.ar.approval.reopenAfterApproval));
+
+  const [ar, en, ckb] = LANGS.map((l) => catalogStrings(locOf(l)).draftsAfterReopen);
+  assert.ok(ar && en && ckb && ckb !== ar && !ckb.startsWith('MISSING'));
+  assert.match(ckb, SORANI);
+});
+
 test('the changes-requested action is «عدّل الطلب», in three languages', () => {
   const cta = LANGS.map((l) => applicationCta({ state: 'changes_requested', revision: 2, reason_public: '' }, locOf(l)));
   assert.deepEqual(cta, ['عدّل الطلب', 'Edit your application', 'داواکارییەکە دەستکاری بکە']);
   assert.notEqual(applicationCta({ state: 'draft', revision: 1, reason_public: '' }, locOf('ar')), cta[0], 'a draft is completed, a returned one is edited');
+});
+
+/**
+ * REVIEW FINDING 8: approval has its own code on the board and in the
+ * diagnostics, mapped to the gate's sentence — never «your account is not
+ * active» or «open your store / check your plan».
+ */
+test('the workshop board and the printers diagnostics say the gate for MERCHANT_NOT_APPROVED, with no «open / renew» advice', () => {
+  const board = code('src/components/merchant/workshop/RequestBoard.tsx');
+  assert.match(board, /blocked === 'MERCHANT_NOT_APPROVED'\s+\? approvalGateText\(loc\)/);
+  const desc = /blocked === 'MERCHANT_NOT_APPROVED'\s+\? loc\(\s*'([^']+)',\s*'([^']+)',\s*'([^']+)'\s*\)/.exec(board);
+  assert.ok(desc, 'the description is three-language');
+  assert.match(desc![3], SORANI);
+  assert.notEqual(desc![3], desc![1]);
+  for (const words of desc!.slice(1)) assert.doesNotMatch(words, /افتح|Open your store|plan|اشتراك/i);
+  const printers = code('src/components/merchant/dashboard/PrintersTab.tsx');
+  assert.match(printers, /case 'MERCHANT_NOT_APPROVED':\s+return approvalGateText\(loc\);/);
+  const api = code('src/components/merchant/workshop/api.ts');
+  assert.match(api, /blocked\?: 'CANNOT_TAKE_WORK' \| 'NOT_TAKING_REQUESTS' \| 'MERCHANT_NOT_APPROVED';/);
+});
+
+// ====================================================== the notice's link
+
+/**
+ * REVIEW FINDING 9: the approval-required notice links to the application at
+ * `/merchant/start` — a MAIN-SITE page. The centre re-based every link onto
+ * the store's host, so from a store's own `/admin` it opened Today. Its rows
+ * now resolve through the workspace's own `resolveLink`.
+ */
+test('the approval notice opens the application on the main site from a store\'s own /admin; workspace links stay in the router', () => {
+  const main = (p: string) => `https://levonis-iq.com${p}`;
+  assert.equal(APPROVAL_REQUIRED_LINK, '/merchant/start');
+  assert.deepEqual(workspaceLinkTarget(APPROVAL_REQUIRED_LINK, '/admin', true, main), { internal: false, to: 'https://levonis-iq.com/merchant/start' });
+  assert.deepEqual(workspaceLinkTarget(APPROVAL_REQUIRED_LINK, '/merchant', false, main), { internal: true, to: '/merchant/start' });
+  assert.deepEqual(workspaceLinkTarget('/merchant/orders/ORD-1', '/admin', true, main), { internal: true, to: '/admin/orders/ORD-1' });
+  assert.deepEqual(workspaceLinkTarget('/merchant/orders/ORD-1', '/merchant', false, main), { internal: true, to: '/merchant/orders/ORD-1' });
+
+  const shell = code('src/components/merchant/shell/MerchantShell.tsx');
+  assert.match(shell, /const resolveLink = useCallback\(\(link: string\) => workspaceLinkTarget\(link, base, onStoreHost, mainHref\)/);
+  const section = code('src/components/merchant/shell/sections/NotificationsSection.tsx');
+  assert.match(section, /<MerchantNotificationCenter\s+resolveLink=\{ws\.resolveLink\}/);
+  const centre = code('src/components/merchant/notifications/MerchantNotificationCenter.tsx');
+  assert.match(centre, /<RowLink\s+target=\{target\(n\.link \|\| '\/merchant'\)\}/);
+  assert.match(centre, /target\.internal \? \(\s*<Link to=\{target\.to\}[\s\S]{0,120}\) : \(\s*<a href=\{target\.to\}/, 'another site is a plain link — a full navigation');
+  assert.doesNotMatch(centre, /to=\{hostPath\(n\.link/, 'no row re-bases a platform page onto the store host');
 });
 
 // ============================================================== strings

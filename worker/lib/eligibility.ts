@@ -79,7 +79,7 @@ export type Dimension = (typeof DIMENSIONS)[number];
  * equal). Grouped by dimension; within a group, the most fundamental first.
  */
 export const REASONS = {
-  trade: ['REQUEST_CLOSED', 'OWN_REQUEST', 'MERCHANT_INACTIVE', 'STORE_UNAVAILABLE', 'PLAN_LAPSED', 'NOT_TAKING_REQUESTS'],
+  trade: ['REQUEST_CLOSED', 'OWN_REQUEST', 'MERCHANT_INACTIVE', 'MERCHANT_NOT_APPROVED', 'STORE_UNAVAILABLE', 'PLAN_LAPSED', 'NOT_TAKING_REQUESTS'],
   capability: ['NO_PRINTER', 'PROCESS', 'BUILD_VOLUME', 'MATERIAL', 'ENCLOSURE', 'HARDENED_NOZZLE', 'QUALITY', 'NOZZLE', 'MULTICOLOR'],
   stock: ['STOCK_MATERIAL', 'STOCK_COLOR', 'STOCK_GRAMS'],
   reach: ['REACH_DELIVERY', 'REACH_PICKUP'],
@@ -435,7 +435,10 @@ export function evaluateEligibility(
   const trade: ReasonCode[] = [];
   if (!req.on_board) trade.push('REQUEST_CLOSED');
   if (req.customer_id && req.customer_id === m.user_id) trade.push('OWN_REQUEST');
-  if (m.merchant_status !== 'active' || m.approved !== true) trade.push('MERCHANT_INACTIVE');
+  // Approval has its OWN code (review finding 8): the workshop is told the gate's
+  // sentence, never «your account is not active» or «open your store / renew».
+  if (m.merchant_status !== 'active') trade.push('MERCHANT_INACTIVE');
+  else if (m.approved !== true) trade.push('MERCHANT_NOT_APPROVED');
   // An allow-list, as everywhere since review S2: a missing store is not an active one.
   if (m.store_status !== 'active') trade.push('STORE_UNAVAILABLE');
   if (!m.plan_ok) trade.push('PLAN_LAPSED');

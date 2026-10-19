@@ -9,9 +9,10 @@
  * only (DECISIONS row 11); `loc` shows the Arabic to Sorani readers.
  */
 import type { Loc } from '../dashboard/ui';
+import { approvalGateText } from '../../../lib/approvalGate';
 
 export const REASON_CODES = [
-  'REQUEST_CLOSED', 'OWN_REQUEST', 'MERCHANT_INACTIVE', 'STORE_UNAVAILABLE', 'PLAN_LAPSED', 'NOT_TAKING_REQUESTS',
+  'REQUEST_CLOSED', 'OWN_REQUEST', 'MERCHANT_INACTIVE', 'MERCHANT_NOT_APPROVED', 'STORE_UNAVAILABLE', 'PLAN_LAPSED', 'NOT_TAKING_REQUESTS',
   'NO_PRINTER', 'PROCESS', 'BUILD_VOLUME', 'MATERIAL', 'ENCLOSURE', 'HARDENED_NOZZLE', 'QUALITY', 'NOZZLE', 'MULTICOLOR',
   'STOCK_MATERIAL', 'STOCK_COLOR', 'STOCK_GRAMS',
   'REACH_DELIVERY', 'REACH_PICKUP',
@@ -29,7 +30,7 @@ export function reasonDimension(code: string): ReasonDimension {
   if (code.startsWith('PREF_')) return 'preference';
   if (code.startsWith('STOCK_')) return 'stock';
   if (code.startsWith('REACH_')) return 'reach';
-  if (['REQUEST_CLOSED', 'OWN_REQUEST', 'MERCHANT_INACTIVE', 'STORE_UNAVAILABLE', 'PLAN_LAPSED', 'NOT_TAKING_REQUESTS'].includes(code)) return 'trade';
+  if (['REQUEST_CLOSED', 'OWN_REQUEST', 'MERCHANT_INACTIVE', 'MERCHANT_NOT_APPROVED', 'STORE_UNAVAILABLE', 'PLAN_LAPSED', 'NOT_TAKING_REQUESTS'].includes(code)) return 'trade';
   return 'capability';
 }
 
@@ -53,6 +54,9 @@ export function reasonText(code: string, loc: Loc): string {
       return loc('هذا طلبك أنت.', 'This is your own request.');
     case 'MERCHANT_INACTIVE':
       return loc('حساب التاجر ليس مفعّلًا الآن.', 'Your merchant account is not active right now.');
+    case 'MERCHANT_NOT_APPROVED':
+      // The approval gate's ONE sentence (src/lib/approvalGate.ts) — never «open your store / renew».
+      return approvalGateText(loc);
     case 'STORE_UNAVAILABLE':
       return loc('متجرك متوقف — افتحه من «إعدادات المتجر».', 'Your store is paused — reopen it in Store settings.');
     case 'PLAN_LAPSED':

@@ -27,6 +27,7 @@ import { formatFigure } from '../../../lib/localeNumber';
 import { offersLabel } from '../../community/hub/copy';
 import { iqdUnit } from '../../../lib/money';
 import { workshopApi, type BoardFilters, type BoardRequest } from './api';
+import { approvalGateText } from '../../../lib/approvalGate';
 import VariantImg from '../../ui/VariantImg';
 
 export interface BoardMaterial {
@@ -182,7 +183,9 @@ export default function RequestBoard({
         <EmptyState
           icon={<PackageSearch aria-hidden="true" className="h-6 w-6" />}
           title={
-            blocked === 'NOT_TAKING_REQUESTS'
+            blocked === 'MERCHANT_NOT_APPROVED'
+              ? approvalGateText(loc)
+              : blocked === 'NOT_TAKING_REQUESTS'
               ? loc('متجرك لا يستقبل الطلبات المخصصة', 'Your store is not taking custom requests')
               : blocked
                 ? loc('ورشتك لا تستقبل عملًا جديدًا الآن', 'Your workshop is not taking new work right now')
@@ -191,7 +194,14 @@ export default function RequestBoard({
                   : loc('لا طلبات تناسب ورشتك الآن', 'No requests fit your workshop right now')
           }
           description={
-            blocked
+            // Approval (review finding 8): what the board will show — never «open your store / renew».
+            blocked === 'MERCHANT_NOT_APPROVED'
+              ? loc(
+                  'تظهر هنا طلبات الزبائن التي تناسب ورشتك بعد اعتماد متجرك.',
+                  'Customer requests that fit your workshop appear here once your store is approved.',
+                  'دوای پەسەندکردنی فرۆشگاکەت، داواکارییەکانی کڕیاران کە لەگەڵ کارگەکەت دەگونجێن لێرە دەردەکەون.'
+                )
+              : blocked
               ? loc('افتح المتجر وفعّل الطلبات المخصصة من إعدادات المتجر، وتأكد أن اشتراكك ساري.', 'Open your store, turn on custom requests in store settings, and check your plan is active.')
               : loc('تظهر هنا الطلبات التي تستطيع طابعاتك ومخزونك وتوصيلك تنفيذها — أضف طابعة أو خامة لتتسع.', 'Requests your printers, stock and delivery can serve appear here — add a printer or a material to see more.')
           }

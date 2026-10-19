@@ -311,8 +311,11 @@ export interface MerchantMe {
   /**
    * `canDraft` (Community V3 push 1.3): product drafts may be written — selling,
    * or approval its only lack. Absent from an older server: read it as `canSell`.
+   * `operational`: the store's own reason with approval set aside ('' = open) —
+   * what the pill and the open/pause switch say while `reason` is `not_approved`.
+   * Absent from an older server: the pill then reads the store's own status.
    */
-  selling: { canSell: boolean; reason: string; canDraft?: boolean };
+  selling: { canSell: boolean; reason: string; canDraft?: boolean; operational?: string };
   suggested_slug: string | null;
   /** The domain store addresses live under, from the server's configuration;
    *  null when none is configured (audit 01 B19). */
@@ -509,6 +512,12 @@ export interface SavedProduct {
    */
   source: 'store' | 'catalog';
   product_id: string;
+  /**
+   * A saved store product whose store the public may not see right now
+   * (push 1.4, owner decision C9): a neutral row — no name, picture, price or
+   * store — kept only so the customer can remove it. Absent on every other row.
+   */
+  unavailable?: boolean;
   slug: string;
   name: string;
   name_ar: string | null;

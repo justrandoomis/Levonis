@@ -485,3 +485,71 @@ test('a request viewer token is untouched by the second table: an unknown token 
   assert.equal((await json(dead)).code, 'VIEWER_TOKEN_INVALID');
   assert.equal((await get(as(raw, bucket, null), `/api/marketplace/print/viewer/${'x'.repeat(43)}/mesh`, UA)).status, 404);
 });
+
+/**
+ * REVIEW FINDINGS 1 AND 5 (Community V3 push 1.4, owner decisions C1/C2 and
+ * «orders already placed — nothing is frozen»): at deploy every existing
+ * merchant is unapproved, and the product-file doors asked the PUBLIC rule
+ * before the owner and grant checks — so every paid download and every
+ * buyer's 3D viewer went dark. The public still hears the one generic
+ * STORE_UNAVAILABLE (C9); the owner and a buyer with a live grant keep what
+ * they already have; a SANCTION still closes the doors to everyone.
+ */
+test('C1/C2: on a store whose merchant is not approved, a buyer\'s paid download and full viewer still work, the owner keeps their files, and everyone else hears STORE_UNAVAILABLE', async () => {
+  const { raw, bucket } = seed();
+  const { pid, ids } = await furnished(raw, bucket);
+  const download = (fid: string) => `/api/product-files/ali3d/${pid}/${fid}/download`;
+  const listPath = `/api/product-files/ali3d/${pid}`;
+  const mintPath = `/api/product-files/ali3d/${pid}/${ids.preview}/viewer-token`;
+  await buy(raw, bucket, pid, 'buy-gate-0123456789abcd');
+  const before = await json(await post(as(raw, bucket, BUYER), mintPath, {}, UA));
+  assert.equal(before.grant, 'full');
+  const strangerToken = (await json(await post(as(raw, bucket, NOOR), mintPath, {}, UA))).token as string;
+
+  // The deploy: no reviewer has approved this merchant (0205 approves nobody).
+  assert.ok(hasColumn(raw, 'community_merchants', 'approved_at'));
+  raw.prepare("UPDATE community_merchants SET approved_at = NULL WHERE id = 'm_ali'").run();
+
+  // The buyer: the paid files, the list that says so, the old viewer link and a new one.
+  const ok = await get(as(raw, bucket, BUYER), download(ids.download_after_purchase));
+  assert.equal(ok.status, 200, await ok.clone().text());
+  assert.equal(new Uint8Array(await ok.arrayBuffer()).byteLength, 134);
+  assert.equal((await get(as(raw, bucket, BUYER), download(ids.instruction))).status, 200);
+  const mine = await get(as(raw, bucket, BUYER), listPath);
+  assert.equal(mine.status, 200, await mine.clone().text());
+  assert.deepEqual((await json(mine)).files.map((f: { downloadable: boolean }) => f.downloadable), [false, true, true]);
+  assert.equal((await get(as(raw, bucket, BUYER), `/api/marketplace/print/viewer/${before.token}`, UA)).status, 200, 'a link minted before the deploy');
+  const after = await post(as(raw, bucket, BUYER), mintPath, {}, UA);
+  assert.equal(after.status, 200, await after.clone().text());
+  const fresh = await json(after);
+  assert.equal(fresh.grant, 'full');
+  assert.equal((await get(as(raw, bucket, BUYER), `/api/marketplace/print/viewer/${fresh.token}`, UA)).status, 200);
+
+  // The owner keeps their own files.
+  assert.equal((await get(as(raw, bucket, ALI), download(ids.download_after_purchase))).status, 200);
+  assert.equal((await get(as(raw, bucket, ALI), listPath)).status, 200);
+
+  // Everyone else: the one generic answer (C9), on every door — and a guest's or stranger's old link is dead.
+  for (const [who, user] of [['guest', null], ['stranger', NOOR]] as const) {
+    const list = await get(as(raw, bucket, user), listPath);
+    assert.equal(list.status, 404, who);
+    assert.equal((await json(list)).code, 'STORE_UNAVAILABLE', `${who}: the list`);
+    const mint = await post(as(raw, bucket, user), mintPath, {}, UA);
+    assert.equal((await json(mint)).code, 'STORE_UNAVAILABLE', `${who}: the viewer token`);
+  }
+  const strangerDownload = await get(as(raw, bucket, NOOR), download(ids.download_after_purchase));
+  assert.equal(strangerDownload.status, 404);
+  assert.equal((await json(strangerDownload)).code, 'STORE_UNAVAILABLE', 'no PRODUCT_FILE_NOT_GRANTED oracle on a hidden store');
+  assert.equal((await get(as(raw, bucket, NOOR), `/api/marketplace/print/viewer/${strangerToken}`, UA)).status, 404);
+  // A product id on a hidden store is nobody's to probe: an unknown id answers the same.
+  assert.equal((await json(await get(as(raw, bucket, NOOR), '/api/product-files/ali3d/no-such-product'))).code, 'STORE_UNAVAILABLE');
+
+  // A SANCTION closes the doors to everyone, the buyer and the owner too — as before push 1.4.
+  raw.prepare("UPDATE merchant_stores SET status = 'suspended' WHERE id = (SELECT id FROM merchant_stores WHERE slug = 'ali3d')").run();
+  for (const user of [BUYER, ALI]) {
+    const res = await get(as(raw, bucket, user), download(ids.download_after_purchase));
+    assert.equal(res.status, 404, user.id);
+    assert.equal((await json(res)).code, 'STORE_UNAVAILABLE', user.id);
+  }
+  assert.equal((await get(as(raw, bucket, BUYER), `/api/marketplace/print/viewer/${fresh.token}`, UA)).status, 404, 'a suspended store\'s viewer link stops');
+});

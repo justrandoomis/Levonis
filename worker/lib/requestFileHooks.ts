@@ -38,6 +38,7 @@ import { composeSnapshot, recordRevisionStatement, reviseIfOfferedStatement, sup
 import { notifyGrouped, peopleAr, stampGroupedCkb } from './notifications';
 import { enqueuePublishedRequestStatement, rematchNow } from './printMatchingStore';
 import { merchantHref } from '@levonis/contracts/merchantRoutes';
+import { merchantPublicSql, withApprovalSchema } from './merchantApproval';
 import { writeRequestSystemUpdate } from '../routes/requestDiscussion';
 
 const MiB = 1024 * 1024;
@@ -125,16 +126,24 @@ export async function notifyRequestFiles(
 ): Promise<void> {
   try {
     const req = await db.prepare('SELECT title FROM community_requests WHERE id = ?').bind(requestId).first<{ title: string }>();
-    const { results } = await db
-      .prepare(
-        `SELECT DISTINCT m.user_id FROM community_merchants m
-          WHERE m.user_id <> ?1 AND (
-            m.id IN (SELECT rm.merchant_id FROM community_request_matches rm WHERE rm.request_id = ?2 AND rm.eligible = 1)
-            OR m.id IN (SELECT o.merchant_id FROM community_offers o WHERE o.request_id = ?2 AND o.state IN ('pending','superseded','accepted'))
-          )`
-      )
-      .bind(actor.id, requestId)
-      .all<{ user_id: string }>();
+    // E7 (push 1.4): a MATCH alone tells only a workshop the public may see and
+    // that is active — a verdict row from before the gate still reads eligible
+    // for a merchant no reviewer approved, and the re-match leaves it alone. An
+    // OFFER is existing work: its merchant is told whatever their approval.
+    // On a database without 0204 the match branch is closed (C11).
+    const { results } = await withApprovalSchema((schema) =>
+      db
+        .prepare(
+          `SELECT DISTINCT m.user_id FROM community_merchants m
+            WHERE m.user_id <> ?1 AND (
+              (m.status = 'active' AND ${merchantPublicSql('m', schema)}
+                AND m.id IN (SELECT rm.merchant_id FROM community_request_matches rm WHERE rm.request_id = ?2 AND rm.eligible = 1))
+              OR m.id IN (SELECT o.merchant_id FROM community_offers o WHERE o.request_id = ?2 AND o.state IN ('pending','superseded','accepted'))
+            )`
+        )
+        .bind(actor.id, requestId)
+        .all<{ user_id: string }>()
+    );
     const title = String(req?.title ?? '').trim();
     const name = actor.name || actor.username || '';
     const aboutAr = title ? ` «${title}»` : '';

@@ -29,7 +29,8 @@ import {
 import { DEFAULT_DELIVERY_PROFILE } from '@levonis/shipping/merchantDelivery';
 import { DEFAULT_MATERIALS } from '../worker/lib/printPricing';
 import { resolvePrinter } from '../worker/lib/printMatchingStore';
-import { REASON_CODES as UI_REASON_CODES } from '../src/components/merchant/workshop/reasons';
+import { REASON_CODES as UI_REASON_CODES, reasonFix, reasonText } from '../src/components/merchant/workshop/reasons';
+import { APPROVAL_GATE_WORDS } from '../src/lib/approvalGate';
 
 const NOW = Date.parse('2026-09-25T12:00:00Z');
 const CAT = new Map<string, CatalogueMaterial>(DEFAULT_MATERIALS.map((m) => [m.id, m]));
@@ -68,7 +69,10 @@ const TABLE: Array<[string, EligibilityCandidate, EligibilityRequest, string]> =
   ['own request', shop({ user_id: 'c1' }), job(), 'OWN_REQUEST'],
   ['merchant restricted', shop({ merchant_status: 'restricted' }), job(), 'MERCHANT_INACTIVE'],
   // Community V3 push 1.4 (E7): a workshop no reviewer approved takes no new work, so it is never eligible.
-  ['merchant not approved', shop({ approved: false }), job(), 'MERCHANT_INACTIVE'],
+  // Its OWN code (review finding 8): the workshop hears the gate's sentence, never «not active» or «open / renew».
+  ['merchant not approved', shop({ approved: false }), job(), 'MERCHANT_NOT_APPROVED'],
+  // A sanction or a restriction still answers as itself first.
+  ['merchant restricted and not approved', shop({ merchant_status: 'restricted', approved: false }), job(), 'MERCHANT_INACTIVE'],
   ['store paused', shop({ store_status: 'paused' }), job(), 'STORE_UNAVAILABLE'],
   ['no store row at all', shop({ store_status: '' }), job(), 'STORE_UNAVAILABLE'],
   ['plan lapsed', shop({ plan_ok: false }), job(), 'PLAN_LAPSED'],
@@ -237,6 +241,15 @@ test('CANONICAL PHYSICS WIN: a printer tied to a model takes the model\'s bed, e
   assert.deepEqual([own.build_x_mm, own.canonical], [900, false]);
   // A resin printer has no nozzle, whatever the row says.
   assert.equal(resolvePrinter({ ...typedHuge, technology: 'resin', m_id: null }).nozzle_mm, 0);
+});
+
+test('MERCHANT_NOT_APPROVED says the approval gate\'s one sentence in three languages, with no «open / renew» fix', () => {
+  for (const l of ['ar', 'en', 'ckb'] as const) {
+    const loc = (ar: string, en: string, ckb?: string) => (l === 'en' ? en : l === 'ckb' ? ckb ?? 'MISSING' : ar);
+    assert.equal(reasonText('MERCHANT_NOT_APPROVED', loc), APPROVAL_GATE_WORDS[l], l);
+  }
+  assert.equal(reasonFix('MERCHANT_NOT_APPROVED'), null, 'no store, plan or printer screen changes it');
+  assert.notEqual(reasonText('MERCHANT_NOT_APPROVED', (ar) => ar), reasonText('MERCHANT_INACTIVE', (ar) => ar));
 });
 
 test('every reason code has words in the client, and nothing else does', () => {

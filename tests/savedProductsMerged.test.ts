@@ -26,6 +26,9 @@ import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { approveMerchants, asD1, freshDb, stubApp, get, json, type StubUser } from './fixtures/app';
 import { communityFavoriteRoutes } from '../worker/routes/communityFavorites';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { ROOT } from './fixtures/d1';
 
 const buyer: StubUser = { id: 'u1', role: 'customer', email: 'b@x.co' };
 const app = (db: unknown) => stubApp(db, buyer, (a) => a.route('/api/community-favorites', communityFavoriteRoutes));
@@ -173,4 +176,17 @@ test('the two saves are distinguishable even when the ids collide', async () => 
   const items = await list(raw);
   assert.equal(items.length, 2, 'both survive — neither overwrites the other');
   assert.deepEqual([...items.map((i) => i.source)].sort(), ['catalog', 'store']);
+});
+
+test('a saved product on a store the public may not see is a neutral row the page renders without the merchant\'s words, and cannot open (C9)', async () => {
+  const raw = freshDb();
+  seed(raw);
+  raw.exec("UPDATE community_merchants SET approved_at = NULL WHERE id = 'cm1'");
+  const store = (await list(raw)).find((i) => i.product_id === 'cp1') as unknown as Record<string, unknown>;
+  assert.equal(store.unavailable, true);
+  assert.deepEqual([store.name, store.store_name, store.store_url, store.image, store.price_iqd], ['', null, null, null, null]);
+  const page = readFileSync(join(ROOT, 'src/pages/SavedProducts.tsx'), 'utf8');
+  assert.match(page, /if \(p\.unavailable\) return;/, 'nothing to open, only to remove');
+  assert.match(page, /p\.unavailable \? \(\s*\/\/[^\n]*\n\s*<div className="flex-1 min-w-0" data-saved-unavailable>/);
+  assert.match(page, /loc\('هذا المنتج غير متاح حاليًا', 'This product is not available right now', 'ئەم بەرهەمە ئێستا بەردەست نییە'\)/);
 });
