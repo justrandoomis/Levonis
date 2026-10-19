@@ -51,11 +51,16 @@ export const cursorOf = (s: ListingSnapshot): number => (typeof s.nextOffset ===
 /**
  * Page 1's answer → the snapshot, keeping the pages «عرض المزيد» had loaded
  * (so the list keeps its length) and their cursor.
+ *
+ * EVERY KEPT CARD THE FRESH PAGE DOES NOT CARRY STAYS, not only the kept pages
+ * past page 1: a product that entered the order ahead pushed the old page's
+ * last card to the next server position — before the kept cursor, so no later
+ * page would bring it back. It stays where it was, after the fresh page.
  */
 export function firstPageSnapshot(res: ProductsListResponse, kept: ListingSnapshot | null): ListingSnapshot {
   const fresh = res.products ?? [];
   const seen = new Set(fresh.map((p) => p.id));
-  const extra = kept && kept.products.length > fresh.length ? kept.products.slice(fresh.length).filter((p) => !seen.has(p.id)) : [];
+  const extra = kept && kept.products.length > fresh.length ? kept.products.filter((p) => !seen.has(p.id)) : [];
   return {
     products: [...fresh, ...extra],
     total: typeof res.total === 'number' ? res.total : fresh.length,

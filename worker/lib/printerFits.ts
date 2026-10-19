@@ -230,25 +230,38 @@ export async function planPrinterFits(
 }
 
 /**
+ * The statement behind `activeFitsFor`. THE JOIN STARTS FROM THE ID LIST and
+ * the order is forced (`CROSS JOIN`): the listing asks it for every candidate
+ * (up to `LISTING_KEYS_CAP`), and with no `sqlite_stat1` (nothing here runs
+ * ANALYZE) SQLite otherwise walks every visible product as the outer loop and
+ * probes the whole list for each — a cost that grows with the square of the
+ * catalogue (≈ 3.7 s at 5,000 products, 16 s at 10,000; one id-list walk with
+ * two primary-key probes per id instead). Its plan is guarded in
+ * tests/listingPaging.test.ts.
+ */
+function activeFitsSql(visiblePr: string): string {
+  return `SELECT f.product_id AS part_id, pr.id, pr.slug, pr.name, pr.name_ar, pr.name_ku, pr.status,
+                pr.category_id, pr.sub_category_id
+           FROM json_each(?) j
+           CROSS JOIN product_printer_fits f ON f.product_id = j.value
+           CROSS JOIN products pr ON pr.id = f.printer_id AND ${visiblePr}
+          ORDER BY f.product_id, f.position, f.printer_id`;
+}
+
+/**
  * The ACTIVE printers each of these products fits, in the admin's order — the
  * product page's «يناسب» chips and the listing's printer filter. Products with
  * no link are absent from the map.
  */
 export async function activeFitsFor(db: D1Database, productIds: readonly string[]): Promise<Map<string, FitPrinter[]>> {
   const out = new Map<string, FitPrinter[]>();
+  // De-duplicated: the id list is the join's outer loop, so an id twice would list its printers twice.
   const wanted = [...new Set(productIds.filter(Boolean))];
   if (!wanted.length) return out;
   const L = await listing(db);
   const rows = await orNone(async () => {
     const { results } = await db
-      .prepare(
-        `SELECT f.product_id AS part_id, pr.id, pr.slug, pr.name, pr.name_ar, pr.name_ku, pr.status,
-                pr.category_id, pr.sub_category_id
-           FROM product_printer_fits f
-           JOIN products pr ON pr.id = f.printer_id AND ${L.visible('pr')}
-          WHERE f.product_id IN (SELECT value FROM json_each(?))
-          ORDER BY f.product_id, f.position, f.printer_id`
-      )
+      .prepare(activeFitsSql(L.visible('pr')))
       .bind(JSON.stringify(wanted))
       .all<PrinterRow & { part_id: string }>();
     return results ?? [];

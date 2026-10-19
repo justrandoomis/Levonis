@@ -36,6 +36,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { asD1, freshDb, get, json, stubApp, type Mount } from './fixtures/app';
 import { publishV2 } from './fixtures/v2Publish';
 import { wavesD1 } from './fixtures/wavesD1';
+import { activeFitsFor } from '../worker/lib/printerFits';
 import {
   LISTING_CACHE_PARAMS,
   keyedListingItem,
@@ -664,4 +665,141 @@ test('the name order compares with ONE collator and sorts the candidates once: n
     delete (NAME_COLLATOR as unknown as { compare?: unknown }).compare;
   }
   assert.equal(NAME_COLLATOR.compare('a', 'B'), -1, 'the collator is itself again');
+});
+
+/**
+ * THE PRINTERS OF EVERY CANDIDATE ARE READ FROM THE ID LIST. With the counts
+ * the listing asks `activeFitsFor` for every candidate (up to the keys cap).
+ * With no `sqlite_stat1` (nothing runs ANALYZE) SQLite chose the visible
+ * products as the outer loop and probed the whole id list for each one —
+ * ≈ 3.7 s at 5,000 products, 16 s at 10,000, the live database held for all
+ * of it. The plan must start from the list and probe by primary key.
+ */
+test('the printers of every candidate are read from the id list, not by walking the catalogue once per id (5,000 products)', async () => {
+  const raw = freshDb();
+  const at = '2026-01-01T00:00:00.000Z';
+  const ins = raw.prepare(
+    `INSERT INTO products (id, slug, name, name_ar, name_ku, description, status, price_iqd, stock, selling_type, sale_types,
+                           spec_fields, display_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, '', ?, 0, 0, 'direct_sale', '["direct_sale"]', '{}', 0, ?, ?)`
+  );
+  const fit = raw.prepare('INSERT INTO product_printer_fits (product_id, printer_id, position) VALUES (?, ?, ?)');
+  const printers = Array.from({ length: 20 }, (_, i) => `pp_${String(i).padStart(2, '0')}`);
+  const parts = Array.from({ length: 5000 }, (_, i) => `pq_${String(i).padStart(4, '0')}`);
+  const expected = new Map<string, string[]>();
+  raw.exec('BEGIN');
+  // Printer 19 is hidden: a part that fits it is never told so.
+  printers.forEach((id, i) => ins.run(id, id.replace('_', '-'), `Printer ${i}`, `طابعة ${i}`, `چاپکەری ${i}`, i === 19 ? 'hidden' : 'active', at, at));
+  parts.forEach((id, i) => {
+    ins.run(id, id.replace('_', '-'), `Part ${i}`, `قطعة ${i}`, `پارچە ${i}`, 'active', at, at);
+    if (i % 4 !== 0) return;
+    const fits = [printers[i % 20], printers[(i + 7) % 20]];
+    fits.forEach((p, position) => fit.run(id, p, position));
+    const shown = fits.filter((p) => p !== 'pp_19');
+    if (shown.length) expected.set(id, shown);
+  });
+  raw.exec('COMMIT');
+
+  const statements: Array<{ sql: string; params: unknown[] }> = [];
+  const base = asD1(raw);
+  const db = new Proxy(base, {
+    get(target, prop, recv) {
+      if (prop === 'prepare') {
+        return (sql: string) => {
+          const st = target.prepare(sql);
+          return new Proxy(st, {
+            get(t, p, r) {
+              if (p === 'bind') return (...params: unknown[]) => (statements.push({ sql, params }), t.bind(...params));
+              const v = Reflect.get(t, p, r);
+              return typeof v === 'function' ? v.bind(t) : v;
+            },
+          });
+        };
+      }
+      const v = Reflect.get(target, prop, recv);
+      return typeof v === 'function' ? v.bind(target) : v;
+    },
+  }) as D1Database;
+
+  const started = performance.now();
+  const got = await activeFitsFor(db, [...parts, ...printers, parts[0]]);
+  const ms = performance.now() - started;
+  assert.deepEqual(
+    [...got].map(([id, list]) => [id, list.map((p) => p.id)]).sort(),
+    [...expected].sort(),
+    'every part with the visible printers it fits, in the admin\'s order'
+  );
+
+  const fitsRead = statements.filter((s) => s.sql.includes('product_printer_fits'));
+  assert.equal(fitsRead.length, 1, 'one statement for every id');
+  const plan = (raw.prepare(`EXPLAIN QUERY PLAN ${fitsRead[0].sql}`).all(...(fitsRead[0].params as never[])) as Array<{ parent: number; detail: string }>)
+    .filter((r) => r.parent === 0 && /^(SCAN|SEARCH) /.test(r.detail))
+    .map((r) => r.detail);
+  assert.match(plan[0] ?? '', /^SCAN j\b/, `the id list is the outer loop: ${plan.join(' | ')}`);
+  assert.match(plan[1] ?? '', /^SEARCH f USING (INDEX sqlite_autoindex_product_printer_fits_1|PRIMARY KEY) \(product_id=\?\)/, `each id probes its own fits: ${plan.join(' | ')}`);
+  assert.match(plan[2] ?? '', /^SEARCH pr USING (INDEX sqlite_autoindex_products_1|INTEGER PRIMARY KEY|PRIMARY KEY) \(id=\?\)/, `each fit probes its printer: ${plan.join(' | ')}`);
+  assert.equal(plan.length, 3, plan.join(' | '));
+  // The quadratic plan took seconds here; the list-first one takes milliseconds. A loose ceiling for a busy runner.
+  assert.ok(ms < 1500, `${Math.round(ms)} ms for 5,000 ids`);
+});
+
+test('a row hidden between the keys read and the row read is not listed — not even as an unpriced card', async () => {
+  const raw = freshDb();
+  const products = catalogue(60);
+  await seed(raw, products);
+  const base = asD1(raw);
+  const plain = await listCatalogProducts(base, { sort: 'newest', limit: '24' }, pricingCtxForUser(base, null), {});
+  const pageIds = (plain.body.products as Card[]).map(idOf);
+  // A sellable product on the page, and a catalog-only one: an admin hides both in the gap.
+  const priced = new Set(products.filter((p) => p.priced).map((p) => p.id));
+  const hidden = [pageIds.find((id) => priced.has(id))!, pageIds.find((id) => !priced.has(id))!];
+  assert.ok(hidden.every(Boolean));
+  let hid = false;
+  const db = new Proxy(base, {
+    get(target, prop, recv) {
+      if (prop === 'prepare') {
+        return (sql: string) => {
+          if (!hid && sql.includes('WHERE products.id IN (SELECT value FROM json_each(?))')) {
+            hid = true;
+            for (const id of hidden) raw.prepare(`UPDATE products SET status = 'draft' WHERE id = ?`).run(id);
+          }
+          return target.prepare(sql);
+        };
+      }
+      const v = Reflect.get(target, prop, recv);
+      return typeof v === 'function' ? v.bind(target) : v;
+    },
+  }) as D1Database;
+  for (const facets of ['', '1']) {
+    for (const id of hidden) raw.prepare(`UPDATE products SET status = 'active' WHERE id = ?`).run(id);
+    hid = false;
+    const q: Record<string, string> = { sort: 'newest', limit: '24', ...(facets ? { facets } : {}) };
+    const out = await listCatalogProducts(db, q, pricingCtxForUser(db, null), {});
+    assert.ok(hid, 'the row read ran after the keys read');
+    const ids = (out.body.products as Card[]).map(idOf);
+    assert.deepEqual(ids, pageIds.filter((id) => !hidden.includes(id)), `facets=${facets || 0}: the page without the hidden rows`);
+  }
+});
+
+test('coming back to a list keeps the card a newcomer pushed off page 1: «عرض المزيد» then reaches every product', async () => {
+  const raw = freshDb();
+  const products = catalogue(100);
+  await seed(raw, products);
+  const app = stubApp(asD1(raw), null, mount, { publishV2: false });
+  const page = async (offset: number, facets = false) =>
+    (await json(await get(app, `/api/products?sort=newest&limit=24${facets ? '&facets=1' : ''}${offset ? `&offset=${offset}` : ''}`))) as ProductsListResponse;
+  const press = async (s: ListingSnapshot) => (await fetchNextPages(s, (offset) => page(offset))).reduce((acc, p) => withNextPage(acc, p.res, p.offset), s);
+  let snap: ListingSnapshot = await press(firstPageSnapshot(await page(0, true), null));
+  assert.equal(snap.products.length, 48);
+  const pushed = String(snap.products[23].id);
+
+  importAhead(raw, 1);
+  // The shopper comes back: page 1 again, over the kept pages.
+  snap = firstPageSnapshot(await page(0, true), snap);
+  assert.ok(snap.products.some((p) => String(p.id) === pushed), 'the card pushed to position 25 is still held');
+  let presses = 0;
+  while (remainingOf(snap) > 0 && presses++ < 20) snap = await press(snap);
+  const ids = snap.products.map((p) => String(p.id));
+  assert.equal(new Set(ids).size, ids.length, 'no card twice');
+  assert.deepEqual([...ids].sort(), [...products.map((p) => p.id), 'li_0000'].sort(), 'all 101 products held');
 });

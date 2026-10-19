@@ -3929,13 +3929,20 @@ function learnProductColumns(db: D1Database, row: Record<string, unknown> | unde
  * see every sellable price; `cut_off`: more candidates than the keys read, the
  * rest not listed). Paging stays exact: the order of a request never depends
  * on `facets`, `limit` or `offset`, so consecutive pages neither repeat nor
- * skip a product.
+ * skip a product — BELOW `LISTING_KEYS_CAP`. Past it (`cut_off: true`) a
+ * brand or printer chip with the counts keeps the first keys of the WHOLE
+ * scope and filters them in memory, while «عرض المزيد» (no counts) narrows in
+ * SQL and keeps the first keys of the chosen brand: two different subsets, so
+ * page 2 on can repeat or skip a product of page 1. The live catalogue is far
+ * below the cap; reaching it means a narrowed second keys read for the order.
  *
  * READ 2 — the resolve: the chosen rows (without the long text no card
  * carries, `LISTING_UNREAD_COLUMNS`), their relations, offers and pools, and
- * (with facets) the printers each candidate fits, in ONE wave. A third wave
- * happens only when a card on the page was not foreseen (a row that changed
- * between the reads).
+ * (with facets) the printers each candidate fits, in ONE wave. The row read
+ * asks the scope's own predicate again (`listedScope`), and the printers are
+ * read starting from the id list (`activeFitsSql`: every candidate's id, so it
+ * must not walk the catalogue once per id). A third wave happens only when a
+ * card on the page was not foreseen (a row that changed between the reads).
  *
  * `total` is every match, `has_more` whether another page exists.
  */
@@ -3946,6 +3953,12 @@ async function pagedListing(
     whereSql: string;
     whereParams: unknown[];
     selectList: string;
+    /**
+     * Who may be listed at all (visible, a composition only while sellable;
+     * sellable only for a commercial list) — no parameters. The row read asks
+     * it again: a row an admin hid between the keys and the rows is not listed.
+     */
+    listedScope: string;
     state: ListingState;
     wantsFacets: boolean;
     limit: number;
@@ -4081,7 +4094,7 @@ async function pagedListing(
       : listedCards(
           db,
           ids.map((id) => byId.get(id)!.key),
-          runListed(db, `${rowSelect} WHERE products.id IN (SELECT value FROM json_each(?))`, (q) =>
+          runListed(db, `${rowSelect} WHERE products.id IN (SELECT value FROM json_each(?)) AND ${o.listedScope}`, (q) =>
             db.prepare(q).bind(JSON.stringify(ids)).all<Record<string, unknown>>()
           ).then((r) => {
             const rows = r.results ?? [];
@@ -4103,7 +4116,10 @@ async function pagedListing(
    * What the resolved order and the counts read: a resolved candidate is its
    * resolved item; every other one is exact from its keys for what this request
    * reads (with facets, with the printers it really fits, for their counts). A
-   * sellable row that left between the two reads (an admin hid it) is not listed.
+   * row that left between the two reads (an admin hid it, a composition stopped
+   * selling) is not listed: the row read asks `listedScope` again, so it has no
+   * row and no card — and a page it was on comes back one card short (the
+   * client pages from the server's cursor).
    */
   const items: ListingItem[] = [];
   if (orderResolved || wantsFacets) {
@@ -4316,9 +4332,11 @@ export async function listCatalogProducts(
    */
   const commercialList = type === 'discounted' || type === 'featured' || type === 'bundle';
   const selectList = `SELECT *, ${optimisticSellableFlag(db)} AS sellable_now FROM products`;
-  let sql = commercialList
-    ? `${selectList} WHERE ${optimisticSellable(db)}`
-    : `${selectList} WHERE ${optimisticVisible(db)} AND (products.composition = '' OR ${optimisticSellable(db)})`;
+  /** Who may be listed at all — the paged listing's row read asks it again (`pagedListing`). */
+  const listedScope = commercialList
+    ? optimisticSellable(db)
+    : `${optimisticVisible(db)} AND (products.composition = '' OR ${optimisticSellable(db)})`;
+  let sql = `${selectList} WHERE ${listedScope}`;
   const params: unknown[] = [];
   /**
    * THE SEARCH THAT COULD NOT FIND THIS SHOP'S OWN FLAGSHIP.
@@ -4512,6 +4530,7 @@ export async function listCatalogProducts(
       whereSql: sql,
       whereParams: params,
       selectList,
+      listedScope,
       state: listingState,
       wantsFacets,
       limit,
