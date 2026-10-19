@@ -171,7 +171,7 @@ Waves:
 **Owns:** `worker/lib/printerFinder.ts` (new, pure), `worker/routes/printerFinder.ts` (new), the `worker/index.ts` mount line, and the `use_cases` / `has_laser_module` fields in `worker/lib/templateFamilies.ts` (device-core group, printer types only).
 
 **Work:**
-- The model in CATALOG_DISCOVERY §9: candidates via the same query as `handleChoosePrinter`; hard filters with labelled relaxation; normalised criteria; weights; the missing-is-zero rule; reason and caveat codes built from `readCompareValue`; `excluded` and `coverage`.
+- The model in CATALOG_DISCOVERY §9: candidates via the same query as `handleChoosePrinter` (the printer/laser type restricted in SQL before the cap, `productTypeSql`); hard filters with labelled relaxation; normalised criteria; weights; the missing-is-zero rule; reason and caveat codes built from `readCompareValue`; `excluded` and `coverage`.
 - `GET /api/printer-finder` and `/meta`.
 - Add the new fields to the admin product form and the import template automatically (they are generated from `templateFamilies`). Check `tests/productFormParityAudit.test.ts` and the import-template tests.
 

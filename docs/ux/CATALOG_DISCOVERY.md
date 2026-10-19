@@ -28,7 +28,7 @@ Mockups (390 px, 2×, real products and photographs): [`mockups/`](./mockups). T
 | Product card (home rail, `/products`) | A tall card: 274 to 298 px at 174 px wide. The name is at 14 px. Two member-price teaser lines. Availability is an **8 px** strip at the bottom edge (`DirectStockEdge`) that nobody can read on a phone. | `ProductCard.tsx` and the inline card in `Products.tsx` are two copies of one design. `CardPrice` always prints PRIME and PRO. |
 | «تسوق حسب الفئة» tiles | Every tile opens `/products?category=<id>`, a flat grid with a name, no description, no sub-sections, no filter or sort. | There is no category page. `/api/products` accepts only `search`, `category`, `type`, `limit`, `offset`. |
 | «عرض جميع الفئات» | Opens `/products`, which is **all products**, not categories. | `CategoryBento` → `SectionHead to="/products"`. |
-| «ساعدني أختار» | Opens the support assistant, which lists 5 printers with prices and asks nothing. | `handleChoosePrinter` in `worker/routes/support.ts` (a deliberate refusal to "invent a judgement"). |
+| «ساعدني أختار» | Opens the support assistant, which lists 5 printers with the storefront card's price and availability (`resolveProductCards`) and asks nothing. | `handleChoosePrinter` in `worker/routes/support.ts` (a deliberate refusal to "invent a judgement"). |
 | «قارن الطابعات» | Opens `/compare` with an empty picker. Nothing on a card or listing can add to a comparison, and there is no tray. | Only the product page sends `?ids=<one>`. |
 | Sale type on a card | A card cannot say «طلب مسبق», because the listing never tells it. | `CARD_FIELDS` omits `sale_types` / `selling_type`. |
 
@@ -423,7 +423,7 @@ worker: worker/lib/printerFinder.ts (pure scoring), worker/routes/printerFinder.
 ## 9. Finder scoring model
 
 ### 9.1 Candidates
-The same set the support assistant uses: active products with a spec sheet whose `product_type` (from the catalogue branch, via `productTypeForBranch`) is `printer` (or `laser` when tech = laser). The price is the **viewer's resolved `display_price_iqd`** ("from" price). Availability is `direct_stock_available`, and sale types come from `sale_types`.
+The same set the support assistant uses: active products with a spec sheet whose `product_type` (from the catalogue branch, via `productTypeForBranch`) is `printer` (or `laser` when tech = laser). The type is applied **in SQL, before the 300-row cap** (`productTypeSql` in `worker/lib/catalogPresentation.ts`, the same rule as `productTypeOf`): the cap counts machines only, so a shelf of filaments or parts with spec sheets cannot spend it (live, before the fix, `/meta` counted 2 of 18 printers; `tests/printerFinderCoverage.test.ts`). The assistant's «ساعدني أختار» applies the same condition before its own 40-row cap. The price is the **viewer's resolved `display_price_iqd`** ("from" price) from the storefront card (`resolveProductCards`, with offers and the mystery pool). Availability is `direct_stock_available`, and sale types come from `sale_types`.
 
 ### 9.2 Hard filters (in order), with transparent relaxation
 1. Technology (`technology` field; FDM covers FDM and filament). `any` keeps everything.

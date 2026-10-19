@@ -29,7 +29,7 @@
  */
 
 import { listing } from '../lib/listing';
-import { rowPriceIfSellable, sellableNowOf } from '../lib/commercialState';
+import { rowPriceIfSellable } from '../lib/commercialState';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { deliversToHome, getSetting, getSettings, type CheckoutPaymentMethod, type DeliveryMethod } from '../lib/settings';
 import { allowedPaymentMethods } from '../lib/paymentPolicy';
@@ -49,8 +49,10 @@ import { notifyStoreOrderComplaint } from '../lib/merchantNotify';
 import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { pricingCtx, publicWithDisplayPrice } from './products';
-import { loadRelationsViews } from '../lib/productOverlay';
+import { pricingCtx, resolveListingCards, resolveProductCards } from './products';
+import { cardAvailability, type AvailabilityState } from '@levonis/catalog/availability';
+import { availabilityFromComposition } from '../lib/publicApi/common';
+import { catalogIndexFor, productTypeSql } from '../lib/catalogPresentation';
 import {
   requireAuth,
   requireAdmin,
@@ -543,8 +545,12 @@ const T: Record<Locale, Record<string, string>> = {
     search_empty: 'اكتب ما تبحث عنه (مثال: PLA، فوهة، A1).',
     search_none: 'لم أجد منتجات مطابقة في الكتالوج العام.',
     search_intro: 'هذا ما وجدته:',
-    in_stock: 'متوفر',
-    out_of_stock: 'غير متوفر',
+    // The product card's own words (src/components/product/AvailabilityLine.tsx, CardPrice.tsx, BundleTile.tsx).
+    avail_available: 'متوفر الآن',
+    avail_preorder: 'طلب مسبق',
+    avail_unavailable: 'غير متوفر',
+    price_from: 'يبدأ من',
+    price_members_only: 'حصري للمشتركين',
     open_product: 'عرض المنتج',
     policies_none: 'لا توجد سياسات منشورة بعد — ستظهر هنا فور نشرها من المالك.',
     policies_pick: 'السياسات المنشورة:',
@@ -680,8 +686,11 @@ const T: Record<Locale, Record<string, string>> = {
     search_empty: 'Type what you are looking for (e.g. PLA, nozzle, A1).',
     search_none: 'No matching products found in the public catalog.',
     search_intro: 'Here is what I found:',
-    in_stock: 'In stock',
-    out_of_stock: 'Out of stock',
+    avail_available: 'In stock',
+    avail_preorder: 'Pre-order',
+    avail_unavailable: 'Unavailable',
+    price_from: 'from',
+    price_members_only: 'Members only',
     open_product: 'View product',
     policies_none: 'No policies are published yet — they will appear here once the owner publishes them.',
     policies_pick: 'Published policies:',
@@ -816,8 +825,11 @@ const T: Record<Locale, Record<string, string>> = {
     search_empty: 'ئەوەی بۆی دەگەڕێیت بنووسە (نموونە: PLA، نۆزڵ، A1).',
     search_none: 'هیچ بەرهەمێکی هاوتا لە کاتالۆگی گشتیدا نەدۆزرایەوە.',
     search_intro: 'ئەمە ئەوەیە کە دۆزیمەوە:',
-    in_stock: 'بەردەستە',
-    out_of_stock: 'بەردەست نییە',
+    avail_available: 'بەردەستە',
+    avail_preorder: 'پێش-داواکاری',
+    avail_unavailable: 'بەردەست نییە',
+    price_from: 'لە',
+    price_members_only: 'تەنها بۆ ئەندامان',
     open_product: 'بینینی بەرهەم',
     policies_none: 'هێشتا هیچ سیاسەتێک بڵاونەکراوەتەوە — کاتێک خاوەن بڵاویان دەکاتەوە لێرە دەردەکەون.',
     policies_pick: 'سیاسەتە بڵاوکراوەکان:',
@@ -899,8 +911,66 @@ function fmtIqd(loc: Locale, n: number): string {
  * «السعر: …» — or «السعر غير متوفر حالياً» alone for a catalog-only product (DECISIONS row 240): never a 0, and
  * never «السعر: السعر غير متوفر…» (the sentence already names the price).
  */
-export function priceSubtitle(loc: Locale, price: number | null): string {
-  return price === null || !(price > 0) ? tr(loc, 'price_unavailable') : `${tr(loc, 'f_price')}: ${fmtIqd(loc, price)}`;
+export function priceSubtitle(loc: Locale, price: number | null, from = false): string {
+  if (price === null || !(price > 0)) return tr(loc, 'price_unavailable');
+  // «يبدأ من» exactly where the card prints it (`display_from`: the SKUs genuinely differ).
+  return `${tr(loc, 'f_price')}: ${from ? `${tr(loc, 'price_from')} ` : ''}${fmtIqd(loc, price)}`;
+}
+
+const AVAILABILITY_WORD: Record<AvailabilityState, string | null> = {
+  available: 'avail_available',
+  preorder: 'avail_preorder',
+  unavailable: 'avail_unavailable',
+  // The card draws nothing for an unknown state (a catalog-only product, a card not told its sale
+  // types), and neither does the assistant: never «غير متوفر» by default.
+  unknown: null,
+};
+
+/**
+ * A STOREFRONT CARD → AN ASSISTANT CARD, and nothing priced on the way.
+ *
+ * `card` is what `resolveListingCards` / `resolveProductCards` built for the
+ * storefront grid: the relational overlay, the LIVE OFFER (a percent or a
+ * dollar sale, gated by tier), the viewer's own rung, the mystery-pool coarse
+ * rule, and a bundle through its own builder. The assistant used to call
+ * `publicWithDisplayPrice` without the offer or the pool, and choose-printer
+ * read the base row's `price_iqd` — so live it quoted eSUN PLA+ at 27,000
+ * beside a card saying 24,250, and the X2D at 2,118,750 beside 1,934,000.
+ *
+ * The figure is the card's own (`display_price_iqd`, else `price_iqd`, as
+ * CardPrice prints it), with its «يبدأ من». The availability is the card's
+ * own rule (`cardAvailability`, packages/catalog), read from
+ * `direct_stock_available` and the sale types — never the base `stock`
+ * counter, which on an option- or colour-tracked product is not the shelf and
+ * made a product with stock on its options read «غير متوفر». A bundle states
+ * its builder's coarse state (`availabilityFromComposition`), and a locked one
+ * no price at all.
+ */
+function assistantCardFrom(loc: Locale, card: Record<string, unknown>, row: Record<string, unknown>, title: string): AssistantCard {
+  const composition = String(row.composition ?? '') !== '';
+  const locked = card.locked === true;
+  const unpriced = card.price_status === 'unpriced';
+  const figure = card.display_price_iqd ?? card.price_iqd;
+  const price = !locked && !unpriced && typeof figure === 'number' && figure > 0 ? figure : null;
+  const from = price !== null && card.display_from === true;
+  const availability: AvailabilityState = composition
+    ? availabilityFromComposition(card.availability_state).state
+    : cardAvailability(card).state;
+  const word = AVAILABILITY_WORD[availability];
+  const images = Array.isArray(card.images) ? card.images : [];
+  const image = typeof card.image === 'string' && card.image ? card.image : typeof images[0] === 'string' && images[0] ? images[0] : undefined;
+  const slug = String(card.product_slug ?? card.slug ?? row.slug ?? '');
+  return {
+    title,
+    subtitle: locked ? tr(loc, 'price_members_only') : priceSubtitle(loc, price, from),
+    price_status: unpriced ? 'unpriced' : 'priced',
+    image,
+    badge: word ? tr(loc, word) : undefined,
+    link: { label: tr(loc, 'open_product'), to: composition ? `/bundles/${slug}` : `/product/${slug}` },
+    price_iqd: price,
+    price_from: from,
+    availability,
+  };
 }
 
 function fmtDate(iso: unknown): string {
@@ -947,6 +1017,14 @@ interface AssistantCard {
   badge?: string;
   fields?: Array<{ label: string; value: string }>;
   link?: AssistantLink;
+  /**
+   * A PRODUCT card's figures as the storefront card states them (`assistantCardFrom`): the price it
+   * prints (null when it prints none), its «يبدأ من», and its availability line's state. Read off the
+   * card the listing builds, never computed here.
+   */
+  price_iqd?: number | null;
+  price_from?: boolean;
+  availability?: AvailabilityState;
 }
 /**
  * THE COMPACT COMPARISON — «بشكل أصغر لا يحدث هوسة في المحادثة».
@@ -1378,39 +1456,22 @@ async function handleProductSearch(c: Context<AppContext>, params: Record<string
     .all<Record<string, unknown>>();
   if (results.length === 0) return { intent: 'product_search', text: tr(loc, 'search_none') };
 
-  // THE ASSISTANT QUOTES THE PRICE THE STOREFRONT QUOTES. It used to read
-  // `products.price_iqd` — the BASE row — so a product whose cheapest option
-  // costs less was announced at a price its own card contradicted, and a
-  // product repriced only in the relational tables was announced at a stale
-  // one. publicWithDisplayPrice is the same function the cards go through:
-  // the relational overlay, the resolver, the viewer's own tier, and a public
-  // shape that has never carried an internal cost.
-  const ctx = await pricingCtx(c);
-  const views = await loadRelationsViews(
-    c.env.DB,
-    results.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
-  );
-  const cards: AssistantCard[] = results.map((row) => {
-    const p = publicWithDisplayPrice(row, ctx, { sellable: sellableNowOf(row) }, views.get(String(row.id))) as Record<string, unknown>;
-    const images = Array.isArray(p.images) ? p.images : [];
-    const image = typeof images[0] === 'string' ? (images[0] as string) : undefined;
-    const stock = p.stock;
-    const badge = typeof stock === 'number' ? (stock > 0 ? tr(loc, 'in_stock') : tr(loc, 'out_of_stock')) : undefined;
-    const shown = p.price_status === 'unpriced' ? null : typeof p.display_price_iqd === 'number' ? p.display_price_iqd : null;
-    return {
-      title: pickName(loc, {
-        p_name: String(row.name ?? ''),
-        p_name_ar: String(row.name_ar ?? ''),
-        p_name_ku: String(row.name_ku ?? ''),
-        name_snapshot: null,
-      }),
-      subtitle: priceSubtitle(loc, shown),
-      price_status: p.price_status === 'unpriced' ? ('unpriced' as const) : ('priced' as const),
-      image,
-      badge,
-      link: { label: tr(loc, 'open_product'), to: `/product/${row.slug}` },
-    };
-  });
+  // THE ASSISTANT QUOTES THE CARD THE STOREFRONT DRAWS: the listing's own builders (offers, the pool,
+  // the viewer's tier, a bundle through its builder) for this viewer, and `assistantCardFrom` reads
+  // the figures off the result. No price is computed here.
+  const cardsById = await resolveListingCards(c.env.DB, results, await pricingCtx(c), null, 'flag');
+  const cards: AssistantCard[] = [];
+  for (const row of results) {
+    const card = cardsById.get(String(row.id));
+    if (!card) continue;
+    const title = pickName(loc, {
+      p_name: String(row.name ?? ''),
+      p_name_ar: String(row.name_ar ?? ''),
+      p_name_ku: String(row.name_ku ?? ''),
+      name_snapshot: null,
+    });
+    cards.push(assistantCardFrom(loc, card, row, title));
+  }
   return { intent: 'product_search', text: tr(loc, 'search_intro'), cards };
 }
 
@@ -1861,32 +1922,38 @@ const STUDIO_ORIGIN = 'https://studio.levonis-iq.com';
  */
 async function handleChoosePrinter(c: Context<AppContext>, loc: Locale): Promise<AssistantReply> {
   const db = c.env.DB;
-  const tax = taxonomy(await loadCatalogs(db));
-  // SELLABLE (DECISIONS row 240, rule R5): «with their real prices» — a printer that cannot be bought is not offered.
-  const L = await listing(db);
+  const [L, idx, catalogs] = await Promise.all([listing(db), catalogIndexFor(db), loadCatalogs(db)]);
+  const tax = taxonomy(catalogs);
+  /**
+   * SELLABLE (DECISIONS row 240, rule R5): «with their real prices» — a printer that cannot be bought
+   * is not offered. PRINTERS ONLY BEFORE THE LIMIT (`productTypeSql`, the printer finder's own
+   * candidate rule): the type used to be checked after `LIMIT 40`, so forty newer filaments or parts
+   * with a spec sheet left no printer to offer. `SELECT *` because the card is built from the whole
+   * row (the resolver walks every option and colour); only the card's projection leaves this route.
+   */
+  const printersOnly = productTypeSql(idx, ['printer']);
   const { results } = await db.prepare(
-    `SELECT ${COMPARE_PRODUCT_COLUMNS}, ${L.sellableFlag('products')} AS sellable_now FROM products
-      WHERE ${L.sellable('products')} AND spec_fields <> '{}' AND spec_fields <> ''
+    `SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products
+      WHERE ${L.sellable('products')} AND composition = '' AND spec_fields <> '{}' AND spec_fields <> ''
+        AND ${printersOnly.sql}
       ORDER BY is_featured DESC, created_at DESC
       LIMIT 40`
-  ).all<CompareProductRow>();
+  ).bind(...printersOnly.binds).all<Record<string, unknown>>();
   const printers = (results ?? [])
-    .map((row) => place(row, tax))
-    .filter((p) => hasAnySpec(p.specs) && p.productType === 'printer')
+    .map((row) => ({ row, placed: place(row as unknown as CompareProductRow, tax) }))
+    .filter(({ placed }) => hasAnySpec(placed.specs) && placed.productType === 'printer')
     .slice(0, 5);
   if (printers.length === 0) return { intent: 'choose_printer', text: tr(loc, 'choose_printer_none') };
+  // The price and the availability the storefront card states, for THIS viewer (offers, tier, pool).
+  const cards = await resolveProductCards(db, printers.map((p) => p.row), await pricingCtx(c), null, 'sellable');
   return {
     intent: 'choose_printer',
     text: tr(loc, 'choose_printer_intro'),
-    cards: printers.map((p) => ({
-      title: compareName(p, loc),
-      subtitle: priceSubtitle(loc, rowPriceIfSellable(p.row)),
-      link: { label: tr(loc, 'open_product'), to: `/product/${p.row.slug}` },
-    })),
-    choices: printers.map((p) => ({
-      label: compareName(p, loc),
+    cards: printers.map(({ row, placed }) => assistantCardFrom(loc, cards.get(String(row.id)) ?? {}, row, compareName(placed, loc))),
+    choices: printers.map(({ placed }) => ({
+      label: compareName(placed, loc),
       intent: 'compare_products' as const,
-      params: { ids: p.row.id },
+      params: { ids: placed.row.id },
     })),
   };
 }

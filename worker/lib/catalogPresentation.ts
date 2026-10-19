@@ -225,6 +225,53 @@ export function productTypeOf(
 }
 
 /**
+ * `productTypeOf` AS A SQL CONDITION, so a capped candidate query keeps only
+ * the product types it wants BEFORE its LIMIT (the printer finder and the
+ * assistant's «ساعدني باختيار طابعة»). Filtering in JS after a `LIMIT 300` of
+ * every visible product with a spec sheet let filaments, parts and lasers take
+ * the slots: live, the finder saw 2 of 18 printers.
+ *
+ * EXACT, not a guess. A row's type depends on two things only: its own
+ * `template_family` (devices, materials, or anything else — which inherits the
+ * branch's) and its leaf section (`sub_category_id`, else `category_id`). So
+ * the rule is evaluated here once per (family, section) pair over the whole
+ * taxonomy, and the condition lists the sections that resolve to one of
+ * `types` for each family, plus — when the family's default resolves to one —
+ * a leaf the taxonomy does not know (an empty branch, as `productTypeOf` reads
+ * it). The JS rule stays the final word at every caller; this only stops the
+ * cap from being spent on rows it would reject.
+ *
+ * D1-safe: the sections travel as JSON lists through `json_each` (at most six
+ * parameters), never one parameter per id. Binds are positional `?`, in order.
+ */
+export function productTypeSql(
+  idx: CatalogIndex,
+  types: readonly string[],
+  alias = 'products'
+): { sql: string; binds: string[] } {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(alias)) throw new Error(`productTypeSql: bad alias ${alias}`);
+  const wanted = new Set(types);
+  const all = [...idx.byId.keys()];
+  const leaf = `COALESCE(NULLIF(${alias}.sub_category_id, ''), ${alias}.category_id, '')`;
+  const family = `(CASE WHEN ${alias}.template_family IN ('devices', 'materials') THEN ${alias}.template_family ELSE '' END)`;
+  const clauses: string[] = [];
+  const binds: string[] = [];
+  for (const own of ['devices', 'materials', ''] as const) {
+    const ids = all.filter((id) => wanted.has(productTypeOf({ template_family: own, sub_category_id: id }, idx) ?? ''));
+    const orphan = wanted.has(productTypeOf({ template_family: own }, idx) ?? '');
+    if (ids.length === 0 && !orphan) continue;
+    const parts = [`${leaf} IN (SELECT value FROM json_each(?))`];
+    binds.push(JSON.stringify(ids));
+    if (orphan) {
+      parts.push(`${leaf} NOT IN (SELECT value FROM json_each(?))`);
+      binds.push(JSON.stringify(all));
+    }
+    clauses.push(`(${family} = '${own}' AND (${parts.join(' OR ')}))`);
+  }
+  return { sql: clauses.length ? `(${clauses.join(' OR ')})` : '0', binds };
+}
+
+/**
  * The taxonomy index, read once per isolate and kept for a minute.
  *
  * Every card on a listing carries `compare_type`, and deriving it needs the

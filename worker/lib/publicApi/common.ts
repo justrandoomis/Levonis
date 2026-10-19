@@ -10,6 +10,7 @@
  */
 import type { CatalogIndex } from '../catalogPresentation';
 import { CONDITION_KINDS } from '../condition';
+import { cardAvailability, type AvailabilityState } from '@levonis/catalog/availability';
 import { array, boolean, enumOf, integer, nullable, object, ref, string, url, dateTime, localized as localizedSchema, type JsonSchema } from './schema';
 import type { PublicUrls } from './urls';
 
@@ -224,7 +225,7 @@ export function priceFromCard(card: Record<string, unknown>, locked = false): Pu
 
 // ------------------------------------------------------------ availability
 
-export type AvailabilityState = 'available' | 'preorder' | 'unavailable' | 'unknown';
+export type { AvailabilityState };
 
 export interface PublicAvailability {
   state: AvailabilityState;
@@ -250,21 +251,18 @@ export const AVAILABILITY_SCHEMA = object(
   'Availability as the site shows it to a visitor.'
 );
 
-/** The card's own rule (src/lib/productCard.ts `cardAvailability`), low-stock at 2. */
+/**
+ * The card's own rule — `cardAvailability` (packages/catalog/src/availability.ts), the function the
+ * compact card draws and the support assistant states — with the API's cap («99+») and sale modes.
+ */
 export function availabilityFromCard(card: Record<string, unknown>): PublicAvailability {
   // A catalog-only card claims no stock and no way to buy (DECISIONS row 240).
   if (card.price_status === 'unpriced') return { state: 'unknown', quantity: null, low_stock: false, sale_modes: [] };
   const saleModes = Array.isArray(card.sale_types)
     ? (card.sale_types as unknown[]).filter((t): t is string => t === 'direct_sale' || t === 'pre_order' || t === 'bundle')
     : [];
-  const n = card.direct_stock_available;
-  if (typeof n === 'number' && Number.isInteger(n) && n > 0) {
-    return { state: 'available', quantity: Math.min(n, 99), low_stock: n <= 2, sale_modes: saleModes };
-  }
-  if (Array.isArray(card.sale_types)) {
-    return { state: saleModes.includes('pre_order') ? 'preorder' : 'unavailable', quantity: null, low_stock: false, sale_modes: saleModes };
-  }
-  return { state: 'unknown', quantity: null, low_stock: false, sale_modes: saleModes };
+  const a = cardAvailability(card);
+  return { state: a.state, quantity: a.qty === null ? null : Math.min(a.qty, 99), low_stock: a.low, sale_modes: saleModes };
 }
 
 /**

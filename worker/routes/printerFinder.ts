@@ -12,7 +12,8 @@
  * THE CANDIDATES ARE THE SUPPORT ASSISTANT'S: active products with a spec sheet
  * whose catalogue branch resolves to a printer (or a laser machine when «Laser»
  * was asked) — the same rule `handleChoosePrinter` uses, through the same
- * taxonomy resolution as the compare page (`productTypeOf`). They are priced
+ * taxonomy resolution as the compare page (`productTypeOf`), applied in SQL
+ * before the candidate cap (`productTypeSql`). They are priced
  * for THIS viewer through the listing's one pricing path, so a budget answer
  * reads the number on the customer's own cards.
  *
@@ -33,7 +34,7 @@ import { safeParse } from '../lib/types';
 import { rateLimit } from '../lib/ratelimit';
 import { FINDER_BUDGETS, encodePairs, finderParamPairs, parseFinderParams } from '@levonis/catalog/discovery';
 import type { FinderMeta, FinderResponse } from '@levonis/catalog/discoveryTypes';
-import { catalogIndexFor, productTypeOf } from '../lib/catalogPresentation';
+import { catalogIndexFor, productTypeOf, productTypeSql } from '../lib/catalogPresentation';
 import { hasLaserModule, runFinder, techGroup, type FinderCandidate } from '../lib/printerFinder';
 import { pricingCtx, resolveProductCards, resolveVariantPricing } from './products';
 import { multicolorBadge, multicolorProfile, variantSheet } from '../lib/multicolor';
@@ -42,7 +43,7 @@ import { isUsdCents } from '@levonis/pricing/usdCents';
 
 export const printerFinderRoutes = new Hono<AppContext>();
 
-/** Every printer the shop could possibly sell is well under this. */
+/** Every printer and laser machine the shop could possibly sell is well under this (the cap counts machines only). */
 export const FINDER_CANDIDATE_CAP = 300;
 
 function edgeCache(): Cache | null {
@@ -56,22 +57,28 @@ interface Loaded {
 
 async function loadCandidates(c: Context<AppContext>): Promise<Loaded> {
   const db = c.env.DB;
-  const L = await listing(db);
-  const [idx, ctx, rows] = await Promise.all([
-    catalogIndexFor(db),
-    pricingCtx(c),
-    db
-      .prepare(
-        // VISIBLE with each row's SELLABLE flag (DECISIONS row 240): priced machines first (rule R1).
-        `SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products
-          WHERE ${L.visible('products')} AND composition = '' AND spec_fields <> '{}' AND spec_fields <> ''
-          ORDER BY sellable_now DESC, is_featured DESC, display_order ASC, created_at DESC
-          LIMIT ?`
-      )
-      .bind(FINDER_CANDIDATE_CAP)
-      .all<Record<string, unknown>>()
-      .then((r) => r.results ?? []),
-  ]);
+  const [L, idx, ctx] = await Promise.all([listing(db), catalogIndexFor(db), pricingCtx(c)]);
+  /**
+   * ONLY MACHINES REACH THE CAP. The type rule used to run in JS after the
+   * LIMIT, so the 300 slots went to whatever visible product with a spec sheet
+   * sorted first — filaments and parts too — and live the finder saw 2 of 18
+   * printers. `productTypeSql` is the same rule (`productTypeOf`) as a SQL
+   * condition on the printer and laser sections, applied before the LIMIT; the
+   * JS check below stays the final word.
+   */
+  const machinesOnly = productTypeSql(idx, ['printer', 'laser']);
+  const rows = await db
+    .prepare(
+      // VISIBLE with each row's SELLABLE flag (DECISIONS row 240): priced machines first (rule R1).
+      `SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products
+        WHERE ${L.visible('products')} AND composition = '' AND spec_fields <> '{}' AND spec_fields <> ''
+          AND ${machinesOnly.sql}
+        ORDER BY sellable_now DESC, is_featured DESC, display_order ASC, created_at DESC
+        LIMIT ?`
+    )
+    .bind(...machinesOnly.binds, FINDER_CANDIDATE_CAP)
+    .all<Record<string, unknown>>()
+    .then((r) => r.results ?? []);
   const machines: Array<{ row: Record<string, unknown>; type: 'printer' | 'laser'; specs: Record<string, unknown> }> = [];
   for (const row of rows) {
     const type = productTypeOf(row, idx);

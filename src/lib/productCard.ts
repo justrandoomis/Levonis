@@ -18,6 +18,7 @@
  */
 import type { ApiProduct } from './api';
 import { isUnpriced } from './priceStatus';
+import { cardAvailability } from '../../packages/catalog/src/availability';
 
 /**
  * Card fields the catalogue stream (S1) adds to `CARD_FIELDS`. They are
@@ -88,52 +89,14 @@ export function cardName(p: Pick<CardProduct, 'name'> & { card_name?: string | n
 
 // ----------------------------------------------------------- availability
 
-export type AvailabilityState = 'available' | 'preorder' | 'unavailable' | 'unknown';
-
-export interface Availability {
-  state: AvailabilityState;
-  /** Direct-sale units the buyer can still take today; null when not stated. */
-  qty: number | null;
-  /** True when `qty` is at or under the low-stock threshold («بقي 2»). */
-  low: boolean;
-}
-
-/** «بقي N» from here down when the shop has not set its own threshold. */
-export const DEFAULT_LOW_STOCK = 2;
-
 /**
- * THREE STATES, AND A FOURTH THAT DRAWS NOTHING.
- *
- *  available   — `direct_stock_available > 0`: units in the Iraq stock now.
- *  preorder    — no direct unit, and the product's sale types include
- *                pre-order.
- *  unavailable — no direct unit, and the sale types say pre-order is not
- *                offered either.
- *  unknown     — no direct unit and the card was not told the sale types
- *                (a card projection that predates `sale_types`). The card
- *                says nothing rather than guess «طلب مسبق».
+ * THE AVAILABILITY RULE lives in packages/catalog/src/availability.ts, shared
+ * with the Worker: the public API's card and the support assistant's product
+ * cards state availability with the SAME function the compact card draws, so
+ * the chat can never say «غير متوفر» about a card that says «متوفر الآن».
  */
-export function cardAvailability(
-  p: Pick<CardProduct, 'direct_stock_available' | 'sale_types' | 'low_stock_threshold' | 'price_status'> & { selling_type?: string }
-): Availability {
-  // CATALOG-ONLY (rows 239-240): stock is not configured for an unpriced
-  // product, so the card says nothing — never «غير متوفر» or «نفد».
-  if (isUnpriced(p)) return { state: 'unknown', qty: null, low: false };
-  const n = p.direct_stock_available;
-  if (typeof n === 'number' && Number.isInteger(n) && n > 0) {
-    const t = p.low_stock_threshold;
-    const threshold = typeof t === 'number' && Number.isInteger(t) && t >= 0 ? t : DEFAULT_LOW_STOCK;
-    return { state: 'available', qty: n, low: n <= threshold };
-  }
-  const types = Array.isArray(p.sale_types) ? p.sale_types : null;
-  if (types) {
-    return { state: types.includes('pre_order') ? 'preorder' : 'unavailable', qty: null, low: false };
-  }
-  // `selling_type` is the legacy single-mode field; the detail payload carries
-  // it and a few older call sites pass a full product to the card.
-  if (p.selling_type === 'pre_order') return { state: 'preorder', qty: null, low: false };
-  return { state: 'unknown', qty: null, low: false };
-}
+export { cardAvailability };
+export { DEFAULT_LOW_STOCK, type Availability, type AvailabilityState } from '../../packages/catalog/src/availability';
 
 // ------------------------------------------------------------ member line
 

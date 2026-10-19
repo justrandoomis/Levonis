@@ -74,8 +74,12 @@ test('every allow-list entry still exists, so the list cannot rot into a blanket
 test('the card helpers and the card price read the status before any figure', () => {
   const card = readFileSync(join(ROOT, 'src/components/CardPrice.tsx'), 'utf8');
   assert.match(card, /if \(isUnpriced\(p\)[^\n]*\) return <UnpricedPrice/);
-  const lib = readFileSync(join(ROOT, 'src/lib/productCard.ts'), 'utf8');
-  assert.match(lib, /if \(isUnpriced\(p\)\) return \{ state: 'unknown'/);
+  // The availability rule lives in packages/catalog (shared with the public API and the support
+  // assistant); the card's module re-exports it.
+  const lib = readFileSync(join(ROOT, 'packages/catalog/src/availability.ts'), 'utf8');
+  assert.match(lib, /if \(p\.price_status === 'unpriced'\) return \{ state: 'unknown'/);
+  const cardLib = readFileSync(join(ROOT, 'src/lib/productCard.ts'), 'utf8');
+  assert.match(cardLib, /import \{ cardAvailability \} from '\.\.\/\.\.\/packages\/catalog\/src\/availability'/);
   const status = readFileSync(join(ROOT, 'src/lib/priceStatus.ts'), 'utf8');
   // UNPRICED_TEXT stays eager: a card must never flash a blank price while a lazy chunk loads.
   assert.doesNotMatch(status, /\bimport\(/);

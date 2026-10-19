@@ -3452,6 +3452,39 @@ export async function resolveProductCards(
 }
 
 /**
+ * VISIBLE rows of EITHER kind → the cards the storefront listing draws for
+ * them, for a caller that reads a mixed result and must say what the grid says
+ * (the support assistant's product search). The same two builders the listing
+ * uses, in the same order: a composition row through its own builder
+ * (`resolveCompositionPageWithMystery` → `compositionCard`, so a locked bundle
+ * carries no price and an unlocked one its live display block), and every
+ * other row — including a composition the builder did not resolve, exactly as
+ * the listing falls through — through `resolveProductCards`. Nothing is priced
+ * here.
+ */
+export async function resolveListingCards(
+  db: D1Database,
+  rows: Record<string, unknown>[],
+  ctx: PricingCtx,
+  idx: CatalogIndex | null,
+  state: 'flag' | 'sellable'
+): Promise<Map<string, Record<string, unknown>>> {
+  const compositionIds = rows.filter((r) => String(r.composition ?? '') !== '').map((r) => String(r.id));
+  const compositions = compositionIds.length
+    ? (await resolveCompositionPageWithMystery(db, [...(await loadCompositionRows(db, compositionIds)).values()], ctx)).resolved
+    : new Map<string, ResolvedBundle>();
+  const out = await resolveProductCards(
+    db,
+    rows.filter((r) => !compositions.has(String(r.id))),
+    ctx,
+    idx,
+    state
+  );
+  for (const [id, b] of compositions) out.set(id, compositionCard(b, ctx));
+  return out;
+}
+
+/**
  * The parameters that turn `/api/products` into the specialised listing
  * (docs/ux/CATALOG_DISCOVERY.md §11). A request carrying NONE of them takes the
  * old path — same SQL, same ORDER BY, same paging — so every existing caller
