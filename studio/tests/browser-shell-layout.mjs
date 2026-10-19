@@ -24,7 +24,8 @@
  *     and in Advanced. The header clips its overflow and cannot scroll, so in
  *     RTL a too-wide action row runs off the LEFT edge and Files / New
  *     project become unreachable — which P1-10's Simple slice action did at
- *     1133px and 1024px before the header learned to narrow.
+ *     1133px and 1024px before the header learned to narrow, and in Sorani
+ *     at 1181-1300px (an 11" iPad Pro in landscape is 1194px).
  *
  * NOT part of `npm test`: it needs a running Studio and a Chromium binary.
  *
@@ -69,6 +70,23 @@ const VIEWPORTS = [
   { name: "ipad-air-landscape", width: 1180, height: 820 },
   { name: "ipad-mini-landscape", width: 1133, height: 744 },
   { name: "desktop", width: 1680, height: 1050 },
+];
+
+/**
+ * The header-fit pass also covers the band between the tablet widths and a
+ * wide desktop, where each narrowing step in globals.css switches: Sorani
+ * Simple once had Files off-screen at 1181-1240px and partly off at
+ * 1280-1300px, and none of the widths above sat in that band.
+ */
+const HEADER_FIT_VIEWPORTS = [
+  ...VIEWPORTS,
+  { name: "ipad-pro-11-landscape", width: 1194, height: 834 },
+  { name: "laptop-1240", width: 1240, height: 800 },
+  { name: "laptop-1280", width: 1280, height: 800 },
+  { name: "laptop-1300", width: 1300, height: 800 },
+  { name: "laptop-1330", width: 1330, height: 800 },
+  { name: "laptop-1360", width: 1360, height: 768 },
+  { name: "laptop-1440", width: 1440, height: 900 },
 ];
 
 /** Rects overlap only when they share area on BOTH axes. */
@@ -182,7 +200,7 @@ for (const vp of VIEWPORTS) {
 const LOCALE_KEY = "levo-studio-locale";
 const GUEST_MODE_KEY = "levo-studio-mode/guest";
 const overflow = [];
-for (const vp of VIEWPORTS) {
+for (const vp of HEADER_FIT_VIEWPORTS) {
   for (const locale of ["ar", "ckb", "en"]) {
     for (const mode of ["simple", "advanced"]) {
       const ctx = await browser.newContext({

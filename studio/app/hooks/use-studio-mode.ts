@@ -22,6 +22,7 @@ import {
   saveStudioMode,
   type StudioMode,
 } from "../studio-mode";
+import { setExpectedStudioUser } from "../studio-identity";
 
 export interface StudioModeControl {
   mode: StudioMode;
@@ -39,6 +40,9 @@ export function useStudioMode(userId: string | null): StudioModeControl {
   const choiceRef = useRef(0);
 
   useEffect(() => {
+    // The prefs calls name this account (studio-identity.ts); the
+    // persistence hook sets the same value, whichever effect runs first.
+    setExpectedStudioUser(userId);
     let active = true;
     const choiceAtStart = choiceRef.current;
     const apply = (next: StudioMode) => {
@@ -61,7 +65,7 @@ export function useStudioMode(userId: string | null): StudioModeControl {
       active = false;
       if (typeof window !== "undefined") window.removeEventListener("online", onOnline);
     };
-  }, [api, namespace, signedIn]);
+  }, [api, namespace, signedIn, userId]);
 
   const setMode = useCallback(
     (next: StudioMode) => {

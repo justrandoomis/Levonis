@@ -286,7 +286,7 @@ test("containment: no engine warning or recovery control is trapped inside the s
     },
     "testid:slice-err": () => {
       assert.match(engine, /ft\(e, "error", n\.error\)/);
-      assert.match(client, /event\.type === "error"\) \{[\s\S]{0,400}setError\(event\.value\)/);
+      assert.match(client, /event\.type === "error"\) \{[\s\S]{0,1200}setError\(event\.value\)/);
     },
     // The retry offer: the shell's error row offers it and clicks the
     // engine's own button through the adapter (a contract test id).
@@ -368,7 +368,7 @@ test("warnings reach the shell in Simple: engine errors and notices are events, 
   assert.match(engine, /ft\(e, "notice", n\.notice\)/);
   // …and the shell puts both in its own message row, in every mode.
   assert.match(client, /event\.type === "notice"\) \{[\s\S]{0,400}setNotice\(event\.value\)/);
-  assert.match(client, /event\.type === "error"\) \{[\s\S]{0,400}setError\(event\.value\)/);
+  assert.match(client, /event\.type === "error"\) \{[\s\S]{0,1200}setError\(event\.value\)/);
   // The stats card (estimate + over-bed warning) and the bed warning are
   // rendered OUTSIDE the engine's side panel: their elements come before
   // the panel's <aside> in the engine's render tree.
@@ -382,11 +382,79 @@ test("warnings reach the shell in Simple: engine errors and notices are events, 
     assert.match(panels, new RegExp(`${name}: true`), `${name} must stay on`);
   }
   // The shell's own warnings do not depend on the mode.
-  const message = client.slice(client.indexOf("{(error || notice) &&"), client.indexOf("{(error || notice) &&") + 200);
-  const stale = client.slice(client.indexOf("{currentStale && !error"), client.indexOf("{currentStale && !error") + 200);
-  for (const block of [message, stale]) assert.doesNotMatch(block, /simpleMode|studioMode/);
+  const slotAt = client.indexOf("const heavyImportText =");
+  assert.ok(slotAt > 0, "the message slot is computed before the render");
+  const slot = client.slice(slotAt, client.indexOf("return (", slotAt));
+  const message = client.slice(client.indexOf("{messageText && <div"), client.indexOf("{messageText && <div") + 200);
+  const stale = client.slice(client.indexOf("{staleBannerShown && <div"), client.indexOf("{staleBannerShown && <div") + 200);
+  for (const block of [slot, message, stale]) {
+    assert.ok(block.length > 100);
+    assert.doesNotMatch(block, /simpleMode|studioMode/);
+  }
   // The mode reaches the engine through its host attribute.
   assert.match(client, /adapter\.setHostAttribute\("data-levo-mode", studioMode\.mode\)/);
+});
+
+test("one message slot: the slow-slice warning beats the generic import notice, the outdated-result banner is never hidden by it, and a slice clears it", async () => {
+  const client = await read("../app/slicer-client.tsx");
+  const slot = client.slice(client.indexOf("const heavyImportText ="), client.indexOf("return (", client.indexOf("const heavyImportText =")));
+  // Only a notice made of nothing but «files were added» gives way to the warning.
+  assert.match(slot, /const noticeIsOnlyImported = notice !== "" && notice\.split\(t\.imported\)\.every\(\(part\) => part\.trim\(\) === ""\);/);
+  assert.match(slot, /const messageText = error \|\| \(heavyImportText && noticeIsOnlyImported \? "" : notice\);/);
+  // The outdated-result banner depends on the message slot and the slicing
+  // state only — never on the warning, which rides in its text instead.
+  assert.match(slot, /const staleBannerShown = currentStale && !messageText && status !== "slicing";/);
+  assert.match(slot, /const heavyWarningShown = Boolean\(heavyImportText\) && !messageText && !staleBannerShown;/);
+  assert.match(client, /\{staleBannerShown && <div className="stale-banner" role="status">\s*<Icon name="warning" \/><span>\{heavyImportText \? `\$\{t\.staleHelp\} \$\{heavyImportText\}` : t\.staleHelp\}<\/span>/);
+  assert.match(client, /\{heavyWarningShown && <div className="editor-message notice" role="status" data-levo-warning="heavy-import">/);
+  // A finished slice ends the warning.
+  const sliced = client.slice(client.indexOf("const handleSliced = useCallback("), client.indexOf("const handleSliced = useCallback(") + 400);
+  assert.match(sliced, /setHeavyImportTriangles\(null\);/);
+
+  // The precedence itself, evaluated with the same expressions.
+  const imported = "Files were added to the project.";
+  const decide = ({ error = "", notice = "", heavy = "", stale = false, slicing = false }) => {
+    const noticeIsOnlyImported = notice !== "" && notice.split(imported).every((part) => part.trim() === "");
+    const messageText = error || (heavy && noticeIsOnlyImported ? "" : notice);
+    const staleBannerShown = stale && !messageText && !slicing;
+    const heavyWarningShown = Boolean(heavy) && !messageText && !staleBannerShown;
+    return { messageText, staleBannerShown, heavyWarningShown };
+  };
+  const heavy = "108,300 triangles — slicing this model may take a while.";
+  assert.deepEqual(decide({ notice: imported, heavy }), { messageText: "", staleBannerShown: false, heavyWarningShown: true });
+  assert.deepEqual(decide({ notice: `${imported} ${imported}`, heavy }), { messageText: "", staleBannerShown: false, heavyWarningShown: true });
+  assert.equal(decide({ notice: "Arranged 3 models on 2 plates.", heavy }).messageText, "Arranged 3 models on 2 plates.");
+  assert.deepEqual(decide({ heavy, stale: true }), { messageText: "", staleBannerShown: true, heavyWarningShown: false });
+  assert.deepEqual(decide({ stale: true }), { messageText: "", staleBannerShown: true, heavyWarningShown: false });
+  assert.equal(decide({ error: "boom", heavy, stale: true }).messageText, "boom");
+  assert.deepEqual(decide({ heavy, stale: true, slicing: true }), { messageText: "", staleBannerShown: false, heavyWarningShown: true });
+});
+
+test("an EMPTY engine error is a clear: it never sets the error status over a slice in progress", async () => {
+  const client = await read("../app/slicer-client.tsx");
+  const at = client.indexOf('} else if (event.type === "error") {');
+  const branch = client.slice(at, client.indexOf("// eslint-disable-next-line react-hooks/exhaustive-deps", at));
+  const empty = branch.slice(branch.indexOf("if (!event.value) {"), branch.indexOf("return;", branch.indexOf("if (!event.value) {")));
+  assert.ok(empty.length > 0, "the empty value is handled first");
+  assert.match(empty, /setError\(""\);/);
+  assert.match(empty, /setDowngradeOfferFor\(null\);/);
+  assert.match(empty, /setStatus\(\(current\) => current === "error" \? "editing" : current\);/);
+  assert.doesNotMatch(empty, /setStatus\("error"\)|endImportWait/);
+  // A real error still ends the import wait and shows the error status.
+  const real = branch.slice(branch.indexOf("return;"));
+  assert.match(real, /endImportWait\(\);[\s\S]*setError\(event\.value\);[\s\S]*setStatus\("error"\);/);
+});
+
+test("the Editor mode choice is the first thing in Settings, above the printer", async () => {
+  const setup = await read("../app/components/sheets/setup.tsx");
+  const body = setup.indexOf('<div className="sheet-body setup-body">');
+  const modeAt = setup.indexOf('<fieldset className="mode-fieldset">');
+  const firstFieldset = setup.indexOf("<fieldset", body);
+  assert.ok(body > 0 && modeAt > 0);
+  assert.equal(firstFieldset, modeAt, "the mode fieldset opens the sheet");
+  assert.ok(modeAt < setup.indexOf("<legend>{t.printer}</legend>"));
+  // "All settings" still switches to Advanced from Simple.
+  assert.match(setup, /props\.mode === "simple" \? t\.modeSwitchHelp : t\.advancedHelp/);
 });
 
 test("Simple keeps a way to slice and to print at every width", async () => {

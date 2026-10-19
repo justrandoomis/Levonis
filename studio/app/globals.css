@@ -290,6 +290,14 @@ button:disabled { cursor: not-allowed; }
   font-size: 11px;
   white-space: nowrap;
 }
+/* The status pill is the one header item that may give way: it can shrink to
+   its dot (the label ellipsised, full text in its title) so that a tight
+   header never pushes an action button off the window — see the narrowing
+   rules near the end of this file. */
+.studio-status { min-width: 0; overflow: hidden; }
+.studio-status > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+:root[dir="rtl"] .studio-status > span { direction: rtl; }
+.studio-status > em { flex: 0 0 auto; }
 .studio-status i { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--idle); }
 .studio-status[data-status="editing"] i, .studio-status[data-status="ready"] i { background: var(--accent); }
 .studio-status[data-status="slicing"] i { background: var(--warning); animation: status-pulse .9s ease-in-out infinite alternate; }
@@ -314,7 +322,10 @@ button:disabled { cursor: not-allowed; }
   text-decoration: none;
 }
 .studio-actions > :is(button, a, .file-select-control):hover, .studio-actions > :is(button, a, .file-select-control).active { background: var(--surface); border-color: var(--line); color: var(--text); }
-.studio-actions svg { width: 19px; height: 19px; }
+.studio-actions svg { width: 19px; height: 19px; flex: 0 0 auto; }
+/* A label never wraps onto a second line inside a 40px button; the header
+   hides labels (below) rather than squeezing them. */
+.studio-actions > :is(button, a, .file-select-control) > span { white-space: nowrap; }
 .import-action { border-color: var(--line) !important; background: var(--surface) !important; }
 .connect-action { border-color: var(--line) !important; background: transparent !important; }
 .connect-action:hover { background: var(--surface) !important; }
@@ -900,21 +911,43 @@ button:disabled { cursor: not-allowed; }
   .project-row button { min-height: 48px; }
 }
 
-/* NARROW DESKTOPS, SPLIT WINDOWS AND TABLETS (900-1180px). The header is a
-   no-wrap grid whose action row is a no-wrap flex row, and the shell clips
-   overflow, so a row wider than the window runs off the edge where nothing
-   can scroll it back: in Arabic and Sorani (RTL) that is the LEFT edge, and
-   with the Simple slice action in the row, Files sat at x -27 at 1133px and
-   fully off-screen at 1024px. So the row narrows in two steps, before it
-   can overflow: first the secondary actions become icons, then (at 1099px
-   and below, which keeps Sorani's longer labels clear of the edge on an
-   iPad in portrait) every action does. Their names stay as aria-label and
-   tooltip.
+/* NARROW DESKTOPS, LAPTOPS, SPLIT WINDOWS AND TABLETS (900-1439px). The
+   header is a no-wrap grid whose action row is a no-wrap flex row, and the
+   shell clips overflow, so a row wider than the window runs off the edge
+   where nothing can scroll it back: in Arabic and Sorani (RTL) that is the
+   LEFT edge. With the Simple slice action in the row, Files sat at x -27 at
+   1133px and fully off-screen at 1024px; in Sorani, whose labels and status
+   are the longest, Files was off-screen at 1181-1240px (an 11" iPad Pro in
+   landscape is 1194px) and partly off at 1280-1300px.
+
+   So the row narrows in two steps, before it can overflow: first the
+   secondary actions become icons, then (at 1099px and below) every action
+   does. Their names stay as aria-label and tooltip. The first step comes
+   earlier when the row is longer — when it carries a primary action (Slice
+   in Simple, Print once a result is ready) and in Sorani — at widths measured
+   in a real build with a margin for other fonts:
+     ar / en                       1279px, or 1329px with a primary action
+     ckb                           1359px, or 1439px with a primary action
+   A browser without :has() keeps the language steps; the status pill, which
+   may shrink to its dot (see .studio-status), absorbs the rest.
+
    tests/browser-shell-layout.mjs measures every header control inside the
-   window in ar, ckb and en, Simple and Advanced. */
-@media (max-width: 1180px) {
+   window in ar, ckb and en, Simple and Advanced, including 1194-1300px. */
+@media (max-width: 1279px) {
   .studio-actions > :is(.new-project-action, .projects-action, .connect-action, .account-action) { padding: 0; }
   .studio-actions > :is(.new-project-action, .projects-action, .connect-action, .account-action) > span { display: none; }
+}
+@media (max-width: 1329px) {
+  :is(.studio-actions:has(> .header-slice-action, > .header-print-action), :root[lang="ckb"] .studio-actions) > :is(.new-project-action, .projects-action, .connect-action, .account-action) { padding: 0; }
+  :is(.studio-actions:has(> .header-slice-action, > .header-print-action), :root[lang="ckb"] .studio-actions) > :is(.new-project-action, .projects-action, .connect-action, .account-action) > span { display: none; }
+}
+@media (max-width: 1359px) {
+  :root[lang="ckb"] .studio-actions > :is(.new-project-action, .projects-action, .connect-action, .account-action) { padding: 0; }
+  :root[lang="ckb"] .studio-actions > :is(.new-project-action, .projects-action, .connect-action, .account-action) > span { display: none; }
+}
+@media (max-width: 1439px) {
+  :root[lang="ckb"] .studio-actions:is(:has(> .header-slice-action), :has(> .header-print-action)) > :is(.new-project-action, .projects-action, .connect-action, .account-action) { padding: 0; }
+  :root[lang="ckb"] .studio-actions:is(:has(> .header-slice-action), :has(> .header-print-action)) > :is(.new-project-action, .projects-action, .connect-action, .account-action) > span { display: none; }
 }
 @media (max-width: 1099px) {
   .studio-actions > :is(button, a, .file-select-control) { padding: 0; }

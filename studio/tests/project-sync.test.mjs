@@ -400,6 +400,84 @@ test("OPEN 409 surfaces a conflict with the server head — nothing uploaded, no
   assert.equal(named(api.calls, "commitRevision").length, 0);
 });
 
+test("OPEN refused with IDENTITY_CHANGED is an account failure, never a revision conflict to resolve", async () => {
+  const api = makeFakeApi({
+    openRevision() {
+      throw new StudioApiError(409, "IDENTITY_CHANGED", "This tab was opened for another account. Reload to continue.");
+    },
+  });
+  const result = await uploadSnapshotRevision(fullInput(api), { api, sleep: async () => {} });
+  assert.equal(result.ok, false);
+  assert.equal(result.kind, "auth");
+  assert.equal(named(api.calls, "openRevision").length, 1, "not retried");
+  assert.equal(named(api.calls, "uploadFile").length, 0);
+});
+
+test("every API call names the account this tab was rendered for; the identity refusal reloads the tab once", async () => {
+  const identity = await import("../app/studio-identity.ts");
+  const prefs = await import("../app/studio-mode.ts");
+  const seen = [];
+  let answer = () => new Response(JSON.stringify({ success: true, project: { id: "x" }, projects: [], prefs: { mode: "simple" }, stored: true }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+  const fetchImpl = async (input, init = {}) => {
+    seen.push({ input, init });
+    return answer();
+  };
+  const header = (init) => new Headers(init.headers).get(identity.EXPECTED_USER_HEADER);
+  const api = createStudioProjectsApi(fetchImpl);
+  const prefsApi = prefs.createStudioPrefsApi(fetchImpl);
+
+  const hadWindow = "window" in globalThis;
+  const previousWindow = globalThis.window;
+  const reloads = [];
+  const storage = new Map();
+  globalThis.window = {
+    location: { reload: () => reloads.push(Date.now()) },
+    sessionStorage: { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, String(v)) },
+  };
+  try {
+    // A guest tab names nobody.
+    identity.setExpectedStudioUser(null);
+    await api.listProjects();
+    assert.equal(header(seen.at(-1).init), null);
+
+    // A signed-in tab names its account on reads and writes alike, and the
+    // JSON content type of a write survives.
+    identity.setExpectedStudioUser("user-a");
+    await api.listProjects();
+    await api.createProject("x");
+    await prefsApi.put("advanced");
+    for (const { init } of seen.slice(1)) {
+      assert.equal(header(init), "user-a");
+      assert.equal(init.credentials, "same-origin");
+    }
+    assert.equal(new Headers(seen.at(-1).init.headers).get("Content-Type"), "application/json");
+    assert.equal(reloads.length, 0);
+
+    // The cookie now holds another account: the call fails as usual and the
+    // tab reloads — once, however many calls are refused.
+    answer = () => new Response(JSON.stringify({ success: false, code: "IDENTITY_CHANGED", error: "other account" }), {
+      status: 409,
+      headers: { "Content-Type": "application/json" },
+    });
+    await assert.rejects(() => api.createProject("x"), (error) => error instanceof StudioApiError && error.code === "IDENTITY_CHANGED");
+    await assert.rejects(() => prefsApi.put("simple"));
+    assert.equal(reloads.length, 1);
+
+    // A revision conflict (also 409) does not reload.
+    storage.clear();
+    answer = () => new Response(JSON.stringify({ success: false, code: "REVISION_CONFLICT", error: "moved" }), { status: 409 });
+    await assert.rejects(() => api.createProject("x"));
+    assert.equal(reloads.length, 1);
+  } finally {
+    identity.setExpectedStudioUser(null);
+    if (hadWindow) globalThis.window = previousWindow;
+    else delete globalThis.window;
+  }
+});
+
 test("COMMIT 409 surfaces a conflict and abandons the pending revision", async () => {
   const api = makeFakeApi({
     commitRevision() {

@@ -348,6 +348,39 @@ test("mode: invalid values are refused, guests get 401, an unknown stored value 
   assert.equal(prefsMod.DEFAULT_STUDIO_MODE, "simple");
 });
 
+test("a tab rendered for A cannot write into B: 409 IDENTITY_CHANGED and nothing written; the right account and header-less calls pass", async () => {
+  const { env, raw } = makeEnv();
+  const asA = { "X-Studio-Expect-User": USER_A.user.id, Origin: STUDIO };
+  const asB = { "X-Studio-Expect-User": USER_B.user.id, Origin: STUDIO };
+
+  // The cookie now holds B; the stale tab still says A.
+  const mode = await call(env, USER_B, "PUT", "/api/prefs", { body: { mode: "advanced" }, headers: asA });
+  assert.equal(mode.response.status, 409);
+  assert.equal(mode.json.code, "IDENTITY_CHANGED");
+  const stillB = await call(env, USER_B, "GET", "/api/prefs");
+  assert.deepEqual([stillB.json.prefs.mode, stillB.json.stored], ["simple", false], "B's choice was not written");
+
+  const create = await call(env, USER_B, "POST", "/api/projects", { body: { name: "A's work" }, headers: asA });
+  assert.equal(create.response.status, 409);
+  assert.equal(create.json.code, "IDENTITY_CHANGED");
+  assert.equal(projectCount(raw), 0, "no project was created in B's account");
+
+  // Reads are refused the same way, so the stale tab cannot list B's projects.
+  const list = await call(env, USER_B, "GET", "/api/projects", { headers: { "X-Studio-Expect-User": USER_A.user.id } });
+  assert.equal(list.response.status, 409);
+
+  // The tab that IS rendered for B, and a call that names nobody, pass.
+  const own = await call(env, USER_B, "POST", "/api/projects", { body: { name: "B's work" }, headers: asB });
+  assert.ok(own.response.ok, `expected success, got ${own.response.status}`);
+  assert.equal(projectCount(raw), 1);
+  const bare = await call(env, USER_B, "GET", "/api/projects");
+  assert.equal(bare.response.status, 200);
+
+  // A guest is still a 401, never an identity question.
+  const guest = await call(env, null, "PUT", "/api/prefs", { body: { mode: "advanced" }, headers: asA });
+  assert.equal(guest.response.status, 401);
+});
+
 test("migration 0002 is safe on every path: absent (bootstrap), after the bootstrap made its tables, and applied twice", async () => {
   // A database at 0001 (the live shape before this push) serves the new code.
   const { env, raw } = makeEnv({ upTo: "0001" });

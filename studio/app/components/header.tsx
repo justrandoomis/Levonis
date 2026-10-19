@@ -169,7 +169,7 @@ export default function StudioHeader(props: StudioHeaderProps) {
       </div>
       <div className="studio-status" data-status={props.status}>
         <i />
-        <span>{props.profileLoading ? t.profileLoading : props.statusLabel}</span>
+        <span title={props.profileLoading ? t.profileLoading : props.statusLabel}>{props.profileLoading ? t.profileLoading : props.statusLabel}</span>
         {!props.profileLoading && !props.profileVerified && <em className="status-preset-warning" title={t.presetFallbackWarning}><Icon name="warning" /></em>}
       </div>
       <div className="studio-actions">

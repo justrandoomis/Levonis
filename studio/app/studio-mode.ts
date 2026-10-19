@@ -33,6 +33,8 @@
  * rewrites the mirror nor pushes its own (stale) answer.
  */
 
+import { fetchAsExpectedUser } from "./studio-identity";
+
 export const STUDIO_MODES = ["simple", "advanced"] as const;
 export type StudioMode = (typeof STUDIO_MODES)[number];
 export const DEFAULT_STUDIO_MODE: StudioMode = "simple";
@@ -159,9 +161,11 @@ function parseAnswer(body: unknown): ServerModeAnswer {
 
 /** Same-origin `/api/prefs` client (credentials same-origin only, like project-sync). */
 export function createStudioPrefsApi(fetchImpl?: FetchLike): StudioPrefsApi {
+  // Like project-sync: the expected account rides along, so a choice made in
+  // a tab rendered for A is never stored as B's (studio-identity.ts).
   const doFetch: FetchLike = (input, init) => {
     const impl = fetchImpl ?? (globalThis.fetch as FetchLike);
-    return impl(input, { credentials: "same-origin", ...init });
+    return fetchAsExpectedUser(impl, input, { credentials: "same-origin", ...init });
   };
   const read = async (response: Response) => {
     if (!response.ok) throw new Error(`prefs request failed (${response.status})`);

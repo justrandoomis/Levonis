@@ -26,6 +26,8 @@
  *     namespace.
  */
 
+import { IDENTITY_CHANGED_CODE, fetchAsExpectedUser } from "./studio-identity";
+
 // ---------------------------------------------------------------------------
 // Shared types
 // ---------------------------------------------------------------------------
@@ -264,9 +266,12 @@ export interface StudioProjectsApi {
 }
 
 export function createStudioProjectsApi(fetchImpl?: FetchLike): StudioProjectsApi {
+  // Every call names the account this tab was rendered for; a refusal
+  // because the cookie now holds another account reloads the tab
+  // (studio-identity.ts).
   const doFetch: FetchLike = (input, init) => {
     const impl = fetchImpl ?? (globalThis.fetch as FetchLike);
-    return impl(input, { credentials: "same-origin", ...init });
+    return fetchAsExpectedUser(impl, input, { credentials: "same-origin", ...init });
   };
   const json = (body: unknown): RequestInit => ({
     headers: { "Content-Type": "application/json" },
@@ -474,7 +479,9 @@ function classifyApiError(error: unknown): {
   if (isAbortError(error)) return { kind: "cancelled", message: "Cancelled", retryable: false, status: null };
   if (error instanceof StudioApiError) {
     const status = error.status;
-    if (status === 401) return { kind: "auth", message: error.message, retryable: false, status };
+    // Another account signed in in another tab: not a revision conflict to
+    // resolve, and not retryable — the tab reloads as that account.
+    if (status === 401 || error.code === IDENTITY_CHANGED_CODE) return { kind: "auth", message: error.message, retryable: false, status };
     if (status === 413 || error.code === "QUOTA_EXCEEDED") {
       return { kind: "quota", message: error.message, retryable: false, status };
     }

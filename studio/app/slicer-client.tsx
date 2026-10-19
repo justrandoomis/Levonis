@@ -2156,13 +2156,25 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       }
       setNotice(event.value);
     } else if (event.type === "error") {
+      // An EMPTY value is the engine clearing its own error, which it does in
+      // the same commit that starts a slice (its simplified retry included),
+      // and its error event arrives after the slicing one. So it clears the
+      // message and the retry offer and leaves a live status alone: setting
+      // "error" here hid the progress and Cancel N% of exactly the slow,
+      // memory-heavy slice the retry is for.
+      if (!event.value) {
+        setError("");
+        setDowngradeOfferFor(null);
+        setStatus((current) => current === "error" ? "editing" : current);
+        return;
+      }
       // An engine error is the other honest end to the wait: no objects are
       // coming, so the row must not sit there until its ceiling runs out.
       endImportWait();
       setError(event.value);
       // The engine renders its retry offer in the same commit as this error,
       // so its button is already in the (possibly hidden) side panel here.
-      setDowngradeOfferFor(event.value && adapter.isControlAvailable("downgrade-retry") ? event.value : null);
+      setDowngradeOfferFor(adapter.isControlAvailable("downgrade-retry") ? event.value : null);
       setStatus("error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2170,6 +2182,9 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
 
   const handleSliced = useCallback((payload: SlicePayload) => {
     const outcome = slicing.handleSliced(payload);
+    // The slow-slice warning has done its job once a slice of the scene
+    // finishes; left up, it outlived the result and hid other messages.
+    setHeavyImportTriangles(null);
     if (outcome.overBed) {
       setError(templateText(t.overBedError, { printer: profile.shortName }));
       setStatus("error");
@@ -2400,6 +2415,22 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       ? t.savedLocalSourceOnly
       : t.autosaved;
 
+  /*
+    ONE MESSAGE SLOT, IN THIS ORDER: an error; the slow-slice warning when the
+    only notice is the generic «files were added» (it says more about the same
+    import, and the notice arrives first, so it used to hide the warning until
+    the person closed it — usually after slicing); any other notice; then the
+    outdated-result banner, which always shows when nothing above is up and
+    carries the slow-slice warning in its own text rather than being hidden by
+    it. A completed slice clears the warning (handleSliced).
+  */
+  const heavyImportText = heavyImportTriangles === null ? ""
+    : templateText(t.heavyModelWarning, { count: Math.round(heavyImportTriangles).toLocaleString(dateLocaleFor(locale)) });
+  const noticeIsOnlyImported = notice !== "" && notice.split(t.imported).every((part) => part.trim() === "");
+  const messageText = error || (heavyImportText && noticeIsOnlyImported ? "" : notice);
+  const staleBannerShown = currentStale && !messageText && status !== "slicing";
+  const heavyWarningShown = Boolean(heavyImportText) && !messageText && !staleBannerShown;
+
   return (
     <main className="studio-app">
       <StudioHeader
@@ -2495,8 +2526,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
             : <progress max="1" value={Math.max(0, Math.min(1, importProgress.ratio))} />}
         </div>}
 
-        {(error || notice) && <div className={`editor-message ${error ? "error" : "notice"}`} role={error ? "alert" : "status"}>
-          <span>{error || notice}</span>
+        {messageText && <div className={`editor-message ${error ? "error" : "notice"}`} role={error ? "alert" : "status"}>
+          <span>{messageText}</span>
           {error && downgradeOfferFor === error && <button className="message-action" data-levo-action="simplified-retry" title={t.simplifiedRetryHelp} onClick={simplifiedRetry}>{t.simplifiedRetry}</button>}
           {!error && arrangeUndoAvailable && <button className="message-action" onClick={undoArrange}>{t.arrangeUndo}</button>}
           {!error && orientUndoAvailable && <button className="message-action" onClick={undoOrient}>{t.orientUndo}</button>}
@@ -2504,13 +2535,13 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
           <button onClick={() => { setError(""); setNotice(""); setDowngradeOfferFor(null); if (status === "error") setStatus("editing"); }} aria-label={t.close}><Icon name="close" /></button>
         </div>}
 
-        {heavyImportTriangles !== null && !error && !notice && <div className="editor-message notice" role="status" data-levo-warning="heavy-import">
-          <span>{templateText(t.heavyModelWarning, { count: Math.round(heavyImportTriangles).toLocaleString(dateLocaleFor(locale)) })}</span>
-          <button onClick={() => setHeavyImportTriangles(null)} aria-label={t.close}><Icon name="close" /></button>
+        {heavyWarningShown && <div className="editor-message notice" role="status" data-levo-warning="heavy-import">
+          <span>{heavyImportText}</span>
+          <button onClick={() => { setHeavyImportTriangles(null); if (noticeIsOnlyImported) setNotice(""); }} aria-label={t.close}><Icon name="close" /></button>
         </div>}
 
-        {currentStale && !error && !notice && heavyImportTriangles === null && status !== "slicing" && <div className="stale-banner" role="status">
-          <Icon name="warning" /><span>{t.staleHelp}</span>
+        {staleBannerShown && <div className="stale-banner" role="status">
+          <Icon name="warning" /><span>{heavyImportText ? `${t.staleHelp} ${heavyImportText}` : t.staleHelp}</span>
           <button onClick={() => triggerSlice(false)}>{t.slice}</button>
         </div>}
 

@@ -279,6 +279,26 @@ export function refuseCrossOriginApiWrite(request: Request): Response | null {
   return apiError(403, "CROSS_ORIGIN_REFUSED", "Cross-origin request refused");
 }
 
+/**
+ * The account the calling tab was rendered for (app/studio-identity.ts). Not
+ * under the stripped `oai-` / `x-levo-` prefixes, so it reaches this point.
+ */
+export const EXPECTED_USER_HEADER = "x-studio-expect-user";
+
+/**
+ * A tab left open under account A, after the person signed in as B in another
+ * tab, still holds A's editor while the cookie now names B. When the tab says
+ * which account it expects and the session is another one, the call is
+ * refused with 409 IDENTITY_CHANGED before anything is read or written, and
+ * the tab reloads as B. A call without the header (an <img> thumbnail, an
+ * older client) is judged by the session alone, as before.
+ */
+export function refuseIdentityMismatch(request: Request, session: StudioSession): Response | null {
+  const expected = request.headers.get(EXPECTED_USER_HEADER);
+  if (expected === null || expected === session.user.id) return null;
+  return apiError(409, "IDENTITY_CHANGED", "This tab was opened for another account. Reload to continue.");
+}
+
 type AccountRoute = "quota" | "projects" | "uploads" | "prefs";
 
 function accountRouteOf(rest: string[]): AccountRoute | null {
@@ -298,7 +318,8 @@ function accountRouteOf(rest: string[]): AccountRoute | null {
  * Order, each step before the next can cost anything:
  *   1. a cross-origin write is refused (no session lookup, no database);
  *   2. health answers without a session;
- *   3. an account route needs a session (401 for guests, still no database);
+ *   3. an account route needs a session (401 for guests, still no database),
+ *      and the account the tab expects (409 IDENTITY_CHANGED otherwise);
  *   4. the signed-in call is charged against the rate limit (429 when over);
  *   5. the handler runs.
  */
@@ -329,6 +350,8 @@ export async function apiRouter(
 
     const s = requireSession(session);
     if (s instanceof Response) return s;
+    const otherAccount = refuseIdentityMismatch(request, s);
+    if (otherAccount) return otherAccount;
     if (route === "quota" && request.method !== "GET") return methodNotAllowed("GET");
     await ensureStudioTables(env.DB);
     const limited = await chargeStudioRateLimit(env, request, s);

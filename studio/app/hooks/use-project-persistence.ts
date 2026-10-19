@@ -58,6 +58,7 @@ import {
   setActiveDraftNamespace,
   type StoredLevoProject,
 } from "../project-store";
+import { setExpectedStudioUser } from "../studio-identity";
 
 export interface PersistenceUser {
   id: string;
@@ -201,6 +202,9 @@ export function useProjectPersistence(options: UseProjectPersistenceOptions): Us
     // and the previous controller is disposed (timers cleared, uploads
     // aborted) BEFORE a new one exists — mandate §4 / acceptance test T5.
     setActiveDraftNamespace(namespace);
+    // …and every account API call from this tab names this user, so a tab
+    // left open under A can never write into B (studio-identity.ts).
+    setExpectedStudioUser(userId);
 
     const callbacks: ProjectSyncCallbacks = {
       captureSnapshot: () => callbacksRef.current.captureSnapshot(),
