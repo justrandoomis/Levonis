@@ -110,7 +110,7 @@ export interface DeltaQueueInput {
    * owner deleted since (or whose source ref went with it) is counted `media_product_gone`, never queued.
    */
   liveProductBySid?: ReadonlyMap<string, string>;
-  /** Source ids an earlier delta run already COMPLETEd as a media item of `fromRun`: counted, never queued again. */
+  /** Source ids an earlier delta run already settled as a media item of `fromRun` (`retrySettled`): counted, never queued again. */
   alreadyRetried?: ReadonlySet<string>;
 }
 
@@ -132,7 +132,7 @@ export interface DeltaQueue {
     withdrawn_listed: number;
     /** COMPLETE items with failed media whose product is gone (deleted, or no longer carrying the source): not queued. */
     media_product_gone: number;
-    /** COMPLETE items with failed media that an earlier delta already retried to COMPLETE: not queued again. */
+    /** COMPLETE items with failed media that an earlier delta already settled (`retrySettled`): not queued again. */
     media_already_retried: number;
   };
 }
@@ -140,8 +140,8 @@ export interface DeltaQueue {
 /**
  * The delta queue: (a) the listed handles absent from every earlier run's items (and from every other handle known:
  * a source ref's, the reviewed manifest's), (b) the COMPLETE items of the closed run whose media failed, whose product
- * still carries the source and that no earlier delta already retried to COMPLETE. A withdrawn or blocked item is
- * neither new nor retried; a completed one without failures is not touched.
+ * still carries the source and that no earlier delta already settled. A withdrawn or blocked item is neither new nor
+ * retried; a completed one without failures is not touched.
  */
 export function deltaQueue(input: DeltaQueueInput): DeltaQueue {
   const listed = new Set(input.listedHandles);
@@ -193,25 +193,56 @@ export async function assertFromRun(db: D1Database, run: ImportRun, fromRun: unk
 export const DELTA_ITEM_SQL = `(discovery_sources LIKE '%"${DELTA_NEW}"%' OR discovery_sources LIKE '%"${MEDIA_RETRY}%')`;
 const DELTA_LIKE = DELTA_ITEM_SQL;
 
+/** Outcomes a later delta may do better on: the product was hidden, a fetch failed again, the page read as another product. */
+const PASSING_OUTCOMES = ['product_not_public', 'not_stored', 'identity_changed'] as const;
+
 /**
- * The source ids an earlier delta run (any run but `runId`) already took to COMPLETE as a media item of `fromRun`:
- * their pictures are attached, so a later delta from the same closed run never fetches them again (the owner may have
- * removed one since; it must not come back). A media item such a run left unfinished (BLOCKED, never reached) is not
- * here: a later delta retries it.
+ * Pure: whether an earlier delta's media item settled what it retried, from its state and the checkpoint its attach
+ * batch wrote (`stage_data.media_retry`: counts and the rows and swatches it attached).
+ *
+ *   - It attached something: settled, COMPLETE or not (BLOCKED at VERIFY, its run closed partial). Its pictures went
+ *     in; one the owner removed since must never come back, and a removed swatch leaves no trace to tell (an image
+ *     row leaves its source ref: mediaRetry.ts counts that one `owner_removed` all the same).
+ *   - It attached nothing and completed: settled unless a medium was left for a passing reason (the product hidden,
+ *     a fetch failed again, the page read as another product) — those a later delta takes again.
+ *   - Anything else (never reached its attach, or attached nothing and stopped): not settled.
+ */
+export function retrySettled(state: string, stageData: unknown): boolean {
+  let data: unknown;
+  try {
+    data = typeof stageData === 'string' ? JSON.parse(stageData || '{}') : stageData;
+  } catch {
+    return false;
+  }
+  const m = data && typeof data === 'object' ? (data as Record<string, unknown>).media_retry : null;
+  if (!m || typeof m !== 'object') return false;
+  const rec = m as Record<string, unknown>;
+  const attached = (Array.isArray(rec.rows) ? rec.rows.length : 0) + (Array.isArray(rec.swatches) ? rec.swatches.length : 0);
+  if (attached > 0) return true;
+  if (state !== 'COMPLETE') return false;
+  const counts = rec.counts && typeof rec.counts === 'object' ? (rec.counts as Record<string, unknown>) : {};
+  return PASSING_OUTCOMES.every((k) => !(Number(counts[k]) > 0));
+}
+
+/**
+ * The source ids an earlier delta run (any run but `runId`) already settled as a media item of `fromRun`
+ * (`retrySettled`): a later delta from the same closed run never queues them again. A media item such a run left
+ * before its attach (BLOCKED, never reached), or one that attached nothing for a passing reason, is not here: a later
+ * delta retries it.
  */
 async function retriedElsewhere(db: D1Database, runId: string, fromRun: string, sids?: readonly string[]): Promise<Set<string>> {
   const { results } = await db
     .prepare(
-      `SELECT source_product_id, discovery_sources FROM catalog_import_items
-        WHERE run_id <> ?1 AND processing_state = 'COMPLETE' AND discovery_sources LIKE ?2
+      `SELECT source_product_id, discovery_sources, processing_state, stage_data FROM catalog_import_items
+        WHERE run_id <> ?1 AND discovery_sources LIKE ?2
           AND (?3 IS NULL OR source_product_id IN (SELECT value FROM json_each(?3)))`
     )
     .bind(runId, `%"${MEDIA_RETRY}${fromRun}"%`, sids ? JSON.stringify(sids) : null)
-    .all<{ source_product_id: string; discovery_sources: string }>();
+    .all<{ source_product_id: string; discovery_sources: string; processing_state: string; stage_data: string }>();
   const out = new Set<string>();
   for (const r of results ?? []) {
     const mark = deltaMarkOf(r.discovery_sources);
-    if (mark?.kind === 'media' && mark.fromRun === fromRun) out.add(String(r.source_product_id));
+    if (mark?.kind === 'media' && mark.fromRun === fromRun && retrySettled(r.processing_state, r.stage_data)) out.add(String(r.source_product_id));
   }
   return out;
 }
@@ -284,7 +315,7 @@ export interface DeltaSkipped {
   known: number;
   /** A media row whose product is gone: deleted since the closed run, or no longer carrying the source. */
   media_product_gone: number;
-  /** A media row an earlier delta run already retried to COMPLETE. */
+  /** A media row an earlier delta run already settled (`retrySettled`). */
   media_already_retried: number;
 }
 
@@ -299,7 +330,7 @@ export interface DeltaSkipped {
  * is LEFT OUT and counted (`skipped`), never refused — a refusal would take every other row of the call with it and
  * stop every later delta the same way: a new row whose source id or handle is already held (an earlier run's item, a
  * product's source ref, the reviewed manifest: spec §O.2 "by handle; then by source id"), a media row whose product
- * is gone, or that an earlier delta already completed. A row already registered keeps its position; a new one takes
+ * is gone, or that an earlier delta already settled. A row already registered keeps its position; a new one takes
  * the next. Discovery fields change only while the item is DISCOVERED.
  */
 export async function acceptDeltaRows(

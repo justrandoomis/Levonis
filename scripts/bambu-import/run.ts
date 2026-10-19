@@ -80,6 +80,7 @@ import {
   type DocumentCheck,
   type HeldRef,
   type MediaAnswerRow,
+  type MediaPlanAnswer,
   type MediaRequest,
   type StatusAnswer,
   type WriteAnswer,
@@ -424,8 +425,13 @@ interface ItemWork {
   publishedThisJob: boolean;
   /** 'media': a delta run's media-only item (§O.3), whose stages write pictures and nothing else. */
   kind: 'item' | 'media';
-  /** A media item's plan (/media-plan): the failed media to fetch again, and the payload digest the Worker recorded. */
-  retry?: { sha: string; payload: ImportPayload; requests: MediaRequest[]; skipped: Record<string, number>; failed: number };
+  /**
+   * A media item's plan (/media-plan): the failed media to fetch again, and the payload digest the Worker recorded.
+   * `payload` null: the moot plan (the page no longer reads as this product; nothing is fetched or attached).
+   */
+  retry?: { sha: string; payload: ImportPayload | null; requests: MediaRequest[]; skipped: Record<string, number>; failed: number };
+  /** A media item whose page no longer reads as its product in this job (a renamed store handle): moot (§O.4). */
+  moot?: boolean;
   /** A media item's attached rows: this job's /media-attach answer, or stage_data.media_retry on a resume. */
   attached: AttachedMedia | null;
 }
@@ -1673,7 +1679,7 @@ export class Importer {
   private async runMediaStage(w: ItemWork, stage: Stage): Promise<ItemOutcome | null> {
     switch (stage) {
       case 'EXTRACTING':
-        await this.extract(w);
+        await this.extractMedia(w);
         await this.event(w, 'ENRICHING', 'ok', { detail: { source_fingerprint: w.payload?.extraction_sha256 ?? '', media_only: true } });
         return null;
       case 'ENRICHING':
@@ -1702,13 +1708,54 @@ export class Importer {
     }
   }
 
-  /** /media-plan: the rebuilt payload (the page read in this job), proved by the Worker; what to fetch again. */
+  /**
+   * A media item's page, read again (once a job). A lasting identity change — the store redirects the reviewed handle
+   * to another one (a renamed product), the page names another product or its JSON-LD disagrees, its options do not
+   * resolve — makes the item MOOT instead of BLOCKED IDENTITY_AMBIGUOUS: a media item writes nothing but pictures, so
+   * nothing needs proving, and a block could never clear (it is not SOURCE_WITHDRAWN, a resume meets the same page,
+   * the run could not close and the queue behind it would never run). The item then completes with nothing attached;
+   * a later delta takes it again (§O.4). Every other stop (a challenge, the page gone, the deadline) stays as it is.
+   */
+  private async extractMedia(w: ItemWork): Promise<void> {
+    if (w.payload || w.moot) return;
+    try {
+      await this.extract(w);
+      const errors = w.build!.report.errors;
+      if (errors.includes('IDENTITY_AMBIGUOUS') || errors.includes('DUPLICATE_VALUE_TEXT') || errors.includes('DUPLICATE_VARIANT')) throw blockedStop('IDENTITY_AMBIGUOUS', 'the options do not resolve');
+    } catch (err) {
+      if (!(err instanceof ImportStop) || err.code !== 'IDENTITY_AMBIGUOUS') throw err;
+      this.makeMoot(w);
+    }
+  }
+
+  private makeMoot(w: ItemWork): void {
+    w.moot = true;
+    w.payload = undefined;
+    w.build = undefined;
+    w.extraction = undefined;
+    this.log.item(w.row.queue_position, w.row.handle, 'EXTRACTING', 'media_moot', { what: 'identity_changed' });
+  }
+
+  /**
+   * /media-plan: the rebuilt payload (the page read in this job), proved by the Worker; what to fetch again. A moot
+   * item (extractMedia), or a payload the Worker finds is no longer this item's product as the import wrote it
+   * (IDENTITY_AMBIGUOUS: the handle, the product or the write mode), sends the moot plan instead.
+   */
   private async mediaPlan(w: ItemWork): Promise<void> {
-    await this.ensureExtracted(w);
-    const errors = w.build!.report.errors;
-    if (errors.includes('IDENTITY_AMBIGUOUS') || errors.includes('DUPLICATE_VALUE_TEXT') || errors.includes('DUPLICATE_VARIANT')) throw blockedStop('IDENTITY_AMBIGUOUS', 'the options do not resolve');
-    const payload = mediaOnlyPayload(w.payload!);
-    const a = await this.ops.mediaPlan(w.sid, w.leaseToken, payload);
+    await this.extractMedia(w);
+    let a: MediaPlanAnswer | null = null;
+    let payload: ImportPayload | null = null;
+    if (!w.moot) {
+      payload = mediaOnlyPayload(w.payload!);
+      try {
+        a = await this.ops.mediaPlan(w.sid, w.leaseToken, payload);
+      } catch (err) {
+        if (!(err instanceof OpsError) || err.kind !== 'permanent' || err.code !== 'IDENTITY_AMBIGUOUS') throw err;
+        this.makeMoot(w);
+        payload = null;
+      }
+    }
+    if (!a) a = await this.ops.mediaPlan(w.sid, w.leaseToken, null);
     w.retry = { sha: a.payload_sha256, payload, requests: a.media, skipped: a.skipped, failed: a.failed };
     w.stagedSha = a.payload_sha256;
     const k = a.skipped;
@@ -1719,6 +1766,7 @@ export class Importer {
       not_in_source: k.not_in_source ?? 0,
       primary_unchanged: k.primary_unchanged ?? 0,
       product_not_public: k.product_not_public ?? 0,
+      identity_changed: k.identity_changed ?? 0,
     });
   }
 
@@ -1736,6 +1784,7 @@ export class Importer {
       rows: a.rows.length,
       swatches: a.swatches.length,
       already_present: c.already_present ?? 0,
+      owner_removed: c.owner_removed ?? 0,
       duplicate_content: c.duplicate_content ?? 0,
       target_missing: c.target_missing ?? 0,
       not_stored: c.not_stored ?? 0,
@@ -1743,9 +1792,10 @@ export class Importer {
   }
 
   /**
-   * VERIFY of a media item: the anonymous site answer of the product shows every attached picture (its image rows,
-   * its values' swatches), with the cache rule (§I.1.9: purge again, wait s-maxage + 60 s, once); then /media-complete,
-   * where the Worker recomputes the rows in D1 and the objects in R2. Nothing attached: nothing to see.
+   * VERIFY of a media item: the anonymous site answer of the product (its image rows, its values' swatches), with the
+   * cache rule (§I.1.9: purge again, wait s-maxage + 60 s, once). What it saw goes to /media-complete every round: the
+   * Worker decides, against what the product still holds (a picture the owner removed or replaced since the attach,
+   * or a product hidden since, is not expected) and the objects in R2. Nothing attached: nothing to see.
    */
   private async verifyMediaRetry(w: ItemWork): Promise<ItemOutcome> {
     if (!w.slug || !w.attached) await this.relearn(w);
@@ -1778,15 +1828,13 @@ export class Importer {
         }
       }
       this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'media_seen', { rows_seen: rowsSeen, rows: att.rows.length, swatches_seen: swatchesSeen, swatches: att.swatches.length, status });
-      if (nothing || (status === 200 && rowsSeen === att.rows.length && swatchesSeen === att.swatches.length)) {
-        const done = await this.ops.mediaComplete(w.sid, w.leaseToken, this.liveUrl(w), { version: 1, live_url: this.liveUrl(w), round, status, rows_seen: rowsSeen, swatches_seen: swatchesSeen });
-        if (done.state === 'COMPLETE') {
-          this.gate.noteComplete(w.sid, done.seq);
-          w.state = 'COMPLETE';
-          this.log.item(w.row.queue_position, w.row.handle, 'COMPLETE', 'complete', { url: this.liveUrl(w) });
-          this.sealItem(w, { outcome: 'complete', media_only: true, plan: w.retry ? { failed: w.retry.failed, requests: w.retry.requests.length, skipped: w.retry.skipped } : null, attached: { rows: att.rows.length, swatches: att.swatches.length }, d1_checks: done.d1_checks });
-          return { kind: 'complete', url: this.liveUrl(w) };
-        }
+      const done = await this.ops.mediaComplete(w.sid, w.leaseToken, this.liveUrl(w), { version: 1, live_url: this.liveUrl(w), round, status, rows_seen: rowsSeen, swatches_seen: swatchesSeen });
+      if (done.state === 'COMPLETE') {
+        this.gate.noteComplete(w.sid, done.seq);
+        w.state = 'COMPLETE';
+        this.log.item(w.row.queue_position, w.row.handle, 'COMPLETE', 'complete', { url: this.liveUrl(w) });
+        this.sealItem(w, { outcome: 'complete', media_only: true, plan: w.retry ? { failed: w.retry.failed, requests: w.retry.requests.length, skipped: w.retry.skipped } : null, attached: { rows: att.rows.length, swatches: att.swatches.length }, d1_checks: done.d1_checks });
+        return { kind: 'complete', url: this.liveUrl(w) };
       }
       if (round === 2) break;
       if (!this.deadline.fits(wait, AFTER_CACHE_WAIT)) throw new ImportStop('DEADLINE_EXIT', 'deadline', 'the cache wait does not fit', { needMs: wait });
@@ -1903,7 +1951,9 @@ export class Importer {
   async withdraw(): Promise<number> {
     if (!this.cfg.item) throw new ConfigError('withdraw needs the item');
     await this.hello();
-    const row = this.deps.bundle.bySid.get(this.cfg.item);
+    // A delta run's new product is not in the reviewed manifest: its row is the one the Worker registered (rowOf).
+    this.deltaView = new Map(this.runIsDelta ? (await this.ops.deltaRows()).map((r) => [r.source_product_id, r]) : []);
+    const row = this.rowOf(this.cfg.item)?.row;
     if (!row) throw new JobStop('REVIEWED_SCOPE_REFUSED', true);
     const found = await this.withdrawEvidence(row);
     if (!found) {

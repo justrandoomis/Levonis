@@ -30,8 +30,8 @@ import type { ImportPayload } from '../packages/catalog/src/bambuImport/payload'
 import type { ImportRun } from '../worker/lib/catalogImport/auth';
 import { OpsRefusal } from '../worker/lib/catalogImport/auth';
 import { applyEvent, finishPublishing, itemBySource, type ItemRow } from '../worker/lib/catalogImport/items';
-import { acceptDeltaRows, DELTA_NEW_MAX, deltaMarkOf, deltaPlan, deltaQueue, deltaSources, isReservedSource, withDeltaRows, deltaRowsOf } from '../worker/lib/catalogImport/delta';
-import { attachRetriedMedia, completeMediaRetry, planMediaRetry, retryPlan } from '../worker/lib/catalogImport/mediaRetry';
+import { acceptDeltaRows, DELTA_NEW_MAX, deltaMarkOf, deltaPlan, deltaQueue, deltaSources, isReservedSource, retrySettled, withDeltaRows, deltaRowsOf } from '../worker/lib/catalogImport/delta';
+import { attachRetriedMedia, completeMediaRetry, MOOT_IDENTITY, MOOT_SHA256, planMediaRetry, retryPlan } from '../worker/lib/catalogImport/mediaRetry';
 import { deleteProductPermanently } from '../worker/lib/productDeletion';
 import { ConfigError, configFromEnv, DELTA_NEW_MAX as RUNNER_NEW_MAX, mediaOnlyPayload, resumeTargetOf } from '../scripts/bambu-import/run';
 
@@ -625,7 +625,10 @@ test('a retried picture byte-identical to one shown under ANOTHER value is attac
        VALUES ('cii_again', ?, 'bambu_us', ?, 'pla-basic-filament', 'x', 1, ?, ?)`
     )
     .run(RUN_C, sid, JSON.stringify(deltaSources('media', RUN_ID)), AT);
+  // As if B had never gone in (its row and its source ref gone: a row the import wrote and the owner removed is
+  // `owner_removed`, tested below): the owner shows the same picture under the same value themselves.
   w.raw.prepare('DELETE FROM product_images WHERE id = ?').run(b.id);
+  w.raw.prepare("DELETE FROM product_option_source_refs WHERE product_id = ? AND kind = 'image' AND levonis_id = ?").run(productId, b.id);
   w.raw.prepare("INSERT INTO product_images (id, product_id, url, sort_order, is_primary, option_value_id, r2_key, source_url) VALUES ('pi_owner_copy', ?, ?, 99, 0, ?, ?, 'https://levonis-iq.com/x')").run(productId, `/files/${keyOfA}`, b.option_value_id, keyOfA);
   walk(w, 'cii_again', 'VALIDATING');
   const again = await itemBySource(w.db, RUN_C, sid);
@@ -637,4 +640,180 @@ test('a retried picture byte-identical to one shown under ANOTHER value is attac
   const writing2 = await itemBySource(w.db, RUN_C, sid);
   const r2 = await attachRetriedMedia(envOf(w), runOf(RUN_C), writing2, w.bundle, { payload_sha256: writing2.payload_sha256, payload });
   assert.deepEqual([r2.counts.attached, r2.counts.duplicate_content], [0, 1], 'shown already under the same value: left out');
+});
+
+// ---------------------------------------------------------------- an earlier delta, the owner, a renamed page
+
+/** The ids of the rows of one medium the attach answered (the payload's rows of that medium). */
+const rowsOfMedium = (payload: ImportPayload, attached: ReadonlyArray<{ id: string }>, mediumId: string) =>
+  attached.filter((r) => payload.images.some((i) => i.id === r.id && i.source_media_id === mediumId)).map((r) => r.id);
+
+/** A media item registered in `runId` by hand (as a later delta would), walked to VALIDATING. */
+async function byHand(w: World, runId: string, sid: string, id: string): Promise<ItemRow> {
+  w.raw
+    .prepare(
+      `INSERT INTO catalog_import_items (id, run_id, source, source_product_id, handle, canonical_url, queue_position, discovery_sources, discovered_at)
+       VALUES (?, ?, 'bambu_us', ?, 'pla-basic-filament', 'x', 1, ?, ?)`
+    )
+    .run(id, runId, sid, JSON.stringify(deltaSources('media', RUN_ID)), AT);
+  walk(w, id, 'VALIDATING');
+  return itemBySource(w.db, runId, sid);
+}
+
+test('a picture or swatch an earlier delta attached is never put back once the owner removed it, even when that delta never reached COMPLETE', async () => {
+  const { w, sid, productId } = await closedRunWithFailures('pla-basic-filament', PICK_PLA);
+  const payload = mediaOnlyPayload(buildFor(w, 'pla-basic-filament').payload);
+  // Delta B attaches and publishes, then its VERIFY blocks; run B closes partial.
+  const item = await deltaItem(w, RUN_B, sid);
+  const plan = await planMediaRetry(w.db, item, payload);
+  for (const m of plan.media) storeFor(w, RUN_B, sid, m.source_media_id, m.role, m.source_url);
+  walk(w, item.id, 'WRITING');
+  const writing = await itemBySource(w.db, RUN_B, sid);
+  const a = await attachRetriedMedia(envOf(w), runOf(RUN_B), writing, w.bundle, { payload_sha256: writing.payload_sha256, payload });
+  assert.equal(a.swatches.length, 1);
+  await finishPublishing(w.db, runOf(RUN_B), await itemBySource(w.db, RUN_B, sid));
+  await applyEvent(w.db, runOf(RUN_B), await itemBySource(w.db, RUN_B, sid), { state: 'BLOCKED', outcome: 'blocked', code: 'VERIFY_FAILED_PERSISTENT', retry_at: '', release: false, detail: {} });
+  w.raw.prepare("UPDATE catalog_import_runs SET state = 'partial' WHERE id = ?").run(RUN_B);
+  // The owner removes one retried picture (every row of it) and the swatch: the admin save deletes the rows it does
+  // not keep, never their source refs.
+  const gone = plan.media.find((m) => m.role === 'gallery')!.source_media_id;
+  const removed = rowsOfMedium(payload, a.rows, gone);
+  assert.ok(removed.length >= 1);
+  for (const id of removed) w.raw.prepare('DELETE FROM product_images WHERE id = ?').run(id);
+  w.raw.prepare('DELETE FROM product_option_value_swatches WHERE option_value_id = ?').run(a.swatches[0].option_value_id);
+  const settled = productState(w, productId);
+
+  // Delta C from the same closed run: B attached, so the item is settled — never queued, never registered.
+  w.raw.prepare("INSERT INTO catalog_import_runs (id, source, state) VALUES (?, 'bambu_us', 'open')").run(RUN_C);
+  const planC = await deltaPlan(w.db, runOf(RUN_C), { from_run: RUN_ID, sitemap_handles: ['pla-basic-filament'] }, w.bundle);
+  assert.deepEqual([planC.media, planC.counts.media_items, planC.counts.media_already_retried], [[], 0, 1]);
+  const regC = await acceptDeltaRows(w.db, runOf(RUN_C), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'media', source_product_id: sid, discovered_at: AT }] });
+  assert.deepEqual(regC, { accepted: 0, new: 0, media: 0, skipped: { ...NONE_SKIPPED, media_already_retried: 1 } });
+
+  // And an item registered anyway puts back neither: the image rows' source refs, and B's checkpoint for the
+  // swatch, say the owner removed them.
+  const again = await byHand(w, RUN_C, sid, 'cii_by_hand');
+  const plan2 = await planMediaRetry(w.db, again, payload);
+  for (const m of plan2.media) {
+    const old = w.raw.prepare('SELECT r2_key FROM catalog_import_media WHERE run_id = ? AND source_product_id = ? AND source_media_id = ?').get(RUN_B, sid, m.source_media_id) as { r2_key: string };
+    w.raw
+      .prepare("INSERT INTO catalog_import_media (run_id, source_product_id, source_media_id, role, source_url, status, r2_key, width, height) VALUES (?, ?, ?, ?, ?, 'stored', ?, 80, 60)")
+      .run(RUN_C, sid, m.source_media_id, m.role, m.source_url, old.r2_key);
+  }
+  walk(w, again.id, 'WRITING');
+  const writing2 = await itemBySource(w.db, RUN_C, sid);
+  const c = await attachRetriedMedia(envOf(w), runOf(RUN_C), writing2, w.bundle, { payload_sha256: writing2.payload_sha256, payload });
+  assert.deepEqual([c.counts.attached, c.counts.owner_removed, c.counts.already_present], [0, 2, 1], JSON.stringify(c.counts));
+  assert.deepEqual([c.rows, c.swatches], [[], []]);
+  assert.deepEqual(productState(w, productId), settled, 'nothing the owner removed came back');
+});
+
+test('a failed swatch for a value the owner hid since, or a value of a hidden group, is never attached (it could never be seen); VERIFY expects only what the product still holds and shows', async () => {
+  for (const hide of ['value', 'group'] as const) {
+    const { w, sid, productId, failed } = await closedRunWithFailures('pla-basic-filament', PICK_PLA);
+    const payload = mediaOnlyPayload(buildFor(w, 'pla-basic-filament').payload);
+    const valueId = payload.swatches.find((s) => s.source_media_id === failed.find((f) => f.role === 'swatch')!.id)!.value_id;
+    if (hide === 'value') w.raw.prepare('UPDATE product_option_values SET active = 0 WHERE id = ? AND product_id = ?').run(valueId, productId);
+    else w.raw.prepare('UPDATE product_option_groups SET active = 0 WHERE id = (SELECT group_id FROM product_option_values WHERE id = ?) AND product_id = ?').run(valueId, productId);
+    const item = await deltaItem(w, RUN_B, sid);
+    const plan = await planMediaRetry(w.db, item, payload);
+    for (const m of plan.media) storeFor(w, RUN_B, sid, m.source_media_id, m.role, m.source_url);
+    walk(w, item.id, 'WRITING');
+    const writing = await itemBySource(w.db, RUN_B, sid);
+    const a = await attachRetriedMedia(envOf(w), runOf(RUN_B), writing, w.bundle, { payload_sha256: writing.payload_sha256, payload });
+    assert.deepEqual([a.swatches, a.counts.target_missing, a.counts.attached], [[], 1, 2], `${hide}: ${JSON.stringify(a.counts)}`);
+    assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM product_option_value_swatches WHERE option_value_id = ?', valueId), 0);
+    assert.ok(a.rows.length >= 2);
+
+    await finishPublishing(w.db, runOf(RUN_B), await itemBySource(w.db, RUN_B, sid));
+    const verifying = await itemBySource(w.db, RUN_B, sid);
+    const env = { DB: w.db, BUCKET: w.bucket as never, R2_PUBLIC: w.bucket as never, R2_PRIVATE: w.media.R2_PRIVATE as never };
+    const live = `${ORIGIN}/product/${verifying.slug}`;
+    const evidence = (status: number, rows: number) => ({ lease_token: LEASE, live_url: live, edge_evidence: { version: 1, live_url: live, round: 1, status, rows_seen: rows, swatches_seen: 0 } });
+    if (hide === 'value') {
+      // The owner removed one attached row before VERIFY: no longer expected (it could never be seen again).
+      w.raw.prepare('DELETE FROM product_images WHERE id = ?').run(a.rows[0].id);
+      const short = await completeMediaRetry(env, `${ORIGIN}/api/ops/catalog-import/x`, runOf(RUN_B), verifying, evidence(200, a.rows.length - 2));
+      assert.equal(short.state, 'VERIFYING_LIVE', 'a row still held that the public product does not show: nothing moves');
+      const done = await completeMediaRetry(env, `${ORIGIN}/api/ops/catalog-import/x`, runOf(RUN_B), await itemBySource(w.db, RUN_B, sid), evidence(200, a.rows.length - 1));
+      assert.equal(done.state, 'COMPLETE');
+      assert.deepEqual((done.d1_checks.media_retry as Record<string, unknown>).rows_present, a.rows.length - 1);
+    } else {
+      // The owner hid the product before VERIFY: nothing to see, nothing held back.
+      w.raw.prepare("UPDATE products SET status = 'draft' WHERE id = ?").run(productId);
+      const done = await completeMediaRetry(env, `${ORIGIN}/api/ops/catalog-import/x`, runOf(RUN_B), verifying, evidence(404, 0));
+      assert.equal(done.state, 'COMPLETE');
+    }
+  }
+});
+
+test('a media item whose page no longer reads as its product (a renamed store handle) is moot: nothing fetched or attached, COMPLETE, and a later delta takes it again', async () => {
+  const { w, sid, productId } = await closedRunWithFailures('pla-basic-filament', PICK_PLA);
+  const before = productState(w, productId);
+  const payload = mediaOnlyPayload(buildFor(w, 'pla-basic-filament').payload);
+  const item = await deltaItem(w, RUN_B, sid);
+  const bad = (e: unknown) => e instanceof OpsRefusal && e.code === 'IMPORT_BAD_REQUEST';
+  const notStaged = (e: unknown) => e instanceof OpsRefusal && e.code === 'IMPORT_NOT_STAGED';
+  // The moot never comes with a payload, and is the one word.
+  await assert.rejects(() => planMediaRetry(w.db, item, payload, MOOT_IDENTITY), bad);
+  await assert.rejects(() => planMediaRetry(w.db, item, undefined, 'gone'), bad);
+  const plan = await planMediaRetry(w.db, item, undefined, MOOT_IDENTITY);
+  assert.deepEqual([plan.media, plan.failed, plan.skipped.identity_changed, plan.payload_sha256], [[], 4, 4, MOOT_SHA256]);
+  walk(w, item.id, 'WRITING');
+  const writing = await itemBySource(w.db, RUN_B, sid);
+  // A payload never stands in for the moot plan.
+  await assert.rejects(() => attachRetriedMedia(envOf(w), runOf(RUN_B), writing, w.bundle, { payload_sha256: writing.payload_sha256, payload }), notStaged);
+  const a = await attachRetriedMedia(envOf(w), runOf(RUN_B), writing, w.bundle, { payload_sha256: writing.payload_sha256, moot: MOOT_IDENTITY });
+  assert.deepEqual([a.rows, a.swatches, a.counts.attached, a.counts.identity_changed, a.product_id], [[], [], 0, 4, productId]);
+  await finishPublishing(w.db, runOf(RUN_B), await itemBySource(w.db, RUN_B, sid));
+  const verifying = await itemBySource(w.db, RUN_B, sid);
+  const env = { DB: w.db, BUCKET: w.bucket as never, R2_PUBLIC: w.bucket as never, R2_PRIVATE: w.media.R2_PRIVATE as never };
+  const live = `${ORIGIN}/product/${verifying.slug}`;
+  const done = await completeMediaRetry(env, `${ORIGIN}/api/ops/catalog-import/x`, runOf(RUN_B), verifying, {
+    lease_token: LEASE,
+    live_url: live,
+    edge_evidence: { version: 1, live_url: live, round: 1, status: 0, rows_seen: 0, swatches_seen: 0 },
+  });
+  assert.equal(done.state, 'COMPLETE', 'the queue behind it is free; the run can close');
+  assert.deepEqual(productState(w, productId), before, 'nothing written');
+  w.raw.prepare("UPDATE catalog_import_runs SET state = 'closed' WHERE id = ?").run(RUN_B);
+
+  // Nothing was attached, for a passing reason: a later delta from the same closed run takes it again.
+  w.raw.prepare("INSERT INTO catalog_import_runs (id, source, state) VALUES (?, 'bambu_us', 'open')").run(RUN_C);
+  const planC = await deltaPlan(w.db, runOf(RUN_C), { from_run: RUN_ID, sitemap_handles: ['pla-basic-filament'] }, w.bundle);
+  assert.deepEqual([planC.media.map((m) => m.source_product_id), planC.counts.media_already_retried], [[sid], 0]);
+  // There the page reads as the product again: the payload's plan, and the moot never stands in for it.
+  const regC = await acceptDeltaRows(w.db, runOf(RUN_C), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'media', source_product_id: sid, discovered_at: AT }] });
+  assert.deepEqual(regC, { accepted: 1, new: 0, media: 1, skipped: NONE_SKIPPED });
+  walk(w, (await itemBySource(w.db, RUN_C, sid)).id, 'VALIDATING');
+  const itemC = await itemBySource(w.db, RUN_C, sid);
+  const planned = await planMediaRetry(w.db, itemC, payload);
+  assert.equal(planned.media.length, 3);
+  walk(w, itemC.id, 'WRITING');
+  const writingC = await itemBySource(w.db, RUN_C, sid);
+  await assert.rejects(() => attachRetriedMedia(envOf(w), runOf(RUN_C), writingC, w.bundle, { payload_sha256: writingC.payload_sha256, moot: MOOT_IDENTITY }), notStaged);
+});
+
+test('an earlier delta settles a media item when it attached something (COMPLETE or not), or completed with nothing left for a passing reason', () => {
+  const sd = (rows: number, swatches: number, counts: Record<string, number> = {}) =>
+    JSON.stringify({
+      media_retry: {
+        counts,
+        rows: Array.from({ length: rows }, (_, i) => ({ id: `r${i}`, r2_key: 'k' })),
+        swatches: Array.from({ length: swatches }, (_, i) => ({ option_value_id: `v${i}`, r2_key: 'k' })),
+      },
+    });
+  // Attached: settled whatever became of the item (a picture the owner removed since must not come back).
+  assert.equal(retrySettled('BLOCKED', sd(1, 0)), true);
+  assert.equal(retrySettled('PUBLISHING', sd(0, 1)), true);
+  assert.equal(retrySettled('COMPLETE', sd(2, 1)), true);
+  // Nothing attached, COMPLETE: settled unless a medium was left for a passing reason.
+  assert.equal(retrySettled('COMPLETE', sd(0, 0, { role_not_attachable: 1, already_present: 2, not_in_source: 1 })), true);
+  assert.equal(retrySettled('COMPLETE', sd(0, 0, { product_not_public: 3 })), false, 'the product was hidden: retried once it is shown');
+  assert.equal(retrySettled('COMPLETE', sd(0, 0, { not_stored: 1 })), false, 'a fetch failed again');
+  assert.equal(retrySettled('COMPLETE', sd(0, 0, { identity_changed: 2 })), false, 'the page read as another product');
+  // Never reached its attach, or attached nothing and stopped: not settled.
+  assert.equal(retrySettled('BLOCKED', sd(0, 0)), false);
+  assert.equal(retrySettled('BLOCKED', '{}'), false);
+  assert.equal(retrySettled('COMPLETE', 'not json'), false);
 });

@@ -756,9 +756,13 @@ export class OpsClient {
     });
   }
 
-  /** Idempotent: it records the payload's digest again and answers the same plan for the same page. */
-  async mediaPlan(sid: string, leaseToken: string, payload: ImportPayload): Promise<MediaPlanAnswer> {
-    const a = await this.send('media-plan', 'POST', this.sidPath(sid, 'media-plan'), { lease_token: leaseToken, payload: payload as unknown as Rec }, true);
+  /**
+   * Idempotent: it records the payload's digest again and answers the same plan for the same page. `null`: the moot
+   * plan (the page no longer reads as this product: nothing is fetched or attached, §O.4).
+   */
+  async mediaPlan(sid: string, leaseToken: string, payload: ImportPayload | null): Promise<MediaPlanAnswer> {
+    const body: Rec = payload ? { lease_token: leaseToken, payload: payload as unknown as Rec } : { lease_token: leaseToken, moot: 'identity_changed' };
+    const a = await this.send('media-plan', 'POST', this.sidPath(sid, 'media-plan'), body, true);
     return {
       payload_sha256: str(a.payload_sha256),
       media: (Array.isArray(a.media) ? a.media : []).flatMap((m) => {
@@ -771,8 +775,11 @@ export class OpsClient {
   }
 
   /** Not idempotent in the call: an ambiguous failure asks /lease what committed (the batch moves the item on). */
-  async mediaAttach(sid: string, leaseToken: string, payloadSha256: string, payload: ImportPayload): Promise<MediaAttachAnswer> {
-    const a = await this.send('media-attach', 'POST', this.sidPath(sid, 'media-attach'), { lease_token: leaseToken, payload_sha256: payloadSha256, payload: payload as unknown as Rec }, false);
+  async mediaAttach(sid: string, leaseToken: string, payloadSha256: string, payload: ImportPayload | null): Promise<MediaAttachAnswer> {
+    const body: Rec = payload
+      ? { lease_token: leaseToken, payload_sha256: payloadSha256, payload: payload as unknown as Rec }
+      : { lease_token: leaseToken, payload_sha256: payloadSha256, moot: 'identity_changed' };
+    const a = await this.send('media-attach', 'POST', this.sidPath(sid, 'media-attach'), body, false);
     const rows = attachedMediaOf(a) ?? { rows: [], swatches: [] };
     return { product_id: str(a.product_id), slug: str(a.slug), counts: numbers(a.counts), ...rows };
   }

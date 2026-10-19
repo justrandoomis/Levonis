@@ -16,7 +16,11 @@
  *                 matches file does not settle (REVIEWED_SCOPE_REFUSED), staged once a reviewed `distinct` entry is
  *                 bundled
  *   a rename      the sitemap lists a handle no run held whose page gives a source id run A holds (the store renamed
- *                 the handle): the row is left out and counted, the media item is registered and worked all the same
+ *                 the handle): the row is left out and counted, the media item is registered and worked all the same;
+ *                 the media item's OWN page renamed (its reviewed handle 301s to another): moot, COMPLETE with nothing
+ *                 attached, and the delta run closes
+ *   withdraw      a delta run's NEW product gone at the source: mode=withdraw finds its row (the Worker registered
+ *                 it; the reviewed manifest never names it) and withdraws it
  *
  * Run: node --import tsx --test tests/catalogImportDeltaE2E.test.ts
  */
@@ -50,12 +54,13 @@ const PAGES: Record<string, string> = {
   'filament-buffer': readFileSync(join(BAMBU_FIXTURES, 'filament-buffer.page.html'), 'utf8'),
 };
 
-/** The store: robots.txt, the three sitemaps (listing `listed`), and the committed pages. */
-function storeAnswer(path: string, listed: readonly string[], seen: string[]): Response {
+/** The store: robots.txt, the three sitemaps (listing `listed`), the redirects of renamed handles, and the committed pages. */
+function storeAnswer(path: string, listed: readonly string[], seen: string[], redirects: Readonly<Record<string, string>> = {}): Response {
   seen.push(path);
   if (path === '/robots.txt') return new Response('User-agent: *\nDisallow: /cart\n', { status: 200 });
   if (path === '/sitemap_products_1.xml') return new Response(`<urlset>${listed.map((h) => `<url><loc>${STORE}/products/${h}</loc></url>`).join('')}</urlset>`, { status: 200 });
   if (path.endsWith('.xml')) return new Response('<urlset></urlset>', { status: 200 });
+  if (redirects[path]) return new Response('', { status: 301, headers: { location: redirects[path] } });
   const m = /^\/products\/([^/]+)$/.exec(path);
   const page = m ? PAGES[decodeURIComponent(m[1])] : undefined;
   return page ? new Response(page, { status: 200, headers: { 'content-type': 'text/html' } }) : new Response('gone', { status: 404 });
@@ -324,12 +329,114 @@ test('mode=delta: a renamed store handle (its source id held by an earlier run) 
     assert.equal(outputs.blocked, 'false', log);
     // The plan saw the new handle; its page was read once and gave the source id run A holds.
     assert.ok(storeSeen.includes('/products/filament-buffer'));
-    assert.match(log, /left out: 1 new rows whose product an earlier run or a product already holds, 0 media items whose product is gone, 0 media items an earlier delta already completed/);
+    assert.match(log, /left out: 1 new rows whose product an earlier run or a product already holds, 0 media items whose product is gone, 0 media items an earlier delta already settled/);
     // The media item registered and worked to COMPLETE; nothing registered for the renamed handle.
     const items = w.raw.prepare('SELECT source_product_id, processing_state FROM catalog_import_items WHERE run_id = ? ORDER BY queue_position').all(DELTA) as Array<Record<string, string>>;
     assert.deepEqual(items.map((i) => [i.source_product_id, i.processing_state]), [[sid, 'COMPLETE']]);
     assert.match(log, /media-only: 2 media attached/);
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+    restoreFetch();
+  }
+});
+
+/** The real runner on the real Worker of `w`, against the fake store (`listed`, `redirects`, the committed pages). */
+function importerOf(w: World, ops: OpsWorld, dataDir: string, dir: string, clock: FakeClock, part: Partial<RunConfig>, store: { listed: string[]; redirects?: Record<string, string>; seen: string[] }) {
+  const fetchLike = async (url: string, init: RequestInit) => {
+    const u = new URL(url);
+    if (u.origin === STORE) return storeAnswer(u.pathname, store.listed, store.seen, store.redirects);
+    if (u.origin === SITE) return ops.fetch(url, init);
+    return new Response('no', { status: 404 });
+  };
+  const lines: string[] = [];
+  const outputs: Record<string, string> = {};
+  const cfg: RunConfig = {
+    mode: 'delta', runId: '', fromRun: RUN_ID, maxItems: 0, resume: false, chain: false, chainCount: 0, autoWithdraw: false, item: '',
+    siteOrigin: SITE, storeOrigin: STORE, dataDir, outDir: join(dir, 'out'), sealKey: 'k'.repeat(43), githubRunId: '1', codeCommit: '', deadlineMs: clock.now() + 330 * 60_000,
+    ...part,
+  };
+  const importer = new Importer(cfg, {
+    clock,
+    fetch: fetchLike,
+    log: new ImportLog((l) => lines.push(l), { siteOrigin: SITE }),
+    token: TOKEN,
+    bundle: loadReviewedBundle(dataDir),
+    seal: (_name, data) => data.length,
+    output: (k, v) => {
+      outputs[k] = v;
+    },
+    summary: new SummaryWriter(undefined),
+    openedRunId: cfg.mode === 'delta' ? DELTA : undefined,
+    browser: async () => ({ check: async () => assert.fail('a media item never opens the browser'), close: async () => {} }),
+  });
+  return { importer, lines, outputs };
+}
+
+test('mode=delta: the media item\'s own page renamed at the store (its handle 301s to another) is moot — COMPLETE with nothing attached — and the delta run closes', async () => {
+  const { w, sid, productId } = await closedRunA();
+  const dir = mkdtempSync(join(tmpdir(), 'levonis-delta-moot-'));
+  try {
+    const ops = opsOf(w);
+    const dataDir = writeBundle(w, dir);
+    installCdnDouble(ops);
+    openRun(w.raw, { id: DELTA });
+    const beforeImages = imagesOf(w, productId);
+    const clock = new FakeClock(Date.now());
+    // The store renamed ams-2-pro: the old handle answers 301 to the new one, and the sitemap lists the new one.
+    PAGES['ams-2-pro-new'] = PAGES['ams-2-pro'];
+    const store = { listed: ['ams-2-pro-new'], redirects: { '/products/ams-2-pro': '/products/ams-2-pro-new' }, seen: [] as string[] };
+    const a = importerOf(w, ops, dataDir, dir, clock, {}, store);
+    const code = await a.importer.main();
+    const log = a.lines.join('\n');
+    assert.equal(code, 0, log);
+    assert.deepEqual([a.outputs.more, a.outputs.blocked], ['false', 'false'], log);
+    assert.ok(store.seen.includes('/products/ams-2-pro'), 'the media item read its reviewed handle');
+    assert.match(log, /the page no longer reads as this product \(identity_changed\)/);
+    assert.match(log, /page no longer this product 2/);
+    const item = w.raw.prepare('SELECT processing_state, blocker_code, stage_data FROM catalog_import_items WHERE run_id = ? AND source_product_id = ?').get(DELTA, sid) as Record<string, string>;
+    assert.deepEqual([item.processing_state, item.blocker_code], ['COMPLETE', ''], log);
+    assert.deepEqual(JSON.parse(item.stage_data).media_retry.rows, []);
+    assert.deepEqual(imagesOf(w, productId), beforeImages, 'nothing attached');
+
+    // The run closes the normal way.
+    const c = importerOf(w, ops, dataDir, dir, clock, { mode: 'close', runId: DELTA, fromRun: '' }, store);
+    const closed = await c.importer.main();
+    assert.equal(closed, 0, c.lines.join('\n'));
+    assert.equal((w.raw.prepare('SELECT state FROM catalog_import_runs WHERE id = ?').get(DELTA) as { state: string }).state, 'closed');
+  } finally {
+    delete PAGES['ams-2-pro-new'];
+    rmSync(dir, { recursive: true, force: true });
+    restoreFetch();
+  }
+});
+
+test('mode=withdraw: a delta run\'s NEW product gone at the source is found by the row the Worker registered, and withdrawn', async () => {
+  const { w } = await closedRunA();
+  const dir = mkdtempSync(join(tmpdir(), 'levonis-delta-withdraw-'));
+  try {
+    const ops = opsOf(w);
+    const dataDir = writeBundle(w, dir);
+    openRun(w.raw, { id: DELTA });
+    const x = pageOf('filament-buffer').extraction;
+    const client = new OpsClient({ siteOrigin: SITE, token: TOKEN, fetch: (u, i) => ops.fetch(u, i), clock: new FakeClock(Date.now()), deadline: new Deadline(Date.now() + 3600_000, new FakeClock(Date.now())) });
+    const reg = await client.deltaManifest(RUN_ID, [{ kind: 'new', source_product_id: x.sourceProductId, handle: 'filament-buffer', route: x.route, discovered_at: '2026-10-19T00:00:00.000Z' }]);
+    assert.equal(reg.new, 1);
+    const lease = await client.lease(x.sourceProductId);
+    await client.event(x.sourceProductId, lease.lease_token, { state: 'EXTRACTING', outcome: 'start' });
+    await client.event(x.sourceProductId, lease.lease_token, { state: 'BLOCKED', outcome: 'blocked', code: 'SOURCE_WITHDRAWN' });
+    // The block was seven hours ago; the page is still gone and the sitemap no longer lists it.
+    w.raw.prepare("UPDATE catalog_import_events SET at = ? WHERE run_id = ? AND outcome = 'blocked'").run(new Date(Date.now() - 7 * 3600_000).toISOString(), DELTA);
+    delete PAGES['filament-buffer'];
+    const clock = new FakeClock(Date.now());
+    const store = { listed: ['ams-2-pro'], seen: [] as string[] };
+    const r = importerOf(w, ops, dataDir, dir, clock, { mode: 'withdraw', runId: DELTA, fromRun: '', item: x.sourceProductId }, store);
+    const code = await r.importer.main();
+    assert.equal(code, 0, r.lines.join('\n'));
+    assert.ok(store.seen.includes('/products/filament-buffer'), 'the second fetch of the registered handle');
+    const state = (w.raw.prepare('SELECT processing_state AS s FROM catalog_import_items WHERE run_id = ? AND source_product_id = ?').get(DELTA, x.sourceProductId) as { s: string }).s;
+    assert.equal(state, 'WITHDRAWN_AT_SOURCE');
+  } finally {
+    PAGES['filament-buffer'] = readFileSync(join(BAMBU_FIXTURES, 'filament-buffer.page.html'), 'utf8');
     rmSync(dir, { recursive: true, force: true });
     restoreFetch();
   }

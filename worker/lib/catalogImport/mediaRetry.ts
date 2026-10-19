@@ -20,11 +20,17 @@
  *                    a product, image, option, variant, price or stock row: an existing image is never moved,
  *                    re-bound or removed, the primary never changes. A row whose id is already there (quarantined
  *                    included), or whose picture the product already shows for the same binding, is counted and
- *                    left out: the stage is idempotent. A product deleted since the closed run gets nothing (its
- *                    plan is empty) and the item completes, so it never stops the queue;
+ *                    left out: the stage is idempotent. A row an import or an earlier delta wrote once (its image
+ *                    source ref is there) that the product no longer holds was removed by the owner: never put back
+ *                    (`owner_removed`). A swatch goes only to a value the public product shows (active, in an active
+ *                    group). A product deleted since the closed run gets nothing (its plan is empty) and the item
+ *                    completes, so it never stops the queue; so does an item whose page no longer reads as this
+ *                    product (a renamed store handle: `identity_changed`, the runner's moot plan);
  *   PUBLISHING       the ordinary /publish-finish (recompute, purge);
  *   VERIFYING_LIVE   POST /items/:sid/media-complete: the runner's public read of the product (every attached
- *                    picture shown) and the Worker's own recompute (every attached row in D1, every object in R2).
+ *                    picture still held shown) and the Worker's own recompute (every attached row still held intact
+ *                    in D1, every object in R2). A row or swatch the owner removed or replaced since the attach, or
+ *                    a product hidden since, is nothing to see: it never holds the item back.
  *
  * Counts only in answers and events; the attached rows' ids and keys stay in stage_data (what VERIFY reads back).
  */
@@ -39,7 +45,7 @@ import { assertImportPayload, type ImportPayload } from '@levonis/catalog/bambuI
 import { collapseContentDuplicates } from '@levonis/catalog/bambuImport/mediaCollapse';
 import { NOW_SQL, OpsRefusal, type ImportRun } from './auth';
 import { liveUrlOf } from './complete';
-import { deltaMarkOf, type DeltaMark } from './delta';
+import { DELTA_ITEM_SQL, deltaMarkOf, type DeltaMark } from './delta';
 import { stageDataOf, type ItemRow } from './items';
 import { importObjectHead } from './media';
 import { IMPORT_GUARD_ID } from './protectedTables';
@@ -62,6 +68,10 @@ export const RETRY_OUTCOMES = [
   'not_in_source',
   'primary_unchanged',
   'product_not_public',
+  /** A row an import or an earlier delta wrote once (its image source ref is there) and the owner removed since. */
+  'owner_removed',
+  /** The page no longer reads as this product (a renamed store handle, an identity that does not resolve): moot. */
+  'identity_changed',
 ] as const;
 export type RetryOutcome = (typeof RETRY_OUTCOMES)[number];
 export type RetryCounts = Record<RetryOutcome, number>;
@@ -165,6 +175,25 @@ export async function retryContext(db: D1Database, item: ItemRow): Promise<Retry
   return { mark, productId: ref.product_id, slug: ref.slug, merge: ref.match_kind === 'merged', active: ref.status === 'active', gone: false, failed };
 }
 
+/** The one moot a runner may report for a media item: its page no longer reads as this product (§O.4). */
+export const MOOT_IDENTITY = 'identity_changed';
+/**
+ * The digest a moot plan records in place of a payload's: /media-attach takes the moot only after /media-plan
+ * recorded it (and a payload only after its own digest), so the two can never be mixed.
+ */
+export const MOOT_SHA256 = payloadSha256({ media_retry_moot: MOOT_IDENTITY });
+
+/**
+ * The plan of a moot item: nothing is fetched or attached, every failed medium counted `identity_changed`. The
+ * runner cannot prove a page that no longer reads as the product; it needs no proof, because nothing is written —
+ * the item completes with nothing attached, and a later delta takes it again (delta.ts `retrySettled`).
+ */
+export function mootPlan(ctx: Pick<RetryContext, 'failed'>): RetryPlan {
+  const skipped = emptyRetryCounts();
+  skipped.identity_changed = new Set(ctx.failed.map((f) => f.source_media_id)).size;
+  return { requests: [], skipped };
+}
+
 /** The plan for this item: `retryPlan`, and nothing at all for a product that is not public. */
 export function planFor(ctx: Pick<RetryContext, 'failed' | 'active'>, payload: ImportPayload): RetryPlan {
   const plan = retryPlan(payload, ctx.failed);
@@ -207,13 +236,22 @@ export function assertRetryRequests(ctx: RetryContext, item: ItemRow, requests: 
 
 export const PLAN_STATES = new Set(['VALIDATING', 'INGESTING_MEDIA', 'WRITING']);
 
-/** POST /items/:sid/media-plan (after holdLease): records the payload's digest and answers what to fetch again. */
-export async function planMediaRetry(db: D1Database, item: ItemRow, raw: unknown): Promise<{ payload_sha256: string; media: RetryRequest[]; skipped: RetryCounts; failed: number }> {
+/**
+ * POST /items/:sid/media-plan (after holdLease): records the payload's digest and answers what to fetch again. With
+ * `moot: 'identity_changed'` and no payload (the runner's page read no longer gives this product): the moot plan.
+ */
+export async function planMediaRetry(
+  db: D1Database,
+  item: ItemRow,
+  raw: unknown,
+  moot?: unknown
+): Promise<{ payload_sha256: string; media: RetryRequest[]; skipped: RetryCounts; failed: number }> {
   if (!PLAN_STATES.has(item.processing_state)) throw new OpsRefusal(409, 'IMPORT_ILLEGAL_TRANSITION', [item.id]);
+  if (moot !== undefined && (moot !== MOOT_IDENTITY || (raw !== undefined && raw !== null))) throw new OpsRefusal(400, 'IMPORT_BAD_REQUEST', [item.id]);
   const ctx = await retryContext(db, item);
-  const payload = retryPayloadOf(raw, item, ctx);
-  const plan = planFor(ctx, payload);
-  const sha = payloadSha256(payload);
+  const payload = moot === undefined ? retryPayloadOf(raw, item, ctx) : null;
+  const plan = payload ? planFor(ctx, payload) : mootPlan(ctx);
+  const sha = payload ? payloadSha256(payload) : MOOT_SHA256;
   const r = await db
     .prepare(
       `UPDATE catalog_import_items
@@ -222,7 +260,7 @@ export async function planMediaRetry(db: D1Database, item: ItemRow, raw: unknown
               updated_at = ${NOW_SQL}
         WHERE id = ? AND lease_token = ? AND processing_state IN ('VALIDATING','INGESTING_MEDIA','WRITING')`
     )
-    .bind(sha, JSON.stringify({ failed: ctx.failed.length, requests: plan.requests.length, skipped: plan.skipped }), item.id, item.lease_token)
+    .bind(sha, JSON.stringify({ failed: ctx.failed.length, requests: plan.requests.length, skipped: plan.skipped, ...(payload ? {} : { moot: MOOT_IDENTITY }) }), item.id, item.lease_token)
     .run();
   if (Number(r.meta?.changes ?? 0) !== 1) throw new OpsRefusal(409, 'IMPORT_ILLEGAL_TRANSITION', [item.id]);
   return { payload_sha256: sha, media: plan.requests, skipped: plan.skipped, failed: ctx.failed.length };
@@ -248,7 +286,7 @@ interface PlannedRow {
 
 /** The outcome of a medium whose rows had these outcomes: attached when any row went in. */
 function mediumOutcome(rows: readonly RetryOutcome[]): RetryOutcome {
-  for (const o of ['attached', 'already_present', 'duplicate_content', 'not_stored'] as const) if (rows.includes(o)) return o;
+  for (const o of ['attached', 'already_present', 'owner_removed', 'duplicate_content', 'not_stored'] as const) if (rows.includes(o)) return o;
   return 'target_missing';
 }
 
@@ -258,15 +296,23 @@ const GALLERY_INSERT = `INSERT INTO product_images
  VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '')
  ON CONFLICT (id) DO NOTHING`;
 
+/** A level the public product shows (productOverlay.ts relationsBlock: `active` neither 0 nor false). */
+const shownLevel = (active: unknown): boolean => active !== 0 && active !== false;
+
 /**
  * POST /items/:sid/media-attach (after holdLease): the planned media now stored, attached in ONE guarded batch
- * (see the head of this file). Answers counts per medium and the rows it inserted.
+ * (see the head of this file). Answers counts per medium and the rows it inserted. A moot item (`moot`, after a
+ * moot /media-plan) attaches nothing and moves on the same way.
  */
 export async function attachRetriedMedia(env: MediaEnv, run: ImportRun, item: ItemRow, bundle: ReviewedBundle, body: Record<string, unknown>): Promise<AttachAnswer> {
   const db = env.DB;
   if (item.processing_state !== 'WRITING') throw new OpsRefusal(409, 'IMPORT_ILLEGAL_TRANSITION', [item.id]);
   if (typeof body.payload_sha256 !== 'string' || body.payload_sha256 !== item.payload_sha256) throw new OpsRefusal(409, 'IMPORT_NOT_STAGED', [item.id]);
+  const moot = body.moot !== undefined;
+  // The moot and a payload never stand in for each other: each needs the plan /media-plan recorded for it.
+  if (moot ? body.moot !== MOOT_IDENTITY || item.payload_sha256 !== MOOT_SHA256 : item.payload_sha256 === MOOT_SHA256) throw new OpsRefusal(409, 'IMPORT_NOT_STAGED', [item.id]);
   const ctx = await retryContext(db, item);
+  if (moot) return commitAttach(db, run, item, ctx, mootPlan(ctx).skipped, [], []);
   const payload = retryPayloadOf(body.payload, item, ctx);
   if (payloadSha256(payload) !== item.payload_sha256) throw new OpsRefusal(409, 'IMPORT_NOT_STAGED', [item.id]);
   const plan = planFor(ctx, payload);
@@ -293,6 +339,15 @@ export async function attachRetriedMedia(env: MediaEnv, run: ImportRun, item: It
   const bindingOf = (r: { r2_key?: unknown; option_value_id?: unknown; variant_id?: unknown; color_id?: unknown }) =>
     `${String(r.r2_key ?? '')}|${String(r.option_value_id ?? '')}|${String(r.variant_id ?? '')}|${String(r.color_id ?? '')}`;
   const existingBindings = new Set(relImages.map(bindingOf));
+  // Every image row an import or an earlier delta wrote for this product carries its source ref (the same batch
+  // wrote both; the admin save deletes an image row, never its ref): a ref without its row is the owner's removal.
+  const { results: refRows } = ctx.gone
+    ? { results: [] as Array<{ levonis_id: string }> }
+    : await db
+        .prepare("SELECT levonis_id FROM product_option_source_refs WHERE product_id = ? AND kind = 'image' AND source = 'bambu_us'")
+        .bind(productId)
+        .all<{ levonis_id: string }>();
+  const writtenOnce = new Set((refRows ?? []).map((r) => String(r.levonis_id)));
   /** The earliest slot a key is shown at (a bound copy of it joins that slot, as the writer's collapse puts it). */
   const firstSlotOfKey = new Map<string, number>();
   for (const i of relImages) {
@@ -301,6 +356,10 @@ export async function attachRetriedMedia(env: MediaEnv, run: ImportRun, item: It
     if (k && (!firstSlotOfKey.has(k) || at < firstSlotOfKey.get(k)!)) firstSlotOfKey.set(k, at);
   }
   const ownValues = new Set((rel?.values ?? []).map((v) => String(v.id)));
+  // A swatch is only ever seen on a value the public product shows (an active value of an active group): one for a
+  // value the owner hid would never show, and its item could never complete.
+  const shownGroups = new Set((rel?.groups ?? []).filter((g) => shownLevel(g.active)).map((g) => String(g.id)));
+  const shownValues = new Set((rel?.values ?? []).filter((v) => shownLevel(v.active) && shownGroups.has(String(v.group_id))).map((v) => String(v.id)));
   const ownVariants = new Set((rel?.variants ?? []).map((v) => String(v.id)));
   const match = ctx.merge ? bundle.matches.bySourceId.get(item.source_product_id) ?? null : null;
   const mergeOk = !ctx.merge || (!!match && (match.decision === 'merge' || match.decision === 'merge_publish') && match.levonis_product_id === productId);
@@ -357,6 +416,7 @@ export async function attachRetriedMedia(env: MediaEnv, run: ImportRun, item: It
   for (const r of rows) {
     const bound = !!(r.option_value_id || r.variant_id || r.color_id);
     if (existingIds.has(r.id)) note(r.source_media_id, 'already_present');
+    else if (writtenOnce.has(r.id)) note(r.source_media_id, 'owner_removed');
     else if (existingBindings.has(bindingOf(r)) || (!bound && existingKeys.has(r.r2_key))) note(r.source_media_id, 'duplicate_content');
     else if (existingKeys.has(r.r2_key)) {
       const keeps = r.binding_rule === 'representative' || r.binding_rule === 'reviewed_override';
@@ -404,18 +464,32 @@ export async function attachRetriedMedia(env: MediaEnv, run: ImportRun, item: It
   const swatches: Array<{ valueId: string; key: string; width: number | null; height: number | null; sourceUrl: string }> = [];
   const swatchIds = new Set(plan.requests.filter((r) => r.role === 'swatch').map((r) => r.source_media_id));
   const wantedSwatches = payload.swatches.filter((s) => swatchIds.has(s.source_media_id));
-  const targets = wantedSwatches.map((s) => (ctx.merge ? (mapping?.values.get(s.value_id)?.optionValueId ?? '') : ownValues.has(s.value_id) ? s.value_id : ''));
+  const targets = wantedSwatches.map((s) => {
+    const t = ctx.merge ? (mapping?.values.get(s.value_id)?.optionValueId ?? '') : ownValues.has(s.value_id) ? s.value_id : '';
+    return t && shownValues.has(t) ? t : '';
+  });
   const { results: haveRows } = await db
     .prepare('SELECT option_value_id FROM product_option_value_swatches WHERE option_value_id IN (SELECT value FROM json_each(?))')
     .bind(JSON.stringify(targets.filter(Boolean)))
     .all<{ option_value_id: string }>();
   const have = new Set((haveRows ?? []).map((h) => String(h.option_value_id)));
+  // A swatch leaves no source ref: the values an earlier delta's checkpoint says it gave one (stage_data.media_retry)
+  // that have none now lost it to the owner — never put back (`owner_removed`), as for an image row.
+  const swatchedOnce = new Set<string>();
+  if (wantedSwatches.length) {
+    const { results: earlier } = await db
+      .prepare(`SELECT stage_data FROM catalog_import_items WHERE run_id <> ? AND source = 'bambu_us' AND source_product_id = ? AND levonis_product_id = ? AND ${DELTA_ITEM_SQL}`)
+      .bind(run.id, item.source_product_id, productId)
+      .all<{ stage_data: string }>();
+    for (const e of earlier ?? []) for (const sw of attachedOf(e).swatches) swatchedOnce.add(sw.option_value_id);
+  }
   for (let i = 0; i < wantedSwatches.length; i++) {
     const s = wantedSwatches[i];
     const target = targets[i];
     const key = keyOf(s.source_media_id);
     if (!target) note(s.source_media_id, 'target_missing');
     else if (have.has(target) || swatches.some((x) => x.valueId === target)) note(s.source_media_id, 'already_present');
+    else if (swatchedOnce.has(target)) note(s.source_media_id, 'owner_removed');
     else if (!key) note(s.source_media_id, 'not_stored');
     else {
       const head = await importObjectHead(env, key);
@@ -433,13 +507,27 @@ export async function attachRetriedMedia(env: MediaEnv, run: ImportRun, item: It
   // A planned medium that produced no row at all (its every payload row filtered before a note): target_missing.
   for (const r of plan.requests) if (!outcomes.has(r.source_media_id)) counts.target_missing++;
 
+  return commitAttach(db, run, item, ctx, counts, verified, swatches);
+}
+
+/**
+ * ONE batch: the guard row (fenced on the item, its lease and its staged payload), INSERTs only, the fenced WRITTEN
+ * event, the checkpoint, the guard row removed.
+ */
+async function commitAttach(
+  db: D1Database,
+  run: ImportRun,
+  item: ItemRow,
+  ctx: RetryContext,
+  counts: RetryCounts,
+  verified: ReadonlyArray<PlannedRow & { wire: Record<string, unknown> }>,
+  swatches: ReadonlyArray<{ valueId: string; key: string; width: number | null; height: number | null; sourceUrl: string }>
+): Promise<AttachAnswer> {
+  const productId = ctx.productId;
   const attached: AttachedRows = {
     rows: verified.map((v) => ({ id: v.row.id, r2_key: String(v.wire.r2_key ?? v.row.r2_key) })),
     swatches: swatches.map((s) => ({ option_value_id: s.valueId, r2_key: s.key })),
   };
-
-  // ---- ONE batch: the guard row (fenced on the item, its lease and its staged payload), INSERTs only, the fenced
-  //      WRITTEN event, the checkpoint, the guard row removed.
   const statements: D1PreparedStatement[] = [
     db
       .prepare(
@@ -534,9 +622,14 @@ export function attachedOf(item: Pick<ItemRow, 'stage_data'>): AttachedRows {
 }
 
 /**
- * POST /items/:sid/media-complete (after holdLease): COMPLETE only when the runner saw every attached picture on the
- * public product and the Worker finds every attached row in D1 and every object in R2. Otherwise nothing moves (the
- * runner purges, waits and asks once more, then blocks VERIFY_FAILED_PERSISTENT).
+ * POST /items/:sid/media-complete (after holdLease): COMPLETE only when the runner saw every attached picture the
+ * product still holds on the public product and the Worker finds each of those rows intact in D1 and every object in
+ * R2. Otherwise nothing moves (the runner purges, waits and asks once more, then blocks VERIFY_FAILED_PERSISTENT).
+ *
+ * The attach batch wrote its rows, their refs and the checkpoint together, so an attached row now missing or no
+ * longer holding its key (quarantined, replaced), or a swatch gone or replaced, is the owner's change since: it is
+ * no longer expected, on either side (a refusal here could never clear: every resume would ask the same). A product
+ * that is not active (or is gone) shows nothing: nothing to see.
  */
 export async function completeMediaRetry(
   env: Pick<Env, 'DB' | 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE'>,
@@ -569,22 +662,33 @@ export async function completeMediaRetry(
     .bind(item.levonis_product_id, JSON.stringify(attached.swatches.map((s) => s.option_value_id)))
     .all<{ option_value_id: string; r2_key: string }>();
   const swatchKey = new Map((swatchRows ?? []).map((r) => [String(r.option_value_id), String(r.r2_key)]));
-  const rowsPresent = attached.rows.filter((r) => imageKey.get(r.id) === r.r2_key).length;
-  const swatchesPresent = attached.swatches.filter((s) => swatchKey.get(s.option_value_id) === s.r2_key).length;
+  const keptRows = attached.rows.filter((r) => imageKey.get(r.id) === r.r2_key);
+  const keptSwatches = attached.swatches.filter((s) => swatchKey.get(s.option_value_id) === s.r2_key);
+  const product = await db.prepare('SELECT status FROM products WHERE id = ?').bind(item.levonis_product_id).first<{ status: string }>();
+  const shown = product?.status === 'active';
   let objects = 0;
-  const keys = [...new Set([...attached.rows.map((r) => r.r2_key), ...attached.swatches.map((s) => s.r2_key)])];
+  const keys = [...new Set([...keptRows.map((r) => r.r2_key), ...keptSwatches.map((s) => s.r2_key)])];
   for (const key of keys) {
     const p = (await importObjectHead(env, key)).presence;
     if (p === 'unknown') throw new OpsRefusal(503, 'IMPORT_STORAGE_UNAVAILABLE', [item.id]);
     if (p === 'present') objects++;
   }
-  const d1Ok = rowsPresent === attached.rows.length && swatchesPresent === attached.swatches.length && objects === keys.length;
-  // Nothing attached: nothing to see (a product that is not public included); else the public product shows it all.
-  const nothing = attached.rows.length + attached.swatches.length === 0;
-  const edgeOk = rowsSeen === attached.rows.length && swatchesSeen === attached.swatches.length && (nothing || status === 200);
+  const d1Ok = objects === keys.length;
+  // Nothing held (nothing attached, all of it removed since, or a product that is not public): nothing to see; else
+  // the public product shows every row and swatch still held.
+  const nothing = !shown || keptRows.length + keptSwatches.length === 0;
+  const edgeOk = nothing || (status === 200 && rowsSeen === keptRows.length && swatchesSeen === keptSwatches.length);
   const d1Checks = {
     ok: d1Ok && edgeOk,
-    media_retry: { rows: attached.rows.length, rows_present: rowsPresent, swatches: attached.swatches.length, swatches_present: swatchesPresent, objects: keys.length, objects_present: objects },
+    media_retry: {
+      rows: attached.rows.length,
+      rows_present: keptRows.length,
+      swatches: attached.swatches.length,
+      swatches_present: keptSwatches.length,
+      objects: keys.length,
+      objects_present: objects,
+      product_shown: shown,
+    },
     agreement: { edge_ok: edgeOk, counts_agree: d1Ok },
   };
   const [fenceIn, fenceOut] = fence(db, `EXISTS (SELECT 1 FROM catalog_import_items WHERE id = ? AND processing_state = 'VERIFYING_LIVE' AND lease_token = ?)`, [item.id, item.lease_token]);

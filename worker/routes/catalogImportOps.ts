@@ -432,7 +432,7 @@ catalogImportOpsRoutes.post(
   handle(async (c) => {
     const body = await readBody(c);
     const item = await holdLease(c.env.DB, c.get('importRun'), sidOf(c), body.lease_token);
-    return c.json(await planMediaRetry(c.env.DB, item, body.payload));
+    return c.json(await planMediaRetry(c.env.DB, item, body.payload, body.moot));
   })
 );
 
