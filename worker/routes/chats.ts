@@ -410,16 +410,21 @@ export async function openStoreThread(
 
 /**
  * HAS THIS CUSTOMER ALREADY GOT BUSINESS WITH THIS MERCHANT? (E12.) A
- * conversation both accounts are members of (the store's thread with them,
- * a request's, or their personal one), a store order, or a community order.
- * The question a new thread to a merchant the public may not see asks before
- * refusing: existing work stays open.
+ * COMMERCE conversation both accounts are members of (the store's thread with
+ * them, a request's, a store order's, or an order chat), a store order, or a
+ * community order. The question a new thread to a merchant the public may not
+ * see asks before refusing: existing work stays open.
+ *
+ * NOT a personal DM (`context_type = ''` and no `order_id`): `{userId}` opens
+ * one with any account on demand, so counting it let a stranger open a DM
+ * first and then the hidden store's thread (review finding 3).
  */
 async function customerKnowsMerchant(db: D1Database, customerId: string, merchantId: string, merchantUserId: string): Promise<boolean> {
   const row = await db
     .prepare(
       `SELECT
          EXISTS (SELECT 1 FROM chat_participants a JOIN chat_participants b ON b.chat_id = a.chat_id AND b.user_id = ?3
+                   JOIN chats ch ON ch.id = a.chat_id AND (ch.context_type <> '' OR ch.order_id IS NOT NULL)
                   WHERE a.user_id = ?1) AS thread,
          EXISTS (SELECT 1 FROM orders o WHERE o.user_id = ?1 AND o.merchant_id = ?2) AS store_order,
          EXISTS (SELECT 1 FROM community_orders co WHERE co.customer_id = ?1 AND co.merchant_id = ?2) AS community_order`

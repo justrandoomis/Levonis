@@ -414,7 +414,8 @@ export function CatalogManager({ canSell, canDraft, sellingReason, store, focusP
 
       {!canSell && (
         <p className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-[12.5px] text-text-primary" role="note" data-approval-gate={gated || undefined}>
-          {gated ? `${held} — ${s.draftsUnderReview}` : s.cannotSell}
+          {/* Drafts are offered only when they ARE open (review finding 7): a pause under review holds them too. */}
+          {gated ? `${held} — ${drafts ? s.draftsUnderReview : store.status === 'paused' ? s.draftsAfterReopen : s.cannotSell}` : s.cannotSell}
         </p>
       )}
 

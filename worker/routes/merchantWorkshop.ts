@@ -102,7 +102,13 @@ merchantWorkshopRoutes.get('/board', async (c) => {
   });
   const accepts = Number((ctx.store as unknown as Record<string, unknown>).accepts_custom_requests ?? 1) === 1;
   if (!open || !accepts) {
-    return c.json({ success: true, requests: [], next_cursor: null, blocked: !open ? 'CANNOT_TAKE_WORK' : 'NOT_TAKING_REQUESTS' });
+    // Approval has its own code (review finding 8): the board then says the
+    // gate's sentence, not «open your store / check your plan». A sanction
+    // or a restriction still answers CANNOT_TAKE_WORK first.
+    const awaitingApproval =
+      !open && !merchantApproved(ctx.merchant) && ctx.merchant.status === 'active' && ctx.store.status !== 'suspended';
+    const blocked = awaitingApproval ? 'MERCHANT_NOT_APPROVED' : !open ? 'CANNOT_TAKE_WORK' : 'NOT_TAKING_REQUESTS';
+    return c.json({ success: true, requests: [], next_cursor: null, blocked });
   }
 
   const decided = await c.env.DB.prepare(

@@ -12,6 +12,7 @@ export default function NotificationsSection() {
   return (
     <div className="space-y-6">
       <MerchantNotificationCenter
+        resolveLink={ws.resolveLink}
         onUnreadChange={(n) => {
           ws.setBellUnread(n);
           ws.attention.refresh(true);

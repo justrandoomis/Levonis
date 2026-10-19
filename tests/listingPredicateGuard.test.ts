@@ -85,9 +85,9 @@ const CUSTOMER_FILES = [
 /** Reviewed lines that are NOT a platform product's visibility: file → substrings, each with its reason. */
 const ALLOWED: Record<string, Array<[string, string]>> = {
   'worker/routes/products.ts': [["cp.slug = ? AND cp.status = 'active'", 'community_products (a merchant listing)']],
+  // The list and (since review finding 2) the save door read the same aliased predicate.
   'worker/routes/communityFavorites.ts': [
     ["p.status = 'active' AND p.lifecycle = 'active'", 'community_products'],
-    ["FROM community_products WHERE id = ? AND status = 'active'", 'community_products'],
   ],
   'worker/lib/socialPreview.ts': [
     ["p.slug = ?1 AND p.status = 'active' AND p.lifecycle = 'active'", 'community_products'],

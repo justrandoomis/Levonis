@@ -19,7 +19,7 @@ import { requireAuth, notFound } from '../lib/http';
 import { rateLimit } from '../lib/ratelimit';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
-import { approvedAtSql, merchantIsPublic, storeIsPublic, withApprovalSchema } from '../lib/merchantApproval';
+import { approvedAtSql, merchantIsPublic, merchantPublicSql, storeIsPublic, storePublicSql, withApprovalSchema } from '../lib/merchantApproval';
 
 export const communityFavoriteRoutes = new Hono<AppContext>();
 
@@ -51,9 +51,9 @@ communityFavoriteRoutes.get('/', requireAuth, async (c) => {
   const db = c.env.DB;
   const root = rootDomainFrom(c.env);
   // The customer's own saved list: a product they saved stays in it, but its
-  // store is linked only while the public may see the store (push 1.4) — the
+  // content is shown only while the public may see the store (push 1.4) — the
   // merchant's status and approval stamp ride along (NULL on a database
-  // without 0204: no link, closed).
+  // without 0204: a neutral row, closed).
   const { results } = await withApprovalSchema((schema) =>
     db
       .prepare(
@@ -106,6 +106,31 @@ communityFavoriteRoutes.get('/', requireAuth, async (c) => {
   );
 
   const storeItems = (results ?? []).map((r) => {
+    /*
+     * A SAVED PRODUCT ON A STORE THE PUBLIC MAY NOT SEE — sanctioned, or
+     * (push 1.4) its merchant not approved — stays in the customer's list so
+     * they can remove it, as a NEUTRAL row (owner decision C9, like
+     * `/followed`): its id, when it was saved and `unavailable`, and not one
+     * field the merchant wrote — no name, picture, price, store name or slug.
+     */
+    if (!storeIsPublic({ status: r.store_status }) || !merchantIsPublic({ status: r.merchant_status, approved_at: r.merchant_approved_at })) {
+      return {
+        source: 'store' as const,
+        product_id: r.product_id,
+        unavailable: true,
+        slug: '',
+        name: '',
+        name_ar: null,
+        image: null,
+        price_iqd: null,
+        original_price_iqd: null,
+        in_stock: null,
+        saved_at: r.saved_at,
+        store_slug: null,
+        store_name: null,
+        store_url: null,
+      };
+    }
     let image: string | null = null;
     try {
       const imgs = JSON.parse(String(r.images ?? '[]'));
@@ -126,10 +151,7 @@ communityFavoriteRoutes.get('/', requireAuth, async (c) => {
       saved_at: r.saved_at,
       store_slug: r.store_slug,
       store_name: r.store_name,
-      store_url:
-        r.store_slug && storeIsPublic({ status: r.store_status }) && merchantIsPublic({ status: r.merchant_status, approved_at: r.merchant_approved_at })
-          ? storeUrl(String(r.store_slug), root, String(r.store_id))
-          : null,
+      store_url: r.store_slug ? storeUrl(String(r.store_slug), root, String(r.store_id)) : null,
     };
   });
 
@@ -187,15 +209,28 @@ communityFavoriteRoutes.get('/ids', requireAuth, async (c) => {
   return c.json({ product_ids: (results ?? []).map((r) => String(r.product_id)) });
 });
 
+/**
+ * SAVE A STORE PRODUCT — only one the public may see right now: on the
+ * shopfront (`status`/`lifecycle` active), its store not sanctioned and its
+ * merchant public (not suspended AND approved, push 1.4). Anything else is the
+ * same 404 a missing id gets (owner decision C9: nothing says why). On a
+ * database without 0204's column the merchant reads as not public: closed.
+ */
 communityFavoriteRoutes.put('/:productId', requireAuth, async (c) => {
   const user = c.get('user')!;
   await rateLimit(c, 'cfav', 120, 3600);
   const productId = c.req.param('productId');
-  const product = await c.env.DB.prepare(
-    "SELECT id FROM community_products WHERE id = ? AND status = 'active' AND lifecycle = 'active'"
-  )
-    .bind(productId)
-    .first();
+  const product = await withApprovalSchema((schema) =>
+    c.env.DB.prepare(
+      `SELECT p.id FROM community_products p
+         JOIN merchant_stores s ON s.id = p.store_id
+         JOIN community_merchants m ON m.id = s.merchant_id
+        WHERE p.id = ? AND p.status = 'active' AND p.lifecycle = 'active'
+          AND ${storePublicSql('s')} AND ${merchantPublicSql('m', schema)}`
+    )
+      .bind(productId)
+      .first()
+  );
   if (!product) throw notFound('product_not_found');
   await c.env.DB.prepare(
     'INSERT INTO community_product_favorites (user_id, product_id) VALUES (?, ?) ON CONFLICT DO NOTHING'

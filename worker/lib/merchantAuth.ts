@@ -308,9 +308,30 @@ export async function draftStatus(
   ownerUserId: string,
   selling: { canSell: boolean; reason: string }
 ): Promise<boolean> {
-  if (selling.canSell) return true;
-  if (selling.reason !== 'not_approved') return false;
-  return (await sellingVerdict(db, ctx, ownerUserId, undefined, { approval: false })).canSell;
+  return (await operationalVerdict(db, ctx, ownerUserId, selling)).canSell;
+}
+
+/**
+ * THE STORE'S OPERATIONAL STATE, APPROVAL SET ASIDE (review finding 6). The
+ * selling verdict asks approval before the pause and the plan, so for every
+ * merchant no reviewer approved yet it answers only `not_approved` — and the
+ * workspace's status pill, the open/pause switch's word and Today's line
+ * would read «paused» on an OPEN store (a tap on the switch then pauses it
+ * for real, and re-opening is refused until approval). This is selling's
+ * answer when approval is not its reason, and otherwise the same verdict
+ * asked without the approval line: open, paused, lapsed or restricted —
+ * approval stays its own axis (`approved` on `/me`). `draftStatus` is its
+ * `canSell` (the draft gate is exactly this rule).
+ */
+export async function operationalVerdict(
+  db: D1Database,
+  ctx: StoreContext,
+  ownerUserId: string,
+  selling: { canSell: boolean; reason: string },
+  ownerTier?: TierStatus
+): Promise<{ canSell: boolean; reason: string }> {
+  if (selling.canSell || selling.reason !== 'not_approved') return { canSell: selling.canSell, reason: selling.reason };
+  return sellingVerdict(db, ctx, ownerUserId, ownerTier, { approval: false });
 }
 
 /**

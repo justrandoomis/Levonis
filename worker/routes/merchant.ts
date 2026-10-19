@@ -31,7 +31,7 @@ import { getTierStatus, benefits } from '../lib/entitlements';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { afterStorefrontWrite, purgeStorefrontAfterWrite } from '../lib/edgePolicy';
 import {
-  draftStatus,
+  operationalVerdict,
   requireStoreOwner,
   requireSellingPrivileges,
   reopenRefusal,
@@ -199,6 +199,9 @@ merchantRoutes.get('/me', async (c) => {
     await afterResponse(c, notifyApprovalRequired(c.env.DB, user.id));
   }
   const selling = ctx ? await sellingStatus(c, ctx) : { canSell: false, reason: 'no_store' };
+  // The store's own state with approval set aside (review finding 6): what the
+  // pill and the open/pause switch say. Its `canSell` is `canDraft`.
+  const operational = ctx ? await operationalVerdict(c.env.DB, ctx, user.id, selling, tier) : { canSell: false, reason: 'no_store' };
 
   return c.json({
     success: true,
@@ -222,7 +225,10 @@ merchantRoutes.get('/me', async (c) => {
     store: ctx ? storePublicShape(ctx, root) : null,
     // `canDraft` (push 1.3): product drafts stay open under review — selling
     // minus the approval line, the rule `requireDraftPrivileges` enforces.
-    selling: { ...selling, canDraft: ctx ? await draftStatus(c.env.DB, ctx, user.id, selling) : false },
+    // `operational` (review finding 6): the operational reason — '' for an
+    // open store — so an unapproved merchant's pill reads open/paused/lapsed,
+    // never «paused» for approval; approval is `approved`, beside it.
+    selling: { ...selling, canDraft: operational.canSell, operational: operational.reason },
     suggested_slug: ctx ? null : suggestSlug(String(user.name ?? '')),
     // The domain a store address lives under, from configuration — so
     // onboarding previews `<slug>.<this>` instead of a hard-coded domain

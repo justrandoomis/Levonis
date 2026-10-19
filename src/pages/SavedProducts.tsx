@@ -76,6 +76,8 @@ export default function SavedProducts() {
   };
 
   const openProduct = (p: SavedProduct) => {
+    // A store the public may not see right now: nothing to open, only to remove.
+    if (p.unavailable) return;
     // A catalogue product lives on this site and nowhere else — no merchant,
     // no subdomain to hop to.
     if (p.source === 'catalog') {
@@ -126,7 +128,7 @@ export default function SavedProducts() {
             <div
               key={`${p.source}:${p.product_id}`}
               onClick={() => openProduct(p)}
-              className="p-3 flex items-center gap-3.5 cursor-pointer hover:bg-white/[0.04] active:bg-[var(--clay-well-bg)] transition-colors"
+              className={`p-3 flex items-center gap-3.5 ${p.unavailable ? '' : 'cursor-pointer'} hover:bg-white/[0.04] active:bg-[var(--clay-well-bg)] transition-colors`}
             >
               <div className="w-14 h-14 rounded-md overflow-hidden bg-surface-raised border border-border-subtle flex items-center justify-center shrink-0">
                 {p.image ? (
@@ -135,6 +137,14 @@ export default function SavedProducts() {
                   <ShoppingBag className="w-5 h-5 text-text-muted" />
                 )}
               </div>
+              {p.unavailable ? (
+                // A NEUTRAL ROW (push 1.4, C9): the server sent nothing the merchant wrote.
+                <div className="flex-1 min-w-0" data-saved-unavailable>
+                  <h3 className="font-semibold text-[13.5px] truncate text-text-secondary">
+                    {loc('هذا المنتج غير متاح حاليًا', 'This product is not available right now', 'ئەم بەرهەمە ئێستا بەردەست نییە')}
+                  </h3>
+                </div>
+              ) : (
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-[13.5px] truncate" dir="auto">
                   {dir === 'rtl' && p.name_ar ? p.name_ar : p.name}
@@ -159,6 +169,7 @@ export default function SavedProducts() {
                 </div>
                 )}
               </div>
+              )}
               <button
                 onClick={(e) => remove(e, p)}
                 disabled={busyId === p.product_id}

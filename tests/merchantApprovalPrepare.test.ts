@@ -311,11 +311,14 @@ test('/api/merchant/me says canDraft: open under review with PLUS, closed when p
   migrate(raw);
   plus(raw, 'u1');
   const read = async () => (await json(await get(meApp(raw, 'u1'), '/api/merchant/me'))).selling as Record<string, unknown>;
-  assert.deepEqual(await read(), { canSell: false, reason: 'not_approved', canDraft: true });
+  // `operational` (review finding 6): the store's own reason with approval set aside — '' is open.
+  assert.deepEqual(await read(), { canSell: false, reason: 'not_approved', canDraft: true, operational: '' });
   raw.exec("UPDATE merchant_stores SET status = 'paused' WHERE id = 's1'");
-  assert.equal((await read()).canDraft, false);
+  const paused = await read();
+  assert.equal(paused.canDraft, false);
+  assert.equal(paused.operational, 'store_paused');
   raw.exec(`UPDATE merchant_stores SET status = 'active' WHERE id = 's1'; UPDATE community_merchants SET approved_at = '${STAMP}' WHERE id = 'm1'`);
-  assert.deepEqual(await read(), { canSell: true, reason: '', canDraft: true });
+  assert.deepEqual(await read(), { canSell: true, reason: '', canDraft: true, operational: '' });
 });
 
 // ------------------------------------------------------- readiness facts

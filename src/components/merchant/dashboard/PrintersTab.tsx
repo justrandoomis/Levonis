@@ -37,6 +37,7 @@ import Spinner from '../../ui/Spinner';
 import { EmptyState, ErrorState } from '../../ui/AsyncStates';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { merchantRefusal } from '../shell/refusal';
+import { approvalGateText } from '../../../lib/approvalGate';
 // Eligibility as data (W5-B): canonical machines, the stock shelf, and the reasons' words.
 import MaterialStockSection from '../workshop/MaterialStockSection';
 import PrinterModelPicker from '../workshop/PrinterModelPicker';
@@ -225,6 +226,9 @@ function reasonText(code: string, loc: Loc): string {
         'حساب التاجر لم يكن مفعّلًا وقت وصول الطلب.',
         'Your merchant account was not active when the request arrived.'
       );
+    case 'MERCHANT_NOT_APPROVED':
+      // The approval gate's one sentence (review finding 8), no «open / renew» advice.
+      return approvalGateText(loc);
     case 'STORE_UNAVAILABLE':
       return loc(
         'متجرك كان متوقفًا وقت وصول الطلب — افتحه من «إعداد المتجر».',

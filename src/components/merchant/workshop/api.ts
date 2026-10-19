@@ -54,7 +54,7 @@ export interface BoardPage {
   requests: BoardRequest[];
   next_cursor: string | null;
   /** The workshop cannot take new work at all, and why. */
-  blocked?: 'CANNOT_TAKE_WORK' | 'NOT_TAKING_REQUESTS';
+  blocked?: 'CANNOT_TAKE_WORK' | 'NOT_TAKING_REQUESTS' | 'MERCHANT_NOT_APPROVED';
 }
 
 export interface BoardFilters {

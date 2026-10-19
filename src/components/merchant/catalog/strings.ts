@@ -37,6 +37,13 @@ export function catalogStrings(loc: Loc) {
       'Prepare your products as drafts now; nobody but you sees them until they are published.',
       'ئێستا بەرهەمەکانت وەک ڕەشنووس ئامادە بکە؛ تا بڵاو نەکرێنەوە کەس جگە لە تۆ نایانبینێت.'
     ),
+    // Review finding 7: under review AND paused by the merchant — no draft
+    // (the pause holds them) and no re-open (that waits for approval, E8).
+    draftsAfterReopen: loc(
+      'متجرك متوقّف مؤقتًا بطلبك: تُجهَّز المنتجات الجديدة بعد اعتماد متجرك وإعادة فتحه. منتجاتك الحالية محفوظة.',
+      'You paused your store: new products can be prepared once your store is approved and you re-open it. Your existing products are kept.',
+      'فرۆشگاکەت لەلایەن خۆتەوە ڕاگیراوە: دوای پەسەندکردنی فرۆشگاکەت و کردنەوەی دووبارەی، دەتوانیت بەرهەمی نوێ ئامادە بکەیت. بەرهەمەکانی ئێستات پارێزراون.'
+    ),
     publishing: loc('النشر', 'Publishing', 'بڵاوکردنەوە'),
     noProducts: loc('لا توجد منتجات بعد', 'No products yet', 'هێشتا بەرهەم نییە'),
     noProductsHint: loc('أضف منتجك الأول: الاسم والسعر والصورة تكفي للبدء.', 'Add your first product: a name, a price and a photo are enough to start.'), // OWNER: Sorani to be written by hand.

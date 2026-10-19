@@ -31,9 +31,9 @@ import { getMediaObject, headMediaObject, putMediaObject, type MediaDomain } fro
 import { analyseModel, viewerMesh, type ModelAnalysis } from './modelGeometry';
 import { MODEL_MAX_BYTES } from './attachments';
 import type { PreviewGrant } from './requestFilePolicy';
-import type { FileKind } from './fileOwnership';
+import { hasProductGrant, type FileKind } from './fileOwnership';
 import { blockedEither } from './userBlocks';
-import { merchantPublicSql, storeIsPublic, withApprovalSchema } from './merchantApproval';
+import { merchantPublicSql, merchantUnsanctionedSql, storeIsPublic, withApprovalSchema } from './merchantApproval';
 
 export type ViewerSourceType = 'product' | 'post';
 
@@ -135,8 +135,11 @@ interface GrantRow {
 interface ProductSourceRow {
   file_key: string; name: string; kind: string; mime: string; analysis: string | null; preview_key: string;
   lifecycle: string; status: string; audience_user_id: string | null; store_status: string; owner_id: string;
+  product_id: string;
   /** 1 when the store's merchant is public (not suspended AND approved, push 1.4). */
   merchant_public: number;
+  /** 1 when the store's merchant is under no sanction — the rule a buyer's link still answers to. */
+  merchant_unsanctioned: number;
 }
 
 interface PostSourceRow {
@@ -186,7 +189,9 @@ export async function resolveViewerGrant(
       .prepare(
         `SELECT f.file_key, f.name, f.kind, f.mime, f.analysis, f.preview_key,
                 p.lifecycle, p.status, p.audience_user_id, s.status AS store_status, s.user_id AS owner_id,
-                ${merchantPublicSql('m', schema)} AS merchant_public
+                p.id AS product_id,
+                ${merchantPublicSql('m', schema)} AS merchant_public,
+                (${merchantUnsanctionedSql('m')}) AS merchant_unsanctioned
            FROM product_files f
            JOIN community_products p ON p.id = f.product_id
            JOIN merchant_stores s ON s.id = f.store_id
@@ -199,8 +204,15 @@ export async function resolveViewerGrant(
     const owner = !!row.bound_user && row.bound_user === src.owner_id;
     if (!owner) {
       // The shopfront's own visibility rule (worker/routes/storefront.ts), re-asked now.
-      // …and, since push 1.4, a store whose merchant the public may see (`storeHiddenFromPublic`'s rule).
-      if (src.lifecycle !== 'active' || src.status !== 'active' || !storeIsPublic({ status: src.store_status }) || Number(src.merchant_public) !== 1) return null;
+      if (src.lifecycle !== 'active' || src.status !== 'active' || !storeIsPublic({ status: src.store_status })) return null;
+      if (Number(src.merchant_unsanctioned) !== 1) return null;
+      // …and, since push 1.4, a store whose merchant the public may see (`storeHiddenFromPublic`'s
+      // rule) — EXCEPT for a buyer holding a live grant on the product: their purchase is
+      // existing work, and finishing it stays open while the merchant awaits approval.
+      if (Number(src.merchant_public) !== 1) {
+        const buyer = !!row.bound_user && (await hasProductGrant(env.DB, src.product_id, row.bound_user));
+        if (!buyer) return null;
+      }
       if (src.audience_user_id && src.audience_user_id !== row.bound_user) return null;
     }
     return shape(row, src);

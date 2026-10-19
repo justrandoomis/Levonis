@@ -128,6 +128,9 @@ const STRINGS = {
     approval: {
       title: 'اعتماد متجرك',
       stillWorks: 'ما زال يعمل كالمعتاد: طلباتك الحالية، أرباحك وتحويلها، النزاعات، ومسودات المنتجات وتصميم الصفحة.',
+      // Review finding 7: when product drafts are NOT open (a pause or a lapsed plan holds them too).
+      stillWorksNoDrafts: 'ما زال يعمل كالمعتاد: طلباتك الحالية، أرباحك وتحويلها، النزاعات، وتصميم الصفحة.',
+      reopenAfterApproval: 'متجرك متوقّف مؤقتًا بطلبك، وتعيد فتحه بعد اعتماد متجرك.',
     },
     readiness: {
       title: 'قبل أن تفتح متجرك',
@@ -289,6 +292,8 @@ const STRINGS = {
     approval: {
       title: 'Your store’s approval',
       stillWorks: 'Still working as usual: your current orders, your earnings and payouts, disputes, and product drafts and page design.',
+      stillWorksNoDrafts: 'Still working as usual: your current orders, your earnings and payouts, disputes, and page design.',
+      reopenAfterApproval: 'You paused your store; you can re-open it once your store is approved.',
     },
     readiness: {
       title: 'Before you open your store',
@@ -448,6 +453,8 @@ const STRINGS = {
     approval: {
       title: 'پەسەندکردنی فرۆشگاکەت',
       stillWorks: 'ئەمانە وەک هەمیشە کار دەکەن: داواکارییەکانی ئێستا، قازانج و گواستنەوەی، ناکۆکییەکان، و ڕەشنووسی بەرهەم و دیزاینی پەڕە.',
+      stillWorksNoDrafts: 'ئەمانە وەک هەمیشە کار دەکەن: داواکارییەکانی ئێستا، قازانج و گواستنەوەی، ناکۆکییەکان، و دیزاینی پەڕە.',
+      reopenAfterApproval: 'فرۆشگاکەت لەلایەن خۆتەوە ڕاگیراوە؛ دوای پەسەندکردنی فرۆشگاکەت دەتوانیت دووبارە بیکەیتەوە.',
     },
     readiness: {
       title: 'پێش ئەوەی فرۆشگاکەت بکەیتەوە',

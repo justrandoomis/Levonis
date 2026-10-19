@@ -58,7 +58,7 @@ import { useMotion } from '../../../lib/motion';
 import { MotionFeatures } from '../../../lib/motionFeatures';
 import type { MerchantMe } from '../../../lib/merchant';
 import {
-  MERCHANT_BASE, STORE_HOST_BASE, hostPath, merchantHref, parseMerchantPath, readWorkspaceQuery, type MerchantSection,
+  MERCHANT_BASE, STORE_HOST_BASE, hostPath, merchantHref, readWorkspaceQuery, type MerchantSection,
 } from '../../../lib/merchantRoutes';
 import { useIsPhone } from '../../../lib/useMediaQuery';
 import ChunkBoundary from '../../ChunkBoundary';
@@ -71,10 +71,11 @@ import { useAttention, type Attention } from './attention';
 import { WorkspaceContext, type WorkspaceValue } from './context';
 import { NAV, PHONE_TABS, badgeCount, moreEntries, navEntry, navGroups, phoneTabFor, sectionPath, type NavEntry } from './nav';
 import { isPaletteKey } from './paletteModel';
-import { resolveWorkspaceRoute } from './routeTable';
+import { resolveWorkspaceRoute, workspaceLinkTarget } from './routeTable';
 import { SECTIONS } from './sections';
 import SectionFallback from './SectionFallback';
 import { storeStatus } from './status';
+import { gateHint } from '../../../lib/approvalGate';
 import { W, say } from './strings';
 
 // Fetched the first time they are opened — none is needed to draw the frame
@@ -148,14 +149,8 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
     [onStoreHost, mainOrigin]
   );
   const href = useCallback((link: string) => hostPath(link, onStoreHost), [onStoreHost]);
-  const resolveLink = useCallback(
-    (link: string) => {
-      if (parseMerchantPath(link) || parseMerchantPath(link, base)) return { internal: true, to: hostPath(link, onStoreHost) };
-      // A platform page: from a store's subdomain it is another site.
-      return onStoreHost ? { internal: false, to: mainHref(link) } : { internal: true, to: link };
-    },
-    [base, onStoreHost, mainHref]
-  );
+  // A platform page: from a store's subdomain it is another site (`workspaceLinkTarget`).
+  const resolveLink = useCallback((link: string) => workspaceLinkTarget(link, base, onStoreHost, mainHref), [base, onStoreHost, mainHref]);
   const go = useCallback(
     (link: string, opts?: { replace?: boolean }) => {
       const t = resolveLink(link);
@@ -273,6 +268,10 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
   };
 
   const status = storeStatus(me);
+  // A held quick-create item says why: the approval gate's sentence while
+  // approval holds selling — the pill stays on the store's own state, so its
+  // reason is '' for an OPEN store under review (review finding 6).
+  const heldHint = gateHint(me.selling.reason, loc, status.reason(loc)) ?? '';
   const a = attention.data;
   const Screen = section ? SECTIONS[section] : null;
 
@@ -295,7 +294,7 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
             collapsed={collapsed}
             canSell={canSell}
             canDraft={canDraft}
-            sellingReason={status.reason(loc)}
+            sellingReason={heldHint}
             onSearch={openPalette}
             bell={<MerchantNotificationBell onOpen={() => navigate(sectionPath('notifications', base))} unread={bellUnread} />}
             base={base}

@@ -59,6 +59,11 @@ import { loadCandidates } from '../worker/lib/printMatchingStore';
 import { resolveProductPreview, resolveStorePreview } from '../worker/lib/socialPreview';
 import { merchantPublicSql, withApprovalSchema } from '../worker/lib/merchantApproval';
 import { REFUSAL_STRINGS } from '../src/lib/refusalStrings';
+import { notifyRequestFiles } from '../worker/lib/requestFileHooks';
+import { merchantAttentionRoutes } from '../worker/routes/merchantWorkspace';
+import { storeStatus } from '../src/components/merchant/shell/status';
+import { W } from '../src/components/merchant/shell/strings';
+import type { MerchantMe } from '../src/lib/merchant';
 
 const FUTURE = '2099-01-01T00:00:00.000Z';
 const STAMP = '2026-10-18T09:00:00.000Z';
@@ -247,8 +252,11 @@ test('E7: matching, the workshop board and the «for me» rail leave an unapprov
 
   const m = merchantApp(raw);
   const board = await json(await get(m, '/api/merchant/workshop/board'));
-  assert.equal(board.blocked, 'CANNOT_TAKE_WORK');
+  // Approval has its own code (review finding 8): the board says the gate, not «open / renew».
+  assert.equal(board.blocked, 'MERCHANT_NOT_APPROVED');
   assert.deepEqual(board.requests, []);
+  const paused = await json(await get(merchantApp(seed({ approved: true, storeStatus: 'paused' })), '/api/merchant/workshop/board'));
+  assert.equal(paused.blocked, 'CANNOT_TAKE_WORK', 'an approved, paused workshop keeps its own code');
   const forMe = await json(await get(m, '/api/community/requests?for=me'));
   assert.equal(forMe.blocked, 'CANNOT_TAKE_WORK');
 
@@ -319,6 +327,124 @@ test('E12: a NEW chat by merchant id to a merchant the public may not see is the
   // An approved store opens a new conversation for anyone.
   const open = await post(customerApp(seed({ approved: true }), STRANGER), '/api/chats/open', { merchantId: 'm1' });
   assert.equal(open.status, 200);
+});
+
+/**
+ * REVIEW FINDING 3: the E12 guard counted ANY conversation both accounts
+ * share — and `{userId}` opens a personal DM with anyone on demand. Only
+ * commerce threads (a store, request or order thread, or an order chat) are
+ * existing business now.
+ */
+test('E12: a personal DM opened first is not business — the hidden store\'s thread is still the generic refusal', async () => {
+  const raw = seed();
+  const dm = await post(customerApp(raw, STRANGER), '/api/chats/open', { userId: 'owner' });
+  assert.equal(dm.status, 200, JSON.stringify(await json(dm.clone())));
+  const refused = await post(customerApp(raw, STRANGER), '/api/chats/open', { merchantId: 'm1' });
+  assert.equal(refused.status, 404);
+  assert.equal(await code(refused), 'STORE_UNAVAILABLE');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM chats WHERE merchant_id = 'm1'"), 0, 'no store thread was opened');
+  // A real commerce thread is business: the buyer's order still opens it (finishing work).
+  assert.equal((await post(customerApp(raw), '/api/chats/open', { merchantId: 'm1' })).status, 200);
+});
+
+/**
+ * REVIEW FINDING 2 (C9): the favourites door saved a hidden store's product
+ * and its list returned that store's name, pictures and price. A save is
+ * refused like a missing id; a saved row becomes neutral — removable, and
+ * not one field the merchant wrote.
+ */
+test('C9: favourites — a hidden store\'s product cannot be saved, and an existing save is a neutral row with nothing the merchant wrote', async () => {
+  const raw = seed();
+  const save = await put(customerApp(raw, STRANGER), '/api/community-favorites/cp1', {});
+  assert.equal(save.status, 404);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM community_product_favorites WHERE user_id = 'stranger'"), 0);
+
+  const res = await get(customerApp(raw), '/api/community-favorites');
+  assert.equal(res.status, 200);
+  const body = await res.clone().text();
+  for (const leak of ['Dragon', 'dragon-widget', 'ali3d', '14000']) assert.ok(!body.includes(leak), `the list leaks «${leak}»: ${body}`);
+  const item = ((await json(res)).items as Array<Record<string, unknown>>).find((i) => i.product_id === 'cp1');
+  assert.ok(item, 'the save stays, so the customer can remove it');
+  assert.equal(item.unavailable, true);
+  for (const k of ['image', 'price_iqd', 'original_price_iqd', 'store_slug', 'store_name', 'store_url', 'name_ar', 'in_stock']) assert.equal(item[k], null, k);
+  assert.equal(item.name, '');
+  // Removing it still works.
+  assert.equal((await customerApp(raw).request('/api/community-favorites/cp1', { method: 'DELETE' })).status, 200);
+
+  // Approved: the door and the row are the shop's, as before.
+  const approved = seed({ approved: true });
+  assert.equal((await put(customerApp(approved, STRANGER), '/api/community-favorites/cp1', {})).status, 200);
+  const shown = ((await json(await get(customerApp(approved), '/api/community-favorites'))).items as Array<Record<string, unknown>>).find((i) => i.product_id === 'cp1')!;
+  assert.equal(shown.name, 'Dragon widget');
+  assert.equal(shown.store_name, 'Dragon Forge');
+  assert.equal(shown.unavailable, undefined);
+  // A sanction hides it the same way.
+  const suspended = seed({ approved: true, storeStatus: 'suspended' });
+  assert.equal((await put(customerApp(suspended, STRANGER), '/api/community-favorites/cp1', {})).status, 404);
+});
+
+/**
+ * REVIEW FINDING 4 (E7): verdict rows written before the gate still read
+ * «eligible» for a merchant no reviewer approved — the re-match never
+ * rewrites them. The file notice and the workspace count no longer trust
+ * them; an OFFER is existing work and its merchant is still told.
+ */
+test('E7: a pre-gate «eligible» match row tells an unapproved workshop nothing — no file notice, no matching count; an offer still hears', async () => {
+  const raw = seed();
+  raw.exec(`
+    INSERT INTO users (id,name,email,password_hash,role,username,creator_public) VALUES
+      ('owner2','Zain','owner2@x.co','h','merchant','zain',0), ('owner3','Huda','owner3@x.co','h','merchant','huda',0);
+    INSERT INTO community_merchants (id,user_id,name,status) VALUES ('m2','owner2','Zain Prints','active'), ('m3','owner3','Huda Prints','active');
+    INSERT INTO community_request_matches (id,request_id,merchant_id,eligible,revision) VALUES
+      ('mt1','r1','m1',1,1), ('mt2','r1','m2',1,1), ('mt3','r1','m3',1,1);
+  `);
+  raw.prepare("UPDATE community_merchants SET approved_at = ? WHERE id = 'm3'").run(STAMP);
+  await notifyRequestFiles(asD1(raw), 'r1', { id: 'buyer', name: 'Sara' });
+  const told = (raw.prepare("SELECT user_id FROM user_notifications WHERE kind = 'request_files' ORDER BY user_id").all() as Array<{ user_id: string }>).map((r) => r.user_id);
+  assert.deepEqual(told, ['owner', 'owner3'], 'm1 through its pending offer (existing work), m3 approved; never the unapproved m2');
+
+  // The workspace count: a match on an open request the merchant has not offered on.
+  const attentionOf = async (db: DatabaseSync) => {
+    db.exec(`
+      INSERT INTO community_requests (id,customer_id,title,description,status,state,visibility)
+        VALUES ('r2','buyer','A dragon lamp','A lamp for a dragon','open','receiving_offers','public');
+      INSERT INTO community_request_matches (id,request_id,merchant_id,eligible,revision) VALUES ('mt9','r2','m1',1,1);
+    `);
+    const app = stubApp(asD1(db), OWNER, (a) => a.route('/api/merchant/attention', merchantAttentionRoutes), { env: ENV });
+    const res = await get(app, '/api/merchant/attention');
+    assert.equal(res.status, 200);
+    return (await json(res)).attention as Record<string, { matching?: number } | undefined>;
+  };
+  assert.equal((await attentionOf(seed())).requests, undefined, 'unapproved: the field is absent, as the board is empty');
+  assert.equal((await attentionOf(seed({ approved: true }))).requests?.matching, 1, 'approved: r2 counts (r1 already has the offer)');
+});
+
+/**
+ * REVIEW FINDING 6: `/me` says the store's OWN state beside the approval
+ * axis, and the pill reads it — an OPEN store of an unapproved merchant
+ * reads «open», never «paused»; a merchant pause reads «paused» and says
+ * re-opening waits for approval.
+ */
+test('the pill stays on the operational axis: /me sends `operational`, and an unapproved OPEN store reads open', async () => {
+  const open = await json(await get(merchantApp(seed()), '/api/merchant/me'));
+  assert.deepEqual(open.selling, { canSell: false, reason: 'not_approved', canDraft: true, operational: '' });
+  const pill = storeStatus(open as MerchantMe);
+  assert.equal(pill.key, 'open');
+  assert.deepEqual(pill.label, W.open);
+  assert.equal(pill.tone, 'success');
+  assert.ok(pill.approval, 'approval rides beside it');
+
+  const paused = await json(await get(merchantApp(seed({ storeStatus: 'paused' })), '/api/merchant/me'));
+  assert.deepEqual(paused.selling, { canSell: false, reason: 'not_approved', canDraft: false, operational: 'store_paused' });
+  const pausedPill = storeStatus(paused as MerchantMe);
+  assert.equal(pausedPill.key, 'paused');
+  assert.deepEqual(pausedPill.label, W.paused);
+  const loc = (ar: string, en: string) => en || ar;
+  assert.match(pausedPill.reason(loc), /once your store is approved/);
+  assert.doesNotMatch(pausedPill.reason(loc), /from store settings/);
+
+  const approved = await json(await get(merchantApp(seed({ approved: true })), '/api/merchant/me'));
+  assert.deepEqual(approved.selling, { canSell: true, reason: '', canDraft: true, operational: '' });
 });
 
 // ========================================================== F: finishing work

@@ -66,6 +66,7 @@ import { rateLimit } from '../lib/ratelimit';
 import { requireStoreOwner, type StoreContext } from '../lib/merchantAuth';
 import { getTierStatus, benefits } from '../lib/entitlements';
 import { communityMayEnter, readCommunityGate } from '../lib/communityGate';
+import { merchantTakesNewWork } from '../lib/communityRequests';
 import { merchantUnreadCounts } from '../lib/merchantNotify';
 import { merchantBuckets } from '../lib/merchantLedger';
 import { publishedLayout } from '../lib/storeLayout';
@@ -273,6 +274,17 @@ merchantAttentionRoutes.get('/', async (c) => {
       // The board is Levo Community: while it is shut to this merchant, the
       // count would point at a door that refuses — so the field is absent.
       if (!communityMayEnter(await readCommunityGate(db), user)) return undefined;
+      // E7 (push 1.4): the board's own rule — a workshop that takes no new
+      // work (not approved, paused, plan lapsed) sees an empty board
+      // (CANNOT_TAKE_WORK), so a count from verdict rows written before the
+      // gate would announce requests the board refuses: the field is absent.
+      const takes = await merchantTakesNewWork(db, {
+        merchantStatus: ctx.merchant.status,
+        storeStatus: ctx.store.status,
+        merchantApproved: merchantApproved(ctx.merchant),
+        ownerUserId: ctx.store.user_id,
+      });
+      if (!takes) return undefined;
       const row = await db
         .prepare(
           `SELECT COUNT(*) AS n

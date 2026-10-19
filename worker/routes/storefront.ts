@@ -306,10 +306,23 @@ async function servableStore(c: Context<AppContext>, rawSlug: string | undefined
   return servableStoreBySlug(c.env.DB, str(rawSlug, 'slug', { min: 1, max: 64 }));
 }
 
-/** The same rule for a caller that already validated the slug (the public API). */
-export async function servableStoreBySlug(db: D1Database, slug: string): Promise<StoreContext> {
+/**
+ * The store on a slug — the live one, else the one a retired slug was renamed
+ * away from — with NO visibility rule applied. Only for a caller that then
+ * decides visibility itself because it serves more than the public: the
+ * product-file doors (worker/routes/productFiles.ts), where the store's owner
+ * and a buyer holding a live grant keep what they already have on a store the
+ * public may not see (finishing existing work stays open).
+ */
+export async function storeBySlugOrRetired(db: D1Database, slug: string): Promise<StoreContext> {
   const ctx = (await storeBySlug(db, slug)) ?? (await storeForRetiredSlug(db, slug));
   if (!ctx) throw notFound('Store not found');
+  return ctx;
+}
+
+/** The same rule for a caller that already validated the slug (the public API). */
+export async function servableStoreBySlug(db: D1Database, slug: string): Promise<StoreContext> {
+  const ctx = await storeBySlugOrRetired(db, slug);
   if (storeHiddenFromPublic(ctx)) throw storeUnavailable();
   return ctx;
 }

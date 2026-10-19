@@ -47,16 +47,23 @@ export function storeStatus(me: StatusInput): StoreStatus {
   const approval = approvalNotice(me);
   const store = me.store;
   const merchantStatus = store?.merchant?.status ?? 'active';
+  // Approval is NOT an operational reason (review finding 6): while selling
+  // answers `not_approved`, the pill reads the server's `operational` reason
+  // (approval set aside; '' = open) — and, from an older server without it,
+  // the store's own status — so an OPEN store never reads «paused». A reason
+  // is '' exactly when selling is on.
+  const gate = me.selling?.reason;
+  const why = gate === 'not_approved' ? me.selling.operational ?? '' : gate ?? '';
   if (store?.status === 'suspended' || merchantStatus === 'suspended') {
     const code = store?.status === 'suspended' ? 'store_suspended' : 'merchant_suspended';
     return { key: 'suspended', tone: 'danger', label: W.suspended, reason: (loc) => sellingReason(code, loc), approval };
   }
-  if (store?.status === 'paused') return { key: 'paused', tone: 'warning', label: W.paused, reason: (loc) => sellingReason('store_paused', loc), approval };
-  const why = me.selling?.reason ?? '';
-  if (!me.selling?.canSell && (why === 'subscription_inactive' || why === 'benefit_restricted')) {
+  // Re-opening a pause waits for approval (E8): then the gate's sentence, never «re-open it from settings».
+  if (store?.status === 'paused') return { key: 'paused', tone: 'warning', label: W.paused, reason: (loc) => sellingReason(gate === 'not_approved' ? gate : 'store_paused', loc), approval };
+  if (why === 'subscription_inactive' || why === 'benefit_restricted') {
     return { key: 'lapsed', tone: 'warning', label: W.lapsed, reason: (loc) => sellingReason(why, loc), approval };
   }
   if (merchantStatus !== 'active') return { key: 'restricted', tone: 'warning', label: W.restricted, reason: (loc) => sellingReason('merchant_restricted', loc), approval };
-  if (!me.selling?.canSell) return { key: 'paused', tone: 'warning', label: W.paused, reason: (loc) => sellingReason(why, loc), approval };
+  if (why) return { key: 'paused', tone: 'warning', label: W.paused, reason: (loc) => sellingReason(why, loc), approval };
   return { key: 'open', tone: 'success', label: W.open, reason: () => '', approval };
 }

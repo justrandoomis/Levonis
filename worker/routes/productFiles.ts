@@ -47,7 +47,8 @@ import { HttpError, badRequest, conflict, int, notFound, requireAuth, str } from
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
-import { requireStoreOwner, type StoreContext } from '../lib/merchantAuth';
+import { requireStoreOwner, storeHiddenFromPublic, storeSanctioned, type StoreContext } from '../lib/merchantAuth';
+import { publicStoreUnavailable } from '../lib/merchantApproval';
 import { anonymousCached, originOf, purgeAnonymousCache } from '../lib/edgePolicy';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { getMediaObject } from '../lib/mediaStorage';
@@ -69,7 +70,7 @@ import {
   revokeProductFileViewerGrantsStatement,
   viewerSessionInput,
 } from '../lib/viewerGrants';
-import { servableStoreBySlug } from './storefront';
+import { storeBySlugOrRetired } from './storefront';
 
 const nowIso = () => new Date().toISOString();
 
@@ -292,7 +293,10 @@ interface VisibleProduct {
 }
 
 /**
- * The store, servable, and the product as the shopfront shows it — the same
+ * The store, servable TO THIS VIEWER (a sanction closes it to everyone; a
+ * merchant the public may not see yet closes it to all but its owner and a
+ * buyer with a live grant on the product), and the product as the shopfront
+ * shows it — the same
  * `lifecycle = 'active' AND status = 'active'` rule storefront.ts applies,
  * plus 0152's private products, which only their one customer may see. The
  * store owner sees their own product in every state (they are looking at
@@ -309,7 +313,7 @@ async function visibleProduct(c: Context<AppContext>, opts: { allowUnpublished?:
   const productId = str(c.req.param('productId'), 'productId', { min: 1, max: 64 });
   const viewer = c.get('user') ?? null;
   const [ctx, p] = await Promise.all([
-    servableStoreBySlug(c.env.DB, slug),
+    storeBySlugOrRetired(c.env.DB, slug),
     privateProductsReady(c.env.DB).then((privateReady) =>
       c.env.DB.prepare(
         `SELECT id, slug, store_id, lifecycle, status, ${privateReady ? 'audience_user_id' : 'NULL AS audience_user_id'}
@@ -319,8 +323,22 @@ async function visibleProduct(c: Context<AppContext>, opts: { allowUnpublished?:
         .first<{ id: string; slug: string; store_id: string; lifecycle: string; status: string; audience_user_id: string | null }>()
     ),
   ]);
-  if (!p || p.store_id !== ctx.store.id) throw notFound('Product not found');
+  // A SANCTION closes these doors to everyone, the owner too — as before push 1.4.
+  if (storeSanctioned(ctx)) throw publicStoreUnavailable();
   const owner = !!viewer && viewer.id === ctx.store.user_id;
+  /*
+   * A STORE THE PUBLIC MAY NOT SEE (its merchant not approved — owner
+   * decisions C1/C2) answers the one generic STORE_UNAVAILABLE (C9) to the
+   * public, but not to the people whose work is already done: the store's
+   * owner, and a buyer holding a LIVE grant on this product (a paid order
+   * already placed — «nothing is frozen»). Asked before «not found», so a
+   * stranger learns nothing about which product ids exist on a hidden store.
+   */
+  if (!owner && storeHiddenFromPublic(ctx)) {
+    const entitled = !!viewer && !!p && p.store_id === ctx.store.id && (await hasProductGrant(c.env.DB, p.id, viewer.id));
+    if (!entitled) throw publicStoreUnavailable();
+  }
+  if (!p || p.store_id !== ctx.store.id) throw notFound('Product not found');
   const published = p.lifecycle === 'active' && p.status === 'active';
   if (!owner && !opts.allowUnpublished && !published) throw notFound('Product not found');
   if (!owner && p.audience_user_id && (!viewer || viewer.id !== p.audience_user_id)) throw notFound('Product not found');

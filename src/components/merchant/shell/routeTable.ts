@@ -26,9 +26,28 @@
 import {
   SECTION_PATHS,
   SECTIONS_WITH_ID,
+  hostPath,
   parseMerchantPath,
   type MerchantSection,
 } from '../../../lib/merchantRoutes';
+
+/**
+ * WHERE A STORED LINK POINTS FROM THIS HOST — the workspace's `resolveLink`,
+ * pure. A workspace address goes through the router, re-based for a store's
+ * own subdomain (`/admin/…`); anything else is a platform page — the merchant
+ * application at `/merchant/start` among them — which from a store's own
+ * subdomain is ANOTHER SITE: an absolute main-site link and a full
+ * navigation (review finding 9: the approval notice opened Today instead).
+ */
+export function workspaceLinkTarget(
+  link: string,
+  base: string,
+  onStoreHost: boolean,
+  mainHref: (path: string) => string
+): { internal: boolean; to: string } {
+  if (parseMerchantPath(link) || parseMerchantPath(link, base)) return { internal: true, to: hostPath(link, onStoreHost) };
+  return onStoreHost ? { internal: false, to: mainHref(link) } : { internal: true, to: link };
+}
 
 export type WorkspaceRoute =
   | { kind: 'section'; section: MerchantSection; id?: string }
