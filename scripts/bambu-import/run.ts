@@ -34,12 +34,15 @@
  *
  * Modes (workflow 60 §K.3): preflight (public checks), open (hello, the
  * manifest, the taxonomy, the protected snapshot `before`), run, close (§A.9,
- * §I.3), withdraw. snapshot, report, revoke and dryrun need no importer.
+ * §I.3), withdraw, delta (§O: a NEW run whose queue is the closed run's
+ * completed items with failed media — a media-only stage — then the products
+ * the sitemaps list that no run ever held; then the queue, as in run).
+ * snapshot, report, revoke and dryrun need no importer.
  *
  * Outputs (GITHUB_OUTPUT): more, blocked, run_id.
  */
 import { createHash } from 'node:crypto';
-import { canonicalJson } from '@levonis/catalog/bambuImport/fingerprint';
+import { canonicalJson, mediaPath } from '@levonis/catalog/bambuImport/fingerprint';
 import { appendFileSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -66,11 +69,26 @@ import {
 import { curatedGate, enrich, type EnrichReport } from './enrich';
 import { blockedStop, HostFetcher, ImportStop, StoreFetcher, transientStop, type FetchLike } from './fetch';
 import { ImportLog, type LogStage } from './log';
-import { OpsClient, OpsError, writtenDocumentsOf, writtenImagesOf, type DocumentCheck, type HeldRef, type MediaAnswerRow, type MediaRequest, type StatusAnswer, type WriteAnswer, type WrittenImage } from './opsClient';
+import {
+  attachedMediaOf,
+  OpsClient,
+  OpsError,
+  writtenDocumentsOf,
+  writtenImagesOf,
+  type AttachedMedia,
+  type DeltaRowView,
+  type DocumentCheck,
+  type HeldRef,
+  type MediaAnswerRow,
+  type MediaRequest,
+  type StatusAnswer,
+  type WriteAnswer,
+  type WrittenImage,
+} from './opsClient';
 import { writtenGallery, type Gallery } from './gallery';
 import { NO_ROBOTS, parseRobots, robotsAllows, SITEMAP_PATHS, type Robots } from './robots';
 import { renderSummary, SummaryWriter, type SummaryItem } from './summary';
-import { AFTER_CACHE_WAIT, cacheWaitOf, edgeEvidence, modelCodesOf, publicBrandSweep, Site, verifyPublic, type VerifyContext, type VerifyOutcome } from './verify';
+import { AFTER_CACHE_WAIT, cacheWaitOf, edgeEvidence, modelCodesOf, publicBrandSweep, Site, siteFacts, verifyPublic, type VerifyContext, type VerifyOutcome } from './verify';
 import type { BrowserInput, BrowserResult } from './browser';
 // @ts-expect-error - plain ESM helper run by workflow 60, no types
 import { sealBuffer } from './seal.mjs';
@@ -99,6 +117,8 @@ export function localOnlyFetch(inner: FetchLike, refused: { count: number }): Fe
   };
 }
 const MEDIA_SPACING_MS = 1000;
+/** At most this many new products in one delta run (worker/lib/catalogImport/delta.ts DELTA_NEW_MAX). */
+export const DELTA_NEW_MAX = 20;
 const HELLO_EVERY = 50;
 /** The wait before the run status is read again after /lease refused a queued item (another one is in flight). */
 const LEASE_CLASH_WAIT_MS = 30_000;
@@ -153,7 +173,7 @@ export function stageAfter(lastCompleted: string): Stage | null {
 
 // ------------------------------------------------------------------ configuration
 
-export type RunMode = 'preflight' | 'open' | 'run' | 'close' | 'withdraw';
+export type RunMode = 'preflight' | 'open' | 'run' | 'close' | 'withdraw' | 'delta';
 
 export interface RunConfig {
   mode: RunMode;
@@ -162,8 +182,10 @@ export interface RunConfig {
   resume: boolean;
   chain: boolean;
   chainCount: number;
-  /** mode=run only: the owner's standing approval (2026-10-18) withdraws a page gone at the source and goes on. */
+  /** mode=run or delta: the owner's standing approval (2026-10-18) withdraws a page gone at the source and goes on. */
   autoWithdraw: boolean;
+  /** mode=delta: the closed run the delta is taken from (workflow 60 passes it as run_id); the new run is the opened one. */
+  fromRun: string;
   item: string;
   siteOrigin: string;
   storeOrigin: string;
@@ -180,17 +202,21 @@ export class ConfigError extends Error {}
 /** The importer's environment, every value validated before anything runs. */
 export function configFromEnv(env: NodeJS.ProcessEnv, root: string): RunConfig {
   const mode = env.IN_MODE ?? '';
-  if (!/^(preflight|open|run|close|withdraw)$/.test(mode)) throw new ConfigError('the importer runs only in preflight, open, run, close and withdraw modes');
-  const runId = env.IN_RUN_ID ?? '';
-  if (runId && !/^cir_[0-9a-f]{24}$/.test(runId)) throw new ConfigError('run_id is not cir_ followed by 24 hex characters');
+  if (!/^(preflight|open|run|close|withdraw|delta)$/.test(mode)) throw new ConfigError('the importer runs only in preflight, open, run, close, withdraw and delta modes');
+  const given = env.IN_RUN_ID ?? '';
+  if (given && !/^cir_[0-9a-f]{24}$/.test(given)) throw new ConfigError('run_id is not cir_ followed by 24 hex characters');
+  // mode=delta: run_id names the CLOSED run the delta is taken from; the run this job works on is the one it opened.
+  if (mode === 'delta' && !given) throw new ConfigError('delta needs the closed run it is taken from (run_id)');
+  const runId = mode === 'delta' ? '' : given;
+  const fromRun = mode === 'delta' ? given : '';
   const maxItems = env.IN_MAX_ITEMS ?? '1';
   if (!/^[0-9]{1,4}$/.test(maxItems)) throw new ConfigError('max_items is not a whole number');
   const chainCount = env.IN_CHAIN_COUNT ?? '0';
   if (!/^([0-9]|1[0-2])$/.test(chainCount)) throw new ConfigError('chain_count is not 0 to 12');
   // A bounded job (the canary, an audit class) is reviewed before the next one (§K.4): it never chains.
-  if (mode === 'run' && env.IN_CHAIN === 'true' && Number(maxItems) !== 0) throw new ConfigError('chain runs only with max_items 0');
+  if ((mode === 'run' || mode === 'delta') && env.IN_CHAIN === 'true' && Number(maxItems) !== 0) throw new ConfigError('chain runs only with max_items 0');
   const autoWithdraw = env.IN_AUTO_WITHDRAW === 'true';
-  if (autoWithdraw && mode !== 'run') throw new ConfigError('auto_withdraw runs only in mode run');
+  if (autoWithdraw && mode !== 'run' && mode !== 'delta') throw new ConfigError('auto_withdraw runs only in modes run and delta');
   const item = env.IN_ITEM ?? '';
   if (item && !/^[0-9]{1,20}$/.test(item)) throw new ConfigError('item is not a source product id');
   const sealKey = env.IN_SEAL_PUBKEY ?? '';
@@ -207,6 +233,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv, root: string): RunConfig {
     chain: env.IN_CHAIN === 'true',
     chainCount: Number(chainCount),
     autoWithdraw,
+    fromRun,
     item,
     siteOrigin,
     storeOrigin,
@@ -230,6 +257,55 @@ export function takeToken(file: string | undefined): string {
   const token = text.trim();
   if (!/^[0-9a-f]{64}$/.test(token)) throw new ConfigError('the token file does not hold a 64-hex token');
   return token;
+}
+
+/**
+ * A delta run's new product as a manifest row (§O.2): the source id, handle, route and type the Worker registered,
+ * its section the reviewed map's resolution of that route (/delta/rows); nothing curated, held or reviewed beyond it.
+ */
+export function deltaManifestRowOf(d: Pick<DeltaRowView, 'source_product_id' | 'handle' | 'canonical_url' | 'type' | 'route' | 'queue_position' | 'leaf' | 'also'>): ManifestRow {
+  return {
+    queue_position: d.queue_position,
+    source: 'bambu_us',
+    source_product_id: d.source_product_id,
+    handle: d.handle,
+    canonical_url: d.canonical_url,
+    title: '',
+    type: d.type,
+    currentAllIdRoute: d.route,
+    leaf: d.leaf,
+    also: d.also,
+    curated: false,
+    hold_code: '',
+    sku_codes: {},
+    value_labels: {},
+    audit_classes: [],
+  };
+}
+
+/**
+ * What a media item sends (§O.4): the payload as the importer builds it, WITHOUT its prose — no description block,
+ * spec, document, relation, external id or note, no short description or usage guide. The Worker refuses a media
+ * payload that carries any (so the allow-list of text it never writes cannot stop a picture), and reads only the
+ * identity, the options and variants, the images and the swatches.
+ */
+export function mediaOnlyPayload(p: ImportPayload): ImportPayload {
+  return {
+    ...p,
+    product: { ...p.product, short_description_en: '', usage_steps: [], usage_official_url: '' },
+    content_blocks: [],
+    specs: [],
+    documents: [],
+    relations: [],
+    external_ids: [],
+    notes: [],
+  };
+}
+
+/** The cache rule's wait from one answer (§I.1.9): its s-maxage + 60 s, at most 360 s (300 s when it names none). */
+export function cacheWaitOfHeaders(headers: Headers): number {
+  const m = /s-maxage=(\d{1,6})/.exec(headers.get('cache-control') ?? '');
+  return Math.min(360_000, ((m ? Number(m[1]) : 300) + 60) * 1000);
 }
 
 // ------------------------------------------------------------------ dependencies
@@ -332,6 +408,12 @@ interface ItemWork {
   gallery?: Gallery;
   /** /publish-finish ran for this item in this job (it purges, and republishes a product hidden on a block). */
   publishedThisJob: boolean;
+  /** 'media': a delta run's media-only item (§O.3), whose stages write pictures and nothing else. */
+  kind: 'item' | 'media';
+  /** A media item's plan (/media-plan): the failed media to fetch again, and the payload digest the Worker recorded. */
+  retry?: { sha: string; payload: ImportPayload; requests: MediaRequest[]; skipped: Record<string, number>; failed: number };
+  /** A media item's attached rows: this job's /media-attach answer, or stage_data.media_retry on a resume. */
+  attached: AttachedMedia | null;
 }
 
 const stageFpEqualOf = (stageData: Record<string, unknown>): boolean | null =>
@@ -375,6 +457,12 @@ export class Importer {
   private finishedHeld: HeldRef[] | null = null;
   private runId: string;
   private resumeUsed = false;
+  /** A delta run's items (§O), by source id, as /delta/rows answers them; read once per job (null outside runQueue). */
+  private deltaView: Map<string, DeltaRowView> | null = null;
+  /** mode=delta: the queue is registered and the snapshot taken; a door that fails later leaves the run to a chained job. */
+  private deltaOpened = false;
+  /** /hello: the run holds delta items (§O). */
+  private runIsDelta = false;
   /** The item whose lease this job holds, and when an item call last renewed it (null between items). */
   private held: { w: ItemWork; renewedAt: number } | null = null;
   private renewing = false;
@@ -472,7 +560,7 @@ export class Importer {
         runId: this.runId,
         siteOrigin: this.cfg.siteOrigin,
         status: this.status,
-        handleOf: (sid) => this.deps.bundle.bySid.get(sid)?.handle ?? null,
+        handleOf: (sid) => this.deps.bundle.bySid.get(sid)?.handle ?? this.deltaView?.get(sid)?.handle ?? null,
         items: this.items,
         blocked,
         withdrawn: [],
@@ -510,6 +598,7 @@ export class Importer {
       if (this.runId && this.runId !== a.run.id) throw new JobStop('RUN_MISMATCH', true);
       this.runId = a.run.id;
     }
+    this.runIsDelta = a.run.delta;
   }
 
   // ---------------------------------------------------------------- modes
@@ -536,12 +625,16 @@ export class Importer {
         case 'withdraw':
           code = await this.withdraw();
           break;
+        case 'delta':
+          ({ more, blocked } = await this.delta());
+          break;
       }
     } catch (err) {
       blocked = true;
       more = false;
       code = 1;
-      if (this.cfg.mode === 'run' && err instanceof OpsError && err.kind === 'transient') {
+      // mode=delta: only once its queue is registered — a delta whose registration did not finish never chains.
+      if ((this.cfg.mode === 'run' || (this.cfg.mode === 'delta' && this.deltaOpened)) && err instanceof OpsError && err.kind === 'transient') {
         // A door that did not settle between items (/hello, /run/status: a 503 D1_OVERLOADED on the token read, a
         // 5xx, a 429) is passing, never "token gone" and never a block: this job holds nothing open, and the next
         // job resumes where D1 says (the chain stays bounded by its count).
@@ -600,6 +693,8 @@ export class Importer {
   /** mode=run: the queue, one item at a time, until max_items, the deadline or a BLOCKED item. */
   async runQueue(): Promise<{ more: boolean; blocked: boolean }> {
     await this.hello();
+    // A delta run's items (§O): its media items and the new products the reviewed manifest does not hold.
+    this.deltaView = new Map(this.runIsDelta ? (await this.ops.deltaRows()).map((r) => [r.source_product_id, r]) : []);
     // The browser before any item: a job that cannot run check 7 claims nothing (§I.1: COMPLETE needs both sides).
     if (!(await this.browserFor())) throw new JobStop('BROWSER_UNAVAILABLE', true);
     let processed = 0;
@@ -613,14 +708,15 @@ export class Importer {
         this.writeSummary(false);
         return { more: false, blocked: false };
       }
-      const row = this.deps.bundle.bySid.get(ref.source_product_id);
-      if (!row) throw new JobStop('REVIEWED_SCOPE_REFUSED', true);
+      const found = this.rowOf(ref.source_product_id);
+      if (!found) throw new JobStop('REVIEWED_SCOPE_REFUSED', true);
+      const row = found.row;
       if ((ref.state === 'DISCOVERED' || ref.state === '') && !this.deadline.canStartItem()) {
         this.log.info('deadline_exit', { need: Math.round((WORST.EXTRACT + WORST.ENRICH) / 1000), left: Math.round(this.deadline.left() / 1000) });
         this.writeSummary(true);
         return { more: true, blocked: false };
       }
-      const outcome = await this.processItem(row);
+      const outcome = await this.processItem(row, found.kind);
       if (outcome.kind === 'skip') {
         // The status named an item its lease says is finished: a stale answer. Never loop on it.
         if (++skips > 3) throw new JobStop('STATUS_INCONSISTENT', true);
@@ -667,7 +763,20 @@ export class Importer {
 
   // ---------------------------------------------------------------- one item
 
-  private async processItem(row: ManifestRow): Promise<ItemOutcome> {
+  /**
+   * The row an item is worked from: the reviewed manifest's; for a delta run's media item the reviewed row at its
+   * position in the new run; for a delta run's new product the row the Worker registered (never one the reviewed
+   * manifest holds). null: the run names an item neither knows.
+   */
+  private rowOf(sid: string): { row: ManifestRow; kind: 'item' | 'media' } | null {
+    const delta = this.deltaView?.get(sid);
+    const reviewed = this.deps.bundle.bySid.get(sid);
+    if (delta?.kind === 'media') return reviewed ? { row: { ...reviewed, queue_position: delta.queue_position }, kind: 'media' } : null;
+    if (delta?.kind === 'new') return reviewed ? null : { row: deltaManifestRowOf(delta), kind: 'item' };
+    return reviewed ? { row: reviewed, kind: 'item' } : null;
+  }
+
+  private async processItem(row: ManifestRow, kind: 'item' | 'media' = 'item'): Promise<ItemOutcome> {
     const sid = row.source_product_id;
     let lease;
     try {
@@ -709,6 +818,8 @@ export class Importer {
       stageDocumentsInactive: writtenDocumentsOf(lease.stage_data.documents_inactive),
       writeChecks: null,
       publishedThisJob: false,
+      kind,
+      attached: attachedMediaOf(lease.stage_data.media_retry),
     };
     const pos = row.queue_position;
     const log = (stage: LogStage, t: Parameters<ImportLog['item']>[3], p: Parameters<ImportLog['item']>[4] = {}) => this.log.item(pos, row.handle, stage, t, p);
@@ -830,6 +941,8 @@ export class Importer {
     if (images) w.stageImages = images;
     const inactive = writtenDocumentsOf(lease.stage_data.documents_inactive);
     if (inactive) w.stageDocumentsInactive = inactive;
+    const attached = attachedMediaOf(lease.stage_data.media_retry);
+    if (attached) w.attached = attached;
   }
 
   /**
@@ -966,6 +1079,7 @@ export class Importer {
   // ---------------------------------------------------------------- the stages
 
   private async runStage(w: ItemWork, stage: Stage): Promise<ItemOutcome | null> {
+    if (w.kind === 'media') return this.runMediaStage(w, stage);
     switch (stage) {
       case 'EXTRACTING':
         await this.extract(w);
@@ -1161,7 +1275,19 @@ export class Importer {
         }
       }
     }
-    const pending = [...wanted.values()].filter((m) => w.media.get(m.source_media_id)?.status !== 'stored');
+    await this.fetchMedia(w, [...wanted.values()]);
+    const primary = p.images.find((i) => i.is_primary);
+    const pm = primary ? w.media.get(primary.source_media_id) : undefined;
+    if (primary && pm?.status !== 'stored') {
+      if (pm?.error_code === 'MEDIA_HOST_NOT_ALLOWED') throw blockedStop('MEDIA_HOST_NOT_ALLOWED', 'the primary image is on a host outside the allow-list');
+      throw blockedStop('PRIMARY_MEDIA_FAILED', 'the primary image could not be stored');
+    }
+    this.logMediaDone(w, wanted.size);
+  }
+
+  /** The media calls themselves: ≤ 4 a call, ≥ 1 s apart, a pending medium asked again (at most 20 rounds). */
+  private async fetchMedia(w: ItemWork, requests: readonly MediaRequest[]): Promise<void> {
+    const pending = requests.filter((m) => w.media.get(m.source_media_id)?.status !== 'stored');
     let lastCall: number | null = null;
     let rounds = 0;
     while (pending.length) {
@@ -1186,18 +1312,15 @@ export class Importer {
         pending.push(...again);
       }
     }
-    const primary = p.images.find((i) => i.is_primary);
-    const pm = primary ? w.media.get(primary.source_media_id) : undefined;
-    if (primary && pm?.status !== 'stored') {
-      if (pm?.error_code === 'MEDIA_HOST_NOT_ALLOWED') throw blockedStop('MEDIA_HOST_NOT_ALLOWED', 'the primary image is on a host outside the allow-list');
-      throw blockedStop('PRIMARY_MEDIA_FAILED', 'the primary image could not be stored');
-    }
+  }
+
+  private logMediaDone(w: ItemWork, total: number): void {
     const all = [...w.media.values()];
     this.log.item(w.row.queue_position, w.row.handle, 'INGESTING_MEDIA', 'media_done', {
       stored: all.filter((m) => m.status === 'stored').length,
       failed: all.filter((m) => m.status === 'failed').length,
       omitted: all.filter((m) => m.status === 'omitted_cap').length,
-      total: wanted.size,
+      total,
     });
   }
 
@@ -1417,6 +1540,235 @@ export class Importer {
     });
     w.shots.forEach((shot, i) => this.seal(`${name}-shot-${i + 1}.png`, shot));
     w.shots = [];
+  }
+
+  // ---------------------------------------------------------------- the delta run (§O)
+
+  /**
+   * mode=delta: the NEW run's queue (cf.mjs opened the run and minted this job's token), then the queue itself, as
+   * in mode=run. The store's robots.txt and its three sitemaps (§I.3.1, at the store's pace); /delta/plan names the
+   * listed handles no run ever held and the closed run's completed items with failed media; each new handle's page
+   * is read once (≥ 11 s apart) for its source id and route; /delta/manifest registers the media items first and the
+   * new products last (a new product may wait for the owner's §E.1 review at its turn — the retries never wait
+   * behind it); the reviewed taxonomy (insert-only, as at open) and the protected snapshot `before`.
+   */
+  async delta(): Promise<{ more: boolean; blocked: boolean }> {
+    await this.hello();
+    const robots = await this.ensureRobots();
+    if (SITEMAP_PATHS.some((path) => !robotsAllows(robots, path))) {
+      this.log.error('note', { code: 'SITEMAP_DISALLOWED' });
+      throw new JobStop('SITEMAP_DISALLOWED', true);
+    }
+    const urls: string[] = [];
+    for (const path of SITEMAP_PATHS) urls.push(...parseSitemap(await this.store.sitemap(path)));
+    const listed = productHandles(urls);
+    const plan = await this.ops.deltaPlan(this.cfg.fromRun, listed);
+    this.log.info('delta_plan', { run: this.cfg.fromRun, ...plan.counts });
+    // More new products than one delta takes (the Worker's DELTA_NEW_MAX) is a review of the store, not a delta:
+    // nothing is read or registered.
+    if (plan.new_handles.length > DELTA_NEW_MAX) {
+      this.log.error('note', { code: 'DELTA_TOO_MANY_NEW' });
+      throw new JobStop('DELTA_TOO_MANY_NEW', true);
+    }
+    const at = this.now();
+    const fresh: Array<Record<string, unknown>> = [];
+    const newProducts: Array<Record<string, unknown>> = [];
+    for (const handle of plan.new_handles) {
+      const raw = encodeURIComponent(handle);
+      if (!robotsAllows(robots, `/products/${raw}`)) {
+        this.log.info('delta_new_skipped', { what: 'robots_disallow' });
+        continue;
+      }
+      let page;
+      try {
+        page = await this.store.productPage(raw);
+      } catch (err) {
+        // A page gone or redirected to another product is not queued (a later delta finds it again if it comes
+        // back); a challenge, a store that does not answer or the deadline stop the job (never bypassed).
+        if (err instanceof ImportStop && (err.code === 'SOURCE_WITHDRAWN' || err.code === 'IDENTITY_AMBIGUOUS')) {
+          this.log.info('delta_new_skipped', { what: err.code === 'SOURCE_WITHDRAWN' ? 'page_gone' : 'other_product' });
+          continue;
+        }
+        throw err;
+      }
+      let x: Extraction;
+      try {
+        x = extractPage(page.html).extraction;
+      } catch {
+        this.log.info('delta_new_skipped', { what: 'unreadable' });
+        continue;
+      }
+      if (x.handle !== handle || !/^\d{1,24}$/.test(x.sourceProductId)) {
+        this.log.info('delta_new_skipped', { what: 'other_product' });
+        continue;
+      }
+      fresh.push({ kind: 'new', source_product_id: x.sourceProductId, handle, route: x.route, discovered_at: at });
+      newProducts.push({ handle, source_product_id: x.sourceProductId, title: x.title, route: x.route, type: productTypeOf(x.route) });
+    }
+    const rows = [...plan.media.map((m) => ({ kind: 'media', source_product_id: m.source_product_id, discovered_at: at })), ...fresh];
+    let calls = 0;
+    const registered = { new: 0, media: 0 };
+    for (let i = 0; i < rows.length; i += 100) {
+      const a = await this.ops.deltaManifest(this.cfg.fromRun, rows.slice(i, i + 100));
+      calls++;
+      registered.new += a.new;
+      registered.media += a.media;
+    }
+    this.log.info('delta_registered', { media: registered.media, new: registered.new, calls });
+    const tax = await this.ops.prepareTaxonomy();
+    this.log.info('taxonomy', { nodes: tax.created_nodes, brand: tax.brand_created, synonyms: tax.synonyms_inserted });
+    const snap = await this.ops.protectSnapshot('before');
+    this.log.info('protect', { phase: 'before', subjects: snap.subjects });
+    this.status = await this.ops.status();
+    // Sealed: the new products' handles, titles and routes are for the owner's review (§E.1), never for the log.
+    this.seal('delta-open-report.json', {
+      run_id: this.runId,
+      from_run: this.cfg.fromRun,
+      sitemap_listed: listed.length,
+      plan: plan.counts,
+      new_products: newProducts,
+      media_items: plan.media,
+      registered,
+      reviewed_bundle_sha256: bundleDigest(this.deps.bundle.sha256),
+      taxonomy: tax,
+      protect_before: snap,
+      status: this.status,
+    });
+    this.deltaOpened = true;
+    return this.runQueue();
+  }
+
+  /**
+   * A media item (§O.3): the page read again and the payload rebuilt exactly as the importer builds it (EXTRACT; never
+   * enriched — nothing but pictures is sent), the plan the Worker proves and answers (/media-plan), the failed media
+   * fetched again (/media, ≤ 4 a call), ONE guarded INSERT-only batch (/media-attach), the ordinary /publish-finish,
+   * and COMPLETE on the public product's own answer (/media-complete).
+   */
+  private async runMediaStage(w: ItemWork, stage: Stage): Promise<ItemOutcome | null> {
+    switch (stage) {
+      case 'EXTRACTING':
+        await this.extract(w);
+        await this.event(w, 'ENRICHING', 'ok', { detail: { source_fingerprint: w.payload?.extraction_sha256 ?? '', media_only: true } });
+        return null;
+      case 'ENRICHING':
+        await this.event(w, 'VALIDATING', 'ok', { detail: { media_only: true } });
+        return null;
+      case 'VALIDATING':
+        await this.mediaPlan(w);
+        await this.event(w, 'INGESTING_MEDIA', 'ok', { detail: { media_only: true, failed: w.retry!.failed, requests: w.retry!.requests.length } });
+        return null;
+      case 'INGESTING_MEDIA':
+        if (!w.retry) await this.mediaPlan(w);
+        await this.fetchMedia(w, w.retry!.requests);
+        this.logMediaDone(w, w.retry!.requests.length);
+        await this.event(w, 'WRITING', 'ok', { detail: this.mediaDetail(w) });
+        return null;
+      case 'WRITING':
+        if (!w.retry) await this.mediaPlan(w);
+        if (w.media.size === 0) await this.fetchMedia(w, w.retry!.requests);
+        await this.attachMedia(w);
+        return null;
+      case 'PUBLISHING':
+        await this.publish(w);
+        return null;
+      case 'VERIFYING_LIVE':
+        return this.verifyMediaRetry(w);
+    }
+  }
+
+  /** /media-plan: the rebuilt payload (the page read in this job), proved by the Worker; what to fetch again. */
+  private async mediaPlan(w: ItemWork): Promise<void> {
+    await this.ensureExtracted(w);
+    const errors = w.build!.report.errors;
+    if (errors.includes('IDENTITY_AMBIGUOUS') || errors.includes('DUPLICATE_VALUE_TEXT') || errors.includes('DUPLICATE_VARIANT')) throw blockedStop('IDENTITY_AMBIGUOUS', 'the options do not resolve');
+    const payload = mediaOnlyPayload(w.payload!);
+    const a = await this.ops.mediaPlan(w.sid, w.leaseToken, payload);
+    w.retry = { sha: a.payload_sha256, payload, requests: a.media, skipped: a.skipped, failed: a.failed };
+    w.stagedSha = a.payload_sha256;
+    const k = a.skipped;
+    this.log.item(w.row.queue_position, w.row.handle, 'VALIDATING', 'media_plan', {
+      failed: a.failed,
+      requests: a.media.length,
+      role_not_attachable: k.role_not_attachable ?? 0,
+      not_in_source: k.not_in_source ?? 0,
+      primary_unchanged: k.primary_unchanged ?? 0,
+      product_not_public: k.product_not_public ?? 0,
+    });
+  }
+
+  /** /media-attach: one guarded batch; an ambiguous answer is settled by /lease (the batch moves the item on). */
+  private async attachMedia(w: ItemWork): Promise<void> {
+    const a = await this.ops.mediaAttach(w.sid, w.leaseToken, w.retry!.sha, w.retry!.payload);
+    w.attached = { rows: a.rows, swatches: a.swatches };
+    w.productId = a.product_id || w.productId;
+    w.slug = a.slug || w.slug;
+    w.state = 'PUBLISHING';
+    w.lastCompleted = 'WRITING';
+    const c = a.counts;
+    this.log.item(w.row.queue_position, w.row.handle, 'WRITING', 'media_attached', {
+      attached: c.attached ?? 0,
+      rows: a.rows.length,
+      swatches: a.swatches.length,
+      already_present: c.already_present ?? 0,
+      duplicate_content: c.duplicate_content ?? 0,
+      target_missing: c.target_missing ?? 0,
+      not_stored: c.not_stored ?? 0,
+    });
+  }
+
+  /**
+   * VERIFY of a media item: the anonymous site answer of the product shows every attached picture (its image rows,
+   * its values' swatches), with the cache rule (§I.1.9: purge again, wait s-maxage + 60 s, once); then /media-complete,
+   * where the Worker recomputes the rows in D1 and the objects in R2. Nothing attached: nothing to see.
+   */
+  private async verifyMediaRetry(w: ItemWork): Promise<ItemOutcome> {
+    if (!w.slug || !w.attached) await this.relearn(w);
+    const att = w.attached;
+    if (!w.slug || !att) throw blockedStop('VERIFY_FAILED_PERSISTENT', 'the attach recorded no rows');
+    if (!w.publishedThisJob) {
+      await this.ops.publishFinish(w.sid, w.leaseToken);
+      w.publishedThisJob = true;
+    }
+    const nothing = att.rows.length + att.swatches.length === 0;
+    for (let round = 1; round <= 2; round++) {
+      let status = 0;
+      let rowsSeen = 0;
+      let swatchesSeen = 0;
+      let wait = 0;
+      if (!nothing) {
+        this.siteBudgetEnd = this.deps.clock.now() + (round === 1 ? WORST.VERIFY : AFTER_CACHE_WAIT);
+        try {
+          const a = await this.site.read('GET', `/api/products/${encodeURIComponent(w.slug)}`);
+          status = a.status;
+          const rel = a.json && typeof a.json.relations === 'object' && a.json.relations !== null && !Array.isArray(a.json.relations) ? (a.json.relations as Record<string, unknown>) : {};
+          const facts = siteFacts(rel);
+          const shown = new Set(facts.images.map((i) => mediaPath(i.url)));
+          const swatches = new Set(facts.groups.flatMap((g) => g.values.map((v) => mediaPath(v.swatch))));
+          rowsSeen = att.rows.filter((r) => shown.has(`/files/${r.r2_key}`)).length;
+          swatchesSeen = att.swatches.filter((sw) => swatches.has(`/files/${sw.r2_key}`)).length;
+          wait = cacheWaitOfHeaders(a.headers);
+        } finally {
+          this.siteBudgetEnd = null;
+        }
+      }
+      this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'media_seen', { rows_seen: rowsSeen, rows: att.rows.length, swatches_seen: swatchesSeen, swatches: att.swatches.length, status });
+      if (nothing || (status === 200 && rowsSeen === att.rows.length && swatchesSeen === att.swatches.length)) {
+        const done = await this.ops.mediaComplete(w.sid, w.leaseToken, this.liveUrl(w), { version: 1, live_url: this.liveUrl(w), round, status, rows_seen: rowsSeen, swatches_seen: swatchesSeen });
+        if (done.state === 'COMPLETE') {
+          this.gate.noteComplete(w.sid, done.seq);
+          w.state = 'COMPLETE';
+          this.log.item(w.row.queue_position, w.row.handle, 'COMPLETE', 'complete', { url: this.liveUrl(w) });
+          this.sealItem(w, { outcome: 'complete', media_only: true, plan: w.retry ? { failed: w.retry.failed, requests: w.retry.requests.length, skipped: w.retry.skipped } : null, attached: { rows: att.rows.length, swatches: att.swatches.length }, d1_checks: done.d1_checks });
+          return { kind: 'complete', url: this.liveUrl(w) };
+        }
+      }
+      if (round === 2) break;
+      if (!this.deadline.fits(wait, AFTER_CACHE_WAIT)) throw new ImportStop('DEADLINE_EXIT', 'deadline', 'the cache wait does not fit', { needMs: wait });
+      this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'cache_wait', { seconds: Math.round(wait / 1000) });
+      await this.ops.publishFinish(w.sid, w.leaseToken);
+      await this.pause(wait);
+    }
+    throw blockedStop('VERIFY_FAILED_PERSISTENT', 'an attached picture is not on the public product after a purge and a wait');
   }
 
   // ---------------------------------------------------------------- close (§A.9, §I.3)
@@ -1696,7 +2048,7 @@ export async function main(env: NodeJS.ProcessEnv = process.env): Promise<number
     summary,
     openedRunId,
     browser: async () => {
-      if (cfg.mode !== 'run') return null;
+      if (cfg.mode !== 'run' && cfg.mode !== 'delta') return null;
       const { BrowserChecker } = await import('./browser');
       return BrowserChecker.launch(cfg.siteOrigin, env);
     },

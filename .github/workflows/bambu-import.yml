@@ -66,6 +66,20 @@
 #             in one batch and purges the products it changed. A part already
 #             loaded is skipped. Counts only in the log, never text. After the
 #             bulk run closes, a correction is open, then translations, then close.
+#   delta     (confirm=IMPORT-LIVE, run_id = the CLOSED run to take the delta
+#             from; spec §O) opens a NEW run, like open, whose queue is
+#             exactly: the closed run's COMPLETE items whose media failed (a
+#             media-only stage: only those media fetched again from
+#             store.bblcdn.com and attached where the original write put them,
+#             in one guarded INSERT-only batch; nothing else of the product is
+#             touched), then the products the store's sitemaps list that no run
+#             ever held (the normal per-product pipeline, behind the §E.1
+#             existing-product gate). robots.txt, the sitemaps and each new page
+#             at the store's pace; the protected snapshot `before`; then the
+#             queue as in run (max_items, chain: the chain dispatches mode=run
+#             with the NEW run id, auto_withdraw). The run closes the normal way
+#             (mode=close with the new run id). The delta's open report (the new
+#             products' handles and titles) is sealed, never logged.
 #   revoke    the kill switch: clears catalog_import_runs.token_sha256 of
 #             `run_id`, so every ops path answers 404, and marks the run
 #             stopped (notes = 'kill_switch'). Before migration 0195 there is
@@ -119,7 +133,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'snapshot, preflight, open, run, close, report, dryrun, withdraw, revoke or translations (see the header of this file)'
+        description: 'snapshot, preflight, open, run, close, report, dryrun, withdraw, revoke, translations or delta (see the header of this file)'
         type: choice
         required: true
         options:
@@ -133,8 +147,9 @@ on:
           - withdraw
           - revoke
           - translations
+          - delta
       run_id:
-        description: 'catalog_import_runs.id: cir_ followed by 24 lowercase hex characters (run, close, report, withdraw, revoke and translations need it; open creates it)'
+        description: 'catalog_import_runs.id: cir_ followed by 24 lowercase hex characters (run, close, report, withdraw, revoke and translations need it; open creates it; delta names the CLOSED run it is taken from and creates a new one)'
         required: false
         default: ''
       max_items:
@@ -147,7 +162,7 @@ on:
         required: false
         default: false
       chain:
-        description: 'max_items 0 only: dispatch the next job when this one ends with items left and none blocked (its deadline, a parked wait)'
+        description: 'run or delta, max_items 0 only: dispatch the next job (mode=run) when this one ends with items left and none blocked (its deadline, a parked wait)'
         type: boolean
         required: false
         default: false
@@ -156,7 +171,7 @@ on:
         required: false
         default: '0'
       auto_withdraw:
-        description: "run only: withdraw a product whose store page is gone (a second fetch ~60 s later, absent from the sitemap) and go on (the owner's standing approval, 2026-10-18)"
+        description: "run or delta: withdraw a product whose store page is gone (a second fetch ~60 s later, absent from the sitemap) and go on (the owner's standing approval, 2026-10-18)"
         type: boolean
         required: false
         default: false
@@ -168,7 +183,7 @@ on:
         description: 'one-time X25519 public key (43 base64url characters) that seals every artifact: node scripts/bambu-import/seal.mjs --keygen <dir>'
         required: true
       confirm:
-        description: 'IMPORT-LIVE for open, run, close, withdraw and translations'
+        description: 'IMPORT-LIVE for open, run, close, withdraw, translations and delta'
         required: false
         default: ''
 
@@ -214,7 +229,7 @@ jobs:
         run: |
           echo "DEADLINE_EPOCH=$(( $(date +%s) + 330*60 ))" >> "$GITHUB_ENV"
           fail() { echo "::error::$1"; exit 1; }
-          [[ "$IN_MODE" =~ ^(snapshot|preflight|open|run|close|report|dryrun|withdraw|revoke|translations)$ ]] || fail 'mode is not one of the ten modes'
+          [[ "$IN_MODE" =~ ^(snapshot|preflight|open|run|close|report|dryrun|withdraw|revoke|translations|delta)$ ]] || fail 'mode is not one of the eleven modes'
           [[ -z "$IN_RUN_ID" || "$IN_RUN_ID" =~ ^cir_[0-9a-f]{24}$ ]] || fail 'run_id is cir_ followed by 24 lowercase hex characters, or empty'
           [[ "$IN_MAX_ITEMS" =~ ^[0-9]{1,4}$ ]] || fail 'max_items is a whole number from 0 to 9999'
           [[ "$IN_RESUME" =~ ^(true|false)$ ]] || fail 'resume is true or false'
@@ -225,15 +240,16 @@ jobs:
           [[ "$IN_SEAL_PUBKEY" =~ ^[A-Za-z0-9_-]{43}$ ]] || fail 'seal_pubkey is a one-time X25519 public key of 43 base64url characters'
           [[ -z "$IN_CONFIRM" || "$IN_CONFIRM" == "IMPORT-LIVE" ]] || fail 'confirm is IMPORT-LIVE or empty'
           case "$IN_MODE" in
-            open|run|close|withdraw|translations) [[ "$IN_CONFIRM" == "IMPORT-LIVE" ]] || fail "mode $IN_MODE writes the live catalogue: confirm must be IMPORT-LIVE" ;;
+            open|run|close|withdraw|translations|delta) [[ "$IN_CONFIRM" == "IMPORT-LIVE" ]] || fail "mode $IN_MODE writes the live catalogue: confirm must be IMPORT-LIVE" ;;
           esac
           case "$IN_MODE" in
             run|close|report|withdraw|revoke|translations) [[ -n "$IN_RUN_ID" ]] || fail "mode $IN_MODE needs the run_id" ;;
+            delta) [[ -n "$IN_RUN_ID" ]] || fail 'delta needs the run_id of the CLOSED run it is taken from' ;;
             open) [[ -z "$IN_RUN_ID" ]] || fail 'open creates a new run: run_id must be empty' ;;
           esac
           if [[ "$IN_MODE" == "withdraw" ]]; then [[ -n "$IN_ITEM" ]] || fail 'withdraw needs the item (a source product id)'; fi
-          if [[ "$IN_AUTO_WITHDRAW" == "true" ]]; then [[ "$IN_MODE" == "run" ]] || fail 'auto_withdraw runs only in mode run'; fi
-          if [[ "$IN_MODE" == "run" && "$IN_CHAIN" == "true" ]]; then [[ "$IN_MAX_ITEMS" == "0" ]] || fail 'chain runs only with max_items 0: a bounded job is reviewed before the next one'; fi
+          if [[ "$IN_AUTO_WITHDRAW" == "true" ]]; then [[ "$IN_MODE" == "run" || "$IN_MODE" == "delta" ]] || fail 'auto_withdraw runs only in modes run and delta'; fi
+          if [[ ( "$IN_MODE" == "run" || "$IN_MODE" == "delta" ) && "$IN_CHAIN" == "true" ]]; then [[ "$IN_MAX_ITEMS" == "0" ]] || fail 'chain runs only with max_items 0: a bounded job is reviewed before the next one'; fi
           echo "inputs valid: mode $IN_MODE"
 
       - uses: actions/checkout@v4
@@ -251,13 +267,13 @@ jobs:
       # The browser checks of §I.1.7 (Playwright, the public site only). No
       # credential exists yet: the token is minted after this step.
       - name: Chromium for the browser checks
-        if: env.IN_MODE == 'run' || env.IN_MODE == 'dryrun'
+        if: env.IN_MODE == 'run' || env.IN_MODE == 'dryrun' || env.IN_MODE == 'delta'
         run: |
           npm install --prefix "$RUNNER_TEMP/browser" --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
           "$RUNNER_TEMP/browser/node_modules/.bin/playwright" install --with-deps chromium
 
       - name: Live database id (masked), preflight and the Time Travel restore point
-        if: env.IN_MODE == 'preflight' || env.IN_MODE == 'open' || env.IN_MODE == 'run' || env.IN_MODE == 'close' || env.IN_MODE == 'withdraw' || env.IN_MODE == 'translations'
+        if: env.IN_MODE == 'preflight' || env.IN_MODE == 'open' || env.IN_MODE == 'run' || env.IN_MODE == 'close' || env.IN_MODE == 'withdraw' || env.IN_MODE == 'translations' || env.IN_MODE == 'delta'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -278,7 +294,7 @@ jobs:
         run: node scripts/bambu-import/cf.mjs report --run "$IN_RUN_ID" --seal "$IN_SEAL_PUBKEY" --out "$RUNNER_TEMP/out"
 
       - name: Open the run and mint the job token (0600 file; only its hash is stored)
-        if: env.IN_MODE == 'open'
+        if: env.IN_MODE == 'open' || env.IN_MODE == 'delta'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -295,7 +311,7 @@ jobs:
       # credential exists here: the ops endpoint is its only door.
       - id: run
         name: Importer
-        if: env.IN_MODE == 'preflight' || env.IN_MODE == 'open' || env.IN_MODE == 'run' || env.IN_MODE == 'close' || env.IN_MODE == 'withdraw'
+        if: env.IN_MODE == 'preflight' || env.IN_MODE == 'open' || env.IN_MODE == 'run' || env.IN_MODE == 'close' || env.IN_MODE == 'withdraw' || env.IN_MODE == 'delta'
         env:
           IMPORT_TOKEN_FILE: ${{ runner.temp }}/import-token
           IMPORT_RUN_FILE: ${{ runner.temp }}/import-run
@@ -321,7 +337,7 @@ jobs:
 
       # Whatever happened above: the job's token stops working now.
       - name: Revoke the job token (always, after every mode that minted one)
-        if: always() && (env.IN_MODE == 'open' || env.IN_MODE == 'run' || env.IN_MODE == 'close' || env.IN_MODE == 'withdraw' || env.IN_MODE == 'translations')
+        if: always() && (env.IN_MODE == 'open' || env.IN_MODE == 'run' || env.IN_MODE == 'close' || env.IN_MODE == 'withdraw' || env.IN_MODE == 'translations' || env.IN_MODE == 'delta')
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -348,9 +364,11 @@ jobs:
   # §J.5: the next job of a long run. It dispatches and does nothing else: no
   # checkout, no npm, no repository code; every value it sends is validated
   # here again. Nothing is ever scheduled: a stopped chain is resumed by hand.
+  # A delta job's next job is mode=run on the NEW run the delta opened (its
+  # importer's run_id output), never another delta.
   chain:
     needs: import
-    if: ${{ needs.import.result == 'success' && needs.import.outputs.more == 'true' && needs.import.outputs.blocked != 'true' && inputs.mode == 'run' && inputs.chain && inputs.max_items == '0' && fromJSON(inputs.chain_count) < 12 }}
+    if: ${{ needs.import.result == 'success' && needs.import.outputs.more == 'true' && needs.import.outputs.blocked != 'true' && contains(fromJSON('["run","delta"]'), inputs.mode) && inputs.chain && inputs.max_items == '0' && fromJSON(inputs.chain_count) < 12 }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

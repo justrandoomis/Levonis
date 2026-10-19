@@ -1272,6 +1272,7 @@ Golden tests (`tests/bambuSentences.test.ts`):
 | `IMPORT_ILLEGAL_TRANSITION` | انتقال غير مسموح في حالة الاستيراد؛ لم يتغير شيء. | That import state change is not allowed; nothing changed. | ئەم گۆڕینی دۆخەی هاوردەکردن ڕێگەپێدراو نییە؛ هیچ نەگۆڕا. |
 | `IMPORT_STOCK_NOT_CONFIGURED` | حدّد طريقة المخزون لهذا المنتج المستورد قبل نشر سعره. | Set this imported product's stock mode before publishing its price. | پێش بڵاوکردنەوەی نرخ، شێوازی کۆگای ئەم بەرهەمە هاوردەکراوە دیاری بکە. |
 | `IMPORT_STOCK_TRACKED_EMPTY` | لتتبّع الكمية أدخل كمية المخزون أولاً. | To track quantity, enter the stock quantity first. | بۆ بەدواداچوونی بڕ، سەرەتا بڕی کۆگا بنووسە. |
+| `IMPORT_DELTA_REFUSED` | الدفعة التكميلية لا تسمح بهذا: الدفعة المصدر غير مغلقة، أو المنتج ليس جديداً أو ليس منتجاً مكتملاً فشلت صوره. لم يُكتب شيء. | The delta run does not allow this: the source run is not closed, or the product is neither new nor a completed product with failed images. Nothing was written. | هاوردەی تەواوکەری ڕێگە بەمە نادات: هاوردەی سەرچاوە دانەخراوە، یان بەرهەمەکە نە نوێیە و نە بەرهەمێکی تەواوکراوە کە وێنەکانی سەرنەکەوتوون. هیچ نەنووسرا. |
 
 These are admin and ops strings, registered in `tests/programmeRefusals.test.ts`.
 
@@ -2372,3 +2373,72 @@ No further item is started until every line is green:
 - **Finding 11's "Save on officially refurbished…" example.** It is promotional and stays removed, by the promotion class finding 27 asks for. Only the two technical plate sentences are restored.
 - **Finding 19's coarser-group rule.** It does not cover H2DC: `H2D AMS Combo` has three variants (`Standard`, `Dual AMS 2 Pro Bundle`, `AMS HT bundle`). The fix is variant-level binding plus a representative image per value (§C.4 steps 2–3).
 - **Finding 32's live signed-in request for every product.** Production has no test customer credential, and creating one is the owner's call (L-17). Per-product proof is the Worker's own validator.
+
+---
+
+## O. The delta run (workflow 60 `mode=delta`)
+
+After the bulk run closed (`partial`: 1,112 COMPLETE, 3 WITHDRAWN_AT_SOURCE), two things were left, and the owner asked for both: the images that failed to download or convert while their products completed (`failed_media_count` of the close report: `catalog_import_media` rows with `status = 'failed'`), and the product the store's sitemap lists that no run ever held. The delta is ONE new run, opened and closed like any other, whose queue is exactly those two kinds of item. Nothing is scheduled; nothing of a product outside the queue is read for writing.
+
+### O.1 The mode and its jobs
+
+| Step | What runs |
+|---|---|
+| validation | `mode=delta` needs `confirm=IMPORT-LIVE` and `run_id` = the **closed** run the delta is taken from (the run id input is reused, so the dispatch keeps its ten inputs); `chain` only with `max_items 0`; `auto_withdraw` allowed (run and delta). |
+| preflight | `cf.mjs preflight --mode delta --run <closed run>`: the migrations, no active run (like `open`), the named run `closed` or `partial`, the Time Travel restore point. |
+| open | `cf.mjs open`: a NEW run row and the job token (0600 file, only its hash stored), as for `open`. |
+| importer | `/hello` (the reviewed files byte for byte); robots.txt and the three sitemaps at the store's pace (§I.3.1); `/delta/plan`; each new handle's page read once (≥ 11 s apart) for its source id and route; `/delta/manifest` (media items first, new products last); `/run/prepare-taxonomy` (insert-only, as at open); `/run/protect-snapshot before`; the sealed `delta-open-report.json` (the new products' handles, titles and routes are for the owner's review and never logged); then the queue, exactly as `mode=run` (one item at a time, `max_items`, the deadline, `auto_withdraw`). |
+| revoke | always(), as for every mode that minted a token. |
+| chain | with `chain=true` and items left: the next job is `mode=run` on the **new** run id (the importer's `run_id` output), never another delta. |
+
+The run is then closed the normal way: `mode=close` with the new run id (§A.9: the end-of-run audit, the protected snapshot `after`, `/run/finish`, the old token answers 404, the sealed close report). `mode=report` reads its ledger.
+
+If the registration itself does not finish (a door that never settles, the deadline), the job ends blocked and never chains: the items registered so far are worked by `mode=run` on the new run and closed; a later delta from the same closed run builds the same queue again, and what was already attached is counted `already_present`.
+
+### O.2 The queue (`worker/lib/catalogImport/delta.ts`, `deltaQueue`, pure)
+
+1. **New products:** the handles the sitemaps list that no item of any earlier run holds (by handle; then by source id, below). A withdrawn product the sitemap lists again is counted (`withdrawn_listed`), never queued: it is held by an earlier run's item, so the owner decides.
+2. **Media items:** the closed run's `COMPLETE` items with at least one `failed` medium, in their queue order. An item that is not COMPLETE (withdrawn, blocked) is never retried (`failed_not_complete` is counted); one the reviewed manifest does not hold (a new product of an earlier delta) is counted `media_not_reviewed`.
+
+`/delta/manifest` checks every row against D1 and refuses the whole call (`IMPORT_DELTA_REFUSED`) otherwise:
+
+- a media row: a COMPLETE item of the closed run with a product and a failed medium, in the reviewed manifest (its row, handle and type are the reviewed ones; it takes its new position in the delta run);
+- a new row: a well-formed handle and route; a source id and handle no earlier run's item holds, no `product_source_refs` row carries, and the reviewed manifest does not name; at most 20 new products in one run;
+- the run holds delta items only, all of the same closed run.
+
+The kind is durable on the item: `discovery_sources` carries `delta_new`, or `media_retry:<closed run>`. These markers are reserved: `/manifest` refuses them. `/hello` answers `run.delta` so a `mode=run` job reads `/delta/rows` before its queue.
+
+### O.3 A new product: the normal pipeline, behind the §E.1 gate
+
+The repository is public and carries no new store data, so the new product's manifest row is not committed: the Worker builds it from what it registered (source id, handle, the store's route kept in `breadcrumbs`, the type the route gives; not curated, no hold, no SKU codes or value labels) and folds it into the bundle its calls read (`runBundle`): `/stage`, `/write` and `/complete` then run the unchanged reviewed-scope checks (§A.3) against it — the route resolved through the **reviewed** taxonomy map (an unmapped route is `TAXONOMY_UNMAPPED`), identity rows only from the identity map, relations only through the compat targets, a create only under its deterministic id, the `product_source_refs` key making a duplicate create impossible.
+
+**The existing-catalogue match check, as the original run had it.** The original run's create/merge decision came from the reviewed `existing-matches.json`, whose entries P0 settled from the §E.1 candidate rule over the live catalogue. The same rule (`packages/catalog/src/bambuImport/matchSignals.ts`, shared with `scripts/bambu-import/match-candidates.ts`) runs in the Worker at `/stage` and `/write` for a new product the matches file does not list, over every live product except the ones an import **created** (each carries its own, different source id). A candidate stops the item: BLOCKED `REVIEWED_SCOPE_REFUSED` (§E.1 item 4; the answer carries `match_review_needed`, counts only). The owner's review is P0's: `mode=snapshot`, then in the sandbox `match-candidates.ts` over the unsealed snapshot and a manifest holding the new product (its row from the sealed delta-open report), and a reviewed entry committed to `existing-matches.json` (`merge`, `merge_publish`, `distinct` or `not_bambu`; ids, a public slug, a decision and a reason code only); after workflow 7 has deployed it, `mode=run` with `resume=true` on the delta run. With no candidate the product is created like any other.
+
+### O.4 A media item: the media-only stage (`worker/lib/catalogImport/mediaRetry.ts`)
+
+The failed media are recorded per product in the closed run's `catalog_import_media` (`status 'failed'`, the role, the source id of the medium, the error code). Where the original write meant to put them is **not** stored (a failed image was left out of the write, §C.4), so it is rebuilt: the runner reads the store page again (robots.txt, ≥ 11 s apart), builds the payload exactly as the importer does and sends it **without its prose** (`mediaOnlyPayload`: no description block, spec, document, relation, external id, note, short description or usage guide — the Worker refuses a media payload that carries any, so text it never writes can neither be written nor stop a picture); the Worker proves it is this item's (`/media-plan`: the source id, the handle, the product the import wrote and how — `product_source_refs`) and plans:
+
+| Failed medium | Outcome |
+|---|---|
+| gallery picture the page still shows, not the primary | fetched again and attached |
+| swatch of a value the page still shows | fetched again and attached when the value has no swatch |
+| description or in-the-box picture | counted `role_not_attachable` (attaching it would rewrite the product's description or specifications) |
+| no longer on the page | counted `not_in_source` |
+| the payload now makes it the primary | counted `primary_unchanged` (the primary never changes here) |
+| the product is not active | counted `product_not_public` (COMPLETE needs public evidence) |
+
+Its stages walk the ordinary graph (§B.3): EXTRACTING (the page) → ENRICHING (nothing is enriched: no text is sent) → VALIDATING (`/media-plan` records the payload's digest) → INGESTING_MEDIA (the ordinary `/media`, which for a media item takes only the planned failed media; store.bblcdn.com only, the CDN rendition retry of §C.4, the app's own conversion and content-addressed keys) → WRITING (`/media-attach`) → PUBLISHING (the ordinary `/publish-finish`: recompute and purge) → VERIFYING_LIVE (`/media-complete`).
+
+**`/media-attach` is ONE batch, INSERT-only, under the import guard:** the guard row `catalog-import-batch` first (fenced on the item at WRITING, its lease and its staged digest, the run open), so every money, stock and package trigger of §B.4 refuses anything; then new `product_images` rows (`ON CONFLICT (id) DO NOTHING`, verified bytes, `is_primary = 0`), their `product_option_source_refs` (kind `image`), swatches for values that have none (`INSERT OR IGNORE`), the lease-fenced `WRITTEN` event, the checkpoint (`stage_data.media_retry`: counts and the attached rows' ids and keys), the guard row removed. Never an UPDATE or a DELETE of a product, image, option, variant, price or stock row.
+
+- **A created product:** each row keeps the payload's own deterministic id, binding and `sort_order` — the slot the original write gave it, between the rows it did write — when the product still has that value or variant (else `target_missing`); byte-identical new copies collapse as the writer collapses them (§C.4 step 1).
+- **A merged product:** bound only through the reviewed value map and appended after the product's own pictures (§E.2, the writer's own `mergeImages`).
+- **Never twice:** a row whose id is already there (`already_present`), or whose picture the product already shows under any row (`duplicate_content`), is left out. Running the stage again — in the same run after a lost answer, or in a later delta — changes nothing.
+
+`/media-complete` moves the item to COMPLETE only when the runner saw every attached picture on the anonymous product answer (`/api/products/<slug>`: its image rows, its values' swatches; the cache rule of §I.1.9 once) and the Worker finds every attached row in D1 and every object in R2. A product's page that is gone at the source blocks `SOURCE_WITHDRAWN` like any item, and `auto_withdraw` withdraws the media item (only the item: the product is untouched).
+
+### O.5 What the delta never does
+
+- It never writes product text, specifications, documents, relations, options, variants, prices, costs, stock or package values of an existing product, and never reorders, re-binds or removes an image.
+- It never commits store data, snapshots, keys or match candidates; logs carry counts, codes, handles of the reviewed manifest and public URLs only (§A.8). Every artifact is sealed.
+- It adds no migration and no new table: the delta kind lives in `discovery_sources`, the attached rows in `stage_data`, the retried media in the delta run's own `catalog_import_media` rows.

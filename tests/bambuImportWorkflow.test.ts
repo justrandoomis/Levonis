@@ -26,7 +26,7 @@
  *     always() step;
  *   - every upload-artifact path ends in `.sealed`;
  *   - concurrency group `bambu-import`, `timeout-minutes` 350, deadline 330;
- *   - for each of the ten modes, exactly the steps it needs run (the `if:`
+ *   - for each of the eleven modes, exactly the steps it needs run (the `if:`
  *     expressions are evaluated here), in a safe order: validation first, the
  *     browser installed before any credential, the preflight and its restore
  *     point before a token is minted, the revoke after the importer;
@@ -189,7 +189,7 @@ const envOf = (step: Map) => (step.env === undefined ? {} : map(step.env, `env o
 const ACTIVE = TEXT.split('\n').filter((line) => !/^\s*#/.test(line));
 
 const INPUTS = ['mode', 'run_id', 'max_items', 'resume', 'chain', 'chain_count', 'auto_withdraw', 'item', 'seal_pubkey', 'confirm'];
-const MODES = ['snapshot', 'preflight', 'open', 'run', 'close', 'report', 'dryrun', 'withdraw', 'revoke', 'translations'];
+const MODES = ['snapshot', 'preflight', 'open', 'run', 'close', 'report', 'dryrun', 'withdraw', 'revoke', 'translations', 'delta'];
 const envName = (input: string) => `IN_${input.toUpperCase()}`;
 const DEFAULT_BRANCH_ONLY = "${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}";
 const CF_STEP = /^node scripts\/bambu-import\/cf\.mjs [a-z]+(?: --[a-z-]+ "\$[A-Z_]+(?:\/[a-z-]+)?")+$/;
@@ -263,7 +263,8 @@ test('permissions: contents read at the top and on the import job; actions write
   const when = String(CHAIN.if);
   assert.equal(
     when,
-    "${{ needs.import.result == 'success' && needs.import.outputs.more == 'true' && needs.import.outputs.blocked != 'true' && inputs.mode == 'run' && inputs.chain && inputs.max_items == '0' && fromJSON(inputs.chain_count) < 12 }}"
+    // mode=delta chains too (§O): its next job is mode=run on the new run (the step below dispatches only that mode).
+    "${{ needs.import.result == 'success' && needs.import.outputs.more == 'true' && needs.import.outputs.blocked != 'true' && contains(fromJSON('[\"run\",\"delta\"]'), inputs.mode) && inputs.chain && inputs.max_items == '0' && fromJSON(inputs.chain_count) < 12 }}"
   );
   assert.doesNotMatch(when, /\|\||always\(|cancelled\(|failure\(|success\(\)/, 'a conjunction, under the implicit success() only');
   assert.deepEqual(map(IMPORT.outputs, 'import outputs'), {
@@ -457,6 +458,9 @@ test('every mode runs exactly the steps it needs, in a safe order', () => {
     revoke: [...common, 'cf revoke --run'],
     // The translation memory (I18N-DESIGN §A.4): the restore point, a token for the active run, the loader, the revoke.
     translations: [...common, 'cf preflight --mode', 'cf mint --run', 'translations', 'cf revoke --run-file', 'actions/upload-artifact'],
+    // The delta run (§O): the browser for its new products, the restore point, a NEW run opened like open, the importer
+    // (the delta queue, then the queue), the revoke.
+    delta: [...common, 'chromium', 'cf preflight --mode', 'cf open --token-file', 'importer', 'cf revoke --run-file', 'actions/upload-artifact'],
   };
   assert.deepEqual(Object.keys(expected), MODES);
   for (const mode of MODES) {
@@ -556,6 +560,9 @@ test('the validation step accepts the valid dispatches and sets the deadline 330
     { ...GOOD, IN_MODE: 'report', IN_RUN_ID: RUN },
     { ...GOOD, IN_MODE: 'close', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE' },
     { ...GOOD, IN_MODE: 'translations', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE' },
+    // The delta (§O): run_id names the CLOSED run; a bounded first job, or the whole queue chained with auto_withdraw.
+    { ...GOOD, IN_MODE: 'delta', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE' },
+    { ...GOOD, IN_MODE: 'delta', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE', IN_MAX_ITEMS: '0', IN_CHAIN: 'true', IN_AUTO_WITHDRAW: 'true' },
   ]) {
     const before = Math.floor(Date.now() / 1000);
     const result = bash(script, env);
@@ -594,8 +601,17 @@ test('the validation step refuses every malformed or hostile input, and never ec
     assert.equal(result.githubEnv.trim().split('\n').length, 1);
   }
   // A mode that writes the live catalogue needs the typed confirmation; revoke needs its run.
-  for (const mode of ['open', 'run', 'close', 'withdraw', 'translations']) {
+  for (const mode of ['open', 'run', 'close', 'withdraw', 'translations', 'delta']) {
     assert.equal(bash(script, { ...GOOD, IN_MODE: mode, IN_RUN_ID: RUN }).status, 1, `${mode} without IMPORT-LIVE`);
+  }
+  // A delta is taken FROM a closed run: without it there is nothing to take it from.
+  const noFrom = bash(script, { ...GOOD, IN_MODE: 'delta', IN_CONFIRM: 'IMPORT-LIVE' });
+  assert.equal(noFrom.status, 1, 'delta without run_id');
+  assert.match(noFrom.stdout, /^::error::delta needs the run_id of the CLOSED run/m);
+  for (const max of ['1', '25']) {
+    const r = bash(script, { ...GOOD, IN_MODE: 'delta', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE', IN_CHAIN: 'true', IN_MAX_ITEMS: max });
+    assert.equal(r.status, 1, `delta chained with max_items ${max}`);
+    assert.match(r.stdout, /^::error::chain runs only with max_items 0/m);
   }
   assert.equal(bash(script, { ...GOOD, IN_MODE: 'revoke' }).status, 1, 'revoke without run_id');
   for (const mode of ['run', 'close', 'withdraw', 'translations']) {

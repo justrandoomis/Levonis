@@ -165,6 +165,7 @@ export const OPS_MESSAGES: Readonly<Record<string, string>> = {
   IMPORT_READBACK_PENDING: 'The write was committed but its read-back has not run yet; ask again.',
   IMPORT_STORAGE_UNAVAILABLE: 'The media storage did not answer; ask again.',
   IMPORT_VERIFY_DISAGREES: 'The runner evidence and the Worker recompute do not both pass and agree.',
+  IMPORT_DELTA_REFUSED: 'The delta run does not allow this: the source run is not closed, the item is not new or not a completed item with failed media, or this call is not a media item\'s.',
   TRANSLATIONS_PART_UNKNOWN: 'This translations part is not in the deployed build; wait for the deploy, then retry.',
   TRANSLATIONS_PART_MISMATCH: 'The translations part does not match the reviewed copy, so it was not loaded.',
   TRANSLATIONS_ROW_INVALID: 'A row of the translations part failed validation, so the part was not loaded.',

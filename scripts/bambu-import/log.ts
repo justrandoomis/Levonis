@@ -115,6 +115,15 @@ export const TEMPLATES = {
   order_violation: 'EXTRACT refused: the previous item has no committed COMPLETE (runner bug); the job stops',
   local_only: 'local dry run: {refused} requests to a host other than 127.0.0.1 refused, never sent',
   note: '{code}',
+  delta_plan:
+    'delta from run {run}: {listed} handles listed in the sitemaps, {new} new; {media_items} completed items with {media_failed} failed media to retry; {failed_not_complete} failed media of items not complete and {withdrawn_listed} withdrawn items listed again are not queued',
+  delta_new_skipped: 'a new sitemap handle is not queued: {what}',
+  delta_registered: 'delta queue registered: {media} media-only items, then {new} new products ({calls} calls)',
+  media_plan:
+    'media-only: {failed} media failed in the closed run; {requests} fetched again; not attachable (description, in the box) {role_not_attachable}, no longer on the page {not_in_source}, primary kept {primary_unchanged}, product not public {product_not_public}',
+  media_attached:
+    'media-only: {attached} media attached ({rows} image rows, {swatches} swatches); already there {already_present}, same picture already shown {duplicate_content}, target gone {target_missing}, not stored {not_stored}',
+  media_seen: 'media-only verify: {rows_seen} of {rows} image rows and {swatches_seen} of {swatches} swatches on the public product (HTTP {status})',
 } as const;
 export type TemplateKey = keyof typeof TEMPLATES;
 
@@ -125,7 +134,7 @@ const HANDLE = /^[\p{Ll}\p{Nd}][\p{Ll}\p{Nd}\p{M}._-]{0,159}$/u;
 const CODE = /^[A-Z][A-Z0-9_]{1,63}$/;
 const WORD = /^[a-z][a-z0-9_]{0,31}$/;
 const RUN_ID = /^cir_[0-9a-f]{24}$/;
-const MODE = /^(snapshot|preflight|open|run|close|report|dryrun|withdraw|revoke)$/;
+const MODE = /^(snapshot|preflight|open|run|close|report|dryrun|withdraw|revoke|translations|delta)$/;
 
 /** Parameter names whose values are checked as something other than a number or boolean. */
 const PARAM_SHAPES: Readonly<Record<string, RegExp>> = {
