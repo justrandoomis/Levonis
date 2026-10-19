@@ -824,7 +824,9 @@ IQD, with a pre-order discount of $50 = 75,000.
   the listing, search, sections, the product page, the public API, the sitemap, the bot preview, the
   comparison, both favourites lists, the community search, the printer finder, «يناسب», the RPC feed and
   the knowledge answer (`/api/products/:slug/knowledge`, its gate and its relation links; the Bambu
-  import spec §G.1).
+  import spec §G.1), and the support assistant's product search — which, like the listing, takes a
+  composition only while it is SELLABLE (`composition = '' OR sellable`, default D6), so it never
+  quotes a bundle no checkout accepts.
 - **SELLABLE**: the old «listed» predicate byte for byte — visible, not held for ANY gap, and
   V2-published. Every PURCHASE path asks it: cart add, read and edit, the quote, checkout, Quick Buy, new
   gifts, bundles and mystery offers, the trade-in target (and, since Services S-P2, its search, the

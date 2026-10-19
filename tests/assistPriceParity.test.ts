@@ -20,17 +20,26 @@
  * «from» price whose stock is on its options, a mystery-pool member, a
  * pre-order-only product, a catalog-only product, a bundle and a locked bundle.
  *
+ * And it says nothing the storefront would not: a sale-held bundle the grid
+ * hides is not quoted (default D6), a members' box the PRIME viewer may buy
+ * («متاح لك» on the tile) is not «غير متوفر», and a pool member whose count is
+ * withheld is not «غير متوفر» beside its price. The bundle chip → word table
+ * below is written out by hand from BundleTile's STATE_LABELS, not computed
+ * with the function under test.
+ *
  * Run: node --import tsx --test tests/assistPriceParity.test.ts
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { asD1, get, json, post, stubApp, type StubUser } from './fixtures/app';
 import { addBundle, seedCatalogue } from './lib/bundles';
 import { productRoutes } from '../worker/routes/products';
 import { supportRoutes } from '../worker/routes/support';
 import { cardAvailability } from '../src/lib/productCard';
-import { availabilityFromComposition } from '../worker/lib/publicApi/common';
+import { compositionAvailability } from '../packages/catalog/src/availability';
 
 const prime: StubUser = { id: 'u_prime', role: 'customer', email: 'n@x.co' };
 
@@ -121,8 +130,24 @@ async function assistantCard(db: unknown, user: StubUser | null, q: string, slug
 /** What the grid prints: the card's figure (CardPrice: `display_price_iqd ?? price_iqd`), none when unpriced or locked. */
 const shownPrice = (card: Rec): number | null =>
   card.locked === true || card.price_status === 'unpriced' ? null : ((card.display_price_iqd ?? card.price_iqd ?? null) as number | null);
+/**
+ * What BundleTile's chip (STATE_LABELS) says, in the product card's four words, for the viewer
+ * who sees it — by hand, so the parity below cannot agree with a wrong mapping by construction.
+ */
+const TILE_WORD: Record<string, string> = {
+  in_stock: 'available', // «متوفر»
+  low: 'available', // «الكمية محدودة»
+  ending_soon: 'available', // «ينتهي قريباً»
+  member_exclusive: 'available', // «متاح لك» — this member may buy it
+  preorder: 'preorder', // «طلب مسبق»
+  sold_out: 'unavailable', // «نفدت الكمية»
+  ended: 'unavailable', // «انتهى العرض»
+  locked: 'unknown', // «حصري للمشتركين» — the members-only line says it
+  upcoming: 'unknown', // «قريباً» + countdown — never «غير متوفر»
+  unconfigured: 'unknown', // «غير مكتمل»
+};
 const shownState = (id: string, card: Rec) =>
-  id.startsWith('b_') ? availabilityFromComposition(card.availability_state).state : cardAvailability(card).state;
+  id.startsWith('b_') ? TILE_WORD[String(card.availability_state)] ?? 'unknown' : cardAvailability(card).state;
 
 async function parity(db: unknown, user: StubUser | null) {
   const grid = await storefront(db, user);
@@ -165,8 +190,15 @@ test('a guest: every assistant price and availability is the storefront card’s
   assert.equal(seen.get('p_pre')!.availability, 'preorder');
   assert.equal(seen.get('p_pre')!.badge, 'Pre-order');
 
-  // A mystery-pool member: the card publishes no exact count, and neither does the answer.
+  // A mystery-pool member: the card publishes no exact count, and neither does the answer. The
+  // count is WITHHELD, not zero — it is bought directly (stock 20) — so neither says «Unavailable»
+  // beside its price.
   assert.equal('direct_stock_available' in grid.get('p_nozzle')!, false);
+  const nozzle = seen.get('p_nozzle')!;
+  assert.equal(nozzle.price_iqd, 5_000);
+  assert.equal(nozzle.availability, 'unknown', 'a hidden count is not an empty shelf');
+  assert.equal(nozzle.badge, undefined);
+  assert.equal(cardAvailability(grid.get('p_nozzle')!).state, 'unknown', 'the grid card draws no «غير متوفر» either');
 
   // Catalog-only: no price, no stock word.
   const lamp = seen.get('p_lamp')!;
@@ -214,4 +246,96 @@ test('the words are the card’s, in Arabic and in real Sorani', async () => {
   assert.equal(pre.badge, 'پێش-داواکاری');
   const box = await assistantCard(db, null, 'Members Box', 'members-box', 'ckb');
   assert.equal(box.subtitle, 'تەنها بۆ ئەندامان');
+});
+
+test('a sale-held bundle the storefront hides is not quoted by the assistant (default D6)', async () => {
+  const raw = seed();
+  // Held for a commercial gap: VISIBLE, not SELLABLE. The grid and the bundle shelf drop it.
+  raw.exec(`INSERT INTO product_completeness (product_id,complete,held,missing_json,missing_count,computed_at)
+            VALUES ('b_starter',0,1,'[{"c":"PRICE"}]',1,'2026-10-19T00:00:00Z')`);
+  const db = asD1(raw);
+  const grid = await storefront(db, null);
+  assert.equal(grid.has('b_starter'), false, 'the storefront hides a bundle that is not sellable');
+  const search = await json(await get(appFor(db, null), '/api/products?search=Starter&limit=50'));
+  assert.deepEqual((search.products as Rec[]).map((p) => p.id), []);
+
+  for (const locale of ['ar', 'en', 'ckb']) {
+    const res = await post(appFor(db, null), '/api/support/assistant', { locale, intent: 'product_search', params: { q: 'Starter Bundle' } });
+    assert.equal(res.status, 200);
+    const reply = (await json(res)).reply as Rec;
+    const cards = (reply.cards ?? []) as Rec[];
+    assert.equal(cards.some((c) => c.link?.to === '/bundles/starter'), false, `${locale}: no price and no «متوفر الآن» for /bundles/starter`);
+    assert.equal(cards.length, 0, `${locale}: nothing else matches «Starter Bundle»`);
+    if (locale === 'en') assert.equal(reply.text, 'No matching products found in the public catalog.');
+  }
+  // The other cards are untouched by the hold.
+  const pla = await assistantCard(db, null, 'PLA Basic', 'pla');
+  assert.equal(pla.price_iqd, 20_000);
+});
+
+test('a PRIME member’s own box («متاح لك») is available in the answer; upcoming and locked get no word', async () => {
+  const raw = seed();
+  // Enough PLA for the box to be IN STOCK, which the builder turns into `member_exclusive` for an
+  // entitled viewer (bundleComposition.ts), and a box whose window opens later.
+  raw.exec(`UPDATE products SET stock = 500 WHERE id = 'p_pla'`);
+  addBundle(raw, {
+    id: 'b_soon',
+    slug: 'soon-box',
+    name: 'Soon Box',
+    priceIqd: 200_000,
+    window: { starts_at: '2099-01-01T00:00:00Z' },
+    components: [{ id: 'bc_soon_pla', product: 'p_pla', qty: 1 }],
+  });
+  const db = asD1(raw);
+
+  const member = await parity(db, prime);
+  assert.equal(member.grid.get('b_box')!.availability_state, 'member_exclusive', 'the tile says «متاح لك»');
+  assert.equal(member.grid.get('b_box')!.locked, false);
+  const box = member.seen.get('b_box')!;
+  assert.equal(box.price_iqd, 300_000);
+  assert.equal(box.availability, 'available', 'a box this member may buy is never «Unavailable»');
+  assert.equal(box.badge, 'In stock');
+  const ar = await assistantCard(db, prime, 'Members Box', 'members-box', 'ar');
+  const ckb = await assistantCard(db, prime, 'Members Box', 'members-box', 'ckb');
+  assert.equal(ar.badge, 'متوفر الآن');
+  assert.equal(ckb.badge, 'بەردەستە');
+
+  // Locked for a guest: the members-only line, no availability word.
+  const guestBox = await assistantCard(db, null, 'Members Box', 'members-box', 'ar');
+  assert.equal(guestBox.subtitle, 'حصري للمشتركين');
+  assert.equal(guestBox.badge, undefined, 'a locked box is not «غير متوفر»');
+
+  // Upcoming: the tile says «قريباً» and counts down, the answer says no availability word.
+  for (const user of [null, prime]) {
+    const soon = await assistantCard(db, user, 'Soon Box', 'soon-box', 'ar');
+    assert.equal(soon.availability, 'unknown');
+    assert.equal(soon.badge, undefined, 'an upcoming box is not «غير متوفر»');
+  }
+});
+
+test('compositionAvailability maps every bundle state as the tile reads it', () => {
+  // Every state the builder can send (bundleComposition.ts `CompositionState`) has an entry here.
+  const src = readFileSync(join(process.cwd(), 'worker/lib/bundleComposition.ts'), 'utf8');
+  const union = /export type CompositionState =([^;]+);/.exec(src);
+  assert.ok(union, 'CompositionState is declared');
+  const states = [...union[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  assert.ok(states.length >= 10);
+  for (const s of states) {
+    assert.ok(s in TILE_WORD, `${s} has a tile word`);
+    assert.equal(compositionAvailability(s), TILE_WORD[s], s);
+  }
+  assert.equal(compositionAvailability(''), 'unknown');
+  assert.equal(compositionAvailability(undefined), 'unknown');
+  assert.equal(compositionAvailability('something_new'), 'unknown', 'a state the tile has no chip for gets no word');
+});
+
+test('cardAvailability: a withheld count on a direct-sale card is unknown, a stated 0 is a fact', () => {
+  assert.equal(cardAvailability({ sale_types: ['direct_sale'] }).state, 'unknown');
+  assert.equal(cardAvailability({ sale_types: ['direct_sale', 'pre_order'] }).state, 'unknown');
+  assert.equal(cardAvailability({ sale_types: ['bundle'] }).state, 'unknown');
+  assert.equal(cardAvailability({ direct_stock_available: null, sale_types: ['direct_sale'] }).state, 'unknown');
+  assert.equal(cardAvailability({ direct_stock_available: 0, sale_types: ['direct_sale'] }).state, 'unavailable');
+  assert.equal(cardAvailability({ direct_stock_available: 0, sale_types: ['direct_sale', 'pre_order'] }).state, 'preorder');
+  assert.equal(cardAvailability({ sale_types: ['pre_order'] }).state, 'preorder', 'no direct sale: pre-order is still said');
+  assert.equal(cardAvailability({ sale_types: [] }).state, 'unavailable');
 });

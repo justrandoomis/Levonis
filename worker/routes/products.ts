@@ -3461,6 +3461,13 @@ export async function resolveProductCards(
  * other row — including a composition the builder did not resolve, exactly as
  * the listing falls through — through `resolveProductCards`. Nothing is priced
  * here.
+ *
+ * A COMPOSITION THAT IS NOT SELLABLE GETS NO CARD (default D6): the listing
+ * never selects one (`composition = '' OR sellable`), and the composition
+ * builder does not re-check sellability — `compositionCard` prices it as
+ * sellable — so a caller that read it VISIBLE (`'flag'`, `sellable_now` 0 or
+ * absent) must not hand it on. It is left out of the map, not drawn as a
+ * catalog-only product.
  */
 export async function resolveListingCards(
   db: D1Database,
@@ -3469,13 +3476,15 @@ export async function resolveListingCards(
   idx: CatalogIndex | null,
   state: 'flag' | 'sellable'
 ): Promise<Map<string, Record<string, unknown>>> {
-  const compositionIds = rows.filter((r) => String(r.composition ?? '') !== '').map((r) => String(r.id));
+  const isComposition = (r: Record<string, unknown>) => String(r.composition ?? '') !== '';
+  const listed = rows.filter((r) => !isComposition(r) || state === 'sellable' || sellableNowOf(r));
+  const compositionIds = listed.filter(isComposition).map((r) => String(r.id));
   const compositions = compositionIds.length
     ? (await resolveCompositionPageWithMystery(db, [...(await loadCompositionRows(db, compositionIds)).values()], ctx)).resolved
     : new Map<string, ResolvedBundle>();
   const out = await resolveProductCards(
     db,
-    rows.filter((r) => !compositions.has(String(r.id))),
+    listed.filter((r) => !compositions.has(String(r.id))),
     ctx,
     idx,
     state

@@ -24,6 +24,15 @@
  *                configured for an unpriced product). The card says nothing
  *                rather than guess «طلب مسبق» or «نفد».
  *
+ * A HIDDEN COUNT IS NOT A ZERO. `direct_stock_available` is ABSENT (not 0)
+ * on a direct-sale card when the server withheld the count on purpose: an
+ * active mystery-pool member (`directStockAvailable` → null under the coarse
+ * rule, §8.2 row 18) is still bought directly, and the door answers
+ * OUT_OF_STOCK honestly if the shelf is empty. So a card whose sale types
+ * offer a direct sale and that carries no count is `unknown` — never
+ * «غير متوفر» beside a price for an item in stock, and never «طلب مسبق» for
+ * one that may be on the shelf. A stated 0 stays a fact.
+ *
  * Pure: no I/O, no imports.
  */
 
@@ -60,8 +69,52 @@ export function cardAvailability(p: AvailabilityInput): Availability {
     return { state: 'available', qty: n, low: n <= threshold };
   }
   if (Array.isArray(p.sale_types)) {
+    // The server's own test for a direct shelf (`directStockAvailable`: direct_sale or bundle). With
+    // one offered and no count on the card, the count was withheld, not found empty.
+    if (n === undefined || n === null) {
+      if (p.sale_types.includes('direct_sale') || p.sale_types.includes('bundle')) return { state: 'unknown', qty: null, low: false };
+    }
     return { state: p.sale_types.includes('pre_order') ? 'preorder' : 'unavailable', qty: null, low: false };
   }
   if (p.selling_type === 'pre_order') return { state: 'preorder', qty: null, low: false };
   return { state: 'unknown', qty: null, low: false };
+}
+
+/**
+ * WHAT A BUNDLE TILE SAYS, IN THE CARD'S FOUR WORDS — FOR THE VIEWER WHO ASKED.
+ *
+ * A bundle's card carries its builder's ONE verdict (`availability_state`,
+ * worker/lib/bundleComposition.ts `CompositionState`), resolved with the
+ * viewer's own tier, and BundleTile (`STATE_LABELS`) draws it as a chip. A
+ * surface that speaks of the same tile in the product card's words (the
+ * support assistant) maps it here, so it never contradicts the chip:
+ *
+ *  available   — in_stock «متوفر», low «الكمية محدودة», ending_soon
+ *                «ينتهي قريباً», and member_exclusive «متاح لك»: an in-stock
+ *                gated offer THIS viewer is entitled to, which they can buy.
+ *  preorder    — preorder «طلب مسبق».
+ *  unavailable — sold_out «نفدت الكمية», ended «انتهى العرض».
+ *  unknown     — locked «حصري للمشتركين» (the members-only line already says
+ *                it), upcoming «قريباً» (not «غير متوفر»: it opens on its
+ *                countdown), unconfigured, and any state this table does not
+ *                know — no word, as the tile renders no chip for one.
+ *
+ * Not the public API's `availabilityFromComposition`, which answers for an
+ * anonymous visitor and reads a members-only box as unavailable.
+ */
+export function compositionAvailability(state: unknown): AvailabilityState {
+  switch (state) {
+    case 'in_stock':
+    case 'low':
+    case 'ending_soon':
+    case 'member_exclusive':
+      return 'available';
+    case 'preorder':
+      return 'preorder';
+    case 'sold_out':
+    case 'ended':
+      return 'unavailable';
+    default:
+      return 'unknown';
+  }
 }

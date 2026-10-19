@@ -50,8 +50,7 @@ import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { pricingCtx, resolveListingCards, resolveProductCards } from './products';
-import { cardAvailability, type AvailabilityState } from '@levonis/catalog/availability';
-import { availabilityFromComposition } from '../lib/publicApi/common';
+import { cardAvailability, compositionAvailability, type AvailabilityState } from '@levonis/catalog/availability';
 import { catalogIndexFor, productTypeSql } from '../lib/catalogPresentation';
 import {
   requireAuth,
@@ -943,8 +942,12 @@ const AVAILABILITY_WORD: Record<AvailabilityState, string | null> = {
  * `direct_stock_available` and the sale types — never the base `stock`
  * counter, which on an option- or colour-tracked product is not the shelf and
  * made a product with stock on its options read «غير متوفر». A bundle states
- * its builder's coarse state (`availabilityFromComposition`), and a locked one
- * no price at all.
+ * its builder's verdict as BundleTile's chip reads it FOR THIS VIEWER
+ * (`compositionAvailability`): a gated box this member is entitled to
+ * («متاح لك», `member_exclusive`) is available — the public API's
+ * anonymous-visitor mapping read it «غير متوفر» — and a locked or upcoming one
+ * gets no word (the members-only line, the countdown). A locked one has no
+ * price at all.
  */
 function assistantCardFrom(loc: Locale, card: Record<string, unknown>, row: Record<string, unknown>, title: string): AssistantCard {
   const composition = String(row.composition ?? '') !== '';
@@ -954,7 +957,7 @@ function assistantCardFrom(loc: Locale, card: Record<string, unknown>, row: Reco
   const price = !locked && !unpriced && typeof figure === 'number' && figure > 0 ? figure : null;
   const from = price !== null && card.display_from === true;
   const availability: AvailabilityState = composition
-    ? availabilityFromComposition(card.availability_state).state
+    ? compositionAvailability(card.availability_state)
     : cardAvailability(card).state;
   const word = AVAILABILITY_WORD[availability];
   const images = Array.isArray(card.images) ? card.images : [];
@@ -1444,10 +1447,12 @@ async function handleProductSearch(c: Context<AppContext>, params: Record<string
   if (q.length < 2) return { intent: 'product_search', text: tr(loc, 'search_empty') };
   const like = likePattern(q);
   // VISIBLE with the SELLABLE flag (DECISIONS row 240): a catalog-only product is found, with no price.
+  // A COMPOSITION only while it is SELLABLE — the storefront listing's own predicate (default D6): a
+  // sale-held bundle is off the grid and the bundle shelf, so the assistant does not quote it either.
   const L = await listing(c.env.DB);
   const { results } = await c.env.DB.prepare(
     `SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products
-      WHERE ${L.visible('products')}
+      WHERE ${L.visible('products')} AND (products.composition = '' OR ${L.sellable('products')})
         AND (name LIKE ?1 ESCAPE '\\' OR name_ar LIKE ?1 ESCAPE '\\' OR name_ku LIKE ?1 ESCAPE '\\' OR brand LIKE ?1 ESCAPE '\\')
       ORDER BY is_featured DESC, created_at DESC
       LIMIT 5`
@@ -1472,6 +1477,8 @@ async function handleProductSearch(c: Context<AppContext>, params: Record<string
     });
     cards.push(assistantCardFrom(loc, card, row, title));
   }
+  // Every row the builders left out (a composition that is not sellable): the honest «no match».
+  if (cards.length === 0) return { intent: 'product_search', text: tr(loc, 'search_none') };
   return { intent: 'product_search', text: tr(loc, 'search_intro'), cards };
 }
 
