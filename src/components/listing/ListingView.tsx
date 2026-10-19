@@ -20,6 +20,7 @@ import ScopedSearch from './ScopedSearch';
 import SortSheet from './SortSheet';
 import ShareButton from './ShareButton';
 import { useListing } from './useListing';
+import { listingNotes, remainingOf } from '../../lib/catalog/listingSnapshot';
 import { activeFilterCount, hasListingFilters } from '../../lib/catalog/listingQuery';
 import {
   appliedChips,
@@ -188,6 +189,8 @@ export default function ListingView({
       ) : (
         <ProductGrid products={data.products} divider={state.sort === 'relevance' && !state.q} withColumn={column} />
       );
+    // What the list says about itself: a partial price/stock order or filter, products not listed.
+    const notes = listingNotes(data, state);
     results = (
       <div className="relative">
         {loading ? (
@@ -198,7 +201,7 @@ export default function ListingView({
         <div aria-busy={loading || undefined} className={`transition-opacity duration-150 ${loading ? 'pointer-events-none opacity-50' : ''}`}>
           {list}
         </div>
-        {data.truncated ? (
+        {notes.partial === 'order' ? (
           <p className="mt-4 text-center text-[12px] text-text-muted">
             {loc(
               'في هذا القسم منتجات كثيرة: رُتّب جزء منها بالسعر والتوفر، ويليه الباقي بترتيب القسم. ضيّق البحث لترتيب أدق.',
@@ -206,8 +209,25 @@ export default function ListingView({
               'ئەم بەشە بەرهەمی زۆری تێدایە: بەشێکیان بە پێی نرخ و بەردەستبوون ڕیزکراون، و ئەوانی تر بە ڕیزبەندیی بەشەکە دوایان دێن. لیستەکە تەسک بکەرەوە بۆ ڕیزبەندییەکی وردتر.'
             )}
           </p>
+        ) : notes.partial === 'filter' ? (
+          <p className="mt-4 text-center text-[12px] text-text-muted">
+            {loc(
+              'في هذا القسم منتجات كثيرة: طُبّق هذا الفلتر على جزء منها فقط، فقد لا تظهر كل المنتجات المطابقة. ضيّق البحث لنتيجة كاملة.',
+              'This section holds many products: this filter was checked on part of them only, so some matching products may not appear. Narrow the list for a complete result.',
+              'ئەم بەشە بەرهەمی زۆری تێدایە: ئەم فلتەرە تەنها لەسەر بەشێکیان جێبەجێ کرا، بۆیە لەوانەیە هەموو بەرهەمە گونجاوەکان دەرنەکەون. لیستەکە تەسک بکەرەوە بۆ ئەنجامێکی تەواو.'
+            )}
+          </p>
         ) : null}
-        <LoadMore remaining={data.hasMore === false ? 0 : Math.max(0, data.total - data.products.length)} state={more} onMore={loadMore} />
+        {notes.cutOff ? (
+          <p className="mt-4 text-center text-[12px] text-text-muted">
+            {loc(
+              'هنا منتجات أكثر مما تعرضه هذه القائمة، فلا تظهر كلها. ضيّق البحث لترى البقية.',
+              'There are more products here than this list can show, so not all of them appear. Narrow the list to see the rest.',
+              'لێرە بەرهەم زیاترە لەوەی ئەم لیستە دەتوانێت نیشانی بدات، بۆیە هەموویان دەرناکەون. لیستەکە تەسک بکەرەوە بۆ بینینی ئەوانی تر.'
+            )}
+          </p>
+        ) : null}
+        <LoadMore remaining={remainingOf(data)} state={more} onMore={loadMore} />
       </div>
     );
   }

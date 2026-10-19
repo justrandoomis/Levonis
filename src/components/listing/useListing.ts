@@ -1,26 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { api, isAborted, type ApiProduct, type ProductsListResponse } from '../../lib/api';
+import { api, isAborted, type ProductsListResponse } from '../../lib/api';
 import { readPageCache, writePageCache } from '../../lib/pageCache';
 import { takePrimedJson } from '../../lib/bootFetch';
 import { LISTING_PAGE_SIZE, listingApiQuery, listingFirstPagePath, parseListing, serializeListing } from '../../lib/catalog/listingQuery';
-import type { FacetSet, ListingState } from '../../lib/catalog/types';
+import { fetchNextPages, firstPageSnapshot, withNextPage, type ListingSnapshot } from '../../lib/catalog/listingSnapshot';
+import type { ListingState } from '../../lib/catalog/types';
+
+export type { ListingSnapshot } from '../../lib/catalog/listingSnapshot';
 
 /** «عرض المزيد» pages (§7 item 9): 24 per page, a button, never an endless scroll. */
 export const PAGE_SIZE = LISTING_PAGE_SIZE;
-
-export interface ListingSnapshot {
-  products: ApiProduct[];
-  total: number;
-  truncated: boolean;
-  /**
-   * The server's word on whether another page follows (`has_more`) — the
-   * listing pages to its last product. Absent from an older answer or snapshot:
-   * then `total` alone says how many remain.
-   */
-  hasMore?: boolean;
-  facets: FacetSet | null;
-}
 
 /**
  * THE LISTING'S STATE IS THE URL; THIS HOOK IS THE ONLY WRITER.
@@ -83,18 +73,8 @@ export function useListing(category: string | null) {
       .then((res) => {
         // A request started early cannot be cancelled; its answer is simply not ours any more.
         if (ctrl.signal.aborted) return;
-        const fresh = res.products ?? [];
-        // Keep the pages «عرض المزيد» had loaded, so the list keeps its length.
-        const seen = new Set(fresh.map((p) => p.id));
-        const extra = snap && snap.products.length > fresh.length ? snap.products.slice(fresh.length).filter((p) => !seen.has(p.id)) : [];
-        const next: ListingSnapshot = {
-          products: [...fresh, ...extra],
-          total: typeof res.total === 'number' ? res.total : fresh.length,
-          truncated: !!res.truncated,
-          // With the kept pages the snapshot is longer than this answer: only `total` can speak for it.
-          ...(extra.length === 0 && typeof res.has_more === 'boolean' ? { hasMore: res.has_more } : {}),
-          facets: res.facets ?? null,
-        };
+        // Keep the pages «عرض المزيد» had loaded (and their server cursor), so the list keeps its length.
+        const next = firstPageSnapshot(res, snap);
         setData(next);
         writePageCache(cacheKey, next);
       })
@@ -116,24 +96,18 @@ export function useListing(category: string | null) {
     const key = cacheKey;
     setMore('loading');
     try {
-      // `sort` is sent explicitly: it keeps the request on the listing path
-      // (and its order) even when every filter is off.
-      const q = listingApiQuery(state, { category: category ?? undefined, limit: PAGE_SIZE, offset: data.products.length });
-      const res = await api.get<ProductsListResponse>(`/api/products?${q}${/(^|&)sort=/.test(q) ? '' : `&sort=${state.sort}`}`);
+      // From the SERVER'S cursor, never from the cards held: a page that repeats cards (products entered
+      // the order ahead of them) must not pull every later page back (src/lib/catalog/listingSnapshot.ts).
+      // `sort` is sent explicitly: it keeps the request on the listing path (and its order) even when
+      // every filter is off.
+      const pages = await fetchNextPages(data, (offset) => {
+        const q = listingApiQuery(state, { category: category ?? undefined, limit: PAGE_SIZE, offset });
+        return api.get<ProductsListResponse>(`/api/products?${q}${/(^|&)sort=/.test(q) ? '' : `&sort=${state.sort}`}`);
+      });
       if (current.current !== key) return;
       setData((have) => {
         if (!have) return have;
-        const seen = new Set(have.products.map((p) => p.id));
-        const added = (res.products ?? []).filter((p) => !seen.has(p.id));
-        // The last page says so (`has_more: false`); a page that adds nothing ends the list too, so the
-        // button can never ask for the same empty page again.
-        const hasMore = added.length === 0 ? false : typeof res.has_more === 'boolean' ? res.has_more : have.hasMore;
-        const next: ListingSnapshot = {
-          ...have,
-          products: [...have.products, ...added],
-          ...(typeof res.total === 'number' ? { total: res.total } : {}),
-          ...(hasMore === undefined ? {} : { hasMore }),
-        };
+        const next = pages.reduce((s, p) => withNextPage(s, p.res, p.offset), have);
         writePageCache(key, next);
         return next;
       });

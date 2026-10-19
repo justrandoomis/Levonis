@@ -18,7 +18,15 @@
  *     with the catalogue (the 50-id chunked offer and pool reads were a wave
  *     each), and the row read leaves out the long text no card carries —
  *     with cards identical to the plain listing's;
- *   - a catalog-only candidate's keyed item is exactly what its card makes.
+ *   - a catalog-only candidate's keyed item is exactly what its card makes;
+ *   - the head priced to order is the same with or without the counts — a
+ *     brand or a printer walked as the client walks it (page 1 with
+ *     `facets=1`, «عرض المزيد» without) past the cap skips and repeats nothing;
+ *   - «عرض المزيد» pages from the SERVER'S cursor: products entering the order
+ *     ahead of the shopper never pull later pages back nor end the list early;
+ *   - the answer says WHICH part was not exact (`partial_order`,
+ *     `partial_counts`, `cut_off`), and the note the client shows follows it;
+ *   - the name order compares with one shared collator and sorts once.
  *
  * Run: node --import tsx --test tests/listingPaging.test.ts
  */
@@ -39,6 +47,20 @@ import {
   type ListingKeyRow,
 } from '../worker/routes/products';
 import { LISTING_SORTS, type ListingSort } from '../packages/catalog/src/discovery';
+import { NAME_COLLATOR, filtersReadResolved, sortItems, storedKeyFilters } from '../worker/lib/listingFacets';
+import {
+  cursorOf,
+  fetchNextPages,
+  firstPageSnapshot,
+  listingNotes,
+  priceOrStockFilterOn,
+  remainingOf,
+  withNextPage,
+  type ListingSnapshot,
+} from '../src/lib/catalog/listingSnapshot';
+import { emptyListing } from '../src/lib/catalog/listingQuery';
+import type { ProductsListResponse } from '../src/lib/api';
+import type { ListingState } from '../src/lib/catalog/types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Card = Record<string, any>;
@@ -146,7 +168,7 @@ function expectedOrder(products: Product[], sort: ListingSort): string[] {
     newest: (a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : byRank(a, b)),
     price_asc: (a, b) => (a.priced && b.priced ? a.price - b.price || byRank(a, b) : Number(b.priced) - Number(a.priced) || byRank(a, b)),
     price_desc: (a, b) => (a.priced && b.priced ? b.price - a.price || byRank(a, b) : Number(b.priced) - Number(a.priced) || byRank(a, b)),
-    name: (a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base', numeric: true }) || byRank(a, b),
+    name: (a, b) => NAME_COLLATOR.compare(a.name, b.name) || byRank(a, b),
     available: (a, b) =>
       Number(b.priced) - Number(a.priced) ||
       Number(available(b) > 0) - Number(available(a) > 0) ||
@@ -383,4 +405,263 @@ test('a catalog-only candidate\'s keyed item is exactly what its card makes of i
     const keyed = keyedListingItem(row as unknown as ListingKeyRow, i, String(row.brand_slug), ['some-printer']);
     assert.deepEqual({ ...keyed, card: null }, { ...resolved, card: null }, String(row.id));
   });
+});
+
+const idOf = (c: Card) => String(c.id);
+
+/**
+ * One listing walked AS THE CLIENT WALKS IT, straight through the route function with a cap a test can
+ * reach: page 1 with the counts (`listingFirstPagePath`), then «عرض المزيد» without them — three small
+ * pages, then large ones to the end.
+ */
+async function walkAsClient(db: D1Database, q: Record<string, string>, cap: number) {
+  const list = async (extra: Record<string, string>) =>
+    (await listCatalogProducts(db, { ...q, ...extra }, pricingCtxForUser(db, null), { caps: { candidates: cap } })).body as Card;
+  const pages: Card[] = [await list({ facets: '1', limit: '5' })];
+  let offset = pages[0].products.length;
+  while (pages[pages.length - 1].has_more) {
+    const b = await list({ limit: pages.length < 4 ? '5' : '50', offset: String(offset) });
+    pages.push(b);
+    offset += b.products.length;
+  }
+  return { pages, ids: pages.flatMap((p) => (p.products as Card[]).map(idOf)), plainFirst: await list({ limit: '5' }) };
+}
+
+test('the head is the same with or without the counts: a brand walked as the client walks it, past the cap, skips and repeats nothing', async () => {
+  const w = await world();
+  const db = asD1(w.raw);
+  const CAP = 10;
+  const brandTwo = w.products.filter((p) => p.brand === 'lb_two');
+  const ranked = shelf(brandTwo);
+  const sellable = ranked.filter((p) => p.priced);
+  assert.equal(sellable.length, 16, 'more sellable products of the brand than the cap');
+  for (const sort of ['price_asc', 'price_desc', 'relevance', 'available', 'direct'] as ListingSort[]) {
+    const { pages, ids, plainFirst } = await walkAsClient(db, { brand: 'brand-two', sort }, CAP);
+    assert.deepEqual((pages[0].products as Card[]).map(idOf), (plainFirst.products as Card[]).map(idOf), `${sort}: page 1 with the counts = page 1 without`);
+    assert.equal(new Set(ids).size, ids.length, `${sort}: a product listed twice`);
+    assert.equal(ids.length, brandTwo.length, `${sort}: every product of the brand, once`);
+    // The brand's first sellable products in the order, then its other sellable ones and its catalog-only
+    // ones in the shelf order — whichever page asked for the counts.
+    assert.deepEqual(ids.slice(0, CAP), expectedOrder(sellable.slice(0, CAP), sort), `${sort}: the head`);
+    assert.deepEqual(ids.slice(CAP, sellable.length), sellable.slice(CAP).map((p) => p.id), `${sort}: the sellable past the head`);
+    assert.deepEqual(ids.slice(sellable.length), ranked.filter((p) => !p.priced).map((p) => p.id), `${sort}: the catalog-only`);
+    for (const [i, p] of pages.entries()) {
+      assert.equal(p.total, brandTwo.length, `${sort} page ${i + 1}: nothing hidden`);
+      assert.equal(p.partial_order, true, `${sort} page ${i + 1}: the order covered the head only`);
+      assert.equal(p.truncated, true, `${sort} page ${i + 1}`);
+    }
+    assert.equal(pages[0].partial_counts, true, `${sort}: the counts saw ${CAP} of 48 sellable prices`);
+    // The brand facet still counts every brand (disjunctive).
+    assert.deepEqual(
+      (pages[0].facets.brands as Card[]).map((b) => [b.slug, b.count]).sort(),
+      [['brand-one', 400], ['brand-three', 400], ['brand-two', 400]]
+    );
+  }
+});
+
+test('«يناسب طابعة» with the counts chooses the head the SQL narrowing chooses without them', async () => {
+  const raw = freshDb();
+  const ins = raw.prepare(
+    `INSERT INTO products (id, slug, name, name_ar, name_ku, description, status, price_iqd, stock, selling_type, sale_types,
+                           spec_fields, display_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, '', 'active', ?, ?, 'direct_sale', '["direct_sale"]', '{}', ?, ?, ?)`
+  );
+  const at = '2026-01-01T00:00:00.000Z';
+  // Two printers (catalog-only: they are linked to, not listed by, the chip).
+  ins.run('fp_pa', 'fit-printer-a', 'Printer A', 'طابعة أ', 'چاپکەری A', 0, 0, 100, at, at);
+  ins.run('fp_pb', 'fit-printer-b', 'Printer B', 'طابعة ب', 'چاپکەری B', 0, 0, 101, at, at);
+  // 30 sellable parts, each cheaper than the one before it in the shelf order.
+  const parts = Array.from({ length: 30 }, (_, i) => `fp_${String(i).padStart(3, '0')}`);
+  parts.forEach((id, i) => ins.run(id, id.replace('_', '-'), `Part ${i}`, `قطعة ${i}`, `پارچە ${i}`, 900_000 - i * 10_000, 5, i, at, at));
+  for (const id of parts) await publishV2(raw, id);
+  const fit = raw.prepare('INSERT INTO product_printer_fits (product_id, printer_id, position) VALUES (?, ?, ?)');
+  parts.forEach((id, i) => {
+    if (i % 2 === 0) fit.run(id, 'fp_pa', 0);
+    if (i % 3 === 0) fit.run(id, 'fp_pb', 1);
+  });
+  const db = asD1(raw);
+  const CAP = 5;
+  const fitsA = parts.filter((_, i) => i % 2 === 0);
+  for (const sort of ['price_asc', 'relevance'] as ListingSort[]) {
+    const { pages, ids, plainFirst } = await walkAsClient(db, { fits: 'fit-printer-a', sort }, CAP);
+    assert.deepEqual((pages[0].products as Card[]).map(idOf), (plainFirst.products as Card[]).map(idOf), `${sort}: page 1 with the counts = page 1 without`);
+    assert.equal(new Set(ids).size, ids.length, `${sort}: a part listed twice`);
+    assert.deepEqual([...ids].sort(), [...fitsA].sort(), `${sort}: every part that fits, once`);
+    // The first five parts that fit, in the order (cheapest last in the shelf: reversed by price); then the rest.
+    const head = fitsA.slice(0, CAP);
+    assert.deepEqual(ids.slice(0, CAP), sort === 'price_asc' ? [...head].reverse() : head, `${sort}: the head`);
+    assert.deepEqual(ids.slice(CAP), fitsA.slice(CAP), `${sort}: past the head, the shelf order`);
+    for (const p of pages) assert.equal(p.partial_order, true);
+    // Every printer is still counted (disjunctive).
+    assert.deepEqual(
+      (pages[0].facets.printers as Card[]).map((p) => [p.slug, p.count]).sort(),
+      [['fit-printer-a', 15], ['fit-printer-b', 10]]
+    );
+  }
+});
+
+/** Catalog-only products as the importer writes them (display order 0, the newest dates): ahead of the shopper in both orders. */
+function importAhead(raw: DatabaseSync, k: number): void {
+  const ins = raw.prepare(
+    `INSERT INTO products (id, slug, name, name_ar, name_ku, description, status, price_iqd, stock, selling_type, sale_types,
+                           brand_id, spec_fields, display_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, '', 'active', 0, 0, 'direct_sale', '["direct_sale"]', 'lb_one', '{}', 0, ?, ?)`
+  );
+  for (let i = 0; i < k; i++) {
+    const id = `li_${String(i).padStart(4, '0')}`;
+    const at = new Date(Date.UTC(2026, 9, 19) + i * 1000).toISOString();
+    ins.run(id, id.replace('_', '-'), `Import ${i}`, `مستورد ${i}`, `هاوردە ${i}`, at, at);
+  }
+}
+
+for (const sort of ['relevance', 'newest'] as const) {
+  test(`«عرض المزيد» pages from the server's cursor: products entering ahead of the shopper (${sort}) neither end the list nor repeat a card`, async () => {
+    const raw = freshDb();
+    const products = catalogue(600);
+    await seed(raw, products);
+    const app = stubApp(asD1(raw), null, mount, { publishV2: false });
+    const page = async (offset: number, facets = false) =>
+      (await json(await get(app, `/api/products?sort=${sort}&limit=24${facets ? '&facets=1' : ''}${offset ? `&offset=${offset}` : ''}`))) as ProductsListResponse;
+    let snap: ListingSnapshot = firstPageSnapshot(await page(0, true), null);
+    const press = async () => {
+      const pages = await fetchNextPages(snap, (offset) => page(offset));
+      snap = pages.reduce((s, p) => withNextPage(s, p.res, p.offset), snap);
+      return pages;
+    };
+    for (let i = 0; i < 3; i++) await press();
+    assert.equal(snap.products.length, 96);
+    assert.equal(cursorOf(snap), 96);
+
+    importAhead(raw, 24);
+    const pages = await press();
+    assert.equal(pages.length, 2, 'the page of cards already held is passed over in the same press');
+    assert.equal(snap.products.length, 120, 'the press still adds a page');
+    assert.equal(cursorOf(snap), 144, 'the cursor is the server position, past the repeats');
+    assert.equal(snap.hasMore, true);
+    assert.ok(remainingOf(snap) > 0, '«عرض المزيد» stays');
+
+    let presses = 0;
+    while (remainingOf(snap) > 0 && presses++ < 40) await press();
+    const ids = snap.products.map((p) => String(p.id));
+    assert.equal(new Set(ids).size, ids.length, 'no card twice');
+    const held = new Set(ids);
+    assert.deepEqual(products.filter((p) => !held.has(p.id)).map((p) => p.id), [], 'every product reached');
+    assert.equal(snap.hasMore, false, 'the list ends where the server says');
+  });
+}
+
+test('the snapshot keeps its cursor: kept pages keep theirs, an older snapshot pages from what it holds, an empty page ends the list', () => {
+  const card = (id: string) => ({ id }) as ProductsListResponse['products'][number];
+  const cards = (from: number, n: number) => Array.from({ length: n }, (_, i) => card(`c${from + i}`));
+  const kept: ListingSnapshot = { products: cards(0, 48), total: 200, truncated: false, nextOffset: 72, hasMore: true, facets: null };
+  const refreshed = firstPageSnapshot({ products: cards(0, 24), total: 200, has_more: true }, kept);
+  assert.equal(refreshed.products.length, 48);
+  assert.equal(cursorOf(refreshed), 72, 'the kept pages keep their server cursor');
+  assert.equal(refreshed.hasMore, undefined, 'only `total` speaks for the kept pages');
+  assert.equal(remainingOf(refreshed), 128);
+  const older = { products: cards(0, 30), total: 100, truncated: false, facets: null } as ListingSnapshot;
+  assert.equal(cursorOf(older), 30, 'an older snapshot pages from the cards it holds');
+  const ended = withNextPage(older, { products: [], total: 100, has_more: true }, 30);
+  assert.equal(ended.hasMore, false, 'an empty page ends the list');
+  assert.equal(remainingOf(ended), 0);
+  const repeats = withNextPage(older, { products: cards(6, 24), total: 100, has_more: true }, 30);
+  assert.equal(repeats.products.length, 30, 'repeats are dropped');
+  assert.equal(cursorOf(repeats), 54, '…and the cursor still moves past them');
+  assert.equal(repeats.hasMore, true, 'a page of repeats does not end the list');
+});
+
+test('the answer says WHICH part was not exact — a partial price order, partial counts, or products cut off — and the note follows', async () => {
+  const w = await world();
+  const db = asD1(w.raw);
+  const list = async (q: Record<string, string>, caps: { candidates?: number; keys?: number }) =>
+    (await listCatalogProducts(db, q, pricingCtxForUser(db, null), { caps })).body as Card;
+  const flags = (b: Card) => ({ truncated: b.truncated, partial_order: b.partial_order, partial_counts: b.partial_counts, cut_off: b.cut_off });
+
+  // A stored-key order is exact from the keys: only the counts saw part of the sellable prices.
+  const newestFacets = await list({ sort: 'newest', facets: '1', limit: '24' }, { candidates: 10 });
+  assert.deepEqual(flags(newestFacets), { truncated: false, partial_order: false, partial_counts: true, cut_off: false });
+  const newestLater = await list({ sort: 'newest', limit: '24', offset: '24' }, { candidates: 10 });
+  assert.deepEqual(flags(newestLater), { truncated: false, partial_order: false, partial_counts: undefined, cut_off: false });
+  // A price order past the cap is partial on every page, with the counts or without.
+  const priceFacets = await list({ sort: 'price_asc', facets: '1', limit: '24' }, { candidates: 10 });
+  assert.deepEqual(flags(priceFacets), { truncated: true, partial_order: true, partial_counts: true, cut_off: false });
+  const priceLater = await list({ sort: 'price_asc', limit: '24', offset: '24' }, { candidates: 10 });
+  assert.deepEqual(flags(priceLater), { truncated: true, partial_order: true, partial_counts: undefined, cut_off: false });
+  // Under the cap nothing is partial.
+  const whole = await list({ sort: 'price_asc', facets: '1', limit: '24' }, {});
+  assert.deepEqual(flags(whole), { truncated: false, partial_order: false, partial_counts: false, cut_off: false });
+  // Past the keys' cap the rest are not listed — whatever the order.
+  const cut = await list({ sort: 'newest', limit: '24' }, { keys: 500 });
+  assert.deepEqual(flags(cut), { truncated: true, partial_order: false, partial_counts: undefined, cut_off: true });
+
+  // The client's note names what happened, from whichever page answered last.
+  const state = emptyListing();
+  const snapOf = (b: Card) => firstPageSnapshot(b as ProductsListResponse, null);
+  assert.deepEqual(listingNotes(snapOf(newestFacets), { ...state, sort: 'newest' }), { partial: null, cutOff: false });
+  assert.deepEqual(listingNotes(snapOf(priceFacets), { ...state, sort: 'price_asc' }), { partial: 'order', cutOff: false });
+  assert.deepEqual(listingNotes(snapOf(priceFacets), { ...state, avail: true }), { partial: 'filter', cutOff: false });
+  assert.deepEqual(listingNotes(snapOf(cut), state), { partial: null, cutOff: true });
+  const later = withNextPage(snapOf(priceFacets), { ...(priceLater as ProductsListResponse), partial_order: false }, 24);
+  assert.equal(later.partialOrder, false, 'a later page\'s word replaces page 1\'s');
+
+  // The client's «price or stock filter» is the Worker's, and the stored-key filters never read one.
+  const states: ListingState[] = [
+    state,
+    { ...state, avail: true },
+    { ...state, sale: 'direct' },
+    { ...state, price: { min: 1, max: null } },
+    { ...state, offer: true },
+    { ...state, member: true },
+    { ...state, brands: ['brand-one'], fits: ['fit-printer-a'], specs: { enclosed: ['1'] } },
+  ];
+  for (const s of states) {
+    assert.equal(priceOrStockFilterOn(s), filtersReadResolved(s), JSON.stringify(s));
+    assert.equal(filtersReadResolved(storedKeyFilters(s)), false);
+    assert.deepEqual(storedKeyFilters(s).brands, s.brands);
+  }
+});
+
+test('the name order compares with ONE collator and sorts the candidates once: no per-comparison localeCompare, no second sort', async () => {
+  const w = await world();
+  const realLocale = String.prototype.localeCompare;
+  const realCompare = NAME_COLLATOR.compare;
+  let locale = 0;
+  let collated = 0;
+  String.prototype.localeCompare = function (this: string, that: string, locales?: string | string[], options?: Intl.CollatorOptions) {
+    locale += 1;
+    return realLocale.call(this, that, locales, options);
+  };
+  Object.defineProperty(NAME_COLLATOR, 'compare', {
+    configurable: true,
+    value: (a: string, b: string) => {
+      collated += 1;
+      return realCompare(a, b);
+    },
+  });
+  try {
+    const count = async (q: string) => {
+      locale = 0;
+      collated = 0;
+      const b = await json(await get(w.app, `/api/products?${q}`));
+      return { b, locale, collated };
+    };
+    await count('sort=name&limit=24&offset=480'); // the isolate is warm
+    const newest = await count('sort=newest&limit=24&offset=480');
+    const named = await count('sort=name&limit=24&offset=480');
+    // One sort of the same 1,200 names in the same (shelf) order, straight through sortItems.
+    collated = 0;
+    const items = shelf(w.products).map((p, i) =>
+      keyedListingItem({ id: p.id, name: p.name, created_at: p.createdAt, brand_id: null, inventory_mode: null, composition: null, sellable_now: 0 }, i, null)
+    );
+    sortItems(items, 'name', false);
+    const once = collated;
+    assert.equal(named.locale, newest.locale, 'the name order calls no localeCompare of its own');
+    assert.equal(newest.collated, 0);
+    assert.ok(named.collated > 0 && named.collated <= Math.ceil(once * 1.2), `${named.collated} comparisons where one sort makes ${once}`);
+    assert.deepEqual((named.b.products as Card[]).map(idOf), expectedOrder(w.products, 'name').slice(480, 504));
+  } finally {
+    String.prototype.localeCompare = realLocale;
+    delete (NAME_COLLATOR as unknown as { compare?: unknown }).compare;
+  }
+  assert.equal(NAME_COLLATOR.compare('a', 'B'), -1, 'the collator is itself again');
 });

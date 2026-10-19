@@ -1824,7 +1824,14 @@ export interface ProductsListResponse {
    * `ListingMeta` in src/lib/catalog/types.ts. The plain listing is unchanged.
    */
   total?: number;
+  /** `partial_order || cut_off` — see `ListingMeta`. */
   truncated?: boolean;
+  /** The price/stock order or filter covered only the first sellable products (the cap). */
+  partial_order?: boolean;
+  /** With `facets=1`: the counts did not see every sellable product's price and stock. */
+  partial_counts?: boolean;
+  /** More products than the listing reads: the ones past it are not listed. */
+  cut_off?: boolean;
   /** Another page follows (the listing pages to its last product). */
   has_more?: boolean;
   sort?: import('./catalog/types').ListingSort;
