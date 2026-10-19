@@ -51,9 +51,9 @@ const OwnerShareMenuItem = lazy(() => import('../components/merchant/share/Owner
 /** A suspended shop's page — rare, so it is not part of every store visit's download. */
 const StoreUnavailable = lazy(() => import('../components/merchant/StoreUnavailable'));
 /**
- * The footer's «تحميل التطبيق» button, shown only on the shop's own host and
+ * The «تحميل التطبيق» button of the footer, shown only on the store host and
  * below the fold: it arrives with the footer, not with the page, so it is not
- * part of every store visit's fixed weight (tests/bundleBudget.test.ts).
+ * part of the fixed weight of every store visit (tests/bundleBudget.test.ts).
  */
 const InstallAppButton = lazy(() => import('../components/pwa/InstallAppButton'));
 
