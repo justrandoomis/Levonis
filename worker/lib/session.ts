@@ -3,8 +3,9 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import type { AppContext, SessionUser } from './types';
 import { randomToken, sha256Hex } from './crypto';
 import { rootDomainFrom, sessionCookieDomain } from './hosts';
-import { MERCHANT_REVIEW_GRANT, PRIVATE_DELEGATION_ENABLED, isOwner, normalizeAdminScope } from './adminScope';
+import { PRIVATE_DELEGATION_ENABLED, isOwner, normalizeAdminScope } from './adminScope';
 import { loadPrivateGrants } from './costAccess';
+import { isCapabilityGrant } from './merchantApproval';
 import { HttpError } from './http';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 
@@ -254,7 +255,8 @@ async function loadCapabilityGrants(db: D1Database, userId: string): Promise<str
       .prepare('SELECT grant_key FROM admin_capability_grants WHERE user_id = ? AND revoked_at IS NULL')
       .bind(userId)
       .all<{ grant_key: string }>();
-    return (results ?? []).map((r) => String(r.grant_key)).filter((k) => k === MERCHANT_REVIEW_GRANT);
+    // The allowlist (merchantApproval.ts CAPABILITY_GRANTS): MERCHANT_REVIEW, KYC_REVIEW, DISPUTES.
+    return (results ?? []).map((r) => String(r.grant_key)).filter(isCapabilityGrant);
   } catch {
     return [];
   }

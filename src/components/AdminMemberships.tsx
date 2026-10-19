@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLanguage } from '../LanguageContext';
+import { useAuth } from '../AuthContext';
 import { api, ApiError, formatIqd } from '../lib/api';
 import { RefreshCw, Users, Inbox, CreditCard, Rocket, PauseCircle } from 'lucide-react';
 import { Overlay } from './ui/Overlay';
@@ -53,6 +54,8 @@ function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
   const [tier, setTier] = useState('');
   const [status, setStatus] = useState('');
   const [kyc, setKyc] = useState('');
+  /** The KYC state, its filter and its column are the KYC desk's (DECISIONS row 261); the server omits them outside it. */
+  const canReviewKyc = useAuth().user?.can_review_kyc === true;
   const [restriction, setRestriction] = useState('');
   const [expiryDays, setExpiryDays] = useState('');
   const [members, setMembers] = useState<MemberRow[]>([]);
@@ -75,7 +78,7 @@ function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
       if (q.trim()) params.set('q', q.trim());
       if (tier) params.set('tier', tier);
       if (status) params.set('status', status);
-      if (kyc) params.set('kyc', kyc);
+      if (kyc && canReviewKyc) params.set('kyc', kyc);
       if (restriction) params.set('restriction', restriction);
       if (expiryDays) params.set('expiry_days', expiryDays);
       const d = await api.get<{ members: MemberRow[] }>(`/api/support/admin/members?${params.toString()}`);
@@ -85,7 +88,7 @@ function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
     } finally {
       setLoading(false);
     }
-  }, [q, tier, status, kyc, restriction, expiryDays, s.loadError]);
+  }, [q, tier, status, kyc, canReviewKyc, restriction, expiryDays, s.loadError]);
 
   useEffect(() => {
     load();
@@ -120,14 +123,16 @@ function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
           <option value="pending_launch">pending_launch</option>
           <option value="none">{s.none}</option>
         </select>
-        <select className={`lv-input ${selectCls}`} value={kyc} onChange={(e) => setKyc(e.target.value)} aria-label={s.fKyc}>
-          <option value="">{s.fKyc}: {s.all}</option>
-          {['draft', 'submitted', 'reviewing', 'changes_requested', 'rejected', 'verified'].map((k) => (
-            <option key={k} value={k}>
-              {k}
-            </option>
-          ))}
-        </select>
+        {canReviewKyc && (
+          <select className={`lv-input ${selectCls}`} value={kyc} onChange={(e) => setKyc(e.target.value)} aria-label={s.fKyc}>
+            <option value="">{s.fKyc}: {s.all}</option>
+            {['draft', 'submitted', 'reviewing', 'changes_requested', 'rejected', 'verified'].map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </select>
+        )}
         <select className={`lv-input ${selectCls}`} value={restriction} onChange={(e) => setRestriction(e.target.value)} aria-label={s.fRestriction}>
           <option value="">{s.fRestriction}: {s.all}</option>
           <option value="active">{s.active}</option>
@@ -157,7 +162,7 @@ function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
           <table className="w-full text-start border-collapse min-w-[820px]">
             <thead>
               <tr className="bg-surface-raised border-b border-border-subtle text-start">
-                {[s.colMember, s.colTier, s.colState, s.colExpiry, s.colKyc, s.colRestr, s.colAddr].map((h) => (
+                {[s.colMember, s.colTier, s.colState, s.colExpiry, ...(canReviewKyc ? [s.colKyc] : []), s.colRestr, s.colAddr].map((h) => (
                   <th key={h} className="py-3 px-4 text-xs font-bold text-text-secondary uppercase tracking-wider text-start">
                     {h}
                   </th>
@@ -202,7 +207,7 @@ function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
                   <td className="py-3 px-4 text-xs font-bold uppercase text-text-secondary">{tierLabel(m.tier)}</td>
                   <td className="py-3 px-4 text-xs text-text-secondary">{m.membership_state}</td>
                   <td className="py-3 px-4 text-xs text-text-muted whitespace-nowrap">{shortDate(m.expires_at)}</td>
-                  <td className="py-3 px-4 text-xs text-text-secondary">{m.kyc_state ?? '—'}</td>
+                  {canReviewKyc && <td className="py-3 px-4 text-xs text-text-secondary">{m.kyc_state ?? '—'}</td>}
                   <td className="py-3 px-4">
                     {m.active_restrictions > 0 ? (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]">
@@ -217,14 +222,14 @@ function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
               ))}
               {!loading && members.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-text-muted">
+                  <td colSpan={canReviewKyc ? 7 : 6} className="py-10 text-center text-text-muted">
                     {s.empty}
                   </td>
                 </tr>
               )}
               {loading && members.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-text-muted">
+                  <td colSpan={canReviewKyc ? 7 : 6} className="py-10 text-center text-text-muted">
                     {s.loading}
                   </td>
                 </tr>

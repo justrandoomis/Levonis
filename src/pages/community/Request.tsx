@@ -104,7 +104,8 @@ export interface RequestRow {
   state: string;
   offer_count: number;
   created_at: string;
-  customer_name: string | null;
+  /** The customer's name — only on the parties' own view (the customer, the workshop dealing with them); absent for everyone else (acceptance 34). */
+  customer_name?: string | null;
   expires_at?: string | null;
   /** Notes the customer wrote for the merchants (0130). */
   customer_notes?: string;

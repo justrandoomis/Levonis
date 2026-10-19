@@ -19,6 +19,7 @@ import type { Env } from './types';
 import { onPublicBoard } from './communityRequests';
 import { liveVerdictForUser } from './printMatchingStore';
 import { assertRequestFilesOpen } from './requestFileRoom';
+import { canHandleDisputes } from './staffCapabilities';
 
 export const MiB = 1024 * 1024;
 export const GiB = 1024 * MiB;
@@ -82,6 +83,9 @@ export function purposeAdmits(purpose: SessionPurpose, kind: UploadKind): boolea
 export interface UploadActor {
   id: string;
   role: string;
+  /** Read only by the complaint door's disputes-desk check (the owner is known by email). */
+  email?: string;
+  admin_scope?: string | null;
 }
 
 /**
@@ -107,7 +111,9 @@ export async function assertUploadEntity(
   db: D1Database,
   user: UploadActor,
   purpose: UploadPurpose,
-  entityRaw: unknown
+  entityRaw: unknown,
+  /** The scope env for the complaint door's disputes-desk check; without it an admin is asked the reporter's question. */
+  scopeEnv?: Pick<Env, 'DB' | 'INITIAL_ADMIN_EMAIL'>
 ): Promise<string> {
   const entity = (required: boolean) => str(entityRaw, 'entity_id', { max: 64, min: required ? 1 : 0, required });
 
@@ -159,16 +165,26 @@ export async function assertUploadEntity(
       return ticket;
     }
 
-    /** A complaint's evidence belongs to the complaint: its reporter, or staff. */
+    /**
+     * A complaint's evidence belongs to the complaint: its reporter, or the
+     * disputes desk (P1-02, DECISIONS row 261) — the owner, a full admin, or
+     * an assistant holding DISPUTES, the same rule as the /files read branch.
+     * Any other admin is asked the reporter's question, so a real complaint id
+     * and an invented one answer alike and nothing lands in its folder.
+     */
     case 'complaint': {
       const complaint = entity(true);
+      const desk =
+        user.role === 'admin' &&
+        !!scopeEnv &&
+        (await canHandleDisputes(scopeEnv, { id: user.id, role: 'admin', email: user.email ?? '', admin_scope: user.admin_scope }));
       const allowed = await db
         .prepare(
-          user.role === 'admin'
+          desk
             ? 'SELECT 1 AS x FROM community_complaints WHERE id = ? LIMIT 1'
             : 'SELECT 1 AS x FROM community_complaints WHERE id = ? AND reporter_id = ? LIMIT 1'
         )
-        .bind(...(user.role === 'admin' ? [complaint] : [complaint, user.id]))
+        .bind(...(desk ? [complaint] : [complaint, user.id]))
         .first();
       if (!allowed) throw forbidden('Not your complaint');
       return complaint;

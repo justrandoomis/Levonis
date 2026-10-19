@@ -793,6 +793,8 @@ export function creatorCard(r: Record<string, unknown>, badges: { pro: Set<strin
       pro: badges.pro.has(String(r.id)),
       premium: badges.premium.has(String(r.id)),
       verified_merchant: merchantOk && !!r.merchant_verified,
+      /** «مزوّد معتمد» (C4): approved and not suspended — the public predicate, separate from `verified_merchant`. */
+      approved_provider: merchantOk,
     },
     stats: { projects: Number(r.projects ?? 0), followers: Number(r.follower_count ?? 0) },
     store: storeOk

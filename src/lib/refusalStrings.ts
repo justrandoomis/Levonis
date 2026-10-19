@@ -806,15 +806,32 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'Write a reason the applicant will read (at least 5 characters).',
     ckb: 'هۆکارێک بنووسە کە پێشکەشکار دەیخوێنێتەوە (بەلایەنی کەمەوە ٥ پیت).',
   },
+  // The owner's grants (C5) cover three desks now: merchant review, KYC and disputes (DECISIONS row 261).
   CAPABILITY_GRANT_TARGET_INVALID: {
-    ar: 'يُمنح إذن مراجعة طلبات التجار لمساعد إداري فقط.',
-    en: 'Merchant-review access is granted to an assistant admin only.',
-    ckb: 'مۆڵەتی پێداچوونەوەی داواکارییەکانی بازرگان تەنها بە یاریدەدەرێکی بەڕێوەبەر دەدرێت.',
+    ar: 'يُمنح هذا الإذن لمساعد إداري فقط.',
+    en: 'This access is granted to an assistant admin only.',
+    ckb: 'ئەم مۆڵەتە تەنها بە یاریدەدەرێکی بەڕێوەبەر دەدرێت.',
   },
   CAPABILITY_GRANT_NOT_NEEDED: {
-    ar: 'المدير الكامل يراجع طلبات التجار دون إذن إضافي.',
-    en: 'A full admin reviews merchant applications without an extra grant.',
-    ckb: 'بەڕێوەبەری تەواو بەبێ مۆڵەتی زیادە پێداچوونەوە بە داواکارییەکانی بازرگان دەکات.',
+    ar: 'المدير الكامل يملك هذه الصلاحية دون إذن إضافي.',
+    en: 'A full admin has this access without an extra grant.',
+    ckb: 'بەڕێوەبەری تەواو بەبێ مۆڵەتی زیادە ئەم دەسەڵاتەی هەیە.',
+  },
+  CAPABILITY_GRANT_KEY_INVALID: {
+    ar: 'هذا الإذن غير معروف. حدّث الصفحة ثم أعد المحاولة.',
+    en: 'This access grant is not recognised. Refresh the page and try again.',
+    ckb: 'ئەم مۆڵەتە نەناسراوە. پەڕەکە نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
+  },
+  // The KYC console and the disputes desk (P1-02, DECISIONS row 261): owner and full admins, assistants by grant.
+  KYC_REVIEW_FORBIDDEN: {
+    ar: 'مراجعة التحقق من الهوية والعناوين ليست ضمن صلاحياتك. يمنحها المالك للمساعدين.',
+    en: 'Reviewing identity and address verification is not within your access. The owner grants it to assistants.',
+    ckb: 'پێداچوونەوە بە پشتڕاستکردنەوەی ناسنامە و ناونیشانەکان لە دەسەڵاتەکانی تۆدا نییە. خاوەن بە یاریدەدەرەکانی دەدات.',
+  },
+  DISPUTES_FORBIDDEN: {
+    ar: 'معالجة الشكاوى والنزاعات ليست ضمن صلاحياتك. يمنحها المالك للمساعدين.',
+    en: 'Handling complaints and disputes is not within your access. The owner grants it to assistants.',
+    ckb: 'چارەسەرکردنی سکاڵا و ناکۆکییەکان لە دەسەڵاتەکانی تۆدا نییە. خاوەن بە یاریدەدەرەکانی دەدات.',
   },
   APPROVAL_REVOKE_STORE_EXISTS: {
     ar: 'فتح هذا التاجر متجره بالفعل، فلا يُسحب اعتماده. أوقف التاجر من إدارة المجتمع بدلًا من ذلك.',

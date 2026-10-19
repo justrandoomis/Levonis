@@ -29,13 +29,28 @@ the store row and compares against the session user.
 Three different questions, three different places, never merged (§43;
 Community V3, DECISIONS rows 256–260):
 
-- **Approved** (`community_merchants.approved_at`, from a human reviewer's
-  decision on a `merchant_applications` row) — *has Levonis accepted this
-  person as a merchant?* NULL is «no» and fails closed, everywhere.
+- **Approved** (`community_merchants.approved_at`, stamped only by a human
+  reviewer's decision on a `merchant_applications` row — the owner, a full
+  admin, or an assistant the owner granted review to, C5) — *has Levonis
+  accepted this person as a merchant?* NULL is «no» and fails closed,
+  everywhere. **This is enforced, not advisory**: every new-commitment door
+  (E3–E12: publishing, offers, the cart, checkout, publishing the store page) answers an
+  unapproved merchant `MERCHANT_NOT_APPROVED`, and every public surface — the
+  storefront, the community directory and feeds, search, the maker pages, the
+  sitemap, the social previews (OG) and the public API — reads the one
+  predicate `merchantPublicSql` / `storePublicSql`
+  (worker/lib/merchantApproval.ts), so an unapproved or suspended merchant is
+  simply not there.
 - **PLUS** (`memberships`) — *may this account operate a store?*
-- **`community_merchants.verified`** — *an optional extra mark an admin sets*;
-  the public «مزوّد معتمد» label comes from approval, not from it (owner
-  decision C4).
+- **`community_merchants.verified`** — *an optional extra mark an admin sets*.
+
+The public «مزوّد معتمد» mark (owner decision C4) comes from approval, never
+from `verified` or a tier: `approved_provider` is derived from the approval
+stamp alone, through the same public predicate
+(worker/lib/merchantOps.ts `approvedProvider` / `approvedProviderSql`), and is
+shown on the store header (leading the hero's facts row, under every hero
+variant), the directory card, the community product card and the maker page. A suspended merchant never carries it, and since an unapproved
+merchant is on no public surface, the field never says anything about one.
 
 **Nobody sells before approval, and subscribing is not approval.** Applying is
 open to every signed-in account, with or without PLUS (C3); selling after

@@ -6,12 +6,14 @@
  * the price, because in a feed of many shops «who makes this» is part of what
  * the product is. «نفد» is the storefront's own word and boolean; a sale shows
  * the struck price the store itself set, never a computed percentage.
+ * «مزوّد معتمد» (C4) follows the store's name as the mark alone, only when
+ * the server says the shop's merchant is approved.
  */
 import { productName } from '../../../lib/productText';
 import { useLanguage } from '../../../LanguageContext';
 import { useMoney } from '../../../CurrencyContext';
 import SafeImage from '../../ui/SafeImage';
-import { HubLink, StoreMark } from './parts';
+import { ApprovedMark, HubLink, StoreMark } from './parts';
 import { useHubStrings } from './strings';
 import type { CommunityProduct } from './api';
 
@@ -65,6 +67,7 @@ export default function ProductTile({ product: p, eager = false }: { product: Co
           <p className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-text-secondary">
             <StoreMark src={p.store.logoUrl} size="xs" />
             <bdi className="truncate">{p.store.name}</bdi>
+            {p.store.approved_provider === true && <ApprovedMark />}
           </p>
         )}
       </div>

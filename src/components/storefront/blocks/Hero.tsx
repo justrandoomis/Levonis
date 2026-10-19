@@ -38,8 +38,9 @@ const HeroVariant = lazy(() => import('./extra').then((m) => ({ default: m.HeroV
  * one row of chips under every hero variant. The row and its words are their
  * own small chunk (./workshopFacts.tsx — not the non-classic blocks' chunk,
  * which every classic workshop store would otherwise fetch for one row),
- * fetched only for a store that has facts to show; until it lands a frame of
- * the row's own height holds its place, so nothing below the hero moves.
+ * fetched only for a store that has facts to show or carries the «مزوّد معتمد»
+ * mark (C4, which leads the row); until it lands a frame of the row's own
+ * height holds its place, so nothing below the hero moves.
  */
 const WorkshopFacts = lazy(() => import('./workshopFacts').then((m) => ({ default: m.WorkshopFacts })));
 
@@ -69,14 +70,21 @@ export function workshopOf(store: StorefrontStore): StoreWorkshop | null {
   return technologies.length || build || turnaround || custom ? { technologies, build, turnaround, custom } : null;
 }
 
-/** Under every hero variant: the facts row, or nothing at all for a store without facts. */
+/**
+ * Under every hero variant: the facts row, or nothing at all for a store with
+ * neither facts nor the «مزوّد معتمد» mark (owner decision C4). The mark leads
+ * the same row — its words live in the row's own lazy chunk, so the store
+ * header shows it without the storefront's fixed weight carrying them
+ * (tests/bundleBudget.test.ts) — and only when the server says
+ * `approved_provider`, which it derives from the approval stamp alone.
+ */
 function HeroWorkshop({ store }: { store: StorefrontStore }) {
   const workshop = workshopOf(store);
-  if (!workshop) return null;
+  if (!workshop && !store.merchant.approved_provider) return null;
   return (
     <Column className="mt-3">
       <Suspense fallback={<div className="h-7" aria-hidden="true" />}>
-        <WorkshopFacts workshop={workshop} />
+        <WorkshopFacts workshop={workshop} store={store} />
       </Suspense>
     </Column>
   );

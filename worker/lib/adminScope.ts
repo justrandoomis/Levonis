@@ -219,6 +219,29 @@ export function canSeeFullSerial(env: Env, user: CostSubject | null | undefined)
 
 /** The 0204 capability that opens merchant review to an assistant admin (owner decision C5). */
 export const MERCHANT_REVIEW_GRANT = 'MERCHANT_REVIEW';
+/** Opens the KYC console (`/api/kyc/admin/*`) to an assistant admin (P1-02, DECISIONS row 261). */
+export const KYC_REVIEW_GRANT = 'KYC_REVIEW';
+/** Opens the complaints and disputes desk to an assistant admin (P1-02, DECISIONS row 261). Never a settlement: that stays money. */
+export const DISPUTES_GRANT = 'DISPUTES';
+
+/**
+ * THE C5 RULE OVER A SESSION'S GRANTS, for one capability key: the owner and
+ * full-scope admins by default, an assistant only with that live grant in the
+ * session loader's `capability_grants` (set for assistant admins only, never
+ * read off a row). A HINT: it hides a tab; every route reads the grant table
+ * itself (worker/lib/merchantApproval.ts `canUseCapability`). Nothing
+ * financial: it never feeds canViewCost / canWriteCost / canMoveMoney.
+ */
+export function capabilityHint(
+  env: Env,
+  user: (CostSubject & { capability_grants?: readonly string[] | null }) | null | undefined,
+  key: string
+): boolean {
+  if (!user || user.role !== 'admin') return false;
+  if (isOwner(env, user)) return true;
+  if (normalizeAdminScope(user.admin_scope) !== 'assistant') return true;
+  return Array.isArray(user.capability_grants) && user.capability_grants.includes(key);
+}
 
 /**
  * WHO MAY REVIEW MERCHANT APPLICATIONS, AS A SESSION HINT (Community V3 push
@@ -234,10 +257,7 @@ export function canReviewMerchantsHint(
   env: Env,
   user: (CostSubject & { capability_grants?: readonly string[] | null }) | null | undefined
 ): boolean {
-  if (!user || user.role !== 'admin') return false;
-  if (isOwner(env, user)) return true;
-  if (normalizeAdminScope(user.admin_scope) !== 'assistant') return true;
-  return Array.isArray(user.capability_grants) && user.capability_grants.includes(MERCHANT_REVIEW_GRANT);
+  return capabilityHint(env, user, MERCHANT_REVIEW_GRANT);
 }
 
 export type ViewerClass =

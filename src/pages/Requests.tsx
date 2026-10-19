@@ -84,7 +84,8 @@ interface RequestRow {
   state: string;
   offer_count: number;
   created_at: string;
-  customer_name: string | null;
+  /** Only on the customer's own list; the board carries nobody's name (acceptance 34). */
+  customer_name?: string | null;
   expires_at?: string | null;
   /** Notes the customer wrote for the merchants (0130). */
   customer_notes?: string;

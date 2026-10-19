@@ -133,6 +133,7 @@ import {
 } from '../lib/productDeletion';
 import { runGuardedMediaCleanupJobs } from '../lib/mediaRefs';
 import { supportInboxCounts } from './adminChats';
+import { canHandleDisputes, canReviewKyc } from '../lib/staffCapabilities';
 
 export const adminRoutes = new Hono<AppContext>();
 adminRoutes.use('*', requireAdmin);
@@ -332,7 +333,8 @@ adminRoutes.get('/overview', async (c) => {
     // Tickets, order-chat messages and complaints — the three queues of the
     // support console (worker/routes/adminChats.ts), counted by the one
     // function its badges use, so the tile and the sidebar cannot disagree.
-    supportInboxCounts(db),
+    // The complaints figure follows the disputes desk (P1-02, DECISIONS row 261).
+    canHandleDisputes(c.env, c.get('user')).then((complaints) => supportInboxCounts(db, complaints)),
     db.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT 10').all<Record<string, unknown>>(),
   ]);
 
@@ -697,6 +699,10 @@ adminRoutes.get('/users/:id/detail', async (c) => {
   // MONEY, not cost: lifetime value, wallet and BNPL limit are what the member
   // sees too. `can_view_financials` in this response is an alias of money.
   const financial = canMoveMoney(c.env, admin);
+  // Identity state and address review are the KYC desk's (P1-02, DECISIONS
+  // row 261; acceptance 07): outside it kyc_cases is not read, `kyc` is
+  // absent, and the address card names only the current approved version.
+  const kycDesk = await canReviewKyc(c.env, admin);
 
   const row = await c.env.DB
     .prepare(
@@ -745,11 +751,13 @@ adminRoutes.get('/users/:id/detail', async (c) => {
     ).bind(id).first<Record<string, unknown>>(),
     // STATES ONLY. The encrypted identity evidence opens exclusively from the
     // dedicated KYC review surface; a member card is not a place to decrypt an
-    // identity document into.
-    c.env.DB.prepare(
-      `SELECT state, reason, submitted_at, decided_at, created_at
-         FROM kyc_cases WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`
-    ).bind(id).first<Record<string, unknown>>(),
+    // identity document into. Read only for the KYC desk.
+    kycDesk
+      ? c.env.DB.prepare(
+          `SELECT state, reason, submitted_at, decided_at, created_at
+             FROM kyc_cases WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`
+        ).bind(id).first<Record<string, unknown>>()
+      : Promise.resolve(null),
     c.env.DB.prepare(
       `SELECT id, kind, case_type, state, reason, benefit_flags, opened_at, resolved_at
          FROM restriction_cases WHERE user_id = ?
@@ -761,7 +769,7 @@ adminRoutes.get('/users/:id/detail', async (c) => {
     // staff signed it off. They are aliased so the client reads one shape.
     c.env.DB.prepare(
       `SELECT version, state, requested_at, approved_at FROM approved_addresses
-        WHERE user_id = ? ORDER BY version DESC LIMIT 1`
+        WHERE user_id = ?${kycDesk ? '' : " AND state = 'approved'"} ORDER BY version DESC LIMIT 1`
     ).bind(id).first<Record<string, unknown>>(),
   ]);
 
@@ -834,14 +842,18 @@ adminRoutes.get('/users/:id/detail', async (c) => {
       newest_session_at: (sessionRow.newest_session_at as string | null) ?? null,
       live_sessions: Number(sessionRow.live_sessions) || 0,
     },
-    kyc: kycRow
+    ...(kycDesk
       ? {
-          state: kycRow.state,
-          reason: kycRow.reason,
-          submitted_at: kycRow.submitted_at ?? null,
-          decided_at: kycRow.decided_at ?? null,
+          kyc: kycRow
+            ? {
+                state: kycRow.state,
+                reason: kycRow.reason,
+                submitted_at: kycRow.submitted_at ?? null,
+                decided_at: kycRow.decided_at ?? null,
+              }
+            : null,
         }
-      : null,
+      : {}),
     restrictions: restrictionRows.map((r) => ({
       id: r.id,
       kind: r.kind,

@@ -13,10 +13,12 @@ import { requireFreshSession, requireOwner } from '../lib/costAccess';
 import { MERCHANT_REVIEW_GRANT, isOwner, normalizeAdminScope } from '../lib/adminScope';
 import {
   APPLICATION_STATES,
+  CAPABILITY_GRANTS,
   ageOn,
   applyTransition,
   baghdadToday,
   canReviewMerchantsHere,
+  isCapabilityGrant,
   isMissingSchema,
   revisionSentSql,
   reviewerNoticeText,
@@ -24,6 +26,7 @@ import {
   validClientOperationId,
   type ApplicationAction,
   type ApplicationState,
+  type CapabilityGrant,
   type LegalName,
 } from '../lib/merchantApproval';
 
@@ -42,9 +45,10 @@ import {
  *                                   `revoke: true`, approved → rejected: REVOKING an approval,
  *                                   only while the user has no store (APPROVAL_REVOKE_STORE_EXISTS after)
  *
- *   GET  /reviewers                 the owner: assistant admins and their MERCHANT_REVIEW grant
- *   POST /reviewers/:userId/grant   the owner issues MERCHANT_REVIEW to an assistant admin
- *   POST /reviewers/:userId/revoke  the owner revokes it
+ *   GET  /reviewers                 the owner: assistant admins and their capability grants
+ *   POST /reviewers/:userId/grant   the owner issues one to an assistant admin — `grant_key`
+ *                                   MERCHANT_REVIEW (the default), KYC_REVIEW or DISPUTES
+ *   POST /reviewers/:userId/revoke  the owner revokes it (same `grant_key`)
  *
  * ITS OWN ROUTER, ON PURPOSE. Merchant administration lives in
  * adminCommunity.ts, whose money routes sit behind `requireFinancialScope`.
@@ -216,24 +220,38 @@ adminMerchantApplicationRoutes.get('/', async (c) => {
  */
 adminMerchantApplicationRoutes.get('/reviewers', requireOwner, async (c) => {
   const owner = c.get('user')!;
-  let rows: Array<{ id: string; username: string | null; name: string | null; admin_scope: string | null; email: string; granted_at: string | null }>;
+  let rows: Array<{ id: string; username: string | null; name: string | null; admin_scope: string | null; email: string }>;
+  let live: Array<{ user_id: string; grant_key: string; granted_at: string }>;
   try {
     rows =
       (
         await c.env.DB.prepare(
-          `SELECT u.id, u.username, u.name, u.admin_scope, u.email, g.granted_at
+          `SELECT u.id, u.username, u.name, u.admin_scope, u.email
              FROM users u
-             LEFT JOIN admin_capability_grants g
-               ON g.user_id = u.id AND g.grant_key = ? AND g.revoked_at IS NULL
             WHERE u.role = 'admin'
             ORDER BY u.username`
-        )
-          .bind(MERCHANT_REVIEW_GRANT)
-          .all<{ id: string; username: string | null; name: string | null; admin_scope: string | null; email: string; granted_at: string | null }>()
+        ).all<{ id: string; username: string | null; name: string | null; admin_scope: string | null; email: string }>()
+      ).results ?? [];
+    // Every live grant of an admin, one read: MERCHANT_REVIEW, KYC_REVIEW and
+    // DISPUTES (P1-02, DECISIONS row 261). An unknown key is not a capability.
+    live =
+      (
+        await c.env.DB.prepare(
+          `SELECT g.user_id, g.grant_key, g.granted_at
+             FROM admin_capability_grants g JOIN users u ON u.id = g.user_id
+            WHERE g.revoked_at IS NULL AND u.role = 'admin'`
+        ).all<{ user_id: string; grant_key: string; granted_at: string }>()
       ).results ?? [];
   } catch (e) {
     if (!isMissingSchema(e)) throw e;
     return c.json({ success: true, available: false, reviewers: [] });
+  }
+  const held = new Map<string, Map<CapabilityGrant, string>>();
+  for (const g of live) {
+    if (!isCapabilityGrant(g.grant_key)) continue;
+    const mine = held.get(g.user_id) ?? new Map<CapabilityGrant, string>();
+    mine.set(g.grant_key, g.granted_at);
+    held.set(g.user_id, mine);
   }
   return c.json({
     success: true,
@@ -243,15 +261,20 @@ adminMerchantApplicationRoutes.get('/reviewers', requireOwner, async (c) => {
       .filter((r) => r.id !== owner.id && !isOwner(c.env, r))
       .map((r) => {
         const assistant = normalizeAdminScope(r.admin_scope) === 'assistant';
+        const mine = held.get(r.id);
+        const merchantReview = assistant ? (mine?.get(MERCHANT_REVIEW_GRANT) ?? null) : null;
         return {
           id: r.id,
           username: r.username,
           name: r.name,
           scope: assistant ? 'assistant' : 'full',
-          // A full admin reviews by default (C5); only an assistant's access is a grant.
+          // A full admin holds every desk by default (C5); only an assistant's access is a grant.
           by_default: !assistant,
-          granted: assistant && !!r.granted_at,
-          granted_at: assistant ? r.granted_at : null,
+          // MERCHANT_REVIEW, as the first client build reads it.
+          granted: !!merchantReview,
+          granted_at: merchantReview,
+          // Every capability, keyed: false for a full admin, who needs none.
+          grants: Object.fromEntries(CAPABILITY_GRANTS.map((k) => [k, assistant && !!mine?.has(k)])) as Record<CapabilityGrant, boolean>,
         };
       }),
   });
@@ -262,6 +285,20 @@ interface GrantTarget {
   role: string;
   email: string;
   admin_scope: string | null;
+}
+
+/**
+ * The capability a grant or revoke names: `grant_key` from the body,
+ * MERCHANT_REVIEW when absent (the first client sent none). Anything off the
+ * allowlist is refused — the table's CHECK is shape-only (0204).
+ */
+function grantKeyOf(body: Record<string, unknown>): CapabilityGrant {
+  const key = body?.grant_key;
+  if (key === undefined || key === null || key === '') return MERCHANT_REVIEW_GRANT;
+  if (!isCapabilityGrant(key)) {
+    throw badRequest('هذا الإذن غير معروف / Unknown access grant', 'CAPABILITY_GRANT_KEY_INVALID');
+  }
+  return key;
 }
 
 const grantTargetInvalid = () =>
@@ -289,13 +326,14 @@ adminMerchantApplicationRoutes.post('/reviewers/:userId/grant', requireOwner, as
   const owner = c.get('user')!;
   const target = await grantTarget(c);
   if (target.id === owner.id || isOwner(c.env, target) || target.role !== 'admin') throw grantTargetInvalid();
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const grantKey = grantKeyOf(body);
   if (normalizeAdminScope(target.admin_scope) !== 'assistant') {
     throw badRequest(
-      'المدير الكامل يراجع طلبات التجار دون إذن إضافي / A full admin reviews merchant applications without an extra grant',
+      'المدير الكامل يملك هذه الصلاحية دون إذن إضافي / A full admin has this access without an extra grant',
       'CAPABILITY_GRANT_NOT_NEEDED'
     );
   }
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const sentOperation = body?.operation_id;
   const operationId = validClientOperationId(sentOperation) ? sentOperation : `srv:${newId()}`;
   const reason = shortText(body?.reason, 300);
@@ -303,7 +341,7 @@ adminMerchantApplicationRoutes.post('/reviewers/:userId/grant', requireOwner, as
   const id = newId('acg');
   const now = new Date().toISOString();
   const { statements: auditRows } = await auditStatements(db, owner.id, 'admin.capability_grant.issued', target.id, {
-    grant_key: MERCHANT_REVIEW_GRANT,
+    grant_key: grantKey,
     operation_id: operationId,
   });
   try {
@@ -314,7 +352,7 @@ adminMerchantApplicationRoutes.post('/reviewers/:userId/grant', requireOwner, as
             `INSERT INTO admin_capability_grants (id, user_id, grant_key, granted_by, granted_at, reason, operation_id)
              VALUES (?, ?, ?, ?, ?, ?, ?)`
           )
-          .bind(id, target.id, MERCHANT_REVIEW_GRANT, owner.id, now, reason, operationId),
+          .bind(id, target.id, grantKey, owner.id, now, reason, operationId),
         ...auditRows,
       ])
     );
@@ -331,11 +369,12 @@ adminMerchantApplicationRoutes.post('/reviewers/:userId/revoke', requireOwner, a
   const owner = c.get('user')!;
   const target = await grantTarget(c);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const grantKey = grantKeyOf(body);
   const reason = shortText(body?.reason, 300);
   const db = c.env.DB;
   const now = new Date().toISOString();
   const { statements: auditRows } = await auditStatements(db, owner.id, 'admin.capability_grant.revoked', target.id, {
-    grant_key: MERCHANT_REVIEW_GRANT,
+    grant_key: grantKey,
   });
   const res = await guarded(() =>
     db.batch([
@@ -344,7 +383,7 @@ adminMerchantApplicationRoutes.post('/reviewers/:userId/revoke', requireOwner, a
           `UPDATE admin_capability_grants SET revoked_at = ?, revoked_by = ?, revoke_reason = ?
             WHERE user_id = ? AND grant_key = ? AND revoked_at IS NULL`
         )
-        .bind(now, owner.id, reason, target.id, MERCHANT_REVIEW_GRANT),
+        .bind(now, owner.id, reason, target.id, grantKey),
       ...auditRows,
     ])
   );

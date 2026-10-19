@@ -15,6 +15,8 @@ export interface StoreRef {
   logoUrl: string | null;
   /** The shop's own address (a subdomain), or its in-site page. */
   url: string;
+  /** «مزوّد معتمد» (C4) — a product card's store line; absent from a reply that predates it. */
+  approved_provider?: boolean;
 }
 
 export interface CommunityProduct {
@@ -43,6 +45,8 @@ export interface CommunityStore {
   bio: string;
   avatarUrl: string | null;
   verified: boolean;
+  /** «مزوّد معتمد» (C4): approved and not suspended — separate from `verified`. */
+  approved_provider?: boolean;
   pro_badge?: boolean;
   premium_badge?: boolean;
   created_at: string;

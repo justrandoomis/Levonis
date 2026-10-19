@@ -35,7 +35,6 @@ import type { MerchantProduct } from '../lib/merchant';
 import { useStore } from '../StoreContext';
 import { scheduleStoreVitals, trackStoreEvent } from '../lib/storeBeacon';
 import { useCommunityAccess } from './community/access';
-import InstallAppButton from '../components/pwa/InstallAppButton';
 import StoreRenderer from '../components/storefront/StoreRenderer';
 import { StoreHomeSkeleton } from '../components/storefront/skeletons';
 import '../components/storefront/styles';
@@ -51,6 +50,12 @@ import type { ReviewsData } from '../../packages/storeLayout/src/data';
 const OwnerShareMenuItem = lazy(() => import('../components/merchant/share/OwnerShareMenuItem'));
 /** A suspended shop's page — rare, so it is not part of every store visit's download. */
 const StoreUnavailable = lazy(() => import('../components/merchant/StoreUnavailable'));
+/**
+ * The footer's «تحميل التطبيق» button, shown only on the shop's own host and
+ * below the fold: it arrives with the footer, not with the page, so it is not
+ * part of every store visit's fixed weight (tests/bundleBudget.test.ts).
+ */
+const InstallAppButton = lazy(() => import('../components/pwa/InstallAppButton'));
 
 type Loc = (ar: string, en: string, ckb?: string) => string;
 
@@ -610,7 +615,9 @@ function LiveInstallCard() {
           'فرۆشگا زیاد بکە بۆ شاشەی سەرەکیت تا وەک ئەپ بکرێتەوە.'
         )}
       </p>
-      <InstallAppButton offered />
+      <Suspense fallback={null}>
+        <InstallAppButton offered />
+      </Suspense>
     </div>
   );
 }

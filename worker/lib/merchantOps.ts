@@ -17,6 +17,7 @@
  */
 
 import { isValidSlugSyntax, isSystemSlug, SLUG_MIN, SLUG_MAX } from './hosts';
+import { merchantIsPublic, merchantPublicSql } from './merchantApproval';
 
 export type SlugRejection =
   | 'too_short'
@@ -190,6 +191,34 @@ export async function autoCompleteDays(db: D1Database): Promise<number> {
     .first<{ value: string }>();
   const n = Number(row?.value);
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 7;
+}
+
+/**
+ * «مزوّد معتمد» — THE APPROVED-PROVIDER MARK (owner decision C4).
+ *
+ * Three marks sit beside a shop's name and none of them stands for another:
+ *   - `verified` — an administrator's own moderation mark on the merchant row;
+ *   - `badgeFor` below — new / trusted / professional / elite, earned from
+ *     finished orders and ratings;
+ *   - this one — a human reviewer APPROVED the merchant (Community V3, the
+ *     approval axis), and the merchant is not suspended.
+ *
+ * It is derived from nothing but the approval stamp, through the one public
+ * predicate: the SQL form IS `merchantPublicSql` (approved_at set AND not
+ * suspended), the row form IS `merchantIsPublic`. So a sanctioned merchant
+ * never carries it, a database without 0204's column reads it as absent (the
+ * same fail-closed answer as every public list, C11), and it can never say
+ * more than the lists already do: a merchant the public may not see is not on
+ * any public surface at all, so the mark is never served about one as
+ * `false` — only the merchant's own reads can ever carry a `false`.
+ */
+export function approvedProviderSql(alias: string, schema = true): string {
+  return merchantPublicSql(alias, schema);
+}
+
+/** The same mark for a merchant row already read (its `status` and `approved_at`). */
+export function approvedProvider(m: { status?: unknown; approved_at?: unknown } | null | undefined): boolean {
+  return merchantIsPublic(m);
 }
 
 /** Merchant badge from transparent, published criteria (§42). */

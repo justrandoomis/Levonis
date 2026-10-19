@@ -43,6 +43,8 @@ export default {
         'GET /reviews': 'op',
         'GET /merchants/:id/reputation': 'op',
         'POST /merchants/:id/reputation': 'op',
+        // The disputes desk (DECISIONS row 261): owner and full admins, an assistant only with the
+        // owner's DISPUTES grant (403 DISPUTES_FORBIDDEN) — tests/adminScopeKycDisputes.test.ts.
         'GET /complaints': 'op',
         'GET /complaints/:id': 'op',
         'POST /complaints/:id/status': 'op',

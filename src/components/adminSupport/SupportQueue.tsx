@@ -6,6 +6,8 @@ import MessagesDesk from './MessagesDesk';
 import { consoleStrings } from './strings';
 import { Segmented } from '../ui/Segmented';
 import { useSupportCounts } from './supportCounts';
+import { useAuth } from '../../AuthContext';
+import { CapabilityRefusal, ReviewerGrants } from '../adminScope/CapabilityGrants';
 
 /**
  * THE SUPPORT CONSOLE — the one place an agent answers a customer from.
@@ -32,6 +34,11 @@ import { useSupportCounts } from './supportCounts';
  * find is, to the person looking for it, a feature that does not exist. It is
  * still mounted from the memberships panel too, so a bookmarked tab keeps
  * working; both mount this component, so the console cannot fork.
+ *
+ * «الشكاوى» IS ITS OWN DESK (P1-02, DECISIONS row 261): the owner, full admins,
+ * and an assistant holding the owner's DISPUTES grant (`can_handle_disputes`,
+ * read as `=== true`). Anyone else has no complaints tab and no count for it
+ * (the server answers 0); the owner manages that grant at the foot of the desk.
  */
 const ComplaintsDesk = React.lazy(() =>
   import('../adminCommunity/AdminCommunity').then((m) => ({ default: m.ComplaintsDesk }))
@@ -43,12 +50,16 @@ export default function SupportQueue() {
   const { lang, dir } = useLanguage();
   const cs = consoleStrings(lang);
   const counts = useSupportCounts();
+  const { user } = useAuth();
+  const canHandleDisputes = user?.can_handle_disputes === true;
   const [desk, setDesk] = useState<Desk>('tickets');
 
   const tabs: Array<{ id: Desk; label: string; icon: React.ElementType; count: number }> = [
     { id: 'tickets', label: cs.tabTickets, icon: LifeBuoy, count: counts?.tickets_waiting ?? 0 },
     { id: 'messages', label: cs.tabMessages, icon: MessageCircle, count: counts?.chats_unread ?? 0 },
-    { id: 'complaints', label: cs.tabComplaints, icon: Scale, count: counts?.complaints_open ?? 0 },
+    ...(canHandleDisputes
+      ? [{ id: 'complaints' as const, label: cs.tabComplaints, icon: Scale, count: counts?.complaints_open ?? 0 }]
+      : []),
   ];
 
   return (
@@ -80,11 +91,15 @@ export default function SupportQueue() {
 
       {desk === 'tickets' && <TicketsDesk />}
       {desk === 'messages' && <MessagesDesk />}
-      {desk === 'complaints' && (
-        <React.Suspense fallback={<div className="py-10 text-center text-sm text-text-muted">…</div>}>
-          <ComplaintsDesk dir={dir} />
-        </React.Suspense>
-      )}
+      {desk === 'complaints' &&
+        (canHandleDisputes ? (
+          <React.Suspense fallback={<div className="py-10 text-center text-sm text-text-muted">…</div>}>
+            <ComplaintsDesk dir={dir} />
+            {user?.is_owner === true && <ReviewerGrants grantKey="DISPUTES" />}
+          </React.Suspense>
+        ) : (
+          <CapabilityRefusal code="DISPUTES_FORBIDDEN" />
+        ))}
     </div>
   );
 }

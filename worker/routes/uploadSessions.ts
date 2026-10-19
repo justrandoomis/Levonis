@@ -500,7 +500,7 @@ uploadSessionRoutes.post('/', async (c) => {
     throw badRequest(`File is too large (max ${Math.round(limitBytes / MiB)} MB)`, 'UPLOAD_TOO_LARGE', { limit_bytes: limitBytes, kind: named.kind });
   }
 
-  const entityId = await assertUploadEntity(c.env.DB, user, purpose, body.entity_id);
+  const entityId = await assertUploadEntity(c.env.DB, user, purpose, body.entity_id, c.env);
   if (purpose === 'request') await assertRequestFileRoom(c.env.DB, entityId);
   await assertQuota(c.env.DB, user.id, purpose, declaredBytes);
 

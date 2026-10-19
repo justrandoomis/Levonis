@@ -375,17 +375,20 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
                 </Section>
               )}
 
-              <Section title={s.secKyc} icon={<BadgeCheck className="h-3.5 w-3.5" />} note={s.kycNote} testId="kyc">
-                {m.kyc ? (
-                  <>
-                    <Row label={s.fState} value={<Pill tone={m.kyc.state === 'verified' ? 'green' : m.kyc.state === 'rejected' ? 'red' : 'zinc'}>{m.kyc.state}</Pill>} />
-                    <Row label={s.fSubmitted} value={whenLabel(m.kyc.submitted_at, s.never)} />
-                    {m.kyc.reason && <Row label={s.fReason} value={m.kyc.reason} />}
-                  </>
-                ) : (
-                  <p className="text-xs text-text-muted">{s.noKyc}</p>
-                )}
-              </Section>
+              {/* The KYC desk's section (DECISIONS row 261): the server omits `kyc` outside it. */}
+              {m.kyc !== undefined && (
+                <Section title={s.secKyc} icon={<BadgeCheck className="h-3.5 w-3.5" />} note={s.kycNote} testId="kyc">
+                  {m.kyc ? (
+                    <>
+                      <Row label={s.fState} value={<Pill tone={m.kyc.state === 'verified' ? 'green' : m.kyc.state === 'rejected' ? 'red' : 'zinc'}>{m.kyc.state}</Pill>} />
+                      <Row label={s.fSubmitted} value={whenLabel(m.kyc.submitted_at, s.never)} />
+                      {m.kyc.reason && <Row label={s.fReason} value={m.kyc.reason} />}
+                    </>
+                  ) : (
+                    <p className="text-xs text-text-muted">{s.noKyc}</p>
+                  )}
+                </Section>
+              )}
 
               <Section title={s.secAddress} icon={<MapPin className="h-3.5 w-3.5" />} testId="address">
                 {m.approved_address ? (

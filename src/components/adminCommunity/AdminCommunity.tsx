@@ -41,6 +41,8 @@ import { usePrompt } from '../ui/PromptDialog';
 import { toast } from '../ui/Toast';
 import { StatusChip, type Tone } from '../ui/Badge';
 import { refusalText } from '../../lib/refusalStrings';
+import { useAuth } from '../../AuthContext';
+import { CapabilityRefusal } from '../adminScope/CapabilityGrants';
 import {
   adminCommunityApi, iqd, badgeLabel,
   type CommunityOverview, type AdminMerchantRow, type AdminMerchantProduct, type AdminComplaintRow,
@@ -55,12 +57,14 @@ export default function AdminCommunity({ dir }: { dir: 'ltr' | 'rtl' }) {
   const rtl = dir === 'rtl';
   const t = (ar: string, en: string) => (rtl ? ar : en);
   const [section, setSection] = useState<Section>('overview');
+  /** «النزاعات والشكاوى» is the disputes desk (DECISIONS row 261): owner, full admins, an assistant with DISPUTES. */
+  const canHandleDisputes = useAuth().user?.can_handle_disputes === true;
 
   const SECTIONS: Array<{ id: Section; label: string; icon: React.ElementType }> = [
     { id: 'overview', label: t('نظرة عامة', 'Overview'), icon: TrendingUp },
     { id: 'merchants', label: t('التجار والمتاجر', 'Merchants & stores'), icon: Store },
     { id: 'board', label: t('الطلبات والعروض', 'Requests & offers'), icon: ClipboardList },
-    { id: 'disputes', label: t('النزاعات والشكاوى', 'Disputes'), icon: Scale },
+    ...(canHandleDisputes ? [{ id: 'disputes' as const, label: t('النزاعات والشكاوى', 'Disputes'), icon: Scale }] : []),
     { id: 'finance', label: t('الأموال', 'Money'), icon: Wallet },
     { id: 'reputation', label: t('التقييمات والسمعة', 'Reviews & reputation'), icon: Star },
     { id: 'settings', label: t('الإعدادات', 'Settings'), icon: Settings2 },
@@ -89,10 +93,10 @@ export default function AdminCommunity({ dir }: { dir: 'ltr' | 'rtl' }) {
         ))}
       </div>
 
-      {section === 'overview' && <Overview t={t} />}
+      {section === 'overview' && <Overview t={t} canHandleDisputes={canHandleDisputes} />}
       {section === 'merchants' && <Merchants t={t} />}
       {section === 'board' && <Board t={t} />}
-      {section === 'disputes' && <Disputes t={t} />}
+      {section === 'disputes' && (canHandleDisputes ? <Disputes t={t} /> : <CapabilityRefusal code="DISPUTES_FORBIDDEN" />)}
       {section === 'finance' && <Finance t={t} />}
       {section === 'reputation' && <Reputation t={t} />}
       {section === 'settings' && (
@@ -136,7 +140,7 @@ export function ComplaintsDesk({ dir }: { dir: 'ltr' | 'rtl' }) {
 
 // ---------------------------------------------------------------- overview
 
-function Overview({ t }: { t: T }) {
+function Overview({ t, canHandleDisputes }: { t: T; canHandleDisputes: boolean }) {
   const [d, setD] = useState<CommunityOverview | null>(null);
   const [err, setErr] = useState('');
 
@@ -221,7 +225,8 @@ function Overview({ t }: { t: T }) {
         </div>
       </div>
 
-      {d.complaints.open > 0 && (
+      {/* The complaints counter belongs to the disputes desk; the server sends null outside it. */}
+      {canHandleDisputes && d.complaints && d.complaints.open > 0 && (
         <div className="lv-alert lv-alert-warning flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-warning shrink-0" />
           <p className="text-text-primary text-[13px]">

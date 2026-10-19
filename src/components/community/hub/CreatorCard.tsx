@@ -17,7 +17,7 @@ import PremiumMemberBadge from '../../merchant/PremiumMemberBadge';
 import FollowUserButton from '../social/FollowUserButton';
 import { creatorHref, type CreatorCard as CreatorCardData } from '../social/api';
 import { followersLabel, socialLang } from '../social/strings';
-import { Avatar, HubLink } from './parts';
+import { ApprovedMark, Avatar, HubLink } from './parts';
 import { projectsLabel, hubLang, useHubStrings } from './strings';
 
 export default function CreatorCard({ creator: c, variant = 'row', follow = true }: { creator: CreatorCardData; variant?: 'row' | 'rail'; follow?: boolean }) {
@@ -27,6 +27,7 @@ export default function CreatorCard({ creator: c, variant = 'row', follow = true
   const badges = (
     <>
       {c.badges.verified_merchant && <BadgeCheck className="h-4 w-4 shrink-0 text-gold" aria-label={s.verifiedMerchant} role="img" />}
+      {c.badges.approved_provider === true && <ApprovedMark />}
       {c.badges.pro && <ProMerchantBadge compact />}
       {c.badges.premium && <PremiumMemberBadge compact />}
     </>

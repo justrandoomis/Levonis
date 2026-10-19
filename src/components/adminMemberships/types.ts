@@ -50,7 +50,8 @@ export interface MemberRow {
   tier: 'free' | 'plus' | 'pro' | 'prime';
   membership_state: string;
   expires_at: string | null;
-  kyc_state: string | null;
+  /** Absent for an admin outside the KYC desk (DECISIONS row 261). */
+  kyc_state?: string | null;
   active_restrictions: number;
   has_approved_address: boolean;
 }
@@ -151,7 +152,8 @@ export interface MemberDetailData {
     pending_launch: { tier: string; duration_months: number } | null;
   };
   memberships: MembershipRow[];
-  kyc_cases: KycCaseRow[];
+  /** Absent for an admin outside the KYC desk (DECISIONS row 261). */
+  kyc_cases?: KycCaseRow[];
   benefit_context: {
     tier: string;
     tier_active: boolean;
@@ -159,6 +161,7 @@ export interface MemberDetailData {
     restrictable_benefits: readonly string[];
     note: string;
   };
+  /** Every version for the KYC desk; outside it, only the current approved one. */
   approved_addresses: ApprovedAddressRow[];
   debt: MemberDebt;
   restriction_cases: RestrictionCase[];

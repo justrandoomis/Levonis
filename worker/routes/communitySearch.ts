@@ -72,6 +72,7 @@ import { canonicalProductMedia, upgradeMedia } from '../lib/productModel';
 import {
   COMMUNITY_DIRECTORY_COLUMNS,
   COMMUNITY_DIRECTORY_FROM,
+  COMMUNITY_FEED_COLUMNS,
   COMMUNITY_PRODUCTS_FROM,
   communityDirectoryVisible,
   communityFeedProduct,
@@ -321,7 +322,7 @@ async function searchCreators({ db, like, viewer, limit, root }: SearchInput) {
 async function searchCommunityProducts({ db, like, viewer, limit, root }: SearchInput) {
   const [{ results }, total] = await withApprovalSchema((schema) => Promise.all([
     db.prepare(
-      `SELECT p.*, s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo_key
+      `SELECT ${COMMUNITY_FEED_COLUMNS(schema)}
          ${COMMUNITY_PRODUCTS_FROM}
         WHERE ${communityProductsVisible('?1', schema)} AND ${merchantBlockSql('?3', 'm')}
         ORDER BY (p.name LIKE ?1 ESCAPE '\\' OR p.name_ar LIKE ?1 ESCAPE '\\') DESC, p.created_at DESC, p.id DESC LIMIT ?2`
@@ -344,18 +345,16 @@ async function searchRequests({ db, like, viewer, limit }: SearchInput) {
   const where = `${requestBoardVisible('?1', '?2')} AND ${requestBlockSql('?3')}`;
   const [{ results }, total] = await Promise.all([
     db.prepare(
-      `SELECT r.*, u.name AS customer_name, u.username AS customer_username,
+      `SELECT r.*,
               (SELECT COUNT(*) FROM community_request_files f WHERE f.request_id = r.id) AS file_count
-         FROM community_requests r LEFT JOIN users u ON u.id = r.customer_id
+         FROM community_requests r
         WHERE ${where}
         ORDER BY (r.title LIKE ?2 ESCAPE '\\') DESC, r.created_at DESC, r.id DESC LIMIT ?4`
     ).bind(now, like, viewer, limit).all<Record<string, unknown>>(),
     boundedCount(db, `SELECT r.id FROM community_requests r WHERE ${where}`, [now, like, viewer]),
   ]);
-  return {
-    rows: results.map((r) => ({ ...publicRequest(r), status: r.status, customer_username: r.customer_username ?? null })),
-    total,
-  };
+  // The board's whitelist and nobody's name (acceptance 34): the job, not the person who posted it.
+  return { rows: results.map((r) => ({ ...publicRequest(r), status: r.status })), total };
 }
 
 /** The catalogue's columns every LIKE fallback reads (worker/routes/products.ts). */
@@ -794,7 +793,7 @@ async function recommendForProduct(c: Context<AppContext>, id: string, limit: nu
   const root = rootDomainFrom(c.env);
   // The anchor was public on this database, so the column is there: no second try is needed.
   const { results } = await db.prepare(
-    `SELECT p.*, s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo_key,
+    `SELECT ${COMMUNITY_FEED_COLUMNS()},
             (CASE WHEN ?2 <> '' AND lower(COALESCE(p.category, '')) = ?2 THEN 1 ELSE 0 END)
             + (CASE WHEN ?3 <> '' AND lower(COALESCE(p.material, '')) = ?3 THEN 1 ELSE 0 END) AS score
        ${COMMUNITY_PRODUCTS_FROM}

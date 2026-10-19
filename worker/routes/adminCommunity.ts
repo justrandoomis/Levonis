@@ -63,6 +63,7 @@ import { maskPhone, normalizePhone } from '../lib/phone';
 import { refreshMerchantRating } from './merchantReviews';
 import { COMPLAINT_AWAITS_DESK_SQL } from './adminChats';
 import { requireFinancialScope } from '../lib/walletAdjust';
+import { canHandleDisputes, requireDisputeHandler } from '../lib/staffCapabilities';
 import { canMoveMoney } from '../lib/adminScope';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { reconcileRefundUnrefunded, reconcileReverseCredit, storeOrderMoneyDrift } from '../lib/storeOrderOps';
@@ -92,6 +93,10 @@ const nowIso = () => new Date().toISOString();
  */
 adminCommunityRoutes.get('/overview', async (c) => {
   const financial = canMoveMoney(c.env, c.get('user'));
+  // The complaints counter is part of the disputes desk (DECISIONS row 261),
+  // like the support badge: an admin outside it gets null, and the count is
+  // never read for them.
+  const disputesDesk = await canHandleDisputes(c.env, c.get('user'));
   const [merchants, stores, products, requests, offers, orders, escrows, complaints, storeSales] = await Promise.all([
     c.env.DB.prepare(
       `SELECT COUNT(*) AS total,
@@ -126,11 +131,13 @@ adminCommunityRoutes.get('/overview', async (c) => {
       `SELECT state, COUNT(*) AS n, COALESCE(SUM(gross_iqd), 0) AS total
          FROM community_escrows GROUP BY state`
     ).all<{ state: string; n: number; total: number }>(),
-    c.env.DB.prepare(
-      `SELECT COUNT(*) AS total,
-              SUM(CASE WHEN status IN ('submitted','under_review') THEN 1 ELSE 0 END) AS open
-         FROM community_complaints`
-    ).first<Record<string, number>>(),
+    disputesDesk
+      ? c.env.DB.prepare(
+          `SELECT COUNT(*) AS total,
+                  SUM(CASE WHEN status IN ('submitted','under_review') THEN 1 ELSE 0 END) AS open
+             FROM community_complaints`
+        ).first<Record<string, number>>()
+      : Promise.resolve(null),
     c.env.DB.prepare(
       `SELECT COUNT(*) AS total,
               COALESCE(SUM(total_iqd), 0) AS gross,
@@ -154,7 +161,7 @@ adminCommunityRoutes.get('/overview', async (c) => {
       fees: financial ? Number(storeSales?.fees ?? 0) : null,
     },
     escrows: escrows.results,
-    complaints,
+    complaints: disputesDesk ? complaints : null,
   });
 });
 
@@ -1074,6 +1081,12 @@ adminCommunityRoutes.post('/merchants/:id/reputation', async (c) => {
 });
 
 // -------------------------------------------------------------- complaints
+//
+// THE DESK'S OWN DOOR (P1-02, DECISIONS row 261): every complaint route asks
+// `requireDisputeHandler` — the owner and full admins by default, an assistant
+// only with the owner's live DISPUTES grant — before it reads a row, so a
+// refused assistant hears 403 DISPUTES_FORBIDDEN and learns nothing about any
+// complaint. Settling the escrow below stays money (`requireFinancialScope`).
 
 /**
  * The address and the element a complaint attachment renders as, beside the
@@ -1090,7 +1103,7 @@ function withComplaintFile(m: Record<string, unknown>): Record<string, unknown> 
   };
 }
 
-adminCommunityRoutes.get('/complaints', async (c) => {
+adminCommunityRoutes.get('/complaints', requireDisputeHandler, async (c) => {
   const status = c.req.query('status') || '';
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 50 });
   const { results } = await c.env.DB.prepare(
@@ -1107,7 +1120,7 @@ adminCommunityRoutes.get('/complaints', async (c) => {
   return c.json({ success: true, complaints: results });
 });
 
-adminCommunityRoutes.get('/complaints/:id', async (c) => {
+adminCommunityRoutes.get('/complaints/:id', requireDisputeHandler, async (c) => {
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const complaint = await c.env.DB.prepare(
     `SELECT ct.*, r.name AS reporter_name, r.email AS reporter_email, m.name AS merchant_name
@@ -1144,7 +1157,7 @@ adminCommunityRoutes.get('/complaints/:id', async (c) => {
   });
 });
 
-adminCommunityRoutes.post('/complaints/:id/status', async (c) => {
+adminCommunityRoutes.post('/complaints/:id/status', requireDisputeHandler, async (c) => {
   const admin = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const body = await c.req.json().catch(() => ({}));
@@ -1195,7 +1208,7 @@ adminCommunityRoutes.post('/complaints/:id/status', async (c) => {
  * foreign key: a 404 naming the complaint is an answer an admin can act on,
  * and a raw FK violation is a 500.
  */
-adminCommunityRoutes.post('/complaints/:id/messages', async (c) => {
+adminCommunityRoutes.post('/complaints/:id/messages', requireDisputeHandler, async (c) => {
   const admin = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;

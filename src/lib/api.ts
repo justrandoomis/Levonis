@@ -368,6 +368,11 @@ export interface ApiUser {
    *  owner's MERCHANT_REVIEW grant (owner decision C5). Hides the tab only;
    *  read as `=== true`. */
   can_review_merchants?: boolean;
+  /** «التحقق والعناوين» and «الشكاوى والنزاعات» (P1-02, DECISIONS row 261): the
+   *  same rule over the owner's KYC_REVIEW and DISPUTES grants. Hide the tab and
+   *  the desk only; read as `=== true`, so an older server's missing flag hides them. */
+  can_review_kyc?: boolean;
+  can_handle_disputes?: boolean;
   /**
    * The owner's OWN session while the account's address is not verified yet
    * (DECISIONS row 185, amendment of 2026-10-08): cost stays shut, and the

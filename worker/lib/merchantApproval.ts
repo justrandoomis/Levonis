@@ -33,7 +33,7 @@
  */
 import type { Context } from 'hono';
 import type { AppContext, Env, SessionUser } from './types';
-import { isOwner, normalizeAdminScope } from './adminScope';
+import { DISPUTES_GRANT, KYC_REVIEW_GRANT, MERCHANT_REVIEW_GRANT, isOwner, normalizeAdminScope } from './adminScope';
 import { auditStatements } from './audit';
 import { newId } from './crypto';
 import { changedExactlyOne, isLostRace } from './gifts/fence';
@@ -348,9 +348,19 @@ export function applicationRequiredRefusal(): HttpError {
 
 // ------------------------------------------------------------ reviewer scope
 
-/** Capability keys `admin_capability_grants` may hold — checked here, shape-checked in 0204. */
-export const CAPABILITY_GRANTS = ['MERCHANT_REVIEW'] as const;
+/**
+ * Capability keys `admin_capability_grants` may hold — checked here, shape-checked
+ * in 0204 (so a new key is a code change, not a migration). Each opens one
+ * desk to an assistant admin and nothing financial: MERCHANT_REVIEW (C5),
+ * KYC_REVIEW and DISPUTES (P1-02, DECISIONS row 261).
+ */
+export const CAPABILITY_GRANTS = [MERCHANT_REVIEW_GRANT, KYC_REVIEW_GRANT, DISPUTES_GRANT] as const;
 export type CapabilityGrant = (typeof CAPABILITY_GRANTS)[number];
+
+/** True for a key on the allowlist above; anything else is not a capability. */
+export function isCapabilityGrant(key: unknown): key is CapabilityGrant {
+  return typeof key === 'string' && (CAPABILITY_GRANTS as readonly string[]).includes(key);
+}
 
 /** A LIVE grant. No table, no grant. Never a financial capability. */
 export async function hasCapabilityGrant(db: D1Database, userId: string, key: CapabilityGrant): Promise<boolean> {
@@ -369,6 +379,24 @@ export async function hasCapabilityGrant(db: D1Database, userId: string, key: Ca
 type ReviewerSubject = Pick<SessionUser, 'id' | 'role' | 'email'> & { admin_scope?: string | null };
 
 /**
+ * THE C5 RULE FOR ONE CAPABILITY: the owner and full-scope admins by default;
+ * an assistant admin only with a live grant of `key` the owner issued, read
+ * from the grant table on every call (a revoke counts on the next request).
+ * Built on adminScope.ts — an unrecognised scope is an assistant's. No admin
+ * row, no capability; a database without 0204 grants nothing to an assistant.
+ */
+export async function canUseCapability(
+  env: Pick<Env, 'DB' | 'INITIAL_ADMIN_EMAIL'>,
+  user: ReviewerSubject | null | undefined,
+  key: CapabilityGrant
+): Promise<boolean> {
+  if (!user || user.role !== 'admin') return false;
+  if (isOwner(env as Env, user)) return true;
+  if (normalizeAdminScope(user.admin_scope) !== 'assistant') return true;
+  return hasCapabilityGrant(env.DB, user.id, key);
+}
+
+/**
  * WHO MAY REVIEW A MERCHANT APPLICATION (owner decision C5): the owner and
  * full-scope admins by default; an assistant admin only with a live
  * MERCHANT_REVIEW grant the owner issued. Built on adminScope.ts — an
@@ -381,10 +409,7 @@ export async function canReviewMerchants(
   env: Pick<Env, 'DB' | 'INITIAL_ADMIN_EMAIL'>,
   user: ReviewerSubject | null | undefined
 ): Promise<boolean> {
-  if (!user || user.role !== 'admin') return false;
-  if (isOwner(env as Env, user)) return true;
-  if (normalizeAdminScope(user.admin_scope) !== 'assistant') return true;
-  return hasCapabilityGrant(env.DB, user.id, 'MERCHANT_REVIEW');
+  return canUseCapability(env, user, MERCHANT_REVIEW_GRANT);
 }
 
 /** `canReviewMerchants` on a host where administration is served at all. */

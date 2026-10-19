@@ -95,15 +95,6 @@ const ar = {
   waiting: 'بانتظار ردّ الخادم…',
   decided: 'تمّ: الحالة الآن',
   actionError: 'تعذّر تنفيذ الإجراء',
-  // The owner's grants (C5)
-  grantsTitle: 'من يراجع طلبات التجار',
-  grantsHint: 'المالك والمدير الكامل يراجعون دائمًا. المساعد يراجع فقط بإذن يمنحه المالك — ولا يفتح له أي صلاحية مالية.',
-  byDefault: 'يراجع دائمًا (مدير كامل)',
-  granted: 'مأذون له',
-  notGranted: 'غير مأذون',
-  grant: 'منح الإذن',
-  revoke: 'سحب الإذن',
-  noAssistants: 'لا يوجد مديرون آخرون.',
 };
 
 type Strings = typeof ar;
@@ -195,14 +186,6 @@ const en: Strings = {
   waiting: 'Waiting for the server…',
   decided: 'Done: the state is now',
   actionError: 'The action failed',
-  grantsTitle: 'Who reviews merchant applications',
-  grantsHint: 'The owner and full admins always review. An assistant reviews only with access the owner grants — and it opens no financial access.',
-  byDefault: 'Always reviews (full admin)',
-  granted: 'Granted',
-  notGranted: 'Not granted',
-  grant: 'Grant access',
-  revoke: 'Revoke access',
-  noAssistants: 'There are no other admins.',
 };
 
 const ckb: Strings = {
@@ -292,14 +275,6 @@ const ckb: Strings = {
   waiting: 'چاوەڕێی وەڵامی ڕاژەکار…',
   decided: 'تەواو: دۆخەکە ئێستا',
   actionError: 'کردارەکە سەرکەوتوو نەبوو',
-  grantsTitle: 'کێ پێداچوونەوە بە داواکارییەکانی بازرگان دەکات',
-  grantsHint: 'خاوەن و بەڕێوەبەری تەواو هەمیشە پێداچوونەوە دەکەن. یاریدەدەر تەنها بە مۆڵەتێک کە خاوەن دەیدات پێداچوونەوە دەکات — و هیچ دەسەڵاتێکی دارایی بۆ ناکاتەوە.',
-  byDefault: 'هەمیشە پێداچوونەوە دەکات (بەڕێوەبەری تەواو)',
-  granted: 'مۆڵەتی هەیە',
-  notGranted: 'مۆڵەتی نییە',
-  grant: 'پێدانی مۆڵەت',
-  revoke: 'کێشانەوەی مۆڵەت',
-  noAssistants: 'هیچ بەڕێوەبەرێکی تر نییە.',
 };
 
 export const REVIEWER_STRINGS = { ar, en, ckb } as const;

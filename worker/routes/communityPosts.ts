@@ -1242,6 +1242,12 @@ communityPostRoutes.get('/creators/:username', async (c) => {
         pro: badges.pro.has(String(u.id)),
         premium: badges.premium.has(String(u.id)),
         verified_merchant: !!(store && store.verified),
+        /**
+         * «مزوّد معتمد» (owner decision C4): the maker's merchant side is
+         * approved and not suspended — `creatorMerchantPublic`, the public
+         * predicate on the row's stamp. Separate from `verified_merchant`.
+         */
+        approved_provider: creatorMerchantPublic(u),
       },
       stats: {
         projects: Number(projects?.n ?? 0),

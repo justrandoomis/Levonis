@@ -50,7 +50,8 @@ export interface CreatorCard {
   name: string;
   avatarUrl: string | null;
   bio: string;
-  badges: { pro: boolean; premium: boolean; verified_merchant: boolean };
+  /** `approved_provider`: «مزوّد معتمد» (C4), separate from `verified_merchant`; absent from an older reply. */
+  badges: { pro: boolean; premium: boolean; verified_merchant: boolean; approved_provider?: boolean };
   stats: { projects: number; followers: number };
   store: { id: string; slug: string; name: string; url: string } | null;
   viewer: { following: boolean };

@@ -142,7 +142,8 @@ export interface Creator {
   member_since: string;
   printers: string[];
   materials: string[];
-  badges: { pro: boolean; premium: boolean; verified_merchant: boolean };
+  /** `approved_provider`: «مزوّد معتمد» (C4), separate from `verified_merchant`; absent from an older reply. */
+  badges: { pro: boolean; premium: boolean; verified_merchant: boolean; approved_provider?: boolean };
   stats: { projects: number; completed_jobs: number; followers?: number };
   /** The creator's store card, in the directory's own shape, when they run one. */
   store: Record<string, unknown> | null;

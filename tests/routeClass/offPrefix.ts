@@ -329,6 +329,8 @@ export default {
         'POST /address-self-approve': 'open',
         'GET /approved-address': 'open',
         'POST /phone-change-request': 'open',
+        // The KYC desk (DECISIONS row 261): owner and full admins, an assistant only with the owner's
+        // KYC_REVIEW grant (403 KYC_REVIEW_FORBIDDEN) — tests/adminScopeKycDisputes.test.ts.
         'GET /admin/queue': 'op',
         'GET /admin/cases/:id': 'op',
         'GET /admin/cases/:id/evidence/:idx': 'op',

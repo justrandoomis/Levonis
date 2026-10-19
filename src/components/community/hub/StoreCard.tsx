@@ -24,7 +24,7 @@ import { badgeLabel, storeHref } from '../../../lib/merchant';
 import ProMerchantBadge from '../../merchant/ProMerchantBadge';
 import PremiumMemberBadge from '../../merchant/PremiumMemberBadge';
 import SafeImage from '../../ui/SafeImage';
-import { HubLink, StoreMark } from './parts';
+import { ApprovedMark, HubLink, StoreMark } from './parts';
 import { completedLabel, followersLabel, productsLabel } from './copy';
 import { useHubStrings } from './strings';
 import type { CommunityStore, CommunityWork } from './api';
@@ -128,6 +128,7 @@ export default function StoreCard({ store: m, canFollow, busy, onToggleFollow, v
             {name}
           </HubLink>
           {m.verified && <BadgeCheck className="h-4 w-4 shrink-0 text-gold" aria-label={s.verified} role="img" />}
+          {m.approved_provider === true && <ApprovedMark />}
           {m.pro_badge && <ProMerchantBadge compact />}
           {m.premium_badge && <PremiumMemberBadge compact />}
         </h3>

@@ -4,7 +4,7 @@
 import React, { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useInView } from 'motion/react';
-import { Store } from 'lucide-react';
+import { ShieldCheck, Store } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { useMotion } from '../../../lib/motion';
 import { useRail } from '../../../lib/useRail';
@@ -15,6 +15,24 @@ import { sectionNumber, useHubStrings } from './strings';
 import VariantImg from '../../ui/VariantImg';
 
 type AnchorProps = Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'href'>;
+
+/**
+ * «مزوّد معتمد» — THE APPROVED-PROVIDER MARK beside a name (owner decision C4):
+ * a reviewer approved this merchant and they are not suspended. Drawn only for
+ * the server's `approved_provider: true`, which it derives from the approval
+ * stamp alone (worker/lib/merchantOps.ts `approvedProvider`). The shield alone,
+ * named for assistive technology and on hover — a card's name line and a
+ * product tile's store line have no room for a pill. Its own mark: the gold
+ * BadgeCheck stays the administrator's «موثّق».
+ */
+export function ApprovedMark() {
+  const s = useHubStrings();
+  return (
+    <span data-approved-provider role="img" aria-label={s.approvedProvider} title={s.approvedProvider} className="inline-flex shrink-0 text-info">
+      <ShieldCheck className="h-4 w-4" strokeWidth={2.25} aria-hidden="true" />
+    </span>
+  );
+}
 
 /**
  * A REAL LINK, WHEREVER IT GOES. A shop with its own subdomain IS its own site,

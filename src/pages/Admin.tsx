@@ -266,6 +266,12 @@ export default function Admin() {
    * missing flag hides the tab. The router re-checks every request.
    */
   const canReviewMerchants = user?.can_review_merchants === true;
+  /**
+   * «التحقق والعناوين» (P1-02, DECISIONS row 261): the same rule over the
+   * owner's KYC_REVIEW grant. Hides the tab; AdminKyc shows the refusal if a
+   * link lands there anyway, and every /api/kyc/admin/* route re-checks.
+   */
+  const canReviewKyc = user?.can_review_kyc === true;
   /** «استيراد Bambu Lab»: the verified owner only, as the API (requireOwner) and «الأمان». */
   const canSeeCatalogImport = canSeeSecurity;
 
@@ -274,21 +280,23 @@ export default function Admin() {
   /** What waits on the services desks (trade-in, price protection), for their badges. */
   const servicesWaiting = useServicesBadge();
 
-  const section = (id: string, ar: string, en: string, ckb?: string) => ({ section: id, sectionLabel: loc(ar, en, ckb) });
+  // Every label and section name carries its Sorani (DECISIONS row 183; GAP-MAP conflict 3):
+  // `ckb` is required here, so a new group cannot fall back to the Arabic.
+  const section = (id: string, ar: string, en: string, ckb: string) => ({ section: id, sectionLabel: loc(ar, en, ckb) });
   const sidebarItems = [
-    { id: 'overview', icon: LayoutDashboard, label: loc('نظرة عامة', 'Overview', 'پێداچوونەوە'), ...section('operations', 'التشغيل', 'Operations', 'بەڕێوەبردن') },
-    { id: 'orders', icon: ClipboardList, label: loc('الطلبات', 'Orders', 'داواکارییەکان'), ...section('operations', 'التشغيل', 'Operations') },
+    { id: 'overview', icon: LayoutDashboard, label: loc('نظرة عامة', 'Overview', 'تێڕوانینی گشتی'), ...section('operations', 'التشغيل', 'Operations', 'بەڕێوەبردن') },
+    { id: 'orders', icon: ClipboardList, label: loc('الطلبات', 'Orders', 'داواکارییەکان'), ...section('operations', 'التشغيل', 'Operations', 'بەڕێوەبردن') },
     ...(canSeeFinance || ownerMustVerify
-      ? [{ id: 'finance', icon: TrendingUp, label: loc('الأرباح والتكاليف', 'Profit & costs', 'قازانج و تێچوون'), ...section('operations', 'التشغيل', 'Operations') }]
+      ? [{ id: 'finance', icon: TrendingUp, label: loc('الأرباح والتكاليف', 'Profit & costs', 'قازانج و تێچوون'), ...section('operations', 'التشغيل', 'Operations', 'بەڕێوەبردن') }]
       : []),
-    { id: 'earnings', icon: Wallet, label: loc('أرباحي', 'My earnings'), ...section('operations', 'التشغيل', 'Operations') },
+    { id: 'earnings', icon: Wallet, label: loc('أرباحي', 'My earnings', 'قازانجەکانم'), ...section('operations', 'التشغيل', 'Operations', 'بەڕێوەبردن') },
     // «إدارة المخزون». Under Operations rather than Catalog on purpose: the
     // catalogue is what the shop SELLS, this is what it HOLDS, and the person
     // receiving a shipment is doing operations work. Deliberately NOT gated on
     // `canSeeFinance` — §52 has the assistant admin counting units all day and
     // the server strips the costs out of what they are sent.
-    { id: 'inventory', icon: Warehouse, label: loc('إدارة المخزون', 'Inventory', 'بەڕێوەبردنی کۆگا'), ...section('operations', 'التشغيل', 'Operations') },
-    { id: 'wallet_requests', icon: Bell, label: loc('طلبات المحفظة', 'Wallet requests'), ...section('operations', 'التشغيل', 'Operations') },
+    { id: 'inventory', icon: Warehouse, label: loc('إدارة المخزون', 'Inventory', 'بەڕێوەبردنی کۆگا'), ...section('operations', 'التشغيل', 'Operations', 'بەڕێوەبردن') },
+    { id: 'wallet_requests', icon: Bell, label: loc('طلبات المحفظة', 'Wallet requests', 'داواکارییەکانی جزدان'), ...section('operations', 'التشغيل', 'Operations', 'بەڕێوەبردن') },
     // «الخدمات» (Services V2 S-P2, spec §10.3): the trade-in desk and the price-protection claims —
     // services the desk runs on a customer's device — moved out of «التشغيل», each with what waits
     // on it (GET /api/admin/services/badge: counts only).
@@ -301,16 +309,16 @@ export default function Admin() {
     ...(canSeePricing || pricingMustVerify
       ? [{ id: 'pricing', icon: Calculator, label: loc('التسعير والشحن', 'Pricing & shipping', 'نرخدانان و ناردنی بەرهەم'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') }]
       : []),
-    { id: 'bundles', icon: Boxes, label: loc('الباقات', 'Bundles'), ...section('catalog', 'الكتالوج', 'Catalog') },
-    { id: 'mystery', icon: Dice5, label: loc('العروض العشوائية', 'Mystery offers', 'ئۆفەرە نهێنییەکان'), ...section('catalog', 'الكتالوج', 'Catalog') },
-    { id: 'mystery_pools', icon: Layers, label: loc('مجموعات السحب', 'Mystery pools', 'کۆمەڵەکانی هەڵبژاردن'), ...section('catalog', 'الكتالوج', 'Catalog') },
-    { id: 'taxonomy', icon: Tag, label: loc('التصنيفات', 'Taxonomy'), ...section('catalog', 'الكتالوج', 'Catalog') },
-    { id: 'warranties', icon: ShieldCheck, label: loc('الضمانات والأجهزة', 'Warranties & devices'), ...section('catalog', 'الكتالوج', 'Catalog') },
-    { id: 'memberships', icon: Crown, label: loc('الأعضاء والدعم', 'Members & support'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
-    { id: 'membership_benefits', icon: BadgePercent, label: loc('مزايا العضوية', 'Membership benefits'), ...section('growth', 'العضويات والتسويق', 'Growth') },
-    { id: 'coupons', icon: Ticket, label: loc('أكواد الخصم', 'Promo codes'), ...section('growth', 'العضويات والتسويق', 'Growth') },
-    { id: 'offers', icon: PercentIcon, label: loc('العروض الخاصة', 'Special offers', 'ئۆفەرە تایبەتەکان'), ...section('growth', 'العضويات والتسويق', 'Growth') },
-    { id: 'ads', icon: Megaphone, label: loc('الإعلانات والنصوص', 'Ads & texts'), ...section('growth', 'العضويات والتسويق', 'Growth') },
+    { id: 'bundles', icon: Boxes, label: loc('الباقات', 'Bundles', 'پاکێجەکان'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') },
+    { id: 'mystery', icon: Dice5, label: loc('العروض العشوائية', 'Mystery offers', 'ئۆفەرە نهێنییەکان'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') },
+    { id: 'mystery_pools', icon: Layers, label: loc('مجموعات السحب', 'Mystery pools', 'کۆمەڵەکانی هەڵبژاردن'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') },
+    { id: 'taxonomy', icon: Tag, label: loc('التصنيفات', 'Taxonomy', 'پۆلێنکردن'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') },
+    { id: 'warranties', icon: ShieldCheck, label: loc('الضمانات والأجهزة', 'Warranties & devices', 'گەرەنتی و ئامێرەکان'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') },
+    { id: 'memberships', icon: Crown, label: loc('الأعضاء والدعم', 'Members & support', 'ئەندامان و پشتگیری'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
+    { id: 'membership_benefits', icon: BadgePercent, label: loc('مزايا العضوية', 'Membership benefits', 'سوودەکانی ئەندامێتی'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
+    { id: 'coupons', icon: Ticket, label: loc('أكواد الخصم', 'Promo codes', 'کۆدەکانی داشکاندن'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
+    { id: 'offers', icon: PercentIcon, label: loc('العروض الخاصة', 'Special offers', 'ئۆفەرە تایبەتەکان'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
+    { id: 'ads', icon: Megaphone, label: loc('الإعلانات والنصوص', 'Ads & texts', 'ڕیکلام و دەقەکان'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
     /* The word «الدعم» exists in this sidebar now, and it is first in the
        Administration group because answering a waiting customer outranks every
        other administrative errand under it. The Kurdish label is the queue's
@@ -322,36 +330,38 @@ export default function Admin() {
        (components/adminSupport/supportCounts.ts). */
     { id: 'support', icon: LifeBuoy, label: loc('الدعم والرسائل', 'Support inbox', 'ڕیزی پشتگیری'), badge: supportWaiting, ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
     { id: 'users', icon: Users, label: t('adminUsers'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
-    { id: 'kyc', icon: ShieldCheck, label: loc('التحقق والعناوين', 'KYC & addresses'), ...section('administration', 'الإدارة', 'Administration') },
+    ...(canReviewKyc
+      ? [{ id: 'kyc', icon: ShieldCheck, label: loc('التحقق والعناوين', 'KYC & addresses', 'پشتڕاستکردنەوە و ناونیشانەکان'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') }]
+      : []),
     ...(canReviewMerchants
       ? [{ id: 'merchant_applications', icon: Store, label: loc('طلبات اعتماد التجار', 'Merchant applications', 'داواکارییەکانی پەسەندکردنی بازرگان'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') }]
       : []),
-    { id: 'reviews', icon: Star, label: loc('المراجعات', 'Reviews', 'هەڵسەنگاندنەکان'), ...section('administration', 'الإدارة', 'Administration') },
+    { id: 'reviews', icon: Star, label: loc('المراجعات', 'Reviews', 'هەڵسەنگاندنەکان'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
     // «الهدايا» (0175): five levels of real store products, grants to
     // customers and their journey to delivery — beside the reviews whose
     // approval grants one.
-    { id: 'gifts', icon: Gift, label: loc('الهدايا', 'Gifts', 'دیارییەکان'), ...section('administration', 'الإدارة', 'Administration') },
+    { id: 'gifts', icon: Gift, label: loc('الهدايا', 'Gifts', 'دیارییەکان'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
     /* «شكاوى الأسعار». /api/admin/price-reports has existed with a full list,
        a computed gap and an audited decision, and NOTHING in src/ called it —
        the only caller in the app was the customer's POST. An admin API with no
        sidebar entry is a feature that, to the person looking for it, is not
-       there. No third `loc` argument: a Kurdish-reading admin gets the Arabic
-       label, and the Sorani is the owner's to write by hand. */
-    { id: 'price_reports', icon: Tag, label: loc('شكاوى الأسعار', 'Price reports'), ...section('administration', 'الإدارة', 'Administration') },
-    { id: 'delivery', icon: Truck, label: loc('التوصيل المحلي', 'Local delivery'), ...section('administration', 'الإدارة', 'Administration') },
-    { id: 'community', icon: Store, label: loc('مجتمع ليفو', 'Levo Community'), ...section('administration', 'الإدارة', 'Administration') },
-    { id: 'printer_farm', icon: Factory, label: loc('مزرعة الطابعات', 'Printer Farm', 'کێڵگەی چاپکەر'), ...section('administration', 'الإدارة', 'Administration') },
+       there. Its Sorani is real Sorani, like every label here (DECISIONS row
+       183: a ckb slot never carries the Arabic; GAP-MAP conflict 3). */
+    { id: 'price_reports', icon: Tag, label: loc('شكاوى الأسعار', 'Price reports', 'سکاڵاکانی نرخ'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
+    { id: 'delivery', icon: Truck, label: loc('التوصيل المحلي', 'Local delivery', 'گەیاندنی ناوخۆیی'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
+    { id: 'community', icon: Store, label: loc('مجتمع ليفو', 'Levo Community', 'کۆمەڵگەی لیڤۆ'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
+    { id: 'printer_farm', icon: Factory, label: loc('مزرعة الطابعات', 'Printer Farm', 'کێڵگەی چاپکەر'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
     ...(canSeeSecurity
       ? [{ id: 'security', icon: ShieldAlert, label: loc('الأمان', 'Security', 'ئاسایش'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') }]
       : []),
-    { id: 'home_settings', icon: LayoutList, label: loc('إعدادات الرئيسية', 'Home settings'), ...section('settings', 'الإعدادات', 'Settings', 'ڕێکخستنەکان') },
-    { id: 'wallet_settings', icon: Wallet, label: loc('إعدادات المحفظة', 'Wallet settings'), ...section('settings', 'الإعدادات', 'Settings') },
-    { id: 'store_settings', icon: Settings, label: loc('إعدادات المتجر', 'Store settings'), ...section('settings', 'الإعدادات', 'Settings') },
-    { id: 'delivery_pricing', icon: Truck, label: loc('إدارة التوصيل', 'Delivery management', 'بەڕێوەبردنی گەیاندن'), ...section('settings', 'الإعدادات', 'Settings') },
+    { id: 'home_settings', icon: LayoutList, label: loc('إعدادات الرئيسية', 'Home settings', 'ڕێکخستنەکانی پەڕەی سەرەکی'), ...section('settings', 'الإعدادات', 'Settings', 'ڕێکخستنەکان') },
+    { id: 'wallet_settings', icon: Wallet, label: loc('إعدادات المحفظة', 'Wallet settings', 'ڕێکخستنەکانی جزدان'), ...section('settings', 'الإعدادات', 'Settings', 'ڕێکخستنەکان') },
+    { id: 'store_settings', icon: Settings, label: loc('إعدادات المتجر', 'Store settings', 'ڕێکخستنەکانی فرۆشگا'), ...section('settings', 'الإعدادات', 'Settings', 'ڕێکخستنەکان') },
+    { id: 'delivery_pricing', icon: Truck, label: loc('إدارة التوصيل', 'Delivery management', 'بەڕێوەبردنی گەیاندن'), ...section('settings', 'الإعدادات', 'Settings', 'ڕێکخستنەکان') },
     // Not "notification settings" — there is nothing to set here. It answers
     // one question the owner actually has: will an order confirmation reach
     // the customer today, on each of the three channels.
-    { id: 'channels', icon: MessageCircle, label: loc('قنوات التواصل', 'Customer channels', 'کەناڵەکانی پەیوەندی'), ...section('settings', 'الإعدادات', 'Settings') },
+    { id: 'channels', icon: MessageCircle, label: loc('قنوات التواصل', 'Customer channels', 'کەناڵەکانی پەیوەندی'), ...section('settings', 'الإعدادات', 'Settings', 'ڕێکخستنەکان') },
   ];
 
   return (

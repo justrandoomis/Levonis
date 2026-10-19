@@ -135,9 +135,12 @@ const nowIso = () => new Date().toISOString();
 /**
  * The public view of a request.
  *
- * Note what is absent: no customer email, phone, address or user id. A
- * merchant browsing the board sees a job to quote on and a display name,
- * which is everything they need to decide whether to offer.
+ * Note what is absent: no customer name, username, avatar, email, phone,
+ * address or user id. A merchant browsing the board sees a job to quote on,
+ * which is everything they need to decide whether to offer (acceptance 34,
+ * GAP-MAP conflict 62: the display name went too). The customer and a
+ * workshop actually dealing with them read the name on their own authorised
+ * reads — `partyRequest` below, the order and the conversation.
  *
  * Exported for the community page's list (worker/routes/community.ts), so the
  * two lists of the same rows answer with ONE whitelist.
@@ -160,7 +163,6 @@ export function publicRequest(r: Record<string, unknown>) {
     offer_count: r.offer_count,
     created_at: r.created_at,
     expires_at: r.expires_at,
-    customer_name: r.customer_name ?? null,
     file_count: r.file_count ?? 0,
     /** The job's version. It moves when a published request's terms change
      *  after an offer priced it; that offer is then superseded (0116, 0130). */
@@ -169,6 +171,16 @@ export function publicRequest(r: Record<string, unknown>) {
      *  private `notes` (where the old wizard stashed a link) is never shown. */
     customer_notes: r.customer_notes ?? '',
   };
+}
+
+/**
+ * THE PARTIES' VIEW: the public whitelist plus the customer's display name —
+ * for the customer themselves and for the workshop dealing with them (an
+ * accepted offer, or the store a direct request was addressed to). Never for
+ * a reader of the board.
+ */
+export function partyRequest(r: Record<string, unknown>) {
+  return { ...publicRequest(r), customer_name: (r.customer_name as string | null | undefined) ?? null };
 }
 
 /** A JSON id list column, read defensively. */
@@ -276,7 +288,6 @@ marketplaceRoutes.get('/requests', requireCommunityOpen, async (c) => {
     `SELECT r.id, r.title, r.description, r.category, r.quantity, r.material, r.color,
             r.dimensions, r.budget_iqd, r.deadline, r.governorate, r.delivery_pref,
             r.state, r.offer_count, r.created_at, r.expires_at,
-            u.name AS customer_name,
             (SELECT COUNT(*) FROM community_request_files f WHERE f.request_id = r.id) AS file_count
        FROM community_requests r JOIN users u ON u.id = r.customer_id
       WHERE ${requestBoardVisible('?1', '?2')}
@@ -309,14 +320,13 @@ marketplaceRoutes.get('/requests/:id', requireCommunityOpen, async (c) => {
   // customer who made it and to the merchant actually engaged on it. Expiry is
   // part of the question (audit 03 §10 I): the board hid an expired request
   // while this page still served it to anyone holding the link.
-  if (!isOwner && !onPublicBoard(r as unknown as RequestForAccess)) {
-    // …and the store a DIRECT request is addressed to (0151): it was sent to
-    // them to quote, and is nobody else's to read.
-    const engaged = user
-      ? (await isEngagedMerchant(c.env.DB, id, user.id)) || (await isDirectMerchant(c.env.DB, id, user.id))
-      : false;
-    if (!engaged) throw notFound('Request not found');
-  }
+  // …and the store a DIRECT request is addressed to (0151): it was sent to
+  // them to quote, and is nobody else's to read. The same answer decides who
+  // reads the customer's NAME (acceptance 34): the parties, never the board.
+  const party =
+    isOwner ||
+    (!!user && ((await isEngagedMerchant(c.env.DB, id, user.id)) || (await isDirectMerchant(c.env.DB, id, user.id))));
+  if (!party && !onPublicBoard(r as unknown as RequestForAccess)) throw notFound('Request not found');
 
   const files = await c.env.DB.prepare(
     'SELECT id, file_name, content_type, size_bytes, kind, preview_key FROM community_request_files WHERE request_id = ?'
@@ -331,7 +341,7 @@ marketplaceRoutes.get('/requests/:id', requireCommunityOpen, async (c) => {
 
   return c.json({
     success: true,
-    request: publicRequest(r),
+    request: party ? partyRequest(r) : publicRequest(r),
     // R2 keys are NEVER returned. What a caller gets is a route on this
     // worker, which re-derives their right to the file on every read — so a
     // link shared after the request closes simply stops working.
@@ -667,7 +677,8 @@ marketplaceRoutes.get('/my-requests', requireAuth, async (c) => {
        FROM community_requests r JOIN users u ON u.id = r.customer_id
       WHERE r.customer_id = ? ORDER BY r.created_at DESC LIMIT 50`
   ).bind(user.id).all();
-  return c.json({ success: true, requests: results.map(publicRequest) });
+  // The customer's own list: theirs, so the parties' view.
+  return c.json({ success: true, requests: results.map(partyRequest) });
 });
 
 /**

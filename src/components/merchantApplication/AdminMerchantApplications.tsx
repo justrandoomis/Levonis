@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, BadgeCheck, Clock, Eye, EyeOff, RefreshCw, ShieldCheck, Store, UserCheck, UserX } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, Clock, Eye, EyeOff, RefreshCw, ShieldCheck, Store, UserX } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 import { Overlay } from '../ui/Overlay';
@@ -11,9 +11,11 @@ import {
   type ReviewAction,
   type ReviewDetail,
   type ReviewQueueRow,
-  type ReviewerRow,
 } from '../../lib/merchantApplication';
 import { REVIEWER_STRINGS } from './reviewerStrings';
+// The owner's list of who reviews, and an assistant's MERCHANT_REVIEW grant (owner decision C5) —
+// one component for the three desks a grant opens (DECISIONS row 261).
+import { ReviewerGrants } from '../adminScope/CapabilityGrants';
 
 /**
  * «طلبات اعتماد التجار» — Admin → الإدارة (Community V3 push 1.2, DECISIONS
@@ -473,77 +475,5 @@ export default function AdminMerchantApplications() {
         </Overlay>
       )}
     </div>
-  );
-}
-
-/** The owner's list of who reviews, and an assistant's MERCHANT_REVIEW grant (owner decision C5). */
-function ReviewerGrants() {
-  const { lang } = useLanguage();
-  const t = REVIEWER_STRINGS[lang] ?? REVIEWER_STRINGS.ar;
-  const rl = refusalLang(lang);
-  const [rows, setRows] = useState<ReviewerRow[] | null>(null);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      const data = await reviewApi.reviewers();
-      setRows(data.reviewers);
-      setError('');
-    } catch (err) {
-      setError(apiRefusal(err, rl, t.loadError));
-    }
-  }, [rl, t.loadError]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const change = async (row: ReviewerRow, grant: boolean) => {
-    setBusy(row.id);
-    setError('');
-    try {
-      if (grant) await reviewApi.grant(row.id, newOperationId());
-      else await reviewApi.revoke(row.id);
-      await load();
-    } catch (err) {
-      setError(apiRefusal(err, rl, t.actionError));
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  return (
-    <section className="mt-8 lv-surface p-4" data-merchant-review-grants>
-      <h3 className="font-bold text-[14px] mb-1">{t.grantsTitle}</h3>
-      <p className="text-[12px] text-text-muted mb-3 leading-relaxed">{t.grantsHint}</p>
-      {error && <p className="lv-alert lv-alert-danger text-[12.5px] text-text-primary mb-3">{error}</p>}
-      {rows && rows.length === 0 && <p className="text-text-muted text-[12.5px]">{t.noAssistants}</p>}
-      <ul className="space-y-2">
-        {(rows ?? []).map((r) => (
-          <li key={r.id} className="flex items-center justify-between gap-2 flex-wrap text-[13px]">
-            <span className="min-w-0 truncate">
-              {r.name || r.username || r.id}
-              {r.username && <span className="text-text-muted" dir="ltr"> @{r.username}</span>}
-            </span>
-            {r.by_default ? (
-              <span className="text-text-muted text-[12px]">{t.byDefault}</span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <span className="text-[12px] text-text-secondary">{r.granted ? t.granted : t.notGranted}</span>
-                <button
-                  onClick={() => void change(r, !r.granted)}
-                  disabled={busy === r.id}
-                  className={`lv-button lv-button-sm ${r.granted ? 'lv-button-secondary' : 'lv-button-primary'}`}
-                >
-                  {r.granted ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
-                  {r.granted ? t.revoke : t.grant}
-                </button>
-              </span>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }

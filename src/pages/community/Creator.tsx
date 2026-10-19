@@ -11,7 +11,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ArrowLeft, ArrowRight, BadgeCheck, Ban, Flag, Globe, MoreHorizontal, Pencil, Plus, UserRound, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BadgeCheck, Ban, Flag, Globe, MoreHorizontal, Pencil, Plus, ShieldCheck, UserRound, Volume2, VolumeX } from 'lucide-react';
 import { IconButton } from '../../components/ui/Button';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
@@ -27,6 +27,7 @@ import LoadMore from '../../components/listing/LoadMore';
 import StoreCard from '../../components/community/hub/StoreCard';
 import type { CommunityStore } from '../../components/community/hub/api';
 import { communityHubApi } from '../../components/community/hub/api';
+import { useHubStrings } from '../../components/community/hub/strings';
 import { useSignInPrompt } from '../../lib/guest';
 import { toast } from '../../components/ui/Toast';
 import ProjectCard, { ProjectCardSkeleton } from '../../components/community/projects/ProjectCard';
@@ -71,6 +72,8 @@ export default function CreatorPage() {
   const { signIn } = useSignInPrompt();
   const s = useProjectStrings();
   const ss = useSocialStrings();
+  /** The community cards' words — «مزوّد معتمد» is said one way on every surface. */
+  const hub = useHubStrings();
   const social = useSocial();
   const m = useMotion();
   const [creator, setCreator] = useState<Creator | null>(null);
@@ -211,9 +214,13 @@ export default function CreatorPage() {
                 <p className="mt-0.5 text-[13px] text-text-muted" dir="ltr">
                   @{creator.username}
                 </p>
-                {(creator.badges.verified_merchant || creator.badges.pro || creator.badges.premium) && (
+                {(creator.badges.verified_merchant || creator.badges.approved_provider === true || creator.badges.pro || creator.badges.premium) && (
                   <p className="mt-2 flex flex-wrap gap-1.5">
                     {creator.badges.verified_merchant && <Badge icon={<BadgeCheck className="h-3.5 w-3.5" />}>{s.verifiedMerchant}</Badge>}
+                    {/* «مزوّد معتمد» (C4): its own mark, never a second «verified». */}
+                    {creator.badges.approved_provider === true && (
+                      <Badge icon={<ShieldCheck className="h-3.5 w-3.5" />} mark="approved-provider">{hub.approvedProvider}</Badge>
+                    )}
                     {creator.badges.pro && <Badge>PRO</Badge>}
                     {creator.badges.premium && <Badge>PREMIUM</Badge>}
                   </p>
@@ -297,9 +304,9 @@ export default function CreatorPage() {
 
 // ------------------------------------------------------------------- pieces
 
-function Badge({ icon, children }: { icon?: React.ReactNode; children: React.ReactNode }) {
+function Badge({ icon, mark, children }: { icon?: React.ReactNode; mark?: 'approved-provider'; children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-border-subtle/60 bg-surface px-2 py-0.5 text-[11px] font-semibold text-text-secondary">
+    <span data-approved-provider={mark === 'approved-provider' ? '' : undefined} className="inline-flex items-center gap-1 rounded-full border border-border-subtle/60 bg-surface px-2 py-0.5 text-[11px] font-semibold text-text-secondary">
       {icon && <span aria-hidden="true" className="text-gold">{icon}</span>}
       {children}
     </span>

@@ -27,6 +27,8 @@ export interface StoreMerchantSummary {
   id: string;
   name: string;
   verified: boolean;
+  /** «مزوّد معتمد» (owner decision C4): approved and not suspended — separate from `verified`. */
+  approved_provider?: boolean;
   /** Active PRO membership status, independent of identity verification. */
   pro_badge?: boolean;
   premium_badge?: boolean;
@@ -768,7 +770,8 @@ export interface CommunityOverview {
   /** Store-product sales, cancelled ones excluded. */
   store_sales?: { total: number; gross: number; fees: number | null };
   escrows: Array<{ state: string; n: number; total: number }>;
-  complaints: { total: number; open: number };
+  /** Null for an admin outside the disputes desk (DECISIONS row 261): the counter is the desk's. */
+  complaints: { total: number; open: number } | null;
 }
 
 export interface AdminMerchantRow {

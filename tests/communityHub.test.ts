@@ -96,6 +96,7 @@ test('a product card opens its store\'s product page; a pre-store listing with n
     name: 'Ali 3D Workshop',
     logoUrl: '/files/community/o1/logo.webp',
     url: '/community/store/s1',
+    approved_provider: true,
   });
   assert.equal(dragon.in_stock, true);
   assert.equal(byId.get('p2')!.in_stock, false, 'a tracked product with nothing left is «نفد»');
@@ -237,8 +238,9 @@ test('the request list says what the job is, with the board\'s whitelist and not
   assert.equal(r1.governorate, 'baghdad');
   assert.equal(r1.offer_count, 3);
   assert.equal(r1.file_count, 2);
-  assert.equal(r1.customer_username, 'hadi', 'the old field still answers');
-  for (const secret of ['notes', 'customer_id', 'email', 'phone']) assert.equal(secret in r1, false, `${secret} is never served`);
+  // Acceptance 34 / GAP-MAP conflict 62: the job, never the person who posted it.
+  for (const secret of ['notes', 'customer_id', 'customer_name', 'customer_username', 'email', 'phone']) assert.equal(secret in r1, false, `${secret} is never served`);
+  assert.ok(!JSON.stringify(body).includes('hadi') && !JSON.stringify(body).includes('Hadi'), 'neither the name nor the username');
   assert.ok(!JSON.stringify(body).includes('private link'));
   assert.ok(!JSON.stringify(body).includes('requests/buyer/'), 'no file key');
 

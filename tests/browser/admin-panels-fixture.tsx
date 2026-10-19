@@ -21,6 +21,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { LanguageProvider } from '../../src/LanguageContext';
+import { AuthContext } from '../../src/AuthContext';
 import AdminKyc from '../../src/components/AdminKyc';
 import '../../src/index.css';
 
@@ -69,13 +70,22 @@ class Catch extends React.Component<{ name: string; children: React.ReactNode },
   }
 }
 
+/**
+ * A full admin on the KYC desk (DECISIONS row 261: `can_review_kyc`), so the
+ * panel mounts its console — the thing this fixture exists to prove opens.
+ * Without the hint AdminKyc shows the refusal instead of the queue.
+ */
+const STAFF = { id: 'usr_fixture_admin', role: 'admin', admin_scope: 'full', is_owner: false, can_review_kyc: true };
+
 function Fixture() {
   return (
-    <div style={{ background: '#000', minHeight: '100vh' }}>
-      <Catch name="kyc">
-        <AdminKyc />
-      </Catch>
-    </div>
+    <AuthContext.Provider value={{ user: STAFF } as unknown as React.ContextType<typeof AuthContext>}>
+      <div style={{ background: '#000', minHeight: '100vh' }}>
+        <Catch name="kyc">
+          <AdminKyc />
+        </Catch>
+      </div>
+    </AuthContext.Provider>
   );
 }
 

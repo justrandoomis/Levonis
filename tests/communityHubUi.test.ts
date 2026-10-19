@@ -264,12 +264,10 @@ const boardRow = (i: number) => ({
   offer_count: i,
   created_at: new Date(Date.now() - i * 60_000).toISOString(),
   expires_at: null,
-  customer_name: null,
   file_count: 0,
   revision: 1,
   customer_notes: '',
   status: 'open',
-  customer_username: null,
   match_score: 80,
 });
 const rail = (me: RailMe, viewer = 'u_eve') =>

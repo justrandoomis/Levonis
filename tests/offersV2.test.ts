@@ -670,7 +670,10 @@ test('?for=me reads the open board, not the workshop\'s whole match history: the
   for (const sql of reads) {
     const plan = (raw.prepare(`EXPLAIN QUERY PLAN ${sql}`).all() as Array<{ detail: string }>).map((r) => r.detail);
     assert.match(plan[0], /^SEARCH r USING INDEX idx_community_requests_state/, `driven from the board: ${plan.join(' | ')}`);
-    assert.ok(plan.some((d) => /SEARCH vm EXISTS USING INDEX idx_request_matches_pair \(request_id=\? AND merchant_id=\?\)/.test(d)), `the verdict is a pair lookup: ${plan.join(' | ')}`);
+    // SQLite labels the verdict's EXISTS either inline («SEARCH vm EXISTS …») or as its own correlated
+    // subquery («SEARCH vm USING INDEX …»), depending on the rest of the statement (the board no longer
+    // joins `users`, acceptance 34); either way it must be the pair lookup.
+    assert.ok(plan.some((d) => /SEARCH vm (?:EXISTS )?USING INDEX idx_request_matches_pair \(request_id=\? AND merchant_id=\?\)/.test(d)), `the verdict is a pair lookup: ${plan.join(' | ')}`);
     assert.ok(!plan.some((d) => /idx_request_matches_merchant/.test(d)), `a scan of the workshop's match history: ${plan.join(' | ')}`);
   }
 });

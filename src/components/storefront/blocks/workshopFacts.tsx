@@ -11,14 +11,16 @@
 import { useLanguage } from '../../../LanguageContext';
 import { useStoreTheme } from '../StoreTheme';
 import type { StoreWorkshop } from './Hero';
+import type { StorefrontStore } from '../types';
 
 /**
  * THE WORKSHOP'S WORDS — Arabic, English and hand-written Sorani, every key in
  * all three (D6). They live here, in this small lazy chunk, and not in
  * ../strings.ts ON PURPOSE: that table ships with every store visit (the
  * storefront closure, tests/bundleBudget.test.ts), and these words are needed
- * only by a store whose read carries workshop facts — the hero's facts row
- * (`WorkshopFacts` below) and the stats block's two figures (./Stats.tsx).
+ * only by a store whose read carries workshop facts or the «مزوّد معتمد» mark —
+ * the hero's facts row (`WorkshopFacts` below) and the stats block's two
+ * figures (./Stats.tsx).
  */
 export const WORKSHOP_WORDS = {
   ar: {
@@ -30,6 +32,8 @@ export const WORKSHOP_WORDS = {
       n === 1 ? 'عادةً خلال يوم' : n === 2 ? 'عادةً خلال يومين' : n % 100 >= 3 && n % 100 <= 10 ? `عادةً خلال ${n} أيام` : `عادةً خلال ${n} يومًا`,
     turnaroundStat: 'أيام للتنفيذ عادةً',
     buildStat: 'أكبر حجم طباعة (مم)',
+    /** «مزوّد معتمد» (owner decision C4) — the same words as the community cards' (hub/strings.ts `approvedProvider`). */
+    approved: 'مزوّد معتمد',
   },
   en: {
     label: 'About the workshop',
@@ -39,6 +43,7 @@ export const WORKSHOP_WORDS = {
     usually: (n: number) => (n === 1 ? 'Usually within a day' : `Usually within ${n} days`),
     turnaroundStat: 'Usual turnaround (days)',
     buildStat: 'Largest print (mm)',
+    approved: 'Approved provider',
   },
   ckb: {
     label: 'دەربارەی وۆرکشۆپەکە',
@@ -48,6 +53,7 @@ export const WORKSHOP_WORDS = {
     usually: (n: number) => `بە زۆری لە ماوەی ${n} ڕۆژدا`,
     turnaroundStat: 'ڕۆژی جێبەجێکردن بە زۆری',
     buildStat: 'گەورەترین قەبارەی چاپ (میلیمەتر)',
+    approved: 'دابینکەری پەسەندکراو',
   },
 } as const;
 
@@ -69,8 +75,16 @@ export function buildFigure(build: NonNullable<StoreWorkshop['build']>, sep = ' 
  * chips. ONE line of a fixed height (the frame Hero.tsx holds while this
  * chunk is on its way is the same 28 px), scrolling sideways — edge to edge —
  * on a narrow phone rather than wrapping into a second line nobody reserved.
+ *
+ * «مزوّد معتمد» (owner decision C4) leads the row when the store read says
+ * `merchant.approved_provider`: a reviewer approved the shop's merchant (the
+ * server derives it from the approval stamp alone). Its own chip, never the
+ * «متجر موثّق» one. A shop with the mark and no facts gets the mark alone
+ * (`workshop` null). The store is handed over whole so the hero's own chunk
+ * names the flag once (tests/bundleBudget.test.ts counts every byte of it).
  */
-export function WorkshopFacts({ workshop }: { workshop: StoreWorkshop }) {
+export function WorkshopFacts({ workshop, store }: { workshop: StoreWorkshop | null; store?: Pick<StorefrontStore, 'merchant'> }) {
+  const approved = store?.merchant.approved_provider === true;
   const { lang } = useLanguage();
   const { accent } = useStoreTheme();
   const w = workshopWords(lang);
@@ -79,23 +93,28 @@ export function WorkshopFacts({ workshop }: { workshop: StoreWorkshop }) {
   return (
     // Edge to edge on a phone (`-mx-4 px-4`, the column's own gutter): a chip cut by the screen's edge says «there is more».
     <ul aria-label={w.label} className="-mx-4 flex h-7 items-center gap-1.5 overflow-x-auto px-4 hide-scrollbar" data-store-workshop>
-      {workshop.custom && (
+      {approved && (
+        <li className={`${chip} font-medium ${accent.chip}`} data-approved-provider>
+          {w.approved}
+        </li>
+      )}
+      {workshop?.custom && (
         <li className={`${chip} font-medium ${accent.chip}`} data-store-workshop-fact="custom">
           {w.custom}
         </li>
       )}
-      {workshop.technologies.map((t) => (
+      {workshop?.technologies.map((t) => (
         <li key={t} className={quiet} data-store-workshop-fact={t}>
           {t === 'fdm' ? 'FDM' : w.resin}
         </li>
       ))}
-      {workshop.build && (
+      {workshop?.build && (
         <li className={quiet} data-store-workshop-fact="build">
           {/* The figure is a left-to-right island (LRI … PDI): «256 × 256 × 300» must not run backwards in Arabic. */}
           {w.upTo(`\u2066${buildFigure(workshop.build)}\u2069`)}
         </li>
       )}
-      {workshop.turnaround !== null && (
+      {workshop && workshop.turnaround !== null && (
         <li className={quiet} data-store-workshop-fact="turnaround">
           {w.usually(workshop.turnaround)}
         </li>

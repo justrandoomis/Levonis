@@ -123,14 +123,20 @@ export type ReviewAction = 'start-review' | 'request-changes' | 'approve' | 'rej
  */
 export type ReviewDecisionAnswer = Pick<ReviewQueueRow, 'id' | 'state' | 'revision'> & Partial<ReviewQueueRow>;
 
+/** The owner's grants (C5; DECISIONS row 261): each opens one desk to an assistant admin, nothing financial. */
+export type CapabilityKey = 'MERCHANT_REVIEW' | 'KYC_REVIEW' | 'DISPUTES';
+
 export interface ReviewerRow {
   id: string;
   username: string | null;
   name: string | null;
   scope: 'assistant' | 'full';
   by_default: boolean;
+  /** MERCHANT_REVIEW. */
   granted: boolean;
   granted_at: string | null;
+  /** Every capability, keyed; absent from a server older than row 261. */
+  grants?: Partial<Record<CapabilityKey, boolean>>;
 }
 
 const REVIEW_BASE = '/api/admin/merchant-applications';
@@ -146,12 +152,15 @@ export const reviewApi = {
     body: { revision: number; operation_id: string; reason_public?: string; note_internal?: string; revoke?: true }
   ) => api.post<{ success: true; replay: boolean; application: ReviewDecisionAnswer }>(`${REVIEW_BASE}/${encodeURIComponent(id)}/${action}`, body),
   reviewers: () => api.get<{ success: true; available: boolean; reviewers: ReviewerRow[] }>(`${REVIEW_BASE}/reviewers`),
-  grant: (userId: string, operationId: string) =>
+  grant: (userId: string, operationId: string, grantKey: CapabilityKey = 'MERCHANT_REVIEW') =>
     api.post<{ success: true; granted: boolean; already: boolean }>(`${REVIEW_BASE}/reviewers/${encodeURIComponent(userId)}/grant`, {
       operation_id: operationId,
+      grant_key: grantKey,
     }),
-  revoke: (userId: string) =>
-    api.post<{ success: true; granted: boolean; already: boolean }>(`${REVIEW_BASE}/reviewers/${encodeURIComponent(userId)}/revoke`, {}),
+  revoke: (userId: string, grantKey: CapabilityKey = 'MERCHANT_REVIEW') =>
+    api.post<{ success: true; granted: boolean; already: boolean }>(`${REVIEW_BASE}/reviewers/${encodeURIComponent(userId)}/revoke`, {
+      grant_key: grantKey,
+    }),
 };
 
 // -------------------------------------------------------------- the rules

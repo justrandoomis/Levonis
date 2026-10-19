@@ -501,12 +501,10 @@ export interface BoardForMeRow {
   offer_count: number;
   created_at: string;
   expires_at: string | null;
-  customer_name: string | null;
   file_count: number;
   revision: number;
   customer_notes: string;
   status: string;
-  customer_username: string | null;
   match_score: number;
 }
 

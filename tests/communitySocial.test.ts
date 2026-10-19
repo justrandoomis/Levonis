@@ -457,9 +457,10 @@ test('the creators list: only accounts with a page, searched and featured, with 
   assert.deepEqual(sara.viewer, { following: true });
   assert.equal(sara.store, null);
   assert.equal(sara.url, '/u/sara');
-  assert.deepEqual(sara.badges, { pro: false, premium: false, verified_merchant: false });
+  assert.deepEqual(sara.badges, { pro: false, premium: false, verified_merchant: false, approved_provider: false });
   const ali = list.creators[1];
   assert.equal(ali.store.slug, 'ali3d');
+  assert.equal(ali.badges.approved_provider, true, '«مزوّد معتمد» (C4): an approved merchant');
   assert.deepEqual(ali.stats, { projects: 0, followers: 2 });
   assert.equal(JSON.stringify(list).includes('@x.co'), false, 'no email anywhere');
 

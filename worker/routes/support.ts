@@ -72,6 +72,7 @@ import { getBalances } from '../lib/wallet';
 import { ENTITLEMENT_MINIMUM_TIER, benefits, getTierStatus, type MembershipEntitlement } from '../lib/entitlements';
 import { bnplEligibility } from '../lib/bnpl';
 import { canMoveMoney } from '../lib/adminScope';
+import { canReviewKyc, kycReviewRefusal } from '../lib/staffCapabilities';
 import { maskSerial } from '../lib/deviceOps';
 import { tradedInSql, unitCoverage, unitIdentity } from '../lib/deviceCustody';
 import { serialAssignmentsInstalled } from '../lib/serialPolicy';
@@ -3061,6 +3062,12 @@ supportRoutes.patch('/admin/tickets/:id', async (c) => {
  * Member search/filter for the PRO-operations console. Returns ONLY the
  * fields the console shows — never password hashes, encrypted identity
  * fields, KYC evidence keys, or internal notes.
+ *
+ * THE KYC STATE IS THE KYC DESK'S (P1-02, DECISIONS row 261; acceptance 07).
+ * An admin outside it (`canReviewKyc` false: an assistant without the owner's
+ * KYC_REVIEW grant) gets no `kyc_state` and may not filter by it — a
+ * `?kyc=submitted` list would rebuild the queue the desk's door closes — and
+ * kyc_cases is never read for them.
  */
 supportRoutes.get('/admin/members', async (c) => {
   const q = str(c.req.query('q'), 'q', { max: 100, required: false });
@@ -3069,12 +3076,14 @@ supportRoutes.get('/admin/members', async (c) => {
   const kyc = str(c.req.query('kyc'), 'kyc', { max: 20, required: false });
   const restriction = str(c.req.query('restriction'), 'restriction', { max: 10, required: false });
   const expiryDays = int(c.req.query('expiry_days'), 'expiry_days', { min: 1, max: 365, def: 0 });
+  const kycDesk = await canReviewKyc(c.env, c.get('user'));
+  if (kyc && !kycDesk) throw kycReviewRefusal();
 
   const nowIso = new Date().toISOString();
   const inner = `
     SELECT u.id, u.email, u.username, u.name, u.created_at,
            m.tier AS m_tier, m.state AS m_state, m.expires_at AS m_expires,
-           (SELECT k.state FROM kyc_cases k WHERE k.user_id = u.id ORDER BY k.created_at DESC LIMIT 1) AS kyc_state,
+           ${kycDesk ? '(SELECT k.state FROM kyc_cases k WHERE k.user_id = u.id ORDER BY k.created_at DESC LIMIT 1)' : 'NULL'} AS kyc_state,
            (SELECT COUNT(*) FROM restriction_cases r WHERE r.user_id = u.id AND r.state = 'active') AS active_restrictions,
            (SELECT COUNT(*) FROM approved_addresses a WHERE a.user_id = u.id AND a.state = 'approved') AS approved_addresses
       FROM users u
@@ -3123,6 +3132,7 @@ supportRoutes.get('/admin/members', async (c) => {
   const { results } = await c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>();
   return c.json({
     success: true,
+    can_review_kyc: kycDesk,
     members: results.map((r) => ({
       id: r.id,
       email: r.email,
@@ -3133,7 +3143,7 @@ supportRoutes.get('/admin/members', async (c) => {
       membership_state:
         r.m_state === 'active' && typeof r.m_expires === 'string' && r.m_expires < nowIso ? 'expired' : (r.m_state ?? 'none'),
       expires_at: r.m_expires ?? null,
-      kyc_state: r.kyc_state ?? null,
+      ...(kycDesk ? { kyc_state: r.kyc_state ?? null } : {}),
       active_restrictions: Number(r.active_restrictions) || 0,
       has_approved_address: (Number(r.approved_addresses) || 0) > 0,
     })),
@@ -3181,6 +3191,12 @@ function restrictionPublic(r: RestrictionRow) {
  * Member detail: subscription payment/term, identity STATE (kyc_cases read —
  * no decrypted fields, no evidence keys), benefit-eligibility context, BNPL
  * debt and live BNPL eligibility, plus restriction cases.
+ *
+ * IDENTITY AND ADDRESS REVIEW ARE THE KYC DESK'S (P1-02, DECISIONS row 261;
+ * acceptance 07). For an admin outside it (`canReviewKyc` false) kyc_cases is
+ * never read and `kyc_cases` is absent, and `approved_addresses` carries only
+ * the current approved version — never a pending request, a rejected one or a
+ * reviewer's reason, which is what the desk's address queue serves.
  */
 supportRoutes.get('/admin/members/:userId', async (c) => {
   const userId = c.req.param('userId');
@@ -3206,6 +3222,7 @@ supportRoutes.get('/admin/members/:userId', async (c) => {
    * renders «محجوب» where nothing arrived, so no screen changes here.
    */
   const financial = canMoveMoney(c.env, c.get('user'));
+  const kycDesk = await canReviewKyc(c.env, c.get('user'));
   const user = await db
     .prepare('SELECT id, email, username, name, role, created_at FROM users WHERE id = ?')
     .bind(userId)
@@ -3221,21 +3238,32 @@ supportRoutes.get('/admin/members/:userId', async (c) => {
       )
       .bind(userId)
       .all<Record<string, unknown>>(),
-    // Identity STATUS only — never the encrypted identity fields or evidence keys.
-    db
-      .prepare(
-        `SELECT id, case_type, doc_type, state, reason, submitted_at, decided_at, retention_until, created_at
-           FROM kyc_cases WHERE user_id = ? ORDER BY created_at DESC LIMIT 20`
-      )
-      .bind(userId)
-      .all<Record<string, unknown>>(),
-    db
-      .prepare(
-        `SELECT id, version, state, name, address, landmark, reason, requested_at, approved_at
-           FROM approved_addresses WHERE user_id = ? ORDER BY version DESC LIMIT 20`
-      )
-      .bind(userId)
-      .all<Record<string, unknown>>(),
+    // Identity STATUS only — never the encrypted identity fields or evidence
+    // keys — and only for the KYC desk.
+    kycDesk
+      ? db
+          .prepare(
+            `SELECT id, case_type, doc_type, state, reason, submitted_at, decided_at, retention_until, created_at
+               FROM kyc_cases WHERE user_id = ? ORDER BY created_at DESC LIMIT 20`
+          )
+          .bind(userId)
+          .all<Record<string, unknown>>()
+      : null,
+    kycDesk
+      ? db
+          .prepare(
+            `SELECT id, version, state, name, address, landmark, reason, requested_at, approved_at
+               FROM approved_addresses WHERE user_id = ? ORDER BY version DESC LIMIT 20`
+          )
+          .bind(userId)
+          .all<Record<string, unknown>>()
+      : db
+          .prepare(
+            `SELECT id, version, state, name, address, landmark, requested_at, approved_at
+               FROM approved_addresses WHERE user_id = ? AND state = 'approved' ORDER BY version DESC LIMIT 1`
+          )
+          .bind(userId)
+          .all<Record<string, unknown>>(),
     db.prepare('SELECT * FROM restriction_cases WHERE user_id = ? ORDER BY opened_at DESC LIMIT 50').bind(userId).all<RestrictionRow>(),
     db.prepare('SELECT state, credit_limit_iqd FROM bnpl_accounts WHERE user_id = ?').bind(userId).first<Record<string, unknown>>(),
     db
@@ -3275,6 +3303,7 @@ supportRoutes.get('/admin/members/:userId', async (c) => {
     // wallet and membership money, never a cost.
     can_view_financials: financial,
     can_move_money: financial,
+    can_review_kyc: kycDesk,
     member: {
       user: { id: user.id, email: user.email, username: user.username, name: user.name, role: user.role, created_at: user.created_at },
       // 1) Subscription payment/term — separate from everything else. The TERM
@@ -3284,8 +3313,9 @@ supportRoutes.get('/admin/members/:userId', async (c) => {
       memberships: financial
         ? memberships.results
         : memberships.results.map((m) => withoutMoney(m, 'price_paid_iqd')),
-      // 2) Identity status — states only, evidence stays in the KYC reviewer flow.
-      kyc_cases: kycCases.results,
+      // 2) Identity status — states only, evidence stays in the KYC reviewer
+      // flow; absent outside the KYC desk.
+      ...(kycCases ? { kyc_cases: kycCases.results } : {}),
       // 3) Benefit-eligibility context: independent of login/data access.
       benefit_context: {
         tier: tierStatus.tier,

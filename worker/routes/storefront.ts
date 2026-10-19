@@ -38,6 +38,7 @@ import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { storeBySlug, storeById, storeHiddenFromPublic, type StoreContext } from '../lib/merchantAuth';
 import { publicStoreUnavailable } from '../lib/merchantApproval';
+import { approvedProvider } from '../lib/merchantOps';
 import { storeTakesOrders } from '../lib/storeOrderOps';
 import { benefits, getTierStatus } from '../lib/entitlements';
 import { salesBadgeTier } from '../lib/salesBadge';
@@ -160,6 +161,10 @@ export async function publicStore(db: D1Database, ctx: StoreContext, rootDomain:
       id: m.id,
       name: m.name,
       verified: !!m.verified,
+      // «مزوّد معتمد» (owner decision C4): approved and not suspended, from the
+      // row's own stamp — separate from `verified`. A shop whose merchant is
+      // not public never reaches this body (`storeUnavailable`).
+      approved_provider: approvedProvider(m),
       pro_badge: benefits.proMerchantBadge(tier),
       // PREMIUM's own mark (0145); a PRO merchant shows the PRO badge alone.
       premium_badge: !benefits.proMerchantBadge(tier) && benefits.premiumBadge(tier),

@@ -18,6 +18,7 @@ import { publicRequest } from './marketplace';
 import { eligibleVerdictSql, publicWorkshopFacts } from '../lib/printMatchingStore';
 import { storeForUser } from '../lib/merchantAuth';
 import { merchantTakesNewWork } from '../lib/communityRequests';
+import { approvedProvider, approvedProviderSql } from '../lib/merchantOps';
 import {
   applicationRequiredRefusal,
   merchantApproved,
@@ -58,6 +59,12 @@ function merchantPublic(m: Record<string, unknown>, badges: { pro: Set<string>; 
     bio: m.bio,
     avatarUrl: m.avatar_key ? `/files/${m.avatar_key}` : null,
     verified: !!m.verified,
+    /**
+     * «مزوّد معتمد» (owner decision C4): a reviewer approved this merchant and
+     * they are not suspended — `approvedProvider`, the public predicate on the
+     * row's own `status` and `approved_at`. Separate from `verified` above.
+     */
+    approved_provider: approvedProvider(m),
     pro_badge: badges.pro.has(String(m.user_id)),
     /** PREMIUM's own mark in the community (0145) — never beside a PRO badge. */
     premium_badge: badges.premium.has(String(m.user_id)),
@@ -118,7 +125,15 @@ export function communityFeedProduct(p: Record<string, unknown>, root: string | 
     ...communityProductPublic(p),
     in_stock: !Number(p.track_stock) || Number(p.stock) > 0,
     url: `/community/store/${encodeURIComponent(storeSlug)}/p/${productSlug}`,
-    store: { id: storeId, slug: storeSlug, name: p.s_name ?? '', logoUrl: fileUrl(p.s_logo_key), url: storeUrl(storeSlug, root, storeId) },
+    store: {
+      id: storeId,
+      slug: storeSlug,
+      name: p.s_name ?? '',
+      logoUrl: fileUrl(p.s_logo_key),
+      url: storeUrl(storeSlug, root, storeId),
+      /** «مزوّد معتمد» (C4), read as `COMMUNITY_FEED_COLUMNS` selects it; a row read without it carries no mark. */
+      approved_provider: Number(p.m_approved_provider ?? 0) === 1,
+    },
   };
 }
 
@@ -198,6 +213,14 @@ export const COMMUNITY_PRODUCTS_FROM = `FROM community_products p
        JOIN merchant_stores s ON s.id = p.store_id`;
 
 /**
+ * A feed card's columns over `COMMUNITY_PRODUCTS_FROM`: the product, its
+ * store, and the merchant's «مزوّد معتمد» mark (C4) through the one public
+ * predicate. `schema` as `communityProductsVisible`'s.
+ */
+export const COMMUNITY_FEED_COLUMNS = (schema = true) =>
+  `p.*, s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo_key, ${approvedProviderSql('m', schema)} AS m_approved_provider`;
+
+/**
  * `schema` is false only on `withApprovalSchema`'s second try, on a database
  * without 0204: the merchant predicate is then FALSE, so the list is empty
  * (owner decision C11) instead of a 500 — or, worse, open.
@@ -231,7 +254,7 @@ communityRoutes.get('/products', async (c) => {
     const visibleCount = `${communityProductsVisible('?1', schema)} AND ${merchantBlockSql('?2', 'm')}`;
     return Promise.all([
       c.env.DB.prepare(
-        `SELECT p.*, s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo_key
+        `SELECT ${COMMUNITY_FEED_COLUMNS(schema)}
            ${from}
           WHERE ${visible}
             AND (?2 = '' OR p.created_at < ?2 OR (p.created_at = ?2 AND p.id < ?3))
@@ -371,7 +394,14 @@ communityRoutes.get('/merchants', async (c) => {
  * And the same FIELDS: the board's own whitelist (`publicRequest`), so a card
  * can say what the job is — quantity, material, budget, governorate, how many
  * offers — instead of «بانتظار العروض» over a request that already had three.
- * `status` and `customer_username` stay for a client that still reads them.
+ * `status` stays for a client that still reads it.
+ *
+ * NOBODY'S NAME (acceptance 34, GAP-MAP conflict 62): the list — and the
+ * workshop's own `?for=me` board, which is another account's read too —
+ * carries the job and never the person who posted it: no name, no username,
+ * no id, no avatar, no contact. `users` is not even joined. The customer and
+ * the workshop they deal with meet on their own authorised reads (the
+ * request page's party view, the order, the conversation).
  */
 // The board's visibility rule — shared with the request board and the public
 // API — is worker/lib/requestBoard.ts; re-exported for the public API's import.
@@ -433,11 +463,10 @@ communityRoutes.get('/requests', async (c) => {
     const fits = eligibleVerdictSql('r', '?6');
     const [{ results: rows }, total] = await Promise.all([
       c.env.DB.prepare(
-        `SELECT r.*, u.name AS customer_name, u.username AS customer_username,
+        `SELECT r.*,
                 (SELECT COUNT(*) FROM community_request_files f WHERE f.request_id = r.id) AS file_count,
                 (SELECT sm.score FROM community_request_matches sm WHERE sm.request_id = r.id AND sm.merchant_id = ?6) AS match_score
            FROM community_requests r
-           LEFT JOIN users u ON u.id = r.customer_id
           WHERE ${visible}
             AND r.customer_id <> ?7
             AND ${fits}
@@ -458,7 +487,6 @@ communityRoutes.get('/requests', async (c) => {
       requests: page.map((r) => ({
         ...publicRequest(r),
         status: r.status,
-        customer_username: r.customer_username ?? null,
         /** The engine's ranking of this job for THIS workshop — the reader's own number, nobody else's. */
         match_score: Number(r.match_score ?? 0) || 0,
       })),
@@ -469,9 +497,9 @@ communityRoutes.get('/requests', async (c) => {
   }
   const [{ results }, total] = await Promise.all([
     c.env.DB.prepare(
-      `SELECT r.*, u.name AS customer_name, u.username AS customer_username,
+      `SELECT r.*,
               (SELECT COUNT(*) FROM community_request_files f WHERE f.request_id = r.id) AS file_count
-         FROM community_requests r LEFT JOIN users u ON u.id = r.customer_id
+         FROM community_requests r
         WHERE ${visible}
           AND (?3 = '' OR r.created_at < ?3 OR (r.created_at = ?3 AND r.id < ?4))
         ORDER BY r.created_at DESC, r.id DESC LIMIT ?5`
@@ -482,11 +510,7 @@ communityRoutes.get('/requests', async (c) => {
   ]);
   return c.json({
     success: true,
-    requests: results.map((r) => ({
-      ...publicRequest(r),
-      status: r.status,
-      customer_username: r.customer_username ?? null,
-    })),
+    requests: results.map((r) => ({ ...publicRequest(r), status: r.status })),
     next_cursor: nextFeedCursor(results, limit),
     total: total ? Number(total.n) : null,
   });

@@ -19,6 +19,7 @@ import type { AppContext } from '../lib/types';
 import { requireAuth, badRequest, forbidden, notFound, oneOf, unavailable } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
+import { canHandleDisputes } from '../lib/staffCapabilities';
 import { recordStaffChatFileRead } from './chats';
 import { avifDimensions, rasterDimensions, stripWebpMetadata, validRasterDimensions } from '../lib/imageMetadata';
 import { mp4IsFastStart, sniffVideo } from '../lib/videoSniff';
@@ -311,11 +312,12 @@ uploadRoutes.post('/', async (c) => {
    * (worker/lib/uploadEntity.ts, shared with /api/uploads/sessions): product
    * media is staff-only; public store media needs a store (STORE_REQUIRED,
    * review W2-5 p3); a chat file needs a thread the uploader may write in; a
-   * support or complaint attachment needs the uploader's own ticket or
-   * complaint, or staff. Verified BEFORE a byte is read, so a key can never
+   * support attachment needs the uploader's own ticket or staff; a complaint
+   * attachment needs the uploader's own complaint or the disputes desk
+   * (DECISIONS row 261). Verified BEFORE a byte is read, so a key can never
    * name an entity the uploader was not entitled to write to.
    */
-  const entityId = await assertUploadEntity(c.env.DB, user, purpose, form.get('entity_id'));
+  const entityId = await assertUploadEntity(c.env.DB, user, purpose, form.get('entity_id'), c.env);
   const limits = await getSetting(c.env.DB, 'uploadLimits');
   const imageMax = Math.min(kindLimitBytes(limits, 'image'), SIMPLE_UPLOAD_HARD_CAP);
   const videoMax = Math.min(kindLimitBytes(limits, 'video'), SIMPLE_UPLOAD_HARD_CAP);
@@ -1254,9 +1256,13 @@ fileRoutes.get('/*', async (c) => {
        * key never reaches the reporter's screen for such a row, but "they
        * would have to guess it" is not a rule, so a file an internal note
        * names is refused to everyone but staff.
+       *
+       * "Staff" is the disputes desk (P1-02, DECISIONS row 261): the owner,
+       * a full admin, or an assistant holding the owner's DISPUTES grant. Any
+       * other admin is asked the reporter's question like anyone else.
        */
       const complaintId = key.split('/')[1] ?? '';
-      if (user.role !== 'admin') {
+      if (!(user.role === 'admin' && (await canHandleDisputes(c.env, user)))) {
         const own = await c.env.DB.prepare(
           `SELECT 1 AS x FROM community_complaints ct
             WHERE ct.id = ? AND ct.reporter_id = ?

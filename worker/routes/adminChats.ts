@@ -37,6 +37,7 @@ import type { AppContext, Env } from '../lib/types';
 import { requireAdmin, str } from '../lib/http';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { chatAttachmentKind } from './chats';
+import { canHandleDisputes } from '../lib/staffCapabilities';
 
 export const adminChatRoutes = new Hono<AppContext>();
 adminChatRoutes.use('*', requireAdmin);
@@ -113,8 +114,12 @@ export interface SupportInboxCounts {
  * THE THREE QUEUES IN ONE READ — the numbers the sidebar badge, the console's
  * tabs and the dashboard tile all show, from one function so the three can
  * never disagree about how many people are waiting.
+ *
+ * `complaints` is the caller's disputes scope (P1-02, DECISIONS row 261): an
+ * assistant without the owner's DISPUTES grant has no complaints desk, so its
+ * badge counts none rather than people it cannot open.
  */
-export async function supportInboxCounts(db: D1Database): Promise<SupportInboxCounts> {
+export async function supportInboxCounts(db: D1Database, complaints = true): Promise<SupportInboxCounts> {
   const row = await db
     .prepare(
       `SELECT
@@ -126,13 +131,14 @@ export async function supportInboxCounts(db: D1Database): Promise<SupportInboxCo
   return {
     tickets_waiting: Number(row?.tickets_waiting) || 0,
     chats_unread: Number(row?.chats_unread) || 0,
-    complaints_open: Number(row?.complaints_open) || 0,
+    complaints_open: complaints ? Number(row?.complaints_open) || 0 : 0,
   };
 }
 
 adminChatRoutes.get('/summary', async (c) => {
   c.header('Cache-Control', 'private, no-store');
-  return c.json({ success: true, ...(await supportInboxCounts(c.env.DB)) });
+  const complaints = await canHandleDisputes(c.env, c.get('user'));
+  return c.json({ success: true, ...(await supportInboxCounts(c.env.DB, complaints)) });
 });
 
 /**

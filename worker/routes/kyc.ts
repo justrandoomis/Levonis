@@ -20,6 +20,7 @@ import { sniff } from './uploads';
 import { getMediaObject, storeMedia } from '../lib/mediaStorage';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { getTierStatus } from '../lib/entitlements';
+import { requireKycReviewer } from '../lib/staffCapabilities';
 
 /**
  * PRO KYC (final-phase brief §9) + approved-address versioning.
@@ -176,6 +177,12 @@ function latestCase(db: D1Database, userId: string, caseType: 'identity' | 'phon
 export const kycRoutes = new Hono<AppContext>();
 kycRoutes.use('*', requireAuth);
 kycRoutes.use('/admin/*', requireAdmin);
+// THE KYC DESK'S OWN DOOR (P1-02, DECISIONS row 261; spec acceptance 07): the
+// owner and full admins by default, an assistant only with the owner's live
+// KYC_REVIEW grant. Every /admin/* route below — queue, case, evidence, both
+// decisions, the address queue — sits behind it, and the refusal is thrown
+// before any case is read: 403 KYC_REVIEW_FORBIDDEN, no name, no file address.
+kycRoutes.use('/admin/*', requireKycReviewer);
 
 // ------------------------------------------------------------------ upload
 

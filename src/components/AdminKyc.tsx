@@ -7,6 +7,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../AuthContext';
 import { apiRefusal, refusalLang } from '../lib/refusalStrings';
 import { Overlay } from './ui/Overlay';
+import { CapabilityRefusal, ReviewerGrants } from './adminScope/CapabilityGrants';
 
 /**
  * Admin — PRO KYC: identity/phone-change review queues and the approved-
@@ -15,8 +16,11 @@ import { Overlay } from './ui/Overlay';
  * the server — the UI says so before opening. Only the explicit human
  * decision here can set 'verified'.
  *
- * NOTE: the codebase currently has one 'admin' role; identity-review vs
- * support vs finance separation is pending a roles model (documented gap).
+ * WHO OPENS IT (P1-02, DECISIONS row 261; spec acceptance 07): the owner and
+ * full admins, and an assistant only with the owner's KYC_REVIEW grant. The
+ * session hint `can_review_kyc` hides the tab and keeps this console shut —
+ * a link that lands here anyway reads the refusal in the admin's language —
+ * and every /api/kyc/admin/* route re-reads the grant table regardless.
  */
 
 const STRINGS = {
@@ -63,7 +67,7 @@ const STRINGS = {
     version: 'النسخة',
     actionError: 'تعذر تنفيذ الإجراء',
     ownRequest: 'هذا طلبك أنت؛ يقرّره أدمن آخر.',
-    rolesGap: 'ملاحظة: يوجد حاليًا دور إداري واحد؛ فصل صلاحيات مراجعة الهوية عن الدعم والمالية بانتظار نموذج أدوار.',
+    rolesGap: 'يراجع هذه الطلبات المالك والمدير الكامل، والمساعد بإذن من المالك فقط. كل فتح لطلب أو وثيقة يُسجَّل في سجل التدقيق.',
   },
   en: {
     title: 'Identity Verification (KYC)',
@@ -108,7 +112,7 @@ const STRINGS = {
     version: 'Version',
     actionError: 'The action failed',
     ownRequest: 'This is your own request; another admin decides it.',
-    rolesGap: 'Note: a single admin role exists today; identity-review vs support vs finance separation is pending a roles model.',
+    rolesGap: "The owner and full admins review these requests; an assistant only with the owner's grant. Every case or document opened is written to the audit log.",
   },
   ckb: {
     title: 'پشتڕاستکردنەوەی ناسنامە (KYC)',
@@ -153,7 +157,7 @@ const STRINGS = {
     version: 'وەشان',
     actionError: 'کردارەکە سەرکەوتوو نەبوو',
     ownRequest: 'ئەمە داواکاریی خۆتە؛ بەڕێوەبەرێکی تر بڕیاری لەسەر دەدات.',
-    rolesGap: 'تێبینی: ئێستا تەنها یەک ڕۆڵی بەڕێوەبەر هەیە؛ جیاکردنەوەی دەسەڵاتی پێداچوونەوەی ناسنامە لە پشتگیری و دارایی چاوەڕوانی مۆدێلی ڕۆڵەکانە.',
+    rolesGap: 'خاوەن و بەڕێوەبەری تەواو پێداچوونەوە بەم داواکارییانە دەکەن؛ یاریدەدەر تەنها بە مۆڵەتی خاوەن. هەر کردنەوەیەکی داواکاری یان بەڵگەنامە لە تۆماری چاودێریدا تۆمار دەکرێت.',
   },
 } as const;
 
@@ -213,7 +217,18 @@ const STATE_STYLE: Record<string, string> = {
   draft: 'bg-white/[0.06] text-text-secondary',
 };
 
+/**
+ * The KYC tab: the console for whoever holds the desk (`can_review_kyc`, read
+ * as `=== true` like every hint), the refusal for anyone else — before a single
+ * queue request is sent, so nothing about any case is asked for.
+ */
 export default function AdminKyc() {
+  const user = useAuth().user;
+  if (user?.can_review_kyc !== true) return <CapabilityRefusal code="KYC_REVIEW_FORBIDDEN" />;
+  return <KycConsole isOwner={user.is_owner === true} />;
+}
+
+function KycConsole({ isOwner }: { isOwner: boolean }) {
   const { lang } = useLanguage();
   const t = STRINGS[lang] || STRINGS.ar;
   /** The viewer: an admin never decides their own case (the server answers SELF_DECISION_FORBIDDEN). */
@@ -651,6 +666,9 @@ export default function AdminKyc() {
           </div>
       </Overlay>
       )}
+
+      {/* The owner's KYC_REVIEW grants (C5 pattern, DECISIONS row 261). */}
+      {isOwner && <ReviewerGrants grantKey="KYC_REVIEW" />}
     </div>
   );
 }

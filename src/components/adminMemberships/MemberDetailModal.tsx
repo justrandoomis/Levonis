@@ -256,7 +256,8 @@ export default function MemberDetailModal({
   };
 
   const view = data ?? shown;
-  const latestKyc = view?.kyc_cases[0] ?? null;
+  // Absent outside the KYC desk (DECISIONS row 261): no pill, no tile, never a «none» that reads as a fact.
+  const latestKyc = view?.kyc_cases?.[0] ?? null;
   const activeCases = view ? view.restriction_cases.filter((r) => r.state === 'active').length : 0;
   const storedLimit = view?.debt.credit_limit_iqd;
 
@@ -357,12 +358,14 @@ export default function MemberDetailModal({
                 value={tierLabel(view.tier_status.tier) || s.none}
                 sub={`${s.colExpiry}: ${shortDate(view.tier_status.expires_at)}`}
               />
-              <Stat
-                label={s.fKyc}
-                value={latestKyc?.state ?? s.none}
-                tone={latestKyc && latestKyc.state !== 'verified' ? 'warn' : 'plain'}
-                sub={latestKyc ? shortDate(latestKyc.submitted_at ?? latestKyc.created_at) : s.kycNone}
-              />
+              {view.kyc_cases && (
+                <Stat
+                  label={s.fKyc}
+                  value={latestKyc?.state ?? s.none}
+                  tone={latestKyc && latestKyc.state !== 'verified' ? 'warn' : 'plain'}
+                  sub={latestKyc ? shortDate(latestKyc.submitted_at ?? latestKyc.created_at) : s.kycNone}
+                />
+              )}
               <Stat
                 label={s.fRestriction}
                 value={activeCases}
@@ -417,36 +420,39 @@ export default function MemberDetailModal({
                 />
               </Section>
 
-              <Section
-                title={s.secIdentity}
-                icon={<BadgeCheck className="h-3.5 w-3.5" />}
-                note={s.kycNote}
-                testId="kyc"
-              >
-                {view.kyc_cases.length === 0 ? (
-                  <p className="text-xs leading-5 text-text-muted">{s.kycNone}</p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {view.kyc_cases.map((k) => (
-                      <li key={k.id} className="flex flex-wrap items-center gap-1.5">
-                        <Pill tone={k.state === 'verified' ? 'green' : k.state === 'rejected' ? 'red' : 'zinc'}>
-                          {k.state}
-                        </Pill>
-                        <span className="text-[11px] leading-4 text-text-secondary">{k.case_type}</span>
-                        {k.doc_type && <span className="text-[11px] leading-4 text-text-muted">{k.doc_type}</span>}
-                        <span className="ms-auto text-[11px] leading-4 text-text-muted">
-                          {shortDate(k.submitted_at ?? k.created_at)}
-                        </span>
-                        {k.reason && (
-                          <p dir="auto" className="w-full text-[11px] leading-relaxed text-text-muted">
-                            {k.reason}
-                          </p>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Section>
+              {/* The KYC desk's section (DECISIONS row 261): the server omits `kyc_cases` outside it. */}
+              {view.kyc_cases && (
+                <Section
+                  title={s.secIdentity}
+                  icon={<BadgeCheck className="h-3.5 w-3.5" />}
+                  note={s.kycNote}
+                  testId="kyc"
+                >
+                  {view.kyc_cases.length === 0 ? (
+                    <p className="text-xs leading-5 text-text-muted">{s.kycNone}</p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {view.kyc_cases.map((k) => (
+                        <li key={k.id} className="flex flex-wrap items-center gap-1.5">
+                          <Pill tone={k.state === 'verified' ? 'green' : k.state === 'rejected' ? 'red' : 'zinc'}>
+                            {k.state}
+                          </Pill>
+                          <span className="text-[11px] leading-4 text-text-secondary">{k.case_type}</span>
+                          {k.doc_type && <span className="text-[11px] leading-4 text-text-muted">{k.doc_type}</span>}
+                          <span className="ms-auto text-[11px] leading-4 text-text-muted">
+                            {shortDate(k.submitted_at ?? k.created_at)}
+                          </span>
+                          {k.reason && (
+                            <p dir="auto" className="w-full text-[11px] leading-relaxed text-text-muted">
+                              {k.reason}
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Section>
+              )}
 
               <Section
                 title={s.secBenefits}

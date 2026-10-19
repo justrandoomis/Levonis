@@ -89,7 +89,8 @@ export interface MemberDetail {
     newest_session_at: string | null;
     live_sessions: number;
   };
-  kyc: { state: string; reason: string; submitted_at: string | null; decided_at: string | null } | null;
+  /** Absent for an admin outside the KYC desk (DECISIONS row 261); null when the member has no case. */
+  kyc?: { state: string; reason: string; submitted_at: string | null; decided_at: string | null } | null;
   restrictions: MemberRestriction[];
   active_restrictions: number;
   channels: MemberChannel[];

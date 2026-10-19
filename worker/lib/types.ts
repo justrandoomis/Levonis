@@ -1,7 +1,7 @@
 import type { HostInfo } from './hosts';
 import { computeCompletion } from './profileCompletion';
 import { maskPhone } from './phone';
-import { canMoveMoney, canReviewMerchantsHint, canViewCost, canWriteCost, isOwner, isUnverifiedOwner, normalizeAdminScope } from './adminScope';
+import { DISPUTES_GRANT, KYC_REVIEW_GRANT, canMoveMoney, canReviewMerchantsHint, canViewCost, canWriteCost, capabilityHint, isOwner, isUnverifiedOwner, normalizeAdminScope } from './adminScope';
 
 export interface Env {
   DB: D1Database;
@@ -203,7 +203,7 @@ export interface SessionUser {
   /** 0177 private grants, set ONLY by the session loader and always [] while
    *  PRIVATE_DELEGATION_ENABLED is false. Never read off a row. */
   private_grants?: readonly string[];
-  /** 0204 capability grants (MERCHANT_REVIEW), set ONLY by the session loader
+  /** 0204 capability grants (MERCHANT_REVIEW, KYC_REVIEW, DISPUTES), set ONLY by the session loader
    *  and only for an assistant admin. A hint's input, never a gate's. */
   capability_grants?: readonly string[];
   subscription_expiry: number;
@@ -314,6 +314,11 @@ export function publicUser(u: SessionUser, env: Pick<Env, 'INITIAL_ADMIN_EMAIL'>
     // and an assistant holding a live MERCHANT_REVIEW grant (owner decision
     // C5). Hides the tab only; every reviewer route re-checks the grant table.
     can_review_merchants: canReviewMerchantsHint(ownerEnv, u),
+    // «التحقق والعناوين» and «الشكاوى والنزاعات» (P1-02, DECISIONS row 261):
+    // the same C5 rule over KYC_REVIEW and DISPUTES. Hide the tab and the desk
+    // only; /api/kyc/admin/* and the complaint routes re-read the grant table.
+    can_review_kyc: capabilityHint(ownerEnv, u, KYC_REVIEW_GRANT),
+    can_handle_disputes: capabilityHint(ownerEnv, u, DISPUTES_GRANT),
     // LEGACY ALIAS OF COST, not of money: a client build from before S1 reads
     // this to show the finance tab, and must hide it from a full admin now.
     can_view_financials: canViewCost(ownerEnv, u),
