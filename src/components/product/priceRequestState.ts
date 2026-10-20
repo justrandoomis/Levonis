@@ -104,3 +104,37 @@ export function decodePriceRequestIntent(raw: string | null | undefined): { opti
   if (parsed.color_id !== null && !ID.test(parsed.color_id)) return null;
   return parsed;
 }
+
+/**
+ * `?v=` — THE SELECTION A SEARCH RESULT MATCHED (smart search 1.7). A result
+ * for «10101» or «0.4» links to its product with the colour or option its
+ * code names (src/components/search/resultLink.ts writes it, in the same
+ * canonical key as `?price_request=`). Decoded here as UNTRUSTED input, like
+ * the price request above: a malformed key is nothing; of a well-formed one
+ * only ids THIS product owns are kept — at most one value per option group,
+ * in the page own group order, and a colour only when the product has it. It
+ * only pre-selects: the price comes from the quote for that selection, and
+ * the parameter stays in the address so a shared link opens the same way.
+ * The page applies it the same on a phone and on a desktop (one selection
+ * state, src/pages/Product.tsx).
+ */
+export const VARIANT_PARAM = 'v';
+
+export function linkedSelection(
+  raw: string | null | undefined,
+  product: { options?: ReadonlyArray<{ id: string }> | null; colors?: ReadonlyArray<{ id: string }> | null },
+  relations: { option_groups?: ReadonlyArray<{ values: ReadonlyArray<{ id: string }> }> } | null | undefined
+): { option_value_ids: string[]; color_id: string | null } | null {
+  const wish = decodePriceRequestIntent(raw);
+  if (!wish) return null;
+  const wanted = new Set(wish.option_value_ids);
+  const groups = relations?.option_groups ?? [];
+  const option_value_ids = groups.length
+    ? groups.flatMap((g) => {
+        const hit = g.values.find((v) => wanted.has(v.id));
+        return hit ? [hit.id] : [];
+      })
+    : (product.options ?? []).filter((o) => wanted.has(o.id)).slice(0, 1).map((o) => o.id);
+  const color_id = wish.color_id && (product.colors ?? []).some((c) => c.id === wish.color_id) ? wish.color_id : null;
+  return option_value_ids.length || color_id ? { option_value_ids, color_id } : null;
+}

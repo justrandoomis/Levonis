@@ -125,7 +125,7 @@ test('opening catalogue requests start before React only on the canonical main h
   const start = (path: string, host: string, inline: { kind?: unknown } | null = { kind: 'main' }, search = '') => bootRequests(path, inline, () => {}, search, host);
   // The session (/api/auth/me) is asked on every page, after the page's own reads (src/lib/bootFetch.ts AUTH_ME_PATH).
   const ME = '/api/auth/me';
-  assert.deepEqual(start('/products', 'levonis-iq.com', null, '?category=x&search=PLA&offset=50&sort=old'), ['/api/storefront/resolve', '/api/products?search=PLA&category=x&limit=50', ME]);
+  assert.deepEqual(start('/products', 'levonis-iq.com', null, '?category=x&search=PLA&offset=50&sort=old'), ['/api/storefront/resolve', '/api/products?search=PLA&category=x&limit=50&nl=1', ME]);
   assert.deepEqual(start('/product/bambu-lab-a1', 'www.levonis-iq.com'), ['/api/products/bambu-lab-a1', ME]);
   for (const host of ['shop.levonis-iq.com', 'printer.example', 'levonis-iq.com.evil.example']) {
     assert.deepEqual(start('/products', host), [ME]);
@@ -138,7 +138,7 @@ test('opening catalogue requests start before React only on the canonical main h
 test('a navigation intent starts only the target same-origin catalogue read with its exact query', () => {
   const origin = 'https://levonis-iq.com';
   assert.equal(navigationDataPath('/product/bambu-p2s?ref=ali', origin), '/api/products/bambu-p2s');
-  assert.equal(navigationDataPath('/products?category=printers&search=P2S&offset=50', origin), '/api/products?search=P2S&category=printers&limit=50');
+  assert.equal(navigationDataPath('/products?category=printers&search=P2S&offset=50', origin), '/api/products?search=P2S&category=printers&limit=50&nl=1');
   for (const href of ['/wallet', '/cart', '/checkout', '/orders', '/bundles/x', '/api/products/x', '/product/x%2Fquote', '/product/x%3Fadmin=1', '/product/%E0%A4%A', 'https://other.example/product/x', '//shop.levonis-iq.com/product/x']) {
     assert.equal(navigationDataPath(href, origin), null, href);
   }

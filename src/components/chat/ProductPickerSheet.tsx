@@ -96,7 +96,7 @@ export default function ProductPickerSheet({
       header={
         <div className="border-b border-border-subtle px-4 pb-3 pt-1">
           <h2 id={titleId} className="text-center text-[16px] font-extrabold text-text-primary">
-            {title ?? loc('أرسل منتجًا', 'Send a product')}
+            {title ?? loc('أرسل منتجًا', 'Send a product', 'بەرهەمێک بنێرە')}
           </h2>
           <label className="relative mt-3 block">
             <Search className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" aria-hidden="true" />
@@ -105,11 +105,10 @@ export default function ProductPickerSheet({
               type="search"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder={loc('ابحث في منتجات المتجر', 'Search the store’s products')}
-              aria-label={loc('ابحث في منتجات المتجر', 'Search the store’s products')}
+              placeholder={loc('ابحث في منتجات المتجر', 'Search the store’s products', 'لە بەرهەمەکانی فرۆشگا بگەڕێ')}
+              aria-label={loc('ابحث في منتجات المتجر', 'Search the store’s products', 'لە بەرهەمەکانی فرۆشگا بگەڕێ')}
             />
           </label>
-          {/* OWNER: Sorani to be written by hand (this sheet). */}
         </div>
       }
     >
@@ -136,7 +135,7 @@ export default function ProductPickerSheet({
                 <span dir="auto" className="block truncate text-[14px] font-semibold text-text-primary">{name}</span>
                 <span className="block text-[13px] tabular-nums text-text-secondary">
                   {p.price_max_iqd && p.price_max_iqd > p.price_iqd ? `${money(p.price_iqd)} – ${money(p.price_max_iqd)}` : money(p.price_iqd)}
-                  {!p.in_stock && <span className="ms-2 text-warning">{loc('نفدت الكمية', 'Out of stock')}</span>}
+                  {!p.in_stock && <span className="ms-2 text-warning">{loc('نفدت الكمية', 'Out of stock', 'تەواو بوو')}</span>}
                 </span>
               </span>
               {sending === p.id && <Loader2 className="w-4 h-4 animate-spin text-text-muted" aria-hidden="true" />}
@@ -145,27 +144,27 @@ export default function ProductPickerSheet({
         })}
         {!loading && !failed && items.length === 0 && (
           <p className="px-4 py-10 text-center text-[13px] text-text-muted">
-            {q.trim() ? loc('لا نتائج لهذا البحث', 'No products match this search') : loc('لا منتجات منشورة في هذا المتجر بعد', 'This store has no published products yet')}
+            {q.trim() ? loc('لا نتائج لهذا البحث', 'No products match this search', 'هیچ بەرهەمێک لەگەڵ ئەم گەڕانە ناگونجێت') : loc('لا منتجات منشورة في هذا المتجر بعد', 'This store has no published products yet', 'ئەم فرۆشگایە هێشتا هیچ بەرهەمێکی بڵاوکراوەی نییە')}
           </p>
         )}
         {failed && (
           <div className="px-4 py-6 text-center">
-            <p className="text-[13px] text-text-secondary">{loc('تعذّر تحميل المنتجات', 'The products could not be loaded')}</p>
+            <p className="text-[13px] text-text-secondary">{loc('تعذّر تحميل المنتجات', 'The products could not be loaded', 'بەرهەمەکان بار نەکران')}</p>
             <button type="button" onClick={() => void load(q, null)} className="lv-button lv-button-secondary lv-button-sm mt-2">
-              {loc('إعادة المحاولة', 'Try again')}
+              {loc('إعادة المحاولة', 'Try again', 'دووبارە هەوڵ بدەرەوە')}
             </button>
           </div>
         )}
         {loading && (
           <div role="status" className="flex justify-center py-4">
             <Loader2 className="w-5 h-5 animate-spin text-text-muted" aria-hidden="true" />
-            <span className="sr-only">{loc('جارٍ التحميل…', 'Loading…')}</span>
+            <span className="sr-only">{loc('جارٍ التحميل…', 'Loading…', 'بارکردن…')}</span>
           </div>
         )}
         {!loading && cursor && (
           <div className="flex justify-center py-2">
             <button type="button" onClick={() => void load(q, cursor)} className="lv-button lv-button-ghost lv-button-sm">
-              {loc('عرض المزيد', 'Show more')}
+              {loc('عرض المزيد', 'Show more', 'زیاتر ببینە')}
             </button>
           </div>
         )}

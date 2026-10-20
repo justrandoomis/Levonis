@@ -1841,7 +1841,22 @@ export interface ProductsListResponse {
   has_more?: boolean;
   sort?: import('./catalog/types').ListingSort;
   facets?: import('./catalog/types').FacetSet;
+  /**
+   * SMART SEARCH (worker/routes/products.ts, src/components/search/searchKit.tsx).
+   * `understood` only with `nl=1` and when the words became constraints; the
+   * other three only when the search named a code. Data, never wording.
+   */
+  understood?: { text: string; chips: SearchChip[] };
+  /** A code typed whole that this listed product carries. */
+  exact?: Array<{ product_id: string; key: string }>;
+  /** Codes no product the shopper may see carries: «لا يوجد تطابق دقيق لـ …». */
+  exact_miss?: string[];
+  /** productId → the selection its codes matched, which the card link carries as `?v=`. */
+  matched?: Record<string, { option_value_ids: string[]; color_id: string | null; variant_id: string | null }>;
 }
+
+/** One understood constraint, and `drop`: the search text without its words (what removing the chip searches). */
+export type SearchChip = import('../../packages/catalog/src/nlQuery').NlChip & { drop: string };
 
 // ----------------------------------------------- «خبرني لما يرجع» (0092)
 

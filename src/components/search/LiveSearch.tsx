@@ -58,7 +58,8 @@ const ROWS = 6;
 export const SEARCH_MAX_LENGTH = 100;
 
 type LiveResponse = ProductsListResponse & { suggestion?: string | null };
-interface Answer {
+/** The rows, the grey word, and what smart search 1.7 says above and under them (./searchKit.tsx). */
+interface Answer extends Pick<ProductsListResponse, 'understood' | 'exact' | 'exact_miss' | 'matched'> {
   products: ApiProduct[];
   suggestion: string | null;
 }
@@ -166,11 +167,11 @@ export default function LiveSearch({
     const timer = window.setTimeout(async () => {
       try {
         const res = await api.get<LiveResponse>(
-          `/api/products?search=${encodeURIComponent(query)}&limit=${ROWS}`,
+          `/api/products?search=${encodeURIComponent(query)}&limit=${ROWS}&nl=1`,
           { signal: controller.signal, mascot: 'silent' }
         );
         if (requestRef.current !== id) return;
-        const data: Answer = { products: res.products ?? [], suggestion: res.suggestion ?? null };
+        const data: Answer = { ...res, products: res.products ?? [], suggestion: res.suggestion ?? null };
         remember(query, data);
         setAnswer({ query, data });
         setStatus('ok');
@@ -259,6 +260,14 @@ export default function LiveSearch({
     onPick?.();
     setOpen(false);
     setActive(-1);
+  };
+
+  // A removed chip searches the text without its words (`drop`); the words left are finished ones.
+  // Only a chip of the text in the field: an older answer still on screen would undo newer typing.
+  const drop = (text: string) => {
+    if (!fresh) return;
+    commit(text && `${text} `, true);
+    inputRef.current?.focus();
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -440,9 +449,10 @@ export default function LiveSearch({
       <Suspense fallback={null}>
         {armed && (
           <LiveSearchPanel shown={panelShown}>
-            {(CardPrice) => (
+            {(kit) => (
             <>
             <div className="max-h-[min(55dvh,26rem)] overflow-y-auto overscroll-contain p-1.5">
+              {data && (view === 'rows' || view === 'empty') && <kit.Head a={data} count={rows.length} onDrop={drop} className="px-1.5 pb-1" />}
               <div
                 role="listbox"
                 id={listId}
@@ -458,7 +468,7 @@ export default function LiveSearch({
                       role="option"
                       aria-selected={i === activeRow}
                       tabIndex={-1}
-                      to={productHref(p)}
+                      to={kit.href(productHref(p), p, data)}
                       onClick={pick}
                       onPointerEnter={() => setActive(i)}
                       className={`flex min-h-[60px] items-center gap-3 rounded-xl px-2 py-1.5 transition-colors ${
@@ -476,8 +486,9 @@ export default function LiveSearch({
                         {/* §3/§12: the product name is English in every language. */}
                         <p className="line-clamp-2 text-[14px] font-medium leading-snug text-text-primary">{p.name}</p>
                         <div className="mt-0.5">
-                          <CardPrice p={p} compact />
+                          <kit.CardPrice p={p} compact />
                         </div>
+                        <kit.Note p={p} a={data!} />
                       </div>
                     </Link>
                   ))}

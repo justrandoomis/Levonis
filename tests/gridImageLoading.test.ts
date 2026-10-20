@@ -44,7 +44,7 @@ test('the first screen is eager, only the lead row is high priority, everything 
   assert.equal(GRID_LEAD_CARDS, 2);
   // The audit's phone shows three rows of /products (tops 86 / 354 / 622) and two of a listing's grid (it starts ~240 px down).
   assert.match(src('src/pages/Products.tsx'), /const FIRST_SCREEN_CARDS = 6;/);
-  assert.match(src('src/pages/Products.tsx'), /<ProductCard p=\{p\} density="compact" compareToggle \{\.\.\.gridImageLoading\(i, FIRST_SCREEN_CARDS\)\} \/>/);
+  assert.match(src('src/pages/Products.tsx'), /<ProductCard p=\{p\} density="compact" compareToggle \{\.\.\.gridImageLoading\(i, FIRST_SCREEN_CARDS\)\} href=\{resultHref\(cardHref\(p\), p, extras\)\} \/>/);
   assert.match(src('src/components/listing/ProductGrid.tsx'), /const FIRST_SCREEN_CARDS = 4;/);
   assert.match(src('src/components/listing/ProductGrid.tsx'), /\{\.\.\.gridImageLoading\(i, FIRST_SCREEN_CARDS\)\}/);
   assert.match(src('src/components/listing/ProductList.tsx'), /eager=\{i < 4\}\s+defer=\{i >= 4\}/);

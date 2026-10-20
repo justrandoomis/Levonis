@@ -36,7 +36,7 @@ import { mascot } from '../lib/mascot';
  *    double taps, and never silently splits a too-large quantity.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import ShippingConflictDialog from '../components/cart/ShippingConflictDialog';
@@ -89,7 +89,7 @@ import Countdown from '../components/ui/Countdown';
 import ConditionPanel from '../components/product/ConditionPanel';
 import StockAlertPanel from '../components/product/StockAlertPanel';
 import { UNPRICED_TEXT } from '../lib/priceStatus';
-import { decodePriceRequestIntent, PRICE_REQUEST_PARAM, selectionKeyOf } from '../components/product/priceRequestState';
+import { decodePriceRequestIntent, linkedSelection, PRICE_REQUEST_PARAM, selectionKeyOf, VARIANT_PARAM } from '../components/product/priceRequestState';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import {
   decodeAlertIntent,
@@ -1910,6 +1910,24 @@ export default function Product() {
     const rest = params.toString();
     navigate(`${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`, { replace: true });
   }, [product, relations, location.search, location.pathname, location.hash, navigate]);
+  /**
+   * `?v=` — A SEARCH RESULT OPENS ON WHAT IT MATCHED (smart search 1.7):
+   * «10101» opens PLA Basic on that colour, «0.4» the 0.4 nozzle. Untrusted
+   * (`linkedSelection` keeps only ids this product owns), applied once per
+   * product and link, before the first paint of the loaded product, and the
+   * same on a phone and a desktop: there is one selection state. The quote
+   * prices it; the link never carries a price.
+   */
+  const linkedFor = useRef('');
+  useLayoutEffect(() => {
+    const raw = location.search.includes(`${VARIANT_PARAM}=`) ? new URLSearchParams(location.search).get(VARIANT_PARAM) : null;
+    if (!product || !raw || linkedFor.current === `${product.slug}|${raw}`) return;
+    linkedFor.current = `${product.slug}|${raw}`;
+    const linked = linkedSelection(raw, product, relations);
+    if (!linked) return;
+    if (linked.option_value_ids.length) setOptionValueIds(linked.option_value_ids);
+    if (linked.color_id) setColorId(linked.color_id);
+  }, [product, relations, location.search]);
   /** Where the request block sits: inside the price card from 1024 px, its button in the phone bar below. */
   const wideLayout = useMediaQuery('(min-width: 1024px)');
   /** The phone bar's slot the request button is drawn into (a callback ref, so the panel re-renders once it exists). */

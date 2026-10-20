@@ -136,8 +136,11 @@ export default function ProductCard({
   deferImage = false,
   imageSizes,
   className,
+  href,
 }: {
   p: ApiProduct;
+  /** Where the card opens, when not its own page: a search result carries its matched selection (`?v=`). */
+  href?: string;
   /** An explicit width utility; overrides `width`. */
   widthClass?: string;
   density?: 'regular' | 'compact';
@@ -166,10 +169,11 @@ export default function ProductCard({
         fetchPriority={fetchPriority}
         deferImage={deferImage}
         imageSizes={imageSizes ?? (width === 'rail' ? '148px' : GRID_CARD_SIZES)}
+        href={href}
       />
     );
   }
-  return <RegularCard p={p} widthClass={widthClass ?? 'w-[160px]'} />;
+  return <RegularCard p={p} widthClass={widthClass ?? 'w-[160px]'} href={href} />;
 }
 
 /**
@@ -192,6 +196,7 @@ function CompactCard({
   fetchPriority,
   deferImage,
   imageSizes,
+  href,
 }: {
   p: CardProduct;
   widthClass: string;
@@ -200,6 +205,7 @@ function CompactCard({
   fetchPriority?: 'high' | 'auto';
   deferImage: boolean;
   imageSizes: string;
+  href?: string;
 }) {
   const { lang } = useLanguage();
   const { theme } = useTheme();
@@ -261,7 +267,7 @@ function CompactCard({
       </div>
 
       <Link
-        to={cardHref(p)}
+        to={href ?? cardHref(p)}
         className="no-press flex min-w-0 flex-1 flex-col px-2.5 pb-2.5 pt-[9px] focus-visible:outline-none after:absolute after:inset-0 after:z-[1] after:content-['']"
       >
         <h3
@@ -308,7 +314,7 @@ function CompactCard({
   );
 }
 
-function RegularCard({ p, widthClass }: { p: ApiProduct; widthClass: string }) {
+function RegularCard({ p, widthClass, href }: { p: ApiProduct; widthClass: string; href?: string }) {
   const { theme } = useTheme();
   const firstImage = productMainImage(p, theme);
   const lightShown = firstImage !== '' && firstImage === p.light_image;
@@ -325,7 +331,7 @@ function RegularCard({ p, widthClass }: { p: ApiProduct; widthClass: string }) {
 
   return (
     <Link
-      to={cardHref(p)}
+      to={href ?? cardHref(p)}
       className={`${widthClass} relative shrink-0 overflow-hidden flex flex-col group bg-surface rounded-xl border border-border-subtle shadow-sm no-press hover:bg-surface-raised active:shadow-press transition-colors min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
     >
       <div className={`relative aspect-square overflow-hidden ${lightShown ? 'bg-surface-selected' : 'bg-charcoal'}`}>

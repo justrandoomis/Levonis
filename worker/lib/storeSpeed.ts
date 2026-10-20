@@ -437,8 +437,11 @@ export function speedAttention(rows: readonly VitalsDayRow[], today: string): Sp
  * The speed lanes (2026-10-18): 233.5 → 235.9 KB measured — the animation
  * core now rides in the store pages' closure, and the entry carries the
  * category pages' early reads; the figure follows the build again.
+ * Smart search 1.7 (2026-10-20): 236.7 KB measured — the Sorani of the
+ * search entries and the live field's `nl=1` wiring; the figure follows the
+ * build: 237.
  */
-export const STOREFRONT_FIXED_KB = 234;
+export const STOREFRONT_FIXED_KB = 237;
 /** The Arabic Cairo subset every store page preloads (index.html: 30,896 B); the Latin subsets load on demand. */
 export const STOREFRONT_FONT_KB = 31;
 

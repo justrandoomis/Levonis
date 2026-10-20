@@ -16,7 +16,6 @@ import { useLanguage } from '../../LanguageContext';
  */
 export default function SearchOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { loc } = useLanguage();
-  // OWNER: Sorani to be written by hand (the window's name).
   const navigate = useNavigate();
   const [value, setValue] = useState('');
   const box = useRef<HTMLDivElement>(null);
@@ -31,7 +30,7 @@ export default function SearchOverlay({ open, onClose }: { open: boolean; onClos
       open={open}
       onClose={onClose}
       placement="top"
-      label={loc('ابحث في المتجر', 'Search the shop')}
+      label={loc('ابحث في المتجر', 'Search the shop', 'لە فرۆشگادا بگەڕێ')}
       panelClassName="w-full max-w-[640px] p-3"
     >
       <div ref={box}>

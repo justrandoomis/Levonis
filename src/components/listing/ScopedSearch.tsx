@@ -54,8 +54,7 @@ export default function ScopedSearch({ value, placeholder, onChange }: { value: 
             setText('');
             onChange('');
           }}
-          // OWNER: Sorani to be written by hand.
-          aria-label={loc('مسح البحث', 'Clear search')}
+          aria-label={loc('مسح البحث', 'Clear search', 'سڕینەوەی گەڕان')}
           className="lv-hit relative -me-1 grid size-7 shrink-0 place-items-center rounded-full bg-surface-selected text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <X aria-hidden="true" className="size-3.5" />

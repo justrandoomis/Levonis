@@ -121,7 +121,8 @@ const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
 test('the field asks the listing, silently, one request per pause', () => {
   const src = read('src/components/search/LiveSearch.tsx');
-  assert.match(src, /api\.get<LiveResponse>\(\s*`\/api\/products\?search=\$\{encodeURIComponent\(query\)\}&limit=\$\{ROWS\}`/);
+  // `nl=1` (smart search 1.7): the words become constraints, said back as chips.
+  assert.match(src, /api\.get<LiveResponse>\(\s*`\/api\/products\?search=\$\{encodeURIComponent\(query\)\}&limit=\$\{ROWS\}&nl=1`/);
   assert.match(src, /signal: controller\.signal, mascot: 'silent'/, 'aborted per keystroke, and not acted out by the mascot');
   assert.match(src, /const DEBOUNCE_MS = 200;/);
   assert.match(src, /requestRef\.current !== id/, 'a late answer to an older query is dropped');
@@ -140,4 +141,34 @@ test('the header and the results page both carry the live field', () => {
   const products = read('src/pages/Products.tsx');
   assert.match(products, /<LiveSearch\b/, 'the results page can refine without going back');
   assert.match(products, /params\.set\('offset', String\(products\.length\)\)/, 'and page past the first fifty');
+});
+
+// =========================================================================
+// SMART SEARCH 1.7 — what the words became, said back above the rows
+// =========================================================================
+
+test('the panel says what the words became: removable chips, the exact line, the row note, the matched link', () => {
+  const src = read('src/components/search/LiveSearch.tsx');
+  // Above the rows, for an answer with rows or an empty one (a constraint too many is removed from there).
+  assert.match(src, /\{data && \(view === 'rows' \|\| view === 'empty'\) && <kit\.Head a=\{data\} count=\{rows\.length\} onDrop=\{drop\}/);
+  // A removed chip searches the text without its words; the words left are finished ones.
+  assert.match(src, /const drop = \(text: string\) => \{\s*if \(!fresh\) return;\s*commit\(text && `\$\{text\} `, true\);\s*inputRef\.current\?\.focus\(\);/, 'and only a chip of the text in the field');
+  // Each row: its availability and «تطابق دقيق» / «قريب», and its link on the selection it matched (`?v=`).
+  assert.match(src, /to=\{kit\.href\(productHref\(p\), p, data\)\}/);
+  assert.match(src, /<kit\.Note p=\{p\} a=\{data!\} \/>/);
+  // None of it is in the entry: the field gets it from its lazy panel.
+  assert.doesNotMatch(src, /^import (?!type\b)[^;]*from '\.\/searchKit';/m, 'the search kit is a static import of the field — the entry');
+  assert.doesNotMatch(src, /^import (?!type\b)[^;]*AvailabilityLine/m);
+  const panel = read('src/components/search/LiveSearchPanel.tsx');
+  assert.match(panel, /import \{ RowNote, SearchHead, resultHref \} from '\.\/searchKit';/);
+  assert.match(panel, /children\(KIT\)/);
+});
+
+test('the results page reads the same words the same way, and its cards open on what they matched', () => {
+  const products = read('src/pages/Products.tsx');
+  assert.match(products, /if \(search\) params\.set\('nl', '1'\);/, 'the panel and «عرض كل النتائج» agree');
+  assert.match(products, /<SearchHead\s+a=\{extras\}/);
+  assert.match(products, /href=\{resultHref\(cardHref\(p\), p, extras\)\}/);
+  const card = read('src/components/home/ProductCard.tsx');
+  assert.equal((card.match(/to=\{href \?\? cardHref\(p\)\}/g) ?? []).length, 2, 'both card densities follow the link they are given');
 });

@@ -14,8 +14,7 @@ export default function TopBarSearch() {
   return (
     <>
       <TopBarButton
-        // OWNER: Sorani to be written by hand.
-        label={loc('بحث في المتجر', 'Search the shop')}
+        label={loc('بحث في المتجر', 'Search the shop', 'گەڕان لە فرۆشگادا')}
         onPointerDown={() => void load()}
         onClick={() => {
           setArmed(true);

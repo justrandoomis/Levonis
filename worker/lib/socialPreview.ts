@@ -751,6 +751,8 @@ export function mainOpeningFor(pathname: string, search = ''): MainOpening | nul
       if (value) params.set(key, value);
     }
     params.set('limit', '50');
+    // The page reads a search with `nl=1` (smart search 1.7, src/lib/bootFetch.ts productsOpeningPath).
+    if (params.has('search')) params.set('nl', '1');
     return { route: 'src/pages/Products.tsx', fetches: [`/api/products?${params}`] };
   }
   const path = pathname.replace(/\/+$/, '') || '/';

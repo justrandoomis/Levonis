@@ -19,6 +19,11 @@ import * as Motion from 'motion/react-m';
 import { CROSS_FADE, useMotion } from '../../lib/motion';
 import { MotionFeatures, useMotionFeaturesFailed } from '../../lib/motionFeatures';
 import CardPrice from '../CardPrice';
+import { RowNote, SearchHead, resultHref } from './searchKit';
+
+/** What the panel hands the field: everything a row says beyond its name and photo. */
+const KIT = { CardPrice, Head: SearchHead, Note: RowNote, href: resultHref };
+export type SearchKit = typeof KIT;
 
 export interface LiveSearchPanelProps {
   /** The field has text and the panel is open. */
@@ -28,9 +33,12 @@ export interface LiveSearchPanelProps {
    * price block, which rides in THIS chunk: the rows only exist inside the
    * panel, so the price (and its «السعر غير متوفر حالياً», DECISIONS rows
    * 239-240) arrives with them in one commit and never flashes blank, while
-   * the header's first paint carries no price code at all.
+   * the header's first paint carries no price code at all. The same goes for
+   * what smart search 1.7 adds (./searchKit.tsx): the understood chips, the
+   * exact line, the row availability and the `?v=` link — none of it is in
+   * the entry.
    */
-  children: (Price: typeof CardPrice) => React.ReactNode;
+  children: (kit: SearchKit) => React.ReactNode;
 }
 
 export default function LiveSearchPanel({ shown, children }: LiveSearchPanelProps) {
@@ -65,7 +73,7 @@ export default function LiveSearchPanel({ shown, children }: LiveSearchPanelProp
             onMouseDown={(e) => e.preventDefault()}
             className="material pointer-events-auto absolute inset-x-0 top-full z-20 mt-2 overflow-hidden rounded-lg border border-border-subtle shadow-lg"
           >
-            <div ref={contentRef}>{children(CardPrice)}</div>
+            <div ref={contentRef}>{children(KIT)}</div>
           </Motion.div>
         )}
       </AnimatePresence>

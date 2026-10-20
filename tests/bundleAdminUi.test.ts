@@ -139,9 +139,9 @@ test('§10: the stepper disables at the server’s max_qty rather than silently 
 
 test('§10: a composition row is linked to where it can be bought, and the redirect is honoured', () => {
   // The grid renders the shared ProductCard, whose destination is
-  // `cardHref` (src/lib/productCard.ts).
-  assert.match(read('src/pages/Products.tsx'), /<ProductCard p=\{p\}/);
-  assert.match(read('src/components/home/ProductCard.tsx'), /to=\{cardHref\(p\)\}/);
+  // `cardHref` (src/lib/productCard.ts) — a search result adds its matched selection (`?v=`) to it, never another destination.
+  assert.match(read('src/pages/Products.tsx'), /<ProductCard p=\{p\}[^>]*href=\{resultHref\(cardHref\(p\), p, extras\)\}/);
+  assert.match(read('src/components/home/ProductCard.tsx'), /to=\{href \?\? cardHref\(p\)\}/);
   assert.match(read('src/lib/productCard.ts'), /\/bundles\/\$\{p\.product_slug\}/, 'the grid still links every card to /product/');
   const product = read('src/pages/Product.tsx');
   assert.match(product, /data\.redirect/, 'the product page ignores the server’s composition redirect');

@@ -25,7 +25,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { APEX, asD1, ctx, freshDb, json, stubApp } from './fixtures/app';
 import { limitD1, violations } from './fixtures/d1Limits';
 import { DEFAULT_LISTING } from '../packages/catalog/src/discovery';
-import { nlApply, nlFold, nlJudgesProducts, nlKeeps, parseNlQuery, type NlChip } from '../packages/catalog/src/nlQuery';
+import { nlApply, nlChipKey, nlFold, nlJudgesProducts, nlKeeps, parseNlQuery, type NlChip } from '../packages/catalog/src/nlQuery';
 import { backfillSearchIndex } from '../worker/lib/search/store';
 
 // =========================================================================
@@ -233,6 +233,29 @@ test('nlApply: the words join the listing state, an explicit URL value wins, and
   assert.deepEqual(at.understood, [{ kind: 'price', min: null, max: 500, currency: 'USD', iqd: { min: null, max: 655_000 } }]);
 });
 
+test('a removed chip (smart search 1.7): its own words leave the field, every other word stays as typed', () => {
+  const w = (q: string) => parseNlQuery(q).without;
+  assert.deepEqual(w('فلامنت اسود اقل من 30 الف'), { price: 'فلامنت اسود', 'color:black': 'فلامنت اقل من 30 الف' });
+  assert.deepEqual(w('طابعة بدون AMS'), { 'exclude:ams': 'طابعة' }, 'the negation goes with what it negated');
+  assert.deepEqual(w('چاپکەر بێ AMS'), { 'exclude:ams': 'چاپکەر' });
+  assert.deepEqual(w('فلامنت مو اسود'), { 'color!:black': 'فلامنت' });
+  assert.deepEqual(w('فلامنت بدون بكرة'), { spool: 'فلامنت' }, 'a flipped constraint is one chip with its negation');
+  assert.deepEqual(w('ريفل'), { spool: '' }, 'nothing left: the field is emptied');
+  // Two bounds are one price chip; a material is a chip AND a search word.
+  assert.deepEqual(w('اكثر من 10 واقل من 30 الف PLA'), { price: 'PLA', 'material:pla': 'اكثر من 10 واقل من 30 الف' });
+  assert.deepEqual(w('filament black under $20'), { price: 'filament black', 'color:black': 'filament under $20' });
+  // A joining word left at an end has nothing to join.
+  assert.equal(w('PLA اسود و رخيص').sort, 'PLA اسود');
+  // Read again, the removal text is the same answer less that one chip.
+  for (const q of ['فلامنت اسود اقل من 30 الف', 'PETG ابيض 1.75 متوفر هسه', 'طابعة رخيصة مو كومبو']) {
+    const nl = parseNlQuery(q);
+    for (const chip of nl.understood) {
+      const again = parseNlQuery(nl.without[nlChipKey(chip)]).understood.map(nlChipKey);
+      assert.deepEqual(again, nl.understood.map(nlChipKey).filter((k) => k !== nlChipKey(chip)), `${q} less ${nlChipKey(chip)}`);
+    }
+  }
+});
+
 test('nlKeeps: an exclusion reads names and the family, never the description; a colour needs evidence; a material judges materials only', () => {
   const noAms = parseNlQuery('طابعة بدون AMS');
   assert.ok(nlJudgesProducts(noAms));
@@ -323,7 +346,7 @@ async function understandingShop(): Promise<DatabaseSync> {
 type Body = {
   products: { id: string; display_price_iqd?: number | null }[];
   total?: number;
-  understood?: { text: string; chips: NlChip[] };
+  understood?: { text: string; chips: Array<NlChip & { drop: string }> };
 };
 
 async function list(db: D1Database, query: string): Promise<Body> {
@@ -337,6 +360,9 @@ async function list(db: D1Database, query: string): Promise<Body> {
 /** A finished search with `nl=1` (trailing space: the last word is not still being typed). */
 const understand = (db: D1Database, q: string) => list(db, `search=${encodeURIComponent(`${q} `)}&nl=1&limit=50`);
 const ids = (b: Body) => b.products.map((p) => p.id).sort();
+/** The chips as the parser reads them, without the removal text the route adds (`drop`, smart search 1.7). */
+const bare = (chips: Array<NlChip & { drop: string }> | undefined): NlChip[] | undefined =>
+  chips?.map((c) => Object.fromEntries(Object.entries(c).filter(([k]) => k !== 'drop')) as NlChip);
 
 test('row 10 through the route: «طابعة بدون AMS» lists the printers and no AMS item — and without nl=1 it is the old search', async () => {
   const db = limitD1(await understandingShop());
@@ -351,7 +377,10 @@ test('row 10 through the route: «طابعة بدون AMS» lists the printers a
     assert.equal(b.total, 2, q);
   }
   const b = await understand(db, 'طابعة بدون AMS');
-  assert.deepEqual(b.understood, { text: 'طابعة', chips: [{ kind: 'exclude', value: 'ams' }] });
+  // `drop` (smart search 1.7): what removing the chip searches — the words without «بدون AMS».
+  assert.deepEqual(b.understood, { text: 'طابعة', chips: [{ kind: 'exclude', value: 'ams', drop: 'طابعة' }] });
+  const dropped = await understand(db, b.understood!.chips[0].drop);
+  assert.deepEqual(dropped.understood, { text: 'طابعة', chips: [] }, 'the removed chip is gone, and nothing else was understood');
   assert.deepEqual(violations, []);
 });
 
@@ -361,7 +390,7 @@ test('row 9 through the route: black filament at most 30,000 — nothing above t
     const b = await understand(db, q);
     assert.deepEqual(ids(b), ['f_black', 'f_petg_black', 'f_refill'], q);
     for (const p of b.products) assert.ok((p.display_price_iqd ?? Infinity) <= 30_000, `${q}: ${p.id} is within the budget`);
-    assert.deepEqual(b.understood?.chips, [
+    assert.deepEqual(bare(b.understood?.chips), [
       { kind: 'price', min: null, max: 30_000, currency: 'IQD' },
       { kind: 'color', value: 'black' },
     ]);
@@ -375,7 +404,7 @@ test('row 11 through the route: «ريفل» is the refill facet, «بكرة ك�
   const db = limitD1(await understandingShop());
   const refill = await understand(db, 'ريفل');
   assert.deepEqual(ids(refill), ['f_black', 'f_refill']);
-  assert.deepEqual(refill.understood, { text: '', chips: [{ kind: 'spool', value: 'refill' }] });
+  assert.deepEqual(refill.understood, { text: '', chips: [{ kind: 'spool', value: 'refill', drop: '' }] });
   const spool = await understand(db, 'بكرة كاملة');
   assert.deepEqual(ids(spool), ['f_black', 'f_petg_black', 'f_silk_black', 'f_tpu_pre', 'f_white']);
   // «spool» is the with-spool facet, not every filament: the refill-only spool and the one with no spool fact are not in it.
@@ -391,7 +420,7 @@ test('row 12 through the route: «متوفر هسه» is direct sale only, «ح�
   const direct = await understand(db, 'فلامنت متوفر هسه');
   assert.ok(direct.products.length > 0);
   assert.ok(!direct.products.some((p) => p.id === 'f_tpu_pre'), 'no pre-order item');
-  assert.deepEqual(direct.understood?.chips, [{ kind: 'sale', value: 'direct' }]);
+  assert.deepEqual(bare(direct.understood?.chips), [{ kind: 'sale', value: 'direct' }]);
   const pre = await understand(db, 'فلامنت حجز');
   assert.deepEqual(ids(pre), ['f_tpu_pre']);
   assert.deepEqual(ids(await understand(db, 'حجز')), ['f_tpu_pre'], 'the words alone: the whole shop, filtered');

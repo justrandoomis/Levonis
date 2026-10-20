@@ -77,6 +77,8 @@ export function productsOpeningPath(search = ''): string {
   if (query.get('search')) params.set('search', query.get('search')!);
   if (query.get('category')) params.set('category', query.get('category')!);
   params.set('limit', '50');
+  // A search reads its words as constraints (smart search 1.7), as src/pages/Products.tsx asks.
+  if (params.has('search')) params.set('nl', '1');
   return `/api/products?${params}`;
 }
 

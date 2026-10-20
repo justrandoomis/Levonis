@@ -25,12 +25,11 @@ export default function FinderBand() {
         <WandSparkles className="size-5 lg:size-6" />
       </span>
       <span className="min-w-0 flex-1">
-        {/* OWNER: Sorani to be written by hand (both lines). */}
         <span className="block text-[14px] font-extrabold leading-5 text-text-primary lg:text-[18px] lg:leading-7">
-          {loc('لست متأكدًا أيها يناسبك؟', 'Not sure which one suits you?')}
+          {loc('لست متأكدًا أيها يناسبك؟', 'Not sure which one suits you?', 'دڵنیا نیت کامیان بۆت گونجاوە؟')}
         </span>
         <span className="block text-[12px] leading-[17px] text-text-muted lg:text-[14px] lg:leading-6">
-          {loc('ستة أسئلة قصيرة، ونرشّح لك أفضل ثلاث طابعات مع السبب.', 'Six short questions, and we suggest the best three printers with the reason.')}
+          {loc('ستة أسئلة قصيرة، ونرشّح لك أفضل ثلاث طابعات مع السبب.', 'Six short questions, and we suggest the best three printers with the reason.', 'شەش پرسیاری کورت، و باشترین سێ چاپکەرت لەگەڵ هۆکارەکەی بۆ پێشنیار دەکەین.')}
         </span>
       </span>
       <Chevron aria-hidden="true" className="size-5 shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5 motion-reduce:transition-none" />

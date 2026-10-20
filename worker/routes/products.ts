@@ -69,7 +69,7 @@ import {
 } from '../lib/catalogPresentation';
 import { searchProducts } from '../lib/search/store';
 import { resolveIdentifier, type IdentifierAnswer } from '../lib/search/identifiers';
-import { nlApply, nlJudgesProducts, nlKeeps, parseNlQuery, type NlChip, type NlProduct, type NlQuery } from '@levonis/catalog/nlQuery';
+import { nlApply, nlChipKey, nlJudgesProducts, nlKeeps, parseNlQuery, type NlChip, type NlProduct, type NlQuery } from '@levonis/catalog/nlQuery';
 import { suggestCompletion } from '../lib/search/complete';
 import {
   SHELF_LIMIT,
@@ -4267,14 +4267,19 @@ export async function listCatalogProducts(
    */
   const listing = nl !== null || LISTING_PARAM_KEYS.some((k) => q[k] !== undefined);
   let listingState = parseListingParams((k) => (k === 'search' ? search : q[k]), 'api');
-  /** What the words narrowed, as data for the search chips (smart search 1.7 says it in ar, en and ckb). */
-  let nlField: { understood?: { text: string; chips: NlChip[] } } = {};
+  /**
+   * What the words narrowed, as data for the search chips (smart search 1.7
+   * says it in ar, en and ckb). Each chip carries `drop`: the search text with
+   * that chip's words taken out, which is what removing the chip puts in the
+   * field, so a removed chip is just another search.
+   */
+  let nlField: { understood?: { text: string; chips: Array<NlChip & { drop: string }> } } = {};
   if (nl) {
     // A dollar bound («اقل من 5 ورقات», "under $500") is converted at the shop rate; without one it is not applied.
     const usdIqd = nl.price?.currency === 'USD' ? ((await getPublicDisplayRate(db)).exchangeRate ?? null) : null;
     const applied = nlApply(listingState, nl, { usdIqd });
     listingState = applied.state;
-    nlField = { understood: { text: nl.text, chips: applied.understood } };
+    nlField = { understood: { text: nl.text, chips: applied.understood.map((c) => ({ ...c, drop: nl.without[nlChipKey(c)] ?? nl.text })) } };
   }
   const nlKeep = nl && nlJudgesProducts(nl) ? (row: Record<string, unknown>) => nlKeeps(nl, nlProductOf(row)) : null;
   const wantsFacets = q.facets === '1';

@@ -294,6 +294,35 @@ diameter, the sale mode («متوفر هسه» / «حجز»), refill or with spo
   `understood: { text, chips }` — data for the chips the search UI words in
   ar, en and ckb (smart search 1.7). `nl` is part of the edge cache key.
 
+### 4f. Saying it back: the search UI (smart search 1.7)
+
+The live field (`src/components/search/LiveSearch.tsx`) and the results page
+(`src/pages/Products.tsx`) both ask with `nl=1`, so the panel under the field
+and «عرض كل النتائج» list the same thing; the opening read the document primes
+(`src/lib/bootFetch.ts`, `worker/lib/socialPreview.ts`) carries it too. What
+they say beyond the products lives in `src/components/search/searchKit.tsx`, a
+lazy chunk the panel hands the field, so none of the wording is in the entry:
+
+* **Chips, one per constraint**, in ar, en and ckb («حتى 30,000 د.ع», «أسود»,
+  «بدون AMS» / «بێ AMS»). Each chip of the answer carries `drop`: the search
+  text with that chip's words taken out and every other word kept as typed
+  (`NlQuery.without`, keyed by `nlChipKey`). Removing a chip puts `drop` in
+  the field, so a removed chip is just another search and the field always
+  shows what is applied.
+* **The exact line.** `exact_miss` reads «لا يوجد تطابق دقيق لـ «10102»» and the
+  results under it are labelled near («قريب»), never as the code; `exact`
+  reads «تطابق دقيق لـ «FAP035»» and marks its row.
+* **Each row** shows the card's three-state availability (`AvailabilityLine`,
+  the shared `cardAvailability` of packages/catalog).
+* **`?v=`.** A result that matched a selection links to its product with that
+  selection (`src/components/search/resultLink.ts`, the canonical combination
+  key `o:…|c:…`). `src/pages/Product.tsx` decodes it as untrusted input
+  (`linkedSelection` in `src/components/product/priceRequestState.ts`: only
+  ids the product owns, one value per group), applies it once per product and
+  link before the first paint — one selection state, so a phone and a desktop
+  open the same way — and prices it through the quote. The parameter stays in
+  the address, so a shared link opens on the same variant.
+
 ## 5. What is deliberately *not* forgiven
 
 `editBudget` gives a three-letter token **no** typo budget. `abs` and `ams` are
@@ -474,4 +503,7 @@ Both sides are stored **normalised**, which is why one row covers «طابعة»
 | `tests/searchBackfillBudget.test.ts` | The catch-up within a statement budget |
 | `tests/searchIdentifiers.test.ts` | Acceptance rows 5–7 through the route on D1's limits; both writers; a database without 0206 |
 | `packages/catalog/src/nlQuery.ts` | The words as constraints (`nl=1`): the parser, `nlApply` onto the listing state, `nlKeeps` per product |
-| `tests/assistUnderstand.test.ts` | Acceptance rows 9–12: the parser in three languages, and through the route on D1's limits |
+| `tests/assistUnderstand.test.ts` | Acceptance rows 9–12: the parser in three languages, and through the route on D1's limits; a removed chip's text |
+| `src/components/search/searchKit.tsx` | The search UI's words (smart search 1.7): chips, the exact line, the row note, the result link |
+| `src/components/search/resultLink.ts` | The `?v=` link a result carries; `linkedSelection` (priceRequestState.ts) is the page's decoder |
+| `tests/searchUi.test.ts` | The chips and the exact line in three languages, the row availability, `?v=` both ways |

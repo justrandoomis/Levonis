@@ -410,6 +410,20 @@ export interface NlQuery {
   exclude: { colours: BaseColour[]; materials: string[]; words: string[] };
   /** Everything above, in one list, in a fixed order. */
   understood: NlChip[];
+  /**
+   * For each understood chip (`nlChipKey`), the input with that chip's words
+   * taken out and every other word kept as typed: the text a removed chip
+   * leaves in the search field (smart search 1.7). Read again, it gives the
+   * same answer less that one constraint.
+   */
+  without: Record<string, string>;
+}
+
+/** One chip's identity, the key of `NlQuery.without`: «price», «color:black», «color!:black», «exclude:ams». */
+export function nlChipKey(c: NlChip): string {
+  if (c.kind === 'color' || c.kind === 'material') return `${c.kind}${c.not ? '!' : ''}:${c.value}`;
+  if (c.kind === 'diameter' || c.kind === 'exclude') return `${c.kind}:${c.value}`;
+  return c.kind;
 }
 
 // ------------------------------------------------------------------ the parser
@@ -469,8 +483,14 @@ export function parseNlQuery(input: string): NlQuery {
     for (const f of lexemesOf(p)) L.push({ f, v: variantsOf(f), piece });
   });
   const used = new Array<boolean>(L.length).fill(false);
+  /** Which chip (`nlChipKey`) each lexeme went to: a removed chip takes exactly its own words out of the field. */
+  const owner = new Array<string>(L.length).fill('');
+  let who = '';
   const take = (from: number, to: number) => {
-    for (let k = from; k < to; k++) used[k] = true;
+    for (let k = from; k < to; k++) {
+      used[k] = true;
+      owner[k] = who;
+    }
   };
 
   // One object, not four lets: the readers below assign them from closures.
@@ -649,6 +669,7 @@ export function parseNlQuery(input: string): NlQuery {
   /** A price constraint from lexeme i: «سعر» … a range, a bound and its amount, or an amount and its bound. */
   const tryPrice = (i: number, flip: boolean): number => {
     if (i >= L.length || used[i]) return 0;
+    who = 'price';
     const j = i + longest(i, PRICE_WORDS);
     const open = longest(j, RANGE_OPEN);
     if (open) {
@@ -713,6 +734,7 @@ export function parseNlQuery(input: string): NlQuery {
     if (!d && !p) return 0;
     const direct = !!d !== flip;
     got.sale = direct ? 'direct' : 'preorder';
+    who = 'sale';
     let end = i + (d || p);
     take(i, end);
     if (d) {
@@ -729,6 +751,7 @@ export function parseNlQuery(input: string): NlQuery {
     if (r) {
       if (guarded(i - 1) || guarded(i + r)) return 0;
       got.spool = flip ? 'spool' : 'refill';
+      who = 'spool';
       take(i, i + r);
       return r;
     }
@@ -739,6 +762,7 @@ export function parseNlQuery(input: string): NlQuery {
     if (guarded(i - 1) || guarded(end)) return 0;
     end += longest(end, SPOOL_FULL);
     got.spool = flip ? 'refill' : 'spool';
+    who = 'spool';
     take(i, end);
     return end - i;
   };
@@ -749,6 +773,7 @@ export function parseNlQuery(input: string): NlQuery {
     if (!d) return 0;
     const end = j + 1 + longest(j + 1, MM_WORDS);
     add(diameters, d);
+    who = `diameter:${d}`;
     take(i, end);
     return end - i;
   };
@@ -766,6 +791,7 @@ export function parseNlQuery(input: string): NlQuery {
     }
     if (!colour) return 0;
     add(flip ? exclude.colours : colours, colour);
+    who = `color${flip ? '!' : ''}:${colour}`;
     take(i, i + len);
     return len;
   };
@@ -775,6 +801,7 @@ export function parseNlQuery(input: string): NlQuery {
     const d = a ? 0 : longest(i, DEAR);
     if (!a && !d) return 0;
     got.sort = a ? 'price_asc' : 'price_desc';
+    who = 'sort';
     const end = i + (a || d);
     take(i, end);
     // «ارخص سعر» was read whole; «سعر» after «رخيص» goes with it.
@@ -792,6 +819,7 @@ export function parseNlQuery(input: string): NlQuery {
       const m = lookup(j, MATERIALS);
       if (m) {
         add(exclude.materials, m);
+        who = `material!:${m}`;
         take(j, j + 1);
         k = 1;
       }
@@ -800,7 +828,9 @@ export function parseNlQuery(input: string): NlQuery {
       const w = L[j].f;
       const excludable = /\p{L}/u.test(w) && w.length >= 2 && !L[j].v.some((v) => FILLERS.has(v) || CONJUNCTIONS.has(v));
       if (!excludable || longest(j, NEGATION)) return 0;
-      add(exclude.words, lookup(j, EXCLUDE_CANON) ?? stripArticle(w));
+      const canon = lookup(j, EXCLUDE_CANON) ?? stripArticle(w);
+      add(exclude.words, canon);
+      who = `exclude:${canon}`;
       take(j, j + 1);
       k = 1;
     }
@@ -819,7 +849,11 @@ export function parseNlQuery(input: string): NlQuery {
       continue;
     }
     const m = lookup(i, MATERIALS);
-    if (m) add(materials, m);
+    if (m) {
+      add(materials, m);
+      // Not consumed (a material stays in the search), but it is this chip's word.
+      owner[i] = `material:${m}`;
+    }
     i++;
   }
 
@@ -851,6 +885,26 @@ export function parseNlQuery(input: string): NlQuery {
   const onlyFillers = understood.length > 0 && kept.every((w) => lexemesOf(w).every((f) => FILLERS.has(f)));
   const text = onlyFillers ? '' : kept.join(' ');
   const lastPiece = pieces.length - 1;
+
+  // Each chip's words out, everything else as typed; a joining word left at either end goes too.
+  const conj = (w: string) => {
+    const lx = lexemesOf(w);
+    return lx.length > 0 && lx.every((f) => CONJUNCTIONS.has(f));
+  };
+  const without: Record<string, string> = {};
+  for (const chip of understood) {
+    const key = nlChipKey(chip);
+    const out: string[] = [];
+    pieces.forEach((raw, piece) => {
+      const mine = L.map((l, k) => ({ l, k })).filter(({ l }) => l.piece === piece);
+      const left = mine.filter(({ k }) => owner[k] !== key);
+      if (!left.length) return;
+      out.push(left.length === mine.length ? raw : left.map(({ l }) => l.f).join(''));
+    });
+    while (out.length && conj(out[out.length - 1])) out.pop();
+    while (out.length && conj(out[0])) out.shift();
+    without[key] = out.join(' ');
+  }
   return {
     text,
     tailConsumed: lastPiece >= 0 && (onlyFillers || !keptPieces.has(lastPiece)),
@@ -863,6 +917,7 @@ export function parseNlQuery(input: string): NlQuery {
     sort,
     exclude,
     understood,
+    without,
   };
 }
 

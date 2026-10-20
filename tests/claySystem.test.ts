@@ -418,7 +418,7 @@ test('the product card is clay a scrolling list can afford, and content-visibili
   const card = read('src/components/home/ProductCard.tsx');
   // The two roots: the compact card (a div under a stretched link) and the regular one (the link itself).
   const compact = /data-product-card="compact"\s*className=\{`([^`]*)`\}/.exec(card)?.[1];
-  const regular = /<Link\s+to=\{cardHref\(p\)\}\s+className=\{`(\$\{widthClass\} relative shrink-0[^`]*)`\}/.exec(card)?.[1];
+  const regular = /<Link\s+to=\{href \?\? cardHref\(p\)\}\s+className=\{`(\$\{widthClass\} relative shrink-0[^`]*)`\}/.exec(card)?.[1];
   assert.ok(compact, 'the compact card root is not where it was');
   assert.ok(regular, 'the regular card root is not where it was');
   for (const [name, root] of [['compact', compact!], ['regular', regular!]] as const) {

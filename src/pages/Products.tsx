@@ -9,9 +9,10 @@ import { Skeleton, ProductGridSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import { readPageCache, writePageCache } from '../lib/pageCache';
 import ProductCard from '../components/home/ProductCard';
-import { availableFirst, gridImageLoading, laterIsPreorder } from '../lib/productCard';
+import { availableFirst, cardHref, gridImageLoading, laterIsPreorder } from '../lib/productCard';
 import { UNPRICED_TEXT } from '../lib/priceStatus';
 import LiveSearch from '../components/search/LiveSearch';
+import { SearchHead, resultHref, type SearchExtras } from '../components/search/searchKit';
 import { takePrimedJson } from '../lib/bootFetch';
 
 /** One page of the listing. The route's own ceiling (`limit` max 50). */
@@ -27,13 +28,20 @@ export default function Products() {
   const search = queryParams.get('search') || '';
   const category = queryParams.get('category') || '';
 
-  /** What this page needs to paint: the grid and the resolved section name. */
-  type ProductsSnapshot = { products: ApiProduct[]; category: ResolvedCategory | null };
+  /** What this page needs to paint: the grid, the resolved section name, and what the search understood. */
+  type ProductsSnapshot = { products: ApiProduct[]; category: ResolvedCategory | null; extras?: SearchExtras };
   // Seed before the first paint, so Back restores the real grid and its
   // scroll height rather than painting skeletons before the mount effect.
   const [initialSnapshot] = useState(() => readPageCache<ProductsSnapshot>(`products:${search}|${category}`));
 
   const [products, setProducts] = useState<ApiProduct[]>(initialSnapshot?.products ?? []);
+  /**
+   * SMART SEARCH ON THE RESULTS PAGE (1.7): the same `nl=1` reading the panel
+   * under the field showed, so «عرض كل النتائج» lists what the panel listed —
+   * the understood chips (each removable), the exact or no-exact line, and
+   * each card opening on the selection its code matched (`?v=`).
+   */
+  const [extras, setExtras] = useState<SearchExtras | null>(initialSnapshot?.extras ?? null);
   const [loading, setLoading] = useState(!initialSnapshot);
   const [error, setError] = useState<unknown>(null);
   /**
@@ -87,7 +95,9 @@ export default function Products() {
     if (snapshot) {
       setProducts(snapshot.products);
       setCategoryRef(snapshot.category);
+      setExtras(snapshot.extras ?? null);
     } else {
+      setExtras(null);
       // Reset on every query change, so a previous section's name can never sit
       // above a new section's grid.
       setCategoryRef(undefined);
@@ -100,6 +110,8 @@ export default function Products() {
       if (search) params.set('search', search);
       if (category) params.set('category', category);
       params.set('limit', String(PAGE_SIZE));
+      // The same order as src/lib/bootFetch.ts productsOpeningPath, so the primed read is this one.
+      if (search) params.set('nl', '1');
       const path = `/api/products?${params.toString()}`;
       // StrictMode's effect replay shares the opening promise; after it
       // settles every refresh/query change still requests current prices.
@@ -109,10 +121,12 @@ export default function Products() {
       const data = await openingRequest.current.promise;
       if (reqIdRef.current !== reqId) return;
       const resolved = category ? data.category ?? null : null;
+      const said: SearchExtras = { understood: data.understood, exact: data.exact, exact_miss: data.exact_miss, matched: data.matched };
       setProducts(data.products || []);
       setExhausted((data.products || []).length < PAGE_SIZE);
       setCategoryRef(resolved);
-      writePageCache(cacheKey, { products: data.products || [], category: resolved });
+      setExtras(said);
+      writePageCache(cacheKey, { products: data.products || [], category: resolved, extras: said });
     } catch (err) {
       console.error(err);
       if (reqIdRef.current !== reqId) return;
@@ -144,11 +158,14 @@ export default function Products() {
       if (search) params.set('search', search);
       if (category) params.set('category', category);
       params.set('limit', String(PAGE_SIZE));
+      if (search) params.set('nl', '1');
       params.set('offset', String(products.length));
       const data = await api.get<ProductsListResponse>(`/api/products?${params.toString()}`);
       // A new query started while this page was in flight: it is not ours.
       if (reqIdRef.current !== reqId) return;
       const next = data.products || [];
+      // The next page carries the matched selections of ITS products.
+      if (data.matched) setExtras((x) => ({ ...x, matched: { ...x?.matched, ...data.matched } }));
       setProducts((have) => {
         const seen = new Set(have.map((p) => p.id));
         return [...have, ...next.filter((p) => !seen.has(p.id))];
@@ -185,9 +202,8 @@ export default function Products() {
    */
   const ordered = search ? { items: products, splitAt: -1, unpricedAt: -1 } : availableFirst(products);
   const laterLabel = laterIsPreorder(ordered)
-      ? loc('بطلب مسبق', 'Pre-order')
-      : loc('ليست في المخزون الآن', 'Not in stock right now');
-  // OWNER: Sorani to be written by hand (the two divider labels above).
+      ? loc('بطلب مسبق', 'Pre-order', 'بە پێش-داواکاری')
+      : loc('ليست في المخزون الآن', 'Not in stock right now', 'ئێستا لە کۆگادا نییە');
 
   return (
     <div className="w-full pb-24 text-text-secondary min-h-screen">
@@ -242,6 +258,15 @@ export default function Products() {
       </div>
 
       <div className="p-4">
+        {search && extras && !error && (
+          <SearchHead
+            a={extras}
+            count={products.length}
+            // A removed chip is the search without its words — a REPLACE, like every refinement here.
+            onDrop={(text) => navigate(text ? `/products?search=${encodeURIComponent(text)}` : '/products', { replace: true })}
+            className="mb-3"
+          />
+        )}
         {loading && products.length === 0 ? (
           <ProductGridSkeleton count={8} density="compact" className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5" />
         ) : error != null ? (
@@ -285,7 +310,7 @@ export default function Products() {
                     <span className="h-px flex-1 bg-border-subtle" />
                   </div>
                 )}
-                <ProductCard p={p} density="compact" compareToggle {...gridImageLoading(i, FIRST_SCREEN_CARDS)} />
+                <ProductCard p={p} density="compact" compareToggle {...gridImageLoading(i, FIRST_SCREEN_CARDS)} href={resultHref(cardHref(p), p, extras)} />
               </React.Fragment>
             ))}
           </div>

@@ -146,8 +146,7 @@ export function CommandPalette({
     setRecent(readRecent(recentKey));
   }, [open, recentKey]);
 
-  // OWNER: Sorani to be written by hand.
-  const recentLabel = loc('الأخيرة', 'Recent');
+  const recentLabel = loc('الأخيرة', 'Recent', 'دواییەکان');
 
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];

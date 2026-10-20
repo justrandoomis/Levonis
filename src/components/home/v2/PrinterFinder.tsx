@@ -40,20 +40,20 @@ export default function PrinterFinder() {
       className="lv-finder-texture relative overflow-hidden rounded-2xl bg-charcoal px-3 py-4 shadow-sm lg:flex lg:items-center lg:justify-between lg:gap-10 lg:px-10 lg:py-8"
     >
       <div className="text-center lg:text-start">
-        {/* OWNER: Sorani to be written by hand (this section's three strings and three labels). */}
         <h2 id="home-finder-title" className="text-[16px] font-bold leading-6 text-ivory lg:text-[24px] lg:leading-9">
-          {loc('محتار أي طابعة تناسبك؟', 'Not sure which printer suits you?')}
+          {loc('محتار أي طابعة تناسبك؟', 'Not sure which printer suits you?', 'نازانیت کام چاپکەر بۆت گونجاوە؟')}
         </h2>
         <p className="mt-0.5 text-[12px] leading-5 text-text-secondary lg:mt-1 lg:text-[15px] lg:leading-6">
           {loc(
             'أجب على بعض الأسئلة البسيطة وسنرشح لك أفضل الخيارات.',
-            'Answer a few simple questions and we will suggest the best options.'
+            'Answer a few simple questions and we will suggest the best options.',
+            'وەڵامی چەند پرسیارێکی سادە بدەرەوە و باشترین هەڵبژاردەکانت بۆ پێشنیار دەکەین.'
           )}
         </p>
       </div>
       <div className="mt-3 flex items-stretch gap-1.5 lg:mt-0 lg:shrink-0 lg:gap-3">
         <Link to="/compare" className={secondary}>
-          {loc('قارن الطابعات', 'Compare printers')}
+          {loc('قارن الطابعات', 'Compare printers', 'چاپکەرەکان بەراورد بکە')}
         </Link>
         <Link
           to="/support?ask=choose_printer"
@@ -62,11 +62,11 @@ export default function PrinterFinder() {
           <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="hidden h-4 w-4 shrink-0 lg:block">
             <path d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3M3.4 3.4l1.8 1.8M10.8 10.8l1.8 1.8M3.4 12.6l1.8-1.8M10.8 5.2l1.8-1.8" />
           </svg>
-          {loc('ساعدني أختار', 'Help me choose')}
+          {loc('ساعدني أختار', 'Help me choose', 'یارمەتیم بدە هەڵبژێرم')}
         </Link>
         {communityShut ? null : (
           <Link to="/community" className={secondary}>
-            {loc('اسأل مجتمع Levo', 'Ask the Levo community')}
+            {loc('اسأل مجتمع Levo', 'Ask the Levo community', 'پرسیار لە کۆمەڵگەی Levo بکە')}
           </Link>
         )}
       </div>

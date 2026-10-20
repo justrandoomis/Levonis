@@ -550,7 +550,8 @@ test('catalogue opening hints use exactly the client search and category request
   const { call } = realWorker();
   const res = await call(APEX, '/products?category=cat%26x&search=PLA&debug=1&limit=1');
   const html = await res.text();
-  assert.match(html, /href="\/api\/products\?search=PLA&amp;category=cat%26x&amp;limit=50"/);
+  // `nl=1`: a search reads its words as constraints (smart search 1.7), exactly as src/pages/Products.tsx asks.
+  assert.match(html, /href="\/api\/products\?search=PLA&amp;category=cat%26x&amp;limit=50&amp;nl=1"/);
   assert.doesNotMatch(html, /debug=1/);
   assert.equal(inline(html)?.kind, 'main');
   const product = await call(APEX, '/product/filament-pla');

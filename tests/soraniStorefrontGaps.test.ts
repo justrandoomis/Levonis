@@ -11,7 +11,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
 import { ROOT } from './fixtures/d1';
@@ -21,13 +21,27 @@ import { dayLabel } from '../worker/lib/deliveryDay';
 
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
 
-/** `loc(...)` calls in a file that pass fewer than three languages. */
-function twoLanguageLoc(rel: string): string[] {
+/** A string the source spells out whole: `'…'`, `"…"` or a template with nothing in it. */
+const literal = (n: ts.Node | undefined): string | null =>
+  n && (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) ? n.text : null;
+
+/**
+ * `loc(...)` calls in a file that pass fewer than three languages — or, with
+ * `copies` (smart search 1.7, the assistant plan §6 «Languages»: the check
+ * extended to the search, assist and diagnose files), whose Sorani slot is
+ * the Arabic string copied letter for letter (DECISIONS row 183). A string
+ * that is the same in every language by nature (a code, a brand) is written
+ * without `loc`.
+ */
+function twoLanguageLoc(rel: string, { copies = false }: { copies?: boolean } = {}): string[] {
   const sf = ts.createSourceFile(rel, read(rel), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const out: string[] = [];
   const visit = (n: ts.Node) => {
-    if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === 'loc' && n.arguments.length < 3) {
-      out.push(`${rel}:${sf.getLineAndCharacterOfPosition(n.getStart()).line + 1} ${n.getText().slice(0, 80)}`);
+    if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === 'loc') {
+      const ar = literal(n.arguments[0]);
+      if (n.arguments.length < 3 || (copies && ar !== null && ar === literal(n.arguments[2]))) {
+        out.push(`${rel}:${sf.getLineAndCharacterOfPosition(n.getStart()).line + 1} ${n.getText().slice(0, 80)}`);
+      }
     }
     ts.forEachChild(n, visit);
   };
@@ -105,7 +119,7 @@ function sourceFiles(dir: string): string[] {
 const MERCHANT_TWO_LANGUAGE_CEILING = 1188;
 
 test('the merchant admin never gains a two-language string; the ceiling only comes down', () => {
-  const found = sourceFiles('src/components/merchant').flatMap(twoLanguageLoc);
+  const found = sourceFiles('src/components/merchant').flatMap((f) => twoLanguageLoc(f));
   assert.ok(
     found.length <= MERCHANT_TWO_LANGUAGE_CEILING,
     `${found.length} two-language loc() calls under src/components/merchant, over the ceiling of ${MERCHANT_TWO_LANGUAGE_CEILING} — write the Sorani`
@@ -129,4 +143,53 @@ test('the shared pieces every merchant screen shows speak Sorani: DataList selec
   const list = read('src/components/ui/DataList.tsx');
   assert.ok(list.includes("loc('تحديد الكل', 'Select all', 'هەمووی هەڵبژێرە')"));
   assert.ok(list.includes("loc('إلغاء التحديد', 'Clear selection', 'پاککردنەوەی هەڵبژاردن')"));
+});
+
+// ---------------------------------------------------------- the search entries
+
+/**
+ * EVERY WAY INTO SEARCH SPEAKS SORANI (smart search 1.7; the assistant plan §1
+ * listed the leaks: TopBarSearch, SearchOverlay, ScopedSearch, CommandPalette,
+ * FinderBand, the home PrinterFinder and ProductPickerSheet passed Arabic and
+ * English only). The extended check — no two-language `loc()` and no Arabic
+ * copied into the Sorani slot — holds them, the live field and its panel, the
+ * results page, and every file of the assistant and the diagnose screens as
+ * they are written (src/components/assist, src/components/diagnose).
+ */
+const SEARCH_ENTRIES = [
+  'src/components/catalog/TopBarSearch.tsx',
+  'src/components/catalog/SearchOverlay.tsx',
+  'src/components/listing/ScopedSearch.tsx',
+  'src/components/ui/CommandPalette.tsx',
+  'src/components/catalog/FinderBand.tsx',
+  'src/components/home/v2/PrinterFinder.tsx',
+  'src/components/chat/ProductPickerSheet.tsx',
+  'src/pages/Products.tsx',
+  'src/components/community/search/SearchOverlay.tsx',
+];
+
+test('every search entry, the live field, the assistant and diagnose speak Sorani — and never the Arabic in its place', () => {
+  const dirs = ['src/components/search', 'src/components/assist', 'src/components/diagnose'].filter((d) => existsSync(join(ROOT, d)));
+  const files = [...SEARCH_ENTRIES, ...dirs.flatMap(sourceFiles)];
+  assert.ok(files.includes('src/components/search/searchKit.tsx'), 'the search UI files were not walked');
+  assert.deepEqual(files.flatMap((f) => twoLanguageLoc(f, { copies: true })), []);
+  for (const f of SEARCH_ENTRIES) assert.doesNotMatch(read(f), /OWNER: Sorani to be written by hand/, `${f} still says its Sorani is missing`);
+  // The words themselves, as written (Sorani, with its own letters — not the Arabic).
+  assert.ok(read('src/components/catalog/TopBarSearch.tsx').includes("loc('بحث في المتجر', 'Search the shop', 'گەڕان لە فرۆشگادا')"));
+  assert.ok(read('src/components/home/v2/PrinterFinder.tsx').includes("loc('ساعدني أختار', 'Help me choose', 'یارمەتیم بدە هەڵبژێرم')"));
+  assert.ok(read('src/components/chat/ProductPickerSheet.tsx').includes("loc('نفدت الكمية', 'Out of stock', 'تەواو بوو')"));
+  assert.ok(read('src/components/ui/CommandPalette.tsx').includes("loc('الأخيرة', 'Recent', 'دواییەکان')"));
+});
+
+test('the extended check catches what it is for: two languages, and the Arabic copied into the Sorani slot', () => {
+  const probe = join('tests', 'fixtures', '__soraniProbe.tsx');
+  const src = "loc('بحث', 'Search');\nloc('بحث', 'Search', 'بحث');\nloc('بحث', 'Search', 'گەڕان');\nloc(name.ar, name.en, name.ar);\n";
+  const path = join(ROOT, probe);
+  writeFileSync(path, src);
+  try {
+    assert.equal(twoLanguageLoc(probe).length, 1, 'the old check: only the two-language call');
+    assert.deepEqual(twoLanguageLoc(probe, { copies: true }).map((l) => l.split(' ')[0]), [`${probe}:1`, `${probe}:2`]);
+  } finally {
+    rmSync(path, { force: true });
+  }
 });
