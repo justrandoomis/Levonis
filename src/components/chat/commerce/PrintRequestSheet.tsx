@@ -87,11 +87,11 @@ export default function PrintRequestSheet({
 
   function validate(): boolean {
     const next: Partial<Record<keyof Form, string>> = {};
-    if (f.title.trim().length < 4) next.title = loc('اكتب عنوانًا للطلب (4 أحرف على الأقل)', 'Give the request a title (at least 4 characters)');
-    if (f.description.trim().length < 10) next.description = loc('صف ما تريد طباعته (10 أحرف على الأقل)', 'Describe what you want printed (at least 10 characters)');
+    if (f.title.trim().length < 4) next.title = loc('اكتب عنوانًا للطلب (4 أحرف على الأقل)', 'Give the request a title (at least 4 characters)', 'ناونیشانێک بۆ داواکارییەکە بنووسە (لانیکەم ٤ پیت)');
+    if (f.description.trim().length < 10) next.description = loc('صف ما تريد طباعته (10 أحرف على الأقل)', 'Describe what you want printed (at least 10 characters)', 'ئەوەی دەتەوێت چاپ بکرێت باس بکە (لانیکەم ١٠ پیت)');
     const q = Number(f.quantity);
-    if (!Number.isInteger(q) || q < 1) next.quantity = loc('عدد صحيح من 1', 'A whole number from 1');
-    if (f.budget && (!Number.isInteger(Number(f.budget)) || Number(f.budget) < 0)) next.budget = loc('بالدينار، أرقام فقط', 'In dinars, digits only');
+    if (!Number.isInteger(q) || q < 1) next.quantity = loc('عدد صحيح من 1', 'A whole number from 1', 'ژمارەیەکی تەواو، لە ١ بەرەو سەر');
+    if (f.budget && (!Number.isInteger(Number(f.budget)) || Number(f.budget) < 0)) next.budget = loc('بالدينار، أرقام فقط', 'In dinars, digits only', 'بە دینار، تەنها ژمارە');
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -104,7 +104,7 @@ export default function PrintRequestSheet({
     }
     setBusy(true);
     try {
-      setStage(loc('جارٍ تجهيز الطلب…', 'Preparing the request…'));
+      setStage(loc('جارٍ تجهيز الطلب…', 'Preparing the request…', 'داواکارییەکە ئامادە دەکرێت…'));
       const { request } = await chatCommerceApi.draftPrintRequest(chatId, {
         title: f.title.trim(),
         description: f.description.trim(),
@@ -127,9 +127,9 @@ export default function PrintRequestSheet({
         });
         if (reasons.length) throw reasons[0];
       }
-      setStage(loc('جارٍ الإرسال…', 'Sending…'));
+      setStage(loc('جارٍ الإرسال…', 'Sending…', 'دەنێردرێت…'));
       await chatCommerceApi.sendPrintRequest(chatId, request.id);
-      toast.success(loc('أُرسل طلب الطباعة إلى المتجر', 'The print request was sent to the store'));
+      toast.success(loc('أُرسل طلب الطباعة إلى المتجر', 'The print request was sent to the store', 'داواکاری چاپکردنەکە بۆ فرۆشگاکە نێردرا'));
       setF(EMPTY);
       setFiles([]);
       onSent();
@@ -154,55 +154,58 @@ export default function PrintRequestSheet({
       dirty={!busy && (f.title !== '' || f.description !== '' || files.length > 0)}
       header={
         <div className="border-b border-border-subtle px-4 pb-3 pt-1">
-          <h2 id={titleId} className="text-center text-[16px] font-extrabold text-text-primary">{loc('طلب طباعة', 'Print request')}</h2>
+          <h2 id={titleId} className="text-center text-[16px] font-extrabold text-text-primary">{loc('طلب طباعة', 'Print request', 'داواکاری چاپکردن')}</h2>
           <p className="mt-1 text-center text-[12px] text-text-muted">
-            {loc(`يصل إلى ${storeName} وحده، ويرد عليك بعرض سعر هنا.`, `Goes to ${storeName} only, who answers with a quote here.`)}
+            {loc(
+              `يصل إلى ${storeName} وحده، ويرد عليك بعرض سعر هنا.`,
+              `Goes to ${storeName} only, who answers with a quote here.`,
+              `تەنها بۆ ${storeName} دەچێت، و لێرەدا بە پێشنیاری نرخ وەڵامت دەداتەوە.`
+            )}
           </p>
-          {/* OWNER: Sorani to be written by hand (this sheet). */}
         </div>
       }
       footer={
         <div className="flex flex-col gap-2 px-4 py-3">
           {stage && <p role="status" className="text-center text-[12px] text-text-muted">{stage}</p>}
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={onClose} disabled={busy}>{loc('إلغاء', 'Cancel')}</Button>
+            <Button variant="secondary" onClick={onClose} disabled={busy}>{loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}</Button>
             <Button variant="primary" block loading={busy} onClick={() => formRef.current?.requestSubmit()} data-print-request-submit>
-              {loc('أرسل الطلب', 'Send the request')}
+              {loc('أرسل الطلب', 'Send the request', 'داواکارییەکە بنێرە')}
             </Button>
           </div>
         </div>
       }
     >
       <form ref={formRef} onSubmit={(e) => void submit(e)} noValidate className="flex flex-col gap-4 px-4 py-4">
-        <Field label={loc('العنوان', 'Title')} error={errors.title} required>
-          <Input value={f.title} onChange={set('title')} maxLength={140} placeholder={loc('مثلًا: قطعة غيار لمروحة', 'e.g. A spare part for a fan')} />
+        <Field label={loc('العنوان', 'Title', 'ناونیشان')} error={errors.title} required>
+          <Input value={f.title} onChange={set('title')} maxLength={140} placeholder={loc('مثلًا: قطعة غيار لمروحة', 'e.g. A spare part for a fan', 'وەک: پارچەیەکی یەدەگ بۆ پانکە')} />
         </Field>
-        <Field label={loc('الوصف', 'Description')} error={errors.description} required>
+        <Field label={loc('الوصف', 'Description', 'وەسف')} error={errors.description} required>
           <Textarea value={f.description} onChange={set('description')} rows={4} maxLength={6000} />
         </Field>
         <div className="grid grid-cols-3 gap-3">
-          <Field label={loc('الكمية', 'Quantity')} error={errors.quantity}>
+          <Field label={loc('الكمية', 'Quantity', 'بڕ')} error={errors.quantity}>
             <Input value={f.quantity} onChange={set('quantity')} inputMode="numeric" ltr />
           </Field>
-          <Field label={loc('المادة', 'Material')} optional>
+          <Field label={loc('المادة', 'Material', 'ماددە')} optional>
             <Input value={f.material} onChange={set('material')} maxLength={60} placeholder="PLA" />
           </Field>
-          <Field label={loc('اللون', 'Colour')} optional>
+          <Field label={loc('اللون', 'Colour', 'ڕەنگ')} optional>
             <Input value={f.color} onChange={set('color')} maxLength={60} />
           </Field>
         </div>
-        <Field label={loc('المقاسات', 'Dimensions')} optional>
-          <Input value={f.dimensions} onChange={set('dimensions')} maxLength={120} placeholder={loc('مثلًا: 10 × 5 × 3 سم', 'e.g. 10 × 5 × 3 cm')} />
+        <Field label={loc('المقاسات', 'Dimensions', 'ڕەهەندەکان')} optional>
+          <Input value={f.dimensions} onChange={set('dimensions')} maxLength={120} placeholder={loc('مثلًا: 10 × 5 × 3 سم', 'e.g. 10 × 5 × 3 cm', 'وەک: ١٠ × ٥ × ٣ سم')} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label={loc('الميزانية (د.ع)', 'Budget (IQD)')} error={errors.budget} optional>
+          <Field label={loc('الميزانية (د.ع)', 'Budget (IQD)', 'بودجە (دینار)')} error={errors.budget} optional>
             <Input value={f.budget} onChange={set('budget')} inputMode="numeric" ltr />
           </Field>
-          <Field label={loc('مطلوب قبل', 'Needed by')} optional>
+          <Field label={loc('مطلوب قبل', 'Needed by', 'پێویستە پێش')} optional>
             <Input type="date" value={f.deadline} onChange={set('deadline')} ltr />
           </Field>
         </div>
-        <Field label={loc('ملاحظات للمتجر', 'Notes for the store')} optional>
+        <Field label={loc('ملاحظات للمتجر', 'Notes for the store', 'تێبینی بۆ فرۆشگاکە')} optional>
           <Textarea value={f.notes} onChange={set('notes')} rows={2} maxLength={1000} />
         </Field>
         <div>
@@ -222,7 +225,7 @@ export default function PrintRequestSheet({
             }}
           />
           <Button variant="secondary" size="sm" icon={<Paperclip className="w-4 h-4" aria-hidden="true" />} onClick={() => fileRef.current?.click()} disabled={busy || files.length >= MAX_FILES}>
-            {loc('أرفق صورًا أو ملف النموذج', 'Attach pictures or the model file')}
+            {loc('أرفق صورًا أو ملف النموذج', 'Attach pictures or the model file', 'وێنە یان فایلی مۆدێلەکە هاوپێچ بکە')}
           </Button>
           <p className="mt-1.5 text-[12px] text-text-muted">
             {loc(
@@ -243,7 +246,7 @@ export default function PrintRequestSheet({
                       setFiles((prev) => prev.filter((_, j) => j !== i));
                       setFileError('');
                     }}
-                    aria-label={loc(`إزالة ${file.name}`, `Remove ${file.name}`)}
+                    aria-label={loc(`إزالة ${file.name}`, `Remove ${file.name}`, `لابردنی ${file.name}`)}
                     className="min-w-9 min-h-9 inline-flex items-center justify-center rounded-md text-text-secondary hover:bg-surface-selected"
                     disabled={busy}
                   >
@@ -255,9 +258,13 @@ export default function PrintRequestSheet({
           )}
         </div>
         <p className="rounded-lg bg-surface-raised px-3 py-2 text-[12px] leading-relaxed text-text-secondary">
-          {loc('تريد عروضًا من عدة ورش تتنافس على طلبك؟', 'Want quotes from several workshops competing for your job?')}{' '}
+          {loc(
+            'تريد عروضًا من عدة ورش تتنافس على طلبك؟',
+            'Want quotes from several workshops competing for your job?',
+            'دەتەوێت چەند وۆرکشۆپێک لەسەر کارەکەت پێشبڕکێ بکەن و نرخت بۆ بنێرن؟'
+          )}{' '}
           <Link to="/requests?view=new" className="font-semibold underline underline-offset-2">
-            {loc('انشره في مجتمع ليفو', 'Post it on Levo Community')}
+            {loc('انشره في مجتمع ليفو', 'Post it on Levo Community', 'لە کۆمەڵگەی لیڤۆ بڵاوی بکەرەوە')}
           </Link>
         </p>
       </form>

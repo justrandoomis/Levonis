@@ -293,6 +293,24 @@ test('the chat print-request sheet reads the one table and takes the door it pic
   assert.doesNotMatch(code('src/lib/chatCommerceApi.ts'), /uploadRequestFile:/, 'no whole-body-only helper left to call');
 });
 
+test('the chat print-request sheet is written in Sorani line by line — never the Arabic falling back', () => {
+  const src = read('src/components/chat/commerce/PrintRequestSheet.tsx');
+  const calls = [...src.matchAll(/loc\(\s*('(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)\s*,\s*('(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)\s*(?:,\s*('(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`))?\s*\)/g)];
+  assert.ok(calls.length >= 29, `the sheet has its loc calls (${calls.length})`);
+  assert.equal(calls.length, (src.match(/\bloc\(/g) ?? []).length, 'every loc call is a literal triple the check can read');
+  assert.deepEqual(calls.filter((m) => !m[3]).map((m) => m[2]), [], 'a loc call without Sorani falls back to the Arabic');
+  for (const m of calls) {
+    const [ar, , ckb] = [m[1], m[2], m[3]!];
+    assert.notEqual(ckb, ar, `${m[2]}: the Sorani is the Arabic`);
+    if (/[؀-ۿ]{2,}\s+[؀-ۿ]{2,}/.test(ckb)) assert.match(ckb, KURDISH, `${m[2]}: «${ckb}» has no Sorani letter`);
+  }
+  const sorani = (en: string) => calls.find((m) => m[2].slice(1, -1) === en)?.[3]?.slice(1, -1);
+  assert.equal(sorani('Attach pictures or the model file'), 'وێنە یان فایلی مۆدێلەکە هاوپێچ بکە');
+  assert.equal(sorani('Sending…'), 'دەنێردرێت…');
+  assert.equal(sorani('Remove ${file.name}'), 'لابردنی ${file.name}');
+  assert.doesNotMatch(src, /OWNER: Sorani to be written/);
+});
+
 test('the request page: session uploads draw the shared tile, the meta line follows the page direction, My requests says the colour in the reader words', () => {
   const list = code('src/components/media/RequestAttachments.tsx');
   assert.doesNotMatch(list, /slice\(0, room\)/, 'no silent slice');

@@ -240,6 +240,37 @@ export function classifyRequestFile(buf: Uint8Array, fileName = ''): Attachment 
   return null;
 }
 
+/**
+ * A REQUEST FILE SENT WITH NO EXTENSION — a camera shot an in-app browser
+ * names only with digits (`20261020_1234`), or a name ending in a bare dot.
+ * The whole-body door took these before P1-03 and takes them again (lead
+ * decision, 2026-10-20): with no name to hold the bytes to, the bytes alone
+ * must prove a picture or a model. So the classifier is asked with NO name —
+ * only formats that carry their own signature can pass (JPEG, PNG, GIF, WebP,
+ * AVIF; a binary STL whose triangle count reproduces its length; a GLB) —
+ * and a text format (ASCII STL, OBJ, STEP, glTF, AMF) or a ZIP never does.
+ * A PDF proves itself too, but it is a document, not a picture or a model:
+ * it must be named `.pdf`. A name WITH an extension keeps the strict rule.
+ */
+export function classifyUnnamedRequestFile(buf: Uint8Array): Attachment | null {
+  const sniffed = classifyRequestFile(buf, '');
+  return sniffed && (sniffed.kind === 'reference' || sniffed.kind === 'model') ? sniffed : null;
+}
+
+/**
+ * THE STORED NAME OF A REQUEST FILE: `safeFileName`, always ending in `.ext`
+ * — the extension the bytes were proven against. A name longer than the
+ * 120-character cut keeps it (`….html` is never cut out of `….html.png`), and
+ * a name with none gets the one its bytes proved appended
+ * (`20261020_1234` → `20261020_1234.jpg`, `photo.` → `photo.jpg`).
+ */
+export function storedRequestFileName(raw: unknown, ext: string): string {
+  const name = safeFileName(raw, ext);
+  if (extensionOf(name) === ext.toLowerCase()) return name;
+  const base = name.slice(0, 119 - ext.length).replace(/\.+$/, '') || 'attachment';
+  return `${base}.${ext}`;
+}
+
 // --------------------------------------------- the asset platform (§9.4)
 
 /**

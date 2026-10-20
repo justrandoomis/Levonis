@@ -34,7 +34,7 @@ import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { printRequestRoutes } from '../worker/routes/printRequests';
 import { uploadSessionRoutes, limitsForPurpose } from '../worker/routes/uploadSessions';
 import { MAX_FILES_PER_REQUEST } from '../worker/lib/requestFileRoom';
-import { attachmentDisposition, classifyRequestFile } from '../worker/lib/attachments';
+import { attachmentDisposition, classifyRequestFile, classifyUnnamedRequestFile, storedRequestFileName } from '../worker/lib/attachments';
 import { SETTING_DEFAULTS } from '../worker/lib/settings';
 import {
   REQUEST_FILE_EXTENSIONS,
@@ -289,7 +289,6 @@ test('the whole-body door asks the name as the session does: an executable dress
     ['drawing.exe', pe, 'exe'],
     ['drawing.avif', pe, null],
     ['x.html', jpeg(), 'html'],
-    ['1697812345678', jpeg(), ''],
   ] as Array<[string, Uint8Array, string | null]>) {
     const res = await viaSimpleDoor(raw, bucket, id, name, bytes);
     const body = await json(res);
@@ -308,6 +307,101 @@ test('the whole-body door asks the name as the session does: an executable dress
   const spelled = await viaSimpleDoor(raw, bucket, id, 'photo.JPEG', jpeg());
   assert.equal(spelled.status, 201, JSON.stringify(await json(spelled.clone())));
   assert.equal((await json(spelled)).file.file_name, 'photo.JPEG');
+});
+
+/** A plain Windows executable: `MZ`, the PE header offset at 0x3c, `PE\0\0`. */
+function pe(): Uint8Array {
+  const out = new Uint8Array(4096);
+  out.set([0x4d, 0x5a, 0x90, 0x00]); // MZ
+  new DataView(out.buffer).setUint32(0x3c, 0x80, true); // e_lfanew
+  out.set([0x50, 0x45, 0, 0], 0x80); // PE\0\0
+  return out;
+}
+
+test('a name with NO extension (a camera shot named by digits, or a bare trailing dot) is taken by the whole-body door when its bytes prove a picture or a model, and stored with the proven extension appended', async () => {
+  const raw = seed();
+  const bucket = memoryBucket();
+  const id = await newDraft(raw, bucket);
+
+  for (const [name, bytes, stored, mime, kind] of [
+    ['20261020_1234', jpeg(), '20261020_1234.jpg', 'image/jpeg', 'reference'],
+    ['photo.', png(), 'photo.png', 'image/png', 'reference'],
+    ['20261020_1235', stl(), '20261020_1235.stl', 'model/stl', 'model'],
+  ] as Array<[string, Uint8Array, string, string, string]>) {
+    const res = await viaSimpleDoor(raw, bucket, id, name, bytes);
+    const body = await json(res);
+    assert.equal(res.status, 201, `${name}: ${JSON.stringify(body)}`);
+    assert.equal(body.file.file_name, stored, `${name}: the sniffed extension is appended`);
+    assert.equal(body.file.content_type, mime, name);
+    assert.equal(body.file.kind, kind, name);
+    const saved = row<{ file_name: string; content_type: string; file_key: string }>(
+      raw, 'SELECT file_name, content_type, file_key FROM community_request_files WHERE id = ?', body.file.id
+    )!;
+    assert.equal(saved.file_name, stored, `${name}: the row keeps the proven name`);
+    assert.equal(saved.content_type, mime, name);
+    assert.ok(saved.file_key.endsWith(`.${stored.split('.').pop()}`), `${name}: the key carries the sniffed extension too (${saved.file_key})`);
+  }
+
+  // A long name with none keeps the appended extension past the 120-character cut.
+  const long = await viaSimpleDoor(raw, bucket, id, '9'.repeat(200), jpeg());
+  assert.equal(long.status, 201, JSON.stringify(await json(long.clone())));
+  const longName = (await json(long)).file.file_name as string;
+  assert.ok(longName.endsWith('.jpg') && longName.length <= 120, longName);
+  assert.equal(fileRows(raw, id), 4);
+
+  // Bytes that prove nothing a request takes are refused, named or not: an
+  // executable (plain, or dressed as AVIF), a text format the name would have
+  // to choose (OBJ), a PDF (a document must be named .pdf), a ZIP — with the
+  // name-less refusal the screen renders ("This file is not accepted on a
+  // request" and what a request does take). Nothing refused is stored.
+  const obj = new TextEncoder().encode('v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n');
+  for (const [name, bytes] of [
+    ['20261020_1236', pe()],
+    ['photo.', pe()],
+    ['20261020_1237', peDressedAsAvif()],
+    ['20261020_1238', obj],
+    ['20261020_1239', pdf()],
+    ['20261020_1240', new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0, 0, 0, 0])],
+  ] as Array<[string, Uint8Array]>) {
+    const res = await viaSimpleDoor(raw, bucket, id, name, bytes);
+    const body = await json(res);
+    assert.equal(res.status, 400, `${name}: ${JSON.stringify(body)}`);
+    assert.equal(body.code, 'UPLOAD_KIND_NOT_ALLOWED', name);
+    assert.deepEqual(body.details, { extension: '', purpose: 'request' }, name);
+  }
+  // A camera HEIC named by digits is told it is HEIC, as a renamed one is.
+  const h = await viaSimpleDoor(raw, bucket, id, '20261020_1241', heic());
+  assert.equal(h.status, 400);
+  assert.equal((await json(h)).code, 'IMAGE_HEIC_UNSUPPORTED');
+  // Over the whole-body ceiling with no name to read a kind from: the route's own ceiling, no kind.
+  const big = new Uint8Array(REQUEST_FILE_LIMITS.wholeBodyMaxBytes + 1);
+  big.set(jpeg());
+  const tooBig = await viaSimpleDoor(raw, bucket, id, '20261020_1242', big);
+  assert.equal(tooBig.status, 400);
+  assert.deepEqual((await json(tooBig)).details, { limit_bytes: REQUEST_FILE_LIMITS.wholeBodyMaxBytes, door: 'whole_body' });
+  assert.equal(fileRows(raw, id), 4, 'nothing refused was stored');
+
+  // A name WITH an extension keeps the strict rule: in the table, and what the bytes are.
+  for (const [name, bytes] of [['shot.html', jpeg()], ['shot.png', jpeg()], ['shot.exe', pe()]] as Array<[string, Uint8Array]>) {
+    const res = await viaSimpleDoor(raw, bucket, id, name, bytes);
+    assert.equal(res.status, 400, name);
+    assert.equal((await json(res)).code, 'UPLOAD_KIND_NOT_ALLOWED', name);
+  }
+  assert.equal(fileRows(raw, id), 4);
+});
+
+test('storedRequestFileName: the proven extension is kept or appended, never cut, never left bare', () => {
+  assert.equal(storedRequestFileName('20261020_1234', 'jpg'), '20261020_1234.jpg');
+  assert.equal(storedRequestFileName('photo.', 'png'), 'photo.png');
+  assert.equal(storedRequestFileName('photo...', 'png'), 'photo.png');
+  assert.equal(storedRequestFileName('photo.JPEG', 'jpeg'), 'photo.JPEG');
+  assert.equal(storedRequestFileName('...', 'jpg'), 'attachment.jpg');
+  assert.equal(storedRequestFileName('', 'stl'), 'attachment.stl');
+  assert.equal(storedRequestFileName('صورة', 'jpg'), 'صورة.jpg');
+  const cut = storedRequestFileName(`${'a'.repeat(115)}.html.png`, 'png');
+  assert.ok(cut.endsWith('.png') && cut.length <= 120 && !cut.includes('..'), cut);
+  assert.equal(classifyUnnamedRequestFile(pdf()), null, 'a document must be named');
+  assert.equal(classifyUnnamedRequestFile(jpeg())?.ext, 'jpg');
 });
 
 test('a listed extension whose bytes are not that format gets the SAME answer from both doors — HEIC as HEIC, the rest as a mismatch', async () => {
