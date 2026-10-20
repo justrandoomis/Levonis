@@ -273,6 +273,8 @@ const ROWS: Row[] = [
   { q: 'بين 900 و 500 الف', lang: 'ar', expect: { price: [500_000, 900_000], text: '' } },
   { q: 'بين 600 و 400 الف', lang: 'ar', expect: { price: [400_000, 600_000], text: '' } },
   { q: 'بين 7 و 5 الاف', lang: 'ar', expect: { price: [5_000, 7_000], text: '' } },
+  // A count ten times the other's or more is not one written high-to-low: 500,000 to a million, like «بين 500 و مليون».
+  { q: 'بين 500 و 1 مليون', lang: 'ar', expect: { price: [500_000, 1_000_000], text: '' } },
   { q: 'بين 500 الف و 400', lang: 'ar', expect: { price: [400_000, 500_000], text: '' } },
   { q: 'بين 500 الف و مليون', lang: 'ar', expect: { price: [500_000, 1_000_000], text: '' } },
   { q: '250-400 الف', lang: 'ar', expect: { price: [250_000, 400_000], text: '' } },
@@ -296,6 +298,7 @@ const ROWS: Row[] = [
   { q: 'between 3 and 2 million', lang: 'en', expect: { price: [2_000_000, 3_000_000], text: '' } },
   { q: 'between 900 and 500k', lang: 'en', expect: { price: [500_000, 900_000], text: '' } },
   { q: 'between 600 and 400k', lang: 'en', expect: { price: [400_000, 600_000], text: '' } },
+  { q: 'between 500 and 1 million', lang: 'en', expect: { price: [500_000, 1_000_000], text: '' } },
   { q: 'between 500k and 1m', lang: 'en', expect: { price: [500_000, 1_000_000], text: '' } },
   { q: '$100 to 200', lang: 'en', expect: { price: [100, 200], usd: true, text: '' } },
   { q: 'between $5 and $10', lang: 'en', expect: { price: [5, 10], usd: true, text: '' } },
@@ -328,6 +331,9 @@ const ROWS: Row[] = [
   { q: 'اكثر من 5000 واقل من 15000', lang: 'ar', expect: { price: [5_000, 15_000], text: '' } },
   { q: 'اكثر من 20 واقل من 50', lang: 'ar', expect: { price: [20_000, 50_000], text: '' } },
   { q: 'طابعة اكثر من 500 الف واقل من مليون', lang: 'ar', expect: { price: [500_000, 1_000_000], text: 'طابعة' } },
+  // Two bounds share a money word as a range with an opener does.
+  { q: 'اكثر من 2 واقل من 3 مليون', lang: 'ar', expect: { price: [2_000_000, 3_000_000], text: '' } },
+  { q: 'اقل من 3 مليون واكثر من 2', lang: 'ar', expect: { price: [2_000_000, 3_000_000], text: '' } },
   { q: 'اكثر من 10 واقل من 30 الف PLA', lang: 'ar', expect: { price: [10_000, 30_000], text: 'PLA', materials: ['pla'], drop: { price: 'PLA', 'material:pla': 'اكثر من 10 واقل من 30 الف' } } },
   { q: 'over 500 and under 1500', lang: 'en', expect: { price: [500, 1_500], text: '' } },
   { q: 'under 1500 and over 500', lang: 'en', expect: { price: [500, 1_500], text: '' } },
@@ -338,6 +344,7 @@ const ROWS: Row[] = [
   { q: 'over 5000 and under 15000', lang: 'en', expect: { price: [5_000, 15_000], text: '' } },
   { q: 'over 20 and under 50', lang: 'en', expect: { price: [20_000, 50_000], text: '' } },
   { q: 'printer over 500k and under 1m', lang: 'en', expect: { price: [500_000, 1_000_000], text: 'printer' } },
+  { q: 'more than 2 and less than 3 million', lang: 'en', expect: { price: [2_000_000, 3_000_000], text: '' } },
   { q: 'زیاتر لە 500 و کەمتر لە 1500', lang: 'ckb', expect: { price: [500, 1_500], text: '' } },
   { q: 'کەمتر لە 1500 و زیاتر لە 500', lang: 'ckb', expect: { price: [500, 1_500], text: '' } },
   { q: 'زیاتر لە 50 و کەمتر لە 20000', lang: 'ckb', expect: { price: [50, 20_000], text: '' } },
@@ -346,6 +353,7 @@ const ROWS: Row[] = [
   { q: 'کەمتر لە 30 هەزار و زیاتر لە 10', lang: 'ckb', expect: { price: [10_000, 30_000], text: '' } },
   { q: 'زیاتر لە 20 و کەمتر لە 50', lang: 'ckb', expect: { price: [20_000, 50_000], text: '' } },
   { q: 'چاپکەر زیاتر لە 500 هەزار و کەمتر لە ملیۆن', lang: 'ckb', expect: { price: [500_000, 1_000_000], text: 'چاپکەر' } },
+  { q: 'زیاتر لە 2 و کەمتر لە 3 ملیۆن', lang: 'ckb', expect: { price: [2_000_000, 3_000_000], text: '' } },
 
   // ======================================================================
   // (c) + (d) A NEGATION CARRIED BY A LIST WORD — exclusions only; the removal keeps the negation
@@ -384,10 +392,14 @@ const ROWS: Row[] = [
   { q: 'بێ ڕەش یان PLA', lang: 'ckb', expect: { text: '', exC: ['black'], exM: ['pla'] } },
   { q: 'بێ AMS یان کۆمبۆ یان ڕەش', lang: 'ckb', expect: { text: '', ex: ['ams', 'combo'], exC: ['black'] } },
   { q: 'چاپکەر کەمتر لە 500 هەزار بێ AMS یان کۆمبۆ', lang: 'ckb', expect: { price: [null, 500_000], text: 'چاپکەر', ex: ['ams', 'combo'] } },
+  // A second negation after the list starts its own: removing «كومبو» leaves «بدون AMS مو اسود».
+  { q: 'بدون AMS ولا كومبو ولا مو اسود', lang: 'ar', expect: { text: '', ex: ['ams', 'combo'], exC: ['black'] } },
   // A direct negation of the spool, then a listed exclusion: removing the spool keeps the AMS left out.
   { q: 'بدون بكرة ولا AMS', lang: 'ar', expect: { text: '', spool: 'refill', ex: ['ams'] } },
   { q: 'without spool or AMS', lang: 'en', expect: { text: '', spool: 'refill', ex: ['ams'] } },
   { q: 'بێ ماسوورە یان AMS', lang: 'ckb', expect: { text: '', spool: 'refill', ex: ['ams'] } },
+  // A bare spool word after the list word is neither left out nor the facet (no filament word): a product word.
+  { q: 'بدون AMS ولا بكرة', lang: 'ar', expect: { text: 'بكرة', ex: ['ams'] } },
   // A price bound after the list word is never negated.
   { q: 'طابعة بدون AMS او اقل من 500 الف', lang: 'ar', expect: { price: [null, 500_000], text: 'طابعة', ex: ['ams'] } },
   { q: 'بدون AMS او اكثر من 500 الف', lang: 'ar', expect: { price: [500_000, null], text: '', ex: ['ams'] } },
@@ -398,6 +410,7 @@ const ROWS: Row[] = [
   { q: 'چاپکەر بێ AMS یان کەمتر لە 500 هەزار', lang: 'ckb', expect: { price: [null, 500_000], text: 'چاپکەر', ex: ['ams'] } },
   { q: 'بێ AMS یان زیاتر لە 500 هەزار', lang: 'ckb', expect: { price: [500_000, null], text: '', ex: ['ams'] } },
   { q: 'فیلامێنت بێ ڕەش یان کەمتر لە 20 هەزار', lang: 'ckb', expect: { price: [null, 20_000], text: 'فیلامێنت', exC: ['black'] } },
+  { q: 'بدون AMS ولا 500 الف', lang: 'ar', expect: { price: [null, 500_000], text: '', ex: ['ams'] } },
   // Nor the sale mode.
   { q: 'بدون AMS ولا متوفر', lang: 'ar', expect: { text: '', ex: ['ams'], sale: 'direct' } },
   { q: 'بدون AMS ولا حجز', lang: 'ar', expect: { text: '', ex: ['ams'], sale: 'preorder' } },
@@ -430,6 +443,10 @@ const ROWS: Row[] = [
   { q: 'بێ AMS یان لەگەڵ کۆمبۆ', lang: 'ckb', expect: { exHas: ['ams'], notEx: ['لەگەڵ'], textHas: ['کۆمبۆ'] } },
   { q: 'بێ AMS یان تەنها کۆمبۆ', lang: 'ckb', expect: { exHas: ['ams'], notEx: ['تەنها'], textHas: ['کۆمبۆ'] } },
   { q: 'فیلامێنت بێ ڕەش تەنها سپی', lang: 'ckb', expect: { exC: ['black'], colours: ['white'], notEx: ['تەنها'], textHas: ['فیلامێنت'] } },
+  { q: 'without AMS or even combo', lang: 'en', expect: { exHas: ['ams'], notEx: ['even'], textHas: ['combo'] } },
+  { q: 'بدون AMS او فقط كومبو', lang: 'ar', expect: { exHas: ['ams'], notEx: ['فقط'], textHas: ['كومبو'] } },
+  { q: 'بێ AMS یان تەنانەت کۆمبۆ', lang: 'ckb', expect: { exHas: ['ams'], notEx: ['تەنانەت'], textHas: ['کۆمبۆ'] } },
+  { q: 'بێ AMS یان بەس کۆمبۆ', lang: 'ckb', expect: { exHas: ['ams'], notEx: ['بەس'], textHas: ['کۆمبۆ'] } },
   // Without a negation, "or" is "or": both are wanted, nothing is left out.
   { q: 'طابعة AMS او كومبو', lang: 'ar', expect: { text: 'طابعة AMS او كومبو' } },
   { q: 'PLA ولا PETG', lang: 'ar', expect: { text: 'PLA PETG', materials: ['pla', 'petg'] } },
@@ -482,6 +499,8 @@ const ROWS: Row[] = [
   { q: 'کەمتر لە 25 هەزار بۆ هەر ماسوورەیەک', lang: 'ckb', expect: { price: [null, 25_000], text: '' } },
   { q: 'کەمتر لە 25 هەزار بۆ هەر ڕۆڵێک', lang: 'ckb', expect: { price: [null, 25_000], text: '' } },
   { q: 'کەمتر لە 5 هەزار بۆ هەر ملیلیترێک', lang: 'ckb', expect: { price: [null, 5_000], text: '' } },
+  { q: 'کەمتر لە 5 هەزار بۆ هەر ملیلیتر', lang: 'ckb', expect: { price: [null, 5_000], text: '' } },
+  { q: 'resin under 5 per millilitre', lang: 'en', expect: { price: [null, 5_000], text: 'resin', materials: ['resin'] } },
 
   // ======================================================================
   // (e) A MEASURE IS NEVER A PRICE — length, temperature, power, time; a quantity stays searched
@@ -516,6 +535,10 @@ const ROWS: Row[] = [
   { q: 'کەمتر لە 300 بۆ هەر ملم', lang: 'ckb', expect: { price: null, text: 'کەمتر لە 300 بۆ هەر ملم' } },
   { q: 'کەمتر لە 300 بۆ هەر پلەیەک', lang: 'ckb', expect: { price: null, text: 'کەمتر لە 300 بۆ هەر پلەیەک' } },
   { q: 'کەمتر لە 40 بۆ هەر واتێک', lang: 'ckb', expect: { price: null, text: 'کەمتر لە 40 بۆ هەر واتێک' } },
+  { q: 'کەمتر لە 30 بۆ هەر سانتیمەترێک', lang: 'ckb', expect: { price: null, text: 'کەمتر لە 30 بۆ هەر سانتیمەترێک' } },
+  { q: 'کەمتر لە 10 بۆ هەر دەقیقەیەک', lang: 'ckb', expect: { price: null, text: 'کەمتر لە 10 بۆ هەر دەقیقەیەک' } },
+  { q: 'اقل من 10 بالدقيقة', lang: 'ar', expect: { price: null, text: 'اقل من 10 بالدقيقة' } },
+  { q: 'under 10 per minute', lang: 'en', expect: { price: null, text: 'under 10 per minute' } },
   { q: 'فیلامێنت کەمتر لە 1 کیلۆ', lang: 'ckb', expect: { price: null, text: 'فیلامێنت کەمتر لە 1 کیلۆ' } },
   { q: 'زیاتر لە 2 کیلۆ', lang: 'ckb', expect: { price: null, text: 'زیاتر لە 2 کیلۆ' } },
   { q: 'کەمتر لە 3 دانە', lang: 'ckb', expect: { price: null, text: 'کەمتر لە 3 دانە' } },
@@ -525,6 +548,9 @@ const ROWS: Row[] = [
   { q: 'فلامنت 2 کیلۆی کەمتر لە 30 هەزار', lang: 'ckb', expect: { price: [null, 30_000], text: 'فلامنت 2 کیلۆی' } },
   { q: 'فیلامێنت 2 کیلۆی کەمتر لە 30 هەزار', lang: 'ckb', expect: { price: [null, 30_000], text: 'فیلامێنت 2 کیلۆی' } },
   { q: 'PLA ٢ کیلۆی کەمتر لە ٣٠ هەزار', lang: 'ckb', expect: { price: [null, 30_000], text: 'PLA ٢ کیلۆی', materials: ['pla'] } },
+  { q: 'فیلامێنت 2 کیلۆی لە 30 هەزار کەمتر', lang: 'ckb', expect: { price: [null, 30_000], text: 'فیلامێنت 2 کیلۆی' } },
+  { q: 'فیلامێنت 2 کیلۆی بە 30 هەزار', lang: 'ckb', expect: { price: [null, 30_000], text: 'فیلامێنت 2 کیلۆی' } },
+  { q: 'دوو کیلۆی کەمتر لە 30 هەزار', lang: 'ckb', expect: { price: [null, 30_000], text: 'دوو کیلۆی' } },
   { q: 'فیلامێنت 1 کیلۆیی کەمتر لە 30 هەزار', lang: 'ckb', expect: { price: [null, 30_000], text: 'فیلامێنت 1 کیلۆیی' } },
   { q: 'PLA 1 کیلۆ کەمتر لە 30 هەزار', lang: 'ckb', expect: { price: [null, 30_000], text: 'PLA 1 کیلۆ', materials: ['pla'] } },
   { q: 'فلامنت 2 كيلو اقل من 30 الف', lang: 'ar', expect: { price: [null, 30_000], text: 'فلامنت 2 كيلو' } },
@@ -610,6 +636,7 @@ const ROWS: Row[] = [
   { q: 'فیلامێنت 1.75 کەمتر لە 25 هەزار', lang: 'ckb', expect: { price: [null, 25_000], text: 'فیلامێنت', diameters: ['1.75'] } },
   { q: 'فیلامێنت 1.75 کەمتر لە 25', lang: 'ckb', expect: { price: [null, 25_000], text: 'فیلامێنت', diameters: ['1.75'] } },
   { q: 'فیلامێنت ڕەش 1.75 کەمتر لە 25 هەزار', lang: 'ckb', expect: { price: [null, 25_000], text: 'فیلامێنت', colours: ['black'], diameters: ['1.75'] } },
+  { q: 'فیلامێنت 1.75 زیاتر لە 20 هەزار', lang: 'ckb', expect: { price: [20_000, null], text: 'فیلامێنت', diameters: ['1.75'] } },
   { q: 'PLA 1.75 کەمتر لە 25 هەزار', lang: 'ckb', expect: { price: [null, 25_000], text: 'PLA', materials: ['pla'], diameters: ['1.75'], contract: false } },
 ];
 
