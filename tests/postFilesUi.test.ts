@@ -218,7 +218,7 @@ test('the picker, the wizard and the chat route large files through the session 
   const wizard = read('src/components/community/requests/RequestWizard.tsx');
   assert.match(wizard, /purpose="request"/);
   assert.match(wizard, /entityId=\{t\.entityId\}/, 'a request upload names its request');
-  assert.match(wizard, /pickUpload\(f\) === 'session'/);
+  assert.match(wizard, /pickRequestUpload\(f\) === 'session'/, 'the request door picker: an unnamed file is proved whole-body');
   assert.match(wizard, /capture="environment"/);
   const chat = read('src/pages/Chat.tsx');
   assert.match(chat, /pickUpload\(file\) === 'session'/);

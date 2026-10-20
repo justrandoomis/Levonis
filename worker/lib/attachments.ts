@@ -189,10 +189,13 @@ export function safeFileName(raw: unknown, fallbackExt: string): string {
  * encoding — which every current browser prefers, so the download keeps the
  * name the customer gave it.
  */
+/** The five characters encodeURIComponent keeps and RFC 5987 attr-char does not, percent-encoded. */
+const RFC5987_ESCAPES: Readonly<Record<string, string>> = { "'": '%27', '(': '%28', ')': '%29', '*': '%2A', '!': '%21' };
+
 export function attachmentDisposition(safeName: string, disposition: 'attachment' | 'inline' = 'attachment'): string {
   const ascii = safeName.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_') || 'attachment';
   // RFC 5987 attr-char leaves out what encodeURIComponent keeps: ' ( ) * !
-  const encoded = encodeURIComponent(safeName).replace(/['()*!]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
+  const encoded = encodeURIComponent(safeName).replace(/['()*!]/g, (ch) => RFC5987_ESCAPES[ch] ?? ch);
   return `${disposition}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
 }
 
