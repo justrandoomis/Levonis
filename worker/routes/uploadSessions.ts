@@ -56,6 +56,7 @@ import { MEASURE_MAX_BYTES, afterRequestFileAdded, insertRequestFile, outliveCli
 import { waitUntilFrom } from '../lib/eventBus';
 import { assertRequestFileRoom, assertRequestTakesFiles } from '../lib/requestFileRoom';
 import { HEIF_REFUSAL, isHeifBytes, sniff } from './uploads';
+import { REQUEST_FILE_LIMITS, requestFileKind } from '../../packages/contracts/src/requestFiles';
 import {
   KEY_PURPOSES,
   MiB,
@@ -471,6 +472,28 @@ async function inspectStoredObject(env: Env, s: SessionRow, visibility: MediaVis
 
 // ------------------------------------------------------------ the routes
 
+/**
+ * THE CEILINGS A SESSION IS HELD TO. The admin's `uploadLimits` for every
+ * purpose but one: a request's file reads the table every request door reads
+ * (packages/contracts/src/requestFiles.ts, R5), so the wizard, the request
+ * page, the whole-body route and this door give one file one answer. The
+ * part size and the session's lifetime stay the admin's.
+ */
+export function limitsForPurpose(purpose: string, admin: UploadLimits): UploadLimits {
+  if (purpose !== 'request') return admin;
+  const mb = (bytes: number) => bytes / MiB;
+  return {
+    ...admin,
+    image_mb: mb(REQUEST_FILE_LIMITS.maxBytes.image),
+    model_mb: mb(REQUEST_FILE_LIMITS.maxBytes.model),
+    document_mb: mb(REQUEST_FILE_LIMITS.maxBytes.document),
+  };
+}
+
+/** Where a request file is read — the authorised route, never `/files/<key>` (R4). */
+const requestFileUrl = (requestId: string, fileId: string) =>
+  `/api/marketplace/requests/${encodeURIComponent(requestId)}/files/${encodeURIComponent(fileId)}`;
+
 export const uploadSessionRoutes = new Hono<AppContext>();
 uploadSessionRoutes.use('*', requireAuth);
 
@@ -488,13 +511,13 @@ uploadSessionRoutes.post('/', async (c) => {
   // The name chooses a ceiling and a key prefix — nothing else. What the
   // bytes are is decided on complete.
   const named = uploadKindForName(fileName);
-  if (!named || named.kind === 'archive' || !purposeAdmits(purpose, named.kind)) {
+  if (!named || named.kind === 'archive' || !purposeAdmits(purpose, named.kind) || (purpose === 'request' && !requestFileKind(fileName))) {
     throw badRequest('This kind of file is not accepted here', 'UPLOAD_KIND_NOT_ALLOWED', {
       extension: named?.ext ?? extensionOf(fileName),
       purpose,
     });
   }
-  const limits = await getSetting(c.env.DB, 'uploadLimits');
+  const limits = limitsForPurpose(purpose, await getSetting(c.env.DB, 'uploadLimits'));
   const limitBytes = kindLimitBytes(limits, named.kind);
   if (declaredBytes > limitBytes) {
     throw badRequest(`File is too large (max ${Math.round(limitBytes / MiB)} MB)`, 'UPLOAD_TOO_LARGE', { limit_bytes: limitBytes, kind: named.kind });
@@ -625,7 +648,7 @@ uploadSessionRoutes.post('/:id/complete', async (c) => {
 
   // FROM HERE THE OBJECT EXISTS, AND ANY REFUSAL DELETES IT: nothing below is
   // allowed to leave bytes in the bucket that no ledger row names.
-  const limits = await getSetting(c.env.DB, 'uploadLimits');
+  const limits = limitsForPurpose(s.purpose, await getSetting(c.env.DB, 'uploadLimits'));
   let verdict: Verdict;
   try {
     // A REQUEST IS ASKED AGAIN (DECISIONS row 258): the session was opened
@@ -701,7 +724,17 @@ uploadSessionRoutes.post('/:id/complete', async (c) => {
         kind === 'model' && verdict.modelBytes ? { bytes: verdict.modelBytes, analysis: verdict.analysis } : null
       )
     );
-    file = { id: added.id, file_name: originalName, content_type: verdict.mime, size_bytes: s.declared_bytes, kind };
+    // The same shape the whole-body door answers: `{id, url, inline}` and the
+    // rest, the url being the authorised route (R4).
+    file = {
+      id: added.id,
+      file_name: originalName,
+      content_type: verdict.mime,
+      size_bytes: s.declared_bytes,
+      kind,
+      inline: verdict.mime.startsWith('image/'),
+      url: requestFileUrl(s.entity_id, added.id),
+    };
   } else {
     await ledger.run();
     await markSession(c.env.DB, s.id, 'completed');
@@ -710,7 +743,9 @@ uploadSessionRoutes.post('/:id/complete', async (c) => {
   return c.json({
     success: true,
     ...(KEY_PURPOSES.has(s.purpose) ? { key: s.object_key } : {}),
-    url: `/files/${s.object_key}`,
+    // A request file is read through its authorised route; `/files/<key>`
+    // refuses every `requests/` key, and naming it only leaked the key (R4).
+    url: file ? String(file.url) : `/files/${s.object_key}`,
     visibility,
     mime: verdict.mime,
     bytes: s.declared_bytes,

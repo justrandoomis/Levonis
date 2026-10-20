@@ -29,7 +29,7 @@
  * time or a size, because a fabricated dimension becomes a fabricated price.
  */
 
-import { validateOutboundUrl } from './fetchGuard';
+import { GuardedFetchError, readResponseBytes, validateOutboundUrl } from './fetchGuard';
 
 export interface LinkProviderConfig {
   id: string;
@@ -141,6 +141,9 @@ export interface ExternalModelInfo {
  * and takes the first that is the right TYPE — and if it finds nothing, it says
  * so rather than returning an object full of undefined that looks like success.
  */
+/** The most a provider's JSON answer may be — far above any real one, far below a Worker's memory. */
+export const RESOLVER_BODY_MAX_BYTES = 512 * 1024;
+
 export async function resolveModelLink(
   raw: string,
   providers: LinkProviderConfig[],
@@ -202,8 +205,12 @@ export async function resolveModelLink(
     // JSON or nothing. An HTML body here means we were handed a page, and
     // reading a page is the thing this module exists not to do.
     if (!type.includes('json')) return { ...base, reason: 'NOT_JSON' };
-    payload = await res.json();
+    // THE BODY HAS A CEILING (R13): a provider answer is a few kilobytes of
+    // JSON, and `res.json()` would buffer whatever an endpoint chose to send.
+    // Read under the fetch guard's own byte limit, and refuse what is larger.
+    payload = JSON.parse(new TextDecoder().decode(await readResponseBytes(res, { maxBytes: RESOLVER_BODY_MAX_BYTES })));
   } catch (e) {
+    if (e instanceof GuardedFetchError && e.code === 'SOURCE_TOO_LARGE') return { ...base, reason: 'TOO_LARGE' };
     return { ...base, reason: e instanceof Error && e.name === 'TimeoutError' ? 'TIMEOUT' : 'FETCH_FAILED' };
   }
 

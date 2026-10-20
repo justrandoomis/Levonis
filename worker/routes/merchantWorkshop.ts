@@ -124,7 +124,7 @@ merchantWorkshopRoutes.get('/board', async (c) => {
             r.deadline, r.governorate, r.delivery_pref, r.state, r.offer_count, r.created_at, r.expires_at,
             r.revision, r.customer_notes, COALESCE(r.published_at, r.created_at) AS sort_at,
             p.process, p.process_unsure, p.material_id, p.material_unsure,
-            p.estimate_low_iqd, p.estimate_high_iqd,
+            p.estimate_low_iqd, p.estimate_high_iqd, p.source_url,
             (SELECT f.id FROM community_request_files f
               WHERE f.request_id = r.id AND f.content_type LIKE 'image/%'
               ORDER BY f.created_at, f.id LIMIT 1) AS thumb_id,
@@ -182,6 +182,9 @@ merchantWorkshopRoutes.get('/board', async (c) => {
       // The picture is read through the file route, which re-derives this
       // workshop's right to it (eligible → pictures) on every read.
       thumb_url: r.thumb_id ? `/api/marketplace/requests/${r.id}/files/${r.thumb_id}` : null,
+      // The pasted link a «رابط مجسم» request is about (R1): the board draws it
+      // as its link card, so a workshop sees the model it would print.
+      source_url: typeof r.source_url === 'string' && r.source_url ? r.source_url : null,
       has_preview: !!Number(r.has_preview ?? 0),
       my_offer: r.my_offer ?? null,
     })),

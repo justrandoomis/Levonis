@@ -177,6 +177,50 @@ export function safeFileName(raw: unknown, fallbackExt: string): string {
   return cleaned || `attachment.${fallbackExt}`;
 }
 
+/**
+ * THE Content-Disposition OF A STORED FILE (Community V3 R6) — one function
+ * for every door that hands a customer's file back.
+ *
+ * `safeFileName` keeps Arabic and Sorani letters, and a header value is a
+ * ByteString: a raw «مخطط.pdf» in `filename="…"` is refused when the Worker
+ * builds the Headers (a 500, a broken picture) or reaches the reader as
+ * mojibake. So the name goes twice: an ASCII stand-in in `filename` for old
+ * clients, and the real name in `filename*` as RFC 5987 UTF-8 percent
+ * encoding — which every current browser prefers, so the download keeps the
+ * name the customer gave it.
+ */
+export function attachmentDisposition(safeName: string, disposition: 'attachment' | 'inline' = 'attachment'): string {
+  const ascii = safeName.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_') || 'attachment';
+  // RFC 5987 attr-char leaves out what encodeURIComponent keeps: ' ( ) * !
+  const encoded = encodeURIComponent(safeName).replace(/['()*!]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `${disposition}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+}
+
+/** An ISO-BMFF still image whose brand says AVIF (`ftyp` + `avif`/`avis`, major or compatible). */
+function isAvif(b: Uint8Array): boolean {
+  if (b.length < 16 || !starts(b, [0x66, 0x74, 0x79, 0x70], 4)) return false;
+  const boxSize = Math.min(b.length, ((b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3]) >>> 0);
+  const brand = (at: number) => String.fromCharCode(b[at], b[at + 1], b[at + 2], b[at + 3]);
+  // The major brand at 8, the minor version at 12, the compatible brands from 16.
+  for (let at = 8; at + 4 <= boxSize; at += at === 8 ? 8 : 4) {
+    const name = brand(at);
+    if (name === 'avif' || name === 'avis') return true;
+  }
+  return false;
+}
+
+/**
+ * A REQUEST FILE, FROM ITS BYTES — `classifyAttachment` plus the one still
+ * format the resumable session already took and the whole-body door did not:
+ * AVIF (packages/contracts/src/requestFiles.ts lists it for both, R5).
+ */
+export function classifyRequestFile(buf: Uint8Array, fileName = ''): Attachment | null {
+  const direct = classifyAttachment(buf, fileName);
+  if (direct) return direct;
+  if (isAvif(buf)) return { ext: 'avif', mime: 'image/avif', kind: 'reference', inline: true };
+  return null;
+}
+
 // --------------------------------------------- the asset platform (§9.4)
 
 /**

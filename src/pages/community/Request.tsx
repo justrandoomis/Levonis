@@ -46,6 +46,8 @@ import { printApi } from '../../lib/printApi';
 import { formatDate } from '../../components/orders/format';
 import { AttachmentList, type RequestFile } from '../../components/media/RequestAttachments';
 import PrintSummary from '../../components/print/PrintSummary';
+import { SourceLinkCard } from '../../components/community/links/LinkCard';
+import { localColour, localMaterial } from '../../components/community/requests/mirrors';
 import ConfirmSheet from '../../components/print/ConfirmSheet';
 import ChannelNudge from '../../components/notify/ChannelNudge';
 import WorkshopRequestCard from '../../components/merchant/workshop/WorkshopRequestCard';
@@ -312,6 +314,8 @@ export function RequestDetail({
   const [isCustomer, setIsCustomer] = useState(false);
   const [materials, setMaterials] = useState<CatalogMaterial[]>([]);
   const [primaryFile, setPrimaryFile] = useState<string | null>(null);
+  /** The model link a link request is about (R1) — from the print summary, drawn as its card here and above the offer. */
+  const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [draftError, setDraftError] = useState('');
   const [discardOpen, setDiscardOpen] = useState(false);
@@ -655,11 +659,18 @@ export function RequestDetail({
               {current.description}
             </p>
           )}
+          {sourceUrl && (
+            <div className="mb-3" data-request="source-link">
+              <p className="mb-1 text-[11.5px] text-text-muted">{s.sourceLink}</p>
+              <SourceLinkCard url={sourceUrl} />
+            </div>
+          )}
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3" data-request-facts>
             {current.budget_iqd !== null && current.budget_iqd !== undefined && <Fact label={s.budget} value={<Money iqd={current.budget_iqd} />} />}
             {current.quantity > 1 && <Fact label={s.quantity} value={`×${current.quantity}`} />}
-            {current.material && <Fact label={s.material} value={current.material} />}
-            {current.color && <Fact label={s.colour} value={current.color} />}
+            {/* The mirrors are stored in English; each reader gets their own words (R8). */}
+            {current.material && <Fact label={s.material} value={localMaterial(current.material, L, materials)} />}
+            {current.color && <Fact label={s.colour} value={localColour(current.color, L)} />}
             {current.dimensions && <Fact label={s.dimensions} value={current.dimensions} />}
             {current.deadline && <Fact label={s.deadline} value={formatDate(current.deadline, lang) || current.deadline} />}
             {/* Where it goes, when it was asked, and until when offers are taken. */}
@@ -700,7 +711,13 @@ export function RequestDetail({
           {/* What Levonis measured and estimated — the estimate card. Renders
               nothing for a request that carries no print row. */}
           <div className="mt-4">
-            <PrintSummary requestId={current.id} onLoaded={(f) => setPrimaryFile(f?.primary_file_id ?? null)} />
+            <PrintSummary
+              requestId={current.id}
+              onLoaded={(f) => {
+                setPrimaryFile(f?.primary_file_id ?? null);
+                setSourceUrl(f?.source_url ? f.source_url : null);
+              }}
+            />
           </div>
         </section>
 
@@ -773,6 +790,8 @@ export function RequestDetail({
                 onChanged={load}
                 prefill={prefill}
                 onPrefillDone={() => setPrefill(null)}
+                jobFiles={files}
+                sourceUrl={sourceUrl}
               />
             )}
           </section>

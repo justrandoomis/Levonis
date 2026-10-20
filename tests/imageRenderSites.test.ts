@@ -47,7 +47,10 @@ const ALLOWED_RAW: Record<string, Record<string, string>> = {
   'src/components/chat/ChatAttachment.tsx': { url: 'a private chat attachment' },
   'src/components/chat/cards/DealCards.tsx': { 'fileUrl(f)': 'a print request file through the authorised marketplace route' },
   'src/components/community/requests/OrderTimeline.tsx': { 'e.file.url': 'a private community-order progress photo (its own file route)' },
-  'src/components/media/RequestAttachments.tsx': { 'f.url': 'a request attachment: private, or a local preview' },
+  // Community V3 R12: a request picture asks its own authorised route for a sized copy (`?w=`,
+  // requestImageSrcSet) — private, so no public variant exists for the shared builder to name.
+  'src/components/community/requests/RequestFileThumbs.tsx': { 'requestImageSrc(url, 160)': 'a private request picture, sized by its authorised route (?w=)' },
+  'src/components/community/requests/RequestWizard.tsx': { objectUrl: 'a blob preview of a picture still on the device (R4)' },
   'src/components/merchant/share/ShareStore.tsx': { icon: 'the generated store icon (/store-icon/), not a stored picture' },
   'src/components/pwa/InstallAppSheet.tsx': { icon: 'a static app icon from /icons/' },
   'src/components/reviews/ReviewSection.tsx': { 'p.url': "the reviewer's own unpublished photos (private until published)", 'igShot.url': 'private evidence of an Instagram post' },

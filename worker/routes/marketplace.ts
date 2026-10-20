@@ -29,12 +29,16 @@ import { requireAuth, badRequest, forbidden, notFound, conflict, str, int, HttpE
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
+import { attachmentDisposition, classifyRequestFile, safeFileName } from '../lib/attachments';
 import {
-  classifyAttachment,
-  maxBytesFor,
-  safeFileName,
-  MODEL_MAX_BYTES,
-} from '../lib/attachments';
+  REQUEST_FILE_LIMITS,
+  requestFileExtension,
+  requestFileKind,
+  requestFileMaxBytes,
+  type RequestFileKind,
+} from '../../packages/contracts/src/requestFiles';
+import { requestImageRendition } from '../lib/imageVariants';
+import { parseVariantWidth } from '../lib/imageConvert';
 import { getTierStatus, benefits, membershipBadges } from '../lib/entitlements';
 import { requireOfferPrivileges, requireWithdrawPrivileges, storeForUser } from '../lib/merchantAuth';
 import { approvedAtSql, merchantApproved, withApprovalSchema } from '../lib/merchantApproval';
@@ -424,23 +428,37 @@ marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {
   const file = form.get('file');
   if (!(file instanceof File)) throw badRequest('No file uploaded');
 
-  // Read the ceiling from the DECLARED size first, so a 900 MB upload is
-  // refused before it is pulled into memory. The real size is re-checked
-  // against the real kind after classification, below.
-  if (file.size > MODEL_MAX_BYTES) {
-    throw badRequest(`File is too large (max ${Math.round(MODEL_MAX_BYTES / 1024 / 1024)} MB)`);
+  // THE SAME TABLE AS EVERY OTHER DOOR (packages/contracts/src/requestFiles.ts,
+  // R5). The declared size is asked first, so a body this route should never
+  // hold is refused before it is read: above the whole-body ceiling a file
+  // takes the resumable session (the browser picks it by the same table).
+  if (file.size > REQUEST_FILE_LIMITS.wholeBodyMaxBytes) {
+    const named = requestFileKind(file.name);
+    throw badRequest('File is too large for this route — upload it through a resumable session', 'UPLOAD_TOO_LARGE', {
+      limit_bytes: named ? Math.min(REQUEST_FILE_LIMITS.wholeBodyMaxBytes, requestFileMaxBytes(named)) : REQUEST_FILE_LIMITS.wholeBodyMaxBytes,
+      ...(named ? { kind: named } : {}),
+      door: 'whole_body',
+    });
   }
 
   const buf = new Uint8Array(await file.arrayBuffer());
-  const kind = classifyAttachment(buf, file.name);
+  const kind = classifyRequestFile(buf, file.name);
   if (!kind) {
-    throw badRequest(
-      'Unsupported file — attach a JPEG, PNG, WebP or GIF image, a PDF, or an STL, 3MF or OBJ model'
-    );
+    // A coded refusal, rendered on the screen from FORMAT_CAPABILITIES in the
+    // reader's language (row `14.format-honesty`) — not one English sentence
+    // naming three formats out of the eight a request takes.
+    throw badRequest('This file is not one of the formats a request accepts', 'UPLOAD_KIND_NOT_ALLOWED', {
+      extension: requestFileExtension(file.name),
+      purpose: 'request',
+    });
   }
-  const max = maxBytesFor(kind.kind);
+  const sized: RequestFileKind = kind.kind === 'reference' ? 'image' : kind.kind;
+  const max = requestFileMaxBytes(sized);
   if (buf.byteLength > max) {
-    throw badRequest(`That file is too large (max ${Math.round(max / 1024 / 1024)} MB for this type)`);
+    throw badRequest(`That file is too large (max ${Math.round(max / 1024 / 1024)} MB for this type)`, 'UPLOAD_TOO_LARGE', {
+      limit_bytes: max,
+      kind: sized,
+    });
   }
 
   const key = attachmentKey(user.id, kind.ext);
@@ -539,6 +557,14 @@ marketplaceRoutes.get('/requests/:id/files/:fileId', requireAuth, async (c) => {
     );
   }
 
+  // `?w=` asks for a SIZED COPY of a picture (R12): a thumbnail on the board,
+  // the wizard or the offer panel fetches 160 px, not the phone original. A
+  // width off the list is refused like any bad parameter; on a model or a
+  // document it means nothing and the file is answered as it is.
+  const asked = parseVariantWidth(c.req.query('w'));
+  if (asked === 'invalid') throw badRequest('Unknown image width', 'IMAGE_VARIANT_WIDTH');
+  const inline = row.content_type.startsWith('image/');
+
   const obj = await getMediaObject(c.env, 'private', row.file_key);
   if (!obj) throw notFound('File not found');
   // Every read is counted (0132 `request_file_reads`). Never blocks the file.
@@ -548,15 +574,33 @@ marketplaceRoutes.get('/requests/:id/files/:fileId', requireAuth, async (c) => {
 
   // Pictures may render in place; a model or a document is handed over as a
   // download. Even for a picture the response is sandboxed with `nosniff`, so
-  // a file that somehow passed classification cannot be run as script.
-  const inline = row.content_type.startsWith('image/');
+  // a file that somehow passed classification cannot be run as script. The
+  // name goes out RFC 5987-encoded, so an Arabic or Sorani name survives the
+  // download intact (R6, worker/lib/attachments.ts).
   const headers = new Headers({
     'Content-Type': row.content_type,
-    'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${row.file_name}"`,
+    'Content-Disposition': attachmentDisposition(row.file_name, inline ? 'inline' : 'attachment'),
     'Cache-Control': 'private, max-age=300',
     'X-Content-Type-Options': 'nosniff',
     'Content-Security-Policy': "default-src 'none'; sandbox",
   });
+  if (asked && inline) {
+    // The copy is cut only AFTER the reader was re-derived above: the edge
+    // keeps it under a key no URL names, and nothing is ever stored in a
+    // public place. A picture the binding cannot cut is answered whole.
+    const copy = await requestImageRendition(c.env, obj, {
+      fileId, width: asked, accept: c.req.header('Accept') ?? '', mime: row.content_type, origin: new URL(c.req.url).origin,
+    });
+    if (copy.kind === 'copy') {
+      headers.set('Content-Type', copy.mime);
+      headers.set('etag', copy.etag);
+      headers.set('X-Variant-Source', copy.source);
+      headers.set('Vary', 'Accept');
+      return new Response(copy.bytes, { headers });
+    }
+    headers.set('etag', obj.httpEtag);
+    return new Response(copy.original, { headers });
+  }
   headers.set('etag', obj.httpEtag);
   return new Response(obj.body, { headers });
 });
@@ -1783,10 +1827,9 @@ marketplaceRoutes.get('/offers/:id/files/:fileId', requireAuth, async (c) => {
   const mime = row.content_type && !/^text\/html/i.test(row.content_type) ? row.content_type : 'application/octet-stream';
   const inline = mime.startsWith('image/');
   const safe = safeFileName(row.name, row.kind === 'pdf' ? 'pdf' : 'bin');
-  const ascii = safe.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
   const headers = new Headers({
     'Content-Type': mime,
-    'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(safe)}`,
+    'Content-Disposition': attachmentDisposition(safe, inline ? 'inline' : 'attachment'),
     'Cache-Control': 'private, max-age=300',
     'X-Content-Type-Options': 'nosniff',
     'Content-Security-Policy': "default-src 'none'; sandbox",

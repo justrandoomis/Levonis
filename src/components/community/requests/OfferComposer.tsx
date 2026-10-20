@@ -37,6 +37,8 @@ import { offersApi } from '../offers/types';
 import type { OfferPrefill } from '../../merchant/workshop/api';
 import { offersV2Api, requestsApi, type CatalogMaterial, type OfferDeliveryMethod, type OfferFileKind, type OfferInputV2, type OfferV2 } from './api';
 import { composerHandover, daysLabel, fill, handoverLabel, offerStateWords, requestLang, shortDay, useRequestStrings, type RequestLang, type RequestStrings } from './strings';
+import { RequestImageStrip, pictureFiles, type ThumbFile } from './RequestFileThumbs';
+import { SourceLinkCard } from '../links/LinkCard';
 
 /** How long an offer stands, in days (the server takes 1–60). */
 export const VALIDITY = [3, 7, 14, 30] as const;
@@ -534,6 +536,10 @@ export interface MerchantOfferSectionProps {
   onChanged: () => void;
   prefill?: OfferPrefill | null;
   onPrefillDone?: () => void;
+  /** The request files this workshop may read — its pictures are drawn as pictures above the offer (R4). */
+  jobFiles?: readonly ThumbFile[];
+  /** The model link a link request is about, drawn as its link card (R1). */
+  sourceUrl?: string | null;
 }
 
 export function MerchantOfferSection({
@@ -549,6 +555,8 @@ export function MerchantOfferSection({
   onChanged,
   prefill = null,
   onPrefillDone,
+  jobFiles = [],
+  sourceUrl = null,
 }: MerchantOfferSectionProps) {
   const { lang } = useLanguage();
   const s = useRequestStrings();
@@ -628,6 +636,21 @@ export function MerchantOfferSection({
     }
   }
 
+  /**
+   * WHAT THIS OFFER PRICES (R1, R4): the request pictures as thumbnails —
+   * sized copies through the route that re-derives this workshop right to
+   * read them — and the pasted model link as its card, above every state of
+   * the offer, so the merchant never prices a job from a file name.
+   */
+  const pictures = pictureFiles(jobFiles);
+  const jobStrip = pictures.length > 0 || sourceUrl ? (
+    <div className="mb-3 space-y-2" data-offer-job>
+      <p className="text-[12px] font-semibold text-text-muted">{s.jobYouPrice}</p>
+      <RequestImageStrip files={pictures} label={s.jobPictures} size={56} />
+      {sourceUrl && <SourceLinkCard url={sourceUrl} />}
+    </div>
+  ) : null;
+
   /** Under the held buttons: the reason, never a silent grey button. */
   const gateNote = gate ? (
     <p className="mt-2 text-[12.5px] text-text-muted" data-approval-gate>
@@ -660,6 +683,7 @@ export function MerchantOfferSection({
   if (!live && draft) {
     return (
       <div className="lv-surface p-4" data-merchant-offer="draft" data-offer={draft.id}>
+        {jobStrip}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[12px] text-text-muted">{s.yourDraft}</p>
@@ -691,6 +715,7 @@ export function MerchantOfferSection({
   if (!latest || (!live && takingOffers && canOffer)) {
     return (
       <div data-merchant-offer="none">
+        {jobStrip}
         {latest && (
           <p className="mb-2 text-[12.5px] text-text-muted">
             {s.previousOffer} {offerStateWords(latest, s).text}
@@ -716,6 +741,7 @@ export function MerchantOfferSection({
   const st = offerStateWords(o, s);
   return (
     <div className="lv-surface p-4" data-merchant-offer={o.state} data-offer={o.id}>
+      {jobStrip}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[12px] text-text-muted">{fill(s.yourOfferVersion, { n: o.revision })}</p>

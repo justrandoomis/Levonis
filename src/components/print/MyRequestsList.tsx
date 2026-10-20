@@ -23,6 +23,7 @@ import {
   BadgeCheck, CalendarClock,
 } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
+import { localMaterial } from '../community/requests/mirrors';
 import { useAuth } from '../../AuthContext';
 import { UnauthorizedState } from '../ui/AsyncStates';
 import { ApiError } from '../../lib/api';
@@ -206,7 +207,7 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
 
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11.5px] text-text-muted mt-2">
                     {(p?.material_id || r.material) && (
-                      <span className="uppercase">{p?.material_id || r.material}</span>
+                      <span>{localMaterial(p?.material_id || r.material, lang === 'en' || lang === 'ckb' ? lang : 'ar')}</span>
                     )}
                     {p?.color_hex && (
                       <span className="flex items-center gap-1.5">

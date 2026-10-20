@@ -20,7 +20,7 @@
 
 import { isSafeMediaKey } from './mediaStorage';
 import { MODEL_EXTENSIONS } from './modelGeometry';
-import { safeFileName } from './attachments';
+import { attachmentDisposition, safeFileName } from './attachments';
 import { isSchemaMissing } from './membershipBenefits';
 
 export type FileKind = 'model' | 'document' | 'image' | 'archive';
@@ -327,15 +327,11 @@ export function revokeOrderProductFileGrantStatements(
 }
 
 /**
- * A stored name for the Content-Disposition header: the ASCII-safe form for
- * old clients and the RFC 5987 form for everyone else, so an Arabic file name
- * survives the download intact and a newline or a quote never reaches the
- * header (worker/lib/attachments.ts `safeFileName` did the stripping).
+ * A stored name for the Content-Disposition header — worker/lib/attachments.ts
+ * `attachmentDisposition` (R6), the one function every door shares: the
+ * ASCII-safe form for old clients and the RFC 5987 form for everyone else.
  */
-export function attachmentDisposition(safeName: string): string {
-  const ascii = safeName.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
-  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(safeName)}`;
-}
+export { attachmentDisposition };
 
 /**
  * The bytes as an ATTACHMENT — the one shape a product file or a post file

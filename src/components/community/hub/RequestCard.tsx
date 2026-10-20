@@ -27,6 +27,7 @@ import { GOVERNORATE_LABELS } from '../../../lib/governorates';
 import { offersLabel, shortDate, timeAgo } from './copy';
 import { fill, useHubStrings } from './strings';
 import type { CommunityRequest } from './api';
+import { localMaterial } from '../requests/mirrors';
 
 const CHIP = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-border-subtle/60 bg-surface px-2 py-0.5';
 
@@ -52,7 +53,8 @@ export default function RequestCard({ request: r, compact = false }: { request: 
       )}
       {r.material && (
         <span className={CHIP}>
-          <bdi>{r.material}</bdi>
+          {/* The stored mirror is the English key; the reader gets their own word (R8). */}
+          <bdi>{localMaterial(r.material, lang === 'en' || lang === 'ckb' ? lang : 'ar')}</bdi>
         </span>
       )}
       {place && (

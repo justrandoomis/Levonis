@@ -1,25 +1,22 @@
 /**
- * «البيانات فقط، والصورة بالرابط» — the owner's decision on a MakerWorld link,
- * and the two halves it has.
+ * A MODEL LINK'S PICTURE — the link card's own copy, never a hot-link.
  *
  * A customer very often has no file, only a link: "print me this one". The
- * resolver already reads the page's own JSON API and comes back with a name, a
- * creator and a set of cover images — and the wizard rendered the first two and
- * threw the third away. A name and a creator are a poor way to check the shop
- * understood WHICH design is meant; the picture is the confirmation.
+ * resolver reads the page's own JSON API and comes back with a name, a
+ * creator and cover images. The owner's first rule was «البيانات فقط، والصورة
+ * بالرابط»: store the cover's address and draw it from the source's CDN. Row
+ * 173 (link cards) superseded it — a reader's browser is never sent to the
+ * pasted host, and a picture is ours or nothing — and R13 (Community V3)
+ * aligns the request with it:
  *
- * THE IMAGE IS A LINK, NOT A COPY. It is loaded from the source's own CDN and
- * never downloaded, never re-hosted and never written to R2. Nothing of theirs
- * is copied, nothing goes stale when the designer replaces the render, and the
- * shop stores no bytes it has no licence to.
- *
- * What that costs is that the URL points at another host, so it must be an
- * absolute https one — `http` is blocked on an https page, and a relative or
- * `data:` string out of somebody else's API is not a picture of anything. The
- * rule is applied on the worker (which decides what is STORED). The component
- * half of these tests read the three-step PrintRequestWizard, which the v2
- * wizard replaced and W6 deleted (nothing imported it); what it drew is gone,
- * what the worker stores and the resolver refuses is still pinned here.
+ *   - `sanitizeSourceMeta` keeps an `image_url` ONLY when it is the link
+ *     card's re-hosted copy (`/files/link-cards/<id>.webp`); any other
+ *     address — the old https hot-link included — is dropped, on write and
+ *     on read (a legacy row's stored address never reaches a screen);
+ *   - this route still never downloads or re-hosts a cover itself: the link
+ *     card resolver (worker/lib/linkCards.ts) is the one door that fetches;
+ *   - the provider resolver still never scrapes, still refuses a non-https
+ *     image, and now reads its JSON under a byte ceiling.
  *
  * Run: npx tsx --test tests/externalModelCover.test.ts
  */
@@ -38,14 +35,10 @@ test('it is a link and never a copy', () => {
   // A re-host would mean an upload call on this path. There is none, and the
   // absence is the feature.
   assert.doesNotMatch(route, /ingestRemoteImage|putMediaObject\([^)]*image_url/);
-  assert.match(
-    route,
-    /never downloaded,\s*\n \* never re-hosted and never written to R2/,
-    'and the reason is written where the rule lives'
-  );
+  assert.match(route, /THE PICTURE IS NEVER HOT-LINKED \(docs\/DECISIONS\.md row 173/, 'and the reason is written where the rule lives');
 });
 
-test('only an absolute https URL is stored, and the blob is typed rather than free-form', () => {
+test('only the link card copy is stored as the picture, and the blob is typed rather than free-form', () => {
   const route = read(ROUTE);
   assert.match(route, /function sanitizeSourceMeta/);
   assert.match(route, /const sourceMeta = sanitizeSourceMeta\(body\.source_meta\);/);
@@ -58,7 +51,8 @@ test('only an absolute https URL is stored, and the blob is typed rather than fr
   for (const key of ['provider', 'external_id', 'name', 'creator', 'image_url', 'resolved']) {
     assert.ok(body.includes(key), `${key} is part of the stored shape`);
   }
-  assert.match(body, /\/\^https:\\\/\\\/\/i\.test\(image\)/, 'the worker decides what it stores');
+  assert.doesNotMatch(body, /\^https/, 'no absolute address from somebody else is stored any more (row 173)');
+  assert.ok(body.includes('files\\/link-cards'), 'only the link card copy is kept');
   assert.match(body, /image\.length <= 600/, 'a URL longer than a permalink is a payload');
   assert.match(body, /raw\.resolved === true/, 'and a truthy string cannot claim the model was resolved');
 });

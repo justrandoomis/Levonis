@@ -116,13 +116,15 @@ import type { Quote } from '../lib/printPricing';
  *
  * The keys are fixed here, and `image_url` is the one that needed a rule.
  *
- * THE OWNER'S DECISION ON THE COVER IMAGE: «البيانات فقط، والصورة بالرابط».
- * The picture is shown from the source's own URL and is never downloaded,
- * never re-hosted and never written to R2 — so nothing of theirs is copied,
- * nothing goes stale when they replace it, and the shop stores no bytes it
- * has no licence to. What that costs is that the URL is a LINK TO ANOTHER
- * HOST, which is why it must be an absolute https one: `http` would break the
- * page it is drawn on, and anything else is not a picture.
+ * THE PICTURE IS NEVER HOT-LINKED (docs/DECISIONS.md row 173, which R13
+ * aligns this with). The dormant rule here used to keep any absolute https
+ * address from somebody else's API and draw it from their host, so every
+ * reader of the request called that host. A link's picture now reaches a
+ * screen one way only: the link card's own copy, fetched once under the
+ * fetch guard, re-hosted under `link-cards/<id>.webp` and drawn from
+ * `/files/` (worker/lib/linkCards.ts). So the only `image_url` kept is that
+ * copy; any other address is dropped, and the cover is never downloaded
+ * here, never re-hosted here and never written to R2 from this route.
  *
  * Length is capped at the same 600 as `source_url` — a URL longer than that is
  * not a permalink, it is a payload.
@@ -139,7 +141,7 @@ function sanitizeSourceMeta(input: unknown): Record<string, string | boolean> {
     external_id: text('external_id', 80),
     name: text('name', 300),
     creator: text('creator', 160),
-    image_url: /^https:\/\//i.test(image) && image.length <= 600 ? image : '',
+    image_url: /^\/files\/link-cards\/[A-Za-z0-9_-]+\.webp$/.test(image) && image.length <= 600 ? image : '',
     resolved: raw.resolved === true,
   };
 }
@@ -1401,7 +1403,7 @@ async function draftShape(env: Env, requestId: string) {
           color_name: String(p.color_name ?? ''),
           primary_file_id: (p.primary_file_id as string | null) ?? null,
           source_url: String(p.source_url ?? ''),
-          source_meta: parseJson<Record<string, unknown>>(p.source_meta, {}),
+          source_meta: sanitizeSourceMeta(parseJson<Record<string, unknown>>(p.source_meta, {})),
           stated_dimensions_mm: parseDims(p.stated_dims),
         }
       : null,
@@ -1595,7 +1597,7 @@ printRequestRoutes.get('/requests/:id', async (c) => {
       source_kind: row.source_kind,
       source_provider: row.source_provider,
       source_url: row.source_url,
-      source_meta: parseJson<Record<string, unknown>>(row.source_meta, {}),
+      source_meta: sanitizeSourceMeta(parseJson<Record<string, unknown>>(row.source_meta, {})),
       // Wizard v2 (W5-A): where the job came from, «لست متأكدًا» as an answer,
       // and the size the customer typed when there is no model to measure.
       source_type: effectiveSourceType(row),

@@ -46,6 +46,8 @@ export interface BoardRequest {
   estimate_high_iqd: number | null;
   file_count: number;
   thumb_url: string | null;
+  /** The model link a link request is about (R1), or null. */
+  source_url?: string | null;
   has_preview: boolean;
   my_offer: 'pending' | 'superseded' | 'accepted' | null;
 }

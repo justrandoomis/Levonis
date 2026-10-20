@@ -5,13 +5,15 @@
  * and the SQL guard in `insertRequestFile` (worker/lib/requestFileHooks.ts)
  * asks once more where the row is written (DECISIONS row 258).
  *
- * A LEAF on purpose: it imports nothing but the HTTP errors, so the route
+ * A LEAF on purpose: it imports nothing but the HTTP errors and the limits
+ * table (a module with no imports of its own), so the route
  * modules that share it cannot be pulled into an import cycle through it.
  */
 import { badRequest, conflict, notFound } from './http';
+import { REQUEST_FILE_LIMITS } from '../../packages/contracts/src/requestFiles';
 
-/** A request may carry this many attachments (the marketplace's own cap). */
-export const MAX_FILES_PER_REQUEST = 6;
+/** A request may carry this many attachments — the one table every door reads (packages/contracts/src/requestFiles.ts, R5). */
+export const MAX_FILES_PER_REQUEST: number = REQUEST_FILE_LIMITS.maxFiles;
 /** The request states in which its attachments may still change — a draft, and a job still taking offers. */
 export const REQUEST_FILE_STATES: ReadonlySet<string> = new Set(['draft', 'open', 'receiving_offers']);
 

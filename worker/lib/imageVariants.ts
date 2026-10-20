@@ -370,6 +370,62 @@ export function scheduleVariantWarm(
   }
 }
 
+// ------------------------------------------------- a request's private picture
+
+/**
+ * A SIZED COPY OF A PRIVATE PICTURE, BEHIND THE ROUTE THAT AUTHORISED THE READ
+ * (Community V3 R12; `GET /api/marketplace/requests/:id/files/:fileId?w=`).
+ *
+ * A request's pictures live under `requests/<user>/…`, a prefix `/files/*`
+ * refuses, so the public copies above can never serve them: the board, the
+ * wizard and the offer panel drew 64 px thumbnails from the phone original.
+ * Here the copy is cut by the same binding (`cutVariant`), in the format the
+ * browser takes, and is NEVER written to a bucket — a public variant key
+ * would be a door around the route's permission check. This data centre keeps
+ * it in its edge cache under a key no URL serves (`__request-file-copies/…`),
+ * named by the file and its ETag, so a replaced picture is never answered
+ * from an old copy; the route asks the reader BEFORE it asks here, so a
+ * cached copy is only ever handed to someone allowed the original.
+ *
+ * Anything the binding cannot do — no binding, an animated or oversized
+ * picture, a GIF or an AVIF original, a failed cut — answers the original.
+ */
+export type RequestRendition =
+  | { kind: 'copy'; bytes: Uint8Array; mime: string; etag: string; source: 'edge' | 'render' }
+  | { kind: 'original'; original: ReadableStream | Blob };
+
+export async function requestImageRendition(
+  env: Pick<Env, 'IMAGES'>,
+  obj: R2ObjectBody,
+  opts: { fileId: string; width: ImageVariantWidth; accept: string; mime: string; origin?: string }
+): Promise<RequestRendition> {
+  const sourceMime = variantSourceMime(`x.${opts.mime.slice('image/'.length)}`);
+  if (!env.IMAGES || !sourceMime || obj.size > IMAGES_MAX_INPUT_BYTES) return { kind: 'original', original: obj.body };
+  const format: ImageVariantFormat = /image\/avif/i.test(opts.accept) ? 'image/avif' : /image\/webp/i.test(opts.accept) ? 'image/webp' : sourceMime;
+  const sourceEtag = bareEtag(obj.httpEtag);
+  const etag = variantEtag(sourceEtag || 'x', opts.width, format);
+  const edge = typeof caches !== 'undefined' && sourceEtag ? (caches as unknown as { default: Cache }).default : null;
+  const cacheKey = new Request(
+    `${opts.origin ?? 'https://levonis-iq.com'}/__request-file-copies/${encodeURIComponent(opts.fileId)}/${sourceEtag}/w${opts.width}.${variantExtension(format)}`
+  );
+  if (edge) {
+    const hit = await edge.match(cacheKey).catch(() => undefined);
+    if (hit) {
+      await obj.body.cancel().catch(() => undefined);
+      return { kind: 'copy', bytes: new Uint8Array(await hit.arrayBuffer()), mime: hit.headers.get('Content-Type') ?? format, etag, source: 'edge' };
+    }
+  }
+  const blob = typeof (obj as Partial<R2ObjectBody>).blob === 'function' ? await obj.blob() : new Blob([await obj.arrayBuffer()]);
+  if (isAnimatedWebp(new Uint8Array(await blob.slice(0, 32).arrayBuffer()))) return { kind: 'original', original: blob };
+  const { outcome } = await cutVariant(env, async () => blob, { width: opts.width, format });
+  if (!outcome.ok) return { kind: 'original', original: blob };
+  if (edge) {
+    const stored = new Response(outcome.bytes, { headers: { 'Content-Type': outcome.mime, 'Cache-Control': 'public, max-age=604800' } });
+    await edge.put(cacheKey, stored).catch(() => undefined);
+  }
+  return { kind: 'copy', bytes: outcome.bytes, mime: outcome.mime, etag, source: 'render' };
+}
+
 // ------------------------------------------------------------- the sweep
 
 /** Where the sweep looks, in priority order: catalogue pictures first. */

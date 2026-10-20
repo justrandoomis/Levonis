@@ -25,6 +25,9 @@ import { StatusChip } from '../../ui/Badge';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/Toast';
 import { requestsApi, type CatalogMaterial } from '../requests/api';
+import { REQUEST_STRINGS } from '../requests/strings';
+import { RequestImageStrip, pictureFiles, type ThumbFile } from '../requests/RequestFileThumbs';
+import { SourceLinkCard } from '../links/LinkCard';
 import OfferComposer from './OfferComposer';
 import OrderContactCard from './OrderContactCard';
 import { deliveryLabel, offerStateLabel, offersApi, validUntil, type Loc, type OfferV2 } from './types';
@@ -53,7 +56,8 @@ function changeLabel(k: string, loc: Loc): string {
     file_ids: ['المرفقات', 'attachments'],
   };
   const v = map[k];
-  return v ? loc(v[0], v[1]) : k;
+  // The Sorani words are the request page table (strings.ts `changes`), never the Arabic standing in.
+  return v ? loc(v[0], v[1], (REQUEST_STRINGS.ckb.changes as Record<string, string>)[k]) : k;
 }
 
 export default function MerchantOfferPanel({
@@ -65,6 +69,8 @@ export default function MerchantOfferPanel({
   onChanged,
   prefill = null,
   onPrefillDone,
+  jobFiles = [],
+  sourceUrl = null,
 }: {
   requestId: string;
   /** This merchant's offers on the request (the server sends only theirs). */
@@ -78,6 +84,10 @@ export default function MerchantOfferPanel({
   prefill?: { price_iqd: number; quote_id: string } | null;
   /** The composer that took the prefill closed. */
   onPrefillDone?: () => void;
+  /** The request files this workshop may read — the pictures are drawn above the offer (R4). */
+  jobFiles?: readonly ThumbFile[];
+  /** The model link a link request is about, as its card (R1). */
+  sourceUrl?: string | null;
 }) {
   const { loc, lang } = useLanguage();
   const toast = useToast();
@@ -119,9 +129,9 @@ export default function MerchantOfferPanel({
   async function withdraw() {
     if (!live) return;
     const ok = await confirm({
-      title: loc('سحب عرضك؟', 'Withdraw your offer?'),
-      consequence: loc('لن يستطيع الزبون قبوله. يمكنك تقديم عرض جديد ما دام الطلب يستقبل العروض.', 'The customer can no longer accept it. You can make a new offer while the request takes offers.'),
-      confirmLabel: loc('اسحب العرض', 'Withdraw offer'),
+      title: loc('سحب عرضك؟', 'Withdraw your offer?', 'ئۆفەرەکەت دەکشێنیتەوە؟'),
+      consequence: loc('لن يستطيع الزبون قبوله. يمكنك تقديم عرض جديد ما دام الطلب يستقبل العروض.', 'The customer can no longer accept it. You can make a new offer while the request takes offers.', 'کڕیارەکە چیتر ناتوانێت قبوڵی بکات. تا داواکارییەکە ئۆفەر وەردەگرێت دەتوانیت ئۆفەرێکی نوێ پێشکەش بکەیت.'),
+      confirmLabel: loc('اسحب العرض', 'Withdraw offer', 'کشاندنەوەی ئۆفەر'),
       destructive: true,
     });
     if (!ok) return;
@@ -129,7 +139,7 @@ export default function MerchantOfferPanel({
       await offersApi.withdraw(live.id);
       onChanged();
     } catch (e) {
-      fail(e, loc('تعذّر سحب العرض', 'Could not withdraw the offer'));
+      fail(e, loc('تعذّر سحب العرض', 'Could not withdraw the offer', 'نەتوانرا ئۆفەرەکە بکشێنرێتەوە'));
     }
   }
 
@@ -137,10 +147,10 @@ export default function MerchantOfferPanel({
     if (!live) return;
     try {
       await offersApi.reconfirm(live.id);
-      toast.success(loc('أكّدت عرضك للطلب بصيغته الحالية.', 'You re-confirmed your offer for the request as it is now.'));
+      toast.success(loc('أكّدت عرضك للطلب بصيغته الحالية.', 'You re-confirmed your offer for the request as it is now.', 'ئۆفەرەکەت بۆ داواکارییەکە بەو شێوەیەی ئێستا هەیە دووبارە پشتڕاست کردەوە.'));
       onChanged();
     } catch (e) {
-      fail(e, loc('تعذّر تأكيد العرض', 'Could not re-confirm the offer'));
+      fail(e, loc('تعذّر تأكيد العرض', 'Could not re-confirm the offer', 'نەتوانرا ئۆفەرەکە دووبارە پشتڕاست بکرێتەوە'));
     }
   }
 
@@ -149,9 +159,18 @@ export default function MerchantOfferPanel({
       const r = await offersApi.openThread(requestId);
       navigate(`/chat/${encodeURIComponent(r.chatId)}`);
     } catch (e) {
-      fail(e, loc('تعذّر فتح المحادثة', 'Could not open the conversation'));
+      fail(e, loc('تعذّر فتح المحادثة', 'Could not open the conversation', 'نەتوانرا گفتوگۆکە بکرێتەوە'));
     }
   }
+
+  // What this offer prices (R1, R4): the pictures as pictures, the link as its card.
+  const pictures = pictureFiles(jobFiles);
+  const jobStrip = pictures.length > 0 || sourceUrl ? (
+    <div className="mb-3 space-y-2" data-offer-job>
+      <RequestImageStrip files={pictures} label={loc('صور الطلب', 'The request pictures', 'وێنەکانی داواکاریەکە')} size={56} />
+      {sourceUrl && <SourceLinkCard url={sourceUrl} />}
+    </div>
+  ) : null;
 
   const composer = (
     <OfferComposer
@@ -175,17 +194,18 @@ export default function MerchantOfferPanel({
   if (!latest || (!live && takingOffers && canOffer)) {
     return (
       <div data-merchant-offer="none">
+        {jobStrip}
         {latest && (
           <p className="mb-2 text-[12.5px] text-text-muted">
-            {loc('عرضك السابق:', 'Your previous offer:')} {offerStateLabel(latest, loc).text}
+            {loc('عرضك السابق:', 'Your previous offer:', 'ئۆفەرەکەی پێشووت:')} {offerStateLabel(latest, loc).text}
           </p>
         )}
         {takingOffers && canOffer ? (
           <Button variant="primary" block onClick={() => setComposing('new')} icon={<Send aria-hidden="true" className="h-4 w-4" />} data-offer-make>
-            {loc('قدّم عرضًا', 'Make an offer')}
+            {loc('قدّم عرضًا', 'Make an offer', 'ئۆفەر پێشکەش بکە')}
           </Button>
         ) : (
-          !latest && <p className="text-[12.5px] text-text-muted">{loc('لا يمكنك تقديم عرض على هذا الطلب الآن.', 'You cannot make an offer on this request now.')}</p>
+          !latest && <p className="text-[12.5px] text-text-muted">{loc('لا يمكنك تقديم عرض على هذا الطلب الآن.', 'You cannot make an offer on this request now.', 'ئێستا ناتوانیت ئۆفەر لەسەر ئەم داواکارییە پێشکەش بکەیت.')}</p>
         )}
         {composer}
         {confirmDialog}
@@ -198,26 +218,27 @@ export default function MerchantOfferPanel({
   const until = validUntil(o.expires_at, lang);
   return (
     <div className="lv-surface p-4" data-merchant-offer={o.state} data-offer={o.id}>
+      {jobStrip}
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[12px] text-text-muted">{loc(`عرضك — النسخة ${o.revision}`, `Your offer — version ${o.revision}`)}</p>
+          <p className="text-[12px] text-text-muted">{loc(`عرضك — النسخة ${o.revision}`, `Your offer — version ${o.revision}`, `ئۆفەرەکەت — وەشانی ${o.revision}`)}</p>
           <p className="mt-0.5 text-[20px] font-bold text-text-primary"><Money iqd={o.price_iqd} /></p>
         </div>
         <StatusChip tone={st.tone}>{st.text}</StatusChip>
       </div>
       <p className="mt-1 text-[12.5px] text-text-secondary">
-        {o.completion_days ? loc(`${o.completion_days} يوم`, `${o.completion_days} days`) : '—'} · {deliveryLabel(o.delivery_method, loc)}
-        {until && <> · {loc(`صالح حتى ${until}`, `valid until ${until}`)}</>}
+        {o.completion_days ? loc(`${o.completion_days} يوم`, `${o.completion_days} days`, `${o.completion_days} ڕۆژ`) : '—'} · {deliveryLabel(o.delivery_method, loc)}
+        {until && <> · {loc(`صالح حتى ${until}`, `valid until ${until}`, `بەردەوامە تا ${until}`)}</>}
       </p>
 
       {stale && (
         <div className="lv-alert lv-alert-warning mt-3 text-[12.5px] leading-relaxed text-warning" data-offer-note="superseded">
           <p className="flex items-start gap-2 font-semibold">
             <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
-            {loc('عدّل الزبون الطلب بعد عرضك، فلا يمكن قبوله حتى تؤكده أو تعدّله.', 'The customer changed the request after your offer; it cannot be accepted until you re-confirm or edit it.')}
+            {loc('عدّل الزبون الطلب بعد عرضك، فلا يمكن قبوله حتى تؤكده أو تعدّله.', 'The customer changed the request after your offer; it cannot be accepted until you re-confirm or edit it.', 'کڕیارەکە دوای ئۆفەرەکەت داواکارییەکەی گۆڕی؛ تا دووبارە پشتڕاستی نەکەیتەوە یان دەستکاری نەکەیت ناتوانرێت قبوڵ بکرێت.')}
           </p>
           {changes && changes.length > 0 && (
-            <p className="mt-1 ps-6 text-text-secondary">{loc('ما الذي تغيّر: ', 'What changed: ')}{changes.join('، ')}</p>
+            <p className="mt-1 ps-6 text-text-secondary">{loc('ما الذي تغيّر: ', 'What changed: ', 'ئەوەی گۆڕاوە: ')}{changes.join('، ')}</p>
           )}
         </div>
       )}
@@ -227,19 +248,19 @@ export default function MerchantOfferPanel({
       ) : (
         <div className="mt-3 flex flex-wrap gap-2">
           {stale && takingOffers && (
-            <Button variant="primary" size="sm" onClick={reconfirm} data-offer-reconfirm={o.id}>{loc('أؤكد عرضي كما هو', 'Re-confirm as is')}</Button>
+            <Button variant="primary" size="sm" onClick={reconfirm} data-offer-reconfirm={o.id}>{loc('أؤكد عرضي كما هو', 'Re-confirm as is', 'وەک خۆی دووبارە پشتڕاست بکەرەوە')}</Button>
           )}
           {(o.state === 'pending' || o.state === 'superseded') && takingOffers && (
             <Button size="sm" variant={stale ? 'secondary' : 'primary'} onClick={() => setComposing('edit')} data-offer-edit={o.id}>
-              {loc('عدّل العرض', 'Edit offer')}
+              {loc('عدّل العرض', 'Edit offer', 'دەستکاریی ئۆفەر')}
             </Button>
           )}
           {(o.state === 'pending' || o.state === 'superseded') && (
             <>
               <Button size="sm" variant="secondary" onClick={chat} icon={<MessageCircle aria-hidden="true" className="h-4 w-4" />}>
-                {loc('راسل الزبون', 'Message')}
+                {loc('راسل الزبون', 'Message', 'نامە')}
               </Button>
-              <Button size="sm" variant="ghost" onClick={withdraw} data-offer-withdraw={o.id}>{loc('اسحب', 'Withdraw')}</Button>
+              <Button size="sm" variant="ghost" onClick={withdraw} data-offer-withdraw={o.id}>{loc('اسحب', 'Withdraw', 'کشاندنەوە')}</Button>
             </>
           )}
         </div>

@@ -13,6 +13,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calculator, FileText, Printer, Sparkles, Image as ImageIcon, Box } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
+import { localColour, localMaterial } from '../../community/requests/mirrors';
 import { useMoney } from '../../../CurrencyContext';
 import { ApiError } from '../../../lib/api';
 import { toast } from '../../../lib/toastStore';
@@ -85,7 +86,7 @@ export function QuoteCardView({ card, mine }: Props) {
   const revision = Number(s.revision ?? 1);
   const title = str(s.title);
   const can = new Set(cur.actions ?? []);
-  const job = [num(s.quantity) && Number(s.quantity) > 1 ? loc(`${s.quantity} قطع`, `${s.quantity} pieces`) : '', str(s.material), str(s.color)]
+  const job = [num(s.quantity) && Number(s.quantity) > 1 ? loc(`${s.quantity} قطع`, `${s.quantity} pieces`, `${s.quantity} پارچە`) : '', localMaterial(str(s.material), (lang === 'en' || lang === 'ckb' ? lang : 'ar')), localColour(str(s.color), (lang === 'en' || lang === 'ckb' ? lang : 'ar'))]
     .filter(Boolean)
     .join(' · ');
 
@@ -197,7 +198,7 @@ export function PrintRequestCardView({ card, mine }: Props) {
   const can = new Set(cur.actions ?? []);
   const description = str(s.description);
   const long = description.length > 180;
-  const job = [num(s.quantity) && Number(s.quantity) > 1 ? loc(`${s.quantity} قطع`, `${s.quantity} pieces`) : loc('قطعة واحدة', 'One piece'), str(s.material), str(s.color), str(s.dimensions)]
+  const job = [num(s.quantity) && Number(s.quantity) > 1 ? loc(`${s.quantity} قطع`, `${s.quantity} pieces`, `${s.quantity} پارچە`) : loc('قطعة واحدة', 'One piece', 'یەک پارچە'), localMaterial(str(s.material), (lang === 'en' || lang === 'ckb' ? lang : 'ar')), localColour(str(s.color), (lang === 'en' || lang === 'ckb' ? lang : 'ar')), str(s.dimensions)]
     .filter(Boolean)
     .join(' · ');
   const fileUrl = (f: RequestFile) => `/api/marketplace/requests/${encodeURIComponent(requestId)}/files/${encodeURIComponent(f.id)}`;

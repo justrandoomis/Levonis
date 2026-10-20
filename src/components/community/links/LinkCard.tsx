@@ -139,6 +139,38 @@ export function LinkCard({ card, variant = 'compact', className = '', printDoor 
 
 export default LinkCard;
 
+/** A bare card for an address the server holds no row for: the host stands as the title. */
+export function bareLinkCard(url: string): LinkCardLike | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+  return { url: u.toString(), host: u.hostname.replace(/^www\./, ''), title: '', description: '', image_url: null, kind: 'unknown' };
+}
+
+/**
+ * A REQUEST'S PASTED LINK (Community V3 R1) — the model a «رابط مجسم» request
+ * is about, on the details page, the board and the offer panel. It is ALWAYS
+ * drawn: the stored card when an author resolve already learned it (the
+ * wizard resolves on paste), a bare card with the host otherwise — the link
+ * is the job, so it never disappears for want of a preview. The reader asks
+ * only the stored row (`useLinkCard`), never a fetch.
+ */
+export function SourceLinkCard({ url, className = '' }: { url: string | null | undefined; className?: string }) {
+  const clean = String(url ?? '').trim();
+  const card = useLinkCard(clean || null);
+  const bare = clean ? bareLinkCard(clean) : null;
+  if (!bare) return null;
+  return (
+    <div data-request-link className={className}>
+      <LinkCard card={card ?? bare} printDoor={false} />
+    </div>
+  );
+}
+
 export interface LinkRowProps {
   /** The body to look in — its first http(s) address is the card's. */
   text: string | null | undefined;

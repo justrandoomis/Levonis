@@ -127,6 +127,20 @@ test('community.ts puts nothing on the board by itself: its one insert is a draf
   const inserts = src.match(/INSERT INTO community_requests[^`]*`/g) ?? [];
   assert.equal(inserts.length, 1);
   assert.match(inserts[0], /'draft'/);
-  assert.match(src, /await publishRequest\(c\.env, user\.id, id, \{\}\)/);
+  // R11: the door asks nothing about how to print, so it publishes «لست متأكدًا» — never an implicit FDM.
+  assert.match(src, /await publishRequest\(c\.env, user\.id, id, \{ process: 'unsure', material_id: 'unsure' \}\)/);
   assert.doesNotMatch(src, /UPDATE community_requests/, 'no community route moves a request by itself');
+});
+
+test('R11: the legacy door publishes «not sure» for the process and the material — no implicit FDM hides it from resin workshops', async () => {
+  const raw = seed();
+  const res = await post(as(raw, 'buyer'), '/api/community/requests', { title: 'A resin miniature', description: 'Small and detailed' });
+  assert.equal(res.status, 200, JSON.stringify(await res.clone().json()));
+  const { id } = await json(res);
+  const p = row<{ process_unsure: number; material_unsure: number; material_id: string | null }>(
+    raw, 'SELECT process_unsure, material_unsure, material_id FROM community_print_requests WHERE request_id = ?', id
+  )!;
+  assert.equal(p.process_unsure, 1, 'the process is an open question, not FDM');
+  assert.equal(p.material_unsure, 1, 'the material is an open question, not a default');
+  assert.ok(!p.material_id, 'no material was picked for the customer');
 });

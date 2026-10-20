@@ -599,7 +599,10 @@ communityRoutes.post('/requests', requireAuth, async (c) => {
     .run();
   await audit(c.env.DB, user.id, 'community.request_created', id, { title, state: 'draft', via: 'community' });
 
-  const out = await publishRequest(c.env, user.id, id, {});
+  // This door asks nothing about HOW to print, so it publishes «لست متأكدًا»
+  // for the process and the material (R11) — never an implicit FDM, which hid
+  // the job from every resin-only workshop and was a choice nobody made.
+  const out = await publishRequest(c.env, user.id, id, { process: 'unsure', material_id: 'unsure' });
   return c.json({ success: true, id, published: true, completeness: out.completeness, matching: out.matching });
 });
 

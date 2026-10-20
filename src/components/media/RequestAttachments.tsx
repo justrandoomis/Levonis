@@ -22,8 +22,12 @@
 
 import { useRef, useState } from 'react';
 import { Loader2, Paperclip, Trash2, FileText, Box, Image as ImageIcon, Download } from 'lucide-react';
-import { api, ApiError } from '../../lib/api';
+import { api } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
+import { pickUpload, uploadLarge } from '../../lib/uploadSession';
+import { REQUEST_FILE_LIMITS, requestFileAccept } from '../../../packages/contracts/src/requestFiles';
+import { requestFileCheck, requestUploadRefusal } from '../community/requests/fileRefusals';
+import { RequestThumb } from '../community/requests/RequestFileThumbs';
 
 export interface RequestFile {
   id: string;
@@ -35,41 +39,28 @@ export interface RequestFile {
   inline?: boolean;
 }
 
-/** Kept in step with worker/lib/attachments.ts. */
-export const ATTACHMENT_ACCEPT = '.jpg,.jpeg,.png,.webp,.gif,.pdf,.stl,.3mf,.obj';
-const IMAGE_MAX = 8 * 1024 * 1024;
-const MODEL_MAX = 40 * 1024 * 1024;
-export const MAX_ATTACHMENTS = 6;
+/**
+ * What a request takes, from the one table every door reads
+ * (packages/contracts/src/requestFiles.ts, R5): the same types, sizes and
+ * count as the wizard, the whole-body route and the resumable session.
+ */
+export const ATTACHMENT_ACCEPT = requestFileAccept();
+export const MAX_ATTACHMENTS = REQUEST_FILE_LIMITS.maxFiles;
+
+type Lang = 'ar' | 'en' | 'ckb';
 
 const isImage = (f: { type?: string; name: string }) =>
-  (f.type ?? '').startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(f.name);
+  (f.type ?? '').startsWith('image/') || /\.(jpe?g|png|webp|gif|avif)$/i.test(f.name);
 
 /**
- * The client-side half of the check. The server sniffs the bytes and is the
- * real gate; this exists so a merchant picking a 200 MB file is told now
- * instead of after the upload.
+ * The client-side half of the check, from the same table as the server. The
+ * server sniffs the bytes and is the real gate; this exists so a customer
+ * picking a 400 MB file is told now instead of after the upload, in words
+ * built from FORMAT_CAPABILITIES (src/components/community/requests/fileRefusals.ts).
  */
-export function attachmentProblem(file: File, loc: Loc): string {
-  const ext = file.name.toLowerCase().split('.').pop() ?? '';
-  if (!['jpg', 'jpeg', 'png', 'webp', 'gif', 'pdf', 'stl', '3mf', 'obj'].includes(ext)) {
-    return loc(
-      'نوع غير مدعوم — أرفق صورة أو PDF أو ملف STL / 3MF / OBJ.',
-      'Unsupported type — attach an image, a PDF, or an STL / 3MF / OBJ model.',
-      'جۆری پشتگیری نەکراو — وێنە یان PDF یان STL / 3MF / OBJ.'
-    );
-  }
-  const max = isImage(file) ? IMAGE_MAX : MODEL_MAX;
-  if (file.size > max) {
-    return loc(
-      `الملف أكبر من ${max / 1024 / 1024} ميغابايت.`,
-      `That file is larger than ${max / 1024 / 1024} MB.`,
-      `فایلەکە لە ${max / 1024 / 1024} MB گەورەترە.`
-    );
-  }
-  return '';
+export function attachmentProblem(file: File, lang: Lang): string {
+  return requestFileCheck(file, lang);
 }
-
-type Loc = (ar: string, en: string, ckb?: string) => string;
 
 export function formatBytes(n: number): string {
   return n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
@@ -81,20 +72,29 @@ function KindIcon({ kind, className }: { kind: string; className?: string }) {
   return <ImageIcon className={className} />;
 }
 
-/** Upload every chosen file to a request that already exists. Returns how
- *  many failed, so the caller can be honest about a partial result. */
-export async function uploadRequestFiles(requestId: string, files: File[]): Promise<number> {
-  let failed = 0;
+/**
+ * Upload every chosen file to a request that already exists: a picture that
+ * fits one request through the whole-body route, a model or anything larger
+ * through a resumable session — the door the same table picks
+ * (src/lib/uploadSession.ts `pickUpload`). Returns how many failed AND why,
+ * so the caller can be honest about a partial result and say what was wrong.
+ */
+export async function uploadRequestFiles(requestId: string, files: File[]): Promise<{ failed: number; reasons: unknown[] }> {
+  const reasons: unknown[] = [];
   for (const file of files) {
-    const form = new FormData();
-    form.append('file', file);
     try {
-      await api.post(`/api/marketplace/requests/${requestId}/files`, form);
-    } catch {
-      failed += 1;
+      if (pickUpload(file) === 'session') {
+        await uploadLarge(file, 'request', { entityId: requestId });
+      } else {
+        const form = new FormData();
+        form.append('file', file);
+        await api.post(`/api/marketplace/requests/${requestId}/files`, form);
+      }
+    } catch (e) {
+      reasons.push(e);
     }
   }
-  return failed;
+  return { failed: reasons.length, reasons };
 }
 
 /**
@@ -108,7 +108,8 @@ export function AttachmentDraft({
   files: File[];
   onChange: (files: File[]) => void;
 }) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
+  const L: Lang = lang === 'en' || lang === 'ckb' ? lang : 'ar';
   const input = useRef<HTMLInputElement | null>(null);
   const [error, setError] = useState('');
 
@@ -123,7 +124,7 @@ export function AttachmentDraft({
     const accepted: File[] = [];
     let rejected = '';
     for (const f of Array.from(list).slice(0, room)) {
-      const problem = attachmentProblem(f, loc);
+      const problem = attachmentProblem(f, L);
       if (problem) { rejected = problem; continue; }
       accepted.push(f);
     }
@@ -167,9 +168,9 @@ export function AttachmentDraft({
 
       <p className="text-text-muted text-[11px] mt-2">
         {loc(
-          'صور، PDF، أو ملفات STL / 3MF / OBJ. حتى 6 ملفات. الملفات تُرفع بعد نشر الطلب.',
-          'Images, PDF, or STL / 3MF / OBJ models. Up to 6 files. They upload once the request is posted.',
-          'وێنە، PDF، یان STL / 3MF / OBJ. تا ٦ فایل.'
+          `صور، PDF، أو مجسمات ثلاثية الأبعاد. حتى ${MAX_ATTACHMENTS} ملفات. الملفات تُرفع بعد نشر الطلب.`,
+          `Images, PDF, or 3D models. Up to ${MAX_ATTACHMENTS} files. They upload once the request is posted.`,
+          `وێنە، PDF، یان مۆدێلی سێ ڕەهەندی. تا ${MAX_ATTACHMENTS} فایل. فایلەکان دوای بڵاوکردنەوەی داواکارییەکە باردەکرێن.`
         )}
       </p>
       {error && <p className="text-red-400 text-[11.5px] mt-1">{error}</p>}
@@ -202,10 +203,13 @@ export function AttachmentList({
   canEdit: boolean;
   onChanged: () => void;
 }) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
+  const L: Lang = lang === 'en' || lang === 'ckb' ? lang : 'ar';
   const input = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  const kindWord = (kind: string) =>
+    kind === 'model' ? loc('مجسم', 'Model', 'مۆدێل') : kind === 'document' ? loc('مستند', 'Document', 'بەڵگەنامە') : loc('صورة', 'Picture', 'وێنە');
 
   async function add(list: FileList | null) {
     if (!list?.length) return;
@@ -217,20 +221,21 @@ export function AttachmentList({
     }
     const chosen = Array.from(list).slice(0, room);
     for (const f of chosen) {
-      const problem = attachmentProblem(f, loc);
+      const problem = attachmentProblem(f, L);
       if (problem) { setError(problem); return; }
     }
 
     setBusy('add');
-    const failed = await uploadRequestFiles(requestId, chosen);
+    const { failed, reasons } = await uploadRequestFiles(requestId, chosen);
     setBusy('');
     if (input.current) input.current.value = '';
     if (failed) {
-      setError(loc(
+      // The reason, not only the count: the server refusal in words (R5).
+      setError(requestUploadRefusal(reasons[0], L, loc(
         `تعذّر رفع ${failed} من الملفات.`,
         `${failed} file(s) could not be uploaded.`,
         `${failed} فایل بار نەکرا.`
-      ));
+      )));
     }
     onChanged();
   }
@@ -242,7 +247,7 @@ export function AttachmentList({
       await api.delete(`/api/marketplace/requests/${requestId}/files/${f.id}`);
       onChanged();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : loc('تعذّر الحذف', 'Could not remove it', 'نەتوانرا بسڕدرێتەوە'));
+      setError(requestUploadRefusal(e, L, loc('تعذّر الحذف', 'Could not remove it', 'نەتوانرا بسڕدرێتەوە')));
     } finally {
       setBusy('');
     }
@@ -260,7 +265,7 @@ export function AttachmentList({
         {files.map((f) => (
           <div key={f.id} className="flex items-center gap-3 px-3 py-2.5">
             {f.inline && f.url ? (
-              <img src={f.url} alt="" className="w-10 h-10 rounded-sm object-cover shrink-0 bg-black/40" />
+              <RequestThumb url={f.url} size={40} />
             ) : (
               <div className="w-10 h-10 rounded-sm bg-surface-raised flex items-center justify-center shrink-0">
                 <KindIcon kind={f.kind} className="w-4 h-4 text-text-muted" />
@@ -269,7 +274,7 @@ export function AttachmentList({
             <div className="min-w-0 flex-1">
               <p className="text-text-primary text-[12.5px] truncate">{f.file_name}</p>
               <p className="text-text-muted text-[11px]" dir="ltr">
-                {f.kind} · {formatBytes(f.size_bytes)}
+                {kindWord(f.kind)} · {formatBytes(f.size_bytes)}
               </p>
             </div>
             {f.url && (
