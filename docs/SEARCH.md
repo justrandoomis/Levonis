@@ -264,6 +264,36 @@ what makes typo tolerance affordable at all.
 
 ---
 
+### 4e. The words as constraints (`nl=1`)
+
+With `nl=1`, `/api/products?search=` reads the words first
+(`packages/catalog/src/nlQuery.ts`, pure, deterministic, no model):
+«فلامنت اسود اقل من 30 الف» searches «فلامنت» under the colour black and a
+price of at most 30,000; «طابعة بدون AMS» searches «طابعة» and leaves out the
+AMS units and the combos. Arabic (Iraqi forms included), English and Sorani;
+digits from every keyboard; number words (الف، مليون، هەزار، ملیۆن، «مليون
+ونص», «نص مليون»); bounds before or after the amount and ranges; dollars and
+«ورقة» converted at the shop rate; colours, materials, the 1.75/2.85
+diameter, the sale mode («متوفر هسه» / «حجز»), refill or with spool («ريفل»,
+«بكرة كاملة», «بدون بكرة») and «رخيص» as the price order.
+
+* **What becomes a filter leaves the search.** Price, sale, spool, colour,
+  diameter and sort words and the negations are consumed; spool words above
+  all, so «بكرة» and "spool" never reach the `spool → filament` synonym. A
+  material stays a search word and also narrows the materials.
+* **Where each lands.** Price, sale, spool and diameter join the listing state
+  (an explicit URL value wins). Colours, materials and exclusions are judged
+  per product before the filters, the counts and the paging: an exclusion
+  reads the names (every language) and the family, never the description
+  («works with the AMS» is written on printers sold without one); a colour
+  needs evidence (the colour facet, a name, a colour or option value sold); a
+  material judges only products that have a `material_type`.
+* **Never a guess.** A number with no money word and no bound is not a price
+  (X1C, 0.4, 6×2, 10101, a resin printer «8K»). With nothing left to search,
+  the whole shop is listed under the constraints. The answer carries
+  `understood: { text, chips }` — data for the chips the search UI words in
+  ar, en and ckb (smart search 1.7). `nl` is part of the edge cache key.
+
 ## 5. What is deliberately *not* forgiven
 
 `editBudget` gives a three-letter token **no** typo budget. `abs` and `ams` are
@@ -443,3 +473,5 @@ Both sides are stored **normalised**, which is why one row covers «طابعة»
 | `tests/searchLive.test.ts` | A realistic catalogue through the route on D1's parameter ceiling; hidden products; the `#doc:6` rollout and its status |
 | `tests/searchBackfillBudget.test.ts` | The catch-up within a statement budget |
 | `tests/searchIdentifiers.test.ts` | Acceptance rows 5–7 through the route on D1's limits; both writers; a database without 0206 |
+| `packages/catalog/src/nlQuery.ts` | The words as constraints (`nl=1`): the parser, `nlApply` onto the listing state, `nlKeeps` per product |
+| `tests/assistUnderstand.test.ts` | Acceptance rows 9–12: the parser in three languages, and through the route on D1's limits |

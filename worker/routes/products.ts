@@ -69,6 +69,7 @@ import {
 } from '../lib/catalogPresentation';
 import { searchProducts } from '../lib/search/store';
 import { resolveIdentifier, type IdentifierAnswer } from '../lib/search/identifiers';
+import { nlApply, nlJudgesProducts, nlKeeps, parseNlQuery, type NlChip, type NlProduct, type NlQuery } from '@levonis/catalog/nlQuery';
 import { suggestCompletion } from '../lib/search/complete';
 import {
   SHELF_LIMIT,
@@ -4232,7 +4233,17 @@ export async function listCatalogProducts(
     caps?: { candidates?: number; keys?: number };
   } = {}
 ): Promise<CatalogListing> {
-  const search = str(q.search, 'search', { max: 100, required: false });
+  const typed = str(q.search, 'search', { max: 100, required: false });
+  /**
+   * THE WORDS AS CONSTRAINTS (smart search 1.6, `nl=1`; @levonis/catalog/nlQuery). «فلامنت اسود
+   * اقل من 30 الف» searches «فلامنت» under a black colour and a price of at most 30,000; «طابعة بدون
+   * AMS» searches «طابعة» and leaves out every AMS and combo. Price, sale, spool and diameter join
+   * the listing state (an explicit URL value wins); colours, materials and exclusions are judged
+   * per product before the listing step (`nlKeep`). Without `nl=1` the search is exactly as before.
+   * Deterministic code only: no model is asked.
+   */
+  const nl: NlQuery | null = q.nl === '1' && typed ? parseNlQuery(typed) : null;
+  const search = nl ? nl.text : typed;
   // A slug as long as /api/catalog/:slug takes (80): the admin's taxonomy
   // slugs reach 63 (slugify's 60 + uniqueSlug's "-2"…"-50").
   const category = str(q.category, 'category', { max: 80, required: false });
@@ -4254,8 +4265,18 @@ export async function listCatalogProducts(
    * is dropped there, never thrown. `listing` is false for every request that
    * existed before it, and those keep the exact path below.
    */
-  const listing = LISTING_PARAM_KEYS.some((k) => q[k] !== undefined);
-  const listingState = parseListingParams((k) => (k === 'search' ? search : q[k]), 'api');
+  const listing = nl !== null || LISTING_PARAM_KEYS.some((k) => q[k] !== undefined);
+  let listingState = parseListingParams((k) => (k === 'search' ? search : q[k]), 'api');
+  /** What the words narrowed, as data for the search chips (smart search 1.7 says it in ar, en and ckb). */
+  let nlField: { understood?: { text: string; chips: NlChip[] } } = {};
+  if (nl) {
+    // A dollar bound («اقل من 5 ورقات», "under $500") is converted at the shop rate; without one it is not applied.
+    const usdIqd = nl.price?.currency === 'USD' ? ((await getPublicDisplayRate(db)).exchangeRate ?? null) : null;
+    const applied = nlApply(listingState, nl, { usdIqd });
+    listingState = applied.state;
+    nlField = { understood: { text: nl.text, chips: applied.understood } };
+  }
+  const nlKeep = nl && nlJudgesProducts(nl) ? (row: Record<string, unknown>) => nlKeeps(nl, nlProductOf(row)) : null;
   const wantsFacets = q.facets === '1';
   // The taxonomy index: card `compare_type` and the category's `path`. Memoised
   // per isolate (catalogPresentation.ts), so this is usually free.
@@ -4409,7 +4430,8 @@ export async function listCatalogProducts(
    * the word hot. See `completing` in worker/lib/search/index.ts.
    */
   const rawSearch = typeof q.search === 'string' ? q.search : '';
-  const typingLastWord = !/\s$/u.test(rawSearch);
+  // A last word the words turned into a constraint is finished: nothing to complete.
+  const typingLastWord = !/\s$/u.test(rawSearch) && !nl?.tailConsumed;
   if (search) {
     /**
      * HIDDEN PRODUCTS TAKE NO RANKING SLOT (docs/SEARCH.md). The engine
@@ -4468,6 +4490,7 @@ export async function listCatalogProducts(
         products: [],
         ...categoryField,
         ...identifierFields(ident, []),
+        ...nlField,
         ...(listing ? { total: 0, truncated: false, partial_order: false, cut_off: false, has_more: false, sort: listingState.sort } : {}),
       }, rows: new Map() };
     } else if (exactIds.length > 0) {
@@ -4592,7 +4615,7 @@ export async function listCatalogProducts(
   if (listing && !wantsFacets && listingState.fits.length) {
     if (!(await printerFitsInstalled(db))) {
       return {
-        body: { products: [], ...categoryField, total: 0, truncated: false, partial_order: false, cut_off: false, has_more: false, sort: listingState.sort },
+        body: { products: [], ...categoryField, ...nlField, total: 0, truncated: false, partial_order: false, cut_off: false, has_more: false, sort: listingState.sort },
         rows: new Map(),
       };
     }
@@ -4616,8 +4639,10 @@ export async function listCatalogProducts(
    * (the engine returns ≤ 200 ids, already ranked) and `type=bundle` (bundle
    * rows only) keep the one read below.
    */
-  if (listing && !search && type !== 'bundle') {
-    return pagedListing(db, {
+  // Words judged per product (a colour, a material, an exclusion) with no search words left take the
+  // one-read path below, where every candidate row is in hand to judge.
+  if (listing && !search && type !== 'bundle' && !nlKeep) {
+    const paged = await pagedListing(db, {
       whereSql: sql,
       whereParams: params,
       selectList,
@@ -4632,6 +4657,7 @@ export async function listCatalogProducts(
       candidateCap: opts.caps?.candidates ?? LISTING_CANDIDATE_CAP,
       keysCap: opts.caps?.keys ?? LISTING_KEYS_CAP,
     });
+    return nl ? { ...paged, body: { ...paged.body, ...nlField } } : paged;
   }
   // One COUNT over the same WHERE, before ORDER BY and paging are appended.
   const countSql = !listing && opts.withTotal ? sql.replace(selectList, 'SELECT COUNT(*) AS n FROM products') : null;
@@ -4731,11 +4757,14 @@ export async function listCatalogProducts(
       (fitsByProduct.get(String(row.id)) ?? []).map((p) => p.slug)
     )
   );
-  const run = runListing(items, listingState, { facets: wantsFacets, brands, printers });
+  // The words judged per product (`nl=1`): before the filters, the counts and the paging, so all three agree.
+  const judged = nlKeep ? items.filter((_, i) => nlKeep(results[i])) : items;
+  const run = runListing(judged, listingState, { facets: wantsFacets, brands, printers });
   const page = run.items.slice(offset, offset + limit);
   return { body: {
     ...categoryField,
     ...suggestion,
+    ...nlField,
     ...(search ? identifierFields(identity, page.map((i) => i.id)) : {}),
     products: page.map((i) => i.card),
     total: run.items.length,
@@ -4750,12 +4779,31 @@ export async function listCatalogProducts(
 }
 
 /**
+ * One listed row as the words' per-product judge reads it (`nlKeeps`): its names in every language,
+ * its spec mirror, and the names of the colours and option values it is sold in.
+ */
+function nlProductOf(row: Record<string, unknown>): NlProduct {
+  const named = (json: unknown): string[] =>
+    safeParse<unknown[]>(String(json ?? '[]'), []).flatMap((e) => {
+      if (!e || typeof e !== 'object') return [];
+      const rec = e as Record<string, unknown>;
+      if (rec.active === false || rec.active === 0) return [];
+      return ['name', 'name_en', 'name_ar', 'name_ckb', 'name_ku'].map((k) => rec[k]).filter((v): v is string => typeof v === 'string');
+    });
+  return {
+    names: [row.name, row.name_ar, row.name_ku],
+    specs: safeParse<Record<string, unknown>>(String(row.spec_fields ?? '{}'), {}),
+    colours: [...named(row.colors), ...named(row.options)],
+  };
+}
+
+/**
  * The query parameters that may change a listing answer — the edge cache key
  * is built from these and nothing else (worker/lib/edgePolicy.ts). Every key
  * `listCatalogProducts` reads is here; a parameter it ignores cannot mint an
  * entry.
  */
-export const LISTING_CACHE_PARAMS: readonly string[] = ['search', 'category', 'type', 'limit', 'offset', 'page', ...LISTING_PARAM_KEYS];
+export const LISTING_CACHE_PARAMS: readonly string[] = ['search', 'category', 'type', 'limit', 'offset', 'page', 'nl', ...LISTING_PARAM_KEYS];
 
 productRoutes.get('/', (c) =>
   // A GUEST'S listing is the same for every guest and is served from the
