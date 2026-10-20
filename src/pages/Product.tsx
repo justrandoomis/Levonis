@@ -89,7 +89,16 @@ import Countdown from '../components/ui/Countdown';
 import ConditionPanel from '../components/product/ConditionPanel';
 import StockAlertPanel from '../components/product/StockAlertPanel';
 import { UNPRICED_TEXT } from '../lib/priceStatus';
-import { decodePriceRequestIntent, followSelectionInAddress, linkedSelection, PRICE_REQUEST_PARAM, selectionKeyOf, VARIANT_PARAM } from '../components/product/priceRequestState';
+import {
+  addressWithout,
+  decodePriceRequestIntent,
+  followSelectionInAddress,
+  linkArrival,
+  linkedSelection,
+  PRICE_REQUEST_PARAM,
+  selectionKeyOf,
+  VARIANT_PARAM,
+} from '../components/product/priceRequestState';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import {
   decodeAlertIntent,
@@ -1869,7 +1878,10 @@ export default function Product() {
    * customer's own Save. The parameter is then dropped from the URL with a
    * REPLACE, so a refresh or a shared link does not re-open the sheet — and a
    * replace rather than a push, because a Back that only removes a query
-   * parameter is a Back that appears not to work.
+   * parameter is a Back that appears not to work. The address it leaves is
+   * the one the WINDOW shows (`addressWithout`): the router may still hold a
+   * `?v=` a later choice rewrote in place, and a replace from it would bring
+   * that back.
    */
   const [alertIntent, setAlertIntent] = useState<StockAlertWish[]>([]);
   useEffect(() => {
@@ -1879,19 +1891,17 @@ export default function Product() {
   }, [location.search]);
   const consumeAlertIntent = useCallback(() => {
     setAlertIntent([]);
-    const params = new URLSearchParams(location.search);
-    if (!params.has('alert')) return;
-    params.delete('alert');
-    const rest = params.toString();
-    navigate(`${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`, { replace: true });
-  }, [navigate, location.search, location.pathname, location.hash]);
+    const next = addressWithout('alert');
+    if (next !== null) navigate(next, { replace: true });
+  }, [navigate]);
 
   /**
    * «طلب السعر» — THE SELECTION COMING BACK FROM /auth (DECISIONS row 240), the
    * `?alert=` pattern above. `?price_request=` is decoded as UNTRUSTED input:
    * only ids this product really has are kept (in the page's own group order),
-   * the selection is pre-chosen, the parameter leaves the URL with a REPLACE,
-   * and nothing is sent — the customer taps «طلب السعر» again.
+   * the selection is pre-chosen, the parameter leaves the URL with a REPLACE
+   * of the window address (`addressWithout`, never a stale `?v=` the router
+   * still holds), and nothing is sent — the customer taps «طلب السعر» again.
    */
   useEffect(() => {
     if (!product || !location.search || location.search.indexOf(`${PRICE_REQUEST_PARAM}=`) === -1) return;
@@ -1906,10 +1916,9 @@ export default function Product() {
       if (ids.length === wanted.size) setOptionValueIds(ids);
       if (wish.color_id && (product.colors ?? []).some((c) => c.id === wish.color_id)) setColorId(wish.color_id);
     }
-    params.delete(PRICE_REQUEST_PARAM);
-    const rest = params.toString();
-    navigate(`${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`, { replace: true });
-  }, [product, relations, location.search, location.pathname, location.hash, navigate]);
+    const next = addressWithout(PRICE_REQUEST_PARAM);
+    if (next !== null) navigate(next, { replace: true });
+  }, [product, relations, location.search, navigate]);
   /**
    * `?v=` — A SEARCH RESULT OPENS ON WHAT IT MATCHED (smart search 1.7):
    * «10101» opens PLA Basic on that colour, «0.4» the 0.4 nozzle. Untrusted
@@ -1919,6 +1928,12 @@ export default function Product() {
    * prices it; the link never carries a price. It is chosen ON TOP of the
    * opening selection (`linkedOpening`): «0.4» keeps the other groups and the
    * single-value ones, and a linked colour brings the options it is sold with.
+   * Once per product, link and NAVIGATION (`location.key`): tapping the same
+   * result again after a choice rewrote `?v=` in place is a router replace to
+   * the same search, so only its new key says it happened, and the link is
+   * applied again. Only while the WINDOW still shows it (`linkArrival`): a
+   * router entry whose `?v=` a later choice already rewrote is an old address,
+   * never applied over what is on screen.
    */
   const linkedFor = useRef('');
   /** The product a link was applied to, and the selection it replaced (the render before it lands). */
@@ -1926,8 +1941,17 @@ export default function Product() {
   const linkFrom = useRef<string | null>(null);
   useLayoutEffect(() => {
     const raw = location.search.includes(`${VARIANT_PARAM}=`) ? new URLSearchParams(location.search).get(VARIANT_PARAM) : null;
-    if (!product || !raw || linkedFor.current === `${product.slug}|${raw}`) return;
-    linkedFor.current = `${product.slug}|${raw}`;
+    if (!product) return;
+    const arrival = linkArrival(linkedFor.current, { slug: product.slug, raw, key: location.key });
+    linkedFor.current = arrival.token;
+    if (!arrival.apply) return;
+    const from = selectionKeyOf(optionValueIds, colorId);
+    if (raw === from) {
+      // Already on screen (a parameter consumed around it): nothing to choose, the address follows from here.
+      linkApplied.current = product.slug;
+      linkFrom.current = null;
+      return;
+    }
     const linked = linkedSelection(raw, product, relations);
     if (!linked) return;
     const colour = linked.color_id
@@ -1937,11 +1961,13 @@ export default function Product() {
         }
       : null;
     const groups = (relations?.option_groups ?? []).filter((g) => g.values.length > 0);
+    const next = linkedOpening(linked, optionValueIds, groups, relations?.variants ?? [], colour);
     linkApplied.current = product.slug;
-    linkFrom.current = selectionKeyOf(optionValueIds, colorId);
-    setOptionValueIds(linkedOpening(linked, optionValueIds, groups, relations?.variants ?? [], colour));
+    // The selection it replaces, until it lands; none when it changes nothing, so the address follows at once.
+    linkFrom.current = selectionKeyOf(next, linked.color_id ?? colorId) === from ? null : from;
+    setOptionValueIds(next);
     if (linked.color_id) setColorId(linked.color_id);
-  }, [product, relations, location.search, optionValueIds, colorId]);
+  }, [product, relations, location.key, location.search, optionValueIds, colorId]);
   /**
    * `?v=` FOLLOWS THE SELECTION once a link opened the page: a later choice
    * rewrites it in place, so a reload or a shared address opens what is on
@@ -1949,9 +1975,11 @@ export default function Product() {
    * navigate, even a replace, makes a new location key, and the shell scrolls
    * to the top on every new key, so each option tap would jump to the top
    * (`followSelectionInAddress` writes over the entry the router holds). The
-   * router keeps the address it opened with, so the effect above, keyed on
-   * that address, never applies the link again over a later choice; a router
-   * update of the address (another parameter consumed) runs this again.
+   * router keeps the address it opened with; the effect above applies a link
+   * again only on a new navigation whose `?v=` the window shows, so a later
+   * choice is never overwritten by the address the page opened with. A new
+   * location key (another tap on the result, a parameter consumed) runs this
+   * again, so the address catches up even when the link changed nothing.
    */
   useEffect(() => {
     if (!product || linkApplied.current !== product.slug) return;
@@ -1960,7 +1988,7 @@ export default function Product() {
       linkFrom.current = null;
     }
     followSelectionInAddress(selectionKey);
-  }, [product, selectionKey, location.search]);
+  }, [product, selectionKey, location.key, location.search]);
   /** Where the request block sits: inside the price card from 1024 px, its button in the phone bar below. */
   const wideLayout = useMediaQuery('(min-width: 1024px)');
   /** The phone bar's slot the request button is drawn into (a callback ref, so the panel re-renders once it exists). */

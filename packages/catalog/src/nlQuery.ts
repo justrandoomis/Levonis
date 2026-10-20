@@ -37,22 +37,25 @@
  * price: X1C, A1 mini, 0.4, 6×2, 10101 and a resin printer «8K» are left to the
  * search and the identifier lane. Nor is a number with a measure or a count
  * after it («اقل من 1 كيلو», "under 300mm", «3 قطع»), or a model name ("Kobra 3
- * Max", "Kobra 2 Plus"); a price PER unit is a price («اقل من 25 للكيلو», "30
- * per kg", "25/kg"). «ولا» and «والا» are "or", not a negation, except right
- * after one, where they are "nor" («بدون AMS ولا كومبو»); "direct drive" and
- * "AMS ready" are features, not the sale mode. A word it does not know stays in
- * the text.
+ * Max", "Kobra 2 Plus"). A price PER unit sold is a price («اقل من 25 للكيلو»,
+ * "30 per kg", "25/kg", «بۆ هەر کیلۆیەک»); per a length, a temperature, a power
+ * or a time it stays a measure («للسم», "per hour"). «ولا» and «والا» are "or",
+ * not a negation; right after one, "or" carries it on («بدون AMS ولا كومبو»,
+ * "without AMS or combo", «بێ AMS یان کۆمبۆ» leave out both). "direct drive"
+ * and "AMS ready" are features, not the sale mode. A word it does not know
+ * stays in the text.
  *
- * A BARE NUMBER BESIDE A BOUND (no money word) is Iraqi shorthand, read so that
- * a budget raised never shrinks: below 10,000 it counts thousands («اقل من 30»
- * is 30,000, «اقل من 1500» 1,500,000); from 10,000 it is read in full but never
- * below the 10,000,000 that 9,999 thousands already reached, so «اقل من 30000»
- * is 10,000,000. Written in full with its separator («30,000»), with a money
- * word («30 الف», «30000 دينار») or as a range, it is exact. A RANGE reads its
- * two ends together: two bare ends alike (in full when either is 10,000 or more,
- * «بين 5000 و 15000»; else both thousands, «بين 500 و 1200»), a bare end beside
- * a money word the way that keeps the order written («بين 500 الف و 1200» is
- * 500,000 to 1,200,000); a range written in ascending order is never swapped.
+ * A BARE NUMBER BESIDE A BOUND (no money word, no separator) is read by one
+ * rule, for an upper and a lower bound alike: below 1,000 it counts thousands
+ * (Iraqi shorthand: «اقل من 30» is 30,000, «اكثر من 500» 500,000, 999 is
+ * 999,000); from 1,000 it is dinars as written («اقل من 30000» is 30,000,
+ * «اكثر من 20000» 20,000, 1000 is 1,000, 1500 is 1,500). Grouped in threes
+ * («30,000», «٣٠٬٠٠٠») it is written in full. A RANGE reads each end by the
+ * same rule; when that inverts the order written («بين 500 و 1200»), its
+ * smaller end is read as written too (500 to 1,200); a range read ascending is
+ * never swapped. A bare end below 1,000 beside an end with a money word shares
+ * that word («بين 2 و 3 مليون»); a bare end that would invert the order beside
+ * one takes thousands («بين 500 الف و 1200» ends at 1,200,000).
  *
  * Pure and deterministic: no model, no network, no I/O (the owner rule for the
  * core search: it works without any paid AI). Every lexicon word is written as
@@ -161,20 +164,43 @@ const MEASURE_WORDS = new Set(
     'mm', 'cm', 'mm/s', 'mms', 'um', 'micron', 'microns', 'nm', 'inch', 'inches', 'x', '×',
     'ml', 'liter', 'litre', 'liters', 'litres', '°c', '°', 'c', 'celsius', 'degree', 'degrees',
     'w', 'watt', 'watts', 'v', 'volt', 'volts', 'amp', 'amps', 'mah', 'hz', 'rpm', 'millimeter', 'millimetre',
+    'meter', 'metre', 'meters', 'metres',
     'pcs', 'pc', 'piece', 'pieces', 'pack', 'packs', 'rolls', 'day', 'days', 'hour', 'hours', 'year', 'years',
     'كيلو', 'كيلوغرام', 'كيلوجرام', 'كغم', 'كغ', 'غرام', 'جرام', 'غم', 'ملم', 'مم', 'ملي', 'مليمتر', 'ميليمتر',
-    'سم', 'سنتي', 'سنتيمتر', 'مل', 'لتر', 'درجة', 'درجات', 'واط', 'فولت', 'امبير', 'انش', 'بوصة',
+    'سم', 'سنتي', 'سنتيمتر', 'مل', 'لتر', 'متر', 'امتار', 'درجة', 'درجات', 'واط', 'فولت', 'امبير', 'انش', 'بوصة',
     'قطع', 'قطعة', 'حبة', 'حبات', 'حبه', 'رول', 'رولات', 'يوم', 'ايام', 'ساعة', 'ساعات', 'سنة', 'سنوات', 'شهر', 'اشهر',
     'کیلۆ', 'کیلۆگرام', 'گرام', 'ملیم', 'ملیمەتر', 'سانتیم', 'سانتیمەتر', 'لیتر', 'پلە', 'وات', 'ڤۆڵت', 'ئینج',
-    'پارچە', 'دانە', 'ڕۆژ', 'کاتژمێر', 'ساڵ', 'مانگ',
+    'پارچە', 'دانە', 'مەتر', 'ڕۆژ', 'کاتژمێر', 'ساڵ', 'مانگ',
+    // «2 کیلۆی PLA» is two kilos of PLA: after a number the Sorani «-ی» form is a quantity (before a price, SORANI_PER_LEAD).
+    'کیلۆی', 'گرامی', 'دانەی', 'پارچەی', 'لیتری', 'مەتری',
   ].map(nlFold)
 );
 /**
- * A measure after «per» is a PRICE PER UNIT, not a measured quantity: "30 per kg", «25 لكل كيلو», «هەر کیلۆ»;
- * glued as «للكيلو», «لكيلو», «بالكيلو» (PER_PREFIXES) or written "/kg". The price stands and the words go with it.
+ * The units things are SOLD by: weight, a piece, a roll or a spool, a volume, a length of tube or wire. After
+ * «per» (PER_WORDS, a slash) or glued as «للكيلو», «لكيلو», «بالمتر» (PER_PREFIXES), a number before one is a
+ * PRICE PER UNIT, not a quantity: «اقل من 25 للكيلو», "30 per kg", "25/kg", «لكل قطعة», «بۆ هەر کیلۆ»; the price
+ * stands and the words go with it. A length, a temperature, a power or a time is not sold by: «اقل من 30 للسم»,
+ * «بالدرجة», "per hour" stay measures, never a price.
  */
-const PER_WORDS = phrases('per', 'each', 'لكل', 'كل', 'بۆ هەر', 'هەر');
+const SOLD_UNITS = new Set(
+  [
+    'kg', 'kgs', 'kilo', 'kilos', 'kilogram', 'kilograms', 'g', 'gr', 'gm', 'gram', 'grams',
+    'piece', 'pieces', 'pc', 'pcs', 'roll', 'rolls', 'spool', 'spools',
+    'liter', 'litre', 'liters', 'litres', 'ml', 'meter', 'metre', 'meters', 'metres',
+    'كيلو', 'كيلوغرام', 'كيلوجرام', 'كغم', 'كغ', 'غرام', 'جرام', 'غم', 'قطعة', 'حبة', 'دانة', 'رول', 'بكرة', 'سبول',
+    'لتر', 'مل', 'متر',
+    'کیلۆ', 'کیلۆگرام', 'گرام', 'دانە', 'پارچە', 'ڕۆڵ', 'ماسوورە', 'لیتر', 'مەتر',
+  ].map(nlFold)
+);
+/** Sorani «a kilo», «a piece»: after an amount a price per unit by itself («25 هەزار کیلۆیەک»), and after «بۆ», «بۆ هەر». */
+const SORANI_A_UNIT = ['کیلۆیەک', 'گرامێک', 'دانەیەک', 'پارچەیەک', 'ڕۆڵێک', 'ماسوورەیەک', 'لیترێک', 'مەترێک'];
+const SORANI_PER_UNIT = new Set(SORANI_A_UNIT.map(nlFold));
+/** Before a price, Sorani «of the kilo» or «a kilo»: «کیلۆی کەمتر لە 25 هەزار», «کیلۆی لە 25 هەزار کەمتر», «کیلۆی بە 25 هەزار». */
+const SORANI_PER_LEAD = new Set(['کیلۆی', 'گرامی', 'دانەی', 'پارچەی', 'لیتری', 'مەتری', ...SORANI_A_UNIT].map(nlFold));
+const PER_WORDS = phrases('per', 'each', 'لكل', 'كل', 'بۆ هەر', 'هەر', 'بۆ');
 const PER_PREFIXES = ['بال', 'لل', 'ل'];
+/** Sorani «بە» ("at", "for") before an amount, like «ب»: «کیلۆی بە 25 هەزار». */
+const SORANI_AT = nlFold('بە');
 /** «بين 500 الف و مليون»: a range opener («من» and "from" alone are a lower bound). */
 const RANGE_OPEN = phrases('بين', 'between', 'لە نێوان', 'من', 'from', 'لە');
 const RANGE_MIN_ALONE = phrases('من', 'from');
@@ -185,17 +211,16 @@ const BARE_SEP = phrases('-', 'الى', 'to', 'تا', 'حتى', 'لحد');
 /** A Sorani amount stands after «لە» when its bound comes last («لە 30 هەزار کەمتر»). */
 const SORANI_FROM = nlFold('لە');
 
-/** Where 9,999 thousands lands, and where a bare number read in full starts to count. */
-const BARE_FLOOR_IN_FULL = 10_000_000;
+/** Below this a bare number counts thousands; from it, dinars as written. */
+const BARE_IN_FULL_FROM = 1000;
 /**
- * A bare number beside a bound, in dinars; MONOTONIC, so a budget raised never shrinks. Below 10,000 it is
- * thousands (Iraqi shorthand: «اقل من 30» is 30,000, «اقل من 1500» 1,500,000). Read in full from 10,000 it
- * would fall from 9,999,000 to 10,000, so it is never below 10,000,000 until its own value is: «اقل من
- * 30000» is 10,000,000, the whole shop. An exact budget is written in full with its separator («30,000»),
- * carries its money word («30 الف», «30000 دينار») or is a range («بين 5000 و 30000»).
+ * A bare number beside a bound (no money word, no separator), in dinars, for an upper and a lower bound
+ * alike. Below 1,000 it counts thousands (Iraqi shorthand: «اقل من 30» is 30,000, «اكثر من 500» 500,000,
+ * 999 is 999,000); from 1,000 it is dinars as written («اقل من 30000» is 30,000, «اكثر من 20000» 20,000,
+ * 1000 is 1,000). Grouped in threes («30,000») it never comes here: it is written in full.
  */
 function bareDinars(n: number): number {
-  return Math.round(n >= BARE_FLOOR_IN_FULL ? n : Math.min(n * 1000, BARE_FLOOR_IN_FULL));
+  return Math.round(n < BARE_IN_FULL_FROM ? n * 1000 : n);
 }
 
 type NumClass =
@@ -380,7 +405,7 @@ const DEAR = phrases('غالي', 'غالية', 'اغلى', 'اغلى شي', 'exp
 const NEGATION = phrases(
   'بدون', 'بلا', 'بلاش', 'مو', 'مش', 'موب', 'غير', 'ليس', 'لا', 'دون', 'عدا', 'ماعدا', 'باستثناء', 'الا', 'من غير',
   'ما اريد', 'ما ابي', 'ما احتاج', 'ما بيه', 'مابيه', 'ما فيه', 'مافيه',
-  'without', 'w/o', 'no', 'not', 'non', 'except', 'excluding', 'exclude', 'dont want', 'do not want', 'no need for',
+  'without', 'w/o', 'no', 'not', 'non', 'neither', 'except', 'excluding', 'exclude', 'dont want', 'do not want', 'no need for',
   'بێ', 'بەبێ', 'نەک', 'نا', 'بێجگە', 'بێجگە لە', 'جگە لە', 'بەدەر لە', 'نامەوێت'
 );
 
@@ -409,9 +434,13 @@ const FILLERS = new Set(
   ].map(nlFold)
 );
 /** «ولا» and «والا» are the Iraqi "or" («PLA ولا PETG»): their «لا» and «الا» are not a negation. */
-const CONJUNCTIONS = new Set(['و', 'او', 'and', 'or', '&', '-', 'یان', 'ولا', 'والا'].map(nlFold));
-/** «ولا» and «والا» right after a negation are "nor": «بدون AMS ولا كومبو», «بدون AMS والا كومبو». */
-const NOR = new Set(['ولا', 'والا'].map(nlFold));
+const CONJUNCTIONS = new Set(['و', 'او', 'and', 'or', 'nor', '&', '-', 'یان', 'ولا', 'والا'].map(nlFold));
+/**
+ * "Or" right after a negation carries it on to the next word, in every language: «بدون AMS ولا كومبو», «بدون
+ * AMS والا كومبو», «بدون AMS او كومبو», "without AMS or combo", "without AMS nor combo", «بێ AMS یان کۆمبۆ»
+ * leave out both. Anywhere else it is "or": "AMS or combo" lists both.
+ */
+const NEGATION_OR = new Set(['ولا', 'والا', 'او', 'or', 'nor', 'یان'].map(nlFold));
 
 // ------------------------------------------------------------------ the lexer
 
@@ -428,7 +457,8 @@ const DASH = /^[-–—~]+$/;
 const LEAD = /^[^\p{L}\p{N}$<>≤≥]+/u;
 const TRAIL = /[^\p{L}\p{N}$+]+$/u;
 const NUMERIC_START = /^[\d$<>≤≥]/;
-const RUNS = /[<>≤≥]|\$|\+|\d+(?:[.,]\d+)*|[^\d$<>≤≥+]+/g;
+/** A slash opens a run of its own: «25k/kg» is 25, k and /kg. */
+const RUNS = /[<>≤≥]|\$|\+|\d+(?:[.,]\d+)*|\/[^\d$<>≤≥+/]*|[^\d$<>≤≥+/]+/g;
 const ARABIC_PREFIXES = ['وال', 'بال', 'لل', 'ال', 'و', 'ب', 'ل'];
 
 /** One piece of the input → its lexemes: «30k» is 30 and k, «1.75mm» 1.75 and mm, «$500» $ and 500; «X1C» stays whole. */
@@ -625,7 +655,7 @@ export function parseNlQuery(input: string): NlQuery {
     let currency: Amount['cur'] = null;
     let prev: Prev = null;
     let grouped = false;
-    if (j < L.length && !used[j] && L[j].f === 'ب') j++; // «ب 500 الف»
+    if (j < L.length && !used[j] && (L[j].f === 'ب' || L[j].f === SORANI_AT)) j++; // «ب 500 الف», «بە 25 هەزار»
     if (j < L.length && !used[j] && L[j].f === '$') {
       currency = 'USD';
       unit = 'strong';
@@ -726,18 +756,44 @@ export function parseNlQuery(input: string): NlQuery {
   };
 
   const isMeasure = (k: number): boolean => k >= 0 && k < L.length && L[k].v.some((v) => MEASURE_WORDS.has(v));
-  /** How many lexemes from k say "per unit" («للكيلو», "per kg", «لكل قطعة», "/kg"): 0 when they do not. */
-  const perUnit = (k: number): number => {
-    if (k >= L.length) return 0;
-    const f = L[k].f;
-    // "/kg" glued to the amount («25/kg») keeps its slash; alone ("25 /kg") the slash opens its piece.
-    const slash = f.startsWith('/') || (pieces[L[k].piece].startsWith('/') && (k === 0 || L[k - 1].piece !== L[k].piece));
-    if (isMeasure(k) && (slash || PER_PREFIXES.some((p) => f.length > p.length && f.startsWith(p) && MEASURE_WORDS.has(f.slice(p.length))))) return 1;
-    const w = longest(k, PER_WORDS);
-    return w && isMeasure(k + w) ? w + 1 : 0;
+  const soldAt = (k: number): boolean => k >= 0 && k < L.length && !used[k] && L[k].v.some((v) => SOLD_UNITS.has(v) || SORANI_PER_UNIT.has(v));
+  /** A slash stands right before lexeme k: "25/kg", "25k/kg", "25 /kg", "25/ kg", "25 / kg". */
+  const afterSlash = (k: number): boolean => {
+    if (L[k].f.startsWith('/')) return true;
+    const prev = k > 0 ? L[k - 1].piece : -1;
+    if (prev === L[k].piece) return false;
+    if (pieces[L[k].piece].startsWith('/') || (prev >= 0 && pieces[prev].endsWith('/'))) return true;
+    return pieces.slice(prev + 1, L[k].piece).some((p) => /^\/+$/.test(p));
   };
-  /** A bare number with a measure or a count after it («1 كيلو», "300mm", «3 قطع»): never a price. Per unit («25 للكيلو») it is one. */
-  const measured = (a: Amount): boolean => a.unit === null && isMeasure(a.end) && !perUnit(a.end);
+  /**
+   * How many lexemes from k say "per unit sold" («للكيلو», "per kg", «لكل قطعة», "/kg", «بۆ هەر کیلۆیەک»,
+   * «کیلۆیەک»): 0 when they do not, and 0 before a unit nothing is sold by («للسم», "per hour").
+   */
+  const perUnit = (k: number): number => {
+    if (k >= L.length || used[k]) return 0;
+    const f = L[k].f;
+    if (SORANI_PER_UNIT.has(f)) return 1;
+    if (soldAt(k) && (afterSlash(k) || PER_PREFIXES.some((p) => f.length > p.length && f.startsWith(p) && SOLD_UNITS.has(f.slice(p.length))))) return 1;
+    const w = longest(k, PER_WORDS);
+    return w && soldAt(k + w) ? w + 1 : 0;
+  };
+  /**
+   * "Per unit" words BEFORE the price, from j: «کیلۆی کەمتر لە 25 هەزار», «بۆ هەر کیلۆیەک کەمتر لە 25 هەزار»,
+   * "per kg under 25"; after a price word the unit alone («سعر الكيلو اقل من 25 الف», «نرخی کیلۆ»). Taken only
+   * when a price follows.
+   */
+  const perLead = (j: number, afterPriceWord: boolean): number => {
+    if (j >= L.length || used[j]) return 0;
+    if (SORANI_PER_LEAD.has(L[j].f) || (afterPriceWord && soldAt(j))) return 1;
+    const w = longest(j, PER_WORDS);
+    return w && soldAt(j + w) ? w + 1 : 0;
+  };
+  /**
+   * A bare number with a measure or a count after it («1 كيلو», "300mm", «3 قطع»), or per a unit nothing is sold by
+   * («30 للسم», "50 per hour", «لكل ساعة»): never a price. Per a unit sold («25 للكيلو») it is one.
+   */
+  const measured = (a: Amount): boolean =>
+    a.unit === null && !perUnit(a.end) && (isMeasure(a.end) || isMeasure(a.end + longest(a.end, PER_WORDS)));
   /** Where a price read up to `end` stops: past the "per unit" words that qualify it. */
   const priceEnd = (end: number): number => end + perUnit(end);
 
@@ -750,13 +806,14 @@ export function parseNlQuery(input: string): NlQuery {
   const flipDir = (dir: 'min' | 'max', flip: boolean): 'min' | 'max' => (flip ? (dir === 'min' ? 'max' : 'min') : dir);
 
   /**
-   * A range from lexeme k: A sep B, its two ends read together.
-   *   - Two bare ends are read alike: in full when either is 10,000 or more or grouped («بين 5000 و 15000» is
-   *     5,000 to 15,000, «من 5000 الى 20000»), else both thousands («بين 500 و 1200» is 500,000 to 1,200,000).
-   *   - A bare end beside an end with a money word takes the reading that keeps the order written: the other
-   *     end thousand or million when it is below 1,000 («بين 25 و 50 الف»), else thousands or in full,
-   *     whichever stays on its side («بين 500 الف و 1200» ends at 1,200,000, «بين 5 الف و 9000» at 9,000).
-   *   - Swapped only when no reading keeps the order: a range written ascending stays ascending.
+   * A range from lexeme k: A sep B, each end read by the bare rule (bareDinars) and the two kept in order.
+   *   - Two bare ends: each by the rule («بين 5000 و 15000» is 5,000 to 15,000, «بين 500 و 900» 500,000 to
+   *     900,000, «بين 5,000 و 15» 5,000 to 15,000). When that inverts the order written («بين 500 و 1200»
+   *     would be 500,000 to 1,200), the smaller end is read as written too: 500 to 1,200.
+   *   - A bare end beside an end with a money word: below 1,000 it shares that word («بين 2 و 3 مليون», «بين
+   *     25 و 50 الف»), else the rule, and the other reading only when the rule inverts the order («بين 500 الف
+   *     و 1200» ends at 1,200,000, «بين 5 الف و 9000» at 9,000).
+   *   - Swapped only when written descending («بين 50 و 25»): a range read ascending is never swapped.
    */
   const readRange = (k: number, bare: boolean): { lo: { v: number; cur: 'IQD' | 'USD' }; hi: { v: number; cur: 'IQD' | 'USD' }; end: number } | null => {
     const a = readAmount(k, { bound: true, range: true });
@@ -778,20 +835,19 @@ export function parseNlQuery(input: string): NlQuery {
     let lo: number;
     let hi: number;
     if (a.unit === null && b.unit === null && cur === 'IQD') {
-      const scale = a.grouped || b.grouped || Math.max(a.value, b.value) >= 10_000 ? 1 : 1000;
-      [lo, hi] = [a.value * scale, b.value * scale];
+      const read = (x: Amount): number => (x.grouped ? x.value : bareDinars(x.value));
+      [lo, hi] = [read(a), read(b)];
+      // Written ascending and read inverted: the smaller end as written too.
+      if (lo > hi && a.value <= b.value) lo = a.value;
     } else {
-      /** A bare end x beside the other end y: its readings, the most likely first; the one that keeps the order written wins. */
+      /** A bare end x beside the other end y: its readings in order; the first that keeps the order written wins. */
       const beside = (x: Amount, y: Amount, low: boolean): number => {
         if (x.unit !== null || x.grouped) return x.value;
-        const borrowed = x.value < 1000 && y.maxMult > 0 ? [x.value * y.maxMult] : [];
-        // Dollars are as typed; dinars read in thousands or in full.
-        const ways = [...borrowed, ...(cur === 'USD' ? [x.value] : low ? [x.value * 1000, x.value] : [x.value, x.value * 1000])].filter(
-          (v) => v <= MAX_PRICE_IQD
-        );
-        const keeps = ways.filter((v) => (low ? v <= y.value : v >= y.value));
-        const pick = keeps.length ? (low ? Math.max(...keeps) : Math.min(...keeps)) : ways[0];
-        return pick ?? x.value;
+        const shared = x.value < BARE_IN_FULL_FROM && y.maxMult > 0 ? [x.value * y.maxMult] : [];
+        // Dollars are as typed; dinars by the rule first, then the other reading.
+        const ruled = x.value < BARE_IN_FULL_FROM ? [x.value * 1000, x.value] : [x.value, x.value * 1000];
+        const ways = [...shared, ...(cur === 'USD' ? [x.value] : ruled)].filter((v) => v <= MAX_PRICE_IQD);
+        return ways.find((v) => (low ? v <= y.value : v >= y.value)) ?? ways[0] ?? x.value;
       };
       [lo, hi] = [beside(a, b, true), beside(b, a, false)];
     }
@@ -804,7 +860,8 @@ export function parseNlQuery(input: string): NlQuery {
   const tryPrice = (i: number, flip: boolean): number => {
     if (i >= L.length || used[i]) return 0;
     who = 'price';
-    const j = i + longest(i, PRICE_WORDS);
+    const named = longest(i, PRICE_WORDS);
+    const j = i + named + perLead(i + named, named > 0);
     const open = longest(j, RANGE_OPEN);
     if (open) {
       const r = readRange(j + open, false);
@@ -854,10 +911,14 @@ export function parseNlQuery(input: string): NlQuery {
       const p = c ? priceOf(a, true) : null;
       if (c && p) {
         setBound(flipDir(dir, flip), p);
-        take(i, at + c);
-        // «لە 30 هەزار کەمتر»: the «لە» before it belongs to the bound.
-        if (i > 0 && !used[i - 1] && L[i - 1].f === SORANI_FROM) take(i - 1, i);
-        return at + c - i;
+        // «25 الف او اقل للكيلو», «لە 25 هەزار کەمتر بۆ هەر کیلۆیەک»: per-unit words after the bound go with it too.
+        const end = priceEnd(at + c);
+        take(i, end);
+        // «لە 30 هەزار کەمتر»: the «لە» before it belongs to the bound, and a «کیلۆی» before that to the price.
+        let from = i;
+        if (from > 0 && !used[from - 1] && L[from - 1].f === SORANI_FROM) take(--from, i);
+        if (from > 0 && !used[from - 1] && SORANI_PER_LEAD.has(L[from - 1].f)) take(from - 1, from);
+        return end - i;
       }
     }
     const p = priceOf(a, false);
@@ -952,11 +1013,12 @@ export function parseNlQuery(input: string): NlQuery {
     return end - i;
   };
 
-  /** Where the last negation ended: «ولا» right there is "nor", anywhere else "or". */
+  /** Where the last negation ended: "or" right there carries it on (NEGATION_OR), anywhere else it is "or". */
   let negatedTo = -1;
   const tryNegation = (i: number): number => {
-    if (CONJUNCTIONS.has(L[i].f) && !(NOR.has(L[i].f) && negatedTo === i)) return 0;
-    const n = longest(i, NEGATION);
+    const carried = negatedTo === i && NEGATION_OR.has(L[i].f);
+    if (CONJUNCTIONS.has(L[i].f) && !carried) return 0;
+    const n = carried ? 1 : longest(i, NEGATION);
     if (!n) return 0;
     const j = i + n;
     if (j >= L.length || used[j]) return 0;

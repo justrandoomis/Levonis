@@ -297,31 +297,46 @@ diameter, the sale mode («متوفر هسه» / «حجز»), refill or with spo
 * **Never a guess.** A number with no money word and no bound is not a price
   (X1C, 0.4, 6×2, 10101, a resin printer «8K»). Nor is a bare number with a
   measure or a count after it («اقل من 1 كيلو», "under 300mm", "up to 300°C",
-  «اقل من 3 قطع», Sorani «کەمتر لە 1 کیلۆ»): the words stay in the search. A
-  price PER unit is a price, and the per-unit words go with it («اقل من 25
-  للكيلو», «لكل كيلو», «بالكيلو», "per kg", "25/kg": at most 25,000). "Kobra 3
-  Max", "Kobra 2 Plus" and "3+" are model names: max, min, plus and + after a
-  number are a bound only after a money word or k ("30k max"). «ولا» and
-  «والا» are "or" («PLA ولا PETG» lists both), and "nor" right after a
-  negation («بدون AMS ولا كومبو», «بدون AMS والا كومبو» leave both out). With
+  «اقل من 3 قطع», Sorani «کەمتر لە 1 کیلۆ», «کەمتر لە 2 کیلۆی PLA»): the
+  words stay in the search. A price PER unit SOLD is a price, and the per-unit
+  words go with it, before the amount, after it or after a final bound («اقل
+  من 25 للكيلو», «لكل كيلو», «بالكيلو», "per kg", "25/kg", "25 / kg",
+  "25k/kg", «25 الف او اقل للكيلو», Sorani «بۆ هەر کیلۆ», «بۆ هەر کیلۆیەک»,
+  «بۆ کیلۆیەک», «کیلۆی کەمتر لە 25 هەزار», «لە 25 هەزار کەمتر بۆ هەر
+  کیلۆیەک»: at most 25,000). The units things are sold by are a kilo, a gram,
+  a piece («قطعة», «دانة», «حبة», «دانە», «پارچە»), a roll, a spool, a litre,
+  a millilitre and a metre («متر», «مەتر»); after «per» or a prefix a length,
+  a temperature, a power or a time («للسم», «بالدرجة», «للواط», «لكل ساعة»,
+  "per hour") stays a measure, never a price. "Kobra 3 Max", "Kobra 2 Plus"
+  and "3+" are model names: max, min, plus and + after a number are a bound
+  only after a money word or k ("30k max"). «ولا» and «والا» are "or" («PLA
+  ولا PETG» lists both). Right after a negation, "or" in every language
+  carries it on: «بدون AMS ولا كومبو», «بدون AMS والا كومبو», «بدون AMS او
+  كومبو», "without AMS or combo", "without AMS nor combo", «بێ AMS یان
+  کۆمبۆ» leave both out; without a negation "AMS or combo" lists both. With
   nothing left to search, the whole shop is listed under the constraints.
-* **A bare number beside a bound** is Iraqi shorthand, read so that a budget
-  raised never shrinks (monotonic from 1 to 1,000,000): below 10,000 it counts
-  thousands («اقل من 30» is 30,000, "under 1000" 1,000,000, «اقل من 9999»
-  9,999,000); from 10,000 it is read in full but never below 10,000,000 until
-  its own value is, so «اقل من 30000» is 10,000,000 — the whole shop rather
-  than a budget that fell as it rose. An exact budget says so: grouped in
-  threes («30,000», «٣٠٬٠٠٠»), with a money word («30 الف», «30000 دينار»), or
-  as a range.
-* **A range reads its two ends together** and a range written in ascending
-  order is never swapped. Two bare ends are read alike: in full when either is
-  10,000 or more or grouped («بين 5000 و 15000» is 5,000 to 15,000, «من 5000
-  الى 20000», "from 2000 to 20000"), otherwise both in thousands («بين 500 و
-  1200» is 500,000 to 1,200,000). A bare end beside an end with a money word
-  takes the reading that keeps the order written: the other end thousand or
-  million below 1,000 («بين 25 و 50 الف», «بين مليون و 2»), else thousands or
-  in full, whichever stays on its side («بين 500 الف و 1200» ends at
-  1,200,000, «بين 5 الف و 9000» at 9,000). The answer carries
+* **A bare number beside a bound** (no money word, no separator) is read by
+  one rule, for an upper and a lower bound alike: **below 1,000 it counts
+  thousands** (Iraqi shorthand: «اقل من 30» is 30,000, «اكثر من 500»
+  500,000, «اقل من 999» 999,000); **from 1,000 it is dinars as written**
+  («اقل من 1000» is 1,000, «اقل من 1500» 1,500, «اقل من 30000» 30,000,
+  «اكثر من 20000» at least 20,000, "over 50000", «زیاتر لە 30000», «30000 او
+  اكثر»). Grouped in threes («30,000», «٣٠٬٠٠٠») it is written in full; with
+  a money word («30 الف», «30000 دينار») it is what the word says. (The
+  monotonic reading of 7f4c071c, «اقل من 30000» as 10,000,000, is withdrawn.)
+* **A range reads each end by the same rule** and is never inverted: «بين
+  5000 و 15000» is 5,000 to 15,000, «من 5000 الى 20000» and "from 2000 to
+  20000" likewise, «بين 500 و 900» 500,000 to 900,000. When the rule would
+  invert the order written («بين 500 و 1200» read as 500,000 then 1,200), the
+  smaller end is read as written too: 500 to 1,200. A grouped end beside a
+  bare one follows the same rule («بين 5,000 و 15» is 5,000 to 15,000). A
+  range read ascending is never swapped; one written descending («بين 50 و
+  25») is the range between its ends. A bare end below 1,000 beside an end
+  with a money word shares that word («بين 2 و 3 مليون», «بين 25 و 50 الف»,
+  «بين مليون و 2»); from 1,000 it follows the rule («بين 1500 و 2 مليون» is
+  1,500 to 2,000,000, «بين 5 الف و 9000» 5,000 to 9,000), and takes
+  thousands only when the rule would invert the order («بين 500 الف و 1200»
+  ends at 1,200,000). The answer carries
   `understood: { text, chips }` — data for the chips the search UI words in
   ar, en and ckb (smart search 1.7). `nl` is part of the edge cache key.
 
@@ -365,7 +380,15 @@ lazy chunk the panel hands the field, so none of the wording is in the entry:
   opens what is on screen, never the variant the search matched. It is not a
   navigation: a router navigate, even a replace, makes a new location key, and
   the shell scrolls to the top on every new key, so each option tap would jump
-  to the top. A page not opened from a link never grows a `?v=`.
+  to the top. A page not opened from a link never grows a `?v=`. The link is
+  applied once per product, link and NAVIGATION (`linkArrival`, keyed on the
+  location key): tapping the same result again after a choice is a router
+  replace to the same search, so only its new key says it happened, and the
+  linked selection comes back. It is applied only while the window still shows
+  it: a router entry whose `?v=` a choice already rewrote is an old address,
+  never applied over the screen. The `?alert=` and `?price_request=`
+  consumers drop their parameter with a replace built from the WINDOW address
+  (`addressWithout`), so a router replace never brings back a stale `?v=`.
 
 ## 5. What is deliberately *not* forgiven
 

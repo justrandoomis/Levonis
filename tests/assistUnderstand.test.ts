@@ -154,81 +154,126 @@ test('a number without a money word or a bound is not a price, and a word the pa
   }
 });
 
-test('a bare budget never shrinks as it rises, from 1 to 1,000,000: thousands below 10,000, then never below 10,000,000', () => {
-  // Every number to 12,000 (the turn at 10,000 included), then a stride to a million with every power of ten and its neighbours.
-  const ns = new Set<number>();
-  for (let n = 1; n <= 12_000; n += 1) ns.add(n);
-  for (let n = 12_000; n <= 1_000_000; n += 113) ns.add(n);
-  for (let p = 10; p <= 1_000_000; p *= 10) for (const n of [p - 1, p, p + 1]) ns.add(n);
-  ns.add(1_000_000);
-  let last = 0;
-  for (const n of [...ns].sort((x, y) => x - y)) {
-    const max = priceOf(`طابعة اقل من ${n}`)?.max;
-    assert.ok(typeof max === 'number', `${n}: read as a bound`);
-    assert.ok(max >= last, `${n}: ${max} after ${last}`);
-    last = max;
-  }
-  // The turn itself: 9,999 thousands, then 10,000 is not 10,000 dinars.
-  assert.equal(priceOf('under 9999')?.max, 9_999_000);
-  assert.equal(priceOf('under 10000')?.max, 10_000_000);
-  assert.ok(priceOf('under 10000')!.max! >= priceOf('under 9999')!.max!, '"under 10000" is never less than "under 9999"');
-  assert.deepEqual(priceOf('printer under 1000'), { min: null, max: 1_000_000, currency: 'IQD' });
-  assert.deepEqual(priceOf('اقل من 1200'), { min: null, max: 1_200_000, currency: 'IQD' });
-  assert.deepEqual(priceOf('printer 1000 or less'), { min: null, max: 1_000_000, currency: 'IQD' });
-  // A bare number in full is never below what a smaller one reached; said with its money word it is exact.
-  assert.deepEqual(priceOf('اقل من 30000'), { min: null, max: 10_000_000, currency: 'IQD' });
-  assert.deepEqual(priceOf('اقل من 30000 دينار'), { min: null, max: 30_000, currency: 'IQD' });
-  assert.deepEqual(priceOf('اقل من 30 الف'), { min: null, max: 30_000, currency: 'IQD' });
-  assert.deepEqual(priceOf('اقل من 15000000'), { min: null, max: 15_000_000, currency: 'IQD' });
+test('a bare number beside a bound: below 1,000 it counts thousands, from 1,000 it is dinars as written, for an upper and a lower bound', () => {
+  const max = (v: number) => ({ min: null, max: v, currency: 'IQD' });
+  const min = (v: number) => ({ min: v, max: null, currency: 'IQD' });
+  // Below 1,000: Iraqi shorthand for thousands.
+  assert.deepEqual(priceOf('اقل من 30'), max(30_000));
+  assert.deepEqual(priceOf('طابعة تحت 500'), max(500_000));
+  assert.deepEqual(priceOf('under 1'), max(1_000));
+  // The threshold, written down: 999 is the last number read in thousands, 1000 the first read as written.
+  assert.deepEqual(priceOf('under 999'), max(999_000));
+  assert.deepEqual(priceOf('under 1000'), max(1_000));
+  assert.deepEqual(priceOf('اقل من 1000'), max(1_000));
+  // From 1,000: dinars as written (the lead decision; 7f4c071c read «اقل من 30000» as 10,000,000).
+  assert.deepEqual(priceOf('اقل من 30000'), max(30_000));
+  assert.deepEqual(priceOf('اقل من 1500'), max(1_500));
+  assert.deepEqual(priceOf('اقل من 1200'), max(1_200));
+  assert.deepEqual(priceOf('printer 1000 or less'), max(1_000));
+  assert.deepEqual(priceOf('اقل من 15000000'), max(15_000_000));
+  for (const n of [1_000, 1_001, 9_999, 10_000, 10_001, 30_000, 250_000, 1_000_000]) assert.deepEqual(priceOf(`under ${n}`), max(n), String(n));
+  for (const n of [1, 30, 500, 998, 999]) assert.deepEqual(priceOf(`under ${n}`), max(n * 1000), String(n));
+  // A lower bound by the same rule, before or after the amount and in every language.
+  assert.deepEqual(priceOf('اكثر من 20000'), min(20_000));
+  assert.deepEqual(priceOf('over 50000'), min(50_000));
+  assert.deepEqual(priceOf('فیلامێنت زیاتر لە 30000'), min(30_000));
+  assert.deepEqual(priceOf('طابعة 30000 او اكثر'), min(30_000));
+  assert.deepEqual(priceOf('اكثر من 500'), min(500_000));
+  assert.deepEqual(priceOf('above 999'), min(999_000));
+  assert.deepEqual(priceOf('above 1000'), min(1_000));
+  // With its money word it is what the word says, whatever its size.
+  assert.deepEqual(priceOf('اقل من 30000 دينار'), max(30_000));
+  assert.deepEqual(priceOf('اقل من 30 الف'), max(30_000));
+  assert.deepEqual(priceOf('اقل من 1500 الف'), max(1_500_000));
   // Grouped in threes it is written in full: exact, on either keyboard.
-  for (const q of ['اقل من 30,000', 'اقل من ٣٠٬٠٠٠', 'under 30,000']) assert.deepEqual(priceOf(q), { min: null, max: 30_000, currency: 'IQD' }, q);
-  assert.deepEqual(priceOf('اقل من 1,500,000'), { min: null, max: 1_500_000, currency: 'IQD' });
+  for (const q of ['اقل من 30,000', 'اقل من ٣٠٬٠٠٠', 'under 30,000']) assert.deepEqual(priceOf(q), max(30_000), q);
+  assert.deepEqual(priceOf('اقل من 1,500,000'), max(1_500_000));
+  assert.deepEqual(priceOf('اكثر من 20,000'), min(20_000));
 });
 
-test('a range reads its two ends together and is never inverted: in full when either bare end is 10,000 or more', () => {
+test('a range reads each end by the bare rule and is never inverted; written ascending it is never swapped', () => {
   const range = (min: number, max: number) => ({ min, max, currency: 'IQD' });
-  // The regression: an end on either side of 10,000 came out as min 15,000 / max 5,000,000.
+  // The regressions: an end on either side of a threshold came out as min 15,000 / max 5,000,000.
   assert.deepEqual(priceOf('بين 5000 و 15000'), range(5_000, 15_000));
   assert.deepEqual(priceOf('من 5000 الى 20000'), range(5_000, 20_000));
   assert.deepEqual(priceOf('from 2000 to 20000'), range(2_000, 20_000));
   assert.deepEqual(priceOf('nozzle between 5000 and 15000'), range(5_000, 15_000));
   assert.deepEqual(priceOf('لە نێوان 5000 و 15000'), range(5_000, 15_000));
-  // Both bare below 10,000: both thousands.
-  assert.deepEqual(priceOf('طابعة بين 500 و 1000'), range(500_000, 1_000_000));
-  assert.deepEqual(priceOf('طابعة بين 900 و 1200'), range(900_000, 1_200_000));
+  // Both below 1,000: both thousands.
+  assert.deepEqual(priceOf('بين 500 و 900'), range(500_000, 900_000));
   assert.deepEqual(priceOf('بين 25 و 50'), range(25_000, 50_000));
-  // A bare end beside a money word: the reading that keeps the order written.
-  assert.deepEqual(priceOf('بين 500 الف و 1200'), range(500_000, 1_200_000));
-  assert.deepEqual(priceOf('بين 5 الف و 9000'), range(5_000, 9_000));
-  assert.deepEqual(priceOf('بين 5 الف و 15000'), range(5_000, 15_000));
-  assert.deepEqual(priceOf('بين 500 و مليون'), range(500_000, 1_000_000));
-  assert.deepEqual(priceOf('بين مليون و 2'), range(1_000_000, 2_000_000));
-  assert.deepEqual(priceOf('بين 1500 و 2 مليون'), range(1_500_000, 2_000_000));
-  assert.deepEqual(priceOf('بين 5000 و 25 الف'), range(5_000, 25_000));
-  // Every ascending pair stays ascending, on each side of 10,000 and across it.
-  for (const [a, b] of [[1, 9], [500, 9_999], [5_000, 10_000], [9_999, 10_000], [2_000, 20_000], [10_000, 900_000], [9, 15_000]] as const) {
-    const p = priceOf(`بين ${a} و ${b}`);
-    assert.ok(p && p.min !== null && p.max !== null && p.min < p.max, `${a}..${b}: ${JSON.stringify(p)}`);
-    assert.equal(p!.min! / a, p!.max! / b, `${a}..${b}: both ends read alike`);
-  }
+  assert.deepEqual(priceOf('بين 9 و 15000'), range(9_000, 15_000));
+  // Read by the rule the order inverts (500,000 then 1,200): the smaller end is read as written too.
+  assert.deepEqual(priceOf('بين 500 و 1200'), range(500, 1_200));
+  assert.deepEqual(priceOf('طابعة بين 900 و 1200'), range(900, 1_200));
+  assert.deepEqual(priceOf('بين 500 و 9999'), range(500, 9_999));
+  // A grouped end beside a bare one: the same rule («15» is 15,000, which keeps the order).
+  assert.deepEqual(priceOf('بين 5,000 و 15'), range(5_000, 15_000));
+  assert.deepEqual(priceOf('بين 5000 و 15'), range(5_000, 15_000));
+  assert.deepEqual(priceOf('بين 500 و 1,200'), range(500, 1_200));
   assert.deepEqual(priceOf('بين 5,000 و 15,000'), range(5_000, 15_000));
   // Written descending, it is still the range between them.
   assert.deepEqual(priceOf('بين 50 و 25'), range(25_000, 50_000));
+  assert.deepEqual(priceOf('بين 15000 و 5000'), range(5_000, 15_000));
+  // Every pair written ascending stays ascending: never swapped, never inverted.
+  for (const [a, b] of [[1, 9], [500, 999], [500, 1_000], [999, 1_000], [500, 9_999], [5_000, 10_000], [2_000, 20_000], [10_000, 900_000], [9, 15_000]] as const) {
+    const p = priceOf(`بين ${a} و ${b}`);
+    assert.ok(p && p.min !== null && p.max !== null && p.min < p.max, `${a}..${b}: ${JSON.stringify(p)}`);
+    assert.ok(p!.min! === a || p!.min! === a * 1000, `${a}..${b}: the low end is ${a} or ${a} thousand`);
+    assert.ok(p!.max! === b || p!.max! === b * 1000, `${a}..${b}: the high end is ${b} or ${b} thousand`);
+  }
+  // A bare end beside a money word: below 1,000 it shares the word, else the rule, else the reading that keeps the order.
+  assert.deepEqual(priceOf('بين 25 و 50 الف'), range(25_000, 50_000));
+  assert.deepEqual(priceOf('بين 2 و 3 مليون'), range(2_000_000, 3_000_000));
+  assert.deepEqual(priceOf('بين مليون و 2'), range(1_000_000, 2_000_000));
+  assert.deepEqual(priceOf('بين 500 و مليون'), range(500_000, 1_000_000));
+  assert.deepEqual(priceOf('بين 5 الف و 9000'), range(5_000, 9_000));
+  assert.deepEqual(priceOf('بين 5 الف و 15000'), range(5_000, 15_000));
+  assert.deepEqual(priceOf('بين 5000 و 25 الف'), range(5_000, 25_000));
+  assert.deepEqual(priceOf('بين 1500 و 2 مليون'), range(1_500, 2_000_000));
+  assert.deepEqual(priceOf('بين 500 الف و 1200'), range(500_000, 1_200_000));
 });
 
-test('a price per unit is a price, a measured quantity is not: «اقل من 25 للكيلو», "per kg", "/kg"', () => {
+test('a price per unit sold is a price, a measured quantity is not: «اقل من 25 للكيلو», "per kg", "/kg", «بۆ هەر کیلۆیەک»', () => {
   const max25 = { min: null, max: 25_000, currency: 'IQD' };
   for (const q of [
-    'فلامنت اقل من 25 للكيلو', 'فلامنت اقل من 25 لكل كيلو', 'فلامنت اقل من 25 بالكيلو', 'فلامنت اقل من 25 الف للكيلو',
-    'filament under 25 per kg', 'filament under 25/kg', 'filament under 25 /kg', 'فلامنت 25 للكيلو او اقل', 'فیلامێنت کەمتر لە 25 هەزار بۆ هەر کیلۆ',
+    'فلامنت اقل من 25 للكيلو', 'فلامنت اقل من 25 لكل كيلو', 'فلامنت اقل من 25 بالكيلو', 'فلامنت اقل من 25 الف للكيلو', 'فلامنت اقل من 25 لكيلو',
+    'filament under 25 per kg', 'filament under 25 each kg', 'filament under 25/kg', 'filament under 25 /kg', 'filament under 25 / kg', 'filament under 25/ kg',
+    'filament under 25k/kg', 'filament under 25k / kg', 'filament under 25k per kg',
+    'فلامنت 25 للكيلو او اقل',
+    // Per-unit words after a final bound.
+    'فلامنت 25 الف او اقل للكيلو', 'filament 25k or less per kg',
+    // Sorani: «بۆ هەر کیلۆ», «بۆ هەر کیلۆیەک», «بۆ کیلۆیەک», «کیلۆی» before the price, and after a final bound.
+    'فیلامێنت کەمتر لە 25 هەزار بۆ هەر کیلۆ', 'فیلامێنت کەمتر لە 25 هەزار بۆ هەر کیلۆیەک', 'فیلامێنت کەمتر لە 25 هەزار بۆ کیلۆیەک',
+    'فیلامێنت کیلۆی کەمتر لە 25 هەزار', 'فیلامێنت کیلۆی لە 25 هەزار کەمتر', 'فیلامێنت کیلۆی بە 25 هەزار',
+    'فیلامێنت لە 25 هەزار کەمتر بۆ هەر کیلۆیەک', 'فیلامێنت 25 هەزار یان کەمتر بۆ کیلۆیەک',
   ]) {
     const nl = parseNlQuery(q);
     assert.deepEqual(nl.price, max25, q);
-    assert.ok(!/كيلو|kg|کیلۆ/u.test(nl.text), `${q}: the per-unit words went with the price (${nl.text})`);
+    assert.ok(!/كيلو|kg|کیلۆ|\/|بۆ|هەر|each|per/u.test(nl.text), `${q}: the per-unit words went with the price (${nl.text})`);
   }
   assert.deepEqual(priceOf('فلامنت بين 20 و 30 للكيلو'), { min: 20_000, max: 30_000, currency: 'IQD' });
-  // Without «per» the measure is a quantity again.
-  for (const q of ['فلامنت اقل من 1 كيلو', 'filament under 1 kg', 'اقل من 2 لتر']) {
+  // Every unit things are sold by: a gram, a piece, a roll, a spool, a litre, a millilitre, a metre.
+  for (const [q, v] of [
+    ['اقل من 3 لكل قطعة', 3_000], ['اقل من 3 للقطعة', 3_000], ['اقل من 3 للدانة', 3_000], ['اقل من 3 للحبة', 3_000], ['under 3 per piece', 3_000],
+    ['PLA اقل من 25 للبكرة', 25_000], ['PLA under 25 per spool', 25_000], ['اقل من 25 للرول', 25_000], ['under 25 per roll', 25_000],
+    ['resin under 30 per litre', 30_000], ['ريزن اقل من 30 للتر', 30_000], ['ريزن اقل من 30 باللتر', 30_000], ['under 5 per ml', 5_000], ['under 5/g', 5_000],
+    ['PTFE اقل من 5 للمتر', 5_000], ['PTFE اقل من 5 بالمتر', 5_000], ['PTFE under 5 per metre', 5_000],
+    ['ڕێزن کەمتر لە 30 هەزار بۆ هەر لیترێک', 30_000], ['PTFE کەمتر لە 5 هەزار بۆ هەر مەترێک', 5_000], ['کەمتر لە 3 هەزار بۆ هەر دانەیەک', 3_000],
+    ['PTFE مەتری کەمتر لە 5 هەزار', 5_000], ['کەمتر لە 3 هەزار دانەیەک', 3_000],
+  ] as const) {
+    assert.equal(priceOf(q)?.max ?? null, v, q);
+  }
+  // A length, a temperature, a power or a time after «per» or a prefix stays a measure: no price, the words searched.
+  for (const q of [
+    'اقل من 30 للسم', 'اقل من 30 بالسم', 'اقل من 300 للملم', 'اقل من 300 بالدرجة', 'اقل من 300 لكل درجة', 'اقل من 40 للواط', 'اقل من 50 لكل ساعة', 'اقل من 50 بالساعة',
+    'heater under 50 per hour', 'under 30 per cm', 'under 40 per watt', 'under 300 per degree',
+  ]) {
+    assert.equal(parseNlQuery(q).price, null, q);
+    assert.equal(parseNlQuery(q).text, q, q);
+  }
+  // Without «per» the measure is a quantity again, «2 کیلۆی PLA» (two kilos of PLA) too.
+  for (const q of ['فلامنت اقل من 1 كيلو', 'filament under 1 kg', 'اقل من 2 لتر', 'اقل من 5 متر', 'PTFE under 2 metres', 'کەمتر لە 2 کیلۆی PLA', 'printer under 300mm/s']) {
     assert.equal(parseNlQuery(q).price, null, q);
     assert.equal(parseNlQuery(q).text, q, q);
   }
@@ -268,6 +313,34 @@ test('row 10: a negation is an exclusion — «بدون AMS», «مو كومبو
     assert.equal(nl.text, q, q);
   }
   assert.deepEqual(parseNlQuery('non-black PLA').exclude.colours, ['black']);
+});
+
+test('a negation carries over "or" in every language: "without AMS or combo", «بێ AMS یان کۆمبۆ», like «بدون AMS ولا كومبو»', () => {
+  for (const [q, text] of [
+    ['طابعة بدون AMS ولا كومبو', 'طابعة'],
+    ['طابعة بدون AMS والا كومبو', 'طابعة'],
+    ['طابعة بدون AMS او كومبو', 'طابعة'],
+    ['printer without AMS or combo', 'printer'],
+    ['printer without AMS nor combo', 'printer'],
+    ['printer no AMS or combo', 'printer'],
+    ['چاپکەر بێ AMS یان کۆمبۆ', 'چاپکەر'],
+    ['چاپکەر بەبێ AMS یان کۆمبۆ', 'چاپکەر'],
+  ] as const) {
+    const nl = parseNlQuery(q);
+    assert.deepEqual(nl.exclude.words, ['ams', 'combo'], q);
+    assert.equal(nl.text, text, q);
+  }
+  // A colour or a material after it, the same.
+  assert.deepEqual(parseNlQuery('PLA without black or white').exclude.colours, ['black', 'white']);
+  assert.deepEqual(parseNlQuery('فیلامێنت بێ PLA یان PETG').exclude.materials, ['pla', 'petg']);
+  // Without a negation "or" is "or": both stay, nothing is excluded.
+  for (const q of ['printer AMS or combo', 'چاپکەر AMS یان کۆمبۆ', 'طابعة AMS او كومبو', 'PLA or PETG']) {
+    assert.deepEqual(parseNlQuery(q).exclude, { colours: [], materials: [], words: [] }, q);
+  }
+  assert.equal(parseNlQuery('printer AMS or combo').text, 'printer AMS or combo');
+  assert.deepEqual(parseNlQuery('PLA or PETG').materials, ['pla', 'petg']);
+  // Only right where a negation ended: a word between them and the combo is searched again.
+  assert.deepEqual(parseNlQuery('without AMS printer or combo').exclude.words, ['ams']);
 });
 
 test('row 11: refill vs with spool, consumed so «spool» never reaches the spool→filament synonym', () => {

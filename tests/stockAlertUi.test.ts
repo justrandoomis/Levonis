@@ -352,10 +352,10 @@ test('the page hands the panel the model list the per-model rule needs', () => {
 test('the choice from the URL opens the sheet and is then dropped from the URL', () => {
   const product = read(PRODUCT);
   assert.match(product, /decodeAlertIntent\(new URLSearchParams\(location\.search\)\.get\('alert'\)\)/);
-  assert.match(product, /params\.delete\('alert'\)/);
   // REPLACE, not push: a Back that only removes a query parameter is a Back
-  // that appears not to work.
-  assert.match(product, /navigate\(`\$\{location\.pathname\}[^\n]*\{ replace: true \}\)/);
+  // that appears not to work. The address it leaves is the window's, so a
+  // `?v=` the selection rewrote in place is never brought back stale.
+  assert.match(product, /const next = addressWithout\('alert'\);\s*if \(next !== null\) navigate\(next, \{ replace: true \}\);/);
 });
 
 test('the copy never says the product is unavailable, because it is not', () => {

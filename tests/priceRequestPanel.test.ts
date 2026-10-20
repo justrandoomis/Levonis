@@ -218,5 +218,5 @@ test('the page: the panel is lazy, a catalog-only product never asks the quote, 
   assert.match(src, /ref=\{setRequestBarSlot\}/, 'the phone bar gives the request button its place');
   // The intent coming back from /auth is decoded as untrusted and dropped with a REPLACE.
   assert.match(src, /decodePriceRequestIntent\(params\.get\(PRICE_REQUEST_PARAM\)\)/);
-  assert.match(src, /params\.delete\(PRICE_REQUEST_PARAM\);/);
+  assert.match(src, /const next = addressWithout\(PRICE_REQUEST_PARAM\);\s*if \(next !== null\) navigate\(next, \{ replace: true \}\);/);
 });

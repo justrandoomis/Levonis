@@ -164,3 +164,47 @@ export function followSelectionInAddress(
   w.history.replaceState(w.history.state, '', next);
   return next;
 }
+
+/** The `?v=` the WINDOW shows now (null when none): what followSelectionInAddress last wrote, or a navigation since. */
+export function shownVariant(w: { location: { href: string } } = window): string | null {
+  return new URL(w.location.href).searchParams.get(VARIANT_PARAM);
+}
+
+/**
+ * WHEN THE PRODUCT PAGE APPLIES A `?v=` LINK: once per product, link and
+ * NAVIGATION, and only while the window still shows it. `token` is the last
+ * one handled (the page keeps it in a ref); `key` is the router location key.
+ *   - The key is part of the token: after a choice rewrote `?v=` in place, a
+ *     second tap on the same search result is a router REPLACE to the same
+ *     search, so only its new key says it happened, and the link is applied
+ *     again (keyed on the search alone it never was).
+ *   - A router entry whose `?v=` a later choice has already rewritten (the
+ *     window shows the choice, not the entry) is an old address, never applied
+ *     over what is on screen.
+ */
+export function linkArrival(
+  token: string,
+  at: { slug: string; raw: string | null; key: string },
+  w: { location: { href: string } } = window
+): { token: string; apply: boolean } {
+  if (!at.raw) return { token, apply: false };
+  const next = `${at.slug}|${at.raw}|${at.key}`;
+  if (next === token) return { token, apply: false };
+  return { token: next, apply: shownVariant(w) === at.raw };
+}
+
+/**
+ * The address a consumed parameter (`?alert=`, `?price_request=`) leaves, for
+ * the router REPLACE that drops it: path, the other parameters and the hash.
+ * Built from the WINDOW, never from the router location: `?v=` follows the
+ * selection in place, so the router still holds the address the page opened
+ * with, and a replace built from it would bring a stale `?v=` back over the
+ * choice on screen (and re-arm the link with it). Null when the window does not
+ * carry the parameter.
+ */
+export function addressWithout(param: string, w: { location: { href: string } } = window): string | null {
+  const url = new URL(w.location.href);
+  if (!url.searchParams.has(param)) return null;
+  url.searchParams.delete(param);
+  return `${url.pathname}${url.search}${url.hash}`;
+}

@@ -26,7 +26,7 @@ import { BASE_COLOURS } from '../packages/catalog/src/bambuImport/registry/colou
 import { parseNlQuery, nlChipKey } from '../packages/catalog/src/nlQuery';
 import { skuComboKey } from '../packages/pricing/src/skuChannel';
 import { linkWithSelection, selectionParam, VARIANT_PARAM as LINK_PARAM } from '../src/components/search/resultLink';
-import { followSelectionInAddress, linkedSelection, VARIANT_PARAM } from '../src/components/product/priceRequestState';
+import { addressWithout, followSelectionInAddress, linkArrival, linkedSelection, VARIANT_PARAM } from '../src/components/product/priceRequestState';
 import { linkedOpening } from '../src/lib/productChooser';
 import { formatIqd, type ApiProduct, type SearchChip } from '../src/lib/api';
 
@@ -276,18 +276,24 @@ test('the product page decodes ?v= as untrusted input and keeps only what the pr
   assert.deepEqual(linkedSelection('o:ov_06', PRODUCT, null), { option_value_ids: ['ov_06'], color_id: null });
 });
 
-test('Product.tsx applies ?v= before the first paint, once per product and link, with no layout condition', () => {
+test('Product.tsx applies ?v= before the first paint, once per product, link and navigation, with no layout condition', () => {
   const src = read('src/pages/Product.tsx');
-  const block = /const linkedFor = useRef\(''\);[\s\S]*?useLayoutEffect\(\(\) => \{([\s\S]*?)\}, \[product, relations, location\.search, optionValueIds, colorId\]\);/.exec(src);
-  assert.ok(block, 'the ?v= effect is missing');
+  const block = /const linkedFor = useRef\(''\);[\s\S]*?useLayoutEffect\(\(\) => \{([\s\S]*?)\}, \[product, relations, location\.key, location\.search, optionValueIds, colorId\]\);/.exec(src);
+  assert.ok(block, 'the ?v= effect is missing, or not keyed on the location key');
   const body = block![1];
   assert.match(body, /new URLSearchParams\(location\.search\)\.get\(VARIANT_PARAM\)/);
-  assert.match(body, /linkedFor\.current === `\$\{product\.slug\}\|\$\{raw\}`/, 'applied once: a later choice is never overwritten');
+  assert.match(
+    body,
+    /const arrival = linkArrival\(linkedFor\.current, \{ slug: product\.slug, raw, key: location\.key \}\);\s*linkedFor\.current = arrival\.token;\s*if \(!arrival\.apply\) return;/,
+    'once per product, link and navigation, and only while the window shows it: a later choice is never overwritten'
+  );
   assert.match(body, /const linked = linkedSelection\(raw, product, relations\);/);
-  assert.match(body, /setOptionValueIds\(linkedOpening\(linked, optionValueIds, groups, relations\?\.variants \?\? \[\], colour\)\)/, 'on top of the opening selection');
+  assert.match(body, /const next = linkedOpening\(linked, optionValueIds, groups, relations\?\.variants \?\? \[\], colour\);[\s\S]*?setOptionValueIds\(next\);/, 'on top of the opening selection');
   assert.match(body, /setColorId\(linked\.color_id\)/);
+  // A link that changes nothing leaves nothing to wait for: the address follows at once.
+  assert.match(body, /linkFrom\.current = selectionKeyOf\(next, linked\.color_id \?\? colorId\) === from \? null : from;/);
   // ?v= follows the selection after the link: a reload or a share opens what is on screen. In place, never a navigation.
-  const follow = /`\?v=` FOLLOWS THE SELECTION[\s\S]*?useEffect\(\(\) => \{([\s\S]*?)\}, \[product, selectionKey, location\.search\]\);/.exec(src);
+  const follow = /`\?v=` FOLLOWS THE SELECTION[\s\S]*?useEffect\(\(\) => \{([\s\S]*?)\}, \[product, selectionKey, location\.key, location\.search\]\);/.exec(src);
   assert.ok(follow, 'the ?v= follower is missing');
   assert.match(follow![1], /followSelectionInAddress\(selectionKey\)/);
   assert.doesNotMatch(follow![1], /navigate\(|setSearchParams|linkedFor\.current =/, 'a choice is not a navigation, and never re-arms the link');
@@ -334,6 +340,87 @@ test('a choice on a page opened with ?v= does not navigate: the address follows 
   // Why it matters: the shell resets the scroll on every new location key, which a router navigate (even a replace) makes.
   const app = read('src/App.tsx');
   assert.match(app, /el\.scrollTo\(\{ top: target \}\)[\s\S]*?\}, \[location\.key, location\.hash, navigationType\]\);/);
+});
+
+test('the same search result tapped again after a choice re-applies its ?v=, and no router REPLACE brings back a stale ?v=', () => {
+  // A browser: the window address and history, and the router location (its search and key) beside it.
+  const linked = 'o:ov_04|c:col_black';
+  const chosen = 'o:ov_06|c:col_black';
+  const w = {
+    location: { href: `https://levonis-iq.com/product/pla-basic?v=${encodeURIComponent(linked)}&ref=ali#specs` },
+    history: {
+      state: { usr: null, key: 'k1', idx: 4 } as unknown,
+      replaceState(data: unknown, _unused: string, url: string) {
+        this.state = data;
+        w.location.href = new URL(url, w.location.href).href;
+      },
+    },
+  };
+  const router = { search: `?v=${encodeURIComponent(linked)}&ref=ali`, key: 'k1' };
+  /** A router navigate REPLACE: the window takes the address, and the router a new location key. */
+  const replace = (to: string, key: string) => {
+    w.location.href = new URL(to, w.location.href).href;
+    const u = new URL(to, w.location.href);
+    router.search = u.search;
+    router.key = key;
+  };
+  const raw = () => new URLSearchParams(router.search).get(VARIANT_PARAM);
+  let token = '';
+  const arrive = () => {
+    const a = linkArrival(token, { slug: 'pla-basic', raw: raw(), key: router.key }, w);
+    token = a.token;
+    return a.apply;
+  };
+
+  // The search result opens the page: applied once.
+  assert.equal(arrive(), true, 'a result opens on what it matched');
+  assert.equal(arrive(), false, 'and not again on the next render of the same navigation');
+  // The shopper taps 0.6: ?v= follows in place; the router still holds the address it opened with.
+  followSelectionInAddress(chosen, w);
+  assert.equal(new URL(w.location.href).searchParams.get(VARIANT_PARAM), chosen);
+  assert.equal(raw(), linked, 'the router did not see the in-place write');
+  assert.equal(arrive(), false, 'a re-render never applies the opening address over the choice');
+
+  // The same result tapped again: a router REPLACE to the same search, so only its key is new.
+  replace(`/product/pla-basic?v=${encodeURIComponent(linked)}&ref=ali#specs`, 'k2');
+  assert.equal(raw(), linked, 'the router search is what it was');
+  assert.equal(arrive(), true, 'the new key re-applies the linked selection');
+  // Keyed on the search alone (7f4c071c) it never was: the token after the first open names this same tap.
+  const searchOnly = `pla-basic|${linked}`;
+  assert.equal(`pla-basic|${raw()}`, searchOnly, 'the same product and link: the old guard returned before applying');
+
+  // A choice again, then a parameter consumed: built from the window, the replace keeps the choice.
+  followSelectionInAddress(chosen, w);
+  w.location.href = new URL(`${w.location.href.split('#')[0]}&alert=x#specs`).href;
+  router.search = `?v=${encodeURIComponent(linked)}&ref=ali&alert=x`;
+  const next = addressWithout('alert', w);
+  assert.equal(next, `/product/pla-basic?v=${encodeURIComponent(chosen)}&ref=ali#specs`, 'the window address, less the parameter');
+  assert.equal(addressWithout('alert', { location: { href: `https://levonis-iq.com/product/pla-basic${router.search}` } })?.includes(encodeURIComponent(linked)), true, 'the router one would have brought the stale ?v= back');
+  replace(next!, 'k3');
+  assert.equal(raw(), chosen);
+  assert.equal(arrive(), true, 'a navigation the window shows');
+  // ...whose link is what is on screen: the page then has nothing to choose (Product.tsx: raw === from).
+
+  // A consumer that changed the selection in the same breath: the follower wrote the new choice before the
+  // router committed the replace built a moment earlier, so that older address is not applied over it.
+  replace(`/product/pla-basic?v=${encodeURIComponent(linked)}&ref=ali#specs`, 'k4');
+  followSelectionInAddress(chosen, w);
+  assert.equal(arrive(), false, 'the window shows the choice, not the entry');
+  assert.equal(addressWithout('alert', w), null, 'nothing to consume, nothing to navigate');
+  // No ?v= at all: nothing to apply.
+  assert.deepEqual(linkArrival('t', { slug: 'pla-basic', raw: null, key: 'k5' }, w), { token: 't', apply: false });
+});
+
+test('Product.tsx: the alert and price-request consumers navigate to the window address, never one rebuilt from the router', () => {
+  const src = read('src/pages/Product.tsx');
+  const alert = /const consumeAlertIntent = useCallback\(\(\) => \{([\s\S]*?)\}, \[navigate\]\);/.exec(src);
+  assert.ok(alert, 'the alert consumer is missing');
+  assert.match(alert![1], /const next = addressWithout\('alert'\);\s*if \(next !== null\) navigate\(next, \{ replace: true \}\);/);
+  assert.doesNotMatch(alert![1], /location\.(search|pathname|hash)/);
+  const price = /decodePriceRequestIntent\(params\.get\(PRICE_REQUEST_PARAM\)\);([\s\S]*?)\}, \[product, relations, location\.search, navigate\]\);/.exec(src);
+  assert.ok(price, 'the price-request consumer is missing');
+  assert.match(price![1], /const next = addressWithout\(PRICE_REQUEST_PARAM\);\s*if \(next !== null\) navigate\(next, \{ replace: true \}\);/);
+  assert.doesNotMatch(price![1], /location\.(pathname|hash)|params\.toString\(\)/);
 });
 
 test('a linked value is chosen on top of the opening selection: the other groups and the single-value ones stay', () => {
