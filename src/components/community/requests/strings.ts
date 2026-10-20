@@ -304,6 +304,8 @@ const ar = {
     deadline: 'الموعد',
     customer_notes: 'الملاحظات',
     file_ids: 'المرفقات',
+    parts: 'القطع',
+    sources: 'المصادر',
   },
   // ---- Phase 5c, the page's second pass (Request.tsx, Discussion.tsx)
   status: 'الحالة',
@@ -619,6 +621,8 @@ const en: typeof ar = {
     deadline: 'deadline',
     customer_notes: 'notes',
     file_ids: 'attachments',
+    parts: 'parts',
+    sources: 'sources',
   },
   // ---- Phase 5c, the page's second pass (Request.tsx, Discussion.tsx)
   status: 'Status',
@@ -935,6 +939,8 @@ const ckb: typeof ar = {
     deadline: 'کاتی کۆتایی',
     customer_notes: 'تێبینیەکان',
     file_ids: 'هاوپێچەکان',
+    parts: 'پارچەکان',
+    sources: 'سەرچاوەکان',
   },
   // ---- Phase 5c, the page's second pass (Request.tsx, Discussion.tsx)
   status: 'دۆخ',

@@ -39,7 +39,8 @@ import { runFxScheduler } from './lib/fx/scheduler';
 import { quarterHourSweepBudget, sweepStaleEnginePrices } from './lib/fx/reprice';
 import { statementBudget } from './lib/fx/budget';
 import { countingD1 } from './lib/d1Count';
-import { QUARTER_HOUR_TICK_LIMIT, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourPriceRequestBudget, quarterHourSearchBudget, quarterHourServicesBudget } from './lib/quarterHourBudget';
+import { QUARTER_HOUR_TICK_LIMIT, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourPriceRequestBudget, quarterHourRequestModelBudget, quarterHourSearchBudget, quarterHourServicesBudget } from './lib/quarterHourBudget';
+import { catchUpRequestModels } from './lib/requestModelBackfill';
 import { runServicesSweep } from './lib/tradeInSweep';
 import { sweepCompleteness } from './lib/productCompleteness';
 import { digestPriceRequests, sweepPriceRequests } from './lib/priceRequests';
@@ -1379,6 +1380,13 @@ export default {
         .then(() => runServicesSweep(tickEnv, statementBudget(quarterHourServicesBudget(used()))))
         .catch((error) => {
           console.error('scheduled services sweep rejected:', error instanceof Error ? error.name : 'unknown');
+        })
+        // LAST (P1-04, DECISIONS row 266): the request-model cache — version-1 print rows whose
+        // model was never materialised, built from the same synthesis every reader uses, within
+        // its own 40 statements cut to what the services sweep left. Never throws.
+        .then(() => catchUpRequestModels(tickEnv, { budget: statementBudget(quarterHourRequestModelBudget(used())) }))
+        .catch((error) => {
+          console.error('scheduled request-model cache rejected:', error instanceof Error ? error.name : 'unknown');
         })
     );
   },

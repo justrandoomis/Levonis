@@ -122,6 +122,7 @@ import { assertMayQuote, directRequest } from '../lib/directRequests';
 import { isDirectMerchant } from '../lib/communityRequests';
 import { announceCustomOrder, customOrderCard, postSystemCard } from '../lib/chatCards';
 import { fileClass, fileReadStatement, fileReader, mayReadBytes, previewGrantFor } from '../lib/requestFilePolicy';
+import { fileSourceRoles, restampAfterFileStatement } from '../lib/requestModel';
 // Phase 5b (docs/COMMUNITY_ECOSYSTEM.md §9.5): the discussion's server-written
 // rows on a close or a revision, and the timeline's «started» row.
 import { writeRequestSystemUpdate } from './requestDiscussion';
@@ -350,6 +351,8 @@ marketplaceRoutes.get('/requests/:id', requireCommunityOpen, async (c) => {
   const { reader } = files.results.length && user
     ? await fileReader(c.env, r as unknown as RequestForAccess, user, { allowAdmin: true })
     : { reader: null };
+  // A file the customer marked as the SOURCE (Q5, P1-04) is not an eligible merchant's to open or preview.
+  const roles = reader === 'eligible' ? await fileSourceRoles(c.env.DB, id) : new Map<string, string>();
 
   return c.json({
     success: true,
@@ -359,13 +362,14 @@ marketplaceRoutes.get('/requests/:id', requireCommunityOpen, async (c) => {
     // link shared after the request closes simply stops working.
     files: files.results.map(({ preview_key, ...f }) => {
       const cls = fileClass(String(f.kind ?? ''), String(f.content_type ?? ''));
-      const readable = mayReadBytes(reader, cls);
+      const role = roles.get(String(f.id)) ?? '';
+      const readable = mayReadBytes(reader, cls, role);
       return {
         ...f,
         inline: String(f.content_type ?? '').startsWith('image/'),
         url: readable ? `/api/marketplace/requests/${id}/files/${f.id}` : null,
         /** download (the original) | view (a picture or a drawing) | preview (the 3D preview only) | none */
-        access: readable ? (cls === 'model' ? 'download' : 'view') : cls === 'model' && preview_key && previewGrantFor(reader) ? 'preview' : 'none',
+        access: readable ? (cls === 'model' ? 'download' : 'view') : cls === 'model' && preview_key && previewGrantFor(reader, role) ? 'preview' : 'none',
       };
     }),
     is_owner: isOwner,
@@ -597,7 +601,8 @@ marketplaceRoutes.get('/requests/:id/files/:fileId', requireAuth, async (c) => {
   // has no files as far as they know.
   if (!visible) throw notFound('File not found');
   const cls = fileClass(row.kind, row.content_type);
-  if (!mayReadBytes(reader, cls)) {
+  const role = reader === 'eligible' ? ((await fileSourceRoles(c.env.DB, id)).get(fileId) ?? '') : '';
+  if (!mayReadBytes(reader, cls, role)) {
     // The request (and its file list) may well be visible to this caller, so
     // a 404 would lie; the refusal says which kind of «no» it is.
     throw new HttpError(
@@ -674,9 +679,13 @@ marketplaceRoutes.delete('/requests/:id/files/:fileId', requireAuth, async (c) =
   if (!row) throw notFound('File not found');
 
   // Row first: while it exists the object is reachable, so removing it last
-  // can only leave an unreferenced object, never a broken reference.
+  // can only leave an unreferenced object, never a broken reference. The
+  // model's sources and part links cascade with it; a model that was fresh is
+  // stamped again from the v1 row the delete leaves (its primary file may go
+  // to NULL), so SQL readers keep trusting it (P1-04).
   await c.env.DB.batch([
     c.env.DB.prepare('DELETE FROM community_request_files WHERE id = ? AND request_id = ?').bind(fileId, id),
+    ...(await restampAfterFileStatement(c.env.DB, id)),
     ...reviseStatements(c.env.DB, id, nowIso()),
   ]);
   await deleteMediaObject(c.env, 'private', row.file_key).catch(() => {});

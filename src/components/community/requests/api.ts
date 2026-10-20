@@ -7,6 +7,7 @@
  */
 import { api } from '../../../lib/api';
 import type { Estimate } from '../../../lib/printEstimate';
+import type { RequestColourMode, RequestSourceKind } from '../../../../packages/contracts/src/requestModel';
 
 export type SourceType = 'model' | 'link' | 'images' | 'description';
 export type ProcessChoice = 'fdm' | 'resin' | 'unsure';
@@ -85,6 +86,78 @@ export interface DraftShape {
     stated_dimensions_mm: Dims | null;
   };
   files: DraftFile[];
+  /** Q2: the budget is shown to merchants only when the customer says so (P1-04 stores it; P1-06 shows the switch). */
+  budget_visible?: boolean;
+  /** The request model's effective version: 1 = the flat job above, 3 = sources and parts (P1-04). */
+  schema_version?: 1 | 3;
+  /** Every source and part, in order — synthesised from `print` while the request is version 1. */
+  model?: DraftModel | null;
+}
+
+/** A colour as the model gives it (packages/contracts/src/requestModel.ts). */
+export interface DraftModelColour {
+  mode: RequestColourMode;
+  hex: string;
+  label: string;
+  palette: string;
+  ref: string;
+}
+
+/** The request model v3 as the owner reads it (worker/lib/requestModel.ts `projectModel`). */
+export interface DraftModel {
+  schema_version: 1 | 3;
+  origin: 'tables' | 'synthesized' | 'legacy';
+  stale: boolean;
+  job: { quantity: number; quality: string; infill_percent: number; supports: boolean; post_processing_minutes: number; source_type: SourceType };
+  sources: Array<{
+    id: string;
+    kind: RequestSourceKind;
+    file_id: string | null;
+    role: string;
+    url: string;
+    canonical_url: string;
+    provider: string;
+    ref_text: string;
+    note: string;
+    is_primary: boolean;
+    position: number;
+  }>;
+  parts: Array<{
+    id: string;
+    position: number;
+    name: string;
+    quantity: number;
+    process: '' | 'fdm' | 'resin';
+    process_unsure: boolean;
+    stated_dims: Dims | null;
+    measured_file_id: string | null;
+    notes: string;
+    assembly_notes: string;
+    legacy_text: string;
+    review_state: string;
+    review_reasons: string[];
+    source_ids: string[];
+    materials: Array<{
+      id: string;
+      position: number;
+      material_id: string;
+      material_unsure: boolean;
+      colors: DraftModelColour[];
+      finish: string;
+      region_reference: string;
+      requirements: string;
+      colors_need_review: boolean;
+    }>;
+  }>;
+  summary: {
+    parts_count: number;
+    pieces_per_set: number;
+    materials: string[];
+    processes: string[];
+    colors_total: number;
+    multicolor_parts: number;
+    review_state: string;
+  };
 }
 
 /**

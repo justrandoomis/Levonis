@@ -151,6 +151,9 @@ test('every code the table translates is one the server can actually emit', () =
     // refuse with codes the request screens decode through this table.
     'worker/routes/marketplace.ts',
     'worker/routes/printRequests.ts',
+    // The request model v3 (P1-04): the parts, materials, colours and sources
+    // a v3 body is refused for, each beside the field it names.
+    'worker/lib/requestModel.ts',
     // Community projects (docs/COMMUNITY_ECOSYSTEM.md Phase 1): the composer
     // decodes POST_* and CONSENT_* beside the field each one names.
     'worker/routes/communityPosts.ts',

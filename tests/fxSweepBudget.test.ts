@@ -50,7 +50,7 @@ import { listPricedProducts } from '../worker/lib/pricingEngine/load';
 import { AUTO_REPRICE_SWEEP_BUDGET, D1_INVOCATION_STATEMENT_LIMIT, QUARTER_HOUR_RESERVE, quarterHourSweepBudget, sweepStaleEnginePrices } from '../worker/lib/fx/reprice';
 import { statementBudget } from '../worker/lib/fx/budget';
 import { countingD1, d1Base } from '../worker/lib/d1Count';
-import { COMPLETENESS_TICK_BUDGET, QUARTER_HOUR_TICK_LIMIT, SERVICES_TICK_BUDGET, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourSearchBudget, quarterHourServicesBudget } from '../worker/lib/quarterHourBudget';
+import { COMPLETENESS_TICK_BUDGET, QUARTER_HOUR_TICK_LIMIT, REQUEST_MODEL_TICK_BUDGET, SERVICES_TICK_BUDGET, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourRequestModelBudget, quarterHourSearchBudget, quarterHourServicesBudget } from '../worker/lib/quarterHourBudget';
 import { drainStaffReconciliations } from '../worker/lib/financeStaffAccrual';
 import { INDEX_FAILED_MARK, INDEX_STAMP, backfillSearchIndex } from '../worker/lib/search/store';
 import { resetEventBus } from '../worker/lib/eventBus';
@@ -73,6 +73,8 @@ const COMPLETENESS_FIRST = /^SELECT 1 AS x FROM product_completeness LIMIT 1$|^S
  * catch-up): the 0192 probe on a fresh binding, or its settings read and first trade-in read once known.
  */
 const SERVICES_FIRST = /^SELECT intake_at, valuation_version FROM trade_in_requests LIMIT 0$|WHERE status IN \('submitted','under_review','value_changed'\) AND intake_at IS NULL AND offer_expires_at IS NULL/;
+/** The request-model cache's first statement (P1-04, worker/lib/requestModelBackfill.ts, after the services sweep): its page read. */
+const REQUEST_MODEL_FIRST = /FROM community_print_requests\s+WHERE model_mirror = '' AND schema_version = 1/;
 
 class CountStmt {
   constructor(
@@ -141,9 +143,12 @@ async function tick(raw: DatabaseSync) {
   } finally {
     console.error = original;
   }
-  // The services sweep runs last of all (worker/index.ts), the completeness catch-up before it, on what the engine sweep left.
-  const svc = d1.log.findIndex((sql) => SERVICES_FIRST.test(sql));
-  const stop = svc === -1 ? d1.log.length : svc;
+  // The request-model cache runs last of all (worker/index.ts, P1-04), the services sweep before it, the
+  // completeness catch-up before that, on what the engine sweep left.
+  const rm = d1.log.findIndex((sql) => REQUEST_MODEL_FIRST.test(sql));
+  const tail = rm === -1 ? d1.log.length : rm;
+  const svc = d1.log.slice(0, tail).findIndex((sql) => SERVICES_FIRST.test(sql));
+  const stop = svc === -1 ? tail : svc;
   const last = d1.log.slice(0, stop).findIndex((sql) => COMPLETENESS_FIRST.test(sql));
   const end = last === -1 ? stop : last;
   const first = d1.log.slice(0, end).findIndex((sql) => SWEEP_FIRST.test(sql));
@@ -152,7 +157,7 @@ async function tick(raw: DatabaseSync) {
   const probes = d1.log.flatMap((sql, i) => (sql === CATCH_UP_FIRST ? [i] : []));
   assert.ok(probes.length <= 1, 'the catch-up probe runs once a tick, and no other job runs it');
   const own = probes.length === 1 && probes[0] < jobs ? probes[0] : jobs;
-  return { total: d1.log.length, own, catchUp: jobs - own, jobs, sweep: end - jobs, completeness: stop - end, services: d1.log.length - stop, log: d1.log, errors };
+  return { total: d1.log.length, own, catchUp: jobs - own, jobs, sweep: end - jobs, completeness: stop - end, services: tail - stop, requestModel: d1.log.length - tail, log: d1.log, errors };
 }
 
 // ------------------------------------------------------------- the world, every job at its bound
@@ -352,6 +357,8 @@ test('the usual tick at its bounds — 200 upload sessions expired and 200 delet
   const servicesShare = quarterHourServicesBudget(withSweep.total - withSweep.services);
   assert.ok(withSweep.services > 0, 'the services sweep looked');
   assert.ok(withSweep.services <= servicesShare && servicesShare <= SERVICES_TICK_BUDGET, `the services sweep spent ${withSweep.services} of its ${servicesShare}`);
+  // The request-model cache (P1-04) after it: one indexed read when nothing is pending.
+  assert.ok(withSweep.requestModel >= 1 && withSweep.requestModel <= quarterHourRequestModelBudget(withSweep.total - withSweep.requestModel), `the request-model cache spent ${withSweep.requestModel}`);
   console.log(`usual quarter-hour tick at its bounds: jobs ${withSweep.jobs}, sweep ${withSweep.sweep} (share ${share}), completeness ${withSweep.completeness} (share ${completenessShare}), services ${withSweep.services} (share ${servicesShare}), total ${withSweep.total} < ${D1_INVOCATION_STATEMENT_LIMIT}`);
 });
 
@@ -406,6 +413,40 @@ test('the services sweep LAST, with every sub-step at its bound: within its own 
   // Nothing of the earlier steps after the services sweep began.
   assert.ok(t.log.slice(t.total - t.services).every((sql) => !/pricing_(?:sku_costs|v2_sku_results)|upload_sessions|FROM outbox|search_tokens|product_completeness/.test(sql)));
   console.log(`services sweep at its bound: ${t.services} of ${share}, total ${t.total} < ${D1_INVOCATION_STATEMENT_LIMIT}`);
+});
+
+/**
+ * P1-04's cache at its bound: 100 version-1 print requests whose model was never built — four pages
+ * more than one tick takes.
+ */
+function seedUnbuiltRequestModels(raw: DatabaseSync) {
+  raw.exec(`INSERT INTO users (id, email, name, role) VALUES ('rm_cust', 'rm@example.test', 'Rm', 'customer')`);
+  const req = raw.prepare(
+    `INSERT INTO community_requests (id, customer_id, title, description, status, state, quantity, governorate)
+     VALUES (?, 'rm_cust', 'A bracket', 'A bracket for a shelf', 'open', 'open', 1, 'baghdad')`
+  );
+  const print = raw.prepare(`INSERT INTO community_print_requests (request_id, material_id, colors_count, source_type) VALUES (?, 'pla', ?, 'description')`);
+  for (let i = 0; i < 100; i++) {
+    const id = `req_rm_${String(i).padStart(3, '0')}`;
+    req.run(id);
+    print.run(id, (i % 3) + 1);
+  }
+}
+
+test('the request-model cache LAST, at its bound: within its own 40 of what the tick left, and the tick under 1,000', async () => {
+  const { current } = await copies({ steady: true, staff: false });
+  seedUnbuiltRequestModels(current);
+  const t = await tick(current);
+  assert.deepEqual(t.errors, [], 'no job reported an error');
+  const share = quarterHourRequestModelBudget(t.total - t.requestModel);
+  assert.ok(t.total < D1_INVOCATION_STATEMENT_LIMIT, `the tick executed ${t.total} statements`);
+  assert.ok(t.requestModel <= share && share <= REQUEST_MODEL_TICK_BUDGET, `the request-model cache spent ${t.requestModel} of its ${share}`);
+  assert.ok(t.requestModel > 20, `the cache worked up to its share (${t.requestModel})`);
+  const built = count(current, "SELECT COUNT(*) AS n FROM community_print_requests WHERE request_id LIKE 'req_rm_%' AND model_mirror <> ''");
+  assert.ok(built >= 50 && built < 100, `whole pages built, the rest left for the next tick (${built})`);
+  // Nothing of the earlier steps after the cache began.
+  assert.ok(t.log.slice(t.total - t.requestModel).every((sql) => !/trade_in_requests|pricing_(?:sku_costs|v2_sku_results)|upload_sessions|FROM outbox|search_tokens|product_completeness/.test(sql)));
+  console.log(`request-model cache at its bound: ${t.requestModel} of ${share}, ${built} built, total ${t.total} < ${D1_INVOCATION_STATEMENT_LIMIT}`);
 });
 
 /** Active products whose index rows are missing or stale — the catch-up's work. */

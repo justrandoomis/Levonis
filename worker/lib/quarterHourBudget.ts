@@ -23,13 +23,18 @@
  *   5. the price-request sweep and the admin digest (DECISIONS row 240,
  *      worker/lib/priceRequests.ts): their own 40, cut to what is left after
  *      the completeness catch-up (`quarterHourPriceRequestBudget`).
- *   6. LAST, the services sweep (Services S-P2, worker/lib/tradeInSweep.ts:
+ *   6. the services sweep (Services S-P2, worker/lib/tradeInSweep.ts:
  *      trade-in offer and credit expiry, the cut-over stamp, completion
  *      catch-up, re-issue notices): its own 120, cut to what is left after the
  *      price-request sweep (`quarterHourServicesBudget`).
+ *   7. LAST, the request-model cache (P1-04, DECISIONS row 266, worker/lib/
+ *      requestModelBackfill.ts): version-1 print rows whose v3 model was never
+ *      materialised, 25 a page at 11 statements — its own 40, cut to what is
+ *      left after the services sweep (`quarterHourRequestModelBudget`). One
+ *      indexed read when nothing is pending.
  *
  * So the invocation's total is at most max(step 1, `QUARTER_HOUR_TICK_LIMIT`):
- * steps 2 to 6 never take it over the limit, and step 1 is bounded by its
+ * steps 2 to 7 never take it over the limit, and step 1 is bounded by its
  * jobs' own bounds — measured at those bounds, together with steps 2 and 3,
  * by tests/fxSweepBudget.test.ts on the real `scheduled()`.
  *
@@ -103,4 +108,15 @@ export const SERVICES_TICK_BUDGET = 120;
  */
 export function quarterHourServicesBudget(usedBefore: number): number {
   return Math.max(0, Math.min(SERVICES_TICK_BUDGET, QUARTER_HOUR_TICK_LIMIT - Math.max(0, Math.ceil(usedBefore))));
+}
+
+/** The request-model cache's own sub-budget (P1-04): three pages of 25 requests at most. */
+export const REQUEST_MODEL_TICK_BUDGET = 40;
+
+/**
+ * THE REQUEST-MODEL CACHE'S SHARE: its own 40, cut to what everything before
+ * it left of `QUARTER_HOUR_TICK_LIMIT`, never below zero. It runs last.
+ */
+export function quarterHourRequestModelBudget(usedBefore: number): number {
+  return Math.max(0, Math.min(REQUEST_MODEL_TICK_BUDGET, QUARTER_HOUR_TICK_LIMIT - Math.max(0, Math.ceil(usedBefore))));
 }

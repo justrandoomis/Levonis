@@ -21,6 +21,8 @@
  * language.
  */
 
+import { REQUEST_PALETTE } from '../../../../packages/contracts/src/requestModel';
+
 type Lang = 'ar' | 'en' | 'ckb';
 
 export interface RequestColour {
@@ -30,16 +32,24 @@ export interface RequestColour {
   ckb: string;
 }
 
-/** The wizard colours, in the order it offers them — the merchant reads the word, not only the swatch. */
-export const REQUEST_COLOURS: readonly RequestColour[] = [
-  { hex: '#1a1a1a', ar: 'أسود', en: 'Black', ckb: 'ڕەش' },
-  { hex: '#f2f2f2', ar: 'أبيض', en: 'White', ckb: 'سپی' },
-  { hex: '#808080', ar: 'رمادي', en: 'Grey', ckb: 'خۆڵەمێشی' },
-  { hex: '#d32f2f', ar: 'أحمر', en: 'Red', ckb: 'سوور' },
-  { hex: '#1976d2', ar: 'أزرق', en: 'Blue', ckb: 'شین' },
-  { hex: '#388e3c', ar: 'أخضر', en: 'Green', ckb: 'سەوز' },
-  { hex: '#fbc02d', ar: 'أصفر', en: 'Yellow', ckb: 'زەرد' },
-];
+/** The palette's names, by its contract key. */
+const PALETTE_NAMES: Readonly<Record<string, { ar: string; en: string; ckb: string }>> = {
+  black: { ar: 'أسود', en: 'Black', ckb: 'ڕەش' },
+  white: { ar: 'أبيض', en: 'White', ckb: 'سپی' },
+  grey: { ar: 'رمادي', en: 'Grey', ckb: 'خۆڵەمێشی' },
+  red: { ar: 'أحمر', en: 'Red', ckb: 'سوور' },
+  blue: { ar: 'أزرق', en: 'Blue', ckb: 'شین' },
+  green: { ar: 'أخضر', en: 'Green', ckb: 'سەوز' },
+  yellow: { ar: 'أصفر', en: 'Yellow', ckb: 'زەرد' },
+};
+
+/**
+ * The wizard colours, in the order it offers them — the merchant reads the
+ * word, not only the swatch. The keys and hexes are the contract's palette
+ * (packages/contracts/src/requestModel.ts), the one the server matches a
+ * stored colour against; the names live here.
+ */
+export const REQUEST_COLOURS: readonly RequestColour[] = REQUEST_PALETTE.map((c) => ({ hex: c.hex, ...PALETTE_NAMES[c.key] }));
 
 /** The seed catalogue (worker/lib/printPricing.ts `DEFAULT_MATERIALS`): id, the English name the mirror carries, Arabic, Sorani. */
 const SEED_MATERIALS: ReadonlyArray<{ id: string; en: string; ar: string; ckb: string }> = [

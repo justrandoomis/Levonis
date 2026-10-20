@@ -614,6 +614,82 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This request is already published. Refresh and edit it from its page.',
     ckb: 'ئەم داواکارییە پێشتر بڵاوکراوەتەوە. پەڕەکە نوێ بکەرەوە و لە پەڕەکەی خۆیەوە دەستکاری بکە.',
   },
+  // ---- the request model v3 (P1-04, DECISIONS row 266): sources, parts, materials, colours.
+  REQUEST_MODEL_V3: {
+    ar: 'هذا الطلب فيه أكثر من قطعة أو مادة — حدّث الصفحة لتعديله.',
+    en: 'This request has several parts or materials — reload the page to edit it.',
+    ckb: 'ئەم داواکارییە چەند پارچە یان کەرەستەیەکی تێدایە — پەڕەکە نوێ بکەرەوە بۆ دەستکاریکردنی.',
+  },
+  REQUEST_MODEL_UNAVAILABLE: {
+    ar: 'لا يمكن حفظ القطع الآن — حاول بعد قليل.',
+    en: 'Parts can’t be saved right now — try again shortly.',
+    ckb: 'ئێستا پارچەکان پاشەکەوت ناکرێن — کەمێکی تر هەوڵ بدەرەوە.',
+  },
+  REQUEST_PARTS_NOT_YET: {
+    ar: 'لا يمكن نشر طلب بعدة قطع أو مواد بعد — احفظه مسودة.',
+    en: 'A request with several parts or materials can’t be published yet — keep it as a draft.',
+    ckb: 'هێشتا ناتوانرێت داواکارییەکی چەند پارچە یان چەند کەرەستە بڵاو بکرێتەوە — وەک ڕەشنووس هەڵیبگرە.',
+  },
+  PARTS_EMPTY: {
+    ar: 'أضف قطعة واحدة على الأقل.',
+    en: 'Add at least one part.',
+    ckb: 'لانیکەم یەک پارچە زیاد بکە.',
+  },
+  PARTS_TOO_MANY: {
+    ar: 'الحدّ الأقصى 12 قطعة في الطلب الواحد.',
+    en: 'A request can have at most 12 parts.',
+    ckb: 'ناتوانیت لە 12 پارچە زیاتر بۆ یەک داواکاری زیاد بکەیت.',
+  },
+  PART_MATERIALS_TOO_MANY: {
+    ar: 'القطعة الواحدة تأخذ 4 مواد على الأكثر.',
+    en: 'One part can take at most 4 materials.',
+    ckb: 'یەک پارچە زۆرترین 4 کەرەستە وەردەگرێت.',
+  },
+  COLOURS_TOO_MANY: {
+    ar: 'المادة الواحدة تأخذ 16 لونًا على الأكثر.',
+    en: 'One material can take at most 16 colours.',
+    ckb: 'یەک کەرەستە زۆرترین 16 ڕەنگ وەردەگرێت.',
+  },
+  LINKS_TOO_MANY: {
+    ar: 'أضف 4 روابط على الأكثر.',
+    en: 'Add at most 4 links.',
+    ckb: 'زۆرترین 4 بەستەر زیاد بکە.',
+  },
+  LINK_DUPLICATE: {
+    ar: 'هذا الرابط مضاف مسبقًا.',
+    en: 'This link is already added.',
+    ckb: 'ئەم بەستەرە پێشتر زیاد کراوە.',
+  },
+  TEXT_REFS_TOO_MANY: {
+    ar: 'أضف 4 مراجع نصية على الأكثر.',
+    en: 'Add at most 4 text references.',
+    ckb: 'زۆرترین 4 سەرچاوەی نووسراو زیاد بکە.',
+  },
+  SOURCE_PRIMARY_MULTIPLE: {
+    ar: 'يمكن اختيار مصدر رئيسي واحد فقط.',
+    en: 'Only one source can be the main one.',
+    ckb: 'تەنها یەک سەرچاوە دەتوانێت سەرەکی بێت.',
+  },
+  SOURCE_NOTE_TOO_LONG: {
+    ar: 'الملاحظة أطول من 500 حرف.',
+    en: 'The note is longer than 500 characters.',
+    ckb: 'تێبینییەکە لە 500 پیت درێژترە.',
+  },
+  PART_MEASURED_FILE_INVALID: {
+    ar: 'اختر ملف مجسّم من ملفات هذا الطلب.',
+    en: 'Choose a model file from this request’s files.',
+    ckb: 'فایلێکی مۆدێل لە فایلەکانی ئەم داواکارییە هەڵبژێرە.',
+  },
+  PART_SOURCE_INVALID: {
+    ar: 'القطعة تشير إلى مصدر غير موجود في هذا الطلب.',
+    en: 'A part points to a source that isn’t on this request.',
+    ckb: 'پارچەیەک ئاماژە بە سەرچاوەیەک دەکات کە لەم داواکارییەدا نییە.',
+  },
+  COLOUR_REF_INVALID: {
+    ar: 'اللون «كما في المرجع» يشير إلى مصدر غير موجود.',
+    en: '“As in the reference” points to a source that isn’t there.',
+    ckb: 'ڕەنگی «وەک لە سەرچاوەکەدا» ئاماژە بە سەرچاوەیەک دەکات کە بوونی نییە.',
+  },
   OFFER_DELIVERY_INVALID: {
     ar: 'اختر طريقة التسليم من القائمة.',
     en: 'Choose the handover method from the list.',

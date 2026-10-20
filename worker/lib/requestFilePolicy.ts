@@ -9,6 +9,9 @@
  *   ELIGIBLE merchant           ✗                  ✓              coarse mesh
  *   anyone else                 ✗                  ✗                  ✗
  *
+ * A file whose source role is `source` (Q5, P1-04) is ✗ in every column for
+ * an eligible merchant: the customer, an admin and the accepted merchant only.
+ *
  * «Eligible» is the live verdict of worker/lib/eligibility.ts for this
  * merchant and this request — the same one that lets them offer — and it is
  * asked only while the request is on the board and Levo Community lets them
@@ -44,17 +47,26 @@ export function fileClass(kind: string, contentType: string): FileClass {
   return 'document';
 }
 
-/** THE MATRIX: may this reader have this class of file's bytes. */
-export function mayReadBytes(reader: FileReader | null, cls: FileClass): boolean {
+/**
+ * THE MATRIX: may this reader have this class of file's bytes.
+ *
+ * A file the customer marked as the SOURCE (P1-04, owner decision Q5: the
+ * editable original of a template or a Studio design) is the customer's, an
+ * admin's and the accepted merchant's — never an eligible merchant's, in any
+ * class. `role` comes from `fileSourceRoles` (worker/lib/requestModel.ts),
+ * which answers nothing on a database before 0208: no roles, no change.
+ */
+export function mayReadBytes(reader: FileReader | null, cls: FileClass, role = ''): boolean {
   if (!reader) return false;
   if (reader === 'owner' || reader === 'admin' || reader === 'engaged') return true;
+  if (role === 'source') return false;
   return cls !== 'model';
 }
 
-/** What a 3D preview this reader may open shows. Null = no preview for them. */
-export function previewGrantFor(reader: FileReader | null): PreviewGrant | null {
+/** What a 3D preview this reader may open shows. Null = no preview for them (a `source` file: none before acceptance). */
+export function previewGrantFor(reader: FileReader | null, role = ''): PreviewGrant | null {
   if (reader === 'owner' || reader === 'engaged') return 'full';
-  if (reader === 'eligible') return 'preview';
+  if (reader === 'eligible') return role === 'source' ? null : 'preview';
   return null;
 }
 

@@ -28,6 +28,9 @@ import { sha256Hex } from './crypto';
 import { safeParse } from './types';
 import { stripFinancials } from './adminScope';
 import { publicAccessoryLine } from './printAccessories';
+import { canonicalFactsV3, modelSnapshot, readRequestModel, type RequestModelRead } from './requestModel';
+
+export { canonicalFactsV3 };
 
 /** How long an untouched draft lives before the sweep calls it abandoned. */
 export const DRAFT_TTL_DAYS = 14;
@@ -145,6 +148,19 @@ export async function factsHash(f: PricedFacts): Promise<string> {
   return sha256Hex(canonicalFacts(f));
 }
 
+/**
+ * THE HASH FOLLOWS THE VERSION (P1-04, docs/DECISIONS.md row 266). A request
+ * whose effective model version is 1 is hashed by `canonicalFacts` above, byte
+ * for byte as before migration 0208 — every pending offer was priced against
+ * that string. Only a version-3 request (worker/lib/requestModel.ts) is hashed
+ * by `canonicalFactsV3`, whose first element is the string 'v3' and so never
+ * equals a v1 string. Never whether model rows exist: the quarter-hour job
+ * materialising a v1 request changes no hash.
+ */
+export function canonicalFor(read: Pick<RequestModelRead, 'schema_version' | 'v1'> & Parameters<typeof canonicalFactsV3>[0]): string {
+  return read.schema_version === 3 ? canonicalFactsV3(read) : canonicalFacts(read.v1);
+}
+
 /** The priced facts of a request as the database holds them now. */
 export function factsFromRows(
   r: Record<string, unknown>,
@@ -237,6 +253,13 @@ export async function composeSnapshot(db: D1Database, requestId: string): Promis
     .prepare('SELECT * FROM community_print_requests WHERE request_id = ?')
     .bind(requestId)
     .first<Record<string, unknown>>();
+  // A version-3 request still mirrored by its v1 row is recorded with its
+  // model and the v3 hash. Every other request — and a v3 row an older build
+  // changed since — takes the v1 path below, unchanged.
+  if (Number(p?.schema_version ?? 1) === 3) {
+    const read = await readRequestModel(db, requestId);
+    if (read && read.schema_version === 3) return modelSnapshot(read);
+  }
   const files = await readRevisionFiles(db, requestId);
   const facts = factsFromRows(r, p ?? null, files);
   const analysis = safeParse<{ measured?: boolean; dimensions_mm?: Dims } | null>(p?.analysis, null);

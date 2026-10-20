@@ -74,6 +74,29 @@ import {
   type SourceType,
 } from '../lib/requestRevisions';
 import type { Quote } from '../lib/printPricing';
+import {
+  applyV1Facts,
+  canonicalFactsV3,
+  factsHashV3,
+  isModelBody,
+  isPublishable,
+  mergeFiles,
+  mirrorFacts,
+  mirrorFromModel,
+  modelOfSpec,
+  modelSpec,
+  modelWriteStatements,
+  pricedSections,
+  projectModel,
+  projectSpec,
+  readModelInput,
+  readRequestModel,
+  stateOf,
+  fileSourceRoles,
+  type ModelState,
+  type RequestModelRead,
+} from '../lib/requestModel';
+import { isMissingSchema } from '../lib/merchantApproval';
 
 /**
  * THE PRINT REQUEST JOURNEY — upload, measure, estimate, publish, notify.
@@ -901,9 +924,6 @@ async function readWizardInput(
     if (!statedDims) throw badRequest('Each dimension must be between 1 and 5000 mm', 'DIMENSIONS_INVALID');
   }
 
-  // `str` answers '' for an absent value, so "supplied" is asked of the body
-  // itself — a republish that omits a field must not blank it.
-  const supplied = (k: string) => body[k] !== undefined;
   return {
     body,
     asStored,
@@ -918,6 +938,18 @@ async function readWizardInput(
     sourceMeta: sourceKind === 'link' ? sourceMeta : sanitizeSourceMeta({}),
     statedDims,
     files,
+    ...readRequestFields(body),
+  };
+}
+
+/**
+ * The request-row fields a body carries. `str` answers '' for an absent value,
+ * so "supplied" is asked of the body itself — a republish that omits a field
+ * must not blank it.
+ */
+function readRequestFields(body: Record<string, unknown>): Pick<WizardInput, 'governorate' | 'deliveryPref' | 'deadline' | 'budget' | 'customerNotes'> {
+  const supplied = (k: string) => body[k] !== undefined;
+  return {
     governorate: supplied('governorate') ? str(body.governorate, 'governorate', { max: 60, required: false }) : undefined,
     deliveryPref: supplied('delivery_pref') ? str(body.delivery_pref, 'delivery_pref', { max: 40, required: false }) : undefined,
     deadline: supplied('deadline') ? readDeadline(body.deadline) : undefined,
@@ -1007,6 +1039,138 @@ function printRowStatement(
   );
 }
 
+// ------------------------------------------------- 5a. the model (P1-04)
+
+const modelUnavailable = () => new HttpError(503, 'Parts cannot be saved right now — try again shortly', 'REQUEST_MODEL_UNAVAILABLE');
+
+/** What a model write carries into the publish or the draft save. */
+interface ModelWritePlan {
+  /** The v1 row the model is written as — what the estimate, the matcher and an older build read. */
+  w: WizardInput;
+  before: RequestModelRead;
+  next: ModelState;
+  budgetVisible?: boolean;
+}
+
+/**
+ * THE V1 ROW OF A V3 BODY: the mirror of the model (worker/lib/requestModel.ts
+ * `mirrorFromModel`) as the `WizardInput` the v1 writers already take, so the
+ * print row, the estimate, the completeness and the matcher are the code they
+ * always were. Accessories and the link's metadata are carried when the body
+ * does not name them.
+ */
+function wizardFromModel(
+  next: ModelState,
+  read: RequestModelRead,
+  input: Record<string, unknown>,
+  stored: Record<string, unknown> | null,
+  fields: ReturnType<typeof readRequestFields>
+): WizardInput {
+  const mirror = mirrorFromModel(next, read.files);
+  const storedAccessories = parseJson<{ accessory_lines?: Array<{ id?: unknown; qty?: unknown }> }>(stored?.estimate, {}).accessory_lines ?? [];
+  const primary = mirror.primary_file_id ? read.modelFiles.find((f) => f.id === mirror.primary_file_id) : undefined;
+  const sameLink = !!mirror.source_url && mirror.source_url === String(stored?.source_url ?? '');
+  return {
+    body: input,
+    asStored: false,
+    spec: {
+      process: mirror.process,
+      material_id: mirror.material_id,
+      quality: (QUALITIES.includes(next.job.quality as PrintQuality) ? next.job.quality : 'standard') as PrintQuality,
+      infill_percent: next.job.infill_percent,
+      supports: next.job.supports,
+      colors_count: mirror.colors_count,
+      post_processing_minutes: next.job.post_processing_minutes,
+      quantity: next.job.quantity,
+      color_hex: mirror.color_hex,
+      color_name: mirror.color_name,
+      accessories: readAccessories(input.accessories !== undefined ? input.accessories : storedAccessories.map((l) => ({ id: l.id, qty: l.qty }))),
+    },
+    choices: { processUnsure: mirror.process_unsure === 1, materialUnsure: mirror.material_unsure === 1 },
+    primaryFileId: mirror.primary_file_id ?? '',
+    analysis: primary ? parseJson<ModelAnalysis | null>(primary.analysis, null) : null,
+    sourceKind: mirror.source_kind,
+    sourceType: mirror.source_type,
+    sourceUrl: mirror.source_url,
+    sourceProvider: mirror.source_provider,
+    sourceMeta: mirror.source_kind === 'link'
+      ? sanitizeSourceMeta(input.source_meta !== undefined ? input.source_meta : sameLink ? parseJson<Record<string, unknown>>(stored?.source_meta, {}) : {})
+      : sanitizeSourceMeta({}),
+    statedDims: mirror.stated_dims,
+    files: read.files,
+    ...fields,
+  };
+}
+
+/**
+ * READ A MODEL WRITE (P1-04, docs/DECISIONS.md row 266) — for a v3 body, and
+ * for any body on a request whose effective version is 3.
+ *
+ *   v3 body            `readModelInput` against the stored model (synthesised
+ *                      while the request is v1): absent fields carried.
+ *   v1 body on v3      an older client: its v1 facts are folded into the
+ *                      model (`applyV1Facts`) and accepted only when the
+ *                      fold's mirror reproduces them exactly; otherwise
+ *                      REQUEST_MODEL_V3 and nothing is written (critique 12).
+ *   v1 body on a v3 row an older build changed since: null — the v1 path,
+ *                      which reads that row as the v1 job it now is.
+ *
+ * A PUBLISH takes only a job the v1 estimate and matcher can price — one
+ * part, one piece a set, one material — until P1-05 reads parts
+ * (`REQUEST_PARTS_NOT_YET`, critique 8); a draft keeps anything.
+ */
+async function planModelWrite(
+  env: Env,
+  requestId: string,
+  input: Record<string, unknown>,
+  stored: Record<string, unknown> | null,
+  request: Record<string, unknown>,
+  mats: PrintMaterial[],
+  opts: { strict: boolean; draft?: boolean }
+): Promise<ModelWritePlan | null> {
+  const modelBody = isModelBody(input);
+  const read = await readRequestModel(env.DB, requestId);
+  if (!read) throw notFound('Request not found');
+  if (!modelBody && read.schema_version !== 3) return null;
+  if (!read.schema) throw modelUnavailable();
+  const budgetVisible = input.budget_visible === undefined ? undefined : input.budget_visible === true || input.budget_visible === 1;
+
+  let next: ModelState;
+  let w: WizardInput;
+  if (modelBody) {
+    const fields = readRequestFields(input);
+    const providers = await getSetting(env.DB, 'printLinkProviders');
+    next = readModelInput(input, {
+      stored: read,
+      files: read.modelFiles,
+      mats,
+      providers,
+      strict: opts.strict,
+      ts: new Date().toISOString(),
+      request: {
+        governorate: fields.governorate ?? read.request.governorate,
+        delivery_pref: fields.deliveryPref ?? read.request.delivery_pref,
+        deadline: fields.deadline !== undefined ? fields.deadline : read.request.deadline,
+        customer_notes: fields.customerNotes ?? read.request.customer_notes,
+      },
+    });
+    w = wizardFromModel(next, read, input, stored, fields);
+  } else {
+    w = await readWizardInput(env, requestId, opts.draft ? { process: input.process ?? 'unsure', ...input } : input, stored, request, mats, { strict: opts.strict });
+    const facts = factsFromInput(w, request);
+    const fold = applyV1Facts(stateOf(read), facts, w.sourceProvider, read.modelFiles, () => newId('rps'));
+    const folded = fold ? mergeFiles(fold, read.modelFiles) : null;
+    if (!folded || canonicalFacts(mirrorFacts(folded, read.files)) !== canonicalFacts(facts)) {
+      throw conflict('This request has several parts or materials — reload the page to edit it', 'REQUEST_MODEL_V3');
+    }
+    next = folded;
+  }
+  if (opts.strict && !isPublishable(next)) {
+    throw conflict('A request with several parts or materials cannot be published yet — keep it as a draft', 'REQUEST_PARTS_NOT_YET');
+  }
+  return { w, before: read, next, budgetVisible };
+}
+
 export interface PublishOutcome {
   quote: Record<string, unknown>;
   completeness: number;
@@ -1072,7 +1236,12 @@ export async function publishRequest(
     getSetting(env.DB, 'printMatchNotifyLimit'),
     accessories(env),
   ]);
-  const w = await readWizardInput(env, requestId, input, stored ?? null, request, mats, { strict: true });
+  // P1-04: a v3 body, or a version-3 request, is read through the model; every
+  // other publish is exactly the v1 path it always was.
+  const model = isModelBody(input) || Number(stored?.schema_version ?? 1) === 3
+    ? await planModelWrite(env, requestId, input, stored ?? null, request, mats, { strict: true })
+    : null;
+  const w = model?.w ?? (await readWizardInput(env, requestId, input, stored ?? null, request, mats, { strict: true }));
   const { spec, choices, analysis } = w;
 
   const quote = estimateFor(
@@ -1116,8 +1285,16 @@ export async function publishRequest(
 
   // Did the facts a merchant priced change? Only a PUBLISHED request can be
   // revised: nobody has priced a draft.
+  //
+  // A model write compares BOTH (critique 2): the v3 strings — the stored
+  // model, synthesised while the request is v1 — and the v1 facts of the row
+  // against the v1 facts of the new mirror. A save that changes neither
+  // keeps the revision (and the pending offers on it); one that would
+  // rewrite what an offer priced in v1 terms revises honestly.
   const nextFacts = factsFromInput(w, request);
-  const changed = !firstPublish && canonicalFacts(factsFromRows(request, stored ?? null, w.files)) !== canonicalFacts(nextFacts);
+  const changed = !firstPublish && (model
+    ? canonicalFactsV3(model.before) !== canonicalFactsV3(model.next) || canonicalFacts(model.before.v1) !== canonicalFacts(nextFacts)
+    : canonicalFacts(factsFromRows(request, stored ?? null, w.files)) !== canonicalFacts(nextFacts));
 
   const ts = new Date().toISOString();
   const readRevision = Number(request.revision ?? 1);
@@ -1143,16 +1320,14 @@ export async function publishRequest(
   if (w.deadline !== undefined) { sets.push('deadline = ?'); vals.push(w.deadline || null); }
   if (w.budget !== undefined) { sets.push('budget_iqd = ?'); vals.push(w.budget); }
   if (w.customerNotes !== undefined) { sets.push('customer_notes = ?'); vals.push(w.customerNotes); }
+  if (model?.budgetVisible !== undefined) { sets.push('budget_visible = ?'); vals.push(model.budgetVisible ? 1 : 0); }
 
+  const snapshotRow = { title: request.title, description: request.description, budget_iqd: w.budget !== undefined ? w.budget : request.budget_iqd };
   const snapshot = {
-    spec: snapshotSpec(
-      { title: request.title, description: request.description, budget_iqd: w.budget !== undefined ? w.budget : request.budget_iqd },
-      nextFacts,
-      measuredDims
-    ),
+    spec: model ? modelSpec(snapshotRow, nextFacts, measuredDims, model.next) : snapshotSpec(snapshotRow, nextFacts, measuredDims),
     files: w.files,
     estimate: publicEstimate(JSON.stringify(quote)),
-    hash: await factsHash(nextFacts),
+    hash: model ? await factsHashV3(model.next) : await factsHash(nextFacts),
   };
 
   try {
@@ -1170,6 +1345,8 @@ export async function publishRequest(
           WHERE id = ?1`
       ).bind(requestId, ts),
       printRowStatement(env.DB, requestId, w, quote, completeness, ts),
+      // The model's rows and its stamp, after the v1 row they mirror (P1-04).
+      ...(model ? modelWriteStatements(env.DB, [{ request_id: requestId, model: model.next, schema_version: 3 }], ts) : []),
       // Offers that priced a revision the line above left behind.
       supersedeStatement(env.DB, requestId, ts),
       offerCountStatement(env.DB, requestId),
@@ -1177,6 +1354,7 @@ export async function publishRequest(
       recordRevisionStatement(env.DB, requestId, snapshot, firstPublish ? 'publish' : 'edit', userId, ts),
     ]);
   } catch (e) {
+    if (model && isMissingSchema(e)) throw modelUnavailable();
     if (!/constraint/i.test(e instanceof Error ? e.message : String(e))) throw e;
     throw conflict('This request changed while you were publishing it — reload it and try again', 'REQUEST_CHANGED');
   }
@@ -1312,8 +1490,12 @@ printRequestRoutes.put('/requests/:id/draft', requireAuth, async (c) => {
     .bind(requestId)
     .first<Record<string, unknown>>();
   const mats = await materials(c.env);
+  // P1-04: a v3 body, or a version-3 draft, is saved through the model.
+  const model = isModelBody(body) || Number(stored?.schema_version ?? 1) === 3
+    ? await planModelWrite(c.env, requestId, body, stored ?? null, request, mats, { strict: false, draft: true })
+    : null;
   // A draft save always carries the wizard's state; an empty body is not "as stored".
-  const w = await readWizardInput(c.env, requestId, { process: body.process ?? 'unsure', ...body }, stored ?? null, request, mats, { strict: false });
+  const w = model?.w ?? (await readWizardInput(c.env, requestId, { process: body.process ?? 'unsure', ...body }, stored ?? null, request, mats, { strict: false }));
 
   const title = body.title === undefined ? undefined : str(body.title, 'title', { min: 4, max: 140 });
   const description = body.description === undefined ? undefined : str(body.description, 'description', { min: 10, max: 6000 });
@@ -1333,6 +1515,7 @@ printRequestRoutes.put('/requests/:id/draft', requireAuth, async (c) => {
   if (w.deadline !== undefined) { sets.push('deadline = ?'); vals.push(w.deadline || null); }
   if (w.budget !== undefined) { sets.push('budget_iqd = ?'); vals.push(w.budget); }
   if (w.customerNotes !== undefined) { sets.push('customer_notes = ?'); vals.push(w.customerNotes); }
+  if (model?.budgetVisible !== undefined) { sets.push('budget_visible = ?'); vals.push(model.budgetVisible ? 1 : 0); }
 
   try {
     await c.env.DB.batch([
@@ -1345,8 +1528,10 @@ printRequestRoutes.put('/requests/:id/draft', requireAuth, async (c) => {
           WHERE id = ?1`
       ).bind(requestId, ts),
       printRowStatement(c.env.DB, requestId, w, null, 0, ts),
+      ...(model ? modelWriteStatements(c.env.DB, [{ request_id: requestId, model: model.next, schema_version: 3 }], ts) : []),
     ]);
   } catch (e) {
+    if (model && isMissingSchema(e)) throw modelUnavailable();
     if (!/constraint/i.test(e instanceof Error ? e.message : String(e))) throw e;
     throw conflict('This request is no longer a draft — reload it', 'REQUEST_NOT_DRAFT');
   }
@@ -1375,6 +1560,9 @@ async function draftShape(env: Env, requestId: string) {
   )
     .bind(requestId)
     .first<{ n: number }>();
+  // The model (P1-04): every source and part, in order, for the customer —
+  // synthesised from the v1 row while the request is version 1.
+  const model = await readRequestModel(env.DB, requestId);
   return {
     id: String(r?.id ?? requestId),
     state: String(r?.state ?? ''),
@@ -1389,6 +1577,9 @@ async function draftShape(env: Env, requestId: string) {
     budget_iqd: r?.budget_iqd === null || r?.budget_iqd === undefined ? null : Number(r.budget_iqd),
     expires_at: (r?.expires_at as string | null) ?? null,
     live_offers: Number(live?.n ?? 0),
+    budget_visible: Number(r?.budget_visible ?? 0) === 1,
+    schema_version: model?.schema_version ?? 1,
+    model: model ? { ...projectModel(model, 'owner'), origin: model.origin, stale: model.stale } : null,
     print: p
       ? {
           source_type: effectiveSourceType(p, (files ?? []).map((f) => String(f.kind))),
@@ -1486,20 +1677,40 @@ printRequestRoutes.get('/requests/:id/revisions', async (c) => {
   )
     .bind(requestId, fullHistory ? 1 : 0, Number(request.revision ?? 1))
     .all<Record<string, unknown>>();
+  /**
+   * A V3 SPEC CARRIES A MODEL (P1-04). Its parts and sources are compared as
+   * the hash compares them, and a v1 revision beside it is read as the model
+   * it synthesises to (critique 11), so a first v3 save shows only what
+   * really moved. A reader who is not a party never sees a role-`source`
+   * file in it (Q5, `projectSpec`).
+   */
+  const party =
+    isOwner ? 'owner' : user?.role === 'admin' ? 'admin'
+      : user && (results ?? []).some((row) => String(row.spec ?? '').includes('"model"')) && (await isEngagedMerchant(c.env.DB, requestId, user.id))
+        ? 'accepted' : 'public';
   let prev: Record<string, unknown> | null = null;
+  let prevFiles: RevisionFile[] = [];
   const revisions = (results ?? []).map((row) => {
-    const spec = parseJson<Record<string, unknown>>(row.spec, {});
-    const changes = prev
+    const spec = projectSpec(parseJson<Record<string, unknown>>(row.spec, {}), party);
+    const files = parseJson<RevisionFile[]>(row.files, []);
+    const changes: string[] = prev
       ? REVISION_FIELDS.filter((k) => JSON.stringify(spec[k] ?? null) !== JSON.stringify(prev![k] ?? null))
       : [];
+    if (prev && (spec.model || prev.model)) {
+      const a = pricedSections(modelOfSpec(prev, prevFiles));
+      const b = pricedSections(modelOfSpec(spec, files));
+      if (JSON.stringify(a.parts) !== JSON.stringify(b.parts)) changes.push('parts');
+      if (JSON.stringify(a.sources) !== JSON.stringify(b.sources)) changes.push('sources');
+    }
     prev = spec;
+    prevFiles = files;
     return {
       revision: Number(row.revision),
       reason: String(row.reason ?? ''),
       created_at: String(row.created_at ?? ''),
       hash: String(row.hash ?? ''),
       spec,
-      files: parseJson<RevisionFile[]>(row.files, []).map((f) => ({ id: f.id, kind: f.kind, file_name: f.file_name })),
+      files: files.map((f) => ({ id: f.id, kind: f.kind, file_name: f.file_name })),
       estimate: publicEstimate(row.estimate),
       changes,
     };
@@ -1695,7 +1906,8 @@ printRequestRoutes.post('/requests/:id/files/:fileId/viewer-token', requireAuth,
   const { reader, gateClosed, verdict, visible } = await fileReader(c.env, file, user, { allowAdmin: false });
   if (gateClosed) throw communityClosedRefusal();
   if (!visible) throw notFound('File not found');
-  const grant = previewGrantFor(reader);
+  // A `source` file (Q5, P1-04) has no preview for a merchant who may only offer.
+  const grant = previewGrantFor(reader, reader === 'eligible' ? ((await fileSourceRoles(c.env.DB, requestId)).get(fileId) ?? '') : '');
   if (!grant) {
     throw new HttpError(
       403,
@@ -1927,7 +2139,7 @@ async function viewerToken(env: Env, raw: string | undefined, viewer: SessionUse
     expires_at: row.request_expires_at,
   };
   const { reader } = await fileReader(env, request, creator, { allowAdmin: false });
-  const now = previewGrantFor(reader);
+  const now = previewGrantFor(reader, reader === 'eligible' ? ((await fileSourceRoles(env.DB, row.request_id)).get(row.file_id) ?? '') : '');
   if (!now || !reader) throw invalid();
   const grant: PreviewGrant = row.grant_level === 'full' && now === 'full' ? 'full' : 'preview';
   return {
@@ -2101,12 +2313,67 @@ printRequestRoutes.post('/requests/:id/repeat', requireCommunityOpen, requireAut
       .run();
   }
 
+  // The model and the budget's visibility (P1-04, Q2) ride along: a
+  // version-3 source is copied part for part, its ids made anew and every
+  // file pointer moved to the COPIED file. A version-1 source needs nothing —
+  // the copy's v1 row synthesises the same model.
+  await copyRequestModel(c.env.DB, sourceId, newRequestId, fileIdMap, now);
+
   await audit(c.env.DB, user.id, 'print.request_repeated', newRequestId, { from: sourceId, state: 'draft' });
   return c.json(
     { success: true, request_id: newRequestId, files: fileIdMap.size, published: false, draft: true },
     201
   );
 });
+
+/**
+ * THE REPEAT'S MODEL. Deterministic new ids (`rps_<fileId>` for a file,
+ * `rps_<rid>_<n>` for a link or a text reference, `rpt_<rid>_<n>`,
+ * `rpm_<rid>_<n>_<k>`), file pointers through `fileIdMap`, a source whose file
+ * did not copy dropped with every reference to it. A review a person made
+ * stays the source's: the copy's parts are reviewed anew. Never throws — the
+ * copy is a draft the customer reviews, and its v1 row stands on its own.
+ */
+async function copyRequestModel(db: D1Database, sourceId: string, newId_: string, fileIdMap: Map<string, string>, ts: string): Promise<void> {
+  try {
+    await db
+      .prepare('UPDATE community_requests SET budget_visible = (SELECT s.budget_visible FROM community_requests s WHERE s.id = ?1) WHERE id = ?2')
+      .bind(sourceId, newId_)
+      .run();
+    const read = await readRequestModel(db, sourceId, { restamp: false });
+    if (!read || read.schema_version !== 3) return;
+    const ids = new Map<string, string>();
+    const sources = read.sources.flatMap((x, i) => {
+      const file = x.file_id ? fileIdMap.get(x.file_id) : null;
+      if (x.file_id && !file) return [];
+      const id = file ? `rps_${file}` : `rps_${newId_}_${i + 1}`;
+      ids.set(x.id, id);
+      return [{ ...x, id, file_id: file ?? null, created_at: ts }];
+    });
+    const parts = read.parts.map((p, i) => ({
+      ...p,
+      id: `rpt_${newId_}_${i + 1}`,
+      measured_file_id: p.measured_file_id ? (fileIdMap.get(p.measured_file_id) ?? null) : null,
+      source_ids: p.source_ids.flatMap((sid) => (ids.has(sid) ? [ids.get(sid)!] : [])),
+      review_state: p.review_state === 'confirmed' ? (p.review_reasons.length ? ('needs_technical_review' as const) : ('' as const)) : p.review_state,
+      reviewed_by: null,
+      reviewed_at: null,
+      materials: p.materials.map((m, k) => ({
+        ...m,
+        id: `rpm_${newId_}_${i + 1}_${k + 1}`,
+        colors: m.colors.map((c) => ({ ...c, ref: c.ref ? (ids.get(c.ref) ?? '') : '' })),
+        created_at: ts,
+        updated_at: ts,
+      })),
+      created_at: ts,
+      updated_at: ts,
+    }));
+    await db.batch(modelWriteStatements(db, [{ request_id: newId_, model: { ...stateOf(read), sources, parts }, schema_version: 3 }], ts));
+  } catch (e) {
+    // A database before 0208 has no model to copy: the copy's v1 row is the whole of it.
+    if (!isMissingSchema(e)) console.error('repeat: the model was not copied for', newId_, e instanceof Error ? e.message : String(e));
+  }
+}
 
 // ------------------------------------------------------------ 9. my requests
 

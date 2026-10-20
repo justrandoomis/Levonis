@@ -37,6 +37,8 @@ export default {
         'POST /products/:id/hide': 'op',
         'POST /reviews/:id/hide': 'op',
         'POST /requests/:id/remove': 'op',
+        // P1-04: the request-model cache by hand (counts only; no money, no request content).
+        'POST /request-models/backfill': 'op',
         'GET /requests': 'op',
         'GET /requests/:id': 'op',
         'POST /offers/:id/reject': 'op',

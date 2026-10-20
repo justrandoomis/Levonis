@@ -888,6 +888,21 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'print_quotes.snapshot': 'the quote numbers as issued',
   'community_print_requests.analysis': 'measured volume, time and mass',
   'community_print_requests.estimate': 'the price estimate numbers',
+  // The request model v3 (P1-04, 0208). File pointers are ROW IDS in
+  // community_request_files — a copied project post or Studio file is the
+  // request's own file row, whose key stays in `file_key` — and the links are
+  // somebody else's pages, as `source_url` is.
+  'community_request_sources.file_id': 'a row id in community_request_files (the request\'s own copy), not a key',
+  'community_request_sources.url': 'an external model page the customer pasted',
+  'community_request_sources.canonical_url': 'the same external page, canonical form',
+  'community_request_sources.origin_meta': 'provenance of a copied post or Studio revision (engine version, ids) — no key',
+  'community_request_parts.measured_file_id': 'a row id in community_request_files, not a key',
+  'community_request_parts.review_reasons': 'review reason codes',
+  'community_request_part_materials.colors': 'colour choices: modes, hexes, labels, source row ids',
+  'community_print_requests.materials_json': 'catalogue material ids of the model summary',
+  'community_print_requests.processes_json': 'print process names of the model summary',
+  'community_offers.coverage_json': 'which request parts an offer covers (part row ids)',
+  'community_offers.substitutions_json': 'material substitutions per part (material row ids, catalogue ids)',
   // Print requests v2 (W5-A, 0130). Snapshots carry FILE ROW IDS, names,
   // kinds and sizes — the keys stay in community_request_files.file_key.
   'community_request_revisions.spec': 'a request revision: spec facts, a file row id, an external link',

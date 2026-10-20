@@ -69,6 +69,7 @@ import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { reconcileRefundUnrefunded, reconcileReverseCredit, storeOrderMoneyDrift } from '../lib/storeOrderOps';
 import { merchantUnsanctionedSql } from '../lib/merchantApproval';
 import { enqueueMatchStatement, rematchAfterResponse } from '../lib/printMatchingStore';
+import { catchUpRequestModels, requestModelBudget } from '../lib/requestModelBackfill';
 
 export const adminCommunityRoutes = new Hono<AppContext>();
 adminCommunityRoutes.use('*', requireAdmin);
@@ -851,6 +852,33 @@ adminCommunityRoutes.get('/requests', async (c) => {
   ).bind(state, state, q, likePattern(q), limit).all();
 
   return c.json({ success: true, requests: results });
+});
+
+/**
+ * THE REQUEST-MODEL CACHE, BY HAND (P1-04, DECISIONS row 266). The quarter-
+ * hour job builds version-1 rows whose model was never materialised
+ * (`unbuilt`); `drift` rebuilds v1 caches an older build left stale after a
+ * rollback, and the rows the job marked `error`. Stateless and paged by
+ * `request_id` (`after`, at most 100 a call); `dry_run` reads and synthesises
+ * without writing — the live half of the compatibility check, counting the
+ * v1 rows whose mirror would not reproduce their own string. Counts only, no
+ * request content. It never touches a version-3 row, a v1 column, a
+ * revision, an offer or an order (worker/lib/requestModelBackfill.ts).
+ */
+adminCommunityRoutes.post('/request-models/backfill', async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const mode = body.mode === undefined ? 'unbuilt' : oneOf(body.mode, 'mode', ['unbuilt', 'drift'] as const);
+  const limit = int(body.limit, 'limit', { min: 1, max: 100, def: 100 });
+  const after = body.after === undefined || body.after === null ? '' : str(body.after, 'after', { max: 80, required: false });
+  const report = await catchUpRequestModels(c.env, {
+    budget: requestModelBudget(200),
+    mode,
+    after,
+    limit,
+    dryRun: body.dry_run === true,
+  });
+  await audit(c.env.DB, c.get('user')!.id, 'admin.request_models_backfill', mode, { ...report });
+  return c.json({ success: true, report });
 });
 
 /**
