@@ -85,7 +85,8 @@ test('amounts: number words, halves and quarters, ranges, bounds after the amoun
   assert.deepEqual(priceOf('اقل من 30'), max(30_000), 'a bare number beside a bound is thousands (Iraqi shorthand)');
   assert.deepEqual(priceOf('اكثر من مليون'), { min: 1_000_000, max: null, currency: 'IQD' });
   assert.deepEqual(priceOf('مو اكثر من مليون'), max(1_000_000), 'a negated lower bound is an upper bound');
-  assert.deepEqual(priceOf('زیاتر لە ملیۆنێک'), null, 'an unknown word is not guessed into a number');
+  assert.deepEqual(priceOf('زیاتر لە ملیۆنێک'), { min: 1_000_000, max: null, currency: 'IQD' }, 'the Sorani indefinite «a million»');
+  assert.deepEqual(priceOf('زیاتر لە ملیۆنەها'), null, 'an unknown word is not guessed into a number');
   for (const q of ['بين 500 الف و مليون', 'من 500 الف الى مليون', 'between 500k and 1m', '500 الف - مليون', 'لە نێوان 500 هەزار و ملیۆن']) {
     assert.deepEqual(priceOf(q), { min: 500_000, max: 1_000_000, currency: 'IQD' }, q);
   }
