@@ -45,6 +45,7 @@ import { hydrateRelations, relationsToWire, type RelationsResponse } from '../sr
 import { docWithoutLegacyMoney, withoutLegacyMoney } from '../src/components/adminProducts/form/v2/v2Model';
 import { backfillSearchIndex, INDEX_STAMP, searchDocsForRows, searchProducts } from '../worker/lib/search/store';
 import { ALIAS_IN_CHUNK, aliasReadCount, loadSearchAliases } from '../worker/lib/search/aliases';
+import { IDENTIFIER_STAMP } from '../worker/lib/search/identifiers';
 import { catalogKnowledgeInstalled, catalogKnowledgeKnown } from '../worker/lib/catalogKnowledge';
 import { planProductSave } from '../worker/lib/productPersistence';
 import { parseProductRow } from '../worker/lib/productModel';
@@ -264,9 +265,14 @@ test('a database without migration 0194 indexes exactly what it did before: no a
 
   // The document is today's document: the rows a 0194 database writes for the
   // same product WITHOUT any alias row are the rows written here.
+  // (A current database also has migration 0206, whose identifier stamp rides beside the tokens: not a token.)
   const withTables = world(null, false);
   await saveThroughForm(withTables.app, PID);
-  assert.deepEqual(tokensOf(withTables.raw, PID), saved, 'no alias rows and no 0194 tables index the same product the same way');
+  assert.deepEqual(
+    tokensOf(withTables.raw, PID).filter((t) => t.token !== IDENTIFIER_STAMP),
+    saved,
+    'no alias rows and no 0194 tables index the same product the same way'
+  );
 });
 
 test('one statement per 90 products, inside D1 limits; the presence probe is asked once per binding', async () => {

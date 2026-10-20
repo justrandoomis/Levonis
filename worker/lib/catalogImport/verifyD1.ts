@@ -136,7 +136,8 @@ export async function recomputeD1Checks(db: D1Database, input: D1CheckInput): Pr
   const wanted = [String(product?.name ?? ''), ...(aliasRows ?? []).map((r) => String(r.value))].flatMap((t) => tokenize(t).filter(isUsefulToken));
   checks.search_stamp = tokens.has(INDEX_STAMP);
   checks.search_tokens = wanted.every((t) => tokens.has(t));
-  counts.search_tokens = Math.max(0, tokens.size - 1);
+  // The stamps (`#doc:…`, `#ids:…`) are not tokens: every word a shopper can type starts with a letter or digit.
+  counts.search_tokens = [...tokens].filter((t) => !t.startsWith('#')).length;
 
   // The rows the write recorded, recomputed.
   const { results: imageRows } = await db

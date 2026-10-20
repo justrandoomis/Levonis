@@ -27,8 +27,9 @@
  */
 
 import { normalizeText } from './normalize';
-import { toSearchDoc, variantNamesFrom } from './document';
-import { aliasReadCount, loadSearchAliases } from './aliases';
+import { selectionNamesFrom, toSearchDoc, variantNamesFrom } from './document';
+import { aliasReadCount, loadSearchSources } from './aliases';
+import { IDENTIFIER_STAMP, identifierRows, planSearchIdentifiers, searchIdentifiersInstalled, type IdentifierRow } from './identifiers';
 import { catalogKnowledgeInstalled, catalogKnowledgeKnown } from '../catalogKnowledge';
 import { candidatePrefix } from './match';
 import {
@@ -155,6 +156,25 @@ export const INDEX_FAILED_MARK = `#fail:${INDEX_STAMP.slice('#doc:'.length)}`;
 export const SEARCH_INDEX_STALE_SQL =
   'NOT EXISTS (SELECT 1 FROM search_tokens t WHERE t.product_id = p.id AND t.token = ?)';
 
+/**
+ * Same shape, for `IDENTIFIER_STAMP` (./identifiers.ts, migration 0206): a
+ * product whose identifier rows were never written, or were wiped with its
+ * tokens by a writer that does not build them (a hashtag rename). Selected by
+ * the backfill only once the table exists.
+ */
+const SEARCH_IDENTIFIERS_STALE_SQL =
+  'NOT EXISTS (SELECT 1 FROM search_tokens s WHERE s.product_id = p.id AND s.token = ?)';
+
+/**
+ * Whether migration 0206 is on this database, asked INSIDE the backfill's own
+ * selection: the predicate above needs the answer before anything is
+ * selected, and a probe of its own would be one more statement a budgeted
+ * pass pays on every binding it has not seen. `sqlite_master` is how the
+ * finance and operations modules ask the same question.
+ */
+const SEARCH_IDENTIFIERS_INSTALLED_SQL =
+  "EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'search_identifiers')";
+
 /** Same shape, for `INDEX_FAILED_MARK`: a product the backfill gave up on. */
 const SEARCH_INDEX_FAILED_SQL =
   'NOT EXISTS (SELECT 1 FROM search_tokens f WHERE f.product_id = p.id AND f.token = ?)';
@@ -187,22 +207,42 @@ const INSERT_INDEX_ROWS_SQL = `INSERT OR REPLACE INTO search_tokens (product_id,
  * the same batch as the product write. A search index updated in a second
  * transaction is an index that disagrees with the catalogue whenever the
  * second one fails.
+ *
+ * `identifiers` (./identifiers.ts, migration 0206): the product's identifier
+ * rows, when the caller built them — which it does only when the table is
+ * there. They replace the product's stored ones, and `IDENTIFIER_STAMP` is
+ * written beside `INDEX_STAMP`. Absent (`undefined`/null): the identifier rows
+ * are not touched, and the stamp is gone with the rest of the product's
+ * tokens, so the catch-up writes them again.
  */
-export function planSearchIndexRows(db: D1Database, productId: string, rows: readonly IndexRow[]): D1PreparedStatement[] {
+export function planSearchIndexRows(
+  db: D1Database,
+  productId: string,
+  rows: readonly IndexRow[],
+  identifiers?: readonly IdentifierRow[] | null
+): D1PreparedStatement[] {
   const stmts: D1PreparedStatement[] = [db.prepare('DELETE FROM search_tokens WHERE product_id = ?').bind(productId)];
   // And the stamp that says WHICH BUILDER wrote these rows (see INDEX_STAMP),
   // written by the same statement as the last of them.
   const pairs: [string, number][] = rows.map((r) => [r.token, r.weight]);
   pairs.push([INDEX_STAMP, 0]);
+  if (identifiers) pairs.push([IDENTIFIER_STAMP, 0]);
   for (let i = 0; i < pairs.length; i += INDEX_ROWS_PER_STATEMENT) {
     stmts.push(db.prepare(INSERT_INDEX_ROWS_SQL).bind(productId, JSON.stringify(pairs.slice(i, i + INDEX_ROWS_PER_STATEMENT))));
   }
+  if (identifiers) stmts.push(...planSearchIdentifiers(db, productId, identifiers));
   return stmts;
 }
 
-/** `planSearchIndexRows` for a document: the rows `buildIndexRows` makes of it. */
-export function planSearchIndex(db: D1Database, doc: SearchDoc): D1PreparedStatement[] {
-  return planSearchIndexRows(db, doc.productId, buildIndexRows(doc));
+/**
+ * A document, and the product's identifier rows when the builder made them
+ * (`searchDocsForRows` with `identifiers: true` on a database with 0206).
+ */
+export type IndexedDoc = SearchDoc & { identifiers?: IdentifierRow[] | null };
+
+/** `planSearchIndexRows` for a document: the rows `buildIndexRows` makes of it, and its identifier rows if it has them. */
+export function planSearchIndex(db: D1Database, doc: IndexedDoc): D1PreparedStatement[] {
+  return planSearchIndexRows(db, doc.productId, buildIndexRows(doc), doc.identifiers);
 }
 
 /**
@@ -249,7 +289,25 @@ export function searchDocColumns(alias = ''): string {
     ...SEARCH_DOC_COLUMNS.map((c) => (alias ? `${alias}.${c}` : c)),
     `(SELECT json_group_array(v.sku) FROM product_variants v
        WHERE v.product_id = ${owner}.id AND v.active = 1 AND v.sku IS NOT NULL AND v.sku <> '') AS variant_skus`,
+    // The same variants WITH THEIR IDS, `[[id, sku], …]`: an identifier row
+    // (./identifiers.ts) names the variant a SKU belongs to.
+    `(SELECT json_group_array(json_array(v.id, v.sku)) FROM product_variants v
+       WHERE v.product_id = ${owner}.id AND v.active = 1 AND v.sku IS NOT NULL AND v.sku <> '') AS variant_refs`,
   ].join(', ');
+}
+
+/** `variant_refs` (`searchDocColumns`) read back: the active variants that carry a SKU. */
+export function variantRefsOf(v: unknown): { id: string; sku: string }[] {
+  if (typeof v !== 'string' || !v.startsWith('[')) return [];
+  try {
+    const parsed: unknown = JSON.parse(v);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((pair) =>
+      Array.isArray(pair) && typeof pair[0] === 'string' && typeof pair[1] === 'string' && pair[1].trim() !== '' ? [{ id: pair[0], sku: pair[1] }] : []
+    );
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -328,8 +386,17 @@ export async function searchDocsForRows(
    * asked (a budgeted pass charges the probe itself and passes the answer, so
    * nothing is sent that it did not pay for). Absent: the loader asks.
    */
-  opts: { aliasesInstalled?: boolean } = {}
-): Promise<SearchDoc[]> {
+  opts: {
+    aliasesInstalled?: boolean;
+    /**
+     * Build each product's identifier rows too (./identifiers.ts) — the
+     * catch-up does, on a database with migration 0206. They come from the
+     * same reads: the alias statement brings the scoped external ids, the
+     * selection brings `variant_refs`, and the names are on the row.
+     */
+    identifiers?: boolean;
+  } = {}
+): Promise<IndexedDoc[]> {
   if (rows.length === 0) return [];
   // EVERY LANGUAGE THE NAME IS WRITTEN IN (`#doc:6`). This read the English
   // name, or the Arabic when there was none — so «بامبو لاب» reached a Bambu
@@ -350,14 +417,15 @@ export async function searchDocsForRows(
   await collect('catalogs', ids.catalogs);
   // THE SAME ALIASES THE SAVE PATH WRITES (./aliases.ts): a backfilled product
   // keeps its colour code, part code and model, exactly as its last save did.
-  const aliases = await loadSearchAliases(
+  const sources = await loadSearchSources(
     db,
     rows.map((r) => String(r.id)),
     opts.aliasesInstalled === undefined ? {} : { installed: opts.aliasesInstalled }
   );
+  const aliases = sources.aliases;
   const named = (id: unknown): string[] => names.get(String(id ?? '')) ?? [];
-  return rows.map((r) =>
-    toSearchDoc({
+  return rows.map((r) => ({
+    ...toSearchDoc({
       id: String(r.id),
       name: r.name,
       name_ar: r.name_ar,
@@ -372,8 +440,19 @@ export async function searchDocsForRows(
       variantNames: variantNamesFrom(r.options, r.colors),
       variantSkus: jsonStrings(r.variant_skus),
       aliases: aliases.get(String(r.id)) ?? [],
-    })
-  );
+    }),
+    ...(opts.identifiers
+      ? {
+          identifiers: identifierRows({
+            sku: r.sku,
+            variants: variantRefsOf(r.variant_refs),
+            externalIds: sources.externalIds.get(String(r.id)) ?? [],
+            options: selectionNamesFrom(r.options),
+            colors: selectionNamesFrom(r.colors),
+          }),
+        }
+      : {}),
+  }));
 }
 
 /** A name's distinct, non-empty spellings across the three languages. */
@@ -772,21 +851,26 @@ export async function backfillSearchIndex(
   const budget = opts.budget ?? null;
   const out: BackfillResult = { indexed: 0, failed: [], deferred: 0 };
   if (budget && !budget.spend(1)) return out;
+  // THE IDENTIFIER ROWS (migration 0206, ./identifiers.ts): once the table
+  // exists, a product is also stale while its identifier stamp is missing —
+  // never written, or wiped by a token-only rewrite. The selection itself says
+  // whether the table is there (`ids_installed`), so it costs no statement.
   const { results } = await db
     .prepare(
-      `SELECT ${searchDocColumns('p')}
+      `SELECT ${searchDocColumns('p')}, ${SEARCH_IDENTIFIERS_INSTALLED_SQL} AS ids_installed
          FROM products p
         WHERE p.status = 'active'
-          AND ${SEARCH_INDEX_STALE_SQL}
+          AND (${SEARCH_INDEX_STALE_SQL} OR (${SEARCH_IDENTIFIERS_INSTALLED_SQL} AND ${SEARCH_IDENTIFIERS_STALE_SQL}))
           AND ${SEARCH_INDEX_FAILED_SQL}
           ${scope ? `AND (${scope.sql})` : ''}
         ORDER BY p.id
         LIMIT ?`
     )
-    .bind(INDEX_STAMP, INDEX_FAILED_MARK, ...(scope?.params ?? []), limit)
+    .bind(INDEX_STAMP, IDENTIFIER_STAMP, INDEX_FAILED_MARK, ...(scope?.params ?? []), limit)
     .all<Record<string, unknown>>();
   const rows = results ?? [];
   if (rows.length === 0) return out;
+  const identifiers = Number(rows[0].ids_installed) === 1;
   // THE ALIAS READ (migration 0194, ./aliases.ts): its presence is asked once
   // per binding — charged when, and only when, the probe is sent — and then it
   // costs one statement per 90 products, none on a database without 0194.
@@ -807,7 +891,7 @@ export async function backfillSearchIndex(
   // THE SAME DOCUMENT THE SAVE PATH WRITES, from the same builder. The cron
   // once composed its own and dropped the option names; two writers of one
   // index must not be two documents.
-  const docs = await searchDocsForRows(db, rows, { aliasesInstalled });
+  const docs = await searchDocsForRows(db, rows, { aliasesInstalled, identifiers });
   const spend = (n: number) => !budget || budget.spend(n);
   // WITH A BUDGET, A BATCH IS SENT ONLY WHEN ITS FAILURE IS PAID FOR TOO:
   // a group of k products and S statements may need S more to retry each
@@ -818,7 +902,7 @@ export async function backfillSearchIndex(
   // stall this function exists to prevent.
   const need = (count: number, statements: number) => (count === 1 ? statements + 1 : 2 * statements + count);
   const fits = (count: number, statements: number) => !budget || budget.canSpend(need(count, statements));
-  const mark = async (doc: SearchDoc, error: string) => {
+  const mark = async (doc: IndexedDoc, error: string) => {
     out.failed.push({ id: doc.productId, error });
     // No room to write the mark down: selected and reported again next pass.
     if (!spend(1)) return;
@@ -832,7 +916,7 @@ export async function backfillSearchIndex(
       // reported again — which is noisy, and still honest.
     }
   };
-  const write = async (group: { doc: SearchDoc; stmts: D1PreparedStatement[] }[]) => {
+  const write = async (group: { doc: IndexedDoc; stmts: D1PreparedStatement[] }[]) => {
     const stmts = group.flatMap((p) => p.stmts);
     // Reserved as the group was built; never false here.
     if (!spend(stmts.length)) {
@@ -867,7 +951,7 @@ export async function backfillSearchIndex(
 
   // The most any budgeted pass could ever spend on one product: its batch and its mark.
   const largest = budget ? (opts.ceiling ?? budget.limit) - budget.used : Infinity;
-  let group: { doc: SearchDoc; stmts: D1PreparedStatement[] }[] = [];
+  let group: { doc: IndexedDoc; stmts: D1PreparedStatement[] }[] = [];
   let size = 0;
   const flush = async () => {
     if (group.length > 0) await write(group);
@@ -952,6 +1036,12 @@ export interface SearchIndexStatus {
   coverage: number;
   /** The pace that closes the gap: products per budgeted pass, one pass a quarter-hour. */
   backfill: { per_pass: number; every_minutes: number; passes_left: number };
+  /**
+   * The identifier lane (migration 0206). While it is installed a product is
+   * `current` only with its identifier rows written too (`IDENTIFIER_STAMP`).
+   * `rows`: identifier rows stored, across the catalogue.
+   */
+  identifiers: { installed: boolean; stamp: string; rows: number };
 }
 
 /**
@@ -971,22 +1061,38 @@ export async function searchIndexStatus(db: D1Database): Promise<SearchIndexStat
     passes_left: Math.ceil(left / SEARCH_BACKFILL_BUDGETED_LIMIT),
   });
   if (!(await searchIndexInstalled(db))) {
-    return { installed: false, stamp: INDEX_STAMP, active: 0, current: 0, older: 0, missing: 0, failed: 0, coverage: 0, backfill: pace(0) };
+    return {
+      installed: false,
+      stamp: INDEX_STAMP,
+      active: 0,
+      current: 0,
+      older: 0,
+      missing: 0,
+      failed: 0,
+      coverage: 0,
+      backfill: pace(0),
+      identifiers: { installed: false, stamp: IDENTIFIER_STAMP, rows: 0 },
+    };
   }
+  const ids = await searchIdentifiersInstalled(db).catch(() => false);
   const row = await db
     .prepare(
       `SELECT COUNT(*) AS active,
               COALESCE(SUM(CASE WHEN cur THEN 1 ELSE 0 END ), 0) AS current,
               COALESCE(SUM(CASE WHEN NOT cur AND fail THEN 1 ELSE 0 END ), 0) AS failed,
               COALESCE(SUM(CASE WHEN NOT cur AND NOT fail AND old THEN 1 ELSE 0 END ), 0) AS older
-         FROM (SELECT EXISTS (SELECT 1 FROM search_tokens t WHERE t.product_id = p.id AND t.token = ?1) AS cur,
+         FROM (SELECT EXISTS (SELECT 1 FROM search_tokens t WHERE t.product_id = p.id AND t.token = ?1)
+                      AND (?3 = 0 OR EXISTS (SELECT 1 FROM search_tokens i WHERE i.product_id = p.id AND i.token = ?4)) AS cur,
                       EXISTS (SELECT 1 FROM search_tokens f WHERE f.product_id = p.id AND f.token = ?2) AS fail,
                       EXISTS (SELECT 1 FROM search_tokens o WHERE o.product_id = p.id AND o.token >= '#doc:' AND o.token < '#doc;') AS old
                  FROM products p
                 WHERE p.status = 'active')`
     )
-    .bind(INDEX_STAMP, INDEX_FAILED_MARK)
+    .bind(INDEX_STAMP, INDEX_FAILED_MARK, ids ? 1 : 0, IDENTIFIER_STAMP)
     .first<{ active: number; current: number; failed: number; older: number }>();
+  const idRows = ids
+    ? Number((await db.prepare('SELECT COUNT(*) AS n FROM search_identifiers').first<{ n: number }>().catch(() => null))?.n ?? 0)
+    : 0;
   const active = Number(row?.active ?? 0);
   const current = Number(row?.current ?? 0);
   const failed = Number(row?.failed ?? 0);
@@ -1002,5 +1108,6 @@ export async function searchIndexStatus(db: D1Database): Promise<SearchIndexStat
     failed,
     coverage: active === 0 ? 1 : current / active,
     backfill: pace(older + missing),
+    identifiers: { installed: ids, stamp: IDENTIFIER_STAMP, rows: idRows },
   };
 }

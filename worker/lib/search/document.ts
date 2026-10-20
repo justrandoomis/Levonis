@@ -157,3 +157,25 @@ export function variantNamesFrom(options: unknown, colors: unknown): string[] {
   }
   return out;
 }
+
+/**
+ * The option values or colours of a stored row's `options` / `colors` JSON
+ * mirror as `{ id, names }` — what the identifier lane (./identifiers.ts)
+ * reads a colour code «(10100)» or a size «0.4mm» from. Every spelling the
+ * mirror holds, legacy ones included (see `variantNamesFrom`); an entry
+ * without an id names no selection and is skipped.
+ */
+export function selectionNamesFrom(list: unknown): { id: string; names: string[] }[] {
+  const out: { id: string; names: string[] }[] = [];
+  for (const item of objectList(list)) {
+    const id = item.id;
+    if (typeof id !== 'string' || id === '') continue;
+    const names: string[] = [];
+    for (const key of ['name_en', 'name_ar', 'name_ckb', 'name', 'name_ku']) {
+      const v = item[key];
+      if (typeof v === 'string' && v.trim() !== '') names.push(v);
+    }
+    out.push({ id, names });
+  }
+  return out;
+}

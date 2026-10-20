@@ -77,11 +77,12 @@ import {
 } from './productModel';
 import { productsHaveColumn, productsHaveConditionDoc } from './conditionProjection';
 import { withClassificationPlacements } from './catalogMembership';
-import { jsonStrings, planSearchIndexRows } from './search/store';
+import { jsonStrings, planSearchIndexRows, variantRefsOf } from './search/store';
 import { buildIndexRows } from './search/index';
 import { tableColumns } from './schemaColumns';
 import { toSearchDoc } from './search/document';
-import { loadSearchAliases } from './search/aliases';
+import { loadSearchSources, type ExternalIdSource } from './search/aliases';
+import { identifierRows } from './search/identifiers';
 import {
   isValidHex,
   normalizeHex,
@@ -2436,6 +2437,13 @@ export interface ProductWriteIntent {
    * batch writes those rows, and this planner reads before that batch commits.
    */
   searchAliases?: string[];
+  /**
+   * THE PRODUCT'S SEARCHABLE EXTERNAL IDS, SCOPED (0194), for its identifier
+   * rows (worker/lib/search/identifiers.ts, migration 0206). Undefined means
+   * "read the stored rows", exactly as `searchAliases`; the catalogue import
+   * passes the rows its own batch writes, at the scope it writes them.
+   */
+  searchExternalIds?: ExternalIdSource[];
 }
 
 export interface ProductSavePlan {
@@ -3229,23 +3237,33 @@ export async function planProductSave(
   // prevent. The backfill cron indexes the product as soon as the table lands.
   // Asked once per binding (worker/lib/schemaColumns.ts): the planner runs twice per save. The catch-up job keeps
   // its own probe (`searchIndexInstalled`), charged to the quarter-hour budget statement for statement.
-  if (doc && (((await tableColumns(db, 'search_tokens'))?.size ?? 0) > 0)) {
+  // The identifier table (migration 0206) is asked in the same wave, through
+  // the same per-binding cache: absent, the save writes the tokens alone.
+  const [tokenColumns, identifierColumns] = doc
+    ? await Promise.all([tableColumns(db, 'search_tokens'), tableColumns(db, 'search_identifiers')])
+    : [null, null];
+  if (doc && (tokenColumns?.size ?? 0) > 0) {
+    const writeIdentifiers = (identifierColumns?.size ?? 0) > 0;
     // The names and the stored aliases are independent reads: sent together.
     // Every language each name is written in (`#doc:6`), and the SKUs of the
-    // variants already stored — one statement, as before.
-    const [nameRows, storedAliases] = await Promise.all([
+    // variants already stored, with their ids — one statement, as before.
+    const [nameRows, stored] = await Promise.all([
       db
         .prepare(
           `SELECT (SELECT json_array(b.name_en, b.name_ar, b.name_ckb) FROM brands b WHERE b.id = ?1) AS brand,
                   (SELECT json_array(c.name_en, c.name_ar, c.name_ckb) FROM catalogs c WHERE c.id = ?2) AS main,
                   (SELECT json_array(c2.name_en, c2.name_ar, c2.name_ckb) FROM catalogs c2 WHERE c2.id = ?3) AS sub,
                   (SELECT json_group_array(v.sku) FROM product_variants v
-                    WHERE v.product_id = ?4 AND v.active = 1 AND v.sku IS NOT NULL AND v.sku <> '') AS skus`
+                    WHERE v.product_id = ?4 AND v.active = 1 AND v.sku IS NOT NULL AND v.sku <> '') AS skus,
+                  (SELECT json_group_array(json_array(v.id, v.sku)) FROM product_variants v
+                    WHERE v.product_id = ?4 AND v.active = 1 AND v.sku IS NOT NULL AND v.sku <> '') AS refs`
         )
         .bind(doc.brand_id ?? '', doc.category_id ?? '', doc.sub_category_id ?? '', productId)
-        .first<{ brand: string | null; main: string | null; sub: string | null; skus: string | null }>(),
-      intent.searchAliases ? Promise.resolve(null) : loadSearchAliases(db, [productId]),
+        .first<{ brand: string | null; main: string | null; sub: string | null; skus: string | null; refs: string | null }>(),
+      // One read serves both: the aliases and the scoped external ids come back together.
+      intent.searchAliases && (intent.searchExternalIds || !writeIdentifiers) ? Promise.resolve(null) : loadSearchSources(db, [productId]),
     ]);
+    const storedAliases = stored?.aliases ?? null;
     // Model and colour names in all three languages: "X2D Combo" is an OPTION
     // name on this shop's products, not part of the product name, so a search
     // for «كومبو» reaches nothing without them.
@@ -3282,7 +3300,23 @@ export async function planProductSave(
         aliases,
       })
     );
-    statements.push(...planSearchIndexRows(db, productId, indexRows));
+    // THE IDENTIFIER ROWS (worker/lib/search/identifiers.ts) from the same
+    // sources the catch-up reads: the SKU, the variants this save leaves
+    // behind, the external ids, and the option and colour names.
+    const identifiers = writeIdentifiers
+      ? identifierRows({
+          sku: doc.sku,
+          variants: relations
+            ? relations.requested.variants
+                .filter((v) => v.active === 1 && typeof v.sku === 'string' && v.sku.trim() !== '')
+                .map((v) => ({ id: v.id, sku: v.sku as string }))
+            : variantRefsOf(nameRows?.refs),
+          externalIds: intent.searchExternalIds ?? stored?.externalIds.get(productId) ?? [],
+          options: (doc.options ?? []).map((o) => ({ id: o.id, names: [o.name_en, o.name_ar, o.name_ckb].filter((n): n is string => typeof n === 'string') })),
+          colors: (doc.colors ?? []).map((c) => ({ id: c.id, names: [c.name_en, c.name_ar, c.name_ckb].filter((n): n is string => typeof n === 'string') })),
+        })
+      : null;
+    statements.push(...planSearchIndexRows(db, productId, indexRows, identifiers));
     searchTokens = indexRows.length;
   }
 

@@ -68,6 +68,7 @@ import {
   type CatalogIndex,
 } from '../lib/catalogPresentation';
 import { searchProducts } from '../lib/search/store';
+import { resolveIdentifier, type IdentifierAnswer } from '../lib/search/identifiers';
 import { suggestCompletion } from '../lib/search/complete';
 import {
   SHELF_LIMIT,
@@ -3552,6 +3553,35 @@ export const LISTING_CANDIDATE_CAP = 1_000;
 export const SEARCH_RESULT_LIMIT = 200;
 
 /**
+ * THE IDENTIFIER LANE'S PART OF A SEARCH ANSWER, for the products this answer
+ * returns (`shown`) — so `exact` and `matched` never name a product that is
+ * not on the page, and never a hidden one:
+ *
+ *   exact       [{ product_id, key, kind, scope: { kind, id } }] — a code
+ *               typed whole that this product carries (worker/lib/search/
+ *               identifiers.ts `IdentifierHit`).
+ *   matched     { [product_id]: { option_value_ids, color_id, variant_id } } —
+ *               the selection its codes and sizes name, for the card's link.
+ *   exact_miss  [the codes as typed] — no product the shopper may see carries
+ *               them. Data, not wording: the search UI says it in ar, en and
+ *               ckb («no exact match for …», smart search 1.7).
+ *
+ * Each key is present only when it has something in it, so an answer without
+ * a code is exactly what it was.
+ */
+function identifierFields(ident: IdentifierAnswer | null, shown: readonly string[]): Record<string, unknown> {
+  if (!ident) return {};
+  const on = new Set(shown);
+  const exact = ident.exact.filter((h) => on.has(h.product_id));
+  const matched = Object.fromEntries([...ident.matched].filter(([id]) => on.has(id)));
+  return {
+    ...(exact.length > 0 ? { exact } : {}),
+    ...(Object.keys(matched).length > 0 ? { matched } : {}),
+    ...(ident.miss.length > 0 ? { exact_miss: ident.miss } : {}),
+  };
+}
+
+/**
  * How many candidate KEYS one listing reads — the deepest `offset` the route
  * accepts. Past it the rest are not listed, and the listing says
  * `cut_off: true` (and `truncated: true`).
@@ -4370,6 +4400,8 @@ export async function listCatalogProducts(
    * than the substring scan it replaces, so that one case falls back.
    */
   let searchOrder: string[] | null = null;
+  /** What the identifier lane answered for this search (null: no search, no 0206, or the lane failed). */
+  let identity: IdentifierAnswer | null = null;
   /**
    * WHETHER THE SHOPPER IS STILL TYPING THE LAST WORD. `str()` trims, so the
    * one signal that says "that word is finished" — a trailing space — is read
@@ -4393,25 +4425,53 @@ export async function listCatalogProducts(
       );
       return new Set((results ?? []).map((r) => String(r.id)));
     };
-    const hits = await degradeIfSchemaMissing(
-      'search index (migration 0089)',
-      () => searchProducts(db, search, { limit: SEARCH_RESULT_LIMIT, completeLast: typingLastWord, visible: listedIds }),
-      null as { ids: string[]; indexReady: boolean } | null
-    );
+    /**
+     * THE IDENTIFIER LANE (worker/lib/search/identifiers.ts, migration 0206),
+     * beside the ranked search and in the same wave: a code typed whole —
+     * «10101», «FAP035», a SKU — is answered EXACTLY. Its products head the
+     * list (`exact`), the selection it names rides along (`matched`, the
+     * colour or option value the page opens on), and a code-like chunk that
+     * no product the shopper may see carries is said so (`exact_miss`). A
+     * database without 0206, or a lane that fails, says nothing either way:
+     * the ranked search answers alone, as before.
+     */
+    const [hits, ident] = await Promise.all([
+      degradeIfSchemaMissing(
+        'search index (migration 0089)',
+        () => searchProducts(db, search, { limit: SEARCH_RESULT_LIMIT, completeLast: typingLastWord, visible: listedIds }),
+        null as { ids: string[]; indexReady: boolean } | null
+      ),
+      resolveIdentifier(db, search, { typing: typingLastWord, visible: listedIds }).catch(() => null),
+    ]);
+    identity = ident;
+    const exactIds = [...new Set((ident?.exact ?? []).map((h) => h.product_id))];
     // A missing TABLE, or a table that exists and is still empty because the
     // backfill has not caught up — both mean "the index cannot answer yet",
     // and both fall back rather than telling every shopper there is nothing.
     if (hits === null || !hits.indexReady) {
-      sql += ` AND (${sqlLikeClause(['name', 'name_ar', 'name_ku', 'description'])})`;
       const like = likePattern(search);
-      params.push(like, like, like, like);
-    } else if (hits.ids.length === 0) {
+      if (exactIds.length > 0) {
+        sql += ` AND ((${sqlLikeClause(['name', 'name_ar', 'name_ku', 'description'])}) OR id IN (SELECT value FROM json_each(?)))`;
+        params.push(like, like, like, like, JSON.stringify(exactIds));
+      } else {
+        sql += ` AND (${sqlLikeClause(['name', 'name_ar', 'name_ku', 'description'])})`;
+        params.push(like, like, like, like);
+      }
+    } else if (hits.ids.length === 0 && exactIds.length === 0) {
       // The category block rides this exit as well — see the note above.
       return { body: {
         products: [],
         ...categoryField,
+        ...identifierFields(ident, []),
         ...(listing ? { total: 0, truncated: false, partial_order: false, cut_off: false, has_more: false, sort: listingState.sort } : {}),
       }, rows: new Map() };
+    } else if (exactIds.length > 0) {
+      // The exact answers first, in the order their codes were typed; then the ranking, without them —
+      // unless the query was nothing but codes, all carried: then the exact answer is the whole answer.
+      const exactSet = new Set(exactIds);
+      searchOrder = ident?.whole ? exactIds : [...exactIds, ...hits.ids.filter((id) => !exactSet.has(id))];
+      sql += ' AND id IN (SELECT value FROM json_each(?))';
+      params.push(JSON.stringify(searchOrder));
     } else {
       /**
        * ONE BOUND PARAMETER FOR THE WHOLE HIT LIST — and the same again for
@@ -4614,6 +4674,7 @@ export async function listCatalogProducts(
       ...categoryField,
       ...suggestion,
       products: cards,
+      ...(search ? identifierFields(identity, results.map((r) => String(r.id))) : {}),
       ...(counted ? { total: Number(counted.n) || 0 } : {}),
     }, rows: rowsById };
   }
@@ -4661,6 +4722,7 @@ export async function listCatalogProducts(
   return { body: {
     ...categoryField,
     ...suggestion,
+    ...(search ? identifierFields(identity, page.map((i) => i.id)) : {}),
     products: page.map((i) => i.card),
     total: run.items.length,
     truncated,

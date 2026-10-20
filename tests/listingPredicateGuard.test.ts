@@ -263,6 +263,11 @@ const EXPECTED_CALLS: Record<string, { visible: number; sellable: number; states
   // A request is ANSWERED when its selection has a live V2 price on a SELLABLE product (worker/lib/priceRequestState.ts):
   // the V2 writer's batch, the sweep's repair and the admin chip («طلبات السعر») all ask it — never a customer read.
   'worker/lib/priceRequestState.ts': { visible: 0, sellable: 1, states: 0 },
+  // The search engine and its identifier lane ask the CALLER's visibility through a callback (`opts.visible(ids)`,
+  // docs/SEARCH.md «Hidden products take no ranking slot», «Identifiers»): the listing route passes its own
+  // `listedScope` read, so a hidden product takes no ranking slot, is never an exact answer, and its code is a miss.
+  'worker/lib/search/store.ts': { visible: 1, sellable: 0, states: 0 },
+  'worker/lib/search/identifiers.ts': { visible: 1, sellable: 0, states: 0 },
 };
 
 /** Every .ts under worker/, relative to the repository root. */

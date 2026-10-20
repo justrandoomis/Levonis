@@ -165,7 +165,60 @@ other words. «nozzle 0.3», where nobody sells a 0.3, answers nothing.
 * **Multi-word synonyms match on word boundaries.** «قطع غيار» fires on those
   two words, not inside «مقطع غيارات».
 
-### 4c. The cost
+### 4c. Identifiers: a code is answered exactly, or not at all
+
+A shopper holding a spool, a box or a spare part types the code printed on it:
+the colour code «10101», the part code «FAP035», a SKU. The ranked search finds
+a product by such a code (the codes are aliases in its `model` field), but it
+cannot say **which selection** the code names, nor that **nothing carries it**.
+The identifier lane (`worker/lib/search/identifiers.ts`, migration 0206) says
+both, beside the ranked search and in the same wave:
+
+* **One key.** `identifierKey` is the only normaliser, on the stored codes and
+  on every chunk a shopper types: upper case, Arabic-Indic and Persian digits
+  folded, separators dropped — «fap-035», «ＦＡＰ０３５» and «FAP035» are
+  `FAP035`, «١٠١٠١» is `10101`. A key needs a digit: «ABS» is a word, and a
+  product whose SKU happens to be one never makes the word an "exact match".
+* **`search_identifiers`** holds `(key, product, scope, kind, source)`: the
+  product's SKU, each active variant's SKU (scope: the variant), each
+  searchable external id at the scope it was stored at (a created import's
+  colour code: its option value), a colour code written in an option or colour
+  name «Jade White (10100)», and the size an option value is named with
+  («0.4mm» → `0.4`, kind `measure`). A colour code stored at **product** scope
+  — a merge that mapped the colour onto a `product_colors` colour, which 0194
+  cannot scope, the live PLA Basic's 43 codes — is also placed on the one
+  colour or option value that names it in its name or ends its id with it
+  («jade-white-10100»). Exactly one, or none.
+* **The answer** (listing route, only when there is something to say):
+  `exact` — `[{ product_id, key, kind, scope: { kind, id } }]`, the products
+  that carry a typed code, listed first; `matched` — `{ [product_id]:
+  { option_value_ids, color_id, variant_id } }`, the selection its codes and
+  sizes name, for the card's link; `exact_miss` — the codes, as typed, that no
+  product the shopper may see carries. The words for the miss line («no exact
+  match for …», in ar, en and ckb) belong to the search UI, not the API.
+* **A query of nothing but codes, all carried, is answered by them alone.**
+  «FAP035» has one answer; the cutting mats whose «FAP030» shares its letters
+  are not answers to it. A code beside words («FAP035 hotend») puts the exact
+  products first and keeps the ranking after them.
+* **A miss is only said about a code.** Four characters at least, and five
+  digits («10102», a GTIN) or letters with two digits or more («FAP036»,
+  «RTX4090»). Never a word, a model name («X1-Carbon», «A1 mini»), a size
+  («0.4mm», «PLA1.75»), a quantity («1000g») or a short number («2024»). And
+  never when the code is spelled whole in a visible product's index (a code in
+  a name or description is not "nothing"), nor while the last chunk is still
+  being typed and some code starts with it.
+* **Honest about what it cannot see.** A hidden product's code is a miss, not a
+  leak. A code that belongs to a selection counts while that selection is
+  sold: a discontinued colour's code is not an exact answer, though the
+  product still carries it at product scope. A database without 0206 says
+  nothing about codes at all — no `exact`, no `exact_miss` — and the ranked
+  search answers alone.
+* **One statement, seven parameters**, however many codes (at most twelve a
+  query): the hits of the codes and of the sizes, the index tokens that spell
+  a code whole, and whether anything starts with the code still being typed.
+  Four compound terms; D1 refuses more than five.
+
+### 4d. The cost
 
 Two reads, whatever the query, neither growing with the catalogue the way a
 `LIKE '%…%'` scan does:
@@ -297,6 +350,20 @@ D1 stand-in that refuses what D1 refuses.
 * **A brand or section rename reindexes its products.** The index holds the
   NAMES; the rename deletes the affected products' stamps in the same batch and
   rewrites the first fifty at once — the cron does the rest.
+* **The identifier rows ride with the tokens.** The product save and the
+  catch-up write a product's `search_identifiers` rows in the same batch as its
+  tokens (`planSearchIndexRows(db, id, rows, identifiers)`: a DELETE and one
+  packed INSERT per 500 rows), from the same sources read by the same loader
+  (`loadSearchSources`, the alias statement with each external id's scope and
+  type), and stamp them `#ids:1` beside `#doc:6`. The catalogue import passes
+  the external ids its own batch writes (`searchExternalIds`). A writer that
+  rewrites tokens alone — a hashtag rename — deletes the `#ids:1` stamp with
+  the rest of the product's rows, and the catch-up selects the product again
+  (its predicate: no `#doc:6`, or, once 0206 is there, no `#ids:1`; whether
+  0206 is there is asked inside the selection, through `sqlite_master`, so it
+  costs no statement). So a deploy of 0206 needs no stamp bump: the catch-up
+  fills the table at its usual pace, and `index-status` counts a product as
+  `current` only with both stamps (`identifiers: { installed, stamp, rows }`).
 
 ---
 
@@ -333,8 +400,11 @@ Both sides are stored **normalised**, which is why one row covers «طابعة»
 | `worker/lib/search/index.ts` | Index rows, query expansion, scoring |
 | `worker/lib/search/document.ts` | What of a product is searchable |
 | `worker/lib/search/complete.ts` | The grey completion: which word, and how much of it is left |
-| `worker/lib/search/store.ts` | The only part that touches D1 |
+| `worker/lib/search/store.ts` | The only part that touches D1 (bar the identifier lane) |
+| `worker/lib/search/identifiers.ts` | The identifier key, the rows a product is keyed by, and the exact resolver |
 | `migrations/0089_search_index.sql` | The two tables and the seed |
+| `migrations/0206_search_identifiers.sql` | `search_identifiers` |
 | `tests/search.test.ts` | The owner's own examples, and acceptance rows 1–4 and 13 of the assistant plan |
 | `tests/searchLive.test.ts` | A realistic catalogue through the route on D1's parameter ceiling; hidden products; the `#doc:6` rollout and its status |
 | `tests/searchBackfillBudget.test.ts` | The catch-up within a statement budget |
+| `tests/searchIdentifiers.test.ts` | Acceptance rows 5–7 through the route on D1's limits; both writers; a database without 0206 |

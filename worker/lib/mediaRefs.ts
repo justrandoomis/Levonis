@@ -468,6 +468,7 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'community_posts.tags': 'short words the author chose',
   // -- identifiers and de-duplication tokens; never a path ------------------
   'admin_settings.key': 'the setting name',
+  'search_identifiers.key': 'a normalised product code (colour code, part code, SKU, size), upper case without separators — never a path',
   'bnpl_ledger.idempotency_key': 'request de-duplication token',
   'community_escrow_events.idempotency_key': 'request de-duplication token',
   'farm_ledger.idempotency_key': 'request de-duplication token',

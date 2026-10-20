@@ -99,7 +99,7 @@ import {
 import { verifyAndNormalizeProductMedia } from '../productMediaWrite';
 import { loadPrinterFitIds } from '../printerFits';
 import { printerProductIds } from '../printerIdentity';
-import { loadSearchAliases, ALIAS_SPEC_KEYS } from '../search/aliases';
+import { loadSearchSources, ALIAS_SPEC_KEYS, type ExternalIdSource } from '../search/aliases';
 import { productSlugFrom, uniqueProductSlug } from '../productSlug';
 import { localizableSlots } from '../translationSlots';
 import { hashSource, TRANSLATION_VERSION } from '../translate';
@@ -1295,9 +1295,18 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
   }
   doc.translation_meta = meta;
 
-  // 11. Search aliases (§C.1): what this batch writes (+ what a merged product already has).
+  // 11. Search aliases (§C.1): what this batch writes (+ what a merged product already has) — and the same
+  // external ids WITH THEIR SCOPE, for the identifier rows (worker/lib/search/identifiers.ts): the catch-up
+  // derives them from the stored rows later, so the save derives them from exactly what the batch leaves stored.
   let aliases = importSearchAliases(externalIds, specs);
-  if (merge) aliases = [...new Set([...((await loadSearchAliases(db, [productId])).get(productId) ?? []), ...aliases])].sort();
+  let searchExternalIds: ExternalIdSource[] = externalIds
+    .filter((e) => e.searchable && e.value.trim() !== '' && e.value.trim().length <= 120)
+    .map((e) => ({ scope_kind: e.scope_kind, scope_id: e.scope_id, id_type: e.id_type, value: e.value.trim() }));
+  if (merge) {
+    const stored = await loadSearchSources(db, [productId]);
+    aliases = [...new Set([...(stored.aliases.get(productId) ?? []), ...aliases])].sort();
+    searchExternalIds = [...(stored.externalIds.get(productId) ?? []), ...searchExternalIds];
+  }
 
   // 12. Preflight, media verification, the authoritative plan (§A.4 step 4).
   const intent: ProductWriteIntent = {
@@ -1311,6 +1320,7 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
     hashtags: false,
     allowComposition: false,
     searchAliases: aliases,
+    searchExternalIds,
   };
   try {
     await preflightProductSave(db, intent);

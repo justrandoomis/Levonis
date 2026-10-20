@@ -96,7 +96,9 @@ const tokens = (raw: DatabaseSync) => raw.prepare('SELECT product_id, token, wei
 async function planSizes(raw: DatabaseSync): Promise<Map<string, number>> {
   const db = asD1(raw);
   const rows = raw.prepare(`SELECT ${searchDocColumns()} FROM products WHERE status = 'active' ORDER BY id`).all() as Record<string, unknown>[];
-  const docs = await searchDocsForRows(db, rows);
+  // The identifier rows ride in the same batch once migration 0206 is there (worker/lib/search/identifiers.ts).
+  const identifiers = !!raw.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'search_identifiers'").get();
+  const docs = await searchDocsForRows(db, rows, { identifiers });
   return new Map(docs.map((d) => [d.productId, planSearchIndex(db, d).length]));
 }
 
@@ -113,8 +115,9 @@ test('a budgeted pass executes exactly what it charged, defers what does not fit
   const sizes = await planSizes(raw);
   const largest = Math.max(...sizes.values());
   const LIMIT = 20;
-  assert.equal(Math.min(...sizes.values()), 2, 'a short product: its DELETE and one INSERT, the stamp in it');
-  assert.ok(largest <= LIMIT - 2 && largest >= 5, `plans of 2..${largest} statements, every one within a pass of ${LIMIT}`);
+  // Its token DELETE and one INSERT (both stamps in it), and the DELETE of its identifier rows (it has none to insert).
+  assert.equal(Math.min(...sizes.values()), 3, 'a short product: three statements');
+  assert.ok(largest <= LIMIT - 2 && largest >= 5, `plans of 3..${largest} statements, every one within a pass of ${LIMIT}`);
 
   const counted = countingD1(asD1(raw));
   let passes = 0;

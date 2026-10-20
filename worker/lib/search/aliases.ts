@@ -50,15 +50,36 @@ export function aliasReadCount(productIds: readonly unknown[]): number {
   return Math.ceil(distinctIds(productIds).length / ALIAS_IN_CHUNK);
 }
 
+/**
+ * The external ids come back WITH THEIR SCOPE AND TYPE: the identifier lane
+ * (./identifiers.ts, migration 0206) keys a colour code to the colour it
+ * names, and it reads them here, in the same statement, so a writer that has
+ * the aliases has the identifiers too and pays nothing more for them.
+ */
 const ALIAS_SQL = (n: number): string => {
   const ph = Array.from({ length: n }, (_, i) => `?${i + 1}`).join(',');
-  return `SELECT product_id, value AS alias FROM product_external_ids
+  return `SELECT product_id, value AS alias, scope_kind, scope_id, id_type FROM product_external_ids
            WHERE searchable = 1 AND product_id IN (${ph})
           UNION ALL
-          SELECT product_id, value_text AS alias FROM product_spec_values
+          SELECT product_id, value_text AS alias, 'product', '', canonical_key FROM product_spec_values
            WHERE canonical_key IN ('${ALIAS_SPEC_KEYS.join("','")}') AND visibility = 'public' AND value_text <> ''
              AND product_id IN (${ph})`;
 };
+
+/** One searchable external id, as stored (0194): what the identifier lane derives its rows from. */
+export interface ExternalIdSource {
+  scope_kind: string;
+  scope_id: string;
+  id_type: string;
+  value: string;
+}
+
+export interface SearchSources {
+  /** productId → its aliases (`loadSearchAliases`). */
+  aliases: Map<string, string[]>;
+  /** productId → its searchable external ids, scoped. Products with none are absent. */
+  externalIds: Map<string, ExternalIdSource[]>;
+}
 
 /**
  * productId → its aliases (distinct, trimmed, sorted so a document is the
@@ -71,7 +92,20 @@ export async function loadSearchAliases(
   productIds: readonly string[],
   opts: { installed?: boolean } = {}
 ): Promise<Map<string, string[]>> {
-  const out = new Map<string, string[]>();
+  return (await loadSearchSources(db, productIds, opts)).aliases;
+}
+
+/**
+ * The aliases AND the scoped external ids of these products, from the same
+ * statements `loadSearchAliases` sends (one per 90 products, none without
+ * 0194). The external ids keep the order they were stored in.
+ */
+export async function loadSearchSources(
+  db: D1Database,
+  productIds: readonly string[],
+  opts: { installed?: boolean } = {}
+): Promise<SearchSources> {
+  const out: SearchSources = { aliases: new Map(), externalIds: new Map() };
   const ids = distinctIds(productIds);
   if (ids.length === 0) return out;
   const installed = opts.installed ?? (await catalogKnowledgeInstalled(db));
@@ -82,7 +116,7 @@ export async function loadSearchAliases(
     const { results } = await db
       .prepare(ALIAS_SQL(part.length))
       .bind(...part)
-      .all<{ product_id: string; alias: string | null }>();
+      .all<{ product_id: string; alias: string | null; scope_kind: string | null; scope_id: string | null; id_type: string | null }>();
     for (const r of results ?? []) {
       const alias = typeof r.alias === 'string' ? r.alias.trim() : '';
       if (!alias || alias.length > MAX_ALIAS) continue;
@@ -90,8 +124,11 @@ export async function loadSearchAliases(
       let set = found.get(pid);
       if (!set) found.set(pid, (set = new Set()));
       set.add(alias);
+      const list = out.externalIds.get(pid) ?? [];
+      list.push({ scope_kind: String(r.scope_kind ?? 'product'), scope_id: String(r.scope_id ?? ''), id_type: String(r.id_type ?? ''), value: alias });
+      out.externalIds.set(pid, list);
     }
   }
-  for (const [pid, set] of found) out.set(pid, [...set].sort());
+  for (const [pid, set] of found) out.aliases.set(pid, [...set].sort());
   return out;
 }
