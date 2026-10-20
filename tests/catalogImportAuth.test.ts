@@ -616,6 +616,215 @@ test('review 6b, 2: an original the IMAGES binding refuses for its input size (u
   }
 });
 
+// ---------------------------------------------------------------- an animated GIF stored as its first frame (§C.4 step 2b, DECISIONS row 264)
+
+const GIF_URL = 'https://store.bblcdn.com/s7/default/9f2e/feature.gif';
+const FIRST_FRAME = `${GIF_URL}__op__resize,m_lfit,w_2400__op__format,f_png`;
+
+/** The global fetch as the CDN: `answer(url)` per address (a Response, or bytes served 200), every request recorded. */
+async function withCdn<T>(answer: (url: string) => Response | Uint8Array, body: (asked: Array<{ url: string; accept: string }>) => Promise<T>): Promise<T> {
+  const real = globalThis.fetch;
+  const asked: Array<{ url: string; accept: string }> = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    asked.push({ url, accept: new Headers(init?.headers).get('accept') ?? '' });
+    const a = answer(url);
+    return a instanceof Response ? a : new Response(a as unknown as BodyInit, { status: 200 });
+  }) as typeof fetch;
+  try {
+    return await body(asked);
+  } finally {
+    globalThis.fetch = real;
+  }
+}
+
+async function mediaCall(w: OpsWorld, sid: string, t: string, media: Array<{ source_media_id: string; source_url: string; role?: string }>) {
+  const r = await w.call(`${OPS}/items/${sid}/media`, { body: { lease_token: t, media: media.map((m) => ({ role: 'description', ...m })) } });
+  assert.equal(r.status, 200);
+  return ((await r.json()) as { media: Array<{ status: string; r2_key: string; width: number | null; height: number | null; error_code: string }> }).media;
+}
+
+const mediaRow = (w: OpsWorld, id: string) =>
+  ({ ...(w.raw.prepare('SELECT status, fetched_variant, derivation, source_url, error_code, attempts, width, height, r2_key FROM catalog_import_media WHERE source_media_id = ?').get(id) as Record<string, unknown>) });
+
+test('an animated GIF is stored as its first frame: the CDN\'s f_png rendition on the same host, verified a still PNG, stored as WebP, its row gif_first_frame; never fetched again; the same key when re-ingested', async () => {
+  const w = opsWorld();
+  const { sid, t } = await toIngesting(w);
+  const { gifBytes, pngBytes } = await import('./fixtures/imageDoubles');
+  const { CDN_FIRST_FRAME_OPS, cdnFirstFrameUrl } = await import('../worker/lib/catalogImport/media');
+  assert.equal(cdnFirstFrameUrl(GIF_URL), FIRST_FRAME);
+  assert.equal(cdnFirstFrameUrl(`${GIF_URL}?v=3`), `${FIRST_FRAME}?v=3`, 'the operations follow the path; a query stays a query');
+  assert.match(CDN_FIRST_FRAME_OPS, /__op__format,f_png$/);
+  await withCdn(
+    (url) => (url === FIRST_FRAME ? pngBytes(640, 360) : gifBytes(640, 360, 12)),
+    async (asked) => {
+      const [m] = await mediaCall(w, sid, t, [{ source_media_id: 'gif1', source_url: GIF_URL }]);
+      assert.deepEqual([m.status, m.error_code, m.width, m.height], ['stored', '', 640, 360]);
+      assert.match(m.r2_key, /^products\/import\/gallery\/[0-9a-f]{64}\.webp$/);
+      assert.deepEqual(asked.map((a) => a.url), [GIF_URL, FIRST_FRAME], 'one more request, never a loop');
+      assert.equal(asked[1].accept, 'image/jpeg,image/png');
+      assert.deepEqual(mediaRow(w, 'gif1'), {
+        status: 'stored', fetched_variant: 'cdn_resized', derivation: 'gif_first_frame', source_url: GIF_URL, error_code: '', attempts: 1, width: 640, height: 360, r2_key: m.r2_key,
+      }, 'the provenance stays the original; the row says it is a first frame');
+      assert.equal(w.bucket.objects.get(m.r2_key)?.contentType, 'image/webp', 'stored as WebP like any picture');
+      // Asked again: stored and in R2, never fetched again.
+      asked.length = 0;
+      const [again] = await mediaCall(w, sid, t, [{ source_media_id: 'gif1', source_url: GIF_URL }]);
+      assert.deepEqual([again.status, again.r2_key], ['stored', m.r2_key]);
+      assert.equal(asked.length, 0, 'never fetched again');
+      // The object gone: re-ingested through the same two requests, to the same key (content-addressed: deterministic).
+      await w.bucket.delete(m.r2_key);
+      const [re] = await mediaCall(w, sid, t, [{ source_media_id: 'gif1', source_url: GIF_URL }]);
+      assert.deepEqual([re.status, re.r2_key], ['stored', m.r2_key]);
+      assert.deepEqual(asked.map((a) => a.url), [GIF_URL, FIRST_FRAME]);
+      assert.equal(mediaRow(w, 'gif1').derivation, 'gif_first_frame');
+      // Another medium showing the same GIF: the same key.
+      const [twin] = await mediaCall(w, sid, t, [{ source_media_id: 'gif2', source_url: GIF_URL }]);
+      assert.equal(twin.r2_key, m.r2_key);
+    }
+  );
+  const { runProgress } = await import('../worker/lib/catalogImport/report');
+  const progress = await runProgress(w.env.DB as never, OPS_RUN);
+  assert.equal(progress.first_frame_media_count, 2, 'the run report counts the first frames');
+  assert.equal(progress.saved_media_count, 2);
+});
+
+test('an animated GIF whose first-frame rendition is still an animation, a still GIF, an APNG, not a picture, a 4xx or a 5xx stays IMAGE_ANIMATED_GIF (failed; pending only while a passing refusal has tries left); nothing stored', async () => {
+  const w = opsWorld();
+  const { sid, t } = await toIngesting(w);
+  const { apngBytes, gifBytes } = await import('./fixtures/imageDoubles');
+  const cases: Array<[string, () => Response | Uint8Array, string]> = [
+    ['animated', () => gifBytes(640, 360, 12), 'failed'],
+    ['gif_still', () => gifBytes(640, 360, 1), 'failed'],
+    ['apng', () => apngBytes(640, 360), 'failed'],
+    ['html', () => new Response('<!doctype html><title>x</title>', { status: 200, headers: { 'content-type': 'text/html' } }), 'failed'],
+    ['http404', () => new Response('no', { status: 404 }), 'failed'],
+    ['http503', () => new Response('busy', { status: 503 }), 'pending'],
+  ];
+  for (const [name, rendition, status] of cases) {
+    const url = `https://store.bblcdn.com/s7/a/${name}.gif`;
+    await withCdn(
+      (u) => (u.includes('__op__') ? rendition() : gifBytes(320, 240, 3)),
+      async (asked) => {
+        const [m] = await mediaCall(w, sid, t, [{ source_media_id: name, source_url: url }]);
+        assert.deepEqual([m.status, m.error_code, m.r2_key], [status, 'IMAGE_ANIMATED_GIF', ''], name);
+        assert.deepEqual(asked.map((a) => a.url), [url, `${url}__op__resize,m_lfit,w_2400__op__format,f_png`], `${name}: one rendition request`);
+        assert.deepEqual(
+          { ...mediaRow(w, name), r2_key: undefined },
+          { status, fetched_variant: 'cdn_resized', derivation: '', source_url: url, error_code: 'IMAGE_ANIMATED_GIF', attempts: 1, width: null, height: null, r2_key: undefined },
+          name
+        );
+      }
+    );
+  }
+  // The passing one: pending until its third try, then failed, still IMAGE_ANIMATED_GIF.
+  await withCdn(
+    (u) => (u.includes('__op__') ? new Response('busy', { status: 503 }) : gifBytes(320, 240, 3)),
+    async () => {
+      const second = await mediaCall(w, sid, t, [{ source_media_id: 'http503', source_url: 'https://store.bblcdn.com/s7/a/http503.gif' }]);
+      assert.deepEqual(second.map((m) => `${m.status}:${m.error_code}`), ['pending:IMAGE_ANIMATED_GIF']);
+      const third = await mediaCall(w, sid, t, [{ source_media_id: 'http503', source_url: 'https://store.bblcdn.com/s7/a/http503.gif' }]);
+      assert.deepEqual(third.map((m) => `${m.status}:${m.error_code}`), ['failed:IMAGE_ANIMATED_GIF']);
+    }
+  );
+  assert.equal(Number((w.raw.prepare("SELECT COUNT(*) AS n FROM catalog_import_media WHERE status = 'stored'").get() as { n: number }).n), 0);
+  assert.equal(w.bucket.objects.size, 0, 'nothing put in R2');
+});
+
+test('a still GIF is unaffected: fetched once, converted and stored as the original, no first frame', async () => {
+  const w = opsWorld();
+  const { sid, t } = await toIngesting(w);
+  const { gifBytes } = await import('./fixtures/imageDoubles');
+  const url = 'https://store.bblcdn.com/s7/a/still.gif';
+  await withCdn(
+    () => gifBytes(320, 240, 1),
+    async (asked) => {
+      const [m] = await mediaCall(w, sid, t, [{ source_media_id: 'still', source_url: url }]);
+      assert.deepEqual([m.status, m.error_code], ['stored', '']);
+      assert.deepEqual(asked.map((a) => a.url), [url]);
+      assert.deepEqual(
+        { ...mediaRow(w, 'still'), r2_key: undefined, width: undefined, height: undefined },
+        { status: 'stored', fetched_variant: 'original', derivation: '', source_url: url, error_code: '', attempts: 1, width: undefined, height: undefined, r2_key: undefined }
+      );
+    }
+  );
+});
+
+test('a first-frame rendition redirected to another host — the other allow-listed name included — is refused and never asked (IMAGE_ANIMATED_GIF); one redirected on the same host is followed and stored', async () => {
+  const w = opsWorld();
+  const { sid, t } = await toIngesting(w);
+  const { gifBytes, pngBytes } = await import('./fixtures/imageDoubles');
+  const redirects: Record<string, string> = {
+    'https://store.bblcdn.com/s7/a/to-eu.gif__op__resize,m_lfit,w_2400__op__format,f_png': 'https://store.bblcdn.eu/s8/a/to-eu.gif__op__format,f_png',
+    'https://store.bblcdn.com/s7/a/to-shop.gif__op__resize,m_lfit,w_2400__op__format,f_png': 'https://cdn.shopify.com/s/files/1/x/to-shop.png',
+    'https://store.bblcdn.com/s7/a/to-http.gif__op__resize,m_lfit,w_2400__op__format,f_png': 'http://store.bblcdn.com/s7/a/to-http.gif__op__format,f_png',
+    // The CDN's own answer for a large animation (2026-10-20): a 302 to a smaller rendition of the same object.
+    'https://store.bblcdn.com/s7/a/big.gif__op__resize,m_lfit,w_2400__op__format,f_png': 'https://store.bblcdn.com/s7/a/big.gif__op__resize,m_lfit,w_1200__op__format,f_png',
+  };
+  await withCdn(
+    (url) => {
+      const location = redirects[url];
+      if (location) return new Response(null, { status: 302, headers: { location } });
+      return url.includes('__op__') ? pngBytes(1200, 675) : gifBytes(2400, 1350, 40);
+    },
+    async (asked) => {
+      const media = await mediaCall(w, sid, t, [
+        { source_media_id: 'r1', source_url: 'https://store.bblcdn.com/s7/a/to-eu.gif' },
+        { source_media_id: 'r2', source_url: 'https://store.bblcdn.com/s7/a/to-shop.gif' },
+        { source_media_id: 'r3', source_url: 'https://store.bblcdn.com/s7/a/to-http.gif' },
+        { source_media_id: 'r4', source_url: 'https://store.bblcdn.com/s7/a/big.gif' },
+      ]);
+      assert.deepEqual(media.map((m) => `${m.status}:${m.error_code}`), ['failed:IMAGE_ANIMATED_GIF', 'failed:IMAGE_ANIMATED_GIF', 'failed:IMAGE_ANIMATED_GIF', 'stored:']);
+      const hosts = asked.map((a) => new URL(a.url).host);
+      assert.ok(hosts.every((h) => h === 'store.bblcdn.com'), `only the original's host was asked: ${hosts.join(',')}`);
+      assert.ok(!asked.some((a) => a.url.startsWith('http://')), 'never over http');
+      assert.equal(asked.filter((a) => a.url.startsWith('https://store.bblcdn.com/s7/a/big.gif')).length, 3, 'the original, the rendition, its same-host redirect');
+      assert.deepEqual([mediaRow(w, 'r4').derivation, mediaRow(w, 'r4').width], ['gif_first_frame', 1200]);
+    }
+  );
+});
+
+test('an animated GIF over the source cap: the 2400-px rendition (still animated) and then its first frame — three requests at most, stored gif_first_frame', async () => {
+  const w = opsWorld();
+  const { sid, t } = await toIngesting(w);
+  const { gifBytes, pngBytes } = await import('./fixtures/imageDoubles');
+  const url = 'https://store.bblcdn.com/s7/a/huge.gif';
+  await withCdn(
+    (u) => {
+      if (u.endsWith('f_png')) return pngBytes(2400, 1350);
+      if (u.includes('__op__')) return gifBytes(2400, 1350, 60);
+      return new Response(new Uint8Array(9 * 1024 * 1024) as unknown as BodyInit, { status: 200, headers: { 'content-length': String(9 * 1024 * 1024) } });
+    },
+    async (asked) => {
+      const [m] = await mediaCall(w, sid, t, [{ source_media_id: 'huge', source_url: url }]);
+      assert.deepEqual([m.status, m.error_code], ['stored', '']);
+      assert.deepEqual(asked.map((a) => a.url), [url, `${url}__op__resize,m_lfit,w_2400__op__format,f_auto__op__quality,q_90`, `${url}__op__resize,m_lfit,w_2400__op__format,f_png`]);
+      assert.deepEqual([mediaRow(w, 'huge').fetched_variant, mediaRow(w, 'huge').derivation, mediaRow(w, 'huge').attempts], ['cdn_resized', 'gif_first_frame', 1]);
+    }
+  );
+});
+
+test('a database before 0207 (no derivation column): the first frame is stored and recorded all the same, without the note; every read counts none', async () => {
+  const w = opsWorld();
+  const { sid, t } = await toIngesting(w);
+  w.raw.exec('ALTER TABLE catalog_import_media DROP COLUMN derivation');
+  const { gifBytes, pngBytes } = await import('./fixtures/imageDoubles');
+  await withCdn(
+    (url) => (url === FIRST_FRAME ? pngBytes(640, 360) : gifBytes(640, 360, 12)),
+    async () => {
+      const [m] = await mediaCall(w, sid, t, [{ source_media_id: 'old1', source_url: GIF_URL }]);
+      assert.deepEqual([m.status, m.error_code], ['stored', '']);
+      const row = w.raw.prepare("SELECT status, fetched_variant, attempts FROM catalog_import_media WHERE source_media_id = 'old1'").get() as Record<string, unknown>;
+      assert.deepEqual({ ...row }, { status: 'stored', fetched_variant: 'cdn_resized', attempts: 1 });
+    }
+  );
+  const { firstFrameMediaIds } = await import('../worker/lib/catalogImport/media');
+  assert.deepEqual([...(await firstFrameMediaIds(w.env.DB as never, OPS_RUN, sid, ['old1']))], []);
+  const { runProgress } = await import('../worker/lib/catalogImport/report');
+  const progress = await runProgress(w.env.DB as never, OPS_RUN);
+  assert.deepEqual([progress.saved_media_count, progress.first_frame_media_count], [1, 0]);
+});
+
 test('review 6b: a passing R2 error on a stored medium answers pending at /media (WRITING: no re-fetch; VERIFYING_LIVE: never failed), in both binding shapes', async () => {
   const { newWorld, stage, write, RUN_ID } = await import('./fixtures/catalogImportWorld');
   const { R2Double } = await import('./fixtures/imageDoubles');

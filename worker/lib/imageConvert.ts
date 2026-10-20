@@ -118,6 +118,23 @@ export function isAnimatedWebp(bytes: Uint8Array): boolean {
   );
 }
 
+/**
+ * An animated PNG (APNG): an `acTL` chunk before the first `IDAT`. Chunks that do not parse end the walk unanswered
+ * (false): the decoder judges such bytes, this only says whether a well-formed PNG declares an animation.
+ */
+export function isAnimatedPng(bytes: Uint8Array): boolean {
+  if (bytes.byteLength < 8 || bytes[0] !== 0x89 || byteString(bytes, 1, 3) !== 'PNG') return false;
+  let offset = 8;
+  while (offset + 8 <= bytes.byteLength) {
+    const length = ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0;
+    const type = byteString(bytes, offset + 4, 4);
+    if (type === 'acTL') return true;
+    if (type === 'IDAT' || type === 'IEND') return false;
+    offset += 12 + length;
+  }
+  return false;
+}
+
 /** Header dimensions for every still format this module reads, AVIF included. */
 function headerDimensions(bytes: Uint8Array, mime: string): RasterDimensions | null {
   return mime === 'image/avif' ? avifDimensions(bytes) : rasterDimensions(bytes, mime);

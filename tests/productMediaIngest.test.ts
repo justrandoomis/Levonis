@@ -656,6 +656,39 @@ test('a static GIF is converted, while an animated GIF is explicitly refused', a
   );
 });
 
+test('still_only (an animated GIF\'s first frame, catalogImport/media.ts): one still PNG or JPEG is stored as WebP; a GIF of any frame count, an APNG or a WebP is IMAGE_NOT_SUPPORTED before the converter; an animated WebP answer is refused', async () => {
+  const { apngBytes, jpegBytes, pngBytes, webpBytes } = await import('./fixtures/imageDoubles');
+  const { isAnimatedPng } = await import('../worker/lib/imageConvert');
+  assert.equal(isAnimatedPng(apngBytes(4, 4)), true);
+  for (const still of [pngBytes(4, 4), png(), gif(2), jpegBytes(4, 4)]) assert.equal(isAnimatedPng(still), false);
+
+  for (const bytes of [pngBytes(64, 48), jpegBytes(64, 48)]) {
+    const images = imagesBinding();
+    const setup = env(images.binding);
+    const stored = await ingestProductMediaBytes(setup.value, { bytes, still_only: true });
+    assert.equal(stored.content_type, 'image/webp');
+    assert.deepEqual(images.calls, ['image/webp']);
+  }
+  for (const bytes of [gif(1), gif(2), apngBytes(64, 48), webp()]) {
+    const images = imagesBinding();
+    const setup = env(images.binding);
+    await assert.rejects(
+      () => ingestProductMediaBytes(setup.value, { bytes, still_only: true }),
+      (error: unknown) => error instanceof ProductMediaIngestError && error.code === 'IMAGE_NOT_SUPPORTED'
+    );
+    assert.deepEqual(images.calls, [], 'refused before the converter');
+    assert.equal(setup.publicBucket.objects.size, 0);
+  }
+  // A converter that answers an animation for a still: refused, nothing stored.
+  const images = imagesBinding(webpBytes(64, 48, { animated: true }));
+  const setup = env(images.binding);
+  await assert.rejects(
+    () => ingestProductMediaBytes(setup.value, { bytes: pngBytes(64, 48), still_only: true }),
+    (error: unknown) => error instanceof ProductMediaIngestError && error.code === 'IMAGE_CONVERT_FAILED'
+  );
+  assert.equal(setup.publicBucket.objects.size, 0);
+});
+
 test('a static AVIF product image is converted and stored only as verified WebP', async () => {
   const images = imagesBinding();
   const setup = env(images.binding);

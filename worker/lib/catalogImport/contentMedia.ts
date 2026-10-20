@@ -69,7 +69,7 @@ import {
   type DeltaMark,
 } from './delta';
 import { stageDataOf, type ItemRow } from './items';
-import { importObjectHead, mediaUrlAllowed, nonImageKindOf } from './media';
+import { firstFrameMediaIds, importObjectHead, mediaUrlAllowed, nonImageKindOf } from './media';
 import { IMPORT_GUARD_ID } from './protectedTables';
 import { payloadSha256, taxonomyOfRow, type ReviewedBundle } from './reviewed';
 import {
@@ -1080,7 +1080,8 @@ export function contentWriteOf(
   plan: ContentPlan,
   keys: ReadonlyMap<string, string>,
   rowBytes: number,
-  codes: ReadonlyMap<string, string> = new Map()
+  codes: ReadonlyMap<string, string> = new Map(),
+  firstFrames: ReadonlySet<string> = new Set()
 ): ContentWrite {
   const outcomes = new Map(plan.outcomes);
   const reasons = new Map(plan.reasons);
@@ -1198,6 +1199,8 @@ export function contentWriteOf(
       boxWrites.push({ rowId, v0: proof.v0, v1 });
     }
   }
+  // An animated GIF put back as its first frame (media.ts, DECISIONS row 264) says so: the reason of its `attached`.
+  for (const id of firstFrames) if (outcomes.get(id) === 'attached') reasons.set(id, 'gif_first_frame');
   const media: Record<string, ContentOutcome> = {};
   for (const [id, o] of outcomes) media[id] = o === 'planned' ? 'not_stored' : o;
   const counts = emptyContentCounts();
@@ -1255,7 +1258,8 @@ export async function attachContentMedia(env: ContentEnv, run: ImportRun, item: 
       await withReviewed(db, ctx, payload, bundle, item);
       const plan = planContent(ctx.state, payload, ctx.failed, ctx.active && !ctx.gone);
       const { keys, codes } = await newKeysOf(env, run.id, item, plan);
-      write = contentWriteOf(ctx.state, payload, plan, keys, ctx.rowBytes, codes);
+      const firstFrames = await firstFrameMediaIds(db, run.id, item.source_product_id, [...keys.keys()]);
+      write = contentWriteOf(ctx.state, payload, plan, keys, ctx.rowBytes, codes, firstFrames);
     }
     try {
       await commitContent(db, run, item, ctx, write);

@@ -8,6 +8,8 @@
  * every product), the owner's dashboard and `report.json`; `itemReportRows`
  * is the per-item table of `report.json` / `report.csv`, streamed in pages.
  */
+import { firstFrameMediaCount } from './media';
+
 export interface ItemRef {
   source_product_id: string;
   handle: string;
@@ -64,6 +66,7 @@ export async function runProgress(db: D1Database, runId: string): Promise<Record
     .prepare("SELECT SUM(CASE WHEN status = 'stored' THEN 1 ELSE 0 END) AS stored, SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed, SUM(CASE WHEN status = 'omitted_cap' THEN 1 ELSE 0 END) AS omitted FROM catalog_import_media WHERE run_id = ?")
     .bind(runId)
     .first<{ stored: number | null; failed: number | null; omitted: number | null }>();
+  const firstFrames = await firstFrameMediaCount(db, runId);
   const links = await db
     .prepare(
       `SELECT COUNT(*) AS memberships,
@@ -111,6 +114,8 @@ export async function runProgress(db: D1Database, runId: string): Promise<Record
     saved_media_count: num(media?.stored),
     linked_variant_media_count: num(agg?.variant_images),
     failed_media_count: num(media?.failed),
+    /** Of the saved: animated GIFs stored as their first frame (DECISIONS row 264). */
+    first_frame_media_count: firstFrames,
     omitted_media_count: num(media?.omitted),
     extracted_specs_count: num(agg?.specs),
     verified_specs_count: num(agg?.verified_specs),

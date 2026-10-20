@@ -18,6 +18,14 @@
  *     ONCE more as the CDN's 2400-px rendition (§C.4 step 2), recorded
  *     `fetched_variant = 'cdn_resized'`; the provenance stays the original. A
  *     rendition that fails too is answered with its own failure.
+ *   - An animated GIF (IMAGE_ANIMATED_GIF, from the original or from that
+ *     rendition) is asked ONCE more through the same door as its FIRST FRAME
+ *     (§C.4 step 2b, DECISIONS row 264): `<url>__op__resize,…__op__format,f_png`
+ *     on the original's own host, every redirect hop on that host too. The answer
+ *     must be ONE still PNG or JPEG (`still_only`) and is stored as WebP like any
+ *     picture, its row `derivation = 'gif_first_frame'`. Whatever refuses that
+ *     rendition, the medium stays IMAGE_ANIMATED_GIF (passing only when the
+ *     refusal was).
  *   - The bytes go through the app's own pipeline (ingestProductMediaUrl:
  *     guarded fetch, sniff, convert to WebP, content-addressed R2 key, cleanup
  *     intent, file_objects); the `catalog_import_media` row keeps the key
@@ -133,17 +141,26 @@ export function nonImageKindOf(url: string): NonImageKind | null {
 }
 
 export type FetchedVariant = 'original' | 'cdn_resized';
+/** What a stored picture was made from, beyond its variant (0207 `catalog_import_media.derivation`). */
+export type MediaDerivation = '' | 'gif_first_frame';
 
 /** §C.4 step 2: the CDN's own resize of an original, 2400 px on the longest side, as JPEG or PNG. */
 export const CDN_RESIZE_OPS = '__op__resize,m_lfit,w_2400__op__format,f_auto__op__quality,q_90';
 export const CDN_RESIZED_ACCEPT = 'image/jpeg,image/png';
+/**
+ * §C.4 step 2b: an animated GIF's first frame as PNG (the CDN answers `format,f_png` of a GIF with its first frame),
+ * resized like step 2 so a large animation's frame stays under the source cap.
+ */
+export const CDN_FIRST_FRAME_OPS = '__op__resize,m_lfit,w_2400__op__format,f_png';
 
-/** `<url>__op__resize,…` — the operations follow the object's path (a query, if any, stays a query). */
-export function cdnResizedUrl(url: string): string {
+/** `<url><ops>` — the operations follow the object's path (a query, if any, stays a query). */
+function cdnRenditionUrl(url: string, ops: string): string {
   const u = new URL(url);
-  u.pathname = `${u.pathname}${CDN_RESIZE_OPS}`;
+  u.pathname = `${u.pathname}${ops}`;
   return u.toString();
 }
+export const cdnResizedUrl = (url: string): string => cdnRenditionUrl(url, CDN_RESIZE_OPS);
+export const cdnFirstFrameUrl = (url: string): string => cdnRenditionUrl(url, CDN_FIRST_FRAME_OPS);
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']);
 
@@ -217,6 +234,12 @@ interface StoredRow {
 /** The original's failures that §C.4 step 2 retries through the CDN rendition: too large to fetch, or refused by the converter. */
 export const RENDITION_RETRY: ReadonlySet<string> = new Set(['IMAGE_SOURCE_TOO_LARGE', 'IMAGE_CONVERT_FAILED']);
 
+const animatedGif = (e: unknown): boolean => e instanceof ProductMediaIngestError && e.code === 'IMAGE_ANIMATED_GIF';
+
+/** A database before 0207: the media row has no `derivation` (the writer then records without it). */
+const missingDerivation = (e: unknown): boolean =>
+  /no column named derivation|no such column: (?:excluded\.)?derivation/i.test(e instanceof Error ? e.message : String(e));
+
 const TRANSIENT_FETCH = new Set(['FETCH_TIMEOUT', 'FETCH_FAILED', 'FETCH_BUDGET_EXCEEDED']);
 const TRANSIENT_INGEST = new Set(['IMAGE_CONVERT_UNAVAILABLE', 'IMAGE_STORAGE_FAILED', 'IMAGE_REFERENCE_MISSING']);
 
@@ -231,6 +254,39 @@ function failureOf(e: unknown): { code: string; transient: boolean } {
   }
   if (e instanceof ProductMediaIngestError) return { code: e.code, transient: TRANSIENT_INGEST.has(e.code) };
   return { code: 'MEDIA_FETCH_FAILED', transient: true };
+}
+
+/** Of `ids`, the media this run STORED as an animated GIF's first frame (0207 `derivation`): none before 0207. */
+export async function firstFrameMediaIds(db: D1Database, runId: string, sourceProductId: string, ids: readonly string[]): Promise<Set<string>> {
+  if (!ids.length) return new Set();
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT source_media_id FROM catalog_import_media
+          WHERE run_id = ? AND source_product_id = ? AND status = 'stored' AND derivation = 'gif_first_frame'
+            AND source_media_id IN (SELECT value FROM json_each(?))`
+      )
+      .bind(runId, sourceProductId, JSON.stringify(ids))
+      .all<{ source_media_id: string }>();
+    return new Set((results ?? []).map((r) => String(r.source_media_id)));
+  } catch (e) {
+    if (missingDerivation(e)) return new Set();
+    throw e;
+  }
+}
+
+/** The run's stored first frames (0207): 0 before 0207. */
+export async function firstFrameMediaCount(db: D1Database, runId: string): Promise<number> {
+  try {
+    const row = await db
+      .prepare("SELECT COUNT(*) AS n FROM catalog_import_media WHERE run_id = ? AND status = 'stored' AND derivation = 'gif_first_frame'")
+      .bind(runId)
+      .first<{ n: number }>();
+    return Number(row?.n ?? 0);
+  } catch (e) {
+    if (missingDerivation(e)) return 0;
+    throw e;
+  }
 }
 
 /** POST /items/:sid/media (after holdLease). */
@@ -251,22 +307,38 @@ export async function ingestImportMedia(env: MediaEnv, requestUrl: string, run: 
   const started = Date.now();
   const out: MediaAnswer[] = [];
 
-  const record = async (m: MediaRequest, a: MediaAnswer, extra: { bytes?: number | null; sha256?: string; tried: boolean; variant?: FetchedVariant }) => {
-    await db
-      .prepare(
-        `INSERT INTO catalog_import_media (run_id, source_product_id, source_media_id, role, source_url, status, r2_key, width, height, bytes, sha256, error_code, attempts,
-                                           fetched_variant)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT (run_id, source_product_id, source_media_id) DO UPDATE SET
-           role = excluded.role, source_url = excluded.source_url, status = excluded.status, r2_key = excluded.r2_key,
-           width = excluded.width, height = excluded.height, bytes = excluded.bytes, sha256 = excluded.sha256,
-           error_code = excluded.error_code, attempts = catalog_import_media.attempts + ?, fetched_variant = excluded.fetched_variant, updated_at = ${NOW_SQL}`
-      )
-      .bind(
-        run.id, item.source_product_id, m.source_media_id, m.role, m.source_url, a.status, a.r2_key, a.width, a.height,
-        extra.bytes ?? null, extra.sha256 ?? '', a.error_code, extra.tried ? 1 : 0, extra.variant ?? 'original', extra.tried ? 1 : 0
-      )
-      .run();
+  const record = async (
+    m: MediaRequest,
+    a: MediaAnswer,
+    extra: { bytes?: number | null; sha256?: string; tried: boolean; variant?: FetchedVariant; derivation?: MediaDerivation }
+  ) => {
+    // `derivation` (0207) only says what a STORED picture was made from: '' on every other row.
+    const statement = (withDerivation: boolean) =>
+      db
+        .prepare(
+          `INSERT INTO catalog_import_media (run_id, source_product_id, source_media_id, role, source_url, status, r2_key, width, height, bytes, sha256, error_code, attempts,
+                                             fetched_variant${withDerivation ? ', derivation' : ''})
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${withDerivation ? ', ?' : ''})
+           ON CONFLICT (run_id, source_product_id, source_media_id) DO UPDATE SET
+             role = excluded.role, source_url = excluded.source_url, status = excluded.status, r2_key = excluded.r2_key,
+             width = excluded.width, height = excluded.height, bytes = excluded.bytes, sha256 = excluded.sha256,
+             error_code = excluded.error_code, attempts = catalog_import_media.attempts + ?, fetched_variant = excluded.fetched_variant,
+             ${withDerivation ? 'derivation = excluded.derivation, ' : ''}updated_at = ${NOW_SQL}`
+        )
+        .bind(
+          run.id, item.source_product_id, m.source_media_id, m.role, m.source_url, a.status, a.r2_key, a.width, a.height,
+          extra.bytes ?? null, extra.sha256 ?? '', a.error_code, extra.tried ? 1 : 0, extra.variant ?? 'original',
+          ...(withDerivation ? [a.status === 'stored' ? (extra.derivation ?? '') : ''] : []),
+          extra.tried ? 1 : 0
+        )
+        .run();
+    try {
+      await statement(true);
+    } catch (e) {
+      // A database before 0207 (an older deploy's): the row is recorded all the same, without the note.
+      if (!missingDerivation(e)) throw e;
+      await statement(false);
+    }
   };
 
   for (const m of requests) {
@@ -311,40 +383,66 @@ export async function ingestImportMedia(env: MediaEnv, requestUrl: string, run: 
       out.push({ source_media_id: m.source_media_id, status: 'pending', r2_key: '', width: null, height: null, error_code: '' });
       continue;
     }
-    const ingest = (url: string, variant: FetchedVariant) => {
+    const sourceHost = new URL(m.source_url).hostname;
+    const ingest = (url: string, kind: FetchedVariant | 'gif_first_frame') => {
       const budget = MEDIA_WALL_MS - (Date.now() - started) - MEDIA_MARGIN_MS;
       if (budget < 1_000) throw new GuardedFetchError('FETCH_TIMEOUT', 'The wall budget of this call is spent');
       return ingestProductMediaUrl(env, url, {
-        allowHost: mediaHostAllowed,
+        // The first frame is asked of the original's own host, and a redirect of it stays there (bounded like every
+        // fetch here): the CDN may answer a large animation with a 302 to a smaller rendition of the same object.
+        allowHost: kind === 'gif_first_frame' ? (h) => h === sourceHost && mediaHostAllowed(h) : mediaHostAllowed,
         // https on the default port, on EVERY hop: a redirect to http:// (or to another port) is refused, never fetched.
         allowUrl: hopAllowed,
         fetcher,
         timeout_ms: Math.min(30_000, budget),
         max_redirects: 2,
-        ...(variant === 'cdn_resized' ? { accept: CDN_RESIZED_ACCEPT } : {}),
+        ...(kind !== 'original' ? { accept: CDN_RESIZED_ACCEPT } : {}),
+        // The first frame must be ONE still PNG or JPEG: an answer that is still an animation is never stored.
+        ...(kind === 'gif_first_frame' ? { still_only: true } : {}),
         // The provenance stays the original address, whichever variant was fetched.
         provenance_url: m.source_url,
       });
     };
     let variant: FetchedVariant = 'original';
+    let derivation = '' as MediaDerivation;
+    // §C.4 step 2b (DECISIONS row 264): an animated GIF is stored as its first frame, asked ONCE.
+    const firstFrame = () => {
+      variant = 'cdn_resized';
+      derivation = 'gif_first_frame';
+      return ingest(cdnFirstFrameUrl(m.source_url), 'gif_first_frame');
+    };
     try {
       let r;
       try {
         r = await ingest(m.source_url, 'original');
       } catch (e) {
-        // §C.4 step 2: an original over the source cap, or one the converter refuses, is asked ONCE more through the
-        // CDN's own 2400-px rendition. The converter's refusal is IMAGE_CONVERT_FAILED whatever its cause (an input
-        // over the binding's area or dimension limit included: productImageToWebp reads every binding error as
-        // 'failed'), so a corrupt original costs one more request, never a loop.
-        if (!(e instanceof ProductMediaIngestError && RENDITION_RETRY.has(e.code))) throw e;
-        variant = 'cdn_resized';
-        r = await ingest(cdnResizedUrl(m.source_url), 'cdn_resized');
+        if (animatedGif(e)) {
+          r = await firstFrame();
+        } else {
+          // §C.4 step 2: an original over the source cap, or one the converter refuses, is asked ONCE more through the
+          // CDN's own 2400-px rendition. The converter's refusal is IMAGE_CONVERT_FAILED whatever its cause (an input
+          // over the binding's area or dimension limit included: productImageToWebp reads every binding error as
+          // 'failed'), so a corrupt original costs one more request, never a loop. An original too large to read
+          // that was an animated GIF is one in that rendition too: then its first frame (at most three requests).
+          if (!(e instanceof ProductMediaIngestError && RENDITION_RETRY.has(e.code))) throw e;
+          variant = 'cdn_resized';
+          try {
+            r = await ingest(cdnResizedUrl(m.source_url), 'cdn_resized');
+          } catch (e2) {
+            if (!animatedGif(e2)) throw e2;
+            r = await firstFrame();
+          }
+        }
       }
       const a: MediaAnswer = { source_media_id: m.source_media_id, status: 'stored', r2_key: r.key, width: r.width, height: r.height, error_code: '' };
-      await record(m, a, { bytes: r.bytes, sha256: /([0-9a-f]{64})\.webp$/.exec(r.key)?.[1] ?? '', tried: true, variant });
+      await record(m, a, { bytes: r.bytes, sha256: /([0-9a-f]{64})\.webp$/.exec(r.key)?.[1] ?? '', tried: true, variant, derivation });
       out.push(a);
     } catch (e) {
-      const f = failureOf(e);
+      let f = failureOf(e);
+      // The first frame is the only way an animated GIF is stored: whatever refused it (an answer still animated or
+      // not a still PNG or JPEG, a redirect off the host, an HTTP error), the medium stays IMAGE_ANIMATED_GIF —
+      // passing only when that refusal was (a timeout, a 5xx, storage), so the runner asks again.
+      if (derivation === 'gif_first_frame') f = { code: 'IMAGE_ANIMATED_GIF', transient: f.transient };
       const tries = Number(prev?.attempts ?? 0) + 1;
       const status = f.transient && tries < MEDIA_TRIES ? 'pending' : 'failed';
       const a: MediaAnswer = { source_media_id: m.source_media_id, status, r2_key: '', width: null, height: null, error_code: f.code };

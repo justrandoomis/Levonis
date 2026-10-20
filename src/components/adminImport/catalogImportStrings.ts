@@ -82,6 +82,7 @@ export const PROGRESS_LABELS: ReadonlyArray<[string, Tri]> = [
   ['saved_media_count', t('الصور المحفوظة', 'Images saved', 'وێنە پاشەکەوتکراوەکان')],
   ['linked_variant_media_count', t('صور مربوطة بخيار', 'Images bound to a choice', 'وێنەی بەستراو بە هەڵبژاردە')],
   ['failed_media_count', t('صور تعذّر حفظها', 'Images failed', 'وێنەی پاشەکەوت نەکراو')],
+  ['first_frame_media_count', t('صور GIF متحركة حُفظ إطارها الأول', 'Animated GIFs saved as their first frame', 'GIFی جووڵاو کە چوارچێوەی یەکەمی پاشەکەوت کرا')],
   ['extracted_specs_count', t('المواصفات المستخرجة', 'Specs extracted', 'تایبەتمەندییە دەرهێنراوەکان')],
   ['verified_specs_count', t('المواصفات المؤكَّدة', 'Specs verified', 'تایبەتمەندییە پشتڕاستکراوەکان')],
   ['document_count', t('المستندات', 'Documents', 'بەڵگەنامەکان')],

@@ -7,6 +7,8 @@ import {
 import {
   IMAGE_OUTPUT_CAP,
   IMAGE_SOURCE_CAP,
+  isAnimatedPng,
+  isAnimatedWebp,
   looksLikeMarkup,
   productImageToWebp,
   sniffImageBytes,
@@ -64,6 +66,8 @@ export interface ProductMediaBytesInput {
   entity_id?: string;
   /** How long an unattached staged object must survive before cleanup may run. */
   cleanup_grace_minutes?: number;
+  /** See ProductMediaFetchOptions.still_only. */
+  still_only?: boolean;
 }
 
 export interface ProductMediaFetchOptions {
@@ -84,7 +88,17 @@ export interface ProductMediaFetchOptions {
   accept?: string;
   /** The provenance recorded for the bytes, when the address fetched is a rendition of it (default: that address). */
   provenance_url?: string;
+  /**
+   * The bytes must be ONE still picture: a PNG (not an APNG) or a JPEG by its own signature, and the WebP made of it
+   * a still — anything else is IMAGE_NOT_SUPPORTED (a GIF of any frame count included). The catalogue import asks this
+   * of an animated GIF's first frame (catalogImport/media.ts), so a CDN answer that is still an animation, or not a
+   * picture at all, is never stored as one.
+   */
+  still_only?: boolean;
 }
+
+/** What `still_only` accepts, by the bytes' own signature. */
+const STILL_ONLY_KINDS: ReadonlySet<string> = new Set(['image/png', 'image/jpeg']);
 
 export interface StagedProductWebpInput {
   key: string;
@@ -702,9 +716,15 @@ export async function ingestProductMediaBytes(
       'The source bytes are not a supported JPEG, PNG, WebP, GIF or AVIF image'
     );
   }
+  if (input.still_only && (!STILL_ONLY_KINDS.has(sourceKind.mime) || isAnimatedPng(input.bytes))) {
+    throw new ProductMediaIngestError('IMAGE_NOT_SUPPORTED', 'A still PNG or JPEG was required');
+  }
 
   const converted = await productImageToWebp(env, input.bytes, sourceKind.mime);
   if (!converted.ok) throw conversionFailure(converted);
+  if (input.still_only && isAnimatedWebp(converted.bytes)) {
+    throw new ProductMediaIngestError('IMAGE_CONVERT_FAILED', 'The converter returned an animation where a still was required');
+  }
   if (converted.bytes.byteLength > IMAGE_OUTPUT_CAP) {
     throw new ProductMediaIngestError(
       'IMAGE_SOURCE_TOO_LARGE',
@@ -809,6 +829,7 @@ export async function ingestProductMediaUrl(
     source_url: options.provenance_url ?? sourceUrl,
     original_name: originalName,
     cleanup_grace_minutes: options.cleanup_grace_minutes,
+    still_only: options.still_only,
   });
 }
 

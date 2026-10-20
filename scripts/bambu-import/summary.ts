@@ -44,6 +44,7 @@ export const PROGRESS_FIELDS = [
   'saved_media_count',
   'linked_variant_media_count',
   'failed_media_count',
+  'first_frame_media_count',
   'extracted_specs_count',
   'verified_specs_count',
   'missing_info_by_reason',

@@ -921,6 +921,28 @@ test('a planned picture /media answered failed is not_stored with its media code
   assert.ok(!contentSettledIds({ content_media: cp }).has(gif), 'a later pass takes it again');
 });
 
+test('an animated GIF /media stored as its first frame (DECISIONS row 264) is put back like any picture: attached, its reason gif_first_frame; the run report counts it', async () => {
+  const { w, sid, failed, payload } = await closedRun(AMS(), PICK_AMS);
+  const gif = failed[0].id;
+  const { a } = await pass(w, RUN_B, sid, payload, {
+    skip: (id) => {
+      if (id !== gif) return false;
+      storeFor(w, RUN_B, sid, gif, 'description', failed[0].url);
+      w.raw
+        .prepare("UPDATE catalog_import_media SET fetched_variant = 'cdn_resized', derivation = 'gif_first_frame' WHERE run_id = ? AND source_product_id = ? AND source_media_id = ?")
+        .run(RUN_B, sid, gif);
+      return true;
+    },
+  });
+  assert.deepEqual([a.counts.attached, a.counts.not_stored], [3, 0]);
+  const cp = checkpointOf(w, RUN_B, sid);
+  assert.deepEqual([cp.media[gif], cp.reasons[gif]], ['attached', 'gif_first_frame']);
+  assert.deepEqual(failed.slice(1).map((f) => [cp.media[f.id], cp.reasons[f.id]]), [['attached', undefined], ['attached', undefined]], 'the others carry no note');
+  assert.ok(contentSettledIds({ content_media: cp }).has(gif), 'settled: never taken again');
+  const { runProgress } = await import('../worker/lib/catalogImport/report');
+  assert.equal((await runProgress(w.db, RUN_B)).first_frame_media_count, 1);
+});
+
 test('the two outcomes decided from the address: appended after every existing key, settled under the rule they were recorded with, taken again under a later rule', () => {
   assert.deepEqual(CONTENT_OUTCOMES.slice(0, 11), [
     'attached', 'already_present', 'owner_removed', 'owner_edited', 'not_imported', 'source_changed', 'not_on_page', 'not_stored', 'product_not_public', 'identity_changed', 'source_gone',

@@ -39,6 +39,24 @@ export function pngBytes(width: number, height: number): Uint8Array {
   ]);
 }
 
+/** An APNG: a PNG whose `acTL` chunk (two frames) precedes its first IDAT. dimsOf reads it as the PNG it starts as. */
+export function apngBytes(width: number, height: number): Uint8Array {
+  return new Uint8Array([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, ...enc('IHDR'), ...u32be(width), ...u32be(height), 8, 6, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 8, ...enc('acTL'), 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, ...enc('IEND'), 0, 0, 0, 0,
+  ]);
+}
+
+/** A GIF89a of `width × height` with `frames` image descriptors (more than one: animated). dimsOf does not read it. */
+export function gifBytes(width: number, height: number, frames: number): Uint8Array {
+  const u16le = (n: number) => [n & 255, (n >>> 8) & 255];
+  const out: number[] = [...enc('GIF89a'), ...u16le(width), ...u16le(height), 0, 0, 0];
+  for (let i = 0; i < frames; i++) out.push(0x2c, 0, 0, 0, 0, ...u16le(width), ...u16le(height), 0, 2, 2, 0x4c, 0x01, 0);
+  out.push(0x3b);
+  return new Uint8Array(out);
+}
+
 /** A JPEG with one SOF0 segment of `width × height`. */
 export function jpegBytes(width: number, height: number): Uint8Array {
   return new Uint8Array([
