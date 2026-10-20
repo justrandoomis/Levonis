@@ -63,14 +63,12 @@ export interface ThreadOrders {
 }
 
 export const chatCommerceApi = {
-  // ---- the customer's print request: draft → files → send
+  // ---- the customer print request: draft → files → send. The files take
+  //      the door the limits table picks (src/components/media/
+  //      RequestAttachments.tsx `uploadRequestFiles`), never always the
+  //      whole-body route.
   draftPrintRequest: (chatId: string, b: PrintRequestInput) =>
     api.post<{ request: { id: string } }>(`/api/chats/${enc(chatId)}/print-requests`, b),
-  uploadRequestFile: (requestId: string, file: File) => {
-    const form = new FormData();
-    form.append('file', file);
-    return api.post<{ file: { id: string; file_name: string } }>(`/api/marketplace/requests/${enc(requestId)}/files`, form);
-  },
   sendPrintRequest: (chatId: string, requestId: string) =>
     api.post(`/api/chats/${enc(chatId)}/print-requests/${enc(requestId)}/send`, { client_id: newClientId() }),
   cancelRequest: (requestId: string) => api.post(`/api/marketplace/requests/${enc(requestId)}/cancel`, {}),

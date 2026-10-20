@@ -61,7 +61,7 @@ const { AttachmentList } = await import('../src/components/media/RequestAttachme
 const { MerchantOfferSection } = await import('../src/components/community/requests/OfferComposer');
 const { WizardFileThumb, previewUrl, releasePreviews } = await import('../src/components/community/requests/RequestWizard');
 const { requestImageSrc, requestImageSrcSet, pictureFiles } = await import('../src/components/community/requests/RequestFileThumbs');
-const { requestFileCheck, requestFileProblemText, requestUploadRefusal, modelFormatGroups } = await import('../src/components/community/requests/fileRefusals');
+const { requestFileCheck, requestFilesCheck, requestFileProblemText, requestUploadRefusal, modelFormatGroups, namedForUpload } = await import('../src/components/community/requests/fileRefusals');
 const { localColour, localMaterial, REQUEST_COLOURS } = await import('../src/components/community/requests/mirrors');
 const { bareLinkCard } = await import('../src/components/community/links/LinkCard');
 const { ApiError } = await import('../src/lib/api');
@@ -157,7 +157,7 @@ test('the wizard: a picture gets an object URL, a model none, and every URL is r
 
 test('the wizard: files are checked before the upload by the table the server reads, the review shows the pictures and the link', () => {
   const wizard = code('src/components/community/requests/RequestWizard.tsx');
-  assert.match(wizard, /const problem = requestFileCheck\(file, L, files\.length \+ pending\.length \+ picked\.length\);/);
+  assert.match(wizard, /requestFilesCheck\(Array\.from\(list\), L, files\.length \+ pending\.length\)/);
   assert.match(wizard, /const MAX_FILES = REQUEST_FILE_LIMITS\.maxFiles;/);
   assert.doesNotMatch(wizard, /const MAX_FILES = 6/);
   assert.match(wizard, /data-wizard="review-sources"/);
@@ -221,6 +221,90 @@ test('R5: refusals are rendered from the limits table and FORMAT_CAPABILITIES, i
   assert.equal(requestUploadRefusal(server, 'ckb'), requestFileProblemText({ code: 'UPLOAD_TOO_LARGE', kind: 'model', limit_bytes: REQUEST_FILE_LIMITS.maxBytes.model }, 'ckb'));
   const kindRefusal = new ApiError(400, 'no', 'UPLOAD_KIND_NOT_ALLOWED', { extension: 'zip', purpose: 'request' });
   assert.match(requestUploadRefusal(kindRefusal, 'en'), /^\.zip files are not accepted on a request\. A request takes pictures/);
+});
+
+// ------------------------------------------------------------ review fixes
+
+test('one pick, one refusal: each refused file named with its short reason, the formats said ONCE, nothing past the sixth dropped silently', () => {
+  const f = (name: string, size = 10, type = '') => new File([new Uint8Array(size)], name, { type });
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    // Two wrong formats: the accepted-formats paragraph appears once, not once per file.
+    const two = requestFilesCheck([f('a.zip'), f('b.rar'), f('ok.stl')], lang);
+    assert.deepEqual(two.accepted.map((x) => x.name), ['ok.stl'], lang);
+    assert.match(two.refusal, /«a\.zip»/);
+    assert.match(two.refusal, /«b\.rar»/);
+    assert.equal(two.refusal.split('STEP').length - 1, 1, `${lang}: the format list is said once`);
+    assert.ok(two.refusal.length < requestFileCheck({ name: 'a.zip', size: 10 }, lang).length * 1.6, `${lang}: two refusals do not repeat the paragraph`);
+    // Four saved, three picked: two go, the third is NAMED with the count sentence.
+    const full = requestFilesCheck([f('1.png'), f('2.png'), f('3.png')], lang, 4);
+    assert.deepEqual(full.accepted.map((x) => x.name), ['1.png', '2.png'], lang);
+    assert.match(full.refusal, /«3\.png»/, `${lang}: the file past the sixth is named, not sliced away`);
+    assert.match(full.refusal, new RegExp(String(REQUEST_FILE_LIMITS.maxFiles)));
+    const fine = requestFilesCheck([f('x.jpg')], lang);
+    assert.equal(fine.refusal, '', `${lang}: a file that fits is not refused`);
+    assert.equal(fine.accepted.length, 1);
+  }
+});
+
+test('a picture with no extension (a camera shot named by digits) is named from its type, then checked and sent like any other', () => {
+  const shot = new File([new Uint8Array(2_000_000)], '1697812345678', { type: 'image/jpeg' });
+  const named = namedForUpload(shot);
+  assert.equal(named.name, '1697812345678.jpg');
+  assert.equal(named.size, shot.size);
+  assert.equal(requestFileCheck(shot, 'en'), '', 'the browser no longer refuses it');
+  const { accepted, refusal } = requestFilesCheck([shot], 'ar');
+  assert.equal(refusal, '');
+  assert.equal(accepted[0].name, '1697812345678.jpg', 'and it is sent with the name every door asks');
+  // Only a picture type is named; anything else without an extension is still refused.
+  assert.equal(namedForUpload(new File([new Uint8Array(4)], 'blob', { type: 'application/octet-stream' })).name, 'blob');
+  assert.match(requestFileCheck(new File([new Uint8Array(4)], 'blob', { type: 'image/heic' }), 'en'), /not accepted/);
+});
+
+test('a listed extension whose bytes are something else reads as a mismatch, and HEIC as HEIC — never ".jpg files are not accepted"', () => {
+  const mismatch = new ApiError(400, 'no', 'UPLOAD_KIND_NOT_ALLOWED', { declared: 'jpg', detected: null });
+  const heic = new ApiError(400, 'no', 'IMAGE_HEIC_UNSUPPORTED');
+  const said: Record<string, [string, string]> = {};
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const m = requestUploadRefusal(mismatch, lang);
+    const h = requestUploadRefusal(heic, lang);
+    assert.match(m, /\.jpg/);
+    assert.doesNotMatch(m, /STEP/, `${lang}: no accepted-formats list for an accepted extension`);
+    assert.notEqual(m, requestFileProblemText({ code: 'UPLOAD_KIND_NOT_ALLOWED', extension: 'jpg' }, lang));
+    assert.match(h, /HEIC/);
+    assert.match(h, /JPEG/);
+    said[lang] = [m, h];
+  }
+  assert.match(said.en[0], /^The contents of this file do not match its name/);
+  for (let i = 0; i < 2; i++) {
+    assert.notEqual(said.ckb[i], said.ar[i], 'the Sorani is its own');
+    assert.match(said.ckb[i], KURDISH);
+  }
+});
+
+test('the chat print-request sheet reads the one table and takes the door it picks', () => {
+  const sheet = code('src/components/chat/commerce/PrintRequestSheet.tsx');
+  assert.doesNotMatch(sheet, /const MAX_FILES = 6/);
+  assert.doesNotMatch(sheet, /image\/jpeg,image\/png/, 'no accept list of its own');
+  assert.match(sheet, /const ACCEPT = ATTACHMENT_ACCEPT;/);
+  assert.match(sheet, /const MAX_FILES = MAX_ATTACHMENTS;/);
+  assert.match(sheet, /requestFilesCheck\(picked, L, files\.length\)/, 'each picked file asked count, kind and size');
+  assert.match(sheet, /uploadRequestFiles\(request\.id, \[files\[i\]\]/, 'a model or a large file takes the session');
+  assert.match(sheet, /requestUploadRefusal\(err, L,/);
+  assert.doesNotMatch(code('src/lib/chatCommerceApi.ts'), /uploadRequestFile:/, 'no whole-body-only helper left to call');
+});
+
+test('the request page: session uploads draw the shared tile, the meta line follows the page direction, My requests says the colour in the reader words', () => {
+  const list = code('src/components/media/RequestAttachments.tsx');
+  assert.doesNotMatch(list, /slice\(0, room\)/, 'no silent slice');
+  assert.match(list, /requestFilesCheck\(Array\.from\(list\), L, files\.length \+ tiles\.length\)/);
+  assert.match(list, /<UploadTile[\s\S]{0,80}purpose="request"[\s\S]{0,40}entityId=\{requestId\}/, 'progress, cancel and retry for a 300 MB model');
+  for (const lang of ['ar', 'ckb'] as const) {
+    const h = html(createElement(AttachmentList, { requestId: 'req_1', files, canEdit: false, onChanged: () => undefined }), lang);
+    assert.doesNotMatch(h, /<p[^>]*dir="ltr"[^>]*>[^<]*(صورة|وێنە|مجسم|مۆدێل)/, `${lang}: the kind word is not forced left-to-right`);
+    assert.match(h, /<span dir="ltr">[0-9.]+ (KB|MB)<\/span>/, `${lang}: only the size is isolated`);
+  }
+  assert.match(code('src/components/print/MyRequestsList.tsx'), /localColour\(p\.color_name \|\| p\.color_hex,/);
+  assert.match(read('src/components/community/requests/RequestWizard.tsx'), /`هەنگاوی \$\{step\} لە 4`/, 'one digit system in the step line');
 });
 
 // ------------------------------------------------------------ the details page

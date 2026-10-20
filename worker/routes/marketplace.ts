@@ -29,7 +29,8 @@ import { requireAuth, badRequest, forbidden, notFound, conflict, str, int, HttpE
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
-import { attachmentDisposition, classifyRequestFile, safeFileName } from '../lib/attachments';
+import { attachmentDisposition, canonicalExtension, classifyRequestFile, safeFileName } from '../lib/attachments';
+import { HEIF_REFUSAL, isHeifBytes } from './uploads';
 import {
   REQUEST_FILE_LIMITS,
   requestFileExtension,
@@ -429,28 +430,48 @@ marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {
   if (!(file instanceof File)) throw badRequest('No file uploaded');
 
   // THE SAME TABLE AS EVERY OTHER DOOR (packages/contracts/src/requestFiles.ts,
-  // R5). The declared size is asked first, so a body this route should never
-  // hold is refused before it is read: above the whole-body ceiling a file
-  // takes the resumable session (the browser picks it by the same table).
+  // R5). The name and the declared size are asked first, so a body this route
+  // should never hold is refused before it is read: above the whole-body
+  // ceiling a file takes the resumable session (the browser picks it by the
+  // same table).
+  //
+  // THE NAME IS ASKED AS THE SESSION ASKS IT (uploadSessions.ts: the
+  // extension must be in the table and must be what the bytes are). The name
+  // is stored and handed back in Content-Disposition, so a file whose bytes
+  // pass as a picture must not keep an `.exe` or `.html` name. A coded
+  // refusal, rendered on the screen from FORMAT_CAPABILITIES in the reader's
+  // language (row `14.format-honesty`).
+  const named = requestFileKind(file.name);
+  if (!named) {
+    throw badRequest('This file is not one of the formats a request accepts', 'UPLOAD_KIND_NOT_ALLOWED', {
+      extension: requestFileExtension(file.name),
+      purpose: 'request',
+    });
+  }
   if (file.size > REQUEST_FILE_LIMITS.wholeBodyMaxBytes) {
-    const named = requestFileKind(file.name);
+    // The kind is named only when its own ceiling is the one passed: a model
+    // may be 300 MiB through the session, so "40 MB, the limit for a model"
+    // would be false. Without a kind the screen says "larger than 40 MB".
+    const own = requestFileMaxBytes(named) <= REQUEST_FILE_LIMITS.wholeBodyMaxBytes;
     throw badRequest('File is too large for this route — upload it through a resumable session', 'UPLOAD_TOO_LARGE', {
-      limit_bytes: named ? Math.min(REQUEST_FILE_LIMITS.wholeBodyMaxBytes, requestFileMaxBytes(named)) : REQUEST_FILE_LIMITS.wholeBodyMaxBytes,
-      ...(named ? { kind: named } : {}),
+      limit_bytes: own ? requestFileMaxBytes(named) : REQUEST_FILE_LIMITS.wholeBodyMaxBytes,
+      ...(own ? { kind: named } : {}),
       door: 'whole_body',
     });
   }
 
   const buf = new Uint8Array(await file.arrayBuffer());
   const kind = classifyRequestFile(buf, file.name);
+  const declared = canonicalExtension(requestFileExtension(file.name));
   if (!kind) {
-    // A coded refusal, rendered on the screen from FORMAT_CAPABILITIES in the
-    // reader's language (row `14.format-honesty`) — not one English sentence
-    // naming three formats out of the eight a request takes.
-    throw badRequest('This file is not one of the formats a request accepts', 'UPLOAD_KIND_NOT_ALLOWED', {
-      extension: requestFileExtension(file.name),
-      purpose: 'request',
-    });
+    // A listed extension whose bytes are not that format: the same answers as
+    // the session door, so one file reads the same wherever it is sent (an
+    // iPhone photo renamed .jpg is told it is HEIC, not that .jpg is refused).
+    if (isHeifBytes(buf)) throw badRequest(HEIF_REFUSAL, 'IMAGE_HEIC_UNSUPPORTED');
+    throw badRequest('This file is not one of the formats accepted here', 'UPLOAD_KIND_NOT_ALLOWED', { declared, detected: null });
+  }
+  if (kind.ext !== declared) {
+    throw badRequest('The file\'s contents do not match its name', 'UPLOAD_KIND_NOT_ALLOWED', { declared, detected: kind.mime });
   }
   const sized: RequestFileKind = kind.kind === 'reference' ? 'image' : kind.kind;
   const max = requestFileMaxBytes(sized);
@@ -479,7 +500,12 @@ marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {
   );
 
   const fileId = newId('crf');
-  const name = safeFileName(file.name, kind.ext);
+  // `safeFileName` keeps 120 characters: a longer name must not lose the
+  // extension the bytes were just proven against (`….html` cut out of
+  // `….html.jpg`).
+  const ownExt = requestFileExtension(file.name);
+  let name = safeFileName(file.name, kind.ext);
+  if (requestFileExtension(name) !== ownExt) name = `${name.slice(0, 119 - ownExt.length).replace(/\.+$/, '')}.${ownExt}`;
   const added = { id: fileId, requestId: id, ownerId: user.id, key, name, mime: kind.mime, bytes: buf.byteLength, kind: kind.kind };
   try {
     // A PUBLISHED job changed: revised in the same write, so every offer

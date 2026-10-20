@@ -212,6 +212,7 @@ test('R5: a model takes the session up to its ceiling; the whole-body route says
   assert.equal(w.code, 'UPLOAD_TOO_LARGE');
   assert.equal(w.details.door, 'whole_body', 'the refusal names the route, so the browser sends it through a session');
   assert.ok(w.details.limit_bytes <= limit);
+  assert.equal(w.details.kind, undefined, 'never "40 MB, the limit for a model": a model may be 300 MB through the session');
 });
 
 test('R5: the kinds are the same list on every door — AVIF through the whole-body route too, a ZIP or a video through none', async () => {
@@ -245,6 +246,107 @@ test('R5: the kinds are the same list on every door — AVIF through the whole-b
   const a = await viaSimpleDoor(raw, bucket, id, 'pic.avif', avif());
   assert.equal(a.status, 201, JSON.stringify(await json(a.clone())));
   assert.equal((await json(a)).file.content_type, 'image/avif');
+});
+
+/** A Windows executable whose DOS header (words the loader ignores) spells `ftyp` + `avif`. */
+function peDressedAsAvif(): Uint8Array {
+  const out = new Uint8Array(4096);
+  out.set([0x4d, 0x5a, 0x90, 0x00]); // MZ
+  out.set([0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66], 4); // ftyp avif
+  new DataView(out.buffer).setUint32(0x3c, 0x80, true); // e_lfanew
+  out.set([0x50, 0x45, 0, 0], 0x80); // PE\0\0
+  return out;
+}
+const jpeg = (size = 256) => {
+  const out = new Uint8Array(size);
+  out.set([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+  return out;
+};
+/** An iPhone photo: an `ftyp` box whose major brand is `heic`. */
+const heic = (size = 256) => {
+  const out = new Uint8Array(size);
+  out.set([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63, 0, 0, 0, 0, 0x6d, 0x69, 0x66, 0x31, 0x68, 0x65, 0x69, 0x63]);
+  return out;
+};
+
+test('the whole-body door asks the name as the session does: an executable dressed as AVIF, or a picture named .html, is refused and never stored', async () => {
+  const raw = seed();
+  const bucket = memoryBucket();
+  const id = await newDraft(raw, bucket);
+
+  // The bytes alone no longer pass: the ftyp box size (bytes 0..3, "MZ..") is not a box.
+  const pe = peDressedAsAvif();
+  assert.equal(classifyRequestFile(pe, 'drawing.exe'), null);
+  assert.equal(classifyRequestFile(pe, 'drawing.avif'), null);
+  // A 1 MiB body that starts with ftyp and declares a huge box: refused without walking it.
+  const huge = new Uint8Array(MiB);
+  huge.set([0x7f, 0xff, 0xff, 0xf0, 0x66, 0x74, 0x79, 0x70, 0x6d, 0x69, 0x66, 0x31]);
+  huge.set([0x61, 0x76, 0x69, 0x66], MiB - 8);
+  assert.equal(classifyRequestFile(huge, 'x.avif'), null);
+  assert.ok(classifyRequestFile(avif(), 'x.avif'), 'a real AVIF head still passes');
+
+  for (const [name, bytes, extension] of [
+    ['drawing.exe', pe, 'exe'],
+    ['drawing.avif', pe, null],
+    ['x.html', jpeg(), 'html'],
+    ['1697812345678', jpeg(), ''],
+  ] as Array<[string, Uint8Array, string | null]>) {
+    const res = await viaSimpleDoor(raw, bucket, id, name, bytes);
+    const body = await json(res);
+    assert.equal(res.status, 400, `${name}: ${JSON.stringify(body)}`);
+    assert.equal(body.code, 'UPLOAD_KIND_NOT_ALLOWED', name);
+    if (extension !== null) assert.equal(body.details.extension, extension, name);
+    else assert.deepEqual(body.details, { declared: 'avif', detected: null }, name);
+  }
+  // A listed name whose bytes are another listed format: the session answer, word for word.
+  const swapped = await viaSimpleDoor(raw, bucket, id, 'photo.jpg', png());
+  assert.equal(swapped.status, 400);
+  assert.deepEqual((await json(swapped)).details, { declared: 'jpg', detected: 'image/png' });
+  assert.equal(fileRows(raw, id), 0, 'nothing refused was stored');
+
+  // `.jpeg` and `.stp` are spellings, not mismatches.
+  const spelled = await viaSimpleDoor(raw, bucket, id, 'photo.JPEG', jpeg());
+  assert.equal(spelled.status, 201, JSON.stringify(await json(spelled.clone())));
+  assert.equal((await json(spelled)).file.file_name, 'photo.JPEG');
+});
+
+test('a listed extension whose bytes are not that format gets the SAME answer from both doors — HEIC as HEIC, the rest as a mismatch', async () => {
+  const raw = seed();
+  const bucket = memoryBucket();
+  const id = await newDraft(raw, bucket);
+  const shiftedPdf = new Uint8Array(256);
+  shiftedPdf.set([0x0a, 0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]);
+  for (const [name, bytes, code, details] of [
+    ['photo.jpg', heic(), 'IMAGE_HEIC_UNSUPPORTED', null],
+    ['drawing.pdf', shiftedPdf, 'UPLOAD_KIND_NOT_ALLOWED', { declared: 'pdf', detected: null }],
+  ] as Array<[string, Uint8Array, string, Record<string, unknown> | null]>) {
+    const simple = await viaSimpleDoor(raw, bucket, id, name, bytes);
+    const s = await json(simple);
+    assert.equal(simple.status, 400, name);
+    assert.equal(s.code, code, `${name}: whole-body`);
+    const { done } = await viaSessionDoor(raw, bucket, id, name, bytes);
+    const d = await json(done);
+    assert.equal(done.status, 400, name);
+    assert.equal(d.code, code, `${name}: session`);
+    if (details) {
+      assert.deepEqual(s.details, details, `${name}: whole-body`);
+      assert.deepEqual(d.details, details, `${name}: session`);
+    }
+    assert.equal('extension' in (s.details ?? {}), false, `${name}: never ".${name.split('.').pop()} files are not accepted"`);
+  }
+  assert.equal(fileRows(raw, id), 0);
+});
+
+test('a stored name keeps the extension its bytes were proven against, even past the 120-character cut', async () => {
+  const raw = seed();
+  const bucket = memoryBucket();
+  const id = await newDraft(raw, bucket);
+  const name = `${'a'.repeat(115)}.html.png`; // cut at 120, it would end ".html"
+  const res = await viaSimpleDoor(raw, bucket, id, name, png());
+  assert.equal(res.status, 201, JSON.stringify(await json(res.clone())));
+  const stored = (await json(res)).file.file_name as string;
+  assert.ok(stored.endsWith('.png') && !stored.includes('..'), stored);
+  assert.ok(stored.length <= 120);
 });
 
 test(`R5: a seventh file is refused by the browser, the whole-body route and the session alike`, async () => {

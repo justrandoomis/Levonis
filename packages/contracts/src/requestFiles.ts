@@ -30,6 +30,14 @@
 
 const MiB = 1024 * 1024;
 
+/**
+ * The whole-body transport ceiling, as a plain constant so the gateway body
+ * class for `/api/marketplace/requests` (services/gateway/src/uploadClasses.ts)
+ * names THIS number and its guard test reads it: the edge and the route
+ * cannot drift apart without a test failing.
+ */
+export const WHOLE_BODY_MAX_BYTES = 40 * 1024 * 1024;
+
 /** The three kinds a request file can be. `image` is stored as kind `reference`. */
 export type RequestFileKind = 'image' | 'model' | 'document';
 
@@ -39,7 +47,7 @@ export const REQUEST_FILE_LIMITS = {
   /** The largest file of each kind, on every door. */
   maxBytes: { image: 25 * MiB, model: 300 * MiB, document: 25 * MiB } as Readonly<Record<RequestFileKind, number>>,
   /** The whole-body route reads a file into memory: above this a file takes the resumable session. */
-  wholeBodyMaxBytes: 40 * MiB,
+  wholeBodyMaxBytes: WHOLE_BODY_MAX_BYTES,
 } as const;
 
 /** The extensions of each kind, lower case. `jpeg` and `stp` are spellings of `jpg` and `step`. */

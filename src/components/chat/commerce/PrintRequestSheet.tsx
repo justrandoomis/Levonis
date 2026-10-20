@@ -18,12 +18,25 @@ import { Sheet } from '../../ui/Sheet';
 import { Field, Input, Textarea, focusFirstInvalid } from '../../ui/Field';
 import { Button } from '../../ui/Button';
 import { useLanguage } from '../../../LanguageContext';
-import { ApiError } from '../../../lib/api';
 import { toast } from '../../../lib/toastStore';
 import { chatCommerceApi } from '../../../lib/chatCommerceApi';
+import { ATTACHMENT_ACCEPT, MAX_ATTACHMENTS, uploadRequestFiles } from '../../media/RequestAttachments';
+import { requestFilesCheck, requestUploadRefusal } from '../../community/requests/fileRefusals';
+import { REQUEST_FILE_EXTENSIONS } from '../../../../packages/contracts/src/requestFiles';
 
-const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,application/pdf,.stl,.3mf,.obj';
-const MAX_FILES = 6;
+/**
+ * THE SAME TABLE AS EVERY OTHER DOOR (packages/contracts/src/requestFiles.ts,
+ * R5): what the picker offers, how many, and each file asked the count, kind
+ * and size before the request is drafted. Each file then takes the door the
+ * table picks (`uploadRequestFiles`): a model or anything above 8 MiB goes
+ * through the resumable session, up to 300 MB, never the whole-body route.
+ */
+const ACCEPT = ATTACHMENT_ACCEPT;
+const MAX_FILES = MAX_ATTACHMENTS;
+const MODEL_FORMATS = REQUEST_FILE_EXTENSIONS.model
+  .filter((e) => e !== 'stp')
+  .map((e) => (e === 'gltf' ? 'glTF' : e.toUpperCase()))
+  .join(' · ');
 
 interface Form {
   title: string;
@@ -52,11 +65,13 @@ export default function PrintRequestSheet({
   onSent: () => void;
 }) {
   const { lang, loc } = useLanguage();
+  const L = lang === 'en' || lang === 'ckb' ? lang : 'ar';
   const titleId = useId();
   const formRef = useRef<HTMLFormElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [f, setF] = useState<Form>(EMPTY);
   const [files, setFiles] = useState<File[]>([]);
+  const [fileError, setFileError] = useState('');
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({});
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState('');
@@ -102,8 +117,15 @@ export default function PrintRequestSheet({
         customer_notes: f.notes.trim(),
       });
       for (let i = 0; i < files.length; i++) {
-        setStage(loc(`جارٍ رفع الملف ${i + 1} من ${files.length}…`, `Uploading file ${i + 1} of ${files.length}…`));
-        await chatCommerceApi.uploadRequestFile(request.id, files[i]);
+        const uploading = (pct: number | null) => {
+          const n = pct === null ? '' : ` ${pct}%`;
+          setStage(loc(`جارٍ رفع الملف ${i + 1} من ${files.length}…${n}`, `Uploading file ${i + 1} of ${files.length}…${n}`, `بارکردنی فایلی ${i + 1} لە ${files.length}…${n}`));
+        };
+        uploading(null);
+        const { reasons } = await uploadRequestFiles(request.id, [files[i]], (_file, p) => {
+          if (p.phase === 'uploading' && p.total > 0) uploading(Math.min(100, Math.round((100 * p.loaded) / p.total)));
+        });
+        if (reasons.length) throw reasons[0];
       }
       setStage(loc('جارٍ الإرسال…', 'Sending…'));
       await chatCommerceApi.sendPrintRequest(chatId, request.id);
@@ -113,9 +135,8 @@ export default function PrintRequestSheet({
       onSent();
       onClose();
     } catch (err) {
-      const fallback = loc('تعذّر إرسال الطلب', 'The request could not be sent');
-      const { apiRefusal } = await import('../../../lib/refusalStrings');
-      toast.error(err instanceof ApiError ? apiRefusal(err, lang, fallback) : fallback);
+      // A refused file says why, in the words of every other door (R5).
+      toast.error(requestUploadRefusal(err, L, loc('تعذّر إرسال الطلب', 'The request could not be sent', 'داواکارییەکە نەنێردرا')));
     } finally {
       setBusy(false);
       setStage('');
@@ -194,15 +215,23 @@ export default function PrintRequestSheet({
             onChange={(e) => {
               const picked = Array.from(e.target.files ?? []);
               e.target.value = '';
-              setFiles((prev) => [...prev, ...picked].slice(0, MAX_FILES));
+              // Every file asked the table in turn: none dropped without its reason.
+              const { accepted, refusal } = requestFilesCheck(picked, L, files.length);
+              if (accepted.length) setFiles((prev) => [...prev, ...accepted]);
+              setFileError(refusal);
             }}
           />
           <Button variant="secondary" size="sm" icon={<Paperclip className="w-4 h-4" aria-hidden="true" />} onClick={() => fileRef.current?.click()} disabled={busy || files.length >= MAX_FILES}>
             {loc('أرفق صورًا أو ملف النموذج', 'Attach pictures or the model file')}
           </Button>
           <p className="mt-1.5 text-[12px] text-text-muted">
-            {loc('صور، PDF، أو STL/3MF/OBJ — حتى 6 ملفات. ملف النموذج لا يُسلَّم للمتجر قبل قبولك عرضه.', 'Pictures, PDF, or STL/3MF/OBJ — up to 6 files. The model file is not handed to the store before you accept its quote.')}
+            {loc(
+              `صور، مخططات PDF، أو مجسمات ثلاثية الأبعاد (${MODEL_FORMATS}) — حتى ${MAX_FILES} ملفات. ملف النموذج لا يُسلَّم للمتجر قبل قبولك عرضه.`,
+              `Pictures, PDF drawings, or 3D models (${MODEL_FORMATS}) — up to ${MAX_FILES} files. The model file is not handed to the store before you accept its quote.`,
+              `وێنە، نەخشەی PDF، یان مۆدێلی سێ ڕەهەندی (${MODEL_FORMATS}) — تا ${MAX_FILES} فایل. فایلی مۆدێلەکە پێش ئەوەی نرخەکەی قبوڵ بکەیت نادرێتە فرۆشگاکە.`
+            )}
           </p>
+          {fileError && <p className="lv-field-error mt-1.5" role="alert">{fileError}</p>}
           {files.length > 0 && (
             <ul className="mt-2 flex flex-col gap-1.5">
               {files.map((file, i) => (
@@ -210,7 +239,10 @@ export default function PrintRequestSheet({
                   <span dir="auto" className="min-w-0 flex-1 truncate">{file.name}</span>
                   <button
                     type="button"
-                    onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
+                    onClick={() => {
+                      setFiles((prev) => prev.filter((_, j) => j !== i));
+                      setFileError('');
+                    }}
                     aria-label={loc(`إزالة ${file.name}`, `Remove ${file.name}`)}
                     className="min-w-9 min-h-9 inline-flex items-center justify-center rounded-md text-text-secondary hover:bg-surface-selected"
                     disabled={busy}

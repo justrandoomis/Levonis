@@ -196,10 +196,29 @@ export function attachmentDisposition(safeName: string, disposition: 'attachment
   return `${disposition}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
 }
 
-/** An ISO-BMFF still image whose brand says AVIF (`ftyp` + `avif`/`avis`, major or compatible). */
+/**
+ * The largest `ftyp` box an AVIF is believed from: 16 bytes of header (size,
+ * `ftyp`, major brand, minor version) and up to 28 compatible brands. Real
+ * encoders write 20 to 44 bytes.
+ */
+const AVIF_FTYP_MAX_BYTES = 128;
+
+/**
+ * AN ISO-BMFF STILL IMAGE WHOSE `ftyp` BOX SAYS AVIF (`avif`/`avis`, major or
+ * compatible) — and a box that is one.
+ *
+ * The box size in bytes 0..3 is checked BEFORE any brand is trusted: 16 to
+ * 128 bytes, a whole number of brands, inside the buffer. A Windows
+ * executable starts `MZ`, so its "box size" is about 1.3 GB; without this
+ * check its DOS header (whose words at 4..11 the loader ignores) could spell
+ * `ftyp` + `avif`, pass as a picture and be stored under its `.exe` name.
+ * The bound also caps the brand walk at 28 entries, so a 40 MiB body that
+ * starts with `ftyp` costs nothing to refuse.
+ */
 function isAvif(b: Uint8Array): boolean {
   if (b.length < 16 || !starts(b, [0x66, 0x74, 0x79, 0x70], 4)) return false;
-  const boxSize = Math.min(b.length, ((b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3]) >>> 0);
+  const boxSize = ((b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3]) >>> 0;
+  if (boxSize < 16 || boxSize > AVIF_FTYP_MAX_BYTES || boxSize > b.length || boxSize % 4 !== 0) return false;
   const brand = (at: number) => String.fromCharCode(b[at], b[at + 1], b[at + 2], b[at + 3]);
   // The major brand at 8, the minor version at 12, the compatible brands from 16.
   for (let at = 8; at + 4 <= boxSize; at += at === 8 ? 8 : 4) {

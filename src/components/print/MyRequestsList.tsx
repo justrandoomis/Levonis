@@ -23,7 +23,7 @@ import {
   BadgeCheck, CalendarClock,
 } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
-import { localMaterial } from '../community/requests/mirrors';
+import { localColour, localMaterial } from '../community/requests/mirrors';
 import { useAuth } from '../../AuthContext';
 import { UnauthorizedState } from '../ui/AsyncStates';
 import { ApiError } from '../../lib/api';
@@ -215,7 +215,7 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
                           className="w-3 h-3 rounded-full border border-white/25"
                           style={{ background: p.color_hex }}
                         />
-                        {p.color_name || p.color_hex}
+                        {localColour(p.color_name || p.color_hex, lang === 'en' || lang === 'ckb' ? lang : 'ar')}
                       </span>
                     )}
                     {r.quantity > 1 && <span dir="ltr">×{r.quantity}</span>}

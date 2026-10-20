@@ -44,7 +44,7 @@ import { pickUpload, resumeKey } from '../../../lib/uploadSession';
 import { UploadTile } from '../../upload/UploadTile';
 import { uploadRequestFiles, formatBytes } from '../../media/RequestAttachments';
 import { REQUEST_FILE_LIMITS, requestFileAccept, requestFileKind } from '../../../../packages/contracts/src/requestFiles';
-import { requestFileCheck, requestUploadRefusal } from './fileRefusals';
+import { requestFilesCheck, requestUploadRefusal } from './fileRefusals';
 import { REQUEST_COLOURS, localColour, localMaterial } from './mirrors';
 import { RequestThumb, pictureFiles } from './RequestFileThumbs';
 import { SourceLinkCard } from '../links/LinkCard';
@@ -405,23 +405,18 @@ export default function RequestWizard({
   /**
    * The browser half of the check (R5): every picked file is asked the same
    * table the server asks — count, kind and size — and a refused one is
-   * named, with the reason, before a byte is sent.
+   * named, with its short reason, before a byte is sent; what a request takes
+   * is said once (`requestFilesCheck`), not once per refused file.
    */
   function addFiles(list: FileList | null) {
     if (!list) return;
-    const picked: PendingFile[] = [];
-    const refused: string[] = [];
-    for (const file of Array.from(list)) {
-      const problem = requestFileCheck(file, L, files.length + pending.length + picked.length);
-      if (problem) {
-        refused.push(`«${file.name}» — ${problem}`);
-        continue;
-      }
+    const { accepted, refusal } = requestFilesCheck(Array.from(list), L, files.length + pending.length);
+    const picked: PendingFile[] = accepted.map((file) => {
       tempSeq.current += 1;
-      picked.push({ tempId: `p${tempSeq.current}`, file, objectUrl: previewUrl(file) });
-    }
+      return { tempId: `p${tempSeq.current}`, file, objectUrl: previewUrl(file) };
+    });
     if (picked.length) setPending((p) => [...p, ...picked]);
-    setErrors((e) => ({ ...e, source: refused.length ? refused.join(' ') : undefined }));
+    setErrors((e) => ({ ...e, source: refusal || undefined }));
     if (fileInput.current) fileInput.current.value = '';
   }
 
@@ -684,7 +679,7 @@ export default function RequestWizard({
       {/* Where am I: the step, its name, and a quiet four-part progress line. */}
       <div className="mb-5">
         <p className="text-[12px] font-semibold text-text-muted tabular-nums">
-          {loc(`الخطوة ${step} من 4`, `Step ${step} of 4`, `هەنگاوی ${step} لە ٤`)}
+          {loc(`الخطوة ${step} من 4`, `Step ${step} of 4`, `هەنگاوی ${step} لە 4`)}
           {editingPublished && <span className="ms-2 text-warning">{loc('تعديل طلب منشور', 'Editing a published request', 'دەستکاریکردنی داواکارییەکی بڵاوکراوە')}</span>}
         </p>
         <h2 className="mt-1 text-[18px] font-bold leading-snug text-text-primary">{stepTitles[step]}</h2>

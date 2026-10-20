@@ -24,10 +24,11 @@ import { useRef, useState } from 'react';
 import { Loader2, Paperclip, Trash2, FileText, Box, Image as ImageIcon, Download } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
-import { pickUpload, uploadLarge } from '../../lib/uploadSession';
+import { pickUpload, uploadLarge, type UploadProgress } from '../../lib/uploadSession';
 import { REQUEST_FILE_LIMITS, requestFileAccept } from '../../../packages/contracts/src/requestFiles';
-import { requestFileCheck, requestUploadRefusal } from '../community/requests/fileRefusals';
+import { requestFileCheck, requestFilesCheck, requestUploadRefusal } from '../community/requests/fileRefusals';
 import { RequestThumb } from '../community/requests/RequestFileThumbs';
+import { UploadTile } from '../upload/UploadTile';
 
 export interface RequestFile {
   id: string;
@@ -79,12 +80,16 @@ function KindIcon({ kind, className }: { kind: string; className?: string }) {
  * (src/lib/uploadSession.ts `pickUpload`). Returns how many failed AND why,
  * so the caller can be honest about a partial result and say what was wrong.
  */
-export async function uploadRequestFiles(requestId: string, files: File[]): Promise<{ failed: number; reasons: unknown[] }> {
+export async function uploadRequestFiles(
+  requestId: string,
+  files: File[],
+  onProgress?: (file: File, progress: UploadProgress) => void
+): Promise<{ failed: number; reasons: unknown[] }> {
   const reasons: unknown[] = [];
   for (const file of files) {
     try {
       if (pickUpload(file) === 'session') {
-        await uploadLarge(file, 'request', { entityId: requestId });
+        await uploadLarge(file, 'request', { entityId: requestId, onProgress: onProgress && ((p) => onProgress(file, p)) });
       } else {
         const form = new FormData();
         form.append('file', file);
@@ -115,21 +120,11 @@ export function AttachmentDraft({
 
   function add(list: FileList | null) {
     if (!list?.length) return;
-    setError('');
-    const room = MAX_ATTACHMENTS - files.length;
-    if (room <= 0) {
-      setError(loc(`الحد الأقصى ${MAX_ATTACHMENTS} ملفات.`, `At most ${MAX_ATTACHMENTS} files.`, `زۆرترین ${MAX_ATTACHMENTS} فایل.`));
-      return;
-    }
-    const accepted: File[] = [];
-    let rejected = '';
-    for (const f of Array.from(list).slice(0, room)) {
-      const problem = attachmentProblem(f, L);
-      if (problem) { rejected = problem; continue; }
-      accepted.push(f);
-    }
+    // Every picked file is asked the table in turn: none is dropped without
+    // its reason (a file past the sixth is named, not sliced away).
+    const { accepted, refusal } = requestFilesCheck(Array.from(list), L, files.length);
     if (accepted.length) onChange([...files, ...accepted]);
-    if (rejected) setError(rejected);
+    setError(refusal);
     if (input.current) input.current.value = '';
   }
 
@@ -206,38 +201,46 @@ export function AttachmentList({
   const { loc, lang } = useLanguage();
   const L: Lang = lang === 'en' || lang === 'ckb' ? lang : 'ar';
   const input = useRef<HTMLInputElement | null>(null);
+  const tileSeq = useRef(0);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  // Files on their way up through a resumable session (a model, or anything
+  // above 8 MiB, up to 300 MB): each draws the shared tile with its progress,
+  // checksum step, cancel and retry, as in the wizard, never a bare spinner.
+  const [tiles, setTiles] = useState<Array<{ id: string; file: File }>>([]);
+  const dropTile = (id: string) => setTiles((list) => list.filter((t) => t.id !== id));
   const kindWord = (kind: string) =>
     kind === 'model' ? loc('مجسم', 'Model', 'مۆدێل') : kind === 'document' ? loc('مستند', 'Document', 'بەڵگەنامە') : loc('صورة', 'Picture', 'وێنە');
 
   async function add(list: FileList | null) {
     if (!list?.length) return;
     setError('');
-    const room = MAX_ATTACHMENTS - files.length;
-    if (room <= 0) {
-      setError(loc(`الحد الأقصى ${MAX_ATTACHMENTS} ملفات.`, `At most ${MAX_ATTACHMENTS} files.`, `زۆرترین ${MAX_ATTACHMENTS} فایل.`));
-      return;
-    }
-    const chosen = Array.from(list).slice(0, room);
-    for (const f of chosen) {
-      const problem = attachmentProblem(f, L);
-      if (problem) { setError(problem); return; }
-    }
-
-    setBusy('add');
-    const { failed, reasons } = await uploadRequestFiles(requestId, chosen);
-    setBusy('');
+    // Every picked file is asked the table in turn, counting the saved files
+    // and the ones still uploading: none is dropped without its reason.
+    const { accepted, refusal } = requestFilesCheck(Array.from(list), L, files.length + tiles.length);
     if (input.current) input.current.value = '';
-    if (failed) {
-      // The reason, not only the count: the server refusal in words (R5).
-      setError(requestUploadRefusal(reasons[0], L, loc(
-        `تعذّر رفع ${failed} من الملفات.`,
-        `${failed} file(s) could not be uploaded.`,
-        `${failed} فایل بار نەکرا.`
-      )));
+    const viaSession = accepted.filter((f) => pickUpload(f) === 'session');
+    const whole = accepted.filter((f) => pickUpload(f) !== 'session');
+    if (viaSession.length) {
+      setTiles((list) => [...list, ...viaSession.map((file) => ({ id: `t${(tileSeq.current += 1)}`, file }))]);
     }
-    onChanged();
+    let said = refusal;
+    if (whole.length) {
+      setBusy('add');
+      const { failed, reasons } = await uploadRequestFiles(requestId, whole);
+      setBusy('');
+      if (failed) {
+        // The reason, not only the count: the server refusal in words (R5).
+        const why = requestUploadRefusal(reasons[0], L, loc(
+          `تعذّر رفع ${failed} من الملفات.`,
+          `${failed} file(s) could not be uploaded.`,
+          `${failed} فایل بار نەکرا.`
+        ));
+        said = said ? `${said} ${why}` : why;
+      }
+      onChanged();
+    }
+    setError(said);
   }
 
   async function remove(f: RequestFile) {
@@ -273,8 +276,8 @@ export function AttachmentList({
             )}
             <div className="min-w-0 flex-1">
               <p className="text-text-primary text-[12.5px] truncate">{f.file_name}</p>
-              <p className="text-text-muted text-[11px]" dir="ltr">
-                {kindWord(f.kind)} · {formatBytes(f.size_bytes)}
+              <p className="text-text-muted text-[11px]">
+                {kindWord(f.kind)} · <span dir="ltr">{formatBytes(f.size_bytes)}</span>
               </p>
             </div>
             {f.url && (
@@ -303,7 +306,26 @@ export function AttachmentList({
         ))}
       </div>
 
-      {canEdit && files.length < MAX_ATTACHMENTS && (
+      {tiles.length > 0 && (
+        <ul className="mt-2 space-y-1.5" aria-label={loc('ملفات قيد الرفع', 'Files uploading', 'فایلەکانی خەریکی بارکردنن')}>
+          {tiles.map((t) => (
+            <li key={t.id} data-attachments="upload-tile">
+              <UploadTile
+                file={t.file}
+                purpose="request"
+                entityId={requestId}
+                onDone={() => {
+                  dropTile(t.id);
+                  onChanged();
+                }}
+                onCancel={() => dropTile(t.id)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {canEdit && files.length + tiles.length < MAX_ATTACHMENTS && (
         <button
           type="button"
           onClick={() => input.current?.click()}
