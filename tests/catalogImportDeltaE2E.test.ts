@@ -48,6 +48,8 @@ import { contentOnlyPayload, Importer, mediaOnlyPayload, type RunConfig } from '
 import type { PayloadBoxItem } from '../packages/catalog/src/bambuImport/payload';
 import { OpsClient } from '../scripts/bambu-import/opsClient';
 import { Deadline } from '../scripts/bambu-import/deadline';
+import { extractPage } from '../packages/catalog/src/bambuImport/extract';
+import { mediaUrlAllowed, nonImageKindOf } from '../worker/lib/catalogImport/media';
 
 after(() => {
   restoreFetch();
@@ -467,10 +469,13 @@ test('mode=withdraw: a delta run\'s NEW product gone at the source is found by t
 
 const DELTA2 = 'cir_d1d1d1d1d1d1d1d1d1d1d1d1';
 
-/** Run A for the content pass: the AMS 2 Pro written with two description pictures and its in-the-box picture failed. */
-async function closedRunContent(before?: (w: World, productId: string) => void) {
+/**
+ * Run A for the content pass: the AMS 2 Pro written with two description pictures and its in-the-box picture failed
+ * (or, with `opts`, the page `html` and the description pictures `description` failed, the box picture only if `box`).
+ */
+async function closedRunContent(before?: (w: World, productId: string) => void, opts: { html?: string; description?: readonly number[]; box?: boolean } = {}) {
   const w = newWorld();
-  const x = pageOf('ams-2-pro').extraction;
+  const x = (opts.html ? extractPage(opts.html) : pageOf('ams-2-pro')).extraction;
   const { payload } = buildFor(w, x);
   const images = payload.content_blocks.filter((b) => b.kind === 'image' && b.source_media_id);
   const box = payload.specs
@@ -478,9 +483,8 @@ async function closedRunContent(before?: (w: World, productId: string) => void) 
     .flatMap((s) => s.value_list)
     .find((v): v is PayloadBoxItem => !!v && typeof v === 'object' && !!(v as PayloadBoxItem).source_media_id)!;
   const failed = [
-    { id: images[1].source_media_id, role: 'description', url: images[1].source_url },
-    { id: images[4].source_media_id, role: 'description', url: images[4].source_url },
-    { id: box.source_media_id, role: 'in_the_box', url: box.source_url },
+    ...(opts.description ?? [1, 4]).map((i) => ({ id: images[i].source_media_id, role: 'description', url: images[i].source_url })),
+    ...((opts.box ?? true) ? [{ id: box.source_media_id, role: 'in_the_box', url: box.source_url }] : []),
   ];
   const s = stage(w, x, { skipMedia: (id) => failed.some((f) => f.id === id) });
   const { result } = await write(w, s);
@@ -584,6 +588,74 @@ test('mode=delta item=content end to end: the description and box pictures put b
     assert.equal(w.raw.prepare('SELECT COUNT(*) AS n FROM catalog_import_items WHERE run_id = ?').get(DELTA2)!.n, 0);
     assert.deepEqual(movedColumns(again, everything(w, productId)), [], 'running it twice changes nothing');
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+    restoreFetch();
+  }
+});
+
+/** The AMS 2 Pro page with its second description picture moved to an MP4 and its fifth to a Shopify-hosted address. */
+const AMS_VIDEO = ['store.bblcdn.com/4731f4c55a/e7d5db9ee6fe48ee9bdab609f61a4efd/AMS-2-Pro-mo.jpg', 'store.bblcdn.com/4731f4c55a/e7d5db9ee6fe48ee9bdab609f61a4efd/AMS-2-Pro-mo.mp4'] as const;
+const AMS_SHOP = ['store.bblcdn.com/4731f4c55a/6e3b062634a74b298c864b38d3dee51b/Size-1920-1280--Picture-compare.jpg', 'cdn.shopify.com/s/files/1/0584/7236/6216/files/Size-1920-1280--Picture-compare.jpg'] as const;
+
+test('mode=delta item=content: a description video and a Shopify-hosted picture are decided from their addresses (not_an_image, host_not_allowed) and never requested; the picture beside them goes in; the plan and attach lines count both; a second content delta queues nothing', async () => {
+  const real = PAGES['ams-2-pro'];
+  for (const [from] of [AMS_VIDEO, AMS_SHOP]) assert.equal(real.split(from).length, 2, 'each address is on the page once');
+  const html = real.replace(AMS_VIDEO[0], AMS_VIDEO[1]).replace(AMS_SHOP[0], AMS_SHOP[1]);
+  PAGES['ams-2-pro'] = html;
+  const dir = mkdtempSync(join(tmpdir(), 'levonis-delta-content-address-'));
+  try {
+    const { w, sid, productId, failed } = await closedRunContent(undefined, { html, description: [1, 4, 6], box: false });
+    assert.deepEqual(
+      failed.map((f) => [nonImageKindOf(f.url), mediaUrlAllowed(f.url)]),
+      [
+        ['video_file', true],
+        [null, false],
+        [null, true],
+      ],
+      'a video on the CDN, a picture off the allow-list, a picture on it'
+    );
+    const [video, shop, picture] = failed;
+    const ops = opsOf(w);
+    const dataDir = writeBundle(w, dir);
+    installCdnDouble(ops);
+    openRun(w.raw, { id: DELTA });
+    const clock = new FakeClock(Date.now());
+    const store = { listed: [] as string[], seen: [] as string[] };
+    const a = importerOf(w, ops, dataDir, dir, clock, { deltaPass: 'content' }, store);
+    const code = await a.importer.main();
+    const log = a.lines.join('\n');
+    assert.equal(code, 0, log);
+    assert.deepEqual(ops.cdn.served.map((u) => u.split('?')[0]), [picture.url], 'only the picture is fetched');
+    assert.deepEqual(ops.cdn.refused, [], 'the Shopify host is never asked, not even of the double');
+    // The runner passes both counts on: the plan line and the attach line (counts only, no host in the log).
+    assert.match(log, /content pass: 3 description and in-the-box pictures failed in the closed run; 1 fetched again; [^\n]*, store page gone 0, not an image 1, host not allowed 1; stored but never written \d+$/m);
+    assert.match(log, /content pass: 1 put back \(1 description, 0 in the box\); [^\n]*, store page gone 0, not an image 1, host not allowed 1$/m);
+    assert.doesNotMatch(log, /bblcdn|shopify|https:\/\/us\.store|p_[0-9a-f]{20}|content:[0-9a-f]|box:[0-9a-f]/);
+    const item = w.raw.prepare('SELECT processing_state, stage_data FROM catalog_import_items WHERE run_id = ? AND source_product_id = ?').get(DELTA, sid) as Record<string, string>;
+    assert.equal(item.processing_state, 'COMPLETE', log);
+    const cp = JSON.parse(item.stage_data).content_media as { media: Record<string, string>; reasons: Record<string, string> };
+    assert.deepEqual(
+      [video, shop, picture].map((f) => [cp.media[f.id], cp.reasons[f.id] ?? '']),
+      [
+        ['not_an_image', 'video_file'],
+        ['host_not_allowed', 'cdn.shopify.com'],
+        ['attached', ''],
+      ]
+    );
+    const blocks = JSON.parse((w.raw.prepare('SELECT content_blocks FROM products WHERE id = ?').get(productId) as { content_blocks: string }).content_blocks) as Array<Record<string, unknown>>;
+    assert.equal(blocks.filter((b) => b.kind === 'image' && b.media_key).length, 14, 'the 13 pictures the import stored and the one put back; the video and the Shopify picture stay out');
+
+    // The run closes; a second content delta from the same closed run queues nothing: all three are settled.
+    const c = importerOf(w, ops, dataDir, dir, clock, { mode: 'close', runId: DELTA, fromRun: '' }, store);
+    assert.equal(await c.importer.main(), 0, c.lines.join('\n'));
+    openRun(w.raw, { id: DELTA2 });
+    const b = importerOf(w, ops, dataDir, dir, clock, { deltaPass: 'content' }, store, DELTA2);
+    assert.equal(await b.importer.main(), 0, b.lines.join('\n'));
+    assert.match(b.lines.join('\n'), /content queue registered: 0 items/);
+    assert.equal(w.raw.prepare('SELECT COUNT(*) AS n FROM catalog_import_items WHERE run_id = ?').get(DELTA2)!.n, 0);
+    assert.deepEqual(ops.cdn.served.map((u) => u.split('?')[0]), [picture.url], 'nothing fetched again');
+  } finally {
+    PAGES['ams-2-pro'] = real;
     rmSync(dir, { recursive: true, force: true });
     restoreFetch();
   }
