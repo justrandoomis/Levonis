@@ -4250,11 +4250,11 @@ export async function listCatalogProducts(
    * اقل من 30 الف» searches «فلامنت» under a black colour and a price of at most 30,000; «طابعة بدون
    * AMS» searches «طابعة» and leaves out every AMS and combo. Price, sale, spool and diameter join
    * the listing state (an explicit URL value wins); colours, materials and exclusions are judged
-   * per product before the listing step (`nlKeep`). Without `nl=1` the search is exactly as before.
-   * Deterministic code only: no model is asked.
+   * per product before the listing step (`nlKeep`). Without `nl=1` the search is exactly as before, and
+   * so it is with `nl=1` when nothing applied (the precision rule, docs/SEARCH.md §4e: a bare number, a
+   * dollar bound with no shop rate, a chip the URL already sets). Deterministic code only: no model is asked.
    */
-  const nl: NlQuery | null = q.nl === '1' && typed ? parseNlQuery(typed) : null;
-  const search = nl ? nl.text : typed;
+  const parsedNl: NlQuery | null = q.nl === '1' && typed ? parseNlQuery(typed) : null;
   // A slug as long as /api/catalog/:slug takes (80): the admin's taxonomy
   // slugs reach 63 (slugify's 60 + uniqueSlug's "-2"…"-50").
   const category = str(q.category, 'category', { max: 80, required: false });
@@ -4276,7 +4276,7 @@ export async function listCatalogProducts(
    * is dropped there, never thrown. `listing` is false for every request that
    * existed before it, and those keep the exact path below.
    */
-  let listingState = parseListingParams((k) => (k === 'search' ? search : q[k]), 'api');
+  let listingState = parseListingParams((k) => (k === 'search' ? typed : q[k]), 'api');
   /**
    * What the words narrowed, as data for the search chips (smart search 1.7
    * says it in ar, en and ckb). Each chip carries `drop`: the search text with
@@ -4284,13 +4284,22 @@ export async function listCatalogProducts(
    * field, so a removed chip is just another search.
    */
   let nlField: { understood?: { text: string; chips: Array<NlChip & { drop: string }> } } = {};
-  if (nl) {
+  /** The words as constraints when they narrowed something; null when nothing applied, and the request is the plain one. */
+  let nl: NlQuery | null = null;
+  if (parsedNl) {
     // A dollar bound («اقل من 5 ورقات», "under $500") is converted at the shop rate; without one it is not applied.
-    const usdIqd = nl.price?.currency === 'USD' ? ((await getPublicDisplayRate(db)).exchangeRate ?? null) : null;
-    const applied = nlApply(listingState, nl, { usdIqd });
-    listingState = applied.state;
-    nlField = { understood: { text: nl.text, chips: applied.understood.map((c) => ({ ...c, drop: nl.without[nlChipKey(c)] ?? nl.text })) } };
+    const usdIqd = parsedNl.price?.currency === 'USD' ? ((await getPublicDisplayRate(db)).exchangeRate ?? null) : null;
+    const applied = nlApply(listingState, parsedNl, { usdIqd });
+    // Nothing applied: the typed search, said back with no chips.
+    nlField = { understood: { text: typed, chips: [] } };
+    if (applied.understood.length) {
+      const words = parsedNl;
+      nl = words;
+      listingState = applied.state;
+      nlField = { understood: { text: words.text, chips: applied.understood.map((c) => ({ ...c, drop: words.without[nlChipKey(c)] ?? words.text })) } };
+    }
   }
+  const search = nl ? nl.text : typed;
   const nlKeep = nl && nlJudgesProducts(nl) ? (row: Record<string, unknown>) => nlKeeps(nl, nlProductOf(row)) : null;
   /**
    * `nl=1` takes the listing path only when the words narrowed something: a chip joined the listing
@@ -4679,7 +4688,7 @@ export async function listCatalogProducts(
       candidateCap: opts.caps?.candidates ?? LISTING_CANDIDATE_CAP,
       keysCap: opts.caps?.keys ?? LISTING_KEYS_CAP,
     });
-    return nl ? { ...paged, body: { ...paged.body, ...nlField } } : paged;
+    return parsedNl ? { ...paged, body: { ...paged.body, ...nlField } } : paged;
   }
   // One COUNT over the same WHERE, before ORDER BY and paging are appended.
   const countSql = !listing && opts.withTotal ? sql.replace(selectList, 'SELECT COUNT(*) AS n FROM products') : null;

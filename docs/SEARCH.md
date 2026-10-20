@@ -277,16 +277,91 @@ digits from every keyboard; number words (الف، مليون، هەزار، م�
 diameter, the sale mode («متوفر هسه» / «حجز»), refill or with spool («ريفل»,
 «بكرة كاملة», «بدون بكرة») and «رخيص» as the price order.
 
+**THE PRECISION RULE** (lead decision; it replaces the bare-number policy of
+smart search 1.6 rounds 1 to 3). The parser applies a constraint only when it
+is unambiguous; anything else stays plain search text and never hides a
+product. When nothing applies (nothing understood, or only a chip the URL
+already sets, or a dollar bound with no shop rate) the request is exactly the
+request without `nl=1`: the typed search, no `understood`.
+
+* **A price needs a money marker AND a comparator.** The amount carries a
+  marker of its own: a thousand or million word (الف، ألف، هزار، هەزار،
+  thousand, k; مليون، ملیۆن، million, m, mil), a money word or sign (دينار،
+  دینار، dinar، IQD، د.ع; $، دولار، dollar، USD; «ورقة», a hundred-dollar note),
+  or digits grouped in threes («30,000», «٣٠٬٠٠٠», «1.500.000»). And a clear
+  comparator or a range opener stands with it in the same clause (a comma or
+  «،» between them ends the clause): before the amount («اقل من», «أقل», «تحت»,
+  «دون», «بحدود», «اقصى», "under", "below", "less than", "max", "up to",
+  «کەمتر لە», «خوار»; «اكثر من», «فوق», "over", "above", "more than", "min",
+  "at least", «زیاتر لە», «لانی کەم») or after it («واقل», «فما دون», «ونازل»,
+  "or less", "and up", "+", «وطالع», Sorani «لە 30 هەزار کەمتر», «لە 500
+  هەزار زیاتر»), or a range opener («بين … و», «ما بين», «من … الى», "between
+  … and", "from … to", «لە نێوان … و», «لە … تا»; «من 30 الف ونازل» and «لە 20
+  هەزارەوە بۆ سەرەوە» are "from" with a bound after the amount).
+* **A bare number is never a price.** 30, 30000, 1500, «ثلاثين», a number
+  with no money word, may be a model, a size or a code: «اقل من 30», "under
+  1000", «بين 5000 و 15000», «زیاتر لە 500» apply nothing, and their words
+  stay in the search as typed («بين 20 و 30 الف» keeps its «و»; «اقل من 25
+  للبكرة» keeps «للبكرة», which is then no spool facet either). An amount
+  without a comparator is no price either: «نص مليون», «مليونين», «ب 500
+  الف», «250-400 الف» (no opener), «لە 20 هەزارەوە» alone. There is no
+  borrowing: a bare end never shares the money word of the other end («بين 25
+  و 50 الف», «بين 3 و 5 ورقات» apply nothing). A measure or a count after the
+  amount is no price («اقل من 1 كيلو», "under 300mm", «اقل من الف غرام»,
+  «کەمتر لە 2 کیلۆی PLA»); a price PER unit SOLD is, and the per-unit words go
+  with it («اقل من 25 الف للكيلو», "25k per kg", "25k/kg", «کەمتر لە 25 هەزار
+  بۆ هەر کیلۆیەک», «کیلۆی کەمتر لە 25 هەزار»): the units sold by are a kilo,
+  a gram, a piece, a roll, a spool, a litre, a millilitre and a metre; per a
+  length, a temperature, a power or a time it stays a measure. "Kobra 3 Max",
+  "Kobra 2 Plus" and "3+" are model names: max, min, plus and + after a bare
+  number are no bound.
+* **Ranges and two bounds.** A range applies only when both ends carry a
+  marker («بين 500 الف و مليون», "between 500k and 1m", «لە نێوان 20 هەزار
+  و 30 هەزار»). Written high-to-low it is sorted only when both ends carry the
+  same marker («بين 50 الف و 25 الف» is 25,000 to 50,000, "between 30,000 and
+  20,000" likewise); with two markers («بين مليون و 500 الف») it is not
+  applied. Two separate bounds apply only when BOTH qualify: «اكثر من 20 الف
+  واقل من 50 الف» is 20,000 to 50,000, «اكثر من 10 واقل من 30 الف» applies
+  neither; two currencies, or two bounds with nothing between them («اكثر من
+  مليون واقل من 500 الف»), apply neither.
+* **Negation around a price.** A negated comparator is read as its positive
+  meaning only in its FIXED FORMS: «لا يزيد عن», «لا يقل عن», «مو اكثر من»,
+  «مو اقل من», "no more than", "no less than", "not over", "not under", and the
+  Sorani «زیاتر نەبێت لە», «کەمتر نەبێت لە», «لە … زیاتر نەبێت», «لە … کەمتر
+  نەبێت» («نەبێ» too). Any other negation around a price leaves it unapplied
+  and searched as typed: «بدون اقل من 30 الف», «ما يزيد عن مليون» (MSA "what
+  exceeds", Iraqi "not more than"), «ما اريد اكثر من مليون», "not more than
+  500k", "nothing over 1m", «زیاتر نییە لە 30 هەزار», «کەمتر لە 20 هەزار
+  نەبێت».
+* **Exclusions are for known terms only.** A negation word («بدون», «بلا»,
+  «مو», «غير», "without", "no", "non-", «بێ», «بەبێ», «نەک» …) directly
+  before a known term leaves it out: AMS or a combo (they go together), a
+  colour, a material; over an article, a colour noun, "in" or "even" («بدون
+  اللون الاسود», «بدون الـ AMS», "not in black"). Before any other word it
+  excludes nothing and both words stay searched («طابعة بدون شاشة»). A list
+  after it («بدون AMS ولا كومبو», «بدون AMS والا كومبو», «بدون AMS او كومبو»,
+  "without AMS or combo", "without AMS nor combo", «بێ AMS یان کۆمبۆ») leaves
+  out each known term; an unknown word in the list stays searched and the list
+  runs on to its next list word («بدون AMS ولا P1S ولا كومبو» leaves out AMS
+  and the combo, and searches P1S). A carried negation never touches a price,
+  the sale mode, the spool or the order: they are read as written, and the
+  list runs on past them. «ولا» and «والا» are "or" without a negation («PLA
+  ولا PETG» lists both). The Sorani negation after a known term («ڕەش نەبێت»,
+  «PLA نەبێت», «بەردەست نییە») is the same.
+* **The rest, as before.** A colour or a material anywhere (a material stays a
+  search word and also narrows the materials). The diameter (1.75 / 2.85) only
+  in a query about filament (a filament or material word), «قطر» or mm beside
+  it or not; a negated diameter is no facet. The sale mode only for its fixed
+  phrases («متوفر», «موجود», "in stock", "available now", «بەردەستە»; «حجز»,
+  "pre-order", «پێشوەختە»; negated, the other one): "direct drive" and "AMS
+  ready" are features. Refill or with spool for the refill words, «مع بكرة»,
+  «بكرة كاملة», «بدون بكرة»; a bare spool word only in a query about filament
+  («PLA بكرة»), never beside an empty, holder, reusable, adapter or buffer word.
 * **What becomes a filter leaves the search.** Price, sale, colour and sort
   words and the negations are consumed, and so are the spool and diameter
-  words that became the facet. A spool word is the facet beside a filament or
-  material word («PLA بكرة», "filament with spool"), with «مع» / «كاملة», or
-  negated («بدون بكرة» is a refill); consumed there, it never reaches the
-  `spool → filament` synonym. Alone a spool word or a diameter names a product
-  and STAYS in the search («بكرة», "spool", "Bambu Reusable Spool", "PTFE
-  1.75"), as it does beside an empty, holder, reusable, adapter or buffer word
-  («بكرة فارغة», «حامل بكرة»). A material stays a search word and also narrows
-  the materials.
+  words that became the facet: consumed, a spool word never reaches the
+  `spool → filament` synonym. With nothing left to search, the whole shop is
+  listed under the constraints.
 * **Where each lands.** Price, sale, spool and diameter join the listing state
   (an explicit URL value wins). Colours, materials and exclusions are judged
   per product before the filters, the counts and the paging: an exclusion
@@ -294,49 +369,11 @@ diameter, the sale mode («متوفر هسه» / «حجز»), refill or with spo
   («works with the AMS» is written on printers sold without one); a colour
   needs evidence (the colour facet, a name, a colour or option value sold); a
   material judges only products that have a `material_type`.
-* **Never a guess.** A number with no money word and no bound is not a price
-  (X1C, 0.4, 6×2, 10101, a resin printer «8K»). Nor is a bare number with a
-  measure or a count after it («اقل من 1 كيلو», "under 300mm", "up to 300°C",
-  «اقل من 3 قطع», Sorani «کەمتر لە 1 کیلۆ», «کەمتر لە 2 کیلۆی PLA»): the
-  words stay in the search. A price PER unit SOLD is a price, and the per-unit
-  words go with it, before the amount, after it or after a final bound («اقل
-  من 25 للكيلو», «لكل كيلو», «بالكيلو», "per kg", "25/kg", "25 / kg",
-  "25k/kg", «25 الف او اقل للكيلو», Sorani «بۆ هەر کیلۆ», «بۆ هەر کیلۆیەک»,
-  «بۆ کیلۆیەک», «کیلۆی کەمتر لە 25 هەزار», «لە 25 هەزار کەمتر بۆ هەر
-  کیلۆیەک»: at most 25,000). The units things are sold by are a kilo, a gram,
-  a piece («قطعة», «دانة», «حبة», «دانە», «پارچە»), a roll, a spool, a litre,
-  a millilitre and a metre («متر», «مەتر»); after «per» or a prefix a length,
-  a temperature, a power or a time («للسم», «بالدرجة», «للواط», «لكل ساعة»,
-  "per hour") stays a measure, never a price. "Kobra 3 Max", "Kobra 2 Plus"
-  and "3+" are model names: max, min, plus and + after a number are a bound
-  only after a money word or k ("30k max"). «ولا» and «والا» are "or" («PLA
-  ولا PETG» lists both). Right after a negation, "or" in every language
-  carries it on: «بدون AMS ولا كومبو», «بدون AMS والا كومبو», «بدون AMS او
-  كومبو», "without AMS or combo", "without AMS nor combo", «بێ AMS یان
-  کۆمبۆ» leave both out; without a negation "AMS or combo" lists both. With
-  nothing left to search, the whole shop is listed under the constraints.
-* **A bare number beside a bound** (no money word, no separator) is read by
-  one rule, for an upper and a lower bound alike: **below 1,000 it counts
-  thousands** (Iraqi shorthand: «اقل من 30» is 30,000, «اكثر من 500»
-  500,000, «اقل من 999» 999,000); **from 1,000 it is dinars as written**
-  («اقل من 1000» is 1,000, «اقل من 1500» 1,500, «اقل من 30000» 30,000,
-  «اكثر من 20000» at least 20,000, "over 50000", «زیاتر لە 30000», «30000 او
-  اكثر»). Grouped in threes («30,000», «٣٠٬٠٠٠») it is written in full; with
-  a money word («30 الف», «30000 دينار») it is what the word says. (The
-  monotonic reading of 7f4c071c, «اقل من 30000» as 10,000,000, is withdrawn.)
-* **A range reads each end by the same rule** and is never inverted: «بين
-  5000 و 15000» is 5,000 to 15,000, «من 5000 الى 20000» and "from 2000 to
-  20000" likewise, «بين 500 و 900» 500,000 to 900,000. When the rule would
-  invert the order written («بين 500 و 1200» read as 500,000 then 1,200), the
-  smaller end is read as written too: 500 to 1,200. A grouped end beside a
-  bare one follows the same rule («بين 5,000 و 15» is 5,000 to 15,000). A
-  range read ascending is never swapped; one written descending («بين 50 و
-  25») is the range between its ends. A bare end below 1,000 beside an end
-  with a money word shares that word («بين 2 و 3 مليون», «بين 25 و 50 الف»,
-  «بين مليون و 2»); from 1,000 it follows the rule («بين 1500 و 2 مليون» is
-  1,500 to 2,000,000, «بين 5 الف و 9000» 5,000 to 9,000), and takes
-  thousands only when the rule would invert the order («بين 500 الف و 1200»
-  ends at 1,200,000). The answer carries
+* **The chip drop contract.** Each chip's `drop` is the search text with that
+  chip's words taken out; read again it gives the same answer less exactly that
+  chip (removing the first exclusion of a negation list keeps the negation for
+  the rest). The golden corpus (`tests/nlQueryGolden.test.ts`) states every row
+  to this rule and checks the contract on each. The answer carries
   `understood: { text, chips }` — data for the chips the search UI words in
   ar, en and ckb (smart search 1.7). `nl` is part of the edge cache key.
 
