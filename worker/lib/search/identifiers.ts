@@ -315,6 +315,42 @@ function codeLike(chunk: string, key: string): boolean {
   return digits >= 2;
 }
 
+/**
+ * THE INDEX TOKENS THAT SPELL A CODE IN A PRODUCT'S TEXT, in the pieces the
+ * tokeniser writes them (./normalize.ts `tokenize`): words split on every
+ * separator, each word into its letter and digit runs, and a run of one
+ * character joined to the run before it (one character is never indexed) —
+ * «CR-10» and «CR10» are `cr` `10`, «PA12-CF» `pa` `12` `cf`, «TPU95A» `tpu`
+ * `95a`, «X1C/P1S» `x1c` `p1s`. A product whose index holds every piece (or
+ * the joined key itself, `cr10`) has the code written in its name or
+ * description, and "no exact match for CR-10" said above the CR-10 would be
+ * false. Pieces past the longest indexed token are left out.
+ */
+export function codePieces(text: string): string[] {
+  const words = foldText(String(text).normalize('NFKC'))
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+  const pieces: string[] = [];
+  for (const word of words) {
+    const runs = word.split(/(?<=\p{L})(?=\p{N})|(?<=\p{N})(?=\p{L})/u);
+    const own: string[] = [];
+    let carry = '';
+    for (const run of runs) {
+      const piece = carry + run;
+      if (piece.length >= 2) {
+        own.push(piece);
+        carry = '';
+      } else carry = piece;
+    }
+    if (carry && own.length > 0) own[own.length - 1] += carry;
+    for (const p of own) if (p.length <= MAX_PIECE && !pieces.includes(p)) pieces.push(p);
+  }
+  return pieces;
+}
+
+/** ./normalize.ts `MAX_TOKEN`: nothing longer is ever an index token. */
+const MAX_PIECE = 32;
+
 /** The codes and measures a query holds. Pure: no database. */
 export function extractIdentifiers(text: unknown): QueryIdentifiers {
   if (typeof text !== 'string' || text.trim() === '') return { codes: [], measures: [], onlyCodes: false };
@@ -367,6 +403,13 @@ export interface IdentifierAnswer {
   whole: boolean;
   /** productId → the selection its codes and sizes name. Products with nothing to preselect are absent. */
   matched: Map<string, MatchedSelection>;
+  /**
+   * Products the caller may show that carry a typed code in their TEXT — its
+   * name, description or an alias spells it (`codePieces`) — and are not in
+   * `exact`. Not an exact answer (no identifier row names them), but not a
+   * near miss either: when `whole` lists `exact` alone, these follow it.
+   */
+  spelled: string[];
   /** The codes, as typed, that no product the caller may show carries — "no exact match for …". */
   miss: string[];
 }
@@ -398,17 +441,27 @@ const IDENTIFIER_HITS = (src: string, param: string, kindTest: string, limit: nu
 
 /**
  * ONE STATEMENT, SEVEN PARAMETERS, however many codes: the identifier hits of
- * the codes (?1) and of the sizes (?2), the index tokens that spell a code
- * whole (?3 — a code written in a product's name or description is not a
- * miss), and one row saying whether any identifier or token merely STARTS
- * with the chunk still being typed (?4–?7, `live` 1 when one does). Four
- * compound terms: D1 refuses more than five.
+ * the codes (?1) and of the sizes (?2), the products whose index SPELLS a code
+ * (?3 — a code written in a product's name or description is not a miss), and
+ * one row saying whether any identifier or token merely STARTS with the chunk
+ * still being typed (?4–?7, `live` 1 when one does). Four compound terms: D1
+ * refuses more than five.
+ *
+ * ?3 is `[[key, joined, [tokens to read], pieces], …]`, one entry per code
+ * (`codePieces`): a product spells the code when it holds the joined key as one
+ * token, or every one of its pieces. Grouped in SQL, so a common piece («10»,
+ * «cr») costs rows read, never rows returned.
  */
 const LANE_SQL = `${IDENTIFIER_HITS('id', '?1', "si.kind <> 'measure'", 400)}
   UNION ALL ${IDENTIFIER_HITS('measure', '?2', "si.kind = 'measure'", 1000)}
   UNION ALL SELECT * FROM (
-    SELECT 'token', t.token, t.product_id, '', '', '', 1, NULL, NULL FROM search_tokens t
-     WHERE t.token IN (SELECT value FROM json_each(?3)) LIMIT 400)
+    SELECT 'token', json_extract(c.value, '$[0]'), t.product_id, '', '', '', 1, NULL, NULL
+      FROM json_each(?3) c
+      JOIN json_each(json_extract(c.value, '$[2]')) p
+      JOIN search_tokens t ON t.token = p.value
+     GROUP BY c.key, t.product_id
+    HAVING MAX(t.token = json_extract(c.value, '$[1]')) = 1 OR COUNT(DISTINCT t.token) >= json_extract(c.value, '$[3]')
+     LIMIT 400)
   UNION ALL SELECT 'prefix', '', '', '', '', '',
     (EXISTS (SELECT 1 FROM search_identifiers si WHERE ?4 <> '' AND si.key > ?4 AND si.key < ?5)
       OR EXISTS (SELECT 1 FROM search_tokens t WHERE ?6 <> '' AND t.token > ?6 AND t.token < ?7)), NULL, NULL`;
@@ -468,7 +521,7 @@ export interface ResolveOptions {
  */
 export async function resolveIdentifier(db: D1Database, text: string, opts: ResolveOptions = {}): Promise<IdentifierAnswer | null> {
   const { codes, measures, onlyCodes } = extractIdentifiers(text);
-  const empty: IdentifierAnswer = { exact: [], whole: false, matched: new Map(), miss: [] };
+  const empty: IdentifierAnswer = { exact: [], whole: false, matched: new Map(), miss: [], spelled: [] };
   if (codes.length === 0 && measures.length === 0) return empty;
   if (!(await searchIdentifiersInstalled(db))) return null;
 
@@ -482,7 +535,15 @@ export async function resolveIdentifier(db: D1Database, text: string, opts: Reso
       .bind(
         JSON.stringify(codes.map((c) => c.key)),
         JSON.stringify(measures),
-        JSON.stringify(codes.filter((c) => c.reportable).map((c) => c.key.toLowerCase())),
+        JSON.stringify(
+          codes
+            .filter((c) => c.reportable)
+            .map((c) => {
+              const joined = c.key.toLowerCase();
+              const pieces = codePieces(c.text);
+              return [c.key, joined, [...new Set([...pieces, joined])], Math.max(1, pieces.length)];
+            })
+        ),
         idPrefix,
         idPrefix ? `${idPrefix}~` : '',
         tokenPrefix,
@@ -518,7 +579,12 @@ export async function resolveIdentifier(db: D1Database, text: string, opts: Reso
   const tokenRows = rows.filter((r) => r.src === 'token');
   const ids = [...new Set([...codeHits, ...tokenRows].map((r) => String(r.product_id)))];
   let shown: ReadonlySet<string> | null = null;
-  if (opts.visible && ids.length > 0) shown = await opts.visible(ids).catch(() => null);
+  if (opts.visible && ids.length > 0) {
+    shown = await opts.visible(ids).catch((e: unknown) => {
+      console.warn('search identifier lane: visibility read failed:', e instanceof Error ? e.message : String(e));
+      return null;
+    });
+  }
   const isShown = (pid: string) => shown === null || shown.has(pid);
   const shownHits = codeHits.filter((r) => isShown(String(r.product_id)));
 
@@ -544,7 +610,7 @@ export async function resolveIdentifier(db: D1Database, text: string, opts: Reso
     // A short or word-like code («X2D» as a SKU) never narrows the list to itself: only a code-like one does.
     if (hits.length === 0 || !c.reportable) whole = false;
     if (hits.length > 0 || !c.reportable) continue;
-    const spelled = tokenRows.some((r) => r.key === c.key.toLowerCase() && isShown(String(r.product_id)));
+    const spelled = tokenRows.some((r) => r.key === c.key && isShown(String(r.product_id)));
     const started = c === typed && rows.some((r) => r.src === 'prefix' && live(r));
     if (!spelled && !started) miss.push(c.text);
   }
@@ -560,5 +626,13 @@ export async function resolveIdentifier(db: D1Database, text: string, opts: Reso
     const sel = selectionOf(list);
     if (sel) matched.set(pid, sel);
   }
-  return { exact, whole: whole && exact.length > 0, matched, miss };
+  // The products that spell a typed code in their text, in the order the codes were typed.
+  const spelled: string[] = [];
+  for (const c of codes) {
+    for (const r of tokenRows) {
+      const pid = String(r.product_id);
+      if (r.key === c.key && isShown(pid) && !inExact.has(pid) && !spelled.includes(pid)) spelled.push(pid);
+    }
+  }
+  return { exact, whole: whole && exact.length > 0, matched, miss, spelled };
 }

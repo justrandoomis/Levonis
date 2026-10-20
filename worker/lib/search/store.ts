@@ -37,6 +37,7 @@ import {
   candidatePrefixes,
   expandQuery,
   resolveTokens,
+  productsLackingMeasures,
   scoreProducts,
   SKELETON_MARK,
   type IndexRow,
@@ -117,10 +118,12 @@ export const INDEX_STAMP = '#doc:6';
  *          code, a part code, a SKU code and the identity model and series of
  *          a product, read by one loader that both writers use. On a database
  *          without 0194 the rewritten rows are the #doc:4 rows exactly.
- *   #doc:6 — measures are tokens: «0.4», «1.75» and
- *          «6×2» are written `0.4`, `1.75`, `6x2`, with the unit as its own
- *          word, and the Arabic-Indic and Eastern digits are folded to ASCII
- *          (./normalize.ts). The Arabic and Sorani descriptions, the brand and
+ *   #doc:6 — measures are tokens: «0.4», «1,75» and
+ *          «Ø6×2» are written `0.4`, `1.75`, `6x2` (a three-part size with its
+ *          footprint beside it), with the unit as its own word, and the
+ *          Arabic-Indic and Eastern digits are folded to ASCII
+ *          (./normalize.ts). Until a product is rewritten, a size is not
+ *          required of it (./index.ts `ScoreOptions.measureExempt`). The Arabic and Sorani descriptions, the brand and
  *          section names in every language and the variant SKUs are indexed;
  *          prose and measures carry no skeleton. The rows are written 500 to a
  *          statement (`INDEX_ROWS_PER_STATEMENT`), so the backfill that
@@ -728,7 +731,34 @@ export async function searchProducts(
     .bind(JSON.stringify(tokens))
     .all<IndexRow>();
 
-  const scored: ScoredProduct[] = scoreProducts(scoring, matched, postings ?? []);
+  /**
+   * A SIZE IS REQUIRED ONLY OF A PRODUCT INDEXED WITH SIZES (`ScoreOptions.
+   * measureExempt` in ./index.ts). The products that match the query's other
+   * words but not its measure are asked whether they carry `INDEX_STAMP`; the
+   * ones that do not are still on an older builder's rows — the catch-up has
+   * not reached them — and rank after the products that carry the size
+   * instead of vanishing. One read, only for a query with a size, and only
+   * when somebody lacks it; it returns the stale ones alone, so once the
+   * catch-up is done it returns nothing. A failed read keeps the size
+   * required of everybody.
+   */
+  let measureExempt: Set<string> | undefined;
+  const lacking = productsLackingMeasures(scoring, matched, postings ?? []);
+  if (lacking.length > 0) {
+    measureExempt = await db
+      .prepare(
+        `SELECT l.value AS product_id FROM json_each(?2) l
+          WHERE NOT EXISTS (SELECT 1 FROM search_tokens t WHERE t.token = ?1 AND t.product_id = l.value)`
+      )
+      .bind(INDEX_STAMP, JSON.stringify(lacking))
+      .all<{ product_id: string }>()
+      .then(({ results }) => new Set((results ?? []).map((r) => String(r.product_id))))
+      .catch((e: unknown) => {
+        console.warn('search: index-version read failed, a size stays required of every product:', e instanceof Error ? e.message : String(e));
+        return undefined;
+      });
+  }
+  const scored: ScoredProduct[] = scoreProducts(scoring, matched, postings ?? [], { measureExempt });
   let ids = scored.slice(0, limit).map((s) => s.product_id);
   if (opts.visible && scored.length > limit) {
     const pool = scored.slice(0, limit * VISIBILITY_OVERFETCH).map((s) => s.product_id);
@@ -1034,8 +1064,15 @@ export interface SearchIndexStatus {
   failed: number;
   /** `current / active` (1 for an empty catalogue). Coverage is complete at 1. */
   coverage: number;
-  /** The pace that closes the gap: products per budgeted pass, one pass a quarter-hour. */
-  backfill: { per_pass: number; every_minutes: number; passes_left: number };
+  /**
+   * AN UPPER BOUND ON THE PACE, not a measurement. A budgeted pass selects at
+   * most `max_per_pass` products, one pass a quarter-hour; how many it really
+   * writes is set by what the tick's other jobs leave of D1's 1,000
+   * statements and by each product's size (its token and identifier
+   * statements), so a busy tick writes fewer. `min_passes_left` is therefore
+   * the FEWEST quarter-hours the rest can take; `coverage` is the exact count.
+   */
+  backfill: { max_per_pass: number; every_minutes: number; min_passes_left: number };
   /**
    * The identifier lane (migration 0206). While it is installed a product is
    * `current` only with its identifier rows written too (`IDENTIFIER_STAMP`).
@@ -1056,9 +1093,9 @@ export interface SearchIndexStatus {
  */
 export async function searchIndexStatus(db: D1Database): Promise<SearchIndexStatus> {
   const pace = (left: number) => ({
-    per_pass: SEARCH_BACKFILL_BUDGETED_LIMIT,
+    max_per_pass: SEARCH_BACKFILL_BUDGETED_LIMIT,
     every_minutes: 15,
-    passes_left: Math.ceil(left / SEARCH_BACKFILL_BUDGETED_LIMIT),
+    min_passes_left: Math.ceil(left / SEARCH_BACKFILL_BUDGETED_LIMIT),
   });
   if (!(await searchIndexInstalled(db))) {
     return {

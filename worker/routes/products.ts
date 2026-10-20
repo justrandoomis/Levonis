@@ -4441,7 +4441,12 @@ export async function listCatalogProducts(
         () => searchProducts(db, search, { limit: SEARCH_RESULT_LIMIT, completeLast: typingLastWord, visible: listedIds }),
         null as { ids: string[]; indexReady: boolean } | null
       ),
-      resolveIdentifier(db, search, { typing: typingLastWord, visible: listedIds }).catch(() => null),
+      // A missing 0206 is answered null inside the lane without throwing; anything that reaches here
+      // is a real failure (a statement D1 refused), logged so a silently lost `exact` can be found.
+      resolveIdentifier(db, search, { typing: typingLastWord, visible: listedIds }).catch((e: unknown) => {
+        console.error('search identifier lane failed:', e instanceof Error ? e.message : String(e));
+        return null;
+      }),
     ]);
     identity = ident;
     const exactIds = [...new Set((ident?.exact ?? []).map((h) => h.product_id))];
@@ -4467,9 +4472,18 @@ export async function listCatalogProducts(
       }, rows: new Map() };
     } else if (exactIds.length > 0) {
       // The exact answers first, in the order their codes were typed; then the ranking, without them —
-      // unless the query was nothing but codes, all carried: then the exact answer is the whole answer.
+      // unless the query was nothing but codes, all carried: then the exact answer is the whole answer,
+      // with the products that write the code in their own text after it (`spelled`, in the ranking's
+      // order). Only the near matches — the cutting mats one character away — are left out.
       const exactSet = new Set(exactIds);
-      searchOrder = ident?.whole ? exactIds : [...exactIds, ...hits.ids.filter((id) => !exactSet.has(id))];
+      if (ident?.whole) {
+        const spelled = new Set(ident.spelled.filter((id) => !exactSet.has(id)));
+        const ranked = hits.ids.filter((id) => spelled.has(id));
+        const rankedSet = new Set(ranked);
+        searchOrder = [...exactIds, ...ranked, ...[...spelled].filter((id) => !rankedSet.has(id))];
+      } else {
+        searchOrder = [...exactIds, ...hits.ids.filter((id) => !exactSet.has(id))];
+      }
       sql += ' AND id IN (SELECT value FROM json_each(?))';
       params.push(JSON.stringify(searchOrder));
     } else {

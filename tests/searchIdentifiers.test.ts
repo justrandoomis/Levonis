@@ -27,6 +27,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { APEX, asD1, ctx, dbThrough, freshDb, json, stubApp } from './fixtures/app';
 import { limitD1, maxParams, violations } from './fixtures/d1Limits';
 import {
+  codePieces,
   extractIdentifiers,
   IDENTIFIER_ROWS_PER_STATEMENT,
   IDENTIFIER_STAMP,
@@ -309,6 +310,74 @@ test('a search without a code answers exactly as before: no new keys', async () 
   const b = await search(db, 'Cutting Mat');
   assert.deepEqual(b.products.map((p) => p.id).sort(), ['p_mat1', 'p_mat2']);
   for (const k of ['exact', 'matched', 'exact_miss']) assert.ok(!(k in b), k);
+});
+
+// -------------------------------------------------------------------------
+// A code written in a product's own text (review of 1.5)
+// -------------------------------------------------------------------------
+
+/** Codes written in names, with separators, in pieces, beside the rows-7 shop's identifier rows. */
+async function spelledShop(): Promise<DatabaseSync> {
+  const raw = await codedShop();
+  const product = (id: string, name: string) =>
+    raw.prepare(`INSERT INTO products (id, slug, name, description, price_iqd, status) VALUES (?, ?, ?, '', 1000, 'active')`).run(id, id, name);
+  product('p_cr10', 'Creality CR-10 SE 3D Printer');
+  product('p_pa12', 'Polymaker PA12-CF Filament');
+  product('p_tpu', 'Bambu TPU 95A HF');
+  product('p_tpu2', 'Bambu TPU 85A/90A');
+  product('p_x1c', 'Hotend for X1C/P1S');
+  // Row 7's code, written in another product's NAME: not an identifier row, but the code the shopper typed.
+  product('p_kit', 'Hotend Kit with FAP035 heater (2 pcs)');
+  // And a product that has FAP and 035 nowhere together.
+  product('p_far', 'FAP Cleaning Kit');
+  const run = await backfillSearchIndex(asD1(raw), { limit: 50 });
+  assert.deepEqual(run.failed, []);
+  return raw;
+}
+
+test('the pieces a code is written in: separators split, letter and digit runs split, a lone character joins its neighbour', () => {
+  assert.deepEqual(codePieces('CR-10'), ['cr', '10']);
+  assert.deepEqual(codePieces('CR10'), ['cr', '10']);
+  assert.deepEqual(codePieces('PA12-CF'), ['pa', '12', 'cf']);
+  assert.deepEqual(codePieces('TPU95A'), ['tpu', '95a']);
+  assert.deepEqual(codePieces('85A/90A'), ['85a', '90a']);
+  assert.deepEqual(codePieces('X1C/P1S'), ['x1c', 'p1s']);
+  assert.deepEqual(codePieces('FAP035'), ['fap', '035']);
+  assert.deepEqual(codePieces('١٠١٠٢'), ['10102']);
+});
+
+test('a code a listed product writes in its own name is not "no exact match" — CR-10, CR10, PA12-CF, TPU95A, 85A/90A, X1C/P1S', async () => {
+  const db = limitD1(await spelledShop());
+  for (const [q, pid] of [
+    ['CR-10', 'p_cr10'],
+    ['CR10', 'p_cr10'],
+    ['Creality CR-10', 'p_cr10'],
+    ['PA12-CF', 'p_pa12'],
+    ['TPU95A', 'p_tpu'],
+    ['85A/90A', 'p_tpu2'],
+    ['X1C/P1S', 'p_x1c'],
+  ] as const) {
+    for (const typing of [false, true]) {
+      const b = await search(db, q, { typing });
+      assert.ok(b.products.some((p) => p.id === pid), `${q}${typing ? ' (typing)' : ''}: ${pid} listed — ${b.products.map((p) => p.id).join(' ')}`);
+      assert.equal(b.exact_miss, undefined, `${q}${typing ? ' (typing)' : ''}: the listed product carries it`);
+    }
+  }
+  // Pieces that do not occur together are not the code: FAP and 035 apart, or a different number.
+  assert.deepEqual((await search(db, 'FAP036')).exact_miss, ['FAP036']);
+  assert.deepEqual((await search(db, 'CR-11')).exact_miss, ['CR-11']);
+  assert.deepEqual(violations, []);
+});
+
+test('a query of nothing but a code keeps the products that write it in their own text, after the exact one; the near matches stay out', async () => {
+  const db = limitD1(await spelledShop());
+  for (const q of ['FAP035', 'fap-035']) {
+    const b = await search(db, q);
+    assert.deepEqual(b.exact?.map((h) => h.product_id), ['p_hotend'], q);
+    assert.deepEqual(b.products.map((p) => p.id), ['p_hotend', 'p_kit'], `${q}: the exact product, then the kit that names FAP035 — no cutting mat, no FAP-only kit`);
+    assert.equal(b.exact_miss, undefined);
+  }
+  assert.deepEqual(violations, []);
 });
 
 test('the whole lane binds far under D1’s 100 parameters, whatever the query holds', async () => {

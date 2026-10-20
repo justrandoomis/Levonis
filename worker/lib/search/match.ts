@@ -24,7 +24,8 @@
 /**
  * True for a token the measure pass wrote (./normalize.ts `extractMeasures`):
  * a number with a dot (`0.4`, `1.75`) or a dimension (`6x2`, `20x20x2`).
- * These are matched exactly, never completed and never forgiven a typo.
+ * These are matched exactly and never forgiven a typo; one is completed only
+ * while it is typed and no product carries it whole (`bestMatches`).
  *
  * HERE, NOT IN ./normalize.ts: the storefront's entry chunk carries
  * `normalizeText` (the grey completion, src/components/search/ghost.ts), and a
@@ -183,10 +184,24 @@ export function bestMatches(
   opts: MatchOptions = {}
 ): TokenMatch[] {
   const exact = vocabulary.includes(queryToken);
-  // A MEASURE IS EXACT OR NOTHING — never completed, never forgiven. `6x2` is
-  // a prefix of `6x20` and one edit from `6x3`, `0.4` a prefix of `0.45`, and
-  // each of those is a different part (./normalize.ts `extractMeasures`).
-  if (isMeasureToken(queryToken)) return exact ? [{ token: queryToken, score: 1 }] : [];
+  // A MEASURE IS EXACT OR NOTHING — never forgiven, and completed only while it
+  // is typed and NOBODY carries it whole. `6x2` is a prefix of `6x20` and one
+  // edit from `6x3`, `0.4` a prefix of `0.45`, and each of those is a different
+  // part (./normalize.ts `extractMeasures`): a shop that sells a 6×2 magnet
+  // answers «6x2» with it alone. But «PLA 1.7», paused on the way to 1.75, is
+  // nobody's size yet, and requiring it whole emptied the list at every pause;
+  // its completions (other SIZES that begin with it) carry it instead. Finished
+  // — a space typed, or a tool's lookup — it is `1.7` or nothing.
+  if (isMeasureToken(queryToken)) {
+    if (exact) return [{ token: queryToken, score: 1 }];
+    if (!opts.complete) return [];
+    const worth = (m: TokenMatch) => (opts.weights?.get(m.token) ?? 1) * m.score;
+    return vocabulary
+      .filter((c) => c.startsWith(queryToken) && isMeasureToken(c))
+      .map((c) => ({ token: c, score: prefixScore(queryToken, c) }))
+      .sort((a, b) => worth(b) - worth(a) || a.token.localeCompare(b.token))
+      .slice(0, limit);
+  }
   if (exact && !opts.complete) return [{ token: queryToken, score: 1 }];
 
   // The mark on a skeleton key is not a letter anybody typed.

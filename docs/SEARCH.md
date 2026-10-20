@@ -142,14 +142,36 @@ measures out whole, before the punctuation goes, and writes them one way:
 | «0.4», «0.40», «.4», «٠٫٤», «۰.۴» | `0.4` |
 | «1.75mm», «PLA1.75» | `1.75` (and `mm`, `pla` as words) |
 | «6×2», «6x2», «6*2», «6 x 2», «٦x٢» | `6x2` |
-| «20×20×2» | `20x20x2` |
+| «Ø6×2mm», «D6x2 mm», «Φ6x2», «مغناطيس6×2» | `6x2` — a diameter mark, a lone D or an Arabic word glued in front is not part of the size |
+| «0,4», «٠،٤», «1,75mm» | `0.4`, `1.75` — a decimal comma (a comma before three digits, «27,000», stays a thousands separator) |
+| «20×20×2», «256×256×256» | `20x20x2` and its footprint `20x20` (index side) |
 | «2.0» | `2` — an ordinary number again |
-| «m3x8» | `m3x8` — a dimension glued to a word stays the word |
+| «m3x8» | `m3x8` — a dimension glued to a Latin word stays the word |
 
-On the query side a measure is **exact and required**: never completed (`6x2`
-is a prefix of `6x20`), never forgiven a typo (`6x3` is one edit away), and a
-product that does not carry it is not an answer, however well it matches the
-other words. «nozzle 0.3», where nobody sells a 0.3, answers nothing.
+A three-part size also writes its **footprint** on the index side: a printer's
+«256×256×256» build volume answers «256x256» beside the plate written
+«256x256»; «256x256x256» typed still asks for all three parts (the query does
+not count the footprint as a second word).
+
+On the query side a measure is **exact and required**: never forgiven a typo
+(`6x3` is one edit away), and a product that does not carry it is not an
+answer, however well it matches the other words. «nozzle 0.3», where nobody
+sells a 0.3, answers nothing. Two exceptions, both about what counts as
+carrying it:
+
+* **The size still being typed** (it ends the query, no space or unit after
+  it) is completed to the sizes that begin with it — only when no product
+  carries it whole. «PLA 1.7», paused on the way to 1.75, lists the 1.75
+  filament instead of nothing; «6x2» is the 6×2 magnet and never the 6×20 it
+  is a prefix of; «PLA 1.7 », finished, is 1.7 or nothing.
+* **A product still on an older builder's rows** (no `INDEX_STAMP`: the
+  catch-up has not rewritten it since the stamp bump) has no measure tokens to
+  carry, so it is not ruled out by one: it ranks after every product that
+  carries the size, on its other words. `searchProducts` asks which of the
+  products lacking the size carry the stamp — one read, only for a query with
+  a size and only when somebody lacks it. Without this, a deploy that bumps the
+  stamp would answer «nozzle 0.4» and «PLA 1.75» with nothing until the
+  catch-up finished. Once coverage is 1, a size is required of everybody.
 
 ### 4b. A query's grammar
 
@@ -196,17 +218,25 @@ both, beside the ranked search and in the same wave:
   sizes name, for the card's link; `exact_miss` — the codes, as typed, that no
   product the shopper may see carries. The words for the miss line («no exact
   match for …», in ar, en and ckb) belong to the search UI, not the API.
-* **A query of nothing but codes, all carried, is answered by them alone.**
-  «FAP035» has one answer; the cutting mats whose «FAP030» shares its letters
-  are not answers to it. A code beside words («FAP035 hotend») puts the exact
-  products first and keeps the ranking after them.
+* **A query of nothing but codes, all carried, is answered by them** — and by
+  the products that write the code in their own text (`spelled`, below),
+  after them in the ranking's order. «FAP035» has one exact answer; a kit
+  named "with FAP035 heater" carries the code too; the cutting mats whose
+  «FAP030» shares its letters are not answers to it. A code beside words
+  («FAP035 hotend») puts the exact products first and keeps the ranking after
+  them.
 * **A miss is only said about a code.** Four characters at least, and five
   digits («10102», a GTIN) or letters with two digits or more («FAP036»,
   «RTX4090»). Never a word, a model name («X1-Carbon», «A1 mini»), a size
   («0.4mm», «PLA1.75»), a quantity («1000g») or a short number («2024»). And
-  never when the code is spelled whole in a visible product's index (a code in
-  a name or description is not "nothing"), nor while the last chunk is still
-  being typed and some code starts with it.
+  never when a visible product's index **spells** the code — a code in a name
+  or description is not "nothing" — nor while the last chunk is still being
+  typed and some code starts with it. Spelled means the joined key as one
+  token (`fap035`) or every **piece** of the code as the tokeniser writes it
+  (`codePieces`: separators split, letter and digit runs split, a lone
+  character joined to its neighbour) on one product: «CR-10» and «CR10» are
+  `cr` `10`, «PA12-CF» `pa` `12` `cf`, «TPU95A» `tpu` `95a`, «X1C/P1S» `x1c`
+  `p1s`. «CR-11» against the CR-10 is still a miss.
 * **Honest about what it cannot see.** A hidden product's code is a miss, not a
   leak. A code that belongs to a selection counts while that selection is
   sold: a discontinued colour's code is not an exact answer, though the
@@ -214,9 +244,11 @@ both, beside the ranked search and in the same wave:
   nothing about codes at all — no `exact`, no `exact_miss` — and the ranked
   search answers alone.
 * **One statement, seven parameters**, however many codes (at most twelve a
-  query): the hits of the codes and of the sizes, the index tokens that spell
-  a code whole, and whether anything starts with the code still being typed.
-  Four compound terms; D1 refuses more than five.
+  query): the hits of the codes and of the sizes, the products whose index
+  spells a code (grouped in SQL, so a common piece such as «10» costs rows
+  read, not rows returned), and whether anything starts with the code still
+  being typed. Four compound terms; D1 refuses more than five. A lane that
+  fails is logged and the ranked search answers alone.
 
 ### 4d. The cost
 
@@ -343,10 +375,13 @@ D1 stand-in that refuses what D1 refuses.
   ticks; now a few ticks rewrite the catalogue.
 * **The rollout is visible.** `GET /api/admin/search/index-status` answers the
   stamp, the active products, how many are `current`, still on an `older`
-  builder's rows, `missing` or `failed`, the `coverage` (current / active) and
-  the passes left. Coverage 1 is the whole active catalogue on the current
-  builder. Until then a product on older rows still answers by its old tokens,
-  and is not an answer to a measure it was not yet indexed with.
+  builder's rows, `missing` or `failed`, and the `coverage` (current / active).
+  Coverage 1 is the whole active catalogue on the current builder. The pace is
+  a bound, not a measurement: `backfill.max_per_pass` (200) and
+  `min_passes_left` — a tick whose jobs spend more of the 1,000 statements, or
+  bigger products, write fewer. Until coverage is 1 a product on older rows
+  still answers by its old tokens, and ranks after the products that carry a
+  size it was not yet indexed with (§4a) instead of dropping out.
 * **A brand or section rename reindexes its products.** The index holds the
   NAMES; the rename deletes the affected products' stamps in the same batch and
   rewrites the first fifty at once — the cron does the rest.

@@ -93,6 +93,7 @@ export default {
         'GET /blocked-terms': 'op',
         'POST /blocked-terms': { cls: 'op', noBody: NB.MODERATION },
         'DELETE /blocked-terms/:term': { cls: 'op', noBody: NB.MODERATION },
+        'GET /search/index-status': 'op',
       },
     },
   ],

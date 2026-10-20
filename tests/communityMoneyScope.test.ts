@@ -241,6 +241,7 @@ const ADMIN_ROUTES: Record<string, MoneyClass> = {
   'GET /blocked-terms': 'none',
   'POST /blocked-terms': 'none',
   'DELETE /blocked-terms/:term': 'none',
+  'GET /search/index-status': 'none',
 };
 
 function walk(router: { routes: Array<{ method: string; path: string; handler: unknown }> }) {

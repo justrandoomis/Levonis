@@ -608,16 +608,18 @@ test('GET /api/admin/search/index-status counts the builder’s coverage, and th
   const read = async () => {
     const res = await (await statusApp(db, ADMIN)).request('/api/admin/search/index-status', {}, undefined, ctx);
     assert.equal(res.status, 200);
-    return (await res.json()) as Record<string, unknown> & { coverage: number; backfill: { passes_left: number } };
+    return (await res.json()) as Record<string, unknown> & { coverage: number; backfill: { max_per_pass: number; min_passes_left: number } };
   };
   const before = await read();
   assert.deepEqual(
     { stamp: before.stamp, active: before.active, current: before.current, older: before.older, missing: before.missing, failed: before.failed, coverage: before.coverage },
     { stamp: '#doc:6', active: N, current: 0, older: 200, missing: 60, failed: 0, coverage: 0 }
   );
-  assert.equal(before.backfill.passes_left, Math.ceil(N / SEARCH_BACKFILL_BUDGETED_LIMIT));
-  // In the window, a product on the old rows is not an answer to a size it has not been indexed with.
-  assert.deepEqual((await searchProducts(db, 'nozzle 0.4', { limit: 200 })).ids, []);
+  // A cap and the fewest passes it allows — never a promise (a busy tick writes fewer).
+  assert.deepEqual(before.backfill, { max_per_pass: SEARCH_BACKFILL_BUDGETED_LIMIT, every_minutes: 15, min_passes_left: Math.ceil(N / SEARCH_BACKFILL_BUDGETED_LIMIT) });
+  // In the window, a product on the old rows is not ruled out by a size it was not yet indexed with:
+  // «nozzle 0.4» still answers with the nozzles it answered with before the deploy, not with nothing.
+  assert.equal((await searchProducts(db, 'nozzle 0.4', { limit: 200 })).ids.length, 200);
 
   // The quarter-hour tick's catch-up, with the share of D1's 1,000 its jobs leave it: two passes cover 260 products.
   const counted = countingD1(db);

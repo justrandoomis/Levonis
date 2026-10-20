@@ -24,13 +24,14 @@ import { rewriteHashtag } from '../worker/lib/hashtags';
 import type { Env } from '../worker/lib/types';
 import { MEASURE_UNITS, normalizeSearchText, normalizeText, tokenize } from '../worker/lib/search/normalize';
 import { collapseSpelledLetters, romanize } from '../worker/lib/search/translit';
-import { boundedDistance, candidatePrefix, editBudget, isMeasureToken } from '../worker/lib/search/match';
+import { bestMatches, boundedDistance, candidatePrefix, editBudget, isMeasureToken } from '../worker/lib/search/match';
 import { buildIndexRows, expandQuery, FIELD_WEIGHT } from '../worker/lib/search/index';
 import { toSearchDoc } from '../worker/lib/search/document';
 import {
   INDEX_ROWS_PER_STATEMENT,
   INDEX_STAMP,
   planSearchIndex,
+  planSearchIndexRows,
   searchDocColumns,
   searchDocsForRows,
   searchProducts,
@@ -1005,7 +1006,7 @@ test('an unknown colour code is nobody’s; a known one is its carrier’s — n
 test('the measure pass: canonical tokens, the unit kept as a word, no fragments, folded digits', () => {
   assert.deepEqual(tokenize('Nozzle 0.4mm'), ['0.4', 'nozzle', 'mm']);
   for (const typed of ['6×2', '6x2', '6*2', '6 x 2', '٦x٢', '۶×۲', '6.0 × 2.00']) assert.deepEqual(tokenize(typed), ['6x2'], typed);
-  assert.deepEqual(tokenize('20×20×2mm'), ['20x20x2', 'mm']);
+  assert.deepEqual(tokenize('20×20×2mm'), ['20x20x2', '20x20', 'mm'], 'a three-part size carries its footprint');
   assert.deepEqual(tokenize('0.40'), ['0.4']);
   assert.deepEqual(tokenize('.4mm'), ['0.4', 'mm']);
   assert.deepEqual(tokenize('2.0mm'), ['2mm', 'mm'], '«2.0» is the number 2, an ordinary word again');
@@ -1017,14 +1018,138 @@ test('the measure pass: canonical tokens, the unit kept as a word, no fragments,
   for (const unit of MEASURE_UNITS) assert.equal(normalizeText(unit), unit, `${unit}: units are written folded`);
 });
 
-test('a code or a size gets no typo budget, and a measure is never completed', () => {
+test('a code or a size gets no typo budget; a size is completed only while typed and only when nobody carries it whole', () => {
   assert.equal(editBudget('10102'), 0);
   assert.equal(editBudget('x1c'), 0);
   assert.equal(editBudget('a00w1'), 0);
   assert.equal(editBudget('hardened'), 2, 'a word keeps its budget');
   const e = expandQuery('magnet 6x2', new Map());
   assert.deepEqual([...(e.measures ?? [])], ['6x2']);
-  assert.ok(!e.completing.has('6x2'), '6x2 is a prefix of 6x20 and must not be completed');
+  assert.ok(e.completing.has('6x2'), 'the size ending the query may still be being typed');
+  assert.ok(!expandQuery('magnet 6x2 ', new Map()).completing.has('6x2'), 'a space finished it');
+  assert.ok(!expandQuery('magnet 6x2mm', new Map()).completing.has('6x2'), 'a unit after it finished it');
+  assert.ok(!expandQuery('6x2 magnet', new Map()).completing.has('6x2'), 'a word after it finished it');
+  // Carried whole: the 6×2 alone, never the 6×20 it is a prefix of, typing or not.
+  const sizes = ['6x2', '6x20', '6x3', '1.75', '1.7x2', 'pla'];
+  assert.deepEqual(bestMatches('6x2', sizes, 5, { complete: true }).map((m) => m.token), ['6x2']);
+  // Nobody's size yet, still typed: the SIZES it begins.
+  assert.deepEqual(bestMatches('1.7', sizes, 5, { complete: true }).map((m) => m.token).sort(), ['1.75', '1.7x2']);
+  // Finished: that size or nothing; never a neighbour one edit away.
+  assert.deepEqual(bestMatches('1.7', sizes, 5, { complete: false }), []);
+  assert.deepEqual(bestMatches('6x4', sizes, 5, { complete: true }), []);
+});
+
+// -------------------------------------------------------------------------
+// Sizes written the other ways a catalogue writes them (review of 1.3/1.4)
+// -------------------------------------------------------------------------
+
+/** measureShop, plus the spellings the live catalogue uses: a mark or a word glued on, a decimal comma, a build volume. */
+async function writtenSizesShop(): Promise<Raw> {
+  const raw = await measureShop();
+  const db = asD1(raw);
+  const add = async (id: string, name: string, over: Partial<Parameters<typeof toSearchDoc>[0]> = {}) => {
+    raw.prepare(`INSERT INTO products (id, slug, name, description, price_iqd, status) VALUES (?, ?, ?, '', 1000, 'active')`).run(id, id, name);
+    await db.batch(planSearchIndex(db, toSearchDoc({ id, name, ...over })));
+  };
+  await add('p_o62', 'Neodymium Magnet Ø6×2mm');
+  await add('p_o63', 'Neodymium Magnet Ø6×3mm');
+  await add('p_ar62', 'مغناطيس6×2');
+  // The live Bambu Lab magnet: no size in its name, both sizes in its OPTION names, written with a D.
+  await add('p_round', 'Bambu Lab Round Magnet', { name_ar: 'مغناطيس دائري Bambu Lab', variantNames: ['D6×2 مم', 'D6x2 mm', 'D6×3 مم', 'D6x3 mm'] });
+  await add('p_sunlu', 'Sunlu PLA 1,75mm 1kg');
+  await add('p_noz04c', 'Brass Nozzle 0,4 mm', { hashtags: ['nozzle'] });
+  await add('p_x1c', 'X1 Carbon', { description: 'Build volume 256×256×256 mm' });
+  await add('p_plate', 'PEI Plate 256x256');
+  await add('p_ext', 'Aluminium Extrusion 20x20x2');
+  await add('p_screw', 'M3x8 Screw');
+  return raw;
+}
+
+test('a size glued to a diameter mark, a D or an Arabic word is still the size; glued to a Latin word it is not', async () => {
+  assert.deepEqual(tokenize('Neodymium Magnet Ø6×2mm'), ['6x2', 'neodymium', 'magnet', 'mm']);
+  assert.deepEqual(tokenize('مغناطيس6×2'), ['6x2', 'مغناطيس']);
+  for (const typed of ['D6x2', 'D6×2 مم', 'Φ6x2', '⌀6x2', 'ø6*2']) assert.ok(tokenize(typed).includes('6x2'), typed);
+  assert.deepEqual(tokenize('M3x8 screw'), ['m3x8', 'screw'], 'an M3 screw stays the word it is');
+  assert.ok(!tokenize('AD6x2').includes('6x2'), 'a D inside a Latin word is the word');
+
+  const raw = await writtenSizesShop();
+  for (const q of ['magnet 6x2', 'مغناطيس 6×2', 'مغناطيس6×2', 'D6x2', 'Ø6×2', '6x2 ']) {
+    const got = await ids(raw, q);
+    for (const must of ['p_o62', 'p_round']) assert.ok(got.includes(must), `${q} → ${must}: ${got.join(' ')}`);
+    for (const never of ['p_o63', 'p_mag63', 'p_mag620']) assert.ok(!got.includes(never), `${q} must not list ${never}: ${got.join(' ')}`);
+  }
+  assert.ok((await ids(raw, 'مغناطيس 6×2')).includes('p_ar62'), 'the Arabic name written without a space');
+  // The round magnet sells both sizes, so 6×3 finds it too — and not the 6×2-only magnets.
+  const six3 = await ids(raw, 'مغناطيس 6x3');
+  assert.ok(six3.includes('p_round') && six3.includes('p_o63'), six3.join(' '));
+  assert.ok(!six3.includes('p_o62') && !six3.includes('p_ar62'), six3.join(' '));
+  assert.deepEqual(await ids(raw, 'm3x8'), ['p_screw']);
+});
+
+test('a decimal comma is a decimal point: «0,4», «٠،٤», «1,75mm» (rows 1 and 13 in that spelling)', async () => {
+  assert.deepEqual(tokenize('nozzle 0,4'), ['0.4', 'nozzle']);
+  assert.deepEqual(tokenize('نوزل ٠،٤'), ['0.4', 'نوزل']);
+  assert.ok(tokenize('Sunlu PLA 1,75mm 1kg').includes('1.75'));
+  assert.deepEqual(tokenize('27,000'), ['27', '000'], 'three digits after a comma: a thousands separator');
+  assert.deepEqual(tokenize('0.2,0.4'), ['0.2', '0.4'], 'a list stays a list');
+  assert.deepEqual(tokenize('10100,10101'), ['10100', '10101']);
+
+  const raw = await writtenSizesShop();
+  for (const q of ['nozzle 0,4', 'نوزل 0,4', 'نوزل ٠،٤', 'nozzle 0.4']) {
+    const got = await ids(raw, q);
+    for (const must of ['p_noz04', 'p_noz04c', 'p_nozkit']) assert.ok(got.includes(must), `${q} → ${must}: ${got.join(' ')}`);
+    for (const never of ['p_noz02', 'p_noz06', 'p_wiper']) assert.ok(!got.includes(never), `${q} must not list ${never}`);
+  }
+  for (const q of ['pla 1,75', 'PLA 1.75', '1.75']) {
+    const got = await ids(raw, q);
+    assert.deepEqual([...got].sort(), ['p_pla175', 'p_sunlu'], `${q}: ${got.join(' ')}`);
+  }
+});
+
+test('a build volume answers its footprint: «256x256» finds the printer and the plate, «256x256x256» the printer alone', async () => {
+  const raw = await writtenSizesShop();
+  for (const q of ['256x256', '256×256', '256 x 256']) assert.deepEqual((await ids(raw, q)).sort(), ['p_plate', 'p_x1c'], q);
+  assert.deepEqual(await ids(raw, '256x256x256'), ['p_x1c'], 'all three parts asked for');
+  assert.deepEqual(await ids(raw, '20x20'), ['p_ext']);
+  assert.deepEqual(await ids(raw, '20x20x2'), ['p_ext']);
+  const e = expandQuery('256x256x256', new Map());
+  assert.deepEqual(e.literal, ['256x256x256'], 'the footprint is not a second word of the query');
+  assert.deepEqual([...(e.measures ?? [])], ['256x256x256']);
+});
+
+test('a size still being typed lists what it is on its way to; finished, it is that size or nothing', async () => {
+  const raw = await measureShop();
+  const typed = async (q: string) => (await searchProducts(asD1(raw), q, { completeLast: true })).ids;
+  const done = async (q: string) => (await searchProducts(asD1(raw), q, { completeLast: false })).ids;
+  assert.deepEqual(await typed('PLA 1.7'), ['p_pla175'], 'on the way to 1.75');
+  assert.deepEqual(await done('PLA 1.7'), [], 'nobody sells 1.7');
+  assert.deepEqual(await typed('PLA 2.8'), ['p_pla285']);
+  // Carried whole, it is not completed: «6x2» is the 6×2 magnet, not the 6×20 as well.
+  assert.deepEqual(await typed('6x2'), ['p_mag62']);
+  assert.deepEqual(await typed('0.3'), [], 'nothing begins with 0.3 either');
+});
+
+test('a size is required only of products indexed with sizes: older rows rank after, never vanish (the catch-up window)', async () => {
+  const raw = await measureShop();
+  const db = asD1(raw);
+  // Three nozzles still on rows an older builder wrote: «0.4mm» was `4mm`, «0.2mm» `2mm`; no measure tokens.
+  for (const [id, frag] of [['o_04', '4mm'], ['o_02', '2mm'], ['o_06', '6mm']] as const) {
+    raw.prepare(`INSERT INTO products (id, slug, name, description, price_iqd, status) VALUES (?, ?, ?, '', 1000, 'active')`).run(id, id, `Old Nozzle ${frag}`);
+    await db.batch(planSearchIndexRows(db, id, ['old', 'nozzle', frag, 'mm'].map((token) => ({ product_id: id, token, weight: 10 }))));
+    raw.prepare("UPDATE search_tokens SET token = '#doc:5' WHERE product_id = ? AND token = ?").run(id, INDEX_STAMP);
+  }
+  const got = await ids(raw, 'nozzle 0.4 ');
+  // Indexed with sizes: the 0.4 nozzle and the kit, first. Its 0.2 and 0.6 neighbours: ruled out.
+  assert.deepEqual(got.slice(0, 2), ['p_noz04', 'p_nozkit'], got.join(' '));
+  for (const never of ['p_noz02', 'p_noz06', 'p_wiper']) assert.ok(!got.includes(never), `${never}: ${got.join(' ')}`);
+  // Not yet rewritten: kept on their other words, after.
+  assert.deepEqual(got.slice(2).sort(), ['o_02', 'o_04', 'o_06']);
+  // Once the catch-up has rewritten them, they answer like everybody else.
+  for (const id of ['o_04', 'o_02', 'o_06']) {
+    const size = { o_04: '0.4', o_02: '0.2', o_06: '0.6' }[id];
+    await db.batch(planSearchIndex(db, toSearchDoc({ id, name: `Old Nozzle ${size}mm` })));
+  }
+  assert.deepEqual((await ids(raw, 'nozzle 0.4 ')).sort(), ['o_04', 'p_noz04', 'p_nozkit']);
 });
 
 test('a finished model fragment still reaches its model — no typo budget, but `x2d` is what `x2` begins', async () => {

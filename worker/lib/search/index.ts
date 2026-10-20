@@ -40,7 +40,7 @@
  *   products by the weights of the tokens they matched.
  */
 
-import { extractMeasures, foldText, isUsefulToken, normalizeSearchText, tokenize } from './normalize';
+import { dimensionFootprint, extractMeasures, foldText, isUsefulToken, normalizeSearchText, tokenize } from './normalize';
 import { bestMatches, candidatePrefix, isMeasureToken, prefixScore, SKELETON_MARK, type TokenMatch } from './match';
 
 export { SKELETON_MARK };
@@ -174,6 +174,11 @@ export interface ExpandedQuery {
    * under the 0.4 one, because "nozzle" alone covered half the query; a size
    * is not half of what the shopper asked for, it is the question. Absent on
    * an expansion built by hand (a unit test): nothing is required.
+   *
+   * Two exceptions, both in what counts as carrying it: the size still being
+   * typed may be carried by a COMPLETION when nobody carries it whole
+   * (`completing`, ./match.ts), and a product whose index predates measure
+   * tokens is not ruled out by one (`ScoreOptions.measureExempt`).
    */
   measures?: ReadonlySet<string>;
 }
@@ -207,8 +212,16 @@ export function expandQuery(
    * exactly what make them measures; `tokenize` folds the text itself and
    * lifts the measures out first, the same way the index side does.
    */
-  const all = tokenize(raw);
+  const tokens = tokenize(raw);
+  /**
+   * A three-part size's footprint is an INDEX-side courtesy (./normalize.ts):
+   * «256x256x256» typed asks for that size, and its footprint is already
+   * inside it — not a second word to look up, require or count.
+   */
+  const implied = new Set(tokens.map(dimensionFootprint).filter((f): f is string => f !== null));
+  const all = implied.size > 0 ? tokens.filter((t) => !implied.has(t)) : tokens;
   const measures = new Set(all.filter(isMeasureToken));
+  const measured = measures.size > 0 ? extractMeasures(foldText(raw)) : null;
   /**
    * WHAT IS LOOKED FOR, AND WHAT IS ONLY GRAMMAR. A unit written against a
    * measure («0.4mm», «0.4 ملم») is said by the measure already, and a
@@ -217,7 +230,7 @@ export function expandQuery(
    * coverage. A word the owner's dictionary gives a meaning to is never a
    * stopword, and a query made of nothing else stays itself.
    */
-  const units = measures.size > 0 ? new Set(extractMeasures(foldText(raw)).units) : new Set<string>();
+  const units = new Set<string>(measured?.units ?? []);
   const kept = all.filter((t) => !units.has(t) && !(QUERY_STOPWORDS.has(t) && !synonyms.has(t)));
   const literal = kept.length > 0 ? kept : all;
   const lookup = new Set<string>(literal);
@@ -336,9 +349,18 @@ export function expandQuery(
    */
   const completing = new Set<string>();
   if (opts.completeLast !== false && !/\s$/u.test(raw)) {
+    /**
+     * A SIZE THAT ENDS THE QUERY may be one still being typed: «PLA 1.7» is
+     * on its way to 1.75, and requiring an exact `1.7` emptied the list at
+     * every pause. It is marked here, and ./match.ts completes it ONLY when
+     * no product carries it whole — `6x2` typed is the 6×2 magnet, never the
+     * 6×20 it is a prefix of. Read off the measure pass, not the last word:
+     * «6 x 2» is three words of one size.
+     */
+    if (measured?.last && measures.has(measured.last)) completing.add(measured.last);
     const last = words[words.length - 1];
     for (const token of tokenize(last)) {
-      // A measure is never completed: `6x2` is a prefix of `6x20`.
+      // The measure, if any, was decided above.
       if (isMeasureToken(token)) continue;
       completing.add(token);
       if (hasArabicScript(token)) {
@@ -364,6 +386,62 @@ export interface ScoredProduct {
   score: number;
 }
 
+export interface ScoreOptions {
+  /**
+   * PRODUCTS WHOSE INDEX PREDATES MEASURE TOKENS — rows written by an older
+   * builder (no `INDEX_STAMP`, ./store.ts), which turned «0.4mm» into `4mm`
+   * and «1.75» into `75` and so carry no `0.4` or `1.75` to be required. A
+   * stamp bump is repaired by the quarter-hour catch-up, a pass at a time, and
+   * until it reaches a product, ruling that product out for a size it was not
+   * yet indexed with answered «nozzle 0.4» and «PLA 1.75» with NOTHING on the
+   * whole shop for the first hours after a deploy — worse than the mixed
+   * sizes it was there to fix. So a product named here is kept on its other
+   * words, after every product that carries the size. Once the catch-up is
+   * done the set is empty and a size is required of everybody.
+   */
+  measureExempt?: ReadonlySet<string>;
+}
+
+/** Each product's best value per typed word, from the index rows of the matched tokens. */
+function perWordScores(
+  matchedTokens: ReadonlyMap<string, { score: number; from: string }>,
+  rows: readonly IndexRow[]
+): Map<string, Map<string, number>> {
+  const byProduct = new Map<string, Map<string, number>>();
+  for (const row of rows) {
+    const match = matchedTokens.get(row.token);
+    if (!match) continue;
+    const value = row.weight * match.score;
+    if (!(value > 0)) continue;
+    let perWord = byProduct.get(row.product_id);
+    if (!perWord) {
+      perWord = new Map();
+      byProduct.set(row.product_id, perWord);
+    }
+    if (value > (perWord.get(match.from) ?? 0)) perWord.set(match.from, value);
+  }
+  return byProduct;
+}
+
+/**
+ * The products these rows reach that do NOT carry every measure the query
+ * requires — the ones `scoreProducts` rules out. The caller asks which of them
+ * are still on an older builder's rows (`ScoreOptions.measureExempt`).
+ */
+export function productsLackingMeasures(
+  expanded: ExpandedQuery,
+  matchedTokens: ReadonlyMap<string, { score: number; from: string }>,
+  rows: readonly IndexRow[]
+): string[] {
+  const required = [...(expanded.measures ?? [])];
+  if (required.length === 0) return [];
+  const out: string[] = [];
+  for (const [product_id, perWord] of perWordScores(matchedTokens, rows)) {
+    if (!required.every((m) => perWord.has(m))) out.push(product_id);
+  }
+  return out;
+}
+
 /**
  * Score every product against the expanded query.
  *
@@ -386,35 +464,28 @@ export interface ScoredProduct {
 export function scoreProducts(
   expanded: ExpandedQuery,
   matchedTokens: ReadonlyMap<string, { score: number; from: string }>,
-  rows: readonly IndexRow[]
+  rows: readonly IndexRow[],
+  opts: ScoreOptions = {}
 ): ScoredProduct[] {
-  const byProduct = new Map<string, Map<string, number>>();
-  for (const row of rows) {
-    const match = matchedTokens.get(row.token);
-    if (!match) continue;
-    const value = row.weight * match.score;
-    if (!(value > 0)) continue;
-    let perWord = byProduct.get(row.product_id);
-    if (!perWord) {
-      perWord = new Map();
-      byProduct.set(row.product_id, perWord);
-    }
-    if (value > (perWord.get(match.from) ?? 0)) perWord.set(match.from, value);
-  }
-
+  const byProduct = perWordScores(matchedTokens, rows);
   const wanted = Math.max(1, expanded.literal.length);
   const required = [...(expanded.measures ?? [])];
-  const out: ScoredProduct[] = [];
+  const out: Array<ScoredProduct & { tier: number }> = [];
   for (const [product_id, perWord] of byProduct) {
-    // A measure the product does not carry rules it out (`ExpandedQuery.measures`).
-    if (required.length > 0 && !required.every((m) => perWord.has(m))) continue;
+    // A measure the product does not carry rules it out (`ExpandedQuery.measures`) —
+    // unless its index predates measures: then it ranks after every product that carries it.
+    let tier = 0;
+    if (required.length > 0 && !required.every((m) => perWord.has(m))) {
+      if (!opts.measureExempt?.has(product_id)) continue;
+      tier = 1;
+    }
     let score = 0;
     for (const v of perWord.values()) score += v;
     const coverage = Math.min(1, perWord.size / wanted);
-    out.push({ product_id, score: score * (0.25 + 0.75 * coverage) * (coverage === 1 ? 1.6 : 1) });
+    out.push({ product_id, tier, score: score * (0.25 + 0.75 * coverage) * (coverage === 1 ? 1.6 : 1) });
   }
-  out.sort((a, b) => b.score - a.score || a.product_id.localeCompare(b.product_id));
-  return out;
+  out.sort((a, b) => a.tier - b.tier || b.score - a.score || a.product_id.localeCompare(b.product_id));
+  return out.map(({ product_id, score }) => ({ product_id, score }));
 }
 
 /**

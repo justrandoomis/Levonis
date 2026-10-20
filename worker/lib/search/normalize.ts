@@ -162,6 +162,14 @@ export const normalizeSearchText = (input: unknown): string => stripPunctuation(
  *   «0.4», «0.40», «.4», «٠٫٤»   → `0.4`
  *   «1.75mm»                      → `1.75`, and `mm` stays behind as a word
  *   «6×2», «6x2», «6*2», «6 x 2»  → `6x2`        «20×20×2» → `20x20x2`
+ *   «0,4», «1,75mm», «٠،٤»        → `0.4`, `1.75`: a decimal COMMA, as half the
+ *                                   world writes one (a comma before exactly
+ *                                   three digits is a thousands separator, and
+ *                                   a list «0.2,0.4» stays a list)
+ *   «Ø6×2», «D6x2», «مغناطيس6×2»   → `6x2`: a diameter mark (Ø Φ ⌀, a lone D) or
+ *                                   an Arabic-script word glued in front is not
+ *                                   part of the size; a Latin word is («m3x8»
+ *                                   is a screw, and stays the word it is)
  *   «2.0»                         → `2`, an ordinary number again
  *
  * The span is then removed from the text, so the fragments it used to leave
@@ -170,13 +178,33 @@ export const normalizeSearchText = (input: unknown): string => stripPunctuation(
  *
  * A measure is matched EXACTLY on the query side (./match.ts `bestMatches`):
  * `6x2` is a prefix of `6x20` and one edit from `6x3`, and both are different
- * products.
+ * products. The one exception is the size still being typed, which nobody
+ * carries whole yet («PLA 1.7» on its way to 1.75): see `Measures.last`.
+ *
+ * A THREE-PART SIZE ALSO GIVES ITS FOOTPRINT on the index side (`tokenize`):
+ * a printer's «256×256×256 mm» build volume is what «256x256» asks about, and
+ * a plate written «256x256» is not a printer — so the printer carries both,
+ * the plate one, and the query «256x256x256» still requires all three parts.
  */
 // Regex LITERALS, not `new RegExp(…)`: the storefront bundles this module for
 // `normalizeText` (src/lib/policyReader.ts) and a literal is dropped with the
 // rest of the measure pass when nothing there uses it.
-/** «6×2», «6 x 2», «6*2», «20x20x2». Not glued to a word in front: «m3x8» stays the word it is. */
-const DIMENSION = /(?<![\p{L}\p{N}.])\d+(?:\.\d+)?(?:\s*[x×*]\s*\d+(?:\.\d+)?){1,2}(?![\p{N}])/gu;
+/**
+ * «6×2», «6 x 2», «6*2», «20x20x2». What may stand right in front of one:
+ * nothing that is part of a word or a number, an Arabic-script letter
+ * («مغناطيس6×2» — no Arabic word continues into a size), a diameter mark
+ * («ø6×2», «φ6x2»; ⌀ is not a letter at all) or a D standing alone in front
+ * («D6x2 mm», the live magnet's option names). A Latin word is the one thing
+ * that may not: «m3x8» is an M3 screw and stays the word it is.
+ */
+const DIMENSION =
+  /(?:(?<![\p{L}\p{N}.])|(?<=\p{Script=Arabic})(?<=\p{L})|(?<=[øφ])|(?<=(?<![\p{L}\p{N}.])d))\d+(?:\.\d+)?(?:\s*[x×*]\s*\d+(?:\.\d+)?){1,2}(?![\p{N}])/gu;
+/**
+ * A decimal COMMA («0,4», «1,75mm», «٠،٤» once the digits are folded): one or
+ * two digits after it, and no digit, dot or comma on either side — so
+ * «27,000» stays a thousands separator and «0.2,0.4» stays a list.
+ */
+const DECIMAL_COMMA = /(?<![\p{N}.,،])(\d+)[,،](\d{1,2})(?![\p{N}.,،])/gu;
 /** «0.4», «1.75», «PLA1.75», a version «1.5.2»; «.4» only where no word is glued to the dot. */
 const DECIMAL = /(?:(?<![\p{N}.])\d+(?:\.\d+)+|(?<![\p{L}\p{N}.])\.\d+)(?![\p{N}])/gu;
 /** A dimension's own parts, once the whole run has been matched. */
@@ -211,19 +239,31 @@ export interface Measures {
   rest: string;
   /** Unit words written right after a measure («0.4mm» → `mm`). */
   units: string[];
+  /**
+   * The measure that ENDS the text, nothing after it — on the query side, the
+   * size the shopper may still be typing («PLA 1.7» on its way to 1.75; see
+   * ./match.ts `bestMatches`). Null when the text ends in anything else,
+   * a unit («0.4mm») or a space included.
+   */
+  last: string | null;
 }
 
 /** Lift the measures out of FOLDED text (`foldText`) — see the block above. */
-export function extractMeasures(folded: string): Measures {
+export function extractMeasures(input: string): Measures {
+  // One character for one character, so every offset below is an offset into `input` too.
+  const folded = input.replace(DECIMAL_COMMA, '$1.$2');
   const measures: string[] = [];
   const units: string[] = [];
+  let last: string | null = null;
   const unitAfter = (text: string, end: number) => {
     const m = /^\s*([\p{L}]+)/u.exec(text.slice(end));
     if (m && MEASURE_UNITS.has(m[1])) units.push(m[1]);
   };
   let rest = folded.replace(DIMENSION, (whole: string, offset: number) => {
     const parts = whole.match(DIMENSION_PART) ?? [];
-    measures.push(parts.map(canonicalNumber).join('x'));
+    const canonical = parts.map(canonicalNumber).join('x');
+    measures.push(canonical);
+    if (offset + whole.length === folded.length) last = canonical;
     unitAfter(folded, offset + whole.length);
     return ' ';
   });
@@ -233,10 +273,17 @@ export function extractMeasures(folded: string): Measures {
     // «2.0» is the number 2: back into the text as one, for the word pass.
     if (!canonical.includes('.')) return canonical;
     measures.push(canonical);
+    if (offset + whole.length === afterDims.length) last = canonical;
     unitAfter(afterDims, offset + whole.length);
     return ' ';
   });
-  return { measures, rest, units };
+  return { measures, rest, units, last };
+}
+
+/** A three-part size's footprint, `256x256x256` → `256x256`; null for anything else. */
+export function dimensionFootprint(measure: string): string | null {
+  const parts = measure.split('x');
+  return parts.length === 3 ? `${parts[0]}x${parts[1]}` : null;
 }
 
 /** The longest token worth indexing. Longer strings are ids, not words. */
@@ -270,7 +317,14 @@ export function tokenize(input: unknown): string[] {
   // The measures first («0.4», «6×2»), lifted out whole before the
   // punctuation that makes them measures is turned into spaces.
   const { measures, rest } = extractMeasures(folded);
-  const out = new Set<string>(measures.filter((m) => m.length >= MIN_TOKEN && m.length <= MAX_TOKEN));
+  const out = new Set<string>();
+  for (const m of measures) {
+    if (m.length < MIN_TOKEN || m.length > MAX_TOKEN) continue;
+    out.add(m);
+    // The footprint of a three-part size rides beside it (see the block above).
+    const footprint = dimensionFootprint(m);
+    if (footprint) out.add(footprint);
+  }
   const norm = stripPunctuation(rest);
   if (!norm) return [...out];
   for (const word of norm.split(' ')) {
