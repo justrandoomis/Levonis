@@ -216,7 +216,7 @@ test('the walk is real: it reaches the customer pages and none of the owner chun
   for (const page of ['Product-', 'Cart-', 'Checkout-', 'Storefront-']) {
     assert.ok(reached.some((f) => f.startsWith(page)), `the walk never reaches the ${page}*.js customer page`);
   }
-  for (const owner of [/^Admin-/, /^AdminPricing-/, /^OwnerRatesCard-/, /^dataFileStrings-/, /^ProductForm-/]) {
+  for (const owner of [/^Admin-/, /^AdminPricing-/, /^OwnerRatesCard-/, /^dataFileStrings-/, /^ProductForm-/, /^ReviewSheetV2-/]) {
     assert.ok(!reached.some((f) => owner.test(f)), `the walk reaches an owner chunk (${owner}) — the barrier is wrong`);
   }
   assert.ok(reached.length > 50 && reached.length < g.code.size, `reached ${reached.length} of ${g.code.size}`);
@@ -315,7 +315,7 @@ test('the first paint names none of the owner-only cost routes', { skip }, () =>
 test('the existing guard\'s owner-chunk exemption swallows no customer chunk', { skip }, () => {
   const g = load();
   const swallowed = [...g.parent.keys()].filter(
-    (f) => /^(AdminPricing|OwnerRatesCard|dataFileStrings)-/.test(f) || g.code.get(f)!.includes('/api/admin/pricing'),
+    (f) => /^(AdminPricing|OwnerRatesCard|dataFileStrings|ProductForm|ReviewSheetV2)-/.test(f) || g.code.get(f)!.includes('/api/admin/pricing'),
   );
   assert.deepEqual(swallowed, [], `customer chunks the existing guard would silently exempt: ${swallowed.join(', ')}`);
 });

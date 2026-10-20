@@ -108,7 +108,11 @@ test('no customer chunk names a provider endpoint, the key or a private FX field
     // Pricing V2-4 (2026-10-14): the admin product form (lazy, admin shell only) builds the V2 pricing
     // wire itself — the owner's cost inputs travel under their field NAMES (`supplier_cost_amount`)
     // through /api/admin/products/:id/pricing, so its chunk no longer names /api/admin/pricing.
-    if (/^(AdminPricing|OwnerRatesCard|dataFileStrings|ProductForm)-/.test(f) || code.includes('/api/admin/pricing')) {
+    // DECISIONS row 251: the admin bundle editor prices on the same V2 review sheet, so the sheet is
+    // shared by two admin chunks and Vite splits it into its own `ReviewSheetV2-*` chunk, which names
+    // the same owner fields. Only admin chunks import it; the reachability walk in
+    // tests/leakAudit_client-bundles_bundle_private_names_guard_gap.test.ts proves no customer page does.
+    if (/^(AdminPricing|OwnerRatesCard|dataFileStrings|ProductForm|ReviewSheetV2)-/.test(f) || code.includes('/api/admin/pricing')) {
       owner++;
       // Even the owner's chunks never hold a provider endpoint or the key: the browser never calls a provider.
       for (const name of ['iraqsm.com/api', 'eurofxref', 'IRAQ_PARALLEL_FX_API_KEY', 'X-API-Key']) assert.ok(!code.includes(name), `${f} carries «${name}»`);
