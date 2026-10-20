@@ -10,17 +10,23 @@
  * WHAT IT READS, in Arabic (with the Iraqi forms people type), English and
  * Sorani:
  *   - amounts: digits from any keyboard, number words, the thousand and million
- *     words (الف، مليون، هەزار، ملیۆن، هزار, k), halves and quarters («مليون
- *     ونص», «نص مليون»), dinars, dollars, and «ورقة» (the Iraqi word for a
- *     hundred-dollar note) after a count or a price bound;
- *   - price bounds before the amount («اقل من», «under», «کەمتر لە»), after it
- *     («فما دون», «or more», «لە ... کەمتر») and ranges («بين ... و ...»,
- *     «250-400 الف», «between ... and ...»);
+ *     words (الف، مليون، هەزار، ملیۆن، هزار, k, mil, "a thousand"), halves and
+ *     quarters («مليون ونص», «نص مليون», «2 ونص مليون», "2 and a half million"),
+ *     dinars, dollars, and «ورقة» (the Iraqi word for a hundred-dollar note)
+ *     after a count or a price bound;
+ *   - price bounds before the amount («اقل من», «under», «کەمتر لە», «بەلایەنی
+ *     کەمەوە», "nothing over"), after it («فما دون», «وطالع», «ونازل», «or more»,
+ *     «لە ... کەمتر», «لە ... زیاترە») and ranges («بين ... و ...», «250-400 الف»,
+ *     «20الف-30الف», «between ... and ...», "from ... up to ...", «لە ...ەوە تا
+ *     ...»);
  *   - colours, materials, the filament diameter (1.75 / 2.85), the sale mode,
  *     refill or with spool, and «رخيص» / «cheap» as the price order;
- *   - negation («بدون», «مو», «without», «بێ»): what follows becomes an
- *     exclusion or the opposite constraint («بدون بكرة» is a refill), never a
- *     search word.
+ *   - negation («بدون», «مو», «without», «بێ», «نە … نە», Iraqi «ما» before a
+ *     known constraint, and the Sorani «… نەبێت» / «… نییە» after it): what it
+ *     reaches becomes an exclusion or the opposite constraint («بدون بكرة» is a
+ *     refill, «بەردەست نییە» a pre-order), never a search word. It reaches over
+ *     a colour noun, the article written apart and "even" («بدون اللون الاسود»,
+ *     «بدون الـ AMS», «ولا حتى ابيض»).
  *
  * WHAT IT CONSUMES. Price, sale, spool, colour, diameter and sort words and the
  * negations leave the search text: a word that became a filter is not also
@@ -36,7 +42,8 @@
  * WHAT IT NEVER DOES. A number without a money word or a price bound is not a
  * price: X1C, A1 mini, 0.4, 6×2, 10101 and a resin printer «8K» are left to the
  * search and the identifier lane. Nor is a number with a measure or a count
- * after it («اقل من 1 كيلو», "under 300mm", «3 قطع»), or a model name ("Kobra 3
+ * after it («اقل من 1 كيلو», "under 300mm", «3 قطع», «300 پلەی سەدی», «3 ڕۆژدا»,
+ * «30 سانتي»), or a model name ("Kobra 3
  * Max", "Kobra 2 Plus"). A price PER unit sold is a price («اقل من 25 للكيلو»,
  * "30 per kg", "25/kg", «بۆ هەر کیلۆیەک»); per a length, a temperature, a power
  * or a time it stays a measure («للسم», "per hour", "10 min", «30 چرکە»). «ولا»
@@ -58,9 +65,11 @@
  * 500»), its smaller end is read as written too (500 to 1,200; 500 to 1,500); a
  * range read ascending is never swapped. A bare end below 1,000 beside an end
  * with a money word shares that word («بين 2 و 3 مليون», «بين 3 و 5 ورقات»,
- * «over 100 and under 200 dollars»), unless the counts are ten times apart
- * («بين مليون و 500» is 500,000 to a million); a bare end that would invert the
- * order beside one takes thousands («بين 500 الف و 1200» ends at 1,200,000).
+ * «over 100 and under 200 dollars»), the hundred with it («بين 2 و 3 مية الف» is
+ * 200,000 to 300,000, «بين 3 و 5 مية» 300,000 to 500,000), unless the counts
+ * are ten times apart («بين مليون و 500» is 500,000 to a million); a bare end
+ * that would invert the order beside one takes thousands («بين 500 الف و 1200»
+ * ends at 1,200,000).
  *
  * Pure and deterministic: no model, no network, no I/O (the owner rule for the
  * core search: it works without any paid AI). Every lexicon word is written as
@@ -139,14 +148,29 @@ const MAX_PRE = phrases(
   'under', 'below', 'less than', 'lower than', 'cheaper than', 'up to', 'upto', 'at most', 'max', 'maximum', 'within',
   'budget', 'budget of', '<', '≤',
   'کەمتر لە', 'کەمتر', 'خوار', 'خوارتر لە', 'لە خوار', 'ژێر', 'لە ژێر', 'تا', 'هەتا', 'بودجە', 'بودجەی', 'زۆرترین',
-  'هەرزانتر لە'
+  'هەرزانتر لە', 'نزمتر لە',
+  // "nothing over 1 million" is at most a million; "less than or equal to", «اقل من او يساوي» an upper bound whole;
+  // «زیاتر نەبێت لە 30 هەزار» (not more than, written before the amount).
+  'nothing over', 'nothing above', 'nothing more than', 'nothing higher than', 'nothing pricier than', 'nothing dearer than',
+  'less than or equal to', 'less than or equal', 'less or equal to', 'lower than or equal to', 'equal to or less than',
+  'equal or less than', 'at or below', 'at or under',
+  'اقل من او يساوي', 'اقل او يساوي', 'اقل من او تساوي', 'اقل او تساوي', 'يساوي او اقل من', 'اصغر من او يساوي',
+  'زیاتر نەبێت لە', 'زیاتر نەبێ لە', 'زیاتر نییە لە', 'زیاتر نیە لە'
 );
 /** «اكثر من مليون»: a lower bound before the amount («لا يقل عن», «حد ادنى», «لانی کەم», «سەروو» too). */
 const MIN_PRE = phrases(
   'اكثر من', 'اكثر', 'فوق', 'اعلى من', 'اغلى من', 'يبدا من', 'ابتداء من', 'على الاقل', 'يتجاوز', 'يتعدى', 'يزيد عن', 'يزيد على',
   'لا يقل عن', 'لا يقل على', 'لا تقل عن', 'ما يقل عن', 'ما يقل على', 'حد ادنى', 'كحد ادنى', 'ادنى', 'اقل شي', 'اقل شيء',
   'over', 'above', 'more than', 'at least', 'min', 'minimum', 'starting at', 'starting from', '>', '≥',
-  'زیاتر لە', 'زیاتر', 'سەرووی', 'لە سەرووی', 'سەروو', 'لە سەروو', 'لانیکەم', 'لانی کەم', 'کەمترین', 'گرانتر لە'
+  'زیاتر لە', 'زیاتر', 'سەرووی', 'لە سەرووی', 'سەروو', 'لە سەروو', 'لانیکەم', 'لانی کەم', 'کەمترین', 'گرانتر لە',
+  'بەرزتر لە',
+  // «بەلایەنی کەمەوە» (at least); «کەمتر نەبێت لە 20 هەزار» (not less than, written before the amount).
+  'بەلایەنی کەمەوە', 'بە لایەنی کەمەوە', 'لانی کەمەوە', 'لانیکەمەوە',
+  'کەمتر نەبێت لە', 'کەمتر نەبێ لە', 'کەمتر نییە لە', 'کەمتر نیە لە',
+  'nothing under', 'nothing below', 'nothing less than', 'nothing cheaper than',
+  'more than or equal to', 'more than or equal', 'greater than or equal to', 'higher than or equal to', 'equal to or more than',
+  'equal or more than', 'at or above', 'at or over',
+  'اكثر من او يساوي', 'اكثر او يساوي', 'اكثر من او تساوي', 'اكبر من او يساوي', 'يساوي او اكثر من'
 );
 /**
  * «30 الف واقل»: an upper bound after the amount (Sorani puts it there: «لە 30 هەزار کەمتر»). The longest
@@ -155,13 +179,24 @@ const MIN_PRE = phrases(
 const MAX_POST = phrases(
   'واقل', 'و اقل', 'او اقل', 'فما دون', 'وتحت', 'او تحت', 'كحد اقصى', 'حد اقصى',
   'or less', 'or below', 'or under', 'and under', 'and below',
-  'یان کەمتر', 'و کەمتر', 'کەمتر', 'بۆ خوارەوە', 'خوارتر', 'زیاتر نەبێت', 'زیاتر نەبێ', 'زیاتر نەبێتن'
+  'یان کەمتر', 'و کەمتر', 'کەمتر', 'بۆ خوارەوە', 'خوارتر', 'زیاتر نەبێت', 'زیاتر نەبێ', 'زیاتر نەبێتن',
+  // Iraqi «ونازل» (and down); "or lower"; the Sorani copula («لە 30 هەزار کەمترە», "is less than") and the post
+  // forms of «هەرزانتر لە», «نزمتر لە» («لە 30 هەزار هەرزانتر», cheaper than 30,000); «زیاتر نییە» (is not more).
+  'ونازل', 'و نازل', 'فنازل', 'فما نازل', 'وانت نازل', 'او انزل', 'وانزل',
+  'or lower', 'or cheaper', 'and lower', 'and less', 'or lesser',
+  'کەمترە', 'یان کەمترە', 'هەرزانتر', 'هەرزانترە', 'نزمتر', 'نزمترە', 'خوارترە', 'زیاتر نییە', 'زیاتر نیە'
 );
 /** «مليون وفوق»: a lower bound after the amount. */
 const MIN_POST = phrases(
   'واكثر', 'و اكثر', 'او اكثر', 'فما فوق', 'وفوق', 'او فوق', 'كحد ادنى', 'حد ادنى', 'على الاقل',
   'or more', 'or above', 'and above', 'and up', 'at least',
-  'یان زیاتر', 'و زیاتر', 'زیاتر', 'بۆ سەرەوە', 'کەمتر نەبێت', 'کەمتر نەبێ', 'کەمتر نەبێتن'
+  'یان زیاتر', 'و زیاتر', 'زیاتر', 'بۆ سەرەوە', 'کەمتر نەبێت', 'کەمتر نەبێ', 'کەمتر نەبێتن',
+  // Iraqi «وطالع» (and up); "or higher"; the Sorani copula («لە 500 هەزار زیاترە», "is more than") and the post
+  // forms of «گرانتر لە», «بەرزتر لە»; «کەمتر نییە» (is not less); «بەلایەنی کەمەوە» (at least) after the amount.
+  'وطالع', 'و طالع', 'فطالع', 'فما طالع', 'وانت طالع', 'وصاعد', 'و صاعد', 'فما اعلى',
+  'or higher', 'or greater', 'or over', 'and over', 'and higher', 'or up',
+  'زیاترە', 'یان زیاترە', 'گرانتر', 'گرانترە', 'بەرزتر', 'بەرزترە', 'کەمتر نییە', 'کەمتر نیە',
+  'بەلایەنی کەمەوە', 'بە لایەنی کەمەوە', 'لانی کەمەوە'
 );
 /**
  * One English word after the amount, a bound only after a money word or k: "30k max", "500 الف plus".
@@ -185,11 +220,15 @@ const MEASURE_WORDS = new Set(
     // Time, length and power in their short forms: "under 10 min", "2 hrs", "30 ft", "1kw" are never a price.
     'second', 'seconds', 'sec', 'secs', 'min', 'mins', 'hr', 'hrs', 'h', 'week', 'weeks', 'wk', 'wks', 'month', 'months',
     'ft', 'feet', 'foot', 'yard', 'yards', 'kw', 'kilowatt', 'kilowatts', 'kwh',
+    // The spellings people type for a length: "30 centimeters", «30 سانتي», «7 انج», a 7" screen.
+    'centimeter', 'centimetre', 'centimeters', 'centimetres', 'millimeters', 'millimetres', 'cms', 'km', 'kms', '"',
     'كيلو', 'كيلوغرام', 'كيلوجرام', 'كغم', 'كغ', 'غرام', 'جرام', 'غم', 'ملم', 'مم', 'ملي', 'مليمتر', 'ميليمتر',
     'سم', 'سنتي', 'سنتيمتر', 'مل', 'لتر', 'متر', 'امتار', 'درجة', 'درجات', 'واط', 'فولت', 'امبير', 'انش', 'بوصة',
     'قطع', 'قطعة', 'حبة', 'حبات', 'حبه', 'رول', 'رولات', 'يوم', 'ايام', 'ساعة', 'ساعات', 'دقيقة', 'دقائق', 'سنة', 'سنوات', 'شهر', 'اشهر',
     'مليلتر', 'ملليتر', 'ثانية', 'ثواني', 'ثوان', 'ثانيتين', 'دقايق', 'اسبوع', 'اسابيع', 'اسبوعين', 'شهور', 'شهرين', 'ساعتين',
     'قدم', 'اقدام', 'كيلوواط',
+    'سانتي', 'سانتيم', 'سانتيمتر', 'سانتيمترات', 'سنتيم', 'سنتم', 'سنتيمترات', 'سانتيات', 'انج', 'انچ', 'انشات', 'بوصات',
+    'مترين', 'كيلوات', 'كيلوين', 'كيلوهات', 'غرامات', 'لترات', 'لترين', 'ملمات',
     'کیلۆ', 'کیلۆگرام', 'گرام', 'ملیم', 'ملیمەتر', 'ملیمێتر', 'سانتیم', 'سانتیمەتر', 'سانتیمێتر', 'لیتر', 'ملیلیتر',
     'پلە', 'وات', 'ڤۆڵت', 'ئینج', 'پارچە', 'دانە', 'مەتر', 'مێتر', 'ڕۆژ', 'کاتژمێر', 'سەعات', 'خولەک', 'دەقیقە', 'ساڵ', 'مانگ',
     'چرکە', 'چرکەی', 'هەفتە', 'هەفتەی', 'حەفتە', 'کیلۆوات',
@@ -197,6 +236,22 @@ const MEASURE_WORDS = new Set(
     'کیلۆی', 'گرامی', 'دانەی', 'پارچەی', 'لیتری', 'مەتری',
   ].map(nlFold)
 );
+/**
+ * Sorani endings on a measure word after a number: the ezafe «-ی» («300 پلەی سەدی» 300 °C, «3 ڕۆژی کار» three
+ * working days, «6 مانگی» six months), the locative «-دا» («3 ڕۆژدا» in three days, «2 هەفتەدا»), the plural «-ان»
+ * («3 ڕۆژان»), and the definite «-ەکە», «-ەکان». The measure is the word without it. Arabic-script words only.
+ */
+const MEASURE_ENDINGS = ['ی', 'دا', 'یدا', 'ان', 'ەکان', 'ەکە', 'ەدا'].map(nlFold);
+const ARABIC_SCRIPT = /[\u0600-\u06ff]/u;
+/** A measure or a count word, the Sorani indefinite («کاتژمێرێک» an hour, «پلەیەک» a degree) and the endings above too. */
+function measureWord(v: string): boolean {
+  if (MEASURE_WORDS.has(v)) return true;
+  const u = soraniUnit(v);
+  if (u !== null && MEASURE_WORDS.has(u)) return true;
+  if (!ARABIC_SCRIPT.test(v)) return false;
+  for (const e of MEASURE_ENDINGS) if (v.length - e.length >= 2 && v.endsWith(e) && MEASURE_WORDS.has(v.slice(0, -e.length))) return true;
+  return false;
+}
 /**
  * The units things are SOLD by: weight, a piece, a roll or a spool, a volume, a length of tube or wire. After
  * «per» (PER_WORDS, a slash) or glued as «للكيلو», «لكيلو», «بالمتر» (PER_PREFIXES), a number before one is a
@@ -238,12 +293,20 @@ const SORANI_AT = nlFold('بە');
 /** «بين 500 الف و مليون»: a range opener («من» and "from" alone are a lower bound). */
 const RANGE_OPEN = phrases('بين', 'between', 'لە نێوان', 'من', 'from', 'لە');
 const RANGE_MIN_ALONE = phrases('من', 'from');
-/** Between the two ends of a range. */
-const RANGE_SEP = phrases('و', 'الى', 'حتى', 'لحد', 'ل', 'and', 'to', '-', '&', 'تا', 'بۆ', 'هەتا');
+/** Between the two ends of a range: "from 20k up to 30k", "till", «لغاية», «هەتاوەکو» too. */
+const RANGE_SEP = phrases(
+  'و', 'الى', 'حتى', 'لحد', 'ل', 'and', 'to', '-', '&', 'تا', 'بۆ', 'هەتا',
+  'up to', 'upto', 'and up to', 'till', 'until', 'through', 'thru', 'لغاية', 'ولغاية', 'الى حد', 'وحتى', 'هەتاوەکو', 'تاوەکو'
+);
 /** Between two bare amounts («250-400 الف», «500 الف الى مليون»): never «و», which joins number words. */
 const BARE_SEP = phrases('-', 'الى', 'to', 'تا', 'حتى', 'لحد');
 /** A Sorani amount stands after «لە» when its bound comes last («لە 30 هەزار کەمتر»). */
 const SORANI_FROM = nlFold('لە');
+/**
+ * The Sorani ablative «-ەوە» on an amount: «لە 20 هەزارەوە تا 30 هەزار» (from 20,000 to 30,000), «لە 500ەوە»,
+ * «لە ملیۆنێکەوە». The lexer splits it off a number word; the amount reads it as its own end.
+ */
+const ABLATIVE = nlFold('ەوە');
 
 /** Below this a bare number counts thousands; from it, dinars as written. */
 const BARE_IN_FULL_FROM = 1000;
@@ -304,12 +367,15 @@ const COUNT_WORDS = wordMap<number>([
   [900, 'تسعمية تسعمائة نۆسەد'],
 ]);
 const HUNDRED = new Set('مية مئة مائة hundred سەد'.split(' ').map(nlFold));
-/** The thousand and million words. `k` and `m` are WEAK: a price only beside a bound («under 30k»), never bare («8K» is a resin screen). */
+/**
+ * The thousand and million words. `k`, `m` and "mil" are WEAK: a price only beside a bound («under 30k», "under 2
+ * mil»), never bare («8K» is a resin screen).
+ */
 const MULTS = wordMap<{ v: number; weak: boolean }>([
   [{ v: 1e3, weak: false }, 'الف الاف آلاف thousand thousands هەزار هزار'],
   [{ v: 1e6, weak: false }, 'مليون ملايين ميليون million millions ملیۆن'],
   [{ v: 1e3, weak: true }, 'k ك'],
-  [{ v: 1e6, weak: true }, 'm mn'],
+  [{ v: 1e6, weak: true }, 'm mn mil'],
 ]);
 const DUALS = wordMap<number>([
   [2e3, 'الفين الفان'],
@@ -440,8 +506,31 @@ const NEGATION = phrases(
   'بدون', 'بلا', 'بلاش', 'مو', 'مش', 'موب', 'غير', 'ليس', 'لا', 'دون', 'عدا', 'ماعدا', 'باستثناء', 'الا', 'من غير',
   'ما اريد', 'ما ابي', 'ما احتاج', 'ما بيه', 'مابيه', 'ما فيه', 'مافيه',
   'without', 'w/o', 'no', 'not', 'non', 'neither', 'except', 'excluding', 'exclude', 'dont want', 'do not want', 'no need for',
-  'بێ', 'بەبێ', 'نەک', 'نا', 'بێجگە', 'بێجگە لە', 'جگە لە', 'بەدەر لە', 'نامەوێت'
+  'بێ', 'بەبێ', 'نەک', 'نا', 'بێجگە', 'بێجگە لە', 'جگە لە', 'بەدەر لە', 'نامەوێت',
+  // «نە ڕەش نە سپی»: the Sorani "neither … nor", each «نە» a negation of its own.
+  'نە'
 );
+
+/** Iraqi «ما» before a known constraint is "not" («ما متوفر», «PLA ما متوفر», «ما اسود»); before anything else, "what". */
+const MA = nlFold('ما');
+/**
+ * Between a negation and what it negates: a colour noun before a colour («بدون اللون الاسود», «بدون لون اسود», «مو
+ * باللون الاسود», «بێ ڕەنگی سپی», "without colour black"), the article written apart («بدون الـ AMS», «بدون ال
+ * PLA», "without the black"), "in" ("not in black") or "even" («ولا حتى ابيض», "or even white», «یان تەنانەت
+ * ڕەش»). The negation reaches over them to the item; they go with it and are never left out themselves.
+ */
+const COLOUR_NOUNS = new Set(['لون', 'اللون', 'الوان', 'colour', 'color', 'colours', 'colors', 'ڕەنگ', 'ڕەنگی', 'رەنگ', 'رەنگی'].map(nlFold));
+const NEG_ARTICLES = new Set(['ال', 'the'].map(nlFold));
+const NEG_FILLERS = new Set(['in', 'a', 'an', 'any'].map(nlFold));
+const EVEN = new Set(['even', 'حتى', 'تەنانەت'].map(nlFold));
+/** The list words of a Sorani post negation: «ڕەش و سپی نەبێت», «ڕەش یان سپی نەبێت». */
+const POST_LIST = new Set(['و', 'یان', 'او', 'or', 'and'].map(nlFold));
+
+/**
+ * The Sorani verb negation written AFTER what it negates: «ڕەش نەبێت» (not black), «PLA نەبێت», «بەردەست نییە» (not
+ * available), «کەمتر لە 20 هەزار نەبێت» (not less than 20,000).
+ */
+const NEG_POST = phrases('نەبێت', 'نەبێ', 'نەبێتن', 'نەبن', 'نییە', 'نیە', 'نابێت');
 
 /**
  * Exclusions that name one thing in several words. An AMS printer bundle is a
@@ -498,24 +587,41 @@ const DASH = /^[-–—~]+$/;
 const LEAD = /^[^\p{L}\p{N}$<>≤≥]+/u;
 const TRAIL = /[^\p{L}\p{N}$+]+$/u;
 const NUMERIC_START = /^[\d$<>≤≥]/;
-/** A slash opens a run of its own: «25k/kg» is 25, k and /kg. */
-const RUNS = /[<>≤≥]|\$|\+|\d+(?:[.,]\d+)*|\/[^\d$<>≤≥+/]*|[^\d$<>≤≥+/]+/g;
+/** A slash opens a run of its own: «25k/kg» is 25, k and /kg. A dash too: «20الف-30الف», "20k-30k" are 20, الف, -, 30, الف. */
+const RUNS = /[<>≤≥]|\$|\+|\d+(?:[.,]\d+)*|\/[^\d$<>≤≥+/]*|[-–—~]+|[^\d$<>≤≥+/\-–—~]+/g;
+/** An inch mark on a number: «7"» is 7 and an inch. */
+const INCH = /^(\d+(?:[.,]\d+)?)["”″′]+$/u;
 const ARABIC_PREFIXES = ['وال', 'بال', 'لل', 'ال', 'و', 'ب', 'ل'];
+
+/** A number or money word («هەزار», «ملیۆنێک», «دینار»): the Sorani ablative «-ەوە» comes off it. */
+const amountWord = (w: string, min = 2): boolean => /^\d+(?:[.,]\d+)*$/.test(w) || (w.length >= min && classify(w) !== null);
+/** «هەزارەوە» → «هەزار», «ەوە»; «500ەوە» → 500, «ەوە». Anything else as it is. */
+function ablative(lx: string[]): string[] {
+  return lx.flatMap((w) =>
+    w.length > ABLATIVE.length && w.endsWith(ABLATIVE) && amountWord(w.slice(0, -ABLATIVE.length)) ? [w.slice(0, -ABLATIVE.length), ABLATIVE] : [w]
+  );
+}
 
 /** One piece of the input → its lexemes: «30k» is 30 and k, «1.75mm» 1.75 and mm, «$500» $ and 500; «X1C» stays whole. */
 function lexemesOf(piece: string): string[] {
   let f = nlFold(piece).replace(/['’`]/g, '');
   if (DASH.test(f)) return ['-'];
-  f = f.replace(LEAD, '').replace(TRAIL, '');
+  f = f.replace(LEAD, '');
+  const inch = INCH.exec(f);
+  if (inch) return [inch[1], '"'];
+  f = f.replace(TRAIL, '');
   if (!f) return [];
-  if (NUMERIC_START.test(f)) return f.match(RUNS) ?? [f];
+  if (NUMERIC_START.test(f)) return ablative(f.match(RUNS) ?? [f]);
   // «ب500», «و50», «ال30»: the preposition or the article is a lexeme of its own.
   const glued = /^(ال|[بول])(\d.*)$/u.exec(f);
-  if (glued) return [glued[1], ...(glued[2].match(RUNS) ?? [])];
+  if (glued) return [glued[1], ...ablative(glued[2].match(RUNS) ?? [])];
+  // «الف-30» («20 الف-30 الف»), "k-30k": a money word, a dash and the next amount.
+  const dashed = /^(\p{L}+)[-–—~]+(\d.*)$/u.exec(f);
+  if (dashed && amountWord(dashed[1], 1)) return [...ablative([dashed[1]]), '-', ...ablative(dashed[2].match(RUNS) ?? [])];
   // "non-combo", "non-black": a negation of a known term. "Non-Slip", "Non-Stick" are product words, kept whole.
   const non = /^non-(.+)$/.exec(f);
   if (non && (EXCLUDE_CANON.has(non[1]) || COLOURS.has(non[1]) || MATERIALS.has(non[1]))) return ['non', non[1]];
-  return [f];
+  return ablative([f]);
 }
 
 function variantsOf(f: string): string[] {
@@ -591,7 +697,14 @@ interface Amount {
   /** Written with a thousands separator («30,000», «٣٠٬٠٠٠»): a number in full, never thousands. */
   grouped: boolean;
   maxMult: number;
+  /**
+   * The scale a bare count beside it shares in a range: what its one leading count is multiplied by («3 مية الف»
+   * 100,000, «5 ورقات» 100, «30 الف» 1,000, «5 مية» 100), else its largest money word (`maxMult`); 0 for none.
+   */
+  share: number;
   cur: 'IQD' | 'USD' | null;
+  /** Written with the Sorani ablative «-ەوە»: «لە 20 هەزارەوە» (from 20,000). */
+  from: boolean;
 }
 
 /** «30,000», «1.500.000»: digits in groups of three, the way a price is written in full. */
@@ -666,6 +779,15 @@ function joins(prev: Prev, next: NumClass, range: boolean, places = 0, hundredAh
   return false;
 }
 
+/**
+ * May a half or a quarter join the count before it («2 ونص مليون», «یەک و نیو ملیۆن», "2 and a half million")? Only
+ * once, right after a count, and only before a thousand or million word (`scaled`) or as a range end («بين 2 ونص و
+ * 3 مليون»): «اقل من 2 ونص» alone is left as it was.
+ */
+function countHalf(prev: Prev, halved: boolean, scaled: boolean): boolean {
+  return !halved && (prev === 'digit' || prev === 'word') && scaled;
+}
+
 export function parseNlQuery(input: string): NlQuery {
   const pieces = String(input ?? '').split(/\s+/u).filter(Boolean);
   const L: Lex[] = [];
@@ -677,6 +799,8 @@ export function parseNlQuery(input: string): NlQuery {
   const aboutFilament = L.some((l) => l.v.some((v) => FILAMENT_WORDS.has(v) || MATERIALS.has(v.replace(/\+$/, ''))));
   /** Which chip (`nlChipKey`) each lexeme went to: a removed chip takes exactly its own words out of the field. */
   const owner = new Array<string>(L.length).fill('');
+  /** A second chip a lexeme also goes with: the list word between two items of a Sorani post negation. */
+  const alsoOwner = new Array<string>(L.length).fill('');
   let who = '';
   const take = (from: number, to: number) => {
     for (let k = from; k < to; k++) {
@@ -728,7 +852,19 @@ export function parseNlQuery(input: string): NlQuery {
     let grouped = false;
     /** The places filled since the last thousand or million word (`placeOf`). */
     let places = 0;
-    const hundredAt = (k: number): boolean => k < L.length && !used[k] && classify(L[k].f)?.k === 'hundred';
+    /** The counts read (digits or number words), the first of them, and whether one came after a scale word. */
+    let terms = 0;
+    let lead = 0;
+    let termAfterScale = false;
+    let scaled = false;
+    let halved = false;
+    const classAt = (k: number): NumClass | null => (k < L.length && !used[k] ? classify(L[k].f) : null);
+    const hundredAt = (k: number): boolean => classAt(k)?.k === 'hundred';
+    /** A thousand or million word or a counted note at k: «2 ونص مليون», "2 and a half million". */
+    const scaleAt = (k: number): boolean => {
+      const c = classAt(k);
+      return !!c && (c.k === 'mult' || (c.k === 'cur' && c.scale > 1));
+    };
     // «ب 500 الف», «بە 25 هەزار»; after a bound the article too: «تحت ال 500», «اقل من ال30».
     if (j < L.length && !used[j] && (L[j].f === 'ب' || L[j].f === SORANI_AT || (o.bound && L[j].f === 'ال'))) j++;
     if (j < L.length && !used[j] && L[j].f === '$') {
@@ -741,19 +877,28 @@ export function parseNlQuery(input: string): NlQuery {
       let joined = false;
       let width = 1;
       if (f === 'و' || f === 'and') {
-        const nx = j + 1 < L.length && !used[j + 1] ? classify(L[j + 1].f) : null;
-        if (!have || !nx || !joins(prev, nx, !!o.range, places, hundredAt(j + 2))) break;
+        // "2 and a half million": the article before the half.
+        const art = j + 2 < L.length && !used[j + 1] && (L[j + 1].f === 'a' || L[j + 1].f === 'an') && classAt(j + 2)?.k === 'frac' ? 1 : 0;
+        const nx = classAt(j + 1 + art);
+        const half = !!nx && nx.k === 'frac' && countHalf(prev, halved, scaleAt(j + 2 + art) || !!o.range);
+        if (!have || !nx || !(half || joins(prev, nx, !!o.range, places, hundredAt(j + 2)))) break;
         joined = true;
-        width = 2;
-        f = L[j + 1].f;
+        width = 2 + art;
+        f = L[j + 1 + art].f;
       } else if (have && f.length > 1 && f.startsWith('و')) {
         const nx = classify(f.slice(1));
-        if (nx && joins(prev, nx, !!o.range, places, hundredAt(j + 1))) {
+        const half = !!nx && nx.k === 'frac' && countHalf(prev, halved, scaleAt(j + 1) || !!o.range);
+        if (nx && (half || joins(prev, nx, !!o.range, places, hundredAt(j + 1)))) {
           joined = true;
           f = f.slice(1);
         }
       }
       let c = classify(f);
+      // "a thousand", "a hundred", "a million": the article is one of them.
+      if (!c && !have && (f === 'a' || f === 'an')) {
+        const nx = classAt(j + 1);
+        if (nx && (nx.k === 'hundred' || (nx.k === 'mult' && !nx.weak) || (nx.k === 'cur' && nx.scale > 1))) c = { k: 'n', v: 1 };
+      }
       // «بمليون», «وعشرين» at the start: the preposition glued to the first word.
       if (!c && !have && f.length > 2 && /^[بول]/u.test(f)) c = classify(f.slice(1));
       // «تحت المليون», «اقل من الالف»: after a bound, the article on the first word.
@@ -768,15 +913,20 @@ export function parseNlQuery(input: string): NlQuery {
       if (c.k === 'digit' || c.k === 'n') {
         if (prev === 'digit' || prev === 'frac' || (prev === 'word' && c.k === 'digit') || (prev === 'mult' && !joined)) break;
         if (prev === 'word' && !joined && (places & placeOf(c, false)) !== 0) break;
+        if (halved) break;
         cur += c.v;
         if (c.k === 'digit' && GROUPED.test(f)) grouped = true;
         places |= placeOf(c, false);
         prev = c.k === 'digit' ? 'digit' : 'word';
+        if (!terms) lead = c.v;
+        terms++;
+        if (scaled) termAfterScale = true;
       } else if (c.k === 'hundred') {
-        if ((prev === 'mult' && !joined) || (places & HUNDREDS)) break;
+        if ((prev === 'mult' && !joined) || (places & HUNDREDS) || halved) break;
         cur = (cur || 1) * 100;
         places = HUNDREDS;
         prev = 'word';
+        scaled = true;
       } else if (c.k === 'mult') {
         if (prev === 'mult' || (c.weak && prev !== 'digit')) break;
         // A bare «الف» is a letter or a word; a bare «مليون» is a price.
@@ -784,6 +934,8 @@ export function parseNlQuery(input: string): NlQuery {
         total += (cur || 1) * c.v;
         cur = 0;
         places = 0;
+        halved = false;
+        scaled = true;
         lastMult = c.v;
         maxMult = Math.max(maxMult, c.v);
         unit = c.weak ? (unit ?? 'weak') : 'strong';
@@ -802,6 +954,10 @@ export function parseNlQuery(input: string): NlQuery {
         } else if (!have) {
           cur = c.v;
           prev = 'frac';
+        } else if (joined && countHalf(prev, halved, true)) {
+          // «2 ونص مليون», «دوو و نیو ملیۆن», "2 and a half million": the half joins the count before the word.
+          cur += c.v;
+          halved = true;
         } else break;
       } else {
         // A currency word ends the amount. «ورقة» needs a count or a bound: alone it is a sheet of paper.
@@ -810,6 +966,8 @@ export function parseNlQuery(input: string): NlQuery {
           if (prev === 'mult' || prev === 'frac' || (!have && !o.bound)) break;
           total += (cur || 1) * c.scale * (c.dual ? 2 : 1);
           cur = 0;
+          halved = false;
+          scaled = true;
           // «بين 3 و 5 ورقات»: the note is the unit a bare end beside it shares (rangeEnds), like «الف».
           maxMult = Math.max(maxMult, c.scale);
           have = true;
@@ -827,7 +985,15 @@ export function parseNlQuery(input: string): NlQuery {
     if (lastMult >= 1e6 && cur > 0 && cur < 1000) cur *= 1000;
     const value = total + cur;
     if (!have || !Number.isFinite(value) || value < 1 || value > MAX_PRICE_IQD) return null;
-    return { value, end: j, unit, grouped, maxMult, cur: currency };
+    // «لە 20 هەزارەوە»: the ablative glued to the amount is read with it.
+    let from = false;
+    if (j < L.length && !used[j] && j > start && L[j].f === ABLATIVE && L[j].piece === L[j - 1].piece) {
+      from = true;
+      j++;
+    }
+    const perLead = terms === 1 && !termAfterScale && lead > 0 ? value / lead : 0;
+    const share = perLead > 1 ? perLead : maxMult;
+    return { value, end: j, unit, grouped, maxMult, share, cur: currency, from };
   };
 
   /** An amount as a price: dollars as typed; dinars; a bare number only beside a bound (Iraqi shorthand: «اقل من 30» is 30,000). */
@@ -839,7 +1005,7 @@ export function parseNlQuery(input: string): NlQuery {
   };
 
   /** A measure or a count, the Sorani indefinite too («کاتژمێرێک» an hour, «پلەیەک» a degree, «واتێک» a watt). */
-  const isMeasure = (k: number): boolean => k >= 0 && k < L.length && L[k].v.some((v) => MEASURE_WORDS.has(v) || MEASURE_WORDS.has(soraniUnit(v) ?? ''));
+  const isMeasure = (k: number): boolean => k >= 0 && k < L.length && L[k].v.some(measureWord);
   const soldAt = (k: number): boolean => k >= 0 && k < L.length && !used[k] && L[k].v.some((v) => SOLD_UNITS.has(v) || soraniPerUnit(v));
   /** Lexeme k is a number: «2 کیلۆی» after it is a quantity, two kilos, not «of the kilo». */
   const numberAt = (k: number): boolean => {
@@ -907,7 +1073,15 @@ export function parseNlQuery(input: string): NlQuery {
    *   - Otherwise the rule, and the other reading only when the rule inverts the order («بين 500 الف و 1200»
    *     ends at 1,200,000, «بين 5 الف و 9000» at 9,000).
    */
-  const rangeEnds = (a: Amount, b: Amount, cur: 'IQD' | 'USD', bounds = false): [number, number] => {
+  const rangeEnds = (a0: Amount, b0: Amount, cur: 'IQD' | 'USD', bounds = false): [number, number] => {
+    // «بين 3 و 5 مية» is three to five hundred: a bare count near the count of «N مية» shares the hundred, before
+    // the rule reads either end (300,000 to 500,000).
+    const hundred = (x: Amount, y: Amount): Amount => {
+      if (x.unit !== null || x.grouped || x.share !== 0 || y.unit !== null || y.share !== 100) return x;
+      const count = y.value / 100;
+      return Math.max(x.value, count) < Math.min(x.value, count) * 10 ? { ...x, value: x.value * 100, share: 100 } : x;
+    };
+    const [a, b] = [hundred(a0, b0), hundred(b0, a0)];
     if (a.unit === null && b.unit === null && cur === 'IQD') {
       const read = (x: Amount): number => (x.grouped ? x.value : bareDinars(x.value));
       const [lo, hi] = [read(a), read(b)];
@@ -922,10 +1096,11 @@ export function parseNlQuery(input: string): NlQuery {
       if (x.unit !== null || x.grouped) return x.value;
       const keeps = (v: number): boolean => (low ? v <= y.value : v >= y.value);
       let shared: number | null = null;
-      if (x.value < BARE_IN_FULL_FROM && y.maxMult > 0 && x.value * y.maxMult <= MAX_PRICE_IQD) {
-        shared = x.value * y.maxMult;
+      // «بين 2 و 3 مية الف» shares the hundred thousand (200,000 to 300,000), «بين 3 و 5 ورقات» the note.
+      if (x.value < BARE_IN_FULL_FROM && y.share > 0 && x.value * y.share <= MAX_PRICE_IQD) {
+        shared = x.value * y.share;
         // The counts as written, the low end's first: «50 و 25 الف» is 50 then 25, high to low.
-        const count = y.value / y.maxMult;
+        const count = y.value / y.share;
         const [first, second] = low ? [x.value, count] : [count, x.value];
         const near = Math.max(first, second) < Math.min(first, second) * 10;
         // Up to the word («بين 2 و 500 مليون») or near the other count; after it, near only («بين مليون و 500»).
@@ -999,6 +1174,17 @@ export function parseNlQuery(input: string): NlQuery {
     return { lo: { v: Math.round(l), cur }, hi: { v: Math.round(h), cur }, end: priceEnd(b.end) };
   };
 
+  /**
+   * Would a bound right before lexeme k take what is at k as its price? Not a measure or a count («2 كيلو», "1kg»),
+   * and not a filament diameter written bare («1.75», «2.85»): after another amount's bound those are what the
+   * query is about, not a second price.
+   */
+  const boundsPrice = (k: number): boolean => {
+    const x = readAmount(k, { bound: true });
+    if (!x || measured(x) || !priceOf(x, true)) return false;
+    return !(x.unit === null && x.end === k + 1 && DIAMETERS.has(L[k].f));
+  };
+
   /** A price constraint from lexeme i: «سعر» … a range, a bound and its amount, or an amount and its bound. */
   const tryPrice = (i: number, flip: boolean): number => {
     if (i >= L.length || used[i]) return 0;
@@ -1014,14 +1200,19 @@ export function parseNlQuery(input: string): NlQuery {
         take(i, r.end);
         return r.end - i;
       }
-      if (longest(j, RANGE_MIN_ALONE) === open) {
-        const a = readAmount(j + open, { bound: false });
-        const p = a && a.unit === 'strong' ? priceOf(a, false) : null;
-        if (a && p) {
+      // «من 30 الف», "from 20k", «لە 20 هەزارەوە»: from an amount on, a lower bound by itself.
+      const a = readAmount(j + open, { bound: false });
+      if (a && (longest(j, RANGE_MIN_ALONE) === open || (open === 1 && L[j].f === SORANI_FROM && a.from))) {
+        // «من 30 الف ونازل», «لە 20 هەزارەوە بۆ سەرەوە»: a bound after the amount says which way; it is read below.
+        const at = priceEnd(a.end);
+        const post = Math.max(longest(at, MAX_POST), longest(at, MIN_POST));
+        const p = a.unit === 'strong' ? priceOf(a, false) : null;
+        if (!post && p) {
           setBound(flipDir('min', flip), p, a);
           take(i, a.end);
           return a.end - i;
         }
+        if (post) return postBound(i, j + open, flip);
       }
     }
     // The longest bound phrase first: «اقل شي» (at least) before «اقل», «حد ادنى» before «حد».
@@ -1033,12 +1224,24 @@ export function parseNlQuery(input: string): NlQuery {
       const a = readAmount(j + c, { bound: true });
       const p = a && !measured(a) ? priceOf(a, true) : null;
       if (a && p) {
-        setBound(flipDir(dir, flip), p, a);
-        const end = priceEnd(a.end);
+        let end = priceEnd(a.end);
+        // «کەمتر لە 20 هەزار نەبێت»: the Sorani verb negation after the amount turns the bound («not less than»).
+        const not = longest(end, NEG_POST);
+        setBound(flipDir(dir, flip !== (not > 0)), p, a);
+        end += not;
         take(i, end);
         return end - i;
       }
     }
+    return postBound(i, j, flip);
+  };
+
+  /**
+   * An amount at j and the bound written after it («30 الف واقل», «لە 30 هەزار کەمتر», «20k and above»), or a bare
+   * range («250-400 الف»), or a strong amount alone (a ceiling); the words from i (a price word, an opener) go with it.
+   */
+  const postBound = (i: number, j: number, flip: boolean): number => {
+    who = 'price';
     const a = readAmount(j, { bound: false });
     if (!a) return 0;
     const range = readRange(j, true);
@@ -1054,13 +1257,15 @@ export function parseNlQuery(input: string): NlQuery {
     const at = priceEnd(a.end);
     // «فیلامێنت 1.75 کەمتر لە 25»: «کەمتر لە» is the bound of the amount after it, not «1.75 or less».
     const pre = Math.max(longest(at, MAX_PRE), longest(at, MIN_PRE));
-    const nextBound = pre > 0 && readAmount(at + pre, { bound: true }) !== null;
-    // «500k or under 30k», «500 هەزار یان زیاتر لە 600 هەزار», "500k or under 300mm": a bound that starts inside
-    // the phrase with an amount of its own after it bounds that amount, not this one.
+    const nextBound = pre > 0 && boundsPrice(at + pre);
+    // «500k or under 30k», «500 هەزار یان زیاتر لە 600 هەزار»: a bound that starts inside the phrase with a price of
+    // its own after it bounds that price, not this one. A diameter or a measure after it is no price: «500 الف فما
+    // فوق 1.75», «20 الف او اكثر 2 كيلو», «30 هەزار یان کەمتر 1.75» are this amount's bound and then a diameter or a
+    // quantity.
     const ownAmount = (c: number): boolean => {
       for (let q = at + 1; q < at + c; q++) {
         const pre = Math.max(longest(q, MAX_PRE), longest(q, MIN_PRE));
-        if (pre > 0 && q + pre >= at + c && readAmount(q + pre, { bound: true }) !== null) return true;
+        if (pre > 0 && q + pre >= at + c && boundsPrice(q + pre)) return true;
       }
       return false;
     };
@@ -1210,12 +1415,15 @@ export function parseNlQuery(input: string): NlQuery {
   const tryNegation = (i: number): number => {
     const carried = negatedTo === i && NEGATION_OR.has(L[i].f);
     if (CONJUNCTIONS.has(L[i].f) && !carried) return 0;
-    const n = carried ? 1 : longest(i, NEGATION);
+    let n = carried ? 1 : longest(i, NEGATION);
+    // Iraqi «ما متوفر» (not available), «ما اسود»: a bare «ما» negates a known constraint only.
+    const ma = !n && L[i].f === MA;
+    if (ma) n = 1;
     if (!n) return 0;
     const j = i + n;
     if (j >= L.length || used[j]) return 0;
     // A lone "non" negates a known term ("non combo", "non black"); "non slip" is a product word.
-    const loose = n === 1 && L[i].f === 'non';
+    const loose = (n === 1 && L[i].f === 'non') || ma;
     /** A price at k, the Sorani «لە» of a bound written last included («یان لە 30 هەزار زیاتر نەبێت»). */
     const priceAt = (k: number, f: boolean): number => {
       const w = tryPrice(k, f);
@@ -1243,33 +1451,73 @@ export function parseNlQuery(input: string): NlQuery {
         return n + said;
       }
       const w = longest(j, SPOOL_WITH);
-      const word = longest(j, REFILL) || (longest(j + w, SPOOL) ? w + longest(j + w, SPOOL) : 0);
-      if (word) {
+      const spoolWord = longest(j, REFILL) || (longest(j + w, SPOOL) ? w + longest(j + w, SPOOL) : 0);
+      if (spoolWord) {
         last.items.push({ key: '', sep: i, asSaid: true });
-        negatedTo = j + word;
+        negatedTo = j + spoolWord;
         return 0;
       }
     }
-    let k = carried ? tryColour(j, true) : trySpool(j, true) || trySale(j, true) || priceAt(j, true) || tryColour(j, true);
+    const material = (at: number): number => {
+      const m = lookup(at, MATERIALS);
+      if (!m) return 0;
+      add(exclude.materials, m);
+      who = `material!:${m}`;
+      take(at, at + 1);
+      return 1;
+    };
+    /** A word left out: a known term, or (`any`) a word that is no function word, bound or negation. */
+    const word = (at: number, any: boolean): number => {
+      if (at >= L.length || used[at]) return 0;
+      const w = L[at].f;
+      const canon = lookup(at, EXCLUDE_CANON);
+      if (canon === undefined) {
+        const excludable =
+          /\p{L}/u.test(w) && w.length >= 2 && !NEG_ARTICLES.has(w) && !L[at].v.some((v) => FILLERS.has(v) || CONJUNCTIONS.has(v)) && !boundWordAt(at);
+        if (!any || !excludable || longest(at, NEGATION)) return 0;
+      }
+      const out = canon ?? stripArticle(w);
+      add(exclude.words, out);
+      who = `exclude:${out}`;
+      take(at, at + 1);
+      return 1;
+    };
+    let k = carried || ma ? tryColour(j, true) : trySpool(j, true) || trySale(j, true) || priceAt(j, true) || tryColour(j, true);
+    if (!k && ma) k = trySale(j, true) || trySpool(j, true);
+    if (!k) k = material(j);
     if (!k) {
-      const m = lookup(j, MATERIALS);
-      if (m) {
-        add(exclude.materials, m);
-        who = `material!:${m}`;
-        take(j, j + 1);
-        k = 1;
+      // Over a colour noun, an article, "in" or "even" to the item after it (COLOUR_NOUNS).
+      let s = j;
+      let noun = false;
+      let even = false;
+      let article = true;
+      for (; s < L.length && !used[s]; s++) {
+        const v = L[s].v;
+        if (v.some((x) => COLOUR_NOUNS.has(x))) noun = true;
+        else if (v.some((x) => EVEN.has(x))) even = true;
+        else if (NEG_FILLERS.has(L[s].f)) article = false;
+        else if (!NEG_ARTICLES.has(L[s].f)) break;
+      }
+      if (s > j && s < L.length && !used[s]) {
+        let got = !carried && !ma && !noun ? trySpool(s, true) || trySale(s, true) : 0;
+        got ||= tryColour(s, true);
+        if (!got && !noun) got = material(s);
+        if (!got && !noun && carried && even && last) {
+          // «ولا حتى كومبو», "or even combo": after "even" in a list, a word is searched as written (never wanted
+          // as a filter), and the list runs on to the next item: «… ولا حتى كومبو ولا اسود» leaves out black.
+          last.items.push({ key: '', sep: i, asSaid: true });
+          negatedTo = s + 1;
+          return 0;
+        }
+        if (!got && !noun) got = word(s, !ma && (article || even));
+        if (got) {
+          take(j, s);
+          k = s - j + got;
+        }
       }
     }
-    if (!k) {
-      const w = L[j].f;
-      const excludable = /\p{L}/u.test(w) && w.length >= 2 && !L[j].v.some((v) => FILLERS.has(v) || CONJUNCTIONS.has(v)) && !boundWordAt(j);
-      if (!excludable || longest(j, NEGATION) || (loose && lookup(j, EXCLUDE_CANON) === undefined)) return 0;
-      const canon = lookup(j, EXCLUDE_CANON) ?? stripArticle(w);
-      add(exclude.words, canon);
-      who = `exclude:${canon}`;
-      take(j, j + 1);
-      k = 1;
-    }
+    if (!k) k = word(j, !loose);
+    if (!k) return 0;
     take(i, j);
     if (carried && last) last.items.push({ key: who, sep: i, asSaid: false });
     else negLists.push({ neg: Array.from({ length: n }, (_, d) => i + d), items: [{ key: who, sep: -1, asSaid: false }] });
@@ -1277,12 +1525,73 @@ export function parseNlQuery(input: string): NlQuery {
     return n + k;
   };
 
+  /**
+   * The Sorani negation written after a list of known items: «ڕەش نەبێت» (not black), «PLA نەبێت», «ڕەش و سپی
+   * نەبێت» (neither black nor white), «بەردەست نییە» (not available: a pre-order), «ڕیفیل نەبێت» (with a spool). Each
+   * item is left out (the sale mode and the spool turned); a removed item takes its list word along and the negation
+   * stays for the rest.
+   */
+  const tryPostNegation = (i: number): number => {
+    type Kind = 'colour' | 'material' | 'sale' | 'spool' | 'canon';
+    const itemAt = (k: number): { at: number; len: number; kind: Kind } | null => {
+      if (k >= L.length || used[k]) return null;
+      let len = 0;
+      for (const [p] of COLOUR_PHRASES) len = Math.max(len, matchAt(k, p));
+      if (len || lookup(k, COLOURS)) return { at: k, len: len || 1, kind: 'colour' };
+      if (lookup(k, MATERIALS)) return { at: k, len: 1, kind: 'material' };
+      const sale = longest(k, DIRECT) || longest(k, PREORDER);
+      if (sale) return { at: k, len: sale, kind: 'sale' };
+      const w = longest(k, SPOOL_WITH);
+      const spool = longest(k, REFILL) || (longest(k + w, SPOOL) ? w + longest(k + w, SPOOL) : 0);
+      if (spool && !guarded(k - 1) && !guarded(k + spool)) return { at: k, len: spool, kind: 'spool' };
+      return lookup(k, EXCLUDE_CANON) !== undefined ? { at: k, len: 1, kind: 'canon' } : null;
+    };
+    const items: Array<{ at: number; len: number; kind: Kind }> = [];
+    const seps: number[] = [];
+    let k = i;
+    let neg = 0;
+    for (;;) {
+      const it = itemAt(k);
+      if (!it) return 0;
+      items.push(it);
+      k += it.len;
+      neg = longest(k, NEG_POST);
+      if (neg) break;
+      if (k < L.length && !used[k] && POST_LIST.has(L[k].f) && itemAt(k + 1)) {
+        seps.push(k);
+        k++;
+      } else return 0;
+    }
+    const keys = items.map((it) => {
+      if (it.kind === 'colour') tryColour(it.at, true);
+      else if (it.kind === 'sale') trySale(it.at, true);
+      else if (it.kind === 'spool') trySpool(it.at, true);
+      else {
+        const v = it.kind === 'material' ? lookup(it.at, MATERIALS)! : lookup(it.at, EXCLUDE_CANON)!;
+        add(it.kind === 'material' ? exclude.materials : exclude.words, v);
+        who = it.kind === 'material' ? `material!:${v}` : `exclude:${v}`;
+        take(it.at, it.at + it.len);
+      }
+      return who;
+    });
+    // The list word before an item goes with it, and the one after the first with the first too.
+    seps.forEach((sep, x) => {
+      who = keys[x + 1];
+      take(sep, sep + 1);
+      if (x === 0) alsoOwner[sep] = keys[0];
+    });
+    who = items.length === 1 ? keys[0] : '';
+    take(k, k + neg);
+    return k + neg - i;
+  };
+
   for (let i = 0; i < L.length; ) {
     if (used[i]) {
       i++;
       continue;
     }
-    const k = tryPrice(i, false) || tryNegation(i) || trySale(i, false) || trySpool(i, false) || tryDiameter(i) || tryColour(i, false) || trySort(i);
+    const k =
+      tryPrice(i, false) || tryNegation(i) || tryPostNegation(i) || trySale(i, false) || trySpool(i, false) || tryDiameter(i) || tryColour(i, false) || trySort(i);
     if (k) {
       i += k;
       continue;
@@ -1358,7 +1667,7 @@ export function parseNlQuery(input: string): NlQuery {
   for (const chip of understood) {
     const key = nlChipKey(chip);
     const plan = firstOut.get(key);
-    const goes = (k: number): boolean => owner[k] === key || (!!plan && (plan.gone.has(k) || plan.at === k));
+    const goes = (k: number): boolean => owner[k] === key || alsoOwner[k] === key || (!!plan && (plan.gone.has(k) || plan.at === k));
     const out: string[] = [];
     let gap = false;
     pieces.forEach((raw, piece) => {
