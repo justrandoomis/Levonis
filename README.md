@@ -68,3 +68,7 @@ the resources and secrets described there.
 - `docs/CLEANUP.md` — what was removed from the original project and why
 - `docs/CLOUDFLARE_SETUP.md` — Phase 2 configuration + Phase 3 deployment
 - `docs/TEST_RESULTS.md` — what was verified locally and what remains
+- `docs/LEVO_ACCEPTANCE_MATRIX.md` — Levo master spec §29: every requirement, its tests, manual evidence, run links and status
+- `docs/LEVO_GAP_MAP.md` — Levo architecture and gap map: what works, conflicts, blocked items, reference studies per track
+- `docs/LEVO_PLAN_PHASE1_2.md` — Levo Phase 1 and Phase 2 pushes, with the status of each
+- `docs/LEVO_REFERENCE_MATRIX.md` — Levo reference study of 17 products, with REA evidence ids
