@@ -601,8 +601,11 @@ test('the ordinary phrasings that used to fall through now reach an answer', asy
     // the one word the delivery entry omitted.
     ['التسليم كم يوم', 'delivery_estimate'],
     ['هل تشحنون للبصرة', 'shipping_cost'],
-    // Somebody whose machine has died, met with a fourteen-item menu.
-    ['الطابعة خربانة', 'open_ticket'],
+    // Somebody whose machine has died, met with a fourteen-item menu. It now
+    // opens the printer-problem triage (which printer, which symptom, the
+    // curated steps, then the team with a prefilled ticket) rather than a
+    // bare ticket prompt: tests/assistAcceptance.test.ts walks it.
+    ['الطابعة خربانة', 'printer_problem'],
     ['رقمكم', 'contact_info'],
     // A shipped checkout method with no word anywhere in the dictionary.
     ['اكو تقسيط', 'payment_methods'],

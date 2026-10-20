@@ -320,6 +320,13 @@ test('the prefixes that share a stem resolve to their own owner, not to the shor
   assert.equal(matchRoute('/api/support/admin/tickets', 'GET')!.owner, 'SUPPORT');
 });
 
+test('the support assistant is open to guests; the rest of /api/support still needs a session', () => {
+  const assistant = matchRoute('/api/support/assistant', 'POST')!;
+  assert.equal(assistant.owner, 'SUPPORT');
+  assert.equal(assistant.requires, 'none');
+  assert.equal(matchRoute('/api/support/tickets', 'POST')!.requires, 'auth');
+});
+
 test('every row is well formed: a known target, a phase that exists, and no duplicate (prefix, methods, pattern)', () => {
   const seen = new Set<string>();
   for (const r of ROUTES) {

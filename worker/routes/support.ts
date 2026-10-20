@@ -49,7 +49,15 @@ import { notifyStoreOrderComplaint } from '../lib/merchantNotify';
 import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { pricingCtx, resolveListingCards, resolveProductCards } from './products';
+import { pricingCtx, resolveProductCards } from '../lib/catalog/cardsRead';
+import { handleTurn } from '../lib/assist/orchestrator';
+import { readContext } from '../lib/assist/context';
+import { viewerFor } from '../lib/assist/viewer';
+import { callTool } from '../lib/assist/registry';
+import { ownDevices, type DeviceLite } from '../lib/assist/tools/devices';
+import { rewriteSpokenModels } from '../lib/assist/understand/models';
+import type { AssistReply, CardRenderer, TicketDraft } from '../lib/assist/types';
+import type { AssistContext } from '../lib/assist/context';
 import { cardAvailability, compositionAvailability, type AvailabilityState } from '@levonis/catalog/availability';
 import { catalogIndexFor, productTypeSql } from '../lib/catalogPresentation';
 import {
@@ -74,8 +82,7 @@ import { bnplEligibility } from '../lib/bnpl';
 import { canMoveMoney } from '../lib/adminScope';
 import { canReviewKyc, kycReviewRefusal } from '../lib/staffCapabilities';
 import { maskSerial } from '../lib/deviceOps';
-import { tradedInSql, unitCoverage, unitIdentity } from '../lib/deviceCustody';
-import { serialAssignmentsInstalled } from '../lib/serialPolicy';
+import { unitCoverage, unitIdentity } from '../lib/deviceCustody';
 import { compareProducts, type CompareRow } from '../lib/compareSpecs';
 import {
   PRODUCT_COLUMNS as COMPARE_PRODUCT_COLUMNS,
@@ -166,6 +173,12 @@ const INTENTS = [
    */
   'power_usage',
   'policy_question',
+  /**
+   * «صارت عندي مشكله بالطابعه», «كلوب» — the printer-problem triage
+   * (worker/lib/assist/orchestrator.ts): which printer, which symptom, the
+   * curated first steps, then the team with a prefilled ticket.
+   */
+  'printer_problem',
   'open_ticket',
   'human_handoff',
   /**
@@ -306,6 +319,9 @@ const LEXICON: Record<Intent, LexEntry> = {
   policy_question: {
     phrases: ['سياسة الموقع', 'الشروط والاحكام', 'terms and conditions', 'privacy policy'],
     stems: ['policy', 'policies', 'terms', 'privacy', 'سياسة', 'سياسات', 'شروط', 'خصوصية', 'سیاسەت', 'مەرج'],
+  },
+  printer_problem: {
+    phrases: ['مشكلة بالطابعة', 'مشكلة في الطابعة', 'printer problem', 'کێشەی پرینتەر'],
   },
   open_ticket: {
     phrases: ['فتح تذكرة', 'عندي مشكلة', 'open a ticket', 'file a complaint'],
@@ -493,6 +509,7 @@ const T: Record<Locale, Record<string, string>> = {
     power_none: 'ما لقيت هذا المنتج.',
     power_unknown: 'استهلاك هذا المنتج غير مسجّل عندنا بعد، وما أريد أعطيك رقم مو مضبوط. راجعنا وننطيك الجواب.',
     c_policies: 'السياسات المنشورة',
+    c_printer_problem: 'مشكلة بالطابعة',
     c_ticket: 'فتح تذكرة دعم',
     c_human: 'التحدث مع فريق Levonis',
     orders_none: 'لا توجد طلبات في حسابك بعد.',
@@ -633,6 +650,7 @@ const T: Record<Locale, Record<string, string>> = {
     power_none: 'I could not find that product.',
     power_unknown: 'Its power draw is not recorded here yet, and I will not give you a number I cannot stand behind. Ask us and we will get it for you.',
     c_policies: 'Published policies',
+    c_printer_problem: 'Printer problem',
     c_ticket: 'Open a support ticket',
     c_human: 'Talk to LEVONIS staff',
     orders_none: 'You have no orders in your account yet.',
@@ -773,6 +791,7 @@ const T: Record<Locale, Record<string, string>> = {
     power_none: 'ئەو بەرهەمەم نەدۆزییەوە.',
     power_unknown: 'ڕاکێشانی کارەبای ئەمە هێشتا لای ئێمە تۆمار نەکراوە، و ناتوانم ژمارەیەکت بدەمێ کە پشتی پێ نەبەستم. پەیوەندیمان پێوە بکە.',
     c_policies: 'سیاسەتە بڵاوکراوەکان',
+    c_printer_problem: 'کێشەی پرینتەر',
     c_ticket: 'کردنەوەی تیکێتی پشتگیری',
     c_human: 'قسەکردن لەگەڵ ستافی Levonis',
     orders_none: 'هێشتا هیچ داواکارییەک لە هەژمارەکەتدا نییە.',
@@ -1029,6 +1048,8 @@ interface AssistantCard {
   price_iqd?: number | null;
   price_from?: boolean;
   availability?: AvailabilityState;
+  /** The product this card is, so the conversation context can name what it showed. */
+  product_id?: string;
 }
 /**
  * THE COMPACT COMPARISON — «بشكل أصغر لا يحدث هوسة في المحادثة».
@@ -1081,6 +1102,15 @@ interface AssistantReply {
    *     `expects` gains nothing it could not have asked for directly.
    */
   expects?: { intent: Intent; slot: 'q' | 'ids'; params?: Record<string, string> };
+  /** The printer-problem triage's curated steps (worker/lib/assist/triage/symptoms.ts). */
+  steps?: AssistReply['steps'];
+  /** «تحدث مع الفريق»: what the ticket form opens with — visible and editable. */
+  ticket_draft?: TicketDraft;
+  /**
+   * THE CONVERSATION'S CONTEXT (worker/lib/assist/context.ts), handed back by
+   * the client with the next message. Closed-set values only; it grants nothing.
+   */
+  context?: AssistContext;
 }
 
 const MENU_ITEMS: Array<{ intent: Intent; labelKey: string }> = [
@@ -1100,6 +1130,7 @@ const MENU_ITEMS: Array<{ intent: Intent; labelKey: string }> = [
   { intent: 'compare_products', labelKey: 'c_compare' },
   { intent: 'power_usage', labelKey: 'c_power' },
   { intent: 'policy_question', labelKey: 'c_policies' },
+  { intent: 'printer_problem', labelKey: 'c_printer_problem' },
   { intent: 'open_ticket', labelKey: 'c_ticket' },
   { intent: 'human_handoff', labelKey: 'c_human' },
 ];
@@ -1129,6 +1160,7 @@ const CHOICE_LABELS: Record<Intent, string> = {
   compare_products: 'c_compare',
   power_usage: 'c_power',
   policy_question: 'c_policies',
+  printer_problem: 'c_printer_problem',
   open_ticket: 'c_ticket',
   human_handoff: 'c_human',
   greeting: 'c_greeting',
@@ -1232,44 +1264,6 @@ async function orderPickReply(db: D1Database, userId: string, loc: Locale, inten
     choices: orderChoices(orders, loc, intent),
     links: [{ label: tr(loc, 'orders_link'), to: '/orders' }],
   };
-}
-
-interface DeviceLite extends Record<string, unknown> {
-  id: string;
-  delivered_at: string | null;
-  warranty_end_at: string | null;
-  policy_version: string | null;
-  serial_raw: string | null;
-  name_snapshot: string | null;
-  p_name: string | null;
-  p_name_ar: string | null;
-  p_name_ku: string | null;
-}
-
-/**
- * The devices the support card may talk about: the caller's live links, minus
- * a device that came back to Levonis — traded in (owner decision 3, derived)
- * or returned (its unit closed, 0178) — even where its link outlived that.
- */
-async function ownDevices(db: D1Database, userId: string): Promise<DeviceLite[]> {
-  const notClosed = (await serialAssignmentsInstalled(db)) ? 'AND u.warranty_closed_at IS NULL' : '';
-  const { results } = await db
-    .prepare(
-      `SELECT u.id, u.delivered_at, u.warranty_end_at, u.policy_version, s.serial_raw, oi.name_snapshot,
-              p.name AS p_name, p.name_ar AS p_name_ar, p.name_ku AS p_name_ku
-         FROM device_registrations r
-         JOIN order_item_units u ON u.id = r.unit_id
-         LEFT JOIN device_serials s ON s.unit_id = u.id
-         LEFT JOIN order_items oi ON oi.id = u.order_item_id
-         LEFT JOIN products p ON p.id = u.product_id
-        WHERE r.user_id = ? AND r.revoked_at IS NULL ${notClosed}
-          AND ${tradedInSql('u')} IS NULL
-        ORDER BY r.registered_at DESC
-        LIMIT 10`
-    )
-    .bind(userId)
-    .all<DeviceLite>();
-  return results;
 }
 
 function pickName(loc: Locale, d: { p_name: string | null; p_name_ar: string | null; p_name_ku: string | null; name_snapshot: string | null }): string {
@@ -1443,44 +1437,45 @@ function handlePasswordHelp(loc: Locale, signedIn: boolean): AssistantReply {
     : { intent: 'password_help', text: tr(loc, 'password_anon'), links: [{ label: tr(loc, 'sign_in'), to: '/auth' }] };
 }
 
-async function handleProductSearch(c: Context<AppContext>, params: Record<string, unknown>, freeText: string, loc: Locale): Promise<AssistantReply> {
-  const q = str(params.q, 'q', { max: 100, required: false }) || freeText.trim();
-  if (q.length < 2) return { intent: 'product_search', text: tr(loc, 'search_empty') };
-  const like = likePattern(q);
-  // VISIBLE with the SELLABLE flag (DECISIONS row 240): a catalog-only product is found, with no price.
-  // A COMPOSITION only while it is SELLABLE — the storefront listing's own predicate (default D6): a
-  // sale-held bundle is off the grid and the bundle shelf, so the assistant does not quote it either.
-  const L = await listing(c.env.DB);
-  const { results } = await c.env.DB.prepare(
-    `SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products
-      WHERE ${L.visible('products')} AND (products.composition = '' OR ${L.sellable('products')})
-        AND (name LIKE ?1 ESCAPE '\\' OR name_ar LIKE ?1 ESCAPE '\\' OR name_ku LIKE ?1 ESCAPE '\\' OR brand LIKE ?1 ESCAPE '\\')
-      ORDER BY is_featured DESC, created_at DESC
-      LIMIT 5`
-  )
-    .bind(like)
-    .all<Record<string, unknown>>();
-  if (results.length === 0) return { intent: 'product_search', text: tr(loc, 'search_none') };
+/**
+ * A STOREFRONT CARD → AN ASSISTANT CARD, titled in the customer's language.
+ * The one mapper every product answer uses, handed to the orchestrator too.
+ */
+function assistantProductCard(loc: Locale, card: Record<string, unknown>, row: Record<string, unknown>): AssistantCard {
+  const title = pickName(loc, {
+    p_name: String(row.name ?? card.name ?? ''),
+    p_name_ar: String(row.name_ar ?? card.name_ar ?? ''),
+    p_name_ku: String(row.name_ku ?? card.name_ku ?? ''),
+    name_snapshot: null,
+  });
+  const id = String(row.id ?? card.id ?? '');
+  return { ...assistantCardFrom(loc, card, row, title), ...(id ? { product_id: id } : {}) };
+}
 
-  // THE ASSISTANT QUOTES THE CARD THE STOREFRONT DRAWS: the listing's own builders (offers, the pool,
-  // the viewer's tier, a bundle through its builder) for this viewer, and `assistantCardFrom` reads
-  // the figures off the result. No price is computed here.
-  const cardsById = await resolveListingCards(c.env.DB, results, await pricingCtx(c), null, 'flag');
-  const cards: AssistantCard[] = [];
-  for (const row of results) {
-    const card = cardsById.get(String(row.id));
-    if (!card) continue;
-    const title = pickName(loc, {
-      p_name: String(row.name ?? ''),
-      p_name_ar: String(row.name_ar ?? ''),
-      p_name_ku: String(row.name_ku ?? ''),
-      name_snapshot: null,
-    });
-    cards.push(assistantCardFrom(loc, card, row, title));
-  }
+const CARD_RENDERER: CardRenderer = { card: assistantProductCard };
+
+/**
+ * PRODUCT SEARCH IS THE SEARCH BOX'S OWN SEARCH.
+ *
+ * This was one `LIKE '%<the whole sentence>%'` over the names, so «بحث عن
+ * منتج صيانه خلل بالنوزل» searched for the whole sentence and found nothing,
+ * and a typed code never reached the identifier lane. It now asks the
+ * storefront's search (`catalog.search` → `listCatalogProducts`): the token
+ * index in every language, exact sizes, exact codes, the visibility rule, and
+ * the cards the grid draws for this viewer — so the assistant and the search
+ * box give the same answer, at the same price. The question words come out
+ * first. The index's own LIKE fallback still answers when the index is not
+ * built yet.
+ */
+async function handleProductSearch(c: Context<AppContext>, params: Record<string, unknown>, freeText: string, loc: Locale): Promise<AssistantReply> {
+  const q = (str(params.q, 'q', { max: 100, required: false }) || stripQuestionWords(freeText, 'product_search')).slice(0, 99);
+  if (q.length < 2) return { intent: 'product_search', text: tr(loc, 'search_empty') };
+  const viewer = viewerFor(c.env.DB, c.get('user')?.id ?? null, loc);
+  const found = await callTool('catalog.search', c.env.DB, viewer, { text: q, limit: 5 });
+  const items = found.ok ? found.data.items : [];
   // Every row the builders left out (a composition that is not sellable): the honest «no match».
-  if (cards.length === 0) return { intent: 'product_search', text: tr(loc, 'search_none') };
-  return { intent: 'product_search', text: tr(loc, 'search_intro'), cards };
+  if (items.length === 0) return { intent: 'product_search', text: tr(loc, 'search_none') };
+  return { intent: 'product_search', text: tr(loc, 'search_intro'), cards: items.map((i) => assistantProductCard(loc, i.card, i.row)) };
 }
 
 /**
@@ -2269,6 +2264,7 @@ export function contextualChoices(loc: Locale, intent: string): AssistantChoice[
     cancel_order: ['order_status', 'human_handoff'],
     contact_info: ['human_handoff', 'open_ticket'],
     bot_identity: ['human_handoff'],
+    printer_problem: ['product_search', 'human_handoff'],
   };
   const next = followups[intent as Intent] ?? [];
   return menuChoices(loc, next);
@@ -2339,7 +2335,37 @@ supportRoutes.post('/assistant', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const loc = resolveLocale(c, body.locale);
   const params = (typeof body.params === 'object' && body.params !== null ? body.params : {}) as Record<string, unknown>;
-  const freeText = str(body.text, 'text', { max: 500, required: false });
+  let freeText = str(body.text, 'text', { max: 500, required: false });
+  // Every answer is this viewer's own (their tier's prices, their devices).
+  c.header('Cache-Control', 'private, no-store');
+
+  /**
+   * THE ORCHESTRATOR FIRST (worker/lib/assist/orchestrator.ts).
+   *
+   * Free text and the «مشكلة بالطابعة» chips go to the deterministic
+   * orchestrator, which owns part questions («نوزل مال اي ون اريده 0.2»), the
+   * printer-problem triage («صارت عندي مشكله بالطابعه», «كلوب») and the
+   * conversation context. It answers null for everything else, and the legacy
+   * handlers below answer as they always did. A tapped legacy chip never
+   * reaches it.
+   */
+  const context = readContext(body.context);
+  const chipIntent = typeof body.intent === 'string' && (INTENTS as readonly string[]).includes(body.intent) ? body.intent : null;
+  if (chipIntent === 'printer_problem' || (!chipIntent && freeText)) {
+    const viewer = viewerFor(c.env.DB, user?.id ?? null, loc);
+    const turn =
+      chipIntent === 'printer_problem'
+        ? ((await handleTurn(c.env.DB, viewer, { chip: params, context }, CARD_RENDERER)) ??
+          (await handleTurn(c.env.DB, viewer, { chip: {}, context }, CARD_RENDERER)))
+        : await handleTurn(c.env.DB, viewer, { text: freeText, context, intentHint: readIntent(freeText).intent }, CARD_RENDERER);
+    if (turn) {
+      const reply = { ...(turn.reply as AssistReply), context: turn.context } as AssistantReply;
+      return c.json({ success: true, reply: withFollowups(reply, loc) });
+    }
+    // A printer named out loud reaches the legacy readers as its token:
+    // «كم تستهلك بي ون اس» is the P1S question it was meant to be.
+    if (freeText) freeText = rewriteSpokenModels(freeText);
+  }
 
   /**
    * THE QUESTION THE ASSISTANT ASKED LAST TURN, handed back by the client.
@@ -2520,6 +2546,10 @@ supportRoutes.post('/assistant', async (c) => {
       break;
     case 'cancel_order':
       reply = handleCancelOrder(loc);
+      break;
+    case 'printer_problem':
+      // Reached only if the orchestrator declined, which a start never does.
+      reply = { intent, text: tr(loc, 'clarify'), choices: menuChoices(loc) };
       break;
   }
   return c.json({ success: true, reply: withFollowups(reply, loc) });

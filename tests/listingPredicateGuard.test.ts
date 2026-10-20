@@ -252,9 +252,11 @@ const EXPECTED_CALLS: Record<string, { visible: number; sellable: number; states
   'worker/routes/reviews.ts': { visible: 2, sellable: 0, states: 0 },
   'worker/routes/seo.ts': { visible: 1, sellable: 0, states: 0 },
   'worker/routes/stockAlerts.ts': { visible: 2, sellable: 0, states: 0 },
-  // The assistant's product search asks VISIBLE and, for a composition, SELLABLE — the storefront listing's own
-  // `composition = '' OR sellable` (default D6): a sale-held bundle is never quoted (tests/assistPriceParity).
-  'worker/routes/support.ts': { visible: 4, sellable: 6, states: 0 },
+  // The assistant's product search is now the storefront's own (`catalog.search` → `listCatalogProducts`, the
+  // predicates counted under products.ts: VISIBLE, and `composition = '' OR sellable`, default D6), so it left
+  // this file: -1 VISIBLE, -2 SELLABLE (assistant v2 push A). A sale-held bundle is still never quoted
+  // (tests/assistPriceParity). What stays is compare, power and choose-printer.
+  'worker/routes/support.ts': { visible: 3, sellable: 4, states: 0 },
   // «طلب السعر» (migration 0193): the request door's validation (`validatePriceRequestSelection`, shared with the
   // Bambu import's /complete, its spec §K.1 D-5) asks VISIBLE and the SELLABLE flag; the sweep asks each
   // product's state. The door itself (worker/routes/priceRequests.ts) asks neither.
