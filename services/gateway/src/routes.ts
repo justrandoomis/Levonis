@@ -315,6 +315,7 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/policies', hosts: 'root', owner: 'POLICIES', flipPhase: 4, requires: 'none', rateClass: 'public-read', cacheable: true },
   { prefix: '/api/support/admin/restrictions', hosts: 'main', owner: 'RISK', flipPhase: 4, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/support/admin', hosts: 'main', owner: 'SUPPORT', flipPhase: 4, requires: 'admin', rateClass: 'admin-write' },
+  { prefix: '/api/support/assistant', hosts: 'main', owner: 'SUPPORT', flipPhase: 4, requires: 'none', rateClass: 'write', note: 'the support assistant answers guests too: product questions and the printer-problem triage' },
   { prefix: '/api/support', hosts: 'main', owner: 'SUPPORT', flipPhase: 4, requires: 'auth', rateClass: 'write' },
   { prefix: '/api/invest', hosts: 'main', owner: 'INVEST', flipPhase: 4, requires: 'investor', rateClass: 'user' },
   { prefix: '/api/admin/invest', hosts: 'main', owner: 'INVEST', flipPhase: 4, requires: 'admin:owner', rateClass: 'admin-write' },

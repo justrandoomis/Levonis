@@ -27,6 +27,7 @@ import ChannelNudge from '../components/notify/ChannelNudge';
 import { IconButton } from '../components/ui/Button';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import VariantImg from '../components/ui/VariantImg';
+import { loadAssistContext, saveAssistContext } from '../lib/assistSession';
 
 /**
  * Guided, deterministic (non-AI) support assistant + real support tickets.
@@ -82,6 +83,12 @@ interface AsstReply {
    * becoming a second, client-side idea of what the conversation is about.
    */
   expects?: { intent: string; slot: string; params?: Record<string, string> };
+  /** The printer-problem triage's curated steps, in order. `hot` marks a burn risk. */
+  steps?: Array<{ key: string; text: string; safety?: 'hot' }>;
+  /** What the ticket form opens with after «تحدث مع الفريق», all of it editable. */
+  ticket_draft?: { subject: string; body: string; unit_id?: string };
+  /** The conversation context: opaque here, stored and returned unchanged (src/lib/assistSession.ts). */
+  context?: unknown;
 }
 
 interface ChatMsg {
@@ -220,6 +227,7 @@ const STRINGS = {
       { intent: 'compare_products', label: 'مقارنة منتجين' },
       { intent: 'power_usage', label: 'استهلاك الكهرباء وحجم الـ UPS' },
       { intent: 'policy_question', label: 'السياسات' },
+      { intent: 'printer_problem', label: 'مشكلة بالطابعة' },
       { intent: 'open_ticket', label: 'فتح تذكرة دعم' },
       { intent: 'human_handoff', label: 'التحدث مع الفريق' },
     ],
@@ -297,6 +305,7 @@ const STRINGS = {
       { intent: 'compare_products', label: 'Compare two products' },
       { intent: 'power_usage', label: 'Power draw and UPS size' },
       { intent: 'policy_question', label: 'Policies' },
+      { intent: 'printer_problem', label: 'Printer problem' },
       { intent: 'open_ticket', label: 'Open a support ticket' },
       { intent: 'human_handoff', label: 'Talk to the team' },
     ],
@@ -376,6 +385,7 @@ const STRINGS = {
       { intent: 'compare_products', label: 'بەراوردی دوو بەرهەم' },
       { intent: 'power_usage', label: 'ڕاکێشانی کارەبا و قەبارەی UPS' },
       { intent: 'policy_question', label: 'سیاسەتەکان' },
+      { intent: 'printer_problem', label: 'کێشەی پرینتەر' },
       { intent: 'open_ticket', label: 'کردنەوەی تیکێتی پشتگیری' },
       { intent: 'human_handoff', label: 'قسە لەگەڵ تیمەکە' },
     ],
@@ -514,6 +524,8 @@ export interface TicketPrefill {
   unitId?: string;
   orderId?: string;
   subject?: string;
+  /** The assistant's handoff draft: printer, symptom and the steps tried. Editable. */
+  body?: string;
 }
 
 function TicketForm({
@@ -532,7 +544,7 @@ function TicketForm({
   onCreated: (t: Ticket) => void;
 }) {
   const [subject, setSubject] = useState(initial?.subject ?? '');
-  const [body, setBody] = useState('');
+  const [body, setBody] = useState(initial?.body ?? '');
   const [orderId, setOrderId] = useState(initial?.orderId ?? '');
   const [unitId, setUnitId] = useState(initial?.unitId ?? '');
   const [orders, setOrders] = useState<OrderOption[]>([]);
@@ -1424,6 +1436,14 @@ export default function Support() {
    * turns later.
    */
   const pendingRef = useRef<AsstReply['expects']>(undefined);
+  /**
+   * THE CONVERSATION CONTEXT (which printer, where the triage is), kept for
+   * the tab. Replaced only by a reply that carries one: an answer from an
+   * older handler says nothing about the printer and must not forget it.
+   */
+  const contextRef = useRef<unknown>(loadAssistContext());
+  /** The latest handoff draft, so the ticket form opens filled in. */
+  const [draft, setDraft] = useState<TicketPrefill | undefined>(undefined);
 
   const send = useCallback(
     async (payload: { intent?: string; params?: Record<string, unknown>; text?: string }, label: string) => {
@@ -1434,8 +1454,20 @@ export default function Support() {
       // and sending it anyway would let a stale slot override a clear answer.
       const expects = payload.intent ? undefined : pendingRef.current;
       try {
-        const d = await api.post<{ reply: AsstReply }>('/api/support/assistant', { ...payload, expects, locale: lang });
+        const d = await api.post<{ reply: AsstReply }>('/api/support/assistant', {
+          ...payload,
+          expects,
+          context: contextRef.current,
+          locale: lang,
+        });
         pendingRef.current = d.reply.expects;
+        if (d.reply.context !== undefined) {
+          contextRef.current = d.reply.context;
+          saveAssistContext(d.reply.context);
+        }
+        if (d.reply.ticket_draft) {
+          setDraft({ subject: d.reply.ticket_draft.subject, body: d.reply.ticket_draft.body, unitId: d.reply.ticket_draft.unit_id });
+        }
         setMessages((prev) => [...prev, { role: 'assistant', text: d.reply.text, reply: d.reply }]);
         if (d.reply.handoff) {
           if (isAuthenticated) setShowTicketForm(true);
@@ -1484,6 +1516,7 @@ export default function Support() {
 
   const onTicketCreated = (t: Ticket) => {
     setShowTicketForm(false);
+    setDraft(undefined);
     setTicketsRefresh((n) => n + 1);
     setMessages((prev) => [
       ...prev,
@@ -1596,6 +1629,17 @@ export default function Support() {
                     {m.text}
                   </div>
 
+                  {m.reply?.steps && m.reply.steps.length > 0 && (
+                    <ol className="list-decimal space-y-1.5 rounded-xl bg-surface px-3.5 py-2.5 ps-8 text-sm leading-relaxed text-text-secondary" data-assist-steps>
+                      {m.reply.steps.map((step) => (
+                        <li key={step.key}>
+                          {step.safety === 'hot' && <AlertTriangle className="me-1 -mt-0.5 inline-block h-3.5 w-3.5 text-gold" aria-hidden="true" />}
+                          {step.text}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+
                   {m.reply?.cards && m.reply.cards.length > 0 && (
                     <div className="space-y-2">
                       {m.reply.cards.map((card, j) => (
@@ -1664,7 +1708,7 @@ export default function Support() {
             {busy && <div className="text-xs text-text-muted px-1">{s.thinking}</div>}
 
             {showTicketForm && (
-              <TicketForm s={s} lang={lang} loc={loc} initial={prefill} onClose={() => setShowTicketForm(false)} onCreated={onTicketCreated} />
+              <TicketForm s={s} lang={lang} loc={loc} initial={draft ?? prefill} onClose={() => setShowTicketForm(false)} onCreated={onTicketCreated} />
             )}
             <div ref={bottomRef} />
             </div>
