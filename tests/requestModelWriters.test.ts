@@ -311,3 +311,127 @@ test('a v3 save on a PUBLISHED request with an offer that changes a priced fact 
 });
 
 
+
+// ---------------------------------------------------------------- review fixes
+
+test('STABLE IDS: a save that drops the ids, or deletes a part and adds it back unchanged, keeps every part and material id — a replay, the offer still pending', async () => {
+  const raw = world();
+  const id = await newDraft(raw);
+  addFile(raw, id, 'crf_look', 'reference', 'look.png');
+  const part = {
+    name: 'Base', process: 'fdm', stated_dimensions_mm: { x: 10, y: 10, z: 10 },
+    materials: [{ material_id: 'pla', colors: [{ mode: 'catalogue', hex: '#1a1a1a' }] }],
+  };
+  const sources = [{ kind: 'file', file_id: 'crf_look', is_primary: true }, { kind: 'link', url: LINK }, { kind: 'text_ref', ref_text: 'Like the lid' }];
+  assert.equal((await saveDraft(raw, id, { schema_version: 3, sources, parts: [part] })).status, 200);
+  assert.equal((await publish(raw, id, { schema_version: 3 })).status, 200);
+  const offer = await offerOn(raw, id, 30_000);
+  const ids = () => ({
+    parts: raw.prepare('SELECT id FROM community_request_parts WHERE request_id = ? ORDER BY id').all(id).map((r) => (r as { id: string }).id),
+    materials: raw.prepare(
+      'SELECT m.id FROM community_request_part_materials m JOIN community_request_parts p ON p.id = m.part_id WHERE p.request_id = ? ORDER BY m.id'
+    ).all(id).map((r) => (r as { id: string }).id),
+    sources: raw.prepare('SELECT id FROM community_request_sources WHERE request_id = ? ORDER BY id').all(id).map((r) => (r as { id: string }).id),
+  });
+  const before = ids();
+  // The same part and sources, no id anywhere (a client that drops them, or delete-and-add-back).
+  const again = await publish(raw, id, { schema_version: 3, sources, parts: [part] });
+  assert.equal(again.status, 200, JSON.stringify(again.body));
+  assert.deepEqual([again.body.replayed, again.body.revision], [true, 1]);
+  assert.deepEqual(ids(), before, 'the ids an offer would name are the ids it still names');
+  assert.equal(row<{ s: string }>(raw, 'SELECT state AS s FROM community_offers WHERE id = ?', offer.id)!.s, 'pending');
+  // An id the request never had, on the same content: the stored part's id all the same.
+  assert.equal((await publish(raw, id, { schema_version: 3, parts: [{ ...part, id: 'tmp_new' }] })).status, 200);
+  assert.deepEqual(ids().parts, before.parts);
+  // Changed content is a new part: a new id, and an honest revision that supersedes the offer.
+  const changed = await publish(raw, id, { schema_version: 3, parts: [{ ...part, materials: [{ material_id: 'petg' }] }] });
+  assert.equal(changed.status, 200, JSON.stringify(changed.body));
+  assert.equal(changed.body.revised, true);
+  assert.notDeepEqual(ids().parts, before.parts);
+  assert.equal(row<{ s: string }>(raw, 'SELECT state AS s FROM community_offers WHERE id = ?', offer.id)!.s, 'superseded');
+});
+
+test('A LINK V1 STORED LONG (a non-ASCII slug, percent-encoded): v1 and v3 saves, the cache and a republish all take it', async () => {
+  const raw = world();
+  // 30 Arabic words: under 200 typed characters, about 800 stored.
+  const url = `https://www.printables.com/model/777-${'مجسم-'.repeat(30)}`;
+  const id = await newDraft(raw);
+  assert.equal((await saveDraft(raw, id, { ...PLA, source_type: 'link', source_kind: 'link', source_url: url })).status, 200);
+  const stored = row<{ n: number }>(raw, 'SELECT length(source_url) AS n FROM community_print_requests WHERE request_id = ?', id)!.n;
+  assert.ok(stored > 600, `stored as ${stored} characters`);
+  const draft = await saveDraft(raw, id, { schema_version: 3, quantity: 2 });
+  assert.equal(draft.status, 200, JSON.stringify(draft.body));
+  assert.equal((await publish(raw, id, { schema_version: 3, quantity: 3 })).status, 200);
+  assert.equal(row<{ n: number }>(raw, "SELECT length(canonical_url) AS n FROM community_request_sources WHERE request_id = ? AND kind = 'link'", id)!.n, stored);
+  // The same link typed into a v3 body is taken too.
+  const other = await newDraft(raw);
+  const typed = await saveDraft(raw, other, { schema_version: 3, sources: [{ kind: 'link', url, is_primary: true }], parts: [{ materials: [{ material_id: 'pla' }] }] });
+  assert.equal(typed.status, 200, JSON.stringify(typed.body));
+});
+
+test('only the request guard is a race: a write the model tables refuse is a fault, never REQUEST_CHANGED or REQUEST_NOT_DRAFT', async () => {
+  const raw = world();
+  const id = await newDraft(raw);
+  raw.exec(`CREATE TRIGGER t_refuse BEFORE INSERT ON community_request_parts BEGIN SELECT RAISE(ABORT, 'CHECK constraint failed: a test'); END`);
+  const draft = await saveDraft(raw, id, { schema_version: 3, parts: [{ materials: [{ material_id: 'pla' }] }] });
+  assert.equal(draft.status, 500, JSON.stringify(draft.body));
+  assert.notEqual(draft.body.code, 'REQUEST_NOT_DRAFT');
+  raw.exec('DROP TRIGGER t_refuse');
+  assert.equal((await publish(raw, id, PLA)).status, 200);
+  raw.exec(`CREATE TRIGGER t_refuse BEFORE INSERT ON community_request_parts BEGIN SELECT RAISE(ABORT, 'CHECK constraint failed: a test'); END`);
+  const pub = await publish(raw, id, { schema_version: 3, quantity: 2 });
+  assert.equal(pub.status, 500, JSON.stringify(pub.body));
+  assert.notEqual(pub.body.code, 'REQUEST_CHANGED');
+});
+
+test('ORIGINALS (role source, Q5): only a file, never the main source nor a measured model — and never the v1 row a board reads', async () => {
+  const raw = world();
+  const id = await newDraft(raw);
+  addFile(raw, id, 'crf_look', 'reference', 'look.png');
+  addFile(raw, id, 'crf_src', 'model', 'design-source.stl');
+  addFile(raw, id, 'crf_print', 'model', 'print-me.stl');
+  const refused = async (body: Record<string, unknown>, code: string) => {
+    const res = await saveDraft(raw, id, { schema_version: 3, ...body });
+    assert.equal(res.status, 400, JSON.stringify(res.body));
+    assert.equal(res.body.code, code);
+  };
+  await refused({ sources: [{ kind: 'link', url: LINK, role: 'source' }] }, 'SOURCE_ROLE_INVALID');
+  await refused({ sources: [{ kind: 'text_ref', ref_text: 'the lid', role: 'source' }] }, 'SOURCE_ROLE_INVALID');
+  await refused({ sources: [{ kind: 'file', file_id: 'crf_src', role: 'source', is_primary: true }] }, 'SOURCE_ORIGINAL_PRIVATE');
+  await refused({
+    sources: [{ kind: 'file', file_id: 'crf_src', role: 'source' }],
+    parts: [{ measured_file_id: 'crf_src', materials: [{ material_id: 'pla' }] }],
+  }, 'SOURCE_ORIGINAL_PRIVATE');
+  // Allowed: the original rides along, the model to print is measured.
+  const ok = await saveDraft(raw, id, {
+    schema_version: 3,
+    sources: [{ kind: 'file', file_id: 'crf_src', role: 'source' }, { kind: 'file', file_id: 'crf_print', is_primary: true }],
+    parts: [{ measured_file_id: 'crf_print', materials: [{ material_id: 'pla' }] }],
+  });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(row<{ f: string }>(raw, 'SELECT primary_file_id AS f FROM community_print_requests WHERE request_id = ?', id)!.f, 'crf_print');
+  // Making the measured file an original later is refused the same way, whichever field moved.
+  await refused({ sources: [{ kind: 'file', file_id: 'crf_print', role: 'source' }] }, 'SOURCE_ORIGINAL_PRIVATE');
+  // When the only model is an original, the v1 row names no model and says no model type.
+  const only = await newDraft(raw);
+  addFile(raw, only, 'crf_only', 'model', 'only-source.stl');
+  addFile(raw, only, 'crf_pic', 'reference', 'pic.png');
+  const res = await saveDraft(raw, only, {
+    schema_version: 3, sources: [{ kind: 'file', file_id: 'crf_only', role: 'source' }], parts: [{ measured_file_id: null, materials: [{ material_id: 'pla' }] }],
+  });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  const p = row<{ f: string | null; t: string }>(raw, 'SELECT primary_file_id AS f, source_type AS t FROM community_print_requests WHERE request_id = ?', only)!;
+  assert.deepEqual([p.f, p.t], [null, 'images']);
+});
+
+test('Q2 THE BUDGET SWITCH is kept from the v1 wizard body too, not only from a v3 one', async () => {
+  const raw = world();
+  const id = await newDraft(raw);
+  const shown = await saveDraft(raw, id, { ...PLA, budget_iqd: 20_000, budget_visible: true });
+  assert.equal(shown.status, 200, JSON.stringify(shown.body));
+  assert.equal(shown.body.draft.budget_visible, true);
+  assert.equal((await publish(raw, id, { ...PLA, budget_visible: false })).status, 200);
+  assert.equal(row<{ v: number }>(raw, 'SELECT budget_visible AS v FROM community_requests WHERE id = ?', id)!.v, 0);
+  assert.equal((await publish(raw, id, { ...PLA })).status, 200);
+  assert.equal(row<{ v: number }>(raw, 'SELECT budget_visible AS v FROM community_requests WHERE id = ?', id)!.v, 0, 'a body that does not name it leaves it');
+});

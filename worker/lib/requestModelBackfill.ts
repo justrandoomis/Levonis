@@ -23,11 +23,25 @@
  * writer that lands in between leaves that request for the next pass. A
  * second run finds nothing pending and writes nothing.
  *
- * A page that fails is halved (25, 12, 6, 3, 1) within the budget; one
- * request that cannot be written alone is marked `model_mirror = 'error'`,
- * which takes it off the index and reads as not fresh — the job never stalls
- * on it, and `mode: 'drift'` (the admin route, by hand) retries it, together
- * with v1 caches an older build left stale after a rollback.
+ * A REQUEST THAT CANNOT BE WRITTEN NEVER STALLS THE JOB. Each synthesised
+ * model is first checked in code against every CHECK and key 0208 declares
+ * (`modelRowProblem`); one that fails is marked `model_mirror = 'error'` in a
+ * single guarded statement and never joins a batch. A batch that still fails
+ * (a file deleted in between, anything the check cannot see) is halved
+ * smaller half first (25, 12, 6, 3, 1): the first page of a pass is sized so
+ * that this whole descent and its `error` mark fit the budget
+ * (`pageWorstCase`), so every pass builds or marks at least one request even
+ * when the one that fails sorts first — and the quarter-hour tick, which
+ * always starts from the beginning, finds the list shorter each time. An
+ * `error` row is off the index and reads as not fresh; `mode: 'drift'` (the
+ * admin route, by hand) retries it.
+ *
+ * A V1 EDIT PUTS ITS CACHE BACK ON THE LIST. This build's v1 publish and
+ * draft save reset `model_mirror` to '' in their own batch
+ * (`v1CacheResetStatements`), and a file arriving or leaving does the same
+ * (`restampAfterFileStatement`), so the scheduled pass rebuilds them. `drift`
+ * is for what no writer of this build reset: caches an older build left stale
+ * after a rollback, and the rows marked `error`.
  */
 import type { Env } from './types';
 import { isMissingSchema } from './merchantApproval';
@@ -35,6 +49,7 @@ import { canonicalFacts, factsFromRows } from './requestRevisions';
 import {
   MIRROR_SQL,
   mirrorFacts,
+  modelRowProblem,
   modelWriteStatements,
   revisionFile,
   synthesizeModel,
@@ -69,6 +84,22 @@ export function requestModelBudget(limit: number): StatementBudget {
 export const REQUEST_MODEL_PAGE = 25;
 /** Statements one full page costs. */
 export const REQUEST_MODEL_PAGE_STATEMENTS = 1 + 3 + 7;
+
+/** Write attempts the smaller-half-first descent takes from `n` entries down to one: n, ⌊n/2⌋, …, 1. */
+export function descentAttempts(n: number): number {
+  let a = 1;
+  for (let k = Math.max(1, Math.floor(n)); k > 1; k = Math.floor(k / 2)) a++;
+  return a;
+}
+
+/**
+ * The most a page of `n` can spend before it has built or marked at least one
+ * request: the select, the reads, every write of the descent to a single
+ * entry, and that entry's `error` mark. 25 → 40, exactly the tick's share.
+ */
+export function pageWorstCase(n: number): number {
+  return 1 + 3 + 7 * descentAttempts(n) + 1;
+}
 
 export interface RequestModelReport {
   mode: 'unbuilt' | 'drift';
@@ -113,15 +144,21 @@ export async function catchUpRequestModels(
   const ts = opts.now ?? new Date().toISOString();
   let after = opts.after ?? '';
   let left = Math.max(1, Math.min(opts.limit ?? Number.MAX_SAFE_INTEGER, 100_000));
+  let firstPage = true;
 
   while (left > 0) {
     // A page is read only when its write fits too: no statement is spent on a page left unwritten.
-    if (!opts.budget.canSpend(opts.dryRun ? 4 : REQUEST_MODEL_PAGE_STATEMENTS) || !opts.budget.spend(1)) {
+    // The FIRST page of a pass is sized so that, should its batch fail, the whole descent to one
+    // request and that request's `error` mark fit as well: a pass always makes progress.
+    let size = Math.min(REQUEST_MODEL_PAGE, left);
+    if (firstPage && !opts.dryRun) while (size > 1 && !opts.budget.canSpend(pageWorstCase(size))) size = Math.floor(size / 2);
+    const need = opts.dryRun ? 4 : firstPage ? pageWorstCase(size) : REQUEST_MODEL_PAGE_STATEMENTS;
+    if (!opts.budget.canSpend(need) || !opts.budget.spend(1)) {
       report.stopped = true;
       report.next_after = after;
       break;
     }
-    const size = Math.min(REQUEST_MODEL_PAGE, left);
+    firstPage = false;
     const cursorBefore = after;
     let page: PageRow[];
     try {
@@ -169,6 +206,7 @@ export async function catchUpRequestModels(
     }
 
     const entries: ModelWriteEntry[] = [];
+    const unwritable: Array<{ rid: string; updated_at: string; mirror: string }> = [];
     for (const row of page) {
       const r = requests.get(row.request_id);
       const p = prints.get(row.request_id);
@@ -177,19 +215,51 @@ export async function catchUpRequestModels(
         continue;
       }
       const files = filesBy.get(row.request_id) ?? [];
-      const model = synthesizeModel(r, p, files);
-      const rev = files.map(revisionFile);
-      if (canonicalFacts(mirrorFacts(model, rev)) !== canonicalFacts(factsFromRows(r, p, rev))) report.mirror_mismatch++;
-      entries.push({
-        request_id: row.request_id,
-        model,
-        schema_version: 1,
-        guard: { updated_at: String(p.updated_at ?? row.updated_at), model_mirror: String(p.model_mirror ?? row.model_mirror) },
-      });
+      const guard = { updated_at: String(p.updated_at ?? row.updated_at), model_mirror: String(p.model_mirror ?? row.model_mirror) };
+      let problem: string | null;
+      let model: ReturnType<typeof synthesizeModel> | null = null;
+      try {
+        model = synthesizeModel(r, p, files);
+        const rev = files.map(revisionFile);
+        if (canonicalFacts(mirrorFacts(model, rev)) !== canonicalFacts(factsFromRows(r, p, rev))) report.mirror_mismatch++;
+        problem = modelRowProblem(model, new Set(files.map((f) => f.id)));
+      } catch (e) {
+        problem = `synthesis failed: ${e instanceof Error ? e.message : String(e)}`;
+      }
+      if (problem || !model) {
+        unwritable.push({ rid: row.request_id, updated_at: guard.updated_at, mirror: guard.model_mirror });
+        console.error('request model: not built for', row.request_id, problem);
+        continue;
+      }
+      entries.push({ request_id: row.request_id, model, schema_version: 1, guard });
     }
     if (opts.dryRun) {
       report.built += entries.length;
+      report.errors += unwritable.length;
     } else {
+      // The rows the tables would refuse leave the work list first, in one guarded statement.
+      if (unwritable.length) {
+        if (!opts.budget.spend(1)) {
+          report.stopped = true;
+          report.next_after = cursorBefore;
+          break;
+        }
+        const marked = await db
+          .prepare(
+            `UPDATE community_print_requests SET model_mirror = 'error'
+              WHERE request_id IN (SELECT json_extract(value, '$.rid') FROM json_each(?1))
+                AND schema_version = 1
+                AND EXISTS (SELECT 1 FROM json_each(?1) g
+                             WHERE json_extract(g.value, '$.rid') = community_print_requests.request_id
+                               AND json_extract(g.value, '$.updated_at') = community_print_requests.updated_at
+                               AND json_extract(g.value, '$.mirror') = community_print_requests.model_mirror)`
+          )
+          .bind(JSON.stringify(unwritable))
+          .run();
+        const n = Number(marked.meta?.changes ?? 0);
+        report.errors += n;
+        report.skipped += unwritable.length - n;
+      }
       const written = await writeHalving(db, entries, ts, opts.budget, report);
       if (written === null) {
         report.stopped = true;
@@ -199,13 +269,18 @@ export async function catchUpRequestModels(
     }
     if (last) break;
   }
+  if (report.stopped && report.built === 0 && report.errors === 0 && report.scanned > 0) {
+    // Nothing moved this pass although work is pending: say so, the next pass starts where this one did.
+    console.warn('request model: a pass stopped on its budget without building a request', JSON.stringify({ mode, scanned: report.scanned, skipped: report.skipped }));
+  }
   return report;
 }
 
 /**
- * Write a page; on failure, halve it and try each half; a single request that
- * cannot be written is marked `error` (guarded, so a writer that landed is
- * untouched). Null when the budget ran out.
+ * Write a page; on failure, halve it — the SMALLER half first, so the descent
+ * to the first entry is n, ⌊n/2⌋, …, 1 (`descentAttempts`) — and try each
+ * half; a single request that cannot be written is marked `error` (guarded,
+ * so a writer that landed is untouched). Null when the budget ran out.
  */
 async function writeHalving(
   db: D1Database,
@@ -239,7 +314,7 @@ async function writeHalving(
       console.error('request model: not built for', entries[0].request_id, e instanceof Error ? e.message : String(e));
       return 0;
     }
-    const half = Math.ceil(entries.length / 2);
+    const half = Math.floor(entries.length / 2);
     const a = await writeHalving(db, entries.slice(0, half), ts, budget, report);
     if (a === null) return null;
     const b = await writeHalving(db, entries.slice(half), ts, budget, report);

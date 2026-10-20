@@ -93,9 +93,11 @@ import {
   readRequestModel,
   stateOf,
   fileSourceRoles,
+  v1CacheResetStatements,
   type ModelState,
   type RequestModelRead,
 } from '../lib/requestModel';
+import { REQUEST_MODEL_LIMITS } from '@levonis/contracts/requestModel';
 import { isMissingSchema } from '../lib/merchantApproval';
 
 /**
@@ -893,8 +895,12 @@ async function readWizardInput(
    * sending a bad one is told; a stored legacy value that no longer passes is
    * dropped rather than blocking the republish of an old request.
    */
-  const rawSourceUrl = str(body.source_url, 'source_url', { max: 600, required: false }) ?? '';
-  const parsedLink = rawSourceUrl ? parseModelLink(rawSourceUrl, providers) : null;
+  const rawSourceUrl = str(body.source_url, 'source_url', { max: REQUEST_MODEL_LIMITS.linkUrlMax, required: false }) ?? '';
+  // The canonical form percent-encodes: 600 typed characters can store as
+  // thousands. Past what a request source holds (migration 0208) it is no
+  // link this build can keep, here or in the model.
+  const parsedRaw = rawSourceUrl ? parseModelLink(rawSourceUrl, providers) : null;
+  const parsedLink = parsedRaw && parsedRaw.canonical_url.length <= REQUEST_MODEL_LIMITS.linkCanonicalMax ? parsedRaw : null;
   if (rawSourceUrl && !parsedLink && !asStored) {
     throw badRequest('That link is not a valid https address', 'BAD_URL');
   }
@@ -1043,6 +1049,32 @@ function printRowStatement(
 
 const modelUnavailable = () => new HttpError(503, 'Parts cannot be saved right now — try again shortly', 'REQUEST_MODEL_UNAVAILABLE');
 
+/**
+ * THE REQUEST ROW'S GUARD, AND ONLY IT, IS A RACE. The publish and the draft
+ * save abort through the NULL their second statement writes into
+ * `updated_at` when the first one changed nothing (the request moved, or left
+ * `draft`); that is REQUEST_CHANGED / REQUEST_NOT_DRAFT. Any other failure —
+ * a CHECK or a key of the model's tables — is a fault and is thrown as one,
+ * never answered as «reload and try again» the customer could repeat forever.
+ */
+const REQUEST_GUARD_ABORT = /NOT NULL constraint failed: community_requests\.updated_at/i;
+const isRequestGuardAbort = (e: unknown) => REQUEST_GUARD_ABORT.test(e instanceof Error ? e.message : String(e));
+
+/**
+ * Q2's switch, «اعرض ميزانيتي للتجار», as any body sends it — a v3 body or
+ * the v1 wizard's: undefined when the body does not name it.
+ */
+function readBudgetVisible(input: Record<string, unknown>): boolean | undefined {
+  return input.budget_visible === undefined ? undefined : input.budget_visible === true || input.budget_visible === 1;
+}
+
+/** `budget_visible = ?` for a request row that has the column (a database before 0208 has nowhere to keep it). */
+function budgetVisibleSet(request: Record<string, unknown>, visible: boolean | undefined, sets: string[], vals: Array<string | number | null>): void {
+  if (visible === undefined || !Object.prototype.hasOwnProperty.call(request, 'budget_visible')) return;
+  sets.push('budget_visible = ?');
+  vals.push(visible ? 1 : 0);
+}
+
 /** What a model write carries into the publish or the draft save. */
 interface ModelWritePlan {
   /** The v1 row the model is written as — what the estimate, the matcher and an older build read. */
@@ -1133,7 +1165,7 @@ async function planModelWrite(
   if (!read) throw notFound('Request not found');
   if (!modelBody && read.schema_version !== 3) return null;
   if (!read.schema) throw modelUnavailable();
-  const budgetVisible = input.budget_visible === undefined ? undefined : input.budget_visible === true || input.budget_visible === 1;
+  const budgetVisible = readBudgetVisible(input);
 
   let next: ModelState;
   let w: WizardInput;
@@ -1320,7 +1352,7 @@ export async function publishRequest(
   if (w.deadline !== undefined) { sets.push('deadline = ?'); vals.push(w.deadline || null); }
   if (w.budget !== undefined) { sets.push('budget_iqd = ?'); vals.push(w.budget); }
   if (w.customerNotes !== undefined) { sets.push('customer_notes = ?'); vals.push(w.customerNotes); }
-  if (model?.budgetVisible !== undefined) { sets.push('budget_visible = ?'); vals.push(model.budgetVisible ? 1 : 0); }
+  budgetVisibleSet(request, model ? model.budgetVisible : readBudgetVisible(input), sets, vals);
 
   const snapshotRow = { title: request.title, description: request.description, budget_iqd: w.budget !== undefined ? w.budget : request.budget_iqd };
   const snapshot = {
@@ -1345,8 +1377,11 @@ export async function publishRequest(
           WHERE id = ?1`
       ).bind(requestId, ts),
       printRowStatement(env.DB, requestId, w, quote, completeness, ts),
-      // The model's rows and its stamp, after the v1 row they mirror (P1-04).
-      ...(model ? modelWriteStatements(env.DB, [{ request_id: requestId, model: model.next, schema_version: 3 }], ts) : []),
+      // The model's rows and its stamp, after the v1 row they mirror (P1-04);
+      // a v1 write puts a built v1 cache back on the quarter-hour job's list.
+      ...(model
+        ? modelWriteStatements(env.DB, [{ request_id: requestId, model: model.next, schema_version: 3 }], ts)
+        : v1CacheResetStatements(env.DB, requestId, stored ?? null)),
       // Offers that priced a revision the line above left behind.
       supersedeStatement(env.DB, requestId, ts),
       offerCountStatement(env.DB, requestId),
@@ -1355,7 +1390,7 @@ export async function publishRequest(
     ]);
   } catch (e) {
     if (model && isMissingSchema(e)) throw modelUnavailable();
-    if (!/constraint/i.test(e instanceof Error ? e.message : String(e))) throw e;
+    if (!isRequestGuardAbort(e)) throw e;
     throw conflict('This request changed while you were publishing it — reload it and try again', 'REQUEST_CHANGED');
   }
 
@@ -1515,7 +1550,7 @@ printRequestRoutes.put('/requests/:id/draft', requireAuth, async (c) => {
   if (w.deadline !== undefined) { sets.push('deadline = ?'); vals.push(w.deadline || null); }
   if (w.budget !== undefined) { sets.push('budget_iqd = ?'); vals.push(w.budget); }
   if (w.customerNotes !== undefined) { sets.push('customer_notes = ?'); vals.push(w.customerNotes); }
-  if (model?.budgetVisible !== undefined) { sets.push('budget_visible = ?'); vals.push(model.budgetVisible ? 1 : 0); }
+  budgetVisibleSet(request, model ? model.budgetVisible : readBudgetVisible(body), sets, vals);
 
   try {
     await c.env.DB.batch([
@@ -1528,11 +1563,13 @@ printRequestRoutes.put('/requests/:id/draft', requireAuth, async (c) => {
           WHERE id = ?1`
       ).bind(requestId, ts),
       printRowStatement(c.env.DB, requestId, w, null, 0, ts),
-      ...(model ? modelWriteStatements(c.env.DB, [{ request_id: requestId, model: model.next, schema_version: 3 }], ts) : []),
+      ...(model
+        ? modelWriteStatements(c.env.DB, [{ request_id: requestId, model: model.next, schema_version: 3 }], ts)
+        : v1CacheResetStatements(c.env.DB, requestId, stored ?? null)),
     ]);
   } catch (e) {
     if (model && isMissingSchema(e)) throw modelUnavailable();
-    if (!/constraint/i.test(e instanceof Error ? e.message : String(e))) throw e;
+    if (!isRequestGuardAbort(e)) throw e;
     throw conflict('This request is no longer a draft — reload it', 'REQUEST_NOT_DRAFT');
   }
   return c.json({ success: true, draft: await draftShape(c.env, requestId) });

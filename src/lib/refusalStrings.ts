@@ -675,6 +675,16 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The note is longer than 500 characters.',
     ckb: 'تێبینییەکە لە 500 پیت درێژترە.',
   },
+  SOURCE_ROLE_INVALID: {
+    ar: 'لا يُعلَّم ملفًا أصليًا إلا ملفٌ مرفوع.',
+    en: 'Only an uploaded file can be marked as the original.',
+    ckb: 'تەنها فایلێکی بارکراو دەتوانرێت وەک فایلی ڕەسەن دیاری بکرێت.',
+  },
+  SOURCE_ORIGINAL_PRIVATE: {
+    ar: 'الملف الأصلي لا يراه إلا التاجر الذي تقبل عرضه، فلا يكون المصدر الرئيسي ولا المجسّم الذي تُقاس منه قطعة.',
+    en: 'The original file is shown only to the merchant whose offer you accept, so it can’t be the main source or the model a part is measured from.',
+    ckb: 'فایلی ڕەسەن تەنها بۆ ئەو بازرگانە دەردەکەوێت کە ئۆفەرەکەی قبوڵ دەکەیت، بۆیە ناتوانێت سەرچاوەی سەرەکی بێت یان ئەو مۆدێلەی پارچەیەکی لێوە دەپێورێت.',
+  },
   PART_MEASURED_FILE_INVALID: {
     ar: 'اختر ملف مجسّم من ملفات هذا الطلب.',
     en: 'Choose a model file from this request’s files.',

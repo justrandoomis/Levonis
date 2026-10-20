@@ -33,7 +33,7 @@ import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { requireStoreOwner } from '../lib/merchantAuth';
-import { merchantApproved } from '../lib/merchantApproval';
+import { isMissingSchema, merchantApproved } from '../lib/merchantApproval';
 import { communityClosedRefusal, communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { merchantTakesNewWork, type RequestForAccess } from '../lib/communityRequests';
 import { getMediaObject } from '../lib/mediaStorage';
@@ -50,6 +50,7 @@ import {
 } from './printQuote';
 import { liveVerdict, merchantRematchPending, rematchNow, MATCH_ENGINE } from '../lib/printMatchingStore';
 import { fileReadStatement, fileReader } from '../lib/requestFilePolicy';
+import { fileSourceRoles } from '../lib/requestModel';
 
 export const merchantWorkshopRoutes = new Hono<AppContext>();
 merchantWorkshopRoutes.use('*', requireAuth);
@@ -119,18 +120,26 @@ merchantWorkshopRoutes.get('/board', async (c) => {
   }
 
   const ts = nowIso();
-  const { results } = await c.env.DB.prepare(
+  // A file the customer marked as the ORIGINAL (role `source`, Q5, P1-04) is
+  // not this eligible workshop's to open or preview: it is never the card's
+  // picture nor its «3D preview». A database before 0208 has no roles.
+  const notOriginal = (withRoles: boolean) =>
+    withRoles
+      ? `AND NOT EXISTS (SELECT 1 FROM community_request_sources s
+                          WHERE s.request_id = f.request_id AND s.file_id = f.id AND s.role = 'source')`
+      : '';
+  const boardSql = (withRoles: boolean) =>
     `SELECT r.id, r.title, r.description, r.quantity, r.material, r.color, r.dimensions, r.budget_iqd,
             r.deadline, r.governorate, r.delivery_pref, r.state, r.offer_count, r.created_at, r.expires_at,
             r.revision, r.customer_notes, COALESCE(r.published_at, r.created_at) AS sort_at,
             p.process, p.process_unsure, p.material_id, p.material_unsure,
             p.estimate_low_iqd, p.estimate_high_iqd, p.source_url,
             (SELECT f.id FROM community_request_files f
-              WHERE f.request_id = r.id AND f.content_type LIKE 'image/%'
+              WHERE f.request_id = r.id AND f.content_type LIKE 'image/%' ${notOriginal(withRoles)}
               ORDER BY f.created_at, f.id LIMIT 1) AS thumb_id,
             (SELECT COUNT(*) FROM community_request_files f WHERE f.request_id = r.id) AS file_count,
             EXISTS (SELECT 1 FROM community_request_files f
-                     WHERE f.request_id = r.id AND f.kind = 'model' AND f.preview_key <> '') AS has_preview,
+                     WHERE f.request_id = r.id AND f.kind = 'model' AND f.preview_key <> '' ${notOriginal(withRoles)}) AS has_preview,
             (SELECT o.state FROM community_offers o
               WHERE o.request_id = r.id AND o.merchant_id = ?1 AND o.state IN ('pending','superseded','accepted')
               LIMIT 1) AS my_offer
@@ -147,10 +156,18 @@ merchantWorkshopRoutes.get('/board', async (c) => {
         AND (?8 = '' OR COALESCE(r.published_at, r.created_at) < ?8
              OR (COALESCE(r.published_at, r.created_at) = ?8 AND r.id < ?9))
       ORDER BY sort_at DESC, r.id DESC
-      LIMIT ?10`
-  )
-    .bind(ctx.merchant.id, MATCH_ENGINE, ts, user.id, process, material, governorate, cursor?.at ?? '', cursor?.id ?? '', limit + 1)
-    .all<Record<string, unknown>>();
+      LIMIT ?10`;
+  const readBoard = (withRoles: boolean) =>
+    c.env.DB.prepare(boardSql(withRoles))
+      .bind(ctx.merchant.id, MATCH_ENGINE, ts, user.id, process, material, governorate, cursor?.at ?? '', cursor?.id ?? '', limit + 1)
+      .all<Record<string, unknown>>();
+  let results: Record<string, unknown>[] | undefined;
+  try {
+    results = (await readBoard(true)).results;
+  } catch (e) {
+    if (!isMissingSchema(e)) throw e;
+    results = (await readBoard(false)).results;
+  }
   const rows = results ?? [];
   const page = rows.slice(0, limit);
   const last = page[page.length - 1];
@@ -261,15 +278,27 @@ merchantWorkshopRoutes.post('/requests/:id/cost', async (c) => {
   }
 
   // THE MODEL: the one asked for, else the request's primary model, else its first.
+  //
+  // An ORIGINAL (role `source`, Q5, P1-04) is the accepted workshop's only:
+  // an eligible one may not have the server read and measure it either — the
+  // byte and preview doors refuse it, and so does this one. Asked by name it
+  // is refused; by default it is passed over.
   const print = await c.env.DB.prepare(
     'SELECT primary_file_id, material_id, material_unsure, quality, supports FROM community_print_requests WHERE request_id = ?'
   ).bind(id).first<Record<string, unknown>>();
-  const wantedFile = str(body.file_id, 'file_id', { max: 60, required: false }) || String(print?.primary_file_id ?? '');
-  const file = await c.env.DB.prepare(
+  const roles = reader === 'eligible' ? await fileSourceRoles(c.env.DB, id) : new Map<string, string>();
+  const askedFile = str(body.file_id, 'file_id', { max: 60, required: false }) ?? '';
+  if (askedFile && roles.get(askedFile) === 'source') {
+    throw new HttpError(403, 'You may not open this file', 'FILE_ORIGINAL_RESTRICTED');
+  }
+  const primaryFile = String(print?.primary_file_id ?? '');
+  const wantedFile = askedFile || (roles.get(primaryFile) === 'source' ? '' : primaryFile);
+  const { results: models } = await c.env.DB.prepare(
     `SELECT id, file_key, file_name, size_bytes FROM community_request_files
       WHERE request_id = ?1 AND kind = 'model' AND (?2 = '' OR id = ?2)
-      ORDER BY CASE WHEN id = ?2 THEN 0 ELSE 1 END, created_at LIMIT 1`
-  ).bind(id, wantedFile).first<{ id: string; file_key: string; file_name: string; size_bytes: number }>();
+      ORDER BY CASE WHEN id = ?2 THEN 0 ELSE 1 END, created_at, id`
+  ).bind(id, wantedFile).all<{ id: string; file_key: string; file_name: string; size_bytes: number }>();
+  const file = (models ?? []).find((f) => roles.get(f.id) !== 'source');
   if (!file) throw conflict('This request has no 3D model to cost', 'COSTING_NO_MODEL');
 
   // THE PRINTER: the one asked for, else the one the verdict would run it on.

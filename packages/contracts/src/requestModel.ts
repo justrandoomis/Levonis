@@ -35,6 +35,12 @@ export const FILE_SOURCE_KINDS = ['file', 'studio_revision', 'project_post'] as 
  * What a source is FOR. `source` (owner decision Q5) is the editable original:
  * readable by the customer, an admin and the ACCEPTED merchant only — never by
  * a merchant who is merely eligible to offer. '' reads as the kind's default.
+ *
+ * Only a FILE can be the original (`SOURCE_ROLE_INVALID`): a link or a text
+ * reference is public by the registry below. And an original is never what
+ * the public job is about — never the main source nor a part's measured model
+ * (`SOURCE_ORIGINAL_PRIVATE`), never the v1 row's `primary_file_id` — so no
+ * reader who may not open it is priced, matched or costed against it.
  */
 export const REQUEST_SOURCE_ROLES = ['', 'production', 'source', 'reference'] as const;
 export type RequestSourceRole = (typeof REQUEST_SOURCE_ROLES)[number];
@@ -99,6 +105,15 @@ export const REQUEST_MODEL_LIMITS = {
   maxColoursPerMaterial: 16,
   maxLinks: 4,
   maxTextRefs: 4,
+  /** What a customer may type as a link, as v1 has always taken it. */
+  linkUrlMax: 600,
+  /**
+   * The link as it is STORED: its canonical form percent-encodes every
+   * non-ASCII letter (up to nine characters for one typed), so 600 typed
+   * characters can store as 5400 and more. The v1 row has always kept that
+   * form; the database CHECK (migration 0208) is this number.
+   */
+  linkCanonicalMax: 8192,
   sourceNoteMax: 500,
   textRefMax: 500,
   partNameMax: 80,
@@ -123,6 +138,8 @@ export const REQUEST_MODEL_REFUSAL_CODES = [
   'TEXT_REFS_TOO_MANY',
   'SOURCE_PRIMARY_MULTIPLE',
   'SOURCE_NOTE_TOO_LONG',
+  'SOURCE_ROLE_INVALID',
+  'SOURCE_ORIGINAL_PRIVATE',
   'PART_MEASURED_FILE_INVALID',
   'PART_SOURCE_INVALID',
   'COLOUR_REF_INVALID',
@@ -140,6 +157,10 @@ export type RequestModelRefusalCode = (typeof REQUEST_MODEL_REFUSAL_CODES)[numbe
  *
  * The customer's identity is never on this list below `accepted`
  * (conflict 62); the budget is `merchants` only when the customer shows it.
+ * A `source` file's bytes, preview and costing are `accepted`; that it is
+ * attached — its kind and file name on the request's file list — is public,
+ * like every attachment (`files.listing`), and no projection below `accepted`
+ * names it as a source, a measured model or a colour reference.
  */
 export type RequestFieldAudience = 'public' | 'merchants' | 'accepted' | 'owner';
 export const REQUEST_FIELD_VISIBILITY: Readonly<Record<string, RequestFieldAudience>> = {
@@ -160,6 +181,7 @@ export const REQUEST_FIELD_VISIBILITY: Readonly<Record<string, RequestFieldAudie
   'sources.file:reference': 'merchants',
   'sources.file:production': 'merchants',
   'sources.file:source': 'accepted',
+  'files.listing': 'public',
   budget_iqd: 'owner',
   'budget_iqd:shown': 'merchants',
   'sources.sha256': 'owner',

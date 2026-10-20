@@ -73,6 +73,8 @@ import {
   REQUEST_MODEL_LIMITS as LIMITS,
   REQUEST_PALETTE,
   REQUEST_PROCESSES,
+  REQUEST_REVIEW_STATES,
+  REQUEST_SOURCE_KINDS,
   REQUEST_SOURCE_ROLES,
   type RequestColourMode,
   type RequestReviewState,
@@ -494,6 +496,21 @@ export function summarize(m: ModelState): ModelSummary {
 
 // ---------------------------------------------------------------- the hash
 
+/** A colour as the hash knows it; `keys` are the model's source keys (an `as_reference` names one). */
+const colourKeyOf = (keys: Map<string, string>) => (c: ModelColour): unknown[] =>
+  c.mode === 'as_reference'
+    ? ['as_reference', c.ref ? (keys.get(c.ref) ?? '') : '']
+    : isSpecific(c) ? ['specific', s(c.hex).toLowerCase(), s(c.label).trim()] : ['any'];
+
+/** A material as the hash knows it: never its id, position or review flag. */
+const materialKeyOf = (x: ModelMaterial, colour: (c: ModelColour) => unknown[]): unknown[] => [
+  x.material_unsure ? null : x.material_id || null,
+  x.colors.length ? x.colors.map(colour) : [['any']],
+  finishKey(s(x.finish)),
+  s(x.region_reference).trim(),
+  s(x.requirements).trim(),
+];
+
 /** A source as the hash knows it: what it IS, never its id, position or provenance. */
 const sourceKey = (x: ModelSource): string =>
   JSON.stringify([x.kind, x.file_id || null, x.kind === 'link' ? s(x.canonical_url) || s(x.url) : '', s(x.ref_text).trim()]);
@@ -513,10 +530,7 @@ const sourceKey = (x: ModelSource): string =>
  */
 export function pricedSections(m: Pick<ModelState, 'sources' | 'parts'>): { sources: unknown[]; parts: unknown[] } {
   const keys = new Map(m.sources.map((x) => [x.id, sourceKey(x)]));
-  const colour = (c: ModelColour): unknown[] =>
-    c.mode === 'as_reference'
-      ? ['as_reference', c.ref ? (keys.get(c.ref) ?? '') : '']
-      : isSpecific(c) ? ['specific', s(c.hex).toLowerCase(), s(c.label).trim()] : ['any'];
+  const colour = colourKeyOf(keys);
   const sources = m.sources.map((x) => [sourceKey(x), roleKey(x), x.is_primary ? 1 : 0, s(x.note).trim()]).sort(byJson);
   const parts = m.parts
     .map((p) => [
@@ -528,9 +542,7 @@ export function pricedSections(m: Pick<ModelState, 'sources' | 'parts'>): { sour
       s(p.assembly_notes).trim(),
       s(p.legacy_text),
       p.source_ids.map((id) => keys.get(id) ?? '').sort(),
-      p.materials
-        .map((x) => [x.material_unsure ? null : x.material_id || null, x.colors.length ? x.colors.map(colour) : [['any']], finishKey(s(x.finish)), s(x.region_reference).trim(), s(x.requirements).trim()])
-        .sort(byJson),
+      p.materials.map((x) => materialKeyOf(x, colour)).sort(byJson),
     ])
     .sort(byJson);
   return { sources, parts };
@@ -578,25 +590,38 @@ export interface MirrorRow {
   stated_dims: Dims | null;
 }
 
-/** The type a model's sources say, when nobody named one. */
+/** The file ids of a model's ORIGINALS (role `source`, Q5): never what its public job is about. */
+export function originalFileIds(m: Pick<ModelState, 'sources'>): Set<string> {
+  return new Set(m.sources.filter((x) => x.role === 'source' && x.file_id).map((x) => x.file_id as string));
+}
+
+/**
+ * The type a model's sources say, when nobody named one. An original (role
+ * `source`) says nothing: the job the board prices is what everyone may see.
+ */
 export function derivedSourceType(m: Pick<ModelState, 'sources' | 'parts'>, files: Array<Pick<ModelFile, 'id' | 'kind'>>): SourceType {
   const kindOf = (id: string | null) => (id ? files.find((f) => f.id === id)?.kind ?? '' : '');
-  const primary = m.sources.find((x) => x.is_primary);
+  const originals = originalFileIds(m);
+  const open = m.sources.filter((x) => x.role !== 'source');
+  const primary = open.find((x) => x.is_primary);
   if (primary) {
     if (primary.kind === 'link') return 'link';
     if (primary.kind === 'text_ref') return 'description';
     const k = kindOf(primary.file_id);
     return k === 'model' ? 'model' : k === 'reference' ? 'images' : 'description';
   }
-  if (m.parts.some((p) => p.measured_file_id) || m.sources.some((x) => kindOf(x.file_id) === 'model')) return 'model';
-  if (m.sources.some((x) => kindOf(x.file_id) === 'reference')) return 'images';
-  if (m.sources.some((x) => x.kind === 'link')) return 'link';
+  if (m.parts.some((p) => p.measured_file_id && !originals.has(p.measured_file_id)) || open.some((x) => kindOf(x.file_id) === 'model')) return 'model';
+  if (open.some((x) => kindOf(x.file_id) === 'reference')) return 'images';
+  if (open.some((x) => x.kind === 'link')) return 'link';
   return 'description';
 }
 
 /**
  * THE V1 ROW OF A MODEL (§5 mirror rules): a coherent single job for any
- * reader that knows only v1.
+ * reader that knows only v1. An original (role `source`, Q5) is never its
+ * link nor its `primary_file_id`: those are what every board reader, the
+ * matcher and the costing route read, and an eligible merchant may not open
+ * an original.
  */
 export function mirrorFromModel(m: ModelState, files: ReadonlyArray<Pick<RevisionFile, 'id' | 'kind'>>): MirrorRow {
   const procs = m.parts.map((p) => (p.process_unsure || !p.process ? null : p.process));
@@ -617,10 +642,13 @@ export function mirrorFromModel(m: ModelState, files: ReadonlyArray<Pick<Revisio
   const perPart = m.parts.map((p) => p.materials.reduce((n, x) => n + x.colors.length, 0));
 
   const type = m.job.source_type;
-  const links = m.sources.filter((x) => x.kind === 'link');
+  const originals = originalFileIds(m);
+  const open = m.sources.filter((x) => x.role !== 'source');
+  const links = open.filter((x) => x.kind === 'link');
   const link = type === 'link' ? (links.find((x) => x.is_primary) ?? links[0]) : undefined;
-  const primary = m.sources.find((x) => x.is_primary);
-  const measured = m.parts.find((p) => p.measured_file_id)?.measured_file_id ?? null;
+  const primary = open.find((x) => x.is_primary);
+  const measuredOf = (id: string | null | undefined) => (id && !originals.has(id) ? id : null);
+  const measured = m.parts.map((p) => measuredOf(p.measured_file_id)).find((x) => x !== null) ?? null;
 
   const dims = m.parts.map((p) => p.stated_dims).filter((d): d is Dims => !!d);
   const stated: Dims | null =
@@ -642,7 +670,7 @@ export function mirrorFromModel(m: ModelState, files: ReadonlyArray<Pick<Revisio
     // At most the sixteen a v1 reader accepts (readSpec), so an older build can republish the row as stored.
     colors_count: Math.min(LIMITS.maxColoursPerMaterial, Math.max(1, ...perPart)),
     primary_file_id:
-      (m.parts[0]?.measured_file_id ?? null) || measured ||
+      measuredOf(m.parts[0]?.measured_file_id) || measured ||
       (primary && primary.file_id && files.find((f) => f.id === primary.file_id)?.kind === 'model' ? primary.file_id : null) || null,
     source_type: type,
     source_kind: type === 'link' ? 'link' : 'upload',
@@ -783,6 +811,7 @@ export function projectModel(m: ModelState & Partial<Pick<RequestModelRead, 'sch
   const full = audience === 'owner' || audience === 'admin';
   const hideSource = audience === 'merchant' || audience === 'public';
   const hidden = new Set(hideSource ? m.sources.filter((x) => x.role === 'source').map((x) => x.id) : []);
+  const hiddenFiles = hideSource ? originalFileIds(m) : new Set<string>();
   const sources = m.sources.filter((x) => !hidden.has(x.id)).map((x) => ({
     id: x.id, kind: x.kind, file_id: x.file_id, role: x.role, url: x.url, canonical_url: x.canonical_url, provider: x.provider,
     ref_text: x.ref_text, note: x.note, is_primary: x.is_primary, position: x.position,
@@ -790,7 +819,9 @@ export function projectModel(m: ModelState & Partial<Pick<RequestModelRead, 'sch
   }));
   const parts = m.parts.map((p) => ({
     id: p.id, position: p.position, name: p.name, quantity: p.quantity, process: p.process, process_unsure: p.process_unsure,
-    stated_dims: p.stated_dims, measured_file_id: p.measured_file_id, notes: p.notes, assembly_notes: p.assembly_notes,
+    stated_dims: p.stated_dims,
+    measured_file_id: p.measured_file_id && hiddenFiles.has(p.measured_file_id) ? null : p.measured_file_id,
+    notes: p.notes, assembly_notes: p.assembly_notes,
     legacy_text: p.legacy_text, review_state: p.review_state, review_reasons: p.review_reasons,
     ...(full ? { reviewed_by: p.reviewed_by, reviewed_at: p.reviewed_at } : {}),
     source_ids: p.source_ids.filter((id) => !hidden.has(id)),
@@ -811,16 +842,26 @@ export function projectModel(m: ModelState & Partial<Pick<RequestModelRead, 'sch
 
 /**
  * A REVISION'S SPEC FOR A READER WHO IS NOT A PARTY — the board's merchants
- * and accounts (critique 6). A role-`source` file leaves the model, and any
- * provenance a snapshot should never have carried is dropped defensively. A
- * v1 spec (no `model`) is returned as it is.
+ * and accounts (critique 6). A role-`source` file leaves the model — as a
+ * source, as a part's source, as a measured model and as a colour's
+ * reference, exactly as `projectModel` leaves it — and any provenance a
+ * snapshot should never have carried is dropped defensively. A v1 spec (no
+ * `model`) is returned as it is.
  */
 export function projectSpec(spec: Record<string, unknown>, audience: ModelAudience): Record<string, unknown> {
   const model = spec.model as Record<string, unknown> | undefined;
   if (!model || typeof model !== 'object' || audience === 'owner' || audience === 'admin' || audience === 'accepted') return spec;
   const m = model as { sources?: Array<Record<string, unknown>>; parts?: Array<Record<string, unknown>> };
-  const hidden = new Set((m.sources ?? []).filter((x) => x.role === 'source').map((x) => String(x.id)));
+  const originals = (m.sources ?? []).filter((x) => x.role === 'source');
+  const hidden = new Set(originals.map((x) => String(x.id)));
+  const hiddenFiles = new Set(originals.map((x) => x.file_id).filter((f) => typeof f === 'string' && f !== '').map(String));
   const strip = ({ sha256: _a, origin_id: _b, origin_ref: _c, origin_hash: _d, origin_meta: _e, ...rest }: Record<string, unknown>) => rest;
+  const material = (x: Record<string, unknown>) => ({
+    ...x,
+    colors: Array.isArray(x.colors)
+      ? (x.colors as Array<Record<string, unknown>>).map((c) => (c && typeof c === 'object' && hidden.has(String(c.ref ?? '')) ? { ...c, ref: '' } : c))
+      : x.colors,
+  });
   return {
     ...spec,
     model: {
@@ -828,7 +869,9 @@ export function projectSpec(spec: Record<string, unknown>, audience: ModelAudien
       sources: (m.sources ?? []).filter((x) => !hidden.has(String(x.id))).map(strip),
       parts: (m.parts ?? []).map((p) => ({
         ...p,
+        measured_file_id: typeof p.measured_file_id === 'string' && hiddenFiles.has(p.measured_file_id) ? null : p.measured_file_id,
         source_ids: Array.isArray(p.source_ids) ? (p.source_ids as unknown[]).filter((id) => !hidden.has(String(id))) : [],
+        materials: Array.isArray(p.materials) ? (p.materials as Array<Record<string, unknown>>).map(material) : p.materials,
       })),
     },
   };
@@ -1134,6 +1177,89 @@ export function modelWriteStatements(db: D1Database, entries: ModelWriteEntry[],
   ];
 }
 
+/** SQLite's `length()` of a text: code points, where a JS length counts UTF-16 units. */
+const sqlLength = (x: unknown): number => {
+  let n = 0;
+  for (const _ of s(x)) n++;
+  return n;
+};
+
+/**
+ * WHY THE FOUR TABLES WOULD REFUSE A MODEL — every CHECK, UNIQUE and
+ * in-request reference migration 0208 declares, asked in code before a batch
+ * is sent. The quarter-hour job marks a request whose synthesised model
+ * fails here `error` up front, so one unwritable row never fails the batch it
+ * would share with its page (worker/lib/requestModelBackfill.ts). `fileIds`
+ * are the request's files as read (the composite file key, the measured
+ * file's key). Null when every row would be accepted.
+ */
+export function modelRowProblem(m: ModelState, fileIds: ReadonlySet<string>): string | null {
+  const sourceIds = new Set<string>();
+  const files = new Set<string>();
+  const links = new Set<string>();
+  let primaries = 0;
+  for (const x of m.sources) {
+    const at = `source ${x.id || '?'}`;
+    if (!x.id || sourceIds.has(x.id)) return `${at}: id missing or repeated`;
+    sourceIds.add(x.id);
+    if (!(REQUEST_SOURCE_KINDS as readonly string[]).includes(x.kind)) return `${at}: kind`;
+    if (!(REQUEST_SOURCE_ROLES as readonly string[]).includes(x.role)) return `${at}: role`;
+    if (isFileKind(x.kind) !== !!x.file_id) return `${at}: file`;
+    if (x.file_id) {
+      if (files.has(x.file_id) || !fileIds.has(x.file_id)) return `${at}: file repeated or not on the request`;
+      files.add(x.file_id);
+    }
+    if (sqlLength(x.url) > LIMITS.linkCanonicalMax || sqlLength(x.canonical_url) > LIMITS.linkCanonicalMax) return `${at}: link too long`;
+    if (sqlLength(x.provider) > 60 || sqlLength(x.ref_text) > LIMITS.textRefMax || sqlLength(x.note) > LIMITS.sourceNoteMax) return `${at}: text too long`;
+    if (x.kind === 'link') {
+      if (!x.canonical_url || links.has(x.canonical_url)) return `${at}: link empty or repeated`;
+      links.add(x.canonical_url);
+    }
+    if (x.kind === 'text_ref' && !x.ref_text) return `${at}: empty reference`;
+    if (x.is_primary) primaries++;
+  }
+  if (primaries > 1) return 'more than one primary source';
+  const partIds = new Set<string>();
+  const materialIds = new Set<string>();
+  for (const p of m.parts) {
+    const at = `part ${p.id || '?'}`;
+    if (!p.id || partIds.has(p.id)) return `${at}: id missing or repeated`;
+    partIds.add(p.id);
+    if (!Number.isInteger(p.quantity) || p.quantity < 1 || p.quantity > LIMITS.partQuantityMax) return `${at}: quantity`;
+    if (sqlLength(p.name) > LIMITS.partNameMax || sqlLength(p.notes) > LIMITS.partNotesMax || sqlLength(p.assembly_notes) > LIMITS.partNotesMax) {
+      return `${at}: text too long`;
+    }
+    if (!(REQUEST_REVIEW_STATES as readonly string[]).includes(p.review_state)) return `${at}: review state`;
+    if (p.measured_file_id && !fileIds.has(p.measured_file_id)) return `${at}: measured file not on the request`;
+    if (new Set(p.source_ids).size !== p.source_ids.length || p.source_ids.some((id) => !sourceIds.has(id))) return `${at}: sources`;
+    for (const x of p.materials) {
+      if (!x.id || materialIds.has(x.id)) return `${at}: material id missing or repeated`;
+      materialIds.add(x.id);
+      if (sqlLength(x.region_reference) > LIMITS.regionReferenceMax || sqlLength(x.requirements) > LIMITS.requirementsMax) return `${at}: material text too long`;
+    }
+  }
+  return null;
+}
+
+/**
+ * A V1 WRITE OF THIS BUILD — a publish or a draft save of a v1 body —
+ * rewrites the v1 columns a built version-1 cache was synthesised from: the
+ * statement, for the same batch, that puts that cache back on the
+ * quarter-hour job's work list (`model_mirror = ''`), as a file leaving does
+ * (`restampAfterFileStatement`). `stored` is the print row the writer read
+ * (`SELECT *`): without the column (a database before 0208) there is nothing
+ * to reset, and nothing is sent. A version-3 row is written by the model and
+ * never here.
+ */
+export function v1CacheResetStatements(db: D1Database, requestId: string, stored: Record<string, unknown> | null): D1PreparedStatement[] {
+  if (!stored || !Object.prototype.hasOwnProperty.call(stored, 'model_mirror')) return [];
+  return [
+    db
+      .prepare(`UPDATE community_print_requests SET model_mirror = '' WHERE request_id = ? AND schema_version = 1 AND model_mirror <> ''`)
+      .bind(requestId),
+  ];
+}
+
 // ------------------------------------------------------------ the snapshot
 
 /**
@@ -1191,7 +1317,12 @@ export function modelOfSpec(spec: Record<string, unknown>, files: RevisionFile[]
 
 // ----------------------------------------------------------- file policy
 
-/** The role of each file source of a request (Q5). Empty on a database before 0208. Never throws. */
+/**
+ * The role of each file source of a request (Q5). Empty on a database before
+ * 0208 — and ONLY there: any other failure is thrown, so a door that asks
+ * fails closed (a 500) instead of serving an original to an eligible
+ * merchant as if no file had a role.
+ */
 export async function fileSourceRoles(db: D1Database, requestId: string): Promise<Map<string, string>> {
   try {
     const { results } = await db
@@ -1199,18 +1330,21 @@ export async function fileSourceRoles(db: D1Database, requestId: string): Promis
       .bind(requestId)
       .all<{ file_id: string; role: string }>();
     return new Map((results ?? []).map((x) => [String(x.file_id), String(x.role)]));
-  } catch {
-    return new Map();
+  } catch (e) {
+    if (isMissingSchema(e)) return new Map();
+    throw e;
   }
 }
 
 /**
- * A FILE IS LEAVING A REQUEST: the statement that re-stamps its model in the
- * same batch, read before it. A version-3 row whose stamp was fresh is
- * stamped from the v1 row the delete leaves (the cascade keeps the tables in
- * step, the FK may null `primary_file_id`); a version-1 cache goes back to the
- * job (`model_mirror = ''`). Guarded by the stamp read here, so a writer that
- * landed in between is left alone. Nothing on a database before 0208.
+ * A FILE IS LEAVING OR ARRIVING: the statement that re-stamps the
+ * request's model in the same batch, read before it. A version-3 row whose
+ * stamp was fresh is stamped from the v1 row the batch leaves (a delete's
+ * cascade keeps the tables in step and its FK may null `primary_file_id`; a
+ * new file is merged on read); a version-1 cache, built without the file or
+ * with it, goes back to the job (`model_mirror = ''`). Guarded by the stamp
+ * read here, so a writer that landed in between is left alone. Nothing on a
+ * database before 0208.
  */
 export async function restampAfterFileStatement(db: D1Database, requestId: string): Promise<D1PreparedStatement[]> {
   try {
@@ -1272,6 +1406,65 @@ const list = (v: unknown, name: string): Record<string, unknown>[] => {
 const partContentKey = (p: ModelPart, sources: ModelSource[]) => JSON.stringify(pricedSections({ sources, parts: [p] }).parts);
 
 /**
+ * STABLE IDS ON A SAVE THAT CHANGES NOTHING (P1-05: an offer's coverage and
+ * substitutions name part and material ROW ids). A part the body did not
+ * echo — no id, or one the request never had — whose priced content equals a
+ * stored part no echo claimed takes that part's id, its review and its
+ * dates; and inside a kept part, a material the body did not echo takes the
+ * id of the stored material it equals. So a client that drops ids, or a
+ * customer who deletes a part and adds it back unchanged, saves a model the
+ * hash calls unchanged (`replayed`, the offers stay pending) with the very
+ * ids those offers name. Content that changed is a new part with a new id —
+ * and a changed hash, which revises and supersedes.
+ */
+function keepStableIds(
+  parts: ModelPart[],
+  stored: Pick<ModelState, 'sources' | 'parts'>,
+  sources: ModelSource[],
+  mintedParts: ReadonlySet<ModelPart>,
+  mintedMats: ReadonlySet<ModelMaterial>,
+  ts: string
+): void {
+  const claimed = new Set(parts.filter((p) => !mintedParts.has(p)).map((p) => p.id));
+  const storedById = new Map(stored.parts.map((p) => [p.id, p]));
+  const colourNew = colourKeyOf(new Map(sources.map((x) => [x.id, sourceKey(x)])));
+  const colourOld = colourKeyOf(new Map(stored.sources.map((x) => [x.id, sourceKey(x)])));
+  for (const part of parts) {
+    let twin = mintedParts.has(part) ? undefined : storedById.get(part.id);
+    if (mintedParts.has(part)) {
+      const key = partContentKey(part, sources);
+      twin = stored.parts.find((p) => !claimed.has(p.id) && partContentKey(p, stored.sources) === key);
+      if (!twin) continue;
+      claimed.add(twin.id);
+      part.id = twin.id;
+      part.created_at = twin.created_at;
+      part.review_state = twin.review_state;
+      part.review_reasons = [...twin.review_reasons];
+      part.reviewed_by = twin.reviewed_by;
+      part.reviewed_at = twin.reviewed_at;
+      part.updated_at = twin.name === part.name && twin.position === part.position ? twin.updated_at : ts;
+    }
+    if (!twin) continue;
+    const taken = new Set(part.materials.filter((m) => !mintedMats.has(m)).map((m) => m.id));
+    for (const mat of part.materials) {
+      if (!mintedMats.has(mat)) continue;
+      const key = JSON.stringify(materialKeyOf(mat, colourNew));
+      const same = twin.materials.find((m) => !taken.has(m.id) && JSON.stringify(materialKeyOf(m, colourOld)) === key);
+      if (!same) continue;
+      taken.add(same.id);
+      const coloursSame = JSON.stringify(same.colors) === JSON.stringify(mat.colors);
+      mat.id = same.id;
+      mat.created_at = same.created_at;
+      mat.colors_need_review = same.colors_need_review && coloursSame;
+      if (coloursSame && same.finish === mat.finish && same.region_reference === mat.region_reference &&
+          same.requirements === mat.requirements && same.colors_need_review === mat.colors_need_review) {
+        mat.updated_at = same.updated_at;
+      }
+    }
+  }
+}
+
+/**
  * A V3 BODY, READ ONCE — for a draft save and for a publish.
  *
  * ABSENT IS CARRIED, NEVER DEFAULTED (R7): no `parts` keeps the stored parts,
@@ -1318,11 +1511,15 @@ export function readModelInput(body: Record<string, unknown>, ctx: ModelInputCon
     if (raw.length > 40) throw badRequest('sources: too many entries');
     sources = [];
     const seenFiles = new Set<string>();
+    const echoedSources = new Set<string>();
+    const minted = new Set<ModelSource>();
     for (const item of raw) {
       const bodyId = typeof item.id === 'string' ? item.id.slice(0, 80) : '';
       const kindIn = s(item.kind);
-      let prev = bodyId ? storedById.get(bodyId) : undefined;
+      // An id echoed twice is the stored source once: the second is a new one.
+      let prev = bodyId && !echoedSources.has(bodyId) ? storedById.get(bodyId) : undefined;
       if (prev && kindIn && kindIn !== prev.kind) prev = undefined;
+      if (prev) echoedSources.add(prev.id);
       const kind = (prev?.kind ?? kindIn) as RequestSourceKind;
       if (!prev && !(CLIENT_SOURCE_KINDS as readonly string[]).includes(kind)) {
         throw badRequest('A source is a file, a link or a text reference');
@@ -1339,6 +1536,9 @@ export function readModelInput(body: Record<string, unknown>, ctx: ModelInputCon
             id: '', kind, file_id: null, sha256: '', role: '', url: '', canonical_url: '', provider: '', ref_text: '',
             origin_id: '', origin_ref: '', origin_hash: '', origin_meta: {}, note: '', is_primary: false, position: 0, created_at: ctx.ts,
           };
+      if (role === 'source' && !isFileKind(kind)) {
+        throw badRequest('Only an uploaded file can be marked as the original', 'SOURCE_ROLE_INVALID');
+      }
       const next: ModelSource = { ...base, kind, note, role, is_primary: item.is_primary === true };
       if (isFileKind(kind)) {
         const fileId = prev ? s(prev.file_id) : s(item.file_id);
@@ -1355,29 +1555,45 @@ export function readModelInput(body: Record<string, unknown>, ctx: ModelInputCon
         next.sha256 = prev?.sha256 || existing?.sha256 || f.sha256;
         if (!prev && existing) next.created_at = existing.created_at;
       } else if (kind === 'link') {
-        const urlIn = item.url === undefined ? (prev?.url ?? '') : str(item.url, 'url', { max: 600, required: false });
+        const urlIn = item.url === undefined ? (prev?.url ?? '') : str(item.url, 'url', { max: LIMITS.linkUrlMax, required: false });
         if (prev && urlIn === prev.url) {
           next.url = prev.url;
           next.canonical_url = prev.canonical_url;
           next.provider = prev.provider;
         } else {
           const parsed = urlIn ? parseModelLink(urlIn, ctx.providers) : null;
-          if (!parsed || parsed.canonical_url.length > 600) throw badRequest('That link is not a valid https address', 'BAD_URL');
+          if (!parsed || parsed.canonical_url.length > LIMITS.linkCanonicalMax) throw badRequest('That link is not a valid https address', 'BAD_URL');
           next.url = urlIn;
           next.canonical_url = parsed.canonical_url;
           next.provider = parsed.provider.slice(0, 60);
         }
         next.id = prev?.id ?? mint('rps');
+        if (!prev) minted.add(next);
       } else if (kind === 'text_ref') {
         next.ref_text = item.ref_text === undefined ? (prev?.ref_text ?? '') : text(item.ref_text, 'ref_text', LIMITS.textRefMax, 'SOURCE_NOTE_TOO_LONG');
         if (!next.ref_text) continue; // an empty reference box is no source
         next.id = prev?.id ?? mint('rps');
+        if (!prev) minted.add(next);
       } else {
         next.id = prev!.id; // a server-made copy: carried, never re-pointed
       }
       if (bodyId) idMap.set(bodyId, next.id);
       idMap.set(next.id, next.id);
       sources.push(next);
+    }
+    // STABLE IDS: a link or a text reference the body did not echo keeps the
+    // id of the stored one it equals (no other source of the body has it).
+    const taken = new Set(sources.filter((x) => !minted.has(x)).map((x) => x.id));
+    for (const x of minted) {
+      const twin = stored.sources.find((y) => !taken.has(y.id) && y.kind === x.kind &&
+        (x.kind === 'link' ? y.canonical_url === x.canonical_url : s(y.ref_text).trim() === s(x.ref_text).trim()));
+      if (!twin) continue;
+      taken.add(twin.id);
+      for (const [k, v] of idMap) if (v === x.id) idMap.set(k, twin.id);
+      idMap.delete(x.id);
+      idMap.set(twin.id, twin.id);
+      x.id = twin.id;
+      x.created_at = twin.created_at;
     }
   }
   const links = sources.filter((x) => x.kind === 'link');
@@ -1398,6 +1614,10 @@ export function readModelInput(body: Record<string, unknown>, ctx: ModelInputCon
   // ---- the parts ----------------------------------------------------------
   const storedParts = new Map(stored.parts.map((p) => [p.id, p]));
   const matProcess = (id: string) => ctx.mats.find((m) => m.id === id)?.process ?? '';
+  const echoed = new Set<string>();
+  const echoedMats = new Set<string>();
+  const mintedParts = new Set<ModelPart>();
+  const mintedMats = new Set<ModelMaterial>();
   let parts: ModelPart[];
   if (body.parts === undefined) {
     parts = stored.parts.map((p) => ({
@@ -1410,7 +1630,9 @@ export function readModelInput(body: Record<string, unknown>, ctx: ModelInputCon
     if (!raw.length) throw badRequest('Add at least one part', 'PARTS_EMPTY');
     if (raw.length > LIMITS.maxParts) throw badRequest(`A request can have at most ${LIMITS.maxParts} parts`, 'PARTS_TOO_MANY');
     parts = raw.map((item, index) => {
-      const prev = typeof item.id === 'string' ? storedParts.get(item.id) : undefined;
+      // An id echoed twice is the stored part once: the second is a new part.
+      const prev = typeof item.id === 'string' && !echoed.has(item.id) ? storedParts.get(item.id) : undefined;
+      if (prev) echoed.add(prev.id);
       // process: «لست متأكدًا» is '' with the flag; a chosen material decides it below.
       let process: ModelPart['process'] = prev?.process ?? '';
       let processUnsure = prev?.process_unsure ?? true;
@@ -1462,7 +1684,7 @@ export function readModelInput(body: Record<string, unknown>, ctx: ModelInputCon
           throw badRequest(`One part can take at most ${LIMITS.maxMaterialsPerPart} materials`, 'PART_MATERIALS_TOO_MANY');
         }
         materials = rawMats.map((m, k) => {
-          const prevMat = typeof m.id === 'string' ? prev?.materials.find((x) => x.id === m.id) : undefined;
+          const prevMat = typeof m.id === 'string' && !echoedMats.has(m.id) ? prev?.materials.find((x) => x.id === m.id) : undefined;
           let materialId = prevMat?.material_id ?? '';
           let materialUnsure = prevMat?.material_unsure ?? false;
           if (m.material_id !== undefined || m.material_unsure !== undefined) {
@@ -1518,7 +1740,8 @@ export function readModelInput(body: Record<string, unknown>, ctx: ModelInputCon
           const needsReview = (materialChanged && colors.some((c) => c.mode !== 'any')) || (!!prevMat?.colors_need_review && coloursSame);
           const same = !!prevMat && !materialChanged && coloursSame && prevMat.finish === finish &&
             prevMat.region_reference === region && prevMat.requirements === requirements && prevMat.colors_need_review === needsReview;
-          return {
+          if (prevMat) echoedMats.add(prevMat.id);
+          const out: ModelMaterial = {
             id: prevMat?.id ?? mint('rpm'),
             position: k,
             material_id: materialId,
@@ -1531,6 +1754,8 @@ export function readModelInput(body: Record<string, unknown>, ctx: ModelInputCon
             created_at: prevMat?.created_at || ctx.ts,
             updated_at: same ? prevMat!.updated_at : ctx.ts,
           };
+          if (!prevMat) mintedMats.add(out);
+          return out;
         });
       }
       if (!materials.length) {
@@ -1577,17 +1802,32 @@ export function readModelInput(body: Record<string, unknown>, ctx: ModelInputCon
         part.review_reasons = reviewReasonsFor(part);
         part.review_state = part.review_reasons.length ? 'needs_technical_review' : '';
       }
+      if (!prev) mintedParts.add(part);
       return part;
     });
+    keepStableIds(parts, stored, sources, mintedParts, mintedMats, ctx.ts);
   }
 
   const merged = mergeFiles({ job, request: { ...ctx.request }, sources, parts }, files);
+
+  // AN ORIGINAL IS NOT THE PUBLIC JOB (Q5): never the main source, never a
+  // part's measured model — whichever of the two the body changed.
+  const originals = originalFileIds(merged);
+  if (merged.sources.some((x) => x.role === 'source' && x.is_primary) ||
+      merged.parts.some((p) => p.measured_file_id && originals.has(p.measured_file_id))) {
+    throw badRequest(
+      'The original file is shown only to the merchant whose offer you accept, so it cannot be the main source or the model a part is measured from',
+      'SOURCE_ORIGINAL_PRIVATE'
+    );
+  }
 
   // The effective source type: named in the body, else kept while the sources
   // and the primary are as stored, else what the sources now say.
   const explicit = (SOURCE_TYPES as readonly string[]).includes(s(body.source_type)) ? (s(body.source_type) as SourceType) : null;
   const primaryOf = (m: Pick<ModelState, 'sources'>) => m.sources.find((x) => x.is_primary)?.id ?? '';
-  const sourcesSame = JSON.stringify(stored.sources.map(sourceKey).sort()) === JSON.stringify(merged.sources.map(sourceKey).sort());
+  // A role is part of «the same sources»: marking a file the original can take the type it was.
+  const roled = (x: ModelSource) => JSON.stringify([sourceKey(x), roleKey(x)]);
+  const sourcesSame = JSON.stringify(stored.sources.map(roled).sort()) === JSON.stringify(merged.sources.map(roled).sort());
   merged.job.source_type = explicit ?? (sourcesSame && primaryOf(stored) === primaryOf(merged) ? stored.job.source_type : derivedSourceType(merged, files));
 
   if (ctx.strict && explicit) {

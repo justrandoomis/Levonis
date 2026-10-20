@@ -40,6 +40,7 @@ import { enqueuePublishedRequestStatement, rematchNow } from './printMatchingSto
 import { merchantHref } from '@levonis/contracts/merchantRoutes';
 import { merchantPublicSql, withApprovalSchema } from './merchantApproval';
 import { writeRequestSystemUpdate } from '../routes/requestDiscussion';
+import { restampAfterFileStatement } from './requestModel';
 
 const MiB = 1024 * 1024;
 const nowIso = () => new Date().toISOString();
@@ -237,9 +238,13 @@ export async function insertRequestFile(
   alongside: D1PreparedStatement[] = []
 ): Promise<void> {
   const ts = nowIso();
+  // A built version-1 model cache lacks the file arriving: back on the
+  // quarter-hour job's list in the same batch (P1-04), as a file leaving does.
+  const restamp = await restampAfterFileStatement(db, f.requestId);
   try {
     await db.batch([
       guardedInsertStatement(db, f),
+      ...restamp,
       ...alongside,
       ...reviseStatements(db, f.requestId, ts),
       enqueuePublishedRequestStatement(db, f.requestId, 'files', ts),

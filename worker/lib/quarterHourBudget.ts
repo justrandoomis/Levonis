@@ -30,8 +30,10 @@
  *   7. LAST, the request-model cache (P1-04, DECISIONS row 266, worker/lib/
  *      requestModelBackfill.ts): version-1 print rows whose v3 model was never
  *      materialised, 25 a page at 11 statements — its own 40, cut to what is
- *      left after the services sweep (`quarterHourRequestModelBudget`). One
- *      indexed read when nothing is pending.
+ *      left after the services sweep (`quarterHourRequestModelBudget`). Its
+ *      first page is sized so that a failing batch's whole descent to one
+ *      request and that request's `error` mark fit (40 for 25), so a tick
+ *      always moves. One indexed read when nothing is pending.
  *
  * So the invocation's total is at most max(step 1, `QUARTER_HOUR_TICK_LIMIT`):
  * steps 2 to 7 never take it over the limit, and step 1 is bounded by its

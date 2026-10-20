@@ -37,6 +37,14 @@
 -- materialised by the quarter-hour job), no CHECK is rebuilt, every added
 -- column has a default so an older build's INSERTs keep working.
 
+-- A LINK IS HELD IN THE FORM V1 ALREADY STORES IT. A customer types at most
+-- 600 characters, but the canonical form percent-encodes every non-ASCII
+-- letter (an Arabic slug grows sixfold, a CJK one ninefold), and the v1 row
+-- has stored that form since the link was validated. 8192 holds any 600 typed
+-- characters however they encode, so no stored v1 link can make its request
+-- unwritable here; every writer refuses a longer one with BAD_URL
+-- (REQUEST_MODEL_LIMITS.linkCanonicalMax).
+--
 -- A source may name only a file of ITS OWN request (the composite key below).
 CREATE UNIQUE INDEX IF NOT EXISTS ux_request_files_request_id ON community_request_files(request_id, id);
 
@@ -47,8 +55,8 @@ CREATE TABLE IF NOT EXISTS community_request_sources (
   file_id TEXT,
   sha256 TEXT NOT NULL DEFAULT '' CHECK (sha256 = '' OR length(sha256) = 64),
   role TEXT NOT NULL DEFAULT '' CHECK (role IN ('','production','source','reference')),
-  url TEXT NOT NULL DEFAULT '' CHECK (length(url) <= 600),
-  canonical_url TEXT NOT NULL DEFAULT '' CHECK (length(canonical_url) <= 600),
+  url TEXT NOT NULL DEFAULT '' CHECK (length(url) <= 8192),
+  canonical_url TEXT NOT NULL DEFAULT '' CHECK (length(canonical_url) <= 8192),
   provider TEXT NOT NULL DEFAULT '' CHECK (length(provider) <= 60),
   ref_text TEXT NOT NULL DEFAULT '' CHECK (length(ref_text) <= 500),
   origin_id TEXT NOT NULL DEFAULT '',

@@ -509,6 +509,43 @@ test('the live verdict endpoint names every failing reason for the workshop, and
   assert.equal((await get(as(raw, 'ali'), `/api/merchant/workshop/requests/${draft}/eligibility`)).status, 404);
 });
 
+test('an ORIGINAL (role source, Q5, P1-04) is not an eligible workshop\'s: never costed, never the card\'s picture nor its «3D preview»', async () => {
+  const raw = seed();
+  const bucket = new MemoryBucket();
+  const { id, model, picture } = await published(raw, bucket);
+  // The customer marks the model as the editable original; the picture is what the job is about.
+  const v3 = await post(as(raw, 'buyer', bucket), `/api/marketplace/print/requests/${id}/publish`, {
+    schema_version: 3,
+    sources: [{ kind: 'file', file_id: model, role: 'source' }, { kind: 'file', file_id: picture, is_primary: true }],
+    parts: [{ measured_file_id: null, stated_dimensions_mm: { x: 20, y: 20, z: 20 }, materials: [{ material_id: 'pla' }] }],
+  });
+  assert.equal(v3.status, 200, JSON.stringify(await json(v3.clone())));
+
+  const asked = await post(as(raw, 'ali', bucket), `/api/merchant/workshop/requests/${id}/cost`, { file_id: model });
+  assert.equal(asked.status, 403);
+  assert.equal((await json(asked)).code, 'FILE_ORIGINAL_RESTRICTED');
+  const byDefault = await post(as(raw, 'ali', bucket), `/api/merchant/workshop/requests/${id}/cost`, {});
+  assert.equal(byDefault.status, 409, 'the only model is the original: nothing to cost');
+  assert.equal((await json(byDefault)).code, 'COSTING_NO_MODEL');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM request_file_reads WHERE what = 'costing' AND user_id = 'ali'"), 0, 'the server never read it for them');
+
+  const card = async () =>
+    ((await json(await get(as(raw, 'ali', bucket), '/api/merchant/workshop/board'))).requests as Array<Record<string, unknown>>).find((r) => r.id === id)!;
+  let c = await card();
+  assert.ok(c, 'still on the board');
+  assert.equal(c.has_preview, false, 'the only previewable model is the original');
+  assert.equal(c.thumb_url, `/api/marketplace/requests/${id}/files/${picture}`);
+  // The picture becomes an original too: the card shows no picture it could not open.
+  const both = await post(as(raw, 'buyer', bucket), `/api/marketplace/print/requests/${id}/publish`, {
+    schema_version: 3,
+    sources: [{ kind: 'file', file_id: model, role: 'source' }, { kind: 'file', file_id: picture, role: 'source' }],
+  });
+  assert.equal(both.status, 200, JSON.stringify(await json(both.clone())));
+  c = await card();
+  assert.ok(c);
+  assert.equal(c.thumb_url, null);
+});
+
 // ----------------------------------------------------- 6. printers & stock
 
 test('PRINTERS: canonical physics are locked, what the machine cannot take is refused by code, an unknown material is refused — never dropped', async () => {
