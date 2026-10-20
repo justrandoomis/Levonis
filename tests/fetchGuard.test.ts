@@ -12,7 +12,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { guardedFetchBytes, validateOutboundUrl } from '../worker/lib/fetchGuard';
+import { GuardedFetchError, guardedFetchBytes, validateOutboundUrl } from '../worker/lib/fetchGuard';
 
 const refuses = (url: string, why: string) =>
   assert.throws(() => validateOutboundUrl(url), /not allowed|Invalid|Only http/i, `${url} — ${why}`);
@@ -158,4 +158,34 @@ test('resolveModelLink follows redirects by hand and refuses a hop to a blocked 
   info = await resolveModelLink('https://makerworld.com/models/123', providers, fake);
   assert.equal(info.resolved, true);
   assert.deepEqual(calls, ['https://api.example.com/models/123', 'https://cdn.example.com/models/123.json']);
+});
+
+test('an answer refused for its size carries what it declared and the first bytes read before the cut (none when its Content-Length alone refused it)', async () => {
+  const declared = (async () =>
+    new Response(new Uint8Array(64), { headers: { 'content-type': 'image/gif', 'content-length': '64' } })) as unknown as typeof fetch;
+  const e1 = await guardedFetchBytes('https://vendor.example/a.gif', { maxBytes: 8, fetcher: declared }).catch((e: unknown) => e);
+  assert.ok(e1 instanceof GuardedFetchError && e1.code === 'SOURCE_TOO_LARGE');
+  assert.deepEqual([e1.refusedBody?.contentType, e1.refusedBody?.leadingBytes.byteLength], ['image/gif', 0]);
+
+  const enc = new TextEncoder();
+  const streamed = (async () =>
+    new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(enc.encode('GIF8'));
+          controller.enqueue(enc.encode('9a-and-much-more-than-sixteen'));
+          controller.close();
+        },
+      })
+    )) as unknown as typeof fetch;
+  const e2 = await guardedFetchBytes('https://vendor.example/b', { maxBytes: 8, fetcher: streamed }).catch((e: unknown) => e);
+  assert.ok(e2 instanceof GuardedFetchError && e2.code === 'SOURCE_TOO_LARGE');
+  assert.equal(e2.refusedBody?.contentType, '');
+  assert.equal(new TextDecoder().decode(e2.refusedBody?.leadingBytes), 'GIF89a-and-much-', 'sixteen bytes, across the chunks');
+
+  const e3 = await guardedFetchBytes('https://vendor.example/c', {
+    maxBytes: 8,
+    fetcher: (async () => new Response(null, { status: 503 })) as unknown as typeof fetch,
+  }).catch((e: unknown) => e);
+  assert.ok(e3 instanceof GuardedFetchError && e3.code === 'HTTP_ERROR' && e3.refusedBody === undefined, 'only a size refusal carries it');
 });

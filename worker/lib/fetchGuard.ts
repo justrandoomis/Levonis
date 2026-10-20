@@ -120,16 +120,31 @@ export type GuardedFetchErrorCode =
   | 'SOURCE_TOO_LARGE'
   | 'FETCH_BUDGET_EXCEEDED';
 
+/**
+ * What an answer refused for its size said of itself (SOURCE_TOO_LARGE only): its declared Content-Type and the
+ * first bytes of the body read before the cut (none when its Content-Length alone refused it). The catalogue
+ * import tells an animated GIF too large to read from it (catalogImport/media.ts, §C.4 step 2b).
+ */
+export interface RefusedBody {
+  contentType: string;
+  leadingBytes: Uint8Array;
+}
+
+/** How many of a refused body's first bytes are kept: enough for any image signature. */
+const REFUSED_LEADING_BYTES = 16;
+
 /** A stable code lets API routes translate failures without string parsing. */
 export class GuardedFetchError extends Error {
   readonly code: GuardedFetchErrorCode;
   readonly status?: number;
+  readonly refusedBody?: RefusedBody;
 
-  constructor(code: GuardedFetchErrorCode, message: string, status?: number, cause?: unknown) {
+  constructor(code: GuardedFetchErrorCode, message: string, status?: number, cause?: unknown, refusedBody?: RefusedBody) {
     super(message, cause === undefined ? undefined : { cause });
     this.name = 'GuardedFetchError';
     this.code = code;
     this.status = status;
+    if (refusedBody) this.refusedBody = refusedBody;
   }
 }
 
@@ -152,11 +167,23 @@ export interface ReadLimitOptions {
 export async function readResponseBytes(response: Response, options: ReadLimitOptions): Promise<Uint8Array> {
   const maxBytes = Math.floor(options.maxBytes);
   if (!Number.isFinite(maxBytes) || maxBytes < 0) throw new Error('Invalid response byte limit');
-  const tooLarge = () =>
-    new GuardedFetchError(
+  const tooLarge = (read: Uint8Array[] = []) => {
+    const leadingBytes = new Uint8Array(REFUSED_LEADING_BYTES);
+    let kept = 0;
+    for (const chunk of read) {
+      if (kept === REFUSED_LEADING_BYTES) break;
+      const part = chunk.subarray(0, REFUSED_LEADING_BYTES - kept);
+      leadingBytes.set(part, kept);
+      kept += part.byteLength;
+    }
+    return new GuardedFetchError(
       'SOURCE_TOO_LARGE',
-      options.tooLargeMessage ?? `Response exceeds the ${maxBytes} byte limit`
+      options.tooLargeMessage ?? `Response exceeds the ${maxBytes} byte limit`,
+      undefined,
+      undefined,
+      { contentType: response.headers.get('content-type') ?? '', leadingBytes: leadingBytes.slice(0, kept) }
     );
+  };
 
   const declared = response.headers.get('content-length');
   if (declared !== null) {
@@ -178,7 +205,7 @@ export async function readResponseBytes(response: Response, options: ReadLimitOp
       if (!value || value.byteLength === 0) continue;
       if (value.byteLength > maxBytes - total) {
         await reader.cancel().catch(() => undefined);
-        throw tooLarge();
+        throw tooLarge([...chunks, value]);
       }
       chunks.push(value);
       total += value.byteLength;

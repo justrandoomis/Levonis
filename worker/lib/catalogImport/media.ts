@@ -25,7 +25,14 @@
  *     must be ONE still PNG or JPEG (`still_only`) and is stored as WebP like any
  *     picture, its row `derivation = 'gif_first_frame'`. Whatever refuses that
  *     rendition, the medium stays IMAGE_ANIMATED_GIF (passing only when the
- *     refusal was).
+ *     refusal was). An original too large to read that WAS a GIF (its path ends
+ *     `.gif`, or the answer declared `image/gif` or began `GIF8`) is taken for an
+ *     animated one: a step-2 rendition answered as ONE still PNG or JPEG is its
+ *     first frame (`derivation = 'gif_first_frame'`), and one too large again
+ *     gets the first-frame request all the same.
+ *   - A redirect hop the outbound guard refuses (credentials or a userinfo@host
+ *     trick in its Location, an IP literal or private name, a non-http scheme)
+ *     is MEDIA_REDIRECT_REFUSED, permanent: never asked, never retried.
  *   - The bytes go through the app's own pipeline (ingestProductMediaUrl:
  *     guarded fetch, sniff, convert to WebP, content-addressed R2 key, cleanup
  *     intent, file_objects); the `catalog_import_media` row keeps the key
@@ -50,7 +57,8 @@
  */
 import type { Env } from '../types';
 import { GuardedFetchError } from '../fetchGuard';
-import { ingestProductMediaUrl, ProductMediaIngestError } from '../productMediaIngest';
+import { HttpError } from '../http';
+import { ingestProductMediaUrl, ProductMediaIngestError, type ProductMediaSource } from '../productMediaIngest';
 import { isSafeMediaKey, mediaBucket } from '../mediaStorage';
 import { NOW_SQL, OpsRefusal, type ImportRun } from './auth';
 import type { ItemRow } from './items';
@@ -236,6 +244,29 @@ export const RENDITION_RETRY: ReadonlySet<string> = new Set(['IMAGE_SOURCE_TOO_L
 
 const animatedGif = (e: unknown): boolean => e instanceof ProductMediaIngestError && e.code === 'IMAGE_ANIMATED_GIF';
 
+const tooLarge = (e: unknown): e is ProductMediaIngestError => e instanceof ProductMediaIngestError && e.code === 'IMAGE_SOURCE_TOO_LARGE';
+
+/**
+ * §C.4 step 2b: a medium too large to read that WAS a GIF — its address's path ends `.gif`, or an answer refused for
+ * its size declared `image/gif` or began `GIF8` (fetchGuard.ts `refusedBody`). Its animation cannot be told without
+ * reading it whole, so it is taken for an animated one.
+ */
+function wasGif(url: string, ...errors: unknown[]): boolean {
+  try {
+    if (new URL(url).pathname.toLowerCase().endsWith('.gif')) return true;
+  } catch {
+    // The address was validated before any request; an unreadable one is simply no signal.
+  }
+  return errors.some((e) => {
+    const cause = e instanceof ProductMediaIngestError ? e.cause : e;
+    const body = cause instanceof GuardedFetchError ? cause.refusedBody : undefined;
+    if (!body) return false;
+    const declared = body.contentType.split(';')[0].trim().toLowerCase();
+    const lead = body.leadingBytes;
+    return declared === 'image/gif' || (lead.byteLength >= 4 && lead[0] === 0x47 && lead[1] === 0x49 && lead[2] === 0x46 && lead[3] === 0x38);
+  });
+}
+
 /** A database before 0207: the media row has no `derivation` (the writer then records without it). */
 const missingDerivation = (e: unknown): boolean =>
   /no column named derivation|no such column: (?:excluded\.)?derivation/i.test(e instanceof Error ? e.message : String(e));
@@ -245,6 +276,10 @@ const TRANSIENT_INGEST = new Set(['IMAGE_CONVERT_UNAVAILABLE', 'IMAGE_STORAGE_FA
 
 /** A failure as `{code, transient}`, from a fixed list. */
 function failureOf(e: unknown): { code: string; transient: boolean } {
+  // The outbound guard's own refusal of an address (validateOutboundUrl: credentials in it, a userinfo@host trick, an
+  // IP literal or a private name, a scheme other than http(s)). The first address passed mediaUrlAllowed before any
+  // request, so here it can only be a redirect hop's Location: permanent, never asked again.
+  if (e instanceof HttpError && e.status === 400) return { code: 'MEDIA_REDIRECT_REFUSED', transient: false };
   if (e instanceof GuardedFetchError) {
     if (e.code === 'HOST_NOT_ALLOWED') return { code: 'MEDIA_HOST_NOT_ALLOWED', transient: false };
     if (e.code === 'SOURCE_TOO_LARGE') return { code: 'IMAGE_SOURCE_TOO_LARGE', transient: false };
@@ -384,7 +419,7 @@ export async function ingestImportMedia(env: MediaEnv, requestUrl: string, run: 
       continue;
     }
     const sourceHost = new URL(m.source_url).hostname;
-    const ingest = (url: string, kind: FetchedVariant | 'gif_first_frame') => {
+    const ingest = (url: string, kind: FetchedVariant | 'gif_first_frame', onSource?: (source: ProductMediaSource) => void) => {
       const budget = MEDIA_WALL_MS - (Date.now() - started) - MEDIA_MARGIN_MS;
       if (budget < 1_000) throw new GuardedFetchError('FETCH_TIMEOUT', 'The wall budget of this call is spent');
       return ingestProductMediaUrl(env, url, {
@@ -401,6 +436,7 @@ export async function ingestImportMedia(env: MediaEnv, requestUrl: string, run: 
         ...(kind === 'gif_first_frame' ? { still_only: true } : {}),
         // The provenance stays the original address, whichever variant was fetched.
         provenance_url: m.source_url,
+        ...(onSource ? { on_source: onSource } : {}),
       });
     };
     let variant: FetchedVariant = 'original';
@@ -426,10 +462,19 @@ export async function ingestImportMedia(env: MediaEnv, requestUrl: string, run: 
           // that was an animated GIF is one in that rendition too: then its first frame (at most three requests).
           if (!(e instanceof ProductMediaIngestError && RENDITION_RETRY.has(e.code))) throw e;
           variant = 'cdn_resized';
+          // §C.4 step 2b: an original too large to read that was a GIF (wasGif) is taken for an animated one.
+          const gifTooLarge = tooLarge(e) && wasGif(m.source_url, e);
+          const rendition: { still?: boolean } = {};
           try {
-            r = await ingest(cdnResizedUrl(m.source_url), 'cdn_resized');
+            r = await ingest(cdnResizedUrl(m.source_url), 'cdn_resized', (source) => {
+              rendition.still = source.still_png_or_jpeg;
+            });
+            // Its rendition answered as ONE still PNG or JPEG is that GIF's first frame, and is recorded as one.
+            if (gifTooLarge && rendition.still) derivation = 'gif_first_frame';
           } catch (e2) {
-            if (!animatedGif(e2)) throw e2;
+            // Still an animation, or too large again (the GIF signal from the original or from this answer): its
+            // first frame, asked once.
+            if (!animatedGif(e2) && !(tooLarge(e) && tooLarge(e2) && (gifTooLarge || wasGif(m.source_url, e2)))) throw e2;
             r = await firstFrame();
           }
         }

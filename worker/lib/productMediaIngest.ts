@@ -68,6 +68,15 @@ export interface ProductMediaBytesInput {
   cleanup_grace_minutes?: number;
   /** See ProductMediaFetchOptions.still_only. */
   still_only?: boolean;
+  /** See ProductMediaFetchOptions.on_source. */
+  on_source?: (source: ProductMediaSource) => void;
+}
+
+/** What the bytes were, by their own signature, before any conversion. */
+export interface ProductMediaSource {
+  mime: string;
+  /** ONE still picture: a PNG that is not an APNG, or a JPEG — what `still_only` requires. */
+  still_png_or_jpeg: boolean;
 }
 
 export interface ProductMediaFetchOptions {
@@ -95,6 +104,12 @@ export interface ProductMediaFetchOptions {
    * picture at all, is never stored as one.
    */
   still_only?: boolean;
+  /**
+   * Told what the fetched bytes were (by their signature, before conversion) once they are known to be a picture.
+   * The catalogue import asks whether the CDN's rendition of a GIF too large to read came back ONE still PNG or JPEG:
+   * then it is that GIF's first frame (catalogImport/media.ts, §C.4 step 2b).
+   */
+  on_source?: (source: ProductMediaSource) => void;
 }
 
 /** What `still_only` accepts, by the bytes' own signature. */
@@ -716,7 +731,9 @@ export async function ingestProductMediaBytes(
       'The source bytes are not a supported JPEG, PNG, WebP, GIF or AVIF image'
     );
   }
-  if (input.still_only && (!STILL_ONLY_KINDS.has(sourceKind.mime) || isAnimatedPng(input.bytes))) {
+  const stillPngOrJpeg = STILL_ONLY_KINDS.has(sourceKind.mime) && !isAnimatedPng(input.bytes);
+  input.on_source?.({ mime: sourceKind.mime, still_png_or_jpeg: stillPngOrJpeg });
+  if (input.still_only && !stillPngOrJpeg) {
     throw new ProductMediaIngestError('IMAGE_NOT_SUPPORTED', 'A still PNG or JPEG was required');
   }
 
@@ -830,6 +847,7 @@ export async function ingestProductMediaUrl(
     original_name: originalName,
     cleanup_grace_minutes: options.cleanup_grace_minutes,
     still_only: options.still_only,
+    on_source: options.on_source,
   });
 }
 

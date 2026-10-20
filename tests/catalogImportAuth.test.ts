@@ -804,6 +804,113 @@ test('an animated GIF over the source cap: the 2400-px rendition (still animated
   );
 });
 
+/** An answer over the 8 MiB source cap: the existing double (a declared Content-Length), or a body cut off as it streams. */
+function oversize(opts: { contentType?: string; lead?: Uint8Array; streamed?: boolean } = {}): Response {
+  const size = 9 * 1024 * 1024;
+  const headers: Record<string, string> = opts.contentType ? { 'content-type': opts.contentType } : {};
+  if (!opts.streamed) return new Response(new Uint8Array(size) as unknown as BodyInit, { status: 200, headers: { ...headers, 'content-length': String(size) } });
+  const lead = opts.lead ?? new Uint8Array(0);
+  let sent = 0;
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (sent === 0) {
+        sent = lead.byteLength || 1;
+        controller.enqueue(lead.byteLength ? lead : new Uint8Array(1));
+        return;
+      }
+      if (sent >= size) return controller.close();
+      const chunk = new Uint8Array(1024 * 1024);
+      sent += chunk.byteLength;
+      controller.enqueue(chunk);
+    },
+  });
+  return new Response(body, { status: 200, headers });
+}
+
+test('a first-frame rendition redirected to an address the outbound guard refuses (credentials, an IP literal) fails at once IMAGE_ANIMATED_GIF, never asked, never retried; an original redirected there is MEDIA_REDIRECT_REFUSED', async () => {
+  const w = opsWorld();
+  const { sid, t } = await toIngesting(w);
+  const { gifBytes } = await import('./fixtures/imageDoubles');
+  const bad = ['https://u:p@store.bblcdn.com/x.png', 'https://127.0.0.1/x.png'];
+  const redirects: Record<string, string> = {
+    'https://store.bblcdn.com/s7/a/to-cred.gif__op__resize,m_lfit,w_2400__op__format,f_png': bad[0],
+    'https://store.bblcdn.com/s7/a/to-ip.gif__op__resize,m_lfit,w_2400__op__format,f_png': bad[1],
+    'https://store.bblcdn.com/s7/a/orig-cred.png': bad[0],
+    'https://store.bblcdn.com/s7/a/orig-ip.png': bad[1],
+  };
+  await withCdn(
+    (url) => {
+      const location = redirects[url];
+      if (location) return new Response(null, { status: 302, headers: { location } });
+      return gifBytes(640, 360, 12);
+    },
+    async (asked) => {
+      const media = await mediaCall(w, sid, t, [
+        { source_media_id: 'g1', source_url: 'https://store.bblcdn.com/s7/a/to-cred.gif' },
+        { source_media_id: 'g2', source_url: 'https://store.bblcdn.com/s7/a/to-ip.gif' },
+        { source_media_id: 'o1', source_url: 'https://store.bblcdn.com/s7/a/orig-cred.png' },
+        { source_media_id: 'o2', source_url: 'https://store.bblcdn.com/s7/a/orig-ip.png' },
+      ]);
+      assert.deepEqual(media.map((m) => `${m.status}:${m.error_code}`), ['failed:IMAGE_ANIMATED_GIF', 'failed:IMAGE_ANIMATED_GIF', 'failed:MEDIA_REDIRECT_REFUSED', 'failed:MEDIA_REDIRECT_REFUSED']);
+      const urls = asked.map((a) => a.url);
+      for (const b of bad) assert.ok(!urls.some((u) => u.includes('u:p@') || u.includes('127.0.0.1') || u === b), `never asked: ${b}`);
+      assert.equal(urls.length, 6, 'each GIF: the original and its first frame; each original: one request');
+      assert.deepEqual([mediaRow(w, 'g1').attempts, mediaRow(w, 'g2').attempts, mediaRow(w, 'o1').attempts], [1, 1, 1]);
+    }
+  );
+});
+
+test('an animated GIF over the source cap whose 2400-px rendition is over the cap too gets its one first-frame request — a GIF by its .gif path, its declared image/gif, or the GIF8 its cut-off body began with; not a GIF: failed IMAGE_SOURCE_TOO_LARGE after two', async () => {
+  const w = opsWorld();
+  const { sid, t } = await toIngesting(w);
+  const { gifBytes, pngBytes } = await import('./fixtures/imageDoubles');
+  const cases: Array<[string, string, () => Response, () => Response, string]> = [
+    ['by_path', 'https://store.bblcdn.com/s7/a/by-path.gif', () => oversize(), () => oversize(), 'stored:'],
+    ['by_type', 'https://store.bblcdn.com/s7/a/by-type', () => oversize({ contentType: 'image/gif; charset=binary' }), () => oversize(), 'stored:'],
+    ['by_bytes', 'https://store.bblcdn.com/s7/a/by-bytes', () => oversize({ streamed: true, lead: gifBytes(4000, 4000, 2) }), () => oversize(), 'stored:'],
+    ['by_rendition', 'https://store.bblcdn.com/s7/a/by-rendition', () => oversize(), () => oversize({ contentType: 'image/gif' }), 'stored:'],
+    ['not_gif', 'https://store.bblcdn.com/s7/a/not-gif.png', () => oversize({ contentType: 'image/png' }), () => oversize({ streamed: true, lead: pngBytes(4000, 4000) }), 'failed:IMAGE_SOURCE_TOO_LARGE'],
+  ];
+  for (const [name, url, original, rendition, outcome] of cases) {
+    await withCdn(
+      (u) => (u.endsWith('f_png') ? pngBytes(2400, 1350) : u.includes('__op__') ? rendition() : original()),
+      async (asked) => {
+        const [m] = await mediaCall(w, sid, t, [{ source_media_id: name, source_url: url }]);
+        assert.equal(`${m.status}:${m.error_code}`, outcome, name);
+        const resized = `${url}__op__resize,m_lfit,w_2400__op__format,f_auto__op__quality,q_90`;
+        const expected = outcome === 'stored:' ? [url, resized, `${url}__op__resize,m_lfit,w_2400__op__format,f_png`] : [url, resized];
+        assert.deepEqual(asked.map((a) => a.url), expected, `${name}: at most three requests`);
+        const row = mediaRow(w, name);
+        assert.deepEqual([row.fetched_variant, row.derivation, row.attempts], ['cdn_resized', outcome === 'stored:' ? 'gif_first_frame' : '', 1], name);
+      }
+    );
+  }
+});
+
+test('an animated GIF over the source cap whose 2400-px rendition comes back ONE still PNG or JPEG is stored as its first frame (derivation gif_first_frame, two requests); a picture that was not a GIF is not', async () => {
+  const w = opsWorld();
+  const { sid, t } = await toIngesting(w);
+  const { gifBytes, jpegBytes, pngBytes } = await import('./fixtures/imageDoubles');
+  const cases: Array<[string, string, () => Response, () => Uint8Array, string]> = [
+    ['png_by_path', 'https://store.bblcdn.com/s7/a/still-png.gif', () => oversize(), () => pngBytes(2400, 1350), 'gif_first_frame'],
+    ['jpeg_by_type', 'https://store.bblcdn.com/s7/a/still-jpeg', () => oversize({ contentType: 'image/gif' }), () => jpegBytes(2400, 1350), 'gif_first_frame'],
+    ['png_by_bytes', 'https://store.bblcdn.com/s7/a/still-bytes', () => oversize({ streamed: true, lead: gifBytes(4000, 4000, 2) }), () => pngBytes(2400, 1351), 'gif_first_frame'],
+    ['photo', 'https://store.bblcdn.com/s7/a/photo.png', () => oversize({ contentType: 'image/png' }), () => pngBytes(2400, 1352), ''],
+  ];
+  for (const [name, url, original, rendition, derivation] of cases) {
+    await withCdn(
+      (u) => (u.includes('__op__') ? rendition() : original()),
+      async (asked) => {
+        const [m] = await mediaCall(w, sid, t, [{ source_media_id: name, source_url: url }]);
+        assert.deepEqual([m.status, m.error_code], ['stored', ''], name);
+        assert.deepEqual(asked.map((a) => a.url), [url, `${url}__op__resize,m_lfit,w_2400__op__format,f_auto__op__quality,q_90`], `${name}: no first-frame request`);
+        const row = mediaRow(w, name);
+        assert.deepEqual([row.status, row.fetched_variant, row.derivation, row.source_url], ['stored', 'cdn_resized', derivation, url], name);
+      }
+    );
+  }
+});
+
 test('a database before 0207 (no derivation column): the first frame is stored and recorded all the same, without the note; every read counts none', async () => {
   const w = opsWorld();
   const { sid, t } = await toIngesting(w);
