@@ -262,8 +262,15 @@ export default function Products() {
           <SearchHead
             a={extras}
             count={products.length}
-            // A removed chip is the search without its words — a REPLACE, like every refinement here.
-            onDrop={(text) => navigate(text ? `/products?search=${encodeURIComponent(text)}` : '/products', { replace: true })}
+            // A removed chip is the search without its words — a REPLACE, like every refinement here —
+            // in the same section: only that constraint goes, never the category the page was opened in.
+            onDrop={(text) => {
+              const next = new URLSearchParams();
+              if (text) next.set('search', text);
+              if (category) next.set('category', category);
+              const rest = next.toString();
+              navigate(rest ? `/products?${rest}` : '/products', { replace: true });
+            }}
             className="mb-3"
           />
         )}

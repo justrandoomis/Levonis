@@ -127,12 +127,15 @@ export function SearchHead({
   a,
   count,
   onDrop,
+  stale = false,
   className = '',
 }: {
   a: SearchExtras;
   /** Products listed under it: the near-match sentence only labels results that are there. */
   count: number;
   onDrop: (text: string) => void;
+  /** The answer is for older text than the field holds: its chips are shown, dimmed, and cannot be removed. */
+  stale?: boolean;
   className?: string;
 }) {
   const { loc, lang } = useLanguage();
@@ -140,6 +143,8 @@ export function SearchHead({
   const chips = (a.understood?.chips ?? []).map((c) => ({ c, label: chipLabel(c, loc, money) })).filter((x) => x.label);
   const miss = a.exact_miss ?? [];
   const hits = [...new Set((a.exact ?? []).map((h) => h.key))];
+  /** Listed rows that are not an exact hit: the near sentence labels those only. */
+  const near = count - new Set((a.exact ?? []).map((h) => h.product_id)).size;
   if (!chips.length && !miss.length && !hits.length) return null;
   return (
     <div className={`space-y-1 ${className}`} data-search-head>
@@ -148,16 +153,17 @@ export function SearchHead({
           role="group"
           aria-label={loc('ما فهمناه من البحث', 'What we understood', 'ئەوەی لە گەڕانەکەت تێگەیشتین')}
           data-understood
-          className="flex flex-wrap items-center gap-x-1.5"
+          className={`flex flex-wrap items-center gap-x-1.5 transition-opacity duration-150 ${stale ? 'opacity-60' : ''}`}
         >
           {chips.map(({ c, label }) => (
             <button
               key={`${c.kind}:${label}`}
               type="button"
               data-understood-chip={c.kind}
+              disabled={stale}
               aria-label={loc(`أزل: ${label}`, `Remove: ${label}`, `لابردن: ${label}`)}
               onClick={() => onDrop(c.drop)}
-              className="group inline-flex min-h-11 shrink-0 items-center focus-visible:outline-none"
+              className="group inline-flex min-h-11 shrink-0 items-center focus-visible:outline-none disabled:cursor-default"
             >
               <span className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-full bg-surface-selected pe-2 ps-3 text-[12.5px] font-bold text-text-primary transition-colors group-hover:bg-surface-raised group-focus-visible:ring-2 group-focus-visible:ring-focus">
                 <bdi>{label}</bdi>
@@ -167,21 +173,25 @@ export function SearchHead({
           ))}
         </div>
       )}
-      {miss.length > 0 ? (
-        <p data-exact-miss className="text-[13px] font-semibold leading-snug text-text-secondary">
-          {loc('لا يوجد تطابق دقيق لـ', 'No exact match for', 'هیچ هاوتایەکی ورد نەدۆزرایەوە بۆ')} «<bdi dir="ltr">{codes(miss, lang)}</bdi>»
-          {/* What is listed under it is near the code, never the code itself. */}
-          {count > 0 && (
-            <span className="block text-[12px] font-medium text-text-muted">
-              {loc('النتائج أدناه قريبة منه، وليست تطابقًا دقيقًا', 'The results below are near matches, not exact', 'ئەنجامەکانی خوارەوە نزیکن، هاوتای ورد نین')}
-            </span>
-          )}
-        </p>
-      ) : hits.length > 0 ? (
+      {/* Both lines when one code was carried and another was not («10101 10102»). */}
+      {hits.length > 0 && (
         <p data-exact-hit className="text-[13px] font-semibold leading-snug text-success">
           {loc('تطابق دقيق لـ', 'Exact match for', 'هاوتای ورد بۆ')} «<bdi dir="ltr">{codes(hits, lang)}</bdi>»
         </p>
-      ) : null}
+      )}
+      {miss.length > 0 && (
+        <p data-exact-miss className="text-[13px] font-semibold leading-snug text-text-secondary">
+          {loc('لا يوجد تطابق دقيق لـ', 'No exact match for', 'هیچ هاوتایەکی ورد نەدۆزرایەوە بۆ')} «<bdi dir="ltr">{codes(miss, lang)}</bdi>»
+          {/* What is listed under it is near the code, never the code itself; an exact hit beside it is not near. */}
+          {near > 0 && (
+            <span data-exact-near className="block text-[12px] font-medium text-text-muted">
+              {hits.length > 0
+                ? loc('النتائج الأخرى قريبة منه، وليست تطابقًا دقيقًا', 'The other results are near matches, not exact', 'ئەنجامەکانی تر نزیکن، هاوتای ورد نین')
+                : loc('النتائج أدناه قريبة منه، وليست تطابقًا دقيقًا', 'The results below are near matches, not exact', 'ئەنجامەکانی خوارەوە نزیکن، هاوتای ورد نین')}
+            </span>
+          )}
+        </p>
+      )}
     </div>
   );
 }

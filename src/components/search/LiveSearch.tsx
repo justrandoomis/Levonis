@@ -452,7 +452,7 @@ export default function LiveSearch({
             {(kit) => (
             <>
             <div className="max-h-[min(55dvh,26rem)] overflow-y-auto overscroll-contain p-1.5">
-              {data && (view === 'rows' || view === 'empty') && <kit.Head a={data} count={rows.length} onDrop={drop} className="px-1.5 pb-1" />}
+              {data && (view === 'rows' || view === 'empty') && <kit.Head a={data} count={rows.length} onDrop={drop} stale={!fresh} className="px-1.5 pb-1" />}
               <div
                 role="listbox"
                 id={listId}

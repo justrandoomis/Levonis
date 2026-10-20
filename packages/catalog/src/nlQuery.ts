@@ -28,11 +28,18 @@
  * Spool and refill words above all: the search dictionary maps «بكرة» and
  * "spool" onto filament (worker/lib/search/vocabulary.ts), so left in the text
  * they would rank every filament and filter nothing. A MATERIAL stays in the
- * text (it is in the names the search ranks) and is also a constraint.
+ * text (it is in the names the search ranks) and is also a constraint. A bare
+ * spool word or diameter becomes the facet only beside a filament or material
+ * word («PLA بكرة», "filament 1.75"); alone it names a product («Bambu Reusable
+ * Spool», "PTFE 1.75") and stays in the text.
  *
  * WHAT IT NEVER DOES. A number without a money word or a price bound is not a
  * price: X1C, A1 mini, 0.4, 6×2, 10101 and a resin printer «8K» are left to the
- * search and the identifier lane. A word it does not know stays in the text.
+ * search and the identifier lane. Nor is a number with a measure or a count
+ * after it («اقل من 1 كيلو», "under 300mm", «3 قطع»), or a model name ("Kobra 3
+ * Max", "Kobra 2 Plus"). «ولا» and «والا» are "or", not a negation; "direct
+ * drive" and "AMS ready" are features, not the sale mode. A word it does not
+ * know stays in the text.
  *
  * Pure and deterministic: no model, no network, no I/O (the owner rule for the
  * core search: it works without any paid AI). Every lexicon word is written as
@@ -116,14 +123,38 @@ const MIN_PRE = phrases(
 /** «30 الف واقل»: an upper bound after the amount (Sorani puts it there: «لە 30 هەزار کەمتر»). */
 const MAX_POST = phrases(
   'واقل', 'و اقل', 'او اقل', 'فما دون', 'وتحت', 'او تحت', 'كحد اقصى', 'حد اقصى',
-  'or less', 'or below', 'or under', 'and under', 'and below', 'max',
+  'or less', 'or below', 'or under', 'and under', 'and below',
   'یان کەمتر', 'و کەمتر', 'کەمتر', 'بۆ خوارەوە', 'خوارتر'
 );
 /** «مليون وفوق»: a lower bound after the amount. */
 const MIN_POST = phrases(
   'واكثر', 'و اكثر', 'او اكثر', 'فما فوق', 'وفوق', 'او فوق',
-  'or more', 'or above', 'and above', 'and up', 'plus', '+', 'min',
+  'or more', 'or above', 'and above', 'and up',
   'یان زیاتر', 'و زیاتر', 'زیاتر', 'بۆ سەرەوە'
+);
+/**
+ * One English word after the amount, a bound only after a money word or k: "30k max", "500 الف plus".
+ * After a bare number it is a model name: "Kobra 3 Max", "Neptune 4 Max", "Kobra 2 Plus".
+ */
+const MAX_POST_UNIT = phrases('max');
+const MIN_POST_UNIT = phrases('plus', '+', 'min');
+/**
+ * A measure or a count after a bare number: «اقل من 1 كيلو» is a weight, "under 300mm" a size,
+ * «اقل من 3 قطع» a count, "up to 300°C" a temperature. Never a price, and the words stay in the search.
+ */
+const MEASURE_WORDS = new Set(
+  [
+    'kg', 'kgs', 'kilo', 'kilos', 'g', 'gr', 'gm', 'gram', 'grams', 'lb', 'lbs', 'oz',
+    'mm', 'cm', 'mm/s', 'mms', 'um', 'micron', 'microns', 'nm', 'inch', 'inches', 'x', '×',
+    'ml', 'liter', 'litre', 'liters', 'litres', '°c', '°', 'c', 'celsius', 'degree', 'degrees',
+    'w', 'watt', 'watts', 'v', 'volt', 'volts', 'amp', 'amps', 'mah', 'hz', 'rpm', 'millimeter', 'millimetre',
+    'pcs', 'pc', 'piece', 'pieces', 'pack', 'packs', 'rolls', 'day', 'days', 'hour', 'hours', 'year', 'years',
+    'كيلو', 'كيلوغرام', 'كيلوجرام', 'كغم', 'كغ', 'غرام', 'جرام', 'غم', 'ملم', 'مم', 'ملي', 'مليمتر', 'ميليمتر',
+    'سم', 'سنتي', 'سنتيمتر', 'مل', 'لتر', 'درجة', 'درجات', 'واط', 'فولت', 'امبير', 'انش', 'بوصة',
+    'قطع', 'قطعة', 'حبة', 'حبات', 'حبه', 'رول', 'رولات', 'يوم', 'ايام', 'ساعة', 'ساعات', 'سنة', 'سنوات', 'شهر', 'اشهر',
+    'کیلۆ', 'کیلۆگرام', 'گرام', 'ملیم', 'ملیمەتر', 'سانتیم', 'سانتیمەتر', 'لیتر', 'پلە', 'وات', 'ڤۆڵت', 'ئینج',
+    'پارچە', 'دانە', 'ڕۆژ', 'کاتژمێر', 'ساڵ', 'مانگ',
+  ].map(nlFold)
 );
 /** «بين 500 الف و مليون»: a range opener («من» and "from" alone are a lower bound). */
 const RANGE_OPEN = phrases('بين', 'between', 'لە نێوان', 'من', 'from', 'لە');
@@ -208,9 +239,13 @@ const CURRENCIES = wordMap<{ cur: 'IQD' | 'USD'; scale: number; dual: boolean }>
 
 /** The sale mode. Time words («هسه», "now") count only beside an availability word. */
 const DIRECT = phrases(
-  'متوفر', 'متوفرة', 'متاح', 'متاحة', 'موجود', 'موجودة', 'جاهز', 'جاهزة', 'بالمخزن', 'بالمخزون', 'مباشر',
-  'in stock', 'instock', 'available', 'ready', 'ready to ship', 'direct',
-  'بەردەست', 'بەردەستە', 'ئامادە', 'ئامادەیە', 'لە کۆگا', 'لە کۆگادا'
+  'متوفر', 'متوفرة', 'متاح', 'متاحة', 'موجود', 'موجودة', 'جاهز', 'جاهزة', 'بالمخزن', 'بالمخزون',
+  // A feature is named with "direct", "ready" and "available" ("direct drive", «دفع مباشر», "AMS
+  // ready", "available colors"): alone they are search words, and only these phrases are the sale mode.
+  'بيع مباشر', 'شراء مباشر',
+  'in stock', 'instock', 'available now', 'now available', 'currently available', 'available in stock',
+  'ready to ship', 'ready stock', 'direct sale', 'direct sales',
+  'بەردەست', 'بەردەستە', 'ئامادە', 'ئامادەیە', 'لە کۆگا', 'لە کۆگادا', 'فرۆشتنی ڕاستەوخۆ'
 );
 const NOW = new Set('هسه هسة هسا هسع الان حاليا now ئێستا'.split(' ').map(nlFold));
 const PREORDER = phrases(
@@ -227,9 +262,22 @@ const REFILL = phrases(
 const SPOOL = phrases('بكرة', 'بكرات', 'سبول', 'spool', 'spools', 'ماسوورە', 'ماسوورەی', 'ماسۆرە');
 const SPOOL_WITH = phrases('مع', 'with', 'full', 'a full', 'لەگەڵ');
 const SPOOL_FULL = phrases('كاملة', 'كامل', 'full', 'تەواو', 'کامڵ');
-/** «بكرة فارغة» is an empty spool and «حامل بكرة» a holder: products, not the spool facet. */
+/** «بكرة فارغة» is an empty spool, «حامل بكرة» a holder and "reusable spool" a spool: products, not the spool facet. */
 const SPOOL_GUARD = new Set(
-  'فارغة فارغ فاضية فاضي empty بەتاڵ حامل holder هولدر stand ستاند حمالة'.split(' ').map(nlFold)
+  (
+    'فارغة فارغ فاضية فاضي empty بەتاڵ حامل holder هولدر stand ستاند حمالة ' +
+    'reusable قابلة قابل adapter adaptor محول محولة ئەداپتەر buffer بفر'
+  )
+    .split(' ')
+    .map(nlFold)
+);
+/**
+ * A bare spool word or diameter is the facet only when the query is about filament: «PLA بكرة»,
+ * "filament 1.75". Alone it is a product name («Bambu Reusable Spool», "PTFE 1.75", a spool adapter),
+ * and the facet would hide every product without a spool type or a diameter.
+ */
+const FILAMENT_WORDS = new Set(
+  'فلامنت فلمنت فيلمنت فيلامنت خيط خيوط filament filaments فیلامێنت فلامێنت'.split(' ').map(nlFold)
 );
 
 /** The filament diameter and the words around it. */
@@ -328,7 +376,10 @@ const FILLERS = new Set(
     'دەمەوێت', 'دەوێت', 'تکایە', 'هەیە', 'پێویستم', 'بۆ', 'لە', 'بە',
   ].map(nlFold)
 );
-const CONJUNCTIONS = new Set(['و', 'او', 'and', 'or', '&', '-', 'یان', 'ولا'].map(nlFold));
+/** «ولا» and «والا» are the Iraqi "or" («PLA ولا PETG»): their «لا» and «الا» are not a negation. */
+const CONJUNCTIONS = new Set(['و', 'او', 'and', 'or', '&', '-', 'یان', 'ولا', 'والا'].map(nlFold));
+/** «ولا» after a negation is "nor": «بدون AMS ولا كومبو». */
+const NOR = nlFold('ولا');
 
 // ------------------------------------------------------------------ the lexer
 
@@ -358,8 +409,9 @@ function lexemesOf(piece: string): string[] {
   // «ب500», «و50»: the preposition is a lexeme of its own.
   const glued = /^([بول])(\d.*)$/u.exec(f);
   if (glued) return [glued[1], ...(glued[2].match(RUNS) ?? [])];
+  // "non-combo", "non-black": a negation of a known term. "Non-Slip", "Non-Stick" are product words, kept whole.
   const non = /^non-(.+)$/.exec(f);
-  if (non) return ['non', non[1]];
+  if (non && (EXCLUDE_CANON.has(non[1]) || COLOURS.has(non[1]) || MATERIALS.has(non[1]))) return ['non', non[1]];
   return [f];
 }
 
@@ -483,6 +535,8 @@ export function parseNlQuery(input: string): NlQuery {
     for (const f of lexemesOf(p)) L.push({ f, v: variantsOf(f), piece });
   });
   const used = new Array<boolean>(L.length).fill(false);
+  /** The query is about filament: a filament or material word anywhere in it («PLA+» too). */
+  const aboutFilament = L.some((l) => l.v.some((v) => FILAMENT_WORDS.has(v) || MATERIALS.has(v.replace(/\+$/, ''))));
   /** Which chip (`nlChipKey`) each lexeme went to: a removed chip takes exactly its own words out of the field. */
   const owner = new Array<string>(L.length).fill('');
   let who = '';
@@ -629,8 +683,12 @@ export function parseNlQuery(input: string): NlQuery {
     if (a.cur === 'USD') return { v: Math.round(a.value), cur: 'USD' };
     if (a.unit === 'strong' || (a.unit === 'weak' && bound)) return { v: Math.round(a.value), cur: 'IQD' };
     if (!bound || a.unit === 'weak') return null;
-    return { v: Math.round(a.value < 1000 ? a.value * 1000 : a.value), cur: 'IQD' };
+    // Below 10,000 the wider reading: «اقل من 1500» is 1,500,000, never 1,500 dinars (a budget raised never shrinks).
+    return { v: Math.round(a.value < 10_000 ? a.value * 1000 : a.value), cur: 'IQD' };
   };
+
+  /** A bare number with a measure or a count after it («1 كيلو», "300mm", «3 قطع»): never a price. */
+  const measured = (a: Amount): boolean => a.unit === null && a.end < L.length && L[a.end].v.some((v) => MEASURE_WORDS.has(v));
 
   const setBound = (dir: 'min' | 'max', p: { v: number; cur: 'IQD' | 'USD' }) => {
     if (!got.price || got.price.currency !== p.cur) got.price = { min: null, max: null, currency: p.cur };
@@ -654,7 +712,7 @@ export function parseNlQuery(input: string): NlQuery {
       b = readAmount(a.end, { bound: true });
       L[a.end] = saved;
     }
-    if (!b) return null;
+    if (!b || measured(a) || measured(b)) return null;
     if (bare && a.unit !== 'strong' && b.unit !== 'strong') return null;
     let av = a.value;
     if (a.unit === null && b.maxMult > 0 && av < 1000) av *= b.maxMult;
@@ -694,7 +752,7 @@ export function parseNlQuery(input: string): NlQuery {
       const c = longest(j, list);
       if (!c) continue;
       const a = readAmount(j + c, { bound: true });
-      const p = a ? priceOf(a, true) : null;
+      const p = a && !measured(a) ? priceOf(a, true) : null;
       if (a && p) {
         setBound(flipDir(dir, flip), p);
         take(i, a.end);
@@ -710,7 +768,9 @@ export function parseNlQuery(input: string): NlQuery {
       take(i, range.end);
       return range.end - i;
     }
-    for (const [list, dir] of [[MAX_POST, 'max'], [MIN_POST, 'min']] as const) {
+    const posts = [[MAX_POST, 'max'], [MIN_POST, 'min']] as Array<[readonly Phrase[], 'min' | 'max']>;
+    if (a.unit !== null) posts.push([MAX_POST_UNIT, 'max'], [MIN_POST_UNIT, 'min']);
+    for (const [list, dir] of posts) {
       const c = longest(a.end, list);
       const p = c ? priceOf(a, true) : null;
       if (c && p) {
@@ -760,7 +820,10 @@ export function parseNlQuery(input: string): NlQuery {
     if (!s) return 0;
     let end = i + w + s;
     if (guarded(i - 1) || guarded(end)) return 0;
-    end += longest(end, SPOOL_FULL);
+    const full = longest(end, SPOOL_FULL);
+    // A bare spool word is the facet beside a filament or material word, or with «مع» / «كاملة».
+    if (!flip && !w && !full && !aboutFilament) return 0;
+    end += full;
     got.spool = flip ? 'refill' : 'spool';
     who = 'spool';
     take(i, end);
@@ -768,6 +831,7 @@ export function parseNlQuery(input: string): NlQuery {
   };
 
   const tryDiameter = (i: number): number => {
+    if (!aboutFilament) return 0;
     const j = i + longest(i, DIAMETER_WORDS);
     const d = j < L.length && !used[j] ? DIAMETERS.get(L[j].f) : undefined;
     if (!d) return 0;
@@ -809,11 +873,16 @@ export function parseNlQuery(input: string): NlQuery {
     return end - i;
   };
 
+  /** Where the last negation ended: «ولا» right there is "nor", anywhere else "or". */
+  let negatedTo = -1;
   const tryNegation = (i: number): number => {
+    if (CONJUNCTIONS.has(L[i].f) && !(L[i].f === NOR && negatedTo === i)) return 0;
     const n = longest(i, NEGATION);
     if (!n) return 0;
     const j = i + n;
     if (j >= L.length || used[j]) return 0;
+    // A lone "non" negates a known term ("non combo", "non black"); "non slip" is a product word.
+    const loose = n === 1 && L[i].f === 'non';
     let k = trySpool(j, true) || trySale(j, true) || tryPrice(j, true) || tryColour(j, true);
     if (!k) {
       const m = lookup(j, MATERIALS);
@@ -827,7 +896,7 @@ export function parseNlQuery(input: string): NlQuery {
     if (!k) {
       const w = L[j].f;
       const excludable = /\p{L}/u.test(w) && w.length >= 2 && !L[j].v.some((v) => FILLERS.has(v) || CONJUNCTIONS.has(v));
-      if (!excludable || longest(j, NEGATION)) return 0;
+      if (!excludable || longest(j, NEGATION) || (loose && lookup(j, EXCLUDE_CANON) === undefined)) return 0;
       const canon = lookup(j, EXCLUDE_CANON) ?? stripArticle(w);
       add(exclude.words, canon);
       who = `exclude:${canon}`;
@@ -835,6 +904,7 @@ export function parseNlQuery(input: string): NlQuery {
       k = 1;
     }
     take(i, j);
+    negatedTo = j + k;
     return n + k;
   };
 

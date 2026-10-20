@@ -4002,9 +4002,16 @@ async function pagedListing(
     categoryField: Record<string, unknown>;
     candidateCap: number;
     keysCap: number;
+    /**
+     * The words judged per product (`nl=1`: a colour, a material, an exclusion), read from the
+     * KEYS: the names, the spec mirror and the colour and option names ride in the first read, so
+     * a judged answer walks the whole scope like any listing and prices only what it must.
+     */
+    keep?: ((row: Record<string, unknown>) => boolean) | null;
   }
 ): Promise<CatalogListing> {
   const { state, wantsFacets, limit, offset, candidateCap, keysCap } = o;
+  const keep = o.keep ?? null;
   const specFiltered = Object.values(state.specs ?? {}).some((v) => Array.isArray(v) && v.length > 0);
   const resolvedFilter = filtersReadResolved(state);
   const resolvedSort = sortReadsResolved(state.sort, false);
@@ -4039,7 +4046,8 @@ async function pagedListing(
     );
     selectParams.push(JSON.stringify(state.fits));
   }
-  if (wantsFacets || specFiltered) keyCols.push('products.spec_fields AS spec_fields');
+  if (wantsFacets || specFiltered || keep) keyCols.push('products.spec_fields AS spec_fields');
+  if (keep) keyCols.push('products.name_ar AS name_ar', 'products.name_ku AS name_ku', 'products.colors AS colors', 'products.options AS options');
   // The brand facet's names, on ONE row per brand — the facet costs no statement of its own.
   if (wantsFacets) {
     keyCols.push(
@@ -4053,7 +4061,9 @@ async function pagedListing(
   const keysParams = [...selectParams, ...o.whereParams, keysCap + 1];
   const { results: fetchedKeys } = await runListed(db, keysSql, (q) => db.prepare(q).bind(...keysParams).all<ListingKeyRow>());
   const keysOverflow = fetchedKeys.length > keysCap;
-  const keys = keysOverflow ? fetchedKeys.slice(0, keysCap) : fetchedKeys;
+  const walked = keysOverflow ? fetchedKeys.slice(0, keysCap) : fetchedKeys;
+  // Judged before the head, the counts and the order are chosen: a product the words leave out takes no place.
+  const keys = keep ? walked.filter((k) => keep(k as unknown as Record<string, unknown>)) : walked;
 
   const sellable = (k: ListingKeyRow) => sellableNowOf(k as unknown as Record<string, unknown>);
   const all = keys.map((key, rank) => ({ key, rank, id: String(key.id), sellable: sellable(key) }));
@@ -4169,7 +4179,8 @@ async function pagedListing(
 
   const brands = new Map<string, BrandInfo>();
   if (wantsFacets) {
-    for (const k of keys) {
+    // Every walked row: a brand's one row carrying its names may be a product the words left out.
+    for (const k of walked) {
       const b = safeParse<BrandInfo | null>(typeof k.brand_info === 'string' ? k.brand_info : 'null', null);
       if (b && typeof b.id === 'string') brands.set(b.id, b);
     }
@@ -4265,7 +4276,6 @@ export async function listCatalogProducts(
    * is dropped there, never thrown. `listing` is false for every request that
    * existed before it, and those keep the exact path below.
    */
-  const listing = nl !== null || LISTING_PARAM_KEYS.some((k) => q[k] !== undefined);
   let listingState = parseListingParams((k) => (k === 'search' ? search : q[k]), 'api');
   /**
    * What the words narrowed, as data for the search chips (smart search 1.7
@@ -4282,6 +4292,12 @@ export async function listCatalogProducts(
     nlField = { understood: { text: nl.text, chips: applied.understood.map((c) => ({ ...c, drop: nl.without[nlChipKey(c)] ?? nl.text })) } };
   }
   const nlKeep = nl && nlJudgesProducts(nl) ? (row: Record<string, unknown>) => nlKeeps(nl, nlProductOf(row)) : null;
+  /**
+   * `nl=1` takes the listing path only when the words narrowed something: a chip joined the listing
+   * state or a product is judged (`nlKeep`). A search they understood nothing in («pla» while it is
+   * typed, a product name) keeps the plain read, a page of rows priced, exactly as without `nl=1`.
+   */
+  const listing = (nlField.understood?.chips.length ?? 0) > 0 || nlKeep !== null || LISTING_PARAM_KEYS.some((k) => q[k] !== undefined);
   const wantsFacets = q.facets === '1';
   // The taxonomy index: card `compare_type` and the category's `path`. Memoised
   // per isolate (catalogPresentation.ts), so this is usually free.
@@ -4644,10 +4660,11 @@ export async function listCatalogProducts(
    * (the engine returns ≤ 200 ids, already ranked) and `type=bundle` (bundle
    * rows only) keep the one read below.
    */
-  // Words judged per product (a colour, a material, an exclusion) with no search words left take the
-  // one-read path below, where every candidate row is in hand to judge.
-  if (listing && !search && type !== 'bundle' && !nlKeep) {
+  // Words judged per product (a colour, a material, an exclusion) with no search words left are judged
+  // on the KEYS (`keep`): the whole scope is walked, and only the page is priced.
+  if (listing && !search && type !== 'bundle') {
     const paged = await pagedListing(db, {
+      keep: nlKeep,
       whereSql: sql,
       whereParams: params,
       selectList,
@@ -4693,7 +4710,10 @@ export async function listCatalogProducts(
   ]);
   learnProductColumns(db, fetched[0]);
   const truncated = listing && fetched.length > candidateCap;
-  const results = truncated ? fetched.slice(0, candidateCap) : fetched;
+  const capped = truncated ? fetched.slice(0, candidateCap) : fetched;
+  // The words judged per product (`nl=1`) before anything is priced: a row they leave out costs no card,
+  // and the filters, the counts and the paging below all see the same rows.
+  const results = nlKeep ? capped.filter(nlKeep) : capped;
   const rowsById = new Map(results.map((r) => [String(r.id), r]));
   const resolved = await listedCards(db, results, Promise.resolve(results), ctxPromise, idxPromise.catch(() => null));
   /**
@@ -4701,23 +4721,27 @@ export async function listCatalogProducts(
    * الكتابي نفسه»): the word the shopper is still typing, completed from the
    * names of the products this very answer ranked first — so the grey word
    * always names something on the list under it. Only on a search, and never
-   * after a trailing space. worker/lib/search/complete.ts.
+   * after a trailing space. worker/lib/search/complete.ts. On the listing path
+   * it is chosen after the filters (a price the words set leaves a product
+   * out, and its name must not complete the word).
    */
-  const suggestion = search
-    ? {
-        suggestion: typingLastWord
-          ? suggestCompletion(
-              search,
-              results.flatMap((r) => [r.name, r.name_ar, r.name_ku])
-            )
-          : null,
-      }
-    : {};
+  const suggestionFrom = (rows: ReadonlyArray<Record<string, unknown> | undefined>) =>
+    search
+      ? {
+          suggestion: typingLastWord
+            ? suggestCompletion(
+                search,
+                rows.flatMap((r) => (r ? [r.name, r.name_ar, r.name_ku] : []))
+              )
+            : null,
+        }
+      : {};
   const cards = results.map((p) => resolved.get(String(p.id))!.card);
   if (!listing) {
     return { body: {
       ...categoryField,
-      ...suggestion,
+      ...suggestionFrom(results),
+      ...nlField,
       products: cards,
       ...(search ? identifierFields(identity, results.map((r) => String(r.id))) : {}),
       ...(counted ? { total: Number(counted.n) || 0 } : {}),
@@ -4730,7 +4754,9 @@ export async function listCatalogProducts(
    * come from ONE read keyed by a json_each list.
    */
   const brandIds = [...new Set(results.map((r) => String(r.brand_id ?? '')).filter(Boolean))];
-  const brandRows = brandIds.length
+  // Read only for what reads it: the brand facet's names, and the brand filter (by slug, in memory).
+  const brandRows =
+    (wantsFacets || listingState.brands.length > 0) && brandIds.length
     ? ((
         await db.prepare(
           'SELECT id, slug, name_ar, name_en, name_ckb FROM brands WHERE id IN (SELECT value FROM json_each(?))'
@@ -4762,13 +4788,11 @@ export async function listCatalogProducts(
       (fitsByProduct.get(String(row.id)) ?? []).map((p) => p.slug)
     )
   );
-  // The words judged per product (`nl=1`): before the filters, the counts and the paging, so all three agree.
-  const judged = nlKeep ? items.filter((_, i) => nlKeep(results[i])) : items;
-  const run = runListing(judged, listingState, { facets: wantsFacets, brands, printers });
+  const run = runListing(items, listingState, { facets: wantsFacets, brands, printers });
   const page = run.items.slice(offset, offset + limit);
   return { body: {
     ...categoryField,
-    ...suggestion,
+    ...suggestionFrom(run.items.map((i) => rowsById.get(i.id))),
     ...nlField,
     ...(search ? identifierFields(identity, page.map((i) => i.id)) : {}),
     products: page.map((i) => i.card),

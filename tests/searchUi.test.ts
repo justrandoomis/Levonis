@@ -27,6 +27,7 @@ import { parseNlQuery, nlChipKey } from '../packages/catalog/src/nlQuery';
 import { skuComboKey } from '../packages/pricing/src/skuChannel';
 import { linkWithSelection, selectionParam, VARIANT_PARAM as LINK_PARAM } from '../src/components/search/resultLink';
 import { linkedSelection, VARIANT_PARAM } from '../src/components/product/priceRequestState';
+import { linkedOpening } from '../src/lib/productChooser';
 import { formatIqd, type ApiProduct, type SearchChip } from '../src/lib/api';
 
 let storedLang = 'ar';
@@ -168,6 +169,45 @@ test('an exact hit says so, on the line and on its row; a plain search adds noth
   assert.equal(render(createElement(SearchHead, { a: { understood: { text: 'x', chips: [] } }, count: 3, onDrop: () => undefined }), 'ar'), '');
 });
 
+test('one code carried and one not («10101 10102»): both lines, and only the other rows are called near', () => {
+  const a = { exact: [{ product_id: 'p_near', key: '10101' }], exact_miss: ['10102'] };
+  const other: Record<Lang, string> = {
+    ar: 'النتائج الأخرى قريبة منه، وليست تطابقًا دقيقًا',
+    en: 'The other results are near matches, not exact',
+    ckb: 'ئەنجامەکانی تر نزیکن، هاوتای ورد نین',
+  };
+  for (const lang of LANGS) {
+    const head = render(createElement(SearchHead, { a, count: 3, onDrop: () => undefined }), lang);
+    assert.match(head, /data-exact-hit/, `${lang}: the carried code is said`);
+    assert.match(head, /data-exact-miss/, `${lang}: and the one nothing carries`);
+    assert.ok(text(head).includes(other[lang]), `${lang}: ${text(head)}`);
+  }
+  assert.notEqual(other.ckb, other.ar);
+  // The exact product is the only one listed: nothing is near, and nothing says so.
+  const only = render(createElement(SearchHead, { a, count: 1, onDrop: () => undefined }), 'ar');
+  assert.match(only, /data-exact-hit/);
+  assert.doesNotMatch(only, /data-exact-near/);
+  assert.ok(!text(only).includes('قريبة'));
+});
+
+test('chips of an older answer are shown dimmed and cannot be tapped while the new one loads', () => {
+  const a = { understood: { text: 'طابعة', chips: chipsOf('طابعة سوداء') } };
+  const stale = render(createElement(SearchHead, { a, count: 2, onDrop: () => undefined, stale: true }), 'ar');
+  assert.match(stale, /<button type="button" data-understood-chip="color" disabled=""/);
+  assert.match(stale, /data-understood="true" class="[^"]*opacity-60/);
+  const fresh = render(createElement(SearchHead, { a, count: 2, onDrop: () => undefined }), 'ar');
+  assert.doesNotMatch(fresh, /disabled=""/);
+  assert.match(read('src/components/search/LiveSearch.tsx'), /<kit\.Head a=\{data\} count=\{rows\.length\} onDrop=\{drop\} stale=\{!fresh\}/);
+});
+
+test('removing a chip on the results page keeps the section it was opened in', () => {
+  const src = read('src/pages/Products.tsx');
+  const drop = /onDrop=\{\(text\) => \{([\s\S]*?)\}\}/.exec(src);
+  assert.ok(drop, 'the chip handler is missing');
+  assert.match(drop![1], /if \(category\) next\.set\('category', category\);/);
+  assert.match(drop![1], /if \(text\) next\.set\('search', text\);/);
+});
+
 test('a dinar bound is written by the money hook, like the card prices beside it', () => {
   const a = { understood: { text: 'فلامنت', chips: chipsOf('فلامنت اسود اقل من 30 الف') } };
   for (const [lang, word] of [['ar', 'حتى'], ['en', 'Up to'], ['ckb', 'تا']] as const) {
@@ -238,16 +278,48 @@ test('the product page decodes ?v= as untrusted input and keeps only what the pr
 
 test('Product.tsx applies ?v= before the first paint, once per product and link, with no layout condition', () => {
   const src = read('src/pages/Product.tsx');
-  const block = /const linkedFor = useRef\(''\);\s*useLayoutEffect\(\(\) => \{([\s\S]*?)\}, \[product, relations, location\.search\]\);/.exec(src);
+  const block = /const linkedFor = useRef\(''\);[\s\S]*?useLayoutEffect\(\(\) => \{([\s\S]*?)\}, \[product, relations, location\.search, optionValueIds, colorId\]\);/.exec(src);
   assert.ok(block, 'the ?v= effect is missing');
   const body = block![1];
   assert.match(body, /new URLSearchParams\(location\.search\)\.get\(VARIANT_PARAM\)/);
   assert.match(body, /linkedFor\.current === `\$\{product\.slug\}\|\$\{raw\}`/, 'applied once: a later choice is never overwritten');
   assert.match(body, /const linked = linkedSelection\(raw, product, relations\);/);
-  assert.match(body, /setOptionValueIds\(linked\.option_value_ids\)/);
+  assert.match(body, /setOptionValueIds\(linkedOpening\(linked, optionValueIds, groups, relations\?\.variants \?\? \[\], colour\)\)/, 'on top of the opening selection');
   assert.match(body, /setColorId\(linked\.color_id\)/);
+  // ?v= follows the selection after the link: a reload or a share opens what is on screen.
+  const follow = /`\?v=` FOLLOWS THE SELECTION[\s\S]*?useEffect\(\(\) => \{([\s\S]*?)\}, \[product, selectionKey, location\.search, location\.pathname, location\.hash, navigate\]\);/.exec(src);
+  assert.ok(follow, 'the ?v= follower is missing');
+  assert.match(follow![1], /params\.set\(VARIANT_PARAM, selectionKey\)/);
+  assert.match(follow![1], /navigate\([^)]*\{ replace: true \}\)/);
   // The phone and the desktop share one selection state: nothing here asks which one it is.
   assert.doesNotMatch(body, /wideLayout|useMediaQuery|innerWidth/);
   // The link never prices: nothing in it reaches the quote but the ids.
   assert.doesNotMatch(body, /setQuote|price/i);
+});
+
+test('a linked value is chosen on top of the opening selection: the other groups and the single-value ones stay', () => {
+  // Nozzle {0.2 default, 0.4} and a Type group with one value: the page opens on 0.2 + hs.
+  const groups = [
+    { id: 'gN', default_value_id: 'v02', values: [{ id: 'v02' }, { id: 'v04' }] },
+    { id: 'gT', values: [{ id: 'hs' }] },
+  ];
+  const variants = [
+    { id: 'a', combo_key: 'o:hs|o:v02' },
+    { id: 'b', combo_key: 'o:hs|o:v04' },
+  ];
+  const opening = ['v02', 'hs'];
+  assert.deepEqual(linkedOpening({ option_value_ids: ['v04'], color_id: null }, opening, groups, variants, null), ['v04', 'hs'], '«0.4» keeps the type');
+  assert.deepEqual(linkedOpening({ option_value_ids: ['v02'], color_id: null }, opening, groups, variants, null), ['v02', 'hs'], 'already chosen: unchanged, never toggled off');
+  // Two multi-value groups without the import data: the other group keeps its value.
+  const plain = [
+    { id: 'g1', values: [{ id: 'a1' }, { id: 'a2' }] },
+    { id: 'g2', values: [{ id: 'b1' }, { id: 'b2' }] },
+  ];
+  assert.deepEqual(linkedOpening({ option_value_ids: ['a2'], color_id: null }, ['a1', 'b2'], plain, [], null), ['a2', 'b2']);
+  // A colour linked only to 0.4: the link brings 0.4, so the colour is shown, not cleared.
+  const colour = { links: [{ group_id: 'gN', option_value_id: 'v04' }] };
+  assert.deepEqual(linkedOpening({ option_value_ids: [], color_id: 'c_red' }, opening, groups, variants, colour), ['v04', 'hs']);
+  // A legacy colour on one option: that option. A product without groups: the linked option alone.
+  assert.deepEqual(linkedOpening({ option_value_ids: [], color_id: 'c' }, ['o1'], [], [], { links: [], option_id: 'o2' }), ['o2']);
+  assert.deepEqual(linkedOpening({ option_value_ids: ['o2'], color_id: null }, ['o1'], [], [], null), ['o2']);
 });

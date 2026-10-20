@@ -165,3 +165,46 @@ export function groupName(g: ChooserGroup & { name_en: string }, lang: 'ar' | 'e
   if (lang === 'ckb') return (g.name_ckb ?? '').trim() || g.name_en;
   return g.name_en;
 }
+
+/**
+ * A SEARCH LINK ON TOP OF THE OPENING SELECTION (`?v=`, smart search 1.7). The
+ * link names only what the code matched («0.4», a colour code), one value a
+ * group at most; the page has already opened on its defaults, its single-value
+ * groups and the server shelf. Each linked value is chosen the way a tap
+ * chooses it (`chooseValue` on an imported product, else the value of that group
+ * replaced), so every other group keeps its opening value and a single-value
+ * group stays chosen. A linked colour the opening options hide brings the
+ * option values it is linked to (the first of each linked group), so it is
+ * shown rather than cleared. A product without relational groups has one
+ * option at a time: the linked one.
+ */
+export function linkedOpening(
+  linked: { option_value_ids: readonly string[]; color_id: string | null },
+  opening: readonly string[],
+  groups: readonly ChooserGroup[],
+  variants: readonly ChooserVariant[],
+  colour: { links: ReadonlyArray<{ group_id: string; option_value_id: string }>; option_id?: string | null } | null
+): string[] {
+  const imported = importedChooser(groups);
+  const choose = (selected: string[], valueId: string): string[] => {
+    if (selected.includes(valueId)) return selected;
+    const group = groups.find((g) => g.values.some((v) => v.id === valueId));
+    if (!group) return groups.length ? selected : [valueId];
+    return imported
+      ? chooseValue(valueId, group.id, selected, groups, variants)
+      : groups.flatMap((g) => {
+          if (g.id === group.id) return [valueId];
+          const kept = g.values.find((v) => selected.includes(v.id));
+          return kept ? [kept.id] : [];
+        });
+  };
+  let selected = [...opening];
+  for (const id of linked.option_value_ids) selected = choose(selected, id);
+  if (colour) {
+    const byGroup = new Map<string, string[]>();
+    for (const link of colour.links) byGroup.set(link.group_id, [...(byGroup.get(link.group_id) ?? []), link.option_value_id]);
+    for (const ids of byGroup.values()) if (!ids.some((id) => selected.includes(id))) selected = choose(selected, ids[0]);
+    if (colour.links.length === 0 && colour.option_id && !selected.includes(colour.option_id)) selected = choose(selected, colour.option_id);
+  }
+  return selected;
+}

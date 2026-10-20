@@ -71,7 +71,7 @@ import { monthsLabel } from '../components/orders/format';
 import { authPathWithSupportRef, captureSupportRefFromSearch } from '../lib/supportRef';
 import { productVariantIdForSelection } from '../lib/productImage';
 import { dedupeByUrl, galleryForSelection, lightMainImageSize, LIGHT_ASPECT_TOLERANCE, mediaInStoredOrder, withLightMainImage } from '../lib/productGallery';
-import { NOT_OFFERED, chooseValue, defaultSelection, groupName, importedChooser, valueOffered } from '../lib/productChooser';
+import { NOT_OFFERED, chooseValue, defaultSelection, groupName, importedChooser, linkedOpening, valueOffered } from '../lib/productChooser';
 import Section from '../components/product/Section';
 import { useTheme } from '../lib/theme';
 import {
@@ -1916,18 +1916,52 @@ export default function Product() {
    * (`linkedSelection` keeps only ids this product owns), applied once per
    * product and link, before the first paint of the loaded product, and the
    * same on a phone and a desktop: there is one selection state. The quote
-   * prices it; the link never carries a price.
+   * prices it; the link never carries a price. It is chosen ON TOP of the
+   * opening selection (`linkedOpening`): «0.4» keeps the other groups and the
+   * single-value ones, and a linked colour brings the options it is sold with.
    */
   const linkedFor = useRef('');
+  /** The product a link was applied to, and the selection it replaced (the render before it lands). */
+  const linkApplied = useRef('');
+  const linkFrom = useRef<string | null>(null);
   useLayoutEffect(() => {
     const raw = location.search.includes(`${VARIANT_PARAM}=`) ? new URLSearchParams(location.search).get(VARIANT_PARAM) : null;
     if (!product || !raw || linkedFor.current === `${product.slug}|${raw}`) return;
     linkedFor.current = `${product.slug}|${raw}`;
     const linked = linkedSelection(raw, product, relations);
     if (!linked) return;
-    if (linked.option_value_ids.length) setOptionValueIds(linked.option_value_ids);
+    const colour = linked.color_id
+      ? {
+          links: (relations?.colors ?? []).find((c) => c.id === linked.color_id)?.links ?? [],
+          option_id: (product.colors ?? []).find((c) => c.id === linked.color_id)?.option_id ?? null,
+        }
+      : null;
+    const groups = (relations?.option_groups ?? []).filter((g) => g.values.length > 0);
+    linkApplied.current = product.slug;
+    linkFrom.current = selectionKeyOf(optionValueIds, colorId);
+    setOptionValueIds(linkedOpening(linked, optionValueIds, groups, relations?.variants ?? [], colour));
     if (linked.color_id) setColorId(linked.color_id);
-  }, [product, relations, location.search]);
+  }, [product, relations, location.search, optionValueIds, colorId]);
+  /**
+   * `?v=` FOLLOWS THE SELECTION once a link opened the page: a later choice
+   * replaces it in place (a REPLACE, no history entry), so a reload or a shared
+   * address opens what is on screen, never the variant the search matched.
+   */
+  useEffect(() => {
+    if (!product || linkApplied.current !== product.slug) return;
+    if (linkFrom.current !== null) {
+      if (selectionKey === linkFrom.current) return;
+      linkFrom.current = null;
+    }
+    const params = new URLSearchParams(location.search);
+    if (!params.has(VARIANT_PARAM) || params.get(VARIANT_PARAM) === selectionKey) return;
+    if (selectionKey) params.set(VARIANT_PARAM, selectionKey);
+    else params.delete(VARIANT_PARAM);
+    // Written by the page, not a new link: the effect above does not apply it again.
+    linkedFor.current = `${product.slug}|${selectionKey}`;
+    const rest = params.toString();
+    navigate(`${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`, { replace: true });
+  }, [product, selectionKey, location.search, location.pathname, location.hash, navigate]);
   /** Where the request block sits: inside the price card from 1024 px, its button in the phone bar below. */
   const wideLayout = useMediaQuery('(min-width: 1024px)');
   /** The phone bar's slot the request button is drawn into (a callback ref, so the panel re-renders once it exists). */
