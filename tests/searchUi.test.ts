@@ -26,7 +26,7 @@ import { BASE_COLOURS } from '../packages/catalog/src/bambuImport/registry/colou
 import { parseNlQuery, nlChipKey } from '../packages/catalog/src/nlQuery';
 import { skuComboKey } from '../packages/pricing/src/skuChannel';
 import { linkWithSelection, selectionParam, VARIANT_PARAM as LINK_PARAM } from '../src/components/search/resultLink';
-import { linkedSelection, VARIANT_PARAM } from '../src/components/product/priceRequestState';
+import { followSelectionInAddress, linkedSelection, VARIANT_PARAM } from '../src/components/product/priceRequestState';
 import { linkedOpening } from '../src/lib/productChooser';
 import { formatIqd, type ApiProduct, type SearchChip } from '../src/lib/api';
 
@@ -286,15 +286,54 @@ test('Product.tsx applies ?v= before the first paint, once per product and link,
   assert.match(body, /const linked = linkedSelection\(raw, product, relations\);/);
   assert.match(body, /setOptionValueIds\(linkedOpening\(linked, optionValueIds, groups, relations\?\.variants \?\? \[\], colour\)\)/, 'on top of the opening selection');
   assert.match(body, /setColorId\(linked\.color_id\)/);
-  // ?v= follows the selection after the link: a reload or a share opens what is on screen.
-  const follow = /`\?v=` FOLLOWS THE SELECTION[\s\S]*?useEffect\(\(\) => \{([\s\S]*?)\}, \[product, selectionKey, location\.search, location\.pathname, location\.hash, navigate\]\);/.exec(src);
+  // ?v= follows the selection after the link: a reload or a share opens what is on screen. In place, never a navigation.
+  const follow = /`\?v=` FOLLOWS THE SELECTION[\s\S]*?useEffect\(\(\) => \{([\s\S]*?)\}, \[product, selectionKey, location\.search\]\);/.exec(src);
   assert.ok(follow, 'the ?v= follower is missing');
-  assert.match(follow![1], /params\.set\(VARIANT_PARAM, selectionKey\)/);
-  assert.match(follow![1], /navigate\([^)]*\{ replace: true \}\)/);
+  assert.match(follow![1], /followSelectionInAddress\(selectionKey\)/);
+  assert.doesNotMatch(follow![1], /navigate\(|setSearchParams|linkedFor\.current =/, 'a choice is not a navigation, and never re-arms the link');
   // The phone and the desktop share one selection state: nothing here asks which one it is.
   assert.doesNotMatch(body, /wideLayout|useMediaQuery|innerWidth/);
   // The link never prices: nothing in it reaches the quote but the ids.
   assert.doesNotMatch(body, /setQuote|price/i);
+});
+
+test('a choice on a page opened with ?v= does not navigate: the address follows in place, the router entry and its key stay, so nothing scrolls to the top', () => {
+  // A window as the browser keeps it: the router entry state carries the key the shell scroll memory is keyed on.
+  const routerEntry = { usr: null, key: 'k_search_result', idx: 4 };
+  const calls: string[] = [];
+  const w = {
+    location: { href: 'https://levonis-iq.com/product/pla-basic?v=o%3Aov_04%7Cc%3Acol_black&ref=ali#specs' },
+    history: {
+      state: routerEntry as unknown,
+      replaceState(data: unknown, _unused: string, url: string) {
+        calls.push(url);
+        this.state = data;
+        w.location.href = new URL(url, w.location.href).href;
+      },
+      pushState() {
+        throw new Error('a choice never adds a history entry');
+      },
+    },
+  };
+  // The shopper taps 0.6: one in-place write, the other parameters and the hash kept, the entry (and its key) the same object.
+  const next = followSelectionInAddress('o:ov_06|c:col_black', w);
+  assert.equal(next, `/product/pla-basic?v=${encodeURIComponent('o:ov_06|c:col_black')}&ref=ali#specs`);
+  assert.deepEqual(calls, [next]);
+  assert.equal(w.history.state, routerEntry, 'the router entry is kept: no new location key, so the shell does not scroll to the top');
+  assert.equal(new URL(w.location.href).searchParams.get(VARIANT_PARAM), 'o:ov_06|c:col_black');
+  // The same choice again writes nothing; back to the linked one writes it back.
+  assert.equal(followSelectionInAddress('o:ov_06|c:col_black', w), null);
+  assert.ok(followSelectionInAddress('o:ov_04|c:col_black', w));
+  assert.equal(calls.length, 2);
+  // Nothing chosen: the parameter leaves the address. A page not opened from a link never grows one.
+  followSelectionInAddress('', w);
+  assert.equal(new URL(w.location.href).searchParams.has(VARIANT_PARAM), false);
+  assert.equal(followSelectionInAddress('o:ov_06', w), null);
+  assert.equal(calls.length, 3);
+  assert.equal(w.history.state, routerEntry);
+  // Why it matters: the shell resets the scroll on every new location key, which a router navigate (even a replace) makes.
+  const app = read('src/App.tsx');
+  assert.match(app, /el\.scrollTo\(\{ top: target \}\)[\s\S]*?\}, \[location\.key, location\.hash, navigationType\]\);/);
 });
 
 test('a linked value is chosen on top of the opening selection: the other groups and the single-value ones stay', () => {

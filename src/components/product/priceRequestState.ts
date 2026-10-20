@@ -138,3 +138,29 @@ export function linkedSelection(
   const color_id = wish.color_id && (product.colors ?? []).some((c) => c.id === wish.color_id) ? wish.color_id : null;
   return option_value_ids.length || color_id ? { option_value_ids, color_id } : null;
 }
+
+/**
+ * `?v=` FOLLOWS THE SELECTION WITHOUT A NAVIGATION. Once a link opened the
+ * page, a later choice rewrites the parameter in place, so a reload or a
+ * shared address opens what is on screen. It is written with
+ * `history.replaceState` over the entry the router already holds (its state,
+ * and so its `key`, kept), never with `navigate`: a router navigation, even a
+ * replace, hands out a new location key, and the shell scrolls
+ * `#main-scroll-container` to the top on every new key (src/App.tsx), so each
+ * option tap on a product opened from search would jump to the top. The
+ * current address is read from the window, not from the router, which does
+ * not see this write. An address without `?v=` is left alone: a page not
+ * opened from a link never grows one. Returns the address written, or null.
+ */
+export function followSelectionInAddress(
+  selectionKey: string,
+  w: { location: { href: string }; history: { state: unknown; replaceState(data: unknown, unused: string, url: string): void } } = window
+): string | null {
+  const url = new URL(w.location.href);
+  if (!url.searchParams.has(VARIANT_PARAM) || url.searchParams.get(VARIANT_PARAM) === selectionKey) return null;
+  if (selectionKey) url.searchParams.set(VARIANT_PARAM, selectionKey);
+  else url.searchParams.delete(VARIANT_PARAM);
+  const next = `${url.pathname}${url.search}${url.hash}`;
+  w.history.replaceState(w.history.state, '', next);
+  return next;
+}

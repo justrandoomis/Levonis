@@ -89,7 +89,7 @@ import Countdown from '../components/ui/Countdown';
 import ConditionPanel from '../components/product/ConditionPanel';
 import StockAlertPanel from '../components/product/StockAlertPanel';
 import { UNPRICED_TEXT } from '../lib/priceStatus';
-import { decodePriceRequestIntent, linkedSelection, PRICE_REQUEST_PARAM, selectionKeyOf, VARIANT_PARAM } from '../components/product/priceRequestState';
+import { decodePriceRequestIntent, followSelectionInAddress, linkedSelection, PRICE_REQUEST_PARAM, selectionKeyOf, VARIANT_PARAM } from '../components/product/priceRequestState';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import {
   decodeAlertIntent,
@@ -1944,8 +1944,14 @@ export default function Product() {
   }, [product, relations, location.search, optionValueIds, colorId]);
   /**
    * `?v=` FOLLOWS THE SELECTION once a link opened the page: a later choice
-   * replaces it in place (a REPLACE, no history entry), so a reload or a shared
-   * address opens what is on screen, never the variant the search matched.
+   * rewrites it in place, so a reload or a shared address opens what is on
+   * screen, never the variant the search matched. NOT A NAVIGATION: a router
+   * navigate, even a replace, makes a new location key, and the shell scrolls
+   * to the top on every new key, so each option tap would jump to the top
+   * (`followSelectionInAddress` writes over the entry the router holds). The
+   * router keeps the address it opened with, so the effect above, keyed on
+   * that address, never applies the link again over a later choice; a router
+   * update of the address (another parameter consumed) runs this again.
    */
   useEffect(() => {
     if (!product || linkApplied.current !== product.slug) return;
@@ -1953,15 +1959,8 @@ export default function Product() {
       if (selectionKey === linkFrom.current) return;
       linkFrom.current = null;
     }
-    const params = new URLSearchParams(location.search);
-    if (!params.has(VARIANT_PARAM) || params.get(VARIANT_PARAM) === selectionKey) return;
-    if (selectionKey) params.set(VARIANT_PARAM, selectionKey);
-    else params.delete(VARIANT_PARAM);
-    // Written by the page, not a new link: the effect above does not apply it again.
-    linkedFor.current = `${product.slug}|${selectionKey}`;
-    const rest = params.toString();
-    navigate(`${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`, { replace: true });
-  }, [product, selectionKey, location.search, location.pathname, location.hash, navigate]);
+    followSelectionInAddress(selectionKey);
+  }, [product, selectionKey, location.search]);
   /** Where the request block sits: inside the price card from 1024 px, its button in the phone bar below. */
   const wideLayout = useMediaQuery('(min-width: 1024px)');
   /** The phone bar's slot the request button is drawn into (a callback ref, so the panel re-renders once it exists). */

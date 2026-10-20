@@ -277,10 +277,16 @@ digits from every keyboard; number words (الف، مليون، هەزار، م�
 diameter, the sale mode («متوفر هسه» / «حجز»), refill or with spool («ريفل»,
 «بكرة كاملة», «بدون بكرة») and «رخيص» as the price order.
 
-* **What becomes a filter leaves the search.** Price, sale, spool, colour,
-  diameter and sort words and the negations are consumed; spool words above
-  all, so «بكرة» and "spool" never reach the `spool → filament` synonym. A
-  material stays a search word and also narrows the materials.
+* **What becomes a filter leaves the search.** Price, sale, colour and sort
+  words and the negations are consumed, and so are the spool and diameter
+  words that became the facet. A spool word is the facet beside a filament or
+  material word («PLA بكرة», "filament with spool"), with «مع» / «كاملة», or
+  negated («بدون بكرة» is a refill); consumed there, it never reaches the
+  `spool → filament` synonym. Alone a spool word or a diameter names a product
+  and STAYS in the search («بكرة», "spool", "Bambu Reusable Spool", "PTFE
+  1.75"), as it does beside an empty, holder, reusable, adapter or buffer word
+  («بكرة فارغة», «حامل بكرة»). A material stays a search word and also narrows
+  the materials.
 * **Where each lands.** Price, sale, spool and diameter join the listing state
   (an explicit URL value wins). Colours, materials and exclusions are judged
   per product before the filters, the counts and the paging: an exclusion
@@ -289,8 +295,33 @@ diameter, the sale mode («متوفر هسه» / «حجز»), refill or with spo
   needs evidence (the colour facet, a name, a colour or option value sold); a
   material judges only products that have a `material_type`.
 * **Never a guess.** A number with no money word and no bound is not a price
-  (X1C, 0.4, 6×2, 10101, a resin printer «8K»). With nothing left to search,
-  the whole shop is listed under the constraints. The answer carries
+  (X1C, 0.4, 6×2, 10101, a resin printer «8K»). Nor is a bare number with a
+  measure or a count after it («اقل من 1 كيلو», "under 300mm", "up to 300°C",
+  «اقل من 3 قطع», Sorani «کەمتر لە 1 کیلۆ»): the words stay in the search. A
+  price PER unit is a price, and the per-unit words go with it («اقل من 25
+  للكيلو», «لكل كيلو», «بالكيلو», "per kg", "25/kg": at most 25,000). "Kobra 3
+  Max", "Kobra 2 Plus" and "3+" are model names: max, min, plus and + after a
+  number are a bound only after a money word or k ("30k max"). «ولا» and
+  «والا» are "or" («PLA ولا PETG» lists both), and "nor" right after a
+  negation («بدون AMS ولا كومبو», «بدون AMS والا كومبو» leave both out). With
+  nothing left to search, the whole shop is listed under the constraints.
+* **A bare number beside a bound** is Iraqi shorthand, read so that a budget
+  raised never shrinks (monotonic from 1 to 1,000,000): below 10,000 it counts
+  thousands («اقل من 30» is 30,000, "under 1000" 1,000,000, «اقل من 9999»
+  9,999,000); from 10,000 it is read in full but never below 10,000,000 until
+  its own value is, so «اقل من 30000» is 10,000,000 — the whole shop rather
+  than a budget that fell as it rose. An exact budget says so: grouped in
+  threes («30,000», «٣٠٬٠٠٠»), with a money word («30 الف», «30000 دينار»), or
+  as a range.
+* **A range reads its two ends together** and a range written in ascending
+  order is never swapped. Two bare ends are read alike: in full when either is
+  10,000 or more or grouped («بين 5000 و 15000» is 5,000 to 15,000, «من 5000
+  الى 20000», "from 2000 to 20000"), otherwise both in thousands («بين 500 و
+  1200» is 500,000 to 1,200,000). A bare end beside an end with a money word
+  takes the reading that keeps the order written: the other end thousand or
+  million below 1,000 («بين 25 و 50 الف», «بين مليون و 2»), else thousands or
+  in full, whichever stays on its side («بين 500 الف و 1200» ends at
+  1,200,000, «بين 5 الف و 9000» at 9,000). The answer carries
   `understood: { text, chips }` — data for the chips the search UI words in
   ar, en and ckb (smart search 1.7). `nl` is part of the edge cache key.
 
@@ -309,9 +340,14 @@ lazy chunk the panel hands the field, so none of the wording is in the entry:
   (`NlQuery.without`, keyed by `nlChipKey`). Removing a chip puts `drop` in
   the field, so a removed chip is just another search and the field always
   shows what is applied.
-* **The exact line.** `exact_miss` reads «لا يوجد تطابق دقيق لـ «10102»» and the
-  results under it are labelled near («قريب»), never as the code; `exact`
-  reads «تطابق دقيق لـ «FAP035»» and marks its row.
+* **The exact lines.** `exact` reads «تطابق دقيق لـ «FAP035»» and its row is
+  marked «تطابق دقيق»; `exact_miss` reads «لا يوجد تطابق دقيق لـ «10102»». Both
+  lines show when one code was carried and another was not («10101 10102»).
+  Under the miss line a sentence labels only the rows that are not an exact
+  hit, and only when there are some: «النتائج أدناه قريبة منه، وليست تطابقًا
+  دقيقًا» when nothing is exact, «النتائج الأخرى قريبة منه…» ("the other results
+  are near matches") beside an exact hit. Each of those rows carries «قريب» /
+  "Near" / «نزیک», never the code.
 * **Each row** shows the card's three-state availability (`AvailabilityLine`,
   the shared `cardAvailability` of packages/catalog).
 * **`?v=`.** A result that matched a selection links to its product with that
@@ -320,8 +356,16 @@ lazy chunk the panel hands the field, so none of the wording is in the entry:
   (`linkedSelection` in `src/components/product/priceRequestState.ts`: only
   ids the product owns, one value per group), applies it once per product and
   link before the first paint — one selection state, so a phone and a desktop
-  open the same way — and prices it through the quote. The parameter stays in
-  the address, so a shared link opens on the same variant.
+  open the same way — and prices it through the quote. It is chosen on top of
+  the opening selection (`linkedOpening`): «0.4» keeps the other groups and
+  the single-value ones, and a linked colour brings the options it is sold
+  with. **`?v=` then follows the selection**: a later choice rewrites it in
+  place (`followSelectionInAddress`, `history.replaceState` over the entry the
+  router holds; nothing chosen removes it), so a reload or a shared address
+  opens what is on screen, never the variant the search matched. It is not a
+  navigation: a router navigate, even a replace, makes a new location key, and
+  the shell scrolls to the top on every new key, so each option tap would jump
+  to the top. A page not opened from a link never grows a `?v=`.
 
 ## 5. What is deliberately *not* forgiven
 
