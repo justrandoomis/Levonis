@@ -50,6 +50,17 @@ export function pickUpload(file: Pick<File, 'name' | 'size'>): 'session' | 'simp
   return 'simple';
 }
 
+/**
+ * The door for a REQUEST file. A file whose name has no extension can only be
+ * proved from its bytes, which the whole-body door does (the session door
+ * decides from the name before any byte), so it goes whole-body whatever its
+ * size; the request table caps it at the picture ceiling first.
+ */
+export function pickRequestUpload(file: Pick<File, 'name' | 'size'>): 'session' | 'simple' {
+  if (!fileExtension(file.name)) return 'simple';
+  return pickUpload(file);
+}
+
 // ------------------------------------------------------------- resume records
 
 /** Name, size and modification time: the same file picked again after a reload gets the same key. */

@@ -98,6 +98,14 @@ export type RequestFileProblem =
 
 export function requestFileProblem(file: { name: string; size: number }, filesAlready = 0): RequestFileProblem | null {
   if (filesAlready >= REQUEST_FILE_LIMITS.maxFiles) return { code: 'REQUEST_FILES_FULL', max_files: REQUEST_FILE_LIMITS.maxFiles };
+  // A name with no extension at all (a camera shot an in-app browser names by
+  // digits, with no type to name it from) is not refused here: the whole-body
+  // door proves a picture or a binary model from its bytes and names it. Only
+  // the picture ceiling is asked, which that door holds it to.
+  if (!requestFileExtension(file.name)) {
+    const limit = requestFileMaxBytes('image');
+    return file.size > limit ? { code: 'UPLOAD_TOO_LARGE', kind: 'image', limit_bytes: limit } : null;
+  }
   const kind = requestFileKind(file.name);
   if (!kind) return { code: 'UPLOAD_KIND_NOT_ALLOWED', extension: requestFileExtension(file.name) };
   const limit = requestFileMaxBytes(kind);

@@ -24,7 +24,7 @@ import { useRef, useState } from 'react';
 import { Loader2, Paperclip, Trash2, FileText, Box, Image as ImageIcon, Download } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
-import { pickUpload, uploadLarge, type UploadProgress } from '../../lib/uploadSession';
+import { pickRequestUpload, uploadLarge, type UploadProgress } from '../../lib/uploadSession';
 import { REQUEST_FILE_LIMITS, requestFileAccept } from '../../../packages/contracts/src/requestFiles';
 import { requestFileCheck, requestFilesCheck, requestUploadRefusal } from '../community/requests/fileRefusals';
 import { RequestThumb } from '../community/requests/RequestFileThumbs';
@@ -88,7 +88,7 @@ export async function uploadRequestFiles(
   const reasons: unknown[] = [];
   for (const file of files) {
     try {
-      if (pickUpload(file) === 'session') {
+      if (pickRequestUpload(file) === 'session') {
         await uploadLarge(file, 'request', { entityId: requestId, onProgress: onProgress && ((p) => onProgress(file, p)) });
       } else {
         const form = new FormData();
@@ -219,8 +219,8 @@ export function AttachmentList({
     // and the ones still uploading: none is dropped without its reason.
     const { accepted, refusal } = requestFilesCheck(Array.from(list), L, files.length + tiles.length);
     if (input.current) input.current.value = '';
-    const viaSession = accepted.filter((f) => pickUpload(f) === 'session');
-    const whole = accepted.filter((f) => pickUpload(f) !== 'session');
+    const viaSession = accepted.filter((f) => pickRequestUpload(f) === 'session');
+    const whole = accepted.filter((f) => pickRequestUpload(f) !== 'session');
     if (viaSession.length) {
       setTiles((list) => [...list, ...viaSession.map((file) => ({ id: `t${(tileSeq.current += 1)}`, file }))]);
     }

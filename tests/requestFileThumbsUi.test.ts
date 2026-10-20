@@ -255,9 +255,12 @@ test('a picture with no extension (a camera shot named by digits) is named from 
   const { accepted, refusal } = requestFilesCheck([shot], 'ar');
   assert.equal(refusal, '');
   assert.equal(accepted[0].name, '1697812345678.jpg', 'and it is sent with the name every door asks');
-  // Only a picture type is named; anything else without an extension is still refused.
+  // Only a picture type is named. Anything else without an extension goes on unnamed to the
+  // whole-body door, which proves a picture or binary model from its bytes or refuses it there
+  // (a HEIC shot gets its own HEIC answer): the browser cannot tell, so it does not refuse.
   assert.equal(namedForUpload(new File([new Uint8Array(4)], 'blob', { type: 'application/octet-stream' })).name, 'blob');
-  assert.match(requestFileCheck(new File([new Uint8Array(4)], 'blob', { type: 'image/heic' }), 'en'), /not accepted/);
+  assert.equal(requestFileCheck(new File([new Uint8Array(4)], 'blob', { type: 'image/heic' }), 'en'), '');
+  assert.match(requestFileCheck(new File([new Uint8Array(4)], 'blob', { type: 'image/heic' }), 'en', 6), /6|full|limit/i);
 });
 
 test('a listed extension whose bytes are something else reads as a mismatch, and HEIC as HEIC — never ".jpg files are not accepted"', () => {

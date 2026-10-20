@@ -40,7 +40,7 @@ import { useLanguage } from '../../../LanguageContext';
 import { ApiError } from '../../../lib/api';
 import { apiRefusal } from '../../../lib/refusalStrings';
 import { GOVERNORATES } from '../../../lib/governorates';
-import { pickUpload, resumeKey } from '../../../lib/uploadSession';
+import { pickRequestUpload, resumeKey } from '../../../lib/uploadSession';
 import { UploadTile } from '../../upload/UploadTile';
 import { uploadRequestFiles, formatBytes } from '../../media/RequestAttachments';
 import { REQUEST_FILE_LIMITS, requestFileAccept, requestFileKind } from '../../../../packages/contracts/src/requestFiles';
@@ -490,8 +490,8 @@ export default function RequestWizard({
       // waits for — the rest in one request each, as before.
       const leaving = pending;
       const chosen = leaving.map((p) => p.file);
-      const session = chosen.filter((f) => pickUpload(f) === 'session');
-      const simple = chosen.filter((f) => pickUpload(f) !== 'session');
+      const session = chosen.filter((f) => pickRequestUpload(f) === 'session');
+      const simple = chosen.filter((f) => pickRequestUpload(f) !== 'session');
       setPending([]);
       // The device previews go with the list: the stored pictures are drawn from the route from here on.
       releasePreviews(leaving);

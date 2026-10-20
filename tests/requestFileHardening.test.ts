@@ -621,3 +621,24 @@ test('R13: the link resolver reads a provider answer under a byte ceiling — a 
     new Response(JSON.stringify({ name: 'Benchy', images: [] }), { status: 200, headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch;
   assert.equal((await resolveModelLink('https://makerworld.com/models/123', providers, small)).resolved, true);
 });
+
+test('the browser lets a name with no extension through to the whole-body door, which proves it from its bytes', async () => {
+  const { pickRequestUpload, pickUpload } = await import('../src/lib/uploadSession');
+  // The table: no extension is not a refusal, only the picture ceiling is asked.
+  assert.equal(requestFileProblem({ name: '20261020_1234', size: 12 * MiB }), null);
+  assert.equal(requestFileProblem({ name: 'photo.', size: 3 * MiB }), null);
+  assert.deepEqual(requestFileProblem({ name: '20261020_1234', size: 26 * MiB }), {
+    code: 'UPLOAD_TOO_LARGE',
+    kind: 'image',
+    limit_bytes: REQUEST_FILE_LIMITS.maxBytes.image,
+  });
+  assert.ok(REQUEST_FILE_LIMITS.maxBytes.image <= REQUEST_FILE_LIMITS.wholeBodyMaxBytes, 'the ceiling fits the whole-body door');
+  // A named file keeps the strict rule.
+  assert.equal(requestFileProblem({ name: 'shot.exe', size: 1 * MiB })?.code, 'UPLOAD_KIND_NOT_ALLOWED');
+  // The door: an unnamed file is never sent to the session (which decides from the name), whatever its size.
+  assert.equal(pickRequestUpload({ name: '20261020_1234', size: 12 * MiB }), 'simple');
+  assert.equal(pickUpload({ name: '20261020_1234', size: 12 * MiB }), 'session', 'the shared picker is unchanged');
+  assert.equal(pickRequestUpload({ name: 'part.stl', size: 1 * MiB }), 'session');
+  assert.equal(pickRequestUpload({ name: 'shot.jpg', size: 12 * MiB }), 'session');
+  assert.equal(pickRequestUpload({ name: 'shot.jpg', size: 2 * MiB }), 'simple');
+});
