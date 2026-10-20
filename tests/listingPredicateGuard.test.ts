@@ -283,6 +283,9 @@ const NOT_CUSTOMER_CALLERS = new Set<string>([
   // The Bambu import's own D1 recompute before COMPLETE (import spec §I.1.10): one `statesOf` asks whether the
   // product it just wrote is visible and not sellable. A check the Worker runs for the import, not a customer read.
   'worker/lib/catalogImport/verifyD1.ts',
+  // The content pass's VERIFY (import spec §O.6): `shownToCustomers` asks whether the product it just wrote into
+  // is VISIBLE, so a held product completes instead of waiting for a public page. The import's check, not a read.
+  'worker/lib/catalogImport/complete.ts',
 ]);
 
 test('the count of each predicate family per file is the reviewed one (reclassify this site in docs and here)', () => {
