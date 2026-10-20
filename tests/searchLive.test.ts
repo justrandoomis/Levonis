@@ -552,6 +552,27 @@ test('through the route: rows 1–3 — a size is matched exactly, and a product
   assert.deepEqual((await routeIds(db, 'nozzle')).sort(), ['n_02', 'n_04', 'n_06', 'n_wiper'], 'without a size, every nozzle');
 });
 
+test('a size query asks the index-version read only about products it has not seen stamped: the second time, nothing', async () => {
+  const raw = await sizedShop();
+  const inner = new SqliteD1(raw);
+  const versionReads: string[] = [];
+  const db = {
+    prepare: (sql: string) => {
+      if (sql.includes('NOT EXISTS (SELECT 1 FROM search_tokens t WHERE t.token = ?1')) versionReads.push(sql);
+      return inner.prepare(sql);
+    },
+    batch: (s: unknown[]) => inner.batch(s as never),
+  } as unknown as D1Database;
+  assert.deepEqual(await routeIds(db, 'nozzle 0.4'), ['n_04']);
+  assert.equal(versionReads.length, 1, 'the 0.2 and 0.6 nozzles and the wiper lack the size: asked once');
+  assert.deepEqual(await routeIds(db, 'nozzle 0.4'), ['n_04']);
+  assert.equal(versionReads.length, 1, 'the same query again: every product it lacks is known stamped, no read');
+  assert.deepEqual(await routeIds(db, 'nozzle 0.6'), ['n_06']);
+  assert.equal(versionReads.length, 2, 'the 0.4 nozzle was never asked about: one read, for it alone');
+  assert.deepEqual(await routeIds(db, 'nozzle 0.2'), ['n_02']);
+  assert.equal(versionReads.length, 2, 'every nozzle is now known to carry the stamp: no further read');
+});
+
 test('a hidden product takes no ranking slot: the engine looks at three times the page and cuts after the visibility filter', async () => {
   const raw = freshDb();
   const db0 = asD1(raw);

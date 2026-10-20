@@ -540,6 +540,24 @@ export async function loadSynonyms(db: D1Database): Promise<Map<string, string>>
 export const SYNONYMS_TTL_MS = 30_000;
 const synonymsMemo = new WeakMap<object, { at: number; map: Promise<Map<string, string>> }>();
 
+/**
+ * Products this isolate has seen carry `INDEX_STAMP`, per database binding.
+ * The builder only ever writes the current stamp, so a product never leaves
+ * the set; a size query asks the index-version read only about the others,
+ * and once the catch-up is done it asks nothing. Bounded, because it is a
+ * memo, not the truth: past the cap the read simply runs.
+ */
+const STAMPED_MEMO_CAP = 20_000;
+const stampedMemo = new WeakMap<object, Set<string>>();
+function stampedProductsFor(db: D1Database): Set<string> {
+  let set = stampedMemo.get(db as object);
+  if (!set) {
+    set = new Set();
+    stampedMemo.set(db as object, set);
+  }
+  return set;
+}
+
 export function synonymsFor(db: D1Database, nowMs = Date.now()): Promise<Map<string, string>> {
   const hit = synonymsMemo.get(db);
   if (hit && nowMs - hit.at < SYNONYMS_TTL_MS) return hit.map;
@@ -744,19 +762,27 @@ export async function searchProducts(
    */
   let measureExempt: Set<string> | undefined;
   const lacking = productsLackingMeasures(scoring, matched, postings ?? []);
-  if (lacking.length > 0) {
+  const stamped = stampedProductsFor(db);
+  const unknown = lacking.filter((id) => !stamped.has(id));
+  if (unknown.length > 0) {
     measureExempt = await db
       .prepare(
         `SELECT l.value AS product_id FROM json_each(?2) l
           WHERE NOT EXISTS (SELECT 1 FROM search_tokens t WHERE t.token = ?1 AND t.product_id = l.value)`
       )
-      .bind(INDEX_STAMP, JSON.stringify(lacking))
+      .bind(INDEX_STAMP, JSON.stringify(unknown))
       .all<{ product_id: string }>()
-      .then(({ results }) => new Set((results ?? []).map((r) => String(r.product_id))))
+      .then(({ results }) => {
+        const stale = new Set((results ?? []).map((r) => String(r.product_id)));
+        if (stamped.size < STAMPED_MEMO_CAP) for (const id of unknown) if (!stale.has(id)) stamped.add(id);
+        return stale;
+      })
       .catch((e: unknown) => {
         console.warn('search: index-version read failed, a size stays required of every product:', e instanceof Error ? e.message : String(e));
         return undefined;
       });
+  } else if (lacking.length > 0) {
+    measureExempt = new Set();
   }
   const scored: ScoredProduct[] = scoreProducts(scoring, matched, postings ?? [], { measureExempt });
   let ids = scored.slice(0, limit).map((s) => s.product_id);
