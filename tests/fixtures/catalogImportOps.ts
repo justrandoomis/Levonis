@@ -63,9 +63,9 @@ export function installCdnDouble(world: Pick<OpsWorld, 'cdn'>, opts: { sameBytes
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     const host = new URL(url).hostname;
-    if (host !== 'store.bblcdn.com') {
+    if (host !== 'store.bblcdn.com' && host !== 'store.bblcdn.eu') {
       world.cdn.refused.push(host);
-      throw new Error('the fetcher double refuses every host but store.bblcdn.com');
+      throw new Error('the fetcher double refuses every host but the two CDN hosts of the allow-list');
     }
     world.cdn.served.push(url);
     // `bytesOf`: serve another URL's picture under this one (a re-upload of the same file under a new name).

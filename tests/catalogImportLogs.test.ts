@@ -289,8 +289,14 @@ test('the content pass\'s log lines (§O.6) carry counts, codes, the run id and 
     product_not_public: 2,
     identity_changed: 0,
     source_gone: 0,
+    not_an_image: 5,
+    host_not_allowed: 1,
   });
   log.info('delta_content_plan', { run: 'cir_0123456789abcdef01234567', content_failed_total: 358, content_items: 189 });
+  // The plan line names the two outcomes decided from the address (§O.6), counts only.
+  log.item(4, 'ams-2-pro', 'VALIDATING', 'content_plan', { failed: 6, requests: 0, not_an_image: 5, host_not_allowed: 'cdn.shopify.com' as never });
+  assert.match(lines[6], /, not an image 5, host not allowed \[\?\]; stored but never written /);
+  lines.splice(6, 1);
   assert.equal(lines[0], '[import] content pass: 3 of the pictures to put back failed with IMAGE_CONVERT_FAILED');
   assert.equal(lines[1], '[import] content pass: [?] of the pictures to put back failed with [?]');
   assert.match(lines[2], /the page reads source_gone;/);
@@ -298,7 +304,7 @@ test('the content pass\'s log lines (§O.6) carry counts, codes, the run id and 
   // Every outcome of the attach, so the plan's "fetched again" are accounted for whatever the fresh read found.
   assert.equal(
     lines[4],
-    '[import] #4 ams-2-pro WRITING: content pass: 3 put back (2 description, 1 in the box); already there 0, removed by the owner 0, edited 0, not written by the import 0, store page changed 0, not stored 0, no longer on the page 0, product not public 2, page no longer this product 0, store page gone 0'
+    '[import] #4 ams-2-pro WRITING: content pass: 3 put back (2 description, 1 in the box); already there 0, removed by the owner 0, edited 0, not written by the import 0, store page changed 0, not stored 0, no longer on the page 0, product not public 2, page no longer this product 0, store page gone 0, not an image 5, host not allowed 1'
   );
   assert.match(lines[5], /^\[import\] content pass from run cir_0123456789abcdef01234567: 358 description and in-the-box pictures failed in the closed run; 189 items/);
   // A delta item that completed on a product not verified public: no address at all.

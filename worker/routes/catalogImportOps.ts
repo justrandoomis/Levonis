@@ -13,7 +13,7 @@
  *   POST /items/:sid/lease              take or renew the item's lease (15 min)
  *   POST /items/:sid/event              a transition the runner performed (§B.5)
  *   POST /items/:sid/stage              preview: allow-list, reviewed scope, taxonomy, plan size
- *   POST /items/:sid/media              ≤ 4 media, store.bblcdn.com only, 45 s
+ *   POST /items/:sid/media              ≤ 4 media, store.bblcdn.com / .eu only, 45 s
  *   POST /items/:sid/write              ONE guarded batch (worker/lib/catalogImport/writer.ts)
  *   POST /items/:sid/publish-finish     republish if hidden on block; recompute; purge; VERIFYING_LIVE
  *   GET  /items/:sid/readback           the write's verifyApplied + live ownership checks (run here, against the plan the

@@ -231,7 +231,7 @@ test('the dev media stand-in: absent from every wrangler.jsonc block, and refuse
   assert.equal(standInFetcher({ CATALOG_IMPORT_MEDIA_ORIGIN: 'https://evil.example' }, 'http://127.0.0.1:8787/x'), undefined, 'a non-loopback origin: never');
   assert.equal(standInFetcher({ CATALOG_IMPORT_MEDIA_ORIGIN: 'http://127.0.0.1:8899/path' }, 'http://127.0.0.1:8787/x'), undefined, 'an origin with a path: never');
   assert.equal(typeof standInFetcher(env, 'http://127.0.0.1:8787/api/ops/catalog-import/items/1/media'), 'function', 'wrangler dev --local only');
-  // The allow-list itself is store.bblcdn.com over https, whatever fetcher is behind it.
+  // The allow-list itself is the CDN's hosts over https, whatever fetcher is behind it.
   assert.equal(mediaUrlAllowed('https://store.bblcdn.com/s1/x.png'), true);
   for (const bad of ['http://store.bblcdn.com/x.png', 'https://store-dev.bblcdn.com/x.png', 'https://evil.example/x.png', 'https://u:p@store.bblcdn.com/x.png', 'https://store.bblcdn.com.evil.example/x.png']) {
     assert.equal(mediaUrlAllowed(bad), false, bad);
@@ -390,6 +390,146 @@ test('review 6b: media over https on the default port on EVERY hop — a redirec
     assert.deepEqual(asked, ['https://store.bblcdn.com/s1/a.png']);
   } finally {
     globalThis.fetch = real;
+  }
+});
+
+// ---------------------------------------------------------------- the allow-list's two hosts, and what is not a picture (§C.4)
+
+/** The global fetch, as the guard sees it: a redirect where `redirects` names one, else a PNG; every URL asked recorded. */
+async function withStoreFetch<T>(redirects: Record<string, string>, body: (asked: string[]) => Promise<T>): Promise<T> {
+  const { pngBytes } = await import('./fixtures/imageDoubles');
+  const real = globalThis.fetch;
+  const asked: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    asked.push(url);
+    const location = redirects[url];
+    if (location) return new Response(null, { status: 302, headers: { location } });
+    return new Response(pngBytes(320, 240) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'image/png' } });
+  }) as typeof fetch;
+  try {
+    return await body(asked);
+  } finally {
+    globalThis.fetch = real;
+  }
+}
+
+test('media allow-list: exactly store.bblcdn.com and store.bblcdn.eu, https on the default port; nothing near them', async () => {
+  const { MEDIA_HOSTS, mediaHostAllowed, mediaUrlAllowed } = await import('../worker/lib/catalogImport/media');
+  assert.deepEqual([...MEDIA_HOSTS].sort(), ['store.bblcdn.com', 'store.bblcdn.eu'], 'the two exact hosts: any widening fails here');
+  for (const ok of ['https://store.bblcdn.eu/s8/default/0a1b/feature.png', 'https://store.bblcdn.eu:443/s8/feature.png', 'https://STORE.BBLCDN.EU/s8/feature.png', 'https://store.bblcdn.com/s7/a.jpg']) {
+    assert.equal(mediaUrlAllowed(ok), true, ok);
+  }
+  for (const bad of [
+    'http://store.bblcdn.eu/s8/feature.png',
+    'https://store.bblcdn.eu:8443/s8/feature.png',
+    'https://u:p@store.bblcdn.eu/s8/feature.png',
+    'https://store.bblcdn.eu.evil.example/s8/feature.png',
+    'https://x.store.bblcdn.eu/s8/feature.png',
+    'https://bblcdn.eu/s8/feature.png',
+    'https://store.bblcdn.eu./s8/feature.png',
+    'https://store-dev.bblcdn.eu/s8/feature.png',
+    'https://cdn.shopify.com/s/files/1/0584/7236/6216/files/feature.png?v=1',
+    'not a url',
+  ]) {
+    assert.equal(mediaUrlAllowed(bad), false, bad);
+  }
+  for (const host of ['bblcdn.eu', 'x.store.bblcdn.eu', 'store.bblcdn.eu.evil.example', 'cdn.shopify.com', 'store.bblcdn.net', '']) assert.equal(mediaHostAllowed(host), false, host);
+});
+
+test('media allow-list on EVERY hop, through the route (the real allowHost and allowUrl): .com → .eu is followed; .eu → another host, http:// or another port is refused and never asked', async () => {
+  const w = opsWorld();
+  const { sid, t } = await toIngesting(w);
+  const call = async (media: Array<{ source_media_id: string; source_url: string }>) => {
+    const r = await w.call(`${OPS}/items/${sid}/media`, { body: { lease_token: t, media: media.map((m) => ({ ...m, role: 'description' })) } });
+    assert.equal(r.status, 200);
+    return ((await r.json()) as { media: Array<{ status: string; error_code: string }> }).media.map((m) => `${m.status}:${m.error_code}`);
+  };
+  await withStoreFetch(
+    {
+      'https://store.bblcdn.com/s7/moved.png': 'https://store.bblcdn.eu/s8/moved.png',
+      'https://store.bblcdn.eu/s8/to-shop.png': 'https://cdn.shopify.com/s/files/1/0584/7236/6216/files/to-shop.png',
+      'https://store.bblcdn.eu/s8/to-http.png': 'http://store.bblcdn.eu/s8/to-http.png',
+      'https://store.bblcdn.eu/s8/to-port.png': 'https://store.bblcdn.eu:8443/s8/to-port.png',
+    },
+    async (asked) => {
+      assert.deepEqual(await call([{ source_media_id: 'h1', source_url: 'https://store.bblcdn.com/s7/moved.png' }, { source_media_id: 'h2', source_url: 'https://store.bblcdn.eu/s8/plain.png' }]), ['stored:', 'stored:']);
+      assert.deepEqual(asked, ['https://store.bblcdn.com/s7/moved.png', 'https://store.bblcdn.eu/s8/moved.png', 'https://store.bblcdn.eu/s8/plain.png']);
+      asked.length = 0;
+      assert.deepEqual(
+        await call([
+          { source_media_id: 'h3', source_url: 'https://store.bblcdn.eu/s8/to-shop.png' },
+          { source_media_id: 'h4', source_url: 'https://store.bblcdn.eu/s8/to-http.png' },
+          { source_media_id: 'h5', source_url: 'https://store.bblcdn.eu/s8/to-port.png' },
+        ]),
+        ['failed:MEDIA_HOST_NOT_ALLOWED', 'failed:MEDIA_HOST_NOT_ALLOWED', 'failed:MEDIA_HOST_NOT_ALLOWED']
+      );
+      assert.deepEqual(asked, ['https://store.bblcdn.eu/s8/to-shop.png', 'https://store.bblcdn.eu/s8/to-http.png', 'https://store.bblcdn.eu/s8/to-port.png'], 'only the first hop of each');
+    }
+  );
+});
+
+test('nonImageKindOf: a video or vector file by the PATH of its address only', async () => {
+  const { nonImageKindOf } = await import('../worker/lib/catalogImport/media');
+  const table: Array<[string, string | null]> = [
+    ['https://store.bblcdn.com/s7/a/tvc.mp4', 'video_file'],
+    ['https://store.bblcdn.com/s7/a/TVC.MP4', 'video_file'],
+    ['https://store.bblcdn.eu/s8/a/clip.webm?v=2', 'video_file'],
+    ['https://store.bblcdn.com/s7/a/clip.mov', 'video_file'],
+    ['https://store.bblcdn.com/s7/a/clip.m4v', 'video_file'],
+    ['https://store.bblcdn.com/s7/a/clip.ogv', 'video_file'],
+    ['https://store.bblcdn.com/s7/a/live.m3u8', 'video_file'],
+    ['https://store.bblcdn.com/s7/a/3d.svg', 'vector_file'],
+    ['https://store.bblcdn.com/s7/a/2D.SVGZ', 'vector_file'],
+    ['https://cdn.shopify.com/s/files/1/x/3d.svg?v=17', 'vector_file'],
+    ['https://store.bblcdn.com/s7/a/x.mp4.png', null],
+    ['https://store.bblcdn.com/svg/x.png', null],
+    ['https://store.bblcdn.com/s7/mp4', null],
+    ['https://store.bblcdn.com/s7/x.png?f=.mp4', null],
+    ['https://store.bblcdn.com/s7/x.png#a.svg', null],
+    ['https://store.bblcdn.com/s7/x.gif', null],
+    ['https://store.bblcdn.com/s7/x.jpg', null],
+    ['not a url', null],
+  ];
+  for (const [url, kind] of table) assert.equal(nonImageKindOf(url), kind, url);
+});
+
+test('media: a video or vector address is MEDIA_NOT_AN_IMAGE before any request, on any host, with no try counted; an .eu picture is fetched and stored', async () => {
+  const { eventCode } = await import('../worker/lib/catalogImport/auth');
+  assert.equal(eventCode('MEDIA_NOT_AN_IMAGE'), 'MEDIA_NOT_AN_IMAGE', 'a code the events know');
+  const w = opsWorld();
+  const { sid, t } = await toIngesting(w);
+  const { installCdnDouble, restoreFetch } = await import('./fixtures/catalogImportOps');
+  installCdnDouble(w);
+  try {
+    const media = [
+      { source_media_id: 'v1', role: 'description', source_url: 'https://store.bblcdn.com/s7/a/tvc.mp4' },
+      { source_media_id: 'v2', role: 'description', source_url: 'https://store.bblcdn.eu/s8/a/3d.svg' },
+      { source_media_id: 'v3', role: 'in_the_box', source_url: 'https://cdn.shopify.com/s/files/1/x/2d.svg?v=3' },
+      { source_media_id: 'v4', role: 'description', source_url: 'https://cdn.shopify.com/s/files/1/x/feature.png?v=3' },
+    ];
+    for (const round of [1, 2]) {
+      const r = await w.call(`${OPS}/items/${sid}/media`, { body: { lease_token: t, media } });
+      assert.equal(r.status, 200);
+      const answers = ((await r.json()) as { media: Array<{ status: string; error_code: string }> }).media;
+      assert.deepEqual(answers.map((m) => `${m.status}:${m.error_code}`), ['failed:MEDIA_NOT_AN_IMAGE', 'failed:MEDIA_NOT_AN_IMAGE', 'failed:MEDIA_NOT_AN_IMAGE', 'failed:MEDIA_HOST_NOT_ALLOWED'], `round ${round}`);
+    }
+    assert.deepEqual(w.cdn.served, [], 'nothing requested');
+    assert.deepEqual(w.cdn.refused, [], 'not even asked of the double');
+    const rows = w.raw.prepare("SELECT source_media_id, status, error_code, attempts FROM catalog_import_media WHERE source_media_id LIKE 'v%' ORDER BY source_media_id").all() as Array<Record<string, unknown>>;
+    assert.deepEqual(rows.map((x) => ({ ...x })), [
+      { source_media_id: 'v1', status: 'failed', error_code: 'MEDIA_NOT_AN_IMAGE', attempts: 0 },
+      { source_media_id: 'v2', status: 'failed', error_code: 'MEDIA_NOT_AN_IMAGE', attempts: 0 },
+      { source_media_id: 'v3', status: 'failed', error_code: 'MEDIA_NOT_AN_IMAGE', attempts: 0 },
+      { source_media_id: 'v4', status: 'failed', error_code: 'MEDIA_HOST_NOT_ALLOWED', attempts: 0 },
+    ]);
+    // The second host is served like the first: fetched once, stored, one try.
+    const r = await w.call(`${OPS}/items/${sid}/media`, { body: { lease_token: t, media: [{ source_media_id: 'e1', role: 'description', source_url: 'https://store.bblcdn.eu/s8/default/0a1b/feature.png' }] } });
+    assert.deepEqual(((await r.json()) as { media: Array<{ status: string }> }).media.map((m) => m.status), ['stored']);
+    assert.deepEqual(w.cdn.served, ['https://store.bblcdn.eu/s8/default/0a1b/feature.png']);
+    assert.equal(Number((w.raw.prepare("SELECT attempts FROM catalog_import_media WHERE source_media_id = 'e1'").get() as { attempts: number }).attempts), 1);
+  } finally {
+    restoreFetch();
   }
 });
 

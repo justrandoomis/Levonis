@@ -2092,6 +2092,8 @@ export class Importer {
       product_not_public: k.product_not_public ?? 0,
       identity_changed: k.identity_changed ?? 0,
       source_gone: k.source_gone ?? 0,
+      not_an_image: k.not_an_image ?? 0,
+      host_not_allowed: k.host_not_allowed ?? 0,
       stored_not_written: a.stored_not_written,
     });
   }
@@ -2123,6 +2125,8 @@ export class Importer {
       product_not_public: c.product_not_public ?? 0,
       identity_changed: c.identity_changed ?? 0,
       source_gone: c.source_gone ?? 0,
+      not_an_image: c.not_an_image ?? 0,
+      host_not_allowed: c.host_not_allowed ?? 0,
     });
   }
 

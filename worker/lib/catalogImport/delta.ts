@@ -316,6 +316,10 @@ export const CONTENT_OUTCOMES = [
   'identity_changed',
   /** The store page is gone (moot): nothing written, a later pass takes it again. */
   'source_gone',
+  /** Its address names a video or a vector file (media.ts nonImageKindOf; reason `video_file` / `vector_file`): never requested. */
+  'not_an_image',
+  /** Its address is off the media allow-list (media.ts mediaUrlAllowed; reason: the host): never requested. */
+  'host_not_allowed',
 ] as const;
 export type ContentOutcome = (typeof CONTENT_OUTCOMES)[number];
 
@@ -325,8 +329,10 @@ export const CONTENT_PASSING: ReadonlySet<string> = new Set(['not_stored', 'prod
 export const CONTENT_FINAL: ReadonlySet<string> = new Set(['attached', 'already_present', 'owner_removed']);
 /**
  * The rule by which the content pass proves a field "as the import wrote it" (recorded in every checkpoint). A
- * non-writing terminal outcome (owner_edited, not_imported, source_changed, not_on_page) recorded under an OLDER rule
- * settles nothing: a corrected proof may take it again. CONTENT_FINAL outcomes are settled whatever the rule.
+ * non-writing terminal outcome (owner_edited, not_imported, source_changed, not_on_page, not_an_image,
+ * host_not_allowed) recorded under an OLDER rule settles nothing: a corrected proof may take it again. CONTENT_FINAL
+ * outcomes are settled whatever the rule. A change to the media allow-list (media.ts MEDIA_HOSTS) or to what
+ * nonImageKindOf reads as not a picture bumps this rule, so the media it settled are taken again under the new one.
  */
 export const CONTENT_RULE = 1;
 

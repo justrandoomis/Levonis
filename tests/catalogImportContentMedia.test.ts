@@ -25,7 +25,9 @@ import { pageOf } from './fixtures/bambu/load';
 import type { ImportPayload, PayloadBoxItem } from '../packages/catalog/src/bambuImport/payload';
 import { OpsRefusal, type ImportRun } from '../worker/lib/catalogImport/auth';
 import { applyEvent, finishPublishing, itemBySource, type ItemRow } from '../worker/lib/catalogImport/items';
-import { acceptDeltaRows, contentSettledIds, CONTENT_RULE } from '../worker/lib/catalogImport/delta';
+import { acceptDeltaRows, contentSettledIds, CONTENT_FINAL, CONTENT_OUTCOMES, CONTENT_PASSING, CONTENT_RULE } from '../worker/lib/catalogImport/delta';
+import { H } from '../packages/catalog/src/bambuImport/hash';
+import { stripQuery } from '../packages/catalog/src/bambuImport/normalize';
 import {
   attachContentMedia,
   bestOutcome,
@@ -759,6 +761,175 @@ test('a product the completeness switch holds (active, but 404 on both public an
     assert.equal(done.state, 'COMPLETE', JSON.stringify(done.d1_checks));
     assert.equal((done.d1_checks.content_media as Record<string, unknown>).product_shown, false);
   }
+});
+
+// ---------------------------------------------------------------- not a picture, or not fetchable: decided from the address
+
+const pathOf = (url: string) => new URL(url).pathname;
+const isVideo = (url: string) => /\.mp4$/i.test(pathOf(url));
+const contentIdOf = (url: string) => `content:${H(stripQuery(url))}`;
+
+/** The h2d page's five description MP4s (in its 40 picture blocks) and one JPEG picture, failed in run A. */
+const PICK_H2D = (p: ImportPayload): Failed[] => {
+  const images = imageBlocksOf(p);
+  const jpg = images.find((b) => /\.jpe?g$/i.test(pathOf(b.source_url)))!;
+  return [...images.filter((b) => isVideo(b.source_url)), jpg].map((b) => ({ id: b.source_media_id, role: 'description' as const, url: b.source_url }));
+};
+
+test('the h2d page: its five description MP4s are not_an_image (video_file) and never requested; the picture failed beside them is put back; the checkpoint settles all six', async () => {
+  const { w, sid, failed, payload } = await closedRun('h2d', PICK_H2D);
+  // The extractor is unchanged: the MP4s keep their block ids and places (the text split at 60 included) under the 40 cap.
+  assert.equal(imageBlocksOf(payload).length, 40);
+  assert.deepEqual(payload.content_blocks.flatMap((b, i) => (b.kind === 'image' && isVideo(b.source_url) ? [i] : [])), [22, 23, 44, 45, 60]);
+  assert.equal(failed.length, 6);
+  const videos = failed.slice(0, 5).map((f) => f.id);
+  const jpg = failed[5].id;
+  const { plan, a } = await pass(w, RUN_B, sid, payload);
+  assert.deepEqual(plan.media.map((m) => m.source_media_id), [jpg], 'only the picture is fetched');
+  assert.deepEqual([plan.failed, plan.skipped.not_an_image, plan.skipped.host_not_allowed], [6, 5, 0]);
+  assert.deepEqual([a.counts.attached, a.counts.not_an_image, a.counts.not_stored, a.counts.blocks], [1, 5, 0, 1]);
+  const cp = checkpointOf(w, RUN_B, sid);
+  for (const id of videos) assert.deepEqual([cp.media[id], cp.reasons[id]], ['not_an_image', 'video_file']);
+  assert.equal(cp.media[jpg], 'attached');
+  assert.deepEqual([...contentSettledIds({ content_media: cp })].sort(), failed.map((f) => f.id).sort(), 'all six settled');
+  // A later content delta queues nothing for this product.
+  w.raw.prepare("UPDATE catalog_import_runs SET state = 'closed' WHERE id = ?").run(RUN_B);
+  w.raw.prepare("INSERT INTO catalog_import_runs (id, source, state) VALUES (?, 'bambu_us', 'open')").run(RUN_C);
+  const r = await acceptDeltaRows(w.db, runOf(RUN_C), w.bundle, { from_run: RUN_ID, rows: [{ kind: 'content', source_product_id: sid, discovered_at: AT }] });
+  assert.deepEqual([r.content, r.skipped.content_already_settled], [0, 1]);
+});
+
+test('a video an earlier pass left not_stored (fetched and refused before this rule knew videos) is taken again, settles as not_an_image, and nothing is requested', async () => {
+  const { w, sid, productId, failed, payload } = await closedRun('h2d', PICK_H2D);
+  const videos = failed.slice(0, 5).map((f) => f.id);
+  await pass(w, RUN_B, sid, payload);
+  // What the canary item recorded: the five videos fetched, refused (IMAGE_NOT_SUPPORTED), not_stored.
+  const sd = JSON.parse((w.raw.prepare('SELECT stage_data FROM catalog_import_items WHERE run_id = ? AND source_product_id = ?').get(RUN_B, sid) as { stage_data: string }).stage_data);
+  for (const id of videos) {
+    sd.content_media.media[id] = 'not_stored';
+    delete sd.content_media.reasons[id];
+  }
+  w.raw.prepare('UPDATE catalog_import_items SET stage_data = ? WHERE run_id = ? AND source_product_id = ?').run(JSON.stringify(sd), RUN_B, sid);
+  w.raw.prepare("UPDATE catalog_import_runs SET state = 'closed' WHERE id = ?").run(RUN_B);
+  const t1 = productRow(w, productId).content_blocks;
+  const { plan, a } = await pass(w, RUN_C, sid, payload);
+  assert.deepEqual([plan.failed, plan.media.length, a.counts.not_an_image, a.counts.attached], [5, 0, 5, 0]);
+  assert.equal(productRow(w, productId).content_blocks, t1, 'nothing written');
+  assert.deepEqual([...contentSettledIds({ content_media: checkpointOf(w, RUN_C, sid) })].sort(), [...videos].sort());
+});
+
+/** AMS 2 Pro description pictures moved to a vector file, a Shopify-hosted picture, a store.bblcdn.eu picture (each id the builder's for its URL). */
+const ODD = {
+  svg: 'https://store.bblcdn.com/s7/default/0a1b2c3d/3d.svg',
+  shop: 'https://cdn.shopify.com/s/files/1/0584/7236/6216/files/feature.png?v=17',
+  eu: 'https://store.bblcdn.eu/s8/default/0a1b2c3d/feature.png',
+  shopKept: 'https://cdn.shopify.com/s/files/1/0584/7236/6216/files/kept.png?v=3',
+  boxShop: 'https://cdn.shopify.com/s/files/1/0645/5876/0155/files/box.png',
+};
+const ODD_AT: ReadonlyArray<[number, string]> = [
+  [1, ODD.svg],
+  [4, ODD.shop],
+  [6, ODD.eu],
+  [8, ODD.shopKept],
+];
+const oddAms = (p: ImportPayload) => {
+  const images = imageBlocksOf(p);
+  for (const [i, url] of ODD_AT) {
+    images[i].source_url = url;
+    images[i].source_media_id = contentIdOf(url);
+  }
+  const box = boxItemsOf(p)[0];
+  box.source_url = ODD.boxShop;
+  box.source_media_id = `box:${H(stripQuery(ODD.boxShop))}`;
+};
+/** The vector, Shopify and .eu pictures and the Shopify box picture failed in run A; the second Shopify picture was stored. */
+const PICK_ODD = (p: ImportPayload): Failed[] => {
+  const images = imageBlocksOf(p);
+  const box = boxItemsOf(p)[0];
+  return [
+    ...[1, 4, 6].map((i) => ({ id: images[i].source_media_id, role: 'description' as const, url: images[i].source_url })),
+    { id: box.source_media_id, role: 'in_the_box', url: box.source_url },
+  ];
+};
+
+test('a vector file is not_an_image (vector_file), a Shopify-hosted picture host_not_allowed (description and in the box), neither requested; a store.bblcdn.eu picture is planned and put back', async () => {
+  const { w, sid, failed, payload } = await closedRun(AMS(), PICK_ODD, { mutate: oddAms });
+  const [svg, shop, eu, box] = failed.map((f) => f.id);
+  assert.deepEqual(failed.map((f) => f.url), [ODD.svg, ODD.shop, ODD.eu, ODD.boxShop]);
+  const { plan, a } = await pass(w, RUN_B, sid, payload);
+  assert.deepEqual(plan.media.map((m) => [m.source_media_id, m.source_url]), [[eu, ODD.eu]], 'only the .eu picture is fetched');
+  assert.deepEqual([plan.skipped.not_an_image, plan.skipped.host_not_allowed], [1, 2]);
+  assert.deepEqual([a.counts.attached, a.counts.not_an_image, a.counts.host_not_allowed, a.counts.blocks, a.counts.box], [1, 1, 2, 1, 0]);
+  const cp = checkpointOf(w, RUN_B, sid);
+  assert.deepEqual(
+    [svg, shop, eu, box].map((id) => [cp.media[id], cp.reasons[id] ?? '']),
+    [
+      ['not_an_image', 'vector_file'],
+      ['host_not_allowed', 'cdn.shopify.com'],
+      ['attached', ''],
+      ['host_not_allowed', 'cdn.shopify.com'],
+    ]
+  );
+  assert.deepEqual([...contentSettledIds({ content_media: cp })].sort(), [svg, shop, eu, box].sort(), 'settled under this rule');
+});
+
+test('the address decides before the field\'s proof: on an edited field the vector file is still not_an_image; a host-refused picture the field already holds stays already_present', async () => {
+  const { w, sid, productId, failed, payload } = await closedRun(AMS(), PICK_ODD, { mutate: oddAms });
+  const [svg, shop, eu, box] = failed.map((f) => f.id);
+  const kept = contentIdOf(ODD.shopKept);
+  {
+    const item = await contentItem(w, RUN_B, sid);
+    const ctx = await contentContext(w.db, item);
+    const p = planContent(ctx.state, payload, [...ctx.failed, { source_media_id: kept, role: 'description' }], true);
+    assert.equal(p.outcomes.get(kept), 'already_present', 'what the field holds is never re-decided by its address');
+    assert.equal(p.outcomes.get(eu), 'planned');
+  }
+  // The owner edits the Arabic of a text block: the description is not provable any more.
+  const row = productRow(w, productId);
+  const blocks = JSON.parse(row.content_blocks) as Array<Record<string, unknown>>;
+  blocks[firstTextBlock(row.content_blocks)].body_ar = 'نص عدله المالك';
+  w.raw.prepare('UPDATE products SET content_blocks = ? WHERE id = ?').run(JSON.stringify(blocks), productId);
+  const ctx = await contentContext(w.db, await itemBySource(w.db, RUN_B, sid));
+  const p = planContent(ctx.state, payload, ctx.failed, true);
+  assert.deepEqual(
+    [svg, shop, eu, box].map((id) => [p.outcomes.get(id), p.reasons.get(id) ?? '']),
+    [
+      ['not_an_image', 'vector_file'],
+      ['host_not_allowed', 'cdn.shopify.com'],
+      ['owner_edited', 'lang'],
+      ['host_not_allowed', 'cdn.shopify.com'],
+    ]
+  );
+  assert.deepEqual(p.requests, []);
+});
+
+test('a planned picture /media answered failed is not_stored with its media code as the reason (diagnosis only): still passing', async () => {
+  const { w, sid, failed, payload } = await closedRun(AMS(), PICK_AMS);
+  const gif = failed[0].id;
+  const { a } = await pass(w, RUN_B, sid, payload, {
+    skip: (id) => {
+      if (id !== gif) return false;
+      w.raw
+        .prepare("INSERT INTO catalog_import_media (run_id, source_product_id, source_media_id, role, source_url, status, error_code, attempts) VALUES (?, ?, ?, 'description', ?, 'failed', 'IMAGE_ANIMATED_GIF', 1)")
+        .run(RUN_B, sid, gif, failed[0].url);
+      return true;
+    },
+  });
+  assert.deepEqual([a.counts.attached, a.counts.not_stored], [2, 1]);
+  const cp = checkpointOf(w, RUN_B, sid);
+  assert.deepEqual([cp.media[gif], cp.reasons[gif]], ['not_stored', 'IMAGE_ANIMATED_GIF']);
+  assert.ok(!contentSettledIds({ content_media: cp }).has(gif), 'a later pass takes it again');
+});
+
+test('the two outcomes decided from the address: appended after every existing key, settled under the rule they were recorded with, taken again under a later rule', () => {
+  assert.deepEqual(CONTENT_OUTCOMES.slice(0, 11), [
+    'attached', 'already_present', 'owner_removed', 'owner_edited', 'not_imported', 'source_changed', 'not_on_page', 'not_stored', 'product_not_public', 'identity_changed', 'source_gone',
+  ], 'the report keys keep their order');
+  assert.deepEqual(CONTENT_OUTCOMES.slice(11), ['not_an_image', 'host_not_allowed']);
+  for (const o of ['not_an_image', 'host_not_allowed']) assert.ok(!CONTENT_PASSING.has(o) && !CONTENT_FINAL.has(o), o);
+  const media = { v: 'not_an_image', h: 'host_not_allowed', s: 'not_stored', a: 'attached' };
+  assert.deepEqual([...contentSettledIds({ content_media: { rule: CONTENT_RULE, media } })].sort(), ['a', 'h', 'v']);
+  assert.deepEqual([...contentSettledIds({ content_media: { rule: CONTENT_RULE, media } }, CONTENT_RULE + 1)].sort(), ['a'], 'an allow-list change (a new rule) takes them again');
 });
 
 // ---------------------------------------------------------------- the door

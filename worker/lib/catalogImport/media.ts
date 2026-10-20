@@ -4,10 +4,14 @@
  *
  *   - At most 4 media a call, inside a 45 s wall budget: what does not fit is
  *     answered `pending` and the runner sends it again.
- *   - store.bblcdn.com over https on its default port ONLY, on every hop
+ *   - store.bblcdn.com and store.bblcdn.eu (the brand's two CDN hosts, exact
+ *     names, §C.4) over https on their default port ONLY, on every hop
  *     (`allowHost` and `allowUrl`, through worker/lib/fetchGuard.ts): any other
  *     host, a redirect to http:// or to another port is `failed` /
  *     MEDIA_HOST_NOT_ALLOWED and nothing is requested from it.
+ *   - A medium whose address names a video or a vector file (nonImageKindOf) is
+ *     `failed` / MEDIA_NOT_AN_IMAGE before anything else: never requested, no
+ *     attempt counted (§C.4 step 0). The app stores raster pictures only.
  *   - An original over the source cap (IMAGE_SOURCE_TOO_LARGE), or one the
  *     converter refuses (IMAGE_CONVERT_FAILED: the IMAGES binding's area or
  *     dimension refusal of a "huge PNG" under the cap lands there, §R-4), is asked
@@ -29,7 +33,7 @@
  *     `failed` at once. The answer names codes, never a URL or a message.
  *
  * THE DEV STAND-IN (`CATALOG_IMPORT_MEDIA_ORIGIN`, the local dry run only). The
- * URL that is validated and allow-listed stays the store.bblcdn.com address;
+ * URL that is validated and allow-listed stays the CDN address;
  * only the fetcher behind the guard is swapped for one that asks the loopback
  * origin for the same path — and only when BOTH the request this Worker
  * received is addressed to a loopback host AND the origin is a loopback http
@@ -43,7 +47,12 @@ import { isSafeMediaKey, mediaBucket } from '../mediaStorage';
 import { NOW_SQL, OpsRefusal, type ImportRun } from './auth';
 import type { ItemRow } from './items';
 
-export const MEDIA_HOST = 'store.bblcdn.com';
+/**
+ * The allow-list, exact host names only (no wildcard, no suffix match): the brand's own CDN under its two names. Any
+ * change here is reviewed with its ownership evidence (§C.4) and bumps the content pass's CONTENT_RULE (delta.ts).
+ */
+export const MEDIA_HOSTS: ReadonlySet<string> = new Set(['store.bblcdn.com', 'store.bblcdn.eu']);
+export const mediaHostAllowed = (host: string): boolean => MEDIA_HOSTS.has(host);
 export const MEDIA_PER_CALL = 4;
 export const MEDIA_WALL_MS = 45_000;
 /** A medium fetched no later than this before the wall budget ends; after it, `pending`. */
@@ -90,14 +99,37 @@ export function mediaRequestsOf(raw: unknown): MediaRequest[] {
 /** One hop's address: https on the default port, no credentials (the host is allowHost's). */
 const hopAllowed = (u: URL): boolean => u.protocol === 'https:' && u.port === '' && !u.username && !u.password;
 
-/** The allow-list: store.bblcdn.com over https on its default port, nothing else (a stand-in only ever swaps the fetcher). */
+/** The allow-list: MEDIA_HOSTS over https on the default port, nothing else (a stand-in only ever swaps the fetcher). */
 export function mediaUrlAllowed(url: string): boolean {
   try {
     const u = new URL(url);
-    return hopAllowed(u) && u.hostname === MEDIA_HOST;
+    return hopAllowed(u) && mediaHostAllowed(u.hostname);
   } catch {
     return false;
   }
+}
+
+/** What a medium's address names when it is not a raster picture (§C.4 step 0): decided from the path alone. */
+export type NonImageKind = 'video_file' | 'vector_file';
+const VIDEO_PATH = /\.(mp4|m4v|mov|webm|ogv|m3u8)$/i;
+const VECTOR_PATH = /\.svgz?$/i;
+
+/**
+ * Pure: `video_file` or `vector_file` when the address's PATH ends in a video or vector extension (the query is not
+ * read), else null — an address that does not parse included (the host check refuses it). Such a medium is never
+ * requested: the app stores raster pictures only (productMediaIngest refuses markup on purpose), and a description video
+ * has no embed the block model can carry.
+ */
+export function nonImageKindOf(url: string): NonImageKind | null {
+  let path: string;
+  try {
+    path = new URL(url).pathname;
+  } catch {
+    return null;
+  }
+  if (VIDEO_PATH.test(path)) return 'video_file';
+  if (VECTOR_PATH.test(path)) return 'vector_file';
+  return null;
 }
 
 export type FetchedVariant = 'original' | 'cdn_resized';
@@ -260,6 +292,14 @@ export async function ingestImportMedia(env: MediaEnv, requestUrl: string, run: 
       out.push({ source_media_id: m.source_media_id, status: 'failed', r2_key: '', width: null, height: null, error_code: 'MEDIA_NOT_STORED' });
       continue;
     }
+    // Decided from the address, before any request and without counting a try: a video or vector file is not a
+    // picture (§C.4 step 0), a host off the list is never asked.
+    if (nonImageKindOf(m.source_url)) {
+      const a: MediaAnswer = { source_media_id: m.source_media_id, status: 'failed', r2_key: '', width: null, height: null, error_code: 'MEDIA_NOT_AN_IMAGE' };
+      await record(m, a, { tried: false });
+      out.push(a);
+      continue;
+    }
     if (!mediaUrlAllowed(m.source_url)) {
       const a: MediaAnswer = { source_media_id: m.source_media_id, status: 'failed', r2_key: '', width: null, height: null, error_code: 'MEDIA_HOST_NOT_ALLOWED' };
       await record(m, a, { tried: false });
@@ -275,7 +315,7 @@ export async function ingestImportMedia(env: MediaEnv, requestUrl: string, run: 
       const budget = MEDIA_WALL_MS - (Date.now() - started) - MEDIA_MARGIN_MS;
       if (budget < 1_000) throw new GuardedFetchError('FETCH_TIMEOUT', 'The wall budget of this call is spent');
       return ingestProductMediaUrl(env, url, {
-        allowHost: (host) => host === MEDIA_HOST,
+        allowHost: mediaHostAllowed,
         // https on the default port, on EVERY hop: a redirect to http:// (or to another port) is refused, never fetched.
         allowUrl: hopAllowed,
         fetcher,

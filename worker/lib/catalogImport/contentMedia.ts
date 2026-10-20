@@ -69,7 +69,7 @@ import {
   type DeltaMark,
 } from './delta';
 import { stageDataOf, type ItemRow } from './items';
-import { importObjectHead } from './media';
+import { importObjectHead, mediaUrlAllowed, nonImageKindOf } from './media';
 import { IMPORT_GUARD_ID } from './protectedTables';
 import { payloadSha256, taxonomyOfRow, type ReviewedBundle } from './reviewed';
 import {
@@ -517,6 +517,16 @@ export function proveBox(state: ContentState, payload: ImportPayload): BoxProof[
 
 // ---------------------------------------------------------------- the plan (pure)
 
+/** A `host_not_allowed` reason: the address's host (with a port that is not the default), its scheme when not https. */
+const hostReasonOf = (url: string): string => {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' ? u.host : `${u.protocol}//${u.host}`;
+  } catch {
+    return 'invalid_url';
+  }
+};
+
 export interface ContentRequest {
   source_media_id: string;
   role: 'description' | 'in_the_box';
@@ -546,7 +556,9 @@ export interface ContentPlan {
  * gets nothing (`product_not_public`); every other failed medium is placed by the payload — a description
  * picture at its image block, an in-the-box picture at every item showing it — and planned only where its field is
  * provable; what the field already holds is `already_present`, what an earlier pass put there and the field no longer
- * holds is `owner_removed` (never put back).
+ * holds is `owner_removed` (never put back). Then, from its address alone and before the field's proof, a video or
+ * vector file is `not_an_image` (reason `video_file` / `vector_file`) and an address off the media allow-list is
+ * `host_not_allowed` (reason: its host): neither is requested, as /media would refuse both without asking.
  */
 export function planContent(state: ContentState | null, payload: ImportPayload, failed: readonly FailedContentMedium[], active: boolean): ContentPlan {
   const outcomes = new Map<string, ContentOutcome | 'planned'>();
@@ -563,6 +575,19 @@ export function planContent(state: ContentState | null, payload: ImportPayload, 
   plan.description = description;
   plan.box = box;
   plan.storedNotWritten = description?.storedNotWritten ?? 0;
+  // Decided from the address, before any request: media.ts answers both the same way without asking.
+  const unfetchable = (id: string, url: string): boolean => {
+    const kind = nonImageKindOf(url);
+    if (kind) {
+      outcomes.set(id, 'not_an_image');
+      reasons.set(id, kind);
+      return true;
+    }
+    if (mediaUrlAllowed(url)) return false;
+    outcomes.set(id, 'host_not_allowed');
+    reasons.set(id, hostReasonOf(url));
+    return true;
+  };
   for (const f of failed) {
     const id = f.source_media_id;
     if (f.role === 'description') {
@@ -574,7 +599,9 @@ export function planContent(state: ContentState | null, payload: ImportPayload, 
       const t = description!.stored.get(b.id);
       if (t && t.kind === 'image' && typeof t.media_key === 'string' && t.media_key) outcomes.set(id, 'already_present');
       else if (state.earlier.blocks.has(b.id)) outcomes.set(id, 'owner_removed');
-      else if (!description!.ok) {
+      else if (unfetchable(id, b.source_url)) {
+        // not_an_image / host_not_allowed: whatever the field's proof says, nothing is fetched or written for it.
+      } else if (!description!.ok) {
         outcomes.set(id, description!.label);
         reasons.set(id, description!.reason);
       } else {
@@ -603,11 +630,14 @@ export function planContent(state: ContentState | null, payload: ImportPayload, 
       } else planned.push(o);
     }
     const best = bestOutcome(each);
+    const settled = each.includes('already_present') || each.includes('owner_removed');
+    const url = (found[0].proof.spec.value_list[found[0].index] as unknown as PayloadBoxItem).source_url;
+    if (!settled && unfetchable(id, url)) continue;
     // A planned occurrence is fetched unless one already shows it (or an earlier pass's was removed by the owner).
-    if (planned.length && !(each.includes('already_present') || each.includes('owner_removed'))) {
+    if (planned.length && !settled) {
       outcomes.set(id, 'planned');
       occurrences.set(id, planned);
-      requests.push({ source_media_id: id, role: 'in_the_box', source_url: (found[0].proof.spec.value_list[found[0].index] as unknown as PayloadBoxItem).source_url });
+      requests.push({ source_media_id: id, role: 'in_the_box', source_url: url });
     } else {
       outcomes.set(id, each.length ? best : 'not_on_page');
       if (reason && !CONTENT_FINAL.has(best)) reasons.set(id, reason);
@@ -1009,32 +1039,56 @@ export function metaWith(m0: string, entries: Readonly<Record<string, unknown>>)
   return { text, added };
 }
 
-/** The new keys of the planned media: this run's own stored rows whose object R2 holds as WebP. */
-async function newKeysOf(env: ContentEnv, runId: string, item: ItemRow, plan: ContentPlan): Promise<Map<string, string>> {
+/**
+ * The new keys of the planned media: this run's own stored rows whose object R2 holds as WebP; and, for the diagnosis
+ * only, the media code of each planned medium this run's /media answered `failed` (the reason of its `not_stored`).
+ */
+async function newKeysOf(env: ContentEnv, runId: string, item: ItemRow, plan: ContentPlan): Promise<{ keys: Map<string, string>; codes: Map<string, string> }> {
   const out = new Map<string, string>();
-  if (!plan.requests.length) return out;
+  const codes = new Map<string, string>();
+  if (!plan.requests.length) return { keys: out, codes };
   const { results } = await env.DB
-    .prepare("SELECT source_media_id, r2_key FROM catalog_import_media WHERE run_id = ? AND source_product_id = ? AND status = 'stored' AND r2_key <> '' AND source_media_id IN (SELECT value FROM json_each(?))")
+    .prepare(
+      `SELECT source_media_id, status, r2_key, error_code FROM catalog_import_media
+        WHERE run_id = ? AND source_product_id = ? AND status IN ('stored', 'failed') AND source_media_id IN (SELECT value FROM json_each(?))`
+    )
     .bind(runId, item.source_product_id, JSON.stringify(plan.requests.map((r) => r.source_media_id)))
-    .all<{ source_media_id: string; r2_key: string }>();
+    .all<{ source_media_id: string; status: string; r2_key: string; error_code: string | null }>();
   for (const r of results ?? []) {
+    if (r.status !== 'stored' || !r.r2_key) {
+      if (r.status === 'failed' && r.error_code) codes.set(String(r.source_media_id), String(r.error_code));
+      continue;
+    }
     const head = await importObjectHead(env, r.r2_key);
     // A storage that does not answer says nothing: refused whole (transient), never read as "not stored".
     if (head.presence === 'unknown') throw new OpsRefusal(503, 'IMAGE_STORAGE_FAILED', [item.id]);
     if (head.presence === 'present' && (!head.contentType || head.contentType === 'image/webp')) out.set(String(r.source_media_id), r.r2_key);
   }
-  return out;
+  return { keys: out, codes };
 }
 
 /**
  * Pure: the write of a plan with the new keys — the outcome of every failed medium, the new description (the field
  * with the pictures at their payload positions and every other block byte for byte, its `order` renumbered by the
  * writer's rule: the field the import would have written) and each box row with its new keys. Every invariant is
- * checked here; a broken one refuses the whole call (500), nothing written.
+ * checked here; a broken one refuses the whole call (500), nothing written. `codes`: the media code of a planned
+ * medium this run's /media answered `failed`, kept as the reason of its `not_stored` (diagnosis only).
  */
-export function contentWriteOf(state: ContentState | null, payload: ImportPayload | null, plan: ContentPlan, keys: ReadonlyMap<string, string>, rowBytes: number): ContentWrite {
+export function contentWriteOf(
+  state: ContentState | null,
+  payload: ImportPayload | null,
+  plan: ContentPlan,
+  keys: ReadonlyMap<string, string>,
+  rowBytes: number,
+  codes: ReadonlyMap<string, string> = new Map()
+): ContentWrite {
   const outcomes = new Map(plan.outcomes);
   const reasons = new Map(plan.reasons);
+  const notStored = (id: string) => {
+    outcomes.set(id, 'not_stored');
+    const code = codes.get(id);
+    if (code) reasons.set(id, code);
+  };
   const inserted: ContentCheckpoint['inserted'] = { blocks: [], box: [] };
   let t1: string | null = null;
   let m1: string | null = null;
@@ -1053,7 +1107,7 @@ export function contentWriteOf(state: ContentState | null, payload: ImportPayloa
       if (r.role !== 'description') continue;
       const k = keys.get(r.source_media_id);
       if (!k) {
-        outcomes.set(r.source_media_id, 'not_stored');
+        notStored(r.source_media_id);
         continue;
       }
       descKeys.set(r.source_media_id, k);
@@ -1114,7 +1168,7 @@ export function contentWriteOf(state: ContentState | null, payload: ImportPayloa
       if (r.role !== 'in_the_box') continue;
       const k = keys.get(r.source_media_id);
       if (!k) {
-        outcomes.set(r.source_media_id, 'not_stored');
+        notStored(r.source_media_id);
         continue;
       }
       for (const o of plan.occurrences.get(r.source_media_id) ?? []) {
@@ -1200,8 +1254,8 @@ export async function attachContentMedia(env: ContentEnv, run: ImportRun, item: 
       if (payloadSha256(payload) !== item.payload_sha256) throw new OpsRefusal(409, 'IMPORT_NOT_STAGED', [item.id]);
       await withReviewed(db, ctx, payload, bundle, item);
       const plan = planContent(ctx.state, payload, ctx.failed, ctx.active && !ctx.gone);
-      const keys = await newKeysOf(env, run.id, item, plan);
-      write = contentWriteOf(ctx.state, payload, plan, keys, ctx.rowBytes);
+      const { keys, codes } = await newKeysOf(env, run.id, item, plan);
+      write = contentWriteOf(ctx.state, payload, plan, keys, ctx.rowBytes, codes);
     }
     try {
       await commitContent(db, run, item, ctx, write);
