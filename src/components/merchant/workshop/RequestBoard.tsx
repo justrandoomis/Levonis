@@ -239,7 +239,22 @@ export default function RequestBoard({
                       <span>{r.process === 'resin' ? loc('ريزن', 'Resin', 'ڕێزن') : r.process === 'fdm' ? 'FDM' : loc('التقنية مفتوحة', 'Any technology', 'هەر تەکنەلۆژیایەک')}</span>
                       {r.material_id && <span aria-hidden="true">·</span>}
                       {r.material_id && <span>{matName(r.material_id)}</span>}
-                      {r.quantity > 1 && <span className="tabular-nums" dir="ltr">×{r.quantity}</span>}
+                      {/* A job of parts (P1-05): its quantity is the sets, said beside the parts. */}
+                      {r.summary && r.summary.parts_count > 1 && (
+                        <span className="tabular-nums">
+                          {loc('عدد القطع', 'Parts', 'پارچەکان')} <bdi dir="ltr">{r.summary.parts_count}</bdi>
+                        </span>
+                      )}
+                      {r.quantity > 1 && (
+                        <span className="tabular-nums" dir="ltr">
+                          {r.summary && (r.summary.parts_count > 1 || r.summary.pieces_per_set > 1) ? `${loc('الأطقم', 'Sets', 'سێت')} ` : ''}×{r.quantity}
+                        </span>
+                      )}
+                      {r.summary?.review_state === 'needs_technical_review' && (
+                        <span className="text-warning" data-board-review>
+                          {loc('تحتاج مراجعة فنية', 'Needs a technical review', 'پێویستی بە پێداچوونەوەی تەکنیکی هەیە')}
+                        </span>
+                      )}
                       {r.governorate && (
                         <span className="inline-flex items-center gap-1">
                           <MapPin aria-hidden="true" className="h-3 w-3" />
@@ -261,7 +276,9 @@ export default function RequestBoard({
                           </>
                         ) : r.estimate_low_iqd !== null && r.estimate_high_iqd !== null ? (
                           <>
-                            {loc('تقدير Levonis', 'Levonis estimate', 'خەمڵاندنی Levonis')}{' '}
+                            {r.estimate_complete === false
+                              ? loc('تقدير القطع المسعّرة فقط', 'Estimate of the priced parts only', 'خەمڵاندنی پارچە نرخدارەکان تەنها')
+                              : loc('تقدير Levonis', 'Levonis estimate', 'خەمڵاندنی Levonis')}{' '}
                             <span className="whitespace-nowrap">
                               <span dir="ltr" className="tabular-nums">{formatFigure(r.estimate_low_iqd, lang)}–{formatFigure(r.estimate_high_iqd, lang)}</span> {iqdUnit(lang)}
                             </span>

@@ -157,7 +157,55 @@ export interface Estimate {
    *  material's uncertainty. */
   range_basis?: 'materials';
 
+  /**
+   * WHAT THE TOTAL COVERS (P1-05, docs/DECISIONS.md row 267). Present on a
+   * job priced part by part: the figures above are then sums over the PRICED
+   * parts only, and `complete: false` means they are not the job's price.
+   * Absent on a one-part job priced the v1 way, whose figures are the job's.
+   */
+  coverage?: EstimateCoverage;
+
   engine: EstimateEngine;
+}
+
+/** One part's own estimate inside a part-by-part total. Never a cost figure. */
+export interface EstimatePart {
+  part_id: string;
+  position: number;
+  /** Pieces of this part in the whole job: pieces per set × sets. */
+  pieces: number;
+  price_iqd: number;
+  price_low_iqd: number;
+  price_high_iqd: number;
+  confidence: EstimateConfidence;
+  reasons: EstimateReasonCode[];
+  /** '' when the part is priced as a range across its materials. */
+  material_id: string;
+  process: 'fdm' | 'resin';
+  material_grams: number;
+  time_minutes: number;
+  range_basis?: 'materials';
+}
+
+/**
+ * A part the total leaves out, and why: an estimate reason (`NO_GEOMETRY`,
+ * `MATERIAL_UNKNOWN`) in `reason`, or — for a combination a publish refuses —
+ * the refusal code in `refusal` (packages/contracts/src/requestModel.ts
+ * `REQUEST_PUBLISH_REFUSAL_CODES`), never mixed in one field.
+ */
+export interface EstimateUnpricedPart {
+  part_id: string;
+  position: number;
+  reason: EstimateReasonCode | '';
+  refusal?: string;
+}
+
+export interface EstimateCoverage {
+  parts_total: number;
+  /** Every part is priced: the total is the job's. Nothing else. */
+  complete: boolean;
+  priced_parts: EstimatePart[];
+  unpriced_parts: EstimateUnpricedPart[];
 }
 
 /** The empty estimate: what an unpriced job reads as. */

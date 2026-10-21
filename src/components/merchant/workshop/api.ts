@@ -20,6 +20,9 @@ export interface Verdict {
   notify_block: '' | 'NOTIFICATIONS_OFF' | 'PAUSED';
   printer: { id: string; name: string } | null;
   stock_tracked: boolean;
+  /** P1-05: a job of parts — every part eligible, and each part with its own reasons. Absent on a one-job request. */
+  covers_all?: boolean;
+  parts?: Array<{ part_id: string; eligible: boolean; reasons: string[]; printer: { id: string; name: string } | null }>;
 }
 
 export interface BoardRequest {
@@ -50,6 +53,9 @@ export interface BoardRequest {
   source_url?: string | null;
   has_preview: boolean;
   my_offer: 'pending' | 'superseded' | 'accepted' | null;
+  /** P1-05: false when the range sums only the parts that could be priced. Absent on an older Worker. */
+  estimate_complete?: boolean;
+  summary?: { parts_count: number; pieces_per_set: number; review_state: string } | null;
 }
 
 export interface BoardPage {

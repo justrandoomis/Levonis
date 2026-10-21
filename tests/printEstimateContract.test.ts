@@ -70,12 +70,32 @@ const CONTRACT_KEYS = [
   'confidence', 'reasons', 'factors', 'covers', 'excludes',
   'material_id', 'process', 'time_minutes', 'material_grams', 'engine',
 ].sort();
-const OPTIONAL_KEYS = new Set(['reason', 'range_basis']);
+const OPTIONAL_KEYS = new Set(['reason', 'range_basis', 'coverage']);
+const COVERAGE_KEYS = ['complete', 'parts_total', 'priced_parts', 'unpriced_parts'];
+const PART_KEYS = ['confidence', 'material_grams', 'material_id', 'part_id', 'pieces', 'position', 'price_high_iqd', 'price_iqd', 'price_low_iqd', 'process', 'reasons', 'time_minutes'];
+
+/** P1-05: what a part-by-part total covers — its own closed shape, and never a cost figure. */
+function assertCoverageShape(e: Estimate, label: string) {
+  if (e.coverage === undefined) return;
+  const c = e.coverage;
+  assert.deepEqual(Object.keys(c).sort(), COVERAGE_KEYS, `${label}: coverage keys`);
+  assert.equal(c.complete, c.unpriced_parts.length === 0 && c.priced_parts.length === c.parts_total, `${label}: complete is «every part priced»`);
+  for (const p of c.priced_parts) {
+    assert.deepEqual(Object.keys(p).filter((k) => k !== 'range_basis').sort(), PART_KEYS, `${label}: priced part keys`);
+    for (const r of p.reasons) assert.ok((ESTIMATE_REASON_CODES as readonly string[]).includes(r), `${label}: part reason ${r}`);
+    if (p.confidence === 'high') assert.deepEqual(p.reasons, [], `${label}: a high part carries no reason`);
+  }
+  for (const u of c.unpriced_parts) {
+    assert.ok(u.reason === '' || (ESTIMATE_REASON_CODES as readonly string[]).includes(u.reason), `${label}: unpriced reason ${u.reason}`);
+    assert.ok(u.reason !== '' || typeof u.refusal === 'string', `${label}: an unpriced part says why`);
+  }
+}
 
 /** The shape, exactly — no extra key can ride in, no listed key can be missing. */
 function assertContractShape(e: Estimate, label: string) {
   const keys = Object.keys(e).filter((k) => !OPTIONAL_KEYS.has(k)).sort();
   assert.deepEqual(keys, CONTRACT_KEYS, `${label}: keys`);
+  assertCoverageShape(e, label);
   assert.ok(['high', 'medium', 'low'].includes(e.confidence), `${label}: confidence`);
   for (const r of e.reasons) assert.ok((ESTIMATE_REASON_CODES as readonly string[]).includes(r), `${label}: reason ${r}`);
   for (const f of e.factors) {
@@ -132,6 +152,30 @@ test('engine A folds into the contract: the shape, no curve, and not one cost fi
   assert.ok(e.covers.includes('material') && e.covers.includes('machine') && e.covers.includes('labor'));
   assert.ok(e.factors.length >= 1 && e.factors.length <= 3);
   assertCurve(e, 3, 'A');
+});
+
+test('P1-05: a total priced part by part carries its coverage in the contract — closed, cost-free, and only when given', async () => {
+  const { estimateModel } = await import('../worker/lib/requestEstimate');
+  const part = (id: string, position: number, material: string, measured: string | null) => ({
+    id, position, name: '', quantity: 1, process: 'fdm' as const, process_unsure: false, stated_dims: null, measured_file_id: measured,
+    notes: '', assembly_notes: '', legacy_text: '', review_state: '' as const, review_reasons: [], reviewed_by: null, reviewed_at: null,
+    source_ids: [], created_at: '', updated_at: '',
+    materials: [{ id: `${id}_m`, position: 0, material_id: material, material_unsure: false, colors: [], finish: '', region_reference: '', requirements: '', colors_need_review: false, created_at: '', updated_at: '' }],
+  });
+  const q = estimateModel(
+    { job: { quantity: 2, quality: 'standard', infill_percent: 20, supports: true, post_processing_minutes: 0, source_type: 'model' }, parts: [part('a', 0, 'pla', 'f'), part('b', 1, 'tpu', null)] },
+    [{ id: 'f', analysis: JSON.stringify(cube(30)) }],
+    { mats: DEFAULT_MATERIALS, cfg: DEFAULT_PRICING, quality: 'standard', infill: 0.2, supports: true, postProcessingMinutes: 0, accessories: [], accessoryCatalogue: [] }
+  );
+  const e = fromEngineA(q, { quantity: 2 });
+  assertContractShape(e, 'parts');
+  assertNoLeak(e, 'parts');
+  assert.equal(e.coverage!.complete, false);
+  assert.equal(e.quantity, 2, 'the quantity of a job of parts is its sets');
+  assert.equal(e.confidence, 'low');
+  // A v1 quote carries no coverage key at all.
+  const v1 = fromEngineA(quotePrint({ analysis: cube(20), materialId: 'pla', quality: 'standard', infill: 0.2, quantity: 1, colors: 1, supports: true, post_processing_minutes: 0 }, DEFAULT_MATERIALS, DEFAULT_PRICING), { quantity: 1 });
+  assert.equal('coverage' in v1, false);
 });
 
 test('an unpriced quote is an unpriced estimate with its reason, and still leaks nothing', () => {

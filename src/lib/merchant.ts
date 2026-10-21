@@ -906,6 +906,26 @@ export interface AdminRequestRow {
   customer_email: string;
   offers_total: number;
   offers_pending: number;
+  /** P1-05: absent on an older Worker. The review only ever set on a request made of parts. */
+  parts_count?: number;
+  review_state?: string;
+  review_reasons?: string[];
+}
+
+/** A part as the technical review reads it (P1-05). */
+export interface AdminReviewPart {
+  id: string;
+  position: number;
+  name: string;
+  quantity: number;
+  process: string;
+  process_unsure: boolean;
+  stated_dims: { x: number; y: number; z: number } | null;
+  measured_file_id: string | null;
+  notes: string;
+  review_state: string;
+  review_reasons: string[];
+  materials: Array<{ id: string; material_id: string; material_unsure: boolean; colors: Array<{ mode: string; hex: string; label: string }> }>;
 }
 
 export interface AdminOfferRow {
@@ -923,6 +943,9 @@ export interface AdminOfferRow {
   message: string;
   state: string;
   created_at: string;
+  /** P1-05: what the offer makes and substitutes; absent on an older Worker. */
+  coverage?: { covers_all: boolean; parts: string[] | null };
+  substitutions?: Array<{ part_id: string; material_row_id: string; from: { material_id: string }; to: { material_id: string } }>;
 }
 
 export interface AdminReviewRow {
@@ -1087,9 +1110,9 @@ export const adminCommunityApi = {
       ...(amount_iqd !== undefined ? { amount_iqd } : {}),
     }),
 
-  requests: (state = '', q = '') =>
-    api.get<{ requests: AdminRequestRow[] }>(
-      `/api/admin/community/requests?state=${encodeURIComponent(state)}&q=${encodeURIComponent(q)}`
+  requests: (state = '', q = '', review = '') =>
+    api.get<{ requests: AdminRequestRow[]; schema?: boolean }>(
+      `/api/admin/community/requests?state=${encodeURIComponent(state)}&q=${encodeURIComponent(q)}${review ? `&review=${encodeURIComponent(review)}` : ''}`
     ),
   request: (id: string) =>
     api.get<{
@@ -1098,7 +1121,13 @@ export const adminCommunityApi = {
       files: Array<{ id: string; file_name: string; content_type: string; size_bytes: number; kind: string }>;
       order: Record<string, unknown> | null;
       escrow: AdminEscrow | null;
+      /** P1-05: the model the reviewer reads, and the fence of each part for a decision. */
+      model?: { parts: AdminReviewPart[] } | null;
+      review?: { state: string; reasons: string[]; parts: Array<{ id: string; updated_at: string; review_state: string; review_reasons: string[]; reviewed_at: string | null }> } | null;
     }>(`/api/admin/community/requests/${id}`),
+  /** P1-05: a technical review decided — each part named with the `updated_at` this reviewer read. */
+  reviewRequest: (id: string, decision: 'confirmed' | 'reopen', parts: Array<{ id: string; updated_at: string }>) =>
+    api.post<{ review_state: string; decision: string; parts: string[] }>(`/api/admin/community/requests/${id}/review`, { decision, parts }),
   rejectOffer: (id: string, reason: string) =>
     api.post<{ state: string }>(`/api/admin/community/offers/${id}/reject`, { reason }),
 

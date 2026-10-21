@@ -19,6 +19,7 @@ import { materialTotalGrams, type PrintAnalysis, type QuoteResult } from '../pri
 import {
   type Estimate,
   type EstimateConfidence,
+  type EstimateCoverage,
   type EstimateExcludeKey,
   type EstimateReasonCode,
   ESTIMATE_REASON_CODES,
@@ -45,12 +46,17 @@ export interface FromEngineAOptions {
   excludes?: EstimateExcludeKey[];
 }
 
-export function fromEngineA(q: EngineAQuote & { range_basis?: 'materials' }, opts: FromEngineAOptions): Estimate {
+/** A quote priced part by part carries what its total covers (P1-05); a v1 quote does not. */
+export type EngineAQuoteWithCoverage = EngineAQuote & { range_basis?: 'materials'; coverage?: EstimateCoverage };
+
+export function fromEngineA(q: EngineAQuoteWithCoverage, opts: FromEngineAOptions): Estimate {
   const engine = { name: 'print-pricing' as const, version: PRINT_PRICING_VERSION };
   const quantity = Math.max(1, Math.floor(opts.quantity || 1));
   if (!q.priced) {
     const reason = knownReasons([q.reason ?? ''])[0] ?? 'NO_GEOMETRY';
-    return unpricedEstimate(reason, quantity, engine, { material_id: q.material_id, process: q.process });
+    const out = unpricedEstimate(reason, quantity, engine, { material_id: q.material_id, process: q.process });
+    if (q.coverage) out.coverage = q.coverage;
+    return out;
   }
   const amounts = engineAAmounts(q.cost_lines);
   const estimate: Estimate = {
@@ -72,6 +78,7 @@ export function fromEngineA(q: EngineAQuote & { range_basis?: 'materials' }, opt
     engine,
   };
   if (q.range_basis === 'materials') estimate.range_basis = 'materials';
+  if (q.coverage) estimate.coverage = q.coverage;
   return estimate;
 }
 

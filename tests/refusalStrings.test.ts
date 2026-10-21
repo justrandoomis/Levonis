@@ -154,6 +154,8 @@ test('every code the table translates is one the server can actually emit', () =
     // The request model v3 (P1-04): the parts, materials, colours and sources
     // a v3 body is refused for, each beside the field it names.
     'worker/lib/requestModel.ts',
+    // Readers and offers v3 (P1-05, row 267): what an offer covers and substitutes.
+    'worker/lib/offerCoverage.ts',
     // Community projects (docs/COMMUNITY_ECOSYSTEM.md Phase 1): the composer
     // decodes POST_* and CONSENT_* beside the field each one names.
     'worker/routes/communityPosts.ts',
@@ -275,13 +277,17 @@ test('every code the table translates is one the server can actually emit', () =
     })
     .join('\n');
   const emitted = `${sources}\n${mystery}`;
+  // A code this build no longer sends but an OLDER build, redeployed by hand,
+  // still answers: its words stay so that answer is never a raw code
+  // (REQUEST_PARTS_NOT_YET, lifted by P1-05 — DECISIONS row 267).
+  const RETIRED_STILL_ANSWERED = new Set(['REQUEST_PARTS_NOT_YET']);
   const orphans = Object.keys(REFUSAL_STRINGS).filter(
     // The mystery engine is a later slice; its codes are translated ahead of it
     // deliberately, so the strings land with the table rather than after the
     // first customer has seen one in English. The pricing programme's contract
     // (packages/contracts/src/costRefusals.ts) is the same case: S1 lands every
     // step's codes at once, and tests/programmeRefusals.test.ts owns them.
-    (code) => !emitted.includes(code) && !code.startsWith('MYSTERY_') && !isCostRefusalCode(code)
+    (code) => !emitted.includes(code) && !code.startsWith('MYSTERY_') && !isCostRefusalCode(code) && !RETIRED_STILL_ANSWERED.has(code)
   );
   assert.deepEqual(orphans, [], `translated codes no route can emit: ${orphans.join(', ')}`);
 });

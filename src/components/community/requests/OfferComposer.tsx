@@ -38,6 +38,9 @@ import type { OfferPrefill } from '../../merchant/workshop/api';
 import { offersV2Api, requestsApi, type CatalogMaterial, type OfferDeliveryMethod, type OfferFileKind, type OfferInputV2, type OfferV2 } from './api';
 import { composerHandover, daysLabel, fill, handoverLabel, offerStateWords, requestLang, shortDay, useRequestStrings, type RequestLang, type RequestStrings } from './strings';
 import { RequestImageStrip, pictureFiles, type ThumbFile } from './RequestFileThumbs';
+import OfferPartsField, { defaultCoverage, partsBody, type PartVerdicts, type PartsValue } from './OfferPartsField';
+import { workshopApi } from '../../merchant/workshop/api';
+import type { RequestPartV3 } from '../../../lib/printApi';
 import { SourceLinkCard } from '../links/LinkCard';
 
 /** How long an offer stands, in days (the server takes 1–60). */
@@ -123,7 +126,10 @@ export function termsFrom(offer: OfferV2 | null | undefined, prefill: OfferPrefi
  * validity is not the composer's default, and silently moving it would
  * change the promise.
  */
-export function offerBody(t: Terms, opts: { draft: boolean; editingSent: boolean; validTouched: boolean; quoteId?: string | null }): OfferInputV2 {
+export function offerBody(
+  t: Terms,
+  opts: { draft: boolean; editingSent: boolean; validTouched: boolean; quoteId?: string | null; parts?: { value: PartsValue; clear: boolean } }
+): OfferInputV2 {
   const b: OfferInputV2 = {
     delivery_fee_iqd: t.delivery === 'pickup' ? 0 : Math.max(0, t.fee ?? 0),
     delivery_method: t.delivery,
@@ -141,7 +147,23 @@ export function offerBody(t: Terms, opts: { draft: boolean; editingSent: boolean
   if (t.days !== null && t.days >= 1) b.completion_days = t.days;
   if (opts.quoteId && !opts.editingSent) b.quote_id = opts.quoteId;
   if (opts.draft) b.draft = true;
+  // P1-05: what the offer covers and substitutes — only when it is not the whole job as asked.
+  if (opts.parts) Object.assign(b, partsBody(opts.parts.value, { clear: opts.parts.clear }));
   return b;
+}
+
+/** An offer (or draft) as the parts field starts: its coverage and substitutions, else the whole job as asked. */
+export function partsFrom(offer: OfferV2 | null | undefined): PartsValue {
+  return {
+    coverage: offer?.coverage && !offer.coverage.covers_all ? offer.coverage.parts ?? [] : null,
+    subs: (offer?.substitutions ?? []).map((x) => ({
+      part_id: x.part_id,
+      material_row_id: x.material_row_id,
+      material_id: x.to.material_id,
+      colour: x.to.colors.map((c) => c.label || c.hex).join(' '),
+      note: x.note,
+    })),
+  };
 }
 
 export interface OfferComposerProps {
@@ -157,11 +179,13 @@ export interface OfferComposerProps {
   deliveryPref?: string;
   /** «استخدم هذا كعرضي» (W5-B): a private costing's price and quote id; nothing is sent until the merchant sends it. */
   prefill?: OfferPrefill | null;
+  /** P1-05: the parts of the request — a job of parts gets the part checklist and substitutes. */
+  parts?: RequestPartV3[];
   onClose: () => void;
   onSaved: (offer: OfferV2, how: 'sent' | 'updated' | 'draft') => void;
 }
 
-export default function OfferComposer({ open, requestId, offer, materials, defaultQuantity, deliveryPref, prefill = null, onClose, onSaved }: OfferComposerProps) {
+export default function OfferComposer({ open, requestId, offer, materials, defaultQuantity, deliveryPref, prefill = null, parts = [], onClose, onSaved }: OfferComposerProps) {
   const { lang } = useLanguage();
   const s = useRequestStrings();
   const L = requestLang(lang);
@@ -178,24 +202,54 @@ export default function OfferComposer({ open, requestId, offer, materials, defau
   const [error, setError] = useState('');
   const [invalid, setInvalid] = useState<{ price?: string; days?: string }>({});
   const [busy, setBusy] = useState<'' | 'send' | 'draft'>('');
+  // P1-05: the parts this offer makes and its substitutes; the verdict per part.
+  const [pv, setPv] = useState<PartsValue>(() => partsFrom(offer));
+  const initialParts = useRef('');
+  const [verdicts, setVerdicts] = useState<PartVerdicts>(null);
+  const [showParts, setShowParts] = useState(false);
+  const multiPart = parts.length > 1;
+  const hadCustom = !!offer && ((offer.coverage && !offer.coverage.covers_all) || (offer.substitutions?.length ?? 0) > 0);
 
   useEffect(() => {
     if (!open) return;
     const start = termsFrom(offer, prefill, { quantity: defaultQuantity, delivery: defaultHandover(deliveryPref) });
     setT(start);
     initial.current = JSON.stringify(start);
+    const startParts = partsFrom(offer);
+    setPv(startParts);
+    initialParts.current = JSON.stringify(startParts);
+    setShowParts(multiPart || (offer?.substitutions?.length ?? 0) > 0);
     setValidTouched(false);
     setError('');
     setInvalid({});
     setBusy('');
     setPending([]);
-  }, [open, offer, prefill, defaultQuantity, deliveryPref]);
+  }, [open, offer, prefill, defaultQuantity, deliveryPref, multiPart]);
+
+  // Which parts this workshop can make: ticked by default on a new offer.
+  useEffect(() => {
+    if (!open || !multiPart) return;
+    let alive = true;
+    workshopApi
+      .verdict(requestId)
+      .then((v) => {
+        if (!alive) return;
+        const list = v.parts ?? null;
+        setVerdicts(list);
+        if (!offer) setPv((x) => (x.coverage === null && !x.subs.length ? { ...x, coverage: defaultCoverage(parts, list) } : x));
+      })
+      .catch(() => alive && setVerdicts(null));
+    return () => {
+      alive = false;
+    };
+  }, [open, multiPart, requestId, offer, parts]);
 
   const set = <K extends keyof Terms>(k: K, v: Terms[K]) => setT((x) => ({ ...x, [k]: v }));
   // No price, no total: «—», never «0 IQD» as if the customer would pay nothing.
   const total = t.price && t.price >= 1 ? previewTotal(t.price, t.fee, t.delivery) : null;
   const fileCount = t.files.length + pending.length;
-  const dirty = pending.length > 0 || (initial.current !== '' && JSON.stringify(t) !== initial.current);
+  const dirty = pending.length > 0 || (initial.current !== '' && (JSON.stringify(t) !== initial.current || JSON.stringify(pv) !== initialParts.current));
+  const partsOpt = (editing: boolean) => ({ value: pv, clear: editing && hadCustom });
 
   function pickFiles(list: FileList | null) {
     if (!list?.length) return;
@@ -236,19 +290,19 @@ export default function OfferComposer({ open, requestId, offer, materials, defau
       let saved: OfferV2;
       let kind: 'sent' | 'updated' | 'draft';
       if (how === 'draft') {
-        const b = offerBody(t, { draft: true, editingSent: false, validTouched, quoteId });
+        const b = offerBody(t, { draft: true, editingSent: false, validTouched, quoteId, parts: partsOpt(isDraft) });
         saved = isDraft ? (await offersV2Api.updateOffer(offer!.id, b)).offer : (await offersV2Api.createOffer(requestId, b)).offer;
         kind = 'draft';
       } else if (isDraft) {
         // The draft's terms as they are on screen, then the send — one promise, validated whole by the server.
-        await offersV2Api.updateOffer(offer!.id, offerBody(t, { draft: false, editingSent: false, validTouched, quoteId }));
+        await offersV2Api.updateOffer(offer!.id, offerBody(t, { draft: false, editingSent: false, validTouched, quoteId, parts: partsOpt(true) }));
         saved = (await offersV2Api.sendOffer(offer!.id)).offer;
         kind = 'sent';
       } else if (editingSent) {
-        saved = (await offersV2Api.updateOffer(offer!.id, offerBody(t, { draft: false, editingSent: true, validTouched, quoteId }))).offer;
+        saved = (await offersV2Api.updateOffer(offer!.id, offerBody(t, { draft: false, editingSent: true, validTouched, quoteId, parts: partsOpt(true) }))).offer;
         kind = 'updated';
       } else {
-        saved = (await offersV2Api.createOffer(requestId, offerBody(t, { draft: false, editingSent: false, validTouched, quoteId }))).offer;
+        saved = (await offersV2Api.createOffer(requestId, offerBody(t, { draft: false, editingSent: false, validTouched, quoteId, parts: partsOpt(false) }))).offer;
         kind = 'sent';
       }
       onSaved(saved, kind);
@@ -347,7 +401,7 @@ export default function OfferComposer({ open, requestId, offer, materials, defau
           </Field>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <Field label={s.quantityLabel} optional hint={s.quantityHint}>
+          <Field label={multiPart ? s.setsLabel : s.quantityLabel} optional hint={s.quantityHint}>
             <NumberInput kind="quantity" min={1} max={100000} value={t.quantity} onValueChange={(v) => set('quantity', v)} data-offer-quantity />
           </Field>
           <Field label={s.colourLabel} optional>
@@ -379,6 +433,14 @@ export default function OfferComposer({ open, requestId, offer, materials, defau
             </div>
           </fieldset>
         )}
+        {parts.length > 0 &&
+          (showParts ? (
+            <OfferPartsField parts={parts} verdicts={verdicts} materials={materials} value={pv} onChange={setPv} s={s} lang={L} />
+          ) : (
+            <Button type="button" size="sm" variant="secondary" onClick={() => setShowParts(true)} data-offer-open-substitute>
+              {s.proposeSubstitute}
+            </Button>
+          ))}
         <Field label={s.notesLabel} optional>
           <Textarea value={t.message} rows={3} maxLength={2000} onChange={(e) => set('message', e.target.value)} dir="auto" data-offer-message />
         </Field>
@@ -540,6 +602,8 @@ export interface MerchantOfferSectionProps {
   jobFiles?: readonly ThumbFile[];
   /** The model link a link request is about, drawn as its link card (R1). */
   sourceUrl?: string | null;
+  /** P1-05: the parts of the request, for the part checklist and substitutes of the composer. */
+  parts?: RequestPartV3[];
 }
 
 export function MerchantOfferSection({
@@ -557,6 +621,7 @@ export function MerchantOfferSection({
   onPrefillDone,
   jobFiles = [],
   sourceUrl = null,
+  parts = [],
 }: MerchantOfferSectionProps) {
   const { lang } = useLanguage();
   const s = useRequestStrings();
@@ -667,6 +732,7 @@ export function MerchantOfferSection({
       defaultQuantity={defaultQuantity}
       deliveryPref={deliveryPref}
       prefill={prefill}
+      parts={parts}
       onClose={() => {
         setComposing('');
         onPrefillDone?.();

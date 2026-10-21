@@ -70,6 +70,19 @@ import { reconcileRefundUnrefunded, reconcileReverseCredit, storeOrderMoneyDrift
 import { merchantUnsanctionedSql } from '../lib/merchantApproval';
 import { enqueueMatchStatement, rematchAfterResponse } from '../lib/printMatchingStore';
 import { catchUpRequestModels, requestModelBudget } from '../lib/requestModelBackfill';
+import {
+  effectiveV3Sql,
+  projectModel,
+  readRequestModel,
+  requestSummarySql,
+  reviewReasonsOf,
+  reviewStateSql,
+  summarize,
+  withoutV1Review,
+} from '../lib/requestModel';
+import { offerCoverageShape } from '../lib/offerCoverage';
+import { publicEstimate } from '../lib/requestRevisions';
+import { isMissingSchema } from '../lib/merchantApproval';
 
 export const adminCommunityRoutes = new Hono<AppContext>();
 adminCommunityRoutes.use('*', requireAdmin);
@@ -834,24 +847,56 @@ adminCommunityRoutes.get('/requests', async (c) => {
   const state = c.req.query('state') || '';
   const q = c.req.query('q') || '';
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 50 });
+  // «تحتاج مراجعة فنية» (P1-05, D9): the published version-3 requests whose
+  // summary asks for a technical review — read off the review index, and only
+  // while the row is still the mirror of its parts (a v1 row has no parts a
+  // reviewer could confirm, critique 6).
+  const review = c.req.query('review') === 'needs_technical_review';
 
-  const { results } = await c.env.DB.prepare(
+  const listSql = (schema: boolean) =>
     `SELECT r.id, r.title, r.state, r.status, r.category, r.quantity, r.budget_iqd,
             r.governorate, r.visibility, r.deadline, r.expires_at,
             r.accepted_offer_id, r.community_order_id, r.created_at,
             r.customer_id, u.name AS customer_name, u.email AS customer_email,
             (SELECT COUNT(*) FROM community_offers o WHERE o.request_id = r.id) AS offers_total,
             (SELECT COUNT(*) FROM community_offers o
-              WHERE o.request_id = r.id AND o.state = 'pending') AS offers_pending
+              WHERE o.request_id = r.id AND o.state = 'pending') AS offers_pending,
+            ${requestSummarySql('p', schema).parts_count} AS parts_count,
+            ${reviewStateSql('p', schema)} AS review_state,
+            ${schema ? `CASE WHEN ${effectiveV3Sql('p')} THEN p.processes_json ELSE '[]' END` : "'[]'"} AS review_processes,
+            ${schema
+              ? `CASE WHEN ${effectiveV3Sql('p')} THEN (SELECT json_group_array(rr.value) FROM community_request_parts pt, json_each(pt.review_reasons) rr WHERE pt.request_id = r.id) ELSE '[]' END`
+              : "'[]'"} AS review_reasons,
+            p.updated_at AS print_updated_at
        FROM community_requests r
        JOIN users u ON u.id = r.customer_id
+       LEFT JOIN community_print_requests p ON p.request_id = r.id
       WHERE (?1 = '' OR r.state = ?2)
         AND (?3 = '' OR r.title LIKE ?4 ESCAPE '\\' OR r.id = ?3)
+        ${review ? `AND p.review_state = 'needs_technical_review' AND ${effectiveV3Sql('p')} AND r.state NOT IN ('draft','cancelled','expired')` : ''}
       ORDER BY r.created_at DESC
-      LIMIT ?5`
-  ).bind(state, state, q, likePattern(q), limit).all();
+      LIMIT ?5`;
+  const read = (schema: boolean) => c.env.DB.prepare(listSql(schema)).bind(state, state, q, likePattern(q), limit).all<Record<string, unknown>>();
+  let results: Record<string, unknown>[];
+  let schema = true;
+  try {
+    results = (await read(true)).results ?? [];
+  } catch (e) {
+    if (!isMissingSchema(e)) throw e;
+    schema = false;
+    // Before 0208 there is no review to list.
+    results = review ? [] : (await read(false)).results ?? [];
+  }
 
-  return c.json({ success: true, requests: results });
+  return c.json({
+    success: true,
+    schema,
+    requests: results.map(({ review_processes, review_reasons, ...r }) => {
+      const reasons = new Set((safeParse<unknown[]>(review_reasons, []) ?? []).map(String));
+      if ((safeParse<unknown[]>(review_processes, []) ?? []).length > 1) reasons.add('mixed_process');
+      return { ...r, parts_count: Number(r.parts_count ?? 1) || 1, review_state: String(r.review_state ?? ''), review_reasons: [...reasons] };
+    }),
+  });
 });
 
 /**
@@ -930,10 +975,26 @@ adminCommunityRoutes.get('/requests/:id', async (c) => {
   // reported request sees immediately whether anything is at stake.
   const escrow = order ? await escrowForOrder(c.env.DB, String(order.id)) : null;
 
+  // P1-05: the model as a reviewer reads it — every part with its materials,
+  // colours, size and review — the estimate with what it covers, and each
+  // part's `updated_at`, which a review decision sends back as its fence.
+  const read = await readRequestModel(c.env.DB, id);
+  const v3 = read?.schema_version === 3;
+  const print = await c.env.DB.prepare('SELECT estimate FROM community_print_requests WHERE request_id = ?').bind(id).first<{ estimate: string }>();
+
   return c.json({
     success: true,
     request,
-    offers: offers.results,
+    model: read ? withoutV1Review(projectModel(read, 'admin'), v3) : null,
+    review: read && v3
+      ? {
+          state: read.summary.review_state,
+          reasons: reviewReasonsOf(read),
+          parts: read.parts.map((p) => ({ id: p.id, updated_at: p.updated_at, review_state: p.review_state, review_reasons: p.review_reasons, reviewed_at: p.reviewed_at })),
+        }
+      : null,
+    estimate: print ? publicEstimate(print.estimate) : null,
+    offers: (offers.results as Array<Record<string, unknown>>).map((o) => ({ ...o, ...offerCoverageShape(o) })),
     // A route, not a key. The marketplace download handler already grants
     // an admin access and re-checks it on every read, so moderation reuses
     // that one authorisation instead of adding a second way in.
@@ -944,6 +1005,74 @@ adminCommunityRoutes.get('/requests/:id', async (c) => {
     order: order ?? null,
     escrow,
   });
+});
+
+/**
+ * A TECHNICAL REVIEW, DECIDED (P1-05, D9). `confirmed` clears the parts a
+ * reviewer looked at; `reopen` puts them back under review. The body names
+ * each part with the `updated_at` the reviewer's own read gave (critique 5):
+ * the batch is fenced on EVERY part of the request being exactly as read —
+ * the named ones as the reviewer saw them, the others as this handler reads
+ * them — so a customer edit in between aborts it (REQUEST_CHANGED), and the
+ * summary written beside it is the summary of what was really reviewed. No
+ * revision moves, no offer is superseded (a review is not hashed), the
+ * mirror stamp is not touched. A customer save that read before this review
+ * cannot undo it (`reviewFenceStatement`).
+ */
+adminCommunityRoutes.post('/requests/:id/review', async (c) => {
+  const admin = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const decision = oneOf(body.decision, 'decision', ['confirmed', 'reopen'] as const);
+  if (!Array.isArray(body.parts) || !body.parts.length || body.parts.length > 64) throw badRequest('Name the parts you reviewed', 'REVIEW_PARTS_REQUIRED');
+  const named = new Map<string, string>();
+  for (const x of body.parts) {
+    const o = x && typeof x === 'object' ? (x as Record<string, unknown>) : {};
+    named.set(str(o.id, 'parts.id', { min: 1, max: 80 }), str(o.updated_at, 'parts.updated_at', { min: 1, max: 40 }));
+  }
+
+  const r = await c.env.DB.prepare('SELECT state FROM community_requests WHERE id = ?').bind(id).first<{ state: string }>();
+  if (!r) throw notFound('Request not found');
+  const read = await readRequestModel(c.env.DB, id, { restamp: false });
+  if (!read || read.schema_version !== 3 || !read.schema) {
+    throw conflict('Only a request made of parts can be reviewed', 'REQUEST_NOT_REVIEWABLE');
+  }
+  if ([...named.keys()].some((pid) => !read.parts.some((p) => p.id === pid))) {
+    throw conflict('That request changed while you were reviewing it — reload it', 'REQUEST_CHANGED');
+  }
+  const ts = nowIso();
+  const state = decision === 'confirmed' ? 'confirmed' : 'needs_technical_review';
+  const next = { ...read, parts: read.parts.map((p) => (named.has(p.id) ? { ...p, review_state: state as typeof p.review_state } : p)) };
+  const summary = summarize(next).review_state;
+  const expected = read.parts.map((p) => ({ id: p.id, updated_at: named.get(p.id) ?? p.updated_at }));
+  try {
+    await c.env.DB.batch([
+      // Every part as read (the named ones as the reviewer read them), and the
+      // row still the mirror of its parts — else nothing below is written.
+      c.env.DB.prepare(
+        `UPDATE community_requests
+            SET updated_at = CASE
+                  WHEN (SELECT COUNT(*) FROM community_request_parts WHERE request_id = ?1) = ?2
+                   AND NOT EXISTS (SELECT 1 FROM json_each(?3) j
+                                    WHERE NOT EXISTS (SELECT 1 FROM community_request_parts pt
+                                                       WHERE pt.request_id = ?1 AND pt.id = json_extract(j.value, '$.id')
+                                                         AND pt.updated_at = json_extract(j.value, '$.updated_at')))
+                   AND EXISTS (SELECT 1 FROM community_print_requests p WHERE p.request_id = ?1 AND ${effectiveV3Sql('p')})
+                  THEN updated_at ELSE NULL END
+          WHERE id = ?1`
+      ).bind(id, read.parts.length, JSON.stringify(expected)),
+      c.env.DB.prepare(
+        `UPDATE community_request_parts SET review_state = ?2, reviewed_by = ?3, reviewed_at = ?4
+          WHERE request_id = ?1 AND id IN (SELECT value FROM json_each(?5))`
+      ).bind(id, state, admin.id, ts, JSON.stringify([...named.keys()])),
+      c.env.DB.prepare(`UPDATE community_print_requests SET review_state = ?2 WHERE request_id = ?1 AND schema_version = 3`).bind(id, summary),
+    ]);
+  } catch (e) {
+    if (!isConstraintAbort(e)) throw e;
+    throw conflict('That request changed while you were reviewing it — reload it', 'REQUEST_CHANGED');
+  }
+  await audit(c.env.DB, admin.id, 'admin.request_reviewed', id, { decision, parts: [...named.keys()], review_state: summary });
+  return c.json({ success: true, review_state: summary, decision, parts: [...named.keys()] });
 });
 
 /**

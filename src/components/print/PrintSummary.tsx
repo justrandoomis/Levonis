@@ -21,8 +21,18 @@ import { useSignInPrompt } from '../../lib/guest';
 import { formatIqd } from '../../lib/api';
 import {
   printApi, priceRange, mmSize, cm3, duration,
-  type PrintFacts, type Confidence, type ModelWarningCode,
+  type PrintFacts, type Confidence, type ModelWarningCode, type RequestModelSummary, type RequestPartV3,
 } from '../../lib/printApi';
+import { StatusChip } from '../ui/Badge';
+import { fill, requestLang, useRequestStrings, type RequestStrings } from '../community/requests/strings';
+import { localColour, localMaterial } from '../community/requests/mirrors';
+import type { EstimateCoverage } from '../../lib/printEstimate';
+
+/** What the request page reads beside the facts (P1-05): its parts and its summary. */
+export interface PrintModelExtra {
+  parts: RequestPartV3[];
+  summary: RequestModelSummary | null;
+}
 
 /**
  * Warning codes travel without prose — the analyser emits a code, the UI writes
@@ -63,9 +73,11 @@ export default function PrintSummary({
 }: {
   requestId: string;
   /** Lets the parent show the estimate in its own header without a second GET. */
-  onLoaded?: (facts: PrintFacts | null) => void;
+  onLoaded?: (facts: PrintFacts | null, extra?: PrintModelExtra) => void;
 }) {
   const { loc, lang } = useLanguage();
+  const rs = useRequestStrings();
+  const [extra, setExtra] = useState<PrintModelExtra>({ parts: [], summary: null });
   const { isAuthenticated } = useAuth();
   const { signIn } = useSignInPrompt();
   const ar = lang === 'ar' || lang === 'ckb';
@@ -80,9 +92,11 @@ export default function PrintSummary({
       .facts(requestId)
       .then((d) => {
         if (!alive) return;
+        const more: PrintModelExtra = { parts: d.model?.parts ?? [], summary: d.summary ?? null };
         setFacts(d.print);
+        setExtra(more);
         setState(d.print ? 'ready' : 'none');
-        onLoaded?.(d.print);
+        onLoaded?.(d.print, more);
       })
       .catch(() => {
         if (!alive) return;
@@ -134,6 +148,10 @@ export default function PrintSummary({
   const a = facts.analysis;
   const est = facts.estimate;
   const conf = facts.estimate_confidence;
+  const coverage = est.coverage;
+  const parts = extra.parts;
+  const review = extra.summary?.review_state ?? '';
+  const showParts = parts.length > 1 || parts.some((p) => p.review_state === 'needs_technical_review');
 
   return (
     <div
@@ -167,7 +185,34 @@ export default function PrintSummary({
               )}
             </span>
           </div>
+          {coverage && !coverage.complete && (
+            // R10: a sum over some parts is never read as the job price.
+            <p className="mt-1.5 text-[11.5px] font-semibold text-warning" data-print-summary-coverage>
+              {fill(rs.estimateCoverage, { k: coverage.priced_parts.length, n: coverage.parts_total })}
+            </p>
+          )}
+          {!!facts.models_unpriced && (
+            <p className="mt-1 text-[11.5px] text-text-muted" data-print-summary-models-unpriced>
+              {fill(rs.modelsUnpriced, { n: facts.models_unpriced })}
+            </p>
+          )}
         </div>
+      )}
+
+      {review === 'needs_technical_review' && (
+        <div className="mb-3" data-print-summary-review>
+          <StatusChip tone="warning">{rs.reviewChip}</StatusChip>
+          <p className="mt-1.5 text-[11.5px] leading-relaxed text-text-secondary">{rs.reviewNote}</p>
+        </div>
+      )}
+      {review === 'confirmed' && (
+        <div className="mb-3" data-print-summary-review="confirmed">
+          <StatusChip tone="success">{rs.reviewDone}</StatusChip>
+        </div>
+      )}
+
+      {showParts && (
+        <PartsList parts={parts} sets={extra.summary?.sets ?? 1} coverage={coverage} s={rs} lang={requestLang(lang)} />
       )}
 
       {a?.measured ? (
@@ -261,6 +306,51 @@ export default function PrintSummary({
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * THE PARTS OF THE JOB (P1-05): each with its pieces and the sets, its
+ * materials and colours, its own estimate (or why it has none) and its
+ * technical review.
+ */
+function PartsList({ parts, sets, coverage, s, lang }: { parts: RequestPartV3[]; sets: number; coverage?: EstimateCoverage; s: RequestStrings; lang: 'ar' | 'en' | 'ckb' }) {
+  const sep = lang === 'en' ? ', ' : '، ';
+  return (
+    <ul className="mb-3 space-y-2" aria-label={s.partsLabel} data-print-summary-parts>
+      {[...parts].sort((x, y) => x.position - y.position).map((p) => {
+        const priced = coverage?.priced_parts.find((x) => x.part_id === p.id);
+        const unpriced = coverage?.unpriced_parts.find((x) => x.part_id === p.id);
+        const materials = p.materials
+          .map((m) => {
+            const name = m.material_unsure || !m.material_id ? '' : localMaterial(m.material_id, lang);
+            const colours = m.colors.filter((c) => c.mode === 'catalogue' || c.mode === 'custom').map((c) => localColour(c.label || c.hex, lang) || c.hex);
+            return [name, colours.join(sep)].filter(Boolean).join(' · ');
+          })
+          .filter(Boolean)
+          .join(sep);
+        return (
+          <li key={p.id} className="lv-well rounded-md px-3 py-2" data-print-summary-part={p.id}>
+            <div className="flex items-start justify-between gap-2">
+              <p className="min-w-0 text-[12.5px] font-semibold text-text-primary">
+                <bdi>{p.name.trim() || fill(s.partN, { n: p.position + 1 })}</bdi>
+              </p>
+              {p.review_state === 'needs_technical_review' && <StatusChip tone="warning">{s.reviewChip}</StatusChip>}
+            </div>
+            <p className="mt-0.5 text-[11.5px] text-text-muted">{fill(s.piecesAndSets, { pieces: p.quantity, sets })}</p>
+            {materials && <p className="mt-0.5 text-[11.5px] text-text-secondary" dir="auto">{materials}</p>}
+            {p.review_reasons.length > 0 && (
+              <p className="mt-0.5 text-[11.5px] text-warning">{p.review_reasons.map((r) => s.reviewReasons[r] ?? r).join(sep)}</p>
+            )}
+            {coverage && (
+              <p className="mt-0.5 text-[11.5px] font-semibold" dir="ltr" data-print-summary-part-price>
+                {priced ? priceRange(priced.price_low_iqd, priced.price_high_iqd, formatIqd) : unpriced ? s.notPriced : ''}
+              </p>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

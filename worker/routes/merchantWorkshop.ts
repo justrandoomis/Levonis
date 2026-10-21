@@ -50,7 +50,7 @@ import {
 } from './printQuote';
 import { liveVerdict, merchantRematchPending, rematchNow, MATCH_ENGINE } from '../lib/printMatchingStore';
 import { fileReadStatement, fileReader } from '../lib/requestFilePolicy';
-import { fileSourceRoles } from '../lib/requestModel';
+import { boardSummaryOf, boardSummarySql, fileSourceRoles, readRequestModel } from '../lib/requestModel';
 
 export const merchantWorkshopRoutes = new Hono<AppContext>();
 merchantWorkshopRoutes.use('*', requireAuth);
@@ -134,6 +134,8 @@ merchantWorkshopRoutes.get('/board', async (c) => {
             r.revision, r.customer_notes, COALESCE(r.published_at, r.created_at) AS sort_at,
             p.process, p.process_unsure, p.material_id, p.material_unsure,
             p.estimate_low_iqd, p.estimate_high_iqd, p.source_url,
+            CASE WHEN json_valid(p.estimate) THEN json_extract(p.estimate, '$.coverage.complete') END AS estimate_complete,
+            ${boardSummarySql('p', withRoles)},
             (SELECT f.id FROM community_request_files f
               WHERE f.request_id = r.id AND f.content_type LIKE 'image/%' ${notOriginal(withRoles)}
               ORDER BY f.created_at, f.id LIMIT 1) AS thumb_id,
@@ -195,6 +197,11 @@ merchantWorkshopRoutes.get('/board', async (c) => {
       material_id: Number(r.material_unsure ?? 0) === 1 ? null : (r.material_id || null),
       estimate_low_iqd: r.estimate_low_iqd ?? null,
       estimate_high_iqd: r.estimate_high_iqd ?? null,
+      // P1-05: false when the range sums only the parts that could be priced —
+      // never one part's price read as the job's (R10). The parts, the pieces
+      // a set and the technical review ride beside it.
+      estimate_complete: r.estimate_complete === null || r.estimate_complete === undefined ? true : Number(r.estimate_complete) === 1,
+      summary: boardSummaryOf(r) ?? null,
       file_count: Number(r.file_count ?? 0),
       // The picture is read through the file route, which re-derives this
       // workshop's right to it (eligible → pictures) on every read.
@@ -244,6 +251,19 @@ merchantWorkshopRoutes.get('/requests/:id/eligibility', async (c) => {
     notify_block: v.notify_block,
     printer: v.printer_id ? { id: v.printer_id, name: live.candidate.printer_names.get(v.printer_id) ?? '' } : null,
     stock_tracked: live.candidate.stock !== 'untracked',
+    // A JOB OF PARTS (P1-05): which parts this workshop can make, each with
+    // its own reasons and machine — what the offer composer ticks by default.
+    ...(v.parts
+      ? {
+          covers_all: v.covers_all === true,
+          parts: v.parts.map((p) => ({
+            part_id: p.part_id,
+            eligible: p.eligible,
+            reasons: p.reasons,
+            printer: p.printer_id ? { id: p.printer_id, name: live.candidate.printer_names.get(p.printer_id) ?? '' } : null,
+          })),
+        }
+      : {}),
   });
 });
 
@@ -287,7 +307,13 @@ merchantWorkshopRoutes.post('/requests/:id/cost', async (c) => {
     'SELECT primary_file_id, material_id, material_unsure, quality, supports FROM community_print_requests WHERE request_id = ?'
   ).bind(id).first<Record<string, unknown>>();
   const roles = reader === 'eligible' ? await fileSourceRoles(c.env.DB, id) : new Map<string, string>();
-  const askedFile = str(body.file_id, 'file_id', { max: 60, required: false }) ?? '';
+  // ONE PART of a job of parts (P1-05, critique High 2): its own measured
+  // model, its own material when it has one, its own pieces. The answer names
+  // the part and is that part's cost only, never the job's.
+  const partId = str(body.part_id, 'part_id', { max: 80, required: false }) ?? '';
+  const part = partId ? (await readRequestModel(c.env.DB, id))?.parts.find((p) => p.id === partId) ?? null : null;
+  if (partId && !part) throw notFound('Part not found');
+  const askedFile = str(body.file_id, 'file_id', { max: 60, required: false }) || part?.measured_file_id || '';
   if (askedFile && roles.get(askedFile) === 'source') {
     throw new HttpError(403, 'You may not open this file', 'FILE_ORIGINAL_RESTRICTED');
   }
@@ -314,7 +340,8 @@ merchantWorkshopRoutes.post('/requests/:id/cost', async (c) => {
 
   // THE MATERIAL, in the quote engine's catalogue (print_materials). The
   // request's own choice when that catalogue has it; else the workshop names one.
-  const requested = Number(print?.material_unsure ?? 0) === 1 ? '' : String(print?.material_id ?? '');
+  const partMaterial = part && part.materials.length === 1 && !part.materials[0].material_unsure ? part.materials[0].material_id : '';
+  const requested = part ? partMaterial : Number(print?.material_unsure ?? 0) === 1 ? '' : String(print?.material_id ?? '');
   const materialId = str(body.material_id, 'material_id', { max: 60, required: false }) || requested;
   const materialRow = materialId
     ? await c.env.DB.prepare('SELECT * FROM print_materials WHERE id = ? AND active = 1').bind(materialId).first<Record<string, unknown>>()
@@ -337,7 +364,8 @@ merchantWorkshopRoutes.post('/requests/:id/cost', async (c) => {
   const strengthId = oneOf(body.strength_id ?? 'standard', 'strength_id', ['light', 'standard', 'strong'] as const);
   const supports = body.supports === undefined ? Number(print?.supports ?? 1) === 1 : body.supports !== false;
   const quantityRow = await c.env.DB.prepare('SELECT quantity FROM community_requests WHERE id = ?').bind(id).first<{ quantity: number }>();
-  const quantity = Math.max(1, Math.min(999, Number(quantityRow?.quantity ?? 1) || 1));
+  const sets = Number(quantityRow?.quantity ?? 1) || 1;
+  const quantity = Math.max(1, Math.min(999, part ? sets * Math.max(1, part.quantity) : sets));
   const nozzleMm = mp.model.defaultNozzleMm;
 
   // THE BYTES, read here and nowhere else — never returned, never copied.
@@ -457,6 +485,7 @@ merchantWorkshopRoutes.post('/requests/:id/cost', async (c) => {
     quality_id: qualityId,
     strength_id: strengthId,
     quantity,
+    part_id: part ? part.id : null,
     bounding_box_mm: built.analysis.boundingBoxMm,
     quote: merchantQuote(priced.result),
   });

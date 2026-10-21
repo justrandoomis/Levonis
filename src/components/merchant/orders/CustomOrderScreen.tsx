@@ -55,6 +55,12 @@ export interface CustomOrderView {
   /** «جاهز» (0160): a moment inside `in_progress`, never a state. */
   ready_at: string | null;
   snapshot: { price_iqd: number | null; delivery_fee_iqd: number; quantity: number | null; color: string; terms: string };
+  /**
+   * WHAT WAS AGREED, PART BY PART (P1-05): the parts made, the parts left
+   * out and each substitution — from the request snapshot of the order; null for
+   * an order of one job made as asked.
+   */
+  agreement: { parts: string[]; uncovered: string[]; substitutions: Array<{ part: string; from: string; to: string }> } | null;
   escrow: { merchant_receivable_iqd: number | null; platform_fee_iqd: number | null } | null;
   can: { start_work: boolean; mark_delivered: boolean; cancel: boolean; dispute: boolean };
 }
@@ -85,6 +91,7 @@ export function readCustomOrder(d: { order: Record<string, unknown>; escrow: Rec
       color: text(snap.color),
       terms: text(snap.terms),
     },
+    agreement: readAgreement(req.agreement),
     escrow: d.escrow ? { merchant_receivable_iqd: num(d.escrow.merchant_receivable_iqd), platform_fee_iqd: num(d.escrow.platform_fee_iqd) } : null,
     can: {
       start_work: !!d.can?.start_work,
@@ -93,6 +100,30 @@ export function readCustomOrder(d: { order: Record<string, unknown>; escrow: Rec
       dispute: !!d.can?.dispute,
     },
   };
+}
+
+/** The agreement in the snapshot, as names and lines (a part without a name is «#n»). */
+export function readAgreement(raw: unknown): CustomOrderView['agreement'] {
+  if (!raw || typeof raw !== 'object') return null;
+  const a = raw as Record<string, unknown>;
+  const list = (v: unknown) => (Array.isArray(v) ? (v as Array<Record<string, unknown>>) : []);
+  const nameOf = (p: Record<string, unknown>) => text(p.name).trim() || `#${(num(p.position) ?? 0) + 1}`;
+  const parts = list(a.parts);
+  const side = (v: unknown) => {
+    const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+    return [text(o.material_id).toUpperCase(), list(o.colors).map((c) => text(c.label) || text(c.hex)).filter(Boolean).join(' ')].filter(Boolean).join(' ');
+  };
+  const out = {
+    parts: parts.map(nameOf),
+    uncovered: list(a.uncovered).map(nameOf),
+    substitutions: list(a.substitutions).map((x) => ({
+      part: nameOf(parts.find((p) => text(p.id) === text(x.part_id)) ?? {}),
+      from: side(x.from),
+      to: side(x.to),
+    })),
+  };
+  // One job made as asked: nothing to say beyond the order itself.
+  return out.parts.length <= 1 && !out.uncovered.length && !out.substitutions.length ? null : out;
 }
 
 export function stateTone(state: string): 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info' {
@@ -246,6 +277,10 @@ export default function CustomOrderScreen({ id, onBack, onChanged }: { id: strin
   if (order.snapshot.quantity && order.snapshot.quantity > 1) facts.push(`${s.quantity}: ${order.snapshot.quantity}`);
   if (order.snapshot.color) facts.push(`${s.color}: ${order.snapshot.color}`);
   if (deliveryWords[order.delivery_method]) facts.push(deliveryWords[order.delivery_method]);
+  const agreed = order.agreement;
+  if (agreed && agreed.parts.length > 1) facts.push(`${s.agreedParts}: ${agreed.parts.join('، ')}`);
+  if (agreed?.uncovered.length) facts.push(`${s.notIncluded}: ${agreed.uncovered.join('، ')}`);
+  for (const x of agreed?.substitutions ?? []) facts.push(fill(s.instead, { to: x.to, from: x.from, part: x.part }));
   const ready = !!order.ready_at && order.state === 'in_progress';
 
   return (

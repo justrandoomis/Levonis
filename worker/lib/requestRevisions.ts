@@ -361,8 +361,15 @@ export function supersedeStatement(db: D1Database, requestId: string, ts: string
 export function recordOfferRevisionStatement(
   db: D1Database,
   offerId: string,
-  reason: 'create' | 'edit' | 'reconfirm'
+  reason: 'create' | 'edit' | 'reconfirm',
+  opts: { v3?: boolean } = {}
 ): D1PreparedStatement {
+  // P1-05: an offer whose coverage or substitutions are (or were) not the
+  // default records them in its version, so «كان جزئيًا» is on the trail. Only
+  // then are the 0208 columns named; every other offer writes today's bytes.
+  const v3 = opts.v3
+    ? `, 'covers_all', o.covers_all, 'coverage', json(o.coverage_json), 'substitutions', json(o.substitutions_json)`
+    : '';
   return db
     .prepare(
       `INSERT OR IGNORE INTO community_offer_revisions
@@ -371,7 +378,7 @@ export function recordOfferRevisionStatement(
               json_object('completion_days', o.completion_days, 'delivery_method', o.delivery_method,
                           'materials', o.materials, 'material_ids', json(o.material_ids),
                           'included', o.included, 'warranty_terms', o.warranty_terms,
-                          'message', o.message, 'expires_at', o.expires_at),
+                          'message', o.message, 'expires_at', o.expires_at${v3}),
               ?2, o.updated_at
          FROM community_offers o WHERE o.id = ?1`
     )

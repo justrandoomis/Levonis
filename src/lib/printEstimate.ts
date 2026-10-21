@@ -100,5 +100,37 @@ export interface Estimate {
 
   range_basis?: 'materials';
 
+  /**
+   * A job priced part by part (P1-05): the figures above are sums over the
+   * PRICED parts only; `complete: false` means they are not the job price.
+   */
+  coverage?: EstimateCoverage;
+
   engine: EstimateEngine;
+}
+
+/** One part inside a part-by-part total. Never a cost figure. */
+export interface EstimatePart {
+  part_id: string;
+  position: number;
+  /** Pieces per set times sets. */
+  pieces: number;
+  price_iqd: number;
+  price_low_iqd: number;
+  price_high_iqd: number;
+  confidence: EstimateConfidence;
+  reasons: EstimateReasonCode[];
+  material_id: string;
+  process: 'fdm' | 'resin';
+  material_grams: number;
+  time_minutes: number;
+  range_basis?: 'materials';
+}
+
+export interface EstimateCoverage {
+  parts_total: number;
+  complete: boolean;
+  priced_parts: EstimatePart[];
+  /** `reason` an estimate code, or `refusal` the code a publish refuses the part with. */
+  unpriced_parts: Array<{ part_id: string; position: number; reason: EstimateReasonCode | ''; refusal?: string }>;
 }

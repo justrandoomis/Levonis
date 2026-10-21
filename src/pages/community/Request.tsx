@@ -45,7 +45,8 @@ import { GOVERNORATE_LABELS } from '../../lib/governorates';
 import { printApi } from '../../lib/printApi';
 import { formatDate } from '../../components/orders/format';
 import { AttachmentList, type RequestFile } from '../../components/media/RequestAttachments';
-import PrintSummary from '../../components/print/PrintSummary';
+import PrintSummary, { type PrintModelExtra } from '../../components/print/PrintSummary';
+import { coverageOf, isPartialOffer, partName, type PartRef } from '../../components/community/requests/offerParts';
 import { SourceLinkCard } from '../../components/community/links/LinkCard';
 import { localColour, localMaterial } from '../../components/community/requests/mirrors';
 import ConfirmSheet from '../../components/print/ConfirmSheet';
@@ -316,6 +317,9 @@ export function RequestDetail({
   const [primaryFile, setPrimaryFile] = useState<string | null>(null);
   /** The model link a link request is about (R1) — from the print summary, drawn as its card here and above the offer. */
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
+  /** P1-05: the parts and summary of the job, read by the print summary and shared with the offers. */
+  const [modelExtra, setModelExtra] = useState<PrintModelExtra>({ parts: [], summary: null });
+  const partRefs = useMemo(() => modelExtra.parts.map((p) => ({ id: p.id, name: p.name, position: p.position })), [modelExtra.parts]);
   const [publishing, setPublishing] = useState(false);
   const [draftError, setDraftError] = useState('');
   const [discardOpen, setDiscardOpen] = useState(false);
@@ -558,6 +562,11 @@ export function RequestDetail({
               {requestStateLabel(current.state, loc)}
             </StatusChip>
           </div>
+          {modelExtra.summary?.review_state === 'needs_technical_review' && (
+            <p className="mt-1.5" data-request-review>
+              <StatusChip tone="warning">{s.reviewChip}</StatusChip>
+            </p>
+          )}
           {(current.customer_name || chosenName) && (
             <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[12.5px] text-text-muted">
               {current.customer_name && <span data-request-customer>{fillNodes(s.by, { name: <bdi>{current.customer_name}</bdi> })}</span>}
@@ -713,9 +722,10 @@ export function RequestDetail({
           <div className="mt-4">
             <PrintSummary
               requestId={current.id}
-              onLoaded={(f) => {
+              onLoaded={(f, extra) => {
                 setPrimaryFile(f?.primary_file_id ?? null);
                 setSourceUrl(f?.source_url ? f.source_url : null);
+                if (extra) setModelExtra(extra);
               }}
             />
           </div>
@@ -768,11 +778,11 @@ export function RequestDetail({
                     </span>
                   </summary>
                   <div className="pt-2">
-                    <OfferCompare requestId={current.id} offers={offers} takingOffers={false} materials={materials} onChanged={refreshAll} />
+                    <OfferCompare requestId={current.id} offers={offers} takingOffers={false} materials={materials} onChanged={refreshAll} parts={partRefs} />
                   </div>
                 </details>
               ) : (
-                <OfferCompare requestId={current.id} offers={offers} takingOffers={open} materials={materials} onChanged={refreshAll} />
+                <OfferCompare requestId={current.id} offers={offers} takingOffers={open} materials={materials} onChanged={refreshAll} parts={partRefs} />
               )
             ) : onlookers ? (
               <OnlookerCard me={me} onNewRequest={onNewRequest} />
@@ -787,6 +797,7 @@ export function RequestDetail({
                 materials={materials}
                 defaultQuantity={current.quantity}
                 deliveryPref={current.delivery_pref}
+                parts={modelExtra.parts}
                 onChanged={load}
                 prefill={prefill}
                 onPrefillDone={() => setPrefill(null)}
@@ -823,7 +834,7 @@ export function RequestDetail({
             <h2 id="request-accepted-title" className="mb-2 text-[13px] font-semibold text-text-muted">
               {s.accepted}
             </h2>
-            <AcceptedOffer o={accepted} s={s} lang={L} materials={materials} mine={!isCustomer} orderState={order?.order.state ?? null} />
+            <AcceptedOffer o={accepted} s={s} lang={L} materials={materials} mine={!isCustomer} orderState={order?.order.state ?? null} parts={partRefs} />
           </section>
         )}
 
@@ -986,6 +997,7 @@ function AcceptedOffer({
   materials,
   mine,
   orderState,
+  parts = [],
 }: {
   o: OfferV2;
   s: RequestStrings;
@@ -994,7 +1006,22 @@ function AcceptedOffer({
   /** The reader is the workshop whose offer this is. */
   mine: boolean;
   orderState: string | null;
+  /** P1-05: the parts of the job, to name what the agreement covers. */
+  parts?: PartRef[];
 }) {
+  const sep = lang === 'en' ? ', ' : '، ';
+  const matName = (id: string) => {
+    const mm = materials.find((x) => x.id === id);
+    return mm ? (lang === 'en' ? mm.name_en : mm.name_ar || mm.name_en) : id;
+  };
+  const { covered, uncovered } = coverageOf(o, parts);
+  const subLines = (o.substitutions ?? []).map((x) =>
+    fill(s.substitutionRow, {
+      to: [matName(x.to.material_id), x.to.colors.map((c) => c.label || c.hex).join(sep)].filter(Boolean).join(' '),
+      from: [matName(x.from.material_id), x.from.colors.map((c) => c.label || c.hex).join(sep)].filter(Boolean).join(' '),
+      part: partName(parts.find((p) => p.id === x.part_id), s) || '—',
+    })
+  );
   const names = o.material_ids
     .map((id) => {
       const mm = materials.find((x) => x.id === id);
@@ -1011,6 +1038,9 @@ function AcceptedOffer({
   if (o.included) facts.push([s.included, <bdi key="i">{o.included}</bdi>]);
   if (o.warranty_terms) facts.push([s.warranty, <bdi key="w">{o.warranty_terms}</bdi>]);
   if (o.terms) facts.push([s.terms, <bdi key="t">{o.terms}</bdi>]);
+  // THE AGREEMENT (P1-05): the parts as agreed, the substitutes, and what was left out.
+  if (parts.length > 1) facts.push([s.agreedParts, covered.map((p) => partName(p, s)).join(sep) || '—']);
+  if (subLines.length) facts.push([s.substitutesLabel, <span key="subs" data-accepted-substitutions>{subLines.map((l) => <span key={l} className="block">{l}</span>)}</span>]);
   return (
     <div className="lv-surface p-4" data-accepted-offer={o.id}>
       <div className="flex items-start justify-between gap-3">
@@ -1040,6 +1070,11 @@ function AcceptedOffer({
         </p>
       )}
       <OfferFiles files={o.files ?? []} label={s.offerFiles} />
+      {isPartialOffer(o) && uncovered.length > 0 && (
+        <p className="mt-2 text-[12px] leading-relaxed text-warning" data-accepted-uncovered>
+          {fill(s.uncoveredNeedNew, { parts: uncovered.map((p) => partName(p, s)).join(sep) })}
+        </p>
+      )}
       {mine && <p className="mt-3 text-[13px] text-success">{s.acceptedByCustomer}</p>}
     </div>
   );

@@ -191,6 +191,31 @@ export interface Quote {
 export interface QuoteAnswer {
   quote: Quote;
   estimate: Estimate;
+  /** R10 (P1-05): model files of the request the estimate did not price. */
+  models_unpriced?: number;
+}
+
+/** What a request is made of, as every list and page reads it (P1-05). */
+export interface RequestSummaryV3 {
+  parts_count: number;
+  pieces_per_set: number;
+  /** Empty, needs_technical_review or confirmed — only ever set on a request made of parts. */
+  review_state: string;
+}
+
+/** One proposed substitution on an offer: what the customer asked (read by the server) and what the merchant proposes. */
+export interface OfferSubstitutionV2 {
+  part_id: string;
+  material_row_id: string;
+  from: { material_id: string; colors: Array<{ hex: string; label: string }> };
+  to: { material_id: string; colors: Array<{ hex: string; label: string }> };
+  note: string;
+}
+
+/** What an offer makes: the whole request, or the parts it names. */
+export interface OfferCoverageV2 {
+  covers_all: boolean;
+  parts: string[] | null;
 }
 
 /** One row of `/revisions`: the estimate as it stood when the revision was
@@ -464,6 +489,9 @@ export interface OfferV2 {
   order_id?: string | null;
   workshop_unable?: boolean;
   quote_id?: string | null;
+  /** P1-05: absent on an older Worker, which means the whole request with nothing substituted. */
+  coverage?: OfferCoverageV2;
+  substitutions?: OfferSubstitutionV2[];
   merchant: {
     id: string;
     name: string;
@@ -498,6 +526,10 @@ export interface OfferInputV2 {
   quote_id?: string;
   /** Save without sending: invisible to the customer until `sendOffer`. */
   draft?: boolean;
+  /** P1-05: the parts this offer makes (null = all) — sent only when not all. */
+  coverage?: { parts: string[] } | null;
+  /** P1-05: another material or colours for a material row of a covered part. */
+  substitutions?: Array<{ part_id: string; material_row_id: string; to: { material_id?: string; colors?: Array<{ hex: string; label: string }> }; note?: string }>;
 }
 
 export interface MyOfferRowV2 extends OfferV2 {
@@ -510,6 +542,10 @@ export interface AcceptOfferBody {
   expected_total_iqd: number;
   offer_revision: number;
   address_id?: string;
+  /** P1-05: sent only when the offer substitutes a material or a colour. */
+  accept_substitutions?: boolean;
+  /** P1-05: sent only when the offer covers some of the parts. */
+  accept_partial?: boolean;
 }
 
 /** «ملف الورشة» + the matching filters, as GET/PUT /api/merchant/request-prefs read and write them. */
@@ -579,6 +615,7 @@ export interface BoardForMeRow {
   customer_notes: string;
   status: string;
   match_score: number;
+  summary?: RequestSummaryV3;
 }
 
 export interface BoardForMePage {

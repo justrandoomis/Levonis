@@ -33,14 +33,17 @@ import { onPublicBoard, type RequestForAccess } from './communityRequests';
 import { effectiveMaterial, effectiveProcess, parseDims } from './requestRevisions';
 import { safeParse } from './types';
 import { isSchemaMissing } from './membershipBenefits';
-import { approvedAtSql, merchantApproved, withApprovalSchema } from './merchantApproval';
+import { approvedAtSql, isMissingSchema, merchantApproved, withApprovalSchema } from './merchantApproval';
+import { effectiveV3Sql } from './requestModel';
 import {
   EMPTY_PREFS,
   QUALITIES,
   evaluateEligibility,
+  partRequest,
   type CapabilityPrinter,
   type CatalogueMaterial,
   type EligibilityCandidate,
+  type EligibilityPart,
   type EligibilityRequest,
   type EligibilityResult,
   type MerchantPrefs,
@@ -128,8 +131,10 @@ export async function loadRequestFacts(db: D1Database, ids: string[], at: string
     const estimate = safeParse<Record<string, unknown>>(r.estimate, {});
     const process = effectiveProcess(print);
     const material = effectiveMaterial(print);
-    // A price or a weight across materials nobody chose is not one job's figure.
-    const firm = !!estimate.priced && !!process && !!material;
+    // A price or a weight across materials nobody chose is not one job's
+    // figure — nor is a sum over some of a job's parts (P1-05).
+    const coverage = estimate.coverage && typeof estimate.coverage === 'object' ? (estimate.coverage as Record<string, unknown>) : null;
+    const firm = !!estimate.priced && !!process && !!material && coverage?.complete !== false;
     const quality = String(r.quality ?? 'standard') as Quality;
     out.set(String(r.id), {
       id: String(r.id),
@@ -160,7 +165,86 @@ export async function loadRequestFacts(db: D1Database, ids: string[], at: string
       quantity: Math.max(1, Number(r.quantity ?? 1) || 1),
     });
   }
+  await attachParts(db, out, results ?? []);
   return out;
+}
+
+const HEX = /^#[0-9a-f]{6}$/;
+
+/**
+ * THE PARTS OF A JOB OF PARTS (P1-05, D4) — one more query for the whole
+ * batch, read only for an EFFECTIVE version-3 row (stored as 3 and still the
+ * mirror its tables were written with) that has more than one part or a part
+ * in more than one material. Any other request is the single job its v1 row
+ * says, exactly as before; a database before 0208 reads no parts at all.
+ */
+async function attachParts(db: D1Database, out: Map<string, RequestFacts>, rows: Record<string, unknown>[]): Promise<void> {
+  if (!out.size) return;
+  let parts: Record<string, unknown>[] = [];
+  try {
+    const res = await db
+      .prepare(
+        `SELECT pt.request_id, pt.id, pt.position, pt.process, pt.process_unsure, pt.stated_dims,
+                CASE WHEN json_valid(f.analysis) THEN json_extract(f.analysis, '$.measured') END AS measured,
+                CASE WHEN json_valid(f.analysis) THEN json_extract(f.analysis, '$.dimensions_mm') END AS measured_dims,
+                (SELECT json_group_array(json_object('material_id', m.material_id, 'material_unsure', m.material_unsure, 'colors', CASE WHEN json_valid(m.colors) THEN m.colors ELSE '[]' END))
+                   FROM (SELECT material_id, material_unsure, colors FROM community_request_part_materials
+                          WHERE part_id = pt.id ORDER BY position, id) m) AS materials
+           FROM community_request_parts pt
+           JOIN community_print_requests p ON p.request_id = pt.request_id
+           LEFT JOIN community_request_files f ON f.id = pt.measured_file_id AND f.request_id = pt.request_id
+          WHERE pt.request_id IN (SELECT value FROM json_each(?)) AND ${effectiveV3Sql('p')}
+          ORDER BY pt.request_id, pt.position, pt.id`
+      )
+      .bind(JSON.stringify([...out.keys()]))
+      .all<Record<string, unknown>>();
+    parts = res.results ?? [];
+  } catch (e) {
+    if (isMissingSchema(e)) return;
+    throw e;
+  }
+  const estimates = new Map(rows.map((r) => [String(r.id), safeParse<Record<string, unknown>>(r.estimate, {})]));
+  const byRequest = new Map<string, Record<string, unknown>[]>();
+  for (const p of parts) byRequest.set(String(p.request_id), [...(byRequest.get(String(p.request_id)) ?? []), p]);
+  for (const [rid, list] of byRequest) {
+    const facts = out.get(rid);
+    if (!facts) continue;
+    const read = list.map((p) => {
+      const mats = (safeParse<Array<Record<string, unknown>>>(p.materials, []) ?? []).map((m) => {
+        const colours = (safeParse<Array<Record<string, unknown>>>(m.colors, []) ?? [])
+          .filter((c) => c && (c.mode === 'catalogue' || c.mode === 'custom'))
+          .map((c) => String(c.hex ?? '').toLowerCase())
+          .filter((h) => HEX.test(h));
+        const id = Number(m.material_unsure ?? 0) === 1 ? '' : String(m.material_id ?? '');
+        return { material_id: id || null, colours, entries: (safeParse<unknown[]>(m.colors, []) ?? []).length };
+      });
+      return { p, mats };
+    });
+    if (read.length < 2 && !read.some((x) => x.mats.length > 1)) continue;
+    const estimate = estimates.get(rid) ?? {};
+    const coverage = (estimate.coverage && typeof estimate.coverage === 'object' ? estimate.coverage : {}) as Record<string, unknown>;
+    const priced = Array.isArray(coverage.priced_parts) ? (coverage.priced_parts as Array<Record<string, unknown>>) : [];
+    const job: EligibilityPart[] = read.map(({ p, mats }) => {
+      const measured = Number(p.measured ?? 0) === 1 || p.measured === true
+        ? safeParse<{ x: number; y: number; z: number } | null>(p.measured_dims, null)
+        : null;
+      const dims = measured && measured.x > 0 && measured.y > 0 && measured.z > 0 ? measured : parseDims(p.stated_dims);
+      const chosen = mats.map((m) => m.material_id).filter((x): x is string => !!x);
+      const own = Number(p.process_unsure ?? 0) === 1 ? null : p.process === 'fdm' || p.process === 'resin' ? (p.process as Process) : null;
+      const entry = priced.find((x) => String(x.part_id) === String(p.id));
+      // A part's grams are one material's figure: a single, chosen material priced as itself.
+      const firm = mats.length === 1 && chosen.length === 1 && !!entry && !entry.range_basis;
+      return {
+        id: String(p.id),
+        process: own,
+        materials: mats.map((m) => ({ material_id: m.material_id, colours: m.colours })),
+        colors_count: Math.max(1, mats.reduce((n, m) => n + m.entries, 0)),
+        dims_mm: dims,
+        grams: firm ? num(entry!.material_grams) : null,
+      };
+    });
+    facts.parts = job;
+  }
 }
 
 // -------------------------------------------------------------- workshops
@@ -392,8 +476,11 @@ export function verdictFor(
 ): Verdict {
   const v = evaluateEligibility(m, req, catalogue, now);
   const printer = v.eligible ? m.printers.find((p) => p.id === v.printer_id) ?? null : null;
+  // A job of parts is ranked on the first part this workshop can make (P1-05).
+  const firstPart = v.parts ? req.parts?.find((p) => p.id === v.parts!.find((x) => x.eligible)?.part_id) : undefined;
+  const rankReq = firstPart ? partRequest(req, firstPart) : req;
   const ranked = printer
-    ? rankScore(req, printer, m, req.material_id ? catalogue.get(req.material_id) ?? null : null, weights)
+    ? rankScore(rankReq, printer, m, rankReq.material_id ? catalogue.get(rankReq.material_id) ?? null : null, weights)
     : { score: 0, detail: {} };
   return { ...v, merchant_id: m.merchant_id, user_id: m.user_id, ...ranked };
 }
@@ -521,7 +608,9 @@ export async function matchRequest(
   const tell = opts.notify && req.on_board
     ? verdicts
         .filter((v) => v.notify && !already.has(v.merchant_id))
-        .sort((a, b) => b.score - a.score || a.merchant_id.localeCompare(b.merchant_id))
+        // A workshop that can make EVERY part is told first (P1-05); a single
+        // job's verdict has no `covers_all` and covers it all.
+        .sort((a, b) => Number(b.covers_all !== false) - Number(a.covers_all !== false) || b.score - a.score || a.merchant_id.localeCompare(b.merchant_id))
         .slice(0, limit)
     : [];
   const text = opts.text ?? rematchNoticeText(req.title);
@@ -617,6 +706,8 @@ export interface LiveVerdict {
   verdict: Verdict;
   request: RequestFacts;
   candidate: Candidate;
+  /** The catalogue the verdict was decided with (the offer route re-asks parts with it). */
+  catalogue: ReadonlyMap<string, CatalogueMaterial>;
 }
 
 /**
@@ -638,7 +729,7 @@ export async function liveVerdict(env: Env, requestId: string, merchantId: strin
   if (!request || !candidate) return null;
   const verdict = verdictFor(candidate, request, catalogue, weights as MatchWeights, now);
   await verdictStatement(db, requestId, request.revision, verdict, null, ts).run();
-  return { verdict, request, candidate };
+  return { verdict, request, candidate, catalogue };
 }
 
 /** The live verdict for the merchant a signed-in account owns, or null (not a merchant, no such request). */

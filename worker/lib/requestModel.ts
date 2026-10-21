@@ -276,6 +276,46 @@ export function MIRROR_SQL(alias: string): string {
 }
 
 /**
+ * AN EFFECTIVE VERSION-3 ROW, in SQL (P1-05): stored as version 3 and still
+ * the mirror its tables were written with. The batch readers (the matcher,
+ * the board, the lists) read parts and a review only for such a row; any
+ * other row is the v1 job it says.
+ */
+export function effectiveV3Sql(alias: string): string {
+  return `(${alias}.schema_version = 3 AND ${alias}.model_mirror = ${MIRROR_SQL(alias)})`;
+}
+
+/**
+ * THE REVIEW A READER SHOWS (P1-05, critique 6): the stored summary state of
+ * an effective version-3 row only. A v1 row's derived «needs review» (several
+ * colours) is informational and nobody can confirm it — no reader shows it.
+ */
+export function reviewStateSql(alias: string, schemaPresent: boolean): string {
+  MIRROR_SQL(alias);
+  return schemaPresent ? `COALESCE(CASE WHEN ${effectiveV3Sql(alias)} THEN ${alias}.review_state ELSE '' END, '')` : "''";
+}
+
+/**
+ * A BOARD ROW'S SUMMARY, for a list that joins the print row as `alias`
+ * (P1-05): `s_parts_count`, `s_pieces_per_set` and `s_review_state` — parts
+ * and pieces through the fingerprint, the review for an effective v3 row only.
+ */
+export function boardSummarySql(alias: string, schemaPresent: boolean): string {
+  const sum = requestSummarySql(alias, schemaPresent);
+  return `${sum.parts_count} AS s_parts_count, ${sum.pieces_per_set} AS s_pieces_per_set, ${reviewStateSql(alias, schemaPresent)} AS s_review_state`;
+}
+
+/** The summary a list row carries, or undefined when the row was read without it. */
+export function boardSummaryOf(r: Record<string, unknown>): { parts_count: number; pieces_per_set: number; review_state: string } | undefined {
+  if (r.s_parts_count === undefined) return undefined;
+  return {
+    parts_count: Number(r.s_parts_count ?? 1) || 1,
+    pieces_per_set: Number(r.s_pieces_per_set ?? 1) || 1,
+    review_state: String(r.s_review_state ?? ''),
+  };
+}
+
+/**
  * THE SUMMARY COLUMNS, AS AN SQL READER MUST READ THEM: the stored value only
  * while the row's fingerprint matches, otherwise derived from the v1 columns
  * exactly as `summarize(synthesizeModel(row))` derives it; COALESCEd for a
@@ -481,6 +521,9 @@ export function summarize(m: ModelState): ModelSummary {
   const perPart = m.parts.map((p) => p.materials.reduce((n, x) => n + x.colors.length, 0));
   const mixed = new Set(effectiveProcesses).size > 1;
   const states = m.parts.map((p) => p.review_state);
+  // Confirmed once EVERY part is (P1-05): a request in several technologies
+  // leaves review when a reviewer has confirmed each of its parts.
+  const confirmed = states.length > 0 && states.every((x) => x === 'confirmed');
   return {
     parts_count: Math.max(1, m.parts.length),
     pieces_per_set: Math.max(1, m.parts.reduce((n, p) => n + p.quantity, 0)),
@@ -488,10 +531,18 @@ export function summarize(m: ModelState): ModelSummary {
     processes: [...new Set(effectiveProcesses)].sort(),
     colors_total: perPart.reduce((a, b) => a + b, 0),
     multicolor_parts: perPart.filter((n) => n > 1).length,
-    review_state: mixed || states.includes('needs_technical_review')
-      ? 'needs_technical_review'
-      : states.length && states.every((x) => x === 'confirmed') ? 'confirmed' : '',
+    review_state: confirmed
+      ? 'confirmed'
+      : mixed || states.includes('needs_technical_review') ? 'needs_technical_review' : '',
   };
+}
+
+/** The request-level reasons a review is for: every part's own, and the mix of technologies. */
+export function reviewReasonsOf(m: ModelState): string[] {
+  const out = new Set(m.parts.flatMap((p) => p.review_reasons));
+  const processes = new Set(m.parts.map((p) => (p.process_unsure ? '' : p.process)).filter(Boolean));
+  if (processes.size > 1) out.add('mixed_process');
+  return [...out];
 }
 
 // ---------------------------------------------------------------- the hash
@@ -710,11 +761,6 @@ export function mirrorFacts(m: ModelState, files: RevisionFile[]): PricedFacts {
   return factsFromRows(r, mirrorPrintRow(m, files), files);
 }
 
-/** P1-04 publishes only a job the v1 estimate and matcher can price: one part, one piece a set, one material. */
-export function isPublishable(m: ModelState): boolean {
-  return m.parts.length === 1 && m.parts[0].quantity === 1 && m.parts[0].materials.length <= 1;
-}
-
 // ------------------------------------------- an old client's v1 body on v3
 
 const sameDims = (a: Dims | null, b: Dims | null) =>
@@ -837,6 +883,23 @@ export function projectModel(m: ModelState & Partial<Pick<RequestModelRead, 'sch
     sources,
     parts,
     summary: m.summary ?? summarize(m),
+  };
+}
+
+/**
+ * A VERSION-1 REQUEST HAS NO REVIEW ANYBODY CAN CONFIRM (P1-05, critique 6):
+ * its synthesised part's «several colours» is informational, and no reader
+ * shows it as a review. A projection of an effective version-3 model is
+ * returned as it is.
+ */
+export function withoutV1Review(m: Record<string, unknown>, v3: boolean): Record<string, unknown> {
+  if (v3) return m;
+  const parts = Array.isArray(m.parts) ? (m.parts as Array<Record<string, unknown>>) : [];
+  const summary = (m.summary ?? {}) as Record<string, unknown>;
+  return {
+    ...m,
+    parts: parts.map((p) => ({ ...p, review_state: '', review_reasons: [] })),
+    summary: { ...summary, review_state: '' },
   };
 }
 
@@ -1174,6 +1237,31 @@ export function modelWriteStatements(db: D1Database, entries: ModelWriteEntry[],
          WHERE request_id IN (${ok})`
       )
       .bind(ids, JSON.stringify(summaries)),
+  ];
+}
+
+/**
+ * A CUSTOMER SAVE NEVER UNDOES A REVIEW IT DID NOT SEE (P1-05, critique 5).
+ * The model write deletes and re-inserts every part with the review state it
+ * READ; a reviewer who confirmed (or reopened) a part after that read would
+ * be silently reverted. For the caller's batch, after the request guard: the
+ * request's `updated_at` goes NULL — the batch aborts as REQUEST_CHANGED —
+ * when any part was reviewed later than the latest review the save read.
+ * Only for a model read from the tables; a v1 request has no review to undo.
+ */
+export function reviewFenceStatement(db: D1Database, read: Pick<RequestModelRead, 'request_id' | 'schema_version' | 'parts'>): D1PreparedStatement[] {
+  if (read.schema_version !== 3) return [];
+  const seen = read.parts.map((p) => p.reviewed_at ?? '').reduce((a, b) => (b > a ? b : a), '');
+  return [
+    db
+      .prepare(
+        `UPDATE community_requests
+            SET updated_at = CASE WHEN EXISTS (SELECT 1 FROM community_request_parts
+                                                WHERE request_id = ?1 AND reviewed_at IS NOT NULL AND reviewed_at > ?2)
+                                  THEN NULL ELSE updated_at END
+          WHERE id = ?1`
+      )
+      .bind(read.request_id, seen),
   ];
 }
 

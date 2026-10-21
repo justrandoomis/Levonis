@@ -17,7 +17,6 @@ import {
 import { FORMAT_CAPABILITIES, type ModelAnalysis } from '../lib/modelGeometry';
 import { MEASURE_LATER_CODE, MEASURE_MAX_BYTES, measureRequestModel, readModelWithin } from '../lib/requestFileHooks';
 import {
-  quotePrint,
   type PrintMaterial,
   type PrintPricingConfig,
   type PrintProcess,
@@ -79,7 +78,6 @@ import {
   canonicalFactsV3,
   factsHashV3,
   isModelBody,
-  isPublishable,
   mergeFiles,
   mirrorFacts,
   mirrorFromModel,
@@ -91,12 +89,29 @@ import {
   projectSpec,
   readModelInput,
   readRequestModel,
+  reviewFenceStatement,
+  reviewStateSql,
+  requestSummarySql,
+  effectiveV3Sql,
   stateOf,
+  summarize,
+  reviewReasonsOf,
+  withoutV1Review,
   fileSourceRoles,
   v1CacheResetStatements,
   type ModelState,
   type RequestModelRead,
 } from '../lib/requestModel';
+import {
+  estimateFor,
+  estimateModel,
+  modelsUnpriced,
+  pricesAsOneJob,
+  unsupportedPart,
+  type Choices,
+  type CoveredQuote,
+  type SpecBody,
+} from '../lib/requestEstimate';
 import { REQUEST_MODEL_LIMITS } from '@levonis/contracts/requestModel';
 import { isMissingSchema } from '../lib/merchantApproval';
 
@@ -347,21 +362,6 @@ printRequestRoutes.post('/link', requireAuth, async (c) => {
 
 // ------------------------------------------------------------- 4. the estimate
 
-interface SpecBody {
-  process: PrintProcess;
-  material_id: string;
-  quality: PrintQuality;
-  infill_percent: number;
-  supports: boolean;
-  colors_count: number;
-  post_processing_minutes: number;
-  quantity: number;
-  color_hex: string;
-  color_name: string;
-  /** «6× مغناطيس، 1× ليد» — the hardware the model calls for, per part. */
-  accessories: AccessorySelection[];
-}
-
 /**
  * The accessory rows off a request body, sanitised.
  *
@@ -383,19 +383,7 @@ function readAccessories(raw: unknown): AccessorySelection[] {
   return out;
 }
 
-/**
- * «لست متأكدًا» (wizard v2, audit 03 G2). The old wizard auto-picked the first
- * FDM material, so a customer who did not care was matched only to PLA shops.
- * Now "not sure" is an answer: `process: 'unsure'` (or `process_unsure`) and
- * `material_id: 'unsure'` (or `material_unsure`). A CHOSEN material fixes the
- * process — a material is either FDM or resin — so an unsure process with a
- * known material is not unsure at all (`normalizeChoices`).
- */
-interface Choices {
-  processUnsure: boolean;
-  materialUnsure: boolean;
-}
-
+/** «لست متأكدًا» as a v1 body says it (the `Choices` type lives with the estimate, worker/lib/requestEstimate.ts). */
 function readChoices(body: Record<string, unknown>): Choices {
   return {
     processUnsure: body.process === 'unsure' || body.process_unsure === true,
@@ -432,53 +420,6 @@ function readSpec(body: Record<string, unknown>): SpecBody {
 }
 
 /**
- * THE ESTIMATE, INCLUDING FOR A CUSTOMER WHO IS NOT SURE.
- *
- * With a material chosen it is `quotePrint`, unchanged. With the material (or
- * the process) left open, no material is assumed — the owner's rule is no
- * auto-PLA — so the job is priced with EVERY active material it could be made
- * in (of the chosen process, or of both) and the answer is the honest range:
- * the cheapest one's low end to the dearest one's high end, confidence low,
- * `range_basis: 'materials'`. Per-material facts that depend on the material
- * (grams, time) are zeroed rather than reported for a material nobody chose.
- */
-function estimateFor(
-  spec: SpecBody,
-  choices: Choices,
-  base: Omit<QuoteInput, 'materialId'>,
-  mats: PrintMaterial[],
-  cfg: PrintPricingConfig
-): Quote & { range_basis?: 'materials' } {
-  if (!choices.materialUnsure && !choices.processUnsure) {
-    return quotePrint({ ...base, materialId: spec.material_id }, mats, cfg);
-  }
-  const candidates = mats.filter((m) => m.active !== false && (choices.processUnsure || m.process === spec.process));
-  const quotes = candidates.map((m) => quotePrint({ ...base, materialId: m.id }, mats, cfg));
-  const priced = quotes.filter((q) => q.priced);
-  if (!priced.length) {
-    return { ...(quotes[0] ?? quotePrint({ ...base, materialId: '' }, mats, cfg)), material_id: '' };
-  }
-  const low = priced.reduce((a, b) => (b.price_low_iqd < a.price_low_iqd ? b : a));
-  const high = Math.max(...priced.map((q) => q.price_high_iqd));
-  const mid = Math.round((low.price_low_iqd + high) / 2);
-  return {
-    ...low,
-    process: choices.processUnsure ? low.process : spec.process,
-    material_id: '',
-    material_grams: 0,
-    print_time_minutes: 0,
-    total_time_minutes: 0,
-    price_iqd: mid,
-    price_low_iqd: low.price_low_iqd,
-    price_high_iqd: high,
-    unit_price_iqd: Math.round(mid / Math.max(1, spec.quantity)),
-    confidence: 'low',
-    confidence_reasons: [...new Set([...low.confidence_reasons, 'MATERIAL_NOT_CHOSEN'])],
-    range_basis: 'materials',
-  };
-}
-
-/**
  * The Levonis estimate. Computes, stores nothing, and is deliberately callable
  * over and over as the customer moves a slider — the wizard's price updates
  * live, and every recomputation goes through the SAME engine the published
@@ -486,24 +427,61 @@ function estimateFor(
  */
 printRequestRoutes.post('/quote', requireAuth, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const spec = readSpec(body);
+  const user = c.get('user')!;
   const [mats, cfg, accs] = await Promise.all([materials(c.env), pricingConfig(c.env), accessories(c.env)]);
+
+  /**
+   * THE JOB OF PARTS (P1-05): with the request named (`request_id`, the
+   * customer's own — anyone else's is a 404) and a v3 body, the model is read
+   * as a save would read it — the body over the stored model, nothing written
+   * — and priced part by part, with what the total covers. A part a publish
+   * would refuse is shown unpriced with the code as its reason; a draft keeps
+   * it. A v1 body is priced as the v1 body it is (the wizard prices what it
+   * shows; its save folds into the model), with the request's R10 beside it.
+   */
+  const requestId = str(body.request_id, 'request_id', { max: 60, required: false }) ?? '';
+  if (requestId) {
+    await ownedRequest(c, requestId, user.id);
+    const read = isModelBody(body) ? await readRequestModel(c.env.DB, requestId) : null;
+    if (read) {
+      const next = readModelInput(body, {
+        stored: read,
+        files: read.modelFiles,
+        mats,
+        providers: await getSetting(c.env.DB, 'printLinkProviders'),
+        strict: false,
+        ts: new Date().toISOString(),
+        request: read.request,
+      });
+      const w = wizardFromModel(next, read, body, read.rows.p, readRequestFields({}));
+      const quote: CoveredQuote = pricesAsOneJob(next)
+        ? estimateFor(w.spec, w.choices, quoteInputOf(w, accs), mats, cfg)
+        : estimateModel(next, read.modelFiles, modelEstimateContext(w, mats, cfg, accs));
+      const estimate = fromEngineA(quote, { quantity: next.job.quantity });
+      const { cost_lines, cost_iqd, floor_iqd, margin_percent, accessory_lines, ...publicQuote } = quote;
+      void cost_lines; void cost_iqd; void floor_iqd; void margin_percent; void accessory_lines;
+      return c.json({ success: true, quote: publicQuote, estimate, models_unpriced: modelsUnpriced(next, read.modelFiles) });
+    }
+  }
+
+  const spec = readSpec(body);
   const choices = normalizeChoices(spec, readChoices(body), mats);
 
   // The geometry may come from an analysed file (the honest path) or from a
   // volume the customer typed because their link could not be measured.
   let analysis: ModelAnalysis | null = null;
+  let fileRequest = requestId;
   const fileId = str(body.file_id, 'file_id', { max: 60, required: false }) ?? '';
   if (fileId) {
-    const user = c.get('user')!;
     const row = await c.env.DB.prepare(
-      `SELECT f.analysis FROM community_request_files f
+      `SELECT f.analysis, f.request_id FROM community_request_files f
          JOIN community_requests r ON r.id = f.request_id
         WHERE f.id = ? AND r.customer_id = ?`
     )
       .bind(fileId, user.id)
-      .first<{ analysis: string }>();
+      .first<{ analysis: string; request_id: string }>();
     analysis = parseJson<ModelAnalysis | null>(row?.analysis, null);
+    if (row && !fileRequest) fileRequest = String(row.request_id);
   } else if (body.analysis && typeof body.analysis === 'object') {
     // A caller may pass an analysis object back (the wizard does, to avoid a
     // second read). It is only ever used for SHAPE — publishing re-reads the
@@ -533,14 +511,69 @@ printRequestRoutes.post('/quote', requireAuth, async (c) => {
   // for the count they want and is quoted that.
   const estimate = fromEngineA(quote, { quantity: spec.quantity });
 
+  // R10 (P1-05): the model files of the request beside the one priced. Read
+  // here, never stored on a v1 estimate (critique 7) — the numbers above are
+  // exactly what they always were.
+  const unpricedModels = fileRequest ? await v1ModelsUnpriced(c.env.DB, fileRequest, fileId) : 0;
+
   // The cost breakdown is the shop's business, not the customer's. What the
   // customer gets is the range, the confidence and why. `accessory_lines` goes
   // too: no client read it from this route, the estimate names the hardware
   // as a factor, and the contract forbids any `lines` in a public payload.
   const { cost_lines, cost_iqd, floor_iqd, margin_percent, accessory_lines, ...publicQuote } = quote;
   void cost_lines; void cost_iqd; void floor_iqd; void margin_percent; void accessory_lines;
-  return c.json({ success: true, quote: publicQuote, estimate });
+  return c.json({ success: true, quote: publicQuote, estimate, models_unpriced: unpricedModels });
 });
+
+/**
+ * R10 FOR A V1 JOB: the request's model files beside the one the estimate
+ * measured (an original, role `source`, never counts — it is not the public
+ * job). A database before 0208 has no roles to read.
+ */
+async function v1ModelsUnpriced(db: D1Database, requestId: string, pricedFileId: string): Promise<number> {
+  const roles = await fileSourceRoles(db, requestId);
+  const [{ results }, stored] = await Promise.all([
+    db.prepare(`SELECT id FROM community_request_files WHERE request_id = ? AND kind = 'model'`).bind(requestId).all<{ id: string }>(),
+    // No file named: the one the stored job is measured from is the priced one.
+    pricedFileId
+      ? Promise.resolve(null)
+      : db.prepare('SELECT primary_file_id FROM community_print_requests WHERE request_id = ?').bind(requestId).first<{ primary_file_id: string | null }>(),
+  ]);
+  const priced = pricedFileId || String(stored?.primary_file_id ?? '');
+  return (results ?? []).filter((f) => String(f.id) !== priced && roles.get(String(f.id)) !== 'source').length;
+}
+
+/** The engine inputs of a job the v1 way: the mirror's (or the body's) one material, its colours and its pieces. */
+function quoteInputOf(w: WizardInput, accs: PrintAccessory[]): Omit<QuoteInput, 'materialId'> {
+  return {
+    analysis: w.analysis,
+    quality: w.spec.quality,
+    infill: w.spec.infill_percent / 100,
+    quantity: w.spec.quantity,
+    colors: w.spec.colors_count,
+    supports: w.spec.supports,
+    post_processing_minutes: w.spec.post_processing_minutes,
+    accessories: w.spec.accessories,
+    accessory_catalogue: accs,
+    fallback_volume_cm3:
+      typeof w.body.volume_cm3 === 'number' && w.body.volume_cm3 > 0 ? w.body.volume_cm3 : undefined,
+  };
+}
+
+/** What a job of parts shares when it is priced part by part (worker/lib/requestEstimate.ts). */
+function modelEstimateContext(w: WizardInput, mats: PrintMaterial[], cfg: PrintPricingConfig, accs: PrintAccessory[]) {
+  return {
+    mats,
+    cfg,
+    quality: w.spec.quality,
+    infill: w.spec.infill_percent / 100,
+    supports: w.spec.supports,
+    postProcessingMinutes: w.spec.post_processing_minutes,
+    accessories: w.spec.accessories,
+    accessoryCatalogue: accs,
+    volumeCm3: typeof w.body.volume_cm3 === 'number' && w.body.volume_cm3 > 0 ? w.body.volume_cm3 : undefined,
+  };
+}
 
 // ------------------------------------------- 4b. what a matched merchant reads
 
@@ -653,6 +686,21 @@ export interface PrintMatchFacts {
   /** ISO date or ''. */
   deadline: string;
   budget_iqd: number | null;
+  /**
+   * A JOB OF PARTS (P1-05, D10): the request's quantity is then the number of
+   * SETS, so «العدد» would be the wrong number. Given, the body names the
+   * parts, the pieces in a set, the sets, every material and every process,
+   * and a technical review when one is needed — instead of the one material,
+   * the one process and the count.
+   */
+  parts?: {
+    count: number;
+    pieces_per_set: number;
+    sets: number;
+    materials: Array<{ id: string; name_ar: string; name_en: string }>;
+    processes: PrintProcess[];
+    review: boolean;
+  };
 }
 
 /**
@@ -693,22 +741,39 @@ export function printMatchNotification(f: PrintMatchFacts): { title: Trilingual;
   // The material names itself. There is no `name_ckb` in the catalogue and
   // inventing one would be a guess: PLA is PLA, so the Latin designation is the
   // honest Kurdish reading rather than a placeholder for a missing translation.
-  const matEn = latinOr(f.material?.name_en ?? '', f.material_id);
-  if (matEn) push({ ar: f.material?.name_ar || matEn, en: matEn, ckb: matEn });
+  if (f.parts) {
+    // Each material of the job, Latin as below; each technology; the parts.
+    for (const m of f.parts.materials) {
+      const en = latinOr(m.name_en, m.id);
+      if (en) push({ ar: m.name_ar || en, en, ckb: en });
+    }
+    for (const proc of f.parts.processes) push(PROCESS_LABEL[proc]);
+    push(QUALITY_LABEL[f.quality]);
+    // Label first, as «العدد» below: no plural agreement to get wrong.
+    if (f.parts.count > 1) push({ ar: `عدد القطع ${f.parts.count}`, en: `${f.parts.count} parts`, ckb: `${f.parts.count} پارچە` });
+    if (f.parts.pieces_per_set > f.parts.count) {
+      push({ ar: `القطع في الطقم ${f.parts.pieces_per_set}`, en: `${f.parts.pieces_per_set} pieces a set`, ckb: `${f.parts.pieces_per_set} پارچە لە هەر سێتێکدا` });
+    }
+    push({ ar: `الأطقم ${f.parts.sets}`, en: `${f.parts.sets} sets`, ckb: `${f.parts.sets} سێت` });
+    if (f.parts.review) push({ ar: 'تحتاج مراجعة فنية', en: 'needs a technical review', ckb: 'پێویستی بە پێداچوونەوەی تەکنیکی هەیە' });
+  } else {
+    const matEn = latinOr(f.material?.name_en ?? '', f.material_id);
+    if (matEn) push({ ar: f.material?.name_ar || matEn, en: matEn, ckb: matEn });
 
-  push(PROCESS_LABEL[f.process]);
-  push(QUALITY_LABEL[f.quality]);
+    push(PROCESS_LABEL[f.process]);
+    push(QUALITY_LABEL[f.quality]);
 
-  // "1 piece" is what every request is unless it says otherwise, so saying it
-  // spends a line of a glanceable message on nothing.
-  if (f.quantity > 1) {
-    // «العدد ٤» and not «٤ قطعة»: Arabic takes the plural for 3–10 («٤ قطع»)
-    // and the dual for 2 («قطعتين»), and the singular only from 11 up — so the
-    // obvious interpolation is wrong for exactly the range a one-off print job
-    // lands in. The merchant needs the number, not the grammar, so the label
-    // goes in front and the agreement question disappears. This also matches
-    // the «التسليم …» / «الميزانية …» shape of the parts beside it.
-    push({ ar: `العدد ${f.quantity}`, en: `${f.quantity} pcs`, ckb: `${f.quantity} دانە` });
+    // "1 piece" is what every request is unless it says otherwise, so saying it
+    // spends a line of a glanceable message on nothing.
+    if (f.quantity > 1) {
+      // «العدد ٤» and not «٤ قطعة»: Arabic takes the plural for 3–10 («٤ قطع»)
+      // and the dual for 2 («قطعتين»), and the singular only from 11 up — so the
+      // obvious interpolation is wrong for exactly the range a one-off print job
+      // lands in. The merchant needs the number, not the grammar, so the label
+      // goes in front and the agreement question disappears. This also matches
+      // the «التسليم …» / «الميزانية …» shape of the parts beside it.
+      push({ ar: `العدد ${f.quantity}`, en: `${f.quantity} pcs`, ckb: `${f.quantity} دانە` });
+    }
   }
   if (f.dimensions) push({ ar: f.dimensions, en: f.dimensions, ckb: f.dimensions });
   if (f.color_hex) push({ ar: f.color_hex, en: f.color_hex, ckb: f.color_hex });
@@ -1147,9 +1212,10 @@ function wizardFromModel(
  *   v1 body on a v3 row an older build changed since: null — the v1 path,
  *                      which reads that row as the v1 job it now is.
  *
- * A PUBLISH takes only a job the v1 estimate and matcher can price — one
- * part, one piece a set, one material — until P1-05 reads parts
- * (`REQUEST_PARTS_NOT_YET`, critique 8); a draft keeps anything.
+ * A PUBLISH takes any job of parts the estimate and the matcher read part by
+ * part (P1-05) — save a part no workshop can print as asked
+ * (`unsupportedPart`: FDM and resin in one part, a resin part in several
+ * materials, a material gone from the catalogue). A draft keeps anything.
  */
 async function planModelWrite(
   env: Env,
@@ -1197,10 +1263,38 @@ async function planModelWrite(
     }
     next = folded;
   }
-  if (opts.strict && !isPublishable(next)) {
-    throw conflict('A request with several parts or materials cannot be published yet — keep it as a draft', 'REQUEST_PARTS_NOT_YET');
+  // P1-05 (D2): a job of parts publishes — save a part no workshop can print
+  // as asked. Refused with the part named, and nothing written; a draft keeps
+  // it, and the live estimate shows it unpriced with the same code.
+  if (opts.strict) {
+    for (const part of next.parts) {
+      const code = unsupportedPart(part, mats);
+      if (!code) continue;
+      const words: Record<string, string> = {
+        PART_PROCESS_MIXED: 'One part cannot be printed in an FDM material and a resin together — make them two parts',
+        PART_RESIN_MULTI_MATERIAL: 'A resin part prints in one material — choose one, or split it into parts',
+        PART_MATERIAL_UNKNOWN: 'One of the materials is no longer in the catalogue — choose another',
+      };
+      throw badRequest(words[code], code, { part_id: part.id, position: part.position });
+    }
   }
   return { w, before: read, next, budgetVisible };
+}
+
+/** What a merchant is told of a job of parts (D10): counts, sets, every material and process, the review. */
+function notificationParts(m: ModelState, mats: PrintMaterial[]): NonNullable<PrintMatchFacts['parts']> {
+  const sum = summarize(m);
+  return {
+    count: sum.parts_count,
+    pieces_per_set: sum.pieces_per_set,
+    sets: m.job.quantity,
+    materials: sum.materials.map((id) => {
+      const mat = mats.find((x) => x.id === id);
+      return { id, name_ar: mat?.name_ar ?? '', name_en: mat?.name_en ?? '' };
+    }),
+    processes: sum.processes.filter((x): x is PrintProcess => x === 'fdm' || x === 'resin'),
+    review: sum.review_state === 'needs_technical_review',
+  };
 }
 
 export interface PublishOutcome {
@@ -1276,25 +1370,14 @@ export async function publishRequest(
   const w = model?.w ?? (await readWizardInput(env, requestId, input, stored ?? null, request, mats, { strict: true }));
   const { spec, choices, analysis } = w;
 
-  const quote = estimateFor(
-    spec,
-    choices,
-    {
-      analysis,
-      quality: spec.quality,
-      infill: spec.infill_percent / 100,
-      quantity: spec.quantity,
-      colors: spec.colors_count,
-      supports: spec.supports,
-      post_processing_minutes: spec.post_processing_minutes,
-      accessories: spec.accessories,
-      accessory_catalogue: accs,
-      fallback_volume_cm3:
-        typeof w.body.volume_cm3 === 'number' && w.body.volume_cm3 > 0 ? w.body.volume_cm3 : undefined,
-    },
-    mats,
-    cfg
-  );
+  // ONE JOB, THE V1 WAY — or a job of parts, PART BY PART (P1-05, D1): one
+  // part, one piece a set, one material takes exactly the call it always did;
+  // anything else is priced per part, and the stored figures are the sums
+  // over the priced parts with `coverage` saying which those are.
+  const byParts = !!model && !pricesAsOneJob(model.next);
+  const quote: CoveredQuote = byParts
+    ? estimateModel(model!.next, model!.before.modelFiles, modelEstimateContext(w, mats, cfg, accs))
+    : estimateFor(spec, choices, quoteInputOf(w, accs), mats, cfg);
 
   const completeness = completenessOf(spec, analysis, w.sourceKind, w.sourceUrl, quote.priced);
 
@@ -1376,6 +1459,8 @@ export async function publishRequest(
             SET updated_at = CASE WHEN updated_at = ?2 THEN updated_at ELSE NULL END
           WHERE id = ?1`
       ).bind(requestId, ts),
+      // A review that landed after this publish read the model is never undone by it (P1-05).
+      ...(model ? reviewFenceStatement(env.DB, model.before) : []),
       printRowStatement(env.DB, requestId, w, quote, completeness, ts),
       // The model's rows and its stamp, after the v1 row they mirror (P1-04);
       // a v1 write puts a built v1 cache back on the quarter-hour job's list.
@@ -1453,6 +1538,7 @@ export async function publishRequest(
     governorate: String(forMatching?.governorate ?? request.governorate ?? ''),
     deadline: String(forMatching?.deadline ?? ''),
     budget_iqd: typeof forMatching?.budget_iqd === 'number' ? forMatching.budget_iqd : null,
+    ...(byParts ? { parts: notificationParts(model!.next, mats) } : {}),
   });
   const matched = await matchRequest(env, requestId, {
     notify: true,
@@ -1562,6 +1648,7 @@ printRequestRoutes.put('/requests/:id/draft', requireAuth, async (c) => {
         `UPDATE community_requests SET updated_at = CASE WHEN state = 'draft' AND updated_at = ?2 THEN updated_at ELSE NULL END
           WHERE id = ?1`
       ).bind(requestId, ts),
+      ...(model ? reviewFenceStatement(c.env.DB, model.before) : []),
       printRowStatement(c.env.DB, requestId, w, null, 0, ts),
       ...(model
         ? modelWriteStatements(c.env.DB, [{ request_id: requestId, model: model.next, schema_version: 3 }], ts)
@@ -1809,13 +1896,16 @@ printRequestRoutes.get('/requests/:id', async (c) => {
   // The customer and the merchant already working the job keep their view.
   const boardShut = publicBoard && !isOwner && !communityMayEnter(await readCommunityGate(c.env.DB), user);
   const openToAll = publicBoard && !boardShut;
+  // THE ACCEPTED merchant reads the model as `accepted` (the original, Q5);
+  // the store a direct request is addressed to, before acceptance, reads it as
+  // any merchant who may offer (P1-05, critique High 6).
+  const accepted = !!user && !isOwner && (await isEngagedMerchant(c.env.DB, requestId, user.id));
   if (!isOwner && !openToAll) {
     // The engaged merchant — or the store a DIRECT request is addressed to (0151).
-    const engaged = user
-      ? (await isEngagedMerchant(c.env.DB, requestId, user.id)) || (await isDirectMerchant(c.env.DB, requestId, user.id))
-      : false;
+    const engaged = user ? accepted || (await isDirectMerchant(c.env.DB, requestId, user.id)) : false;
     if (!engaged) throw boardShut ? communityClosedRefusal() : notFound('Request not found');
   }
+  const audience = isOwner ? 'owner' : accepted ? 'accepted' : user ? 'merchant' : 'public';
 
   const row = await c.env.DB.prepare('SELECT * FROM community_print_requests WHERE request_id = ?')
     .bind(requestId)
@@ -1829,9 +1919,31 @@ printRequestRoutes.get('/requests/:id', async (c) => {
   // cut to what and how many (DECISIONS row 220).
   const estimate = publicEstimate(row.estimate);
 
+  // THE MODEL AND ITS SUMMARY (P1-05): every part with its materials, colours
+  // and review, as this reader may see it — a review only on an effective
+  // version-3 request (critique 6: a v1 «several colours» is not a review
+  // anybody can clear). R10 is read here, never stored on a v1 estimate.
+  const read = await readRequestModel(c.env.DB, requestId);
+  const v3 = read?.schema_version === 3;
+  const projected = read ? withoutV1Review(projectModel(read, audience), v3) : null;
+  const summary = read
+    ? {
+        parts_count: read.summary.parts_count,
+        pieces_per_set: read.summary.pieces_per_set,
+        sets: read.job.quantity,
+        materials: read.summary.materials,
+        processes: read.summary.processes,
+        review_state: v3 ? read.summary.review_state : '',
+        review_reasons: v3 ? reviewReasonsOf(read) : [],
+      }
+    : null;
+
   return c.json({
     success: true,
+    model: projected,
+    summary,
     print: {
+      models_unpriced: read ? modelsUnpriced(read, read.modelFiles) : 0,
       process: row.process,
       material_id: row.material_id,
       color_hex: row.color_hex,
@@ -2433,8 +2545,22 @@ async function copyRequestModel(db: D1Database, sourceId: string, newId_: string
  */
 printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
   const user = c.get('user')!;
-  const { results } = await c.env.DB.prepare(
-    `SELECT r.id, r.title, r.state, r.status, r.quantity, r.material, r.color,
+  // THE SUMMARY (P1-05): parts, pieces a set and the review — read through
+  // the fingerprint (`requestSummarySql`), the review only for an effective
+  // version-3 row — and R10, the model files the estimate did not price.
+  // A database before 0208 reads the v1 derivation and no review.
+  const listSql = (schema: boolean) => {
+    const sum = requestSummarySql('p', schema);
+    const v3Parts = schema
+      ? `AND NOT EXISTS (SELECT 1 FROM community_request_parts pt WHERE pt.request_id = r.id AND pt.measured_file_id = mf.id AND ${effectiveV3Sql('p')})
+         AND NOT EXISTS (SELECT 1 FROM community_request_sources so WHERE so.request_id = r.id AND so.file_id = mf.id AND so.role = 'source')`
+      : '';
+    return `SELECT r.id, r.title, r.state, r.status, r.quantity, r.material, r.color,
+            ${sum.parts_count} AS s_parts_count, ${sum.pieces_per_set} AS s_pieces_per_set,
+            ${reviewStateSql('p', schema)} AS s_review_state,
+            CASE WHEN json_valid(p.estimate) THEN json_extract(p.estimate, '$.coverage.complete') END AS s_estimate_complete,
+            (SELECT COUNT(*) FROM community_request_files mf
+              WHERE mf.request_id = r.id AND mf.kind = 'model' AND mf.id IS NOT COALESCE(p.primary_file_id, '') ${v3Parts}) AS s_models_unpriced,
             r.budget_iqd, r.deadline, r.governorate, r.offer_count, r.created_at,
             r.accepted_offer_id, r.community_order_id, r.revision, r.expires_at, r.published_at,
             p.process_unsure, p.material_unsure, p.source_type,
@@ -2453,10 +2579,15 @@ printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
        LEFT JOIN community_merchants m ON m.id = o.merchant_id
       WHERE r.customer_id = ?
       ORDER BY r.created_at DESC
-      LIMIT 50`
-  )
-    .bind(user.id)
-    .all<Record<string, unknown>>();
+      LIMIT 50`;
+  };
+  let results: Record<string, unknown>[] | undefined;
+  try {
+    results = (await c.env.DB.prepare(listSql(true)).bind(user.id).all<Record<string, unknown>>()).results;
+  } catch (e) {
+    if (!isMissingSchema(e)) throw e;
+    results = (await c.env.DB.prepare(listSql(false)).bind(user.id).all<Record<string, unknown>>()).results;
+  }
 
   return c.json({
     success: true,
@@ -2476,6 +2607,14 @@ printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
       revision: Number(r.revision ?? 1),
       expires_at: (r.expires_at as string | null) ?? null,
       published_at: (r.published_at as string | null) ?? null,
+      summary: {
+        parts_count: Number(r.s_parts_count ?? 1) || 1,
+        pieces_per_set: Number(r.s_pieces_per_set ?? 1) || 1,
+        review_state: String(r.s_review_state ?? ''),
+        // false only for a job priced part by part with a part left unpriced.
+        estimate_complete: r.s_estimate_complete === null || r.s_estimate_complete === undefined ? true : Number(r.s_estimate_complete) === 1,
+        models_unpriced: Number(r.s_models_unpriced ?? 0) || 0,
+      },
       // The print side is null for a request made before this system, or one
       // that was never published through the wizard. The UI renders the plain
       // card for those rather than pretending there is a measurement.

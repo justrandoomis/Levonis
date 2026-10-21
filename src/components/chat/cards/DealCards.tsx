@@ -89,6 +89,13 @@ export function QuoteCardView({ card, mine }: Props) {
   const job = [num(s.quantity) && Number(s.quantity) > 1 ? loc(`${s.quantity} قطع`, `${s.quantity} pieces`, `${s.quantity} پارچە`) : '', localMaterial(str(s.material), (lang === 'en' || lang === 'ckb' ? lang : 'ar')), localColour(str(s.color), (lang === 'en' || lang === 'ckb' ? lang : 'ar'))]
     .filter(Boolean)
     .join(' · ');
+  // P1-05, defensive: a quote that covers some parts or substitutes is
+  // accepted on the request page, where the customer acknowledges it — never
+  // from a card (a conversation request is never made of parts today).
+  const needsPage = [s, cur as unknown as Record<string, unknown>].some((x) => {
+    const cov = x?.coverage as { covers_all?: unknown } | undefined;
+    return (!!cov && cov.covers_all === false) || (Array.isArray(x?.substitutions) && (x.substitutions as unknown[]).length > 0);
+  });
 
   const accept = async () => {
     const yes = await confirm({
@@ -140,7 +147,12 @@ export function QuoteCardView({ card, mine }: Props) {
         <StatusLine tone={toneOf(cur.status)}>{statusText('quote', cur.status, loc, side)}</StatusLine>
         {(can.size > 0 || orderId) && (
           <CardActions>
-            {can.has('accept') && <CardButton action="accept" variant="primary" busy={busy === 'accept'} onClick={() => void accept()}>{loc('قبول العرض', 'Accept')}</CardButton>}
+            {can.has('accept') && !needsPage && <CardButton action="accept" variant="primary" busy={busy === 'accept'} onClick={() => void accept()}>{loc('قبول العرض', 'Accept')}</CardButton>}
+            {can.has('accept') && needsPage && (
+              <CardButton action="open_request" variant="primary" onClick={() => navigate(`/requests/${encodeURIComponent(str(s.request_id))}`)}>
+                {loc('افتح الطلب لقبول هذا العرض', 'Open the request to accept this offer', 'داواکارییەکە بکەرەوە بۆ قبوڵکردنی ئەم ئۆفەرە')}
+              </CardButton>
+            )}
             {can.has('decline') && <CardButton action="decline" busy={busy === 'decline'} onClick={() => void decline()}>{loc('رفض', 'Decline')}</CardButton>}
             {can.has('reconfirm') && (
               <CardButton action="reconfirm" variant="primary" busy={busy === 'reconfirm'} onClick={() => void run('reconfirm', () => chatCommerceApi.reconfirm(card.ref), loc('أكّدت عرضك للطلب كما هو الآن', 'You re-confirmed your quote'))}>

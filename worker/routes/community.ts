@@ -14,6 +14,8 @@ import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { anonymousCached } from '../lib/edgePolicy';
 import { publishRequest } from './printRequests';
 import { publicRequest } from './marketplace';
+import { boardSummarySql } from '../lib/requestModel';
+import { isMissingSchema } from '../lib/merchantApproval';
 // Workshop facts on the store page, and the merchant's own board (0159, §9.5).
 import { eligibleVerdictSql, publicWorkshopFacts } from '../lib/printMatchingStore';
 import { storeForUser } from '../lib/merchantAuth';
@@ -461,18 +463,26 @@ communityRoutes.get('/requests', async (c) => {
      * to; the count asks the same way.
      */
     const fits = eligibleVerdictSql('r', '?6');
-    const [{ results: rows }, total] = await Promise.all([
-      c.env.DB.prepare(
-        `SELECT r.*,
+    // The summary (P1-05) rides the print row; a database before 0208 reads the v1 derivation.
+    const mineSql = (schema: boolean) =>
+      `SELECT r.*,
                 (SELECT COUNT(*) FROM community_request_files f WHERE f.request_id = r.id) AS file_count,
-                (SELECT sm.score FROM community_request_matches sm WHERE sm.request_id = r.id AND sm.merchant_id = ?6) AS match_score
+                (SELECT sm.score FROM community_request_matches sm WHERE sm.request_id = r.id AND sm.merchant_id = ?6) AS match_score,
+                ${boardSummarySql('p', schema)}
            FROM community_requests r
+           LEFT JOIN community_print_requests p ON p.request_id = r.id
           WHERE ${visible}
             AND r.customer_id <> ?7
             AND ${fits}
             AND (?3 = '' OR r.created_at < ?3 OR (r.created_at = ?3 AND r.id < ?4))
-          ORDER BY r.created_at DESC, r.id DESC LIMIT ?5`
-      ).bind(now, q, cursor.at, cursor.id, limit + 1, mine.merchant.id, user.id).all<Record<string, unknown>>(),
+          ORDER BY r.created_at DESC, r.id DESC LIMIT ?5`;
+    const readMine = (schema: boolean) =>
+      c.env.DB.prepare(mineSql(schema)).bind(now, q, cursor.at, cursor.id, limit + 1, mine.merchant.id, user.id).all<Record<string, unknown>>();
+    const [{ results: rows }, total] = await Promise.all([
+      readMine(true).catch((e) => {
+        if (isMissingSchema(e)) return readMine(false);
+        throw e;
+      }),
       cursor.at === ''
         ? c.env.DB.prepare(
             `SELECT COUNT(*) AS n FROM community_requests r
@@ -495,15 +505,22 @@ communityRoutes.get('/requests', async (c) => {
       for: 'me',
     });
   }
-  const [{ results }, total] = await Promise.all([
-    c.env.DB.prepare(
-      `SELECT r.*,
-              (SELECT COUNT(*) FROM community_request_files f WHERE f.request_id = r.id) AS file_count
+  const allSql = (schema: boolean) =>
+    `SELECT r.*,
+              (SELECT COUNT(*) FROM community_request_files f WHERE f.request_id = r.id) AS file_count,
+              ${boardSummarySql('p', schema)}
          FROM community_requests r
+         LEFT JOIN community_print_requests p ON p.request_id = r.id
         WHERE ${visible}
           AND (?3 = '' OR r.created_at < ?3 OR (r.created_at = ?3 AND r.id < ?4))
-        ORDER BY r.created_at DESC, r.id DESC LIMIT ?5`
-    ).bind(now, q, cursor.at, cursor.id, limit).all<Record<string, unknown>>(),
+        ORDER BY r.created_at DESC, r.id DESC LIMIT ?5`;
+  const readAll = (schema: boolean) =>
+    c.env.DB.prepare(allSql(schema)).bind(now, q, cursor.at, cursor.id, limit).all<Record<string, unknown>>();
+  const [{ results }, total] = await Promise.all([
+    readAll(true).catch((e) => {
+      if (isMissingSchema(e)) return readAll(false);
+      throw e;
+    }),
     cursor.at === ''
       ? c.env.DB.prepare(`SELECT COUNT(*) AS n FROM community_requests r WHERE ${visible}`).bind(now, q).first<{ n: number }>()
       : Promise.resolve(null),

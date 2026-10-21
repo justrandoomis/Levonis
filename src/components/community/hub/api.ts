@@ -82,6 +82,8 @@ export interface CommunityRequest {
   file_count?: number;
   created_at: string;
   expires_at?: string | null;
+  /** P1-05: the parts, the pieces a set and the technical review — absent on an older Worker. */
+  summary?: { parts_count: number; pieces_per_set: number; review_state: string };
 }
 
 export interface CommunityWork {

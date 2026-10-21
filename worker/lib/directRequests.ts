@@ -23,7 +23,7 @@ import { HttpError, conflict, notFound } from './http';
 import { isSchemaMissing } from './membershipBenefits';
 import { isPast, merchantTakesNewWork } from './communityRequests';
 import { approvedAtSql, merchantApproved, withApprovalSchema } from './merchantApproval';
-import { assertMayOffer } from './printMatchingStore';
+import { assertMayOffer, type LiveVerdict } from './printMatchingStore';
 
 export interface DirectRequestRow {
   id: string;
@@ -108,11 +108,12 @@ export async function assertDirectStanding(env: Env, requestId: string, merchant
  * a store's quote in its own conversation is never refused for printers the
  * customer never asked about.
  */
-export async function assertMayQuote(env: Env, requestId: string, merchantId: string): Promise<void> {
+export async function assertMayQuote(env: Env, requestId: string, merchantId: string): Promise<LiveVerdict | null> {
   const direct = await directRequest(env.DB, requestId);
   if (direct) {
     await assertDirectStanding(env, requestId, merchantId);
-    return;
+    return null;
   }
-  await assertMayOffer(env, requestId, merchantId);
+  // The live verdict, for a caller that also asks it of each covered part (P1-05).
+  return assertMayOffer(env, requestId, merchantId);
 }

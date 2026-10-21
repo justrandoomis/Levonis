@@ -22,7 +22,7 @@
  * ever mounted inside the platform admin, on the apex host.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Loader2, Search, BadgeCheck, Ban, ShieldCheck, Store, AlertTriangle, Wallet,
   Scale, Settings2, TrendingUp, ChevronLeft, Check, ClipboardList, Star, Printer, Paperclip,
@@ -49,6 +49,11 @@ import {
   type AdminRequestRow, type AdminReviewRow, type AdminReputation, type AdminComplaintMessage,
 } from '../../lib/merchant';
 import VariantImg from '../ui/VariantImg';
+import { Button } from '../ui/Button';
+import { useLanguage } from '../../LanguageContext';
+
+// P1-05: the technical review queue loads only when an admin opens it.
+const TechnicalReviewPanel = lazy(() => import('./TechnicalReviewPanel'));
 
 type Section =
   | 'overview' | 'merchants' | 'board' | 'disputes' | 'finance' | 'reputation' | 'settings' | 'print';
@@ -796,6 +801,8 @@ function Board({ t }: { t: T }) {
   const [state, setState] = useState('');
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const { loc } = useLanguage();
 
   const load = useCallback(() => {
     adminCommunityApi.requests(state, q).then((d) => setRows(d.requests)).catch(() => setRows([]));
@@ -803,9 +810,19 @@ function Board({ t }: { t: T }) {
   useEffect(load, [load]);
 
   if (open) return <RequestDetail id={open} t={t} onBack={() => { setOpen(null); load(); }} />;
+  if (reviewing) {
+    return (
+      <Suspense fallback={<Spin />}>
+        <TechnicalReviewPanel onBack={() => setReviewing(false)} />
+      </Suspense>
+    );
+  }
 
   return (
     <div className="space-y-4">
+      <Button size="sm" variant="secondary" onClick={() => setReviewing(true)} data-technical-review-open>
+        {loc('المراجعة الفنية', 'Technical review', 'پێداچوونەوەی تەکنیکی')}
+      </Button>
       <div className="relative">
         <Search className="w-4 h-4 text-text-muted absolute start-3 top-1/2 -translate-y-1/2" />
         <input
@@ -873,6 +890,7 @@ function Board({ t }: { t: T }) {
 }
 
 function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void }) {
+  const { loc } = useLanguage();
   const [d, setD] = useState<Awaited<ReturnType<typeof adminCommunityApi.request>> | null>(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState('');
@@ -947,6 +965,22 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
         </div>
       </Section>
 
+      {/* P1-05: a job of parts — each part with what it is made in. */}
+      {(d.model?.parts.length ?? 0) > 1 && (
+        <Section title={loc('القطع', 'Parts', 'پارچەکان')}>
+          <div className="space-y-1.5" data-admin-request-parts>
+            {d.model!.parts.map((p) => (
+              <div key={p.id} className="flex items-center justify-between gap-3 text-[12px]">
+                <span className="text-text-secondary truncate">{p.name || `#${p.position + 1}`}</span>
+                <span className="text-text-muted shrink-0" dir="ltr">
+                  ×{p.quantity} · {p.materials.map((m) => (m.material_unsure || !m.material_id ? '?' : m.material_id.toUpperCase())).join(' + ')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
       {!!d.files.length && (
         <Section title={t('المرفقات', 'Attachments')}>
           {/* File keys are never sent to a browser (§67) — an admin sees what
@@ -992,6 +1026,15 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
                   </div>
                 </div>
 
+                {(o.coverage?.covers_all === false || !!o.substitutions?.length) && (
+                  <p className="text-warning text-[11.5px] mt-1" data-admin-offer-coverage>
+                    {o.coverage?.covers_all === false
+                      ? loc(`جزئي — القطع المشمولة ${o.coverage.parts?.length ?? 0}`, `Partial — ${o.coverage.parts?.length ?? 0} parts covered`, `بەشەکی — ${o.coverage.parts?.length ?? 0} پارچە گیراوە`)
+                      : ''}
+                    {o.coverage?.covers_all === false && !!o.substitutions?.length ? ' · ' : ''}
+                    {o.substitutions?.map((x) => `${x.to.material_id.toUpperCase()} ← ${x.from.material_id.toUpperCase()}`).join('، ')}
+                  </p>
+                )}
                 {!!o.message && (
                   <p className="text-text-secondary text-[12px] mt-2 whitespace-pre-wrap">{o.message}</p>
                 )}

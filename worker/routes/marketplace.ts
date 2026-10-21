@@ -49,7 +49,7 @@ import { requestImageRendition } from '../lib/imageVariants';
 import { parseVariantWidth } from '../lib/imageConvert';
 import { getTierStatus, benefits, membershipBadges } from '../lib/entitlements';
 import { requireOfferPrivileges, requireWithdrawPrivileges, storeForUser } from '../lib/merchantAuth';
-import { approvedAtSql, merchantApproved, withApprovalSchema } from '../lib/merchantApproval';
+import { approvedAtSql, isMissingSchema, merchantApproved, withApprovalSchema } from '../lib/merchantApproval';
 import { feeFor, autoCompleteDays } from '../lib/merchantOps';
 import {
   escrowForOrder,
@@ -116,13 +116,35 @@ import { requestBoardVisible } from '../lib/requestBoard';
 import { likePattern } from '../lib/sqlLike';
 import { notifyStatement } from '../lib/notifications';
 // Eligibility as data (W5-B): the offer gate, the file matrix and the re-match.
-import { assertMayOffer, eligibleVerdictSql, liveVerdict } from '../lib/printMatchingStore';
+import { assertMayOffer, eligibleVerdictSql, liveVerdict, type LiveVerdict } from '../lib/printMatchingStore';
 // A request addressed to ONE store (0151): its store quotes it without matching.
 import { assertMayQuote, directRequest } from '../lib/directRequests';
 import { isDirectMerchant } from '../lib/communityRequests';
 import { announceCustomOrder, customOrderCard, postSystemCard } from '../lib/chatCards';
 import { fileClass, fileReadStatement, fileReader, mayReadBytes, previewGrantFor } from '../lib/requestFilePolicy';
-import { fileSourceRoles, restampAfterFileStatement } from '../lib/requestModel';
+import { boardSummaryOf, boardSummarySql, fileSourceRoles, modelOfSpec, readRequestModel, restampAfterFileStatement } from '../lib/requestModel';
+import {
+  DEFAULT_COVERAGE,
+  agreementSnapshot,
+  assertCoverageEligible,
+  assertNoAddedParts,
+  coverageColumns,
+  coverageUnavailable,
+  isDefaultCoverage,
+  isRevisionFenceAbort,
+  loadRevisionModel,
+  modelAtRevision,
+  namesCoverage,
+  offerCoverageShape,
+  readCoverageBody,
+  resolveCoverage,
+  revisionHashFence,
+  storedCoverage,
+  uncoverableParts,
+  type CoverageBody,
+  type OfferCoverageTerms,
+  type RevisionModel,
+} from '../lib/offerCoverage';
 // Phase 5b (docs/COMMUNITY_ECOSYSTEM.md §9.5): the discussion's server-written
 // rows on a close or a revision, and the timeline's «started» row.
 import { writeRequestSystemUpdate } from './requestDiscussion';
@@ -183,6 +205,8 @@ export function publicRequest(r: Record<string, unknown>) {
     /** Notes the customer wrote FOR the merchants (0130) — a real column. The
      *  private `notes` (where the old wizard stashed a link) is never shown. */
     customer_notes: r.customer_notes ?? '',
+    /** P1-05: the parts, the pieces a set and the technical review — only on a list that read them. */
+    ...(boardSummaryOf(r) ? { summary: boardSummaryOf(r) } : {}),
   };
 }
 
@@ -262,6 +286,13 @@ export function offerShape(o: Record<string, unknown>, badges: { pro: Set<string
     revised: Number(o.revision ?? 1) > 1,
     valid_until: (o.expires_at as string | null) ?? null,
     draft: false,
+    /**
+     * WHAT THIS OFFER MAKES (P1-05): the whole request, or the parts it names
+     * (a PARTIAL offer), and the materials or colours it proposes instead of
+     * the customer's — each with what it replaces. A row before 0208 is the
+     * whole request with nothing substituted.
+     */
+    ...offerCoverageShape(o),
     // What a customer needs to compare offers (§27) — reputation, not contact
     // details.
     merchant: o.m_name
@@ -297,18 +328,26 @@ marketplaceRoutes.get('/requests', requireCommunityOpen, async (c) => {
   const category = c.req.query('category') || '';
   const governorate = c.req.query('governorate') || '';
 
-  const { results } = await c.env.DB.prepare(
+  // The summary (P1-05) rides the print row; a database before 0208 reads the v1 derivation.
+  const boardSql = (schema: boolean) =>
     `SELECT r.id, r.title, r.description, r.category, r.quantity, r.material, r.color,
             r.dimensions, r.budget_iqd, r.deadline, r.governorate, r.delivery_pref,
             r.state, r.offer_count, r.created_at, r.expires_at,
-            (SELECT COUNT(*) FROM community_request_files f WHERE f.request_id = r.id) AS file_count
+            (SELECT COUNT(*) FROM community_request_files f WHERE f.request_id = r.id) AS file_count,
+            ${boardSummarySql('p', schema)}
        FROM community_requests r JOIN users u ON u.id = r.customer_id
+       LEFT JOIN community_print_requests p ON p.request_id = r.id
       WHERE ${requestBoardVisible('?1', '?2')}
         AND (?3 = '' OR r.category = ?3)
         AND (?4 = '' OR r.governorate = ?4)
         AND (?5 = '' OR r.created_at < ?5 OR (r.created_at = ?5 AND r.id < ?6))
-      ORDER BY r.created_at DESC, r.id DESC LIMIT ?7`
-  ).bind(nowIso(), q, category, governorate, cursor.at, cursor.id, limit).all<Record<string, unknown>>();
+      ORDER BY r.created_at DESC, r.id DESC LIMIT ?7`;
+  const read = (schema: boolean) =>
+    c.env.DB.prepare(boardSql(schema)).bind(nowIso(), q, category, governorate, cursor.at, cursor.id, limit).all<Record<string, unknown>>();
+  const { results } = await read(true).catch((e) => {
+    if (isMissingSchema(e)) return read(false);
+    throw e;
+  });
 
   return c.json({
     success: true,
@@ -1173,6 +1212,17 @@ interface DraftPayload extends OfferTerms, OfferExtras {
   quote_id?: string;
   /** Kept raw so the validity is recomputed from the SEND, not from the day the draft was saved. */
   valid_days?: number | null;
+  /** P1-05: the parts the draft covers (null = all) and its substitutions, re-checked at send. */
+  coverage?: string[] | null;
+  substitutions?: CoverageBody['substitutions'];
+}
+
+/** A draft keeps the coverage as a body would send it again (re-checked at send). */
+function draftCoverage(t: OfferCoverageTerms): Pick<DraftPayload, 'coverage' | 'substitutions'> {
+  return {
+    coverage: t.parts,
+    substitutions: t.substitutions.map((x) => ({ part_id: x.part_id, material_row_id: x.material_row_id, to: { material_id: x.to.material_id, colors: x.to.colors }, note: x.note })),
+  };
 }
 
 /** A merchant's own draft by id — null when none, and on a database behind 0159. */
@@ -1265,6 +1315,8 @@ function draftShape(d: DraftRow, request: { revision?: unknown } = {}) {
     files: files.map((f) => ({ id: null, kind: f.kind, name: f.name, bytes: f.bytes, content_type: f.content_type ?? '', url: null, key: f.key })),
     merchant: null,
     quote_id: p.quote_id ?? null,
+    coverage: { covers_all: !Array.isArray(p.coverage), parts: Array.isArray(p.coverage) ? p.coverage : null },
+    substitutions: Array.isArray(p.substitutions) ? p.substitutions : [],
   };
 }
 
@@ -1280,10 +1332,18 @@ function draftShape(d: DraftRow, request: { revision?: unknown } = {}) {
  */
 function insertOfferStatements(
   db: D1Database,
-  p: { id: string; requestId: string; merchantId: string; storeId: string | null; customerId: string; terms: OfferTerms; extras: OfferExtras; ts: string }
+  p: {
+    id: string; requestId: string; merchantId: string; storeId: string | null; customerId: string; terms: OfferTerms; extras: OfferExtras; ts: string;
+    /** P1-05: a coverage or substitutions that are not the default, and the revision hash they were checked against. */
+    coverage?: { terms: OfferCoverageTerms; hash: string };
+  }
 ): D1PreparedStatement[] {
   const { terms: t, extras: x } = p;
+  const cov = p.coverage && !isDefaultCoverage(p.coverage.terms) ? p.coverage : null;
+  const cols = cov ? coverageColumns(cov.terms) : null;
   return [
+    // The request is still the version the coverage was checked against (critique 3).
+    ...(cov ? [revisionHashFence(db, p.requestId, cov.hash)] : []),
     db
       .prepare(
         `INSERT INTO community_offers
@@ -1313,11 +1373,54 @@ function insertOfferStatements(
             AND EXISTS (SELECT 1 FROM community_offers WHERE id = ?)`
       )
       .bind(p.ts, p.requestId, p.id),
+    // Its coverage and substitutions, on the row just written — only when
+    // they are not the default, so a whole offer's statements are today's.
+    ...(cols
+      ? [db.prepare('UPDATE community_offers SET coverage_json = ?, substitutions_json = ?, covers_all = ? WHERE id = ?')
+          .bind(cols.coverage_json, cols.substitutions_json, cols.covers_all, p.id)]
+      : []),
     // What the customer will see as this offer's first version (0130).
-    recordOfferRevisionStatement(db, p.id, 'create'),
+    recordOfferRevisionStatement(db, p.id, 'create', { v3: !!cols }),
     // The board shows a live count; it is recomputed, never incremented.
     offerCountStatement(db, p.requestId),
   ];
+}
+
+/**
+ * THE COVERAGE A BODY NAMES, CHECKED (P1-05). Nothing named — or the
+ * defaults written out — is the whole request and costs no read. Otherwise
+ * the request's current revision is read and the coverage resolved against
+ * it; a database before 0208 refuses OFFER_COVERAGE_UNAVAILABLE, and a chat
+ * or direct request takes no coverage at all.
+ */
+async function coverageFromBody(
+  env: Env,
+  requestId: string,
+  raw: CoverageBody,
+  stored: OfferCoverageTerms = DEFAULT_COVERAGE
+): Promise<{ terms: OfferCoverageTerms; rm: RevisionModel | null }> {
+  if (!namesCoverage(raw) && isDefaultCoverage(stored)) return { terms: DEFAULT_COVERAGE, rm: null };
+  const read = await readRequestModel(env.DB, requestId);
+  if (!read) throw notFound('Request not found');
+  const rm = await loadRevisionModel(env.DB, requestId, async () => read);
+  if (!rm) throw notFound('Request not found');
+  const mats = (await getSetting(env.DB, 'printMaterials')) as unknown as Array<{ id: string; process: string; active?: boolean }>;
+  const terms = resolveCoverage(raw, rm, Array.isArray(mats) ? mats : [], stored);
+  if (!isDefaultCoverage(terms) && !read.schema) throw coverageUnavailable();
+  return { terms, rm };
+}
+
+/**
+ * EVERY PART THE OFFER COVERS, THIS WORKSHOP CAN MAKE (D5; critique 2) — as
+ * asked or with its substitution. A whole offer covers every part, so a
+ * workshop that can make only some of a job's parts offers on those. A job
+ * the matcher reads as one (no parts) was judged whole by the verdict.
+ */
+async function assertCoveredPartsMakeable(env: Env, requestId: string, live: LiveVerdict | null, terms: OfferCoverageTerms, rm: RevisionModel | null): Promise<void> {
+  if (!live || !live.request.parts || !live.request.parts.length) return;
+  const model = rm ?? (await loadRevisionModel(env.DB, requestId, async () => readRequestModel(env.DB, requestId)));
+  if (!model) return;
+  assertCoverageEligible(live, terms, model.model);
 }
 
 /** Offers on a request. The customer sees all; a merchant sees only their own. */
@@ -1455,6 +1558,9 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
   // Nothing is stored yet: every fee here is one the body named.
   pickupFeeRule(t.delivery_method, x.delivery_fee_iqd, true);
   const files = (await readOfferFiles(c.env.DB, body, user.id, requestId)) ?? [];
+  // P1-05: the parts this offer makes and what it substitutes, checked
+  // against the request's current revision (nothing read when not named).
+  const coverage = await coverageFromBody(c.env, requestId, readCoverageBody(body));
   /**
    * ELIGIBILITY IS THE PERMISSION (W5-B; audit 03 §9 G7). A plan used to be
    * enough to bid on anything; now the workshop must be able to make THIS job
@@ -1466,7 +1572,8 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
    * bar: saving one opens the upload door for its files (purpose `offer`), and
    * that door is a workshop's that may quote the job.
    */
-  await assertMayOffer(c.env, requestId, ctx.merchant.id);
+  const live = await assertMayOffer(c.env, requestId, ctx.merchant.id);
+  await assertCoveredPartsMakeable(c.env, requestId, live, coverage.terms, coverage.rm);
   // «استخدم هذا كعرضي» (costing v2): the private quote this offer came from.
   const quoteId = str(body.quote_id, 'quote_id', { max: 60, required: false }) || '';
 
@@ -1478,7 +1585,10 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
       `SELECT id FROM community_offers WHERE request_id = ? AND merchant_id = ? AND state IN ('pending','superseded','accepted') LIMIT 1`
     ).bind(requestId, ctx.merchant.id).first();
     if (live) throw conflict('You already have an active offer on this request', 'OFFER_EXISTS');
-    const payload: DraftPayload = { ...t, ...x, store_id: ctx.store.id, quote_id: quoteId || undefined, valid_days: readValidDays(body) ?? null };
+    const payload: DraftPayload = {
+      ...t, ...x, store_id: ctx.store.id, quote_id: quoteId || undefined, valid_days: readValidDays(body) ?? null,
+      ...(isDefaultCoverage(coverage.terms) ? {} : draftCoverage(coverage.terms)),
+    };
     const draftId = newId('ofd');
     try {
       await c.env.DB.prepare(
@@ -1507,11 +1617,16 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
       // fenced on the offer row.
       ...insertOfferStatements(c.env.DB, {
         id, requestId, merchantId: ctx.merchant.id, storeId: ctx.store.id, customerId: user.id, terms: t, extras: x, ts,
+        coverage: coverage.rm ? { terms: coverage.terms, hash: coverage.rm.hash } : undefined,
       }),
       ...offerFileStatements(c.env.DB, id, files, ts, null),
     ]);
-    inserted = Number(res[0]?.meta.changes ?? 0);
+    inserted = Number(res[isDefaultCoverage(coverage.terms) ? 0 : 1]?.meta.changes ?? 0);
   } catch (e) {
+    // The request moved under the parts this offer names (P1-05): nothing written.
+    if (!isDefaultCoverage(coverage.terms) && isRevisionFenceAbort(e)) {
+      throw conflict('The request changed while you were offering — check it and try again', 'REQUEST_CHANGED');
+    }
     // The partial unique index on (request_id, merchant_id) WHERE state is
     // live. A merchant already has an offer here; withdrawing frees the slot.
     // Anything else is a real failure and is not dressed up as this one.
@@ -1667,7 +1782,9 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
   if (x.quantity !== undefined) put('quantity', x.quantity);
   if (x.color !== undefined) put('color', x.color);
   if (x.terms !== undefined) put('terms', x.terms);
-  if (!sets.length && body.files === undefined) throw badRequest('Nothing to update');
+  // P1-05: the parts the offer covers and its substitutions, when the body names them.
+  const covBody = readCoverageBody(body);
+  if (!sets.length && body.files === undefined && !namesCoverage(covBody)) throw badRequest('Nothing to update');
   // A fee the body names is checked against the method it ends up with (the
   // body's, else the stored one) below, once the stored row is known.
   const feeNamed = x.delivery_fee_iqd !== undefined;
@@ -1675,7 +1792,7 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
   const offerId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const before = await c.env.DB.prepare(
     `SELECT o.price_iqd, o.completion_days, o.delivery_method, o.delivery_fee_iqd, o.message, o.materials, o.included,
-            o.warranty_terms, o.revision, o.state, o.request_id, r.customer_id
+            o.warranty_terms, o.revision, o.state, o.request_id, r.customer_id, r.revision AS r_revision, r.visibility AS r_visibility
        FROM community_offers o JOIN community_requests r ON r.id = o.request_id
       WHERE o.id = ? AND o.merchant_id = ?`
   ).bind(offerId, ctx.merchant.id).first<Record<string, unknown>>();
@@ -1689,6 +1806,15 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
     if (!draft) throw notFound('Offer not found');
     const files = await readOfferFiles(c.env.DB, body, c.get('user')!.id, draft.request_id);
     const payload: DraftPayload = { ...safeParse<DraftPayload>(draft.payload_json, {}), ...t, ...x };
+    if (namesCoverage(covBody)) {
+      // Checked now so the composer hears at once; checked again at send.
+      const was = readCoverageBody({ coverage: payload.coverage, substitutions: payload.substitutions });
+      const merged: CoverageBody = { ...was, ...covBody };
+      const { terms } = await coverageFromBody(c.env, draft.request_id, merged);
+      delete payload.coverage;
+      delete payload.substitutions;
+      if (!isDefaultCoverage(terms)) Object.assign(payload, draftCoverage(terms));
+    }
     if (pickupFeeRule(payload.delivery_method, payload.delivery_fee_iqd, feeNamed) === 'zero') payload.delivery_fee_iqd = 0;
     const validDays = readValidDays(body);
     if (validDays !== undefined) payload.valid_days = validDays;
@@ -1705,11 +1831,44 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
   if (pickupFeeRule(t.delivery_method ?? before.delivery_method, x.delivery_fee_iqd ?? before.delivery_fee_iqd, feeNamed) === 'zero') {
     put('delivery_fee_iqd', 0);
   }
+  // P1-05: the coverage as it will stand — the body's, or the stored one
+  // checked again when the job moved since the offer priced it (a part gone
+  // refuses, a part removed from a partial offer may make it whole, a «whole»
+  // offer never stretches over a part added since).
+  const requestId = String(before.request_id);
+  const offerRow = (await c.env.DB.prepare('SELECT * FROM community_offers WHERE id = ?').bind(offerId).first<Record<string, unknown>>()) ?? {};
+  const stored = storedCoverage(offerRow);
+  const stale = before.state === 'superseded' || Number(offerRow.request_revision ?? 1) < Number(before.r_revision ?? 1);
+  if (before.r_visibility === 'direct' && namesCoverage(covBody) && (covBody.coverage || covBody.substitutions?.length)) {
+    throw badRequest('A request made in a conversation is not made of parts', 'OFFER_COVERAGE_INVALID');
+  }
+  let coverage: { terms: OfferCoverageTerms; rm: RevisionModel | null } = { terms: stored, rm: null };
+  if (namesCoverage(covBody) || (stale && before.r_visibility !== 'direct')) {
+    const forced = stale && isDefaultCoverage(stored) && !namesCoverage(covBody);
+    coverage = forced
+      ? { terms: DEFAULT_COVERAGE, rm: await loadRevisionModel(c.env.DB, requestId, async () => readRequestModel(c.env.DB, requestId)) }
+      : await coverageFromBody(c.env, requestId, covBody, stored);
+    if (stale && coverage.rm) {
+      assertNoAddedParts(stored, await modelAtRevision(c.env.DB, requestId, Number(offerRow.request_revision ?? 1)), coverage.rm, covBody.coverage !== undefined);
+    }
+  }
+  const coverageChanged = JSON.stringify(coverageColumns(coverage.terms)) !== JSON.stringify(coverageColumns(stored));
+  if (coverageChanged) {
+    if (!Object.prototype.hasOwnProperty.call(offerRow, 'covers_all')) throw coverageUnavailable();
+    const cols = coverageColumns(coverage.terms);
+    put('coverage_json', cols.coverage_json);
+    put('substitutions_json', cols.substitutions_json);
+    put('covers_all', cols.covers_all);
+  }
+  const fenced = !isDefaultCoverage(coverage.terms) && !!coverage.rm;
+
   // An edit prices the job AS IT NOW IS: a new promise, so the same bar as a
   // new offer (W5-B) — a workshop the revised job no longer fits cannot re-price it.
   if (before.state === 'pending' || before.state === 'superseded') {
     // A DIRECT request's store quotes it without matching (0151).
-    await assertMayQuote(c.env, String(before.request_id), ctx.merchant.id);
+    const live = await assertMayQuote(c.env, requestId, ctx.merchant.id);
+    // …and every part it covers, as asked or with its substitution (critique 2).
+    await assertCoveredPartsMakeable(c.env, requestId, live, coverage.terms, coverage.rm);
   }
 
   // `state IN (pending, superseded)` is in the WHERE clause, so an accepted
@@ -1718,6 +1877,7 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
   let changes = 0;
   try {
     const res = await c.env.DB.batch([
+      ...(fenced ? [revisionHashFence(c.env.DB, requestId, coverage.rm!.hash)] : []),
       c.env.DB.prepare(
         `UPDATE community_offers
             SET ${sets.length ? `${sets.join(', ')}, ` : ''}state = 'pending', revision = revision + 1,
@@ -1728,13 +1888,14 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
                          WHERE r.id = community_offers.request_id AND r.state IN ('open','receiving_offers')
                            AND (r.expires_at IS NULL OR r.expires_at = '' OR r.expires_at > ?))`
       ).bind(...vals, ts, offerId, ctx.merchant.id, ts),
-      recordOfferRevisionStatement(c.env.DB, offerId, 'edit'),
+      recordOfferRevisionStatement(c.env.DB, offerId, 'edit', { v3: !isDefaultCoverage(coverage.terms) || !isDefaultCoverage(stored) }),
       offerCountStatement(c.env.DB, String(before.request_id)),
       // A new file set rides the same edit, fenced on the edit having landed.
       ...(files ? offerFileStatements(c.env.DB, offerId, files, ts, ts) : []),
     ]);
-    changes = Number(res[0]?.meta.changes ?? 0);
+    changes = Number(res[fenced ? 1 : 0]?.meta.changes ?? 0);
   } catch (e) {
+    if (fenced && isRevisionFenceAbort(e)) throw conflict('The request changed while you were editing — check it and try again', 'REQUEST_CHANGED');
     throw offerWriteConflict(e) ?? e;
   }
   if (!changes) throw conflict('That offer can no longer be changed', 'OFFER_NOT_AVAILABLE');
@@ -1808,7 +1969,10 @@ marketplaceRoutes.post('/offers/:id/send', requireCommunityOpen, requireAuth, as
   pickupFeeRule(t.delivery_method, x.delivery_fee_iqd, true);
   const draftFiles = safeParse<OfferFileInput[]>(draft.files_json, []);
   const files = (await readOfferFiles(c.env.DB, { files: Array.isArray(draftFiles) ? draftFiles : [] }, user.id, requestId)) ?? [];
-  await assertMayOffer(c.env, requestId, ctx.merchant.id);
+  // The draft's coverage, checked again against the request as it now is (P1-05).
+  const coverage = await coverageFromBody(c.env, requestId, readCoverageBody({ coverage: payload.coverage, substitutions: payload.substitutions }));
+  const live = await assertMayOffer(c.env, requestId, ctx.merchant.id);
+  await assertCoveredPartsMakeable(c.env, requestId, live, coverage.terms, coverage.rm);
   const quoteId = typeof payload.quote_id === 'string' ? payload.quote_id : '';
 
   const id = newId('off');
@@ -1817,13 +1981,17 @@ marketplaceRoutes.post('/offers/:id/send', requireCommunityOpen, requireAuth, as
     const res = await c.env.DB.batch([
       ...insertOfferStatements(c.env.DB, {
         id, requestId, merchantId: ctx.merchant.id, storeId: ctx.store.id, customerId: user.id, terms: t, extras: x, ts,
+        coverage: coverage.rm ? { terms: coverage.terms, hash: coverage.rm.hash } : undefined,
       }),
       ...offerFileStatements(c.env.DB, id, files, ts, null),
       // The draft goes only if the offer landed — else it stays, to be sent again.
       c.env.DB.prepare('DELETE FROM community_offer_drafts WHERE id = ? AND EXISTS (SELECT 1 FROM community_offers WHERE id = ?)').bind(draftId, id),
     ]);
-    inserted = Number(res[0]?.meta.changes ?? 0);
+    inserted = Number(res[isDefaultCoverage(coverage.terms) ? 0 : 1]?.meta.changes ?? 0);
   } catch (e) {
+    if (!isDefaultCoverage(coverage.terms) && isRevisionFenceAbort(e)) {
+      throw conflict('The request changed while you were sending — check it and try again', 'REQUEST_CHANGED');
+    }
     throw offerWriteConflict(e) ?? e;
   }
   if (!inserted) {
@@ -1914,24 +2082,49 @@ marketplaceRoutes.post('/offers/:id/reconfirm', requireCommunityOpen, requireAut
   // Standing by an offer for the job as it NOW is — only if the workshop can
   // still make it (W5-B). A revision that outgrew the printer is not re-confirmable.
   const standing = await c.env.DB.prepare(
-    `SELECT request_id FROM community_offers WHERE id = ? AND merchant_id = ? AND state IN ('pending','superseded')`
-  ).bind(offerId, ctx.merchant.id).first<{ request_id: string }>();
-  if (standing) await assertMayQuote(c.env, standing.request_id, ctx.merchant.id);
+    `SELECT o.*, r.visibility AS r_visibility FROM community_offers o JOIN community_requests r ON r.id = o.request_id
+      WHERE o.id = ? AND o.merchant_id = ? AND o.state IN ('pending','superseded')`
+  ).bind(offerId, ctx.merchant.id).first<Record<string, unknown>>();
+  // P1-05: the offer's coverage, checked against the request as it NOW is —
+  // a covered part gone, or a substituted material the customer changed,
+  // refuses (the merchant edits instead); a partial offer whose uncovered
+  // parts were removed becomes whole; a «whole» offer never stretches over a
+  // part added since (critique 4).
+  const stored = standing ? storedCoverage(standing) : DEFAULT_COVERAGE;
+  let coverage: { terms: OfferCoverageTerms; rm: RevisionModel | null } = { terms: stored, rm: null };
+  if (standing && standing.r_visibility !== 'direct') {
+    const requestId = String(standing.request_id);
+    const rm = await loadRevisionModel(c.env.DB, requestId, async () => readRequestModel(c.env.DB, requestId));
+    if (rm) {
+      const mats = (await getSetting(c.env.DB, 'printMaterials')) as unknown as Array<{ id: string; process: string; active?: boolean }>;
+      coverage = { terms: isDefaultCoverage(stored) ? DEFAULT_COVERAGE : resolveCoverage({}, rm, Array.isArray(mats) ? mats : [], stored), rm };
+      assertNoAddedParts(stored, await modelAtRevision(c.env.DB, requestId, Number(standing.request_revision ?? 1)), rm, false);
+    }
+  }
+  const coverageChanged = JSON.stringify(coverageColumns(coverage.terms)) !== JSON.stringify(coverageColumns(stored));
+  const cols = coverageColumns(coverage.terms);
+  const fenced = !isDefaultCoverage(coverage.terms) && !!coverage.rm;
+  if (standing) {
+    const live = await assertMayQuote(c.env, String(standing.request_id), ctx.merchant.id);
+    await assertCoveredPartsMakeable(c.env, String(standing.request_id), live, coverage.terms, coverage.rm);
+  }
   let changes = 0;
   try {
     const res = await c.env.DB.batch([
+      ...(fenced ? [revisionHashFence(c.env.DB, String(standing!.request_id), coverage.rm!.hash)] : []),
       c.env.DB.prepare(
         `UPDATE community_offers
             SET state = 'pending', revision = revision + 1,
                 request_revision = (SELECT r.revision FROM community_requests r WHERE r.id = community_offers.request_id),
+                ${coverageChanged ? 'coverage_json = ?4, substitutions_json = ?5, covers_all = ?6,' : ''}
                 updated_at = ?1
           WHERE id = ?2 AND merchant_id = ?3 AND state IN ('pending','superseded')
             AND request_revision < (SELECT r.revision FROM community_requests r WHERE r.id = community_offers.request_id)
             AND EXISTS (SELECT 1 FROM community_requests r
                          WHERE r.id = community_offers.request_id AND r.state IN ('open','receiving_offers')
                            AND (r.expires_at IS NULL OR r.expires_at = '' OR r.expires_at > ?1))`
-      ).bind(ts, offerId, ctx.merchant.id),
-      recordOfferRevisionStatement(c.env.DB, offerId, 'reconfirm'),
+      ).bind(ts, offerId, ctx.merchant.id, ...(coverageChanged ? [cols.coverage_json, cols.substitutions_json, cols.covers_all] : [])),
+      recordOfferRevisionStatement(c.env.DB, offerId, 'reconfirm', { v3: !isDefaultCoverage(coverage.terms) || !isDefaultCoverage(stored) }),
       c.env.DB.prepare(
         `UPDATE community_requests
             SET offer_count = (SELECT COUNT(*) FROM community_offers o
@@ -1939,8 +2132,9 @@ marketplaceRoutes.post('/offers/:id/reconfirm', requireCommunityOpen, requireAut
           WHERE id = (SELECT request_id FROM community_offers WHERE id = ?)`
       ).bind(offerId),
     ]);
-    changes = Number(res[0]?.meta.changes ?? 0);
+    changes = Number(res[fenced ? 1 : 0]?.meta.changes ?? 0);
   } catch (e) {
+    if (fenced && isRevisionFenceAbort(e)) throw conflict('The request changed while you were confirming — check it and try again', 'REQUEST_CHANGED');
     throw offerWriteConflict(e) ?? e;
   }
   if (!changes) {
@@ -2083,8 +2277,17 @@ async function offerMerchantStanding(env: Env, offer: Record<string, unknown>): 
   // A DIRECT request (0151) was addressed to this store by the customer: there
   // is no printer matching to ask — the store taking new work is the whole bar.
   if (offer.r_visibility === 'direct') return 'ok';
-  const live = await liveVerdict(env, String(offer.req_id ?? offer.request_id), String(offer.merchant_id));
-  return live && !live.verdict.eligible ? 'ineligible' : 'ok';
+  const requestId = String(offer.req_id ?? offer.request_id);
+  const live = await liveVerdict(env, requestId, String(offer.merchant_id));
+  if (live && !live.verdict.eligible) return 'ineligible';
+  // A JOB OF PARTS (P1-05, critique 2): the request-level verdict says «some
+  // part»; the offer is fundable only when this workshop can still make
+  // EVERY part it covers — as asked, or with its substitution.
+  if (live?.request.parts?.length) {
+    const model = await modelAtRevision(env.DB, requestId, Number(offer.request_revision ?? 1));
+    if (model && uncoverableParts(live, storedCoverage(offer), model)) return 'ineligible';
+  }
+  return 'ok';
 }
 
 /** The offer, its request and its merchant — everything acceptance decides on. */
@@ -2119,7 +2322,8 @@ function acceptanceRefusal(
   offer: Record<string, unknown>,
   expected: { total: number; revision: number },
   now: string,
-  standing: OfferStanding
+  standing: OfferStanding,
+  ack: { partial: boolean; substitutions: boolean } = { partial: false, substitutions: false }
 ): HttpError | null {
   const fresh = { offer: offerShape(offer) };
   // Superseded by the customer's own change to the job (W5-A): the same
@@ -2166,6 +2370,21 @@ function acceptanceRefusal(
   // The TOTAL (price + delivery fee, 0159) and the revision the confirmation showed.
   if (expected.total !== offerTotal(offer) || expected.revision !== Number(offer.revision ?? 1)) {
     return new HttpError(409, 'This offer changed since you opened it — review it again', 'OFFER_CHANGED', fresh);
+  }
+  /**
+   * WHAT THE CUSTOMER ACKNOWLEDGED (P1-05, D6). A substituted offer is
+   * accepted only with `accept_substitutions`, a partial one only with
+   * `accept_partial` — both answered with the fresh offer, before any money
+   * is reserved. An edit of either moves the offer's revision, so the
+   * acknowledgement is tied to the version the customer saw. A substitutions
+   * column that cannot be read asks for the acknowledgement (fails closed).
+   */
+  const terms = storedCoverage(offer);
+  if ((terms.substitutions.length > 0 || terms.unreadable) && !ack.substitutions) {
+    return new HttpError(409, 'This offer proposes a different material or colour — accept the substitutes first', 'OFFER_SUBSTITUTION_UNACCEPTED', fresh);
+  }
+  if (terms.parts !== null && !ack.partial) {
+    return new HttpError(409, 'This offer does not cover every part — confirm you understand that first', 'OFFER_PARTIAL_UNACCEPTED', fresh);
   }
   return null;
 }
@@ -2253,7 +2472,8 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
     }
   }
 
-  const refusal = acceptanceRefusal(offer, expected, nowIso(), await offerMerchantStanding(c.env, offer));
+  const ack = { partial: body.accept_partial === true, substitutions: body.accept_substitutions === true };
+  const refusal = acceptanceRefusal(offer, expected, nowIso(), await offerMerchantStanding(c.env, offer), ack);
   if (refusal) throw refusal;
 
   const requestId = String(offer.req_id);
@@ -2299,6 +2519,29 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
         estimate: publicEstimate(revRow.estimate),
       }
     : { revision: Number(offer.r_revision ?? 1), ...((await composeSnapshot(c.env.DB, requestId)) ?? {}), source: 'live' };
+  /**
+   * THE AGREEMENT (P1-05, D7) — for a version-3 job, or an offer that covers
+   * some parts or substitutes: the parts as agreed, the parts left out, the
+   * substitutions and the acknowledgement given. Built from the revision the
+   * offer priced BEFORE any money moves; a covered part or substituted row
+   * no longer there, or a `from` that no longer matches, is OFFER_STALE
+   * (critique 3c). A v1 job with a whole offer keeps today's bytes.
+   */
+  const terms = storedCoverage(offer);
+  const snapSpec = (requestSnapshot as { spec?: Record<string, unknown> }).spec ?? {};
+  const v3Spec = Number(snapSpec.schema_version ?? 1) === 3;
+  const withAgreement = v3Spec || !isDefaultCoverage(terms) || terms.unreadable;
+  if (withAgreement) {
+    const files = ((requestSnapshot as { files?: unknown }).files ?? []) as Parameters<typeof modelOfSpec>[1];
+    const agreedModel = snapSpec.model && typeof snapSpec.model === 'object'
+      ? modelOfSpec(snapSpec, Array.isArray(files) ? files : [])
+      : await readRequestModel(c.env.DB, requestId);
+    const agreement = terms.unreadable || !agreedModel ? null : agreementSnapshot(agreedModel, terms, ack);
+    if (!agreement) {
+      throw new HttpError(409, 'You changed this request after the merchant made this offer — it can be accepted once they re-confirm it', 'OFFER_STALE', { offer: offerShape(offer) });
+    }
+    Object.assign(requestSnapshot, { ...(v3Spec ? { schema_version: 3 } : {}), agreement });
+  }
   const merchantUserId = String(offer.m_user_id);
   /**
    * THE MONEY IS THE TOTAL (0159, §9.5): the price plus the delivery fee is
@@ -2436,6 +2679,8 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
           offer_revision: Number(offer.revision ?? 1),
           request_revision: Number(offer.r_revision ?? 1),
           accepted_at: ts,
+          // What the offer made and substituted (P1-05) — only beside an agreement.
+          ...(withAgreement ? { coverage: { covers_all: terms.parts === null, parts: terms.parts }, substitutions: terms.substitutions } : {}),
         }),
         ts, ts,
         Number(offer.r_revision ?? 1),
@@ -2475,7 +2720,7 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
       if (!isConstraintAbort(e)) throw e;
       const fresh = await offerForAcceptance(db, offerId);
       const why = fresh
-        ? acceptanceRefusal(fresh, expected, nowIso(), await offerMerchantStanding(c.env, fresh))
+        ? acceptanceRefusal(fresh, expected, nowIso(), await offerMerchantStanding(c.env, fresh), ack)
         : notFound('Offer not found');
       throw why ?? conflict('This request changed while you were accepting — reload it and try again', 'ACCEPT_CONFLICT');
     }

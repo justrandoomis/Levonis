@@ -38,9 +38,23 @@ export default function RequestCard({ request: r, compact = false }: { request: 
   const place = r.governorate ? GOVERNORATE_LABELS[r.governorate]?.[lang] ?? '' : '';
   const offers = r.offer_count ?? 0;
   const deadline = shortDate(r.deadline, lang);
+  // A job of parts (P1-05): its quantity is the number of SETS, said as such beside the parts.
+  const sum = r.summary;
+  const ofParts = !!sum && (sum.parts_count > 1 || sum.pieces_per_set > 1);
 
   const chips = (
     <>
+      {sum?.review_state === 'needs_technical_review' && (
+        <span className={`${CHIP} font-semibold text-warning`} data-community-request-review>
+          {loc('تحتاج مراجعة فنية', 'Needs a technical review', 'پێویستی بە پێداچوونەوەی تەکنیکی هەیە')}
+        </span>
+      )}
+      {ofParts && (
+        <span className={`${CHIP} tabular-nums`} data-community-request-parts={sum!.parts_count}>
+          {sum!.parts_count > 1 ? loc('عدد القطع', 'Parts', 'پارچەکان') : loc('القطع في الطقم', 'Pieces a set', 'پارچە لە هەر سێتێکدا')}:{' '}
+          <bdi dir="ltr">{sum!.parts_count > 1 ? sum!.parts_count : sum!.pieces_per_set}</bdi>
+        </span>
+      )}
       {r.budget_iqd != null && r.budget_iqd > 0 && (
         <span className={`${CHIP} font-semibold text-gold`}>
           {loc('الميزانية', 'Budget', 'بودجە')}: <bdi className="tabular-nums">{money(r.budget_iqd)}</bdi>
@@ -48,6 +62,7 @@ export default function RequestCard({ request: r, compact = false }: { request: 
       )}
       {(r.quantity ?? 1) > 1 && (
         <span className={`${CHIP} tabular-nums`}>
+          {ofParts && <>{loc('الأطقم', 'Sets', 'سێت')}: </>}
           <bdi dir="ltr">×{r.quantity}</bdi>
         </span>
       )}

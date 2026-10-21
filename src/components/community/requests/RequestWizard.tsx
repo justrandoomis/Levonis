@@ -311,6 +311,8 @@ export default function RequestWizard({
   const [error, setError] = useState('');
   const [errors, setErrors] = useState<Partial<Record<'title' | 'description' | 'source' | 'deadline', string>>>({});
   const [quote, setQuote] = useState<Quote | null>(null);
+  /** R10 (P1-05): the model files of the request this estimate did not price. */
+  const [modelsUnpriced, setModelsUnpriced] = useState(0);
   const [linkInfo, setLinkInfo] = useState<{ name?: string } | null>(null);
   const [published, setPublished] = useState<{ notified: number; replayed: boolean; revised: boolean } | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -575,8 +577,12 @@ export default function RequestWizard({
     if (step !== 4 || !requestId) return;
     let alive = true;
     requestsApi
-      .quote({ ...payload, file_id: payload.primary_file_id })
-      .then((d) => alive && setQuote(d.quote))
+      .quote({ ...payload, file_id: payload.primary_file_id, request_id: requestId })
+      .then((d) => {
+        if (!alive) return;
+        setQuote(d.quote);
+        setModelsUnpriced(d.models_unpriced ?? 0);
+      })
       .catch(() => alive && setQuote(null));
     return () => {
       alive = false;
@@ -1134,6 +1140,12 @@ export default function RequestWizard({
                         ? loc('المادة لم تُحدد، فهذا المدى يغطي المواد الممكنة. السعر النهائي من عروض التجار.', 'The material is open, so this range covers the materials it could be. The final price comes from merchants’ offers.', 'ماددەکە دیاری نەکراوە، بۆیە ئەم مەودایە ئەو ماددانە دەگرێتەوە کە دەکرێت بەکاربهێنرێن. نرخی کۆتایی لە ئۆفەری بازرگانەکانەوە دێت.')
                         : loc('تقدير فقط — السعر النهائي من عروض التجار.', 'An estimate — the final price comes from merchants’ offers.', 'تەنها خەمڵاندنە — نرخی کۆتایی لە ئۆفەری بازرگانەکانەوە دێت.')}
                     </p>
+                    {modelsUnpriced > 0 && (
+                      // R10: one model priced is never the whole job read as priced.
+                      <p className="mt-1 text-[12px] font-semibold text-warning" data-wizard-models-unpriced={modelsUnpriced}>
+                        {loc(`ملفات نماذج أخرى لم يشملها التقدير: ${modelsUnpriced}`, `Other model files not in this estimate: ${modelsUnpriced}`, `فایلی مۆدێلی تر کە لەم خەمڵاندنەدا نین: ${modelsUnpriced}`)}
+                      </p>
+                    )}
                   </>
                 ) : (
                   <p className="mt-1 text-[13px] leading-relaxed text-text-secondary">

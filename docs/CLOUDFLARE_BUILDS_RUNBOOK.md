@@ -121,6 +121,16 @@ it costs zero minutes until run.
 | `deploy-studio-*.yml` | `studio/` has **no** Workers Builds support — no `WORKERS_CI` branch, and `studio/wrangler.jsonc` still commits a placeholder id. Moving it is separate work, not a toggle. |
 | `svc-*.yml` | One Workers Builds connection deploys **one** Worker. The six service Workers would each need their own. |
 
+### Rolling back to a build older than P1-05
+
+Before a manual redeploy of a commit older than P1-05 (docs/DECISIONS.md row
+267), run `scripts/before-rollback-offers-v3.sql` against the live database
+(the command is in the file). An older build does not know that a partial or
+substituted offer needs the customer's acknowledgement; the statement turns
+every such pending offer `superseded`, so the older build refuses it
+(`OFFER_STALE`) instead of funding it as the whole job. After rolling forward,
+the merchant's edit or re-confirmation re-opens it.
+
 ### Deleting a workflow breaks `npm run check`
 
 `tests/workflowNaming.test.ts` holds a hardcoded list of six deploy workflows

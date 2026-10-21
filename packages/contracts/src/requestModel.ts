@@ -147,6 +147,46 @@ export const REQUEST_MODEL_REFUSAL_CODES = [
 export type RequestModelRefusalCode = (typeof REQUEST_MODEL_REFUSAL_CODES)[number];
 
 /**
+ * WHY A PUBLISH REFUSES ONE PART (P1-05, docs/DECISIONS.md row 267). Each
+ * answers with `{part_id, position}` so the screen names the part. A draft and
+ * the live estimate keep such a part and show it unpriced, with the code as
+ * its reason; only the publish refuses it.
+ *
+ *   PART_PROCESS_MIXED         one part in an FDM material and a resin together
+ *   PART_RESIN_MULTI_MATERIAL  a resin part in more than one material
+ *   PART_MATERIAL_UNKNOWN      a material that is not in the active catalogue
+ *
+ * Several parts in different processes are allowed: that is a technical
+ * review (`mixed_process`), never a refusal.
+ */
+export const REQUEST_PUBLISH_REFUSAL_CODES = ['PART_PROCESS_MIXED', 'PART_RESIN_MULTI_MATERIAL', 'PART_MATERIAL_UNKNOWN'] as const;
+export type RequestPublishRefusalCode = (typeof REQUEST_PUBLISH_REFUSAL_CODES)[number];
+
+/**
+ * WHAT AN OFFER COVERS AND WHAT IT SUBSTITUTES (P1-05, row 267). Coverage
+ * names the parts an offer makes (none named = the whole request);
+ * a substitution proposes another material or colour for one material row of
+ * a covered part. The customer accepts a partial or substituted offer only by
+ * acknowledging it (`accept_partial`, `accept_substitutions`).
+ */
+export const OFFER_COVERAGE_REFUSAL_CODES = [
+  'OFFER_COVERAGE_INVALID',
+  'OFFER_PART_NOT_ELIGIBLE',
+  'OFFER_SUBSTITUTION_INVALID',
+  'OFFER_SUBSTITUTION_UNACCEPTED',
+  'OFFER_PARTIAL_UNACCEPTED',
+  'OFFER_COVERAGE_UNAVAILABLE',
+] as const;
+export type OfferCoverageRefusalCode = (typeof OFFER_COVERAGE_REFUSAL_CODES)[number];
+
+export const OFFER_LIMITS = {
+  /** The merchant's note on one substitution. */
+  substitutionNoteMax: 200,
+  /** Substitutions on one offer: at most one per material row of the largest request. */
+  substitutionsMax: 48,
+} as const;
+
+/**
  * WHO SEES WHICH FIELD — the registry «ما يراه الآخرون» (P1-06) renders and
  * `projectModel` enforces.
  *

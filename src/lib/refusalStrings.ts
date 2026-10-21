@@ -630,6 +630,64 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'A request with several parts or materials can’t be published yet — keep it as a draft.',
     ckb: 'هێشتا ناتوانرێت داواکارییەکی چەند پارچە یان چەند کەرەستە بڵاو بکرێتەوە — وەک ڕەشنووس هەڵیبگرە.',
   },
+  // ---- readers and offers v3 (P1-05, DECISIONS row 267): a part a publish
+  // refuses, and what an offer covers and substitutes. A part code arrives
+  // with `{part_id, position}`; the screen puts «القطعة n:» in front.
+  PART_PROCESS_MIXED: {
+    ar: 'لا يمكن طباعة قطعة واحدة بمادة FDM وريزن معًا — اجعلهما قطعتين.',
+    en: 'One part cannot be printed in an FDM material and a resin together — make them two parts.',
+    ckb: 'ناتوانرێت یەک پارچە بە کەرەستەی FDM و ڕێزن پێکەوە چاپ بکرێت — بیانکە بە دوو پارچە.',
+  },
+  PART_RESIN_MULTI_MATERIAL: {
+    ar: 'قطعة الريزن تُطبع بمادة واحدة — اختر مادة واحدة أو قسّمها إلى قطع.',
+    en: 'A resin part prints in one material — choose one, or split it into parts.',
+    ckb: 'پارچەی ڕێزن بە یەک کەرەستە چاپ دەکرێت — یەکێک هەڵبژێرە، یان بیکە بە چەند پارچەیەک.',
+  },
+  PART_MATERIAL_UNKNOWN: {
+    ar: 'إحدى المواد لم تعد في الكتالوج — اختر مادة أخرى.',
+    en: 'One of the materials is no longer in the catalogue — choose another.',
+    ckb: 'یەکێک لە کەرەستەکان ئیتر لە کاتالۆگدا نییە — یەکێکی تر هەڵبژێرە.',
+  },
+  OFFER_COVERAGE_INVALID: {
+    ar: 'القطع المختارة لا تطابق الطلب كما هو الآن — اخترها من جديد.',
+    en: 'The chosen parts do not match this request as it now is — choose them again.',
+    ckb: 'پارچە هەڵبژێردراوەکان لەگەڵ داواکارییەکە بەم شێوەیەی ئێستا ناگونجێن — دووبارە هەڵیانبژێرەوە.',
+  },
+  OFFER_PART_NOT_ELIGIBLE: {
+    ar: 'ورشتك لا تستطيع صنع إحدى القطع المختارة — أزلها من العرض.',
+    en: 'Your workshop cannot make one of the chosen parts — remove it from the offer.',
+    ckb: 'وۆرکشۆپەکەت ناتوانێت یەکێک لە پارچە هەڵبژێردراوەکان دروست بکات — لە ئۆفەرەکە لای ببە.',
+  },
+  OFFER_SUBSTITUTION_INVALID: {
+    ar: 'البديل غير صالح: اختر مادة من الكتالوج بنفس تقنية القطعة، لقطعة يشملها العرض.',
+    en: 'That substitute is not valid: choose a catalogue material of the same technology as the part, for a part the offer covers.',
+    ckb: 'ئەو جێگرەوەیە دروست نییە: کەرەستەیەک لە کاتالۆگ بە هەمان تەکنیکی پارچەکە هەڵبژێرە، بۆ پارچەیەک کە ئۆفەرەکە دەیگرێتەوە.',
+  },
+  OFFER_SUBSTITUTION_UNACCEPTED: {
+    ar: 'هذا العرض يقترح مادة أو لونًا مختلفًا — وافق على البدائل أولًا.',
+    en: 'This offer proposes a different material or colour — accept the substitutes first.',
+    ckb: 'ئەم ئۆفەرە کەرەستە یان ڕەنگێکی جیاواز پێشنیار دەکات — سەرەتا جێگرەوەکان قبوڵ بکە.',
+  },
+  OFFER_PARTIAL_UNACCEPTED: {
+    ar: 'هذا العرض لا يشمل كل القطع — أكّد أنك تعلم ذلك أولًا.',
+    en: 'This offer does not cover every part — confirm you understand that first.',
+    ckb: 'ئەم ئۆفەرە هەموو پارچەکان ناگرێتەوە — سەرەتا پشتڕاستی بکەرەوە کە ئەمە دەزانیت.',
+  },
+  OFFER_COVERAGE_UNAVAILABLE: {
+    ar: 'لا يمكن حفظ القطع المشمولة أو البدائل الآن — حاول بعد قليل.',
+    en: 'The covered parts and substitutes cannot be saved right now — try again shortly.',
+    ckb: 'ئێستا ناتوانرێت پارچە گیراوەکان یان جێگرەوەکان پاشەکەوت بکرێن — کەمێکی تر هەوڵ بدەرەوە.',
+  },
+  REQUEST_NOT_REVIEWABLE: {
+    ar: 'هذا الطلب ليس مقسّمًا إلى قطع، فلا مراجعة فنية له.',
+    en: 'This request is not made of parts, so it has no technical review.',
+    ckb: 'ئەم داواکارییە بە پارچە دابەش نەکراوە، بۆیە پێداچوونەوەی تەکنیکی نییە.',
+  },
+  REVIEW_PARTS_REQUIRED: {
+    ar: 'اختر القطع التي راجعتها.',
+    en: 'Choose the parts you reviewed.',
+    ckb: 'ئەو پارچانە هەڵبژێرە کە پێیاندا چوویتەوە.',
+  },
   PARTS_EMPTY: {
     ar: 'أضف قطعة واحدة على الأقل.',
     en: 'Add at least one part.',
@@ -2445,8 +2503,18 @@ export function apiRefusal(err: unknown, lang: Lang, fallback = ''): string {
   const text = refusalText(code, lang, message || fallback);
   // A sentence written for a named field never reaches a screen with «{field}» in it (the FX panel
   // answers PRICING_INPUT_INVALID {field:'rate'} through here): the sentence without a name instead.
-  return text.includes('{field}') ? FIELD_GENERIC[lang] : text;
+  if (text.includes('{field}')) return FIELD_GENERIC[lang];
+  // P1-05: a refusal about ONE part names it first — «القطعة 2: …».
+  const position = (err as { details?: { position?: unknown } } | null)?.details?.position;
+  if (PART_CODES.has(code) && typeof position === 'number' && Number.isInteger(position) && position >= 0) {
+    return `${PART_PREFIX[lang].replace('{n}', String(position + 1))} ${text}`;
+  }
+  return text;
 }
+
+/** The refusals that arrive with `{part_id, position}` (P1-05). */
+const PART_CODES = new Set(['PART_PROCESS_MIXED', 'PART_RESIN_MULTI_MATERIAL', 'PART_MATERIAL_UNKNOWN', 'OFFER_PART_NOT_ELIGIBLE']);
+const PART_PREFIX: Record<Lang, string> = { ar: 'القطعة {n}:', en: 'Part {n}:', ckb: 'پارچەی {n}:' };
 
 /** The site's language as this table's key — Arabic unless English or Sorani. */
 export const refusalLang = (lang: string | null | undefined): Lang => (lang === 'en' || lang === 'ckb' ? lang : 'ar');

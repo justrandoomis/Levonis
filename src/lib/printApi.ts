@@ -14,7 +14,7 @@
  */
 
 import { api } from './api';
-import type { Estimate } from './printEstimate';
+import type { Estimate, EstimateCoverage } from './printEstimate';
 
 export type PrintProcess = 'fdm' | 'resin';
 export type PrintQuality = 'draft' | 'standard' | 'fine' | 'ultra';
@@ -165,12 +165,48 @@ export interface PrintFacts extends PrintSpec {
   source_url: string;
   source_meta: Record<string, unknown>;
   analysis: ModelAnalysis | null;
-  estimate: Partial<PublicQuote>;
+  estimate: Partial<PublicQuote> & { coverage?: EstimateCoverage };
   estimate_low_iqd: number | null;
   estimate_high_iqd: number | null;
   estimate_confidence: Confidence | null;
   completeness: number;
   required_capabilities: string[];
+  /** R10 (P1-05): the model files of the request the estimate did not price. */
+  models_unpriced?: number;
+}
+
+/** A part as every reader of the request sees it (P1-05; the public projection of the model). */
+export interface RequestPartV3 {
+  id: string;
+  position: number;
+  name: string;
+  quantity: number;
+  process: '' | 'fdm' | 'resin';
+  process_unsure: boolean;
+  stated_dims: Vec3 | null;
+  measured_file_id: string | null;
+  notes: string;
+  review_state: string;
+  review_reasons: string[];
+  materials: Array<{
+    id: string;
+    position: number;
+    material_id: string;
+    material_unsure: boolean;
+    colors: Array<{ mode: string; hex: string; label: string; palette: string; ref: string }>;
+    finish: string;
+  }>;
+}
+
+/** What `GET /api/marketplace/print/requests/:id` adds beside `print` (P1-05). */
+export interface RequestModelSummary {
+  parts_count: number;
+  pieces_per_set: number;
+  sets: number;
+  materials: string[];
+  processes: string[];
+  review_state: string;
+  review_reasons: string[];
 }
 
 /**
@@ -190,6 +226,8 @@ export interface MyRequestRow {
   offer_count: number;
   file_count: number;
   created_at: string;
+  /** P1-05: the parts, pieces a set, review and R10 — absent on an older Worker. */
+  summary?: { parts_count: number; pieces_per_set: number; review_state: string; estimate_complete: boolean; models_unpriced: number };
   /** null for a request made before the print system, or never published. */
   print: {
     process: PrintProcess;
@@ -272,7 +310,13 @@ export const printApi = {
   myRequests: () => api.get<{ requests: MyRequestRow[] }>(`${BASE}/my-requests`),
 
   facts: (requestId: string) =>
-    api.get<{ print: PrintFacts | null; is_owner: boolean }>(`${BASE}/requests/${requestId}`),
+    api.get<{
+      print: PrintFacts | null;
+      is_owner: boolean;
+      /** P1-05: absent on an older Worker. */
+      model?: { parts: RequestPartV3[] } | null;
+      summary?: RequestModelSummary | null;
+    }>(`${BASE}/requests/${requestId}`),
 
   viewerToken: (requestId: string, fileId: string) =>
     api.post<{ token: string; url: string; expires_at: string }>(

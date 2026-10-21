@@ -7,7 +7,7 @@
  * comes back from the GET with every source and part in order; sending it back
  * unchanged changes no row and no hash; the v1 row it is mirrored to is a
  * coherent single job (an unsure material, the colour count of the busiest
- * part); a multi-part job is refused at publish until P1-05; an older client's
+ * part); a multi-part job publishes (P1-05 lifted the gate); an older client's
  * v1 body is folded into a one-part model and refused on a several-part one;
  * the repeat copies the model onto the copied files; deleting the primary file
  * keeps the model fresh; every refusal answers its own code; and a database
@@ -110,15 +110,17 @@ test('acceptance 14: a two-part draft with files, a link, a text reference and n
   assert.equal(row<{ quantity: number }>(raw, 'SELECT quantity FROM community_requests WHERE id = ?', id)!.quantity, 3);
 });
 
-test('a several-part job is a draft until P1-05 reads parts: publishing it is REQUEST_PARTS_NOT_YET and writes nothing', async () => {
+test('P1-05 lifted the gate: a several-part job publishes, its revision carries the model and the estimate its coverage, and it is matched', async () => {
   const raw = world();
   const id = await draftWithFiles(raw);
   assert.equal((await saveDraft(raw, id, twoPartBody())).status, 200);
   const res = await publish(raw, id, { schema_version: 3 });
-  assert.equal(res.status, 409);
-  assert.equal(res.body.code, 'REQUEST_PARTS_NOT_YET');
-  assert.equal(row<{ state: string }>(raw, 'SELECT state FROM community_requests WHERE id = ?', id)!.state, 'draft');
-  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM community_request_revisions WHERE request_id = ?', id), 0);
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(row<{ state: string }>(raw, 'SELECT state FROM community_requests WHERE id = ?', id)!.state, 'open');
+  const rev = row<{ spec: string; estimate: string }>(raw, 'SELECT spec, estimate FROM community_request_revisions WHERE request_id = ? AND revision = 1', id)!;
+  assert.equal(JSON.parse(rev.spec).model.parts.length, 2);
+  assert.equal(JSON.parse(rev.estimate).coverage.parts_total, 2);
+  assert.ok(count(raw, 'SELECT COUNT(*) AS n FROM community_request_matches WHERE request_id = ?', id) > 0, 'the job was matched');
 });
 
 test('a one-part v3 job publishes from the mirror, is priced like v1, and publishing it again is a replay', async () => {

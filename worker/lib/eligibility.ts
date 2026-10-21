@@ -129,6 +129,28 @@ export interface EligibilityRequest {
   /** The Levonis estimate, for the merchant's job-value band; null = not priced. */
   estimate_iqd: number | null;
   quantity: number;
+  /**
+   * A JOB OF PARTS (P1-05, docs/DECISIONS.md row 267). Set only for an
+   * effective version-3 request with more than one part, or a part in more
+   * than one material. Without it the verdict is today's single-job path,
+   * untouched; with it, capability, stock and the part preferences are judged
+   * part by part, and the request is eligible when at least one part is.
+   */
+  parts?: EligibilityPart[];
+}
+
+/** One part of a job, as the matcher reads it. */
+export interface EligibilityPart {
+  id: string;
+  /** null = unsure (any technology this workshop runs). */
+  process: Process | null;
+  /** Each material row: the material (null = unsure) and its named colours, lower-case #rrggbb. */
+  materials: Array<{ material_id: string | null; colours: string[] }>;
+  /** Colours laid down in one print of this part: every colour entry of its rows. */
+  colors_count: number;
+  dims_mm: { x: number; y: number; z: number } | null;
+  /** Material grams of this part for the whole job; null = unknown (or a multi-material part). */
+  grams: number | null;
 }
 
 /** A merchant printer with its physics RESOLVED (canonical model first). */
@@ -242,6 +264,18 @@ export interface EligibilityResult {
   /** Eligible AND the merchant wants to hear about it. */
   notify: boolean;
   notify_block: NotifyBlock;
+  /** A job of parts only: each part's own verdict, in the request's order. */
+  parts?: PartVerdict[];
+  /** A job of parts only: every part is eligible. */
+  covers_all?: boolean;
+}
+
+export interface PartVerdict {
+  part_id: string;
+  eligible: boolean;
+  /** The part's failing reasons (capability, stock, part preferences), in policy order. */
+  reasons: ReasonCode[];
+  printer_id: string;
 }
 
 // ------------------------------------------------------------- the physics
@@ -425,6 +459,7 @@ export function evaluateEligibility(
   catalogue: ReadonlyMap<string, CatalogueMaterial>,
   now: number
 ): EligibilityResult {
+  if (req.parts && req.parts.length) return evaluateByParts(m, req, req.parts, catalogue, now);
   const reasons: ReasonCode[] = [];
   const dims: Record<Dimension, DimensionState> = {
     trade: 'pass', capability: 'pass', stock: 'pass', reach: 'pass', preference: 'pass',
@@ -432,17 +467,7 @@ export function evaluateEligibility(
   const material = req.material_id ? catalogue.get(req.material_id) ?? null : null;
 
   // ---- trade: may this merchant take new work on this request at all ----
-  const trade: ReasonCode[] = [];
-  if (!req.on_board) trade.push('REQUEST_CLOSED');
-  if (req.customer_id && req.customer_id === m.user_id) trade.push('OWN_REQUEST');
-  // Approval has its OWN code (review finding 8): the workshop is told the gate's
-  // sentence, never «your account is not active» or «open your store / renew».
-  if (m.merchant_status !== 'active') trade.push('MERCHANT_INACTIVE');
-  else if (m.approved !== true) trade.push('MERCHANT_NOT_APPROVED');
-  // An allow-list, as everywhere since review S2: a missing store is not an active one.
-  if (m.store_status !== 'active') trade.push('STORE_UNAVAILABLE');
-  if (!m.plan_ok) trade.push('PLAN_LAPSED');
-  if (!m.accepts_custom_requests) trade.push('NOT_TAKING_REQUESTS');
+  const trade = tradeReasons(m, req);
   if (trade.length) dims.trade = 'fail';
   reasons.push(...trade);
 
@@ -512,6 +537,277 @@ export function evaluateEligibility(
     printer_id: best?.id ?? '',
     notify: eligible && notify_block === '',
     notify_block,
+  };
+}
+
+// ------------------------------------------------------------ trade
+
+function tradeReasons(m: EligibilityCandidate, req: EligibilityRequest): ReasonCode[] {
+  const trade: ReasonCode[] = [];
+  if (!req.on_board) trade.push('REQUEST_CLOSED');
+  if (req.customer_id && req.customer_id === m.user_id) trade.push('OWN_REQUEST');
+  // Approval has its OWN code (review finding 8): the workshop is told the gate's
+  // sentence, never «your account is not active» or «open your store / renew».
+  if (m.merchant_status !== 'active') trade.push('MERCHANT_INACTIVE');
+  else if (m.approved !== true) trade.push('MERCHANT_NOT_APPROVED');
+  // An allow-list, as everywhere since review S2: a missing store is not an active one.
+  if (m.store_status !== 'active') trade.push('STORE_UNAVAILABLE');
+  if (!m.plan_ok) trade.push('PLAN_LAPSED');
+  if (!m.accepts_custom_requests) trade.push('NOT_TAKING_REQUESTS');
+  return trade;
+}
+
+// ------------------------------------------------- a job of parts (P1-05)
+
+/**
+ * ONE PART AS A ONE-JOB REQUEST, for one of its materials: the part's own
+ * process, size and colour count, the request's quality and place. What the
+ * single-job physics (`printerCannot`) and the ranking read.
+ */
+export function partRequest(req: EligibilityRequest, part: EligibilityPart, materialId: string | null = part.materials[0]?.material_id ?? null): EligibilityRequest {
+  const row = part.materials.find((x) => x.material_id === materialId) ?? part.materials[0];
+  const { parts: _parts, ...rest } = req;
+  void _parts;
+  return {
+    ...rest,
+    process: part.process,
+    material_id: materialId,
+    color_hex: row && row.colours.length === 1 ? row.colours[0] : '',
+    colors_count: Math.max(1, part.colors_count),
+    dims_mm: part.dims_mm,
+    grams: part.grams,
+  };
+}
+
+/**
+ * Why ONE printer cannot make ONE PART ('' = it can): `printerCannot` once
+ * for each material of the part, with the part's colour count. A part in
+ * several materials therefore needs one machine that runs all of them and
+ * lays down as many colours at once — and a part in one colour never asks for
+ * a multicolour machine, whatever colour the other parts are.
+ */
+export function printerCannotPart(
+  p: CapabilityPrinter,
+  part: EligibilityPart,
+  req: EligibilityRequest,
+  catalogue: ReadonlyMap<string, CatalogueMaterial>
+): ReasonCode | '' {
+  const rows = part.materials.length ? part.materials : [{ material_id: null, colours: [] }];
+  for (const row of rows) {
+    const material = row.material_id ? catalogue.get(row.material_id) ?? null : null;
+    const why = printerCannot(p, partRequest(req, part, row.material_id), material);
+    if (why) return why;
+  }
+  return '';
+}
+
+/**
+ * IS THIS PART ON THE SHELF: each material (or, unsure, any material of a
+ * technology the capable machines run) in stock, each named colour present,
+ * and — a single-material part with known grams — enough of it: one line of
+ * a single colour holding the grams (as the single job reads it), or across
+ * the part's colours together. Parts that share a material and colour are
+ * not summed against each other.
+ */
+export function partStockVerdict(
+  stock: StockLine[],
+  part: EligibilityPart,
+  processes: Process[],
+  catalogue: ReadonlyMap<string, CatalogueMaterial>
+): ReasonCode | '' {
+  const rows = part.materials.length ? part.materials : [{ material_id: null, colours: [] }];
+  for (const row of rows) {
+    const lines = stock.filter((l) =>
+      row.material_id ? l.material_id === row.material_id : processes.includes(catalogue.get(l.material_id)?.process ?? ('' as Process))
+    );
+    if (!lines.some((l) => l.grams > 0)) return 'STOCK_MATERIAL';
+    for (const colour of row.colours) {
+      if (!lines.some((l) => (l.color_hex === '' || l.color_hex === colour) && l.grams > 0)) return 'STOCK_COLOR';
+    }
+  }
+  if (rows.length === 1 && part.grams !== null && part.grams > 0) {
+    const need = Math.ceil(part.grams);
+    const row = rows[0];
+    const lines = stock.filter((l) =>
+      row.material_id ? l.material_id === row.material_id : processes.includes(catalogue.get(l.material_id)?.process ?? ('' as Process))
+    );
+    const inColours = row.colours.length ? lines.filter((l) => l.color_hex === '' || row.colours.includes(l.color_hex)) : lines;
+    const enough = row.colours.length > 1
+      ? inColours.reduce((n, l) => n + l.grams, 0) >= need
+      : inColours.some((l) => l.grams >= need);
+    if (!enough) return 'STOCK_GRAMS';
+  }
+  return '';
+}
+
+/** The preferences a PART answers: process, material, colour, capability, size. */
+function partPreferenceReasons(
+  p: MerchantPrefs,
+  req: EligibilityRequest,
+  part: EligibilityPart,
+  capablePrinters: CapabilityPrinter[],
+  catalogue: ReadonlyMap<string, CatalogueMaterial>
+): ReasonCode[] {
+  const out: ReasonCode[] = [];
+  if (p.processes.length) {
+    const ok = part.process
+      ? p.processes.includes(part.process)
+      : capablePrinters.some((pr) => p.processes.includes(pr.technology));
+    if (!ok) out.push('PREF_PROCESS');
+  }
+  const chosen = part.materials.map((x) => x.material_id).filter((x): x is string => !!x);
+  if (p.materials.length && chosen.some((id) => !p.materials.includes(id))) out.push('PREF_MATERIAL');
+  const colours = part.materials.flatMap((x) => x.colours);
+  const allowed = p.colors.map((c) => c.toLowerCase());
+  if (p.colors.length && colours.some((c) => !allowed.includes(c.toLowerCase()))) out.push('PREF_COLOR');
+  if (p.capabilities.length) {
+    const rows = part.materials.length ? part.materials : [{ material_id: null, colours: [] }];
+    const needed = new Set(rows.flatMap((row) =>
+      jobCapabilities(partRequest(req, part, row.material_id), row.material_id ? catalogue.get(row.material_id) ?? null : null)
+    ));
+    if ([...needed].some((cap) => !p.capabilities.includes(cap))) out.push('PREF_CAPABILITY');
+  }
+  if (part.dims_mm) {
+    const longest = Math.max(part.dims_mm.x, part.dims_mm.y, part.dims_mm.z);
+    if ((p.min_size_mm > 0 && longest < p.min_size_mm) || (p.max_size_mm !== null && p.max_size_mm > 0 && longest > p.max_size_mm)) {
+      out.push('PREF_SIZE');
+    }
+  }
+  return out;
+}
+
+/** The preferences the REQUEST answers: where it goes, how, and the job-value band. */
+function requestPreferenceReasons(p: MerchantPrefs, req: EligibilityRequest): ReasonCode[] {
+  const out: ReasonCode[] = [];
+  if (p.governorates.length && req.governorate) {
+    const gov = normalizeGovernorate(req.governorate) || req.governorate;
+    if (!p.governorates.includes(gov) && !p.governorates.includes(req.governorate)) out.push('PREF_GOVERNORATE');
+  }
+  if (p.delivery.length && req.delivery_pref && !p.delivery.includes(req.delivery_pref)) out.push('PREF_DELIVERY');
+  if (req.estimate_iqd !== null) {
+    if (p.min_job_iqd > 0 && req.estimate_iqd < p.min_job_iqd) out.push('PREF_JOB_TOO_SMALL');
+    if (p.max_job_iqd !== null && p.max_job_iqd > 0 && req.estimate_iqd > p.max_job_iqd) out.push('PREF_JOB_TOO_LARGE');
+  }
+  return out;
+}
+
+const byPolicy = (codes: Iterable<ReasonCode>): ReasonCode[] =>
+  [...new Set(codes)].sort((a, b) => ALL_REASONS.indexOf(a) - ALL_REASONS.indexOf(b));
+
+export interface PartEvaluation extends PartVerdict {
+  capability: ReasonCode | '';
+  stock: ReasonCode | '';
+  preference: ReasonCode[];
+  /** The machines that can make the part (the best is `printer_id`). */
+  capable: CapabilityPrinter[];
+}
+
+/**
+ * ONE PART, FOR ONE WORKSHOP — capability, stock and the part's own
+ * preferences (P1-05). Pure; the offer route asks it of a covered part as
+ * asked and with a merchant's substitution applied.
+ */
+export function evaluatePart(
+  m: EligibilityCandidate,
+  req: EligibilityRequest,
+  part: EligibilityPart,
+  catalogue: ReadonlyMap<string, CatalogueMaterial>
+): PartEvaluation {
+  const capable: CapabilityPrinter[] = [];
+  let capReason: ReasonCode | '' = m.printers.length ? '' : 'NO_PRINTER';
+  for (const p of m.printers) {
+    const why = printerCannotPart(p, part, req, catalogue);
+    if (!why) capable.push(p);
+    else if (!capReason || CAPABILITY_ORDER.indexOf(why) < CAPABILITY_ORDER.indexOf(capReason)) capReason = why;
+  }
+  const capability: ReasonCode | '' = capable.length ? '' : capReason || 'NO_PRINTER';
+  let stock: ReasonCode | '' = '';
+  if (m.stock !== 'untracked') {
+    const processes = [...new Set((capable.length ? capable : m.printers).map((p) => p.technology))];
+    stock = partStockVerdict(m.stock, part, processes, catalogue);
+  }
+  const preference = partPreferenceReasons(m.prefs, req, part, capable.length ? capable : m.printers, catalogue);
+  const reasons = byPolicy([...(capability ? [capability] : []), ...(stock ? [stock] : []), ...preference]);
+  const eligible = reasons.length === 0;
+  return {
+    part_id: part.id,
+    eligible,
+    reasons,
+    printer_id: eligible ? bestPrinter(capable)?.id ?? '' : '',
+    capability,
+    stock,
+    preference,
+    capable,
+  };
+}
+
+/**
+ * THE VERDICT FOR A JOB OF PARTS. Trade, reach and the request's own
+ * preferences (governorate, delivery, the job-value band) decide the request;
+ * each part answers capability, stock and its own preferences. Eligible = no
+ * request-level reason AND at least one part eligible; `covers_all` = every
+ * part. The reasons are the request's, plus — only when no part passes — the
+ * parts' together, in policy order. A preference still only narrows: it adds
+ * reasons, to a part or to the request, and never removes one.
+ */
+function evaluateByParts(
+  m: EligibilityCandidate,
+  req: EligibilityRequest,
+  parts: EligibilityPart[],
+  catalogue: ReadonlyMap<string, CatalogueMaterial>,
+  now: number
+): EligibilityResult {
+  const dims: Record<Dimension, DimensionState> = {
+    trade: 'pass', capability: 'pass', stock: 'pass', reach: 'pass', preference: 'pass',
+  };
+  const request: ReasonCode[] = [];
+  const trade = tradeReasons(m, req);
+  if (trade.length) dims.trade = 'fail';
+  request.push(...trade);
+  if (m.reach === 'not_evaluated') dims.reach = 'unknown';
+  else {
+    const why = reachVerdict(m.reach, req);
+    if (why) {
+      dims.reach = 'fail';
+      request.push(why);
+    }
+  }
+  const prefs = requestPreferenceReasons(m.prefs, req);
+  request.push(...prefs);
+
+  const verdicts = parts.map((part) => evaluatePart(m, req, part, catalogue));
+  const passing = verdicts.filter((v) => v.eligible);
+  const some = passing.length > 0;
+  if (m.stock === 'untracked') dims.stock = 'untracked';
+  if (!some) {
+    if (verdicts.some((v) => v.capability)) dims.capability = 'fail';
+    if (m.stock !== 'untracked' && verdicts.some((v) => v.stock)) dims.stock = 'fail';
+    if (verdicts.some((v) => v.preference.length)) dims.preference = 'fail';
+  } else {
+    const first = parts.find((p) => p.id === passing[0].part_id);
+    if (first && !first.dims_mm) dims.capability = 'unknown';
+  }
+  if (prefs.length) dims.preference = 'fail';
+
+  const reasons = byPolicy([...request, ...(some ? [] : verdicts.flatMap((v) => v.reasons))]);
+  const eligible = request.length === 0 && some;
+  const notify_block: NotifyBlock = !eligible
+    ? ''
+    : !m.request_opportunities
+      ? 'NOTIFICATIONS_OFF'
+      : pausedAt(m.prefs, now)
+        ? 'PAUSED'
+        : '';
+  return {
+    eligible,
+    reason: reasons[0] ?? '',
+    reasons,
+    dims,
+    printer_id: eligible ? passing[0].printer_id : '',
+    notify: eligible && notify_block === '',
+    notify_block,
+    parts: verdicts.map((v) => ({ part_id: v.part_id, eligible: v.eligible, reasons: v.reasons, printer_id: v.printer_id })),
+    covers_all: verdicts.every((v) => v.eligible),
   };
 }
 

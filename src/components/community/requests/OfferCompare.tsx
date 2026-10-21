@@ -37,41 +37,25 @@ import { offersV2Api, type CatalogMaterial, type OfferFileV2, type OfferHistoryE
 import { FileGlyph } from './OfferComposer';
 import { daysLabel, fill, fillNodes, handoverLabel, jobsLabel, offerStateWords, requestLang, shortDay, useRequestStrings, type RequestLang, type RequestStrings } from './strings';
 import VariantImg from '../../ui/VariantImg';
+import { Checkbox } from '../../ui/Switch';
+import {
+  acceptBody,
+  bestOffers,
+  coverageOf,
+  isPartialOffer,
+  offerIsLive,
+  partName,
+  partialLabel,
+  sortOffers,
+  substitutesSomething,
+  type OfferSort,
+  type PartRef,
+} from './offerParts';
 
-type Sort = 'price' | 'time' | 'rating';
+type Sort = OfferSort;
 
-/** An offer the customer can still take. */
-export function offerIsLive(o: OfferV2): boolean {
-  return o.state === 'pending' && !o.stale && !o.expired && !o.workshop_unable;
-}
-
-/** The three best-in-class picks for the quick comparison, from the live offers. */
-export function bestOffers(offers: OfferV2[]): { cheapest: OfferV2 | null; fastest: OfferV2 | null; topRated: OfferV2 | null } {
-  const live = offers.filter(offerIsLive);
-  const by = (key: (o: OfferV2) => number) => live.reduce<OfferV2 | null>((best, o) => (best === null || key(o) < key(best) ? o : best), null);
-  const rated = live.filter((o) => o.merchant?.rating != null);
-  return {
-    cheapest: by((o) => o.total_iqd ?? Number.MAX_SAFE_INTEGER),
-    fastest: by((o) => o.completion_days || Number.MAX_SAFE_INTEGER),
-    topRated: rated.reduce<OfferV2 | null>((best, o) => (best === null || (o.merchant!.rating ?? 0) > (best.merchant!.rating ?? 0) ? o : best), null),
-  };
-}
-
-/** The accepted offer first, then the ones that can still be taken, each group in the chosen order. */
-export function sortOffers(offers: OfferV2[], sort: Sort): OfferV2[] {
-  const rank = (o: OfferV2) => (o.state === 'accepted' ? 0 : offerIsLive(o) ? 1 : 2);
-  const key = (o: OfferV2) => (sort === 'price' ? o.total_iqd ?? Number.MAX_SAFE_INTEGER : sort === 'time' ? o.completion_days || 9999 : -(o.merchant?.rating ?? 0));
-  return [...offers].sort((a, b) => rank(a) - rank(b) || key(a) - key(b));
-}
-
-/** What `acceptOffer` sends — the TOTAL and the version on screen, never a price the server did not compute. */
-export function acceptBody(o: Pick<OfferV2, 'total_iqd' | 'revision' | 'delivery_method'>, addressId: string) {
-  return {
-    expected_total_iqd: o.total_iqd ?? 0,
-    offer_revision: o.revision,
-    ...(addressId && o.delivery_method !== 'pickup' ? { address_id: addressId } : {}),
-  };
-}
+// The pure helpers live in ./offerParts (P1-05) and are re-exported here for the callers that read them from this file.
+export { acceptBody, bestOffers, offerIsLive, sortOffers };
 
 export interface OfferCompareProps {
   requestId: string;
@@ -80,9 +64,11 @@ export interface OfferCompareProps {
   takingOffers: boolean;
   materials: CatalogMaterial[];
   onChanged: () => void;
+  /** P1-05: the parts of the request, to name what a partial offer covers and what a substitution replaces. */
+  parts?: PartRef[];
 }
 
-export default function OfferCompare({ requestId, offers, takingOffers, materials, onChanged }: OfferCompareProps) {
+export default function OfferCompare({ requestId, offers, takingOffers, materials, onChanged, parts = [] }: OfferCompareProps) {
   const { lang } = useLanguage();
   const s = useRequestStrings();
   const L = requestLang(lang);
@@ -160,6 +146,7 @@ export default function OfferCompare({ requestId, offers, takingOffers, material
             s={s}
             lang={L}
             matName={matName}
+            parts={parts}
             canAct={takingOffers && offerIsLive(o)}
             onAccept={() => setAccepting(o)}
             onDecline={() => decline(o)}
@@ -176,6 +163,7 @@ export default function OfferCompare({ requestId, offers, takingOffers, material
           <h3 id="offer-compare-title" className="px-4 pt-3 text-[13px] font-bold text-text-primary">
             {s.compare}
           </h3>
+          {offers.some(isPartialOffer) && <p className="px-4 pt-1 text-[11.5px] text-text-muted" data-compare-complete-only>{s.partialCompareNote}</p>}
           <dl className="divide-y divide-border-subtle/60 px-4 pb-1 pt-1">
             <CompareRow label={s.cheapest} o={best.cheapest} value={best.cheapest ? <Money iqd={best.cheapest.total_iqd} /> : null} />
             <CompareRow label={s.fastest} o={best.fastest} value={best.fastest ? daysLabel(best.fastest.completion_days, L) : null} />
@@ -199,6 +187,8 @@ export default function OfferCompare({ requestId, offers, takingOffers, material
 
       <AcceptSheet
         offer={accepting}
+        parts={parts}
+        matName={matName}
         onClose={() => setAccepting(null)}
         onAccepted={(o) => {
           setAccepting(null);
@@ -275,11 +265,22 @@ export function Breakdown({ o, s }: { o: Pick<OfferV2, 'price_iqd' | 'delivery_f
   );
 }
 
+/** «PETG بدل TPU (المقبض)» — each substitution in the words of the reader. */
+function substitutionLines(o: OfferV2, parts: PartRef[], matName: (id: string) => string, s: RequestStrings): string[] {
+  const colours = (cs: Array<{ hex: string; label: string }>) => cs.map((c) => c.label || c.hex).filter(Boolean).join('، ');
+  return (o.substitutions ?? []).map((x) => {
+    const side = (v: { material_id: string; colors: Array<{ hex: string; label: string }> }) =>
+      [matName(v.material_id), colours(v.colors)].filter(Boolean).join(' ');
+    return fill(s.substitutionRow, { to: side(x.to), from: side(x.from), part: partName(parts.find((p) => p.id === x.part_id), s) || '—' });
+  });
+}
+
 function OfferColumn({
   o,
   s,
   lang,
   matName,
+  parts,
   canAct,
   onAccept,
   onDecline,
@@ -290,6 +291,7 @@ function OfferColumn({
   s: RequestStrings;
   lang: RequestLang;
   matName: (id: string) => string;
+  parts: PartRef[];
   canAct: boolean;
   onAccept: () => void;
   onDecline: () => void;
@@ -297,6 +299,9 @@ function OfferColumn({
   onHistory: () => void;
 }) {
   const m = o.merchant;
+  const partial = partialLabel(o, parts.length, s);
+  const { covered, uncovered } = coverageOf(o, parts);
+  const subs = substitutionLines(o, parts, matName, s);
   const st = offerStateWords(o, s);
   const history = o.history ?? [];
   const prev = history.length > 1 ? history[history.length - 2] : null;
@@ -309,6 +314,7 @@ function OfferColumn({
       data-offer-state={o.state}
       data-offer-stale={o.stale ? 'true' : undefined}
       data-offer-revised={o.revised ? 'true' : undefined}
+      data-offer-partial={partial ? 'true' : undefined}
       aria-label={m?.name ?? s.theMerchant}
     >
       <header className="flex items-start justify-between gap-2">
@@ -327,7 +333,10 @@ function OfferColumn({
             {!!m?.completed_orders && <span>{jobsLabel(m.completed_orders, lang)}</span>}
           </p>
         </div>
-        <StatusChip tone={st.tone}>{st.text}</StatusChip>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <StatusChip tone={st.tone}>{st.text}</StatusChip>
+          {partial && <StatusChip tone="warning">{partial}</StatusChip>}
+        </div>
       </header>
 
       <p className="mt-3 text-[20px] font-bold text-text-primary" data-offer-total={o.total_iqd ?? ''}>
@@ -363,6 +372,25 @@ function OfferColumn({
         {o.quantity != null && <Row k={s.quantity}>{`×${o.quantity}`}</Row>}
         {o.color && <Row k={s.colour}>{o.color}</Row>}
         <Row k={s.materials}>{o.material_ids?.length ? o.material_ids.map(matName).join(sep) : o.materials || '—'}</Row>
+        {parts.length > 1 && (
+          <Row k={s.partsLabel}>
+            <span data-offer-parts>{partial ? covered.map((p) => partName(p, s)).join(sep) : s.allParts}</span>
+            {uncovered.length > 0 && (
+              <span className="block text-[11.5px] text-warning" data-offer-uncovered>
+                {`${s.notIncluded}: ${uncovered.map((p) => partName(p, s)).join(sep)}`}
+              </span>
+            )}
+          </Row>
+        )}
+        {subs.length > 0 && (
+          <Row k={s.substitutesLabel}>
+            {subs.map((line) => (
+              <span key={line} className="block" data-offer-substitution>
+                {line}
+              </span>
+            ))}
+          </Row>
+        )}
         <Row k={s.included}>{o.included || '—'}</Row>
         <Row k={s.warranty}>{o.warranty_terms || '—'}</Row>
         {o.terms && <Row k={s.terms}>{o.terms}</Row>}
@@ -464,9 +492,23 @@ function HistorySheet({ offer, onClose }: { offer: OfferV2 | null; onClose: () =
 }
 
 /** A refusal with a way out: its sentence and what «حدّث» does. */
-type Notice = { code: 'OFFER_CHANGED' | 'OFFER_STALE'; text: string };
+type Notice = { code: 'OFFER_CHANGED' | 'OFFER_STALE' | 'OFFER_SUBSTITUTION_UNACCEPTED' | 'OFFER_PARTIAL_UNACCEPTED'; text: string };
 
-function AcceptSheet({ offer, onClose, onAccepted, onRefresh }: { offer: OfferV2 | null; onClose: () => void; onAccepted: (o: OfferV2) => void; onRefresh: () => void }) {
+function AcceptSheet({
+  offer,
+  parts,
+  matName,
+  onClose,
+  onAccepted,
+  onRefresh,
+}: {
+  offer: OfferV2 | null;
+  parts: PartRef[];
+  matName: (id: string) => string;
+  onClose: () => void;
+  onAccepted: (o: OfferV2) => void;
+  onRefresh: () => void;
+}) {
   const { lang } = useLanguage();
   const s = useRequestStrings();
   const L = requestLang(lang);
@@ -478,10 +520,15 @@ function AcceptSheet({ offer, onClose, onAccepted, onRefresh }: { offer: OfferV2
   const [needsTopUp, setNeedsTopUp] = useState(false);
   const [addresses, setAddresses] = useState<ApiAddress[] | null>(null);
   const [addressId, setAddressId] = useState('');
+  // P1-05: the acknowledgements, each shown only when the offer needs it.
+  const [ackPartial, setAckPartial] = useState(false);
+  const [ackSubs, setAckSubs] = useState(false);
 
   useEffect(() => {
     if (!offer) return;
     setShown(offer);
+    setAckPartial(false);
+    setAckSubs(false);
     setChanged(false);
     setNotice(null);
     setError('');
@@ -514,12 +561,23 @@ function AcceptSheet({ offer, onClose, onAccepted, onRefresh }: { offer: OfferV2
       onAccepted(o);
     } catch (e) {
       const code = e instanceof ApiError ? e.code : '';
+      if (code === 'OFFER_SUBSTITUTION_UNACCEPTED' || code === 'OFFER_PARTIAL_UNACCEPTED') {
+        // P1-05: what this offer needs acknowledged, on the fresh offer the refusal carries.
+        const fresh = e instanceof ApiError ? (e.details?.offer as Partial<OfferV2> | undefined) : undefined;
+        if (fresh) setShown({ ...o, ...fresh, merchant: o.merchant, files: o.files, history: o.history });
+        setAckPartial(false);
+        setAckSubs(false);
+        setNotice({ code, text: apiRefusal(e, L, s.couldNotAccept) });
+        return;
+      }
       if (code === 'OFFER_CHANGED' || code === 'OFFER_STALE') {
         const fresh = e instanceof ApiError ? (e.details?.offer as Partial<OfferV2> | undefined) : undefined;
         if (fresh && code === 'OFFER_CHANGED') {
           // The fresh terms from the refusal itself: the total and the version the next press confirms.
           setShown({ ...o, ...fresh, merchant: o.merchant, files: o.files, history: o.history });
           setChanged(true);
+          setAckPartial(false);
+          setAckSubs(false);
         }
         setNotice({ code, text: apiRefusal(e, L, s.couldNotAccept) });
         return;
@@ -538,6 +596,12 @@ function AcceptSheet({ offer, onClose, onAccepted, onRefresh }: { offer: OfferV2
 
   const name = o?.merchant?.name ?? s.theMerchant;
   const stale = notice?.code === 'OFFER_STALE';
+  const needsPartial = !!o && isPartialOffer(o);
+  const needsSubs = !!o && substitutesSomething(o);
+  const acknowledged = (!needsPartial || ackPartial) && (!needsSubs || ackSubs);
+  const sep = L === 'en' ? ', ' : '، ';
+  const uncoveredNames = o ? coverageOf(o, parts).uncovered.map((p) => partName(p, s)).join(sep) : '';
+  const subs = o ? substitutionLines(o, parts, matName, s) : [];
   return (
     <Sheet
       open={!!offer}
@@ -565,7 +629,7 @@ function AcceptSheet({ offer, onClose, onAccepted, onRefresh }: { offer: OfferV2
             </Link>
           )}
           {!stale && (
-            <Button variant="primary" block onClick={accept} loadingLabel={s.holding} data-accept-confirm>
+            <Button variant="primary" block onClick={accept} disabled={!acknowledged} loadingLabel={s.holding} data-accept-confirm>
               {changed ? s.acceptNewTerms : s.acceptAndHold}
             </Button>
           )}
@@ -578,7 +642,7 @@ function AcceptSheet({ offer, onClose, onAccepted, onRefresh }: { offer: OfferV2
       {o && (
         <div className="space-y-3 px-5 pb-3 pt-1 text-[13px] leading-relaxed text-text-secondary" data-accept-sheet={o.id}>
           {notice && (
-            <div role="status" className="lv-alert lv-alert-warning flex items-start justify-between gap-3" data-accept={notice.code === 'OFFER_CHANGED' ? 'changed' : 'stale'}>
+            <div role="status" className="lv-alert lv-alert-warning flex items-start justify-between gap-3" data-accept={notice.code === 'OFFER_STALE' ? 'stale' : 'changed'}>
               <span className="min-w-0 text-text-primary">{notice.text}</span>
               <Button size="sm" variant="secondary" onClick={refresh} className="shrink-0" data-accept-refresh>
                 {s.refresh}
@@ -602,6 +666,17 @@ function AcceptSheet({ offer, onClose, onAccepted, onRefresh }: { offer: OfferV2
               {handoverLabel(o.delivery_method, s)} · {fill(s.version, { n: o.revision })}
             </p>
           </div>
+          {subs.length > 0 && (
+            <ul className="space-y-1 rounded-lg bg-surface-raised px-3.5 py-2.5 text-[12.5px] text-text-primary" aria-label={s.substitutesLabel} data-accept-substitutions>
+              {subs.map((line) => (
+                <li key={line} dir="auto">{line}</li>
+              ))}
+            </ul>
+          )}
+          {needsSubs && <Checkbox checked={ackSubs} onChange={setAckSubs} label={s.ackSubstitutions} data-accept-ack="substitutions" />}
+          {needsPartial && (
+            <Checkbox checked={ackPartial} onChange={setAckPartial} label={fill(s.ackPartial, { parts: uncoveredNames || '—' })} data-accept-ack="partial" />
+          )}
           <p>{s.heldExplain}</p>
           {o.delivery_method !== 'pickup' && (
             <div>
