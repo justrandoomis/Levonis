@@ -42,12 +42,6 @@ export interface TriageState {
    * symptom it does not lead to.
    */
   faultIn?: PartKey;
-  /**
-   * Opened only by a printer the customer says is theirs («عندي اي ون», "I
-   * have an A1"), and no fault named since: «تحدث مع الفريق» then drafts no
-   * ticket that claims a problem (review round 5). Never beside a symptom.
-   */
-  owned?: true;
 }
 
 export interface AssistContext {
@@ -140,7 +134,6 @@ export function readContext(raw: unknown): AssistContext {
       if (out.triage.steps && t.tried === true) out.triage.tried = true;
       const faultIn = oneOf(PART_KEYS, t.faultIn);
       if (symptom && faultIn && PART_SYMPTOM[faultIn] === symptom) out.triage.faultIn = faultIn;
-      if (!symptom && (stage === 'printer' || stage === 'symptom') && t.owned === true) out.triage.owned = true;
     }
   }
   if (Array.isArray(c.shown)) {

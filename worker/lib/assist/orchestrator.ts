@@ -28,7 +28,7 @@ import { callTool } from './registry';
 import { tr } from './strings';
 import { FITS_MAX, SEARCH_LIMIT_MAX, SEARCH_OFFSET_MAX, type CatalogItem, type CatalogSearchArgs } from './tools/catalog';
 import type { MyPrinter } from './tools/devices';
-import { nextTriage, ownedOnly, triagePrinter, type TriageInput, type TriageStep } from './triage/flow';
+import { nextTriage, triagePrinter, type TriageInput, type TriageStep } from './triage/flow';
 import { SYMPTOMS, symptomDef, wikiFor } from './triage/symptoms';
 import type { AssistCard, AssistChoice, AssistReply, CardRenderer, ModelToken, PartKey, Viewer } from './types';
 import { MODEL_TOKENS, PART_KEYS, SYMPTOM_KEYS, type SymptomKey } from './types';
@@ -75,8 +75,6 @@ const OUTCOME_ANSWER_HINTS = new Set(['printer_problem', 'open_ticket', 'human_h
 const FOLLOWUP_HINTS = new Set(['price_question', 'stock_question']);
 /** The legacy intents a question about a printer by name may carry: «شكد سعر A1», «A1 متوفر؟», «ابحث عن A1». */
 const NAMED_PRINTER_HINTS = new Set(['price_question', 'stock_question', 'product_search']);
-/** The legacy intents «عندي اي ون», "I have an A1" or «A1م هەیە» may carry: a printer named, or the customer's own. */
-const OWNED_PRINTER_HINTS = new Set([...NAMED_PRINTER_HINTS, ...PRINTER_ANSWER_HINTS]);
 
 /**
  * A part question asked while the triage waits for «which printer?» or «which
@@ -94,14 +92,6 @@ function withoutPrinter(ctx: AssistContext): AssistContext {
   const out: AssistContext = { ...ctx };
   delete out.printer;
   return out;
-}
-
-/** The context with its triage no longer only the printer owned (`TriageState.owned`). */
-function disowned(ctx: AssistContext): AssistContext {
-  if (!ctx.triage?.owned) return ctx;
-  const triage = { ...ctx.triage };
-  delete triage.owned;
-  return { ...ctx, triage };
 }
 
 /** A family whose printer this conversation already chose is that printer: «نوزل X1» after the X1C. */
@@ -134,9 +124,6 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
     }
     const triage = readChip(input.chip);
     if (!triage) return null;
-    // «عندي اي ون» and then «تحدث مع الفريق»: no fault was ever named, so no
-    // ticket says there is one. The plain handoff answers (review round 5).
-    if (triage.kind === 'talk' && ownedOnly(input.context.triage)) return null;
     return runTriage(db, viewer, input.context, triage, render);
   }
   const text = input.text?.trim();
@@ -162,27 +149,24 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
   // «نوزل مال اي ون» at «أي طابعة عندك؟» is a part question, not the answer: the parts are shown (below).
   const partQuestion = !!u.part && !u.problemCue && !u.symptom;
   if (stage === 'printer' && bare && !partQuestion && (hint === null || PRINTER_ANSWER_HINTS.has(hint))) {
-    // «A1 بيها مشكلة» after «عندي طابعة»: a problem is now said, so the triage is no longer only the printer owned.
-    const said = u.problemCue ? disowned(ctx) : ctx;
-    const owned = said.triage?.owned ? { owned: true as const } : {};
     const extras = triageExtras(u.symptom ?? partFault(u), u.hmsCode, faultPart(u));
     // What was already said is held: the symptom, the code, and the part a fault was named in.
     const holding = () =>
       extras.symptom
-        ? triageExtras(extras.symptom, extras.code ?? said.triage?.code, extras.faultIn)
-        : triageExtras(said.triage?.symptom, extras.code ?? said.triage?.code, said.triage?.faultIn);
-    if (u.model) return runTriage(db, viewer, said, { kind: 'printer', model: u.model, ...extras }, render);
+        ? triageExtras(extras.symptom, extras.code ?? ctx.triage?.code, extras.faultIn)
+        : triageExtras(ctx.triage?.symptom, extras.code ?? ctx.triage?.code, ctx.triage?.faultIn);
+    if (u.model) return runTriage(db, viewer, ctx, { kind: 'printer', model: u.model, ...extras }, render);
     // «X1»: which of the family, holding what was already said.
-    if (u.family) return runTriage(db, viewer, known, { kind: 'start', ...among, ...holding(), ...owned }, render);
+    if (u.family) return runTriage(db, viewer, known, { kind: 'start', ...among, ...holding() }, render);
     // «طابعتي», "my own printer": the one printer of this account; with several, or none
     // (a guest), the same question again, holding what was already said.
     if (u.ownPrinter) {
       const mine = await myPrinters(db, viewer);
-      if (mine.length === 1) return runTriage(db, viewer, said, { kind: 'printer', model: mine[0].model, unit_id: mine[0].unit_id, ...extras }, render);
-      return runTriage(db, viewer, said, { kind: 'start', ...holding(), ...owned }, render);
+      if (mine.length === 1) return runTriage(db, viewer, ctx, { kind: 'printer', model: mine[0].model, unit_id: mine[0].unit_id, ...extras }, render);
+      return runTriage(db, viewer, ctx, { kind: 'start', ...holding() }, render);
     }
     // «عندي طابعة كريالتي اندر 3», «طابعة أخرى»: a printer this shop does not list.
-    if (u.otherPrinter || u.printerUnread) return runTriage(db, viewer, said, { kind: 'printer', model: 'other', ...extras }, render);
+    if (u.otherPrinter || u.printerUnread) return runTriage(db, viewer, ctx, { kind: 'printer', model: 'other', ...extras }, render);
   }
   if (stage === 'symptom' && bare) {
     // While the triage asks for the symptom, «خيوط» alone is stringing, a
@@ -328,20 +312,9 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
   // text that may answer a pending question («أي طابعة عندك؟», a legacy
   // `expects`) is left to that question.
   const triageAsking = stage === 'printer' || stage === 'symptom';
-  // "how much is my A1", "is my A1 in stock": a price or a stock ask is a shopping question, whoever owns the printer (review round 5).
-  // A stock ask is read as the price ask is, whatever the scorer made of it: «اكو A1 مالتي», "is my printer in stock" (review round 5.2).
-  const shopping = u.priceAsk || u.stockAsk || (hint !== null && FOLLOWUP_HINTS.has(hint));
-  if (printerOnly(u, shopping) && (hint === null ? !input.awaiting && !triageAsking : NAMED_PRINTER_HINTS.has(hint))) {
+  if (printerOnly(u) && (hint === null ? !input.awaiting && !triageAsking : NAMED_PRINTER_HINTS.has(hint))) {
     const answer = await printerNamed(db, viewer, ctx, u, hint, render);
     if (answer) return answer;
-  }
-  // «عندي اي ون», «طابعتي A1», "I have an A1", «A1م هەیە», «پرینتەرێکم هەیە»: the
-  // customer says which printer is theirs. Never that printer for sale (review
-  // round 4.3): the triage asks what is wrong with it («ما المشكلة في طابعة
-  // A1؟»), or which printer it is, and holds it as theirs. Only with no triage
-  // in hand and no legacy question pending; otherwise the legacy answer has it.
-  if (printerOwned(u, shopping) && (!stage || stage === 'done') && !input.awaiting && (hint === null || OWNED_PRINTER_HINTS.has(hint))) {
-    return runTriage(db, viewer, known, { kind: 'start', ...printer, owned: true }, render);
   }
 
   const named = !!u.model || !!u.family;
@@ -365,28 +338,9 @@ function faultPart(u: Understood): PartKey | undefined {
  * A printer named and nothing else: a model or a series («A1», «X1»), or the
  * printer word alone («طابعة», "printers"), with at most the words of a price
  * or stock question around it. No part, size, code, fault, account word,
- * bundle («A1 combo» is its own card) or second printer; and never a printer
- * the customer says is theirs («طابعتي A1», «عندي اي ون», "I have an A1",
- * «A1م هەیە»): that tells which printer they own, it does not ask to buy one
- * (review round 4.3, `printerOwned`). A price or stock ask (`shopping`: "how
- * much is my A1", "is my A1 in stock") is still about the printer itself,
- * whatever word of owning it carries (review round 5).
+ * bundle («A1 combo» is its own card) or second printer.
  */
-function printerOnly(u: Understood, shopping: boolean): boolean {
-  return printerAlone(u) && (!u.ownsPrinter || shopping);
-}
-
-/**
- * «عندي اي ون», "I have an A1", «پرینتەرێکم هەیە»: a printer, said to be the
- * customer's own, and nothing else. Never a price or stock ask: that is never
- * answered with «what is the problem?» (review round 5).
- */
-function printerOwned(u: Understood, shopping: boolean): boolean {
-  return printerAlone(u) && u.ownsPrinter && !u.productCue && !shopping;
-}
-
-/** The shape `printerOnly` and `printerOwned` share: a printer, or the printer word, and nothing else. */
-function printerAlone(u: Understood): boolean {
+function printerOnly(u: Understood): boolean {
   return (
     u.printerCue &&
     u.models.length <= 1 &&
@@ -553,10 +507,8 @@ function readPartChip(params: Record<string, unknown>): { u: Understood; anyPrin
     otherPrinter: false,
     correction: false,
     ownPrinter: false,
-    ownsPrinter: false,
     triedSaid: false,
     priceAsk: false,
-    stockAsk: false,
     residual: [],
   };
   return { u, anyPrinter };

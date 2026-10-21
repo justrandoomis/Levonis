@@ -574,52 +574,6 @@ test('round 4.3: steps not tried are no outcome; a bare "still" or «هێشتا�
   }
 });
 
-test('round 4.3: a printer the customer says is theirs is read as owned; a question about a printer the shop sells is not', () => {
-  for (const text of [
-    'طابعتي A1',
-    'طابعتي اي ون',
-    'عندي اي ون',
-    'عندي طابعة',
-    'وعندي اي ون',
-    'اشتريت اي ون',
-    'I have an A1',
-    'I own a P1S',
-    "I've got a P1S",
-    'I have a printer',
-    'my A1',
-    'A1 م هەیە',
-    'A1م هەیە',
-    'پرینتەرێکم هەیە',
-    'پرینتەرەکەم A1 ە',
-    'A1ی خۆم',
-  ]) {
-    assert.equal(understand(text).ownsPrinter, true, text);
-  }
-  for (const text of [
-    'A1',
-    'شكد سعر A1',
-    'do you have the A1?',
-    'how much is the A1?',
-    'عندكم اي ون؟',
-    'اريد طابعة',
-    'A1 هەیە؟',
-    'نرخی A1 چەندە؟',
-    'بۆ خۆم A1 دەمەوێ',
-    'printers',
-  ]) {
-    assert.equal(understand(text).ownsPrinter, false, text);
-  }
-});
-
-test('round 5: a Sorani printer word with «-م» is owned only before «هەیە» or «هەمە»; want, need and have-not never are', () => {
-  for (const text of ['پرینتەرێکم دەوێ', 'پرینتەرێکم دەوێت', 'پرینتەرم دەوێ', 'پرینتەرێکم پێویستە', 'چاپکەرێکم دەوێ', 'پرینتەرم نییە', 'پرینتەرێکم نیە', 'A1م دەوێت', 'پرینتەرێکم ئەوێ', 'پرینتەرێکم', 'پرینتەرم']) {
-    assert.equal(understand(text).ownsPrinter, false, text);
-  }
-  for (const text of ['پرینتەرێکم هەیە', 'پرینتەرم هەیە', 'چاپکەرێکم هەیە', 'پرینتەرێکم هەمە', 'پرینتەرەکەم', 'A1م هەیە']) {
-    assert.equal(understand(text).ownsPrinter, true, text);
-  }
-});
-
 test('round 5: the steps are said to be tried only with a verb of trying that nothing negates', () => {
   for (const text of [
     'جربتها وما انحلّت',
@@ -683,67 +637,6 @@ test('round 5: the common whole «still» replies are «not fixed»; a longer se
   }
   for (const text of ['still waiting for the needle to arrive', "I still haven't tried them", 'هێشتا تاقیم نەکردۆتەوە', 'still have not tried']) {
     assert.equal(readOutcome(normalizeText(text)), undefined, `«${text}»`);
-  }
-});
-
-test('round 5.2: in Arabic and English, a want or a need makes «مالتي», «مالي» and "my own" mean "for me", and a have-not is never ownership', () => {
-  for (const text of [
-    'اريد اي ون مالتي',
-    'اريد A1 مالي',
-    'ماكو عندي اي ون',
-    'عندي ولا اي ون',
-    'اريد طابعة مالتي',
-    'ابي طابعة مالتي',
-    'ابغى طابعة مالتي',
-    'ودي طابعة مالتي',
-    'احتاج طابعة مالتي',
-    'اريد طابعة مالي',
-    'ماكو عندي طابعة',
-    'ماكو عدي طابعة',
-    'ماكو طابعة عندي',
-    'عندي ولا طابعة',
-    'ما عندي طابعة',
-    'I want my own A1',
-    'I need my own A1',
-    'my own A1 please',
-    'I want an A1 of my own',
-    "I'd like my own A1",
-    'I want my own printer',
-    'I need my own printer',
-    'I have no printer',
-    "I don't have an A1",
-  ]) {
-    assert.equal(understand(text).ownsPrinter, false, text);
-  }
-  // Ownership said without a want or a have-not is still ownership.
-  for (const text of ['عندي اي ون', 'وعندي اي ون', 'طابعتي A1', 'اي ون مالتي', 'I have an A1', 'my own A1', 'my A1', 'I have a printer', 'A1م هەیە']) {
-    assert.equal(understand(text).ownsPrinter, true, text);
-  }
-});
-
-test('round 5.2: a stock ask is read as the price ask is, whatever the scorer makes of it', () => {
-  for (const text of [
-    'is my printer in stock',
-    'my printer in stock?',
-    'do you have my A1 in stock',
-    'do you have my A1',
-    'is my A1 available',
-    'اكو A1 مالتي',
-    'اكو طابعتي؟',
-    'واكو A1؟',
-    'طابعتي موجودة عندكم؟',
-    'عندي A1 موجودة عندكم؟',
-    'A1 متوفرة؟',
-    'A1 بەردەستە؟',
-  ]) {
-    assert.equal(understand(text).stockAsk, true, text);
-  }
-  // «اكو عندي», «موجودة عندي» are "I have": ownership, never a stock ask.
-  for (const text of ['عندي اي ون', 'اكو عندي اي ون', 'عندي A1 موجودة عندي', 'I have an A1', 'A1م هەیە', 'how much is my A1', 'طابعتي A1']) {
-    assert.equal(understand(text).stockAsk, false, text);
-  }
-  for (const text of ['اكو عندي اي ون', 'عندي A1 موجودة عندي']) {
-    assert.equal(understand(text).ownsPrinter, true, text);
   }
 });
 
