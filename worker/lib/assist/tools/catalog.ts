@@ -10,8 +10,10 @@
  * `printerModels` is which printers the shop actually lists, by model token:
  * the chips the triage offers and the `fits` filter of a part question.
  */
-import { listCatalogProducts } from '../../catalog/cardsRead';
+import { listCatalogProducts, resolveListingCards } from '../../catalog/cardsRead';
+import { optimisticSellable, optimisticSellableFlag, optimisticVisible, runListed } from '../../listing';
 import { printerOptions } from '../../printerFits';
+import { searchProducts } from '../../search/store';
 import type { ModelToken, Viewer } from '../types';
 import { MODEL_TOKENS } from '../types';
 import { latinModels } from '../understand/models';
@@ -23,6 +25,15 @@ export interface CatalogSearchArgs {
   fits?: string[];
   category?: 'cat_maint';
   limit: number;
+  /**
+   * ONLY WHAT THE TEXT REALLY NAMES: keep a product only when the identifier
+   * lane answered it exactly, or every typed word reaches it without a
+   * forgiven typo (worker/lib/search/index.ts `strongProducts`). For a text
+   * that may not name a product at all — the route's last resort for a
+   * sentence nothing else read — where a forgiving ranking would answer
+   * «اوكي» with a filament.
+   */
+  strong?: boolean;
 }
 
 export interface CatalogItem {
@@ -60,11 +71,55 @@ export async function catalogSearch(db: D1Database, viewer: Viewer, args: Catalo
   }
   const exact = Array.isArray(listing.body.exact) ? (listing.body.exact as Array<{ product_id?: unknown }>) : [];
   const miss = Array.isArray(listing.body.exact_miss) ? (listing.body.exact_miss as unknown[]) : [];
+  const exactIds = [...new Set(exact.map((h) => String(h.product_id ?? '')).filter(Boolean))];
+  let kept = items;
+  if (args.strong && text && items.length) {
+    // The same engine, asked which of its matches carry every word. A database
+    // whose index is not built yet answered through the LIKE fallback, which
+    // is already literal: its answer stands.
+    const ranked = await searchProducts(db, `${text} `, { limit: SEARCH_LIMIT_MAX, completeLast: false, strong: true }).catch(() => null);
+    if (ranked?.indexReady) {
+      const keep = new Set([...exactIds, ...(ranked.strong ?? [])]);
+      kept = items.filter((i) => keep.has(i.id));
+    } else if (!ranked) {
+      kept = items.filter((i) => exactIds.includes(i.id));
+    }
+  }
   return {
-    items,
-    exactIds: [...new Set(exact.map((h) => String(h.product_id ?? '')).filter(Boolean))],
+    items: kept,
+    exactIds,
     exactMiss: miss.filter((m): m is string => typeof m === 'string'),
   };
+}
+
+/**
+ * THE PRODUCTS JUST SHOWN, READ AGAIN («شكد سعره؟», «الاول بكم»).
+ *
+ * The ids come from the conversation context, which a browser can forge, so
+ * they are only ids: each row is read again under the storefront listing's
+ * own visibility rule and turned into a card by the storefront's card
+ * builder, for this viewer. The price and availability are therefore today's,
+ * the grid's, and a product no longer listed is simply absent. Same order as
+ * `ids`.
+ */
+export async function catalogByIds(db: D1Database, viewer: Viewer, ids: string[]): Promise<CatalogItem[]> {
+  if (ids.length === 0) return [];
+  const scope = `${optimisticVisible(db)} AND (products.composition = '' OR ${optimisticSellable(db)})`;
+  const { results } = await runListed(
+    db,
+    `SELECT *, ${optimisticSellableFlag(db)} AS sellable_now FROM products WHERE ${scope} AND products.id IN (SELECT value FROM json_each(?))`,
+    (q) => db.prepare(q).bind(JSON.stringify(ids)).all<Record<string, unknown>>()
+  );
+  const rows = results ?? [];
+  const cards = await resolveListingCards(db, rows, await viewer.pricing, null, 'flag');
+  const byId = new Map(rows.map((r) => [String(r.id), r]));
+  const out: CatalogItem[] = [];
+  for (const id of ids) {
+    const row = byId.get(id);
+    const card = cards.get(id);
+    if (row && card) out.push({ id, card, row });
+  }
+  return out;
 }
 
 /** Memoised per isolate: the printer list changes when the owner edits the catalogue, not per request. */

@@ -51,7 +51,7 @@ import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { pricingCtx, resolveProductCards } from '../lib/catalog/cardsRead';
 import { handleTurn } from '../lib/assist/orchestrator';
-import { readContext } from '../lib/assist/context';
+import { readContext, SHOWN_MAX } from '../lib/assist/context';
 import { viewerFor } from '../lib/assist/viewer';
 import { callTool } from '../lib/assist/registry';
 import { ownDevices, type DeviceLite } from '../lib/assist/tools/devices';
@@ -1471,11 +1471,17 @@ const CARD_RENDERER: CardRenderer = { card: assistantProductCard };
  * first. The index's own LIKE fallback still answers when the index is not
  * built yet.
  */
-async function handleProductSearch(c: Context<AppContext>, params: Record<string, unknown>, freeText: string, loc: Locale): Promise<AssistantReply> {
+async function handleProductSearch(
+  c: Context<AppContext>,
+  params: Record<string, unknown>,
+  freeText: string,
+  loc: Locale,
+  opts: { strong?: boolean } = {}
+): Promise<AssistantReply> {
   const q = (str(params.q, 'q', { max: 100, required: false }) || stripQuestionWords(freeText, 'product_search')).slice(0, 99);
   if (q.length < 2) return { intent: 'product_search', text: tr(loc, 'search_empty') };
   const viewer = viewerFor(c.env.DB, c.get('user')?.id ?? null, loc);
-  const found = await callTool('catalog.search', c.env.DB, viewer, { text: q, limit: 5 });
+  const found = await callTool('catalog.search', c.env.DB, viewer, { text: q, limit: 5, ...(opts.strong ? { strong: true } : {}) });
   const items = found.ok ? found.data.items : [];
   // Every row the builders left out (a composition that is not sellable): the honest «no match».
   if (items.length === 0) return { intent: 'product_search', text: tr(loc, 'search_none') };
@@ -2372,6 +2378,25 @@ supportRoutes.post('/assistant', async (c) => {
   }
 
   /**
+   * A LEGACY ANSWER ENDS THE TRIAGE AND IS THE LAST ANSWER. The client keeps
+   * the context it was last handed, so a reply that carried none left «which
+   * printer?» pending, and «شكد سعر P1S» three turns later was read as its
+   * answer; and «بكم؟» after a legacy answer re-showed the products of the
+   * answer before it. Every reply from here on hands the context back without
+   * the triage, with `shown` naming what THIS reply showed (the printer and the
+   * part stay: they are still this conversation's).
+   */
+  const send = (r: AssistantReply) => {
+    if (!context.triage && !context.shown) return c.json({ success: true, reply: r });
+    const next: AssistContext = { ...context };
+    delete next.triage;
+    const shown = (r.cards ?? []).map((card) => card.product_id).filter((id): id is string => typeof id === 'string' && id !== '');
+    if (shown.length) next.shown = [...new Set(shown)].slice(0, SHOWN_MAX);
+    else delete next.shown;
+    return c.json({ success: true, reply: { ...r, context: next } });
+  };
+
+  /**
    * THE QUESTION THE ASSISTANT ASKED LAST TURN, handed back by the client.
    *
    * Validated as strictly as anything else that arrives in a body: the intent
@@ -2420,27 +2445,30 @@ supportRoutes.post('/assistant', async (c) => {
        * "stupid" answer on this screen into the right one. If the catalogue
        * has never heard of it either, THEN the menu.
        */
+      /**
+       * ONLY A STRONG MATCH. The search engine forgives typos and ranks
+       * partial matches, which is right in the search box and wrong here: a
+       * sentence nothing else read may not name a product at all, and «اوكي»,
+       * «منو انت» and «كم الساعة هسه» each half-match something on a real
+       * shelf. A card is shown only when the identifier lane answered it
+       * exactly or every word reaches it without a forgiven typo; otherwise
+       * the menu, as before the search engine.
+       */
       if (isLikelyCatalogueLookup(freeText)) {
-        const found = await handleProductSearch(c, {}, freeText, loc);
+        const found = await handleProductSearch(c, {}, freeText, loc, { strong: true });
         if (found.cards?.length) {
-          return c.json({ success: true, reply: withFollowups(found, loc) });
+          return send(withFollowups(found, loc));
         }
       }
       const subset = decision.shortlist.length ? decision.shortlist : undefined;
-      return c.json({
-        success: true,
-        reply: {
-          intent: 'clarify',
-          text: tr(loc, subset ? 'clarify_multi' : 'clarify'),
-          choices: menuChoices(loc, subset),
-        } satisfies AssistantReply,
-      });
+      return send({
+        intent: 'clarify',
+        text: tr(loc, subset ? 'clarify_multi' : 'clarify'),
+        choices: menuChoices(loc, subset),
+      } satisfies AssistantReply);
     }
   } else {
-    return c.json({
-      success: true,
-      reply: { intent: 'clarify', text: tr(loc, 'clarify'), choices: menuChoices(loc) } satisfies AssistantReply,
-    });
+    return send({ intent: 'clarify', text: tr(loc, 'clarify'), choices: menuChoices(loc) } satisfies AssistantReply);
   }
 
   /**
@@ -2463,7 +2491,7 @@ supportRoutes.post('/assistant', async (c) => {
   const resolved: Record<string, unknown> = { ...inferred, ...slotParams, ...params };
 
   if (ACCOUNT_INTENTS.has(intent) && !user) {
-    return c.json({ success: true, reply: signInReply(intent, loc) });
+    return send(signInReply(intent, loc));
   }
 
   let reply: AssistantReply;
@@ -2570,7 +2598,7 @@ supportRoutes.post('/assistant', async (c) => {
       reply = { intent, text: tr(loc, 'clarify'), choices: menuChoices(loc) };
       break;
   }
-  return c.json({ success: true, reply: withFollowups(reply, loc) });
+  return send(withFollowups(reply, loc));
 });
 
 // ================================================================== tickets

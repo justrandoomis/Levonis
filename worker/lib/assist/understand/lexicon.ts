@@ -29,6 +29,45 @@ export const FILLERS: readonly string[] = [
   'and', 'or', 'with', 'want', 'need', 'have', 'any', 'there', 'some', 'price', 'buy', 'search', 'find', 'product', 'products',
   // Sorani
   'بۆ', 'دەمەوێ', 'دەمەوێت', 'هەیە', 'نییە', 'چی', 'چۆن', 'زۆر', 'باشە', 'تکایە', 'لە', 'چەند', 'ئایا', 'من',
+  // What Arabic glues to a word and a Latin name cut off it: «لل A1», «بال P1S».
+  'ال', 'لل', 'بال', 'وال', 'فال', 'ب', 'ف',
+  // «مالتي» (mine), «بيها» (in it), «دا» (Iraqi "is …-ing").
+  'مالتي', 'مالي', 'مالته', 'مالها', 'بيها', 'بيه', 'فيها', 'دا', 'طابعتي',
+];
+
+/**
+ * «لا قصدي بي ون اس» — "no, I mean the P1S": the customer corrects the
+ * printer of the question just answered. Also fillers: they name nothing.
+ */
+export const CORRECTION_WORDS: readonly string[] = ['لا', 'قصدي', 'اقصد', 'قصدت', 'مو', 'no', 'mean', 'meant', 'نەخێر', 'مەبەستم'];
+
+/** «الاول بكم» — which of the products just shown. 0 is the first. */
+export const ORDINAL_WORDS: Readonly<Record<string, number>> = {
+  'الاول': 0, 'اول': 0, 'الاولى': 0, 'اولى': 0, 'first': 0, 'یەکەم': 0, 'یەکەمیان': 0,
+  'الثاني': 1, 'ثاني': 1, 'الثانيه': 1, 'second': 1, 'دووەم': 1, 'دووەمیان': 1,
+  'الثالث': 2, 'ثالث': 2, 'الثالثه': 2, 'third': 2, 'سێیەم': 2, 'سێیەمیان': 2,
+};
+
+/** At the triage's «which printer?»: «طابعة أخرى», "another one", or a maker the shop does not list. */
+export const OTHER_PRINTER: LexEntry = {
+  phrases: ['طابعه اخرى', 'طابعه ثانيه', 'غير طابعه', 'other printer', 'another printer', 'پرینتەرێکی تر'],
+  stems: ['اخرى', 'غيرها', 'other', 'another'],
+};
+
+/**
+ * THE OUTCOME OF THE STEPS, TYPED («جربتها وما انحلّت», "still not fixed").
+ * The not-fixed list is read first: it carries the negation of the fixed one.
+ * Whole phrases between gaps, after `normalizeText` (so «انحلّت» is «انحلت»).
+ */
+export const OUTCOME_NOT_FIXED: readonly string[] = [
+  'ما انحلت', 'ما انحل', 'ما انحلت المشكله', 'مانحلت', 'ما حلت', 'ما زبطت', 'ما زبط', 'ما نفعت', 'ما نفع', 'ما فادت', 'ما فاد',
+  'ما اشتغلت', 'ما اشتغل', 'لم تنحل', 'لم تحل', 'نفس المشكله', 'نفس الشي', 'بعدها نفس', 'بعده نفس', 'بعدها مسدود', 'بعده مسدود',
+  'not fixed', 'still not', 'still', 'didnt work', 'did not work', 'didnt help', 'did not help', 'same problem', 'no luck',
+  'چارەسەر نەبوو', 'هێشتا', 'هەمان کێشە', 'سوودی نەبوو', 'کاری نەکرد',
+];
+export const OUTCOME_RESOLVED: readonly string[] = [
+  'انحلت', 'انحل', 'انحلت المشكله', 'زبطت', 'زبط', 'اشتغلت', 'اشتغل', 'صارت زينه', 'صار زين', 'رجعت تشتغل', 'رجعت زينه',
+  'fixed', 'solved', 'it works', 'works now', 'that fixed it', 'چارەسەر بوو', 'باش بوو', 'کاری کرد',
 ];
 
 /** A shopping question, as opposed to a report of a fault. */
@@ -42,11 +81,25 @@ export const PRODUCT_CUE: LexEntry = {
 
 /** «مشكلة», «خلل», «عطل», «ما تشتغل» — something is wrong. */
 export const PROBLEM_CUE: LexEntry = {
-  phrases: ['ما تشتغل', 'ما يشتغل', 'لا تعمل', 'لا يعمل', 'not working', 'does not work', 'doesnt work', 'كار ناكات', 'کار ناکات'],
+  phrases: [
+    'ما تشتغل', 'ما يشتغل', 'لا تعمل', 'لا يعمل', 'not working', 'does not work', 'doesnt work', 'كار ناكات', 'کار ناکات',
+    'ما يسحب', 'ما تسحب', 'not feeding', 'does not feed', 'doesnt feed',
+  ],
   stems: [
     'مشكل', 'مشاكل', 'عطل', 'خلل', 'خربان', 'خربانه', 'عاطل', 'problem', 'problems', 'issue', 'broken', 'fault',
     'کێشە', 'کێشەی', 'تێکچووە', 'خراپە',
   ],
+};
+
+/**
+ * A FAULT THE CURATED STEPS DO NOT COVER: a leak, a printer that does not heat.
+ * It is a problem (the triage asks which printer), but it is not a clog, so
+ * the part it names does not pick the clog steps for it: the customer picks
+ * the symptom, or «أخرى», and the team gets the rest.
+ */
+export const FAULT_CUE: LexEntry = {
+  phrases: ['ما تسخن', 'ما يسخن', 'لا تسخن', 'لا يسخن', 'not heating', 'does not heat', 'doesnt heat', 'گەرم نابێت', 'گەرم نابێتەوە'],
+  stems: ['تسريب', 'يسرب', 'تسرب', 'يخر', 'leak', 'leaks', 'leaking', 'دزەدەکات', 'دزە'],
 };
 
 /** «الطابعة», «printer», «پرینتەر». A named model is a printer cue too. */
@@ -73,6 +126,13 @@ export const PART_LEXICON: Record<PartKey, LexEntry> = {
     phrases: ['ابره تنظيف', 'ابر تنظيف', 'cleaning needle', 'cleaning kit', 'ئامرازی پاککردنەوە'],
     stems: ['ابره', 'تنظيف', 'needle', 'needles', 'cleaning', 'پاککردنەوە', 'دەرزی'],
   },
+};
+
+/** The symptom a fault IN a part family is, when no other symptom is named: «مشكلة بالنوزل» is the clog path. */
+export const PART_SYMPTOM: Readonly<Record<PartKey, SymptomKey>> = {
+  nozzle_hotend: 'clog',
+  plate: 'adhesion',
+  cleaning: 'clog',
 };
 
 /** What each family is searched as: the catalogue's own (indexed) words. */
@@ -109,29 +169,44 @@ export const PART_LABELS: Readonly<Record<PartKey, L3>> = {
  */
 export const SYMPTOM_LEXICON: Record<Exclude<SymptomKey, 'other'>, LexEntry> = {
   clog: {
+    // Either word order: «ما يطلع فلامنت» and «الفلامنت ما يطلع من النوزل». The
+    // article on the first word comes off before matching (`bareProclitics`),
+    // so «نوزل مسكر» also reads «النوزل مسكر». «مسكر» and «معلك» alone are not
+    // here: «المحل مسكر» is a shop that is closed, «الطلب معلك» an order.
     phrases: [
       'انسداد النوزل', 'النوزل مسدود', 'نوزل مسدود', 'ما يطلع فلامنت', 'ما يطلع خيط', 'ما ينزل فلامنت', 'nozzle clog',
       'no extrusion', 'not extruding', 'نۆزڵ گیراوە', 'نۆزڵەکە گیراوە',
+      'فلامنت ما يطلع', 'فلامنت ما ينزل', 'فلامنت ما يخرج', 'خيط ما يطلع', 'خيط ما ينزل', 'ما يطلع من النوزل', 'ما ينزل من النوزل',
+      'ما يطلع شي من النوزل', 'ما يطلع من الفوهه', 'نوزل مسكر', 'نوزل مسكور', 'نوزل معلك', 'نوزل عالق', 'فلامنت معلك', 'فلامنت عالق',
+      'خيط معلك', 'nozzle blocked', 'nozzle is blocked', 'nothing comes out', 'filament not coming out', 'filament stuck',
+      'فیلامێنت نایەتە دەرەوە', 'نۆزڵ داخراوە',
     ],
     stems: ['كلوب', 'كلوك', 'انسداد', 'مسدود', 'clog', 'clogged', 'jam', 'jammed', 'گیراوە', 'گیراوه'],
   },
   adhesion: {
     phrases: [
       'ما يلزق', 'ما يلصق', 'ما يلتصق', 'عدم الالتصاق', 'الطبقه الاولى', 'not sticking', 'does not stick', 'first layer',
-      'چینی یەکەم', 'نانووسێت',
+      'چینی یەکەم', 'نانووسێت', 'ترتفع من الزوايا', 'ترتفع من الاطراف', 'زوايا ترتفع', 'تنشال من البليت', 'تنقلع من البليت',
+      'corners lifting', 'lifting corners', 'گۆشەکان بەرز دەبنەوە',
     ],
-    stems: ['التصاق', 'يلتصق', 'warping', 'adhesion', 'نانووسێت', 'نەنووسان'],
+    stems: ['التصاق', 'يلتصق', 'تقوس', 'تتقوس', 'تقوست', 'warping', 'warped', 'adhesion', 'نانووسێت', 'نەنووسان'],
   },
   layer_shift: {
-    phrases: ['ازاحه الطبقات', 'ازاحه طبقات', 'الطبقات مزاحه', 'layer shift', 'layer shifting', 'لادانی چین', 'لادانی چینەکان'],
-    stems: ['ازاحه', 'مزاحه', 'layershift', 'لادان'],
+    phrases: [
+      'ازاحه الطبقات', 'ازاحه طبقات', 'الطبقات مزاحه', 'layer shift', 'layer shifting', 'لادانی چین', 'لادانی چینەکان',
+      'طبقات تزحف', 'طبقات منحرفه', 'طبقات مايله', 'shifted layers', 'layers shifted', 'چینەکان لادەدەن',
+    ],
+    stems: ['ازاحه', 'مزاحه', 'تزحف', 'layershift', 'لادان'],
   },
   stringing: {
-    phrases: ['خيوط رفيعه', 'خيوط بين', 'stringing'],
-    stems: ['stringing', 'شعيرات', 'دەزوو'],
+    phrases: ['خيوط رفيعه', 'خيوط بين', 'stringing', 'مثل شعر', 'مثل الشعر', 'بيها خيوط', 'فيها خيوط', 'like hair', 'وەک موو'],
+    stems: ['stringing', 'stringy', 'شعيرات', 'دەزوو'],
   },
   ams: {
-    phrases: ['مشكله ams', 'مشكلة ams', 'ams problem', 'ams error', 'کێشەی ams'],
+    phrases: [
+      'مشكله ams', 'مشكلة ams', 'ams problem', 'ams error', 'کێشەی ams', 'ams ما يسحب', 'ams لا يسحب', 'ams not feeding',
+      'ams is not feeding', 'ams doesnt feed', 'ams فیلامێنت ناکێشێت',
+    ],
   },
   hms: {
     phrases: ['رمز خطا', 'رمز الخطا', 'كود خطا', 'كود الخطا', 'error code', 'hms error', 'hms code', 'کۆدی هەڵە'],

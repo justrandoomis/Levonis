@@ -826,7 +826,9 @@ IQD, with a pre-order discount of $50 = 75,000.
   the knowledge answer (`/api/products/:slug/knowledge`, its gate and its relation links; the Bambu
   import spec §G.1), and the support assistant's product search — which, like the listing, takes a
   composition only while it is SELLABLE (`composition = '' OR sellable`, default D6), so it never
-  quotes a bundle no checkout accepts.
+  quotes a bundle no checkout accepts. The assistant's follow-up re-read («شكد سعره؟»: the products
+  its last answer showed, `catalogByIds` in `worker/lib/assist/tools/catalog.ts`) asks the listing's
+  own question the same way, with the SELLABLE flag the card builder prices from.
 - **SELLABLE**: the old «listed» predicate byte for byte — visible, not held for ANY gap, and
   V2-published. Every PURCHASE path asks it: cart add, read and edit, the quote, checkout, Quick Buy, new
   gifts, bundles and mystery offers, the trade-in target (and, since Services S-P2, its search, the

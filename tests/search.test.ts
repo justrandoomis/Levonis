@@ -25,7 +25,7 @@ import type { Env } from '../worker/lib/types';
 import { MEASURE_UNITS, normalizeSearchText, normalizeText, tokenize } from '../worker/lib/search/normalize';
 import { collapseSpelledLetters, romanize } from '../worker/lib/search/translit';
 import { bestMatches, boundedDistance, candidatePrefix, editBudget, isMeasureToken } from '../worker/lib/search/match';
-import { buildIndexRows, expandQuery, FIELD_WEIGHT } from '../worker/lib/search/index';
+import { buildIndexRows, expandQuery, FIELD_WEIGHT, resolveTokens, strongProducts } from '../worker/lib/search/index';
 import { toSearchDoc } from '../worker/lib/search/document';
 import {
   INDEX_ROWS_PER_STATEMENT,
@@ -1245,3 +1245,24 @@ test('the backfill reads every language of a name and the variant SKUs, with no 
   }
   assert.deepEqual(await ids(raw, 'zz'), [], 'an inactive variant’s SKU is not a way in');
 });
+
+test('strongProducts: every typed word, reached without a forgiven typo', () => {
+  const vocabulary = ['riser', 'base', 'antenna', 'wifi', 'oker'];
+  const rows = [
+    { product_id: 'riser', token: 'riser', weight: 10 },
+    { product_id: 'riser', token: 'base', weight: 10 },
+    { product_id: 'antenna', token: 'antenna', weight: 10 },
+    { product_id: 'antenna', token: 'wifi', weight: 10 },
+    { product_id: 'oker', token: 'oker', weight: 10 },
+  ];
+  const strong = (q: string) => {
+    const expanded = expandQuery(`${q} `, new Map(), { completeLast: false });
+    return [...strongProducts(expanded, resolveTokens(expanded, vocabulary), rows)].sort();
+  };
+  assert.deepEqual(strong('riser base'), ['riser'], 'both words, exact');
+  assert.deepEqual(strong('ris bas'), ['riser'], 'completions count');
+  assert.deepEqual(strong('riser lamp'), [], 'one word of two is not a strong match');
+  assert.deepEqual(strong('okey'), [], 'a forgiven typo is not a strong match');
+  assert.deepEqual(strong('wifi'), ['antenna']);
+});
+

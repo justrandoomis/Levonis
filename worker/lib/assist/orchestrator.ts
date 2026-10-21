@@ -30,10 +30,10 @@ import type { CatalogItem } from './tools/catalog';
 import type { MyPrinter } from './tools/devices';
 import { nextTriage, type TriageInput, type TriageStep } from './triage/flow';
 import { SYMPTOMS, symptomDef, wikiFor } from './triage/symptoms';
-import type { AssistCard, AssistChoice, AssistReply, CardRenderer, ModelToken, Viewer } from './types';
-import { MODEL_TOKENS, SYMPTOM_KEYS, type SymptomKey } from './types';
+import type { AssistCard, AssistChoice, AssistReply, CardRenderer, ModelToken, PartKey, Viewer } from './types';
+import { MODEL_TOKENS, PART_KEYS, SYMPTOM_KEYS, type SymptomKey } from './types';
 import { mentionsModel, understand, type Understood } from './understand';
-import { PART_FIX_TERMS, PART_LABELS, PART_TERMS } from './understand/lexicon';
+import { PART_FIX_TERMS, PART_LABELS, PART_SYMPTOM, PART_TERMS } from './understand/lexicon';
 
 export interface TurnInput {
   /** The customer's message, raw. */
@@ -58,8 +58,38 @@ const DEVICE_CHIPS_MAX = 3;
 /** The order printer chips are offered in: the most asked-about first. */
 const CHIP_ORDER: readonly ModelToken[] = ['A1', 'A1 mini', 'A2L', 'P1S', 'P1P', 'P2S', 'X1C', 'X1E', 'X2D', 'H2D', 'H2D Pro', 'H2S', 'H2C'];
 
+/**
+ * The legacy intents a text may carry and still be the ANSWER to the triage's
+ * question. «طابعتي A1» reads as nothing else; «شكد سعر A1» reads as a price
+ * question, and a new question beats a pending one (the route's own rule).
+ */
+const PRINTER_ANSWER_HINTS = new Set(['printer_problem', 'my_devices']);
+const OUTCOME_ANSWER_HINTS = new Set(['printer_problem', 'open_ticket', 'human_handoff', 'thanks', 'greeting']);
+const FOLLOWUP_HINTS = new Set(['price_question', 'stock_question']);
+
+/**
+ * A part question asked while the triage waits for «which printer?» or «which
+ * symptom?» has changed the subject: the question is no longer pending, so a
+ * later «A1» is not read as its answer. After the steps the triage stays, so
+ * «بكم الهوت اند؟» and then «ما انحلت» still reach the ticket.
+ */
+function dropPendingQuestion(ctx: AssistContext): void {
+  if (ctx.triage && (ctx.triage.stage === 'printer' || ctx.triage.stage === 'symptom')) delete ctx.triage;
+}
+
+/** The context without the printer: a printer named and not read must not be answered for by the remembered one. */
+function withoutPrinter(ctx: AssistContext): AssistContext {
+  const out: AssistContext = { ...ctx };
+  delete out.printer;
+  return out;
+}
+
 export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInput, render: CardRenderer): Promise<TurnOutcome | null> {
   if (input.chip) {
+    if (input.chip.step === 'part') {
+      const asked = readPartChip(input.chip);
+      return asked ? products(db, viewer, asked, input.context, render, null) : null;
+    }
     const triage = readChip(input.chip);
     if (!triage) return null;
     return runTriage(db, viewer, input.context, triage, render);
@@ -70,37 +100,152 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
   if (extractOrderId(text)) return null;
 
   const ctx = input.context;
-  const u = understand(text, { expectSymptom: ctx.triage?.stage === 'symptom' });
+  const hint = input.intentHint ?? null;
+  const u = understand(text);
+  const stage = ctx.triage?.stage;
+  /** Nothing in the text but the answer: no shopping word, no size, no code. */
+  const bare = !u.productCue && u.measures.length === 0 && u.codes.length === 0;
+  // A printer named and not read is not the printer remembered from earlier.
+  const known = u.printerUnread && !u.model ? withoutPrinter(ctx) : ctx;
 
-  if (u.hmsCode) {
-    if (ctx.printer) return runTriage(db, viewer, ctx, { kind: 'symptom', symptom: 'hms', code: u.hmsCode }, render);
-    return runTriage(db, viewer, ctx, { kind: 'start', symptom: 'hms', code: u.hmsCode, ...(u.model ? { model: u.model } : {}) }, render);
+  // ── The triage's pending question, answered. Only a text that carries
+  //    nothing else is an answer: «شكد سعر A1» at «which printer?» is a price
+  //    question, and «اكو خيوط PLA؟» at «which symptom?» a filament one.
+  if (stage === 'printer' && bare && (hint === null || PRINTER_ANSWER_HINTS.has(hint))) {
+    const symptom = u.symptom ?? partFault(u);
+    if (u.model) return runTriage(db, viewer, ctx, { kind: 'printer', model: u.model, ...(symptom ? { symptom } : {}) }, render);
+    // «عندي طابعة كريالتي اندر 3», «طابعة أخرى»: a printer this shop does not list.
+    if (u.otherPrinter || u.printerUnread) return runTriage(db, viewer, ctx, { kind: 'printer', model: 'other', ...(symptom ? { symptom } : {}) }, render);
   }
-  if (ctx.triage?.stage === 'printer' && u.model) {
-    return runTriage(db, viewer, ctx, { kind: 'printer', model: u.model, ...(u.symptom ? { symptom: u.symptom } : {}) }, render);
-  }
-  if (ctx.triage?.stage === 'symptom' && u.symptom) {
-    if (u.model && u.model !== ctx.printer?.model) {
-      return runTriage(db, viewer, ctx, { kind: 'start', model: u.model, symptom: u.symptom }, render);
+  if (stage === 'symptom' && bare) {
+    // While the triage asks for the symptom, «خيوط» alone is stringing, a
+    // fault in a part is that part's symptom («مشكلة بالنوزل», or «النوزل»
+    // alone → the clog path; «اريد نوزل» is a shopping question), and a fault
+    // the steps do not cover (a leak) is «أخرى».
+    const ua = understand(text, { expectSymptom: true });
+    const partOnly = ua.part && (ua.problemCue || text.split(/\s+/).length === 1);
+    const symptom: SymptomKey | undefined = ua.symptom ?? (ua.faultCue ? 'other' : partOnly ? PART_SYMPTOM[ua.part!] : undefined);
+    if (symptom && (hint === null || hint === 'printer_problem' || ua.residual.length === 0)) {
+      if (ua.model && ua.model !== ctx.printer?.model) {
+        return runTriage(db, viewer, ctx, { kind: 'start', model: ua.model, symptom }, render);
+      }
+      return runTriage(db, viewer, ctx, { kind: 'symptom', symptom }, render);
     }
-    return runTriage(db, viewer, ctx, { kind: 'symptom', symptom: u.symptom }, render);
+  }
+  // «جربتها وما انحلّت», "still not fixed", «انحلت»: the chip's outcome, typed.
+  if (stage === 'steps' && u.outcome && bare && (hint === null || OUTCOME_ANSWER_HINTS.has(hint))) {
+    return runTriage(db, viewer, ctx, { kind: 'outcome', outcome: u.outcome }, render);
+  }
+
+  // ── A printer fault, cold.
+  if (u.hmsCode) {
+    if (u.model) return runTriage(db, viewer, ctx, { kind: 'start', symptom: 'hms', code: u.hmsCode, model: u.model }, render);
+    if (known.printer) return runTriage(db, viewer, known, { kind: 'symptom', symptom: 'hms', code: u.hmsCode }, render);
+    return runTriage(db, viewer, known, { kind: 'start', symptom: 'hms', code: u.hmsCode }, render);
   }
   if (u.symptom && !u.productCue) {
-    return runTriage(db, viewer, ctx, { kind: 'start', symptom: u.symptom, ...(u.model ? { model: u.model } : {}) }, render);
+    return runTriage(db, viewer, known, { kind: 'start', symptom: u.symptom, ...(u.model ? { model: u.model } : {}) }, render);
+  }
+  // «عندي مشكلة بالنوزل», «النوزل خربان»: a fault in a part is that part's
+  // symptom, and the customer is asked which printer. A fault the curated
+  // steps do not cover (a leak) starts the triage without one.
+  if (u.part && u.problemCue && !u.productCue) {
+    const symptom = partFault(u);
+    return runTriage(db, viewer, known, { kind: 'start', ...(symptom ? { symptom } : {}), ...(u.model ? { model: u.model } : {}) }, render);
   }
   if (u.problemCue && u.printerCue && !u.productCue && !u.part) {
-    return runTriage(db, viewer, ctx, { kind: 'start', ...(u.model ? { model: u.model } : {}) }, render);
+    return runTriage(db, viewer, known, { kind: 'start', ...(u.model ? { model: u.model } : {}) }, render);
   }
+
+  // ── Follow-ups on the last answer. The context holds the part, the printer
+  //    and what was shown; a short follow-up is read against them.
+  if (ctx.part && !u.part && !u.symptom && !u.problemCue && u.residual.length === 0) {
+    // «اكو 0.4؟» after «نوزل مال بي ون اس»: the same part, that size.
+    if (u.measures.length > 0) return products(db, viewer, { ...u, part: ctx.part }, known, render, hint);
+    // «لا قصدي بي ون اس», or the answer to «which printer is it for?»: the same part, that printer.
+    if (u.model && bare && (u.correction || !ctx.printer || ctx.printer.model === 'other')) {
+      return products(db, viewer, { ...u, part: ctx.part }, ctx, render, hint);
+    }
+  }
+  // «شكد سعره؟», «متوفر؟», «الاول بكم»: the products just shown, read again
+  // through the card builder, so the price is still the grid's.
+  if (
+    ctx.shown?.length &&
+    hint !== null &&
+    FOLLOWUP_HINTS.has(hint) &&
+    !u.part &&
+    !u.model &&
+    !u.printerUnread &&
+    u.measures.length === 0 &&
+    u.codes.length === 0 &&
+    u.residual.length === 0
+  ) {
+    return shownAgain(db, viewer, ctx, u.ordinal, hint, render);
+  }
+
   if (u.part || (u.maintenance && (u.model || u.productCue)) || (u.measures.length > 0 && (u.model || u.productCue))) {
-    return products(db, viewer, u, ctx, render, input.intentHint ?? null);
+    return products(db, viewer, u, known, render, hint);
   }
   return null;
+}
+
+/** The symptom a fault in the named part is: «مشكلة بالنوزل» is a clog. Never for a fault the steps do not cover. */
+function partFault(u: Understood): SymptomKey | undefined {
+  return u.part && u.problemCue && !u.faultCue ? PART_SYMPTOM[u.part] : undefined;
+}
+
+/** The products the last answer showed, read again. A product no longer listed is simply absent. */
+async function shownAgain(
+  db: D1Database,
+  viewer: Viewer,
+  ctx: AssistContext,
+  ordinal: number | undefined,
+  hint: string,
+  render: CardRenderer
+): Promise<TurnOutcome> {
+  const loc = viewer.locale;
+  const shown = ctx.shown ?? [];
+  const wanted = ordinal !== undefined && ordinal < shown.length ? [shown[ordinal]] : shown;
+  const r = await callTool('catalog.byIds', db, viewer, { ids: wanted });
+  const items = r.ok ? r.data : [];
+  const cards = items.slice(0, CARDS_MAX).map((i) => render.card(loc, i.card, i.row));
+  const text = cards.length === 0 ? tr(loc, 'shown_gone') : tr(loc, wanted.length === 1 ? 'shown_one' : 'shown_again');
+  return { reply: { intent: hint, text, ...(cards.length ? { cards } : {}) }, context: ctx };
 }
 
 // ═════════════════════════════════════════════════════════════ chips
 
 const CHIP_STEPS = new Set(['printer', 'symptom', 'outcome', 'talk', 'change_printer']);
 const UNIT_SHAPE = /^[A-Za-z0-9_-]{1,64}$/;
+const SIZE_SHAPE = /^\d{1,3}(?:\.\d{1,3})?$/;
+
+/**
+ * «لأي طابعة تريد النوزل؟» answered by a chip: `{ step: 'part', part, model, size? }`,
+ * from the closed sets only. The question it answers is read again as if typed.
+ */
+function readPartChip(params: Record<string, unknown>): Understood | null {
+  const part = (PART_KEYS as readonly string[]).includes(String(params.part)) ? (params.part as PartKey) : null;
+  const model = (MODEL_TOKENS as readonly string[]).includes(String(params.model)) ? (params.model as ModelToken) : null;
+  if (!part || !model) return null;
+  const size = typeof params.size === 'string' && SIZE_SHAPE.test(params.size) ? params.size : undefined;
+  return {
+    model,
+    models: [model],
+    part,
+    maintenance: false,
+    measures: size ? [size] : [],
+    codes: [],
+    productCue: false,
+    problemCue: false,
+    faultCue: false,
+    printerCue: true,
+    printerUnread: false,
+    otherBrand: false,
+    otherPrinter: false,
+    correction: false,
+    residual: [],
+  };
+}
 
 /** A chip's params, from the closed sets only. Anything else is ignored, never trusted. */
 function readChip(params: Record<string, unknown>): TriageInput | null {
@@ -319,8 +464,11 @@ async function products(
 ): Promise<TurnOutcome> {
   const loc = viewer.locale;
   const remembered = ctx.printer && ctx.printer.model !== 'other' ? ctx.printer.model : undefined;
-  // The printer chosen earlier in the conversation applies to PART questions only.
-  const model: ModelToken | undefined = u.model ?? (u.part ? remembered : undefined);
+  // The printer chosen earlier in the conversation applies to PART questions
+  // only, and never when this sentence named a printer that could not be read
+  // («نوزل مال زد ون»): that is asked, not guessed.
+  const model: ModelToken | undefined = u.model ?? (u.part && !u.printerUnread ? remembered : undefined);
+  if (!model && u.part && u.printerUnread && !u.otherBrand) return askPartPrinter(db, viewer, u, u.part, ctx);
   const fault = !!u.part && u.problemCue;
   const category = fault || u.maintenance ? ('cat_maint' as const) : undefined;
   const terms = u.part ? (fault ? PART_FIX_TERMS[u.part] : PART_TERMS[u.part]) : '';
@@ -365,6 +513,8 @@ async function products(
 
   const cards = items.slice(0, CARDS_MAX).map((i) => render.card(loc, i.card, i.row));
   const next: AssistContext = { ...ctx };
+  dropPendingQuestion(next);
+  if (u.printerUnread && !u.model) delete next.printer;
   if (u.part) {
     next.part = u.part;
     if (model) next.printer = { model, ...(ctx.printer?.model === model && ctx.printer.unit_id ? { unit_id: ctx.printer.unit_id } : {}) };
@@ -384,3 +534,19 @@ async function products(
   return { reply, context: next };
 }
 
+/**
+ * «لأي طابعة تريد النوزل؟» — a part question whose printer was named and not
+ * read. The chips are the printers the shop lists; each carries the part and
+ * the size back, so the answer is the question asked again with that printer.
+ * The context keeps the part and drops the printer, so a typed «A1» answers it too.
+ */
+async function askPartPrinter(db: D1Database, viewer: Viewer, u: Understood, part: PartKey, ctx: AssistContext): Promise<TurnOutcome> {
+  const loc = viewer.locale;
+  const listed = await printerModelsSafe(db, viewer);
+  const size = u.measures.find((m) => SIZE_SHAPE.test(m));
+  const choices: AssistChoice[] = [];
+  for (const model of CHIP_ORDER) if (listed.has(model)) choices.push(chip(model, { step: 'part', part, model, ...(size ? { size } : {}) }));
+  const next: AssistContext = { ...withoutPrinter(ctx), part };
+  dropPendingQuestion(next);
+  return { reply: { intent: 'product_search', text: tr(loc, 'part_printer_which', { part: PART_LABELS[part][loc] }), choices }, context: next };
+}

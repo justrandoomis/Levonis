@@ -489,6 +489,47 @@ export function scoreProducts(
 }
 
 /**
+ * The best a FORGIVEN TYPO scores (./match.ts `bestMatches`: one edit is 0.55,
+ * two are 0.40). An exact match scores 1 and a completion more than this.
+ */
+export const TYPO_SCORE = 0.55;
+
+/**
+ * THE PRODUCTS THAT MATCH EVERY TYPED WORD WITHOUT A TYPO.
+ *
+ * The ranking forgives: a word one edit from a catalogue word still counts,
+ * and a product matching one word of three still ranks. That is right for the
+ * search box, where a shopper typed a product name. It is wrong for a caller
+ * that does not know whether the text names a product at all — the support
+ * assistant's last resort for a sentence it could not read: «اوكي» is one
+ * edit from a word in a filament's name, «منو انت» half-matches an antenna,
+ * and a forgiving ranking answers every chit-chat with a card. A product is in
+ * this set only when EVERY typed word (`literal`) reaches it through an exact
+ * or completed match, never a forgiven one. Pure.
+ */
+export function strongProducts(
+  expanded: ExpandedQuery,
+  matchedTokens: ReadonlyMap<string, { score: number; from: string }>,
+  rows: readonly IndexRow[]
+): Set<string> {
+  const out = new Set<string>();
+  if (expanded.literal.length === 0) return out;
+  const words = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const match = matchedTokens.get(row.token);
+    if (!match || !(match.score > TYPO_SCORE) || !(row.weight > 0)) continue;
+    let seen = words.get(row.product_id);
+    if (!seen) {
+      seen = new Set();
+      words.set(row.product_id, seen);
+    }
+    seen.add(match.from);
+  }
+  for (const [product_id, seen] of words) if (expanded.literal.every((w) => seen.has(w))) out.add(product_id);
+  return out;
+}
+
+/**
  * How many vocabulary tokens a ONE-CHARACTER term may resolve to when the
  * caller could not say how heavily each one is weighted (a unit test handing
  * `resolveTokens` a bare word list). With weights, see `LETTER_MIN_WEIGHT`.

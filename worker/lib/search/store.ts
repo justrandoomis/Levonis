@@ -40,6 +40,7 @@ import {
   productsLackingMeasures,
   scoreProducts,
   SKELETON_MARK,
+  strongProducts,
   type IndexRow,
   type SearchDoc,
   type ScoredProduct,
@@ -592,6 +593,12 @@ export interface SearchResult {
    * no candidate tokens, which on a built index is the rare case.
    */
   indexReady: boolean;
+  /**
+   * Only with `SearchOptions.strong`: the ranked ids every typed word reaches
+   * without a forgiven typo (./index.ts `strongProducts`), best first, before
+   * the `limit` cut and the visibility check (the caller filters what it lists).
+   */
+  strong?: string[];
 }
 
 /**
@@ -630,6 +637,8 @@ export interface SearchOptions {
    * today's cut (the caller still filters).
    */
   visible?: (ids: string[]) => Promise<ReadonlySet<string>>;
+  /** Also answer `SearchResult.strong`. No extra read: it is computed from the rows already fetched. */
+  strong?: boolean;
 }
 
 export async function searchProducts(
@@ -790,6 +799,10 @@ export async function searchProducts(
     const pool = scored.slice(0, limit * VISIBILITY_OVERFETCH).map((s) => s.product_id);
     const shown = await opts.visible(pool).catch(() => null);
     if (shown) ids = pool.filter((id) => shown.has(id)).slice(0, limit);
+  }
+  if (opts.strong) {
+    const strong = strongProducts(expanded, matched, postings ?? []);
+    return { ids, understood: tokens, indexReady: true, strong: scored.map((s) => s.product_id).filter((id) => strong.has(id)) };
   }
   return { ids, understood: tokens, indexReady: true };
 }

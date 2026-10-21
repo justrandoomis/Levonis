@@ -45,6 +45,7 @@ const CUSTOMER_FILES = [
   'worker/lib/printerFits.ts',
   'worker/routes/compare.ts',
   'worker/routes/support.ts',
+  'worker/lib/assist/tools/catalog.ts',
   'worker/routes/communitySearch.ts',
   'worker/routes/communityFavorites.ts',
   'worker/routes/profile.ts',
@@ -257,6 +258,10 @@ const EXPECTED_CALLS: Record<string, { visible: number; sellable: number; states
   // this file: -1 VISIBLE, -2 SELLABLE (assistant v2 push A). A sale-held bundle is still never quoted
   // (tests/assistPriceParity). What stays is compare, power and choose-printer.
   'worker/routes/support.ts': { visible: 3, sellable: 4, states: 0 },
+  // The assistant's follow-up («شكد سعره؟», `catalogByIds`): the products its last answer showed, read again
+  // with the listing's own scope — VISIBLE, and `composition = '' OR sellable` (default D6) — and the SELLABLE
+  // flag the card builder prices from, so a re-read can quote nothing the grid would not.
+  'worker/lib/assist/tools/catalog.ts': { visible: 1, sellable: 2, states: 0 },
   // «طلب السعر» (migration 0193): the request door's validation (`validatePriceRequestSelection`, shared with the
   // Bambu import's /complete, its spec §K.1 D-5) asks VISIBLE and the SELLABLE flag; the sweep asks each
   // product's state. The door itself (worker/routes/priceRequests.ts) asks neither.
