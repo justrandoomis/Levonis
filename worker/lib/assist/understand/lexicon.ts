@@ -152,15 +152,48 @@ export const PROBLEM_CUE: LexEntry = {
     'ما يسحب', 'ما تسحب', 'not feeding', 'does not feed', 'doesnt feed',
     'ما تطبع', 'ما يطبع', 'لا تطبع', 'لا يطبع', 'not printing', 'does not print', 'doesnt print', 'wont print', "won't print",
     'stopped working', 'stopped printing', 'چاپ ناکات', 'چاپ ناکا',
-    // "something is wrong with my printer", "help, my printer stopped", "it is acting up".
-    'something wrong', 'something is wrong', 'somethings wrong', 'wrong with', 'not right', 'acting up', 'acting weird',
-    'printer stopped', 'it stopped', 'has stopped', 'just stopped', 'keeps stopping',
+    // "something is wrong with my printer", "help, my printer stopped", "it is acting up". The printer is
+    // the subject: a bare "wrong with", "not right", "has stopped" or "it stopped" is as often an order
+    // ("my A1 order has stopped") or a choice ("is the P1S not right for beginners?"), and "something is
+    // wrong" beside an order, a delivery or a return is the account question (`ACCOUNT_WORDS`).
+    'something wrong', 'something is wrong', 'somethings wrong', 'wrong with my printer', 'wrong with the printer', 'acting up',
+    'acting weird', 'printer stopped', 'printer has stopped', 'printer just stopped', 'printer keeps stopping',
   ],
   stems: [
     'مشكل', 'مشاكل', 'عطل', 'خلل', 'خربان', 'خربانه', 'عاطل', 'وكفت', 'واكفه', 'problem', 'problems', 'issue', 'broken', 'fault',
     'کێشە', 'کێشەی', 'تێکچووە', 'خراپە',
   ],
 };
+
+/**
+ * AN ORDER, A DELIVERY, A RETURN, A WARRANTY, A PAYMENT OR A PURCHASE, named
+ * beside a fault word: «عندي مشكلة بطلبية الاي ون», "something is wrong with
+ * my A1 order", "the delivery of my P1S has stopped", "I want to return my A1,
+ * something is wrong with it". The fault word is about the account then, so
+ * the printer triage does not start and the account handlers answer.
+ *
+ * Whole words, read after the Arabic article and the glued prepositions come
+ * off («بطلبية», «بالضمان», «للتوصيل»). A purchase or an arrival in the PAST
+ * («اشتريت», «وصلتني», "bought", "ordered", "arrived") is the story of a
+ * fault, not a question about the account, and is deliberately not here:
+ * «اي تو وصلتني الطابعة وبيها مشكلة» is still the triage.
+ */
+export const ACCOUNT_WORDS: readonly string[] = [
+  // The order: «طلبية» is the Iraqi word, «اوردر» the loanword, «داواکاری» the Sorani.
+  'order', 'orders', 'طلب', 'طلبي', 'طلبيه', 'طلبيتي', 'طلبات', 'طلباتي', 'طلبياتي', 'اوردر',
+  'داواکاری', 'داواکارییەکەم', 'داواکاریەکەم', 'داواکارییەکە', 'داواکارییەکەی',
+  // The delivery.
+  'delivery', 'deliveries', 'shipping', 'shipment', 'توصيل', 'شحن', 'شحنه', 'شحنتي', 'گەیاندن', 'گەیاندنی', 'گەیاندنەکە',
+  // A return or a refund.
+  'return', 'returns', 'returning', 'refund', 'refunds', 'ارجاع', 'ارجع', 'ارجعها', 'ارجعه', 'ترجيع', 'استرجاع', 'استرداد',
+  'گەڕاندنەوە', 'گەڕاندنەوەی', 'بیگەڕێنمەوە',
+  // The warranty.
+  'warranty', 'guarantee', 'ضمان', 'ضماني', 'كفاله', 'كفالتي', 'گەرەنتی', 'گەرەنتییەکە', 'گەرەنتییەکەی',
+  // The payment.
+  'payment', 'payments', 'pay', 'paid', 'invoice', 'receipt', 'دفع', 'دفعت', 'فاتوره', 'فاتورتي', 'پارەدان', 'پارەدانەکە', 'پسوولە',
+  // Buying, now: "what is wrong with buying the A1 mini?".
+  'buying', 'purchase', 'purchasing', 'شراء', 'کڕین',
+];
 
 /**
  * A FAULT THE CURATED STEPS DO NOT COVER: a leak, a printer that does not heat.
@@ -212,7 +245,13 @@ export const CLEANING_TOOLS: Record<CleaningTool, LexEntry> = {
   wipes: { stems: ['wipes', 'مناديل', 'منديل'] },
 };
 
-/** The symptom a fault IN a part family is, when no other symptom is named: «مشكلة بالنوزل» is the clog path. */
+/**
+ * The steps a fault IN a part family is answered with, when no symptom is
+ * named: «مشكلة بالنوزل» takes the clog steps. It is a path, not a finding:
+ * the triage keeps the part (`TriageState.faultIn`), and the chat and the
+ * ticket say «a problem with the nozzle», never «انسداد النوزل», until the
+ * customer names the clog («مسدود», «كلوب», "clogged", «گیراوە»).
+ */
 export const PART_SYMPTOM: Readonly<Record<PartKey, SymptomKey>> = {
   nozzle_hotend: 'clog',
   plate: 'adhesion',

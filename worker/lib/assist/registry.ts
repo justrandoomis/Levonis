@@ -20,6 +20,7 @@ import {
   catalogSearch,
   FITS_MAX,
   printerCards,
+  printerLineup,
   printerModels,
   printerModelsOf,
   SEARCH_LIMIT_MAX,
@@ -40,6 +41,7 @@ export type ToolName =
   | 'catalog.byIds'
   | 'catalog.printerModels'
   | 'catalog.printersOf'
+  | 'catalog.printerLineup'
   | 'catalog.printerModelsOf'
   | 'devices.mine'
   | 'cases.draft';
@@ -134,6 +136,23 @@ const printersOfTool: ToolDef<{ model: ModelToken }, CatalogItem[]> = {
   run: (db, viewer, input) => printerCards(db, viewer, input.model, SHOWN_MAX),
 };
 
+/** One printer of each model asked, the ones the shop lists, in that order («طابعة», "printers"). Model tokens only. */
+const printerLineupTool: ToolDef<{ models: ModelToken[] }, CatalogItem[]> = {
+  name: 'catalog.printerLineup',
+  audience: 'public',
+  effect: 'read',
+  parse(raw) {
+    const o = asObject(raw);
+    if (!o || !Array.isArray(o.models)) return bad('models');
+    const models = o.models;
+    if (models.length === 0 || models.length > MODEL_TOKENS.length || !models.every((m) => (MODEL_TOKENS as readonly string[]).includes(String(m)))) {
+      return bad('models');
+    }
+    return { models: [...new Set(models as ModelToken[])] };
+  },
+  run: (db, viewer, input) => printerLineup(db, viewer, input.models, SHOWN_MAX),
+};
+
 /** Which listed printers' models a set of shown products are («A1 combo» showed the A1). Ids only. */
 const printerModelsOfTool: ToolDef<{ ids: string[] }, ModelToken[]> = {
   name: 'catalog.printerModelsOf',
@@ -184,6 +203,7 @@ export const TOOLS: Readonly<Record<ToolName, ToolDef<any, any>>> = {
   'catalog.byIds': catalogByIdsTool,
   'catalog.printerModels': printerModelsTool,
   'catalog.printersOf': printersOfTool,
+  'catalog.printerLineup': printerLineupTool,
   'catalog.printerModelsOf': printerModelsOfTool,
   'devices.mine': devicesMineTool,
   'cases.draft': casesDraftTool,
@@ -194,6 +214,7 @@ interface ToolOutputs {
   'catalog.byIds': CatalogItem[];
   'catalog.printerModels': Map<ModelToken, string[]>;
   'catalog.printersOf': CatalogItem[];
+  'catalog.printerLineup': CatalogItem[];
   'catalog.printerModelsOf': ModelToken[];
   'devices.mine': MyPrinter[];
   'cases.draft': TicketDraft;

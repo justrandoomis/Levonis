@@ -47,6 +47,12 @@ export interface TurnInput {
    * a price question keeps its `price_question` label (and its follow-up chips).
    */
   intentHint?: string | null;
+  /**
+   * A legacy question is waiting for this text («أي منتج تريد تقارنه؟», the
+   * `expects` of the client): a text the scorer names no intent for is its answer,
+   * so a bare «P1S» is left to it.
+   */
+  awaiting?: boolean;
 }
 
 export interface TurnOutcome {
@@ -67,6 +73,8 @@ const CHIP_ORDER: readonly ModelToken[] = ['A1', 'A1 mini', 'A2L', 'P1S', 'P1P',
 const PRINTER_ANSWER_HINTS = new Set(['printer_problem', 'my_devices']);
 const OUTCOME_ANSWER_HINTS = new Set(['printer_problem', 'open_ticket', 'human_handoff', 'thanks', 'greeting']);
 const FOLLOWUP_HINTS = new Set(['price_question', 'stock_question']);
+/** The legacy intents a question about a printer by name may carry: «شكد سعر A1», «A1 متوفر؟», «ابحث عن A1». */
+const NAMED_PRINTER_HINTS = new Set(['price_question', 'stock_question', 'product_search']);
 
 /**
  * A part question asked while the triage waits for «which printer?» or «which
@@ -95,9 +103,17 @@ function withRemembered(u: Understood, ctx: AssistContext): Understood {
   return out;
 }
 
-/** What a typed answer carries besides the printer: the symptom it names and the HMS code it holds. */
-function triageExtras(symptom: SymptomKey | undefined, code: string | undefined): { symptom?: SymptomKey; code?: string } {
-  return { ...(symptom ? { symptom } : {}), ...(code ? { code } : {}) };
+/**
+ * What a typed answer carries besides the printer: the symptom it names, the
+ * HMS code it holds, and the part a fault was named in when the symptom is
+ * only the steps that part takes («مشكلة بالنوزل»).
+ */
+function triageExtras(
+  symptom: SymptomKey | undefined,
+  code: string | undefined,
+  faultIn?: PartKey
+): { symptom?: SymptomKey; code?: string; faultIn?: PartKey } {
+  return { ...(symptom ? { symptom } : {}), ...(code ? { code } : {}), ...(symptom && faultIn ? { faultIn } : {}) };
 }
 
 export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInput, render: CardRenderer): Promise<TurnOutcome | null> {
@@ -119,8 +135,8 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
   const hint = input.intentHint ?? null;
   const u = withRemembered(understand(text), ctx);
   const stage = ctx.triage?.stage;
-  /** Nothing in the text but the answer: no shopping word, no size, no code. */
-  const bare = !u.productCue && u.measures.length === 0 && u.codes.length === 0;
+  /** Nothing in the text but the answer: no shopping word, no account word, no size, no code. */
+  const bare = !u.productCue && !u.accountCue && u.measures.length === 0 && u.codes.length === 0;
   // A printer named and not read, or a family named, is not the printer remembered from earlier.
   const known = (u.printerUnread || u.family) && !u.model ? withoutPrinter(ctx) : ctx;
   // «طابعتي X1»: the family's printers are the only chips.
@@ -133,20 +149,21 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
   // «نوزل مال اي ون» at «أي طابعة عندك؟» is a part question, not the answer: the parts are shown (below).
   const partQuestion = !!u.part && !u.problemCue && !u.symptom;
   if (stage === 'printer' && bare && !partQuestion && (hint === null || PRINTER_ANSWER_HINTS.has(hint))) {
-    const extras = triageExtras(u.symptom ?? partFault(u), u.hmsCode);
+    const extras = triageExtras(u.symptom ?? partFault(u), u.hmsCode, faultPart(u));
+    // What was already said is held: the symptom, the code, and the part a fault was named in.
+    const holding = () =>
+      extras.symptom
+        ? triageExtras(extras.symptom, extras.code ?? ctx.triage?.code, extras.faultIn)
+        : triageExtras(ctx.triage?.symptom, extras.code ?? ctx.triage?.code, ctx.triage?.faultIn);
     if (u.model) return runTriage(db, viewer, ctx, { kind: 'printer', model: u.model, ...extras }, render);
     // «X1»: which of the family, holding what was already said.
-    if (u.family) {
-      const held = triageExtras(extras.symptom ?? ctx.triage?.symptom, extras.code ?? ctx.triage?.code);
-      return runTriage(db, viewer, known, { kind: 'start', ...among, ...held }, render);
-    }
+    if (u.family) return runTriage(db, viewer, known, { kind: 'start', ...among, ...holding() }, render);
     // «طابعتي», "my own printer": the one printer of this account; with several, or none
     // (a guest), the same question again, holding what was already said.
     if (u.ownPrinter) {
       const mine = await myPrinters(db, viewer);
       if (mine.length === 1) return runTriage(db, viewer, ctx, { kind: 'printer', model: mine[0].model, unit_id: mine[0].unit_id, ...extras }, render);
-      const held = triageExtras(extras.symptom ?? ctx.triage?.symptom, extras.code ?? ctx.triage?.code);
-      return runTriage(db, viewer, ctx, { kind: 'start', ...held }, render);
+      return runTriage(db, viewer, ctx, { kind: 'start', ...holding() }, render);
     }
     // «عندي طابعة كريالتي اندر 3», «طابعة أخرى»: a printer this shop does not list.
     if (u.otherPrinter || u.printerUnread) return runTriage(db, viewer, ctx, { kind: 'printer', model: 'other', ...extras }, render);
@@ -159,14 +176,17 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
     // symptom AND the code: «رمز خطأ 0300-…» is never asked for again.
     const ua = withRemembered(understand(text, { expectSymptom: true }), ctx);
     const partOnly = ua.part && (ua.problemCue || text.split(/\s+/).length === 1);
-    const symptom: SymptomKey | undefined = ua.symptom ?? (ua.faultCue ? 'other' : partOnly ? PART_SYMPTOM[ua.part!] : undefined);
+    const byPart = !ua.symptom && !ua.faultCue && partOnly ? ua.part : undefined;
+    const symptom: SymptomKey | undefined = ua.symptom ?? (ua.faultCue ? 'other' : byPart ? PART_SYMPTOM[byPart] : undefined);
     if (symptom && (hint === null || hint === 'printer_problem' || ua.residual.length === 0)) {
       const code = ua.hmsCode ? { code: ua.hmsCode } : {};
+      // «النوزل», «مشكلة بالنوزل»: the clog steps, and the part, never «انسداد النوزل», on the ticket.
+      const fault = byPart ? { faultIn: byPart } : {};
       if (ua.model && ua.model !== ctx.printer?.model) {
-        return runTriage(db, viewer, ctx, { kind: 'start', model: ua.model, symptom, ...code }, render);
+        return runTriage(db, viewer, ctx, { kind: 'start', model: ua.model, symptom, ...code, ...fault }, render);
       }
-      if (ua.family) return runTriage(db, viewer, withoutPrinter(ctx), { kind: 'start', among: ua.family.members, symptom, ...code }, render);
-      return runTriage(db, viewer, ctx, { kind: 'symptom', symptom, ...code }, render);
+      if (ua.family) return runTriage(db, viewer, withoutPrinter(ctx), { kind: 'start', among: ua.family.members, symptom, ...code, ...fault }, render);
+      return runTriage(db, viewer, ctx, { kind: 'symptom', symptom, ...code, ...fault }, render);
     }
   }
   // «جربتها وما انحلّت», "still not fixed", «انحلت»: the chip's outcome, typed.
@@ -201,12 +221,18 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
   if (u.symptom && !u.productCue) {
     return runTriage(db, viewer, known, { kind: 'start', symptom: u.symptom, ...printer }, render);
   }
-  // «عندي مشكلة بالنوزل», «النوزل خربان»: a fault in a part is that part's
-  // symptom, and the customer is asked which printer. A fault the curated
-  // steps do not cover (a leak) starts the triage without one.
+  // «عندي مشكلة بطلبية الاي ون», "something is wrong with my A1 order", "the
+  // delivery of my P1S has stopped": the fault word is about an order, a
+  // delivery, a return, a warranty or a payment. The account handlers answer
+  // it; the printer triage never starts on it (review round 4.2).
+  if (u.accountCue && u.problemCue && !u.productCue) return null;
+  // «عندي مشكلة بالنوزل», «النوزل خربان»: a fault in a part takes the steps of
+  // that part, and the customer is asked which printer. The part, not a symptom,
+  // is what they said (`faultIn`). A fault the curated steps do not cover (a
+  // leak) starts the triage without one.
   if (u.part && u.problemCue && !u.productCue) {
     const symptom = partFault(u);
-    return runTriage(db, viewer, known, { kind: 'start', ...(symptom ? { symptom } : {}), ...printer }, render);
+    return runTriage(db, viewer, known, { kind: 'start', ...(symptom ? { symptom, faultIn: u.part } : {}), ...printer }, render);
   }
   if (u.problemCue && u.printerCue && !u.productCue && !u.part) {
     return runTriage(db, viewer, known, { kind: 'start', ...printer }, render);
@@ -279,16 +305,119 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
     return shownAgain(db, viewer, ctx, u.ordinal, followHint, render);
   }
 
-  const printerNamed = !!u.model || !!u.family;
-  if (u.part || (u.maintenance && (printerNamed || u.productCue)) || (u.measures.length > 0 && (printerNamed || u.productCue))) {
+  // «شكد سعر A1», "how much is the A1?", «A1» or «طابعة» alone: a printer, and
+  // nothing else. The printer itself leads, then what the search box finds by
+  // its name; the parts alone never answer a question about the printer. A
+  // text that may answer a pending question («أي طابعة عندك؟», a legacy
+  // `expects`) is left to that question.
+  const triageAsking = stage === 'printer' || stage === 'symptom';
+  if (printerOnly(u) && (hint === null ? !input.awaiting && !triageAsking : NAMED_PRINTER_HINTS.has(hint))) {
+    const answer = await printerNamed(db, viewer, ctx, u, hint, render);
+    if (answer) return answer;
+  }
+
+  const named = !!u.model || !!u.family;
+  if (u.part || (u.maintenance && (named || u.productCue)) || (u.measures.length > 0 && (named || u.productCue))) {
     return products(db, viewer, u, known, render, hint);
   }
   return null;
 }
 
-/** The symptom a fault in the named part is: «مشكلة بالنوزل» is a clog. Never for a fault the steps do not cover. */
+/** The steps a fault in the named part takes: «مشكلة بالنوزل», the clog steps. Never for a fault the steps do not cover. */
 function partFault(u: Understood): SymptomKey | undefined {
   return u.part && u.problemCue && !u.faultCue ? PART_SYMPTOM[u.part] : undefined;
+}
+
+/** The part a fault was named in, when no symptom was: the symptom is then only the steps it takes (`partFault`). */
+function faultPart(u: Understood): PartKey | undefined {
+  return !u.symptom && partFault(u) ? u.part : undefined;
+}
+
+/**
+ * A printer named and nothing else: a model or a series («A1», «X1»), or the
+ * printer word alone («طابعة», "printers"), with at most the words of a price
+ * or stock question around it. No part, size, code, fault, account word,
+ * bundle («A1 combo» is its own card) or second printer.
+ */
+function printerOnly(u: Understood): boolean {
+  return (
+    u.printerCue &&
+    u.models.length <= 1 &&
+    !u.part &&
+    !u.symptom &&
+    !u.hmsCode &&
+    !u.problemCue &&
+    !u.accountCue &&
+    !u.maintenance &&
+    !u.printerUnread &&
+    !u.otherPrinter &&
+    !u.ownPrinter &&
+    !u.correction &&
+    !u.bundle &&
+    u.ordinal === undefined &&
+    u.measures.length === 0 &&
+    u.codes.length === 0 &&
+    u.residual.length === 0
+  );
+}
+
+/**
+ * «شكد سعر A1», "price of the A1", «A1» (review round 4.2). The storefront
+ * search for «A1» ranks five A1 parts above the A1 itself, so the answer was
+ * spare parts and never the printer. The printer comes first, as the shop
+ * lists it (new before refurbished, `catalog.printersOf`), and what the search
+ * finds by the same name follows. A series («X1») is its listed printers, one
+ * of each; the printer word alone («طابعة») one of each printer the shop
+ * lists. Null when the shop lists none: the legacy answer stands. Shown, the
+ * printer is remembered as browsed, as a shopping answer that names it is.
+ */
+async function printerNamed(
+  db: D1Database,
+  viewer: Viewer,
+  ctx: AssistContext,
+  u: Understood,
+  hint: string | null,
+  render: CardRenderer
+): Promise<TurnOutcome | null> {
+  const loc = viewer.locale;
+  const model = u.model;
+  let label: string = model ?? '';
+  let printers: CatalogItem[] = [];
+  if (model) {
+    const r = await callTool('catalog.printersOf', db, viewer, { model });
+    printers = r.ok ? r.data : [];
+  } else {
+    const listed = await printerModelsSafe(db, viewer);
+    const models = CHIP_ORDER.filter((m) => listed.has(m) && (!u.family || u.family.members.includes(m)));
+    if (u.family) label = models.join(' / ');
+    if (models.length) {
+      const r = await callTool('catalog.printerLineup', db, viewer, { models });
+      printers = r.ok ? r.data : [];
+    }
+  }
+  if (printers.length === 0) return null;
+  // What the search box finds by the own name of the printer follows; the printer is never shown twice.
+  const words = model ?? u.family?.name;
+  let rows: CatalogItem[] = [];
+  if (words && printers.length < CARDS_MAX) {
+    const r = await callTool('catalog.search', db, viewer, { text: words, limit: CARDS_MAX });
+    rows = r.ok ? r.data.items.filter((i) => !printers.some((p) => p.id === i.id)) : [];
+  }
+  const items = [...printers, ...rows].slice(0, CARDS_MAX);
+  const text = !words
+    ? tr(loc, 'printers_listed')
+    : items.length > printers.length
+      ? tr(loc, 'printer_named', { printer: label })
+      : tr(loc, 'printer_itself', { printer: label });
+  // A shopping answer, as the legacy answers are (`send` in the route): it ends the triage, so a printer
+  // only browsed never stands in a ticket for the one the customer chose.
+  const next: AssistContext = { ...ctx, shown: items.slice(0, SHOWN_MAX).map((i) => i.id) };
+  delete next.triage;
+  delete next.asking;
+  delete next.size;
+  if (model && ctx.printer?.model !== model) next.printer = { model, browsed: true };
+  const intent = hint && LABEL_INTENTS.has(hint) ? hint : 'product_search';
+  return { reply: { intent, text, cards: items.map((i) => render.card(loc, i.card, i.row)) }, context: next };
 }
 
 /** The printer the conversation is about, as the shop lists it. Null when the shop lists none of that model. */
@@ -369,6 +498,7 @@ function readPartChip(params: Record<string, unknown>): { u: Understood; anyPrin
     codes: [],
     productCue: false,
     problemCue: false,
+    accountCue: false,
     faultCue: false,
     printerCue: true,
     printerUnread: false,
@@ -421,8 +551,11 @@ function codeJoined(ctx: AssistContext, symptom: SymptomKey, code: string, loc: 
   const next: AssistContext = { ...ctx, triage: { ...ctx.triage!, symptom, code } };
   delete next.asking;
   delete next.size;
+  // The fault as the customer gave it: «النوزل», when a part was named and no symptom.
+  const faultIn = ctx.triage?.faultIn;
+  const said = faultIn ? PART_LABELS[faultIn][loc] : symptomDef(symptom).label[loc];
   return {
-    reply: { intent: 'printer_problem', text: tr(loc, 'hms_code_joined', { code, symptom: symptomDef(symptom).label[loc] }), choices: stepsChoices(loc) },
+    reply: { intent: 'printer_problem', text: tr(loc, 'hms_code_joined', { code, symptom: said }), choices: stepsChoices(loc) },
     context: next,
   };
 }
@@ -491,7 +624,12 @@ async function replyFor(db: D1Database, viewer: Viewer, step: TriageStep, ctx: A
       }
       for (const model of offered) choices.push(chip(model, { step: 'printer', model }));
       choices.push(chip(tr(loc, 'printer_other'), { step: 'printer', model: 'other' }));
-      const text = step.symptom ? tr(loc, 'printer_which_symptom', { symptom: symptomDef(step.symptom).label[loc] }) : tr(loc, 'printer_which');
+      // «مشكلة بالنوزل»: the echo says the part the customer named, never the symptom its steps are for.
+      const text = step.faultIn
+        ? tr(loc, 'printer_which_part', { part: PART_LABELS[step.faultIn][loc] })
+        : step.symptom
+          ? tr(loc, 'printer_which_symptom', { symptom: symptomDef(step.symptom).label[loc] })
+          : tr(loc, 'printer_which');
       return { intent: 'printer_problem', text, choices };
     }
     case 'ask_symptom': {
@@ -503,7 +641,14 @@ async function replyFor(db: D1Database, viewer: Viewer, step: TriageStep, ctx: A
     case 'steps': {
       const def = symptomDef(step.symptom);
       const label = def.label[loc];
-      let text = step.model === 'other' ? tr(loc, 'steps_intro_other', { symptom: label }) : tr(loc, 'steps_intro', { symptom: label, printer: step.model });
+      const part = step.faultIn ? PART_LABELS[step.faultIn][loc] : '';
+      let text = part
+        ? step.model === 'other'
+          ? tr(loc, 'steps_intro_part_other', { part })
+          : tr(loc, 'steps_intro_part', { part, printer: step.model })
+        : step.model === 'other'
+          ? tr(loc, 'steps_intro_other', { symptom: label })
+          : tr(loc, 'steps_intro', { symptom: label, printer: step.model });
       // The note first: the intro ends with «بالترتيب:», and what follows the colon is the steps.
       if (step.code) text = `${tr(loc, 'hms_code_noted', { code: step.code })} ${text}`;
       const keys = new Set(shownStepKeys(step.symptom, step.code));
@@ -530,14 +675,16 @@ async function replyFor(db: D1Database, viewer: Viewer, step: TriageStep, ctx: A
         {
           ...(step.model ? { model: step.model } : {}),
           ...(step.symptom ? { symptom: step.symptom } : {}),
+          ...(step.faultIn ? { faultIn: step.faultIn } : {}),
           tried: step.tried,
+          ...(step.shownSteps ? { shownSteps: true } : {}),
           ...(step.code ? { code: step.code } : {}),
           ...(ownUnit ? { unit_id: ownUnit } : {}),
           ...(ctx.shown ? { shown: ctx.shown } : {}),
         },
         loc
       );
-      // «فيها الطابعة والمشكلة والخطوات التي جربتها» only when all three are in it.
+      // «فيها الطابعة والمشكلة والخطوات التي جربتها» only when all three are in it: steps only shown are not tried.
       const full = step.tried && !!step.model && !!step.symptom;
       if (!viewer.userId) {
         return {

@@ -14,6 +14,7 @@
  * still comes from the session alone.
  */
 import { MODEL_TOKENS, PART_KEYS, SYMPTOM_KEYS, type ModelToken, type PartKey, type SymptomKey } from './types';
+import { PART_SYMPTOM } from './understand/lexicon';
 
 export const TRIAGE_STAGES = ['printer', 'symptom', 'steps', 'done'] as const;
 export type TriageStage = (typeof TRIAGE_STAGES)[number];
@@ -24,10 +25,23 @@ export interface TriageState {
   /** An HMS code as typed (shape-checked), held for the ticket. */
   code?: string;
   /**
-   * The curated steps of `symptom` were shown. Only then does the ticket list
-   * them as tried: «تحدث مع الفريق» at «which printer?» showed none.
+   * The curated steps of `symptom` were shown: «تحدث مع الفريق» at «which
+   * printer?» showed none. Shown is not tried: the ticket lists them as shown.
    */
   steps?: true;
+  /**
+   * The customer said the steps did not fix it («جربتها وما انحلّت», "still
+   * not fixed"): only then does the ticket list them as tried. Kept, so the
+   * draft after the sign-in trip says it too. Never without `steps`.
+   */
+  tried?: true;
+  /**
+   * The fault was named in this part («مشكلة بالنوزل») and `symptom` is the
+   * steps it takes (./understand/lexicon.ts `PART_SYMPTOM`), not a symptom the
+   * customer named: the chat and the ticket say the part. Never beside a
+   * symptom it does not lead to.
+   */
+  faultIn?: PartKey;
 }
 
 export interface AssistContext {
@@ -117,6 +131,9 @@ export function readContext(raw: unknown): AssistContext {
       if (symptom) out.triage.symptom = symptom;
       if (typeof t.code === 'string' && HMS_CODE_SHAPE.test(t.code)) out.triage.code = t.code.toUpperCase();
       if (symptom && t.steps === true) out.triage.steps = true;
+      if (out.triage.steps && t.tried === true) out.triage.tried = true;
+      const faultIn = oneOf(PART_KEYS, t.faultIn);
+      if (symptom && faultIn && PART_SYMPTOM[faultIn] === symptom) out.triage.faultIn = faultIn;
     }
   }
   if (Array.isArray(c.shown)) {

@@ -491,3 +491,53 @@ test('round 4: English faults and the Sorani «any other?»', () => {
   }
   assert.equal(understand('پرینتەرێکی تر').printerCue, true, '«another printer» still names a printer');
 });
+
+test('round 4.2: an order, a delivery, a return, a warranty or a payment beside a fault word is read as the account', () => {
+  for (const text of [
+    'something is wrong with my A1 order',
+    'my A1 order has stopped',
+    'the delivery of my P1S has stopped',
+    'I want to return my A1, something is wrong with it',
+    'something is wrong with the warranty of my A1',
+    'my A1 order is not right',
+    'I have a problem with my A1 order',
+    'problem with the delivery of my P1S',
+    'something wrong with the payment for my printer',
+    'عندي مشكلة بطلبية الاي ون',
+    'مشكلة بتوصيل البي ون اس',
+    'اريد ارجع الاي ون بيه مشكلة',
+    'عندي مشكلة بالضمان',
+    'داواکارییەکەم کێشەی هەیە',
+  ]) {
+    assert.equal(understand(text).accountCue, true, text);
+  }
+  // A purchase or an arrival in the past is the story of a fault, never the account.
+  for (const text of [
+    'اي تو وصلتني الطابعة وبيها مشكلة',
+    'اشتريت طابعة من عندكم وما تشتغل',
+    'I bought an A1 and it stopped working',
+    'the A1 I ordered is not printing',
+    'my printer arrived and it is not printing',
+    'something is wrong with my printer',
+    'عندي مشكلة بالنوزل',
+  ]) {
+    assert.equal(understand(text).accountCue, false, text);
+  }
+});
+
+test('round 4.2: "not right", a bare "wrong with", "has stopped" and "it stopped" are no fault; the printer as the subject still is', () => {
+  for (const text of [
+    'is the P1S not right for beginners?',
+    'the A1 is not right for me, what else?',
+    'nothing wrong with the A1, I just want a faster printer',
+    'what is wrong with buying the A1 mini?',
+    'my A1 order has stopped',
+    'my A1 order is not right',
+    'has the A1 combo offer stopped?',
+  ]) {
+    assert.equal(understand(text).problemCue, false, text);
+  }
+  for (const text of ['something is wrong with my printer', 'help, my printer stopped', 'my printer has stopped', 'my printer is acting up', 'what is wrong with my printer']) {
+    assert.equal(understand(text).problemCue, true, text);
+  }
+});

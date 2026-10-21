@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { buildTicketDraft, handoffForStaff, readHandoff, shownStepKeys } from '../worker/lib/assist/handoff';
 import { symptomDef } from '../worker/lib/assist/triage/symptoms';
 import { CONSOLE_STRINGS } from '../src/components/adminSupport/strings';
+import { PART_LABELS } from '../worker/lib/assist/understand/lexicon';
 import { assistKindOf, readAttachmentKeys } from '../worker/lib/assist/attachments';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -200,4 +201,23 @@ test('the lane comments under src/ carry no apostrophe', () => {
   ];
   for (const [file, phrase] of reworded) if (phrase.test(read(file))) bad.push(`${file}: ${phrase}`);
   assert.deepEqual(bad, []);
+});
+
+test('round 4.2: a summary may name the part of a fault instead of a symptom, and the desk labels it in three languages', () => {
+  const plateSteps = symptomDef('adhesion').steps.map((st) => st.key);
+  const kept = readHandoff({ v: 1, model: null, symptom: null, part: 'plate', tried: [...plateSteps, 'cool_down'], shown: [], attachments: 0 });
+  assert.deepEqual(kept, { v: 1, model: null, symptom: null, part: 'plate', tried: plateSteps, shown: [], attachments: 0 });
+  assert.equal(readHandoff({ v: 1, model: null, symptom: null, part: 'boiler' }), null, 'not a part the shop knows');
+  // A symptom named is the finding; the part is then not carried.
+  assert.equal(readHandoff({ v: 1, model: 'A1', symptom: 'clog', part: 'plate', tried: [] })?.part, undefined);
+  const staff = handoffForStaff(JSON.stringify(kept))!;
+  assert.equal(staff.symptom, null);
+  assert.deepEqual(staff.part, { key: 'plate', label: PART_LABELS.plate });
+  assert.deepEqual(staff.tried.map((t) => t.key), plateSteps);
+  assert.equal(handoffForStaff(JSON.stringify({ v: 1, model: 'A1', symptom: 'clog', tried: [] }))!.part, null);
+  for (const loc of ['ar', 'en', 'ckb'] as const) {
+    assert.ok(CONSOLE_STRINGS[loc].hfPart.trim().length > 0, loc);
+  }
+  assert.notEqual(CONSOLE_STRINGS.ckb.hfPart, CONSOLE_STRINGS.ar.hfPart);
+  assert.match(read('src/components/adminSupport/TicketsDesk.tsx'), /handoff\.part/);
 });

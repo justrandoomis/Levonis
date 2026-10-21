@@ -2,19 +2,22 @@
  * «تحدث مع الفريق» — THE TICKET, PREFILLED (assistant plan 2.5, the part push A needs).
  *
  * The customer should not have to type again what the conversation already
- * established. The draft names the printer, the symptom, the code if one was
- * typed, and the steps that were shown and tried, each label taken from the
- * curated set in the customer's language. It is a DRAFT: the ticket form
- * shows it, the customer can edit every word, and nothing is sent until they
- * press send. The only thing besides the text is the same facts as closed-set
+ * established. The draft names the printer, the symptom (or the part a fault
+ * was named in), the code if one was typed, and the steps: as tried when the
+ * customer said they did not fix it, as shown when they were only shown, each
+ * label taken from the curated set in the language of the customer. It is a
+ * DRAFT: the ticket form shows it, the customer can edit every word, and
+ * nothing is sent until they press send. The only thing besides the text is
+ * the same facts as closed-set
  * values (`HandoffSummary`), so the desk can read them without parsing prose;
  * no sentence of the customer's rides in it.
  */
-import type { HandoffSummary, L3, Locale, ModelToken, SymptomKey, TicketDraft } from './types';
-import { MODEL_TOKENS, SYMPTOM_KEYS } from './types';
+import type { HandoffSummary, L3, Locale, ModelToken, PartKey, SymptomKey, TicketDraft } from './types';
+import { MODEL_TOKENS, PART_KEYS, SYMPTOM_KEYS } from './types';
 import { tr } from './strings';
 import { symptomDef } from './triage/symptoms';
 import { HMS_CODE_SHAPE, SHOWN_MAX } from './context';
+import { PART_LABELS, PART_SYMPTOM } from './understand/lexicon';
 
 export interface DraftInput {
   /** The printer the customer chose or named; absent when none was, and then the draft names none. */
@@ -22,10 +25,22 @@ export interface DraftInput {
   /** The symptom the customer named; absent when none was, and then the draft names none. */
   symptom?: SymptomKey;
   /**
-   * The curated steps of `symptom` were SHOWN in the chat. Only then are they
-   * listed as tried; a ticket asked for before any step was shown lists none.
+   * The customer said the curated steps of `symptom` did not fix it. Only
+   * then are they listed as tried (and in `tried` of the summary).
    */
   tried?: boolean;
+  /**
+   * The steps were SHOWN in the chat and nobody said they were tried
+   * («تحدث مع الفريق» after the steps): listed as shown, never as tried.
+   * A ticket asked for before any step was shown lists none.
+   */
+  shownSteps?: boolean;
+  /**
+   * `symptom` is the steps a fault in this part took («مشكلة بالنوزل» → the
+   * clog steps), not a symptom the customer named: the draft and the summary
+   * state the part, never that symptom.
+   */
+  faultIn?: PartKey;
   code?: string;
   /** Already checked against the viewer's own devices by the caller. */
   unit_id?: string;
@@ -59,7 +74,10 @@ export function readHandoff(raw: unknown): HandoffSummary | null {
   const model =
     h.model === 'other' ? 'other' : typeof h.model === 'string' && (MODEL_TOKENS as readonly string[]).includes(h.model) ? (h.model as ModelToken) : null;
   const symptom = typeof h.symptom === 'string' && (SYMPTOM_KEYS as readonly string[]).includes(h.symptom) ? (h.symptom as SymptomKey) : null;
-  const allowed = symptom ? symptomDef(symptom).steps.map((st) => st.key) : [];
+  // The part a fault was named in stands only where no symptom was named; its steps are those it took.
+  const part = !symptom && typeof h.part === 'string' && (PART_KEYS as readonly string[]).includes(h.part) ? (h.part as PartKey) : null;
+  const stepsOf = symptom ?? (part ? PART_SYMPTOM[part] : null);
+  const allowed = stepsOf ? symptomDef(stepsOf).steps.map((st) => st.key) : [];
   const asked = new Set(Array.isArray(h.tried) ? h.tried.filter((k): k is string => typeof k === 'string') : []);
   const tried = allowed.filter((k) => asked.has(k));
   const code = typeof h.code === 'string' && HMS_CODE_SHAPE.test(h.code) ? h.code.toUpperCase() : undefined;
@@ -68,14 +86,16 @@ export function readHandoff(raw: unknown): HandoffSummary | null {
     : [];
   const count = Number(h.attachments);
   const attachments = Number.isInteger(count) && count >= 0 && count <= 6 ? count : 0;
-  if (!model && !symptom) return null;
-  return { v: 1, model, symptom, tried, ...(code ? { code } : {}), shown, attachments };
+  if (!model && !symptom && !part) return null;
+  return { v: 1, model, symptom, ...(part ? { part } : {}), tried, ...(code ? { code } : {}), shown, attachments };
 }
 
 /** The summary as the desk shows it: every label from the curated set, in all three languages. */
 export interface StaffHandoff {
   model: ModelToken | 'other' | null;
   symptom: { key: SymptomKey; label: L3 } | null;
+  /** The part a fault was named in, when no symptom was («مشكلة بالنوزل»). */
+  part: { key: PartKey; label: L3 } | null;
   tried: Array<{ key: string; text: L3 }>;
   code: string | null;
   shown: string[];
@@ -86,10 +106,12 @@ export function handoffForStaff(raw: unknown): StaffHandoff | null {
   const h = readHandoff(raw);
   if (!h) return null;
   const def = h.symptom ? symptomDef(h.symptom) : null;
+  const steps = def ?? (h.part ? symptomDef(PART_SYMPTOM[h.part]) : null);
   return {
     model: h.model,
     symptom: def ? { key: def.key, label: def.label } : null,
-    tried: def ? def.steps.filter((st) => h.tried.includes(st.key)).map((st) => ({ key: st.key, text: st.tried ?? st.text })) : [],
+    part: h.part ? { key: h.part, label: PART_LABELS[h.part] } : null,
+    tried: steps ? steps.steps.filter((st) => h.tried.includes(st.key)).map((st) => ({ key: st.key, text: st.tried ?? st.text })) : [],
     code: h.code ?? null,
     shown: h.shown,
     attachments: h.attachments,
@@ -110,40 +132,48 @@ export function printerLabel(loc: Locale, model: ModelToken | 'other'): string {
 /**
  * The draft states what the conversation established and nothing more: a
  * printer nobody chose and a symptom nobody named are left out of the text
- * and of the summary (never «طابعة أخرى» / «أخرى» by default), and the steps
- * are listed as tried only when they were shown.
+ * and of the summary (never «طابعة أخرى» / «أخرى» by default); a fault named
+ * in a part is that part («موضع المشكلة: النوزل»), never the symptom its steps
+ * are for; and the steps are listed as tried only when the customer said they
+ * did not fix it, as shown when they were only shown.
  */
 export function buildTicketDraft(input: DraftInput, loc: Locale): TicketDraft {
   const def = input.symptom ? symptomDef(input.symptom) : null;
-  const symptom = def ? def.label[loc] : '';
+  const faultIn = def && input.faultIn && PART_SYMPTOM[input.faultIn] === input.symptom ? input.faultIn : undefined;
+  // What the subject says the problem is: the symptom named, or the part the fault was named in.
+  const problem = faultIn ? PART_LABELS[faultIn][loc] : def ? def.label[loc] : '';
   const printer = input.model ? printerLabel(loc, input.model) : '';
   const named = input.model && input.model !== 'other' ? input.model : null;
   const subject = def
     ? named
-      ? tr(loc, 'ticket_subject', { printer: named, symptom })
-      : tr(loc, 'ticket_subject_other', { symptom })
+      ? tr(loc, 'ticket_subject', { printer: named, symptom: problem })
+      : tr(loc, 'ticket_subject_other', { symptom: problem })
     : named
       ? tr(loc, 'ticket_subject_printer', { printer: named })
       : tr(loc, 'ticket_subject_plain');
-  const tried = def && input.symptom && input.tried ? shownStepKeys(input.symptom, input.code) : [];
+  const steps = def && input.symptom ? shownStepKeys(input.symptom, input.code) : [];
+  const tried = input.tried ? steps : [];
+  const listed = tried.length ? tried : input.shownSteps ? steps : [];
   const lines: string[] = [];
   if (printer) lines.push(tr(loc, 'ticket_printer', { printer }));
-  if (def) lines.push(tr(loc, 'ticket_problem', { symptom }));
+  if (faultIn) lines.push(tr(loc, 'ticket_part', { part: problem }));
+  else if (def) lines.push(tr(loc, 'ticket_problem', { symptom: problem }));
   if (input.code) lines.push(tr(loc, 'ticket_code', { code: input.code }));
-  if (def && tried.length) {
-    lines.push(tr(loc, 'ticket_tried'));
-    for (const key of tried) {
+  if (def && listed.length) {
+    lines.push(tr(loc, tried.length ? 'ticket_tried' : 'ticket_shown'));
+    for (const key of listed) {
       const step = def.steps.find((s) => s.key === key);
       if (step) lines.push(`- ${(step.tried ?? step.text)[loc]}`);
     }
   }
-  // A summary that names neither a printer nor a symptom is no summary (`readHandoff`).
+  // A summary that names neither a printer nor a symptom (nor the part of a fault) is no summary (`readHandoff`).
   const handoff: HandoffSummary | null =
     input.model || input.symptom
       ? {
           v: 1,
           model: input.model ?? null,
-          symptom: input.symptom ?? null,
+          symptom: faultIn ? null : (input.symptom ?? null),
+          ...(faultIn ? { part: faultIn } : {}),
           tried,
           ...(input.code ? { code: input.code } : {}),
           shown: [...(input.shown ?? [])].slice(0, SHOWN_MAX),

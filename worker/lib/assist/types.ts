@@ -92,7 +92,13 @@ export interface HandoffSummary {
   v: 1;
   model: ModelToken | 'other' | null;
   symptom: SymptomKey | null;
-  /** Step keys of `symptom`, in the curated order. */
+  /**
+   * The part a fault was named in («مشكلة بالنوزل») when no symptom was:
+   * the ticket says the nozzle, never the clog its steps are for. Absent when
+   * a symptom is named.
+   */
+  part?: PartKey;
+  /** Step keys of `symptom` (or of the steps `part` took), in the curated order: only those the customer said they tried. */
   tried: string[];
   code?: string;
   shown: string[];

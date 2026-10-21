@@ -163,16 +163,23 @@ test('round 4: the handoff states only what the customer gave: the triage printe
   assert.deepEqual(atSymptom.step, { kind: 'handoff', model: 'A1', tried: false });
   // «طابعة أخرى» chosen by the customer is what they gave, and stays.
   const other = nextTriage(nextTriage({ v: 1, triage: { stage: 'printer', symptom: 'noise' } }, { kind: 'printer', model: 'other' }).context, { kind: 'talk' });
-  assert.deepEqual(other.step, { kind: 'handoff', model: 'other', symptom: 'noise', tried: true });
+  // Review round 4.2: shown, and nobody said tried.
+  assert.deepEqual(other.step, { kind: 'handoff', model: 'other', symptom: 'noise', tried: false, shownSteps: true });
   // After the steps, another printer chosen for the same fault: the steps were still shown.
   const steps = nextTriage({ v: 1, triage: { stage: 'printer', symptom: 'clog' } }, { kind: 'printer', model: 'A1' });
   const changed = nextTriage(steps.context, { kind: 'change_printer' });
   assert.deepEqual(changed.context.triage, { stage: 'printer', symptom: 'clog', steps: true });
-  assert.deepEqual(nextTriage(changed.context, { kind: 'talk' }).step, { kind: 'handoff', symptom: 'clog', tried: true });
+  assert.deepEqual(nextTriage(changed.context, { kind: 'talk' }).step, { kind: 'handoff', symptom: 'clog', tried: false, shownSteps: true });
   // Talked once after the steps, the done state keeps that they were shown; once before, it does not.
   const done = nextTriage(steps.context, { kind: 'talk' });
   assert.deepEqual(done.context.triage, { stage: 'done', symptom: 'clog', steps: true });
-  assert.deepEqual(nextTriage(readContext(JSON.parse(JSON.stringify(done.context))), { kind: 'talk' }).step, { kind: 'handoff', model: 'A1', symptom: 'clog', tried: true });
+  assert.deepEqual(nextTriage(readContext(JSON.parse(JSON.stringify(done.context))), { kind: 'talk' }).step, {
+    kind: 'handoff',
+    model: 'A1',
+    symptom: 'clog',
+    tried: false,
+    shownSteps: true,
+  });
   assert.deepEqual(nextTriage(early.context, { kind: 'talk' }).step, { kind: 'handoff', symptom: 'clog', tried: false });
   // The flag is a closed set, and means nothing without a symptom.
   assert.equal(readContext({ v: 1, triage: { stage: 'done', symptom: 'clog', steps: 'yes' } }).triage?.steps, undefined);
@@ -206,6 +213,77 @@ test('round 4: no Sorani or Arabic clitic is glued onto a placeholder (a Latin l
   for (const loc of ['ar', 'ckb'] as const) {
     for (const [key, text] of Object.entries(ASSIST_T[loc])) {
       assert.doesNotMatch(text, /\}[\u0621-\u064A\u0671-\u06D3\u06D5]/, `${loc}.${key}: ${text}`);
+    }
+  }
+});
+
+test('round 4.2: the steps are tried only when the customer says they did not fix it; the team alone lists them as shown', () => {
+  const steps = nextTriage({ v: 1, triage: { stage: 'printer', symptom: 'clog' } }, { kind: 'printer', model: 'A1' });
+  const talk = nextTriage(steps.context, { kind: 'talk' });
+  assert.deepEqual(talk.step, { kind: 'handoff', model: 'A1', symptom: 'clog', tried: false, shownSteps: true });
+  assert.deepEqual(talk.context.triage, { stage: 'done', symptom: 'clog', steps: true });
+  const notFixed = nextTriage(steps.context, { kind: 'outcome', outcome: 'not_fixed' });
+  assert.deepEqual(notFixed.step, { kind: 'handoff', model: 'A1', symptom: 'clog', tried: true });
+  assert.deepEqual(notFixed.context.triage, { stage: 'done', symptom: 'clog', steps: true, tried: true });
+  // Said once, it stays said, through the client and back: the talk chip after the sign-in drafts the same ticket.
+  assert.deepEqual(nextTriage(readContext(JSON.parse(JSON.stringify(notFixed.context))), { kind: 'talk' }).step, {
+    kind: 'handoff',
+    model: 'A1',
+    symptom: 'clog',
+    tried: true,
+  });
+  // Before any step: neither tried nor shown.
+  assert.deepEqual(nextTriage({ v: 1, triage: { stage: 'printer', symptom: 'clog' } }, { kind: 'talk' }).step, { kind: 'handoff', symptom: 'clog', tried: false });
+  // Closed set, and never without the steps shown.
+  assert.equal(readContext({ v: 1, triage: { stage: 'done', symptom: 'clog', steps: true, tried: 'yes' } }).triage?.tried, undefined);
+  assert.equal(readContext({ v: 1, triage: { stage: 'done', symptom: 'clog', tried: true } }).triage?.tried, undefined);
+  for (const loc of ['ar', 'en', 'ckb'] as const) {
+    const shown = buildTicketDraft({ model: 'A1', symptom: 'clog', shownSteps: true }, loc);
+    assert.deepEqual(shown.handoff?.tried, [], loc);
+    assert.ok(!shown.body.includes(ASSIST_T[loc].ticket_tried), `${loc}: ${shown.body}`);
+    assert.ok(shown.body.includes(ASSIST_T[loc].ticket_shown), `${loc}: ${shown.body}`);
+    for (const st of symptomDef('clog').steps) assert.ok(shown.body.includes((st.tried ?? st.text)[loc]), `${loc}: ${st.key}`);
+    const tried = buildTicketDraft({ model: 'A1', symptom: 'clog', tried: true, shownSteps: true }, loc);
+    assert.ok(tried.body.includes(ASSIST_T[loc].ticket_tried) && !tried.body.includes(ASSIST_T[loc].ticket_shown), `${loc}: tried wins`);
+  }
+});
+
+test('round 4.2: a fault in a part keeps the part, through the triage, and the ticket states the part, never the symptom of its steps', () => {
+  const start = nextTriage({ v: 1 }, { kind: 'start', symptom: 'clog', faultIn: 'nozzle_hotend' });
+  assert.deepEqual(start.step, { kind: 'ask_printer', symptom: 'clog', faultIn: 'nozzle_hotend' });
+  assert.deepEqual(start.context.triage, { stage: 'printer', symptom: 'clog', faultIn: 'nozzle_hotend' });
+  const steps = nextTriage(readContext(JSON.parse(JSON.stringify(start.context))), { kind: 'printer', model: 'A1' });
+  assert.deepEqual(steps.step, { kind: 'steps', model: 'A1', symptom: 'clog', faultIn: 'nozzle_hotend' });
+  const handoff = nextTriage(steps.context, { kind: 'outcome', outcome: 'not_fixed' });
+  assert.deepEqual(handoff.step, { kind: 'handoff', model: 'A1', symptom: 'clog', tried: true, faultIn: 'nozzle_hotend' });
+  // Another printer for the same fault keeps the part; a symptom named replaces it.
+  assert.equal(nextTriage(steps.context, { kind: 'change_printer' }).context.triage?.faultIn, 'nozzle_hotend');
+  assert.equal(nextTriage(steps.context, { kind: 'symptom', symptom: 'clog' }).context.triage?.faultIn, undefined);
+  assert.equal(nextTriage(start.context, { kind: 'printer', model: 'A1', symptom: 'adhesion' }).context.triage?.faultIn, undefined);
+  // The context keeps it only beside the symptom it leads to.
+  assert.equal(readContext({ v: 1, triage: { stage: 'steps', symptom: 'adhesion', faultIn: 'nozzle_hotend' } }).triage?.faultIn, undefined);
+  assert.equal(readContext({ v: 1, triage: { stage: 'printer', faultIn: 'nozzle_hotend' } }).triage?.faultIn, undefined);
+  assert.equal(readContext({ v: 1, triage: { stage: 'steps', symptom: 'clog', faultIn: 'boiler' } }).triage?.faultIn, undefined);
+  for (const loc of ['ar', 'en', 'ckb'] as const) {
+    for (const [part, symptom] of [
+      ['nozzle_hotend', 'clog'],
+      ['plate', 'adhesion'],
+    ] as const) {
+      const guessed = symptomDef(symptom).label[loc];
+      for (const model of ['A1', undefined] as const) {
+        const d = buildTicketDraft({ ...(model ? { model } : {}), symptom, faultIn: part, tried: true }, loc);
+        assert.ok(!d.subject.includes(guessed) && !d.body.includes(guessed), `${loc} ${part}: ${d.subject} / ${d.body}`);
+        assert.ok(d.subject.includes(PART_LABELS[part][loc]) && d.body.includes(PART_LABELS[part][loc]), `${loc} ${part}: ${d.subject} / ${d.body}`);
+        assert.deepEqual(d.handoff, {
+          v: 1,
+          model: model ?? null,
+          symptom: null,
+          part,
+          tried: symptomDef(symptom).steps.map((st) => st.key),
+          shown: [],
+          attachments: 0,
+        });
+      }
     }
   }
 });
