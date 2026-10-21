@@ -10,7 +10,7 @@
 -- and its «send draft» drops a draft's `coverage` / `substitutions` keys and
 -- sends it as a whole offer at the price the merchant set for a part.
 -- Commitments fail closed (C11), so before an emergency manual redeploy of an
--- older commit run these TWO statements against the live database:
+-- older commit run these THREE statements against the live database:
 --
 --   npx wrangler d1 execute levonis-db-staging --remote \
 --     --file scripts/before-rollback-offers-v3.sql
@@ -21,7 +21,11 @@
 --    and it frees the merchant's one-live-offer slot, so the merchant may make
 --    a NEW offer on the whole job under the older build. No money is held by
 --    an open offer, so nothing else moves.
--- 2. Every draft that carries a coverage or a substitution is deleted, since
+-- 2. Every request such an offer was on has its advertised `offer_count`
+--    recounted by the one rule every offer move uses (`offerCountStatement`:
+--    pending or accepted), so the board stops advertising offers that are
+--    gone. Its `updated_at` is not touched (the revision fences read it).
+-- 3. Every draft that carries a coverage or a substitution is deleted, since
 --    the older build would send it as a whole offer. Its merchant writes the
 --    offer again.
 --
@@ -34,6 +38,13 @@ UPDATE community_offers
        updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
  WHERE state IN ('pending', 'superseded')
    AND (COALESCE(covers_all, 1) = 0 OR COALESCE(substitutions_json, '[]') <> '[]');
+
+UPDATE community_requests
+   SET offer_count = (SELECT COUNT(*) FROM community_offers o
+                       WHERE o.request_id = community_requests.id AND o.state IN ('pending', 'accepted'))
+ WHERE id IN (SELECT request_id FROM community_offers
+               WHERE state = 'withdrawn'
+                 AND (COALESCE(covers_all, 1) = 0 OR COALESCE(substitutions_json, '[]') <> '[]'));
 
 DELETE FROM community_offer_drafts
  WHERE CASE WHEN json_valid(payload_json)

@@ -27,7 +27,7 @@ import { GOVERNORATES } from '../../../lib/governorates';
 import { formatFigure } from '../../../lib/localeNumber';
 import { offersLabel } from '../../community/hub/copy';
 import { iqdUnit } from '../../../lib/money';
-import { workshopApi, type BoardFilters, type BoardRequest } from './api';
+import { boardJobFacts, workshopApi, type BoardFilters, type BoardRequest } from './api';
 import { approvalGateText } from '../../../lib/approvalGate';
 import { RequestThumb } from '../../community/requests/RequestFileThumbs';
 import { localMaterial } from '../../community/requests/mirrors';
@@ -97,6 +97,12 @@ export default function RequestBoard({
   const matName = (id: string | null) => {
     if (!id) return '';
     return localMaterial(id, lang === 'en' || lang === 'ckb' ? lang : 'ar', materials);
+  };
+  const techLabel = (r: BoardRequest) => {
+    const f = boardJobFacts(r);
+    const words = f.processes.map((x) => (x === 'resin' ? loc('ريزن', 'Resin', 'ڕێزن') : 'FDM'));
+    if (f.anyTechnology) words.push(loc('التقنية مفتوحة', 'Any technology', 'هەر تەکنەلۆژیایەک'));
+    return words.join(' + ');
   };
   const govName = (id: string) => {
     const g = GOVERNORATES.find((x) => x.id === id);
@@ -236,9 +242,10 @@ export default function RequestBoard({
                   <span className="min-w-0 flex-1">
                     <span dir="auto" className="line-clamp-2 block text-[14px] font-semibold leading-snug text-text-primary">{r.title}</span>
                     <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-text-muted">
-                      <span>{r.process === 'resin' ? loc('ريزن', 'Resin', 'ڕێزن') : r.process === 'fdm' ? 'FDM' : loc('التقنية مفتوحة', 'Any technology', 'هەر تەکنەلۆژیایەک')}</span>
-                      {r.material_id && <span aria-hidden="true">·</span>}
-                      {r.material_id && <span>{matName(r.material_id)}</span>}
+                      {/* A job of parts names the technologies and materials of its parts (P1-05 review 3). */}
+                      <span data-board-tech>{techLabel(r)}</span>
+                      {boardJobFacts(r).materials.length > 0 && <span aria-hidden="true">·</span>}
+                      {boardJobFacts(r).materials.length > 0 && <span data-board-materials>{boardJobFacts(r).materials.map(matName).join(' + ')}</span>}
                       {/* A job of parts (P1-05): its quantity is the sets, said beside the parts. */}
                       {r.summary && r.summary.parts_count > 1 && (
                         <span className="tabular-nums">

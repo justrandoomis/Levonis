@@ -141,6 +141,7 @@ import {
   revisionHashFence,
   storedCoverage,
   uncoverableParts,
+  coverageNeedsPartCheck,
   type CoverageBody,
   type OfferCoverageTerms,
   type RevisionModel,
@@ -166,6 +167,13 @@ export const marketplaceRoutes = new Hono<AppContext>();
 const nowIso = () => new Date().toISOString();
 
 // --------------------------------------------------------------- shapes
+
+/** The public card's summary: the whitelisted fields only (P1-05). */
+const publicSummary = (x: NonNullable<ReturnType<typeof boardSummaryOf>>) => ({
+  parts_count: x.parts_count,
+  pieces_per_set: x.pieces_per_set,
+  review_state: x.review_state,
+});
 
 /**
  * The public view of a request.
@@ -205,8 +213,9 @@ export function publicRequest(r: Record<string, unknown>) {
     /** Notes the customer wrote FOR the merchants (0130) — a real column. The
      *  private `notes` (where the old wizard stashed a link) is never shown. */
     customer_notes: r.customer_notes ?? '',
-    /** P1-05: the parts, the pieces a set and the technical review — only on a list that read them. */
-    ...(boardSummaryOf(r) ? { summary: boardSummaryOf(r) } : {}),
+    /** P1-05: the parts, the pieces a set and the technical review — only on a list that read them.
+     *  The whitelist names its three fields; the materials and technologies are the workshop board's. */
+    ...(boardSummaryOf(r) ? { summary: publicSummary(boardSummaryOf(r)!) } : {}),
   };
 }
 
@@ -1456,16 +1465,46 @@ async function coverageFromBody(
 }
 
 /**
- * EVERY PART THE OFFER COVERS, THIS WORKSHOP CAN MAKE (D5; critique 2) — as
- * asked or with its substitution. A whole offer covers every part, so a
- * workshop that can make only some of a job's parts offers on those. A job
- * the matcher reads as one (no parts) was judged whole by the verdict.
+ * EVERY PART THE OFFER COVERS, THIS WORKSHOP CAN MAKE (D5; critique 2) — with
+ * its substitution when it carries one, else as asked. A whole offer covers
+ * every part, so a workshop that can make only some of a job's parts offers
+ * on those. A job the matcher reads as one was judged as asked by the
+ * verdict; its substitution is judged here (P1-05 review 3).
+ *
+ * Answers the revision it judged (the one handed in, or the one it read), or
+ * null when nothing was judged. THE CALLER FENCES ITS WRITE ON THAT HASH
+ * (P1-05 review 4): a whole offer names no coverage, so without the fence a
+ * part the customer added after this read would be covered by a price set
+ * without it.
  */
-async function assertCoveredPartsMakeable(env: Env, requestId: string, live: LiveVerdict | null, terms: OfferCoverageTerms, rm: RevisionModel | null): Promise<void> {
-  if (!live || !live.request.parts || !live.request.parts.length) return;
+async function assertCoveredPartsMakeable(env: Env, requestId: string, live: LiveVerdict | null, terms: OfferCoverageTerms, rm: RevisionModel | null): Promise<RevisionModel | null> {
+  if (!live || !coverageNeedsPartCheck(live, terms)) return rm;
   const model = rm ?? (await loadRevisionModel(env.DB, requestId, async () => readRequestModel(env.DB, requestId)));
-  if (!model) return;
+  if (!model) return rm;
   assertCoverageEligible(live, terms, model.model);
+  return model;
+}
+
+/**
+ * THE REQUEST THE MERCHANT SAW (P1-05 review 4). The composer sends the hash
+ * of the revision it rendered (`expected_request_hash`, from the request
+ * page); a new offer or a sent draft is refused REQUEST_CHANGED when the
+ * request is no longer that revision — before the first offer a customer
+ * edit rewrites revision 1 in place, so its number alone does not move. The
+ * answer is the revision to fence the write on. An older client that sends no
+ * hash keeps the fence on what the route itself read.
+ */
+async function assertSeenRevision(env: Env, requestId: string, body: Record<string, unknown>, rm: RevisionModel | null): Promise<RevisionModel | null> {
+  const raw = body.expected_request_hash;
+  if (raw === undefined || raw === null || raw === '') return rm;
+  const expected = str(raw, 'expected_request_hash', { max: 128 });
+  const now = rm ?? (await loadRevisionModel(env.DB, requestId, async () => readRequestModel(env.DB, requestId)));
+  // A request with no revision row has no hash to compare: nothing to refuse.
+  if (!now || !now.hash) return rm;
+  if (now.hash !== expected) {
+    throw conflict('The request changed since you opened it — check it and try again', 'REQUEST_CHANGED');
+  }
+  return now;
 }
 
 /**
@@ -1474,19 +1513,25 @@ async function assertCoveredPartsMakeable(env: Env, requestId: string, live: Liv
  * «some part is makeable», so the offers list asks the rule acceptance applies
  * (`offerMerchantStanding`): `uncoverableParts` with the offer's own coverage
  * and substitutions, against the revision it priced, on the workshop as it is
- * now. Read only: no verdict is written. A v1 request, or one the matcher
- * reads as one job, costs one indexed read; a database before 0208 none.
+ * now. A substitution is judged on any request, one job included (review
+ * 3). Read only: no verdict is written. A v1 request with no substituted
+ * offer, or one the matcher reads as one job, costs one indexed read; a
+ * database before 0208 none.
  */
 async function offersUnableByPart(db: D1Database, requestId: string, rows: Array<Record<string, unknown>>): Promise<Set<string>> {
   const out = new Set<string>();
   const pending = rows.filter((o) => o.state === 'pending' && Number(o.vm_eligible ?? 1) !== 0);
   if (!pending.length) return out;
-  try {
-    const v3 = await db.prepare(`SELECT 1 AS x FROM community_print_requests p WHERE p.request_id = ? AND ${effectiveV3Sql('p')}`).bind(requestId).first();
-    if (!v3) return out;
-  } catch (e) {
-    if (isSchemaMissing(e)) return out;
-    throw e;
+  // A substitution is judged on any request (P1-05 review 3): what gets made is the substitute.
+  const substituted = pending.some((o) => storedCoverage(o).substitutions.length > 0);
+  if (!substituted) {
+    try {
+      const v3 = await db.prepare(`SELECT 1 AS x FROM community_print_requests p WHERE p.request_id = ? AND ${effectiveV3Sql('p')}`).bind(requestId).first();
+      if (!v3) return out;
+    } catch (e) {
+      if (isSchemaMissing(e)) return out;
+      throw e;
+    }
   }
   const [facts, candidates, catalogue] = await Promise.all([
     loadRequestFacts(db, [requestId]),
@@ -1494,15 +1539,17 @@ async function offersUnableByPart(db: D1Database, requestId: string, rows: Array
     loadCatalogue(db),
   ]);
   const request = facts.get(requestId);
-  if (!request?.parts?.length) return out;
+  if (!request) return out;
   const models = new Map<number, ReturnType<typeof modelAtRevision>>();
   for (const o of pending) {
+    const terms = storedCoverage(o);
+    if (!coverageNeedsPartCheck({ request }, terms)) continue;
     const candidate = candidates.find((m) => m.merchant_id === String(o.merchant_id));
     if (!candidate) continue;
     const rev = Number(o.request_revision ?? 1);
     if (!models.has(rev)) models.set(rev, modelAtRevision(db, requestId, rev));
     const model = await models.get(rev)!;
-    if (model && uncoverableParts({ candidate, request, catalogue }, storedCoverage(o), model)) out.add(String(o.id));
+    if (model && uncoverableParts({ candidate, request, catalogue }, terms, model)) out.add(String(o.id));
   }
   return out;
 }
@@ -1665,7 +1712,10 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
    * that door is a workshop's that may quote the job.
    */
   const live = await assertMayOffer(c.env, requestId, ctx.merchant.id);
-  await assertCoveredPartsMakeable(c.env, requestId, live, coverage.terms, coverage.rm);
+  // The revision every check above read, a whole offer's too: its write is
+  // fenced on that hash (P1-05 review 4); a sent offer also on the one its
+  // merchant saw.
+  const judged = await assertCoveredPartsMakeable(c.env, requestId, live, coverage.terms, coverage.rm);
   // «استخدم هذا كعرضي» (costing v2): the private quote this offer came from.
   const quoteId = str(body.quote_id, 'quote_id', { max: 60, required: false }) || '';
 
@@ -1699,6 +1749,7 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
     return c.json({ success: true, offer: draftShape(saved!, { revision: req.revision }) }, 201);
   }
 
+  const fence = await assertSeenRevision(c.env, requestId, body, judged);
   const id = newId('off');
   let inserted = 0;
   try {
@@ -1709,14 +1760,14 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
       // fenced on the offer row.
       ...insertOfferStatements(c.env.DB, {
         id, requestId, merchantId: ctx.merchant.id, storeId: ctx.store.id, customerId: user.id, terms: t, extras: x, ts,
-        coverage: coverage.rm ? { terms: coverage.terms, hash: coverage.rm.hash } : undefined,
+        coverage: fence ? { terms: coverage.terms, hash: fence.hash } : undefined,
       }),
       ...offerFileStatements(c.env.DB, id, files, ts, null),
     ]);
-    inserted = Number(res[coverage.rm ? 1 : 0]?.meta.changes ?? 0);
+    inserted = Number(res[fence ? 1 : 0]?.meta.changes ?? 0);
   } catch (e) {
-    // The request moved under the parts this offer names (P1-05): nothing written.
-    if (coverage.rm && isRevisionFenceAbort(e)) {
+    // The request moved under what this offer was checked against (P1-05): nothing written.
+    if (fence && isRevisionFenceAbort(e)) {
       throw conflict('The request changed while you were offering — check it and try again', 'REQUEST_CHANGED');
     }
     // The partial unique index on (request_id, merchant_id) WHERE state is
@@ -1952,19 +2003,26 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
     put('substitutions_json', cols.substitutions_json);
     put('covers_all', cols.covers_all);
   }
-  // Fenced whenever the request model was read for the check, a whole offer
-  // too: a part added after that read (the revision rewritten in place) would
-  // otherwise be covered by a price set without it (critique 4).
-  const fenced = !!coverage.rm;
-
   // An edit prices the job AS IT NOW IS: a new promise, so the same bar as a
   // new offer (W5-B) — a workshop the revised job no longer fits cannot re-price it.
+  let judged = coverage.rm;
   if (before.state === 'pending' || before.state === 'superseded') {
     // A DIRECT request's store quotes it without matching (0151).
     const live = await assertMayQuote(c.env, requestId, ctx.merchant.id);
     // …and every part it covers, as asked or with its substitution (critique 2).
-    await assertCoveredPartsMakeable(c.env, requestId, live, coverage.terms, coverage.rm);
+    judged = await assertCoveredPartsMakeable(c.env, requestId, live, coverage.terms, coverage.rm);
   }
+  // An offer that was current when it was read is edited on that revision
+  // only: a customer edit landing between the reads above (a new revision)
+  // is the stale path, with its added-parts check — never a silent re-price.
+  if (judged && !stale && judged.revision !== Number(offerRow.request_revision ?? 1)) {
+    throw conflict('The request changed while you were editing — check it and try again', 'REQUEST_CHANGED');
+  }
+  // Fenced whenever the request model was read for a check, a whole offer
+  // too — a price-only edit of a pending whole offer on a job of parts reads
+  // it for the part check: a part added after that read would otherwise be
+  // covered by a price set without it (critique 4; P1-05 review 4).
+  const fenced = !!judged;
 
   // `state IN (pending, superseded)` is in the WHERE clause, so an accepted
   // offer cannot be edited even by a request that tries; and only while its
@@ -1972,7 +2030,7 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
   let changes = 0;
   try {
     const res = await c.env.DB.batch([
-      ...(fenced ? [revisionHashFence(c.env.DB, requestId, coverage.rm!.hash)] : []),
+      ...(fenced ? [revisionHashFence(c.env.DB, requestId, judged!.hash)] : []),
       c.env.DB.prepare(
         `UPDATE community_offers
             SET ${sets.length ? `${sets.join(', ')}, ` : ''}state = 'pending', revision = revision + 1,
@@ -2067,7 +2125,10 @@ marketplaceRoutes.post('/offers/:id/send', requireCommunityOpen, requireAuth, as
   // The draft's coverage, checked again against the request as it now is (P1-05).
   const coverage = await coverageFromBody(c.env, requestId, draftCoverageBody(payload));
   const live = await assertMayOffer(c.env, requestId, ctx.merchant.id);
-  await assertCoveredPartsMakeable(c.env, requestId, live, coverage.terms, coverage.rm);
+  // Fenced on the revision the checks read, and on the one its merchant saw (P1-05 review 4).
+  const judged = await assertCoveredPartsMakeable(c.env, requestId, live, coverage.terms, coverage.rm);
+  const sendBody = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const fence = await assertSeenRevision(c.env, requestId, sendBody && typeof sendBody === 'object' ? sendBody : {}, judged);
   const quoteId = typeof payload.quote_id === 'string' ? payload.quote_id : '';
 
   const id = newId('off');
@@ -2076,15 +2137,15 @@ marketplaceRoutes.post('/offers/:id/send', requireCommunityOpen, requireAuth, as
     const res = await c.env.DB.batch([
       ...insertOfferStatements(c.env.DB, {
         id, requestId, merchantId: ctx.merchant.id, storeId: ctx.store.id, customerId: user.id, terms: t, extras: x, ts,
-        coverage: coverage.rm ? { terms: coverage.terms, hash: coverage.rm.hash } : undefined,
+        coverage: fence ? { terms: coverage.terms, hash: fence.hash } : undefined,
       }),
       ...offerFileStatements(c.env.DB, id, files, ts, null),
       // The draft goes only if the offer landed — else it stays, to be sent again.
       c.env.DB.prepare('DELETE FROM community_offer_drafts WHERE id = ? AND EXISTS (SELECT 1 FROM community_offers WHERE id = ?)').bind(draftId, id),
     ]);
-    inserted = Number(res[coverage.rm ? 1 : 0]?.meta.changes ?? 0);
+    inserted = Number(res[fence ? 1 : 0]?.meta.changes ?? 0);
   } catch (e) {
-    if (coverage.rm && isRevisionFenceAbort(e)) {
+    if (fence && isRevisionFenceAbort(e)) {
       throw conflict('The request changed while you were sending — check it and try again', 'REQUEST_CHANGED');
     }
     throw offerWriteConflict(e) ?? e;
@@ -2380,8 +2441,9 @@ async function offerMerchantStanding(env: Env, offer: Record<string, unknown>): 
   if (live && !live.verdict.eligible) return 'ineligible';
   // A JOB OF PARTS (P1-05, critique 2): the request-level verdict says «some
   // part»; the offer is fundable only when this workshop can still make
-  // EVERY part it covers — as asked, or with its substitution.
-  if (live?.request.parts?.length) {
+  // EVERY part it covers — with its substitution when it carries one, else
+  // as asked. A substitution on a one-job request is judged too (review 3).
+  if (live && coverageNeedsPartCheck(live, storedCoverage(offer))) {
     const model = await modelAtRevision(env.DB, requestId, Number(offer.request_revision ?? 1));
     if (model && uncoverableParts(live, storedCoverage(offer), model)) return 'ineligible';
   }

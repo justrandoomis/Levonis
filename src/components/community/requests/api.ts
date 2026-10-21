@@ -530,6 +530,12 @@ export interface OfferInputV2 {
   coverage?: { parts: string[] } | null;
   /** P1-05: another material or colours for a material row of a covered part. */
   substitutions?: Array<{ part_id: string; material_row_id: string; to: { material_id?: string; colors?: Array<{ hex: string; label: string }> }; note?: string }>;
+  /**
+   * P1-05 review 4: the hash of the request revision the composer rendered
+   * (`revision_hash` of the request page). A new offer is refused
+   * REQUEST_CHANGED when the request is no longer that revision.
+   */
+  expected_request_hash?: string;
 }
 
 export interface MyOfferRowV2 extends OfferV2 {
@@ -639,8 +645,12 @@ export const offersV2Api = {
   updateOffer: (offerId: string, b: Partial<OfferInputV2>) =>
     api.patch<{ success: boolean; offer: OfferV2 }>(`/api/marketplace/offers/${encodeId(offerId)}`, b),
   /** «أرسل العرض»: a draft becomes a live offer; OFFER_REQUEST_CLOSED keeps the draft when the request closed. */
-  sendOffer: (draftId: string) =>
-    api.post<{ success: boolean; offer: OfferV2 }>(`/api/marketplace/offers/${encodeId(draftId)}/send`),
+  sendOffer: (draftId: string, expectedRequestHash = '') =>
+    api.post<{ success: boolean; offer: OfferV2 }>(
+      `/api/marketplace/offers/${encodeId(draftId)}/send`,
+      // P1-05 review 4: the revision the merchant saw; none from an older page.
+      expectedRequestHash ? { expected_request_hash: expectedRequestHash } : undefined
+    ),
   /** Accept the TOTAL the card showed; a changed total or revision is OFFER_CHANGED with the fresh offer. */
   acceptOffer: (offerId: string, b: AcceptOfferBody) =>
     api.post<{ success: boolean; order: { id: string; state: string; price_iqd: number; chat_id: string | null }; escrow_id: string | null; replayed?: boolean }>(

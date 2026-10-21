@@ -316,6 +316,8 @@ export const printApi = {
       /** P1-05: absent on an older Worker. */
       model?: { parts: RequestPartV3[] } | null;
       summary?: RequestModelSummary | null;
+      /** P1-05 review 4: the revision these parts belong to — an offer sends it back. */
+      revision_hash?: string;
     }>(`${BASE}/requests/${requestId}`),
 
   viewerToken: (requestId: string, fileId: string) =>

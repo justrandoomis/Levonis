@@ -55,7 +55,30 @@ export interface BoardRequest {
   my_offer: 'pending' | 'superseded' | 'accepted' | null;
   /** P1-05: false when the range sums only the parts that could be priced. Absent on an older Worker. */
   estimate_complete?: boolean;
-  summary?: { parts_count: number; pieces_per_set: number; review_state: string } | null;
+  /**
+   * P1-05: the parts, pieces a set and review; and (review 3) the materials
+   * and technologies the parts chose, which a job in several of them names
+   * where its v1 row says «open». Absent on an older Worker.
+   */
+  summary?: { parts_count: number; pieces_per_set: number; review_state: string; materials?: string[]; processes?: Array<'fdm' | 'resin'> } | null;
+}
+
+/**
+ * WHAT A BOARD CARD NAMES (P1-05 review 3): the technologies and materials of
+ * the parts when the row carries them, else the one process and material
+ * of the v1 row. `anyTechnology` is said when no technology is named, or when a
+ * part was left open beside a named one (the v1 row is open while the parts
+ * named only one).
+ */
+export function boardJobFacts(r: Pick<BoardRequest, 'process' | 'material_id' | 'summary'>): {
+  processes: Array<'fdm' | 'resin'>;
+  materials: string[];
+  anyTechnology: boolean;
+} {
+  const named = r.summary?.processes?.filter((x) => x === 'fdm' || x === 'resin') ?? [];
+  const processes = named.length ? named : r.process ? [r.process] : [];
+  const materials = r.summary?.materials?.length ? r.summary.materials : r.material_id ? [r.material_id] : [];
+  return { processes, materials, anyTechnology: !processes.length || (!r.process && processes.length === 1) };
 }
 
 export interface BoardPage {

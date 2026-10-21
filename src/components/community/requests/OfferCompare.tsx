@@ -43,14 +43,20 @@ import {
   bestOffers,
   coverageOf,
   isPartialOffer,
+  listSep,
   offerIsLive,
   partName,
+  partialAckReady,
   partialLabel,
   sortOffers,
   substitutesSomething,
+  substitutionPieces,
+  readerDir,
   type OfferSort,
   type PartRef,
 } from './offerParts';
+import { localMaterial } from './mirrors';
+import { SubstitutionText } from './SubstitutionText';
 
 type Sort = OfferSort;
 
@@ -79,10 +85,8 @@ export default function OfferCompare({ requestId, offers, takingOffers, material
   const [accepting, setAccepting] = useState<OfferV2 | null>(null);
   const [historyOf, setHistoryOf] = useState<OfferV2 | null>(null);
 
-  const matName = (id: string) => {
-    const m = materials.find((x) => x.id === id);
-    return m ? (L === 'en' ? m.name_en : m.name_ar || m.name_en) : id;
-  };
+  // The catalogue name in the reader language: Sorani from the seed, never the Arabic standing in (P1-05 review 3).
+  const matName = (id: string) => localMaterial(id, L, materials) || id;
 
   const sorted = useMemo(() => sortOffers(offers, sort), [offers, sort]);
   const best = useMemo(() => bestOffers(offers), [offers]);
@@ -146,6 +150,7 @@ export default function OfferCompare({ requestId, offers, takingOffers, material
             s={s}
             lang={L}
             matName={matName}
+            materials={materials}
             parts={parts}
             canAct={takingOffers && offerIsLive(o)}
             onAccept={() => setAccepting(o)}
@@ -163,13 +168,15 @@ export default function OfferCompare({ requestId, offers, takingOffers, material
           <h3 id="offer-compare-title" className="px-4 pt-3 text-[13px] font-bold text-text-primary">
             {s.compare}
           </h3>
-          {offers.some(isPartialOffer) && <p className="px-4 pt-1 text-[11.5px] text-text-muted" data-compare-complete-only>{s.partialCompareNote}</p>}
+          {/* Only when the picks really left a live partial offer out (P1-05 review 3). */}
+          {best.completeOnly && <p className="px-4 pt-1 text-[11.5px] text-text-muted" data-compare-complete-only>{s.partialCompareNote}</p>}
           <dl className="divide-y divide-border-subtle/60 px-4 pb-1 pt-1">
-            <CompareRow label={s.cheapest} o={best.cheapest} value={best.cheapest ? <Money iqd={best.cheapest.total_iqd} /> : null} />
-            <CompareRow label={s.fastest} o={best.fastest} value={best.fastest ? daysLabel(best.fastest.completion_days, L) : null} />
+            <CompareRow label={s.cheapest} o={best.cheapest} partial={best.cheapest ? partialLabel(best.cheapest, parts.length, s) : ''} value={best.cheapest ? <Money iqd={best.cheapest.total_iqd} /> : null} />
+            <CompareRow label={s.fastest} o={best.fastest} partial={best.fastest ? partialLabel(best.fastest, parts.length, s) : ''} value={best.fastest ? daysLabel(best.fastest.completion_days, L) : null} />
             <CompareRow
               label={s.topRated}
               o={best.topRated}
+              partial={best.topRated ? partialLabel(best.topRated, parts.length, s) : ''}
               value={
                 best.topRated ? (
                   <span className="inline-flex items-center gap-1 tabular-nums">
@@ -188,7 +195,7 @@ export default function OfferCompare({ requestId, offers, takingOffers, material
       <AcceptSheet
         offer={accepting}
         parts={parts}
-        matName={matName}
+        materials={materials}
         onClose={() => setAccepting(null)}
         onAccepted={(o) => {
           setAccepting(null);
@@ -203,23 +210,34 @@ export default function OfferCompare({ requestId, offers, takingOffers, material
   );
 }
 
-function CompareRow({ label, o, value }: { label: string; o: OfferV2 | null; value: ReactNode }) {
+function CompareRow({ label, o, value, partial = '' }: { label: string; o: OfferV2 | null; value: ReactNode; partial?: string }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2 text-[12.5px]" data-compare-row>
       <dt className="shrink-0 text-text-muted">{label}</dt>
       <dd className="flex min-w-0 items-center gap-2 text-end text-text-primary">
         {o && <bdi className="truncate font-semibold">{o.merchant?.name ?? '—'}</bdi>}
+        {/* A pick from the partial pool says it makes only some parts. */}
+        {o && partial && (
+          <span className="shrink-0" data-compare-partial>
+            <StatusChip tone="warning">{partial}</StatusChip>
+          </span>
+        )}
         <span className="shrink-0 tabular-nums">{value ?? '—'}</span>
       </dd>
     </div>
   );
 }
 
-function Row({ k, children }: { k: string; children: ReactNode }) {
+/**
+ * A fact of the offer. `dir="auto"` is for what the merchant typed; a line the
+ * screen writes itself (a substitution) passes the direction of the reader, so a
+ * Latin material name at its start does not turn the sentence around.
+ */
+function Row({ k, children, dir = 'auto' }: { k: string; children: ReactNode; dir?: 'auto' | 'ltr' | 'rtl' }) {
   return (
     <div className="flex items-start justify-between gap-3 py-2">
       <dt className="shrink-0 text-[12px] text-text-muted">{k}</dt>
-      <dd className="min-w-0 break-words text-end text-[12.5px] text-text-primary" dir="auto">
+      <dd className="min-w-0 break-words text-end text-[12.5px] text-text-primary" dir={dir}>
         {children}
       </dd>
     </div>
@@ -265,21 +283,12 @@ export function Breakdown({ o, s }: { o: Pick<OfferV2, 'price_iqd' | 'delivery_f
   );
 }
 
-/** «PETG بدل TPU (المقبض)» — each substitution in the words of the reader. */
-function substitutionLines(o: OfferV2, parts: PartRef[], matName: (id: string) => string, s: RequestStrings): string[] {
-  const colours = (cs: Array<{ hex: string; label: string }>) => cs.map((c) => c.label || c.hex).filter(Boolean).join('، ');
-  return (o.substitutions ?? []).map((x) => {
-    const side = (v: { material_id: string; colors: Array<{ hex: string; label: string }> }) =>
-      [matName(v.material_id), colours(v.colors)].filter(Boolean).join(' ');
-    return fill(s.substitutionRow, { to: side(x.to), from: side(x.from), part: partName(parts.find((p) => p.id === x.part_id), s) || '—' });
-  });
-}
-
 function OfferColumn({
   o,
   s,
   lang,
   matName,
+  materials,
   parts,
   canAct,
   onAccept,
@@ -291,6 +300,7 @@ function OfferColumn({
   s: RequestStrings;
   lang: RequestLang;
   matName: (id: string) => string;
+  materials: CatalogMaterial[];
   parts: PartRef[];
   canAct: boolean;
   onAccept: () => void;
@@ -301,12 +311,12 @@ function OfferColumn({
   const m = o.merchant;
   const partial = partialLabel(o, parts.length, s);
   const { covered, uncovered } = coverageOf(o, parts);
-  const subs = substitutionLines(o, parts, matName, s);
+  const subs = substitutionPieces(o, parts, s, lang, materials);
   const st = offerStateWords(o, s);
   const history = o.history ?? [];
   const prev = history.length > 1 ? history[history.length - 2] : null;
   const until = shortDay(o.valid_until ?? o.expires_at, lang);
-  const sep = lang === 'en' ? ', ' : '، ';
+  const sep = listSep(lang);
   return (
     <article
       className="lv-surface flex w-[85%] shrink-0 snap-start flex-col p-4 sm:w-auto"
@@ -383,10 +393,10 @@ function OfferColumn({
           </Row>
         )}
         {subs.length > 0 && (
-          <Row k={s.substitutesLabel}>
-            {subs.map((line) => (
-              <span key={line} className="block" data-offer-substitution>
-                {line}
+          <Row k={s.substitutesLabel} dir={readerDir(lang)}>
+            {subs.map((x) => (
+              <span key={x.line} className="block" data-offer-substitution>
+                <SubstitutionText x={x} s={s} />
               </span>
             ))}
           </Row>
@@ -497,14 +507,14 @@ type Notice = { code: 'OFFER_CHANGED' | 'OFFER_STALE' | 'OFFER_SUBSTITUTION_UNAC
 function AcceptSheet({
   offer,
   parts,
-  matName,
+  materials,
   onClose,
   onAccepted,
   onRefresh,
 }: {
   offer: OfferV2 | null;
   parts: PartRef[];
-  matName: (id: string) => string;
+  materials: CatalogMaterial[];
   onClose: () => void;
   onAccepted: (o: OfferV2) => void;
   onRefresh: () => void;
@@ -598,10 +608,12 @@ function AcceptSheet({
   const stale = notice?.code === 'OFFER_STALE';
   const needsPartial = !!o && isPartialOffer(o);
   const needsSubs = !!o && substitutesSomething(o);
-  const acknowledged = (!needsPartial || ackPartial) && (!needsSubs || ackSubs);
-  const sep = L === 'en' ? ', ' : '، ';
-  const uncoveredNames = o ? coverageOf(o, parts).uncovered.map((p) => partName(p, s)).join(sep) : '';
-  const subs = o ? substitutionLines(o, parts, matName, s) : [];
+  // A partial offer is acknowledged against the parts it leaves out, named —
+  // never «—» while the parts of the request have not loaded (P1-05 review 3).
+  const partsReady = !o || partialAckReady(o, parts);
+  const acknowledged = (!needsPartial || (partsReady && ackPartial)) && (!needsSubs || ackSubs);
+  const uncoveredNames = o ? coverageOf(o, parts).uncovered.map((p) => partName(p, s)).join(listSep(L)) : '';
+  const subs = o ? substitutionPieces(o, parts, s, L, materials) : [];
   return (
     <Sheet
       open={!!offer}
@@ -668,14 +680,22 @@ function AcceptSheet({
           </div>
           {subs.length > 0 && (
             <ul className="space-y-1 rounded-lg bg-surface-raised px-3.5 py-2.5 text-[12.5px] text-text-primary" aria-label={s.substitutesLabel} data-accept-substitutions>
-              {subs.map((line) => (
-                <li key={line} dir="auto">{line}</li>
+              {subs.map((x) => (
+                <li key={x.line} dir={readerDir(L)}>
+                  <SubstitutionText x={x} s={s} />
+                </li>
               ))}
             </ul>
           )}
           {needsSubs && <Checkbox checked={ackSubs} onChange={setAckSubs} label={s.ackSubstitutions} data-accept-ack="substitutions" />}
-          {needsPartial && (
-            <Checkbox checked={ackPartial} onChange={setAckPartial} label={fill(s.ackPartial, { parts: uncoveredNames || '—' })} data-accept-ack="partial" />
+          {needsPartial && partsReady && (
+            <Checkbox checked={ackPartial} onChange={setAckPartial} label={fill(s.ackPartial, { parts: uncoveredNames })} data-accept-ack="partial" />
+          )}
+          {needsPartial && !partsReady && (
+            <p className="flex items-start gap-2 text-[12px] leading-relaxed text-warning" role="status" data-accept-parts-missing>
+              <AlertTriangle aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {s.partsNotLoaded}
+            </p>
           )}
           <p>{s.heldExplain}</p>
           {o.delivery_method !== 'pickup' && (

@@ -2500,7 +2500,10 @@ export function apiRefusal(err: unknown, lang: Lang, fallback = ''): string {
   const message = e && typeof e.message === 'string' && e.message ? e.message : fallback;
   const counted = stockRefusal(err, lang);
   if (counted) return counted;
-  const text = refusalText(code, lang, message || fallback);
+  // P1-05 review 4: the part can be made as asked; the substitute is what this workshop cannot make.
+  const text = code === 'OFFER_PART_NOT_ELIGIBLE' && (err as { details?: { substitute?: unknown } } | null)?.details?.substitute === true
+    ? SUBSTITUTE_NOT_ELIGIBLE[lang]
+    : refusalText(code, lang, message || fallback);
   // A sentence written for a named field never reaches a screen with «{field}» in it (the FX panel
   // answers PRICING_INPUT_INVALID {field:'rate'} through here): the sentence without a name instead.
   if (text.includes('{field}')) return FIELD_GENERIC[lang];
@@ -2511,6 +2514,17 @@ export function apiRefusal(err: unknown, lang: Lang, fallback = ''): string {
   }
   return text;
 }
+
+/**
+ * OFFER_PART_NOT_ELIGIBLE with `details.substitute` (P1-05 review 4): the part
+ * could be made as asked, so «remove it from the offer» is the wrong advice —
+ * on a one-part job there is nothing to untick. The remedy is the substitute.
+ */
+const SUBSTITUTE_NOT_ELIGIBLE: Record<Lang, string> = {
+  ar: 'طابعات ورشتك لا تصنع البديل المقترح لهذه القطعة — اختر مادة تشغّلها طابعاتك أو أزل البديل.',
+  en: 'Your printers cannot make the substitute proposed for this part — choose a material your printers run, or remove the substitute.',
+  ckb: 'پرینتەرەکانی وۆرکشۆپەکەت ناتوانن ئەو جێگرەوەیە دروست بکەن کە بۆ ئەم پارچەیە پێشنیارت کردووە — ماددەیەک هەڵبژێرە کە پرینتەرەکانت کاری پێ دەکەن، یان جێگرەوەکە لاببە.',
+};
 
 /** The refusals that arrive with `{part_id, position}` (P1-05). */
 const PART_CODES = new Set(['PART_PROCESS_MIXED', 'PART_RESIN_MULTI_MATERIAL', 'PART_MATERIAL_UNKNOWN', 'OFFER_PART_NOT_ELIGIBLE']);

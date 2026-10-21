@@ -170,6 +170,13 @@ export function pricesAsOneJob(m: Pick<ModelState, 'parts'>): boolean {
  * request that no part is measured from, an original (role `source`, Q5)
  * aside — it is never what the public job is priced on. For a v1 request
  * this is «the model files beside the primary one». Read, never stored.
+ *
+ * ONE RULE FOR EVERY READER (P1-05 review 3): a ONE-JOB estimate (the v1
+ * call, `pricesAsOneJob`) is priced on the mirror's `primary_file_id`, which
+ * the caller passes as `extraPriced` — for a part with no measured file that
+ * is the model file named as the main source. A job priced part by part
+ * priced only its parts' measured files. The list reads the same rule in SQL
+ * (`pricedPrimarySql`).
  */
 export function modelsUnpriced(
   m: Pick<ModelState, 'parts' | 'sources'>,
@@ -179,6 +186,31 @@ export function modelsUnpriced(
   const measured = new Set([...m.parts.map((p) => p.measured_file_id).filter((x): x is string => !!x), ...extraPriced]);
   const originals = new Set(m.sources.filter((x) => x.role === 'source' && x.file_id).map((x) => String(x.file_id)));
   return files.filter((f) => f.kind === 'model' && !measured.has(f.id) && !originals.has(f.id)).length;
+}
+
+/** The stored estimate was priced part by part: it says what it covers. Any other is the one-job v1 call. */
+export function pricedByParts(estimate: unknown): boolean {
+  let e: unknown = estimate;
+  if (typeof estimate === 'string') {
+    try {
+      e = JSON.parse(estimate);
+    } catch {
+      return false;
+    }
+  }
+  const coverage = e && typeof e === 'object' ? (e as Record<string, unknown>).coverage : undefined;
+  return !!coverage && typeof coverage === 'object' && !Array.isArray(coverage);
+}
+
+/**
+ * The same, in SQL, for a list that joins the print row as `alias`: 1 when
+ * its `primary_file_id` is the file the estimate priced — a row that is not
+ * an effective version-3 row, or whose estimate carries no coverage.
+ */
+export function pricedPrimarySql(alias: string, v3Sql: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]{0,40}$/.test(alias)) throw new Error('requestEstimate: invalid SQL alias');
+  const byParts = `(CASE WHEN json_valid(${alias}.estimate) THEN json_type(${alias}.estimate, '$.coverage') END) = 'object'`;
+  return `NOT COALESCE((${v3Sql}) AND ${byParts}, 0)`;
 }
 
 // --------------------------------------------------- a job, part by part

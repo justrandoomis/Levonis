@@ -32,6 +32,8 @@ import type { EstimateCoverage } from '../../lib/printEstimate';
 export interface PrintModelExtra {
   parts: RequestPartV3[];
   summary: RequestModelSummary | null;
+  /** P1-05 review 4: the revision these parts belong to (empty from an older Worker); an offer sends it back. */
+  revisionHash: string;
 }
 
 /**
@@ -77,7 +79,7 @@ export default function PrintSummary({
 }) {
   const { loc, lang } = useLanguage();
   const rs = useRequestStrings();
-  const [extra, setExtra] = useState<PrintModelExtra>({ parts: [], summary: null });
+  const [extra, setExtra] = useState<PrintModelExtra>({ parts: [], summary: null, revisionHash: '' });
   const { isAuthenticated } = useAuth();
   const { signIn } = useSignInPrompt();
   const ar = lang === 'ar' || lang === 'ckb';
@@ -92,7 +94,7 @@ export default function PrintSummary({
       .facts(requestId)
       .then((d) => {
         if (!alive) return;
-        const more: PrintModelExtra = { parts: d.model?.parts ?? [], summary: d.summary ?? null };
+        const more: PrintModelExtra = { parts: d.model?.parts ?? [], summary: d.summary ?? null, revisionHash: d.revision_hash ?? '' };
         setFacts(d.print);
         setExtra(more);
         setState(d.print ? 'ready' : 'none');

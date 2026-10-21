@@ -130,9 +130,10 @@ substituted offer needs the customer's acknowledgement, and its edit and
 «send draft» ignore an offer's coverage. The script turns every such open
 offer (`pending` or `superseded`) `withdrawn` (terminal in every build: no
 edit, re-confirm or acceptance re-opens it, so it is never funded as the whole
-job) and deletes every draft that carries a coverage or a substitution. The
-merchant makes a new offer instead; a withdrawn offer is not re-opened after
-rolling forward.
+job), recounts the advertised `offer_count` of every request it withdrew an
+offer on (so the board stops showing offers that are gone), and deletes every
+draft that carries a coverage or a substitution. The merchant makes a new
+offer instead; a withdrawn offer is not re-opened after rolling forward.
 
 ### Deleting a workflow breaks `npm run check`
 

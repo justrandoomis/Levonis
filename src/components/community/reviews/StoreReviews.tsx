@@ -101,7 +101,8 @@ export function StoreReviewCard({ item, onDone }: { item: EligibleReview; onDone
     if (!files?.length || uploading) return;
     setPhotoError('');
     const room = MAX_PHOTOS - photos.length;
-    const list = [...files].slice(0, Math.max(0, room));
+    // Array.from, not a spread: the tests typecheck (no DOM.Iterable) reads this page through the request page.
+    const list = Array.from(files).slice(0, Math.max(0, room));
     if (!list.length) return;
     setUploading(true);
     try {

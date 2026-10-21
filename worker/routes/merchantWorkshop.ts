@@ -50,7 +50,7 @@ import {
 } from './printQuote';
 import { liveVerdict, merchantRematchPending, rematchNow, MATCH_ENGINE } from '../lib/printMatchingStore';
 import { fileReadStatement, fileReader } from '../lib/requestFilePolicy';
-import { boardSummaryOf, boardSummarySql, fileSourceRoles, readRequestModel } from '../lib/requestModel';
+import { boardFilterSql, boardSummaryOf, boardSummarySql, fileSourceRoles, readRequestModel } from '../lib/requestModel';
 
 export const merchantWorkshopRoutes = new Hono<AppContext>();
 merchantWorkshopRoutes.use('*', requireAuth);
@@ -81,7 +81,9 @@ function readCursor(raw: string | undefined): { at: string; id: string } | null 
  * custom requests) gets an empty list and the reason, not a stale one.
  *
  * Filters: `process` (fdm|resin — a request whose customer was unsure of the
- * process is in both), `material` (a catalogue id), `governorate` (an id).
+ * process is in both), `material` (a catalogue id), `governorate` (an id). A
+ * job of parts is matched on its parts (`boardFilterSql`): a job in PLA and
+ * TPU is found by either, a job in FDM and resin by either (P1-05 review 3).
  */
 merchantWorkshopRoutes.get('/board', async (c) => {
   const user = c.get('user')!;
@@ -152,8 +154,7 @@ merchantWorkshopRoutes.get('/board', async (c) => {
         AND r.state IN ('open','receiving_offers') AND r.visibility = 'public'
         AND (r.expires_at IS NULL OR r.expires_at = '' OR r.expires_at > ?3)
         AND r.customer_id <> ?4
-        AND (?5 = '' OR COALESCE(p.process_unsure, 0) = 1 OR p.process = ?5)
-        AND (?6 = '' OR (p.material_id = ?6 AND COALESCE(p.material_unsure, 0) = 0))
+        ${boardFilterSql('p', withRoles, '?5', '?6')}
         AND (?7 = '' OR r.governorate = ?7)
         AND (?8 = '' OR COALESCE(r.published_at, r.created_at) < ?8
              OR (COALESCE(r.published_at, r.created_at) = ?8 AND r.id < ?9))

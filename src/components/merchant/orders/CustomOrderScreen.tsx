@@ -38,6 +38,8 @@ import { formatDate } from '../../orders/format';
 import OrderContactCard from '../../community/offers/OrderContactCard';
 import OrderTimeline from '../../community/requests/OrderTimeline';
 import { deliveredConsequence, fill, ordersLang, useCustomOrderStrings, type CustomOrderStrings } from './strings';
+import { localColour, localMaterial, type MaterialLike } from '../../community/requests/mirrors';
+import { requestsApi } from '../../community/requests/api';
 
 /** The order as GET /api/marketplace/orders/:id answers it, the fields this screen reads. */
 export interface CustomOrderView {
@@ -60,9 +62,37 @@ export interface CustomOrderView {
    * out and each substitution — from the request snapshot of the order; null for
    * an order of one job made as asked.
    */
-  agreement: { parts: string[]; uncovered: string[]; substitutions: Array<{ part: string; from: string; to: string }> } | null;
+  agreement: { parts: AgreedPart[]; uncovered: AgreedPart[]; substitutions: Array<{ part: AgreedPart; from: AgreedSide; to: AgreedSide }> } | null;
   escrow: { merchant_receivable_iqd: number | null; platform_fee_iqd: number | null } | null;
   can: { start_work: boolean; mark_delivered: boolean; cancel: boolean; dispute: boolean };
+}
+
+/** A part of the agreement: its name (empty when the customer gave none) and its place, from 1. */
+export interface AgreedPart {
+  name: string;
+  n: number;
+}
+
+/** A part as the screen names it: its name, else «Part n» in the reader language (never «#n»). */
+export const agreedPartName = (p: AgreedPart, s: Pick<CustomOrderStrings, 'partN'>): string => p.name || fill(s.partN, { n: p.n });
+
+/** One side of a substitution as the snapshot keeps it: a catalogue id and its colours. */
+export interface AgreedSide {
+  material_id: string;
+  colors: Array<{ hex: string; label: string }>;
+}
+
+/**
+ * A side in the reader language (P1-05 review 3): the catalogue name (Sorani
+ * from the seed catalogue, never the raw upper-case id), the palette colours
+ * by name, the language list separator. `catalogue` names a material the
+ * owner added beyond the seed (review 4); without it such a material reads as
+ * its id.
+ */
+export function agreementSide(v: AgreedSide, lang: string, catalogue: readonly MaterialLike[] = []): string {
+  const L = ordersLang(lang);
+  const colours = v.colors.map((c) => localColour(c.label || c.hex, L)).filter(Boolean).join(L === 'en' ? ', ' : '، ');
+  return [localMaterial(v.material_id, L, catalogue), colours].filter(Boolean).join(' ');
 }
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : null);
@@ -102,16 +132,16 @@ export function readCustomOrder(d: { order: Record<string, unknown>; escrow: Rec
   };
 }
 
-/** The agreement in the snapshot, as names and lines (a part without a name is «#n»). */
+/** The agreement in the snapshot, as parts and lines (a part without a name is named by its place on screen). */
 export function readAgreement(raw: unknown): CustomOrderView['agreement'] {
   if (!raw || typeof raw !== 'object') return null;
   const a = raw as Record<string, unknown>;
   const list = (v: unknown) => (Array.isArray(v) ? (v as Array<Record<string, unknown>>) : []);
-  const nameOf = (p: Record<string, unknown>) => text(p.name).trim() || `#${(num(p.position) ?? 0) + 1}`;
+  const nameOf = (p: Record<string, unknown>): AgreedPart => ({ name: text(p.name).trim(), n: (num(p.position) ?? 0) + 1 });
   const parts = list(a.parts);
-  const side = (v: unknown) => {
+  const side = (v: unknown): AgreedSide => {
     const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
-    return [text(o.material_id).toUpperCase(), list(o.colors).map((c) => text(c.label) || text(c.hex)).filter(Boolean).join(' ')].filter(Boolean).join(' ');
+    return { material_id: text(o.material_id), colors: list(o.colors).map((c) => ({ hex: text(c.hex), label: text(c.label) })).filter((c) => c.hex || c.label) };
   };
   const out = {
     parts: parts.map(nameOf),
@@ -160,6 +190,21 @@ export default function CustomOrderScreen({ id, onBack, onChanged }: { id: strin
   const [problem, setProblem] = useState('');
   // A move made here («ابدأ العمل», «سلّمت العمل») is a row on the timeline too.
   const [moves, setMoves] = useState(0);
+  // The catalogue names a substituted material the owner added beyond the seed (review 4):
+  // read only when the agreement substitutes something.
+  const [catalogue, setCatalogue] = useState<MaterialLike[]>([]);
+  const substitutes = !!order?.agreement?.substitutions.length;
+  useEffect(() => {
+    if (!substitutes) return;
+    let alive = true;
+    requestsApi
+      .catalog()
+      .then((c) => alive && setCatalogue(c.materials))
+      .catch(() => alive && setCatalogue([]));
+    return () => {
+      alive = false;
+    };
+  }, [substitutes]);
 
   const load = useCallback(() => {
     setError(null);
@@ -278,9 +323,13 @@ export default function CustomOrderScreen({ id, onBack, onChanged }: { id: strin
   if (order.snapshot.color) facts.push(`${s.color}: ${order.snapshot.color}`);
   if (deliveryWords[order.delivery_method]) facts.push(deliveryWords[order.delivery_method]);
   const agreed = order.agreement;
-  if (agreed && agreed.parts.length > 1) facts.push(`${s.agreedParts}: ${agreed.parts.join('، ')}`);
-  if (agreed?.uncovered.length) facts.push(`${s.notIncluded}: ${agreed.uncovered.join('، ')}`);
-  for (const x of agreed?.substitutions ?? []) facts.push(fill(s.instead, { to: x.to, from: x.from, part: x.part }));
+  const sep = ordersLang(lang) === 'en' ? ', ' : '، ';
+  const named = (ps: AgreedPart[]) => ps.map((p) => agreedPartName(p, s)).join(sep);
+  if (agreed && agreed.parts.length > 1) facts.push(`${s.agreedParts}: ${named(agreed.parts)}`);
+  if (agreed?.uncovered.length) facts.push(`${s.notIncluded}: ${named(agreed.uncovered)}`);
+  for (const x of agreed?.substitutions ?? []) {
+    facts.push(fill(s.instead, { to: agreementSide(x.to, lang, catalogue), from: agreementSide(x.from, lang, catalogue), part: agreedPartName(x.part, s) }));
+  }
   const ready = !!order.ready_at && order.state === 'in_progress';
 
   return (

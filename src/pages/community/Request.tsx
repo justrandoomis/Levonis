@@ -46,7 +46,8 @@ import { printApi } from '../../lib/printApi';
 import { formatDate } from '../../components/orders/format';
 import { AttachmentList, type RequestFile } from '../../components/media/RequestAttachments';
 import PrintSummary, { type PrintModelExtra } from '../../components/print/PrintSummary';
-import { coverageOf, isPartialOffer, partName, type PartRef } from '../../components/community/requests/offerParts';
+import { coverageOf, isPartialOffer, listSep, partialLabel, partName, readerDir, substitutionPieces, type PartRef } from '../../components/community/requests/offerParts';
+import { SubstitutionText } from '../../components/community/requests/SubstitutionText';
 import { SourceLinkCard } from '../../components/community/links/LinkCard';
 import { localColour, localMaterial } from '../../components/community/requests/mirrors';
 import ConfirmSheet from '../../components/print/ConfirmSheet';
@@ -318,7 +319,7 @@ export function RequestDetail({
   /** The model link a link request is about (R1) — from the print summary, drawn as its card here and above the offer. */
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   /** P1-05: the parts and summary of the job, read by the print summary and shared with the offers. */
-  const [modelExtra, setModelExtra] = useState<PrintModelExtra>({ parts: [], summary: null });
+  const [modelExtra, setModelExtra] = useState<PrintModelExtra>({ parts: [], summary: null, revisionHash: '' });
   const partRefs = useMemo(() => modelExtra.parts.map((p) => ({ id: p.id, name: p.name, position: p.position })), [modelExtra.parts]);
   const [publishing, setPublishing] = useState(false);
   const [draftError, setDraftError] = useState('');
@@ -798,6 +799,7 @@ export function RequestDetail({
                 defaultQuantity={current.quantity}
                 deliveryPref={current.delivery_pref}
                 parts={modelExtra.parts}
+                requestHash={modelExtra.revisionHash}
                 onChanged={load}
                 prefill={prefill}
                 onPrefillDone={() => setPrefill(null)}
@@ -990,7 +992,7 @@ function useOrderView(
   return { view, timeline, timelineFailed, retryTimeline };
 }
 
-function AcceptedOffer({
+export function AcceptedOffer({
   o,
   s,
   lang,
@@ -1009,25 +1011,15 @@ function AcceptedOffer({
   /** P1-05: the parts of the job, to name what the agreement covers. */
   parts?: PartRef[];
 }) {
-  const sep = lang === 'en' ? ', ' : '، ';
-  const matName = (id: string) => {
-    const mm = materials.find((x) => x.id === id);
-    return mm ? (lang === 'en' ? mm.name_en : mm.name_ar || mm.name_en) : id;
-  };
+  const sep = listSep(lang);
   const { covered, uncovered } = coverageOf(o, parts);
-  const subLines = (o.substitutions ?? []).map((x) =>
-    fill(s.substitutionRow, {
-      to: [matName(x.to.material_id), x.to.colors.map((c) => c.label || c.hex).join(sep)].filter(Boolean).join(' '),
-      from: [matName(x.from.material_id), x.from.colors.map((c) => c.label || c.hex).join(sep)].filter(Boolean).join(' '),
-      part: partName(parts.find((p) => p.id === x.part_id), s) || '—',
-    })
-  );
-  const names = o.material_ids
-    .map((id) => {
-      const mm = materials.find((x) => x.id === id);
-      return mm ? (lang === 'en' ? mm.name_en : mm.name_ar || mm.name_en) : id;
-    })
-    .join(lang === 'en' ? ', ' : '، ');
+  // The agreement in the reader language (P1-05 review 3): catalogue names through localMaterial, palette colours by name.
+  const subs = substitutionPieces(o, parts, s, lang, materials);
+  // PARTIAL WHATEVER LOADED (P1-05 review 4): the chip comes from the offer
+  // itself — «جزئي» bare until the parts arrive, then with its count — so a
+  // failed or slow read of the parts never shows a partial order as the whole job.
+  const partial = partialLabel(o, parts.length, s);
+  const names = o.material_ids.map((id) => localMaterial(id, lang, materials) || id).join(sep);
   const facts: Array<[string, ReactNode]> = [
     [s.completion, o.completion_days ? daysLabel(o.completion_days, lang) : '—'],
     [s.handover, handoverLabel(o.delivery_method, s)],
@@ -1040,7 +1032,18 @@ function AcceptedOffer({
   if (o.terms) facts.push([s.terms, <bdi key="t">{o.terms}</bdi>]);
   // THE AGREEMENT (P1-05): the parts as agreed, the substitutes, and what was left out.
   if (parts.length > 1) facts.push([s.agreedParts, covered.map((p) => partName(p, s)).join(sep) || '—']);
-  if (subLines.length) facts.push([s.substitutesLabel, <span key="subs" data-accepted-substitutions>{subLines.map((l) => <span key={l} className="block">{l}</span>)}</span>]);
+  if (subs.length) {
+    facts.push([
+      s.substitutesLabel,
+      <span key="subs" dir={readerDir(lang)} className="block" data-accepted-substitutions>
+        {subs.map((x) => (
+          <span key={x.line} className="block">
+            <SubstitutionText x={x} s={s} />
+          </span>
+        ))}
+      </span>,
+    ]);
+  }
   return (
     <div className="lv-surface p-4" data-accepted-offer={o.id}>
       <div className="flex items-start justify-between gap-3">
@@ -1050,7 +1053,14 @@ function AcceptedOffer({
           </p>
           <p className="text-[12px] text-text-muted">{fill(s.version, { n: o.revision })}</p>
         </div>
-        {orderState && <StatusChip tone={orderState === 'completed' ? 'success' : orderState === 'disputed' ? 'danger' : 'info'}>{orderStateWord(orderState, s)}</StatusChip>}
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          {orderState && <StatusChip tone={orderState === 'completed' ? 'success' : orderState === 'disputed' ? 'danger' : 'info'}>{orderStateWord(orderState, s)}</StatusChip>}
+          {partial && (
+            <span data-accepted-partial>
+              <StatusChip tone="warning">{partial}</StatusChip>
+            </span>
+          )}
+        </div>
       </div>
       <p className="mt-2 text-[20px] font-bold text-text-primary" data-offer-total={o.total_iqd ?? ''}>
         <Money iqd={o.total_iqd} />

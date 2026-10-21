@@ -26,9 +26,20 @@ export interface ComposerSub {
   part_id: string;
   material_row_id: string;
   material_id: string;
+  /** The colour field as the merchant reads it: empty = the colours as asked. */
   colour: string;
   note: string;
+  /**
+   * The colours a stored offer proposed (hex and label), kept so an edit
+   * sends them back unchanged while the field still reads them (P1-05 review
+   * 3): one or more palette colours never turn into a single label with no
+   * hex. Absent for a colour the merchant types.
+   */
+  colors?: Array<{ hex: string; label: string }>;
 }
+
+/** The words of the colour field for stored colours: each label (or hex), space-separated. */
+export const colourFieldText = (colors: Array<{ hex: string; label: string }>): string => colors.map((c) => c.label || c.hex).join(' ');
 
 export interface PartsValue {
   /** null = every part. */
@@ -116,7 +127,7 @@ export default function OfferPartsField({
                   const substitutable = !row.material_unsure && !!row.material_id;
                   if (!substitutable) return null;
                   const sub = subOf(p.id, row.id);
-                  const asked = [localMaterial(row.material_id, lang), named.map((c) => localColour(c.label || c.hex, lang) || c.hex).join(sep)].filter(Boolean).join(' · ');
+                  const asked = [localMaterial(row.material_id, lang, materials), named.map((c) => localColour(c.label || c.hex, lang) || c.hex).join(sep)].filter(Boolean).join(' · ');
                   const sameProcess = materials.filter((m) => {
                     const from = materials.find((x) => x.id === row.material_id);
                     return !from || m.process === from.process;
@@ -140,7 +151,7 @@ export default function OfferPartsField({
                           >
                             {sameProcess.map((m) => (
                               <option key={m.id} value={m.id}>
-                                {lang === 'en' ? m.name_en : m.name_ar || m.name_en}
+                                {localMaterial(m.id, lang, materials)}
                               </option>
                             ))}
                           </select>
@@ -198,12 +209,17 @@ export default function OfferPartsField({
  * exactly what it always did.
  */
 export function partsBody(v: PartsValue, opts: { clear: boolean }): { coverage?: { parts: string[] } | null; substitutions?: Array<{ part_id: string; material_row_id: string; to: { material_id?: string; colors?: Array<{ hex: string; label: string }> }; note?: string }> } {
-  const subs = v.subs.map((x) => ({
-    part_id: x.part_id,
-    material_row_id: x.material_row_id,
-    to: { material_id: x.material_id, ...(x.colour.trim() ? { colors: [{ hex: '', label: x.colour.trim() }] } : {}) },
-    ...(x.note.trim() ? { note: x.note.trim() } : {}),
-  }));
+  const subs = v.subs.map((x) => {
+    const typed = x.colour.trim();
+    // The stored colours, unchanged, while the field still reads them; a typed colour by its words.
+    const colors = x.colors?.length && typed === colourFieldText(x.colors).trim() ? x.colors : typed ? [{ hex: '', label: typed }] : null;
+    return {
+      part_id: x.part_id,
+      material_row_id: x.material_row_id,
+      to: { material_id: x.material_id, ...(colors ? { colors } : {}) },
+      ...(x.note.trim() ? { note: x.note.trim() } : {}),
+    };
+  });
   const out: ReturnType<typeof partsBody> = {};
   if (v.coverage !== null) out.coverage = { parts: v.coverage };
   else if (opts.clear) out.coverage = null;

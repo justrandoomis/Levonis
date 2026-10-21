@@ -8,7 +8,8 @@
  * nothing substituted, so every v1 screen and body is exactly as before.
  */
 import type { OfferV2 } from './api';
-import { fill, type RequestStrings } from './strings';
+import { fill, type RequestLang, type RequestStrings } from './strings';
+import { localColour, localMaterial, type MaterialLike } from './mirrors';
 
 /** A part as the screens name it. */
 export interface PartRef {
@@ -37,12 +38,73 @@ export function coverageOf(o: Pick<OfferV2, 'coverage'>, parts: PartRef[]): { co
   return { covered: ordered.filter((p) => ids.has(p.id)), uncovered: ordered.filter((p) => !ids.has(p.id)) };
 }
 
-/** «جزئي — القطع المشمولة 1/2», or an empty string for an offer that covers the whole request. */
+/**
+ * «جزئي — القطع المشمولة 1/2», or an empty string for an offer that covers the
+ * whole request. Before the parts of the request are known (fewer than it covers),
+ * «جزئي» alone: never a count like 1/1 that reads as the whole job.
+ */
 export function partialLabel(o: Pick<OfferV2, 'coverage'>, partsTotal: number, s: RequestStrings): string {
   if (!isPartialOffer(o)) return '';
   const k = o.coverage?.parts?.length ?? 0;
-  return fill(s.partialChip, { k, n: Math.max(partsTotal, k) });
+  if (partsTotal <= k) return s.partialChipBare;
+  return fill(s.partialChip, { k, n: partsTotal });
 }
+
+/**
+ * A partial offer can be acknowledged only against the parts it leaves out,
+ * named: the parts of the request are loaded, they hold every part the offer
+ * covers, and at least one is left out. A whole offer needs no list. Until
+ * then acceptance waits (P1-05 review 3: the parts come from a second read).
+ */
+export function partialAckReady(o: Pick<OfferV2, 'coverage'>, parts: PartRef[]): boolean {
+  if (!isPartialOffer(o)) return true;
+  const ids = new Set(parts.map((p) => p.id));
+  const covered = o.coverage?.parts ?? [];
+  return covered.length > 0 && covered.every((id) => ids.has(id)) && parts.some((p) => !covered.includes(p.id));
+}
+
+/** The list separator of the language: «، » in Arabic and Sorani, «, » in English. */
+export const listSep = (lang: RequestLang): string => (lang === 'en' ? ', ' : '، ');
+
+/** One side of a substitution in the reader language: the catalogue name, then the colours by name. */
+export function substitutionSide(v: { material_id: string; colors: Array<{ hex: string; label: string }> }, lang: RequestLang, materials: readonly MaterialLike[] = []): string {
+  const colours = v.colors.map((c) => localColour(c.label || c.hex, lang)).filter(Boolean).join(listSep(lang));
+  return [localMaterial(v.material_id, lang, materials), colours].filter(Boolean).join(' ');
+}
+
+/** One substitution in the words of the reader, each side apart, and the line they make. */
+export interface SubstitutionPiece {
+  to: string;
+  from: string;
+  part: string;
+  line: string;
+}
+
+/**
+ * Each substitution of an offer, its sides apart (P1-05 review 4): a screen
+ * draws each side isolated (`SubstitutionText`) in the direction of the READER —
+ * every common substitute starts with a Latin name (PLA, PETG, TPU), so a
+ * line laid out by its first strong letter reads the swap backwards in
+ * Arabic and Sorani.
+ */
+export function substitutionPieces(o: Pick<OfferV2, 'substitutions'>, parts: PartRef[], s: RequestStrings, lang: RequestLang, materials: readonly MaterialLike[] = []): SubstitutionPiece[] {
+  return (o.substitutions ?? []).map((x) => {
+    const v = {
+      to: substitutionSide(x.to, lang, materials),
+      from: substitutionSide(x.from, lang, materials),
+      part: partName(parts.find((p) => p.id === x.part_id), s) || '—',
+    };
+    return { ...v, line: fill(s.substitutionRow, v) };
+  });
+}
+
+/** «PETG بدل TPU (المقبض)» — each substitution of an offer in the words of the reader. */
+export function substitutionLines(o: Pick<OfferV2, 'substitutions'>, parts: PartRef[], s: RequestStrings, lang: RequestLang, materials: readonly MaterialLike[] = []): string[] {
+  return substitutionPieces(o, parts, s, lang, materials).map((x) => x.line);
+}
+
+/** The direction of the reader — for a line the screen writes itself, never `auto`. */
+export const readerDir = (lang: RequestLang): 'ltr' | 'rtl' => (lang === 'en' ? 'ltr' : 'rtl');
 
 /**
  * WHAT ACCEPTANCE SENDS — the total and the version on screen, and an
@@ -70,9 +132,11 @@ export function offerIsLive(o: OfferV2): boolean {
 /**
  * The three best-in-class picks for the quick comparison. Cheapest and
  * fastest are chosen among the COMPLETE offers when there are any: a partial
- * offer is cheaper and faster because it makes less.
+ * offer is cheaper and faster because it makes less. `completeOnly` is true
+ * only when that choice left a live partial offer out — the one case the
+ * screen says «among the complete offers».
  */
-export function bestOffers(offers: OfferV2[]): { cheapest: OfferV2 | null; fastest: OfferV2 | null; topRated: OfferV2 | null } {
+export function bestOffers(offers: OfferV2[]): { cheapest: OfferV2 | null; fastest: OfferV2 | null; topRated: OfferV2 | null; completeOnly: boolean } {
   const live = offers.filter(offerIsLive);
   const complete = live.filter((o) => !isPartialOffer(o));
   const pool = complete.length ? complete : live;
@@ -82,6 +146,7 @@ export function bestOffers(offers: OfferV2[]): { cheapest: OfferV2 | null; faste
     cheapest: by((o) => o.total_iqd ?? Number.MAX_SAFE_INTEGER),
     fastest: by((o) => o.completion_days || Number.MAX_SAFE_INTEGER),
     topRated: rated.reduce<OfferV2 | null>((best, o) => (best === null || (o.merchant!.rating ?? 0) > (best.merchant!.rating ?? 0) ? o : best), null),
+    completeOnly: complete.length > 0 && live.some(isPartialOffer),
   };
 }
 

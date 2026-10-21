@@ -32,8 +32,13 @@
  *                                active catalogue or of another technology, a
  *                                change that changes nothing, two on one row,
  *                                or a part written as free text
- *   OFFER_PART_NOT_ELIGIBLE      a covered part this workshop can make neither
- *                                as asked nor with its substitution
+ *   OFFER_PART_NOT_ELIGIBLE      a covered part this workshop cannot make as
+ *                                it would be made: with its substitution when
+ *                                it carries one (capability and stock, its
+ *                                colours counted again), else as asked (a
+ *                                one-job request: its substitution);
+ *                                `details.substitute` when the part itself
+ *                                could be made as asked
  *   OFFER_COVERAGE_UNAVAILABLE   coverage or substitutions named on a database
  *                                before 0208
  *
@@ -377,43 +382,128 @@ export const isRevisionFenceAbort = (e: unknown): boolean =>
 
 // --------------------------------------------------------- eligibility
 
-const toEligibilityPart = (p: EligibilityPart, subs: OfferSubstitution[]): EligibilityPart => ({
-  ...p,
-  materials: p.materials.map((row, i) => {
-    const sub = subs[i];
-    if (!sub) return row;
-    return { material_id: sub.to.material_id, colours: sub.to.colors.map((c) => c.hex).filter((h) => HEX6.test(h)) };
-  }),
-});
+/**
+ * A PART AS IT WOULD BE MADE: each substituted row in its substitute's
+ * material and colours, and the colours laid down in one print counted again
+ * (P1-05 review 4). A substitute that turns one colour into four asks for a
+ * machine that lays down four; the as-asked count would let a single-colour
+ * printer commit to it. `rows` are the model's rows of the part, in the order
+ * of `p.materials`: a row not substituted keeps its own colour entries. With
+ * no rows to count, the larger of the as-asked count and the substitutes'.
+ */
+const toEligibilityPart = (p: EligibilityPart, subs: Array<OfferSubstitution | undefined>, rows?: ReadonlyArray<Pick<ModelMaterial, 'colors'>>): EligibilityPart => {
+  const counted = rows && rows.length === p.materials.length
+    ? rows.reduce((n, row, i) => n + (subs[i] ? subs[i]!.to.colors.length : row.colors.length), 0)
+    : Math.max(p.colors_count, subs.reduce((n, x) => n + (x ? x.to.colors.length : 0), 0));
+  return {
+    ...p,
+    materials: p.materials.map((row, i) => {
+      const sub = subs[i];
+      if (!sub) return row;
+      return { material_id: sub.to.material_id, colours: sub.to.colors.map((c) => c.hex).filter((h) => HEX6.test(h)) };
+    }),
+    colors_count: Math.max(1, counted),
+  };
+};
 
 /**
- * THE COVERED PARTS THIS WORKSHOP CAN MAKE, as asked or with its
- * substitution (D5) — the first that it cannot, with its reasons, or null.
- * A request the matcher reads as one job (no `parts` on the live facts) was
- * already judged whole by the request-level verdict.
+ * A REQUEST THE MATCHER READS AS ONE JOB (no `parts` on the live facts), as
+ * the part each substitution names: the request's own process, size and
+ * grams, in the substitute's material and colours — and the substitute's
+ * colour count when it names colours (a material-only substitute carries the
+ * colours asked). The job as asked was judged whole by the request-level
+ * verdict; what a substitution changes is judged here, so the one-job path
+ * asks the same question as a job of parts. One job has one material row, so
+ * the substitution needs no row of the model to stand on (a v1 revision
+ * names its part by another id).
+ */
+function oneJobSwapped(req: LiveVerdict['request'], terms: OfferCoverageTerms): EligibilityPart[] {
+  const byPart = new Map<string, OfferSubstitution[]>();
+  for (const x of terms.substitutions) byPart.set(x.part_id, [...(byPart.get(x.part_id) ?? []), x]);
+  return [...byPart].map(([id, subs]) => {
+    const named = subs.reduce((n, x) => n + x.to.colors.length, 0);
+    return {
+      id,
+      process: req.process,
+      materials: subs.map((x) => ({ material_id: x.to.material_id, colours: x.to.colors.map((c) => c.hex).filter((h) => HEX6.test(h)) })),
+      colors_count: Math.max(1, named > 0 ? named : req.colors_count),
+      dims_mm: req.dims_mm,
+      grams: req.grams,
+    };
+  });
+}
+
+/**
+ * A SUBSTITUTE IS JUDGED ON WHAT THE WORKSHOP CAN DO (P1-05 review 4):
+ * capability and stock. Its own preferences narrow what it is shown and told
+ * about; a merchant who proposes a material has chosen it, so a preference
+ * that leaves it out does not refuse the offer.
+ */
+const substituteVerdict = (v: ReturnType<typeof evaluatePart>): { eligible: boolean; reasons: string[] } => {
+  const reasons: string[] = [];
+  if (v.capability) reasons.push(v.capability);
+  if (v.stock) reasons.push(v.stock);
+  return { eligible: reasons.length === 0, reasons };
+};
+
+/** The first covered part this workshop cannot make, its reasons, and whether the substitute is the cause. */
+export interface UncoverablePart {
+  part_id: string;
+  position: number;
+  reasons: string[];
+  /** The part can be made as asked: the substitute it carries is what fails (the merchant changes or drops it). */
+  substitute?: true;
+}
+
+/**
+ * THE COVERED PARTS THIS WORKSHOP CAN MAKE (D5) — the first that it cannot,
+ * with its reasons, or null. What gets made is what is judged: a part that
+ * carries a substitution is judged WITH it, whatever its verdict as asked (a
+ * workshop never commits to a material none of its printers runs, nor to
+ * more colours than they lay down), on capability and stock; any other
+ * covered part, as asked. On a request the matcher reads as one job the
+ * request-level verdict judged the job as asked, so only its substitutions
+ * are judged here. `substitute` marks a part that could be made as asked, so
+ * the merchant hears that the substitute is the problem, not the part.
  */
 export function uncoverableParts(
   live: Pick<LiveVerdict, 'candidate' | 'request' | 'catalogue'>,
   terms: OfferCoverageTerms,
   model: Pick<ModelState, 'parts'>
-): { part_id: string; position: number; reasons: string[] } | null {
-  const parts = live.request.parts;
-  if (!parts || !parts.length) return null;
+): UncoverablePart | null {
   const catalogue = live.catalogue as ReadonlyMap<string, CatalogueMaterial>;
+  const parts = live.request.parts;
+  if (!parts || !parts.length) {
+    for (const part of oneJobSwapped(live.request, terms)) {
+      const swapped = substituteVerdict(evaluatePart(live.candidate, live.request, part, catalogue));
+      if (swapped.eligible) continue;
+      return { part_id: part.id, position: model.parts.find((x) => x.id === part.id)?.position ?? 0, reasons: swapped.reasons, substitute: true };
+    }
+    return null;
+  }
   for (const part of parts) {
     if (terms.parts !== null && !terms.parts.includes(part.id)) continue;
-    const asked = evaluatePart(live.candidate, live.request, part, catalogue);
-    if (asked.eligible) continue;
     const mp = model.parts.find((x) => x.id === part.id);
-    const subsByRow = (mp?.materials ?? []).map((row) => terms.substitutions.find((x) => x.part_id === part.id && x.material_row_id === row.id));
+    const rows = mp?.materials ?? [];
+    const subsByRow = rows.map((row) => terms.substitutions.find((x) => x.part_id === part.id && x.material_row_id === row.id));
+    const position = mp?.position ?? parts.indexOf(part);
     if (subsByRow.some(Boolean)) {
-      const swapped = evaluatePart(live.candidate, live.request, toEligibilityPart(part, subsByRow as OfferSubstitution[]), catalogue);
+      const swapped = substituteVerdict(evaluatePart(live.candidate, live.request, toEligibilityPart(part, subsByRow, rows), catalogue));
       if (swapped.eligible) continue;
+      // The part as asked, on the same two counts: when it passes, the substitute is the cause.
+      const asked = substituteVerdict(evaluatePart(live.candidate, live.request, part, catalogue));
+      return { part_id: part.id, position, reasons: swapped.reasons, ...(asked.eligible ? { substitute: true as const } : {}) };
     }
-    return { part_id: part.id, position: mp?.position ?? parts.indexOf(part), reasons: asked.reasons };
+    const verdict = evaluatePart(live.candidate, live.request, part, catalogue);
+    if (verdict.eligible) continue;
+    return { part_id: part.id, position, reasons: verdict.reasons };
   }
   return null;
 }
+
+/** The terms carry something the request-level verdict did not judge: a job of parts, or a substitution. */
+export const coverageNeedsPartCheck = (live: Pick<LiveVerdict, 'request'>, terms: Pick<OfferCoverageTerms, 'substitutions'>): boolean =>
+  !!live.request.parts?.length || terms.substitutions.length > 0;
 
 export function assertCoverageEligible(
   live: Pick<LiveVerdict, 'candidate' | 'request' | 'catalogue'>,
@@ -421,9 +511,16 @@ export function assertCoverageEligible(
   model: Pick<ModelState, 'parts'>
 ): void {
   const bad = uncoverableParts(live, terms, model);
-  if (bad) {
-    throw new HttpError(403, 'Your workshop cannot make one of the chosen parts — remove it from the offer', 'OFFER_PART_NOT_ELIGIBLE', bad);
+  if (!bad) return;
+  if (bad.substitute) {
+    throw new HttpError(
+      403,
+      'Your workshop cannot make the substitute proposed for this part — choose a material your printers run, or drop the substitute',
+      'OFFER_PART_NOT_ELIGIBLE',
+      { ...bad }
+    );
   }
+  throw new HttpError(403, 'Your workshop cannot make one of the chosen parts — remove it from the offer', 'OFFER_PART_NOT_ELIGIBLE', { ...bad });
 }
 
 // ---------------------------------------------------------- the snapshot

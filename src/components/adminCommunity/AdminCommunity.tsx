@@ -51,6 +51,7 @@ import {
 import VariantImg from '../ui/VariantImg';
 import { Button } from '../ui/Button';
 import { useLanguage } from '../../LanguageContext';
+import { adminSubstitutionSides, reviewLang } from './reviewWords';
 
 // P1-05: the technical review queue loads only when an admin opens it.
 const TechnicalReviewPanel = lazy(() => import('./TechnicalReviewPanel'));
@@ -890,7 +891,7 @@ function Board({ t }: { t: T }) {
 }
 
 function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void }) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
   const [d, setD] = useState<Awaited<ReturnType<typeof adminCommunityApi.request>> | null>(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState('');
@@ -1032,7 +1033,15 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
                       ? loc(`جزئي — القطع المشمولة ${o.coverage.parts?.length ?? 0}`, `Partial — ${o.coverage.parts?.length ?? 0} parts covered`, `بەشەکی — ${o.coverage.parts?.length ?? 0} پارچە گیراوە`)
                       : ''}
                     {o.coverage?.covers_all === false && !!o.substitutions?.length ? ' · ' : ''}
-                    {o.substitutions?.map((x) => `${x.to.material_id.toUpperCase()} ← ${x.from.material_id.toUpperCase()}`).join('، ')}
+                    {o.substitutions?.map((x, i) => {
+                      const v = adminSubstitutionSides(x, reviewLang(lang));
+                      return (
+                        <span key={i} dir={lang === 'en' ? 'ltr' : 'rtl'} data-admin-offer-substitution>
+                          {i > 0 && (lang === 'en' ? ', ' : '، ')}
+                          <bdi>{v.to}</bdi> {v.word} <bdi>{v.from}</bdi>
+                        </span>
+                      );
+                    })}
                   </p>
                 )}
                 {!!o.message && (

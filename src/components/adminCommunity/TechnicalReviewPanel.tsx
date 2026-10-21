@@ -22,6 +22,7 @@ import { adminCommunityApi, type AdminRequestRow, type AdminReviewPart } from '.
 import { Button } from '../ui/Button';
 import { StatusChip } from '../ui/Badge';
 import { toast } from '../ui/Toast';
+import { colourWord, materialWord, reviewAge } from './reviewWords';
 
 type Loc = (ar: string, en: string, ckb?: string) => string;
 
@@ -33,11 +34,6 @@ const reasonWord = (r: string, loc: Loc) =>
       : r === 'mixed_process'
         ? loc('قطع بتقنيات طباعة مختلفة (FDM وريزن)', 'parts in different print technologies (FDM and resin)', 'پارچەکان بە تەکنیکی چاپی جیاواز (FDM و ڕێزن)')
         : r;
-
-function age(iso: string, loc: Loc): string {
-  const days = Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 86_400_000));
-  return days < 1 ? loc('اليوم', 'today', 'ئەمڕۆ') : loc(`منذ ${days} يوم`, `${days} d ago`, `${days} ڕۆژ لەمەوبەر`);
-}
 
 export default function TechnicalReviewPanel({ onBack }: { onBack: () => void }) {
   const { loc, lang } = useLanguage();
@@ -72,7 +68,7 @@ export default function TechnicalReviewPanel({ onBack }: { onBack: () => void })
               <span className="block min-w-0">
                 <bdi className="block truncate text-[13.5px] font-semibold text-text-primary">{r.title}</bdi>
                 <span className="mt-0.5 block text-[11.5px] text-text-muted">
-                  {loc(`عدد القطع ${r.parts_count ?? 1}`, `${r.parts_count ?? 1} parts`, `${r.parts_count ?? 1} پارچە`)} · {age(r.created_at, loc)}
+                  {loc(`عدد القطع ${r.parts_count ?? 1}`, `${r.parts_count ?? 1} parts`, `${r.parts_count ?? 1} پارچە`)} · {reviewAge(r.created_at, loc)}
                 </span>
                 {!!r.review_reasons?.length && (
                   <span className="mt-0.5 block text-[11.5px] text-warning">{r.review_reasons.map((x) => reasonWord(x, loc)).join(lang === 'en' ? ', ' : '، ')}</span>
@@ -88,6 +84,8 @@ export default function TechnicalReviewPanel({ onBack }: { onBack: () => void })
 
 function ReviewDetail({ id, loc, lang, onBack }: { id: string; loc: Loc; lang: string; onBack: () => void }) {
   const [parts, setParts] = useState<AdminReviewPart[] | null>(null);
+  // The files of the request, each a Worker route that re-checks the admin on every read (never a key).
+  const [files, setFiles] = useState<Array<{ id: string; file_name: string; kind: string; url?: string }>>([]);
   const [fence, setFence] = useState<Array<{ id: string; updated_at: string }>>([]);
   const [state, setState] = useState('');
   const [title, setTitle] = useState('');
@@ -102,6 +100,7 @@ function ReviewDetail({ id, loc, lang, onBack }: { id: string; loc: Loc; lang: s
       .then((d) => {
         setTitle(String(d.request.title ?? ''));
         setParts(d.model?.parts ?? []);
+        setFiles(d.files ?? []);
         setFence((d.review?.parts ?? []).map((p) => ({ id: p.id, updated_at: p.updated_at })));
         setState(d.review?.state ?? '');
       })
@@ -145,17 +144,51 @@ function ReviewDetail({ id, loc, lang, onBack }: { id: string; loc: Loc; lang: s
               <bdi className="min-w-0 text-[13px] font-semibold text-text-primary">{p.name.trim() || loc(`القطعة ${p.position + 1}`, `Part ${p.position + 1}`, `پارچەی ${p.position + 1}`)}</bdi>
               <span className="shrink-0 text-[12px] tabular-nums text-text-muted" dir="ltr">×{p.quantity}</span>
             </div>
-            <p className="mt-1 text-[12px] text-text-secondary" dir="auto">
-              {p.materials
-                .map((m) => [m.material_unsure || !m.material_id ? loc('مادة غير محددة', 'material open', 'کەرەستە دیاری نەکراوە') : m.material_id.toUpperCase(), m.colors.map((c) => (c.mode === 'any' ? loc('أي لون', 'any colour', 'هەر ڕەنگێک') : c.label || c.hex)).join(' ')].filter(Boolean).join(' · '))
-                .join(sep)}
+            <p className="mt-1 text-[12px] text-text-secondary" dir={L === 'en' ? 'ltr' : 'rtl'} data-technical-review-materials>
+              {p.materials.map((m, i) => (
+                <span key={m.id ?? i}>
+                  {i > 0 && sep}
+                  <bdi>{m.material_unsure || !m.material_id ? loc('مادة غير محددة', 'material open', 'کەرەستە دیاری نەکراوە') : materialWord(m.material_id, L)}</bdi>
+                  {m.colors.length > 0 && ' · '}
+                  {m.colors.length > 0 && <bdi>{m.colors.map((c) => colourWord(c, loc, L)).join(sep)}</bdi>}
+                </span>
+              ))}
             </p>
-            <p className="mt-0.5 text-[11.5px] text-text-muted">{size(p)}</p>
+            <p className="mt-0.5 text-[11.5px] text-text-muted">
+              {size(p)}
+              {(() => {
+                const measured = p.measured_file_id ? files.find((f) => f.id === p.measured_file_id && f.url) : undefined;
+                return measured ? (
+                  <>
+                    {' · '}
+                    <a href={measured.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-gold underline-offset-4 hover:underline" data-technical-review-file={measured.id}>
+                      <bdi>{measured.file_name}</bdi>
+                    </a>
+                  </>
+                ) : null;
+              })()}
+            </p>
             {!!p.review_reasons.length && <p className="mt-0.5 text-[11.5px] text-warning">{p.review_reasons.map((x) => reasonWord(x, loc)).join(sep)}</p>}
             {p.notes && <p className="mt-0.5 text-[11.5px] text-text-secondary" dir="auto">{p.notes}</p>}
           </li>
         ))}
       </ul>
+      {/* The references the customer gave: what «as in the reference» points at, opened from the review itself. */}
+      {files.some((f) => f.url) && (
+        <section className="lv-surface p-3" aria-label={loc('المرفقات', 'Attachments', 'هاوپێچەکان')}>
+          <h4 className="text-[12.5px] font-semibold text-text-secondary">{loc('المرفقات', 'Attachments', 'هاوپێچەکان')}</h4>
+          <ul className="mt-1 space-y-1">
+            {files.filter((f) => f.url).map((f) => (
+              <li key={f.id} className="flex items-center justify-between gap-3 text-[12px]">
+                <a href={f.url} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate font-semibold text-gold underline-offset-4 hover:underline" data-technical-review-file={f.id}>
+                  <bdi>{f.file_name}</bdi>
+                </a>
+                <span className="shrink-0 text-text-muted" dir="ltr">{f.kind}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {!!parts?.length && (
         <div className="flex flex-wrap gap-2">
           <Button variant="primary" onClick={() => decide('confirmed')} loading={busy === 'confirmed'} disabled={!!busy} data-technical-review-confirm>

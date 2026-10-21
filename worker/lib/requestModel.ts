@@ -297,22 +297,66 @@ export function reviewStateSql(alias: string, schemaPresent: boolean): string {
 
 /**
  * A BOARD ROW'S SUMMARY, for a list that joins the print row as `alias`
- * (P1-05): `s_parts_count`, `s_pieces_per_set` and `s_review_state` — parts
- * and pieces through the fingerprint, the review for an effective v3 row only.
+ * (P1-05): `s_parts_count`, `s_pieces_per_set`, `s_review_state`, and the
+ * job's chosen materials and technologies (`s_materials`, `s_processes`) —
+ * through the fingerprint, the review for an effective v3 row only. A job in
+ * several materials or technologies has a v1 mirror that names none of them
+ * (material open, process open); its card reads these instead (review 3).
  */
 export function boardSummarySql(alias: string, schemaPresent: boolean): string {
   const sum = requestSummarySql(alias, schemaPresent);
-  return `${sum.parts_count} AS s_parts_count, ${sum.pieces_per_set} AS s_pieces_per_set, ${reviewStateSql(alias, schemaPresent)} AS s_review_state`;
+  return `${sum.parts_count} AS s_parts_count, ${sum.pieces_per_set} AS s_pieces_per_set, ${reviewStateSql(alias, schemaPresent)} AS s_review_state, `
+    + `${sum.materials_json} AS s_materials, ${sum.processes_json} AS s_processes`;
 }
 
+const idList = (raw: unknown): string[] => {
+  let v: unknown = raw;
+  if (typeof raw === 'string') {
+    try {
+      v = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x !== '') : [];
+};
+
 /** The summary a list row carries, or undefined when the row was read without it. */
-export function boardSummaryOf(r: Record<string, unknown>): { parts_count: number; pieces_per_set: number; review_state: string } | undefined {
+export function boardSummaryOf(r: Record<string, unknown>): { parts_count: number; pieces_per_set: number; review_state: string; materials: string[]; processes: string[] } | undefined {
   if (r.s_parts_count === undefined) return undefined;
   return {
     parts_count: Number(r.s_parts_count ?? 1) || 1,
     pieces_per_set: Number(r.s_pieces_per_set ?? 1) || 1,
     review_state: String(r.s_review_state ?? ''),
+    materials: idList(r.s_materials),
+    processes: idList(r.s_processes).filter((x) => x === 'fdm' || x === 'resin'),
   };
+}
+
+/**
+ * THE BOARD'S TECHNOLOGY AND MATERIAL FILTERS, for a list that joins the
+ * request as `r` and its print row as `alias` (review 3). An effective
+ * version-3 row is matched on its PARTS — a technology when some part is in
+ * it or left open, a material when some part names it — so a job in two
+ * materials is found by either; any other row on its v1 columns, as always.
+ * `processParam` and `materialParam` are the bound parameters ('' = no filter).
+ */
+export function boardFilterSql(alias: string, schemaPresent: boolean, processParam: string, materialParam: string): string {
+  MIRROR_SQL(alias);
+  const a = alias;
+  const v1Process = `(COALESCE(${a}.process_unsure, 0) = 1 OR ${a}.process = ${processParam})`;
+  const v1Material = `(${a}.material_id = ${materialParam} AND COALESCE(${a}.material_unsure, 0) = 0)`;
+  if (!schemaPresent) return `AND (${processParam} = '' OR ${v1Process}) AND (${materialParam} = '' OR ${v1Material})`;
+  const v3 = effectiveV3Sql(a);
+  const partProcess = `EXISTS (SELECT 1 FROM community_request_parts fp
+                                WHERE fp.request_id = ${a}.request_id
+                                  AND (fp.process_unsure = 1 OR fp.process NOT IN ('fdm','resin') OR fp.process = ${processParam}))`;
+  const partMaterial = `EXISTS (SELECT 1 FROM community_request_part_materials fm
+                                  JOIN community_request_parts fp ON fp.id = fm.part_id
+                                 WHERE fp.request_id = ${a}.request_id
+                                   AND fm.material_id = ${materialParam} AND COALESCE(fm.material_unsure, 0) = 0)`;
+  return `AND (${processParam} = '' OR CASE WHEN COALESCE(${v3}, 0) THEN ${partProcess} ELSE ${v1Process} END)
+        AND (${materialParam} = '' OR CASE WHEN COALESCE(${v3}, 0) THEN ${partMaterial} ELSE ${v1Material} END)`;
 }
 
 /**

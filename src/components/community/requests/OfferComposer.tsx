@@ -38,10 +38,13 @@ import type { OfferPrefill } from '../../merchant/workshop/api';
 import { offersV2Api, requestsApi, type CatalogMaterial, type OfferDeliveryMethod, type OfferFileKind, type OfferInputV2, type OfferV2 } from './api';
 import { composerHandover, daysLabel, fill, handoverLabel, offerStateWords, requestLang, shortDay, useRequestStrings, type RequestLang, type RequestStrings } from './strings';
 import { RequestImageStrip, pictureFiles, type ThumbFile } from './RequestFileThumbs';
-import OfferPartsField, { defaultCoverage, partsBody, type PartVerdicts, type PartsValue } from './OfferPartsField';
+import OfferPartsField, { colourFieldText, defaultCoverage, partsBody, type PartVerdicts, type PartsValue } from './OfferPartsField';
 import { workshopApi } from '../../merchant/workshop/api';
 import type { RequestPartV3 } from '../../../lib/printApi';
 import { SourceLinkCard } from '../links/LinkCard';
+import { localMaterial } from './mirrors';
+import { coverageOf, listSep, partName, partialLabel, readerDir, substitutionPieces, type PartRef } from './offerParts';
+import { SubstitutionText } from './SubstitutionText';
 
 /** How long an offer stands, in days (the server takes 1–60). */
 export const VALIDITY = [3, 7, 14, 30] as const;
@@ -128,7 +131,11 @@ export function termsFrom(offer: OfferV2 | null | undefined, prefill: OfferPrefi
  */
 export function offerBody(
   t: Terms,
-  opts: { draft: boolean; editingSent: boolean; validTouched: boolean; quoteId?: string | null; parts?: { value: PartsValue; clear: boolean } }
+  opts: {
+    draft: boolean; editingSent: boolean; validTouched: boolean; quoteId?: string | null; parts?: { value: PartsValue; clear: boolean };
+    /** P1-05 review 4: the revision the composer rendered — a NEW offer is refused if the request moved since. */
+    requestHash?: string;
+  }
 ): OfferInputV2 {
   const b: OfferInputV2 = {
     delivery_fee_iqd: t.delivery === 'pickup' ? 0 : Math.max(0, t.fee ?? 0),
@@ -149,21 +156,54 @@ export function offerBody(
   if (opts.draft) b.draft = true;
   // P1-05: what the offer covers and substitutes — only when it is not the whole job as asked.
   if (opts.parts) Object.assign(b, partsBody(opts.parts.value, { clear: opts.parts.clear }));
+  // The job the merchant priced: a new offer only (a draft is no promise; an edit is checked against its offer).
+  if (opts.requestHash && !opts.draft && !opts.editingSent) b.expected_request_hash = opts.requestHash;
   return b;
 }
 
-/** An offer (or draft) as the parts field starts: its coverage and substitutions, else the whole job as asked. */
+const sameColours = (a: Array<{ hex: string; label: string }>, b: Array<{ hex: string; label: string }>) =>
+  a.length === b.length && a.every((c, i) => c.hex === b[i].hex && c.label === b[i].label);
+
+/**
+ * An offer (or draft) as the parts field starts: its coverage and
+ * substitutions, else the whole job as asked. A substitution that changes the
+ * material only stores the colours asked (`to.colors = from.colors`): its
+ * colour field starts empty, so an edit sends the material only and the
+ * colours stay those the customer asked. Colours the merchant proposed are
+ * kept with their hex (P1-05 review 3).
+ */
 export function partsFrom(offer: OfferV2 | null | undefined): PartsValue {
   return {
     coverage: offer?.coverage && !offer.coverage.covers_all ? offer.coverage.parts ?? [] : null,
-    subs: (offer?.substitutions ?? []).map((x) => ({
-      part_id: x.part_id,
-      material_row_id: x.material_row_id,
-      material_id: x.to.material_id,
-      colour: x.to.colors.map((c) => c.label || c.hex).join(' '),
-      note: x.note,
-    })),
+    subs: (offer?.substitutions ?? []).map((x) => {
+      const proposed = x.to.colors.length > 0 && !sameColours(x.to.colors, x.from?.colors ?? []);
+      return {
+        part_id: x.part_id,
+        material_row_id: x.material_row_id,
+        material_id: x.to.material_id,
+        colour: proposed ? colourFieldText(x.to.colors) : '',
+        note: x.note,
+        ...(proposed ? { colors: x.to.colors.map((c) => ({ hex: c.hex, label: c.label })) } : {}),
+      };
+    }),
   };
+}
+
+/**
+ * THE VERDICT PER PART ARRIVES (a new offer): the parts this workshop can make
+ * become the default ticks — and the baseline the composer compares against,
+ * so a merchant who opens it and closes it untouched is not asked to discard
+ * changes nobody made. A value the merchant already changed is left alone.
+ */
+export function applyPartVerdicts(
+  current: PartsValue,
+  baseline: string,
+  parts: Array<{ id: string }>,
+  verdicts: PartVerdicts
+): { value: PartsValue; baseline: string } {
+  if (current.coverage !== null || current.subs.length) return { value: current, baseline };
+  const value = { ...current, coverage: defaultCoverage(parts, verdicts) };
+  return { value, baseline: JSON.stringify(current) === baseline ? JSON.stringify(value) : baseline };
 }
 
 export interface OfferComposerProps {
@@ -181,11 +221,13 @@ export interface OfferComposerProps {
   prefill?: OfferPrefill | null;
   /** P1-05: the parts of the request — a job of parts gets the part checklist and substitutes. */
   parts?: RequestPartV3[];
+  /** P1-05 review 4: the hash of the revision those parts belong to (`revision_hash` of the request page). */
+  requestHash?: string;
   onClose: () => void;
   onSaved: (offer: OfferV2, how: 'sent' | 'updated' | 'draft') => void;
 }
 
-export default function OfferComposer({ open, requestId, offer, materials, defaultQuantity, deliveryPref, prefill = null, parts = [], onClose, onSaved }: OfferComposerProps) {
+export default function OfferComposer({ open, requestId, offer, materials, defaultQuantity, deliveryPref, prefill = null, parts = [], requestHash = '', onClose, onSaved }: OfferComposerProps) {
   const { lang } = useLanguage();
   const s = useRequestStrings();
   const L = requestLang(lang);
@@ -236,7 +278,13 @@ export default function OfferComposer({ open, requestId, offer, materials, defau
         if (!alive) return;
         const list = v.parts ?? null;
         setVerdicts(list);
-        if (!offer) setPv((x) => (x.coverage === null && !x.subs.length ? { ...x, coverage: defaultCoverage(parts, list) } : x));
+        if (!offer) {
+          setPv((x) => {
+            const next = applyPartVerdicts(x, initialParts.current, parts, list);
+            initialParts.current = next.baseline;
+            return next.value;
+          });
+        }
       })
       .catch(() => alive && setVerdicts(null));
     return () => {
@@ -296,13 +344,13 @@ export default function OfferComposer({ open, requestId, offer, materials, defau
       } else if (isDraft) {
         // The draft's terms as they are on screen, then the send — one promise, validated whole by the server.
         await offersV2Api.updateOffer(offer!.id, offerBody(t, { draft: false, editingSent: false, validTouched, quoteId, parts: partsOpt(true) }));
-        saved = (await offersV2Api.sendOffer(offer!.id)).offer;
+        saved = (await offersV2Api.sendOffer(offer!.id, requestHash)).offer;
         kind = 'sent';
       } else if (editingSent) {
         saved = (await offersV2Api.updateOffer(offer!.id, offerBody(t, { draft: false, editingSent: true, validTouched, quoteId, parts: partsOpt(true) }))).offer;
         kind = 'updated';
       } else {
-        saved = (await offersV2Api.createOffer(requestId, offerBody(t, { draft: false, editingSent: false, validTouched, quoteId, parts: partsOpt(false) }))).offer;
+        saved = (await offersV2Api.createOffer(requestId, offerBody(t, { draft: false, editingSent: false, validTouched, quoteId, parts: partsOpt(false), requestHash }))).offer;
         kind = 'sent';
       }
       onSaved(saved, kind);
@@ -426,7 +474,7 @@ export default function OfferComposer({ open, requestId, offer, materials, defau
                     className="lv-choice px-3 text-[12.5px] font-medium disabled:opacity-40"
                     data-offer-material={m.id}
                   >
-                    <bdi>{L === 'en' ? m.name_en : m.name_ar || m.name_en}</bdi>
+                    <bdi>{localMaterial(m.id, L, materials)}</bdi>
                   </button>
                 );
               })}
@@ -604,6 +652,8 @@ export interface MerchantOfferSectionProps {
   sourceUrl?: string | null;
   /** P1-05: the parts of the request, for the part checklist and substitutes of the composer. */
   parts?: RequestPartV3[];
+  /** P1-05 review 4: the revision those parts belong to; a new offer or a sent draft carries it back. */
+  requestHash?: string;
 }
 
 export function MerchantOfferSection({
@@ -622,6 +672,7 @@ export function MerchantOfferSection({
   jobFiles = [],
   sourceUrl = null,
   parts = [],
+  requestHash = '',
 }: MerchantOfferSectionProps) {
   const { lang } = useLanguage();
   const s = useRequestStrings();
@@ -629,6 +680,7 @@ export function MerchantOfferSection({
   const toast = useToast();
   const [confirm, confirmDialog] = useConfirm();
   const [composing, setComposing] = useState<'' | 'new' | 'edit' | 'draft'>('');
+  const partRefs = useMemo<PartRef[]>(() => parts.map((p) => ({ id: p.id, name: p.name, position: p.position })), [parts]);
   const [changes, setChanges] = useState<string[] | null>(null);
   const live = offers.find((o) => o.state === 'pending' || o.state === 'superseded' || o.state === 'accepted') ?? null;
   const latest = live ?? offers[offers.length - 1] ?? null;
@@ -693,7 +745,7 @@ export function MerchantOfferSection({
       return;
     }
     try {
-      await offersV2Api.sendOffer(draft.id);
+      await offersV2Api.sendOffer(draft.id, requestHash);
       toast.success(s.offerSent);
       onChanged();
     } catch (e) {
@@ -733,6 +785,7 @@ export function MerchantOfferSection({
       deliveryPref={deliveryPref}
       prefill={prefill}
       parts={parts}
+      requestHash={requestHash}
       onClose={() => {
         setComposing('');
         onPrefillDone?.();
@@ -759,7 +812,7 @@ export function MerchantOfferSection({
           </div>
           <StatusChip tone="neutral">{s.draftSaved}</StatusChip>
         </div>
-        <OfferBrief o={draft} s={s} lang={L} />
+        <OfferBrief o={draft} s={s} lang={L} parts={partRefs} materials={materials} />
         <p className="mt-2 text-[12.5px] text-text-muted">{s.draftHint}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {takingOffers && canOffer && (
@@ -817,7 +870,7 @@ export function MerchantOfferSection({
         </div>
         <StatusChip tone={st.tone}>{st.text}</StatusChip>
       </div>
-      <OfferBrief o={o} s={s} lang={L} />
+      <OfferBrief o={o} s={s} lang={L} parts={partRefs} materials={materials} />
 
       {stale && (
         <div className="lv-alert lv-alert-warning mt-3 text-[12.5px] leading-relaxed" data-offer-note="superseded">
@@ -864,9 +917,14 @@ export function MerchantOfferSection({
   );
 }
 
-/** «السعر + التوصيل · 3 أيام · أوصله · صالح حتى ٣ أكتوبر» under a merchant's own card. */
-export function OfferBrief({ o, s, lang }: { o: OfferV2; s: RequestStrings; lang: RequestLang }) {
-  const parts = useMemo(() => {
+/**
+ * «السعر + التوصيل · 3 أيام · أوصله · صالح حتى ٣ أكتوبر» under the own card of
+ * a merchant — and what it covers (P1-05 review 4): the partial chip with the parts
+ * it makes, and its substitutes, as the column of the customer shows them, so a
+ * workshop reads its own terms without reopening the composer.
+ */
+export function OfferBrief({ o, s, lang, parts = [], materials = [] }: { o: OfferV2; s: RequestStrings; lang: RequestLang; parts?: PartRef[]; materials?: CatalogMaterial[] }) {
+  const facts = useMemo(() => {
     const out: string[] = [];
     if (o.completion_days) out.push(daysLabel(o.completion_days, lang));
     if (o.delivery_method) out.push(handoverLabel(o.delivery_method, s));
@@ -874,14 +932,35 @@ export function OfferBrief({ o, s, lang }: { o: OfferV2; s: RequestStrings; lang
     if (until) out.push(`${s.validUntil} ${until}`);
     return out;
   }, [o.completion_days, o.delivery_method, o.valid_until, o.expires_at, s, lang]);
+  const partial = partialLabel(o, parts.length, s);
+  const covered = partial && parts.length ? coverageOf(o, parts).covered.map((p) => partName(p, s)).join(listSep(lang)) : '';
+  const subs = substitutionPieces(o, parts, s, lang, materials);
   return (
-    <p className="mt-1 text-[12.5px] text-text-secondary" data-offer-brief>
-      {o.delivery_fee_iqd > 0 && o.price_iqd !== null && (
-        <span className="me-2 text-text-muted" data-offer-breakdown>
-          <Money iqd={o.price_iqd} /> + <Money iqd={o.delivery_fee_iqd} /> {s.feeShort}
-        </span>
+    <>
+      <p className="mt-1 text-[12.5px] text-text-secondary" data-offer-brief>
+        {o.delivery_fee_iqd > 0 && o.price_iqd !== null && (
+          <span className="me-2 text-text-muted" data-offer-breakdown>
+            <Money iqd={o.price_iqd} /> + <Money iqd={o.delivery_fee_iqd} /> {s.feeShort}
+          </span>
+        )}
+        {facts.join(' · ')}
+      </p>
+      {partial && (
+        <p className="mt-1.5 flex flex-wrap items-center gap-2 text-[12px] text-text-secondary" data-offer-brief-partial>
+          <StatusChip tone="warning">{partial}</StatusChip>
+          {covered && <bdi>{covered}</bdi>}
+        </p>
       )}
-      {parts.join(' · ')}
-    </p>
+      {subs.length > 0 && (
+        <ul className="mt-1.5 space-y-0.5 text-[12px] text-text-secondary" dir={readerDir(lang)} aria-label={s.substitutesLabel} data-offer-brief-substitutions>
+          {subs.map((x) => (
+            <li key={x.line}>
+              <SubstitutionText x={x} s={s} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
+

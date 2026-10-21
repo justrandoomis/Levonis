@@ -945,7 +945,7 @@ export interface AdminOfferRow {
   created_at: string;
   /** P1-05: what the offer makes and substitutes; absent on an older Worker. */
   coverage?: { covers_all: boolean; parts: string[] | null };
-  substitutions?: Array<{ part_id: string; material_row_id: string; from: { material_id: string }; to: { material_id: string } }>;
+  substitutions?: Array<{ part_id: string; material_row_id: string; from: { material_id: string; colors?: Array<{ hex: string; label: string }> }; to: { material_id: string; colors?: Array<{ hex: string; label: string }> } }>;
 }
 
 export interface AdminReviewRow {
@@ -1118,7 +1118,8 @@ export const adminCommunityApi = {
     api.get<{
       request: Record<string, unknown>;
       offers: AdminOfferRow[];
-      files: Array<{ id: string; file_name: string; content_type: string; size_bytes: number; kind: string }>;
+      /** `url` is a Worker route that re-checks the admin on every read (never a key). */
+      files: Array<{ id: string; file_name: string; content_type: string; size_bytes: number; kind: string; url?: string }>;
       order: Record<string, unknown> | null;
       escrow: AdminEscrow | null;
       /** P1-05: the model the reviewer reads, and the fence of each part for a decision. */

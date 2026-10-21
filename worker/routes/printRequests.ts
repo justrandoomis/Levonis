@@ -106,6 +106,8 @@ import {
   estimateFor,
   estimateModel,
   modelsUnpriced,
+  pricedByParts,
+  pricedPrimarySql,
   pricesAsOneJob,
   unsupportedPart,
   type Choices,
@@ -460,7 +462,9 @@ printRequestRoutes.post('/quote', requireAuth, async (c) => {
       const estimate = fromEngineA(quote, { quantity: next.job.quantity });
       const { cost_lines, cost_iqd, floor_iqd, margin_percent, accessory_lines, ...publicQuote } = quote;
       void cost_lines; void cost_iqd; void floor_iqd; void margin_percent; void accessory_lines;
-      return c.json({ success: true, quote: publicQuote, estimate, models_unpriced: modelsUnpriced(next, read.modelFiles) });
+      // R10, one rule (review 3): a one-job price was measured on the mirror's primary file.
+      const pricedPrimary = pricesAsOneJob(next) && w.primaryFileId ? [w.primaryFileId] : [];
+      return c.json({ success: true, quote: publicQuote, estimate, models_unpriced: modelsUnpriced(next, read.modelFiles, pricedPrimary) });
     }
   }
 
@@ -754,7 +758,8 @@ export function printMatchNotification(f: PrintMatchFacts): { title: Trilingual;
     if (f.parts.pieces_per_set > f.parts.count) {
       push({ ar: `القطع في الطقم ${f.parts.pieces_per_set}`, en: `${f.parts.pieces_per_set} pieces a set`, ckb: `${f.parts.pieces_per_set} پارچە لە هەر سێتێکدا` });
     }
-    push({ ar: `الأطقم ${f.parts.sets}`, en: `${f.parts.sets} sets`, ckb: `${f.parts.sets} سێت` });
+    // One set is «1 set», not «1 sets» (review 4).
+    push({ ar: `الأطقم ${f.parts.sets}`, en: `${f.parts.sets} ${f.parts.sets === 1 ? 'set' : 'sets'}`, ckb: `${f.parts.sets} سێت` });
     if (f.parts.review) push({ ar: 'تحتاج مراجعة فنية', en: 'needs a technical review', ckb: 'پێویستی بە پێداچوونەوەی تەکنیکی هەیە' });
   } else {
     const matEn = latinOr(f.material?.name_en ?? '', f.material_id);
@@ -1919,6 +1924,16 @@ printRequestRoutes.get('/requests/:id', async (c) => {
   // cut to what and how many (DECISIONS row 220).
   const estimate = publicEstimate(row.estimate);
 
+  // THE REVISION THIS PAGE SHOWS (P1-05 review 4): its hash, read BEFORE the
+  // model, so a customer edit landing between the two reads leaves the page
+  // with an older hash than its parts — the offer it sends is then refused
+  // REQUEST_CHANGED, never written over parts its merchant did not see. The
+  // current revision's hash is what GET …/revisions already gives this reader.
+  const shown = await c.env.DB.prepare(
+    `SELECT v.hash FROM community_requests r
+       JOIN community_request_revisions v ON v.request_id = r.id AND v.revision = r.revision
+      WHERE r.id = ?`
+  ).bind(requestId).first<{ hash: string | null }>();
   // THE MODEL AND ITS SUMMARY (P1-05): every part with its materials, colours
   // and review, as this reader may see it — a review only on an effective
   // version-3 request (critique 6: a v1 «several colours» is not a review
@@ -1942,8 +1957,14 @@ printRequestRoutes.get('/requests/:id', async (c) => {
     success: true,
     model: projected,
     summary,
+    // What an offer sends back as `expected_request_hash` ('' before revision rows).
+    revision_hash: String(shown?.hash ?? ''),
     print: {
-      models_unpriced: read ? modelsUnpriced(read, read.modelFiles) : 0,
+      // R10, one rule with «طلباتي» and /quote (review 3): a one-job estimate
+      // priced the row's primary file; a job priced part by part, its parts'.
+      models_unpriced: read
+        ? modelsUnpriced(read, read.modelFiles, v3 && pricedByParts(row.estimate) ? [] : [String(row.primary_file_id ?? '')].filter(Boolean))
+        : 0,
       process: row.process,
       material_id: row.material_id,
       color_hex: row.color_hex,
@@ -2551,6 +2572,12 @@ printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
   // A database before 0208 reads the v1 derivation and no review.
   const listSql = (schema: boolean) => {
     const sum = requestSummarySql('p', schema);
+    // R10, one rule with the request page (review 3): the primary file is the
+    // priced one only for a one-job estimate (not an effective v3 row, or no coverage).
+    // A request with no print row has no estimate, so nothing it left out (review 4).
+    const primaryPriced = schema
+      ? `AND NOT (mf.id IS COALESCE(p.primary_file_id, '') AND ${pricedPrimarySql('p', effectiveV3Sql('p'))})`
+      : `AND mf.id IS NOT COALESCE(p.primary_file_id, '')`;
     const v3Parts = schema
       ? `AND NOT EXISTS (SELECT 1 FROM community_request_parts pt WHERE pt.request_id = r.id AND pt.measured_file_id = mf.id AND ${effectiveV3Sql('p')})
          AND NOT EXISTS (SELECT 1 FROM community_request_sources so WHERE so.request_id = r.id AND so.file_id = mf.id AND so.role = 'source')`
@@ -2559,8 +2586,9 @@ printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
             ${sum.parts_count} AS s_parts_count, ${sum.pieces_per_set} AS s_pieces_per_set,
             ${reviewStateSql('p', schema)} AS s_review_state,
             CASE WHEN json_valid(p.estimate) THEN json_extract(p.estimate, '$.coverage.complete') END AS s_estimate_complete,
+            CASE WHEN p.request_id IS NULL THEN 0 ELSE
             (SELECT COUNT(*) FROM community_request_files mf
-              WHERE mf.request_id = r.id AND mf.kind = 'model' AND mf.id IS NOT COALESCE(p.primary_file_id, '') ${v3Parts}) AS s_models_unpriced,
+              WHERE mf.request_id = r.id AND mf.kind = 'model' ${primaryPriced} ${v3Parts}) END AS s_models_unpriced,
             r.budget_iqd, r.deadline, r.governorate, r.offer_count, r.created_at,
             r.accepted_offer_id, r.community_order_id, r.revision, r.expires_at, r.published_at,
             p.process_unsure, p.material_unsure, p.source_type,

@@ -205,11 +205,12 @@ test('an edit of the substitutions moves the revision: the one the customer saw 
   const j = await jobOfParts(raw);
   const sub = await offer(raw, j.id, { substitutions: [{ part_id: j.b, material_row_id: j.mb, to: { material_id: 'petg' } }] });
   const o = sub.body.offer;
-  const edit = await patch(as(raw, 'owner'), `/api/marketplace/offers/${o.id}`, { substitutions: [{ part_id: j.b, material_row_id: j.mb, to: { material_id: 'abs' } }] });
+  // PLA, which this workshop runs: a substitute is judged on its printers (ABS needs an enclosure it lacks).
+  const edit = await patch(as(raw, 'owner'), `/api/marketplace/offers/${o.id}`, { substitutions: [{ part_id: j.b, material_row_id: j.mb, to: { material_id: 'pla' } }] });
   assert.equal(edit.status, 200, JSON.stringify(await json(edit.clone())));
   const after = (await json(edit)).offer;
   assert.equal(after.revision, o.revision + 1);
-  assert.equal(after.substitutions[0].to.material_id, 'abs');
+  assert.equal(after.substitutions[0].to.material_id, 'pla');
   const stale = await accept(raw, o.id, o.total_iqd, o.revision, { accept_substitutions: true });
   assert.equal(stale.body.code, 'OFFER_CHANGED');
   // Back to no substitution: the columns go back to their defaults.

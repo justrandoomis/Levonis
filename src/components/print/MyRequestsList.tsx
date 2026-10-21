@@ -37,6 +37,27 @@ import { requestStateLabel, requestStateTone } from '../community/requests/reque
 import { StatusChip } from '../ui/Badge';
 import { CommunityLoadError } from '../../pages/community/access';
 import { offersLabel } from '../community/hub/copy';
+import { fill, requestStrings } from '../community/requests/strings';
+
+/**
+ * WHAT THE SUMMARY ADDS TO A ROW OF «طلباتي» (P1-05, DECISIONS row 267 §8;
+ * review 3): the technical review, an estimate that sums only the priced
+ * parts (never read as the price of the job, R10), and the model files the
+ * estimate did not price — each an empty string when it does not apply, or on
+ * an older Worker that sends no summary. The unpriced files are said only
+ * beside an estimate, as the request page says them (review 4): a draft or an
+ * unpriced job has no estimate for a file to be left out of.
+ */
+export function myRequestNotes(r: Pick<MyRequestRow, 'summary' | 'print'>, lang: string): { review: string; partial: string; unpriced: string } {
+  const s = requestStrings(lang);
+  const sum = r.summary;
+  const estimated = !!r.print && (r.print.estimate_low_iqd !== null || r.print.estimate_high_iqd !== null);
+  return {
+    review: sum?.review_state === 'needs_technical_review' ? s.reviewChip : '',
+    partial: sum && sum.estimate_complete === false ? s.estimatePricedOnly : '',
+    unpriced: estimated && sum && sum.models_unpriced > 0 ? fill(s.modelsUnpriced, { n: sum.models_unpriced }) : '',
+  };
+}
 
 const CONFIDENCE_TEXT: Record<Confidence, [string, string]> = {
   high: ['دقة عالية', 'High confidence'],
@@ -158,6 +179,7 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
 
       {rows.map((r) => {
         const p = r.print;
+        const notes = myRequestNotes(r, lang);
         return (
           <div
             key={r.id}
@@ -188,6 +210,11 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
                       {requestStateLabel(r.state, loc)}
                     </StatusChip>
                   </div>
+                  {notes.review && (
+                    <p className="mt-1" data-my-request-review>
+                      <StatusChip tone="warning">{notes.review}</StatusChip>
+                    </p>
+                  )}
 
                   <p className="text-[11px] text-text-muted mt-0.5" dir="ltr">
                     {r.created_at.slice(0, 10)}
@@ -202,6 +229,17 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
                           {loc(...CONFIDENCE_TEXT[p.estimate_confidence])}
                         </span>
                       )}
+                    </p>
+                  )}
+                  {/* A sum over some parts is not the job price: said beside it (R10, P1-05). */}
+                  {p && (p.estimate_low_iqd !== null || p.estimate_high_iqd !== null) && notes.partial && (
+                    <p className="mt-0.5 text-[11.5px] font-semibold text-warning" data-my-request-partial>
+                      {notes.partial}
+                    </p>
+                  )}
+                  {notes.unpriced && (
+                    <p className="mt-0.5 text-[11.5px] text-warning" data-my-request-unpriced>
+                      {notes.unpriced}
                     </p>
                   )}
 
