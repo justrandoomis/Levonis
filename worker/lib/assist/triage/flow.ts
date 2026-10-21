@@ -20,14 +20,12 @@ export type PrinterChoice = ModelToken | 'other';
  * kept for the steps and the ticket like one typed earlier. `among`: the
  * printers of a family the customer named («X1»), offered as the only chips.
  * `faultIn`: the symptom is the steps a fault in this part takes («مشكلة
- * بالنوزل» → the clog steps), not a symptom the customer named. `owned`: the
- * customer only said the printer is theirs («عندي اي ون», "I have an A1"), no
- * fault (`TriageState.owned`). `tried` on a typed outcome: false when the
- * reply did not say the steps were tried («نفس المشكله» alone); the chip says
- * they were.
+ * بالنوزل» → the clog steps), not a symptom the customer named. `tried` on a
+ * typed outcome: false when the reply did not say the steps were tried («نفس
+ * المشكله» alone); the chip says they were.
  */
 export type TriageInput =
-  | { kind: 'start'; model?: ModelToken; symptom?: SymptomKey; code?: string; among?: readonly ModelToken[]; faultIn?: PartKey; owned?: true }
+  | { kind: 'start'; model?: ModelToken; symptom?: SymptomKey; code?: string; among?: readonly ModelToken[]; faultIn?: PartKey }
   | { kind: 'printer'; model: PrinterChoice; unit_id?: string; symptom?: SymptomKey; code?: string; faultIn?: PartKey }
   | { kind: 'symptom'; symptom: SymptomKey; code?: string; faultIn?: PartKey }
   | { kind: 'outcome'; outcome: 'resolved' | 'not_fixed'; tried?: boolean }
@@ -59,15 +57,6 @@ export interface TriageResult {
  */
 export function triagePrinter(ctx: AssistContext): PrinterChoice | undefined {
   return ctx.printer && !ctx.printer.browsed ? ctx.printer.model : undefined;
-}
-
-/**
- * A triage opened only by a printer the customer owns («عندي اي ون»), with no
- * symptom and no part named since: «تحدث مع الفريق» there drafts no ticket
- * that claims a problem; the plain handoff answers (review round 5).
- */
-export function ownedOnly(held: AssistContext['triage']): boolean {
-  return held?.owned === true && !held.symptom && !held.faultIn;
 }
 
 function withPrinter(ctx: AssistContext, model: PrinterChoice, unitId?: string): AssistContext {
@@ -112,7 +101,6 @@ function askPrinter(ctx: AssistContext, symptom?: SymptomKey, code?: string, ste
         ...(code ? { code } : {}),
         ...(symptom && steps ? { steps: true as const } : {}),
         ...(symptom && steps && tried ? { tried: true as const } : {}),
-        ...(!symptom && ctx.triage?.owned ? { owned: true as const } : {}),
         ...fault,
       },
     },
@@ -125,7 +113,6 @@ export function nextTriage(ctx: AssistContext, input: TriageInput): TriageResult
     case 'start': {
       const model: PrinterChoice | undefined = input.model ?? triagePrinter(ctx);
       const fault = input.symptom ? faultOf(input.faultIn) : {};
-      const owned = input.owned && !input.symptom ? { owned: true as const } : {};
       if (!model) {
         return {
           step: {
@@ -136,26 +123,18 @@ export function nextTriage(ctx: AssistContext, input: TriageInput): TriageResult
           },
           context: {
             ...ctx,
-            triage: {
-              stage: 'printer',
-              ...(input.symptom ? { symptom: input.symptom } : {}),
-              ...(input.code ? { code: input.code } : {}),
-              ...fault,
-              ...owned,
-            },
+            triage: { stage: 'printer', ...(input.symptom ? { symptom: input.symptom } : {}), ...(input.code ? { code: input.code } : {}), ...fault },
           },
         };
       }
       const next = withPrinter(ctx, model);
-      if (!input.symptom) return { step: { kind: 'ask_symptom', model }, context: { ...next, triage: { stage: 'symptom', ...owned } } };
+      if (!input.symptom) return { step: { kind: 'ask_symptom', model }, context: { ...next, triage: { stage: 'symptom' } } };
       return toSteps(next, model, input.symptom, input.code, input.faultIn);
     }
     case 'printer': {
       const next = withPrinter(ctx, input.model, input.unit_id);
       const symptom = input.symptom ?? held?.symptom;
-      // The printer picked at «which printer?» after «عندي طابعة»: still only the printer owned.
-      const owned = held?.owned && !held.symptom ? { owned: true as const } : {};
-      if (!symptom) return { step: { kind: 'ask_symptom', model: input.model }, context: { ...next, triage: { stage: 'symptom', ...owned } } };
+      if (!symptom) return { step: { kind: 'ask_symptom', model: input.model }, context: { ...next, triage: { stage: 'symptom' } } };
       // A symptom typed with the printer replaces the part the fault was named in; none typed keeps it.
       return toSteps(next, input.model, symptom, input.code ?? held?.code, input.symptom ? input.faultIn : held?.faultIn);
     }

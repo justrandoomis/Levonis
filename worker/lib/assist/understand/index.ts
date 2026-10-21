@@ -41,15 +41,12 @@ import {
   OUTCOME_RESOLVED,
   MAINTENANCE_CUE,
   OWN_PRINTER,
-  OWNS_PRINTER,
   PART_LEXICON,
   PAST_PURCHASE,
   PRICE_ASK,
   PRINTER_CUE,
   PROBLEM_CUE,
   PRODUCT_CUE,
-  STOCK_ASK,
-  STOCK_ASK_NOT,
   STRINGING_WEAK,
   SYMPTOM_LEXICON,
   TRIED_SAID,
@@ -114,12 +111,6 @@ export interface Understood {
   /** «طابعتي», "my own printer", «پرینتەرەکەی خۆم» and nothing else: the printer of the account. */
   ownPrinter: boolean;
   /**
-   * «عندي اي ون», «طابعتي A1», "I have an A1", «A1م هەیە»: the customer says
-   * which printer is theirs, so the sentence never asks to buy it (review
-   * round 4.3, ./lexicon.ts `OWNS_PRINTER`).
-   */
-  ownsPrinter: boolean;
-  /**
    * «جربتها», "tried them", «تاقیم کردەوە»: the customer says they tried the
    * steps. A typed not-fixed reply puts them on the ticket as tried only
    * with this (review round 5, ./lexicon.ts `TRIED_SAID`).
@@ -127,12 +118,6 @@ export interface Understood {
   triedSaid: boolean;
   /** "how much?", «شكد؟»: a price asked, whatever the intent scorer made of it. */
   priceAsk: boolean;
-  /**
-   * «متوفر؟», «اكو A1 مالتي», "is my printer in stock", "do you have": stock
-   * asked, whatever the intent scorer made of it (review round 5.2,
-   * ./lexicon.ts `STOCK_ASK`).
-   */
-  stockAsk: boolean;
   /** The words no reader claimed, at most four: what is left to search for. */
   residual: string[];
 }
@@ -240,20 +225,12 @@ const FILLER_SET = new Set([...FILLERS, ...CORRECTION_WORDS, ...Object.keys(ORDI
 const CORRECTION_SET = new Set(CORRECTION_WORDS.map(normalizeText).filter(Boolean));
 const ORDINALS = new Map(Object.entries(ORDINAL_WORDS).map(([w, n]) => [normalizeText(w), n] as const));
 const PRICE_ASKS = PRICE_ASK.map(normalizeText).filter(Boolean);
-const STOCK_ASKS = STOCK_ASK.map(normalizeText).filter(Boolean);
-const STOCK_ASKS_NOT = STOCK_ASK_NOT.map(normalizeText).filter(Boolean);
 const OWN_MINE = new Set(OWN_PRINTER.mine.map(normalizeText).filter(Boolean));
 const OWN_WITH = new Set(OWN_PRINTER.with.map(normalizeText).filter(Boolean));
 const NOT_FIXED = OUTCOME_NOT_FIXED.map(normalizeText).filter(Boolean);
 const NOT_FIXED_ALONE = new Set(OUTCOME_NOT_FIXED_ALONE.map(normalizeText).filter(Boolean));
 const NOT_TRIED = OUTCOME_NOT_TRIED.map(normalizeText).filter(Boolean);
 const RESOLVED = OUTCOME_RESOLVED.map(normalizeText).filter(Boolean);
-const OWNS_WORDS = new Set(OWNS_PRINTER.words.map(normalizeText).filter(Boolean));
-const OWNS_PHRASES = OWNS_PRINTER.phrases.map(normalizeText).filter(Boolean);
-const OWNS_VETO = new Set(OWNS_PRINTER.veto.map(normalizeText).filter(Boolean));
-const OWNS_HAVE_NOT = OWNS_PRINTER.haveNot.map(normalizeText).filter(Boolean);
-const OWNS_WANTS = OWNS_PRINTER.wants.map(normalizeText).filter(Boolean);
-const OWNS_FOR_ME = OWNS_PRINTER.forMe.map(normalizeText).filter(Boolean);
 const TRIED_VERBS = TRIED_SAID.verbs.map((v) => tokenize(normalizeText(v))).filter((v) => v.length > 0);
 const TRIED_NEGATIONS = new Set(TRIED_SAID.negations.map(normalizeText).filter(Boolean));
 const TRIED_AUXILIARIES = new Set(TRIED_SAID.auxiliaries.map(normalizeText).filter(Boolean));
@@ -267,7 +244,7 @@ const TRIED_PARTIAL = [...TRIED_SAID.partial, ...Object.keys(ORDINAL_WORDS)].map
 /** Within how many words before its verb a negation still negates it, over `TRIED_SAID.adverbs`. */
 const NEGATION_REACH = 3;
 
-/** «وعندي», «واكو», «وجربتها»: the conjunction glued on, taken off. «ولا» (nor, not even) stays whole. */
+/** «وجربتها», «وسويتها»: the conjunction glued on, taken off. «ولا» (nor, not even) stays whole. */
 function unglued(tokens: readonly string[]): string[] {
   return tokens.map((t) => (t.length > 2 && t.startsWith('و') && !t.startsWith('وو') && t !== 'ولا' ? t.slice(1) : t));
 }
@@ -319,28 +296,6 @@ function negatedBefore(tokens: readonly string[], i: number): boolean {
     if (!TRIED_ADVERBS.has(tokens[k])) return false;
   }
   return false;
-}
-/**
- * «عندي اي ون», «وعندي طابعة», "I have an A1", «A1م هەیە»: a printer the
- * customer says is theirs. Never with a want, need or have-not
- * («پرینتەرێکم دەوێ», «پرینتەرم نییە», «ماكو عندي طابعة», «عندي ولا اي ون», "I
- * have no printer"), and «مالتي», «مالي» and "my own" beside a want or a need
- * are "for me" («اريد طابعة مالتي», "I want my own A1"). Pure.
- */
-function saysOwned(normalized: string, typed: readonly string[]): boolean {
-  const tokens = unglued(typed);
-  const padded = ` ${normalized} `;
-  const bare = ` ${tokens.join(' ')} `;
-  if (tokens.some((t) => OWNS_VETO.has(t)) || saysAny(padded, OWNS_HAVE_NOT) || saysAny(bare, OWNS_HAVE_NOT)) return false;
-  const wants = saysAny(padded, OWNS_WANTS) || saysAny(bare, OWNS_WANTS);
-  const text = wants ? OWNS_FOR_ME.reduce((t, p) => t.split(` ${p} `).join(' '), bare) : bare;
-  if (tokenize(text.trim()).some((t) => OWNS_WORDS.has(t))) return true;
-  return saysAny(text, OWNS_PHRASES);
-}
-/** «متوفر؟», «اكو A1؟», "is my printer in stock": a stock ask; never «اكو عندي اي ون» ("I have an A1"). Pure. */
-function saysStock(normalized: string, typed: readonly string[]): boolean {
-  const drop = (text: string) => STOCK_ASKS_NOT.reduce((t, p) => t.split(` ${p} `).join(' '), text);
-  return saysAny(drop(` ${normalized} `), STOCK_ASKS) || saysAny(drop(` ${unglued(typed).join(' ')} `), STOCK_ASKS);
 }
 /**
  * THE IRAQI PROGRESSIVE «دا» («is …-ing») between the negation and its verb:
@@ -504,10 +459,8 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
     ...(outcome ? { outcome } : {}),
     ...(wordSymptom ? { wordSymptom } : {}),
     ownPrinter,
-    ownsPrinter: saysOwned(normalized, typedWords),
     triedSaid: saysTried(normalized),
     priceAsk: PRICE_ASKS.some((p) => ` ${normalized} `.includes(` ${p} `)),
-    stockAsk: saysStock(normalized, typedWords),
     residual,
   };
 }
