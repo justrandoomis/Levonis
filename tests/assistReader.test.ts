@@ -685,3 +685,116 @@ test('round 5: the common whole «still» replies are «not fixed»; a longer se
     assert.equal(readOutcome(normalizeText(text)), undefined, `«${text}»`);
   }
 });
+
+test('round 5.2: in Arabic and English, a want or a need makes «مالتي», «مالي» and "my own" mean "for me", and a have-not is never ownership', () => {
+  for (const text of [
+    'اريد اي ون مالتي',
+    'اريد A1 مالي',
+    'ماكو عندي اي ون',
+    'عندي ولا اي ون',
+    'اريد طابعة مالتي',
+    'ابي طابعة مالتي',
+    'ابغى طابعة مالتي',
+    'ودي طابعة مالتي',
+    'احتاج طابعة مالتي',
+    'اريد طابعة مالي',
+    'ماكو عندي طابعة',
+    'ماكو عدي طابعة',
+    'ماكو طابعة عندي',
+    'عندي ولا طابعة',
+    'ما عندي طابعة',
+    'I want my own A1',
+    'I need my own A1',
+    'my own A1 please',
+    'I want an A1 of my own',
+    "I'd like my own A1",
+    'I want my own printer',
+    'I need my own printer',
+    'I have no printer',
+    "I don't have an A1",
+  ]) {
+    assert.equal(understand(text).ownsPrinter, false, text);
+  }
+  // Ownership said without a want or a have-not is still ownership.
+  for (const text of ['عندي اي ون', 'وعندي اي ون', 'طابعتي A1', 'اي ون مالتي', 'I have an A1', 'my own A1', 'my A1', 'I have a printer', 'A1م هەیە']) {
+    assert.equal(understand(text).ownsPrinter, true, text);
+  }
+});
+
+test('round 5.2: a stock ask is read as the price ask is, whatever the scorer makes of it', () => {
+  for (const text of [
+    'is my printer in stock',
+    'my printer in stock?',
+    'do you have my A1 in stock',
+    'do you have my A1',
+    'is my A1 available',
+    'اكو A1 مالتي',
+    'اكو طابعتي؟',
+    'واكو A1؟',
+    'طابعتي موجودة عندكم؟',
+    'عندي A1 موجودة عندكم؟',
+    'A1 متوفرة؟',
+    'A1 بەردەستە؟',
+  ]) {
+    assert.equal(understand(text).stockAsk, true, text);
+  }
+  // «اكو عندي», «موجودة عندي» are "I have": ownership, never a stock ask.
+  for (const text of ['عندي اي ون', 'اكو عندي اي ون', 'عندي A1 موجودة عندي', 'I have an A1', 'A1م هەیە', 'how much is my A1', 'طابعتي A1']) {
+    assert.equal(understand(text).stockAsk, false, text);
+  }
+  for (const text of ['اكو عندي اي ون', 'عندي A1 موجودة عندي']) {
+    assert.equal(understand(text).ownsPrinter, true, text);
+  }
+});
+
+test('round 5.2: a negation further off, a "nothing" after the verb, «ولا» and only some of the steps are never «tried»; the plural «ـهن», the Sorani forms and "did that" are', () => {
+  for (const text of [
+    "I haven't really tried them, still clogged",
+    "I haven't even tried them, still clogged",
+    'I have not actually done them, still clogged',
+    'never really tried, still clogged',
+    'I did nothing, still clogged',
+    'I did none of them, still clogged',
+    "I've done nothing, still clogged",
+    'I have done nothing yet, still clogged',
+    'I have done none of them, still clogged',
+    'done nothing, still clogged',
+    'nothing done, still clogged',
+    'tried nothing, still clogged',
+    "I've tried nothing yet, still clogged",
+    'I did the first one only, still clogged',
+    'ولا سويت شي وبعده نفس المشكله',
+    'سويت ولا شي، نفس المشكله',
+    'ولا خطوة جربتها، نفس المشكله',
+    'ما بعد جربتها نفس المشكله',
+    'جربت الاولى بس، نفس المشكله',
+    'تەنها یەکەمیانم کرد، هێشتا گیراوە',
+  ]) {
+    assert.equal(saysTried(normalizeText(text)), false, `«${text}»`);
+    assert.equal(understand(text).triedSaid, false, `«${text}»`);
+  }
+  for (const text of [
+    'جربتهن وما زبطت',
+    'سويتهن بس نفس المشكله',
+    'طبقتهن وبعده مسدود',
+    'نفذتهن ونفس المشكله',
+    'عملتهن كلهن ونفس المشكله',
+    'مسويهن بس بعده مسدود',
+    'هەموویم تاقی کردەوە، هێشتا چارەسەر نەبووە',
+    'تاقی کردەوە، هێشتا گیراوە',
+    'تاقیمکردنەوە، هێشتا گیراوە',
+    'جێبەجێم کردن، هێشتا گیراوە',
+    'ئەنجامم دان بەڵام هێشتا',
+    'did that, still clogged',
+    'did these, still clogged',
+    'gave it a try, still clogged',
+    // A clause of its own after the verb, and a bare «لا» ("no,") opening the reply, never negate it.
+    'tried, nothing changed',
+    'did it, nothing changed',
+    'جربت ولا شي تغير',
+    'لا جربتها بس نفس المشكله',
+  ]) {
+    assert.equal(saysTried(normalizeText(text)), true, `«${text}»`);
+    assert.equal(understand(text).triedSaid, true, `«${text}»`);
+  }
+});
