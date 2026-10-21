@@ -613,6 +613,29 @@ uploadSessionRoutes.get('/:id', async (c) => {
     await expireSession(c.env, s);
     throw sessionNotFound();
   }
+  // A REQUEST SESSION THAT COMPLETED answers with the file row it landed
+  // (P1-06, acceptance 13): when the answer to «complete» was lost on the way,
+  // the browser's retry finds the file here instead of opening a second
+  // session and storing the same bytes twice.
+  if (s.state === 'completed' && s.purpose === 'request') {
+    const f = await c.env.DB.prepare(
+      `SELECT id, file_name, content_type, size_bytes, kind FROM community_request_files WHERE request_id = ? AND file_key = ?`
+    )
+      .bind(s.entity_id, s.object_key)
+      .first<{ id: string; file_name: string; content_type: string; size_bytes: number; kind: string }>();
+    if (f) {
+      const file = {
+        id: f.id,
+        file_name: f.file_name,
+        content_type: f.content_type,
+        size_bytes: Number(f.size_bytes ?? 0),
+        kind: f.kind,
+        inline: String(f.content_type).startsWith('image/'),
+        url: requestFileUrl(s.entity_id, f.id),
+      };
+      return c.json({ success: true, ...sessionPublic(s), sha256: s.sha256, file });
+    }
+  }
   return c.json({ success: true, ...sessionPublic(s) });
 });
 

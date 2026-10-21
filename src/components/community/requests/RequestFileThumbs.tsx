@@ -13,20 +13,28 @@
  * No strings of its own: the caller names the list.
  */
 import type { ReactNode } from 'react';
+import type { ImageVariantWidth } from '../../../../packages/contracts/src/imageSizing';
 
 /** The widths a thumbnail asks the route for (a subset of packages/contracts/src/imageSizing.ts). */
 const THUMB_WIDTHS = [160, 320, 640] as const;
+/** The widths the editor’s in-page viewer asks for: a full-screen picture on a phone up to a desktop (P1-06). */
+const VIEWER_WIDTHS = [640, 1080, 1280, 1600] as const;
 
 /** One sized copy of a stored request picture; a `blob:` or any other source is returned as it is. */
-export function requestImageSrc(url: string, width: (typeof THUMB_WIDTHS)[number]): string {
+export function requestImageSrc(url: string, width: ImageVariantWidth): string {
   if (!url.startsWith('/api/marketplace/requests/')) return url;
   return `${url}${url.includes('?') ? '&' : '?'}w=${width}`;
 }
 
 /** The srcset of a stored request picture, so a phone with a dense screen still gets a sharp thumbnail. */
-export function requestImageSrcSet(url: string): string | undefined {
+export function requestImageSrcSet(url: string, widths: readonly ImageVariantWidth[] = THUMB_WIDTHS): string | undefined {
   if (!url.startsWith('/api/marketplace/requests/')) return undefined;
-  return THUMB_WIDTHS.map((w) => `${requestImageSrc(url, w)} ${w}w`).join(', ');
+  return widths.map((w) => `${requestImageSrc(url, w)} ${w}w`).join(', ');
+}
+
+/** The viewer’s srcset: the picture as large as the screen shows it, never the phone original. */
+export function requestViewerSrcSet(url: string): string | undefined {
+  return requestImageSrcSet(url, VIEWER_WIDTHS);
 }
 
 export interface ThumbFile {

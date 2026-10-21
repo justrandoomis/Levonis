@@ -614,6 +614,29 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This request is already published. Refresh and edit it from its page.',
     ckb: 'ئەم داواکارییە پێشتر بڵاوکراوەتەوە. پەڕەکە نوێ بکەرەوە و لە پەڕەکەی خۆیەوە دەستکاری بکە.',
   },
+  // ---- the request editor (P1-06, DECISIONS row 268): a draft may be born
+  // empty, so the publish asks for the title and the description; a stale
+  // window cannot overwrite a newer save; a request for one store is sent to it.
+  REQUEST_TITLE_REQUIRED: {
+    ar: 'اكتب عنوانًا من 4 إلى 140 حرفًا قبل النشر.',
+    en: 'Write a title of 4 to 140 characters before publishing.',
+    ckb: 'پێش بڵاوکردنەوە ناونیشانێک بنووسە لە ٤ تا ١٤٠ پیت.',
+  },
+  REQUEST_DESCRIPTION_REQUIRED: {
+    ar: 'صف ما تريده في 10 أحرف على الأقل قبل النشر.',
+    en: 'Describe what you need in at least 10 characters before publishing.',
+    ckb: 'پێش بڵاوکردنەوە ئەوەی پێویستتە لانیکەم بە ١٠ پیت باس بکە.',
+  },
+  DRAFT_CHANGED: {
+    ar: 'تغيّرت المسودة من نافذة أخرى — حمّل الأحدث.',
+    en: 'The draft changed in another window — load the latest.',
+    ckb: 'ڕەشنووسەکە لە پەنجەرەیەکی ترەوە گۆڕا — نوێترینەکە بار بکە.',
+  },
+  REQUEST_IS_DIRECT: {
+    ar: 'هذا الطلب لمتجر واحد — أرسله إليه من محادثتك معه.',
+    en: 'This request is for one store — send it to the store from your conversation with it.',
+    ckb: 'ئەم داواکارییە بۆ یەک فرۆشگایە — لە گفتوگۆکەت لەگەڵ ئەو فرۆشگایەدا بینێرە.',
+  },
   // ---- the request model v3 (P1-04, DECISIONS row 266): sources, parts, materials, colours.
   REQUEST_MODEL_V3: {
     ar: 'هذا الطلب فيه أكثر من قطعة أو مادة — حدّث الصفحة لتعديله.',

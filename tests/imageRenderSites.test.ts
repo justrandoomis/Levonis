@@ -51,6 +51,16 @@ const ALLOWED_RAW: Record<string, Record<string, string>> = {
   // requestImageSrcSet) — private, so no public variant exists for the shared builder to name.
   'src/components/community/requests/RequestFileThumbs.tsx': { 'requestImageSrc(url, 160)': 'a private request picture, sized by its authorised route (?w=)' },
   'src/components/community/requests/RequestWizard.tsx': { objectUrl: 'a blob preview of a picture still on the device (R4)' },
+  // The request editor (P1-06, row 268): the same two kinds of picture — a device preview while it is
+  // on its way, and the private authorised route asked for a sized copy (`?w=`) once stored.
+  'src/components/community/requests/editor/SourceThumb.tsx': { preview: 'a blob preview of a picture still on the device (R4)' },
+  'src/components/community/requests/editor/ImageGrid.tsx': {
+    'p.preview': 'a blob preview of a picture still on the device (R4)',
+    'requestImageSrc(p.url, 320)': 'a private request picture, sized by its authorised route (?w=, requestImageSrcSet)',
+  },
+  'src/components/community/requests/editor/ImageViewer.tsx': {
+    src: 'the in-page viewer: a private request picture sized by its authorised route (?w=1280, requestViewerSrcSet), or its blob preview',
+  },
   'src/components/merchant/share/ShareStore.tsx': { icon: 'the generated store icon (/store-icon/), not a stored picture' },
   'src/components/pwa/InstallAppSheet.tsx': { icon: 'a static app icon from /icons/' },
   'src/components/reviews/ReviewSection.tsx': { 'p.url': "the reviewer's own unpublished photos (private until published)", 'igShot.url': 'private evidence of an Instagram post' },

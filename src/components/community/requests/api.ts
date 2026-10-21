@@ -92,7 +92,110 @@ export interface DraftShape {
   schema_version?: 1 | 3;
   /** Every source and part, in order — synthesised from `print` while the request is version 1. */
   model?: DraftModel | null;
+  /** P1-06: what the editor sends back as `expected_updated_at`. Absent on an older Worker. */
+  updated_at?: string;
+  /** P1-06: the one store a DIRECT request is addressed to; null for a board request. */
+  direct?: { merchant_id: string; store_name: string; store_slug: string; chat_id: string | null } | null;
 }
+
+// ---------------------------------------------------------------------------
+//  THE V3 BODY (P1-06, docs/DECISIONS.md row 268): what the request editor
+//  sends to the draft save, the estimate and the publish. Ids it echoes are
+//  the server’s; an id the server never gave (`tmp_…`) names a new source so
+//  a part or a colour can point at it in the same body. It never sends
+//  `source_type`: the server derives it.
+// ---------------------------------------------------------------------------
+
+export interface V3Colour {
+  mode: RequestColourMode;
+  hex?: string;
+  label?: string;
+  ref?: string;
+}
+
+export interface V3Material {
+  id?: string;
+  material_id: string;
+  colors: V3Colour[];
+  finish: string;
+  region_reference: string;
+  requirements: string;
+}
+
+export interface V3Part {
+  id?: string;
+  name: string;
+  quantity: number;
+  process: ProcessChoice;
+  stated_dimensions_mm: Dims | null;
+  measured_file_id: string | null;
+  notes: string;
+  assembly_notes: string;
+  source_ids: string[];
+  materials: V3Material[];
+}
+
+export interface V3Source {
+  id: string;
+  kind: RequestSourceKind;
+  file_id?: string;
+  url?: string;
+  ref_text?: string;
+  note: string;
+  is_primary: boolean;
+  role?: string;
+}
+
+export interface V3Body {
+  schema_version: 3;
+  title?: string;
+  description?: string;
+  quantity: number;
+  quality: Quality;
+  sources: V3Source[];
+  parts: V3Part[];
+}
+
+const draftPath = (id: string) => `/api/marketplace/print/requests/${encodeURIComponent(id)}/draft`;
+
+export const editorApi = {
+  /** A new draft, born empty and version 3 (worker/routes/requestEntries.ts). */
+  createEntry: () =>
+    api.post<{ request_id: string; replayed: boolean; draft: DraftShape }>('/api/marketplace/print/requests', { entry: { kind: 'blank' } }),
+  draft: (id: string) => api.get<{ draft: DraftShape }>(draftPath(id)),
+  /** `expected` refuses with 409 DRAFT_CHANGED when another window saved first. */
+  save: (id: string, body: V3Body, expected?: string) =>
+    api.put<{ draft: DraftShape }>(draftPath(id), expected ? { ...body, expected_updated_at: expected } : body),
+  publish: (id: string, body: V3Body) =>
+    api.post<PublishResult>(`/api/marketplace/print/requests/${encodeURIComponent(id)}/publish`, body),
+  quote: (id: string, body: V3Body) => api.post<QuoteAnswer>('/api/marketplace/print/quote', { ...body, request_id: id }),
+  cancel: (id: string) => api.post<{ success: boolean }>(`/api/marketplace/requests/${encodeURIComponent(id)}/cancel`),
+  viewerToken: (id: string, fileId: string) =>
+    api.post<{ token: string; url: string }>(
+      `/api/marketplace/print/requests/${encodeURIComponent(id)}/files/${encodeURIComponent(fileId)}/viewer-token`
+    ),
+  /**
+   * The save that must outlive the page (it is leaving): a plain keepalive
+   * request, with no `expected_updated_at` — a save of this same tab still in
+   * flight moves the stamp, and a stale stamp would throw the last words away.
+   * Fire and forget; false when the browser refused to send it.
+   */
+  saveOnLeave: (id: string, body: V3Body): boolean => {
+    try {
+      if (typeof fetch !== 'function') return false;
+      void fetch(draftPath(id), {
+        method: 'PUT',
+        credentials: 'same-origin',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).catch(() => undefined);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+};
 
 /** A colour as the model gives it (packages/contracts/src/requestModel.ts). */
 export interface DraftModelColour {

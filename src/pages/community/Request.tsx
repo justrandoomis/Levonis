@@ -152,6 +152,14 @@ function justPublished(state: unknown): boolean {
 
 // ------------------------------------------------------------------- route
 
+/**
+ * The request editor (/requests/new[/:id], /requests/:id/edit; row 268) is a
+ * chunk of its own, imported from here (src/App.tsx `RequestEditorPage`): by
+ * the time it loads, this page’s modules are in memory, so the editor’s chunk
+ * reuses them rather than splitting them into chunks of their own.
+ */
+export const loadRequestEditor = () => import('./RequestEditor');
+
 export default function RequestPage() {
   const { id = '' } = useParams();
   const location = useLocation();

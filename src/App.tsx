@@ -317,6 +317,13 @@ const CommunitySaved = React.lazy(() => import('./pages/community/Saved'));
 // A print request's own page (Phase 5, §9.5): /requests/:id. The old
 // /requests?request=<id> address is redirected there by pages/Requests.tsx.
 const CommunityRequest = React.lazy(() => import('./pages/community/Request'));
+// The request editor (P1-06, docs/DECISIONS.md row 268): /requests/new[/:id]
+// and /requests/:id/edit, a lazy chunk of its own behind the sign-in and the
+// gate. It is fetched THROUGH the request page’s module, which it shares most
+// of its code with: the editor’s chunk then reuses that page’s modules
+// instead of splitting them into new shared chunks, and the first paint of
+// every visitor carries one more route, not the editor’s dependency list.
+const RequestEditorPage = React.lazy(() => import('./pages/community/Request').then((m) => m.loadRequestEditor()));
 const Orders = React.lazy(() => import('./pages/Orders'));
 const OrderDetail = React.lazy(() => import('./pages/OrderDetail'));
 const Community = prefetchable(() => import('./pages/Community'));
@@ -554,6 +561,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) return <Navigate to="/auth" replace state={{ from: location.pathname + location.search }} />;
   return <>{children}</>;
 }
+
+// Both editor addresses share one element: signed in, and behind the gate.
+const requestEditorRoute = <ProtectedRoute><CommunityGate closedExtra={<RunningCommunityOrders />}><RequestEditorPage /></CommunityGate></ProtectedRoute>;
 
 // UX-level gate only — every admin API call is separately authorized on the
 // server, so hiding the route is presentation, not the security boundary.
@@ -1073,6 +1083,8 @@ function AppContent() {
               under the card (closedExtra) so they can still confirm or
               cancel — /api/marketplace/orders is outside the wall. */}
           <Route path="/requests" element={<CommunityGate closedExtra={<RunningCommunityOrders />}><Requests /></CommunityGate>} />
+          <Route path="/requests/new/:id?" element={requestEditorRoute} />
+          <Route path="/requests/:id/edit" element={requestEditorRoute} />
           <Route path="/requests/:id" element={<CommunityGate closedExtra={<RunningCommunityOrders />}><CommunityRequest /></CommunityGate>} />
           <Route path="/merchant/start" element={<ProtectedRoute><MerchantStart /></ProtectedRoute>} />
           {/* Behind the gate too: the page is a list of COMMUNITY stores and it

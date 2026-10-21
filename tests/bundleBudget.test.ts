@@ -342,6 +342,8 @@ test('the split really happened: every page and panel §10 names has a chunk of 
     // board rail are each a lazy chunk — named here, and kept out of the
     // entry, the store pages and the workspace frame by the test below.
     'Request', 'OrderTimeline', 'CustomOrderScreen', 'AnnouncementSheet', 'BoardRail',
+    // The request editor (P1-06, row 268): /requests/new[/:id] and /requests/:id/edit, its own chunk.
+    'RequestEditor',
     // the manualChunks groups — `vendor-motion` is the features half and
     // `vendor-motion-core` the eager half (P1b); `vendor-icons` the icons the
     // lazy routes share (vite.config.ts `iconChunk`).
@@ -716,7 +718,7 @@ test('the analytics, order and Today screens stay small and never pull in a char
  * of its own and a static import of none of those closures; the announcement
  * sheet opens on a tap from Today, so it is not in Today's closure either.
  */
-const PHASE5_LAZY = ['Request', 'OrderTimeline', 'CustomOrderScreen', 'AnnouncementSheet', 'BoardRail'] as const;
+const PHASE5_LAZY = ['Request', 'OrderTimeline', 'CustomOrderScreen', 'AnnouncementSheet', 'BoardRail', 'RequestEditor'] as const;
 
 test('the Phase-5 screens are lazy chunks outside the entry, the store pages, the workspace frame and Today', () => {
   const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
