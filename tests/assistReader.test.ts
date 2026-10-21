@@ -215,4 +215,3 @@ test('follow-up words: a correction, an ordinal, and a printer that is not a pro
   assert.deepEqual(understand('P1S').codes, [], '«P1S» typed alone is the printer, not the code P1S');
   assert.deepEqual(understand('اكو 0.4؟').measures, ['0.4']);
 });
-

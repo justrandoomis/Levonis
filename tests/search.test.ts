@@ -1265,4 +1265,3 @@ test('strongProducts: every typed word, reached without a forgiven typo', () => 
   assert.deepEqual(strong('okey'), [], 'a forgiven typo is not a strong match');
   assert.deepEqual(strong('wifi'), ['antenna']);
 });
-
