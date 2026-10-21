@@ -126,10 +126,13 @@ it costs zero minutes until run.
 Before a manual redeploy of a commit older than P1-05 (docs/DECISIONS.md row
 267), run `scripts/before-rollback-offers-v3.sql` against the live database
 (the command is in the file). An older build does not know that a partial or
-substituted offer needs the customer's acknowledgement; the statement turns
-every such pending offer `superseded`, so the older build refuses it
-(`OFFER_STALE`) instead of funding it as the whole job. After rolling forward,
-the merchant's edit or re-confirmation re-opens it.
+substituted offer needs the customer's acknowledgement, and its edit and
+«send draft» ignore an offer's coverage. The script turns every such open
+offer (`pending` or `superseded`) `withdrawn` (terminal in every build: no
+edit, re-confirm or acceptance re-opens it, so it is never funded as the whole
+job) and deletes every draft that carries a coverage or a substitution. The
+merchant makes a new offer instead; a withdrawn offer is not re-opened after
+rolling forward.
 
 ### Deleting a workflow breaks `npm run check`
 

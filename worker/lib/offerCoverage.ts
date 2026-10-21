@@ -37,9 +37,11 @@
  *   OFFER_COVERAGE_UNAVAILABLE   coverage or substitutions named on a database
  *                                before 0208
  *
- * Every write that stores a non-default coverage is fenced on the revision's
- * hash (`revisionHashFence`), so a part checked against one version of the
- * request is never stored against another (critique 3).
+ * Every write whose coverage was checked against the request model (a
+ * non-default coverage, or a whole offer checked for parts added since) is
+ * fenced on the revision's hash (`revisionHashFence`), so a part checked
+ * against one version of the request is never stored against another
+ * (critiques 3 and 4).
  */
 import { HttpError } from './http';
 import { safeParse } from './types';
@@ -84,7 +86,18 @@ export const isDefaultCoverage = (t: OfferCoverageTerms): boolean => t.parts ===
  */
 export interface CoverageBody {
   coverage?: string[] | null;
-  substitutions?: Array<{ part_id: string; material_row_id: string; to: { material_id?: string; colors?: SubColour[] }; note: string }>;
+  substitutions?: Array<{
+    part_id: string;
+    material_row_id: string;
+    to: { material_id?: string; colors?: SubColour[] };
+    note: string;
+    /**
+     * The source it was proposed against. Set by the server only (a stored
+     * offer, a saved draft), never read from a body: when the customer has
+     * changed that material since, the substitution is refused.
+     */
+    was?: OfferSubstitution['from'];
+  }>;
 }
 
 /** The request as an offer is checked against: its current revision and the model that revision recorded. */
@@ -213,7 +226,7 @@ export function resolveCoverage(
     if (row.material_unsure || !row.material_id) throw invalidSubstitution('The customer left this material open: choosing one is not a substitution', at);
     const from = fromOf(row);
     // A re-read of a stored substitution whose source moved is not carried (critique 4).
-    const was = (x as { was?: OfferSubstitution['from'] }).was;
+    const was = x.was;
     if (was && (was.material_id !== from.material_id || !sameColours(was.colors, from.colors))) {
       throw invalidSubstitution('The customer changed this material since — propose the substitute again', at);
     }

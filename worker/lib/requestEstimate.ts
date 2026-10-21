@@ -146,14 +146,17 @@ const activeMaterial = (mats: ReadonlyArray<PrintMaterial>, id: string) => mats.
  * material and a resin together cannot be printed as one part; a resin part
  * cures in one vat of one material; a material that left the catalogue
  * cannot be priced or matched. A chosen-but-empty material is «not chosen»,
- * not unknown.
+ * not unknown. A part is resin by its chosen materials OR by the process the
+ * customer named for it, so a resin part of two open material rows is refused
+ * too: no workshop could ever make it (its open rows read as two colours).
  */
-export function unsupportedPart(part: Pick<ModelPart, 'materials'>, mats: ReadonlyArray<PrintMaterial>): RequestPublishRefusalCode | null {
+export function unsupportedPart(part: Pick<ModelPart, 'materials' | 'process' | 'process_unsure'>, mats: ReadonlyArray<PrintMaterial>): RequestPublishRefusalCode | null {
   const chosen = part.materials.filter((x) => !x.material_unsure && x.material_id);
   if (chosen.some((x) => !activeMaterial(mats, x.material_id))) return 'PART_MATERIAL_UNKNOWN';
   const processes = new Set(chosen.map((x) => activeMaterial(mats, x.material_id)!.process));
   if (processes.size > 1) return 'PART_PROCESS_MIXED';
-  if (processes.has('resin') && part.materials.length > 1) return 'PART_RESIN_MULTI_MATERIAL';
+  const resin = processes.has('resin') || (!part.process_unsure && part.process === 'resin');
+  if (resin && part.materials.length > 1) return 'PART_RESIN_MULTI_MATERIAL';
   return null;
 }
 

@@ -146,6 +146,7 @@ const ADMIN_COMMUNITY_ROUTES: Record<string, MoneyClass> = {
   'POST /products/:id/hide': 'none',
   'POST /reviews/:id/hide': 'none',
   'POST /requests/:id/remove': 'none',
+  'POST /requests/:id/review': 'none',
   // P1-04: the request-model cache by hand — part rows and summary columns, counts only, no amount.
   'POST /request-models/backfill': 'none',
   'GET /requests': 'none',

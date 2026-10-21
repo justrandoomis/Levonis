@@ -43,11 +43,13 @@ test('a multi-part job publishes: its revision carries the model, its estimate t
 const REFUSED: Array<[string, Record<string, unknown>]> = [
   ['PART_PROCESS_MIXED', { name: 'Mixed', materials: [{ material_id: 'pla' }, { material_id: 'resin-standard' }] }],
   ['PART_RESIN_MULTI_MATERIAL', { name: 'Two resins', materials: [{ material_id: 'resin-standard' }, { material_id: 'resin-tough' }] }],
+  // A resin part by its named process, its two material rows left open: no workshop could make it.
+  ['PART_RESIN_MULTI_MATERIAL', { name: 'Two open resins', process: 'resin', materials: [{ material_id: 'unsure' }, { material_id: 'unsure' }] }],
   ['PART_MATERIAL_UNKNOWN', { name: 'Gone', materials: [{ material_id: 'unobtainium' }] }],
 ];
 
 for (const [code, bad] of REFUSED) {
-  test(`15: ${code} — refused at publish with the part named, nothing written; the draft keeps it`, async () => {
+  test(`15: ${code} (${String(bad.name)}) — refused at publish with the part named, nothing written; the draft keeps it`, async () => {
     const raw = world();
     const id = await newDraft(raw);
     const body = { schema_version: 3, parts: [{ name: 'Fine', process: 'fdm', materials: [{ material_id: 'pla' }] }, bad] };

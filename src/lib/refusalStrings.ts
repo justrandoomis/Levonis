@@ -659,9 +659,9 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ckb: 'وۆرکشۆپەکەت ناتوانێت یەکێک لە پارچە هەڵبژێردراوەکان دروست بکات — لە ئۆفەرەکە لای ببە.',
   },
   OFFER_SUBSTITUTION_INVALID: {
-    ar: 'البديل غير صالح: اختر مادة من الكتالوج بنفس تقنية القطعة، لقطعة يشملها العرض.',
-    en: 'That substitute is not valid: choose a catalogue material of the same technology as the part, for a part the offer covers.',
-    ckb: 'ئەو جێگرەوەیە دروست نییە: کەرەستەیەک لە کاتالۆگ بە هەمان تەکنیکی پارچەکە هەڵبژێرە، بۆ پارچەیەک کە ئۆفەرەکە دەیگرێتەوە.',
+    ar: 'البديل غير صالح: اختر مادة من الكتالوج بنفس تقنية القطعة، لقطعة يشملها العرض. وإن غيّر الزبون تلك المادة منذ اقترحته فاقترحه من جديد.',
+    en: 'That substitute is not valid: choose a catalogue material of the same technology as the part, for a part the offer covers. If the customer changed that material since you proposed it, propose it again.',
+    ckb: 'ئەو جێگرەوەیە دروست نییە: کەرەستەیەک لە کاتالۆگ بە هەمان تەکنیکی پارچەکە هەڵبژێرە، بۆ پارچەیەک کە ئۆفەرەکە دەیگرێتەوە. ئەگەر کڕیار دوای پێشنیارەکەت ئەو کەرەستەیەی گۆڕیبێت، دووبارە پێشنیاری بکەرەوە.',
   },
   OFFER_SUBSTITUTION_UNACCEPTED: {
     ar: 'هذا العرض يقترح مادة أو لونًا مختلفًا — وافق على البدائل أولًا.',
