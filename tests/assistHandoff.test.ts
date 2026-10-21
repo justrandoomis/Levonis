@@ -67,7 +67,7 @@ test('the desk reads the summary in all three languages, from the curated set', 
 });
 
 test('the draft carries the summary the ticket door stores', () => {
-  const draft = buildTicketDraft({ model: 'P1S', symptom: 'hms', code: '0300-0100-0001-0003', shown: ['p1', 'p2'] }, 'ckb');
+  const draft = buildTicketDraft({ model: 'P1S', symptom: 'hms', code: '0300-0100-0001-0003', shown: ['p1', 'p2'], tried: true }, 'ckb');
   assert.deepEqual(draft.handoff, {
     v: 1,
     model: 'P1S',

@@ -136,6 +136,11 @@ test('the auth layer never imports the conversation statically, and the owner mo
   assert.doesNotMatch(auth, /^import[^;]*from '\.\/lib\/assist(?:Session|Owner)'/m, 'a static import puts it in the entry chunk');
   const owner = readFileSync(join(ROOT, 'src/lib/assistOwner.ts'), 'utf8');
   assert.doesNotMatch(owner, /^import /m, 'the owner module is fetched alone: it pulls nothing in with it');
+  // Review round 4: its header says what is true, a dynamic import and a chunk of its own.
+  assert.match(auth, /import\('\.\/lib\/assistOwner'\)/);
+  const header = owner.slice(0, owner.indexOf('*/'));
+  assert.doesNotMatch(header, /part of the entry chunk/);
+  assert.match(header, /dynamic import/);
   // One set of keys: the module that loads and saves the conversation reads them from the owner module.
   const conversation = readFileSync(join(ROOT, 'src/lib/assistSession.ts'), 'utf8');
   assert.match(conversation, /import \{ ASSIST_CONTEXT_KEY, ASSIST_STATE_KEY \} from '\.\/assistOwner'/);

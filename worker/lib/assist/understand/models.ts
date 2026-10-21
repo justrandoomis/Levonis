@@ -383,6 +383,24 @@ export const OTHER_BRANDS: readonly string[] = [
   'کریالیتی', 'ئێندەر', 'پروسا', 'ئەنیکیوبیک', 'ئیلیگۆ', 'نێپتوون', 'نێپتون', 'کۆبرا', 'ڤۆرۆن', 'سۆڤۆڵ',
 ];
 const OTHER_BRAND_SET = new Set(OTHER_BRANDS.map(normalizeText));
+/**
+ * Each maker above as the catalogue writes it, in Latin: «سنابميكر» is
+ * Snapmaker. The shop sells some of their parts («Snapmaker U1 Hot End
+ * Nozzle»), so the name is looked up before it is dropped from the search.
+ */
+const BRAND_LATIN: ReadonlyMap<string, string> = new Map(
+  (
+    [
+      ['كريالتي', 'creality'], ['كرياليتي', 'creality'], ['كريلتي', 'creality'], ['کریالیتی', 'creality'],
+      ['اندر', 'ender'], ['ئێندەر', 'ender'], ['بروسا', 'prusa'], ['پروسا', 'prusa'],
+      ['انيكيوبك', 'anycubic'], ['انيكيوبيك', 'anycubic'], ['ئەنیکیوبیک', 'anycubic'],
+      ['اليجو', 'elegoo'], ['ايليجو', 'elegoo'], ['ئیلیگۆ', 'elegoo'], ['سنابميكر', 'snapmaker'], ['فلاشفورج', 'flashforge'],
+      ['نبتون', 'neptune'], ['نيبتون', 'neptune'], ['نبتيون', 'neptune'], ['نێپتوون', 'neptune'], ['نێپتون', 'neptune'],
+      ['كوبرا', 'kobra'], ['کۆبرا', 'kobra'], ['فورون', 'voron'], ['ڤۆرۆن', 'voron'], ['سوفول', 'sovol'], ['سۆڤۆڵ', 'sovol'],
+      ['كيدي', 'qidi'], ['ارتيلري', 'artillery'], ['ارتلري', 'artillery'],
+    ] as const
+  ).map(([word, latin]) => [normalizeText(word), latin] as const)
+);
 
 /** Lines of other makers written as letters and a number: «CR-10», «cr6» (Creality), «SV06» (Sovol). */
 const OTHER_LINE = /^(?:cr|sv)\d/;
@@ -407,6 +425,8 @@ export interface UnreadPrinter {
   unread: boolean;
   /** One of those words is another maker's name. */
   otherBrand: boolean;
+  /** Those makers, in Latin as the catalogue writes them («snapmaker»). */
+  makers: string[];
 }
 
 /**
@@ -424,6 +444,7 @@ const HYPHEN_NAME = /(?<![A-Za-z0-9])([A-Za-z]{1,3})[-\u2010-\u2014](\d{1,3})(?!
 export function unreadPrinter(words: readonly string[]): UnreadPrinter {
   let unread = false;
   let otherBrand = false;
+  const makers: string[] = [];
   let joined = ` ${words.join(' ')} `;
   for (const phrase of NOT_NAMES) joined = joined.split(` ${phrase} `).join(' ');
   const tokens = joined.trim().split(' ').filter(Boolean);
@@ -438,12 +459,14 @@ export function unreadPrinter(words: readonly string[]): UnreadPrinter {
     if (OTHER_BRAND_SET.has(t)) {
       unread = true;
       otherBrand = true;
+      const latin = /^[a-z]+$/.test(t) ? t : BRAND_LATIN.get(t);
+      if (latin && !makers.includes(latin)) makers.push(latin);
     } else if (SPOKEN_DIGITS.has(t) ? i > 0 && (SPOKEN_LETTERS.has(tokens[i - 1]) || isBrand(tokens[i - 1])) : MODEL_SHAPE.test(t) && !NOT_A_MODEL.test(t)) {
       unread = true;
       if (OTHER_LINE.test(t)) otherBrand = true;
     }
   }
-  return { unread, otherBrand };
+  return { unread, otherBrand, makers };
 }
 
 /**

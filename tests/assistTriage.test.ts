@@ -99,8 +99,9 @@ test('the state machine: printer, symptom, steps, outcome', () => {
   assert.equal(changed.context.printer, undefined);
 
   assert.deepEqual(nextTriage(steps.context, { kind: 'outcome', outcome: 'resolved' }).step, { kind: 'resolved' });
-  assert.deepEqual(nextTriage(steps.context, { kind: 'outcome', outcome: 'not_fixed' }).step, { kind: 'handoff', model: 'A1', symptom: 'clog' });
-  assert.deepEqual(nextTriage({ v: 1 }, { kind: 'talk' }).step, { kind: 'handoff', model: 'other', symptom: 'other' });
+  assert.deepEqual(nextTriage(steps.context, { kind: 'outcome', outcome: 'not_fixed' }).step, { kind: 'handoff', model: 'A1', symptom: 'clog', tried: true });
+  // Review round 4: nothing given is nothing stated, never «another printer» and «other» by default.
+  assert.deepEqual(nextTriage({ v: 1 }, { kind: 'talk' }).step, { kind: 'handoff', tried: false });
 
   // A unit chosen for one model does not ride along to another.
   const withUnit = nextTriage({ v: 1 }, { kind: 'printer', model: 'A1', unit_id: 'u1' });
@@ -121,14 +122,14 @@ test('the state machine: printer, symptom, steps, outcome', () => {
 
 test('the ticket draft names the printer, the symptom, the code and every step tried, in the customer’s language', () => {
   for (const loc of ['ar', 'en', 'ckb'] as const) {
-    const d = buildTicketDraft({ model: 'A1', symptom: 'clog' }, loc);
+    const d = buildTicketDraft({ model: 'A1', symptom: 'clog', tried: true }, loc);
     assert.match(d.subject, /A1/);
     assert.ok(d.body.includes(symptomDef('clog').label[loc]), loc);
     for (const step of symptomDef('clog').steps) assert.ok(d.body.includes((step.tried ?? step.text)[loc]), `${loc}: ${step.key}`);
     // Review round 3: the ticket lists what was tried, never «the matching parts are below».
     assert.doesNotMatch(d.body, /أدناه|below|خوارەوە/, `${loc}: the ticket points at parts it does not carry`);
   }
-  const hms = buildTicketDraft({ model: 'X1C', symptom: 'hms', code: '0300-0100-0001-0003' }, 'en');
+  const hms = buildTicketDraft({ model: 'X1C', symptom: 'hms', code: '0300-0100-0001-0003', tried: true }, 'en');
   assert.match(hms.body, /0300-0100-0001-0003/);
   assert.ok(!hms.body.includes('Type the full code'), 'a code already typed is not listed as a step to do');
   assert.equal(buildTicketDraft({ model: 'other', symptom: 'noise' }, 'ar').subject, 'مشكلة في الطابعة: صوت غريب');
@@ -145,4 +146,66 @@ test('round 3: a printer a shopping answer only showed is not the printer the tr
   const chosen = nextTriage(browsed, { kind: 'printer', model: 'A1' });
   assert.deepEqual(chosen.context.printer, { model: 'A1' });
   assert.equal(nextTriage(chosen.context, { kind: 'start', symptom: 'clog' }).step.kind, 'steps');
+});
+
+test('round 4: the handoff states only what the customer gave: the triage printer, the symptom named, the steps shown', () => {
+  // A printer a shopping answer only showed is not the customer's printer, in the ticket either.
+  const browsed = nextTriage({ v: 1, printer: { model: 'P1S', browsed: true } }, { kind: 'start', symptom: 'clog' });
+  assert.equal(browsed.step.kind, 'ask_printer');
+  const early = nextTriage({ ...browsed.context, printer: { model: 'P1S', browsed: true } }, { kind: 'talk' });
+  assert.deepEqual(early.step, { kind: 'handoff', symptom: 'clog', tried: false }, 'no printer, and no step was shown');
+  assert.deepEqual(early.context.triage, { stage: 'done', symptom: 'clog' });
+  // A member's unit rides only with a printer the triage chose.
+  const own = nextTriage({ v: 1, printer: { model: 'A1', unit_id: 'u1', browsed: true } }, { kind: 'talk' });
+  assert.deepEqual(own.step, { kind: 'handoff', tried: false });
+  // At «which symptom?», the printer is known and nothing else.
+  const atSymptom = nextTriage(nextTriage({ v: 1 }, { kind: 'printer', model: 'A1' }).context, { kind: 'talk' });
+  assert.deepEqual(atSymptom.step, { kind: 'handoff', model: 'A1', tried: false });
+  // «طابعة أخرى» chosen by the customer is what they gave, and stays.
+  const other = nextTriage(nextTriage({ v: 1, triage: { stage: 'printer', symptom: 'noise' } }, { kind: 'printer', model: 'other' }).context, { kind: 'talk' });
+  assert.deepEqual(other.step, { kind: 'handoff', model: 'other', symptom: 'noise', tried: true });
+  // After the steps, another printer chosen for the same fault: the steps were still shown.
+  const steps = nextTriage({ v: 1, triage: { stage: 'printer', symptom: 'clog' } }, { kind: 'printer', model: 'A1' });
+  const changed = nextTriage(steps.context, { kind: 'change_printer' });
+  assert.deepEqual(changed.context.triage, { stage: 'printer', symptom: 'clog', steps: true });
+  assert.deepEqual(nextTriage(changed.context, { kind: 'talk' }).step, { kind: 'handoff', symptom: 'clog', tried: true });
+  // Talked once after the steps, the done state keeps that they were shown; once before, it does not.
+  const done = nextTriage(steps.context, { kind: 'talk' });
+  assert.deepEqual(done.context.triage, { stage: 'done', symptom: 'clog', steps: true });
+  assert.deepEqual(nextTriage(readContext(JSON.parse(JSON.stringify(done.context))), { kind: 'talk' }).step, { kind: 'handoff', model: 'A1', symptom: 'clog', tried: true });
+  assert.deepEqual(nextTriage(early.context, { kind: 'talk' }).step, { kind: 'handoff', symptom: 'clog', tried: false });
+  // The flag is a closed set, and means nothing without a symptom.
+  assert.equal(readContext({ v: 1, triage: { stage: 'done', symptom: 'clog', steps: 'yes' } }).triage?.steps, undefined);
+  assert.equal(readContext({ v: 1, triage: { stage: 'done', steps: true } }).triage?.steps, undefined);
+});
+
+test('round 4: a draft before any step names no step tried, and leaves out a printer or a fault nobody gave', () => {
+  for (const loc of ['ar', 'en', 'ckb'] as const) {
+    const label = symptomDef('clog').label[loc];
+    const noPrinter = buildTicketDraft({ symptom: 'clog' }, loc);
+    assert.equal(noPrinter.subject, ASSIST_T[loc].ticket_subject_other.replace('{symptom}', label), loc);
+    assert.equal(noPrinter.body, ASSIST_T[loc].ticket_problem.replace('{symptom}', label), `${loc}: one line, the fault`);
+    assert.deepEqual(noPrinter.handoff, { v: 1, model: null, symptom: 'clog', tried: [], shown: [], attachments: 0 });
+    for (const word of [ASSIST_T[loc].printer_other, ASSIST_T[loc].ticket_tried, ASSIST_T[loc].ticket_printer.split('{')[0]]) {
+      assert.ok(!noPrinter.body.includes(word), `${loc}: «${word}» is not in a draft that has no printer and no step`);
+    }
+    const noFault = buildTicketDraft({ model: 'A1' }, loc);
+    assert.equal(noFault.subject, ASSIST_T[loc].ticket_subject_printer.replace('{printer}', 'A1'), loc);
+    assert.equal(noFault.body, ASSIST_T[loc].ticket_printer.replace('{printer}', 'A1'), loc);
+    assert.deepEqual(noFault.handoff, { v: 1, model: 'A1', symptom: null, tried: [], shown: [], attachments: 0 });
+    const nothing = buildTicketDraft({}, loc);
+    assert.deepEqual({ subject: nothing.subject, body: nothing.body, handoff: nothing.handoff }, { subject: ASSIST_T[loc].ticket_subject_plain, body: '', handoff: undefined });
+    // Not shown, not tried, even when printer and fault are both known.
+    const unshown = buildTicketDraft({ model: 'A1', symptom: 'clog' }, loc);
+    assert.deepEqual(unshown.handoff?.tried, []);
+    assert.ok(!unshown.body.includes(ASSIST_T[loc].ticket_tried), loc);
+  }
+});
+
+test('round 4: no Sorani or Arabic clitic is glued onto a placeholder (a Latin line or printer name)', () => {
+  for (const loc of ['ar', 'ckb'] as const) {
+    for (const [key, text] of Object.entries(ASSIST_T[loc])) {
+      assert.doesNotMatch(text, /\}[\u0621-\u064A\u0671-\u06D3\u06D5]/, `${loc}.${key}: ${text}`);
+    }
+  }
 });

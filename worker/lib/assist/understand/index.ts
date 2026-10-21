@@ -28,6 +28,7 @@ import {
 } from './models';
 import {
   AMS_WEAK,
+  CLEANING_TOOLS,
   CORRECTION_WORDS,
   FAULT_CUE,
   FILLERS,
@@ -45,6 +46,7 @@ import {
   PRODUCT_CUE,
   STRINGING_WEAK,
   SYMPTOM_LEXICON,
+  type CleaningTool,
 } from './lexicon';
 
 export interface Understood {
@@ -77,6 +79,10 @@ export interface Understood {
   printerUnread: boolean;
   /** One of the unread names is another maker's («كريالتي», «prusa»). */
   otherBrand: boolean;
+  /** Those makers in Latin, as the catalogue writes them: «سنابميكر» is «snapmaker». */
+  makers?: string[];
+  /** Which cleaning tool was named, when the part is `cleaning`: «ابرة» the needle, «اسفنجة» the sponge. */
+  tool?: CleaningTool;
   /** «طابعة أخرى», "another printer": the answer «another printer» to «which printer?». */
   otherPrinter: boolean;
   /** «لا قصدي …», "no, I mean …": a correction of the last answer. */
@@ -99,6 +105,7 @@ export interface Understood {
 }
 
 const compiledParts = compileLexicon(PART_LEXICON);
+const compiledTools = compileLexicon(CLEANING_TOOLS);
 const compiledSymptoms = compileLexicon(SYMPTOM_LEXICON);
 const compiledCues = compileLexicon({
   product: PRODUCT_CUE,
@@ -264,7 +271,11 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
   const maintenance = has(cues, 'maintenance');
   const otherPrinter = has(cues, 'other_printer');
 
-  const part = best(scoreIntents(rest, compiledParts));
+  // «تنظيف النوزل», "nozzle cleaning": the cleaning tools FOR the nozzle. The more particular part wins.
+  const partScores = scoreIntents(rest, compiledParts);
+  const firstPart = best(partScores);
+  const part = firstPart === 'nozzle_hotend' && has(partScores, 'cleaning') ? 'cleaning' : firstPart;
+  const tool = part === 'cleaning' ? best(scoreIntents(rest, compiledTools)) : undefined;
 
   const symptomScores = new Map<SymptomKey, number>();
   for (const s of scoreIntents(rest, compiledSymptoms)) symptomScores.set(s.intent, s.score);
@@ -318,7 +329,7 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
   const seriesWords = new Set(fam?.words ?? []);
   const joinedNames = hyphenNames(raw);
   const scan = unreadPrinter([...tokenize(rest).filter((t) => !seriesWords.has(t)), ...joinedNames]);
-  const unread = { unread: models.length === 0 && scan.unread, otherBrand: scan.otherBrand };
+  const unread = { unread: models.length === 0 && scan.unread, otherBrand: scan.otherBrand, makers: scan.makers };
   const correction = words.some((t) => CORRECTION_SET.has(t));
   const ordinal = words.map((t) => ORDINALS.get(t)).find((n) => n !== undefined);
   const outcome = readOutcome(normalized);
@@ -348,6 +359,8 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
     printerCue,
     printerUnread: unread.unread,
     otherBrand: unread.otherBrand,
+    ...(unread.makers.length ? { makers: unread.makers } : {}),
+    ...(tool ? { tool } : {}),
     otherPrinter: otherPrinter || unread.otherBrand,
     correction,
     ...(ordinal !== undefined ? { ordinal } : {}),

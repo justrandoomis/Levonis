@@ -28,12 +28,17 @@ export type TriageInput =
   | { kind: 'talk' }
   | { kind: 'change_printer' };
 
+/**
+ * `handoff` carries only what the customer gave: no printer when none was
+ * chosen (a printer a shopping answer only showed is not one), no symptom when
+ * none was named, and `tried` only when the steps of that symptom were shown.
+ */
 export type TriageStep =
   | { kind: 'ask_printer'; symptom?: SymptomKey; among?: readonly ModelToken[] }
   | { kind: 'ask_symptom'; model: PrinterChoice }
   | { kind: 'steps'; model: PrinterChoice; symptom: SymptomKey; code?: string }
   | { kind: 'resolved' }
-  | { kind: 'handoff'; model: PrinterChoice; symptom: SymptomKey; code?: string };
+  | { kind: 'handoff'; model?: PrinterChoice; symptom?: SymptomKey; code?: string; tried: boolean };
 
 export interface TriageResult {
   step: TriageStep;
@@ -61,12 +66,24 @@ function toSteps(ctx: AssistContext, model: PrinterChoice, symptom: SymptomKey, 
   };
 }
 
-function askPrinter(ctx: AssistContext, symptom?: SymptomKey, code?: string): TriageResult {
+/**
+ * True when the curated steps of the held symptom were shown in this
+ * conversation: the triage is at them, or left them with `steps` set.
+ */
+function stepsShown(held: AssistContext['triage']): boolean {
+  return !!held?.symptom && (held.stage === 'steps' || held.steps === true);
+}
+
+/** `steps`: the steps of `symptom` were already shown (another printer is being chosen for the same fault). */
+function askPrinter(ctx: AssistContext, symptom?: SymptomKey, code?: string, steps = false): TriageResult {
   const rest: AssistContext = { ...ctx };
   delete rest.printer;
   return {
     step: { kind: 'ask_printer', ...(symptom ? { symptom } : {}) },
-    context: { ...rest, triage: { stage: 'printer', ...(symptom ? { symptom } : {}), ...(code ? { code } : {}) } },
+    context: {
+      ...rest,
+      triage: { stage: 'printer', ...(symptom ? { symptom } : {}), ...(code ? { code } : {}), ...(symptom && steps ? { steps: true as const } : {}) },
+    },
   };
 }
 
@@ -103,16 +120,25 @@ export function nextTriage(ctx: AssistContext, input: TriageInput): TriageResult
     case 'talk':
       return handoff(ctx);
     case 'change_printer':
-      return askPrinter(ctx, held?.symptom, held?.code);
+      return askPrinter(ctx, held?.symptom, held?.code, stepsShown(held));
   }
 }
 
+/**
+ * «تحدث مع الفريق»: the ticket says what the customer gave and nothing else.
+ * The printer is the one chosen or named in the triage (`triagePrinter`), never
+ * one a shopping answer only showed; a printer or a symptom nobody gave is
+ * left out, not written as «أخرى»; and the steps are listed as tried only when
+ * they were shown («which printer?» answered with «تحدث مع الفريق» showed none).
+ */
 function handoff(ctx: AssistContext): TriageResult {
-  const symptom = ctx.triage?.symptom ?? 'other';
-  const model = ctx.printer?.model ?? 'other';
-  const code = ctx.triage?.code;
+  const held = ctx.triage;
+  const symptom = held?.symptom;
+  const model = triagePrinter(ctx);
+  const code = held?.code;
+  const tried = stepsShown(held);
   return {
-    step: { kind: 'handoff', model, symptom, ...(code ? { code } : {}) },
-    context: { ...ctx, triage: { stage: 'done', symptom, ...(code ? { code } : {}) } },
+    step: { kind: 'handoff', ...(model ? { model } : {}), ...(symptom ? { symptom } : {}), ...(code ? { code } : {}), tried },
+    context: { ...ctx, triage: { stage: 'done', ...(symptom ? { symptom } : {}), ...(code ? { code } : {}), ...(tried ? { steps: true as const } : {}) } },
   };
 }
