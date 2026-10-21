@@ -99,7 +99,7 @@ interface AsstReply {
    * becoming a second, client-side idea of what the conversation is about.
    */
   expects?: { intent: string; slot: string; params?: Record<string, string> };
-  /** The printer-problem triage's curated steps, in order. `hot` marks a burn risk. */
+  /** The curated steps of the printer-problem triage, in order. `hot` marks a burn risk. */
   steps?: Array<{ key: string; text: string; safety?: 'hot' }>;
   /** What the ticket form opens with after «تحدث مع الفريق», all of it editable. */
   ticket_draft?: { subject: string; body: string; unit_id?: string; handoff?: unknown };
@@ -571,10 +571,10 @@ export interface TicketPrefill {
   unitId?: string;
   orderId?: string;
   subject?: string;
-  /** The assistant's handoff draft: printer, symptom and the steps tried. Editable. */
+  /** The handoff draft from the assistant: printer, symptom and the steps tried. Editable. */
   body?: string;
   /**
-   * The same facts as closed-set values, from the server's draft. Sent back
+   * The same facts as closed-set values, from the draft the server wrote. Sent back
    * untouched; the server reads it again and keeps it for the team only.
    */
   handoff?: unknown;
@@ -986,7 +986,7 @@ function TicketsTab({
           threadPaths(kind, id).read
         );
         const head = headOf(kind, d);
-        // `key` here is only a React key: the address is the server's own `/files/…`.
+        // `key` here is only a React key: the address is the `/files/…` the server composed.
         const attachments = (d.attachments ?? [])
           .filter((a) => a.kind === 'image' || a.kind === 'video' || a.kind === 'audio')
           .map((a) => ({ key: a.file_url, url: a.file_url, kind: a.kind as AssistAttachment['kind'], mime: a.mime }));
@@ -1747,7 +1747,7 @@ export default function Support() {
         }
         if (d.reply.ticket_draft) {
           /**
-           * «من المحادثة»: the customer's own last few typed lines, appended in
+           * «من المحادثة»: the last few lines the customer typed, appended in
            * the open where they can read and edit them before sending. Nothing
            * from the conversation travels that the form does not show.
            */
@@ -1782,8 +1782,8 @@ export default function Support() {
   );
 
   /**
-   * A FILE ARRIVED FROM THE + SHEET. It is shown at once as the customer's
-   * own bubble and waits for the ticket. The acknowledgement is said here, on
+   * A FILE ARRIVED FROM THE + SHEET. It is shown at once as a bubble of the
+   * customer and waits for the ticket. The acknowledgement is said here, on
    * the page: nothing reads the file in this push, so no server turn pretends
    * to have looked at it. It carries the chips of the step the customer was
    * on, so «تحدث مع الفريق» is still one tap away.

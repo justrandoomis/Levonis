@@ -82,7 +82,7 @@ export function handoffForStaff(raw: unknown): StaffHandoff | null {
   return {
     model: h.model,
     symptom: def ? { key: def.key, label: def.label } : null,
-    tried: def ? def.steps.filter((st) => h.tried.includes(st.key)).map((st) => ({ key: st.key, text: st.text })) : [],
+    tried: def ? def.steps.filter((st) => h.tried.includes(st.key)).map((st) => ({ key: st.key, text: st.tried ?? st.text })) : [],
     code: h.code ?? null,
     shown: h.shown,
     attachments: h.attachments,
@@ -113,7 +113,7 @@ export function buildTicketDraft(input: DraftInput, loc: Locale): TicketDraft {
     lines.push(tr(loc, 'ticket_tried'));
     for (const key of tried) {
       const step = def.steps.find((s) => s.key === key);
-      if (step) lines.push(`- ${step.text[loc]}`);
+      if (step) lines.push(`- ${(step.tried ?? step.text)[loc]}`);
     }
   }
   const handoff: HandoffSummary = {

@@ -42,7 +42,8 @@
  * first.
  *
  * A NAME WRITTEN IN TWO PIECES IS ONE NAME: «P1-S», «x1 c» and «نوزل p1 s»
- * are the P1S and the X1C (`joinSplitNames`), never the series read alone.
+ * are the P1S and the X1C, and «A-1» is the A1 (`joinSplitNames`), never the
+ * series read alone nor a printer the tables cannot read.
  */
 import { normalizeText } from '../../assistantNlu';
 import { MODELS, modelsInText } from '@levonis/catalog/bambuImport/registry/models';
@@ -191,6 +192,12 @@ export interface FamilyRead {
    * way is that printer only beside a part, a printer word or a fault.
    */
   bare: boolean;
+  /**
+   * Read only from a lowercase «x1»: a quantity as often as the series. It is
+   * the series only where a bare «A2» is the A2L (./index.ts), and it is
+   * never an unread printer.
+   */
+  weak: boolean;
 }
 
 /**
@@ -200,8 +207,8 @@ export interface FamilyRead {
  * Series» are four printers, not one series and an unreadable name. `rest` is
  * the normalised text with the read printer names already taken out
  * (`scanSpokenModels`). A lowercase «x2» is a quantity as often as a series
- * («نوزل x2», two nozzles), so the X series is read from a capital X only.
- * Pure.
+ * («نوزل x2», two nozzles), so the X series is read from a capital X, and
+ * a lowercase «x1» only as a `weak` read. Pure.
  */
 export function readFamily(raw: string, rest: string): FamilyRead | undefined {
   const families: string[] = [];
@@ -223,17 +230,21 @@ export function readFamily(raw: string, rest: string): FamilyRead | undefined {
     if (!families.includes(entry.token)) families.push(entry.token);
     words.push(entry.token.replace(/\s*series$/i, '').toLowerCase(), 'series');
   }
+  let strong = spoken || named;
   for (const token of left.split(' ')) {
     const family = FAMILY_SHORT.get(token);
     if (!family) continue;
-    if (token.startsWith('x') && !new RegExp(`(?<![A-Za-z0-9])${token.toUpperCase()}(?![A-Za-z0-9])`).test(raw)) continue;
+    const capital = !token.startsWith('x') || new RegExp(`(?<![A-Za-z0-9])${token.toUpperCase()}(?![A-Za-z0-9])`).test(raw);
+    // «x2» in lowercase is two of something; «x1» may be the X1 (`weak`).
+    if (!capital && token !== 'x1') continue;
+    if (capital) strong = true;
     if (!families.includes(family)) families.push(family);
     words.push(token);
   }
   if (families.length === 0) return undefined;
   const found = new Set(families.flatMap((family) => FAMILY_MEMBERS.get(family) ?? []));
   const members = MODEL_TOKENS.filter((m) => found.has(m));
-  return { families, members, rest: left, words: [...new Set(words)], bare: !spoken && !named };
+  return { families, members, rest: left, words: [...new Set(words)], bare: !spoken && !named, weak: !strong };
 }
 
 /**
@@ -305,13 +316,23 @@ export function scanSpokenModels(normalized: string): SpokenScan {
  * typed. Pure.
  */
 export function joinSplitNames(raw: string): string {
-  return raw.replace(SPLIT_NAME, (whole, head: string, tail: string) => {
+  const joinedPrinter = (head: string, tail: string, whole: string) => {
     const joined = `${head}${tail}`;
     const read = modelsInText(joined).filter((e) => e.kind === 'printer');
     return read.length === 1 && read[0].token.replace(/\s+/g, '').toLowerCase() === joined.toLowerCase() ? joined : whole;
-  });
+  };
+  return (
+    raw
+      .replace(SPLIT_NAME, (whole, head: string, tail: string) => joinedPrinter(head, tail, whole))
+      // «A-1», «X-1»: the letter and the digit of a printer or a series of the registry, hyphenated.
+      .replace(HYPHEN_SERIES, (whole, head: string, digit: string) => {
+        const joined = `${head}${digit}`;
+        return FAMILY_SHORT.has(joined.toLowerCase()) ? joined : joinedPrinter(head, digit, whole);
+      })
+  );
 }
 const SPLIT_NAME = /(?<![A-Za-z0-9])([A-Za-z]\d)[\s_\-\u2010-\u2014]+([A-Za-z])(?![A-Za-z0-9])/g;
+const HYPHEN_SERIES = /(?<![A-Za-z0-9])([A-Za-z])[-\u2010-\u2014](\d)(?![0-9])/g;
 
 /** The printers a text names in Latin letters, through the registry. Families are left out. */
 export function latinModels(raw: string): ModelToken[] {
@@ -363,6 +384,18 @@ export const OTHER_BRANDS: readonly string[] = [
 ];
 const OTHER_BRAND_SET = new Set(OTHER_BRANDS.map(normalizeText));
 
+/** Lines of other makers written as letters and a number: «CR-10», «cr6» (Creality), «SV06» (Sovol). */
+const OTHER_LINE = /^(?:cr|sv)\d/;
+
+/**
+ * A word that is part of a printer name and never of a product: another
+ * maker («نبتون»), or a spoken digit («فور» of «نبتون فور»). Claimed, so it is
+ * not searched.
+ */
+export function printerNameWord(token: string): boolean {
+  return isBrand(token) || SPOKEN_DIGITS.has(token);
+}
+
 /** A maker's name, with an Arabic proclitic on it or not («للكريالتي»). */
 function isBrand(token: string): boolean {
   if (OTHER_BRAND_SET.has(token)) return true;
@@ -375,6 +408,17 @@ export interface UnreadPrinter {
   /** One of those words is another maker's name. */
   otherBrand: boolean;
 }
+
+/**
+ * «CR-10», «K-1»: a name written with a hyphen between its letters and its
+ * number, joined («cr10») when it has the shape of a model name («PA-6» is a
+ * material and stays apart). The text normalised loses the hyphen, so this
+ * reads the raw text. Pure.
+ */
+export function hyphenNames(raw: string): string[] {
+  return [...raw.matchAll(HYPHEN_NAME)].map((m) => `${m[1]}${m[2]}`.toLowerCase()).filter((t) => MODEL_SHAPE.test(t) && !NOT_A_MODEL.test(t));
+}
+const HYPHEN_NAME = /(?<![A-Za-z0-9])([A-Za-z]{1,3})[-\u2010-\u2014](\d{1,3})(?![0-9])/g;
 
 /** `words`: the words of the sentence with every READ printer name already taken out. */
 export function unreadPrinter(words: readonly string[]): UnreadPrinter {
@@ -396,6 +440,7 @@ export function unreadPrinter(words: readonly string[]): UnreadPrinter {
       otherBrand = true;
     } else if (SPOKEN_DIGITS.has(t) ? i > 0 && (SPOKEN_LETTERS.has(tokens[i - 1]) || isBrand(tokens[i - 1])) : MODEL_SHAPE.test(t) && !NOT_A_MODEL.test(t)) {
       unread = true;
+      if (OTHER_LINE.test(t)) otherBrand = true;
     }
   }
   return { unread, otherBrand };

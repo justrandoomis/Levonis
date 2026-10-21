@@ -15,7 +15,17 @@
 import { CONFIDENT_SCORE, compileLexicon, normalizeText, scoreIntents, tokenize, type LexEntry } from '../../assistantNlu';
 import { extractIdentifiers, type CodeCandidate } from '../../search/identifiers';
 import type { ModelToken, PartKey, SymptomKey } from '../types';
-import { bareProclitics, joinSplitNames, latinModels, readFamily, scanSpokenModels, splitScripts, unreadPrinter } from './models';
+import {
+  bareProclitics,
+  hyphenNames,
+  joinSplitNames,
+  latinModels,
+  printerNameWord,
+  readFamily,
+  scanSpokenModels,
+  splitScripts,
+  unreadPrinter,
+} from './models';
 import {
   AMS_WEAK,
   CORRECTION_WORDS,
@@ -26,8 +36,10 @@ import {
   OUTCOME_NOT_FIXED,
   OUTCOME_RESOLVED,
   MAINTENANCE_CUE,
+  OWN_PRINTER,
   PART_LEXICON,
   PAST_PURCHASE,
+  PRICE_ASK,
   PRINTER_CUE,
   PROBLEM_CUE,
   PRODUCT_CUE,
@@ -73,6 +85,15 @@ export interface Understood {
   ordinal?: number;
   /** The outcome of the steps, typed: «ما انحلت» / «انحلت». Read on every sentence; acted on only after the steps. */
   outcome?: 'resolved' | 'not_fixed';
+  /**
+   * The symptom the WORDS name, before an HMS code in the sentence makes it
+   * `hms`: «وطلعلي رمز 0300-…» names none, «وطلعلي رمز و صار انسداد» the clog.
+   */
+  wordSymptom?: SymptomKey;
+  /** «طابعتي», "my own printer", «پرینتەرەکەی خۆم» and nothing else: the printer of the account. */
+  ownPrinter: boolean;
+  /** "how much?", «شكد؟»: a price asked, whatever the intent scorer made of it. */
+  priceAsk: boolean;
   /** The words no reader claimed, at most four: what is left to search for. */
   residual: string[];
 }
@@ -165,6 +186,9 @@ const CLAIM_PHRASES = [...new Set(ALL_ENTRIES.flatMap((e) => (e.phrases ?? []).m
 const FILLER_SET = new Set([...FILLERS, ...CORRECTION_WORDS, ...Object.keys(ORDINAL_WORDS)].map(normalizeText).filter(Boolean));
 const CORRECTION_SET = new Set(CORRECTION_WORDS.map(normalizeText).filter(Boolean));
 const ORDINALS = new Map(Object.entries(ORDINAL_WORDS).map(([w, n]) => [normalizeText(w), n] as const));
+const PRICE_ASKS = PRICE_ASK.map(normalizeText).filter(Boolean);
+const OWN_MINE = new Set(OWN_PRINTER.mine.map(normalizeText).filter(Boolean));
+const OWN_WITH = new Set(OWN_PRINTER.with.map(normalizeText).filter(Boolean));
 const NOT_FIXED = OUTCOME_NOT_FIXED.map(normalizeText).filter(Boolean);
 const RESOLVED = OUTCOME_RESOLVED.map(normalizeText).filter(Boolean);
 
@@ -176,11 +200,24 @@ export function readOutcome(normalized: string): 'resolved' | 'not_fixed' | unde
   if (RESOLVED.some((p) => padded.includes(` ${p} `))) return 'resolved';
   return undefined;
 }
+/**
+ * THE IRAQI PROGRESSIVE «دا» («is …-ing») between the negation and its verb:
+ * «الطابعة ما دا تشتغل» is «ما تشتغل», «ما دا يطلع فلامنت» is «ما يطلع
+ * فلامنت». Taken out before any phrase is read, so every phrase list reads it
+ * without a second copy of each phrase. Pure.
+ */
+export function dropProgressive(normalized: string): string {
+  return ` ${normalized} `
+    .replace(/ (ما|لا) دا (?=\S)/g, ' $1 ')
+    .replace(/ دا (ما|لا) /g, ' $1 ')
+    .trim();
+}
+
 /** Sizes and units: carried by `measures`, never searched as words. */
 const MEASURE_PIECE = /^(?:\d+(?:mm|cm|m|g|kg|ml)?|mm|cm|ملم|مم|مل|ملي)$/;
 
 function claimedWord(token: string, modelWords: ReadonlySet<string>): boolean {
-  if (token.length < 2 || FILLER_SET.has(token) || MEASURE_PIECE.test(token) || modelWords.has(token)) return true;
+  if (token.length < 2 || FILLER_SET.has(token) || MEASURE_PIECE.test(token) || modelWords.has(token) || printerNameWord(token)) return true;
   if (CLAIM_STEMS.some((s) => claims(token, s))) return true;
   // «واكو», «وبليت»: the conjunction glued on.
   if (token.startsWith('و') && token.length > 2) {
@@ -203,8 +240,8 @@ export interface UnderstandOptions {
 export function understand(typed: string, opts: UnderstandOptions = {}): Understood {
   // «P1-S» is the P1S, «x1 c» the X1C (./models.ts `joinSplitNames`).
   const raw = joinSplitNames(typed);
-  // «للA1» is «لل A1»; «الاي ون» is «اي ون» (./models.ts).
-  const normalized = normalizeText(splitScripts(raw));
+  // «للA1» is «لل A1»; «الاي ون» is «اي ون» (./models.ts); «ما دا تشتغل» is «ما تشتغل».
+  const normalized = dropProgressive(normalizeText(splitScripts(raw)));
   const spoken = scanSpokenModels(normalized);
   const latin = latinModels(raw);
   const models = [...new Set([...spoken.models, ...latin])];
@@ -237,6 +274,8 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
   if (problemCue) {
     for (const s of scoreIntents(rest, compiledAmsWeak)) symptomScores.set('ams', (symptomScores.get('ams') ?? 0) + s.score);
   }
+  const byWords = [...symptomScores.entries()].sort((a, b) => b[1] - a[1]);
+  const wordSymptom = byWords.length > 0 && byWords[0][1] >= CONFIDENT_SCORE ? byWords[0][0] : undefined;
   const hmsCode = readHmsCode(raw);
   if (hmsCode) symptomScores.set('hms', Math.max(symptomScores.get('hms') ?? 0, 10));
   const ranked = [...symptomScores.entries()].sort((a, b) => b[1] - a[1]);
@@ -246,10 +285,13 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
   // A bare «A2» is also a paper size («ورق A2», "A2 paper"), so read that way
   // it is the A2L only beside a part, a printer word, a fault or a symptom.
   const single = fam && fam.members.length === 1 ? fam.members[0] : undefined;
-  const singleTaken =
-    !!single && (!fam!.bare || !!part || has(cues, 'printer') || problemCue || !!symptom || maintenance);
+  // Beside a part, a printer word, a fault or a symptom, or typed alone (the answer to «which printer?»).
+  const beside = !!part || has(cues, 'printer') || problemCue || !!symptom || maintenance || tokenize(normalized).length === 1;
+  const singleTaken = !!single && (!fam!.bare || beside);
   if (singleTaken) models.push(single!);
-  const named = fam && (fam.members.length > 1 || singleTaken) ? fam : undefined;
+  // A lowercase «x1» is a quantity as often as a series («نوزل x1» is one nozzle, or the X1):
+  // the series only where a bare «A2» would be the A2L.
+  const named = fam && (!fam.weak || beside) && (fam.members.length > 1 || singleTaken) ? fam : undefined;
   const family =
     named && named.members.length > 1
       ? { name: named.families.map((f) => f.replace(/\s*series$/i, '')).join(' / '), members: named.members }
@@ -274,13 +316,19 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
   const words = tokenize(leftover.trim());
   // A series named is never an unreadable printer, read as a printer or not («ورق A2»).
   const seriesWords = new Set(fam?.words ?? []);
-  const scan = unreadPrinter(tokenize(rest).filter((t) => !seriesWords.has(t)));
+  const joinedNames = hyphenNames(raw);
+  const scan = unreadPrinter([...tokenize(rest).filter((t) => !seriesWords.has(t)), ...joinedNames]);
   const unread = { unread: models.length === 0 && scan.unread, otherBrand: scan.otherBrand };
   const correction = words.some((t) => CORRECTION_SET.has(t));
   const ordinal = words.map((t) => ORDINALS.get(t)).find((n) => n !== undefined);
   const outcome = readOutcome(normalized);
+  const typedWords = tokenize(normalized);
+  const ownPrinter =
+    typedWords.length > 0 && typedWords.some((t) => OWN_MINE.has(t)) && typedWords.every((t) => OWN_MINE.has(t) || OWN_WITH.has(t));
   const residual = words
     .filter((t) => !claimedWord(t, modelWords))
+    // The «cr» of «CR-10»: a piece of a printer name, not a word to search.
+    .filter((t) => !(/^[a-z]+$/.test(t) && joinedNames.some((n) => n.startsWith(t) && /^\d+$/.test(n.slice(t.length)))))
     .filter((t) => !hmsCode || !/^[0-9a-f]{4,16}$/i.test(t) || !hmsPieces.has(t.toUpperCase().slice(0, 4)))
     .slice(0, RESIDUAL_MAX);
 
@@ -304,6 +352,9 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
     correction,
     ...(ordinal !== undefined ? { ordinal } : {}),
     ...(outcome ? { outcome } : {}),
+    ...(wordSymptom ? { wordSymptom } : {}),
+    ownPrinter,
+    priceAsk: PRICE_ASKS.some((p) => ` ${normalized} `.includes(` ${p} `)),
     residual,
   };
 }

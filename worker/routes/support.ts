@@ -2083,6 +2083,17 @@ async function handleSubjectSearch(
       intent === 'price_question' ? 'price_which' : intent === 'stock_question' ? 'stock_which' : 'materials_which';
     return { intent, text: tr(loc, promptKey), expects: { intent, slot: 'q' } };
   }
+  /**
+   * A MATERIAL AND WHAT KIND: "silk PLA", "TPU 95A". The forgiving search pads
+   * the two silk filaments with every other PLA; the products that carry every
+   * word are the answer, alone, when there are any. A bare «PLA» keeps the
+   * ordinary search.
+   */
+  const words = subject.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length > 1 && words.some((w) => MATERIAL_NAMES.has(w))) {
+    const exact = await handleProductSearch(c, { q: subject }, subject, loc, { strong: true });
+    if (exact.cards?.length) return { ...exact, intent };
+  }
   const found = await handleProductSearch(c, { q: subject }, subject, loc);
   // The search's own «ما لقيت» keeps asking, so a typo does not dead-end.
   return found.cards?.length
@@ -2478,24 +2489,31 @@ supportRoutes.post('/assistant', async (c) => {
     );
     if (!context.triage && !context.shown && !context.asking && !context.size && !shown.length) return c.json({ success: true, reply: r });
     const next: AssistContext = { ...context };
-    delete next.triage;
-    delete next.asking;
-    delete next.size;
+    // «لم أفهم» answers nothing: the question the assistant asked («أي طابعة عندك؟») is still open.
+    if (r.intent !== 'clarify') {
+      delete next.triage;
+      delete next.asking;
+      delete next.size;
+    }
     if (shown.length) {
       next.shown = shown;
       /**
        * «A1 combo» answered with the A1 and the A1 Combo: this conversation is
        * now about the A1, so «شكد سعر الطابعة؟» is that printer, not five others.
-       * Only when the cards show the listed printers of exactly one model.
+       * Only when the SENTENCE named that model: «اريد طابعة» or "printers"
+       * showing one refurbished P1S among cables names no printer (review
+       * round 3). And it is a printer browsed, not owned: the triage still
+       * asks «أي طابعة عندك؟» (worker/lib/assist/triage/flow.ts `triagePrinter`).
        */
-      const viewer = viewerFor(c.env.DB, user?.id ?? null, loc);
-      const models = await callTool('catalog.printerModelsOf', c.env.DB, viewer, { ids: shown }).catch(() => null);
-      const listed = models?.ok ? models.data : [];
-      // «طابعة A1» also showed the A1 mini: the printer the sentence named decides between them.
-      const named = freeText ? understand(freeText).models.filter((m) => listed.includes(m)) : [];
-      const model = named.length === 1 ? named[0] : listed.length === 1 ? listed[0] : undefined;
-      if (model) {
-        next.printer = { model, ...(context.printer?.model === model && context.printer.unit_id ? { unit_id: context.printer.unit_id } : {}) };
+      const named = freeText ? understand(freeText).models : [];
+      if (named.length) {
+        const viewer = viewerFor(c.env.DB, user?.id ?? null, loc);
+        const models = await callTool('catalog.printerModelsOf', c.env.DB, viewer, { ids: shown }).catch(() => null);
+        const listed = models?.ok ? models.data : [];
+        // «طابعة A1» also showed the A1 mini: the printer the sentence named decides between them.
+        const shownNamed = named.filter((m) => listed.includes(m));
+        const model = shownNamed.length === 1 ? shownNamed[0] : undefined;
+        if (model && context.printer?.model !== model) next.printer = { model, browsed: true };
       }
     } else delete next.shown;
     return c.json({ success: true, reply: { ...r, context: next } });

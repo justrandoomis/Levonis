@@ -115,9 +115,29 @@ test('a conversation stored with no owner on record is not trusted', () => {
 test('the auth layer names the owner on every identity change, and the Support page resets on the event', () => {
   const auth = readFileSync(join(ROOT, 'src/AuthContext.tsx'), 'utf8');
   const setUser = auth.slice(auth.indexOf('const setUser = useCallback'), auth.indexOf('useEffect(purgeLegacyPrivateDrafts'));
-  assert.match(setUser, /adoptAssistOwner\(next \? next\.id : null\)/);
+  assert.match(setUser, /const owner = next \? next\.id : null;/);
+  assert.match(setUser, /import\('\.\/lib\/assistOwner'\)\.then\(\(m\) => m\.adoptAssistOwner\(owner\)\)/);
   const support = readFileSync(join(ROOT, 'src/pages/Support.tsx'), 'utf8');
   assert.match(support, /addEventListener\(ASSIST_CLEARED_EVENT, reset\)/);
   const reset = support.slice(support.indexOf('const reset = () => {'), support.indexOf('window.addEventListener(ASSIST_CLEARED_EVENT'));
   for (const piece of ['contextRef.current = undefined', 'setDraft(undefined)', 'setAttachments([])', 'setMessages(']) assert.ok(reset.includes(piece), piece);
+});
+
+/**
+ * THE ENTRY CHUNK CARRIES NONE OF THE CONVERSATION (review round 3). A static
+ * import of src/lib/assistSession.ts from the auth layer put the whole module
+ * (load, save, the owner stamp) in the entry: the storefront app payload rose
+ * to 237.2 KB, over its 237 KB budget (tests/bundleBudget.test.ts). The owner
+ * stamp lives in its own module, which imports nothing, and the auth layer
+ * fetches it with a dynamic import.
+ */
+test('the auth layer never imports the conversation statically, and the owner module imports nothing', () => {
+  const auth = readFileSync(join(ROOT, 'src/AuthContext.tsx'), 'utf8');
+  assert.doesNotMatch(auth, /^import[^;]*from '\.\/lib\/assist(?:Session|Owner)'/m, 'a static import puts it in the entry chunk');
+  const owner = readFileSync(join(ROOT, 'src/lib/assistOwner.ts'), 'utf8');
+  assert.doesNotMatch(owner, /^import /m, 'the owner module is fetched alone: it pulls nothing in with it');
+  // One set of keys: the module that loads and saves the conversation reads them from the owner module.
+  const conversation = readFileSync(join(ROOT, 'src/lib/assistSession.ts'), 'utf8');
+  assert.match(conversation, /import \{ ASSIST_CONTEXT_KEY, ASSIST_STATE_KEY \} from '\.\/assistOwner'/);
+  assert.doesNotMatch(conversation, /'levonis\.assist\./, 'no second copy of a key');
 });

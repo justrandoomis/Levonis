@@ -108,7 +108,7 @@ function block(src: string, open: RegExp, keys: readonly string[]): Record<strin
 }
 
 const SUPPORT_KEYS = ['attachAdd', 'attachSignIn', 'attachAck', 'fromChat', 'attachmentsLabel', 'removeAttachment', 'voiceNote', 'attachGone', 'attachUnavailable', 'openImage'];
-const SHEET_KEYS = ['title', 'gallery', 'camera', 'voice', 'recording', 'stopAttach', 'cancel', 'close', 'uploading', 'full', 'tooLarge', 'limit', 'kind', 'heic', 'failed', 'micDenied', 'micFailed'];
+const SHEET_KEYS = ['title', 'gallery', 'camera', 'voice', 'recording', 'stopAttach', 'cancel', 'close', 'uploading', 'full', 'dropped', 'tooLarge', 'limit', 'kind', 'heic', 'failed', 'micDenied', 'micFailed'];
 
 test('the customer page and the + sheet say every new sentence in Arabic, English and real Sorani', () => {
   for (const [file, keys] of [
@@ -149,4 +149,55 @@ test('the + sheet is its own chunk: the Support page imports only its type', () 
   assert.match(sheet, /capture="environment"/);
   assert.match(sheet, /useVoiceRecorder\(\)/);
   assert.match(sheet, /uploadFile\(file, 'assist'\)/);
+});
+
+/**
+ * REVIEW ROUND 3. More files picked than the six a ticket takes: the first ones
+ * are attached and the sheet stays open saying how many were left out (it used
+ * to close on them). The weekly ceiling counts a file sent with a ticket for
+ * its seven days, so no sentence tells the customer that sending the ticket
+ * frees it.
+ */
+test('the + sheet keeps itself open on files left out, and never promises that a ticket frees the weekly ceiling', () => {
+  const sheet = read('src/components/support/AssistAttach.tsx');
+  const send = sheet.slice(sheet.indexOf('const send = async'), sheet.indexOf('const onPick'));
+  assert.match(send, /const dropped = Math\.max\(0, files\.length - Math\.max\(0, remaining\)\);/);
+  assert.match(send, /setError\(t\.dropped\.replace\('\{n\}', String\(dropped\)\)\)/);
+  assert.match(send, /if \(dropped === 0\) onClose\(\);/, 'the sheet closes only when every picked file was attached');
+  assert.doesNotMatch(send.replace('if (dropped === 0) onClose();', ''), /onClose\(\)/, 'no other path closes it');
+  for (const lang of ['ar', 'en', 'ckb']) {
+    const limit = block(sheet, new RegExp(`\\n {2}${lang}: \\{`), ['limit', 'dropped']);
+    assert.doesNotMatch(limit.limit, /أرسل التذكرة أولاً|Send the ticket first|سەرەتا تیکێتەکە بنێرە/, `${lang}: a ticket frees nothing`);
+    assert.match(limit.dropped, /\{n\}/, `${lang}: how many were left out`);
+  }
+});
+
+/**
+ * No apostrophe in an English comment this lane wrote under src/
+ * (scripts/clay-census.mjs scans string literals over the raw source, comments
+ * included, so an odd apostrophe can pair the wrong quotes in a later edit).
+ * The files the lane wrote whole are read whole; in the two pages it extended,
+ * the comments review round 3 reworded must not come back.
+ */
+test('the lane comments under src/ carry no apostrophe', () => {
+  const commentOf = (line: string) => (/^\s*(?:\/\/|\*|\/\*)/.test(line) ? line : (/\s\/\/\s.*$/.exec(line)?.[0] ?? ''));
+  const bad: string[] = [];
+  for (const file of ['src/components/support/AssistAttach.tsx', 'src/lib/assistSession.ts', 'src/lib/assistOwner.ts']) {
+    read(file)
+      .split('\n')
+      .forEach((line, i) => {
+        if (/[A-Za-z]['\u2019][A-Za-z]/.test(commentOf(line))) bad.push(`${file}:${i + 1}: ${line.trim()}`);
+      });
+  }
+  const reworded: Array<[string, RegExp]> = [
+    ['src/components/adminSupport/TicketsDesk.tsx', /The assistant's summary and attachments/],
+    ['src/pages/Support.tsx', /triage's curated steps/],
+    ['src/pages/Support.tsx', /The assistant's handoff draft/],
+    ['src/pages/Support.tsx', /from the server's draft/],
+    ['src/pages/Support.tsx', /the address is the server's own/],
+    ['src/pages/Support.tsx', /the customer's own last few typed lines/],
+    ['src/pages/Support.tsx', /shown at once as the customer's/],
+  ];
+  for (const [file, phrase] of reworded) if (phrase.test(read(file))) bad.push(`${file}: ${phrase}`);
+  assert.deepEqual(bad, []);
 });

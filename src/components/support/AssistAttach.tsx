@@ -5,7 +5,7 @@ import { formatElapsed, useVoiceRecorder } from '../../lib/voiceRecorder';
 
 /**
  * THE + IN THE SUPPORT ASSISTANT: a photo, a clip or a voice note
- * (support assistant v2, push A; the owner's item 5).
+ * (support assistant v2, push A; item 5 of the owner).
  *
  * Loaded only when the + is pressed, so the assistant page itself carries
  * none of it. Three ways in:
@@ -45,8 +45,9 @@ const COPY: Record<Lang, Record<string, string>> = {
     close: 'إغلاق',
     uploading: 'جارٍ الرفع…',
     full: 'يمكن إرفاق 6 ملفات كحد أقصى.',
+    dropped: 'لم يُرفق {n} من الملفات المختارة، فالحد الأقصى 6 ملفات.',
     tooLarge: 'الملف أكبر من الحد المسموح.',
-    limit: 'وصلت إلى حد المرفقات لهذا الأسبوع. أرسل التذكرة أولاً.',
+    limit: 'وصلت إلى حد المرفقات لهذا الأسبوع. يمكنك إرسال التذكرة بالملفات المرفقة الآن، وإرفاق المزيد بعد بضعة أيام.',
     kind: 'أرفق صورة أو فيديو أو رسالة صوتية فقط.',
     heic: 'صيغة HEIC غير مدعومة. اختر صورة JPEG أو أرسل لقطة شاشة.',
     failed: 'تعذر رفع الملف، حاول مرة أخرى.',
@@ -64,8 +65,9 @@ const COPY: Record<Lang, Record<string, string>> = {
     close: 'Close',
     uploading: 'Uploading…',
     full: 'You can attach up to 6 files.',
+    dropped: '{n} of the chosen files were not attached. You can attach up to 6 files.',
     tooLarge: 'The file is larger than allowed.',
-    limit: 'You reached the attachment limit for this week. Send the ticket first.',
+    limit: 'You reached the attachment limit for this week. You can send the ticket with the files attached now, and attach more in a few days.',
     kind: 'Attach a photo, a video or a voice note only.',
     heic: 'HEIC photos are not supported. Choose a JPEG photo or send a screenshot.',
     failed: 'The file could not be uploaded. Try again.',
@@ -83,8 +85,9 @@ const COPY: Record<Lang, Record<string, string>> = {
     close: 'داخستن',
     uploading: 'خەریکی بارکردنە…',
     full: 'دەتوانیت تا ٦ فایل هاوپێچ بکەیت.',
+    dropped: '{n} لە فایلە هەڵبژێردراوەکان هاوپێچ نەکران. دەتوانیت تا ٦ فایل هاوپێچ بکەیت.',
     tooLarge: 'فایلەکە لە سنووری ڕێپێدراو گەورەترە.',
-    limit: 'گەیشتیتە سنووری هاوپێچەکانی ئەم هەفتەیە. سەرەتا تیکێتەکە بنێرە.',
+    limit: 'گەیشتیتە سنووری هاوپێچەکانی ئەم هەفتەیە. دەتوانیت ئێستا تیکێتەکە لەگەڵ فایلە هاوپێچکراوەکان بنێریت، و دوای چەند ڕۆژێک فایلی زیاتر هاوپێچ بکەیت.',
     kind: 'تەنها وێنە، ڤیدیۆ یان نامەی دەنگی هاوپێچ بکە.',
     heic: 'وێنەی HEIC پشتگیری ناکرێت. وێنەیەکی JPEG هەڵبژێرە یان وێنەی شاشە بنێرە.',
     failed: 'فایلەکە بار نەکرا، دووبارە هەوڵ بدەرەوە.',
@@ -128,8 +131,11 @@ export default function AssistAttach({
 
   const send = async (files: File[]) => {
     if (!files.length) return;
-    if (files.length > remaining) {
-      setError(t.full);
+    // More picked than the ticket takes: the first ones are attached, and the sheet stays
+    // open saying how many were left out, never closing on files that silently vanished.
+    const dropped = Math.max(0, files.length - Math.max(0, remaining));
+    if (dropped > 0) {
+      setError(t.dropped.replace('{n}', String(dropped)));
       files = files.slice(0, Math.max(0, remaining));
       if (!files.length) return;
     } else {
@@ -146,7 +152,7 @@ export default function AssistAttach({
         onAttached({ key: up.key, url: up.url, kind: kindOf(mime), mime });
         left -= 1;
       }
-      onClose();
+      if (dropped === 0) onClose();
     } catch (err) {
       setError(refusalText(t, err));
     } finally {

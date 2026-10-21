@@ -27,7 +27,12 @@ export interface TriageState {
 
 export interface AssistContext {
   v: 1;
-  printer?: { model: ModelToken | 'other'; unit_id?: string };
+  /**
+   * `browsed`: the printer was only SHOWN in a shopping answer («A1 combo»,
+   * «طابعة A1»). It answers «شكد سعر الطابعة؟» and a part question, but the
+   * printer-problem triage still asks which printer the customer has.
+   */
+  printer?: { model: ModelToken | 'other'; unit_id?: string; browsed?: true };
   part?: PartKey;
   /**
    * The size the part question carried while the assistant asks which
@@ -79,6 +84,7 @@ export function readContext(raw: unknown): AssistContext {
     if (model) {
       out.printer = { model };
       if (typeof p.unit_id === 'string' && ID_SHAPE.test(p.unit_id)) out.printer.unit_id = p.unit_id;
+      if (p.browsed === true) out.printer.browsed = true;
     }
   }
   const part = oneOf(PART_KEYS, c.part);

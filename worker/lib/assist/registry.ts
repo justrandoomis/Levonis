@@ -23,6 +23,7 @@ import {
   printerModels,
   printerModelsOf,
   SEARCH_LIMIT_MAX,
+  SEARCH_OFFSET_MAX,
   SEARCH_TEXT_MAX,
   type CatalogItem,
   type CatalogSearchArgs,
@@ -82,11 +83,14 @@ const catalogSearchTool: ToolDef<CatalogSearchArgs, CatalogSearchResult> = {
     if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > SEARCH_LIMIT_MAX) return bad('limit');
     if (!text.trim() && !fits?.length && o.category === undefined) return bad('empty');
     if (o.strong !== undefined && typeof o.strong !== 'boolean') return bad('strong');
+    const offset = o.offset === undefined ? 0 : o.offset;
+    if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0 || offset > SEARCH_OFFSET_MAX) return bad('offset');
     return {
       text,
       ...(fits ? { fits } : {}),
       ...(o.category === 'cat_maint' ? { category: 'cat_maint' as const } : {}),
       limit,
+      ...(offset ? { offset } : {}),
       ...(o.strong === true ? { strong: true } : {}),
     };
   },

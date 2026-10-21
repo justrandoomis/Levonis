@@ -127,7 +127,7 @@ function ageOf(iso: string, s: S): string {
 const THREAD_POLL_MS = 10_000;
 const QUEUE_POLL_MS = 30_000;
 
-/** The assistant's summary and attachments, folded so the thread keeps its height. */
+/** The summary and attachments from the assistant, folded so the thread keeps its height. */
 function AssistantPanel({
   handoff,
   attachments,
