@@ -36,9 +36,11 @@ import {
   ORDINAL_WORDS,
   OTHER_PRINTER,
   OUTCOME_NOT_FIXED,
+  OUTCOME_NOT_TRIED,
   OUTCOME_RESOLVED,
   MAINTENANCE_CUE,
   OWN_PRINTER,
+  OWNS_PRINTER,
   PART_LEXICON,
   PAST_PURCHASE,
   PRICE_ASK,
@@ -107,6 +109,12 @@ export interface Understood {
   wordSymptom?: SymptomKey;
   /** «طابعتي», "my own printer", «پرینتەرەکەی خۆم» and nothing else: the printer of the account. */
   ownPrinter: boolean;
+  /**
+   * «عندي اي ون», «طابعتي A1», "I have an A1", «A1م هەیە»: the customer says
+   * which printer is theirs, so the sentence never asks to buy it (review
+   * round 4.3, ./lexicon.ts `OWNS_PRINTER`).
+   */
+  ownsPrinter: boolean;
   /** "how much?", «شكد؟»: a price asked, whatever the intent scorer made of it. */
   priceAsk: boolean;
   /** The words no reader claimed, at most four: what is left to search for. */
@@ -219,15 +227,29 @@ const PRICE_ASKS = PRICE_ASK.map(normalizeText).filter(Boolean);
 const OWN_MINE = new Set(OWN_PRINTER.mine.map(normalizeText).filter(Boolean));
 const OWN_WITH = new Set(OWN_PRINTER.with.map(normalizeText).filter(Boolean));
 const NOT_FIXED = OUTCOME_NOT_FIXED.map(normalizeText).filter(Boolean);
+const NOT_TRIED = OUTCOME_NOT_TRIED.map(normalizeText).filter(Boolean);
 const RESOLVED = OUTCOME_RESOLVED.map(normalizeText).filter(Boolean);
+const OWNS_WORDS = new Set(OWNS_PRINTER.words.map(normalizeText).filter(Boolean));
+const OWNS_PHRASES = OWNS_PRINTER.phrases.map(normalizeText).filter(Boolean);
 
-/** «جربتها وما انحلّت» → not fixed; «انحلت» → resolved. The negated list first. Pure. */
+/**
+ * «جربتها وما انحلّت» → not fixed; «انحلت» → resolved. The negated list first.
+ * «بعدني ما جربتها», "I still have not tried them" → none: the steps were not
+ * tried, so nothing is known of their outcome. Pure.
+ */
 export function readOutcome(normalized: string): 'resolved' | 'not_fixed' | undefined {
   // «وما» is «و» + «ما»: the conjunction glued on must not hide the negation.
   const padded = ` ${normalized} `.replace(/ و(ما|لم) /g, ' $1 ');
+  if (NOT_TRIED.some((p) => padded.includes(` ${p} `))) return undefined;
   if (NOT_FIXED.some((p) => padded.includes(` ${p} `))) return 'not_fixed';
   if (RESOLVED.some((p) => padded.includes(` ${p} `))) return 'resolved';
   return undefined;
+}
+/** «عندي اي ون», «وعندي طابعة», "I have an A1", «A1م هەیە»: a printer the customer says is theirs. Pure. */
+function saysOwned(normalized: string, tokens: readonly string[]): boolean {
+  if (tokens.some((t) => OWNS_WORDS.has(t) || (t.startsWith('و') && OWNS_WORDS.has(t.slice(1))))) return true;
+  const padded = ` ${normalized} `;
+  return OWNS_PHRASES.some((p) => padded.includes(` ${p} `));
 }
 /**
  * THE IRAQI PROGRESSIVE «دا» («is …-ing») between the negation and its verb:
@@ -391,6 +413,7 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
     ...(outcome ? { outcome } : {}),
     ...(wordSymptom ? { wordSymptom } : {}),
     ownPrinter,
+    ownsPrinter: saysOwned(normalized, typedWords),
     priceAsk: PRICE_ASKS.some((p) => ` ${normalized} `.includes(` ${p} `)),
     residual,
   };
