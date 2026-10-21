@@ -691,3 +691,143 @@ test('round 5.2: a negation further off, a "nothing" after the verb, «ولا» 
     assert.equal(understand(text).triedSaid, true, `«${text}»`);
   }
 });
+
+// ════════════════════════════════════════ review, round 5.4
+
+test('round 5.4: a printer the customer says they have, own or bought is read as such; a want, a need, a have-not, a price or a stock ask never is', () => {
+  for (const text of [
+    'عندي اي ون',
+    'وعندي اي ون',
+    'طابعتي A1',
+    'اكو عندي اي ون',
+    'اشتريت اي ون من عندكم',
+    'شريت اي ون من عدكم',
+    'طابعتي A1 من عندكم',
+    'عندي طابعة',
+    'I have an A1',
+    'I own a P1S',
+    'I bought an A1',
+    'my printer is an A1',
+    'A1م هەیە',
+    'پرینتەرێکی P1Sم هەیە',
+    'پرینتەرێکم هەیە',
+    'پرینتەرەکەم A1ە',
+  ]) {
+    assert.equal(understand(text).ownsSaid, true, `«${text}»`);
+  }
+  for (const text of [
+    'اريد اي ون مالتي',
+    'ابي طابعة مالتي',
+    'ماكو عندي طابعة',
+    'ماكو طابعة عندي',
+    'عندي ولا اي ون',
+    'ما عندي طابعة',
+    'I want an A1, I have a P1S',
+    'I need my own printer',
+    "I don't have a printer",
+    'I have no printer',
+    'پرینتەرێکم دەوێ',
+    'پرینتەرێکم پێویستە',
+    'پرینتەرم نییە',
+    'عندكم اي ون؟',
+    'do you have the A1?',
+    'A1 هەیە؟',
+    'how much is my A1',
+    'is my printer in stock',
+    'اكو طابعتي؟',
+    'طابعتي موجودة عندكم؟',
+    'عندي A1 موجودة عندكم؟',
+    'عندي اي ون شكد سعره',
+    'I have an A1, how much is it',
+    'A1م هەیە، نرخی چەندە؟',
+  ]) {
+    assert.equal(understand(text).ownsSaid, false, `«${text}»`);
+  }
+});
+
+test('round 5.4: the glued «ماعندي» and «معندي» are read as «ما عندي», never a word to search', () => {
+  for (const text of ['ماعندي طابعة', 'معندي طابعة', 'وماعندي طابعة']) {
+    const spaced = understand(text.replace(/م(ا)?عندي/, 'ما عندي'));
+    assert.deepEqual(understand(text).residual, spaced.residual, `«${text}»`);
+    assert.ok(!understand(text).residual.some((w) => w.includes('عندي')), `«${text}»: ${JSON.stringify(understand(text).residual)}`);
+  }
+});
+
+test('round 5.4: «still» or «هێشتا» and a fault, a problem or sameness is «not fixed»; a wait and steps not tried are not', () => {
+  for (const text of [
+    'still jamming',
+    'still jams',
+    'still failing',
+    'still a problem',
+    'still an issue',
+    'it still persists',
+    'still occurs',
+    'still doing it',
+    'still nothing',
+    'still no extrusion',
+    'still nothing comes out',
+    'هێشتا کێشەی هەیە',
+    'هێشتا هەر وایە',
+    'هێشتا هەر کار ناکات',
+    'هێشتا خراپە',
+    'هێشتا هەر گیراوە',
+    'هێشتا نۆزڵەکە گیراوە',
+  ]) {
+    assert.equal(readOutcome(normalizeText(text)), 'not_fixed', `«${text}»`);
+    assert.equal(understand(text).outcome, 'not_fixed', `«${text}»`);
+  }
+  for (const text of ['still waiting for a part', 'still waiting for the needle to arrive', 'هێشتا چاوەڕێی پارچەکەم', 'هێشتا تاقیم نەکردۆتەوە', "I still haven't tried them"]) {
+    assert.equal(readOutcome(normalizeText(text)), undefined, `«${text}»`);
+  }
+});
+
+test('round 5.4: «بعد ما» before a verb is "after", never a negation; «بعدني ما انحلت» is not fixed; "after trying them" says tried', () => {
+  for (const text of ['بعد ما جربتهم ما زبطت', 'بعد ما جربتها نفس المشكلة', 'من بعد ما طبقتها نفس المشكله', 'جربتها بس بعدني ما انحلت', 'after trying them, still clogged']) {
+    assert.equal(readOutcome(normalizeText(text)), 'not_fixed', `«${text}»`);
+    assert.equal(saysTried(normalizeText(text)), true, `«${text}»`);
+    assert.equal(understand(text).triedSaid, true, `«${text}»`);
+  }
+  for (const text of ['بعدني ما انحلت', 'بعدني ما زبطت']) {
+    assert.equal(readOutcome(normalizeText(text)), 'not_fixed', `«${text}»`);
+    assert.equal(saysTried(normalizeText(text)), false, `«${text}»`);
+  }
+  for (const text of ['بعدني ما جربتها', 'ما جربتهم']) {
+    assert.equal(readOutcome(normalizeText(text)), undefined, `«${text}»`);
+    assert.equal(saysTried(normalizeText(text)), false, `«${text}»`);
+  }
+});
+
+test('round 5.4: a verb of trying is the steps only with an object that means them or at the end of its clause; never another thing done, and never the printer', () => {
+  for (const text of [
+    'I tried printing again, still clogged',
+    'tried restarting, still clogged',
+    'I tried another spool, same problem',
+    'I did a cold pull, still clogged',
+    'i did see them but still clogged',
+    'it did that again, still clogged',
+    'the printer did that again, still clogged',
+    'still clogged, it did it again',
+    'did that help? no, still clogged',
+    'حاولت اطبع بس نفس المشكله',
+    'جربت اطبع وبعدها مسدودة',
+    'سويت تنظيف للنوزل وبعده مسدود',
+  ]) {
+    assert.equal(saysTried(normalizeText(text)), false, `«${text}»`);
+    assert.equal(understand(text).triedSaid, false, `«${text}»`);
+  }
+  for (const text of [
+    'tried them, still clogged',
+    'I tried, still clogged',
+    'tried everything, still clogged',
+    'I tried the steps, still clogged',
+    'I did that, still clogged',
+    'done that, still clogged',
+    'جربت الخطوات وما زبطت',
+    'جربت بس نفس المشكله',
+    'سويت كلشي وما زبطت',
+    'تاقیم کردەوە، هێشتا گیراوە',
+  ]) {
+    assert.equal(saysTried(normalizeText(text)), true, `«${text}»`);
+    assert.equal(understand(text).triedSaid, true, `«${text}»`);
+  }
+});
