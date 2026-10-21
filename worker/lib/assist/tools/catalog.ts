@@ -9,6 +9,8 @@
  *
  * `printerModels` is which printers the shop actually lists, by model token:
  * the chips the triage offers and the `fits` filter of a part question.
+ * `printerCards` is those printers themselves, as cards («شكد سعر الطابعة»
+ * while the conversation is about the A1).
  */
 import { listCatalogProducts, resolveListingCards } from '../../catalog/cardsRead';
 import { optimisticSellable, optimisticSellableFlag, optimisticVisible, runListed } from '../../listing';
@@ -124,15 +126,14 @@ export async function catalogByIds(db: D1Database, viewer: Viewer, ids: string[]
 
 /** Memoised per isolate: the printer list changes when the owner edits the catalogue, not per request. */
 const MODELS_TTL_MS = 60_000;
-const modelsMemo = new WeakMap<D1Database, { at: number; value: Promise<Map<ModelToken, string[]>> }>();
 
-/**
- * Model token → the slugs of the ACTIVE, new (not used-unit) printers the
- * catalogue lists under it, in the registry's order. «Bambu Lab A1 Combo» and
- * «Bambu Lab A1» are both A1. A model the shop does not list is absent, so it
- * never becomes a chip.
- */
-export function printerModels(db: D1Database, nowMs = Date.now()): Promise<Map<ModelToken, string[]>> {
+interface ListedPrinters {
+  slugs: Map<ModelToken, string[]>;
+  ids: Map<ModelToken, string[]>;
+}
+const modelsMemo = new WeakMap<D1Database, { at: number; value: Promise<ListedPrinters> }>();
+
+function listedPrinters(db: D1Database, nowMs: number): Promise<ListedPrinters> {
   const hit = modelsMemo.get(db);
   if (hit && nowMs - hit.at < MODELS_TTL_MS) return hit.value;
   const value = loadPrinterModels(db);
@@ -141,18 +142,46 @@ export function printerModels(db: D1Database, nowMs = Date.now()): Promise<Map<M
   return value;
 }
 
-async function loadPrinterModels(db: D1Database): Promise<Map<ModelToken, string[]>> {
+/**
+ * Model token → the slugs of the ACTIVE, new (not used-unit) printers the
+ * catalogue lists under it, in the registry's order. «Bambu Lab A1 Combo» and
+ * «Bambu Lab A1» are both A1. A model the shop does not list is absent, so it
+ * never becomes a chip.
+ */
+export async function printerModels(db: D1Database, nowMs = Date.now()): Promise<Map<ModelToken, string[]>> {
+  return (await listedPrinters(db, nowMs)).slugs;
+}
+
+/**
+ * The printers the shop lists under one model, as the storefront cards them
+ * for this viewer (`catalogByIds`: today's visibility, price and stock). At
+ * most `limit`; none when the shop lists no printer of that model.
+ */
+export async function printerCards(db: D1Database, viewer: Viewer, model: ModelToken, limit: number): Promise<CatalogItem[]> {
+  const ids = (await listedPrinters(db, Date.now())).ids.get(model) ?? [];
+  return ids.length ? catalogByIds(db, viewer, ids.slice(0, limit)) : [];
+}
+
+async function loadPrinterModels(db: D1Database): Promise<ListedPrinters> {
   const printers = await printerOptions(db);
-  const byModel = new Map<ModelToken, string[]>();
+  const slugs = new Map<ModelToken, string[]>();
+  const ids = new Map<ModelToken, string[]>();
   for (const p of printers) {
     if (p.status !== 'active' || p.used) continue;
     const model = latinModels(p.name_en || p.name_ar)[0];
     if (!model) continue;
-    const list = byModel.get(model) ?? [];
+    const list = slugs.get(model) ?? [];
     if (!list.includes(p.slug)) list.push(p.slug);
-    byModel.set(model, list);
+    slugs.set(model, list);
+    const idList = ids.get(model) ?? [];
+    if (!idList.includes(p.id)) idList.push(p.id);
+    ids.set(model, idList);
   }
-  const ordered = new Map<ModelToken, string[]>();
-  for (const token of MODEL_TOKENS) if (byModel.has(token)) ordered.set(token, byModel.get(token)!);
+  const ordered: ListedPrinters = { slugs: new Map(), ids: new Map() };
+  for (const token of MODEL_TOKENS) {
+    if (!slugs.has(token)) continue;
+    ordered.slugs.set(token, slugs.get(token)!);
+    ordered.ids.set(token, ids.get(token)!);
+  }
   return ordered;
 }

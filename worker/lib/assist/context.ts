@@ -29,6 +29,12 @@ export interface AssistContext {
   v: 1;
   printer?: { model: ModelToken | 'other'; unit_id?: string };
   part?: PartKey;
+  /**
+   * The size the part question carried while the assistant asks which
+   * printer it is for («نوزل 0.4 مال زد ون» → «لأي طابعة؟»), so a typed «A1»
+   * keeps the 0.4 exactly as the tapped chip does.
+   */
+  size?: string;
   triage?: TriageState;
   /** The product ids the last answer showed, newest answer only. */
   shown?: string[];
@@ -39,6 +45,8 @@ export const CONTEXT_MAX_BYTES = 2048;
 export const SHOWN_MAX = 6;
 
 const ID_SHAPE = /^[A-Za-z0-9_-]{1,64}$/;
+/** A nozzle or plate size as the search engine reads it: «0.4», «0.25», «256». */
+export const SIZE_SHAPE = /^\d{1,3}(?:\.\d{1,3})?$/;
 export const HMS_CODE_SHAPE = /^[0-9A-F]{4}(?:[-_ ][0-9A-F]{4}){1,3}$/i;
 
 const oneOf = <T extends string>(set: readonly T[], v: unknown): T | undefined =>
@@ -69,6 +77,7 @@ export function readContext(raw: unknown): AssistContext {
   }
   const part = oneOf(PART_KEYS, c.part);
   if (part) out.part = part;
+  if (part && typeof c.size === 'string' && SIZE_SHAPE.test(c.size)) out.size = c.size;
 
   if (typeof c.triage === 'object' && c.triage !== null) {
     const t = c.triage as Record<string, unknown>;

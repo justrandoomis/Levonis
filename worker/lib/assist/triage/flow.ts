@@ -15,16 +15,21 @@ import type { ModelToken, SymptomKey } from '../types';
 
 export type PrinterChoice = ModelToken | 'other';
 
+/**
+ * `code`: an HMS code typed in the same message («P1S وطلعلي رمز 0300-…»),
+ * kept for the steps and the ticket like one typed earlier. `among`: the
+ * printers of a family the customer named («X1»), offered as the only chips.
+ */
 export type TriageInput =
-  | { kind: 'start'; model?: ModelToken; symptom?: SymptomKey; code?: string }
-  | { kind: 'printer'; model: PrinterChoice; unit_id?: string; symptom?: SymptomKey }
+  | { kind: 'start'; model?: ModelToken; symptom?: SymptomKey; code?: string; among?: readonly ModelToken[] }
+  | { kind: 'printer'; model: PrinterChoice; unit_id?: string; symptom?: SymptomKey; code?: string }
   | { kind: 'symptom'; symptom: SymptomKey; code?: string }
   | { kind: 'outcome'; outcome: 'resolved' | 'not_fixed' }
   | { kind: 'talk' }
   | { kind: 'change_printer' };
 
 export type TriageStep =
-  | { kind: 'ask_printer'; symptom?: SymptomKey }
+  | { kind: 'ask_printer'; symptom?: SymptomKey; among?: readonly ModelToken[] }
   | { kind: 'ask_symptom'; model: PrinterChoice }
   | { kind: 'steps'; model: PrinterChoice; symptom: SymptomKey; code?: string }
   | { kind: 'resolved' }
@@ -64,7 +69,7 @@ export function nextTriage(ctx: AssistContext, input: TriageInput): TriageResult
       const model: PrinterChoice | undefined = input.model ?? ctx.printer?.model;
       if (!model) {
         return {
-          step: { kind: 'ask_printer', ...(input.symptom ? { symptom: input.symptom } : {}) },
+          step: { kind: 'ask_printer', ...(input.symptom ? { symptom: input.symptom } : {}), ...(input.among?.length ? { among: input.among } : {}) },
           context: { ...ctx, triage: { stage: 'printer', ...(input.symptom ? { symptom: input.symptom } : {}), ...(input.code ? { code: input.code } : {}) } },
         };
       }
@@ -76,7 +81,7 @@ export function nextTriage(ctx: AssistContext, input: TriageInput): TriageResult
       const next = withPrinter(ctx, input.model, input.unit_id);
       const symptom = input.symptom ?? held?.symptom;
       if (!symptom) return { step: { kind: 'ask_symptom', model: input.model }, context: { ...next, triage: { stage: 'symptom' } } };
-      return toSteps(next, input.model, symptom, held?.code);
+      return toSteps(next, input.model, symptom, input.code ?? held?.code);
     }
     case 'symptom': {
       const code = input.code ?? (input.symptom === held?.symptom ? held?.code : undefined);

@@ -15,7 +15,7 @@
 import { CONFIDENT_SCORE, compileLexicon, normalizeText, scoreIntents, tokenize, type LexEntry } from '../../assistantNlu';
 import { extractIdentifiers, type CodeCandidate } from '../../search/identifiers';
 import type { ModelToken, PartKey, SymptomKey } from '../types';
-import { bareProclitics, latinModels, scanSpokenModels, splitScripts, unreadPrinter } from './models';
+import { bareProclitics, latinModels, readFamily, scanSpokenModels, splitScripts, unreadPrinter } from './models';
 import {
   AMS_WEAK,
   CORRECTION_WORDS,
@@ -35,9 +35,14 @@ import {
 } from './lexicon';
 
 export interface Understood {
-  /** The first printer named (spoken or Latin). */
+  /** The first printer named (spoken or Latin). A family of one printer («A2») is that printer. */
   model?: ModelToken;
   models: ModelToken[];
+  /**
+   * A printer FAMILY named and no printer: «X1», «بي ون», «ئێکس وەن». The
+   * family's printers, as the registry lists them; never a single guess.
+   */
+  family?: { name: string; members: ModelToken[] };
   part?: PartKey;
   /** «صيانة»: the question is about maintenance products. */
   maintenance: boolean;
@@ -175,16 +180,25 @@ export function understand(raw: string, opts: UnderstandOptions = {}): Understoo
   const spoken = scanSpokenModels(normalized);
   const latin = latinModels(raw);
   const models = [...new Set([...spoken.models, ...latin])];
+  const ids = extractIdentifiers(raw);
+  // A series is read only when no printer was: «X1» is the X1C or the X1E,
+  // and the A2 series is the A2L alone, so «A2» is the A2L. Never a word a
+  // size already holds: «0.4 X2» is the search engine's 0.4X2.
+  const read = models.length === 0 ? readFamily(raw, spoken.rest) : undefined;
+  const fam = read && !ids.measures.some((m) => read.words.some((w) => m.toLowerCase().endsWith(w))) ? read : undefined;
+  if (fam && fam.members.length === 1) models.push(fam.members[0]);
+  const family = fam && fam.members.length > 1 ? { name: fam.family.replace(/\s*series$/i, ''), members: fam.members } : undefined;
+  const familyWords = new Set(fam?.words ?? []);
   // Every reader below sees the text WITHOUT the spoken printer names, so the
   // «اي» of «اي ون» is never read as anything else; and with the article off
   // the first word of every known phrase, so «الهوت اند» is «هوت اند».
-  const rest = bareProclitics(spoken.rest, CLAIM_PHRASES);
+  const rest = bareProclitics(fam ? fam.rest : spoken.rest, CLAIM_PHRASES);
 
   const cues = scoreIntents(rest, compiledCues);
   const faultCue = has(cues, 'fault');
   const problemCue = has(cues, 'problem') || faultCue;
   const productCue = has(cues, 'product');
-  const printerCue = has(cues, 'printer') || models.length > 0;
+  const printerCue = has(cues, 'printer') || models.length > 0 || !!fam;
   const maintenance = has(cues, 'maintenance');
   const otherPrinter = has(cues, 'other_printer');
 
@@ -203,23 +217,22 @@ export function understand(raw: string, opts: UnderstandOptions = {}): Understoo
   const ranked = [...symptomScores.entries()].sort((a, b) => b[1] - a[1]);
   const symptom = ranked.length > 0 && ranked[0][1] >= CONFIDENT_SCORE ? ranked[0][0] : undefined;
 
-  const ids = extractIdentifiers(raw);
   const hmsPieces = new Set(hmsCode ? hmsCode.split('-') : []);
   // A printer read as a printer is not also a product code: «P1S» typed alone
   // answers «which printer?», it does not ask for the code P1S.
-  const modelKeys = new Set(latin.flatMap((m) => [m.toLowerCase().replace(/\s+/g, ''), ...m.toLowerCase().split(' ')]));
+  const modelKeys = new Set([...latin.flatMap((m) => [m.toLowerCase().replace(/\s+/g, ''), ...m.toLowerCase().split(' ')]), ...familyWords]);
   const codes = ids.codes
     .filter((c) => !hmsCode || !(hmsPieces.has(c.key.slice(0, 4)) || /^HMS/i.test(c.text)))
     .filter((c) => !modelKeys.has(c.key.toLowerCase()));
 
   // What nobody claimed: the words a search may still need («فولاذ»).
   const modelWords = new Set(
-    latin.flatMap((m) => m.toLowerCase().split(' ')).concat(['combo', 'carbon', 'series', 'bambu', 'lab', 'بامبو'])
+    latin.flatMap((m) => m.toLowerCase().split(' ')).concat(['combo', 'carbon', 'series', 'bambu', 'lab', 'بامبو'], [...familyWords])
   );
   let leftover = ` ${rest} `;
   for (const phrase of CLAIM_PHRASES) leftover = leftover.split(` ${phrase} `).join(' ');
   const words = tokenize(leftover.trim());
-  const scan = unreadPrinter(tokenize(rest));
+  const scan = unreadPrinter(tokenize(rest).filter((t) => !familyWords.has(t)));
   const unread = { unread: models.length === 0 && scan.unread, otherBrand: scan.otherBrand };
   const correction = words.some((t) => CORRECTION_SET.has(t));
   const ordinal = words.map((t) => ORDINALS.get(t)).find((n) => n !== undefined);
@@ -232,6 +245,7 @@ export function understand(raw: string, opts: UnderstandOptions = {}): Understoo
   return {
     ...(models[0] ? { model: models[0] } : {}),
     models,
+    ...(family ? { family } : {}),
     ...(part ? { part } : {}),
     maintenance,
     ...(symptom ? { symptom } : {}),
