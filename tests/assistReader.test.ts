@@ -456,3 +456,38 @@ test('round 3: «CR-10» is another maker; «PA-6» is a material and stays a se
   assert.equal(understand('nozzle for A-1').printerUnread, false);
   assert.deepEqual(understand('نوزل X-1').family?.members, ['X1C', 'X1E']);
 });
+
+test('round 4: «تنظيف النوزل» is the cleaning tools; a cleaning tool named is read; "nozzle" alone is still the nozzle', () => {
+  for (const text of ['nozzle cleaning', 'تنظيف النوزل', 'پاککردنەوەی نۆزڵ', 'شي ينظف النوزل', 'اريد شي انظف بيه النوزل', 'اسفنجة تنظيف النوزل', 'شتێک بۆ پاککردنەوەی نۆزڵ']) {
+    const u = understand(text);
+    assert.equal(u.part, 'cleaning', text);
+    assert.deepEqual(u.residual, [], `${text}: nothing left over to search`);
+  }
+  assert.equal(understand('اسفنجة تنظيف النوزل').tool, 'sponge');
+  assert.equal(understand('ابرة تنظيف').tool, 'needle');
+  assert.equal(understand('nozzle cleaning').tool, undefined);
+  assert.equal(understand('نوزل مال اي ون').part, 'nozzle_hotend');
+  assert.equal(understand('nozzle').part, 'nozzle_hotend');
+});
+
+test('round 4: another maker is read in Latin, as the catalogue writes it', () => {
+  assert.deepEqual(understand('اكو نوزل سنابميكر؟').makers, ['snapmaker']);
+  assert.deepEqual(understand('snapmaker hotend').makers, ['snapmaker']);
+  assert.deepEqual(understand('نوزل مال نبتون فور').makers, ['neptune']);
+  assert.equal(understand('نوزل مال اي ون').makers, undefined);
+});
+
+test('round 4: English faults and the Sorani «any other?»', () => {
+  for (const text of ['something is wrong with my printer', 'help, my printer stopped', 'my printer is acting up']) {
+    const u = understand(text);
+    assert.equal(u.problemCue, true, text);
+    assert.equal(u.printerCue, true, text);
+  }
+  for (const text of ['شتی تر هەیە؟', 'جۆری تر هەیە؟', 'هی تر هەیە؟']) {
+    const u = understand(text);
+    assert.equal(u.otherPrinter, true, text);
+    assert.deepEqual(u.residual, [], text);
+    assert.equal(u.printerCue, false, `${text}: no printer named, so it is «more of the same»`);
+  }
+  assert.equal(understand('پرینتەرێکی تر').printerCue, true, '«another printer» still names a printer');
+});

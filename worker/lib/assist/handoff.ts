@@ -17,8 +17,15 @@ import { symptomDef } from './triage/symptoms';
 import { HMS_CODE_SHAPE, SHOWN_MAX } from './context';
 
 export interface DraftInput {
-  model: ModelToken | 'other';
-  symptom: SymptomKey;
+  /** The printer the customer chose or named; absent when none was, and then the draft names none. */
+  model?: ModelToken | 'other';
+  /** The symptom the customer named; absent when none was, and then the draft names none. */
+  symptom?: SymptomKey;
+  /**
+   * The curated steps of `symptom` were SHOWN in the chat. Only then are they
+   * listed as tried; a ticket asked for before any step was shown lists none.
+   */
+  tried?: boolean;
   code?: string;
   /** Already checked against the viewer's own devices by the caller. */
   unit_id?: string;
@@ -100,30 +107,53 @@ export function printerLabel(loc: Locale, model: ModelToken | 'other'): string {
   return model === 'other' ? tr(loc, 'printer_other') : model;
 }
 
+/**
+ * The draft states what the conversation established and nothing more: a
+ * printer nobody chose and a symptom nobody named are left out of the text
+ * and of the summary (never «طابعة أخرى» / «أخرى» by default), and the steps
+ * are listed as tried only when they were shown.
+ */
 export function buildTicketDraft(input: DraftInput, loc: Locale): TicketDraft {
-  const def = symptomDef(input.symptom);
-  const symptom = def.label[loc];
-  const printer = printerLabel(loc, input.model);
-  const subject =
-    input.model === 'other' ? tr(loc, 'ticket_subject_other', { symptom }) : tr(loc, 'ticket_subject', { printer, symptom });
-  const tried = shownStepKeys(input.symptom, input.code);
-  const lines = [tr(loc, 'ticket_printer', { printer }), tr(loc, 'ticket_problem', { symptom })];
+  const def = input.symptom ? symptomDef(input.symptom) : null;
+  const symptom = def ? def.label[loc] : '';
+  const printer = input.model ? printerLabel(loc, input.model) : '';
+  const named = input.model && input.model !== 'other' ? input.model : null;
+  const subject = def
+    ? named
+      ? tr(loc, 'ticket_subject', { printer: named, symptom })
+      : tr(loc, 'ticket_subject_other', { symptom })
+    : named
+      ? tr(loc, 'ticket_subject_printer', { printer: named })
+      : tr(loc, 'ticket_subject_plain');
+  const tried = def && input.symptom && input.tried ? shownStepKeys(input.symptom, input.code) : [];
+  const lines: string[] = [];
+  if (printer) lines.push(tr(loc, 'ticket_printer', { printer }));
+  if (def) lines.push(tr(loc, 'ticket_problem', { symptom }));
   if (input.code) lines.push(tr(loc, 'ticket_code', { code: input.code }));
-  if (tried.length) {
+  if (def && tried.length) {
     lines.push(tr(loc, 'ticket_tried'));
     for (const key of tried) {
       const step = def.steps.find((s) => s.key === key);
       if (step) lines.push(`- ${(step.tried ?? step.text)[loc]}`);
     }
   }
-  const handoff: HandoffSummary = {
-    v: 1,
-    model: input.model,
-    symptom: input.symptom,
-    tried,
-    ...(input.code ? { code: input.code } : {}),
-    shown: [...(input.shown ?? [])].slice(0, SHOWN_MAX),
-    attachments: 0,
+  // A summary that names neither a printer nor a symptom is no summary (`readHandoff`).
+  const handoff: HandoffSummary | null =
+    input.model || input.symptom
+      ? {
+          v: 1,
+          model: input.model ?? null,
+          symptom: input.symptom ?? null,
+          tried,
+          ...(input.code ? { code: input.code } : {}),
+          shown: [...(input.shown ?? [])].slice(0, SHOWN_MAX),
+          attachments: 0,
+        }
+      : null;
+  return {
+    subject: subject.slice(0, 200),
+    body: lines.join('\n'),
+    ...(input.unit_id ? { unit_id: input.unit_id } : {}),
+    ...(handoff ? { handoff } : {}),
   };
-  return { subject: subject.slice(0, 200), body: lines.join('\n'), ...(input.unit_id ? { unit_id: input.unit_id } : {}), handoff };
 }

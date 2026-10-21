@@ -439,7 +439,9 @@ uploadRoutes.post('/', async (c) => {
             ? ', an MP4 or WebM video, or a voice note'
             : allowVideo
               ? ' or MP4 video'
-              : '')
+              : ''),
+      // The + sheet names the kinds it takes for this code (src/components/support/AssistAttach.tsx).
+      purpose === 'assist' ? 'ASSIST_ATTACH_KIND' : undefined
     );
   }
   if ((kind.mime.startsWith('audio/') || kind.mime === 'application/pdf') && file.size > documentMax) {

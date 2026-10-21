@@ -22,11 +22,11 @@
  */
 import { extractOrderId, normalizeText } from '../assistantNlu';
 import type { AssistContext } from './context';
-import { SHOWN_MAX, SIZE_SHAPE } from './context';
+import { ROWS_MAX, SEEN_MAX, SHOWN_MAX, SIZE_SHAPE } from './context';
 import { buildTicketDraft, shownStepKeys } from './handoff';
 import { callTool } from './registry';
 import { tr } from './strings';
-import { FITS_MAX, SEARCH_LIMIT_MAX, SEARCH_OFFSET_MAX, type CatalogItem } from './tools/catalog';
+import { FITS_MAX, SEARCH_LIMIT_MAX, SEARCH_OFFSET_MAX, type CatalogItem, type CatalogSearchArgs } from './tools/catalog';
 import type { MyPrinter } from './tools/devices';
 import { nextTriage, triagePrinter, type TriageInput, type TriageStep } from './triage/flow';
 import { SYMPTOMS, symptomDef, wikiFor } from './triage/symptoms';
@@ -130,7 +130,9 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
   //    nothing else is an answer: «شكد سعر A1» at «which printer?» is a price
   //    question, and «اكو خيوط PLA؟» at «which symptom?» a filament one. An
   //    HMS code typed with the answer («P1S وطلعلي رمز 0300-…») rides with it.
-  if (stage === 'printer' && bare && (hint === null || PRINTER_ANSWER_HINTS.has(hint))) {
+  // «نوزل مال اي ون» at «أي طابعة عندك؟» is a part question, not the answer: the parts are shown (below).
+  const partQuestion = !!u.part && !u.problemCue && !u.symptom;
+  if (stage === 'printer' && bare && !partQuestion && (hint === null || PRINTER_ANSWER_HINTS.has(hint))) {
     const extras = triageExtras(u.symptom ?? partFault(u), u.hmsCode);
     if (u.model) return runTriage(db, viewer, ctx, { kind: 'printer', model: u.model, ...extras }, render);
     // «X1»: which of the family, holding what was already said.
@@ -520,31 +522,34 @@ async function replyFor(db: D1Database, viewer: Viewer, step: TriageStep, ctx: A
     case 'resolved':
       return { intent: 'printer_problem', text: tr(loc, 'resolved_reply') };
     case 'handoff': {
-      // The device rides along only when it is still this viewer's own.
-      const unit = ctx.printer?.unit_id;
+      // The device rides along only with the printer the triage chose, and only while it is still this viewer's own.
+      const unit = step.model && ctx.printer?.model === step.model && !ctx.printer.browsed ? ctx.printer.unit_id : undefined;
       const mine = unit ? await myPrinters(db, viewer) : [];
       const ownUnit = unit && mine.some((p) => p.unit_id === unit) ? unit : undefined;
       const draft = buildTicketDraft(
         {
-          model: step.model,
-          symptom: step.symptom,
+          ...(step.model ? { model: step.model } : {}),
+          ...(step.symptom ? { symptom: step.symptom } : {}),
+          tried: step.tried,
           ...(step.code ? { code: step.code } : {}),
           ...(ownUnit ? { unit_id: ownUnit } : {}),
           ...(ctx.shown ? { shown: ctx.shown } : {}),
         },
         loc
       );
+      // «فيها الطابعة والمشكلة والخطوات التي جربتها» only when all three are in it.
+      const full = step.tried && !!step.model && !!step.symptom;
       if (!viewer.userId) {
         return {
           intent: 'printer_problem',
-          text: tr(loc, 'handoff_reply_guest'),
+          text: tr(loc, full ? 'handoff_reply_guest' : 'handoff_reply_said_guest'),
           handoff: true,
           auth_required: true,
           ticket_draft: draft,
           links: [{ label: tr(loc, 'sign_in'), to: '/auth' }],
         };
       }
-      return { intent: 'printer_problem', text: tr(loc, 'handoff_reply'), handoff: true, ticket_draft: draft };
+      return { intent: 'printer_problem', text: tr(loc, full ? 'handoff_reply' : 'handoff_reply_said'), handoff: true, ticket_draft: draft };
     }
   }
 }
@@ -698,12 +703,52 @@ interface PrinterSearch {
   exactMiss: string[];
   /** The printers the answer names: «A1», or a family's listed printers «X1C / X1E». */
   label: string;
+  /** With a page asked for: the listing row the page after this one starts at. */
+  next?: number;
 }
 
-/** «اكو غيرها؟»: the page after the cards already shown, without them. */
+/** «اكو غيرها؟»: where the next page starts in the part's own listing, and every card already shown. */
 interface NextPage {
   offset: number;
   exclude: ReadonlySet<string>;
+}
+
+/** The windows one «اكو غيرها؟» reads at most: enough to fill a page past three pages already shown. */
+const PAGE_WINDOWS = 3;
+
+/**
+ * ONE PAGE OF A LISTING, past what was already shown. Read from `page.offset`
+ * in windows of SEARCH_LIMIT_MAX until a page of cards is full or the listing
+ * ends; a row already shown (or one `keep` refuses) is skipped, never shown
+ * again. `next` is the row after the last one gone through, so the following
+ * page starts there and no row is left behind: the cards a page put first from
+ * another search («the part itself first») push no listing row off every page.
+ */
+async function pageOf(
+  db: D1Database,
+  viewer: Viewer,
+  args: Pick<CatalogSearchArgs, 'text' | 'fits' | 'category'>,
+  page: NextPage,
+  keep: (i: CatalogItem) => boolean = () => true
+): Promise<{ items: CatalogItem[]; next: number; exactMiss: string[] }> {
+  const items: CatalogItem[] = [];
+  let at = page.offset;
+  let exactMiss: string[] = [];
+  for (let window = 0; window < PAGE_WINDOWS && items.length < CARDS_MAX && at <= SEARCH_OFFSET_MAX; window++) {
+    const r = await callTool('catalog.search', db, viewer, { ...args, limit: SEARCH_LIMIT_MAX, ...(at ? { offset: at } : {}) });
+    if (!r.ok) break;
+    if (window === 0) exactMiss = r.data.exactMiss;
+    const rows = r.data.items;
+    let used = 0;
+    for (const item of rows) {
+      used++;
+      if (!page.exclude.has(item.id) && keep(item) && !items.some((x) => x.id === item.id)) items.push(item);
+      if (items.length === CARDS_MAX) break;
+    }
+    at += used;
+    if (rows.length < SEARCH_LIMIT_MAX) break;
+  }
+  return { items, next: Math.min(at, ROWS_MAX), exactMiss };
 }
 
 /**
@@ -720,8 +765,6 @@ async function forPrinters(
   head?: Head,
   page?: NextPage
 ): Promise<PrinterSearch> {
-  const fresh = (items: CatalogItem[]) => (page ? items.filter((i) => !page.exclude.has(i.id)) : items);
-  const at = page ? { offset: page.offset } : {};
   const listed = await printerModelsSafe(db, viewer);
   const sold = models.filter((m) => listed.has(m));
   const label = (sold.length ? sold : models).join(' / ');
@@ -734,17 +777,20 @@ async function forPrinters(
   const scopes: Array<'cat_maint' | undefined> = category ? [category, undefined] : [undefined];
   let exactMiss: string[] = [];
   if (slugs.length) {
+    // The next page of linked parts; none, and no by-name guess stands in for it.
+    if (page) {
+      const next = await pageOf(db, viewer, { text, fits: slugs, ...(category ? { category } : {}) }, page);
+      return { items: next.items, mode: next.items.length ? 'linked' : 'none', exactMiss: next.exactMiss, label, next: next.next };
+    }
     for (const scope of scopes) {
-      const r = await callTool('catalog.search', db, viewer, { text, fits: slugs, ...(scope ? { category: scope } : {}), limit: CARDS_MAX, ...at });
-      const linked = r.ok ? fresh(r.data.items) : [];
+      const r = await callTool('catalog.search', db, viewer, { text, fits: slugs, ...(scope ? { category: scope } : {}), limit: CARDS_MAX });
+      const linked = r.ok ? r.data.items : [];
       if (linked.length) {
         const items = head ? await headFirst(db, viewer, linked, head, { fits: slugs, ...(scope ? { category: scope } : {}) }) : linked;
         return { items, mode: 'linked', exactMiss: r.ok ? r.data.exactMiss : [], label };
       }
       if (r.ok) exactMiss = r.data.exactMiss;
     }
-    // The next page of linked parts is empty: no by-name guess stands in for it.
-    if (page) return { items: [], mode: 'none', exactMiss, label };
   }
   // No link: the products that NAME one of the printers. Asked twice at most:
   // as typed, then with the printer's own name words added («p1p p1»). The
@@ -754,14 +800,21 @@ async function forPrinters(
   // words is kept from it.
   const wanted = termWords(text);
   const queries = [text, `${text} ${modelNameWords(models)}`.trim().slice(0, 99)].filter((q, i, all) => q && all.indexOf(q) === i);
+  const names = (words: string) => (i: CatalogItem) => models.some((m) => mentionsModel(namedText(i.row), m)) && (words === text || namesTerm(i, wanted));
+  if (page) {
+    // The next page of the products that name the printer, as the first page was read.
+    for (const words of queries) {
+      const next = await pageOf(db, viewer, { text: words }, page, names(words));
+      if (next.items.length) return { items: next.items, mode: 'named', exactMiss: next.exactMiss, label, next: next.next };
+    }
+    return { items: [], mode: 'none', exactMiss, label };
+  }
   for (const words of queries) {
     for (const scope of scopes) {
-      const r = await callTool('catalog.search', db, viewer, { text: words, ...(scope ? { category: scope } : {}), limit: 8, ...at });
+      const r = await callTool('catalog.search', db, viewer, { text: words, ...(scope ? { category: scope } : {}), limit: 8 });
       if (!r.ok) continue;
       if (words === text) exactMiss = r.data.exactMiss;
-      const named = fresh(r.data.items).filter(
-        (i) => models.some((m) => mentionsModel(namedText(i.row), m)) && (words === text || namesTerm(i, wanted))
-      );
+      const named = r.data.items.filter(names(words));
       if (named.length) {
         // The part itself first here too: «Bambu Hotend - P1 Series» before the wiper that names the P1.
         const isHead = head ? headTest(head) : () => false;
@@ -808,7 +861,9 @@ async function products(
   let printers: readonly ModelToken[] = model ? [model] : (u.family?.members ?? []);
   const fault = !!u.part && u.problemCue;
   const category = fault || u.maintenance ? ('cat_maint' as const) : undefined;
-  const terms = u.part ? (fault ? PART_FIX_TERMS[u.part] : PART_TERMS[u.part]) : '';
+  // «ابرة تنظيف», «اسفنجة تنظيف النوزل»: the cleaning tool named is searched with the part.
+  const base = u.part ? (fault ? PART_FIX_TERMS[u.part] : PART_TERMS[u.part]) : '';
+  const terms = u.part === 'cleaning' && u.tool && !base.split(' ').includes(u.tool) ? `${base} ${u.tool}` : base;
   // The printer is a FILTER (the catalogue link, or the by-name check), not a
   // search word: «A1» in the query would rank every part that merely names the
   // A1 (the A1 hotend, for a question about plates) as an answer. It is a word
@@ -842,6 +897,13 @@ async function products(
       }
     }
   }
+  /**
+   * «اكو نوزل سنابميكر؟»: another maker, named. The shop sells parts of some
+   * («Snapmaker U1 Hot End Nozzle»): that maker's own parts of the kind asked
+   * come first, under the same check-the-page caveat. A maker the shop has no
+   * product of is dropped from the search as before.
+   */
+  const makerItems = anyPrinter && u.part && u.makers?.length ? await makerParts(db, viewer, u.makers, terms) : [];
   if (found) {
     items = found.items;
     mode = found.mode;
@@ -859,6 +921,10 @@ async function products(
         break;
       }
     }
+  }
+  if (makerItems.length) {
+    items = [...makerItems, ...items.filter((i) => !makerItems.some((m) => m.id === i.id))].slice(0, CARDS_MAX);
+    if (mode === 'none') mode = 'plain';
   }
 
   const intent = intentHint && LABEL_INTENTS.has(intentHint) ? intentHint : 'product_search';
@@ -890,6 +956,9 @@ async function products(
   const shown = items.slice(0, SHOWN_MAX).map((i) => i.id);
   if (shown.length) next.shown = shown;
   else delete next.shown;
+  // A new part answer starts the «اكو غيرها؟» paging again: from the top of the part's own listing, past these cards.
+  if (u.part && shown.length) next.more = { rows: 0, seen: shown };
+  else delete next.more;
 
   const reply: AssistReply = { intent, text: sentences.join(' '), ...(cards.length ? { cards } : {}) };
   if (!cards.length) {
@@ -916,32 +985,40 @@ function lineLabel(word: string): string {
 /**
  * «اكو غيرها؟», "any other?" after the part cards: the next page of the same
  * part, for the printer the conversation is about (linked, or named when the
- * shop links none), or for none. What was shown is left out; nothing new is
- * said plainly, with the full search one tap away. The printer is never
- * turned into «another printer».
+ * shop links none), or for none. It goes on from where the last page stopped
+ * in the part's own listing (`ctx.more`), and no card shown for this part
+ * before is shown again; a page that brings nothing new says so plainly, with
+ * the full search one tap away. The printer is never turned into «another
+ * printer».
  */
 async function moreOfPart(db: D1Database, viewer: Viewer, ctx: AssistContext, part: PartKey, render: CardRenderer): Promise<TurnOutcome> {
   const loc = viewer.locale;
-  const seen = new Set(ctx.shown ?? []);
-  const page: NextPage = { offset: Math.min(seen.size, SEARCH_OFFSET_MAX), exclude: seen };
+  const cursor = ctx.more ?? { rows: 0, seen: [] };
+  const seen = [...new Set([...cursor.seen, ...(ctx.shown ?? [])])];
+  const page: NextPage = { offset: cursor.rows, exclude: new Set(seen) };
   const model = ctx.printer && ctx.printer.model !== 'other' ? ctx.printer.model : undefined;
   const words = PART_TERMS[part];
   let items: CatalogItem[] = [];
+  let next = cursor.rows;
   let text = '';
   if (model) {
     const found = await forPrinters(db, viewer, [model], words, undefined, undefined, page);
     items = found.items;
+    next = found.next ?? next;
     if (found.mode === 'linked') text = tr(loc, 'more_for_printer', { printer: found.label });
     else if (found.mode === 'named') text = tr(loc, 'parts_by_name', { printer: found.label });
   } else {
-    const r = await callTool('catalog.search', db, viewer, { text: words, limit: SEARCH_LIMIT_MAX, offset: page.offset });
-    items = r.ok ? r.data.items.filter((i) => !seen.has(i.id)) : [];
+    const found = await pageOf(db, viewer, { text: words }, page);
+    items = found.items;
+    next = found.next;
     text = tr(loc, 'more_results');
   }
   const cards = items.slice(0, CARDS_MAX).map((i) => render.card(loc, i.card, i.row));
-  const next: AssistContext = { ...ctx };
-  dropPendingQuestion(next);
-  delete next.size;
+  const nextCtx: AssistContext = { ...ctx };
+  dropPendingQuestion(nextCtx);
+  delete nextCtx.size;
+  const shownNow = items.slice(0, SHOWN_MAX).map((i) => i.id);
+  nextCtx.more = { rows: next, seen: [...seen, ...shownNow].slice(-SEEN_MAX) };
   if (!cards.length) {
     // Nothing new: the cards on screen stay the ones a «شكد سعره؟» reads again.
     return {
@@ -953,11 +1030,27 @@ async function moreOfPart(db: D1Database, viewer: Viewer, ctx: AssistContext, pa
           { label: tr(loc, 'talk_team'), intent: 'human_handoff' },
         ],
       },
-      context: next,
+      context: nextCtx,
     };
   }
-  next.shown = items.slice(0, SHOWN_MAX).map((i) => i.id);
-  return { reply: { intent: 'product_search', text, cards }, context: next };
+  nextCtx.shown = shownNow;
+  return { reply: { intent: 'product_search', text, cards }, context: nextCtx };
+}
+
+/** The parts of the kind `terms` names among the products of these makers (the strong lookup); none on any failure. */
+async function makerParts(db: D1Database, viewer: Viewer, makers: readonly string[], terms: string): Promise<CatalogItem[]> {
+  const kind = termWords(terms);
+  const out: CatalogItem[] = [];
+  // The maker's name alone, searched strictly: every product it reaches carries it.
+  for (const words of makers.slice(0, 2)) {
+    try {
+      const r = await callTool('catalog.search', db, viewer, { text: words, limit: SEARCH_LIMIT_MAX, strong: true });
+      for (const i of r.ok ? r.data.items : []) if (namesTerm(i, kind) && !out.some((x) => x.id === i.id)) out.push(i);
+    } catch {
+      /* the plain answer stands */
+    }
+  }
+  return out.slice(0, CARDS_MAX);
 }
 
 /** The products every one of these words reaches (the strong lookup); none on any failure. */

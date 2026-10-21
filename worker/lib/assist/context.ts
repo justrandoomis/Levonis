@@ -23,6 +23,11 @@ export interface TriageState {
   symptom?: SymptomKey;
   /** An HMS code as typed (shape-checked), held for the ticket. */
   code?: string;
+  /**
+   * The curated steps of `symptom` were shown. Only then does the ticket list
+   * them as tried: «تحدث مع الفريق» at «which printer?» showed none.
+   */
+  steps?: true;
 }
 
 export interface AssistContext {
@@ -49,11 +54,22 @@ export interface AssistContext {
   triage?: TriageState;
   /** The product ids the last answer showed, newest answer only. */
   shown?: string[];
+  /**
+   * «اكو غيرها؟» PAGING of `part`, across answers: `rows`, the rows of the
+   * part's own listing already gone through, and `seen`, every product shown
+   * for it so far (the newest SEEN_MAX). A second «اكو غيرها؟» goes on from
+   * where the first stopped and never shows a card again.
+   */
+  more?: { rows: number; seen: string[] };
 }
 
 /** A context bigger than this is not a context; it is ignored whole. */
 export const CONTEXT_MAX_BYTES = 2048;
 export const SHOWN_MAX = 6;
+/** Three pages of cards: the paging cursor stays well inside CONTEXT_MAX_BYTES. */
+export const SEEN_MAX = 18;
+/** Past this many rows, the listing offset is capped (tools/catalog.ts SEARCH_OFFSET_MAX plus a page). */
+export const ROWS_MAX = 64;
 
 const ID_SHAPE = /^[A-Za-z0-9_-]{1,64}$/;
 /** A nozzle or plate size as the search engine reads it: «0.4», «0.25», «256». */
@@ -100,11 +116,18 @@ export function readContext(raw: unknown): AssistContext {
       const symptom = oneOf(SYMPTOM_KEYS, t.symptom);
       if (symptom) out.triage.symptom = symptom;
       if (typeof t.code === 'string' && HMS_CODE_SHAPE.test(t.code)) out.triage.code = t.code.toUpperCase();
+      if (symptom && t.steps === true) out.triage.steps = true;
     }
   }
   if (Array.isArray(c.shown)) {
     const ids = c.shown.filter((x): x is string => typeof x === 'string' && ID_SHAPE.test(x)).slice(0, SHOWN_MAX);
     if (ids.length) out.shown = ids;
+  }
+  if (part && typeof c.more === 'object' && c.more !== null && !Array.isArray(c.more)) {
+    const m = c.more as Record<string, unknown>;
+    const rows = Number(m.rows);
+    const seen = Array.isArray(m.seen) ? [...new Set(m.seen.filter((x): x is string => typeof x === 'string' && ID_SHAPE.test(x)))].slice(-SEEN_MAX) : [];
+    if (Number.isInteger(rows) && rows >= 0 && rows <= ROWS_MAX) out.more = { rows, seen };
   }
   return out;
 }

@@ -1755,7 +1755,8 @@ export default function Support() {
             .filter((m) => m.role === 'user' && m.typed && m.text.trim())
             .slice(-5)
             .map((m) => `- ${m.text.trim().slice(0, 200)}`);
-          const body = quoted.length ? `${d.reply.ticket_draft.body}\n\n${s.fromChat}\n${quoted.join('\n')}` : d.reply.ticket_draft.body;
+          // A draft asked for before the printer or the fault was given carries no body of its own.
+          const body = [d.reply.ticket_draft.body, quoted.length ? `${s.fromChat}\n${quoted.join('\n')}` : ''].filter(Boolean).join('\n\n');
           setDraft({
             subject: d.reply.ticket_draft.subject,
             body: body.slice(0, 4000),

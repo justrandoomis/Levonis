@@ -2,10 +2,11 @@
  * WHOSE SUPPORT CONVERSATION THIS TAB HOLDS, and nothing else.
  *
  * The auth layer (src/AuthContext.tsx) calls `adoptAssistOwner` on every
- * identity change, so this module is part of the entry chunk: it imports
- * nothing and holds only the owner stamp and the drop. The conversation itself
- * (load and save) stays in src/lib/assistSession.ts, which only the lazy
- * Support page imports. tests/bundleBudget.test.ts measures the entry.
+ * identity change through a dynamic import, so this module is a chunk of its
+ * own, outside the entry: it imports nothing and holds only the owner stamp
+ * and the drop. The conversation itself (load and save) stays in
+ * src/lib/assistSession.ts, which only the lazy Support page imports.
+ * tests/bundleBudget.test.ts measures the entry.
  */
 /** The server context and the rest of the conversation (src/lib/assistSession.ts reads and writes them). */
 export const ASSIST_CONTEXT_KEY = 'levonis.assist.v1';

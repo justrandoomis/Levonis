@@ -39,8 +39,10 @@ import {
   decideIntent,
   extractOrderId,
   isLikelyCatalogueLookup,
+  normalizeText,
   scoreIntents,
   stripWords,
+  tokenize,
   type IntentDecision,
   type LexEntry,
 } from '../lib/assistantNlu';
@@ -532,6 +534,18 @@ function tooShortToLookUp(stripped: string): boolean {
  * «PLA شكد» kept nothing and asked «أي مادة تقصد؟».
  */
 const MATERIAL_NAMES = new Set(['pla', 'petg', 'abs', 'tpu', 'asa', 'resin']);
+/**
+ * A LINE OR A GRADE of a material, the word that picks a product rather than
+ * an option: «silk», «matte», «basic», «95A», «HF», «CF», «PLA+». Never a
+ * colour, a weight or a size.
+ */
+const MATERIAL_KINDS = new Set([
+  'silk', 'matte', 'basic', 'marble', 'metal', 'galaxy', 'sparkle', 'glow', 'translucent', 'wood', 'tough', 'aero', 'lite',
+  'plus', 'pro', 'hf', 'cf', 'gf', 'support', 'gradient', 'dual', 'rapid', 'carbon', 'flex', 'hs', 'hyper',
+]);
+function isMaterialKind(word: string): boolean {
+  return MATERIAL_KINDS.has(word.replace(/\+$/, '')) || /^\d{2}[ad]$/.test(word) || /^(?:cf|gf|hf)\d*$/.test(word) || /^[a-z]+\+$/.test(word);
+}
 function materialsSubject(text: string): string {
   const entry = LEXICON.materials_help;
   const asking = (['price_question', 'stock_question'] as const).flatMap((intent) => [
@@ -557,12 +571,27 @@ function materialsSubject(text: string): string {
  * a lowercase substring scan could not.
  */
 export function matchIntents(text: string): Intent[] {
-  return scoreIntents(text, COMPILED_LEXICON).map((s) => s.intent);
+  return scoreIntents(withoutProOfAName(text), COMPILED_LEXICON).map((s) => s.intent);
+}
+
+/**
+ * «H2D Pro», "AMS 2 Pro price": a «pro» right after a model or a product name
+ * («h2d», «2», «ams») is part of that name, never the Pro membership. It is
+ * taken out before the scorer reads the sentence, so "price of AMS 2 Pro" is
+ * the price question it is, in English as in Arabic, and «H2D Pro» typed alone
+ * is looked up as the product. "My pro membership", "am I pro?" and «اشتراك
+ * pro» still read as the membership.
+ */
+const PRO_NAMES = new Set(['ams']);
+function withoutProOfAName(text: string): string {
+  const tokens = tokenize(normalizeText(text));
+  const kept = tokens.filter((t, i) => !(t === 'pro' && i > 0 && (/\d/.test(tokens[i - 1]) || PRO_NAMES.has(tokens[i - 1]))));
+  return kept.length === tokens.length ? text : kept.join(' ');
 }
 
 /** The one decision, with its shortlist when it declines to make one. */
 function readIntent(text: string): IntentDecision<Intent> {
-  return decideIntent(scoreIntents(text, COMPILED_LEXICON));
+  return decideIntent(scoreIntents(withoutProOfAName(text), COMPILED_LEXICON));
 }
 
 // --------------------------------------------------------------- dictionary
@@ -2087,10 +2116,12 @@ async function handleSubjectSearch(
    * A MATERIAL AND WHAT KIND: "silk PLA", "TPU 95A". The forgiving search pads
    * the two silk filaments with every other PLA; the products that carry every
    * word are the answer, alone, when there are any. A bare «PLA» keeps the
-   * ordinary search.
+   * ordinary search, and so does a colour, a weight or a size («PETG اسود»,
+   * «PLA 1kg»): those are option names, often in English only, and the
+   * products that carry the word in their own text are not all that have it.
    */
   const words = subject.toLowerCase().split(/\s+/).filter(Boolean);
-  if (words.length > 1 && words.some((w) => MATERIAL_NAMES.has(w))) {
+  if (words.length > 1 && words.some((w) => MATERIAL_NAMES.has(w)) && words.some((w) => !MATERIAL_NAMES.has(w) && isMaterialKind(w))) {
     const exact = await handleProductSearch(c, { q: subject }, subject, loc, { strong: true });
     if (exact.cards?.length) return { ...exact, intent };
   }

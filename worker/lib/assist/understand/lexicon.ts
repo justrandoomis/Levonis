@@ -52,6 +52,8 @@ export const FILLERS: readonly string[] = [
   // «اريد نوزل جديد», «نوزل اصلي»: new and genuine describe every product on the shelf; searched, they
   // reach «Like New» open-box printers and a «DIY Kit» instead of the part.
   'جديد', 'جديده', 'اصلي', 'اصليه', 'new', 'original', 'genuine', 'نوێ', 'ڕەسەن',
+  // «شي ينظف النوزل», «شتێک بۆ پاککردنەوەی نۆزڵ», «شتی تر هەیە؟», «جۆری تر»: "something", "a kind of".
+  'شي', 'شيء', 'something', 'شتێک', 'شتی', 'جۆری', 'هی',
 ];
 
 /**
@@ -106,7 +108,8 @@ export const ORDINAL_WORDS: Readonly<Record<string, number>> = {
 /** At the triage's «which printer?»: «طابعة أخرى», "another one", or a maker the shop does not list. */
 export const OTHER_PRINTER: LexEntry = {
   phrases: ['طابعه اخرى', 'طابعه ثانيه', 'غير طابعه', 'other printer', 'another printer', 'پرینتەرێکی تر'],
-  stems: ['اخرى', 'غيرها', 'other', 'another'],
+  // Sorani «تر» ("other"): «شتی تر هەیە؟», «جۆری تر», «هی تر», read only as a whole word.
+  stems: ['اخرى', 'غيرها', 'other', 'another', 'تر'],
 };
 
 /**
@@ -149,6 +152,9 @@ export const PROBLEM_CUE: LexEntry = {
     'ما يسحب', 'ما تسحب', 'not feeding', 'does not feed', 'doesnt feed',
     'ما تطبع', 'ما يطبع', 'لا تطبع', 'لا يطبع', 'not printing', 'does not print', 'doesnt print', 'wont print', "won't print",
     'stopped working', 'stopped printing', 'چاپ ناکات', 'چاپ ناکا',
+    // "something is wrong with my printer", "help, my printer stopped", "it is acting up".
+    'something wrong', 'something is wrong', 'somethings wrong', 'wrong with', 'not right', 'acting up', 'acting weird',
+    'printer stopped', 'it stopped', 'has stopped', 'just stopped', 'keeps stopping',
   ],
   stems: [
     'مشكل', 'مشاكل', 'عطل', 'خلل', 'خربان', 'خربانه', 'عاطل', 'وكفت', 'واكفه', 'problem', 'problems', 'issue', 'broken', 'fault',
@@ -190,8 +196,20 @@ export const PART_LEXICON: Record<PartKey, LexEntry> = {
   },
   cleaning: {
     phrases: ['ابره تنظيف', 'ابر تنظيف', 'cleaning needle', 'cleaning kit', 'ئامرازی پاککردنەوە'],
-    stems: ['ابره', 'تنظيف', 'needle', 'needles', 'cleaning', 'پاککردنەوە', 'دەرزی'],
+    // «ينظف», «انظف», «تنظف» (to clean: «نظف» reaches each), «اسفنجة», "clean", "sponge", "wipes".
+    stems: [
+      'ابره', 'تنظيف', 'needle', 'needles', 'cleaning', 'پاککردنەوە', 'دەرزی', 'نظف', 'اسفنج', 'clean', 'sponge', 'sponges', 'wipes',
+      'پاککەرەوە', 'ئیسفەنج',
+    ],
   },
+};
+
+/** The cleaning tools a customer names, as the catalogue words they are searched by. */
+export type CleaningTool = 'needle' | 'sponge' | 'wipes';
+export const CLEANING_TOOLS: Record<CleaningTool, LexEntry> = {
+  needle: { stems: ['ابره', 'needle', 'needles', 'دەرزی'] },
+  sponge: { stems: ['اسفنج', 'sponge', 'sponges', 'ئیسفەنج'] },
+  wipes: { stems: ['wipes', 'مناديل', 'منديل'] },
 };
 
 /** The symptom a fault IN a part family is, when no other symptom is named: «مشكلة بالنوزل» is the clog path. */
@@ -205,7 +223,8 @@ export const PART_SYMPTOM: Readonly<Record<PartKey, SymptomKey>> = {
 export const PART_TERMS: Readonly<Record<PartKey, string>> = {
   nozzle_hotend: 'hotend nozzle',
   plate: 'plate',
-  cleaning: 'cleaning needle',
+  // The storefront's own answer to "nozzle cleaning": the sponge and the wipes first. A tool named is added («ابرة» → needle).
+  cleaning: 'nozzle cleaning',
 };
 
 /** What fixes a fault in that family: the part and what cleans it. */

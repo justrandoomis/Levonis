@@ -180,6 +180,17 @@ test('the door holds: no account, a PDF, a file over the limit, and a flood are 
   const pdf = await h.upload('owner', PDF, 'scan.pdf', 'application/pdf');
   assert.equal(pdf.status, 400);
   assert.equal((await body(pdf)).code, 'ASSIST_ATTACH_KIND');
+  // Review round 4: any other kind is refused by the same name, so the + sheet says which kinds it takes,
+  // never «try again» for a file that can never be sent.
+  for (const [file, name, type] of [
+    [bytes('PK\u0003\u0004 archive'), 'notes.zip', 'application/zip'],
+    [bytes('<!doctype html><p>x</p>'), 'page.html', 'text/html'],
+    [bytes('<svg xmlns="http://www.w3.org/2000/svg"/>'), 'logo.svg', 'image/svg+xml'],
+  ] as const) {
+    const refused = await h.upload('owner', file, name, type);
+    assert.equal(refused.status, 400, name);
+    assert.equal((await body(refused)).code, 'ASSIST_ATTACH_KIND', name);
+  }
 
   h.raw.exec(`INSERT INTO admin_settings (key, value) VALUES ('uploadLimits', '{"video_mb":1}')`);
   const big = new Uint8Array(2 * 1024 * 1024);
@@ -348,11 +359,13 @@ test('a GUEST typing «تحدث مع الفريق» mid-triage gets the same dra
     assert.ok((reply.links as Rec[]).some((l) => l.to === '/auth'), `${locale}: the sign-in link`);
     assert.match(reply.ticket_draft.subject, /P1S/, locale);
     assert.equal(reply.ticket_draft.handoff.symptom, 'adhesion', locale);
-    assert.deepEqual(reply.context.triage, { stage: 'done', symptom: 'adhesion' }, `${locale}: the triage is not lost on the way to the sign-in page`);
+    // `steps`: the adhesion steps were shown, so the signed-in draft still lists them as tried (review round 4).
+    assert.deepEqual(reply.context.triage, { stage: 'done', symptom: 'adhesion', steps: true }, `${locale}: the triage is not lost on the way to the sign-in page`);
     // Signed in, the chip drafts the same ticket, never «المشكلة: أخرى».
     const after = await h.ask('owner', { locale, intent: 'printer_problem', params: { step: 'talk' }, context: reply.context });
     assert.equal(after.ticket_draft.handoff.symptom, 'adhesion', locale);
     assert.equal(after.ticket_draft.handoff.model, 'P1S', locale);
+    assert.ok(after.ticket_draft.handoff.tried.length > 0, `${locale}: the steps shown before the sign-in are still the steps tried`);
   }
   // Without a triage a guest still gets the account sign-in reply for the plain handoff.
   const cold = await h.ask('', { text: 'تحدث مع الفريق' });
