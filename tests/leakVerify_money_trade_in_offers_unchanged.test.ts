@@ -15,7 +15,7 @@
  *
  * LOCAL ONLY: in-memory SQLite, the real trade-in routes, a stub session.
  */
-import { test } from 'node:test';
+import { mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { asD1, freshDb, stubApp, post, json, send, type StubUser } from './fixtures/app';
@@ -236,11 +236,23 @@ const V1_FIGURES: Record<string, { estimated_iqd: number; estimate: unknown }> =
   }
 };
 
+/**
+ * The offer falls with whole 30-day months since delivery (`wholeMonthsBetween`), so the figures above hold only
+ * while the unit is 12 months old: from 2026-09-21 to 2026-10-20 after DELIVERED. The clock is pinned inside that
+ * window, or the guard turns red on the day the unit ages a month, with no change to the code.
+ */
+const PRICED_AT = '2026-10-10T00:00:00.000Z';
+
 test('trade-in offers for the same unit, answers and target: HEAD saves the base figures', async () => {
-  const now = await fingerprint();
-  console.log(`FINGERPRINT ${JSON.stringify(now)}`);
-  if (BASE_FIGURES) assert.deepEqual(now, BASE_FIGURES);
-  for (const [label, v] of Object.entries(now as Record<string, { estimated_iqd: number }>)) {
-    assert.ok(v.estimated_iqd <= V1_FIGURES[label].estimated_iqd, `${label}: the store-safe offer ${v.estimated_iqd} never exceeds the old ${V1_FIGURES[label].estimated_iqd}`);
+  mock.timers.enable({ apis: ['Date'], now: Date.parse(PRICED_AT) });
+  try {
+    const now = await fingerprint();
+    console.log(`FINGERPRINT ${JSON.stringify(now)}`);
+    if (BASE_FIGURES) assert.deepEqual(now, BASE_FIGURES);
+    for (const [label, v] of Object.entries(now as Record<string, { estimated_iqd: number }>)) {
+      assert.ok(v.estimated_iqd <= V1_FIGURES[label].estimated_iqd, `${label}: the store-safe offer ${v.estimated_iqd} never exceeds the old ${V1_FIGURES[label].estimated_iqd}`);
+    }
+  } finally {
+    mock.timers.reset();
   }
 });
