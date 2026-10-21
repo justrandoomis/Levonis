@@ -17,6 +17,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SYMPTOMS, symptomDef, wikiFor } from '../worker/lib/assist/triage/symptoms';
 import { nextTriage } from '../worker/lib/assist/triage/flow';
+import { readContext } from '../worker/lib/assist/context';
 import { ASSIST_T } from '../worker/lib/assist/strings';
 import { buildTicketDraft } from '../worker/lib/assist/handoff';
 import { PART_LABELS } from '../worker/lib/assist/understand/lexicon';
@@ -47,7 +48,10 @@ test('every symptom and step is written three times, and the steps are few', () 
     three(s.key, s.label);
     assert.ok(s.steps.length >= 1 && s.steps.length <= 4, `${s.key}: ${s.steps.length} steps`);
     assert.equal(new Set(s.steps.map((x) => x.key)).size, s.steps.length, `${s.key}: duplicate step key`);
-    for (const step of s.steps) three(`${s.key}.${step.key}`, step.text);
+    for (const step of s.steps) {
+      three(`${s.key}.${step.key}`, step.text);
+      if (step.tried) three(`${s.key}.${step.key}.tried`, step.tried);
+    }
   }
   for (const [key, label] of Object.entries(PART_LABELS)) three(key, label);
 });
@@ -120,10 +124,25 @@ test('the ticket draft names the printer, the symptom, the code and every step t
     const d = buildTicketDraft({ model: 'A1', symptom: 'clog' }, loc);
     assert.match(d.subject, /A1/);
     assert.ok(d.body.includes(symptomDef('clog').label[loc]), loc);
-    for (const step of symptomDef('clog').steps) assert.ok(d.body.includes(step.text[loc]), `${loc}: ${step.key}`);
+    for (const step of symptomDef('clog').steps) assert.ok(d.body.includes((step.tried ?? step.text)[loc]), `${loc}: ${step.key}`);
+    // Review round 3: the ticket lists what was tried, never «the matching parts are below».
+    assert.doesNotMatch(d.body, /أدناه|below|خوارەوە/, `${loc}: the ticket points at parts it does not carry`);
   }
   const hms = buildTicketDraft({ model: 'X1C', symptom: 'hms', code: '0300-0100-0001-0003' }, 'en');
   assert.match(hms.body, /0300-0100-0001-0003/);
   assert.ok(!hms.body.includes('Type the full code'), 'a code already typed is not listed as a step to do');
   assert.equal(buildTicketDraft({ model: 'other', symptom: 'noise' }, 'ar').subject, 'مشكلة في الطابعة: صوت غريب');
+});
+
+test('round 3: a printer a shopping answer only showed is not the printer the triage goes on with', () => {
+  const browsed = readContext({ v: 1, printer: { model: 'A1', browsed: true } });
+  assert.deepEqual(browsed.printer, { model: 'A1', browsed: true });
+  assert.deepEqual(readContext({ v: 1, printer: { model: 'A1', browsed: 'yes' } }).printer, { model: 'A1' }, 'closed set: true or nothing');
+  assert.deepEqual(nextTriage(browsed, { kind: 'start', symptom: 'clog' }).step, { kind: 'ask_printer', symptom: 'clog' });
+  assert.deepEqual(nextTriage(browsed, { kind: 'start' }).step, { kind: 'ask_printer' });
+  assert.equal(nextTriage(browsed, { kind: 'symptom', symptom: 'noise' }).step.kind, 'ask_printer');
+  // Chosen in the triage, it is the printer from then on.
+  const chosen = nextTriage(browsed, { kind: 'printer', model: 'A1' });
+  assert.deepEqual(chosen.context.printer, { model: 'A1' });
+  assert.equal(nextTriage(chosen.context, { kind: 'start', symptom: 'clog' }).step.kind, 'steps');
 });

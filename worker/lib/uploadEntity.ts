@@ -28,7 +28,8 @@ export const ASSIST_ATTACH_LIMIT = 30;
 export const ASSIST_ATTACH_WINDOW_DAYS = 7;
 
 const assistLimitRefusal = () =>
-  badRequest('You have attached many files this week — send the ticket first', 'ASSIST_ATTACH_LIMIT', { limit: ASSIST_ATTACH_LIMIT });
+  // A file sent with a ticket still counts for its seven days: sending the ticket frees nothing, so the refusal says when.
+  badRequest('You have attached the most files allowed this week; try again in a few days', 'ASSIST_ATTACH_LIMIT', { limit: ASSIST_ATTACH_LIMIT });
 
 /**
  * THE ASSISTANT CEILING, COUNTED AGAIN ONCE THE FILE IS WRITTEN.

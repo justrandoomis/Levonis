@@ -194,7 +194,12 @@ test('the door holds: no account, a PDF, a file over the limit, and a flood are 
   for (let i = 0; i < ASSIST_ATTACH_LIMIT; i++) seed.run(`assist/u_owner/attachments/seed${i}.webp`);
   const flood = await h.upload('owner', webp(), 'one-more.webp', 'image/webp');
   assert.equal(flood.status, 400);
-  assert.equal((await body(flood)).code, 'ASSIST_ATTACH_LIMIT');
+  const refusal = await body(flood);
+  assert.equal(refusal.code, 'ASSIST_ATTACH_LIMIT');
+  // Review round 3: a file sent with a ticket still counts for its seven days, so the refusal
+  // never promises that sending the ticket frees the ceiling; it says when it frees.
+  assert.doesNotMatch(JSON.stringify(refusal), /send the ticket/i);
+  assert.match(JSON.stringify(refusal), /few days/);
   assert.equal((await h.upload('stranger', webp(), 'mine.webp', 'image/webp')).status, 200, 'the ceiling is per uploader');
 });
 

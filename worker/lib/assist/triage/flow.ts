@@ -40,6 +40,14 @@ export interface TriageResult {
   context: AssistContext;
 }
 
+/**
+ * The printer the triage may go on with unasked: one the customer chose or
+ * named, never one a shopping answer only showed («اريد طابعة», «A1 combo»).
+ */
+export function triagePrinter(ctx: AssistContext): PrinterChoice | undefined {
+  return ctx.printer && !ctx.printer.browsed ? ctx.printer.model : undefined;
+}
+
 function withPrinter(ctx: AssistContext, model: PrinterChoice, unitId?: string): AssistContext {
   // A device chosen earlier stays attached only while the same model is meant.
   const keep = unitId ?? (ctx.printer?.model === model ? ctx.printer.unit_id : undefined);
@@ -66,7 +74,7 @@ export function nextTriage(ctx: AssistContext, input: TriageInput): TriageResult
   const held = ctx.triage;
   switch (input.kind) {
     case 'start': {
-      const model: PrinterChoice | undefined = input.model ?? ctx.printer?.model;
+      const model: PrinterChoice | undefined = input.model ?? triagePrinter(ctx);
       if (!model) {
         return {
           step: { kind: 'ask_printer', ...(input.symptom ? { symptom: input.symptom } : {}), ...(input.among?.length ? { among: input.among } : {}) },
@@ -85,7 +93,7 @@ export function nextTriage(ctx: AssistContext, input: TriageInput): TriageResult
     }
     case 'symptom': {
       const code = input.code ?? (input.symptom === held?.symptom ? held?.code : undefined);
-      const model = ctx.printer?.model;
+      const model = triagePrinter(ctx);
       if (!model) return askPrinter(ctx, input.symptom, code);
       return toSteps(ctx, model, input.symptom, code);
     }

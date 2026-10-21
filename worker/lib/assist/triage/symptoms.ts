@@ -20,6 +20,11 @@ import type { L3, ModelToken, SymptomKey } from '../types';
 export interface StepDef {
   key: string;
   text: L3;
+  /**
+   * The step as the ticket lists it under «الخطوات التي جربتها», when the chat
+   * text points at something only the chat has («القطع المناسبة أدناه»).
+   */
+  tried?: L3;
   safety?: 'hot';
 }
 
@@ -70,6 +75,11 @@ export const SYMPTOMS: readonly SymptomDef[] = [
           ar: 'إذا لم يخرج شيء، نظّف النوزل كما يشرح الدليل الرسمي، أو استبدل الهوت إند (القطع المناسبة أدناه).',
           en: 'If nothing comes out, clean the nozzle as the official guide shows, or replace the hotend (matching parts are below).',
           ckb: 'ئەگەر هیچ نەهاتە دەرەوە، نۆزڵەکە پاک بکەرەوە وەک ڕێنمایی فەرمی پیشانی دەدات، یان هۆت ئێندەکە بگۆڕە (پارچە گونجاوەکان لە خوارەوەن).',
+        },
+        tried: {
+          ar: 'إذا لم يخرج شيء، نظّف النوزل كما يشرح الدليل الرسمي، أو استبدل الهوت إند.',
+          en: 'If nothing comes out, clean the nozzle as the official guide shows, or replace the hotend.',
+          ckb: 'ئەگەر هیچ نەهاتە دەرەوە، نۆزڵەکە پاک بکەرەوە وەک ڕێنمایی فەرمی پیشانی دەدات، یان هۆت ئێندەکە بگۆڕە.',
         },
       },
     ],

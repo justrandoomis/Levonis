@@ -27,6 +27,8 @@ export interface CatalogSearchArgs {
   fits?: string[];
   category?: 'cat_maint';
   limit: number;
+  /** The listing offset: «اكو غيرها؟» asks for the page after the cards already shown. */
+  offset?: number;
   /**
    * ONLY WHAT THE TEXT REALLY NAMES: keep a product only when the identifier
    * lane answered it exactly, or every typed word reaches it without a
@@ -53,6 +55,7 @@ export interface CatalogSearchResult {
 export const SEARCH_LIMIT_MAX = 8;
 export const SEARCH_TEXT_MAX = 100;
 export const FITS_MAX = 8;
+export const SEARCH_OFFSET_MAX = 48;
 
 export async function catalogSearch(db: D1Database, viewer: Viewer, args: CatalogSearchArgs): Promise<CatalogSearchResult> {
   const q: Record<string, string> = { limit: String(Math.min(SEARCH_LIMIT_MAX, Math.max(1, args.limit))) };
@@ -62,6 +65,7 @@ export async function catalogSearch(db: D1Database, viewer: Viewer, args: Catalo
   if (text) q.search = `${text} `;
   if (args.fits?.length) q.fits = args.fits.slice(0, FITS_MAX).join(',');
   if (args.category) q.category = args.category;
+  if (args.offset) q.offset = String(Math.min(SEARCH_OFFSET_MAX, Math.max(0, Math.floor(args.offset))));
   if (!q.search && !q.fits && !q.category) return { items: [], exactIds: [], exactMiss: [] };
   const listing = await listCatalogProducts(db, q, viewer.pricing);
   const products = Array.isArray(listing.body.products) ? (listing.body.products as Record<string, unknown>[]) : [];

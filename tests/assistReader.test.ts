@@ -386,3 +386,73 @@ test('round 2: Sorani «پلێت» and «کلۆگ», and an HMS code typed with 
   assert.equal(typed.symptom, 'hms');
   assert.deepEqual(typed.codes, []);
 });
+
+// ════════════════════════════════════════ review, round 3
+
+test('round 3: a lowercase «x1» is the X1 alone or beside a part, a lowercase «x2» stays a quantity', () => {
+  for (const text of ['x1', 'x1 nozzle', 'نوزل x1', 'الطابعة x1 بيها مشكلة']) {
+    const u = understand(text);
+    assert.deepEqual(u.family?.members, ['X1C', 'X1E'], text);
+    assert.equal(u.printerUnread, false, text);
+  }
+  // Beside nothing that makes it a printer, it is not one: and never an unreadable printer either.
+  const quantity = understand('PLA x1');
+  assert.equal(quantity.family, undefined);
+  assert.equal(quantity.printerUnread, false);
+  for (const text of ['نوزل x2', 'نوزل 0.4 x2']) assert.equal(understand(text).model, undefined, text);
+  // «A2» typed alone answers «which printer?»; «ورق A2» is still paper.
+  assert.equal(understand('A2').model, 'A2L');
+  assert.equal(understand('ورق A2').model, undefined);
+});
+
+test('round 3: the Iraqi «دا», «ما تطبع», «وكفت», "stopped working", «چاپ ناکات» are faults', () => {
+  for (const text of ['الطابعة ما تطبع', 'الطابعة ما دا تشتغل', 'الطابعه وكفت', 'my printer is not printing', 'printer stopped working', "it won't print", 'پرینتەرەکەم چاپ ناکات']) {
+    assert.equal(understand(text).problemCue, true, text);
+  }
+  const clog = understand('ما دا يطلع فلامنت من النوزل');
+  assert.equal(clog.symptom, 'clog');
+  // «دا» elsewhere is left alone.
+  assert.equal(understand('دا').problemCue, false);
+});
+
+test('round 3: «طابعتي», "my own printer", «پرینتەرەکەی خۆم» name the printer of the account, and nothing else does', () => {
+  for (const text of ['طابعتي', 'مالتي', 'my printer', 'my own printer', 'mine', 'پرینتەرەکەم', 'پرینتەرەکەی خۆم', 'هی خۆم']) {
+    assert.equal(understand(text).ownPrinter, true, text);
+  }
+  for (const text of ['طابعتي A1', 'طابعتي بيها مشكلة', 'my printer is broken', 'نوزل لطابعتي', 'printer']) {
+    assert.equal(understand(text).ownPrinter, false, text);
+  }
+});
+
+test('round 3: the words a code arrives with, English follow-ups, a price asked bare, and what is never searched', () => {
+  const code = understand('وطلعلي رمز 0300-0100-0001-0003');
+  assert.equal(code.symptom, 'hms');
+  assert.equal(code.wordSymptom, undefined, 'the words name no fault: the code joins the fault in hand');
+  assert.equal(understand('انسداد النوزل ورمز 0300-0100-0001-0003').wordSymptom, 'clog');
+  for (const text of ['how much is it?', 'is it in stock?', 'how much are they?', 'how much is the first one?']) {
+    assert.deepEqual(understand(text).residual, [], text);
+  }
+  assert.equal(understand('how much is the first one?').ordinal, 0);
+  for (const text of ['how much?', 'شكد؟', 'بيش', 'چەندە؟']) assert.equal(understand(text).priceAsk, true, text);
+  assert.equal(understand('how many layers?').priceAsk, false);
+  for (const text of ['اريد اغير النوزل مال الاي ون', 'نوزل طابعة ثري دي', 'اريد نوزل جديد', 'اكو نوزل اصلي؟', 'نۆزڵم دەوێت', 'نوزل مال نبتون فور']) {
+    assert.deepEqual(understand(text).residual, [], text);
+  }
+  assert.equal(understand('I need maintenance products for a faulty nozzle').productCue, true);
+});
+
+test('round 3: «CR-10» is another maker; «PA-6» is a material and stays a search word', () => {
+  const cr = understand('and a nozzle for my CR-10');
+  assert.equal(cr.printerUnread, true);
+  assert.equal(cr.otherBrand, true);
+  assert.deepEqual(cr.residual, []);
+  assert.equal(understand('nozzle for cr10').otherBrand, true);
+  const pa = understand('PA-6 filament');
+  assert.equal(pa.printerUnread, false);
+  assert.ok(pa.residual.includes('pa'), JSON.stringify(pa.residual));
+  // A Bambu name written in two pieces is still that printer, or that series.
+  assert.equal(understand('nozzle for p1-s').model, 'P1S');
+  assert.equal(understand('nozzle for A-1').model, 'A1');
+  assert.equal(understand('nozzle for A-1').printerUnread, false);
+  assert.deepEqual(understand('نوزل X-1').family?.members, ['X1C', 'X1E']);
+});

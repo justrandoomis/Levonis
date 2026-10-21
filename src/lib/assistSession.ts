@@ -1,5 +1,5 @@
 /**
- * THE SUPPORT ASSISTANT'S CONVERSATION CONTEXT, kept for this browser tab.
+ * THE CONVERSATION CONTEXT OF THE SUPPORT ASSISTANT, kept for this browser tab.
  *
  * The server hands back a small, closed-set context with each reply (which
  * printer this conversation is about, where the printer-problem triage is)
@@ -10,7 +10,9 @@
  * Storage may be unavailable (private mode, a full quota); every access is
  * guarded and the assistant then simply remembers within the page.
  */
-const KEY = 'levonis.assist.v1';
+import { ASSIST_CONTEXT_KEY, ASSIST_STATE_KEY } from './assistOwner';
+
+const KEY = ASSIST_CONTEXT_KEY;
 /** The server ignores a larger context; so does this page. */
 const MAX_CHARS = 2048;
 
@@ -48,7 +50,7 @@ export function saveAssistContext(context: unknown): void {
  * the server), and reads the stored value back as untrusted: anything that is
  * not the shape it wrote is dropped whole.
  */
-const STATE_KEY = 'levonis.assist.state.v1';
+const STATE_KEY = ASSIST_STATE_KEY;
 /** Far below any quota; a transcript that grows past it is simply not kept. */
 const STATE_MAX_CHARS = 200_000;
 
@@ -77,59 +79,5 @@ export function saveAssistState(state: unknown): void {
   }
 }
 
-/**
- * WHOSE CONVERSATION THIS TAB HOLDS: the signed-in id it was held for, or ''
- * for a guest. Written by the auth layer (src/AuthContext.tsx) whenever the
- * identity is known or changes.
- */
-const OWNER_KEY = 'levonis.assist.owner.v1';
-/** Dispatched on `window` when the stored conversation was dropped, so an open Support page resets too. */
-export const ASSIST_CLEARED_EVENT = 'levonis:assist-cleared';
-
-/** Drops the transcript, the draft, the attachment keys and the context, for this tab. */
-export function clearAssistSession(): void {
-  try {
-    sessionStorage.removeItem(KEY);
-    sessionStorage.removeItem(STATE_KEY);
-  } catch {
-    // Storage refused: nothing was kept to drop.
-  }
-  try {
-    window.dispatchEvent(new Event(ASSIST_CLEARED_EVENT));
-  } catch {
-    // No window (a test or a worker): there is no page to reset.
-  }
-}
-
-/**
- * A SIGNED-IN CONVERSATION NEVER PASSES TO ANOTHER IDENTITY.
- *
- * Signing out navigates inside the app, without a reload, and the storage of
- * this tab kept the transcript (order ids, order status, the masked device
- * names, the lines the customer typed), the ticket draft with its device,
- * the attachment keys and the server context: the next account, or a guest,
- * opening /support in the same tab got all of it back. So when the identity
- * changes AWAY from the signed-in user the conversation was held for (sign
- * out, another account, a session that expired before a reload), everything
- * is dropped. A guest who signs in keeps the conversation they started: that
- * is the trip to the sign-in page the draft is kept for. Stored state with no
- * owner on record (kept before this stamp existed) is not trusted either.
- */
-export function adoptAssistOwner(userId: string | null): void {
-  const next = userId ?? '';
-  let stored: string | null = null;
-  let held = false;
-  try {
-    stored = sessionStorage.getItem(OWNER_KEY);
-    held = sessionStorage.getItem(KEY) !== null || sessionStorage.getItem(STATE_KEY) !== null;
-  } catch {
-    return;
-  }
-  const leaving = stored === null ? held : stored !== '' && stored !== next;
-  if (leaving) clearAssistSession();
-  try {
-    sessionStorage.setItem(OWNER_KEY, next);
-  } catch {
-    // Storage refused: nothing is kept for anyone.
-  }
-}
+/** Who the conversation belongs to, and the drop: kept apart, so the entry chunk carries only that (src/lib/assistOwner.ts). */
+export { ASSIST_CLEARED_EVENT, adoptAssistOwner, clearAssistSession } from './assistOwner';

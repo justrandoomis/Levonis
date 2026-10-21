@@ -28,7 +28,7 @@ export const FILLERS: readonly string[] = [
   'what', 'whats', 'is', 'the', 'a', 'an', 'of', 'for', 'me', 'my', 'i', 'you', 'please', 'do', 'does', 'can', 'much', 'how',
   'and', 'or', 'with', 'want', 'need', 'have', 'any', 'there', 'some', 'price', 'buy', 'search', 'find', 'product', 'products',
   // Sorani
-  'بۆ', 'دەمەوێ', 'دەمەوێت', 'هەیە', 'نییە', 'چی', 'چۆن', 'زۆر', 'باشە', 'تکایە', 'لە', 'چەند', 'ئایا', 'من',
+  'بۆ', 'دەمەوێ', 'دەمەوێت', 'دەوێ', 'دەوێت', 'پێویستە', 'هەیە', 'نییە', 'چی', 'چۆن', 'زۆر', 'باشە', 'تکایە', 'لە', 'چەند', 'ئایا', 'من',
   // What Arabic glues to a word and a Latin name cut off it: «لل A1», «بال P1S».
   'ال', 'لل', 'بال', 'وال', 'فال', 'ب', 'ف',
   // «مالتي» (mine), «بيها» (in it), «دا» (Iraqi "is …-ing").
@@ -40,7 +40,44 @@ export const FILLERS: readonly string[] = [
   'تو', 'توه', 'توا', 'اشتريت', 'اشتريته', 'اشتريتها', 'شريت', 'شريته', 'شريتها', 'وصلني', 'وصلتني', 'وصلتلي', 'وصلت',
   // «اي» / «ايه» ("yes", or "which"), «الها» / «اله» ("for it").
   'اي', 'ايه', 'الها', 'اله',
+  // English follow-ups on the cards just shown: "how much is it?", "is it in stock?",
+  // "how much are they?", "the first one".
+  'it', 'its', 'they', 'them', 'are', 'in', 'one', 'ones', 'this', 'that', 'these', 'those',
+  // «اريد اغير النوزل»: to change or replace the part is still a question about the part.
+  'اغير', 'اغيره', 'ابدل', 'ابدله', 'ابدلها', 'استبدل', 'استبدله', 'تبديل', 'replace', 'change', 'بگۆڕم', 'بیگۆڕم',
+  // «طابعة ثري دي», "3D printer", «پرینتەری سێ ڕەهەندی»: the kind of printer, never a product word.
+  'ثري', 'تري', 'دي', '3d', 'سێ', 'ڕەهەندی',
+  // "my own printer", «پرینتەرەکەی خۆم».
+  'own', 'خۆم', 'خۆمە',
+  // «اريد نوزل جديد», «نوزل اصلي»: new and genuine describe every product on the shelf; searched, they
+  // reach «Like New» open-box printers and a «DIY Kit» instead of the part.
+  'جديد', 'جديده', 'اصلي', 'اصليه', 'new', 'original', 'genuine', 'نوێ', 'ڕەسەن',
 ];
+
+/**
+ * A PRICE ASKED WITH NO PRODUCT NAMED: "how much?", «شكد؟», «بيش؟», «چەندە؟».
+ * After cards, it is the price of the cards just shown.
+ */
+export const PRICE_ASK: readonly string[] = ['how much', 'شكد', 'بيش', 'بكم', 'چەندە', 'نرخی چەندە'];
+
+/**
+ * «طابعتي», "my own printer", «پرینتەرەکەی خۆم» typed as the answer to «which
+ * printer?»: the customer means the printer of their own account. A sentence
+ * of these words only, with at least one of `mine`.
+ */
+export const OWN_PRINTER: { readonly mine: readonly string[]; readonly with: readonly string[] } = {
+  mine: ['طابعتي', 'مالتي', 'مالي', 'my', 'mine', 'پرینتەرەکەم', 'خۆم', 'خۆمە'],
+  with: ['طابعه', 'الطابعه', 'نفسها', 'هي', 'هاي', 'printer', 'own', 'the', 'it', 'its', 'is', 'پرینتەر', 'پرینتەرەکە', 'پرینتەرەکەی', 'هی', 'ئەوە'],
+};
+
+/**
+ * MAKERS AND LINES OF PARTS, without a digit in their name («E3D», «V6» and
+ * «MK8» carry one and are read by their shape). Only such a word, left over
+ * after a part question, names a product line that may outrank the printer
+ * remembered from earlier: «اكو نوزل E3D؟». A word like «جديد», «ستيل» or
+ * "high flow" describes the part and never does.
+ */
+export const LINE_WORDS: readonly string[] = ['revo', 'obxidian', 'phaetus', 'trianglelab', 'bondtech', 'capricorn', 'microswiss', 'mosquito', 'dragon'];
 
 /**
  * A PURCHASE IN THE PAST is the story of a fault («اشتريت طابعة من عندكم وصار
@@ -90,21 +127,31 @@ export const OUTCOME_RESOLVED: readonly string[] = [
 
 /** A shopping question, as opposed to a report of a fault. */
 export const PRODUCT_CUE: LexEntry = {
-  phrases: ['ابحث عن', 'دور على', 'اريد اشتري', 'do you have', 'i want to buy', 'گەڕان بۆ', 'دەمەوێ بیکڕم'],
+  phrases: [
+    'ابحث عن', 'دور على', 'اريد اشتري', 'do you have', 'i want to buy', 'maintenance products', 'maintenance product', 'گەڕان بۆ',
+    'دەمەوێ بیکڕم',
+  ],
+  // "product" is the English «منتج»: "I need maintenance products for a faulty nozzle" shops, as the Arabic does.
   stems: [
     'بحث', 'ابحث', 'منتج', 'منتجات', 'اشتري', 'اشتريه', 'عندكم', 'عدكم', 'تبيعون', 'سعر', 'اسعار', 'بكم', 'متوفر', 'موجود',
-    'search', 'buy', 'price', 'stock', 'available', 'گەڕان', 'بەرهەم', 'نرخ', 'بکڕم', 'بەردەست',
+    'search', 'buy', 'price', 'stock', 'available', 'product', 'products', 'گەڕان', 'بەرهەم', 'نرخ', 'بکڕم', 'بەردەست',
   ],
 };
 
-/** «مشكلة», «خلل», «عطل», «ما تشتغل» — something is wrong. */
+/**
+ * «مشكلة», «خلل», «عطل», «ما تشتغل», «ما تطبع», «وكفت» — something is wrong.
+ * The Iraqi progressive «دا» («ما دا تشتغل») comes off before these are read
+ * (./index.ts `dropProgressive`).
+ */
 export const PROBLEM_CUE: LexEntry = {
   phrases: [
     'ما تشتغل', 'ما يشتغل', 'لا تعمل', 'لا يعمل', 'not working', 'does not work', 'doesnt work', 'كار ناكات', 'کار ناکات',
     'ما يسحب', 'ما تسحب', 'not feeding', 'does not feed', 'doesnt feed',
+    'ما تطبع', 'ما يطبع', 'لا تطبع', 'لا يطبع', 'not printing', 'does not print', 'doesnt print', 'wont print', "won't print",
+    'stopped working', 'stopped printing', 'چاپ ناکات', 'چاپ ناکا',
   ],
   stems: [
-    'مشكل', 'مشاكل', 'عطل', 'خلل', 'خربان', 'خربانه', 'عاطل', 'problem', 'problems', 'issue', 'broken', 'fault',
+    'مشكل', 'مشاكل', 'عطل', 'خلل', 'خربان', 'خربانه', 'عاطل', 'وكفت', 'واكفه', 'problem', 'problems', 'issue', 'broken', 'fault',
     'کێشە', 'کێشەی', 'تێکچووە', 'خراپە',
   ],
 };
