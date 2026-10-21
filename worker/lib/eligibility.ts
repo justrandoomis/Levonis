@@ -144,7 +144,11 @@ export interface EligibilityPart {
   id: string;
   /** null = unsure (any technology this workshop runs). */
   process: Process | null;
-  /** Each material row: the material (null = unsure) and its named colours, lower-case #rrggbb. */
+  /**
+   * Each material row: the material (null = unsure) and its named colours,
+   * lower-case #rrggbb. A substitute colour named without a hex is a
+   * `label:` key no stock line holds (offerCoverage.ts `stockColours`).
+   */
   materials: Array<{ material_id: string | null; colours: string[] }>;
   /** Colours laid down in one print of this part: every colour entry of its rows. */
   colors_count: number;

@@ -116,6 +116,7 @@ import {
 } from '../lib/requestEstimate';
 import { REQUEST_MODEL_LIMITS } from '@levonis/contracts/requestModel';
 import { isMissingSchema } from '../lib/merchantApproval';
+import { orderCoverageFacts } from '../lib/chatCards';
 
 /**
  * THE PRINT REQUEST JOURNEY — upload, measure, estimate, publish, notify.
@@ -2644,12 +2645,14 @@ printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
             f.model_format AS primary_format,
             o.price_iqd AS accepted_price_iqd, o.completion_days AS accepted_days,
             m.name AS accepted_merchant_name,
+            co.offer_snapshot AS accepted_offer_snapshot, co.request_snapshot AS accepted_request_snapshot,
             (SELECT COUNT(*) FROM community_request_files cf WHERE cf.request_id = r.id) AS file_count
        FROM community_requests r
        LEFT JOIN community_print_requests p ON p.request_id = r.id
        LEFT JOIN community_request_files f ON f.id = p.primary_file_id
        LEFT JOIN community_offers o ON o.id = r.accepted_offer_id
        LEFT JOIN community_merchants m ON m.id = o.merchant_id
+       LEFT JOIN community_orders co ON co.id = r.community_order_id
       WHERE r.customer_id = ?
       ORDER BY r.created_at DESC
       LIMIT 50`;
@@ -2723,6 +2726,9 @@ printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
             merchant_name: String(r.accepted_merchant_name ?? ''),
             price_iqd: r.accepted_price_iqd === null ? null : Number(r.accepted_price_iqd),
             completion_days: r.accepted_days === null ? null : Number(r.accepted_days),
+            // Partial or substituted, from the order snapshots (P1-05 review 6), as
+            // the order row and the chat card say it; nothing for a whole order.
+            ...orderCoverageFacts({ offer_snapshot: r.accepted_offer_snapshot, request_snapshot: r.accepted_request_snapshot }),
           }
         : null,
     })),

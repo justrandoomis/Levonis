@@ -27,7 +27,7 @@ import { GOVERNORATES } from '../../../lib/governorates';
 import { formatFigure } from '../../../lib/localeNumber';
 import { offersLabel } from '../../community/hub/copy';
 import { iqdUnit } from '../../../lib/money';
-import { boardJobFacts, workshopApi, type BoardFilters, type BoardRequest } from './api';
+import { boardEstimateLabel, boardJobFacts, workshopApi, type BoardFilters, type BoardRequest } from './api';
 import { approvalGateText } from '../../../lib/approvalGate';
 import { RequestThumb } from '../../community/requests/RequestFileThumbs';
 import { jobCountWords, localMaterial } from '../../community/requests/mirrors';
@@ -287,9 +287,7 @@ export default function RequestBoard({
                           </>
                         ) : r.estimate_low_iqd !== null && r.estimate_high_iqd !== null ? (
                           <>
-                            {r.estimate_complete === false
-                              ? loc('تقدير القطع المسعّرة فقط', 'Estimate of the priced parts only', 'خەمڵاندنی پارچە نرخدارەکان تەنها')
-                              : loc('تقدير Levonis', 'Levonis estimate', 'خەمڵاندنی Levonis')}{' '}
+                            {boardEstimateLabel(r.estimate_complete, L)}{' '}
                             <span className="whitespace-nowrap">
                               <span dir="ltr" className="tabular-nums">{formatFigure(r.estimate_low_iqd, lang)}–{formatFigure(r.estimate_high_iqd, lang)}</span> {iqdUnit(lang)}
                             </span>

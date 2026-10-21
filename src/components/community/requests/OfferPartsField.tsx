@@ -7,8 +7,10 @@
  * selectable as soon as a substitute is proposed on it, because a substitute
  * can make it makeable (the server decides, critique High 5). Each material
  * row the customer chose a material or a colour for can carry «اقترح بديلًا»:
- * a catalogue material of the part own technology, a colour by name, and a
- * note. Nothing is sent for a one-part request unless a substitute is
+ * a catalogue material of the part own technology, colours from the wizard
+ * palette (one entry each, with its hex, so the server counts and stocks them
+ * as it does any colour, P1-05 review 6), and a note. Nothing is sent for a
+ * one-part request unless a substitute is
  * proposed, and nothing at all when every part is covered and nothing is
  * substituted.
  */
@@ -19,27 +21,41 @@ import { Input } from '../../ui/Field';
 import type { CatalogMaterial } from './api';
 import type { RequestPartV3 } from '../../../lib/printApi';
 import { fill, type RequestLang, type RequestStrings } from './strings';
-import { localColour, localMaterial } from './mirrors';
+import { REQUEST_COLOURS, localColour, localMaterial } from './mirrors';
+import { askedRowLine, readerDir } from './offerParts';
+
+/** A colour a substitute proposes: its hex and the English word the wizard stores. */
+export interface SubColourChoice {
+  hex: string;
+  label: string;
+}
 
 /** One substitution as the composer holds it. */
 export interface ComposerSub {
   part_id: string;
   material_row_id: string;
   material_id: string;
-  /** The colour field as the merchant reads it: empty = the colours as asked. */
-  colour: string;
-  note: string;
   /**
-   * The colours a stored offer proposed (hex and label), kept so an edit
-   * sends them back unchanged while the field still reads them (P1-05 review
-   * 3): one or more palette colours never turn into a single label with no
-   * hex. Absent for a colour the merchant types.
+   * The colours proposed, one entry per colour (P1-05 review 6): palette
+   * colours with their hex, or a colour a stored offer proposed, kept as it
+   * was while it stays chosen. Empty = the colours as asked.
    */
-  colors?: Array<{ hex: string; label: string }>;
+  colors: SubColourChoice[];
+  note: string;
 }
 
-/** The words of the colour field for stored colours: each label (or hex), space-separated. */
-export const colourFieldText = (colors: Array<{ hex: string; label: string }>): string => colors.map((c) => c.label || c.hex).join(' ');
+const sameChoice = (a: SubColourChoice, b: SubColourChoice) => (a.hex ? a.hex === b.hex : !b.hex && a.label === b.label);
+
+/** The colours to choose from: the wizard palette, then any chosen colour beyond it (from a stored offer). */
+export function paletteChoices(chosen: readonly SubColourChoice[]): SubColourChoice[] {
+  const palette = REQUEST_COLOURS.map((c) => ({ hex: c.hex, label: c.en }));
+  return [...palette, ...chosen.filter((c) => !palette.some((p) => sameChoice(p, c)))];
+}
+
+/** A colour chosen or unchosen, the order of choosing kept. */
+export function toggleColour(chosen: readonly SubColourChoice[], c: SubColourChoice): SubColourChoice[] {
+  return chosen.some((x) => sameChoice(x, c)) ? chosen.filter((x) => !sameChoice(x, c)) : [...chosen, { hex: c.hex, label: c.label }];
+}
 
 export interface PartsValue {
   /** null = every part. */
@@ -94,7 +110,6 @@ export default function OfferPartsField({
     onChange({ coverage: all ? null : ordered.map((p) => p.id).filter((x) => now!.includes(x)), subs });
   };
   const dropSub = (pid: string, rid: string) => onChange({ ...value, subs: value.subs.filter((x) => !(x.part_id === pid && x.material_row_id === rid)) });
-  const sep = lang === 'en' ? ', ' : '، ';
   const showChecks = ordered.length > 1;
 
   return (
@@ -127,15 +142,16 @@ export default function OfferPartsField({
                   const substitutable = !row.material_unsure && !!row.material_id;
                   if (!substitutable) return null;
                   const sub = subOf(p.id, row.id);
-                  const asked = [localMaterial(row.material_id, lang, materials), named.map((c) => localColour(c.label || c.hex, lang) || c.hex).join(sep)].filter(Boolean).join(' · ');
+                  // Every colour entry, the open ones as words (P1-05 review 6).
+                  const asked = askedRowLine(row, lang, materials);
                   const sameProcess = materials.filter((m) => {
                     const from = materials.find((x) => x.id === row.material_id);
                     return !from || m.process === from.process;
                   });
                   return (
                     <div key={row.id} className="mt-1.5" data-offer-row={row.id}>
-                      <p className="text-[11.5px] text-text-secondary" dir="auto">
-                        {s.asAsked}: {asked}
+                      <p className="text-[11.5px] text-text-secondary" dir={readerDir(lang)}>
+                        {s.asAsked}: <bdi dir={readerDir(lang)}>{asked}</bdi>
                       </p>
                       {sub ? (
                         <div className="mt-1.5 space-y-2" data-offer-sub={row.id}>
@@ -156,15 +172,30 @@ export default function OfferPartsField({
                             ))}
                           </select>
                           {named.length > 0 && (
-                            <Input
-                              value={sub.colour}
-                              maxLength={60}
-                              placeholder={s.substituteColour}
-                              aria-label={s.substituteColour}
-                              onChange={(e) => putSub({ ...sub, colour: e.target.value })}
-                              dir="auto"
-                              data-offer-sub-colour
-                            />
+                            <div>
+                              <p className="text-[12px] text-text-muted" id={`${id}-${row.id}-c`}>
+                                {s.substituteColour}
+                              </p>
+                              <p className="text-[11px] text-text-muted">{s.substituteColourHint}</p>
+                              <div role="group" aria-labelledby={`${id}-${row.id}-c`} className="mt-1 flex flex-wrap gap-1.5" data-offer-sub-colours>
+                                {paletteChoices(sub.colors).map((c) => {
+                                  const on = sub.colors.some((x) => sameChoice(x, c));
+                                  return (
+                                    <button
+                                      key={c.hex || c.label}
+                                      type="button"
+                                      aria-pressed={on}
+                                      onClick={() => putSub({ ...sub, colors: toggleColour(sub.colors, c) })}
+                                      className="lv-choice inline-flex items-center gap-1.5 px-2.5 text-[12px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                                      data-offer-sub-colour-choice={c.hex || c.label}
+                                    >
+                                      {c.hex && <span aria-hidden="true" className="h-3 w-3 rounded-full border border-white/20" style={{ backgroundColor: c.hex }} />}
+                                      {localColour(c.label || c.hex, lang) || c.hex}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           )}
                           <Input
                             value={sub.note}
@@ -185,7 +216,7 @@ export default function OfferPartsField({
                           size="sm"
                           variant="secondary"
                           className="mt-1"
-                          onClick={() => putSub({ part_id: p.id, material_row_id: row.id, material_id: row.material_id, colour: '', note: '' })}
+                          onClick={() => putSub({ part_id: p.id, material_row_id: row.id, material_id: row.material_id, colors: [], note: '' })}
                           data-offer-sub-add={row.id}
                         >
                           {s.proposeSubstitute}
@@ -210,9 +241,8 @@ export default function OfferPartsField({
  */
 export function partsBody(v: PartsValue, opts: { clear: boolean }): { coverage?: { parts: string[] } | null; substitutions?: Array<{ part_id: string; material_row_id: string; to: { material_id?: string; colors?: Array<{ hex: string; label: string }> }; note?: string }> } {
   const subs = v.subs.map((x) => {
-    const typed = x.colour.trim();
-    // The stored colours, unchanged, while the field still reads them; a typed colour by its words.
-    const colors = x.colors?.length && typed === colourFieldText(x.colors).trim() ? x.colors : typed ? [{ hex: '', label: typed }] : null;
+    // One entry per colour chosen, each with its hex; none chosen = the colours as asked.
+    const colors = x.colors.length ? x.colors.map((c) => ({ hex: c.hex, label: c.label })) : null;
     return {
       part_id: x.part_id,
       material_row_id: x.material_row_id,

@@ -71,8 +71,8 @@ test('the composer sends coverage and substitutions only when not the default â€
   assert.deepEqual(partsBody({ coverage: null, subs: [] }, { clear: true }), { coverage: null, substitutions: [] });
   assert.deepEqual(partsBody({ coverage: ['pa'], subs: [] }, { clear: false }), { coverage: { parts: ['pa'] } });
   assert.deepEqual(
-    partsBody({ coverage: null, subs: [{ part_id: 'pb', material_row_id: 'mb', material_id: 'petg', colour: ' Black ', note: '' }] }, { clear: false }),
-    { substitutions: [{ part_id: 'pb', material_row_id: 'mb', to: { material_id: 'petg', colors: [{ hex: '', label: 'Black' }] } }] }
+    partsBody({ coverage: null, subs: [{ part_id: 'pb', material_row_id: 'mb', material_id: 'petg', colors: [{ hex: '#1a1a1a', label: 'Black' }], note: '' }] }, { clear: false }),
+    { substitutions: [{ part_id: 'pb', material_row_id: 'mb', to: { material_id: 'petg', colors: [{ hex: '#1a1a1a', label: 'Black' }] } }] }
   );
   // The default ticks are the parts the workshop can make.
   const ps = [{ id: 'pa' }, { id: 'pb' }];

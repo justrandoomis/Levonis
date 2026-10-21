@@ -69,7 +69,7 @@ export default function TechnicalReviewPanel({ onBack }: { onBack: () => void })
               <span className="block min-w-0">
                 <bdi className="block truncate text-[13.5px] font-semibold text-text-primary">{r.title}</bdi>
                 <span className="mt-0.5 block text-[11.5px] text-text-muted">
-                  {loc(`عدد القطع ${r.parts_count ?? 1}`, `${r.parts_count ?? 1} parts`, `${r.parts_count ?? 1} پارچە`)} · {reviewAge(r.created_at, loc)}
+                  {loc(`عدد القطع ${r.parts_count ?? 1}`, `Parts: ${r.parts_count ?? 1}`, `${r.parts_count ?? 1} پارچە`)} · {reviewAge(r.created_at, loc)}
                 </span>
                 {!!r.review_reasons?.length && (
                   <span className="mt-0.5 block text-[11.5px] text-warning">{r.review_reasons.map((x) => reasonWord(x, loc)).join(lang === 'en' ? ', ' : '، ')}</span>

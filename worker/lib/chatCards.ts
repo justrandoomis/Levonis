@@ -271,7 +271,6 @@ export function quoteCardFrom(t: QuoteTerms): ResolvedCard {
   return { type: 'quote', ref: t.offer_id, snapshot, body: `🧮 ${clip(t.title, 180)}` };
 }
 
-/** A funded (or moved) custom order's card — the event it records is part of the snapshot. */
 /**
  * WHAT THE ORDER MAKES, ON ITS CARD (P1-05 review 5): an order accepted from
  * a partial offer says so, with the number of parts left out, and one with
@@ -292,6 +291,7 @@ export function orderCoverageFacts(order: Record<string, unknown>): { covers_all
   return { ...(partial ? { covers_all: false as const, uncovered_count: uncovered } : {}), ...(substitutes ? { substitutes: true as const } : {}) };
 }
 
+/** A funded (or moved) custom order's card — the event it records is part of the snapshot. */
 export function customOrderCard(order: Record<string, unknown>, title: string, event: string): ResolvedCard {
   const snapshot = {
     v: 1,

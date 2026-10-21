@@ -46,6 +46,7 @@ import { uploadRequestFiles, formatBytes } from '../../media/RequestAttachments'
 import { REQUEST_FILE_LIMITS, requestFileAccept, requestFileKind } from '../../../../packages/contracts/src/requestFiles';
 import { requestFilesCheck, requestUploadRefusal } from './fileRefusals';
 import { REQUEST_COLOURS, localColour, localMaterial } from './mirrors';
+import { estimateCoverageLine, requestStrings } from './strings';
 import { RequestThumb, pictureFiles } from './RequestFileThumbs';
 import { SourceLinkCard } from '../links/LinkCard';
 import { warmLink } from '../links/useLinkCard';
@@ -1140,6 +1141,12 @@ export default function RequestWizard({
                         ? loc('المادة لم تُحدد، فهذا المدى يغطي المواد الممكنة. السعر النهائي من عروض التجار.', 'The material is open, so this range covers the materials it could be. The final price comes from merchants’ offers.', 'ماددەکە دیاری نەکراوە، بۆیە ئەم مەودایە ئەو ماددانە دەگرێتەوە کە دەکرێت بەکاربهێنرێن. نرخی کۆتایی لە ئۆفەری بازرگانەکانەوە دێت.')
                         : loc('تقدير فقط — السعر النهائي من عروض التجار.', 'An estimate — the final price comes from merchants’ offers.', 'تەنها خەمڵاندنە — نرخی کۆتایی لە ئۆفەری بازرگانەکانەوە دێت.')}
                     </p>
+                    {estimateCoverageLine(quote, requestStrings(L)) && (
+                      // R10 (P1-05 review 6): a sum over the priced parts is never read as the job price.
+                      <p className="mt-1 text-[12px] font-semibold text-warning" data-wizard-estimate-coverage>
+                        {estimateCoverageLine(quote, requestStrings(L))}
+                      </p>
+                    )}
                     {modelsUnpriced > 0 && (
                       // R10: one model priced is never the whole job read as priced.
                       <p className="mt-1 text-[12px] font-semibold text-warning" data-wizard-models-unpriced={modelsUnpriced}>

@@ -114,12 +114,10 @@ test('colours: the order screen keeps «as in the reference» from the agreement
 
 test('colours: an edit never sends the entries the customer left open — a material-only substitute stays material only, a proposed colour keeps only what was named', () => {
   const material = composer.partsFrom(offer({ substitutions: [{ part_id: 'pa', material_row_id: 'ma', note: '', from: { material_id: 'pla', colors: [BLACK, AS_REF] }, to: { material_id: 'petg', colors: [BLACK, AS_REF] } }] }));
-  assert.equal(material.subs[0].colour, '');
-  assert.equal(material.subs[0].colors, undefined);
+  assert.deepEqual(material.subs[0].colors, []);
   const red = { hex: '#d32f2f', label: 'Red' };
   const proposed = composer.partsFrom(offer({ substitutions: [{ part_id: 'pa', material_row_id: 'ma', note: '', from: { material_id: 'pla', colors: [BLACK, AS_REF] }, to: { material_id: 'pla', colors: [red, AS_REF] } }] }));
   assert.deepEqual(proposed.subs[0].colors, [red]);
-  assert.equal(proposed.subs[0].colour, 'Red');
 });
 
 // ================================================================ card

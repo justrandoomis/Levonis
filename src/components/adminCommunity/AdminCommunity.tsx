@@ -1040,7 +1040,7 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
                 {(o.coverage?.covers_all === false || !!o.substitutions?.length) && (
                   <p className="text-warning text-[11.5px] mt-1" data-admin-offer-coverage>
                     {o.coverage?.covers_all === false
-                      ? loc(`جزئي — القطع المشمولة ${o.coverage.parts?.length ?? 0}`, `Partial — ${o.coverage.parts?.length ?? 0} parts covered`, `بەشەکی — ${o.coverage.parts?.length ?? 0} پارچە گیراوە`)
+                      ? loc(`جزئي — القطع المشمولة ${o.coverage.parts?.length ?? 0}`, `Partial — parts covered: ${o.coverage.parts?.length ?? 0}`, `بەشەکی — ${o.coverage.parts?.length ?? 0} پارچە گیراوە`)
                       : ''}
                     {o.coverage?.covers_all === false && !!o.substitutions?.length ? ' · ' : ''}
                     {o.substitutions?.map((x, i) => {

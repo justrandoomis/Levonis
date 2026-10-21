@@ -184,6 +184,8 @@ export interface Quote {
   /** Hardware ids the catalogue no longer has, so the wizard can say so. */
   accessories_unknown?: string[];
   range_basis?: 'materials';
+  /** A job priced part by part (P1-05): what the figures cover. Absent on a v1 estimate. */
+  coverage?: { complete: boolean; parts_total: number; priced_parts: unknown[] };
 }
 
 /** What `POST /api/marketplace/print/quote` answers: the engine's fields and

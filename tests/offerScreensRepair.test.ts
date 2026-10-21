@@ -80,21 +80,21 @@ test('composer: a material-only substitution comes back from an edit as material
   const from = { material_id: 'tpu', colors: BLACK_RED };
   const stored = { part_id: 'p1', material_row_id: 'm1', from, to: { material_id: 'petg', colors: BLACK_RED }, note: '' };
   const v = composer.partsFrom(offer({ coverage: { covers_all: true, parts: null }, substitutions: [stored] }));
-  assert.equal(v.subs[0].colour, '', 'no colour pre-filled that the merchant never proposed');
+  assert.deepEqual(v.subs[0].colors, [], 'no colour pre-chosen that the merchant never proposed');
   const body = partsBody(v, { clear: true });
   assert.deepEqual(body.substitutions?.[0].to, { material_id: 'petg' });
   const out = resolveCoverage(readCoverageBody(body as never), MODEL, MATS);
   assert.deepEqual(out.substitutions[0].to, { material_id: 'petg', colors: BLACK_RED });
 });
 
-test('composer: a colour the merchant proposed keeps its hex through an edit; a typed change is sent as typed', () => {
+test('composer: a colour the merchant proposed keeps its hex through an edit; a palette colour chosen instead is sent with its hex (review 6)', () => {
   const green = [{ hex: '#16a34a', label: 'Green' }];
   const stored = { part_id: 'p1', material_row_id: 'm1', from: { material_id: 'tpu', colors: BLACK_RED }, to: { material_id: 'tpu', colors: green }, note: 'n' };
   const v = composer.partsFrom(offer({ substitutions: [stored] }));
-  assert.equal(v.subs[0].colour, 'Green');
+  assert.deepEqual(v.subs[0].colors, green);
   assert.deepEqual(partsBody(v, { clear: true }).substitutions?.[0].to, { material_id: 'tpu', colors: green });
-  const typed = { ...v, subs: [{ ...v.subs[0], colour: 'Dark green' }] };
-  assert.deepEqual(partsBody(typed, { clear: true }).substitutions?.[0].to, { material_id: 'tpu', colors: [{ hex: '', label: 'Dark green' }] });
+  const chosen = { ...v, subs: [{ ...v.subs[0], colors: [{ hex: '#388e3c', label: 'Green' }] }] };
+  assert.deepEqual(partsBody(chosen, { clear: true }).substitutions?.[0].to, { material_id: 'tpu', colors: [{ hex: '#388e3c', label: 'Green' }] });
 });
 
 test('composer: the default ticks applied when the verdict arrives are the baseline — an untouched composer is not dirty', () => {

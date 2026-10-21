@@ -92,6 +92,20 @@ export function boardJobFacts(r: Pick<BoardRequest, 'process' | 'material_id' | 
   };
 }
 
+/**
+ * THE ESTIMATE LABEL OF A BOARD CARD (P1-05 review 6): «of the priced parts
+ * only» when a part of the job is unpriced (R10), in the words the list and
+ * the request page use; in Sorani «نرخیان بۆ دانراوە» (priced), never
+ * «نرخدار», which reads as «valuable». An older Worker says nothing about
+ * coverage: the plain label.
+ */
+export function boardEstimateLabel(complete: boolean | undefined, lang: 'ar' | 'en' | 'ckb'): string {
+  if (complete === false) {
+    return { ar: 'تقدير القطع المسعّرة فقط', en: 'Estimate of the priced parts only', ckb: 'خەمڵاندن تەنها بۆ ئەو پارچانەی نرخیان بۆ دانراوە' }[lang];
+  }
+  return { ar: 'تقدير Levonis', en: 'Levonis estimate', ckb: 'خەمڵاندنی Levonis' }[lang];
+}
+
 export interface BoardPage {
   requests: BoardRequest[];
   next_cursor: string | null;

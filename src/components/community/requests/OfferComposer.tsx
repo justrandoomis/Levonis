@@ -38,7 +38,7 @@ import type { OfferPrefill } from '../../merchant/workshop/api';
 import { offersV2Api, requestsApi, type CatalogMaterial, type OfferDeliveryMethod, type OfferFileKind, type OfferInputV2, type OfferV2 } from './api';
 import { composerHandover, daysLabel, fill, handoverLabel, offerStateWords, requestLang, shortDay, useRequestStrings, type RequestLang, type RequestStrings } from './strings';
 import { RequestImageStrip, pictureFiles, type ThumbFile } from './RequestFileThumbs';
-import OfferPartsField, { colourFieldText, defaultCoverage, partsBody, type PartVerdicts, type PartsValue } from './OfferPartsField';
+import OfferPartsField, { defaultCoverage, partsBody, type PartVerdicts, type PartsValue } from './OfferPartsField';
 import { workshopApi } from '../../merchant/workshop/api';
 import type { RequestPartV3 } from '../../../lib/printApi';
 import { SourceLinkCard } from '../links/LinkCard';
@@ -167,10 +167,10 @@ const sameColours = (a: Array<{ hex: string; label: string }>, b: Array<{ hex: s
 /**
  * An offer (or draft) as the parts field starts: its coverage and
  * substitutions, else the whole job as asked. A substitution that changes the
- * material only stores the colours asked (`to.colors = from.colors`): its
- * colour field starts empty, so an edit sends the material only and the
+ * material only stores the colours asked (`to.colors = from.colors`): it
+ * starts with no colour chosen, so an edit sends the material only and the
  * colours stay those the customer asked. Colours the merchant proposed are
- * kept with their hex (P1-05 review 3).
+ * chosen again, one entry each with its hex (P1-05 reviews 3 and 6).
  */
 export function partsFrom(offer: OfferV2 | null | undefined): PartsValue {
   return {
@@ -184,9 +184,8 @@ export function partsFrom(offer: OfferV2 | null | undefined): PartsValue {
         part_id: x.part_id,
         material_row_id: x.material_row_id,
         material_id: x.to.material_id,
-        colour: proposed ? colourFieldText(named) : '',
+        colors: proposed ? named.map((c) => ({ hex: c.hex, label: c.label })) : [],
         note: x.note,
-        ...(proposed ? { colors: named.map((c) => ({ hex: c.hex, label: c.label })) } : {}),
       };
     }),
   };

@@ -1558,7 +1558,7 @@ async function offersUnableByPart(db: D1Database, requestId: string, rows: Array
     const rev = Number(o.request_revision ?? 1);
     if (!models.has(rev)) models.set(rev, modelAtRevision(db, requestId, rev));
     const model = await models.get(rev)!;
-    if (model && uncoverableParts({ candidate, request, catalogue }, terms, model)) out.add(String(o.id));
+    if (uncoverableParts({ candidate, request, catalogue }, terms, model ?? { parts: [] })) out.add(String(o.id));
   }
   return out;
 }
@@ -2487,7 +2487,7 @@ async function offerMerchantStanding(env: Env, offer: Record<string, unknown>): 
   // as asked. A substitution on a one-job request is judged too (review 3).
   if (live && coverageNeedsPartCheck(live, storedCoverage(offer))) {
     const model = await modelAtRevision(env.DB, requestId, Number(offer.request_revision ?? 1));
-    if (model && uncoverableParts(live, storedCoverage(offer), model)) return 'ineligible';
+    if (uncoverableParts(live, storedCoverage(offer), model ?? { parts: [] })) return 'ineligible';
   }
   return 'ok';
 }

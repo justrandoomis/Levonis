@@ -25,7 +25,7 @@ import {
 } from '../../lib/printApi';
 import { StatusChip } from '../ui/Badge';
 import { fill, requestLang, useRequestStrings, type RequestStrings } from '../community/requests/strings';
-import { localColour, localMaterial } from '../community/requests/mirrors';
+import { partMaterialsLine, readerDir } from '../community/requests/offerParts';
 import type { EstimateCoverage } from '../../lib/printEstimate';
 
 /** What the request page reads beside the facts (P1-05): its parts and its summary. */
@@ -323,14 +323,8 @@ function PartsList({ parts, sets, coverage, s, lang }: { parts: RequestPartV3[];
       {[...parts].sort((x, y) => x.position - y.position).map((p) => {
         const priced = coverage?.priced_parts.find((x) => x.part_id === p.id);
         const unpriced = coverage?.unpriced_parts.find((x) => x.part_id === p.id);
-        const materials = p.materials
-          .map((m) => {
-            const name = m.material_unsure || !m.material_id ? '' : localMaterial(m.material_id, lang);
-            const colours = m.colors.filter((c) => c.mode === 'catalogue' || c.mode === 'custom').map((c) => localColour(c.label || c.hex, lang) || c.hex);
-            return [name, colours.join(sep)].filter(Boolean).join(' · ');
-          })
-          .filter(Boolean)
-          .join(sep);
+        // Every colour entry, the open ones as words (P1-05 review 6).
+        const materials = partMaterialsLine(p, lang);
         return (
           <li key={p.id} className="lv-well rounded-md px-3 py-2" data-print-summary-part={p.id}>
             <div className="flex items-start justify-between gap-2">
@@ -340,7 +334,8 @@ function PartsList({ parts, sets, coverage, s, lang }: { parts: RequestPartV3[];
               {p.review_state === 'needs_technical_review' && <StatusChip tone="warning">{s.reviewChip}</StatusChip>}
             </div>
             <p className="mt-0.5 text-[11.5px] text-text-muted">{fill(s.piecesAndSets, { pieces: p.quantity, sets })}</p>
-            {materials && <p className="mt-0.5 text-[11.5px] text-text-secondary" dir="auto">{materials}</p>}
+            {/* The reader direction: the line starts with a Latin name (PLA, TPU), which dir=auto would turn LTR in Arabic and Sorani. */}
+            {materials && <p className="mt-0.5 text-[11.5px] text-text-secondary" dir={readerDir(lang)}>{materials}</p>}
             {p.review_reasons.length > 0 && (
               <p className="mt-0.5 text-[11.5px] text-warning">{p.review_reasons.map((r) => s.reviewReasons[r] ?? r).join(sep)}</p>
             )}

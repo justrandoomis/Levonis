@@ -29,6 +29,14 @@
 --    the older build would send it as a whole offer. Its merchant writes the
 --    offer again.
 --
+-- RUN IT TWICE: once before the redeploy, and AGAIN right after the older build
+-- is live. Until the cut-over the P1-05 build still answers, so a merchant can
+-- make a partial or substituted offer, or save such a draft, between the first
+-- run and the redeploy; the older build would then fund that offer as the whole
+-- job. The older build cannot make such a row, so the second run catches every
+-- one made in the gap and nothing comes after it (P1-05 review 6). The merchant
+-- sees the offer withdrawn on the workshop board and writes it again.
+--
 -- Idempotent; touches no offer and no draft that covers the whole request as
 -- asked. A draft whose payload is not valid JSON carries no coverage and is
 -- left alone. ORDERS already accepted from such an offer are not touched here:

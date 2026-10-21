@@ -253,6 +253,11 @@ export interface MyRequestRow {
     merchant_name: string;
     price_iqd: number | null;
     completion_days: number | null;
+    /** P1-05 review 6: the order makes only some parts (absent for a whole order or an older Worker). */
+    covers_all?: false;
+    uncovered_count?: number;
+    /** The order carries substitutes the customer accepted. */
+    substitutes?: true;
   } | null;
 }
 

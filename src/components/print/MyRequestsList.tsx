@@ -38,6 +38,7 @@ import { StatusChip } from '../ui/Badge';
 import { CommunityLoadError } from '../../pages/community/access';
 import { offersLabel } from '../community/hub/copy';
 import { fill, requestStrings } from '../community/requests/strings';
+import { customOrderChips } from '../chat/cards/cardWords';
 
 /**
  * WHAT THE SUMMARY ADDS TO A ROW OF «طلباتي» (P1-05, DECISIONS row 267 §8;
@@ -277,6 +278,16 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
                           <span className="ms-auto" dir="ltr">{money(r.accepted.price_iqd)}</span>
                         )}
                       </p>
+                      {/* A partial or substituted order is never read as the whole job (P1-05 review 6). */}
+                      {customOrderChips(r.accepted, loc).length > 0 && (
+                        <p className="mt-1 flex flex-wrap gap-1.5" data-my-request-accepted-chip>
+                          {customOrderChips(r.accepted, loc).map((c) => (
+                            <StatusChip key={c} tone="warning">
+                              {c}
+                            </StatusChip>
+                          ))}
+                        </p>
+                      )}
                       {r.accepted.completion_days !== null && r.accepted.completion_days > 0 && (
                         <p className="text-[11px] text-emerald-200/70 mt-0.5 flex items-center gap-1.5">
                           <CalendarClock className="w-3 h-3" />

@@ -244,6 +244,16 @@ async function attachParts(db: D1Database, out: Map<string, RequestFacts>, rows:
       };
     });
     facts.parts = job;
+    // THE JOB-VALUE BAND (P1-05 review 6): a job in several materials or
+    // technologies has no one material or process on its v1 mirror, so the
+    // request-level read above leaves its value unknown. When every part is
+    // priced, each as its own chosen material, the estimate IS the job value,
+    // and the band reads it as it does for a job in one material. A sum over
+    // some parts, or a range across materials nobody chose, stays unknown.
+    // The grams stay per part: a weight across materials is no one figure.
+    const whole = !!estimate.priced && coverage.complete === true && !estimate.range_basis
+      && priced.length === job.length && priced.every((x) => !x.range_basis);
+    if (whole && facts.estimate_iqd === null) facts.estimate_iqd = num(estimate.price_iqd);
   }
 }
 

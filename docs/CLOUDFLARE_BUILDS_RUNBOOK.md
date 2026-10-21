@@ -135,6 +135,15 @@ offer on (so the board stops showing offers that are gone), and deletes every
 draft that carries a coverage or a substitution. The merchant makes a new
 offer instead; a withdrawn offer is not re-opened after rolling forward.
 
+Run the script TWICE: once before the redeploy, and again right after the older
+build is live. Until the cut-over the P1-05 build still answers, so a partial
+or substituted offer (or such a draft) can be made between the first run and
+the redeploy, and the older build would fund that offer as the whole job. The
+older build cannot make such a row, so the second run catches every one made
+in the gap. The script is idempotent: the second run changes nothing the first
+already did. Run the read-only open-orders query below again with it: an order
+accepted in the gap is listed then.
+
 ORDERS ALREADY ACCEPTED from a partial or substituted offer are not touched
 by that script: their money is held at the price of what was agreed, and an
 older build's order screen and admin view do not read the agreement

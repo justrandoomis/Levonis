@@ -42,13 +42,14 @@
  *   OFFER_COVERAGE_UNAVAILABLE   coverage or substitutions named on a database
  *                                before 0208
  *
- * Every offer write — a new offer, a sent draft, an edit or a re-confirm —
- * is fenced on the hash of the revision it read before its checks
+ * Every offer write on a BOARD request — a new offer, a sent draft, an edit
+ * or a re-confirm — is fenced on the hash of the revision it read before its checks
  * (`revisionHead`, or the model the coverage was resolved on;
  * `revisionHashFence`), a whole offer on a one-job request too, so a part
  * checked against one version of the request is never stored against
  * another, and never covered by a price set without it (critiques 3 and 4;
- * P1-05 review 5).
+ * P1-05 review 5). A re-confirm on a DIRECT request (0151) reads no model and
+ * covers no part: it is not fenced, as before P1-05 (P1-05 review 6).
  */
 import { HttpError } from './http';
 import { safeParse } from './types';
@@ -438,6 +439,22 @@ const swappedCount = (row: Pick<ModelMaterial, 'colors'>, sub: OfferSubstitution
 };
 
 /**
+ * THE COLOURS A SUBSTITUTED ROW IS STOCKED IN (P1-05 review 6): each hex; a
+ * colour the merchant NAMED without one (a label only, as an older composer
+ * sent it) stands as a key no stock line holds, so a workshop that tracks its
+ * colours has it only on a line whose colour is not tracked and is refused
+ * STOCK_COLOR otherwise, exactly as for a hex it does not hold. A colour the
+ * customer asked keeps the as-asked reading (a hex, else not judged), so a
+ * material-only substitute is judged on the colours as the part itself is.
+ */
+const stockColours = (sub: OfferSubstitution): string[] => {
+  const asked = new Set(namedOf(sub.from.colors).map((c) => `${c.hex}|${c.label}`));
+  return namedOf(sub.to.colors).flatMap((c) =>
+    HEX6.test(c.hex) ? [c.hex] : asked.has(`${c.hex}|${c.label}`) ? [] : [`label:${c.label.trim().toLowerCase()}`]
+  );
+};
+
+/**
  * A PART AS IT WOULD BE MADE: each substituted row in its substitute's
  * material and colours, and the colours laid down in one print counted again
  * (P1-05 review 4). A substitute that turns one colour into four asks for a
@@ -459,7 +476,7 @@ const toEligibilityPart = (p: EligibilityPart, subs: Array<OfferSubstitution | u
     materials: p.materials.map((row, i) => {
       const sub = subs[i];
       if (!sub) return row;
-      return { material_id: sub.to.material_id, colours: sub.to.colors.map((c) => c.hex).filter((h) => HEX6.test(h)) };
+      return { material_id: sub.to.material_id, colours: stockColours(sub) };
     }),
     colors_count: Math.max(1, counted),
   };
@@ -489,7 +506,7 @@ function oneJobSwapped(req: LiveVerdict['request'], terms: OfferCoverageTerms): 
     return {
       id,
       process: req.process,
-      materials: subs.map((x) => ({ material_id: x.to.material_id, colours: x.to.colors.map((c) => c.hex).filter((h) => HEX6.test(h)) })),
+      materials: subs.map((x) => ({ material_id: x.to.material_id, colours: stockColours(x) })),
       colors_count: Math.max(1, req.colors_count + moved),
       dims_mm: req.dims_mm,
       grams: req.grams,

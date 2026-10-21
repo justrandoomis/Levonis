@@ -66,6 +66,31 @@ export function partialAckReady(o: Pick<OfferV2, 'coverage'>, parts: PartRef[]):
 /** The list separator of the language: «، » in Arabic and Sorani, «, » in English. */
 export const listSep = (lang: RequestLang): string => (lang === 'en' ? ', ' : '، ');
 
+/** A material row as the customer asked it: the material (unless left open) and every colour entry. */
+export interface AskedRow {
+  material_id: string;
+  material_unsure?: boolean;
+  colors: ReadonlyArray<{ mode?: string; hex: string; label: string }>;
+}
+
+/**
+ * ONE MATERIAL ROW AS ASKED, in the reader language (P1-05 review 6): the
+ * material (none when the customer left it open), then EVERY colour entry,
+ * «any colour» and «as in the reference» as words, so a part asked in
+ * [Black, as in the reference] never reads as Black alone. The request page
+ * parts list and the composer «as the customer asked» line both read it.
+ */
+export function askedRowLine(row: AskedRow, lang: RequestLang, materials: readonly MaterialLike[] = []): string {
+  const name = row.material_unsure || !row.material_id ? '' : localMaterial(row.material_id, lang, materials);
+  const colours = row.colors.map((c) => entryColour(c, lang)).filter(Boolean).join(listSep(lang));
+  return [name, colours].filter(Boolean).join(' · ');
+}
+
+/** Every material row of a part as asked, in the reader language (`askedRowLine` each). */
+export function partMaterialsLine(p: { materials: readonly AskedRow[] }, lang: RequestLang, materials: readonly MaterialLike[] = []): string {
+  return p.materials.map((row) => askedRowLine(row, lang, materials)).filter(Boolean).join(listSep(lang));
+}
+
 /**
  * One side of a substitution in the reader language: the catalogue name, then
  * the colours by name — «any colour» and «as in the reference» as words, so

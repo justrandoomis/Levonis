@@ -139,7 +139,8 @@ const ar = {
   coverPartsHint: 'اختر القطع التي يشملها عرضك',
   cannotMakePart: 'ورشتك لا تستطيع صنعها كما طُلبت',
   substituteMaterial: 'المادة البديلة',
-  substituteColour: 'اللون البديل (اسمه)',
+  substituteColour: 'اللون البديل',
+  substituteColourHint: 'اختر لونًا أو أكثر، أو لا تختر شيئًا لتبقى الألوان كما طلبها العميل',
   substituteNote: 'ملاحظة للعميل (اختياري)',
   removeSubstitute: 'إزالة البديل',
   asAsked: 'كما طلب العميل',
@@ -507,7 +508,8 @@ const en: typeof ar = {
   coverPartsHint: 'Choose the parts your offer covers',
   cannotMakePart: 'Your workshop cannot make it as asked',
   substituteMaterial: 'Substitute material',
-  substituteColour: 'Substitute colour (its name)',
+  substituteColour: 'Substitute colour',
+  substituteColourHint: 'Choose one colour or more, or none to keep the colours the customer asked for',
   substituteNote: 'A note for the customer (optional)',
   removeSubstitute: 'Remove the substitute',
   asAsked: 'As the customer asked',
@@ -864,7 +866,8 @@ const ckb: typeof ar = {
   coverPartsHint: 'ئەو پارچانە هەڵبژێرە کە ئۆفەرەکەت دەیانگرێتەوە',
   cannotMakePart: 'وۆرکشۆپەکەت ناتوانێت وەک داواکراو دروستی بکات',
   substituteMaterial: 'کەرەستەی جێگرەوە',
-  substituteColour: 'ڕەنگی جێگرەوە (ناوەکەی)',
+  substituteColour: 'ڕەنگی جێگرەوە',
+  substituteColourHint: 'یەک ڕەنگ یان زیاتر هەڵبژێرە، یان هیچ هەڵمەبژێرە بۆ ئەوەی ڕەنگەکان وەک داواکەی کڕیار بمێننەوە',
   substituteNote: 'تێبینییەک بۆ کڕیار (ئارەزوومەندانە)',
   removeSubstitute: 'جێگرەوەکە لاببە',
   asAsked: 'وەک کڕیار داوای کردووە',
@@ -1116,6 +1119,21 @@ export function requestStrings(lang: string): RequestStrings {
 export function useRequestStrings(): RequestStrings {
   const { lang } = useLanguage();
   return requestStrings(lang);
+}
+
+/**
+ * R10 BESIDE AN ESTIMATE (P1-05 review 6): «the estimate covers the priced
+ * parts only (k/n)» when a job of parts was priced with a part left out, as
+ * the request page, the list and the board say it; empty for a whole job and for
+ * a v1 estimate, which carries no coverage. The wizard says it under its range.
+ */
+export function estimateCoverageLine(
+  q: { coverage?: { complete: boolean; parts_total: number; priced_parts: unknown[] } | null } | null | undefined,
+  s: RequestStrings
+): string {
+  const c = q?.coverage;
+  if (!c || c.complete !== false) return '';
+  return fill(s.estimateCoverage, { k: c.priced_parts.length, n: c.parts_total });
 }
 
 /** «{n} يوم» → «3 يوم»; every placeholder the sentence names, in the sentence's own order. */
