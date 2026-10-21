@@ -541,3 +541,74 @@ test('round 4.2: "not right", a bare "wrong with", "has stopped" and "it stopped
     assert.equal(understand(text).problemCue, true, text);
   }
 });
+
+test('round 4.3: steps not tried are no outcome; a bare "still" or «هێشتا» is not «not fixed», the whole phrases still are', () => {
+  for (const text of [
+    "I still haven't tried them",
+    "still haven't tried",
+    'I have not tried them yet',
+    "didn't try them",
+    'بعدني ما جربتها',
+    'ما جربتها',
+    'لم أجربها بعد',
+    'هێشتا تاقیم نەکردۆتەوە',
+    'تاقیم نەکردووەتەوە',
+    'still waiting for the needle to arrive',
+    'still',
+    'هێشتا',
+  ]) {
+    assert.equal(readOutcome(normalizeText(text)), undefined, `«${text}»`);
+    assert.equal(understand(text).outcome, undefined, `«${text}»`);
+  }
+  for (const text of [
+    'still not fixed',
+    'still clogged',
+    "it's still the same",
+    "still doesn't work",
+    "it still didn't work",
+    "didn't work",
+    'تاقیم کردەوە، هێشتا چارەسەر نەبووە',
+    'هێشتا کار ناکات',
+    'هێشتا گیراوە',
+    'هێشتا هەمان کێشەیە',
+  ]) {
+    assert.equal(readOutcome(normalizeText(text)), 'not_fixed', `«${text}»`);
+  }
+});
+
+test('round 4.3: a printer the customer says is theirs is read as owned; a question about a printer the shop sells is not', () => {
+  for (const text of [
+    'طابعتي A1',
+    'طابعتي اي ون',
+    'عندي اي ون',
+    'عندي طابعة',
+    'وعندي اي ون',
+    'اشتريت اي ون',
+    'I have an A1',
+    'I own a P1S',
+    "I've got a P1S",
+    'I have a printer',
+    'my A1',
+    'A1 م هەیە',
+    'A1م هەیە',
+    'پرینتەرێکم هەیە',
+    'پرینتەرەکەم A1 ە',
+    'A1ی خۆم',
+  ]) {
+    assert.equal(understand(text).ownsPrinter, true, text);
+  }
+  for (const text of [
+    'A1',
+    'شكد سعر A1',
+    'do you have the A1?',
+    'how much is the A1?',
+    'عندكم اي ون؟',
+    'اريد طابعة',
+    'A1 هەیە؟',
+    'نرخی A1 چەندە؟',
+    'بۆ خۆم A1 دەمەوێ',
+    'printers',
+  ]) {
+    assert.equal(understand(text).ownsPrinter, false, text);
+  }
+});

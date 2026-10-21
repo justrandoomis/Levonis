@@ -73,6 +73,29 @@ export const OWN_PRINTER: { readonly mine: readonly string[]; readonly with: rea
 };
 
 /**
+ * A PRINTER THE CUSTOMER SAYS IS THEIRS («عندي اي ون», «طابعتي A1», "I have
+ * an A1", «A1م هەیە», «پرینتەرێکم هەیە»): they tell which printer they own,
+ * they do not ask to buy one, so it is never answered with that printer for
+ * sale (review round 4.3). Whole words, and phrases between gaps, after
+ * `normalizeText`, which turns an apostrophe into a gap («i ve»). «عندكم»,
+ * "do you have" and «A1 هەیە؟» still ask; «بۆ خۆم» is "for myself", a
+ * purchase.
+ */
+export const OWNS_PRINTER: { readonly words: readonly string[]; readonly phrases: readonly string[] } = {
+  words: [
+    // «طابعتي», «مالتي» (mine), «عندي» / «عدي» (I have), «لدي», «املك» (I own), and a purchase in the past.
+    'طابعتي', 'لطابعتي', 'بطابعتي', 'طابعتنا', 'مكينتي', 'ماكينتي', 'مالتي', 'مالي', 'عندي', 'عدي', 'عندنا', 'عدنا',
+    'لدي', 'لدينا', 'املك', 'امتلك', 'نملك', 'اشتريت', 'اشتريته', 'اشتريتها', 'اشترينا', 'اشتريناها', 'شريت', 'شريته',
+    'شريتها', 'شرينا',
+    'my', 'mine', 'our', 'ours', 'ive', 'bought', 'purchased',
+    // «پرینتەرەکەم» (my printer), «پرینتەرێکم» (a printer of mine), «A1ەکەم» (my A1), «هەمە» (I have it), «کڕیم» (I bought).
+    'پرینتەرەکەم', 'پرینتەرەکەمە', 'پرینتەرێکم', 'پرینتەرم', 'چاپکەرەکەم', 'چاپکەرێکم', 'ەکەم', 'هەمە', 'هەمانە', 'کڕیم', 'کڕیمە',
+  ],
+  // «A1م هەیە», «A1مان هەیە»: the clitic of «I have» and «we have» before «هەیە»; «A1ی خۆم», my own A1.
+  phrases: ['i have', 'i ve', 'i own', 'i got', 'we have', 'we own', 'we got', 'م هەیە', 'مان هەیە', 'ی خۆم', 'هی خۆم'],
+};
+
+/**
  * MAKERS AND LINES OF PARTS, without a digit in their name («E3D», «V6» and
  * «MK8» carry one and are read by their shape). Only such a word, left over
  * after a part question, names a product line that may outrank the printer
@@ -115,13 +138,36 @@ export const OTHER_PRINTER: LexEntry = {
 /**
  * THE OUTCOME OF THE STEPS, TYPED («جربتها وما انحلّت», "still not fixed").
  * The not-fixed list is read first: it carries the negation of the fixed one.
- * Whole phrases between gaps, after `normalizeText` (so «انحلّت» is «انحلت»).
+ * Whole phrases between gaps, after `normalizeText` (so «انحلّت» is «انحلت»,
+ * and an apostrophe is a gap). A bare "still" or «هێشتا» (still, yet) is never
+ * one: «هێشتا تاقیم نەکردۆتەوە» is "not tried yet", and "still waiting for
+ * the needle" a wait (review round 4.3).
  */
 export const OUTCOME_NOT_FIXED: readonly string[] = [
   'ما انحلت', 'ما انحل', 'ما انحلت المشكله', 'مانحلت', 'ما حلت', 'ما زبطت', 'ما زبط', 'ما نفعت', 'ما نفع', 'ما فادت', 'ما فاد',
   'ما اشتغلت', 'ما اشتغل', 'لم تنحل', 'لم تحل', 'نفس المشكله', 'نفس الشي', 'بعدها نفس', 'بعده نفس', 'بعدها مسدود', 'بعده مسدود',
-  'not fixed', 'still not', 'still', 'didnt work', 'did not work', 'didnt help', 'did not help', 'same problem', 'no luck',
-  'چارەسەر نەبوو', 'هێشتا', 'هەمان کێشە', 'سوودی نەبوو', 'کاری نەکرد',
+  'not fixed', 'didnt work', 'did not work', "didn't work", 'didnt help', 'did not help', "didn't help", 'same problem', 'same issue',
+  'no luck',
+  'still not', 'still clogged', 'still blocked', 'still jammed', 'still stuck', 'still stringing', 'still leaking', 'still broken',
+  'still the same', 'still same', 'still happening', 'still there', 'still having', 'still has', 'still doesnt', "still doesn't",
+  'still does not', 'still didnt', "still didn't", 'still did not', 'still wont', "still won't", 'still isnt', "still isn't",
+  'still is not', 'still cant', "still can't", 'still cannot',
+  'چارەسەر نەبوو', 'چارەسەر نەبووە', 'هەمان کێشە', 'هەمان کێشەیە', 'سوودی نەبوو', 'کاری نەکرد', 'هێشتا کار ناکات', 'هێشتا گیراوە',
+  'هێشتا هەروایە', 'هێشتا ماوە',
+];
+/**
+ * THE STEPS NOT TRIED («بعدني ما جربتها», "I still have not tried them",
+ * «هێشتا تاقیم نەکردۆتەوە»): no outcome at all, read before both lists. The
+ * steps were only shown, and a ticket never says they were tried (review
+ * round 4.3).
+ */
+export const OUTCOME_NOT_TRIED: readonly string[] = [
+  'ما جربت', 'ما جربتها', 'ما جربته', 'ما جربتهم', 'ماجربت', 'ماجربتها', 'لم اجرب', 'لم اجربها', 'لم اجربهم', 'بعدني ما',
+  'ما طبقتها', 'ما سويتها',
+  "haven't tried", 'havent tried', 'have not tried', 'not tried', "didn't try", 'didnt try', 'did not try', "haven't yet",
+  'havent yet', 'have not yet', 'not yet tried', 'yet to try',
+  'تاقیم نەکردۆتەوە', 'تاقیم نەکردووەتەوە', 'تاقیم نەکردوەتەوە', 'تاقیم نەکردووە', 'تاقیم نەکردەوە', 'تاقیم نەکردنەوە',
+  'تاقیمان نەکردۆتەوە', 'تاقیمان نەکردەوە', 'تاقی نەکراوەتەوە',
 ];
 export const OUTCOME_RESOLVED: readonly string[] = [
   'انحلت', 'انحل', 'انحلت المشكله', 'زبطت', 'زبط', 'اشتغلت', 'اشتغل', 'صارت زينه', 'صار زين', 'رجعت تشتغل', 'رجعت زينه',

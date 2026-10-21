@@ -75,6 +75,8 @@ const OUTCOME_ANSWER_HINTS = new Set(['printer_problem', 'open_ticket', 'human_h
 const FOLLOWUP_HINTS = new Set(['price_question', 'stock_question']);
 /** The legacy intents a question about a printer by name may carry: «شكد سعر A1», «A1 متوفر؟», «ابحث عن A1». */
 const NAMED_PRINTER_HINTS = new Set(['price_question', 'stock_question', 'product_search']);
+/** The legacy intents «عندي اي ون», "I have an A1" or «A1م هەیە» may carry: a printer named, or the customer's own. */
+const OWNED_PRINTER_HINTS = new Set([...NAMED_PRINTER_HINTS, ...PRINTER_ANSWER_HINTS]);
 
 /**
  * A part question asked while the triage waits for «which printer?» or «which
@@ -315,6 +317,14 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
     const answer = await printerNamed(db, viewer, ctx, u, hint, render);
     if (answer) return answer;
   }
+  // «عندي اي ون», «طابعتي A1», "I have an A1", «A1م هەیە», «پرینتەرێکم هەیە»: the
+  // customer says which printer is theirs. Never that printer for sale (review
+  // round 4.3): the triage asks what is wrong with it («ما المشكلة في طابعة
+  // A1؟»), or which printer it is, and holds it as theirs. Only with no triage
+  // in hand and no legacy question pending; otherwise the legacy answer has it.
+  if (printerOwned(u) && (!stage || stage === 'done') && !input.awaiting && (hint === null || OWNED_PRINTER_HINTS.has(hint))) {
+    return runTriage(db, viewer, known, { kind: 'start', ...printer }, render);
+  }
 
   const named = !!u.model || !!u.family;
   if (u.part || (u.maintenance && (named || u.productCue)) || (u.measures.length > 0 && (named || u.productCue))) {
@@ -337,9 +347,22 @@ function faultPart(u: Understood): PartKey | undefined {
  * A printer named and nothing else: a model or a series («A1», «X1»), or the
  * printer word alone («طابعة», "printers"), with at most the words of a price
  * or stock question around it. No part, size, code, fault, account word,
- * bundle («A1 combo» is its own card) or second printer.
+ * bundle («A1 combo» is its own card) or second printer; and never a printer
+ * the customer says is theirs («طابعتي A1», «عندي اي ون», "I have an A1",
+ * «A1م هەیە»): that tells which printer they own, it does not ask to buy one
+ * (review round 4.3, `printerOwned`).
  */
 function printerOnly(u: Understood): boolean {
+  return printerAlone(u) && !u.ownsPrinter;
+}
+
+/** «عندي اي ون», "I have an A1", «پرینتەرێکم هەیە»: a printer, said to be the customer's own, and nothing else. */
+function printerOwned(u: Understood): boolean {
+  return printerAlone(u) && u.ownsPrinter && !u.productCue;
+}
+
+/** The shape `printerOnly` and `printerOwned` share: a printer, or the printer word, and nothing else. */
+function printerAlone(u: Understood): boolean {
   return (
     u.printerCue &&
     u.models.length <= 1 &&
@@ -506,6 +529,7 @@ function readPartChip(params: Record<string, unknown>): { u: Understood; anyPrin
     otherPrinter: false,
     correction: false,
     ownPrinter: false,
+    ownsPrinter: false,
     priceAsk: false,
     residual: [],
   };
