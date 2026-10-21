@@ -13,7 +13,7 @@ import { audit } from '../lib/audit';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { anonymousCached } from '../lib/edgePolicy';
 import { publishRequest } from './printRequests';
-import { publicRequest } from './marketplace';
+import { publicRequest, requestForReader } from './marketplace';
 import { boardSummarySql } from '../lib/requestModel';
 import { isMissingSchema } from '../lib/merchantApproval';
 // Workshop facts on the store page, and the merchant's own board (0159, §9.5).
@@ -394,7 +394,7 @@ communityRoutes.get('/merchants', async (c) => {
  * its customer had made PRIVATE, and one whose expiry had passed.
  *
  * And the same FIELDS: the board's own whitelist (`publicRequest`), so a card
- * can say what the job is — quantity, material, budget, governorate, how many
+ * can say what the job is — quantity, material, governorate, how many
  * offers — instead of «بانتظار العروض» over a request that already had three.
  * `status` stays for a client that still reads it.
  *
@@ -495,7 +495,8 @@ communityRoutes.get('/requests', async (c) => {
     return c.json({
       success: true,
       requests: page.map((r) => ({
-        ...publicRequest(r),
+        // An eligible workshop reads the budget when the customer shows it (Q2, row 268).
+        ...requestForReader(r, 'merchant'),
         status: r.status,
         /** The engine's ranking of this job for THIS workshop — the reader's own number, nobody else's. */
         match_score: Number(r.match_score ?? 0) || 0,

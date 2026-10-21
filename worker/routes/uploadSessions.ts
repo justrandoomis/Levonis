@@ -312,7 +312,7 @@ class Sha256 {
 type DigestStreamCtor = new (algorithm: string) => WritableStream<Uint8Array> & { readonly digest: Promise<ArrayBuffer> };
 
 /** The object's SHA-256, streamed: never more than one chunk of it in memory. */
-async function sha256OfObject(env: Env, visibility: MediaVisibility, key: string): Promise<string> {
+export async function sha256OfObject(env: Env, visibility: MediaVisibility, key: string): Promise<string> {
   const obj = await getMediaObject(env, visibility, key);
   if (!obj) throw new Error('the assembled object vanished before it could be verified');
   const DigestStream = (crypto as unknown as { DigestStream?: DigestStreamCtor }).DigestStream;

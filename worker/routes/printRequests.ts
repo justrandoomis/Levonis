@@ -116,6 +116,7 @@ import {
 } from '../lib/requestEstimate';
 import { REQUEST_MODEL_LIMITS } from '@levonis/contracts/requestModel';
 import { isMissingSchema } from '../lib/merchantApproval';
+import { budgetFor, budgetVisibleOf, stripSpecBudget, type BudgetReader } from '../lib/requestBudget';
 import { orderCoverageFacts } from '../lib/chatCards';
 
 /**
@@ -1316,19 +1317,48 @@ async function planModelWrite(
   // P1-05 (D2): a job of parts publishes — save a part no workshop can print
   // as asked. Refused with the part named, and nothing written; a draft keeps
   // it, and the live estimate shows it unpriced with the same code.
-  if (opts.strict) {
-    for (const part of next.parts) {
-      const code = unsupportedPart(part, mats);
-      if (!code) continue;
-      const words: Record<string, string> = {
-        PART_PROCESS_MIXED: 'One part cannot be printed in an FDM material and a resin together — make them two parts',
-        PART_RESIN_MULTI_MATERIAL: 'A resin part prints in one material — choose one, or split it into parts',
-        PART_MATERIAL_UNKNOWN: 'One of the materials is no longer in the catalogue — choose another',
-      };
-      throw badRequest(words[code], code, { part_id: part.id, position: part.position });
-    }
-  }
+  if (opts.strict) assertPartsPrintable(next.parts, mats);
   return { w, before: read, next, budgetVisible };
+}
+
+const PART_REFUSAL_WORDS: Record<string, string> = {
+  PART_PROCESS_MIXED: 'One part cannot be printed in an FDM material and a resin together — make them two parts',
+  PART_RESIN_MULTI_MATERIAL: 'A resin part prints in one material — choose one, or split it into parts',
+  PART_MATERIAL_UNKNOWN: 'One of the materials is no longer in the catalogue — choose another',
+};
+
+/** The first part no workshop can print as asked, refused with its id and place (P1-05, D2). */
+function assertPartsPrintable(parts: ModelState['parts'], mats: PrintMaterial[]): void {
+  for (const part of parts) {
+    const code = unsupportedPart(part, mats);
+    if (code) throw badRequest(PART_REFUSAL_WORDS[code], code, { part_id: part.id, position: part.position });
+  }
+}
+
+/** A draft born empty (the editor's entry door, row 268) says what it is before anyone sees it. */
+function assertRequestText(request: Record<string, unknown>): void {
+  const title = String(request.title ?? '').trim();
+  if (title.length < 4 || title.length > 140) {
+    throw badRequest('Write a title of 4 to 140 characters before publishing', 'REQUEST_TITLE_REQUIRED');
+  }
+  if (String(request.description ?? '').trim().length < 10) {
+    throw badRequest('Describe what you need in at least 10 characters before publishing', 'REQUEST_DESCRIPTION_REQUIRED');
+  }
+}
+
+/**
+ * WHAT A DIRECT REQUEST MUST SAY BEFORE IT IS SENT TO ITS STORE — the publish
+ * door's own checks, for the doors that send instead of publishing
+ * (worker/routes/chatCommerce.ts `sendDirectDraft`, from the conversation or
+ * the request editor; P1-06, docs/DECISIONS.md row 268): a title of 4–140
+ * characters, a description of 10 or more, and — for a version-3 request —
+ * no part a workshop cannot print as asked (PART_*, with the part named).
+ */
+export async function assertSendable(env: Env, request: Record<string, unknown>): Promise<void> {
+  assertRequestText(request);
+  const read = await readRequestModel(env.DB, String(request.id ?? ''));
+  if (!read || read.schema_version !== 3 || !read.schema) return;
+  assertPartsPrintable(read.parts, await materials(env));
 }
 
 /** What a merchant is told of a job of parts (D10): counts, sets, every material and process, the review. */
@@ -1408,15 +1438,7 @@ export async function publishRequest(
   const firstPublish = state === 'draft';
   // A draft may be born empty (the editor's entry door, row 268); the board
   // never shows one without a title and a description.
-  if (firstPublish && opts.requireText) {
-    const title = String(request.title ?? '').trim();
-    if (title.length < 4 || title.length > 140) {
-      throw badRequest('Write a title of 4 to 140 characters before publishing', 'REQUEST_TITLE_REQUIRED');
-    }
-    if (String(request.description ?? '').trim().length < 10) {
-      throw badRequest('Describe what you need in at least 10 characters before publishing', 'REQUEST_DESCRIPTION_REQUIRED');
-    }
-  }
+  if (firstPublish && opts.requireText) assertRequestText(request);
   if (!firstPublish && isPast(request.expires_at as string | null)) {
     throw conflict('This request has expired', 'REQUEST_EXPIRED');
   }
@@ -1553,15 +1575,16 @@ export async function publishRequest(
   // notification is composed from the ROW, not from this call's payload. A
   // republish that does not resend them must still tell merchants the deadline
   // and budget the customer set the first time round.
-  const forMatching = await env.DB.prepare(
-    'SELECT governorate, delivery_pref, deadline, budget_iqd, revision FROM community_requests WHERE id = ?'
-  )
+  // The whole row: `budget_visible` (0208) is read where it exists, and a
+  // database without it reads the budget as hidden (Q2, row 268).
+  const forMatching = await env.DB.prepare('SELECT * FROM community_requests WHERE id = ?')
     .bind(requestId)
     .first<{
       governorate: string;
       delivery_pref: string;
       deadline: string | null;
       budget_iqd: number | null;
+      budget_visible?: number | null;
       revision: number;
     }>();
   const revision = Number(forMatching?.revision ?? readRevision);
@@ -1605,7 +1628,8 @@ export async function publishRequest(
     dimensions: dimsLabel,
     governorate: String(forMatching?.governorate ?? request.governorate ?? ''),
     deadline: String(forMatching?.deadline ?? ''),
-    budget_iqd: typeof forMatching?.budget_iqd === 'number' ? forMatching.budget_iqd : null,
+    // Told only to the eligible workshops, and only when the customer shows it to merchants (Q2).
+    budget_iqd: budgetFor(forMatching?.budget_iqd, forMatching?.budget_visible, 'merchant'),
     ...(byParts ? { parts: notificationParts(model!.next, mats) } : {}),
   });
   const matched = await matchRequest(env, requestId, {
@@ -1798,7 +1822,7 @@ async function directOf(env: Env, r: Record<string, unknown> | null): Promise<{ 
   };
 }
 
-async function draftShape(env: Env, requestId: string) {
+export async function draftShape(env: Env, requestId: string) {
   const r = await env.DB.prepare('SELECT * FROM community_requests WHERE id = ?').bind(requestId).first<Record<string, unknown>>();
   const p = await env.DB.prepare('SELECT * FROM community_print_requests WHERE request_id = ?')
     .bind(requestId)
@@ -1945,10 +1969,20 @@ printRequestRoutes.get('/requests/:id/revisions', async (c) => {
     isOwner ? 'owner' : user?.role === 'admin' ? 'admin'
       : user && (results ?? []).some((row) => String(row.spec ?? '').includes('"model"')) && (await isEngagedMerchant(c.env.DB, requestId, user.id))
         ? 'accepted' : 'public';
+  /**
+   * THE BUDGET (Q2, row 268): the customer and an admin read it; a merchant
+   * who offered on the request, the accepted one and a direct request's store
+   * read it when the customer shows it to merchants; anyone else the board
+   * lets in never does. Stored specs keep it; this read empties it.
+   */
+  const budgetReader: BudgetReader = isOwner ? 'owner' : user?.role === 'admin' ? 'admin'
+    : user && (fullHistory || (await isEngagedMerchant(c.env.DB, requestId, user.id)) || (await isDirectMerchant(c.env.DB, requestId, user.id)))
+      ? 'merchant' : 'public';
+  const budgetVisible = budgetReader === 'merchant' && (await budgetVisibleOf(c.env.DB, requestId)) ? 1 : 0;
   let prev: Record<string, unknown> | null = null;
   let prevFiles: RevisionFile[] = [];
   const revisions = (results ?? []).map((row) => {
-    const spec = projectSpec(parseJson<Record<string, unknown>>(row.spec, {}), party);
+    const spec = stripSpecBudget(projectSpec(parseJson<Record<string, unknown>>(row.spec, {}), party), budgetVisible, budgetReader);
     const files = parseJson<RevisionFile[]>(row.files, []);
     const changes: string[] = prev
       ? REVISION_FIELDS.filter((k) => JSON.stringify(spec[k] ?? null) !== JSON.stringify(prev![k] ?? null))

@@ -154,14 +154,48 @@ export interface V3Body {
   quality: Quality;
   sources: V3Source[];
   parts: V3Part[];
+  /** Named only when changed (editor/state.ts): the server keeps what the body does not name. */
+  customer_notes?: string;
+  governorate?: string;
+  delivery_pref?: string;
+  deadline?: string;
+  budget_iqd?: number | null;
+  /** Q2: «اعرض ميزانيتي للتجار». */
+  budget_visible?: boolean;
+}
+
+/** Where a new draft comes from (the editor's address: ?project= · ?product=&store= · ?store=). */
+export type EditorEntry =
+  | { kind: 'blank' }
+  | { kind: 'project'; post_id: string }
+  | { kind: 'product'; product_id: string; store: string }
+  | { kind: 'store'; merchant_id: string };
+
+/** What an entry copied: the count, and each file it skipped with its code. */
+export interface EntryCopies {
+  files: number;
+  skipped: Array<{ name: string; code: string; post_file_id: string }>;
 }
 
 const draftPath = (id: string) => `/api/marketplace/print/requests/${encodeURIComponent(id)}/draft`;
 
 export const editorApi = {
-  /** A new draft, born empty and version 3 (worker/routes/requestEntries.ts). */
-  createEntry: () =>
-    api.post<{ request_id: string; replayed: boolean; draft: DraftShape }>('/api/marketplace/print/requests', { entry: { kind: 'blank' } }),
+  /**
+   * A new draft, born version 3 (worker/routes/requestEntries.ts): empty, or
+   * from a project (its files copied in), a store product or a store. An idle
+   * draft from the same origin is answered again (`replayed`).
+   */
+  createEntry: (entry: EditorEntry = { kind: 'blank' }, lang?: string) =>
+    api.post<{ request_id: string; replayed: boolean; draft: DraftShape; copied?: EntryCopies }>('/api/marketplace/print/requests', { entry, ...(lang ? { lang } : {}) }),
+  /** A project file the entry skipped, copied again (never one the request already holds). */
+  copyFromProject: (id: string, postId: string, fileIds: string[]) =>
+    api.post<{ draft: DraftShape; copied: EntryCopies & { already: string[] } }>(
+      `/api/marketplace/print/requests/${encodeURIComponent(id)}/copy-from-project`,
+      { post_id: postId, file_ids: fileIds }
+    ),
+  /** A request for one store, sent to it: its conversation opens and its card lands there. */
+  sendDirect: (id: string) =>
+    api.post<{ chat_id: string; replayed?: boolean }>(`/api/marketplace/print/requests/${encodeURIComponent(id)}/send`),
   draft: (id: string) => api.get<{ draft: DraftShape }>(draftPath(id)),
   /** `expected` refuses with 409 DRAFT_CHANGED when another window saved first. */
   save: (id: string, body: V3Body, expected?: string) =>
@@ -224,6 +258,10 @@ export interface DraftModel {
     note: string;
     is_primary: boolean;
     position: number;
+    /** The owner's projection only (P1-06): where a server copy came from — a project, a product. */
+    origin_id?: string;
+    origin_ref?: string;
+    origin_meta?: Record<string, unknown>;
   }>;
   parts: Array<{
     id: string;

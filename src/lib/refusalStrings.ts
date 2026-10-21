@@ -632,6 +632,22 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The draft changed in another window — load the latest.',
     ckb: 'ڕەشنووسەکە لە پەنجەرەیەکی ترەوە گۆڕا — نوێترینەکە بار بکە.',
   },
+  // ---- the editor's entries (P1-06, row 268): a project, a product, a store.
+  ENTRY_NOT_FOUND: {
+    ar: 'لم نجد ما تريد أن تطلب طباعته — ربما حُذف أو لم يعد متاحًا.',
+    en: 'We could not find what you want printed. It may have been removed or is no longer available.',
+    ckb: 'ئەوەی دەتەوێت چاپ بکرێت نەدۆزرایەوە — لەوانەیە سڕابێتەوە یان ئیتر بەردەست نەبێت.',
+  },
+  COPY_CHANGED: {
+    ar: 'تغيّر الملف أثناء نسخه — حاول مرة أخرى.',
+    en: 'The file changed while it was being copied. Try again.',
+    ckb: 'فایلەکە لە کاتی کۆپیکردندا گۆڕا — دووبارە هەوڵ بدەرەوە.',
+  },
+  STORE_UNAVAILABLE: {
+    ar: 'هذا المتجر غير متاح الآن.',
+    en: 'This store is not available right now.',
+    ckb: 'ئەم فرۆشگایە ئێستا بەردەست نییە.',
+  },
   REQUEST_IS_DIRECT: {
     ar: 'هذا الطلب لمتجر واحد — أرسله إليه من محادثتك معه.',
     en: 'This request is for one store — send it to the store from your conversation with it.',

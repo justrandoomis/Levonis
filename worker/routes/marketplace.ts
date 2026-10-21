@@ -162,6 +162,8 @@ import { ownedFileObject } from '../lib/fileOwnership';
 import { isSchemaMissing } from '../lib/membershipBenefits';
 // A board deal's conversation: the request thread, found or created by the chat door's own helper.
 import { openStoreThread } from './chats';
+// Q2 (row 268): the budget is the customer's, shown to a merchant only when they say so.
+import { budgetFor, budgetVisibleOf, snapshotHasBudget, stripSnapshotBudget, type BudgetReader } from '../lib/requestBudget';
 
 export const marketplaceRoutes = new Hono<AppContext>();
 
@@ -199,7 +201,8 @@ export function publicRequest(r: Record<string, unknown>) {
     material: r.material,
     color: r.color,
     dimensions: r.dimensions,
-    budget_iqd: r.budget_iqd,
+    /** NEVER PUBLIC (Q2, row 268): a reader who may see it gets it from `requestForReader`. */
+    budget_iqd: null as number | null,
     deadline: r.deadline,
     governorate: r.governorate,
     delivery_pref: r.delivery_pref,
@@ -226,8 +229,18 @@ export function publicRequest(r: Record<string, unknown>) {
  * accepted offer, or the store a direct request was addressed to). Never for
  * a reader of the board.
  */
-export function partyRequest(r: Record<string, unknown>) {
-  return { ...publicRequest(r), customer_name: (r.customer_name as string | null | undefined) ?? null };
+export function partyRequest(r: Record<string, unknown>, reader: Exclude<BudgetReader, 'public'>) {
+  return { ...requestForReader(r, reader), customer_name: (r.customer_name as string | null | undefined) ?? null };
+}
+
+/**
+ * The public whitelist for a reader who may be shown the budget (Q2,
+ * worker/lib/requestBudget.ts): the customer and an admin always, a merchant
+ * the request is meant for only when the customer turned the switch on. The
+ * reader is NAMED by every caller — never a list's index (`rows.map(fn)`).
+ */
+export function requestForReader(r: Record<string, unknown>, reader: BudgetReader) {
+  return { ...publicRequest(r), budget_iqd: budgetFor(r.budget_iqd, r.budget_visible, reader) };
 }
 
 /** A JSON id list column, read defensively. */
@@ -397,7 +410,10 @@ marketplaceRoutes.get('/requests/:id', requireCommunityOpen, async (c) => {
   // requestFilePolicy.ts): the list is the request's, the bytes are not. A
   // file this caller may not read carries no URL; a model an eligible
   // merchant may only preview says so. Asked only when there are files.
-  const { reader } = files.results.length && user
+  // The budget (Q2) is asked of the same reader when the customer shows it to
+  // merchants: an ELIGIBLE workshop reads it, any other visitor does not.
+  const budgetAsked = !party && !!user && budgetFor(r.budget_iqd, r.budget_visible, 'merchant') !== null;
+  const { reader } = (files.results.length || budgetAsked) && user
     ? await fileReader(c.env, r as unknown as RequestForAccess, user, { allowAdmin: true })
     : { reader: null };
   // A file the customer marked as the SOURCE (Q5, P1-04) is not an eligible merchant's to open or preview.
@@ -405,7 +421,9 @@ marketplaceRoutes.get('/requests/:id', requireCommunityOpen, async (c) => {
 
   return c.json({
     success: true,
-    request: party ? partyRequest(r) : publicRequest(r),
+    request: party
+      ? partyRequest(r, isOwner ? 'owner' : user?.role === 'admin' ? 'admin' : 'merchant')
+      : requestForReader(r, user?.role === 'admin' ? 'admin' : reader === 'eligible' ? 'merchant' : 'public'),
     // R2 keys are NEVER returned. What a caller gets is a route on this
     // worker, which re-derives their right to the file on every read — so a
     // link shared after the request closes simply stops working.
@@ -801,7 +819,7 @@ marketplaceRoutes.post('/requests', requireCommunityOpen, requireAuth, async (c)
 
   await audit(c.env.DB, user.id, 'community.request_created', id, { title, state: 'draft' });
   const row = await c.env.DB.prepare('SELECT * FROM community_requests WHERE id = ?').bind(id).first();
-  return c.json({ success: true, request: publicRequest(row as Record<string, unknown>) }, 201);
+  return c.json({ success: true, request: requestForReader(row as Record<string, unknown>, 'owner') }, 201);
 });
 
 /**
@@ -830,7 +848,7 @@ marketplaceRoutes.get('/my-requests', requireAuth, async (c) => {
       WHERE r.customer_id = ? ORDER BY r.created_at DESC LIMIT 50`
   ).bind(user.id).all();
   // The customer's own list: theirs, so the parties' view.
-  return c.json({ success: true, requests: results.map(partyRequest) });
+  return c.json({ success: true, requests: results.map((r) => partyRequest(r, 'owner')) });
 });
 
 /**
@@ -2992,6 +3010,13 @@ marketplaceRoutes.get('/orders/:id', requireAuth, async (c) => {
   const orderId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const { row, isCustomer, isMerchant } = await loadOrderForParty(c, orderId);
   const [escrow, autoDays] = await Promise.all([escrowForOrder(c.env.DB, orderId), autoCompleteDays(c.env.DB)]);
+  // The job as accepted, its budget only for the customer — or for the
+  // merchant when the customer shows it (Q2, row 268). The stored snapshot is
+  // never rewritten.
+  const snapshot = publicSnapshot(row.request_snapshot);
+  const requestSnapshot = isCustomer || !snapshotHasBudget(snapshot)
+    ? snapshot
+    : stripSnapshotBudget(snapshot, (await budgetVisibleOf(c.env.DB, String(row.request_id ?? ''))) ? 1 : 0, 'merchant');
   return c.json({
     success: true,
     /**
@@ -3008,7 +3033,7 @@ marketplaceRoutes.get('/orders/:id', requireAuth, async (c) => {
       // The job revision this order was accepted on (0130) — both sides see
       // the same job; neither can rewrite it.
       // Its estimate as the parties may read it, whatever an old row holds (review W2-5 p6).
-      request_snapshot: publicSnapshot(row.request_snapshot),
+      request_snapshot: requestSnapshot,
       // Never the raw pair: each side gets the OTHER side's contact, below.
       contact_snapshot: undefined,
     },

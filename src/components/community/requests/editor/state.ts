@@ -20,8 +20,13 @@
  *   adoptIds(...)         after a save, the ids the server gave to what was
  *                         new, kept under the editor’s own keys.
  *
- * The delivery and budget fields are hydrated and carried, never sent: the
- * server keeps a field the body does not name (absent = carried).
+ * THE DELIVERY AND THE BUDGET. `carried` is what the server holds; the
+ * editor edits `delivery`, and the body names a field only when it differs
+ * from what is held (the server keeps a field the body does not name). So an
+ * unchanged save of a published request never re-sends a deadline that has
+ * since passed, and the hash a merchant priced stays where it was. The
+ * budget's switch (Q2, «اعرض ميزانيتي للتجار») is `budgetVisible`, off by
+ * default.
  *
  * THE MAIN SOURCE. A source the customer marked is the main one; when none
  * is marked, the editor picks one the way a merchant would start — the first
@@ -56,6 +61,22 @@ export interface EditorSource {
   original: boolean;
   /** The role stored before, when it is not `source` — echoed so nothing changes by itself. */
   baseRole: string;
+  /** Where a server copy came from (the owner’s projection): a project or a product, and its title. Display only. */
+  origin?: SourceOrigin | null;
+}
+
+export interface SourceOrigin {
+  kind: 'project' | 'product';
+  title: string;
+}
+
+/** The provenance the owner reads of a source: a project copy, or a product’s page or cover. */
+export function originOf(x: { kind: string; origin_id?: string; origin_ref?: string; origin_meta?: Record<string, unknown> }): SourceOrigin | null {
+  if (!x.origin_id) return null;
+  const title = typeof x.origin_meta?.title === 'string' ? x.origin_meta.title : '';
+  if (x.kind === 'project_post') return { kind: 'project', title };
+  if (x.origin_ref === 'product' || x.origin_ref === 'product_cover') return { kind: 'product', title };
+  return null;
 }
 
 export interface EditorColour {
@@ -97,6 +118,19 @@ export interface EditorPart {
   reviewReasons: string[];
 }
 
+export interface DeliveryFields {
+  /** Notes for the merchants (`customer_notes`). */
+  notes: string;
+  governorate: string;
+  /** '' (either), 'delivery' or 'pickup'. */
+  handover: string;
+  /** YYYY-MM-DD or ''. */
+  deadline: string;
+  budget: number | null;
+  /** Q2: shown to the merchants the request is meant for. Off by default. */
+  budgetVisible: boolean;
+}
+
 export interface EditorState {
   requestId: string;
   requestState: string;
@@ -111,8 +145,10 @@ export interface EditorState {
   files: DraftFile[];
   sources: EditorSource[];
   parts: EditorPart[];
-  /** Carried, not edited here (see the header). */
-  carried: { notes: string; governorate: string; handover: string; deadline: string; budget: number | null; budgetVisible: boolean };
+  /** What the server holds of the delivery and the budget (see the header). */
+  carried: DeliveryFields;
+  /** …and what the customer has made of them here. */
+  delivery: DeliveryFields;
   /** The counter behind `tmp_` keys. */
   seq: number;
 }
@@ -172,6 +208,7 @@ export function hydrate(d: DraftShape): EditorState {
     primary: !!x.is_primary,
     original: x.role === 'source',
     baseRole: x.role === 'source' ? '' : x.role,
+    origin: originOf(x),
   }));
   // Every file of the request is a source (the server’s own rule); a file the
   // model did not list yet becomes one, so a file never goes missing here.
@@ -222,17 +259,24 @@ export function hydrate(d: DraftShape): EditorState {
     files: d.files,
     sources,
     parts,
-    carried: {
-      notes: d.customer_notes,
-      governorate: d.governorate,
-      handover: d.delivery_pref,
-      deadline: d.deadline,
-      budget: d.budget_iqd,
-      budgetVisible: !!d.budget_visible,
-    },
+    carried: deliveryOf(d),
+    delivery: deliveryOf(d),
     seq,
   };
 }
+
+function deliveryOf(d: DraftShape): DeliveryFields {
+  return {
+    notes: d.customer_notes ?? '',
+    governorate: d.governorate ?? '',
+    handover: d.delivery_pref === 'delivery' || d.delivery_pref === 'pickup' ? d.delivery_pref : '',
+    deadline: d.deadline ?? '',
+    budget: d.budget_iqd ?? null,
+    budgetVisible: !!d.budget_visible,
+  };
+}
+
+const NO_DELIVERY: DeliveryFields = { notes: '', governorate: '', handover: '', deadline: '', budget: null, budgetVisible: false };
 
 /** The editor before the draft exists: nothing typed, one part in «لست متأكدًا» and «أي لون». */
 export function blankState(): EditorState {
@@ -250,7 +294,8 @@ export function blankState(): EditorState {
     files: [],
     sources: [],
     parts: [emptyPart('tmp_part_1', 'tmp_mat_2')],
-    carried: { notes: '', governorate: '', handover: '', deadline: '', budget: null, budgetVisible: false },
+    carried: { ...NO_DELIVERY },
+    delivery: { ...NO_DELIVERY },
     seq: 2,
   };
 }
@@ -351,7 +396,21 @@ export function editorBody(s: EditorState): V3Body {
     body.title = s.title.trim();
     body.description = s.description.trim();
   }
+  // The delivery and the budget: only what the customer changed (see the header).
+  const d = s.delivery ?? s.carried;
+  const was = s.carried;
+  if (d.notes.trim() !== was.notes.trim()) body.customer_notes = d.notes.trim();
+  if (d.governorate !== was.governorate) body.governorate = d.governorate;
+  if (d.handover !== was.handover) body.delivery_pref = d.handover;
+  if (d.deadline !== was.deadline) body.deadline = d.deadline;
+  if (d.budget !== was.budget) body.budget_iqd = d.budget;
+  if (d.budgetVisible !== was.budgetVisible) body.budget_visible = d.budgetVisible;
   return body;
+}
+
+/** The delivery as the server will hold it once this state is saved: what a save adopts. */
+export function savedDelivery(s: EditorState): EditorState {
+  return { ...s, carried: { ...(s.delivery ?? s.carried) } };
 }
 
 export const bodyKey = (s: EditorState): string => JSON.stringify(editorBody(s));
@@ -380,7 +439,7 @@ export function sentShape(s: EditorState): SentShape {
  */
 export function adoptIds(s: EditorState, sent: SentShape, draft: DraftShape): EditorState {
   const m = draft.model;
-  if (!m) return { ...s, updatedAt: draft.updated_at ?? s.updatedAt, files: draft.files };
+  if (!m) return { ...s, updatedAt: draft.updated_at ?? s.updatedAt, files: draft.files, carried: deliveryOf(draft) };
   const sourceIds = new Map<Key, string>();
   const taken = new Set<string>();
   for (const x of sent.sources) {
@@ -410,6 +469,9 @@ export function adoptIds(s: EditorState, sent: SentShape, draft: DraftShape): Ed
     updatedAt: draft.updated_at ?? s.updatedAt,
     revision: draft.revision,
     liveOffers: draft.live_offers,
+    // What the server now holds of the delivery and the budget.
+    carried: deliveryOf(draft),
+    delivery: s.delivery ?? deliveryOf(draft),
     files: mergeFiles(s.files, draft.files),
     sources: s.sources.map((x) => (sourceIds.has(x.key) ? { ...x, id: sourceIds.get(x.key)! } : x)),
     parts: s.parts.map((p) => {
@@ -636,6 +698,9 @@ export function deserialise(raw: string | null | undefined): EditorState | null 
     const v = JSON.parse(raw) as EditorState;
     if (!v || typeof v !== 'object' || typeof v.requestId !== 'string' || !Array.isArray(v.parts) || !Array.isArray(v.sources) || !Array.isArray(v.files)) return null;
     if (!v.parts.every((p) => p && typeof p.key === 'string' && Array.isArray(p.materials) && p.materials.length > 0)) return null;
+    // A tab copy written before the delivery fields were edited here holds `carried` only.
+    if (!v.carried) v.carried = { ...NO_DELIVERY };
+    if (!v.delivery) v.delivery = { ...v.carried };
     return v;
   } catch {
     return null;

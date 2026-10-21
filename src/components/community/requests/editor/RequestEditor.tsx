@@ -37,7 +37,7 @@ import { useToast } from '../../../ui/Toast';
 import { warmLink } from '../../links/useLinkCard';
 import { forgetCommunityFeed } from '../../hub/feedCache';
 import { requestPath } from '../requestStates';
-import { editorApi, requestsApi, type Catalog, type DraftFile, type Quote } from '../api';
+import { editorApi, requestsApi, type Catalog, type DraftFile, type EditorEntry, type EntryCopies, type Quote } from '../api';
 import {
   addLink,
   addMaterial,
@@ -77,10 +77,52 @@ import { gridPictures, type GridPicture } from './ImageGrid';
 import { ImageViewer } from './ImageViewer';
 import { PartsEditor } from './PartsEditor';
 import { ReviewSheet } from './ReviewSheet';
+import { DeliveryFields } from './DeliveryFields';
+import { AudiencePanel } from './AudiencePanel';
 import { partEstimates } from './estimate';
 import { editorLang, editorStrings, fill } from './strings';
 
-type Load = { phase: 'loading' } | { phase: 'failed'; error: unknown } | { phase: 'ready' } | { phase: 'locked'; requestId: string };
+type Load =
+  | { phase: 'loading' }
+  | { phase: 'entering'; kind: EditorEntry['kind'] }
+  | { phase: 'failed'; error: unknown; entry?: boolean }
+  | { phase: 'ready' }
+  | { phase: 'locked'; requestId: string };
+
+/**
+ * WHERE A NEW REQUEST COMES FROM, read from the editor's address (row 268):
+ *   ?project=<post>                 a project's files, copied in
+ *   ?product=<product>&store=<slug> a store product, for that store only
+ *   ?store=<merchant>               «لهذا المتجر فقط»
+ * Anything else is a blank request (a carried `?link=` is added on arrival).
+ */
+export function entryFrom(params: URLSearchParams): EditorEntry | null {
+  const project = params.get('project')?.trim();
+  if (project) return { kind: 'project', post_id: project };
+  const product = params.get('product')?.trim();
+  const store = params.get('store')?.trim();
+  if (product && store) return { kind: 'product', product_id: product, store };
+  if (store) return { kind: 'store', merchant_id: store };
+  return null;
+}
+
+/** A skipped copy in the reader's words: the editor's own for the copy codes, the refusal table for the rest. */
+export function copyReason(code: string, lang: 'ar' | 'en' | 'ckb', t: { copyTooLarge: string; copyKind: string; copyFull: string; copyMissing: string; copyChanged: string; copyFailed: string }): string {
+  switch (code) {
+    case 'COPY_TOO_LARGE':
+      return t.copyTooLarge;
+    case 'COPY_KIND':
+      return t.copyKind;
+    case 'REQUEST_FILES_FULL':
+      return t.copyFull;
+    case 'COPY_MISSING':
+      return t.copyMissing;
+    case 'COPY_CHANGED':
+      return t.copyChanged;
+    default:
+      return apiRefusal({ code }, lang, t.copyFailed);
+  }
+}
 
 /** The address an editable request lives at: a draft at /requests/new/:id, a published one at /requests/:id/edit. */
 export function editorPath(requestId: string, requestState: string): string {
@@ -117,7 +159,12 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
   const [viewer, setViewer] = useState<number | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState('');
+  /** What a project entry copied: the post, the count, and what it skipped (each with «انسخه مجددًا»). */
+  const [copies, setCopies] = useState<(EntryCopies & { postId: string; seeded: boolean }) | null>(null);
+  const [copying, setCopying] = useState('');
   const rootRef = useRef<HTMLDivElement | null>(null);
+  /** The link flow, for the effect that adds a carried link (it is defined below the render guards). */
+  const addLinkFlowRef = useRef<(url: string) => Promise<string>>(async () => '');
   const stateRef = useRef<EditorState | null>(null);
   stateRef.current = state;
   const setState = useCallback((updater: (s: EditorState | null) => EditorState | null) => setStateRaw(updater), []);
@@ -143,6 +190,26 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
     if (routeId && routeId === createdHere.current) return;
     let alive = true;
     setLoad({ phase: 'loading' });
+    const entry = routeId ? null : entryFrom(params);
+    if (entry) {
+      // A draft made from a project, a product or a store: born on the server
+      // (an idle one from the same origin is answered again), then loaded at
+      // its own address like every draft.
+      setLoad({ phase: 'entering', kind: entry.kind });
+      editorApi
+        .createEntry(entry, lang)
+        .then(({ request_id, copied, draft }) => {
+          if (!alive) return;
+          if (entry.kind === 'project') {
+            setCopies({ postId: entry.post_id, files: copied?.files ?? 0, skipped: copied?.skipped ?? [], seeded: (draft.model?.parts.length ?? 0) > 1 });
+          }
+          navigate(`/requests/new/${encodeURIComponent(request_id)}`, { replace: true });
+        })
+        .catch((error) => alive && setLoad({ phase: 'failed', error, entry: true }));
+      return () => {
+        alive = false;
+      };
+    }
     if (!routeId) {
       const fresh = blankState();
       const copy = readMirror(storage, userId, '', null);
@@ -219,6 +286,22 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
       createFailed.current = Date.now();
     });
   }, [state, load.phase, blankKey, ensureRequest]);
+
+  // A link carried to a blank page (Tools, a link card, an old address) is
+  // checked and added on arrival — which is the act that creates the draft.
+  const carriedLink = useRef(false);
+  useEffect(() => {
+    if (carriedLink.current || load.phase !== 'ready' || !state || state.requestId) return;
+    const link = params.get('link')?.trim();
+    if (!link) return;
+    carriedLink.current = true;
+    const p = new URLSearchParams(params);
+    p.delete('link');
+    setParams(p, { replace: true });
+    void addLinkFlowRef.current(link).then((err) => err && toast.error(err));
+    // Once, when the blank page is ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load.phase, state?.requestId]);
 
   // ---------------------------------------------------------------- uploads
 
@@ -309,10 +392,13 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
 
   // ---------------------------------------------------------------- render guards
 
-  if (load.phase === 'loading' || (!state && load.phase === 'ready')) {
+  if (load.phase === 'loading' || load.phase === 'entering' || (!state && load.phase === 'ready')) {
+    const entering = load.phase === 'entering';
     return (
-      <div className="mx-auto max-w-2xl space-y-3 px-4 py-6" aria-busy="true" data-editor="loading">
-        <p className="sr-only">{t.preparing}</p>
+      <div className="mx-auto max-w-2xl space-y-3 px-4 py-6" aria-busy="true" data-editor={entering ? `entering-${load.kind}` : 'loading'}>
+        <p className={entering ? 'text-[14px] font-semibold text-text-secondary' : 'sr-only'} role="status">
+          {entering && load.kind === 'project' ? t.copyingProject : t.preparing}
+        </p>
         <div className="h-24 animate-pulse rounded-xl bg-surface-selected motion-reduce:animate-none" />
         <div className="h-40 animate-pulse rounded-xl bg-surface-selected motion-reduce:animate-none" />
       </div>
@@ -321,7 +407,7 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
   if (load.phase === 'failed') {
     return (
       <div className="mx-auto max-w-2xl px-4 py-10 text-center" data-editor="load-failed">
-        <p className="text-[15px] font-semibold text-text-primary">{t.loadFailed}</p>
+        <p className="text-[15px] font-semibold text-text-primary">{load.entry ? t.entryFailed : t.loadFailed}</p>
         <p className="mt-1 text-[13px] text-text-secondary">{apiRefusal(load.error, L, '')}</p>
         <Button className="mt-4" variant="secondary" onClick={() => navigate(0)}>
           {t.retryLoad}
@@ -391,6 +477,8 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
       return apiRefusal(e, L, t.linkInvalid);
     }
   };
+
+  addLinkFlowRef.current = addLinkFlow;
 
   const addTextFlow = (text: string): string => {
     const [, , err] = addTextRef(s, text);
@@ -474,6 +562,17 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
         return;
       }
       const cur = stateRef.current ?? s;
+      if (cur.direct && !publishedEdit) {
+        // A request for one store is SENT: its conversation opens and its
+        // card lands there; the customer reads the store's offer in it.
+        const sent = await editorApi.sendDirect(id);
+        clearMirror(storage, userId, id);
+        persistence.reset(cur);
+        toast.success(fill(t.directSentTitle, { store: cur.direct.store_name }));
+        navigate('/requests?view=mine', { replace: true });
+        navigate(`/chat/${encodeURIComponent(sent.chat_id)}`);
+        return;
+      }
       await editorApi.publish(id, editorBody(cur));
       forgetCommunityFeed('requests');
       clearMirror(storage, userId, id);
@@ -483,7 +582,7 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
       navigate('/requests?view=mine', { replace: true });
       navigate(requestPath(id), { state: { published: !publishedEdit } });
     } catch (e) {
-      setPublishError(apiRefusal(e, L, publishedEdit ? t.saveFailed : t.publishFailed));
+      setPublishError(apiRefusal(e, L, publishedEdit ? t.saveFailed : s.direct ? t.sendFailed : t.publishFailed));
     } finally {
       setPublishing(false);
     }
@@ -526,6 +625,26 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
   const keepMine = async () => {
     const ok = await confirm({ title: t.keepMineConfirmTitle, consequence: t.keepMineConfirmBody, confirmLabel: t.keepMine, destructive: true });
     if (ok) await persistence.keepMine();
+  };
+
+  /** «انسخه مجددًا»: a skipped project file, copied again — never one the request already holds. */
+  const copyAgain = async (postFileId: string) => {
+    if (!copies || !s.requestId) return;
+    setCopying(postFileId);
+    try {
+      await persistence.flush();
+      const d = await editorApi.copyFromProject(s.requestId, copies.postId, [postFileId]);
+      const fresh = hydrate(d.draft);
+      persistence.reset(fresh);
+      setStateRaw((cur) => (cur ? { ...fresh, title: cur.title, description: cur.description, delivery: cur.delivery } : fresh));
+      setCopies((c) =>
+        c ? { ...c, files: c.files + d.copied.files, skipped: [...c.skipped.filter((x) => x.post_file_id !== postFileId), ...d.copied.skipped] } : c
+      );
+    } catch (e) {
+      toast.error(apiRefusal(e, L, t.copyFailed));
+    } finally {
+      setCopying('');
+    }
   };
 
   const removePartFlow = async (key: Key): Promise<boolean> => {
@@ -652,6 +771,25 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
         <h2 id="editor-sources" className="mb-2 text-[15px] font-bold text-text-primary">
           {t.secSources}
         </h2>
+        {copies && (
+          <div className="mb-3 space-y-2" data-editor="project-copies">
+            {copies.files === 0 && copies.skipped.length === 0 && <p className="lv-alert lv-alert-info text-[12.5px]">{t.projectNoFiles}</p>}
+            {copies.files > 0 && <p className="text-[12px] text-text-muted">{t.projectCopyNote}</p>}
+            {copies.seeded && s.parts.length > 1 && <p className="lv-alert lv-alert-info text-[12.5px]" data-editor="seeded-parts">{t.seededParts}</p>}
+            {copies.skipped.map((x) => (
+              <div key={`${x.post_file_id}:${x.code}`} className="lv-alert lv-alert-warning flex flex-wrap items-center gap-2 text-[12.5px]" data-editor-copy-skipped={x.code}>
+                <p className="min-w-0 flex-1">
+                  <bdi>{fill(t.copySkipped, { name: x.name, reason: copyReason(x.code, L, t) })}</bdi>
+                </p>
+                {x.post_file_id && (
+                  <Button size="sm" variant="secondary" loading={copying === x.post_file_id} onClick={() => void copyAgain(x.post_file_id)}>
+                    {t.copyAgain}
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         <SourcesArea
           state={s}
           uploads={uploads}
@@ -719,6 +857,24 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
         />
       </section>
 
+      <section className="mt-8" aria-labelledby="editor-delivery" onBlur={flushOnLeave} data-editor-section="delivery">
+        <h2 id="editor-delivery" className="mb-3 text-[15px] font-bold text-text-primary">
+          {t.secDelivery}
+        </h2>
+        <DeliveryFields
+          value={s.delivery ?? s.carried}
+          direct={!!s.direct}
+          published={publishedEdit}
+          onChange={(patch) => edit((cur) => ({ ...cur, delivery: { ...(cur.delivery ?? cur.carried), ...patch } }))}
+          lang={L}
+          t={t}
+        />
+      </section>
+
+      <div className="mt-8">
+        <AudiencePanel state={s} t={t} />
+      </div>
+
       <ActionBar
         status={persistence.status}
         edit={publishedEdit}
@@ -741,6 +897,7 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
         busy={publishing}
         error={publishError}
         onPublish={() => void publish()}
+        quote={quote}
         lang={L}
         t={t}
       />

@@ -320,6 +320,11 @@ export function SourcesArea({
                           </span>
                         )}
                         {x.original && <span className="font-semibold text-warning" data-editor-original>{t.originalBadge}</span>}
+                        {x.origin && (
+                          <span data-editor-origin={x.origin.kind}>
+                            <bdi>{fill(x.origin.kind === 'project' ? t.fromProject : t.fromProduct, { title: x.origin.title })}</bdi>
+                          </span>
+                        )}
                       </p>
                     </div>
                     <Menu

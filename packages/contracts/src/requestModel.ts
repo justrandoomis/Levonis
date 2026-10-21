@@ -229,3 +229,23 @@ export const REQUEST_FIELD_VISIBILITY: Readonly<Record<string, RequestFieldAudie
   customer_identity: 'accepted',
   address: 'accepted',
 };
+
+/**
+ * WHAT EACH CLASS OF ATTACHMENT GIVES EACH AUDIENCE (P1-06, docs/DECISIONS.md
+ * row 268) — the file matrix of worker/lib/requestFilePolicy.ts
+ * (`mayReadBytes`, `previewGrantFor`) said in the audiences above, for the
+ * request editor's «ما يراه الآخرون». tests/requestAudiencePanel.test.ts holds
+ * the two equal for every class, reader and role.
+ *
+ *   listing  its kind and its file name on the request's file list
+ *   preview  a simplified 3D preview (models)
+ *   bytes    the file itself
+ *
+ * `source` is a file of any class the customer marked as the original (Q5).
+ */
+export const REQUEST_FILE_VISIBILITY = {
+  image: { listing: 'public', bytes: 'merchants' },
+  document: { listing: 'public', bytes: 'merchants' },
+  model: { listing: 'public', preview: 'merchants', bytes: 'accepted' },
+  source: { listing: 'public', preview: 'accepted', bytes: 'accepted' },
+} as const satisfies Record<string, { listing: RequestFieldAudience; bytes: RequestFieldAudience; preview?: RequestFieldAudience }>;

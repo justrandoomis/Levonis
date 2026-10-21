@@ -156,6 +156,9 @@ test('every code the table translates is one the server can actually emit', () =
     'worker/lib/requestModel.ts',
     // Readers and offers v3 (P1-05, row 267): what an offer covers and substitutes.
     'worker/lib/offerCoverage.ts',
+    // The request editor's entries (P1-06, row 268): a project, a product or a store.
+    'worker/routes/requestEntries.ts',
+    'worker/lib/requestHandoff.ts',
     // Community projects (docs/COMMUNITY_ECOSYSTEM.md Phase 1): the composer
     // decodes POST_* and CONSENT_* beside the field each one names.
     'worker/routes/communityPosts.ts',
