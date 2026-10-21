@@ -2067,6 +2067,28 @@ const meets = (have: ReadonlySet<string>, want: ReadonlySet<string> | undefined)
 };
 
 /**
+ * The colours a product text names in a phrase of several words: «PLA Silk Multi-Color», «متعدد الالوان».
+ * Its words alone name none of them («multi» and «color» are not colours).
+ */
+function phraseColours(texts: ReadonlyArray<unknown>): Set<BaseColour> {
+  const out = new Set<BaseColour>();
+  for (const t of texts) {
+    if (typeof t !== 'string' || !t) continue;
+    const words = nlFold(t).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+    for (let i = 0; i < words.length; i++) {
+      for (const [p, c] of COLOUR_PHRASES) {
+        if (i + p.length > words.length) continue;
+        if (p.every((w, k) => words[i + k] === w || stripArticle(words[i + k]) === w)) out.add(c);
+      }
+    }
+  }
+  return out;
+}
+/** Whether these texts name colour `c`, in one word or in a phrase. */
+const namesColour = (texts: ReadonlyArray<unknown>, c: BaseColour): boolean =>
+  meets(wordsOf(texts), COLOUR_SET.get(c)) || phraseColours(texts).has(c);
+
+/**
  * The words an exclusion leaves out. «مو كومبو» leaves out the AMS units too (a combo is a printer with its AMS),
  * but never what the search itself asks for: «AMS بدون كومبو», "AMS lite without combo" search the AMS units and
  * leave out the combos only.
@@ -2111,13 +2133,11 @@ export function nlKeeps(nl: NlQuery, p: NlProduct): boolean {
       .split('|')
       .map((s) => s.trim())
       .filter(Boolean);
-    const facet = wordsOf(facetPieces);
-    const carried = new Set([...facet, ...names, ...wordsOf(p.colours ?? [])]);
-    if (nl.colours.length && !nl.colours.some((c) => meets(carried, COLOUR_SET.get(c)))) return false;
+    const carried = [...facetPieces, ...p.names, ...(p.colours ?? [])];
+    if (nl.colours.length && !nl.colours.some((c) => namesColour(carried, c))) return false;
     for (const c of nl.exclude.colours) {
-      const set = COLOUR_SET.get(c);
-      if (meets(names, set)) return false;
-      if (facetPieces.length && facetPieces.every((piece) => meets(wordsOf([piece]), set))) return false;
+      if (namesColour(p.names, c)) return false;
+      if (facetPieces.length && facetPieces.every((piece) => namesColour([piece], c))) return false;
     }
   }
   if (nl.materials.length || nl.exclude.materials.length) {

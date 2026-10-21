@@ -512,6 +512,14 @@ test('nlKeeps: an exclusion reads names and the family, never the description; a
   assert.equal(nlKeeps(black, product(['Bambu PLA Basic'], { color_name: 'white' })), false);
   assert.equal(nlKeeps(black, product(['Bambu PLA Basic'])), false, 'no evidence, no black');
 
+  // A colour named in a phrase: «Multi-Color» is two words, neither a colour alone.
+  const silk = product(['PLA Silk Multi-Color', 'PLA حريري متعدد الالوان'], { material_type: 'PLA' }, ['Aurora Purple', 'Dawn Radiance']);
+  for (const q of ['PLA Silk Multi-Color', 'PLA multi-color', 'PLA متعدد الالوان', 'PLA فرە ڕەنگ']) {
+    assert.equal(nlKeeps(parseNlQuery(q), silk), true, `${q}: the line the shopper named stays`);
+  }
+  assert.equal(nlKeeps(parseNlQuery('PLA multi-color'), product(['Bambu PLA Basic'], { color_name: 'black', material_type: 'PLA' })), false);
+  assert.equal(nlKeeps(parseNlQuery('PLA بدون متعدد الالوان'), silk), false, 'a multicolour line left out by its name');
+
   const notBlack = parseNlQuery('فلامنت مو اسود');
   assert.equal(nlKeeps(notBlack, product(['PLA'], { color_name: 'black' })), false, 'sold in black alone');
   assert.equal(nlKeeps(notBlack, product(['PLA'], { color_name: 'white | black' })), true, 'sold in other colours too');
