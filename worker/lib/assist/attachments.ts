@@ -13,7 +13,11 @@
  *     customer's file (the `/files` gate would then show it to staff);
  *   - in one of the three folders the upload route writes, which also names
  *     the kind (no client claim decides between <img>, <video> and <audio>);
- *   - actually stored (an R2 HEAD), the way a ticket message's key is checked.
+ *   - actually stored (an R2 HEAD), the way a ticket message's key is checked;
+ *   - held against the media cleanup first (`protectMediaObjectFromCleanup`),
+ *     so the drain cannot delete a week-old key between that HEAD and the row
+ *     that names it: the cleanup either sees the protection and leaves the
+ *     key, or holds its claim and the ticket door refuses the key by name.
  *
  * Mime and size come from the uploader's own ledger row (`file_objects`),
  * falling back to the HEAD's size. Nothing here reads the bytes and nothing
@@ -21,6 +25,7 @@
  */
 import { badRequest } from '../http';
 import { headMediaObject, isSafeMediaKey } from '../mediaStorage';
+import { protectMediaObjectFromCleanup } from '../productDeletion';
 import { tableColumns } from '../schemaColumns';
 import type { Env } from '../types';
 
@@ -68,6 +73,30 @@ export function readAttachmentKeys(raw: unknown, userId: string): string[] {
   return keys;
 }
 
+/** How long a key handed to a ticket is held against the cleanup: the ticket's batch commits well within it. */
+export const ASSIST_ATTACH_PROTECT_MINUTES = 15;
+
+/**
+ * THE TICKET DOOR COOPERATES WITH THE CLEANUP (worker/lib/productDeletion.ts).
+ * Each key is protected before it is checked and linked. A key the drain has
+ * already claimed is being deleted: refused as not uploaded, never linked to
+ * a ticket that would then point at nothing. A database without the guard
+ * table (before 0099) has no cooperating cleanup either, and passes.
+ */
+async function holdAgainstCleanup(db: D1Database, keys: readonly string[]): Promise<void> {
+  for (const key of keys) {
+    let held: boolean;
+    try {
+      held = await protectMediaObjectFromCleanup(db, key, ASSIST_ATTACH_PROTECT_MINUTES);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/not installed|no such table/i.test(message)) return;
+      throw error;
+    }
+    if (!held) throw badRequest('That attachment was not uploaded — attach it again', 'ATTACHMENT_NOT_FOUND');
+  }
+}
+
 /** Each key is a stored object; its mime and size from the uploader's ledger row. */
 export async function checkStoredAttachments(
   env: Pick<Env, 'DB'> & Parameters<typeof headMediaObject>[0],
@@ -75,6 +104,7 @@ export async function checkStoredAttachments(
   keys: readonly string[]
 ): Promise<CheckedAttachment[]> {
   if (!keys.length) return [];
+  await holdAgainstCleanup(env.DB, keys);
   const heads = await Promise.all(keys.map((key) => headMediaObject(env, 'private', key)));
   heads.forEach((head) => {
     if (!head) throw badRequest('That attachment was not uploaded — attach it again', 'ATTACHMENT_NOT_FOUND');
@@ -104,13 +134,28 @@ export async function checkStoredAttachments(
 }
 
 /**
- * ONE statement for every row, and only onto THIS user's ticket: if the
- * derived ticket id ever belonged to someone else (the collision the ticket
- * door refuses by name), not a row is written under it.
+ * ONE statement for every row, and only onto the ticket THIS REQUEST created,
+ * for THIS user:
+ *
+ *   - if the derived ticket id ever belonged to someone else (the collision
+ *     the ticket door refuses by name), not a row is written under it;
+ *   - an idempotent REPLAY (the same key sent again) finds the ticket the
+ *     first request wrote, at that request's `created_at`, so the guard is
+ *     false and nothing is added: a hand-built replay can neither pass the
+ *     six-file limit nor slip files onto a ticket staff have since resolved,
+ *     unannounced. `createdAt` is the instant this request wrote into the
+ *     ticket row of the same batch;
+ *   - and never onto a ticket that already holds files.
  */
-export function attachmentInsert(db: D1Database, ticketId: string, userId: string, rows: readonly CheckedAttachment[]): D1PreparedStatement | null {
+export function attachmentInsert(
+  db: D1Database,
+  ticketId: string,
+  userId: string,
+  rows: readonly CheckedAttachment[],
+  createdAt: string
+): D1PreparedStatement | null {
   if (!rows.length) return null;
-  const values: unknown[] = [ticketId, userId];
+  const values: unknown[] = [ticketId, userId, createdAt];
   const tuples = rows.map((row, i) => {
     const base = values.length;
     values.push(row.key, row.kind, row.mime, row.bytes, i);
@@ -120,7 +165,8 @@ export function attachmentInsert(db: D1Database, ticketId: string, userId: strin
     .prepare(
       `INSERT INTO support_ticket_attachments (ticket_id, file_key, kind, mime_type, byte_size, position)
        SELECT ?1, column1, column2, column3, column4, column5 FROM (VALUES ${tuples.join(', ')})
-        WHERE EXISTS (SELECT 1 FROM support_tickets WHERE id = ?1 AND user_id = ?2)
+        WHERE EXISTS (SELECT 1 FROM support_tickets WHERE id = ?1 AND user_id = ?2 AND created_at = ?3)
+          AND NOT EXISTS (SELECT 1 FROM support_ticket_attachments held WHERE held.ticket_id = ?1)
        ON CONFLICT (ticket_id, file_key) DO NOTHING`
     )
     .bind(...values);

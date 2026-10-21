@@ -32,8 +32,17 @@
  *
  * A SERIES IS NOT AN UNREADABLE NAME. «X1», «بي ون», «ئێکس وەن» name a
  * printer family of the registry (X1C and X1E), not a printer the shop does
- * not know: `readFamily` reads them, and a family of one printer («A2» is the
- * A2L) is that printer.
+ * not know: `readFamily` reads them, every one a sentence names («X1 او P1»
+ * is four printers), and a family of one printer («A2» is the A2L) is that
+ * printer.
+ *
+ * SORANI GLUES THE ARTICLE AND THE POSSESSIVE ON AT THE END: «ئەی وەنەکەم» is
+ * "my A1", «پی وەن ئێسەکە» "the P1S". `bareEnclitics` takes them off the last
+ * word of a Sorani name, as `bareProclitics` takes the Arabic ones off the
+ * first.
+ *
+ * A NAME WRITTEN IN TWO PIECES IS ONE NAME: «P1-S», «x1 c» and «نوزل p1 s»
+ * are the P1S and the X1C (`joinSplitNames`), never the series read alone.
  */
 import { normalizeText } from '../../assistantNlu';
 import { MODELS, modelsInText } from '@levonis/catalog/bambuImport/registry/models';
@@ -65,35 +74,77 @@ function spelled(...pieces: ReadonlyArray<readonly string[]>): string[] {
   return pieces.reduce<string[]>((acc, list) => acc.flatMap((head) => list.map((p) => (head ? `${head} ${p}` : p))), ['']);
 }
 
+/** The Sorani names, normalised: only these lose an enclitic at their end. */
+const SORANI_NAMES = new Set<string>();
+
+/** A Sorani name said piece by piece (`spelled`), remembered as Sorani. */
+function kurdish(...pieces: ReadonlyArray<readonly string[]>): string[] {
+  const forms = spelled(...pieces);
+  for (const form of forms) SORANI_NAMES.add(normalizeText(form));
+  return forms;
+}
+
+/**
+ * What Sorani glues to the END of a name: the article «ەکە», the plural
+ * «ەکان», the possessives «م», «ت», «ی», «مان», and both together («ەکەم»,
+ * my …). After a vowel the article is «کە» or «یەکە» («دییەکە»). Longest
+ * first, normalised as the text is.
+ */
+const ENCLITICS: readonly string[] = [
+  'ەکەمان', 'ەکەتان', 'ەکەیان', 'یەکەمان', 'یەکەم', 'یەکەت', 'یەکەی', 'ەکانم', 'ەکانت', 'ەکەم', 'ەکەت', 'ەکەی', 'ەکان', 'یەکە',
+  'ەکە', 'کەم', 'کەت', 'کە', 'مان', 'تان', 'م', 'ت', 'ی',
+]
+  .map(normalizeText)
+  .sort((a, b) => b.length - a.length);
+
+/**
+ * «ئەی وەنەکەم» → «ئەی وەن»: an enclitic on the LAST word of one of `phrases`
+ * comes off. Only a Sorani name is touched, so no Arabic word loses a letter.
+ */
+export function bareEnclitics(normalized: string, phrases: readonly string[]): string {
+  let out = ` ${normalized} `;
+  for (const phrase of phrases) {
+    if (!SORANI_NAMES.has(phrase)) continue;
+    for (const clitic of ENCLITICS) {
+      const needle = ` ${phrase}${clitic} `;
+      if (out.includes(needle)) out = out.split(needle).join(` ${phrase} `);
+    }
+  }
+  return out.replace(/\s+/g, ' ').trim();
+}
+
 export const SPOKEN_MODELS: ReadonlyArray<readonly [ModelToken, readonly string[]]> = [
-  ['A1 mini', ['اي ون ميني', 'ايه ون ميني', 'اي ون مني', 'ايه ون مني', 'a one mini', ...spelled(KU.a, KU.one, KU.mini)]],
-  ['A1', ['اي ون', 'ايه ون', 'a one', ...spelled(KU.a, KU.one)]],
-  ['A2L', ['اي تو ال', 'ايه تو ال', ...spelled(KU.a, KU.two, KU.l)]],
-  ['P1P', ['بي ون بي', ...spelled(KU.p, KU.one, KU.p)]],
-  ['P1S', ['بي ون اس', 'بي ون س', ...spelled(KU.p, KU.one, KU.s)]],
-  ['P2S', ['بي تو اس', ...spelled(KU.p, KU.two, KU.s)]],
-  ['X1C', ['اكس ون كاربون', 'اكس ون كربون', 'اكس ون سي', ...spelled(KU.x, KU.one, [...KU.carbon, ...KU.c])]],
-  ['X1E', ['اكس ون اي', ...spelled(KU.x, KU.one, KU.e)]],
-  ['X2D', ['اكس تو دي', ...spelled(KU.x, KU.two, KU.d)]],
-  ['H2D Pro', [...H.map((h) => `${h} تو دي برو`), ...spelled(KU.h, KU.two, KU.d, KU.pro)]],
-  ['H2D', [...H.map((h) => `${h} تو دي`), ...spelled(KU.h, KU.two, KU.d)]],
-  ['H2S', [...H.map((h) => `${h} تو اس`), ...spelled(KU.h, KU.two, KU.s)]],
-  ['H2C', [...H.map((h) => `${h} تو سي`), ...spelled(KU.h, KU.two, KU.c)]],
+  ['A1 mini', ['اي ون ميني', 'ايه ون ميني', 'اي ون مني', 'ايه ون مني', 'a one mini', ...kurdish(KU.a, KU.one, KU.mini)]],
+  ['A1', ['اي ون', 'ايه ون', 'a one', ...kurdish(KU.a, KU.one)]],
+  ['A2L', ['اي تو ال', 'ايه تو ال', ...kurdish(KU.a, KU.two, KU.l)]],
+  ['P1P', ['بي ون بي', ...kurdish(KU.p, KU.one, KU.p)]],
+  ['P1S', ['بي ون اس', 'بي ون س', ...kurdish(KU.p, KU.one, KU.s)]],
+  ['P2S', ['بي تو اس', ...kurdish(KU.p, KU.two, KU.s)]],
+  ['X1C', ['اكس ون كاربون', 'اكس ون كربون', 'اكس ون سي', ...kurdish(KU.x, KU.one, [...KU.carbon, ...KU.c])]],
+  ['X1E', ['اكس ون اي', ...kurdish(KU.x, KU.one, KU.e)]],
+  ['X2D', ['اكس تو دي', ...kurdish(KU.x, KU.two, KU.d)]],
+  ['H2D Pro', [...H.map((h) => `${h} تو دي برو`), ...kurdish(KU.h, KU.two, KU.d, KU.pro)]],
+  ['H2D', [...H.map((h) => `${h} تو دي`), ...kurdish(KU.h, KU.two, KU.d)]],
+  ['H2S', [...H.map((h) => `${h} تو اس`), ...kurdish(KU.h, KU.two, KU.s)]],
+  ['H2C', [...H.map((h) => `${h} تو سي`), ...kurdish(KU.h, KU.two, KU.c)]],
 ];
 
 /**
  * A SERIES, SAID OUT LOUD: «اكس ون» (X1), «بي ون» (P1), «ئێکس وەن». Read only
  * after every whole model name above is taken out, so «اكس ون كاربون» stays
- * the X1C. The key is the registry's family («X1 Series»). The Sorani «ئەی
- * تۆ» is left out on purpose: it is also "hey, you".
+ * the X1C. The key is the registry's family («X1 Series»).
+ *
+ * The A2 series is not said out loud: Iraqi «اي تو» is «إي تو», "yes, just
+ * now", and the A2 series is the A2L alone, so reading it would turn that
+ * phrase into a definite printer. The whole «اي تو ال» is the A2L (above).
+ * The Sorani «ئەی تۆ» is left out for the same reason: it is "hey, you".
  */
 export const SPOKEN_FAMILIES: ReadonlyArray<readonly [string, readonly string[]]> = [
-  ['A2 Series', ['اي تو', 'ايه تو']],
-  ['P1 Series', ['بي ون', ...spelled(KU.p, KU.one)]],
-  ['P2 Series', ['بي تو', ...spelled(KU.p, KU.two)]],
-  ['X1 Series', ['اكس ون', ...spelled(KU.x, KU.one)]],
-  ['X2 Series', ['اكس تو', ...spelled(KU.x, KU.two)]],
-  ['H2 Series', [...H.map((h) => `${h} تو`), ...spelled(KU.h, KU.two)]],
+  ['P1 Series', ['بي ون', ...kurdish(KU.p, KU.one)]],
+  ['P2 Series', ['بي تو', ...kurdish(KU.p, KU.two)]],
+  ['X1 Series', ['اكس ون', ...kurdish(KU.x, KU.one)]],
+  ['X2 Series', ['اكس تو', ...kurdish(KU.x, KU.two)]],
+  ['H2 Series', [...H.map((h) => `${h} تو`), ...kurdish(KU.h, KU.two)]],
 ];
 
 /** Every phrase, normalised once, longest first. */
@@ -126,44 +177,63 @@ const FAMILY_PHRASES: ReadonlyArray<readonly [string, string]> = SPOKEN_FAMILIES
 const FAMILY_SPOKEN = FAMILY_PHRASES.map(([phrase]) => phrase);
 
 export interface FamilyRead {
-  /** The registry's family, «X1 Series». */
-  family: string;
-  /** Its printers, in the registry's order. One printer means the family IS that printer. */
+  /** The registry's families, «X1 Series», in the order found. */
+  families: string[];
+  /** Their printers, in the registry's order, each once. One printer means the family IS that printer. */
   members: ModelToken[];
-  /** `rest` with the spoken family taken out. */
+  /** `rest` with every spoken family taken out. */
   rest: string;
-  /** The words that named it («x1», «series»): claimed, never searched, never an unread printer. */
+  /** The words that named them («x1», «series»): claimed, never searched, never an unread printer. */
   words: string[];
+  /**
+   * Read from a bare Latin short name alone («A2», «X1»): no «series», nothing
+   * spoken. «A2» is also a paper size, so a family of one printer read this
+   * way is that printer only beside a part, a printer word or a fault.
+   */
+  bare: boolean;
 }
 
 /**
- * The printer family a sentence names when it names no printer: spoken
+ * The printer families a sentence names when it names no printer: spoken
  * («اكس ون», «ئێکس وەن»), Latin («X1», «p1»), or the registry's own «X1
- * Series». `rest` is the normalised text with the read printer names already
- * taken out (`scanSpokenModels`). A lowercase «x2» is a quantity as often as
- * a series («نوزل x2», two nozzles), so the X series is read from a capital
- * X only. Pure.
+ * Series». EVERY family it names: «نوزل X1 او P1» and «Nozzle Wiper - X1/P1
+ * Series» are four printers, not one series and an unreadable name. `rest` is
+ * the normalised text with the read printer names already taken out
+ * (`scanSpokenModels`). A lowercase «x2» is a quantity as often as a series
+ * («نوزل x2», two nozzles), so the X series is read from a capital X only.
+ * Pure.
  */
 export function readFamily(raw: string, rest: string): FamilyRead | undefined {
-  let text = ` ${bareProclitics(rest, FAMILY_SPOKEN)} `;
+  const families: string[] = [];
+  const words: string[] = [];
+  let spoken = false;
+  let named = false;
+  let text = ` ${bareEnclitics(bareProclitics(rest, FAMILY_SPOKEN), FAMILY_SPOKEN)} `;
   for (const [phrase, family] of FAMILY_PHRASES) {
     const needle = ` ${phrase} `;
     if (!text.includes(needle)) continue;
     text = text.split(needle).join(' ');
-    return { family, members: [...(FAMILY_MEMBERS.get(family) ?? [])], rest: text.replace(/\s+/g, ' ').trim(), words: [] };
+    spoken = true;
+    if (!families.includes(family)) families.push(family);
   }
-  const named = modelsInText(splitScripts(raw)).find((e) => e.kind === 'printer_family');
-  if (named) {
-    const short = named.token.replace(/\s*series$/i, '').toLowerCase();
-    return { family: named.token, members: [...(FAMILY_MEMBERS.get(named.token) ?? [])], rest, words: [short, 'series'] };
+  const left = text.replace(/\s+/g, ' ').trim();
+  for (const entry of modelsInText(splitScripts(raw))) {
+    if (entry.kind !== 'printer_family') continue;
+    named = true;
+    if (!families.includes(entry.token)) families.push(entry.token);
+    words.push(entry.token.replace(/\s*series$/i, '').toLowerCase(), 'series');
   }
-  for (const token of rest.split(' ')) {
+  for (const token of left.split(' ')) {
     const family = FAMILY_SHORT.get(token);
     if (!family) continue;
     if (token.startsWith('x') && !new RegExp(`(?<![A-Za-z0-9])${token.toUpperCase()}(?![A-Za-z0-9])`).test(raw)) continue;
-    return { family, members: [...(FAMILY_MEMBERS.get(family) ?? [])], rest, words: [token] };
+    if (!families.includes(family)) families.push(family);
+    words.push(token);
   }
-  return undefined;
+  if (families.length === 0) return undefined;
+  const found = new Set(families.flatMap((family) => FAMILY_MEMBERS.get(family) ?? []));
+  const members = MODEL_TOKENS.filter((m) => found.has(m));
+  return { families, members, rest: left, words: [...new Set(words)], bare: !spoken && !named };
 }
 
 /**
@@ -213,7 +283,7 @@ export interface SpokenScan {
 
 /** Scan NORMALISED text for spoken model names. Pure. */
 export function scanSpokenModels(normalized: string): SpokenScan {
-  let rewritten = ` ${bareProclitics(normalized, SPOKEN_PHRASES)} `;
+  let rewritten = ` ${bareEnclitics(bareProclitics(normalized, SPOKEN_PHRASES), SPOKEN_PHRASES)} `;
   let rest = rewritten;
   const models: ModelToken[] = [];
   for (const [phrase, token] of PHRASES) {
@@ -226,6 +296,22 @@ export function scanSpokenModels(normalized: string): SpokenScan {
   const tidy = (s: string) => s.replace(/\s+/g, ' ').trim();
   return { models, rewritten: tidy(rewritten), rest: tidy(rest) };
 }
+
+/**
+ * «P1-S», «x1 c», «X1-C» → «P1S», «x1c», «X1C»: a series followed by the one
+ * letter that completes a printer of the registry is that printer. Only a
+ * join the registry reads as exactly that printer is made, so «A1 mini» and
+ * «X1 Carbon» (more than one letter) and «A1 a» (no such printer) stay as
+ * typed. Pure.
+ */
+export function joinSplitNames(raw: string): string {
+  return raw.replace(SPLIT_NAME, (whole, head: string, tail: string) => {
+    const joined = `${head}${tail}`;
+    const read = modelsInText(joined).filter((e) => e.kind === 'printer');
+    return read.length === 1 && read[0].token.replace(/\s+/g, '').toLowerCase() === joined.toLowerCase() ? joined : whole;
+  });
+}
+const SPLIT_NAME = /(?<![A-Za-z0-9])([A-Za-z]\d)[\s_\-\u2010-\u2014]+([A-Za-z])(?![A-Za-z0-9])/g;
 
 /** The printers a text names in Latin letters, through the registry. Families are left out. */
 export function latinModels(raw: string): ModelToken[] {
@@ -241,11 +327,14 @@ export function latinModels(raw: string): ModelToken[] {
  * nor guesses: it asks which printer, or treats it as «another printer».
  *
  * A spoken digit («ون», «تو», «وەن») is part of a model name only right after
- * a spoken LETTER («زد ون», «كي ون سي»): alone it is a word of its own. Iraqi
- * «تو» is "just now" («اشتريته تو»), and «ثري دي» is "3D", the kind of
- * printer, never a model. A Latin letter-and-digit token that is not a size,
- * a material («PA6», «TPU 95A»), a screw («M3»), a nozzle standard («V6»,
- * «MK8»), a hotend maker («E3D») or the AMS is a model name.
+ * a spoken LETTER («زد ون», «كي ون سي») or a maker («نبتون فور», Neptune 4):
+ * alone it is a word of its own. Iraqi «تو» is "just now" («اشتريته تو»),
+ * «اي تو» is "yes, just now", and «ثري دي» is "3D", the kind of printer,
+ * never a model. A Latin letter-and-digit token that is not a size, a
+ * material («PA6», «TPU 95A»), a screw («M3», «BT2»), a nozzle standard
+ * («V6», «MK8»), a connector or a belt («SH1.0», «PH2.0», «GT2»), a paper
+ * size («A4»), a hotend maker («E3D»), a machine that is not a printer (the
+ * R1 laser, the E1 purifier) or the AMS is a model name.
  */
 /** Sorani «تۆ» (you) is not here: «ئەی تۆ» is "hey, you". */
 const SPOKEN_DIGITS = new Set(['ون', 'وان', 'تو', 'ثري', 'فور', 'وەن'].map(normalizeText));
@@ -256,16 +345,29 @@ const SPOKEN_LETTERS = new Set(
     'دبليو', 'اكس', 'واي', 'زد', 'زي', 'ئەی', 'پی', 'ئێکس', 'ئیکس', 'ئێچ', 'ئەیچ', 'ئێس', 'ئی', 'کەی', 'زێد', 'ئێم', 'ئێن', 'ئێڵ',
   ].map(normalizeText)
 );
-/** «ثري دي», "3D": the kind of printer, read before any spoken digit. */
-const THREE_D = ['ثري دي', 'تري دي', 'سري دي', 'ثرى دى'].map(normalizeText);
+/**
+ * Spoken words that are not a printer, read before any spoken digit: «ثري
+ * دي» ("3D", the kind of printer) and «اي تو» («إي تو», "yes, just now").
+ */
+const NOT_NAMES = ['ثري دي', 'تري دي', 'سري دي', 'ثرى دى', 'اي تو', 'ايه تو'].map(normalizeText);
 const MODEL_SHAPE = /^[a-z]{1,3}\d{1,2}[a-z]{0,4}$/;
-const NOT_A_MODEL = /^(?:pa|ppa|pps|pc|pet|petg|pla|abs|asa|tpu|tpe|pva|hips|pp|m|mk|v|ams)\d{1,2}(?:cf|gf|hf|a|d)?$|^e3d$/;
-/** Printer makers the shop does not sell printers of, as written in Latin and in Arabic. */
+const NOT_A_MODEL =
+  /^(?:pa|ppa|pps|pc|pet|petg|pla|abs|asa|tpu|tpe|pva|hips|pp|m|mk|v|ams)\d{1,2}(?:cf|gf|hf|a|d)?$|^(?:sh|ph|xh|zh|gh|jst|gt|bt|n|d|dc|idc|co)\d{1,2}[a-z]{0,2}$|^a[3-6]$|^(?:e3d|r1|e1)$/;
+/** Printer makers the shop does not sell printers of, as written in Latin, Arabic and Sorani. */
 export const OTHER_BRANDS: readonly string[] = [
   'creality', 'ender', 'prusa', 'anycubic', 'kobra', 'elegoo', 'neptune', 'sovol', 'voron', 'flashforge', 'qidi', 'artillery',
   'snapmaker', 'كريالتي', 'كرياليتي', 'كريلتي', 'اندر', 'بروسا', 'انيكيوبك', 'انيكيوبيك', 'اليجو', 'ايليجو', 'سنابميكر', 'فلاشفورج',
+  // «نبتون فور» (Neptune 4), «كوبرا تو» (Kobra 2): the line is said, not the maker.
+  'نبتون', 'نيبتون', 'نبتيون', 'كوبرا', 'فورون', 'سوفول', 'كيدي', 'ارتيلري', 'ارتلري',
+  'کریالیتی', 'ئێندەر', 'پروسا', 'ئەنیکیوبیک', 'ئیلیگۆ', 'نێپتوون', 'نێپتون', 'کۆبرا', 'ڤۆرۆن', 'سۆڤۆڵ',
 ];
 const OTHER_BRAND_SET = new Set(OTHER_BRANDS.map(normalizeText));
+
+/** A maker's name, with an Arabic proclitic on it or not («للكريالتي»). */
+function isBrand(token: string): boolean {
+  if (OTHER_BRAND_SET.has(token)) return true;
+  return PROCLITICS.some((c) => token.length > c.length + 1 && token.startsWith(c) && OTHER_BRAND_SET.has(token.slice(c.length)));
+}
 
 export interface UnreadPrinter {
   /** A word that names a printer the tables above could not read. */
@@ -279,7 +381,7 @@ export function unreadPrinter(words: readonly string[]): UnreadPrinter {
   let unread = false;
   let otherBrand = false;
   let joined = ` ${words.join(' ')} `;
-  for (const phrase of THREE_D) joined = joined.split(` ${phrase} `).join(' ');
+  for (const phrase of NOT_NAMES) joined = joined.split(` ${phrase} `).join(' ');
   const tokens = joined.trim().split(' ').filter(Boolean);
   for (let i = 0; i < tokens.length; i++) {
     let t = tokens[i];
@@ -292,7 +394,7 @@ export function unreadPrinter(words: readonly string[]): UnreadPrinter {
     if (OTHER_BRAND_SET.has(t)) {
       unread = true;
       otherBrand = true;
-    } else if (SPOKEN_DIGITS.has(t) ? i > 0 && SPOKEN_LETTERS.has(tokens[i - 1]) : MODEL_SHAPE.test(t) && !NOT_A_MODEL.test(t)) {
+    } else if (SPOKEN_DIGITS.has(t) ? i > 0 && (SPOKEN_LETTERS.has(tokens[i - 1]) || isBrand(tokens[i - 1])) : MODEL_SHAPE.test(t) && !NOT_A_MODEL.test(t)) {
       unread = true;
     }
   }

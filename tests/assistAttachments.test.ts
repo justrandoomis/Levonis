@@ -28,6 +28,7 @@ import type { AppContext } from '../worker/lib/types';
 import { HttpError } from '../worker/lib/http';
 import { supportRoutes } from '../worker/routes/support';
 import { fileRoutes, uploadRoutes } from '../worker/routes/uploads';
+import { claimMediaObjectForCleanup } from '../worker/lib/productDeletion';
 import { queueUnattachedAssistMedia } from '../worker/lib/assist/attachments';
 import { STATIC_SECURITY_HEADERS } from '../worker/lib/securityPolicy';
 import { ASSIST_ATTACH_LIMIT } from '../worker/lib/uploadEntity';
@@ -323,6 +324,119 @@ test('«تحدث مع الفريق» typed mid-triage opens the same prefilled d
   const cold = await h.ask('owner', { text: 'تحدث مع الفريق' });
   assert.equal(cold.intent, 'human_handoff');
   assert.equal(cold.ticket_draft, undefined, 'without a triage it is the plain handoff');
+});
+
+test('a GUEST typing «تحدث مع الفريق» mid-triage gets the same draft and the sign-in link, in ar, en and ckb, and keeps the triage', async () => {
+  const h = harness();
+  for (const [locale, words] of [
+    ['ar', 'تحدث مع الفريق'],
+    ['ar', 'اريد احجي ويا الفريق'],
+    ['ar', 'افتح تذكرة'],
+    ['en', 'talk to the team'],
+    ['ckb', 'قسە لەگەڵ تیمەکە بکە'],
+  ] as const) {
+    h.raw.exec('DELETE FROM rate_limits');
+    const context = { v: 1, printer: { model: 'P1S' }, triage: { stage: 'steps', symptom: 'adhesion' } };
+    const reply = await h.ask('', { locale, text: words, context });
+    assert.equal(reply.handoff, true, `${locale}: ${JSON.stringify(reply).slice(0, 200)}`);
+    assert.equal(reply.auth_required, true, locale);
+    assert.ok((reply.links as Rec[]).some((l) => l.to === '/auth'), `${locale}: the sign-in link`);
+    assert.match(reply.ticket_draft.subject, /P1S/, locale);
+    assert.equal(reply.ticket_draft.handoff.symptom, 'adhesion', locale);
+    assert.deepEqual(reply.context.triage, { stage: 'done', symptom: 'adhesion' }, `${locale}: the triage is not lost on the way to the sign-in page`);
+    // Signed in, the chip drafts the same ticket, never «المشكلة: أخرى».
+    const after = await h.ask('owner', { locale, intent: 'printer_problem', params: { step: 'talk' }, context: reply.context });
+    assert.equal(after.ticket_draft.handoff.symptom, 'adhesion', locale);
+    assert.equal(after.ticket_draft.handoff.model, 'P1S', locale);
+  }
+  // Without a triage a guest still gets the account sign-in reply for the plain handoff.
+  const cold = await h.ask('', { text: 'تحدث مع الفريق' });
+  assert.equal(cold.ticket_draft, undefined);
+  assert.equal(cold.auth_required, true);
+});
+
+// ═══════════════════════════════════════════════ a replay, the cleanup and the ceiling
+
+const count = (h: ReturnType<typeof harness>, sql: string, ...args: string[]): number =>
+  Number((h.raw.prepare(sql).get(...args) as Rec).n);
+
+async function photos(h: ReturnType<typeof harness>, n: number, tag: string): Promise<string[]> {
+  const keys: string[] = [];
+  for (let i = 0; i < n; i++) {
+    h.raw.exec('DELETE FROM rate_limits');
+    const res = await h.upload('owner', webp(), `${tag}${i}.webp`, 'image/webp');
+    assert.equal(res.status, 200, JSON.stringify(await res.clone().json()));
+    keys.push(String((await body(res)).key));
+  }
+  return keys;
+}
+
+test('a replay of the same confirmation adds no file: never past the six, never onto a ticket staff resolved', async () => {
+  const h = harness();
+  const base = { confirm: true, subject: 'Nozzle clog', body: 'Nothing comes out.', idempotencyKey: 'assist-key-replay-1' };
+  const first = await photos(h, 6, 'a');
+  const created = await h.postJson('owner', '/api/support/tickets', { ...base, attachments: first });
+  assert.equal(created.status, 200);
+  const id = String((await body(created)).ticket.id);
+  const rows = () => count(h, 'SELECT COUNT(*) AS n FROM support_ticket_attachments WHERE ticket_id = ?', id);
+  assert.equal(rows(), 6, 'the first confirmation links all six');
+
+  // The same key with six other files: the same ticket, the same six.
+  const other = await photos(h, 6, 'b');
+  h.raw.exec('DELETE FROM rate_limits');
+  const replay = await h.postJson('owner', '/api/support/tickets', { ...base, attachments: other });
+  assert.equal(replay.status, 200);
+  assert.equal((await body(replay)).replay, true);
+  assert.equal(rows(), 6, 'a replay never passes the six-file limit');
+  assert.equal(((await body(await h.as('owner', `/api/support/tickets/${id}`))).attachments as Rec[]).length, 6);
+  for (const key of other) assert.equal((await h.as('admin', `/files/${key}`)).status, 403, 'never handed to the team');
+
+  // Resolved by staff, then replayed with new files: nothing is added and nothing reopens.
+  h.raw.prepare("UPDATE support_tickets SET state = 'resolved' WHERE id = ?").run(id);
+  const late = await photos(h, 3, 'c');
+  h.raw.exec('DELETE FROM rate_limits');
+  const again = await h.postJson('owner', '/api/support/tickets', { ...base, attachments: late });
+  assert.equal((await body(again)).replay, true);
+  assert.equal(rows(), 6);
+  assert.equal((h.raw.prepare('SELECT state FROM support_tickets WHERE id = ?').get(id) as Rec).state, 'resolved');
+  for (const key of late) assert.equal((await h.as('admin', `/files/${key}`)).status, 403);
+  const summary = h.raw.prepare('SELECT handoff_summary FROM support_tickets WHERE id = ?').get(id) as Rec;
+  assert.equal(summary.handoff_summary ?? null, null, 'no summary was sent, none was written');
+});
+
+test('the ticket door holds each key against the cleanup: a key the drain has claimed is refused, a key it took cannot be claimed', async () => {
+  const h = harness();
+  const [claimed, kept] = await photos(h, 2, 'g');
+  const token = await claimMediaObjectForCleanup(h.db as never, claimed);
+  assert.ok(token, 'the drain holds the claim on the old key');
+  const refused = await h.postJson('owner', '/api/support/tickets', { confirm: true, subject: 'Nozzle clog', body: 'Nothing comes out.', attachments: [claimed] });
+  assert.equal(refused.status, 400);
+  assert.equal((await body(refused)).code, 'ATTACHMENT_NOT_FOUND', 'being deleted: never linked to a ticket that would point at nothing');
+  assert.equal(count(h, 'SELECT COUNT(*) AS n FROM support_tickets'), 0);
+  h.raw.exec('DELETE FROM rate_limits');
+  const sent = await h.postJson('owner', '/api/support/tickets', { confirm: true, subject: 'Nozzle clog', body: 'Nothing comes out.', attachments: [kept] });
+  assert.equal(sent.status, 200);
+  assert.equal(await claimMediaObjectForCleanup(h.db as never, kept), null, 'protected while the ticket commits; then the ticket names it');
+});
+
+test('the weekly ceiling holds against parallel uploads: exactly thirty live files, the others refused and removed', async () => {
+  const h = harness();
+  const seed = h.raw.prepare(
+    `INSERT INTO file_objects (object_key, visibility, domain, owner_id, entity_id, mime_type, byte_size)
+     VALUES (?, 'private', 'assist', 'u_owner', 'u_owner', 'image/webp', 30)`
+  );
+  for (let i = 0; i < ASSIST_ATTACH_LIMIT - 1; i++) seed.run(`assist/u_owner/attachments/seed${i}.webp`);
+  const results = await Promise.all(Array.from({ length: 8 }, (_, i) => h.upload('owner', webp(), `par${i}.webp`, 'image/webp')));
+  const accepted = results.filter((r) => r.status === 200);
+  assert.equal(accepted.length, 1, `${results.map((r) => r.status).join(',')}`);
+  for (const r of results.filter((x) => x.status !== 200)) {
+    assert.equal(r.status, 400);
+    assert.equal((await body(r)).code, 'ASSIST_ATTACH_LIMIT');
+  }
+  const live = count(h, `SELECT COUNT(*) AS n FROM file_objects WHERE owner_id = 'u_owner' AND domain = 'assist' AND deleted_at IS NULL`);
+  assert.equal(live, ASSIST_ATTACH_LIMIT);
+  const stored = [...h.privateBucket.objects.keys()].filter((k) => k.startsWith('assist/u_owner/'));
+  assert.equal(stored.length, 1, 'every refused upload is removed from the bucket again');
 });
 
 // ═══════════════════════════════════════════════ a database before 0209

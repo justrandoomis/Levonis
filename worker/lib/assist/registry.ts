@@ -21,6 +21,7 @@ import {
   FITS_MAX,
   printerCards,
   printerModels,
+  printerModelsOf,
   SEARCH_LIMIT_MAX,
   SEARCH_TEXT_MAX,
   type CatalogItem,
@@ -33,7 +34,14 @@ import type { TicketDraft } from './types';
 import { SYMPTOM_KEYS, type SymptomKey } from './types';
 import { HMS_CODE_SHAPE, SHOWN_MAX } from './context';
 
-export type ToolName = 'catalog.search' | 'catalog.byIds' | 'catalog.printerModels' | 'catalog.printersOf' | 'devices.mine' | 'cases.draft';
+export type ToolName =
+  | 'catalog.search'
+  | 'catalog.byIds'
+  | 'catalog.printerModels'
+  | 'catalog.printersOf'
+  | 'catalog.printerModelsOf'
+  | 'devices.mine'
+  | 'cases.draft';
 
 export type ToolResult<O> = { ok: true; data: O } | { ok: false; code: 'BAD_ARGS' | 'NEEDS_SESSION' | 'UNKNOWN_TOOL' };
 
@@ -122,6 +130,20 @@ const printersOfTool: ToolDef<{ model: ModelToken }, CatalogItem[]> = {
   run: (db, viewer, input) => printerCards(db, viewer, input.model, SHOWN_MAX),
 };
 
+/** Which listed printers' models a set of shown products are («A1 combo» showed the A1). Ids only. */
+const printerModelsOfTool: ToolDef<{ ids: string[] }, ModelToken[]> = {
+  name: 'catalog.printerModelsOf',
+  audience: 'public',
+  effect: 'read',
+  parse(raw) {
+    const o = asObject(raw);
+    if (!o || !Array.isArray(o.ids)) return bad('ids');
+    if (o.ids.length === 0 || o.ids.length > SHOWN_MAX || !o.ids.every((id) => typeof id === 'string' && ID.test(id))) return bad('ids');
+    return { ids: [...new Set(o.ids as string[])] };
+  },
+  run: (db, _viewer, input) => printerModelsOf(db, input.ids),
+};
+
 const devicesMineTool: ToolDef<Record<string, never>, MyPrinter[]> = {
   name: 'devices.mine',
   audience: 'session',
@@ -158,6 +180,7 @@ export const TOOLS: Readonly<Record<ToolName, ToolDef<any, any>>> = {
   'catalog.byIds': catalogByIdsTool,
   'catalog.printerModels': printerModelsTool,
   'catalog.printersOf': printersOfTool,
+  'catalog.printerModelsOf': printerModelsOfTool,
   'devices.mine': devicesMineTool,
   'cases.draft': casesDraftTool,
 };
@@ -167,6 +190,7 @@ interface ToolOutputs {
   'catalog.byIds': CatalogItem[];
   'catalog.printerModels': Map<ModelToken, string[]>;
   'catalog.printersOf': CatalogItem[];
+  'catalog.printerModelsOf': ModelToken[];
   'devices.mine': MyPrinter[];
   'cases.draft': TicketDraft;
 }

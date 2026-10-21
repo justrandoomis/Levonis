@@ -35,6 +35,12 @@ export interface AssistContext {
    * keeps the 0.4 exactly as the tapped chip does.
    */
   size?: string;
+  /**
+   * «لأي طابعة تريد النوزل؟» is waiting for its answer. Only then is a bare
+   * «طابعة أخرى» / «غيرها» that answer: after an ordinary part search the
+   * same «اكو غيرها؟» means "any others?", not "another printer".
+   */
+  asking?: 'part_printer';
   triage?: TriageState;
   /** The product ids the last answer showed, newest answer only. */
   shown?: string[];
@@ -78,6 +84,7 @@ export function readContext(raw: unknown): AssistContext {
   const part = oneOf(PART_KEYS, c.part);
   if (part) out.part = part;
   if (part && typeof c.size === 'string' && SIZE_SHAPE.test(c.size)) out.size = c.size;
+  if (part && c.asking === 'part_printer') out.asking = 'part_printer';
 
   if (typeof c.triage === 'object' && c.triage !== null) {
     const t = c.triage as Record<string, unknown>;

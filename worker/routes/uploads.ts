@@ -26,6 +26,7 @@ import { mp4IsFastStart, sniffVideo } from '../lib/videoSniff';
 import { getSetting, type UploadLimits } from '../lib/settings';
 import {
   SIMPLE_UPLOAD_PURPOSES,
+  assertAssistUploadWithinLimit,
   assertQuota,
   assertUploadEntity,
   chatKeyKind,
@@ -629,6 +630,8 @@ uploadRoutes.post('/', async (c) => {
     { httpMetadata: { contentType: storedMime, cacheControl } }
   );
   await recordPurpose(c.env.DB, key, purpose);
+  // The assistant's weekly ceiling, counted again now that this file is in the ledger.
+  if (purpose === 'assist') await assertAssistUploadWithinLimit(c.env, user.id, key);
   // A public picture's small copies, after the answer (worker/lib/imageVariants.ts).
   if (target.visibility === 'public' && storedMime.startsWith('image/')) {
     scheduleVariantWarm(() => c.executionCtx, c.env, { key, bytes: buf, width: dimensions?.width ?? null });

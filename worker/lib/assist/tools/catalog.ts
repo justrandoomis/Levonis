@@ -155,15 +155,39 @@ export async function printerModels(db: D1Database, nowMs = Date.now()): Promise
 /**
  * The printers the shop lists under one model, as the storefront cards them
  * for this viewer (`catalogByIds`: today's visibility, price and stock). At
- * most `limit`; none when the shop lists no printer of that model.
+ * most `limit`; none when the shop lists no printer of that model. A new
+ * printer comes before a refurbished or open-box one (`loadPrinterModels`).
  */
 export async function printerCards(db: D1Database, viewer: Viewer, model: ModelToken, limit: number): Promise<CatalogItem[]> {
   const ids = (await listedPrinters(db, Date.now())).ids.get(model) ?? [];
   return ids.length ? catalogByIds(db, viewer, ids.slice(0, limit)) : [];
 }
 
+/**
+ * The models of the listed printers among `ids`, in the registry's order.
+ * An answer that showed the A1 and the A1 Combo was about the A1; one that
+ * showed a part, or three different printers, is about no one printer.
+ */
+export async function printerModelsOf(db: D1Database, ids: readonly string[]): Promise<ModelToken[]> {
+  if (!ids.length) return [];
+  const listed = await listedPrinters(db, Date.now());
+  const wanted = new Set(ids);
+  return [...listed.ids.entries()].filter(([, list]) => list.some((id) => wanted.has(id))).map(([model]) => model);
+}
+
+/**
+ * A refurbished, open-box or second-hand listing: it is offered after the new
+ * printer of the same model, whatever its name sorts as («[Refurbished] …»
+ * sorts before «Bambu …»).
+ */
+const SECOND_HAND = /refurb|renewed|open[\s-]?box|pre[\s-]?owned|second[\s-]?hand|\bused\b|مجدد|مستعمل|اوبن\s?بوكس|مستخدم/i;
+function secondHand(p: { name_en: string; name_ar: string; slug: string }): boolean {
+  return SECOND_HAND.test(`${p.name_en} ${p.name_ar} ${p.slug}`);
+}
+
 async function loadPrinterModels(db: D1Database): Promise<ListedPrinters> {
-  const printers = await printerOptions(db);
+  // New first, then refurbished and open-box; otherwise the listing's own order (a stable sort).
+  const printers = [...(await printerOptions(db))].sort((a, b) => Number(secondHand(a)) - Number(secondHand(b)));
   const slugs = new Map<ModelToken, string[]>();
   const ids = new Map<ModelToken, string[]>();
   for (const p of printers) {
