@@ -4,7 +4,7 @@
  *
  *   «فلامنت اسود اقل من 30 الف»  → search «فلامنت», colour black, price ≤ 30,000 IQD
  *   «طابعة بدون AMS»             → search «طابعة», nothing that is an AMS or a combo
- *   «ريفل» / «بكرة كاملة»        → the refill / with-spool facet
+ *   «فلامنت ريفل» / «فلامنت بكرة كاملة» → the refill / with-spool facet
  *   «متوفر هسه» / «حجز»          → sale=direct / sale=preorder
  *
  * THE PRECISION RULE (lead decision; docs/SEARCH.md §4e). A constraint is applied only when it is
@@ -22,33 +22,44 @@
  *   - range openers («بين … و», «من … الى», "between … and", "from … to", «لە نێوان … و», «لە … تا»).
  * A BARE NUMBER (30, 30000, 1500, a number word without a money word) is never a price: it may be a
  * model, a size or a code, and it stays in the search. «نص مليون», «ب 500 الف» and «250-400 الف» have no
- * comparator or opener: no price either. A range applies only when both ends carry a marker; written
- * high-to-low it is sorted only when both ends carry the same one («بين 50 الف و 25 الف»), else it is not
- * applied. Two separate bounds apply only when both qualify («اكثر من 10 واقل من 30 الف» applies
- * neither). A negated comparator is read as its positive meaning only in its fixed forms («لا يزيد عن»,
- * «لا يقل عن», «مو اكثر من», «مو اقل من», "no more than", "no less than", "not over", "not under", «زیاتر
+ * comparator or opener: no price either; «مليون و 500» (1,000,500 or 1,500,000?) is never guessed. A
+ * comparator word keeps its article: «على الاكثر», «بالاكثر» are "at most", «بالاقل» "at least", and «الاكثر»
+ * alone is no comparator. A range applies only when both ends carry a marker and one currency (an end without
+ * one is in dinars; only a currency after the second of two ends written alike covers both: "between 1.5k-2k
+ * dollars"); written high-to-low it is sorted only when both ends carry the same one («بين 50 الف و 25 الف»),
+ * else it is not applied. Two separate bounds apply only when both qualify («اكثر من 10 واقل من 30 الف»
+ * applies neither). A negated comparator is read as its positive meaning only in its fixed forms («لا يزيد
+ * عن», «لا يقل عن», «مو اكثر من», «مو اقل من», "no more than", "no less than", "not over", "not under", «زیاتر
  * نەبێت لە», «کەمتر نەبێت لە» and the Sorani «لە … زیاتر نەبێت», «لە … کەمتر نەبێت»); any other negation
- * around a price («بدون اقل من 30 الف», «ما يزيد عن مليون», "nothing over 1m", «کەمتر لە 20 هەزار نەبێت»)
- * leaves it unapplied. A measure or a count after the amount is not a price («اقل من 1 كيلو», "under
- * 300mm"); a price PER unit sold is one («اقل من 25 الف للكيلو», "25k per kg", «بۆ هەر کیلۆیەک»).
+ * around a price leaves it unapplied: before it in its clause over any words («بدون اقل من 30 الف», «ما يزيد عن
+ * مليون», «ما عندي اكثر من 30 الف», "cannot pay more than 1m", «ناتوانم زیاتر لە 500 هەزار بدەم»), after it
+ * («فوق 500 الف ما اريد», "over $300 no", «زیاتر لە 500 هەزار نامەوێت», "is too much"), or carried by a list word
+ * («بدون AMS ولا اكثر من مليون», "without AMS or under $300"). A negation another constraint took is that
+ * constraint's, never the price's («بدون AMS اقل من 500 الف»). A measure or a count after the amount is not a
+ * price («اقل من 1 كيلو», "under 300mm"); a price PER unit sold is one («اقل من 25 الف للكيلو», "25k per kg",
+ * «بۆ هەر کیلۆیەک»).
  *
- * EXCLUSIONS. Only for a negation word («بدون», «بلا», «مو», "without", "no", "non-", «بێ» …) directly
- * before a known term: AMS, combo, a colour or a material (over an article, a colour noun, "in" or
- * "even"). A list after it («بدون AMS ولا كومبو», "without AMS or combo", «بێ AMS یان کۆمبۆ») leaves out
- * each known term of the list; an unknown word in the list stays searched and the list runs on to its
- * next list word. A carried negation never touches a price, the sale mode, the spool or the order: they
- * are read as written. The Sorani negation after a known term («ڕەش نەبێت», «PLA نەبێت») is the same.
- * «ولا» and «والا» are "or", not a negation.
+ * EXCLUSIONS. Only for a negation word («بدون», «بلا», «مو», «لا اريد», "without", "no", "non-", "anything
+ * but", «بێ» …) directly before a known term: AMS, combo, a colour or a material (over an article, a colour
+ * noun, "in" or "even"; never past a comma: «لا، اسود» asks for black). A list after it («بدون AMS ولا كومبو»,
+ * "without AMS or combo", «بێ AMS یان کۆمبۆ»; "and" or a comma to one more of the same kind: «بدون اسود
+ * وابيض», "except black and white") leaves out each known term of the list; an unknown word in the list stays
+ * searched and the list runs on to its next list word. Carried by a list word, a negation turns the sale mode
+ * and the spool as a direct one does, and holds a price, a diameter or the order (never applied, never turned).
+ * «ما اريد الا X», "dont want anything but X" mean "only X": X is read as written. The Sorani negation after a
+ * known term («ڕەش نەبێت», «ڕەش نامەوێت», «PLA نەبێت») is the same. «ولا» and «والا» are "or", not a negation.
+ * An AMS the search asks for is never left out with a combo («AMS بدون كومبو», `nlKeeps`).
  *
  * THE REST. Colours and materials anywhere (a material stays in the search text too); the diameter
- * (1.75 / 2.85) only in a query about filament (a filament or material word), with «قطر» or mm beside it
- * or not; the sale mode only for its fixed phrases («متوفر», "in stock", «بەردەستە»; «حجز», "pre-order",
- * «پێشوەختە»); refill or with spool for the refill words and the spool phrases («مع بكرة», «بكرة كاملة»),
- * a bare spool word only in a query about filament; «رخيص» / "cheap" as the price order. A word that
- * became a constraint leaves the search text; a word it does not know stays in it.
+ * (1.75 / 2.85) only beside a filament word or with mm («فلامنت 1.75», «1.75mm»), never an end of a range of
+ * sizes; the sale mode only for its fixed phrases («متوفر», "in stock", «بەردەستە»; «حجز», "pre-order",
+ * «پێشوەختە»); refill or with spool for the refill words and the spool phrases («مع بكرة», «بكرة كاملة», a bare
+ * spool word) only beside a filament word; «رخيص» / "cheap" as the price order, never negated («مو رخيص» is no
+ * order). A material anchors neither the diameter nor the spool: its chip removed would take them along. A word
+ * that became a constraint leaves the search text; a word it does not know stays in it.
  *
  * THE CHIP DROP CONTRACT. For each chip, `without` is the input with the words of that chip taken out; read
- * again it gives the same answer less exactly that chip.
+ * again it gives the same answer less exactly that chip. No exception.
  *
  * Pure and deterministic: no model, no network, no I/O (the owner rule for the
  * core search: it works without any paid AI). Every lexicon word is written as
@@ -137,7 +148,10 @@ const MAX_PRE = phrases(
   'less than or equal to', 'less than or equal', 'less or equal to', 'lower than or equal to', 'equal to or less than',
   'equal or less than', 'at or below', 'at or under',
   'اقل من او يساوي', 'اقل او يساوي', 'اقل من او تساوي', 'اقل او تساوي', 'يساوي او اقل من', 'اصغر من او يساوي',
-  'زیاتر نەبێت لە', 'زیاتر نەبێ لە'
+  'زیاتر نەبێت لە', 'زیاتر نەبێ لە',
+  // «على الاكثر 30 الف», «بالاكثر مليون», «عالاكثر» (at most); «الحد الاقصى». A comparator word is matched without its
+  // article (CMP_PREFIXES): «الاكثر» is never «اكثر» (more than), so alone it applies nothing.
+  'على الاكثر', 'عالاكثر', 'بالاكثر', 'الحد الاقصى', 'بالحد الاقصى'
 );
 /** «اكثر من مليون»: a lower bound before the amount («حد ادنى», «لانی کەم», «سەروو» too; the fixed forms «لا يقل عن», «مو اقل من»). */
 const MIN_PRE = phrases(
@@ -151,7 +165,9 @@ const MIN_PRE = phrases(
   'کەمتر نەبێت لە', 'کەمتر نەبێ لە',
   'more than or equal to', 'more than or equal', 'greater than or equal to', 'higher than or equal to', 'equal to or more than',
   'equal or more than', 'at or above', 'at or over',
-  'اكثر من او يساوي', 'اكثر او يساوي', 'اكثر من او تساوي', 'اكبر من او يساوي', 'يساوي او اكثر من'
+  'اكثر من او يساوي', 'اكثر او يساوي', 'اكثر من او تساوي', 'اكبر من او يساوي', 'يساوي او اكثر من',
+  // «بالاقل 20 الف», «عالاقل» (at least); «الحد الادنى». «الاقل» alone («the least») applies nothing.
+  'بالاقل', 'عالاقل', 'الحد الادنى', 'بالحد الادنى'
 );
 /**
  * «30 الف واقل»: an upper bound after the amount (Sorani puts it there: «لە 30 هەزار کەمتر»). The longest
@@ -166,7 +182,8 @@ const MAX_POST = phrases(
   // forms of «هەرزانتر لە», «نزمتر لە» («لە 30 هەزار هەرزانتر», cheaper than 30,000).
   'ونازل', 'و نازل', 'فنازل', 'فما نازل', 'وانت نازل', 'او انزل', 'وانزل',
   'or lower', 'or cheaper', 'and lower', 'and less', 'or lesser',
-  'کەمترە', 'یان کەمترە', 'هەرزانتر', 'هەرزانترە', 'نزمتر', 'نزمترە', 'خوارترە'
+  'کەمترە', 'یان کەمترە', 'هەرزانتر', 'هەرزانترە', 'نزمتر', 'نزمترە', 'خوارترە',
+  'على الاكثر', 'عالاكثر', 'بالاكثر'
 );
 /** «مليون وفوق»: a lower bound after the amount. */
 const MIN_POST = phrases(
@@ -178,7 +195,8 @@ const MIN_POST = phrases(
   'وطالع', 'و طالع', 'فطالع', 'فما طالع', 'وانت طالع', 'وصاعد', 'و صاعد', 'فما اعلى',
   'or higher', 'or greater', 'or over', 'and over', 'and higher', 'or up',
   'زیاترە', 'یان زیاترە', 'گرانتر', 'گرانترە', 'بەرزتر', 'بەرزترە',
-  'بەلایەنی کەمەوە', 'بە لایەنی کەمەوە', 'لانی کەمەوە'
+  'بەلایەنی کەمەوە', 'بە لایەنی کەمەوە', 'لانی کەمەوە',
+  'بالاقل', 'عالاقل'
 );
 /**
  * One English word after the amount, a bound only after a money word or k: "30k max", "500 الف plus".
@@ -186,6 +204,10 @@ const MIN_POST = phrases(
  */
 const MAX_POST_UNIT = phrases('max');
 const MIN_POST_UNIT = phrases('plus', '+', 'min');
+/** Every comparator phrase: matched in its comparator forms (`cmpFormsOf`), never without an article. */
+const CMP: ReadonlySet<Phrase> = new Set([...MAX_PRE, ...MIN_PRE, ...MAX_POST, ...MIN_POST, ...MAX_POST_UNIT, ...MIN_POST_UNIT]);
+/** The comparators written before an amount, both directions. */
+const PRE_CMP: readonly Phrase[] = [...MAX_PRE, ...MIN_PRE];
 /**
  * A measure or a count after a bare number: «اقل من 1 كيلو» is a weight, "under 300mm" a size,
  * «اقل من 3 قطع» a count, "up to 300°C" a temperature. Never a price, and the words stay in the search.
@@ -420,7 +442,7 @@ const COLOUR_WORDS: ReadonlyArray<readonly [BaseColour, string]> = [
   ['orange', 'orange برتقالي برتقالية پرتەقاڵی'],
   ['yellow', 'yellow اصفر صفرا صفراء زەرد'],
   ['green', 'green اخضر خضرا خضراء زيتوني سەوز'],
-  ['blue', 'blue navy ازرق زرقا زرقاء كحلي لبني سمائي نيلي شین'],
+  ['blue', 'blue navy ازرق زرقا زرقاء كحلي لبني لبنية سمائي نيلي شین'],
   ['purple', 'purple violet بنفسجي بنفسجية موف مۆر'],
   ['pink', 'pink وردي وردية زهري پەمەیی'],
   ['brown', 'brown wood بني بنية قهوائي جوزي خشبي قاوەیی'],
@@ -473,12 +495,25 @@ const DEAR = phrases('غالي', 'غالية', 'اغلى', 'اغلى شي', 'exp
 /** Negation: what follows is excluded, or the opposite constraint. */
 const NEGATION = phrases(
   'بدون', 'بلا', 'بلاش', 'مو', 'مش', 'موب', 'غير', 'ليس', 'لا', 'دون', 'عدا', 'ماعدا', 'باستثناء', 'الا', 'من غير',
-  'ما اريد', 'ما ابي', 'ما احتاج', 'ما بيه', 'مابيه', 'ما فيه', 'مافيه',
+  'ما اريد', 'ما ابي', 'ما احتاج', 'ما بيه', 'مابيه', 'ما فيه', 'مافيه', 'ما بيها', 'مابيها', 'ما فيها', 'مافيها',
   'without', 'w/o', 'no', 'not', 'non', 'neither', 'except', 'excluding', 'exclude', 'dont want', 'do not want', 'no need for',
   'بێ', 'بەبێ', 'نەک', 'نا', 'بێجگە', 'بێجگە لە', 'جگە لە', 'بەدەر لە', 'نامەوێت',
   // «نە ڕەش نە سپی»: the Sorani "neither … nor", each «نە» a negation of its own.
-  'نە'
+  'نە',
+  // "I do not want": «لا اريد الاسود», «ما ابغى اسود», «ما بدي», «مش عايز», «ما احب», «ما ريد», glued «مااريد»,
+  // «ماريد»; "anything but black", "other than black", "not a fan of black"; Sorani «نامەوێ», «ناوێت».
+  'لا اريد', 'لا ابي', 'لا ابغى', 'لا نريد', 'لا احب', 'ما ابغى', 'ما ابغي', 'ما بدي', 'ما نريد', 'ما احب', 'ما ريد',
+  'مش عايز', 'مش عاوز', 'مو عايز', 'مااريد', 'ماريد', 'مابي', 'ماابي', 'مابدي', 'مانريد',
+  'anything but', 'other than', 'not a fan of', 'dont like', 'do not like',
+  'نامەوێ', 'ناوێت', 'ناوێ', 'نامانەوێت'
 );
+/**
+ * After «ما اريد» / «لا اريد» / "dont want", an exception word turns the negation round: «ما اريد الا الاسود», «لا
+ * اريد غير الابيض», "dont want anything but black" mean "only black". The two negation words go together and stay
+ * searched; what follows is read as written (a colour is wanted, never left out).
+ */
+const EXCEPT = new Set(['الا', 'غير', 'سوى', 'عدا', 'ماعدا', 'but', 'except'].map(nlFold));
+const EXCEPT_PHRASES = phrases('anything but', 'anything except', 'anything other than', 'nothing but', 'other than');
 
 /** Iraqi «ما» before a known constraint is "not" («ما متوفر», «PLA ما متوفر», «ما اسود»); before anything else, "what". */
 const MA = nlFold('ما');
@@ -499,7 +534,27 @@ const POST_LIST = new Set(['و', 'یان', 'او', 'or', 'and'].map(nlFold));
  * The Sorani verb negation written AFTER what it negates: «ڕەش نەبێت» (not black), «PLA نەبێت», «بەردەست نییە» (not
  * available), «کەمتر لە 20 هەزار نەبێت» (not less than 20,000).
  */
-const NEG_POST = phrases('نەبێت', 'نەبێ', 'نەبێتن', 'نەبن', 'نییە', 'نیە', 'نابێت');
+const NEG_POST = phrases(
+  'نەبێت', 'نەبێ', 'نەبێتن', 'نەبن', 'نییە', 'نیە', 'نابێت',
+  // "I do not want" after the item, the Sorani order: «ڕەش نامەوێت», «فیلامێنت ڕەش نامەوێ».
+  'نامەوێت', 'نامەوێ', 'ناوێت', 'ناوێ', 'نامانەوێت'
+);
+/**
+ * Words that negate what is around them, beside NEGATION, NEG_POST and Iraqi «ما»: around a price, the order or a
+ * diameter they leave it unapplied ("nothing over 1m", "cannot pay more than 1m", «ما عندي اكثر من 30 الف», «مب
+ * اكثر», «ماكو اقل», «ناتوانم زیاتر لە 500 هەزار بدەم», «زیاتر لە 500 هەزار نەخێر»). Never an exclusion by themselves.
+ */
+const PRICE_NEGATION = new Set(
+  [
+    'nothing', 'never', 'none', 'cant', 'cannot', 'wont', 'dont', 'doesnt', 'didnt', 'isnt', 'arent', 'wasnt',
+    'werent', 'shouldnt', 'wouldnt', 'couldnt', 'mustnt', 'aint', 'not', 'no',
+    'مب', 'ماكو', 'معندي', 'ماعندي', 'مااقدر', 'ماقدر', 'مايصير', 'ميصير', 'ماينفع', 'لن', 'لم', 'ليس', 'ليست', 'مو', 'مش',
+    'موب', 'لا', 'ما',
+    'نەخێر', 'ناتوانم', 'ناتوانین', 'نادەم', 'نادەین', 'نابێ', 'ناکڕم', 'نا',
+  ].map(nlFold)
+);
+/** "More than $300 is too much": after a price, "too" (much, high, expensive) or «كثير», «هواية» says it is no bound wanted. */
+const PRICE_TOO = new Set(['too', 'كثير', 'كثيره', 'هوايه', 'واجد', 'وايد', 'زياده', 'زۆرە'].map(nlFold));
 
 /**
  * Exclusions that name one thing in several words. An AMS printer bundle is a
@@ -540,6 +595,10 @@ const CONJUNCTIONS = new Set(['و', 'او', 'and', 'or', 'nor', '&', '-', 'یا�
  * leave out both. Anywhere else it is "or": "AMS or combo" lists both.
  */
 const NEGATION_OR = new Set(['ولا', 'والا', 'او', 'or', 'nor', 'یان'].map(nlFold));
+/** "And" in a negation list: it carries the negation only to one more term of the same kind («بدون اسود وابيض»). */
+const AND_LIST = new Set(['و', 'and', '&'].map(nlFold));
+/** A comma or «،» at the end of a piece: in a negation list, between two of a kind, a list word ("excluding black, white"). */
+const LIST_COMMA = /[,،]$/u;
 
 // ------------------------------------------------------------------ the lexer
 
@@ -548,6 +607,8 @@ interface Lex {
   f: string;
   /** Its lookup forms: itself, without inner punctuation, and without an Arabic prefix (و ب ل ال). */
   v: string[];
+  /** Its forms as a comparator word: never without an article («الاكثر» is not «اكثر», «بالاقل» not «اقل»). */
+  c: string[];
   /** The whitespace-separated piece of the input it came from. */
   piece: number;
 }
@@ -590,7 +651,14 @@ function lexemesOf(piece: string): string[] {
   // "non-combo", "non-black": a negation of a known term. "Non-Slip", "Non-Stick" are product words, kept whole.
   const non = /^non-(.+)$/.exec(f);
   if (non && (EXCLUDE_CANON.has(non[1]) || COLOURS.has(non[1]) || MATERIALS.has(non[1]))) return ['non', non[1]];
+  // «وابيض», «والاسود», «وPLA»: a «و» glued to a known term is the list word of its own («بدون اسود وابيض»).
+  if (f.length > 2 && f.startsWith('و') && !knownTerm(f) && knownTerm(f.slice(1))) return ['و', f.slice(1)];
   return ablative([f]);
+}
+
+/** A colour, a material, AMS or a combo, with or without its article. */
+function knownTerm(w: string): boolean {
+  return [w, stripArticle(w)].some((x) => COLOURS.has(x) || MATERIALS.has(x) || EXCLUDE_CANON.has(x));
 }
 
 function variantsOf(f: string): string[] {
@@ -603,6 +671,17 @@ function variantsOf(f: string): string[] {
 
 /** «الكومبو» → «كومبو»: the article off, when a word is left. */
 const stripArticle = (w: string): string => (w.startsWith('ال') && w.length > 3 ? w.slice(2) : w);
+
+/** The one-letter prefixes a comparator word may carry: «واقل», «باقل من», «لاقل». The article never. */
+const CMP_PREFIXES = ['و', 'ب', 'ل'];
+function cmpFormsOf(f: string): string[] {
+  const out = [f];
+  const bare = f.replace(/[.\-_/]/g, '');
+  if (bare && bare !== f) out.push(bare);
+  for (const p of CMP_PREFIXES) if (f.startsWith(p) && f.length - p.length >= 2) out.push(f.slice(p.length));
+  return out;
+}
+const lex = (f: string, piece: number): Lex => ({ f, v: variantsOf(f), c: cmpFormsOf(f), piece });
 
 // ------------------------------------------------------------------ the result
 
@@ -670,6 +749,11 @@ interface Amount {
   cur: 'IQD' | 'USD' | null;
   /** Written with the Sorani ablative «-ەوە»: «لە 20 هەزارەوە» (from 20,000). */
   from: boolean;
+  /**
+   * A bare number joined after a million («مليون و 500», "1 million and 500", «ملیۆنێک و 500»): 1,000,500 as written,
+   * 1,500,000 as often meant. Never guessed: the amount carries no marker of its own and the price is not applied.
+   */
+  ambiguous: boolean;
 }
 
 /** «30,000», «1.500.000»: digits in groups of three, the way a price is written in full. */
@@ -766,7 +850,7 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
   const pieces = String(input ?? '').split(/\s+/u).filter(Boolean);
   const L: Lex[] = [];
   pieces.forEach((p, piece) => {
-    for (const f of lexemesOf(p)) L.push({ f, v: variantsOf(f), piece });
+    for (const f of lexemesOf(p)) L.push(lex(f, piece));
   });
   const used = new Array<boolean>(L.length).fill(false);
   /**
@@ -774,8 +858,6 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
    * other reader takes them («للبكرة» is not the spool facet there) and the search keeps them as typed.
    */
   const held = new Array<boolean>(L.length).fill(false);
-  /** The query is about filament: a filament or material word anywhere in it («PLA+» too). */
-  const aboutFilament = L.some((l) => l.v.some((v) => FILAMENT_WORDS.has(v) || MATERIALS.has(v.replace(/\+$/, ''))));
   /** Which chip (`nlChipKey`) each lexeme went to: a removed chip takes exactly its own words out of the field. */
   const owner = new Array<string>(L.length).fill('');
   /** A second chip a lexeme also goes with: the list word between two items of a Sorani post negation. */
@@ -802,7 +884,8 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
 
   const matchAt = (i: number, p: Phrase): number => {
     if (i < 0 || i + p.length > L.length) return 0;
-    for (let k = 0; k < p.length; k++) if (used[i + k] || held[i + k] || !L[i + k].v.includes(p[k])) return 0;
+    const cmp = CMP.has(p);
+    for (let k = 0; k < p.length; k++) if (used[i + k] || held[i + k] || !(cmp ? L[i + k].c : L[i + k].v).includes(p[k])) return 0;
     return p.length;
   };
   const longest = (i: number, list: readonly Phrase[]): number => {
@@ -950,8 +1033,8 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
       have = true;
       j += width;
     }
-    // «مليون و 250» is 1,250,000 in a shop that prices in thousands.
-    if (lastMult >= 1e6 && cur > 0 && cur < 1000) cur *= 1000;
+    // «مليون و 250»: 1,000,250 as written or 1,250,000 as meant; no thousands are implied, the amount is ambiguous.
+    const ambiguous = lastMult >= 1e6 && cur > 0 && cur < 1000;
     const value = total + cur;
     if (!have || !Number.isFinite(value) || value < 1 || value > MAX_PRICE_IQD) return null;
     // «لە 20 هەزارەوە»: the ablative glued to the amount is read with it.
@@ -960,7 +1043,7 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
       from = true;
       j++;
     }
-    return { value, end: j, unit, grouped, maxMult, cur: currency, from };
+    return { value, end: j, unit, grouped, maxMult, cur: currency, from, ambiguous };
   };
 
   /** A measure or a count, the Sorani indefinite too («کاتژمێرێک» an hour, «پلەیەک» a degree, «واتێک» a watt). */
@@ -1016,7 +1099,7 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
   const priceEnd = (end: number): number => end + perUnit(end);
 
   /** A money marker of its own: a thousand or million word (k and m too), a money word or sign, or digits grouped in threes. */
-  const marked = (a: Amount): boolean => a.unit !== null || a.cur !== null || a.grouped;
+  const marked = (a: Amount): boolean => !a.ambiguous && (a.unit !== null || a.cur !== null || a.grouped);
   /** Two ends written with the same money marker: the same scale word, digits grouped or not alike, no two currencies. */
   const sameMark = (a: Amount, b: Amount): boolean =>
     a.maxMult === b.maxMult && a.grouped === b.grouped && (a.cur === null || b.cur === null || a.cur === b.cur);
@@ -1030,6 +1113,8 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
     to: number;
     bound?: { dir: 'min' | 'max'; a: Amount };
     range?: [Amount, Amount];
+    /** The negation word a fixed negated comparator begins with («مو اكثر من», "no more than"): a list may follow it. */
+    neg?: number;
   }
 
   /** «20 الف و 30 الف», «500k-1m», «لە 20 هەزارەوە تا 30 هەزار»: the two ends of a range after its opener. */
@@ -1042,7 +1127,7 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
     else if (a.end < L.length && /^[ول]./u.test(L[a.end].f)) {
       // «و50 الف»: the separator glued to the second end.
       const saved = L[a.end];
-      L[a.end] = { ...saved, f: saved.f.slice(1), v: variantsOf(saved.f.slice(1)) };
+      L[a.end] = lex(saved.f.slice(1), saved.piece);
       b = readAmount(a.end, { bound: true });
       L[a.end] = saved;
     }
@@ -1133,24 +1218,66 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
     pres.sort((x, y) => y[0] - x[0]);
     for (const [c, dir] of pres) {
       const a = readAmount(j + c, { bound: true });
-      if (a && !measured(a)) return { from: i, to: priceEnd(a.end), bound: { dir, a } };
+      if (a && !measured(a)) return { from: i, to: priceEnd(a.end), bound: { dir, a }, neg: exact ? j : undefined };
     }
     return readPost(i, j);
   };
 
-  /** Words that negate what follows, beside NEGATION and Iraqi «ما»: "nothing over 1m" is no bound to apply. */
-  const PRICE_NEGATION = new Set(['nothing', 'never', 'none'].map(nlFold));
   /** The forms a negation word is read in: as typed, and without a glued «و» («ومو», «وبدون»). */
   const negForms = (k: number): string[] => {
     const f = L[k].f;
     return f.length > 2 && f.startsWith('و') ? [f, f.slice(1)] : [f];
   };
+  const NEG_ANY = [...NEGATION, ...NEG_POST];
+  /** A negation ends at lexeme q: a NEGATION or NEG_POST phrase, Iraqi «ما», or one of PRICE_NEGATION. */
   const negationEndsAt = (q: number): boolean => {
     if (negForms(q).some((f) => f === MA || PRICE_NEGATION.has(f))) return true;
-    return NEGATION.some((p) => {
+    return NEG_ANY.some((p) => {
       const s = q - p.length + 1;
       return s >= 0 && p.every((w, d) => (d === 0 ? negForms(s) : [L[s + d].f]).includes(w));
     });
+  };
+  /** How many lexemes from q are a phrase of `list` as typed (0 for none); a glued «و» before the first is read off. */
+  const phraseAt = (q: number, list: readonly Phrase[]): number => {
+    let n = 0;
+    for (const p of list) if (q + p.length <= L.length && p.every((w, d) => (d === 0 ? negForms(q) : [L[q + d].f]).includes(w))) n = Math.max(n, p.length);
+    return n;
+  };
+  /** A negation of what follows begins at q (0 for none). «ولا», «والا», "or" and "nor" are list words, never one here. */
+  const negationAt = (q: number): number => {
+    if (q >= L.length || CONJUNCTIONS.has(L[q].f)) return 0;
+    return phraseAt(q, NEGATION) || (negForms(q).some((f) => f === MA || PRICE_NEGATION.has(f)) ? 1 : 0);
+  };
+  /** A known term at q (a colour, a material, AMS or a combo, the sale mode, the spool, the order, a diameter). */
+  const knownAt = (q: number): boolean =>
+    q >= 0 &&
+    q < L.length &&
+    (lookup(q, COLOURS) !== undefined ||
+      COLOUR_PHRASES.some(([p]) => matchAt(q, p) > 0) ||
+      lookup(q, MATERIALS) !== undefined ||
+      lookup(q, EXCLUDE_CANON) !== undefined ||
+      [DIRECT, PREORDER, REFILL, SPOOL, CHEAP, DEAR].some((list) => longest(q, list) > 0) ||
+      DIAMETERS.has(L[q].f));
+  /** A comparator begins at q: what stands after it belongs to that price, not to the one before. «بدون» is never «دون». */
+  const comparatorAt = (q: number): boolean =>
+    q < L.length && PRE_CMP.some((p) => (!negationWord(q) || p[0] === L[q].f) && matchAt(q, p) > 0);
+  /**
+   * What a negation ending before q reaches: a known term or a comparator (its index), over an article, a colour noun,
+   * "in", "even" or a list word; -1 for nothing, or when a comma ends the clause of the negation («لا، اسود»).
+   */
+  const reachedFrom = (q: number): number => {
+    if (q > 0 && clauseEndsAt(q - 1)) return -1;
+    let s = q;
+    while (
+      s < L.length &&
+      !used[s] &&
+      !knownAt(s) &&
+      (CONJUNCTIONS.has(L[s].f) || L[s].v.some((v) => COLOUR_NOUNS.has(v) || EVEN.has(v) || NEG_FILLERS.has(v) || NEG_ARTICLES.has(v)))
+    ) {
+      if (clauseEndsAt(s)) return -1;
+      s++;
+    }
+    return knownAt(s) || comparatorAt(s) ? s : -1;
   };
   /** «, ؛ ; . ! ?» at the end of a piece closes a clause: a comparator and its amount stand in one clause. */
   const CLAUSE_END = /[,،;؛:!?؟.…]$/u;
@@ -1161,16 +1288,55 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
     return false;
   };
   /**
-   * A negation stands before lexeme k in its clause, over fillers only («بدون اقل من…», «ما اريد اكثر من…»,
-   * "nothing over…"): the price is not applied. A list word («ولا», "or", «یان») is "or" and ends the look: a
-   * carried negation never touches a price, it is read as written. «لا، اريد اقل من 30 الف» ("no, I want…") is a
-   * clause of its own.
+   * A negation stands before lexeme k in its clause that nothing else took: the price (the order, a diameter) is not
+   * applied. Over every word in between («بدون اقل من…», «ما عندي اكثر من…», «ما اقدر ادفع اكثر من…», "cannot pay more
+   * than…", "should not be more than…", «ناتوانم زیاتر لە…»); a negation another constraint took belongs to it
+   * («بدون AMS اقل من 500 الف» is no AMS and at most 500,000). The look passes over the words of other constraints
+   * instead of stopping at them, so a chip removed never uncovers a negation; it stops at a held attempt, which took the
+   * negation before it. «ولا», «والا» and "or" are list words.
+   * «لا، اريد اقل من 30 الف» ("no, I want…") is a clause of its own.
    */
   const negatedBefore = (k: number): boolean => {
     for (let q = k - 1; q >= 0; q--) {
-      if (clauseEndsAt(q) || CONJUNCTIONS.has(L[q].f)) return false;
+      // A held attempt («ولا اقل من 30 الف» in a list, «مو رخيص») took the negation before it: the look ends there.
+      if (clauseEndsAt(q) || held[q]) return false;
+      if (used[q] || CONJUNCTIONS.has(L[q].f)) continue;
       if (negationEndsAt(q)) return true;
-      if (!L[q].v.some((v) => FILLERS.has(v))) return false;
+    }
+    return false;
+  };
+  /**
+   * A negation after lexeme `to` in its clause that reaches nothing of its own (a known term or another comparator):
+   * «طابعة فوق 500 الف ما اريد», "over $300 no", «زیاتر لە 500 هەزار نامەوێت», «لە 500 هەزار زیاتر نەخێر»; for a price
+   * also "too" ("more than $300 is too much"). «اقل من 30 الف بدون AMS» is no AMS: that negation is AMS's. The look
+   * passes over known terms, so a chip removed never uncovers a negation.
+   */
+  const negatedAfter = (to: number, price: boolean): boolean => {
+    if (to > 0 && to < L.length && clauseEndsAt(to - 1)) return false;
+    for (let q = to; q < L.length; q++) {
+      if (comparatorAt(q)) return false;
+      if (!used[q] && !held[q]) {
+        // A negation of what follows that reaches a known term belongs to it («بدون AMS»): look on past it.
+        const n = negationAt(q);
+        const r = n ? reachedFrom(q + n) : -1;
+        if (r >= 0) {
+          if (comparatorAt(r)) return false;
+          q += n - 1;
+          continue;
+        }
+        // The Sorani negation of what precedes («ڕەش نەبێت») belongs to the known term right before it; right after the
+        // amount, or after a word it does not know, it negates the price.
+        const post = phraseAt(q, NEG_POST);
+        if (post) {
+          if (q > to && knownAt(q - 1)) {
+            q += post - 1;
+            continue;
+          }
+          return true;
+        }
+        if (n || (price && L[q].v.some((v) => PRICE_TOO.has(v)))) return true;
+      }
+      if (clauseEndsAt(q)) return false;
     }
     return false;
   };
@@ -1191,9 +1357,11 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
   const applyPrice = (r: PriceRead): boolean => {
     if (r.bound) return setBound(r.bound.dir, Math.round(r.bound.a.value), r.bound.a.cur ?? 'IQD');
     const [a, b] = r.range!;
-    // «بين 500 الف و 200 دولار»: two currencies are two answers.
-    if ((a.cur && b.cur && a.cur !== b.cur) || (b.cur && a.cur === null && a.unit === 'strong' && b.cur !== 'IQD')) return false;
-    const cur = a.cur ?? b.cur ?? 'IQD';
+    // «بين 500 الف و 200 دولار», "between $300 and 500k": an end with no currency is in dinars, and two currencies are
+    // two answers. A dinar end never borrows the dollar of the other («500k» is never 500,000 dollars).
+    // Only a currency written after the second end of two written alike covers both ("between 1.5k-2k dollars").
+    const cur = a.cur ?? (b.cur && a.maxMult > 0 && a.maxMult === b.maxMult ? b.cur : 'IQD');
+    if ((b.cur ?? 'IQD') !== cur) return false;
     // «بين 50 الف و 25 الف»: written high-to-low, sorted only when both ends carry the same money marker.
     if (a.value > b.value && !sameMark(a, b)) return false;
     const [lo, hi] = a.value <= b.value ? [a.value, b.value] : [b.value, a.value];
@@ -1213,17 +1381,26 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
       prices &&
       amounts.every(marked) &&
       !negatedBefore(r.from) &&
-      !longest(r.to, NEG_POST) &&
+      !negatedAfter(r.to, true) &&
       !brokenClause(r.from, r.to) &&
       applyPrice(r);
     if (!ok) {
-      failed = true;
-      for (let k = r.from; k < r.to; k++) if (!used[k]) held[k] = true;
+      holdPrice(r);
       return 0;
     }
     who = 'price';
     take(r.from, r.to);
+    // «مو اكثر من 30 الف ولا اسود», "no more than 30k nor black": the negation of the fixed form runs on over a list.
+    if (r.neg !== undefined) {
+      negLists.push({ neg: [r.neg], items: [{ key: 'price', sep: -1, start: r.from, asSaid: false, guard: false }] });
+      negatedTo = r.to;
+    }
     return r.to - i;
+  };
+  /** A price attempt that does not qualify: its words are held (searched as typed) and no other bound applies. */
+  const holdPrice = (r: PriceRead): void => {
+    failed = true;
+    for (let k = r.from; k < r.to; k++) if (!used[k]) held[k] = true;
   };
 
   const trySale = (i: number, flip: boolean): number => {
@@ -1244,13 +1421,28 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
   };
 
   const guarded = (k: number) => k >= 0 && k < L.length && L[k].v.some((v) => SPOOL_GUARD.has(v));
+  /**
+   * The spool facet and the diameter are read where they are written and kept only when a filament word stands
+   * beside them (`anchored`, once the whole query is read): «فلامنت ريفل», "filament with spool", «فیلامێنت 1.75»; the
+   * diameter with mm too («1.75mm», «1.75 مم»). Alone, or beside anything else, the words are a product: «glue
+   * refill», «طابعة بدون بكرة», "AMS with spool", "PTFE tube 1.75 for PLA". A material is no anchor: dropping its
+   * chip would take the facet with it.
+   */
+  interface Candidate {
+    from: number;
+    to: number;
+    key: string;
+    value: string;
+    mm: boolean;
+  }
+  const candidates: Candidate[] = [];
   const trySpool = (i: number, flip: boolean): number => {
     const r = longest(i, REFILL);
     if (r) {
       if (guarded(i - 1) || guarded(i + r)) return 0;
-      got.spool = flip ? 'spool' : 'refill';
       who = 'spool';
       take(i, i + r);
+      candidates.push({ from: i, to: i + r, key: who, value: flip ? 'spool' : 'refill', mm: false });
       return r;
     }
     const w = longest(i, SPOOL_WITH);
@@ -1258,25 +1450,35 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
     if (!s) return 0;
     let end = i + w + s;
     if (guarded(i - 1) || guarded(end)) return 0;
-    const full = longest(end, SPOOL_FULL);
-    // A bare spool word is the facet beside a filament or material word, or with «مع» / «كاملة».
-    if (!flip && !w && !full && !aboutFilament) return 0;
-    end += full;
-    got.spool = flip ? 'refill' : 'spool';
+    end += longest(end, SPOOL_FULL);
     who = 'spool';
     take(i, end);
+    candidates.push({ from: i, to: end, key: who, value: flip ? 'refill' : 'spool', mm: false });
     return end - i;
   };
 
   const tryDiameter = (i: number): number => {
-    if (!aboutFilament) return 0;
     const j = i + longest(i, DIAMETER_WORDS);
-    const d = j < L.length && !used[j] ? DIAMETERS.get(L[j].f) : undefined;
+    const d = j < L.length && !used[j] && !held[j] ? DIAMETERS.get(L[j].f) : undefined;
     if (!d) return 0;
-    const end = j + 1 + longest(j + 1, MM_WORDS);
-    add(diameters, d);
+    const mm = longest(j + 1, MM_WORDS);
+    const end = j + 1 + mm;
+    // «بدون … 1.75», «1.75 لا»: a diameter has no opposite to read; negated, it stays words. «بين 1.75 و 2.85 ملم»,
+    // "1.75-2.85mm", "1.75 to 2.85": an end of a range of sizes is no diameter either («و», "and" make a range only
+    // after an opener: «فلامنت 1.75 و 2.85» is both diameters).
+    const numberAt = (k: number): boolean => k >= 0 && k < L.length && classify(L[k].f)?.k === 'digit';
+    const opened = (k: number): boolean => RANGE_OPEN.some((p) => k - p.length >= 0 && matchAt(k - p.length, p) === p.length);
+    const rangeSep = (k: number, n: number): boolean => !AND_LIST.has(L[k].f) || opened(n);
+    const sepBefore = i > 1 && RANGE_SEP.some((p) => p.length === 1 && L[i - 1].v.includes(p[0])) && numberAt(i - 2) && rangeSep(i - 1, i - 2);
+    const sepAfter = longest(j + 1, RANGE_SEP);
+    const ranged = sepBefore || opened(i) || (sepAfter > 0 && numberAt(j + 1 + sepAfter) && rangeSep(j + 1, i));
+    if (ranged || negatedBefore(i) || negatedAfter(end, false)) {
+      for (let k = i; k < end; k++) held[k] = true;
+      return 0;
+    }
     who = `diameter:${d}`;
     take(i, end);
+    candidates.push({ from: i, to: end, key: who, value: d, mm: mm > 0 });
     return end - i;
   };
 
@@ -1302,9 +1504,15 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
     const a = longest(i, CHEAP);
     const d = a ? 0 : longest(i, DEAR);
     if (!a && !d) return 0;
+    const end = i + (a || d);
+    // «مو رخيص», "not the cheapest", «ما اريد رخيص», «هەرزان نەبێت»: a negated order is no order (never its
+    // opposite); its words stay searched.
+    if (negatedBefore(i) || negatedAfter(end, false)) {
+      for (let k = i; k < end; k++) held[k] = true;
+      return 0;
+    }
     got.sort = a ? 'price_asc' : 'price_desc';
     who = 'sort';
-    const end = i + (a || d);
     take(i, end);
     // «ارخص سعر» was read whole; «سعر» after «رخيص» goes with it.
     if (end < L.length && longest(end, PRICE_WORDS)) take(end, end + 1);
@@ -1313,51 +1521,96 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
 
   /**
    * One negation and what it reaches: the negation words, then each item of its list with the list word («ولا»,
-   * "or", «یان») that carried it there (-1 for the first). An item `asSaid` is a price, the sale mode, the spool, a
-   * diameter or the order the list ran past, read as written, or an unknown word it ran past (`key` '' when it
-   * stayed a word); the others are the exclusions it negates. A removed chip keeps the negation for the
-   * exclusions left.
+   * "or", «یان»; "and" or a comma between two of a kind) that carried it there (-1 for none). An item `asSaid` is
+   * an unknown word or a held one the list ran past (`key` ''); a `guard` is a price, the order or a diameter held
+   * there, which must stay behind a negation when the first item is removed. The others are the exclusions it
+   * negates (the sale mode and the spool turned). A removed chip keeps the negation for the exclusions left.
    */
+  interface NegItem {
+    key: string;
+    sep: number;
+    start: number;
+    asSaid: boolean;
+    guard: boolean;
+  }
   interface NegList {
     neg: number[];
-    items: Array<{ key: string; sep: number; asSaid: boolean }>;
+    items: NegItem[];
   }
   const negLists: NegList[] = [];
   /** Where the last negation ended: "or" right there carries it on (NEGATION_OR), anywhere else it is "or". */
   let negatedTo = -1;
+  /** The kind of the chip of an excluded item: "and" and a comma carry a negation only to one more of the same kind. */
+  const kindOf = (key: string): string =>
+    key.startsWith('color!') ? 'colour' : key.startsWith('material!') ? 'material' : key.startsWith('exclude:') ? 'canon' : '';
+  const kindAt = (k: number): string => {
+    if (k >= L.length || used[k] || held[k]) return '';
+    if (lookup(k, COLOURS) !== undefined || COLOUR_PHRASES.some(([p]) => matchAt(k, p) > 0)) return 'colour';
+    if (lookup(k, MATERIALS) !== undefined) return 'material';
+    return lookup(k, EXCLUDE_CANON) !== undefined ? 'canon' : '';
+  };
   const tryNegation = (i: number): number => {
-    const carried = negatedTo === i && NEGATION_OR.has(L[i].f);
-    if (CONJUNCTIONS.has(L[i].f) && !carried) return 0;
-    let n = carried ? 1 : longest(i, NEGATION);
-    // Iraqi «ما متوفر» (not available), «ما اسود»: a bare «ما» negates a known constraint only.
-    const ma = !n && L[i].f === MA;
-    if (ma) n = 1;
-    if (!n) return 0;
-    const j = i + n;
-    if (j >= L.length || used[j]) return 0;
     const last = negLists[negLists.length - 1];
-    // A diameter has no opposite to read («بدون 1.75»): the negation and the number stay words, and no facet.
-    if (!carried && aboutFilament && DIAMETERS.has(L[j + longest(j, DIAMETER_WORDS)]?.f ?? '')) {
-      const d = j + longest(j, DIAMETER_WORDS);
-      return d + 1 + longest(d + 1, MM_WORDS) - i;
+    let carried = negatedTo === i && NEGATION_OR.has(L[i].f);
+    let n = carried ? 1 : 0;
+    if (!carried && negatedTo === i && last) {
+      // «بدون اسود وابيض», "except black and white", «بێ ڕەش و سپی», "excluding black, white": "and" or a comma
+      // carries the negation on to another term of the same kind («بدون كومبو و اسود» is a black one without combo).
+      const kind = kindOf([...last.items].reverse().find((it) => !it.asSaid)?.key ?? '');
+      if (kind && AND_LIST.has(L[i].f) && kindAt(i + 1) === kind) {
+        carried = true;
+        n = 1;
+      } else if (kind && i > 0 && L[i - 1].piece !== L[i].piece && LIST_COMMA.test(pieces[L[i - 1].piece]) && kindAt(i) === kind) {
+        carried = true;
+      }
+    }
+    if (!carried) {
+      if (CONJUNCTIONS.has(L[i].f)) return 0;
+      n = longest(i, NEGATION);
+    }
+    // Iraqi «ما متوفر» (not available), «ما اسود»: a bare «ما» negates a known constraint only.
+    const ma = !carried && !n && L[i].f === MA;
+    if (ma) n = 1;
+    if (!carried && !n) return 0;
+    const j = i + n;
+    if (j >= L.length || used[j] || held[j]) return 0;
+    const sep = carried && n ? i : -1;
+    if (!carried) {
+      // «لا، اسود» ("no, black"): a comma after the negation ends its reach.
+      if (clauseEndsAt(j - 1)) return 0;
+      // «ما اريد الا الاسود», «لا اريد غير الابيض», "dont want anything but black": only that. The two negations
+      // stay searched and what follows is read as written.
+      const except = EXCEPT.has(L[j].f) ? 1 : longest(j, EXCEPT_PHRASES);
+      if (except) {
+        for (let k = i; k < j + except; k++) held[k] = true;
+        return 0;
+      }
+    }
+    // A diameter has no opposite to read («بدون 1.75», «بدون اسود ولا 2.85»): the negation and the number stay words.
+    const dw = j + longest(j, DIAMETER_WORDS);
+    if (dw < L.length && !used[dw] && DIAMETERS.has(L[dw].f)) {
+      const end = dw + 1 + longest(dw + 1, MM_WORDS);
+      for (let k = i; k < end; k++) held[k] = true;
+      if (carried && last) {
+        last.items.push({ key: '', sep, start: j, asSaid: true, guard: true });
+        negatedTo = end;
+      }
+      return 0;
     }
     if (carried && last) {
-      // Carried by a list word, a negation reaches exclusions only: a price, the sale mode, the spool, a diameter
-      // or the order there is read as said («بدون AMS او اقل من 500 الف», "without AMS or in stock", «بێ AMS یان
-      // ڕیفیل»), and a bare spool word stays a word. The list runs on past it to the next exclusion: «بدون اسود
-      // ولا اقل من 30 الف ولا ابيض» leaves out white too, never wants it.
-      const said = tryPrice(j) || trySale(j, false) || trySpool(j, false) || tryDiameter(j) || trySort(j);
-      if (said) {
-        take(i, j); // the list word goes with the item it listed
-        last.items.push({ key: who, sep: i, asSaid: true });
-        negatedTo = j + said;
-        return n + said;
-      }
-      const w = longest(j, SPOOL_WITH);
-      const spoolWord = longest(j, REFILL) || (longest(j + w, SPOOL) ? w + longest(j + w, SPOOL) : 0);
-      if (spoolWord) {
-        last.items.push({ key: '', sep: i, asSaid: true });
-        negatedTo = j + spoolWord;
+      // Carried by a list word, a price or the order is held, never applied and never turned («بدون AMS ولا اكثر من
+      // مليون», "not black nor under 30k", «بێ AMS یان زیاتر لە 500 هەزار», «بدون اسود ولا رخيص»), and the list runs
+      // on past it to the next exclusion.
+      const r = readPrice(j);
+      const order = r ? 0 : longest(j, CHEAP) || longest(j, DEAR);
+      if (r || order) {
+        const end = r ? r.to : j + order;
+        if (r) holdPrice({ ...r, from: i });
+        else for (let k = i; k < end; k++) held[k] = true;
+        // A bare amount («ولا اقل من 30») could never apply: no guard, the item is a word like any other.
+        const guard = !r || (r.range ?? [r.bound!.a]).every(marked);
+        last.items.push({ key: '', sep, start: j, asSaid: true, guard });
+        negatedTo = end;
         return 0;
       }
     }
@@ -1379,8 +1632,9 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
       take(at, at + 1);
       return 1;
     };
-    // A price right after a negation is never turned («بدون اقل من 30 الف»): it stays words (`negatedBefore`).
-    let k = carried || ma ? tryColour(j, true) : trySpool(j, true) || trySale(j, true) || tryColour(j, true);
+    // A price right after a negation is never turned («بدون اقل من 30 الف»): it stays words (`negatedBefore`). The sale
+    // mode and the spool are turned, carried by a list word too («بدون AMS ولا حجز» is in stock).
+    let k = ma ? tryColour(j, true) : trySpool(j, true) || trySale(j, true) || tryColour(j, true);
     if (!k && ma) k = trySale(j, true) || trySpool(j, true);
     if (!k) k = material(j);
     if (!k) {
@@ -1395,13 +1649,13 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
         else if (!NEG_FILLERS.has(L[s].f) && !NEG_ARTICLES.has(L[s].f)) break;
       }
       if (s > j && s < L.length && !used[s]) {
-        let got = !carried && !ma && !noun ? trySpool(s, true) || trySale(s, true) : 0;
+        let got = !ma && !noun ? trySpool(s, true) || trySale(s, true) : 0;
         got ||= tryColour(s, true);
         if (!got && !noun) got = material(s);
         if (!got && !noun && carried && even && last) {
           // «ولا حتى كومبو», "or even combo": after "even" in a list, a word is searched as written (never wanted
           // as a filter), and the list runs on to the next item: «… ولا حتى كومبو ولا اسود» leaves out black.
-          last.items.push({ key: '', sep: i, asSaid: true });
+          last.items.push({ key: '', sep, start: j, asSaid: true, guard: false });
           negatedTo = s + 1;
           return 0;
         }
@@ -1419,15 +1673,15 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
       let m = j;
       while (m < L.length && !used[m] && !NEGATION_OR.has(L[m].f)) m++;
       if (m < L.length && !used[m] && m > j) {
-        last.items.push({ key: '', sep: i, asSaid: true });
+        last.items.push({ key: '', sep, start: j, asSaid: true, guard: false });
         negatedTo = m;
       }
       return 0;
     }
     if (!k) return 0;
     take(i, j);
-    if (carried && last) last.items.push({ key: who, sep: i, asSaid: false });
-    else negLists.push({ neg: Array.from({ length: n }, (_, d) => i + d), items: [{ key: who, sep: -1, asSaid: false }] });
+    if (carried && last) last.items.push({ key: who, sep, start: j, asSaid: false, guard: false });
+    else negLists.push({ neg: Array.from({ length: n }, (_, d) => i + d), items: [{ key: who, sep: -1, start: j, asSaid: false, guard: false }] });
     negatedTo = j + k;
     return n + k;
   };
@@ -1512,6 +1766,46 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
     i++;
   }
 
+  // The spool facet and the diameter stand only beside a filament word (or mm): over the words other constraints
+  // took, a material and a list word, never over a word left to the search. A chip dropped takes only words that are
+  // passed over here, so the answer to its removal text keeps every other facet.
+  const filamentAt = (k: number): boolean => L[k].v.some((v) => FILAMENT_WORDS.has(v));
+  const passable = (k: number): boolean =>
+    used[k] || CONJUNCTIONS.has(L[k].f) || L[k].v.some((v) => MATERIALS.has(v.replace(/\+$/, '')));
+  const anchored = (c: Candidate): boolean => {
+    let a = c.from - 1;
+    while (a >= 0 && !filamentAt(a) && passable(a)) a--;
+    if (a >= 0 && filamentAt(a)) return true;
+    let b = c.to;
+    while (b < L.length && !filamentAt(b) && passable(b)) b++;
+    return b < L.length && filamentAt(b);
+  };
+  const inCandidate = new Set(candidates.flatMap((c) => Array.from({ length: c.to - c.from }, (_, d) => c.from + d)));
+  for (const c of candidates) {
+    // The negation and the list word that turned it go with it (never the words of another «1.75»).
+    while (c.from > 0 && used[c.from - 1] && owner[c.from - 1] === c.key && !inCandidate.has(c.from - 1)) c.from--;
+    while (c.to < L.length && used[c.to] && owner[c.to] === c.key && !inCandidate.has(c.to)) c.to++;
+  }
+  const standing = candidates.map((c) => c.mm || anchored(c));
+  candidates.forEach((c, x) => {
+    if (standing[x]) {
+      if (c.key === 'spool') got.spool = c.value as SpoolFacet;
+      else add(diameters, c.value);
+      return;
+    }
+    for (let k = c.from; k < c.to; k++) {
+      used[k] = false;
+      owner[k] = '';
+      held[k] = true;
+    }
+  });
+  const standingKeys = new Set(candidates.filter((_, x) => standing[x]).map((c) => c.key));
+  for (const list of negLists) {
+    for (const it of list.items) {
+      if ((it.key === 'spool' || it.key.startsWith('diameter:')) && !standingKeys.has(it.key)) Object.assign(it, { key: '', asSaid: true });
+    }
+  }
+
   const { price, sale, spool, sort } = got;
   const understood: NlChip[] = [];
   if (price) understood.push({ kind: 'price', min: price.min, max: price.max, currency: price.currency });
@@ -1563,59 +1857,96 @@ function parse(input: string, prices: boolean): { nl: NlQuery; failed: boolean }
   };
   // A negation list («بدون AMS ولا كومبو», «بدون اسود ولا اقل من 30 ولا ابيض») keeps its negation while an
   // exclusion after the first item stands. Removing the first item moves the negation words onto the list word
-  // of the next exclusion, and the list words of the items read as written in between go with it («بدون كومبو»,
-  // «اقل من 30 بدون ابيض»); with no exclusion after it, the negation and those list words go with it. A later
-  // item takes its own list word along (`owner`).
-  const firstOut = new Map<string, { gone: Set<number>; at: number; neg: string }>();
+  // of the next exclusion (or before it, after a comma), and the list words of the items read as written in between
+  // go with it («بدون كومبو», «اقل من 30 بدون ابيض»); with no exclusion after it, the negation and those list words
+  // go with it. A price, the order or a diameter held in the list (a guard) must stay behind its negation, or it would
+  // apply: then the negation and every list word stay where they are and only the item goes («بدون ولا اقل من 30 الف
+  // بدون ابيض»). A later item takes its own list word along (`owner`).
+  interface FirstOut {
+    gone: Set<number>;
+    keep: Set<number>;
+    /** Where the negation is written again: in place of a list word, or before a word. */
+    marks: Map<number, 'replace' | 'before'>;
+    neg: string;
+  }
+  /** Every list a chip is the first item of (the same colour can head two lists). */
+  const firstOut = new Map<string, FirstOut[]>();
   for (const { neg, items } of negLists) {
     const first = items[0].key;
-    if (items.length < 2 || !first || firstOut.has(first)) continue;
+    if (items.length < 2 || !first) continue;
     const next = items.findIndex((it, x) => x > 0 && !it.asSaid && it.key !== first);
-    const gone = new Set(neg);
-    // The list word right after the first item goes with it; those between two items read as written stay
-    // («اقل من 30 ولا مليون» never becomes «30 مليون»).
-    if (items[1].asSaid) gone.add(items[1].sep);
+    const guard = items.some((it, x) => x > 0 && it.guard && (next < 0 || x < next));
+    const negSet = new Set(neg);
+    const gone = new Set<number>();
+    const keep = new Set<number>();
+    if (guard) for (const k of neg) keep.add(k);
+    else {
+      for (const k of neg) gone.add(k);
+      // The list word right after the first item goes with it; those between two items read as written stay
+      // («اقل من 30 ولا مليون» never becomes «30 مليون»).
+      if (items[1].asSaid && items[1].sep >= 0) gone.add(items[1].sep);
+    }
     // The negation as typed: its whole pieces, or its own lexemes where a piece holds more («non-combo»).
     const negPieces = [...new Set(neg.map((k) => L[k].piece))];
     const text = negPieces
       .map((pc) => {
         const all = L.map((l, k) => ({ l, k })).filter(({ l }) => l.piece === pc);
-        return all.every(({ k }) => gone.has(k)) ? pieces[pc] : all.filter(({ k }) => gone.has(k)).map(({ l }) => l.f).join('');
+        return all.every(({ k }) => negSet.has(k)) ? pieces[pc] : all.filter(({ k }) => negSet.has(k)).map(({ l }) => l.f).join('');
       })
       .join(' ');
-    firstOut.set(first, { gone, at: next < 0 ? -1 : items[next].sep, neg: text });
+    const marks = new Map<number, 'replace' | 'before'>();
+    // Each later guard keeps its list word with the negation written before it («… مو ولا 2.85»).
+    if (guard) items.forEach((g, x) => x > 1 && g.guard && (next < 0 || x < next) && marks.set(g.sep >= 0 ? g.sep : g.start, 'before'));
+    const it = next < 0 ? null : items[next];
+    if (it) marks.set(it.sep >= 0 ? it.sep : it.start, it.sep >= 0 ? 'replace' : 'before');
+    firstOut.set(first, [...(firstOut.get(first) ?? []), { gone, keep, marks, neg: text }]);
   }
   const without: Record<string, string> = {};
   for (const chip of understood) {
     const key = nlChipKey(chip);
-    const plan = firstOut.get(key);
-    const goes = (k: number): boolean => owner[k] === key || alsoOwner[k] === key || (!!plan && (plan.gone.has(k) || plan.at === k));
+    const plans = firstOut.get(key) ?? [];
+    const goes = (k: number): boolean =>
+      ((owner[k] === key || alsoOwner[k] === key) && !plans.some((p) => p.keep.has(k))) ||
+      plans.some((p) => p.gone.has(k) || p.marks.get(k) === 'replace');
     const out: string[] = [];
+    /** Whether each piece written is a free list word: one right before a removed item goes with it. */
+    const freeOut: boolean[] = [];
+    const push = (w: string, free = false) => {
+      out.push(w);
+      freeOut.push(free);
+    };
     let gap = false;
     pieces.forEach((raw, piece) => {
       const mine = L.map((l, k) => ({ l, k })).filter(({ l }) => l.piece === piece);
       const left = mine.filter(({ k }) => !goes(k));
-      if (plan && mine.some(({ k }) => k === plan.at)) {
-        out.push(plan.neg);
-        if (left.length) out.push(left.map(({ l }) => l.f).join(''));
+      const plan = plans.find((p) => mine.some(({ k }) => p.marks.has(k)));
+      if (plan) {
+        push(plan.neg);
+        if (left.length) push(left.length === mine.length ? raw : left.map(({ l }) => l.f).join(''));
         gap = false;
         return;
       }
       if (!mine.length) {
-        if (inHeld(piece)) out.push(raw);
+        if (inHeld(piece)) push(raw);
         return;
       }
       if (!left.length) {
+        // «PLA ولا PETG اريد» less PETG: the free list word that joined it goes with it.
+        if (freeOut[freeOut.length - 1]) {
+          out.pop();
+          freeOut.pop();
+        }
         gap = true;
         return;
       }
       // «بدون AMS PLA والا PETG» less PLA: the free list word that joined it to the next goes with it, or it
-      // would carry the negation on to PETG.
-      const free = left.length === mine.length && mine.every(({ l, k }) => CONJUNCTIONS.has(l.f) && !owner[k]);
+      // would carry the negation on to PETG. «اسود وابيض» less white: the «و» glued to it goes too.
+      const free = left.every(({ l, k }) => CONJUNCTIONS.has(l.f) && !owner[k] && !held[k]);
+      if (free && left.length < mine.length) return;
       const after = gap;
       gap = false;
       if (after && free) return;
-      out.push(left.length === mine.length ? raw : left.map(({ l }) => l.f).join(''));
+      push(left.length === mine.length ? raw : left.map(({ l }) => l.f).join(''), free && left.length === mine.length);
     });
     while (out.length && conj(out[out.length - 1])) out.pop();
     while (out.length && conj(out[0])) out.shift();
@@ -1736,6 +2067,23 @@ const meets = (have: ReadonlySet<string>, want: ReadonlySet<string> | undefined)
 };
 
 /**
+ * The words an exclusion leaves out. «مو كومبو» leaves out the AMS units too (a combo is a printer with its AMS),
+ * but never what the search itself asks for: «AMS بدون كومبو», "AMS lite without combo" search the AMS units and
+ * leave out the combos only.
+ */
+function searchedOut(nl: NlQuery, w: string): ReadonlySet<string> {
+  const terms = EXCLUDE_TERMS.get(w);
+  if (!terms) return new Set([w]);
+  const asked = new Set<string>();
+  for (const t of wordsOf([nl.text])) {
+    const canon = EXCLUDE_CANON.get(t);
+    if (canon !== undefined && canon !== w) asked.add(canon);
+  }
+  if (!asked.size) return terms;
+  return new Set([...terms].filter((t) => !asked.has(EXCLUDE_CANON.get(t) ?? '')));
+}
+
+/**
  * Does this product stay in an answer to `nl`?
  *
  *   - an exclusion word leaves out a product whose NAME (any language) or
@@ -1754,7 +2102,7 @@ export function nlKeeps(nl: NlQuery, p: NlProduct): boolean {
   if (nl.exclude.words.length) {
     const family = wordsOf([specString(p.specs, 'product_family').replace(/_/g, ' ')]);
     for (const w of nl.exclude.words) {
-      const terms = EXCLUDE_TERMS.get(w) ?? new Set([w]);
+      const terms = searchedOut(nl, w);
       if (meets(names, terms) || meets(family, terms)) return false;
     }
   }

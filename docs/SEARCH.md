@@ -274,8 +274,9 @@ AMS units and the combos. Arabic (Iraqi forms included), English and Sorani;
 digits from every keyboard; number words (الف، مليون، هەزار، ملیۆن، «مليون
 ونص», «نص مليون»); bounds before or after the amount and ranges; dollars and
 «ورقة» converted at the shop rate; colours, materials, the 1.75/2.85
-diameter, the sale mode («متوفر هسه» / «حجز»), refill or with spool («ريفل»,
-«بكرة كاملة», «بدون بكرة») and «رخيص» as the price order.
+diameter, the sale mode («متوفر هسه» / «حجز»), refill or with spool beside a
+filament word («فلامنت ريفل», «فلامنت بكرة كاملة», «فلامنت بدون بكرة») and
+«رخيص» as the price order.
 
 **THE PRECISION RULE** (lead decision; it replaces the bare-number policy of
 smart search 1.6 rounds 1 to 3). The parser applies a constraint only when it
@@ -306,7 +307,11 @@ request without `nl=1`: the typed search, no `understood`.
   without a comparator is no price either: «نص مليون», «مليونين», «ب 500
   الف», «250-400 الف» (no opener), «لە 20 هەزارەوە» alone. There is no
   borrowing: a bare end never shares the money word of the other end («بين 25
-  و 50 الف», «بين 3 و 5 ورقات» apply nothing). A measure or a count after the
+  و 50 الف», «بين 3 و 5 ورقات» apply nothing), and a bare number after a
+  million is never a count of thousands («اكثر من مليون و 500», "more than 1
+  million and 500": 1,000,500 or 1,500,000? nothing applies). A comparator
+  word keeps its article: «على الاكثر», «بالاكثر», «عالاكثر» are "at most",
+  «بالاقل» "at least"; «الاكثر», «الاقل» alone apply nothing. A measure or a count after the
   amount is no price («اقل من 1 كيلو», "under 300mm", «اقل من الف غرام»,
   «کەمتر لە 2 کیلۆی PLA»); a price PER unit SOLD is, and the per-unit words go
   with it («اقل من 25 الف للكيلو», "25k per kg", "25k/kg", «کەمتر لە 25 هەزار
@@ -320,7 +325,9 @@ request without `nl=1`: the typed search, no `understood`.
   و 30 هەزار»). Written high-to-low it is sorted only when both ends carry the
   same marker («بين 50 الف و 25 الف» is 25,000 to 50,000, "between 30,000 and
   20,000" likewise); with two markers («بين مليون و 500 الف») it is not
-  applied. Two separate bounds apply only when BOTH qualify: «اكثر من 20 الف
+  applied. An end without a currency is in dinars: "between $300 and 500k",
+  «بين 300 الف و 500 دولار» apply nothing; only a currency after the second of
+  two ends written alike covers both ("between 1.5k-2k dollars"). Two separate bounds apply only when BOTH qualify: «اكثر من 20 الف
   واقل من 50 الف» is 20,000 to 50,000, «اكثر من 10 واقل من 30 الف» applies
   neither; two currencies, or two bounds with nothing between them («اكثر من
   مليون واقل من 500 الف»), apply neither.
@@ -329,34 +336,59 @@ request without `nl=1`: the typed search, no `understood`.
   «مو اقل من», "no more than", "no less than", "not over", "not under", and the
   Sorani «زیاتر نەبێت لە», «کەمتر نەبێت لە», «لە … زیاتر نەبێت», «لە … کەمتر
   نەبێت» («نەبێ» too). Any other negation around a price leaves it unapplied
-  and searched as typed: «بدون اقل من 30 الف», «ما يزيد عن مليون» (MSA "what
-  exceeds", Iraqi "not more than"), «ما اريد اكثر من مليون», "not more than
-  500k", "nothing over 1m", «زیاتر نییە لە 30 هەزار», «کەمتر لە 20 هەزار
-  نەبێت».
+  and searched as typed: before it anywhere in its clause, over verbs and
+  unknown words («بدون اقل من 30 الف», «ما يزيد عن مليون» (MSA "what exceeds",
+  Iraqi "not more than"), «ما اريد اكثر من مليون», «ما عندي اكثر من 30 الف»,
+  «ما اقدر ادفع اكثر من 500 الف», «مب», «ماكو», "not more than 500k", "nothing
+  over 1m", "cannot pay more than 1m", "should not be more than $300",
+  «ناتوانم زیاتر لە 500 هەزار بدەم», «زیاتر نییە لە 30 هەزار»); after it,
+  reaching nothing of its own («فوق 500 الف ما اريد», "over $300 no", "more
+  than $300 is too much", «کەمتر لە 20 هەزار نەبێت», «زیاتر لە 500 هەزار
+  نامەوێت», «لە 500 هەزار زیاتر نەخێر»); or carried by a list word («بدون AMS
+  ولا اكثر من مليون», "without AMS or under $300", «بێ AMS یان زیاتر لە 500
+  هەزار»). A negation another constraint took is that constraint's: «بدون AMS
+  اقل من 500 الف» and "under $300 without AMS" are no AMS and at most the
+  amount. A fixed form runs on over a list: "no more than 30k nor black",
+  «مو اكثر من 30 الف ولا اسود» leave black out.
 * **Exclusions are for known terms only.** A negation word («بدون», «بلا»,
-  «مو», «غير», "without", "no", "non-", «بێ», «بەبێ», «نەک» …) directly
-  before a known term leaves it out: AMS or a combo (they go together), a
-  colour, a material; over an article, a colour noun, "in" or "even" («بدون
-  اللون الاسود», «بدون الـ AMS», "not in black"). Before any other word it
-  excludes nothing and both words stay searched («طابعة بدون شاشة»). A list
-  after it («بدون AMS ولا كومبو», «بدون AMS والا كومبو», «بدون AMS او كومبو»,
-  "without AMS or combo", "without AMS nor combo", «بێ AMS یان کۆمبۆ») leaves
-  out each known term; an unknown word in the list stays searched and the list
-  runs on to its next list word («بدون AMS ولا P1S ولا كومبو» leaves out AMS
-  and the combo, and searches P1S). A carried negation never touches a price,
-  the sale mode, the spool or the order: they are read as written, and the
-  list runs on past them. «ولا» and «والا» are "or" without a negation («PLA
-  ولا PETG» lists both). The Sorani negation after a known term («ڕەش نەبێت»,
-  «PLA نەبێت», «بەردەست نییە») is the same.
-* **The rest, as before.** A colour or a material anywhere (a material stays a
-  search word and also narrows the materials). The diameter (1.75 / 2.85) only
-  in a query about filament (a filament or material word), «قطر» or mm beside
-  it or not; a negated diameter is no facet. The sale mode only for its fixed
-  phrases («متوفر», «موجود», "in stock", "available now", «بەردەستە»; «حجز»,
-  "pre-order", «پێشوەختە»; negated, the other one): "direct drive" and "AMS
-  ready" are features. Refill or with spool for the refill words, «مع بكرة»,
-  «بكرة كاملة», «بدون بكرة»; a bare spool word only in a query about filament
-  («PLA بكرة»), never beside an empty, holder, reusable, adapter or buffer word.
+  «مو», «غير», «لا اريد», «ما ابغى», «ما بدي», «مش عايز», "without", "no",
+  "non-", "anything but", "other than", «بێ», «بەبێ», «نەک» …) directly before
+  a known term leaves it out: AMS or a combo (they go together, but never the
+  AMS the search asks for: «AMS بدون كومبو» keeps the AMS units), a colour, a
+  material; over an article, a colour noun, "in" or "even" («بدون اللون
+  الاسود», «بدون الـ AMS», "not in black"), never past a comma («لا، اسود»,
+  "no, black" ask for black). Before any other word it excludes nothing and
+  both words stay searched («طابعة بدون شاشة»). A list after it («بدون AMS ولا
+  كومبو», «بدون AMS والا كومبو», «بدون AMS او كومبو», "without AMS or combo",
+  "without AMS nor combo", «بێ AMS یان کۆمبۆ»; "and" or a comma to one more of
+  the same kind: «بدون اسود وابيض», "except black and white", "excluding
+  black, white", «بێ ڕەش و سپی») leaves out each known term; an unknown word in
+  the list stays searched and the list runs on to its next list word («بدون
+  AMS ولا P1S ولا كومبو» leaves out AMS and the combo, and searches P1S).
+  Carried by a list word, a negation turns the sale mode and the spool like a
+  direct one («بدون AMS ولا حجز» is in stock) and holds a price, a diameter or
+  the order: never applied, and the list runs on past them. «ما اريد الا
+  الاسود», «لا اريد غير الابيض», "dont want anything but black" mean "only
+  that colour": it is read as written. «ولا» and «والا» are "or" without a
+  negation («PLA ولا PETG» lists both). The Sorani negation after a known term
+  («ڕەش نەبێت», «ڕەش نامەوێت», «PLA نەبێت», «بەردەست نییە») is the same.
+* **The rest.** A colour or a material anywhere (a material stays a search
+  word and also narrows the materials; «لبنية» is light blue). The diameter
+  (1.75 / 2.85) only beside a filament word («فلامنت 1.75», «فیلامێنت ڕەش
+  1.75», over the words of other constraints) or with mm («1.75mm», «1.75
+  مم»); never beside anything else ("PTFE tube 1.75 for PLA", "PLA 0.4 nozzle
+  1.75"), never an end of a range of sizes («بين 1.75 و 2.85 ملم»); a negated
+  diameter is no facet. The sale mode only for its fixed phrases («متوفر»,
+  «موجود», "in stock", "available now", «بەردەستە»; «حجز», "pre-order",
+  «پێشوەختە»; negated, the other one): "direct drive" and "AMS ready" are
+  features. Refill or with spool (the refill words, «مع بكرة», «بكرة كاملة»,
+  «بدون بكرة», a bare spool word) only beside a filament word: "glue refill",
+  «طابعة بدون بكرة», "AMS with spool" and Iraqi «بكرة» (tomorrow) are words;
+  never beside an empty, holder, reusable, adapter or buffer word. A material
+  anchors neither: «PLA 1.75», «PLA ريفل» search those words, so removing the
+  PLA chip never takes another facet with it. «رخيص» / "cheap" is the price
+  order; negated («مو رخيص», "not the cheapest", «هەرزان نەبێت») it is no
+  order, never the opposite one.
 * **What becomes a filter leaves the search.** Price, sale, colour and sort
   words and the negations are consumed, and so are the spool and diameter
   words that became the facet: consumed, a spool word never reaches the
@@ -371,9 +403,11 @@ request without `nl=1`: the typed search, no `understood`.
   material judges only products that have a `material_type`.
 * **The chip drop contract.** Each chip's `drop` is the search text with that
   chip's words taken out; read again it gives the same answer less exactly that
-  chip (removing the first exclusion of a negation list keeps the negation for
-  the rest). The golden corpus (`tests/nlQueryGolden.test.ts`) states every row
-  to this rule and checks the contract on each. The answer carries
+  chip, with no exception (removing the first exclusion of a negation list
+  keeps the negation for the rest; before a held price, diameter or order it
+  stays where it was typed, so they stay held). The golden corpus
+  (`tests/nlQueryGolden.test.ts`) states every row to this rule and checks the
+  contract on each. The answer carries
   `understood: { text, chips }` — data for the chips the search UI words in
   ar, en and ckb (smart search 1.7). `nl` is part of the edge cache key.
 

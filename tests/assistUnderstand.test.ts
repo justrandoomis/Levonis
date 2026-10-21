@@ -79,7 +79,8 @@ test('amounts: number words, halves and quarters, ranges, bounds after the amoun
   assert.deepEqual(priceOf('تحت نص مليون'), max(500_000));
   assert.deepEqual(priceOf('اقل من ربع مليون'), max(250_000));
   assert.deepEqual(priceOf('اقل من مليونين'), max(2_000_000));
-  assert.deepEqual(priceOf('اقل من مليون و 250'), max(1_250_000));
+  // «مليون و 250» is 1,000,250 as written and 1,250,000 as often meant: no thousands are implied, nothing applies.
+  assert.equal(priceOf('اقل من مليون و 250'), null);
   assert.deepEqual(priceOf('اقل من خمسة وعشرين الف'), max(25_000));
   assert.deepEqual(priceOf('under half a million'), max(500_000));
   assert.deepEqual(priceOf('کەمتر لە نیو ملیۆن'), max(500_000));
@@ -292,9 +293,10 @@ test('row 10: a negation is an exclusion — «بدون AMS», «مو كومبو
     assert.deepEqual(nl.exclude.words, [word], q);
     assert.ok(!nlFold(nl.text).includes('ams') && !/بدون|without|بێ/u.test(nl.text), `${q}: the negation and its word left the search`);
   }
-  // A negated constraint is the opposite constraint.
-  assert.equal(parseNlQuery('بدون بكرة').spool, 'refill');
-  assert.equal(parseNlQuery('without spool').spool, 'refill');
+  // A negated constraint is the opposite constraint (the spool beside a filament word only).
+  assert.equal(parseNlQuery('فلامنت بدون بكرة').spool, 'refill');
+  assert.equal(parseNlQuery('filament without spool').spool, 'refill');
+  assert.equal(parseNlQuery('طابعة بدون بكرة').spool, null);
   assert.equal(parseNlQuery('بدون حجز').sale, 'direct');
   assert.deepEqual(parseNlQuery('فلامنت مو اسود').exclude.colours, ['black']);
   assert.deepEqual(parseNlQuery('فلامنت بدون PLA').exclude.materials, ['pla']);
@@ -337,31 +339,38 @@ test('a negation carries over "or" in every language: "without AMS or combo", «
   assert.deepEqual(parseNlQuery('without AMS printer or combo').exclude.words, ['ams']);
 });
 
-test('row 11: refill vs with spool, consumed so «spool» never reaches the spool→filament synonym', () => {
-  for (const q of ['ريفل', 'ريفيل', 'refill', 'ڕیفیل', 'بدون بكرة', 'بێ ماسوورە', 'عبوة بدون بكرة']) {
+test('row 11: refill vs with spool beside a filament word, consumed so «spool» never reaches the spool→filament synonym', () => {
+  for (const [q, text] of [
+    ['فلامنت ريفل', 'فلامنت'], ['فلامنت ريفيل', 'فلامنت'], ['filament refill', 'filament'], ['فیلامێنت ڕیفیل', 'فیلامێنت'],
+    ['فلامنت بدون بكرة', 'فلامنت'], ['فیلامێنت بێ ماسوورە', 'فیلامێنت'], ['PLA filament refill', 'PLA filament'],
+  ] as const) {
     const nl = parseNlQuery(q);
     assert.equal(nl.spool, 'refill', q);
-    assert.equal(nl.text, '', q);
-  }
-  for (const q of ['بكرة كاملة', 'مع بكرة', 'with spool', 'full spool', 'لەگەڵ ماسوورە']) {
-    const nl = parseNlQuery(q);
-    assert.equal(nl.spool, 'spool', q);
-    assert.equal(nl.text, '', `${q}: no spool word is left for the synonym`);
-  }
-  // A bare spool word is the facet beside a filament or material word.
-  for (const [q, text] of [['PLA spool', 'PLA'], ['filament spool', 'filament'], ['فلامنت بكرة', 'فلامنت'], ['فیلامێنت ماسوورە', 'فیلامێنت']] as const) {
-    const nl = parseNlQuery(q);
-    assert.equal(nl.spool, 'spool', q);
     assert.equal(nl.text, text, q);
   }
-  const pla = parseNlQuery('PLA refill');
-  assert.equal(pla.text, 'PLA');
-  assert.equal(pla.spool, 'refill');
+  for (const [q, text] of [
+    ['فلامنت بكرة كاملة', 'فلامنت'], ['فلامنت مع بكرة', 'فلامنت'], ['filament with spool', 'filament'], ['filament full spool', 'filament'],
+    ['فیلامێنت لەگەڵ ماسوورە', 'فیلامێنت'], ['filament spool', 'filament'], ['فلامنت بكرة', 'فلامنت'], ['فیلامێنت ماسوورە', 'فیلامێنت'],
+  ] as const) {
+    const nl = parseNlQuery(q);
+    assert.equal(nl.spool, 'spool', q);
+    assert.equal(nl.text, text, `${q}: no spool word is left for the synonym`);
+  }
+  // Without a filament word beside it the spool and refill words are a product: a glue or wiper refill, a printer
+  // or an AMS with a spool, «بكرة» (tomorrow). A material is no anchor: «PLA refill» searches the refills by name.
+  for (const q of [
+    'ريفل', 'refill', 'بدون بكرة', 'with spool', 'بكرة كاملة', 'glue refill', 'nozzle wiper refill', 'ريفيل غراء', 'طابعة بدون بكرة',
+    'AMS with spool', 'P1S with spool', 'چاپکەر لەگەڵ ماسوورە', 'PLA refill', 'PLA spool', 'PLA اسود يوصل بكرة',
+  ]) {
+    const nl = parseNlQuery(q);
+    assert.equal(nl.spool, null, q);
+    assert.ok(!nl.understood.some((c) => c.kind === 'spool'), q);
+  }
   // An empty spool, a spool holder, a reusable spool, an adapter: products, not the facet. Alone, the
   // spool word and the diameter are product names too ("PTFE 1.75" is a tube, not a filament filter).
   for (const q of [
     'empty spool', 'بكرة فارغة', 'حامل بكرة', 'spool holder', 'spool', 'ماسوورە', 'Bambu Reusable Spool', 'بكرة بامبو قابلة لاعادة الاستخدام',
-    'reusable spool', 'PETG reusable spool', 'spool adapter', 'spool buffer', 'توصيل بكرة', 'PTFE 1.75', 'انبوب تفلون 1.75', '1.75mm',
+    'reusable spool', 'PETG reusable spool', 'spool adapter', 'spool buffer', 'توصيل بكرة', 'PTFE 1.75', 'انبوب تفلون 1.75', 'PTFE tube 1.75 for PLA',
   ]) {
     const nl = parseNlQuery(q);
     assert.equal(nl.spool, null, q);
@@ -392,10 +401,15 @@ test('row 12: «متوفر هسه» is direct, «حجز» is pre-order — never
 });
 
 test('row 13 and the rest: the diameter, the price order, colour words of every language', () => {
-  assert.deepEqual(parseNlQuery('PLA 1.75').diameters, ['1.75']);
-  assert.deepEqual(parseNlQuery('PETG ٢٫٨٥').diameters, ['2.85']);
+  // The diameter beside a filament word or with mm; a material beside it is no anchor (its chip removed would take it).
+  assert.deepEqual(parseNlQuery('فلامنت 1.75').diameters, ['1.75']);
+  assert.deepEqual(parseNlQuery('PETG filament ٢٫٨٥').diameters, ['2.85']);
   assert.deepEqual(parseNlQuery('فلامنت قطر 1.75mm').diameters, ['1.75']);
-  assert.equal(parseNlQuery('PLA 1.75').text, 'PLA');
+  assert.deepEqual(parseNlQuery('PLA 1.75mm').diameters, ['1.75']);
+  assert.deepEqual(parseNlQuery('1.75mm').diameters, ['1.75']);
+  assert.equal(parseNlQuery('PLA 1.75mm').text, 'PLA');
+  assert.deepEqual(parseNlQuery('PLA 1.75').diameters, []);
+  assert.equal(parseNlQuery('PLA 1.75').text, 'PLA 1.75');
   assert.deepEqual(parseNlQuery('طابعة رخيصة').sort, 'price_asc');
   assert.deepEqual(parseNlQuery('cheapest printer').sort, 'price_asc');
   assert.deepEqual(parseNlQuery('چاپکەری هەرزان').sort, 'price_asc');
@@ -448,7 +462,7 @@ test('a removed chip (smart search 1.7): its own words leave the field, every ot
   assert.deepEqual(w('چاپکەر بێ AMS'), { 'exclude:ams': 'چاپکەر' });
   assert.deepEqual(w('فلامنت مو اسود'), { 'color!:black': 'فلامنت' });
   assert.deepEqual(w('فلامنت بدون بكرة'), { spool: 'فلامنت' }, 'a flipped constraint is one chip with its negation');
-  assert.deepEqual(w('ريفل'), { spool: '' }, 'nothing left: the field is emptied');
+  assert.deepEqual(w('متوفر'), { sale: '' }, 'nothing left: the field is emptied');
   // Two bounds are one price chip; a material is a chip AND a search word.
   assert.deepEqual(w('اكثر من 10 الف واقل من 30 الف PLA'), { price: 'PLA', 'material:pla': 'اكثر من 10 الف واقل من 30 الف' });
   // A bare bound beside it: neither applies, and only the material is a chip.
@@ -464,8 +478,9 @@ test('a removed chip (smart search 1.7): its own words leave the field, every ot
       assert.deepEqual(again, nl.understood.map(nlChipKey).filter((k) => k !== nlChipKey(chip)), `${q} less ${nlChipKey(chip)}`);
     }
   }
-  // The one exception, by design: the material was the only filament word, so without it 1.75 is a search word again.
-  assert.deepEqual(parseNlQuery(w('PETG 1.75')['material:petg']).diameters, []);
+  // No exception: with mm the diameter stands without the material, and a material alone anchors nothing.
+  assert.deepEqual(parseNlQuery(w('PETG 1.75mm')['material:petg']).diameters, ['1.75']);
+  assert.deepEqual(parseNlQuery('PETG 1.75').diameters, []);
 });
 
 test('nlKeeps: an exclusion reads names and the family, never the description; a colour needs evidence; a material judges materials only', () => {
@@ -477,6 +492,18 @@ test('nlKeeps: an exclusion reads names and the family, never the description; a
   assert.equal(nlKeeps(noAms, product(['نظام تعدد المواد'], { product_family: 'bambu_lab_ams' })), false, 'the family names it');
   assert.equal(nlKeeps(noAms, product(['Bambu Lab AMS lite'])), false);
   assert.equal(nlKeeps(noAms, product(['', 'طابعة الكومبو'])), false, 'an Arabic name, with its article');
+  // A combo left out takes the AMS units with it, unless the search asks for them: «AMS بدون كومبو», "AMS lite non-combo".
+  assert.equal(nlKeeps(parseNlQuery('طابعة مو كومبو'), product(['Bambu Lab AMS lite'])), false);
+  for (const q of ['AMS بدون كومبو', 'AMS lite without combo', 'AMS lite بێ کۆمبۆ', 'AMS lite non-combo']) {
+    const nl = parseNlQuery(q);
+    assert.equal(nlKeeps(nl, product(['Bambu Lab AMS lite', 'AMS لايت'])), true, `${q}: the AMS asked for stays`);
+    assert.equal(nlKeeps(nl, product(['نظام تعدد المواد'], { product_family: 'bambu_lab_ams' })), true, `${q}: by its family too`);
+    assert.equal(nlKeeps(nl, product(['Bambu Lab X1 Carbon Combo'])), false, `${q}: the combo goes`);
+  }
+  // «لبنية» is light blue, never «ل» + «بنية» (brown).
+  const lightBlue = parseNlQuery('PLA لبنية');
+  assert.equal(nlKeeps(lightBlue, product(['Bambu PLA Basic'], { color_name: 'blue', material_type: 'PLA' })), true);
+  assert.equal(nlKeeps(lightBlue, product(['Bambu PLA Basic'], { color_name: 'brown', material_type: 'PLA' })), false);
 
   const black = parseNlQuery('فلامنت اسود');
   assert.equal(nlKeeps(black, product(['Bambu PLA Basic'], { color_name: 'white | black' })), true, 'the colour facet');
@@ -621,18 +648,20 @@ test('row 9 through the route: black filament at most 30,000 — nothing above t
   assert.deepEqual(violations, []);
 });
 
-test('row 11 through the route: «ريفل» is the refill facet, «بكرة كاملة» the with-spool one — «spool» is not «filament»', async () => {
+test('row 11 through the route: «فلامنت ريفل» is the refill facet, «فلامنت بكرة كاملة» the with-spool one — «spool» is not «filament»', async () => {
   const db = limitD1(await understandingShop());
-  const refill = await understand(db, 'ريفل');
+  const refill = await understand(db, 'فلامنت ريفل');
   assert.deepEqual(ids(refill), ['f_black', 'f_refill']);
-  assert.deepEqual(refill.understood, { text: '', chips: [{ kind: 'spool', value: 'refill', drop: '' }] });
-  const spool = await understand(db, 'بكرة كاملة');
+  assert.deepEqual(refill.understood, { text: 'فلامنت', chips: [{ kind: 'spool', value: 'refill', drop: 'فلامنت' }] });
+  const spool = await understand(db, 'فلامنت بكرة كاملة');
   assert.deepEqual(ids(spool), ['f_black', 'f_petg_black', 'f_silk_black', 'f_tpu_pre', 'f_white']);
   // «spool» beside a filament word is the with-spool facet, not every filament: the refill-only spool and the one with no spool fact are not in it.
   const english = await understand(db, 'filament spool');
   assert.deepEqual(ids(english), ids(spool));
   assert.ok(!english.products.some((p) => p.id === 'f_refill' || p.id === 'f_285'));
-  assert.deepEqual(ids(await understand(db, 'PLA refill')), ['f_black', 'f_refill']);
+  assert.deepEqual(ids(await understand(db, 'PLA filament refill')), ['f_black', 'f_refill']);
+  // Alone, a refill word is no facet: nothing is filtered.
+  assert.deepEqual((await understand(db, 'ريفل')).understood?.chips, []);
   // Alone, the spool word and the diameter name products: nothing is filtered, and the spool and the tube are found.
   for (const [q, id] of [
     ['Bambu Reusable Spool', 'a_spool'],
@@ -646,6 +675,31 @@ test('row 11 through the route: «ريفل» is the refill facet, «بكرة ك�
     assert.ok(b.products.some((p) => p.id === id), `${q}: ${id} is listed`);
     assert.deepEqual(b.understood?.chips, [], q);
   }
+  assert.deepEqual(violations, []);
+});
+
+test('the precision rule through the route: a negation around a price applies nothing, a combo left out keeps the AMS asked for', async () => {
+  const db = limitD1(await understandingShop());
+  // «على الاكثر» is "at most": the filaments at 30,000 or less, never only the dearer ones.
+  const most = await understand(db, 'فلامنت على الاكثر 30 الف');
+  assert.deepEqual(bare(most.understood?.chips), [{ kind: 'price', min: null, max: 30_000, currency: 'IQD' }]);
+  assert.ok(most.products.some((p) => p.id === 'f_285') && most.products.some((p) => p.id === 'f_refill'), 'the cheap filaments are listed');
+  assert.ok(!most.products.some((p) => p.id === 'f_silk_black' || p.id === 'f_tpu_pre'), 'nothing above the budget');
+  // "Nor more than a million" after a list: the price is held, the printers under a million stay.
+  const nor = await understand(db, 'طابعة بدون AMS ولا اكثر من مليون');
+  assert.deepEqual(bare(nor.understood?.chips), [{ kind: 'exclude', value: 'ams' }]);
+  assert.ok(nor.products.some((p) => p.id === 'p_a1') && nor.products.some((p) => p.id === 'p_p1s'), 'A1 and P1S are listed');
+  // "I do not have more than 30,000": no bound at all, the page is the page without nl=1.
+  const have = await understand(db, 'فلامنت ما عندي اكثر من 30 الف');
+  assert.deepEqual(have.understood?.chips, []);
+  // «لا اريد الاسود»: black is left out, never the only colour kept.
+  const notBlack = await understand(db, 'لا اريد الاسود PLA');
+  assert.deepEqual(bare(notBlack.understood?.chips), [{ kind: 'material', value: 'pla' }, { kind: 'color', value: 'black', not: true }]);
+  assert.ok(notBlack.products.some((p) => p.id === 'f_white') && !notBlack.products.some((p) => p.id === 'f_black'));
+  // «AMS بدون كومبو»: the AMS units searched for stay, only the combo goes.
+  const ams = await understand(db, 'AMS بدون كومبو');
+  assert.ok(ams.products.some((p) => p.id === 'p_ams') && ams.products.some((p) => p.id === 'p_ams_lite'), 'the AMS units are listed');
+  assert.ok(!ams.products.some((p) => p.id === 'p_x1c_combo'), 'the combo is left out');
   assert.deepEqual(violations, []);
 });
 

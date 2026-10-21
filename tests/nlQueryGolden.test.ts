@@ -19,14 +19,17 @@
  *  (c) a negated comparator is read as its positive meaning only in its fixed forms («لا يزيد عن», «لا يقل
  *      عن», «مو اكثر من», «مو اقل من», "no more than", "no less than", "not over", "not under", «زیاتر نەبێت
  *      لە», «کەمتر نەبێت لە», «لە … زیاتر نەبێت», «لە … کەمتر نەبێت»); any other negation around a price
- *      leaves it unapplied;
+ *      leaves it unapplied: before it in its clause over any words, after it, or carried by a list word
+ *      («بدون AMS ولا اكثر من مليون»); a negation another constraint took is that constraint's;
  *  (d) an exclusion applies only for a negation directly before a known term (AMS, combo, a colour, a
- *      material); a list after it («ولا», «والا», «او», "or", "nor", «یان») leaves out each known term, an
- *      unknown word in the list stays searched, and a carried negation never touches a price, the sale mode
- *      or the spool facet (they are read as written); a function word («بس», «حتى», "just", "only», «لەگەڵ»,
- *      «مع», "with", «تەنها» …) is never excluded;
- *  (e) a chip's removal text, read again, is the same answer less exactly that chip (removing the first
- *      exclusion of a negation list keeps the negation for the rest);
+ *      material), never past a comma; a list after it («ولا», «والا», «او», "or", "nor", «یان»; "and" or a
+ *      comma to a term of the same kind) leaves out each known term, an unknown word in the list stays
+ *      searched; carried, the negation turns the sale mode and the spool like a direct one and holds a price,
+ *      a diameter or the order (never applied); a function word («بس», «حتى», "just", "only», «لەگەڵ», «مع»,
+ *      "with", «تەنها» …) is never excluded;
+ *  (e) a chip's removal text, read again, is the same answer less exactly that chip, with no exception
+ *      (removing the first exclusion of a negation list keeps the negation for the rest; before a held price,
+ *      diameter or order the negation stays where it was typed, so they stay held);
  *  (f) a per-unit word goes with a qualified price only before a unit things are sold by (kg, g, piece,
  *      roll, spool, litre, ml, metre, their Arabic and Sorani forms, the Sorani indefinite «ێک/یەک» too); a
  *      measure (length, temperature, power, time) never becomes a price; «N کیلۆی» after a number stays a
@@ -38,10 +41,9 @@
  * material:x, material!:x, exclude:x). `price` is [min, max] in dinars, or in
  * dollars with `usd`. `exHas` / `notEx` say only which words are and are not
  * excluded, where the policy fixes no more than that. Every row also holds
- * the removal contract (d) for each of its chips, except the few marked
- * `contract: false`: there a material is the only filament word beside a
- * diameter or a bare spool word, the documented exception pinned in
- * tests/assistUnderstand.test.ts, which this corpus does not decide.
+ * the removal contract (e) for each of its chips. There is no exception: a
+ * material is no anchor of the diameter or the spool facet (only a filament
+ * word beside them is, or mm for the diameter), so removing it keeps them.
  *
  * Deterministic: nothing here asks a model.
  *
@@ -77,8 +79,6 @@ interface Expect {
   sort?: 'price_asc';
   /** The removal text of these chips (nlChipKey → text), exactly. */
   drop?: Record<string, string>;
-  /** false: the removal contract (d) is not checked on this row (see the header). */
-  contract?: false;
 }
 
 interface Row {
@@ -136,34 +136,34 @@ const ROWS: Row[] = [
   { q: 'A1 mini بێ AMS', lang: 'ckb', expect: { text: 'A1 mini', ex: ['ams'] } },
 
   // ======================================================================
-  // ACCEPTANCE ROW 11 — refill vs with spool; a bare spool word is a product
+  // ACCEPTANCE ROW 11 — refill vs with spool beside a filament word; alone, or beside anything else, a product
   // ======================================================================
-  { q: 'ريفل', lang: 'ar', expect: { text: '', spool: 'refill', drop: { spool: '' } } },
-  { q: 'ريفيل', lang: 'ar', expect: { text: '', spool: 'refill' } },
-  { q: 'بدون بكرة', lang: 'ar', expect: { text: '', spool: 'refill' } },
-  { q: 'عبوة بدون بكرة', lang: 'ar', expect: { text: '', spool: 'refill' } },
+  { q: 'ريفل', lang: 'ar', expect: { price: null, text: 'ريفل' } },
+  { q: 'ريفيل', lang: 'ar', expect: { price: null, text: 'ريفيل' } },
+  { q: 'بدون بكرة', lang: 'ar', expect: { price: null, text: 'بدون بكرة' } },
+  { q: 'عبوة بدون بكرة', lang: 'ar', expect: { price: null, text: 'عبوة بدون بكرة' } },
   { q: 'فلامنت بدون بكرة', lang: 'ar', expect: { text: 'فلامنت', spool: 'refill', drop: { spool: 'فلامنت' } } },
-  { q: 'بكرة كاملة', lang: 'ar', expect: { text: '', spool: 'spool' } },
-  { q: 'مع بكرة', lang: 'ar', expect: { text: '', spool: 'spool' } },
+  { q: 'بكرة كاملة', lang: 'ar', expect: { price: null, text: 'بكرة كاملة' } },
+  { q: 'مع بكرة', lang: 'ar', expect: { price: null, text: 'مع بكرة' } },
   { q: 'فلامنت بكرة', lang: 'ar', expect: { text: 'فلامنت', spool: 'spool' } },
   { q: 'بكرة فارغة', lang: 'ar', expect: { text: 'بكرة فارغة' } },
   { q: 'حامل بكرة', lang: 'ar', expect: { text: 'حامل بكرة' } },
   { q: 'طابعة بكرة', lang: 'ar', expect: { text: 'طابعة بكرة' } },
-  { q: 'refill', lang: 'en', expect: { text: '', spool: 'refill' } },
-  { q: 'with spool', lang: 'en', expect: { text: '', spool: 'spool' } },
-  { q: 'full spool', lang: 'en', expect: { text: '', spool: 'spool' } },
-  { q: 'PLA refill', lang: 'en', expect: { text: 'PLA', materials: ['pla'], spool: 'refill' } },
-  { q: 'refill PLA', lang: 'en', expect: { text: 'PLA', materials: ['pla'], spool: 'refill' } },
-  { q: 'PLA spool', lang: 'en', expect: { text: 'PLA', materials: ['pla'], spool: 'spool', contract: false } },
+  { q: 'refill', lang: 'en', expect: { price: null, text: 'refill' } },
+  { q: 'with spool', lang: 'en', expect: { price: null, text: 'with spool' } },
+  { q: 'full spool', lang: 'en', expect: { price: null, text: 'full spool' } },
+  { q: 'PLA refill', lang: 'en', expect: { price: null, text: 'PLA refill', materials: ['pla'] } },
+  { q: 'refill PLA', lang: 'en', expect: { price: null, text: 'refill PLA', materials: ['pla'] } },
+  { q: 'PLA spool', lang: 'en', expect: { price: null, text: 'PLA spool', materials: ['pla'] } },
   { q: 'empty spool', lang: 'en', expect: { text: 'empty spool' } },
   { q: 'spool holder', lang: 'en', expect: { text: 'spool holder' } },
   { q: 'Bambu Reusable Spool', lang: 'en', expect: { text: 'Bambu Reusable Spool' } },
   { q: 'PTFE 1.75', lang: 'en', expect: { text: 'PTFE 1.75' } },
-  { q: 'ڕیفیل', lang: 'ckb', expect: { text: '', spool: 'refill' } },
-  { q: 'بێ ماسوورە', lang: 'ckb', expect: { text: '', spool: 'refill' } },
-  { q: 'لەگەڵ ماسوورە', lang: 'ckb', expect: { text: '', spool: 'spool' } },
+  { q: 'ڕیفیل', lang: 'ckb', expect: { price: null, text: 'ڕیفیل' } },
+  { q: 'بێ ماسوورە', lang: 'ckb', expect: { price: null, text: 'بێ ماسوورە' } },
+  { q: 'لەگەڵ ماسوورە', lang: 'ckb', expect: { price: null, text: 'لەگەڵ ماسوورە' } },
   { q: 'فیلامێنت ماسوورە', lang: 'ckb', expect: { text: 'فیلامێنت', spool: 'spool' } },
-  { q: 'PLA ڕیفیل', lang: 'ckb', expect: { text: 'PLA', materials: ['pla'], spool: 'refill' } },
+  { q: 'PLA ڕیفیل', lang: 'ckb', expect: { price: null, text: 'PLA ڕیفیل', materials: ['pla'] } },
   { q: 'ماسوورە', lang: 'ckb', expect: { text: 'ماسوورە' } },
 
   // ======================================================================
@@ -452,67 +452,67 @@ const ROWS: Row[] = [
   // A second negation after the list starts its own: removing «كومبو» leaves «بدون AMS مو اسود».
   { q: 'بدون AMS ولا كومبو ولا مو اسود', lang: 'ar', expect: { text: '', ex: ['ams', 'combo'], exC: ['black'] } },
   // A direct negation of the spool, then a listed exclusion: removing the spool keeps the AMS left out.
-  { q: 'بدون بكرة ولا AMS', lang: 'ar', expect: { text: '', spool: 'refill', ex: ['ams'] } },
-  { q: 'without spool or AMS', lang: 'en', expect: { text: '', spool: 'refill', ex: ['ams'] } },
-  { q: 'بێ ماسوورە یان AMS', lang: 'ckb', expect: { text: '', spool: 'refill', ex: ['ams'] } },
+  { q: 'بدون بكرة ولا AMS', lang: 'ar', expect: { price: null, text: 'بدون بكرة', ex: ['ams'] } },
+  { q: 'without spool or AMS', lang: 'en', expect: { price: null, text: 'without spool', ex: ['ams'] } },
+  { q: 'بێ ماسوورە یان AMS', lang: 'ckb', expect: { price: null, text: 'بێ ماسوورە', ex: ['ams'] } },
   // A bare spool word after the list word is neither left out nor the facet (no filament word): a product word.
   { q: 'بدون AMS ولا بكرة', lang: 'ar', expect: { text: 'بكرة', ex: ['ams'] } },
   // A price bound after the list word is never negated: read as written when it qualifies, else searched.
-  { q: 'طابعة بدون AMS او اقل من 500 الف', lang: 'ar', expect: { price: [null, 500_000], text: 'طابعة', ex: ['ams'] } },
-  { q: 'بدون AMS او اكثر من 500 الف', lang: 'ar', expect: { price: [500_000, null], text: '', ex: ['ams'] } },
-  { q: 'فلامنت بدون اسود ولا اقل من 20 الف', lang: 'ar', expect: { price: [null, 20_000], text: 'فلامنت', exC: ['black'] } },
-  { q: 'printer without AMS or under 500k', lang: 'en', expect: { price: [null, 500_000], text: 'printer', ex: ['ams'] } },
-  { q: 'without AMS or more than 500k', lang: 'en', expect: { price: [500_000, null], text: '', ex: ['ams'] } },
-  { q: 'filament without black or under 20k', lang: 'en', expect: { price: [null, 20_000], text: 'filament', exC: ['black'] } },
-  { q: 'چاپکەر بێ AMS یان کەمتر لە 500 هەزار', lang: 'ckb', expect: { price: [null, 500_000], text: 'چاپکەر', ex: ['ams'] } },
-  { q: 'بێ AMS یان زیاتر لە 500 هەزار', lang: 'ckb', expect: { price: [500_000, null], text: '', ex: ['ams'] } },
-  { q: 'فیلامێنت بێ ڕەش یان کەمتر لە 20 هەزار', lang: 'ckb', expect: { price: [null, 20_000], text: 'فیلامێنت', exC: ['black'] } },
+  { q: 'طابعة بدون AMS او اقل من 500 الف', lang: 'ar', expect: { price: null, text: 'طابعة اقل من 500 الف', ex: ['ams'] } },
+  { q: 'بدون AMS او اكثر من 500 الف', lang: 'ar', expect: { price: null, text: 'اكثر من 500 الف', ex: ['ams'] } },
+  { q: 'فلامنت بدون اسود ولا اقل من 20 الف', lang: 'ar', expect: { price: null, text: 'فلامنت اقل من 20 الف', exC: ['black'] } },
+  { q: 'printer without AMS or under 500k', lang: 'en', expect: { price: null, text: 'printer under 500k', ex: ['ams'] } },
+  { q: 'without AMS or more than 500k', lang: 'en', expect: { price: null, text: 'more than 500k', ex: ['ams'] } },
+  { q: 'filament without black or under 20k', lang: 'en', expect: { price: null, text: 'filament under 20k', exC: ['black'] } },
+  { q: 'چاپکەر بێ AMS یان کەمتر لە 500 هەزار', lang: 'ckb', expect: { price: null, text: 'چاپکەر کەمتر لە 500 هەزار', ex: ['ams'] } },
+  { q: 'بێ AMS یان زیاتر لە 500 هەزار', lang: 'ckb', expect: { price: null, text: 'زیاتر لە 500 هەزار', ex: ['ams'] } },
+  { q: 'فیلامێنت بێ ڕەش یان کەمتر لە 20 هەزار', lang: 'ckb', expect: { price: null, text: 'فیلامێنت کەمتر لە 20 هەزار', exC: ['black'] } },
   { q: 'بدون AMS ولا 500 الف', lang: 'ar', expect: { price: null, text: '500 الف', ex: ['ams'] } },
   // Nor the sale mode.
-  { q: 'بدون AMS ولا متوفر', lang: 'ar', expect: { text: '', ex: ['ams'], sale: 'direct' } },
-  { q: 'بدون AMS ولا حجز', lang: 'ar', expect: { text: '', ex: ['ams'], sale: 'preorder' } },
-  { q: 'without AMS or in stock', lang: 'en', expect: { text: '', ex: ['ams'], sale: 'direct' } },
-  { q: 'without AMS or pre-order', lang: 'en', expect: { text: '', ex: ['ams'], sale: 'preorder' } },
-  { q: 'without combo nor in stock', lang: 'en', expect: { text: '', ex: ['combo'], sale: 'direct' } },
-  { q: 'بێ AMS یان بەردەستە', lang: 'ckb', expect: { text: '', ex: ['ams'], sale: 'direct' } },
+  { q: 'بدون AMS ولا متوفر', lang: 'ar', expect: { price: null, text: '', ex: ['ams'], sale: 'preorder' } },
+  { q: 'بدون AMS ولا حجز', lang: 'ar', expect: { price: null, text: '', ex: ['ams'], sale: 'direct' } },
+  { q: 'without AMS or in stock', lang: 'en', expect: { price: null, text: '', ex: ['ams'], sale: 'preorder' } },
+  { q: 'without AMS or pre-order', lang: 'en', expect: { price: null, text: '', ex: ['ams'], sale: 'direct' } },
+  { q: 'without combo nor in stock', lang: 'en', expect: { price: null, text: '', ex: ['combo'], sale: 'preorder' } },
+  { q: 'بێ AMS یان بەردەستە', lang: 'ckb', expect: { price: null, text: '', ex: ['ams'], sale: 'preorder' } },
   // Nor the spool facet.
-  { q: 'بدون AMS او بكرة كاملة', lang: 'ar', expect: { text: '', ex: ['ams'], spool: 'spool' } },
-  { q: 'فلامنت بدون اسود ولا ريفل', lang: 'ar', expect: { text: 'فلامنت', exC: ['black'], spool: 'refill' } },
-  { q: 'بدون PLA ولا ريفل', lang: 'ar', expect: { text: '', exM: ['pla'], spool: 'refill' } },
-  { q: 'بدون كومبو ولا مع بكرة', lang: 'ar', expect: { text: '', ex: ['combo'], spool: 'spool' } },
-  { q: 'without AMS or with spool', lang: 'en', expect: { text: '', ex: ['ams'], spool: 'spool' } },
-  { q: 'without black or refill', lang: 'en', expect: { text: '', exC: ['black'], spool: 'refill' } },
-  { q: 'without PETG or refill', lang: 'en', expect: { text: '', exM: ['petg'], spool: 'refill' } },
-  { q: 'بێ ڕەش یان ڕیفیل', lang: 'ckb', expect: { text: '', exC: ['black'], spool: 'refill' } },
-  { q: 'بێ PLA یان ڕیفیل', lang: 'ckb', expect: { text: '', exM: ['pla'], spool: 'refill' } },
-  { q: 'بێ AMS یان لەگەڵ ماسوورە', lang: 'ckb', expect: { text: '', ex: ['ams'], spool: 'spool' } },
+  { q: 'بدون AMS او بكرة كاملة', lang: 'ar', expect: { price: null, text: 'بكرة كاملة', ex: ['ams'] } },
+  { q: 'فلامنت بدون اسود ولا ريفل', lang: 'ar', expect: { price: null, text: 'فلامنت', exC: ['black'], spool: 'spool' } },
+  { q: 'بدون PLA ولا ريفل', lang: 'ar', expect: { price: null, text: 'ريفل', exM: ['pla'] } },
+  { q: 'بدون كومبو ولا مع بكرة', lang: 'ar', expect: { price: null, text: 'مع بكرة', ex: ['combo'] } },
+  { q: 'without AMS or with spool', lang: 'en', expect: { price: null, text: 'with spool', ex: ['ams'] } },
+  { q: 'without black or refill', lang: 'en', expect: { price: null, text: 'refill', exC: ['black'] } },
+  { q: 'without PETG or refill', lang: 'en', expect: { price: null, text: 'refill', exM: ['petg'] } },
+  { q: 'بێ ڕەش یان ڕیفیل', lang: 'ckb', expect: { price: null, text: 'ڕیفیل', exC: ['black'] } },
+  { q: 'بێ PLA یان ڕیفیل', lang: 'ckb', expect: { price: null, text: 'ڕیفیل', exM: ['pla'] } },
+  { q: 'بێ AMS یان لەگەڵ ماسوورە', lang: 'ckb', expect: { price: null, text: 'لەگەڵ ماسوورە', ex: ['ams'] } },
   // The list runs on past a price (applied or searched), the sale mode, the spool or the order to the next exclusion: white, PETG and
   // combo are left out too, never wanted. Removing the first exclusion moves the negation to the next one.
   { q: 'بدون اسود ولا اقل من 30 ولا ابيض', lang: 'ar', expect: { price: null, text: 'اقل من 30', exC: ['black', 'white'], drop: { 'color!:black': 'اقل من 30 بدون ابيض', 'color!:white': 'بدون اسود ولا اقل من 30' } } },
   { q: 'فلامنت مو اسود ولا اقل من 30 ولا ابيض', lang: 'ar', expect: { price: null, text: 'فلامنت اقل من 30', exC: ['black', 'white'] } },
   { q: 'بدون PLA ولا اقل من 25 للكيلو ولا PETG', lang: 'ar', expect: { price: null, text: 'اقل من 25 للكيلو', exM: ['pla', 'petg'] } },
-  { q: 'بدون AMS ولا اقل من 500 الف ولا كومبو', lang: 'ar', expect: { price: [null, 500_000], text: '', ex: ['ams', 'combo'] } },
-  { q: 'بدون AMS ولا اقل من 20 الف ولا كومبو', lang: 'ar', expect: { price: [null, 20_000], text: '', ex: ['ams', 'combo'] } },
-  { q: 'بدون AMS ولا متوفر ولا كومبو', lang: 'ar', expect: { text: '', sale: 'direct', ex: ['ams', 'combo'], drop: { sale: 'بدون AMS ولا كومبو', 'exclude:ams': 'متوفر بدون كومبو' } } },
-  { q: 'بدون اسود ولا ريفل ولا ابيض', lang: 'ar', expect: { text: '', spool: 'refill', exC: ['black', 'white'] } },
-  { q: 'بدون AMS ولا ريفل ولا كومبو', lang: 'ar', expect: { text: '', spool: 'refill', ex: ['ams', 'combo'], drop: { spool: 'بدون AMS ولا كومبو' } } },
+  { q: 'بدون AMS ولا اقل من 500 الف ولا كومبو', lang: 'ar', expect: { price: null, text: 'اقل من 500 الف', ex: ['ams', 'combo'] } },
+  { q: 'بدون AMS ولا اقل من 20 الف ولا كومبو', lang: 'ar', expect: { price: null, text: 'اقل من 20 الف', ex: ['ams', 'combo'] } },
+  { q: 'بدون AMS ولا متوفر ولا كومبو', lang: 'ar', expect: { price: null, text: '', ex: ['ams', 'combo'], sale: 'preorder', drop: { sale: 'بدون AMS ولا كومبو', 'exclude:ams': 'بدون متوفر ولا كومبو' } } },
+  { q: 'بدون اسود ولا ريفل ولا ابيض', lang: 'ar', expect: { price: null, text: 'ريفل', exC: ['black', 'white'] } },
+  { q: 'بدون AMS ولا ريفل ولا كومبو', lang: 'ar', expect: { price: null, text: 'ريفل', ex: ['ams', 'combo'] } },
   { q: 'بدون AMS ولا بكرة ولا كومبو', lang: 'ar', expect: { text: 'بكرة', ex: ['ams', 'combo'] } },
-  { q: 'بدون AMS ولا كومبو ولا اقل من 20 الف رخيص', lang: 'ar', expect: { price: [null, 20_000], text: '', ex: ['ams', 'combo'], sort: 'price_asc', drop: { price: 'بدون AMS ولا كومبو رخيص' } } },
+  { q: 'بدون AMS ولا كومبو ولا اقل من 20 الف رخيص', lang: 'ar', expect: { price: null, text: 'اقل من 20 الف', ex: ['ams', 'combo'], sort: 'price_asc' } },
   { q: 'without black or between 20 and 30k or white', lang: 'en', expect: { price: null, text: 'between 20 and 30k', exC: ['black', 'white'], drop: { 'color!:black': 'between 20 and 30k without white' } } },
-  { q: 'without AMS or under 500k or combo', lang: 'en', expect: { price: [null, 500_000], text: '', ex: ['ams', 'combo'] } },
-  { q: 'without AMS or in stock or combo', lang: 'en', expect: { text: '', sale: 'direct', ex: ['ams', 'combo'], drop: { sale: 'without AMS or combo' } } },
-  { q: 'without AMS or cheapest or combo', lang: 'en', expect: { text: '', sort: 'price_asc', ex: ['ams', 'combo'] } },
+  { q: 'without AMS or under 500k or combo', lang: 'en', expect: { price: null, text: 'under 500k', ex: ['ams', 'combo'] } },
+  { q: 'without AMS or in stock or combo', lang: 'en', expect: { price: null, text: '', ex: ['ams', 'combo'], sale: 'preorder', drop: { sale: 'without AMS or combo' } } },
+  { q: 'without AMS or cheapest or combo', lang: 'en', expect: { price: null, text: 'cheapest', ex: ['ams', 'combo'] } },
   { q: 'بێ ڕەش یان لە نێوان 20 و 30 هەزار یان سپی', lang: 'ckb', expect: { price: null, text: 'لە نێوان 20 و 30 هەزار', exC: ['black', 'white'] } },
   { q: 'بێ ڕەش یان 30 هەزار یان سپی', lang: 'ckb', expect: { price: null, text: '30 هەزار', exC: ['black', 'white'] } },
-  { q: 'بێ AMS یان کەمتر لە 500 هەزار یان کۆمبۆ', lang: 'ckb', expect: { price: [null, 500_000], text: '', ex: ['ams', 'combo'] } },
-  { q: 'بێ AMS یان بەردەستە یان کۆمبۆ', lang: 'ckb', expect: { text: '', sale: 'direct', ex: ['ams', 'combo'] } },
-  { q: 'بێ AMS یان لە 30 هەزار زیاتر نەبێت یان کۆمبۆ', lang: 'ckb', expect: { price: [null, 30_000], text: '', ex: ['ams', 'combo'] } },
+  { q: 'بێ AMS یان کەمتر لە 500 هەزار یان کۆمبۆ', lang: 'ckb', expect: { price: null, text: 'کەمتر لە 500 هەزار', ex: ['ams', 'combo'] } },
+  { q: 'بێ AMS یان بەردەستە یان کۆمبۆ', lang: 'ckb', expect: { price: null, text: '', ex: ['ams', 'combo'], sale: 'preorder' } },
+  { q: 'بێ AMS یان لە 30 هەزار زیاتر نەبێت یان کۆمبۆ', lang: 'ckb', expect: { price: null, text: 'لە 30 هەزار زیاتر نەبێت', ex: ['ams', 'combo'] } },
   { q: 'بێ AMS یان ملیۆنێک', lang: 'ckb', expect: { price: null, text: 'ملیۆنێک', ex: ['ams'] } },
   // A bound word is never left out, even when what follows is a measure: the measure stays searched as typed.
   { q: 'without AMS or under 300mm', lang: 'en', expect: { text: 'under 300mm', ex: ['ams'] } },
   { q: 'بدون AMS ولا اقل من 30 سم', lang: 'ar', expect: { text: 'اقل من 30 سم', ex: ['ams'] } },
   { q: 'بدون AMS ولا اكثر من 2 كيلو', lang: 'ar', expect: { text: 'اكثر من 2 كيلو', ex: ['ams'] } },
-  { q: 'بێ ڕەش یان هەرزانتر لە 20 هەزار', lang: 'ckb', expect: { price: [null, 20_000], text: '', exC: ['black'] } },
+  { q: 'بێ ڕەش یان هەرزانتر لە 20 هەزار', lang: 'ckb', expect: { price: null, text: 'هەرزانتر لە 20 هەزار', exC: ['black'] } },
   // A diameter has no opposite: a negated one is no facet, and the words stay searched.
   { q: 'filament without 1.75', lang: 'en', expect: { text: 'filament without 1.75' } },
   { q: 'فیلامێنت بێ 1.75', lang: 'ckb', expect: { text: 'فیلامێنت بێ 1.75' } },
@@ -735,9 +735,9 @@ const ROWS: Row[] = [
   // ======================================================================
   // EVERYTHING TOGETHER — diameter, sort, sale, colour, exclusion, price
   // ======================================================================
-  { q: 'PLA 1.75', lang: 'en', expect: { text: 'PLA', materials: ['pla'], diameters: ['1.75'], contract: false } },
-  { q: 'PETG ٢٫٨٥', lang: 'en', expect: { text: 'PETG', materials: ['petg'], diameters: ['2.85'], contract: false } },
-  { q: 'PLA 1.75 under 25k', lang: 'en', expect: { price: [null, 25_000], text: 'PLA', materials: ['pla'], diameters: ['1.75'], contract: false } },
+  { q: 'PLA 1.75', lang: 'en', expect: { price: null, text: 'PLA 1.75', materials: ['pla'] } },
+  { q: 'PETG ٢٫٨٥', lang: 'en', expect: { price: null, text: 'PETG ٢٫٨٥', materials: ['petg'] } },
+  { q: 'PLA 1.75 under 25k', lang: 'en', expect: { price: [null, 25_000], text: 'PLA 1.75', materials: ['pla'] } },
   { q: 'filament 1.75 under 25k', lang: 'en', expect: { price: [null, 25_000], text: 'filament', diameters: ['1.75'] } },
   { q: 'cheapest printer', lang: 'en', expect: { text: 'printer', sort: 'price_asc' } },
   { q: 'PLA white in stock under 30k', lang: 'en', expect: { price: [null, 30_000], text: 'PLA', colours: ['white'], materials: ['pla'], sale: 'direct' } },
@@ -761,13 +761,13 @@ const ROWS: Row[] = [
   { q: 'فیلامێنت 1.75 کەمتر لە 25', lang: 'ckb', expect: { price: null, text: 'فیلامێنت کەمتر لە 25', diameters: ['1.75'] } },
   { q: 'فیلامێنت ڕەش 1.75 کەمتر لە 25 هەزار', lang: 'ckb', expect: { price: [null, 25_000], text: 'فیلامێنت', colours: ['black'], diameters: ['1.75'] } },
   { q: 'فیلامێنت 1.75 زیاتر لە 20 هەزار', lang: 'ckb', expect: { price: [20_000, null], text: 'فیلامێنت', diameters: ['1.75'] } },
-  { q: 'PLA 1.75 کەمتر لە 25 هەزار', lang: 'ckb', expect: { price: [null, 25_000], text: 'PLA', materials: ['pla'], diameters: ['1.75'], contract: false } },
+  { q: 'PLA 1.75 کەمتر لە 25 هەزار', lang: 'ckb', expect: { price: [null, 25_000], text: 'PLA 1.75', materials: ['pla'] } },
   // ======================================================================
   // ROUND 3 — case by case, under the precision rule
   // ======================================================================
   // A bound written after the amount keeps it when a diameter or a quantity follows (a bare 1.75 / 2.85 or «2 كيلو»
   // is never the amount of the bound word inside the phrase): «فما فوق 1.75» is "and up", then the diameter.
-  { q: 'PLA 500 الف فما فوق 1.75', lang: 'ar', expect: { price: [500_000, null], text: 'PLA', materials: ['pla'], diameters: ['1.75'], contract: false } },
+  { q: 'PLA 500 الف فما فوق 1.75', lang: 'ar', expect: { price: [500_000, null], text: 'PLA 1.75', materials: ['pla'] } },
   { q: 'فلامنت 500 الف فما فوق 1.75', lang: 'ar', expect: { price: [500_000, null], text: 'فلامنت', diameters: ['1.75'] } },
   { q: 'PLA 20 الف او اكثر 2 كيلو', lang: 'ar', expect: { price: [20_000, null], text: 'PLA 2 كيلو', materials: ['pla'] } },
   { q: 'طابعة 500 الف فما فوق 2 قطعة', lang: 'ar', expect: { price: [500_000, null], text: 'طابعة 2 قطعة' } },
@@ -778,7 +778,7 @@ const ROWS: Row[] = [
   { q: 'filament 20k and above 1.75', lang: 'en', expect: { price: [20_000, null], text: 'filament', diameters: ['1.75'] } },
   { q: 'filament 30k or less 1.75mm', lang: 'en', expect: { price: [null, 30_000], text: 'filament', diameters: ['1.75'] } },
   { q: 'فلامنت 30 الف واقل 1.75', lang: 'ar', expect: { price: [null, 30_000], text: 'فلامنت', diameters: ['1.75'] } },
-  { q: 'PLA 20 الف واكثر 1.75', lang: 'ar', expect: { price: [20_000, null], text: 'PLA', materials: ['pla'], diameters: ['1.75'], contract: false } },
+  { q: 'PLA 20 الف واكثر 1.75', lang: 'ar', expect: { price: [20_000, null], text: 'PLA 1.75', materials: ['pla'] } },
   { q: 'فلامنت 20 الف واكثر 1.75', lang: 'ar', expect: { price: [20_000, null], text: 'فلامنت', diameters: ['1.75'] } },
   { q: 'فیلامێنت لە 20 هەزار زیاتر 1.75', lang: 'ckb', expect: { price: [20_000, null], text: 'فیلامێنت', diameters: ['1.75'] } },
   { q: 'فیلامێنت لە 30 هەزار کەمتر 1.75', lang: 'ckb', expect: { price: [null, 30_000], text: 'فیلامێنت', diameters: ['1.75'] } },
@@ -998,6 +998,222 @@ const ROWS: Row[] = [
   { q: 'طابعة بدون شاشة', lang: 'ar', expect: { text: 'طابعة بدون شاشة' } },
   { q: 'printer without screen', lang: 'en', expect: { text: 'printer without screen' } },
   { q: 'چاپکەر بێ شاشە', lang: 'ckb', expect: { text: 'چاپکەر بێ شاشە' } },
+  // ======================================================================
+  // PRECISION ROUND 4 — what the verifiers found against the precision rule. When unsure, nothing applies.
+  // ======================================================================
+  // (a) «على الاكثر», «بالاكثر», «عالاكثر» are "at most", «بالاقل» "at least"; a comparator word never loses its
+  // article, so «الاكثر» / «الاقل» alone («the most», «the least») apply nothing.
+  { q: 'على الأكثر 30 ألف', lang: 'ar', expect: { price: [null, 30_000], text: '' } },
+  { q: 'فلامنت على الاكثر 30 الف', lang: 'ar', expect: { price: [null, 30_000], text: 'فلامنت', drop: { price: 'فلامنت' } } },
+  { q: 'بالأكثر مليون', lang: 'ar', expect: { price: [null, 1_000_000], text: '' } },
+  { q: 'بالاكثر 30 الف', lang: 'ar', expect: { price: [null, 30_000], text: '' } },
+  { q: 'عالاكثر 30 الف', lang: 'ar', expect: { price: [null, 30_000], text: '' } },
+  { q: 'الاكثر 30 الف', lang: 'ar', expect: { price: null, text: 'الاكثر 30 الف' } },
+  { q: 'بالاقل 20 الف', lang: 'ar', expect: { price: [20_000, null], text: '' } },
+  { q: 'فلامنت بالاقل 30 الف', lang: 'ar', expect: { price: [30_000, null], text: 'فلامنت' } },
+  { q: 'الاقل 20 الف', lang: 'ar', expect: { price: null, text: 'الاقل 20 الف' } },
+  { q: '30 الف بالاكثر', lang: 'ar', expect: { price: [null, 30_000], text: '' } },
+  // (c) A negation carried by a list word onto a price («ولا اكثر من», "nor over", «یان زیاتر لە») is a negation
+  // around it: the price is held, never applied in either direction, and the list runs on past it.
+  { q: 'طابعة بدون AMS ولا اكثر من مليون', lang: 'ar', expect: { price: null, text: 'طابعة اكثر من مليون', ex: ['ams'], drop: { 'exclude:ams': 'طابعة بدون ولا اكثر من مليون' } } },
+  { q: 'printer without AMS nor over 1m', lang: 'en', expect: { price: null, text: 'printer over 1m', ex: ['ams'], drop: { 'exclude:ams': 'printer without nor over 1m' } } },
+  { q: 'printer without AMS nor over $300', lang: 'en', expect: { price: null, text: 'printer over $300', ex: ['ams'] } },
+  { q: 'طابعة بدون AMS ولا اقل من 500 الف', lang: 'ar', expect: { price: null, text: 'طابعة اقل من 500 الف', ex: ['ams'] } },
+  { q: 'فلامنت مو اسود ولا اقل من 30 الف', lang: 'ar', expect: { price: null, text: 'فلامنت اقل من 30 الف', exC: ['black'], drop: { 'color!:black': 'فلامنت مو ولا اقل من 30 الف' } } },
+  { q: 'فلامنت مو اسود ولا ابيض ولا اكثر من 30 الف', lang: 'ar', expect: { price: null, text: 'فلامنت اكثر من 30 الف', exC: ['black', 'white'], drop: { 'color!:black': 'فلامنت مو ابيض ولا اكثر من 30 الف', 'color!:white': 'فلامنت مو اسود ولا اكثر من 30 الف' } } },
+  { q: 'filament not black nor white nor under 30k', lang: 'en', expect: { price: null, text: 'filament under 30k', exC: ['black', 'white'], drop: { 'color!:black': 'filament not white nor under 30k', 'color!:white': 'filament not black nor under 30k' } } },
+  { q: 'چاپکەر بێ ڕەش یان سپی یان زیاتر لە 30 هەزار', lang: 'ckb', expect: { price: null, text: 'چاپکەر زیاتر لە 30 هەزار', exC: ['black', 'white'], drop: { 'color!:black': 'چاپکەر بێ سپی یان زیاتر لە 30 هەزار' } } },
+  // (c) Any other negation before the comparator in its clause, over verbs and unknown words: «ما عندي», «ما اقدر
+  // ادفع», «مب», "can't pay", "should not be", «ناتوانم … بدەم», «نابێ», «پارەم نییە» — nothing applies.
+  { q: 'فلامنت ما عندي اكثر من 30 الف', lang: 'ar', expect: { price: null, text: 'فلامنت ما عندي اكثر من 30 الف' } },
+  { q: 'معندي اكثر من 30 الف', lang: 'ar', expect: { price: null, text: 'معندي اكثر من 30 الف' } },
+  { q: 'مااريد اكثر من 30 الف', lang: 'ar', expect: { price: null, text: 'مااريد اكثر من 30 الف' } },
+  { q: 'ما اريد اكثر من 30 الف', lang: 'ar', expect: { price: null, text: 'ما اريد اكثر من 30 الف' } },
+  { q: 'طابعة ما اقدر ادفع اكثر من 500 الف', lang: 'ar', expect: { price: null, text: 'طابعة ما اقدر ادفع اكثر من 500 الف' } },
+  { q: 'ما راح ادفع اكثر من 500 الف', lang: 'ar', expect: { price: null, text: 'ما راح ادفع اكثر من 500 الف' } },
+  { q: 'ما تطلع اكثر من 500 الف', lang: 'ar', expect: { price: null, text: 'ما تطلع اكثر من 500 الف' } },
+  { q: 'طابعة مب اكثر من 500 الف', lang: 'ar', expect: { price: null, text: 'طابعة مب اكثر من 500 الف' } },
+  { q: 'printer can\'t pay more than 1m', lang: 'en', expect: { price: null, text: 'printer can\'t pay more than 1m' } },
+  { q: 'printer should not be more than $300', lang: 'en', expect: { price: null, text: 'printer should not be more than $300' } },
+  { q: 'cannot spend over $300', lang: 'en', expect: { price: null, text: 'cannot spend over $300' } },
+  { q: 'won\'t pay above $300', lang: 'en', expect: { price: null, text: 'won\'t pay above $300' } },
+  { q: 'isn\'t over $300', lang: 'en', expect: { price: null, text: 'isn\'t over $300' } },
+  { q: 'shouldnt be over $300', lang: 'en', expect: { price: null, text: 'shouldnt be over $300' } },
+  { q: 'i can not pay over $300', lang: 'en', expect: { price: null, text: 'i can not pay over $300' } },
+  { q: 'i do not want anything over $300', lang: 'en', expect: { price: null, text: 'i do not want anything over $300' } },
+  // (c) A negation AFTER the amount that reaches nothing of its own («ما اريد», "no", "not wanted", "too much",
+  // «نامەوێت», «نادەم», «نا», «نەخێر»): nothing applies.
+  { q: 'طابعة فوق 500 الف ما اريد', lang: 'ar', expect: { price: null, text: 'طابعة فوق 500 الف ما اريد' } },
+  { q: 'اكثر من 500 الف لا', lang: 'ar', expect: { price: null, text: 'اكثر من 500 الف لا' } },
+  { q: 'اكثر من 500 الف ما ابي', lang: 'ar', expect: { price: null, text: 'اكثر من 500 الف ما ابي' } },
+  { q: 'اكثر من 500 الف ماريد', lang: 'ar', expect: { price: null, text: 'اكثر من 500 الف ماريد' } },
+  { q: 'اكثر من 500 الف لا اريد', lang: 'ar', expect: { price: null, text: 'اكثر من 500 الف لا اريد' } },
+  { q: 'printer over $300 no', lang: 'en', expect: { price: null, text: 'printer over $300 no' } },
+  { q: 'printer over $300 not wanted', lang: 'en', expect: { price: null, text: 'printer over $300 not wanted' } },
+  { q: 'printer more than $300 is too much', lang: 'en', expect: { price: null, text: 'printer more than $300 is too much' } },
+  { q: 'چاپکەر زیاتر لە 500 هەزار نامەوێت', lang: 'ckb', expect: { price: null, text: 'چاپکەر زیاتر لە 500 هەزار نامەوێت' } },
+  { q: 'زیاتر لە 500 هەزار نامەوێ', lang: 'ckb', expect: { price: null, text: 'زیاتر لە 500 هەزار نامەوێ' } },
+  { q: 'زیاتر لە 500 هەزار ناوێت', lang: 'ckb', expect: { price: null, text: 'زیاتر لە 500 هەزار ناوێت' } },
+  { q: 'زیاتر لە 500 هەزار نادەم', lang: 'ckb', expect: { price: null, text: 'زیاتر لە 500 هەزار نادەم' } },
+  { q: 'زیاتر لە 500 هەزار نا', lang: 'ckb', expect: { price: null, text: 'زیاتر لە 500 هەزار نا' } },
+  { q: 'لە 500 هەزار زیاتر نامەوێت', lang: 'ckb', expect: { price: null, text: 'لە 500 هەزار زیاتر نامەوێت' } },
+  { q: 'لە 500 هەزار زیاتر نا', lang: 'ckb', expect: { price: null, text: 'لە 500 هەزار زیاتر نا' } },
+  { q: 'لە 500 هەزار زیاتر نەخێر', lang: 'ckb', expect: { price: null, text: 'لە 500 هەزار زیاتر نەخێر' } },
+  { q: 'چاپکەر ناتوانم زیاتر لە 500 هەزار بدەم', lang: 'ckb', expect: { price: null, text: 'چاپکەر ناتوانم زیاتر لە 500 هەزار بدەم' } },
+  { q: 'نامەوێ زیاتر لە 500 هەزار', lang: 'ckb', expect: { price: null, text: 'نامەوێ زیاتر لە 500 هەزار' } },
+  { q: 'نابێ زیاتر لە 500 هەزار', lang: 'ckb', expect: { price: null, text: 'نابێ زیاتر لە 500 هەزار' } },
+  { q: 'نابێت زیاتر لە 500 هەزار بێت', lang: 'ckb', expect: { price: null, text: 'نابێت زیاتر لە 500 هەزار بێت' } },
+  { q: 'پارەم نییە زیاتر لە 500 هەزار', lang: 'ckb', expect: { price: null, text: 'پارەم نییە زیاتر لە 500 هەزار' } },
+  // A negation that reaches a known term is that term's: the price beside it applies.
+  { q: 'طابعة بدون AMS اقل من 500 الف', lang: 'ar', expect: { price: [null, 500_000], text: 'طابعة', ex: ['ams'], drop: { price: 'طابعة بدون AMS', 'exclude:ams': 'طابعة اقل من 500 الف' } } },
+  { q: 'printer under $300 without AMS', lang: 'en', expect: { price: [null, 300], usd: true, text: 'printer', ex: ['ams'], drop: { price: 'printer without AMS', 'exclude:ams': 'printer under $300' } } },
+  { q: 'فلامنت اقل من 30 الف مو اسود', lang: 'ar', expect: { price: [null, 30_000], text: 'فلامنت', exC: ['black'], drop: { price: 'فلامنت مو اسود', 'color!:black': 'فلامنت اقل من 30 الف' } } },
+  { q: 'چاپکەر کەمتر لە 500 هەزار بێ AMS', lang: 'ckb', expect: { price: [null, 500_000], text: 'چاپکەر', ex: ['ams'], drop: { price: 'چاپکەر بێ AMS', 'exclude:ams': 'چاپکەر کەمتر لە 500 هەزار' } } },
+  // (c)(d) A fixed negated form runs on over a list: "no more than 30k nor black" leaves black out, never wants it.
+  { q: 'filament no more than 30k nor black', lang: 'en', expect: { price: [null, 30_000], text: 'filament', exC: ['black'], drop: { price: 'filament no black', 'color!:black': 'filament no more than 30k' } } },
+  { q: 'فلامنت مو اكثر من 30 الف ولا اسود', lang: 'ar', expect: { price: [null, 30_000], text: 'فلامنت', exC: ['black'], drop: { price: 'فلامنت مو اسود', 'color!:black': 'فلامنت مو اكثر من 30 الف' } } },
+  { q: 'فلامنت لا يزيد عن 30 الف ولا ابيض', lang: 'ar', expect: { price: [null, 30_000], text: 'فلامنت', exC: ['white'], drop: { price: 'فلامنت لا ابيض', 'color!:white': 'فلامنت لا يزيد عن 30 الف' } } },
+  // (d) A combo left out keeps the AMS the search asks for (nlKeeps; tests/assistUnderstand.test.ts).
+  { q: 'AMS بدون كومبو', lang: 'ar', expect: { price: null, text: 'AMS', ex: ['combo'], drop: { 'exclude:combo': 'AMS' } } },
+  { q: 'AMS lite without combo', lang: 'en', expect: { price: null, text: 'AMS lite', ex: ['combo'], drop: { 'exclude:combo': 'AMS lite' } } },
+  { q: 'AMS lite بێ کۆمبۆ', lang: 'ckb', expect: { price: null, text: 'AMS lite', ex: ['combo'], drop: { 'exclude:combo': 'AMS lite' } } },
+  { q: 'AMS lite non-combo', lang: 'en', expect: { price: null, text: 'AMS lite', ex: ['combo'], drop: { 'exclude:combo': 'AMS lite' } } },
+  // (b) An end without a currency is in dinars: a dinar end never borrows the dollar of the other. Only a currency
+  // after the second of two ends written alike covers both ("between 20k and 30k dollars").
+  { q: 'between $300 and 500k', lang: 'en', expect: { price: null, text: 'between $300 and 500k' } },
+  { q: 'بين 300 الف و 500 دولار', lang: 'ar', expect: { price: null, text: 'بين 300 الف و 500 دولار' } },
+  { q: 'بين 50 دولار و 30 الف', lang: 'ar', expect: { price: null, text: 'بين 50 دولار و 30 الف' } },
+  { q: 'from $200 to 400k', lang: 'en', expect: { price: null, text: 'from $200 to 400k' } },
+  { q: 'لە 300 دۆلار تا 500 هەزار', lang: 'ckb', expect: { price: null, text: 'لە 300 دۆلار تا 500 هەزار' } },
+  { q: 'between 20k and 30k dollars', lang: 'en', expect: { price: [20_000, 30_000], usd: true, text: '' } },
+  // (c) «ماكو» (there is none), "or" carrying a negation onto a price: nothing applies.
+  { q: 'طابعة ماكو اقل من 500 الف', lang: 'ar', expect: { price: null, text: 'طابعة ماكو اقل من 500 الف' } },
+  { q: 'printer without AMS or under $300', lang: 'en', expect: { price: null, text: 'printer under $300', ex: ['ams'], drop: { 'exclude:ams': 'printer without or under $300' } } },
+  { q: 'چاپکەر بێ AMS یان زیاتر لە 500 هەزار', lang: 'ckb', expect: { price: null, text: 'چاپکەر زیاتر لە 500 هەزار', ex: ['ams'], drop: { 'exclude:ams': 'چاپکەر بێ یان زیاتر لە 500 هەزار' } } },
+  // (a) A bare number joined after a million («مليون و 500») is 1,000,500 as written or 1,500,000 as meant: no
+  // thousands are implied, nothing applies. «مليون و 500 الف» is one amount.
+  { q: 'more than 1 million and 500', lang: 'en', expect: { price: null, text: 'more than 1 million and 500' } },
+  { q: 'اكثر من مليون و 200', lang: 'ar', expect: { price: null, text: 'اكثر من مليون و 200' } },
+  { q: 'اكثر من 2 مليون و 500', lang: 'ar', expect: { price: null, text: 'اكثر من 2 مليون و 500' } },
+  { q: 'کەمتر لە ملیۆنێک و 500', lang: 'ckb', expect: { price: null, text: 'کەمتر لە ملیۆنێک و 500' } },
+  { q: 'اقل من مليون و 500 الف', lang: 'ar', expect: { price: [null, 1_500_000], text: '' } },
+  // (e) No contract exception: a material anchors no diameter and no spool, so its chip removed keeps every other.
+  { q: 'PLA 1.75 مم اقل من 25 الف', lang: 'ar', expect: { price: [null, 25_000], text: 'PLA', materials: ['pla'], diameters: ['1.75'], drop: { 'material:pla': '1.75 مم اقل من 25 الف', 'diameter:1.75': 'PLA اقل من 25 الف' } } },
+  { q: 'PLA اسود 1.75', lang: 'ar', expect: { price: null, text: 'PLA 1.75', colours: ['black'], materials: ['pla'], drop: { 'material:pla': 'اسود 1.75' } } },
+  { q: 'اقل من 30 الف 1.75 PLA', lang: 'ar', expect: { price: [null, 30_000], text: '1.75 PLA', materials: ['pla'], drop: { 'material:pla': 'اقل من 30 الف 1.75' } } },
+  // (d) "I do not want …" before or after a colour («لا اريد», «ما ابغى», «ما بدي», «مش عايز», «ما احب», "anything
+  // but", "other than", "not a fan of"; Sorani «… نامەوێت»): an exclusion, never the colour wanted.
+  { q: 'لا اريد الاسود', lang: 'ar', expect: { price: null, text: '', exC: ['black'], drop: { 'color!:black': '' } } },
+  { q: 'لا أريد اللون الأسود', lang: 'ar', expect: { price: null, text: '', exC: ['black'] } },
+  { q: 'PLA لا اريد اسود', lang: 'ar', expect: { price: null, text: 'PLA', exC: ['black'], materials: ['pla'], drop: { 'color!:black': 'PLA' } } },
+  { q: 'ما ابغى اسود', lang: 'ar', expect: { price: null, text: '', exC: ['black'] } },
+  { q: 'ما بدي اسود', lang: 'ar', expect: { price: null, text: '', exC: ['black'] } },
+  { q: 'مش عايز اسود', lang: 'ar', expect: { price: null, text: '', exC: ['black'] } },
+  { q: 'ما احب الاسود', lang: 'ar', expect: { price: null, text: '', exC: ['black'] } },
+  { q: 'ما ريد اسود', lang: 'ar', expect: { price: null, text: '', exC: ['black'] } },
+  { q: 'لا اريد الاسود PLA', lang: 'ar', expect: { price: null, text: 'PLA', exC: ['black'], materials: ['pla'], drop: { 'material:pla': 'لا اريد الاسود' } } },
+  { q: 'ڕەش نامەوێت', lang: 'ckb', expect: { price: null, text: '', exC: ['black'], drop: { 'color!:black': '' } } },
+  { q: 'فیلامێنت ڕەش نامەوێت', lang: 'ckb', expect: { price: null, text: 'فیلامێنت', exC: ['black'], drop: { 'color!:black': 'فیلامێنت' } } },
+  { q: 'فیلامێنت ڕەش و سپی نامەوێت', lang: 'ckb', expect: { price: null, text: 'فیلامێنت', exC: ['black', 'white'], drop: { 'color!:black': 'فیلامێنت سپی نامەوێت', 'color!:white': 'فیلامێنت ڕەش نامەوێت' } } },
+  { q: 'PLA anything but black', lang: 'en', expect: { price: null, text: 'PLA', exC: ['black'], materials: ['pla'], drop: { 'color!:black': 'PLA' } } },
+  { q: 'PLA other than black', lang: 'en', expect: { price: null, text: 'PLA', exC: ['black'], materials: ['pla'] } },
+  { q: 'not a fan of black PLA', lang: 'en', expect: { price: null, text: 'PLA', exC: ['black'], materials: ['pla'], drop: { 'material:pla': 'not a fan of black' } } },
+  // (d) «ما اريد الا X», «لا اريد غير X», "dont want anything but X" mean "only X": X is read as written.
+  { q: 'ما اريد الا الاسود', lang: 'ar', expect: { price: null, text: 'ما اريد الا', colours: ['black'], drop: { 'color:black': 'ما اريد الا' } } },
+  { q: 'لا اريد الا الابيض', lang: 'ar', expect: { price: null, text: 'لا اريد الا', colours: ['white'] } },
+  { q: 'PLA ما اريد غير الاسود', lang: 'ar', expect: { price: null, text: 'PLA ما اريد غير', colours: ['black'], materials: ['pla'], drop: { 'material:pla': 'ما اريد غير الاسود' } } },
+  { q: 'dont want anything but black', lang: 'en', expect: { price: null, text: 'dont want anything but', colours: ['black'] } },
+  // (d) "And" or a comma in a negation list carries it to one more term of the same kind ("except black and white"
+  // leaves out both, like the Sorani «ڕەش و سپی نەبێت»); to a term of another kind it does not.
+  { q: 'بدون اسود وابيض', lang: 'ar', expect: { price: null, text: '', exC: ['black', 'white'], drop: { 'color!:black': 'بدون ابيض', 'color!:white': 'بدون اسود' } } },
+  { q: 'PLA ماعدا الاسود والابيض', lang: 'ar', expect: { price: null, text: 'PLA', exC: ['black', 'white'], materials: ['pla'], drop: { 'color!:black': 'PLA ماعدا الابيض', 'color!:white': 'PLA ماعدا الاسود' } } },
+  { q: 'PLA غير اسود وابيض', lang: 'ar', expect: { price: null, text: 'PLA', exC: ['black', 'white'], materials: ['pla'] } },
+  { q: 'PLA except black and white', lang: 'en', expect: { price: null, text: 'PLA', exC: ['black', 'white'], materials: ['pla'], drop: { 'color!:black': 'PLA except white', 'color!:white': 'PLA except black' } } },
+  { q: 'without black and white', lang: 'en', expect: { price: null, text: '', exC: ['black', 'white'] } },
+  { q: 'PLA excluding black, white', lang: 'en', expect: { price: null, text: 'PLA', exC: ['black', 'white'], materials: ['pla'], drop: { 'color!:black': 'PLA excluding white', 'color!:white': 'PLA excluding black,' } } },
+  { q: 'بدون اسود، ابيض', lang: 'ar', expect: { price: null, text: '', exC: ['black', 'white'], drop: { 'color!:black': 'بدون ابيض', 'color!:white': 'بدون اسود،' } } },
+  { q: 'بێ ڕەش و سپی', lang: 'ckb', expect: { price: null, text: '', exC: ['black', 'white'], drop: { 'color!:black': 'بێ سپی', 'color!:white': 'بێ ڕەش' } } },
+  { q: 'فیلامێنت بێ ڕەش و سپی', lang: 'ckb', expect: { price: null, text: 'فیلامێنت', exC: ['black', 'white'] } },
+  { q: 'بدون كومبو و اسود', lang: 'ar', expect: { price: null, text: '', colours: ['black'], ex: ['combo'] } },
+  // A negated price order («مو رخيص», "not the cheapest", «هەرزان نەبێت») is no order, never its opposite; its
+  // negation never turns the next word into an exclusion when the order chip is not there.
+  { q: 'مو رخيص', lang: 'ar', expect: { price: null, text: 'مو رخيص' } },
+  { q: 'PLA مو رخيص', lang: 'ar', expect: { price: null, text: 'PLA مو رخيص', materials: ['pla'], drop: { 'material:pla': 'مو رخيص' } } },
+  { q: 'not cheap PLA', lang: 'en', expect: { price: null, text: 'not cheap PLA', materials: ['pla'], drop: { 'material:pla': 'not cheap' } } },
+  { q: 'PLA not the cheapest', lang: 'en', expect: { price: null, text: 'PLA not the cheapest', materials: ['pla'] } },
+  { q: 'بدون رخيص', lang: 'ar', expect: { price: null, text: 'بدون رخيص' } },
+  { q: 'ما اريد رخيص', lang: 'ar', expect: { price: null, text: 'ما اريد رخيص' } },
+  { q: 'هەرزان نەبێت', lang: 'ckb', expect: { price: null, text: 'هەرزان نەبێت' } },
+  { q: 'فیلامێنت هەرزان نەبێت', lang: 'ckb', expect: { price: null, text: 'فیلامێنت هەرزان نەبێت' } },
+  { q: 'مو غالي', lang: 'ar', expect: { price: null, text: 'مو غالي' } },
+  { q: 'not expensive PLA', lang: 'en', expect: { price: null, text: 'not expensive PLA', materials: ['pla'] } },
+  { q: 'بدون رخيص اسود', lang: 'ar', expect: { price: null, text: 'بدون رخيص', colours: ['black'], drop: { 'color:black': 'بدون رخيص' } } },
+  { q: 'مو رخيص PLA', lang: 'ar', expect: { price: null, text: 'مو رخيص PLA', materials: ['pla'] } },
+  { q: 'مو غالي اسود', lang: 'ar', expect: { price: null, text: 'مو غالي', colours: ['black'], drop: { 'color:black': 'مو غالي' } } },
+  { q: 'not cheap black', lang: 'en', expect: { price: null, text: 'not cheap', colours: ['black'], drop: { 'color:black': 'not cheap' } } },
+  { q: 'نەک هەرزان ڕەش', lang: 'ckb', expect: { price: null, text: 'نەک هەرزان', colours: ['black'], drop: { 'color:black': 'نەک هەرزان' } } },
+  { q: 'no cheap AMS', lang: 'en', expect: { price: null, text: 'no cheap AMS' } },
+  // (d) A carried negation turns the sale mode and the spool like a direct one («بدون حجز» is in stock); the
+  // spool only beside a filament word; a diameter or the order in the list is held.
+  { q: 'PLA بدون AMS ولا حجز', lang: 'ar', expect: { price: null, text: 'PLA', materials: ['pla'], ex: ['ams'], sale: 'direct', drop: { 'exclude:ams': 'PLA بدون حجز', sale: 'PLA بدون AMS' } } },
+  { q: 'filament without AMS or preorder', lang: 'en', expect: { price: null, text: 'filament', ex: ['ams'], sale: 'direct', drop: { 'exclude:ams': 'filament without preorder', sale: 'filament without AMS' } } },
+  { q: 'فیلامێنت بێ AMS یان پێشوەختە', lang: 'ckb', expect: { price: null, text: 'فیلامێنت', ex: ['ams'], sale: 'direct', drop: { 'exclude:ams': 'فیلامێنت بێ پێشوەختە', sale: 'فیلامێنت بێ AMS' } } },
+  { q: 'PLA without black or refill', lang: 'en', expect: { price: null, text: 'PLA refill', exC: ['black'], materials: ['pla'], drop: { 'color!:black': 'PLA refill' } } },
+  { q: 'فیلامێنت بێ ڕەش یان ڕیفیل', lang: 'ckb', expect: { price: null, text: 'فیلامێنت', exC: ['black'], spool: 'spool', drop: { 'color!:black': 'فیلامێنت بێ ڕیفیل', spool: 'فیلامێنت بێ ڕەش' } } },
+  { q: 'فلامنت بدون اسود ولا بكرة', lang: 'ar', expect: { price: null, text: 'فلامنت', exC: ['black'], spool: 'refill', drop: { 'color!:black': 'فلامنت بدون بكرة', spool: 'فلامنت بدون اسود' } } },
+  { q: 'PLA بدون اسود ولا بكرة', lang: 'ar', expect: { price: null, text: 'PLA بكرة', exC: ['black'], materials: ['pla'], drop: { 'color!:black': 'PLA بكرة' } } },
+  { q: 'PLA without black or spool', lang: 'en', expect: { price: null, text: 'PLA spool', exC: ['black'], materials: ['pla'] } },
+  { q: 'PLA 1.75 بدون اسود ولا 2.85', lang: 'ar', expect: { price: null, text: 'PLA 1.75 2.85', exC: ['black'], materials: ['pla'], drop: { 'color!:black': 'PLA 1.75 بدون ولا 2.85' } } },
+  { q: 'PLA without black or 2.85', lang: 'en', expect: { price: null, text: 'PLA 2.85', exC: ['black'], materials: ['pla'], drop: { 'color!:black': 'PLA without or 2.85' } } },
+  { q: 'بدون اسود ولا 1.75 PLA', lang: 'ar', expect: { price: null, text: '1.75 PLA', exC: ['black'], materials: ['pla'], drop: { 'color!:black': 'بدون ولا 1.75 PLA', 'material:pla': 'بدون اسود ولا 1.75' } } },
+  { q: 'فلامنت بدون اسود ولا 2.85', lang: 'ar', expect: { price: null, text: 'فلامنت 2.85', exC: ['black'], drop: { 'color!:black': 'فلامنت بدون ولا 2.85' } } },
+  { q: 'بدون اسود ولا اقل من 30 الف', lang: 'ar', expect: { price: null, text: 'اقل من 30 الف', exC: ['black'], drop: { 'color!:black': 'بدون ولا اقل من 30 الف' } } },
+  { q: 'بدون اسود ولا اكثر من 50 الف', lang: 'ar', expect: { price: null, text: 'اكثر من 50 الف', exC: ['black'] } },
+  { q: 'without black or under 30k', lang: 'en', expect: { price: null, text: 'under 30k', exC: ['black'], drop: { 'color!:black': 'without or under 30k' } } },
+  { q: 'بێ ڕەش یان کەمتر لە 30 هەزار', lang: 'ckb', expect: { price: null, text: 'کەمتر لە 30 هەزار', exC: ['black'], drop: { 'color!:black': 'بێ یان کەمتر لە 30 هەزار' } } },
+  { q: 'بدون اسود ولا اقل من 30 الف ولا ابيض', lang: 'ar', expect: { price: null, text: 'اقل من 30 الف', exC: ['black', 'white'], drop: { 'color!:black': 'بدون ولا اقل من 30 الف بدون ابيض', 'color!:white': 'بدون اسود ولا اقل من 30 الف' } } },
+  { q: 'without black or cheapest or white', lang: 'en', expect: { price: null, text: 'cheapest', exC: ['black', 'white'], drop: { 'color!:black': 'without or cheapest without white' } } },
+  // The spool facet only beside a filament word: a glue or wiper refill, a printer or an AMS «with spool», Iraqi
+  // «بكرة» (tomorrow) are products or words. The diameter beside a filament word or with mm only.
+  { q: 'glue refill', lang: 'en', expect: { price: null, text: 'glue refill' } },
+  { q: 'liquid glue refill', lang: 'en', expect: { price: null, text: 'liquid glue refill' } },
+  { q: 'nozzle wiper refill', lang: 'en', expect: { price: null, text: 'nozzle wiper refill' } },
+  { q: 'ريفيل غراء', lang: 'ar', expect: { price: null, text: 'ريفيل غراء' } },
+  { q: 'طابعة بدون بكرة', lang: 'ar', expect: { price: null, text: 'طابعة بدون بكرة' } },
+  { q: 'printer without spool', lang: 'en', expect: { price: null, text: 'printer without spool' } },
+  { q: 'AMS with spool', lang: 'en', expect: { price: null, text: 'AMS with spool' } },
+  { q: 'طابعة مع بكرة', lang: 'ar', expect: { price: null, text: 'طابعة مع بكرة' } },
+  { q: 'P1S with spool', lang: 'en', expect: { price: null, text: 'P1S with spool' } },
+  { q: 'A1 mini with full spool', lang: 'en', expect: { price: null, text: 'A1 mini with full spool' } },
+  { q: 'چاپکەر لەگەڵ ماسوورە', lang: 'ckb', expect: { price: null, text: 'چاپکەر لەگەڵ ماسوورە' } },
+  { q: 'چاپکەر بێ ماسوورە', lang: 'ckb', expect: { price: null, text: 'چاپکەر بێ ماسوورە' } },
+  { q: 'PLA اسود يوصل بكرة', lang: 'ar', expect: { price: null, text: 'PLA يوصل بكرة', colours: ['black'], materials: ['pla'], drop: { 'color:black': 'PLA يوصل بكرة', 'material:pla': 'اسود يوصل بكرة' } } },
+  { q: 'PLA يوصل بكرة', lang: 'ar', expect: { price: null, text: 'PLA يوصل بكرة', materials: ['pla'] } },
+  { q: 'PTFE tube 1.75 for PLA', lang: 'en', expect: { price: null, text: 'PTFE tube 1.75 for PLA', materials: ['pla'] } },
+  { q: 'PLA 0.4 nozzle 1.75', lang: 'en', expect: { price: null, text: 'PLA 0.4 nozzle 1.75', materials: ['pla'] } },
+  { q: 'spool holder 1.75 kg PLA', lang: 'en', expect: { price: null, text: 'spool holder 1.75 kg PLA', materials: ['pla'] } },
+  { q: 'بۆری PTFE 1.75 بۆ PLA', lang: 'ckb', expect: { price: null, text: 'بۆری PTFE 1.75 بۆ PLA', materials: ['pla'] } },
+  // «لبنية» is light blue, never «ل» + «بنية» (brown).
+  { q: 'PLA لبنية', lang: 'ar', expect: { price: null, text: 'PLA', colours: ['blue'], materials: ['pla'], drop: { 'color:blue': 'PLA' } } },
+  { q: 'PLA لبنيه', lang: 'ar', expect: { price: null, text: 'PLA', colours: ['blue'], materials: ['pla'] } },
+  { q: 'لبنية', lang: 'ar', expect: { price: null, text: '', colours: ['blue'] } },
+  { q: 'فلامنت لبنية', lang: 'ar', expect: { price: null, text: 'فلامنت', colours: ['blue'] } },
+  { q: 'ابي لبنية', lang: 'ar', expect: { price: null, text: '', colours: ['blue'] } },
+  // (e) With mm the diameter stands without the material; without mm a material alone anchors nothing.
+  { q: 'PLA 1.75mm بدون كومبو', lang: 'en', expect: { price: null, text: 'PLA', materials: ['pla'], ex: ['combo'], diameters: ['1.75'], drop: { 'material:pla': '1.75mm بدون كومبو', 'diameter:1.75': 'PLA بدون كومبو', 'exclude:combo': 'PLA 1.75mm' } } },
+  { q: 'PLA 1.75مم', lang: 'ar', expect: { price: null, text: 'PLA', materials: ['pla'], diameters: ['1.75'], drop: { 'material:pla': '1.75مم', 'diameter:1.75': 'PLA' } } },
+  { q: 'PETG 1.75 بكرة', lang: 'ar', expect: { price: null, text: 'PETG 1.75 بكرة', materials: ['petg'], drop: { 'material:petg': '1.75 بكرة' } } },
+  { q: '1.75 PLA', lang: 'en', expect: { price: null, text: '1.75 PLA', materials: ['pla'] } },
+  { q: 'PLA قطر 1.75', lang: 'ar', expect: { price: null, text: 'PLA قطر 1.75', materials: ['pla'] } },
+  { q: 'بدون AMS 1.75 PLA', lang: 'ar', expect: { price: null, text: '1.75 PLA', materials: ['pla'], ex: ['ams'], drop: { 'material:pla': 'بدون AMS 1.75' } } },
+  { q: 'فیلامێنت PLA 1.75', lang: 'ckb', expect: { price: null, text: 'فیلامێنت PLA', materials: ['pla'], diameters: ['1.75'], drop: { 'material:pla': 'فیلامێنت 1.75', 'diameter:1.75': 'فیلامێنت PLA' } } },
+  { q: 'فیلامێنت ڕیفیل PLA', lang: 'ckb', expect: { price: null, text: 'فیلامێنت PLA', materials: ['pla'], spool: 'refill', drop: { 'material:pla': 'فیلامێنت ڕیفیل', spool: 'فیلامێنت PLA' } } },
+  // (d) A comma after the negation ends its reach: "no, black" asks for black.
+  { q: 'لا، اسود', lang: 'ar', expect: { price: null, text: 'لا،', colours: ['black'] } },
+  { q: 'لا، الاسود', lang: 'ar', expect: { price: null, text: 'لا،', colours: ['black'] } },
+  { q: 'no, black', lang: 'en', expect: { price: null, text: 'no,', colours: ['black'] } },
+  { q: 'no, black PLA', lang: 'en', expect: { price: null, text: 'no, PLA', colours: ['black'], materials: ['pla'] } },
+  { q: 'نا، ڕەش', lang: 'ckb', expect: { price: null, text: 'نا،', colours: ['black'] } },
 ];
 
 // ------------------------------------------------------------------ the check
@@ -1056,16 +1272,14 @@ function check(row: Row): void {
 
   for (const [key, text] of Object.entries(e.drop ?? {})) assert.equal(nl.without[key], text, `${at}: the removal text of ${key}`);
 
-  // (d) Each chip's removal text, read again, is the same answer less exactly that chip.
-  if (e.contract !== false) {
-    for (const chip of nl.understood) {
-      const key = nlChipKey(chip);
-      const rest = nl.without[key];
-      assert.equal(typeof rest, 'string', `${at}: ${key} has a removal text`);
-      const again = parseNlQuery(rest).understood;
-      const less: NlChip[] = nl.understood.filter((c) => nlChipKey(c) !== key);
-      assert.deepEqual(again, less, `${at}: less ${key} is «${rest}», read again ${JSON.stringify(again.map(nlChipKey))}`);
-    }
+  // (e) Each chip's removal text, read again, is the same answer less exactly that chip.
+  for (const chip of nl.understood) {
+    const key = nlChipKey(chip);
+    const rest = nl.without[key];
+    assert.equal(typeof rest, 'string', `${at}: ${key} has a removal text`);
+    const again = parseNlQuery(rest).understood;
+    const less: NlChip[] = nl.understood.filter((c) => nlChipKey(c) !== key);
+    assert.deepEqual(again, less, `${at}: less ${key} is «${rest}», read again ${JSON.stringify(again.map(nlChipKey))}`);
   }
 }
 
