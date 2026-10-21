@@ -52,6 +52,7 @@ import VariantImg from '../ui/VariantImg';
 import { Button } from '../ui/Button';
 import { useLanguage } from '../../LanguageContext';
 import { adminSubstitutionSides, reviewLang } from './reviewWords';
+import { requestsApi, type CatalogMaterial } from '../community/requests/api';
 
 // P1-05: the technical review queue loads only when an admin opens it.
 const TechnicalReviewPanel = lazy(() => import('./TechnicalReviewPanel'));
@@ -897,6 +898,8 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
   const [busy, setBusy] = useState('');
   // The admin's reasons are asked in the panel's own dialog, never the browser's own (W3-B).
   const [prompt, promptDialog] = usePrompt();
+  // The live catalogue, for a substitute beyond the seed list (P1-05 review 5).
+  const [catalogue, setCatalogue] = useState<CatalogMaterial[]>([]);
 
   const load = useCallback(() => {
     adminCommunityApi
@@ -905,6 +908,13 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
       .catch((e) => setErr(e instanceof ApiError ? e.message : 'error'));
   }, [id]);
   useEffect(load, [load]);
+  useEffect(() => {
+    let live = true;
+    requestsApi.catalog().then((c) => live && setCatalogue(c.materials ?? [])).catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
 
   async function act(key: string, fn: () => Promise<unknown>) {
     setBusy(key);
@@ -1034,11 +1044,11 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
                       : ''}
                     {o.coverage?.covers_all === false && !!o.substitutions?.length ? ' · ' : ''}
                     {o.substitutions?.map((x, i) => {
-                      const v = adminSubstitutionSides(x, reviewLang(lang));
+                      const v = adminSubstitutionSides(x, reviewLang(lang), catalogue);
                       return (
                         <span key={i} dir={lang === 'en' ? 'ltr' : 'rtl'} data-admin-offer-substitution>
                           {i > 0 && (lang === 'en' ? ', ' : '، ')}
-                          <bdi>{v.to}</bdi> {v.word} <bdi>{v.from}</bdi>
+                          <bdi dir={lang === 'en' ? 'ltr' : 'rtl'}>{v.to}</bdi> {v.word} <bdi dir={lang === 'en' ? 'ltr' : 'rtl'}>{v.from}</bdi>
                         </span>
                       );
                     })}

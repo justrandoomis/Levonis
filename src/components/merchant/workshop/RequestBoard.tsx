@@ -30,7 +30,7 @@ import { iqdUnit } from '../../../lib/money';
 import { boardJobFacts, workshopApi, type BoardFilters, type BoardRequest } from './api';
 import { approvalGateText } from '../../../lib/approvalGate';
 import { RequestThumb } from '../../community/requests/RequestFileThumbs';
-import { localMaterial } from '../../community/requests/mirrors';
+import { jobCountWords, localMaterial } from '../../community/requests/mirrors';
 import { SourceLinkCard } from '../../community/links/LinkCard';
 
 export interface BoardMaterial {
@@ -97,6 +97,12 @@ export default function RequestBoard({
   const matName = (id: string | null) => {
     if (!id) return '';
     return localMaterial(id, lang === 'en' || lang === 'ckb' ? lang : 'ar', materials);
+  };
+  const L = lang === 'en' || lang === 'ckb' ? lang : 'ar';
+  // The materials the parts named, and «any material» when a part left it open beside them (P1-05 review 5).
+  const matLabel = (r: BoardRequest) => {
+    const f = boardJobFacts(r);
+    return [...f.materials.map(matName), ...(f.anyMaterial ? [loc('المادة مفتوحة', 'Any material', 'هەر کەرەستەیەک')] : [])].join(' + ');
   };
   const techLabel = (r: BoardRequest) => {
     const f = boardJobFacts(r);
@@ -245,13 +251,11 @@ export default function RequestBoard({
                       {/* A job of parts names the technologies and materials of its parts (P1-05 review 3). */}
                       <span data-board-tech>{techLabel(r)}</span>
                       {boardJobFacts(r).materials.length > 0 && <span aria-hidden="true">·</span>}
-                      {boardJobFacts(r).materials.length > 0 && <span data-board-materials>{boardJobFacts(r).materials.map(matName).join(' + ')}</span>}
-                      {/* A job of parts (P1-05): its quantity is the sets, said beside the parts. */}
-                      {r.summary && r.summary.parts_count > 1 && (
-                        <span className="tabular-nums">
-                          {loc('عدد القطع', 'Parts', 'پارچەکان')} <bdi dir="ltr">{r.summary.parts_count}</bdi>
-                        </span>
-                      )}
+                      {boardJobFacts(r).materials.length > 0 && <span data-board-materials>{matLabel(r)}</span>}
+                      {/* A job of parts (P1-05): the parts and the pieces a set (review 5), and its quantity is the sets. */}
+                      {r.summary && jobCountWords(r.summary, L).map((w) => (
+                        <span key={w} className="tabular-nums" data-board-count>{w}</span>
+                      ))}
                       {r.quantity > 1 && (
                         <span className="tabular-nums" dir="ltr">
                           {r.summary && (r.summary.parts_count > 1 || r.summary.pieces_per_set > 1) ? `${loc('الأطقم', 'Sets', 'سێت')} ` : ''}×{r.quantity}

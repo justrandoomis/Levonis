@@ -38,7 +38,7 @@ import { formatDate } from '../../orders/format';
 import OrderContactCard from '../../community/offers/OrderContactCard';
 import OrderTimeline from '../../community/requests/OrderTimeline';
 import { deliveredConsequence, fill, ordersLang, useCustomOrderStrings, type CustomOrderStrings } from './strings';
-import { localColour, localMaterial, type MaterialLike } from '../../community/requests/mirrors';
+import { entryColour, localMaterial, type MaterialLike } from '../../community/requests/mirrors';
 import { requestsApi } from '../../community/requests/api';
 
 /** The order as GET /api/marketplace/orders/:id answers it, the fields this screen reads. */
@@ -76,10 +76,10 @@ export interface AgreedPart {
 /** A part as the screen names it: its name, else «Part n» in the reader language (never «#n»). */
 export const agreedPartName = (p: AgreedPart, s: Pick<CustomOrderStrings, 'partN'>): string => p.name || fill(s.partN, { n: p.n });
 
-/** One side of a substitution as the snapshot keeps it: a catalogue id and its colours. */
+/** One side of a substitution as the snapshot keeps it: a catalogue id and its colours (an entry left open by its `mode`). */
 export interface AgreedSide {
   material_id: string;
-  colors: Array<{ hex: string; label: string }>;
+  colors: Array<{ hex: string; label: string; mode?: 'any' | 'as_reference' }>;
 }
 
 /**
@@ -91,7 +91,8 @@ export interface AgreedSide {
  */
 export function agreementSide(v: AgreedSide, lang: string, catalogue: readonly MaterialLike[] = []): string {
   const L = ordersLang(lang);
-  const colours = v.colors.map((c) => localColour(c.label || c.hex, L)).filter(Boolean).join(L === 'en' ? ', ' : '، ');
+  // «any colour» and «as in the reference» are words: what a material-only substitute keeps (P1-05 review 5).
+  const colours = v.colors.map((c) => entryColour(c, L)).filter(Boolean).join(L === 'en' ? ', ' : '، ');
   return [localMaterial(v.material_id, L, catalogue), colours].filter(Boolean).join(' ');
 }
 
@@ -141,7 +142,12 @@ export function readAgreement(raw: unknown): CustomOrderView['agreement'] {
   const parts = list(a.parts);
   const side = (v: unknown): AgreedSide => {
     const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
-    return { material_id: text(o.material_id), colors: list(o.colors).map((c) => ({ hex: text(c.hex), label: text(c.label) })).filter((c) => c.hex || c.label) };
+    return {
+      material_id: text(o.material_id),
+      colors: list(o.colors)
+        .map((c): AgreedSide['colors'][number] => (c.mode === 'any' || c.mode === 'as_reference' ? { hex: '', label: '', mode: c.mode } : { hex: text(c.hex), label: text(c.label) }))
+        .filter((c) => c.hex || c.label || c.mode),
+    };
   };
   const out = {
     parts: parts.map(nameOf),

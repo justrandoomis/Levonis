@@ -42,11 +42,13 @@
  *   OFFER_COVERAGE_UNAVAILABLE   coverage or substitutions named on a database
  *                                before 0208
  *
- * Every write whose coverage was checked against the request model (a
- * non-default coverage, or a whole offer checked for parts added since) is
- * fenced on the revision's hash (`revisionHashFence`), so a part checked
- * against one version of the request is never stored against another
- * (critiques 3 and 4).
+ * Every offer write — a new offer, a sent draft, an edit or a re-confirm —
+ * is fenced on the hash of the revision it read before its checks
+ * (`revisionHead`, or the model the coverage was resolved on;
+ * `revisionHashFence`), a whole offer on a one-job request too, so a part
+ * checked against one version of the request is never stored against
+ * another, and never covered by a price set without it (critiques 3 and 4;
+ * P1-05 review 5).
  */
 import { HttpError } from './http';
 import { safeParse } from './types';
@@ -61,6 +63,14 @@ import type { LiveVerdict } from './printMatchingStore';
 export interface SubColour {
   hex: string;
   label: string;
+  /**
+   * A colour the customer left open: «any colour» or «as in the reference»
+   * (P1-05 review 5). No hex and no label; a merchant never names one. It is
+   * carried on both sides of a substitution, so a material-only substitute
+   * keeps every colour asked: it is counted (MULTICOLOR), kept in the
+   * agreement and shown on both sides.
+   */
+  mode?: 'any' | 'as_reference';
 }
 
 export interface OfferSubstitution {
@@ -178,12 +188,27 @@ export const namesCoverage = (b: CoverageBody): boolean => b.coverage !== undefi
 
 // ------------------------------------------------------- against the model
 
+const isNamedColour = (c: { mode: string }) => c.mode === 'catalogue' || c.mode === 'custom';
+
 const specificColours = (m: Pick<ModelMaterial, 'colors'>): SubColour[] =>
-  m.colors.filter((c) => c.mode === 'catalogue' || c.mode === 'custom').map((c) => ({ hex: s(c.hex).toLowerCase(), label: s(c.label) }));
+  m.colors.filter(isNamedColour).map((c) => ({ hex: s(c.hex).toLowerCase(), label: s(c.label) }));
+
+/**
+ * EVERY COLOUR ENTRY OF A ROW, in its order (P1-05 review 5): a named colour
+ * as its hex and label, «any» and «as in the reference» by their mode. A
+ * substitution's `from` is this, so nothing the customer asked is dropped.
+ */
+const rowColours = (m: Pick<ModelMaterial, 'colors'>): SubColour[] =>
+  m.colors.map((c) => (isNamedColour(c)
+    ? { hex: s(c.hex).toLowerCase(), label: s(c.label) }
+    : { hex: '', label: '', mode: c.mode === 'as_reference' ? ('as_reference' as const) : ('any' as const) }));
+
+/** The colours a merchant named (a side without the entries the customer left open). */
+const namedOf = (cs: ReadonlyArray<SubColour>): SubColour[] => cs.filter((c) => !c.mode).map((c) => ({ hex: c.hex, label: c.label }));
 
 const sameColours = (a: SubColour[], b: SubColour[]) => JSON.stringify(a) === JSON.stringify(b);
 
-const fromOf = (row: ModelMaterial) => ({ material_id: row.material_id, colors: specificColours(row) });
+const fromOf = (row: ModelMaterial) => ({ material_id: row.material_id, colors: rowColours(row) });
 
 const ordered = (m: Pick<ModelState, 'parts'>) => [...m.parts].sort((a, b) => a.position - b.position);
 
@@ -240,10 +265,15 @@ export function resolveCoverage(
     const toMat = mats.find((m) => m.id === toId && m.active !== false);
     if (!toMat) throw invalidSubstitution('Choose a material from the catalogue', at);
     if (partProcess && toMat.process !== partProcess) throw invalidSubstitution('The substitute must be of the same technology as the part', at);
-    if (x.to.colors !== undefined && x.to.colors.length && !from.colors.length) {
+    // What the merchant names replaces the colours the customer named; the
+    // entries left open (any, as in the reference) stay on both sides
+    // (P1-05 review 5). A stored side is read back without them.
+    const named = namedOf(x.to.colors ?? []);
+    const asked = specificColours(row);
+    if (named.length && !asked.length) {
       throw invalidSubstitution('The customer asked for any colour here: there is no colour to substitute', at);
     }
-    const toColours = x.to.colors !== undefined && x.to.colors.length ? x.to.colors : from.colors;
+    const toColours = named.length && !sameColours(named, asked) ? [...named, ...from.colors.filter((c) => c.mode)] : from.colors;
     if (toId === from.material_id && sameColours(toColours, from.colors)) throw invalidSubstitution('That substitute changes nothing', at);
     subs.push({ part_id: part.id, material_row_id: row.id, from, to: { material_id: toId, colors: toColours }, note: x.note });
   }
@@ -358,6 +388,25 @@ export async function modelAtRevision(db: D1Database, requestId: string, revisio
 }
 
 /**
+ * THE REQUEST'S CURRENT REVISION, ITS NUMBER AND HASH — one read, no model
+ * (P1-05 review 5). Every offer write fences on it, a one-job request's too:
+ * read before the checks, so a part the customer adds after them is never
+ * covered by a price set without it. Null for a request that is gone; the
+ * hash is '' for one older than revision rows.
+ */
+export async function revisionHead(db: D1Database, requestId: string): Promise<{ revision: number; hash: string } | null> {
+  const row = await db
+    .prepare(
+      `SELECT q.revision AS revision,
+              (SELECT h.hash FROM community_request_revisions h WHERE h.request_id = q.id AND h.revision = q.revision) AS hash
+         FROM community_requests q WHERE q.id = ?`
+    )
+    .bind(requestId)
+    .first<{ revision: number | null; hash: string | null }>();
+  return row ? { revision: Number(row.revision ?? 1), hash: String(row.hash ?? '') } : null;
+}
+
+/**
  * THE FENCE (critique 3a): for the offer's batch, before its INSERT or
  * UPDATE. The request's `updated_at` goes NULL — the batch aborts, nothing is
  * written — unless the current revision still has the hash the coverage was
@@ -382,6 +431,12 @@ export const isRevisionFenceAbort = (e: unknown): boolean =>
 
 // --------------------------------------------------------- eligibility
 
+/** The colours a substituted row is made in: those the substitute names (else the ones asked), and every entry the customer left open. */
+const swappedCount = (row: Pick<ModelMaterial, 'colors'>, sub: OfferSubstitution): number => {
+  const named = namedOf(sub.to.colors);
+  return (named.length ? named.length : row.colors.filter(isNamedColour).length) + row.colors.filter((c) => !isNamedColour(c)).length;
+};
+
 /**
  * A PART AS IT WOULD BE MADE: each substituted row in its substitute's
  * material and colours, and the colours laid down in one print counted again
@@ -392,9 +447,13 @@ export const isRevisionFenceAbort = (e: unknown): boolean =>
  * no rows to count, the larger of the as-asked count and the substitutes'.
  */
 const toEligibilityPart = (p: EligibilityPart, subs: Array<OfferSubstitution | undefined>, rows?: ReadonlyArray<Pick<ModelMaterial, 'colors'>>): EligibilityPart => {
+  // A substituted row counts the colours its substitute names, or the ones
+  // asked when it names none, AND the entries the customer left open — «any»
+  // and «as in the reference» are colours the print still lays down (P1-05
+  // review 5): a material-only substitute counts exactly what was asked.
   const counted = rows && rows.length === p.materials.length
-    ? rows.reduce((n, row, i) => n + (subs[i] ? subs[i]!.to.colors.length : row.colors.length), 0)
-    : Math.max(p.colors_count, subs.reduce((n, x) => n + (x ? x.to.colors.length : 0), 0));
+    ? rows.reduce((n, row, i) => n + (subs[i] ? swappedCount(row, subs[i]!) : row.colors.length), 0)
+    : Math.max(p.colors_count, p.colors_count + subs.reduce((n, x) => n + (x ? namedOf(x.to.colors).length - namedOf(x.from.colors).length : 0), 0));
   return {
     ...p,
     materials: p.materials.map((row, i) => {
@@ -409,9 +468,11 @@ const toEligibilityPart = (p: EligibilityPart, subs: Array<OfferSubstitution | u
 /**
  * A REQUEST THE MATCHER READS AS ONE JOB (no `parts` on the live facts), as
  * the part each substitution names: the request's own process, size and
- * grams, in the substitute's material and colours — and the substitute's
- * colour count when it names colours (a material-only substitute carries the
- * colours asked). The job as asked was judged whole by the request-level
+ * grams, in the substitute's material and colours — the request's colour
+ * count moved by what the substitute changes (P1-05 review 5): a
+ * material-only substitute is counted on every colour asked (a v1 job of two
+ * colours, one of them named, stays two), one that turns one named colour
+ * into two counts one more. The job as asked was judged whole by the request-level
  * verdict; what a substitution changes is judged here, so the one-job path
  * asks the same question as a job of parts. One job has one material row, so
  * the substitution needs no row of the model to stand on (a v1 revision
@@ -421,12 +482,15 @@ function oneJobSwapped(req: LiveVerdict['request'], terms: OfferCoverageTerms): 
   const byPart = new Map<string, OfferSubstitution[]>();
   for (const x of terms.substitutions) byPart.set(x.part_id, [...(byPart.get(x.part_id) ?? []), x]);
   return [...byPart].map(([id, subs]) => {
-    const named = subs.reduce((n, x) => n + x.to.colors.length, 0);
+    const moved = subs.reduce((n, x) => {
+      const named = namedOf(x.to.colors).length;
+      return n + (named ? named - namedOf(x.from.colors).length : 0);
+    }, 0);
     return {
       id,
       process: req.process,
       materials: subs.map((x) => ({ material_id: x.to.material_id, colours: x.to.colors.map((c) => c.hex).filter((h) => HEX6.test(h)) })),
-      colors_count: Math.max(1, named > 0 ? named : req.colors_count),
+      colors_count: Math.max(1, req.colors_count + moved),
       dims_mm: req.dims_mm,
       grams: req.grams,
     };
@@ -525,13 +589,28 @@ export function assertCoverageEligible(
 
 // ---------------------------------------------------------- the snapshot
 
+const asAgreed = (c: Pick<ModelColour, 'mode' | 'hex' | 'label'>) => ({ mode: c.mode, hex: c.hex, label: c.label });
+
+/**
+ * THE COLOURS AGREED FOR A ROW (P1-05 review 5): a material-only substitute
+ * keeps every entry asked, as asked — «any» and «as in the reference»
+ * included; one that names colours puts them in place of the named colours
+ * asked and keeps the entries the customer left open.
+ */
+const agreedColours = (row: ModelMaterial, sub: OfferSubstitution) => {
+  const named = namedOf(sub.to.colors);
+  if (!named.length || sameColours(named, specificColours(row))) return row.colors.map(asAgreed);
+  return [
+    ...named.map((c) => ({ mode: 'custom', hex: c.hex, label: c.label })),
+    ...row.colors.filter((c) => !isNamedColour(c)).map(asAgreed),
+  ];
+};
+
 const agreedMaterial = (row: ModelMaterial, sub: OfferSubstitution | undefined) => ({
   id: row.id,
   material_id: sub ? sub.to.material_id : row.material_id,
   material_unsure: sub ? false : row.material_unsure,
-  colors: sub
-    ? sub.to.colors.map((c) => ({ mode: 'custom', hex: c.hex, label: c.label }))
-    : row.colors.map((c: ModelColour) => ({ mode: c.mode, hex: c.hex, label: c.label })),
+  colors: sub ? agreedColours(row, sub) : row.colors.map(asAgreed),
   finish: row.finish,
   substituted: !!sub,
 });

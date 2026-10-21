@@ -383,7 +383,7 @@ function OfferColumn({
         {o.color && <Row k={s.colour}>{o.color}</Row>}
         <Row k={s.materials}>{o.material_ids?.length ? o.material_ids.map(matName).join(sep) : o.materials || '—'}</Row>
         {parts.length > 1 && (
-          <Row k={s.partsLabel}>
+          <Row k={s.partsLabel} dir={readerDir(lang)}>
             <span data-offer-parts>{partial ? covered.map((p) => partName(p, s)).join(sep) : s.allParts}</span>
             {uncovered.length > 0 && (
               <span className="block text-[11.5px] text-warning" data-offer-uncovered>
@@ -396,7 +396,7 @@ function OfferColumn({
           <Row k={s.substitutesLabel} dir={readerDir(lang)}>
             {subs.map((x) => (
               <span key={x.line} className="block" data-offer-substitution>
-                <SubstitutionText x={x} s={s} />
+                <SubstitutionText x={x} s={s} dir={readerDir(lang)} />
               </span>
             ))}
           </Row>
@@ -682,7 +682,7 @@ function AcceptSheet({
             <ul className="space-y-1 rounded-lg bg-surface-raised px-3.5 py-2.5 text-[12.5px] text-text-primary" aria-label={s.substitutesLabel} data-accept-substitutions>
               {subs.map((x) => (
                 <li key={x.line} dir={readerDir(L)}>
-                  <SubstitutionText x={x} s={s} />
+                  <SubstitutionText x={x} s={s} dir={readerDir(L)} />
                 </li>
               ))}
             </ul>

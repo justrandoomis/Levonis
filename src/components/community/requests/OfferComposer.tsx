@@ -133,7 +133,7 @@ export function offerBody(
   t: Terms,
   opts: {
     draft: boolean; editingSent: boolean; validTouched: boolean; quoteId?: string | null; parts?: { value: PartsValue; clear: boolean };
-    /** P1-05 review 4: the revision the composer rendered — a NEW offer is refused if the request moved since. */
+    /** P1-05 reviews 4 and 5: the revision the composer rendered — a new offer or an edit is refused if the request moved since. */
     requestHash?: string;
   }
 ): OfferInputV2 {
@@ -156,8 +156,8 @@ export function offerBody(
   if (opts.draft) b.draft = true;
   // P1-05: what the offer covers and substitutes — only when it is not the whole job as asked.
   if (opts.parts) Object.assign(b, partsBody(opts.parts.value, { clear: opts.parts.clear }));
-  // The job the merchant priced: a new offer only (a draft is no promise; an edit is checked against its offer).
-  if (opts.requestHash && !opts.draft && !opts.editingSent) b.expected_request_hash = opts.requestHash;
+  // The job the merchant priced: a new offer and an edit of a sent offer (P1-05 review 5) — a draft is no promise.
+  if (opts.requestHash && !opts.draft) b.expected_request_hash = opts.requestHash;
   return b;
 }
 
@@ -176,14 +176,17 @@ export function partsFrom(offer: OfferV2 | null | undefined): PartsValue {
   return {
     coverage: offer?.coverage && !offer.coverage.covers_all ? offer.coverage.parts ?? [] : null,
     subs: (offer?.substitutions ?? []).map((x) => {
-      const proposed = x.to.colors.length > 0 && !sameColours(x.to.colors, x.from?.colors ?? []);
+      // The entries the customer left open («any», «as in the reference») ride
+      // on both sides; the merchant never names them, so they are never sent (P1-05 review 5).
+      const named = x.to.colors.filter((c) => !c.mode);
+      const proposed = named.length > 0 && !sameColours(x.to.colors, x.from?.colors ?? []);
       return {
         part_id: x.part_id,
         material_row_id: x.material_row_id,
         material_id: x.to.material_id,
-        colour: proposed ? colourFieldText(x.to.colors) : '',
+        colour: proposed ? colourFieldText(named) : '',
         note: x.note,
-        ...(proposed ? { colors: x.to.colors.map((c) => ({ hex: c.hex, label: c.label })) } : {}),
+        ...(proposed ? { colors: named.map((c) => ({ hex: c.hex, label: c.label })) } : {}),
       };
     }),
   };
@@ -347,7 +350,7 @@ export default function OfferComposer({ open, requestId, offer, materials, defau
         saved = (await offersV2Api.sendOffer(offer!.id, requestHash)).offer;
         kind = 'sent';
       } else if (editingSent) {
-        saved = (await offersV2Api.updateOffer(offer!.id, offerBody(t, { draft: false, editingSent: true, validTouched, quoteId, parts: partsOpt(true) }))).offer;
+        saved = (await offersV2Api.updateOffer(offer!.id, offerBody(t, { draft: false, editingSent: true, validTouched, quoteId, parts: partsOpt(true), requestHash }))).offer;
         kind = 'updated';
       } else {
         saved = (await offersV2Api.createOffer(requestId, offerBody(t, { draft: false, editingSent: false, validTouched, quoteId, parts: partsOpt(false), requestHash }))).offer;
@@ -948,14 +951,14 @@ export function OfferBrief({ o, s, lang, parts = [], materials = [] }: { o: Offe
       {partial && (
         <p className="mt-1.5 flex flex-wrap items-center gap-2 text-[12px] text-text-secondary" data-offer-brief-partial>
           <StatusChip tone="warning">{partial}</StatusChip>
-          {covered && <bdi>{covered}</bdi>}
+          {covered && <bdi dir={readerDir(lang)}>{covered}</bdi>}
         </p>
       )}
       {subs.length > 0 && (
         <ul className="mt-1.5 space-y-0.5 text-[12px] text-text-secondary" dir={readerDir(lang)} aria-label={s.substitutesLabel} data-offer-brief-substitutions>
           {subs.map((x) => (
             <li key={x.line}>
-              <SubstitutionText x={x} s={s} />
+              <SubstitutionText x={x} s={s} dir={readerDir(lang)} />
             </li>
           ))}
         </ul>

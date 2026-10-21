@@ -181,10 +181,17 @@ export function pricesAsOneJob(m: Pick<ModelState, 'parts'>): boolean {
 export function modelsUnpriced(
   m: Pick<ModelState, 'parts' | 'sources'>,
   files: ReadonlyArray<Pick<ModelFile, 'id' | 'kind'>>,
-  extraPriced: ReadonlyArray<string> = []
+  extraPriced: ReadonlyArray<string> = [],
+  /**
+   * The originals the TABLE names (`community_request_sources.role =
+   * 'source'`, `fileSourceRoles`), whatever the row's v3 state (P1-05 review
+   * 5): a row an older writer made no longer v3 reads a synthesised model
+   * whose sources carry no role, and the list and /quote exclude them still.
+   */
+  tableOriginals: ReadonlyArray<string> = []
 ): number {
   const measured = new Set([...m.parts.map((p) => p.measured_file_id).filter((x): x is string => !!x), ...extraPriced]);
-  const originals = new Set(m.sources.filter((x) => x.role === 'source' && x.file_id).map((x) => String(x.file_id)));
+  const originals = new Set([...m.sources.filter((x) => x.role === 'source' && x.file_id).map((x) => String(x.file_id)), ...tableOriginals]);
   return files.filter((f) => f.kind === 'model' && !measured.has(f.id) && !originals.has(f.id)).length;
 }
 

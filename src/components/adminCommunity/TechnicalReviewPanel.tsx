@@ -22,7 +22,8 @@ import { adminCommunityApi, type AdminRequestRow, type AdminReviewPart } from '.
 import { Button } from '../ui/Button';
 import { StatusChip } from '../ui/Badge';
 import { toast } from '../ui/Toast';
-import { colourWord, materialWord, reviewAge } from './reviewWords';
+import { requestsApi, type CatalogMaterial } from '../community/requests/api';
+import { colourWord, fileKindWord, materialWord, reviewAge } from './reviewWords';
 
 type Loc = (ar: string, en: string, ckb?: string) => string;
 
@@ -90,8 +91,17 @@ function ReviewDetail({ id, loc, lang, onBack }: { id: string; loc: Loc; lang: s
   const [state, setState] = useState('');
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState<'' | 'confirmed' | 'reopen'>('');
+  // The live catalogue: a material beyond the seed list reads by its name, not its id (P1-05 review 5).
+  const [catalogue, setCatalogue] = useState<CatalogMaterial[]>([]);
   const sep = lang === 'en' ? ', ' : '، ';
   const L = lang === 'en' || lang === 'ckb' ? lang : 'ar';
+  useEffect(() => {
+    let live = true;
+    requestsApi.catalog().then((c) => live && setCatalogue(c.materials ?? [])).catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
 
   const load = useCallback(() => {
     setParts(null);
@@ -148,9 +158,9 @@ function ReviewDetail({ id, loc, lang, onBack }: { id: string; loc: Loc; lang: s
               {p.materials.map((m, i) => (
                 <span key={m.id ?? i}>
                   {i > 0 && sep}
-                  <bdi>{m.material_unsure || !m.material_id ? loc('مادة غير محددة', 'material open', 'کەرەستە دیاری نەکراوە') : materialWord(m.material_id, L)}</bdi>
+                  <bdi dir={L === 'en' ? 'ltr' : 'rtl'}>{m.material_unsure || !m.material_id ? loc('مادة غير محددة', 'material open', 'کەرەستە دیاری نەکراوە') : materialWord(m.material_id, L, catalogue)}</bdi>
                   {m.colors.length > 0 && ' · '}
-                  {m.colors.length > 0 && <bdi>{m.colors.map((c) => colourWord(c, loc, L)).join(sep)}</bdi>}
+                  {m.colors.length > 0 && <bdi dir={L === 'en' ? 'ltr' : 'rtl'}>{m.colors.map((c) => colourWord(c, loc, L)).join(sep)}</bdi>}
                 </span>
               ))}
             </p>
@@ -183,7 +193,7 @@ function ReviewDetail({ id, loc, lang, onBack }: { id: string; loc: Loc; lang: s
                 <a href={f.url} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate font-semibold text-gold underline-offset-4 hover:underline" data-technical-review-file={f.id}>
                   <bdi>{f.file_name}</bdi>
                 </a>
-                <span className="shrink-0 text-text-muted" dir="ltr">{f.kind}</span>
+                <span className="shrink-0 text-text-muted">{fileKindWord(f.kind, L)}</span>
               </li>
             ))}
           </ul>

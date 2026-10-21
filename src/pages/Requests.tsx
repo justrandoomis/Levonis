@@ -46,6 +46,7 @@ import OrderContactCard from '../components/community/offers/OrderContactCard';
 import RequestBoard from '../components/merchant/workshop/RequestBoard';
 import { Segmented } from '../components/ui/Segmented';
 import { StatusChip } from '../components/ui/Badge';
+import { customOrderChips, customOrderReminder } from '../components/chat/cards/cardWords';
 import FilterChip from '../components/community/FilterChip';
 import { merchantHref } from '../lib/merchantRoutes';
 import ConfirmSheet from '../components/print/ConfirmSheet';
@@ -651,6 +652,14 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
             </p>
             <StatusChip className="shrink-0">{stateLabel(o.state)}</StatusChip>
           </div>
+          {/* An order from a partial or substituted offer is not the whole job (P1-05 review 5). */}
+          {customOrderChips(o, loc).length > 0 && (
+            <p className="mb-1.5 flex flex-wrap gap-1.5" data-community-order-coverage={o.id}>
+              {customOrderChips(o, loc).map((c) => (
+                <StatusChip key={c} tone="warning">{c}</StatusChip>
+              ))}
+            </p>
+          )}
           <p className="text-text-muted text-[11.5px] mb-2">
             {o.merchant_name} · <span className="text-text-primary font-semibold tabular-nums" dir="ltr">{iqd(o.price_iqd)}</span>
             {/* Held only while the work runs or is disputed: a completed order's
@@ -735,11 +744,11 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
         onConfirm={run}
         onClose={() => setAction(null)}
       >
-        {loc(
+        {[action?.kind === 'confirm' ? customOrderReminder(action.order, loc) : '', loc(
           'التأكيد يحوّل المبلغ للتاجر ولا يمكن التراجع عنه.',
           'Confirming releases the money to the merchant and cannot be undone.',
           'پشتڕاستکردنەوە پارەکە دەداتە بازرگان.'
-        )}
+        )].filter(Boolean).join(' ')}
       </ConfirmSheet>
 
       <ConfirmSheet

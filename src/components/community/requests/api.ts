@@ -203,12 +203,21 @@ export interface RequestSummaryV3 {
   review_state: string;
 }
 
+/** A colour on a side of a substitution: named (hex, label), or one the customer left open (`mode`). */
+export interface SubstitutionColour {
+  hex: string;
+  label: string;
+  mode?: 'any' | 'as_reference';
+}
+
 /** One proposed substitution on an offer: what the customer asked (read by the server) and what the merchant proposes. */
 export interface OfferSubstitutionV2 {
   part_id: string;
   material_row_id: string;
-  from: { material_id: string; colors: Array<{ hex: string; label: string }> };
-  to: { material_id: string; colors: Array<{ hex: string; label: string }> };
+  /** Every colour asked; an entry the customer left open carries its `mode` (P1-05 review 5) and no hex or label. */
+  from: { material_id: string; colors: SubstitutionColour[] };
+  /** The colours proposed (else the ones asked), and the entries left open, kept. */
+  to: { material_id: string; colors: SubstitutionColour[] };
   note: string;
 }
 

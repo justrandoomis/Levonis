@@ -27,7 +27,7 @@ import { GOVERNORATE_LABELS } from '../../../lib/governorates';
 import { offersLabel, shortDate, timeAgo } from './copy';
 import { fill, useHubStrings } from './strings';
 import type { CommunityRequest } from './api';
-import { localMaterial } from '../requests/mirrors';
+import { jobCountWords, localMaterial } from '../requests/mirrors';
 
 const CHIP = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-border-subtle/60 bg-surface px-2 py-0.5';
 
@@ -49,12 +49,12 @@ export default function RequestCard({ request: r, compact = false }: { request: 
           {loc('تحتاج مراجعة فنية', 'Needs a technical review', 'پێویستی بە پێداچوونەوەی تەکنیکی هەیە')}
         </span>
       )}
-      {ofParts && (
-        <span className={`${CHIP} tabular-nums`} data-community-request-parts={sum!.parts_count}>
-          {sum!.parts_count > 1 ? loc('عدد القطع', 'Parts', 'پارچەکان') : loc('القطع في الطقم', 'Pieces a set', 'پارچە لە هەر سێتێکدا')}:{' '}
-          <bdi dir="ltr">{sum!.parts_count > 1 ? sum!.parts_count : sum!.pieces_per_set}</bdi>
+      {/* The parts AND the pieces a set, side by side (P1-05 review 5), never one instead of the other. */}
+      {ofParts && jobCountWords(sum!, lang === 'en' || lang === 'ckb' ? lang : 'ar').map((w) => (
+        <span key={w} className={`${CHIP} tabular-nums`} data-community-request-parts={sum!.parts_count}>
+          {w}
         </span>
-      )}
+      ))}
       {r.budget_iqd != null && r.budget_iqd > 0 && (
         <span className={`${CHIP} font-semibold text-gold`}>
           {loc('الميزانية', 'Budget', 'بودجە')}: <bdi className="tabular-nums">{money(r.budget_iqd)}</bdi>

@@ -19,7 +19,7 @@ import { merchantHref } from '../../../lib/merchantRoutes';
 import type { ChatCard } from '../../../lib/chatCards';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { useCardActions } from './cardContext';
-import { daysText, statusText } from './cardWords';
+import { customOrderChips, customOrderReminder, daysText, statusText } from './cardWords';
 import { CardActions, CardButton, CardKicker, CardShell, StatusLine, toneOf } from './parts';
 import VariantImg from '../../ui/VariantImg';
 
@@ -141,13 +141,16 @@ export function CustomOrderCardView({ card, mine }: Props) {
     });
     if (yes) await run('deliver', () => chatCommerceApi.markDelivered(orderId), loc('سُجّل التسليم', 'Delivery recorded'));
   };
+  // A partial or substituted order says so where it is confirmed (P1-05 review 5).
+  const chips = customOrderChips(s, loc);
+  const reminder = customOrderReminder(s, loc);
   const confirmIt = async () => {
     const yes = await confirm({
       title: loc('وصلك العمل كما اتفقتما؟', 'Did you get what you agreed?'),
-      consequence: loc(
+      consequence: [reminder, loc(
         'تأكيد الاستلام يُفرج عن المبلغ للمتجر ولا يمكن التراجع عنه. إن كانت هناك مشكلة، افتح نزاعًا من صفحة الطلب بدلًا من ذلك.',
         'Confirming releases the money to the store and cannot be undone. If something is wrong, open a dispute from the order page instead.'
-      ),
+      )].filter(Boolean).join(' '),
       confirmLabel: loc('نعم، أؤكّد الاستلام', 'Yes, confirm'),
     });
     if (yes) await run('confirm', () => chatCommerceApi.confirmCustomOrder(orderId), loc('شكرًا — اكتمل الطلب', 'Thanks — the order is complete'));
@@ -158,6 +161,13 @@ export function CustomOrderCardView({ card, mine }: Props) {
       <div className="p-3 flex flex-col gap-1.5">
         <CardKicker icon={Hammer}>{loc('عمل مخصص — في الضمان', 'Custom work — held in escrow')}</CardKicker>
         <h3 dir="auto" className="text-[14px] font-bold leading-snug">{String(s.title ?? '')}</h3>
+        {chips.length > 0 && (
+          <p className="flex flex-wrap gap-1.5" data-custom-order-coverage>
+            {chips.map((c) => (
+              <span key={c} className="rounded-full border border-border-subtle px-2 py-0.5 text-[11.5px] font-semibold text-text-secondary">{c}</span>
+            ))}
+          </p>
+        )}
         <p className="text-[15px] font-extrabold tabular-nums">{moneyBoth(Number(s.price_iqd ?? 0))}</p>
         {Number(s.completion_days ?? 0) > 0 && (
           <p className="text-[12.5px] text-text-secondary">{loc('مدة التنفيذ: ', 'Ready in: ')}{daysText(Number(s.completion_days), loc)}</p>

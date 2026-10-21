@@ -131,6 +131,37 @@ export function deliveryText(method: unknown, loc: Loc): string {
   )[String(method ?? '')] ?? '';
 }
 
+/**
+ * WHAT A CUSTOM ORDER LEAVES OUT OR CHANGES (P1-05 review 5): «جزئي» with the
+ * number of parts left out, and «مع بدائل» — from the facts the server put on
+ * the card or the order row, so an order from a partial or substituted offer
+ * never reads as the whole job where it is confirmed. Nothing for a whole
+ * order with nothing substituted. Every word in Arabic, English and Sorani.
+ */
+export function customOrderChips(s: { covers_all?: unknown; uncovered_count?: unknown; substitutes?: unknown }, loc: Loc): string[] {
+  const out: string[] = [];
+  if (s.covers_all === false) {
+    const n = Math.max(0, Math.trunc(Number(s.uncovered_count ?? 0)) || 0);
+    out.push(n > 0
+      ? loc(`جزئي — قطع غير مشمولة: ${n}`, `Partial — parts not included: ${n}`, `بەشەکی — پارچە نەگیراوەکان: ${n}`)
+      : loc('جزئي', 'Partial', 'بەشەکی'));
+  }
+  if (s.substitutes === true) out.push(loc('مع بدائل', 'With substitutes', 'لەگەڵ جێگرەوە'));
+  return out;
+}
+
+/** The reminder beside «أكّد الاستلام» for such an order: what was agreed is not the whole request. */
+export function customOrderReminder(s: { covers_all?: unknown; substitutes?: unknown }, loc: Loc): string {
+  const parts: string[] = [];
+  if (s.covers_all === false) {
+    parts.push(loc('هذا الطلب لا يشمل كل قطع طلبك.', 'This order does not include every part of your request.', 'ئەم داواکارییە هەموو پارچەکانی داواکارییەکەت ناگرێتەوە.'));
+  }
+  if (s.substitutes === true) {
+    parts.push(loc('وفيه بدائل وافقت عليها.', 'It has substitutes you accepted.', 'جێگرەوەی تێدایە کە ڕازی بوویت پێی.'));
+  }
+  return parts.join(' ');
+}
+
 /** «٣ أيام» / «3 days» — a count of days, singular and plural handled plainly. */
 export function daysText(n: number, loc: Loc): string {
   const d = Math.max(0, Math.round(n));

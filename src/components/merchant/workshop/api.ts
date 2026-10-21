@@ -60,7 +60,11 @@ export interface BoardRequest {
    * and technologies the parts chose, which a job in several of them names
    * where its v1 row says «open». Absent on an older Worker.
    */
-  summary?: { parts_count: number; pieces_per_set: number; review_state: string; materials?: string[]; processes?: Array<'fdm' | 'resin'> } | null;
+  summary?: {
+    parts_count: number; pieces_per_set: number; review_state: string; materials?: string[]; processes?: Array<'fdm' | 'resin'>;
+    /** P1-05 review 5: a part left its material open beside the named ones. Absent on an older Worker. */
+    materials_open?: boolean;
+  } | null;
 }
 
 /**
@@ -74,11 +78,18 @@ export function boardJobFacts(r: Pick<BoardRequest, 'process' | 'material_id' | 
   processes: Array<'fdm' | 'resin'>;
   materials: string[];
   anyTechnology: boolean;
+  /** Some part left its material open beside the named ones (P1-05 review 5): «PLA + any material», never «PLA» alone. */
+  anyMaterial: boolean;
 } {
   const named = r.summary?.processes?.filter((x) => x === 'fdm' || x === 'resin') ?? [];
   const processes = named.length ? named : r.process ? [r.process] : [];
   const materials = r.summary?.materials?.length ? r.summary.materials : r.material_id ? [r.material_id] : [];
-  return { processes, materials, anyTechnology: !processes.length || (!r.process && processes.length === 1) };
+  return {
+    processes,
+    materials,
+    anyTechnology: !processes.length || (!r.process && processes.length === 1),
+    anyMaterial: materials.length > 0 && !!r.summary?.materials_open,
+  };
 }
 
 export interface BoardPage {

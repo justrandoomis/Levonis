@@ -266,6 +266,11 @@ export interface CommunityOrderRow {
   merchant_name: string;
   store_slug: string | null;
   role: 'customer' | 'merchant';
+  /** P1-05 review 5: false for an order accepted from a partial offer (absent otherwise), with the parts left out. */
+  covers_all?: false;
+  uncovered_count?: number;
+  /** P1-05 review 5: the order carries substitutes. */
+  substitutes?: true;
 }
 
 /** Everything the server says this account may do in the community. */

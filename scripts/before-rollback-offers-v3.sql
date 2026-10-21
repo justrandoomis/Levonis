@@ -31,7 +31,9 @@
 --
 -- Idempotent; touches no offer and no draft that covers the whole request as
 -- asked. A draft whose payload is not valid JSON carries no coverage and is
--- left alone.
+-- left alone. ORDERS already accepted from such an offer are not touched here:
+-- list them first with the read-only scripts/before-rollback-open-orders-v3.sql
+-- and follow each by hand (docs/CLOUDFLARE_BUILDS_RUNBOOK.md).
 -- ============================================================================
 UPDATE community_offers
    SET state = 'withdrawn',

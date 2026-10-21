@@ -301,12 +301,21 @@ export function reviewStateSql(alias: string, schemaPresent: boolean): string {
  * job's chosen materials and technologies (`s_materials`, `s_processes`) —
  * through the fingerprint, the review for an effective v3 row only. A job in
  * several materials or technologies has a v1 mirror that names none of them
- * (material open, process open); its card reads these instead (review 3).
+ * (material open, process open); its card reads these instead (review 3),
+ * and `s_materials_open` when a part left its material open (review 5).
  */
 export function boardSummarySql(alias: string, schemaPresent: boolean): string {
   const sum = requestSummarySql(alias, schemaPresent);
+  // A part whose material the customer left open, beside named ones (P1-05
+  // review 5): the card says «any material» as it says «any technology».
+  const open = schemaPresent
+    ? `COALESCE(CASE WHEN ${effectiveV3Sql(alias)} THEN EXISTS (SELECT 1 FROM community_request_part_materials om
+                                                  JOIN community_request_parts op ON op.id = om.part_id
+                                                 WHERE op.request_id = ${alias}.request_id
+                                                   AND (COALESCE(om.material_unsure, 0) = 1 OR COALESCE(om.material_id, '') = '')) END, 0)`
+    : '0';
   return `${sum.parts_count} AS s_parts_count, ${sum.pieces_per_set} AS s_pieces_per_set, ${reviewStateSql(alias, schemaPresent)} AS s_review_state, `
-    + `${sum.materials_json} AS s_materials, ${sum.processes_json} AS s_processes`;
+    + `${sum.materials_json} AS s_materials, ${sum.processes_json} AS s_processes, ${open} AS s_materials_open`;
 }
 
 const idList = (raw: unknown): string[] => {
@@ -322,7 +331,7 @@ const idList = (raw: unknown): string[] => {
 };
 
 /** The summary a list row carries, or undefined when the row was read without it. */
-export function boardSummaryOf(r: Record<string, unknown>): { parts_count: number; pieces_per_set: number; review_state: string; materials: string[]; processes: string[] } | undefined {
+export function boardSummaryOf(r: Record<string, unknown>): { parts_count: number; pieces_per_set: number; review_state: string; materials: string[]; processes: string[]; materials_open: boolean } | undefined {
   if (r.s_parts_count === undefined) return undefined;
   return {
     parts_count: Number(r.s_parts_count ?? 1) || 1,
@@ -330,6 +339,7 @@ export function boardSummaryOf(r: Record<string, unknown>): { parts_count: numbe
     review_state: String(r.s_review_state ?? ''),
     materials: idList(r.s_materials),
     processes: idList(r.s_processes).filter((x) => x === 'fdm' || x === 'resin'),
+    materials_open: Number(r.s_materials_open ?? 0) === 1,
   };
 }
 

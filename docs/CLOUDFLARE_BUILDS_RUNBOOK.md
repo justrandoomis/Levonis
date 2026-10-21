@@ -135,6 +135,17 @@ offer on (so the board stops showing offers that are gone), and deletes every
 draft that carries a coverage or a substitution. The merchant makes a new
 offer instead; a withdrawn offer is not re-opened after rolling forward.
 
+ORDERS ALREADY ACCEPTED from a partial or substituted offer are not touched
+by that script: their money is held at the price of what was agreed, and an
+older build's order screen and admin view do not read the agreement
+(`request_snapshot.agreement`), so both sides would see the whole request as
+the job. Before the rollback, list them with the read-only
+`scripts/before-rollback-open-orders-v3.sql` (every order not `completed`,
+`cancelled` or `refunded` whose agreement covers some parts or whose offer
+carries substitutes). An empty answer means nothing to follow. Otherwise
+follow each listed order by hand until it ends, telling both sides what was
+agreed, or wait with the rollback until none is open.
+
 ### Deleting a workflow breaks `npm run check`
 
 `tests/workflowNaming.test.ts` holds a hardcoded list of six deploy workflows

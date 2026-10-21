@@ -464,7 +464,23 @@ printRequestRoutes.post('/quote', requireAuth, async (c) => {
       void cost_lines; void cost_iqd; void floor_iqd; void margin_percent; void accessory_lines;
       // R10, one rule (review 3): a one-job price was measured on the mirror's primary file.
       const pricedPrimary = pricesAsOneJob(next) && w.primaryFileId ? [w.primaryFileId] : [];
-      return c.json({ success: true, quote: publicQuote, estimate, models_unpriced: modelsUnpriced(next, read.modelFiles, pricedPrimary) });
+      return c.json({ success: true, quote: publicQuote, estimate, models_unpriced: modelsUnpriced(next, read.modelFiles, pricedPrimary, originalsOf(await fileSourceRoles(c.env.DB, requestId))) });
+    }
+    /**
+     * A V1 BODY ON A PUBLISHED JOB OF PARTS (P1-05 review 5): the v1 wizard
+     * opened from «تعديل» knows one file, and its one-job price and «other
+     * model files» would disagree with the page for the same request. The
+     * stored model is priced as the page prices it — part by part, its R10
+     * by the same rule — until a v3 editor exists.
+     */
+    const parts = isModelBody(body) ? null : await storedJobOfParts(c.env.DB, requestId);
+    if (parts) {
+      const w = wizardFromModel(parts, parts, {}, parts.rows.p, readRequestFields({}));
+      const quote: CoveredQuote = estimateModel(parts, parts.modelFiles, modelEstimateContext(w, mats, cfg, accs));
+      const estimate = fromEngineA(quote, { quantity: parts.job.quantity });
+      const { cost_lines, cost_iqd, floor_iqd, margin_percent, accessory_lines, ...publicQuote } = quote;
+      void cost_lines; void cost_iqd; void floor_iqd; void margin_percent; void accessory_lines;
+      return c.json({ success: true, quote: publicQuote, estimate, models_unpriced: modelsUnpriced(parts, parts.modelFiles, [], originalsOf(await fileSourceRoles(c.env.DB, requestId))) });
     }
   }
 
@@ -528,6 +544,26 @@ printRequestRoutes.post('/quote', requireAuth, async (c) => {
   void cost_lines; void cost_iqd; void floor_iqd; void margin_percent; void accessory_lines;
   return c.json({ success: true, quote: publicQuote, estimate, models_unpriced: unpricedModels });
 });
+
+/** The files the request's source table names as originals (role `source`). */
+const originalsOf = (roles: ReadonlyMap<string, string>): string[] => [...roles].filter(([, role]) => role === 'source').map(([id]) => id);
+
+/**
+ * The request's stored model when it is an effective version-3 job the
+ * estimate prices part by part, else null — one indexed read for any other
+ * request; nothing on a database before 0208.
+ */
+async function storedJobOfParts(db: D1Database, requestId: string): Promise<RequestModelRead | null> {
+  try {
+    const v3 = await db.prepare(`SELECT 1 AS x FROM community_print_requests p WHERE p.request_id = ? AND ${effectiveV3Sql('p')}`).bind(requestId).first();
+    if (!v3) return null;
+  } catch (e) {
+    if (isMissingSchema(e)) return null;
+    throw e;
+  }
+  const read = await readRequestModel(db, requestId);
+  return read && read.schema_version === 3 && !pricesAsOneJob(read) ? read : null;
+}
 
 /**
  * R10 FOR A V1 JOB: the request's model files beside the one the estimate
@@ -753,13 +789,21 @@ export function printMatchNotification(f: PrintMatchFacts): { title: Trilingual;
     }
     for (const proc of f.parts.processes) push(PROCESS_LABEL[proc]);
     push(QUALITY_LABEL[f.quality]);
-    // Label first, as «العدد» below: no plural agreement to get wrong.
-    if (f.parts.count > 1) push({ ar: `عدد القطع ${f.parts.count}`, en: `${f.parts.count} parts`, ckb: `${f.parts.count} پارچە` });
+    // Label first, as «العدد» below: no plural agreement to get wrong. A PART
+    // and a PIECE are two words (P1-05 review 5) — «الأجزاء» / «بەش» beside
+    // «القطع» / «پارچە» — so «2 parts · 3 pieces a set» never reads in Arabic
+    // or Sorani as two counts of the same thing.
+    if (f.parts.count > 1) push({ ar: `عدد الأجزاء ${f.parts.count}`, en: `${f.parts.count} parts`, ckb: `${f.parts.count} بەش` });
     if (f.parts.pieces_per_set > f.parts.count) {
       push({ ar: `القطع في الطقم ${f.parts.pieces_per_set}`, en: `${f.parts.pieces_per_set} pieces a set`, ckb: `${f.parts.pieces_per_set} پارچە لە هەر سێتێکدا` });
     }
     // One set is «1 set», not «1 sets» (review 4).
     push({ ar: `الأطقم ${f.parts.sets}`, en: `${f.parts.sets} ${f.parts.sets === 1 ? 'set' : 'sets'}`, ckb: `${f.parts.sets} سێت` });
+    // …and the pieces in all, the number a workshop prints (review 5).
+    if (f.parts.sets > 1) {
+      const total = f.parts.pieces_per_set * f.parts.sets;
+      push({ ar: `مجموع القطع ${total}`, en: `${total} pieces in all`, ckb: `کۆی پارچەکان ${total}` });
+    }
     if (f.parts.review) push({ ar: 'تحتاج مراجعة فنية', en: 'needs a technical review', ckb: 'پێویستی بە پێداچوونەوەی تەکنیکی هەیە' });
   } else {
     const matEn = latinOr(f.material?.name_en ?? '', f.material_id);
@@ -1962,8 +2006,9 @@ printRequestRoutes.get('/requests/:id', async (c) => {
     print: {
       // R10, one rule with «طلباتي» and /quote (review 3): a one-job estimate
       // priced the row's primary file; a job priced part by part, its parts'.
+      // An original the table names never counts, as in the list and /quote (review 5).
       models_unpriced: read
-        ? modelsUnpriced(read, read.modelFiles, v3 && pricedByParts(row.estimate) ? [] : [String(row.primary_file_id ?? '')].filter(Boolean))
+        ? modelsUnpriced(read, read.modelFiles, v3 && pricedByParts(row.estimate) ? [] : [String(row.primary_file_id ?? '')].filter(Boolean), originalsOf(await fileSourceRoles(c.env.DB, requestId)))
         : 0,
       process: row.process,
       material_id: row.material_id,

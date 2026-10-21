@@ -9,7 +9,7 @@
  */
 import type { OfferV2 } from './api';
 import { fill, type RequestLang, type RequestStrings } from './strings';
-import { localColour, localMaterial, type MaterialLike } from './mirrors';
+import { entryColour, localMaterial, type MaterialLike } from './mirrors';
 
 /** A part as the screens name it. */
 export interface PartRef {
@@ -66,9 +66,13 @@ export function partialAckReady(o: Pick<OfferV2, 'coverage'>, parts: PartRef[]):
 /** The list separator of the language: «، » in Arabic and Sorani, «, » in English. */
 export const listSep = (lang: RequestLang): string => (lang === 'en' ? ', ' : '، ');
 
-/** One side of a substitution in the reader language: the catalogue name, then the colours by name. */
-export function substitutionSide(v: { material_id: string; colors: Array<{ hex: string; label: string }> }, lang: RequestLang, materials: readonly MaterialLike[] = []): string {
-  const colours = v.colors.map((c) => localColour(c.label || c.hex, lang)).filter(Boolean).join(listSep(lang));
+/**
+ * One side of a substitution in the reader language: the catalogue name, then
+ * the colours by name — «any colour» and «as in the reference» as words, so
+ * a material-only substitute shows the colours that stay (P1-05 review 5).
+ */
+export function substitutionSide(v: { material_id: string; colors: Array<{ hex: string; label: string; mode?: string }> }, lang: RequestLang, materials: readonly MaterialLike[] = []): string {
+  const colours = v.colors.map((c) => entryColour(c, lang)).filter(Boolean).join(listSep(lang));
   return [localMaterial(v.material_id, lang, materials), colours].filter(Boolean).join(' ');
 }
 

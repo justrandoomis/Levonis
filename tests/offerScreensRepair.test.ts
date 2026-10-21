@@ -237,7 +237,7 @@ test('review: the admin offer line shows the colours of a colour-only substituti
   assert.equal(review.adminSubstitutionText(colourOnly, 'en'), 'PLA Olive instead of PLA Black');
   const materialOnly = { ...colourOnly, to: { material_id: 'petg', colors: colourOnly.from.colors } };
   assert.equal(review.adminSubstitutionText(materialOnly, 'en'), 'PETG instead of PLA');
-  assert.match(code('src/components/adminCommunity/AdminCommunity.tsx'), /adminSubstitutionSides\(x, reviewLang\(lang\)\)/);
+  assert.match(code('src/components/adminCommunity/AdminCommunity.tsx'), /adminSubstitutionSides\(x, reviewLang\(lang\), catalogue\)/);
 });
 
 // ================================================== fourth review (round 2)
@@ -272,13 +272,14 @@ test('bidi: a substitution line is drawn in the reader direction with each side 
   assert.equal(parts.readerDir('en'), 'ltr');
   const [x] = parts.substitutionPieces(offer({ substitutions: [PETG_FOR_PLA] }), [{ id: 'pa', name: 'المقبض', position: 0 }], requestStrings('ar'), 'ar', CATALOGUE);
   assert.equal(x.line, 'PETG بدل PLA (المقبض)');
-  assert.equal(renderToStaticMarkup(createElement(SubstitutionText, { x, s: requestStrings('ar') })), '<bdi>PETG</bdi> بدل <bdi>PLA</bdi> (<bdi>المقبض</bdi>)');
+  // Review 5: each isolate takes the reader direction too (offerScreensReview5.test.ts).
+  assert.equal(renderToStaticMarkup(createElement(SubstitutionText, { x, s: requestStrings('ar'), dir: 'rtl' })), '<bdi dir="rtl">PETG</bdi> بدل <bdi dir="rtl">PLA</bdi> (<bdi dir="rtl">المقبض</bdi>)');
   const compare = code('src/components/community/requests/OfferCompare.tsx');
   assert.match(compare, /<li key=\{x\.line\} dir=\{readerDir\(L\)\}>/, 'the acknowledged list');
   assert.match(compare, /<Row k=\{s\.substitutesLabel\} dir=\{readerDir\(lang\)\}>/, 'the offer column');
   assert.doesNotMatch(compare, /<li key=\{line\} dir="auto">/);
   for (const f of ['src/components/community/requests/OfferCompare.tsx', 'src/pages/community/Request.tsx', 'src/components/community/requests/OfferComposer.tsx']) {
-    assert.match(code(f), /<SubstitutionText x=\{x\} s=\{s\} \/>/, f);
+    assert.match(code(f), /<SubstitutionText x=\{x\} s=\{s\} dir=\{readerDir\((lang|L)\)\} \/>/, f);
   }
 });
 
@@ -305,9 +306,9 @@ test('merchant card: the workshop own offer or draft shows its partial chip, the
   const html = draw(createElement(composer.OfferBrief, { o, s: requestStrings('en'), lang: 'en', parts: PARTS, materials: [] }));
   assert.match(html, /data-offer-brief-partial/);
   assert.ok(html.includes('Partial — parts covered 1/2'));
-  assert.ok(html.includes('<bdi>Body</bdi>'), 'the parts it makes');
+  assert.ok(html.includes('<bdi dir="ltr">Body</bdi>'), 'the parts it makes');
   assert.match(html, /data-offer-brief-substitutions/);
-  assert.ok(html.includes('<bdi>PETG</bdi> instead of <bdi>PLA</bdi> (<bdi>Body</bdi>)'));
+  assert.ok(html.includes('<bdi dir="ltr">PETG</bdi> instead of <bdi dir="ltr">PLA</bdi> (<bdi dir="ltr">Body</bdi>)'));
   const src = code('src/components/community/requests/OfferComposer.tsx');
   assert.match(src, /<OfferBrief o=\{draft\} s=\{s\} lang=\{L\} parts=\{partRefs\} materials=\{materials\} \/>/);
   assert.match(src, /<OfferBrief o=\{o\} s=\{s\} lang=\{L\} parts=\{partRefs\} materials=\{materials\} \/>/);
@@ -315,12 +316,12 @@ test('merchant card: the workshop own offer or draft shows its partial chip, the
   assert.doesNotMatch(draw(createElement(composer.OfferBrief, { o: offer(), s: requestStrings('en'), lang: 'en', parts: PARTS, materials: [] })), /data-offer-brief-(partial|substitutions)/);
 });
 
-test('seen revision: a new offer carries the revision the composer rendered; a draft and an edit do not', () => {
+test('seen revision: a new offer and (review 5) an edit carry the revision the composer rendered; a draft does not', () => {
   const t = composer.termsFrom(null, null, {});
   const fresh = composer.offerBody({ ...t, price: 20_000, days: 3 }, { draft: false, editingSent: false, validTouched: false, requestHash: 'h1' });
   assert.equal(fresh.expected_request_hash, 'h1');
   assert.equal(composer.offerBody(t, { draft: true, editingSent: false, validTouched: false, requestHash: 'h1' }).expected_request_hash, undefined);
-  assert.equal(composer.offerBody(t, { draft: false, editingSent: true, validTouched: false, requestHash: 'h1' }).expected_request_hash, undefined);
+  assert.equal(composer.offerBody(t, { draft: false, editingSent: true, validTouched: false, requestHash: 'h1' }).expected_request_hash, 'h1');
   assert.equal(composer.offerBody(t, { draft: false, editingSent: false, validTouched: false }).expected_request_hash, undefined, 'an unknown revision sends nothing');
   const src = code('src/components/community/requests/OfferComposer.tsx');
   assert.match(src, /parts: partsOpt\(false\), requestHash \}/);
@@ -357,7 +358,7 @@ test('review: the reviewer reads materials and palette colours in the admin lang
   assert.doesNotMatch(code('src/components/adminCommunity/reviewWords.ts'), /←/);
   const panel = code('src/components/adminCommunity/TechnicalReviewPanel.tsx');
   assert.doesNotMatch(panel, /toUpperCase\(\)/);
-  assert.match(panel, /materialWord\(m\.material_id, L\)/);
+  assert.match(panel, /materialWord\(m\.material_id, L, catalogue\)/);
 });
 
 test('order screen: an unnamed part is «Part n» in the reader language, and a material beyond the seed reads by its catalogue name', () => {

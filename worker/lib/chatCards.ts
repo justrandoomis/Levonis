@@ -272,6 +272,26 @@ export function quoteCardFrom(t: QuoteTerms): ResolvedCard {
 }
 
 /** A funded (or moved) custom order's card — the event it records is part of the snapshot. */
+/**
+ * WHAT THE ORDER MAKES, ON ITS CARD (P1-05 review 5): an order accepted from
+ * a partial offer says so, with the number of parts left out, and one with
+ * substitutes says that too — read from the order's own snapshots (the
+ * agreement in `request_snapshot`, the coverage and substitutions in
+ * `offer_snapshot`). A whole order with nothing substituted adds nothing, so
+ * its card is the card every order had before.
+ */
+export function orderCoverageFacts(order: Record<string, unknown>): { covers_all?: false; uncovered_count?: number; substitutes?: true } {
+  const obj = (v: unknown): Record<string, unknown> =>
+    v && typeof v === 'object' ? (v as Record<string, unknown>) : typeof v === 'string' ? safeParse<Record<string, unknown>>(v, {}) ?? {} : {};
+  const offer = obj(order.offer_snapshot);
+  const agreement = obj(obj(order.request_snapshot).agreement);
+  const coverage = obj(offer.coverage);
+  const partial = agreement.covers_all === false || coverage.covers_all === false;
+  const uncovered = Array.isArray(agreement.uncovered) ? agreement.uncovered.length : 0;
+  const substitutes = (Array.isArray(offer.substitutions) && offer.substitutions.length > 0) || (Array.isArray(agreement.substitutions) && agreement.substitutions.length > 0);
+  return { ...(partial ? { covers_all: false as const, uncovered_count: uncovered } : {}), ...(substitutes ? { substitutes: true as const } : {}) };
+}
+
 export function customOrderCard(order: Record<string, unknown>, title: string, event: string): ResolvedCard {
   const snapshot = {
     v: 1,
@@ -282,6 +302,7 @@ export function customOrderCard(order: Record<string, unknown>, title: string, e
     completion_days: Math.max(0, Math.trunc(Number(order.completion_days) || 0)),
     delivery_method: clip(order.delivery_method, 40),
     event,
+    ...orderCoverageFacts(order),
   };
   return { type: 'custom_order', ref: String(order.id), snapshot, body: `🧾 ${clip(title, 180)}` };
 }

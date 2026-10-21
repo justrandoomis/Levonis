@@ -120,7 +120,7 @@ import { assertMayOffer, eligibleVerdictSql, liveVerdict, loadCandidates, loadCa
 // A request addressed to ONE store (0151): its store quotes it without matching.
 import { assertMayQuote, directRequest } from '../lib/directRequests';
 import { isDirectMerchant } from '../lib/communityRequests';
-import { announceCustomOrder, customOrderCard, postSystemCard } from '../lib/chatCards';
+import { announceCustomOrder, customOrderCard, orderCoverageFacts, postSystemCard } from '../lib/chatCards';
 import { fileClass, fileReadStatement, fileReader, mayReadBytes, previewGrantFor } from '../lib/requestFilePolicy';
 import { boardSummaryOf, boardSummarySql, effectiveV3Sql, fileSourceRoles, modelOfSpec, readRequestModel, restampAfterFileStatement } from '../lib/requestModel';
 import {
@@ -139,6 +139,7 @@ import {
   readCoverageBody,
   resolveCoverage,
   revisionHashFence,
+  revisionHead,
   storedCoverage,
   uncoverableParts,
   coverageNeedsPartCheck,
@@ -1243,7 +1244,9 @@ function draftCoverage(t: OfferCoverageTerms): Pick<DraftPayload, 'coverage' | '
       material_row_id: x.material_row_id,
       to: {
         ...(x.to.material_id !== x.from.material_id ? { material_id: x.to.material_id } : {}),
-        ...(JSON.stringify(x.to.colors) !== JSON.stringify(x.from.colors) ? { colors: x.to.colors } : {}),
+        // Only the colours the merchant named: the entries the customer left
+        // open are read again from the request (P1-05 review 5).
+        ...(JSON.stringify(x.to.colors) !== JSON.stringify(x.from.colors) ? { colors: x.to.colors.filter((c) => !c.mode).map((c) => ({ hex: c.hex, label: c.label })) } : {}),
       },
       note: x.note,
       was: x.from,
@@ -1485,22 +1488,28 @@ async function assertCoveredPartsMakeable(env: Env, requestId: string, live: Liv
   return model;
 }
 
+/** A revision as a write is fenced on: its number and its hash. */
+type RevisionHead = { revision: number; hash: string };
+
 /**
- * THE REQUEST THE MERCHANT SAW (P1-05 review 4). The composer sends the hash
- * of the revision it rendered (`expected_request_hash`, from the request
- * page); a new offer or a sent draft is refused REQUEST_CHANGED when the
- * request is no longer that revision — before the first offer a customer
- * edit rewrites revision 1 in place, so its number alone does not move. The
+ * THE REQUEST THE MERCHANT SAW (P1-05 reviews 4 and 5). The composer sends the
+ * hash of the revision it rendered (`expected_request_hash`, from the request
+ * page) with a new offer, a sent draft and an edit; the write is refused
+ * REQUEST_CHANGED when the request is no longer that revision — before the
+ * first offer a customer edit rewrites revision 1 in place, so its number
+ * alone does not move. `fence` is the revision the route read BEFORE its
+ * checks (`revisionHead`, or the model the coverage was resolved on); the
  * answer is the revision to fence the write on. An older client that sends no
- * hash keeps the fence on what the route itself read.
+ * hash is fenced on what the route read: a change made between its reads and
+ * its write is refused, one made before its request arrived is not seen.
  */
-async function assertSeenRevision(env: Env, requestId: string, body: Record<string, unknown>, rm: RevisionModel | null): Promise<RevisionModel | null> {
+async function assertSeenRevision(env: Env, requestId: string, body: Record<string, unknown>, fence: RevisionHead | null): Promise<RevisionHead | null> {
   const raw = body.expected_request_hash;
-  if (raw === undefined || raw === null || raw === '') return rm;
+  if (raw === undefined || raw === null || raw === '') return fence;
   const expected = str(raw, 'expected_request_hash', { max: 128 });
-  const now = rm ?? (await loadRevisionModel(env.DB, requestId, async () => readRequestModel(env.DB, requestId)));
+  const now = fence ?? (await revisionHead(env.DB, requestId));
   // A request with no revision row has no hash to compare: nothing to refuse.
-  if (!now || !now.hash) return rm;
+  if (!now || !now.hash) return fence;
   if (now.hash !== expected) {
     throw conflict('The request changed since you opened it — check it and try again', 'REQUEST_CHANGED');
   }
@@ -1700,6 +1709,11 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
   // P1-05: the parts this offer makes and what it substitutes, checked
   // against the request's current revision (nothing read when not named).
   const coverage = await coverageFromBody(c.env, requestId, readCoverageBody(body));
+  // EVERY OFFER IS FENCED ON THE REVISION READ BEFORE ITS CHECKS (P1-05
+  // review 5), a whole offer on a one-job request too: its matcher verdict
+  // reads no model, so a part the customer adds after this read would
+  // otherwise be covered by a price set for one part.
+  const head: RevisionHead | null = coverage.rm ?? (await revisionHead(c.env.DB, requestId));
   /**
    * ELIGIBILITY IS THE PERMISSION (W5-B; audit 03 §9 G7). A plan used to be
    * enough to bid on anything; now the workshop must be able to make THIS job
@@ -1749,7 +1763,7 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
     return c.json({ success: true, offer: draftShape(saved!, { revision: req.revision }) }, 201);
   }
 
-  const fence = await assertSeenRevision(c.env, requestId, body, judged);
+  const fence = await assertSeenRevision(c.env, requestId, body, head ?? judged);
   const id = newId('off');
   let inserted = 0;
   try {
@@ -2006,23 +2020,35 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
   // An edit prices the job AS IT NOW IS: a new promise, so the same bar as a
   // new offer (W5-B) — a workshop the revised job no longer fits cannot re-price it.
   let judged = coverage.rm;
+  let fence: RevisionHead | null = null;
   if (before.state === 'pending' || before.state === 'superseded') {
+    // The revision read BEFORE the checks (P1-05 review 5): every edit that
+    // re-prices is fenced on it, one on a one-job request too.
+    const head: RevisionHead | null = coverage.rm ?? (await revisionHead(c.env.DB, requestId));
     // A DIRECT request's store quotes it without matching (0151).
     const live = await assertMayQuote(c.env, requestId, ctx.merchant.id);
     // …and every part it covers, as asked or with its substitution (critique 2).
     judged = await assertCoveredPartsMakeable(c.env, requestId, live, coverage.terms, coverage.rm);
+    // …and on the revision its merchant saw, when the composer names it.
+    fence = await assertSeenRevision(c.env, requestId, body, head ?? judged);
   }
   // An offer that was current when it was read is edited on that revision
   // only: a customer edit landing between the reads above (a new revision)
   // is the stale path, with its added-parts check — never a silent re-price.
-  if (judged && !stale && judged.revision !== Number(offerRow.request_revision ?? 1)) {
+  const readAt = Number(offerRow.request_revision ?? 1);
+  if (!stale && ((judged && judged.revision !== readAt) || (fence && fence.revision !== readAt))) {
     throw conflict('The request changed while you were editing — check it and try again', 'REQUEST_CHANGED');
   }
-  // Fenced whenever the request model was read for a check, a whole offer
-  // too — a price-only edit of a pending whole offer on a job of parts reads
-  // it for the part check: a part added after that read would otherwise be
-  // covered by a price set without it (critique 4; P1-05 review 4).
-  const fenced = !!judged;
+  // FENCED WHATEVER THE PART CHECK DECIDED (P1-05 review 5): a price-only
+  // edit of a pending whole offer on a one-part or v1 job reads no model, and
+  // a part the customer added between its reads and its write would
+  // otherwise reopen the offer they had just superseded, over a part its
+  // merchant never saw (critique 4; P1-05 reviews 4 and 5).
+  const fenced = !!fence;
+  // …and an offer read as pending on the current revision is written only
+  // while it still is — whatever the hash fence could see (a request older
+  // than revision rows has no hash).
+  const current = !stale && before.state === 'pending';
 
   // `state IN (pending, superseded)` is in the WHERE clause, so an accepted
   // offer cannot be edited even by a request that tries; and only while its
@@ -2030,7 +2056,7 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
   let changes = 0;
   try {
     const res = await c.env.DB.batch([
-      ...(fenced ? [revisionHashFence(c.env.DB, requestId, judged!.hash)] : []),
+      ...(fenced ? [revisionHashFence(c.env.DB, requestId, fence!.hash)] : []),
       c.env.DB.prepare(
         `UPDATE community_offers
             SET ${sets.length ? `${sets.join(', ')}, ` : ''}state = 'pending', revision = revision + 1,
@@ -2039,8 +2065,10 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
           WHERE id = ? AND merchant_id = ? AND state IN ('pending','superseded')
             AND EXISTS (SELECT 1 FROM community_requests r
                          WHERE r.id = community_offers.request_id AND r.state IN ('open','receiving_offers')
-                           AND (r.expires_at IS NULL OR r.expires_at = '' OR r.expires_at > ?))`
-      ).bind(...vals, ts, offerId, ctx.merchant.id, ts),
+                           AND (r.expires_at IS NULL OR r.expires_at = '' OR r.expires_at > ?))${current ? `
+            AND state = 'pending' AND request_revision = ?
+            AND (SELECT r.revision FROM community_requests r WHERE r.id = community_offers.request_id) = ?` : ''}`
+      ).bind(...vals, ts, offerId, ctx.merchant.id, ts, ...(current ? [readAt, readAt] : [])),
       recordOfferRevisionStatement(c.env.DB, offerId, 'edit', { v3: !isDefaultCoverage(coverage.terms) || !isDefaultCoverage(stored) }),
       offerCountStatement(c.env.DB, String(before.request_id)),
       // A new file set rides the same edit, fenced on the edit having landed.
@@ -2051,7 +2079,19 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
     if (fenced && isRevisionFenceAbort(e)) throw conflict('The request changed while you were editing — check it and try again', 'REQUEST_CHANGED');
     throw offerWriteConflict(e) ?? e;
   }
-  if (!changes) throw conflict('That offer can no longer be changed', 'OFFER_NOT_AVAILABLE');
+  if (!changes) {
+    if (current) {
+      // The customer changed the job between the reads and the write: their
+      // publish superseded the offer, and it stays so (P1-05 review 5).
+      const now = await c.env.DB.prepare(
+        `SELECT o.state, r.revision AS r_revision FROM community_offers o JOIN community_requests r ON r.id = o.request_id WHERE o.id = ?`
+      ).bind(offerId).first<{ state: string; r_revision: number }>();
+      if (now && (now.state === 'superseded' || Number(now.r_revision ?? 1) !== readAt)) {
+        throw conflict('The request changed while you were editing — check it and try again', 'REQUEST_CHANGED');
+      }
+    }
+    throw conflict('That offer can no longer be changed', 'OFFER_NOT_AVAILABLE');
+  }
 
   const row = await c.env.DB.prepare('SELECT * FROM community_offers WHERE id = ?').bind(offerId).first<Record<string, unknown>>();
   await audit(c.env.DB, c.get('user')!.id, 'community.offer_edited', offerId, {
@@ -2124,11 +2164,13 @@ marketplaceRoutes.post('/offers/:id/send', requireCommunityOpen, requireAuth, as
   const files = (await readOfferFiles(c.env.DB, { files: Array.isArray(draftFiles) ? draftFiles : [] }, user.id, requestId)) ?? [];
   // The draft's coverage, checked again against the request as it now is (P1-05).
   const coverage = await coverageFromBody(c.env, requestId, draftCoverageBody(payload));
+  // Fenced on the revision read before the checks — a one-job request's too —
+  // and on the one its merchant saw (P1-05 reviews 4 and 5).
+  const head: RevisionHead | null = coverage.rm ?? (await revisionHead(c.env.DB, requestId));
   const live = await assertMayOffer(c.env, requestId, ctx.merchant.id);
-  // Fenced on the revision the checks read, and on the one its merchant saw (P1-05 review 4).
   const judged = await assertCoveredPartsMakeable(c.env, requestId, live, coverage.terms, coverage.rm);
   const sendBody = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const fence = await assertSeenRevision(c.env, requestId, sendBody && typeof sendBody === 'object' ? sendBody : {}, judged);
+  const fence = await assertSeenRevision(c.env, requestId, sendBody && typeof sendBody === 'object' ? sendBody : {}, head ?? judged);
   const quoteId = typeof payload.quote_id === 'string' ? payload.quote_id : '';
 
   const id = newId('off');
@@ -3417,15 +3459,19 @@ marketplaceRoutes.get('/orders', requireAuth, async (c) => {
     `SELECT o.id, o.state, o.price_iqd, o.merchant_receivable_iqd, o.created_at,
             o.delivered_at, o.completed_at, o.auto_complete_at, o.request_id, o.merchant_id,
             r.title AS request_title, m.name AS merchant_name, s.slug AS store_slug,
-            CASE WHEN o.customer_id = ? THEN 'customer' ELSE 'merchant' END AS role
+            CASE WHEN o.customer_id = ? THEN 'customer' ELSE 'merchant' END AS role,
+            o.offer_snapshot, o.request_snapshot
        FROM community_orders o
        JOIN community_merchants m ON m.id = o.merchant_id
        LEFT JOIN merchant_stores s ON s.id = o.store_id
        JOIN community_requests r ON r.id = o.request_id
       WHERE o.customer_id = ? OR m.user_id = ?
       ORDER BY o.created_at DESC LIMIT 50`
-  ).bind(user.id, user.id, user.id).all();
-  return c.json({ success: true, orders: results });
+  ).bind(user.id, user.id, user.id).all<Record<string, unknown>>();
+  // A partial or substituted order says so on its row (P1-05 review 5); the
+  // snapshots themselves stay on the order's own page.
+  const orders = (results ?? []).map(({ offer_snapshot, request_snapshot, ...o }) => ({ ...o, ...orderCoverageFacts({ offer_snapshot, request_snapshot }) }));
+  return c.json({ success: true, orders });
 });
 
 // ------------------------------------------------------ complaints (reporter)

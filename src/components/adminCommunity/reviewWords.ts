@@ -6,7 +6,7 @@
  * Every word in Arabic, English and Sorani.
  */
 
-import { localColour, localMaterial } from '../community/requests/mirrors';
+import { entryColour, localColour, localMaterial, type MaterialLike } from '../community/requests/mirrors';
 
 type Loc = (ar: string, en: string, ckb?: string) => string;
 export type ReviewLang = 'ar' | 'en' | 'ckb';
@@ -26,8 +26,23 @@ export function colourWord(c: { mode: string; hex: string; label: string }, loc:
   return localColour(c.label || c.hex, lang) || loc('لون بلا اسم', 'unnamed colour', 'ڕەنگی بێ ناو');
 }
 
-/** A catalogue material as the reviewer reads it: its name in the language of the reviewer, never the raw upper-case id. */
-export const materialWord = (id: string, lang: ReviewLang): string => localMaterial(id, lang) || id;
+/**
+ * A catalogue material as the reviewer reads it: its name in the language of
+ * the reviewer, never the raw upper-case id. `catalogue` (the live print
+ * catalogue) names a material the owner added beyond the seed list, as the
+ * request page and the order screen do (P1-05 review 5).
+ */
+export const materialWord = (id: string, lang: ReviewLang, catalogue: readonly MaterialLike[] = []): string => localMaterial(id, lang, catalogue) || id;
+
+/** The kind of an attachment in the language of the reviewer (P1-05 review 5): never the raw English key. */
+export function fileKindWord(kind: string, lang: ReviewLang): string {
+  const words: Record<string, Record<ReviewLang, string>> = {
+    model: { ar: 'نموذج', en: 'model', ckb: 'مۆدێل' },
+    reference: { ar: 'مرجع', en: 'reference', ckb: 'سەرچاوە' },
+    document: { ar: 'مستند', en: 'document', ckb: 'بەڵگەنامە' },
+  };
+  return words[kind]?.[lang] ?? kind;
+}
 
 /**
  * How long a request has waited, LABEL FIRST («أيام الانتظار: 3»), so the
@@ -39,7 +54,7 @@ export function reviewAge(iso: string, loc: Loc, now: number = Date.now()): stri
   return loc(`أيام الانتظار: ${days}`, `Days waiting: ${days}`, `ڕۆژانی چاوەڕوانی: ${days}`);
 }
 
-type Side = { material_id: string; colors?: Array<{ hex: string; label: string }> };
+type Side = { material_id: string; colors?: Array<{ hex: string; label: string; mode?: string }> };
 
 /** «{to} بدل {from}»: a word, never an arrow — an arrow points the other way once an RTL line reorders its runs. */
 const INSTEAD: Record<ReviewLang, string> = { ar: 'بدل', en: 'instead of', ckb: 'لە جیاتی' };
@@ -49,16 +64,16 @@ const INSTEAD: Record<ReviewLang, string> = { ar: 'بدل', en: 'instead of', ck
  * the reviewer: the catalogue name, and the colours by name when they change, so
  * a colour-only substitution never reads «PLA بدل PLA».
  */
-export function adminSubstitutionSides(x: { from: Side; to: Side }, lang: ReviewLang): { to: string; from: string; word: string } {
+export function adminSubstitutionSides(x: { from: Side; to: Side }, lang: ReviewLang, catalogue: readonly MaterialLike[] = []): { to: string; from: string; word: string } {
   const sep = lang === 'en' ? ', ' : '، ';
-  const colours = (cs: Side['colors']) => (cs ?? []).map((c) => localColour(c.label || c.hex, lang)).filter(Boolean).join(sep);
+  const colours = (cs: Side['colors']) => (cs ?? []).map((c) => entryColour(c, lang)).filter(Boolean).join(sep);
   const changed = JSON.stringify(x.to.colors ?? []) !== JSON.stringify(x.from.colors ?? []);
-  const side = (v: Side) => [materialWord(v.material_id, lang), changed ? colours(v.colors) : ''].filter(Boolean).join(' ');
+  const side = (v: Side) => [materialWord(v.material_id, lang, catalogue), changed ? colours(v.colors) : ''].filter(Boolean).join(' ');
   return { to: side(x.to), from: side(x.from), word: INSTEAD[lang] };
 }
 
 /** «PETG بدل PLA» — the line the admin board shows (each side isolated there). */
-export function adminSubstitutionText(x: { from: Side; to: Side }, lang: ReviewLang): string {
-  const v = adminSubstitutionSides(x, lang);
+export function adminSubstitutionText(x: { from: Side; to: Side }, lang: ReviewLang, catalogue: readonly MaterialLike[] = []): string {
+  const v = adminSubstitutionSides(x, lang, catalogue);
   return `${v.to} ${v.word} ${v.from}`;
 }

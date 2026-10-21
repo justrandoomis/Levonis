@@ -112,3 +112,36 @@ export function localColour(value: string | null | undefined, lang: Lang): strin
   const c = requestColour(raw);
   return c ? c[lang] : raw;
 }
+
+/**
+ * A JOB OF PARTS, COUNTED (P1-05 review 5): the parts when there are several,
+ * the pieces a set when they are more than the parts. A PART and a PIECE are
+ * two words in Arabic and Sorani («الأجزاء» / «بەش» beside «القطع» /
+ * «پارچە»), so «2 parts» and «3 pieces a set» side by side never read as two
+ * counts of one thing. Label first in Arabic: no number agreement to get wrong.
+ */
+export function jobCountWords(sum: { parts_count: number; pieces_per_set: number }, lang: Lang): string[] {
+  const out: string[] = [];
+  const n = sum.parts_count;
+  const k = sum.pieces_per_set;
+  if (n > 1) out.push({ ar: `عدد الأجزاء ${n}`, en: `${n} parts`, ckb: `${n} بەش` }[lang]);
+  if (k > n) out.push({ ar: `القطع في الطقم ${k}`, en: `${k} pieces a set`, ckb: `${k} پارچە لە هەر سێتێکدا` }[lang]);
+  return out;
+}
+
+/** The colours a customer leaves open, as words (P1-05 review 5). */
+const OPEN_COLOURS: Readonly<Record<'any' | 'as_reference', Record<Lang, string>>> = {
+  any: { ar: 'أي لون', en: 'any colour', ckb: 'هەر ڕەنگێک' },
+  as_reference: { ar: 'كما في المرجع', en: 'as in the reference', ckb: 'وەک لە سەرچاوەکەدا' },
+};
+
+/**
+ * A colour entry of a substitution side or of an agreed part, in the
+ * language of the reader: «any colour» and «as in the reference» are words, never a blank —
+ * a material-only substitute keeps them on both sides (P1-05 review 5), so
+ * the customer sees what stays; a named colour as `localColour` reads it.
+ */
+export function entryColour(c: { mode?: string; hex: string; label: string }, lang: Lang): string {
+  if (c.mode === 'any' || c.mode === 'as_reference') return OPEN_COLOURS[c.mode][lang];
+  return localColour(c.label || c.hex, lang);
+}

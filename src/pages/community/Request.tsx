@@ -1038,7 +1038,7 @@ export function AcceptedOffer({
       <span key="subs" dir={readerDir(lang)} className="block" data-accepted-substitutions>
         {subs.map((x) => (
           <span key={x.line} className="block">
-            <SubstitutionText x={x} s={s} />
+            <SubstitutionText x={x} s={s} dir={readerDir(lang)} />
           </span>
         ))}
       </span>,
