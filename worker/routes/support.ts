@@ -2494,7 +2494,12 @@ supportRoutes.post('/assistant', async (c) => {
       chipIntent === 'printer_problem'
         ? ((await handleTurn(c.env.DB, viewer, { chip: params, context }, CARD_RENDERER)) ??
           (await handleTurn(c.env.DB, viewer, { chip: {}, context }, CARD_RENDERER)))
-        : await handleTurn(c.env.DB, viewer, { text: freeText, context, intentHint: readIntent(freeText).intent }, CARD_RENDERER);
+        : await handleTurn(
+            c.env.DB,
+            viewer,
+            { text: freeText, context, intentHint: readIntent(freeText).intent, ...(readPending(body.expects) ? { awaiting: true } : {}) },
+            CARD_RENDERER
+          );
     if (turn) {
       const reply = { ...(turn.reply as AssistReply), context: turn.context } as AssistantReply;
       return c.json({ success: true, reply: withFollowups(reply, loc) });

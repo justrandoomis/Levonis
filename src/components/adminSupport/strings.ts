@@ -36,6 +36,8 @@ export interface ConsoleStrings {
   hfPrinter: string;
   hfOtherPrinter: string;
   hfProblem: string;
+  /** The part a fault was named in, when the customer named no symptom («مشكلة بالنوزل»). */
+  hfPart: string;
   hfTried: string;
   hfCode: string;
   hfProducts: string;
@@ -68,6 +70,7 @@ export const CONSOLE_STRINGS: Record<'ar' | 'en' | 'ckb', ConsoleStrings> = {
     hfPrinter: 'الطابعة',
     hfOtherPrinter: 'طابعة أخرى',
     hfProblem: 'المشكلة',
+    hfPart: 'موضع المشكلة',
     hfTried: 'الخطوات التي جرّبها',
     hfCode: 'رمز الخطأ',
     hfProducts: 'المنتجات التي عُرضت عليه',
@@ -98,6 +101,7 @@ export const CONSOLE_STRINGS: Record<'ar' | 'en' | 'ckb', ConsoleStrings> = {
     hfPrinter: 'Printer',
     hfOtherPrinter: 'Another printer',
     hfProblem: 'Problem',
+    hfPart: 'Problem area',
     hfTried: 'Steps tried',
     hfCode: 'Error code',
     hfProducts: 'Products shown',
@@ -128,6 +132,7 @@ export const CONSOLE_STRINGS: Record<'ar' | 'en' | 'ckb', ConsoleStrings> = {
     hfPrinter: 'پرینتەر',
     hfOtherPrinter: 'پرینتەرێکی تر',
     hfProblem: 'کێشە',
+    hfPart: 'شوێنی کێشە',
     hfTried: 'هەنگاوە تاقیکراوەکان',
     hfCode: 'کۆدی هەڵە',
     hfProducts: 'ئەو بەرهەمانەی پیشانی دران',

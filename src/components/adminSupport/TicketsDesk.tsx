@@ -78,6 +78,8 @@ type L3 = { ar: string; en: string; ckb: string };
 interface TicketHandoff {
   model: string | null;
   symptom: { key: string; label: L3 } | null;
+  /** The part a fault was named in, when no symptom was named (absent on a summary stored before it existed). */
+  part?: { key: string; label: L3 } | null;
   tried: Array<{ key: string; text: L3 }>;
   code: string | null;
   products: Array<{ id: string; slug: string; name: string; name_ar: string; name_ku: string }>;
@@ -157,6 +159,12 @@ function AssistantPanel({
             <>
               <dt className="font-bold">{cs.hfProblem}</dt>
               <dd className="text-text-primary">{pick(handoff.symptom.label)}</dd>
+            </>
+          )}
+          {!handoff.symptom && handoff.part && (
+            <>
+              <dt className="font-bold">{cs.hfPart}</dt>
+              <dd className="text-text-primary">{pick(handoff.part.label)}</dd>
             </>
           )}
           {handoff.code && (

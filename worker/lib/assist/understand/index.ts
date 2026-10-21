@@ -27,6 +27,7 @@ import {
   unreadPrinter,
 } from './models';
 import {
+  ACCOUNT_WORDS,
   AMS_WEAK,
   CLEANING_TOOLS,
   CORRECTION_WORDS,
@@ -68,6 +69,14 @@ export interface Understood {
   codes: CodeCandidate[];
   productCue: boolean;
   problemCue: boolean;
+  /**
+   * An order, a delivery, a return, a warranty, a payment or a purchase named
+   * («بطلبية», "delivery", «ضمان»): beside a fault word it is the account
+   * question, never the printer triage (./lexicon.ts `ACCOUNT_WORDS`).
+   */
+  accountCue: boolean;
+  /** «كومبو», "combo": the bundle of the printer named, not the printer alone. */
+  bundle?: boolean;
   /** A fault the curated steps do not cover (a leak, no heat): a problem, never the clog its part suggests. */
   faultCue: boolean;
   printerCue: boolean;
@@ -166,6 +175,19 @@ function withoutPastPurchase(normalized: string): string {
 
 /** «كومبو»: the bundle word after a printer name, in every script; a model word, never searched. */
 const COMBO_WORDS = ['combo', 'كومبو', 'كمبو', 'کۆمبۆ', 'کۆمبو'].map(normalizeText);
+
+/**
+ * THE ACCOUNT WORDS, whole («طلبية», "order"), or behind the article and the
+ * prepositions Arabic glues on («بطلبية», «بالضمان», «للتوصيل», «والدفع»).
+ * Never a prefix match: «طلبت» ("I ordered") is the story of a fault.
+ */
+const ACCOUNT_SET = new Set(ACCOUNT_WORDS.map(normalizeText).filter(Boolean));
+const ARABIC_PROCLITICS = ['وبال', 'وال', 'بال', 'فال', 'لل', 'ال', 'وب', 'ول', 'و', 'ب', 'ل'];
+function namesAccount(tokens: readonly string[]): boolean {
+  return tokens.some(
+    (t) => ACCOUNT_SET.has(t) || (ARABIC.test(t) && ARABIC_PROCLITICS.some((p) => t.startsWith(p) && t.length - p.length >= 3 && ACCOUNT_SET.has(t.slice(p.length))))
+  );
+}
 
 /** The single-token rule of the intent scorer, used to say which words a reader claimed. */
 function claims(token: string, stem: string): boolean {
@@ -355,6 +377,8 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
     codes,
     productCue,
     problemCue,
+    accountCue: namesAccount(typedWords),
+    ...(typedWords.some((t) => COMBO_WORDS.includes(t)) ? { bundle: true } : {}),
     faultCue,
     printerCue,
     printerUnread: unread.unread,

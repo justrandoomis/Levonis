@@ -32,6 +32,8 @@ import { claimMediaObjectForCleanup } from '../worker/lib/productDeletion';
 import { queueUnattachedAssistMedia } from '../worker/lib/assist/attachments';
 import { STATIC_SECURITY_HEADERS } from '../worker/lib/securityPolicy';
 import { ASSIST_ATTACH_LIMIT } from '../worker/lib/uploadEntity';
+import { ASSIST_T } from '../worker/lib/assist/strings';
+import { PART_LABELS } from '../worker/lib/assist/understand/lexicon';
 
 type Rec = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -365,12 +367,48 @@ test('a GUEST typing «تحدث مع الفريق» mid-triage gets the same dra
     const after = await h.ask('owner', { locale, intent: 'printer_problem', params: { step: 'talk' }, context: reply.context });
     assert.equal(after.ticket_draft.handoff.symptom, 'adhesion', locale);
     assert.equal(after.ticket_draft.handoff.model, 'P1S', locale);
-    assert.ok(after.ticket_draft.handoff.tried.length > 0, `${locale}: the steps shown before the sign-in are still the steps tried`);
+    // Review round 4.2: shown is not tried. Nobody said they tried them, so the draft lists them as shown, and tries none.
+    assert.deepEqual(after.ticket_draft.handoff.tried, [], `${locale}: the steps shown before the sign-in are not steps tried`);
+    assert.ok(String(after.ticket_draft.body).includes(ASSIST_T[locale].ticket_shown), `${locale}: ${after.ticket_draft.body}`);
   }
   // Without a triage a guest still gets the account sign-in reply for the plain handoff.
   const cold = await h.ask('', { text: 'تحدث مع الفريق' });
   assert.equal(cold.ticket_draft, undefined);
   assert.equal(cold.auth_required, true);
+});
+
+test('round 4.2: «تحدث مع الفريق» after the steps stores no step as tried, and a part fault reaches the desk as the part', async () => {
+  const h = harness();
+  const steps = await h.ask('owner', {
+    intent: 'printer_problem',
+    params: { step: 'symptom', symptom: 'clog' },
+    context: { v: 1, printer: { model: 'A1' }, triage: { stage: 'symptom' } },
+  });
+  const talk = await h.ask('owner', { text: 'تحدث مع الفريق', context: steps.context });
+  const draft = talk.ticket_draft as Rec;
+  assert.deepEqual(draft.handoff.tried, []);
+  const keys = [(await threeFiles(h)).photo];
+  const created = await h.postJson('owner', '/api/support/tickets', { confirm: true, subject: draft.subject, body: draft.body, attachments: keys, handoff: draft.handoff, idempotencyKey: 'assist-key-r42-1' });
+  assert.equal(created.status, 200, JSON.stringify(await created.clone().json()));
+  const id = String((await body(created)).ticket.id);
+  const stored = JSON.parse(String((h.raw.prepare('SELECT handoff_summary FROM support_tickets WHERE id = ?').get(id) as Rec).handoff_summary));
+  assert.deepEqual(stored.tried, [], 'the stored summary tries nothing nobody said they tried');
+  const desk = await body(await h.as('admin', `/api/support/admin/tickets/${id}`));
+  assert.deepEqual(desk.handoff.tried, []);
+
+  // «عندي مشكلة بالنوزل», then the team: the desk reads «the nozzle», never «انسداد النوزل».
+  h.raw.exec('DELETE FROM rate_limits');
+  const asked = await h.ask('owner', { text: 'عندي مشكلة بالنوزل' });
+  h.raw.exec('DELETE FROM rate_limits');
+  const part = await h.ask('owner', { text: 'تحدث مع الفريق', context: asked.context });
+  const partDraft = part.ticket_draft as Rec;
+  h.raw.exec('DELETE FROM rate_limits');
+  const sent = await h.postJson('owner', '/api/support/tickets', { confirm: true, subject: partDraft.subject, body: partDraft.body, handoff: partDraft.handoff, idempotencyKey: 'assist-key-r42-2' });
+  assert.equal(sent.status, 200, JSON.stringify(await sent.clone().json()));
+  const partId = String((await body(sent)).ticket.id);
+  const partDesk = await body(await h.as('admin', `/api/support/admin/tickets/${partId}`));
+  assert.equal(partDesk.handoff.symptom, null);
+  assert.deepEqual(partDesk.handoff.part, { key: 'nozzle_hotend', label: PART_LABELS.nozzle_hotend });
 });
 
 // ═══════════════════════════════════════════════ a replay, the cleanup and the ceiling

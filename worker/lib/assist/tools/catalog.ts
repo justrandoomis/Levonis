@@ -168,6 +168,18 @@ export async function printerCards(db: D1Database, viewer: Viewer, model: ModelT
 }
 
 /**
+ * ONE PRINTER OF EACH MODEL, in the order asked («طابعة», "printers"): the
+ * first listing of each model the shop lists (a new printer before a
+ * refurbished one, `loadPrinterModels`), as the storefront cards them for this
+ * viewer. A model the shop does not list is skipped. At most `limit`.
+ */
+export async function printerLineup(db: D1Database, viewer: Viewer, models: readonly ModelToken[], limit: number): Promise<CatalogItem[]> {
+  const listed = (await listedPrinters(db, Date.now())).ids;
+  const ids = [...new Set(models.map((m) => listed.get(m)?.[0]).filter((id): id is string => !!id))].slice(0, limit);
+  return ids.length ? catalogByIds(db, viewer, ids) : [];
+}
+
+/**
  * The models of the listed printers among `ids`, in the registry's order.
  * An answer that showed the A1 and the A1 Combo was about the A1; one that
  * showed a part, or three different printers, is about no one printer.
