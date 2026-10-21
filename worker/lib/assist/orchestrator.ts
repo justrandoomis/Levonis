@@ -329,7 +329,8 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
   // `expects`) is left to that question.
   const triageAsking = stage === 'printer' || stage === 'symptom';
   // "how much is my A1", "is my A1 in stock": a price or a stock ask is a shopping question, whoever owns the printer (review round 5).
-  const shopping = u.priceAsk || (hint !== null && FOLLOWUP_HINTS.has(hint));
+  // A stock ask is read as the price ask is, whatever the scorer made of it: «اكو A1 مالتي», "is my printer in stock" (review round 5.2).
+  const shopping = u.priceAsk || u.stockAsk || (hint !== null && FOLLOWUP_HINTS.has(hint));
   if (printerOnly(u, shopping) && (hint === null ? !input.awaiting && !triageAsking : NAMED_PRINTER_HINTS.has(hint))) {
     const answer = await printerNamed(db, viewer, ctx, u, hint, render);
     if (answer) return answer;
@@ -555,6 +556,7 @@ function readPartChip(params: Record<string, unknown>): { u: Understood; anyPrin
     ownsPrinter: false,
     triedSaid: false,
     priceAsk: false,
+    stockAsk: false,
     residual: [],
   };
   return { u, anyPrinter };

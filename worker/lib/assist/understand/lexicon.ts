@@ -87,7 +87,14 @@ export const OWN_PRINTER: { readonly mine: readonly string[]; readonly with: rea
  * of the verb after it. So «پرینتەرێکم» and «پرینتەرم» are ownership only
  * before «هەیە» or «هەمە», and a sentence with one of `veto` is never one.
  */
-export const OWNS_PRINTER: { readonly words: readonly string[]; readonly phrases: readonly string[]; readonly veto: readonly string[] } = {
+export const OWNS_PRINTER: {
+  readonly words: readonly string[];
+  readonly phrases: readonly string[];
+  readonly veto: readonly string[];
+  readonly haveNot: readonly string[];
+  readonly wants: readonly string[];
+  readonly forMe: readonly string[];
+} = {
   words: [
     // «طابعتي», «مالتي» (mine), «عندي» / «عدي» (I have), «لدي», «املك» (I own), and a purchase in the past.
     'طابعتي', 'لطابعتي', 'بطابعتي', 'طابعتنا', 'مكينتي', 'ماكينتي', 'مالتي', 'مالي', 'عندي', 'عدي', 'عندنا', 'عدنا',
@@ -103,9 +110,38 @@ export const OWNS_PRINTER: { readonly words: readonly string[]; readonly phrases
     'i have', 'i ve', 'i own', 'i got', 'we have', 'we own', 'we got', 'م هەیە', 'مان هەیە', 'ی خۆم', 'هی خۆم',
     'پرینتەرێکم هەیە', 'پرینتەرم هەیە', 'چاپکەرێکم هەیە', 'چاپکەرم هەیە',
   ],
-  // «دەوێ», «دەوێت», «ئەوێ» (want), «پێویستە» (is needed), «نییە», «نیە» (there is not).
-  veto: ['دەوێ', 'دەوێت', 'ئەوێ', 'ئەوێت', 'پێویستە', 'پێویستمە', 'نییە', 'نیە'],
+  // «دەوێ», «دەوێت», «ئەوێ» (want), «پێویستە» (is needed), «نییە», «نیە» (there is not); «ماكو» (there is no).
+  veto: ['دەوێ', 'دەوێت', 'ئەوێ', 'ئەوێت', 'پێویستە', 'پێویستمە', 'نییە', 'نیە', 'ماكو'],
+  // HAVE NOT, in Arabic and English (review round 5.2): «ما عندي طابعة», «عندي ولا طابعة» (not even one),
+  // «ولا اي ون», "I do not have an A1", "I have no printer". Phrases between gaps; a sentence with one is never ownership.
+  haveNot: [
+    'ما عندي', 'ماعندي', 'معندي', 'ما عدي', 'لا عندي', 'مو عندي', 'ما عندنا', 'ما لدي', 'ليس لدي', 'ليس عندي', 'لا املك', 'ما املك',
+    'عندي ولا', 'عدي ولا', 'لدي ولا', 'عندنا ولا', 'ولا طابعه', 'ولا مكينه', 'ولا ماكينه', 'ولا اي',
+    'don t have', 'dont have', 'do not have', 'have no', 've no', 'haven t got', 'havent got', 'don t own', 'dont own', 'do not own',
+  ],
+  // WANT IS NOT OWN (review round 5.2): beside a want or a need («اريد», «ابي», «ودي», «احتاج», "want",
+  // "need", "would like", "please"), «مالتي», «مالي» and "my own" are "for me": «اريد طابعة مالتي» and
+  // "I want my own A1" ask to buy one. Whole words, and phrases between gaps.
+  wants: [
+    'اريد', 'اريده', 'اريدها', 'نريد', 'ابي', 'ابيها', 'ابغى', 'ابغاها', 'ودي', 'احتاج', 'احتاجها', 'محتاج', 'نحتاج', 'بدي',
+    'want', 'wants', 'wanna', 'need', 'needs', 'would like', 'i d like', 'id like', 'please', 'pls', 'plz',
+  ],
+  forMe: ['مالتي', 'مالي', 'my own'],
 };
+
+/**
+ * A STOCK ASK («متوفر؟», «اكو A1؟», «موجودة عندكم؟», «بەردەستە؟», "in stock", "do you
+ * have"): a shopping question, read the way `PRICE_ASK` is, whatever word of owning the
+ * printer it carries ("is my printer in stock"). Phrases between gaps (review round 5.2).
+ */
+export const STOCK_ASK: readonly string[] = [
+  'متوفر', 'متوفره', 'موجود', 'موجوده', 'اكو', 'عندكم', 'عدكم', 'بەردەستە', 'بەردەستن', 'in stock', 'available', 'do you have',
+  'do u have',
+];
+/** «اكو عندي اي ون», «موجودة عندي»: "I have", never a stock ask. Taken out before `STOCK_ASK` is read. */
+export const STOCK_ASK_NOT: readonly string[] = [
+  'اكو عندي', 'اكو عدي', 'اكو عندنا', 'اكو عدنا', 'اكو لدي', 'موجود عندي', 'موجوده عندي', 'متوفر عندي', 'متوفره عندي',
+];
 
 /**
  * MAKERS AND LINES OF PARTS, without a digit in their name («E3D», «V6» and
@@ -194,31 +230,68 @@ export const OUTCOME_NOT_TRIED: readonly string[] = [
 ];
 /**
  * THE STEPS SAID TO BE TRIED («جربتها», "tried them", «تاقیم کردەوە»): only
- * with one of `verbs`, no word of `negations` right before it («ما سويتها»,
- * "have not done them", "not yet tried"; the Sorani negation is in the verb
- * itself, «نەمکردووە»), and none of `negatedAfter` right after a verb that
- * ends in an auxiliary ("I did not"). A not-fixed reply without one («نفس
- * المشكله», "still clogged", «هێشتا گیراوە») says nothing of trying: the
- * ticket lists the steps as shown, never as tried (review round 5).
+ * with one of `verbs`, no word of `negations` before it («ما سويتها», "have
+ * not done them", "not yet tried"; the Sorani negation is in the verb itself,
+ * «نەمکردووە»), and none of `negatedAfter` right after a verb that ends in an
+ * auxiliary ("I did not"). A not-fixed reply without one («نفس المشكله»,
+ * "still clogged", «هێشتا گیراوە») says nothing of trying: the ticket lists
+ * the steps as shown, never as tried (review round 5).
+ *
+ * THE NEGATION MAY STAND FURTHER OFF (review round 5.2). Up to three words
+ * back, over the words of `adverbs` ("I have not really tried them", «ما بعد
+ * جربتها»); «ولا» and one word before the verb («ولا خطوة جربتها», not one
+ * step); a word of `none` before the verb ("nothing done") or right after a
+ * verb with no object of its own ("I did nothing", "tried none", «سويت ولا
+ * شي»), unless a word of `clause` follows it ("tried, nothing changed"). A
+ * reply that names only some of the steps (`partial`, or an ordinal: "the
+ * first one only", «الاولى بس») never says all of them were tried.
  */
 export const TRIED_SAID: {
   readonly verbs: readonly string[];
   readonly negations: readonly string[];
   readonly auxiliaries: readonly string[];
   readonly negatedAfter: readonly string[];
+  readonly adverbs: readonly string[];
+  readonly notEven: readonly string[];
+  readonly none: readonly string[];
+  readonly bare: readonly string[];
+  readonly clause: readonly string[];
+  readonly partial: readonly string[];
 } = {
   verbs: [
     'جربت', 'جربتها', 'جربته', 'جربتهم', 'جربنا', 'جربناها', 'سويت', 'سويتها', 'سويته', 'سويتهم', 'سوينا', 'سويناها', 'طبقت', 'طبقتها',
     'طبقته', 'طبقتهم', 'عملتها', 'عملتهم', 'نفذت', 'نفذتها', 'نفذتهم', 'اتبعت', 'اتبعتها', 'حاولت', 'مسويها', 'مجربها',
+    // The Iraqi plural clitic «ـهن» (review round 5.2).
+    'جربتهن', 'سويتهن', 'طبقتهن', 'نفذتهن', 'عملتهن', 'مسويهن', 'مجربهن', 'جربناهن', 'سويناهن',
     'tried', 'i did', 'we did', 'did them', 'did it', 'did all', 'did those', 'did everything', 'did every', 'did each', 'done',
-    'followed', 'applied', 'went through',
+    'followed', 'applied', 'went through', 'did that', 'did these', 'did this', 'gave it a try', 'gave them a try', 'gave it a go',
     'تاقیم کردەوە', 'تاقیمکردەوە', 'تاقیم کردنەوە', 'تاقیم کرد', 'تاقیمان کردەوە', 'کردم', 'کردمن', 'کردمە', 'هەمووم کرد',
     'جێبەجێم کرد', 'ئەنجامم دا',
+    // Without the clitic on the verb («هەموویم تاقی کردەوە»), glued, and plural (review round 5.2).
+    'تاقی کردەوە', 'تاقیمکردنەوە', 'جێبەجێم کردن', 'ئەنجامم دان',
   ],
-  // «ما», «لم», «مو»; the English ones, and «t», the end of "haven t" once the apostrophe is a gap.
-  negations: ['ما', 'لم', 'مو', 'مش', 'not', 'never', 't', 'nt', 'haven', 'havent', 'hasn', 'hasnt', 'didn', 'didnt', 'dont', 'yet'],
+  // «ما», «لم», «مو», «ولا»; the English ones, and «t», the end of "haven t" once the apostrophe is a gap.
+  negations: [
+    'ما', 'لم', 'مو', 'مش', 'ولا', 'not', 'never', 't', 'nt', 'haven', 'havent', 'hasn', 'hasnt', 'didn', 'didnt', 'dont', 'yet',
+    'nothing', 'none',
+  ],
   auxiliaries: ['did'],
   negatedAfter: ['not', 'nt', 'never'],
+  // Between a negation and its verb: "not really tried", "never even did", «ما بعد جربتها», «ما حتى سويتها».
+  adverbs: ['even', 'really', 'actually', 'yet', 'ever', 'still', 'just', 'quite', 'fully', 'properly', 'بعد', 'حتى', 'اصلا', 'ابد', 'ابدا', 'للحين'],
+  // «ولا خطوة جربتها»: «ولا» and the one word it negates, before the verb.
+  notEven: ['ولا'],
+  // "did nothing", "tried none", "done anything", «سويت شي», «سويت ولا شي».
+  none: ['nothing', 'none', 'anything', 'شي', 'شيء', 'ولا'],
+  // The verbs a word of `none` can be the object of: never "did it" or «جربتها», which carry their own.
+  bare: ['جربت', 'جربنا', 'سويت', 'سوينا', 'طبقت', 'نفذت', 'اتبعت', 'حاولت', 'tried', 'i did', 'we did', 'done'],
+  // "tried, nothing changed", «جربت ولا شي تغير»: the word of `none` starts its own clause.
+  clause: [
+    'changed', 'change', 'worked', 'works', 'work', 'happened', 'helped', 'helps', 'fixed', 'improved',
+    'تغير', 'تغيرت', 'صار', 'صارت', 'اشتغل', 'اشتغلت', 'زبط', 'زبطت', 'فاد', 'فادت', 'نفع', 'نفعت', 'انحل', 'انحلت',
+  ],
+  // Only some of the steps: "only", "just one", "one of them", «بعضها», «یەکێکیان», «تەنها»; the ordinals are read too.
+  partial: ['only', 'just one', 'one of them', 'some of them', 'a few', 'بعضها', 'بعض', 'یەکێکیان', 'هەندێکیان', 'تەنها'],
 };
 export const OUTCOME_RESOLVED: readonly string[] = [
   'انحلت', 'انحل', 'انحلت المشكله', 'زبطت', 'زبط', 'اشتغلت', 'اشتغل', 'صارت زينه', 'صار زين', 'رجعت تشتغل', 'رجعت زينه',
