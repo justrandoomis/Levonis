@@ -205,6 +205,7 @@ if (target) {
     'd1_databases',
     'r2_buckets',
     'images',
+    'ai',
     'vars',
     'assets',
     'observability',

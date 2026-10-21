@@ -208,6 +208,24 @@ jobs:
             *) echo "::notice::IRAQ_PARALLEL_FX_API_KEY: binding type $FX_KEY_TYPE" ;;
           esac
 
+          # THE ASSISTANT AI KEY'S BINDING TYPE, NEVER ITS VALUE (DECISIONS row
+          # 262). Same rule as the exchange-rate key above: a SECRET set in the
+          # dashboard, never put, read or deleted by any workflow; this step only
+          # reports and never fails (tests/workflowSecrets.test.ts). /secrets is
+          # read first: /settings does not always list a secret by name (see
+          # telegram-admin-webhook.yml), and "absent" must not be a false alarm.
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/levonis-staging/secrets" \
+            -o /tmp/secrets.json || true
+          AI_KEY_TYPE=$(jq -r '[(.result // [])[] | select(.name == "ANTHROPIC_API_KEY") | .type] | first // empty' /tmp/secrets.json 2>/dev/null || true)
+          [ -n "$AI_KEY_TYPE" ] || AI_KEY_TYPE=$(jq -r '[.result.bindings[] | select(.name == "ANTHROPIC_API_KEY") | .type] | first // "absent"' /tmp/settings.json)
+          case "$AI_KEY_TYPE" in
+            secret_text) echo "ANTHROPIC_API_KEY: secret_text (correct)" ;;
+            absent) echo "::notice::ANTHROPIC_API_KEY: absent — the support assistant stays in basic mode until the owner adds it as a secret. / المفتاح غير موجود؛ يبقى المساعد في الوضع الأساسي." ;;
+            plain_text) echo "::warning::ANTHROPIC_API_KEY is a plain_text var: it is visible in the dashboard and re-sent on every deploy. Re-create it as a secret (Workers → levonis-staging → Settings → Variables and Secrets → type Secret). / المفتاح مخزّن كمتغير نصي ظاهر؛ أعد إنشاءه كسرّ." ;;
+            *) echo "::notice::ANTHROPIC_API_KEY: binding type $AI_KEY_TYPE" ;;
+          esac
+
       - name: Resolve the staging database id into wrangler.jsonc
         id: db
         run: |

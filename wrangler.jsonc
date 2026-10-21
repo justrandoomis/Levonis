@@ -350,6 +350,15 @@
         }
       ],
       "images": { "binding": "IMAGES" },
+      /*
+       * Workers AI (the support assistant AI layer, DECISIONS row 262), on the
+       * LIVE Worker only. Not at the top level: `ai` has no local simulator,
+       * so a top-level binding would make a plain `npm run dev` open a remote
+       * session on a Cloudflare account. Local dev and env.dark run without
+       * it, and the assistant there stays in basic mode. No model is named
+       * here or anywhere in the repository; the owner picks them in admin.
+       */
+      "ai": { "binding": "AI" },
       "vars": {
         // ONLY NAMES WITH A REAL VALUE — see the top-level `vars` note. Every
         // other name this block used to declare empty (GOOGLE_CLIENT_ID,

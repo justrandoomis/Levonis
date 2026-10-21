@@ -21,6 +21,12 @@ export interface Env {
    * is not there" instead of one per call site.
    */
   IMAGES?: ImagesBinding;
+  /**
+   * Workers AI (wrangler.jsonc `ai`, declared on env.staging only). Undefined in unit tests, in local dev and on
+   * env.dark, and the support assistant then stays in basic mode. Defined is not the same as working: under
+   * `wrangler dev --local` every call fails, so a failed call is basic mode too.
+   */
+  AI?: Ai;
   ASSETS: Fetcher;
   /**
    * DEV ONLY (the Bambu import's local dry run, scripts/e2e-bambu-import.mjs): a loopback origin that serves the
@@ -43,6 +49,13 @@ export interface Env {
    * stores it. Without it the USD/IQD pair stays honestly NOT_CONFIGURED.
    */
   IRAQ_PARALLEL_FX_API_KEY?: string;
+  /**
+   * The provider API key (Anthropic) of the support assistant AI layer (DECISIONS row 262). A Worker SECRET the owner set in the
+   * dashboard; workflow 7 reports its binding type only and never puts, reads or deletes it
+   * (tests/workflowSecrets.test.ts). Sent only in the x-api-key header to the provider host, never logged, stored
+   * or returned. Without it every assistant task stays in basic mode.
+   */
+  ANTHROPIC_API_KEY?: string;
   EMAIL_API_KEY?: string; // e.g. a Resend API key, enables password-reset email
   EMAIL_FROM?: string;
   TELEGRAM_BOT_TOKEN?: string; // the CUSTOMER bot: linking, OTP, account messages
