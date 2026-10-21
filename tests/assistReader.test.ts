@@ -9,7 +9,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { understand, readHmsCode, readOutcome } from '../worker/lib/assist/understand';
+import { understand, readHmsCode, readOutcome, saysTried } from '../worker/lib/assist/understand';
 import {
   FAMILY_MEMBERS,
   MODEL_NAME_WORDS,
@@ -542,7 +542,7 @@ test('round 4.2: "not right", a bare "wrong with", "has stopped" and "it stopped
   }
 });
 
-test('round 4.3: steps not tried are no outcome; a bare "still" or «هێشتا» is not «not fixed», the whole phrases still are', () => {
+test('round 4.3: steps not tried are no outcome; a bare "still" or «هێشتا» inside a sentence is not «not fixed», the whole phrases still are', () => {
   for (const text of [
     "I still haven't tried them",
     "still haven't tried",
@@ -554,8 +554,6 @@ test('round 4.3: steps not tried are no outcome; a bare "still" or «هێشتا�
     'هێشتا تاقیم نەکردۆتەوە',
     'تاقیم نەکردووەتەوە',
     'still waiting for the needle to arrive',
-    'still',
-    'هێشتا',
   ]) {
     assert.equal(readOutcome(normalizeText(text)), undefined, `«${text}»`);
     assert.equal(understand(text).outcome, undefined, `«${text}»`);
@@ -610,5 +608,80 @@ test('round 4.3: a printer the customer says is theirs is read as owned; a quest
     'printers',
   ]) {
     assert.equal(understand(text).ownsPrinter, false, text);
+  }
+});
+
+test('round 5: a Sorani printer word with «-م» is owned only before «هەیە» or «هەمە»; want, need and have-not never are', () => {
+  for (const text of ['پرینتەرێکم دەوێ', 'پرینتەرێکم دەوێت', 'پرینتەرم دەوێ', 'پرینتەرێکم پێویستە', 'چاپکەرێکم دەوێ', 'پرینتەرم نییە', 'پرینتەرێکم نیە', 'A1م دەوێت', 'پرینتەرێکم ئەوێ', 'پرینتەرێکم', 'پرینتەرم']) {
+    assert.equal(understand(text).ownsPrinter, false, text);
+  }
+  for (const text of ['پرینتەرێکم هەیە', 'پرینتەرم هەیە', 'چاپکەرێکم هەیە', 'پرینتەرێکم هەمە', 'پرینتەرەکەم', 'A1م هەیە']) {
+    assert.equal(understand(text).ownsPrinter, true, text);
+  }
+});
+
+test('round 5: the steps are said to be tried only with a verb of trying that nothing negates', () => {
+  for (const text of [
+    'جربتها وما انحلّت',
+    'جربت كلشي ونفس المشكله',
+    'ما زبطت، جربتها كلها',
+    'سويتها بس نفس المشكله',
+    'tried them, still not fixed',
+    'I did them all, still clogged',
+    'done, still the same',
+    'still not fixed, I tried them',
+    'تاقیم کردەوە، هێشتا چارەسەر نەبووە',
+    'تاقیم کردەوە بەڵام هێشتا',
+    'هەمووم کرد، هێشتا گیراوە',
+  ]) {
+    assert.equal(saysTried(normalizeText(text)), true, `«${text}»`);
+    assert.equal(understand(text).triedSaid, true, `«${text}»`);
+  }
+  for (const text of [
+    'ما سويتها بس نفس المشكله',
+    'ما سويت الخطوات، نفس المشكله',
+    'ما طبقت الخطوات بعده مسدود',
+    'نفس المشكله',
+    'ما انحلت',
+    "haven't done them, still clogged",
+    'I have not done the steps, no luck',
+    "I didn't do them, still clogged",
+    'I did not do them, same problem',
+    'not yet, same problem',
+    "I haven't yet tried",
+    'still clogged',
+    "it still didn't work",
+    'نەمکردووە، هێشتا گیراوە',
+    'هێشتا گیراوە',
+    'هێشتا تاقیم نەکردۆتەوە',
+  ]) {
+    assert.equal(saysTried(normalizeText(text)), false, `«${text}»`);
+    assert.equal(understand(text).triedSaid, false, `«${text}»`);
+  }
+});
+
+test('round 5: the common whole «still» replies are «not fixed»; a longer sentence with a bare «still» is not', () => {
+  for (const text of [
+    'هێشتا کێشەکە هەیە',
+    'هێشتا چاک نەبووە',
+    'هێشتا کارناکات',
+    'هێشتا ئیش ناکات',
+    'هێشتا هەمان شتە',
+    'نەخێر هێشتا',
+    'تاقیم کردەوە بەڵام هێشتا',
+    'هێشتا',
+    'still',
+    'it still happens',
+    'nope, still',
+    'yes still',
+    'still bad',
+    'still getting the same error',
+    'tried all of them but still',
+    'still clogs',
+  ]) {
+    assert.equal(readOutcome(normalizeText(text)), 'not_fixed', `«${text}»`);
+  }
+  for (const text of ['still waiting for the needle to arrive', "I still haven't tried them", 'هێشتا تاقیم نەکردۆتەوە', 'still have not tried']) {
+    assert.equal(readOutcome(normalizeText(text)), undefined, `«${text}»`);
   }
 });
