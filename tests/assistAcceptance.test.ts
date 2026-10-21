@@ -2052,3 +2052,150 @@ test('round 5.2: a not-fixed reply that says nothing was done, negates further o
     assert.ok(String(reply.ticket_draft.body).includes(ASSIST_STRINGS[locale].ticket_tried), `${label}: ${reply.ticket_draft.body}`);
   }
 });
+
+// ════════════════════════════════════════ review, round 5.4
+
+test('round 5.4: a printer the customer says they have, own or bought is never offered for sale; a want, a have-not, a price or a stock ask still shows it first', async () => {
+  const { say } = await round4();
+  const PRINTER_IDS = new Set(['p_a1', 'p_a1c', 'p_a1m', 'p_a1r', 'p_x1c', 'p_p1s', 'p_h2dpro']);
+  for (const user of [member, null]) {
+    for (const [text, locale] of [
+      ['عندي اي ون', 'ar'],
+      ['طابعتي A1', 'ar'],
+      ['اكو عندي اي ون', 'ar'],
+      ['اشتريت اي ون من عندكم', 'ar'],
+      ['طابعتي A1 من عندكم', 'ar'],
+      ['عندي طابعة', 'ar'],
+      ['I have an A1', 'en'],
+      ['I own a P1S', 'en'],
+      ['I have a printer', 'en'],
+      ['A1م هەیە', 'ckb'],
+      ['پرینتەرێکی P1Sم هەیە', 'ckb'],
+      ['پرینتەرێکم هەیە', 'ckb'],
+    ] as const) {
+      const label = `${user ? 'member' : 'guest'} «${text}»`;
+      const reply = await say(user, { text, locale });
+      assert.notEqual(reply.intent, 'printer_problem', `${label}: ${reply.text}`);
+      assert.equal(reply.context?.triage, undefined, label);
+      assert.ok(!ids(reply).some((id) => PRINTER_IDS.has(id)), `${label}: a printer for sale: ${JSON.stringify(ids(reply))}`);
+      assert.notEqual(reply.context?.printer?.browsed, true, `${label}: no printer was shown`);
+    }
+  }
+  for (const [text, locale] of [
+    ['عندكم اي ون؟', 'ar'],
+    ['do you have the A1?', 'en'],
+    ['A1 هەیە؟', 'ckb'],
+    ['اريد اي ون مالتي', 'ar'],
+    ['I want my own A1', 'en'],
+    ['ماكو عندي اي ون', 'ar'],
+    ['عندي اي ون شكد سعره', 'ar'],
+    ['I have an A1, how much is it', 'en'],
+    ['A1م هەیە، نرخی چەندە؟', 'ckb'],
+  ] as const) {
+    const reply = await say(null, { text, locale });
+    assert.equal(ids(reply)[0], 'p_a1', `«${text}»: ${reply.intent} ${JSON.stringify(ids(reply))}`);
+  }
+});
+
+test('round 5.4: the glued «ماعندي طابعة», «معندي طابعة» get the answer «ما عندي طابعة» gets, never a product', async () => {
+  const { raw, say } = await round4();
+  // The live shelf's matte filament, which «ماعندي», looked up as a word, reached.
+  raw
+    .prepare(
+      `INSERT INTO products (id,slug,name,name_ar,name_ku,price_iqd,status,stock,options,colors,selling_type,sale_types,
+         preorder_transports,images,inventory_mode,ops_policy,category_id)
+       VALUES ('pla_matte','pla-matte','Bambu Lab PLA Matte Filament — 1 kg','فلمنت Bambu Lab PLA Matte — 1 كغم','',25000,'active',5,'[]','[]',
+               'direct_sale','["direct_sale"]','[]','[]','BASE','{}','cat_materials')`
+    )
+    .run();
+  assert.deepEqual((await backfillSearchIndex(asD1(raw), { limit: 50 })).failed, []);
+  const spaced = await say(null, { text: 'ما عندي طابعة' });
+  for (const text of ['ماعندي طابعة', 'معندي طابعة']) {
+    const reply = await say(null, { text });
+    assert.deepEqual(ids(reply), [], `«${text}»: ${reply.intent} ${JSON.stringify(ids(reply))}`);
+    assert.equal(reply.intent, spaced.intent, `«${text}»: ${reply.text}`);
+    assert.equal(reply.text, spaced.text, `«${text}»`);
+  }
+});
+
+test('round 5.4: «still» or «هێشتا» and a fault, a problem or sameness after the steps reach the team, the steps listed as shown', async () => {
+  const { say } = await round4();
+  for (const [locale, start, said] of [
+    ['en', 'my nozzle is clogged', 'still jamming'],
+    ['en', 'my nozzle is clogged', 'still a problem'],
+    ['en', 'my nozzle is clogged', 'still failing'],
+    ['en', 'my nozzle is clogged', 'still doing it'],
+    ['en', 'my nozzle is clogged', 'still nothing comes out'],
+    ['ckb', 'نۆزڵەکە گیراوە', 'هێشتا کێشەی هەیە'],
+    ['ckb', 'نۆزڵەکە گیراوە', 'هێشتا هەر وایە'],
+    ['ckb', 'نۆزڵەکە گیراوە', 'هێشتا هەر گیراوە'],
+    ['ckb', 'نۆزڵەکە گیراوە', 'هێشتا نۆزڵەکە گیراوە'],
+    ['ckb', 'نۆزڵەکە گیراوە', 'هێشتا خراپە'],
+  ] as const) {
+    const label = `${locale} «${said}»`;
+    const asked = await say(member, { text: start, locale });
+    const steps = await say(member, { text: 'A1', locale, context: asked.context });
+    assert.equal(steps.context.triage.stage, 'steps', label);
+    const reply = await say(member, { text: said, locale, context: steps.context });
+    assert.equal(reply.handoff, true, `${label}: ${reply.intent} ${reply.text}`);
+    assert.equal(reply.ticket_draft.handoff.symptom, 'clog', label);
+    assert.deepEqual(reply.ticket_draft.handoff.tried, [], `${label}: nothing was said of trying`);
+    assert.ok(String(reply.ticket_draft.body).includes(ASSIST_STRINGS[locale].ticket_shown), `${label}: ${reply.ticket_draft.body}`);
+    assert.equal(reply.context.triage.stage, 'done', label);
+  }
+});
+
+test('round 5.4: «بعد ما جربتها» is "after I tried them": the steps reach the team as tried; «بعدني ما انحلت» reaches it as shown', async () => {
+  const { say } = await round4();
+  const clogKeys = symptomDef('clog').steps.map((st) => st.key);
+  for (const [locale, start, said, tried] of [
+    ['ar', 'النوزل مسدود', 'بعد ما جربتهم ما زبطت', true],
+    ['ar', 'النوزل مسدود', 'من بعد ما طبقتها نفس المشكله', true],
+    ['ar', 'النوزل مسدود', 'جربتها بس بعدني ما انحلت', true],
+    ['ar', 'النوزل مسدود', 'بعدني ما انحلت', false],
+    ['en', 'my nozzle is clogged', 'after trying them, still clogged', true],
+  ] as const) {
+    const T = ASSIST_STRINGS[locale];
+    for (const user of [member, null]) {
+      const label = `${locale} ${user ? 'member' : 'guest'} «${said}»`;
+      const asked = await say(user, { text: start, locale });
+      const steps = await say(user, { text: 'A1', locale, context: asked.context });
+      const reply = await say(user, { text: said, locale, context: steps.context });
+      assert.equal(reply.context?.triage?.stage, 'done', `${label}: ${reply.intent} ${reply.text}`);
+      const draft = reply.ticket_draft ?? (await say(user, { intent: 'printer_problem', params: { step: 'talk' }, locale, context: reply.context })).ticket_draft;
+      assert.deepEqual(draft.handoff.tried, tried ? clogKeys : [], `${label}: ${draft.body}`);
+      assert.ok(String(draft.body).includes(tried ? T.ticket_tried : T.ticket_shown), `${label}: ${draft.body}`);
+    }
+  }
+});
+
+test('round 5.4: "tried printing again", «حاولت اطبع», "I did a cold pull", "it did that again" never put the steps on the ticket as tried', async () => {
+  const { say } = await round4();
+  const clogKeys = symptomDef('clog').steps.map((st) => st.key);
+  for (const [locale, start, said, tried] of [
+    ['en', 'clog', 'I tried printing again, still clogged', false],
+    ['en', 'clog', 'tried restarting, still clogged', false],
+    ['en', 'clog', 'I did a cold pull, still clogged', false],
+    ['en', 'clog', 'i did see them but still clogged', false],
+    ['en', 'clog', 'it did that again, still clogged', false],
+    ['en', 'clog', 'did that help? no, still clogged', false],
+    ['ar', 'كلوب', 'حاولت اطبع بس نفس المشكله', false],
+    ['ar', 'كلوب', 'جربت اطبع وبعدها مسدودة', false],
+    ['en', 'clog', 'I tried, still clogged', true],
+    ['en', 'clog', 'I tried the steps, still clogged', true],
+    ['ar', 'كلوب', 'جربت الخطوات وما زبطت', true],
+    ['ar', 'كلوب', 'جربت بس نفس المشكله', true],
+  ] as const) {
+    const T = ASSIST_STRINGS[locale];
+    const label = `${locale} «${said}»`;
+    const asked = await say(member, { text: start, locale });
+    const steps = await say(member, { text: 'A1', locale, context: asked.context });
+    const reply = await say(member, { text: said, locale, context: steps.context });
+    assert.equal(reply.handoff, true, `${label}: ${reply.intent} ${reply.text}`);
+    assert.deepEqual(reply.ticket_draft.handoff.tried, tried ? clogKeys : [], `${label}: ${reply.ticket_draft.body}`);
+    assert.equal(handoffForStaff(reply.ticket_draft.handoff)?.tried.length, tried ? clogKeys.length : 0, `${label}: the staff summary`);
+    assert.ok(String(reply.ticket_draft.body).includes(tried ? T.ticket_tried : T.ticket_shown), `${label}: ${reply.ticket_draft.body}`);
+    if (tried) assert.equal(reply.text, T.handoff_reply, label);
+    else assert.notEqual(reply.text, T.handoff_reply, `${label}: the reply says the steps were tried`);
+  }
+});
