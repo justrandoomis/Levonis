@@ -19,6 +19,7 @@ import {
   catalogByIds,
   catalogSearch,
   FITS_MAX,
+  printerCards,
   printerModels,
   SEARCH_LIMIT_MAX,
   SEARCH_TEXT_MAX,
@@ -32,7 +33,7 @@ import type { TicketDraft } from './types';
 import { SYMPTOM_KEYS, type SymptomKey } from './types';
 import { HMS_CODE_SHAPE, SHOWN_MAX } from './context';
 
-export type ToolName = 'catalog.search' | 'catalog.byIds' | 'catalog.printerModels' | 'devices.mine' | 'cases.draft';
+export type ToolName = 'catalog.search' | 'catalog.byIds' | 'catalog.printerModels' | 'catalog.printersOf' | 'devices.mine' | 'cases.draft';
 
 export type ToolResult<O> = { ok: true; data: O } | { ok: false; code: 'BAD_ARGS' | 'NEEDS_SESSION' | 'UNKNOWN_TOOL' };
 
@@ -108,6 +109,19 @@ const printerModelsTool: ToolDef<Record<string, never>, Map<ModelToken, string[]
   run: (db) => printerModels(db),
 };
 
+/** The printers the shop lists under one model, as cards («شكد سعر الطابعة» about the A1). */
+const printersOfTool: ToolDef<{ model: ModelToken }, CatalogItem[]> = {
+  name: 'catalog.printersOf',
+  audience: 'public',
+  effect: 'read',
+  parse(raw) {
+    const o = asObject(raw);
+    if (!o || !(MODEL_TOKENS as readonly string[]).includes(String(o.model))) return bad('model');
+    return { model: o.model as ModelToken };
+  },
+  run: (db, viewer, input) => printerCards(db, viewer, input.model, SHOWN_MAX),
+};
+
 const devicesMineTool: ToolDef<Record<string, never>, MyPrinter[]> = {
   name: 'devices.mine',
   audience: 'session',
@@ -143,6 +157,7 @@ export const TOOLS: Readonly<Record<ToolName, ToolDef<any, any>>> = {
   'catalog.search': catalogSearchTool,
   'catalog.byIds': catalogByIdsTool,
   'catalog.printerModels': printerModelsTool,
+  'catalog.printersOf': printersOfTool,
   'devices.mine': devicesMineTool,
   'cases.draft': casesDraftTool,
 };
@@ -151,6 +166,7 @@ interface ToolOutputs {
   'catalog.search': CatalogSearchResult;
   'catalog.byIds': CatalogItem[];
   'catalog.printerModels': Map<ModelToken, string[]>;
+  'catalog.printersOf': CatalogItem[];
   'devices.mine': MyPrinter[];
   'cases.draft': TicketDraft;
 }

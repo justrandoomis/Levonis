@@ -464,6 +464,30 @@ function stripQuestionWords(text: string, intent: Intent): string {
 }
 
 /**
+ * THE PRICE AND STOCK QUESTION, TAKEN OUT BEFORE THE STRONG LOOKUP.
+ *
+ * The last-resort lookup keeps a product only when EVERY word reaches it, so
+ * a question word left in the text is a word the product must contain: «بكم
+ * PLA؟», «نرخی PLA چەندە؟» and «AMS 2 Pro بكم» found nothing and got the
+ * two-chip menu, and «سعر AMS 2 Pro» kept only a product whose text happened
+ * to carry «سعر». The price and stock entries of the lexicon come out, with
+ * the forms a question inflects them into, so what is left is the product.
+ */
+const ASKING_FORMS = [
+  'سعره', 'سعرها', 'سعرة', 'بيش', 'بيشه', 'بيشها', 'متوفره', 'متوفرة', 'موجوده', 'موجودة', 'اكو', 'ماكو', 'عدكم',
+  'costs', 'available', 'stock',
+  'نرخی', 'نرخەکەی', 'چەندە', 'بەچەندە', 'بە', 'هەیە', 'نییە', 'بەردەستە',
+] as const;
+
+function stripForLookup(text: string): string {
+  const words = (['product_search', 'price_question', 'stock_question'] as const).flatMap((intent) => [
+    ...(LEXICON[intent].phrases ?? []),
+    ...(LEXICON[intent].stems ?? []),
+  ]);
+  return stripWords(text, [...words, ...FILLER, ...ASKING_FORMS]);
+}
+
+/**
  * Every intent with any evidence, best first.
  *
  * Kept as the module's exported surface — and as the name three test files
@@ -1478,7 +1502,8 @@ async function handleProductSearch(
   loc: Locale,
   opts: { strong?: boolean } = {}
 ): Promise<AssistantReply> {
-  const q = (str(params.q, 'q', { max: 100, required: false }) || stripQuestionWords(freeText, 'product_search')).slice(0, 99);
+  const given = str(params.q, 'q', { max: 100, required: false });
+  const q = (given || (opts.strong ? stripForLookup(freeText) : stripQuestionWords(freeText, 'product_search'))).slice(0, 99);
   if (q.length < 2) return { intent: 'product_search', text: tr(loc, 'search_empty') };
   const viewer = viewerFor(c.env.DB, c.get('user')?.id ?? null, loc);
   const found = await callTool('catalog.search', c.env.DB, viewer, { text: q, limit: 5, ...(opts.strong ? { strong: true } : {}) });
@@ -2457,7 +2482,9 @@ supportRoutes.post('/assistant', async (c) => {
       if (isLikelyCatalogueLookup(freeText)) {
         const found = await handleProductSearch(c, {}, freeText, loc, { strong: true });
         if (found.cards?.length) {
-          return send(withFollowups(found, loc));
+          // «بكم PLA؟» found its product: it is still the price question it was asked as.
+          const asked = (['price_question', 'stock_question'] as const).find((i) => decision.shortlist.includes(i));
+          return send(withFollowups(asked ? { ...found, intent: asked } : found, loc));
         }
       }
       const subset = decision.shortlist.length ? decision.shortlist : undefined;

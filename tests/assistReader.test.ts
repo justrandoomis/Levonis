@@ -11,7 +11,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { understand, readHmsCode, readOutcome } from '../worker/lib/assist/understand';
 import {
+  FAMILY_MEMBERS,
   MODEL_NAME_WORDS,
+  SPOKEN_FAMILIES,
   SPOKEN_MODELS,
   bareProclitics,
   mentionsModel,
@@ -214,4 +216,66 @@ test('follow-up words: a correction, an ordinal, and a printer that is not a pro
   assert.equal(understand('الثاني متوفر؟').ordinal, 1);
   assert.deepEqual(understand('P1S').codes, [], '«P1S» typed alone is the printer, not the code P1S');
   assert.deepEqual(understand('اكو 0.4؟').measures, ['0.4']);
+});
+
+test('Sorani spoken printer names: «ئەی وەن», «پی وەن ئێس», «ئێچ تو دی», each a printer of the registry', () => {
+  for (const [text, model] of [
+    ['ئەی وەن', 'A1'],
+    ['ئەی وەن مینی', 'A1 mini'],
+    ['ئەی تو ئێڵ', 'A2L'],
+    ['پی وەن ئێس', 'P1S'],
+    ['پی وەن پی', 'P1P'],
+    ['پی تو ئێس', 'P2S'],
+    ['ئێکس وەن کاربۆن', 'X1C'],
+    ['ئێکس وەن ئی', 'X1E'],
+    ['ئێکس تو دی', 'X2D'],
+    ['ئێچ تو دی', 'H2D'],
+    ['ئێچ تو دی پرۆ', 'H2D Pro'],
+    ['ئێچ تو ئێس', 'H2S'],
+    ['ئێچ تو سی', 'H2C'],
+  ] as const) {
+    assert.equal(understand(text).model, model, `«${text}»`);
+  }
+  const u = understand('نۆزڵ بۆ ئەی وەن 0.2');
+  assert.equal(u.part, 'nozzle_hotend');
+  assert.equal(u.model, 'A1');
+  assert.deepEqual(u.measures, ['0.2']);
+  assert.deepEqual(u.residual, []);
+  const fault = understand('کێشە لە ئەی وەن هەیە');
+  assert.equal(fault.model, 'A1');
+  assert.equal(fault.problemCue, true);
+});
+
+test('a series is its printers, never an unread name: «X1», «بي ون», «ئێکس وەن»; «A2» is the A2L', () => {
+  const printers = new Set(MODELS.filter((m) => m.kind === 'printer').map((m) => m.token));
+  for (const [family, forms] of SPOKEN_FAMILIES) {
+    const members = FAMILY_MEMBERS.get(family) ?? [];
+    assert.ok(members.length > 0, family);
+    for (const m of members) assert.ok(printers.has(m), `${family}: ${m}`);
+    for (const form of forms) {
+      const u = understand(`نوزل ${form}`);
+      assert.equal(u.printerUnread, false, `«${form}»`);
+      if (members.length === 1) assert.equal(u.model, members[0], `«${form}»`);
+      else assert.deepEqual(u.family?.members, members, `«${form}»`);
+    }
+  }
+  for (const text of ['نوزل X1', 'نوزل x1 series', 'نوزل للاكس ون']) assert.deepEqual(understand(text).family, { name: 'X1', members: ['X1C', 'X1E'] }, text);
+  assert.deepEqual(understand('نوزل P1').family, { name: 'P1', members: ['P1P', 'P1S'] });
+  assert.equal(understand('نوزل A2').model, 'A2L');
+  // A whole model name is never cut down to its series.
+  assert.equal(understand('اكس ون كاربون').family, undefined);
+  assert.equal(understand('بي ون اس').model, 'P1S');
+  assert.equal(understand('X1C').family, undefined);
+  // «x2» in lowercase, or held by a size, is a quantity as often as a series: never silently the X2D.
+  for (const text of ['نوزل x2', 'نوزل 0.4 x2', 'نوزل 0.4 X2']) assert.equal(understand(text).model, undefined, text);
+  assert.equal(understand('نوزل X2').model, 'X2D');
+});
+
+test('not printer names: E3D (a hotend maker), «ثري دي» (3D), Iraqi «تو» (just now), TPU 95A, AMS2', () => {
+  for (const text of ['نوزل E3D', 'نوزل لطابعة ثري دي', 'نوزل اشتريته تو', 'TPU 95A', 'ams2 pro', 'وصلني تو', 'نۆزڵ بۆ تۆ', 'ئەی تۆ کێشەم هەیە']) {
+    assert.equal(understand(text).printerUnread, false, `«${text}»`);
+    assert.equal(understand(text).model, undefined, `«${text}»`);
+  }
+  // A spoken digit after a spoken letter is still a printer the tables do not know.
+  for (const text of ['نوزل مال زد ون', 'نوزل كي ون سي', 'نۆزڵ بۆ زێد وەن', 'nozzle for the Z1']) assert.equal(understand(text).printerUnread, true, `«${text}»`);
 });

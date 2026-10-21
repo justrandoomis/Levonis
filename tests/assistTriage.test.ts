@@ -102,6 +102,17 @@ test('the state machine: printer, symptom, steps, outcome', () => {
   const withUnit = nextTriage({ v: 1 }, { kind: 'printer', model: 'A1', unit_id: 'u1' });
   assert.equal(withUnit.context.printer?.unit_id, 'u1');
   assert.equal(nextTriage(withUnit.context, { kind: 'printer', model: 'X1C' }).context.printer?.unit_id, undefined);
+
+  // A code typed with the printer («P1S وطلعلي رمز …») is the code of the steps and the ticket.
+  const coded = nextTriage({ v: 1, triage: { stage: 'printer' } }, { kind: 'printer', model: 'P1S', symptom: 'hms', code: '0300-0100-0001-0003' });
+  assert.deepEqual(coded.step, { kind: 'steps', model: 'P1S', symptom: 'hms', code: '0300-0100-0001-0003' });
+  assert.deepEqual(coded.context.triage, { stage: 'steps', symptom: 'hms', code: '0300-0100-0001-0003' });
+  // A family named: its printers are the question's only answers.
+  assert.deepEqual(nextTriage({ v: 1 }, { kind: 'start', symptom: 'clog', among: ['X1C', 'X1E'] }).step, {
+    kind: 'ask_printer',
+    symptom: 'clog',
+    among: ['X1C', 'X1E'],
+  });
 });
 
 test('the ticket draft names the printer, the symptom, the code and every step tried, in the customer’s language', () => {

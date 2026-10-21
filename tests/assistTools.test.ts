@@ -40,6 +40,9 @@ test('unknown tools and bad arguments are refused, never guessed at', async () =
     assert.deepEqual(await callTool('catalog.search', db, anon, args), { ok: false, code: 'BAD_ARGS' }, JSON.stringify(args));
   }
   assert.deepEqual(await callTool('cases.draft', db, anon, { model: 'Z9', symptom: 'clog' }), { ok: false, code: 'BAD_ARGS' });
+  for (const args of [null, {}, { model: 'Z9' }, { model: "A1' OR 1=1" }]) {
+    assert.deepEqual(await callTool('catalog.printersOf', db, anon, args), { ok: false, code: 'BAD_ARGS' }, JSON.stringify(args));
+  }
   assert.deepEqual(await callTool('cases.draft', db, anon, { model: 'A1', symptom: 'clog', code: 'DROP TABLE' }), { ok: false, code: 'BAD_ARGS' });
 });
 
@@ -67,6 +70,10 @@ test('the carried context keeps closed-set values and id shapes only', () => {
   );
   assert.deepEqual(readContext({ v: 1, triage: { stage: 'steps', code: 'rm -rf' } }), { v: 1, triage: { stage: 'steps' } });
   assert.equal(readContext({ v: 1, shown: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', '<x>'] }).shown?.length, 6);
+  // The size waiting with a part question: a size shape, and only beside the part.
+  assert.deepEqual(readContext({ v: 1, part: 'nozzle_hotend', size: '0.4' }), { v: 1, part: 'nozzle_hotend', size: '0.4' });
+  assert.deepEqual(readContext({ v: 1, part: 'nozzle_hotend', size: '0.4; DROP' }), { v: 1, part: 'nozzle_hotend' });
+  assert.deepEqual(readContext({ v: 1, size: '0.4' }), { v: 1 });
   assert.deepEqual(readContext({ v: 1, printer: { model: 'A1' }, pad: 'x'.repeat(CONTEXT_MAX_BYTES) }), { v: 1 }, 'oversize is ignored whole');
   const loop: Record<string, unknown> = { v: 1 };
   loop.self = loop;
