@@ -9,8 +9,16 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { understand, readHmsCode } from '../worker/lib/assist/understand';
-import { MODEL_NAME_WORDS, SPOKEN_MODELS, mentionsModel, rewriteSpokenModels } from '../worker/lib/assist/understand/models';
+import { understand, readHmsCode, readOutcome } from '../worker/lib/assist/understand';
+import {
+  MODEL_NAME_WORDS,
+  SPOKEN_MODELS,
+  bareProclitics,
+  mentionsModel,
+  rewriteSpokenModels,
+  splitScripts,
+} from '../worker/lib/assist/understand/models';
+import { normalizeText } from '../worker/lib/assistantNlu';
 import { MODEL_TOKENS } from '../worker/lib/assist/types';
 import { MODELS } from '../packages/catalog/src/bambuImport/registry/models';
 import { extractIdentifiers } from '../worker/lib/search/identifiers';
@@ -138,3 +146,73 @@ test('the by-name check reads whole words, and a series word names its printers'
   assert.equal(mentionsModel('Hotend for A1 mini', 'A1 mini'), true);
   assert.equal(mentionsModel('Hotend for A12', 'A1'), false);
 });
+
+test('an article or preposition glued to a printer name: «الاي ون», «للبي ون اس», «للA1», «بالP1S»', () => {
+  for (const [text, model] of [
+    ['نوزل مال الاي ون', 'A1'],
+    ['نوزل للاي ون', 'A1'],
+    ['نوزل بالاي ون', 'A1'],
+    ['حق الاي ون', 'A1'],
+    ['نوزل مال البي ون اس', 'P1S'],
+    ['للبي ون اس', 'P1S'],
+    ['للاكس ون كاربون', 'X1C'],
+    ['والاي ون ميني', 'A1 mini'],
+    ['نوزل للA1', 'A1'],
+    ['نوزل بالP1S', 'P1S'],
+    ['نوزل للX1C', 'X1C'],
+  ] as const) {
+    const u = understand(text);
+    assert.equal(u.model, model, `«${text}»`);
+    assert.deepEqual(u.residual, [], `«${text}»: nothing left over`);
+  }
+  assert.equal(understand('الهوت اند مال A1').part, 'nozzle_hotend', 'a phrase keeps its article too');
+  assert.equal(splitScripts('للA1 بالP1S الـAMS'), 'لل A1 بال P1S الـ AMS');
+  assert.equal(splitScripts('A١ ٠.٢mm'), 'A١ ٠.٢mm', 'Arabic-Indic digits stay with their neighbours');
+  // Only a known phrase loses its clitic: «البيت» is not «بيت».
+  assert.equal(bareProclitics(normalizeText('البيت للاي ون'), [normalizeText('اي ون')]), normalizeText('البيت اي ون'));
+  assert.equal(rewriteSpokenModels('كم تستهلك البي ون اس'), 'كم تستهلك p1s');
+});
+
+test('a printer named and not read: spoken digits, a model-shaped token, another maker; never a material or a screw', () => {
+  for (const text of ['نوزل مال زد ون', 'نوزل k1c', 'نوزل للكريالتي', 'نوزل prusa mk4']) assert.equal(understand(text).printerUnread, true, `«${text}»`);
+  assert.equal(understand('عندي طابعة كريالتي اندر 3').otherBrand, true);
+  for (const text of ['نوزل مال اي ون', 'PA6-CF', 'براغي M3', 'نوزل V6 0.4', 'نوزل', 'A1 combo']) assert.equal(understand(text).printerUnread, false, `«${text}»`);
+});
+
+test('typed symptoms in either word order, and the words that are not symptoms', () => {
+  for (const [text, symptom] of [
+    ['النوزل معلك', 'clog'],
+    ['الفلامنت ما يطلع من النوزل', 'clog'],
+    ['ما يطلع فلامنت', 'clog'],
+    ['النوزل مسكر', 'clog'],
+    ['الطبعة ترتفع من الزوايا', 'adhesion'],
+    ['الطبقات دا تزحف', 'layer_shift'],
+    ['الطبعة بيها خيوط مثل شعر', 'stringing'],
+    ['الـAMS ما يسحب الفلامنت', 'ams'],
+    ['AMS is not feeding', 'ams'],
+  ] as const) {
+    assert.equal(understand(text).symptom, symptom, `«${text}»`);
+  }
+  for (const text of ['المحل مسكر', 'الطلب معلك', 'خيوط PLA']) assert.equal(understand(text).symptom, undefined, `«${text}»`);
+  const leak = understand('تسريب من النوزل');
+  assert.equal(leak.problemCue, true);
+  assert.equal(leak.faultCue, true, 'a leak is a fault, not the clog its part suggests');
+});
+
+test('the outcome of the steps, typed: the negation first, in three languages', () => {
+  for (const text of ['جربتها وما انحلّت', 'ما انحلت', 'نفس المشكلة', 'still not fixed', 'did not work', 'هێشتا چارەسەر نەبوو']) {
+    assert.equal(readOutcome(normalizeText(text)), 'not_fixed', `«${text}»`);
+  }
+  for (const text of ['انحلت', 'انحلّت المشكلة شكرا', 'fixed', 'چارەسەر بوو']) assert.equal(readOutcome(normalizeText(text)), 'resolved', `«${text}»`);
+  for (const text of ['شكد سعر A1', 'كلوب']) assert.equal(readOutcome(normalizeText(text)), undefined, `«${text}»`);
+});
+
+test('follow-up words: a correction, an ordinal, and a printer that is not a product code', () => {
+  assert.equal(understand('لا قصدي بي ون اس').correction, true);
+  assert.equal(understand('لا قصدي بي ون اس').model, 'P1S');
+  assert.equal(understand('الاول بكم').ordinal, 0);
+  assert.equal(understand('الثاني متوفر؟').ordinal, 1);
+  assert.deepEqual(understand('P1S').codes, [], '«P1S» typed alone is the printer, not the code P1S');
+  assert.deepEqual(understand('اكو 0.4؟').measures, ['0.4']);
+});
+

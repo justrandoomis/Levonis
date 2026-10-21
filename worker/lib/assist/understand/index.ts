@@ -15,10 +15,16 @@
 import { CONFIDENT_SCORE, compileLexicon, normalizeText, scoreIntents, tokenize, type LexEntry } from '../../assistantNlu';
 import { extractIdentifiers, type CodeCandidate } from '../../search/identifiers';
 import type { ModelToken, PartKey, SymptomKey } from '../types';
-import { latinModels, scanSpokenModels } from './models';
+import { bareProclitics, latinModels, scanSpokenModels, splitScripts, unreadPrinter } from './models';
 import {
   AMS_WEAK,
+  CORRECTION_WORDS,
+  FAULT_CUE,
   FILLERS,
+  ORDINAL_WORDS,
+  OTHER_PRINTER,
+  OUTCOME_NOT_FIXED,
+  OUTCOME_RESOLVED,
   MAINTENANCE_CUE,
   PART_LEXICON,
   PRINTER_CUE,
@@ -42,7 +48,25 @@ export interface Understood {
   codes: CodeCandidate[];
   productCue: boolean;
   problemCue: boolean;
+  /** A fault the curated steps do not cover (a leak, no heat): a problem, never the clog its part suggests. */
+  faultCue: boolean;
   printerCue: boolean;
+  /**
+   * A printer was named and could not be read («زد ون», «k1c», «كريالتي»).
+   * Never true when a printer WAS read. The orchestrator does not answer for
+   * the printer remembered from earlier when this is set.
+   */
+  printerUnread: boolean;
+  /** One of the unread names is another maker's («كريالتي», «prusa»). */
+  otherBrand: boolean;
+  /** «طابعة أخرى», "another printer": the answer «another printer» to «which printer?». */
+  otherPrinter: boolean;
+  /** «لا قصدي …», "no, I mean …": a correction of the last answer. */
+  correction: boolean;
+  /** «الاول», "second": which of the products just shown (0 is the first). */
+  ordinal?: number;
+  /** The outcome of the steps, typed: «ما انحلت» / «انحلت». Read on every sentence; acted on only after the steps. */
+  outcome?: 'resolved' | 'not_fixed';
   /** The words no reader claimed, at most four: what is left to search for. */
   residual: string[];
 }
@@ -52,8 +76,10 @@ const compiledSymptoms = compileLexicon(SYMPTOM_LEXICON);
 const compiledCues = compileLexicon({
   product: PRODUCT_CUE,
   problem: PROBLEM_CUE,
+  fault: FAULT_CUE,
   printer: PRINTER_CUE,
   maintenance: MAINTENANCE_CUE,
+  other_printer: OTHER_PRINTER,
 });
 const compiledStringingWeak = compileLexicon({ stringing: STRINGING_WEAK });
 const compiledAmsWeak = compileLexicon({ ams: AMS_WEAK });
@@ -92,6 +118,8 @@ function claims(token: string, stem: string): boolean {
 const ALL_ENTRIES: LexEntry[] = [
   PRODUCT_CUE,
   PROBLEM_CUE,
+  FAULT_CUE,
+  OTHER_PRINTER,
   PRINTER_CUE,
   MAINTENANCE_CUE,
   STRINGING_WEAK,
@@ -103,7 +131,20 @@ const CLAIM_STEMS = [...new Set(ALL_ENTRIES.flatMap((e) => (e.stems ?? []).map(n
 const CLAIM_PHRASES = [...new Set(ALL_ENTRIES.flatMap((e) => (e.phrases ?? []).map(normalizeText)).filter((p) => p.includes(' ')))].sort(
   (a, b) => b.length - a.length
 );
-const FILLER_SET = new Set(FILLERS.map(normalizeText).filter(Boolean));
+const FILLER_SET = new Set([...FILLERS, ...CORRECTION_WORDS, ...Object.keys(ORDINAL_WORDS)].map(normalizeText).filter(Boolean));
+const CORRECTION_SET = new Set(CORRECTION_WORDS.map(normalizeText).filter(Boolean));
+const ORDINALS = new Map(Object.entries(ORDINAL_WORDS).map(([w, n]) => [normalizeText(w), n] as const));
+const NOT_FIXED = OUTCOME_NOT_FIXED.map(normalizeText).filter(Boolean);
+const RESOLVED = OUTCOME_RESOLVED.map(normalizeText).filter(Boolean);
+
+/** «جربتها وما انحلّت» → not fixed; «انحلت» → resolved. The negated list first. Pure. */
+export function readOutcome(normalized: string): 'resolved' | 'not_fixed' | undefined {
+  // «وما» is «و» + «ما»: the conjunction glued on must not hide the negation.
+  const padded = ` ${normalized} `.replace(/ و(ما|لم) /g, ' $1 ');
+  if (NOT_FIXED.some((p) => padded.includes(` ${p} `))) return 'not_fixed';
+  if (RESOLVED.some((p) => padded.includes(` ${p} `))) return 'resolved';
+  return undefined;
+}
 /** Sizes and units: carried by `measures`, never searched as words. */
 const MEASURE_PIECE = /^(?:\d+(?:mm|cm|m|g|kg|ml)?|mm|cm|ملم|مم|مل|ملي)$/;
 
@@ -129,19 +170,23 @@ export interface UnderstandOptions {
 }
 
 export function understand(raw: string, opts: UnderstandOptions = {}): Understood {
-  const normalized = normalizeText(raw);
+  // «للA1» is «لل A1»; «الاي ون» is «اي ون» (./models.ts).
+  const normalized = normalizeText(splitScripts(raw));
   const spoken = scanSpokenModels(normalized);
   const latin = latinModels(raw);
   const models = [...new Set([...spoken.models, ...latin])];
   // Every reader below sees the text WITHOUT the spoken printer names, so the
-  // «اي» of «اي ون» is never read as anything else.
-  const rest = spoken.rest;
+  // «اي» of «اي ون» is never read as anything else; and with the article off
+  // the first word of every known phrase, so «الهوت اند» is «هوت اند».
+  const rest = bareProclitics(spoken.rest, CLAIM_PHRASES);
 
   const cues = scoreIntents(rest, compiledCues);
-  const problemCue = has(cues, 'problem');
+  const faultCue = has(cues, 'fault');
+  const problemCue = has(cues, 'problem') || faultCue;
   const productCue = has(cues, 'product');
   const printerCue = has(cues, 'printer') || models.length > 0;
   const maintenance = has(cues, 'maintenance');
+  const otherPrinter = has(cues, 'other_printer');
 
   const part = best(scoreIntents(rest, compiledParts));
 
@@ -160,7 +205,12 @@ export function understand(raw: string, opts: UnderstandOptions = {}): Understoo
 
   const ids = extractIdentifiers(raw);
   const hmsPieces = new Set(hmsCode ? hmsCode.split('-') : []);
-  const codes = ids.codes.filter((c) => !hmsCode || !(hmsPieces.has(c.key.slice(0, 4)) || /^HMS/i.test(c.text)));
+  // A printer read as a printer is not also a product code: «P1S» typed alone
+  // answers «which printer?», it does not ask for the code P1S.
+  const modelKeys = new Set(latin.flatMap((m) => [m.toLowerCase().replace(/\s+/g, ''), ...m.toLowerCase().split(' ')]));
+  const codes = ids.codes
+    .filter((c) => !hmsCode || !(hmsPieces.has(c.key.slice(0, 4)) || /^HMS/i.test(c.text)))
+    .filter((c) => !modelKeys.has(c.key.toLowerCase()));
 
   // What nobody claimed: the words a search may still need («فولاذ»).
   const modelWords = new Set(
@@ -168,7 +218,13 @@ export function understand(raw: string, opts: UnderstandOptions = {}): Understoo
   );
   let leftover = ` ${rest} `;
   for (const phrase of CLAIM_PHRASES) leftover = leftover.split(` ${phrase} `).join(' ');
-  const residual = tokenize(leftover.trim())
+  const words = tokenize(leftover.trim());
+  const scan = unreadPrinter(tokenize(rest));
+  const unread = { unread: models.length === 0 && scan.unread, otherBrand: scan.otherBrand };
+  const correction = words.some((t) => CORRECTION_SET.has(t));
+  const ordinal = words.map((t) => ORDINALS.get(t)).find((n) => n !== undefined);
+  const outcome = readOutcome(normalized);
+  const residual = words
     .filter((t) => !claimedWord(t, modelWords))
     .filter((t) => !hmsCode || !/^[0-9a-f]{4,16}$/i.test(t) || !hmsPieces.has(t.toUpperCase().slice(0, 4)))
     .slice(0, RESIDUAL_MAX);
@@ -184,7 +240,14 @@ export function understand(raw: string, opts: UnderstandOptions = {}): Understoo
     codes,
     productCue,
     problemCue,
+    faultCue,
     printerCue,
+    printerUnread: unread.unread,
+    otherBrand: unread.otherBrand,
+    otherPrinter: otherPrinter || unread.otherBrand,
+    correction,
+    ...(ordinal !== undefined ? { ordinal } : {}),
+    ...(outcome ? { outcome } : {}),
     residual,
   };
 }

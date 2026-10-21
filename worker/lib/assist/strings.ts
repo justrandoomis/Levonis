@@ -47,6 +47,10 @@ export const ASSIST_T: Readonly<Record<Locale, Readonly<Record<string, string>>>
     measure_note: 'القياس {size}: اختره من خيارات المنتج في صفحته.',
     exact_miss: 'لا يوجد تطابق تام للرمز {code}.',
     all_results: 'كل النتائج',
+    part_printer_which: 'لأي طابعة تريد {part}؟ اختر واحدة:',
+    shown_again: 'هذه المنتجات التي عرضتها عليك، بسعرها وتوفرها الحاليين:',
+    shown_one: 'هذا المنتج الذي تقصده، بسعره وتوفره الحاليين:',
+    shown_gone: 'المنتجات التي عرضتها لم تعد معروضة في الكتالوج. اكتب اسم المنتج وأبحث لك عنه.',
   },
   en: {
     c_printer_problem: 'Printer problem',
@@ -85,6 +89,10 @@ export const ASSIST_T: Readonly<Record<Locale, Readonly<Record<string, string>>>
     measure_note: 'Size {size}: choose it from the product options on its page.',
     exact_miss: 'No exact match for {code}.',
     all_results: 'All results',
+    part_printer_which: 'Which printer is the {part} for? Pick one:',
+    shown_again: 'These are the products I just showed you, with their current price and availability:',
+    shown_one: 'Here is the product you mean, with its current price and availability:',
+    shown_gone: 'The products I showed are no longer listed. Type the product name and I will look it up.',
   },
   ckb: {
     c_printer_problem: 'کێشەی پرینتەر',
@@ -123,6 +131,10 @@ export const ASSIST_T: Readonly<Record<Locale, Readonly<Record<string, string>>>
     measure_note: 'قەبارەی {size}: لە هەڵبژاردنەکانی بەرهەمەکە لە پەڕەکەیدا هەڵیبژێرە.',
     exact_miss: 'هیچ هاوتایەکی تەواو بۆ {code} نییە.',
     all_results: 'هەموو ئەنجامەکان',
+    part_printer_which: '{part} بۆ کام پرینتەرە؟ یەکێک هەڵبژێرە:',
+    shown_again: 'ئەمانە ئەو بەرهەمانەن کە پیشانم دایت، بە نرخ و بەردەستبوونی ئێستایانەوە:',
+    shown_one: 'ئەمە ئەو بەرهەمەیە کە مەبەستتە، بە نرخ و بەردەستبوونی ئێستایەوە:',
+    shown_gone: 'ئەو بەرهەمانەی پیشانم دان ئیتر لە کاتالۆگدا نین. ناوی بەرهەمەکە بنووسە و بۆت دەگەڕێم.',
   },
 };
 

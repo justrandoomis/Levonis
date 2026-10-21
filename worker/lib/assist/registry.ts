@@ -15,14 +15,24 @@
  */
 import type { Viewer, ModelToken } from './types';
 import { MODEL_TOKENS } from './types';
-import { catalogSearch, FITS_MAX, printerModels, SEARCH_LIMIT_MAX, SEARCH_TEXT_MAX, type CatalogSearchArgs, type CatalogSearchResult } from './tools/catalog';
+import {
+  catalogByIds,
+  catalogSearch,
+  FITS_MAX,
+  printerModels,
+  SEARCH_LIMIT_MAX,
+  SEARCH_TEXT_MAX,
+  type CatalogItem,
+  type CatalogSearchArgs,
+  type CatalogSearchResult,
+} from './tools/catalog';
 import { ownDevices, printersOf, type MyPrinter } from './tools/devices';
 import { buildTicketDraft, type DraftInput } from './handoff';
 import type { TicketDraft } from './types';
 import { SYMPTOM_KEYS, type SymptomKey } from './types';
-import { HMS_CODE_SHAPE } from './context';
+import { HMS_CODE_SHAPE, SHOWN_MAX } from './context';
 
-export type ToolName = 'catalog.search' | 'catalog.printerModels' | 'devices.mine' | 'cases.draft';
+export type ToolName = 'catalog.search' | 'catalog.byIds' | 'catalog.printerModels' | 'devices.mine' | 'cases.draft';
 
 export type ToolResult<O> = { ok: true; data: O } | { ok: false; code: 'BAD_ARGS' | 'NEEDS_SESSION' | 'UNKNOWN_TOOL' };
 
@@ -62,9 +72,32 @@ const catalogSearchTool: ToolDef<CatalogSearchArgs, CatalogSearchResult> = {
     const limit = o.limit === undefined ? 6 : o.limit;
     if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > SEARCH_LIMIT_MAX) return bad('limit');
     if (!text.trim() && !fits?.length && o.category === undefined) return bad('empty');
-    return { text, ...(fits ? { fits } : {}), ...(o.category === 'cat_maint' ? { category: 'cat_maint' as const } : {}), limit };
+    if (o.strong !== undefined && typeof o.strong !== 'boolean') return bad('strong');
+    return {
+      text,
+      ...(fits ? { fits } : {}),
+      ...(o.category === 'cat_maint' ? { category: 'cat_maint' as const } : {}),
+      limit,
+      ...(o.strong === true ? { strong: true } : {}),
+    };
   },
   run: (db, viewer, input) => catalogSearch(db, viewer, input),
+};
+
+const ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** The products the conversation just showed, read again as cards («شكد سعره؟»). Ids only; nothing else is trusted. */
+const catalogByIdsTool: ToolDef<{ ids: string[] }, CatalogItem[]> = {
+  name: 'catalog.byIds',
+  audience: 'public',
+  effect: 'read',
+  parse(raw) {
+    const o = asObject(raw);
+    if (!o || !Array.isArray(o.ids)) return bad('ids');
+    if (o.ids.length === 0 || o.ids.length > SHOWN_MAX || !o.ids.every((id) => typeof id === 'string' && ID.test(id))) return bad('ids');
+    return { ids: [...new Set(o.ids as string[])] };
+  },
+  run: (db, viewer, input) => catalogByIds(db, viewer, input.ids),
 };
 
 const printerModelsTool: ToolDef<Record<string, never>, Map<ModelToken, string[]>> = {
@@ -108,6 +141,7 @@ const casesDraftTool: ToolDef<DraftInput, TicketDraft> = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const TOOLS: Readonly<Record<ToolName, ToolDef<any, any>>> = {
   'catalog.search': catalogSearchTool,
+  'catalog.byIds': catalogByIdsTool,
   'catalog.printerModels': printerModelsTool,
   'devices.mine': devicesMineTool,
   'cases.draft': casesDraftTool,
@@ -115,6 +149,7 @@ export const TOOLS: Readonly<Record<ToolName, ToolDef<any, any>>> = {
 
 interface ToolOutputs {
   'catalog.search': CatalogSearchResult;
+  'catalog.byIds': CatalogItem[];
   'catalog.printerModels': Map<ModelToken, string[]>;
   'devices.mine': MyPrinter[];
   'cases.draft': TicketDraft;
