@@ -29,6 +29,7 @@ import { productRoutes } from '../worker/routes/products';
 import { supportRoutes } from '../worker/routes/support';
 import { ASSIST_T as ASSIST_STRINGS } from '../worker/lib/assist/strings';
 import { symptomDef } from '../worker/lib/assist/triage/symptoms';
+import { handoffForStaff } from '../worker/lib/assist/handoff';
 import { PART_LABELS, PART_SYMPTOM } from '../worker/lib/assist/understand/lexicon';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -1793,16 +1794,20 @@ test('round 4.3: «بعدني ما جربتها», "still have not tried them", 
       assert.ok(String(draft.body).includes(T.ticket_shown), `${label}: ${draft.body}`);
     }
   }
-  // The whole phrases are still «not fixed»: the steps tried, on the ticket.
-  for (const [locale, start, notFixed] of [
-    ['en', 'my nozzle is clogged', 'still clogged'],
-    ['en', 'my nozzle is clogged', "it still didn't work"],
-    ['ckb', 'نۆزڵەکە گیراوە', 'هێشتا کار ناکات'],
+  // The whole phrases are still «not fixed»: the ticket. The steps are tried on it only when the reply says
+  // so (review round 5): "still clogged" alone lists them as shown.
+  for (const [locale, start, notFixed, tried] of [
+    ['en', 'my nozzle is clogged', 'still clogged', false],
+    ['en', 'my nozzle is clogged', "it still didn't work", false],
+    ['ckb', 'نۆزڵەکە گیراوە', 'هێشتا کار ناکات', false],
+    ['en', 'my nozzle is clogged', 'tried them, still clogged', true],
+    ['ckb', 'نۆزڵەکە گیراوە', 'تاقیم کردەوە، هێشتا کار ناکات', true],
   ] as const) {
     const asked = await say(member, { text: start, locale });
     const steps = await say(member, { text: 'A1', locale, context: asked.context });
     const reply = await say(member, { text: notFixed, locale, context: steps.context });
-    assert.deepEqual(reply.ticket_draft?.handoff.tried, symptomDef('clog').steps.map((st) => st.key), `«${notFixed}»: ${reply.text}`);
+    assert.equal(reply.handoff, true, `«${notFixed}»: ${reply.text}`);
+    assert.deepEqual(reply.ticket_draft?.handoff.tried, tried ? symptomDef('clog').steps.map((st) => st.key) : [], `«${notFixed}»: ${reply.text}`);
   }
 });
 
@@ -1856,5 +1861,185 @@ test('round 4.3: a printer the customer says is theirs is not offered for sale; 
   ] as const) {
     const reply = await say(null, { text, locale });
     assert.equal(ids(reply)[0], 'p_a1', `«${text}»: ${reply.intent} ${JSON.stringify(ids(reply))}`);
+  }
+});
+
+// ════════════════════════════════════════ review, round 5
+
+test('round 5: «پرینتەرێکم دەوێ», «پرینتەرێکم پێویستە» are the printer lineup; «پرینتەرم نییە» never starts the triage', async () => {
+  const { say } = await round4();
+  const PRINTER_IDS = new Set(['p_a1', 'p_a1c', 'p_a1m', 'p_a1r', 'p_x1c', 'p_p1s', 'p_h2dpro']);
+  for (const user of [member, null]) {
+    for (const text of ['پرینتەرێکم دەوێ', 'پرینتەرێکم پێویستە', 'پرینتەرم دەوێ', 'پرینتەرێکم دەوێت', 'چاپکەرێکم دەوێ']) {
+      const label = `${user ? 'member' : 'guest'} «${text}»`;
+      const reply = await say(user, { text, locale: 'ckb' });
+      assert.notEqual(reply.intent, 'printer_problem', `${label}: ${reply.text}`);
+      assert.equal(reply.context?.triage, undefined, label);
+      assert.equal(ids(reply)[0], 'p_a1', `${label}: ${JSON.stringify(ids(reply))}`);
+      assert.ok(ids(reply).length >= 3 && ids(reply).every((id) => PRINTER_IDS.has(id)), `${label}: the lineup: ${JSON.stringify(ids(reply))}`);
+    }
+    for (const text of ['پرینتەرم نییە', 'پرینتەرێکم نیە']) {
+      const label = `${user ? 'member' : 'guest'} «${text}»`;
+      const reply = await say(user, { text, locale: 'ckb' });
+      assert.notEqual(reply.intent, 'printer_problem', `${label}: ${reply.text}`);
+      assert.equal(reply.context?.triage, undefined, label);
+      const team = await say(user, { text: 'قسە لەگەڵ تیمەکە بکە', locale: 'ckb', context: reply.context });
+      assert.equal(team.ticket_draft, undefined, `${label}: ${JSON.stringify(team.ticket_draft)}`);
+    }
+  }
+});
+
+test('round 5: a triage opened only by a printer owned drafts no ticket that claims a problem; a fault said after it does', async () => {
+  const { say } = await round4();
+  for (const user of [member, null]) {
+    for (const [locale, own, talk] of [
+      ['ar', 'عندي اي ون', 'تحدث مع الفريق'],
+      ['ar', 'عندي طابعة', 'تحدث مع الفريق'],
+      ['en', 'I have an A1', 'talk to the team'],
+      ['en', 'I own a P1S', 'talk to the team'],
+      ['en', 'I have a printer', 'talk to the team'],
+      ['ckb', 'A1م هەیە', 'قسە لەگەڵ تیمەکە بکە'],
+      ['ckb', 'پرینتەرێکم هەیە', 'قسە لەگەڵ تیمەکە بکە'],
+    ] as const) {
+      const label = `${user ? 'member' : 'guest'} «${own}»`;
+      const owned = await say(user, { text: own, locale });
+      assert.equal(owned.intent, 'printer_problem', `${label}: ${owned.text}`);
+      assert.equal(owned.context.triage.owned, true, label);
+      const contexts: Rec[] = [owned.context];
+      // «which printer?» answered with a chip: still only the printer owned.
+      if (owned.context.triage.stage === 'printer') {
+        const picked = await say(user, { intent: 'printer_problem', params: { step: 'printer', model: 'A1' }, locale, context: owned.context });
+        assert.deepEqual(picked.context.triage, { stage: 'symptom', owned: true }, label);
+        contexts.push(picked.context);
+      }
+      for (const context of contexts) {
+        for (const turn of [{ text: talk }, { intent: 'human_handoff' }]) {
+          const at = `${label} at ${context.triage.stage} ${JSON.stringify(turn)}`;
+          const reply = await say(user, { ...turn, locale, context });
+          assert.equal(reply.ticket_draft, undefined, `${at}: ${JSON.stringify(reply.ticket_draft)}`);
+          assert.equal(reply.intent, 'human_handoff', at);
+          assert.equal(user ? reply.handoff : reply.auth_required, true, at);
+          assert.equal(reply.context?.triage, undefined, at);
+        }
+      }
+    }
+  }
+  // After a finished triage, the same.
+  const steps = await say(member, { text: 'A1', locale: 'en', context: (await say(member, { text: 'my nozzle is clogged', locale: 'en' })).context });
+  const fixed = await say(member, { text: 'that fixed it', locale: 'en', context: steps.context });
+  assert.equal(fixed.context.triage.stage, 'done');
+  const again = await say(member, { text: 'I have a P1S', locale: 'en', context: fixed.context });
+  assert.equal(again.context.triage.owned, true);
+  const after = await say(member, { text: 'talk to the team', locale: 'en', context: again.context });
+  assert.equal(after.ticket_draft, undefined, JSON.stringify(after.ticket_draft));
+  // A fault said after it is that fault's ticket: a symptom picked, or a problem typed with the printer.
+  const owned = await say(member, { text: 'I have an A1', locale: 'en' });
+  const clog = await say(member, { intent: 'printer_problem', params: { step: 'symptom', symptom: 'clog' }, locale: 'en', context: owned.context });
+  assert.equal(clog.context.triage.owned, undefined);
+  const clogTalk = await say(member, { text: 'talk to the team', locale: 'en', context: clog.context });
+  assert.equal(clogTalk.ticket_draft.handoff.symptom, 'clog');
+  const which = await say(member, { text: 'عندي طابعة' });
+  const said = await say(member, { text: 'A1 بيها مشكلة', context: which.context });
+  assert.equal(said.context.triage.stage, 'symptom', said.text);
+  assert.equal(said.context.triage.owned, undefined);
+  const saidTalk = await say(member, { text: 'تحدث مع الفريق', context: said.context });
+  assert.equal(saidTalk.ticket_draft.handoff.model, 'A1');
+  // A carried context cannot claim it beside a symptom.
+  const forged = await say(member, {
+    text: 'تحدث مع الفريق',
+    context: { v: 1, printer: { model: 'A1' }, triage: { stage: 'steps', symptom: 'clog', owned: true } },
+  });
+  assert.equal(forged.ticket_draft.handoff.symptom, 'clog');
+});
+
+test('round 5: a price or stock question with «my» is about the printer: the A1 first, at the grid price, never the fault question', async () => {
+  const { db, say } = await round4();
+  // The storefront grid's figure for the A1, page by page (this shelf is longer than one page).
+  let grid: number | null | undefined;
+  for (let offset = 0; grid === undefined && offset < 500; offset += 50) {
+    const page = (await json(await get(appFor(db, null), `/api/products?limit=50&offset=${offset}`))).products as Rec[];
+    const card = page.find((p) => p.id === 'p_a1');
+    if (card) grid = (card.display_price_iqd ?? card.price_iqd ?? null) as number | null;
+    if (!page.length) break;
+  }
+  assert.equal(typeof grid, 'number', 'the A1 is on the grid, priced');
+  for (const text of ['how much is my A1', 'price of my A1', 'my A1 price', 'is my A1 available', 'is my A1 in stock']) {
+    const reply = await say(null, { text, locale: 'en' });
+    assert.notEqual(reply.intent, 'printer_problem', `«${text}»: ${reply.text}`);
+    assert.equal(reply.context?.triage, undefined, text);
+    assert.deepEqual(ids(reply).slice(0, 3), ['p_a1', 'p_a1c', 'p_a1r'], `«${text}»: ${reply.intent} ${JSON.stringify(ids(reply))}`);
+    assert.equal(reply.cards[0].price_iqd, grid, `«${text}»: the grid's figure`);
+  }
+});
+
+test('round 5: a not-fixed reply says the steps were tried only with a verb of trying: never «ما سويتها», "have not done them", «نەمکردووە»', async () => {
+  const { say } = await round4();
+  const clogKeys = symptomDef('clog').steps.map((st) => st.key);
+  for (const [locale, start, said, talk] of [
+    ['ar', 'النوزل مسدود', 'ما سويتها بس نفس المشكله', 'تحدث مع الفريق'],
+    ['ar', 'النوزل مسدود', 'ما سويت الخطوات، نفس المشكله', 'تحدث مع الفريق'],
+    ['ar', 'النوزل مسدود', 'نفس المشكله', 'تحدث مع الفريق'],
+    ['en', 'my nozzle is clogged', "haven't done them, still clogged", 'talk to the team'],
+    ['en', 'my nozzle is clogged', "I didn't do them, still clogged", 'talk to the team'],
+    ['en', 'my nozzle is clogged', 'not yet, same problem', 'talk to the team'],
+    ['ckb', 'نۆزڵەکە گیراوە', 'نەمکردووە، هێشتا گیراوە', 'قسە لەگەڵ تیمەکە بکە'],
+    ['ckb', 'نۆزڵەکە گیراوە', 'هێشتا نەمکردووە، هەمان کێشەیە', 'قسە لەگەڵ تیمەکە بکە'],
+  ] as const) {
+    const T = ASSIST_STRINGS[locale];
+    for (const user of [member, null]) {
+      const label = `${locale} ${user ? 'member' : 'guest'} «${said}»`;
+      const asked = await say(user, { text: start, locale });
+      const steps = await say(user, { text: 'A1', locale, context: asked.context });
+      assert.equal(steps.context.triage.stage, 'steps', label);
+      const reply = await say(user, { text: said, locale, context: steps.context });
+      assert.notEqual(reply.text, T.handoff_reply, `${label}: the reply says the steps were tried`);
+      assert.notEqual(reply.context?.triage?.tried, true, label);
+      for (const draft of [reply.ticket_draft, (await say(user, { text: talk, locale, context: reply.context ?? steps.context })).ticket_draft]) {
+        if (!draft) continue;
+        assert.deepEqual(draft.handoff.tried, [], `${label}: ${draft.body}`);
+        assert.deepEqual(handoffForStaff(draft.handoff)?.tried, [], `${label}: the staff summary`);
+        assert.ok(!String(draft.body).includes(T.ticket_tried), `${label}: ${draft.body}`);
+        assert.ok(String(draft.body).includes(T.ticket_shown), `${label}: ${draft.body}`);
+      }
+    }
+  }
+  // A verb of trying, and the chip, still say it.
+  for (const [locale, start, said] of [
+    ['ar', 'النوزل مسدود', 'جربتها بس نفس المشكله'],
+    ['en', 'my nozzle is clogged', 'tried them, still clogged'],
+    ['ckb', 'نۆزڵەکە گیراوە', 'تاقیم کردەوە، هێشتا گیراوە'],
+  ] as const) {
+    const asked = await say(member, { text: start, locale });
+    const steps = await say(member, { text: 'A1', locale, context: asked.context });
+    for (const turn of [{ text: said }, { intent: 'printer_problem', params: { step: 'outcome', outcome: 'not_fixed' } }]) {
+      const reply = await say(member, { ...turn, locale, context: steps.context });
+      assert.deepEqual(reply.ticket_draft.handoff.tried, clogKeys, `${locale} ${JSON.stringify(turn)}`);
+      assert.equal(handoffForStaff(reply.ticket_draft.handoff)?.tried.length, clogKeys.length);
+      assert.equal(reply.text, ASSIST_STRINGS[locale].handoff_reply, `${locale} ${JSON.stringify(turn)}`);
+    }
+  }
+});
+
+test('round 5: the common whole «still» replies after the steps reach the team, never the menu or the same steps', async () => {
+  const { say } = await round4();
+  for (const [locale, start, said] of [
+    ['ckb', 'نۆزڵەکە گیراوە', 'هێشتا کێشەکە هەیە'],
+    ['ckb', 'نۆزڵەکە گیراوە', 'هێشتا چاک نەبووە'],
+    ['ckb', 'نۆزڵەکە گیراوە', 'هێشتا کارناکات'],
+    ['ckb', 'نۆزڵەکە گیراوە', 'هێشتا ئیش ناکات'],
+    ['ckb', 'نۆزڵەکە گیراوە', 'تاقیم کردەوە بەڵام هێشتا'],
+    ['en', 'my nozzle is clogged', 'it still happens'],
+    ['en', 'my nozzle is clogged', 'still clogs'],
+    ['en', 'my nozzle is clogged', 'still bad'],
+    ['en', 'my nozzle is clogged', 'still getting the same error'],
+    ['en', 'my nozzle is clogged', 'tried all of them but still'],
+    ['en', 'my nozzle is clogged', 'still'],
+  ] as const) {
+    const asked = await say(member, { text: start, locale });
+    const steps = await say(member, { text: 'A1', locale, context: asked.context });
+    const reply = await say(member, { text: said, locale, context: steps.context });
+    assert.equal(reply.handoff, true, `«${said}»: ${reply.intent} ${reply.text}`);
+    assert.equal(reply.ticket_draft.handoff.symptom, 'clog', said);
+    assert.equal(reply.context.triage.stage, 'done', said);
   }
 });

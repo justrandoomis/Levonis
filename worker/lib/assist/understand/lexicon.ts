@@ -80,19 +80,31 @@ export const OWN_PRINTER: { readonly mine: readonly string[]; readonly with: rea
  * `normalizeText`, which turns an apostrophe into a gap («i ve»). «عندكم»,
  * "do you have" and «A1 هەیە؟» still ask; «بۆ خۆم» is "for myself", a
  * purchase.
+ *
+ * THE SORANI «-م» IS ALSO WANT, NEED AND HAVE NOT (review round 5).
+ * «پرینتەرێکم دەوێ» is "I want a printer", «پرینتەرێکم پێویستە» "I need a
+ * printer" and «پرینتەرم نییە» "I have no printer": the clitic is the subject
+ * of the verb after it. So «پرینتەرێکم» and «پرینتەرم» are ownership only
+ * before «هەیە» or «هەمە», and a sentence with one of `veto` is never one.
  */
-export const OWNS_PRINTER: { readonly words: readonly string[]; readonly phrases: readonly string[] } = {
+export const OWNS_PRINTER: { readonly words: readonly string[]; readonly phrases: readonly string[]; readonly veto: readonly string[] } = {
   words: [
     // «طابعتي», «مالتي» (mine), «عندي» / «عدي» (I have), «لدي», «املك» (I own), and a purchase in the past.
     'طابعتي', 'لطابعتي', 'بطابعتي', 'طابعتنا', 'مكينتي', 'ماكينتي', 'مالتي', 'مالي', 'عندي', 'عدي', 'عندنا', 'عدنا',
     'لدي', 'لدينا', 'املك', 'امتلك', 'نملك', 'اشتريت', 'اشتريته', 'اشتريتها', 'اشترينا', 'اشتريناها', 'شريت', 'شريته',
     'شريتها', 'شرينا',
     'my', 'mine', 'our', 'ours', 'ive', 'bought', 'purchased',
-    // «پرینتەرەکەم» (my printer), «پرینتەرێکم» (a printer of mine), «A1ەکەم» (my A1), «هەمە» (I have it), «کڕیم» (I bought).
-    'پرینتەرەکەم', 'پرینتەرەکەمە', 'پرینتەرێکم', 'پرینتەرم', 'چاپکەرەکەم', 'چاپکەرێکم', 'ەکەم', 'هەمە', 'هەمانە', 'کڕیم', 'کڕیمە',
+    // «پرینتەرەکەم» (my printer), «A1ەکەم» (my A1), «هەمە» (I have it), «کڕیم» (I bought).
+    'پرینتەرەکەم', 'پرینتەرەکەمە', 'چاپکەرەکەم', 'ەکەم', 'هەمە', 'هەمانە', 'کڕیم', 'کڕیمە',
   ],
-  // «A1م هەیە», «A1مان هەیە»: the clitic of «I have» and «we have» before «هەیە»; «A1ی خۆم», my own A1.
-  phrases: ['i have', 'i ve', 'i own', 'i got', 'we have', 'we own', 'we got', 'م هەیە', 'مان هەیە', 'ی خۆم', 'هی خۆم'],
+  // «A1م هەیە», «A1مان هەیە»: the clitic of «I have» and «we have» before «هەیە»; «A1ی خۆم», my own A1;
+  // «پرینتەرێکم هەیە» (I have a printer), never «پرینتەرێکم» alone.
+  phrases: [
+    'i have', 'i ve', 'i own', 'i got', 'we have', 'we own', 'we got', 'م هەیە', 'مان هەیە', 'ی خۆم', 'هی خۆم',
+    'پرینتەرێکم هەیە', 'پرینتەرم هەیە', 'چاپکەرێکم هەیە', 'چاپکەرم هەیە',
+  ],
+  // «دەوێ», «دەوێت», «ئەوێ» (want), «پێویستە» (is needed), «نییە», «نیە» (there is not).
+  veto: ['دەوێ', 'دەوێت', 'ئەوێ', 'ئەوێت', 'پێویستە', 'پێویستمە', 'نییە', 'نیە'],
 };
 
 /**
@@ -154,6 +166,17 @@ export const OUTCOME_NOT_FIXED: readonly string[] = [
   'still is not', 'still cant', "still can't", 'still cannot',
   'چارەسەر نەبوو', 'چارەسەر نەبووە', 'هەمان کێشە', 'هەمان کێشەیە', 'سوودی نەبوو', 'کاری نەکرد', 'هێشتا کار ناکات', 'هێشتا گیراوە',
   'هێشتا هەروایە', 'هێشتا ماوە',
+  // The common whole forms with «still» / «هێشتا» (review round 5).
+  'still happens', 'still clogs', 'still bad', 'still getting', 'but still',
+  'هێشتا کێشەکە هەیە', 'هێشتا کێشە هەیە', 'هێشتا چاک نەبووە', 'هێشتا کارناکات', 'هێشتا ئیش ناکات', 'هێشتا هەمان', 'بەڵام هێشتا',
+];
+/**
+ * «still», «nope, still», «نەخێر هێشتا» as the WHOLE reply to the steps: not
+ * fixed. Never as a part of a longer sentence («still waiting for the
+ * needle», «هێشتا تاقیم نەکردۆتەوە»), which only `OUTCOME_NOT_FIXED` reads.
+ */
+export const OUTCOME_NOT_FIXED_ALONE: readonly string[] = [
+  'still', 'nope still', 'no still', 'yes still', 'yeah still', 'هێشتا', 'نەخێر هێشتا', 'نا هێشتا', 'بەڵێ هێشتا',
 ];
 /**
  * THE STEPS NOT TRIED («بعدني ما جربتها», "I still have not tried them",
@@ -169,6 +192,34 @@ export const OUTCOME_NOT_TRIED: readonly string[] = [
   'تاقیم نەکردۆتەوە', 'تاقیم نەکردووەتەوە', 'تاقیم نەکردوەتەوە', 'تاقیم نەکردووە', 'تاقیم نەکردەوە', 'تاقیم نەکردنەوە',
   'تاقیمان نەکردۆتەوە', 'تاقیمان نەکردەوە', 'تاقی نەکراوەتەوە',
 ];
+/**
+ * THE STEPS SAID TO BE TRIED («جربتها», "tried them", «تاقیم کردەوە»): only
+ * with one of `verbs`, no word of `negations` right before it («ما سويتها»,
+ * "have not done them", "not yet tried"; the Sorani negation is in the verb
+ * itself, «نەمکردووە»), and none of `negatedAfter` right after a verb that
+ * ends in an auxiliary ("I did not"). A not-fixed reply without one («نفس
+ * المشكله», "still clogged", «هێشتا گیراوە») says nothing of trying: the
+ * ticket lists the steps as shown, never as tried (review round 5).
+ */
+export const TRIED_SAID: {
+  readonly verbs: readonly string[];
+  readonly negations: readonly string[];
+  readonly auxiliaries: readonly string[];
+  readonly negatedAfter: readonly string[];
+} = {
+  verbs: [
+    'جربت', 'جربتها', 'جربته', 'جربتهم', 'جربنا', 'جربناها', 'سويت', 'سويتها', 'سويته', 'سويتهم', 'سوينا', 'سويناها', 'طبقت', 'طبقتها',
+    'طبقته', 'طبقتهم', 'عملتها', 'عملتهم', 'نفذت', 'نفذتها', 'نفذتهم', 'اتبعت', 'اتبعتها', 'حاولت', 'مسويها', 'مجربها',
+    'tried', 'i did', 'we did', 'did them', 'did it', 'did all', 'did those', 'did everything', 'did every', 'did each', 'done',
+    'followed', 'applied', 'went through',
+    'تاقیم کردەوە', 'تاقیمکردەوە', 'تاقیم کردنەوە', 'تاقیم کرد', 'تاقیمان کردەوە', 'کردم', 'کردمن', 'کردمە', 'هەمووم کرد',
+    'جێبەجێم کرد', 'ئەنجامم دا',
+  ],
+  // «ما», «لم», «مو»; the English ones, and «t», the end of "haven t" once the apostrophe is a gap.
+  negations: ['ما', 'لم', 'مو', 'مش', 'not', 'never', 't', 'nt', 'haven', 'havent', 'hasn', 'hasnt', 'didn', 'didnt', 'dont', 'yet'],
+  auxiliaries: ['did'],
+  negatedAfter: ['not', 'nt', 'never'],
+};
 export const OUTCOME_RESOLVED: readonly string[] = [
   'انحلت', 'انحل', 'انحلت المشكله', 'زبطت', 'زبط', 'اشتغلت', 'اشتغل', 'صارت زينه', 'صار زين', 'رجعت تشتغل', 'رجعت زينه',
   'fixed', 'solved', 'it works', 'works now', 'that fixed it', 'چارەسەر بوو', 'باش بوو', 'کاری کرد',

@@ -36,6 +36,7 @@ import {
   ORDINAL_WORDS,
   OTHER_PRINTER,
   OUTCOME_NOT_FIXED,
+  OUTCOME_NOT_FIXED_ALONE,
   OUTCOME_NOT_TRIED,
   OUTCOME_RESOLVED,
   MAINTENANCE_CUE,
@@ -49,6 +50,7 @@ import {
   PRODUCT_CUE,
   STRINGING_WEAK,
   SYMPTOM_LEXICON,
+  TRIED_SAID,
   type CleaningTool,
 } from './lexicon';
 
@@ -115,6 +117,12 @@ export interface Understood {
    * round 4.3, ./lexicon.ts `OWNS_PRINTER`).
    */
   ownsPrinter: boolean;
+  /**
+   * «جربتها», "tried them", «تاقیم کردەوە»: the customer says they tried the
+   * steps. A typed not-fixed reply puts them on the ticket as tried only
+   * with this (review round 5, ./lexicon.ts `TRIED_SAID`).
+   */
+  triedSaid: boolean;
   /** "how much?", «شكد؟»: a price asked, whatever the intent scorer made of it. */
   priceAsk: boolean;
   /** The words no reader claimed, at most four: what is left to search for. */
@@ -227,10 +235,16 @@ const PRICE_ASKS = PRICE_ASK.map(normalizeText).filter(Boolean);
 const OWN_MINE = new Set(OWN_PRINTER.mine.map(normalizeText).filter(Boolean));
 const OWN_WITH = new Set(OWN_PRINTER.with.map(normalizeText).filter(Boolean));
 const NOT_FIXED = OUTCOME_NOT_FIXED.map(normalizeText).filter(Boolean);
+const NOT_FIXED_ALONE = new Set(OUTCOME_NOT_FIXED_ALONE.map(normalizeText).filter(Boolean));
 const NOT_TRIED = OUTCOME_NOT_TRIED.map(normalizeText).filter(Boolean);
 const RESOLVED = OUTCOME_RESOLVED.map(normalizeText).filter(Boolean);
 const OWNS_WORDS = new Set(OWNS_PRINTER.words.map(normalizeText).filter(Boolean));
 const OWNS_PHRASES = OWNS_PRINTER.phrases.map(normalizeText).filter(Boolean);
+const OWNS_VETO = new Set(OWNS_PRINTER.veto.map(normalizeText).filter(Boolean));
+const TRIED_VERBS = TRIED_SAID.verbs.map((v) => tokenize(normalizeText(v))).filter((v) => v.length > 0);
+const TRIED_NEGATIONS = new Set(TRIED_SAID.negations.map(normalizeText).filter(Boolean));
+const TRIED_AUXILIARIES = new Set(TRIED_SAID.auxiliaries.map(normalizeText).filter(Boolean));
+const TRIED_NEGATED_AFTER = new Set(TRIED_SAID.negatedAfter.map(normalizeText).filter(Boolean));
 
 /**
  * «جربتها وما انحلّت» → not fixed; «انحلت» → resolved. The negated list first.
@@ -241,12 +255,32 @@ export function readOutcome(normalized: string): 'resolved' | 'not_fixed' | unde
   // «وما» is «و» + «ما»: the conjunction glued on must not hide the negation.
   const padded = ` ${normalized} `.replace(/ و(ما|لم) /g, ' $1 ');
   if (NOT_TRIED.some((p) => padded.includes(` ${p} `))) return undefined;
-  if (NOT_FIXED.some((p) => padded.includes(` ${p} `))) return 'not_fixed';
+  if (NOT_FIXED_ALONE.has(normalized) || NOT_FIXED.some((p) => padded.includes(` ${p} `))) return 'not_fixed';
   if (RESOLVED.some((p) => padded.includes(` ${p} `))) return 'resolved';
   return undefined;
 }
-/** «عندي اي ون», «وعندي طابعة», "I have an A1", «A1م هەیە»: a printer the customer says is theirs. Pure. */
+/**
+ * «جربتها وما انحلت», "tried them, still clogged", «تاقیم کردەوە»: a verb of
+ * trying, not negated («ما سويتها», "have not done them"). Pure.
+ */
+export function saysTried(normalized: string): boolean {
+  const tokens = tokenize(normalized).map((t) => (t.length > 2 && t.startsWith('و') && !t.startsWith('وو') ? t.slice(1) : t));
+  return TRIED_VERBS.some((verb) =>
+    tokens.some((_, i) => {
+      if (verb.some((w, k) => tokens[i + k] !== w)) return false;
+      if (i > 0 && TRIED_NEGATIONS.has(tokens[i - 1])) return false;
+      const after = tokens[i + verb.length];
+      return !(TRIED_AUXILIARIES.has(verb[verb.length - 1]) && after !== undefined && TRIED_NEGATED_AFTER.has(after));
+    })
+  );
+}
+/**
+ * «عندي اي ون», «وعندي طابعة», "I have an A1", «A1م هەیە»: a printer the
+ * customer says is theirs. Never with a Sorani want, need or have-not
+ * («پرینتەرێکم دەوێ», «پرینتەرم نییە»). Pure.
+ */
 function saysOwned(normalized: string, tokens: readonly string[]): boolean {
+  if (tokens.some((t) => OWNS_VETO.has(t))) return false;
   if (tokens.some((t) => OWNS_WORDS.has(t) || (t.startsWith('و') && OWNS_WORDS.has(t.slice(1))))) return true;
   const padded = ` ${normalized} `;
   return OWNS_PHRASES.some((p) => padded.includes(` ${p} `));
@@ -414,6 +448,7 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
     ...(wordSymptom ? { wordSymptom } : {}),
     ownPrinter,
     ownsPrinter: saysOwned(normalized, typedWords),
+    triedSaid: saysTried(normalized),
     priceAsk: PRICE_ASKS.some((p) => ` ${normalized} `.includes(` ${p} `)),
     residual,
   };
