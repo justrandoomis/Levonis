@@ -15,7 +15,7 @@
 import { CONFIDENT_SCORE, compileLexicon, normalizeText, scoreIntents, tokenize, type LexEntry } from '../../assistantNlu';
 import { extractIdentifiers, type CodeCandidate } from '../../search/identifiers';
 import type { ModelToken, PartKey, SymptomKey } from '../types';
-import { bareProclitics, latinModels, readFamily, scanSpokenModels, splitScripts, unreadPrinter } from './models';
+import { bareProclitics, joinSplitNames, latinModels, readFamily, scanSpokenModels, splitScripts, unreadPrinter } from './models';
 import {
   AMS_WEAK,
   CORRECTION_WORDS,
@@ -27,6 +27,7 @@ import {
   OUTCOME_RESOLVED,
   MAINTENANCE_CUE,
   PART_LEXICON,
+  PAST_PURCHASE,
   PRINTER_CUE,
   PROBLEM_CUE,
   PRODUCT_CUE,
@@ -102,7 +103,9 @@ const HMS_LONG = /(?<![0-9A-Z])([0-9A-F]{4})[-_ ]([0-9A-F]{4})[-_ ]([0-9A-F]{4})
 const HMS_PACKED = /HMS[_ -]?([0-9A-F]{4})([0-9A-F]{4})([0-9A-F]{4})([0-9A-F]{4})(?![0-9A-Z])/i;
 const HMS_SHORT = /HMS[_ -]?([0-9A-F]{4})[-_ ]?([0-9A-F]{4})(?![0-9A-Z])/i;
 
-export function readHmsCode(raw: string): string | undefined {
+export function readHmsCode(input: string): string | undefined {
+  // An Iraqi phone keyboard types «٠٣٠٠-٠١٠٠-…»: the same code.
+  const raw = asciiDigits(input);
   const named = /HMS/i.test(raw);
   const m = HMS_LONG.exec(raw) ?? HMS_PACKED.exec(raw) ?? HMS_SHORT.exec(raw);
   if (!m) return undefined;
@@ -112,6 +115,29 @@ export function readHmsCode(raw: string): string | undefined {
   if (!named && !groups.some((g) => /[A-F]/i.test(g) || g.startsWith('0'))) return undefined;
   return groups.map((g) => g.toUpperCase()).join('-');
 }
+
+/** Arabic-Indic and Persian digits as ASCII digits; nothing else changes. */
+function asciiDigits(raw: string): string {
+  return raw.replace(/[\u0660-\u0669\u06F0-\u06F9]/g, (d) => String((d.codePointAt(0)! - 0x0660) % 0x90));
+}
+
+/**
+ * «اشتريت طابعة من عندكم وصار بيها انسداد»: a purchase in the PAST is the
+ * story of a fault, never a shopping question, so these words never count as
+ * the product cue. Whole words and phrases, normalised.
+ */
+const PAST_PURCHASE_WORDS = new Set(PAST_PURCHASE.map(normalizeText).filter((w) => w && !w.includes(' ')));
+const PAST_PURCHASE_PHRASES = PAST_PURCHASE.map(normalizeText).filter((w) => w.includes(' '));
+function withoutPastPurchase(normalized: string): string {
+  let text = ` ${normalized} `;
+  for (const phrase of PAST_PURCHASE_PHRASES) text = text.split(` ${phrase} `).join(' ');
+  return tokenize(text.trim())
+    .filter((t) => !PAST_PURCHASE_WORDS.has(t) && !(t.startsWith('و') && PAST_PURCHASE_WORDS.has(t.slice(1))))
+    .join(' ');
+}
+
+/** «كومبو»: the bundle word after a printer name, in every script; a model word, never searched. */
+const COMBO_WORDS = ['combo', 'كومبو', 'كمبو', 'کۆمبۆ', 'کۆمبو'].map(normalizeText);
 
 /** The single-token rule of the intent scorer, used to say which words a reader claimed. */
 function claims(token: string, stem: string): boolean {
@@ -174,7 +200,9 @@ export interface UnderstandOptions {
   expectSymptom?: boolean;
 }
 
-export function understand(raw: string, opts: UnderstandOptions = {}): Understood {
+export function understand(typed: string, opts: UnderstandOptions = {}): Understood {
+  // «P1-S» is the P1S, «x1 c» the X1C (./models.ts `joinSplitNames`).
+  const raw = joinSplitNames(typed);
   // «للA1» is «لل A1»; «الاي ون» is «اي ون» (./models.ts).
   const normalized = normalizeText(splitScripts(raw));
   const spoken = scanSpokenModels(normalized);
@@ -182,23 +210,20 @@ export function understand(raw: string, opts: UnderstandOptions = {}): Understoo
   const models = [...new Set([...spoken.models, ...latin])];
   const ids = extractIdentifiers(raw);
   // A series is read only when no printer was: «X1» is the X1C or the X1E,
-  // and the A2 series is the A2L alone, so «A2» is the A2L. Never a word a
-  // size already holds: «0.4 X2» is the search engine's 0.4X2.
+  // and «X1 او P1» any of four. Never a word a size already holds: «0.4 X2»
+  // is the search engine's 0.4X2.
   const read = models.length === 0 ? readFamily(raw, spoken.rest) : undefined;
   const fam = read && !ids.measures.some((m) => read.words.some((w) => m.toLowerCase().endsWith(w))) ? read : undefined;
-  if (fam && fam.members.length === 1) models.push(fam.members[0]);
-  const family = fam && fam.members.length > 1 ? { name: fam.family.replace(/\s*series$/i, ''), members: fam.members } : undefined;
-  const familyWords = new Set(fam?.words ?? []);
   // Every reader below sees the text WITHOUT the spoken printer names, so the
   // «اي» of «اي ون» is never read as anything else; and with the article off
   // the first word of every known phrase, so «الهوت اند» is «هوت اند».
   const rest = bareProclitics(fam ? fam.rest : spoken.rest, CLAIM_PHRASES);
 
-  const cues = scoreIntents(rest, compiledCues);
+  // «اشتريت» and «من عندكم» tell what happened; they do not ask to buy.
+  const cues = scoreIntents(withoutPastPurchase(rest), compiledCues);
   const faultCue = has(cues, 'fault');
   const problemCue = has(cues, 'problem') || faultCue;
   const productCue = has(cues, 'product');
-  const printerCue = has(cues, 'printer') || models.length > 0 || !!fam;
   const maintenance = has(cues, 'maintenance');
   const otherPrinter = has(cues, 'other_printer');
 
@@ -217,6 +242,21 @@ export function understand(raw: string, opts: UnderstandOptions = {}): Understoo
   const ranked = [...symptomScores.entries()].sort((a, b) => b[1] - a[1]);
   const symptom = ranked.length > 0 && ranked[0][1] >= CONFIDENT_SCORE ? ranked[0][0] : undefined;
 
+  // A series of one printer is that printer: the A2 series is the A2L alone.
+  // A bare «A2» is also a paper size («ورق A2», "A2 paper"), so read that way
+  // it is the A2L only beside a part, a printer word, a fault or a symptom.
+  const single = fam && fam.members.length === 1 ? fam.members[0] : undefined;
+  const singleTaken =
+    !!single && (!fam!.bare || !!part || has(cues, 'printer') || problemCue || !!symptom || maintenance);
+  if (singleTaken) models.push(single!);
+  const named = fam && (fam.members.length > 1 || singleTaken) ? fam : undefined;
+  const family =
+    named && named.members.length > 1
+      ? { name: named.families.map((f) => f.replace(/\s*series$/i, '')).join(' / '), members: named.members }
+      : undefined;
+  const familyWords = new Set(named?.words ?? []);
+  const printerCue = has(cues, 'printer') || models.length > 0 || !!family;
+
   const hmsPieces = new Set(hmsCode ? hmsCode.split('-') : []);
   // A printer read as a printer is not also a product code: «P1S» typed alone
   // answers «which printer?», it does not ask for the code P1S.
@@ -227,12 +267,14 @@ export function understand(raw: string, opts: UnderstandOptions = {}): Understoo
 
   // What nobody claimed: the words a search may still need («فولاذ»).
   const modelWords = new Set(
-    latin.flatMap((m) => m.toLowerCase().split(' ')).concat(['combo', 'carbon', 'series', 'bambu', 'lab', 'بامبو'], [...familyWords])
+    latin.flatMap((m) => m.toLowerCase().split(' ')).concat(COMBO_WORDS, ['carbon', 'series', 'bambu', 'lab', 'بامبو'], [...familyWords])
   );
   let leftover = ` ${rest} `;
   for (const phrase of CLAIM_PHRASES) leftover = leftover.split(` ${phrase} `).join(' ');
   const words = tokenize(leftover.trim());
-  const scan = unreadPrinter(tokenize(rest).filter((t) => !familyWords.has(t)));
+  // A series named is never an unreadable printer, read as a printer or not («ورق A2»).
+  const seriesWords = new Set(fam?.words ?? []);
+  const scan = unreadPrinter(tokenize(rest).filter((t) => !seriesWords.has(t)));
   const unread = { unread: models.length === 0 && scan.unread, otherBrand: scan.otherBrand };
   const correction = words.some((t) => CORRECTION_SET.has(t));
   const ordinal = words.map((t) => ORDINALS.get(t)).find((n) => n !== undefined);

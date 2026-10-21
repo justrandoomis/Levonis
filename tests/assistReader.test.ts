@@ -15,7 +15,9 @@ import {
   MODEL_NAME_WORDS,
   SPOKEN_FAMILIES,
   SPOKEN_MODELS,
+  bareEnclitics,
   bareProclitics,
+  joinSplitNames,
   mentionsModel,
   rewriteSpokenModels,
   splitScripts,
@@ -278,4 +280,109 @@ test('not printer names: E3D (a hotend maker), «ثري دي» (3D), Iraqi «ت�
   }
   // A spoken digit after a spoken letter is still a printer the tables do not know.
   for (const text of ['نوزل مال زد ون', 'نوزل كي ون سي', 'نۆزڵ بۆ زێد وەن', 'nozzle for the Z1']) assert.equal(understand(text).printerUnread, true, `«${text}»`);
+});
+
+// ════════════════════════════════════════ review, round 2
+
+test('round 2: «اي تو» is "yes, just now", never the A2 series; a bare Latin «A2» is the A2L only beside a part, a printer or a fault', () => {
+  for (const [, forms] of SPOKEN_FAMILIES) for (const form of forms) assert.ok(!['اي تو', 'ايه تو'].includes(form), form);
+  for (const text of ['اي تو وصلت', 'اي تو اشتريت نوزل', 'الطابعة اي تو', 'اي تو وصلتني الطابعة وبيها مشكلة', 'ورق A2', 'A2 paper']) {
+    const u = understand(text);
+    assert.equal(u.model, undefined, `«${text}»`);
+    assert.equal(u.printerUnread, false, `«${text}»`);
+  }
+  assert.equal(understand('نوزل A2').model, 'A2L');
+  assert.equal(understand('طابعة A2 بيها مشكلة').model, 'A2L');
+  assert.equal(understand('اي تو ال').model, 'A2L', 'the whole spoken name is still the A2L');
+});
+
+test('round 2: «تو», the purchase and «اي» are not searched: «نوزل اشتريته تو» leaves nothing over', () => {
+  for (const text of ['نوزل اشتريته تو', 'اي تو اشتريت نوزل', 'نوزل شريته توه', 'نوزل وصلني تو']) assert.deepEqual(understand(text).residual, [], text);
+  assert.deepEqual(understand('نوزل مال اي ون كومبو').residual, [], '«كومبو» is the bundle word of the printer name');
+  assert.deepEqual(understand('نۆزڵ بۆ ئەی وەن کۆمبۆ').residual, []);
+});
+
+test('round 2: a name in two pieces is one printer: «P1-S», «x1 c», «نوزل p1 s»', () => {
+  for (const [text, model] of [
+    ['nozzle for p1-s', 'P1S'],
+    ['nozzle for P1-S', 'P1S'],
+    ['نوزل p1 s', 'P1S'],
+    ['nozzle for X1-C', 'X1C'],
+    ['nozzle for x1-c', 'X1C'],
+    ['H2-D hotend', 'H2D'],
+  ] as const) {
+    const u = understand(text);
+    assert.equal(u.model, model, text);
+    assert.equal(u.family, undefined, text);
+    assert.equal(u.printerUnread, false, text);
+  }
+  // Only a join the registry reads as exactly that printer.
+  assert.equal(joinSplitNames('A1 mini X1 Carbon A1 a'), 'A1 mini X1 Carbon A1 a');
+  assert.equal(joinSplitNames('0.4 x2 d'), '0.4 x2d', 'a join of a real printer only');
+  assert.equal(understand('نوزل P1').family?.name, 'P1', 'a series named alone stays a series');
+});
+
+test('round 2: Sorani glues the article and the possessive on at the end: «ئەی وەنەکەم» is my A1', () => {
+  for (const [text, model] of [
+    ['ئەی وەنەکەم کێشەی هەیە', 'A1'],
+    ['نۆزڵ بۆ ئەی وەنەکەم', 'A1'],
+    ['نۆزڵی ئەی وەنەکە', 'A1'],
+    ['پی وەن ئێسەکەم کێشەی هەیە', 'P1S'],
+    ['ئێچ تو دییەکەم', 'H2D'],
+  ] as const) {
+    assert.equal(understand(text).model, model, text);
+  }
+  assert.deepEqual(understand('نۆزڵ بۆ ئێکس وەنەکەم').family, { name: 'X1', members: ['X1C', 'X1E'] });
+  // Only a Sorani name loses a letter: an Arabic phrase is never touched.
+  assert.equal(bareEnclitics(normalizeText('اي ونه'), [normalizeText('اي ون')]), normalizeText('اي ونه'));
+});
+
+test('round 2: two series named are all their printers, and connectors, belts and lasers are not printers', () => {
+  for (const text of ['نوزل X1 او P1', 'hotend for X1 and P1', 'Nozzle Wiper - X1/P1 Series', 'نوزل للاكس ون والبي ون']) {
+    const u = understand(text);
+    assert.equal(u.printerUnread, false, text);
+    assert.deepEqual(u.family?.members, ['P1P', 'P1S', 'X1C', 'X1E'], text);
+  }
+  for (const text of ['GT2 Timing Belt', '030 Micro DC Motor with SH1.0', 'PH2.0 cable', 'Air-assist Nozzle - R1', 'A4 200g Kraft Paper', 'BT2 screw', 'N20 motor']) {
+    assert.equal(understand(text).printerUnread, false, text);
+  }
+});
+
+test('round 2: a maker named by its line, with a spoken digit, is a printer the shop does not list', () => {
+  for (const text of ['نوزل مال نبتون فور', 'وعندي هم كوبرا تو، اريد نوزل الها', 'نێپتوون فۆر', 'نوزل للنبتون فور']) {
+    const u = understand(text);
+    assert.equal(u.printerUnread, true, text);
+    assert.equal(u.otherBrand, true, text);
+    assert.equal(u.model, undefined, text);
+  }
+});
+
+test('round 2: a purchase in the past is the story of a fault, not a shopping question', () => {
+  for (const [text, symptom] of [
+    ['اشتريت طابعة وصار بيها انسداد بالنوزل', 'clog'],
+    ['اشتريت طابعة تو وصار بيها انسداد بالنوزل', 'clog'],
+    ['اشتريت A1 من عدكم والنوزل مسدود', 'clog'],
+  ] as const) {
+    const u = understand(text);
+    assert.equal(u.productCue, false, text);
+    assert.equal(u.symptom, symptom, text);
+  }
+  const story = understand('اشتريت طابعة من عندكم وصارت بيها مشكلة');
+  assert.equal(story.productCue, false);
+  assert.equal(story.problemCue, true);
+  // Asking to buy is still asking: «عندكم», «اريد اشتري», «بكم».
+  for (const text of ['عندكم نوزل؟', 'اريد اشتري نوزل', 'بكم النوزل']) assert.equal(understand(text).productCue, true, text);
+});
+
+test('round 2: Sorani «پلێت» and «کلۆگ», and an HMS code typed with Arabic-Indic digits', () => {
+  const plate = understand('پلێت بۆ ئێکس وەن کاربۆن');
+  assert.equal(plate.part, 'plate');
+  assert.equal(plate.model, 'X1C');
+  for (const text of ['کلۆگ', 'نۆزڵەکەم کلۆگ بووە']) assert.equal(understand(text).symptom, 'clog', text);
+  assert.equal(readHmsCode('٠٣٠٠-٠١٠٠-٠٠٠١-٠٠٠٣'), '0300-0100-0001-0003');
+  assert.equal(readHmsCode('۰۷۰۰-۲۰۰۰-۰۰۰۲-۰۰۰۱'), '0700-2000-0002-0001', 'the Persian digits too');
+  const typed = understand('رمز خطأ ٠٣٠٠-٠١٠٠-٠٠٠١-٠٠٠٣');
+  assert.equal(typed.hmsCode, '0300-0100-0001-0003');
+  assert.equal(typed.symptom, 'hms');
+  assert.deepEqual(typed.codes, []);
 });

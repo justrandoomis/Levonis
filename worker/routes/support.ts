@@ -56,6 +56,7 @@ import { viewerFor } from '../lib/assist/viewer';
 import { callTool } from '../lib/assist/registry';
 import { ownDevices, type DeviceLite } from '../lib/assist/tools/devices';
 import { rewriteSpokenModels } from '../lib/assist/understand/models';
+import { understand } from '../lib/assist/understand';
 import type { AssistReply, CardRenderer, TicketDraft } from '../lib/assist/types';
 import type { AssistContext } from '../lib/assist/context';
 import { attachmentInsert, checkStoredAttachments, readAttachmentKeys, ticketAttachments } from '../lib/assist/attachments';
@@ -331,8 +332,12 @@ const LEXICON: Record<Intent, LexEntry> = {
     stems: ['ticket', 'complaint', 'تذكرة', 'شكوى', 'مشكلة', 'خربان', 'عاطل', 'معطل', 'تیکێت', 'سکاڵا'],
   },
   human_handoff: {
-    // «تحدث مع الفريق» is the triage's own chip label (worker/lib/assist/strings.ts), typed.
-    phrases: ['اريد اتكلم مع موظف', 'talk to a human', 'real person', 'customer service', 'کارمەندێک', 'تحدث مع الفريق', 'talk to the team', 'قسە لەگەڵ تیمەکە'],
+    // «تحدث مع الفريق» is the triage's own chip label (worker/lib/assist/strings.ts), typed;
+    // «احجي ويا الفريق» is how Iraqi says it ("let me talk to the team"), however it is spelt.
+    phrases: [
+      'اريد اتكلم مع موظف', 'talk to a human', 'real person', 'customer service', 'کارمەندێک', 'تحدث مع الفريق', 'talk to the team', 'قسە لەگەڵ تیمەکە',
+      'احجي ويا الفريق', 'احچي ويا الفريق', 'احجي مع الفريق', 'اتكلم ويا الفريق', 'اتكلم مع الفريق', 'احجي ويا موظف', 'talk to staff',
+    ],
     stems: ['human', 'agent', 'staff', 'موظف', 'انسان', 'اتواصل', 'کارمەند', 'مرۆڤ'],
   },
 
@@ -477,6 +482,8 @@ const ASKING_FORMS = [
   'سعره', 'سعرها', 'سعرة', 'بيش', 'بيشه', 'بيشها', 'متوفره', 'متوفرة', 'موجوده', 'موجودة', 'اكو', 'ماكو', 'عدكم',
   'costs', 'available', 'stock',
   'نرخی', 'نرخەکەی', 'چەندە', 'بەچەندە', 'بە', 'هەیە', 'نییە', 'بەردەستە',
+  // «اكو غيرها؟», "any other?": more of the last answer, which names no product.
+  'غيرها', 'غيره', 'اخرى', 'اخر', 'other', 'others', 'another', 'تر', 'دیکە',
 ] as const;
 
 function stripForLookup(text: string): string {
@@ -485,6 +492,59 @@ function stripForLookup(text: string): string {
     ...(LEXICON[intent].stems ?? []),
   ]);
   return stripWords(text, [...words, ...FILLER, ...ASKING_FORMS]);
+}
+
+/** The forms of the price question and of the stock question the strong lookup takes out. */
+const PRICE_FORMS = ['سعره', 'سعرها', 'سعرة', 'بيش', 'بيشه', 'بيشها', 'نرخی', 'نرخەکەی', 'چەندە', 'بەچەندە', 'costs'] as const;
+const STOCK_FORMS = ['متوفره', 'متوفرة', 'موجوده', 'موجودة', 'available', 'stock', 'بەردەستە'] as const;
+
+/**
+ * WHICH QUESTION THE STRONG LOOKUP WAS ASKED AS: the price question only when
+ * a price word was really in the sentence (and taken out), the stock question
+ * likewise. Never from the scorer's near misses: «glue stick» is one letter
+ * from «stock», and it is a product name, not a stock question.
+ */
+function askedAs(text: string): 'price_question' | 'stock_question' | null {
+  const all = stripWords(text, []);
+  const removes = (intent: 'price_question' | 'stock_question', forms: readonly string[]) =>
+    stripWords(text, [...(LEXICON[intent].phrases ?? []), ...(LEXICON[intent].stems ?? []), ...forms]) !== all;
+  if (removes('price_question', PRICE_FORMS)) return 'price_question';
+  if (removes('stock_question', STOCK_FORMS)) return 'stock_question';
+  return null;
+}
+
+/**
+ * NOTHING LEFT TO LOOK UP. «ماكو رد؟» ("no reply?") is «رد» once «ماكو» is
+ * out, and two Arabic letters reach a timing belt; a question that is only
+ * a short Arabic word after the question words come out is small talk, and
+ * gets the menu.
+ */
+function tooShortToLookUp(stripped: string): boolean {
+  const tokens = stripped.split(' ').filter(Boolean);
+  return tokens.length === 0 || tokens.every((t) => /^[\u0600-\u06FF]{1,2}$/.test(t));
+}
+
+/**
+ * WHAT A MATERIAL QUESTION IS ABOUT. «PLA شكد» and «PETG بيش» ask the price of
+ * a material: the material's name is the subject, never a question word, so
+ * it stays, and the price and stock words (with their Iraqi forms, «بيش»,
+ * «شكد») come out. «PETG بيش» searched for «بيش» and found bronze bushings;
+ * «PLA شكد» kept nothing and asked «أي مادة تقصد؟».
+ */
+const MATERIAL_NAMES = new Set(['pla', 'petg', 'abs', 'tpu', 'asa', 'resin']);
+function materialsSubject(text: string): string {
+  const entry = LEXICON.materials_help;
+  const asking = (['price_question', 'stock_question'] as const).flatMap((intent) => [
+    ...(LEXICON[intent].phrases ?? []),
+    ...(LEXICON[intent].stems ?? []),
+  ]);
+  return stripWords(text, [
+    ...(entry.phrases ?? []),
+    ...(entry.stems ?? []).filter((w) => !MATERIAL_NAMES.has(w)),
+    ...asking,
+    ...FILLER,
+    ...ASKING_FORMS,
+  ]);
 }
 
 /**
@@ -2017,7 +2077,7 @@ async function handleSubjectSearch(
   loc: Locale
 ): Promise<AssistantReply> {
   const given = str(params.q, 'q', { max: 100, required: false });
-  const subject = given || stripQuestionWords(freeText, intent);
+  const subject = given || (intent === 'materials_help' ? materialsSubject(freeText) : stripQuestionWords(freeText, intent));
   if (subject.length < 2) {
     const promptKey =
       intent === 'price_question' ? 'price_which' : intent === 'stock_question' ? 'stock_which' : 'materials_which';
@@ -2411,13 +2471,33 @@ supportRoutes.post('/assistant', async (c) => {
    * the triage, with `shown` naming what THIS reply showed (the printer and the
    * part stay: they are still this conversation's).
    */
-  const send = (r: AssistantReply) => {
-    if (!context.triage && !context.shown) return c.json({ success: true, reply: r });
+  const send = async (r: AssistantReply) => {
+    const shown = [...new Set((r.cards ?? []).map((card) => card.product_id).filter((id): id is string => typeof id === 'string' && id !== ''))].slice(
+      0,
+      SHOWN_MAX
+    );
+    if (!context.triage && !context.shown && !context.asking && !context.size && !shown.length) return c.json({ success: true, reply: r });
     const next: AssistContext = { ...context };
     delete next.triage;
-    const shown = (r.cards ?? []).map((card) => card.product_id).filter((id): id is string => typeof id === 'string' && id !== '');
-    if (shown.length) next.shown = [...new Set(shown)].slice(0, SHOWN_MAX);
-    else delete next.shown;
+    delete next.asking;
+    delete next.size;
+    if (shown.length) {
+      next.shown = shown;
+      /**
+       * «A1 combo» answered with the A1 and the A1 Combo: this conversation is
+       * now about the A1, so «شكد سعر الطابعة؟» is that printer, not five others.
+       * Only when the cards show the listed printers of exactly one model.
+       */
+      const viewer = viewerFor(c.env.DB, user?.id ?? null, loc);
+      const models = await callTool('catalog.printerModelsOf', c.env.DB, viewer, { ids: shown }).catch(() => null);
+      const listed = models?.ok ? models.data : [];
+      // «طابعة A1» also showed the A1 mini: the printer the sentence named decides between them.
+      const named = freeText ? understand(freeText).models.filter((m) => listed.includes(m)) : [];
+      const model = named.length === 1 ? named[0] : listed.length === 1 ? listed[0] : undefined;
+      if (model) {
+        next.printer = { model, ...(context.printer?.model === model && context.printer.unit_id ? { unit_id: context.printer.unit_id } : {}) };
+      }
+    } else delete next.shown;
     return c.json({ success: true, reply: { ...r, context: next } });
   };
 
@@ -2479,11 +2559,11 @@ supportRoutes.post('/assistant', async (c) => {
        * exactly or every word reaches it without a forgiven typo; otherwise
        * the menu, as before the search engine.
        */
-      if (isLikelyCatalogueLookup(freeText)) {
+      if (isLikelyCatalogueLookup(freeText) && !tooShortToLookUp(stripForLookup(freeText))) {
         const found = await handleProductSearch(c, {}, freeText, loc, { strong: true });
         if (found.cards?.length) {
           // «بكم PLA؟» found its product: it is still the price question it was asked as.
-          const asked = (['price_question', 'stock_question'] as const).find((i) => decision.shortlist.includes(i));
+          const asked = askedAs(freeText);
           return send(withFollowups(asked ? { ...found, intent: asked } : found, loc));
         }
       }
@@ -2516,6 +2596,23 @@ supportRoutes.post('/assistant', async (c) => {
 
   // A tapped chip's own params win over anything inferred or carried.
   const resolved: Record<string, unknown> = { ...inferred, ...slotParams, ...params };
+
+  /**
+   * «تحدث مع الفريق» TYPED OR TAPPED FROM THE MENU, MID-TRIAGE, is the
+   * triage's own «talk» step: the ticket opens prefilled with the printer,
+   * the symptom and the steps tried instead of a blank form. A GUEST gets the
+   * same draft with the sign-in link (the triage's handoff step adds it), not
+   * «this information is private to your account»: nothing private is read,
+   * and the draft must survive the trip to the sign-in page.
+   */
+  if ((intent === 'open_ticket' || intent === 'human_handoff') && context.triage) {
+    const viewer = viewerFor(c.env.DB, user?.id ?? null, loc);
+    const turn = await handleTurn(c.env.DB, viewer, { chip: { step: 'talk' }, context }, CARD_RENDERER);
+    if (turn) {
+      const drafted = { ...(turn.reply as AssistReply), context: turn.context } as AssistantReply;
+      return c.json({ success: true, reply: withFollowups(drafted, loc) });
+    }
+  }
 
   if (ACCOUNT_INTENTS.has(intent) && !user) {
     return send(signInReply(intent, loc));
@@ -2558,23 +2655,10 @@ supportRoutes.post('/assistant', async (c) => {
       reply = await handlePolicyQuestion(c, resolved, loc);
       break;
     case 'open_ticket':
-    case 'human_handoff': {
-      /**
-       * «تحدث مع الفريق» TYPED OR TAPPED FROM THE MENU, MID-TRIAGE, is the
-       * triage's own «talk» step: the ticket opens prefilled with the printer,
-       * the symptom and the steps tried instead of a blank form.
-       */
-      if (context.triage) {
-        const viewer = viewerFor(c.env.DB, user?.id ?? null, loc);
-        const turn = await handleTurn(c.env.DB, viewer, { chip: { step: 'talk' }, context }, CARD_RENDERER);
-        if (turn) {
-          const drafted = { ...(turn.reply as AssistReply), context: turn.context } as AssistantReply;
-          return c.json({ success: true, reply: withFollowups(drafted, loc) });
-        }
-      }
+    case 'human_handoff':
+      // Mid-triage, the prefilled draft above has already answered.
       reply = handleHandoff(intent, loc);
       break;
-    }
     case 'greeting':
       reply = { intent, text: tr(loc, 'greeting_reply'), choices: menuChoices(loc) };
       break;
@@ -2857,7 +2941,8 @@ supportRoutes.post('/tickets', requireAuth, async (c) => {
     : newId('tkt');
   const firstMessageId = idempotencyKey ? `tkm_${(await sha256Hex(`${ticketId}\nfirst`)).slice(0, 20)}` : newId('tkm');
   const now = new Date().toISOString();
-  const linked = attachmentInsert(c.env.DB, ticketId, user.id, attachments);
+  // Linked only onto the ticket THIS request writes (`now` is its created_at): a replay adds nothing.
+  const linked = attachmentInsert(c.env.DB, ticketId, user.id, attachments, now);
   const [written] = await c.env.DB.batch([
     handoff
       ? c.env.DB.prepare(

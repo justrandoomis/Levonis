@@ -35,6 +35,22 @@ export const FILLERS: readonly string[] = [
   'مالتي', 'مالي', 'مالته', 'مالها', 'بيها', 'بيه', 'فيها', 'دا', 'طابعتي',
   // «بكم الطابعة نفسها» (the printer itself), «نرخی پرینتەرەکە چەندە» (how much is the printer).
   'نفسها', 'نفسه', 'itself', 'چەندە', 'خۆی',
+  // «نوزل اشتريته تو»: Iraqi «تو» / «توه» is "just now", and the purchase and the
+  // delivery are the story, not the product («وصلني», «وصلتني» it reached me).
+  'تو', 'توه', 'توا', 'اشتريت', 'اشتريته', 'اشتريتها', 'شريت', 'شريته', 'شريتها', 'وصلني', 'وصلتني', 'وصلتلي', 'وصلت',
+  // «اي» / «ايه» ("yes", or "which"), «الها» / «اله» ("for it").
+  'اي', 'ايه', 'الها', 'اله',
+];
+
+/**
+ * A PURCHASE IN THE PAST is the story of a fault («اشتريت طابعة من عندكم وصار
+ * بيها انسداد», I bought a printer from you and it clogged), never a question
+ * about buying: these never count as the shopping cue. «من عندكم» is "from
+ * you"; «عندكم» alone («عندكم نوزل؟») still asks.
+ */
+export const PAST_PURCHASE: readonly string[] = [
+  'اشتريت', 'اشتريته', 'اشتريتها', 'اشتريتهم', 'اشترينا', 'اشتريناها', 'شريت', 'شريته', 'شريتها', 'شرينا',
+  'من عندكم', 'من عدكم', 'منكم', 'bought', 'purchased', 'کڕیم', 'کڕیمە', 'لە ئێوە',
 ];
 
 /**
@@ -121,8 +137,9 @@ export const PART_LEXICON: Record<PartKey, LexEntry> = {
     stems: ['نوزل', 'نوزلات', 'فوهه', 'فوهات', 'هوتند', 'هوتاند', 'nozzle', 'nozzles', 'hotend', 'hotends', 'نۆزڵ', 'نۆزل'],
   },
   plate: {
-    phrases: ['لوح طباعه', 'لوح الطباعه', 'سطح الطباعه', 'build plate', 'پلەیتی چاپ'],
-    stems: ['بليت', 'بليتات', 'صفيحه', 'plate', 'plates', 'pei', 'پلەیت'],
+    phrases: ['لوح طباعه', 'لوح الطباعه', 'سطح الطباعه', 'build plate', 'پلەیتی چاپ', 'پلێتی چاپ'],
+    // «پلێت» is the commoner Sorani spelling of the same loanword.
+    stems: ['بليت', 'بليتات', 'صفيحه', 'plate', 'plates', 'pei', 'پلەیت', 'پلێت'],
   },
   cleaning: {
     phrases: ['ابره تنظيف', 'ابر تنظيف', 'cleaning needle', 'cleaning kit', 'ئامرازی پاککردنەوە'],
@@ -181,9 +198,10 @@ export const SYMPTOM_LEXICON: Record<Exclude<SymptomKey, 'other'>, LexEntry> = {
       'فلامنت ما يطلع', 'فلامنت ما ينزل', 'فلامنت ما يخرج', 'خيط ما يطلع', 'خيط ما ينزل', 'ما يطلع من النوزل', 'ما ينزل من النوزل',
       'ما يطلع شي من النوزل', 'ما يطلع من الفوهه', 'نوزل مسكر', 'نوزل مسكور', 'نوزل معلك', 'نوزل عالق', 'فلامنت معلك', 'فلامنت عالق',
       'خيط معلك', 'nozzle blocked', 'nozzle is blocked', 'nothing comes out', 'filament not coming out', 'filament stuck',
-      'فیلامێنت نایەتە دەرەوە', 'نۆزڵ داخراوە',
+      'فیلامێنت نایەتە دەرەوە', 'نۆزڵ داخراوە', 'کلۆگ بووە', 'کلۆگی کردووە',
     ],
-    stems: ['كلوب', 'كلوك', 'انسداد', 'مسدود', 'clog', 'clogged', 'jam', 'jammed', 'گیراوە', 'گیراوه'],
+    // «کلۆگ» is the Sorani loanword, as «كلوب» is the Iraqi one.
+    stems: ['كلوب', 'كلوك', 'انسداد', 'مسدود', 'clog', 'clogged', 'jam', 'jammed', 'گیراوە', 'گیراوه', 'کلۆگ'],
   },
   adhesion: {
     phrases: [

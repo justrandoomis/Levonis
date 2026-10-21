@@ -26,13 +26,14 @@ import { SHOWN_MAX, SIZE_SHAPE } from './context';
 import { buildTicketDraft, shownStepKeys } from './handoff';
 import { callTool } from './registry';
 import { tr } from './strings';
-import { FITS_MAX, type CatalogItem } from './tools/catalog';
+import { FITS_MAX, SEARCH_LIMIT_MAX, type CatalogItem } from './tools/catalog';
 import type { MyPrinter } from './tools/devices';
 import { nextTriage, type TriageInput, type TriageStep } from './triage/flow';
 import { SYMPTOMS, symptomDef, wikiFor } from './triage/symptoms';
 import type { AssistCard, AssistChoice, AssistReply, CardRenderer, ModelToken, PartKey, Viewer } from './types';
 import { MODEL_TOKENS, PART_KEYS, SYMPTOM_KEYS, type SymptomKey } from './types';
 import { mentionsModel, understand, type Understood } from './understand';
+import { MODEL_NAME_WORDS } from './understand/models';
 import { PART_FIX_TERMS, PART_LABELS, PART_SYMPTOM, PART_TERMS } from './understand/lexicon';
 
 export interface TurnInput {
@@ -75,6 +76,7 @@ const FOLLOWUP_HINTS = new Set(['price_question', 'stock_question']);
  */
 function dropPendingQuestion(ctx: AssistContext): void {
   if (ctx.triage && (ctx.triage.stage === 'printer' || ctx.triage.stage === 'symptom')) delete ctx.triage;
+  delete ctx.asking;
 }
 
 /** The context without the printer: a printer named and not read must not be answered for by the remembered one. */
@@ -195,7 +197,11 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
       return products(db, viewer, answer, ctx, render, hint);
     }
     // «طابعة أخرى», «كريالتي»: the part, for a printer the shop does not list.
-    if (u.otherPrinter && bare && !ctx.printer) return products(db, viewer, answer, ctx, render, hint, { anyPrinter: true });
+    // Only as the answer to «لأي طابعة؟», or when a printer is named: after an
+    // ordinary part search a bare «اكو غيرها؟» is "any others?", never a printer.
+    if (u.otherPrinter && bare && !ctx.printer && (ctx.asking === 'part_printer' || u.printerCue || u.otherBrand)) {
+      return products(db, viewer, answer, ctx, render, hint, { anyPrinter: true });
+    }
   }
   // «شكد سعر الطابعة», "how much is the printer?" while the conversation is
   // about the A1: the A1 itself, as the storefront cards it. With no printer
@@ -265,6 +271,7 @@ async function printerItself(
   const cards = items.slice(0, CARDS_MAX).map((i) => render.card(loc, i.card, i.row));
   const next: AssistContext = { ...ctx, shown: items.slice(0, SHOWN_MAX).map((i) => i.id) };
   dropPendingQuestion(next);
+  delete next.size;
   return { reply: { intent: hint, text: tr(loc, 'printer_itself', { printer: model }), cards }, context: next };
 }
 
@@ -284,7 +291,10 @@ async function shownAgain(
   const items = r.ok ? r.data : [];
   const cards = items.slice(0, CARDS_MAX).map((i) => render.card(loc, i.card, i.row));
   const text = cards.length === 0 ? tr(loc, 'shown_gone') : tr(loc, wanted.length === 1 ? 'shown_one' : 'shown_again');
-  return { reply: { intent: hint, text, ...(cards.length ? { cards } : {}) }, context: ctx };
+  const next: AssistContext = { ...ctx };
+  delete next.asking;
+  delete next.size;
+  return { reply: { intent: hint, text, ...(cards.length ? { cards } : {}) }, context: next };
 }
 
 // ═════════════════════════════════════════════════════════════ chips
@@ -367,9 +377,23 @@ async function runTriage(db: D1Database, viewer: Viewer, ctx: AssistContext, inp
     const own = mine.find((p) => p.unit_id === input.unit_id && p.model === input.model);
     checked = own ? input : { kind: 'printer', model: input.model, ...(input.symptom ? { symptom: input.symptom } : {}) };
   }
+  // «مشكلة بالنوزل بطابعة X1» where the shop lists one printer of the series
+  // (and the customer owns no other of it): that printer, not a question with
+  // one chip in it. The A2 series is read the same way, as the A2L.
+  if (input.kind === 'start' && !input.model && input.among?.length && !ctx.printer) {
+    const [mine, listed] = await Promise.all([myPrinters(db, viewer), printerModelsSafe(db, viewer)]);
+    const among = input.among;
+    const candidates = [...new Set([...among.filter((m) => listed.has(m)), ...mine.map((p) => p.model).filter((m) => among.includes(m))])];
+    if (candidates.length === 1) {
+      const only: TriageInput = { ...input, model: candidates[0] };
+      delete only.among;
+      checked = only;
+    }
+  }
   const { step, context } = nextTriage(ctx, checked);
   // A printer fault is not the answer to «which printer is the nozzle for?»: that size waits no longer.
   delete context.size;
+  delete context.asking;
   const reply = await replyFor(db, viewer, step, context, render);
   // The parts a step answer showed are what the team sees as «products shown».
   if (step.kind === 'steps') {
@@ -411,7 +435,7 @@ async function replyFor(db: D1Database, viewer: Viewer, step: TriageStep, ctx: A
       if (step.code) text = `${text} ${tr(loc, 'hms_code_noted', { code: step.code })}`;
       const keys = new Set(shownStepKeys(step.symptom, step.code));
       const steps = def.steps.filter((s) => keys.has(s.key)).map((s) => ({ key: s.key, text: s.text[loc], ...(s.safety ? { safety: s.safety } : {}) }));
-      const cards = def.fix && step.model !== 'other' ? await fixCards(db, viewer, step.model, def.fix, render) : [];
+      const cards = def.fix && step.model !== 'other' ? await fixCards(db, viewer, step.model, def.fix, render, SYMPTOM_HEAD[step.symptom]) : [];
       const wiki = wikiFor(def, step.model);
       return {
         intent: 'printer_problem',
@@ -499,10 +523,70 @@ async function fixCards(
   viewer: Viewer,
   model: ModelToken,
   fix: { terms: string; category?: 'cat_maint' },
-  render: CardRenderer
+  render: CardRenderer,
+  head?: Head
 ): Promise<AssistCard[]> {
-  const found = await forPrinters(db, viewer, [model], fix.terms, fix.category);
+  const found = await forPrinters(db, viewer, [model], fix.terms, fix.category, head);
   return found.items.slice(0, CARDS_MAX).map((i) => render.card(viewer.locale, i.card, i.row));
+}
+
+/**
+ * THE PART ITSELF FIRST. «نوزل مال اي ون» listed the A1 hotend sixth, after a
+ * sponge, a sock and a fan, and the clog steps («استبدل الهوت إند، القطع
+ * المناسبة أدناه») showed six cleaning items and no hotend at all: the search
+ * ranks every word of «hotend nozzle cleaning needle» alike. A product whose
+ * own name is the part comes first, and when none made the page, the part is
+ * asked for alone, under the same printer link, and put first.
+ */
+interface Head {
+  /** The catalogue word for the part, searched alone. */
+  term: string;
+  /**
+   * The part as the HEAD of a product's own (source) name: the last word, or
+   * followed only by a size, a dash or «Kit» («Bambu Hotend - A1/A2», «E3D …
+   * Hotend», «Hardened Steel Nozzle 0.4mm»), never by what it is a part of
+   * («Hotend Cooling Fan», «Nozzle Wiper», «Induction Hotend Rack Frame»).
+   */
+  name: RegExp;
+  /** The part named as what an accessory is FOR: «Cooling Fan for Hotend - A2L», «Silicone Sock for Hotend». */
+  accessory: RegExp;
+}
+const HOTEND_HEAD: Head = {
+  term: 'hotend',
+  name: /\b(?:hot\s?ends?|nozzles?)(?=\s*(?:$|[-\u2013\u2014(|/,:]|\d|kits?\b|sets?\b))/i,
+  accessory: /\b(?:for|of|with|to)\b[^-\u2013\u2014(|/]*\b(?:hot\s?ends?|nozzles?)\b/i,
+};
+const PART_HEAD: Readonly<Partial<Record<PartKey, Head>>> = { nozzle_hotend: HOTEND_HEAD };
+const SYMPTOM_HEAD: Readonly<Partial<Record<SymptomKey, Head>>> = { clog: HOTEND_HEAD };
+
+/** `items` with the products named as the part first; failing one, the part searched alone, first. */
+async function headFirst(
+  db: D1Database,
+  viewer: Viewer,
+  items: CatalogItem[],
+  head: Head,
+  scope: { fits: string[]; category?: 'cat_maint' }
+): Promise<CatalogItem[]> {
+  const isHead = (i: CatalogItem) => {
+    const name = String(i.row.name ?? i.card.name ?? '');
+    return head.name.test(name) && !head.accessory.test(name);
+  };
+  const heads = items.filter(isHead);
+  if (heads.length) return [...heads, ...items.filter((i) => !isHead(i))];
+  // The accessories named after the part («Hotend Cooling Fan») rank with it: a full page, then the part itself.
+  const text = head.term;
+  const r = await callTool('catalog.search', db, viewer, { text, fits: scope.fits, ...(scope.category ? { category: scope.category } : {}), limit: SEARCH_LIMIT_MAX });
+  const found = r.ok ? r.data.items.filter((i) => isHead(i) && !items.some((x) => x.id === i.id)).slice(0, 2) : [];
+  return found.length ? [...found, ...items].slice(0, CARDS_MAX) : items;
+}
+
+/**
+ * The words a product's name carries for a printer: «p1p», «p1». The by-name
+ * fallback adds them to its query, so «Bambu Hotend - P1 Series» is among
+ * the eight a general search returns for «نوزل P1P», not crowded out by them.
+ */
+function nameWords(models: readonly ModelToken[]): string {
+  return [...new Set(models.flatMap((m) => MODEL_NAME_WORDS[m].filter((g) => g.length === 1).map((g) => g[0])))].join(' ');
 }
 
 interface PrinterSearch {
@@ -522,7 +606,8 @@ async function forPrinters(
   viewer: Viewer,
   models: readonly ModelToken[],
   text: string,
-  category?: 'cat_maint'
+  category?: 'cat_maint',
+  head?: Head
 ): Promise<PrinterSearch> {
   const listed = await printerModelsSafe(db, viewer);
   const sold = models.filter((m) => listed.has(m));
@@ -538,16 +623,24 @@ async function forPrinters(
   if (slugs.length) {
     for (const scope of scopes) {
       const r = await callTool('catalog.search', db, viewer, { text, fits: slugs, ...(scope ? { category: scope } : {}), limit: CARDS_MAX });
-      if (r.ok && r.data.items.length) return { items: r.data.items, mode: 'linked', exactMiss: r.data.exactMiss, label };
+      if (r.ok && r.data.items.length) {
+        const items = head ? await headFirst(db, viewer, r.data.items, head, { fits: slugs, ...(scope ? { category: scope } : {}) }) : r.data.items;
+        return { items, mode: 'linked', exactMiss: r.data.exactMiss, label };
+      }
       if (r.ok) exactMiss = r.data.exactMiss;
     }
   }
-  for (const scope of scopes) {
-    const r = await callTool('catalog.search', db, viewer, { text, ...(scope ? { category: scope } : {}), limit: 8 });
-    if (!r.ok) continue;
-    exactMiss = r.data.exactMiss;
-    const named = r.data.items.filter((i) => models.some((m) => mentionsModel(namedText(i.row), m)));
-    if (named.length) return { items: named, mode: 'named', exactMiss, label };
+  // No link: the products that NAME one of the printers. Asked twice at most:
+  // as typed, then with the printer's own name words added («p1p p1»).
+  const queries = [text, `${text} ${nameWords(models)}`.trim().slice(0, 99)].filter((q, i, all) => q && all.indexOf(q) === i);
+  for (const words of queries) {
+    for (const scope of scopes) {
+      const r = await callTool('catalog.search', db, viewer, { text: words, ...(scope ? { category: scope } : {}), limit: 8 });
+      if (!r.ok) continue;
+      if (words === text) exactMiss = r.data.exactMiss;
+      const named = r.data.items.filter((i) => models.some((m) => mentionsModel(namedText(i.row), m)));
+      if (named.length) return { items: named, mode: 'named', exactMiss, label };
+    }
   }
   return { items: [], mode: 'none', exactMiss, label };
 }
@@ -571,9 +664,17 @@ async function products(
   // only, and never when this sentence named a printer that could not be read
   // («نوزل مال زد ون»): that is asked, not guessed. A family named («X1») is
   // all of its printers; «another printer» is none of the shop's.
-  const model: ModelToken | undefined = u.model ?? (u.part && !u.printerUnread && !u.family && !opts.anyPrinter ? remembered : undefined);
+  let model: ModelToken | undefined = u.model ?? (u.part && !u.printerUnread && !u.family && !opts.anyPrinter ? remembered : undefined);
   if (!model && u.part && u.printerUnread && !u.otherBrand && !opts.anyPrinter) return askPartPrinter(db, viewer, u, u.part, ctx);
-  const printers: readonly ModelToken[] = model ? [model] : (u.family?.members ?? []);
+  /**
+   * «اكو نوزل E3D؟» after the A1 parts: words that name a product line of
+   * their own (every word reaches a product, the strong lookup) decide before
+   * the remembered printer does. Those products linked to the printer come
+   * first; none linked, the question is asked as if cold. The printer stays
+   * remembered for the next question.
+   */
+  const lineIds = model && !u.model && u.residual.length ? await strongIds(db, viewer, u.residual.join(' ')) : new Set<string>();
+  let printers: readonly ModelToken[] = model ? [model] : (u.family?.members ?? []);
   const fault = !!u.part && u.problemCue;
   const category = fault || u.maintenance ? ('cat_maint' as const) : undefined;
   const terms = u.part ? (fault ? PART_FIX_TERMS[u.part] : PART_TERMS[u.part]) : '';
@@ -589,8 +690,20 @@ async function products(
   let mode: PrinterSearch['mode'] | 'plain' = 'none';
   let exactMiss: string[] = [];
   let label = '';
-  if (printers.length) {
-    const found = await forPrinters(db, viewer, printers, words, category);
+  // The part itself first, when the question names nothing more particular
+  // (no other word, and no size: «0.2» already narrows the answer to the parts that have it).
+  const head = u.part && u.residual.length === 0 && u.measures.length === 0 && !fault ? PART_HEAD[u.part] : undefined;
+  let found = printers.length ? await forPrinters(db, viewer, printers, words, category, head) : null;
+  if (found && lineIds.size) {
+    const line = found.items.filter((i) => lineIds.has(i.id));
+    if (line.length) found = { ...found, items: [...line, ...found.items.filter((i) => !lineIds.has(i.id))] };
+    else {
+      found = null;
+      model = undefined;
+      printers = [];
+    }
+  }
+  if (found) {
     items = found.items;
     mode = found.mode;
     exactMiss = found.exactMiss;
@@ -602,7 +715,7 @@ async function products(
       if (!r.ok) continue;
       exactMiss = r.data.exactMiss;
       if (r.data.items.length) {
-        items = r.data.items;
+        items = head ? await headFirst(db, viewer, r.data.items, head, { fits: [], ...(scope ? { category: scope } : {}) }) : r.data.items;
         mode = 'plain';
         break;
       }
@@ -647,6 +760,16 @@ async function products(
   return { reply, context: next };
 }
 
+/** The products every one of these words reaches (the strong lookup); none on any failure. */
+async function strongIds(db: D1Database, viewer: Viewer, words: string): Promise<Set<string>> {
+  try {
+    const r = await callTool('catalog.search', db, viewer, { text: words, limit: 8, strong: true });
+    return new Set(r.ok ? r.data.items.map((i) => i.id) : []);
+  } catch {
+    return new Set();
+  }
+}
+
 /**
  * «لأي طابعة تريد النوزل؟» — a part question whose printer was named and not
  * read. The chips are the printers the shop lists and «طابعة أخرى»; each
@@ -665,5 +788,7 @@ async function askPartPrinter(db: D1Database, viewer: Viewer, u: Understood, par
   const next: AssistContext = { ...withoutPrinter(ctx), part, ...carried };
   if (!size) delete next.size;
   dropPendingQuestion(next);
+  // The question is now pending: a typed «طابعة أخرى» answers it (handleTurn).
+  next.asking = 'part_printer';
   return { reply: { intent: 'product_search', text: tr(loc, 'part_printer_which', { part: PART_LABELS[part][loc] }), choices }, context: next };
 }

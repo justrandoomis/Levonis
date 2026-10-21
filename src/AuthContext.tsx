@@ -3,6 +3,7 @@ import { api, ApiError, ApiUser, clearApiSessionRequests } from './lib/api';
 import { clearPageCache } from './lib/pageCache';
 import { AUTH_ME_PATH, clearPrimedRequests, takePrimedJson } from './lib/bootFetch';
 import { privateDrafts, purgeLegacyPrivateDrafts } from './lib/privateDrafts';
+import { adoptAssistOwner } from './lib/assistSession';
 import { createSessionAdopter, type SessionAdoption } from './lib/sessionCheck';
 
 export type { SessionAdoption };
@@ -48,6 +49,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionScope.current = scope;
       clearPageCache();
       privateDrafts.clear();
+      // The conversation with the support assistant belongs to this identity: another one never inherits it.
+      adoptAssistOwner(next ? next.id : null);
     }
     // Invalidate before rendering the new account; a parent effect runs after
     // child effects and would let their first reads join the old request.

@@ -63,8 +63,19 @@ async function shop(): Promise<DatabaseSync> {
     add(id, slug, name, nameAr, 1_000_000, 'cat_printers_fdm');
     raw.prepare('INSERT OR IGNORE INTO product_catalogs (product_id, catalog_id, position) VALUES (?, ?, ?)').run(id, 'cat_printers_fdm', 100 + position);
   });
-  add('h_a1', 'bambu-hotend-a1-a2', 'Bambu Hotend - A1/A2', 'هوت إند بامبو - A1/A2', 45_000, 'cat_maint_hotend',
-    sizes(['0.2mm', '0.4mm', '0.6mm', '0.8mm', 'A1', 'A1 mini', 'A2L']));
+  const hotendSizes = ['0.2mm', '0.4mm', '0.6mm', '0.8mm', 'A1', 'A1 mini', 'A2L'];
+  add('h_a1', 'bambu-hotend-a1-a2', 'Bambu Hotend - A1/A2', 'هوت إند بامبو - A1/A2', 45_000, 'cat_maint_hotend', sizes(hotendSizes));
+  // Its sizes as relational option rows too, so the real V2 writer publishes it and the grid
+  // prices it («يبدأ من» 45,000): the parity checks below compare figures, never null to null.
+  raw.prepare(`INSERT INTO product_option_groups (id,product_id,name_en,sort,active) VALUES ('g_h_a1','h_a1','Size',0,1)`).run();
+  hotendSizes.forEach((n, i) =>
+    raw
+      .prepare(
+        `INSERT INTO product_option_values (id,product_id,group_id,name_en,name_ar,sort,active,stock,regular_price_iqd)
+         VALUES (?,?,?,?,?,?,1,3,?)`
+      )
+      .run(`ov_${i}`, 'h_a1', 'g_h_a1', n, n, i, i === 0 ? 45_000 : 50_000)
+  );
   add('h_x1', 'bambu-hotend-x1-p1', 'Bambu Hotend - X1/P1', 'هوت إند بامبو - X1/P1', 60_000, 'cat_maint_hotend', sizes(['0.2mm', '0.4mm']));
   add('n_needle', 'nozzle-cleaning-needle', 'Nozzle Cleaning Needle', 'إبرة تنظيف النوزل', 5_000, 'cat_maint_spare');
   add('pl_pei', 'textured-pei-plate', 'Textured PEI Plate', 'بليت PEI محبب', 30_000, 'cat_maint_plate');
@@ -139,7 +150,10 @@ test('1. «نوزل مال اي ون اريده 0.2»: the A1 hotend with a 0.2,
     assert.match(reply.text, /0\.2/);
     assert.equal(reply.context.printer.model, 'A1');
     const card = (reply.cards as Rec[]).find((c) => c.product_id === 'h_a1')!;
-    assert.equal(card.price_iqd, await gridPrice(db, user, 'h_a1'), 'the assistant quotes the grid’s own figure');
+    const grid = await gridPrice(db, user, 'h_a1');
+    assert.equal(grid, 45_000, 'the grid prices the hotend: the parity below compares figures, not null to null');
+    assert.equal(card.price_iqd, grid, 'the assistant quotes the grid’s own figure');
+    assert.equal(card.price_from, true, '«يبدأ من», as the grid');
   }
   assert.deepEqual(violations, []);
 });
@@ -622,13 +636,15 @@ test('round 1: E3D, «ثري دي» and Iraqi «تو» are not printer names; a 
   const a2 = await ask(db, null, { text: 'نوزل A2' });
   assert.equal(a2.context.printer.model, 'A2L');
   assert.ok(ids(a2).includes('h_a1') && !ids(a2).includes('h_x1'), JSON.stringify(ids(a2)));
-  // A series named in a fault offers its printers only, and «another printer».
+  // A series named in a fault, where the shop lists ONE printer of it, is that printer
+  // (round 2): never a question with a single chip in it.
   const x1 = await ask(db, null, { text: 'طابعة X1 بيها مشكلة' });
   assert.equal(x1.intent, 'printer_problem');
-  assert.deepEqual((x1.choices as Rec[]).map((c) => c.params?.model), ['X1C', 'other']);
+  assert.equal(x1.context.printer.model, 'X1C');
+  assert.equal(x1.context.triage.stage, 'symptom');
   const atPrinter = await ask(db, null, { text: 'P1', context: (await ask(db, null, { text: 'كلوب' })).context });
-  assert.deepEqual((atPrinter.choices as Rec[]).map((c) => c.params?.model), ['P1S', 'other']);
-  assert.equal(atPrinter.context.triage.symptom, 'clog', 'the clog is still held');
+  assert.equal(atPrinter.context.printer.model, 'P1S');
+  assert.deepEqual(atPrinter.context.triage, { stage: 'steps', symptom: 'clog' }, 'the clog is still held');
 });
 
 test('round 1: «which printer is the nozzle for?» keeps «another printer», in three languages, and the size', async () => {
@@ -714,5 +730,218 @@ test('round 1: Sorani spoken printer names, each a printer of the registry', asy
   assert.equal(fault.intent, 'printer_problem');
   assert.equal(fault.context.printer.model, 'A1');
   assert.equal(fault.context.triage.stage, 'symptom');
+  assert.deepEqual(violations, []);
+});
+
+// ════════════════════════════════════════ review, round 2
+
+/**
+ * The round-1 shop, plus what the round-2 sentences are about: a refurbished A1
+ * listed with the printers (its name sorts before «Bambu …»), the A1's
+ * accessories that a «hotend nozzle» search ranks with the hotend itself, a
+ * plate bundle named «Combo», and the decoys of the price and stock words.
+ */
+async function shopRound2(): Promise<DatabaseSync> {
+  const raw = await shopPlus();
+  const add = (id: string, slug: string, name: string, nameAr: string, category: string, price = 70_000) =>
+    raw
+      .prepare(
+        `INSERT INTO products (id,slug,name,name_ar,name_ku,price_iqd,status,stock,options,colors,selling_type,sale_types,
+           preorder_transports,images,inventory_mode,ops_policy,category_id)
+         VALUES (?,?,?,?,'',?,'active',5,'[]','[]','direct_sale','["direct_sale"]','[]','[]','BASE','{}',?)`
+      )
+      .run(id, slug, name, nameAr, price, category);
+  const fit = (part: string, printer: string, position = 0) =>
+    raw.prepare('INSERT INTO product_printer_fits (product_id, printer_id, position) VALUES (?, ?, ?)').run(part, printer, position);
+  add('p_a1r', 'refurbished-bambu-lab-a1', '[Refurbished] Bambu Lab A1 3D Printer', 'طابعة بامبو لاب A1 مجددة', 'cat_printers_fdm', 800_000);
+  raw.prepare('INSERT OR IGNORE INTO product_catalogs (product_id, catalog_id, position) VALUES (?, ?, ?)').run('p_a1r', 'cat_printers_fdm', 99);
+  add('glue', 'glue-stick', 'Glue Stick', 'صمغ لاصق', 'cat_maint_spare');
+  // A name that carries «رد»: what «ماكو رد؟» ("no reply?") reached once «ماكو» was out.
+  add('reply_card', 'reply-card', 'Reply Card', 'بطاقة رد', 'cat_maint_spare');
+  add('petg', 'petg-hf', 'PETG HF', 'فلامنت PETG HF', 'cat_materials');
+  add('bush', 'oil-impregnated-bronze-bushings', 'Oil Impregnated Bronze Bushings', 'جلب برونز', 'cat_maint_spare');
+  add('plate_combo', 'build-plate-combo', 'Build Plate Combo', 'كومبو ألواح الطباعة', 'cat_maint_plate');
+  fit('plate_combo', 'p_a1', 2);
+  for (const [id, name] of [
+    ['a_sponge', 'Nozzle Cleaning Sponge'],
+    ['a_wipes', 'Nozzle Cleaning Wipes'],
+    ['a_sock', 'Silicone Sock for Hotend - A1'],
+    ['a_fan', 'Hotend Cooling Fan - A1 Series'],
+    ['a_wiper', 'Heatbed Nozzle Wiper - A1/A2L'],
+    ['a_heat', 'Hotend Heating Assembly - A1 Series'],
+    ['a_therm', 'Hotend Thermistor - A1 Series'],
+    ['a_needle', 'Nozzle Cleaning Needle Kit - A1'],
+  ] as const) {
+    add(id, id.replace('_', '-'), name, name, 'cat_maint_spare', 15_000);
+    fit(id, 'p_a1', 3);
+  }
+  const run = await backfillSearchIndex(asD1(raw), { limit: 50 });
+  assert.deepEqual(run.failed, []);
+  return raw;
+}
+
+const HOTENDS = new Set(['h_a1', 'h_x1', 'h_e3d']);
+
+test('round 2: «اي تو» is "yes, just now": no A2L in the triage, the parts or the context', async () => {
+  const db = limitD1(await shopRound2());
+  const fault = await ask(db, null, { text: 'اي تو وصلتني الطابعة وبيها مشكلة' });
+  assert.equal(fault.intent, 'printer_problem');
+  assert.equal(fault.context.printer, undefined, JSON.stringify(fault.context));
+  assert.equal(fault.context.triage.stage, 'printer', 'which printer? is asked');
+  assert.doesNotMatch(String(fault.text), /A2L/);
+  const parts = await ask(db, null, { text: 'اي تو اشتريت نوزل' });
+  assert.doesNotMatch(String(parts.text), /A2L/);
+  assert.equal(parts.context.printer, undefined);
+});
+
+test('round 2: «اكو غيرها؟» after an ordinary part search is not «another printer»; the fault after it still asks which printer', async () => {
+  const db = limitD1(await shopRound2());
+  for (const [locale, part, more, fault] of [
+    ['ar', 'نوزل', 'اكو غيرها؟', 'النوزل مسدود'],
+    ['en', 'nozzle', 'any other?', 'my nozzle is clogged'],
+  ] as const) {
+    const first = await ask(db, null, { text: part, locale });
+    const second = await ask(db, null, { text: more, locale, context: first.context });
+    assert.equal(second.context?.printer, undefined, `${locale}: ${JSON.stringify(second.context)}`);
+    assert.doesNotMatch(String(second.text), /تأكد في صفحة كل منتج|check each product page/i, locale);
+    const third = await ask(db, null, { text: fault, locale, context: second.context ?? first.context });
+    assert.equal(third.intent, 'printer_problem', locale);
+    assert.equal(third.context.triage.stage, 'printer', `${locale}: which printer? is asked, not steps for «another printer»`);
+  }
+  // While «لأي طابعة تريد النوزل؟» waits, the same words ARE its answer.
+  const asked = await ask(db, null, { text: 'نوزل مال زد ون' });
+  assert.equal(asked.context.asking, 'part_printer');
+  const other = await ask(db, null, { text: 'غيرها', context: asked.context });
+  assert.equal(other.context.printer.model, 'other');
+  assert.equal(other.context.asking, undefined, 'answered, the question is no longer pending');
+});
+
+test('round 2: the strong lookup is a price or stock question only when a price or stock word was in it; «ماكو رد؟» is small talk', async () => {
+  const db = limitD1(await shopRound2());
+  for (const locale of ['ar', 'en'] as const) {
+    const glue = await ask(db, null, { text: 'glue stick', locale });
+    assert.equal(ids(glue)[0], 'glue', locale);
+    assert.equal(glue.intent, 'product_search', `${locale}: «stick» is not «stock»`);
+  }
+  assert.equal((await ask(db, null, { text: 'glue stick متوفر؟' })).intent, 'stock_question');
+  for (const text of ['ماكو رد', 'ماكو رد؟']) {
+    const reply = await ask(db, null, { text });
+    assert.equal(reply.intent, 'clarify', text);
+    assert.equal(reply.cards, undefined, text);
+  }
+});
+
+test('round 2: the part itself first, the leftover story words never searched, and «كومبو» is the printer name', async () => {
+  const db = limitD1(await shopRound2());
+  const a1 = await ask(db, null, { text: 'نوزل مال اي ون' });
+  assert.equal(ids(a1)[0], 'h_a1', `the A1 hotend before its sponge and its fan: ${JSON.stringify(ids(a1))}`);
+  const combo = await ask(db, null, { text: 'نوزل مال اي ون كومبو' });
+  assert.equal(ids(combo)[0], 'h_a1', JSON.stringify(ids(combo)));
+  assert.ok(!ids(combo).includes('plate_combo'), 'a plate bundle is not a nozzle answer');
+  const story = await ask(db, null, { text: 'نوزل اشتريته تو' });
+  assert.ok(HOTENDS.has(ids(story)[0]), `a hotend first: ${JSON.stringify(ids(story))}`);
+  // The clog steps («استبدل الهوت إند، القطع المناسبة أدناه») show the hotend.
+  const clog = await ask(db, null, { text: 'A1', context: (await ask(db, null, { text: 'كلوب' })).context });
+  assert.equal(clog.context.triage.stage, 'steps');
+  assert.equal(ids(clog)[0], 'h_a1', JSON.stringify(ids(clog)));
+  // No catalogue link to the P1P: the P1 Series hotend names it, beyond the first page of a general search.
+  const p1p = await ask(db, null, { text: 'نوزل P1P' });
+  assert.ok(ids(p1p).includes('h_x1'), `${p1p.text} ${JSON.stringify(ids(p1p))}`);
+  assert.match(String(p1p.text), /تذكر P1P/);
+});
+
+test('round 2: the printer itself, new before refurbished, and after an ordinary product search too', async () => {
+  const db = limitD1(await shopRound2());
+  const parts = await ask(db, null, { text: 'نوزل مال اي ون' });
+  const printer = await ask(db, null, { text: 'شكد سعر الطابعة', context: parts.context });
+  assert.deepEqual(ids(printer), ['p_a1', 'p_a1c', 'p_a1r'], 'the refurbished A1 after the new ones');
+  // An ordinary (legacy) product search: «A1 combo», «P1S», «طابعة A1».
+  const combo = await ask(db, null, { text: 'A1 combo' });
+  assert.equal(combo.context.printer.model, 'A1', JSON.stringify(combo.context));
+  const price = await ask(db, null, { text: 'شكد سعر الطابعة؟', context: combo.context });
+  assert.deepEqual(ids(price), ['p_a1', 'p_a1c', 'p_a1r'], JSON.stringify(ids(price)));
+  const p1s = await ask(db, null, { text: 'P1S' });
+  const stock = await ask(db, null, { text: 'الطابعة متوفرة؟', context: p1s.context });
+  assert.deepEqual(ids(stock), ['p_p1s'], JSON.stringify(ids(stock)));
+  const named = await ask(db, null, { text: 'طابعة A1' });
+  const again = await ask(db, null, { text: 'شكد سعرها؟', context: named.context });
+  assert.deepEqual(ids(again), ids(named), 'the products just shown, read again');
+  assert.equal(again.intent, 'price_question');
+});
+
+test('round 2: «p1-s», «x1-c», «E3D» after the A1, Sorani «پلێت» and «ئەی وەنەکەم», two series at once', async () => {
+  const db = limitD1(await shopRound2());
+  const hyphen = await ask(db, null, { text: 'nozzle for p1-s', locale: 'en' });
+  assert.equal(hyphen.context.printer.model, 'P1S');
+  assert.ok(ids(hyphen).includes('h_x1') && !ids(hyphen).includes('h_a1'), JSON.stringify(ids(hyphen)));
+  assert.equal((await ask(db, null, { text: 'nozzle for x1-c', locale: 'en' })).context.printer.model, 'X1C');
+  // «اكو نوزل E3D؟» right after the A1 parts: the E3D hotend, and the A1 is still remembered.
+  const a1 = await ask(db, null, { text: 'نوزل مال اي ون' });
+  const e3d = await ask(db, null, { text: 'اكو نوزل E3D؟', context: a1.context });
+  assert.equal(ids(e3d)[0], 'h_e3d', JSON.stringify(ids(e3d)));
+  assert.equal(e3d.context.printer.model, 'A1');
+  const plate = await ask(db, null, { text: 'واكو بليت؟', context: e3d.context });
+  assert.ok(ids(plate).includes('pl_pei'), 'the next part question is the A1 again');
+  // Sorani.
+  const ckbPlate = await ask(db, null, { text: 'پلێت بۆ ئێکس وەن کاربۆن', locale: 'ckb' });
+  assert.equal(ckbPlate.context.part, 'plate');
+  assert.equal(ckbPlate.context.printer.model, 'X1C');
+  const mine = await ask(db, null, { text: 'ئەی وەنەکەم کێشەی هەیە', locale: 'ckb' });
+  assert.equal(mine.intent, 'printer_problem');
+  assert.equal(mine.context.printer.model, 'A1');
+  const myNozzle = await ask(db, null, { text: 'نۆزڵ بۆ ئەی وەنەکەم', locale: 'ckb' });
+  assert.equal(ids(myNozzle)[0], 'h_a1');
+  // Two series named: their parts, never «which printer is the nozzle for?».
+  for (const [text, locale] of [['نوزل X1 او P1', 'ar'], ['hotend for X1 and P1', 'en']] as const) {
+    const both = await ask(db, null, { text, locale });
+    assert.ok(ids(both).includes('h_x1'), `${text}: ${both.text} ${JSON.stringify(ids(both))}`);
+    assert.ok(!((both.choices ?? []) as Rec[]).some((c) => c.params?.step === 'part'), `${text}: no printer chips`);
+  }
+});
+
+test('round 2: «نبتون فور» is a printer the shop does not list, never the remembered A1', async () => {
+  const db = limitD1(await shopRound2());
+  const a1 = await ask(db, null, { text: 'نوزل مال اي ون' });
+  for (const text of ['نوزل مال نبتون فور', 'وعندي هم كوبرا تو، اريد نوزل الها']) {
+    const other = await ask(db, null, { text, context: a1.context });
+    assert.doesNotMatch(String(other.text), /A1/, text);
+    assert.ok(!ids(other).includes('pl_pei'), text);
+  }
+  const start = await ask(db, null, { text: 'صارت عندي مشكله بالطابعه' });
+  const answer = await ask(db, null, { text: 'نبتون فور', context: start.context });
+  assert.equal(answer.intent, 'printer_problem');
+  assert.equal(answer.context.printer.model, 'other');
+});
+
+test('round 2: «اشتريت …» opens a fault story, not a shopping list', async () => {
+  const db = limitD1(await shopRound2());
+  const clog = await ask(db, null, { text: 'اشتريت طابعة تو وصار بيها انسداد بالنوزل' });
+  assert.equal(clog.intent, 'printer_problem');
+  assert.deepEqual(clog.context.triage, { stage: 'printer', symptom: 'clog' });
+  const problem = await ask(db, null, { text: 'اشتريت طابعة من عندكم وصارت بيها مشكلة' });
+  assert.equal(problem.intent, 'printer_problem');
+  assert.equal(problem.context.triage.stage, 'printer');
+  const mine = await ask(db, member, { text: 'اشتريت A1 من عدكم والنوزل مسدود' });
+  assert.equal(mine.intent, 'printer_problem');
+  assert.deepEqual(mine.context.triage, { stage: 'steps', symptom: 'clog' });
+  assert.ok((mine.steps as Rec[]).length > 0);
+});
+
+test('round 2: an HMS code in Arabic-Indic digits, Sorani «کلۆگ», and «PETG بيش», «PLA شكد»', async () => {
+  const db = limitD1(await shopRound2());
+  const start = await ask(db, null, { text: 'صارت عندي مشكله بالطابعه' });
+  const which = await ask(db, null, { text: 'P1S', context: start.context });
+  const typed = await ask(db, null, { text: 'رمز خطأ ٠٣٠٠-٠١٠٠-٠٠٠١-٠٠٠٣', context: which.context });
+  assert.deepEqual(typed.context.triage, { stage: 'steps', symptom: 'hms', code: '0300-0100-0001-0003' });
+  assert.ok(!(typed.steps as Rec[]).some((st) => st.key === 'type_code'), 'the code is not asked for again');
+  for (const text of ['کلۆگ', 'نۆزڵەکەم کلۆگ بووە']) {
+    const reply = await ask(db, null, { text, locale: 'ckb' });
+    assert.equal(reply.intent, 'printer_problem', text);
+    assert.equal(reply.context.triage.symptom, 'clog', text);
+  }
+  const petg = await ask(db, null, { text: 'PETG بيش' });
+  assert.ok(ids(petg).includes('petg') && !ids(petg).includes('bush'), JSON.stringify(ids(petg)));
+  const pla = await ask(db, null, { text: 'PLA شكد' });
+  assert.ok(ids(pla).includes('f_pla'), `${pla.text} ${JSON.stringify(ids(pla))}`);
   assert.deepEqual(violations, []);
 });

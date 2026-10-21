@@ -29,7 +29,7 @@ import ChannelNudge from '../components/notify/ChannelNudge';
 import { IconButton } from '../components/ui/Button';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import VariantImg from '../components/ui/VariantImg';
-import { loadAssistContext, loadAssistState, saveAssistContext, saveAssistState } from '../lib/assistSession';
+import { ASSIST_CLEARED_EVENT, loadAssistContext, loadAssistState, saveAssistContext, saveAssistState } from '../lib/assistSession';
 import ChunkBoundary from '../components/ChunkBoundary';
 import type { AssistAttachment } from '../components/support/AssistAttach';
 
@@ -1654,23 +1654,21 @@ export default function Support() {
   // that comes from the server. A conversation already under way is kept on
   // a language change: only a screen that is still just the greeting is
   // greeted again, in the new language.
+  const greeting = (): ChatMsg[] => [
+    {
+      role: 'assistant',
+      text: s.greeting,
+      reply: {
+        intent: 'menu',
+        text: s.greeting,
+        choices: s.menu.map((m) => ({ label: m.label, intent: m.intent })),
+      },
+    },
+  ];
+  const greetingRef = useRef(greeting);
+  greetingRef.current = greeting;
   useEffect(() => {
-    setMessages((prev) =>
-      prev.some((m) => m.role === 'user')
-        ? prev
-        : [
-            {
-              role: 'assistant',
-              text: s.greeting,
-              reply: {
-                intent: 'menu',
-                text: s.greeting,
-                choices: s.menu.map((m) => ({ label: m.label, intent: m.intent })),
-              },
-            },
-          ]
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setMessages((prev) => (prev.some((m) => m.role === 'user') ? prev : greetingRef.current()));
   }, [lang]);
 
   useEffect(() => {
@@ -1696,6 +1694,26 @@ export default function Support() {
   const contextRef = useRef<unknown>(loadAssistContext());
   /** The latest handoff draft, so the ticket form opens filled in. */
   const [draft, setDraft] = useState<TicketPrefill | undefined>(restored.draft);
+
+  /**
+   * ANOTHER IDENTITY, A NEW CONVERSATION. The auth layer drops the stored
+   * conversation when the signed-in user leaves (src/lib/assistSession.ts
+   * `adoptAssistOwner`); a Support page already open resets with it, so the
+   * next account never sees the transcript, draft, files or context of the last one.
+   */
+  useEffect(() => {
+    const reset = () => {
+      pendingRef.current = undefined;
+      contextRef.current = undefined;
+      setDraft(undefined);
+      setAttachments([]);
+      setShowTicketForm(false);
+      setTicketJustOpened(false);
+      setMessages(greetingRef.current());
+    };
+    window.addEventListener(ASSIST_CLEARED_EVENT, reset);
+    return () => window.removeEventListener(ASSIST_CLEARED_EVENT, reset);
+  }, []);
 
   // Kept for the tab, prices stripped (`storedReply`), every write guarded.
   useEffect(() => {

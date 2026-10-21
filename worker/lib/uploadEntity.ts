@@ -9,7 +9,7 @@
  * purpose, the entity id, the file name — decide only WHICH check runs; the
  * check itself reads the database.
  */
-import type { MediaDomain, MediaVisibility } from './mediaStorage';
+import { deleteMediaObject, type MediaDomain, type MediaVisibility } from './mediaStorage';
 import { HttpError, badRequest, forbidden, notFound, str } from './http';
 import { storeForUser } from './merchantAuth';
 import { assertMayWriteInThread } from '../routes/chats';
@@ -26,6 +26,41 @@ export const MiB = 1024 * 1024;
 /** The assistant chat's attachment ceiling: this many live files per uploader per window (0209). */
 export const ASSIST_ATTACH_LIMIT = 30;
 export const ASSIST_ATTACH_WINDOW_DAYS = 7;
+
+const assistLimitRefusal = () =>
+  badRequest('You have attached many files this week — send the ticket first', 'ASSIST_ATTACH_LIMIT', { limit: ASSIST_ATTACH_LIMIT });
+
+/**
+ * THE ASSISTANT CEILING, COUNTED AGAIN ONCE THE FILE IS WRITTEN.
+ *
+ * `assertUploadEntity` counts before a byte is stored, so uploads sent in
+ * parallel all saw the same count and all passed: eight at once over 29 live
+ * files left 37. Once this upload's ledger row exists, its PLACE among the
+ * uploader's live assistant files of the window is read (in the order the
+ * rows were written). Past the ceiling, the object and its ledger row are
+ * removed again and the upload is refused by the same name, so exactly
+ * `ASSIST_ATTACH_LIMIT` survive however many raced.
+ */
+export async function assertAssistUploadWithinLimit(
+  env: Pick<Env, 'DB' | 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE'>,
+  userId: string,
+  key: string
+): Promise<void> {
+  const place = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM file_objects
+      WHERE owner_id = ?1 AND domain = 'assist' AND deleted_at IS NULL AND created_at >= datetime('now', ?2)
+        AND rowid <= (SELECT rowid FROM file_objects WHERE object_key = ?3)`
+  )
+    .bind(userId, `-${ASSIST_ATTACH_WINDOW_DAYS} days`, key)
+    .first<{ n: number }>();
+  if (Number(place?.n ?? 0) <= ASSIST_ATTACH_LIMIT) return;
+  await deleteMediaObject(env, 'private', key).catch(() => undefined);
+  await env.DB.prepare(`UPDATE file_objects SET deleted_at = datetime('now') WHERE object_key = ? AND deleted_at IS NULL`)
+    .bind(key)
+    .run()
+    .catch(() => undefined);
+  throw assistLimitRefusal();
+}
 export const GiB = 1024 * MiB;
 
 /**
@@ -193,11 +228,8 @@ export async function assertUploadEntity(
         )
         .bind(user.id, `-${ASSIST_ATTACH_WINDOW_DAYS} days`)
         .first<{ n: number }>();
-      if (Number(recent?.n ?? 0) >= ASSIST_ATTACH_LIMIT) {
-        throw badRequest('You have attached many files this week — send the ticket first', 'ASSIST_ATTACH_LIMIT', {
-          limit: ASSIST_ATTACH_LIMIT,
-        });
-      }
+      if (Number(recent?.n ?? 0) >= ASSIST_ATTACH_LIMIT) throw assistLimitRefusal();
+      // Counted again after the write (`assertAssistUploadWithinLimit`): parallel uploads all see this count.
       return user.id;
     }
 
