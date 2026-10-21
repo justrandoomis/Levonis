@@ -53,6 +53,8 @@ export interface AssistLink {
  */
 export interface AssistCard {
   title: string;
+  /** The product the card shows, so the conversation can remember what it showed. */
+  product_id?: string;
 }
 
 /** One step of a curated fix. `safety: 'hot'` draws the hot-surface warning. */
@@ -67,6 +69,35 @@ export interface TicketDraft {
   subject: string;
   body: string;
   unit_id?: string;
+  /**
+   * The triage in closed-set values (./handoff.ts `HandoffSummary`). The form
+   * sends it back untouched; the ticket door reads it again and keeps it for
+   * staff only.
+   */
+  handoff?: HandoffSummary;
+}
+
+/**
+ * THE TRIAGE IN CLOSED-SET VALUES, FOR STAFF (assistant plan 2.5, row 21).
+ *
+ * Rides on the draft so the ticket form can send it back, and is stored by
+ * the ticket door as `support_tickets.handoff_summary` (0209). Nothing in it
+ * is free text: a model token, a symptom key, step keys of that symptom, a
+ * code of the HMS shape, product ids and a count. The customer's own ticket
+ * read never returns it; the desk reads it through `handoffForStaff`
+ * (./handoff.ts), which reads it again with the same closed sets, so even a
+ * stored value is never trusted as written.
+ */
+export interface HandoffSummary {
+  v: 1;
+  model: ModelToken | 'other' | null;
+  symptom: SymptomKey | null;
+  /** Step keys of `symptom`, in the curated order. */
+  tried: string[];
+  code?: string;
+  shown: string[];
+  /** Set by the ticket door from the attachments it linked, never from the body. */
+  attachments: number;
 }
 
 export interface AssistReply {

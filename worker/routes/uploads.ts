@@ -361,7 +361,14 @@ uploadRoutes.post('/', async (c) => {
    * end-to-end video sniff, and the same 1 GiB of live video per account.
    */
   const merchantVideo = purpose === 'community' || purpose === 'post';
-  const allowVideo = purpose === 'product' || purpose === 'chat' || purpose === 'support' || purpose === 'complaint' || merchantVideo;
+  /**
+   * THE ASSISTANT CHAT (0209) carries what a support ticket carries — the clip
+   * of the printer failing — and a voice note, which it reads like a
+   * conversation does (`sniffChat`, below). Never a PDF: it is not a document
+   * drop, and a ticket's attachment row has no `file` kind.
+   */
+  const allowVideo =
+    purpose === 'product' || purpose === 'chat' || purpose === 'support' || purpose === 'complaint' || purpose === 'assist' || merchantVideo;
   const maxSize = allowVideo ? videoMax : imageMax;
   if (file.size > maxSize) {
     throw badRequest(`File is too large (max ${Math.round(maxSize / 1024 / 1024)} MB)`, 'UPLOAD_TOO_LARGE', { limit_bytes: maxSize });
@@ -372,7 +379,10 @@ uploadRoutes.post('/', async (c) => {
   const warnings: string[] = [];
   // A conversation may also carry a voice note or a PDF (`sniffChat`); every
   // other purpose keeps the picture-and-clip sniff it always had.
-  let kind = purpose === 'chat' ? sniffChat(buf, file.type || '') : sniff(buf);
+  let kind = purpose === 'chat' || purpose === 'assist' ? sniffChat(buf, file.type || '') : sniff(buf);
+  if (purpose === 'assist' && kind?.mime === 'application/pdf') {
+    throw badRequest('Attach a photo, a video or a voice note here', 'ASSIST_ATTACH_KIND');
+  }
   if (merchantVideo && (kind?.mime.startsWith('video/') || (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3))) {
     const video = sniffVideo(buf);
     if (!video.ok) {
@@ -422,7 +432,13 @@ uploadRoutes.post('/', async (c) => {
   if (!kind) {
     throw badRequest(
       'Unsupported file type — please upload a JPEG, PNG, WebP or GIF image' +
-        (purpose === 'chat' ? ', an MP4 video, a voice note or a PDF' : allowVideo ? ' or MP4 video' : '')
+        (purpose === 'chat'
+          ? ', an MP4 video, a voice note or a PDF'
+          : purpose === 'assist'
+            ? ', an MP4 or WebM video, or a voice note'
+            : allowVideo
+              ? ' or MP4 video'
+              : '')
     );
   }
   if ((kind.mime.startsWith('audio/') || kind.mime === 'application/pdf') && file.size > documentMax) {
@@ -575,6 +591,9 @@ uploadRoutes.post('/', async (c) => {
     purpose === 'complaint' ? { visibility: 'private', domain: 'complaints', entityId, keyKind: storedMime.startsWith('video/') ? 'video' : 'attachments' } :
     purpose === 'avatar' ? { visibility: 'public', domain: 'users', entityId: user.id, keyKind: 'avatar' } :
     purpose === 'chat' ? { visibility: 'private', domain: 'chat', entityId, keyKind: chatKeyKind(storedMime) } :
+    // `assist/<uid>/attachments|video|audio/<id>.<ext>`: the uploader's own
+    // folder until a ticket takes the key (0209). `entityId` IS the uploader.
+    purpose === 'assist' ? { visibility: 'private', domain: 'assist', entityId: user.id, keyKind: chatKeyKind(storedMime) } :
     purpose === 'community' ? { visibility: 'public', domain: 'merchants', entityId: user.id, keyKind: 'public' } :
     purpose === 'post' ? { visibility: 'public', domain: 'users', entityId: user.id, keyKind: 'posts' } :
     { visibility: 'public', domain: 'products', entityId: 'catalog', keyKind: storedMime.startsWith('video/') ? 'video' : 'gallery' };
@@ -1245,6 +1264,30 @@ fileRoutes.get('/*', async (c) => {
           .bind(ticketId, user.id)
           .first();
         if (!own) throw forbidden('Not your file');
+      }
+    } else if (key.startsWith('assist/')) {
+      /**
+       * YOURS — OR HANDED TO THE TEAM (support assistant v2, 0209).
+       *
+       * The key names the UPLOADER (`assist/<uid>/…`): a photo of a clogged
+       * nozzle attached in the assistant chat belongs to the customer who
+       * took it, before any ticket exists. Staff do NOT read every one: an
+       * attachment reaches the desk only when the customer sent a ticket
+       * with it, so an admin may read a key only once a
+       * `support_ticket_attachments` row names it. A database before 0209
+       * has no such rows and answers 403, like anyone else's file.
+       */
+      const owner = key.split('/')[1] ?? '';
+      if (owner !== user.id) {
+        let handed = false;
+        if (user.role === 'admin') {
+          try {
+            handed = !!(await c.env.DB.prepare('SELECT 1 AS x FROM support_ticket_attachments WHERE file_key = ? LIMIT 1').bind(key).first());
+          } catch {
+            handed = false;
+          }
+        }
+        if (!handed) throw forbidden('Not your file');
       }
     } else if (key.startsWith('complaints/')) {
       /**

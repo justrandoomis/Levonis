@@ -38,6 +38,7 @@ import {
   type StockAlertPruneReport,
 } from './stockAlerts';
 import { runGuardedMediaCleanup } from './mediaRefs';
+import { queueUnattachedAssistMedia } from './assist/attachments';
 import { convertLegacyProducts } from './catalog/legacy';
 import { checkSchemaDrift, type DriftAlarmReport } from './schemaDriftAlarm';
 import {
@@ -188,6 +189,12 @@ export interface DurableJobsReport {
    * and its bytes survive. If the reference set cannot be proven complete it
    * deletes NOTHING and leaves every job pending for the next tick.
    */
+  /**
+   * The support assistant's photos, clips and voice notes that no ticket took
+   * within seven days, QUEUED for the guarded drain below (0209). Queued, not
+   * deleted: the drain proves each key unreferenced before it touches R2.
+   */
+  assist_retention: { queued: number; skipped: boolean };
   media_cleanup: {
     attempted: number;
     deleted: number;
@@ -308,6 +315,7 @@ export async function runDurableJobs(env: Env, opts: DurableJobsOptions = {}): P
     stock_alerts: { scanned: 0, matched: 0, notified: 0, dead: 0, deferred: 0 },
     stock_alert_prune: { deleted: 0, bound_hit: false },
     outbox_final: { sent: 0, failed: 0 },
+    assist_retention: { queued: 0, skipped: false },
     media_cleanup: { attempted: 0, deleted: 0, still_referenced: 0, dead_lettered: 0, retrying: 0, refusals: [] },
     schema_drift: null,
     errors: [],
@@ -702,6 +710,11 @@ export async function runDurableJobs(env: Env, opts: DurableJobsOptions = {}): P
       FINISHED_RETENTION_DAYS,
       PRUNE_RUN_LIMIT
     );
+  });
+
+  // 15b. The assistant's unclaimed attachments join the queue the drain below empties.
+  await step('assist_retention', async () => {
+    report.assist_retention = await queueUnattachedAssistMedia(env.DB);
   });
 
   /**

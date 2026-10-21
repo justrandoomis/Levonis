@@ -328,6 +328,9 @@ export const UPLOAD_MAX_EDGE: Record<string, number> = {
   support: 2_048,
   // A complaint's evidence is read the same way, in the same kind of thread.
   complaint: 2_048,
+  // The support assistant chat: the photo of the clogged nozzle, read in a
+  // bubble and then in the ticket desk, like a ticket attachment.
+  assist: 2_048,
 };
 
 /**

@@ -42,6 +42,7 @@ const ALLOWED_RAW: Record<string, Record<string, string>> = {
   },
   'src/components/AdminSerials.tsx': { 'ev.url': 'private warranty evidence, served whole after the access check', 'm.file_url': 'a private claim-thread file' },
   'src/components/adminSupport/MessageMedia.tsx': { url: 'a private support attachment' },
+  'src/components/adminSupport/TicketsDesk.tsx': { 'a.file_url': 'a private support-assistant attachment handed to the ticket (0209)' },
   'src/components/adminTradeIn/TradeInDetail.tsx': { 'p.url': 'private trade-in photographs (inspection evidence)', photo: 'the trade-in photo viewer: the original, for inspection' },
   'src/components/adminTradeIn/IntakeSheet.tsx': { 'p.url': 'private intake photographs, admins only' },
   'src/components/chat/ChatAttachment.tsx': { url: 'a private chat attachment' },
@@ -58,7 +59,7 @@ const ALLOWED_RAW: Record<string, Record<string, string>> = {
   'src/components/warranty/ClaimForms.tsx': { 'a.url': 'a private warranty-claim attachment' },
   'src/components/warranty/ClaimThreadOverlay.tsx': { 'ev.url': 'private warranty evidence', 'msg.file_url': 'a private claim-thread file' },
   'src/pages/Chat.tsx': { fileUrl: 'a private chat attachment' },
-  'src/pages/Support.tsx': { 'm.file_url': 'a private support attachment' },
+  'src/pages/Support.tsx': { 'm.file_url': 'a private support attachment', 'a.url': 'a private support-assistant attachment (assist/<uid>/…, 0209)' },
   'src/components/LogoLoop.tsx': { 'item.src': 'the caller supplies srcSet and sizes with each item' },
   // The workspace frame measured 17 bytes under its own budget (tests/bundleBudget.test.ts,
   // 32 KB) before this change; a srcset here costs ~60. The merchant's own 36 px logo in

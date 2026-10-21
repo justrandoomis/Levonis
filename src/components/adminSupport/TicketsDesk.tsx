@@ -64,6 +64,40 @@ interface TicketMsg {
   pending?: boolean;
 }
 
+type L3 = { ar: string; en: string; ckb: string };
+
+/**
+ * «من المساعد» — WHAT THE SUPPORT ASSISTANT HANDED OVER (0209).
+ *
+ * The triage in closed-set values, already labelled by the server from the
+ * curated set in all three languages (worker/lib/assist/handoff.ts
+ * `handoffForStaff`), and the photos, clips and voice notes the customer
+ * attached in the assistant chat. Staff only: the customer never reads this
+ * summary back.
+ */
+interface TicketHandoff {
+  model: string | null;
+  symptom: { key: string; label: L3 } | null;
+  tried: Array<{ key: string; text: L3 }>;
+  code: string | null;
+  products: Array<{ id: string; slug: string; name: string; name_ar: string; name_ku: string }>;
+  attachments: number;
+}
+interface TicketAttachment {
+  kind: 'image' | 'video' | 'audio';
+  file_url: string;
+  mime: string;
+  bytes: number;
+  created_at: string;
+}
+interface ThreadState {
+  ticket: AdminTicket;
+  messages: TicketMsg[];
+  handoff: TicketHandoff | null;
+  attachments: TicketAttachment[];
+}
+type ThreadReply = { ticket: AdminTicket; messages: TicketMsg[]; handoff?: TicketHandoff | null; attachments?: TicketAttachment[] };
+
 /** A state is information: a flat chip in its tone (build plan §5). */
 const STATE_STYLES: Record<AdminTicket['state'], string> = {
   open: 'lv-chip [--chip:var(--color-info)]',
@@ -93,6 +127,94 @@ function ageOf(iso: string, s: S): string {
 const THREAD_POLL_MS = 10_000;
 const QUEUE_POLL_MS = 30_000;
 
+/** The assistant's summary and attachments, folded so the thread keeps its height. */
+function AssistantPanel({
+  handoff,
+  attachments,
+  lang,
+  cs,
+}: {
+  handoff: TicketHandoff | null;
+  attachments: TicketAttachment[];
+  lang: string;
+  cs: ReturnType<typeof consoleStrings>;
+}) {
+  const pick = (l: L3) => (lang === 'en' ? l.en : lang === 'ckb' ? l.ckb : l.ar);
+  const productName = (p: TicketHandoff['products'][number]) =>
+    (lang === 'en' ? p.name : lang === 'ckb' ? p.name_ku || p.name_ar : p.name_ar) || p.name || p.id;
+  return (
+    <details open className="lv-surface p-3 text-xs" data-ticket-handoff>
+      <summary className="cursor-pointer select-none text-xs font-black text-text-primary">{cs.fromAssistant}</summary>
+      {handoff && (
+        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-text-secondary">
+          {handoff.model && (
+            <>
+              <dt className="font-bold">{cs.hfPrinter}</dt>
+              <dd className="text-text-primary">{handoff.model === 'other' ? cs.hfOtherPrinter : handoff.model}</dd>
+            </>
+          )}
+          {handoff.symptom && (
+            <>
+              <dt className="font-bold">{cs.hfProblem}</dt>
+              <dd className="text-text-primary">{pick(handoff.symptom.label)}</dd>
+            </>
+          )}
+          {handoff.code && (
+            <>
+              <dt className="font-bold">{cs.hfCode}</dt>
+              <dd className="font-mono text-text-primary" dir="ltr">
+                {handoff.code}
+              </dd>
+            </>
+          )}
+          {handoff.tried.length > 0 && (
+            <>
+              <dt className="font-bold">{cs.hfTried}</dt>
+              <dd>
+                <ol className="list-decimal space-y-0.5 ps-4 text-text-primary">
+                  {handoff.tried.map((t) => (
+                    <li key={t.key}>{pick(t.text)}</li>
+                  ))}
+                </ol>
+              </dd>
+            </>
+          )}
+          {handoff.products.length > 0 && (
+            <>
+              <dt className="font-bold">{cs.hfProducts}</dt>
+              <dd className="flex flex-wrap gap-x-2 gap-y-0.5">
+                {handoff.products.map((p) => (
+                  <a key={p.id} href={`/product/${encodeURIComponent(p.slug || p.id)}`} target="_blank" rel="noopener noreferrer" className="text-gold underline">
+                    {productName(p)}
+                  </a>
+                ))}
+              </dd>
+            </>
+          )}
+        </dl>
+      )}
+      {attachments.length > 0 && (
+        <div className="mt-2">
+          <div className="mb-1 font-bold text-text-secondary">{cs.hfAttachments}</div>
+          <div className="flex flex-wrap gap-2">
+            {attachments.map((a) =>
+              a.kind === 'image' ? (
+                <a key={a.file_url} href={a.file_url} target="_blank" rel="noopener noreferrer" aria-label={cs.openImage} title={cs.openImage}>
+                  <img src={a.file_url} alt="" referrerPolicy="no-referrer" className="h-24 w-24 rounded-lg bg-black/30 object-cover" />
+                </a>
+              ) : a.kind === 'video' ? (
+                <video key={a.file_url} src={a.file_url} controls playsInline preload="metadata" className="h-24 w-40 rounded-lg bg-black" />
+              ) : (
+                <audio key={a.file_url} src={a.file_url} controls preload="metadata" className="w-60 max-w-full" />
+              )
+            )}
+          </div>
+        </div>
+      )}
+    </details>
+  );
+}
+
 export default function TicketsDesk() {
   const { lang } = useLanguage();
   const s: S = STRINGS[lang] ?? STRINGS.ar;
@@ -102,7 +224,7 @@ export default function TicketsDesk() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
-  const [thread, setThread] = useState<{ ticket: AdminTicket; messages: TicketMsg[] } | null>(null);
+  const [thread, setThread] = useState<ThreadState | null>(null);
   const [threadLoading, setThreadLoading] = useState(false);
   const [reply, setReply] = useState('');
   const [busy, setBusy] = useState(false);
@@ -151,8 +273,8 @@ export default function TicketsDesk() {
       setThreadError('');
       setThreadLoading(true);
       try {
-        const d = await api.get<{ ticket: AdminTicket; messages: TicketMsg[] }>(`/api/support/admin/tickets/${id}`);
-        setThread({ ticket: d.ticket, messages: d.messages || [] });
+        const d = await api.get<ThreadReply>(`/api/support/admin/tickets/${id}`);
+        setThread({ ticket: d.ticket, messages: d.messages || [], handoff: d.handoff ?? null, attachments: d.attachments || [] });
       } catch (e) {
         setThreadError(e instanceof ApiError ? e.message : s.loadError);
       } finally {
@@ -172,13 +294,16 @@ export default function TicketsDesk() {
     const id = openId;
     return pollWhileVisible(() => {
       api
-        .get<{ ticket: AdminTicket; messages: TicketMsg[] }>(`/api/support/admin/tickets/${id}`, { mascot: 'silent' })
+        .get<ThreadReply>(`/api/support/admin/tickets/${id}`, { mascot: 'silent' })
         .then((d) => {
           setThread((prev) =>
             prev && prev.ticket.id === id
               ? {
                   ticket: prev.ticket.state === d.ticket.state && prev.ticket.updated_at === d.ticket.updated_at ? prev.ticket : { ...prev.ticket, ...d.ticket },
                   messages: mergeThread(prev.messages, d.messages || []),
+                  // Written once with the ticket; the panel keeps what it showed.
+                  handoff: prev.handoff,
+                  attachments: prev.attachments,
                 }
               : prev
           );
@@ -243,6 +368,7 @@ export default function TicketsDesk() {
       if (!prev || prev.ticket.id !== ticketId) return prev;
       const settled: TicketMsg = res?.message ? { ...res.message, pending: false } : { ...fallback, id: tempId, pending: false };
       return {
+        ...prev,
         ticket: { ...prev.ticket, state: res?.ticket_state ?? 'waiting_customer', updated_at: res?.updated_at ?? prev.ticket.updated_at },
         messages: settleThread(prev.messages, tempId, settled),
       };
@@ -378,6 +504,9 @@ export default function TicketsDesk() {
                 </select>
               </div>
             </div>
+          )}
+          {thread && (thread.handoff || thread.attachments.length > 0) && (
+            <AssistantPanel handoff={thread.handoff} attachments={thread.attachments} lang={lang} cs={cs} />
           )}
         </div>
 
