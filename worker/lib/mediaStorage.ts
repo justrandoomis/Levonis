@@ -39,7 +39,12 @@ export type MediaDomain =
    *  `merchant-review/<application id>/photo/…`, private, re-encoded to WebP
    *  (no EXIF). /files serves no such prefix; only the audited reviewer route
    *  (Community V3 push 1.2) streams it. DECISIONS row 256. */
-  | 'merchant-review';
+  | 'merchant-review'
+  /** 0209 — a photo, clip or voice note attached in the support assistant:
+   *  `assist/<uploader id>/<attachments|video|audio>/…`, private, read through
+   *  the gate in worker/routes/uploads.ts (the uploader; staff once a ticket
+   *  names it). */
+  | 'assist';
 
 export interface MediaKeyInput {
   visibility: MediaVisibility;

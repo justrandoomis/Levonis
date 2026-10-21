@@ -342,6 +342,9 @@ test('the split really happened: every page and panel §10 names has a chunk of 
     // board rail are each a lazy chunk — named here, and kept out of the
     // entry, the store pages and the workspace frame by the test below.
     'Request', 'OrderTimeline', 'CustomOrderScreen', 'AnnouncementSheet', 'BoardRail',
+    // The support assistant's + sheet (gallery, camera, voice note): fetched the
+    // first time the + is pressed, never with the Support page itself.
+    'AssistAttach',
     // the manualChunks groups — `vendor-motion` is the features half and
     // `vendor-motion-core` the eager half (P1b); `vendor-icons` the icons the
     // lazy routes share (vite.config.ts `iconChunk`).

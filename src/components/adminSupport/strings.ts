@@ -31,6 +31,15 @@ export interface ConsoleStrings {
   back: string;
   openImage: string;
   refresh: string;
+  /** «من المساعد»: what the support assistant handed over with a ticket (0209). */
+  fromAssistant: string;
+  hfPrinter: string;
+  hfOtherPrinter: string;
+  hfProblem: string;
+  hfTried: string;
+  hfCode: string;
+  hfProducts: string;
+  hfAttachments: string;
 }
 
 export const CONSOLE_STRINGS: Record<'ar' | 'en' | 'ckb', ConsoleStrings> = {
@@ -55,6 +64,14 @@ export const CONSOLE_STRINGS: Record<'ar' | 'en' | 'ckb', ConsoleStrings> = {
     back: 'رجوع',
     openImage: 'فتح الصورة بالحجم الكامل',
     refresh: 'تحديث',
+    fromAssistant: 'من المساعد',
+    hfPrinter: 'الطابعة',
+    hfOtherPrinter: 'طابعة أخرى',
+    hfProblem: 'المشكلة',
+    hfTried: 'الخطوات التي جرّبها',
+    hfCode: 'رمز الخطأ',
+    hfProducts: 'المنتجات التي عُرضت عليه',
+    hfAttachments: 'المرفقات',
   },
   en: {
     tabTickets: 'Tickets',
@@ -77,6 +94,14 @@ export const CONSOLE_STRINGS: Record<'ar' | 'en' | 'ckb', ConsoleStrings> = {
     back: 'Back',
     openImage: 'Open the full-size image',
     refresh: 'Refresh',
+    fromAssistant: 'From the assistant',
+    hfPrinter: 'Printer',
+    hfOtherPrinter: 'Another printer',
+    hfProblem: 'Problem',
+    hfTried: 'Steps tried',
+    hfCode: 'Error code',
+    hfProducts: 'Products shown',
+    hfAttachments: 'Attachments',
   },
   ckb: {
     tabTickets: 'تیکێتەکان',
@@ -92,13 +117,21 @@ export const CONSOLE_STRINGS: Record<'ar' | 'en' | 'ckb', ConsoleStrings> = {
     unreadBadge: (n: number) => `${n} نەخوێندراوە`,
     image: 'وێنە',
     video: 'ڤیدیۆ',
-    audio: 'رسالة صوتية', // OWNER: Sorani by hand.
+    audio: 'نامەی دەنگی',
     file: 'ملف', // OWNER: Sorani by hand.
     fromTeam: 'تیم',
     order: 'داواکاری',
     back: 'گەڕانەوە',
     openImage: 'فتح الصورة بالحجم الكامل', // OWNER: Sorani by hand.
     refresh: 'نوێکردنەوە',
+    fromAssistant: 'لە یاریدەدەرەکەوە',
+    hfPrinter: 'پرینتەر',
+    hfOtherPrinter: 'پرینتەرێکی تر',
+    hfProblem: 'کێشە',
+    hfTried: 'هەنگاوە تاقیکراوەکان',
+    hfCode: 'کۆدی هەڵە',
+    hfProducts: 'ئەو بەرهەمانەی پیشانی دران',
+    hfAttachments: 'هاوپێچەکان',
   },
 };
 

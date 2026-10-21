@@ -22,6 +22,10 @@ import { assertRequestFilesOpen } from './requestFileRoom';
 import { canHandleDisputes } from './staffCapabilities';
 
 export const MiB = 1024 * 1024;
+
+/** The assistant chat's attachment ceiling: this many live files per uploader per window (0209). */
+export const ASSIST_ATTACH_LIMIT = 30;
+export const ASSIST_ATTACH_WINDOW_DAYS = 7;
 export const GiB = 1024 * MiB;
 
 /**
@@ -35,11 +39,14 @@ export const UPLOAD_PURPOSES = [
   'request', 'product_file',
   'order_update',
   'offer',
+  // A photo, clip or voice note in the support assistant chat (0209): filed
+  // under the uploader, handed to a ticket by the ticket door.
+  'assist',
 ] as const;
 export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number];
 
 /** What the whole-body route takes: small pictures, clips, voice notes and PDFs. */
-export const SIMPLE_UPLOAD_PURPOSES = ['receipt', 'avatar', 'chat', 'product', 'community', 'support', 'complaint', 'post'] as const;
+export const SIMPLE_UPLOAD_PURPOSES = ['receipt', 'avatar', 'chat', 'product', 'community', 'support', 'complaint', 'post', 'assist'] as const;
 export type SimpleUploadPurpose = (typeof SIMPLE_UPLOAD_PURPOSES)[number];
 
 /** What a resumable session may be opened for. */
@@ -163,6 +170,35 @@ export async function assertUploadEntity(
         .first();
       if (!own) throw forbidden('Not your ticket');
       return ticket;
+    }
+
+    /**
+     * AN ASSISTANT ATTACHMENT BELONGS TO THE UPLOADER until a ticket takes it
+     * (support assistant v2, 0209). There is no ticket yet when the customer
+     * photographs the clogged nozzle, so the file is filed under them —
+     * `assist/<uid>/…` — and `entity_id` is ignored. The ticket door checks
+     * the prefix again before it links a key, so a key cannot be handed to a
+     * ticket by anyone but its uploader.
+     *
+     * A ceiling on COUNT, not only bytes: one account may hold 30 live
+     * assistant attachments from the last seven days (ASSIST_ATTACH_LIMIT).
+     * The retention sweep removes the ones no ticket took after seven days,
+     * so the ceiling frees itself.
+     */
+    case 'assist': {
+      const recent = await db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM file_objects
+            WHERE owner_id = ? AND domain = 'assist' AND deleted_at IS NULL AND created_at >= datetime('now', ?)`
+        )
+        .bind(user.id, `-${ASSIST_ATTACH_WINDOW_DAYS} days`)
+        .first<{ n: number }>();
+      if (Number(recent?.n ?? 0) >= ASSIST_ATTACH_LIMIT) {
+        throw badRequest('You have attached many files this week — send the ticket first', 'ASSIST_ATTACH_LIMIT', {
+          limit: ASSIST_ATTACH_LIMIT,
+        });
+      }
+      return user.id;
     }
 
     /**

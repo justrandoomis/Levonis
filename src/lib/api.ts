@@ -2244,7 +2244,7 @@ export function newIdempotencyKey(): string {
 /** Upload a file; returns its key + URL. */
 export async function uploadFile(
   file: File,
-  purpose: 'receipt' | 'avatar' | 'chat' | 'product' | 'community' | 'support' | 'complaint' | 'post',
+  purpose: 'receipt' | 'avatar' | 'chat' | 'product' | 'community' | 'support' | 'complaint' | 'post' | 'assist',
   /**
    * The thing this file belongs to, when it is not the uploader.
    *
@@ -2257,7 +2257,9 @@ export async function uploadFile(
    * A SUPPORT attachment is filed under the TICKET for the same reason and
    * checked the same way: `purpose:'support'` must name the ticket, and the
    * server refuses a ticket that is not yours before storing anything. A
-   * `complaint` attachment names the complaint, on the same terms.
+   * `complaint` attachment names the complaint, on the same terms. An
+   * `assist` attachment (the support assistant chat) names nothing: it is
+   * filed under the uploader until a ticket takes it.
    */
   entityId?: string
 ): Promise<{ key: string; url: string; mime?: string; bytes?: number; width?: number | null; height?: number | null; visibility?: 'public' | 'private' }> {

@@ -148,6 +148,12 @@ async function runTriage(db: D1Database, viewer: Viewer, ctx: AssistContext, inp
   }
   const { step, context } = nextTriage(ctx, checked);
   const reply = await replyFor(db, viewer, step, context, render);
+  // The parts a step answer showed are what the team sees as «products shown».
+  if (step.kind === 'steps') {
+    const shown = (reply.cards ?? []).map((card) => card.product_id).filter((id): id is string => typeof id === 'string');
+    if (shown.length) context.shown = shown.slice(0, SHOWN_MAX);
+    else delete context.shown;
+  }
   return { reply, context };
 }
 
@@ -202,7 +208,13 @@ async function replyFor(db: D1Database, viewer: Viewer, step: TriageStep, ctx: A
       const mine = unit ? await myPrinters(db, viewer) : [];
       const ownUnit = unit && mine.some((p) => p.unit_id === unit) ? unit : undefined;
       const draft = buildTicketDraft(
-        { model: step.model, symptom: step.symptom, ...(step.code ? { code: step.code } : {}), ...(ownUnit ? { unit_id: ownUnit } : {}) },
+        {
+          model: step.model,
+          symptom: step.symptom,
+          ...(step.code ? { code: step.code } : {}),
+          ...(ownUnit ? { unit_id: ownUnit } : {}),
+          ...(ctx.shown ? { shown: ctx.shown } : {}),
+        },
         loc
       );
       if (!viewer.userId) {

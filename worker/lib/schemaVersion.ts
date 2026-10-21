@@ -43,7 +43,7 @@
  * fails otherwise, which is the point: the value exists so that a deploy can
  * notice its own database is behind, and a stale value notices nothing.
  */
-export const EXPECTED_MIGRATION = '0208_request_sources_parts.sql';
+export const EXPECTED_MIGRATION = '0209_support_ticket_assist.sql';
 
 /**
  * How many migration files this code expects to have been applied.
@@ -63,7 +63,7 @@ export const EXPECTED_MIGRATION = '0208_request_sources_parts.sql';
  * the numbering has gaps, which is exactly why the count has to be its own
  * constant rather than something derived from the name.
  */
-export const EXPECTED_MIGRATION_COUNT = 201;
+export const EXPECTED_MIGRATION_COUNT = 202;
 
 /**
  * The leading number of a migration filename, or null when it has none.

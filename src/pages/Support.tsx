@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
@@ -16,6 +16,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   Paperclip,
+  Plus,
+  X,
 } from 'lucide-react';
 /**
  * A TICKET IS A PROMISE OF A REPLY, and a reply that only reaches the in-app
@@ -27,7 +29,21 @@ import ChannelNudge from '../components/notify/ChannelNudge';
 import { IconButton } from '../components/ui/Button';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import VariantImg from '../components/ui/VariantImg';
-import { loadAssistContext, saveAssistContext } from '../lib/assistSession';
+import { loadAssistContext, loadAssistState, saveAssistContext, saveAssistState } from '../lib/assistSession';
+import ChunkBoundary from '../components/ChunkBoundary';
+import type { AssistAttachment } from '../components/support/AssistAttach';
+
+/**
+ * The + sheet (gallery, camera, voice note) is its own chunk, fetched the
+ * first time the + is pressed: a customer who only asks questions never
+ * downloads the recorder.
+ */
+const AssistAttach = lazy(() => import('../components/support/AssistAttach'));
+
+/** A ticket takes at most this many assistant attachments (worker/lib/assist/attachments.ts). */
+const ATTACH_MAX = 6;
+/** How much of the transcript survives a reload in this tab. */
+const TRANSCRIPT_KEEP = 40;
 
 /**
  * Guided, deterministic (non-AI) support assistant + real support tickets.
@@ -86,7 +102,7 @@ interface AsstReply {
   /** The printer-problem triage's curated steps, in order. `hot` marks a burn risk. */
   steps?: Array<{ key: string; text: string; safety?: 'hot' }>;
   /** What the ticket form opens with after «تحدث مع الفريق», all of it editable. */
-  ticket_draft?: { subject: string; body: string; unit_id?: string };
+  ticket_draft?: { subject: string; body: string; unit_id?: string; handoff?: unknown };
   /** The conversation context: opaque here, stored and returned unchanged (src/lib/assistSession.ts). */
   context?: unknown;
 }
@@ -96,6 +112,10 @@ interface ChatMsg {
   text: string;
   reply?: AsstReply;
   error?: boolean;
+  /** Typed by the customer (not a tapped chip): what «من المحادثة» quotes in the ticket. */
+  typed?: boolean;
+  /** Photos, clips and voice notes the customer attached in this bubble. */
+  attachments?: AssistAttachment[];
 }
 
 interface Ticket {
@@ -191,6 +211,15 @@ const STRINGS = {
     complaintLabel: 'شكوى',
     complaintOn: 'على',
     openImage: 'فتح الصورة بالحجم الكامل',
+    attachAdd: 'إرفاق صورة أو فيديو أو رسالة صوتية',
+    attachSignIn: 'سجّل الدخول لإرفاق صور أو فيديو أو رسائل صوتية.',
+    attachAck: 'استلمت المرفق. سيصل إلى الفريق مع التذكرة عندما تختار «تحدث مع الفريق».',
+    fromChat: 'من المحادثة:',
+    attachmentsLabel: 'المرفقات',
+    removeAttachment: 'إزالة المرفق',
+    voiceNote: 'رسالة صوتية',
+    attachGone: 'أحد المرفقات لم يعد متاحاً. أزله ثم أرفقه من جديد.',
+    attachUnavailable: 'لا يمكن إرسال المرفقات مع التذكرة حالياً. أزلها ثم أرسل التذكرة.',
     complaintStatus: {
       submitted: 'جديدة',
       under_review: 'قيد المراجعة',
@@ -282,6 +311,15 @@ const STRINGS = {
     complaintLabel: 'Complaint',
     complaintOn: 'about',
     openImage: 'Open the full-size image',
+    attachAdd: 'Attach a photo, video or voice note',
+    attachSignIn: 'Sign in to attach photos, videos or voice notes.',
+    attachAck: 'Got it. It goes to the team with the ticket when you choose «Talk to the team».',
+    fromChat: 'From the conversation:',
+    attachmentsLabel: 'Attachments',
+    removeAttachment: 'Remove attachment',
+    voiceNote: 'Voice note',
+    attachGone: 'One of the attachments is no longer available. Remove it and attach it again.',
+    attachUnavailable: 'Attachments cannot be sent with a ticket right now. Remove them and send the ticket.',
     complaintStatus: {
       submitted: 'New',
       under_review: 'Under review',
@@ -361,7 +399,16 @@ const STRINGS = {
     complaintsTitle: 'شكاواي',
     complaintLabel: 'شكوى',
     complaintOn: 'على',
-    openImage: 'فتح الصورة بالحجم الكامل',
+    openImage: 'کردنەوەی وێنەکە بە قەبارەی تەواو',
+    attachAdd: 'وێنە، ڤیدیۆ یان نامەی دەنگی هاوپێچ بکە',
+    attachSignIn: 'بچۆ ژوورەوە بۆ هاوپێچکردنی وێنە، ڤیدیۆ یان نامەی دەنگی.',
+    attachAck: 'وەرمگرت. کاتێک «قسە لەگەڵ تیمەکە بکە» هەڵدەبژێریت، لەگەڵ تیکێتەکە دەگاتە تیمەکە.',
+    fromChat: 'لە گفتوگۆکەوە:',
+    attachmentsLabel: 'هاوپێچەکان',
+    removeAttachment: 'لابردنی هاوپێچ',
+    voiceNote: 'نامەی دەنگی',
+    attachGone: 'یەکێک لە هاوپێچەکان ئیتر بەردەست نییە. لایببە و دووبارە هاوپێچی بکەرەوە.',
+    attachUnavailable: 'لە ئێستادا ناتوانرێت هاوپێچ لەگەڵ تیکێت بنێردرێت. لایانببە و تیکێتەکە بنێرە.',
     complaintStatus: {
       submitted: 'جديدة',
       under_review: 'قيد المراجعة',
@@ -526,6 +573,30 @@ export interface TicketPrefill {
   subject?: string;
   /** The assistant's handoff draft: printer, symptom and the steps tried. Editable. */
   body?: string;
+  /**
+   * The same facts as closed-set values, from the server's draft. Sent back
+   * untouched; the server reads it again and keeps it for the team only.
+   */
+  handoff?: unknown;
+}
+
+/**
+ * ONE ATTACHMENT, SMALL: a picture as a thumbnail, a clip or a voice note as
+ * its own player. `/files/…` is the private address the server composed; the
+ * gate there decides who may read it.
+ */
+function AttachmentThumb({ a, label, compact = false }: { a: AssistAttachment; label: string; compact?: boolean }) {
+  if (a.kind === 'audio') {
+    return <audio src={a.url} controls preload="metadata" aria-label={label} className={compact ? 'w-56 max-w-full' : 'w-full max-w-xs'} />;
+  }
+  if (a.kind === 'video') {
+    return <video src={a.url} controls playsInline preload="metadata" className={`rounded-lg bg-black ${compact ? 'h-20 w-28 object-cover' : 'max-h-56 w-full max-w-xs'}`} />;
+  }
+  return (
+    <a href={a.url} target="_blank" rel="noopener noreferrer" className="block">
+      <img src={a.url} alt="" referrerPolicy="no-referrer" className={`rounded-lg bg-surface-raised ${compact ? 'h-20 w-20 object-cover' : 'max-h-56 max-w-full object-contain'}`} />
+    </a>
+  );
 }
 
 function TicketForm({
@@ -533,6 +604,8 @@ function TicketForm({
   lang,
   loc,
   initial,
+  attachments = [],
+  onRemoveAttachment,
   onClose,
   onCreated,
 }: {
@@ -540,6 +613,9 @@ function TicketForm({
   lang: string;
   loc: (ar: string, en: string, ckb?: string) => string;
   initial?: TicketPrefill;
+  /** What the customer attached in the assistant chat; it goes with the ticket. */
+  attachments?: AssistAttachment[];
+  onRemoveAttachment?: (key: string) => void;
   onClose: () => void;
   onCreated: (t: Ticket) => void;
 }) {
@@ -618,13 +694,49 @@ function TicketForm({
         unit_id: unitId || undefined,
         source: 'assistant',
         idempotencyKey: idemKey.current || undefined,
+        attachments: attachments.length ? attachments.map((a) => a.key) : undefined,
+        handoff: initial?.handoff ?? undefined,
       });
       onCreated(data.ticket);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : s.netError);
+      const code = e instanceof ApiError ? e.code : undefined;
+      setError(
+        code === 'ATTACHMENT_NOT_FOUND' || code === 'ATTACHMENT_NOT_YOURS' || code === 'ATTACHMENT_INVALID'
+          ? s.attachGone
+          : code === 'ATTACHMENTS_UNAVAILABLE'
+            ? s.attachUnavailable
+            : e instanceof ApiError
+              ? e.message
+              : s.netError
+      );
       setBusy(false);
     }
   };
+
+  const attachmentList = (removable: boolean) =>
+    attachments.length > 0 && (
+      <div data-support-ticket-attachments>
+        <div className="mb-1.5 text-xs font-bold text-text-secondary">{s.attachmentsLabel}</div>
+        <div className="flex flex-wrap gap-2">
+          {attachments.map((a) => (
+            <div key={a.key} className="relative">
+              <AttachmentThumb a={a} label={s.voiceNote} compact />
+              {removable && onRemoveAttachment && (
+                <button
+                  type="button"
+                  onClick={() => onRemoveAttachment(a.key)}
+                  aria-label={s.removeAttachment}
+                  title={s.removeAttachment}
+                  className="lv-button lv-button-secondary absolute -top-2 -end-2 min-h-7 w-7 rounded-full px-0"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
 
   return (
     <div className="lv-surface p-4 space-y-4" data-support-ticket-form>
@@ -707,6 +819,7 @@ function TicketForm({
               <ChevronDown className="w-4 h-4 text-text-muted absolute top-3 end-3 pointer-events-none" />
             </div>
           </div>
+          {attachmentList(true)}
           {error && <div className="text-xs text-danger">{error}</div>}
           <button onClick={goConfirm} className="lv-button lv-button-primary w-full">
             {s.next}
@@ -720,6 +833,7 @@ function TicketForm({
             <div className="text-xs text-text-secondary whitespace-pre-wrap break-words">{body}</div>
             {orderId && <div className="text-xs text-text-muted font-mono">{orderId}</div>}
           </div>
+          {attachmentList(false)}
           {error && <div className="text-xs text-danger">{error}</div>}
           <div className="flex gap-2">
             <button
@@ -779,6 +893,8 @@ type ThreadHead =
 interface OpenThread {
   head: ThreadHead;
   messages: TicketMsg[];
+  /** What the assistant chat handed to this ticket (0209); read once, on open. */
+  attachments?: AssistAttachment[];
 }
 
 /** How often an open thread re-reads itself while the page is visible. */
@@ -866,9 +982,15 @@ function TicketsTab({
       setThread(null);
       setReplyError('');
       try {
-        const d = await api.get<{ ticket?: Ticket; complaint?: Complaint; messages: TicketMsg[] }>(threadPaths(kind, id).read);
+        const d = await api.get<{ ticket?: Ticket; complaint?: Complaint; messages: TicketMsg[]; attachments?: Array<{ kind: string; file_url: string; mime?: string }> }>(
+          threadPaths(kind, id).read
+        );
         const head = headOf(kind, d);
-        if (head) setThread({ head, messages: d.messages || [] });
+        // `key` here is only a React key: the address is the server's own `/files/…`.
+        const attachments = (d.attachments ?? [])
+          .filter((a) => a.kind === 'image' || a.kind === 'video' || a.kind === 'audio')
+          .map((a) => ({ key: a.file_url, url: a.file_url, kind: a.kind as AssistAttachment['kind'], mime: a.mime }));
+        if (head) setThread({ head, messages: d.messages || [], attachments });
       } catch (e) {
         setReplyError(e instanceof ApiError ? e.message : s.loadError);
       } finally {
@@ -912,7 +1034,7 @@ function TicketsTab({
             if (!prev || prev.head.kind !== kind) return prev;
             const prevId = prev.head.kind === 'ticket' ? prev.head.ticket.id : prev.head.complaint.id;
             if (prevId !== id) return prev;
-            return { head, messages: mergeThread(prev.messages, d.messages || []) };
+            return { ...prev, head, messages: mergeThread(prev.messages, d.messages || []) };
           });
         })
         .catch(() => undefined);
@@ -1012,7 +1134,7 @@ function TicketsTab({
               kind: 'complaint',
               complaint: { ...prev.head.complaint, status: res?.status ?? prev.head.complaint.status, updated_at: res?.updated_at ?? prev.head.complaint.updated_at },
             };
-      return { head, messages: settleThread(prev.messages, tempId, settled) };
+      return { ...prev, head, messages: settleThread(prev.messages, tempId, settled) };
     });
     if (kind === 'ticket') {
       setTickets((prev) =>
@@ -1147,6 +1269,13 @@ function TicketsTab({
                         )}
                       </div>
                       {head.ticket.order_id && <div className="text-xs text-text-muted font-mono mt-1">{head.ticket.order_id}</div>}
+                      {thread.attachments && thread.attachments.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2" data-support-ticket-attachments>
+                          {thread.attachments.map((a) => (
+                            <AttachmentThumb key={a.key} a={a} label={s.voiceNote} compact />
+                          ))}
+                        </div>
+                      )}
                     </>
                   ) : (
                     <>
@@ -1341,6 +1470,109 @@ function TicketsTab({
 
 // ------------------------------------------------------------------- page
 
+// --------------------------------------------- the conversation, kept for the tab
+
+interface StoredAssist {
+  messages: ChatMsg[];
+  attachments: AssistAttachment[];
+  draft?: TicketPrefill;
+}
+
+const ATTACH_KINDS: ReadonlySet<string> = new Set(['image', 'video', 'audio']);
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+const text = (v: unknown, max = 4000): string | null => (typeof v === 'string' ? v.slice(0, max) : null);
+
+/** An attachment exactly as the upload answered it, or nothing. */
+function storedAttachment(v: unknown): AssistAttachment | null {
+  if (!isRecord(v) || typeof v.key !== 'string' || !v.key.startsWith('assist/') || v.url !== `/files/${v.key}` || !ATTACH_KINDS.has(String(v.kind))) return null;
+  return { key: v.key, url: v.url, kind: v.kind as AssistAttachment['kind'], ...(typeof v.mime === 'string' ? { mime: v.mime.slice(0, 100) } : {}) };
+}
+
+/**
+ * A REPLY AS IT MAY BE SHOWN AGAIN AFTER A RELOAD: its words, steps, chips
+ * and links, and each card as a name and a link only. No price, stock line or
+ * table survives: those are only ever shown fresh from the server.
+ */
+function storedReply(v: unknown): AsstReply | undefined {
+  if (!isRecord(v)) return undefined;
+  const intent = text(v.intent, 64);
+  const said = text(v.text);
+  if (intent === null || said === null) return undefined;
+  const out: AsstReply = { intent, text: said };
+  const link = (l: unknown): AsstLink | null => {
+    if (!isRecord(l)) return null;
+    const label = text(l.label, 200);
+    const to = text(l.to, 500);
+    if (label === null || to === null) return null;
+    if (l.external === true) return to.startsWith('https://') ? { label, to, external: true } : null;
+    return to.startsWith('/') && !to.startsWith('//') ? { label, to } : null;
+  };
+  const steps = list(v.steps).flatMap((st) =>
+    isRecord(st) && typeof st.key === 'string' && typeof st.text === 'string'
+      ? [{ key: st.key.slice(0, 64), text: st.text.slice(0, 1000), ...(st.safety === 'hot' ? { safety: 'hot' as const } : {}) }]
+      : []
+  );
+  if (steps.length) out.steps = steps;
+  const cards = list(v.cards).flatMap((c) => {
+    if (!isRecord(c)) return [];
+    const title = text(c.title, 300);
+    if (title === null) return [];
+    const to = link(c.link);
+    return [{ title, ...(typeof c.image === 'string' && c.image.startsWith('/') ? { image: c.image } : {}), ...(to ? { link: to } : {}) }];
+  });
+  if (cards.length) out.cards = cards;
+  const links = list(v.links).map(link).filter((l): l is AsstLink => !!l);
+  if (links.length) out.links = links;
+  const choices = list(v.choices).flatMap((ch) => {
+    if (!isRecord(ch)) return [];
+    const label = text(ch.label, 200);
+    const chIntent = text(ch.intent, 64);
+    if (label === null || chIntent === null) return [];
+    const params = isRecord(ch.params)
+      ? Object.fromEntries(Object.entries(ch.params).filter(([, pv]) => typeof pv === 'string').map(([k, pv]) => [k.slice(0, 32), String(pv).slice(0, 200)]))
+      : undefined;
+    return [{ label, intent: chIntent, ...(params ? { params } : {}) }];
+  });
+  if (choices.length) out.choices = choices;
+  if (v.handoff === true) out.handoff = true;
+  if (v.auth_required === true) out.auth_required = true;
+  return out;
+}
+
+function readStoredAssist(raw: unknown): StoredAssist {
+  const out: StoredAssist = { messages: [], attachments: [] };
+  if (!isRecord(raw)) return out;
+  for (const m of list(raw.messages).slice(-TRANSCRIPT_KEEP)) {
+    if (!isRecord(m) || (m.role !== 'user' && m.role !== 'assistant')) continue;
+    const said = text(m.text);
+    if (said === null) continue;
+    const msg: ChatMsg = { role: m.role, text: said };
+    if (m.typed === true) msg.typed = true;
+    if (m.error === true) msg.error = true;
+    const reply = storedReply(m.reply);
+    if (reply) msg.reply = reply;
+    const files = list(m.attachments).map(storedAttachment).filter((a): a is AssistAttachment => !!a);
+    if (files.length) msg.attachments = files;
+    out.messages.push(msg);
+  }
+  out.attachments = list(raw.attachments).map(storedAttachment).filter((a): a is AssistAttachment => !!a).slice(0, ATTACH_MAX);
+  if (isRecord(raw.draft)) {
+    const subject = text(raw.draft.subject, 200);
+    const body = text(raw.draft.body, 4000);
+    if (subject !== null && body !== null) {
+      out.draft = {
+        subject,
+        body,
+        ...(typeof raw.draft.unitId === 'string' ? { unitId: raw.draft.unitId.slice(0, 64) } : {}),
+        // Closed-set values the server reads again; never shown, never trusted here.
+        ...(isRecord(raw.draft.handoff) ? { handoff: raw.draft.handoff } : {}),
+      };
+    }
+  }
+  return out;
+}
+
 export default function Support() {
   const navigate = useNavigate();
   const { state, key: locationKey } = useLocation();
@@ -1383,7 +1615,21 @@ export default function Support() {
     // or from the assistant tab) changes no search param — only the key of
     // the navigation it made. Without it that tap did nothing at all.
   }, [qTab, qTicket, qComplaint, locationKey]);
-  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  /**
+   * THE CONVERSATION AS THIS TAB LEFT IT (src/lib/assistSession.ts), read
+   * once: a reload, a language change or the trip to the sign-in page keeps
+   * the steps already tried, the draft and the attached photos.
+   */
+  const [restored] = useState<StoredAssist>(() => readStoredAssist(loadAssistState()));
+  const [messages, setMessages] = useState<ChatMsg[]>(restored.messages);
+  const messagesRef = useRef<ChatMsg[]>(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+  /** Photos, clips and voice notes waiting for the ticket «تحدث مع الفريق» opens. */
+  const [attachments, setAttachments] = useState<AssistAttachment[]>(restored.attachments);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const attachedSinceOpen = useRef(0);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [showTicketForm, setShowTicketForm] = useState(false);
@@ -1405,19 +1651,25 @@ export default function Support() {
   }, [hasPrefill, isAuthenticated]);
 
   // Greeting + main menu are client-side (button-first); every answer after
-  // that comes from the server.
+  // that comes from the server. A conversation already under way is kept on
+  // a language change: only a screen that is still just the greeting is
+  // greeted again, in the new language.
   useEffect(() => {
-    setMessages([
-      {
-        role: 'assistant',
-        text: s.greeting,
-        reply: {
-          intent: 'menu',
-          text: s.greeting,
-          choices: s.menu.map((m) => ({ label: m.label, intent: m.intent })),
-        },
-      },
-    ]);
+    setMessages((prev) =>
+      prev.some((m) => m.role === 'user')
+        ? prev
+        : [
+            {
+              role: 'assistant',
+              text: s.greeting,
+              reply: {
+                intent: 'menu',
+                text: s.greeting,
+                choices: s.menu.map((m) => ({ label: m.label, intent: m.intent })),
+              },
+            },
+          ]
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang]);
 
@@ -1443,12 +1695,22 @@ export default function Support() {
    */
   const contextRef = useRef<unknown>(loadAssistContext());
   /** The latest handoff draft, so the ticket form opens filled in. */
-  const [draft, setDraft] = useState<TicketPrefill | undefined>(undefined);
+  const [draft, setDraft] = useState<TicketPrefill | undefined>(restored.draft);
+
+  // Kept for the tab, prices stripped (`storedReply`), every write guarded.
+  useEffect(() => {
+    saveAssistState({
+      messages: messages.slice(-TRANSCRIPT_KEEP).map((m) => ({ ...m, reply: m.reply ? storedReply(m.reply) : undefined })),
+      attachments,
+      draft,
+    });
+  }, [messages, attachments, draft]);
 
   const send = useCallback(
     async (payload: { intent?: string; params?: Record<string, unknown>; text?: string }, label: string) => {
       if (busy) return;
-      setMessages((prev) => [...prev, { role: 'user', text: label }]);
+      const sent: ChatMsg = { role: 'user', text: label, ...(payload.text !== undefined ? { typed: true } : {}) };
+      setMessages((prev) => [...prev, sent]);
       setBusy(true);
       // A tapped chip names its own intent, so the pending question is moot —
       // and sending it anyway would let a stale slot override a clear answer.
@@ -1466,7 +1728,22 @@ export default function Support() {
           saveAssistContext(d.reply.context);
         }
         if (d.reply.ticket_draft) {
-          setDraft({ subject: d.reply.ticket_draft.subject, body: d.reply.ticket_draft.body, unitId: d.reply.ticket_draft.unit_id });
+          /**
+           * «من المحادثة»: the customer's own last few typed lines, appended in
+           * the open where they can read and edit them before sending. Nothing
+           * from the conversation travels that the form does not show.
+           */
+          const quoted = [...messagesRef.current, sent]
+            .filter((m) => m.role === 'user' && m.typed && m.text.trim())
+            .slice(-5)
+            .map((m) => `- ${m.text.trim().slice(0, 200)}`);
+          const body = quoted.length ? `${d.reply.ticket_draft.body}\n\n${s.fromChat}\n${quoted.join('\n')}` : d.reply.ticket_draft.body;
+          setDraft({
+            subject: d.reply.ticket_draft.subject,
+            body: body.slice(0, 4000),
+            unitId: d.reply.ticket_draft.unit_id,
+            ...(d.reply.ticket_draft.handoff ? { handoff: d.reply.ticket_draft.handoff } : {}),
+          });
         }
         setMessages((prev) => [...prev, { role: 'assistant', text: d.reply.text, reply: d.reply }]);
         if (d.reply.handoff) {
@@ -1483,8 +1760,32 @@ export default function Support() {
         setBusy(false);
       }
     },
-    [busy, lang, isAuthenticated, s.netError]
+    [busy, lang, isAuthenticated, s.netError, s.fromChat]
   );
+
+  /**
+   * A FILE ARRIVED FROM THE + SHEET. It is shown at once as the customer's
+   * own bubble and waits for the ticket. The acknowledgement is said here, on
+   * the page: nothing reads the file in this push, so no server turn pretends
+   * to have looked at it. It carries the chips of the step the customer was
+   * on, so «تحدث مع الفريق» is still one tap away.
+   */
+  const onAttached = (a: AssistAttachment) => {
+    attachedSinceOpen.current += 1;
+    setAttachments((prev) => (prev.some((x) => x.key === a.key) ? prev : [...prev, a].slice(0, ATTACH_MAX)));
+    setMessages((prev) => [...prev, { role: 'user', text: '', attachments: [a] }]);
+  };
+  const closeAttach = () => {
+    setAttachOpen(false);
+    if (attachedSinceOpen.current === 0) return;
+    attachedSinceOpen.current = 0;
+    setMessages((prev) => {
+      const last = [...prev].reverse().find((m) => m.role === 'assistant' && m.reply?.intent !== 'attach_ack');
+      const choices = last?.reply?.choices;
+      return [...prev, { role: 'assistant', text: s.attachAck, reply: { intent: 'attach_ack', text: s.attachAck, ...(choices ? { choices } : {}) } }];
+    });
+  };
+  const removeAttachment = (key: string) => setAttachments((prev) => prev.filter((a) => a.key !== key));
 
   /**
    * `/support?ask=choose_printer` — «ساعدني أختار» on the home page opens the
@@ -1517,6 +1818,8 @@ export default function Support() {
   const onTicketCreated = (t: Ticket) => {
     setShowTicketForm(false);
     setDraft(undefined);
+    // The files went with the ticket; the next ticket starts empty.
+    setAttachments([]);
     setTicketsRefresh((n) => n + 1);
     setMessages((prev) => [
       ...prev,
@@ -1616,6 +1919,14 @@ export default function Support() {
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className="max-w-[92%] space-y-2 sm:max-w-[82%]">
+                  {m.attachments && m.attachments.length > 0 && (
+                    <div className="flex flex-wrap justify-end gap-2" data-assist-attachment>
+                      {m.attachments.map((a) => (
+                        <AttachmentThumb key={a.key} a={a} label={s.voiceNote} />
+                      ))}
+                    </div>
+                  )}
+                  {(m.text || !m.attachments?.length) && (
                   <div
                     className={`inline-block rounded-xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words ${
                       m.role === 'user'
@@ -1628,6 +1939,7 @@ export default function Support() {
                     {m.error && <AlertTriangle className="w-3.5 h-3.5 inline-block me-1 -mt-0.5" />}
                     {m.text}
                   </div>
+                  )}
 
                   {m.reply?.steps && m.reply.steps.length > 0 && (
                     <ol className="list-decimal space-y-1.5 rounded-xl bg-surface px-3.5 py-2.5 ps-8 text-sm leading-relaxed text-text-secondary" data-assist-steps>
@@ -1708,7 +2020,16 @@ export default function Support() {
             {busy && <div className="text-xs text-text-muted px-1">{s.thinking}</div>}
 
             {showTicketForm && (
-              <TicketForm s={s} lang={lang} loc={loc} initial={draft ?? prefill} onClose={() => setShowTicketForm(false)} onCreated={onTicketCreated} />
+              <TicketForm
+                s={s}
+                lang={lang}
+                loc={loc}
+                initial={draft ?? prefill}
+                attachments={attachments}
+                onRemoveAttachment={removeAttachment}
+                onClose={() => setShowTicketForm(false)}
+                onCreated={onTicketCreated}
+              />
             )}
             <div ref={bottomRef} />
             </div>
@@ -1733,7 +2054,29 @@ export default function Support() {
                 ))}
               </div>
             )}
+            {attachOpen && isAuthenticated && (
+              <ChunkBoundary compact>
+                <Suspense fallback={null}>
+                  <AssistAttach lang={lang} remaining={ATTACH_MAX - attachments.length} onAttached={onAttached} onClose={closeAttach} />
+                </Suspense>
+              </ChunkBoundary>
+            )}
             <div className="max-w-3xl mx-auto flex gap-2">
+              {/* THE +: a photo, a clip or a voice note for the team. A guest is
+                  asked to sign in first (the files are kept under an account);
+                  the conversation survives the trip in this tab. */}
+              <button
+                type="button"
+                onClick={() => (isAuthenticated ? (attachOpen ? closeAttach() : setAttachOpen(true)) : signIn())}
+                disabled={busy}
+                className="lv-button lv-button-secondary w-12 shrink-0 px-0"
+                aria-label={isAuthenticated ? s.attachAdd : s.attachSignIn}
+                title={isAuthenticated ? s.attachAdd : s.attachSignIn}
+                aria-expanded={isAuthenticated ? attachOpen : undefined}
+                data-assist-attach-button
+              >
+                <Plus className="w-4 h-4" />
+              </button>
               <input
                 className="lv-input flex-1 min-w-0 text-sm"
                 value={input}

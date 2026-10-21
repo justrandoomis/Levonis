@@ -383,6 +383,10 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   // merely be missed, it would silently turn the entire guarded cleanup into
   // a no-op for every other prefix too.
   { table: 'support_ticket_messages', column: 'file_key', kind: 'text', why: 'a support-ticket attachment' },
+  // 0209 — a photo, clip or voice note attached in the assistant chat and
+  // handed to a ticket (assist/<uploader>/…). Unlinked ones are swept after
+  // seven days (worker/lib/jobs.ts `assist_unattached`); a linked one is kept.
+  { table: 'support_ticket_attachments', column: 'file_key', kind: 'text', why: 'an assistant attachment handed to a support ticket (0209)' },
   { table: 'warranty_claims', column: 'evidence', kind: 'json', why: 'private evidence keys' },
   { table: 'return_cases', column: 'evidence', kind: 'json', why: 'private evidence keys' },
   // 0143 — the photographs a customer takes of the device they are trading in,

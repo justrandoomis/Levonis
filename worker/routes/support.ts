@@ -58,6 +58,9 @@ import { ownDevices, type DeviceLite } from '../lib/assist/tools/devices';
 import { rewriteSpokenModels } from '../lib/assist/understand/models';
 import type { AssistReply, CardRenderer, TicketDraft } from '../lib/assist/types';
 import type { AssistContext } from '../lib/assist/context';
+import { attachmentInsert, checkStoredAttachments, readAttachmentKeys, ticketAttachments } from '../lib/assist/attachments';
+import { handoffForStaff, readHandoff } from '../lib/assist/handoff';
+import { tableColumns } from '../lib/schemaColumns';
 import { cardAvailability, compositionAvailability, type AvailabilityState } from '@levonis/catalog/availability';
 import { catalogIndexFor, productTypeSql } from '../lib/catalogPresentation';
 import {
@@ -328,7 +331,8 @@ const LEXICON: Record<Intent, LexEntry> = {
     stems: ['ticket', 'complaint', 'تذكرة', 'شكوى', 'مشكلة', 'خربان', 'عاطل', 'معطل', 'تیکێت', 'سکاڵا'],
   },
   human_handoff: {
-    phrases: ['اريد اتكلم مع موظف', 'talk to a human', 'real person', 'customer service', 'کارمەندێک'],
+    // «تحدث مع الفريق» is the triage's own chip label (worker/lib/assist/strings.ts), typed.
+    phrases: ['اريد اتكلم مع موظف', 'talk to a human', 'real person', 'customer service', 'کارمەندێک', 'تحدث مع الفريق', 'talk to the team', 'قسە لەگەڵ تیمەکە'],
     stems: ['human', 'agent', 'staff', 'موظف', 'انسان', 'اتواصل', 'کارمەند', 'مرۆڤ'],
   },
 
@@ -2499,9 +2503,23 @@ supportRoutes.post('/assistant', async (c) => {
       reply = await handlePolicyQuestion(c, resolved, loc);
       break;
     case 'open_ticket':
-    case 'human_handoff':
+    case 'human_handoff': {
+      /**
+       * «تحدث مع الفريق» TYPED OR TAPPED FROM THE MENU, MID-TRIAGE, is the
+       * triage's own «talk» step: the ticket opens prefilled with the printer,
+       * the symptom and the steps tried instead of a blank form.
+       */
+      if (context.triage) {
+        const viewer = viewerFor(c.env.DB, user?.id ?? null, loc);
+        const turn = await handleTurn(c.env.DB, viewer, { chip: { step: 'talk' }, context }, CARD_RENDERER);
+        if (turn) {
+          const drafted = { ...(turn.reply as AssistReply), context: turn.context } as AssistantReply;
+          return c.json({ success: true, reply: withFollowups(drafted, loc) });
+        }
+      }
       reply = handleHandoff(intent, loc);
       break;
+    }
     case 'greeting':
       reply = { intent, text: tr(loc, 'greeting_reply'), choices: menuChoices(loc) };
       break;
@@ -2704,6 +2722,15 @@ supportRoutes.post('/tickets', requireAuth, async (c) => {
   const unitId = str(body.unit_id, 'unit_id', { max: 40, required: false });
   const source = body.source === 'manual' ? 'manual' : 'assistant';
   const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { min: 8, max: 80, required: false });
+  /**
+   * WHAT THE ASSISTANT HANDS THE TEAM (support assistant v2, 0209): the
+   * photos, clips and voice notes attached in the assistant chat, and the
+   * triage as closed-set values. Keys are checked for shape and ownership
+   * before any I/O (worker/lib/assist/attachments.ts); the summary is read
+   * with the same closed sets the desk reads it with (worker/lib/assist/handoff.ts).
+   */
+  const attachmentKeys = readAttachmentKeys(body.attachments, user.id);
+  const handoffIn = readHandoff(body.handoff);
 
   if (orderId) {
     const own = await c.env.DB.prepare('SELECT id FROM orders WHERE id = ? AND user_id = ?').bind(orderId, user.id).first();
@@ -2732,6 +2759,19 @@ supportRoutes.post('/tickets', requireAuth, async (c) => {
       .first();
     if (!own) throw badRequest('That device was not found in your account', 'UNIT_NOT_FOUND');
   }
+
+  /**
+   * A DATABASE BEFORE 0209 still takes a plain ticket. Attachments are then
+   * refused by name rather than dropped (the customer would believe the team
+   * has the photo), and the summary, which is staff convenience, is left out.
+   */
+  const ticketCols = attachmentKeys.length || handoffIn ? await tableColumns(c.env.DB, 'support_tickets', ['handoff_summary']) : null;
+  const assistSchema = !!ticketCols?.has('handoff_summary');
+  if (attachmentKeys.length && !assistSchema) {
+    throw badRequest('Attachments cannot be sent with a ticket yet — send the ticket without them', 'ATTACHMENTS_UNAVAILABLE');
+  }
+  const attachments = await checkStoredAttachments(c.env, user.id, attachmentKeys);
+  const handoff = handoffIn && assistSchema ? { ...handoffIn, attachments: attachments.length } : null;
 
   // REAL PRO priority snapshot: eligible active PRO, unless an active
   // restriction case gates the priorityService benefit.
@@ -2762,14 +2802,21 @@ supportRoutes.post('/tickets', requireAuth, async (c) => {
     : newId('tkt');
   const firstMessageId = idempotencyKey ? `tkm_${(await sha256Hex(`${ticketId}\nfirst`)).slice(0, 20)}` : newId('tkm');
   const now = new Date().toISOString();
+  const linked = attachmentInsert(c.env.DB, ticketId, user.id, attachments);
   const [written] = await c.env.DB.batch([
-    c.env.DB.prepare(
-      `INSERT INTO support_tickets (id, user_id, subject, order_id, unit_id, priority, state, source, created_at, updated_at, last_customer_msg_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`
-    ).bind(ticketId, user.id, subject, orderId || null, unitId || null, priority, source, now, now, now),
+    handoff
+      ? c.env.DB.prepare(
+          `INSERT INTO support_tickets (id, user_id, subject, order_id, unit_id, priority, state, source, created_at, updated_at, last_customer_msg_at, handoff_summary)
+           VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`
+        ).bind(ticketId, user.id, subject, orderId || null, unitId || null, priority, source, now, now, now, JSON.stringify(handoff))
+      : c.env.DB.prepare(
+          `INSERT INTO support_tickets (id, user_id, subject, order_id, unit_id, priority, state, source, created_at, updated_at, last_customer_msg_at)
+           VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`
+        ).bind(ticketId, user.id, subject, orderId || null, unitId || null, priority, source, now, now, now),
     c.env.DB.prepare(
       'INSERT INTO support_ticket_messages (id, ticket_id, sender_id, is_staff, body) VALUES (?, ?, ?, 0, ?) ON CONFLICT(id) DO NOTHING'
     ).bind(firstMessageId, ticketId, user.id, message),
+    ...(linked ? [linked] : []),
   ]);
 
   const ticket = await c.env.DB.prepare('SELECT * FROM support_tickets WHERE id = ? AND user_id = ?')
@@ -2817,6 +2864,9 @@ supportRoutes.post('/tickets', requireAuth, async (c) => {
       (priority ? '\nPriority: PRO' : '') +
       (orderId ? `\nOrder: ${orderId}` : '') +
       (unitId ? `\nDevice: ${unitId}` : '') +
+      // Closed-set tokens only (a model token, a symptom key) and a count.
+      (handoff ? `\nAssistant: ${[handoff.model, handoff.symptom].filter(Boolean).join(' · ')}` : '') +
+      (attachments.length ? `\nAttachments: ${attachments.length}` : '') +
       `\nSource: ${source}`
   );
 
@@ -2836,7 +2886,9 @@ supportRoutes.get('/tickets/:id', requireAuth, async (c) => {
   )
     .bind(ticket.id)
     .all<Record<string, unknown>>();
-  return c.json({ success: true, ticket: ticketPublic(ticket), messages: messages.map(messagePublic) });
+  // The files the assistant chat handed to this ticket; the summary stays with staff.
+  const attachments = await ticketAttachments(c.env.DB, ticket.id);
+  return c.json({ success: true, ticket: ticketPublic(ticket), messages: messages.map(messagePublic), attachments });
 });
 
 supportRoutes.post('/tickets/:id/messages', requireAuth, async (c) => {
@@ -2992,8 +3044,40 @@ supportRoutes.get('/admin/tickets/:id', async (c) => {
   )
     .bind(ticket.id)
     .all<Record<string, unknown>>();
-  return c.json({ success: true, ticket: ticketPublic(ticket, { admin: true }), messages: messages.map(messagePublic) });
+  /**
+   * «من المساعد» — what the triage established, for the agent (0209). Read
+   * again through the closed sets, labelled from the curated set in all three
+   * languages, with the names of the products the customer was shown. Absent
+   * on a ticket the assistant did not prepare, and on a database before 0209.
+   */
+  const handoff = handoffForStaff(ticket.handoff_summary ?? null);
+  const shownProducts = handoff?.shown.length ? await productNames(c.env.DB, handoff.shown) : [];
+  const attachments = await ticketAttachments(c.env.DB, ticket.id);
+  return c.json({
+    success: true,
+    ticket: ticketPublic(ticket, { admin: true }),
+    messages: messages.map(messagePublic),
+    handoff: handoff ? { ...handoff, products: shownProducts } : null,
+    attachments,
+  });
 });
+
+/** Names for the desk's «products shown» line, in the catalogue's three languages. */
+async function productNames(db: D1Database, ids: readonly string[]): Promise<Array<{ id: string; slug: string; name: string; name_ar: string; name_ku: string }>> {
+  try {
+    const { results } = await db
+      .prepare(`SELECT id, slug, name, name_ar, name_ku FROM products WHERE id IN (${ids.map(() => '?').join(', ')})`)
+      .bind(...ids)
+      .all<{ id: string; slug: string | null; name: string | null; name_ar: string | null; name_ku: string | null }>();
+    const byId = new Map((results ?? []).map((r) => [r.id, r]));
+    return ids
+      .map((id) => byId.get(id))
+      .filter((r): r is NonNullable<typeof r> => !!r)
+      .map((r) => ({ id: r.id, slug: String(r.slug ?? ''), name: String(r.name ?? ''), name_ar: String(r.name_ar ?? ''), name_ku: String(r.name_ku ?? '') }));
+  } catch {
+    return [];
+  }
+}
 
 supportRoutes.post('/admin/tickets/:id/messages', async (c) => {
   const admin = c.get('user')!;

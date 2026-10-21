@@ -27,6 +27,10 @@ export default function MessageMedia({
   if (kind === 'video') {
     return <video src={url} controls playsInline preload="metadata" className={`mb-1 max-h-[300px] w-full rounded-lg bg-black ${className}`} />;
   }
+  // A voice note from the support assistant (0209): the player, nothing to crop.
+  if (kind === 'audio') {
+    return <audio src={url} controls preload="metadata" className={`mb-1 w-full max-w-xs ${className}`} />;
+  }
   if (kind === 'image') {
     return (
       <a href={url} target="_blank" rel="noopener noreferrer" aria-label={openLabel} title={openLabel} className={`mb-1 block ${className}`}>

@@ -132,7 +132,10 @@ export const STATIC_SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   // camera=(self): the warranty and serial-inventory barcode scanners
   // (src/components/scanner) — this origin only, never a frame or a third party.
-  'Permissions-Policy': 'geolocation=(), microphone=(), camera=(self)',
+  // microphone=(self): a voice note in the order chat and the support
+  // assistant (src/lib/voiceRecorder.ts), recorded only after the visitor
+  // presses the microphone; this origin only, never a frame or a third party.
+  'Permissions-Policy': 'geolocation=(), microphone=(self), camera=(self)',
 };
 
 /**
