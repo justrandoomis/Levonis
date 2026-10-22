@@ -46,9 +46,9 @@ import { forgetAiConfig, loadAiState, taskModelOf } from '../lib/ai/config';
 import { hasRequiredRates, perCallLimitMicro, utcDay } from '../lib/ai/budget';
 import { providerAvailable, taskWorstCaseMicro } from '../lib/ai/readiness';
 import { later, runTask, speechSpec, understandSpec, visionSpec, PHOTO_LIMITS, SPEECH_MAX_BYTES, type TaskOutcome } from '../lib/ai/run';
-import { conformsTo, HMS_PATTERN, PHOTO_SCHEMA, READING_SCHEMA } from '../lib/ai/schemas';
+import { HMS_PATTERN } from '../lib/ai/schemas';
 import { bytesToBase64, stripJpegMetadata } from '../lib/ai/jpeg';
-import { aliasOfToken } from '../lib/assist/ai/aliases';
+import { canonicalHmsCode, readPhotoReading, readReading, readTranscript } from '../lib/assist/ai/validate';
 import { AI_TASKS, PROVIDER_KINDS, TASK_PROVIDER, type AiTask, type ListedModel, type TaskModel } from '../lib/ai/types';
 
 export const adminAssistAiRoutes = new Hono<AppContext>();
@@ -511,9 +511,10 @@ adminAssistAiRoutes.post('/test/:task', limitRoute('assist-ai-test', 6, 900), as
     const spec = understandSpec(env, { text: UNDERSTAND_TEST_SENTENCE, locale: 'ar' }, { guest: false }, deps);
     out = await runTask(env, spec, deps, { adminTest: true, models: rankRows(saved, body?.rank) });
     if (out.ok) {
-      valid = conformsTo(READING_SCHEMA, out.value);
-      const v = out.value as Record<string, unknown>;
-      expected = valid && v.action === 'triage' && v.symptom === 'clog' && v.printer === aliasOfToken('A1');
+      // `valid`: the answer passes the SAME validator a customer's answer must pass (worker/lib/assist/ai/validate.ts).
+      const reading = readReading(out.value, UNDERSTAND_TEST_SENTENCE, { v: 1 });
+      valid = reading !== null;
+      expected = reading?.action === 'triage' && reading.symptom === 'clog' && reading.model === 'A1';
     }
   } else if (task === 'vision') {
     const form = await testForm(c);
@@ -524,9 +525,10 @@ adminAssistAiRoutes.post('/test/:task', limitRoute('assist-ai-test', 6, 900), as
     if (!spec) throw refuse(400, 'AI_TEST_INPUT_INVALID');
     out = await runTask(env, spec, deps, { adminTest: true, models: rankRows(saved, form.get('rank')) });
     if (out.ok) {
-      valid = conformsTo(PHOTO_SCHEMA, out.value);
-      const codes = valid ? ((out.value as { hms_codes: string[] }).hms_codes ?? []) : [];
-      expected = codes.some((x) => x.toUpperCase() === code);
+      const reading = readPhotoReading(out.value);
+      valid = reading !== null;
+      const drawn = canonicalHmsCode(code);
+      expected = !!reading && !!drawn && reading.hmsCodes.includes(drawn);
     }
   } else {
     const form = await testForm(c);
@@ -554,9 +556,10 @@ adminAssistAiRoutes.post('/test/:task', limitRoute('assist-ai-test', 6, 900), as
     if (!spec) throw refuse(400, 'AI_TEST_INPUT_INVALID');
     out = await runTask(env, spec, deps, { adminTest: true, models });
     if (out.ok) {
-      const v = out.value as { text?: unknown; transcription_info?: { language?: unknown } };
-      valid = typeof v.text === 'string' && v.text.trim().length > 0;
-      const lang = typeof v.transcription_info?.language === 'string' ? v.transcription_info.language : '';
+      // The transcript itself never leaves this handler: only whether it passes the customer's own reader.
+      const v = out.value as { transcription_info?: { language?: unknown } };
+      valid = readTranscript(out.value) !== null;
+      const lang = typeof v.transcription_info?.language === 'string' ? v.transcription_info.language.trim().toLowerCase() : '';
       expected = valid && (lang === 'ar' || lang === 'en');
       if (manualId && valid && expected) testToken = await mintTestToken(manualId, Date.now());
     }

@@ -341,6 +341,50 @@ export async function convertToWebp(
   }
 }
 
+/**
+ * THE PICTURE THE ASSISTANT'S PHOTO READING SENDS, AND NOTHING ELSE (push B
+ * plan §5.2 step 7). A customer's stored photo, scaled down to fit 1568 px and
+ * re-encoded as JPEG through the same Images binding and call shape as
+ * `convertToWebp`. The caller (worker/routes/assistAi.ts) strips what metadata
+ * is left and checks the result (worker/lib/ai/jpeg.ts) before any provider
+ * sees it; nothing here is written anywhere, and nothing is returned but bytes
+ * or a reason. This module stays the only reader of `env.IMAGES`.
+ */
+export const VISION_RENDITION_EDGE = 1568;
+export const VISION_RENDITION_QUALITY = 85;
+/** Far above what a 1568 px JPEG at quality 85 weighs; the checker's own 1.5 MB limit is the real one. */
+export const VISION_RENDITION_MAX_BYTES = 4 * 1024 * 1024;
+
+export type VisionRenditionOutcome =
+  | { ok: true; bytes: Uint8Array }
+  | { ok: false; reason: 'unavailable' | 'failed' | 'too_large' | 'not_image' };
+
+export async function visionRendition(env: Pick<Env, 'IMAGES'>, bytes: Uint8Array, mime: string): Promise<VisionRenditionOutcome> {
+  if (mime && !/^image\//i.test(mime)) return { ok: false, reason: 'not_image' };
+  if (bytes.byteLength === 0) return { ok: false, reason: 'failed' };
+  if (bytes.byteLength > IMAGES_MAX_INPUT_BYTES) return { ok: false, reason: 'too_large' };
+  const images = env.IMAGES;
+  if (!images) return { ok: false, reason: 'unavailable' };
+  try {
+    const stream = new Blob([bytes]).stream();
+    const result = await images
+      .input(stream)
+      .transform({ width: VISION_RENDITION_EDGE, height: VISION_RENDITION_EDGE, fit: 'scale-down' })
+      .output({ format: 'image/jpeg', quality: VISION_RENDITION_QUALITY });
+    const response = result.response();
+    if (!response.ok) return { ok: false, reason: 'failed' };
+    const out = await readResponseBytes(response, {
+      maxBytes: VISION_RENDITION_MAX_BYTES,
+      tooLargeMessage: `Vision rendition exceeds the ${VISION_RENDITION_MAX_BYTES} byte limit`,
+    });
+    return out.byteLength ? { ok: true, bytes: out } : { ok: false, reason: 'failed' };
+  } catch (e) {
+    // A reason only: the binding's own message never travels further.
+    if (e instanceof GuardedFetchError && e.code === 'SOURCE_TOO_LARGE') return { ok: false, reason: 'too_large' };
+    return { ok: false, reason: 'failed' };
+  }
+}
+
 export type ProductWebpOutcome =
   | { ok: true; bytes: Uint8Array; mime: 'image/webp'; width: number; height: number; converted: boolean }
   | { ok: false; reason: 'unsupported' | 'animated_gif' | 'unavailable' | 'failed' | 'too_large'; detail?: string };

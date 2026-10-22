@@ -4,10 +4,14 @@
  *
  * Assistant (/api/support/assistant):
  *   POST { intent?, params?, text?, locale? } → { reply }
- *   - Fixed allowlist of intents resolved by deterministic rules ONLY:
- *     button intents + per-language keyword dictionaries. No LLM, no external
- *     inference, no free-text SQL. Unknown/ambiguous input returns clarifying
- *     choices — never a guess.
+ *   - Fixed allowlist of intents resolved by deterministic rules first:
+ *     button intents + per-language keyword dictionaries, no free-text SQL.
+ *     Unknown/ambiguous input returns clarifying choices — never a guess.
+ *     Push B's AI layer (./assistAi.ts, shipped switched off) is consulted at
+ *     ONE point only, after every rule and the strong catalogue lookup found
+ *     nothing: a model may pick one of push A's own paths or a read-only
+ *     intent, and the reply is still the templates over real data, marked
+ *     `mode: 'ai'`. With the layer off, every reply is push A's, byte for byte.
  *   - Every account handler queries ONLY the signed-in user's own rows (or
  *     public catalog/published policies) and returns a small allowlisted DTO.
  *     A manipulated id (another user's order) gets the same
@@ -53,6 +57,7 @@ import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { pricingCtx, resolveProductCards } from '../lib/catalog/cardsRead';
 import { handleTurn, ownedPrinterNamed } from '../lib/assist/orchestrator';
+import { markAi, maybeUnderstand, mountAssistAi } from './assistAi';
 import { readContext, SHOWN_MAX } from '../lib/assist/context';
 import { viewerFor } from '../lib/assist/viewer';
 import { callTool } from '../lib/assist/registry';
@@ -2514,6 +2519,8 @@ supportRoutes.post('/assistant', async (c) => {
    * (worker/lib/assist/orchestrator.ts `ownedPrinterNamed`, review round 5.4).
    */
   let ownedPrinter = false;
+  /** The text exactly as typed: push B's consult reads it (and checks a model's words against it), never the rewrite below. */
+  const typed = freeText;
   if (chipIntent === 'printer_problem' || (!chipIntent && freeText)) {
     const viewer = viewerFor(c.env.DB, user?.id ?? null, loc);
     const turn =
@@ -2597,6 +2604,12 @@ supportRoutes.post('/assistant', async (c) => {
   let intent: Intent | null = null;
   /** Filled from `pending` only, and only when the text answers its question. */
   let slotParams: Record<string, unknown> = {};
+  /**
+   * Push B: a model's reading named the read-only intent below (./assistAi.ts
+   * `maybeUnderstand`). Its handler answers exactly as for a typed or tapped
+   * intent, with every session and ownership check; the reply is then marked.
+   */
+  let aiUsed = false;
 
   if (typeof body.intent === 'string' && (INTENTS as readonly string[]).includes(body.intent)) {
     // An explicit tap on a chip. Always wins — it is not a guess at all.
@@ -2648,12 +2661,32 @@ supportRoutes.post('/assistant', async (c) => {
           return send(withFollowups(asked ? { ...found, intent: asked } : found, loc));
         }
       }
-      const subset = decision.shortlist.length ? decision.shortlist : undefined;
-      return send({
-        intent: 'clarify',
-        text: tr(loc, subset ? 'clarify_multi' : 'clarify'),
-        choices: menuChoices(loc, subset),
-      } satisfies AssistantReply);
+      /**
+       * PUSH B'S ONE CONSULT POINT. Every rule, the legacy scorer and the strong
+       * lookup found nothing; only now may a model read the sentence. It never
+       * throws, and `null` (switched off, not ready, a limit, any fault, any
+       * invalid answer) is push A's clarify reply below, byte for byte. A
+       * printer the customer owns («عندي اي ون») was read by the rules: not asked.
+       */
+      const ai = ownedPrinter
+        ? null
+        : await maybeUnderstand(c, { text: typed ?? freeText, loc, context, viewer: viewerFor(c.env.DB, user?.id ?? null, loc), render: CARD_RENDERER });
+      if (ai?.kind === 'reply') {
+        const reply = { ...(ai.turn.reply as AssistReply), context: ai.turn.context } as AssistantReply;
+        return c.json({ success: true, reply: markAi(withFollowups(reply, loc), loc) });
+      }
+      if (ai?.kind === 'intent') {
+        intent = ai.intent;
+        slotParams = {};
+        aiUsed = true;
+      } else {
+        const subset = decision.shortlist.length ? decision.shortlist : undefined;
+        return send({
+          intent: 'clarify',
+          text: tr(loc, subset ? 'clarify_multi' : 'clarify'),
+          choices: menuChoices(loc, subset),
+        } satisfies AssistantReply);
+      }
     }
   } else {
     return send({ intent: 'clarify', text: tr(loc, 'clarify'), choices: menuChoices(loc) } satisfies AssistantReply);
@@ -2691,12 +2724,13 @@ supportRoutes.post('/assistant', async (c) => {
     const turn = await handleTurn(c.env.DB, viewer, { chip: { step: 'talk' }, context }, CARD_RENDERER);
     if (turn) {
       const drafted = { ...(turn.reply as AssistReply), context: turn.context } as AssistantReply;
-      return c.json({ success: true, reply: withFollowups(drafted, loc) });
+      const shown = withFollowups(drafted, loc);
+      return c.json({ success: true, reply: aiUsed ? markAi(shown, loc) : shown });
     }
   }
 
   if (ACCOUNT_INTENTS.has(intent) && !user) {
-    return send(signInReply(intent, loc));
+    return send(aiUsed ? markAi(signInReply(intent, loc), loc) : signInReply(intent, loc));
   }
 
   let reply: AssistantReply;
@@ -2791,8 +2825,15 @@ supportRoutes.post('/assistant', async (c) => {
       reply = { intent, text: tr(loc, 'clarify'), choices: menuChoices(loc) };
       break;
   }
-  return send(withFollowups(reply, loc));
+  // The follow-ups first, then push B's mark: «ليس هذا ما قصدته» never stands in for them.
+  return send(aiUsed ? markAi(withFollowups(reply, loc), loc) : withFollowups(reply, loc));
 });
+
+/**
+ * Push B's sub-routes of the assistant: `/assistant/readiness`, `/assistant/read`
+ * and `/assistant/read-frames` (./assistAi.ts), with this file's card mapper.
+ */
+mountAssistAi(supportRoutes, CARD_RENDERER);
 
 // ================================================================== tickets
 

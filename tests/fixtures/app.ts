@@ -295,13 +295,52 @@ export type Mount = (app: Hono<AppContext>) => void;
  * the apex-only guard on /api/admin/*, a stubbed session user and the same
  * onError translation (HttpError → JSON; anything else → a generic 500).
  */
-export function stubApp(
-  db: unknown,
-  user: StubUser | null,
-  mount: Mount,
-  opts: { host?: string; env?: Record<string, unknown>; sessionAgeSeconds?: number; publishV2?: boolean | 'always' } = {}
-) {
+export interface StubAppOpts {
+  host?: string;
+  env?: Record<string, unknown>;
+  sessionAgeSeconds?: number;
+  publishV2?: boolean | 'always';
+}
+
+/**
+ * REPLAY TAPS (tests/aiBasicModeParity.test.ts). A tap sees each request a
+ * stubApp answers: before it runs (`before`, e.g. to snapshot a table the
+ * request will write) and after (`after`, with the response), together with
+ * the database, the user and the options the app was built with, so it can
+ * send the same request again under other conditions. A request carrying
+ * `x-stub-replay` is a replay and is never tapped. Empty in every other test:
+ * an app built with no tap installed has no extra middleware at all.
+ */
+export interface StubTap {
+  before?(t: StubTapRequest): Promise<unknown>;
+  after(t: StubTapRequest & { response: Response; state: unknown }): Promise<void>;
+}
+export interface StubTapRequest {
+  db: unknown;
+  user: StubUser | null;
+  opts: StubAppOpts;
+  method: string;
+  path: string;
+  headers: Record<string, string>;
+  body: string;
+}
+export const stubTaps: StubTap[] = [];
+
+export function stubApp(db: unknown, user: StubUser | null, mount: Mount, opts: StubAppOpts = {}) {
   const a = new Hono<AppContext>();
+  if (stubTaps.length) {
+    a.use('*', async (c, next) => {
+      if (c.req.header('x-stub-replay')) return next();
+      const url = new URL(c.req.url);
+      const headers: Record<string, string> = {};
+      c.req.raw.headers.forEach((v, k) => (headers[k] = v));
+      const body = c.req.method === 'GET' || c.req.method === 'HEAD' ? '' : await c.req.raw.clone().text();
+      const req: StubTapRequest = { db, user, opts, method: c.req.method, path: url.pathname + url.search, headers, body };
+      const states = await Promise.all(stubTaps.map((tap) => (tap.before ? tap.before(req) : undefined)));
+      await next();
+      for (const [i, tap] of stubTaps.entries()) await tap.after({ ...req, response: c.res.clone(), state: states[i] });
+    });
+  }
   // The clean start (A.12.1): seeded raw products are V2-published before a customer request
   // (tests/fixtures/autoPublish.ts); `publishV2: false` keeps them as the cut-over left them, and
   // `'always'` publishes before an admin request too (a gift level or a pool names a sellable product).
