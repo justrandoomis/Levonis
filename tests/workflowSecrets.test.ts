@@ -73,3 +73,23 @@ test('.dev.vars.example names the keys with no value', () => {
   assert.match(example, /^IRAQ_PARALLEL_FX_API_KEY=$/m);
   assert.match(example, /^ANTHROPIC_API_KEY=$/m);
 });
+
+/**
+ * THE ASSISTANT READINESS PROBE (push B plan §14, B1 part). After the live
+ * verify, workflow 7 asks the public readiness route: 200, a mode of basic
+ * or ai, and no Workers AI model path in the body. It reads nothing secret
+ * and writes nothing.
+ */
+test('workflow 7 probes the assistant readiness: 200, mode basic or ai, no model path', () => {
+  const yml = workflows.find((w) => w.f === 'deploy-staging-code.yml')!.text;
+  const at = yml.indexOf('- name: The assistant readiness answers, and names no model');
+  assert.ok(at > 0, 'the probe step is there');
+  const verify = yml.indexOf('- name: Verify the live site, read-only');
+  assert.ok(verify > 0 && verify < at, 'it runs after the live verify, against the code just deployed');
+  const step = yml.slice(at, yml.indexOf('\n      - name:', at + 10));
+  assert.match(step, /https:\/\/levonis-iq\.com\/api\/support\/assistant\/readiness/);
+  assert.match(step, /\[ "\$code" = "200" \]/);
+  assert.match(step, /basic\|ai\)/);
+  assert.match(step, /grep -qF '@cf\/'/);
+  assert.doesNotMatch(step, /ANTHROPIC|secrets\.|--var|-X POST|Authorization/);
+});

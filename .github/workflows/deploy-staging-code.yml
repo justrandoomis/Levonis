@@ -771,6 +771,25 @@ jobs:
             | jq -c '[.plans[] | {id, tier, duration_months, price_iqd}]'
           [ "$fail" = "0" ] || { echo "::error::an endpoint did not answer 200 after the deploy"; exit 1; }
 
+      # THE SUPPORT ASSISTANT'S READINESS (push B plan §5.5, §14). Public and
+      # read-only: it must answer 200 with mode basic or ai, and its body must
+      # never carry a Workers AI model path. It ships dark (basic) until the
+      # owner turns the layer on in admin; a model id never appears in it.
+      - name: The assistant readiness answers, and names no model
+        run: |
+          code=$(curl -s -o /tmp/assist_ready.json -w '%{http_code}' --max-time 25 "https://levonis-iq.com/api/support/assistant/readiness")
+          echo "/api/support/assistant/readiness -> $code"
+          [ "$code" = "200" ] || { echo "::error::the assistant readiness did not answer 200"; exit 1; }
+          mode=$(jq -r '.mode // "missing"' /tmp/assist_ready.json 2>/dev/null || echo "invalid")
+          case "$mode" in
+            basic|ai) echo "assistant mode: $mode" ;;
+            *) echo "::error::the assistant readiness mode is $mode, expected basic or ai"; exit 1 ;;
+          esac
+          if grep -qF '@cf/' /tmp/assist_ready.json; then
+            echo "::error::the assistant readiness carries a Workers AI model path"; exit 1
+          fi
+          jq -c '{mode, text, photo, clip, voice}' /tmp/assist_ready.json
+
       # CATALOG-ONLY (DECISIONS rows 239-240; Bambu import spec §K.1 D-1),
       # after the clean start (DECISIONS row 222, spec addendum A.4.6). One
       # active, VISIBLE ordinary product that is NOT V2-published yet, read-only,

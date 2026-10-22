@@ -146,7 +146,9 @@ test('prepare-deploy-config.mjs uses the extracted module and kept everything el
   // exact eight-element source text and would fail on any addition, which is
   // the opposite of what it should do: adding a binding kind is always safe,
   // and dropping one is the outage.
-  for (const key of ['name', 'd1_databases', 'r2_buckets', 'images', 'vars', 'assets', 'observability', 'triggers']) {
+  // `ai` (the support assistant AI layer, push B0) is non-inheritable like `images`: a fold without it
+  // deploys a Worker with no speech binding, and the assistant silently stays in basic mode.
+  for (const key of ['name', 'd1_databases', 'r2_buckets', 'images', 'ai', 'vars', 'assets', 'observability', 'triggers']) {
     assert.match(src, new RegExp(`'${key}',`), `the fold list dropped "${key}"`);
   }
   assert.match(src, /mergeVars\(cfg\.vars, live, fromEnv\)/, 'the merge is the shared one');
