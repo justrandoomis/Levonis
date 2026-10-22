@@ -7,8 +7,8 @@ identifiers.
 
 ## 1. Live state
 
-- **Live head:** `53c0401d` (P1-05). Workflow 7 run 39644096376 is green (21/21).
-- **Database:** live schema `0208_request_sources_parts.sql`, 201 migrations.
+- **Live head:** `3f117db3` (support assistant v2, push A), landed 2026-10-22. Workflow 7 run 39772742711 is green.
+- **Database:** live schema `0209_support_ticket_assist.sql`, 202 migrations.
 - **Landed today, in order:**
 
 | Commit | What | Workflow 7 |
@@ -16,6 +16,7 @@ identifiers.
 | `529d49be` | Smart search 1.6/1.7 (`nl=1`, the precision rule, colour phrases such as «Multi-Color»), plus the trade-in money guard pinning its clock | run 39526606397 |
 | `0c5ad613` | Assistant AI layer **B0**: Workers AI binding `AI` on `env.staging` only; workflow 7 reports `ANTHROPIC_API_KEY` by type | run 39537773129 |
 | `53c0401d` | **P1-05** readers and offers v3 (per-part estimate with coverage, per-part eligibility, offer coverage and substitutions) | run 39644096376 |
+| `3f117db3` | **Assistant v2, push A** (no AI): the reader for Iraqi Arabic, English and Sorani, the real search engine, the printer-problem triage with a ticket draft, attachments on the ticket; migration 0209. Final rounds 5.4–5.7 (see §3.1) | run 39772742711 (2026-10-22) |
 
 - **B0 outcome:**
   - The deploy token accepted the AI binding.
@@ -40,48 +41,36 @@ identifiers.
 
 ## 3. Lanes in flight
 
-### 3.1 Support assistant v2, push A (no AI) — branch `wip/assist-v2`
+### 3.1 Support assistant v2, push A — LANDED (`3f117db3`, 2026-10-22)
 
-- **What it is:** the owner complained that the support bot is dumb and that photos, video and voice notes cannot be attached. Push A changes the support assistant in `worker/lib/assist/**`, `worker/routes/support.ts`, `src/pages/Support.tsx` and `src/components/support/AssistAttach.tsx`:
-  - it reads Iraqi Arabic, English and Sorani, including spoken printer names («اي ون», «بي ون اس», «ئەی وەن»);
-  - it asks the real search engine (prices equal the storefront grid);
-  - it runs a printer-problem triage (printer → symptom → steps → «تحدث مع الفريق» with a prefilled draft);
-  - it attaches photos, clips and voice notes to the ticket.
-- **Migration:** `0209_support_ticket_assist.sql`, with `worker/lib/schemaVersion.ts` at `0209` / `202`. This is correct on top of live 0208/201.
-- **Commits:**
-  - The branch is based on `529d49be`. Rebase it onto the live head first; conflicts are expected to be small.
-  - **Last verified commit:** `0ca63248` (review round 5.3).
-  - **Tip `6ce6a051`:** WIP, with test edits only for the final round. No code backs them yet, so some tests fail. Implement the items below to make them pass, or drop the commit.
-- **Test file naming:**
-  - `tests/assistReader.test.ts` is push A's reader test.
-  - `tests/assistUnderstand.test.ts` belongs to the live smart-search lane.
-- **The six final items** (all in `worker/lib/assist/understand/*` and `orchestrator.ts`; each needs a test in ar, en and ckb):
-  1. **Ownership guard.**
-     - In `printerOnly`, a sentence with a first-person have/own/bought word («عندي», «طابعتي», «اشتريت … من عندكم», "I have", "I own", "my printer", «…م هەیە», «پرینتەرەکەم») is not "a printer name only". It falls through to the legacy answer, exactly as live does (the clarify menu).
-     - Keep printer-first for want/need («اريد», "I want", «دەمەوێ», «پێویستە»), for not-having, for «عندكم اي ون؟» / "do you have the A1", and for any price or stock ask.
-     - A wrong hit must only ever produce the live answer.
-     - Do not reintroduce an ownership triage: rounds 4.2–5.2 tried it, and it never converged.
-  2. **Glued negation.** Split «ماعندي» / «معندي» into «ما عندي» before reading. Today «ماعندي طابعة» fuzzy-matches a Matte filament.
-  3. **«still» / «هێشتا».** Read it as "not fixed" when a fault, problem or sameness word follows it. Do not, when a not-tried or waiting phrase is present.
-  4. **«بعد ما» / «بعدما».** Before a verb it means "after", never a negation. Remove «بعدني ما» from `OUTCOME_NOT_TRIED`.
-  5. **The tried claim.** A try/do verb counts only when its object means the steps (them, it, all, the steps, «ـها/ـهم», «الخطوات», «هەمووم») or the clause ends. Never with a gerund or another noun ("tried printing again"), and never with a third-person subject ("it did that again"). Otherwise the draft lists the steps as shown, not as tried.
-  6. Tests for each item.
-- **Landing gate** (what blocks landing):
-  - a turn worse than live `0c5ad613`;
-  - a ticket draft or staff summary stating something the customer did not give;
-  - a broken owner case;
-  - a price different from the storefront grid;
-  - data from another customer.
+- The six final items are in (round 5.4, `aa9730f2`): the ownership guard, glued «ماعندي», still/«هێشتا», «بعد ما» as "after", the tried claim needs the steps as its object, and the tests.
+- Rounds 5.5–5.7 (`f8c2ce82`, `02973253`, `3f117db3`) fixed the landing-gate findings of three verification rounds:
+  - a turn worse than live;
+  - a ticket draft stating something the customer did not give.
 
-  Everything else is follow-up.
-- **The five owner cases to verify live after landing**, in ar, en and ckb, as guest and member:
-  1. «نوزل مال اي ون اريده 0.2»: the exact A1/A2 0.2 hotend first. The Multi-Size kit after it is accepted (lead decision: the kit carries a 0.2 nozzle).
-  2. «بحث عن منتج صيانه خلل بالنوزل»: maintenance products for a nozzle.
-  3. «صارت عندي مشكله بالطابعه»: the triage, own printer first, symptoms, steps, then a handoff draft that states only what was given.
-  4. «كلوب»: which printer, then the clog steps, the parts and the wiki link.
-  5. The + button attaches a photo, video and voice note to the ticket. Staff see them only after the ticket includes them.
+  Each round was checked by a live-vs-branch parity harness and a ticket-truth adversary.
+- **Results:**
+  - Last round: no regressions, and 0 false facts in 79 drafts on 120 realistic conversations.
+  - 0 price mismatches against the storefront grid.
+  - 0 data from another customer.
+  - All 368 assistant and support tests pass, and CI was green on every tip.
+- **Live check, guest, ar/en/ckb:**
+  - case 1: the A1/A2 hotend first, then the Multi-Size kit;
+  - case 2: nozzle maintenance products;
+  - case 3: printer, then symptoms;
+  - case 4: printer, then the clog steps and parts, then a draft that says "tried" only after "tried them".
+- **Not checked live:**
+  - the member path (own printer first);
+  - case 5 (attachments).
 
-### 3.2 Assistant AI layer B1 — not started; plan in `assist-ai-layer-B1-plan.md`
+  Both need a signed-in account; tests cover them.
+- **Follow-ups, not blockers:**
+  - Some real "tried all the steps" phrasings are drafted as "shown". This is the safe direction.
+  - A price asked together with delivery loses its cards.
+  - «خلصت الفلامنت مالتي» and «فیلامێنتم تەواو بوو» show loosely related products.
+  - "I tried another filament, still clogged" shows the steps again.
+
+### 3.2 Assistant AI layer B1 — in progress (branch `b1/server` in the local worktree `/home/user/levonis-b1s`, client lane `b1/client`); plan in `assist-ai-layer-B1-plan.md`
 
 - Start after push A lands. It builds on push A's adapter seam `worker/lib/assist/ai/adapter.ts`.
 - **Shape:**
