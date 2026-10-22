@@ -17,6 +17,7 @@
  */
 import type { Env } from '../types';
 import { webpConversionAvailable } from '../imageConvert';
+import { maxVisionImageTokens } from './jpeg';
 import { anthropicAvailable } from './providers/anthropic';
 import { workersAiAvailable } from './providers/workersAi';
 import { loadAiState, type AiState } from './config';
@@ -37,7 +38,7 @@ const promptBytes = (task: AiTask): number =>
 
 /** The most one call of this task could cost on this model (the admin's `worst_case_warn` reads the same). */
 export function taskWorstCaseMicro(m: TaskModel): number {
-  return nominalWorstCaseMicro(m, promptBytes(m.task));
+  return nominalWorstCaseMicro(m, promptBytes(m.task), maxVisionImageTokens());
 }
 
 /** Can this model row run at all under this cap? */

@@ -22,8 +22,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
-import { OWNER, all, asD1, dbThrough, get, json, providerFetch, put, post, row, send, stubApp, ctx, type StubUser } from './fixtures/app';
-import { KEY, SPEECH_MODEL, TEXT_MODEL, aiDb, answer, fakeAi, jsonResponse, tinyJpeg, textModel } from './fixtures/aiLayer';
+import { OWNER, all, asD1, dbThrough, get, json, providerFetch, put, post, send, stubApp, ctx, type StubUser } from './fixtures/app';
+import { KEY, SPEECH_MODEL, TEXT_MODEL, aiDb, answer, fakeAi, jsonResponse, one, tinyJpeg, textModel } from './fixtures/aiLayer';
 import { adminAssistAiRoutes, mintTestToken, testTokenValid, usdToMicro } from '../worker/routes/adminAssistAi';
 import { ASSIST_AI_REFUSALS } from '../packages/contracts/src/assistAiRefusals';
 import { forgetAiConfig } from '../worker/lib/ai/config';
@@ -82,7 +82,7 @@ test('every route refuses every other admin with 403 OWNER_ONLY, before anything
       assert.equal(res.status, 403, `${user.id} ${method} ${path}`);
       assert.equal((await json(res)).code, 'OWNER_ONLY');
     }
-    assert.equal(row<{ n: number }>(raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action LIKE 'assist_ai.%'").n, 0);
+    assert.equal(one<{ n: number }>(raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action LIKE 'assist_ai.%'").n, 0);
   }
   assert.equal(providerFetch.attempts.length, 0, 'no provider was asked for a list on behalf of a non-owner');
   const anon = appFor(aiDb().raw, null);
@@ -99,7 +99,7 @@ test('a write needs a fresh sign-in: 401 REAUTH_REQUIRED after ten minutes', asy
     assert.equal(res.status, 401, `${method} ${path}`);
     assert.equal((await json(res)).code, 'REAUTH_REQUIRED');
   }
-  assert.equal(row<{ version: number }>(raw, 'SELECT version FROM ai_settings').version, 1);
+  assert.equal(one<{ version: number }>(raw, 'SELECT version FROM ai_settings').version, 1);
 });
 
 test('a save re-fetches the live list: an unlisted id, a missing capability, missing rates and an unreadable list are refused', async () => {
@@ -124,7 +124,7 @@ test('a save re-fetches the live list: an unlisted id, a missing capability, mis
   };
   assert.deepEqual(await code(`${BASE}/tasks/understand/0`, { model_id: TEXT_MODEL, rates: RATES }), [409, 'AI_MODEL_LIST_UNAVAILABLE']);
   assert.equal(all(raw, 'SELECT * FROM ai_task_models').length, 0);
-  assert.equal(row<{ version: number }>(raw, 'SELECT version FROM ai_settings').version, 1, 'a refused save bumps nothing');
+  assert.equal(one<{ version: number }>(raw, 'SELECT version FROM ai_settings').version, 1, 'a refused save bumps nothing');
 });
 
 test('a listed model is saved in micro-USD, with effort from the listing, the version bumped and an audit of names only', async () => {
@@ -136,7 +136,7 @@ test('a listed model is saved in micro-USD, with effort from the listing, the ve
   const body = await json(res);
   assert.equal(body.effort_low, true);
   assert.equal(typeof body.worst_case_warn, 'boolean');
-  const m = row<Record<string, unknown>>(raw, 'SELECT * FROM ai_task_models');
+  const m = one<Record<string, unknown>>(raw, 'SELECT * FROM ai_task_models');
   assert.equal(m.provider, 'anthropic', 'the provider comes from the task, never the body');
   assert.equal(m.in_micro_per_mtok, 1_000_000);
   assert.equal(m.out_micro_per_mtok, 5_000_000);
@@ -145,8 +145,8 @@ test('a listed model is saved in micro-USD, with effort from the listing, the ve
   assert.equal(m.speech_micro_per_minute, 0, 'a text row stores no per-minute price');
   assert.equal(m.effort_low, 1);
   assert.equal(m.gone, 0);
-  assert.equal(row<{ version: number }>(raw, 'SELECT version FROM ai_settings').version, 2);
-  const audit = row<{ action: string; target: string; detail: string }>(raw, "SELECT action, target, detail FROM audit_log WHERE action LIKE 'assist_ai.%'");
+  assert.equal(one<{ version: number }>(raw, 'SELECT version FROM ai_settings').version, 2);
+  const audit = one<{ action: string; target: string; detail: string }>(raw, "SELECT action, target, detail FROM audit_log WHERE action LIKE 'assist_ai.%'");
   assert.equal(audit.action, 'assist_ai.model.save');
   assert.equal(audit.target, 'assist_ai:understand:0');
   const detail = JSON.parse(audit.detail) as Record<string, unknown>;
@@ -156,20 +156,20 @@ test('a listed model is saved in micro-USD, with effort from the listing, the ve
 
   // Saving the same row again changes nothing but still bumps the version (every write does).
   await put(a, `${BASE}/tasks/understand/0`, { model_id: TEXT_MODEL, rates: { in: 1, out: '5', cache_write: '1.25', cache_read: '0.1' } });
-  assert.equal(row<{ version: number }>(raw, 'SELECT version FROM ai_settings').version, 3);
+  assert.equal(one<{ version: number }>(raw, 'SELECT version FROM ai_settings').version, 3);
   const second = all<{ detail: string }>(raw, "SELECT detail FROM audit_log WHERE action = 'assist_ai.model.save' ORDER BY rowid")[1]!;
   assert.deepEqual((JSON.parse(second.detail) as { fields: string[] }).fields, []);
 
   // A saved row clears `gone`.
   raw.exec('UPDATE ai_task_models SET gone = 1');
   await put(a, `${BASE}/tasks/understand/0`, { model_id: TEXT_MODEL, rates: RATES });
-  assert.equal(row<{ gone: number }>(raw, 'SELECT gone FROM ai_task_models').gone, 0);
+  assert.equal(one<{ gone: number }>(raw, 'SELECT gone FROM ai_task_models').gone, 0);
 
   const del = await send(a, 'DELETE', `${BASE}/tasks/understand/0`);
   assert.equal(del.status, 200);
   assert.equal((await json(del)).removed, true);
   assert.equal(all(raw, 'SELECT * FROM ai_task_models').length, 0);
-  assert.equal(row<{ version: number }>(raw, 'SELECT version FROM ai_settings').version, 5);
+  assert.equal(one<{ version: number }>(raw, 'SELECT version FROM ai_settings').version, 5);
 });
 
 test('settings: validated, the version bumped, the audit names the fields only', async () => {
@@ -183,9 +183,9 @@ test('settings: validated, the version bumped, the audit names the fields only',
   }
   const res = await put(a, `${BASE}/settings`, { enabled: true, daily_cap_usd: '2.50', guests: true, guest_share_pct: 10, understand_ckb: false });
   assert.equal(res.status, 200);
-  const s = row<Record<string, number>>(raw, 'SELECT enabled, daily_cap_micro_usd, guests, guest_share_pct, understand_ckb, version FROM ai_settings');
+  const s = one<Record<string, number>>(raw, 'SELECT enabled, daily_cap_micro_usd, guests, guest_share_pct, understand_ckb, version FROM ai_settings');
   assert.deepEqual({ ...s }, { enabled: 1, daily_cap_micro_usd: 2_500_000, guests: 1, guest_share_pct: 10, understand_ckb: 0, version: 2 });
-  const audit = row<{ detail: string }>(raw, "SELECT detail FROM audit_log WHERE action = 'assist_ai.settings.save'");
+  const audit = one<{ detail: string }>(raw, "SELECT detail FROM audit_log WHERE action = 'assist_ai.settings.save'");
   assert.deepEqual(JSON.parse(audit.detail), { fields: ['enabled', 'guests', 'daily_cap_micro_usd', 'guest_share_pct'] });
   assert.ok(!/2500000|2\.5|"10"/.test(audit.detail));
   assert.equal((await put(a, `${BASE}/settings`, { daily_cap_usd: 50 })).status, 200, 'the $50 ceiling itself is allowed');
@@ -226,7 +226,7 @@ test('a typed speech id is saved only with a passing Test token, for that id, wi
   assert.equal((await json(res)).code, 'AI_TEST_TOKEN_REQUIRED', 'a tampered token is refused');
   res = await put(a, `${BASE}/tasks/speech/0`, { model_id: SPEECH_MODEL, rates, test_token: t.test_token });
   assert.equal(res.status, 200);
-  const m = row<Record<string, unknown>>(raw, 'SELECT provider, model_id, speech_micro_per_minute, in_micro_per_mtok FROM ai_task_models');
+  const m = one<Record<string, unknown>>(raw, 'SELECT provider, model_id, speech_micro_per_minute, in_micro_per_mtok FROM ai_task_models');
   assert.deepEqual({ ...m }, { provider: 'workers_ai', model_id: SPEECH_MODEL, speech_micro_per_minute: 6_000, in_micro_per_mtok: 0 });
 
   const now = Date.now();
@@ -304,7 +304,7 @@ test('the understanding Test is budgeted and ledgered, and answers codes and fla
   assert.deepEqual({ ok: t.ok, code: t.code, valid: t.valid, expected: t.expected }, { ok: true, code: 'OK', valid: true, expected: true });
   assert.ok(t.cost_micro_usd > 0);
   assert.ok(!JSON.stringify(t).includes('ZZMODELZZ'), 'the output never leaves the handler');
-  assert.equal(row<{ outcome: string }>(raw, 'SELECT outcome FROM ai_usage').outcome, 'OK', 'the Test runs while the switch is off, and is ledgered');
+  assert.equal(one<{ outcome: string }>(raw, 'SELECT outcome FROM ai_usage').outcome, 'OK', 'the Test runs while the switch is off, and is ledgered');
   assert.equal(providerFetch.attempts.filter((x) => x.url === 'https://api.anthropic.com/v1/messages').length, 1);
 
   providerFetch.handler = async () => answer({ action: 'none' });

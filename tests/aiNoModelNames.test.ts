@@ -156,7 +156,7 @@ test('(a) no file push B adds or edits holds a model-family word', () => {
 });
 
 test('(b) repository-wide, model-id shapes only where the frozen ratchet allows, exactly', () => {
-  const listed = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, maxBuffer: 1 << 28 }).toString('utf8').split('\0').filter(Boolean);
+  const listed = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, maxBuffer: 1 << 28, encoding: 'utf8' }).split('\0').filter(Boolean);
   assert.ok(listed.length > 1000, `git ls-files listed ${listed.length} files`);
   const counts: Record<string, number> = {};
   for (const f of listed) {
@@ -164,7 +164,7 @@ test('(b) repository-wide, model-id shapes only where the frozen ratchet allows,
     if (!existsSync(path) || statSync(path).isDirectory()) continue;
     const buf = readFileSync(path);
     if (buf.includes(0)) continue; // binary
-    const n = idShapes(buf.toString('utf8')).length;
+    const n = idShapes(buf.toString()).length;
     if (n) counts[f] = n;
   }
   const byDigest = Object.fromEntries(Object.entries(counts).map(([f, n]) => [sha(f), n]));

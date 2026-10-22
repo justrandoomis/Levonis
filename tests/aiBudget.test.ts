@@ -13,7 +13,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { KEY, READING_OK, aiDb, answer, clock, recordingTransport, textModel, speechModel } from './fixtures/aiLayer';
+import { KEY, READING_OK, aiDb, answer, clock, one, recordingTransport, textModel, speechModel } from './fixtures/aiLayer';
 import { row } from './fixtures/app';
 import {
   costMicro,
@@ -27,6 +27,8 @@ import {
 } from '../worker/lib/ai/budget';
 import { loadAiConfig } from '../worker/lib/ai/config';
 import { aiReady, runUnderstand } from '../worker/lib/ai/run';
+import { taskWorstCaseMicro } from '../worker/lib/ai/readiness';
+import { maxVisionImageTokens } from '../worker/lib/ai/jpeg';
 import { NO_USAGE, type AiConfig, type Rates, type TaskModel } from '../worker/lib/ai/types';
 import type { Env } from '../worker/lib/types';
 
@@ -93,13 +95,26 @@ function serialised(db: D1Database): D1Database {
   });
 }
 
+test('the nominal worst case (readiness and the admin warning) fits a typical model under the default cap', () => {
+  const at = (task: 'understand' | 'vision' | 'speech', r: Rates) =>
+    taskWorstCaseMicro({ task, rank: 0, provider: task === 'speech' ? 'workers_ai' : 'anthropic', modelId: 'x', rates: r, effortLow: false });
+  const r = rates({ inPerMTok: 3_000_000, outPerMTok: 15_000_000 });
+  assert.ok(at('understand', r) <= perCallLimitMicro(1_000_000), `understand ${at('understand', r)}`);
+  assert.ok(at('vision', r) <= perCallLimitMicro(1_000_000), `vision ${at('vision', r)}`);
+  assert.equal(at('speech', rates({ speechPerMinute: 6_000 })), 7_500);
+  // Four full frames (4 × 46²) are the largest picture load: more than one full photo (58²).
+  assert.equal(maxVisionImageTokens(), 4 * 46 * 46);
+  // A dear model at $15/$75 would not run for vision under the default cap: the admin warns.
+  assert.ok(at('vision', rates({ inPerMTok: 15_000_000, outPerMTok: 75_000_000 })) > perCallLimitMicro(1_000_000));
+});
+
 test('fifty concurrent reservations never pass the cap', async () => {
   const { raw, db: plain } = aiDb();
   const db = serialised(plain);
   const cfg = cfgOf();
   const granted = await Promise.all(Array.from({ length: 50 }, () => reserve(db, DAY, 30_000, cfg, false)));
   assert.equal(granted.filter(Boolean).length, 33);
-  const r = row<{ reserved_micro_usd: number; calls: number }>(raw, 'SELECT reserved_micro_usd, calls FROM ai_spend_day WHERE day = ?', DAY);
+  const r = one<{ reserved_micro_usd: number; calls: number }>(raw, 'SELECT reserved_micro_usd, calls FROM ai_spend_day WHERE day = ?', DAY);
   assert.equal(r.reserved_micro_usd, 990_000);
   assert.equal(r.calls, 33);
   assert.ok(r.reserved_micro_usd <= cfg.capMicro);
@@ -107,7 +122,7 @@ test('fifty concurrent reservations never pass the cap', async () => {
   // so even then the cap holds (fail closed).
   const second = aiDb();
   const any = await Promise.all(Array.from({ length: 50 }, () => reserve(second.db, DAY, 30_000, cfg, false)));
-  const held = row<{ reserved_micro_usd: number } | undefined>(second.raw, 'SELECT reserved_micro_usd FROM ai_spend_day WHERE day = ?', DAY);
+  const held = row<{ reserved_micro_usd: number }>(second.raw, 'SELECT reserved_micro_usd FROM ai_spend_day WHERE day = ?', DAY);
   assert.ok((held?.reserved_micro_usd ?? 0) === any.filter(Boolean).length * 30_000);
   assert.ok((held?.reserved_micro_usd ?? 0) <= cfg.capMicro);
 });
@@ -119,7 +134,7 @@ test('the guest share is enforced inside the same UPDATE', async () => {
   assert.equal(await reserve(db, DAY, 100_000, cfg, true), true);
   assert.equal(await reserve(db, DAY, 100_000, cfg, true), false, '300 000 > 25 % of 1 000 000');
   assert.equal(await reserve(db, DAY, 100_000, cfg, false), true, 'a signed-in customer is not held by the guest share');
-  const r = row<{ reserved_micro_usd: number; guest_micro_usd: number }>(raw, 'SELECT reserved_micro_usd, guest_micro_usd FROM ai_spend_day WHERE day = ?', DAY);
+  const r = one<{ reserved_micro_usd: number; guest_micro_usd: number }>(raw, 'SELECT reserved_micro_usd, guest_micro_usd FROM ai_spend_day WHERE day = ?', DAY);
   assert.deepEqual({ ...r }, { reserved_micro_usd: 300_000, guest_micro_usd: 200_000 });
   assert.equal(await reserve(db, DAY, 1, cfgOf({ guestSharePct: 0 }), true), false, 'a 0 % share lets no guest through');
   assert.equal(await reserve(db, DAY, 1, cfgOf({ capMicro: 0 }), false), false, 'a zero cap refuses everything');
@@ -140,9 +155,9 @@ test('settle swaps the reservation for the real cost and writes a codes-only led
     costMicro: 1_300,
     latencyMs: 812,
   });
-  const d = row<Record<string, number>>(raw, 'SELECT reserved_micro_usd, spent_micro_usd, guest_micro_usd FROM ai_spend_day WHERE day = ?', DAY);
+  const d = one<Record<string, number>>(raw, 'SELECT reserved_micro_usd, spent_micro_usd, guest_micro_usd FROM ai_spend_day WHERE day = ?', DAY);
   assert.deepEqual({ ...d }, { reserved_micro_usd: 0, spent_micro_usd: 1_300, guest_micro_usd: 1_300 });
-  const u = row<Record<string, unknown>>(raw, 'SELECT * FROM ai_usage');
+  const u = one<Record<string, unknown>>(raw, 'SELECT * FROM ai_usage');
   assert.equal(u.outcome, 'OK');
   assert.equal(u.cost_micro_usd, 1_300);
   assert.equal(u.guest, 1);
@@ -164,7 +179,7 @@ test('a lost settle keeps the reservation: the day fails closed', async () => {
     costMicro: 10,
     latencyMs: 1,
   });
-  const d = row<Record<string, number>>(raw, 'SELECT reserved_micro_usd, spent_micro_usd FROM ai_spend_day WHERE day = ?', DAY);
+  const d = one<Record<string, number>>(raw, 'SELECT reserved_micro_usd, spent_micro_usd FROM ai_spend_day WHERE day = ?', DAY);
   assert.deepEqual({ ...d }, { reserved_micro_usd: 50_000, spent_micro_usd: 0 });
 });
 
@@ -186,7 +201,7 @@ test('over the cap the transport is never called', async () => {
   const env = { DB: db, ANTHROPIC_API_KEY: KEY } as unknown as Env;
   assert.equal(await runUnderstand(env, input, { guest: false }, { transport: t, now: c.now }), null);
   assert.equal(t.calls.length, 0);
-  assert.equal(row<{ n: number }>(raw, 'SELECT COUNT(*) AS n FROM ai_usage').n, 0, 'no call, no ledger row');
+  assert.equal(one<{ n: number }>(raw, 'SELECT COUNT(*) AS n FROM ai_usage').n, 0, 'no call, no ledger row');
 });
 
 test('a successful call is settled at its real cost; a timeout is charged the whole reservation', async () => {
@@ -196,7 +211,7 @@ test('a successful call is settled at its real cost; a timeout is charged the wh
   const ok = recordingTransport(() => answer(READING_OK, { usage: { input_tokens: 2000, output_tokens: 100 } }));
   assert.deepEqual(await runUnderstand(env, input, { guest: false }, { transport: ok, now: c.now }), READING_OK);
   const day = utcDay(c.now());
-  let d = row<Record<string, number>>(raw, 'SELECT reserved_micro_usd, spent_micro_usd, calls FROM ai_spend_day WHERE day = ?', day);
+  let d = one<Record<string, number>>(raw, 'SELECT reserved_micro_usd, spent_micro_usd, calls FROM ai_spend_day WHERE day = ?', day);
   // 2000 × $1 + 100 × $5 per MTok = 2000 + 500 = 2500 micro-USD.
   assert.deepEqual({ ...d }, { reserved_micro_usd: 0, spent_micro_usd: 2_500, calls: 1 });
 
@@ -204,8 +219,8 @@ test('a successful call is settled at its real cost; a timeout is charged the wh
     throw Object.assign(new Error('aborted'), { name: 'AbortError' });
   });
   assert.equal(await runUnderstand(env, input, { guest: false }, { transport: slow, now: c.now }), null);
-  d = row<Record<string, number>>(raw, 'SELECT reserved_micro_usd, spent_micro_usd FROM ai_spend_day WHERE day = ?', day);
-  const charged = row<{ cost_micro_usd: number; outcome: string }>(raw, "SELECT cost_micro_usd, outcome FROM ai_usage WHERE outcome = 'TIMEOUT'");
+  d = one<Record<string, number>>(raw, 'SELECT reserved_micro_usd, spent_micro_usd FROM ai_spend_day WHERE day = ?', day);
+  const charged = one<{ cost_micro_usd: number; outcome: string }>(raw, "SELECT cost_micro_usd, outcome FROM ai_usage WHERE outcome = 'TIMEOUT'");
   assert.ok(charged.cost_micro_usd > 2_500, 'the timeout is charged the worst case, not nothing');
   assert.equal(d.spent_micro_usd, 2_500 + charged.cost_micro_usd);
   assert.equal(d.reserved_micro_usd, 0);
@@ -222,7 +237,7 @@ test('the UTC day rolls over: a new day has the whole cap again', async () => {
   c.set(Date.parse('2026-10-23T00:00:01.000Z'));
   assert.deepEqual(await runUnderstand(env, input, { guest: false }, { transport: t, now: c.now }), READING_OK);
   assert.equal(t.calls.length, 1);
-  assert.equal(row<{ calls: number }>(raw, "SELECT calls FROM ai_spend_day WHERE day = '2026-10-23'").calls, 1);
+  assert.equal(one<{ calls: number }>(raw, "SELECT calls FROM ai_spend_day WHERE day = '2026-10-23'").calls, 1);
   assert.equal(utcDay(Date.parse('2026-10-22T23:59:59.999Z')), '2026-10-22');
   assert.equal(utcDay(Date.parse('2026-10-23T00:00:00.000Z')), '2026-10-23');
 });

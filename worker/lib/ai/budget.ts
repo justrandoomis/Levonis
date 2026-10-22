@@ -177,15 +177,17 @@ export async function pruneAiLedger(
   }
 }
 
+/** The longest user turn a nominal worst case assumes, in UTF-8 bytes. */
+export const NOMINAL_USER_BYTES = 4096;
+
 /**
  * The most one call of `task` could cost on this model, for readiness and
- * the admin's `worst_case_warn` (§10, §11): the longest prompt the task
- * sends, at most four pictures for vision, a 75 s note for speech.
+ * the admin's `worst_case_warn` (§10, §11): the task's system prompt, the
+ * longest user turn, the largest picture load the limits allow (vision), a
+ * 75 s note (speech).
  */
-export function nominalWorstCaseMicro(m: TaskModel, systemPromptBytes: number): number {
-  const userMax = 4096;
-  const pictures = m.task === 'vision' ? [4784, 4784, 4784, 4784] : [];
-  const inputTokens = systemPromptBytes + userMax + INPUT_HEADROOM_TOKENS + pictures.reduce((s, n) => s + n, 0);
+export function nominalWorstCaseMicro(m: TaskModel, systemPromptBytes: number, pictureTokens = 0): number {
+  const inputTokens = systemPromptBytes + NOMINAL_USER_BYTES + INPUT_HEADROOM_TOKENS + (m.task === 'vision' ? pictureTokens : 0);
   return worstCaseMicro(m, { inputTokens, maxTokens: MAX_OUTPUT_TOKENS });
 }
 

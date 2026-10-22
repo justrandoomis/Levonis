@@ -32,7 +32,7 @@ import { workersAiTranscribe } from './providers/workersAi';
 import { loadAiState, noteCircuitOpen, noteModelGone } from './config';
 import { MAX_OUTPUT_TOKENS, costMicro, estimateInputTokens, hasRequiredRates, perCallLimitMicro, reserve, settle, utcDay, worstCaseMicro } from './budget';
 import { markModelGone, recordHealth } from './health';
-import { checkJpeg, imageTokens } from './jpeg';
+import { FRAME_LIMITS, PHOTO_LIMITS, checkJpeg, imageTokens } from './jpeg';
 import { logAiCall } from './log';
 import { UNDERSTAND_SYSTEM, VISION_SYSTEM, understandUserText, visionUserText } from './prompts';
 import { PHOTO_SCHEMA, READING_SCHEMA } from './schemas';
@@ -46,9 +46,8 @@ export const DEADLINE_MS: Readonly<Record<AiTask, number>> = { understand: 4_000
 export const MIN_FALLBACK_MS = 2_000;
 export const FALLBACK_CODES: ReadonlySet<FailCode> = new Set(['TIMEOUT', 'NETWORK', 'OVERLOADED', 'RATE_LIMITED', 'HTTP_5XX', 'MODEL_GONE']);
 
-/** Photo: one rendition, sides ≤ 1600, ≤ 1.5 MB. Clip: 2–4 frames, sides ≤ 1280, ≤ 400 KB each (§5.2, §5.3). */
-export const PHOTO_LIMITS = { maxSide: 1600, maxBytes: 1_500_000, min: 1, max: 1 } as const;
-export const FRAME_LIMITS = { maxSide: 1280, maxBytes: 400_000, min: 2, max: 4 } as const;
+/** Photo and frame limits (§5.2, §5.3), defined beside the JPEG check. */
+export { PHOTO_LIMITS, FRAME_LIMITS } from './jpeg';
 /** A voice note the ledger may send: 1.5 MB (§5.4). */
 export const SPEECH_MAX_BYTES = 1_500_000;
 

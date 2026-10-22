@@ -17,8 +17,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { KEY, READING_OK, TEXT_MODEL, TEXT_MODEL_B, aiDb, answer, clock, errorResponse, recordingTransport, textModel } from './fixtures/aiLayer';
-import { all, asD1, dbThrough, row } from './fixtures/app';
+import { KEY, READING_OK, TEXT_MODEL, TEXT_MODEL_B, aiDb, answer, clock, errorResponse, one, recordingTransport, textModel } from './fixtures/aiLayer';
+import { all, asD1, dbThrough } from './fixtures/app';
 import { forgetAiConfig, loadAiConfig, loadAiState, CONFIG_MEMO_MS } from '../worker/lib/ai/config';
 import { aiReady, readiness, runTask, runUnderstand, understandSpec } from '../worker/lib/ai/run';
 import type { Env } from '../worker/lib/types';
@@ -92,7 +92,7 @@ test('KEY_REJECTED opens the circuit for 60 minutes; OK closes it again', async 
   let reply: () => Response = () => errorResponse(401, 'authentication_error');
   const t = recordingTransport(() => reply());
   assert.equal(await runUnderstand(env, input, { guest: false }, { transport: t, now: c.now }), null);
-  const h = row<{ open_until: string; last_fail_code: string }>(raw, "SELECT open_until, last_fail_code FROM ai_provider_health WHERE provider = 'anthropic'");
+  const h = one<{ open_until: string; last_fail_code: string }>(raw, "SELECT open_until, last_fail_code FROM ai_provider_health WHERE provider = 'anthropic'");
   assert.equal(h.last_fail_code, 'KEY_REJECTED');
   assert.equal(h.open_until, new Date(c.now() + 60 * 60_000).toISOString());
   // Same isolate, at once: no call.
@@ -108,7 +108,7 @@ test('KEY_REJECTED opens the circuit for 60 minutes; OK closes it again', async 
   c.advance(2 * 60_000 + CONFIG_MEMO_MS);
   reply = () => answer(READING_OK);
   assert.deepEqual(await runUnderstand(env, input, { guest: false }, { transport: t, now: c.now }), READING_OK);
-  const closed = row<{ open_until: string | null; consecutive_failures: number }>(raw, "SELECT open_until, consecutive_failures FROM ai_provider_health WHERE provider = 'anthropic'");
+  const closed = one<{ open_until: string | null; consecutive_failures: number }>(raw, "SELECT open_until, consecutive_failures FROM ai_provider_health WHERE provider = 'anthropic'");
   assert.deepEqual({ ...closed }, { open_until: null, consecutive_failures: 0 });
 });
 
@@ -124,7 +124,7 @@ test('three consecutive TIMEOUTs open the circuit for 5 minutes', async () => {
     c.advance(1_000);
   }
   assert.equal(t.calls.length, 3);
-  const h = row<{ open_until: string; consecutive_failures: number }>(raw, "SELECT open_until, consecutive_failures FROM ai_provider_health WHERE provider = 'anthropic'");
+  const h = one<{ open_until: string; consecutive_failures: number }>(raw, "SELECT open_until, consecutive_failures FROM ai_provider_health WHERE provider = 'anthropic'");
   assert.equal(h.consecutive_failures, 3);
   assert.equal(Date.parse(h.open_until) - (c.now() - 1_000), 5 * 60_000);
   assert.equal(await runUnderstand(env, input, { guest: false }, { transport: t, now: c.now }), null);
@@ -142,13 +142,13 @@ test('a refusal or invalid output does not count toward the circuit', async () =
   const t = recordingTransport(() => answer(READING_OK, { stop: 'refusal' }));
   for (let i = 0; i < 4; i++) await runUnderstand(envOf(db), input, { guest: false }, { transport: t });
   assert.equal(t.calls.length, 4);
-  const h = row<{ open_until: string | null; consecutive_failures: number; last_fail_code: string }>(raw, 'SELECT open_until, consecutive_failures, last_fail_code FROM ai_provider_health');
+  const h = one<{ open_until: string | null; consecutive_failures: number; last_fail_code: string }>(raw, 'SELECT open_until, consecutive_failures, last_fail_code FROM ai_provider_health');
   assert.deepEqual({ ...h }, { open_until: null, consecutive_failures: 0, last_fail_code: 'REFUSAL' });
 });
 
 test('MODEL_GONE marks the row gone and bumps the version; the next call skips it', async () => {
   const { raw, db } = aiDb({ models: [textModel('understand', 0), textModel('understand', 1)] });
-  const v0 = row<{ version: number }>(raw, 'SELECT version FROM ai_settings').version;
+  const v0 = one<{ version: number }>(raw, 'SELECT version FROM ai_settings').version;
   const t = recordingTransport((n) => (n === 1 ? errorResponse(404, 'not_found_error') : answer(READING_OK)));
   const env = envOf(db);
   assert.deepEqual(await runUnderstand(env, input, { guest: false }, { transport: t }), READING_OK);
@@ -156,7 +156,7 @@ test('MODEL_GONE marks the row gone and bumps the version; the next call skips i
     [0, 1],
     [1, 0],
   ]);
-  assert.equal(row<{ version: number }>(raw, 'SELECT version FROM ai_settings').version, v0 + 1);
+  assert.equal(one<{ version: number }>(raw, 'SELECT version FROM ai_settings').version, v0 + 1);
   await runUnderstand(env, input, { guest: false }, { transport: t });
   assert.deepEqual(t.calls.map((x) => modelOf(x.body)), [TEXT_MODEL, TEXT_MODEL_B, TEXT_MODEL_B], 'the gone row is skipped in this isolate at once');
   forgetAiConfig();
@@ -216,14 +216,14 @@ test('the switch off, a guest without the toggle, Sorani text without the toggle
   assert.equal(await runUnderstand(envOf(ckb.db), { text: 'پرینتەرەکەم کار ناکات', locale: 'ar' }, { guest: false }, { transport: t }), null);
   assert.equal(await runUnderstand(envOf(ckb.db), { text: 'my printer', locale: 'ckb' }, { guest: false }, { transport: t }), null);
   assert.equal(t.calls.length, 0);
-  for (const d of [off, guests, ckb]) assert.equal(row<{ n: number }>(d.raw, 'SELECT COUNT(*) AS n FROM ai_spend_day').n, 0);
+  for (const d of [off, guests, ckb]) assert.equal(one<{ n: number }>(d.raw, 'SELECT COUNT(*) AS n FROM ai_spend_day').n, 0);
 
   const ckbOn = aiDb({ understandCkb: true, models: [textModel('understand', 0)] });
   assert.deepEqual(await runUnderstand(envOf(ckbOn.db), { text: 'پرینتەرەکەم کار ناکات', locale: 'ckb' }, { guest: false }, { transport: t }), READING_OK);
   const guestsOn = aiDb({ guests: true, models: [textModel('understand', 0)] });
   assert.deepEqual(await runUnderstand(envOf(guestsOn.db), input, { guest: true }, { transport: t }), READING_OK);
   assert.equal(t.calls.length, 2);
-  assert.equal(row<{ guest: number }>(guestsOn.raw, 'SELECT guest FROM ai_usage').guest, 1);
+  assert.equal(one<{ guest: number }>(guestsOn.raw, 'SELECT guest FROM ai_usage').guest, 1);
 });
 
 test('no key or no model: basic, nothing called', async () => {
@@ -242,5 +242,5 @@ test('the bookkeeping goes through waitUntil when the route gives one', async ()
   assert.deepEqual(await runUnderstand(envOf(db), input, { guest: false }, { transport: t, waitUntil: (p) => pending.push(p) }), READING_OK);
   assert.equal(pending.length, 1);
   await Promise.all(pending);
-  assert.equal(row<{ n: number }>(raw, 'SELECT COUNT(*) AS n FROM ai_usage').n, 1);
+  assert.equal(one<{ n: number }>(raw, 'SELECT COUNT(*) AS n FROM ai_usage').n, 1);
 });

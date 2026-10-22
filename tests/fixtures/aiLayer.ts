@@ -7,7 +7,8 @@
  * No model is named: every model id here is an invented, neutral string.
  */
 import type { DatabaseSync } from 'node:sqlite';
-import { asD1, freshDb } from './app';
+import assert from 'node:assert/strict';
+import { asD1, freshDb, row } from './app';
 import { forgetAiConfig } from '../../worker/lib/ai/config';
 import type { Transport } from '../../worker/lib/ai/types';
 
@@ -174,3 +175,10 @@ export function clock(start = Date.parse('2026-10-22T10:00:00.000Z')) {
 export const settleAll = async (ps: Promise<unknown>[]) => {
   await Promise.all(ps.splice(0));
 };
+
+/** One row that must exist (the fixture's `row`, narrowed for the type checker). */
+export function one<T = Record<string, unknown>>(raw: DatabaseSync, sql: string, ...params: unknown[]): T {
+  const r = row<T>(raw, sql, ...params);
+  assert.ok(r !== undefined, `no row for: ${sql}`);
+  return r;
+}

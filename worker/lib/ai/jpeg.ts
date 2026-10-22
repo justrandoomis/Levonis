@@ -12,6 +12,10 @@
  * empty array, which `checkJpeg` refuses (`BAD_INPUT` upstream).
  */
 
+/** Photo: one rendition, sides ≤ 1600, ≤ 1.5 MB. Clip: 2–4 frames, sides ≤ 1280, ≤ 400 KB each (plan §5.2, §5.3). */
+export const PHOTO_LIMITS = { maxSide: 1600, maxBytes: 1_500_000, min: 1, max: 1 } as const;
+export const FRAME_LIMITS = { maxSide: 1280, maxBytes: 400_000, min: 2, max: 4 } as const;
+
 const SOI = 0xd8;
 const SOS = 0xda;
 const EOI = 0xd9;
@@ -100,6 +104,13 @@ export function checkJpeg(b: Uint8Array, maxSide: number, maxBytes: number): { w
 /** The provider's image-token estimate for one picture, capped as the plan's worst case says (§10). */
 export function imageTokens(width: number, height: number): number {
   return Math.min(4784, Math.ceil(width / 28) * Math.ceil(height / 28));
+}
+
+/** The most picture tokens one vision call can carry: the larger of one full photo and four full frames. */
+export function maxVisionImageTokens(): number {
+  const photo = PHOTO_LIMITS.max * imageTokens(PHOTO_LIMITS.maxSide, PHOTO_LIMITS.maxSide);
+  const clip = FRAME_LIMITS.max * imageTokens(FRAME_LIMITS.maxSide, FRAME_LIMITS.maxSide);
+  return Math.max(photo, clip);
 }
 
 /** Base64 without a library: chunked so a 1.5 MB picture never builds one giant argument list. */
