@@ -108,6 +108,7 @@ import { priceRequestRoutes } from './routes/priceRequests';
 // the owner's read-only dashboard API.
 import { catalogImportOpsRoutes } from './routes/catalogImportOps';
 import { adminCatalogImportRoutes } from './routes/adminCatalogImport';
+import { adminAssistAiRoutes } from './routes/adminAssistAi';
 import { merchantPrinterRoutes } from './routes/merchantPrinters';
 import { merchantWorkshopRoutes } from './routes/merchantWorkshop';
 import { merchantCatalogRoutes } from './routes/merchantCatalog';
@@ -523,6 +524,11 @@ app.route('/api/price-requests', priceRequestRoutes);
 // (worker/lib/catalogImport/auth.ts). CSRF-exempt by construction: no cookie, no Origin.
 app.route('/api/ops/catalog-import', catalogImportOpsRoutes);
 app.route('/api/admin/catalog-import', adminCatalogImportRoutes);
+// «الذكاء الاصطناعي للمساعد» (push B plan §11): the owner's AI tab — the switch, the cap, the
+// per-task model rows chosen from the provider's live list, the ledger and provider health.
+// Owner only at its own door (requireOwner, fresh session for writes), and mounted before
+// /api/admin so that router's handlers never answer for it.
+app.route('/api/admin/assist-ai', adminAssistAiRoutes);
 app.route('/api', miscRoutes);
 app.route('/api/admin', adminRoutes);
 // The farm's balancing console. Under /api/admin/* on purpose: the apex-only

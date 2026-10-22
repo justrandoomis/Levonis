@@ -90,6 +90,7 @@ import { adminPriceReportRoutes, priceReportRoutes } from '../../worker/routes/p
 import { priceRequestRoutes } from '../../worker/routes/priceRequests';
 import { catalogImportOpsRoutes } from '../../worker/routes/catalogImportOps';
 import { adminCatalogImportRoutes } from '../../worker/routes/adminCatalogImport';
+import { adminAssistAiRoutes } from '../../worker/routes/adminAssistAi';
 import { warrantyAdminRoutes, warrantyPublicRoutes } from '../../worker/routes/warranty';
 import { adminCommunityRoutes } from '../../worker/routes/adminCommunity';
 import { adminChatRoutes } from '../../worker/routes/adminChats';
@@ -219,6 +220,8 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   // token), and the owner's read-only dashboard API.
   ['/api/ops/catalog-import', catalogImportOpsRoutes as unknown as Router],
   ['/api/admin/catalog-import', adminCatalogImportRoutes as Router],
+  // The assistant AI tab (push B): owner only; no cost, no price, no credential value.
+  ['/api/admin/assist-ai', adminAssistAiRoutes as Router],
   ['/api/admin/price-reports', adminPriceReportRoutes as Router],
   ['/api/admin/products-v2', adminProductsRoutes as Router],
   ['/api/admin/template', templateRoutes as Router],
