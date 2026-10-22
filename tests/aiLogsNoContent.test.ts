@@ -149,3 +149,40 @@ test('the admin save and the admin Tests: coded lines only', async () => {
   assertClean(['spoken']);
 });
 
+
+// ------------------------------------------------------------------ the customer routes (part 2)
+
+test('the customer routes: the consult point, a photo, a clip and a voice note log codes only', async () => {
+  const { aiHarness, FULL, photoReading, provide, textReading } = await import('./fixtures/aiRoutes');
+  const heard = `${MARK} النوزل مسدود`;
+  const h = aiHarness({ ...FULL, speech: { run: async () => ({ text: heard, transcription_info: { language: 'ar', duration: 2 } }) } });
+  const customerText = `شي غريب يصير ${MARK} ما ادري شنو`;
+  const answers = [
+    () => answer(textReading({ action: 'products', part: 'nozzle_hotend', terms: [MARK, 'غريب'] })),
+    () => answer(textReading({ action: 'intent', intent: 'greeting', terms: [MARK] })),
+    () => answer(null, { rawText: `${MARK} {` }),
+    () => errorResponse(529, 'overloaded_error'),
+    () => {
+      throw new Error(`${MARK} socket hang up`);
+    },
+    () => answer(photoReading({ hms_codes: ['0300-0100-0001-0003'], label_codes: [MARK] })),
+    () => answer(photoReading({ subject: 'label', label_codes: [MARK] })),
+  ];
+  let i = 0;
+  provide(() => answers[Math.min(i++, answers.length - 1)]!());
+  for (let k = 0; k < 5; k++) await h.assistant('owner', { text: customerText });
+  const photo = h.seedFile('owner', 'attachments', new Uint8Array([1, 2, 3]), 'image/webp');
+  await h.read('owner', { kind: 'photo', key: photo });
+  const clip = h.seedFile('owner', 'video', new Uint8Array([1, 2, 3]), 'video/mp4');
+  const frame = tinyJpeg(640, 480);
+  await h.readFrames('owner', { key: clip, consent: '1', f0: frame, f1: frame });
+  const voice = h.seedFile('owner', 'audio', new Uint8Array([7, 7, 7]), 'audio/webm');
+  const res = await h.read('owner', { kind: 'voice', key: voice });
+  assert.equal(((await res.json()) as { transcript?: string }).transcript, heard, 'the transcript went to its owner…');
+  assert.ok(assistLines().length >= 8, `only ${assistLines().length} assist_ai lines`);
+  // …and nowhere else: not the customer's text, the transcript, a frame's base64, nor the audio's.
+  assertClean([customerText, heard, 'النوزل مسدود', bytesToBase64(frame).slice(0, 40), bytesToBase64(new Uint8Array([7, 7, 7])), 'socket hang up']);
+  const outcomes = all<{ outcome: string }>(h.raw, 'SELECT outcome FROM ai_usage');
+  assert.ok(outcomes.length >= 8);
+  for (const { outcome } of outcomes) assert.ok(outcome === 'OK' || (FAIL_CODES as readonly string[]).includes(outcome), outcome);
+});

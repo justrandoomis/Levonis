@@ -100,6 +100,8 @@ function scoped(): string[] {
     'packages/contracts/src/assistAiRefusals.ts',
     'tests/routeClass/adminAssistAi.ts',
     'tests/fixtures/aiLayer.ts',
+    'tests/fixtures/aiRoutes.ts',
+    'worker/lib/policies/assistant_ai.ts',
   ].map((p) => join(ROOT, p));
   const migrations = readdirSync(join(ROOT, 'migrations'))
     .filter((f) => f.startsWith('0210'))

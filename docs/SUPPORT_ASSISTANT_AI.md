@@ -188,6 +188,28 @@ limit hit, an open circuit, a provider fault, a timeout, a refusal, a
 truncation, or any invalid output. Rollback is `enabled = 0` in admin; it
 reaches every isolate within 30 s with no deploy.
 
+## Tests (plan §16)
+
+| File | Proves |
+|---|---|
+| `tests/aiNoModelTextInReplies.test.ts` | A marker the fake provider plants in every slot never reaches a reply or a chip's answer (I1). |
+| `tests/aiValidate.test.ts` | The hand-written validators (I3, I4). |
+| `tests/aiBasicModeParity.test.ts` | Push A's acceptance and price-parity corpora replayed under every basic condition, byte for byte (I11). |
+| `tests/aiRulesFirst.test.ts` | The model is asked only at the clarify point. |
+| `tests/aiInjection.test.ts` | Acceptance test 44. |
+| `tests/aiNoActions.test.ts` | Acceptance test 45: no write intent, a SQL spy, no ticket without the customer's confirmed POST. |
+| `tests/aiReadRoutes.test.ts` | The read routes' refusals, the rendition strip, frames, voice. |
+| `tests/aiReadiness.test.ts` | The readiness flags per configuration and viewer; nothing private in it. |
+| `tests/aiHandoffV2.test.ts` | `ai_read` and the version 2 summary. |
+| `tests/aiStrings.test.ts` | The server sentences in three languages. |
+| `tests/aiLogsNoContent.test.ts`, `tests/aiSingleReaders.test.ts`, `tests/aiNoModelNames.test.ts` | Logs, single readers, no model names. |
+
+`aiBasicModeParity` runs push A's two corpora itself, so it is one of the
+slowest files of the suite: each turn is replayed under a permissive probe
+first, and only a turn the probe sends to the provider is replayed under all
+eighteen conditions (a turn the probe never sends cannot reach the consult
+point under a stricter one).
+
 ## Pending owner decisions (plan §20)
 
 1. **Vision during triage.** May the vision task be configured? Until yes,

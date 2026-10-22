@@ -346,6 +346,11 @@ export default {
       writes: WRITES,
       routes: {
         'POST /assistant': 'open',
+        // Push B (worker/routes/assistAi.ts): readiness is public; a read needs the customer's own
+        // session and their own attachment (tests/aiReadRoutes.test.ts), never an admin.
+        'GET /assistant/readiness': 'open',
+        'POST /assistant/read': 'open',
+        'POST /assistant/read-frames': 'open',
         'GET /tickets': 'open',
         'POST /tickets': 'open',
         'GET /tickets/:id': 'open',

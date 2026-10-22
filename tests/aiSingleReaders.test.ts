@@ -118,3 +118,48 @@ test('the page CSP connect-src names no provider host', () => {
     assert.doesNotMatch(readFileSync(join(ROOT, f), 'utf8'), /anthropic\.com/i, f);
   }
 });
+
+test('the AI routes say nothing of their own: every text they hand a customer is a template', () => {
+  // worker/routes/assistAi.ts names `text` only as the catalogue's search argument, the model's
+  // (redacted) input and type annotations; every reply comes from worker/lib/assist/ai/media.ts or
+  // push A's orchestrator.
+  const route = code(join(ROOT, 'worker/routes/assistAi.ts'));
+  const lines = route
+    .split('\n')
+    .filter((l) => /\btext\s*:(?!\s*(string|boolean|unknown)\b)/.test(l))
+    .map((l) => l.trim());
+  assert.deepEqual(lines, [
+    '{ text: redactForModel(text), locale: args.loc, ...(ctx.triage ? { stage: ctx.triage.stage } : {}), ...(printer ? { printer } : {}) },',
+    "const r = await callTool('catalog.search', db, viewer, { text: code, limit: 4 });",
+  ]);
+  // The provider layer is reached only through its entry points and readers, never its transport or providers.
+  for (const m of route.matchAll(/from\s+['"]([^'"]+)['"]/g)) {
+    assert.doesNotMatch(m[1]!, /lib\/ai\/(transport|providers\/)/, m[1]);
+  }
+  // support.ts reaches the layer through ./assistAi only.
+  const support = code(join(ROOT, 'worker/routes/support.ts'));
+  assert.doesNotMatch(support, /from ['"]\.\.\/lib\/ai\//);
+  assert.match(support, /from '\.\/assistAi'/);
+});
+
+test('the photo and voice replies are templates: every text: is a dictionary sentence', () => {
+  const media = code(join(ROOT, 'worker/lib/assist/ai/media.ts'));
+  const texts = [...media.matchAll(/\btext: ([^,\n}]+)/g)].map((m) => m[1]!.trim());
+  assert.ok(texts.length >= 8);
+  for (const expr of texts) assert.match(expr, /^(say\(|tr\(loc)/, expr);
+  // `say` is a dictionary sentence, with the clip's own dictionary note in front.
+  assert.match(media, /const say = \(key: string, vars: Record<string, string \| number> = \{\}\) =>\s*source === 'clip' \? `\$\{tr\(loc, 'video_frames_note'/);
+  // handleReading writes no text at all: push A's own paths answer.
+  const orchestrator = code(join(ROOT, 'worker/lib/assist/orchestrator.ts'));
+  const reading = orchestrator.slice(orchestrator.indexOf('export async function handleReading'), orchestrator.indexOf('function readingWords'));
+  assert.ok(reading.length > 500);
+  assert.doesNotMatch(reading, /\btext\s*:(?!\s*string\b)/);
+});
+
+test('push B reaches the Images binding through imageConvert only, and the read routes write no media', () => {
+  const readsImages = (f: string) => /(?:\benv|\bc\.env)\s*(?:\.|\?\.)\s*IMAGES\b/.test(code(f));
+  assert.deepEqual(PUSH_B_SERVER.filter(readsImages).map(rel), []);
+  assert.match(code(join(ROOT, 'worker/lib/imageConvert.ts')), /export async function visionRendition[\s\S]*?const images = env\.IMAGES;/);
+  const route = code(join(ROOT, 'worker/routes/assistAi.ts'));
+  assert.doesNotMatch(route, /\.put\(|putMediaObject|deleteMediaObject|createMultipartUpload/);
+});
