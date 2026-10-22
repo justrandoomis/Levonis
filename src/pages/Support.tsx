@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Paperclip,
   Plus,
+  Sparkles,
   X,
 } from 'lucide-react';
 /**
@@ -31,7 +32,23 @@ import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import VariantImg from '../components/ui/VariantImg';
 import { ASSIST_CLEARED_EVENT, loadAssistContext, loadAssistState, saveAssistContext, saveAssistState } from '../lib/assistSession';
 import ChunkBoundary from '../components/ChunkBoundary';
-import type { AssistAttachment } from '../components/support/AssistAttach';
+import type { AssistAttachment, AssistReadJob, AssistReadOutcome } from '../components/support/AssistAttach';
+import {
+  AI_READ_INTENT,
+  BASIC_READINESS,
+  canRead,
+  consentScope,
+  fetchReadiness,
+  providerFor,
+  readChoiceTarget,
+  readChoices,
+  readConsent,
+  readKindOf,
+  rememberConsent,
+  TRANSCRIPT_MAX,
+  voiceCkbHintDue,
+  type AiReadiness,
+} from '../lib/assistAi';
 
 /**
  * The + sheet (gallery, camera, voice note) is its own chunk, fetched the
@@ -39,6 +56,12 @@ import type { AssistAttachment } from '../components/support/AssistAttach';
  * downloads the recorder.
  */
 const AssistAttach = lazy(() => import('../components/support/AssistAttach'));
+/**
+ * The consent sheet and the read (push B1) come from the same chunk, fetched
+ * the first time a read chip is tapped. Frames are taken from a clip by a
+ * second lazy module (src/lib/assistMedia.ts) that only the read imports.
+ */
+const AssistAiRead = lazy(() => import('../components/support/AssistAttach').then((m) => ({ default: m.AssistAiRead })));
 
 /** A ticket takes at most this many assistant attachments (worker/lib/assist/attachments.ts). */
 const ATTACH_MAX = 6;
@@ -105,6 +128,11 @@ interface AsstReply {
   ticket_draft?: { subject: string; body: string; unit_id?: string; handoff?: unknown };
   /** The conversation context: opaque here, stored and returned unchanged (src/lib/assistSession.ts). */
   context?: unknown;
+  /**
+   * Set only on a reply the AI layer helped choose (push B1, plan §5.1): the
+   * page then says so under the bubble. A basic reply carries no such field.
+   */
+  mode?: 'ai';
 }
 
 interface ChatMsg {
@@ -220,6 +248,15 @@ const STRINGS = {
     voiceNote: 'رسالة صوتية',
     attachGone: 'أحد المرفقات لم يعد متاحاً. أزله ثم أرفقه من جديد.',
     attachUnavailable: 'لا يمكن إرسال المرفقات مع التذكرة حالياً. أزلها ثم أرسل التذكرة.',
+    greetingAi:
+      'مرحبًا! أنا مساعد Levonis. أستعين بالذكاء الاصطناعي لفهم سؤالك وقراءة الصور فقط؛ أما الأسعار والتوفر والحلول فمن بيانات المتجر الحقيقية. اختر موضوعًا أو اكتب سؤالك:',
+    aiTag: 'فُهم بمساعدة الذكاء الاصطناعي',
+    readPhoto: 'اقرأ الصورة',
+    readClip: 'اقرأ المقطع',
+    voiceToText: 'حوّل التسجيل إلى نص',
+    voiceHeard: 'هذا ما سمعته — راجعه وعدّله ثم أرسله:',
+    voiceCkbHint: 'تصل رسالتك الصوتية إلى الفريق؛ تحويل الكلام الكردي إلى نص غير متاح بعد.',
+    readFailed: 'تعذرت قراءة المرفق الآن. ما زال مرفقًا، وسيراه الفريق إذا فتحت تذكرة.',
     complaintStatus: {
       submitted: 'جديدة',
       under_review: 'قيد المراجعة',
@@ -320,6 +357,15 @@ const STRINGS = {
     voiceNote: 'Voice note',
     attachGone: 'One of the attachments is no longer available. Remove it and attach it again.',
     attachUnavailable: 'Attachments cannot be sent with a ticket right now. Remove them and send the ticket.',
+    greetingAi:
+      'Hello! I am the LEVONIS assistant. I use AI only to understand your question and read photos; prices, stock and fixes come from the real data of the shop. Pick a topic or type your question:',
+    aiTag: 'Understood with AI help',
+    readPhoto: 'Read the photo',
+    readClip: 'Read the clip',
+    voiceToText: 'Turn the recording into text',
+    voiceHeard: 'This is what I heard — check it, edit it, then send:',
+    voiceCkbHint: 'Your voice note reaches the team; Kurdish speech-to-text is not available yet.',
+    readFailed: 'The attachment could not be read right now. It is still attached, and the team will see it if you open a ticket.',
     complaintStatus: {
       submitted: 'New',
       under_review: 'Under review',
@@ -409,6 +455,15 @@ const STRINGS = {
     voiceNote: 'نامەی دەنگی',
     attachGone: 'یەکێک لە هاوپێچەکان ئیتر بەردەست نییە. لایببە و دووبارە هاوپێچی بکەرەوە.',
     attachUnavailable: 'لە ئێستادا ناتوانرێت هاوپێچ لەگەڵ تیکێت بنێردرێت. لایانببە و تیکێتەکە بنێرە.',
+    greetingAi:
+      'سڵاو! من یاریدەدەری Levonis م. زیرەکی دەستکرد تەنها بۆ تێگەیشتن لە پرسیارەکەت و خوێندنەوەی وێنە بەکاردەهێنم؛ نرخ و بەردەستبوون و چارەسەرەکان لە داتای ڕاستەقینەی فرۆشگاکەوە دێن. بابەتێک هەڵبژێرە یان پرسیارەکەت بنووسە:',
+    aiTag: 'بە یارمەتی زیرەکی دەستکرد تێگەیشترا',
+    readPhoto: 'وێنەکە بخوێنەوە',
+    readClip: 'ڤیدیۆکە بخوێنەوە',
+    voiceToText: 'تۆمارەکە بکە بە نووسین',
+    voiceHeard: 'ئەمە ئەوەیە کە بیستم — بیپشکنە، دەستکاری بکە، پاشان بینێرە:',
+    voiceCkbHint: 'تێبینییە دەنگییەکەت دەگاتە تیمەکە؛ گۆڕینی قسەی کوردی بۆ دەق هێشتا بەردەست نییە.',
+    readFailed: 'ئێستا نەتوانرا هاوپێچەکە بخوێندرێتەوە. هێشتا هاوپێچ کراوە، و تیمەکە دەیبینێت ئەگەر تیکێتێک بکەیتەوە.',
     complaintStatus: {
       submitted: 'جديدة',
       under_review: 'قيد المراجعة',
@@ -1537,6 +1592,8 @@ function storedReply(v: unknown): AsstReply | undefined {
   if (choices.length) out.choices = choices;
   if (v.handoff === true) out.handoff = true;
   if (v.auth_required === true) out.auth_required = true;
+  // «فُهم بمساعدة الذكاء الاصطناعي» is still said under it after a reload.
+  if (v.mode === 'ai') out.mode = 'ai';
   return out;
 }
 
@@ -1629,9 +1686,28 @@ export default function Support() {
   /** Photos, clips and voice notes waiting for the ticket «تحدث مع الفريق» opens. */
   const [attachments, setAttachments] = useState<AssistAttachment[]>(restored.attachments);
   const [attachOpen, setAttachOpen] = useState(false);
-  const attachedSinceOpen = useRef(0);
+  /** The files attached since the + sheet opened: the acknowledgement offers to read them. */
+  const attachedSinceOpen = useRef<AssistAttachment[]>([]);
+  /**
+   * A CLIP AS PICKED, IN MEMORY FOR THIS VISIT ONLY: its frames are taken from
+   * it without a download. Never stored; after a reload the clip is read from
+   * its own `/files/` address instead.
+   */
+  const pickedClips = useRef(new Map<string, File>());
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  /**
+   * WHAT THE AI LAYER OFFERS THIS VIEWER (push B1). Basic until the server
+   * says otherwise, and basic on any failure: the page is push A until then.
+   */
+  const [readiness, setReadiness] = useState<AiReadiness>(BASIC_READINESS);
+  /** The read a chip asked for: the consent sheet, then the read, in the composer. */
+  const [readJob, setReadJob] = useState<{ job: AssistReadJob; label: string } | null>(null);
+  /** A read is under way (or its consent sheet is open): no other turn starts meanwhile. */
+  const reading = readJob !== null;
+  /** The composer holds a transcript the customer has not sent yet: said above it. */
+  const [heard, setHeard] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const [showTicketForm, setShowTicketForm] = useState(false);
   const [ticketsRefresh, setTicketsRefresh] = useState(0);
   /**
@@ -1650,17 +1726,33 @@ export default function Support() {
     if (hasPrefill && isAuthenticated) setShowTicketForm(true);
   }, [hasPrefill, isAuthenticated]);
 
+  /**
+   * READINESS, asked once per identity: a guest and a signed-in customer may
+   * be offered different reads. Never blocks the page and never throws.
+   */
+  useEffect(() => {
+    let live = true;
+    void fetchReadiness().then((r) => {
+      if (live) setReadiness(r);
+    });
+    return () => {
+      live = false;
+    };
+  }, [isAuthenticated]);
+
   // Greeting + main menu are client-side (button-first); every answer after
   // that comes from the server. A conversation already under way is kept on
   // a language change: only a screen that is still just the greeting is
-  // greeted again, in the new language.
+  // greeted again, in the new language. The AI greeting replaces the basic
+  // one only once readiness says so, and only before anything was sent.
+  const greetingText = readiness.mode === 'ai' ? s.greetingAi : s.greeting;
   const greeting = (): ChatMsg[] => [
     {
       role: 'assistant',
-      text: s.greeting,
+      text: greetingText,
       reply: {
         intent: 'menu',
-        text: s.greeting,
+        text: greetingText,
         choices: s.menu.map((m) => ({ label: m.label, intent: m.intent })),
       },
     },
@@ -1669,7 +1761,7 @@ export default function Support() {
   greetingRef.current = greeting;
   useEffect(() => {
     setMessages((prev) => (prev.some((m) => m.role === 'user') ? prev : greetingRef.current()));
-  }, [lang]);
+  }, [lang, readiness.mode]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -1706,6 +1798,9 @@ export default function Support() {
       pendingRef.current = undefined;
       contextRef.current = undefined;
       setDraft(undefined);
+      setReadJob(null);
+      setHeard(false);
+      pickedClips.current.clear();
       setAttachments([]);
       setShowTicketForm(false);
       setTicketJustOpened(false);
@@ -1789,22 +1884,90 @@ export default function Support() {
    * to have looked at it. It carries the chips of the step the customer was
    * on, so «تحدث مع الفريق» is still one tap away.
    */
-  const onAttached = (a: AssistAttachment) => {
-    attachedSinceOpen.current += 1;
+  const onAttached = (a: AssistAttachment, file?: File) => {
+    attachedSinceOpen.current = [...attachedSinceOpen.current, a];
+    if (a.kind === 'video' && file) pickedClips.current.set(a.key, file);
     setAttachments((prev) => (prev.some((x) => x.key === a.key) ? prev : [...prev, a].slice(0, ATTACH_MAX)));
     setMessages((prev) => [...prev, { role: 'user', text: '', attachments: [a] }]);
   };
+  /**
+   * The words of a read chip, by kind. «اقرأ الصورة» is a question the customer
+   * asks with a tap; the page offers it, never answers it for them.
+   */
+  const readLabels = { photo: s.readPhoto, clip: s.readClip, voice: s.voiceToText };
   const closeAttach = () => {
     setAttachOpen(false);
-    if (attachedSinceOpen.current === 0) return;
-    attachedSinceOpen.current = 0;
+    const added = attachedSinceOpen.current;
+    if (added.length === 0) return;
+    attachedSinceOpen.current = [];
+    // PUSH B1: a read chip for each file the AI layer may read for this viewer (none in basic
+    // mode, none for a kind whose read was declined in this session), before the chips of the
+    // step the customer was on. A Sorani voice note is never sent: the page says so instead.
+    const reads = readChoices(added, readiness, lang, readLabels, (scope) => readConsent(scope) === false);
+    const ack = voiceCkbHintDue(readiness, lang, added.map((a) => a.kind)) ? `${s.attachAck}\n${s.voiceCkbHint}` : s.attachAck;
     setMessages((prev) => {
       const last = [...prev].reverse().find((m) => m.role === 'assistant' && m.reply?.intent !== 'attach_ack');
-      const choices = last?.reply?.choices;
-      return [...prev, { role: 'assistant', text: s.attachAck, reply: { intent: 'attach_ack', text: s.attachAck, ...(choices ? { choices } : {}) } }];
+      const carried = (last?.reply?.choices ?? []).filter((ch) => ch.intent !== AI_READ_INTENT);
+      const choices = reads.length || carried.length ? [...reads, ...carried] : undefined;
+      return [...prev, { role: 'assistant', text: ack, reply: { intent: 'attach_ack', text: ack, ...(choices ? { choices } : {}) } }];
     });
   };
-  const removeAttachment = (key: string) => setAttachments((prev) => prev.filter((a) => a.key !== key));
+  const removeAttachment = (key: string) => {
+    pickedClips.current.delete(key);
+    setAttachments((prev) => prev.filter((a) => a.key !== key));
+  };
+
+  /** The file a read chip names, if it is still attached in this conversation and may be read now. */
+  const readTarget = (choice: AsstChoice): AssistReadJob | null => {
+    if (choice.intent !== AI_READ_INTENT) return null;
+    const target = readChoiceTarget(choice.params);
+    if (!target || !canRead(target.kind, readiness, lang)) return null;
+    const attachment = attachments.find((a) => a.key === target.key);
+    if (!attachment || readKindOf(attachment.kind) !== target.kind) return null;
+    const file = target.kind === 'clip' ? pickedClips.current.get(attachment.key) : undefined;
+    return { kind: target.kind, attachment, ...(file ? { file } : {}) };
+  };
+
+  /**
+   * HOW A READ ENDS (push B1, plan §5.2-§5.4, §8). A reply is an ordinary
+   * reply of the assistant, drawn like any other; its candidate chips wait
+   * for a tap. A transcript goes into the composer of the customer as an
+   * editable draft under «هذا ما سمعته» and is never sent for them. Anything
+   * else is said by the page, with the chips of the step the customer was on.
+   */
+  const finishRead = (label: string, outcome: AssistReadOutcome, key: string) => {
+    setReadJob(null);
+    if (outcome.kind === 'transcript') {
+      // After anything the customer had already typed, never over it; the composer takes 500.
+      const heardText = outcome.text;
+      setInput((typed) => (typed.trim() ? `${typed.trim()} ${heardText}` : heardText).slice(0, TRANSCRIPT_MAX));
+      setHeard(true);
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+      return;
+    }
+    const asked: ChatMsg = { role: 'user', text: label };
+    if (outcome.kind === 'reply') {
+      const reply = outcome.reply as unknown as AsstReply;
+      pendingRef.current = reply.expects;
+      if (reply.context !== undefined) {
+        contextRef.current = reply.context;
+        saveAssistContext(reply.context);
+      }
+      setMessages((prev) => [...prev, asked, { role: 'assistant', text: reply.text, reply }]);
+      return;
+    }
+    const said = outcome.kind === 'note' ? outcome.text : s.readFailed;
+    setMessages((prev) => {
+      const current = [...prev].reverse().find((m) => m.role === 'assistant')?.reply?.choices ?? [];
+      // A clip this device cannot decode is not offered again; a failed read may be retried.
+      const choices = outcome.kind === 'note' ? current.filter((ch) => readChoiceTarget(ch.params)?.key !== key) : current;
+      return [
+        ...prev,
+        asked,
+        { role: 'assistant', text: said, reply: { intent: 'attach_ack', text: said, ...(choices.length ? { choices } : {}) } },
+      ];
+    });
+  };
 
   /**
    * `/support?ask=choose_printer` — «ساعدني أختار» on the home page opens the
@@ -1829,8 +1992,9 @@ export default function Support() {
 
   const sendText = () => {
     const q = input.trim();
-    if (!q) return;
+    if (!q || reading) return;
     setInput('');
+    setHeard(false);
     send({ text: q }, q);
   };
 
@@ -1838,6 +2002,7 @@ export default function Support() {
     setShowTicketForm(false);
     setDraft(undefined);
     // The files went with the ticket; the next ticket starts empty.
+    pickedClips.current.clear();
     setAttachments([]);
     setTicketsRefresh((n) => n + 1);
     setMessages((prev) => [
@@ -1856,7 +2021,16 @@ export default function Support() {
   // Keeping only the latest assistant reply avoids a wall of duplicate chips
   // and gives the server room to return context-specific next actions.
   const latestAssistant = [...messages].reverse().find((message) => message.role === 'assistant');
-  const activeChoices = latestAssistant?.reply?.choices ?? [];
+  // A read chip shows only while its file is attached and the AI layer may read it for this viewer.
+  const activeChoices = (latestAssistant?.reply?.choices ?? []).filter((ch) => ch.intent !== AI_READ_INTENT || readTarget(ch) !== null);
+  const tapChoice = (choice: AsstChoice) => {
+    if (choice.intent !== AI_READ_INTENT) {
+      send({ intent: choice.intent, params: choice.params }, choice.label);
+      return;
+    }
+    const job = readTarget(choice);
+    if (job) setReadJob({ job, label: choice.label });
+  };
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col text-text-secondary" data-support-layout>
@@ -1958,6 +2132,14 @@ export default function Support() {
                     {m.error && <AlertTriangle className="w-3.5 h-3.5 inline-block me-1 -mt-0.5" />}
                     {m.text}
                   </div>
+                  )}
+
+                  {/* «فُهم بمساعدة الذكاء الاصطناعي»: only under a reply the AI layer helped choose. */}
+                  {m.role === 'assistant' && m.reply?.mode === 'ai' && (
+                    <p className="flex items-center gap-1 px-1 text-[11px] text-text-muted" data-assist-ai-tag>
+                      <Sparkles className="h-3 w-3 shrink-0" aria-hidden="true" />
+                      {s.aiTag}
+                    </p>
                   )}
 
                   {m.reply?.steps && m.reply.steps.length > 0 && (
@@ -2064,8 +2246,8 @@ export default function Support() {
                   <button
                     key={`${choice.intent}:${index}`}
                     type="button"
-                    onClick={() => send({ intent: choice.intent, params: choice.params }, choice.label)}
-                    disabled={busy}
+                    onClick={() => tapChoice(choice)}
+                    disabled={busy || reading}
                     className="shrink-0 rounded-full border border-border-subtle bg-surface px-3 py-1.5 text-xs font-bold text-text-secondary transition-colors hover:bg-surface-selected hover:text-text-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                   >
                     {choice.label}
@@ -2080,6 +2262,28 @@ export default function Support() {
                 </Suspense>
               </ChunkBoundary>
             )}
+            {readJob && (
+              <ChunkBoundary compact>
+                <Suspense fallback={null}>
+                  <AssistAiRead
+                    key={`${readJob.job.kind}:${readJob.job.attachment.key}`}
+                    lang={lang}
+                    job={readJob.job}
+                    provider={providerFor(readJob.job.kind, readiness)}
+                    askConsent={readConsent(consentScope(readJob.job.kind)) !== true}
+                    context={contextRef.current}
+                    onConsent={(accepted) => rememberConsent(consentScope(readJob.job.kind), accepted)}
+                    onDone={(outcome) => finishRead(readJob.label, outcome, readJob.job.attachment.key)}
+                    onCancel={() => setReadJob(null)}
+                  />
+                </Suspense>
+              </ChunkBoundary>
+            )}
+            {heard && input.trim() !== '' && (
+              <p className="mx-auto mb-1.5 max-w-3xl px-1 text-xs font-bold text-text-secondary" data-assist-voice-heard>
+                {s.voiceHeard}
+              </p>
+            )}
             <div className="max-w-3xl mx-auto flex gap-2">
               {/* THE +: a photo, a clip or a voice note for the team. A guest is
                   asked to sign in first (the files are kept under an account);
@@ -2087,7 +2291,7 @@ export default function Support() {
               <button
                 type="button"
                 onClick={() => (isAuthenticated ? (attachOpen ? closeAttach() : setAttachOpen(true)) : signIn())}
-                disabled={busy}
+                disabled={busy || reading}
                 className="lv-button lv-button-secondary w-12 shrink-0 px-0"
                 aria-label={isAuthenticated ? s.attachAdd : s.attachSignIn}
                 title={isAuthenticated ? s.attachAdd : s.attachSignIn}
@@ -2097,9 +2301,13 @@ export default function Support() {
                 <Plus className="w-4 h-4" />
               </button>
               <input
+                ref={inputRef}
                 className="lv-input flex-1 min-w-0 text-sm"
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  if (!e.target.value.trim()) setHeard(false);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') sendText();
                 }}
@@ -2110,7 +2318,7 @@ export default function Support() {
               <button
                 type="button"
                 onClick={sendText}
-                disabled={busy || input.trim().length === 0}
+                disabled={busy || reading || input.trim().length === 0}
                 className="lv-button lv-button-primary w-12 shrink-0 px-0"
                 aria-label={s.send}
               >

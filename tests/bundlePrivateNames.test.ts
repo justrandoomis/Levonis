@@ -47,6 +47,16 @@ const NEVER_IN_CUSTOMER_CODE = [
   'provider_calls',
   'canonical_supplier_cost_usd',
   'supplier_cost_amount',
+  // Push B1 (plan §14): the owner routes of the assistant AI layer and the
+  // column names of its spend ledger and model rows. The owner tab speaks USD
+  // to its own routes and names none of the columns either.
+  '/api/admin/assist-ai',
+  'daily_cap_micro_usd',
+  'speech_micro_per_minute',
+  'in_micro_per_mtok',
+  // The browser never calls a model provider and never holds its key (plan §13).
+  'api.anthropic.com',
+  'ANTHROPIC_API_KEY',
 ];
 
 /** Also absent from the first paint: the owner routes and the owner panel's own words. */
@@ -96,6 +106,7 @@ test('no customer chunk names a provider endpoint, the key or a private FX field
   const chunks = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
   assert.ok(chunks.length > 10, `only ${chunks.length} chunks`);
   let owner = 0;
+  let assistAi = 0;
   for (const f of chunks) {
     const code = readFileSync(join(ASSETS, f), 'utf8');
     // The owner's chunks: the pricing tab, the dashboard rates card, and the
@@ -115,12 +126,20 @@ test('no customer chunk names a provider endpoint, the key or a private FX field
     if (/^(AdminPricing|OwnerRatesCard|dataFileStrings|ProductForm|ReviewSheetV2)-/.test(f) || code.includes('/api/admin/pricing')) {
       owner++;
       // Even the owner's chunks never hold a provider endpoint or the key: the browser never calls a provider.
-      for (const name of ['iraqsm.com/api', 'eurofxref', 'IRAQ_PARALLEL_FX_API_KEY', 'X-API-Key']) assert.ok(!code.includes(name), `${f} carries «${name}»`);
+      for (const name of ['iraqsm.com/api', 'eurofxref', 'IRAQ_PARALLEL_FX_API_KEY', 'X-API-Key', 'api.anthropic.com', 'ANTHROPIC_API_KEY']) assert.ok(!code.includes(name), `${f} carries «${name}»`);
+      continue;
+    }
+    // Push B1: the owner tab of the assistant AI layer speaks to /api/admin/assist-ai and nothing
+    // else of the list; it names no provider host, no key and no ledger column (it reads USD).
+    if (/^AdminAssistAi-/.test(f)) {
+      assistAi++;
+      for (const name of NEVER_IN_CUSTOMER_CODE.filter((n) => n !== '/api/admin/assist-ai')) assert.ok(!code.includes(name), `${f} carries «${name}»`);
       continue;
     }
     for (const name of NEVER_IN_CUSTOMER_CODE) assert.ok(!code.includes(name), `${f} carries «${name}»`);
   }
   assert.ok(owner >= 1, 'the owner pricing chunk was not found');
+  assert.equal(assistAi, 1, 'the owner tab of the assistant AI layer is not one chunk of its own');
   // The attribution link is in exactly the menu chunk(s), never more widely.
   const attributed = chunks.filter((f) => readFileSync(join(ASSETS, f), 'utf8').includes('https://iraqsm.com'));
   assert.ok(attributed.length >= 1 && attributed.length <= 2, `the IQWealth link is in ${attributed.length} chunks`);

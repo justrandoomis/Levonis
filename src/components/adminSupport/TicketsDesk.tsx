@@ -84,6 +84,21 @@ interface TicketHandoff {
   code: string | null;
   products: Array<{ id: string; slug: string; name: string; name_ar: string; name_ku: string }>;
   attachments: number;
+  /**
+   * Push B1 (a v2 summary): which of these facts the customer confirmed from a
+   * reading of a photo or a clip. Absent on every basic summary.
+   */
+  read_by_ai?: unknown;
+}
+
+/** The facts a reading may have supplied, in the order the desk names them. */
+const READ_FIELDS = ['code', 'symptom', 'printer', 'part'] as const;
+type ReadField = (typeof READ_FIELDS)[number];
+
+/** The closed-set field names of a v2 summary, known values only, each once. */
+export function readByAiFields(v: unknown): ReadField[] {
+  if (!Array.isArray(v)) return [];
+  return READ_FIELDS.filter((f) => v.includes(f));
 }
 interface TicketAttachment {
   kind: 'image' | 'video' | 'audio';
@@ -144,9 +159,17 @@ function AssistantPanel({
   const pick = (l: L3) => (lang === 'en' ? l.en : lang === 'ckb' ? l.ckb : l.ar);
   const productName = (p: TicketHandoff['products'][number]) =>
     (lang === 'en' ? p.name : lang === 'ckb' ? p.name_ku || p.name_ar : p.name_ar) || p.name || p.id;
+  const fieldName: Record<ReadField, string> = { code: cs.fieldCode, symptom: cs.fieldSymptom, printer: cs.fieldPrinter, part: cs.fieldPart };
+  const readFields = readByAiFields(handoff?.read_by_ai);
   return (
     <details open className="lv-surface p-3 text-xs" data-ticket-handoff>
       <summary className="cursor-pointer select-none text-xs font-black text-text-primary">{cs.fromAssistant}</summary>
+      {readFields.length > 0 && (
+        // What came from a reading is said as such: the desk knows the customer confirmed it, not typed it.
+        <p className="mt-2 text-text-secondary" data-ticket-read-by-ai>
+          {cs.readByAi.replace('{fields}', readFields.map((f) => fieldName[f]).join(lang === 'en' ? ', ' : '، '))}
+        </p>
+      )}
       {handoff && (
         <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-text-secondary">
           {handoff.model && (

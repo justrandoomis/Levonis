@@ -42,6 +42,15 @@ export interface ConsoleStrings {
   hfCode: string;
   hfProducts: string;
   hfAttachments: string;
+  /**
+   * «قرأه المساعد من مرفق وأكّده الزبون: {fields}» (push B1, plan §12.3): the
+   * facts the customer confirmed from a reading of a photo or a clip, by name.
+   */
+  readByAi: string;
+  fieldCode: string;
+  fieldSymptom: string;
+  fieldPrinter: string;
+  fieldPart: string;
 }
 
 export const CONSOLE_STRINGS: Record<'ar' | 'en' | 'ckb', ConsoleStrings> = {
@@ -75,6 +84,11 @@ export const CONSOLE_STRINGS: Record<'ar' | 'en' | 'ckb', ConsoleStrings> = {
     hfCode: 'رمز الخطأ',
     hfProducts: 'المنتجات التي عُرضت عليه',
     hfAttachments: 'المرفقات',
+    readByAi: 'قرأه المساعد من مرفق وأكّده الزبون: {fields}',
+    fieldCode: 'رمز الخطأ',
+    fieldSymptom: 'العَرَض',
+    fieldPrinter: 'الطابعة',
+    fieldPart: 'القطعة',
   },
   en: {
     tabTickets: 'Tickets',
@@ -106,6 +120,11 @@ export const CONSOLE_STRINGS: Record<'ar' | 'en' | 'ckb', ConsoleStrings> = {
     hfCode: 'Error code',
     hfProducts: 'Products shown',
     hfAttachments: 'Attachments',
+    readByAi: 'Read by the assistant from an attachment and confirmed by the customer: {fields}',
+    fieldCode: 'Error code',
+    fieldSymptom: 'Symptom',
+    fieldPrinter: 'Printer',
+    fieldPart: 'Part',
   },
   ckb: {
     tabTickets: 'تیکێتەکان',
@@ -137,6 +156,11 @@ export const CONSOLE_STRINGS: Record<'ar' | 'en' | 'ckb', ConsoleStrings> = {
     hfCode: 'کۆدی هەڵە',
     hfProducts: 'ئەو بەرهەمانەی پیشانی دران',
     hfAttachments: 'هاوپێچەکان',
+    readByAi: 'یاریدەدەرەکە لە هاوپێچێکەوە خوێندییەوە و کڕیارەکە پشتڕاستی کردەوە: {fields}',
+    fieldCode: 'کۆدی هەڵە',
+    fieldSymptom: 'نیشانە',
+    fieldPrinter: 'پرینتەر',
+    fieldPart: 'پارچە',
   },
 };
 

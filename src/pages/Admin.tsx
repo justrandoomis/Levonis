@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat, Gift, Calculator, ShieldAlert } from 'lucide-react';
+import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat, Gift, Calculator, ShieldAlert, Bot } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { supportTotal, useSupportCounts } from '../components/adminSupport/supportCounts';
 import { useServicesBadge } from '../components/adminTradeIn/servicesBadge';
@@ -128,6 +128,12 @@ const AdminTradeIn = React.lazy(() => import('../components/adminTradeIn/AdminTr
 const AdminPriceProtection = React.lazy(() => import('../components/adminPriceProtection/AdminPriceProtection'));
 // «الأمان» (DECISIONS row 206): decoys, blocks and the security log — the verified owner's alone.
 const AdminSecurity = React.lazy(() => import('../components/adminSecurity/AdminSecurity'));
+/**
+ * «الذكاء الاصطناعي للمساعد» (push B1, plan §11): the switch, the cap, the
+ * models per task from the live list of the provider, health and the ledger.
+ * The verified owner only, like «الأمان»; its own chunk (tests/bundleBudget.test.ts).
+ */
+const AdminAssistAi = React.lazy(() => import('../components/AdminAssistAi'));
 
 /**
  * What a tab shows while its chunk arrives. Deliberately the panel's own empty
@@ -181,7 +187,8 @@ type AdminTab =
   | 'delivery'
   | 'community'
   | 'printer_farm'
-  | 'security';
+  | 'security'
+  | 'assist_ai';
 
 
 /**
@@ -195,7 +202,7 @@ type AdminTab =
  * `?tab=offers` is «فتح في العروض الخاصة» on the product form's «تخفيض السعر»
  * card (docs/ux/PRODUCT-DISCOUNT.md §6.4).
  */
-const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'price_protection', 'finance', 'inventory', 'earnings', 'pricing', 'products', 'offers', 'security', 'delivery_pricing'];
+const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'price_protection', 'finance', 'inventory', 'earnings', 'pricing', 'products', 'offers', 'security', 'delivery_pricing', 'assist_ai'];
 
 function initialAdminTab(): AdminTab {
   try {
@@ -274,6 +281,8 @@ export default function Admin() {
   const canReviewKyc = user?.can_review_kyc === true;
   /** «استيراد Bambu Lab»: the verified owner only, as the API (requireOwner) and «الأمان». */
   const canSeeCatalogImport = canSeeSecurity;
+  /** «الذكاء الاصطناعي للمساعد»: the same gate; /api/admin/assist-ai refuses everyone else (requireOwner). */
+  const canSeeAssistAi = canSeeSecurity;
 
   /** People waiting in the support console, for the sidebar badge. */
   const supportWaiting = supportTotal(useSupportCounts());
@@ -353,6 +362,9 @@ export default function Admin() {
     { id: 'printer_farm', icon: Factory, label: loc('مزرعة الطابعات', 'Printer Farm', 'کێڵگەی چاپکەر'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
     ...(canSeeSecurity
       ? [{ id: 'security', icon: ShieldAlert, label: loc('الأمان', 'Security', 'ئاسایش'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') }]
+      : []),
+    ...(canSeeAssistAi
+      ? [{ id: 'assist_ai', icon: Bot, label: loc('الذكاء الاصطناعي للمساعد', 'Assistant AI', 'زیرەکی دەستکردی یاریدەدەر'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') }]
       : []),
     { id: 'home_settings', icon: LayoutList, label: loc('إعدادات الرئيسية', 'Home settings', 'ڕێکخستنەکانی پەڕەی سەرەکی'), ...section('settings', 'الإعدادات', 'Settings', 'ڕێکخستنەکان') },
     { id: 'wallet_settings', icon: Wallet, label: loc('إعدادات المحفظة', 'Wallet settings', 'ڕێکخستنەکانی جزدان'), ...section('settings', 'الإعدادات', 'Settings', 'ڕێکخستنەکان') },
@@ -487,6 +499,8 @@ export default function Admin() {
         {activeTab === 'price_reports' && <PriceReportsPanel />}
 
         {activeTab === 'security' && canSeeSecurity && <AdminSecurity />}
+
+        {activeTab === 'assist_ai' && canSeeAssistAi && <AdminAssistAi />}
 
         {activeTab === 'membership_benefits' && <AdminBenefits />}
 

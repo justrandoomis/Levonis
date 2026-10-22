@@ -150,7 +150,8 @@ test('the + sheet is its own chunk: the Support page imports only its type', () 
   // Camera capture on a phone, and a voice note.
   const sheet = read('src/components/support/AssistAttach.tsx');
   assert.match(sheet, /capture="environment"/);
-  assert.match(sheet, /useVoiceRecorder\(\)/);
+  // Push B1: the recorder of the assistant takes the one-minute cap (plan §5.4).
+  assert.match(sheet, /useVoiceRecorder\(/);
   assert.match(sheet, /uploadFile\(file, 'assist'\)/);
 });
 

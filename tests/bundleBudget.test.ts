@@ -345,6 +345,9 @@ test('the split really happened: every page and panel §10 names has a chunk of 
     // The support assistant's + sheet (gallery, camera, voice note): fetched the
     // first time the + is pressed, never with the Support page itself.
     'AssistAttach',
+    // Push B1: the owner tab of the assistant AI layer, and the frame taker a
+    // clip read and the owner vision Test import (the test at the end of this file).
+    'AdminAssistAi', 'assistMedia',
     // the manualChunks groups — `vendor-motion` is the features half and
     // `vendor-motion-core` the eager half (P1b); `vendor-icons` the icons the
     // lazy routes share (vite.config.ts `iconChunk`).
@@ -849,4 +852,31 @@ test('the category explorer\'s static closure carries neither the listing gramma
     const hit = [...closure].find((f) => f.startsWith(`${name}-`));
     assert.equal(hit, undefined, `${name} is a static dependency of the explorer`);
   }
+});
+
+/**
+ * THE ASSISTANT AI LAYER IS LAZY TWICE (push B1, plan §14, §16 #21).
+ *
+ * The owner tab (`AdminAssistAi`) is a chunk the admin shell fetches only when
+ * «الذكاء الاصطناعي للمساعد» opens. The frame taker (`assistMedia`, a hidden
+ * video and a canvas) is a chunk that only a read of a clip and the owner
+ * vision Test import. Neither may be in the initial payload, in the Support
+ * page, in the + sheet or in the admin shell; and the + sheet (with the
+ * consent sheet and the read) stays out of the Support page as push A left it.
+ */
+test('the AI owner tab and the frame taker are lazy-only chunks, and the + sheet stays out of the Support page', () => {
+  const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
+  const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
+  for (const name of ['AdminAssistAi', 'assistMedia', 'AssistAttach', 'Support', 'Admin']) assert.ok(chunk(name), `${name} has no chunk of its own`);
+  const initial = staticClosure(entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!);
+  const holders = ['Support', 'AssistAttach', 'Admin'].map((name) => [name, staticClosure(chunk(name)!)] as const);
+  for (const lazyOnly of ['AdminAssistAi', 'assistMedia']) {
+    const f = chunk(lazyOnly)!;
+    assert.equal(initial.has(f), false, `${lazyOnly} is in the initial payload`);
+    for (const [name, closure] of holders) assert.equal(closure.has(f), false, `${lazyOnly} is a STATIC import of ${name}`);
+  }
+  assert.equal(staticClosure(chunk('Support')!).has(chunk('AssistAttach')!), false, 'the + sheet is a static import of the Support page');
+  console.log(
+    `bundle: assistant AI layer ${['Support', 'AssistAttach', 'assistMedia', 'AdminAssistAi'].map((n) => `${n} ${kb(gz(join(ASSETS, chunk(n)!)))}`).join(', ')} gzip`
+  );
 });

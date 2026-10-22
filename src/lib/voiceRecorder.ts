@@ -67,6 +67,8 @@ export interface VoiceRecorder {
   recording: boolean;
   /** Whole seconds since the recording started. */
   elapsed: number;
+  /** The cap this recorder was given (`maxSeconds`), or null for none. */
+  limit: number | null;
   error: VoiceRecorderError;
   start: () => Promise<boolean>;
   /** Stops and hands back the recording (null when it was empty). */
@@ -85,7 +87,21 @@ function recorderSupported(): boolean {
   );
 }
 
-export function useVoiceRecorder(): VoiceRecorder {
+export interface VoiceRecorderOptions {
+  /**
+   * Stop by itself after this many seconds (the support assistant: 60, push B1
+   * plan §5.4; the owner speech Test: 10). The order chat passes nothing and
+   * keeps recording until it is stopped.
+   */
+  maxSeconds?: number;
+  /** Called with the recording when the cap stopped it (null when it was empty). */
+  onLimit?: (file: File | null) => void;
+}
+
+export function useVoiceRecorder(options: VoiceRecorderOptions = {}): VoiceRecorder {
+  const maxSeconds = options.maxSeconds && options.maxSeconds > 0 ? options.maxSeconds : null;
+  const onLimitRef = useRef(options.onLimit);
+  onLimitRef.current = options.onLimit;
   const [supported] = useState(recorderSupported);
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -135,7 +151,15 @@ export function useVoiceRecorder(): VoiceRecorder {
       streamRef.current = stream;
       rec.start();
       const startedAt = Date.now();
-      timerRef.current = window.setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 250);
+      timerRef.current = window.setInterval(() => {
+        const seconds = Math.floor((Date.now() - startedAt) / 1000);
+        setElapsed(seconds);
+        // THE CAP: the recorder stops itself and hands the recording to `onLimit`, once.
+        if (maxSeconds !== null && seconds >= maxSeconds && rec.state !== 'inactive' && !settleRef.current) {
+          settleRef.current = (file) => onLimitRef.current?.(file);
+          rec.stop();
+        }
+      }, 250);
       setRecording(true);
       return true;
     } catch (e) {
@@ -145,7 +169,7 @@ export function useVoiceRecorder(): VoiceRecorder {
       release();
       return false;
     }
-  }, [supported, release]);
+  }, [supported, release, maxSeconds]);
 
   const stop = useCallback(
     () =>
@@ -181,5 +205,5 @@ export function useVoiceRecorder(): VoiceRecorder {
     []
   );
 
-  return { supported, recording, elapsed, error, start, stop, cancel };
+  return { supported, recording, elapsed, limit: maxSeconds, error, start, stop, cancel };
 }
