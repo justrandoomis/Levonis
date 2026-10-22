@@ -874,3 +874,106 @@ test('round 5.4: "after" in Sorani, the not-tried forms «بعدني ما» used
     assert.equal(saysTried(normalizeText(text)), true, `«${text}»`);
   }
 });
+
+// ════════════════════════════════════════ review, round 5.5
+
+test('round 5.5: a word glued to «و» after a bare verb is a word, not a new clause; «لهسه بعد ما» is "not yet"', () => {
+  for (const text of [
+    'جربت ويه بكره ثانيه وبعدها مسدوده',
+    'جربت وحده بس وبعده مسدود',
+    'جربت وحده ثانيه وما زبطت',
+    'جربت ويا حراره اعلى وما زبطت',
+    'جربت وحده منهن وما زبطت',
+    'لهسه بعد ما جربتها بس بعده مسدود',
+    'بعد ما جربتهن لحد الان وبعدها مسدوده',
+  ]) {
+    assert.equal(saysTried(normalizeText(text)), false, `«${text}»`);
+    assert.equal(understand(text).triedSaid, false, `«${text}»`);
+  }
+  // "Not yet" tried: no outcome, as «ما جربتها» alone.
+  for (const text of ['لهسه بعد ما جربتها بس بعده مسدود', 'بعد ما جربتهن لحد الان وبعدها مسدوده']) {
+    assert.equal(readOutcome(normalizeText(text)), undefined, `«${text}»`);
+  }
+  // The clause still ends at «وما», «ونفس», «وبعدها», and bare «بعد ما» is still "after".
+  for (const text of ['جربت وما زبطت', 'جربت ونفس المشكله', 'جربت وبعدها مسدوده', 'بعد ما جربتهم ما زبطت']) {
+    assert.equal(saysTried(normalizeText(text)), true, `«${text}»`);
+  }
+});
+
+test('round 5.5: "the X I tried", a third-person or passive subject, «هم»/"yet"/"now" before an object, Sorani «و»/«کە»/«ئەوەم», and only some steps are never the steps tried', () => {
+  for (const text of [
+    // A relative clause: what was tried is the noun before it.
+    'the other roll I tried still jams',
+    'the other spool I tried still clogs',
+    'النوزل الجديد اللي جربته بعده مسدود',
+    'ئەو قرقرەیەی کە تاقیم کردەوە هێشتا گیراوە',
+    // Not the customer.
+    'my A1 did it again, still clogged',
+    'the print did it again, still stringing',
+    'the print was done but still stringy',
+    // An object or an adverb after the verb, not a new clause.
+    'جربت هم طريقه ثانيه وما زبطت',
+    'I tried yet another spool, still clogged',
+    'I tried now with PETG, still clogged',
+    // Sorani: the object stands before «و» or is «ئەوەم» ("that one").
+    'نۆزڵێکی نوێم کڕی و تاقیم کردەوە، هێشتا گیراوە',
+    'گەرمیم زیاد کرد و تاقی کردەوە، هێشتا گیراوە',
+    'فیلامێنتێکی ترم هێنا، ئەوەم تاقی کردەوە، هێشتا گیراوە',
+    // Only some of the steps.
+    'I did all but one, still clogged',
+    'I tried them except the last, still clogged',
+    'جربت كلها عدا الاخيره وما زبطت',
+  ]) {
+    assert.equal(saysTried(normalizeText(text)), false, `«${text}»`);
+    assert.equal(understand(text).triedSaid, false, `«${text}»`);
+  }
+  for (const text of [
+    'I tried, still clogged',
+    'yes I tried, still clogged',
+    'ok I tried them, still clogged',
+    "I've tried, still clogged",
+    'still not fixed, I tried them',
+    'جربتها وما انحلت',
+    'جربت بس نفس المشكله',
+    'هەنگاوەکانم تاقی کردەوە، هێشتا گیراوە',
+    'دوای ئەوەی تاقیم کردنەوە، هێشتا گیراوە',
+    'بەڵام تاقیم کردەوە، هێشتا گیراوە',
+  ]) {
+    assert.equal(saysTried(normalizeText(text)), true, `«${text}»`);
+  }
+});
+
+test('round 5.5: a symptom or a part the customer denies is not read; the one named instead is', () => {
+  // At «which symptom?», as the triage reads it.
+  for (const [text, symptom] of [
+    ['ماعندي كلوب، عندي خيوط', 'stringing'],
+    ["it's not clogged, it's stringing", 'stringing'],
+    ['نۆزڵەکە نەگیراوە، دەزوو دەکات', 'stringing'],
+  ] as const) {
+    assert.equal(understand(text, { expectSymptom: true }).symptom, symptom, `«${text}»`);
+  }
+  for (const [text, part] of [
+    ['ماعندي مشكلة بالنوزل، المشكلة بالبليت', 'plate'],
+    ['the nozzle is fine, the problem is the plate', 'plate'],
+    ['نۆزڵەکە باشە، کێشەکە لە پلێتەکەیە', undefined],
+  ] as const) {
+    assert.equal(understand(text).part, part, `«${text}»`);
+  }
+  // A fault said with a negation, alone, is still that fault: «ما يطلع فلامنت» is the clog.
+  assert.equal(understand('ما يطلع فلامنت من النوزل').symptom, 'clog');
+  assert.equal(understand('النوزل مسدود').part, 'nozzle_hotend');
+});
+
+test('round 5.5: Sorani «ئەی وەنەکەم» ("my A1") says the printer is had; a purchase told is a story, not a shopping list', () => {
+  for (const text of ['ئەی وەنەکەم', 'پی وەن ئێسەکەم', 'ئێکس وەن سییەکەم', 'پرینتەری ئەی وەنەکەم']) {
+    assert.equal(understand(text).ownsSaid, true, `«${text}»`);
+  }
+  for (const text of ['ئەی وەن', 'ئەی وەنەکە', 'نۆزڵ بۆ ئەی وەن 0.2']) assert.equal(understand(text).ownsSaid, false, `«${text}»`);
+  for (const text of ['اشتريت نوزل وما يركب', 'النوزل اللي اشتريته ما يركب', "I bought a nozzle and it doesn't fit", 'نۆزڵێکم کڕی بەڵام ناگونجێت']) {
+    assert.equal(understand(text).purchaseStory, true, `«${text}»`);
+  }
+  // A want beside it, or «من عندكم» alone, still shops.
+  for (const text of ['اشتريت اي ون واريد نوزل', 'اريد نوزل من عندكم', 'نوزل مال اي ون اريده 0.2']) {
+    assert.equal(understand(text).purchaseStory, undefined, `«${text}»`);
+  }
+});

@@ -20,7 +20,7 @@
  * says the product MENTIONS the printer and to check the product page. It
  * never shows another printer's part as a match.
  */
-import { extractOrderId, normalizeText } from '../assistantNlu';
+import { extractOrderId, normalizeText, tokenize } from '../assistantNlu';
 import type { AssistContext } from './context';
 import { ROWS_MAX, SEEN_MAX, SHOWN_MAX, SIZE_SHAPE } from './context';
 import { buildTicketDraft, shownStepKeys } from './handoff';
@@ -34,7 +34,7 @@ import type { AssistCard, AssistChoice, AssistReply, CardRenderer, ModelToken, P
 import { MODEL_TOKENS, PART_KEYS, SYMPTOM_KEYS, type SymptomKey } from './types';
 import { mentionsModel, understand, type Understood } from './understand';
 import { MODEL_NAME_WORDS } from './understand/models';
-import { LINE_WORDS, PART_FIX_TERMS, PART_LABELS, PART_SYMPTOM, PART_TERMS } from './understand/lexicon';
+import { LINE_WORDS, NOT_SEARCHED, PART_FIX_TERMS, PART_LABELS, PART_SYMPTOM, PART_TERMS } from './understand/lexicon';
 
 export interface TurnInput {
   /** The customer's message, raw. */
@@ -75,6 +75,21 @@ const OUTCOME_ANSWER_HINTS = new Set(['printer_problem', 'open_ticket', 'human_h
 const FOLLOWUP_HINTS = new Set(['price_question', 'stock_question']);
 /** The legacy intents a question about a printer by name may carry: «شكد سعر A1», «A1 متوفر؟», «ابحث عن A1». */
 const NAMED_PRINTER_HINTS = new Set(['price_question', 'stock_question', 'product_search']);
+/**
+ * The legacy intents a part question may carry and still be one: a shopping
+ * question, a fault, «طابعتي …», a greeting, «ساعدني اختار», and the power
+ * question «الخطوات» (watt) reads into it; `open_ticket` with a fault word
+ * («عندي مشكلة بالنوزل», «النوزل خربان»: its stems are the fault words). Any
+ * other is about a part the customer already has, or a policy: «اريد ارجع
+ * النوزل» (return_help), «متى يوصل النوزل» (delivery_estimate), «ضمان النوزل»
+ * (warranty_status), «الغي طلب النوزل», «دفع النوزل عند الاستلام». Its handler
+ * answers, as live; the parts are never shown for sale to their owner (review
+ * round 5.5).
+ */
+const PART_HINTS = new Set([
+  'product_search', 'price_question', 'stock_question', 'materials_help', 'printer_problem', 'my_devices', 'power_usage', 'greeting',
+  'choose_printer',
+]);
 
 /**
  * A part question asked while the triage waits for «which printer?» or «which
@@ -134,6 +149,8 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
   const ctx = input.context;
   const hint = input.intentHint ?? null;
   const u = withRemembered(understand(text), ctx);
+  /** The scorer named an account or policy question: a part in it is not one to show (`PART_HINTS`). */
+  const elsewhere = hint !== null && !PART_HINTS.has(hint) && !(hint === 'open_ticket' && u.problemCue);
   const stage = ctx.triage?.stage;
   /** Nothing in the text but the answer: no shopping word, no account word, no size, no code. */
   const bare = !u.productCue && !u.accountCue && u.measures.length === 0 && u.codes.length === 0;
@@ -191,9 +208,10 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
   }
   // «جربتها وما انحلّت», "still not fixed", «انحلت»: the chip's outcome, typed.
   // Typed, the steps are tried only when the customer says so («جربتها»), not by «نفس المشكله» alone (review round 5).
-  // Said to be tried, it answers the steps whatever the legacy scorer made of it: «الخطوات» holds «وات»
-  // (watt), so «جربت الخطوات وما زبطت» read as the power question (review round 5.4).
-  if (stage === 'steps' && u.outcome && bare && (hint === null || OUTCOME_ANSWER_HINTS.has(hint) || u.triedSaid)) {
+  // Said to be tried, it answers the steps though the scorer read the power question: «الخطوات» holds «وات»
+  // (watt), so «جربت الخطوات وما زبطت» read as one (review round 5.4). Only that one: "I tried now with PETG"
+  // is a materials question, and stays one (review round 5.5).
+  if (stage === 'steps' && u.outcome && bare && (hint === null || OUTCOME_ANSWER_HINTS.has(hint) || (u.triedSaid && hint === 'power_usage'))) {
     return runTriage(db, viewer, ctx, { kind: 'outcome', outcome: u.outcome, tried: u.triedSaid }, render);
   }
 
@@ -233,7 +251,7 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
   // that part, and the customer is asked which printer. The part, not a symptom,
   // is what they said (`faultIn`). A fault the curated steps do not cover (a
   // leak) starts the triage without one.
-  if (u.part && u.problemCue && !u.productCue) {
+  if (u.part && u.problemCue && !u.productCue && !elsewhere) {
     const symptom = partFault(u);
     return runTriage(db, viewer, known, { kind: 'start', ...(symptom ? { symptom, faultIn: u.part } : {}), ...printer }, render);
   }
@@ -319,11 +337,59 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
     if (answer) return answer;
   }
 
+  // «اريد ارجع النوزل», «ضمان النوزل»: an account or policy question about a part (`PART_HINTS`); «اشتريت نوزل
+  // وما يركب»: a purchase told. Neither shows that part for sale: the legacy answer stands (review round 5.5).
+  if (elsewhere || (u.purchaseStory && !u.productCue)) return null;
   const named = !!u.model || !!u.family;
   if (u.part || (u.maintenance && (named || u.productCue)) || (u.measures.length > 0 && (named || u.productCue))) {
+    // «كابل رأس الطباعة», "Cooling Fan for Hotend - H2 Series": a product's own name, typed, is that product.
+    if (u.part) {
+      const typed = await typedName(db, viewer, ctx, text, hint, render);
+      if (typed) return typed;
+    }
     return products(db, viewer, u, known, render, hint);
   }
   return null;
+}
+
+/**
+ * «كابل رأس الطباعة», "Cooling Fan for Hotend - H2 Series": the customer typed
+ * a product's own name, and a part word in it («رأس الطباعة», "Hotend") read as
+ * a part question that never showed that product. When the words typed are
+ * exactly the words of a product's name (in any of its languages), reached by
+ * the strong lookup, that product is the answer, as the search box gives it
+ * (review round 5.5). Null otherwise, or on any failure.
+ */
+async function typedName(
+  db: D1Database,
+  viewer: Viewer,
+  ctx: AssistContext,
+  text: string,
+  hint: string | null,
+  render: CardRenderer
+): Promise<TurnOutcome | null> {
+  const wordsOf = (value: unknown) => [...new Set(tokenize(normalizeText(String(value ?? ''))))].sort().join(' ');
+  const typed = wordsOf(text);
+  if (typed.split(' ').length < 2) return null;
+  let items: CatalogItem[] = [];
+  try {
+    const r = await callTool('catalog.search', db, viewer, { text, limit: SEARCH_LIMIT_MAX, strong: true });
+    items = r.ok ? r.data.items : [];
+  } catch {
+    return null;
+  }
+  const exact = items.filter((i) => [i.row.name, i.row.name_ar, i.row.name_ku].some((name) => wordsOf(name) === typed));
+  if (exact.length === 0) return null;
+  const loc = viewer.locale;
+  const next: AssistContext = { ...ctx, shown: exact.slice(0, SHOWN_MAX).map((i) => i.id) };
+  dropPendingQuestion(next);
+  delete next.size;
+  delete next.more;
+  const intent = hint && LABEL_INTENTS.has(hint) ? hint : 'product_search';
+  return {
+    reply: { intent, text: tr(loc, 'products_intro'), cards: exact.slice(0, CARDS_MAX).map((i) => render.card(loc, i.card, i.row)) },
+    context: next,
+  };
 }
 
 /** The steps a fault in the named part takes: «مشكلة بالنوزل», the clog steps. Never for a fault the steps do not cover. */
@@ -998,6 +1064,7 @@ async function forPrinters(
 // ═════════════════════════════════════════════════════════════ products
 
 const LABEL_INTENTS = new Set(['price_question', 'stock_question']);
+const NOT_SEARCHED_SET = new Set(NOT_SEARCHED.map(normalizeText).filter(Boolean));
 
 async function products(
   db: D1Database,
@@ -1026,7 +1093,9 @@ async function products(
    * line's own products of this kind are shown, said to be not linked to the
    * printer. The printer stays remembered for the next question.
    */
-  const lineWords = model && !u.model ? u.residual.filter(isLineWord) : [];
+  // «ما عندي بليت»: the negation left over is never searched (review round 5.5).
+  const residual = u.residual.filter((w) => !NOT_SEARCHED_SET.has(w));
+  const lineWords = model && !u.model ? residual.filter(isLineWord) : [];
   const lineIds = lineWords.length ? await strongIds(db, viewer, lineWords.join(' ')) : new Set<string>();
   let printers: readonly ModelToken[] = model ? [model] : (u.family?.members ?? []);
   const fault = !!u.part && u.problemCue;
@@ -1038,7 +1107,7 @@ async function products(
   // search word: «A1» in the query would rank every part that merely names the
   // A1 (the A1 hotend, for a question about plates) as an answer. It is a word
   // only when nothing else names what is wanted.
-  const named = [terms, ...u.residual].filter(Boolean);
+  const named = [terms, ...residual].filter(Boolean);
   const printerWord = model ?? u.family?.name;
   const words = [...named, ...(printerWord && named.length === 0 ? [printerWord] : []), ...u.measures].join(' ').slice(0, 99);
 
@@ -1048,7 +1117,7 @@ async function products(
   let label = '';
   // The part itself first, when the question names nothing more particular
   // (no other word, and no size: «0.2» already narrows the answer to the parts that have it).
-  const head = u.part && u.residual.length === 0 && u.measures.length === 0 && !fault ? PART_HEAD[u.part] : undefined;
+  const head = u.part && residual.length === 0 && u.measures.length === 0 && !fault ? PART_HEAD[u.part] : undefined;
   let found = printers.length ? await forPrinters(db, viewer, printers, words, category, head) : null;
   let lineAlone = '';
   if (found && lineIds.size) {

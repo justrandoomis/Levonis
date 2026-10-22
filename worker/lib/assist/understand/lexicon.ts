@@ -129,6 +129,46 @@ export const OWNS_SAID: {
 };
 
 /**
+ * A SYMPTOM OR A PART THE CUSTOMER DENIES (review round 5.5): «ماعندي كلوب،
+ * عندي خيوط», "it's not clogged, it's stringing", «نۆزڵەکە نەگیراوە، دەزوو
+ * دەکات», «ماعندي مشكلة بالنوزل، المشكلة بالبليت», "the nozzle is fine, the
+ * problem is the plate", «نۆزڵەکە باشە». The word is not read as the symptom
+ * or the part (./index.ts `withoutDenied`):
+ *  - with a word of `fine` after it (over `fineSkip`), always;
+ *  - with a negation before it (`before`; «ما» and «لا» only before a word of
+ *    `have`, «ما عندي كلوب», never the verb of a symptom «ما يطلع»), over
+ *    `skip`, or the Sorani «نە» on the word itself, only when another symptom
+ *    or part is named and not denied: that one is read instead.
+ */
+export const DENIAL: {
+  readonly before: readonly string[];
+  readonly beforeHave: readonly string[];
+  readonly have: readonly string[];
+  readonly skip: readonly string[];
+  readonly reach: number;
+  readonly fine: readonly string[];
+  readonly fineSkip: readonly string[];
+} = {
+  before: ['مو', 'مش', 'ماكو', 'ليس', 'ليست', 'بدون', 'not', 'no', 'never', 'isnt', 'isn', 't', 'nt', 'wasnt', 'arent', 'without'],
+  beforeHave: ['ما', 'لا'],
+  have: ['عندي', 'عدي', 'عندنا', 'اكو', 'بيها', 'بيه', 'فيها', 'فيه'],
+  skip: ['عندي', 'عدي', 'عندنا', 'اكو', 'بيها', 'بيه', 'فيها', 'فيه', 'مشكله', 'مشكلة', 'مشاكل', 'a', 'an', 'the', 'any', 'problem', 'issue', 'with', 'is', 's', 'it', 'its', 'my'],
+  reach: 4,
+  fine: ['fine', 'ok', 'okay', 'good', 'alright', 'زين', 'زينه', 'سليم', 'سليمه', 'تمام', 'باشە', 'ساغە'],
+  fineSkip: ['is', 's', 'are', 'was', 'هو', 'هي', 'its', 'it'],
+};
+
+/**
+ * A NEGATION OR A RUN-OUT, LEFT OVER BESIDE A PART: «ما عندي بليت», «خلص
+ * الفلامنت», "I have no plate". Never a word to search: «ما» half-matched
+ * «ميني» and showed the A1 mini printer (orchestrator `products`, review
+ * round 5.5).
+ */
+export const NOT_SEARCHED: readonly string[] = [
+  'ما', 'مو', 'مش', 'لا', 'ماكو', 'خلص', 'خلصت', 'بدون', 'no', 'not', 'dont', 'don', 't', 'none', 'without', 'نییە', 'نیە',
+];
+
+/**
  * MAKERS AND LINES OF PARTS, without a digit in their name («E3D», «V6» and
  * «MK8» carry one and are read by their shape). Only such a word, left over
  * after a part question, names a product line that may outrank the printer
@@ -145,7 +185,17 @@ export const LINE_WORDS: readonly string[] = ['revo', 'obxidian', 'phaetus', 'tr
  */
 export const PAST_PURCHASE: readonly string[] = [
   'اشتريت', 'اشتريته', 'اشتريتها', 'اشتريتهم', 'اشترينا', 'اشتريناها', 'شريت', 'شريته', 'شريتها', 'شرينا',
-  'من عندكم', 'من عدكم', 'منكم', 'bought', 'purchased', 'کڕیم', 'کڕیمە', 'لە ئێوە',
+  'من عندكم', 'من عدكم', 'منكم', 'bought', 'purchased', 'کڕیم', 'کڕیمە', 'کڕی', 'لە ئێوە',
+];
+/**
+ * THE VERBS OF A PURCHASE TOLD («اشتريت نوزل وما يركب», "the nozzle I bought
+ * doesn't fit", «نۆزڵێکم کڕی»): a part named in such a story is the part the
+ * customer has, never one to show for sale (./index.ts `purchaseStory`, review
+ * round 5.5). «من عندكم» alone is not one: «اريد نوزل من عندكم» shops.
+ */
+export const PURCHASE_TOLD: readonly string[] = [
+  'اشتريت', 'اشتريته', 'اشتريتها', 'اشتريتهم', 'اشترينا', 'اشتريناها', 'شريت', 'شريته', 'شريتها', 'شرينا',
+  'bought', 'purchased', 'کڕیم', 'کڕیمە', 'کڕی',
 ];
 
 /**
@@ -251,6 +301,13 @@ export const OUTCOME_NOT_TRIED: readonly string[] = [
   'تاقیمان نەکردۆتەوە', 'تاقیمان نەکردەوە', 'تاقی نەکراوەتەوە',
 ];
 /**
+ * "NOT YET" BESIDE «بعد ما»: «لهسه بعد ما جربتها», «بعد ما جربتهن لحد الان»
+ * can only mean "I have not tried them yet", so «بعد ما» is not "after" in a
+ * sentence with one of these (./index.ts `afterNotNegation`, review round 5.5).
+ */
+export const NOT_YET_WORDS: readonly string[] = ['لهسه', 'للحين', 'لحد', 'لسه', 'لحين', 'هسه'];
+
+/**
  * THE STEPS SAID TO BE TRIED («جربتها», "tried them", «تاقیم کردەوە»): only
  * with one of `verbs`, no word of `negations` before it («ما سويتها», "have
  * not done them", "not yet tried"; the Sorani negation is in the verb itself,
@@ -273,8 +330,9 @@ export const OUTCOME_NOT_TRIED: readonly string[] = [
  * steps (`objects`, over `determiners`: "tried them", "the steps",
  * «الخطوات», «كلشي»; a demonstrative only with a steps word or the end of
  * its clause after it: "did that, still …", never "that new filament") or
- * when its clause ends there (`clauseStart`, or «و» glued on the next word:
- * "I tried, still clogged", «جربت بس نفس المشكله», «جربت وما زبطت»). Never
+ * when its clause ends there (`clauseStart`, read with «و» taken off the next
+ * word: "I tried, still clogged", «جربت بس نفس المشكله», «جربت وما زبطت»;
+ * never «جربت ويه بكره ثانيه» or «جربت وحده منهن», review round 5.5). Never
  * with a gerund, a verb or another noun after it ("tried printing again",
  * «حاولت اطبع», "I did a cold pull", «سويت تنظيف»). A "did …" verb that
  * carries its object ("did that") is not one when a word other than
@@ -307,6 +365,11 @@ export const TRIED_SAID: {
   readonly afterObject: readonly string[];
   readonly thirdPerson: readonly string[];
   readonly contractions: readonly string[];
+  readonly passive: readonly string[];
+  readonly relatives: readonly string[];
+  readonly subjects: readonly string[];
+  readonly subjectSkip: readonly string[];
+  readonly beforeSubject: readonly string[];
 } = {
   verbs: [
     'جربت', 'جربتها', 'جربته', 'جربتهم', 'جربنا', 'جربناها', 'سويت', 'سويتها', 'سويته', 'سويتهم', 'سوينا', 'سويناها', 'طبقت', 'طبقتها',
@@ -326,10 +389,12 @@ export const TRIED_SAID: {
     'تاقی کردەوە', 'تاقیمکردنەوە', 'جێبەجێم کردن', 'ئەنجامم دان',
   ],
   // Before a Sorani verb: the steps («هەموویم», «هەنگاوەکان», «ئەوانە») or a clause word («بەڵام», «ئەوەی» of «دوای ئەوەی»); never another noun.
+  // Never «و», «کە», «ئەوە» or «ئەوەم» (review round 5.5): the object stands before them, so «نۆزڵێکی نوێم کڕی و تاقیم
+  // کردەوە» tried the new nozzle, «ئەو قرقرەیەی کە تاقیم کردەوە» is the spool, and «ئەوەم» "that one" (a filament).
   soraniBefore: [
     'هەموو', 'هەمووی', 'هەمووم', 'هەموویم', 'هەموویان', 'هەمووشیان', 'هەمووشم', 'هەنگاوەکان', 'هەنگاوەکانم', 'هەنگاوەکانیش',
-    'ئەوانە', 'ئەوانەم', 'ئەمانە', 'ئەمانەم', 'ئەوە', 'ئەوەم',
-    'بەڵام', 'و', 'ئەوەی', 'کە', 'من', 'منیش', 'ئێمە', 'بەڵێ', 'نەخێر', 'نا',
+    'ئەوانە', 'ئەوانەم', 'ئەمانە', 'ئەمانەم',
+    'بەڵام', 'ئەوەی', 'من', 'منیش', 'ئێمە', 'بەڵێ', 'نەخێر', 'نا',
   ],
   // «ما», «لم», «مو», «ولا»; the English ones, and «t», the end of "haven t" once the apostrophe is a gap.
   negations: [
@@ -355,7 +420,11 @@ export const TRIED_SAID: {
     'تغير', 'تغيرت', 'صار', 'صارت', 'اشتغل', 'اشتغلت', 'زبط', 'زبطت', 'فاد', 'فادت', 'نفع', 'نفعت', 'انحل', 'انحلت',
   ],
   // Only some of the steps: "only", "just one", "one of them", «بعضها», «یەکێکیان», «تەنها»; the ordinals are read too.
-  partial: ['only', 'just one', 'one of them', 'some of them', 'a few', 'بعضها', 'بعض', 'یەکێکیان', 'هەندێکیان', 'تەنها'],
+  // "all but one", "except the last", «وحده منهن», «عدا الاخيرة», «جگە لە» (review round 5.5).
+  partial: [
+    'only', 'just one', 'one of them', 'some of them', 'a few', 'but one', 'except', 'apart from', 'other than',
+    'بعضها', 'بعض', 'عدا', 'الا', 'غير', 'منهن', 'منها', 'منهم', 'یەکێکیان', 'هەندێکیان', 'تەنها', 'جگە لە',
+  ],
   // The objects of a `bare` verb that mean the steps: "tried them", "did everything", «جربت الخطوات», «سويت كلشي».
   objects: [
     'them', 'it', 'all', 'everything', 'both', 'each', 'those', 'these', 'that', 'this',
@@ -371,9 +440,11 @@ export const TRIED_SAID: {
     'الخطوات', 'خطوات', 'الخطوه', 'خطوه', 'الحلول', 'حلول', 'الطريقه', 'الطرق',
   ],
   // The first word of the next clause: "I tried, still clogged", «جربت بس نفس المشكله», «جربت ما زبطت».
+  // Never «هم» (also), "yet", "now", "so" or "then": after a bare verb they start its object or an adverb, «جربت هم طريقه
+  // ثانيه», "tried yet another spool", "tried now with PETG" (review round 5.5).
   clauseStart: [
-    'still', 'but', 'and', 'same', 'no', 'nope', 'not', 'nothing', 'yet', 'though', 'however', 'so', 'then', 'now',
-    'بس', 'لكن', 'بعدين', 'ما', 'لا', 'مو', 'نفس', 'بعدها', 'بعده', 'بعدني', 'هم', 'للاسف', 'مازال', 'لازال', 'لسه',
+    'still', 'but', 'and', 'same', 'no', 'nope', 'not', 'nothing', 'though', 'however',
+    'بس', 'لكن', 'بعدين', 'ما', 'لا', 'مو', 'نفس', 'بعدها', 'بعده', 'بعدني', 'للاسف', 'مازال', 'لازال', 'لسه',
     'هێشتا', 'بەڵام', 'کەچی',
     // The intransitive verbs of an outcome: «جربت صار نفس الشي», «جربت تغير شي؟».
     'changed', 'worked', 'happened', 'helped', 'fixed', 'improved',
@@ -381,10 +452,30 @@ export const TRIED_SAID: {
   ],
   // What may follow a "did …" verb that carries its object: "did it again", "did them all"; "did that help?" asks.
   afterObject: ['again', 'too', 'also', 'already', 'twice', 'all', 'both', 'properly', 'exactly', 'carefully', 'myself'],
-  // Not the customer: "it did that again", "the printer did that again".
-  thirdPerson: ['it', 'he', 'she', 'they', 'printer', 'machine', 'nozzle', 'hotend', 'extruder', 'ams'],
+  // Not the customer: "it did that again", "the printer did that again", "my A1 did it again", "the print did it
+  // again" (the printer names are read too, ./index.ts; review round 5.5).
+  thirdPerson: [
+    'it', 'he', 'she', 'they', 'printer', 'machine', 'nozzle', 'hotend', 'extruder', 'ams',
+    'print', 'prints', 'job', 'filament', 'spool', 'roll', 'one', 'plate', 'bed', 'part',
+  ],
   // "it's done that", "it has done it": read past to the subject.
   contractions: ['s', 'has', 'had', 'just'],
+  // "the print was done": a passive «done» says nothing of the customer (review round 5.5).
+  passive: ['is', 'was', 'were', 'are', 'be', 'been', 'being', 'got', 'get', 'gets'],
+  // «النوزل الجديد اللي جربته»: a verb in a relative clause tries its noun, never the steps (review round 5.5).
+  relatives: ['اللي', 'الي', 'اللى', 'الذي', 'التي', 'يلي'],
+  /**
+   * "the other roll I tried still jams": a bare verb whose subject «I» / «we»
+   * stands right after a noun is a relative clause, and its object is that
+   * noun. Read past `subjectSkip` to the subject; the word before it must be
+   * none, or one of `beforeSubject` ("yes, I tried", "ok I tried") (review round 5.5).
+   */
+  subjects: ['i', 'we'],
+  subjectSkip: ['have', 've', 'had', 'd', 'just', 'already', 'also', 'both', 'really', 'actually'],
+  beforeSubject: [
+    'yes', 'yeah', 'yep', 'yup', 'ya', 'ok', 'okay', 'sure', 'well', 'so', 'and', 'but', 'also', 'already', 'then', 'now',
+    'no', 'nope', 'still', 'actually', 'honestly', 'hi', 'hey', 'hello', 'sorry', 'oh', 'ah', 'um', 'hmm',
+  ],
 };
 export const OUTCOME_RESOLVED: readonly string[] = [
   'انحلت', 'انحل', 'انحلت المشكله', 'زبطت', 'زبط', 'اشتغلت', 'اشتغل', 'صارت زينه', 'صار زين', 'رجعت تشتغل', 'رجعت زينه',

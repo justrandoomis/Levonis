@@ -664,7 +664,9 @@ test('round 1: E3D, «ثري دي» and Iraqi «تو» are not printer names; a 
   for (const text of ['نوزل لطابعة ثري دي', 'نوزل اشتريته تو']) {
     const reply = await ask(db, null, { text });
     assert.doesNotMatch(String(reply.text), /لأي طابعة/, text);
-    assert.ok(ids(reply).length > 0, text);
+    // «نوزل اشتريته تو» ("the nozzle I just bought") is a purchase told: the menu, as live, never that part for sale (review round 5.5).
+    if (text === 'نوزل اشتريته تو') assert.deepEqual(ids(reply), [], text);
+    else assert.ok(ids(reply).length > 0, text);
   }
   // «X1» is the X1C or the X1E, «P1» the P1S or the P1P: the parts linked to either, not «which printer?».
   for (const [text, part] of [
@@ -824,8 +826,6 @@ async function shopRound2(): Promise<DatabaseSync> {
   return raw;
 }
 
-const HOTENDS = new Set(['h_a1', 'h_x1', 'h_e3d']);
-
 test('round 2: «اي تو» is "yes, just now": no A2L in the triage, the parts or the context', async () => {
   const db = limitD1(await shopRound2());
   const fault = await ask(db, null, { text: 'اي تو وصلتني الطابعة وبيها مشكلة' });
@@ -835,7 +835,7 @@ test('round 2: «اي تو» is "yes, just now": no A2L in the triage, the parts
   assert.doesNotMatch(String(fault.text), /A2L/);
   const parts = await ask(db, null, { text: 'اي تو اشتريت نوزل' });
   assert.doesNotMatch(String(parts.text), /A2L/);
-  assert.equal(parts.context.printer, undefined);
+  assert.equal(parts.context?.printer, undefined);
 });
 
 test('round 2: «اكو غيرها؟» after an ordinary part search is not «another printer»; the fault after it still asks which printer', async () => {
@@ -882,8 +882,10 @@ test('round 2: the part itself first, the leftover story words never searched, a
   const combo = await ask(db, null, { text: 'نوزل مال اي ون كومبو' });
   assert.equal(ids(combo)[0], 'h_a1', JSON.stringify(ids(combo)));
   assert.ok(!ids(combo).includes('plate_combo'), 'a plate bundle is not a nozzle answer');
+  // A purchase told («نوزل اشتريته تو», "the nozzle I just bought") never shows that part for sale: the menu, as live (review round 5.5).
   const story = await ask(db, null, { text: 'نوزل اشتريته تو' });
-  assert.ok(HOTENDS.has(ids(story)[0]), `a hotend first: ${JSON.stringify(ids(story))}`);
+  assert.equal(story.intent, 'clarify', `${story.intent}: ${JSON.stringify(ids(story))}`);
+  assert.deepEqual(ids(story), []);
   // The clog steps («استبدل الهوت إند، القطع المناسبة أدناه») show the hotend.
   const clog = await ask(db, null, { text: 'A1', context: (await ask(db, null, { text: 'كلوب' })).context });
   assert.equal(clog.context.triage.stage, 'steps');
@@ -1168,7 +1170,6 @@ test('round 3: a nozzle question with no printer shows a hotend first, past the 
     ['I want a nozzle', 'en'],
     ['نۆزڵم دەوێت', 'ckb'],
     ['عندكم هوت اند؟', 'ar'],
-    ['النوزل اشتريته تو', 'ar'],
     ['نوزل طابعة ثري دي', 'ar'],
   ] as const) {
     const reply = await say(null, { text, locale });
@@ -2212,6 +2213,11 @@ test('round 5.4: a printer named alone by the one who has it gets the answer liv
       ['my A1', 'en', 'clarify'],
       ['پرینتەرەکەم A1ە', 'ckb', 'clarify'],
       ['A1م هەیە', 'ckb', 'clarify'],
+      // The Sorani possessive on the spoken name: "my A1", "my P1S", "my A1 printer" (review round 5.5).
+      ['ئەی وەنەکەم', 'ckb', 'clarify'],
+      ['پی وەن ئێسەکەم', 'ckb', 'clarify'],
+      ['ئێکس وەن سییەکەم', 'ckb', 'clarify'],
+      ['پرینتەری ئەی وەنەکەم', 'ckb', 'clarify'],
     ] as const) {
       const label = `${user ? 'member' : 'guest'} «${text}»`;
       const reply = await say(user, { text, locale });
@@ -2242,5 +2248,219 @@ test('round 5.4: in Sorani, a thing tried that is not the steps never puts them 
     assert.deepEqual(reply.ticket_draft.handoff.tried, tried ? clogKeys : [], `${label}: ${reply.ticket_draft.body}`);
     assert.equal(handoffForStaff(reply.ticket_draft.handoff)?.tried.length, tried ? clogKeys.length : 0, `${label}: the staff summary`);
     assert.ok(String(reply.ticket_draft.body).includes(tried ? T.ticket_tried : T.ticket_shown), `${label}: ${reply.ticket_draft.body}`);
+  }
+});
+
+// ════════════════════════════════════════ review, round 5.5
+
+/** The round-4 shop and the real accessory shelf: the words a forgiving search half-matches. */
+async function round55(): Promise<{ say: (user: StubUser | null, body: Rec) => Promise<Rec> }> {
+  const { raw, say } = await round4();
+  SHELF.forEach(([name, nameAr], i) =>
+    raw
+      .prepare(
+        `INSERT INTO products (id,slug,name,name_ar,name_ku,price_iqd,status,stock,options,colors,selling_type,sale_types,
+           preorder_transports,images,inventory_mode,ops_policy,category_id)
+         VALUES (?,?,?,?,'',?,'active',5,'[]','[]','direct_sale','["direct_sale"]','[]','[]','BASE','{}','cat_maint_spare')`
+      )
+      .run(`s_${i}`, `shelf-${i}`, name, nameAr, 10_000 + i * 1000)
+  );
+  assert.deepEqual((await backfillSearchIndex(asD1(raw), { limit: 200 })).failed, []);
+  return { say };
+}
+
+type Locale = 'ar' | 'en' | 'ckb';
+
+/** The products a reply offers (device and policy cards carry none). */
+const offered = (reply: Rec): string[] => ((reply.cards ?? []) as Rec[]).map((c) => c.product_id).filter((id): id is string => typeof id === 'string');
+const PRINTER_IDS = new Set(['p_a1', 'p_a1c', 'p_a1m', 'p_a1r', 'p_x1c', 'p_p1s', 'p_h2dpro']);
+
+test('round 5.5: a return, a delivery, a warranty, a cancel or a payment question that names a part gets the answer live gave, never that part for sale', async () => {
+  const { say } = await round55();
+  for (const user of [member, null]) {
+    for (const [text, locale, intent] of [
+      ['اريد ارجع النوزل', 'ar', 'return_help'],
+      ['استرجاع الهوت اند', 'ar', 'return_help'],
+      ['متى يوصل النوزل', 'ar', 'delivery_estimate'],
+      ['طلبت بليت وما وصل', 'ar', 'delivery_estimate'],
+      ['ضمان النوزل', 'ar', 'warranty_status'],
+      ['الغي طلب النوزل', 'ar', 'cancel_order'],
+      ['دفع النوزل عند الاستلام', 'ar', 'payment_methods'],
+      ['I want to return the nozzle', 'en', 'return_help'],
+      ['when will my nozzle arrive', 'en', 'delivery_estimate'],
+      ['is the nozzle under warranty', 'en', 'warranty_status'],
+      ['گەڕاندنەوەی نۆزڵ', 'ckb', 'return_help'],
+      ['نۆزڵەکەم کەی دەگات', 'ckb', 'delivery_estimate'],
+      ['گەرەنتی نۆزڵ', 'ckb', 'warranty_status'],
+    ] as const) {
+      const label = `${user ? 'member' : 'guest'} «${text}»`;
+      const reply = await say(user, { text, locale });
+      assert.equal(reply.intent, intent, `${label}: ${reply.text}`);
+      assert.deepEqual(offered(reply), [], `${label}: a part for sale`);
+    }
+    // Inside the triage, a wait for a part is the delivery question, not the part for sale.
+    for (const [locale, start, said] of [
+      ['en', 'my nozzle is clogged', 'still waiting for the needle to arrive'],
+      ['ar', 'النوزل مسدود', 'بعدني انتظر الابرة توصل'],
+    ] as const) {
+      const label = `${user ? 'member' : 'guest'} ${locale} «${said}»`;
+      const asked = await say(user, { text: start, locale });
+      const steps = await say(user, { text: 'A1', locale, context: asked.context });
+      assert.equal(steps.context.triage.stage, 'steps', label);
+      const reply = await say(user, { text: said, locale, context: steps.context });
+      assert.equal(reply.intent, 'delivery_estimate', `${label}: ${reply.text}`);
+      assert.deepEqual(offered(reply), [], `${label}: a part for sale`);
+    }
+  }
+});
+
+test('round 5.5: a part bought and told about gets the menu live gave, never that part for sale', async () => {
+  const { say } = await round55();
+  for (const user of [member, null]) {
+    for (const [text, locale] of [
+      ['اشتريت نوزل وما يركب', 'ar'],
+      ['النوزل اللي اشتريته ما يركب', 'ar'],
+      ['اشتريت بليت وما يناسب', 'ar'],
+      ["I bought a nozzle and it doesn't fit", 'en'],
+      ["the nozzle I bought doesn't fit", 'en'],
+      ['نۆزڵێکم کڕی بەڵام ناگونجێت', 'ckb'],
+    ] as const) {
+      const label = `${user ? 'member' : 'guest'} «${text}»`;
+      const reply = await say(user, { text, locale });
+      assert.equal(reply.intent, 'clarify', `${label}: ${reply.text}`);
+      assert.deepEqual(offered(reply), [], label);
+      assert.ok((reply.choices as Rec[] | undefined)?.length, `${label}: the menu`);
+    }
+  }
+});
+
+test('round 5.5: the delivery price is the delivery question; having no filament or plate never shows a printer; a product name typed exactly is that product', async () => {
+  const { say } = await round55();
+  for (const user of [member, null]) {
+    const who = user ? 'member' : 'guest';
+    for (const [text, locale] of [
+      ['كم سعر التوصيل', 'ar'],
+      ['شكد سعر التوصيل', 'ar'],
+      ['delivery price', 'en'],
+    ] as const) {
+      const reply = await say(user, { text, locale });
+      assert.equal(reply.intent, 'shipping_cost', `${who} «${text}»: ${reply.text}`);
+      assert.deepEqual(offered(reply), [], `${who} «${text}»: a product as the delivery price`);
+    }
+    // "how much is …" is also the price question: the delivery is one of the two choices, never a product.
+    const howMuch = await say(user, { text: 'how much is delivery', locale: 'en' });
+    assert.deepEqual(offered(howMuch), [], `${who}: ${howMuch.text}`);
+    assert.ok(((howMuch.choices ?? []) as Rec[]).some((c) => c.intent === 'shipping_cost'), `${who}: ${JSON.stringify(howMuch.choices)}`);
+    for (const [text, locale] of [
+      ['ماعندي فلامنت', 'ar'],
+      ['معندي فلامنت', 'ar'],
+      ['ما عندي فلامنت', 'ar'],
+      ['خلص الفلامنت عندي', 'ar'],
+      ['I have no filament', 'en'],
+    ] as const) {
+      const reply = await say(user, { text, locale });
+      assert.equal(reply.intent, 'materials_help', `${who} «${text}»`);
+      assert.deepEqual(offered(reply), [], `${who} «${text}»: ${JSON.stringify(offered(reply))}`);
+    }
+    for (const text of ['ماعندي بليت', 'ما عندي بليت']) {
+      const reply = await say(user, { text });
+      assert.ok(!offered(reply).some((id) => PRINTER_IDS.has(id)), `${who} «${text}»: ${JSON.stringify(offered(reply))}`);
+    }
+    for (const [text, locale, id, price] of [
+      ['كابل رأس الطباعة', 'ar', 's_8', 18_000],
+      ['Cooling Fan for Hotend - H2 Series', 'en', 'd_fan_h2', 25_000],
+    ] as const) {
+      const reply = await say(user, { text, locale });
+      assert.equal(offered(reply)[0], id, `${who} «${text}»: ${JSON.stringify(offered(reply))}`);
+      assert.equal((reply.cards as Rec[])[0].price_iqd, price, `${who} «${text}»: the product's own price`);
+    }
+  }
+});
+
+test('round 5.5: another spool, a step, "not yet", "the X I tried", another subject, an object after «هم»/"yet"/"now", Sorani «و»/«کە»/«ئەوەم», or only some steps never put the steps on the ticket as tried', async () => {
+  const { say } = await round4();
+  const P = (step: string, extra: Record<string, string> = {}) => ({ intent: 'printer_problem', params: { step, ...extra } });
+  const cases: Array<[Locale, Array<string | Rec>, string, boolean]> = [
+    ['ar', ['اي ون بيها كلوب'], 'جربت ويه بكره ثانيه وبعدها مسدوده', false],
+    ['ar', ['اي ون بيها كلوب'], 'جربت وحده ثانيه وما زبطت', false],
+    ['ar', ['اي ون بيها كلوب'], 'جربت وحده منهن وما زبطت', false],
+    ['ar', ['اي ون بيها كلوب'], 'لهسه بعد ما جربتها بس بعده مسدود', false],
+    ['ar', ['كلوب', 'اي ون'], 'بعد ما جربتهن لحد الان وبعدها مسدوده', false],
+    ['ar', ['اي ون بيها كلوب'], 'النوزل الجديد اللي جربته بعده مسدود', false],
+    ['ar', ['كلوب', 'اي ون'], 'جربت هم طريقه ثانيه وما زبطت', false],
+    ['en', ['my A1 nozzle is clogged'], 'I tried now with PETG, still clogged', false],
+    ['en', ['my A1 nozzle is clogged'], 'the other roll I tried still jams', false],
+    ['en', ['my A1 nozzle is clogged'], 'my A1 did it again, still clogged', false],
+    ['en', ['my P1S is stringing'], 'the print did it again, still stringing', false],
+    ['en', ['my A1 is stringing'], 'the print was done but still stringy', false],
+    ['en', ['my nozzle is clogged', 'A1'], 'I tried yet another spool, still clogged', false],
+    ['en', ['my A1 nozzle is clogged'], 'I did all but one, still clogged', false],
+    ['en', ['my nozzle is clogged', 'A1'], 'I tried them except the last, still clogged', false],
+    ['ckb', ['کلۆگ', 'A1'], 'فیلامێنتێکی ترم هێنا، ئەوەم تاقی کردەوە، هێشتا گیراوە', false],
+    ['ckb', ['کلۆگ', 'A1'], 'ئەو قرقرەیەی کە تاقیم کردەوە هێشتا گیراوە', false],
+    ['ckb', ['کلۆگ', 'A1'], 'نۆزڵێکی نوێم کڕی و تاقیم کردەوە، هێشتا گیراوە', false],
+    ['ckb', ['کلۆگ', 'A1'], 'گەرمیم زیاد کرد و تاقی کردەوە، هێشتا گیراوە', false],
+    // The steps said to be tried still are.
+    ['ar', ['اي ون بيها كلوب'], 'جربت وما زبطت', true],
+    ['en', ['my A1 nozzle is clogged'], 'yes I tried them, still clogged', true],
+    ['ckb', ['کلۆگ', 'A1'], 'هەنگاوەکانم تاقی کردەوە، هێشتا گیراوە', true],
+  ];
+  for (const user of [member, null]) {
+    const run = [...cases];
+    // The member's own A1, from the menu: printer chip, symptom chip, then the reply.
+    if (user) {
+      run.push(['ar', ['صارت عندي مشكله بالطابعه', P('printer', { model: 'A1', unit_id: 'unit_own' }), P('symptom', { symptom: 'clog' })], 'جربت وحده بس وبعده مسدود', false]);
+      run.push(['ar', ['صارت عندي مشكله بالطابعه', P('printer', { model: 'A1', unit_id: 'unit_own' }), P('symptom', { symptom: 'clog' })], 'جربت ويا حراره اعلى وما زبطت', false]);
+    }
+    for (const [locale, turns, said, tried] of run) {
+      const T = ASSIST_STRINGS[locale];
+      const label = `${locale} ${user ? 'member' : 'guest'} «${said}»`;
+      let context: Rec | undefined;
+      for (const turn of turns) context = (await say(user, { locale, ...(typeof turn === 'string' ? { text: turn } : turn), ...(context ? { context } : {}) })).context;
+      assert.equal(context?.triage?.stage, 'steps', `${label}: the steps were shown`);
+      const keys = symptomDef(context!.triage.symptom).steps.map((st) => st.key);
+      const reply = await say(user, { text: said, locale, context });
+      const draft = reply.ticket_draft ?? (await say(user, { ...P('talk'), locale, context: reply.context })).ticket_draft;
+      assert.deepEqual(draft.handoff.tried, tried ? keys : [], `${label}: ${draft.body}`);
+      assert.equal(handoffForStaff(draft.handoff)?.tried.length, tried ? keys.length : 0, `${label}: the staff summary`);
+      assert.ok(String(draft.body).includes(tried ? T.ticket_tried : T.ticket_shown), `${label}: ${draft.body}`);
+    }
+  }
+});
+
+test('round 5.5: a symptom or a part the customer denies never goes on the ticket as the problem', async () => {
+  const { say } = await round4();
+  const P = (step: string, extra: Record<string, string> = {}) => ({ intent: 'printer_problem', params: { step, ...extra } });
+  const mine = P('printer', { model: 'A1', unit_id: 'unit_own' });
+  const cases: Array<[Locale, StubUser | null, Array<string | Rec>, { symptom?: string; part?: string }]> = [
+    ['ar', member, ['صارت عندي مشكله بالطابعه', mine, 'ماعندي كلوب، عندي خيوط', 'تحدث مع الفريق'], {}],
+    ['en', null, ['something is wrong with my printer', 'P1S', "it's not clogged, it's stringing", 'talk to the team'], { symptom: 'stringing' }],
+    ['en', member, ['something is wrong with my printer', 'P1S', "it's not clogged, it's stringing", 'talk to the team'], { symptom: 'stringing' }],
+    ['ckb', member, ['صارت عندي مشكله بالطابعه', mine, 'نۆزڵەکە نەگیراوە، دەزوو دەکات', 'قسە لەگەڵ تیمەکە بکە'], { symptom: 'stringing' }],
+    ['ar', null, ['ماعندي مشكلة بالنوزل، المشكلة بالبليت', 'اي ون', 'تحدث مع الفريق'], { part: 'plate' }],
+    ['ar', member, ['ماعندي مشكلة بالنوزل، المشكلة بالبليت', 'اي ون', 'تحدث مع الفريق'], { part: 'plate' }],
+    ['en', member, ['the nozzle is fine, the problem is the plate', 'A1', 'talk to the team'], { part: 'plate' }],
+    ['en', null, ['the nozzle is fine, the problem is the plate', 'A1', 'talk to the team'], { part: 'plate' }],
+    ['ckb', null, ['نۆزڵەکە باشە، کێشەکە لە پلێتەکەیە', 'A1', 'قسە لەگەڵ تیمەکە بکە'], {}],
+  ];
+  for (const [locale, user, turns, expected] of cases) {
+    const label = `${locale} ${user ? 'member' : 'guest'} «${turns.filter((t) => typeof t === 'string').join(' → ')}»`;
+    let reply: Rec = {};
+    for (const turn of turns) {
+      reply = await say(user, { locale, ...(typeof turn === 'string' ? { text: turn } : turn), ...(reply.context ? { context: reply.context } : {}) });
+      const draft = reply.ticket_draft;
+      if (!draft) continue;
+      // Whatever was drafted: never the clog or the nozzle the customer denied.
+      assert.notEqual(draft.handoff?.symptom, 'clog', `${label}: ${draft.body}`);
+      assert.notEqual(draft.handoff?.part, 'nozzle_hotend', `${label}: ${draft.body}`);
+      assert.ok(!String(draft.body).includes(symptomDef('clog').label[locale]), `${label}: ${draft.body}`);
+      assert.ok(!String(draft.body).includes(PART_LABELS.nozzle_hotend[locale]), `${label}: ${draft.body}`);
+      assert.notEqual(handoffForStaff(draft.handoff)?.symptom?.key, 'clog', `${label}: the staff summary`);
+    }
+    if (expected.symptom || expected.part) {
+      assert.ok(reply.ticket_draft, `${label}: ${reply.intent} ${reply.text}`);
+      if (expected.symptom) assert.equal(reply.ticket_draft.handoff.symptom, expected.symptom, `${label}: ${reply.ticket_draft.body}`);
+      if (expected.part) assert.equal(reply.ticket_draft.handoff.part, expected.part, `${label}: ${reply.ticket_draft.body}`);
+    }
   }
 });

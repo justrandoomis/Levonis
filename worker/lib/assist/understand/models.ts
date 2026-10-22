@@ -98,6 +98,23 @@ const ENCLITICS: readonly string[] = [
   .map(normalizeText)
   .sort((a, b) => b.length - a.length);
 
+/** The first-person possessives among `ENCLITICS`: «ئەی وەنەکەم» is "my A1", «ئەی وەنەکەمان» "our A1". */
+const MY_ENCLITICS: readonly string[] = ['ەکەمان', 'یەکەمان', 'یەکەم', 'ەکانم', 'ەکەم', 'کەم', 'مان', 'م']
+  .map(normalizeText)
+  .sort((a, b) => b.length - a.length);
+
+/**
+ * «ئەی وەنەکەم», «پی وەن ئێسەکەم», «پرینتەری ئەی وەنەکەم»: a Sorani printer
+ * name with the first-person possessive glued on its last word, "my A1".
+ * The customer has that printer (review round 5.5). Pure, on normalised text.
+ */
+export function possessedSoraniName(normalized: string): boolean {
+  const padded = ` ${normalized} `;
+  return [...SPOKEN_PHRASES, ...FAMILY_SPOKEN].some(
+    (phrase) => SORANI_NAMES.has(phrase) && MY_ENCLITICS.some((clitic) => padded.includes(` ${phrase}${clitic} `))
+  );
+}
+
 /**
  * «ئەی وەنەکەم» → «ئەی وەن»: an enclitic on the LAST word of one of `phrases`
  * comes off. Only a Sorani name is touched, so no Arabic word loses a letter.

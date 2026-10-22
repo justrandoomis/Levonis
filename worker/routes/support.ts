@@ -58,7 +58,7 @@ import { viewerFor } from '../lib/assist/viewer';
 import { callTool } from '../lib/assist/registry';
 import { ownDevices, type DeviceLite } from '../lib/assist/tools/devices';
 import { rewriteSpokenModels } from '../lib/assist/understand/models';
-import { understand } from '../lib/assist/understand';
+import { splitGluedNegation, understand } from '../lib/assist/understand';
 import type { AssistReply, CardRenderer, TicketDraft } from '../lib/assist/types';
 import type { AssistContext } from '../lib/assist/context';
 import { attachmentInsert, checkStoredAttachments, readAttachmentKeys, ticketAttachments } from '../lib/assist/attachments';
@@ -384,8 +384,17 @@ const LEXICON: Record<Intent, LexEntry> = {
     phrases: ['الفرق بين المواد', 'اي فلامنت', 'أي خيط', 'which filament', 'what material', 'کام فیلامێنت'],
     stems: ['filament', 'pla', 'petg', 'abs', 'tpu', 'asa', 'resin', 'فلامنت', 'خيوط', 'راتنج', 'ريزن', 'مواد', 'فیلامێنت'],
   },
+  /**
+   * «كم سعر التوصيل», "how much is delivery": the price OF THE DELIVERY, never
+   * a product search for «التوصيل» (which the forgiving search read as
+   * «الطابعة» and answered with a cable pack, review round 5.5).
+   */
   shipping_cost: {
-    phrases: ['كم اجور التوصيل', 'شكد التوصيل', 'اجرة التوصيل', 'كلفة التوصيل', 'shipping cost', 'delivery fee', 'نرخی گەیاندن'],
+    phrases: [
+      'كم اجور التوصيل', 'شكد التوصيل', 'اجرة التوصيل', 'كلفة التوصيل', 'shipping cost', 'delivery fee', 'نرخی گەیاندن',
+      'سعر التوصيل', 'كم سعر التوصيل', 'شكد سعر التوصيل', 'سعر الشحن', 'كم سعر الشحن',
+      'how much is delivery', 'how much is shipping', 'delivery price', 'shipping price', 'delivery cost',
+    ],
     stems: ['اجور', 'اجرة', 'كلفة', 'شحن'],
   },
   /**
@@ -546,18 +555,26 @@ const MATERIAL_KINDS = new Set([
 function isMaterialKind(word: string): boolean {
   return MATERIAL_KINDS.has(word.replace(/\+$/, '')) || /^\d{2}[ad]$/.test(word) || /^(?:cf|gf|hf)\d*$/.test(word) || /^[a-z]+\+$/.test(word);
 }
+/**
+ * «ماعندي فلامنت», «خلص الفلامنت عندي», "I have no filament": having none or
+ * running out names no material. Left in, «ماعندي» reached «ميني» and showed
+ * the A1 mini printer; out, nothing is left and the material is asked for
+ * (review round 5.5).
+ */
+const MATERIAL_NOT_SUBJECT = ['ما', 'مو', 'ماكو', 'عندي', 'عدي', 'خلص', 'خلصت', 'no', 'not', 'have', 'dont', 'don', 't', 'any'] as const;
 function materialsSubject(text: string): string {
   const entry = LEXICON.materials_help;
   const asking = (['price_question', 'stock_question'] as const).flatMap((intent) => [
     ...(LEXICON[intent].phrases ?? []),
     ...(LEXICON[intent].stems ?? []),
   ]);
-  return stripWords(text, [
+  return stripWords(splitGluedNegation(text), [
     ...(entry.phrases ?? []),
     ...(entry.stems ?? []).filter((w) => !MATERIAL_NAMES.has(w)),
     ...asking,
     ...FILLER,
     ...ASKING_FORMS,
+    ...MATERIAL_NOT_SUBJECT,
   ]);
 }
 

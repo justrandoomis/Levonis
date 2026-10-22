@@ -15,11 +15,14 @@
 import { CONFIDENT_SCORE, compileLexicon, normalizeText, scoreIntents, tokenize, type LexEntry } from '../../assistantNlu';
 import { extractIdentifiers, type CodeCandidate } from '../../search/identifiers';
 import type { ModelToken, PartKey, SymptomKey } from '../types';
+import { MODEL_TOKENS } from '../types';
 import {
+  MODEL_NAME_WORDS,
   bareProclitics,
   hyphenNames,
   joinSplitNames,
   latinModels,
+  possessedSoraniName,
   printerNameWord,
   readFamily,
   scanSpokenModels,
@@ -31,6 +34,7 @@ import {
   AMS_WEAK,
   CLEANING_TOOLS,
   CORRECTION_WORDS,
+  DENIAL,
   FAULT_CUE,
   FILLERS,
   ORDINAL_WORDS,
@@ -40,6 +44,7 @@ import {
   OUTCOME_NOT_TRIED,
   OUTCOME_RESOLVED,
   MAINTENANCE_CUE,
+  NOT_YET_WORDS,
   OWN_PRINTER,
   OWNS_SAID,
   PART_LEXICON,
@@ -48,6 +53,7 @@ import {
   PRINTER_CUE,
   PROBLEM_CUE,
   PRODUCT_CUE,
+  PURCHASE_TOLD,
   STILL_AT_FAULT,
   STRINGING_WEAK,
   SYMPTOM_LEXICON,
@@ -128,6 +134,12 @@ export interface Understood {
   triedSaid: boolean;
   /** "how much?", «شكد؟»: a price asked, whatever the intent scorer made of it. */
   priceAsk: boolean;
+  /**
+   * «اشتريت نوزل وما يركب», "the nozzle I bought doesn't fit», «نۆزڵێکم کڕی»:
+   * a purchase told, with no want or need beside it. The part named is the
+   * customer's own: never shown for sale (orchestrator, review round 5.5).
+   */
+  purchaseStory?: boolean;
   /** The words no reader claimed, at most four: what is left to search for. */
   residual: string[];
 }
@@ -260,8 +272,19 @@ const TRIED_DEMONSTRATIVES = normalSet(TRIED_SAID.demonstratives);
 const TRIED_STEPS_WORDS = normalSet(TRIED_SAID.stepsWords);
 const TRIED_CLAUSE_START = normalSet(TRIED_SAID.clauseStart);
 const TRIED_AFTER_OBJECT = normalSet(TRIED_SAID.afterObject);
-const TRIED_THIRD_PERSON = normalSet(TRIED_SAID.thirdPerson);
+/** The third person, and every printer name as the text writes it («a1», «p1s», «x1»): "my A1 did it again". */
+const TRIED_THIRD_PERSON = normalSet([
+  ...TRIED_SAID.thirdPerson,
+  ...MODEL_TOKENS.flatMap((m) => [m.toLowerCase().replace(/\s+/g, ''), ...MODEL_NAME_WORDS[m].flat()]),
+]);
 const TRIED_CONTRACTIONS = normalSet(TRIED_SAID.contractions);
+const TRIED_PASSIVE = normalSet(TRIED_SAID.passive);
+const TRIED_RELATIVES = normalSet(TRIED_SAID.relatives);
+const TRIED_SUBJECTS = normalSet(TRIED_SAID.subjects);
+const TRIED_SUBJECT_SKIP = normalSet(TRIED_SAID.subjectSkip);
+const TRIED_BEFORE_SUBJECT = normalSet(TRIED_SAID.beforeSubject);
+const NOT_YET = normalSet(NOT_YET_WORDS);
+const PURCHASE_VERBS = normalSet(PURCHASE_TOLD);
 /** The Arabic verbs of trying, one word each: «بعد ما» before one of them is "after" (`afterNotNegation`). */
 const TRIED_ARABIC_VERBS = new Set(TRIED_VERBS.filter((v) => v.length === 1 && ARABIC.test(v[0])).map((v) => v[0]));
 const STILL_WORDS = normalSet(STILL_AT_FAULT.still);
@@ -294,10 +317,13 @@ export function splitGluedNegation(text: string): string {
  * «بعد ما جربتها», «بعدما طبقتها», «من بعد ما سويتهم»: "after I tried them".
  * Before a verb of trying, «ما» is not a negation, so it comes off (review
  * round 5.4). Only before such a verb: «بعد ما انحلت», «بعدني ما زبطت» are
- * "still not fixed" and keep it. Pure, on normalised text.
+ * "still not fixed" and keep it; and never beside "until now" («لهسه بعد ما
+ * جربتها», `NOT_YET_WORDS`), where it is "not yet". Pure, on normalised text.
  */
 export function afterNotNegation(normalized: string): string {
   const tokens = tokenize(normalized);
+  // «لهسه بعد ما جربتها»: with "until now" beside it, «بعد ما» is "not yet" (review round 5.5).
+  if (tokens.some((t) => NOT_YET.has(t))) return normalized;
   const out: string[] = [];
   for (let i = 0; i < tokens.length; i += 1) {
     const t = tokens[i];
@@ -370,6 +396,10 @@ export function saysTried(normalized: string): boolean {
       // Sorani: the object comes first. «هەموویم تاقی کردەوە», never «فیلامێنتێکی ترم تاقی کردەوە».
       if (TRIED_SORANI.has(verb.join(' '))) return i === 0 || TRIED_SORANI_BEFORE.has(tokens[i - 1]);
       if (thirdPersonBefore(tokens, i)) return false;
+      // «النوزل الجديد اللي جربته»: the verb of a relative clause tries its noun (review round 5.5).
+      if (i > 0 && TRIED_RELATIVES.has(tokens[i - 1])) return false;
+      // "the print was done": a passive says nothing of the customer (review round 5.5).
+      if (verb.join(' ') === 'done' && i > 0 && TRIED_PASSIVE.has(tokens[i - 1])) return false;
       const end = i + verb.length;
       const after = tokens[end];
       const bare = TRIED_BARE.has(verb.join(' '));
@@ -380,23 +410,43 @@ export function saysTried(normalized: string): boolean {
         return next < tokens.length && TRIED_CLAUSE.has(tokens[next]);
       }
       if (TRIED_AUXILIARIES.has(verb[verb.length - 1]) && after !== undefined && TRIED_NEGATED_AFTER.has(after)) return false;
-      if (bare) return clauseEnds(typed, tokens, end) || stepsObject(typed, tokens, end);
+      if (bare) return (clauseEnds(tokens, end) && !relativeClause(tokens, i, verb)) || stepsObject(tokens, end);
       // "did that", "did it": the object is carried; "did that help?" asks.
-      if (verb[0] === 'did') return clauseEnds(typed, tokens, end) || TRIED_AFTER_OBJECT.has(after);
+      if (verb[0] === 'did') return clauseEnds(tokens, end) || TRIED_AFTER_OBJECT.has(after);
       return true;
     })
   );
 }
 
-/** The verb at `end` ended its clause: nothing after it, a clause's first word, or «و» glued on the next word («جربت وما زبطت»). */
-function clauseEnds(typed: readonly string[], tokens: readonly string[], end: number): boolean {
+/**
+ * The verb at `end` ended its clause: nothing after it, or a clause's first
+ * word. The tokens are unglued, so «وما زبطت», «وبعدها» and «ونفس» end it;
+ * «ويه بكره ثانيه» ("with another spool") and «وحده منهن» ("one of them") are
+ * words, not «و» and a new clause (review round 5.5).
+ */
+function clauseEnds(tokens: readonly string[], end: number): boolean {
   const next = tokens[end];
-  if (next === undefined || TRIED_CLAUSE_START.has(next)) return true;
-  return typed[end] !== next && ARABIC.test(next);
+  return next === undefined || TRIED_CLAUSE_START.has(next);
+}
+
+/**
+ * "the other roll I tried still jams": an English bare verb whose subject «I»
+ * or «we» stands right after a noun is a relative clause; what was tried is
+ * that noun, never the steps. "I tried", "yes I tried", "ok, we tried" are
+ * not (review round 5.5).
+ */
+function relativeClause(tokens: readonly string[], i: number, verb: readonly string[]): boolean {
+  let k = i - 1;
+  if (!TRIED_SUBJECTS.has(verb[0])) {
+    while (k >= 0 && TRIED_SUBJECT_SKIP.has(tokens[k])) k -= 1;
+    if (k < 0 || !TRIED_SUBJECTS.has(tokens[k])) return false;
+    k -= 1;
+  }
+  return k >= 0 && !ARABIC.test(tokens[k]) && !TRIED_BEFORE_SUBJECT.has(tokens[k]);
 }
 
 /** The object at `end` means the steps: "them", "the steps", «الخطوات», «كلشي»; a demonstrative only with a steps word or a clause end after it. */
-function stepsObject(typed: readonly string[], tokens: readonly string[], end: number): boolean {
+function stepsObject(tokens: readonly string[], end: number): boolean {
   let at = end;
   while (at < tokens.length && TRIED_DETERMINERS.has(tokens[at])) at += 1;
   const head = tokens[at];
@@ -404,7 +454,7 @@ function stepsObject(typed: readonly string[], tokens: readonly string[], end: n
   if (TRIED_STEPS_WORDS.has(head)) return true;
   if (!TRIED_OBJECTS.has(head)) return false;
   if (!TRIED_DEMONSTRATIVES.has(head)) return true;
-  return clauseEnds(typed, tokens, at + 1) || TRIED_STEPS_WORDS.has(tokens[at + 1]) || TRIED_AFTER_OBJECT.has(tokens[at + 1]);
+  return clauseEnds(tokens, at + 1) || TRIED_STEPS_WORDS.has(tokens[at + 1]) || TRIED_AFTER_OBJECT.has(tokens[at + 1]);
 }
 
 /** "it did that again", "the printer did that again", "it's done it": an English verb whose subject is not the customer. */
@@ -454,6 +504,66 @@ const best = <I extends string>(scores: Array<{ intent: I; score: number }>): I 
 const has = (scores: Array<{ intent: string; score: number }>, intent: string): boolean =>
   scores.some((s) => s.intent === intent && s.score >= CONFIDENT_SCORE);
 
+const DENY_BEFORE = normalSet(DENIAL.before);
+const DENY_BEFORE_HAVE = normalSet(DENIAL.beforeHave);
+const DENY_HAVE = normalSet(DENIAL.have);
+const DENY_SKIP = normalSet(DENIAL.skip);
+const DENY_FINE = normalSet(DENIAL.fine);
+const DENY_FINE_SKIP = normalSet(DENIAL.fineSkip);
+/** The Sorani negation on the word itself: «نەگیراوە» is "not clogged". */
+const SORANI_NOT = normalizeText('نە');
+
+/** The symptom or the part one word names alone, if any. */
+function namedBy(token: string): { kind: 'part' | 'symptom'; key: string } | undefined {
+  const part = best(scoreIntents(token, compiledParts));
+  if (part) return { kind: 'part', key: part };
+  const symptom = best(scoreIntents(token, compiledSymptoms)) ?? best(scoreIntents(token, compiledStringingWeak)) ?? best(scoreIntents(token, compiledAmsWeak));
+  return symptom ? { kind: 'symptom', key: symptom } : undefined;
+}
+
+/** A negation before the word at `at`, over `DENIAL.skip`: «ما عندي كلوب», «مو النوزل», "not clogged", "no stringing". */
+function negatedAt(tokens: readonly string[], at: number): boolean {
+  for (let k = at - 1; k >= 0 && k >= at - DENIAL.reach; k -= 1) {
+    if (DENY_BEFORE.has(tokens[k])) return true;
+    // «ما» and «لا» negate a having («ما عندي كلوب»), never the verb of a symptom («ما يطلع فلامنت»).
+    if (DENY_BEFORE_HAVE.has(tokens[k])) return DENY_HAVE.has(tokens[k + 1] ?? '');
+    if (!DENY_SKIP.has(tokens[k])) return false;
+  }
+  return false;
+}
+
+/** "is fine" right after the word at `at`: «النوزل زين», "the nozzle is fine", «نۆزڵەکە باشە». */
+function fineAfter(tokens: readonly string[], at: number): boolean {
+  for (let k = at + 1; k < tokens.length && k <= at + 2; k += 1) {
+    if (DENY_FINE.has(tokens[k])) return true;
+    if (!DENY_FINE_SKIP.has(tokens[k])) return false;
+  }
+  return false;
+}
+
+/**
+ * THE TEXT WITHOUT A SYMPTOM OR A PART THE CUSTOMER DENIES (./lexicon.ts
+ * `DENIAL`, review round 5.5). Said to be fine, the word goes; negated, it
+ * goes only when another symptom or part is named and not denied, so «ماعندي
+ * كلوب، عندي خيوط» is stringing and the ticket never says «انسداد النوزل».
+ * Read only for the part and the symptom. Pure, on normalised text.
+ */
+export function withoutDenied(rest: string): string {
+  const tokens = tokenize(rest);
+  const named = tokens.flatMap((t, at) => {
+    const n = namedBy(t);
+    if (!n) return [];
+    const sorani = t.startsWith(SORANI_NOT) && namedBy(t.slice(SORANI_NOT.length))?.key === n.key;
+    return [{ ...n, at, negated: sorani || negatedAt(tokens, at), fine: fineAfter(tokens, at) }];
+  });
+  const drop = new Set<number>();
+  for (const w of named) {
+    const other = named.some((o) => o.kind === w.kind && o.key !== w.key && !o.negated && !o.fine);
+    if (w.fine || (w.negated && other)) drop.add(w.at);
+  }
+  return drop.size ? tokens.filter((_, at) => !drop.has(at)).join(' ') : rest;
+}
+
 export interface UnderstandOptions {
   /** The triage is asking which symptom: «خيوط» alone then means stringing. */
   expectSymptom?: boolean;
@@ -486,19 +596,22 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
   const maintenance = has(cues, 'maintenance');
   const otherPrinter = has(cues, 'other_printer');
 
+  // «ماعندي كلوب، عندي خيوط», "the nozzle is fine, the problem is the plate": a symptom or a part denied is not read.
+  const affirmed = withoutDenied(rest);
+
   // «تنظيف النوزل», "nozzle cleaning": the cleaning tools FOR the nozzle. The more particular part wins.
-  const partScores = scoreIntents(rest, compiledParts);
+  const partScores = scoreIntents(affirmed, compiledParts);
   const firstPart = best(partScores);
   const part = firstPart === 'nozzle_hotend' && has(partScores, 'cleaning') ? 'cleaning' : firstPart;
-  const tool = part === 'cleaning' ? best(scoreIntents(rest, compiledTools)) : undefined;
+  const tool = part === 'cleaning' ? best(scoreIntents(affirmed, compiledTools)) : undefined;
 
   const symptomScores = new Map<SymptomKey, number>();
-  for (const s of scoreIntents(rest, compiledSymptoms)) symptomScores.set(s.intent, s.score);
+  for (const s of scoreIntents(affirmed, compiledSymptoms)) symptomScores.set(s.intent, s.score);
   if (opts.expectSymptom || problemCue) {
-    for (const s of scoreIntents(rest, compiledStringingWeak)) symptomScores.set('stringing', (symptomScores.get('stringing') ?? 0) + s.score);
+    for (const s of scoreIntents(affirmed, compiledStringingWeak)) symptomScores.set('stringing', (symptomScores.get('stringing') ?? 0) + s.score);
   }
   if (problemCue) {
-    for (const s of scoreIntents(rest, compiledAmsWeak)) symptomScores.set('ams', (symptomScores.get('ams') ?? 0) + s.score);
+    for (const s of scoreIntents(affirmed, compiledAmsWeak)) symptomScores.set('ams', (symptomScores.get('ams') ?? 0) + s.score);
   }
   const byWords = [...symptomScores.entries()].sort((a, b) => b[1] - a[1]);
   const wordSymptom = byWords.length > 0 && byWords[0][1] >= CONFIDENT_SCORE ? byWords[0][0] : undefined;
@@ -586,10 +699,18 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
     ...(wordSymptom ? { wordSymptom } : {}),
     ownPrinter,
     ownsSaid: !priceAsk && !productCue && saysOwns(typedWords),
+    ...(tellsPurchase(typedWords) ? { purchaseStory: true } : {}),
     triedSaid: saysTried(normalized),
     priceAsk,
     residual,
   };
+}
+
+/** «اشتريت نوزل وما يركب», "I bought a nozzle": a verb of a past purchase, and no want or need («اشتريت اي ون واريد نوزل»). Pure. */
+function tellsPurchase(typedWords: readonly string[]): boolean {
+  const words = unglued(typedWords);
+  if (!words.some((t) => PURCHASE_VERBS.has(t))) return false;
+  return ![...typedWords, ...words].some((t) => OWNS_WANT.has(t)) && !saysAny(` ${words.join(' ')} `, OWNS_WANT_PHRASES);
 }
 
 /**
@@ -607,6 +728,8 @@ function saysOwns(typedWords: readonly string[]): boolean {
   // «اكو اي ون؟», «اكو طابعتي؟» ask the shop; «اكو عندي اي ون» says it.
   if (words.some((t, i) => OWNS_THERE_IS.has(t) && !OWNS_THERE_IS_MINE.has(words[i + 1] ?? ''))) return false;
   if (words.some((t) => OWNS_HAVE.has(t)) || saysAny(padded, OWNS_PHRASES)) return true;
+  // Sorani «ئەی وەنەکەم», «پی وەن ئێسەکەم»: "my A1", the possessive on the spoken name (review round 5.5).
+  if (possessedSoraniName(typedWords.join(' '))) return true;
   // Sorani: «A1م هەیە», «پرینتەرێکم هەیە» (the clitic «م» before «هەیە»), «پرینتەرەکەم» (my printer).
   if (words.some((t, i) => OWNS_SORANI_HAVE.has(t) && i > 0 && words[i - 1].endsWith('م'))) return true;
   return words.some((t) => t.endsWith('م') && OWNS_SORANI_PRINTER.some((p) => t.startsWith(p)));
