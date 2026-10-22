@@ -98,10 +98,14 @@ function scoped(): string[] {
     'wrangler.jsonc',
     'docs/SUPPORT_ASSISTANT_AI.md',
     'packages/contracts/src/assistAiRefusals.ts',
+    'packages/contracts/src/assistAiReadRefusals.ts',
     'tests/routeClass/adminAssistAi.ts',
     'tests/fixtures/aiLayer.ts',
     'tests/fixtures/aiRoutes.ts',
     'worker/lib/policies/assistant_ai.ts',
+    // The client half's own new tests (their names do not start with «ai»).
+    'tests/assistAiClient.test.ts',
+    'tests/assistMediaHelpers.test.ts',
   ].map((p) => join(ROOT, p));
   const migrations = readdirSync(join(ROOT, 'migrations'))
     .filter((f) => f.startsWith('0210'))

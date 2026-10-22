@@ -3,6 +3,7 @@ import { Camera, Image as ImageIcon, Mic, ShieldCheck, Square, X } from 'lucide-
 import { ApiError, uploadFile } from '../../lib/api';
 import { formatElapsed, useVoiceRecorder } from '../../lib/voiceRecorder';
 import { AI_POLICY_PATH, readAttachment, readFrames, type AiReadKind, type AiReply } from '../../lib/assistAi';
+import { ASSIST_AI_READ_REFUSALS, type AssistAiReadRefusalCode } from '../../../packages/contracts/src/assistAiReadRefusals';
 import Spinner from '../ui/Spinner';
 
 /**
@@ -331,14 +332,46 @@ export interface AssistReadJob {
 
 /**
  * How a read ended. `reply` is drawn like any other reply; `transcript` goes
- * into the composer only; `note` is a sentence of this sheet (no server call
- * was made); `error` is a failed turn the page words itself.
+ * into the composer only; `note` is a sentence of this sheet for a read that
+ * cannot work on this file (its chip is not offered again); `gone` is a file
+ * the server no longer has, said in the words of the page; `error` is a
+ * failed turn that may be tried again, worded by the page unless the server
+ * named the reason.
  */
 export type AssistReadOutcome =
   | { kind: 'reply'; reply: AiReply }
   | { kind: 'transcript'; text: string }
   | { kind: 'note'; text: string }
-  | { kind: 'error' };
+  | { kind: 'gone' }
+  | { kind: 'error'; text?: string };
+
+/**
+ * A READ THE SERVER REFUSED OUTRIGHT (worker/routes/assistAi.ts), as the page
+ * says it, by CODE, in the language of the page: never the "ar / en" sentence
+ * of the server. Everything a reading can meet once it runs (switched off,
+ * the cap, a limit, a provider fault, an unclear picture) is an ordinary
+ * reply, not a refusal, and never reaches here.
+ *   - frames the server cannot take (a body over 2 MB, or frames it could not
+ *     use) are a clip this device could not turn into frames: `frames_failed`;
+ *   - a key that is gone (cleaned up) or not of this account: the sentence
+ *     push A already says, «أحد المرفقات لم يعد متاحاً», on the page;
+ *   - the read refusals of the contract (packages/contracts/src/assistAiReadRefusals.ts):
+ *     their own sentence; only the consent refusal may be tried again;
+ *   - anything else (no session, a dropped connection): «تعذرت قراءة المرفق» of the page.
+ */
+export function refusedRead(err: unknown, kind: AiReadKind, lang: string): AssistReadOutcome {
+  if (!(err instanceof ApiError)) return { kind: 'error' };
+  const code = err.code ?? '';
+  if (kind === 'clip' && (err.status === 413 || code === 'AI_FRAMES_TOO_LARGE' || code === 'AI_FRAMES_INVALID')) {
+    return { kind: 'note', text: copyFor(lang).framesFailed };
+  }
+  if (code === 'ATTACHMENT_NOT_FOUND' || code === 'ATTACHMENT_NOT_YOURS') return { kind: 'gone' };
+  if (Object.prototype.hasOwnProperty.call(ASSIST_AI_READ_REFUSALS, code)) {
+    const text = ASSIST_AI_READ_REFUSALS[code as AssistAiReadRefusalCode][lang === 'en' || lang === 'ckb' ? lang : 'ar'];
+    return code === 'AI_CONSENT_REQUIRED' ? { kind: 'error', text } : { kind: 'note', text };
+  }
+  return { kind: 'error' };
+}
 
 type Phase = 'consent' | 'frames' | 'reading';
 
@@ -411,9 +444,7 @@ export function AssistAiRead({
       setPhase('reading');
       finish(await readAttachment({ kind: job.kind, key: job.attachment.key, locale: lang, context }));
     } catch (err) {
-      // A body over the limit is a clip this device could not make small enough: the same sentence.
-      if (job.kind === 'clip' && err instanceof ApiError && err.status === 413) finish({ kind: 'note', text: t.framesFailed });
-      else finish({ kind: 'error' });
+      finish(refusedRead(err, job.kind, lang));
     }
   };
 

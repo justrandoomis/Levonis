@@ -876,6 +876,12 @@ test('the AI owner tab and the frame taker are lazy-only chunks, and the + sheet
     for (const [name, closure] of holders) assert.equal(closure.has(f), false, `${lazyOnly} is a STATIC import of ${name}`);
   }
   assert.equal(staticClosure(chunk('Support')!).has(chunk('AssistAttach')!), false, 'the + sheet is a static import of the Support page');
+  // The + sheet words a refused read by code (packages/contracts/src/assistAiReadRefusals.ts) and
+  // carries none of the owner tab refusal table: the two tables are two modules, so no shared chunk
+  // hands the owner sentences to a customer.
+  const sheet = [...staticClosure(chunk('AssistAttach')!)].map((f) => readFileSync(join(ASSETS, f), 'utf8'));
+  assert.ok(sheet.some((code) => code.includes('AI_FRAMES_INVALID')), 'the + sheet does not carry the read refusals');
+  for (const code of sheet) assert.ok(!code.includes('AI_TEST_TOKEN_REQUIRED') && !code.includes('AI_MODEL_NOT_LISTED'), 'the + sheet carries the owner tab refusals');
   console.log(
     `bundle: assistant AI layer ${['Support', 'AssistAttach', 'assistMedia', 'AdminAssistAi'].map((n) => `${n} ${kb(gz(join(ASSETS, chunk(n)!)))}`).join(', ')} gzip`
   );

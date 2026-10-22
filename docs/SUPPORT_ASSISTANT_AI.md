@@ -59,6 +59,12 @@ is push A's, byte for byte. This file is the design as built. The full plan is
 | `worker/routes/adminAssistAi.ts` | The owner's tab API (`/api/admin/assist-ai`). |
 | `worker/lib/imageConvert.ts` | `visionRendition`: the photo re-encoded to a 1568 px JPEG (the only `IMAGES` reader). |
 | `worker/lib/policies/assistant_ai.ts` | The customer-facing document (version 1), in force only while reading is on. |
+| `src/lib/assistAi.ts` | The page's half: readiness read strictly (anything else is basic), the read chips, consent memory (`sessionStorage`, guarded), the read and read-frames requests, the transcript reader. |
+| `src/components/support/AssistAttach.tsx` | The + sheet (one-minute recording cap) and `AssistAiRead`: the consent sheet naming the company, then the read; a refusal is worded by its code (`refusedRead`). Lazy. |
+| `src/lib/assistMedia.ts` | 2–4 canvas frames from a clip on the device (≤ 1024 px, ≤ 400,000 bytes each, the server's own limit), and the owner's vision Test picture. Lazy. |
+| `src/pages/Support.tsx` | The greeting by mode, the AI tag, the read chips, the transcript into the composer. |
+| `src/components/AdminAssistAi.tsx` | The owner's tab (lazy, verified owner only), its refusals worded from `packages/contracts/src/assistAiRefusals.ts`. |
+| `src/components/adminSupport/TicketsDesk.tsx` | The desk line naming the `read_by_ai` fields. |
 
 ## The text path (`POST /api/support/assistant`)
 
@@ -141,7 +147,7 @@ letter) or the reply is `voice_unclear`. No `language` is ever sent.
 
 Multipart: `key` (the clip's own), `consent=1`, `locale`, `context`, and
 `f0`…`f3`. The body is read under a 2 MB cap (413 `AI_FRAMES_TOO_LARGE`);
-2–4 frames, each ≤ 400 KB, a JPEG with sides ≤ 1280 and no APP1 (else 400
+2–4 frames, each ≤ 400 KB (400,000 bytes), a JPEG with sides ≤ 1280 and no APP1 (else 400
 `AI_FRAMES_INVALID`); the same session, consent and ownership checks (kind
 `video`). Frames are read in memory, never stored, and count against no
 attachment limit. Not ready or over the limits → `clip_unavailable`.
@@ -203,6 +209,8 @@ reaches every isolate within 30 s with no deploy.
 | `tests/aiHandoffV2.test.ts` | `ai_read` and the version 2 summary. |
 | `tests/aiStrings.test.ts` | The server sentences in three languages. |
 | `tests/aiLogsNoContent.test.ts`, `tests/aiSingleReaders.test.ts`, `tests/aiNoModelNames.test.ts` | Logs, single readers, no model names. |
+| `tests/aiClientContract.test.ts` | The page's and the owner tab's real requests through the real routes, read back by the page's own readers: the two halves agree on every field and limit. |
+| `tests/assistAiClient.test.ts`, `tests/aiStringsClient.test.ts`, `tests/assistMediaHelpers.test.ts` | The client half: request shapes, consent, chips, the transcript rule, the owner tab, its strings in three languages, the frame helpers. |
 
 `aiBasicModeParity` runs push A's two corpora itself, so it is one of the
 slowest files of the suite: each turn is replayed under a permissive probe

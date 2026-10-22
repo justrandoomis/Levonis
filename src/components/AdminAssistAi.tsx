@@ -35,6 +35,7 @@ import { useLanguage } from '../LanguageContext';
 import { useOptionalAuth } from '../AuthContext';
 import { api, ApiError } from '../lib/api';
 import { apiRefusal, refusalLang } from '../lib/refusalStrings';
+import { ASSIST_AI_REFUSALS, isAssistAiRefusalCode } from '../../packages/contracts/src/assistAiRefusals';
 import { formatElapsed, useVoiceRecorder } from '../lib/voiceRecorder';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -521,11 +522,16 @@ function when(iso: string | null, lang: string): string {
 }
 
 /**
- * A refusal in the language of the owner. The server sends the sentence of
- * its own refusal table as the fallback (packages/contracts/src/assistAiRefusals.ts
- * on the server branch); the shared table gives the cost codes (REAUTH_REQUIRED, OWNER_ONLY).
+ * A refusal in the language of the owner. The codes of this tab come from
+ * its own table (packages/contracts/src/assistAiRefusals.ts, the one the
+ * server words its "ar / en" fallback from), so a Sorani owner reads Sorani;
+ * the shared table gives the cost codes (REAUTH_REQUIRED, OWNER_ONLY).
  */
-const refusal = (e: unknown, lang: string, fallback: string) => apiRefusal(e, refusalLang(lang), fallback);
+export function refusal(e: unknown, lang: string, fallback: string): string {
+  const code = e instanceof ApiError ? e.code : undefined;
+  if (isAssistAiRefusalCode(code)) return ASSIST_AI_REFUSALS[code][lang === 'en' || lang === 'ckb' ? lang : 'ar'];
+  return apiRefusal(e, refusalLang(lang), fallback);
+}
 
 const fill = (template: string, vars: Record<string, string | number>) =>
   template.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));

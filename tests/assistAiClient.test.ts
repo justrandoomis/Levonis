@@ -55,8 +55,10 @@ import {
 } from '../src/lib/assistAi';
 import { ApiError } from '../src/lib/api';
 import { LanguageProvider } from '../src/LanguageContext';
-import { ASSIST_VOICE_MAX_SECONDS, AssistAiRead } from '../src/components/support/AssistAttach';
-import { MODEL_ID_SHAPE, normalizeUsd, parseUsd, readOverview } from '../src/components/AdminAssistAi';
+import { ASSIST_VOICE_MAX_SECONDS, AssistAiRead, refusedRead } from '../src/components/support/AssistAttach';
+import { MODEL_ID_SHAPE, normalizeUsd, parseUsd, readOverview, refusal as adminRefusal } from '../src/components/AdminAssistAi';
+import { ASSIST_AI_READ_REFUSALS, ASSIST_AI_REFUSALS } from '../packages/contracts/src/assistAiRefusals';
+import { MODEL_ID_SHAPE as SERVER_MODEL_ID_SHAPE } from '../worker/lib/ai/providers/anthropic';
 import { readByAiFields } from '../src/components/adminSupport/TicketsDesk';
 
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
@@ -384,8 +386,34 @@ test('the sheet reads only after «موافق»: a decline remembers no and clos
   const post = read_.indexOf('readFrames(');
   assert.ok(frames > 0 && guard > frames && post > guard, 'extract, check, then post');
   assert.match(read_, /await import\('\.\.\/\.\.\/lib\/assistMedia'\)/);
-  // 413 on the frames is the same sentence as frames that could not be taken.
-  assert.match(read_, /err\.status === 413\) finish\(\{ kind: 'note', text: t\.framesFailed \}\)/);
+  // A refusal is worded by its code (refusedRead, below): 413 on the frames is the same sentence as frames that could not be taken.
+  assert.match(read_, /catch \(err\) \{\s*finish\(refusedRead\(err, job\.kind, lang\)\);/);
+});
+
+test('a refused read is said by its code, in the language of the page; only a retryable one keeps its chip', () => {
+  const refused = (status: number, code: string) => new ApiError(status, 'ar / en', code);
+  // Frames the server cannot take are frames this device could not make: «frames_failed», chip dropped.
+  for (const err of [refused(413, 'AI_FRAMES_TOO_LARGE'), refused(400, 'AI_FRAMES_INVALID'), new ApiError(413, '')]) {
+    const out = refusedRead(err, 'clip', 'en');
+    assert.equal(out.kind, 'note');
+    assert.match((out as { text: string }).text, /could not take frames/);
+  }
+  // A file the server no longer has (or never had for this account): the sentence of the page, chip dropped.
+  assert.deepEqual(refusedRead(refused(400, 'ATTACHMENT_NOT_FOUND'), 'photo', 'ar'), { kind: 'gone' });
+  assert.deepEqual(refusedRead(refused(403, 'ATTACHMENT_NOT_YOURS'), 'voice', 'ckb'), { kind: 'gone' });
+  // The contract table, in the language of the page, never the "ar / en" sentence of the server.
+  const kind = refusedRead(refused(400, 'AI_READ_KIND'), 'photo', 'ckb');
+  assert.equal(kind.kind, 'note');
+  assert.equal((kind as { text: string }).text, ASSIST_AI_READ_REFUSALS.AI_READ_KIND.ckb);
+  const consent = refusedRead(refused(400, 'AI_CONSENT_REQUIRED'), 'photo', 'en');
+  assert.deepEqual(consent, { kind: 'error', text: ASSIST_AI_READ_REFUSALS.AI_CONSENT_REQUIRED.en }, 'a consent refusal may be tried again');
+  // No session, an unknown code, a dropped connection: the failed turn of the page, which may be retried.
+  assert.deepEqual(refusedRead(refused(401, 'UNAUTHORIZED'), 'photo', 'ar'), { kind: 'error' });
+  assert.deepEqual(refusedRead(new Error('offline'), 'voice', 'en'), { kind: 'error' });
+  // The page: «gone» says push A's own sentence and, like a note, offers that file no more.
+  const page = read('src/pages/Support.tsx');
+  assert.match(page, /outcome\.kind === 'gone' \? s\.attachGone : \(outcome\.text \?\? s\.readFailed\)/);
+  assert.match(page, /const dropped = outcome\.kind === 'note' \|\| outcome\.kind === 'gone';/);
 });
 
 test('the + sheet: the one-minute cap, the recording kept, attaching it still the choice of the customer', () => {
@@ -520,6 +548,7 @@ test('the owner tab: the GET answer read safely, 0 and 1 as booleans, nothing mi
   // A model id is checked before it is sent (the server checks again).
   assert.ok(MODEL_ID_SHAPE.test('vendor/model-name_1.0:latest@x'));
   for (const bad of ['', 'a b', 'x'.repeat(129), 'a;b', 'a?b']) assert.ok(!MODEL_ID_SHAPE.test(bad), bad);
+  assert.equal(MODEL_ID_SHAPE.source, SERVER_MODEL_ID_SHAPE.source, 'the shape the server checks again, exactly');
 });
 
 test('the owner tab: lazy, the verified owner only, its own deep link; it names no provider host and no ledger column', () => {
@@ -550,6 +579,20 @@ test('the owner tab: lazy, the verified owner only, its own deep link; it names 
   assert.match(tab, /`\$\{BASE\}\/models\?task=\$\{task\}`/);
   const body = tab.slice(tab.indexOf('const body = {'), tab.indexOf('};', tab.indexOf('const body = {')));
   assert.doesNotMatch(body, /provider/);
+});
+
+test('the owner tab words its refusals by code from the contract table, Sorani included; other codes go to the shared table', () => {
+  const err = new ApiError(409, 'ar / en', 'AI_MODEL_NOT_LISTED');
+  assert.equal(adminRefusal(err, 'ckb', 'x'), ASSIST_AI_REFUSALS.AI_MODEL_NOT_LISTED.ckb);
+  assert.equal(adminRefusal(err, 'en', 'x'), ASSIST_AI_REFUSALS.AI_MODEL_NOT_LISTED.en);
+  assert.equal(adminRefusal(err, 'ar', 'x'), ASSIST_AI_REFUSALS.AI_MODEL_NOT_LISTED.ar);
+  // Every code the owner routes refuse with has its sentence in the table (worker/routes/adminAssistAi.ts).
+  const route = read('worker/routes/adminAssistAi.ts');
+  const codes = new Set([...route.matchAll(/refuse\(\d{3}, '([A-Z_]+)'\)/g)].map((m) => m[1]!));
+  assert.ok(codes.size >= 8, `only ${codes.size} codes found`);
+  for (const code of codes) assert.ok(code in ASSIST_AI_REFUSALS, `${code} has no sentence in the contract table`);
+  // A code that is not of this tab falls through to the shared refusal table, never to a blank.
+  assert.ok(adminRefusal(new ApiError(500, '', 'SOMETHING_ELSE'), 'en', 'fallback sentence').length > 0);
 });
 
 // ----------------------------------------------------------------- the desk

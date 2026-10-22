@@ -61,6 +61,7 @@ const PUSH_B_SERVER = [
   join(ROOT, 'worker/routes/adminAssistAi.ts'),
   join(ROOT, 'worker/routes/assistAi.ts'),
   join(ROOT, 'packages/contracts/src/assistAiRefusals.ts'),
+  join(ROOT, 'packages/contracts/src/assistAiReadRefusals.ts'),
 ].filter((f) => existsSync(f));
 
 test('among push B server files, fetch( appears only in the one transport', () => {

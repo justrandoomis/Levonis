@@ -28,6 +28,8 @@ import {
   testCode,
 } from '../src/lib/assistMedia';
 import { HMS_CODE_SHAPE } from '../worker/lib/assist/context';
+import { FRAME_LIMITS } from '../worker/lib/ai/jpeg';
+import { FRAMES_BODY_MAX_BYTES } from '../worker/routes/assistAi';
 import { readHmsCode } from '../worker/lib/assist/understand';
 
 test('frameTimes: four points strictly inside (0, d), in order, at 15, 40, 65 and 90 percent', () => {
@@ -84,8 +86,13 @@ test('fitEdge: every frame stays inside the server limit for frames (1280) at th
 
 test('the limits the server holds are the limits the browser aims under', () => {
   assert.equal(MIN_FRAMES, 2, 'fewer than two frames is no reading (plan §5.3)');
-  assert.equal(FRAME_MAX_BYTES, 400 * 1024, 'each frame at most 400 KB');
-  assert.ok(4 * FRAME_MAX_BYTES < 2 * 1024 * 1024, 'four frames fit the 2 MB body');
+  // The server's own numbers (worker/lib/ai/jpeg.ts, worker/routes/assistAi.ts), not a copy of them:
+  // a frame the browser keeps must be a frame the server takes.
+  assert.equal(MIN_FRAMES, FRAME_LIMITS.min);
+  assert.equal(FRAME_FRACTIONS.length, FRAME_LIMITS.max, 'at most four frames');
+  assert.equal(FRAME_MAX_BYTES, FRAME_LIMITS.maxBytes, 'each frame at most 400 KB, as the server counts them');
+  assert.ok(FRAME_EDGE <= FRAME_LIMITS.maxSide, 'the longest side within the server limit');
+  assert.ok(FRAME_LIMITS.max * FRAME_MAX_BYTES < FRAMES_BODY_MAX_BYTES, 'four frames fit the 2 MB body');
 });
 
 test('without a document there are no frames and no drawing, and nothing throws', async () => {

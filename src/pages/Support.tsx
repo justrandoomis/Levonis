@@ -1956,11 +1956,13 @@ export default function Support() {
       setMessages((prev) => [...prev, asked, { role: 'assistant', text: reply.text, reply }]);
       return;
     }
-    const said = outcome.kind === 'note' ? outcome.text : s.readFailed;
+    const said = outcome.kind === 'note' ? outcome.text : outcome.kind === 'gone' ? s.attachGone : (outcome.text ?? s.readFailed);
     setMessages((prev) => {
       const current = [...prev].reverse().find((m) => m.role === 'assistant')?.reply?.choices ?? [];
-      // A clip this device cannot decode is not offered again; a failed read may be retried.
-      const choices = outcome.kind === 'note' ? current.filter((ch) => readChoiceTarget(ch.params)?.key !== key) : current;
+      // A clip this device cannot decode, or a file the server no longer has, is not offered again;
+      // a failed read may be retried.
+      const dropped = outcome.kind === 'note' || outcome.kind === 'gone';
+      const choices = dropped ? current.filter((ch) => readChoiceTarget(ch.params)?.key !== key) : current;
       return [
         ...prev,
         asked,

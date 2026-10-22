@@ -25,8 +25,8 @@ export const MAX_PICK_SECONDS = 120;
 export const FRAME_EDGE = 1024;
 /** JPEG quality first tried, and the lower ones tried when a frame is too heavy. */
 export const FRAME_QUALITIES = [0.8, 0.65, 0.5] as const;
-/** The server takes at most 400 KB a frame. */
-export const FRAME_MAX_BYTES = 400 * 1024;
+/** The server takes at most 400 KB a frame, counted in thousands (worker/lib/ai/jpeg.ts FRAME_LIMITS). */
+export const FRAME_MAX_BYTES = 400_000;
 export const SEEK_TIMEOUT_MS = 6000;
 export const TOTAL_TIMEOUT_MS = 10000;
 /** Fewer than this many frames is no reading: the page says so and calls nothing. */
