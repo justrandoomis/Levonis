@@ -21,8 +21,10 @@
  * never shows another printer's part as a match.
  */
 import { extractOrderId, normalizeText, tokenize } from '../assistantNlu';
+import type { Reading } from './ai/adapter';
+import { canonicalHmsCode } from './ai/validate';
 import type { AssistContext } from './context';
-import { ROWS_MAX, SEEN_MAX, SHOWN_MAX, SIZE_SHAPE } from './context';
+import { readAiRead, ROWS_MAX, SEEN_MAX, SHOWN_MAX, SIZE_SHAPE } from './context';
 import { buildTicketDraft, shownStepKeys } from './handoff';
 import { callTool } from './registry';
 import { tr } from './strings';
@@ -30,7 +32,7 @@ import { FITS_MAX, SEARCH_LIMIT_MAX, SEARCH_OFFSET_MAX, type CatalogItem, type C
 import type { MyPrinter } from './tools/devices';
 import { nextTriage, triagePrinter, type TriageInput, type TriageStep } from './triage/flow';
 import { SYMPTOMS, symptomDef, wikiFor } from './triage/symptoms';
-import type { AssistCard, AssistChoice, AssistReply, CardRenderer, ModelToken, PartKey, Viewer } from './types';
+import type { AiReadField, AssistCard, AssistChoice, AssistReply, CardRenderer, ModelToken, PartKey, Viewer } from './types';
 import { MODEL_TOKENS, PART_KEYS, SYMPTOM_KEYS, type SymptomKey } from './types';
 import { mentionsModel, understand, type Understood } from './understand';
 import { MODEL_NAME_WORDS } from './understand/models';
@@ -142,10 +144,67 @@ function triageExtras(
 }
 
 export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInput, render: CardRenderer): Promise<TurnOutcome | null> {
+  const out = await turnOf(db, viewer, input, render);
+  return out ? withAiRead(input, out) : null;
+}
+
+/**
+ * WHAT WAS READ FROM AN ATTACHMENT AND CONFIRMED, CARRIED (push B plan §6.10).
+ *
+ * A candidate chip from a photo or a clip carries `via` («photo», «clip»); the
+ * turn it starts adds the field it set (the code, the symptom, the printer or
+ * the part) to the context's `ai_read`. A later turn that sets that field
+ * another way (typed, or a chip without `via`) drops it, so the ticket never
+ * says the assistant read what the customer then gave by hand. A context
+ * without `ai_read`, and a chip without `via`, leave the outcome exactly as
+ * push A built it.
+ */
+const VIA = new Set(['photo', 'clip']);
+const STEP_FIELD: Readonly<Record<string, AiReadField>> = { code: 'code', symptom: 'symptom', printer: 'printer', part: 'part' };
+
+function fieldValue(ctx: AssistContext, field: AiReadField): string | undefined {
+  switch (field) {
+    case 'code':
+      return ctx.triage?.code;
+    case 'symptom':
+      return ctx.triage?.symptom;
+    case 'printer':
+      return ctx.printer?.model;
+    case 'part':
+      return ctx.part ?? ctx.triage?.faultIn;
+  }
+}
+
+function withAiRead(input: TurnInput, out: TurnOutcome): TurnOutcome {
+  const before = readAiRead(input.context.ai_read);
+  const step = typeof input.chip?.step === 'string' ? input.chip.step : '';
+  const viaField = input.chip && typeof input.chip.via === 'string' && VIA.has(input.chip.via) ? STEP_FIELD[step] : undefined;
+  if (before.length === 0 && !viaField) return out;
+  // Kept: what was read before and still holds the same value; added: what this tap confirmed, when it set it.
+  const kept = before.filter((f) => f !== viaField && fieldValue(out.context, f) !== undefined && fieldValue(out.context, f) === fieldValue(input.context, f));
+  const added = viaField && fieldValue(out.context, viaField) !== undefined ? [viaField] : [];
+  const read = readAiRead([...kept, ...added]);
+  const context: AssistContext = { ...out.context };
+  if (read.length) context.ai_read = read;
+  else delete context.ai_read;
+  return { reply: out.reply, context };
+}
+
+async function turnOf(db: D1Database, viewer: Viewer, input: TurnInput, render: CardRenderer): Promise<TurnOutcome | null> {
   if (input.chip) {
     if (input.chip.step === 'part') {
       const asked = readPartChip(input.chip);
       return asked ? products(db, viewer, asked.u, input.context, render, null, { anyPrinter: asked.anyPrinter }) : null;
+    }
+    // «نعم، هذا هو الرمز»: a code read from a photo, confirmed. Read again by push A's
+    // own reader, never trusted as sent; then exactly the path of the same code typed.
+    if (input.chip.step === 'code') {
+      const code = canonicalHmsCode(input.chip.code);
+      if (!code) return null;
+      const model = chipModel(input.chip.model);
+      if (model) return runTriage(db, viewer, input.context, { kind: 'start', symptom: 'hms', code, model }, render);
+      if (input.context.printer) return runTriage(db, viewer, input.context, { kind: 'symptom', symptom: 'hms', code }, render);
+      return runTriage(db, viewer, input.context, { kind: 'start', symptom: 'hms', code }, render);
     }
     const triage = readChip(input.chip);
     if (!triage) return null;
@@ -466,6 +525,83 @@ export function ownedPrinterNamed(typed: string): boolean {
 }
 
 /**
+ * A MODEL'S READING, ANSWERED BY PUSH A (push B plan §5.1, invariants I1, I4,
+ * I5). The route reaches this only after every rule, the legacy scorer and
+ * the strong catalogue lookup found nothing, and only with a reading the
+ * validators accepted (./ai/validate.ts). The reading picks WHICH of push A's
+ * own paths answers; the answer is still push A's: its search, its curated
+ * triage, its templates, its cards.
+ *
+ * THE RULES WIN WHEREVER THEY READ SOMETHING. The sentence is read again by
+ * `understand`, and the reading only fills what the rules left empty: the
+ * printer, the part, the symptom. Sizes, codes and the order id come from the
+ * rules alone. Search words are the reading's verified terms (whole tokens of
+ * the customer's own text), never a printer name or a number.
+ *
+ * `null` means the clarify menu, byte for byte: a reading of a question this
+ * file does not own (`intent`, `none`), an outcome with no steps on screen, or
+ * a product search that found nothing to show.
+ */
+export async function handleReading(
+  db: D1Database,
+  viewer: Viewer,
+  r: Reading,
+  text: string,
+  ctx: AssistContext,
+  render: CardRenderer
+): Promise<TurnOutcome | null> {
+  const u = withRemembered(understand(text), ctx);
+  const said = faultModel(u);
+  const known = ((u.printerUnread || u.family) && !u.model) || (u.models.length > 0 && !said) ? withoutPrinter(ctx) : ctx;
+  /** The reading's printer, unless the customer denied it. */
+  const readModel = (m: ModelToken | 'other' | undefined): ModelToken | 'other' | undefined =>
+    m && m !== 'other' && u.deniedModels.includes(m) ? undefined : m;
+
+  switch (r.action) {
+    case 'products': {
+      const read = readModel(r.model);
+      const model = u.model ?? (read === 'other' ? undefined : read);
+      const synth: Understood = {
+        ...u,
+        ...(model ? { model, models: u.models.length ? u.models : [model] } : {}),
+        ...(u.part ?? r.part ? { part: u.part ?? r.part } : {}),
+        maintenance: u.maintenance || r.maintenance,
+        productCue: true,
+        residual: readingWords(r.terms),
+      };
+      const anyPrinter = !model && !!synth.part && r.model === 'other' && !u.family;
+      const out = await products(db, viewer, synth, known, render, null, { anyPrinter });
+      // Found nothing to show: the menu, not «لم أجد». «لأي طابعة؟» is an answer of its own.
+      if (!out.reply.cards?.length && out.context.asking !== 'part_printer') return null;
+      return out;
+    }
+    case 'triage': {
+      // «another printer» read by a model is no printer: the triage asks, and «طابعة أخرى» is one of its chips.
+      const read = readModel(r.model);
+      const model = said ?? (read === 'other' ? undefined : read);
+      const symptom = u.symptom ?? r.symptom;
+      return runTriage(db, viewer, known, { kind: 'start', ...(model ? { model } : {}), ...(symptom ? { symptom } : {}) }, render);
+    }
+    case 'outcome':
+      if (ctx.triage?.stage !== 'steps') return null;
+      return runTriage(db, viewer, ctx, { kind: 'outcome', outcome: r.outcome, tried: u.triedSaid }, render);
+    default:
+      return null;
+  }
+}
+
+/**
+ * The words a reading may add to a search: its verified terms, split, each
+ * once, never a printer's name (the printer is a filter, never a word) and
+ * never a number (sizes come from the rules alone), four at most.
+ */
+function readingWords(terms: readonly string[]): string[] {
+  const printerWords = new Set(MODEL_TOKENS.flatMap((m) => [m.toLowerCase().replace(/\s+/g, ''), ...MODEL_NAME_WORDS[m].flat()]));
+  const words = terms.flatMap((t) => normalizeText(t).split(' ')).filter((w) => w.length >= 2 && !/\d/.test(w) && !printerWords.has(w));
+  return [...new Set(words)].slice(0, 4);
+}
+
+/**
  * «شكد سعر A1», "price of the A1", «A1» (review round 4.2). The storefront
  * search for «A1» ranks five A1 parts above the A1 itself, so the answer was
  * spare parts and never the printer. The printer comes first, as the shop
@@ -579,19 +715,30 @@ async function shownAgain(
 
 // ═════════════════════════════════════════════════════════════ chips
 
-const CHIP_STEPS = new Set(['printer', 'symptom', 'outcome', 'talk', 'change_printer']);
+const CHIP_STEPS = new Set(['printer', 'symptom', 'outcome', 'talk', 'change_printer', 'code']);
 const UNIT_SHAPE = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** A printer a chip names, from the closed set only. */
+function chipModel(v: unknown): ModelToken | undefined {
+  return (MODEL_TOKENS as readonly string[]).includes(String(v)) ? (v as ModelToken) : undefined;
+}
 
 /**
  * «لأي طابعة تريد النوزل؟» answered by a chip: `{ step: 'part', part, model, size? }`,
  * from the closed sets only. The question it answers is read again as if typed.
  * `model: 'other'` («طابعة أخرى») is the part for a printer the shop does not list.
+ *
+ * A chip with NO model (push B: «نعم» under «تظهر في الصورة قطعة تشبه النوزل»)
+ * is the part asked for alone, the same reading a typed «اريد نوزل» gives: the
+ * printer this conversation chose answers for it, as it does for the typed
+ * question. A model that is there and not one of the shop's is still refused.
  */
 function readPartChip(params: Record<string, unknown>): { u: Understood; anyPrinter: boolean } | null {
   const part = (PART_KEYS as readonly string[]).includes(String(params.part)) ? (params.part as PartKey) : null;
   const anyPrinter = params.model === 'other';
   const model = (MODEL_TOKENS as readonly string[]).includes(String(params.model)) ? (params.model as ModelToken) : null;
-  if (!part || (!model && !anyPrinter)) return null;
+  const unnamed = params.model === undefined;
+  if (!part || (!model && !anyPrinter && !unnamed)) return null;
   const size = typeof params.size === 'string' && SIZE_SHAPE.test(params.size) ? params.size : undefined;
   const u: Understood = {
     ...(model ? { model } : {}),
@@ -604,7 +751,7 @@ function readPartChip(params: Record<string, unknown>): { u: Understood; anyPrin
     problemCue: false,
     accountCue: false,
     faultCue: false,
-    printerCue: true,
+    printerCue: !unnamed,
     printerUnread: false,
     otherBrand: false,
     otherPrinter: false,
@@ -789,6 +936,7 @@ async function replyFor(db: D1Database, viewer: Viewer, step: TriageStep, ctx: A
           ...(step.code ? { code: step.code } : {}),
           ...(ownUnit ? { unit_id: ownUnit } : {}),
           ...(ctx.shown ? { shown: ctx.shown } : {}),
+          ...(ctx.ai_read?.length ? { readByAi: ctx.ai_read } : {}),
         },
         loc
       );

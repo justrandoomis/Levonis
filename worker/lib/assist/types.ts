@@ -34,12 +34,24 @@ export interface Viewer {
   pricing: Promise<PricingCtx>;
 }
 
-/** A chip the client sends back verbatim as `{ intent, params }`. */
+/**
+ * A chip the client sends back verbatim as `{ intent, params }`. `menu` is no
+ * intent the route knows: tapped, it reaches the route's clarify reply, the
+ * topic menu (push B's «ليس هذا ما قصدته» and «لا، ليس هذا»).
+ */
 export interface AssistChoice {
   label: string;
-  intent: 'printer_problem' | 'product_search' | 'human_handoff';
+  intent: 'printer_problem' | 'product_search' | 'human_handoff' | 'menu';
   params?: Record<string, string>;
 }
+
+/**
+ * What the customer CONFIRMED after the assistant read it from an attachment
+ * (push B): a code, a symptom, a printer or a part, each by a tap on a
+ * candidate chip. Field names only, never a value.
+ */
+export const AI_READ_FIELDS = ['code', 'symptom', 'printer', 'part'] as const;
+export type AiReadField = (typeof AI_READ_FIELDS)[number];
 
 export interface AssistLink {
   label: string;
@@ -89,7 +101,11 @@ export interface TicketDraft {
  * stored value is never trusted as written.
  */
 export interface HandoffSummary {
-  v: 1;
+  /**
+   * 1, or 2 when `read_by_ai` names a field. A conversation in which nothing
+   * was read from an attachment writes version 1, byte for byte as push A did.
+   */
+  v: 1 | 2;
   model: ModelToken | 'other' | null;
   symptom: SymptomKey | null;
   /**
@@ -104,6 +120,12 @@ export interface HandoffSummary {
   shown: string[];
   /** Set by the ticket door from the attachments it linked, never from the body. */
   attachments: number;
+  /**
+   * Version 2 only: the fields above the assistant read from an attachment and
+   * the customer confirmed with a tap (push B). Each names a field this summary
+   * carries; never empty (a summary with none is version 1).
+   */
+  read_by_ai?: AiReadField[];
 }
 
 export interface AssistReply {

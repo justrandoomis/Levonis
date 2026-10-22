@@ -12,8 +12,8 @@
  * values (`HandoffSummary`), so the desk can read them without parsing prose;
  * no sentence of the customer's rides in it.
  */
-import type { HandoffSummary, L3, Locale, ModelToken, PartKey, SymptomKey, TicketDraft } from './types';
-import { MODEL_TOKENS, PART_KEYS, SYMPTOM_KEYS } from './types';
+import type { AiReadField, HandoffSummary, L3, Locale, ModelToken, PartKey, SymptomKey, TicketDraft } from './types';
+import { AI_READ_FIELDS, MODEL_TOKENS, PART_KEYS, SYMPTOM_KEYS } from './types';
 import { tr } from './strings';
 import { symptomDef } from './triage/symptoms';
 import { HMS_CODE_SHAPE, SHOWN_MAX } from './context';
@@ -46,6 +46,12 @@ export interface DraftInput {
   unit_id?: string;
   /** The product ids the conversation showed last (the context's `shown`). */
   shown?: readonly string[];
+  /**
+   * The fields the customer confirmed after the assistant read them from an
+   * attachment (the context's `ai_read`, push B). Only those the summary
+   * carries are kept; none, and the summary is version 1 exactly as before.
+   */
+  readByAi?: readonly AiReadField[];
 }
 
 export type { HandoffSummary };
@@ -70,7 +76,7 @@ export function readHandoff(raw: unknown): HandoffSummary | null {
   }
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const h = value as Record<string, unknown>;
-  if (h.v !== 1) return null;
+  if (h.v !== 1 && h.v !== 2) return null;
   const model =
     h.model === 'other' ? 'other' : typeof h.model === 'string' && (MODEL_TOKENS as readonly string[]).includes(h.model) ? (h.model as ModelToken) : null;
   const symptom = typeof h.symptom === 'string' && (SYMPTOM_KEYS as readonly string[]).includes(h.symptom) ? (h.symptom as SymptomKey) : null;
@@ -87,7 +93,21 @@ export function readHandoff(raw: unknown): HandoffSummary | null {
   const count = Number(h.attachments);
   const attachments = Number.isInteger(count) && count >= 0 && count <= 6 ? count : 0;
   if (!model && !symptom && !part) return null;
-  return { v: 1, model, symptom, ...(part ? { part } : {}), tried, ...(code ? { code } : {}), shown, attachments };
+  const summary: HandoffSummary = { v: 1, model, symptom, ...(part ? { part } : {}), tried, ...(code ? { code } : {}), shown, attachments };
+  // Version 2 names only fields this summary still carries; none, and it reads as version 1.
+  const read = h.v === 2 && Array.isArray(h.read_by_ai) ? carriedReads(summary, h.read_by_ai) : [];
+  return read.length ? { ...summary, v: 2, read_by_ai: read } : summary;
+}
+
+/** The known field names in `raw` that `summary` actually carries, in the fixed order. */
+function carriedReads(summary: Omit<HandoffSummary, 'v' | 'read_by_ai'>, raw: readonly unknown[]): AiReadField[] {
+  const carries: Record<AiReadField, boolean> = {
+    code: !!summary.code,
+    symptom: !!summary.symptom,
+    printer: !!summary.model && summary.model !== 'other',
+    part: !!summary.part,
+  };
+  return AI_READ_FIELDS.filter((f) => raw.includes(f) && carries[f]);
 }
 
 /** The summary as the desk shows it: every label from the curated set, in all three languages. */
@@ -100,6 +120,8 @@ export interface StaffHandoff {
   code: string | null;
   shown: string[];
   attachments: number;
+  /** Version 2 only: what the assistant read from an attachment and the customer confirmed (never empty when present). */
+  read_by_ai?: AiReadField[];
 }
 
 export function handoffForStaff(raw: unknown): StaffHandoff | null {
@@ -115,6 +137,7 @@ export function handoffForStaff(raw: unknown): StaffHandoff | null {
     code: h.code ?? null,
     shown: h.shown,
     attachments: h.attachments,
+    ...(h.read_by_ai?.length ? { read_by_ai: [...h.read_by_ai] } : {}),
   };
 }
 
@@ -167,7 +190,7 @@ export function buildTicketDraft(input: DraftInput, loc: Locale): TicketDraft {
     }
   }
   // A summary that names neither a printer nor a symptom (nor the part of a fault) is no summary (`readHandoff`).
-  const handoff: HandoffSummary | null =
+  const base: HandoffSummary | null =
     input.model || input.symptom
       ? {
           v: 1,
@@ -180,6 +203,10 @@ export function buildTicketDraft(input: DraftInput, loc: Locale): TicketDraft {
           attachments: 0,
         }
       : null;
+  // Version 2 only when something the summary carries was read from an attachment (push B):
+  // a conversation without one writes version 1, byte for byte as before.
+  const read = base && input.readByAi?.length ? carriedReads(base, input.readByAi) : [];
+  const handoff: HandoffSummary | null = base && read.length ? { ...base, v: 2, read_by_ai: read } : base;
   return {
     subject: subject.slice(0, 200),
     body: lines.join('\n'),

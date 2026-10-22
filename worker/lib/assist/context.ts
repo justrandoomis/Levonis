@@ -13,7 +13,7 @@
  * triage re-checks against the signed-in viewer's own devices; account data
  * still comes from the session alone.
  */
-import { MODEL_TOKENS, PART_KEYS, SYMPTOM_KEYS, type ModelToken, type PartKey, type SymptomKey } from './types';
+import { AI_READ_FIELDS, MODEL_TOKENS, PART_KEYS, SYMPTOM_KEYS, type AiReadField, type ModelToken, type PartKey, type SymptomKey } from './types';
 import { PART_SYMPTOM } from './understand/lexicon';
 
 export const TRIAGE_STAGES = ['printer', 'symptom', 'steps', 'done'] as const;
@@ -75,6 +75,14 @@ export interface AssistContext {
    * where the first stopped and never shows a card again.
    */
   more?: { rows: number; seen: string[] };
+  /**
+   * What the customer confirmed, with a tap on a candidate chip, after the
+   * assistant read it from a photo or a clip (push B): the code, the symptom,
+   * the printer or the part. Field names only. A later turn that sets that
+   * field another way drops it (orchestrator `withAiRead`), and the ticket's
+   * summary names only those it still carries (./handoff.ts, version 2).
+   */
+  ai_read?: AiReadField[];
 }
 
 /** A context bigger than this is not a context; it is ignored whole. */
@@ -146,5 +154,13 @@ export function readContext(raw: unknown): AssistContext {
     const seen = Array.isArray(m.seen) ? [...new Set(m.seen.filter((x): x is string => typeof x === 'string' && ID_SHAPE.test(x)))].slice(-SEEN_MAX) : [];
     if (Number.isInteger(rows) && rows >= 0 && rows <= ROWS_MAX) out.more = { rows, seen };
   }
+  const read = readAiRead(c.ai_read);
+  if (read.length) out.ai_read = read;
   return out;
+}
+
+/** Known field names only, each once, in the fixed order: anything else is dropped. */
+export function readAiRead(raw: unknown): AiReadField[] {
+  if (!Array.isArray(raw)) return [];
+  return AI_READ_FIELDS.filter((f) => raw.includes(f));
 }

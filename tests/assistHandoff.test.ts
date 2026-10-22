@@ -31,7 +31,9 @@ const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 test('readHandoff keeps the closed sets and nothing else', () => {
   assert.equal(readHandoff(null), null);
   assert.equal(readHandoff('not json'), null);
-  assert.equal(readHandoff({ v: 2, model: 'A1', symptom: 'clog' }), null, 'another version is not this summary');
+  assert.equal(readHandoff({ v: 3, model: 'A1', symptom: 'clog' }), null, 'another version is not this summary');
+  // Push B's version 2 names what was read from an attachment; with nothing it may name, it is version 1.
+  assert.deepEqual(readHandoff({ v: 2, model: 'A1', symptom: 'clog' }), { v: 1, model: 'A1', symptom: 'clog', tried: [], shown: [], attachments: 0 });
   assert.equal(readHandoff({ v: 1, model: 'Z9', symptom: 'flood' }), null, 'neither a printer nor a symptom');
   const clean = readHandoff({
     v: 1,
