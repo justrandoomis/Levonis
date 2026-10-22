@@ -70,10 +70,30 @@ identifiers.
   - «خلصت الفلامنت مالتي» and «فیلامێنتم تەواو بوو» show loosely related products.
   - "I tried another filament, still clogged" shows the steps again.
 
-### 3.2 Assistant AI layer B1 — in progress (branch `b1/server` in the local worktree `/home/user/levonis-b1s`, client lane `b1/client`); plan in `assist-ai-layer-B1-plan.md`
+### 3.2 Assistant AI layer B1 — BUILT, NOT REVIEWED, NOT LANDED (branch `wip/assist-b1`, tip `b64e8e8c`); plan in `assist-ai-layer-B1-plan.md`
+
+**Where it stopped (2026-10-22, at the owner's request).** On `wip/assist-b1` (12 commits, based on `02973253`, which is push A before its last round 5.7):
+- part 1 (`ea21b733..9156cd9f`): migration 0210 dark, the provider core, the owner's admin API, the workflow 7 readiness probe;
+- part 2 (`b3bcee03..db5f369c`): the assistant seam, the consult point, the read routes, basic mode proven byte for byte;
+- the client lane (`5e7c324f`), then the integration (`b64e8e8c`). The integrator reported every plan §17 check green.
+
+The three-lens adversarial review was stopped before it reported.
+
+**To resume:**
+1. Rebase `wip/assist-b1` onto the live default branch. Push A landed as `3f117db3`, with round 5.7 touching `worker/lib/assist/understand/*`, `orchestrator.ts` and `worker/routes/support.ts`.
+2. Re-run the plan §17 checks.
+3. Run the review lenses from the session's workflow (copy them into a new run):
+   - invariants I1–I11, privacy and no model names;
+   - security and budget;
+   - basic-mode byte parity with push A, using the parity harness approach from §3.1.
+4. Fix only confirmed findings.
+5. Push to `ci/assist-b1`, then fast-forward, follow workflow 7, and run the plan §18 live checks. Readiness must say `basic`, and the five owner cases must be unchanged.
+6. B1 ships dark (`enabled=0`). The owner questions below come before turn-on, not before landing.
+
+
 
 - Start after push A lands. It builds on push A's adapter seam `worker/lib/assist/ai/adapter.ts`.
-- **Shape:**
+- **Shape (as planned):**
   - It ships dark (`enabled=0`).
   - Migration `0210_assist_ai_layer.sql`, with schemaVersion `0210` / `203`.
   - Model ids live only in D1 rows the owner picks in admin from the provider's live model list. No model name may appear anywhere in the repository.
