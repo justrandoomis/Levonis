@@ -102,6 +102,16 @@ function dropPendingQuestion(ctx: AssistContext): void {
   delete ctx.asking;
 }
 
+/**
+ * The printer of a fault, as the customer named it: the first one they do not
+ * deny or call fine («ماعندي اي ون، عندي بي ون اس» is the P1S; «not the A1»
+ * names none). Only the triage reads it; a shopping answer keeps `u.model`
+ * («ماعندي اي ون» still shows the A1 first, review round 5.6).
+ */
+function faultModel(u: Understood): ModelToken | undefined {
+  return u.models.find((m) => !u.deniedModels.includes(m));
+}
+
 /** The context without the printer: a printer named and not read must not be answered for by the remembered one. */
 function withoutPrinter(ctx: AssistContext): AssistContext {
   const out: AssistContext = { ...ctx };
@@ -154,8 +164,9 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
   const stage = ctx.triage?.stage;
   /** Nothing in the text but the answer: no shopping word, no account word, no size, no code. */
   const bare = !u.productCue && !u.accountCue && u.measures.length === 0 && u.codes.length === 0;
-  // A printer named and not read, or a family named, is not the printer remembered from earlier.
-  const known = (u.printerUnread || u.family) && !u.model ? withoutPrinter(ctx) : ctx;
+  // A printer named and not read, or a family named, is not the printer remembered from earlier; nor is one denied.
+  const said = faultModel(u);
+  const known = ((u.printerUnread || u.family) && !u.model) || (u.models.length > 0 && !said) ? withoutPrinter(ctx) : ctx;
   // «طابعتي X1»: the family's printers are the only chips.
   const among = u.family ? { among: u.family.members } : {};
 
@@ -172,7 +183,9 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
       extras.symptom
         ? triageExtras(extras.symptom, extras.code ?? ctx.triage?.code, extras.faultIn)
         : triageExtras(ctx.triage?.symptom, extras.code ?? ctx.triage?.code, ctx.triage?.faultIn);
-    if (u.model) return runTriage(db, viewer, ctx, { kind: 'printer', model: u.model, ...extras }, render);
+    if (said) return runTriage(db, viewer, ctx, { kind: 'printer', model: said, ...extras }, render);
+    // «ماعندي اي ون», "not the A1", «A1م نییە»: no printer given; the same question again (review round 5.6).
+    if (u.model) return runTriage(db, viewer, known, { kind: 'start', ...holding() }, render);
     // «X1»: which of the family, holding what was already said.
     if (u.family) return runTriage(db, viewer, known, { kind: 'start', ...among, ...holding() }, render);
     // «طابعتي», "my own printer": the one printer of this account; with several, or none
@@ -199,8 +212,9 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
       const code = ua.hmsCode ? { code: ua.hmsCode } : {};
       // «النوزل», «مشكلة بالنوزل»: the clog steps, and the part, never «انسداد النوزل», on the ticket.
       const fault = byPart ? { faultIn: byPart } : {};
-      if (ua.model && ua.model !== ctx.printer?.model) {
-        return runTriage(db, viewer, ctx, { kind: 'start', model: ua.model, symptom, ...code, ...fault }, render);
+      const named = faultModel(ua);
+      if (named && named !== ctx.printer?.model) {
+        return runTriage(db, viewer, ctx, { kind: 'start', model: named, symptom, ...code, ...fault }, render);
       }
       if (ua.family) return runTriage(db, viewer, withoutPrinter(ctx), { kind: 'start', among: ua.family.members, symptom, ...code, ...fault }, render);
       return runTriage(db, viewer, ctx, { kind: 'symptom', symptom, ...code, ...fault }, render);
@@ -232,10 +246,10 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
     return codeJoined(ctx, held.symptom, u.hmsCode, viewer.locale);
   }
 
-  // ── A printer fault, cold.
-  const printer = u.model ? { model: u.model } : among;
+  // ── A printer fault, cold. The printer is one the customer did not deny (`faultModel`).
+  const printer = said ? { model: said } : among;
   if (u.hmsCode) {
-    if (u.model) return runTriage(db, viewer, ctx, { kind: 'start', symptom: 'hms', code: u.hmsCode, model: u.model }, render);
+    if (said) return runTriage(db, viewer, ctx, { kind: 'start', symptom: 'hms', code: u.hmsCode, model: said }, render);
     if (known.printer) return runTriage(db, viewer, known, { kind: 'symptom', symptom: 'hms', code: u.hmsCode }, render);
     return runTriage(db, viewer, known, { kind: 'start', symptom: 'hms', code: u.hmsCode, ...among }, render);
   }
@@ -339,7 +353,10 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
 
   // «اريد ارجع النوزل», «ضمان النوزل»: an account or policy question about a part (`PART_HINTS`); «اشتريت نوزل
   // وما يركب»: a purchase told. Neither shows that part for sale: the legacy answer stands (review round 5.5).
-  if (elsewhere || (u.purchaseStory && !u.productCue)) return null;
+  // Nor does a part named in an after-sale question the scorer was unsure of: «ابي استرجع البليت», "cancel my
+  // nozzle order", «پلێتەکە شکاو گەیشت», «سعر توصيل النوزل» (`afterSale`, review round 5.6).
+  // «النوزل مو مسدود», "the nozzle isn't clogged": a symptom denied, none named, is not a shopping question either.
+  if (elsewhere || (u.part && u.afterSale) || (u.purchaseStory && !u.productCue) || (u.symptomDenied && !u.productCue)) return null;
   const named = !!u.model || !!u.family;
   if (u.part || (u.maintenance && (named || u.productCue)) || (u.measures.length > 0 && (named || u.productCue))) {
     // «كابل رأس الطباعة», "Cooling Fan for Hotend - H2 Series": a product's own name, typed, is that product.
@@ -596,6 +613,8 @@ function readPartChip(params: Record<string, unknown>): { u: Understood; anyPrin
     ownsSaid: false,
     triedSaid: false,
     priceAsk: false,
+    afterSale: false,
+    deniedModels: [],
     residual: [],
   };
   return { u, anyPrinter };

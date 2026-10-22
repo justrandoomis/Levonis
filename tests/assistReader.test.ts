@@ -977,3 +977,134 @@ test('round 5.5: Sorani «ئەی وەنەکەم» ("my A1") says the printer is 
     assert.equal(understand(text).purchaseStory, undefined, `«${text}»`);
   }
 });
+
+// ════════════════════════════════════════ review, round 5.6
+
+test('round 5.6: an after-sale question is read as one in Arabic, English and Sorani; buying is not', () => {
+  for (const text of [
+    'ابي استرجع البليت',
+    'اريد استبدل النوزل',
+    'ممكن ابدل البليت بغيره',
+    'وين طلب النوزل',
+    'الهوت اند مالتي وين صار',
+    'سعر نوزل اي ون مع التوصيل',
+    'cancel my nozzle order',
+    'can I exchange the hotend',
+    'I received the wrong nozzle',
+    'my plate order has not arrived',
+    'پلێتەکە شکاو گەیشت',
+    'دەمەوێت نۆزڵەکە بگەڕێنمەوە',
+    'دەمەوێت پلێتەکە بگۆڕمەوە',
+    'نرخی گەیاندنی نۆزڵ چەندە',
+  ]) {
+    assert.equal(understand(text).afterSale, true, `«${text}»`);
+  }
+  for (const text of ['اريد شراء نوزل', 'اريد نوزل 0.4 للاي ون', 'اريد اغير النوزل مال الاي ون', 'nozzle for A1 0.2', 'نۆزڵم دەوێت']) {
+    assert.equal(understand(text).afterSale, false, `«${text}»`);
+  }
+});
+
+test('round 5.6: a symptom denied is never read, alone or not; a part only lacked is still the part; a name of several words is denied whole', () => {
+  for (const text of [
+    'ماعندي كلوب',
+    'ما بيها كلوب',
+    'ماكو كلوب',
+    'النوزل مو مسدود',
+    'لا ما بيها خيوط',
+    "I don't have a clog",
+    "the nozzle isn't clogged",
+    'no clog',
+    'not a clog, the layers shift',
+    'there is no stringing',
+    'کلۆگم نییە',
+    'نۆزڵەکە نەگیراوە',
+  ]) {
+    assert.equal(understand(text).symptom, undefined, `«${text}»`);
+    assert.equal(understand(text, { expectSymptom: true }).symptom, undefined, `«${text}» at «which symptom?»`);
+  }
+  for (const [text, symptom] of [
+    ['کلۆگم نییە، دەزوو هەیە', 'stringing'],
+    ['کێشەکە کلۆگ نییە، دەزوو دەکات', 'stringing'],
+    ['گیراوە نییە، دەزوو دەکات', 'stringing'],
+    ['No, the nozzle is clogged', 'clog'],
+    ['لا، بيها كلوب', 'clog'],
+  ] as const) {
+    assert.equal(understand(text).symptom, symptom, `«${text}»`);
+  }
+  for (const [text, part] of [
+    ['ماعندي بليت', 'plate'],
+    ['ماعندي نوزل 0.2', 'nozzle_hotend'],
+    ['I have no plate for my A1', 'plate'],
+    ['پلێتم نییە', 'plate'],
+    ['the hot end is fine, the problem is the plate', 'plate'],
+    ['راس الطباعه زين، المشكلة بالبليت', 'plate'],
+    ['هوت اند زين، المشكله بالبليت', 'plate'],
+    ['لوح الطباعه زين، المشكلة بالنوزل', 'nozzle_hotend'],
+    ["it's not the nozzle, the problem is the fan", undefined],
+    ['هۆت ئێند باشە، کێشەکە لە پلێتەکەیە', undefined],
+  ] as const) {
+    assert.equal(understand(text).part, part, `«${text}»`);
+  }
+});
+
+test('round 5.6: a problem said not to be is no problem cue; a printer denied or fine is read as such, "no, A1" is not', () => {
+  for (const text of ['ما عندي مشكلة بالنوزل بس اريد انظفه', 'no problem with the nozzle, I just want to clean it', 'کێشەم نییە، نۆزڵم دەوێت']) {
+    assert.equal(understand(text).problemCue, false, `«${text}»`);
+  }
+  for (const text of ['عندي مشكلة بالنوزل', 'the nozzle is fine, the problem is the plate', 'پرینتەرەکەم کێشەی هەیە']) {
+    assert.equal(understand(text).problemCue, true, `«${text}»`);
+  }
+  for (const [text, denied] of [
+    ['ماعندي اي ون', ['A1']],
+    ['not the A1', ['A1']],
+    ["I don't have the A1", ['A1']],
+    ['A1م نییە', ['A1']],
+    ['ماعندي اي ون، عندي بي ون اس', ['A1']],
+    ['الاي ون زينه، البي ون اس بيها كلوب', ['A1']],
+    ['no, A1', []],
+    ['A1 ok', []],
+    ['لا اي ون', []],
+    ['A1', []],
+  ] as const) {
+    assert.deepEqual(understand(text).deniedModels, denied, `«${text}»`);
+  }
+});
+
+test('round 5.6: another subject, a thing named before «it» / «ـه», Sorani «ئەوەی» alone or «لەگەڵ», and some steps never say the steps were tried', () => {
+  for (const text of [
+    'the toolhead did it again, still clogged',
+    'the X1 Carbon did it again, still clogged',
+    'my Bambu did it again, still clogged',
+    'the printer also did it again, still clogged',
+    'it really did it again, still stringing',
+    'I changed the nozzle and tried it, still clogged',
+    'the new nozzle, I tried it, still clogged',
+    'بدلت النوزل وجربته وبعده مسدود',
+    'النوزل الجديد جربته وبعده مسدود',
+    'النوزل اللي جبته جربته وبعده مسدود',
+    'ئەوەی تاقیم کردەوە نۆزڵێکی نوێ بوو، هێشتا گیراوە',
+    'ئەوەی کردم گۆڕینی نۆزڵ بوو، هێشتا گیراوە',
+    'تاقیم کردەوە لەگەڵ نۆزڵێکی نوێ، هێشتا گیراوە',
+    'I tried steps 1 and 2, still clogged',
+    'I tried them but not the last one, still clogged',
+    'جربتها كلها ماعدا الاخيره وبعده مسدود',
+    'جربتها كلها بس مو الاخيره وبعده مسدود',
+    'هەموویم تاقی کردەوە بێجگە لە پاککردنەوە، هێشتا گیراوە',
+    'هەموویم تاقی کردەوە، دوایینیان نا، هێشتا گیراوە',
+  ]) {
+    assert.equal(saysTried(normalizeText(text)), false, `«${text}»`);
+    assert.equal(understand(text).triedSaid, false, `«${text}»`);
+  }
+  for (const text of [
+    'I did them all, still clogged',
+    'yes did them all, still clogged',
+    'I have also done them, still clogged',
+    'did it, nothing changed',
+    'tried them all last night, still clogged',
+    'جربتها كلها وبعده مسدود',
+    'دوای ئەوەی تاقیم کردنەوە، هێشتا گیراوە',
+    'تاقیم کردەوە بە هەموو هەنگاوەکان، هێشتا گیراوە',
+  ]) {
+    assert.equal(saysTried(normalizeText(text)), true, `«${text}»`);
+  }
+});

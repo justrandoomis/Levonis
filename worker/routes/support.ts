@@ -559,9 +559,11 @@ function isMaterialKind(word: string): boolean {
  * «ماعندي فلامنت», «خلص الفلامنت عندي», "I have no filament": having none or
  * running out names no material. Left in, «ماعندي» reached «ميني» and showed
  * the A1 mini printer; out, nothing is left and the material is asked for
- * (review round 5.5).
+ * (review round 5.5). «لا» ("no") and «بيها» ("in it") too: left in, the
+ * search completed «لا» to «لاب» and showed every A1 printer for «لا مو كلوب،
+ * خيوط», and «بيها» reached a riser base (review round 5.6).
  */
-const MATERIAL_NOT_SUBJECT = ['ما', 'مو', 'ماكو', 'عندي', 'عدي', 'خلص', 'خلصت', 'no', 'not', 'have', 'dont', 'don', 't', 'any'] as const;
+const MATERIAL_NOT_SUBJECT = ['ما', 'مو', 'ماكو', 'لا', 'عندي', 'عدي', 'بيها', 'بيه', 'فيها', 'فيه', 'خلص', 'خلصت', 'no', 'not', 'have', 'dont', 'don', 't', 'any'] as const;
 function materialsSubject(text: string): string {
   const entry = LEXICON.materials_help;
   const asking = (['price_question', 'stock_question'] as const).flatMap((intent) => [

@@ -135,10 +135,13 @@ export const OWNS_SAID: {
  * problem is the plate", «نۆزڵەکە باشە». The word is not read as the symptom
  * or the part (./index.ts `withoutDenied`):
  *  - with a word of `fine` after it (over `fineSkip`), always;
- *  - with a negation before it (`before`; «ما» and «لا» only before a word of
- *    `have`, «ما عندي كلوب», never the verb of a symptom «ما يطلع»), over
- *    `skip`, or the Sorani «نە» on the word itself, only when another symptom
- *    or part is named and not denied: that one is read instead.
+ *  - with a negation before it (`before`; «ما» only before a word of `have`,
+ *    «ما عندي كلوب», never the verb of a symptom «ما يطلع»), over `skip`, the
+ *    Sorani «نە» on the word itself, or «نییە» after it (`after`): a symptom
+ *    always, whether or not another one is named (review round 5.6: «ماعندي
+ *    كلوب» alone names no symptom, and no ticket says «انسداد النوزل»); a part
+ *    always, unless the customer only LACKS it («ماعندي بليت», "no plate",
+ *    «پلێتم نییە»: `lack`, with no problem word between) and names no other.
  */
 export const DENIAL: {
   readonly before: readonly string[];
@@ -148,14 +151,59 @@ export const DENIAL: {
   readonly reach: number;
   readonly fine: readonly string[];
   readonly fineSkip: readonly string[];
+  readonly after: readonly string[];
+  readonly afterSkip: readonly string[];
+  readonly answerNo: readonly string[];
+  readonly lack: readonly string[];
+  readonly lackHave: readonly string[];
+  readonly answerNext: readonly string[];
+  readonly problemWords: readonly string[];
+  readonly problemBefore: readonly string[];
+  readonly problemBeforeHave: readonly string[];
+  readonly problemHave: readonly string[];
+  readonly problemSkip: readonly string[];
 } = {
   before: ['مو', 'مش', 'ماكو', 'ليس', 'ليست', 'بدون', 'not', 'no', 'never', 'isnt', 'isn', 't', 'nt', 'wasnt', 'arent', 'without'],
-  beforeHave: ['ما', 'لا'],
+  // «لا» is not here: «لا، بيها كلوب», «لا عندي كلوب» answer "no" and then say it (review round 5.6).
+  beforeHave: ['ما'],
   have: ['عندي', 'عدي', 'عندنا', 'اكو', 'بيها', 'بيه', 'فيها', 'فيه'],
-  skip: ['عندي', 'عدي', 'عندنا', 'اكو', 'بيها', 'بيه', 'فيها', 'فيه', 'مشكله', 'مشكلة', 'مشاكل', 'a', 'an', 'the', 'any', 'problem', 'issue', 'with', 'is', 's', 'it', 'its', 'my'],
+  // "I don't have a clog": «have» is read past too (review round 5.6).
+  skip: [
+    'عندي', 'عدي', 'عندنا', 'اكو', 'بيها', 'بيه', 'فيها', 'فيه', 'مشكله', 'مشكلة', 'مشاكل', 'a', 'an', 'the', 'any', 'problem', 'issue', 'with',
+    'is', 's', 'it', 'its', 'my', 'have', 'has', 'had', 'got',
+  ],
   reach: 4,
   fine: ['fine', 'ok', 'okay', 'good', 'alright', 'زين', 'زينه', 'سليم', 'سليمه', 'تمام', 'باشە', 'ساغە'],
   fineSkip: ['is', 's', 'are', 'was', 'هو', 'هي', 'its', 'it'],
+  /**
+   * THE SORANI NEGATION AFTER THE WORD (review round 5.6): «کلۆگم نییە» ("I
+   * have no clog"), «کێشەکە کلۆگ نییە» ("the problem is not a clog»), «گیراوە
+   * نییە», «A1م نییە». Right after the word, over `afterSkip` (the clitic «م»
+   * a Latin name sheds: «A1م» is read «a1 م»).
+   */
+  after: ['نییە', 'نیە', 'نەبووە', 'نەبوو', 'نیيە'],
+  afterSkip: ['م'],
+  /**
+   * "No, the nozzle is clogged": a «no» that answers, followed by the thing
+   * itself, denies nothing; "not the nozzle" and "no clog" still do.
+   */
+  answerNo: ['no', 'nope'],
+  // A having denied: «ماكو نوزل», "no plate", "without a plate", and "don't have" (`lackHave` with a have-word between).
+  lack: ['ماكو', 'no', 'without', 'بدون'],
+  lackHave: ['t', 'nt', 'dont', 'doesnt', 'didnt'],
+  answerNext: ['the', 'my', 'it', 'its', 'i', 'is', 's'],
+  /**
+   * A PROBLEM SAID NOT TO BE (review round 5.6): «ما عندي مشكلة بالنوزل بس
+   * اريد انظفه», "no problem with the nozzle, I just want to clean it»,
+   * «کێشەم نییە». The problem noun under a having denied («ما عندي», «ماكو»,
+   * "no", "don't have any") is not the problem cue; "not a problem with the
+   * nozzle, it's the plate" and «مو مشكلة» are not read as such a denial.
+   */
+  problemWords: ['مشكله', 'مشكلة', 'مشاكل', 'مشكل', 'problem', 'problems', 'issue', 'issues', 'کێشە', 'کێشەی', 'کێشەم'],
+  problemBefore: ['ماكو', 'no', 'without', 'بدون'],
+  problemBeforeHave: ['ما', 't', 'nt', 'dont', 'doesnt', 'didnt'],
+  problemHave: ['عندي', 'عدي', 'عندنا', 'اكو', 'بيها', 'بيه', 'فيها', 'فيه', 'have', 'has', 'had', 'got'],
+  problemSkip: ['عندي', 'عدي', 'عندنا', 'اكو', 'بيها', 'بيه', 'فيها', 'فيه', 'have', 'has', 'had', 'got', 'a', 'an', 'any', 'real', 'big', 'other'],
 };
 
 /**
@@ -370,6 +418,14 @@ export const TRIED_SAID: {
   readonly subjects: readonly string[];
   readonly subjectSkip: readonly string[];
   readonly beforeSubject: readonly string[];
+  readonly subjectAdverbs: readonly string[];
+  readonly singular: readonly string[];
+  readonly singularObjects: readonly string[];
+  readonly things: readonly string[];
+  readonly stepNumbers: readonly string[];
+  readonly stepWords: readonly string[];
+  readonly soraniWith: readonly string[];
+  readonly soraniAfterClause: readonly string[];
 } = {
   verbs: [
     'جربت', 'جربتها', 'جربته', 'جربتهم', 'جربنا', 'جربناها', 'سويت', 'سويتها', 'سويته', 'سويتهم', 'سوينا', 'سويناها', 'طبقت', 'طبقتها',
@@ -394,7 +450,7 @@ export const TRIED_SAID: {
   soraniBefore: [
     'هەموو', 'هەمووی', 'هەمووم', 'هەموویم', 'هەموویان', 'هەمووشیان', 'هەمووشم', 'هەنگاوەکان', 'هەنگاوەکانم', 'هەنگاوەکانیش',
     'ئەوانە', 'ئەوانەم', 'ئەمانە', 'ئەمانەم',
-    'بەڵام', 'ئەوەی', 'من', 'منیش', 'ئێمە', 'بەڵێ', 'نەخێر', 'نا',
+    'بەڵام', 'من', 'منیش', 'ئێمە', 'بەڵێ', 'نەخێر', 'نا',
   ],
   // «ما», «لم», «مو», «ولا»; the English ones, and «t», the end of "haven t" once the apostrophe is a gap.
   negations: [
@@ -424,6 +480,9 @@ export const TRIED_SAID: {
   partial: [
     'only', 'just one', 'one of them', 'some of them', 'a few', 'but one', 'except', 'apart from', 'other than',
     'بعضها', 'بعض', 'عدا', 'الا', 'غير', 'منهن', 'منها', 'منهم', 'یەکێکیان', 'هەندێکیان', 'تەنها', 'جگە لە',
+    // «ماعدا» typed as one word, «بێجگە» the common spelling, and the last step named: "but not the last one",
+    // «بس مو الاخيره», «دوایینیان نا» (review round 5.6).
+    'ماعدا', 'بێجگە', 'the last', 'last one', 'last step', 'الاخيره', 'الاخير', 'دوایینیان', 'دوایینەکە',
   ],
   // The objects of a `bare` verb that mean the steps: "tried them", "did everything", «جربت الخطوات», «سويت كلشي».
   objects: [
@@ -457,6 +516,8 @@ export const TRIED_SAID: {
   thirdPerson: [
     'it', 'he', 'she', 'they', 'printer', 'machine', 'nozzle', 'hotend', 'extruder', 'ams',
     'print', 'prints', 'job', 'filament', 'spool', 'roll', 'one', 'plate', 'bed', 'part',
+    // "the toolhead did it again", "my Bambu did it again", "the X1 Carbon did it again" (review round 5.6).
+    'toolhead', 'head', 'device', 'thing', 'unit', 'bambu', 'lab', 'carbon', 'mini', 'pro', 'combo',
   ],
   // "it's done that", "it has done it": read past to the subject.
   contractions: ['s', 'has', 'had', 'just'],
@@ -476,6 +537,36 @@ export const TRIED_SAID: {
     'yes', 'yeah', 'yep', 'yup', 'ya', 'ok', 'okay', 'sure', 'well', 'so', 'and', 'but', 'also', 'already', 'then', 'now',
     'no', 'nope', 'still', 'actually', 'honestly', 'hi', 'hey', 'hello', 'sorry', 'oh', 'ah', 'um', 'hmm',
   ],
+  /**
+   * BETWEEN A SUBJECT AND ITS "did" OR "done" (review round 5.6): "the printer
+   * also did it again", "it really did it again". Read past to the subject. A
+   * "did …" or "done" counts only with «I» / «we», no subject at all, or a word
+   * of `beforeSubject` before it: never the printer, the toolhead, «Bambu».
+   */
+  subjectAdverbs: ['also', 'really', 'then', 'again', 'even', 'once', 'always', 'still', 'actually', 'just', 'already', 'have', 've', 'has', 's', 'had', 'd'],
+  /**
+   * «جربته», «سويته», «طبقته»: the object «ـه» is one thing, masculine, never
+   * the steps («ـها», «ـهم», «ـهن»): «بدلت النوزل وجربته», «النوزل الجديد
+   * جربته» tried the nozzle (review round 5.6).
+   */
+  singular: ['جربته', 'سويته', 'طبقته', 'نفذته', 'جربناه', 'سويناه'],
+  /**
+   * "I changed the nozzle and tried it", "the new nozzle, I tried it": «it»,
+   * «that», «this» after a part or a filament named before the verb in the
+   * same message is that thing, never the steps (`things`, and the parts).
+   */
+  singularObjects: ['it', 'that', 'this'],
+  things: ['filament', 'spool', 'roll', 'reel', 'pla', 'petg', 'abs', 'tpu', 'asa', 'firmware', 'one'],
+  /** "steps 1 and 2", "step one", «الخطوه 2»: only some steps, by number. */
+  stepNumbers: ['1', '2', '3', '4', 'one', 'two', 'three', 'four', 'یەک', 'دوو', 'سێ'],
+  stepWords: ['step', 'steps', 'خطوه', 'الخطوه', 'خطوات', 'الخطوات', 'هەنگاو', 'هەنگاوی'],
+  /**
+   * «تاقیم کردەوە لەگەڵ نۆزڵێکی نوێ», «تاقیم کردەوە بە فیلامێنتێکی تر»: "I
+   * tried WITH a new nozzle": what was tried follows, never the steps.
+   */
+  soraniWith: ['لەگەڵ', 'بە'],
+  /** «دوای ئەوەی تاقیم کردنەوە» ("after I tried them"); «ئەوەی» alone opens "what I tried was …" (review round 5.6). */
+  soraniAfterClause: ['دوای ئەوەی', 'پاش ئەوەی'],
 };
 export const OUTCOME_RESOLVED: readonly string[] = [
   'انحلت', 'انحل', 'انحلت المشكله', 'زبطت', 'زبط', 'اشتغلت', 'اشتغل', 'صارت زينه', 'صار زين', 'رجعت تشتغل', 'رجعت زينه',
@@ -545,8 +636,30 @@ export const ACCOUNT_WORDS: readonly string[] = [
   'warranty', 'guarantee', 'ضمان', 'ضماني', 'كفاله', 'كفالتي', 'گەرەنتی', 'گەرەنتییەکە', 'گەرەنتییەکەی',
   // The payment.
   'payment', 'payments', 'pay', 'paid', 'invoice', 'receipt', 'دفع', 'دفعت', 'فاتوره', 'فاتورتي', 'پارەدان', 'پارەدانەکە', 'پسوولە',
-  // Buying, now: "what is wrong with buying the A1 mini?".
-  'buying', 'purchase', 'purchasing', 'شراء', 'کڕین',
+  // An exchange, a return asked, a cancel (review round 5.6): «ابي استرجع البليت», «ممكن ابدل البليت بغيره», "can I
+  // exchange the hotend", "cancel my nozzle order", «دەمەوێت نۆزڵەکە بگەڕێنمەوە», «دەمەوێت پلێتەکە بگۆڕمەوە».
+  'استرجع', 'استرجعه', 'استرجعها', 'ارجاعه', 'ابدل', 'ابدله', 'ابدلها', 'استبدل', 'استبدله', 'استبدلها', 'استبدال',
+  'الغي', 'الغيه', 'الغيها', 'الغاء',
+  'exchange', 'exchanged', 'exchanging', 'cancel', 'cancelled', 'canceled', 'cancellation', 'refunded',
+  'بگەڕێنمەوە', 'بگۆڕمەوە', 'بیگۆڕمەوە', 'گۆڕینەوە', 'گۆڕینەوەی', 'هەڵوەشاندنەوە', 'هەڵوەشاندنەوەی',
+];
+/**
+ * «شراء», "buying": an account word beside a fault ("what is wrong with buying
+ * the A1 mini?"), but a shopping one beside a part («اريد شراء نوزل»), so
+ * never an after-sale question (./index.ts `afterSale`).
+ */
+export const ACCOUNT_BUYING: readonly string[] = ['buying', 'purchase', 'purchasing', 'شراء', 'کڕین'];
+/**
+ * AFTER THE SALE, IN WORDS IN A ROW (review round 5.6): "I received the wrong
+ * nozzle", «پلێتەکە شکاو گەیشت» (it arrived broken), «الهوت اند مالتي وين صار»
+ * (where has it got to). «وصلتني» or "arrived" alone is the story of a fault
+ * and is not here.
+ */
+export const ACCOUNT_PHRASES: readonly string[] = [
+  'received the wrong', 'got the wrong', 'sent the wrong', 'sent me the wrong', 'wrong item', 'arrived broken', 'arrived damaged',
+  'came broken', 'has not arrived', 'hasnt arrived', 'did not arrive', 'didnt arrive', 'never arrived', 'not arrived',
+  'وين صار', 'وين صارت', 'وين وصل', 'وين وصلت', 'وصل مكسور', 'وصلني مكسور', 'وصلتني مكسوره', 'وصلني غلط', 'وصلتني غلط',
+  'شکاو گەیشت', 'شکاوی گەیشت', 'شکاو گەیشتووە', 'شکاو هات',
 ];
 
 /**

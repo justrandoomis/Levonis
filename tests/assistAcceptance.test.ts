@@ -2464,3 +2464,232 @@ test('round 5.5: a symptom or a part the customer denies never goes on the ticke
     }
   }
 });
+
+// ════════════════════════════════════════ review, round 5.6
+
+test('round 5.6: an after-sale question that names a part gets the answer live gave when the scorer is unsure, never that part for sale', async () => {
+  const { say } = await round55();
+  for (const user of [member, null]) {
+    for (const [text, locale] of [
+      ['ابي استرجع البليت', 'ar'],
+      ['اريد استبدل النوزل', 'ar'],
+      ['ممكن ابدل البليت بغيره', 'ar'],
+      ['وين طلب النوزل', 'ar'],
+      ['الهوت اند مالتي وين صار', 'ar'],
+      ['سعر توصيل النوزل', 'ar'],
+      ['اجور توصيل الهوت اند', 'ar'],
+      ['سعر نوزل اي ون مع التوصيل', 'ar'],
+      ['cancel my nozzle order', 'en'],
+      ['cancel the plate order', 'en'],
+      ['can I exchange the hotend', 'en'],
+      ['how to exchange a nozzle for a different size', 'en'],
+      ['my plate order has not arrived', 'en'],
+      ['shipping for a nozzle', 'en'],
+      ['can I pay for the nozzle on delivery', 'en'],
+      ['I received the wrong nozzle', 'en'],
+      ['پلێتەکە شکاو گەیشت', 'ckb'],
+      ['نۆزڵەکە شکاو گەیشت', 'ckb'],
+      ['دەمەوێت نۆزڵەکە بگەڕێنمەوە', 'ckb'],
+      ['دەمەوێت پلێتەکە بگۆڕمەوە', 'ckb'],
+      ['نرخی گەیاندنی نۆزڵ چەندە', 'ckb'],
+    ] as const) {
+      const label = `${user ? 'member' : 'guest'} «${text}»`;
+      const reply = await say(user, { text, locale });
+      assert.notEqual(reply.intent, 'product_search', `${label}: ${reply.text}`);
+      assert.deepEqual(offered(reply), [], `${label}: a part for sale`);
+      assert.ok(((reply.choices ?? []) as Rec[]).length > 0, `${label}: the topics to choose from`);
+    }
+    // Buying, and changing the part on the printer, still shop.
+    const buy = await say(user, { text: 'اريد شراء نوزل' });
+    assert.ok(offered(buy).length > 0, `${user ? 'member' : 'guest'} «اريد شراء نوزل»: ${buy.intent} ${buy.text}`);
+    const change = await say(user, { text: 'اريد اغير النوزل مال الاي ون' });
+    assert.equal(offered(change)[0], 'h_a1', `${user ? 'member' : 'guest'} «اريد اغير النوزل مال الاي ون»: ${JSON.stringify(offered(change))}`);
+  }
+});
+
+test('round 5.6: a symptom denied on its own is never read: no triage starts on it and no ticket names it', async () => {
+  const { say } = await round4();
+  const P = (step: string, extra: Record<string, string> = {}) => ({ intent: 'printer_problem', params: { step, ...extra } });
+  const team: Record<Locale, string> = { ar: 'تحدث مع الفريق', en: 'talk to the team', ckb: 'قسە لەگەڵ تیمەکە بکە' };
+  for (const user of [member, null]) {
+    const who = user ? 'member' : 'guest';
+    for (const [text, locale] of [
+      ['ماعندي كلوب', 'ar'],
+      ['ما عندي كلوب', 'ar'],
+      ['النوزل مو مسدود', 'ar'],
+      ['ما بيها كلوب', 'ar'],
+      ['ماكو كلوب', 'ar'],
+      ['لا ما بيها خيوط', 'ar'],
+      ["I don't have a clog", 'en'],
+      ["the nozzle isn't clogged", 'en'],
+      ["it's not clogged", 'en'],
+      ['no clog', 'en'],
+      ['not a clog, the layers shift', 'en'],
+      ['there is no stringing', 'en'],
+      ['کلۆگم نییە', 'ckb'],
+      ['نۆزڵەکە نەگیراوە', 'ckb'],
+    ] as const) {
+      const label = `${who} «${text}»`;
+      const first = await say(user, { text, locale });
+      assert.notEqual(first.intent, 'printer_problem', `${label}: ${first.text}`);
+      assert.equal(first.context?.triage, undefined, label);
+      assert.deepEqual(offered(first), [], `${label}: ${JSON.stringify(offered(first))}`);
+      // «A1», then the team: whatever is drafted names no clog and no stringing.
+      let reply = await say(user, { text: 'A1', locale, ...(first.context ? { context: first.context } : {}) });
+      reply = await say(user, { text: team[locale], locale, ...(reply.context ? { context: reply.context } : {}) });
+      const draft = reply.ticket_draft;
+      if (draft) {
+        assert.equal(draft.handoff?.symptom ?? null, null, `${label}: ${draft.body}`);
+        assert.equal(handoffForStaff(draft.handoff)?.symptom ?? null, null, `${label}: the staff summary`);
+      }
+    }
+    // At «which symptom?», a denial alone is no symptom: the draft names none.
+    for (const [locale, start, denied] of [
+      ['ar', 'صارت عندي مشكله بالطابعه', 'ماعندي كلوب'],
+      ['en', 'something is wrong with my printer', "it's not clogged"],
+      ['ckb', 'پرینتەرەکەم کێشەی هەیە', 'کلۆگم نییە'],
+    ] as const) {
+      const label = `${who} ${locale} «${denied}»`;
+      let reply = await say(user, { text: start, locale });
+      reply = await say(user, { ...P('printer', { model: 'A1' }), locale, context: reply.context });
+      assert.equal(reply.context.triage.stage, 'symptom', label);
+      reply = await say(user, { text: denied, locale, context: reply.context });
+      assert.notEqual(reply.context?.triage?.symptom, 'clog', `${label}: ${reply.text}`);
+      reply = await say(user, { text: team[locale], locale, context: reply.context });
+      assert.ok(reply.ticket_draft, `${label}: ${reply.intent} ${reply.text}`);
+      assert.equal(reply.ticket_draft.handoff.symptom ?? null, null, `${label}: ${reply.ticket_draft.body}`);
+      assert.ok(!String(reply.ticket_draft.body).includes(symptomDef('clog').label[locale]), `${label}: ${reply.ticket_draft.body}`);
+    }
+    // The symptom named instead of the one denied is read, cold and after the steps.
+    for (const [locale, turns] of [
+      ['ckb', ['کلۆگم نییە، دەزوو هەیە', 'A1']],
+      ['ckb', ['کلۆگ', 'A1', 'نا، کلۆگ نییە، دەزوو']],
+      ['en', ['clog', 'A1', 'no, not clogged, stringing']],
+    ] as const) {
+      const label = `${who} ${locale} «${turns.join(' → ')}»`;
+      let reply: Rec = {};
+      for (const text of turns) reply = await say(user, { text, locale, ...(reply.context ? { context: reply.context } : {}) });
+      reply = await say(user, { text: team[locale], locale, context: reply.context });
+      assert.equal(reply.ticket_draft?.handoff?.symptom, 'stringing', `${label}: ${reply.ticket_draft?.body ?? reply.text}`);
+    }
+  }
+});
+
+test('round 5.6: «لا» or «بيها» left in a materials question is no subject: never «لاب» and the A1 printers', async () => {
+  const { say } = await round55();
+  for (const user of [member, null]) {
+    const who = user ? 'member' : 'guest';
+    for (const text of ['لا ماعندي فلامنت', 'لا مو كلوب، خيوط', 'لا، خيوط', 'لا خيوط', 'لا اريد فلامنت', 'فلامنت لا', 'لا ما بيها خيوط']) {
+      const reply = await say(user, { text });
+      assert.equal(reply.intent, 'materials_help', `${who} «${text}»: ${reply.text}`);
+      assert.ok(!offered(reply).some((id) => PRINTER_IDS.has(id)), `${who} «${text}»: ${JSON.stringify(offered(reply))}`);
+      assert.ok(!offered(reply).includes('s_8'), `${who} «${text}»: ${JSON.stringify(offered(reply))}`);
+    }
+    // Inside the clog triage, the correction is no printer for sale either.
+    let reply = await say(user, { text: 'كلوب' });
+    reply = await say(user, { text: 'A1', context: reply.context });
+    reply = await say(user, { text: 'لا مو كلوب، خيوط', context: reply.context });
+    assert.ok(!offered(reply).some((id) => PRINTER_IDS.has(id)), `${who}: ${JSON.stringify(offered(reply))}`);
+    // A material named after «لا» is still that material.
+    const pla = await say(user, { text: 'لا، PLA' });
+    assert.ok(offered(pla).includes('esun_pla'), `${who}: ${JSON.stringify(offered(pla))}`);
+  }
+});
+
+test('round 5.6: another subject, a thing named before «tried it» / «جربته», Sorani «ئەوەی» or «لەگەڵ», and some steps by number or "not the last" never put the steps on the ticket as tried', async () => {
+  const { say } = await round4();
+  const P = (step: string, extra: Record<string, string> = {}) => ({ intent: 'printer_problem', params: { step, ...extra } });
+  const chips = (symptom: string) => ['صارت عندي مشكله بالطابعه', P('printer', { model: 'A1', unit_id: 'unit_own' }), P('symptom', { symptom })];
+  const cases: Array<[Locale, Array<string | Rec>, string, boolean]> = [
+    ['en', ['my A1 nozzle is clogged'], 'the toolhead did it again, still clogged', false],
+    ['en', ['my X1 Carbon nozzle is clogged'], 'the X1 Carbon did it again, still clogged', false],
+    ['en', ['my nozzle is clogged', 'A1'], 'my Bambu did it again, still clogged', false],
+    ['en', ['my P1S nozzle is clogged'], 'the printer also did it again, still clogged', false],
+    ['en', ['my A1 is stringing'], 'it really did it again, still stringing', false],
+    ['en', ['my A1 nozzle is clogged'], 'I changed the nozzle and tried it, still clogged', false],
+    ['en', ['my nozzle is clogged', 'A1'], 'the new nozzle, I tried it, still clogged', false],
+    ['ar', ['اي ون بيها كلوب'], 'بدلت النوزل وجربته وبعده مسدود', false],
+    ['ar', ['كلوب', 'اي ون'], 'النوزل اللي جبته جربته وبعده مسدود', false],
+    ['ckb', ['کلۆگ', 'A1'], 'ئەوەی تاقیم کردەوە نۆزڵێکی نوێ بوو، هێشتا گیراوە', false],
+    ['ckb', ['کلۆگ', 'A1'], 'تاقیم کردەوە لەگەڵ نۆزڵێکی نوێ، هێشتا گیراوە', false],
+    ['en', ['my A1 nozzle is clogged'], 'I tried steps 1 and 2, still clogged', false],
+    ['ar', ['اي ون بيها كلوب'], 'جربتها كلها ماعدا الاخيره وبعده مسدود', false],
+    ['ar', ['كلوب', 'اي ون'], 'جربتها كلها بس مو الاخيره وبعده مسدود', false],
+    ['ckb', ['کلۆگ', 'A1'], 'هەموویم تاقی کردەوە بێجگە لە پاککردنەوە، هێشتا گیراوە', false],
+    // The steps said to be tried still are.
+    ['en', ['my A1 nozzle is clogged'], 'I did them all, still clogged', true],
+    ['en', ['my A1 nozzle is clogged'], 'yes did them all, still clogged', true],
+    ['ar', ['اي ون بيها كلوب'], 'جربتها كلها وبعده مسدود', true],
+    ['ckb', ['کلۆگ', 'A1'], 'دوای ئەوەی تاقیم کردنەوە، هێشتا گیراوە', true],
+    ['ckb', ['کلۆگ', 'A1'], 'تاقیم کردەوە بە هەموو هەنگاوەکان، هێشتا گیراوە', true],
+  ];
+  for (const user of [member, null]) {
+    const run = [...cases];
+    if (user) {
+      run.push(['ar', chips('clog'), 'النوزل الجديد جربته وبعده مسدود', false]);
+      run.push(['en', chips('clog'), 'I tried them but not the last one, still clogged', false]);
+      run.push(['ckb', chips('clog'), 'ئەوەی کردم گۆڕینی نۆزڵ بوو، هێشتا گیراوە', false]);
+      run.push(['ckb', chips('clog'), 'هەموویم تاقی کردەوە، دوایینیان نا، هێشتا گیراوە', false]);
+    }
+    for (const [locale, turns, said, tried] of run) {
+      const T = ASSIST_STRINGS[locale];
+      const label = `${locale} ${user ? 'member' : 'guest'} «${said}»`;
+      let context: Rec | undefined;
+      for (const turn of turns) context = (await say(user, { locale, ...(typeof turn === 'string' ? { text: turn } : turn), ...(context ? { context } : {}) })).context;
+      assert.equal(context?.triage?.stage, 'steps', `${label}: the steps were shown`);
+      const keys = symptomDef(context!.triage.symptom).steps.map((st) => st.key);
+      const reply = await say(user, { text: said, locale, context });
+      const draft = reply.ticket_draft ?? (await say(user, { ...P('talk'), locale, context: reply.context })).ticket_draft;
+      assert.deepEqual(draft.handoff.tried, tried ? keys : [], `${label}: ${draft.body}`);
+      assert.equal(handoffForStaff(draft.handoff)?.tried.length, tried ? keys.length : 0, `${label}: the staff summary`);
+      assert.ok(String(draft.body).includes(tried ? T.ticket_tried : T.ticket_shown), `${label}: ${draft.body}`);
+    }
+  }
+});
+
+test('round 5.6: a part denied by a name of several words or by the Sorani «نییە», a printer denied at «which printer?», and a problem said not to be never become the ticket', async () => {
+  const { say } = await round4();
+  const mine = { intent: 'printer_problem', params: { step: 'printer', model: 'A1', unit_id: 'unit_own' } };
+  const cases: Array<[Locale, StubUser | null, Array<string | Rec>, { model?: string | null; symptom?: string | null; part?: string | null; none?: boolean }]> = [
+    ['en', null, ['the hot end is fine, the problem is the plate', 'A1', 'talk to the team'], { part: 'plate' }],
+    ['en', member, ['my printer has a problem, the hot end is fine, the plate is the problem', mine, 'talk to the team'], { part: 'plate' }],
+    ['ar', null, ['راس الطباعه زين، المشكلة بالبليت', 'اي ون', 'تحدث مع الفريق'], { part: 'plate' }],
+    ['ar', member, ['هوت اند زين، المشكله بالبليت', mine, 'تحدث مع الفريق'], { part: 'plate' }],
+    ['ar', null, ['لوح الطباعه زين، المشكلة بالنوزل', 'اي ون', 'تحدث مع الفريق'], { part: 'nozzle_hotend' }],
+    ['ckb', null, ['هۆت ئێند باشە، کێشەکە لە پلێتەکەیە', 'A1', 'قسە لەگەڵ تیمەکە بکە'], { none: true }],
+    ['ckb', member, ['صارت عندي مشكله بالطابعه', mine, 'کێشەکە کلۆگ نییە، دەزوو دەکات', 'قسە لەگەڵ تیمەکە بکە'], { symptom: 'stringing' }],
+    ['ckb', null, ['کێشەکە کلۆگ نییە، دەزوو دەکات', 'A1', 'قسە لەگەڵ تیمەکە بکە'], { symptom: 'stringing' }],
+    ['ckb', null, ['پرینتەرەکەم کێشەی هەیە', 'A1', 'گیراوە نییە، دەزوو دەکات', 'قسە لەگەڵ تیمەکە بکە'], { symptom: 'stringing' }],
+    ['en', null, ['my nozzle is clogged', 'not the A1', 'talk to the team'], { model: null, symptom: 'clog' }],
+    ['ar', null, ['كلوب', 'ماعندي اي ون', 'تحدث مع الفريق'], { model: null, symptom: 'clog' }],
+    ['ckb', null, ['کلۆگ', 'A1م نییە', 'قسە لەگەڵ تیمەکە بکە'], { model: null, symptom: 'clog' }],
+    ['en', null, ['my nozzle is clogged', 'not the A1, the P1S', 'talk to the team'], { model: 'P1S', symptom: 'clog' }],
+    ['en', null, ['no problem with the nozzle, I just want to clean it', 'A1', 'talk to the team'], { none: true }],
+    ['ar', member, ['ما عندي مشكلة بالنوزل بس اريد انظفه', 'تحدث مع الفريق'], { none: true }],
+  ];
+  for (const [locale, user, turns, expected] of cases) {
+    const label = `${locale} ${user ? 'member' : 'guest'} «${turns.filter((t) => typeof t === 'string').join(' → ')}»`;
+    let reply: Rec = {};
+    for (const turn of turns) {
+      reply = await say(user, { locale, ...(typeof turn === 'string' ? { text: turn } : turn), ...(reply.context ? { context: reply.context } : {}) });
+      const draft = reply.ticket_draft;
+      // Whatever is drafted on the way: never a denied part, the cleaning tools as a fault, or the clog said not to be.
+      if (!draft?.handoff) continue;
+      assert.notEqual(draft.handoff.part, 'cleaning', `${label}: ${draft.body}`);
+      if (expected.part !== undefined || expected.symptom === 'stringing') assert.notEqual(draft.handoff.symptom, 'clog', `${label}: ${draft.body}`);
+    }
+    const draft = reply.ticket_draft;
+    if (expected.none) {
+      assert.ok(!draft?.handoff?.part && !draft?.handoff?.symptom, `${label}: ${draft?.body ?? reply.text}`);
+      continue;
+    }
+    assert.ok(draft?.handoff, `${label}: ${reply.intent} ${reply.text}`);
+    if (expected.part !== undefined) assert.equal(draft.handoff.part ?? null, expected.part, `${label}: ${draft.body}`);
+    if (expected.symptom !== undefined) assert.equal(draft.handoff.symptom ?? null, expected.symptom, `${label}: ${draft.body}`);
+    if (expected.model !== undefined) {
+      assert.equal(draft.handoff.model ?? null, expected.model, `${label}: ${draft.body}`);
+      assert.equal(handoffForStaff(draft.handoff)?.model ?? null, expected.model, `${label}: the staff summary`);
+    }
+    if (expected.part === 'plate') assert.ok(!String(draft.body).includes(PART_LABELS.nozzle_hotend[locale]), `${label}: ${draft.body}`);
+  }
+});

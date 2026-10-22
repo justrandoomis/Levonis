@@ -30,6 +30,8 @@ import {
   unreadPrinter,
 } from './models';
 import {
+  ACCOUNT_BUYING,
+  ACCOUNT_PHRASES,
   ACCOUNT_WORDS,
   AMS_WEAK,
   CLEANING_TOOLS,
@@ -86,6 +88,27 @@ export interface Understood {
    * question, never the printer triage (./lexicon.ts `ACCOUNT_WORDS`).
    */
   accountCue: boolean;
+  /**
+   * An order, a delivery, a return, an exchange, a cancel, a warranty or a
+   * payment named, or an item that came wrong or broken («ابي استرجع البليت»,
+   * "cancel my nozzle order", «پلێتەکە شکاو گەیشت»); never «شراء», "buying".
+   * Beside a part it is an after-sale question: the part is never shown for
+   * sale and the legacy answer stands, as live (orchestrator, review round 5.6).
+   */
+  afterSale: boolean;
+  /**
+   * The printers the customer says they do NOT have, or that are fine («ماعندي
+   * اي ون», "not the A1", «A1م نییە», «الاي ون زينه»). Never the printer of a
+   * fault: the triage's «which printer?» is not answered by one (review round 5.6).
+   */
+  deniedModels: ModelToken[];
+  /**
+   * A symptom was named and denied, and none is left («النوزل مو مسدود», "the
+   * nozzle isn't clogged", «کلۆگم نییە»): the sentence says what is NOT wrong.
+   * It is neither the triage nor a shopping question for the part beside it;
+   * the legacy answer stands, as live (orchestrator, review round 5.6).
+   */
+  symptomDenied?: boolean;
   /** «كومبو», "combo": the bundle of the printer named, not the printer alone. */
   bundle?: boolean;
   /** A fault the curated steps do not cover (a leak, no heat): a problem, never the clog its part suggests. */
@@ -213,10 +236,14 @@ const COMBO_WORDS = ['combo', 'كومبو', 'كمبو', 'کۆمبۆ', 'کۆمب�
  * Never a prefix match: «طلبت» ("I ordered") is the story of a fault.
  */
 const ACCOUNT_SET = new Set(ACCOUNT_WORDS.map(normalizeText).filter(Boolean));
+const ACCOUNT_BUYING_SET = new Set([...ACCOUNT_WORDS, ...ACCOUNT_BUYING].map(normalizeText).filter(Boolean));
+const ACCOUNT_PHRASE_LIST = ACCOUNT_PHRASES.map(normalizeText).filter(Boolean);
 const ARABIC_PROCLITICS = ['وبال', 'وال', 'بال', 'فال', 'لل', 'ال', 'وب', 'ول', 'و', 'ب', 'ل'];
-function namesAccount(tokens: readonly string[]): boolean {
-  return tokens.some(
-    (t) => ACCOUNT_SET.has(t) || (ARABIC.test(t) && ARABIC_PROCLITICS.some((p) => t.startsWith(p) && t.length - p.length >= 3 && ACCOUNT_SET.has(t.slice(p.length))))
+function namesAccount(tokens: readonly string[], set: ReadonlySet<string> = ACCOUNT_BUYING_SET): boolean {
+  return (
+    tokens.some(
+      (t) => set.has(t) || (ARABIC.test(t) && ARABIC_PROCLITICS.some((p) => t.startsWith(p) && t.length - p.length >= 3 && set.has(t.slice(p.length))))
+    ) || saysAny(` ${tokens.join(' ')} `, ACCOUNT_PHRASE_LIST)
   );
 }
 
@@ -283,6 +310,14 @@ const TRIED_RELATIVES = normalSet(TRIED_SAID.relatives);
 const TRIED_SUBJECTS = normalSet(TRIED_SAID.subjects);
 const TRIED_SUBJECT_SKIP = normalSet(TRIED_SAID.subjectSkip);
 const TRIED_BEFORE_SUBJECT = normalSet(TRIED_SAID.beforeSubject);
+const TRIED_SUBJECT_ADVERBS = normalSet(TRIED_SAID.subjectAdverbs);
+const TRIED_SINGULAR = normalSet(TRIED_SAID.singular);
+const TRIED_SINGULAR_OBJECTS = normalSet(TRIED_SAID.singularObjects);
+const TRIED_THINGS = normalSet(TRIED_SAID.things);
+const TRIED_STEP_NUMBERS = normalSet(TRIED_SAID.stepNumbers);
+const TRIED_STEP_WORDS = normalSet(TRIED_SAID.stepWords);
+const TRIED_SORANI_WITH = normalSet(TRIED_SAID.soraniWith);
+const TRIED_SORANI_AFTER_CLAUSE = TRIED_SAID.soraniAfterClause.map((p) => tokenize(normalizeText(p)));
 const NOT_YET = normalSet(NOT_YET_WORDS);
 const PURCHASE_VERBS = normalSet(PURCHASE_TOLD);
 /** The Arabic verbs of trying, one word each: «بعد ما» before one of them is "after" (`afterNotNegation`). */
@@ -389,13 +424,21 @@ export function saysTried(normalized: string): boolean {
   const typed = tokenize(afterNotNegation(normalized));
   const tokens = unglued(typed);
   if (saysAny(` ${tokens.join(' ')} `, TRIED_PARTIAL)) return false;
+  // "steps 1 and 2", "step one", «الخطوه 2»: some of the steps, by number (review round 5.6).
+  if (tokens.some((t, i) => TRIED_STEP_WORDS.has(t) && TRIED_STEP_NUMBERS.has(tokens[i + 1] ?? ''))) return false;
   return TRIED_VERBS.some((verb) =>
     tokens.some((_, i) => {
       if (verb.some((w, k) => tokens[i + k] !== w)) return false;
       if (negatedBefore(tokens, i)) return false;
+      // «جربته», «سويته»: the object «ـه» is one thing (the nozzle just named), never the steps (review round 5.6).
+      if (verb.length === 1 && TRIED_SINGULAR.has(verb[0])) return false;
       // Sorani: the object comes first. «هەموویم تاقی کردەوە», never «فیلامێنتێکی ترم تاقی کردەوە».
-      if (TRIED_SORANI.has(verb.join(' '))) return i === 0 || TRIED_SORANI_BEFORE.has(tokens[i - 1]);
+      if (TRIED_SORANI.has(verb.join(' '))) return soraniStepsTried(tokens, i, verb.length);
       if (thirdPersonBefore(tokens, i)) return false;
+      // "did it", "done": only the customer's own (I, we, none, "yes"), never "the toolhead", "my Bambu" (review round 5.6).
+      if ((verb[0] === 'did' || verb.join(' ') === 'done') && !firstPersonBefore(tokens, i)) return false;
+      // "I changed the nozzle and tried it": «it» after a part or a filament named before is that thing (review round 5.6).
+      if (singularThing(tokens, i, verb)) return false;
       // «النوزل الجديد اللي جربته»: the verb of a relative clause tries its noun (review round 5.5).
       if (i > 0 && TRIED_RELATIVES.has(tokens[i - 1])) return false;
       // "the print was done": a passive says nothing of the customer (review round 5.5).
@@ -457,11 +500,54 @@ function stepsObject(tokens: readonly string[], end: number): boolean {
   return clauseEnds(tokens, at + 1) || TRIED_STEPS_WORDS.has(tokens[at + 1]) || TRIED_AFTER_OBJECT.has(tokens[at + 1]);
 }
 
-/** "it did that again", "the printer did that again", "it's done it": an English verb whose subject is not the customer. */
+/** "it did that again", "the printer also did that again", "it's done it": an English verb whose subject is not the customer. */
 function thirdPersonBefore(tokens: readonly string[], i: number): boolean {
   let k = i - 1;
-  while (k >= 0 && TRIED_CONTRACTIONS.has(tokens[k])) k -= 1;
+  while (k >= 0 && (TRIED_CONTRACTIONS.has(tokens[k]) || TRIED_SUBJECT_ADVERBS.has(tokens[k]))) k -= 1;
   return k >= 0 && TRIED_THIRD_PERSON.has(tokens[k]);
+}
+
+/**
+ * The subject of a "did …" or "done" at `i` is the customer: «I» or «we»,
+ * nothing at all ("did them all"), or a word that opens a reply ("yes, did
+ * them"), read past the adverbs and auxiliaries ("I have also done them").
+ * Any other word is someone or something else: "the toolhead did it again",
+ * "my Bambu did it again" (review round 5.6).
+ */
+function firstPersonBefore(tokens: readonly string[], i: number): boolean {
+  let k = i - 1;
+  while (k >= 0 && (TRIED_SUBJECT_ADVERBS.has(tokens[k]) || TRIED_CONTRACTIONS.has(tokens[k]))) k -= 1;
+  return k < 0 || TRIED_SUBJECTS.has(tokens[k]) || TRIED_BEFORE_SUBJECT.has(tokens[k]);
+}
+
+/**
+ * "I changed the nozzle and tried it", "the new nozzle, I tried it", "new
+ * filament, did that": the object «it» / «that» / «this» of the verb at `i`
+ * when a part or a filament stands before the verb is that thing (review
+ * round 5.6).
+ */
+function singularThing(tokens: readonly string[], i: number, verb: readonly string[]): boolean {
+  const end = i + verb.length;
+  const carried = verb.length > 1 && TRIED_SINGULAR_OBJECTS.has(verb[verb.length - 1]);
+  let at = end;
+  while (at < tokens.length && TRIED_DETERMINERS.has(tokens[at])) at += 1;
+  const object = carried || (tokens[at] !== undefined && TRIED_SINGULAR_OBJECTS.has(tokens[at]));
+  if (!object) return false;
+  return tokens.slice(0, i).some((t) => TRIED_THINGS.has(t) || namedBy(t)?.kind === 'part');
+}
+
+/**
+ * A Sorani verb of trying at `i` tries the steps: nothing before it, or the
+ * steps or a clause word (`soraniBefore`), or «دوای ئەوەی» ("after"); never
+ * «ئەوەی» alone ("what I tried was a new nozzle"), and never «لەگەڵ» or «بە»
+ * right after it ("I tried WITH a new nozzle", review round 5.6).
+ */
+function soraniStepsTried(tokens: readonly string[], i: number, length: number): boolean {
+  // «تاقیم کردەوە بە هەموو هەنگاوەکان» ("with all the steps") still tries them.
+  if (TRIED_SORANI_WITH.has(tokens[i + length] ?? '') && !TRIED_SORANI_BEFORE.has(tokens[i + length + 1] ?? '')) return false;
+  if (i === 0) return true;
+  if (TRIED_SORANI_AFTER_CLAUSE.some((p) => p.length <= i && p.every((w, k) => tokens[i - p.length + k] === w))) return true;
+  return TRIED_SORANI_BEFORE.has(tokens[i - 1]);
 }
 /** A negation before the verb at `i`: over adverbs ("not really tried"), or «ولا» and one word («ولا خطوة جربتها»). */
 function negatedBefore(tokens: readonly string[], i: number): boolean {
@@ -510,8 +596,28 @@ const DENY_HAVE = normalSet(DENIAL.have);
 const DENY_SKIP = normalSet(DENIAL.skip);
 const DENY_FINE = normalSet(DENIAL.fine);
 const DENY_FINE_SKIP = normalSet(DENIAL.fineSkip);
+const DENY_AFTER = normalSet(DENIAL.after);
+const DENY_AFTER_SKIP = normalSet(DENIAL.afterSkip);
+const DENY_ANSWER_NO = normalSet(DENIAL.answerNo);
+const DENY_ANSWER_NEXT = normalSet(DENIAL.answerNext);
+const DENY_LACK = normalSet(DENIAL.lack);
+const DENY_LACK_HAVE = normalSet(DENIAL.lackHave);
+const PROBLEM_WORDS = [...normalSet(DENIAL.problemWords)];
+const PROBLEM_BEFORE = normalSet(DENIAL.problemBefore);
+const PROBLEM_BEFORE_HAVE = normalSet(DENIAL.problemBeforeHave);
+const PROBLEM_HAVE = normalSet(DENIAL.problemHave);
+const PROBLEM_SKIP = normalSet(DENIAL.problemSkip);
 /** The Sorani negation on the word itself: «نەگیراوە» is "not clogged". */
 const SORANI_NOT = normalizeText('نە');
+/**
+ * The part and symptom names of more than one word («hot end», «راس الطباعه»,
+ * «هوت اند», «لوح الطباعه», «هۆت ئێند»), as token runs: a denial reads the
+ * whole name (review round 5.6).
+ */
+const NAME_PHRASES: Array<{ kind: 'part' | 'symptom'; key: string; words: string[] }> = [
+  ...Object.entries(PART_LEXICON).flatMap(([key, e]) => (e.phrases ?? []).map((p) => ({ kind: 'part' as const, key, words: tokenize(normalizeText(p)) }))),
+  ...Object.entries(SYMPTOM_LEXICON).flatMap(([key, e]) => (e.phrases ?? []).map((p) => ({ kind: 'symptom' as const, key, words: tokenize(normalizeText(p)) }))),
+].filter((p) => p.words.length > 1);
 
 /** The symptom or the part one word names alone, if any. */
 function namedBy(token: string): { kind: 'part' | 'symptom'; key: string } | undefined {
@@ -521,15 +627,27 @@ function namedBy(token: string): { kind: 'part' | 'symptom'; key: string } | und
   return symptom ? { kind: 'symptom', key: symptom } : undefined;
 }
 
-/** A negation before the word at `at`, over `DENIAL.skip`: «ما عندي كلوب», «مو النوزل», "not clogged", "no stringing". */
-function negatedAt(tokens: readonly string[], at: number): boolean {
+/**
+ * A negation before the word at `at`, over `DENIAL.skip`: «ما عندي كلوب», «مو النوزل», "not clogged", "no stringing".
+ * A «no» that answers ("No, the nozzle is clogged") is not one. `lack` is a having denied with no problem word
+ * between («ماعندي بليت», "I have no plate", «ماكو نوزل»): of a part, the customer lacks it and may be shopping for
+ * it; `deny` is anything else («مو النوزل», "no problem with the nozzle", "not the nozzle") (review round 5.6).
+ */
+function negationAt(tokens: readonly string[], at: number, answers = false): 'lack' | 'deny' | undefined {
+  let problem = false;
+  let having = false;
   for (let k = at - 1; k >= 0 && k >= at - DENIAL.reach; k -= 1) {
-    if (DENY_BEFORE.has(tokens[k])) return true;
-    // «ما» and «لا» negate a having («ما عندي كلوب»), never the verb of a symptom («ما يطلع فلامنت»).
-    if (DENY_BEFORE_HAVE.has(tokens[k])) return DENY_HAVE.has(tokens[k + 1] ?? '');
-    if (!DENY_SKIP.has(tokens[k])) return false;
+    const t = tokens[k];
+    // Before a printer name, a «no» is always an answer: "no, A1" picks the A1.
+    if (DENY_ANSWER_NO.has(t) && (answers || DENY_ANSWER_NEXT.has(tokens[k + 1] ?? ''))) return undefined;
+    if (DENY_BEFORE.has(t)) return !problem && (DENY_LACK.has(t) || (DENY_LACK_HAVE.has(t) && having)) ? 'lack' : 'deny';
+    // «ما» negates a having («ما عندي كلوب»), never the verb of a symptom («ما يطلع فلامنت»).
+    if (DENY_BEFORE_HAVE.has(t)) return DENY_HAVE.has(tokens[k + 1] ?? '') ? (problem ? 'deny' : 'lack') : undefined;
+    if (!DENY_SKIP.has(t)) return undefined;
+    if (PROBLEM_HAVE.has(t)) having = true;
+    if (PROBLEM_WORDS.some((w) => claims(t, w))) problem = true;
   }
-  return false;
+  return undefined;
 }
 
 /** "is fine" right after the word at `at`: «النوزل زين», "the nozzle is fine", «نۆزڵەکە باشە». */
@@ -541,27 +659,104 @@ function fineAfter(tokens: readonly string[], at: number): boolean {
   return false;
 }
 
+/** The Sorani negation right after the word ending at `end`: «کلۆگم نییە», «گیراوە نییە», «A1م نییە». */
+function deniedAfter(tokens: readonly string[], end: number): boolean {
+  let k = end + 1;
+  while (k < tokens.length && k <= end + 2 && DENY_AFTER_SKIP.has(tokens[k])) k += 1;
+  return k < tokens.length && DENY_AFTER.has(tokens[k]);
+}
+/**
+ * «پلێتم نییە», «نۆزڵ نییە»: "I have no plate", "there is no nozzle", a lack;
+ * «کێشەکە نۆزڵ نییە» ("the problem is not the nozzle"), with a problem word
+ * just before, denies it.
+ */
+function negationAfter(tokens: readonly string[], at: number, end: number): 'lack' | 'deny' | undefined {
+  if (!deniedAfter(tokens, end)) return undefined;
+  return tokens.slice(Math.max(0, at - 2), at).some((t) => PROBLEM_WORDS.some((w) => claims(t, w))) ? 'deny' : 'lack';
+}
+
 /**
  * THE TEXT WITHOUT A SYMPTOM OR A PART THE CUSTOMER DENIES (./lexicon.ts
- * `DENIAL`, review round 5.5). Said to be fine, the word goes; negated, it
- * goes only when another symptom or part is named and not denied, so «ماعندي
- * كلوب، عندي خيوط» is stringing and the ticket never says «انسداد النوزل».
- * Read only for the part and the symptom. Pure, on normalised text.
+ * `DENIAL`, review rounds 5.5 and 5.6). Said to be fine or negated, the word
+ * goes, whether or not another one is named: «ماعندي كلوب» alone names no
+ * symptom, and the ticket never says «انسداد النوزل»; «ماعندي كلوب، عندي خيوط»
+ * is stringing. A name of several words («hot end», «راس الطباعه») goes whole.
+ * The Sorani negation after the word («کلۆگ نییە») denies it too. Read only
+ * for the part and the symptom. Pure, on normalised text.
  */
 export function withoutDenied(rest: string): string {
   const tokens = tokenize(rest);
-  const named = tokens.flatMap((t, at) => {
+  type Named = { kind: 'part' | 'symptom'; key: string; at: number; end: number; how?: 'lack' | 'deny' | 'fine' };
+  const named: Named[] = [];
+  const how = (at: number, end: number): Named['how'] => (fineAfter(tokens, end) ? 'fine' : (negationAt(tokens, at) ?? negationAfter(tokens, at, end)));
+  for (const phrase of NAME_PHRASES) {
+    for (let at = 0; at + phrase.words.length <= tokens.length; at += 1) {
+      if (phrase.words.some((w, k) => tokens[at + k] !== w)) continue;
+      const end = at + phrase.words.length - 1;
+      named.push({ kind: phrase.kind, key: phrase.key, at, end, how: how(at, end) });
+    }
+  }
+  tokens.forEach((t, at) => {
     const n = namedBy(t);
-    if (!n) return [];
+    if (!n) return;
     const sorani = t.startsWith(SORANI_NOT) && namedBy(t.slice(SORANI_NOT.length))?.key === n.key;
-    return [{ ...n, at, negated: sorani || negatedAt(tokens, at), fine: fineAfter(tokens, at) }];
+    named.push({ ...n, at, end: at, how: sorani ? 'deny' : how(at, at) });
   });
   const drop = new Set<number>();
   for (const w of named) {
-    const other = named.some((o) => o.kind === w.kind && o.key !== w.key && !o.negated && !o.fine);
-    if (w.fine || (w.negated && other)) drop.add(w.at);
+    if (!w.how) continue;
+    // A part the customer only LACKS («ماعندي بليت») is still the part asked about, unless another one is named.
+    const other = named.some((o) => o.kind === w.kind && o.key !== w.key && !o.how);
+    if (w.kind === 'part' && w.how === 'lack' && !other) continue;
+    for (let k = w.at; k <= w.end; k += 1) drop.add(k);
   }
   return drop.size ? tokens.filter((_, at) => !drop.has(at)).join(' ') : rest;
+}
+
+/**
+ * THE TEXT WITHOUT A PROBLEM SAID NOT TO BE (./lexicon.ts `DENIAL.problemWords`,
+ * review round 5.6): «ما عندي مشكلة بالنوزل بس اريد انظفه», "no problem with
+ * the nozzle", «کێشەم نییە». Read only for the cues. Pure, on normalised text.
+ */
+function withoutDeniedProblem(rest: string): string {
+  const tokens = tokenize(rest);
+  const drop = new Set<number>();
+  tokens.forEach((t, at) => {
+    if (!PROBLEM_WORDS.some((w) => claims(t, w))) return;
+    if (deniedAfter(tokens, at)) drop.add(at);
+    for (let k = at - 1; k >= 0 && k >= at - DENIAL.reach; k -= 1) {
+      if (PROBLEM_BEFORE.has(tokens[k])) {
+        drop.add(at);
+        return;
+      }
+      if (PROBLEM_BEFORE_HAVE.has(tokens[k])) {
+        if (PROBLEM_HAVE.has(tokens[k + 1] ?? '')) drop.add(at);
+        return;
+      }
+      if (!PROBLEM_SKIP.has(tokens[k])) return;
+    }
+  });
+  return drop.size ? tokens.filter((_, at) => !drop.has(at)).join(' ') : rest;
+}
+
+/**
+ * The printers named with a denial («ما عندي اي ون», "not the A1", "I don't
+ * have an A1", «A1م نییە») or, beside another, said to be fine («الاي ون
+ * زينه»), as the text names them: `rewritten` holds every spoken name as its
+ * Latin token (review round 5.6). Pure, on normalised text.
+ */
+function deniedModelsIn(rewritten: string, models: readonly ModelToken[]): ModelToken[] {
+  const tokens = tokenize(rewritten);
+  return models.filter((m) =>
+    MODEL_NAME_WORDS[m].some((group) =>
+      tokens.some((_, at) => {
+        if (group.some((w, k) => tokens[at + k] !== w)) return false;
+        const end = at + group.length - 1;
+        // "Fine" only beside another printer («الاي ون زينه، البي ون اس بيها كلوب»): "A1 ok" alone answers «which printer?».
+        return negationAt(tokens, at, true) !== undefined || deniedAfter(tokens, end) || (models.length > 1 && fineAfter(tokens, end));
+      })
+    )
+  );
 }
 
 export interface UnderstandOptions {
@@ -588,8 +783,8 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
   // the first word of every known phrase, so «الهوت اند» is «هوت اند».
   const rest = bareProclitics(fam ? fam.rest : spoken.rest, CLAIM_PHRASES);
 
-  // «اشتريت» and «من عندكم» tell what happened; they do not ask to buy.
-  const cues = scoreIntents(withoutPastPurchase(rest), compiledCues);
+  // «اشتريت» and «من عندكم» tell what happened; they do not ask to buy. «ما عندي مشكلة» is no problem.
+  const cues = scoreIntents(withoutPastPurchase(withoutDeniedProblem(rest)), compiledCues);
   const faultCue = has(cues, 'fault');
   const problemCue = has(cues, 'problem') || faultCue;
   const productCue = has(cues, 'product');
@@ -619,6 +814,8 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
   if (hmsCode) symptomScores.set('hms', Math.max(symptomScores.get('hms') ?? 0, 10));
   const ranked = [...symptomScores.entries()].sort((a, b) => b[1] - a[1]);
   const symptom = ranked.length > 0 && ranked[0][1] >= CONFIDENT_SCORE ? ranked[0][0] : undefined;
+  // A symptom the words named before the denials came off, and none after.
+  const symptomDenied = !symptom && affirmed !== rest && (best(scoreIntents(rest, compiledSymptoms)) ?? best(scoreIntents(rest, compiledStringingWeak))) !== undefined;
 
   // A series of one printer is that printer: the A2 series is the A2L alone.
   // A bare «A2» is also a paper size («ورق A2», "A2 paper"), so read that way
@@ -685,6 +882,9 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
     productCue,
     problemCue,
     accountCue: namesAccount(typedWords),
+    afterSale: namesAccount(typedWords, ACCOUNT_SET),
+    deniedModels: models.length ? deniedModelsIn(spoken.rewritten, models) : [],
+    ...(symptomDenied ? { symptomDenied: true } : {}),
     ...(typedWords.some((t) => COMBO_WORDS.includes(t)) ? { bundle: true } : {}),
     faultCue,
     printerCue,
