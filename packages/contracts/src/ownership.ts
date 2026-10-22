@@ -355,7 +355,9 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ]),
   ...owned('invoices', ['invoices']),
   ...owned('policies', ['policy_documents', 'policy_acceptances']),
-  ...owned('support', ['support_tickets', 'support_ticket_messages', 'support_ticket_attachments']),
+  // 0210 — the support assistant's AI layer (push B): the daily spend ledger,
+  // the per-call usage rows (codes and counts only) and provider health.
+  ...owned('support', ['support_tickets', 'support_ticket_messages', 'support_ticket_attachments', 'ai_spend_day', 'ai_usage', 'ai_provider_health']),
   // 0185 — the deception layer (DECISIONS row 206): blocks, canary batches and
   // actor scores. The planned `risk_scores` / `risk_signals` belong to the
   // future risk service's own D1 and are not these.
@@ -369,7 +371,9 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   // beside `ops_permissions`; `security_events` is the owner's refusal log.
   // 0204: `admin_capability_grants` (MERCHANT_REVIEW, owner decision C5) is the
   // same kind of access configuration, a sibling of the private grants.
-  ...owned('config', ['admin_settings', 'feature_flags', 'config_versions', 'ops_permissions', 'admin_private_grants', 'admin_capability_grants']),
+  // 0210: the owner's AI switch, cap and per-task model rows (`ai_settings`,
+  // `ai_task_models`) are configuration beside `admin_settings`.
+  ...owned('config', ['admin_settings', 'feature_flags', 'config_versions', 'ops_permissions', 'admin_private_grants', 'admin_capability_grants', 'ai_settings', 'ai_task_models']),
   ...owned('audit', ['audit_log', 'audit_events', 'audit_chain_heads', 'security_events']),
   ...owned('analytics', [
     'merchant_store_analytics_daily', 'analytics_events', 'analytics_daily_platform', 'analytics_daily_merchant',

@@ -68,6 +68,45 @@ export async function rateLimit(
 }
 
 /**
+ * THE SAME LIMIT AS A QUESTION, NEVER A 429 (the support assistant AI layer,
+ * push B plan §6.9). The upsert is `rateLimit`'s own, keyed the same way; the
+ * answer is `true` while the window still has room and `false` once it is
+ * spent. A refused caller falls back to basic mode instead of failing the
+ * turn, which is why the AI paths use this and never `rateLimit`: an eager
+ * customer must still get push A's answer.
+ *
+ * FAIL CLOSED. Any error (a missing table, a D1 hiccup) answers `false`: a
+ * limiter that cannot count must not let a paid call through.
+ */
+export async function rateLimitAllows(
+  c: Context<AppContext>,
+  bucket: string,
+  limit: number,
+  windowSeconds: number
+): Promise<boolean> {
+  try {
+    const user = c.get('user');
+    const ip = c.req.header('CF-Connecting-IP') || 'unknown';
+    const key = rateLimitKey(bucket, user?.id ?? null, ip);
+    const now = Math.floor(Date.now() / 1000);
+    const windowStart = now - (now % windowSeconds);
+    const row = await c.env.DB.prepare(
+      `INSERT INTO rate_limits (key, window_start, count) VALUES (?, ?, 1)
+       ON CONFLICT(key) DO UPDATE SET
+         count = CASE WHEN window_start = ?2 THEN count + 1 ELSE 1 END,
+         window_start = ?2
+       RETURNING count`
+    )
+      .bind(key, windowStart)
+      .first<{ count: number }>();
+    if (!row) return false;
+    return Number(row.count) <= limit;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * WHICH BUCKET REFUSED THIS REQUEST, for the security log (push 1s, S7: a 429
  * on the pricing and FX buckets is recorded, worker/lib/securityEvents.ts).
  * Keyed by the request object, like `charged` below, so the 429's body stays
