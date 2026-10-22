@@ -472,6 +472,8 @@ const FILLER = [
   'what', 'whats', 'is', 'the', 'a', 'an', 'of', 'for', 'me', 'my', 'i', 'you', 'please', 'do', 'does',
   'can', 'much', 'how', 'and', 'or', 'between', 'about', 'with',
   'چی', 'چەند', 'بۆ', 'لە',
+  // «باشە» is the Sorani "OK": alone, the strong lookup showed bronze bushings for it (review round 5.7).
+  'باشە',
 ] as const;
 
 function stripQuestionWords(text: string, intent: Intent): string {
@@ -2144,11 +2146,26 @@ async function handleSubjectSearch(
     const exact = await handleProductSearch(c, { q: subject }, subject, loc, { strong: true });
     if (exact.cards?.length) return { ...exact, intent };
   }
-  const found = await handleProductSearch(c, { q: subject }, subject, loc);
+  const found = await handleProductSearch(c, { q: subject }, subject, loc, tellsFault(freeText) ? { strong: true } : {});
   // The search's own «ما لقيت» keeps asking, so a typo does not dead-end.
   return found.cards?.length
     ? { ...found, intent }
     : { ...found, intent, expects: { intent, slot: 'q' } };
+}
+
+/**
+ * A FAULT TOLD, NOT A PRODUCT ASKED (review round 5.7): «الطابعه دتسوي خيوط
+ * هوايه», «نشفت الفلامنت وبعدها نفس الشي», "the ams says filament runout". The
+ * forgiving search ran on what was left of such a sentence and showed a WiFi
+ * antenna for «هوايه» and a dartboard ring. A sentence that names a problem, a
+ * symptom (said or denied) or a not-fixed outcome is looked up strongly, as the
+ * last-resort lookup is: a product only when every word reaches it, otherwise
+ * live's «nothing found».
+ */
+function tellsFault(said: string): boolean {
+  if (!said.trim()) return false;
+  const u = understand(said);
+  return u.problemCue || u.symptom !== undefined || u.wordSymptom !== undefined || u.outcome === 'not_fixed' || u.symptomDenied === true;
 }
 
 /**
@@ -2725,7 +2742,10 @@ supportRoutes.post('/assistant', async (c) => {
       break;
     case 'product_search':
       // An owned printer named alone («طابعتي A1 من عندكم»): live's «لم أجد», never that printer for sale.
-      reply = ownedPrinter ? { intent: 'product_search', text: tr(loc, 'search_none') } : await handleProductSearch(c, resolved, freeText, loc);
+      // A fault told («نوزل الطابعه انسد» with nothing read) is looked up strongly (`tellsFault`, review round 5.7).
+      reply = ownedPrinter
+        ? { intent: 'product_search', text: tr(loc, 'search_none') }
+        : await handleProductSearch(c, resolved, freeText, loc, tellsFault(freeText) ? { strong: true } : {});
       break;
     case 'compare_products':
       reply = await handleCompareProducts(c, resolved, freeText, loc);

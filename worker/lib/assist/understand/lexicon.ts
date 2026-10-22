@@ -166,7 +166,8 @@ export const DENIAL: {
   before: ['مو', 'مش', 'ماكو', 'ليس', 'ليست', 'بدون', 'not', 'no', 'never', 'isnt', 'isn', 't', 'nt', 'wasnt', 'arent', 'without'],
   // «لا» is not here: «لا، بيها كلوب», «لا عندي كلوب» answer "no" and then say it (review round 5.6).
   beforeHave: ['ما'],
-  have: ['عندي', 'عدي', 'عندنا', 'اكو', 'بيها', 'بيه', 'فيها', 'فيه'],
+  // «ما تسوي خيوط», «ما يطلع خيوط»: the verbs of a symptom that makes strings, negated, deny it (review round 5.7).
+  have: ['عندي', 'عدي', 'عندنا', 'اكو', 'بيها', 'بيه', 'فيها', 'فيه', 'تسوي', 'يسوي', 'دتسوي', 'ديسوي', 'تطلع', 'يطلع', 'دتطلع'],
   // "I don't have a clog": «have» is read past too (review round 5.6).
   skip: [
     'عندي', 'عدي', 'عندنا', 'اكو', 'بيها', 'بيه', 'فيها', 'فيه', 'مشكله', 'مشكلة', 'مشاكل', 'a', 'an', 'the', 'any', 'problem', 'issue', 'with',
@@ -772,14 +773,19 @@ export const SYMPTOM_LEXICON: Record<Exclude<SymptomKey, 'other'>, LexEntry> = {
       'خيط معلك', 'nozzle blocked', 'nozzle is blocked', 'nothing comes out', 'filament not coming out', 'filament stuck',
       'فیلامێنت نایەتە دەرەوە', 'نۆزڵ داخراوە', 'کلۆگ بووە', 'کلۆگی کردووە',
     ],
-    // «کلۆگ» is the Sorani loanword, as «كلوب» is the Iraqi one.
-    stems: ['كلوب', 'كلوك', 'انسداد', 'مسدود', 'clog', 'clogged', 'jam', 'jammed', 'گیراوە', 'گیراوه', 'کلۆگ'],
+    // «کلۆگ» is the Sorani loanword, as «كلوب» is the Iraqi one. «انسد», «ينسد», «منسد»: the verb, in
+    // the past as in the present («نوزل الطابعه انسد», review round 5.7).
+    stems: ['كلوب', 'كلوك', 'انسداد', 'مسدود', 'انسد', 'ينسد', 'تنسد', 'منسد', 'clog', 'clogged', 'jam', 'jammed', 'گیراوە', 'گیراوه', 'کلۆگ'],
   },
   adhesion: {
     phrases: [
       'ما يلزق', 'ما يلصق', 'ما يلتصق', 'عدم الالتصاق', 'الطبقه الاولى', 'not sticking', 'does not stick', 'first layer',
       'چینی یەکەم', 'نانووسێت', 'ترتفع من الزوايا', 'ترتفع من الاطراف', 'زوايا ترتفع', 'تنشال من البليت', 'تنقلع من البليت',
       'corners lifting', 'lifting corners', 'گۆشەکان بەرز دەبنەوە',
+      // Iraqi «تلزك» (sticks), with the progressive «د» glued on; "isn't sticking", "coming off the plate" (review round 5.7).
+      'ما تلزك', 'ما يلزك', 'ما دتلزك', 'ما ديلزك', 'ما تلزق', 'ما دتلزق', 'ما تلصق', 'ما تلتصق', "isn't sticking", 'isnt sticking',
+      "doesn't stick", 'doesnt stick', "won't stick", 'wont stick', 'coming off the plate', 'comes off the plate', 'came off the plate',
+      'coming off the bed', 'comes off the bed', 'came off the bed',
     ],
     stems: ['التصاق', 'يلتصق', 'تقوس', 'تتقوس', 'تقوست', 'warping', 'warped', 'adhesion', 'نانووسێت', 'نەنووسان'],
   },
@@ -791,13 +797,21 @@ export const SYMPTOM_LEXICON: Record<Exclude<SymptomKey, 'other'>, LexEntry> = {
     stems: ['ازاحه', 'مزاحه', 'تزحف', 'layershift', 'لادان'],
   },
   stringing: {
-    phrases: ['خيوط رفيعه', 'خيوط بين', 'stringing', 'مثل شعر', 'مثل الشعر', 'بيها خيوط', 'فيها خيوط', 'like hair', 'وەک موو'],
+    phrases: [
+      'خيوط رفيعه', 'خيوط بين', 'stringing', 'مثل شعر', 'مثل الشعر', 'بيها خيوط', 'فيها خيوط', 'like hair', 'وەک موو',
+      // The printer or the print MAKES strings: «طابعتي تسوي خيوط», «الطابعه دتسوي خيوط», «الطبعه طلعت كلها خيوط»
+      // (review round 5.7). Never «ما تسوي خيوط»: its verb is a having denied (`DENIAL.have`).
+      'تسوي خيوط', 'يسوي خيوط', 'دتسوي خيوط', 'ديسوي خيوط', 'سوت خيوط', 'تطلع خيوط', 'يطلع خيوط', 'دتطلع خيوط', 'طلعت خيوط',
+      'كلها خيوط',
+    ],
     stems: ['stringing', 'stringy', 'شعيرات', 'دەزوو'],
   },
   ams: {
     phrases: [
       'مشكله ams', 'مشكلة ams', 'ams problem', 'ams error', 'کێشەی ams', 'ams ما يسحب', 'ams لا يسحب', 'ams not feeding',
       'ams is not feeding', 'ams doesnt feed', 'ams فیلامێنت ناکێشێت',
+      // «ال ams ما دا يقره الفلامنت» (does not read the filament), "the ams says filament runout" (review round 5.7).
+      'ams ما يقره', 'ams ما يقرا', 'ams ما يقراه', 'ams ما يقري', 'ams says', 'ams keeps saying', 'ams shows',
     ],
   },
   hms: {

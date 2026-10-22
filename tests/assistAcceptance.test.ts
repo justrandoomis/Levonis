@@ -2693,3 +2693,131 @@ test('round 5.6: a part denied by a name of several words or by the Sorani «ن�
     if (expected.part === 'plate') assert.ok(!String(draft.body).includes(PART_LABELS.nozzle_hotend[locale]), `${label}: ${draft.body}`);
   }
 });
+
+const TEAM: Record<Locale, string> = { ar: 'تحدث مع الفريق', en: 'talk to the team', ckb: 'قسە لەگەڵ تیمەکە بکە' };
+
+/** Plays typed turns in one conversation (each with the last reply's context) and returns every reply. */
+async function play(say: (user: StubUser | null, body: Rec) => Promise<Rec>, user: StubUser | null, locale: Locale, turns: readonly string[]): Promise<Rec[]> {
+  const replies: Rec[] = [];
+  let context: Rec | undefined;
+  for (const text of turns) {
+    const reply = await say(user, { text, locale, ...(context ? { context } : {}) });
+    replies.push(reply);
+    if (reply.context !== undefined) context = reply.context;
+  }
+  return replies;
+}
+
+test('round 5.7: «A1 ميني», «A1 مینی» and «H2D برو» are the A1 mini and the H2D Pro on the ticket and the staff summary, cold and at «which printer?»', async () => {
+  const { say } = await round4();
+  for (const user of [member, null]) {
+    const who = user ? 'member' : 'guest';
+    for (const [locale, turns, model] of [
+      ['ckb', ['A1 مینی دەزوو دروست دەکات'], 'A1 mini'],
+      ['ckb', ['A1 مینی نۆزڵەکەی گیراوە'], 'A1 mini'],
+      ['ar', ['A1 ميني بيها كلوب'], 'A1 mini'],
+      ['ar', ['كلوب', 'A1 ميني'], 'A1 mini'],
+      ['ckb', ['کلۆگ', 'A1 مینی'], 'A1 mini'],
+      ['ar', ['H2D برو بيها كلوب'], 'H2D Pro'],
+    ] as const) {
+      const label = `${who} ${locale} «${turns.join(' → ')}»`;
+      const replies = await play(say, user, locale, [...turns, TEAM[locale]]);
+      const steps = replies[replies.length - 2];
+      assert.equal(steps.context?.printer?.model, model, `${label}: ${steps.text}`);
+      const draft = replies[replies.length - 1].ticket_draft;
+      assert.equal(draft?.handoff?.model, model, `${label}: ${draft?.body ?? replies[replies.length - 1].text}`);
+      assert.equal(handoffForStaff(draft.handoff)?.model, model, `${label}: the staff summary`);
+      assert.ok(String(draft.subject).includes(model), `${label}: ${draft.subject}`);
+    }
+    // Tried, under the printer named.
+    const [, tried] = await play(say, user, 'ar', ['A1 ميني بيها كلوب', 'جربتهن كلهن وبعده نفس الشي']);
+    assert.equal(tried.ticket_draft?.handoff?.model, 'A1 mini', `${who}: ${tried.text}`);
+  }
+});
+
+test('round 5.7: «باشە» (OK) gets the menu, as live, never a product card', async () => {
+  const { say } = await round4();
+  for (const user of [member, null]) {
+    const who = user ? 'member' : 'guest';
+    for (const text of ['باشە', 'باشه']) {
+      const reply = await say(user, { text, locale: 'ckb' });
+      assert.equal(reply.intent, 'clarify', `${who} «${text}»: ${reply.text}`);
+      assert.deepEqual(offered(reply), [], `${who} «${text}»`);
+    }
+    // After the ticket draft, too.
+    const replies = await play(say, user, 'ckb', ['A1 بيها كلوب', TEAM.ckb, 'باشە']);
+    assert.deepEqual(offered(replies[2]), [], `${who}: ${replies[2].text}`);
+    assert.equal(replies[2].intent, 'clarify', `${who}: ${replies[2].text}`);
+  }
+});
+
+test('round 5.7: a fault told starts the triage with its symptom, never printers or parts for sale; a fault the reader cannot place gets live\'s «nothing found»', async () => {
+  const { say } = await round55();
+  for (const user of [member, null]) {
+    const who = user ? 'member' : 'guest';
+    for (const [text, locale, symptom, model] of [
+      ['طابعتي تسوي خيوط', 'ar', 'stringing', undefined],
+      ['الطابعه دتسوي خيوط هوايه', 'ar', 'stringing', undefined],
+      ['الطبعه طلعت كلها خيوط شعر', 'ar', 'stringing', undefined],
+      ['طابعتي A1 ميني دتسوي خيوط', 'ar', 'stringing', 'A1 mini'],
+      ['الطبعه ما تلزك على البليت', 'ar', 'adhesion', undefined],
+      ['my print keeps coming off the plate halfway', 'en', 'adhesion', undefined],
+      ['طابعتي بي ون بي ما تلزك الطبعه عالبليت', 'ar', 'adhesion', 'P1P'],
+      ['my p1s print isnt sticking to the textured plate', 'en', 'adhesion', 'P1S'],
+      ['نوزل الطابعه انسد', 'ar', 'clog', undefined],
+      ['النوزل مالتي انسد شسوي', 'ar', 'clog', undefined],
+      ['ال ams ما دا يقره الفلامنت', 'ar', 'ams', undefined],
+      ['the ams says filament runout but theres filament', 'en', 'ams', undefined],
+    ] as const) {
+      const label = `${who} «${text}»`;
+      const reply = await say(user, { text, locale });
+      assert.equal(reply.intent, 'printer_problem', `${label}: ${reply.text}`);
+      assert.equal(reply.context?.triage?.symptom, symptom, `${label}: ${JSON.stringify(reply.context?.triage)}`);
+      if (model) assert.equal(reply.context?.printer?.model, model, label);
+      assert.ok(!offered(reply).some((id) => PRINTER_IDS.has(id) || id.startsWith('s_')), `${label}: ${JSON.stringify(offered(reply))}`);
+    }
+    // A fault or a not-fixed outcome the reader cannot place: no decoy, no printer (live: «لم أجد»).
+    for (const [text, locale] of [
+      ['نشفت الفلامنت وبعدها نفس الشي', 'ar'],
+      ['قصيت الفلامنت ودزيته بس بعده نفس الشي', 'ar'],
+      ['طلعت الفلامنت ورجعته ونفس الشي ما يطلع', 'ar'],
+    ] as const) {
+      const label = `${who} «${text}»`;
+      const reply = await say(user, { text, locale });
+      assert.ok(!offered(reply).some((id) => PRINTER_IDS.has(id) || id.startsWith('s_')), `${label}: ${JSON.stringify(offered(reply))}`);
+    }
+    // Still a material question: «اريد خيوط PLA» shops.
+    const pla = await say(user, { text: 'اريد خيوط PLA' });
+    assert.ok(offered(pla).includes('esun_pla'), `${who}: ${JSON.stringify(offered(pla))}`);
+    // Denied: no stringing triage.
+    const denied = await say(user, { text: 'طابعتي ما تسوي خيوط' });
+    assert.notEqual(denied.context?.triage?.symptom, 'stringing', `${who}: ${denied.text}`);
+  }
+});
+
+test('round 5.7: during the steps, what the customer did is not a part question, and the fault named again after trying them closes them', async () => {
+  const { say } = await round55();
+  for (const user of [member, null]) {
+    const who = user ? 'member' : 'guest';
+    // «البليت جديد وما لمسته بايدي», "i cleaned it with soap": live's answer, no card, and the triage stays.
+    for (const [locale, turns] of [
+      ['ar', ['الطبعه ما تلزك على البليت', 'A1', 'البليت جديد وما لمسته بايدي']],
+      ['en', ['my p1s print isnt sticking to the textured plate', 'i cleaned it with soap']],
+    ] as const) {
+      const label = `${who} ${locale} «${turns.join(' → ')}»`;
+      const replies = await play(say, user, locale, turns);
+      const last = replies[replies.length - 1];
+      assert.deepEqual(offered(last), [], `${label}: ${last.text}`);
+      assert.notEqual(last.intent, 'product_search', `${label}: ${last.text}`);
+      assert.equal(last.context?.triage?.stage, 'steps', `${label}: the triage stays`);
+    }
+    // «جربتها كلها وبعده ما تلزق»: tried, not fixed, the ticket; never the same steps again.
+    const [, , closed] = await play(say, user, 'ar', ['الطبعه ما تلزك', 'A1', 'جربتها كلها وبعده ما تلزق']);
+    assert.equal(closed.ticket_draft?.handoff?.symptom, 'adhesion', `${who}: ${closed.text}`);
+    assert.deepEqual(handoffForStaff(closed.ticket_draft.handoff)?.tried.map((t) => t.key), ['wash_plate', 'plate_type'], `${who}: tried`);
+    // Not tried yet: the steps again, no ticket.
+    const [, notYet] = await play(say, user, 'ar', ['اي ون بيها كلوب', 'لهسه بعد ما جربتها بس بعده مسدود']);
+    assert.equal(notYet.ticket_draft, undefined, `${who}: ${notYet.text}`);
+    assert.equal(notYet.context?.triage?.stage, 'steps', `${who}: the steps again`);
+  }
+});

@@ -225,8 +225,27 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
   // Said to be tried, it answers the steps though the scorer read the power question: «الخطوات» holds «وات»
   // (watt), so «جربت الخطوات وما زبطت» read as one (review round 5.4). Only that one: "I tried now with PETG"
   // is a materials question, and stays one (review round 5.5).
-  if (stage === 'steps' && u.outcome && bare && (hint === null || OUTCOME_ANSWER_HINTS.has(hint) || (u.triedSaid && hint === 'power_usage'))) {
-    return runTriage(db, viewer, ctx, { kind: 'outcome', outcome: u.outcome, tried: u.triedSaid }, render);
+  // «جربتها كلها وبعده ما تلزق», «غسلت البليت وبعدها ما تلزك»: the fault the steps are for, named again after
+  // them with no printer, is the steps not fixing it, never the same steps shown again (review round 5.7). They
+  // are tried only when the customer says so (`triedSaid`); otherwise the ticket lists them as shown, as «talk».
+  // Said not to be tried yet («لهسه بعد ما جربتها بس بعده مسدود»), they are shown again, as before.
+  const again =
+    stage === 'steps' &&
+    !u.outcome &&
+    !u.notTried &&
+    !u.hmsCode &&
+    !!u.symptom &&
+    u.symptom === ctx.triage?.symptom &&
+    u.models.length === 0 &&
+    !u.family;
+  const outcome = u.outcome ?? (again ? 'not_fixed' : undefined);
+  if (
+    stage === 'steps' &&
+    outcome &&
+    bare &&
+    (hint === null || OUTCOME_ANSWER_HINTS.has(hint) || (u.triedSaid && hint === 'power_usage') || (again && hint === 'materials_help'))
+  ) {
+    return runTriage(db, viewer, ctx, { kind: 'outcome', outcome, tried: u.triedSaid }, render);
   }
 
   // ── An HMS code typed after the steps, naming no other fault and no other
@@ -357,6 +376,10 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
   // nozzle order", «پلێتەکە شکاو گەیشت», «سعر توصيل النوزل» (`afterSale`, review round 5.6).
   // «النوزل مو مسدود», "the nozzle isn't clogged": a symptom denied, none named, is not a shopping question either.
   if (elsewhere || (u.part && u.afterSale) || (u.purchaseStory && !u.productCue) || (u.symptomDenied && !u.productCue)) return null;
+  // During the steps, a part named among other words, with no shopping word, size, code or printer, is the
+  // customer telling what they did or have («البليت جديد وما لمسته بايدي», "i cleaned it with soap"), not a part
+  // question: the legacy answer stands, as live, and the triage stays (review round 5.7).
+  if (stage === 'steps' && u.part && u.residual.length > 0 && !shopsFor(u) && (hint === null || !NAMED_PRINTER_HINTS.has(hint))) return null;
   const named = !!u.model || !!u.family;
   if (u.part || (u.maintenance && (named || u.productCue)) || (u.measures.length > 0 && (named || u.productCue))) {
     // «كابل رأس الطباعة», "Cooling Fan for Hotend - H2 Series": a product's own name, typed, is that product.
@@ -407,6 +430,11 @@ async function typedName(
     reply: { intent, text: tr(loc, 'products_intro'), cards: exact.slice(0, CARDS_MAX).map((i) => render.card(loc, i.card, i.row)) },
     context: next,
   };
+}
+
+/** A shopping word, a price asked, a size, a code or a printer named beside the part: a part question. */
+function shopsFor(u: Understood): boolean {
+  return u.productCue || u.priceAsk || u.measures.length > 0 || u.codes.length > 0 || !!u.model || !!u.family;
 }
 
 /** The steps a fault in the named part takes: «مشكلة بالنوزل», the clog steps. Never for a fault the steps do not cover. */

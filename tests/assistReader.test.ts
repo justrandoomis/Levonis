@@ -1108,3 +1108,57 @@ test('round 5.6: another subject, a thing named before «it» / «ـه», Sorani
     assert.equal(saysTried(normalizeText(text)), true, `«${text}»`);
   }
 });
+
+test('round 5.7: a Latin series and the rest of its name in Arabic letters is the whole printer, «A1 ميني» the A1 mini, «H2D برو» the H2D Pro', () => {
+  for (const [text, model] of [
+    ['A1 ميني', 'A1 mini'],
+    ['A1 مینی', 'A1 mini'],
+    ['A1ميني', 'A1 mini'],
+    ['A1 مني', 'A1 mini'],
+    ['a1 ميني بيها كلوب', 'A1 mini'],
+    ['A1 مینی دەزوو دروست دەکات', 'A1 mini'],
+    ['A1 مینی نۆزڵەکەی گیراوە', 'A1 mini'],
+    ['طابعتي A1 ميني دتسوي خيوط', 'A1 mini'],
+    ['H2D برو بيها كلوب', 'H2D Pro'],
+    ['H2D پرۆ', 'H2D Pro'],
+    // No such printer: the series alone, as typed.
+    ['A1 برو', 'A1'],
+    ['P1S ميني', 'P1S'],
+  ] as const) {
+    assert.deepEqual(understand(text).models, [model], `«${text}»`);
+  }
+  // The symptom beside it is still read.
+  assert.equal(understand('A1 مینی دەزوو دروست دەکات').symptom, 'stringing');
+  assert.equal(understand('A1 ميني بيها كلوب').symptom, 'clog');
+  assert.equal(understand('H2D برو بيها كلوب').symptom, 'clog');
+});
+
+test('round 5.7: the printer that makes strings, the print that does not stick, «انسد» and the AMS that does not read the filament are faults', () => {
+  for (const [text, symptom] of [
+    ['طابعتي تسوي خيوط', 'stringing'],
+    ['الطابعه دتسوي خيوط هوايه', 'stringing'],
+    ['الطبعه طلعت كلها خيوط شعر', 'stringing'],
+    ['مو مسدود، بس يطلع خيوط', 'stringing'],
+    ['الطبعه ما تلزك على البليت', 'adhesion'],
+    ['طابعتي بي ون بي ما تلزك الطبعه عالبليت', 'adhesion'],
+    ['الطبعه ما تلزك زين', 'adhesion'],
+    ['my print keeps coming off the plate halfway', 'adhesion'],
+    ['my p1s print isnt sticking to the textured plate', 'adhesion'],
+    ["my print isn't sticking", 'adhesion'],
+    ['نوزل الطابعه انسد', 'clog'],
+    ['النوزل مالتي انسد شسوي', 'clog'],
+    ['ال ams ما دا يقره الفلامنت', 'ams'],
+    ['the ams says filament runout but theres filament', 'ams'],
+  ] as const) {
+    assert.equal(understand(text).symptom, symptom, `«${text}»`);
+  }
+  // Denied, or a material asked about: no stringing.
+  for (const text of ['طابعتي ما تسوي خيوط', 'ما يطلع خيوط', 'اريد خيوط PLA', 'خيوط PETG']) {
+    assert.equal(understand(text).symptom, undefined, `«${text}»`);
+  }
+  // «ونفس الشي» is «و» + «نفس الشي»: not fixed. «لهسه بعد ما جربتها» is not tried.
+  assert.equal(readOutcome(normalizeText('طلعت الفلامنت ورجعته ونفس الشي ما يطلع')), 'not_fixed');
+  assert.equal(understand('لهسه بعد ما جربتها بس بعده مسدود').notTried, true);
+  assert.equal(understand('ما جربتهن وبعده مسدود').notTried, true);
+  assert.equal(understand('جربتها كلها وبعده ما تلزق').notTried, undefined);
+});

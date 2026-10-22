@@ -22,6 +22,7 @@ import {
   hyphenNames,
   joinSplitNames,
   latinModels,
+  latinNameTails,
   possessedSoraniName,
   printerNameWord,
   readFamily,
@@ -155,6 +156,12 @@ export interface Understood {
    * with this (review round 5, ./lexicon.ts `TRIED_SAID`).
    */
   triedSaid: boolean;
+  /**
+   * «بعدني ما جربتها», "haven't tried them": the steps said not to be tried
+   * (`saysNotTried`). Read only by the orchestrator, so a fault named again
+   * after them shows them again rather than closing them (review round 5.7).
+   */
+  notTried?: boolean;
   /** "how much?", «شكد؟»: a price asked, whatever the intent scorer made of it. */
   priceAsk: boolean;
   /**
@@ -404,14 +411,31 @@ const saysAny = (padded: string, phrases: readonly string[]): boolean => phrases
  */
 export function readOutcome(normalized: string): 'resolved' | 'not_fixed' | undefined {
   const text = afterNotNegation(normalized);
-  // «وما» is «و» + «ما», «وبعدها مسدودة» «و» + «بعدها»: the conjunction glued on must not hide the phrase.
-  const padded = ` ${text} `.replace(/ و(ما|لم|بعدها|بعده)(?= )/g, ' $1');
+  const padded = outcomeText(text);
   if (NOT_TRIED.some((p) => padded.includes(` ${p} `))) return undefined;
   if (NOT_FIXED_ALONE.has(text) || NOT_FIXED.some((p) => padded.includes(` ${p} `))) return 'not_fixed';
   if (stillAtFault(tokenize(padded.trim()))) return 'not_fixed';
   if (RESOLVED.some((p) => padded.includes(` ${p} `))) return 'resolved';
   return undefined;
 }
+/**
+ * «وما» is «و» + «ما», «وبعدها مسدودة» «و» + «بعدها», «ونفس الشي» «و» + «نفس» (review round 5.7): the
+ * conjunction glued on must not hide the phrase. Padded with a space at each end.
+ */
+function outcomeText(text: string): string {
+  return ` ${text} `.replace(/ و(ما|لم|بعدها|بعده|نفس)(?= )/g, ' $1');
+}
+
+/**
+ * «بعدني ما جربتها», «لهسه بعد ما جربتها», "haven't tried them": the steps
+ * said NOT to be tried (./lexicon.ts `OUTCOME_NOT_TRIED`). Pure, on
+ * normalised text.
+ */
+export function saysNotTried(normalized: string): boolean {
+  const padded = outcomeText(afterNotNegation(normalized));
+  return NOT_TRIED.some((p) => padded.includes(` ${p} `));
+}
+
 /**
  * «جربتها وما انحلت», "tried them, still clogged", «تاقیم کردەوە»: a verb of
  * trying, not negated («ما سويتها», "have not done them", "I have not really
@@ -688,12 +712,16 @@ export function withoutDenied(rest: string): string {
   const tokens = tokenize(rest);
   type Named = { kind: 'part' | 'symptom'; key: string; at: number; end: number; how?: 'lack' | 'deny' | 'fine' };
   const named: Named[] = [];
-  const how = (at: number, end: number): Named['how'] => (fineAfter(tokens, end) ? 'fine' : (negationAt(tokens, at) ?? negationAfter(tokens, at, end)));
+  const how = (at: number, end: number, negated = false): Named['how'] =>
+    !negated && fineAfter(tokens, end) ? 'fine' : (negationAt(tokens, at) ?? negationAfter(tokens, at, end));
   for (const phrase of NAME_PHRASES) {
+    // «ما تلزك زين», "isn't sticking good": after a name that carries its own negation, «زين» is "well",
+    // never "is fine" (review round 5.7).
+    const negated = phrase.words.some((w) => DENY_BEFORE_HAVE.has(w) || DENY_BEFORE.has(w));
     for (let at = 0; at + phrase.words.length <= tokens.length; at += 1) {
       if (phrase.words.some((w, k) => tokens[at + k] !== w)) continue;
       const end = at + phrase.words.length - 1;
-      named.push({ kind: phrase.kind, key: phrase.key, at, end, how: how(at, end) });
+      named.push({ kind: phrase.kind, key: phrase.key, at, end, how: how(at, end, negated) });
     }
   }
   tokens.forEach((t, at) => {
@@ -765,8 +793,9 @@ export interface UnderstandOptions {
 }
 
 export function understand(typed: string, opts: UnderstandOptions = {}): Understood {
-  // «P1-S» is the P1S, «x1 c» the X1C (./models.ts `joinSplitNames`); «ماعندي» is «ما عندي».
-  const raw = joinSplitNames(splitGluedNegation(typed));
+  // «P1-S» is the P1S, «x1 c» the X1C (./models.ts `joinSplitNames`); «ماعندي» is «ما عندي»;
+  // «A1 ميني» is the A1 mini, «H2D برو» the H2D Pro (`latinNameTails`, review round 5.7).
+  const raw = joinSplitNames(latinNameTails(splitGluedNegation(typed)));
   // «للA1» is «لل A1»; «الاي ون» is «اي ون» (./models.ts); «ما دا تشتغل» is «ما تشتغل».
   const normalized = dropProgressive(normalizeText(splitScripts(raw)));
   const spoken = scanSpokenModels(normalized);
@@ -901,6 +930,7 @@ export function understand(typed: string, opts: UnderstandOptions = {}): Underst
     ownsSaid: !priceAsk && !productCue && saysOwns(typedWords),
     ...(tellsPurchase(typedWords) ? { purchaseStory: true } : {}),
     triedSaid: saysTried(normalized),
+    ...(saysNotTried(normalized) ? { notTried: true } : {}),
     priceAsk,
     residual,
   };

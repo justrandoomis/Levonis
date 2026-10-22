@@ -351,6 +351,35 @@ export function joinSplitNames(raw: string): string {
 const SPLIT_NAME = /(?<![A-Za-z0-9])([A-Za-z]\d)[\s_\-\u2010-\u2014]+([A-Za-z])(?![A-Za-z0-9])/g;
 const HYPHEN_SERIES = /(?<![A-Za-z0-9])([A-Za-z])[-\u2010-\u2014](\d)(?![0-9])/g;
 
+/**
+ * THE SERIES IN LATIN, THE REST OF THE NAME IN ARABIC LETTERS (review round
+ * 5.7): \u00abA1 \u0645\u064a\u0646\u064a\u00bb, \u00abA1 \u0645\u06cc\u0646\u06cc\u00bb, \u00abA1\u0645\u064a\u0646\u064a\u00bb, \u00abH2D \u0628\u0631\u0648\u00bb. Iraqi and Kurdish customers
+ * type the series on the Latin keyboard and switch back for the rest; the
+ * registry read the \u00abA1\u00bb alone, and the ticket named the A1 for an A1 mini.
+ * The word is written in Latin (\u00abA1 mini\u00bb, \u00abH2D Pro\u00bb) only when the joined
+ * name is exactly a printer of the registry: \u00abA1 \u0628\u0631\u0648\u00bb stays as typed. Pure,
+ * on the raw text.
+ */
+export function latinNameTails(raw: string): string {
+  return raw.replace(LATIN_HEAD_ARABIC_WORD, (whole, head: string, word: string) => {
+    const tail = NAME_TAILS.get(normalizeText(word));
+    if (!tail) return whole;
+    const joined = `${head} ${tail}`;
+    return modelsInText(joined).some((e) => e.kind === 'printer' && e.token.toLowerCase() === joined.toLowerCase()) ? joined : whole;
+  });
+}
+/** The Arabic and Sorani spellings of the words that end a printer name, normalised, and the Latin word. */
+const NAME_TAILS: ReadonlyMap<string, string> = new Map(
+  (
+    [
+      ['mini', ['\u0645\u064a\u0646\u064a', '\u0645\u0646\u064a', ...KU.mini]],
+      ['pro', ['\u0628\u0631\u0648', ...KU.pro]],
+    ] as const
+  ).flatMap(([latin, forms]) => forms.map((form) => [normalizeText(form), latin] as const))
+);
+/** A Latin series (\u00abA1\u00bb, \u00abH2D\u00bb) and the Arabic-script word right after it, spaced or glued. */
+const LATIN_HEAD_ARABIC_WORD = /(?<![A-Za-z0-9])([A-Za-z]\d[A-Za-z]?)[\s\u0640]*((?:(?=\p{Script=Arabic})\p{L})+)(?!\p{L})/gu;
+
 /** The printers a text names in Latin letters, through the registry. Families are left out. */
 export function latinModels(raw: string): ModelToken[] {
   return modelsInText(splitScripts(raw))
