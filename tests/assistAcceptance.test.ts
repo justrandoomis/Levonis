@@ -2199,3 +2199,48 @@ test('round 5.4: "tried printing again", «حاولت اطبع», "I did a cold 
     else assert.notEqual(reply.text, T.handoff_reply, `${label}: the reply says the steps were tried`);
   }
 });
+
+test('round 5.4: a printer named alone by the one who has it gets the answer live gave, in ar, en and ckb: the menu or «not found», never a lookup that offers it', async () => {
+  const { say } = await round4();
+  // Live (53c0401d) answered each of these so; the search engine now finds the A1 by «طابعتي A1», so no lookup runs.
+  for (const user of [member, null]) {
+    for (const [text, locale, intent] of [
+      ['طابعتي A1 من عندكم', 'ar', 'product_search'],
+      ['اشتريت اي ون من عندكم', 'ar', 'product_search'],
+      ['A1 مالتي من عدكم', 'ar', 'clarify'],
+      ['I own an A1', 'en', 'clarify'],
+      ['my A1', 'en', 'clarify'],
+      ['پرینتەرەکەم A1ە', 'ckb', 'clarify'],
+      ['A1م هەیە', 'ckb', 'clarify'],
+    ] as const) {
+      const label = `${user ? 'member' : 'guest'} «${text}»`;
+      const reply = await say(user, { text, locale });
+      assert.equal(reply.intent, intent, `${label}: ${reply.text}`);
+      assert.deepEqual(ids(reply), [], label);
+      assert.equal(reply.context?.printer, undefined, `${label}: no printer was shown`);
+      assert.equal(reply.context?.triage, undefined, label);
+      if (intent === 'clarify') assert.ok((reply.choices as Rec[] | undefined)?.length, `${label}: the menu`);
+    }
+  }
+});
+
+test('round 5.4: in Sorani, a thing tried that is not the steps never puts them on the ticket as tried; the steps tried, and "after" tried, do', async () => {
+  const { say } = await round4();
+  const clogKeys = symptomDef('clog').steps.map((st) => st.key);
+  const T = ASSIST_STRINGS.ckb;
+  for (const [said, tried] of [
+    ['سپوڵێکی ترم تاقی کردەوە، هێشتا گیراوە', false],
+    ['دووبارە تاقیم کردەوە، هێشتا گیراوە', false],
+    ['هەنگاوەکانم تاقی کردەوە، هێشتا گیراوە', true],
+    ['دوای ئەوەی تاقیم کردنەوە، هێشتا گیراوە', true],
+  ] as const) {
+    const label = `ckb «${said}»`;
+    const asked = await say(member, { text: 'نۆزڵەکە گیراوە', locale: 'ckb' });
+    const steps = await say(member, { text: 'A1', locale: 'ckb', context: asked.context });
+    const reply = await say(member, { text: said, locale: 'ckb', context: steps.context });
+    assert.equal(reply.handoff, true, `${label}: ${reply.intent} ${reply.text}`);
+    assert.deepEqual(reply.ticket_draft.handoff.tried, tried ? clogKeys : [], `${label}: ${reply.ticket_draft.body}`);
+    assert.equal(handoffForStaff(reply.ticket_draft.handoff)?.tried.length, tried ? clogKeys.length : 0, `${label}: the staff summary`);
+    assert.ok(String(reply.ticket_draft.body).includes(tried ? T.ticket_tried : T.ticket_shown), `${label}: ${reply.ticket_draft.body}`);
+  }
+});

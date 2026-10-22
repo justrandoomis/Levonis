@@ -191,7 +191,9 @@ export async function handleTurn(db: D1Database, viewer: Viewer, input: TurnInpu
   }
   // «جربتها وما انحلّت», "still not fixed", «انحلت»: the chip's outcome, typed.
   // Typed, the steps are tried only when the customer says so («جربتها»), not by «نفس المشكله» alone (review round 5).
-  if (stage === 'steps' && u.outcome && bare && (hint === null || OUTCOME_ANSWER_HINTS.has(hint))) {
+  // Said to be tried, it answers the steps whatever the legacy scorer made of it: «الخطوات» holds «وات»
+  // (watt), so «جربت الخطوات وما زبطت» read as the power question (review round 5.4).
+  if (stage === 'steps' && u.outcome && bare && (hint === null || OUTCOME_ANSWER_HINTS.has(hint) || u.triedSaid)) {
     return runTriage(db, viewer, ctx, { kind: 'outcome', outcome: u.outcome, tried: u.triedSaid }, render);
   }
 
@@ -339,6 +341,11 @@ function faultPart(u: Understood): PartKey | undefined {
  * printer word alone («طابعة», "printers"), with at most the words of a price
  * or stock question around it. No part, size, code, fault, account word,
  * bundle («A1 combo» is its own card) or second printer.
+ *
+ * Never a printer the customer says they have, own or bought («عندي اي ون»,
+ * «طابعتي A1», "I have an A1", «A1م هەیە»: `ownsSaid`): it is not offered for
+ * sale, and the legacy answer stands, as live (review round 5.4). A want, a
+ * have-not, «عندكم اي ون؟» and a price or stock ask still show it first.
  */
 function printerOnly(u: Understood): boolean {
   return (
@@ -353,6 +360,7 @@ function printerOnly(u: Understood): boolean {
     !u.printerUnread &&
     !u.otherPrinter &&
     !u.ownPrinter &&
+    !u.ownsSaid &&
     !u.correction &&
     !u.bundle &&
     u.ordinal === undefined &&
@@ -360,6 +368,18 @@ function printerOnly(u: Understood): boolean {
     u.codes.length === 0 &&
     u.residual.length === 0
   );
+}
+
+/**
+ * «طابعتي A1 من عندكم», «عندي اي ون», "I have an A1": a printer named alone by
+ * the one who has it (`printerOnly` but for `ownsSaid`). The orchestrator
+ * declines it, and the route answers it as live did: no catalogue lookup,
+ * whose search would now find that printer and offer it for sale (review
+ * round 5.4).
+ */
+export function ownedPrinterNamed(typed: string): boolean {
+  const u = understand(typed);
+  return u.ownsSaid && printerOnly({ ...u, ownsSaid: false });
 }
 
 /**
@@ -507,6 +527,7 @@ function readPartChip(params: Record<string, unknown>): { u: Understood; anyPrin
     otherPrinter: false,
     correction: false,
     ownPrinter: false,
+    ownsSaid: false,
     triedSaid: false,
     priceAsk: false,
     residual: [],

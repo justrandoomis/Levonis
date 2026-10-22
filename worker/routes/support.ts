@@ -52,7 +52,7 @@ import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { pricingCtx, resolveProductCards } from '../lib/catalog/cardsRead';
-import { handleTurn } from '../lib/assist/orchestrator';
+import { handleTurn, ownedPrinterNamed } from '../lib/assist/orchestrator';
 import { readContext, SHOWN_MAX } from '../lib/assist/context';
 import { viewerFor } from '../lib/assist/viewer';
 import { callTool } from '../lib/assist/registry';
@@ -2488,6 +2488,13 @@ supportRoutes.post('/assistant', async (c) => {
    */
   const context = readContext(body.context);
   const chipIntent = typeof body.intent === 'string' && (INTENTS as readonly string[]).includes(body.intent) ? body.intent : null;
+  /**
+   * «طابعتي A1 من عندكم», «عندي اي ون»: a printer named alone by the one who
+   * has it. The orchestrator declines it, and it gets live's answer: no
+   * catalogue lookup, which would now find that printer and offer it for sale
+   * (worker/lib/assist/orchestrator.ts `ownedPrinterNamed`, review round 5.4).
+   */
+  let ownedPrinter = false;
   if (chipIntent === 'printer_problem' || (!chipIntent && freeText)) {
     const viewer = viewerFor(c.env.DB, user?.id ?? null, loc);
     const turn =
@@ -2504,6 +2511,7 @@ supportRoutes.post('/assistant', async (c) => {
       const reply = { ...(turn.reply as AssistReply), context: turn.context } as AssistantReply;
       return c.json({ success: true, reply: withFollowups(reply, loc) });
     }
+    if (freeText && !chipIntent) ownedPrinter = ownedPrinterNamed(freeText);
     // A printer named out loud reaches the legacy readers as its token:
     // «كم تستهلك بي ون اس» is the P1S question it was meant to be.
     if (freeText) freeText = rewriteSpokenModels(freeText);
@@ -2613,7 +2621,7 @@ supportRoutes.post('/assistant', async (c) => {
        * exactly or every word reaches it without a forgiven typo; otherwise
        * the menu, as before the search engine.
        */
-      if (isLikelyCatalogueLookup(freeText) && !tooShortToLookUp(stripForLookup(freeText))) {
+      if (!ownedPrinter && isLikelyCatalogueLookup(freeText) && !tooShortToLookUp(stripForLookup(freeText))) {
         const found = await handleProductSearch(c, {}, freeText, loc, { strong: true });
         if (found.cards?.length) {
           // «بكم PLA؟» found its product: it is still the price question it was asked as.
@@ -2697,7 +2705,8 @@ supportRoutes.post('/assistant', async (c) => {
       reply = handlePasswordHelp(loc, !!user);
       break;
     case 'product_search':
-      reply = await handleProductSearch(c, resolved, freeText, loc);
+      // An owned printer named alone («طابعتي A1 من عندكم»): live's «لم أجد», never that printer for sale.
+      reply = ownedPrinter ? { intent: 'product_search', text: tr(loc, 'search_none') } : await handleProductSearch(c, resolved, freeText, loc);
       break;
     case 'compare_products':
       reply = await handleCompareProducts(c, resolved, freeText, loc);

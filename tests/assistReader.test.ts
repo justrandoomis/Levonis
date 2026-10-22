@@ -831,3 +831,46 @@ test('round 5.4: a verb of trying is the steps only with an object that means th
     assert.equal(understand(text).triedSaid, true, `«${text}»`);
   }
 });
+
+test('round 5.4: in Sorani the object comes before the verb: «هەموویم تاقی کردەوە» is the steps tried, «فیلامێنتێکی ترم تاقی کردەوە» is not', () => {
+  for (const text of [
+    'فیلامێنتێکی ترم تاقی کردەوە، هێشتا گیراوە',
+    'دووبارە تاقیم کردەوە، هێشتا گیراوە',
+    'سپوڵێکی ترم تاقی کردەوە بەڵام هێشتا',
+  ]) {
+    assert.equal(saysTried(normalizeText(text)), false, `«${text}»`);
+    assert.equal(understand(text).triedSaid, false, `«${text}»`);
+  }
+  for (const text of [
+    'هەموویم تاقی کردەوە، هێشتا گیراوە',
+    'هەنگاوەکانم تاقی کردەوە، هێشتا گیراوە',
+    'ئەوانەم تاقی کردەوە بەڵام هێشتا',
+    'تاقیم کردەوە بەڵام هێشتا',
+  ]) {
+    assert.equal(saysTried(normalizeText(text)), true, `«${text}»`);
+    assert.equal(understand(text).triedSaid, true, `«${text}»`);
+  }
+});
+
+test('round 5.4: "after" in Sorani, the not-tried forms «بعدني ما» used to cover, «وبعدها مسدودة», and English questions and demonstratives', () => {
+  // «دوای ئەوەی» (after): Sorani carries no negation there to mistake.
+  for (const text of ['دوای ئەوەی تاقیم کردنەوە، هێشتا گیراوە']) {
+    assert.equal(readOutcome(normalizeText(text)), 'not_fixed', `«${text}»`);
+    assert.equal(saysTried(normalizeText(text)), true, `«${text}»`);
+  }
+  // Steps not tried stay without an outcome, with «بعدني ما» out of the list.
+  for (const text of ['بعدني ما سويتهم بس نفس المشكلة', 'بعدني ما طبقتهم', 'ما جربتهن وبعده مسدود']) {
+    assert.equal(readOutcome(normalizeText(text)), undefined, `«${text}»`);
+    assert.equal(saysTried(normalizeText(text)), false, `«${text}»`);
+  }
+  // «بعد ما» before a verb that is not one of trying keeps its negation: «بعد ما انحلت» is still not fixed.
+  assert.equal(readOutcome(normalizeText('بعد ما انحلت')), 'not_fixed');
+  // The conjunction glued on: «وبعدها مسدودة» is «بعدها مسدودة».
+  for (const text of ['جربت اطبع وبعدها مسدودة', 'وبعده مسدود']) assert.equal(readOutcome(normalizeText(text)), 'not_fixed', `«${text}»`);
+  for (const text of ['did it work? no, still clogged', 'I tried that new filament, still clogged', 'I did that new firmware update, still clogged', "it's done that again, still clogged"]) {
+    assert.equal(saysTried(normalizeText(text)), false, `«${text}»`);
+  }
+  for (const text of ['I did that again, still clogged', 'did them all, still clogged', 'I followed your instructions, still clogged', 'went through the steps, still clogged']) {
+    assert.equal(saysTried(normalizeText(text)), true, `«${text}»`);
+  }
+});
