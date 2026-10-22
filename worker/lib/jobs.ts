@@ -39,6 +39,7 @@ import {
 } from './stockAlerts';
 import { runGuardedMediaCleanup } from './mediaRefs';
 import { queueUnattachedAssistMedia } from './assist/attachments';
+import { pruneAiLedger } from './ai/budget';
 import { convertLegacyProducts } from './catalog/legacy';
 import { checkSchemaDrift, type DriftAlarmReport } from './schemaDriftAlarm';
 import {
@@ -195,6 +196,11 @@ export interface DurableJobsReport {
    * deleted: the drain proves each key unreferenced before it touches R2.
    */
   assist_retention: { queued: number; skipped: boolean };
+  /**
+   * The assistant AI layer's ledger (0210): usage rows older than 90 days and
+   * spend-day rows older than 400 days, deleted. Skipped before 0210.
+   */
+  ai_retention: { usage_deleted: number; days_deleted: number; skipped: boolean };
   media_cleanup: {
     attempted: number;
     deleted: number;
@@ -316,6 +322,7 @@ export async function runDurableJobs(env: Env, opts: DurableJobsOptions = {}): P
     stock_alert_prune: { deleted: 0, bound_hit: false },
     outbox_final: { sent: 0, failed: 0 },
     assist_retention: { queued: 0, skipped: false },
+    ai_retention: { usage_deleted: 0, days_deleted: 0, skipped: false },
     media_cleanup: { attempted: 0, deleted: 0, still_referenced: 0, dead_lettered: 0, retrying: 0, refusals: [] },
     schema_drift: null,
     errors: [],
@@ -715,6 +722,11 @@ export async function runDurableJobs(env: Env, opts: DurableJobsOptions = {}): P
   // 15b. The assistant's unclaimed attachments join the queue the drain below empties.
   await step('assist_retention', async () => {
     report.assist_retention = await queueUnattachedAssistMedia(env.DB);
+  });
+
+  // 15c. The assistant AI layer's ledger keeps codes and counts only; it is still pruned (0210).
+  await step('ai_retention', async () => {
+    report.ai_retention = await pruneAiLedger(env.DB);
   });
 
   /**

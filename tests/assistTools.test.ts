@@ -18,7 +18,7 @@ import { asD1, freshDb } from './fixtures/app';
 import { callTool, TOOLS } from '../worker/lib/assist/registry';
 import { readContext, CONTEXT_MAX_BYTES } from '../worker/lib/assist/context';
 import { viewerFor } from '../worker/lib/assist/viewer';
-import { BASIC_ROUTER } from '../worker/lib/assist/ai/adapter';
+import { BASIC_SEAM } from '../worker/lib/assist/ai/adapter';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -81,8 +81,9 @@ test('the carried context keeps closed-set values and id shapes only', () => {
 });
 
 test('basic mode: the model seam is empty', async () => {
-  assert.equal(BASIC_ROUTER.ready(), false);
-  assert.equal(await BASIC_ROUTER.route('نوزل'), null);
+  assert.equal(await BASIC_SEAM.ready('understand'), false);
+  assert.equal(await BASIC_SEAM.ready('vision'), false);
+  assert.equal(await BASIC_SEAM.ready('speech'), false);
 });
 
 function filesUnder(dir: string): string[] {

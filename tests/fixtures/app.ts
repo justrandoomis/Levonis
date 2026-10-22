@@ -20,7 +20,7 @@ export const APEX = 'levonis-iq.com';
 export const MERCHANT_HOST = 'somestore.levonis-iq.com';
 
 /**
- * NO TEST EVER REACHES AN FX PROVIDER (FX programme plan §15). Every route
+ * NO TEST EVER REACHES AN FX OR AI PROVIDER (FX programme plan §15). Every route
  * test imports this file, so the global `fetch` is wrapped once here: a
  * request to IQWealth (`iraqsm.com`) or the ECB is recorded in
  * `providerFetch.attempts` and answered by `providerFetch.handler` when a test
@@ -31,7 +31,9 @@ export const providerFetch: {
   attempts: Array<{ url: string; headers: Record<string, string> }>;
   handler: ((url: string, init?: RequestInit) => Promise<Response>) | null;
 } = { attempts: [], handler: null };
-const PROVIDER_HOST = /^(?:[a-z0-9-]+\.)*(?:iraqsm\.com|ecb\.europa\.eu)$/i;
+// The assistant AI layer's text and vision provider (push B) is behind the same tripwire: no unit
+// test ever reaches it, and a test that needs an answer installs `providerFetch.handler`.
+const PROVIDER_HOST = /^(?:[a-z0-9-]+\.)*(?:iraqsm\.com|ecb\.europa\.eu|anthropic\.com)$/i;
 const realFetch = globalThis.fetch;
 if (!(realFetch as { __fxTripwire?: boolean }).__fxTripwire) {
   const wrapped = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
