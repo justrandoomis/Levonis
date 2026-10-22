@@ -21,6 +21,7 @@ import { site_terms } from './site_terms';
 import { privacy } from './privacy';
 import { support } from './support';
 import { faq } from './faq';
+import { assistant_ai } from './assistant_ai';
 
 /**
  * THE REGISTRY — the only author of store policy.
@@ -56,6 +57,7 @@ const MODULES = {
   privacy,
   support,
   faq,
+  assistant_ai,
 } as const;
 
 export type PolicyKey = keyof typeof MODULES;
@@ -161,7 +163,7 @@ export const POLICY_SECTIONS = [
       en: 'Legal Terms and Privacy',
       ckb: 'مەرجە یاساییەکان و تایبەتمەندێتی',
     },
-    keys: ['terms', 'site_terms', 'privacy'],
+    keys: ['terms', 'site_terms', 'privacy', 'assistant_ai'],
   },
   {
     id: 'help',
