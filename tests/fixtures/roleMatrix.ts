@@ -42,6 +42,7 @@ import { DEFAULT_PRICING } from '../../worker/lib/printPricing';
 import { baseUsdOf } from '../../worker/lib/pricingEngine/orderBasis';
 
 import { productRoutes, homeRoutes } from '../../worker/routes/products';
+import { searchDay, searchTrendingRoutes } from '../../worker/routes/searchTrending';
 import { bundlesRoutes, adminCompositionAnalyticsRoutes } from '../../worker/routes/bundles';
 import { cartRoutes } from '../../worker/routes/cart';
 import { orderRoutes } from '../../worker/routes/orders';
@@ -167,6 +168,7 @@ export type MountSpec = readonly [prefix: string, router: Router];
  */
 export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/products', productRoutes as Router],
+  ['/api/search', searchTrendingRoutes as Router],
   ['/api/bundles', bundlesRoutes as Router],
   ['/api/admin/bundles', adminBundlesRoutes as Router],
   ['/api/admin/mystery', adminMysteryRoutes as Router],
@@ -354,6 +356,12 @@ export const ADMIN_ROLES: readonly RoleName[] = ['assistant', 'full', 'legacy_nu
  */
 export function seedRoleMatrix(raw: DatabaseSync = freshDb()): DatabaseSync {
   seedCostlyProduct(raw);
+  // Sweep a populated public ranking, so its cost-free projection is exercised
+  // for every role. Deploy-ahead fixtures may intentionally omit migration 0212.
+  if (raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='search_selection_visitors'").get()) {
+    const insert = raw.prepare('INSERT INTO search_selection_visitors (day, product_id, visitor_hash) VALUES (?, ?, ?)');
+    for (let i = 0; i < 3; i++) insert.run(searchDay(), 'p_a1', `role-matrix-${i}`);
+  }
   // A NULL default hides a margin leak from every role sweep. Exercise a
   // configured public service tariff with its private sibling present.
   raw.prepare('INSERT OR REPLACE INTO admin_settings (key,value) VALUES (?,?)').run('printServicePricing', JSON.stringify({
