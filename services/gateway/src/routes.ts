@@ -99,6 +99,9 @@ export const ROUTES: readonly RouteRule[] = [
   // ------------------------------------------------------- catalog (public)
   { prefix: '/api/products', hosts: 'root', owner: 'CATALOG', flipPhase: 5, requires: 'none', rateClass: 'public-read', cacheable: true },
   { prefix: '/api/home', hosts: 'root', owner: 'CATALOG', flipPhase: 5, requires: 'none', rateClass: 'public-read', cacheable: true },
+  // Product selections and their public daily ranks belong to catalogue search.
+  // POST keeps the core's own write limiter; this prefix is not edge-cacheable.
+  { prefix: '/api/search', hosts: 'root', owner: 'CATALOG', flipPhase: 5, requires: 'none', rateClass: 'public-read' },
   { prefix: '/api/bundles', hosts: 'root', owner: 'CATALOG', flipPhase: 5, requires: 'none', rateClass: 'public-read', cacheable: true, note: 'members-only body; an anonymous miss is success:false and is never stored' },
   { prefix: '/api/settings/public', hosts: 'root', owner: 'CONFIG', flipPhase: 4, requires: 'none', rateClass: 'public-read', cacheable: true },
   // «المقارنة». Reads products, their spec sheets and the power advice derived
