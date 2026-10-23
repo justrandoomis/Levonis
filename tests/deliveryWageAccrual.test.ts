@@ -93,8 +93,10 @@ test('unknown FIFO holds only profit-dependent wages; verifying the order cost r
   const data = await json(response); assert.equal(response.status, 200, JSON.stringify(data));
   assert.equal(data.reconciliation_pending, false);
   const profit = (await participantSources(db, 'employee')).find(source => source.title === 'profit_percent')!;
-  assert.equal(profit.amount_iqd, 3000); assert.equal(profit.available_iqd, 3000);
-  assert.equal((await json(await get(self, '/earnings'))).summary.available_earnings_iqd, 13000);
+  // Profit pay is 10% of 50,000 sales less 20,000 COGS and the 10,000
+  // fixed/revenue wages; the profit distribution itself is not deducted.
+  assert.equal(profit.amount_iqd, 2000); assert.equal(profit.available_iqd, 2000);
+  assert.equal((await json(await get(self, '/earnings'))).summary.available_earnings_iqd, 12000);
   assert.equal(row(raw, 'SELECT processed_orders FROM finance_staff_reconciliations WHERE staff_id=?', id)?.processed_orders, 0);
   assert.equal(row(raw, "SELECT unit_cost_iqd FROM order_item_inventory_allocations WHERE order_id='missing-cost'")?.unit_cost_iqd, null, 'verified per-order adjustment does not fabricate inventory cost');
   await finishNotifications();

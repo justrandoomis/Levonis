@@ -813,6 +813,6 @@ test('missing FIFO cost stays pending and posts once when the allocations become
   await runOrderFinancialEffects(env, 'order', 'delivered');
   await runOrderFinancialEffects(env, 'order', 'delivered');
   assert.equal(count(raw, "SELECT COUNT(*) n FROM accounting_entries WHERE event_key='cogs:order'"), 1);
-  assert.equal(count(raw, 'SELECT SUM(amount_iqd) n FROM finance_order_costs'), 3000);
+  assert.equal(count(raw, 'SELECT SUM(amount_iqd) n FROM finance_order_costs'), 3500, '10% of net profit includes the recorded 5000 shipping income');
   assert.equal(count(raw, 'SELECT COUNT(*) n FROM finance_posting_errors'), 0);
 });

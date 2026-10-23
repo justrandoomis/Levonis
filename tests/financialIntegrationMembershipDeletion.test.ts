@@ -64,8 +64,10 @@ for (const correctBeforeDelete of [false, true]) {
       assert.deepEqual(w.raw.prepare('SELECT id,product_id FROM order_items ORDER BY id').all().map(v => ({ ...v })),
         [{ id: 'ip', product_id: null }, { id: 'iq', product_id: null }, { id: 'ir', product_id: 'r' }]);
       assert.notEqual((await profitSourceFingerprint(w.db, 'o')).value, fingerprint.value);
-      assert.match(String(w.raw.prepare(`SELECT ${staffBasisFingerprintSql('?1')} value`).get('o')!.value), /^\["membership-unit-v1",/,
-        'deleted products retain the affected-membership fingerprint, so recovery cannot fall back to the old calculation');
+      const wageSource=String(w.raw.prepare(`SELECT ${staffBasisFingerprintSql('?1')} value`).get('o')!.value);
+      assert.match(wageSource, /^\["participant-net-v1",/);
+      assert.ok(wageSource.includes(JSON.stringify(w.snapshot())),
+        'net-profit recovery retains the original membership evidence and the deleted-product identities');
       await correctMembershipSale(w.db, 'o', w.day);
       await correctMembershipSale(w.db, 'o', w.day);
       assert.equal(w.raw.prepare("SELECT COUNT(*) n FROM accounting_entries WHERE event_key='membership-sale:o'").get()!.n, 1);

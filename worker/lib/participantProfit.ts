@@ -46,15 +46,15 @@ export async function participantNetProfit(db: D1Database, base: OrderProfitBase
   let promotions = new Map<string, number>(), general = new Map<string, number>();
   if (month && await workspaceInstalled(db)) {
     promotions = (await monthlyPromotionShares(db, month)).shares;
-    const [expenses, lines] = await Promise.all([
-      db.prepare(`SELECT COALESCE(SUM(e.amount_iqd),0) amount FROM operating_expenses e WHERE substr(e.expense_day,1,7)=? AND ${generalExpense}`).bind(month).first<{ amount: number }>(),
-      db.prepare(`SELECT i.id,i.qty FROM order_items i JOIN orders o ON o.id=i.order_id
+    const expenses = await db.prepare(`SELECT COALESCE(SUM(e.amount_iqd),0) amount FROM operating_expenses e WHERE substr(e.expense_day,1,7)=? AND ${generalExpense}`).bind(month).first<{ amount: number }>();
+    if (expenses?.amount) {
+      const lines = await db.prepare(`SELECT i.id,i.qty FROM order_items i JOIN orders o ON o.id=i.order_id
         WHERE o.status='delivered' AND o.seller_type='levonis' AND substr(date(o.delivered_at,'+3 hours'),1,7)=?
-        AND NOT EXISTS(SELECT 1 FROM order_items child WHERE child.bundle_parent_item_id=i.id) ORDER BY i.id LIMIT 10001`).bind(month).all<{ id: string; qty: number }>(),
-    ]);
-    if (lines.results.length > 10000) throw conflict(serverMessage('NET_PROFIT_ALLOCATION_LIMIT'),'NET_PROFIT_ALLOCATION_LIMIT');
-    const shares = spread(expenses?.amount ?? 0, lines.results.map(line => line.qty));
-    general = new Map(lines.results.map((line, index) => [line.id, shares[index] ?? 0]));
+        AND NOT EXISTS(SELECT 1 FROM order_items child WHERE child.bundle_parent_item_id=i.id) ORDER BY i.id LIMIT 10001`).bind(month).all<{ id: string; qty: number }>();
+      if (lines.results.length > 10000) throw conflict(serverMessage('NET_PROFIT_ALLOCATION_LIMIT'),'NET_PROFIT_ALLOCATION_LIMIT');
+      const shares = spread(expenses.amount, lines.results.map(line => line.qty));
+      general = new Map(lines.results.map((line, index) => [line.id, shares[index] ?? 0]));
+    }
   }
   base.lines.forEach((line, index) => {
     const direct = costs.get(line.id)!;
@@ -86,10 +86,12 @@ export function participantNetFingerprintSql(baseSql: string, order: string, sta
       (SELECT * FROM finance_monthly_promotions WHERE month=${month} ORDER BY id)),
     (SELECT json_group_array(json_array(e.id,e.amount_iqd,e.expense_day)) FROM
       (SELECT * FROM operating_expenses ORDER BY id) e WHERE substr(e.expense_day,1,7)=${month} AND ${generalExpense}),
-    (SELECT json_group_array(json_array(i.id,i.qty)) FROM
+    CASE WHEN EXISTS(SELECT 1 FROM finance_monthly_promotions WHERE month=${month} AND enabled=1 AND amount_iqd>0)
+      OR EXISTS(SELECT 1 FROM operating_expenses e WHERE substr(e.expense_day,1,7)=${month} AND e.amount_iqd>0 AND ${generalExpense})
+    THEN (SELECT json_group_array(json_array(i.id,i.qty)) FROM
       (SELECT * FROM order_items ORDER BY id) i JOIN orders pn_order ON pn_order.id=i.order_id
       WHERE pn_order.status='delivered' AND pn_order.seller_type='levonis' AND substr(date(pn_order.delivered_at,'+3 hours'),1,7)=${month}
-      AND NOT EXISTS(SELECT 1 FROM order_items child WHERE child.bundle_parent_item_id=i.id))
+      AND NOT EXISTS(SELECT 1 FROM order_items child WHERE child.bundle_parent_item_id=i.id)) END
     ${staffCosts ? `,
     (SELECT json_group_array(json_array(pn_cost.id,CASE WHEN pn_cost.state IN ('pending_cost','reversed') THEN pn_cost.state ELSE 'cost' END,pn_cost.amount_iqd,
       (SELECT SUM(delta_iqd) FROM finance_cost_adjustments a WHERE a.cost_id=pn_cost.id)))
