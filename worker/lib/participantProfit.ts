@@ -1,5 +1,5 @@
 import { reportAdjustments } from './financeReportOverlay';
-import { monthlyPromotionShares, spread, workspaceInstalled, type OrderProfitBase } from './orderProfit';
+import { spread, workspaceInstalled, type OrderProfitBase } from './orderProfit';
 import { conflict } from './http';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 
@@ -25,7 +25,9 @@ function isProfitShare(cost: Row): boolean {
  * deductions already in line revenue are never subtracted a second time.
  * Staff profit percentages exclude all staff profit distributions themselves
  * to avoid a recursive wage calculation. Investors retain the established
- * ordering after staff costs. Fixed/revenue wages remain costs in both bases. */
+ * ordering after staff costs. Fixed/revenue wages remain costs in both bases.
+ * Monthly promotion is borne solely by the store, including its linked
+ * operating expense; it affects neither participant profit nor capital loss. */
 export async function participantNetProfit(db: D1Database, base: OrderProfitBase, forStaff = false): Promise<Map<string, number | null>> {
   const adjustments = (await reportAdjustments(db, [base.order_id])).get(base.order_id)!;
   const values = new Map<string, number | null>();
@@ -43,9 +45,8 @@ export async function participantNetProfit(db: D1Database, base: OrderProfitBase
   const weights = base.lines.map(line => Math.max(0, line.net_goods_iqd));
   const coupons = spread(adjustments.coupon_iqd, weights.some(Boolean) ? weights : base.lines.map(line => line.qty));
   const month = (await db.prepare("SELECT substr(date(delivered_at,'+3 hours'),1,7) month FROM orders WHERE id=?").bind(base.order_id).first<{ month: string | null }>())?.month;
-  let promotions = new Map<string, number>(), general = new Map<string, number>();
+  let general = new Map<string, number>();
   if (month && await workspaceInstalled(db)) {
-    promotions = (await monthlyPromotionShares(db, month)).shares;
     const expenses = await db.prepare(`SELECT COALESCE(SUM(e.amount_iqd),0) amount FROM operating_expenses e WHERE substr(e.expense_day,1,7)=? AND ${generalExpense}`).bind(month).first<{ amount: number }>();
     if (expenses?.amount) {
       const lines = await db.prepare(`SELECT i.id,i.qty FROM order_items i JOIN orders o ON o.id=i.order_id
@@ -64,14 +65,17 @@ export async function participantNetProfit(db: D1Database, base: OrderProfitBase
       - line.courier_fee_iqd - line.payment_fee_iqd - (coupons[index] ?? 0)
       - (adjustments.price_protection_by_line.get(line.id) ?? 0)
       - (adjustments.trade_in_credit_returned_by_line.get(line.id) ?? 0)
-      - (promotions.get(line.id) ?? 0) - (general.get(line.id) ?? 0));
+      - (general.get(line.id) ?? 0));
   });
   return values;
 }
 
 /** Same source definition for calculation fences, payout guards and recovery.
  * Versioning queues old entitlements; deductions added later invalidate them
- * immediately. Full-month inputs keep overhead independent of report filters. */
+ * immediately. Full-month inputs keep overhead independent of report filters.
+ * Keep the v1 shape and an empty promotion slot so unaffected wages remain
+ * payable. Old fingerprints carrying a promotion or its allocation differ
+ * and queue restoration; future promotion changes cannot stale balances. */
 export function participantNetFingerprintSql(baseSql: string, order: string, staffCosts = false): string {
   const month = monthSql(order);
   return `json_array('participant-net-v1',json((${baseSql})),
@@ -82,12 +86,10 @@ export function participantNetFingerprintSql(baseSql: string, order: string, sta
       (SELECT * FROM order_items WHERE order_id=${order} ORDER BY id)),
     (SELECT json_group_array(json_array(id,order_item_id,state,credited_iqd)) FROM
       (SELECT * FROM price_protection_claims WHERE order_id=${order} ORDER BY id)),
-    (SELECT json_group_array(json_array(id,amount_iqd,enabled)) FROM
-      (SELECT * FROM finance_monthly_promotions WHERE month=${month} ORDER BY id)),
+    json('[]'),
     (SELECT json_group_array(json_array(e.id,e.amount_iqd,e.expense_day)) FROM
       (SELECT * FROM operating_expenses ORDER BY id) e WHERE substr(e.expense_day,1,7)=${month} AND ${generalExpense}),
-    CASE WHEN EXISTS(SELECT 1 FROM finance_monthly_promotions WHERE month=${month} AND enabled=1 AND amount_iqd>0)
-      OR EXISTS(SELECT 1 FROM operating_expenses e WHERE substr(e.expense_day,1,7)=${month} AND e.amount_iqd>0 AND ${generalExpense})
+    CASE WHEN EXISTS(SELECT 1 FROM operating_expenses e WHERE substr(e.expense_day,1,7)=${month} AND e.amount_iqd>0 AND ${generalExpense})
     THEN (SELECT json_group_array(json_array(i.id,i.qty)) FROM
       (SELECT * FROM order_items ORDER BY id) i JOIN orders pn_order ON pn_order.id=i.order_id
       WHERE pn_order.status='delivered' AND pn_order.seller_type='levonis' AND substr(date(pn_order.delivered_at,'+3 hours'),1,7)=${month}

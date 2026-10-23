@@ -44,7 +44,7 @@ test('every P-A string has ar, en and its own Sorani — never the Arabic or the
 
 test('the display notes describe unchanged currency and the current net-profit participation policy', () => {
   assert.equal(PA_STRINGS.usdNote.ar, 'عرض بالدولار فقط. المبالغ المحاسبية محفوظة بالدينار ولا تتغير.');
-  assert.equal(PA_STRINGS.netProfitNote.ar, 'هذه الخصومات تقلل صافي الربح الذي تُحسب منه حصص الموظفين والمستثمرين، مع حفظ سجل المدفوعات السابقة.');
+  assert.equal(PA_STRINGS.netProfitNote.ar, 'هذه الخصومات تقلل صافي الربح الذي تُحسب منه حصص الموظفين والمستثمرين، مع حفظ سجل المدفوعات السابقة. الترويج يتحمله المتجر وحده ولا يُخصم من حصصهم.');
   assert.equal(PA_STRINGS.displayCurrency.ckb, 'دراوی پیشاندان');
   assert.match(PA_STRINGS.usdToday.ar, /^≈/);
   assert.match(PA_STRINGS.usdMixed.ckb, /^≈/);

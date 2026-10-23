@@ -88,6 +88,43 @@ test('investor-only recovery deducts coupons, points, credited protection and mo
   assert.equal((await drainOrderFinanceRecovery({DB:s.db} as Env)).scanned,0);
   assert.equal(count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events'),events);
 });
+test('store promotion repairs historical investor profit and capital losses without changing payments or later blocking withdrawals',async()=>{
+  const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);await sale(s,'order',['lot-a']);await syncInvestorOrder(s.db,'order');
+  await requestWithdrawal({DB:s.db} as Env,'investor','promotion-paid',100,'earnings');
+  await changeWithdrawalState(s.db,'promotion-paid','admin','approve');
+  await payWithdrawal(s.db,'admin','promotion-paid',{id:'promotion-receipt',reference:'cash',receipt_url:''});
+  const paid=row(s.raw,"SELECT * FROM finance_withdrawal_payments WHERE id='promotion-receipt'");
+  s.raw.exec("INSERT INTO expense_categories(id,slug,name_ar) VALUES ('old-ad','old-ad','Promotion')");
+  s.raw.prepare('INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title) VALUES (?,?,?,?,?)').run('old-ad-cost','old-ad',1000,baghdadDay(),'Promotion');
+  await syncInvestorOrder(s.db,'order');
+  assert.equal((await participantOverview(s.db,'investor')).summary.investor_profit_iqd,0);
+  assert.ok(count(s.raw,'SELECT SUM(amount_iqd) n FROM investor_capital_losses')>0);
+  s.raw.prepare(`INSERT INTO finance_monthly_promotions(id,month,currency,amount_minor,exchange_rate,amount_iqd,expense_id,created_by,created_at,updated_at)
+    VALUES ('store-promotion',?,'IQD',1000,1,1000,'old-ad-cost','admin',?,?)`).run(baghdadDay().slice(0,7),baghdadDay(),baghdadDay());
+  const old=row<{snapshot:string}>(s.raw,"SELECT snapshot FROM investor_allocation_results WHERE allocation_id='order-a0'")!;
+  const currentSource=(await investorOrderSplit(s.db,'order')).source_fingerprint;assert.ok(currentSource);
+  const snapshot=JSON.parse(old.snapshot),fingerprint=JSON.parse(currentSource);
+  fingerprint[5]=[['store-promotion',1000,1]];fingerprint[7]=[['order-item',1]];snapshot.source_fingerprint=JSON.stringify(fingerprint);
+  s.raw.prepare("UPDATE investor_allocation_results SET snapshot=? WHERE allocation_id='order-a0'").run(JSON.stringify(snapshot));
+  const repair=await drainOrderFinanceRecovery({DB:s.db} as Env);
+  assert.equal(repair.completed,1,JSON.stringify(repair));
+  const restored=(await participantOverview(s.db,'investor')).summary;
+  assert.deepEqual([restored.investor_profit_iqd,restored.earnings_paid_iqd,restored.available_earnings_iqd,restored.investor_profit_debt_iqd],[140,100,40,0]);
+  assert.equal(count(s.raw,'SELECT SUM(amount_iqd) n FROM investor_capital_losses'),0,'promotion cannot consume funded capital');
+  assert.deepEqual(row(s.raw,"SELECT * FROM finance_withdrawal_payments WHERE id='promotion-receipt'"),paid);
+  const basis=(await investorOrderSplit(s.db,'order')).source_fingerprint;
+  s.raw.exec("UPDATE finance_monthly_promotions SET amount_iqd=5000,amount_minor=5000 WHERE id='store-promotion'");
+  assert.equal((await investorOrderSplit(s.db,'order')).source_fingerprint,basis);
+  assert.equal((await participantOverview(s.db,'investor')).summary.available_earnings_iqd,40);
+  const reportApp=stubApp(s.db,ADMIN,app=>app.route('/workspace',adminFinanceWorkspaceRoutes));
+  const owner=await json(await get(reportApp,`/workspace/summary?from=${baghdadDay().slice(0,7)}-01&to=${baghdadDay()}`));
+  assert.equal(owner.totals.promotion_iqd,5000);
+  assert.equal(owner.totals.owner_period_net_after_report_adjustments_iqd,-4740,'only the owner bears promotion after the unchanged 140 investor share');
+  const events=count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events');
+  assert.equal((await drainOrderFinanceRecovery({DB:s.db} as Env)).scanned,0);
+  assert.equal(count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events'),events);
+  assert.equal(count(s.raw,'SELECT SUM(debit_iqd-credit_iqd) n FROM accounting_lines'),0);
+});
 test('contract shares enforce 100 percent, immutable funded terms, and unused contract can be voided and replaced',async()=>{
   const s=setup(),a=await contract(s,'inc-a','investor',{capital_share_bps:6000,profit_share_bps:2100,loss_share_bps:6000,principal_iqd:180});
   const bad=await post(s.app,'/i/contracts',{...a,operation_id:crypto.randomUUID(),user_id:'other',capital_share_bps:6000});assert.equal(bad.status,409);

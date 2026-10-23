@@ -133,7 +133,7 @@ export async function investorOrderSplit(db: D1Database, orderId: string, previe
           qty: weights[i], profit_basis_iqd: profit, profit_iqd: earned,
           capital_iqd: recovered,
           loss_iqd: loss,raw_loss_iqd:loss,eligible: delivered && collected,
-          snapshot: JSON.stringify({ version: base.version, profit_basis:'net_after_deductions_v1',source_fingerprint:sourceFingerprint,contract_version: c.version, qty: weights[i], principal_iqd:recovered, revenue: revenue[i], cost, expenses: expenses[i], profit, collected, delivered }) });
+          snapshot: JSON.stringify({ version: base.version, profit_basis:'net_excluding_store_promotion_v2',source_fingerprint:sourceFingerprint,contract_version: c.version, qty: weights[i], principal_iqd:recovered, revenue: revenue[i], cost, expenses: expenses[i], profit, collected, delivered }) });
       }
     }
   }

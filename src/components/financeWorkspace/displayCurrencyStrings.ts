@@ -64,9 +64,9 @@ export const PA_STRINGS = {
     ckb: 'پوختە دوای داشکانەکانی ڕاپۆرت',
   },
   netProfitNote: {
-    ar: 'هذه الخصومات تقلل صافي الربح الذي تُحسب منه حصص الموظفين والمستثمرين، مع حفظ سجل المدفوعات السابقة.',
-    en: 'These deductions reduce the net profit used for staff and investor shares. Previous payments stay recorded.',
-    ckb: 'ئەم داشکانانە قازانجی پاکی بەشی کارمەندان و وەبەرهێنەران کەم دەکەنەوە. پارەدانی پێشوو تۆمارکراو دەمێنێتەوە.',
+    ar: 'هذه الخصومات تقلل صافي الربح الذي تُحسب منه حصص الموظفين والمستثمرين، مع حفظ سجل المدفوعات السابقة. الترويج يتحمله المتجر وحده ولا يُخصم من حصصهم.',
+    en: 'These deductions reduce the net profit used for staff and investor shares. Previous payments stay recorded. Promotion is paid solely by the store and does not reduce their shares.',
+    ckb: 'ئەم داشکانانە قازانجی پاکی بەشی کارمەندان و وەبەرهێنەران کەم دەکەنەوە. پارەدانی پێشوو تۆمارکراو دەمێنێتەوە. خەرجی ڕیکلام تەنها لەسەر فرۆشگایە و لە بەشی ئەوان کەم ناکرێتەوە.',
   },
 
   // ---- §8: the IQD/USD display toggle (display only; accounting stays IQD)

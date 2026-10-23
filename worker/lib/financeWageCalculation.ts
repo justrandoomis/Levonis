@@ -156,7 +156,7 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
       const id=cost?.id??newId('oc'),liability='2100';
       if(cost&&cost.held_iqd>0&&amount!==null&&amount<cost.paid_iqd+cost.held_iqd)throw conflict('طلب سحب مفتوح يحتاج إعادة اعتماد قبل تخفيض الاستحقاق');
       if(cost&&amount!==null)reservationTargets.push({cost_id:id,amount_iqd:amount});
-      const snapshot=JSON.stringify({rule,line_ids:target.line_ids,qty:target.qty,staff_id:staff.id,earning_day:earningDay,profit_basis:'net_after_deductions_v1'});
+      const snapshot=JSON.stringify({rule,line_ids:target.line_ids,qty:target.qty,staff_id:staff.id,earning_day:earningDay,profit_basis:'net_excluding_store_promotion_v2'});
       if(!cost){
         const expense=amount!==null&&amount>0?newId('opex'):null;
         if(expense)statements.push(db.prepare('INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,note) VALUES (?,?,?,?,?,?)').bind(expense,rule.category_id,amount,day,rule.name,`استحقاق تسليم ${earningDay} / طلب ${orderId}`));

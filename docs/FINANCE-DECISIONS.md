@@ -283,14 +283,17 @@ The owner explicitly corrected the requested direction: «اجعله يحسب م
 Profit-percentage wages and investor distributions now include coupons,
 points, membership and offer savings, accepted price reductions, actual
 returns, credited price protection, verified inventory cost, direct costs,
-collection fees and allocated monthly expenses. A line coupon or embedded
+collection fees and allocated ordinary monthly expenses. Promotion is borne
+solely by the store (owner clarification, 2026-10-23). A line coupon or embedded
 membership saving is counted once. A stocked trade-in credit remains payment
 in kind; returned credit is removed from retained revenue.
 
-Monthly promotion and otherwise unlinked operating expenses use all sold
-units in the delivery's Baghdad month, following the workspace's established
-monthly promotion allocation. Changes to the month or its sold-unit population
-invalidate affected balances for bounded reconciliation. Missing inventory
+Otherwise unlinked operating expenses, excluding the expense attached to a
+monthly promotion, use all sold units in the delivery's Baghdad month.
+Changes to that ordinary overhead or its sold-unit population invalidate
+affected balances for bounded reconciliation. Promotion still uses the
+monthly sold-unit allocation in the owner's report only. Adding, editing or
+disabling promotion cannot reduce or block participant balances. Missing inventory
 cost or other pending costs remain unknown rather than zero.
 
 Staff profit percentages are calculated before their own percentage
@@ -300,7 +303,8 @@ investor shares after staff costs. Fixed wages, explicit manual overrides and
 revenue-percentage contracts keep their respective rules.
 
 This supersedes the former report-only coupon/price-protection exception and
-owner-only monthly-expense treatment for participant entitlements. It does
+owner-only ordinary-monthly-expense treatment for participant entitlements;
+the owner's promotion exception remains in force. It does
 not rewrite original orders, invoices, payments or closed-period journals.
 Old projections are invalidated by the versioned financial fingerprint;
 recovery appends the difference in an open period. Already-paid amounts remain
@@ -316,3 +320,15 @@ Example: sale 100,000, goods cost 60,000, discounts 20,000 leaves a 20,000
 profit basis before any further costs. A 10% staff share is 2,000; a 35%
 investor share, after that staff expense, is 6,300. Further recorded costs
 reduce both bases through the same calculation.
+
+### 7.1 Promotion correction (2026-10-23)
+
+The owner explicitly confirmed that the «الترويج» section is paid by the
+store, not employees or investors. It never reduces wages, investor profit
+or investor principal, even if it exceeds the store's profit for the month.
+The v1 fingerprint shape is preserved with an empty promotion slot: affected
+old projections differ and the automatic minute recovery posts an offset to
+restore the correct entitlement. Unaffected orders remain payable. Original
+payments and negative adjustments remain as history; a matching positive
+correction restores the balance once, without duplicating it on replay.
+Wage preview calculation version 6 invalidates pre-correction previews.

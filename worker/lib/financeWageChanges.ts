@@ -47,7 +47,7 @@ async function changeContext(db:D1Database,ruleId:string,input:WageChangeInput,a
 
 // Completed and interrupted previews from an older calculation must be
 // reviewed again after a deploy, even when their source rows did not change.
-const PREVIEW_CALCULATION_VERSION=5;
+const PREVIEW_CALCULATION_VERSION=6;
 type PreviewDetail={order_id:string;earning_day:string;affected:boolean;units:number;previous_iqd:number;corrected_iqd:number|null;delta_iqd:number;manual_overrides:number;pending_costs:number;investor_delta_iqd:number|null;owner_delta_iqd:number|null};
 type PreviewWork={calculation_version:number;projected:ParticipantSource[];detail:PreviewDetail[];affectedCostIds:string[];affectedInvestorIds:string[];pendingTargets:Record<string,number|null>;previous:number;corrected:number;knownCorrected:number;delta:number;units:number;unknown:number;manual:number;investorDelta:number;ownerDelta:number;profitUnknown:number;investorUnknown:number;matched:number;reviewed:number};
 type PreviewPage={cursor:string;work?:PreviewWork};
@@ -146,7 +146,7 @@ export async function previewWageChange(db:D1Database,ruleId:string,input:WageCh
     before_balance:existingBalance,after_balance:expectedBalance,pending_costs:unknown,manual_overrides:manual,
     investor_delta_iqd:investorUnknown?null:investorDelta,owner_delta_iqd:profitUnknown?null:ownerDelta,
     profit_review_orders:profitUnknown,withdrawals,orders:detail,
-    profit_basis:'net_after_deductions_v1',recorded_at:context.now};
+    profit_basis:'net_excluding_store_promotion_v2',recorded_at:context.now};
   if(await clock(db)!==beforeClock)throw conflict('تغيرت بيانات الطلبات أثناء المعاينة؛ أعد المعاينة','WAGE_PREVIEW_STALE');
   const token=await sha256Hex(JSON.stringify({calculation_version:PREVIEW_CALCULATION_VERSION,clock:beforeClock,rule:context.rule,reason:context.reason,from,until,actor}));
   return {context,clock:beforeClock,preview:{...preview,preview_token:token},page:{cursor:scanned.at(-1)?.id??page?.cursor??'',complete:!page||orders.length<=6,scanned:scanned.length},work:{calculation_version:PREVIEW_CALCULATION_VERSION,projected,detail,affectedCostIds,affectedInvestorIds,pendingTargets,previous,corrected,knownCorrected,delta,units,unknown,manual,investorDelta,ownerDelta,profitUnknown,investorUnknown,matched,reviewed}};
