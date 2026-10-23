@@ -1,3 +1,4 @@
+import AddressSearch from './AddressSearch';
 /**
  * ONE ADDRESS FORM, FOR EVERY PLACE AN ADDRESS IS WRITTEN.
  *
@@ -42,6 +43,7 @@ import { useLanguage } from '../../LanguageContext';
 import { GOVERNORATES } from '../../lib/governorates';
 
 export interface AddressFormProps {
+  savedAddresses?: ApiAddress[];
   /** The row being edited, or null/undefined to create a new one. */
   initial?: ApiAddress | null;
   /** The saved row's id. The caller selects it — that is the whole point. */
@@ -73,6 +75,7 @@ function forDisplay(stored: string): string {
 
 export default function AddressForm({
   initial,
+  savedAddresses = [],
   onSaved,
   onCancel,
   defaultWhenFirst = false,
@@ -202,6 +205,17 @@ export default function AddressForm({
 
   return (
     <div className={gap}>
+      <AddressSearch addresses={savedAddresses} onPick={(choice) => {
+        setGovernorate(choice.governorate || '');
+        if (choice.saved) {
+          const saved = choice.saved;
+          setArea(saved.area || ''); setAddress(saved.address || ''); setLandmark(saved.landmark || '');
+          if (!name.trim()) setName(saved.name || '');
+          if (!phone.trim()) setPhone(forDisplay(saved.phone || ''));
+        }
+        setFieldErrors({});
+        refs.address.current?.focus({ preventScroll: true });
+      }} />
       <div>
         <label htmlFor="addr-name" className={labelCls}>
           {loc('اسم المستلم', 'Recipient’s name', 'ناوی وەرگر')}

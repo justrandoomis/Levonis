@@ -21,6 +21,7 @@ import { coreAllRoutes, coreMounts, rootMountPaths } from './_harness';
 const EXPECTED_OWNER: Record<string, string> = {
   '/api/auth': 'IDENTITY',
   '/api/products': 'CATALOG',
+  '/api/search': 'CATALOG',
   '/api/compare': 'CATALOG',
   '/api/catalog': 'CATALOG',
   '/api/printer-finder': 'CATALOG',

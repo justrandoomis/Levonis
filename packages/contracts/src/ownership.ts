@@ -140,6 +140,9 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // Its identifier lane (0206): every code a product is keyed by, derived
     // from the same rows and written in the same batch as its tokens.
     'search_identifiers',
+    // Daily product selections from catalogue search (0212), deduplicated by
+    // daily visitor hash and retained for seven days to derive public ranks.
+    'search_selection_visitors',
     // A bundle and a mystery offer ARE `products` rows (docs/BUNDLES_MYSTERY.md §1.2);
     // their composition is catalogue structure, beside options and colours.
     'bundle_config', 'bundle_components', 'bundle_component_choices',

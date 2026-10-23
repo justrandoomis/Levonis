@@ -1,3 +1,4 @@
+import MotionCollection from '../components/motion/MotionCollection';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
@@ -274,6 +275,7 @@ export default function Products() {
             className="mb-3"
           />
         )}
+        <MotionCollection version={ordered.items.map((p) => p.id).join(',')}>
         {loading && products.length === 0 ? (
           <ProductGridSkeleton count={8} density="compact" className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5" />
         ) : error != null ? (
@@ -317,7 +319,7 @@ export default function Products() {
                     <span className="h-px flex-1 bg-border-subtle" />
                   </div>
                 )}
-                <ProductCard p={p} density="compact" compareToggle {...gridImageLoading(i, FIRST_SCREEN_CARDS)} href={resultHref(cardHref(p), p, extras)} />
+                <div className="flex" data-motion-key={p.id}><ProductCard p={p} density="compact" compareToggle {...gridImageLoading(i, FIRST_SCREEN_CARDS)} href={resultHref(cardHref(p), p, extras)} /></div>
               </React.Fragment>
             ))}
           </div>
@@ -337,6 +339,7 @@ export default function Products() {
           )}
           </div>
         )}
+        </MotionCollection>
       </div>
     </div>
   );

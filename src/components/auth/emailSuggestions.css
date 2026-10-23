@@ -1,0 +1,13 @@
+/* Lucian UX/UI Prompt #264 · MIT License (c) 2026 Seokwoooo */
+.u264 { --ux-surface-2: var(--color-surface-selected); --ux-accent: var(--color-accent); --ux-ink: var(--color-text-primary); }
+.u264 .u264-dms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.u264 .u264-dm { min-height: 44px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--ux-ink); background: var(--ux-surface-2); animation: u264-in .35s cubic-bezier(.3,1.5,.5,1) backwards; }
+.u264 .u264-fx { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; min-height: 44px; text-align: start; margin-top: 4px; border-radius: 10px; padding: 6px 10px; background: var(--ux-surface-2); color: var(--ux-ink); font-size: 12px; animation: u264-fix .35s cubic-bezier(.3,1.4,.5,1); }
+.u264 .u264-fx bdi { color: var(--ux-accent); overflow-wrap: anywhere; }
+.u264 .u264-ok { display: flex; gap: 5px; align-items: center; font-size: 12px; color: var(--color-text-secondary); min-height: 28px; }
+.u264 button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+@keyframes u264-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .u264 .u264-dm, .u264 .u264-fx { animation: none; } }
+
+.u264 .u264-fx mark { background: transparent; color: var(--ux-accent); text-decoration: underline; text-underline-offset: 3px; }
+@keyframes u264-fix { from { transform: translateY(-8px) scaleY(.6); opacity: 0; } to { transform: none; opacity: 1; } }

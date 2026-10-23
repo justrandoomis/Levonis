@@ -556,6 +556,7 @@ export default function StoreCheckout() {
                 <Loader2 className="w-4 h-4 text-gold animate-spin" aria-hidden="true" />
               ) : addingAddress || editing ? (
                 <AddressForm
+                  savedAddresses={addresses ?? []}
                   dense
                   defaultWhenFirst
                   initial={editing}

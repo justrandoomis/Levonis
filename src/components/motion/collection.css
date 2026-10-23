@@ -1,0 +1,7 @@
+/* Lucian UX/UI Prompts #292, #308, #317 · MIT License (c) 2026 Seokwoooo */
+.u292 { --ux-surface: var(--color-surface); --ux-ink: var(--color-text-primary); --ux-accent: var(--color-accent); }
+.u292 [data-motion-key] { position: relative; min-width: 0; }
+.u308 [data-motion-photo] { transform-origin: 0 0; }
+.u292-count { display: inline-block; animation: u292-count-in .35s cubic-bezier(.3,1.25,.4,1); }
+@keyframes u292-count-in { from { transform: translateY(70%); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .u292-count { animation: none; } }

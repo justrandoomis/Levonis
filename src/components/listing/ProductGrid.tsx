@@ -29,7 +29,7 @@ import '../../styles/catalog.css';
 /** Two rows of two: the cards a phone shows above the fold of a listing. */
 const FIRST_SCREEN_CARDS = 4;
 
-export default function ProductGrid({ products, divider, withColumn }: { products: ApiProduct[]; divider: boolean; withColumn: boolean }) {
+export default function ProductGrid({ products, divider, withColumn, view = 'grid' }: { products: ApiProduct[]; divider: boolean; withColumn: boolean; view?: 'grid' | 'list' }) {
   const { loc } = useLanguage();
   const ordered = divider ? availableFirst(products) : { items: products, splitAt: -1, unpricedAt: -1 };
   const laterLabel = laterIsPreorder(ordered)
@@ -38,8 +38,9 @@ export default function ProductGrid({ products, divider, withColumn }: { product
   // OWNER: Sorani to be written by hand (the two divider labels above — the Products page's own wording).
   return (
     <ul
-      data-product-grid
-      className={`grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 ${withColumn ? 'lg:grid-cols-3 xl:grid-cols-4' : 'lg:grid-cols-4 xl:grid-cols-5'} lg:gap-4`}
+      data-product-grid={view === 'grid' ? true : undefined}
+      data-product-list={view === 'list' ? true : undefined}
+      className={view === 'list' ? 'grid grid-cols-1 gap-2 lg:grid-cols-2 lg:gap-3' : `grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 ${withColumn ? 'lg:grid-cols-3 xl:grid-cols-4' : 'lg:grid-cols-4 xl:grid-cols-5'} lg:gap-4`}
     >
       {ordered.items.map((p, i) => (
         <React.Fragment key={p.id}>
@@ -49,8 +50,8 @@ export default function ProductGrid({ products, divider, withColumn }: { product
           {/* `lv-cv` (content-visibility) goes on the CARD, not this <li>:
               paint containment clips a descendant's ink at the container's
               edge, which would cut every card's clay shadow from the 9th on. */}
-          <li className="flex">
-            <ProductCard p={p} density="compact" compareToggle {...gridImageLoading(i, FIRST_SCREEN_CARDS)} className={i >= 8 ? 'lv-cv' : undefined} />
+          <li className="flex" data-motion-key={p.id}>
+            <ProductCard layout={view} p={p} density="compact" compareToggle {...gridImageLoading(i, FIRST_SCREEN_CARDS)} className={i >= 8 ? (view === 'list' ? 'lv-cv-row' : 'lv-cv') : undefined} />
           </li>
         </React.Fragment>
       ))}

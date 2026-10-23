@@ -149,6 +149,7 @@ function buildFullProduct(db: DatabaseSync, id: string, slug: string, extraKey?:
   });
 
   insert(db, 'product_option_groups', { id: `${id}-g1`, product_id: id, name_en: 'Model' });
+  insert(db, 'search_selection_visitors', { day: 1, product_id: id, visitor_hash: `daily-${id}` });
   for (const n of [1, 2]) {
     insert(db, 'product_option_values', {
       id: `${id}-o${n}`,
@@ -271,6 +272,7 @@ test('1. a full product leaves zero owned rows, and its order history survives',
     ['product_catalogs', 'product_id'],
     ['product_facets', 'product_id'],
     ['product_translations', 'product_id'],
+    ['search_selection_visitors', 'product_id'],
     ['inventory_ledger', 'product_id'],
     ['procurement_selection_cost_defaults', 'product_id'],
     ['pricing_direct_purchase', 'product_id'],
@@ -294,6 +296,7 @@ test('1. a full product leaves zero owned rows, and its order history survives',
   assert.equal(item.name_snapshot, 'Product p-full', 'the snapshot is what a receipt reads');
   assert.equal(result.rows_unlinked_by_table.order_items, 1);
   assert.equal(result.rows_deleted_by_table.procurement_selection_cost_defaults, 1);
+  assert.equal(result.rows_deleted_by_table.search_selection_visitors, 1);
   assert.ok(result.rows_deleted_by_table.pricing_engine >= 1, 'private input deletion is counted under the neutral engine name');
   assert.equal('pricing_direct_purchase' in result.rows_deleted_by_table, false);
   assert.equal('ops_guards' in result.rows_deleted_by_table, false, 'internal tokens are not reported as deleted product data');

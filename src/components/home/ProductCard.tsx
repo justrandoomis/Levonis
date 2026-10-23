@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { ProductTransitionLink as Link } from '../motion/ProductTransition';
 import { type ApiProduct } from '../../lib/api';
 import SafeImage from '../ui/SafeImage';
 import CardPrice from '../CardPrice';
@@ -137,8 +137,10 @@ export default function ProductCard({
   imageSizes,
   className,
   href,
+  layout = 'grid',
 }: {
   p: ApiProduct;
+  layout?: 'grid' | 'list';
   /** Where the card opens, when not its own page: a search result carries its matched selection (`?v=`). */
   href?: string;
   /** An explicit width utility; overrides `width`. */
@@ -162,6 +164,7 @@ export default function ProductCard({
   if (density === 'compact') {
     return (
       <CompactCard
+        layout={layout}
         p={p as CardProduct}
         widthClass={`${widthClass ?? (width === 'rail' ? 'w-[148px] shrink-0' : 'w-full')}${className ? ` ${className}` : ''}`}
         compareToggle={compareToggle}
@@ -197,8 +200,10 @@ function CompactCard({
   deferImage,
   imageSizes,
   href,
+  layout = 'grid',
 }: {
   p: CardProduct;
+  layout?: 'grid' | 'list';
   widthClass: string;
   compareToggle: boolean;
   eager: boolean;
@@ -207,6 +212,7 @@ function CompactCard({
   imageSizes: string;
   href?: string;
 }) {
+  const list = layout === 'list';
   const { lang } = useLanguage();
   const { theme } = useTheme();
   // The main image for the theme on screen (0138); the compare tray keeps the
@@ -232,9 +238,10 @@ function CompactCard({
   return (
     <div
       data-product-card="compact"
-      className={`${widthClass} group relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-border-subtle bg-surface shadow-sm transition-colors hover:bg-surface-raised has-[a:active]:shadow-press has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus`}
+      data-product-id={p.id}
+      className={`${widthClass} group relative flex min-w-0 ${list ? 'flex-row p-2.5 gap-3' : 'flex-col'} overflow-hidden rounded-xl border border-border-subtle bg-surface shadow-sm transition-colors hover:bg-surface-raised has-[a:active]:shadow-press has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus`}
     >
-      <div className={`relative mx-1 mt-1 aspect-[6/5] overflow-hidden rounded-lg ${lightShown ? 'bg-surface-selected' : 'bg-charcoal'}`}>
+      <div data-motion-photo className={`relative ${list ? 'size-24 shrink-0' : 'mx-1 mt-1 aspect-[6/5]'} overflow-hidden rounded-lg ${lightShown ? 'bg-surface-selected' : 'bg-charcoal'}`}>
         <SafeImage
           src={image}
           alt=""
@@ -242,7 +249,7 @@ function CompactCard({
           eager={eager}
           fetchPriority={fetchPriority}
           defer={deferImage}
-          sizes={imageSizes}
+          sizes={list ? '96px' : imageSizes}
           className="h-full w-full"
           bgClassName={lightShown ? 'bg-surface-selected' : 'bg-charcoal'}
           fallbackClassName="text-snow/35"
@@ -268,6 +275,7 @@ function CompactCard({
 
       <Link
         to={href ?? cardHref(p)}
+        data-motion-copy
         className="no-press flex min-w-0 flex-1 flex-col px-2.5 pb-2.5 pt-[9px] focus-visible:outline-none after:absolute after:inset-0 after:z-[1] after:content-['']"
       >
         <h3
@@ -297,7 +305,7 @@ function CompactCard({
             </>
           ) : null}
         </p>
-        <div className="mt-1.5">
+        <div className="mt-1.5" data-motion-price>
           <CardPrice p={p} density="compact" />
         </div>
         <AvailabilityLine product={p} className="mt-auto pt-[7px]" />
@@ -332,9 +340,10 @@ function RegularCard({ p, widthClass, href }: { p: ApiProduct; widthClass: strin
   return (
     <Link
       to={href ?? cardHref(p)}
+      data-product-id={p.id}
       className={`${widthClass} relative shrink-0 overflow-hidden flex flex-col group bg-surface rounded-xl border border-border-subtle shadow-sm no-press hover:bg-surface-raised active:shadow-press transition-colors min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
     >
-      <div className={`relative aspect-square overflow-hidden ${lightShown ? 'bg-surface-selected' : 'bg-charcoal'}`}>
+      <div data-motion-photo className={`relative aspect-square overflow-hidden ${lightShown ? 'bg-surface-selected' : 'bg-charcoal'}`}>
         <SafeImage
           src={firstImage}
           alt={name}

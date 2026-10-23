@@ -417,8 +417,10 @@ function liTags(src: string): string[] {
 test('the product card is clay a scrolling list can afford, and content-visibility never clips its cast', () => {
   const card = read('src/components/home/ProductCard.tsx');
   // The two roots: the compact card (a div under a stretched link) and the regular one (the link itself).
-  const compact = /data-product-card="compact"\s*className=\{`([^`]*)`\}/.exec(card)?.[1];
-  const regular = /<Link\s+to=\{href \?\? cardHref\(p\)\}\s+className=\{`(\$\{widthClass\} relative shrink-0[^`]*)`\}/.exec(card)?.[1];
+  // Identity/data attributes used by transitions may sit before the class;
+  // keep checking the same root's clay styling regardless of their order.
+  const compact = /data-product-card="compact"[^>]*?\s+className=\{`([^`]*)`\}/.exec(card)?.[1];
+  const regular = /<Link\s+to=\{href \?\? cardHref\(p\)\}[^>]*?\s+className=\{`(\$\{widthClass\} relative shrink-0[^`]*)`\}/.exec(card)?.[1];
   assert.ok(compact, 'the compact card root is not where it was');
   assert.ok(regular, 'the regular card root is not where it was');
   for (const [name, root] of [['compact', compact!], ['regular', regular!]] as const) {
@@ -443,7 +445,7 @@ test('the product card is clay a scrolling list can afford, and content-visibili
   }
   assert.deepEqual(offenders, [], 'an unpadded <li> carries content-visibility and clips its card');
   // And the listing grid still skips the far cards (the containment moved, it did not go).
-  assert.match(read('src/components/listing/ProductGrid.tsx'), /<ProductCard\b[^>]*className=\{i >= 8 \? 'lv-cv' : undefined\}/);
+  assert.match(read('src/components/listing/ProductGrid.tsx'), /<ProductCard\b[^>]*className=\{i >= 8 \? \(view === 'list' \? 'lv-cv-row' : 'lv-cv'\) : undefined\}/);
   assert.match(read('src/components/listing/ProductList.tsx'), /data-product-row\s*className=\{`[^`]*\$\{i >= 10 \? 'lv-cv-row' : ''\}`\}/);
   assert.match(read('src/styles/catalog.css'), /\.lv-cv \{\s*content-visibility: auto;/);
 });
