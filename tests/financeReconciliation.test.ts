@@ -63,7 +63,7 @@ test('pending profit cost follows reassignment immediately and keeps that employ
   assert.equal(cost.staff_id, 'staff_hussein');
   assert.equal(cost.snapshot_staff, 'staff_hussein');
   assert.equal(cost.state, 'due');
-  assert.equal(cost.amount_iqd, 3000);
+  assert.equal(cost.amount_iqd, 3500, '10% of net profit including the recorded 5000 shipping income');
   assert.equal((await post(app, `/f/costs/${cost.id}/approve`, {})).status, 200);
   assert.equal((await post(app, '/f/staff/staff_hussein/payments', { operation_id: crypto.randomUUID(), amount_iqd: 3000 })).status, 200);
 });
@@ -282,7 +282,7 @@ test('concurrent assignment prevents stale FIFO completion from charging the for
   assert.equal(row(s.raw, 'SELECT state FROM finance_order_costs')?.state, 'pending_cost');
   await runOrderFinancialEffects(s.env, 'order', 'delivered');
   assert.deepEqual(row(s.raw, 'SELECT staff_id,state,amount_iqd FROM finance_order_costs'), {
-    staff_id: 'staff_hussein', state: 'due', amount_iqd: 3000,
+    staff_id: 'staff_hussein', state: 'due', amount_iqd: 3500,
   });
 });
 
@@ -322,6 +322,6 @@ test('assignment cannot change after a competing request fixes the employee paya
   assert.equal(response.status, 409);
   assert.equal(row(s.raw, 'SELECT staff_id FROM finance_task_assignments')?.staff_id, 'staff_sajjad');
   assert.deepEqual(row(s.raw, 'SELECT staff_id,state,amount_iqd FROM finance_order_costs'), {
-    staff_id: 'staff_sajjad', state: 'due', amount_iqd: 3000,
+    staff_id: 'staff_sajjad', state: 'due', amount_iqd: 3500,
   });
 });

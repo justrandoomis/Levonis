@@ -39,6 +39,17 @@ const BRIEF: PricingSummary = {
   store_price_iqd: 900_000,
 };
 
+test('a new or unpriced stock line can open its profit and price editor before a summary exists', () => {
+  for (const summary of [null, { ...BRIEF, state: 'blocked' as const, store_price_iqd: null, issue_codes: ['TARGET_PROFIT_MISSING'] }]) {
+    const html = render(createElement(PricingSummaryBar, { summary, label: 'New cable', onEdit: () => {} }));
+    assert.match(html, /<button[^>]*data-procurement-price-edit/);
+    assert.ok(html.includes('تعديل الربح وسعر البيع'));
+    assert.ok(html.includes('New cable'));
+  }
+  const readOnly = render(createElement(PricingSummaryBar, { summary: BRIEF, label: 'x' }));
+  assert.ok(!readOnly.includes('data-procurement-price-edit'));
+});
+
 test('the card (the clean start): cost $500.00 / +$120.00 / the store’s V2 price 900,000 د.ع, in that order, each figure an LTR island', () => {
   const html = render(createElement(PricingSummaryBar, { summary: BRIEF, label: 'AMS HT' }));
   const order = ['$500.00', '+$120.00', '900,000 د.ع'].map((f) => html.indexOf(f));

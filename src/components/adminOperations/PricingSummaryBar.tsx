@@ -25,8 +25,10 @@ const CELL = 'rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-1)] px-3 py-2';
 const usd = (cents: number | null | undefined) => (cents == null ? '—' : formatUsdCents(cents));
 const Fig = ({ children }: { children: React.ReactNode }) => <bdi dir="ltr" className="whitespace-nowrap tabular-nums">{children}</bdi>;
 
-export default function PricingSummaryBar({ summary, label, busy = false, notInstalled = false, readOnlyLabel, directFirst = false }: {
+export default function PricingSummaryBar({ summary, label, busy = false, notInstalled = false, readOnlyLabel, directFirst = false, onEdit }: {
   summary: PricingSummary | null | undefined;
+  /** Open the canonical V2 pricing editor without leaving the purchase. */
+  onEdit?: () => void;
   /** The line's name, for the bar's and the pill's accessible names. */
   label: string;
   busy?: boolean;
@@ -44,7 +46,7 @@ export default function PricingSummaryBar({ summary, label, busy = false, notIns
    */
   directFirst?: boolean;
 }) {
-  const { lang } = useLanguage();
+  const { lang, loc } = useLanguage();
   const s = procurementPricingStrings(lang);
   const [open, setOpen] = useState(false);
   const panel = useId();
@@ -71,6 +73,9 @@ export default function PricingSummaryBar({ summary, label, busy = false, notIns
 
   return (
     <section aria-label={s.barAria(label)} aria-busy={busy || undefined} className="mt-3 border-t border-[var(--ap-border)] pt-3" data-pricing-summary>
+      {onEdit && <button type="button" className="mb-3 min-h-11 rounded-[var(--ap-radius-md)] border border-[var(--ap-border)] px-3 py-2 text-sm font-semibold text-[var(--ap-text-1)]" onClick={onEdit} data-procurement-price-edit aria-label={`${loc('تعديل الربح وسعر البيع', 'Edit profit and selling price', 'دەستکاریکردنی قازانج و نرخی فرۆشتن')} · ${label}`}>
+        {loc('تعديل الربح وسعر البيع', 'Edit profit and selling price', 'دەستکاریکردنی قازانج و نرخی فرۆشتن')}
+      </button>}
       {readOnlyLabel && <p className="mb-1.5 text-[12px] font-semibold text-[var(--ap-text-3)]">{s.current}</p>}
       <dl className="grid grid-cols-2 gap-2 tabular-nums sm:grid-cols-3">
         <div className={CELL}>

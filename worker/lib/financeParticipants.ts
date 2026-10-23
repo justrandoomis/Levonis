@@ -3,8 +3,10 @@ import { hasUnknownRefund, isConfirmedOrderCost } from './financeLedger';
 import { reconcileEffectiveWages } from './financeWageCalculation';
 import { investorProjectionStaleSql } from './investorFinance';
 import { getOrderProfitBase } from './orderProfit';
-import { withMembershipFinancialFingerprintSql } from './orderMembership';
+import { participantNetFingerprintSql, participantNetProfit } from './participantProfit';
+import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { correctMembershipSale } from './membershipSaleCorrection';
+import { membershipDiscountAtLineSql } from './orderMembership';
 import { newId } from './crypto';
 import { badRequest, conflict, notFound } from './http';
 import { baghdadDay, fence, journalPlan, periodOpen } from './operations';
@@ -392,57 +394,78 @@ const wageBasisSql=`json_array(
 export function staffBasisFingerprintSql(orderSql:string,includeLate=true) {
   const simple=wageBasisSql.replace(/\?/g,orderSql);
   const legacy=includeLate?`json_array(${simple},(SELECT json_group_array(json_array(s.adjustment_id,s.allocation_id,s.unit_delta_iqd)) FROM lot_cost_adjustment_shares s JOIN order_item_inventory_allocations a ON a.id=s.allocation_id WHERE a.order_id=${orderSql}))`:simple;
-  return withMembershipFinancialFingerprintSql(legacy,orderSql);
+  return participantNetFingerprintSql(legacy,orderSql,true);
 }
-/** Percentage wages and material costs follow corrected recognised revenue/COGS. Explicit per-order
- * staff amounts remain the owner's override; fixed service fees stay fixed. */
+/** Staff profit shares follow net profit; material/revenue rules retain their
+ * contracted basis. Explicit per-order overrides and fixed fees stay fixed. */
 export async function reconcileStaffOrderCosts(db: D1Database, orderId: string, opts: {actor?:string;day?:string}={}) {
   if(!await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_cost_adjustments'").first())return {adjusted:0};
   const temporal=await reconcileEffectiveWages(db,orderId,opts);
+  // Fixed wages can change in the same employment/rule correction. Percentage
+  // wages must see those newly recorded costs before we certify the basis.
+  if(temporal.netCostsChanged)temporal.adjusted+=(await reconcileEffectiveWages(db,orderId,opts)).adjusted;
   const hasLate=await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lot_cost_adjustment_shares'").first();
   const basisSql=staffBasisFingerprintSql('?1',!!hasLate);
-  const beforeBasis=(await db.prepare(`SELECT ${basisSql} AS value`).bind(orderId).first<{value:string}>())!.value;
-  if(beforeBasis.startsWith('["membership-unit-v1",'))await correctMembershipSale(db,orderId,opts.day??baghdadDay());
+  const basis=(await db.prepare(`SELECT ${basisSql} AS value,
+    EXISTS(SELECT 1 FROM order_items mi WHERE mi.order_id=?1 AND mi.membership_discount_iqd>0
+      AND (${membershipDiscountAtLineSql('mi')})=0) AS membership_correction`).bind(orderId).first<{value:string;membership_correction:number}>())!;
+  const beforeBasis=basis.value;
+  if(basis.membership_correction)await correctMembershipSale(db,orderId,opts.day??baghdadDay());
 
   const costs=(await db.prepare(`SELECT c.*,${effectiveStaffCostSql()} AS effective_iqd,${staffPaidSql()} AS paid_iqd,
     ${heldSourceSql("'staff'",'c.id')} AS held_iqd,
     EXISTS(SELECT 1 FROM finance_cost_adjustments ca WHERE ca.cost_id=c.id AND ca.kind='manual') AS manual_override
     FROM finance_order_costs c WHERE c.order_id=? AND c.state IN ('due','approved','pending_cost') ORDER BY c.order_item_id,c.id`)
     .bind(orderId).all<{id:string;order_item_id:string|null;rule_id:string;state:string;snapshot:string;effective_iqd:number|null;paid_iqd:number;held_iqd:number;manual_override:number;category_id:string;staff_id:string|null;rule_name:string;group_key:string;milestone:string}>()).results??[];
-  if(!costs.length){
-    // An affected invoice without employees still needs one recovery pass for
-    // its native sale journal. Reuse the same financial-source checkpoint.
-    if(beforeBasis.startsWith('["membership-unit-v1",'))await db.batch([
+  if(!costs.some(cost=>!temporal.managed.has(cost.rule_id))){
+    // Timeline-managed wages are already current. Orders without employees
+    // also retain the same checkpoint for their native sale recovery.
+    await db.batch([
       ...fence(db,`${basisSql.replace(/\?1/g,'?2')}=?3`,[orderId,beforeBasis]),
       db.prepare('INSERT INTO finance_staff_basis(order_id,basis_fingerprint,updated_at) VALUES (?,?,?) ON CONFLICT(order_id) DO UPDATE SET basis_fingerprint=excluded.basis_fingerprint,updated_at=excluded.updated_at WHERE basis_fingerprint<>excluded.basis_fingerprint').bind(orderId,beforeBasis,new Date().toISOString()),
     ]);
     return {adjusted:temporal.adjusted};
   }
   const base=await getOrderProfitBase(db,orderId),day=opts.day??baghdadDay();
+  let netProfit=new Map<string,number|null>();
   const staffStarts=await employmentInstalled(db)?new Map(((await db.prepare('SELECT id,start_work_date FROM finance_staff').all<{id:string;start_work_date:string|null}>()).results??[]).map((s)=>[s.id,s])):new Map<string,{start_work_date:string|null}>();
   const frozen=await db.prepare('SELECT rules_json FROM finance_order_snapshots WHERE order_id=?').bind(orderId).first<{rules_json:string}>();
   const snapshot=frozen?JSON.parse(frozen.rules_json) as Array<{line_id:string;rules:Array<{id:string}>}>:[];
   const plans:Array<{cost:typeof costs[number];amount:number;base_iqd:number}>=[],caps=new Map<string,number>();
   for(const cost of costs.filter((c)=>c.manual_override))caps.set(cost.rule_id,(caps.get(cost.rule_id)??0)+(cost.effective_iqd??0));
-  for(const cost of costs) {
-    if(temporal.managed.has(cost.rule_id))continue;
-    if(cost.staff_id&&staffStarts.has(cost.staff_id)&&!staffDateEligible(staffStarts.get(cost.staff_id)!,base.order))continue;
-    let rule:{basis:string;amount:number;cap_iqd:number|null;requires_assignment?:number};
-    try{rule=JSON.parse(cost.snapshot).rule;}catch{continue;}
-    if(!rule || !['profit_percent','revenue_percent'].includes(rule.basis))continue;
-    const used=caps.get(cost.rule_id)??0;
-    if(cost.manual_override)continue;
-    const targets=base.lines.filter((l)=>cost.order_item_id?l.id===cost.order_item_id:snapshot.some((f)=>f.line_id===l.id&&f.rules.some((r)=>r.id===cost.rule_id)));
-    if(!targets.length || targets.some(hasUnknownRefund) || (rule.basis==='profit_percent' && targets.some((l)=>l.cogs_iqd===null || !isConfirmedOrderCost(l.cost_confidence))))continue;
-    if(cost.state==='pending_cost' && rule.requires_assignment) {
-      const task=await db.prepare('SELECT staff_id,completed_at FROM finance_task_assignments WHERE order_id=? AND group_key=?').bind(orderId,cost.group_key).first<{staff_id:string;completed_at:string|null}>();
-      if(!task || task.staff_id!==cost.staff_id || (cost.milestone==='prepared'&&!task.completed_at))continue;
+  // Resolve independent revenue/material costs before calculating the staff
+  // percentages that depend on them. Both phases commit under one source fence.
+  for(const profitPhase of [false,true]) {
+    if(profitPhase){
+      const projected={...base,costs:base.costs.map(cost=>{
+        const plan=plans.find(p=>p.cost.id===cost.id);
+        return plan?{...cost,state:'due',effective_amount_iqd:plan.amount}:cost;
+      })};
+      netProfit=await participantNetProfit(db,projected,true);
     }
-    const revenue=targets.reduce((v,l)=>v+l.retained_revenue_iqd,0),cogs=targets.reduce((v,l)=>v+(l.cogs_iqd??0),0);
-    let amount=Number(BigInt(Math.max(0,rule.basis==='profit_percent'?revenue-cogs:revenue))*BigInt(rule.amount)/10000n);
-    if(rule.cap_iqd!==null)amount=Math.min(amount,Math.max(0,rule.cap_iqd-used));
-    caps.set(cost.rule_id,used+amount);
-    if(amount!==cost.effective_iqd)plans.push({cost,amount,base_iqd:Math.max(0,rule.basis==='profit_percent'?revenue-cogs:revenue)});
+    for(const cost of costs) {
+      if(temporal.managed.has(cost.rule_id))continue;
+      if(cost.staff_id&&staffStarts.has(cost.staff_id)&&!staffDateEligible(staffStarts.get(cost.staff_id)!,base.order))continue;
+      let rule:{basis:string;amount:number;cap_iqd:number|null;requires_assignment?:number};
+      try{rule=JSON.parse(cost.snapshot).rule;}catch{continue;}
+      if(!rule || !['profit_percent','revenue_percent'].includes(rule.basis))continue;
+      if(Boolean(cost.staff_id&&rule.basis==='profit_percent')!==profitPhase)continue;
+      const used=caps.get(cost.rule_id)??0;
+      if(cost.manual_override)continue;
+      const targets=base.lines.filter((l)=>cost.order_item_id?l.id===cost.order_item_id:snapshot.some((f)=>f.line_id===l.id&&f.rules.some((r)=>r.id===cost.rule_id)));
+      if(!targets.length || targets.some(hasUnknownRefund) || (rule.basis==='profit_percent' && targets.some((l)=>l.cogs_iqd===null || !isConfirmedOrderCost(l.cost_confidence))))continue;
+      if(cost.state==='pending_cost' && rule.requires_assignment) {
+        const task=await db.prepare('SELECT staff_id,completed_at FROM finance_task_assignments WHERE order_id=? AND group_key=?').bind(orderId,cost.group_key).first<{staff_id:string;completed_at:string|null}>();
+        if(!task || task.staff_id!==cost.staff_id || (cost.milestone==='prepared'&&!task.completed_at))continue;
+      }
+      const revenue=targets.reduce((v,l)=>v+l.retained_revenue_iqd,0),cogs=targets.reduce((v,l)=>v+(l.cogs_iqd??0),0);
+      if(cost.staff_id&&rule.basis==='profit_percent'&&targets.some(line=>netProfit.get(line.id)==null))throw conflict(serverMessage('NET_PROFIT_PENDING'),'NET_PROFIT_PENDING');
+      const targetBase=Math.max(0,rule.basis==='profit_percent'?(cost.staff_id?targets.reduce((sum,line)=>sum+netProfit.get(line.id)!,0):revenue-cogs):revenue);
+      let amount=Number(BigInt(targetBase)*BigInt(rule.amount)/10000n);
+      if(rule.cap_iqd!==null)amount=Math.min(amount,Math.max(0,rule.cap_iqd-used));
+      caps.set(cost.rule_id,used+amount);
+      if(amount!==cost.effective_iqd)plans.push({cost,amount,base_iqd:targetBase});
+    }
   }
   if(plans.length)await periodOpen(db,day);
   const actor=opts.actor??null;
@@ -465,6 +488,9 @@ export async function reconcileStaffOrderCosts(db: D1Database, orderId: string, 
       ...journalPlan(db,{key:`staff-adjustment:${id}`,day,title:'تحديث أجر نسبة بعد تصحيح الطلب',source:'finance_cost_adjustment',sourceId:id,actor},delta>0?[{account:'5100',debit:delta},{account:liability,credit:delta}]:[{account:liability,debit:-delta},{account:'5100',credit:-delta}]).statements,
       ...(await auditStatements(db,actor,'finance.staff_percentage_recalculated',cost.id,{before_iqd:cost.effective_iqd,after_iqd:amount,order_id:orderId})).statements);
   }
-  statements.push(db.prepare('INSERT INTO finance_staff_basis(order_id,basis_fingerprint,updated_at) VALUES (?,?,?) ON CONFLICT(order_id) DO UPDATE SET basis_fingerprint=excluded.basis_fingerprint,updated_at=excluded.updated_at WHERE basis_fingerprint<>excluded.basis_fingerprint').bind(orderId,beforeBasis,new Date().toISOString()));
+  // Independent costs may have changed in this same batch. Certify the
+  // resulting source, after those writes, while the initial fence still
+  // rejects any concurrent edit made since calculation.
+  statements.push(db.prepare(`INSERT INTO finance_staff_basis(order_id,basis_fingerprint,updated_at) VALUES (?1,(${basisSql}),?2) ON CONFLICT(order_id) DO UPDATE SET basis_fingerprint=excluded.basis_fingerprint,updated_at=excluded.updated_at WHERE basis_fingerprint<>excluded.basis_fingerprint`).bind(orderId,new Date().toISOString()));
   await commitParticipantStatements(db,statements);return {adjusted:plans.length+temporal.adjusted};
 }

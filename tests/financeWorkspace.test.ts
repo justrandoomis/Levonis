@@ -116,7 +116,7 @@ test('order-wide reduction never creates negative costs on a zero-cost line',asy
   const b=await getOrderProfitBase(db,'order'),extra={...b.lines[0],id:'extra',manual_direct_iqd:0};b.lines[0].manual_direct_iqd=100;b.lines.push(extra);
   const p=planProfitAdjustment(b,null,'manual_direct_iqd',0);assert.deepEqual(p.allocations.map((a)=>a.delta_iqd),[-100,0]);
 });
-test('100 USD monthly owner promotion uses every sold unit, preserves entitlement basis and excludes duplicate overhead',async()=>{
+test('100 USD monthly promotion uses every sold unit, preserves the invoice basis and excludes duplicate overhead',async()=>{
   const {raw,db,add,app}=setup();add('other',1);
   const operation=crypto.randomUUID(),created=await post(app,'/f/promotions',{month:month(),amount:100,currency:'USD',exchange_rate:1400,operation_id:operation});assert.equal(created.status,200,JSON.stringify(await json(created)));
   assert.equal((await post(app,'/f/promotions',{month:month(),amount:100,currency:'USD',exchange_rate:1400,operation_id:operation})).status,200);

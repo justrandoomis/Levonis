@@ -5,6 +5,7 @@ import { describeOrderProfit, type ProfitCostReview } from './orderProfitReview'
 import type { OrderCostProjection, ProjectedOrderFinance } from './orderCostProjection';
 import { COST_BASIS, isConfirmedOrderCost, normalizeCostBasis } from './financeLedger';
 import { membershipDiscountAtLine } from './orderMembership';
+import { participantNetFingerprintSql } from './participantProfit';
 
 type Row = Record<string, unknown>;
 const n = (v: unknown) => Number(v ?? 0);
@@ -171,8 +172,8 @@ export function planProfitAdjustment(base: OrderProfitBase, lineId: string | nul
   return { previous, delta, allocations };
 }
 
-/** Batched read-only basis. No investor or monthly-marketing table is read
- * here, so employee/investor entitlement cannot inherit an owner-only cost. */
+/** Batched read-only accounting basis. Participant calculations add their
+ * shared net-profit deductions without rewriting these invoice sources. */
 export async function getOrderProfitBases(db: D1Database, orderIds: string[], options: { skipAdjustments?: boolean; costOverrides?:Record<string,Row[]> } = {}): Promise<OrderProfitBase[]> {
   if (!orderIds.length) return [];
   const ids = JSON.stringify([...new Set(orderIds)]);
@@ -291,7 +292,7 @@ export async function getOrderProfitBase(db: D1Database, orderId: string): Promi
 export async function profitSourceFingerprint(db:D1Database,orderId:string) {
   const present=(await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('finance_cost_adjustments','lot_cost_adjustment_shares')").all<{name:string}>()).results??[];
   const has=new Set(present.map((r)=>r.name));
-  const sql=`json_array(
+  const legacy=`json_array(
     (SELECT json_array(status,updated_at,price_adjustment_iqd,shipping_iqd,cod_tax_iqd,due_on_delivery_iqd,gini_paid_iqd,points_discount_iqd,benefit_snapshot) FROM orders WHERE id=?1),
     (SELECT json_group_array(json_array(id,product_id,qty,line_total_iqd,component_alloc_iqd,coupon_discount_iqd,membership_discount_iqd,membership_rule_id,cost_iqd,cost_basis)) FROM (SELECT * FROM order_items WHERE order_id=?1 ORDER BY id)),
     (SELECT json_group_array(json_array(id,qty,cogs_iqd,released_at)) FROM (SELECT * FROM order_item_inventory_allocations WHERE order_id=?1 ORDER BY id)),
@@ -303,6 +304,7 @@ export async function profitSourceFingerprint(db:D1Database,orderId:string) {
     (SELECT json_group_array(json_array(e.id,e.state)) FROM accounting_entries e WHERE (e.source_type='order' AND e.source_id=?1) OR (e.source_type='return' AND e.source_id IN (SELECT id FROM return_cases WHERE order_id=?1))),
     ${has.has('finance_cost_adjustments')?"(SELECT json_group_array(json_array(a.id,a.delta_iqd)) FROM finance_cost_adjustments a JOIN finance_order_costs c ON c.id=a.cost_id WHERE c.order_id=?1)":'NULL'},
     ${has.has('lot_cost_adjustment_shares')?"(SELECT json_group_array(json_array(s.adjustment_id,s.allocation_id,s.unit_delta_iqd,s.recognized_iqd)) FROM lot_cost_adjustment_shares s JOIN order_item_inventory_allocations a ON a.id=s.allocation_id WHERE a.order_id=?1)":'NULL'})`;
+  const sql=has.has('finance_cost_adjustments')?participantNetFingerprintSql(legacy,'?1'):legacy;
   const value=(await db.prepare(`SELECT ${sql} value`).bind(orderId).first<{value:string}>())!.value;
   return {sql,value};
 }

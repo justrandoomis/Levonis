@@ -76,6 +76,29 @@ test('a changed financial source invalidates preview; only the owner can alter w
   assert.equal((await patch(x.app('finance','full'),`/people/staff/${x.staffId}`,{start_work_date:'2026-09-01'})).status,403);
 });
 
+test('a credited protection claim invalidates a stored wage preview and the refreshed preview uses net profit',async()=>{
+  const x=await setup({basis:'profit_percent',amount:1000});await x.order('net',1,'2026-09-20T12:00:00Z');await x.drain();
+  const p=await x.preview(2000,'2026-09-15',{basis:'profit_percent'});
+  assert.equal(p.value.corrected_iqd,6000);
+  x.raw.exec(`INSERT INTO price_protection_claims(id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,credited_iqd,state)
+    VALUES ('net-credit','buyer','net','line:net',50000,45000,1,5000,'credited')`);
+  const stale=await post(x.boss,`/people/rules/${x.ruleId}/apply`,{...p.body,operation_id:'net-preview-credit',preview_token:p.value.preview_token});
+  assert.equal(stale.status,409);assert.equal((await json(stale)).code,'WAGE_PREVIEW_STALE');
+  const fresh=await x.preview(2000,'2026-09-15',{basis:'profit_percent'});
+  assert.equal(fresh.value.corrected_iqd,5000);
+});
+
+test('changing fixed wages recalculates a simultaneous profit share from the new costs in preview and posting',async()=>{
+  const x=await setup();
+  const added=await post(x.boss,'/operations/rules',{staff_id:x.staffId,basis:'profit_percent',amount:1000,group_key:'net-profit-share',milestone:'delivered'});
+  assert.equal(added.status,200,JSON.stringify(await json(added)));
+  await x.order('net',2,'2026-09-20T12:00:00Z');await x.drain();
+  assert.equal((await x.earnings()).summary.staff_iqd,24000,'20000 fixed plus 10% of the remaining 40000 profit');
+  const result=await x.apply(5000,'2026-09-15');
+  assert.equal(result.preview.corrected_iqd,15000,'10000 fixed plus 10% of the remaining 50000 profit');
+  assert.equal((await x.earnings()).summary.staff_iqd,15000);
+});
+
 test('partly paid withdrawal requires explicit release; the paid portion and its evidence survive',async()=>{
   const x=await setup();await x.order('a',10,'2026-09-20T12:00:00Z');await x.drain();const withdrawal=await x.pay(100000,40000);
   const p=await x.preview(5000,'2026-09-15');assert.equal(p.value.withdrawals[0].paid_iqd,40000);

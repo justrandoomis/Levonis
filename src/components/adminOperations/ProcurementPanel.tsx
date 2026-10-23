@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { privateDrafts } from '../../lib/privateDrafts';
 import StockSelection from './StockSelection';
 import PurchaseFundingFields, { newFunding, fundingValid, type FundingDraft, type PurchaseInvestor } from './PurchaseFundingFields';
@@ -24,6 +24,7 @@ import { useLanguage } from '../../LanguageContext';
 import type { CostProfile, ProcurementChargeBasis } from '../../../packages/contracts/src/procurementCost';
 import type { ApprovedProcurementRate } from '../../../packages/contracts/src/procurementRate';
 import '../adminInventory/inventory-workspace.css';
+const ProductPricingForm = lazy(() => import('../adminProducts/ProductForm'));
 const InvestorContractForm = lazy(() => import('../financePeople/InvestorPanel').then((m) => ({ default: m.InvestorContractForm })));
 import {
   api,
@@ -168,6 +169,17 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     [usePurchase, setUsePurchase] = useState<Record<string, boolean>>({}),
     [preferValues, setPreferValues] = useState<Record<string, boolean>>({}),
     [savedPricing, setSavedPricing] = useState<PricingPreview | null>(null);
+  // Keep the purchase component mounted while its product's canonical V2 editor is open.
+  // Quantities, costs, receiving selections and the current wizard step survive the round trip.
+  const [pricingProduct, setPricingProduct] = useState<string | null>(null);
+  const [pricingRevision, setPricingRevision] = useState(0);
+  const pricingReturnScroll = useRef(0);
+  const savedPricingRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => savedPricingRequest.current?.abort(), []);
+  const editPricing = (id: string) => {
+    pricingReturnScroll.current = window.scrollY;
+    setPricingProduct(id);
+  };
   const [investmentFor, setInvestmentFor] = useState('');
   // `approved_rates`: the approved central rates the document's rate is prefilled from and checked against (V2-0 F4, row 224).
   const [config, setConfig] = useState<{ suppliers: Named[]; locations: Named[]; investors: PurchaseInvestor[]; cost_profiles: CostProfile[]; approved_rates: ApprovedProcurementRate[] }>({
@@ -222,12 +234,19 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   }, [load, run]);
   /** A saved purchase's pricing: each line's current summary and whether its cost was applied (read only). */
   const loadSavedPricing = async (id: string, status: string, lineKeys: string[]) => {
+    savedPricingRequest.current?.abort();
+    const controller = new AbortController();
+    savedPricingRequest.current = controller;
     setSavedPricing(null);
     if (pricingOff || status === 'draft') return;
-    try { setSavedPricing(await previewSaved(id, { usePurchase: {}, prefer: {}, lineKeys })); }
+    try {
+      const next = await previewSaved(id, { usePurchase: {}, prefer: {}, lineKeys }, controller.signal);
+      if (!controller.signal.aborted) setSavedPricing(next);
+    }
     catch (e) { if (e instanceof ApiError && e.code === 'PRICING_NOT_INSTALLED') setPricingOff(true); }
   };
   const open = async (id: string) => {
+    savedPricingRequest.current?.abort();
     const d = purchaseDocumentFromWire<Detail>(await api.get<unknown>(`${PROCUREMENT}/documents/${id}`));
     setSelected(d);
     setRenaming(null);
@@ -402,7 +421,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   const extrasValid = Object.values(extras).every(extraOnStep);
   const nameValid = purchaseNameFits(header.invoice_no);
   // The card's pricing, live: the server prices the draft as it would be saved (debounced, latest wins).
-  const previewKey = editing && step >= 2 && costsValid && extrasValid && !pricingOff ? JSON.stringify([draftBody('ordered', false), choices, editId]) : '';
+  const previewKey = !pricingProduct && editing && step >= 2 && costsValid && extrasValid && !pricingOff ? JSON.stringify([draftBody('ordered', false), choices, editId, pricingRevision]) : '';
   useEffect(() => {
     if (!previewKey) return;
     const ctrl = new AbortController();
@@ -410,7 +429,17 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
       setPricingBusy(true);
       const [body, picked, id] = JSON.parse(previewKey) as [Record<string, unknown>, PreviewChoices, string];
       previewDraft(body, picked, id || null, ctrl.signal)
-        .then((r) => { setPricing(r); setPricingError(''); })
+        .then((r) => {
+          if (ctrl.signal.aborted) return;
+          setPricing(r);
+          setPricingError('');
+          // The editor can publish a new price while this purchase stays open.
+          // Refresh the estimates too, without touching its quantities or cost.
+          setLines((current) => current.map((line, i) => {
+            const price = r.lines.find((x) => x.index === i && x.key === estimateLineKey(line, i))?.pricing_summary.store_price_iqd;
+            return price === undefined || price === line.selling_price_iqd ? line : { ...line, selling_price_iqd: price };
+          }));
+        })
         .catch((e) => {
           if (isAborted(e)) return;
           if (e instanceof ApiError && e.code === 'PRICING_NOT_INSTALLED') { setPricingOff(true); setPricing(null); return; }
@@ -425,6 +454,23 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   const saveLocal = () => { privateDrafts.setItem('levonis-purchase-draft-v2', JSON.stringify({ header, lines, charges, funding, editId, editVersion, operationId, quickReceive })); setDraftAvailable(true); };
   const restoreLocal = () => { try { const d = JSON.parse(privateDrafts.getItem('levonis-purchase-draft-v2') || '{}'); if (!Array.isArray(d.lines)) return; setHeader({ ...newHeader(), ...restoreCostProfileSnapshot(d.header ?? {}, config.cost_profiles) }); setLines(d.lines); setCharges(Array.isArray(d.charges) ? d.charges.map(chargeDraft) : []); setFunding(d.funding ?? newFunding()); setEditId(d.editId); setEditVersion(d.editVersion); setOperationId(d.operationId); setQuickReceive(d.quickReceive); setEditing(true); setStep(0); } catch { privateDrafts.removeItem('levonis-purchase-draft-v2'); } };
   const addChoice = () => { if (!choice) return; setLines((old) => [...old, selectionCostDraft(choice, header.cost_profile_id)]); setRecent((old) => [choice, ...old.filter((r) => `${r.product_id}:${r.scope}:${r.scope_id}` !== `${choice.product_id}:${choice.scope}:${choice.scope_id}`)].slice(0, 6)); setChoice(null); };
+  if (pricingProduct) return (
+    <div className="inventory-workspace" data-procurement-price-editor>
+      <p className={`mb-3 text-sm ${T.text2}`}>{editing
+        ? loc('مسودة الشراء محفوظة هنا. احفظ الشراء لتظهر تكلفته الجديدة في التسعير؛ يمكنك ضبط الربح والسعر ثم الرجوع لإكماله.', 'Your purchase draft stays here. Save the purchase to use its new cost in pricing; you can edit profit and price, then return to finish it.', 'ڕەشنووسی کڕینەکەت لێرە دەمێنێتەوە. کڕینەکە پاشەکەوت بکە بۆ بەکارهێنانی تێچووە نوێیەکە لە نرخدان؛ دەتوانیت قازانج و نرخ دەستکاری بکەیت و بگەڕێیتەوە بۆ تەواوکردنی.')
+        : loc('عدّل الحد الأدنى للربح وسعر البيع، ثم ارجع إلى الشحنة. تكلفة الشراء الجديدة تظهر هنا للمراجعة.', 'Edit minimum profit and selling price, then return to the shipment. Its new purchase cost is available here for review.', 'کەمترین قازانج و نرخی فرۆشتن دەستکاری بکە، پاشان بگەڕێوە بۆ بارەکە. تێچووی نوێی کڕین لێرە بۆ پێداچوونەوە بەردەستە.')}</p>
+      <Suspense fallback={<p role="status">{loc('جارٍ تحميل التسعير…', 'Loading pricing…', 'نرخدان باردەکرێت…')}</p>}>
+        <ProductPricingForm key={pricingProduct} productId={pricingProduct} initialSection={3}
+          onListChanged={onChanged}
+          onBack={() => {
+            setPricingProduct(null);
+            setPricingRevision((r) => r + 1);
+            if (selected && !editing) void loadSavedPricing(selected.purchase.id, selected.purchase.status, selected.lines.map(estimateLineKey));
+            requestAnimationFrame(() => window.scrollTo({ top: pricingReturnScroll.current }));
+          }} />
+      </Suspense>
+    </div>
+  );
   return (
     <div className="inventory-workspace">
       {op.feedback}
@@ -525,7 +571,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
                 emptyHint={header.cost_profile_id ? loc('إن دفعت مصروفًا فعليًا، أضفه من «مصاريف إضافية فعلية» أدناه.', 'If you actually paid an extra expense, add it under “Actual extra expenses” below.', 'ئەگەر خەرجییەکی زیادەت بە ڕاستی داوە، لە «خەرجیی زیادەی ڕاستەقینە» لە خوارەوە زیادی بکە.') : undefined}
               />
               <p className={`mt-2 text-xs ${T.text3}`}>{loc('إجمالي البند مع الشحن', 'Total line cost with freight', 'کۆی بەند لەگەڵ ناردن')}: {costMoney(estimates[i]?.total_iqd)} · {loc('تُقرب المجاميع إلى أقرب دينار، ومتوسط القطعة للعرض.', 'Totals round to the nearest IQD; the unit average is for display.', 'کۆکان بۆ نزیکترین دینار خڕ دەکرێنەوە، و تێکڕای پارچە تەنها بۆ پیشاندانە.')}</p>
-              <PricingSummaryBar summary={summaryOf(i)} label={l.label} busy={pricingBusy && !summaryOf(i)} notInstalled={pricingOff} directFirst />
+              <PricingSummaryBar summary={summaryOf(i)} label={l.label} busy={pricingBusy && !summaryOf(i)} notInstalled={pricingOff} directFirst onEdit={() => editPricing(l.product_id)} />
               {pricingError && !pricingOff && <p role="status" className={`mt-2 text-[13px] ${T.text2}`}>{pricingError}</p>}
               {funding.mode === 'investor' && <label className="mt-3 flex gap-2 text-sm"><input type="checkbox" checked={!funding.incoming_indexes || funding.incoming_indexes.includes(i)} onChange={(e) => setFunding((f) => { const indexes = f.incoming_indexes ?? lines.map((_, j) => j); return { ...f, incoming_indexes: e.target.checked ? [...indexes, i] : indexes.filter((j) => j !== i) }; })} />{loc('مشمول بتمويل المستثمر ونسبته', 'Include in investor funding and profit share', 'لە پارەدارکردنی وەبەرهێنەر و ڕێژەکەیدا هەژمار دەکرێت')}</label>}
             </article>)}</div>
@@ -586,7 +632,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               <div><dt>{pn.reviewRow}</dt><dd>{header.invoice_no.trim() || pn.fallback}</dd></div>
               <div><dt>{loc('التكلفة', 'Cost status', 'دۆخی تێچوو')}</dt><dd>{header.cost_state === 'final' ? loc('نهائية', 'Final', 'کۆتایی') : loc('تقديرية؛ لا تستلم بعد', 'Estimated; receipt is blocked', 'خەمڵێنراو؛ هێشتا وەرمەگرە')}</dd></div>
             </dl>
-            <div className="inventory-lines">{lines.map((l, i) => <article className="inventory-line" key={i}><strong>{l.label}</strong><div className={`mt-2 flex flex-wrap gap-3 text-sm ${T.text2}`}><span>{loc('الكمية', 'Quantity', 'بڕ')}: {l.qty_ordered}</span><span>{loc('تكلفة البند', 'Line cost', 'تێچووی بەند')}: {money(estimates[i]?.total_iqd)}</span><span>{ps.landedRow}: {money(estimates[i]?.unit_iqd)}</span><span>{loc('ربح المستثمر التقديري', 'Estimated investor profit', 'قازانجی خەمڵێنراوی وەبەرهێنەر')}: {money(estimates[i]?.investor_iqd)}</span><span>{loc('ربح المتجر التقديري', 'Estimated store profit', 'قازانجی خەمڵێنراوی فرۆشگا')}: {money(estimates[i]?.owner_iqd)}</span></div><PricingSummaryBar summary={summaryOf(i)} label={l.label} busy={pricingBusy && !summaryOf(i)} notInstalled={pricingOff} directFirst /><SavedPurchaseUnitOrigins value={l.unit_origins ? purchaseUnitRows(l.unit_origins, l.qty_ordered) : undefined} /></article>)}</div>
+            <div className="inventory-lines">{lines.map((l, i) => <article className="inventory-line" key={i}><strong>{l.label}</strong><div className={`mt-2 flex flex-wrap gap-3 text-sm ${T.text2}`}><span>{loc('الكمية', 'Quantity', 'بڕ')}: {l.qty_ordered}</span><span>{loc('تكلفة البند', 'Line cost', 'تێچووی بەند')}: {money(estimates[i]?.total_iqd)}</span><span>{ps.landedRow}: {money(estimates[i]?.unit_iqd)}</span><span>{loc('ربح المستثمر التقديري', 'Estimated investor profit', 'قازانجی خەمڵێنراوی وەبەرهێنەر')}: {money(estimates[i]?.investor_iqd)}</span><span>{loc('ربح المتجر التقديري', 'Estimated store profit', 'قازانجی خەمڵێنراوی فرۆشگا')}: {money(estimates[i]?.owner_iqd)}</span></div><PricingSummaryBar summary={summaryOf(i)} label={l.label} busy={pricingBusy && !summaryOf(i)} notInstalled={pricingOff} directFirst onEdit={() => editPricing(l.product_id)} /><SavedPurchaseUnitOrigins value={l.unit_origins ? purchaseUnitRows(l.unit_origins, l.qty_ordered) : undefined} /></article>)}</div>
             <p className={`text-sm ${T.text3}`}>{loc('احفظ مسودة إن كنت تنتظر تكلفة نهائية. تأكيد الشراء يضيف شحنة قادمة؛ اختر استلام شحنة عند وصولها.', 'Save a draft while waiting for final costs. Confirming creates an incoming shipment; receive it when it arrives.', 'ئەگەر چاوەڕێی تێچووی کۆتایی دەکەیت ڕەشنووس پاشەکەوت بکە. پشتڕاستکردنەوەی کڕین بارێکی چاوەڕوانکراو زیاد دەکات؛ کاتێک گەیشت وەرگرتنی بار هەڵبژێرە.')}</p>
           </>}
           <aside className="inventory-sticky-summary"><div className="inventory-total"><span>{loc('المجموع مع تكاليف الشحنة', 'Total landed cost', 'کۆی گشتی لەگەڵ تێچووەکانی بار')}</span><strong>{money(costsValid ? total : null)}</strong></div>{funding.mode === 'investor' && <dl className="inventory-review"><div><dt>{loc('تمويل مخصص / مستلم', 'Allocated / received', 'پارەدارکردنی تەرخانکراو / وەرگیراو')}</dt><dd>{costMoney(allocated)} / {costMoney(Number(funding.received_iqd))}</dd></div><div><dt>{loc('مساهمة المتجر', 'Store contribution', 'بەشداریی فرۆشگا')}</dt><dd>{costMoney(Math.max(0, total - allocated))}</dd></div>{fundingReturn.return_total_iqd > 0 && <div><dt>{ir.footerRow}{fundingReturn.awaits_cash && <span className={`block text-xs font-normal ${T.text3}`}>{ir.footerCaption}</span>}</dt><dd>{costMoney(fundingReturn.return_total_iqd)}</dd></div>}<div><dt>{loc('تمويل ينتظر الاستلام', 'Funding not yet received', 'پارەدارکردنی چاوەڕێی وەرگرتن')}</dt><dd>{costMoney(Math.max(0, allocated - Number(funding.received_iqd)))}</dd></div></dl>}<p className={`mt-2 text-xs ${T.text3}`}>{(quickReceive ? loc('ستُستلم القطع الموجودة الآن بعد تأكيد التكلفة. الربح تقديري حتى التسليم والتحصيل.', 'On-hand units are received after confirming cost. Profit remains an estimate until delivery and collection.', 'پارچە ئامادەکان دوای پشتڕاستکردنەوەی تێچوو وەردەگیرێن. قازانج خەمڵێنراوە تا گەیاندن و وەرگرتنی پارە.') : loc('الشراء القادم لا يزيد المخزون المتاح. الربح تقديري حتى تسليم الطلب والتحصيل.', 'Incoming purchases do not increase available stock. Profit remains an estimate until delivery and collection.', 'کڕینی چاوەڕوانکراو کۆگای بەردەست زیاد ناکات. قازانج خەمڵێنراوە تا گەیاندنی داواکاری و وەرگرتنی پارە.'))}</p></aside>
@@ -674,12 +720,12 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
             return pending.length ? (
               <div className="lv-alert lv-alert-info mb-3 px-3 py-2 text-sm text-text-primary" data-purchase-price-reviews>
                 <strong>{loc('تكلفة هذا الشراء بانتظار مراجعتك', 'This purchase’s cost awaits your review', 'تێچووی ئەم کڕینە چاوەڕێی پێداچوونەوەتە')}</strong>
-                <p className="mt-1">{loc('لا يتغير أي سعر قبل أن تراجعه. افتح المنتج وراجع السعر الجديد، ثم اعتمده أو أبقِ التكلفة الحالية.', 'No price changes until you review it. Open the product and review the new price, then apply it or keep the current cost.', 'هیچ نرخێک ناگۆڕێت تا پێیدا نەچیتەوە. بەرهەمەکە بکەرەوە و نرخە نوێیەکە ببینە، پاشان پەسەندی بکە یان تێچووی ئێستا بهێڵەرەوە.')}</p>
+                <p className="mt-1">{loc('لا يتغير أي سعر قبل أن تراجعه. اضغط «تعديل الربح وسعر البيع» وراجع السعر الجديد، ثم اعتمده أو أبقِ التكلفة الحالية.', 'No price changes until you review it. Select “Edit profit and selling price” and review the new price, then apply it or keep the current cost.', 'هیچ نرخێک ناگۆڕێت تا پێیدا نەچیتەوە. بەرهەمەکە بکەرەوە و نرخە نوێیەکە ببینە، پاشان پەسەندی بکە یان تێچووی ئێستا بهێڵەرەوە.')}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {pending.map((pid) => (
-                    <a key={pid} className={T.btnGhost} href={`/admin?tab=products&edit=${encodeURIComponent(pid)}`} data-purchase-review-open={pid}>
-                      {loc('راجع السعر', 'Review the price', 'نرخەکە ببینە')}: {selected.lines.find((l) => l.product_id === pid)?.label ?? pid}
-                    </a>
+                    <button type="button" key={pid} className={T.btnGhost} onClick={() => editPricing(pid)} data-purchase-review-open={pid}>
+                      {loc('تعديل الربح وسعر البيع', 'Edit profit and selling price', 'دەستکاریکردنی قازانج و نرخی فرۆشتن')}: {selected.lines.find((l) => l.product_id === pid)?.label ?? pid}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -703,7 +749,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
                 return { title: c.title, scope: c.scope, amount_iqd: c.amount_iqd, unit_amount_iqd: c.unit_amount_iqd, basis: c.basis, covers: c.applies_to && [...new Set(selected.lines.filter((x) => c.applies_to!.includes(estimateLineKey(x, 0))).map((x) => x.label))], covered, share_iqd: c.allocations ? c.allocations.find((a) => a.line_id === l.line_id)?.amount_iqd ?? 0 : null, status: 'counted' };
               })}
             />
-            {savedPricing && <PricingSummaryBar summary={savedPricing.lines.find((x) => x.line_id === l.line_id)?.pricing_summary} label={l.label} readOnlyLabel directFirst />}
+            <PricingSummaryBar summary={savedPricing?.lines.find((x) => x.line_id === l.line_id)?.pricing_summary} label={l.label} readOnlyLabel directFirst notInstalled={pricingOff} onEdit={() => editPricing(l.product_id)} />
             {/* An engine-priced product's price is the engine's (ENGINE_MANAGED): no manual price update. */}
 
             <SavedPurchaseUnitOrigins key={`${selected.purchase.id}:${l.line_id}`} value={l.unit_origins} serialBlockedHint={selected.purchase.status === 'draft' || selected.purchase.cost_state !== 'final' ? loc('أكمل الكمية والتكاليف النهائية وأكد الشراء قبل تسجيل الأرقام التسلسلية.', 'Finish quantities and final costs, then confirm the purchase before registering serials.', 'بڕ و تێچووی کۆتایی تەواو بکە و کڕین پشتڕاست بکەرەوە پێش تۆمارکردنی ژمارەکان.') : undefined} onSerialSave={selected.purchase.cost_state === 'final' && ['ordered', 'partial', 'received'].includes(selected.purchase.status) ? async (unit, read) => {

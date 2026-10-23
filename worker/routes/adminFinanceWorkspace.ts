@@ -101,11 +101,10 @@ function summaryCharts(bases:OrderProfitBase[],r:{from:string;to:string},expense
 }
 /**
  * P-A F4 + F5: the order-level coupon and the credited price-protection
- * amounts, as DEDUCTIONS IN THIS REPORT ONLY (owner question Q3, default
- * "report only"; worker/lib/financeReportOverlay.ts). Applied to the bases
- * this route already built, after the investor split, so `calculateGoods`,
- * `getOrderProfitBase(s)` and every writer that settles investors, wages and
- * journals never see them. A line takes its share of `min(coupon, net goods)`
+ * amounts, displayed after the investor split. Participant entitlements use
+ * these same deductions through participantProfit (owner, 2026-10-22).
+ * The original invoice/accounting basis stays intact; display deductions are
+ * still applied once here. A line takes its share of `min(coupon, net goods)`
  * by net goods plus its own claims; the excess of a coupon above the goods
  * (it cut shipping, then the COD fee) stays at the order level, so the
  * products never carry more than their goods.

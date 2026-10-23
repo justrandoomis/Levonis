@@ -1,5 +1,5 @@
 /**
- * THE REPORT-ONLY DEDUCTIONS OF «الأرباح والتكاليف» (P-A fixes F4 and F5;
+ * SHARED DEDUCTIONS OF «الأرباح والتكاليف» (P-A fixes F4 and F5;
  * owner brief 2026-10-09, "Accounting Currency": revenue is what the customer
  * actually paid, after discounts and refunds).
  *
@@ -13,13 +13,11 @@
  *   F5  price-protection credits paid back to the customer on a line
  *       (`price_protection_claims`, state 'credited').
  *
- * They are shown as DEDUCTIONS IN THE REPORT ONLY (owner question Q3, default
- * "report only"). `calculateGoods`, `getOrderProfitBase(s)` and every writer
- * that reads them — investor accrual, staff wages, participants, percentage
- * costs, workspace postings, reconciliation — are untouched, so no recorded
- * investor share, wage or journal entry moves. That is a test
- * (tests/financeOverlayNoSettlement.test.ts), and so is the rule that only
- * worker/routes/adminFinanceWorkspace.ts imports this module.
+ * Owner clarification, 2026-10-22: these deductions also reduce staff and
+ * investor profit shares. participantProfit reads this same evidence so the
+ * report and entitlement cannot disagree or deduct line coupons twice.
+ * Invoice, wallet and native sale journals remain historical evidence;
+ * reconciliation appends entitlement corrections in the open period.
  *
  * Read only. Two `json_each`-bound reads (the pattern of
  * `getOrderProfitBases`), whatever the number of orders.
@@ -60,14 +58,15 @@ export async function reportAdjustments(db: D1Database, orderIds: readonly strin
   for (const id of ids) out.set(id, { coupon_iqd: 0, trade_in_credit_iqd: 0, trade_in_credit_returned_by_line: new Map(), trade_in_credit_returned_iqd: 0, price_protection_by_line: new Map(), price_protection_iqd: 0 });
   if (!ids.length) return out;
   const bound = JSON.stringify(ids);
-  const residual = `MAX(0, COALESCE(json_extract(o.coupon_snapshot, '$.discount_iqd'), o.coupon_discount_iqd, 0)
+  const snapshot = "CASE WHEN json_valid(o.coupon_snapshot) THEN o.coupon_snapshot ELSE '{}' END";
+  const residual = `MAX(0, COALESCE(json_extract(${snapshot}, '$.discount_iqd'), o.coupon_discount_iqd, 0)
                        - COALESCE((SELECT SUM(i.coupon_discount_iqd) FROM order_items i WHERE i.order_id = o.id), 0))`;
   const couponRows = () =>
     db
       .prepare(
         `SELECT o.id order_id, ${residual} coupon_iqd,
                 EXISTS (SELECT 1 FROM coupons tc JOIN trade_in_stock ts ON ts.request_id = tc.trade_in_id
-                         WHERE tc.id = json_extract(o.coupon_snapshot, '$.coupon_id')) stocked
+                         WHERE tc.id = json_extract(${snapshot}, '$.coupon_id')) stocked
            FROM orders o WHERE o.id IN (SELECT value FROM json_each(?))`
       )
       .bind(bound)

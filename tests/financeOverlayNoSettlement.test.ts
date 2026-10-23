@@ -1,22 +1,6 @@
-/**
- * THE COUPON AND PRICE-PROTECTION DEDUCTIONS NEVER REACH A SETTLEMENT
- * (design P-A §7.2 F4/F5, integrity H3; owner question Q3, default "report
- * only").
- *
- * Fixing the coupon and the price-protection credit inside the profit base
- * would re-split investor shares and re-post wages and journals for orders
- * already settled. So they are a REPORT-ONLY overlay: applied by
- * worker/routes/adminFinanceWorkspace.ts to the answers it returns, and seen by
- * nothing that settles money. This file proves it three ways:
- *   1. two orders identical but for a coupon and a credited claim have the
- *      same profit base — the basis every writer reads;
- *   2. reading the workspace (summary, list, detail) and reconciling the order
- *      leave investor results, order costs, workspace postings, journals and
- *      the order, line, wallet and claim rows byte-identical;
- *   3. only the workspace route imports the overlay module.
- *
- * Run: node --import tsx --test tests/financeOverlayNoSettlement.test.ts
- */
+/** Net-profit policy (owner clarification 2026-10-22): deductions affect
+ * entitlements through participantProfit, while report reads and original
+ * invoice/accounting evidence remain unchanged. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -25,6 +9,7 @@ import { asD1, freshDb, get, json, stubApp } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 import { adminFinanceWorkspaceRoutes } from '../worker/routes/adminFinanceWorkspace';
 import { getOrderProfitBase, getOrderProfitBases, syncOrderWorkspaceAccounting } from '../worker/lib/orderProfit';
+import { participantNetProfit } from '../worker/lib/participantProfit';
 import { reconcileFinanceOrder } from '../worker/lib/financeReconcile';
 
 function world() {
@@ -64,6 +49,8 @@ test('the profit base every writer reads is the same with and without a coupon a
     return copy;
   };
   assert.deepEqual(comparable(overlay, 'overlay'), comparable(plain, 'plain'));
+  assert.equal((await participantNetProfit(db, plain)).get('plain:1'), 85000);
+  assert.equal((await participantNetProfit(db, overlay)).get('overlay:1'), 67000, 'the share basis includes the residual coupon and credited protection');
   assert.equal(overlay.totals.net_goods_iqd, 200000, 'calculateGoods still ignores the order-level coupon');
   assert.equal(JSON.stringify(overlay).includes('price_protection'), false);
   assert.equal(JSON.stringify(overlay).includes('coupon_iqd'), false);
@@ -90,7 +77,7 @@ test('reading the workspace and reconciling write nothing new: investor results,
   assert.equal(JSON.stringify(await getOrderProfitBase(db, 'overlay')), baseBefore, 'the profit base is unchanged');
 });
 
-test('only the workspace route imports the overlay; no settlement module names it', () => {
+test('the report and shared participation calculator use one deduction reader', () => {
   const files: string[] = [];
   const walk = (dir: string) => {
     for (const name of readdirSync(dir)) {
@@ -101,9 +88,9 @@ test('only the workspace route imports the overlay; no settlement module names i
   };
   walk(join(ROOT, 'worker'));
   const importers = files.filter((f) => /from\s+['"][^'"]*financeReportOverlay['"]/.test(readFileSync(f, 'utf8'))).map((f) => relative(ROOT, f));
-  assert.deepEqual(importers, ['worker/routes/adminFinanceWorkspace.ts']);
+  assert.deepEqual(importers.sort(), ['worker/lib/participantProfit.ts', 'worker/routes/adminFinanceWorkspace.ts']);
   for (const f of ['worker/lib/orderProfit.ts', 'worker/lib/investorFinance.ts', 'worker/lib/financeWageCalculation.ts', 'worker/lib/financeParticipants.ts', 'worker/lib/orderFinance.ts', 'worker/lib/financeReconcile.ts']) {
     const src = readFileSync(join(ROOT, f), 'utf8');
-    assert.doesNotMatch(src, /price_protection_claims|financeReportOverlay|reportAdjustments/, `${f} must not see the report-only deductions`);
+    assert.doesNotMatch(src, /price_protection_claims|financeReportOverlay|reportAdjustments/, `${f} uses the shared participation calculator instead of duplicating deduction logic`);
   }
 });

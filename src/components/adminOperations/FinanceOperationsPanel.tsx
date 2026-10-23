@@ -318,7 +318,7 @@ function Rules({
             options={[
               { id: 'unit', name: loc('مبلغ لكل قطعة', 'Amount per unit') },
               { id: 'order', name: loc('مبلغ لكل طلب', 'Amount per order') },
-              { id: 'profit_percent', name: loc('نسبة من ربح البضاعة', 'Percent of goods profit') },
+              { id: 'profit_percent', name: loc('نسبة من الربح', 'Percent of profit', 'ڕێژەیەک لە قازانج') },
               { id: 'revenue_percent', name: loc('نسبة من صافي بيع البضاعة', 'Percent of net goods sales') },
             ]}
           />
@@ -396,8 +396,9 @@ function Rules({
         </div>
         <p className={`my-4 text-xs leading-6 ${T.text3}`}>
           {loc(
-            'نسبة الربح تُحسب بعد خصومات البضاعة وتكلفة FIFO وقبل الأجور. الربح السالب لا يولد عمولة، والتكلفة المجهولة تبقى معلقة. إصدارات القواعد محفوظة لكل طلب.',
-            'Profit percentages use net goods after discounts and FIFO cost, before wages. Losses earn no commission; unknown costs stay pending. Each order retains its rule versions.',
+            'نسبة أرباح الموظف تُحسب من الصافي بعد الخصومات والكوبونات والنقاط والتعويضات والتكاليف والمصاريف الموزعة، وقبل توزيع نسب أرباح الموظفين نفسها. الربح السالب لا يولد عمولة، والتكاليف المجهولة تبقى معلقة.',
+            'Staff profit shares use net profit after discounts, coupons, points, credits, costs and allocated expenses, before distributing staff profit shares themselves. Losses earn no commission; unknown costs stay pending.',
+            'بەشی قازانجی کارمەند لە قازانجی پاک هەژمار دەکرێت دوای داشکاندن، کۆپۆن، خاڵ، قەرەبوو، تێچوو و خەرجییە دابەشکراوەکان و پێش دابەشکردنی بەشی قازانجی کارمەندان. زیان کۆمسیۆن دروست ناکات؛ تێچووی نەزانراو چاوەڕێ دەکات.',
           )}
         </p>
         <div className="flex gap-2">

@@ -10,6 +10,7 @@ import { effectiveWageRules, wageVersions, type EffectiveWageRule, type WageVers
 import { readRuleScope } from './financeRuleScopes';
 import { readNeverLinkedLines } from './financeDeletedProductScope';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
+import { participantNetProfit } from './participantProfit';
 
 export interface WageCost {
   id:string;order_item_id:string|null;rule_id:string;staff_id:string;state:string;snapshot:string;
@@ -90,6 +91,12 @@ export async function planStaffWages(db:D1Database,staff:EmploymentStaff,base:Or
     else groups.set(group,{rule,ids:[line.line_id]});
   }
   const result:WageTarget[]=[],used=new Map<string,number>();
+  const netProfit=rules.some(rule=>rule.basis==='profit_percent')?await participantNetProfit(db,{
+    ...base,costs:base.costs.map(cost=>{
+      const current=rules.find(rule=>rule.id===cost.rule_id);
+      return current?{...cost,wage_rule_snapshot:JSON.stringify(current)}:cost;
+    }),
+  },true):new Map<string,number|null>();
   // Per-order manual overrides take priority and keep their original amount.
   // Do not also create a competing new per-unit/order rule in that work group.
   const manual=old.filter(c=>c.manual_iqd!==null&&managed.has(c.rule_id));
@@ -107,9 +114,10 @@ export async function planStaffWages(db:D1Database,staff:EmploymentStaff,base:Or
     const revenue=lines.reduce((n,l)=>n+l.retained_revenue_iqd,0);
     const cogs=lines.some(l=>l.cogs_iqd===null||!isConfirmedOrderCost(l.cost_confidence))?null:lines.reduce((n,l)=>n+l.cogs_iqd!,0);
     const unknownRevenue=['profit_percent','revenue_percent'].includes(rule.basis)&&lines.some(hasUnknownRefund);
-    let amount=unknownRevenue?null:qty===0?0:costAmount({...rule,cap_iqd:null},qty,Math.max(0,revenue),cogs);
+    const profit=rule.basis==='profit_percent'?(cogs===null||lines.some(line=>netProfit.get(line.id)==null)?null:Math.max(0,lines.reduce((sum,line)=>sum+netProfit.get(line.id)!,0))):null;
+    let amount=unknownRevenue?null:qty===0?0:rule.basis==='profit_percent'?(profit===null?null:Number(BigInt(profit)*BigInt(rule.amount)/10000n)):costAmount({...rule,cap_iqd:null},qty,Math.max(0,revenue),cogs);
     if(amount!==null){if(rule.cap_iqd!==null)amount=Math.min(amount,Math.max(0,rule.cap_iqd-(used.get(rule.id)??0)));used.set(rule.id,(used.get(rule.id)??0)+amount);}
-    result.push({cost:old.find(c=>key(c.rule_id,c.order_item_id)===key(rule.id,lineId))??null,rule,line_id:lineId,amount,qty,base_iqd:unknownRevenue?null:rule.basis==='profit_percent'?(cogs===null?null:Math.max(0,revenue-cogs)):revenue,manual:false,line_ids:ids});
+    result.push({cost:old.find(c=>key(c.rule_id,c.order_item_id)===key(rule.id,lineId))??null,rule,line_id:lineId,amount,qty,base_iqd:unknownRevenue?null:rule.basis==='profit_percent'?profit:revenue,manual:false,line_ids:ids});
   }
   // Scope exclusions, priority changes and an employment cutoff remove the
   // entitlement with an offset, preserving any payment that already happened.
@@ -121,18 +129,18 @@ export async function planStaffWages(db:D1Database,staff:EmploymentStaff,base:Or
 }
 
 export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:{actor?:string;day?:string}={}) {
-  const allVersions=await wageVersions(db);if(!allVersions.length)return {adjusted:0,managed:new Set<string>()};
+  const allVersions=await wageVersions(db);if(!allVersions.length)return {adjusted:0,managed:new Set<string>(),netCostsChanged:false};
   const employees=(await db.prepare('SELECT * FROM finance_staff').all<EmploymentStaff>()).results??[];
   // Undated legacy task-assignment rules retain their established writer until
   // an employment date or an explicit wage revision opts them into the timeline.
   const datedStaff=new Set(employees.filter(s=>s.start_work_date).map(s=>s.id));
   const revisedRules=new Set(allVersions.filter(v=>v.revision>1&&!v.id.startsWith('wage:baseline:')).map(v=>v.rule_id));
   const versions=allVersions.filter(v=>datedStaff.has(v.staff_id)||revisedRules.has(v.rule_id));
-  if(!versions.length)return {adjusted:0,managed:new Set<string>()};
+  if(!versions.length)return {adjusted:0,managed:new Set<string>(),netCostsChanged:false};
   const base=await getOrderProfitBase(db,orderId),earningDay=deliveryDay(base.order);
-  const managed=new Set(versions.map(v=>v.rule_id));if(!earningDay)return {adjusted:0,managed:new Set<string>()};
+  const managed=new Set(versions.map(v=>v.rule_id));if(!earningDay)return {adjusted:0,managed:new Set<string>(),netCostsChanged:false};
   const source=await profitSourceFingerprint(db,orderId);
-  const statements:D1PreparedStatement[]=[],day=opts.day??baghdadDay(),now=new Date().toISOString();let adjusted=0;
+  const statements:D1PreparedStatement[]=[],day=opts.day??baghdadDay(),now=new Date().toISOString();let adjusted=0,netCostsChanged=false;
   const reservationTargets:Array<{cost_id:string;amount_iqd:number}>=[];
   for(const staff of employees){
     const targets=await planStaffWages(db,staff,base,versions.filter(v=>v.staff_id===staff.id));
@@ -140,10 +148,15 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
     statements.push(...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=?)',[staff.id,staff.employment_version]));
     for(const target of targets){
       const {cost,rule,amount}=target;
+      const previous=base.costs.find(c=>c.id===cost?.id);
+      const previousRule=JSON.parse(String(previous?.wage_rule_snapshot??'null'))??JSON.parse(String(previous?.snapshot??'{}')).rule;
+      const previousBasis=previous?previousRule?.basis:rule.basis;
+      if((rule.basis!=='profit_percent'||previousBasis!=='profit_percent')&&
+        (!cost||amount!==cost.effective_iqd||(cost.state==='pending_cost'&&amount!==null)||previousBasis!==rule.basis))netCostsChanged=true;
       const id=cost?.id??newId('oc'),liability='2100';
       if(cost&&cost.held_iqd>0&&amount!==null&&amount<cost.paid_iqd+cost.held_iqd)throw conflict('طلب سحب مفتوح يحتاج إعادة اعتماد قبل تخفيض الاستحقاق');
       if(cost&&amount!==null)reservationTargets.push({cost_id:id,amount_iqd:amount});
-      const snapshot=JSON.stringify({rule,line_ids:target.line_ids,qty:target.qty,staff_id:staff.id,earning_day:earningDay,profit_basis:'retained_goods_less_verified_cogs'});
+      const snapshot=JSON.stringify({rule,line_ids:target.line_ids,qty:target.qty,staff_id:staff.id,earning_day:earningDay,profit_basis:'net_after_deductions_v1'});
       if(!cost){
         const expense=amount!==null&&amount>0?newId('opex'):null;
         if(expense)statements.push(db.prepare('INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,note) VALUES (?,?,?,?,?,?)').bind(expense,rule.category_id,amount,day,rule.name,`استحقاق تسليم ${earningDay} / طلب ${orderId}`));
@@ -187,5 +200,5 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
     try{await db.batch([...fence(db,`${source.sql.replace(/\?1/g,'?2')}=?3`,[orderId,source.value]),...reservationFence,...statements]);}
     catch(e){if(/CHECK constraint|UNIQUE constraint/.test(String(e)))throw conflict('تغيرت بيانات الأجر أثناء التسوية؛ أعد المحاولة');throw e;}
   }
-  return {adjusted,managed};
+  return {adjusted,managed,netCostsChanged};
 }

@@ -54,7 +54,8 @@ const pendingPercentages = [
   { rule_name: 'revenue_percent', amount_iqd: null, state: 'pending_cost' },
 ];
 const knownPercentages = [
-  { rule_name: 'profit_percent', amount_iqd: 7000, state: 'due' },
+  // Revenue-based wages are an expense before distributing net-profit shares.
+  { rule_name: 'profit_percent', amount_iqd: 6000, state: 'due' },
   { rule_name: 'revenue_percent', amount_iqd: 10000, state: 'due' },
 ];
 
@@ -71,11 +72,11 @@ test('native delivery/retry never finalizes percentage wages while a historical 
   x.knownRefund(50000);
   await runOrderFinancialEffects(x.env, 'order', 'delivered');
   assert.deepEqual(x.costs(), knownPercentages);
-  assert.equal(await x.available(), 17000);
+  assert.equal(await x.available(), 16000);
   const entries = count(x.raw, 'SELECT COUNT(*) n FROM accounting_entries');
   await runOrderFinancialEffects(x.env, 'order', 'delivered');
   assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM accounting_entries'), entries);
-  assert.equal(await x.available(), 17000);
+  assert.equal(await x.available(), 16000);
 });
 
 test('legacy pending wages require a known retained-sales basis, then materialize once after the refund is documented', async () => {
@@ -86,7 +87,7 @@ test('legacy pending wages require a known retained-sales basis, then materializ
   x.knownRefund(50000);
   await reconcileStaffOrderCosts(x.db, 'order', { actor: 'boss', day: '2026-10-05' });
   assert.deepEqual(x.costs(), knownPercentages);
-  assert.equal(await x.available(), 17000);
+  assert.equal(await x.available(), 16000);
   const entries = count(x.raw, 'SELECT COUNT(*) n FROM accounting_entries');
   await reconcileStaffOrderCosts(x.db, 'order', { actor: 'boss', day: '2026-10-05' });
   assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM accounting_entries'), entries);
@@ -111,10 +112,12 @@ test('effective wages hold unknown refund percentages while independent unit/ord
   x.knownRefund(50000);
   await reconcileStaffOrderCosts(x.db, 'order', { actor: 'boss', day: '2026-10-05' });
   assert.deepEqual(x.costs(), [
-    { rule_name: 'order', amount_iqd: 2500, state: 'due' }, ...knownPercentages,
+    { rule_name: 'order', amount_iqd: 2500, state: 'due' },
+    { rule_name: 'profit_percent', amount_iqd: 4750, state: 'due' },
+    { rule_name: 'revenue_percent', amount_iqd: 10000, state: 'due' },
     { rule_name: 'unit', amount_iqd: 10000, state: 'due' },
   ]);
-  assert.equal(await x.available(), 29500);
+  assert.equal(await x.available(), 27250, 'net-profit share follows the fixed, unit and revenue-based wage expenses');
   const entries = count(x.raw, 'SELECT COUNT(*) n FROM accounting_entries');
   await reconcileStaffOrderCosts(x.db, 'order', { actor: 'boss', day: '2026-10-05' });
   assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM accounting_entries'), entries);
@@ -124,17 +127,17 @@ test('a documented zero refund is known revenue and does not leave percentage wa
   const x = setup(); freezeLegacyRules(x, true); x.knownRefund(0);
   await reconcileStaffOrderCosts(x.db, 'order', { actor: 'boss', day: '2026-10-05' });
   assert.deepEqual(x.costs(), [
-    { rule_name: 'profit_percent', amount_iqd: 12000, state: 'due' },
+    { rule_name: 'profit_percent', amount_iqd: 10500, state: 'due' },
     { rule_name: 'revenue_percent', amount_iqd: 15000, state: 'due' },
   ]);
-  assert.equal(await x.available(), 27000);
+  assert.equal(await x.available(), 25500);
 });
 
 test('a newly discovered unknown historical refund blocks already-earned percentages after reconciliation without rewriting paid history', async () => {
   const x = setup(); freezeLegacyRules(x);
   x.raw.exec('DELETE FROM stock_return_inspections; DELETE FROM return_cases;');
   await runOrderFinancialEffects(x.env, 'order', 'delivered');
-  assert.equal(await x.available(), 27000);
+  assert.equal(await x.available(), 25500);
   for (const cost of all<{ id: string }>(x.raw, 'SELECT id FROM finance_order_costs WHERE order_id=?', 'order')) {
     const response = await post(x.app, `/operations/costs/${cost.id}/approve`, {});
     assert.equal(response.status, 200, JSON.stringify(await json(response)));
@@ -154,7 +157,7 @@ test('a newly discovered unknown historical refund blocks already-earned percent
   x.knownRefund(50000);
   await reconcileStaffOrderCosts(x.db, 'order', { actor: 'boss', day: '2026-10-05' });
   assert.deepEqual(x.costs(), original, 'corrections remain separate from original wage records');
-  assert.equal(await x.available(), 8000, '17,000 corrected earnings less the original 9,000 payment');
+  assert.equal(await x.available(), 7000, '16,000 corrected net earnings less the original 9,000 payment');
   assert.equal(row(x.raw, 'SELECT SUM(amount_iqd) amount FROM finance_staff_payments')?.amount, 9000);
   assert.equal(count(x.raw, "SELECT COUNT(*) n FROM accounting_entries WHERE event_key='staff-payment:pay-before-unknown-refund'"), 1);
 });

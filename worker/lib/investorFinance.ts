@@ -2,19 +2,15 @@ import { newId } from './crypto';
 import { isConfirmedOrderCost } from './financeLedger';
 import { badRequest, conflict, notFound } from './http';
 import { allocateExact, baghdadDay, fence, journalPlan, periodOpen } from './operations';
-import { getOrderProfitBase } from './orderProfit';
-import { withMembershipFinancialFingerprintSql } from './orderMembership';
+import { getOrderProfitBase, type OrderProfitBase } from './orderProfit';
+import { participantNetFingerprintSql, participantNetProfit } from './participantProfit';
 import { employmentInstalled, investorEmploymentPendingSql } from './financeEmployment';
 
 export type InvestmentContract = {
   id: string; incoming_id: string; user_id: string; name: string; principal_iqd: number;
   capital_share_bps: number; profit_share_bps: number; loss_share_bps: number; version: number;
 };
-type Allocation = { id: string; lot_id: string; qty: number; cogs_iqd: number | null; unit_cost_iqd: number | null; returned_qty: number; returned_cogs_iqd: number; late_cost_iqd?: number };
-type ProfitView = {
-  order: Record<string, unknown>; version: string | number;
-  lines: Array<{ id: string; qty: number; returned_qty: number; retained_revenue_iqd: number; cogs_iqd: number | null; profit_basis_iqd: number | null; cost_confidence: string; allocations: Allocation[] }>;
-};
+type ProfitView = OrderProfitBase;
 export async function investorFinanceInstalled(db: D1Database) {
   return !!await db.prepare("SELECT 1 FROM sqlite_master WHERE name='investment_contracts'").first();
 }
@@ -48,7 +44,7 @@ const legacyFingerprintSql = `json_array(
  (SELECT json_group_array(json_array(id,field,delta_iqd)) FROM finance_workspace_postings WHERE order_id=?1),
  (SELECT json_group_array(json_array(s.adjustment_id,s.allocation_id,s.unit_delta_iqd)) FROM lot_cost_adjustment_shares s JOIN order_item_inventory_allocations a ON a.id=s.allocation_id WHERE a.order_id=?1),
  (SELECT json_group_array(json_array(e.return_case_id,e.allocation_id,e.qty,r.state)) FROM stock_return_lot_evidence e JOIN return_cases r ON r.id=e.return_case_id WHERE r.order_id=?1))`;
-const fingerprintSql = withMembershipFinancialFingerprintSql(legacyFingerprintSql,'?1');
+const fingerprintSql = participantNetFingerprintSql(legacyFingerprintSql,'?1');
 async function fingerprint(db: D1Database, orderId: string) { return (await db.prepare(`SELECT ${fingerprintSql} AS value`).bind(orderId).first<{ value: string }>())!.value; }
 /** Trusted SQL expressions only. Used inside payout's own transaction fence. */
 export function investorProjectionStaleSql(contractExpr='e.contract_id'){
@@ -78,6 +74,7 @@ export async function investorOrderSplit(db: D1Database, orderId: string, previe
   if (!await investorFinanceInstalled(db)) return { allocations: [], investor_profit_iqd: 0, owner_profit_iqd: null, pending: false };
   const sourceFingerprint = await fingerprint(db, orderId);
   const base = previewBase??await getOrderProfitBase(db, orderId) as unknown as ProfitView;
+  const netProfit=await participantNetProfit(db,base);
   const contracts = (await db.prepare(`SELECT DISTINCT c.* FROM investment_contracts c JOIN inventory_lots l ON l.incoming_id=c.incoming_id
     JOIN order_item_inventory_allocations a ON a.lot_id=l.id WHERE a.order_id=? AND a.released_at IS NULL AND c.state='active'`).bind(orderId).all<InvestmentContract>()).results ?? [];
   const capitalUnits=(await db.prepare('SELECT lc.* FROM purchase_investor_lot_capital lc JOIN order_item_inventory_allocations a ON a.lot_id=lc.lot_id WHERE a.order_id=?').bind(orderId).all<{lot_id:string;contract_id:string;unit_principal_iqd:number}>()).results??[];
@@ -105,7 +102,8 @@ export async function investorOrderSplit(db: D1Database, orderId: string, previe
   for (const line of base.lines) {
     if (line.profit_basis_iqd !== null) totalBasis += line.profit_basis_iqd;
     const rows = line.allocations;
-    if (!rows.length || line.profit_basis_iqd === null || line.cogs_iqd === null || !isConfirmedOrderCost(line.cost_confidence) || (line.cost_confidence !== 'manual_verified' && rows.some(a => a.cogs_iqd === null))) {
+    const net=netProfit.get(line.id);
+    if (!rows.length || net == null || line.cogs_iqd === null || !isConfirmedOrderCost(line.cost_confidence) || (line.cost_confidence !== 'manual_verified' && rows.some(a => a.cogs_iqd === null))) {
       if (rows.some(a => contracts.some(c => c.incoming_id === origins.find(o => o.id === a.id)?.incoming_id))) pending = true;
       continue;
     }
@@ -116,7 +114,7 @@ export async function investorOrderSplit(db: D1Database, orderId: string, previe
     const revenue = signedShares(line.retained_revenue_iqd, weights.some(q => q > 0) ? weights : rows.map(a => a.qty));
     const originalCogs = rows.map(a => Number(a.cogs_iqd ?? 0) - Number(a.returned_cogs_iqd ?? 0) + (a.late_cost_iqd ?? 0));
     const costOverride = signedShares(line.cogs_iqd - originalCogs.reduce((n, v) => n + v, 0), rows.map(a => a.qty));
-    const expenses = signedShares(line.retained_revenue_iqd - line.cogs_iqd - line.profit_basis_iqd, rows.map(a => a.qty));
+    const expenses = signedShares(line.retained_revenue_iqd - line.cogs_iqd - net, rows.map(a => a.qty));
     for (const [i, a] of rows.entries()) {
       const lateCost = a.late_cost_iqd === undefined ? (adjustments.find(v => v.allocation_id === a.id)?.unit_delta ?? 0) * Math.max(0, a.qty - Number(a.returned_qty ?? 0)) : 0;
       const cost = originalCogs[i] + costOverride[i] + lateCost;
@@ -135,7 +133,7 @@ export async function investorOrderSplit(db: D1Database, orderId: string, previe
           qty: weights[i], profit_basis_iqd: profit, profit_iqd: earned,
           capital_iqd: recovered,
           loss_iqd: loss,raw_loss_iqd:loss,eligible: delivered && collected,
-          snapshot: JSON.stringify({ version: base.version, source_fingerprint:sourceFingerprint,contract_version: c.version, qty: weights[i], principal_iqd:recovered, revenue: revenue[i], cost, expenses: expenses[i], profit, collected, delivered }) });
+          snapshot: JSON.stringify({ version: base.version, profit_basis:'net_after_deductions_v1',source_fingerprint:sourceFingerprint,contract_version: c.version, qty: weights[i], principal_iqd:recovered, revenue: revenue[i], cost, expenses: expenses[i], profit, collected, delivered }) });
       }
     }
   }
@@ -149,7 +147,7 @@ export async function investorOrderSplit(db: D1Database, orderId: string, previe
     for(const row of combined){const assigned=Math.min(left,row.loss_iqd);left-=assigned;const a=out.find(a=>a.contract_id===contract.id&&a.allocation_id===row.allocation_id);if(a){a.loss_iqd=assigned;a.snapshot=JSON.stringify({...JSON.parse(a.snapshot),capital_loss_iqd:assigned});}}
   }
   investorLoss=out.reduce((n,a)=>n+a.loss_iqd,0);
-  const cap=Math.max(0,totalBasis);
+  const cap=Math.max(0,[...netProfit.values()].reduce<number>((sum,value)=>sum+(value??0),0));
   if(investorProfit>cap&&out.length){const shares=signedShares(cap,out.map(a=>a.profit_iqd));out.forEach((a,i)=>{a.profit_iqd=shares[i];a.snapshot=JSON.stringify({...JSON.parse(a.snapshot),profit_share_iqd:shares[i]});});investorProfit=cap;}
   return { allocations: out, investor_profit_iqd: delivered ? investorProfit : 0, investor_loss_iqd: delivered ? investorLoss : 0,
     investor_net_iqd: delivered ? investorProfit - investorLoss : 0,

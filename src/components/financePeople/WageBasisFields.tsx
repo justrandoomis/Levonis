@@ -25,7 +25,7 @@ export default function WageBasisFields({ basis, amount, onBasisChange, onAmount
         onBasisChange(next === 'fixed' ? 'unit' : next);
       }}>
         <option value="fixed">{loc('مبلغ ثابت بالدينار', 'Fixed amount in IQD')}</option>
-        <option value="profit_percent">{loc('نسبة من ربح البضاعة', 'Share of goods profit')}</option>
+        <option value="profit_percent">{loc('نسبة من صافي الربح', 'Share of net profit', 'ڕێژەیەک لە قازانجی پاک')}</option>
         <option value="revenue_percent">{loc('نسبة من صافي المبيعات', 'Share of net sales')}</option>
       </Select>
     </Field>
@@ -49,7 +49,7 @@ export default function WageBasisFields({ basis, amount, onBasisChange, onAmount
       {cap !== null && <> · {loc('بعد تطبيق سقف الأجر', 'after the pay cap')}</>}
     </p>}
     {percent && <p className="fp-note">{basis === 'profit_percent'
-      ? loc('تُحسب النسبة على ربح القطع المشمولة: قيمتها بعد الخصومات والمرتجعات مطروحًا منها تكلفتها المثبتة، ثم تُجمع أجورها. أجور ٦ قطع تشمل أرباح القطع الست، دون ضرب الناتج في ٦ مرة أخرى. تُحسب الأجور قبل حصة المستثمر.', 'The percentage uses eligible goods revenue after discounts and returns, less verified cost, then adds the line earnings. Pay for 6 units includes all 6 units’ profit; it is not multiplied by 6 again. Wages are calculated before the investor share.')
+      ? loc('تُحسب النسبة بعد الخصومات والكوبونات والنقاط والمرتجعات وتعويضات حماية السعر والتكاليف والمصاريف الموزعة. تُوزع مصاريف الشهر حسب القطع المباعة. نسب أرباح الموظفين نفسها تُحسب قبل توزيعها، ثم تُحسب حصة المستثمر بعد أجور الموظفين. الربح السالب لا يولد أجر نسبة.', 'The percentage uses net profit after discounts, coupons, points, returns, price-protection credits, costs and allocated expenses. Monthly expenses follow sold units. Staff profit shares are calculated before their own distribution; the investor share follows staff pay. Losses earn no percentage wage.', 'ڕێژەکە لە قازانجی پاک هەژمار دەکرێت دوای داشکاندن، کۆپۆن، خاڵ، گەڕاندنەوە، قەرەبووی پاراستنی نرخ، تێچوو و خەرجییە دابەشکراوەکان. خەرجی مانگ بەپێی دانە فرۆشراوەکان دابەش دەکرێت. بەشی قازانجی کارمەندان پێش دابەشکردنی خۆی هەژمار دەکرێت؛ بەشی وەبەرهێنەر دوای کرێی کارمەندانە. زیان کرێی ڕێژەیی دروست ناکات.')
       : loc('تُحسب النسبة على صافي مبيعات القطع المشمولة بعد الخصومات والمرتجعات. طلب فيه ٦ قطع يشمل مبيعات القطع الست، دون ضرب الناتج في ٦ مرة أخرى.', 'The percentage uses net sales of eligible units after discounts and returns. An order with 6 units includes all 6 units’ sales; it is not multiplied by 6 again.')}</p>}
   </>;
 }

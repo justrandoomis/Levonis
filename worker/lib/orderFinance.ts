@@ -11,6 +11,7 @@ import { wageVersions } from './financeWageTimeline';
 import { employmentInstalled, nextEmploymentDay, staffCanAccrue, type EmploymentStaff } from './financeEmployment';
 import { advanceCollectionsSql } from './membershipSaleCorrection';
 import { readDeletedProductFinanceScopes } from './financeDeletedProductScope';
+import { participantNetProfit } from './participantProfit';
 export { recordFinancialFailure } from './financePostingErrors';
 
 export interface CostRule {
@@ -291,6 +292,7 @@ export async function runOrderFinancialEffects(
     }
   }
   const percentageBase=[...groups.values()].some(({rule})=>['profit_percent','revenue_percent'].includes(rule.basis))?await getOrderProfitBase(db,orderId):null;
+  const netProfit=percentageBase&&[...groups.values()].some(({rule})=>rule.basis==='profit_percent')?await participantNetProfit(db,percentageBase,true):new Map<string,number|null>();
   for (const { rule, lineIds } of groups.values()) {
     const assigned = assignments.find((a) => a.group_key === rule.group_key);
     if (rule.requires_assignment && (!assigned || (milestone === 'prepared' && !assigned.completed_at)))
@@ -316,7 +318,9 @@ export async function runOrderFinancialEffects(
       qty,
       staff_id: staff,
     });
-    let amount = unknownRevenue?null:costAmount({ ...rule, cap_iqd: null }, qty, revenue, cogs);
+    const staffProfit=staff&&rule.basis==='profit_percent';
+    const profit=staffProfit?(cogs===null||percentageLines!.some(line=>netProfit.get(line.id)==null)?null:Math.max(0,percentageLines!.reduce((sum,line)=>sum+netProfit.get(line.id)!,0))):null;
+    let amount = unknownRevenue?null:staffProfit?(profit===null?null:Number(BigInt(profit)*BigInt(rule.amount)/10000n)):costAmount({ ...rule, cap_iqd: null }, qty, revenue, cogs);
     const itemId = rule.basis === 'order' ? null : lineIds[0];
     if(staff&&await db.prepare(`SELECT 1 FROM finance_order_costs WHERE order_id=? AND staff_id=? AND group_key=? AND milestone=? AND rule_id<>? AND state<>'reversed' AND (order_item_id IS ? OR order_item_id IS NULL OR ? IS NULL) LIMIT 1`).bind(orderId,staff,rule.group_key,milestone,rule.id,itemId,itemId).first())continue;
     const existing = await db
@@ -377,7 +381,7 @@ export async function runOrderFinancialEffects(
           )
           .bind(
             amount,
-            unknownRevenue?null:rule.basis === 'profit_percent' ? (cogs === null ? null : Math.max(0, revenue - cogs)) : revenue,
+            unknownRevenue?null:staffProfit?profit:rule.basis === 'profit_percent' ? (cogs === null ? null : Math.max(0, revenue - cogs)) : revenue,
             expense,
             snapshotJson,
             day,
@@ -403,7 +407,7 @@ export async function runOrderFinancialEffects(
             rule.category_id,
             rule.center_id,
             milestone,
-            unknownRevenue?null:rule.basis === 'profit_percent' ? (cogs === null ? null : Math.max(0, revenue - cogs)) : revenue,
+            unknownRevenue?null:staffProfit?profit:rule.basis === 'profit_percent' ? (cogs === null ? null : Math.max(0, revenue - cogs)) : revenue,
             qty,
             amount,
             day,

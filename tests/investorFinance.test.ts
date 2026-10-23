@@ -16,6 +16,8 @@ import {adminFinanceOperationsRoutes} from '../worker/routes/adminFinanceOperati
 import {continueStaffReconciliation} from '../worker/lib/financeStaffAccrual';
 import {adminInventoryRoutes} from '../worker/routes/adminInventory';
 import type {Env} from '../worker/lib/types';
+import { drainOrderFinanceRecovery } from '../worker/lib/financeOrderRecovery';
+import { adminFinanceWorkspaceRoutes } from '../worker/routes/adminFinanceWorkspace';
 const ADMIN={id:'admin',email:'boss@x.co',role:'admin' as const};
 function setup(){
   const raw=freshDb();raw.exec(`INSERT INTO users(id,email,role,admin_scope,name) VALUES ('admin','boss@x.co','admin','full','Owner'),('investor','investor@x.co','admin','assistant','Investor'),('other','other@x.co','admin','assistant','Other'),('buyer','buyer@x.co','customer',NULL,'Buyer');
@@ -56,6 +58,35 @@ test('mixed FIFO origins accrue 35 percent separately, capital is not profit, de
   const before=count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events');await syncInvestorOrder(s.db,'order',{actor:'admin'});assert.equal(count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events'),before);
   assert.equal((await investmentContractSummary(s.db,a.operation_id)).summary.available_profit_iqd,140);
   assert.equal(count(s.raw,'SELECT SUM(debit_iqd-credit_iqd) n FROM accounting_lines'),0);
+});
+test('investor-only recovery deducts coupons, points, credited protection and monthly expenses from historical profit',async()=>{
+  const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);await sale(s,'order',['lot-a']);await syncInvestorOrder(s.db,'order');
+  await requestWithdrawal({DB:s.db} as Env,'investor','net-paid',100,'earnings');
+  await changeWithdrawalState(s.db,'net-paid','admin','approve');
+  await payWithdrawal(s.db,'admin','net-paid',{id:'net-receipt',reference:'cash',receipt_url:''});
+  const paid=row(s.raw,"SELECT * FROM finance_withdrawal_payments WHERE id='net-receipt'");
+  s.raw.exec(`UPDATE orders SET points_discount_iqd=20,coupon_snapshot='{"discount_iqd":130}',coupon_discount_iqd=130 WHERE id='order';
+    UPDATE order_items SET coupon_discount_iqd=30 WHERE id='order-item';
+    INSERT INTO price_protection_claims(id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,credited_iqd,state)
+      VALUES ('net-credit','buyer','order','order-item',500,450,1,50,'credited');
+    INSERT INTO expense_categories(id,slug,name_ar) VALUES ('net-expenses','net-expenses','Expenses');`);
+  s.raw.prepare('INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title) VALUES (?,?,?,?,?)').run('net-rent','net-expenses',60,baghdadDay(),'Rent');
+  assert.equal((await participantOverview(s.db,'investor')).summary.available_earnings_iqd,0);
+  await assert.rejects(requestWithdrawal({DB:s.db} as Env,'investor','net-stale',1,'earnings'));
+  const report=await drainOrderFinanceRecovery({DB:s.db} as Env);
+  assert.equal(report.completed,1,JSON.stringify(report));
+  const summary=(await participantOverview(s.db,'investor')).summary;
+  assert.equal(summary.investor_profit_iqd,49,'(500 - 100 cost - 30 line coupon - 20 points - 100 residual coupon - 50 credit - 60 rent) × 35%');
+  assert.equal(summary.earnings_paid_iqd,100);
+  assert.deepEqual(row(s.raw,"SELECT * FROM finance_withdrawal_payments WHERE id='net-receipt'"),paid);
+  assert.equal(count(s.raw,"SELECT SUM(amount_iqd) n FROM investor_finance_events WHERE kind='profit_correction'"),-91);
+  const reportApp=stubApp(s.db,ADMIN,app=>app.route('/workspace',adminFinanceWorkspaceRoutes));
+  const owner=await get(reportApp,`/workspace/summary?from=${baghdadDay().slice(0,7)}-01&to=${baghdadDay()}`);
+  assert.equal(owner.status,200);
+  assert.equal((await json(owner)).totals.owner_period_net_after_report_adjustments_iqd,91,'owner receives the same net 140 less investor 49; deductions are not doubled');
+  const events=count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events');
+  assert.equal((await drainOrderFinanceRecovery({DB:s.db} as Env)).scanned,0);
+  assert.equal(count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events'),events);
 });
 test('contract shares enforce 100 percent, immutable funded terms, and unused contract can be voided and replaced',async()=>{
   const s=setup(),a=await contract(s,'inc-a','investor',{capital_share_bps:6000,profit_share_bps:2100,loss_share_bps:6000,principal_iqd:180});

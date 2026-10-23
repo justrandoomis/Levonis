@@ -26,7 +26,7 @@ export interface OrderFinanceRecoveryReport {
 
 // A completed employee job is not evidence that every wage was calculable.
 // Keep these order candidates independent of that job's cursor/revision. The
-// The shared basis fingerprint also finds legacy percentages and source writes
+// shared basis fingerprint also finds legacy percentages and source writes
 // interrupted before they could record a failure. Reuse the exact payable
 // guard's inputs instead of inventing a second definition of a fresh wage.
 // Genuine unknown costs remain candidates, but the rotating cursor prevents
@@ -39,9 +39,9 @@ const candidate = `o.seller_type='levonis' AND o.status='delivered' AND o.delive
       AND NOT EXISTS(SELECT 1 FROM finance_staff_basis b WHERE b.order_id=o.id AND b.basis_fingerprint=(${staffBasisFingerprintSql('o.id')}))
       AND NOT EXISTS(SELECT 1 FROM finance_cost_adjustments a WHERE a.cost_id=c.id AND a.kind='manual'))))
   OR (EXISTS(SELECT 1 FROM order_items mi WHERE mi.order_id=o.id AND mi.membership_discount_iqd>0
-    AND (${membershipDiscountAtLineSql('mi')})=0) AND (
-      NOT EXISTS(SELECT 1 FROM finance_staff_basis b WHERE b.order_id=o.id AND b.basis_fingerprint=(${staffBasisFingerprintSql('o.id')}))
-      OR ${investorOrderProjectionStaleSql('o.id')}))
+    AND (${membershipDiscountAtLineSql('mi')})=0)
+    AND NOT EXISTS(SELECT 1 FROM finance_staff_basis b WHERE b.order_id=o.id AND b.basis_fingerprint=(${staffBasisFingerprintSql('o.id')})))
+  OR ${investorOrderProjectionStaleSql('o.id')}
   OR EXISTS(SELECT 1 FROM finance_posting_errors e WHERE e.order_id=o.id AND e.event_key IN (
     'delivered:'||o.id,'cogs:'||o.id,'investor:'||o.id,'workspace-reconciliation:'||o.id,'automatic-finance:'||o.id)))`;
 

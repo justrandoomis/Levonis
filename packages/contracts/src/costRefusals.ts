@@ -306,6 +306,21 @@ export const COST_REFUSALS = {
     en: 'This refund amount needs financial review before it can be applied. No new refund was made.',
     ckb: 'ئەم بڕەی گەڕاندنەوەی پارە پێویستی بە پشکنینی دارایی هەیە پێش جێبەجێکردن. هیچ پارەیەکی نوێ نەگەڕێنرایەوە.',
   },
+  NET_PROFIT_PENDING: {
+    ar: 'الأرباح معلقة حتى تثبيت تكاليف الطلب.',
+    en: 'Earnings are pending verification of the order costs.',
+    ckb: 'قازانجەکان چاوەڕێی پشتڕاستکردنەوەی تێچووی داواکارییەکەن.',
+  },
+  NET_PROFIT_UPDATE_REQUIRED: {
+    ar: 'أكمل تحديث نظام الحساب ثم أعد معاينة الأجور.',
+    en: 'Complete the accounting update, then preview wages again.',
+    ckb: 'نوێکردنەوەی سیستەمی ژمێریاری تەواو بکە، پاشان دووبارە پێشبینینی کرێکان ببینە.',
+  },
+  NET_PROFIT_ALLOCATION_LIMIT: {
+    ar: 'عدد بنود الشهر تجاوز حد توزيع المصاريف؛ يلزم مراجعة الحساب.',
+    en: 'This month exceeds the expense allocation limit; the calculation needs review.',
+    ckb: 'ژمارەی بڕگەکانی ئەم مانگە لە سنووری دابەشکردنی خەرجی تێپەڕیوە؛ پێویستە هەژمارەکە پێداچوونەوەی بۆ بکرێت.',
+  },
   MEMBERSHIP_SALE_REVIEW_REQUIRED: {
     ar: 'قيد البيع القديم لا يطابق لقطة الطلب. راجعه قبل تسوية خصم العضوية.',
     en: 'The original sale journal does not match the order snapshot. Review it before reconciling the membership discount.',

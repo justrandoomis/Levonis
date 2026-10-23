@@ -167,9 +167,54 @@ test('frozen membership application changes invalidate wage and investor financi
     wage_invalidated: await wageFingerprint() !== before.wage,
     investor_invalidated: (await investorOrderSplit(x.db, 'order')).source_fingerprint !== before.investor,
   }, { wage_invalidated: true, investor_invalidated: true }, 'neither participant may withdraw against the old interpretation of the frozen saving');
+  const unit = { wage: await wageFingerprint(), investor: (await investorOrderSplit(x.db, 'order')).source_fingerprint };
   x.raw.exec("UPDATE order_items SET membership_rule_id='different-rule' WHERE id='line'");
-  assert.deepEqual({ wage: await wageFingerprint(), investor: (await investorOrderSplit(x.db, 'order')).source_fingerprint }, before,
-    'changing the frozen item linkage invalidates the corrected fingerprint and restores the legacy interpretation');
+  assert.notEqual(await wageFingerprint(), unit.wage, 'changing the frozen rule linkage invalidates the wage basis');
+  assert.notEqual((await investorOrderSplit(x.db, 'order')).source_fingerprint, unit.investor);
+  assert.equal((await getOrderProfitBase(x.db, 'order')).lines[0].retained_revenue_iqd, 80000, 'missing evidence still restores the historical interpretation');
+});
+
+test('staff shares use net profit after every recorded deduction and recover historical paid wages through offsets', async () => {
+  const x = await earningsFixture({ percentage: true });
+  assert.equal((await participantOverview(x.db, 'employee')).summary.staff_iqd, 6000);
+  await requestWithdrawal(x.env, 'employee', 'net-paid', 2000);
+  await changeWithdrawalState(x.db, 'net-paid', 'boss', 'approve');
+  await payWithdrawal(x.db, 'boss', 'net-paid', { id: 'net-receipt', reference: 'cash', receipt_url: '' });
+  const payments = all(x.raw, 'SELECT * FROM finance_staff_payments ORDER BY id');
+  const original = all(x.raw, 'SELECT * FROM finance_order_costs ORDER BY id');
+  x.raw.exec(`UPDATE order_items SET coupon_discount_iqd=10000,membership_discount_iqd=10000 WHERE id='line';
+    UPDATE orders SET coupon_snapshot='{"discount_iqd":14000}',coupon_discount_iqd=14000,points_discount_iqd=5000,price_adjustment_iqd=-5000,total_iqd=66000,due_on_delivery_iqd=66000 WHERE id='order';
+    INSERT INTO price_protection_claims(id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,credited_iqd,state)
+      VALUES ('net-credit','buyer','order','line',50000,47000,2,6000,'credited');
+    INSERT INTO expense_categories(id,slug,name_ar) VALUES ('net-expenses','net-expenses','Expenses');
+    INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title) VALUES
+      ('net-rent','net-expenses',4000,'2026-09-01','Rent'),('net-pack','net-expenses',2000,'2026-09-22','Packaging'),('net-ad','net-expenses',2000,'2026-09-01','Promotion');
+    INSERT INTO finance_expense_links(expense_id,order_id) VALUES ('net-pack','order');
+    INSERT INTO finance_monthly_promotions(id,month,currency,amount_minor,exchange_rate,amount_iqd,expense_id,created_by,created_at,updated_at)
+      VALUES ('net-promotion','2026-09','IQD',2000,1,2000,'net-ad','boss','2026-09-01','2026-09-01');
+    INSERT INTO finance_collections(id,order_id,payer,amount_iqd,fee_iqd,collection_day,actor_id,created_at)
+      VALUES ('net-collection','order','customer',66000,1000,'2026-09-22','boss','2026-09-22');`);
+  assert.equal((await participantOverview(x.db, 'employee')).summary.available_earnings_iqd, 0, 'old wages cannot fund a withdrawal');
+  const recovery = await drainOrderFinanceRecovery(x.env);
+  assert.equal(recovery.completed, 1, JSON.stringify(recovery));
+  const summary = (await participantOverview(x.db, 'employee')).summary;
+  // 100000 - 10000 line coupon - 10000 membership - 5000 points - 5000 price
+  // - 40000 COGS - 4000 residual coupon - 6000 credit - 2000 packaging
+  // - 1000 fee - 4000 rent - 2000 promotion = 11000; wage 10% = 1100.
+  assert.deepEqual([summary.staff_iqd, summary.earnings_paid_iqd, summary.staff_debt_iqd], [1100, 2000, 900]);
+  assert.deepEqual(all(x.raw, 'SELECT * FROM finance_order_costs ORDER BY id'), original);
+  assert.deepEqual(all(x.raw, 'SELECT * FROM finance_staff_payments ORDER BY id'), payments);
+  assert.equal((await getOrderProfitBase(x.db, 'order')).totals.net_goods_iqd, 70000, 'invoice revenue is not rewritten by the participation calculation');
+  assert.equal((await drainOrderFinanceRecovery(x.env)).scanned, 0, 'replay never repeats the deduction or wage correction');
+
+  // Full-month overhead follows all sold units, including later deliveries.
+  x.raw.exec(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,created_at,delivered_at)
+    VALUES ('later','buyer','delivered','{}','standard','{}','cash',100000,1500,100000,100000,'2026-09-23','2026-09-23');
+    INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd) VALUES ('later-line','later','p','Printer',2,50000,100000);`);
+  const updated = await drainOrderFinanceRecovery(x.env);
+  assert.equal(updated.completed, 1, JSON.stringify(updated));
+  assert.equal((await participantOverview(x.db, 'employee')).summary.staff_iqd, 1400, 'half of the monthly 6000 expense now belongs to the later order');
+  assert.equal(count(x.raw, 'SELECT SUM(debit_iqd-credit_iqd) n FROM accounting_lines'), 0);
 });
 
 test('membership recovery corrects a historical percentage wage through a delta while keeping paid and held money', async () => {

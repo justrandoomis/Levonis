@@ -273,3 +273,46 @@ historical fallback, and that changes to current catalogue prices or exchange
 rates do not change recorded costs or post accounting entries.
 It also verifies native-journal parity, unchanged advances and collections,
 closed-period refusal, concurrent replay and subsequent actual refunds.
+
+
+## 7. Participant shares use net profit (owner clarification, 2026-10-22)
+
+The owner explicitly corrected the requested direction: «اجعله يحسب من الربح
+الصافي بعد الخصومات وكل شي وليس قبلها».
+
+Profit-percentage wages and investor distributions now include coupons,
+points, membership and offer savings, accepted price reductions, actual
+returns, credited price protection, verified inventory cost, direct costs,
+collection fees and allocated monthly expenses. A line coupon or embedded
+membership saving is counted once. A stocked trade-in credit remains payment
+in kind; returned credit is removed from retained revenue.
+
+Monthly promotion and otherwise unlinked operating expenses use all sold
+units in the delivery's Baghdad month, following the workspace's established
+monthly promotion allocation. Changes to the month or its sold-unit population
+invalidate affected balances for bounded reconciliation. Missing inventory
+cost or other pending costs remain unknown rather than zero.
+
+Staff profit percentages are calculated before their own percentage
+allocations, avoiding a circular calculation. Fixed and revenue-based wages
+are expenses. The established order remains: calculate staff pay first, then
+investor shares after staff costs. Fixed wages, explicit manual overrides and
+revenue-percentage contracts keep their respective rules.
+
+This supersedes the former report-only coupon/price-protection exception and
+owner-only monthly-expense treatment for participant entitlements. It does
+not rewrite original orders, invoices, payments or closed-period journals.
+Old projections are invalidated by the versioned financial fingerprint;
+recovery appends the difference in an open period. Already-paid amounts remain
+recorded and may become an outstanding offset; an open withdrawal must be
+released before a reduction can consume its reservation.
+
+Migration 0210 adds only preview-clock triggers for the newly relevant credit
+and promotion sources. Existing financial rows are unchanged. A stored wage
+preview expires when those sources change; an older database can still serve
+earnings but must finish this update before accepting a new wage preview.
+
+Example: sale 100,000, goods cost 60,000, discounts 20,000 leaves a 20,000
+profit basis before any further costs. A 10% staff share is 2,000; a 35%
+investor share, after that staff expense, is 6,300. Further recorded costs
+reduce both bases through the same calculation.

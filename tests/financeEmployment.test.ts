@@ -101,7 +101,7 @@ test('owner recheck restores historical pending wages with confirmed checkout co
   assert.equal((await json(await post(boss, `/people/staff/${id}/recheck`, body))).already, true);
   assert.equal(count(raw, "SELECT COUNT(*) n FROM audit_log WHERE action='finance.staff_recheck_requested' AND target=?", id), 1);
   await drain(id);
-  assert.equal(costs(id).find(c => c.order_id === 'pending-source')?.effective_iqd, 3000);
+  assert.equal(costs(id).find(c => c.order_id === 'pending-source')?.effective_iqd, 3500, 'net profit includes the recorded delivery income');
   assert.equal(costs(id).find(c => c.order_id === 'pending-source')?.state, 'due');
   assert.equal(costs(id).find(c => c.order_id === 'manual-source')?.effective_iqd, 4200);
   assert.deepEqual(all(raw, 'SELECT * FROM finance_staff_payments WHERE staff_id=?', id), payments);
@@ -109,7 +109,7 @@ test('owner recheck restores historical pending wages with confirmed checkout co
   const after = row(raw, 'SELECT * FROM finance_staff WHERE id=?', id)!;
   assert.deepEqual({ ...after, employment_version: previous.employment_version }, previous);
   const earnings = await json(await get(self, '/earnings'));
-  assert.equal(earnings.summary.available_earnings_iqd, 3000);
+  assert.equal(earnings.summary.available_earnings_iqd, 3500);
   assert.equal(earnings.summary.pending_costs, 0);
   // «أرباحي» carries no movements log (owner 2026-10-10): balances, sources and
   // withdrawals stay; the wage costs and the 4,200 payment above are untouched.
@@ -120,7 +120,7 @@ test('owner recheck restores historical pending wages with confirmed checkout co
   // still there (one is due, the other approved: two rows), with their
   // amounts and without the order ids.
   const wages = earnings.entries.filter((e: { kind: string }) => e.kind === 'staff') as Array<{ order_id: string | null; amount_iqd: number }>;
-  assert.deepEqual(wages.map((e) => e.amount_iqd).sort((a, b) => a - b), [3000, 4200], 'both wage sources are still listed');
+  assert.deepEqual(wages.map((e) => e.amount_iqd).sort((a, b) => a - b), [3500, 4200], 'both wage sources are still listed');
   assert.deepEqual(wages.map((e) => e.order_id), [null, null], 'no order id on a profit-share row');
   assert.ok(Array.isArray(earnings.withdrawals));
   assert.ok(earnings.employment && earnings.investment, 'the rest of the page is still served');
@@ -622,9 +622,10 @@ test('a cutoff edit racing a committed archive cannot restore the stale active e
 test('a percentage recalculation cannot revive earnings after a competing cutoff has fully reconciled', { timeout: 20_000 }, async () => {
   const { raw, db, boss, self, order, staff, rule, drain, costs } = setup();
   await order('zero-profit-cutoff', '2026-09-21T10:00:00.000Z');
-  withoutLotCostLock(raw, `UPDATE order_items SET cost_iqd=50000 WHERE order_id='zero-profit-cutoff';
-    UPDATE inventory_lots SET unit_cost_iqd=50000 WHERE id='lot:zero-profit-cutoff';
-    UPDATE order_item_inventory_allocations SET unit_cost_iqd=50000,cogs_iqd=50000 WHERE order_id='zero-profit-cutoff';`);
+  // Net zero includes the order's recorded 5000 delivery income.
+  withoutLotCostLock(raw, `UPDATE order_items SET cost_iqd=55000 WHERE order_id='zero-profit-cutoff';
+    UPDATE inventory_lots SET unit_cost_iqd=55000 WHERE id='lot:zero-profit-cutoff';
+    UPDATE order_item_inventory_allocations SET unit_cost_iqd=55000,cogs_iqd=55000 WHERE order_id='zero-profit-cutoff';`);
   const id = await staff(); await rule(id, { basis: 'profit_percent', amount: 1000 }); await drain(id);
   const original = costs(id)[0]; assert.ok(original); assert.equal(original.effective_iqd, 0);
   raw.exec("UPDATE orders SET price_adjustment_iqd=10000 WHERE id='zero-profit-cutoff'");

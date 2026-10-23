@@ -9,13 +9,19 @@ import { getOrderProfitBase, getOrderProfitBases } from './orderProfit';
 import { participantAdvanceState, participantSources, participantSummary, type ParticipantSource } from './financeParticipants';
 import { investorOrderSplit } from './investorFinance';
 import { validateRuleScope } from './financeRuleScopes';
+import { serverMessage } from '../../packages/contracts/src/costRefusals';
 
 export interface WageChangeInput {
   amount:unknown;basis?:unknown;effective_from:unknown;effective_to?:unknown;reason:unknown;
   version:unknown;scope?:unknown;active?:unknown;cap_iqd?:unknown;requires_assignment?:unknown;
   operation_id?:unknown;preview_token?:unknown;release_withdrawals?:unknown;preview_job_id?:unknown;
 }
-const clock=async(db:D1Database)=>(await db.prepare('SELECT version FROM finance_mutation_clock WHERE id=1').first<{version:number}>())!.version;
+const clock=async(db:D1Database)=>{
+  const state=await db.prepare(`SELECT version,EXISTS(SELECT 1 FROM sqlite_master WHERE type='trigger'
+    AND name='finance_clock_price_protection_claims_update') AS net_ready FROM finance_mutation_clock WHERE id=1`).first<{version:number;net_ready:number}>();
+  if(!state?.net_ready)throw conflict(serverMessage('NET_PROFIT_UPDATE_REQUIRED'),'NET_PROFIT_UPDATE_REQUIRED');
+  return state.version;
+};
 async function changeContext(db:D1Database,ruleId:string,input:WageChangeInput,actor:string){
   const old=await db.prepare('SELECT * FROM finance_cost_rules WHERE id=?').bind(ruleId).first<EffectiveWageRule>();
   if(!old?.staff_id)throw notFound('قاعدة الموظف غير موجودة');
@@ -41,7 +47,7 @@ async function changeContext(db:D1Database,ruleId:string,input:WageChangeInput,a
 
 // Completed and interrupted previews from an older calculation must be
 // reviewed again after a deploy, even when their source rows did not change.
-const PREVIEW_CALCULATION_VERSION=4;
+const PREVIEW_CALCULATION_VERSION=5;
 type PreviewDetail={order_id:string;earning_day:string;affected:boolean;units:number;previous_iqd:number;corrected_iqd:number|null;delta_iqd:number;manual_overrides:number;pending_costs:number;investor_delta_iqd:number|null;owner_delta_iqd:number|null};
 type PreviewWork={calculation_version:number;projected:ParticipantSource[];detail:PreviewDetail[];affectedCostIds:string[];affectedInvestorIds:string[];pendingTargets:Record<string,number|null>;previous:number;corrected:number;knownCorrected:number;delta:number;units:number;unknown:number;manual:number;investorDelta:number;ownerDelta:number;profitUnknown:number;investorUnknown:number;matched:number;reviewed:number};
 type PreviewPage={cursor:string;work?:PreviewWork};
@@ -76,7 +82,20 @@ export async function previewWageChange(db:D1Database,ruleId:string,input:WageCh
   const scanned=page?orders.slice(0,6):orders;
   reviewed+=scanned.length;
   for(const {id} of scanned){
-    const base=await getOrderProfitBase(db,id),targets=await planStaffWages(db,staff,base,[...versions,added]);
+    const base=await getOrderProfitBase(db,id);
+    let targets=await planStaffWages(db,staff,base,[...versions,added]);
+    const simulate=(values:WageTarget[])=>{
+      const ids=new Set(values.map(t=>t.cost?.id).filter(Boolean));
+      return [...base.costs.filter(c=>!ids.has(String(c.id))),...values.map((t,index)=>({
+        ...(t.cost??{}),id:t.cost?.id??`preview:${index}`,order_id:id,order_item_id:t.line_id,staff_id:staff.id,
+        effective_amount_iqd:t.amount,state:t.amount===null?'pending_cost':'due',
+        snapshot:JSON.stringify({rule:t.rule}),wage_rule_snapshot:JSON.stringify(t.rule),
+      }))];
+    };
+    if(targets.some(t=>t.rule.basis==='profit_percent')&&targets.some(t=>t.rule.basis!=='profit_percent'&&t.amount!==t.cost?.effective_iqd)){
+      const projected=(await getOrderProfitBases(db,[id],{costOverrides:{[id]:simulate(targets)}}))[0];
+      targets=await planStaffWages(db,staff,projected,[...versions,added]);
+    }
     if(!targets.length)continue;
     let beforeTargets:WageTarget[];
     try { beforeTargets=await planStaffWages(db,staff,base,versions); }
@@ -96,11 +115,7 @@ export async function previewWageChange(db:D1Database,ruleId:string,input:WageCh
     const affected=affectedWageLines(ruleId,beforeTargets,targets);
     const oldAmount=targets.reduce((n,t)=>n+(t.cost?.effective_iqd??0),0),pending=targets.filter(t=>t.amount===null).length;
     const newAmount=targets.reduce((n,t)=>n+(t.amount??t.cost?.effective_iqd??0),0);
-    const costIds=new Set(targets.map(t=>t.cost?.id).filter(Boolean));
-    const simulatedCosts=[...base.costs.filter(c=>!costIds.has(String(c.id))),...targets.map((t,index)=>({
-      ...(t.cost??{}),id:t.cost?.id??`preview:${index}`,order_id:id,order_item_id:t.line_id,staff_id:staff.id,
-      effective_amount_iqd:t.amount,state:t.amount===null?'pending_cost':'due',
-    }))];
+    const simulatedCosts=simulate(targets);
     const newBase=(await getOrderProfitBases(db,[id],{costOverrides:{[id]:simulatedCosts}}))[0];
     const [beforeInvestor,afterInvestor]=await Promise.all([investorOrderSplit(db,id),investorOrderSplit(db,id,newBase as unknown as NonNullable<Parameters<typeof investorOrderSplit>[2]>)]);
     for(const a of [...beforeInvestor.allocations,...afterInvestor.allocations]){const id=`invprofit:${a.contract_id}`;if(!affectedInvestorIds.includes(id))affectedInvestorIds.push(id);}
@@ -131,7 +146,7 @@ export async function previewWageChange(db:D1Database,ruleId:string,input:WageCh
     before_balance:existingBalance,after_balance:expectedBalance,pending_costs:unknown,manual_overrides:manual,
     investor_delta_iqd:investorUnknown?null:investorDelta,owner_delta_iqd:profitUnknown?null:ownerDelta,
     profit_review_orders:profitUnknown,withdrawals,orders:detail,
-    profit_basis:'retained_goods_less_verified_cogs',recorded_at:context.now};
+    profit_basis:'net_after_deductions_v1',recorded_at:context.now};
   if(await clock(db)!==beforeClock)throw conflict('تغيرت بيانات الطلبات أثناء المعاينة؛ أعد المعاينة','WAGE_PREVIEW_STALE');
   const token=await sha256Hex(JSON.stringify({calculation_version:PREVIEW_CALCULATION_VERSION,clock:beforeClock,rule:context.rule,reason:context.reason,from,until,actor}));
   return {context,clock:beforeClock,preview:{...preview,preview_token:token},page:{cursor:scanned.at(-1)?.id??page?.cursor??'',complete:!page||orders.length<=6,scanned:scanned.length},work:{calculation_version:PREVIEW_CALCULATION_VERSION,projected,detail,affectedCostIds,affectedInvestorIds,pendingTargets,previous,corrected,knownCorrected,delta,units,unknown,manual,investorDelta,ownerDelta,profitUnknown,investorUnknown,matched,reviewed}};

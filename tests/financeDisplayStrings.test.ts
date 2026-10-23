@@ -42,9 +42,9 @@ test('every P-A string has ar, en and its own Sorani — never the Arabic or the
   assert.equal(fill('{a} {b}', { a: 1 }), '1 {b}', 'an unknown placeholder stays as written');
 });
 
-test('the brief\'s own words are kept: the toggle note, the report-only note and the F2 sentence', () => {
+test('the display notes describe unchanged currency and the current net-profit participation policy', () => {
   assert.equal(PA_STRINGS.usdNote.ar, 'عرض بالدولار فقط. المبالغ المحاسبية محفوظة بالدينار ولا تتغير.');
-  assert.equal(PA_STRINGS.reportOnlyNote.ar, 'خصم للعرض في التقرير فقط؛ لا يغيّر حصص المستثمرين ولا الأجور ولا القيود المسجلة');
+  assert.equal(PA_STRINGS.netProfitNote.ar, 'هذه الخصومات تقلل صافي الربح الذي تُحسب منه حصص الموظفين والمستثمرين، مع حفظ سجل المدفوعات السابقة.');
   assert.equal(PA_STRINGS.displayCurrency.ckb, 'دراوی پیشاندان');
   assert.match(PA_STRINGS.usdToday.ar, /^≈/);
   assert.match(PA_STRINGS.usdMixed.ckb, /^≈/);

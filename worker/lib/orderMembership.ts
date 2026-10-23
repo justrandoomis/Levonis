@@ -46,10 +46,14 @@ export function membershipDiscountAtLineSql(item = 'i'): string {
     AND (json_type(${value},'$.rule_id') IN ('text','null') OR json_type(${value},'$.rule_id') IS NULL)
     AND json_extract(${value},'$.product_id')=(${product})
     AND json_extract(${value},'$.rule_id') IS ${item}.membership_rule_id`;
-  return `CASE WHEN EXISTS(SELECT 1 FROM orders om WHERE om.id=${item}.order_id
-    AND EXISTS(SELECT 1 FROM json_each(${lines}) mb WHERE ${matches} AND json_extract(${value},'$.applied_at')='unit')
-    AND NOT EXISTS(SELECT 1 FROM json_each(${lines}) mb WHERE ${matches} AND COALESCE(json_extract(${value},'$.applied_at'),'')<>'unit'))
-    THEN 0 ELSE COALESCE(${item}.membership_discount_iqd,0) END`;
+  // One aggregate proves that matches exist AND all apply at the unit. Avoid
+  // nested EXISTS: inside wage/withdrawal guards they exceed D1's expression
+  // depth of 100, even for an account with no earnings. Missing/invalid sites
+  // count as non-unit, exactly like membershipDiscountAtLine above.
+  return `(SELECT CASE WHEN COUNT(*)>0 AND MIN(json_extract(${value},'$.applied_at') IS 'unit')=1
+    THEN 0 ELSE COALESCE(${item}.membership_discount_iqd,0) END
+    FROM orders om JOIN json_each(${lines}) mb
+    WHERE om.id=${item}.order_id AND ${matches})`;
 }
 
 /** Keep persisted fingerprints byte-identical for unaffected orders. Only a

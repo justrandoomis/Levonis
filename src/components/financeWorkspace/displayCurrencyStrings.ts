@@ -3,7 +3,7 @@
  * Currency"; design §7.2 and §8).
  *
  * Accounting stays in IQD. These are the sentences the profit page adds for
- * the read-only fixes (F2, F3), the report-only deductions (F4/F5) and the
+ * the read-only fixes (F2, F3), the shared net-profit deductions (F4/F5) and the
  * IQD/USD display toggle, in Arabic, English and Sorani. They live in one
  * module so `tests/financeDisplayStrings.test.ts` can hold every entry to the
  * rule of docs/DECISIONS.md row 183: the `ckb` slot is its own Sorani — never
@@ -47,7 +47,7 @@ export const PA_STRINGS = {
     ckb: 'پێشنیار: نرخی دۆلاری فرۆشگا لە {date}: {rate}',
   },
 
-  // ---- F4/F5: report-only deductions (owner question Q3, default "report only")
+  // ---- F4/F5: deductions also reduce participant shares (owner, 2026-10-22)
   couponDeduction: {
     ar: 'خصم القسيمة',
     en: 'Coupon discount',
@@ -63,10 +63,10 @@ export const PA_STRINGS = {
     en: 'Net after report deductions',
     ckb: 'پوختە دوای داشکانەکانی ڕاپۆرت',
   },
-  reportOnlyNote: {
-    ar: 'خصم للعرض في التقرير فقط؛ لا يغيّر حصص المستثمرين ولا الأجور ولا القيود المسجلة',
-    en: 'Deducted in this report only; it does not change recorded investor shares, wages or journal entries',
-    ckb: 'تەنها لەم ڕاپۆرتەدا دەردەکرێت؛ بەشی وەبەرهێنەران و کرێ و تۆمارە ژمێریارییەکان ناگۆڕێت',
+  netProfitNote: {
+    ar: 'هذه الخصومات تقلل صافي الربح الذي تُحسب منه حصص الموظفين والمستثمرين، مع حفظ سجل المدفوعات السابقة.',
+    en: 'These deductions reduce the net profit used for staff and investor shares. Previous payments stay recorded.',
+    ckb: 'ئەم داشکانانە قازانجی پاکی بەشی کارمەندان و وەبەرهێنەران کەم دەکەنەوە. پارەدانی پێشوو تۆمارکراو دەمێنێتەوە.',
   },
 
   // ---- §8: the IQD/USD display toggle (display only; accounting stays IQD)
