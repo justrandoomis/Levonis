@@ -831,6 +831,10 @@ IQD, with a pre-order discount of $50 = 75,000.
   quotes a bundle no checkout accepts. The assistant's follow-up re-read («شكد سعره؟»: the products
   its last answer showed, `catalogByIds` in `worker/lib/assist/tools/catalog.ts`) asks the listing's
   own question the same way, with the SELLABLE flag the card builder prices from.
+  Search-selection trends (`worker/routes/searchTrending.ts`, migration 0212) also ask VISIBLE:
+  the selection door validates the chosen product, and the daily-rank query rechecks visibility
+  before returning its identity. These two calls expose no price or purchase action, so a
+  catalog-only product remains eligible while hidden or catalogue-held products do not.
 - **SELLABLE**: the old «listed» predicate byte for byte — visible, not held for ANY gap, and
   V2-published. Every PURCHASE path asks it: cart add, read and edit, the quote, checkout, Quick Buy, new
   gifts, bundles and mystery offers, the trade-in target (and, since Services S-P2, its search, the

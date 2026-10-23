@@ -37,6 +37,7 @@ import { sellableSql, visibleSql } from '../worker/lib/listing';
 /** The customer-facing files that read platform products (design §(c); spec §2). */
 const CUSTOMER_FILES = [
   'worker/routes/products.ts',
+  'worker/routes/searchTrending.ts',
   'worker/lib/homeShelves.ts',
   'worker/lib/catalogMembership.ts',
   'worker/lib/catalogPresentation.ts',
@@ -252,6 +253,9 @@ const EXPECTED_CALLS: Record<string, { visible: number; sellable: number; states
   'worker/routes/returns.ts': { visible: 0, sellable: 2, states: 0 },
   'worker/routes/reviews.ts': { visible: 2, sellable: 0, states: 0 },
   'worker/routes/seo.ts': { visible: 1, sellable: 0, states: 0 },
+  // Search selections and daily ranks expose catalogue identity only, including
+  // unpriced products; recording and reading both recheck VISIBLE (PRICING-V2 §9).
+  'worker/routes/searchTrending.ts': { visible: 2, sellable: 0, states: 0 },
   'worker/routes/stockAlerts.ts': { visible: 2, sellable: 0, states: 0 },
   // The assistant's product search is now the storefront's own (`catalog.search` → `listCatalogProducts`, the
   // predicates counted under products.ts: VISIBLE, and `composition = '' OR sellable`, default D6), so it left
@@ -373,6 +377,7 @@ test('the predicates themselves: SELLABLE is the old clause, VISIBLE carries exa
 const RAW_PRICE = /Number\([^)]*\.price_iqd\) \|\| 0|price_iqd \?\? 0|price_iqd\) \|\| 0/;
 const RAW_PRICE_FILES = [
   'worker/routes/products.ts',
+  'worker/routes/searchTrending.ts',
   'worker/routes/compare.ts',
   'worker/routes/support.ts',
   'worker/routes/profile.ts',
