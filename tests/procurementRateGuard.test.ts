@@ -199,14 +199,15 @@ test('the purchase panel never seeds 1 for a foreign currency; it prefills, bloc
   assert.match(panel, /data-purchase-rate="far"/);
 });
 
-test('«Keep this session’s draft» (serials, local only) shows no rate refusal; the server draft save still waits for the rate', () => {
+test('«Keep this session’s draft» (serials or pending price edits, local only) shows no rate refusal; the server draft save still waits for the rate', () => {
   const panel = src('src/components/adminOperations/ProcurementPanel.tsx');
   const handler = panel.match(/onClick=\{\(\) => \{ saveLocal\(\);([^\n]*?)\}\}>\{hasDraftSerials/)?.[1];
   assert.ok(handler, 'the draft button handler');
   // The rate refusal sits inside the branch that sends the draft to the server…
-  assert.match(handler, /^ if \(costsValid && originsValid && !hasDraftSerials\) \{ if \(!rateReady\) \{ op\.setError\([^;]*\); return; \} op\.run\(\(\) => save\('draft'\)/);
-  // …so a local-only keep (a draft with serials) never reaches it.
+  assert.match(handler, /^ if \(!pendingInlinePrices && costsValid && originsValid && !hasDraftSerials\) \{ if \(!rateReady\) \{ op\.setError\([^;]*\); return; \} op\.run\(\(\) => save\('draft'\)/);
+  // …so a local-only keep (serials or pending inline prices) never reaches it.
   assert.equal(handler.indexOf('!rateReady') > handler.indexOf('!hasDraftSerials'), true);
+  assert.equal(handler.indexOf('!rateReady') > handler.indexOf('!pendingInlinePrices'), true);
 });
 
 /** Every `loc()` call of a file: its argument texts (null for a non-literal) and its line. */

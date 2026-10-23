@@ -96,7 +96,7 @@ test('both fields are editable with decimal keyboards even before any price exis
     line: { ...selection, scope: 'option', label: 'New cable' }, purchaseDraft: null, value: {}, onChange: () => {}, onSaved: () => {}, revision: 0, summary: null, onAdvanced: () => {},
   }) }));
   for (const field of ['final_cost_usd', 'minimum_profit_usd']) {
-    assert.match(html, new RegExp(`<input[^>]+inputMode="decimal"[^>]+placeholder="—"[^>]+data-procurement-field="${field}"`));
+    assert.match(html, new RegExp(`<input[^>]+inputMode="decimal"[^>]+placeholder="—"[^>]+data-v2-field="${field}"`));
   }
-  assert.doesNotMatch(html, /<input[^>]+disabled/);
+  assert.doesNotMatch(html, /<input[^>]+\sdisabled(?:=|[\s>])/);
 });

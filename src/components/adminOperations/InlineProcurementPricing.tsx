@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from 'react';
 import { api, ApiError, isAborted } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { contractRefusal, refusalLang } from '../../lib/refusalStrings';
-import { typingUsd } from '../adminProducts/form/v2/usdTyping';
+import { UsdInput } from '../adminProducts/form/v2/v2Ui';
 import type { V2Answer, V2DraftWire } from '../adminProducts/form/v2/v2Model';
 import PricingSummaryBar from './PricingSummaryBar';
 import type { PricingSummary } from './procurementPricing';
@@ -61,15 +61,11 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
   const confirmRequired = result?.preview.large_change || result?.preview.drop_flag;
   const change = (field: keyof InlinePriceDraft, text: string) => {
     setError(null); setSaved(false); setConfirmedKey('');
-    onChange({ ...value, [field]: typingUsd(text) });
+    onChange({ ...value, [field]: text });
   };
   const field = (key: keyof InlinePriceDraft, label: string, fallback: string | null | undefined) => (
-    <div className="flex min-w-0 items-center gap-1" dir="ltr">
-      <span aria-hidden="true">$</span>
-      <input id={`${id}-${key}`} aria-label={`${label} (USD) · ${line.label}`} type="text" inputMode="decimal" autoComplete="off"
-        className="min-h-11 w-full min-w-0 rounded-[var(--ap-radius-md)] border border-[var(--ap-border)] bg-[var(--ap-surface-0)] px-2 tabular-nums focus:border-[var(--ap-ring)]"
-        placeholder="—" disabled={saving} value={value[key] ?? fallback ?? ''} onChange={(e) => change(key, e.target.value)} data-procurement-field={key} />
-    </div>
+    <UsdInput id={`${id}-${key}`} label={`${label} (USD) · ${line.label}`} placeholder="—" disabled={saving}
+      value={value[key] ?? fallback ?? ''} onChange={(text) => change(key, text)} data={key} />
   );
   const save = async () => {
     if (!result || saving) return;

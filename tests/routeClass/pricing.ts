@@ -122,6 +122,10 @@ export default {
           cls: 'cost_read',
           why: 'the procurement card’s 4-cell summary, «تفاصيل» and the review preview: prices in memory, writes nothing; POST only for its body',
         },
+        'POST /procurement/line-pricing': {
+          cls: 'cost_read',
+          why: 'the owner’s inline final cost and minimum profit preview prepares a V2 draft in memory; writes nothing and uses POST only for its body',
+        },
         'POST /products/:id/apply-purchase': {
           cls: 'cost_write',
           why: 'a confirmed purchase → the product’s current costs and typed minimum profits (pricing_inputs, pricing_rules); never a price',
