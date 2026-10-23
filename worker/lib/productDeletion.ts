@@ -158,6 +158,8 @@ export const OWNED_TABLES: OwnedTable[] = [
   // Its codes (migration 0206): a colour code or SKU left behind would answer
   // "exact match" with a product that no longer exists.
   { table: 'search_identifiers', by: { column: 'product_id' } },
+  // Daily search-selection ranks have no meaning after their catalogue product is gone.
+  { table: 'search_selection_visitors', by: { column: 'product_id' } },
   { table: 'product_translations', by: { column: 'product_id' } },
   // ---- stock and pricing history owned by the product --------------------
   { table: 'inventory_ledger', by: { column: 'product_id' } },
