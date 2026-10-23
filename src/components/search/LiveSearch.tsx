@@ -1,3 +1,4 @@
+import { afterCriticalPaint } from '../../lib/afterCriticalPaint';
 import React, { Suspense, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, PackageSearch, RotateCcw, Search, X } from 'lucide-react';
@@ -91,6 +92,7 @@ function remember(query: string, answer: Answer) {
  * first paint, measured in the commit that moved them).
  */
 const LiveSearchPanel = React.lazy(() => import('./LiveSearchPanel'));
+const TrendingSearches = React.lazy(() => import('./TrendingSearches').catch(() => ({ default: () => <></> })));
 
 /** Where a result opens — the same rule as the results grid. A composition row is bought at /bundles. */
 export const productHref = (p: ApiProduct): string =>
@@ -146,6 +148,8 @@ export default function LiveSearch({
   // The panel chunk is requested on the first touch or focus, before there is
   // anything to show, so it is in memory by the time the first answer lands.
   const [armed, setArmed] = useState(false);
+  const [trendsReady, setTrendsReady] = useState(false);
+  useEffect(() => size === 'regular' ? afterCriticalPaint(() => setTrendsReady(true)) : undefined, [size]);
   const arm = () => {
     if (armed) return;
     setArmed(true);
@@ -256,7 +260,9 @@ export default function LiveSearch({
           : 'rows';
   const activeRow = view === 'rows' && active >= 0 && active < rows.length ? active : -1;
 
-  const pick = () => {
+  const pick = (productId: string) => {
+    // Count canonical catalogue selections, never private free-text search input.
+    void api.post('/api/search/selection', { product_id: productId }, { mascot: 'silent' }).catch(() => {});
     onPick?.();
     setOpen(false);
     setActive(-1);
@@ -442,6 +448,7 @@ export default function LiveSearch({
         )}
       </div>
 
+      {size === 'regular' && !hasQuery && <div className="min-h-11"><Suspense fallback={null}>{trendsReady && <TrendingSearches onChoose={(term) => { arm(); commit(term, true); inputRef.current?.focus({ preventScroll: true }); }} />}</Suspense></div>}
       <div className="sr-only" aria-live="polite">
         {announcement}
       </div>
@@ -469,7 +476,7 @@ export default function LiveSearch({
                       aria-selected={i === activeRow}
                       tabIndex={-1}
                       to={kit.href(productHref(p), p, data)}
-                      onClick={pick}
+                      onClick={() => pick(p.id)}
                       onPointerEnter={() => setActive(i)}
                       className={`flex min-h-[60px] items-center gap-3 rounded-xl px-2 py-1.5 transition-colors ${
                         i === activeRow ? 'bg-white/[0.10]' : 'hover:bg-white/[0.05]'

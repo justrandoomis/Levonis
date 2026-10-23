@@ -2290,6 +2290,7 @@ export default function Checkout() {
             {addingAddress ? (
               <div className="lv-surface mt-3 p-4">
                 <AddressForm
+                  savedAddresses={addresses ?? []}
                   dense
                   defaultWhenFirst={addresses.length === 0}
                   onCancel={() => setAddingAddress(false)}

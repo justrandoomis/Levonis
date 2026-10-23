@@ -561,6 +561,7 @@ export default function Addresses() {
             page behind. */}
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <AddressForm
+                  savedAddresses={addresses ?? []}
             key={editingAddress?.id ?? 'new'}
             initial={editingAddress}
             defaultWhenFirst={addresses.length === 0}

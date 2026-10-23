@@ -1,3 +1,5 @@
+import './components/motion/media.css';
+import './components/motion/collection.css';
 import React, { Suspense } from 'react';
 import { Routes, Route, useLocation, useNavigationType } from 'react-router-dom';
 /**

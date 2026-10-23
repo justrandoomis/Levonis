@@ -1,7 +1,9 @@
+// Lucian UX/UI Prompt #258 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#258
 import React, { useEffect, useRef, useState } from 'react';
 import { ImageOff, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { IMAGE_VARIANT_WIDTHS, variantSrcSet } from '../../../packages/contracts/src/imageSizing';
+import { isVariantSource } from '../../../packages/contracts/src/imageSizing';
 import { whenNear } from '../../lib/nearViewport';
 
 /**
@@ -166,16 +168,19 @@ export default function SafeImage({
    * nothing the visitor can see happen. Eager images are simply there — and
    * so is a deferred one released while already on the screen.
    */
+  const preview = !eager && !release.onScreen && release.near && isVariantSource(cleanSrc) && status === 'loading' ? `${cleanSrc}?w=160` : '';
   const revealCls = eager || release.onScreen
     ? 'opacity-100'
-    : `transition-opacity duration-300 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`;
+    : `u258-photo ${status === 'loaded' ? 'opacity-100' : 'is-lq'}`;
 
   return (
-    <div ref={boxRef} className={`relative overflow-hidden ${aspectCls} ${bgClassName} ${className}`}>
+    <div ref={boxRef} className={`u258 relative overflow-hidden ${aspectCls} ${bgClassName} ${className}`}>
+      {preview && <img src={preview} srcSet={variantSrcSet(cleanSrc, { max: 160 })} sizes="160px" alt="" aria-hidden="true" decoding="async" loading="lazy" fetchPriority="low" referrerPolicy={referrerPolicy} className={`u258-preview ${fit === 'contain' ? 'object-contain' : 'object-cover'} ${imgClassName}`} onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />}
       {cleanSrc && status !== 'error' && release.near && (
         <img
           key={`${cleanSrc}#${attempt}`}
           ref={imgRef}
+          data-main-image
           src={cleanSrc}
           srcSet={shownSizes && srcSet}
           sizes={shownSizes}
@@ -192,10 +197,7 @@ export default function SafeImage({
         />
       )}
       {cleanSrc && status === 'loading' && (
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 bg-surface-selected/60 animate-pulse motion-reduce:animate-none"
-        />
+        <div aria-hidden="true" className={preview ? "u258-progress" : "absolute inset-0 bg-surface-selected/60 animate-pulse motion-reduce:animate-none"} />
       )}
       {showFallback && (
         <div

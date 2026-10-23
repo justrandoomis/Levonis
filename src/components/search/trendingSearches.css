@@ -1,0 +1,20 @@
+/* Lucian UX/UI Prompt #322 · MIT License (c) 2026 Seokwoooo */
+.u322 { position: relative; min-height: 36px; --ux-surface: var(--color-surface); --ux-ink: var(--color-text-primary); --ux-accent: var(--color-accent); }
+.u322 .u322-head { display: flex; align-items: center; }
+.u322 .u322-tk { display: flex; flex: 1; min-width: 0; align-items: center; gap: 8px; min-height: 44px; border-radius: 12px; padding: 0 8px; text-align: start; color: var(--ux-ink); }
+.u322 .u322-tk small { flex: none; font-size: 10px; color: var(--ux-accent); font-weight: 850; }
+.u322 .u322-roll { flex: 1; min-width: 0; overflow: hidden; height: 36px; }
+.u322 .u322-line { height: 36px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 800; animation: u322-roll .5s cubic-bezier(.3,1.2,.5,1); }
+.u322 .u322-line>span, .u322 li span { min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.u322 b { color: var(--ux-accent); font-variant-numeric: tabular-nums; }
+.u322 em { flex: none; font-style: normal; font-size: 10px; color: var(--color-text-muted); }
+.u322 .u322-pause { flex: none; display: grid; place-items: center; min-width: 44px; min-height: 44px; border-radius: 12px; color: var(--color-text-secondary); }
+.u322 .u322-panel { position: absolute; inset-inline: 0; top: 100%; z-index: 35; padding: 12px; border-radius: 16px; border: 1px solid var(--color-border-subtle); background: var(--ux-surface); box-shadow: 0 16px 34px -18px #0007; animation: u322-panel .45s cubic-bezier(.3,1,.4,1); }
+.u322 .u322-panel>p { font-size: 11px; color: var(--color-text-muted); padding-bottom: 6px; }
+.u322 ol { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px; margin: 0; padding: 0; list-style: none; }
+.u322 li button { display: flex; align-items: center; gap: 7px; width: 100%; min-height: 44px; padding: 0 6px; border-radius: 8px; color: var(--ux-ink); font-size: 11.5px; text-align: start; }
+.u322 button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+@keyframes u322-roll { from { transform: translateY(100%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes u322-panel { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (hover: hover) and (pointer: fine) { .u322 button:hover { background: var(--color-surface-selected); } }
+@media (prefers-reduced-motion: reduce) { .u322 .u322-line, .u322 .u322-panel { animation: none; } }

@@ -1,3 +1,4 @@
+import MotionCollection from '../motion/MotionCollection';
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PackageSearch } from 'lucide-react';
@@ -13,7 +14,6 @@ import QuickFilterChips from './QuickFilterChips';
 import AppliedFilterChips from './AppliedFilterChips';
 import ResultCount from './ResultCount';
 import ProductGrid from './ProductGrid';
-import ProductList from './ProductList';
 import LoadMore from './LoadMore';
 import EmptyFiltered from './EmptyFiltered';
 import ScopedSearch from './ScopedSearch';
@@ -183,13 +183,7 @@ export default function ListingView({
       />
     );
   } else {
-    const list =
-      view === 'list' ? (
-        <ProductList products={data.products} />
-      ) : (
-        <ProductGrid products={data.products} divider={state.sort === 'relevance' && !state.q} withColumn={column} />
-      );
-    // What the list says about itself: a partial price/stock order or filter, products not listed.
+    const list = <ProductGrid products={data.products} view={view} divider={view === 'grid' && state.sort === 'relevance' && !state.q} withColumn={column} />;
     const notes = listingNotes(data, state);
     results = (
       <div className="relative">
@@ -313,7 +307,7 @@ export default function ListingView({
             ) : (
               <div className="h-8" />
             )}
-            {results}
+            <MotionCollection version={`${view}:${data?.products.map((p) => p.id).join(',') ?? ''}`} view={view}>{results}</MotionCollection>
           </div>
         </div>
       </div>

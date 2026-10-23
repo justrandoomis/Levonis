@@ -1,3 +1,4 @@
+import EmailSuggestions from './EmailSuggestions';
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 
@@ -142,6 +143,7 @@ export default function AuthTextField({
           </span>
         )}
       </div>
+      {(type === 'email' || inputMode === 'email') && <EmailSuggestions value={value} onChange={onChange} inputId={id} disabled={disabled} />}
       {error ? (
         <p id={errorId} className="lv-field__error">
           {error}

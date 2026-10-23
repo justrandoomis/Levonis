@@ -9,7 +9,7 @@ export default function ResultCount({ count, explanation, busy }: { count: strin
   return (
     <div data-result-count className="flex items-baseline justify-between gap-3 pb-2 pt-1 text-[12px] text-text-muted lg:text-[13px]">
       <p aria-live="polite" aria-busy={busy || undefined} className="font-extrabold tabular-nums text-text-primary">
-        {count}
+        <span key={count} className="u292-count">{count}</span>
       </p>
       <p className="truncate">{explanation}</p>
     </div>

@@ -1,3 +1,5 @@
+import DissolveImage from '../components/motion/DissolveImage';
+import { useProductEntrance } from '../components/motion/ProductTransition';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import { mascot } from '../lib/mascot';
 /**
@@ -1312,6 +1314,7 @@ export default function Product() {
   // renders when there is a media URL — without fighting ref variance.
   const zoomBtnRef = useRef<HTMLElement | null>(null);
   const heroRef = useRef<HTMLDivElement | null>(null);
+  useProductEntrance(heroRef, !loading && !!product);
 
   const [addingToCart, setAddingToCart] = useState(false);
   // Set only from the server's CART_SHIPPING_CONFLICT refusal. null = no dialog.
@@ -5173,8 +5176,7 @@ export default function Product() {
               {/* `data-gallery-hero` / `data-gallery-strip`: the hooks the import's browser check reads the main picture
                   and the thumbnails by (scripts/bambu-import/browser.ts) — never a style. */}
               <div ref={heroRef} className="lv-surface relative w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] overflow-hidden" data-gallery-hero>
-                <SafeImage
-                  key={activeMedia?.url || 'empty'}
+                <DissolveImage
                   src={activeMedia?.url}
                   alt={
                     pick(lang as Lang, activeMedia?.alt_ar, activeMedia?.alt_en, activeMedia?.alt_ckb) || name
@@ -5192,7 +5194,7 @@ export default function Product() {
                     // is here, check it has the shape of the twin (lightMainImageSize).
                     if (status !== 'loaded' || theme !== 'light' || src !== (product.light_image ?? '').trim()) return;
                     if (product.light_image_width && product.light_image_height) return;
-                    const img = heroRef.current?.querySelector('img');
+                    const img = heroRef.current?.querySelector<HTMLImageElement>('img[data-main-image]');
                     const assumed = mediaAspect(activeMedia);
                     if (!img || !img.naturalWidth || !img.naturalHeight || !assumed) return;
                     const aspect = img.naturalWidth / img.naturalHeight;
@@ -5224,7 +5226,14 @@ export default function Product() {
               </div>
 
               {gallery.length > 1 ? (
-                <div className="mt-3 flex gap-2 overflow-x-auto hide-scrollbar pb-1" aria-label={s.gallery} data-gallery-strip>
+                <div className="mt-3 flex gap-2 overflow-x-auto hide-scrollbar pb-1" aria-label={s.gallery} data-gallery-strip onKeyDown={(event) => {
+                  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                  event.preventDefault();
+                  const step = (event.key === 'ArrowLeft') === (dir === 'rtl') ? 1 : -1;
+                  const next = (galleryIndex + step + gallery.length) % gallery.length;
+                  setGalleryIndex(next);
+                  event.currentTarget.querySelectorAll('button')[next]?.focus({ preventScroll: true });
+                }}>
                   {gallery.map((m, i) => (
                     <button
                       key={m.url + i}
@@ -5265,7 +5274,7 @@ export default function Product() {
                 beside the gallery starts with the same two lines, so this pair
                 is visually hidden there (still read, still the page's one
                 h1) — see the top of the <aside> below. */}
-            <div className="mt-5">
+            <div className="mt-5" data-product-detail>
               <div className="lg:sr-only">
               {/* The name is English on every surface (§3/§7): LTR, aligned with the column (I18N-DESIGN §B.1 rule 7). */}
               <h1 className="text-xl sm:text-2xl font-bold text-text-primary leading-snug text-start rtl:text-right" dir={scriptDir(name)}>{name}</h1>
