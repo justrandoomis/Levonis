@@ -6,7 +6,7 @@
 PRAGMA defer_foreign_keys = true;
 
 -- pricing_rules
-CREATE TABLE pricing_rules_precision_new (
+CREATE TABLE pricing_rules_new (
   id                  TEXT PRIMARY KEY,
   kind                TEXT NOT NULL CHECK (kind IN ('target_profit','direct_sale_extra')),
   scope               TEXT NOT NULL CHECK (scope IN ('global','category','product','option','color','sku')),
@@ -43,10 +43,10 @@ CREATE TABLE pricing_rules_precision_new (
   CHECK (legacy_amount_iqd IS NULL OR (source = 'LEGACY_MIGRATION' AND kind = 'target_profit' AND amount_usd IS NOT NULL))
 );
 
-INSERT INTO pricing_rules_precision_new (id, kind, scope, catalog_id, product_id, scope_id, state, amount_usd, amount_iqd, legacy_amount_iqd, legacy_usd_iqd_rate, source, legacy_result_id, version, updated_by, updated_at)
+INSERT INTO pricing_rules_new (id, kind, scope, catalog_id, product_id, scope_id, state, amount_usd, amount_iqd, legacy_amount_iqd, legacy_usd_iqd_rate, source, legacy_result_id, version, updated_by, updated_at)
   SELECT id, kind, scope, catalog_id, product_id, scope_id, state, amount_usd, amount_iqd, legacy_amount_iqd, legacy_usd_iqd_rate, source, legacy_result_id, version, updated_by, updated_at FROM pricing_rules;
 DROP TABLE pricing_rules;
-ALTER TABLE pricing_rules_precision_new RENAME TO pricing_rules;
+ALTER TABLE pricing_rules_new RENAME TO pricing_rules;
 
 CREATE INDEX idx_pricing_rules_product ON pricing_rules(product_id) WHERE product_id IS NOT NULL;
 
@@ -106,7 +106,7 @@ WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
 -- pricing_price_points
-CREATE TABLE pricing_price_points_precision_new (
+CREATE TABLE pricing_price_points_new (
   product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   scope      TEXT NOT NULL CHECK (scope IN ('product','option','color','sku')),
   scope_id   TEXT NOT NULL DEFAULT '' CHECK (length(scope_id) <= 400),
@@ -129,10 +129,10 @@ CREATE TABLE pricing_price_points_precision_new (
   CHECK (scope <> 'sku'     OR kind = 'fixed')
 );
 
-INSERT INTO pricing_price_points_precision_new (product_id, scope, scope_id, kind, amount_usd, version, updated_by, updated_at)
+INSERT INTO pricing_price_points_new (product_id, scope, scope_id, kind, amount_usd, version, updated_by, updated_at)
   SELECT product_id, scope, scope_id, kind, amount_usd, version, updated_by, updated_at FROM pricing_price_points;
 DROP TABLE pricing_price_points;
-ALTER TABLE pricing_price_points_precision_new RENAME TO pricing_price_points;
+ALTER TABLE pricing_price_points_new RENAME TO pricing_price_points;
 
 CREATE TRIGGER pricing_price_points_guard_delete BEFORE DELETE ON pricing_price_points
 WHEN EXISTS (SELECT 1 FROM products p WHERE p.id = OLD.product_id)
@@ -174,7 +174,7 @@ WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
 -- pricing_preorder_discounts
-CREATE TABLE pricing_preorder_discounts_precision_new (
+CREATE TABLE pricing_preorder_discounts_new (
   product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   scope      TEXT NOT NULL CHECK (scope IN ('product','option','color','sku')),
   scope_id   TEXT NOT NULL DEFAULT '' CHECK (length(scope_id) <= 400),
@@ -188,10 +188,10 @@ CREATE TABLE pricing_preorder_discounts_precision_new (
   CHECK ((scope = 'product') = (scope_id = ''))
 );
 
-INSERT INTO pricing_preorder_discounts_precision_new (product_id, scope, scope_id, amount_usd, version, updated_by, updated_at)
+INSERT INTO pricing_preorder_discounts_new (product_id, scope, scope_id, amount_usd, version, updated_by, updated_at)
   SELECT product_id, scope, scope_id, amount_usd, version, updated_by, updated_at FROM pricing_preorder_discounts;
 DROP TABLE pricing_preorder_discounts;
-ALTER TABLE pricing_preorder_discounts_precision_new RENAME TO pricing_preorder_discounts;
+ALTER TABLE pricing_preorder_discounts_new RENAME TO pricing_preorder_discounts;
 
 CREATE TRIGGER pricing_preorder_discounts_guard_delete BEFORE DELETE ON pricing_preorder_discounts
 WHEN EXISTS (SELECT 1 FROM products p WHERE p.id = OLD.product_id)
@@ -233,7 +233,7 @@ WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
 -- pricing_v2_sku_results
-CREATE TABLE pricing_v2_sku_results_precision_new (
+CREATE TABLE pricing_v2_sku_results_new (
   product_id         TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   combo_key          TEXT NOT NULL CHECK (length(combo_key) <= 400 AND (combo_key = '' OR combo_key GLOB 'o:?*' OR combo_key GLOB 'c:?*')),
   channel            TEXT NOT NULL CHECK (channel IN ('direct_sale','pre_order_air','pre_order_sea','pre_order_land')),
@@ -298,10 +298,10 @@ CREATE TABLE pricing_v2_sku_results_precision_new (
   CHECK ((target_rule_id IS NULL) = (target_rule_version IS NULL))
 );
 
-INSERT INTO pricing_v2_sku_results_precision_new (product_id, combo_key, channel, method, anchor, final_price_iqd, exact_iqd, direct_price_iqd, direct_exact_iqd, usd_ceil6, deltas_usd, discount_usd, discount_scope, discount_scope_id, floor, below_cost, below_min_profit, shipping_profile, supplier_currency, fx_rate, fx_version, cross_rate, cross_fx_version, shipping_rate, shipping_version, replacement_exact, replacement_cost_iqd, target_profit_usd, target_rule_id, target_rule_version, usd_iqd_rate, usd_fx_version, inputs_seq, config_version, write_seq, computed_at)
+INSERT INTO pricing_v2_sku_results_new (product_id, combo_key, channel, method, anchor, final_price_iqd, exact_iqd, direct_price_iqd, direct_exact_iqd, usd_ceil6, deltas_usd, discount_usd, discount_scope, discount_scope_id, floor, below_cost, below_min_profit, shipping_profile, supplier_currency, fx_rate, fx_version, cross_rate, cross_fx_version, shipping_rate, shipping_version, replacement_exact, replacement_cost_iqd, target_profit_usd, target_rule_id, target_rule_version, usd_iqd_rate, usd_fx_version, inputs_seq, config_version, write_seq, computed_at)
   SELECT product_id, combo_key, channel, method, anchor, final_price_iqd, exact_iqd, direct_price_iqd, direct_exact_iqd, usd_ceil6, deltas_usd, discount_usd, discount_scope, discount_scope_id, floor, below_cost, below_min_profit, shipping_profile, supplier_currency, fx_rate, fx_version, cross_rate, cross_fx_version, shipping_rate, shipping_version, replacement_exact, replacement_cost_iqd, target_profit_usd, target_rule_id, target_rule_version, usd_iqd_rate, usd_fx_version, inputs_seq, config_version, write_seq, computed_at FROM pricing_v2_sku_results;
 DROP TABLE pricing_v2_sku_results;
-ALTER TABLE pricing_v2_sku_results_precision_new RENAME TO pricing_v2_sku_results;
+ALTER TABLE pricing_v2_sku_results_new RENAME TO pricing_v2_sku_results;
 
 CREATE INDEX idx_pricing_v2_results_currency ON pricing_v2_sku_results(supplier_currency, product_id);
 
@@ -333,7 +333,7 @@ WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
 -- pricing_sku_costs
-CREATE TABLE pricing_sku_costs_precision_new (
+CREATE TABLE pricing_sku_costs_new (
   product_id                      TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   combo_key                       TEXT NOT NULL,
   channel                         TEXT NOT NULL CHECK (channel IN ('direct_sale','pre_order_air','pre_order_sea','pre_order_land')),
@@ -397,10 +397,10 @@ CREATE TABLE pricing_sku_costs_precision_new (
          BETWEEN 0 AND rounding_step_iqd)
 );
 
-INSERT INTO pricing_sku_costs_precision_new (product_id, combo_key, channel, shipping_profile, supplier_amount, supplier_currency, supplier_input_mode, current_supplier_cost_usd_exact, usd_iqd_rate, usd_fx_version, cross_rate, cross_fx_version, fx_rate, fx_version, supplier_cost_iqd, shipping_basis, shipping_rate, shipping_version, effective_weight_g, shipping_cbm, manual_cbm, effective_cbm, shipping_cost_iqd, additional_cost_iqd, replacement_exact, replacement_cost_iqd, target_profit_iqd, target_profit_usd, target_profit_iqd_exact, shipping_cost_usd, additional_cost_usd, current_total_cost_usd, final_price_usd, target_rule_id, target_rule_version, direct_sale_extra_iqd, extra_rule_id, extra_rule_version, rule_catalog_id, config_version, inputs_seq, rounding_step_iqd, preorder_base_iqd, computed_price_iqd, pricing_revision, computed_at)
+INSERT INTO pricing_sku_costs_new (product_id, combo_key, channel, shipping_profile, supplier_amount, supplier_currency, supplier_input_mode, current_supplier_cost_usd_exact, usd_iqd_rate, usd_fx_version, cross_rate, cross_fx_version, fx_rate, fx_version, supplier_cost_iqd, shipping_basis, shipping_rate, shipping_version, effective_weight_g, shipping_cbm, manual_cbm, effective_cbm, shipping_cost_iqd, additional_cost_iqd, replacement_exact, replacement_cost_iqd, target_profit_iqd, target_profit_usd, target_profit_iqd_exact, shipping_cost_usd, additional_cost_usd, current_total_cost_usd, final_price_usd, target_rule_id, target_rule_version, direct_sale_extra_iqd, extra_rule_id, extra_rule_version, rule_catalog_id, config_version, inputs_seq, rounding_step_iqd, preorder_base_iqd, computed_price_iqd, pricing_revision, computed_at)
   SELECT product_id, combo_key, channel, shipping_profile, supplier_amount, supplier_currency, supplier_input_mode, current_supplier_cost_usd_exact, usd_iqd_rate, usd_fx_version, cross_rate, cross_fx_version, fx_rate, fx_version, supplier_cost_iqd, shipping_basis, shipping_rate, shipping_version, effective_weight_g, shipping_cbm, manual_cbm, effective_cbm, shipping_cost_iqd, additional_cost_iqd, replacement_exact, replacement_cost_iqd, target_profit_iqd, target_profit_usd, target_profit_iqd_exact, shipping_cost_usd, additional_cost_usd, current_total_cost_usd, final_price_usd, target_rule_id, target_rule_version, direct_sale_extra_iqd, extra_rule_id, extra_rule_version, rule_catalog_id, config_version, inputs_seq, rounding_step_iqd, preorder_base_iqd, computed_price_iqd, pricing_revision, computed_at FROM pricing_sku_costs;
 DROP TABLE pricing_sku_costs;
-ALTER TABLE pricing_sku_costs_precision_new RENAME TO pricing_sku_costs;
+ALTER TABLE pricing_sku_costs_new RENAME TO pricing_sku_costs;
 
 CREATE INDEX idx_pricing_sku_costs_currency ON pricing_sku_costs(supplier_currency, product_id);
 
