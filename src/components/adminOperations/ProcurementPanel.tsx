@@ -11,6 +11,7 @@ import PurchaseUnitOrigins, { PurchaseUnitReceiveFields, SavedPurchaseUnitOrigin
 import type { PurchaseSerialResult } from './PurchaseUnitSerial';
 import { copyPurchaseUnits, purchaseReceiptDraft, purchaseReceiptValid, purchaseUnitRows, purchaseUnitsValid, purchaseUnitsWire, type PurchaseReceiptDraft } from './procurementUnitOrigins';
 import PricingSummaryBar from './PricingSummaryBar';
+import InlineProcurementPricing, { type InlinePriceDraft } from './InlineProcurementPricing';
 import BatchSnapshotCard from '../adminInventory/BatchSnapshotCard';
 import { extraOnStep, previewDraft, previewSaved, type PreviewChoices, type PricingPreview, type PricingSummary } from './procurementPricing';
 import { procurementPricingStrings } from './procurementPricingStrings';
@@ -157,9 +158,15 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   const rs = procurementRateStrings(lang);
   // «تغيير الاسم» on a saved purchase: the name being typed (null = closed).
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [inlinePrices, setInlinePrices] = useState<Record<string, InlinePriceDraft>>({});
+  const inlineKey = (l: Pick<Selection, 'product_id' | 'scope' | 'scope_id'>) => `${l.product_id}:${l.scope}:${l.scope_id}`;
+  const setInlinePrice = (key: string, value: InlinePriceDraft) => setInlinePrices((current) => {
+    const next = { ...current };
+    if (Object.keys(value).length) next[key] = value; else delete next[key];
+    return next;
+  });
   // The card's pricing (USD design §5): the server's summary per line and the per-product choices.
-  // DECISIONS row 249: no minimum profit is typed here (the product's prices section is its one
-  // source), and every line counts — the preview reads the purchase exactly as its confirm does.
+  // Inline edits use the same V2 writer as the product form; every purchase line still counts.
   const [pricing, setPricing] = useState<PricingPreview | null>(null),
     [pricingBusy, setPricingBusy] = useState(false),
     [pricingOff, setPricingOff] = useState(false),
@@ -228,7 +235,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     setPurchases(r.purchases.map((p) => purchaseRowFromWire<Purchase>(p)));
   }, [offset, receiveOnly]);
   const { run } = op;
-  useEffect(() => { if (!editing || (!lines.length && funding.mode === 'store')) return; const timer = setTimeout(() => { privateDrafts.setItem('levonis-purchase-draft-v2', JSON.stringify({ header, lines, charges, funding, editId, editVersion, operationId, quickReceive })); setDraftAvailable(true); }, 600); return () => clearTimeout(timer); }, [editing, header, lines, charges, funding, editId, editVersion, operationId, quickReceive]);
+  useEffect(() => { if (!editing || (!lines.length && funding.mode === 'store')) return; const timer = setTimeout(() => { privateDrafts.setItem('levonis-purchase-draft-v2', JSON.stringify({ header, lines, charges, funding, editId, editVersion, operationId, quickReceive, inlinePrices })); setDraftAvailable(true); }, 600); return () => clearTimeout(timer); }, [editing, header, lines, charges, funding, editId, editVersion, operationId, quickReceive, inlinePrices]);
   useEffect(() => {
     run(load);
   }, [load, run]);
@@ -309,6 +316,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     setOperationId(crypto.randomUUID());
     setChoice(null);
     setExtras({});
+    setInlinePrices({});
     setUsePurchase({});
     setPreferValues({});
     setPricing(null);
@@ -419,6 +427,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   const fundingNeedsFinalCost = funding.mode === 'investor' && header.cost_state !== 'final';
   // A typed Direct Sale Extra the server would refuse (whole dinars on the 1,000 step) blocks the preview and the confirm.
   const extrasValid = Object.values(extras).every(extraOnStep);
+  const pendingInlinePrices = lines.some((line) => Object.keys(inlinePrices[inlineKey(line)] ?? {}).length > 0);
   const nameValid = purchaseNameFits(header.invoice_no);
   // The card's pricing, live: the server prices the draft as it would be saved (debounced, latest wins).
   const previewKey = !pricingProduct && editing && step >= 2 && costsValid && extrasValid && !pricingOff ? JSON.stringify([draftBody('ordered', false), choices, editId, pricingRevision]) : '';
@@ -451,8 +460,8 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     return () => { clearTimeout(timer); ctrl.abort(); };
   }, [previewKey]);
   const summaryOf = (i: number): PricingSummary | null => pricing?.lines.find((x) => x.index === i)?.pricing_summary ?? null;
-  const saveLocal = () => { privateDrafts.setItem('levonis-purchase-draft-v2', JSON.stringify({ header, lines, charges, funding, editId, editVersion, operationId, quickReceive })); setDraftAvailable(true); };
-  const restoreLocal = () => { try { const d = JSON.parse(privateDrafts.getItem('levonis-purchase-draft-v2') || '{}'); if (!Array.isArray(d.lines)) return; setHeader({ ...newHeader(), ...restoreCostProfileSnapshot(d.header ?? {}, config.cost_profiles) }); setLines(d.lines); setCharges(Array.isArray(d.charges) ? d.charges.map(chargeDraft) : []); setFunding(d.funding ?? newFunding()); setEditId(d.editId); setEditVersion(d.editVersion); setOperationId(d.operationId); setQuickReceive(d.quickReceive); setEditing(true); setStep(0); } catch { privateDrafts.removeItem('levonis-purchase-draft-v2'); } };
+  const saveLocal = () => { privateDrafts.setItem('levonis-purchase-draft-v2', JSON.stringify({ header, lines, charges, funding, editId, editVersion, operationId, quickReceive, inlinePrices })); setDraftAvailable(true); };
+  const restoreLocal = () => { try { const d = JSON.parse(privateDrafts.getItem('levonis-purchase-draft-v2') || '{}'); if (!Array.isArray(d.lines)) return; setHeader({ ...newHeader(), ...restoreCostProfileSnapshot(d.header ?? {}, config.cost_profiles) }); setLines(d.lines); setInlinePrices(d.inlinePrices ?? {}); setCharges(Array.isArray(d.charges) ? d.charges.map(chargeDraft) : []); setFunding(d.funding ?? newFunding()); setEditId(d.editId); setEditVersion(d.editVersion); setOperationId(d.operationId); setQuickReceive(d.quickReceive); setEditing(true); setStep(0); } catch { privateDrafts.removeItem('levonis-purchase-draft-v2'); } };
   const addChoice = () => { if (!choice) return; setLines((old) => [...old, selectionCostDraft(choice, header.cost_profile_id)]); setRecent((old) => [choice, ...old.filter((r) => `${r.product_id}:${r.scope}:${r.scope_id}` !== `${choice.product_id}:${choice.scope}:${choice.scope_id}`)].slice(0, 6)); setChoice(null); };
   if (pricingProduct) return (
     <div className="inventory-workspace" data-procurement-price-editor>
@@ -571,7 +580,10 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
                 emptyHint={header.cost_profile_id ? loc('إن دفعت مصروفًا فعليًا، أضفه من «مصاريف إضافية فعلية» أدناه.', 'If you actually paid an extra expense, add it under “Actual extra expenses” below.', 'ئەگەر خەرجییەکی زیادەت بە ڕاستی داوە، لە «خەرجیی زیادەی ڕاستەقینە» لە خوارەوە زیادی بکە.') : undefined}
               />
               <p className={`mt-2 text-xs ${T.text3}`}>{loc('إجمالي البند مع الشحن', 'Total line cost with freight', 'کۆی بەند لەگەڵ ناردن')}: {costMoney(estimates[i]?.total_iqd)} · {loc('تُقرب المجاميع إلى أقرب دينار، ومتوسط القطعة للعرض.', 'Totals round to the nearest IQD; the unit average is for display.', 'کۆکان بۆ نزیکترین دینار خڕ دەکرێنەوە، و تێکڕای پارچە تەنها بۆ پیشاندانە.')}</p>
-              <PricingSummaryBar summary={summaryOf(i)} label={l.label} busy={pricingBusy && !summaryOf(i)} notInstalled={pricingOff} directFirst onEdit={() => editPricing(l.product_id)} />
+              <InlineProcurementPricing line={l} purchaseDraft={costsValid ? draftBody('ordered', false) : null}
+                value={inlinePrices[inlineKey(l)] ?? {}} onChange={(value) => setInlinePrice(inlineKey(l), value)}
+                onSaved={() => { setInlinePrice(inlineKey(l), {}); setPricingRevision((v) => v + 1); onChanged(); }}
+                revision={pricingRevision} summary={summaryOf(i)} onAdvanced={() => editPricing(l.product_id)} />
               {pricingError && !pricingOff && <p role="status" className={`mt-2 text-[13px] ${T.text2}`}>{pricingError}</p>}
               {funding.mode === 'investor' && <label className="mt-3 flex gap-2 text-sm"><input type="checkbox" checked={!funding.incoming_indexes || funding.incoming_indexes.includes(i)} onChange={(e) => setFunding((f) => { const indexes = f.incoming_indexes ?? lines.map((_, j) => j); return { ...f, incoming_indexes: e.target.checked ? [...indexes, i] : indexes.filter((j) => j !== i) }; })} />{loc('مشمول بتمويل المستثمر ونسبته', 'Include in investor funding and profit share', 'لە پارەدارکردنی وەبەرهێنەر و ڕێژەکەیدا هەژمار دەکرێت')}</label>}
             </article>)}</div>
@@ -642,9 +654,10 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
           {hasDraftSerials && header.cost_state !== 'final' && <p role="alert" className="mt-2 text-sm text-[var(--ap-danger)]">{loc('ثبّت التكلفة النهائية قبل تأكيد شراء يحتوي على أرقام تسلسلية.', 'Set final costs before confirming a purchase with serial numbers.', 'پێش پشتڕاستکردنەوەی کڕین لەگەڵ ژمارەکان تێچووی کۆتایی جێگیر بکە.')}</p>}
           {draftSerialCount > 50 && <p role="alert" className="mt-2 text-sm text-[var(--ap-danger)]">{loc('يمكن تسجيل 50 رقمًا تسلسليًا مع التأكيد. سجّل بقية الأرقام قطعةً قطعةً بعد حفظ الشراء.', 'Register up to 50 serials with confirmation. Add the remaining serials one unit at a time after saving the purchase.', 'لەگەڵ پشتڕاستکردنەوە تا 50 ژمارە تۆمار بکە. دوای پاشەکەوتکردنی کڕین ژمارەکانی تر یەک بە یەک زیاد بکە.')}</p>}
           <div className="inventory-footer">
+            {pendingInlinePrices && <p role="status" className={`text-sm ${T.text2}`}>{loc('احفظ تعديلات التكلفة والربح داخل بطاقة المنتج قبل المتابعة.', 'Save the cost and profit edits in the product card before continuing.', 'پێش بەردەوامبوون، دەستکارییەکانی تێچوو و قازانج لە کارتی بەرهەم پاشەکەوت بکە.')}</p>}
             {step > 0 && <button type="button" className={T.btnSecondary} onClick={() => setStep((v) => v - 1)}>{loc('رجوع', 'Back', 'گەڕانەوە')}</button>}
-            {step < 3 ? <button type="button" className={T.btnPrimary} disabled={op.busy || !nameValid || !fundingValid(funding) || (step > 0 && (!quantitiesValid || !originsValid)) || (step === 2 && (!costsValid || !draftSerialsValid || !rateReady))} onClick={() => setStep((v) => v + 1)}>{loc('التالي', 'Continue', 'بەردەوامبە')}</button> : <button type="button" className={T.btnPrimary} disabled={op.busy || !draftSerialsValid || !originsValid || !costsValid || !extrasValid || !nameValid || !fundingValid(funding) || fundingNeedsFinalCost || !rateReady || (quickReceive && header.cost_state !== 'final')} onClick={() => op.run(() => save('ordered'), loc('تم تأكيد أمر الشراء', 'Purchase confirmed', 'کڕینەکە پشتڕاست کرایەوە'))}>{(quickReceive ? loc('تأكيد وإضافة المخزون', 'Confirm and receive stock', 'پشتڕاستکردنەوە و زیادکردنی کۆگا') : loc('تأكيد الشراء القادم', 'Confirm incoming purchase', 'پشتڕاستکردنەوەی کڕینی چاوەڕوانکراو'))}</button>}
-            <button type="button" className={T.btnSecondary} disabled={op.busy || !nameValid} onClick={() => { saveLocal(); if (costsValid && originsValid && !hasDraftSerials) { if (!rateReady) { op.setError(rateStand === 'missing' ? rs.missing : COST_REFUSALS.PURCHASE_RATE_CONFIRM_REQUIRED[lang]); return; } op.run(() => save('draft'), loc('تم حفظ المسودة', 'Draft saved', 'ڕەشنووسەکە پاشەکەوت کرا')); } }}>{hasDraftSerials ? loc('حفظ مسودة هذه الجلسة', 'Keep this session’s draft', 'هێشتنەوەی ڕەشنووسی ئەم دانیشتنە') : loc('حفظ مسودة', 'Save draft', 'پاشەکەوتکردنی ڕەشنووس')}</button>
+            {step < 3 ? <button type="button" className={T.btnPrimary} disabled={op.busy || !nameValid || !fundingValid(funding) || (step > 0 && (!quantitiesValid || !originsValid)) || (step === 2 && (!costsValid || !draftSerialsValid || !rateReady || pendingInlinePrices))} onClick={() => setStep((v) => v + 1)}>{loc('التالي', 'Continue', 'بەردەوامبە')}</button> : <button type="button" className={T.btnPrimary} disabled={op.busy || pendingInlinePrices || !draftSerialsValid || !originsValid || !costsValid || !extrasValid || !nameValid || !fundingValid(funding) || fundingNeedsFinalCost || !rateReady || (quickReceive && header.cost_state !== 'final')} onClick={() => op.run(() => save('ordered'), loc('تم تأكيد أمر الشراء', 'Purchase confirmed', 'کڕینەکە پشتڕاست کرایەوە'))}>{(quickReceive ? loc('تأكيد وإضافة المخزون', 'Confirm and receive stock', 'پشتڕاستکردنەوە و زیادکردنی کۆگا') : loc('تأكيد الشراء القادم', 'Confirm incoming purchase', 'پشتڕاستکردنەوەی کڕینی چاوەڕوانکراو'))}</button>}
+            <button type="button" className={T.btnSecondary} disabled={op.busy || !nameValid} onClick={() => { saveLocal(); if (!pendingInlinePrices && costsValid && originsValid && !hasDraftSerials) { if (!rateReady) { op.setError(rateStand === 'missing' ? rs.missing : COST_REFUSALS.PURCHASE_RATE_CONFIRM_REQUIRED[lang]); return; } op.run(() => save('draft'), loc('تم حفظ المسودة', 'Draft saved', 'ڕەشنووسەکە پاشەکەوت کرا')); } }}>{hasDraftSerials ? loc('حفظ مسودة هذه الجلسة', 'Keep this session’s draft', 'هێشتنەوەی ڕەشنووسی ئەم دانیشتنە') : loc('حفظ مسودة', 'Save draft', 'پاشەکەوتکردنی ڕەشنووس')}</button>
             <button type="button" className={T.btnGhost} disabled={op.busy} onClick={() => setEditing(false)}>{loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}</button>
           </div>
         </Card>

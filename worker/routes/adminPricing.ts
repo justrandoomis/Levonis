@@ -122,6 +122,7 @@ import { previewRateAct, type RateMove, type RatePreview } from '../lib/pricingE
 import { FRESH_SESSION_SECONDS, sessionAgeSeconds } from '../lib/session';
 import { loadBatches, type BatchFilter } from '../lib/batchSnapshot';
 import { v2PublicationCounts } from '../lib/pricingEngine/v2/queue';
+import { procurementLinePricing } from '../lib/pricingEngine/v2/procurementLine';
 
 export const adminPricingRoutes = new Hono<AppContext>();
 
@@ -727,6 +728,19 @@ async function procurementPreview(c: Context<AppContext>, purchase: PurchaseForP
     .map((l) => lineDto(l, lineSummary(purchase, l, { loaded: loaded.get(l.product_id)!, stored: stored.get(l.product_id)! }, previews.get(l.product_id)!, rates)));
   return { rates, products, lines };
 }
+
+// Read-only preparation for the inline fields. The existing V2 writer remains
+// the only save path, including its sequence, hash, audit and confirmation gates.
+adminPricingRoutes.post('/procurement/line-pricing', async (c) => {
+  const body = strictBody(await jsonObject(c), ['product_id', 'scope', 'scope_id', 'draft', 'final_cost_usd', 'minimum_profit_usd']);
+  let purchase: PurchaseForPricing | null = null;
+  if (body.draft !== undefined && body.draft !== null) {
+    if (!isRecord(body.draft)) throw inputInvalid('draft');
+    purchase = draftForPricing(await parseProcurementDraft(c.env.DB, body.draft), body.draft, null);
+    if (purchase.currency === 'IQD') purchase = { ...purchase, usd_iqd: await purchaseUsdIqd(c.env.DB, null, new Date().toISOString()) };
+  }
+  return c.json({ success: true, ...await procurementLinePricing(c, body, purchase) });
+});
 
 adminPricingRoutes.post('/procurement/preview', async (c) => {
   const body = strictBody(await jsonObject(c), ['draft', 'purchase_id', 'pricing']);

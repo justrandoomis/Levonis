@@ -25,8 +25,9 @@ const CELL = 'rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-1)] px-3 py-2';
 const usd = (cents: number | null | undefined) => (cents == null ? '—' : formatUsdCents(cents));
 const Fig = ({ children }: { children: React.ReactNode }) => <bdi dir="ltr" className="whitespace-nowrap tabular-nums">{children}</bdi>;
 
-export default function PricingSummaryBar({ summary, label, busy = false, notInstalled = false, readOnlyLabel, directFirst = false, onEdit }: {
+export default function PricingSummaryBar({ summary, label, busy = false, notInstalled = false, readOnlyLabel, directFirst = false, onEdit, fields }: {
   summary: PricingSummary | null | undefined;
+  fields?: { cost: React.ReactNode; profit: React.ReactNode; price: number | null };
   /** Open the canonical V2 pricing editor without leaving the purchase. */
   onEdit?: () => void;
   /** The line's name, for the bar's and the pill's accessible names. */
@@ -56,7 +57,7 @@ export default function PricingSummaryBar({ summary, label, busy = false, notIns
   const level = (l: string | null) =>
     l === 'option' ? s.levelOption : l === 'color' ? s.levelColour : l === 'sku' ? s.levelVariant : s.levelProduct;
   const profit = ok && summary!.target_profit_cents != null ? `+${usd(summary!.target_profit_cents)}` : '—';
-  const reasons = !busy && summary && !ok
+  const reasons = !fields && !busy && summary && !ok
     ? summary.issue_codes.map((code) =>
         code === 'SHIPPING_RATE_MISSING' ? s.shippingRateMissing : code === 'TARGET_PROFIT_MISSING' ? s.targetProfitMissing : issueText(code, lang)
       )
@@ -67,9 +68,9 @@ export default function PricingSummaryBar({ summary, label, busy = false, notIns
   // section ٣ «الأسعار» of the product.
   void directFirst;
   void engine;
-  const storePrice = summary?.store_price_iqd ?? null;
+  const storePrice = fields ? fields.price : summary?.store_price_iqd ?? null;
   const cell4Label = s.cellCustomer;
-  const cell4Value = !summary ? '—' : storePrice === null ? s.needsPricing : money(storePrice);
+  const cell4Value = !summary && !fields ? '—' : storePrice === null ? s.needsPricing : money(storePrice);
 
   return (
     <section aria-label={s.barAria(label)} aria-busy={busy || undefined} className="mt-3 border-t border-[var(--ap-border)] pt-3" data-pricing-summary>
@@ -80,11 +81,11 @@ export default function PricingSummaryBar({ summary, label, busy = false, notIns
       <dl className="grid grid-cols-2 gap-2 tabular-nums sm:grid-cols-3">
         <div className={CELL}>
           <dt className="text-[12px] text-[var(--ap-text-3)]">{s.cellCost}</dt>
-          <dd className="text-[15px] font-semibold text-[var(--ap-text-1)]"><Fig>{shown(ok ? usd(summary!.current_total_cost_cents) : '—')}</Fig></dd>
+          <dd className="text-[15px] font-semibold text-[var(--ap-text-1)]">{fields?.cost ?? <Fig>{shown(ok ? usd(summary!.current_total_cost_cents) : '—')}</Fig>}</dd>
         </div>
         <div className={CELL}>
           <dt className="text-[12px] text-[var(--ap-text-3)]">{s.cellProfit}</dt>
-          <dd className="text-[15px] font-semibold text-[var(--ap-text-1)]"><Fig>{shown(profit)}</Fig></dd>
+          <dd className="text-[15px] font-semibold text-[var(--ap-text-1)]">{fields?.profit ?? <Fig>{shown(profit)}</Fig>}</dd>
         </div>
         <div className="rounded-[var(--ap-radius-md)] bg-[var(--ap-accent-soft)] px-3 py-2 text-[var(--ap-accent-text)]">
           <dt className="text-[12px]">{cell4Label}</dt>
@@ -95,7 +96,7 @@ export default function PricingSummaryBar({ summary, label, busy = false, notIns
       </dl>
       {busy && <p role="status" className="sr-only">{s.computing}</p>}
       {reasons.length > 0 && <p role="status" className="mt-2 text-[13px] text-[var(--ap-text-2)]">{reasons.join(lang === 'en' ? '; ' : '؛ ')}</p>}
-      {ok && (
+      {ok && !fields && (
         <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-[var(--ap-text-3)]">
           <span>{s.basedOn(profileName(summary!.shipping_profile, lang))}</span>
           <span>{s.reviewInPrices}</span>
