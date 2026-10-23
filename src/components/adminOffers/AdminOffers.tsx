@@ -700,6 +700,7 @@ export default function AdminOffers() {
               ) : editing.offer_price_mode === 'fixed_usd' ? (
                 <Field ar="السعر بعد الخصم ($)" en={STRINGS.en.usdPrice}>
                   <UsdInput
+                    decimals={2}
                     value={usdDraft ?? (editing.offer_usd_prices ?? []).find((p) => p.model_id === '')?.usd ?? ''}
                     onChange={(v) => setUsdDraft(v)}
                     label={s.usdPrice}

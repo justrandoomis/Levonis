@@ -30,7 +30,7 @@ export function useV2Strings(): V2Strings {
 export const channelName = (ch: V2Channel, lang: V2Lang): string => PRICING_CHANNEL_LABELS[ch][lang];
 
 /**
- * A dollar amount as typed: digits, one dot, two decimals (and, `signed`, one
+ * A dollar unit amount as typed: digits, one dot, up to six decimals (and, `signed`, one
  * sign). The «$» sits outside the value, so a screen reader and a copy-paste
  * read the number alone.
  */
@@ -38,6 +38,7 @@ export function UsdInput({
   value,
   onChange,
   signed = false,
+  decimals = 6,
   id,
   label,
   placeholder,
@@ -47,6 +48,8 @@ export function UsdInput({
   value: string;
   onChange: (next: string) => void;
   signed?: boolean;
+  /** Other consumers may still store whole cents (special offers). */
+  decimals?: number;
   id?: string;
   /** The accessible name when no visible label points at the input. */
   label?: string;
@@ -69,7 +72,7 @@ export function UsdInput({
         disabled={disabled}
         aria-label={label}
         data-v2-field={data}
-        onChange={(e) => onChange(typingUsd(e.target.value, signed))}
+        onChange={(e) => onChange(typingUsd(e.target.value, signed, decimals))}
       />
     </div>
   );

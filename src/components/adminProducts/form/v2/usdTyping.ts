@@ -16,13 +16,13 @@ export function toAscii(s: string): string {
     .replace(/٬/g, ',');
 }
 
-/** What a dollar input lets through while typing: digits, one dot, two decimals, and (signed) one leading sign. */
-export function typingUsd(raw: string, signed = false): string {
+/** Unit prices allow six decimals; cent-only offer fields pass 2 explicitly. */
+export function typingUsd(raw: string, signed = false, decimals = 6): string {
   let t = toAscii(raw).replace(signed ? /[^\d.+-]/g : /[^\d.]/g, '');
   if (signed) {
     const sign = /^[+-]/.exec(t)?.[0] ?? '';
     t = sign + t.replace(/[+-]/g, '');
   }
   const [head, ...rest] = t.split('.');
-  return rest.length ? `${head}.${rest.join('').slice(0, 2)}` : head;
+  return rest.length ? `${head}.${rest.join('').slice(0, decimals)}` : head;
 }

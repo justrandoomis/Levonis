@@ -6,7 +6,7 @@
  * THE MINIMUM PROFIT CARRIES ITS CURRENCY (owner brief 2026-10-09, USD design
  * §2.2; migration 0181). A `target_profit` row holds exactly one of:
  *   - `amount_usd`: the owner's minimum profit in US dollars — canonical
- *     decimal text, at most two decimals, 0 < x ≤ 100,000 (the 0181 CHECK);
+ *     decimal text, at most six decimals, 0 < x ≤ 100,000 (the 0211 CHECK);
  *   - `amount_iqd`: a whole dinar amount > 0 — the migrated, not yet converted
  *     form (P1 builds it in memory; storage allows it only on a
  *     LEGACY_MIGRATION row).
@@ -69,18 +69,18 @@ export const MAX_RULE_AMOUNT_USD = 100_000;
 /** At most this many decimals in a USD minimum profit (cents). */
 export const RULE_USD_PLACES = 2;
 
-/** The 0181 CHECK grammar of `pricing_rules.amount_usd`: digits, at most one '.', 1–2 decimals, ≤ 9 characters. */
-const USD_RULE_TEXT = /^[0-9]+(?:\.[0-9]{1,2})?$/;
+/** The 0211 CHECK grammar of `pricing_rules.amount_usd`: digits, at most one '.', 1–6 decimals, ≤ 13 characters. */
+const USD_RULE_TEXT = /^[0-9]+(?:\.[0-9]{1,6})?$/;
 const MAX_USD_EXACT: ProcurementExact = { num: BigInt(MAX_RULE_AMOUNT_USD), den: 1n };
 
 /**
- * A stored USD minimum profit, exact — or null when the 0181 CHECK would refuse
- * it (not text, more than two decimals, 0, above 100,000). Reads what the
+ * A stored USD minimum profit, exact — or null when the 0211 CHECK would refuse
+ * it (not text, more than six decimals, 0, above 100,000). Reads what the
  * database may hold ('120.50' and '120.5' alike); writers store the canonical
  * form (`canonicalUsdRuleAmount`).
  */
 export function parseUsdRuleAmount(raw: unknown): ProcurementExact | null {
-  if (typeof raw !== 'string' || raw.length > 9 || !USD_RULE_TEXT.test(raw)) return null;
+  if (typeof raw !== 'string' || raw.length > 13 || !USD_RULE_TEXT.test(raw)) return null;
   const exact = procurementExact(raw);
   if (exact.num <= 0n || compareProcurementExact(exact, MAX_USD_EXACT) > 0) return null;
   return exact;

@@ -417,7 +417,7 @@ test('the stored shapes the 0189 CHECKs refuse are V2_SCOPE_INVALID / AMOUNT_TOO
     ['product price on a cost-first product', run([P()], [], 'cost'), 'V2_SCOPE_INVALID'],
     ['product scope with an id', run([{ scope: 'product', scope_id: 'x', kind: 'fixed', usd: '5' }]), 'V2_SCOPE_INVALID'],
     ['unknown scope', run([P(), { scope: 'category' as never, scope_id: 'x', kind: 'fixed', usd: '5' }]), 'V2_SCOPE_INVALID'],
-    ['three decimals', run([P('1000.001')]), 'AMOUNT_TOO_LARGE'],
+    ['seven decimals', run([P('1000.0000001')]), 'AMOUNT_TOO_LARGE'],
     ['above $100,000', run([P('100000.01')]), 'AMOUNT_TOO_LARGE'],
     ['a zero difference', run([P(), { scope: 'color', scope_id: 'red', kind: 'delta', usd: '0' }]), 'AMOUNT_TOO_LARGE'],
     ['a negative discount', run([P()], [{ scope: 'product', scope_id: '', usd: '-1' }]), 'AMOUNT_TOO_LARGE'],
@@ -532,12 +532,12 @@ test('resolveDiscount: sku > colour > model > product; anchorOf: sku > model > p
   assert.equal(anchorOf(pts.slice(0, 1), s, 'cost').anchor, null, 'a product dollar price is not a cost-first anchor');
 });
 
-test('parseV2Usd is the 0189 CHECK grammar', () => {
-  for (const ok of ['1', '0.01', '120.5', '120.50', '100000', '007.5']) assert.ok(parseV2Usd(ok), ok);
-  for (const bad of ['0', '0.00', '1.234', '1.', '.5', '1e3', '100000.01', '-1', '+1', ' 1', '1,5', '', '1234567890', 'abc']) assert.equal(parseV2Usd(bad), null, bad);
+test('parseV2Usd is the 0211 CHECK grammar', () => {
+  for (const ok of ['1', '0.01', '0.051', '0.000001', '99999.999999', '120.5', '120.50', '100000', '007.5']) assert.ok(parseV2Usd(ok), ok);
+  for (const bad of ['0', '0.00', '1.2345678', '1.', '.5', '1e3', '100000.01', '-1', '+1', ' 1', '1,5', '', '1234567890', 'abc']) assert.equal(parseV2Usd(bad), null, bad);
   assert.deepEqual(parseV2Usd('-43.21', { signed: true }), { num: -4321n, den: 100n });
   assert.deepEqual(parseV2Usd('+7.77', { signed: true }), { num: 777n, den: 100n });
-  for (const bad of ['0', '-0', '+-1', '--1', '-100000.01', '-1.234']) assert.equal(parseV2Usd(bad, { signed: true }), null, bad);
+  for (const bad of ['0', '-0', '+-1', '--1', '-100000.01', '-1.2345678']) assert.equal(parseV2Usd(bad, { signed: true }), null, bad);
   assert.deepEqual(parseV2Usd('0', { zero: true }), { num: 0n, den: 1n });
   assert.equal(parseV2Usd(15 as unknown as string), null, 'a number is not stored text');
   assert.throws(() => parseV2Usd(1.5 as unknown as string), RangeError);

@@ -269,14 +269,14 @@ export function dollarsOf(answer: V2Answer | null | undefined): { points: WirePo
 // ---------------------------------------------------------------- typing --
 
 /**
- * A dollar amount as typed, cleaned to the server's grammar (≤ 2 decimals,
+ * A dollar amount as typed, cleaned to the server's grammar (≤ 6 decimals,
  * ≤ 100,000): `null` when it is empty or not a number yet ('.', '-').
  * `signed` allows a sign (a difference); `zero` allows 0 (a discount's
  * explicit «no discount»). A difference of 0 is «none» (null).
  */
 export function cleanUsd(text: string, opts: { signed?: boolean; zero?: boolean } = {}): string | null {
   const t = toAscii(text).trim().replace(/,/g, '');
-  const m = /^([+-]?)(\d{1,6})(?:\.(\d{1,2}))?\.?$/.exec(t);
+  const m = /^([+-]?)(\d{1,6})(?:\.(\d{1,6}))?\.?$/.exec(t);
   if (!m) return null;
   if (m[1] && !opts.signed) return null;
   const whole = m[2].replace(/^0+(?=\d)/, '');
@@ -977,7 +977,6 @@ export function preorderOffOf(pre: V2TableRow | null | undefined, direct: V2Tabl
 /** Row 244 (the owner's answer only): the shelf an SKU's direct price is read from, or null. */
 export const shelfOf = (line: SkuLine | null | undefined): { cost_iqd: number; units: number } | null => line?.channels.direct_sale?.owner?.v2_shelf ?? null;
 
-/** A dollar figure as the server stated it, at most 2 decimals shown («$1,000.00»). Display only. */
 /**
  * §2.1 rule 2: the discount an SKU inherits when its own field is empty — its model's exception when the model
  * has one, else the product's. The SKU field shows it («الموديل: $25.00» / «المنتج: $40.00»).
@@ -995,12 +994,13 @@ export function inheritPlaceholder(inherit: string, inherited: { amount_usd: str
   return inherit;
 }
 
+/** Preserve unit-price precision; ordinary dollar amounts still show at least two decimals. */
 export function usdText(text: string | null | undefined): string {
   if (text === null || text === undefined || text === '') return '—';
   const n = Number(text);
   if (!Number.isFinite(n)) return text;
   const sign = n < 0 ? '−' : '';
-  return `${sign}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${sign}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`;
 }
 
 /* The final price (the owner's, 2026-10-18): dollars as whole micro-dollars, so no float decides a cent. */
@@ -1010,6 +1010,7 @@ const microsOf = (text: string | null | undefined): bigint | null => {
 };
 const centsUp = (micros: bigint): bigint => (micros + 9_999n) / 10_000n;
 const centsText = (cents: bigint): string => `${cents / 100n}.${String(cents % 100n).padStart(2, '0')}`;
+const microsText = (micros: bigint): string => `${micros / 1_000_000n}.${String(micros % 1_000_000n).padStart(6, '0').replace(/0+$/, '').padEnd(2, '0')}`;
 /** A cost-first SKU's dollars as the customer reads them: its `usd_ceil6` rounded UP to the cent (row 248). */
 export function usdCentsUp(text: string | null | undefined): string | null {
   const micros = microsOf(text);
@@ -1020,7 +1021,7 @@ export function usdCentsUp(text: string | null | undefined): string | null {
  * THE FINAL PRICE — A TWO-WAY EDITOR OF THE MINIMUM PROFIT T (the owner's, 2026-10-18; T stays the one stored
  * figure). On a cost-first SKU the direct dollars are ceil6((R + T×U + differences×U) ÷ U), R the supplier route
  * or the shelf (row 244): T moves them one for one, so the dollars without profit (`base`) are the CURRENT
- * preview's figure less its own T. `final` is what the customer reads: rounded UP to the cent (row 248). Null
+ * preview's figure less its own T. The editor keeps all six decimals, before the customer's display rounding. Null
  * when the SKU has no such figure (not priced yet, or its minimum profit is a dinar rule).
  */
 export function finalUsdOf(line: SkuLine | null | undefined): { final: string; base: string; cost: string; profit: string } | null {
@@ -1028,12 +1029,12 @@ export function finalUsdOf(line: SkuLine | null | undefined): { final: string; b
   const total = microsOf(o?.v2_usd_ceil6);
   const t = microsOf(o?.v2_profit_usd);
   if (!o || total === null || t === null || t > total) return null;
-  return { final: centsText(centsUp(total)), base: String(total - t), cost: centsText(centsUp(total - t)), profit: o.v2_profit_usd! };
+  return { final: microsText(total), base: String(total - t), cost: microsText(total - t), profit: o.v2_profit_usd! };
 }
 
 /**
- * A typed final price → the minimum profit that shows it: T = final − base, down to the cent, so the price the
- * customer reads (rounded up to the cent) is the one typed. Refused at or below the base — the cost: T is never
+ * A typed final price → its exact minimum profit: T = final − base, in whole micro-dollars. Refused at or
+ * below the base — the cost: T is never
  * 0 or less (an empty minimum profit inherits). Null while nothing is typed.
  */
 export function profitForFinal(typed: string, base: string): { ok: true; usd: string } | { ok: false; reason: 'below_cost' | 'too_large' } | null {
@@ -1042,8 +1043,8 @@ export function profitForFinal(typed: string, base: string): { ok: true; usd: st
   const x = cleanUsd(t, { zero: true });
   if (x === null) return { ok: false, reason: 'too_large' };
   const over = microsOf(x)! - BigInt(base);
-  if (over < 10_000n) return { ok: false, reason: 'below_cost' };
-  const usd = cleanUsd(centsText(over / 10_000n));
+  if (over <= 0n) return { ok: false, reason: 'below_cost' };
+  const usd = cleanUsd(microsText(over));
   return usd === null ? { ok: false, reason: 'too_large' } : { ok: true, usd };
 }
 

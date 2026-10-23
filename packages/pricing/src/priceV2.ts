@@ -113,7 +113,7 @@ export const V2_SCOPES: readonly V2Scope[] = ['product', 'option', 'color', 'sku
 /** A USD price, difference or discount: at most this much (the 0189 CHECK, like 0181's minimum profit). */
 export const V2_MAX_USD = 100_000;
 
-/** USD text: ≤ 2 decimals, the 0181 amount_usd grammar; a delta may be signed and is never 0. */
+/** USD text: ≤ 6 decimals (0211); a delta may be signed and is never 0. */
 export interface V2PricePoint {
   scope: V2Scope;
   scope_id: string;
@@ -224,7 +224,7 @@ export interface V2Result {
 
 /* ------------------------------------------------------------ the grammar -- */
 
-const V2_USD_TEXT = /^[0-9]+(?:\.[0-9]{1,2})?$/;
+const V2_USD_TEXT = /^[0-9]+(?:\.[0-9]{1,6})?$/;
 const MAX_USD_EXACT: ProcurementExact = { num: BigInt(V2_MAX_USD), den: 1n };
 const ZERO: ProcurementExact = { num: 0n, den: 1n };
 
@@ -242,8 +242,8 @@ function assertNoFloat(value: unknown, path: string, seen: Set<object> = new Set
 }
 
 /**
- * A stored V2 dollar amount, exact — or null when the 0189 CHECK would refuse it:
- * digits, at most one '.', one or two decimals, ≤ 9 characters (≤ 10 with a sign),
+ * A stored V2 dollar amount, exact — or null when the 0211 CHECK would refuse it:
+ * digits, at most one '.', up to six decimals, ≤ 13 characters (≤ 14 with a sign),
  * 0 < |x| ≤ 100,000. `signed` (a ± difference) takes one leading '+' or '-';
  * `zero` (a discount) also takes 0. Reads '120.50' and '120.5' alike.
  */
@@ -253,7 +253,7 @@ export function parseV2Usd(text: unknown, opts: { signed?: boolean; zero?: boole
   const signed = opts.signed === true;
   const sign = signed && (text.startsWith('-') || text.startsWith('+')) ? text[0] : '';
   const body = text.slice(sign.length);
-  if (text.length > (signed ? 10 : 9) || !V2_USD_TEXT.test(body)) return null;
+  if (text.length > (signed ? 14 : 13) || !V2_USD_TEXT.test(body)) return null;
   const magnitude = procurementExact(body);
   if (compareProcurementExact(magnitude, MAX_USD_EXACT) > 0) return null;
   if (magnitude.num === 0n && !opts.zero) return null;

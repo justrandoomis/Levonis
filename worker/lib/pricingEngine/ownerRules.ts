@@ -4,7 +4,7 @@
  * acceptance of the migrated values (§4.3; FX plan §10 step 2).
  *
  * Validation (in the route, mirrored by the 0181 CHECKs):
- *   - minimum profit: canonical USD text, ≤ 2 decimals, 0 < x ≤ 100,000;
+ *   - minimum profit: canonical USD text, ≤ 6 decimals, 0 < x ≤ 100,000;
  *     Arabic-Indic digits and a decimal comma normalised; empty = INHERIT;
  *     never a dinar amount (a dinar minimum exists only as a migrated row);
  *   - Direct Sale Extra: whole dinars ≥ 0 on the 1,000 step, never USD;

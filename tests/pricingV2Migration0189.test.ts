@@ -8,7 +8,7 @@
  *                only on an engine product — a V2 product never drops to
  *                manual through the old exit door
  *   points       the dollar price points: a colour is a difference, an SKU and
- *                the product are fixed prices, ≤ 2 decimals, a difference is
+ *                the product are fixed prices, ≤ 6 decimals after 0211, a difference is
  *                never 0; engine token on every write, never re-inserted,
  *                every change bumps inputs_seq
  *   discounts    the one pre-order discount: ≥ 0 (0 = an explicit «no
@@ -172,7 +172,7 @@ test('the method is set, changed or cleared only with the mode token, and only o
 
 /* ---------------------------------------------------------------- points -- */
 
-test('price points: a colour is a difference, an SKU and the product are fixed prices, ≤ 2 decimals, a difference is never 0', () => {
+test('price points: a colour is a difference, an SKU and the product are fixed prices, ≤ 6 decimals after 0211, a difference is never 0', () => {
   const db = freshDb();
   seedProduct(db);
   const ok = [
@@ -191,8 +191,8 @@ test('price points: a colour is a difference, an SKU and the product are fixed p
     [point('color', 'c_fixed', 'fixed', '10'), 'a colour fixed price (C1: a colour is a difference)'],
     [point('sku', 'o:x', 'delta', '10'), 'an SKU difference (C1: an SKU is a fixed price)'],
     [point('product', '', 'delta', '10', 'v2_other'), 'a product difference (the product is the anchor)'],
-    [point('option', 'three_dp', 'fixed', '10.123'), 'three decimals'],
-    [point('option', 'three_dp_d', 'delta', '-10.123'), 'three decimals on a difference'],
+    [point('option', 'seven_dp', 'fixed', '10.1234567'), 'seven decimals'],
+    [point('option', 'seven_dp_d', 'delta', '-10.1234567'), 'seven decimals on a difference'],
     [point('option', 'zero_d', 'delta', '0'), 'a difference of 0'],
     [point('option', 'neg_zero_d', 'delta', '-0'), 'a difference of -0'],
     [point('option', 'zero_cents_d', 'delta', '+0.00'), 'a difference of +0.00'],
@@ -252,12 +252,12 @@ test('price points and discounts: the engine token on every write, never re-inse
   run(db, priced(P, `DELETE FROM pricing_preorder_discounts WHERE product_id = '${P}'`));
   assert.equal(seqOf(db), seq0 + 5, 'a delete bumps inputs_seq');
 
-  // The discount's own grammar: ≥ 0 (0 is the explicit «no discount» exception), ≤ 2 decimals, ≤ 100,000.
+  // The discount's own grammar: ≥ 0 (0 is the explicit «no discount» exception), ≤ 6 decimals after 0211, ≤ 100,000.
   run(db, priced(P, discount('product', '', '0')));
   run(db, priced(P, discount('option', `${P}_o1`, '25.5')));
   run(db, priced(P, discount('color', `${P}_c0`, '100000')));
   run(db, priced(P, discount('sku', `o:${P}_o0|c:${P}_c0`, '0.97')));
-  for (const [usd, why] of [['-1', 'negative'], ['10.123', 'three decimals'], ['100000.01', 'above 100,000'], ['', 'empty'], ['1e2', 'an exponent']]) {
+  for (const [usd, why] of [['-1', 'negative'], ['10.1234567', 'seven decimals'], ['100000.01', 'above 100,000'], ['', 'empty'], ['1e2', 'an exponent']]) {
     assert.throws(() => run(db, priced(P, discount('option', `bad_${why}`, usd!))), CHECK, why);
   }
   assert.throws(() => run(db, priced(P, discount('product', 'x', '5'))), CHECK, 'a product scope with an id');
@@ -299,7 +299,7 @@ test('V2 results: P ≤ D, direct sells at D with no Δ, price-first never floor
     [{ exact_iqd: '1.2.3' }, 'an exact figure that is no decimal'],
     [{ exact_iqd: '-1425000' }, 'a negative exact figure'],
     [{ usd_ceil6: '950.1234567' }, 'more than 6 decimals'],
-    [{ deltas_usd: '1.234' }, 'a difference with 3 decimals'],
+    [{ deltas_usd: '1.2345678' }, 'a difference with 7 decimals'],
     [{ discount_usd: '-5' }, 'a negative Δ'],
     [{ combo_key: 'x' }, 'a key that is no SKU key'],
     [{ discount_scope: 'product', discount_scope_id: null }, 'a Δ scope without its id'],

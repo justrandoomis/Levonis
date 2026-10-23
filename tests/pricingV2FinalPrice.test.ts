@@ -3,8 +3,7 @@
  * 2026-10-18; docs/PRICING-V2.md §1.2).
  *
  *   - T stays the one stored figure: a typed final price X stores T = X − base, the reference SKU's dollars
- *     without profit read from the CURRENT preview (down to the cent, so the customer's price — rounded up to
- *     the cent, row 248 — is X);
+ *     without profit read from the CURRENT preview (in micro-dollars, preserving fractional-cent unit prices);
  *   - a typed T moves the shown final price on the next preview (never the stale one);
  *   - at or below cost it is refused (ar/en/ckb), T untouched;
  *   - a price editor never sees it; a model in «تكلفة مختلفة» has its own beside its minimum-profit exception.
@@ -155,11 +154,11 @@ test('a typed final price $X stores T = X − base (the preview’s dollars with
   assert.equal(JSON.stringify(wire).includes('final'), false, 'no final-price key reaches the server');
   // Arabic-Indic digits and the Arabic decimal mark are digits.
   assert.deepEqual(profitForFinal('١٤٠٫٥', ref!.base), { ok: true, usd: '40.5' });
-  // A sub-cent base: T is taken down to the cent, so the customer's price (rounded up to the cent) is X.
+  // A sub-cent base: T preserves all six places so the next preview equals X.
   const odd = finalUsdOf(skuLines([row('m1', '114.503817', '25', 171_756)])[0])!;
-  assert.equal(odd.final, '114.51');
+  assert.equal(odd.final, '114.503817');
   const t = profitForFinal('120', odd.base);
-  assert.deepEqual(t, { ok: true, usd: '30.49' });
+  assert.deepEqual(t, { ok: true, usd: '30.496183' });
   assert.equal(odd.base, '89503817', 'micro-dollars: $89.503817');
   assert.equal(usdCentsUp('119.993817'), '120.00', '$89.503817 + $30.49, rounded up to the cent');
   // Nothing typed: nothing changes.
@@ -199,10 +198,10 @@ test('editing T moves the shown final price — from the next preview, never the
   // The next preview: $100 + $40.
   const after = answer(TABLE(row('m1', '140', '40', 210_000)));
   assert.equal(valueOf(section3(stateOf(after, draftWith(after, { min_profit_usd: '40' }))), 'final-usd'), '140.00');
-  // The result bar reads the same cents (rounded up, row 248).
+  // The result bar preserves the same precise unit price as the editor.
   const odd = section3(stateOf(answer(TABLE(row('m1', '114.503817', '25', 171_756)))));
-  assert.equal(valueOf(odd, 'final-usd'), '114.51');
-  assert.ok(odd.includes('$114.51') && !odd.includes('$114.50'));
+  assert.equal(valueOf(odd, 'final-usd'), '114.503817');
+  assert.ok(odd.includes('$114.503817') && !odd.includes('$114.51'));
   // No preview figure: the field waits, and says why.
   const none = section3(stateOf(answer(TABLE(row('m1', '125', null, 187_500)).slice(0, 1))));
   assert.match(inputOf(none, 'final-usd') ?? '', /disabled/);

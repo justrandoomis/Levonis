@@ -88,8 +88,10 @@ There are two ways to set it, chosen per product (Decision A):
   - The guarantee D − R ≥ T (row 187) now applies to the **direct** price.
   - **«السعر النهائي ($)»** (the owner's, 2026-10-18) sits beside T, at the product and in a
     model's «تكلفة مختلفة» exception. It is a two-way editor of T, not a stored figure: typing
-    X stores T = X − (the reference SKU's D_usd − T, from the current preview), taken down to
-    the cent, so the customer's dollars (rounded up to the cent, row 248) are X. A typed T moves
+    X stores T = X − (the reference SKU's D_usd − T, from the current preview), preserving
+    six decimal places (owner correction, 2026-10-23). Dollar unit prices, differences, discounts and
+    minimum profits accept up to six decimals: 0.051 is stored and shown as 0.051. The final-price
+    editor and its result read the six-place preview, before customer display rounding. A typed T moves
     it on the next preview. At or below cost it is refused. The dinars may still be lifted by
     the rounding rule (row 245). The reference SKU is priced from cost alone: never one on a
     «سعر خاص» (its model's or its own), where D is max(the price, R + T) and T does not move it

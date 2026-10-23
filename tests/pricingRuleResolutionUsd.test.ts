@@ -76,9 +76,9 @@ test('a USD minimum at the option level beats a migrated dinar minimum at the pr
   assert.equal(resolveRuleAt([], 'target_profit', TARGET).status, 'missing');
 });
 
-test('an ACTIVE row with an amount the 0181 CHECKs refuse is BLOCKED, never skipped', () => {
+test('an ACTIVE row with an amount the 0211 CHECKs refuse is BLOCKED, never skipped', () => {
   const product = rule('product', { usd: '50' });
-  for (const bad of [{ usd: '0' }, { usd: '120.555' }, { usd: '100000.01' }, { usd: '1e3' }, { usd: '75', iqd: 120_000 }, { iqd: 0 }]) {
+  for (const bad of [{ usd: '0' }, { usd: '120.5555555' }, { usd: '100000.01' }, { usd: '1e3' }, { usd: '75', iqd: 120_000 }, { iqd: 0 }]) {
     const r = resolveRuleAt([product, rule('option', bad)], 'target_profit', TARGET);
     assert.equal(r.status, 'blocked', JSON.stringify(bad));
   }
@@ -124,9 +124,9 @@ test('targetProfitExactIqd: amount_usd × U exactly, or the dinar amount; null w
   assert.equal(procurementExactText(targetProfitExactIqd(iqd, null)!), '192000');
 });
 
-test('isValidRuleRowAmount and parseUsdRuleAmount mirror the 0181 CHECKs', () => {
-  for (const ok of ['120', '120.5', '120.50', '0.01', '100000', '007.5']) assert.ok(parseUsdRuleAmount(ok), ok);
-  for (const bad of ['0', '0.00', '120.555', '100000.01', '-1', '.5', '5.', '1e3', '١٢٠', ' 120', '1234567890', 120 as unknown as string]) {
+test('isValidRuleRowAmount and parseUsdRuleAmount mirror the 0211 CHECKs', () => {
+  for (const ok of ['120', '120.5', '120.50', '0.01', '0.051', '0.000001', '99999.999999', '100000', '007.5']) assert.ok(parseUsdRuleAmount(ok), ok);
+  for (const bad of ['0', '0.00', '120.5555555', '100000.01', '-1', '.5', '5.', '1e3', '١٢٠', ' 120', '1234567890', 120 as unknown as string]) {
     assert.equal(parseUsdRuleAmount(bad), null, String(bad));
   }
   assert.ok(isValidRuleRowAmount({ kind: 'target_profit', amount_usd: '120', amount_iqd: null }));
@@ -141,7 +141,7 @@ test("canonicalUsdRuleAmount: the owner's typing, normalised; ambiguity refused"
   const cases: Array<[unknown, string | null]> = [
     ['120', '120'], ['120.50', '120.5'], ['120.00', '120'], ['007.5', '7.5'], [' 99.9 ', '99.9'],
     ['١٢٠٫٥', '120.5'], ['۱۲۰', '120'], ['120,5', '120.5'], ['120,55', '120.55'], [120.5, '120.5'], [100000, '100000'],
-    ['1,200', null], ['120.555', null], ['0', null], ['0.001', null], ['', null], ['abc', null], ['-5', null], ['100000.01', null],
+    ['1,200', null], ['120.555', '120.555'], ['0', null], ['0.001', '0.001'], ['', null], ['abc', null], ['-5', null], ['100000.01', null],
     ['.5', null], ['5.', null], [Number.NaN, null], [null, null], [{}, null],
   ];
   for (const [input, expected] of cases) assert.equal(canonicalUsdRuleAmount(input), expected, JSON.stringify(input));

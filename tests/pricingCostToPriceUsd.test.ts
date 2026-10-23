@@ -245,7 +245,7 @@ test('a USD minimum needs U on every channel: FX_RATE_MISSING {USD} on an EUR pr
 test('an invalid USD amount on a hand-built resolution fails closed (TARGET_PROFIT_BLOCKED); a mixed tie priced at another rate is a programming error', () => {
   const rates = chainRates('1600', '1.1', '0.14', { GERMANY_LAND: '3200' });
   const chain: SkuInputChain = { base: { override: { supplier_cost: '450', supplier_currency: 'EUR', shipping_weight_g: 2500 } } };
-  for (const bad of ['0', '120.555', '100000.01', '-1', 'abc']) {
+  for (const bad of ['0', '120.5555555', '100000.01', '-1', 'abc']) {
     const r = priceSku({ chain, rates, channels: ['pre_order_land'], target: usdTarget(bad) });
     assert.deepEqual(codes(r), ['TARGET_PROFIT_BLOCKED'], bad);
   }

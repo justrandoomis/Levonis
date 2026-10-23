@@ -82,13 +82,13 @@ const rule = (id: string, cols: Record<string, string | number | null>) => {
   return `INSERT INTO pricing_rules (${keys.join(', ')}) VALUES (${vals.join(', ')})`;
 };
 
-test('pricing_rules: a USD minimum profit is ≤ 2 decimals, above 0 and at most 100,000', () => {
+test('pricing_rules: a USD minimum profit is ≤ 6 decimals after 0211, above 0 and at most 100,000', () => {
   const db = freshDb();
   seedProduct(db);
-  for (const ok of ['120', '120.5', '120.55', '0.01', '100000', '99999.99']) {
+  for (const ok of ['120', '120.5', '120.55', '0.01', '0.051', '0.000001', '100000', '99999.999999']) {
     db.exec(rule(`r_${ok}`, { amount_usd: ok, scope: 'option', scope_id: `o_${ok}` }));
   }
-  for (const bad of ['120.555', '0', '0.00', '-5', '100000.01', '1e3', '.5', '5.', '1.2.3', '12a', '1234567890']) {
+  for (const bad of ['120.5555555', '0', '0.00', '-5', '100000.01', '1e3', '.5', '5.', '1.2.3', '12a', '1234567890']) {
     refused(db, rule(`bad_${bad}`, { amount_usd: bad, scope: 'option', scope_id: `b_${bad}` }), /CHECK constraint failed/);
   }
 });
