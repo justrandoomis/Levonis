@@ -96,6 +96,7 @@ import {
   EMPTY_RELATIONS,
   loadRelationsView,
   loadRelationsViews,
+  loadRelationsViewsForIds,
   publicRelations,
   capacityFrom,
   snapshotFrom,
@@ -332,7 +333,7 @@ function quotableDiscount(rule: BenefitRule): boolean {
  * PLUS is an offer-scoped rung (§4.4) that no ordinary product emits and no
  * card teases, so a PLUS rule has nothing to show here.
  */
-export function shelfDiscountRules(ctx: PricingCtx): BenefitRule[] {
+export function shelfDiscountRules(ctx: Pick<PricingCtx, 'benefitRules' | 'benefitNowIso'>): BenefitRule[] {
   return ctx.benefitRules.filter(
     (rule) =>
       rule.enabled &&
@@ -392,7 +393,7 @@ const LIVE_PRICED_OFFER = `EXISTS (SELECT 1 FROM offer_windows w
           AND ${OFFER_NOT_SUSPENDED_SQL})`;
 
 export function discountedWhere(
-  ctx: PricingCtx,
+  ctx: Pick<PricingCtx, 'benefitRules' | 'benefitNowIso'>,
   /**
    * F7 (docs/ux/PRODUCT-DISCOUNT.md §8.8): with `offersAt` (the request's instant), a product with a
    * LIVE, active, PRICED, unsuspended special-offer window is discounted too — the flash board's «عرض
@@ -5723,108 +5724,78 @@ async function gradedSummary(c: Context<AppContext>): Promise<Response> {
 }
 
 async function homePage(c: Context<AppContext>): Promise<Response> {
-  /**
-   * THE MEMBERSHIP RULES ARE NOW AN INPUT TO THE DISCOUNTS QUERY, so the one
-   * request that already loads them is started first and the strip's statement
-   * is CHAINED off it rather than awaited before the wave.
-   *
-   * Everything else on the first screen — the settings, the latest strip, the
-   * graded shelf, the taxonomy, the brands — keeps flying in parallel with it,
-   * so the page waits on `max(the rest, pricingCtx + discounted)` instead of
-   * gaining a round trip of its own. `pricingCtx` is two small reads that this
-   * route already performed; nothing new is read.
-   */
-  const ctxPromise = pricingCtx(c);
-  const settingsPromise = getSettings(c.env.DB, PUBLIC_SETTING_KEYS);
-  // worker/lib/listing.ts, optimistic, no probe before the first wave: the commercial strips are SELLABLE,
-  // the new arrivals and the brand counts VISIBLE (DECISIONS row 240, rule R4).
   const db = c.env.DB;
+  const ctxPromise = pricingCtx(c);
+  const settingsPromise = getSettings(db, PUBLIC_SETTING_KEYS);
+  const displayRatePromise = getPublicDisplayRate(db);
+  const cardIndexPromise = catalogIndexFor(db).catch(() => null);
   const L = {
     visible: (alias?: string) => optimisticVisible(db, alias),
     sellable: (alias?: string) => optimisticSellable(db, alias),
     sellableFlag: (alias?: string) => optimisticSellableFlag(db, alias),
   };
-  // The display currency's rate (FX plan §8): the one public FX figure, in the first wave.
-  const displayRatePromise = getPublicDisplayRate(c.env.DB);
-  // The taxonomy the cards' knowledge line names its section from (the Bambu import spec §G.5): memoised per
-  // isolate, in the first wave, so «الكل» draws the same card as a section's tab (/api/products) does.
-  const cardIndexPromise = catalogIndexFor(db).catch(() => null);
-  const [settings, discounted, latest, openBoxRows, categories, brands, ctx, display] = await Promise.all([
-    settingsPromise,
-    /**
-     * THE DISCOUNTS STRIP SELECTED ON A RETIRED CONCEPT, so it was always empty.
-     *
-     * It asked for `original_price_iqd > price_iqd` — the compare-at price
-     * that §4 retired and the admin form now shows read-only, which nothing
-     * writes any more. Live, this returned zero rows, so a section the owner
-     * can see in the admin panel simply never appeared on the page.
-     *
-     * The honest reading of "discounted" in this shop is the one
-     * `/api/products?type=discounted` already uses: a real membership price
-     * BELOW the regular one. Same predicate, so the home strip and the
-     * listing behind its "see all" can no longer disagree about what the word
-     * means. `composition = ''` for the same reason the listing excludes
-     * them — a bundle's availability is computed from its members and it
-     * belongs on the bundles shelf, not here.
-     *
-     * AND THEN IT WAS EMPTY AGAIN, for the second time and the same reason:
-     * "a real membership price" was read as a TYPED `pro_price_iqd` /
-     * `prime_price_iqd`, while this shop states both memberships in
-     * `membership_benefit_rules` and types neither column. The predicate is
-     * now the UNION of the two, built by `discountedWhere` — which is a
-     * function, and not a copy of a WHERE clause, precisely so that "same
-     * predicate" above stays a fact rather than a hope.
-     */
-    ctxPromise.then((ready) => {
-      const reach = discountedWhere(ready, { offersAt: new Date().toISOString() });
-      return runListed(
-        db,
-        `SELECT * FROM products
-          WHERE ${L.sellable('products')} AND composition = ''
-            AND ${reach.sql}
-          ORDER BY created_at DESC LIMIT 10`,
-        (q) => db.prepare(q).bind(...reach.params).all<Record<string, unknown>>()
-      );
-    }),
-    // R4: priced first; catalog-only items fill only the slots priced items leave empty (`homeLatest`).
-    runListed(
+
+  // Shelf selection uses shared discount rules, never the viewer's tier. It
+  // can start while their live membership is read; pricing still awaits ctx.
+  // pricingInputsFor coalesces with pricingCtx's existing read on a cold isolate.
+  const discountedPromise = pricingInputsFor(db).then((inputs) => {
+    const nowIso = new Date().toISOString();
+    const reach = discountedWhere({ benefitRules: inputs.benefitRules, benefitNowIso: nowIso }, { offersAt: nowIso });
+    return runListed(
       db,
-      `SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products
-        WHERE ${L.visible('products')} AND (products.composition = '' OR ${L.sellable('products')})
-        ORDER BY sellable_now DESC, created_at DESC LIMIT ${HOME_LATEST_LIMIT}`,
-      (q) => db.prepare(q).all<Record<string, unknown>>()
-    ),
-    // OPEN BOX / USED / REFURBISHED, newest first.
-    //
-    // `condition_doc <> '{}'` is the same predicate migration 0085's PARTIAL
-    // index is built on, so this reads the index rather than scanning the
-    // catalogue on the shop's first screen. The shelf shows a fixed handful;
-    // the full list lives behind its own listing.
-    //
-    // Through openBoxShelf, because this ONE optional strip naming a column
-    // from the newest migration is what turned the whole first screen into an
-    // error card when a deploy landed ahead of its database — see
-    // worker/lib/conditionProjection.ts.
-    openBoxShelf(c.env.DB),
-    /**
-     * THE REAL TAXONOMY — MAIN SECTIONS, EACH WITH THE SUB-SECTIONS THAT HOLD
-     * SOMETHING. «الأقسام الرئيسية ثم الأقسام الفرعية التي فيها المنتجات».
-     *
-     * This used to count through `product_catalogs` alone and returned `[]`
-     * against the live database, so the home page showed no categories at all
-     * while the admin listed «الطابعات · 3». The join table was empty — and
-     * being emptied on every product save — because the product form records
-     * the owner's choice in `category_id` / `sub_category_id`. One membership
-     * relation over both, with counts that roll up from descendants, lives in
-     * worker/lib/catalogMembership.ts along with the whole story.
-     */
-    // The sections the owner put in a bento square survive the tree's caps
-    // (worker/lib/homeBento.ts), so an assignment is never cut off the page.
-    settingsPromise.then((s) =>
-      homeCategoryTree(c.env.DB, {
-        keep: new Set(Object.values(normalizeHomeBento((s as Record<string, unknown>).homeBento)).map((a) => a!.category)),
-      })
-    ),
+      `SELECT * FROM products
+        WHERE ${L.sellable('products')} AND composition = ''
+          AND ${reach.sql}
+        ORDER BY created_at DESC LIMIT 10`,
+      (q) => db.prepare(q).bind(...reach.params).all<Record<string, unknown>>()
+    );
+  });
+  const latestPromise = runListed(
+    db,
+    `SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products
+      WHERE ${L.visible('products')} AND (products.composition = '' OR ${L.sellable('products')})
+      ORDER BY sellable_now DESC, created_at DESC LIMIT ${HOME_LATEST_LIMIT}`,
+    (q) => db.prepare(q).all<Record<string, unknown>>()
+  );
+
+  // Only the product rows gate their relations. The old all-screen barrier
+  // made every photo/price read wait for settings -> category counts as well.
+  // Graded reference prices need only the graded rows, so join this wave too.
+  const productsPromise = Promise.all([discountedPromise, latestPromise, openBoxShelf(db)]).then(
+    async ([discounted, latest, openBoxRows]) => {
+      logServedByRegion(c, latest.meta);
+      const latestRows = homeLatest(latest.results ?? []);
+      const homeRows = new Map<string, { id: string; inventory_mode: unknown }>();
+      for (const r of [...discounted.results, ...latestRows, ...openBoxRows]) {
+        homeRows.set(String(r.id), { id: String(r.id), inventory_mode: r.inventory_mode });
+      }
+      const ids = [...homeRows.keys()];
+      const referenceIds = [...new Set(openBoxRows
+        .map((r) => parseConditionDoc(r.condition_doc)?.new_product_id)
+        .filter((id): id is string => typeof id === 'string' && id !== ''))];
+      const referencePricesPromise = referenceIds.length
+        ? runListed(
+            db,
+            `SELECT id, price_iqd FROM products WHERE ${L.sellable('products')} AND id IN (${referenceIds.map(() => '?').join(',')})`,
+            (q) => db.prepare(q).bind(...referenceIds).all<{ id: string; price_iqd: number }>()
+          ).then(({ results }) => new Map((results ?? []).map((r) => [String(r.id), Number(r.price_iqd) || 0])))
+        : Promise.resolve(new Map<string, number>());
+      const [views, pooled, offers, referencePrices] = await Promise.all([
+        loadRelationsViews(db, [...homeRows.values()]),
+        degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(db, ids), new Set<string>()),
+        degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(db, ids.map(subjectOf)), EMPTY_OFFERS()),
+        referencePricesPromise,
+      ]);
+      return { discounted: discounted.results, latestRows, openBoxRows, views, pooled, offers, referencePrices };
+    }
+  );
+
+  const [settings, categories, brands, ctx, display, cardIndex, products] = await Promise.all([
+    settingsPromise,
+    // Keep the owner's assigned bento sections even beyond the usual tree caps.
+    settingsPromise.then((s) => homeCategoryTree(db, {
+      keep: new Set(Object.values(normalizeHomeBento(s.homeBento)).map((a) => a!.category)),
+    })),
     runListed(
       db,
       `WITH counted AS (
@@ -5847,16 +5818,10 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
     ),
     ctxPromise,
     displayRatePromise,
+    cardIndexPromise,
+    productsPromise,
   ]);
-  logServedByRegion(c, latest.meta);
-  const cardIndex = await cardIndexPromise;
-  /** An ordinary product's card gains its knowledge line (§G.5); a composition card never does. */
-  const withLine = (card: Record<string, unknown>, row: Record<string, unknown>) =>
-    cardIndex && String(row.composition ?? '') === '' ? withCardKnowledge(card, row, cardIndex) : card;
 
-  // Normalize on the way OUT as well as on the way in: rows written before
-  // lib/homeContent.ts existed never went through the validator, and the
-  // storefront puts these straight into an <img src> and an <a href>.
   const raw = projectPublicSettings(settings);
   const safeSettings = {
     ...raw,
@@ -5865,77 +5830,27 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
     ...display,
   };
 
-  // THE HOME CARDS PRICE FROM THE SAME PLACE THE CART DOES. Without the
-  // relational overlay a card falls back to the `products.options` /
-  // `products.colors` JSON mirrors, and an owner who repriced an option in the
-  // form would see the home page keep the old number while the product page
-  // and the cart showed the new one — the very split the price-change round
-  // was about. One batched read for both strips, not N+1 per card.
-  // A product can be in BOTH strips, and the same id twice would bind a
-  // duplicate placeholder for nothing.
-  const latestRows = homeLatest(latest.results ?? []);
-  const homeRows = new Map<string, { id: string; inventory_mode: unknown }>();
-  for (const r of [...discounted.results, ...latestRows, ...openBoxRows]) {
-    homeRows.set(String(r.id), { id: String(r.id), inventory_mode: r.inventory_mode });
-  }
-  const [homeViews, homePooled, homeOffers] = await Promise.all([
-    loadRelationsViews(c.env.DB, [...homeRows.values()]),
-    // §8.2 row 18 on the home rails too: the same card, the same `stock` field.
-    degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, [...homeRows.keys()].map(String)), new Set<string>()),
-    /**
-     * SCHEDULED OFFERS, ON THE FIRST SCREEN — the shop's flash deals.
-     *
-     * `offer_windows` (migration 0060) is fully built, admin-editable at
-     * /api/admin/offers, and honoured by /api/products and /api/bundles. The
-     * home page passed a literal `null` where every one of those passes the
-     * offer view, so a deal the owner scheduled priced correctly on the
-     * listing and the product page and at NO price at all on the page every
-     * visitor lands on first — no offer price, no countdown, no badge.
-     *
-     * One batched read for every card on the page, exactly as the listing
-     * does it (§14), and the price still comes from `resolveOfferPrice` — the
-     * same resolution the checkout charges, never a discount computed here.
-     */
-    degradeIfSchemaMissing(
-      'offers (migration 0060)',
-      () => loadOffers(c.env.DB, [...homeRows.keys()].map((id) => subjectOf(String(id)))),
-      EMPTY_OFFERS()
-    ),
-  ]);
-
-  /** The offer view for one card, or undefined when nothing is scheduled. */
-  const offerFor = (id: unknown) => homeOffers.get(offerKey(subjectOf(String(id))));
-
-  /**
-   * The new-product prices the graded shelf compares against, in ONE read.
-   *
-   * Only ACTIVE rows: a used listing that points at a product the owner has
-   * since hidden must not keep advertising a saving against a price the shop
-   * no longer offers.
-   */
-  const referenceIds = [
-    ...new Set(
-      openBoxRows
-        .map((r) => parseConditionDoc(r.condition_doc)?.new_product_id)
-        .filter((id): id is string => typeof id === 'string' && id !== '')
-    ),
-  ];
-  const referencePrices = new Map<string, number>();
-  if (referenceIds.length > 0) {
-    const { results: refRows } = await runListed(
-      db,
-      `SELECT id, price_iqd FROM products WHERE ${L.sellable('products')} AND id IN (${referenceIds.map(() => '?').join(',')})`,
-      (q) => db.prepare(q).bind(...referenceIds).all<{ id: string; price_iqd: number }>()
-    );
-    for (const r of refRows ?? []) referencePrices.set(String(r.id), Number(r.price_iqd) || 0);
-  }
-  const openBoxCards = openBoxRows.map((p) => {
-    const card = withLine(
-      cardShape(publicWithDisplayPrice(p, ctx, { sellable: true }, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id)))),
-      p
-    );
+  // A product often occurs in several shelves. Resolve its card once within
+  // THIS response, keeping catalog-only and sellable projections distinct.
+  // Nothing (including membership prices or stock) is cached across requests.
+  const cards = new Map<string, Record<string, unknown>>();
+  const cardFor = (row: Record<string, unknown>, sellable: boolean): Record<string, unknown> => {
+    const id = String(row.id);
+    const key = `${id}:${sellable}`;
+    const found = cards.get(key);
+    if (found) return found;
+    const card = cardShape(publicWithDisplayPrice(
+      row, ctx, { sellable }, products.views.get(id), undefined,
+      products.offers.get(offerKey(subjectOf(id))), products.pooled.has(id)
+    ));
+    const result = cardIndex && String(row.composition ?? '') === '' ? withCardKnowledge(card, row, cardIndex) : card;
+    cards.set(key, result);
+    return result;
+  };
+  const openBoxCards = products.openBoxRows.map((p) => {
+    const card = cardFor(p, true);
     const condition = parseConditionDoc(p.condition_doc);
-    const reference = condition?.new_product_id ? referencePrices.get(condition.new_product_id) : undefined;
+    const reference = condition?.new_product_id ? products.referencePrices.get(condition.new_product_id) : undefined;
     const saving = conditionSaving(Number(card.display_price_iqd ?? card.price_iqd ?? 0), reference);
     return saving ? { ...card, condition_reference: saving } : card;
   });
@@ -5943,37 +5858,11 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
   return c.json({
     success: true,
     settings: safeSettings,
-    discounted: discounted.results.map((p) =>
-      withLine(cardShape(publicWithDisplayPrice(p, ctx, { sellable: true }, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id)))), p)
-    ),
-    latest: latestRows.map((p) =>
-      withLine(
-        cardShape(
-          publicWithDisplayPrice(p, ctx, { sellable: sellableNowOf(p) }, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id)))
-        ),
-        p
-      )
-    ),
-    // Already filtered to catalogs that hold something, at both levels —
-    // homeCategoryTree drops the empties rather than making the client do it.
+    discounted: products.discounted.map((p) => cardFor(p, true)),
+    latest: products.latestRows.map((p) => cardFor(p, sellableNowOf(p))),
     categories,
     brands: brands.results.filter((r) => Number(r.product_count) > 0),
-    // The first screen's own artwork — brand marks and service icons. Resolved
-    // here rather than in the client so the seeded defaults and the owner's
-    // uploads arrive as one already-decided list of URLs, and the storefront
-    // never has to know what `UiUx/MainPage/` is. `mainPageMedia` is already in
-    // PUBLIC_SETTING_KEYS, so this costs no extra read.
     siteMedia: resolveSiteMedia((safeSettings as Record<string, unknown>).mainPageMedia),
-    /**
-     * The graded shelf, each card carrying the CURRENT price of the new
-     * product it is a copy of.
-     *
-     * Resolved here rather than on the card, because one batched read answers
-     * the whole shelf: twelve cards would otherwise be twelve lookups on the
-     * first screen. A link to a product that is gone, hidden, or not actually
-     * dearer simply yields no comparison — conditionSaving() refuses to print
-     * a zero or negative saving beside a struck-through number.
-     */
     open_box: openBoxCards,
   });
 }
@@ -6046,15 +5935,17 @@ async function homeSections(c: Context<AppContext>): Promise<Response> {
   }
 
   const ph = wanted.map(() => '?').join(',');
-  const { results: rows } = await c.env.DB
+  const rowsPromise = c.env.DB
     .prepare(`SELECT * FROM products WHERE id IN (${ph})`)
     .bind(...wanted)
-    .all<Record<string, unknown>>();
+    .all<Record<string, unknown>>()
+    .then(({ results }) => results);
 
-  const [views, offers, pooled] = await Promise.all([
-    loadRelationsViews(c.env.DB, rows.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))),
-    degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(c.env.DB, rows.map((r) => subjectOf(String(r.id)))), EMPTY_OFFERS()),
-    degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, rows.map((r) => String(r.id))), new Set<string>()),
+  const [rows, views, offers, pooled] = await Promise.all([
+    rowsPromise,
+    loadRelationsViewsForIds(c.env.DB, wanted, rowsPromise.then((rows) => rows.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode })))),
+    degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(c.env.DB, wanted.map(subjectOf)), EMPTY_OFFERS()),
+    degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, wanted), new Set<string>()),
   ]);
 
   const cardIndex = await cardIndexPromise;

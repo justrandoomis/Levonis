@@ -81,8 +81,10 @@ const CEILINGS: Array<{ path: string; host?: string; waves: [warm: number, cold:
   // FX-7: the SKU rung (product_sku_prices) is read beside the relations, in the same wave — one statement, no wave.
   // The Bambu import (spec §G.5): the cards' knowledge line names the section from the memoised taxonomy,
   // read in the FIRST wave on a cold isolate (one statement, no wave; nothing warm) — 23 → 24.
-  { path: '/api/home', waves: [3, 3, 3], prepares: 24 },
-  { path: '/api/home/sections', waves: [4, 4, 4], prepares: 22 },
+  // 2026-10-23: product relations no longer wait for the category tree or the
+  // viewer's membership read; extra shelves fetch rows and relations together.
+  { path: '/api/home', waves: [2, 3, 2], prepares: 24 },
+  { path: '/api/home/sections', waves: [3, 3, 3], prepares: 22 },
   { path: '/api/products', waves: [2, 2, 2], prepares: 17 },
   // The paged listing (owner 2026-10-19, «browse ALL products»): the keys of every candidate, then the
   // page's (and, under a priced order or the counts, the sellable candidates') rows, relations, offers and
@@ -294,7 +296,7 @@ test('the shopfront reads the owner\'s tier ONCE, and its stats in one batch', a
   const p = await w.measure(`/api/products/${LIVE_PRODUCTS[0].slug}`);
   assert.equal(p.waves, 2, p.sqls.join('\n'));
   const home = await w.measure('/api/home');
-  assert.equal(home.waves, 3, home.sqls.join('\n'));
+  assert.equal(home.waves, 2, home.sqls.join('\n'));
 });
 
 /**

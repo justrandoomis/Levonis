@@ -490,12 +490,29 @@ export async function loadRelationsViews(
   db: D1Database,
   rows: Array<{ id: string; inventory_mode?: unknown }>
 ): Promise<Map<string, ProductRelationsView>> {
+  return loadRelationsViewsForIds(db, rows.map((r) => r.id), Promise.resolve(rows));
+}
+
+/**
+ * When shelf selection already knows the ids, fetch relations alongside the
+ * product rows. Only assembly needs the rows' authoritative inventory modes;
+ * waiting for those rows before starting all nine reads adds a D1 round trip.
+ * Removed rows produce no view, even if their relations were read in parallel.
+ */
+export async function loadRelationsViewsForIds(
+  db: D1Database,
+  ids: string[],
+  rowsOf: Promise<Array<{ id: string; inventory_mode?: unknown }>>
+): Promise<Map<string, ProductRelationsView>> {
   const out = new Map<string, ProductRelationsView>();
-  if (rows.length === 0) return out;
-  const ids = rows.map((r) => r.id);
+  if (ids.length === 0) {
+    await rowsOf;
+    return out;
+  }
   // One bound parameter for the list (json_each): the live D1 refuses > 100 (review F1).
 
-  const [groups, values, colors, links, variants, images, fulfillments, optionTransports, skuPrices] = await Promise.all([
+  const [rows, groups, values, colors, links, variants, images, fulfillments, optionTransports, skuPrices] = await Promise.all([
+    rowsOf,
     softAll<OptionGroupRow>('groups', () =>
       db.prepare(`SELECT * FROM product_option_groups WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY sort, name_en`).bind(JSON.stringify(ids)).all<OptionGroupRow>()
     ),
