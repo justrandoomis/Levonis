@@ -5778,7 +5778,11 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
             db,
             `SELECT id, price_iqd FROM products WHERE ${L.sellable('products')} AND id IN (${referenceIds.map(() => '?').join(',')})`,
             (q) => db.prepare(q).bind(...referenceIds).all<{ id: string; price_iqd: number }>()
-          ).then(({ results }) => new Map((results ?? []).map((r) => [String(r.id), Number(r.price_iqd) || 0])))
+          ).then(({ results }) => {
+            const referencePrices = new Map<string, number>();
+            for (const r of results ?? []) referencePrices.set(String(r.id), Number(r.price_iqd) || 0);
+            return referencePrices;
+          })
         : Promise.resolve(new Map<string, number>());
       const [views, pooled, offers, referencePrices] = await Promise.all([
         loadRelationsViews(db, [...homeRows.values()]),
@@ -5793,7 +5797,7 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
   const [settings, categories, brands, ctx, display, cardIndex, products] = await Promise.all([
     settingsPromise,
     // Keep the owner's assigned bento sections even beyond the usual tree caps.
-    settingsPromise.then((s) => homeCategoryTree(db, {
+    settingsPromise.then((s) => homeCategoryTree(c.env.DB, {
       keep: new Set(Object.values(normalizeHomeBento(s.homeBento)).map((a) => a!.category)),
     })),
     runListed(
