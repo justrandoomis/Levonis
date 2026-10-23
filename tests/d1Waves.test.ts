@@ -81,23 +81,23 @@ const CEILINGS: Array<{ path: string; host?: string; waves: [warm: number, cold:
   // FX-7: the SKU rung (product_sku_prices) is read beside the relations, in the same wave — one statement, no wave.
   // The Bambu import (spec §G.5): the cards' knowledge line names the section from the memoised taxonomy,
   // read in the FIRST wave on a cold isolate (one statement, no wave; nothing warm) — 23 → 24.
-  { path: '/api/home', waves: [3, 3, 6], prepares: 24 },
-  { path: '/api/home/sections', waves: [4, 4, 6], prepares: 22 },
-  { path: '/api/products', waves: [2, 2, 5], prepares: 17 },
+  { path: '/api/home', waves: [3, 3, 3], prepares: 24 },
+  { path: '/api/home/sections', waves: [4, 4, 4], prepares: 22 },
+  { path: '/api/products', waves: [2, 2, 2], prepares: 17 },
   // The paged listing (owner 2026-10-19, «browse ALL products»): the keys of every candidate, then the
   // page's (and, under a priced order or the counts, the sellable candidates') rows, relations, offers and
   // pools in ONE wave — the brand names ride the keys. Before (base b8233ee3, measured the same way): waves
   // 5/5/7, 4/4/6, 4/4/7, 3/3/6 and the same statements (16, 15, 15, 14 warm); after: no more statements.
-  { path: '/api/products?category=cat_printers_fdm&facets=1&limit=24', waves: [3, 3, 4], prepares: 16 },
-  { path: '/api/products?category=cat_printers_fdm&sort=relevance&limit=24&offset=4', waves: [3, 3, 4], prepares: 15 },
-  { path: '/api/products?brand=bambu-lab&sort=price_asc&facets=1&limit=24', waves: [2, 2, 4], prepares: 15 },
-  { path: '/api/products?sort=newest&limit=24', waves: [2, 2, 4], prepares: 14 },
-  { path: `/api/products/${LIVE_PRODUCTS[0].slug}`, waves: [2, 2, 5], prepares: 23 },
+  { path: '/api/products?category=cat_printers_fdm&facets=1&limit=24', waves: [3, 3, 3], prepares: 16 },
+  { path: '/api/products?category=cat_printers_fdm&sort=relevance&limit=24&offset=4', waves: [3, 3, 3], prepares: 15 },
+  { path: '/api/products?brand=bambu-lab&sort=price_asc&facets=1&limit=24', waves: [2, 2, 2], prepares: 15 },
+  { path: '/api/products?sort=newest&limit=24', waves: [2, 2, 2], prepares: 14 },
+  { path: `/api/products/${LIVE_PRODUCTS[0].slug}`, waves: [2, 2, 2], prepares: 23 },
   // FX-1: the display rate (pricing_fx_rates USD) is read beside the settings, in the same wave.
   { path: '/api/settings/public', waves: [1, 1, 1], prepares: 2 },
   { path: '/api/community/access', waves: [1, 1, 1], prepares: 1 },
-  { path: '/api/storefront/resolve', host: HOST, waves: [5, 5, 5], prepares: 20 },
-  { path: `/api/storefront/${SLUG}`, waves: [5, 5, 5], prepares: 20 },
+  { path: '/api/storefront/resolve', host: HOST, waves: [3, 3, 3], prepares: 20 },
+  { path: `/api/storefront/${SLUG}`, waves: [3, 3, 3], prepares: 20 },
   { path: `/api/storefront/${SLUG}/products`, waves: [2, 2, 2], prepares: 2 },
   { path: `/api/storefront/${SLUG}/reviews`, waves: [2, 2, 2], prepares: 3 },
   { path: '/api/print-quote/materials', waves: [1, 1, 1], prepares: 1 },
@@ -285,8 +285,9 @@ test('the pricing inputs: one wave cold, no statement warm, forgotten at once by
 test('the shopfront reads the owner\'s tier ONCE, and its stats in one batch', async () => {
   const w = world();
   const c = await w.measure('/api/storefront/resolve', null, HOST);
-  const sweeps = c.sqls.filter((s) => s.startsWith("UPDATE memberships SET state = 'expired'"));
-  assert.equal(sweeps.length, 1, `getTierStatus ran ${sweeps.length} times:\n${c.sqls.join('\n')}`);
+  const tierReads = c.sqls.filter((s) => s.startsWith('SELECT * FROM memberships WHERE user_id = ?'));
+  assert.equal(tierReads.length, 1, `getTierStatus ran ${tierReads.length} times:\n${c.sqls.join('\n')}`);
+  assert.ok(!c.sqls.some((s) => s.startsWith('UPDATE memberships')), 'an unexpired membership needs no expiry write');
   assert.equal(c.batches, 1, 'the four stat counts are one D1 call');
   assert.ok(c.sqls.some((s) => s.startsWith('BATCH(4)')));
   // The product page: everything that needs only the row's id leaves in the second wave.

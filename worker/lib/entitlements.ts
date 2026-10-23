@@ -313,29 +313,7 @@ export async function getLaunchConfig(db: D1Database): Promise<LaunchConfig> {
  */
 export async function getTierStatus(db: D1Database, userId: string): Promise<TierStatus> {
   const nowIso = new Date().toISOString();
-  // A frozen PRO membership (0145) never expires while it waits. On a
-  // database that has not run 0145 nothing can be frozen, and the column the
-  // guard names is not there to name (tierPause.ts, `isPausedAtMissing`).
-  let pausable = true;
-  try {
-    await db
-      .prepare(
-        "UPDATE memberships SET state = 'expired' WHERE user_id = ? AND state = 'active' AND expires_at IS NOT NULL AND expires_at < ? AND paused_at IS NULL"
-      )
-      .bind(userId, nowIso)
-      .run();
-  } catch (e) {
-    if (!isPausedAtMissing(e)) throw e;
-    pausable = false;
-    await db
-      .prepare(
-        "UPDATE memberships SET state = 'expired' WHERE user_id = ? AND state = 'active' AND expires_at IS NOT NULL AND expires_at < ?"
-      )
-      .bind(userId, nowIso)
-      .run();
-  }
-
-  const { results } = await db
+  const readMemberships = () => db
     .prepare(
       `SELECT * FROM memberships
         WHERE user_id = ? AND state IN ('active','prepaid_pending_launch')
@@ -344,7 +322,31 @@ export async function getTierStatus(db: D1Database, userId: string): Promise<Tie
     .bind(userId)
     .all<MembershipRow>();
 
+  // This is on every signed-in catalogue read. Previously even a free
+  // account paid four sequential D1 trips, including two UPDATE attempts.
+  // Read fresh authority and its derived cache together; write only when a
+  // transition is needed. Nothing is memoised across requests, so revocation,
+  // expiry and benefit restrictions still take effect on the next read.
+  const [{ results }, { results: cases }, cachedUser] = await Promise.all([
+    readMemberships(),
+    db.prepare("SELECT benefit_flags FROM restriction_cases WHERE user_id = ? AND state = 'active'")
+      .bind(userId).all<{ benefit_flags: string }>(),
+    db.prepare('SELECT membership_tier, subscription_plan, subscription_expiry FROM users WHERE id = ?')
+      .bind(userId).first<{ membership_tier: string; subscription_plan: string; subscription_expiry: number }>(),
+  ]);
+
+  // SELECT * also tells us whether 0145 exists without a schema probe. A
+  // frozen PRO never expires. A real expiry keeps the conditional write and
+  // re-read, including a renewal that races with that write.
+  const pausable = results.every((row) => Object.hasOwn(row, 'paused_at'));
   let rows = results;
+  if (rows.some((row) => row.state === 'active' && row.expires_at !== null && row.expires_at < nowIso && row.paused_at == null)) {
+    await db.prepare(
+      "UPDATE memberships SET state = 'expired' WHERE user_id = ? AND state = 'active' AND expires_at IS NOT NULL AND expires_at < ?" +
+      (pausable ? ' AND paused_at IS NULL' : '')
+    ).bind(userId, nowIso).run();
+    rows = (await readMemberships()).results;
+  }
   if (rows.some((m) => m.state === 'prepaid_pending_launch')) {
     rows = await convertReservationOnRead(db, userId, rows, nowIso);
   }
@@ -377,10 +379,6 @@ export async function getTierStatus(db: D1Database, userId: string): Promise<Tie
   // choke point — so checkout, pricing, community and support all honor
   // the same decision without separate wiring.
   const gated = new Set<string>();
-  const { results: cases } = await db
-    .prepare("SELECT benefit_flags FROM restriction_cases WHERE user_id = ? AND state = 'active'")
-    .bind(userId)
-    .all<{ benefit_flags: string }>();
   for (const r of cases) {
     for (const f of safeParse<unknown[]>(r.benefit_flags, [])) {
       if (typeof f === 'string') gated.add(f);
@@ -409,13 +407,15 @@ export async function getTierStatus(db: D1Database, userId: string): Promise<Tie
   // migration.
   const legacyPlan = status.tier === 'prime' ? 'free' : status.tier;
   const expiryMs = status.expires_at ? new Date(status.expires_at).getTime() : 0;
-  await db
-    .prepare(
-      `UPDATE users SET membership_tier = ?, subscription_plan = ?, subscription_expiry = ?
-        WHERE id = ? AND (membership_tier <> ? OR subscription_plan <> ? OR subscription_expiry <> ?)`
-    )
-    .bind(status.tier, legacyPlan, expiryMs, userId, status.tier, legacyPlan, expiryMs)
-    .run();
+  if (cachedUser && (cachedUser.membership_tier !== status.tier || cachedUser.subscription_plan !== legacyPlan || cachedUser.subscription_expiry !== expiryMs)) {
+    await db
+      .prepare(
+        `UPDATE users SET membership_tier = ?, subscription_plan = ?, subscription_expiry = ?
+          WHERE id = ? AND (membership_tier IS NOT ? OR subscription_plan IS NOT ? OR subscription_expiry IS NOT ?)`
+      )
+      .bind(status.tier, legacyPlan, expiryMs, userId, status.tier, legacyPlan, expiryMs)
+      .run();
+  }
 
   return status;
 }
