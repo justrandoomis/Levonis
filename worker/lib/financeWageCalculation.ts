@@ -5,7 +5,7 @@ import { conflict } from './http';
 import { baghdadDay, fence, journalPlan, periodOpen } from './operations';
 import { getOrderProfitBase, profitSourceFingerprint, type OrderProfitBase } from './orderProfit';
 import { snapshotFor, costAmount } from './orderFinance';
-import { nextEmploymentDay, staffCanAccrue, type EmploymentStaff } from './financeEmployment';
+import { nextEmploymentDay, staffCanAccrue, staffDateEligible, type EmploymentStaff } from './financeEmployment';
 import { effectiveWageRules, wageVersions, type EffectiveWageRule, type WageVersion } from './financeWageTimeline';
 import { readRuleScope } from './financeRuleScopes';
 import { readNeverLinkedLines } from './financeDeletedProductScope';
@@ -173,7 +173,7 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
       }else if(cost&&amount!==null&&amount!==cost.effective_iqd){
         const delta=amount-(cost.effective_iqd??0),adjustment=newId('wagefix');
         const revision=(await db.prepare('SELECT COUNT(*) AS n FROM finance_cost_adjustments WHERE cost_id=?').bind(id).first<{n:number}>())!.n;
-        const reason=rule.change_reason??'إعادة احتساب الأجر بحسب يوم التسليم وبداية العمل';
+        const reason=!staffDateEligible(staff,base.order)?'خارج تاريخ بدء استحقاق الموظف':!staffCanAccrue(staff,base.order)?'تسوية فترة توقف الموظف':rule.change_reason==='إنشاء قاعدة الأجر'||!rule.change_reason?'إعادة احتساب الأجر بحسب يوم التسليم وفترات العمل':rule.change_reason;
         statements.push(db.prepare("INSERT INTO finance_cost_adjustments(id,cost_id,kind,delta_iqd,before_iqd,after_iqd,actor_id,adjustment_day,created_at,employment_version,reason,wage_version_id,earning_day,recalculation_key) VALUES (?,?,'recalculation',?,?,?,?,?,?,?,?,?,?,?)")
           .bind(adjustment,id,delta,cost.effective_iqd??0,amount,opts.actor??null,day,now,staff.employment_version,reason,rule.wage_version_id??null,earningDay,`wage:${id}:${staff.employment_version}:${revision}:${amount}`),
           ...journalPlan(db,{key:`wage-adjustment:${adjustment}`,day,title:reason,source:'finance_cost_adjustment',sourceId:adjustment,actor:opts.actor},delta>0?[{account:'5100',debit:delta},{account:liability,credit:delta}]:[{account:liability,debit:-delta},{account:'5100',credit:-delta}]).statements,

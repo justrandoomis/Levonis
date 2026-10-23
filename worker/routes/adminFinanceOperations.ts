@@ -26,6 +26,8 @@ import { operationsReport } from '../lib/operationsReport';
 import { wageVersionStatement } from '../lib/financeWageTimeline';
 import { nextEmploymentDay, queueStaffReconciliation, readStaff, updateStaffEmployment } from '../lib/financeEmployment';
 
+import { staffActiveAt } from '../lib/financeEmploymentIntervals';
+
 export const adminFinanceOperationsRoutes = new Hono<AppContext>();
 adminFinanceOperationsRoutes.use('*', requireAdmin);
 // THE DOOR (owner decision 2): payroll, withdrawals and profit are cost — the
@@ -128,8 +130,8 @@ async function ruleValues(
     throw badRequest('اختر القسم أو المنتج');
   const scope = b.scope == null ? null : await validateRuleScope(db,b.scope);
   const staffId = text(b.staff_id, 60) || null;
-  const staff = staffId ? await db.prepare('SELECT id,name,start_work_date FROM finance_staff WHERE id=? AND active=1 AND archived_at IS NULL').bind(staffId).first<{id:string;name:string;start_work_date:string|null}>() : null;
-  if(staffId && !staff) throw badRequest('اختر موظفًا نشطًا من القائمة');
+  const staff = staffId ? await readStaff(db,staffId) : null;
+  if(staffId && (!staff || !staffActiveAt(staff))) throw badRequest('اختر موظفًا نشطًا من القائمة');
   let category = text(b.category_id, 60);
   if(!category) {
     await db.prepare("INSERT OR IGNORE INTO expense_categories(id,slug,name_ar,name_en) VALUES ('finance_staff_wages','finance-staff-wages','أجور الموظفين','Staff wages')").run();

@@ -332,3 +332,29 @@ restore the correct entitlement. Unaffected orders remain payable. Original
 payments and negative adjustments remain as history; a matching positive
 correction restores the balance once, without duplicating it on replay.
 Wage preview calculation version 6 invalidates pre-correction previews.
+
+### 7.2 Employee pauses and dated resumptions (2026-10-23)
+
+The original employment start date and unpaid pauses are separate facts.
+The owner's example is a pause from 13 October and resumption on 23 October:
+keep prior earnings, exclude deliveries on 13–22 October, and include deliveries
+from 00:00 Baghdad on 23 October. Resuming never moves the original hiring
+cutoff or restarts the wage-rule timeline. The existing initial start-date rule
+(next-day eligibility) remains unchanged; resumption includes its own day.
+
+Owners can add or correct multiple non-overlapping pause intervals. An empty
+resume date keeps the employee paused; a future resume date takes effect
+without another edit. Existing instant-based archive/restore intervals keep
+their recorded precision. Date edits compare the employment revision, retain
+an audit of the intervals, block reductions of reserved withdrawals, and queue
+the existing bounded reconciliation. Earlier payments and original accruals
+are retained; corrections append offsets in the current open period. Legacy
+wages and investor pending guards use employment at delivery, not today's
+active flag.
+
+A later hiring date can legitimately zero older earnings. The owner view now
+identifies previously earned orders excluded by that date and shows the
+amount before and after each adjustment. Correcting a mistaken hiring cutoff
+and recording the real pause restores eligible prior earnings once; the
+system must not infer a person's original hiring date from a screenshot or
+silently convert every negative historical adjustment into a positive wage.

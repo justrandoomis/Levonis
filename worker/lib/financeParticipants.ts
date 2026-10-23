@@ -14,7 +14,8 @@ import { auditStatements } from './audit';
 import { notifyStatement } from './notifications';
 import { PRIVATE_DELEGATION_ENABLED, canViewCost, isOwner } from './adminScope';
 import type { Env, SessionUser } from './types';
-import { employmentInstalled, investorEmploymentPendingSql, nextEmploymentDay, staffDateEligible } from './financeEmployment';
+import { employmentInstalled, investorEmploymentPendingSql, nextEmploymentDay, staffCanAccrue, type EmploymentStaff } from './financeEmployment';
+import { inactiveAtSql } from './financeEmploymentIntervals';
 import { SURPLUS_PREFIX, SURPLUS_ROWS_SQL, surplusInstalled } from './investorSurplus';
 
 export type BalanceType = 'earnings' | 'capital' | 'all';
@@ -49,7 +50,7 @@ const currentWageTargetSql=(cost='ec',job='j',order='jo')=>`EXISTS(SELECT 1 FROM
 const unknownWageRefundSql=(orderSql:string,itemSql:string)=>`EXISTS(SELECT 1 FROM return_cases ur WHERE ur.order_id=${orderSql} AND (${itemSql} IS NULL OR ur.order_item_id=${itemSql}) AND ur.state='resolved' AND ur.resolution='refund' AND
   CASE WHEN EXISTS(SELECT 1 FROM finance_refund_facts uf WHERE uf.case_id=ur.id) THEN (SELECT uf.refund_iqd FROM finance_refund_facts uf WHERE uf.case_id=ur.id)
   ELSE COALESCE((SELECT json_extract(ua.detail,'$.refund.amount_iqd') FROM audit_log ua WHERE ua.action='return.transition' AND ua.target=ur.id AND json_valid(ua.detail) AND json_extract(ua.detail,'$.refund.amount_iqd') IS NOT NULL ORDER BY ua.id DESC LIMIT 1),(SELECT uw.amount_iqd FROM wallet_transactions uw WHERE uw.id='wtx_ret_'||ur.id AND uw.status='approved')) END IS NULL)`;
-export const staffReconciliationBlockedSql=(orderSql='c.order_id',costSql='c.id',includeLate=true)=>`(EXISTS(SELECT 1 FROM finance_wage_targets wt WHERE wt.cost_id=${costSql} AND wt.amount_iqd IS NULL) OR EXISTS(SELECT 1 FROM finance_order_costs ec JOIN finance_staff es ON es.id=ec.staff_id JOIN orders eo ON eo.id=ec.order_id WHERE ec.id=${costSql} AND COALESCE(ec.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments ca WHERE ca.cost_id=ec.id),0)>0 AND es.start_work_date IS NOT NULL AND (eo.status<>'delivered' OR COALESCE(date(eo.delivered_at,'+3 hours')>es.start_work_date,0)=0)) OR EXISTS(SELECT 1 FROM finance_staff_reconciliations j JOIN finance_order_costs ec ON ec.staff_id=j.staff_id JOIN orders jo ON jo.id=ec.order_id WHERE ec.id=${costSql} AND j.state<>'complete' AND ec.order_id>j.cursor AND (j.affected_from IS NULL OR date(jo.delivered_at,'+3 hours')>=j.affected_from) AND (j.affected_until IS NULL OR date(jo.delivered_at,'+3 hours')<j.affected_until) AND NOT ${currentWageTargetSql()}) OR EXISTS(SELECT 1 FROM finance_posting_errors pe WHERE pe.order_id=${orderSql}
+export const staffReconciliationBlockedSql=(orderSql='c.order_id',costSql='c.id',includeLate=true)=>`(EXISTS(SELECT 1 FROM finance_wage_targets wt WHERE wt.cost_id=${costSql} AND wt.amount_iqd IS NULL) OR EXISTS(SELECT 1 FROM finance_order_costs ec JOIN finance_staff es ON es.id=ec.staff_id JOIN orders eo ON eo.id=ec.order_id WHERE ec.id=${costSql} AND COALESCE(ec.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments ca WHERE ca.cost_id=ec.id),0)>0 AND ((es.start_work_date IS NOT NULL AND (eo.status<>'delivered' OR COALESCE(date(eo.delivered_at,'+3 hours')>es.start_work_date,0)=0)) OR ${inactiveAtSql('es.inactive_periods_json','eo.delivered_at')})) OR EXISTS(SELECT 1 FROM finance_staff_reconciliations j JOIN finance_order_costs ec ON ec.staff_id=j.staff_id JOIN orders jo ON jo.id=ec.order_id WHERE ec.id=${costSql} AND j.state<>'complete' AND ec.order_id>j.cursor AND (j.affected_from IS NULL OR date(jo.delivered_at,'+3 hours')>=j.affected_from) AND (j.affected_until IS NULL OR date(jo.delivered_at,'+3 hours')<j.affected_until) AND NOT ${currentWageTargetSql()}) OR EXISTS(SELECT 1 FROM finance_posting_errors pe WHERE pe.order_id=${orderSql}
   AND (pe.event_key<>'cogs:'||${orderSql} OR NOT EXISTS(SELECT 1 FROM finance_order_costs wage WHERE wage.id=${costSql} AND COALESCE((SELECT basis FROM finance_wage_targets WHERE cost_id=wage.id),json_extract(wage.snapshot,'$.rule.basis')) IN ('unit','order','revenue_percent')))) OR EXISTS(
   SELECT 1 FROM finance_order_costs sc WHERE sc.id=${costSql} AND COALESCE((SELECT basis FROM finance_wage_targets WHERE cost_id=sc.id),json_extract(sc.snapshot,'$.rule.basis')) IN ('profit_percent','revenue_percent')
   AND NOT EXISTS(SELECT 1 FROM finance_cost_adjustments ca WHERE ca.cost_id=sc.id AND ca.kind='manual')
@@ -156,7 +157,7 @@ export async function participantOverview(db: D1Database, userId: string, opts: 
   const withdrawals = await db.prepare('SELECT * FROM finance_withdrawals WHERE user_id=? ORDER BY created_at DESC LIMIT 200').bind(userId).all<WithdrawalRow>();
   // Own setup/progress is useful even before the first cost exists. Never
   // expose rule snapshots, raw failures, account identifiers or other staff.
-  const employmentRows = (await db.prepare(`SELECT s.start_work_date,s.active,
+  const employmentRows = (await db.prepare(`SELECT s.start_work_date,CASE WHEN s.archived_at IS NOT NULL THEN 0 WHEN json_array_length(s.inactive_periods_json)>0 THEN NOT ${inactiveAtSql('s.inactive_periods_json',"'now'")} ELSE s.active END AS active,
     s.archived_at IS NOT NULL AS archived,
     EXISTS(SELECT 1 FROM finance_cost_rules r WHERE r.staff_id=s.id AND r.active=1) AS has_rules,
     j.state AS reconciliation_state,COALESCE(j.processed_orders,0) AS processed_orders
@@ -428,7 +429,7 @@ export async function reconcileStaffOrderCosts(db: D1Database, orderId: string, 
   }
   const base=await getOrderProfitBase(db,orderId),day=opts.day??baghdadDay();
   let netProfit=new Map<string,number|null>();
-  const staffStarts=await employmentInstalled(db)?new Map(((await db.prepare('SELECT id,start_work_date FROM finance_staff').all<{id:string;start_work_date:string|null}>()).results??[]).map((s)=>[s.id,s])):new Map<string,{start_work_date:string|null}>();
+  const staffStarts=await employmentInstalled(db)?new Map(((await db.prepare('SELECT * FROM finance_staff').all<EmploymentStaff>()).results??[]).map((s)=>[s.id,s])):new Map<string,EmploymentStaff>();
   const frozen=await db.prepare('SELECT rules_json FROM finance_order_snapshots WHERE order_id=?').bind(orderId).first<{rules_json:string}>();
   const snapshot=frozen?JSON.parse(frozen.rules_json) as Array<{line_id:string;rules:Array<{id:string}>}>:[];
   const plans:Array<{cost:typeof costs[number];amount:number;base_iqd:number}>=[],caps=new Map<string,number>();
@@ -445,7 +446,7 @@ export async function reconcileStaffOrderCosts(db: D1Database, orderId: string, 
     }
     for(const cost of costs) {
       if(temporal.managed.has(cost.rule_id))continue;
-      if(cost.staff_id&&staffStarts.has(cost.staff_id)&&!staffDateEligible(staffStarts.get(cost.staff_id)!,base.order))continue;
+      if(cost.staff_id&&staffStarts.has(cost.staff_id)&&!staffCanAccrue(staffStarts.get(cost.staff_id)!,base.order))continue;
       let rule:{basis:string;amount:number;cap_iqd:number|null;requires_assignment?:number};
       try{rule=JSON.parse(cost.snapshot).rule;}catch{continue;}
       if(!rule || !['profit_percent','revenue_percent'].includes(rule.basis))continue;

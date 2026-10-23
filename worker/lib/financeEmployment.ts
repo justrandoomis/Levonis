@@ -2,6 +2,7 @@ import { badRequest, conflict, notFound } from './http';
 import { baghdadDay, dateValue, fence, journalPlan, periodOpen } from './operations';
 import { auditStatements } from './audit';
 import { newId } from './crypto';
+import { employmentIntervals, inactiveAt, inactiveAtSql, staffActiveAt, type EmploymentInterval } from './financeEmploymentIntervals';
 
 export interface EmploymentStaff {
   id:string; name:string; role:string; user_id:string|null; active:number;
@@ -24,8 +25,8 @@ export const investorEmploymentPendingSql=(contractSql='e.contract_id',kindSql='
   WHERE ec.id=${contractSql} AND ej.state<>'complete' AND eo.id>ej.cursor AND (ej.affected_from IS NULL OR date(eo.delivered_at,'+3 hours')>=ej.affected_from) AND (ej.affected_until IS NULL OR date(eo.delivered_at,'+3 hours')<ej.affected_until)
   AND (${kindSql}='investor_profit' OR ec.loss_share_bps>0 OR EXISTS(SELECT 1 FROM finance_withdrawal_allocations pa WHERE pa.source_id='invprofit:'||ec.id AND pa.source_kind='investor_profit' AND pa.paid_iqd>0))
   AND (EXISTS(SELECT 1 FROM finance_order_costs cost WHERE cost.order_id=eo.id AND cost.staff_id=es.id AND cost.state<>'reversed')
-    OR (es.active=1 AND es.archived_at IS NULL AND es.start_work_date IS NOT NULL AND eo.status='delivered' AND date(eo.delivered_at,'+3 hours')>es.start_work_date
-      AND json_array_length(ej.rules_json)>0 AND NOT EXISTS(SELECT 1 FROM json_each(es.inactive_periods_json) ip WHERE julianday(eo.delivered_at)>=julianday(json_extract(ip.value,'$.from')) AND (json_extract(ip.value,'$.to') IS NULL OR julianday(eo.delivered_at)<julianday(json_extract(ip.value,'$.to')))))))`;
+    OR (es.start_work_date IS NOT NULL AND eo.status='delivered' AND date(eo.delivered_at,'+3 hours')>es.start_work_date
+      AND json_array_length(ej.rules_json)>0 AND NOT ${inactiveAtSql('es.inactive_periods_json','eo.delivered_at')})))`;
 export const readStaff=(db:D1Database,id:string)=>db.prepare('SELECT * FROM finance_staff WHERE id=?').bind(id).first<EmploymentStaff>();
 export const readStaffReconciliation=(db:D1Database,id:string)=>db.prepare('SELECT * FROM finance_staff_reconciliations WHERE staff_id=?').bind(id).first<StaffReconciliation>();
 export const employmentDate=(value:unknown)=>value===null||value===''?null:dateValue(value);
@@ -39,10 +40,10 @@ export function staffDateEligible(staff:Pick<EmploymentStaff,'start_work_date'>,
 export function staffCanAccrue(staff:EmploymentStaff,order:Record<string,unknown>) {
   if(!staffDateEligible(staff,order))return false;
   // Archiving stops its own interval, not the employee's past deliveries.
-  if((!staff.active||staff.archived_at)&&!order.delivered_at)return false;
+  if(!order.delivered_at)return staffActiveAt(staff);
   const at=deliveryTime(order.delivered_at);
-  const periods=JSON.parse(staff.inactive_periods_json) as Array<{from:string;to:string|null}>;
-  return !Number.isFinite(at)||!periods.some((p)=>at>=Date.parse(p.from)&&(!p.to||at<Date.parse(p.to)));
+  const periods=JSON.parse(staff.inactive_periods_json) as EmploymentInterval[];
+  return Number.isFinite(at)&&!inactiveAt(periods,at);
 }
 export async function queueStaffReconciliation(db:D1Database,staffId:string,actor:string|null,statements:D1PreparedStatement[]=[],bump=true,replacementRule?:{id:string;[key:string]:unknown},range?:{from:string|null;until:string|null;reason:string;operationId:string}) {
   const staff=await readStaff(db,staffId);if(!staff)throw notFound('الموظف غير موجود');
@@ -60,26 +61,33 @@ export async function queueStaffReconciliation(db:D1Database,staffId:string,acto
 }
 export async function updateStaffEmployment(db:D1Database,id:string,b:Record<string,unknown>,actor:string,archive=false) {
   const old=await readStaff(db,id);if(!old)throw notFound('الموظف غير موجود');
+  const editingPeriods=b.inactive_periods!==undefined;
+  if(b.employment_version!==undefined&&b.employment_version!==old.employment_version||editingPeriods&&b.employment_version===undefined)throw conflict('تغير سجل الموظف؛ حدّث الصفحة ثم أعد المحاولة');
+  if(editingPeriods&&(b.active!==undefined||archive||old.archived_at))throw badRequest('عدّل فترات التوقف للموظف غير المحذوف دون تغيير الحالة منفصلًا');
   const start=b.start_work_date===undefined?old.start_work_date:employmentDate(b.start_work_date);
   const userId=b.user_id===undefined?old.user_id:(typeof b.user_id==='string'?b.user_id.trim():null);
   if(userId&&!(await db.prepare('SELECT id FROM users WHERE id=?').bind(userId).first()))throw badRequest('اختر حسابًا موجودًا');
   if(old.user_id&&old.user_id!==userId&&await db.prepare('SELECT 1 FROM finance_order_costs WHERE staff_id=? UNION ALL SELECT 1 FROM finance_staff_payments WHERE staff_id=? LIMIT 1').bind(id,id).first())throw conflict('هذا الحساب مرتبط باستحقاقات سابقة؛ أضف موظفًا جديدًا للحساب الآخر');
   const now=new Date().toISOString(),archived=archive?old.archived_at??now:b.restore===true?null:old.archived_at;
-  const active=archived?0:b.active===undefined?old.active:b.active===true||b.active===1?1:0;
-  const periods=JSON.parse(old.inactive_periods_json) as Array<{from:string;to:string|null}>;
-  if(old.active&&!active)periods.push({from:now,to:null});
-  if(!old.active&&active){const open=[...periods].reverse().find((p)=>!p.to);if(open)open.to=now;}
+  const periods=editingPeriods?employmentIntervals(b.inactive_periods):JSON.parse(old.inactive_periods_json) as EmploymentInterval[];
+  const wasActive=staffActiveAt(old);
+  const active=archived?0:editingPeriods?Number(JSON.stringify(periods)===old.inactive_periods_json?wasActive:!inactiveAt(periods,Date.parse(now))):b.active===undefined?Number(wasActive):b.active===true||b.active===1?1:0;
+  if(!editingPeriods&&archive){const current=periods.find(p=>inactiveAt([p],Date.parse(now)));if(current)current.to=null;else if(!old.archived_at)periods.push({from:now,to:null});}
+  else if(!editingPeriods&&wasActive&&!active)periods.push({from:now,to:null});
+  if(!editingPeriods&&!wasActive&&active){const current=periods.find(p=>inactiveAt([p],Date.parse(now)));if(current)current.to=now;}
+  const periodsJson=JSON.stringify(periods);
   const name=b.name===undefined?old.name:typeof b.name==='string'?b.name.trim():'';
   const role=b.role===undefined?old.role:typeof b.role==='string'?b.role.trim():'';
   if(!name||name.length>120||role.length>120)throw badRequest('الاسم أو الدور غير صحيح');
   const changingDate=start!==old.start_work_date;
-  const changesAccrual=changingDate||active!==old.active||archived!==old.archived_at;
+  const changesAccrual=changingDate||periodsJson!==old.inactive_periods_json||active!==old.active||archived!==old.archived_at;
   // A date edit cannot invalidate money currently reserved for withdrawal.
-  const heldSql=`SELECT 1 FROM finance_order_costs c JOIN orders o ON o.id=c.order_id JOIN finance_withdrawal_allocations a ON a.source_kind='staff' AND a.source_id=c.id JOIN finance_withdrawals w ON w.id=a.withdrawal_id WHERE c.staff_id=? AND w.state IN ('requested','approved','part_paid') AND a.amount_iqd>a.paid_iqd AND (? IS NOT NULL AND (o.status<>'delivered' OR o.delivered_at IS NULL OR date(o.delivered_at,'+3 hours')<=?))`;
-  if(changingDate&&await db.prepare(heldSql).bind(id,start,start).first())throw conflict('حرر طلب السحب المحجوز قبل تغيير تاريخ استحقاق هذه الطلبات');
-  const statements=[...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=? AND user_id IS ? AND name=? AND role=? AND active=? AND start_work_date IS ? AND archived_at IS ? AND inactive_periods_json=?)',[id,old.employment_version,old.user_id,old.name,old.role,old.active,old.start_work_date,old.archived_at,old.inactive_periods_json]),...(changingDate?fence(db,`NOT EXISTS(${heldSql})`,[id,start,start]):[]),
-    db.prepare('UPDATE finance_staff SET name=?,role=?,user_id=?,active=?,start_work_date=?,archived_at=?,inactive_periods_json=? WHERE id=?').bind(name,role,userId||null,active,start,archived,JSON.stringify(periods),id),
-    ...(await auditStatements(db,actor,archive?'finance.staff_archived':'finance.staff_updated',id,{before:old,after:{name,role,user_id:userId,active,start_work_date:start,archived_at:archived}})).statements];
+  const heldSql=`SELECT 1 FROM finance_order_costs c JOIN orders o ON o.id=c.order_id JOIN finance_withdrawal_allocations a ON a.source_kind='staff' AND a.source_id=c.id JOIN finance_withdrawals w ON w.id=a.withdrawal_id WHERE c.staff_id=? AND w.state IN ('requested','approved','part_paid') AND a.amount_iqd>a.paid_iqd AND ((? IS NOT NULL AND (o.status<>'delivered' OR o.delivered_at IS NULL OR date(o.delivered_at,'+3 hours')<=?)) OR ${inactiveAtSql('?','o.delivered_at')})`;
+  const heldArgs=[id,start,start,periodsJson];
+  if(changesAccrual&&await db.prepare(heldSql).bind(...heldArgs).first())throw conflict('حرر طلب السحب المحجوز قبل تغيير فترة استحقاق هذه الطلبات');
+  const statements=[...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=? AND user_id IS ? AND name=? AND role=? AND active=? AND start_work_date IS ? AND archived_at IS ? AND inactive_periods_json=?)',[id,old.employment_version,old.user_id,old.name,old.role,old.active,old.start_work_date,old.archived_at,old.inactive_periods_json]),...(changesAccrual?fence(db,`NOT EXISTS(${heldSql})`,heldArgs):[]),
+    db.prepare('UPDATE finance_staff SET name=?,role=?,user_id=?,active=?,start_work_date=?,archived_at=?,inactive_periods_json=? WHERE id=?').bind(name,role,userId||null,active,start,archived,periodsJson,id),
+    ...(await auditStatements(db,actor,archive?'finance.staff_archived':'finance.staff_updated',id,{before:old,after:{name,role,user_id:userId,active,start_work_date:start,archived_at:archived,inactive_periods_json:periodsJson}})).statements];
   try {
     if(!changesAccrual){
       await db.batch([...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=? AND user_id IS ? AND name=? AND role=?)',[id,old.employment_version,old.user_id,old.name,old.role]),...statements]);
@@ -121,17 +129,17 @@ async function updateWithLegacyRules(db:D1Database,id:string,actor:string,statem
  * cash settlements and manual corrections remain immutable. */
 export async function reconcileEmploymentCutoff(db:D1Database,orderId:string,actor?:string,day=baghdadDay()) {
   if(!await employmentInstalled(db))return 0;
-  const rows=(await db.prepare(`SELECT c.id,c.rule_id,c.staff_id,c.amount_iqd,c.state,s.start_work_date,s.employment_version,o.status AS order_status,o.delivered_at,
+  const rows=(await db.prepare(`SELECT c.id,c.rule_id,c.staff_id,c.amount_iqd,c.state,s.start_work_date,s.employment_version,s.active,s.archived_at,s.inactive_periods_json,o.status AS order_status,o.delivered_at,
     COALESCE(c.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments a WHERE a.cost_id=c.id),0) AS effective,
     COALESCE(c.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments a WHERE a.cost_id=c.id AND a.employment_version IS NULL),0) AS intended,
     (SELECT COALESCE(SUM(a.amount_iqd-a.paid_iqd),0) FROM finance_withdrawal_allocations a JOIN finance_withdrawals w ON w.id=a.withdrawal_id WHERE a.source_kind='staff' AND a.source_id=c.id AND w.state IN ('requested','approved','part_paid')) AS held
-    FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id JOIN orders o ON o.id=c.order_id WHERE c.order_id=? AND c.state IN ('due','approved')`).bind(orderId).all<{id:string;rule_id:string;staff_id:string;amount_iqd:number;state:string;start_work_date:string|null;employment_version:number;order_status:string;delivered_at:string|null;effective:number;intended:number;held:number}>()).results??[];
+    FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id JOIN orders o ON o.id=c.order_id WHERE c.order_id=? AND c.state IN ('due','approved')`).bind(orderId).all<EmploymentStaff&{id:string;rule_id:string;staff_id:string;amount_iqd:number;state:string;order_status:string;delivered_at:string|null;effective:number;intended:number;held:number}>()).results??[];
   const timeline=await db.prepare("SELECT 1 FROM sqlite_master WHERE name='finance_wage_versions'").first();
-  const managed=timeline?new Set(((await db.prepare('SELECT DISTINCT rule_id FROM finance_wage_versions').all<{rule_id:string}>()).results??[]).map(r=>r.rule_id)):new Set<string>();
+  const managed=timeline?new Set(((await db.prepare("SELECT DISTINCT v.rule_id FROM finance_wage_versions v JOIN finance_staff s ON s.id=v.staff_id WHERE s.start_work_date IS NOT NULL OR EXISTS(SELECT 1 FROM finance_wage_versions revised WHERE revised.rule_id=v.rule_id AND revised.revision>1 AND revised.id NOT LIKE 'wage:baseline:%')").all<{rule_id:string}>()).results??[]).map(r=>r.rule_id)):new Set<string>();
   const statements:D1PreparedStatement[]=[];let changed=0;
   for(const row of rows){
     if(managed.has(row.rule_id))continue;
-    const target=staffDateEligible(row,{status:row.order_status,delivered_at:row.delivered_at})?Math.max(0,row.intended):0;
+    const target=staffCanAccrue(row,{status:row.order_status,delivered_at:row.delivered_at})?Math.max(0,row.intended):0;
     if(target===row.effective)continue;
     if(row.held>0&&target<row.effective)throw conflict('حرر طلب السحب المحجوز قبل تطبيق تاريخ الاستحقاق');
     const id=newId('employmentfix'),delta=target-row.effective;

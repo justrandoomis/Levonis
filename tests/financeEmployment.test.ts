@@ -672,3 +672,115 @@ test('a percentage recalculation cannot revive earnings after a competing cutoff
   assert.equal(costs(id)[0].effective_iqd, 0);
   assert.equal(count(raw, 'SELECT COUNT(*) n FROM finance_cost_adjustments WHERE cost_id=?', original.id), 0);
 });
+
+test('dated pause and resumption preserve prior wages and payments and use inclusive Baghdad days', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-24T12:00:00Z') });
+  const { raw, boss, self, order, staff, rule, drain, costs } = setup();
+  await order('a-before-pause', '2026-10-12T20:59:59.999Z');
+  await order('b-pause-boundary', '2026-10-12T21:00:00.000Z');
+  await order('c-during-pause', '2026-10-18T12:00:00.000Z');
+  await order('d-last-paused-second', '2026-10-22T20:59:59.999Z');
+  await order('e-resume-boundary', '2026-10-22T21:00:00.000Z');
+  await order('f-after-resume', '2026-10-23T12:00:00.000Z');
+  const id = await staff({ start_work_date: '2026-10-01' }); await rule(id); await drain(id);
+  assert.equal((await post(boss, `/operations/costs/${costs(id)[0].id}/approve`)).status, 200);
+  assert.equal((await post(boss, `/operations/staff/${id}/payments`, { operation_id: 'pause-paid-before', amount_iqd: 5000, kind: 'payment' })).status, 200);
+  const payments = all(raw, 'SELECT * FROM finance_staff_payments');
+  const original = all(raw, 'SELECT * FROM finance_order_costs ORDER BY id');
+  const pause = async (to: string | null) => {
+    const revision = row(raw, 'SELECT employment_version FROM finance_staff WHERE id=?', id)!.employment_version;
+    const response = await patch(boss, `/people/staff/${id}`, { employment_version: revision, inactive_periods: [{ from: '2026-10-13', to }] });
+    assert.equal(response.status, 200, JSON.stringify(await json(response)));
+    await drain(id);
+  };
+  await pause(null);
+  assert.deepEqual(costs(id).filter(c => c.effective_iqd > 0).map(c => c.order_id), ['a-before-pause']);
+  await pause('2026-10-23');
+  assert.deepEqual(costs(id).filter(c => c.effective_iqd > 0).map(c => c.order_id), ['a-before-pause', 'e-resume-boundary', 'f-after-resume']);
+  assert.deepEqual(all(raw, 'SELECT * FROM finance_order_costs ORDER BY id'), original);
+  assert.deepEqual(all(raw, 'SELECT * FROM finance_staff_payments'), payments);
+  assert.equal(row(raw, 'SELECT start_work_date FROM finance_staff WHERE id=?', id)?.start_work_date, '2026-10-01');
+  const earnings = await json(await get(self, '/earnings'));
+  assert.equal(earnings.summary.staff_net_iqd, 10000); assert.equal(earnings.summary.available_earnings_iqd, 10000); assert.equal(earnings.summary.debt_iqd, 0);
+  const adjustmentCount = count(raw, 'SELECT COUNT(*) n FROM finance_cost_adjustments');
+  await pause('2026-10-23');
+  assert.equal(count(raw, 'SELECT COUNT(*) n FROM finance_cost_adjustments'), adjustmentCount);
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM finance_cost_adjustments WHERE reason='تسوية فترة توقف الموظف'"), 5);
+  assert.equal(count(raw, 'SELECT COALESCE(SUM(debit_iqd-credit_iqd),0) n FROM accounting_lines'), 0);
+});
+
+test('correcting a pause mistakenly entered as the hiring date restores zeroed profit wages once', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-24T12:00:00Z') });
+  const { raw, boss, self, order, staff, rule, drain, costs } = setup();
+  await order('old-sixth', '2026-10-06T10:00:00Z'); await order('old-eighth', '2026-10-08T10:00:00Z');
+  await order('paused-thirteenth', '2026-10-13T10:00:00Z'); await order('resumed-twenty-third', '2026-10-23T10:00:00Z');
+  const id = await staff({ start_work_date: '2026-10-01' }); await rule(id, { basis: 'profit_percent', amount: 1000 }); await drain(id);
+  assert.equal((await patch(boss, `/people/staff/${id}`, { start_work_date: '2026-10-13' })).status, 200); await drain(id);
+  assert.equal(costs(id).find(c => c.order_id === 'old-sixth')?.effective_iqd, 0);
+  const listing = await json(await get(boss, '/people/staff'));
+  assert.deepEqual(listing.staff.find((s: { id: string }) => s.id === id).cutoff_earnings, { orders: 3, first_day: '2026-10-06' });
+  const revision = row(raw, 'SELECT employment_version FROM finance_staff WHERE id=?', id)!.employment_version;
+  const response = await patch(boss, `/people/staff/${id}`, { employment_version: revision, start_work_date: '2026-10-01', inactive_periods: [{ from: '2026-10-13', to: '2026-10-23' }] });
+  assert.equal(response.status, 200, JSON.stringify(await json(response))); await drain(id);
+  assert.deepEqual(costs(id).map(c => [c.order_id, c.effective_iqd]), [['old-eighth', 3500], ['old-sixth', 3500], ['paused-thirteenth', 0], ['resumed-twenty-third', 3500]]);
+  assert.equal((await json(await get(self, '/earnings'))).summary.available_earnings_iqd, 10500);
+  assert.equal((await json(await get(boss, '/people/staff'))).staff.find((s: { id: string }) => s.id === id).cutoff_earnings, null);
+});
+
+test('scheduled resumption becomes active on its saved day without another edit', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-22T12:00:00Z') });
+  const { raw, boss, self, env, order, staff, rule, drain, costs } = setup();
+  const id = await staff({ start_work_date: '2026-10-01' }); await rule(id); await drain(id);
+  const revision = row(raw, 'SELECT employment_version FROM finance_staff WHERE id=?', id)!.employment_version;
+  const response = await patch(boss, `/people/staff/${id}`, { employment_version: revision, inactive_periods: [{ from: '2026-10-13', to: '2026-10-23' }] });
+  assert.equal(response.status, 200, JSON.stringify(await json(response))); await drain(id);
+  assert.equal((await json(await get(boss, '/people/staff'))).staff.find((s: {id:string})=>s.id===id).active, 0, JSON.stringify({now:new Date().toISOString(),staff:row(raw,'SELECT * FROM finance_staff WHERE id=?',id)}));
+  t.mock.timers.setTime(Date.parse('2026-10-22T21:00:00Z'));
+  assert.equal((await json(await get(boss, '/people/staff'))).staff.find((s: {id:string})=>s.id===id).active, 1);
+  // The stored flag remains paused; delivery eligibility uses the interval.
+  assert.equal(row(raw, 'SELECT active FROM finance_staff WHERE id=?', id)?.active, 0);
+  await order('scheduled-first-delivery', '2026-10-22T21:00:00Z');
+  await runOrderFinancialEffects(env, 'scheduled-first-delivery', 'delivered');
+  assert.equal(costs(id)[0].effective_iqd, 5000);
+  assert.equal((await json(await get(self, '/earnings'))).summary.available_earnings_iqd, 5000);
+});
+
+test('pause edits reject overlaps, invalid dates, stale versions and held earnings atomically', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-24T12:00:00Z') });
+  const { raw, boss, self, order, staff, rule, drain } = setup();
+  await order('reserved-paused-order', '2026-10-15T10:00:00Z');
+  const id = await staff({ start_work_date: '2026-10-01' }); await rule(id); await drain(id);
+  const before = row(raw, 'SELECT * FROM finance_staff WHERE id=?', id)!;
+  const periods = [{ from: '2026-10-13', to: '2026-10-23' }];
+  const write = (inactive_periods: unknown, employment_version: unknown = before.employment_version) => patch(boss, `/people/staff/${id}`, { employment_version, inactive_periods });
+  assert.equal((await write(periods, Number(before.employment_version) - 1)).status, 409);
+  assert.equal((await write([{ from: '2026-02-30', to: null }])).status, 400);
+  assert.equal((await write([{ from: '2026-10-13', to: '2026-10-13' }])).status, 400);
+  assert.equal((await write([...periods, { from: '2026-10-20', to: null }])).status, 400);
+  assert.equal((await patch(self, `/people/staff/${id}`, { employment_version: before.employment_version, inactive_periods: periods })).status, 403);
+  assert.equal((await post(self, '/earnings/withdrawals', { operation_id: 'pause-held-earnings', amount_iqd: 5000 })).status, 200);
+  assert.equal((await write(periods)).status, 409);
+  assert.deepEqual(row(raw, 'SELECT * FROM finance_staff WHERE id=?', id), before);
+  assert.equal(count(raw, 'SELECT COUNT(*) n FROM finance_cost_adjustments'), 0);
+});
+
+test('undated legacy wages obey paused intervals and still post earlier deliveries while currently paused', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-01T12:00:00Z') });
+  const { raw, boss, self, env, order, staff, rule, drain, costs } = setup();
+  const id = await staff({ start_work_date: null }); await rule(id);
+  for (const [name, delivered] of [['legacy-before', '2026-10-06T12:00:00Z'], ['legacy-paused', '2026-10-18T12:00:00Z']]) {
+    await order(name, delivered, { created: '2026-10-01T12:01:00Z' });
+    await runOrderFinancialEffects(env, name, 'delivered');
+  }
+  assert.equal(costs(id).reduce((n, c) => n + c.effective_iqd, 0), 10000);
+  t.mock.timers.setTime(Date.parse('2026-10-24T12:00:00Z'));
+  const revision = row(raw, 'SELECT employment_version FROM finance_staff WHERE id=?', id)!.employment_version;
+  const response = await patch(boss, `/people/staff/${id}`, { employment_version: revision, inactive_periods: [{ from: '2026-10-13', to: null }] });
+  assert.equal(response.status, 200, JSON.stringify(await json(response))); await drain(id);
+  assert.equal(costs(id).find(c => c.order_id === 'legacy-paused')?.effective_iqd, 0);
+  await order('legacy-late-posting', '2026-10-08T12:00:00Z', { created: '2026-10-01T12:01:00Z' });
+  await runOrderFinancialEffects(env, 'legacy-late-posting', 'delivered');
+  assert.equal(costs(id).find(c => c.order_id === 'legacy-late-posting')?.effective_iqd, 5000);
+  assert.equal((await json(await get(self, '/earnings'))).summary.available_earnings_iqd, 10000);
+  assert.equal(count(raw, 'SELECT COUNT(*) n FROM finance_posting_errors'), 0);
+});

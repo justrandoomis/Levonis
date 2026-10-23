@@ -245,11 +245,11 @@ export async function runOrderFinancialEffects(
       const rules=staffOnly?.rules??(await db.prepare('SELECT * FROM finance_cost_rules WHERE staff_id=? AND active=1').bind(employee.id).all<CostRule>()).results??[];
       const deliveredDay=baghdadDay(new Date(String(goods.order.delivered_at)));
       const applied=await snapshotFor(db,goods.lines,new Date().toISOString(),rules.map((r)=>r.employment_effective_default&&employee.start_work_date?{...r,effective_from:nextEmploymentDay(employee.start_work_date)}:r),deliveredDay);
-      await db.batch([...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=? AND active=1 AND archived_at IS NULL) AND EXISTS(SELECT 1 FROM orders WHERE id=? AND status=? AND delivered_at IS ?)',[employee.id,employee.employment_version,orderId,goods.order.status,goods.order.delivered_at]),
+      await db.batch([...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=?) AND EXISTS(SELECT 1 FROM orders WHERE id=? AND status=? AND delivered_at IS ?)',[employee.id,employee.employment_version,orderId,goods.order.status,goods.order.delivered_at]),
         db.prepare(`INSERT INTO finance_staff_order_rules(order_id,staff_id,employment_version,rules_json,created_at) VALUES (?,?,?,?,?) ON CONFLICT(order_id,staff_id) DO UPDATE SET employment_version=excluded.employment_version,rules_json=excluded.rules_json,created_at=excluded.created_at`).bind(orderId,employee.id,employee.employment_version,JSON.stringify(applied),new Date().toISOString())]);
     }
-    const overlays=(await db.prepare('SELECT r.rules_json FROM finance_staff_order_rules r JOIN finance_staff s ON s.id=r.staff_id WHERE r.order_id=? AND r.employment_version=s.employment_version AND s.active=1 AND s.archived_at IS NULL').bind(orderId).all<{rules_json:string}>()).results??[];
-    const supplemental=overlays.flatMap((r)=>JSON.parse(r.rules_json) as RuleSnapshot);
+    const overlays=(await db.prepare('SELECT r.staff_id,r.rules_json FROM finance_staff_order_rules r JOIN finance_staff s ON s.id=r.staff_id WHERE r.order_id=? AND r.employment_version=s.employment_version').bind(orderId).all<{staff_id:string;rules_json:string}>()).results??[];
+    const supplemental=overlays.filter(r=>staffById.has(r.staff_id)&&staffCanAccrue(staffById.get(r.staff_id)!,goods.order)).flatMap((r)=>JSON.parse(r.rules_json) as RuleSnapshot);
     frozen=goods.lines.map((line)=>({line_id:line.id,product_id:line.product_id??'',rules:[...(frozen.find((f)=>f.line_id===line.id)?.rules??[]).filter((r)=>!r.staff_id||!staffById.get(r.staff_id)?.start_work_date),...supplemental.filter((f)=>f.line_id===line.id).flatMap((f)=>f.rules)]}));
   }
   const assignments =
@@ -330,7 +330,7 @@ export async function runOrderFinancialEffects(
       .bind(orderId, rule.id, itemId)
       .first<{ id: string; state: string; amount_iqd: number | null }>();
     if (existing && existing.state !== 'pending_cost') continue;
-    if(employee)statements.push(...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=? AND active=1 AND archived_at IS NULL) AND EXISTS(SELECT 1 FROM orders WHERE id=? AND status=? AND delivered_at IS ?)',[employee.id,employee.employment_version,orderId,goods.order.status,goods.order.delivered_at??null]));
+    if(employee)statements.push(...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=?) AND EXISTS(SELECT 1 FROM orders WHERE id=? AND status=? AND delivered_at IS ?)',[employee.id,employee.employment_version,orderId,goods.order.status,goods.order.delivered_at??null]));
     // The employee and completion state read above must still belong to this
     // task when its cost becomes payable. Reassignment is a competing write,
     // even when the previous cost was only waiting for FIFO.

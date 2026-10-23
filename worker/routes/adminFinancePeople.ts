@@ -1,3 +1,4 @@
+import { staffActiveAt } from '../lib/financeEmploymentIntervals';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { badRequest, conflict, forbidden, notFound, requireAdmin, str } from '../lib/http';
@@ -64,6 +65,12 @@ adminFinancePeopleRoutes.get('/staff',async(c)=>{
     db.prepare('SELECT r.*,s.name AS staff_name FROM finance_cost_rules r LEFT JOIN finance_staff s ON s.id=r.staff_id ORDER BY r.active DESC,r.name').all<ScopedCostRule&Record<string,unknown>>(),
     db.prepare('SELECT * FROM finance_staff_reconciliations').all<import('../lib/financeEmployment').StaffReconciliation>()]);
   const reportRange=financeRange(c.req.query()),periods=await staffPeriodReport(db,reportRange);
+  const cutoffRows=(await db.prepare(`SELECT c.staff_id,COUNT(DISTINCT c.order_id) AS orders,MIN(date(o.delivered_at,'+3 hours')) AS first_day
+    FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id JOIN orders o ON o.id=c.order_id
+    WHERE c.state<>'reversed' AND c.amount_iqd>0 AND s.start_work_date IS NOT NULL AND date(o.delivered_at,'+3 hours')<=s.start_work_date
+      AND c.amount_iqd+COALESCE((SELECT SUM(a.delta_iqd) FROM finance_cost_adjustments a WHERE a.cost_id=c.id),0)=0
+    GROUP BY c.staff_id`).all<{staff_id:string;orders:number;first_day:string}>()).results??[];
+  const cutoffByStaff=new Map(cutoffRows.map(row=>[row.staff_id,{orders:row.orders,first_day:row.first_day}]));
   const histories=await wageVersions(db);
   const currentRules=new Map<string,import('../lib/financeWageTimeline').EffectiveWageRule>();
   const balances=new Map<string,Awaited<ReturnType<typeof participantOverview>>['summary']>();
@@ -75,7 +82,7 @@ adminFinancePeopleRoutes.get('/staff',async(c)=>{
   const rr=(rules.results??[]).map(r=>{const current=currentRules.get(String(r.id));return current?{...r,...current,version:r.version}:r;}).map((r)=>({...r,scope:readRuleScope(r)??{catalog_ids:r.target_type==='catalog'?[r.target_id]:[],product_ids:r.target_type==='product'?[r.target_id]:[],excluded_product_ids:[]}}));
   const ids=[...new Set(rr.flatMap((r)=>[...r.scope.product_ids,...r.scope.excluded_product_ids]))];
   const products=ids.length?await db.prepare('SELECT id,name,name_ar,name_en,sku FROM products WHERE id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(ids)).all():{results:[]};
-  return c.json({success:true,can_manage_staff:isOwner(c.env,c.get('user')!),staff:(staff.results??[]).map(s=>({...s,balance:balances.get(String(s.id))??null,period:periods.get(String(s.id))??{earned_iqd:0,paid_iqd:0,adjustments_iqd:0,pending_costs:0}})),catalogs:catalogs.results??[],rules:rr,scope_products:products.results??[],reconciliations:(jobs.results??[]).map(publicReconciliation)});
+  return c.json({success:true,can_manage_staff:isOwner(c.env,c.get('user')!),staff:(staff.results??[]).map(s=>({...s,active:Number(staffActiveAt(s as unknown as import('../lib/financeEmployment').EmploymentStaff)),cutoff_earnings:cutoffByStaff.get(String(s.id))??null,balance:balances.get(String(s.id))??null,period:periods.get(String(s.id))??{earned_iqd:0,paid_iqd:0,adjustments_iqd:0,pending_costs:0}})),catalogs:catalogs.results??[],rules:rr,scope_products:products.results??[],reconciliations:(jobs.results??[]).map(publicReconciliation)});
 });
 adminFinancePeopleRoutes.post('/staff',async(c)=>{
   const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');if(!isOwner(c.env,actor))throw forbidden('تعديل الموظفين وتواريخهم للأدمن الرئيسي فقط');
