@@ -48,60 +48,60 @@ INSERT INTO pricing_rules_new (id, kind, scope, catalog_id, product_id, scope_id
 DROP TABLE pricing_rules;
 ALTER TABLE pricing_rules_new RENAME TO pricing_rules;
 
-CREATE INDEX idx_pricing_rules_product ON pricing_rules(product_id) WHERE product_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_pricing_rules_product ON pricing_rules(product_id) WHERE product_id IS NOT NULL;
 
-CREATE UNIQUE INDEX idx_pricing_rules_target
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pricing_rules_target
   ON pricing_rules(kind, scope, IFNULL(catalog_id,''), IFNULL(product_id,''), scope_id);
 
-CREATE TRIGGER pricing_config_rule_del AFTER DELETE ON pricing_rules WHEN OLD.product_id IS NULL
+CREATE TRIGGER IF NOT EXISTS pricing_config_rule_del AFTER DELETE ON pricing_rules WHEN OLD.product_id IS NULL
 BEGIN UPDATE pricing_engine_control SET config_version = config_version + 1 WHERE id = 1; END;
 
-CREATE TRIGGER pricing_config_rule_ins AFTER INSERT ON pricing_rules WHEN NEW.product_id IS NULL
+CREATE TRIGGER IF NOT EXISTS pricing_config_rule_ins AFTER INSERT ON pricing_rules WHEN NEW.product_id IS NULL
 BEGIN UPDATE pricing_engine_control SET config_version = config_version + 1 WHERE id = 1; END;
 
-CREATE TRIGGER pricing_config_rule_upd AFTER UPDATE ON pricing_rules
+CREATE TRIGGER IF NOT EXISTS pricing_config_rule_upd AFTER UPDATE ON pricing_rules
 WHEN NEW.product_id IS NULL OR OLD.product_id IS NULL
 BEGIN UPDATE pricing_engine_control SET config_version = config_version + 1 WHERE id = 1; END;
 
-CREATE TRIGGER pricing_rules_engine_delete BEFORE DELETE ON pricing_rules
+CREATE TRIGGER IF NOT EXISTS pricing_rules_engine_delete BEFORE DELETE ON pricing_rules
 WHEN OLD.product_id IS NOT NULL AND EXISTS (SELECT 1 FROM products p WHERE p.id = OLD.product_id)
  AND EXISTS (SELECT 1 FROM product_pricing_state s WHERE s.product_id = OLD.product_id AND s.mode = 'engine') AND NOT EXISTS (SELECT 1 FROM ops_guards g WHERE g.id = 'engine-price:' || OLD.product_id)
 BEGIN SELECT RAISE(ABORT, 'PRICING_PREVIEW_REQUIRED'); END;
 
-CREATE TRIGGER pricing_rules_engine_insert BEFORE INSERT ON pricing_rules
+CREATE TRIGGER IF NOT EXISTS pricing_rules_engine_insert BEFORE INSERT ON pricing_rules
 WHEN NEW.product_id IS NOT NULL AND EXISTS (SELECT 1 FROM product_pricing_state s WHERE s.product_id = NEW.product_id AND s.mode = 'engine') AND NOT EXISTS (SELECT 1 FROM ops_guards g WHERE g.id = 'engine-price:' || NEW.product_id)
 BEGIN SELECT RAISE(ABORT, 'PRICING_PREVIEW_REQUIRED'); END;
 
-CREATE TRIGGER pricing_rules_engine_update BEFORE UPDATE ON pricing_rules
+CREATE TRIGGER IF NOT EXISTS pricing_rules_engine_update BEFORE UPDATE ON pricing_rules
 WHEN (OLD.product_id IS NOT NULL AND EXISTS (SELECT 1 FROM product_pricing_state s WHERE s.product_id = OLD.product_id AND s.mode = 'engine') AND NOT EXISTS (SELECT 1 FROM ops_guards g WHERE g.id = 'engine-price:' || OLD.product_id))
   OR (NEW.product_id IS NOT NULL AND EXISTS (SELECT 1 FROM product_pricing_state s WHERE s.product_id = NEW.product_id AND s.mode = 'engine') AND NOT EXISTS (SELECT 1 FROM ops_guards g WHERE g.id = 'engine-price:' || NEW.product_id))
 BEGIN SELECT RAISE(ABORT, 'PRICING_PREVIEW_REQUIRED'); END;
 
-CREATE TRIGGER pricing_rules_no_reinsert BEFORE INSERT ON pricing_rules
+CREATE TRIGGER IF NOT EXISTS pricing_rules_no_reinsert BEFORE INSERT ON pricing_rules
 WHEN EXISTS (SELECT 1 FROM pricing_rules r WHERE r.id = NEW.id
                 OR (r.kind = NEW.kind AND r.scope = NEW.scope AND IFNULL(r.catalog_id,'') = IFNULL(NEW.catalog_id,'')
                     AND IFNULL(r.product_id,'') = IFNULL(NEW.product_id,'') AND r.scope_id = NEW.scope_id))
 BEGIN SELECT RAISE(ABORT, 'PRICING_INPUT_REINSERT'); END;
 
-CREATE TRIGGER pricing_rules_seq_del AFTER DELETE ON pricing_rules WHEN OLD.product_id IS NOT NULL
+CREATE TRIGGER IF NOT EXISTS pricing_rules_seq_del AFTER DELETE ON pricing_rules WHEN OLD.product_id IS NOT NULL
 BEGIN UPDATE product_pricing_state SET inputs_seq = inputs_seq + 1 WHERE product_id = OLD.product_id; END;
 
-CREATE TRIGGER pricing_rules_seq_ins AFTER INSERT ON pricing_rules WHEN NEW.product_id IS NOT NULL
+CREATE TRIGGER IF NOT EXISTS pricing_rules_seq_ins AFTER INSERT ON pricing_rules WHEN NEW.product_id IS NOT NULL
 BEGIN UPDATE product_pricing_state SET inputs_seq = inputs_seq + 1 WHERE product_id = NEW.product_id; END;
 
-CREATE TRIGGER pricing_rules_seq_upd AFTER UPDATE ON pricing_rules
+CREATE TRIGGER IF NOT EXISTS pricing_rules_seq_upd AFTER UPDATE ON pricing_rules
 WHEN NEW.product_id IS NOT NULL OR OLD.product_id IS NOT NULL
 BEGIN UPDATE product_pricing_state SET inputs_seq = inputs_seq + 1 WHERE product_id IN (OLD.product_id, NEW.product_id); END;
 
-CREATE TRIGGER trg_import_guard_pricing_rules_del BEFORE DELETE ON pricing_rules
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_pricing_rules_del BEFORE DELETE ON pricing_rules
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
-CREATE TRIGGER trg_import_guard_pricing_rules_ins BEFORE INSERT ON pricing_rules
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_pricing_rules_ins BEFORE INSERT ON pricing_rules
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
-CREATE TRIGGER trg_import_guard_pricing_rules_upd BEFORE UPDATE ON pricing_rules
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_pricing_rules_upd BEFORE UPDATE ON pricing_rules
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
@@ -134,42 +134,42 @@ INSERT INTO pricing_price_points_new (product_id, scope, scope_id, kind, amount_
 DROP TABLE pricing_price_points;
 ALTER TABLE pricing_price_points_new RENAME TO pricing_price_points;
 
-CREATE TRIGGER pricing_price_points_guard_delete BEFORE DELETE ON pricing_price_points
+CREATE TRIGGER IF NOT EXISTS pricing_price_points_guard_delete BEFORE DELETE ON pricing_price_points
 WHEN EXISTS (SELECT 1 FROM products p WHERE p.id = OLD.product_id)
  AND NOT EXISTS (SELECT 1 FROM ops_guards g WHERE g.id = 'engine-price:' || OLD.product_id)
 BEGIN SELECT RAISE(ABORT, 'PRICING_PREVIEW_REQUIRED'); END;
 
-CREATE TRIGGER pricing_price_points_guard_insert BEFORE INSERT ON pricing_price_points
+CREATE TRIGGER IF NOT EXISTS pricing_price_points_guard_insert BEFORE INSERT ON pricing_price_points
 WHEN NOT EXISTS (SELECT 1 FROM ops_guards g WHERE g.id = 'engine-price:' || NEW.product_id)
 BEGIN SELECT RAISE(ABORT, 'PRICING_PREVIEW_REQUIRED'); END;
 
-CREATE TRIGGER pricing_price_points_guard_update BEFORE UPDATE ON pricing_price_points
+CREATE TRIGGER IF NOT EXISTS pricing_price_points_guard_update BEFORE UPDATE ON pricing_price_points
 WHEN NEW.product_id IS NOT OLD.product_id
   OR NOT EXISTS (SELECT 1 FROM ops_guards g WHERE g.id = 'engine-price:' || NEW.product_id)
 BEGIN SELECT RAISE(ABORT, 'PRICING_PREVIEW_REQUIRED'); END;
 
-CREATE TRIGGER pricing_price_points_no_reinsert BEFORE INSERT ON pricing_price_points
+CREATE TRIGGER IF NOT EXISTS pricing_price_points_no_reinsert BEFORE INSERT ON pricing_price_points
 WHEN EXISTS (SELECT 1 FROM pricing_price_points p WHERE p.product_id = NEW.product_id AND p.scope = NEW.scope AND p.scope_id = NEW.scope_id)
 BEGIN SELECT RAISE(ABORT, 'PRICING_INPUT_REINSERT'); END;
 
-CREATE TRIGGER pricing_price_points_seq_del AFTER DELETE ON pricing_price_points
+CREATE TRIGGER IF NOT EXISTS pricing_price_points_seq_del AFTER DELETE ON pricing_price_points
 BEGIN UPDATE product_pricing_state SET inputs_seq = inputs_seq + 1 WHERE product_id = OLD.product_id; END;
 
-CREATE TRIGGER pricing_price_points_seq_ins AFTER INSERT ON pricing_price_points
+CREATE TRIGGER IF NOT EXISTS pricing_price_points_seq_ins AFTER INSERT ON pricing_price_points
 BEGIN UPDATE product_pricing_state SET inputs_seq = inputs_seq + 1 WHERE product_id = NEW.product_id; END;
 
-CREATE TRIGGER pricing_price_points_seq_upd AFTER UPDATE ON pricing_price_points
+CREATE TRIGGER IF NOT EXISTS pricing_price_points_seq_upd AFTER UPDATE ON pricing_price_points
 BEGIN UPDATE product_pricing_state SET inputs_seq = inputs_seq + 1 WHERE product_id IN (OLD.product_id, NEW.product_id); END;
 
-CREATE TRIGGER trg_import_guard_pricing_price_points_del BEFORE DELETE ON pricing_price_points
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_pricing_price_points_del BEFORE DELETE ON pricing_price_points
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
-CREATE TRIGGER trg_import_guard_pricing_price_points_ins BEFORE INSERT ON pricing_price_points
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_pricing_price_points_ins BEFORE INSERT ON pricing_price_points
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
-CREATE TRIGGER trg_import_guard_pricing_price_points_upd BEFORE UPDATE ON pricing_price_points
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_pricing_price_points_upd BEFORE UPDATE ON pricing_price_points
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
@@ -193,42 +193,42 @@ INSERT INTO pricing_preorder_discounts_new (product_id, scope, scope_id, amount_
 DROP TABLE pricing_preorder_discounts;
 ALTER TABLE pricing_preorder_discounts_new RENAME TO pricing_preorder_discounts;
 
-CREATE TRIGGER pricing_preorder_discounts_guard_delete BEFORE DELETE ON pricing_preorder_discounts
+CREATE TRIGGER IF NOT EXISTS pricing_preorder_discounts_guard_delete BEFORE DELETE ON pricing_preorder_discounts
 WHEN EXISTS (SELECT 1 FROM products p WHERE p.id = OLD.product_id)
  AND NOT EXISTS (SELECT 1 FROM ops_guards g WHERE g.id = 'engine-price:' || OLD.product_id)
 BEGIN SELECT RAISE(ABORT, 'PRICING_PREVIEW_REQUIRED'); END;
 
-CREATE TRIGGER pricing_preorder_discounts_guard_insert BEFORE INSERT ON pricing_preorder_discounts
+CREATE TRIGGER IF NOT EXISTS pricing_preorder_discounts_guard_insert BEFORE INSERT ON pricing_preorder_discounts
 WHEN NOT EXISTS (SELECT 1 FROM ops_guards g WHERE g.id = 'engine-price:' || NEW.product_id)
 BEGIN SELECT RAISE(ABORT, 'PRICING_PREVIEW_REQUIRED'); END;
 
-CREATE TRIGGER pricing_preorder_discounts_guard_update BEFORE UPDATE ON pricing_preorder_discounts
+CREATE TRIGGER IF NOT EXISTS pricing_preorder_discounts_guard_update BEFORE UPDATE ON pricing_preorder_discounts
 WHEN NEW.product_id IS NOT OLD.product_id
   OR NOT EXISTS (SELECT 1 FROM ops_guards g WHERE g.id = 'engine-price:' || NEW.product_id)
 BEGIN SELECT RAISE(ABORT, 'PRICING_PREVIEW_REQUIRED'); END;
 
-CREATE TRIGGER pricing_preorder_discounts_no_reinsert BEFORE INSERT ON pricing_preorder_discounts
+CREATE TRIGGER IF NOT EXISTS pricing_preorder_discounts_no_reinsert BEFORE INSERT ON pricing_preorder_discounts
 WHEN EXISTS (SELECT 1 FROM pricing_preorder_discounts d WHERE d.product_id = NEW.product_id AND d.scope = NEW.scope AND d.scope_id = NEW.scope_id)
 BEGIN SELECT RAISE(ABORT, 'PRICING_INPUT_REINSERT'); END;
 
-CREATE TRIGGER pricing_preorder_discounts_seq_del AFTER DELETE ON pricing_preorder_discounts
+CREATE TRIGGER IF NOT EXISTS pricing_preorder_discounts_seq_del AFTER DELETE ON pricing_preorder_discounts
 BEGIN UPDATE product_pricing_state SET inputs_seq = inputs_seq + 1 WHERE product_id = OLD.product_id; END;
 
-CREATE TRIGGER pricing_preorder_discounts_seq_ins AFTER INSERT ON pricing_preorder_discounts
+CREATE TRIGGER IF NOT EXISTS pricing_preorder_discounts_seq_ins AFTER INSERT ON pricing_preorder_discounts
 BEGIN UPDATE product_pricing_state SET inputs_seq = inputs_seq + 1 WHERE product_id = NEW.product_id; END;
 
-CREATE TRIGGER pricing_preorder_discounts_seq_upd AFTER UPDATE ON pricing_preorder_discounts
+CREATE TRIGGER IF NOT EXISTS pricing_preorder_discounts_seq_upd AFTER UPDATE ON pricing_preorder_discounts
 BEGIN UPDATE product_pricing_state SET inputs_seq = inputs_seq + 1 WHERE product_id IN (OLD.product_id, NEW.product_id); END;
 
-CREATE TRIGGER trg_import_guard_pricing_preorder_discounts_del BEFORE DELETE ON pricing_preorder_discounts
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_pricing_preorder_discounts_del BEFORE DELETE ON pricing_preorder_discounts
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
-CREATE TRIGGER trg_import_guard_pricing_preorder_discounts_ins BEFORE INSERT ON pricing_preorder_discounts
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_pricing_preorder_discounts_ins BEFORE INSERT ON pricing_preorder_discounts
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
-CREATE TRIGGER trg_import_guard_pricing_preorder_discounts_upd BEFORE UPDATE ON pricing_preorder_discounts
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_pricing_preorder_discounts_upd BEFORE UPDATE ON pricing_preorder_discounts
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
@@ -303,32 +303,32 @@ INSERT INTO pricing_v2_sku_results_new (product_id, combo_key, channel, method, 
 DROP TABLE pricing_v2_sku_results;
 ALTER TABLE pricing_v2_sku_results_new RENAME TO pricing_v2_sku_results;
 
-CREATE INDEX idx_pricing_v2_results_currency ON pricing_v2_sku_results(supplier_currency, product_id);
+CREATE INDEX IF NOT EXISTS idx_pricing_v2_results_currency ON pricing_v2_sku_results(supplier_currency, product_id);
 
-CREATE TRIGGER pricing_v2_sku_results_delete_guard BEFORE DELETE ON pricing_v2_sku_results
+CREATE TRIGGER IF NOT EXISTS pricing_v2_sku_results_delete_guard BEFORE DELETE ON pricing_v2_sku_results
 WHEN EXISTS (SELECT 1 FROM products p WHERE p.id = OLD.product_id)
  AND EXISTS (SELECT 1 FROM product_pricing_state s WHERE s.product_id = OLD.product_id AND s.mode = 'engine')
  AND NOT EXISTS (SELECT 1 FROM ops_guards g WHERE g.id IN ('engine-price:' || OLD.product_id, 'pricing-rates-apply'))
 BEGIN SELECT RAISE(ABORT, 'ENGINE_MANAGED'); END;
 
-CREATE TRIGGER pricing_v2_sku_results_insert_guard BEFORE INSERT ON pricing_v2_sku_results
+CREATE TRIGGER IF NOT EXISTS pricing_v2_sku_results_insert_guard BEFORE INSERT ON pricing_v2_sku_results
 WHEN NOT EXISTS (SELECT 1 FROM ops_guards g WHERE g.id IN ('engine-price:' || NEW.product_id, 'pricing-rates-apply'))
 BEGIN SELECT RAISE(ABORT, 'ENGINE_MANAGED'); END;
 
-CREATE TRIGGER pricing_v2_sku_results_update_guard BEFORE UPDATE ON pricing_v2_sku_results
+CREATE TRIGGER IF NOT EXISTS pricing_v2_sku_results_update_guard BEFORE UPDATE ON pricing_v2_sku_results
 WHEN NEW.product_id IS NOT OLD.product_id
   OR NOT EXISTS (SELECT 1 FROM ops_guards g WHERE g.id IN ('engine-price:' || NEW.product_id, 'pricing-rates-apply'))
 BEGIN SELECT RAISE(ABORT, 'ENGINE_MANAGED'); END;
 
-CREATE TRIGGER trg_import_guard_pricing_v2_sku_results_del BEFORE DELETE ON pricing_v2_sku_results
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_pricing_v2_sku_results_del BEFORE DELETE ON pricing_v2_sku_results
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
-CREATE TRIGGER trg_import_guard_pricing_v2_sku_results_ins BEFORE INSERT ON pricing_v2_sku_results
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_pricing_v2_sku_results_ins BEFORE INSERT ON pricing_v2_sku_results
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
-CREATE TRIGGER trg_import_guard_pricing_v2_sku_results_upd BEFORE UPDATE ON pricing_v2_sku_results
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_pricing_v2_sku_results_upd BEFORE UPDATE ON pricing_v2_sku_results
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
@@ -402,8 +402,8 @@ INSERT INTO pricing_sku_costs_new (product_id, combo_key, channel, shipping_prof
 DROP TABLE pricing_sku_costs;
 ALTER TABLE pricing_sku_costs_new RENAME TO pricing_sku_costs;
 
-CREATE INDEX idx_pricing_sku_costs_currency ON pricing_sku_costs(supplier_currency, product_id);
+CREATE INDEX IF NOT EXISTS idx_pricing_sku_costs_currency ON pricing_sku_costs(supplier_currency, product_id);
 
-CREATE INDEX idx_pricing_sku_costs_fx ON pricing_sku_costs(supplier_currency, fx_version);
+CREATE INDEX IF NOT EXISTS idx_pricing_sku_costs_fx ON pricing_sku_costs(supplier_currency, fx_version);
 
-CREATE INDEX idx_pricing_sku_costs_profile ON pricing_sku_costs(shipping_profile, product_id);
+CREATE INDEX IF NOT EXISTS idx_pricing_sku_costs_profile ON pricing_sku_costs(shipping_profile, product_id);
