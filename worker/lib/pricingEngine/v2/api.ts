@@ -612,6 +612,9 @@ export interface GateInput {
   publishing: boolean;
   /** A prices-only apply with nothing to write answers without a batch. */
   prices_only?: boolean;
+  /** A validated inventory purchase prepares the tracked-stock decision in
+   * the price batch. Its ordinary import fence still runs after that setup. */
+  preparedImportStock?: boolean;
   preview: () => Promise<unknown>;
 }
 
@@ -640,7 +643,7 @@ export async function gateV2(g: GateInput): Promise<V2Verdict> {
   // A complete write publishes (its results make the product SELLABLE): a product the catalogue import created is
   // refused until the owner chose its stock mode (Bambu import spec §B.10) — here, before any preview or review
   // sheet, and again by the batch's own fence (v2/write.ts step 0), which stays the authority.
-  if (stockMiss) throw importStockRefusal();
+  if (stockMiss && !g.preparedImportStock) throw importStockRefusal();
   if (!g.priceChange) return 'write';
   if (!isHash(g.hash)) throw refusal(409, 'PRICING_PREVIEW_REQUIRED', { preview: await g.preview() });
   if (g.hash !== ev.hash) throw refusal(409, 'PRICING_PREVIEW_STALE', { preview: await g.preview() });

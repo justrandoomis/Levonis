@@ -79,6 +79,7 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
     try {
       await api.put(`/api/admin/products-v2/${encodeURIComponent(line.product_id)}/pricing`, {
         pricing: result.pricing, seq: result.preview.seq, preview_hash: result.preview.review_hash,
+        procurement_stock: { scope: line.scope, scope_id: line.scope_id },
         ...(confirmedKey === requestKey ? { confirm_large_change: true } : {}),
       });
       setSaved(true);

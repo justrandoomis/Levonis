@@ -141,6 +141,7 @@ import { ProductMediaIngestError, verifyStoredProductMedia, type ProductMediaRef
 import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
 import { loadPrinterFitIds, printerOptions } from '../lib/printerFits';
 import { loadImportStock } from '../lib/importStock';
+import { planProcurementImportStock } from '../lib/procurementImportStock';
 
 /** Kept under its old name: the diff is now the contract's (productPersistence). */
 export const priceHistoryDeltas = sharedPriceHistoryDeltas;
@@ -1487,7 +1488,7 @@ adminProductsRoutes.put('/:id/pricing', limitRoute('pricing-write', 600), async 
   const method = storedMethodOf(read);
   // A product's FIRST V2 write needs 0189's tables (a deploy ahead of its migration writes nothing).
   if (!method && !(await pricingV2Installed(db))) throw new HttpError(503, serverMessage('PRICING_NOT_INSTALLED'), 'PRICING_NOT_INSTALLED', { section: 3 });
-  const body = v2Body(await jsonObject(c), ['seq', 'pricing', 'preview_hash', 'confirm_large_change']);
+  const body = v2Body(await jsonObject(c), ['seq', 'pricing', 'preview_hash', 'confirm_large_change', 'procurement_stock']);
   if (body.confirm_large_change !== undefined && typeof body.confirm_large_change !== 'boolean') throw inputInvalid('confirm_large_change');
   const seq = v2Body(body.seq, ['inputs_seq', 'write_seq']);
   const whole = (v: unknown) => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
@@ -1496,6 +1497,7 @@ adminProductsRoutes.put('/:id/pricing', limitRoute('pricing-write', 600), async 
   const viewer = v2ViewerOf(c.env, c.get('user'));
   const user = c.get('user')!;
   const now = new Date().toISOString();
+  if (body.procurement_stock !== undefined && viewer !== 'owner') throw costRefusal(c.env, user, { fields: ['procurement_stock'] });
   // §4.3 step 1 before step 2: a replay of a saved preview answers as the first save did.
   const pid = read.loaded.id;
   if ((seq.inputs_seq !== (read.stored.state?.inputs_seq ?? 0) || seq.write_seq !== (read.stored.state?.write_seq ?? 0))) {
@@ -1506,6 +1508,9 @@ adminProductsRoutes.put('/:id/pricing', limitRoute('pricing-write', 600), async 
   }
   const desired = desiredFor(read, wire, { viewer, env: c.env, user, now });
   const ev = await evaluateDesired(read, desired);
+  const stockSetup = body.procurement_stock === undefined ? [] : await planProcurementImportStock(
+    db, pid, v2Body(body.procurement_stock, ['scope', 'scope_id']) as { scope: unknown; scope_id: unknown }, user.id, now,
+  );
   const verdict = await gateV2({
     c,
     ev,
@@ -1514,6 +1519,7 @@ adminProductsRoutes.put('/:id/pricing', limitRoute('pricing-write', 600), async 
     priceChange: true,
     publishing: false,
     prices_only: true,
+    preparedImportStock: stockSetup.length > 0,
     preview: async () => v2Answer({ viewer, read, ev }),
   });
   if (verdict === 'already') return c.json({ success: true, already: true, ...(await v2StoredAnswer(c, pid)) });
@@ -1529,7 +1535,7 @@ adminProductsRoutes.put('/:id/pricing', limitRoute('pricing-write', 600), async 
     ...(ev.kind === 'v2_create' ? { firstWrite: firstWriteStatements(db, read.stored, foldedReviewOf(read, viewer, user.id, now)) } : {}),
     ...(bell.length ? { extraAudits: bell } : {}),
   };
-  const statements = verdict === 'data' ? await v2DataStatements(db, ev, opts) : await v2WriteStatements(db, ev, opts);
+  const statements = verdict === 'data' ? await v2DataStatements(db, ev, opts) : [...stockSetup, ...await v2WriteStatements(db, ev, opts)];
   if (statements.length > V2_PRICING_STATEMENT_CAP) throw new HttpError(409, serverMessage('PRICING_SET_TOO_LARGE'), 'PRICING_SET_TOO_LARGE', { section: 3 });
   try {
     await db.batch(statements);
