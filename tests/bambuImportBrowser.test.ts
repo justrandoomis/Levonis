@@ -112,37 +112,22 @@ test('R6 the other way: a page that leads with another colour\'s picture once Bl
   assert.ok(r.counts.values_failed >= 1);
 });
 
-test('§G.3 opening selection, read from the page: the defaults while they form a variant, else the first alone; a single-value group is chosen too', async () => {
+test('ordinary arrivals leave defaults and single-value groups unselected', async () => {
   const payload = payloadOf('pla-basic-filament');
   const media = mediaOf(payload);
-  // As built: colour, spool and the one weight form an exact variant.
-  const opening = pageDefaultSelection(payload);
-  assert.equal(opening.length, payload.groups.length, 'the single-value weight group is part of it');
-  assert.ok(payload.variants.some((v) => v.value_ids.length === opening.length && opening.every((id) => v.value_ids.includes(id))));
-  const r = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF }), { payload, media, images: payload.images, allValues: false });
-  assert.equal(r.checks.default_selection, true);
-  assert.deepEqual(r.selections[0], opening, 'the opening selection is recorded first, whole');
-
-  // Defaults that form no variant: the page opens on the first default alone (and the weight, when it fits).
-  const colours = payload.groups.find((g) => g.kind === 'color')!;
-  const spools = payload.groups.find((g) => g.kind === 'spool')!;
-  const pair = colours.values.flatMap((c) => spools.values.map((s) => [c.id, s.id] as const)).find(([c, s]) => !formsVariant([c, s], payload.variants))!;
-  assert.ok(pair, 'PLA Basic has a colour without one of the spools');
-  const odd: ImportPayload = JSON.parse(JSON.stringify(payload));
-  odd.groups.find((g) => g.id === colours.id)!.default_value_id = pair[0];
-  odd.groups.find((g) => g.id === spools.id)!.default_value_id = pair[1];
-  const right = await inspectProductPage(new ModelProductPage(odd, media, { breadcrumb: LEAF }), { payload: odd, media, images: odd.images, allValues: false });
-  assert.equal(right.checks.default_selection, true, 'the page that follows §G.3 passes');
-  assert.ok(right.selections[0].includes(pair[0]) && !right.selections[0].includes(pair[1]));
-  const old = await inspectProductPage(new ModelProductPage(odd, media, { breadcrumb: LEAF, allDefaults: true }), { payload: odd, media, images: odd.images, allValues: false });
-  assert.equal(old.checks.default_selection, false, 'a page that presses defaults forming no variant does not');
+  assert.deepEqual(pageDefaultSelection(payload), []);
+  const result = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF }), { payload, media, images: payload.images, allValues: false });
+  assert.equal(result.checks.default_selection, true);
+  assert.deepEqual(result.selections[0], []);
+  const selected = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF, allDefaults: true }), { payload, media, images: payload.images, allValues: false });
+  assert.equal(selected.checks.default_selection, false, 'preselecting catalogue defaults is a regression');
 });
 
 test('a press is chooseValue (§1 row 27): an unoffered value is taken and the clash let go; «H2D» from the opening takes its one fitting «standard»', () => {
   const p = payloadOf('h2d');
   const name = (id: string) => p.groups.flatMap((g) => g.values).find((v) => v.id === id)!.name_en;
   const version = p.groups.find((g) => g.kind === 'version')!;
-  const opening = pageDefaultSelection(p);
+  const opening = p.groups.map((group) => group.default_value_id).filter((id): id is string => !!id);
   assert.deepEqual(opening.map(name), ['H2D AMS Combo', 'Standard']);
   const h2d = version.values.find((v) => v.name_en === 'H2D')!;
   const laser = version.values.find((v) => v.name_en === 'H2D Laser Full Combo')!;
@@ -157,15 +142,21 @@ test('unoffered values (H2D): marked, said, pressed — the page holds chooseVal
   const payload = payloadOf('h2d');
   const media = mediaOf(payload);
   const laser = payload.groups.find((g) => g.kind === 'version')!.values.find((v) => v.name_en === 'H2D Laser Full Combo')!;
-  const page = new ModelProductPage(payload, media, { breadcrumb: LEAF });
+  const picked = payload.groups.map((group) => group.default_value_id).filter((id): id is string => !!id);
+  const withChoice = (knobs: ConstructorParameters<typeof ModelProductPage>[2] = {}) => {
+    const page = new ModelProductPage(payload, media, { breadcrumb: LEAF, ...knobs });
+    page.selection = [...picked]; // The customer has already chosen this combination.
+    return page;
+  };
+  const page = withChoice();
   const r = await inspectProductPage(page, { payload, media, images: payload.images, allValues: true });
-  assert.ok(r.counts.values_not_offered >= 1, 'H2D has values not offered with the opening choice');
+  assert.ok(r.counts.values_not_offered >= 1, 'H2D has values not offered with the customer choice');
   for (const name of ['not_offered_helper', 'not_offered_marks', 'selection_held', 'no_dead_end', 'selection_images']) assert.equal(r.checks[name], true, `${name}: ${JSON.stringify(r.counts)}`);
   assert.equal(r.counts.values_failed, 0);
   assert.ok(r.selections.some((s) => s.length === 1 && s[0] === laser.id), 'the unoffered «H2D Laser Full Combo» was pressed, and «Standard» let go');
   for (const s of r.selections) assert.ok(formsVariant(s, payload.variants), `a recorded selection the page could not hold: ${s.join(',')}`);
   const knob = async (k: ConstructorParameters<typeof ModelProductPage>[2]) =>
-    inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF, ...k }), { payload, media, images: payload.images, allValues: true });
+    inspectProductPage(withChoice(k), { payload, media, images: payload.images, allValues: true });
   assert.equal((await knob({ noHelper: true })).checks.not_offered_helper, false);
   assert.equal((await knob({ noMarks: true })).checks.not_offered_marks, false);
   const dead = await knob({ disableUnoffered: true });
@@ -383,11 +374,11 @@ test('in Chromium, on the final step-7 markup: controls by data-option-value, ma
       }
       assert.equal(r.checks.image_decodes, true, JSON.stringify(r.checks));
       assert.equal(r.checks.request_door, true, 'the request door by its hook');
-      assert.equal(r.checks.default_selection, true, 'the swatch and the chip of the opening selection are read as pressed');
+      assert.equal(r.checks.default_selection, true, 'the initial swatches and option chips remain unpressed');
       for (const name of ['selection_images', 'selection_held', 'not_offered_marks', 'not_offered_helper', 'no_dead_end', 'knowledge_tabs', 'us_110v_other_versions']) assert.equal(r.checks[name], true, `${name}: ${JSON.stringify(r.counts)}`);
-      assert.equal(r.counts.values_not_offered, 2, 'Black beside Refill, then Refill beside Black');
+      assert.equal(r.counts.values_not_offered, 1, 'Refill beside Black after an explicit choice');
       // Black lets Refill go and takes its one spool; Refill then lets Black go and takes its one colour.
-      assert.deepEqual(r.selections, [['ov_white', 'ov_refill'], ['ov_white', 'ov_refill'], ['ov_black', 'ov_spool'], ['ov_white', 'ov_refill'], ['ov_white', 'ov_spool']]);
+      assert.deepEqual(r.selections, [[], ['ov_white'], ['ov_black'], ['ov_white', 'ov_refill'], ['ov_white', 'ov_spool']]);
       assert.equal(r.counts.values_failed, 0);
       assert.deepEqual([r.counts.knowledge_tabs, r.counts.us_110v_notes], [2, 1]);
       // This page names its section in a nav; the real one does not (§1 row 28): either way, never a check.

@@ -15,14 +15,9 @@
  *          anything is measured) — the document preloads both, each under its
  *          own `media` query (`themeMedia`), the same bytes for every visitor.
  *
- * Certain means: the page's OPENING SELECTION IS EMPTY, so its gallery is the
- * stored order and its lead is the primary. Product.tsx opens on a selection
- * when the server names one (`initial_selection`, direct sale), when the
- * import's chooser gives defaults (`defaultSelection` over groups the import
- * shaped — `kind`, a default value, a swatch), when exactly one public option
- * exists, when exactly one colour exists, or when the address carries a
- * selection to restore (`?price_request=`, `?alert=`). Any of those: no answer
- * here (the preview's own certain case, or none — as before).
+ * Ordinary arrivals leave options and colours empty, including stocked SKUs,
+ * imported defaults and single-value groups (owner 2026-10-25). Only an
+ * explicit selection link may change the opening picture.
  *
  * The answer is computed from the very body the page will read — the
  * anonymous `/api/products/<slug>` copy this colo holds (edgePolicy.ts
@@ -50,17 +45,7 @@ const text = (v: unknown): string => (typeof v === 'string' ? v : '');
 const size = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null);
 
 /** The query parameters that restore a selection on the product page (Product.tsx's deep links). */
-export const SELECTION_PARAMS = ['price_request', 'alert'] as const;
-
-/** src/lib/productChooser.ts `importedChooser`: groups the import shaped carry a kind, a default or a swatch. */
-function importedChooser(groups: readonly Rec[]): boolean {
-  return groups.some(
-    (g) =>
-      text(g.kind) !== '' ||
-      text(g.default_value_id) !== '' ||
-      list(g.values).some((v) => isRec(v.swatch) && (!!text(v.swatch.url) || !!text(v.swatch.published_hex)))
-  );
-}
+export const SELECTION_PARAMS = ['price_request', 'alert', 'v'] as const;
 
 /** src/lib/productGallery.ts `mediaInStoredOrder` + `dedupeByUrl`, then the first: the lead of an empty selection. */
 function storedLead(product: Rec): LeadPicture | null {
@@ -87,20 +72,6 @@ export function openingLeadFromDetail(detail: unknown, search = ''): OpeningLead
   const query = new URLSearchParams(search);
   if (SELECTION_PARAMS.some((p) => query.has(p))) return null;
   const product = detail.product;
-  // 1. The server's opening shelf.
-  if (isRec(detail.initial_selection) && detail.initial_selection.fulfillment_type === 'direct_sale') return null;
-  const relations = isRec(detail.relations) ? detail.relations : null;
-  const groups = relations ? list(relations.option_groups) : [];
-  // 2. The import's defaults (the page asks its chooser only over groups with values).
-  if (relations && importedChooser(groups.filter((g) => list(g.values).length > 0))) return null;
-  // 3. Exactly one public option opens selected.
-  const publicIds = new Set(groups.flatMap((g) => list(g.values).map((v) => text(v.id))));
-  const options = list(product.options);
-  const opts = relations ? options.filter((o) => publicIds.has(text(o.id))) : options;
-  if (opts.length === 1) return null;
-  // 4. Exactly one colour (with no option of its own) opens selected.
-  const colors = list(product.colors);
-  if (colors.length === 1 && !text(colors[0].option_id)) return null;
   // The selection is empty: the stored order, the primary first.
   const dark = storedLead(product);
   if (!dark || !dark.url) return null;

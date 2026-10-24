@@ -47,7 +47,7 @@ import { useAuth } from '../AuthContext';
 import { useWallet } from '../WalletContext';
 import {
   ArrowRight, ArrowLeft, ShoppingCart, Star, Sparkles, Check, Share2, Heart, Clock, Package,
-  ChevronDown, X, FileText, Settings2, ShieldCheck, Truck,
+  ChevronDown, FileText, Settings2, ShieldCheck, Truck,
   AlertTriangle, Store, ZoomIn, Image as ImageIcon, Box, ExternalLink, PlayCircle, Wrench, TrendingUp, PackageOpen,
 } from 'lucide-react';
 import ProAddressNotice from '../components/membership/ProAddressNotice';
@@ -65,7 +65,7 @@ import VariantImg from '../components/ui/VariantImg';
 import Note from '../components/ui/Note';
 import { QuantityInput } from '../components/ui/QuantityInput';
 import { quantityLimit } from '../../packages/pricing/src/quantity';
-import { Overlay, Sheet } from '../components/ui/Overlay';
+import { Sheet } from '../components/ui/Overlay';
 import { IconButton } from '../components/ui/Button';
 import ChunkBoundary from '../components/ChunkBoundary';
 import { ProductDetailSkeleton } from '../components/ui/Skeleton';
@@ -164,6 +164,10 @@ function ChipLabel({ text, className }: { text: string; className: string }) {
 const STEP_IMAGE_SIZES = '(min-width: 1024px) 180px, (min-width: 640px) 25vw, 33vw';
 /** The pictures of the description: a 2–3 column grid in the left column. */
 const DESCRIPTION_IMAGE_SIZES = '(min-width: 1024px) 300px, (min-width: 640px) 33vw, 50vw';
+
+const loadProductLightbox = () => import('../components/motion/ProductLightbox');
+const ProductLightbox = React.lazy(loadProductLightbox);
+const warmProductLightbox = () => { void loadProductLightbox().catch(() => {}); };
 
 /**
  * THE PRODUCT'S KNOWLEDGE (the Bambu import spec §G.1, §G.2): specifications with
@@ -1194,8 +1198,8 @@ export default function Product() {
     };
   }, [loading, product?.id]);
 
-  // Selection — nothing is guessed: a value is set only when the catalogue
-  // leaves exactly one possibility (no randomness) or the user picks it.
+  // Options and colours start empty. Only a customer choice or an explicit
+  // selection link may choose them, even for a single-value product.
   /** One selected value per active relational group, kept in group order. */
   const [optionValueIds, setOptionValueIds] = useState<string[]>([]);
   /** What the knowledge answer covers (spec §G.2): its tabs then stand in for the page's older specs and box sections. */
@@ -1309,12 +1313,9 @@ export default function Product() {
   const [lightShape, setLightShape] = useState<{ url: string; aspect: number } | null>(null);
   const [lightbox, setLightbox] = useState(false);
   const [lightboxPreview, setLightboxPreview] = useState<{ src: string; url: string } | null>(null);
-  // The zoom control the lightbox came out of. The viewer scales FROM this
-  // button and collapses back INTO it, so the enlarged photo is visibly the
-  // same object as the thumbnail the customer tapped rather than a second,
-  // unrelated window that happened to appear. A plain callback ref (not a
-  // typed useRef on the element) keeps the button conditional — it only
-  // renders when there is a media URL — without fighting ref variance.
+  const [lightboxStarted, setLightboxStarted] = useState(false);
+  const [spatialZoom, setSpatialZoom] = useState(true);
+  // Focus returns to the control; the photo itself supplies the zoom geometry.
   const zoomBtnRef = useRef<HTMLElement | null>(null);
   const heroRef = useRef<HTMLDivElement | null>(null);
   useProductEntrance(heroRef, !loading && !!product);
@@ -1370,6 +1371,7 @@ export default function Product() {
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setLightbox(false);
       setLoadError(null);
       openingQuoteKey.current = null;
       try {
@@ -1424,12 +1426,9 @@ export default function Product() {
         setConditionRef(data.condition_reference ?? null);
         setFitsPrinters(data.fits_printers ?? []);
         setMaintenance(data.maintenance_parts ?? null);
-        // THE PRICE IS ALREADY HERE. `pricing` is the server's own resolver
-        // result for the opening selection, computed on this request; seeding the
-        // quote with it means the page opens with a real, final figure instead
-        // of «يبدأ من» plus a round trip. `quotedFor` is set to that exact key so
-        // the moment a variant IS chosen the page knows this quote no longer
-        // answers the question.
+        // Keep the server quote tied to the SKU it actually priced. It is
+        // never authoritative for the empty choice on an ordinary arrival;
+        // the quote effect resolves that choice separately.
         const initial = data.initial_selection?.fulfillment_type === 'direct_sale'
           ? data.initial_selection
           : null;
@@ -1460,54 +1459,12 @@ export default function Product() {
         setActionError('');
         setNotice('');
 
-        // Prefer the server-proven first direct-sale shelf. This happens once
-        // per product load, never in a reactive effect that could overwrite a
-        // later customer choice. Legacy/sold-out products keep the previous
-        // single-possibility fallback.
-        const publicRelationOptionIds = new Set(
-          (data.relations?.option_groups ?? []).flatMap((group) => group.values.map((value) => value.id))
-        );
-        // The PRESENCE of relational data is the boundary, not whether its
-        // public option set happens to be non-empty. An empty set can mean all
-        // relation groups are inactive; falling back to the JSON options in
-        // that case would resurrect admin-hidden values on the storefront.
-        const opts = data.relations
-          ? (data.product.options ?? []).filter((option) => publicRelationOptionIds.has(option.id))
-          : (data.product.options ?? []);
-        /*
-          THE IMPORT'S DEFAULT SELECTION (the Bambu import spec §G.3). With no
-          `initial_selection` — always the case for an unpriced product — a product
-          whose groups carry the source's defaults opens on them, while they form a
-          real variant (else the first group's default alone), and every
-          single-value group is chosen. A product without the import's data gets
-          nothing new (`defaultSelection` answers []).
-        */
-        const importedDefaults = data.relations
-          ? defaultSelection(
-              (data.relations.option_groups ?? []).filter((g) => g.values.length > 0),
-              data.relations.variants ?? []
-            )
-          : [];
-        const openingOptionValueIds = initial
-          ? (initial.option_value_ids?.length
-              ? initial.option_value_ids
-              : initial.option_id
-                ? [initial.option_id]
-                : [])
-          : importedDefaults.length
-            ? importedDefaults
-            : (opts.length === 1 ? [opts[0].id] : []);
-        const openingOptionId = openingOptionValueIds[0] ?? '';
-        setOptionValueIds(openingOptionValueIds);
+        // A stocked SKU and import defaults describe the catalogue, not a
+        // customer choice. Keep the main photo until the customer selects.
+        setOptionValueIds([]);
+        setColorId('');
+        setModelKey('');
         setKnowledgeCovers({ specs: false, box: false });
-        const cols = (data.product.colors ?? []).filter(
-          (c) => !c.option_id || (openingOptionId && c.option_id === openingOptionId)
-        );
-        setColorId(
-          initial
-            ? (initial.color_id ?? '')
-            : (cols.length === 1 && (data.product.colors ?? []).length === 1 ? cols[0].id : '')
-        );
         // A product that only pre-orders, by exactly one route, has already
         // answered the route question — so it is answered for the buyer.
         //
@@ -2561,11 +2518,6 @@ export default function Product() {
   useEffect(() => {
     if (selectedOption) setModelKey(selectedOption.variant_key || selectedOption.id);
   }, [selectedOption]);
-  // With exactly one model there is no first step to take.
-  useEffect(() => {
-    if (models && models.length === 1 && !modelKey) setModelKey(models[0].key);
-  }, [models, modelKey]);
-
 
   if (loading || !product) {
     return (
@@ -2699,6 +2651,13 @@ export default function Product() {
   const stepGallery = (step: number, animate = true) => {
     setGalleryMotion(animate);
     setGalleryIndex((index) => (index + step + gallery.length) % gallery.length);
+  };
+  const openPhoto = (event: React.MouseEvent) => {
+    const image = Array.from(heroRef.current?.querySelectorAll<HTMLImageElement>('img[data-main-image],img[data-transition-picture]') ?? []).find((img) => img.complete && img.naturalWidth > 0);
+    setLightboxPreview(image && activeMedia?.url ? { src: activeMedia.url, url: image.currentSrc || image.src } : null);
+    setSpatialZoom(event.detail > 0);
+    setLightboxStarted(true);
+    setLightbox(true);
   };
   const options = storefrontOptions;
 
@@ -5182,7 +5141,7 @@ export default function Product() {
             <section aria-label={s.gallery}>
               {/* `data-gallery-hero` / `data-gallery-strip`: the hooks the import's browser check reads the main picture
                   and the thumbnails by (scripts/bambu-import/browser.ts) — never a style. */}
-              <GallerySurface ref={heroRef} count={gallery.length} direction={dir} onStep={stepGallery} tabIndex={gallery.length > 1 ? 0 : undefined} role="group" aria-label={s.gallery} className="lv-surface relative w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] overflow-hidden" data-gallery-hero>
+              <GallerySurface ref={heroRef} count={gallery.length} direction={dir} onStep={stepGallery} onClick={(event) => { if (activeMedia?.url && !(event.target as HTMLElement).closest('button,a')) openPhoto(event); }} tabIndex={gallery.length > 1 ? 0 : undefined} role="group" aria-label={s.gallery} className="lv-surface relative w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] overflow-hidden" data-gallery-hero>
                 <DissolveImage
                   animate={galleryMotion}
                   src={activeMedia?.url}
@@ -5225,11 +5184,10 @@ export default function Product() {
                       ref={(el: HTMLButtonElement | null) => {
                         zoomBtnRef.current = el;
                       }}
-                      onClick={() => {
-                        const image = Array.from(heroRef.current?.querySelectorAll<HTMLImageElement>('img[data-main-image],img[data-transition-picture]') ?? []).find((img) => img.complete && img.naturalWidth > 0);
-                        setLightboxPreview(image && activeMedia?.url ? { src: activeMedia.url, url: image.currentSrc || image.src } : null);
-                        setLightbox(true);
-                      }}
+                      onPointerEnter={warmProductLightbox}
+                      onFocus={warmProductLightbox}
+                      onPointerDown={warmProductLightbox}
+                      onClick={openPhoto}
                       label={s.zoom}
                       icon={<ZoomIn aria-hidden="true" className="w-5 h-5" />}
                     />
@@ -5868,58 +5826,14 @@ export default function Product() {
         )}
       </div>
 
-      {/* ------------------------------------------------------- image zoom */}
-      {/*
-        THE PHOTO VIEWER.
-
-        It used to be a bare `fixed inset-0 bg-black/95` that was mounted when
-        `lightbox` flipped true and unmounted when it flipped false: the photo
-        appeared out of nothing and, on close, simply ceased to exist. On a
-        product page that is worse than merely abrupt — the customer loses the
-        thread between the thumbnail they tapped and the enlarged image, so a
-        second tap feels like opening a different thing rather than returning
-        to the same one.
-
-        `Overlay`, not `Sheet`: this is a centred viewing task, not a tray of
-        controls pulled up from the bottom edge, and a drag-down-to-dismiss
-        grabber on top of a photograph would both cover the product and invite
-        a gesture that fights the pinch/pan people expect over an image. It
-        arrives scaled up out of the zoom button (`anchor`) and collapses back
-        into it, which is the spatial link the old markup could not express.
-
-        `solid`: the primitive's default material is tinted, blurred glass.
-        Behind a product photo that is a lie about the colour the customer is
-        about to pay for, so the viewer opts out and supplies its own neutral
-        black ground — matching the old `bg-black/95` — where the only colour
-        on screen is the product's own.
-
-        Dismissal is unchanged in substance: the old container closed on any
-        click that was not the image itself (the <img> stopped propagation), so
-        the scrim closes it here, and the X button stays exactly as it was.
-        `z={200}` preserves the old `z-[200]`.
-      */}
-      <Overlay
-        open={lightbox && !!activeMedia?.url}
-        onClose={() => setLightbox(false)}
-        label={s.gallery}
-        anchor={zoomBtnRef}
-        solid
-        z={200}
-        testId="product-lightbox"
-        panelClassName="bg-black max-w-full max-h-[calc(100dvh-2rem)] overflow-hidden"
-      >
-        <span className="absolute top-4 end-4 z-10">
-          <IconButton
-            variant="secondary"
-            onClick={() => setLightbox(false)}
-            label={s.close}
-            icon={<X aria-hidden="true" className="w-5 h-5" />}
-          />
-        </span>
-        <GallerySurface count={gallery.length} direction={dir} onStep={stepGallery} tabIndex={0} role="group" aria-label={s.gallery} className="relative h-[min(82dvh,900px)] w-[min(calc(100vw-2rem),1200px)]">
-          <DissolveImage animate={galleryMotion} src={activeMedia?.url} placeholderSrc={lightboxPreview?.src === activeMedia?.url ? lightboxPreview?.url : undefined} alt={pick(lang as Lang, activeMedia?.alt_ar, activeMedia?.alt_en, activeMedia?.alt_ckb) || name} fit="contain" eager className="w-full h-full" bgClassName="bg-black" imgClassName="p-3" />
-        </GallerySurface>
-      </Overlay>
+      {/* Keep the photo viewer lazy; its modal retains focus and owns dismissal. */}
+      {lightboxStarted && <ChunkBoundary compact><React.Suspense fallback={null}>
+        <ProductLightbox open={lightbox && !!activeMedia?.url} onClose={() => setLightbox(false)}
+          hero={heroRef} trigger={zoomBtnRef} label={s.gallery} closeLabel={s.close}
+          src={activeMedia?.url} preview={lightboxPreview?.src === activeMedia?.url ? lightboxPreview.url : undefined}
+          alt={pick(lang as Lang, activeMedia?.alt_ar, activeMedia?.alt_en, activeMedia?.alt_ckb) || name}
+          count={gallery.length} direction={dir} onStep={stepGallery} animate={galleryMotion} spatial={spatialZoom} />
+      </React.Suspense></ChunkBoundary>}
 
       <ShippingConflictDialog
         open={shippingConflict !== null}

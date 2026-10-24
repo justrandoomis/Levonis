@@ -103,9 +103,10 @@ test('product thumbnails declare their real slots, leaving the zoom image at its
     assert.match(html, /loading="lazy"/);
     assert.doesNotMatch(html, /fetchPriority="high"/);
   }
-  const zoom = source.match(/<DissolveImage\b[^>]*placeholderSrc=[\s\S]*?\/>/)?.[0];
+  const lightbox = readFileSync(join(ROOT, 'src/components/motion/ProductLightbox.tsx'), 'utf8');
+  const zoom = lightbox.match(/<DissolveImage\b[\s\S]*?\/>/)?.[0];
   assert.ok(zoom, 'zoom keeps the selected original URL');
-  assert.match(zoom, /src=\{activeMedia\?\.url\}/);
+  assert.match(zoom, /src=\{props\.src\}/);
   assert.doesNotMatch(zoom, /srcSet=|sizes=/);
   const zoomHtml = render(createElement(SafeImage, { src: '/files/products/zoom.webp', eager: true, reveal: 'none', placeholderSrc: '/files/products/zoom.webp?w=640' }));
   assert.match(zoomHtml, /src="\/files\/products\/zoom.webp"/);

@@ -87,7 +87,7 @@ export class ModelProductPage implements ProductPageDriver {
   }
 
   private opening(): string[] {
-    if (!this.knobs.allDefaults) return defaultSelection(this.groups, this.payload.variants);
+    if (!this.knobs.allDefaults) return [];
     const defaults = this.groups.filter((g) => g.default_value_id && g.values.some((v) => v.id === g.default_value_id)).map((g) => g.default_value_id);
     const singles = this.groups.filter((g) => g.values.length === 1 && !g.default_value_id).map((g) => g.values[0].id);
     return [...defaults, ...singles];
@@ -159,7 +159,8 @@ export class ModelProductPage implements ProductPageDriver {
   async knowledge(): Promise<KnowledgeView> {
     const k = this.knobs.knowledge;
     if (!k) return { shown: false, tabs: [], usNotes: 0, usOutside: 0 };
-    const sel = { optionValueIds: this.selection, variantId: productVariantIdForSelection(this.payload.variants, { optionValueIds: this.selection }) };
+    const ids = this.selection.length ? this.selection : defaultSelection(this.groups, this.payload.variants);
+    const sel = { optionValueIds: ids, variantId: productVariantIdForSelection(this.payload.variants, { optionValueIds: ids }) };
     const tabs = knowledgeTabs(k, sel);
     // The US 110 V rows the tabs draw: the specs' and materials' «إصدارات أخرى», and the packaging tab's.
     const tables = [...tabs.specs, ...tabs.materials].map((g) => rowsForSelection(g.rows, sel));

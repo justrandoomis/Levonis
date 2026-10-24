@@ -36,7 +36,7 @@ import { parseRobots, robotsAllows } from '../scripts/bambu-import/robots';
 import { ImportStop, StoreFetcher } from '../scripts/bambu-import/fetch';
 import { ExtractGate, localOnlyFetch, stageAfter } from '../scripts/bambu-import/run';
 import { reviewedDifferences } from '../scripts/bambu-import/discover';
-import { defaultSelection, expectedFacts } from '../scripts/bambu-import/verify';
+import { expectedFacts } from '../scripts/bambu-import/verify';
 import type { MediaAnswerRow } from '../scripts/bambu-import/opsClient';
 // @ts-expect-error - plain ESM helper, no types
 import { unsealBuffer } from '../scripts/bambu-import/seal.mjs';
@@ -750,7 +750,7 @@ test('verification: what the runner records and sends as edge evidence, read fro
     assert.equal(ev.checks.fingerprint.detail.expected, ev.checks.fingerprint.detail.live);
     assert.deepEqual(ev.sections, { leaf: 'ams-filament-feeding', root: 'printer-accessories', secondary: [] });
     assert.equal(ev.live_url, 'https://levonis-iq.com/product/bambu-ams-2-pro');
-    assert.ok(Array.isArray(ev.selections_checked) && ev.selections_checked[0].length === 2, 'the default selection, for the Worker\'s eligibility check');
+    assert.deepEqual(ev.selections_checked, [[]], 'the browser opening leaves choices empty; the Worker still verifies eligibility');
     // The public site was read anonymously: no ops token on a site request.
     assert.ok(w.calls.every((c) => c.path.startsWith('/')));
   } finally {
@@ -962,7 +962,7 @@ test('a merge in the runner\'s own loop: the existing product\'s page holds none
     assert.equal(await w.importer().main(), 0, w.logLines.join('\n'));
     const item = w.item('ams-2-pro');
     assert.equal(item.match_kind, 'merged');
-    assert.ok(defaultSelection(item.payload!).length > 0, 'the payload has an opening selection of its own (else this proves nothing)');
+    assert.ok(item.payload!.groups.some((group) => group.default_value_id), 'the imported payload still carries its own catalogue defaults');
     assert.equal(item.state, 'COMPLETE', w.logLines.join('\n'));
     const sent = callsTo(w, /\/complete$/).map((c) => (c.body!.edge_evidence as { selections_checked: unknown }).selections_checked);
     assert.deepEqual(sent, [[]], 'no selection of the payload\'s values is sent for a merged product');

@@ -433,7 +433,7 @@ test('the edge evidence: the selections the page held (the opening one first, §
   const payload = payloadOf('pla-basic-filament');
   const o = await verify(live('pla-basic-filament', { payload, sections: ['filament', 'pla'] }));
   const opening = pageDefaultSelection(payload);
-  assert.equal(opening.length, payload.groups.length);
+  assert.deepEqual(opening, []);
   const held = [opening, [...opening.slice(0, 0), payload.groups[0].values[3].id, ...opening.slice(1)]];
   const ev = edgeEvidence(o, { ok: true, checks: {}, counts: {}, selections: held }, `${SITE}/product/pla-basic-filament`, payload, 1) as { selections_checked: string[][] };
   assert.deepEqual(ev.selections_checked, held);

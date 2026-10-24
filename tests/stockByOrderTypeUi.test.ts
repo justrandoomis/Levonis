@@ -136,10 +136,12 @@ test('the desktop product layout uses the viewport and stacks availability choic
   assert.doesNotMatch(page, /Pre-order commission is not configured/);
 });
 
-test('product details apply the server-proven stocked direct selection once on load', () => {
+test('product details leave options and colours empty until the customer chooses', () => {
   const page = read(PRODUCT);
   assert.match(page, /data\.initial_selection\?\.fulfillment_type === 'direct_sale'/);
-  assert.match(page, /setOptionValueIds\(openingOptionValueIds\)/);
+  assert.match(page, /setOptionValueIds\(\[\]\)/);
+  assert.match(page, /setColorId\(''\)/);
+  assert.doesNotMatch(page, /setOptionValueIds\(openingOptionValueIds\)|const importedDefaults =/);
   assert.match(page, /optionValueIds: optionValueIds\.length \? optionValueIds : undefined/);
   assert.match(page, /body\.optionValueIds = optionValueIds/);
   assert.match(page, /data-option-groups/);
@@ -151,7 +153,7 @@ test('product details apply the server-proven stocked direct selection once on l
 
 test('inactive relational groups never fall back to legacy product options', () => {
   const page = read(PRODUCT);
-  assert.match(page, /const opts = data\.relations\s*\?[\s\S]{0,180}publicRelationOptionIds\.has\(option\.id\)/);
+
   assert.doesNotMatch(page, /publicRelationOptionIds\.size > 0/);
   assert.match(page, /const storefrontOptions = useMemo\(\(\) => \{[\s\S]{0,180}if \(!relations\) return all;/);
   assert.match(page, /const options = storefrontOptions;/);

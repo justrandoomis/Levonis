@@ -21,9 +21,10 @@ export function imagePlane(box: Box, width: number, height: number, fit: string,
 }
 
 /** Freeze the already decoded candidate. Never clone SafeImage's skeleton, srcset or reveal layers. */
-function take(el: HTMLElement, fallback?: Picture): Picture | undefined {
-  const image = el.querySelector<HTMLImageElement>(fallback ? 'img[data-main-image]' : 'img[data-transition-picture],img[data-main-image]');
-  if (!image || (!fallback && (!image.complete || !image.naturalWidth))) return;
+export function take(el: HTMLElement, fallback?: Picture): Picture | undefined {
+  const image = fallback ? el.querySelector<HTMLImageElement>('img[data-main-image]')
+    : Array.from(el.querySelectorAll<HTMLImageElement>('img[data-transition-picture],img[data-main-image],img[data-image-placeholder]')).find((img) => img.complete && img.naturalWidth > 0);
+  if (!image) return;
   const rect = el.getBoundingClientRect();
   if (!visible(rect)) return;
   const css = getComputedStyle(image), surface = getComputedStyle(el);

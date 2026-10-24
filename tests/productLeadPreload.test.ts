@@ -71,35 +71,26 @@ test('an empty opening selection: the stored primary in the dark theme, the ligh
   assert.deepEqual(openingLeadFromDetail(detailOf(), '?ref=ali'), openingLeadFromDetail(detailOf()), 'a referral changes nothing');
 });
 
-test('any opening selection means no answer: the server\'s shelf, the import\'s defaults, one option, one colour, a selection in the address', () => {
-  const none: Array<[string, unknown, string?]> = [
-    ['server shelf', detailOf({ initial_selection: { fulfillment_type: 'direct_sale', option_value_ids: ['a'] } })],
-    ['import default', detailOf({ relations: { option_groups: [{ id: 'g', default_value_id: 'a', values: [{ id: 'a' }, { id: 'b' }] }], variants: [] } })],
-    ['import kind', detailOf({ relations: { option_groups: [{ id: 'g', kind: 'color', values: [{ id: 'a' }, { id: 'b' }] }], variants: [] } })],
-    ['import swatch', detailOf({ relations: { option_groups: [{ id: 'g', values: [{ id: 'a', swatch: { url: '/files/x.webp' } }, { id: 'b' }] }], variants: [] } })],
-    ['one public option', detailOf({ relations: { option_groups: [{ id: 'g', values: [{ id: 'a' }] }], variants: [] } }, { options: [{ id: 'a' }, { id: 'hidden' }] })],
-    ['one colour', detailOf({}, { colors: [{ id: 'red' }] })],
-    ['price request', detailOf(), '?price_request=abc'],
-    ['stock alert', detailOf(), '?alert=xyz'],
-    ['not a detail', { success: false }],
-    ['no media', detailOf({}, { media: [], images: [] })],
+test('catalogue defaults, stocked SKUs and lone choices leave the opening photo unchanged', () => {
+  const examples = [
+    detailOf({ initial_selection: { fulfillment_type: 'direct_sale', option_value_ids: ['a'], color_id: 'red' } }),
+    detailOf({ relations: { option_groups: [{ id: 'g', default_value_id: 'a', values: [{ id: 'a' }, { id: 'b' }] }] } }),
+    detailOf({ relations: { option_groups: [{ id: 'g', kind: 'color', values: [{ id: 'a' }] }] } }),
+    detailOf({}, { options: [{ id: 'only' }], colors: [{ id: 'red' }] }),
+    detailOf({}, { colors: [{ id: 'red', option_id: 'a' }] }),
   ];
-  for (const [name, detail, search] of none) assert.equal(openingLeadFromDetail(detail, search), null, name);
-  // A pre-order shelf is not the page's opening selection; two public options are not one.
-  assert.ok(openingLeadFromDetail(detailOf({ initial_selection: { fulfillment_type: 'pre_order' } })));
-  assert.ok(openingLeadFromDetail(detailOf({ relations: { option_groups: [{ id: 'g', values: [{ id: 'a' }, { id: 'b' }] }], variants: [] } }, { options: [{ id: 'a' }, { id: 'b' }] })));
-  // A single colour bound to an option is not auto-selected without that option.
-  assert.ok(openingLeadFromDetail(detailOf({}, { colors: [{ id: 'red', option_id: 'a' }] })));
+  for (const example of examples) assert.deepEqual(openingLeadFromDetail(example), openingLeadFromDetail(detailOf()));
+  for (const search of ['?price_request=abc', '?alert=xyz', '?v=o:a|c:red']) assert.equal(openingLeadFromDetail(detailOf(), search), null);
+  assert.equal(openingLeadFromDetail({ success: false }), null);
+  assert.equal(openingLeadFromDetail(detailOf({}, { media: [], images: [] })), null);
 });
 
 test('the rule is Product.tsx\'s, and its lead is the one the page\'s own gallery functions give', () => {
   const page = read('src/pages/Product.tsx');
-  // The four automatic openings and the two deep links, as the page spells them.
+  // Empty ordinary arrivals and explicit deep links, as the page spells them.
   for (const pin of [
-    "const initial = data.initial_selection?.fulfillment_type === 'direct_sale'",
-    '(data.relations.option_groups ?? []).filter((g) => g.values.length > 0)',
-    ': (opts.length === 1 ? [opts[0].id] : []);',
-    "(cols.length === 1 && (data.product.colors ?? []).length === 1 ? cols[0].id : '')",
+    'setOptionValueIds([]);',
+    "setColorId('');",
     "location.search.indexOf(`${PRICE_REQUEST_PARAM}=`)",
     "location.search.indexOf('alert=')",
     "const light = theme === 'light' ? (product.light_image ?? '').trim() : '';",
@@ -220,12 +211,14 @@ test('a bound gallery that opens on its primary: preloaded once per theme from t
   });
 });
 
-test('a bound gallery the server opens on a shelf (stock behind the second option): no preload', async () => {
+test('a stocked suggested SKU does not replace the main photo on an ordinary arrival', async () => {
   await withCaches(async () => {
     const { call, raw } = liveWorker();
     raw.prepare("UPDATE product_option_values SET stock = 3 WHERE id = 'second'").run();
     const detail = (await (await call('/api/products/filament-pla')).json()) as { initial_selection: { option_value_ids: string[] } | null };
     assert.deepEqual(detail.initial_selection?.option_value_ids, ['second'], 'the real server-selected shelf');
-    assert.deepEqual(imagePreloads(await (await call('/product/filament-pla')).text()), []);
+    const preloads = imagePreloads(await (await call('/product/filament-pla')).text());
+    assert.equal(preloads.length, 2);
+    assert.ok(preloads[0].includes(`href="${MAIN}"`));
   });
 });

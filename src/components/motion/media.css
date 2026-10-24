@@ -10,8 +10,9 @@
 .u349 .u349-previous, .u349 .u349-cells { position: absolute; inset: 0; pointer-events: none; background-repeat: no-repeat; }
 /* Tile offsets use physical x/y coordinates, including in an RTL gallery. */
 .u349 .u349-cells { display: grid; direction: ltr; grid-template-columns: repeat(12,1fr); grid-template-rows: repeat(9,1fr); }
-.u349 .u349-cells i { background-repeat: no-repeat; animation: u349-pixel .2s linear both; }
+.u349 .u349-cells i { background-repeat: no-repeat; animation: u349-pixel var(--duration-ui, 250ms) steps(1, end) both; }
 @keyframes u349-pixel { from { opacity: 1; } to { opacity: 0; } }
+.product-photo-overlay [data-overlay-scrim] { background: rgb(0 0 0 / .95); }
 @media (prefers-reduced-motion: reduce) {
   .u258 .u258-photo, .u258 .u258-photo.is-lq { transition: none; filter: none; transform: none; }
   .u258 .u258-progress::after, .u349 .u349-cells i { animation: none; }

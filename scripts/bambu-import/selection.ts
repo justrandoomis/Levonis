@@ -11,9 +11,8 @@
  * the payload's groups and variants and the gallery as written, the way
  * src/pages/Product.tsx feeds them the page body's relations:
  *
- *   - THE OPENING SELECTION: each group's default while the defaults form a
- *     real variant, else the first group's default alone; then every
- *     single-value group that fits.
+ *   - THE OPENING SELECTION is empty: the customer chooses, including
+ *     single-value groups. Defaults still describe the imported catalogue.
  *   - A VALUE NOT OFFERED with the rest of the selection (it forms no variant
  *     with the other groups' choices) says so («غير متاح مع هذا الاختيار»,
  *     dimmed) and STAYS PRESSABLE: pressing it selects it and lets go of the
@@ -33,7 +32,6 @@ import { productMediaForSelection, productVariantIdForSelection } from '@levonis
 import type { ImportPayload } from '@levonis/catalog/bambuImport/payload';
 import {
   chooseValue,
-  defaultSelection,
   formsVariant as pageFormsVariant,
   importedChooser,
   valueOffered as pageValueOffered,
@@ -69,13 +67,9 @@ export function valueOffered(valueId: string, groupId: string, selected: readonl
   return pageValueOffered(valueId, groupId, selected, chooserGroups(groups), variants);
 }
 
-/** The page's opening selection (§G.3), in group order (Product.tsx: the import's defaults, else a lone option). */
-export function pageDefaultSelection(payload: Pick<ImportPayload, 'groups' | 'variants'>): string[] {
-  const groups = chooserGroups(payload.groups);
-  const opening = defaultSelection(groups, payload.variants);
-  if (opening.length) return opening;
-  const all = groups.flatMap((g) => g.values.map((v) => v.id));
-  return all.length === 1 ? all : [];
+/** Ordinary arrivals leave every option empty, even import defaults and single-value groups. */
+export function pageDefaultSelection(_payload: Pick<ImportPayload, 'groups' | 'variants'>): string[] {
+  return [];
 }
 
 /**

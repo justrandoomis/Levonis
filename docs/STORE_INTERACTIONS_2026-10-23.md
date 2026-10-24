@@ -47,3 +47,37 @@ Targeted checks cover email completion/custom domains, multilingual saved-addres
 The repository-wide CI suite is separate from these targeted local checks.
 
 The 2026-10-24 image-motion regression fix adds `tests/productImageMotion.test.ts` and `scripts/e2e-product-motion.mjs`. A local Chromium fixture renders the real React components under StrictMode and passed **40 browser checks**: delayed data and responsive image loading, forward/Back continuity and focus, cached-image handoff without a second visible photo, retaining the pinned photo's aspect ratio when the card and detail use different crops, interrupted navigation, rapid selection, aligned pixel-only rendering in RTL, retry, touch/mouse/trackpad navigation, native vertical scrolling, enlarged-image loading and swiping, keyboard behavior and reduced motion. Mid-flight and pixel-dissolve screenshots were inspected. The fixture uses local synthetic images and no live customer actions. These checks do not claim physical-device Safari testing or complete light/dark coverage of unrelated interactions.
+
+## Product-photo follow-up — 2026-10-25
+
+Ordinary product arrivals now leave options, models and colours unselected,
+including imported defaults, a stocked server suggestion and single-value
+choices. Explicit variant/search links still restore the requested selection.
+The quote remains keyed to the selection the server actually priced; a suggested
+SKU is never treated as the customer's empty selection. The lead-image preload
+and import browser verifier follow the new opening rule. Catalogue defaults
+remain available to the knowledge and compatibility helpers.
+
+The photo viewer is a lazy component using the existing Overlay for focus,
+Escape, dismissal and scroll locking. Its photo travels from the actual painted
+image rectangle into the viewer and back in 250ms with the existing UI duration
+and move curve. The page copy is hidden until the return completes; an already
+decoded preview covers the original-resolution load. Closing mid-entry reverses
+from the current presentation position. Both the photo and its zoom button open
+the viewer, while horizontal swipes continue to select images. Keyboard openings
+are immediate and reduced motion uses a short opacity transition.
+
+Pixel changes now replace opaque tiles at scattered times within the same 250ms
+UI duration. This makes individual blocks visible, instead of almost uniformly
+blending the whole photo. The grid still reconstructs one aligned photo in RTL;
+there is no blur, column wipe or extra scaling during gallery selection.
+
+The Chromium fixture now also renders the real Product page with its compiled
+styles and local API fixtures. It verifies empty choices on arrival, explicit
+choices and variant links, photo-tap zoom, entry/exit interruption, focus return,
+slow full-resolution loading and a visibly discrete pixel midpoint. Build budgets
+remain unchanged and the zoom module is excluded from the product's first load.
+
+Validation for this follow-up: **66 Chromium checks passed**, including touch
+swipes and the real Product page; **96 targeted regression checks passed**;
+the import verifier also passed all **9 tests with its real Chromium probe**.

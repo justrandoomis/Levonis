@@ -14,7 +14,7 @@
  *   - the request door (`[data-price-request-cta]`) is there, «السعر غير متوفر
  *     حالياً» is visible; there is no add-to-cart, buy-now or Quick Buy control
  *     and no 0 before a dinar unit;
- *   - the opening selection is the page's §G.3 rule, read from what the option
+ *   - the opening selection is empty (owner 2026-10-25), read from what the option
  *     groups show pressed (`fieldset[data-option-group]`, each control's
  *     `data-option-value`);
  *   - for each colour, version or size value (≤ 12; all for the audit
@@ -47,6 +47,7 @@
  * Screenshots (audit classes, 1 in 25, every failure) come back as buffers and
  * are sealed by the caller; nothing is written to disk in clear.
  */
+import { defaultSelection } from '../../src/lib/productChooser';
 import { createRequire } from 'node:module';
 import { existsSync, realpathSync } from 'node:fs';
 import { mediaPath } from '@levonis/catalog/bambuImport/fingerprint';
@@ -253,7 +254,7 @@ export async function inspectProductPage(page: ProductPageDriver, input: PageChe
   const opening = pageDefaultSelection(payload);
   let selection = inGroupOrder(await page.pressedValues(groups), groups);
   checks.default_selection = sameSet(selection, opening);
-  if (selection.length) selections.push([...selection]);
+  selections.push([...selection]);
 
   let imagesOk = true;
   let heldOk = true;
@@ -326,7 +327,7 @@ export async function inspectProductPage(page: ProductPageDriver, input: PageChe
 
   // The knowledge tabs follow the selection on screen, else the opening one (Product.tsx knowledgeSelection).
   if (input.knowledge) {
-    const ids = selection.length ? selection : opening;
+    const ids = selection.length ? selection : defaultSelection(payload.groups, payload.variants);
     const expected = knowledgeTabs(input.knowledge, { optionValueIds: ids, variantId: productVariantIdForSelection(variants, { optionValueIds: ids }) }).order;
     const k = await page.knowledge();
     counts.knowledge_tabs = k.tabs.length;

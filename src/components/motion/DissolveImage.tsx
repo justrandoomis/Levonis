@@ -51,8 +51,9 @@ export default function DissolveImage({ animate = true, ...props }: React.Compon
         const x = i % 12, y = Math.floor(i / 12);
         const bg = background(reveal.old, reveal.width, reveal.height, reveal.padding);
         const [left, top] = String(bg.backgroundPosition).split(' ').map(parseFloat);
-        // Scatter the fade across both axes. A column-based delay reads as vertical blinds.
-        return <i key={i} style={{ ...bg, backgroundPosition: `${left - x * reveal.width / 12}px ${top - y * reveal.height / 9}px`, animationDelay: `${((i * 37 + y * 19) % 97)}ms` }} />;
+        // Distinct opaque tiles swap throughout 250ms instead of blending into
+        // an almost invisible crossfade. Scatter across both axes, never columns.
+        return <i key={i} style={{ ...bg, backgroundPosition: `${left - x * reveal.width / 12}px ${top - y * reveal.height / 9}px`, animationDelay: `${-((i * 73 + y * 31) % 108) * 2}ms` }} />;
       })}
     </div>}
   </div>;
