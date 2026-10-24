@@ -3,11 +3,17 @@
  * as the price: previews never write stock, and a refused price rolls it back.
  * A purchase is not a receipt. Only unknown counters become zero; existing
  * quantities, reservations, lots and incoming purchases are never rewritten. */
+import { serverMessage } from '@levonis/contracts/costRefusals';
 import { auditStatements } from './audit';
+import { badRequest } from './http';
 import { importStockNotConfigured, TRACKED_STOCK_SQL, trackedStockBinds } from './importStock';
 import { requireSelection } from './inventorySelection';
 import { fence } from './operations';
-import { inputInvalid } from './pricingEngine/whatIf';
+
+const invalidStock = () => badRequest(
+  serverMessage('PRICING_INPUT_INVALID').replaceAll('{field}', 'procurement_stock'),
+  'PRICING_INPUT_INVALID', { field: 'procurement_stock' },
+);
 
 export async function planProcurementImportStock(
   db: D1Database,
@@ -18,7 +24,7 @@ export async function planProcurementImportStock(
 ): Promise<D1PreparedStatement[]> {
   const { scope, scope_id: scopeId } = selection;
   if (typeof scope !== 'string' || !['base', 'option', 'color', 'variant'].includes(scope)
-    || typeof scopeId !== 'string' || (scope === 'base' ? scopeId !== '' : !scopeId)) throw inputInvalid('procurement_stock');
+    || typeof scopeId !== 'string' || (scope === 'base' ? scopeId !== '' : !scopeId)) throw invalidStock();
   if (!(await importStockNotConfigured(db, productId))) return [];
   await requireSelection(db, productId, scope, scopeId);
   const modes: Record<string, string> = { base: 'BASE', option: 'OPTION', color: 'COLOR', variant: 'VARIANT_COMBINATION' };
@@ -34,7 +40,7 @@ export async function planProcurementImportStock(
     const group = await db.prepare(`SELECT v.group_id FROM product_option_values v JOIN product_option_groups g ON g.id = v.group_id
       WHERE v.id = ? AND v.product_id = ? AND v.active = 1 AND g.product_id = ? AND g.active = 1`)
       .bind(scopeId, productId, productId).first<{ group_id: string }>();
-    if (!group) throw inputInvalid('procurement_stock');
+    if (!group) throw invalidStock();
     guards.push(...fence(db, `EXISTS (SELECT 1 FROM product_option_values v JOIN product_option_groups g ON g.id = v.group_id
       WHERE v.id = ? AND v.product_id = ? AND v.group_id = ? AND v.active = 1 AND g.product_id = ? AND g.active = 1)`, [scopeId, productId, group.group_id, productId]));
     initialize = db.prepare('UPDATE product_option_values SET stock = 0 WHERE product_id = ? AND group_id = ? AND active = 1 AND stock IS NULL')
