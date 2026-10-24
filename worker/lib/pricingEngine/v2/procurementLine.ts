@@ -125,7 +125,7 @@ export async function procurementLinePricing(c: Context<AppContext>, body: Recor
       const baseUsd = base === null ? null : usd(base);
       if (!channel || baseUsd === null) throw inputInvalid('customer_price_usd_requires_cost');
       fixed = channel.anchor !== 'cost';
-      const delta = procurementExact(channel.deltas_usd);
+      const delta = procurementExact(channel.deltas_usd, { signed: true });
       const effectiveCost = addProcurementExact(procurementExact(baseUsd), !fixed && delta.num > 0n ? delta : procurementExact('0'));
       const profit = addProcurementExact(requested, { num: -effectiveCost.num, den: effectiveCost.den });
       if (profit.num <= 0n) throw inputInvalid('customer_price_usd_below_cost');
@@ -140,12 +140,13 @@ export async function procurementLinePricing(c: Context<AppContext>, body: Recor
       const point = { scope: pointScope, scope_id: pointId, kind: 'fixed', usd: requestedText };
       pricing.points = [...points, point];
       ev = await evaluate();
-      const direct = channelOf(ev)?.direct_exact_iqd;
-      if (direct && read.rates?.usd_iqd) {
+      const channel = channelOf(ev);
+      if (channel) {
         // Model/product anchors still carry option and colour differences.
-        // Reverse them using exact engine output, never the rounded IQD price.
-        const actual = quotientProcurementExact(procurementExact(direct), procurementExact(read.rates.usd_iqd));
-        const adjusted = addProcurementExact(addProcurementExact(requested, requested), { num: -actual.num, den: actual.den });
+        // Reverse the exact differences, even when a negative adjustment was
+        // temporarily hidden by the engine's minimum-profit floor.
+        const delta = procurementExact(channel.deltas_usd, { signed: true });
+        const adjusted = addProcurementExact(requested, { num: -delta.num, den: delta.den });
         const text = procurementExactText(adjusted);
         if (!parseV2Usd(text)) throw inputInvalid('customer_price_usd_conflicts');
         point.usd = text;

@@ -162,6 +162,9 @@ test('fixed USD editing works without cost and preserves other prices and pre-or
     { scope: 'sku' as const, scope_id: `c:${pid}_c1`, kind: 'fixed' as const, usd: '30' },
   ];
   await writeV2(w.db, pid, { method: 'usd', points, discounts: [{ scope: 'product', scope_id: '', usd: '2' }] });
+  const base = await json(await post(w.app, path, { product_id: pid, scope: 'base', scope_id: '', customer_price_usd: '200' }));
+  assert.equal(base.customer_price_usd, '200', JSON.stringify(base));
+  assert.equal(base.pricing.points.find((x: { scope: string }) => x.scope === 'product').usd, '198', 'the final price includes the colour difference');
   const p = await json(await post(w.app, path, { product_id: pid, scope: 'color', scope_id: `${pid}_c0`, customer_price_usd: '10.051' }));
   assert.equal(p.customer_price_usd, '10.051', JSON.stringify(p));
   assert.equal(p.pricing.method, 'usd');
@@ -181,14 +184,20 @@ test('fixed USD editing works without cost and preserves other prices and pre-or
 
 test('cost-based fixed model prices remain editable and keep their existing pricing method', async () => {
   const w = pricingWorld();
+  w.raw.prepare(`INSERT INTO product_colors (id, product_id, name_en, name_ar, name_ckb, hex, sort, active, stock)
+    VALUES ('inline-fixed-red', ?, 'Red', 'أحمر', 'سوور', '#ff0000', 0, 1, 5)`).run(AMS);
   await writeV2(w.db, AMS, { method: 'cost', minimumProfitUsd: '10', points: [
     { scope: 'option', scope_id: AMS_MODEL, kind: 'fixed', usd: '550' },
+    { scope: 'color', scope_id: 'inline-fixed-red', kind: 'delta', usd: '-2' },
   ], inputs: { supplier_cost_amount: '495', supplier_cost_currency: 'USD', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 2500 } });
   const p = await json(await post(w.app, path, { ...selection, customer_price_usd: '560.051' }));
   assert.equal(p.customer_price_usd, '560.051', JSON.stringify(p));
   assert.equal(p.minimum_profit_usd, '60.051');
   assert.equal(p.pricing.method, 'cost');
-  assert.deepEqual(p.pricing.points, [{ scope: 'option', scope_id: AMS_MODEL, kind: 'fixed', usd: '560.051' }]);
+  assert.deepEqual(p.pricing.points, [
+    { scope: 'color', scope_id: 'inline-fixed-red', kind: 'delta', usd: '-2' },
+    { scope: 'option', scope_id: AMS_MODEL, kind: 'fixed', usd: '562.051' },
+  ]);
   const saved = await put(v2App(w.raw), `/api/admin/products-v2/${AMS}/pricing`, { pricing: p.pricing, seq: p.preview.seq, preview_hash: p.preview.review_hash, confirm_large_change: true });
   assert.equal(saved.status, 200, JSON.stringify(await json(saved)));
   const again = await json(await post(w.app, path, selection));
