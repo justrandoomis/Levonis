@@ -74,13 +74,13 @@ export async function procurementLinePricing(c: Context<AppContext>, body: Recor
   }
 
   const ruleTarget = unitRuleTarget(read.loaded.id, selection);
-  const existingProfit = resolveRuleAt(ev.stored.rules, 'target_profit', ruleTarget, { usdIqdRate: read.rates?.usd_iqd ?? null });
   const profitScope = target.scope === 'base' ? 'product' : target.scope;
+  const setProfit = (amount: string) => { cost.minimum_profit = [{ kind: 'target_profit', scope: profitScope, scope_id: target.scope_id, amount_usd: amount }]; };
   if (body.minimum_profit_usd !== undefined) {
     if (typeof body.minimum_profit_usd !== 'string') throw inputInvalid('minimum_profit_usd');
     const text = typedDecimalText(body.minimum_profit_usd.trim());
     if (text && !parseV2Usd(text)) throw inputInvalid('minimum_profit_usd');
-    cost.minimum_profit = [{ kind: 'target_profit', scope: profitScope, scope_id: target.scope_id, amount_usd: text }];
+    setProfit(text);
   }
   if (body.final_cost_usd !== undefined) {
     if (typeof body.final_cost_usd !== 'string') throw inputInvalid('final_cost_usd');
@@ -102,15 +102,70 @@ export async function procurementLinePricing(c: Context<AppContext>, body: Recor
     input.supplier_cost_amount = procurementExactText(ceilToPlaces(supplier, 6));
   }
   ev = await evaluate();
-  const replacement = replacementOf(ev);
-  const rule = body.minimum_profit_usd === undefined ? existingProfit : resolveRuleAt(mergedRules(read.stored, ev.ruleWrites), 'target_profit', ruleTarget, { usdIqdRate: read.rates?.usd_iqd ?? null });
   const usd = (amount: string | number) => read.rates?.usd_iqd ? procurementExactText(ceilToPlaces(quotientProcurementExact(procurementExact(amount), procurementExact(read.rates.usd_iqd)), 6)) : null;
+  const channelOf = (e: V2Evaluation) => {
+    const channels = e.result?.skus.find((s) => s.combo_key === selection.combo_key)?.channels;
+    return channels?.find((ch) => ch.channel === 'direct_sale') ?? channels?.[0];
+  };
+  if (body.customer_price_usd !== undefined) {
+    if (body.minimum_profit_usd !== undefined || typeof body.customer_price_usd !== 'string') throw inputInvalid('customer_price_usd');
+    const requested = parseV2Usd(typedDecimalText(body.customer_price_usd.trim()));
+    if (!requested) throw inputInvalid('customer_price_usd');
+    const requestedText = procurementExactText(requested);
+    let fixed = ev.method === 'usd';
+    if (!fixed) {
+      // Resolve the same shelf/supplier cost and adjustments as the normal
+      // engine, even when this selection has no minimum profit yet. This is
+      // only a preview; its temporary rule is replaced before it can be saved.
+      setProfit('1');
+      ev = await evaluate();
+      const channel = channelOf(ev);
+      const replacement = replacementOf(ev);
+      const base = channel?.shelf?.cost_iqd ?? (replacement?.ok ? replacement.cost.replacement_exact : null);
+      const baseUsd = base === null ? null : usd(base);
+      if (!channel || baseUsd === null) throw inputInvalid('customer_price_usd_requires_cost');
+      fixed = channel.anchor !== 'cost';
+      const delta = procurementExact(channel.deltas_usd);
+      const effectiveCost = addProcurementExact(procurementExact(baseUsd), !fixed && delta.num > 0n ? delta : procurementExact('0'));
+      const profit = addProcurementExact(requested, { num: -effectiveCost.num, den: effectiveCost.den });
+      if (profit.num <= 0n) throw inputInvalid('customer_price_usd_below_cost');
+      setProfit(procurementExactText(profit));
+    }
+    if (fixed) {
+      // Keep the product's method, discounts and unrelated price points. A
+      // colour/variant gets its own SKU price; a model keeps its model scope.
+      const pointScope = scope === 'base' ? 'product' : scope === 'option' && selection.option_value_ids[0] === id ? 'option' : 'sku';
+      const pointId = pointScope === 'product' ? '' : pointScope === 'option' ? id : selection.combo_key;
+      const points = ev.points.filter((p) => p.scope !== pointScope || p.scope_id !== pointId).map((p) => ({ ...p }));
+      const point = { scope: pointScope, scope_id: pointId, kind: 'fixed', usd: requestedText };
+      pricing.points = [...points, point];
+      ev = await evaluate();
+      const direct = channelOf(ev)?.direct_exact_iqd;
+      if (direct && read.rates?.usd_iqd) {
+        // Model/product anchors still carry option and colour differences.
+        // Reverse them using exact engine output, never the rounded IQD price.
+        const actual = quotientProcurementExact(procurementExact(direct), procurementExact(read.rates.usd_iqd));
+        const adjusted = addProcurementExact(addProcurementExact(requested, requested), { num: -actual.num, den: actual.den });
+        const text = procurementExactText(adjusted);
+        if (!parseV2Usd(text)) throw inputInvalid('customer_price_usd_conflicts');
+        point.usd = text;
+      }
+    }
+    ev = await evaluate();
+    // A narrower exception must never make a typed price appear saved while
+    // the customer's price remains different. The advanced editor resolves it.
+    const channel = channelOf(ev);
+    if (!channel || usd(channel.direct_exact_iqd) !== requestedText) throw inputInvalid('customer_price_usd_conflicts');
+  }
+  const replacement = replacementOf(ev);
+  const rule = resolveRuleAt(mergedRules(read.stored, ev.ruleWrites), 'target_profit', ruleTarget, { usdIqdRate: read.rates?.usd_iqd ?? null });
   const row = ev.rows.find((r) => r.combo_key === selection.combo_key && r.channel === 'direct_sale') ?? ev.rows.find((r) => r.combo_key === selection.combo_key);
   return {
     pricing,
     preview: v2Answer({ viewer: 'owner', read, ev }),
     final_cost_usd: replacement?.ok ? usd(replacement.cost.replacement_exact) : null,
     minimum_profit_usd: rule.status === 'active' ? rule.amount_usd ?? (rule.amount_iqd === null ? null : usd(rule.amount_iqd)) : null,
+    customer_price_usd: row?.owner?.usd_ceil6 ?? row?.usd_exact ?? null,
     customer_price_iqd: row?.new_iqd ?? null,
     profit_scope: profitScope,
     cost_from_purchase: inputs.length > 0 && body.final_cost_usd === undefined,

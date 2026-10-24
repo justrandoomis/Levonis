@@ -8,12 +8,13 @@ import PricingSummaryBar from './PricingSummaryBar';
 import type { PricingSummary } from './procurementPricing';
 import { money, T, type Selection } from './shared';
 
-export type InlinePriceDraft = { final_cost_usd?: string; minimum_profit_usd?: string };
+export type InlinePriceDraft = { final_cost_usd?: string; minimum_profit_usd?: string; customer_price_usd?: string };
 interface LinePrice {
   pricing: V2DraftWire;
   preview: V2Answer;
   final_cost_usd: string | null;
   minimum_profit_usd: string | null;
+  customer_price_usd: string | null;
   customer_price_iqd: number | null;
   profit_scope: 'product' | 'option' | 'color' | 'sku';
   cost_from_purchase: boolean;
@@ -39,7 +40,8 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
   const [attempt, setAttempt] = useState(0);
   const dirty = Object.keys(value).length > 0;
   const valid = (value.final_cost_usd === undefined || /^(?:\d+)(?:\.\d{1,6})?$/.test(value.final_cost_usd))
-    && (value.minimum_profit_usd === undefined || value.minimum_profit_usd === '' || /^(?:\d+)(?:\.\d{1,6})?$/.test(value.minimum_profit_usd));
+    && (value.minimum_profit_usd === undefined || value.minimum_profit_usd === '' || /^(?:\d+)(?:\.\d{1,6})?$/.test(value.minimum_profit_usd))
+    && (value.customer_price_usd === undefined || /^(?:\d+)(?:\.\d{1,6})?$/.test(value.customer_price_usd));
   const requestKey = JSON.stringify([{ product_id: line.product_id, scope: line.scope, scope_id: line.scope_id, ...(purchaseDraft ? { draft: purchaseDraft } : {}), ...value }, revision, attempt]);
   useEffect(() => {
     if (!valid) return;
@@ -61,7 +63,11 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
   const confirmRequired = result?.preview.large_change || result?.preview.drop_flag;
   const change = (field: keyof InlinePriceDraft, text: string) => {
     setError(null); setSaved(false); setConfirmedKey('');
-    onChange({ ...value, [field]: text });
+    const next = { ...value, [field]: text };
+    // The last edited amount drives the preview; never send two competing targets.
+    if (field === 'customer_price_usd') delete next.minimum_profit_usd;
+    if (field === 'minimum_profit_usd') delete next.customer_price_usd;
+    onChange(next);
   };
   const field = (key: keyof InlinePriceDraft, label: string, fallback: string | null | undefined) => (
     <UsdInput id={`${id}-${key}`} label={`${label} (USD) · ${line.label}`} placeholder="—" disabled={saving}
@@ -93,7 +99,13 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
     ? loc('أكمل مسار الشحن ووزن أو حجم القطعة أولاً لحساب التكلفة النهائية.', 'Complete the shipping route and packed weight or volume before setting the final cost.', 'سەرەتا ڕێگای ناردن و کێش یان قەبارەی پاکێجکراو تەواو بکە بۆ دانانی تێچووی کۆتایی.')
     : invalidField === 'final_cost_usd_below_freight'
       ? loc('التكلفة النهائية يجب أن تكون أكبر من الشحن والمصاريف الإضافية.', 'Final cost must exceed freight and extra charges.', 'تێچووی کۆتایی دەبێت لە کرێی ناردن و خەرجیی زیادە زیاتر بێت.')
-      : invalidField === 'final_cost_usd' || invalidField === 'minimum_profit_usd'
+      : invalidField === 'customer_price_usd_requires_cost'
+        ? loc('أكمل التكلفة أولاً لحساب الربح من سعر الزبون.', 'Complete the cost before calculating profit from the customer price.', 'سەرەتا تێچوو تەواو بکە بۆ ژماردنی قازانج لە نرخی کڕیار.')
+      : invalidField === 'customer_price_usd_below_cost'
+        ? loc('سعر الزبون يجب أن يتجاوز التكلفة وفروق الخيارات ليبقى الربح موجبًا.', 'The customer price must exceed cost and option adjustments to keep a positive profit.', 'نرخی کڕیار دەبێت لە تێچوو و جیاوازیی هەڵبژاردەکان زیاتر بێت بۆ قازانجی ئەرێنی.')
+      : invalidField === 'customer_price_usd_conflicts'
+        ? loc('توجد قاعدة سعر خاصة تتعارض مع هذا المبلغ. راجع إعدادات التسعير.', 'A specific pricing rule conflicts with this amount. Review the pricing settings.', 'یاسایەکی تایبەتی نرخدان لەگەڵ ئەم بڕە ناکۆکە. ڕێکخستنەکانی نرخدان بپشکنە.')
+      : invalidField === 'final_cost_usd' || invalidField === 'minimum_profit_usd' || invalidField === 'customer_price_usd'
         ? loc('أدخل مبلغاً صالحاً بالدولار، حتى ست خانات عشرية.', 'Enter a valid USD amount with up to six decimal places.', 'بڕێکی دروست بە دۆلار بنووسە، تا شەش ژمارەی دەهەمی.')
         : error ? contractRefusal(error, refusalLang(lang), error instanceof Error ? error.message : String(error)) : '';
   return (
@@ -101,9 +113,10 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
       <PricingSummaryBar summary={summary} label={line.label} busy={pending} fields={{
         cost: field('final_cost_usd', loc('التكلفة النهائية', 'Final cost', 'تێچووی کۆتایی'), latest?.final_cost_usd),
         profit: field('minimum_profit_usd', loc('الحد الأدنى للربح', 'Minimum profit', 'کەمترین قازانج'), latest?.minimum_profit_usd),
+        customerUsd: field('customer_price_usd', loc('السعر النهائي للزبون', 'Final customer price', 'نرخی کۆتایی کڕیار'), latest?.customer_price_usd),
         price: result?.customer_price_iqd ?? null,
       }} />
-      <p className={`mt-2 text-xs ${T.text3}`}>{loc('عدّل التكلفة أو الربح بالدولار ثم احفظ السعر. تكلفة الشحنة المحاسبية تبقى حسب بيانات الشراء أعلاه.', 'Edit cost or profit in USD, then save the price. The shipment’s accounting cost follows the purchase fields above.', 'تێچوو یان قازانج بە دۆلار دەستکاری بکە، پاشان نرخەکە پاشەکەوت بکە. تێچووی ژمێریاریی بارەکە بەپێی زانیاریی کڕینی سەرەوەیە.')}</p>
+      <p className={`mt-2 text-xs ${T.text3}`}>{loc('عدّل التكلفة أو الربح أو سعر الزبون بالدولار ثم احفظ. في التسعير حسب التكلفة، تعديل سعر الزبون يعيد حساب الربح. يظهر سعر الدينار بعد التقريب المعتمد. تكلفة الشحنة المحاسبية تبقى حسب بيانات الشراء أعلاه.', 'Edit cost, profit or customer price in USD, then save. Cost-based pricing recalculates profit when you edit the customer price. IQD reflects the configured rounding. The shipment’s accounting cost follows the purchase fields above.', 'تێچوو، قازانج یان نرخی کڕیار بە دۆلار دەستکاری بکە و پاشەکەوت بکە. لە نرخدانی بەپێی تێچوو، گۆڕینی نرخی کڕیار قازانج دووبارە دەژمێرێتەوە. نرخی دینار بەپێی خڕکردنەوەکەیە. تێچووی ژمێریاریی بارەکە بەپێی زانیاریی کڕینی سەرەوەیە.')}</p>
       {result?.preview.method === 'usd' && <p className={`mt-1 text-xs ${T.text3}`}>{loc('هذا المنتج يستخدم سعر بيع ثابتاً؛ تغيير التكلفة أو الربح يحافظ على قاعدة تسعيره.', 'This product uses a fixed selling price; cost and profit edits preserve its pricing method.', 'ئەم بەرهەمە نرخی فرۆشتنی جێگیری هەیە؛ دەستکاریکردنی تێچوو و قازانج شێوازی نرخدانەکە دەپارێزێت.')}</p>}
       {dirty && result && !result.preview.complete && <p role="status" className={`mt-2 text-sm ${T.text2}`}>{loc('يمكن حفظ البيانات، لكن السعر يحتاج استكمال بيانات التسعير.', 'You can save these inputs, but pricing still needs more information.', 'دەتوانیت ئەم زانیارییانە پاشەکەوت بکەیت، بەڵام نرخدان زانیاریی زیاتر دەوێت.')}</p>}
       {dirty && result && (result.preview.changes?.length ?? 0) > 0 && <details className={`mt-2 text-xs ${T.text2}`}>

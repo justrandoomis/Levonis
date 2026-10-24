@@ -27,7 +27,7 @@ const Fig = ({ children }: { children: React.ReactNode }) => <bdi dir="ltr" clas
 
 export default function PricingSummaryBar({ summary, label, busy = false, notInstalled = false, readOnlyLabel, directFirst = false, onEdit, fields }: {
   summary: PricingSummary | null | undefined;
-  fields?: { cost: React.ReactNode; profit: React.ReactNode; price: number | null };
+  fields?: { cost: React.ReactNode; profit: React.ReactNode; customerUsd: React.ReactNode; price: number | null };
   /** Open the canonical V2 pricing editor without leaving the purchase. */
   onEdit?: () => void;
   /** The line's name, for the bar's and the pill's accessible names. */
@@ -78,7 +78,7 @@ export default function PricingSummaryBar({ summary, label, busy = false, notIns
         {loc('تعديل الربح وسعر البيع', 'Edit profit and selling price', 'دەستکاریکردنی قازانج و نرخی فرۆشتن')}
       </button>}
       {readOnlyLabel && <p className="mb-1.5 text-[12px] font-semibold text-[var(--ap-text-3)]">{s.current}</p>}
-      <dl className="grid grid-cols-2 gap-2 tabular-nums sm:grid-cols-3">
+      <dl className={`grid grid-cols-2 gap-2 tabular-nums ${fields ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
         <div className={CELL}>
           <dt className="text-[12px] text-[var(--ap-text-3)]">{s.cellCost}</dt>
           <dd className="text-[15px] font-semibold text-[var(--ap-text-1)]">{fields?.cost ?? <Fig>{shown(ok ? usd(summary!.current_total_cost_cents) : '—')}</Fig>}</dd>
@@ -87,6 +87,10 @@ export default function PricingSummaryBar({ summary, label, busy = false, notIns
           <dt className="text-[12px] text-[var(--ap-text-3)]">{s.cellProfit}</dt>
           <dd className="text-[15px] font-semibold text-[var(--ap-text-1)]">{fields?.profit ?? <Fig>{shown(profit)}</Fig>}</dd>
         </div>
+        {fields && <div className={CELL}>
+          <dt className="text-[12px] text-[var(--ap-text-3)]">{s.cellFinalUsd}</dt>
+          <dd className="text-[15px] font-semibold text-[var(--ap-text-1)]">{fields.customerUsd}</dd>
+        </div>}
         <div className="rounded-[var(--ap-radius-md)] bg-[var(--ap-accent-soft)] px-3 py-2 text-[var(--ap-accent-text)]">
           <dt className="text-[12px]">{cell4Label}</dt>
           <dd className="text-[15px] font-semibold">
