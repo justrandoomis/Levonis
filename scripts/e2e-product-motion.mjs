@@ -35,7 +35,7 @@ function Product() {
   const hero = useRef(null), navigate = useNavigate();
   useProductEntrance(hero, ready);
   useEffect(() => { const timer = setTimeout(() => setReady(true), cfg.dataDelay ?? 600); return () => clearTimeout(timer); }, []);
-  const images = [cfg.responsive ? '/files/products/motion-a.png' : '/large-a.svg','/large-b.svg','/large-c.svg', '/broken.svg'];
+  const images = [cfg.responsive ? '/files/products/motion-a.png' : cfg.tallHero ? '/tall-a.svg' : '/large-a.svg','/large-b.svg','/large-c.svg', '/broken.svg'];
   const move = (step, animate = true) => { setMotion(animate); setIndex((i) => (i + step + images.length) % images.length); };
   return <><header><button id="back" onClick={() => navigate(-1)}>Back</button><Link id="other" to="/other">Other page</Link></header>
     {ready ? <><GallerySurface ref={hero} data-gallery-hero className="hero" count={images.length} direction={cfg.rtl ? 'rtl' : 'ltr'} onStep={move} tabIndex={0}>
@@ -69,7 +69,7 @@ const server = createServer((request, response) => {
   if (request.url === '/harness.js') { response.writeHead(200, { 'content-type': 'text/javascript' }); response.end(result.outputFiles[0].text); return; }
   if (request.url === '/broken.svg') { response.writeHead(404, { 'content-type': 'text/plain' }); response.end('Not found'); return; }
   if (request.url?.startsWith('/files/products/motion-a.png')) { response.writeHead(200, { 'content-type': 'image/svg+xml' }); response.end(svg('-a')); return; }
-  if (request.url?.endsWith('.svg')) { response.writeHead(200, { 'content-type': 'image/svg+xml', 'cache-control': 'public,max-age=3600' }); response.end(svg(request.url)); return; }
+  if (request.url?.endsWith('.svg')) { response.writeHead(200, { 'content-type': 'image/svg+xml', 'cache-control': 'public,max-age=3600' }); response.end(request.url === '/tall-a.svg' ? svg(request.url).replace('height="600"', 'height="800"') : svg(request.url)); return; }
   response.writeHead(200, { 'content-type': 'text/html' }); response.end(html);
 });
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -168,10 +168,14 @@ try {
     await context.close();
   }
   {
-    const { page, context, errors } = await open({ dataDelay: 0 });
+    const { page, context, errors } = await open({ dataDelay: 0, tallHero: true });
+    // A cached destination can already expose its different intrinsic ratio
+    // when the shared photo's destination geometry is first measured.
+    await page.evaluate(async () => { const img = new Image(); img.src = '/tall-a.svg'; await img.decode(); });
     await page.click('#open');
     await page.waitForFunction(() => document.querySelector('[data-gallery-hero] [data-image-state="loaded"]') && document.querySelector('[data-product-transition]')?.getAnimations().length);
     check('a fast destination image stays hidden during the flight', await page.locator('[data-gallery-hero] img[data-main-image]').evaluate((img) => getComputedStyle(img).visibility === 'hidden'));
+    check('the pinned photo keeps its own aspect ratio when the destination photo has a different shape', await page.locator('[data-transition-picture]').evaluate((img) => Math.abs(parseFloat(img.style.width) / parseFloat(img.style.height) - img.naturalWidth / img.naturalHeight) < .001));
     await ready(page);
     check('the destination is visible again after the handoff', await page.locator('[data-gallery-hero] img[data-main-image]').evaluate((img) => getComputedStyle(img).visibility === 'visible'));
     await page.click('#image-1');
@@ -196,7 +200,7 @@ try {
     }
     await page.click('#image-2'); await page.click('#image-0');
     await page.waitForFunction(() => !document.querySelector('.u349-cells,.u349-previous'));
-    check('rapid selection settles on the latest image with no old layer', await page.locator('[data-gallery-hero] img[data-main-image]').getAttribute('src') === '/large-a.svg');
+    check('rapid selection settles on the latest image with no old layer', await page.locator('[data-gallery-hero] img[data-main-image]').getAttribute('src') === '/tall-a.svg');
     await drag(page, -120); check('mouse drag left selects the next LTR image', await index(page) === '1');
     await drag(page, 120); check('mouse drag right selects the previous image', await index(page) === '0');
     await drag(page, 4, 3); check('a tap is not a swipe', await index(page) === '0');

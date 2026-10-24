@@ -27,7 +27,8 @@ function take(el: HTMLElement, fallback?: Picture): Picture | undefined {
   const rect = el.getBoundingClientRect();
   if (!visible(rect)) return;
   const css = getComputedStyle(image), surface = getComputedStyle(el);
-  const width = image.naturalWidth || fallback!.width, height = image.naturalHeight || fallback!.height;
+  // Keep the pinned photo's ratio when the destination uses another crop.
+  const width = fallback?.width ?? image.naturalWidth, height = fallback?.height ?? image.naturalHeight;
   return {
     rect, width, height, url: fallback?.url ?? (image.currentSrc || image.src),
     plane: imagePlane(image.getBoundingClientRect(), width, height, css.objectFit, css.objectPosition, parseFloat(css.paddingTop) || 0),
