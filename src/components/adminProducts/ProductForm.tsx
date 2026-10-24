@@ -866,7 +866,7 @@ export default function ProductForm({
         ...docWithoutLegacyMoney(docFields),
         // Add-product: the id the V2 preview priced the draft under (the server keeps a sent id).
         ...(next.id ? {} : { id: draftId }),
-        relations: withoutLegacyMoney(relationsToWire(rel)),
+        relations: withoutLegacyMoney(relationsToWire(rel, baseline ? (JSON.parse(baseline) as { rs: RelationsState }).rs : undefined)),
         ...(Object.keys(overrides).length ? { translation_overrides: overrides } : {}),
         // Omitted deliberately when the admin has chosen to overwrite: the
         // server skips the stale check when no expectation is stated, which is
