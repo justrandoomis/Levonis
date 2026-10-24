@@ -1155,13 +1155,20 @@ export function withBlankDirectStockAsZero(rel: RelationsState): RelationsState 
   };
 }
 
-export function relationsToWire(input: RelationsState) {
+export function relationsToWire(input: RelationsState, baseline?: RelationsState) {
   // Blanks become zeros BEFORE the mode is derived, so the payload and the
   // mode are computed from the same, complete grid. See the note on the
   // function: a blank direct-sale shelf means nothing is on it.
   const rel = withBlankDirectStockAsZero(input);
   return {
     inventory_mode: deriveInventoryMode(rel),
+    // A price/content save must not put the editor's old stock back after a
+    // sale. The server preserves untouched quantities and checks edited ones.
+    ...(baseline ? { stock_baseline: {
+      option: baseline.groups.flatMap((g) => g.values.map((v) => ({ id: v.id, stock: v.stock }))),
+      color: baseline.colors.map((c) => ({ id: c.id, stock: c.stock })),
+      variant: baseline.variants.map((v) => ({ id: v.id, stock: v.stock })),
+    } } : {}),
     groups: rel.groups.map((g, gi) => ({
       id: g.id,
       name_en: g.name_en,

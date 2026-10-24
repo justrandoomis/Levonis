@@ -859,6 +859,20 @@ export async function planInventory(
     );
   }
 
+  // Stock changes invalidate an open product editor / exported template just
+  // like content edits do. Otherwise a later price save can resurrect sold
+  // units while passing expected_updated_at. Guard with this operation's
+  // ledger keys so a refused move does not mark the product as changed.
+  const movedKeys = JSON.stringify(fresh.map((w) => w.key));
+  statements.push(db.prepare(
+    `UPDATE products SET updated_at = CASE
+       WHEN julianday(updated_at) >= julianday('now')
+         THEN strftime('%Y-%m-%dT%H:%M:%fZ', updated_at, '+0.001 seconds')
+       ELSE strftime('%Y-%m-%dT%H:%M:%fZ', 'now') END
+     WHERE id IN (SELECT product_id FROM inventory_ledger
+       WHERE idempotency_key IN (SELECT value FROM json_each(?)))`
+  ).bind(movedKeys));
+
   // §7 of the events catalogue: one InventoryChanged per ledger write, in the
   // SAME batch as the counter change, so a stock movement and the fact that it
   // happened commit together. `outboxStatement` returns null — and this loop

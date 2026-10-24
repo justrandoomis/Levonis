@@ -50,6 +50,7 @@ import { badRequest, notFound, str, int, HttpError } from './http';
 import { serverMessage } from '@levonis/contracts/costRefusals';
 import { newId } from './crypto';
 import { audit } from './audit';
+import { preserveUneditedStock, stockWriteFence, isStockWriteConflict, stockWriteChanged, type StockWriteScope } from './productStockWrite';
 import { busFor, nextAggregateSeq, outboxStatement } from './eventBus';
 import { ProductAddedV1 } from '@levonis/contracts/events/v1/ProductAdded';
 import { sha256Hex } from '@levonis/contracts/canonical';
@@ -1084,6 +1085,13 @@ export async function planRelationsWriteFrom(
     ? body.facet_ids.filter((x): x is string => typeof x === 'string')
     : null;
 
+  const stockScopes: StockWriteScope[] = [
+    { scope: 'option', table: 'product_option_values', existing: existing.values, incoming: valueInputs },
+    { scope: 'color', table: 'product_colors', existing: existing.colors, incoming: colorInputs },
+    { scope: 'variant', table: 'product_variants', existing: snap.existingVariants, incoming: variantInputs },
+  ];
+  preserveUneditedStock(body.stock_baseline, stockScopes);
+
   // ---- deletions that would strand reserved stock ------------------------
   const keptValues = valueIds;
   const keptColors = colorIds;
@@ -1390,7 +1398,7 @@ export async function planRelationsWriteFrom(
   if (errors.length) return { errors: [...new Set(errors)] };
 
   // ---- the statements, run as ONE batch by the caller ---------------------
-  const stmts: D1PreparedStatement[] = [];
+  const stmts: D1PreparedStatement[] = await stockWriteFence(db, productId, stockScopes);
 
   stmts.push(db.prepare('UPDATE products SET inventory_mode = ? WHERE id = ?').bind(mode, productId));
 
@@ -3631,7 +3639,12 @@ export async function saveProductAtomic(
   plan: ProductSavePlan,
   auditRows: Array<{ action: string; detail: Record<string, unknown> }> = []
 ): Promise<void> {
-  if (plan.statements.length) await db.batch(plan.statements);
+  try {
+    if (plan.statements.length) await db.batch(plan.statements);
+  } catch (error) {
+    if (isStockWriteConflict(error)) throw stockWriteChanged();
+    throw error;
+  }
   await postCommitProductSave(db, plan, auditRows);
 }
 
