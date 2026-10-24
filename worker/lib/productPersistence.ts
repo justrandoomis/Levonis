@@ -665,7 +665,14 @@ export async function planRelationsWriteFrom(
   // A key another product already owns («refill-1kg» in two filament files)
   // becomes this product's own id, links included (relationIdScope.ts) —
   // before any rule below reads an id, so every rule sees the ids it writes.
-  const { body, renamed } = await scopeForeignRelationIds(db, productId, requestBody);
+  // Read the guard capability alongside the existing ID lookup: protecting
+  // stock must not add a sequential database wait to every product save.
+  const [{ body, renamed }, stockGuard] = await Promise.all([
+    scopeForeignRelationIds(db, productId, requestBody),
+    snap.existing.values.length || snap.existing.colors.length || snap.existingVariants.length
+      ? db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ops_guards'").first()
+      : Promise.resolve(null),
+  ]);
   const baseLadder = snap.baseLadder;
   const existing = snap.existing;
   const errors: string[] = [];
@@ -1398,7 +1405,7 @@ export async function planRelationsWriteFrom(
   if (errors.length) return { errors: [...new Set(errors)] };
 
   // ---- the statements, run as ONE batch by the caller ---------------------
-  const stmts: D1PreparedStatement[] = await stockWriteFence(db, productId, stockScopes);
+  const stmts: D1PreparedStatement[] = stockWriteFence(db, productId, stockScopes, !!stockGuard);
 
   stmts.push(db.prepare('UPDATE products SET inventory_mode = ? WHERE id = ?').bind(mode, productId));
 

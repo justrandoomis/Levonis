@@ -51,15 +51,15 @@ export function preserveUneditedStock(baseline: unknown, scopes: StockWriteScope
 }
 
 /** A checkout between planning and committing must roll the entire save back. */
-export async function stockWriteFence(
+export function stockWriteFence(
   db: D1Database,
   productId: string,
-  scopes: StockWriteScope[]
-): Promise<D1PreparedStatement[]> {
-  if (!scopes.some((s) => s.existing.length)) return [];
+  scopes: StockWriteScope[],
+  guardInstalled: boolean
+): D1PreparedStatement[] {
   // Older schema fixtures/import installations predate the transaction guard.
-  // Current deployments have it; never swallow a database failure here.
-  if (!await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ops_guards'").first()) return [];
+  // The caller probes it alongside its existing reads, without swallowing errors.
+  if (!guardInstalled || !scopes.some((s) => s.existing.length)) return [];
   const checks: string[] = [];
   const binds: unknown[] = [];
   for (const { table, existing } of scopes) {
