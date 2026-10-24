@@ -10,7 +10,7 @@ export const PROCUREMENT = '/api/admin/procurement',
   STOCK = '/api/admin/stock-operations',
   FINANCE = '/api/admin/finance-operations';
 export const today = () => new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 10);
-export const money = (v: number | null | undefined) => (v == null ? '—' : `${v.toLocaleString('en-US')} د.ع`);
+export const money = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? '—' : `${v.toLocaleString('en-US')} د.ع`);
 export interface Named {
   id: string;
   name?: string;

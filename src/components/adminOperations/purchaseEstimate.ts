@@ -9,6 +9,15 @@ export const estimateLineKey = (l: EstimateLine, i: number) =>
 function rounded(values: (number | string)[], divisor = 1) {
   try { return roundProcurementProduct(values, divisor); } catch { return NaN; }
 }
+/** Unknown prices/costs are not zero profit. A store-funded line owes no investor share. */
+export function purchaseProfit(price: number | null, qty: number, total: number, profitBps: number, included = true) {
+  const computed = price !== null && Number.isFinite(price) && Number.isFinite(total) && Number.isFinite(qty)
+    ? price * qty - total : null;
+  const profit = computed !== null && Number.isFinite(computed) ? computed : null;
+  const investor = !included || profitBps === 0 ? 0 : profit === null || !Number.isFinite(profitBps)
+    ? null : Math.floor(Math.max(0, profit) * profitBps / 10000);
+  return { profit_iqd: profit, investor_iqd: investor, owner_iqd: profit === null || investor === null ? null : profit - investor };
+}
 // The server validates selections, rounds IQD and allocates every dinar again
 // at save time — with the same allocator, so the preview is what is saved.
 export function purchaseEstimate(lines: EstimateLine[], charges: EstimateCharge[], rate: number, profitBps: number, included?: number[], shipping?: EstimateShipping) {
@@ -37,9 +46,7 @@ export function purchaseEstimate(lines: EstimateLine[], charges: EstimateCharge[
   return lines.map((l, i) => {
     const extras = shares.reduce((n, row) => n + row[i], 0);
     const freight = autoFreight[i] + extras;
-    // No store price yet (a product still «يحتاج تسعيرًا»): the profit is not computable — NaN, never «price 0».
-    const total = costs[i] + freight, profit = typeof l.selling_price_iqd === 'number' ? l.selling_price_iqd * l.qty_ordered - total : NaN;
-    const investor = !included || included.includes(i) ? Math.floor(Math.max(0, profit) * profitBps / 10000) : 0;
-    return { purchase_iqd: costs[i], auto_shipping_iqd: autoFreight[i], extras_iqd: extras, charge_shares: shares.map((row) => row[i]), freight_iqd: freight, total_iqd: total, unit_iqd: total / l.qty_ordered, profit_iqd: profit, investor_iqd: investor, owner_iqd: profit - investor };
+    const total = costs[i] + freight;
+    return { purchase_iqd: costs[i], auto_shipping_iqd: autoFreight[i], extras_iqd: extras, charge_shares: shares.map((row) => row[i]), freight_iqd: freight, total_iqd: total, unit_iqd: total / l.qty_ordered, ...purchaseProfit(l.selling_price_iqd, l.qty_ordered, total, profitBps, !included || included.includes(i)) };
   });
 }

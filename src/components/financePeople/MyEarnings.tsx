@@ -14,6 +14,17 @@ export type EarningsData = {
   employment?: { start_work_date: string | null; first_earning_day: string | null; active: number; archived: number; has_rules: number; reconciliation_state: string | null; processed_orders: number }[];
 };
 
+/** The spendable total includes returned principal; withdrawal ledgers stay separate. */
+export function EarningsAvailable({ earnings, capital }: { earnings: number; capital: number }) {
+  const { loc } = useLanguage();
+  return <div className="fp-stat">
+    <span>{loc('متاح للسحب', 'Available to withdraw', 'بەردەست بۆ ڕاکێشان')}</span><Money value={earnings + capital} />
+    {capital > 0 && <p className="fp-muted">
+      {loc('أرباح', 'Earnings', 'قازانج')}: <Money value={earnings} /> · {loc('رأس مال', 'Capital', 'سەرمایە')}: <Money value={capital} />
+    </p>}
+  </div>;
+}
+
 /**
  * «مصادر مستحقاتك»: work, investment profit and returned capital — of which the
  * investment remainder of funded shipments (owner request 2026-10-10), withdrawn
@@ -58,11 +69,11 @@ export default function MyEarnings() {
   return <div className="ap fp fp-stack" dir={dir}>
     <header className="fp-heading"><div><h2>{loc('أرباحي', 'My earnings')}</h2><p>{loc('مستحقاتك من العمل والاستثمار، في مكان واحد.', 'Your work and investment earnings, together.')}</p></div><Button variant="ghost" aria-label={loc('تحديث الأرباح', 'Refresh earnings')} icon={<RefreshCw size={17} />} onClick={remote.load} loading={remote.loading} /></header>
     <Feedback error={op.error} notice={op.notice} />
-    {!data ? <Loading error={remote.error} retry={remote.load} /> : <>
+    {!data || !s ? <Loading error={remote.error} retry={remote.load} /> : <>
       <Feedback error={remote.error} />
       <section className="fp-hero"><div><p className="flex items-center gap-2"><Wallet size={17} aria-hidden="true" />{(s.net_balance_iqd ?? 0) < 0 ? loc('عليك', 'You owe') : loc('لك', 'Your balance')}</p><Money value={Math.abs(s.net_balance_iqd ?? balance('earnings'))} className={(s.net_balance_iqd ?? 0) < 0 ? 'fp-negative' : ''} /><p className="text-xs mt-1">{loc('رصيد الأرباح التراكمي بعد التسديد والسلف', 'Cumulative earnings after payments and advances')}</p>{returnView.hero_capital_iqd > 0 && <p className="text-xs mt-1">{ir.heroCapital}: <Money value={returnView.hero_capital_iqd} /></p>}</div><Button variant="primary" icon={<ArrowDownToLine size={17} />} disabled={balance('earnings') <= 0} onClick={() => startWithdrawal('earnings')}>{loc('طلب سحب الأرباح', 'Request withdrawal')}</Button></section>
       <div className="fp-stats">
-        <div className="fp-stat"><span>{loc('متاح للسحب', 'Available to withdraw')}</span><Money value={balance('earnings')} /></div>
+        <EarningsAvailable earnings={balance('earnings')} capital={balance('capital')} />
         <div className="fp-stat"><span>{loc('قيد الاستحقاق', 'Pending')}</span><Money value={s.earnings_pending_iqd ?? 0} /></div>
         <div className="fp-stat"><span>{loc('محجوز للسحب', 'Reserved')}</span><Money value={s.earnings_held_iqd ?? s.held_iqd} /></div>
         <div className="fp-stat"><span>{loc('تم تسديده', 'Paid')}</span><Money value={s.earnings_paid_iqd ?? s.paid_iqd} /></div>

@@ -9,6 +9,13 @@ import type { PricingSummary } from './procurementPricing';
 import { money, T, type Selection } from './shared';
 
 export type InlinePriceDraft = { final_cost_usd?: string; minimum_profit_usd?: string; customer_price_usd?: string };
+type PriceSelection = Pick<Selection, 'product_id' | 'scope' | 'scope_id' | 'label'>;
+export const inlinePriceKey = (line: PriceSelection) => `${line.product_id}:${line.scope}:${line.scope_id}`;
+export const inlinePricingRequestKey = (line: PriceSelection, draft: Record<string, unknown> | null, value: InlinePriceDraft, revision: number) =>
+  JSON.stringify([{ product_id: line.product_id, scope: line.scope, scope_id: line.scope_id, ...(draft ? { draft } : {}), ...value }, revision]);
+export type InlinePriceQuote = { requestKey: string; price: number | null };
+export const currentInlinePrice = (quote: InlinePriceQuote | undefined, requestKey: string): number | null =>
+  quote?.requestKey === requestKey && typeof quote.price === 'number' && Number.isFinite(quote.price) ? quote.price : null;
 interface LinePrice {
   pricing: V2DraftWire;
   preview: V2Answer;
@@ -20,8 +27,8 @@ interface LinePrice {
   cost_from_purchase: boolean;
 }
 
-export default function InlineProcurementPricing({ line, purchaseDraft, value, onChange, onSaved, revision, summary, onAdvanced }: {
-  line: Pick<Selection, 'product_id' | 'scope' | 'scope_id' | 'label'>;
+export default function InlineProcurementPricing({ line, purchaseDraft, value, onChange, onSaved, revision, summary, onAdvanced, readOnly = false, onQuote }: {
+  line: PriceSelection;
   purchaseDraft: Record<string, unknown> | null;
   value: InlinePriceDraft;
   onChange: (value: InlinePriceDraft) => void;
@@ -29,6 +36,8 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
   revision: number;
   summary: PricingSummary | null;
   onAdvanced: () => void;
+  readOnly?: boolean;
+  onQuote?: (selectionKey: string, quote: InlinePriceQuote) => void;
 }) {
   const { lang, loc } = useLanguage();
   const id = useId();
@@ -42,7 +51,7 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
   const valid = (value.final_cost_usd === undefined || /^(?:\d+)(?:\.\d{1,6})?$/.test(value.final_cost_usd))
     && (value.minimum_profit_usd === undefined || value.minimum_profit_usd === '' || /^(?:\d+)(?:\.\d{1,6})?$/.test(value.minimum_profit_usd))
     && (value.customer_price_usd === undefined || /^(?:\d+)(?:\.\d{1,6})?$/.test(value.customer_price_usd));
-  const requestKey = JSON.stringify([{ product_id: line.product_id, scope: line.scope, scope_id: line.scope_id, ...(purchaseDraft ? { draft: purchaseDraft } : {}), ...value }, revision, attempt]);
+  const requestKey = inlinePricingRequestKey(line, purchaseDraft, value, revision);
   useEffect(() => {
     if (!valid) return;
     const controller = new AbortController();
@@ -55,8 +64,11 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
         });
     }, 300);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [requestKey, valid]);
+  }, [requestKey, valid, attempt]);
   const result = answer?.key === requestKey && valid ? answer.data : null;
+  const selectionKey = inlinePriceKey(line);
+  const price = result?.customer_price_iqd ?? null;
+  useEffect(() => { onQuote?.(selectionKey, { requestKey, price }); }, [onQuote, selectionKey, requestKey, price]);
   const answeredSelection = answer ? JSON.parse(answer.key)[0] as Selection : null;
   const latest = answeredSelection?.product_id === line.product_id && answeredSelection.scope === line.scope && answeredSelection.scope_id === line.scope_id ? answer?.data : null;
   const pending = !result && !error && valid;
@@ -109,6 +121,23 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
       : invalidField === 'final_cost_usd' || invalidField === 'minimum_profit_usd' || invalidField === 'customer_price_usd'
         ? loc('أدخل مبلغاً صالحاً بالدولار، حتى ست خانات عشرية.', 'Enter a valid USD amount with up to six decimal places.', 'بڕێکی دروست بە دۆلار بنووسە، تا شەش ژمارەی دەهەمی.')
         : error ? contractRefusal(error, refusalLang(lang), error instanceof Error ? error.message : String(error)) : '';
+  // Review uses the exact same V2 quote as step 3. A selected SKU can be priced
+  // while another SKU still blocks publishing the product; never substitute a
+  // missing product-wide published price for this saved selection's quote.
+  if (readOnly) return <div data-procurement-price-review>
+    <PricingSummaryBar summary={summary} label={line.label} busy={pending} onEdit={onAdvanced} fields={{
+      cost: result?.final_cost_usd ? `$${result.final_cost_usd}` : '—',
+      profit: result?.minimum_profit_usd ? `$${result.minimum_profit_usd}` : '—',
+      customerUsd: result?.customer_price_usd ? `$${result.customer_price_usd}` : '—',
+      price,
+    }} />
+    {result && <p role="status" className={`mt-2 text-xs ${T.text3}`}>{dirty || result.cost_from_purchase
+      ? loc('هذه معاينة لتعديلات لم تُحفظ بعد. ارجع إلى التكاليف والشحن لحفظها.', 'This previews unsaved edits. Return to Costs and shipping to save them.', 'ئەمە پێشبینیی دەستکارییە پاشەکەوتنەکراوەکانە. بگەڕێوە بۆ تێچوو و ناردن بۆ پاشەکەوتکردن.')
+      : result.preview.complete
+      ? loc('سعر الخيار المحسوب من بيانات التسعير الحالية؛ يُستخدم لتقدير الربح.', 'The selection price calculated from current pricing inputs is used to estimate profit.', 'نرخی هەڵبژاردە لە زانیارییەکانی ئێستای نرخدانەوە ژمێردراوە و بۆ خەمڵاندنی قازانج بەکاردێت.')
+      : loc('نشر سعر المنتج ينتظر استكمال بيانات التسعير من الإعدادات. سعر الخيار، إن ظهر، يبقى معاينة لتقدير الربح.', 'Publishing the product price requires completing its pricing settings. Any displayed selection price remains a preview for estimating profit.', 'بڵاوکردنەوەی نرخی بەرهەم پێویستی بە تەواوکردنی ڕێکخستنەکانی نرخدان هەیە. نرخی پیشاندراوی هەڵبژاردە تەنها پێشبینییە بۆ خەمڵاندنی قازانج.')}</p>}
+    {errorText && <p role="alert" className="mt-2 text-sm text-[var(--ap-danger)]">{errorText}</p>}
+  </div>;
   return (
     <div data-procurement-inline-pricing>
       <PricingSummaryBar summary={summary} label={line.label} busy={pending} fields={{
@@ -119,7 +148,7 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
       }} />
       <p className={`mt-2 text-xs ${T.text3}`}>{loc('عدّل التكلفة أو الربح أو سعر الزبون بالدولار ثم احفظ. في التسعير حسب التكلفة، تعديل سعر الزبون يعيد حساب الربح. يظهر سعر الدينار بعد التقريب المعتمد. تكلفة الشحنة المحاسبية تبقى حسب بيانات الشراء أعلاه.', 'Edit cost, profit or customer price in USD, then save. Cost-based pricing recalculates profit when you edit the customer price. IQD reflects the configured rounding. The shipment’s accounting cost follows the purchase fields above.', 'تێچوو، قازانج یان نرخی کڕیار بە دۆلار دەستکاری بکە و پاشەکەوت بکە. لە نرخدانی بەپێی تێچوو، گۆڕینی نرخی کڕیار قازانج دووبارە دەژمێرێتەوە. نرخی دینار بەپێی خڕکردنەوەکەیە. تێچووی ژمێریاریی بارەکە بەپێی زانیاریی کڕینی سەرەوەیە.')}</p>
       {result?.preview.method === 'usd' && <p className={`mt-1 text-xs ${T.text3}`}>{loc('هذا المنتج يستخدم سعر بيع ثابتاً؛ تغيير التكلفة أو الربح يحافظ على قاعدة تسعيره.', 'This product uses a fixed selling price; cost and profit edits preserve its pricing method.', 'ئەم بەرهەمە نرخی فرۆشتنی جێگیری هەیە؛ دەستکاریکردنی تێچوو و قازانج شێوازی نرخدانەکە دەپارێزێت.')}</p>}
-      {dirty && result && !result.preview.complete && <p role="status" className={`mt-2 text-sm ${T.text2}`}>{loc('يمكن حفظ البيانات، لكن السعر يحتاج استكمال بيانات التسعير.', 'You can save these inputs, but pricing still needs more information.', 'دەتوانیت ئەم زانیارییانە پاشەکەوت بکەیت، بەڵام نرخدان زانیاریی زیاتر دەوێت.')}</p>}
+      {result && !result.preview.complete && <p role="status" className={`mt-2 text-sm ${T.text2}`}>{loc('سعر هذا الخيار معاينة. يمكن حفظ بياناته، لكن نشر المنتج ينتظر استكمال بيانات بقية خياراته من إعدادات التسعير.', 'This selection’s price is a preview. Its inputs can be saved, but publishing requires completing the remaining pricing inputs in Pricing settings.', 'نرخی ئەم هەڵبژاردەیە پێشبینییە. زانیارییەکانی پاشەکەوت دەکرێن، بەڵام بڵاوکردنەوە پێویستی بە تەواوکردنی زانیارییە ماوەکانی نرخدان هەیە لە ڕێکخستنەکانی نرخدان.')}</p>}
       {dirty && result && (result.preview.changes?.length ?? 0) > 0 && <details className={`mt-2 text-xs ${T.text2}`}>
         <summary>{loc('تغييرات الأسعار', 'Price changes', 'گۆڕانکاریی نرخەکان')} ({result.preview.changes!.length})</summary>
         <ul>{result.preview.changes!.map((r) => <li key={`${r.combo_key}:${r.channel}`} dir="auto">{lang === 'en' ? r.names.en : lang === 'ckb' ? r.names.ckb || r.names.en : r.names.ar} · {r.channel}: <bdi dir="ltr">{r.old_iqd === null ? '—' : money(r.old_iqd)} → {r.new_iqd === null ? '—' : money(r.new_iqd)}</bdi></li>)}</ul>

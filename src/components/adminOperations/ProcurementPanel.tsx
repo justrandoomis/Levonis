@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { privateDrafts } from '../../lib/privateDrafts';
 import StockSelection from './StockSelection';
 import PurchaseFundingFields, { newFunding, fundingValid, type FundingDraft, type PurchaseInvestor } from './PurchaseFundingFields';
-import { estimateLineKey, purchaseEstimate } from './purchaseEstimate';
+import { estimateLineKey, purchaseEstimate, purchaseProfit } from './purchaseEstimate';
 import { changeLineCostProfile, changePurchaseCostMode, cloneCostProfileSnapshot, packedMeasureInput, packedMeasureValid, restoreCostProfileSnapshot, selectionCostDraft, type ProcurementDraftLine as DraftLine } from './procurementCostDraft';
 import { chargeDraft, chargeProblems, chargesAfterRouteChange, chargeWire, looksLikeFreight, newChargeDraft, type ChargeDraft } from './procurementCharges';
 import { purchaseDocumentFromWire, purchaseRowFromWire } from './procurementWire';
@@ -11,7 +11,7 @@ import PurchaseUnitOrigins, { PurchaseUnitReceiveFields, SavedPurchaseUnitOrigin
 import type { PurchaseSerialResult } from './PurchaseUnitSerial';
 import { copyPurchaseUnits, purchaseReceiptDraft, purchaseReceiptValid, purchaseUnitRows, purchaseUnitsValid, purchaseUnitsWire, type PurchaseReceiptDraft } from './procurementUnitOrigins';
 import PricingSummaryBar from './PricingSummaryBar';
-import InlineProcurementPricing, { type InlinePriceDraft } from './InlineProcurementPricing';
+import InlineProcurementPricing, { currentInlinePrice, inlinePriceKey, inlinePricingRequestKey, type InlinePriceDraft, type InlinePriceQuote } from './InlineProcurementPricing';
 import BatchSnapshotCard from '../adminInventory/BatchSnapshotCard';
 import { extraOnStep, previewDraft, previewSaved, type PreviewChoices, type PricingPreview, type PricingSummary } from './procurementPricing';
 import { procurementPricingStrings } from './procurementPricingStrings';
@@ -159,6 +159,9 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   // «تغيير الاسم» on a saved purchase: the name being typed (null = closed).
   const [renaming, setRenaming] = useState<string | null>(null);
   const [inlinePrices, setInlinePrices] = useState<Record<string, InlinePriceDraft>>({});
+  const [priceQuotes, setPriceQuotes] = useState<Record<string, InlinePriceQuote>>({});
+  const onPriceQuote = useCallback((key: string, quote: InlinePriceQuote) => setPriceQuotes((current) =>
+    current[key]?.requestKey === quote.requestKey && current[key]?.price === quote.price ? current : { ...current, [key]: quote }), []);
   const inlineKey = (l: Pick<Selection, 'product_id' | 'scope' | 'scope_id'>) => `${l.product_id}:${l.scope}:${l.scope_id}`;
   const setInlinePrice = (key: string, value: InlinePriceDraft) => setInlinePrices((current) => {
     const next = { ...current };
@@ -168,7 +171,6 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   // The card's pricing (USD design §5): the server's summary per line and the per-product choices.
   // Inline edits use the same V2 writer as the product form; every purchase line still counts.
   const [pricing, setPricing] = useState<PricingPreview | null>(null),
-    [pricingBusy, setPricingBusy] = useState(false),
     [pricingOff, setPricingOff] = useState(false),
     [pricingError, setPricingError] = useState(''),
     // The owner's typed Direct Sale Extras, keyed `product|scope|scope_id` (owner request 2026-10-10: the review asks for it in place).
@@ -418,6 +420,12 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   const updateCharge = (j: number, change: Partial<ChargeDraft>) => setCharges((a) => a.map((x, k) => k === j ? { ...x, ...change } : x));
   const total = estimates.reduce((n, e) => n + e.total_iqd, 0);
   const costsValid = inputsValid && chargeIssues.every((p) => !p.length) && Number.isSafeInteger(total) && total <= 1e12 && estimates.every((e) => Number.isSafeInteger(e.total_iqd) && e.total_iqd >= 0);
+  const quoteDraft = costsValid ? draftBody('ordered', false) : null;
+  const reviewProfits = lines.map((line, i) => purchaseProfit(
+    currentInlinePrice(priceQuotes[inlinePriceKey(line)], inlinePricingRequestKey(line, quoteDraft, inlinePrices[inlineKey(line)] ?? {}, pricingRevision)),
+    line.qty_ordered, estimates[i].total_iqd, funding.mode === 'investor' ? funding.profit_share_bps : 0,
+    !funding.incoming_indexes || funding.incoming_indexes.includes(i),
+  ));
   const fundedCost = estimates.reduce((n, e, i) => n + (!funding.incoming_indexes || funding.incoming_indexes.includes(i) ? e.total_iqd : 0), 0);
   const allocated = funding.mode === 'investor' ? Math.min(Number(funding.agreed_iqd), fundedCost) : 0;
   // The investment remainder (agreed − landed) returns to the investor's «أرباحي» once their cash is recorded; the server decides on save.
@@ -435,7 +443,6 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     if (!previewKey) return;
     const ctrl = new AbortController();
     const timer = setTimeout(() => {
-      setPricingBusy(true);
       const [body, picked, id] = JSON.parse(previewKey) as [Record<string, unknown>, PreviewChoices, string];
       previewDraft(body, picked, id || null, ctrl.signal)
         .then((r) => {
@@ -454,8 +461,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
           if (e instanceof ApiError && e.code === 'PRICING_NOT_INSTALLED') { setPricingOff(true); setPricing(null); return; }
           setPricing(null);
           setPricingError(e instanceof Error ? e.message : String(e));
-        })
-        .finally(() => { if (!ctrl.signal.aborted) setPricingBusy(false); });
+        });
     }, 450);
     return () => { clearTimeout(timer); ctrl.abort(); };
   }, [previewKey]);
@@ -581,7 +587,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               />
               <p className={`mt-2 text-xs ${T.text3}`}>{loc('إجمالي البند مع الشحن', 'Total line cost with freight', 'کۆی بەند لەگەڵ ناردن')}: {costMoney(estimates[i]?.total_iqd)} · {loc('تُقرب المجاميع إلى أقرب دينار، ومتوسط القطعة للعرض.', 'Totals round to the nearest IQD; the unit average is for display.', 'کۆکان بۆ نزیکترین دینار خڕ دەکرێنەوە، و تێکڕای پارچە تەنها بۆ پیشاندانە.')}</p>
               <InlineProcurementPricing line={l} purchaseDraft={costsValid ? draftBody('ordered', false) : null}
-                value={inlinePrices[inlineKey(l)] ?? {}} onChange={(value) => setInlinePrice(inlineKey(l), value)}
+                value={inlinePrices[inlineKey(l)] ?? {}} onChange={(value) => setInlinePrice(inlineKey(l), value)} onQuote={onPriceQuote}
                 onSaved={() => { setInlinePrice(inlineKey(l), {}); setPricingRevision((v) => v + 1); onChanged(); }}
                 revision={pricingRevision} summary={summaryOf(i)} onAdvanced={() => editPricing(l.product_id)} />
               {pricingError && !pricingOff && <p role="status" className={`mt-2 text-[13px] ${T.text2}`}>{pricingError}</p>}
@@ -644,7 +650,20 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               <div><dt>{pn.reviewRow}</dt><dd>{header.invoice_no.trim() || pn.fallback}</dd></div>
               <div><dt>{loc('التكلفة', 'Cost status', 'دۆخی تێچوو')}</dt><dd>{header.cost_state === 'final' ? loc('نهائية', 'Final', 'کۆتایی') : loc('تقديرية؛ لا تستلم بعد', 'Estimated; receipt is blocked', 'خەمڵێنراو؛ هێشتا وەرمەگرە')}</dd></div>
             </dl>
-            <div className="inventory-lines">{lines.map((l, i) => <article className="inventory-line" key={i}><strong>{l.label}</strong><div className={`mt-2 flex flex-wrap gap-3 text-sm ${T.text2}`}><span>{loc('الكمية', 'Quantity', 'بڕ')}: {l.qty_ordered}</span><span>{loc('تكلفة البند', 'Line cost', 'تێچووی بەند')}: {money(estimates[i]?.total_iqd)}</span><span>{ps.landedRow}: {money(estimates[i]?.unit_iqd)}</span><span>{loc('ربح المستثمر التقديري', 'Estimated investor profit', 'قازانجی خەمڵێنراوی وەبەرهێنەر')}: {money(estimates[i]?.investor_iqd)}</span><span>{loc('ربح المتجر التقديري', 'Estimated store profit', 'قازانجی خەمڵێنراوی فرۆشگا')}: {money(estimates[i]?.owner_iqd)}</span></div><PricingSummaryBar summary={summaryOf(i)} label={l.label} busy={pricingBusy && !summaryOf(i)} notInstalled={pricingOff} directFirst onEdit={() => editPricing(l.product_id)} /><SavedPurchaseUnitOrigins value={l.unit_origins ? purchaseUnitRows(l.unit_origins, l.qty_ordered) : undefined} /></article>)}</div>
+            <div className="inventory-lines">{lines.map((l, i) => <article className="inventory-line" key={`${inlineKey(l)}:${i}`}>
+              <strong>{l.label}</strong>
+              <div className={`mt-2 flex flex-wrap gap-3 text-sm ${T.text2}`}>
+                <span>{loc('الكمية', 'Quantity', 'بڕ')}: {l.qty_ordered}</span>
+                <span>{loc('تكلفة البند', 'Line cost', 'تێچووی بەند')}: {money(estimates[i]?.total_iqd)}</span>
+                <span>{ps.landedRow}: {money(estimates[i]?.unit_iqd)}</span>
+                <span>{loc('ربح المستثمر التقديري', 'Estimated investor profit', 'قازانجی خەمڵێنراوی وەبەرهێنەر')}: {money(reviewProfits[i]?.investor_iqd)}</span>
+                <span>{loc('ربح المتجر التقديري', 'Estimated store profit', 'قازانجی خەمڵێنراوی فرۆشگا')}: {money(reviewProfits[i]?.owner_iqd)}</span>
+              </div>
+              <InlineProcurementPricing line={l} purchaseDraft={quoteDraft} value={inlinePrices[inlineKey(l)] ?? {}}
+                onChange={(value) => setInlinePrice(inlineKey(l), value)} onSaved={() => {}} revision={pricingRevision}
+                summary={summaryOf(i)} onAdvanced={() => editPricing(l.product_id)} readOnly onQuote={onPriceQuote} />
+              <SavedPurchaseUnitOrigins value={l.unit_origins ? purchaseUnitRows(l.unit_origins, l.qty_ordered) : undefined} />
+            </article>)}</div>
             <p className={`text-sm ${T.text3}`}>{loc('احفظ مسودة إن كنت تنتظر تكلفة نهائية. تأكيد الشراء يضيف شحنة قادمة؛ اختر استلام شحنة عند وصولها.', 'Save a draft while waiting for final costs. Confirming creates an incoming shipment; receive it when it arrives.', 'ئەگەر چاوەڕێی تێچووی کۆتایی دەکەیت ڕەشنووس پاشەکەوت بکە. پشتڕاستکردنەوەی کڕین بارێکی چاوەڕوانکراو زیاد دەکات؛ کاتێک گەیشت وەرگرتنی بار هەڵبژێرە.')}</p>
           </>}
           <aside className="inventory-sticky-summary"><div className="inventory-total"><span>{loc('المجموع مع تكاليف الشحنة', 'Total landed cost', 'کۆی گشتی لەگەڵ تێچووەکانی بار')}</span><strong>{money(costsValid ? total : null)}</strong></div>{funding.mode === 'investor' && <dl className="inventory-review"><div><dt>{loc('تمويل مخصص / مستلم', 'Allocated / received', 'پارەدارکردنی تەرخانکراو / وەرگیراو')}</dt><dd>{costMoney(allocated)} / {costMoney(Number(funding.received_iqd))}</dd></div><div><dt>{loc('مساهمة المتجر', 'Store contribution', 'بەشداریی فرۆشگا')}</dt><dd>{costMoney(Math.max(0, total - allocated))}</dd></div>{fundingReturn.return_total_iqd > 0 && <div><dt>{ir.footerRow}{fundingReturn.awaits_cash && <span className={`block text-xs font-normal ${T.text3}`}>{ir.footerCaption}</span>}</dt><dd>{costMoney(fundingReturn.return_total_iqd)}</dd></div>}<div><dt>{loc('تمويل ينتظر الاستلام', 'Funding not yet received', 'پارەدارکردنی چاوەڕێی وەرگرتن')}</dt><dd>{costMoney(Math.max(0, allocated - Number(funding.received_iqd)))}</dd></div></dl>}<p className={`mt-2 text-xs ${T.text3}`}>{(quickReceive ? loc('ستُستلم القطع الموجودة الآن بعد تأكيد التكلفة. الربح تقديري حتى التسليم والتحصيل.', 'On-hand units are received after confirming cost. Profit remains an estimate until delivery and collection.', 'پارچە ئامادەکان دوای پشتڕاستکردنەوەی تێچوو وەردەگیرێن. قازانج خەمڵێنراوە تا گەیاندن و وەرگرتنی پارە.') : loc('الشراء القادم لا يزيد المخزون المتاح. الربح تقديري حتى تسليم الطلب والتحصيل.', 'Incoming purchases do not increase available stock. Profit remains an estimate until delivery and collection.', 'کڕینی چاوەڕوانکراو کۆگای بەردەست زیاد ناکات. قازانج خەمڵێنراوە تا گەیاندنی داواکاری و وەرگرتنی پارە.'))}</p></aside>
