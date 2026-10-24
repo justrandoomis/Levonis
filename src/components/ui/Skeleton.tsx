@@ -173,7 +173,7 @@ export function ProductDetailSkeleton() {
       <div aria-hidden="true" className="mx-auto w-full max-w-[1540px] px-4 sm:px-6 xl:px-8 pt-2">
         <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px] lg:gap-8 xl:gap-12 lg:items-start">
           <div className="min-w-0">
-            <div className="w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] rounded-2xl border border-border-subtle bg-surface overflow-hidden">
+            <div data-product-gallery-placeholder className="relative w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] rounded-2xl border border-border-subtle bg-surface overflow-hidden">
               <div className="w-full h-full bg-surface-selected animate-pulse motion-reduce:animate-none" />
             </div>
             <div className="mt-3 flex gap-2 pb-1">

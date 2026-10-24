@@ -35,7 +35,6 @@ import { variantSrcSet } from '../packages/contracts/src/imageSizing';
 
 /** Raw `<img>` tags that deliberately show their file as it is: file → the `src` expression → why. */
 const ALLOWED_RAW: Record<string, Record<string, string>> = {
-  'src/pages/Product.tsx': { 'activeMedia?.url': 'the zoom (lightbox) shows the stored original itself' },
   'src/components/AdminKyc.tsx': { '`/api/kyc/admin/cases/${shownCase.id}/evidence/${i}`': 'private KYC evidence through its own authorised route' },
   'src/components/merchantApplication/AdminMerchantApplications.tsx': {
     'reviewApi.photoUrl(shown.id)': 'the private merchant-review photo through its own audited reviewer route (no variants exist for it)',

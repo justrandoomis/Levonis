@@ -103,9 +103,15 @@ test('product thumbnails declare their real slots, leaving the zoom image at its
     assert.match(html, /loading="lazy"/);
     assert.doesNotMatch(html, /fetchPriority="high"/);
   }
-  const zoom = source.match(/<img\s+src=\{activeMedia\?\.url\}[\s\S]*?\/>/)?.[0];
+  const zoom = source.match(/<DissolveImage\b[^>]*placeholderSrc=[\s\S]*?\/>/)?.[0];
   assert.ok(zoom, 'zoom keeps the selected original URL');
+  assert.match(zoom, /src=\{activeMedia\?\.url\}/);
   assert.doesNotMatch(zoom, /srcSet=|sizes=/);
+  const zoomHtml = render(createElement(SafeImage, { src: '/files/products/zoom.webp', eager: true, reveal: 'none', placeholderSrc: '/files/products/zoom.webp?w=640' }));
+  assert.match(zoomHtml, /src="\/files\/products\/zoom.webp"/);
+  assert.doesNotMatch(zoomHtml, /srcSet=|sizes=/);
+  assert.match(zoomHtml, /data-image-placeholder/);
+  assert.doesNotMatch(zoomHtml, /animate-pulse/);
   assert.equal(IMAGE_VARIANT_WIDTHS.find((width) => width >= 64 * 2), 160, 'a 2x thumbnail does not need a 320px file');
   assert.equal(IMAGE_VARIANT_WIDTHS.find((width) => width >= 185 * 1.75), 480, 'the observed phone grid can retain DPR without jumping to 640px');
 });

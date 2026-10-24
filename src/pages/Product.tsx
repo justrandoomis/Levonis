@@ -1,4 +1,5 @@
 import DissolveImage from '../components/motion/DissolveImage';
+import GallerySurface from '../components/motion/GallerySurface';
 import { useProductEntrance } from '../components/motion/ProductTransition';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import { mascot } from '../lib/mascot';
@@ -1300,12 +1301,14 @@ export default function Product() {
   }, []);
 
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [galleryMotion, setGalleryMotion] = useState(true);
   // The shape of the light main image, measured once it has loaded, kept ONLY
   // when it is not the shape of the primary (src/lib/productGallery.ts
   // `lightMainImageSize`): its size is then dropped rather than assumed. null —
   // the usual case — keeps the size of the primary and costs no render.
   const [lightShape, setLightShape] = useState<{ url: string; aspect: number } | null>(null);
   const [lightbox, setLightbox] = useState(false);
+  const [lightboxPreview, setLightboxPreview] = useState<{ src: string; url: string } | null>(null);
   // The zoom control the lightbox came out of. The viewer scales FROM this
   // button and collapses back INTO it, so the enlarged photo is visibly the
   // same object as the thumbnail the customer tapped rather than a second,
@@ -2693,6 +2696,10 @@ export default function Product() {
   const colorImage = (id: string): string =>
     mediaBindings.find((image) => image.color_id === id)?.url ?? '';
   const activeMedia = gallery[Math.min(galleryIndex, Math.max(0, gallery.length - 1))];
+  const stepGallery = (step: number, animate = true) => {
+    setGalleryMotion(animate);
+    setGalleryIndex((index) => (index + step + gallery.length) % gallery.length);
+  };
   const options = storefrontOptions;
 
   // Per-level sellable counts (server-derived, never raw counters) — shown
@@ -5175,8 +5182,9 @@ export default function Product() {
             <section aria-label={s.gallery}>
               {/* `data-gallery-hero` / `data-gallery-strip`: the hooks the import's browser check reads the main picture
                   and the thumbnails by (scripts/bambu-import/browser.ts) — never a style. */}
-              <div ref={heroRef} className="lv-surface relative w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] overflow-hidden" data-gallery-hero>
+              <GallerySurface ref={heroRef} count={gallery.length} direction={dir} onStep={stepGallery} tabIndex={gallery.length > 1 ? 0 : undefined} role="group" aria-label={s.gallery} className="lv-surface relative w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] overflow-hidden" data-gallery-hero>
                 <DissolveImage
+                  animate={galleryMotion}
                   src={activeMedia?.url}
                   alt={
                     pick(lang as Lang, activeMedia?.alt_ar, activeMedia?.alt_en, activeMedia?.alt_ckb) || name
@@ -5217,13 +5225,17 @@ export default function Product() {
                       ref={(el: HTMLButtonElement | null) => {
                         zoomBtnRef.current = el;
                       }}
-                      onClick={() => setLightbox(true)}
+                      onClick={() => {
+                        const image = Array.from(heroRef.current?.querySelectorAll<HTMLImageElement>('img[data-main-image],img[data-transition-picture]') ?? []).find((img) => img.complete && img.naturalWidth > 0);
+                        setLightboxPreview(image && activeMedia?.url ? { src: activeMedia.url, url: image.currentSrc || image.src } : null);
+                        setLightbox(true);
+                      }}
                       label={s.zoom}
                       icon={<ZoomIn aria-hidden="true" className="w-5 h-5" />}
                     />
                   </span>
                 ) : null}
-              </div>
+              </GallerySurface>
 
               {gallery.length > 1 ? (
                 <div className="mt-3 flex gap-2 overflow-x-auto hide-scrollbar pb-1" aria-label={s.gallery} data-gallery-strip onKeyDown={(event) => {
@@ -5231,6 +5243,7 @@ export default function Product() {
                   event.preventDefault();
                   const step = (event.key === 'ArrowLeft') === (dir === 'rtl') ? 1 : -1;
                   const next = (galleryIndex + step + gallery.length) % gallery.length;
+                  setGalleryMotion(false);
                   setGalleryIndex(next);
                   event.currentTarget.querySelectorAll('button')[next]?.focus({ preventScroll: true });
                 }}>
@@ -5240,7 +5253,7 @@ export default function Product() {
                       type="button"
                       aria-pressed={i === galleryIndex}
                       aria-label={s.imageOf.replace('{n}', String(i + 1)).replace('{total}', String(gallery.length))}
-                      onClick={() => setGalleryIndex(i)}
+                      onClick={(event) => { setGalleryMotion(event.detail > 0); setGalleryIndex(i); }}
                       className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border transition-colors ${
                         // Forced colours repaint every border alike: the chosen
                         // picture keeps a Highlight frame there.
@@ -5903,12 +5916,9 @@ export default function Product() {
             icon={<X aria-hidden="true" className="w-5 h-5" />}
           />
         </span>
-        <img
-          src={activeMedia?.url}
-          alt={pick(lang as Lang, activeMedia?.alt_ar, activeMedia?.alt_en, activeMedia?.alt_ckb) || name}
-          referrerPolicy="no-referrer"
-          className="block max-w-full max-h-[calc(100dvh-2rem)] object-contain"
-        />
+        <GallerySurface count={gallery.length} direction={dir} onStep={stepGallery} tabIndex={0} role="group" aria-label={s.gallery} className="relative h-[min(82dvh,900px)] w-[min(calc(100vw-2rem),1200px)]">
+          <DissolveImage animate={galleryMotion} src={activeMedia?.url} placeholderSrc={lightboxPreview?.src === activeMedia?.url ? lightboxPreview?.url : undefined} alt={pick(lang as Lang, activeMedia?.alt_ar, activeMedia?.alt_en, activeMedia?.alt_ckb) || name} fit="contain" eager className="w-full h-full" bgClassName="bg-black" imgClassName="p-3" />
+        </GallerySurface>
       </Overlay>
 
       <ShippingConflictDialog

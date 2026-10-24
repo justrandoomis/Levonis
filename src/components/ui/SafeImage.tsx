@@ -54,6 +54,8 @@ export default function SafeImage({
   onStatus,
   fetchPriority,
   defer = false,
+  reveal = 'blur',
+  placeholderSrc,
 }: {
   src?: string | null;
   alt?: string;
@@ -109,6 +111,10 @@ export default function SafeImage({
    * when it is released (a tall phone, a desktop) is not faded in either.
    */
   defer?: boolean;
+  /** A gallery/route transition already owns the reveal; do not layer blur/zoom over it. */
+  reveal?: 'blur' | 'none';
+  /** An already decoded candidate used while opening a larger view of the same photo. */
+  placeholderSrc?: string | null;
 }) {
   const { lang } = useLanguage();
   const s = STRINGS[lang];
@@ -168,13 +174,13 @@ export default function SafeImage({
    * nothing the visitor can see happen. Eager images are simply there — and
    * so is a deferred one released while already on the screen.
    */
-  const preview = !eager && !release.onScreen && release.near && isVariantSource(cleanSrc) && status === 'loading' ? `${cleanSrc}?w=160` : '';
-  const revealCls = eager || release.onScreen
+  const preview = !placeholderSrc && reveal === 'blur' && !eager && !release.onScreen && release.near && isVariantSource(cleanSrc) && status === 'loading' ? `${cleanSrc}?w=160` : '';
+  const revealCls = reveal === 'none' || eager || release.onScreen
     ? 'opacity-100'
     : `u258-photo ${status === 'loaded' ? 'opacity-100' : 'is-lq'}`;
 
   return (
-    <div ref={boxRef} className={`u258 relative overflow-hidden ${aspectCls} ${bgClassName} ${className}`}>
+    <div ref={boxRef} data-image-state={showFallback ? 'error' : status} className={`u258 relative overflow-hidden ${aspectCls} ${bgClassName} ${className}`}>
       {preview && <img src={preview} srcSet={variantSrcSet(cleanSrc, { max: 160 })} sizes="160px" alt="" aria-hidden="true" decoding="async" loading="lazy" fetchPriority="low" referrerPolicy={referrerPolicy} className={`u258-preview ${fit === 'contain' ? 'object-contain' : 'object-cover'} ${imgClassName}`} onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />}
       {cleanSrc && status !== 'error' && release.near && (
         <img
@@ -196,7 +202,8 @@ export default function SafeImage({
           } ${revealCls} ${imgClassName}`}
         />
       )}
-      {cleanSrc && status === 'loading' && (
+      {placeholderSrc && status === 'loading' && <img data-image-placeholder src={placeholderSrc} alt="" aria-hidden="true" referrerPolicy={referrerPolicy} className={`absolute inset-0 w-full h-full ${fit === 'contain' ? 'object-contain' : 'object-cover'} ${imgClassName}`} />}
+      {cleanSrc && status === 'loading' && !placeholderSrc && (
         <div aria-hidden="true" className={preview ? "u258-progress" : "absolute inset-0 bg-surface-selected/60 animate-pulse motion-reduce:animate-none"} />
       )}
       {showFallback && (
