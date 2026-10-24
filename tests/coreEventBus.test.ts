@@ -4,9 +4,9 @@
  *
  * The property that matters most here is the one that is easiest to lose: with
  * no `EVENT_BUS_ENABLED=on`, no outbox table or no consumer binding — the live
- * Worker today, and the live Worker after this ships — NOTHING changes. Every
- * "off" case below asserts the statement count of the batch the business code
- * would have run anyway, not merely that no event was written.
+ * Worker today, and the live Worker after this ships — the business operation
+ * still commits without publishing an event. Inventory includes its product
+ * revision; the wallet also checks that disabled emitters prepare no extra reads.
  *
  * The rest is the dispatcher against fake consumer bindings: acked, retried
  * with backoff, dead-lettered after the eighth attempt, and never delivered to
@@ -172,20 +172,23 @@ test('a bus configured for ANOTHER database is not this database’s bus', async
   assert.equal(count(b, 'SELECT COUNT(*) AS n FROM core_outbox_events'), 0);
 });
 
-test('EVENT_BUS_ENABLED unset: the inventory batch is exactly the batch it is today', async () => {
+test('EVENT_BUS_ENABLED unset: inventory and its revision commit without an event', async () => {
   resetEventBus();
   const raw = freshDb();
   const env = envFor(raw); // no EVENT_BUS_ENABLED
   configureEventBus(env);
   assert.equal(eventsEnabled(env), false);
   seedProduct(raw);
+  const before = row(raw, "SELECT updated_at FROM products WHERE id = 'p1'")!.updated_at;
   const plan = await planInventory(env.DB, [{ product_id: 'p1', qty: 2, line_id: 'l1', targets: [baseTarget()] }], {
     kind: 'reserve',
     operationId: 'op1',
   });
-  // Two statements per move — the guarded ledger INSERT and the guarded counter
-  // UPDATE — and not one more.
-  assert.equal(plan.statements.length, 2);
+  await env.DB.batch(plan.statements);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM inventory_ledger'), 1);
+  assert.equal(count(raw, "SELECT stock_reserved AS n FROM products WHERE id = 'p1'"), 2);
+  assert.notEqual(row(raw, "SELECT updated_at FROM products WHERE id = 'p1'")!.updated_at, before);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM core_outbox_events'), 0);
 });
 
 /**
@@ -238,7 +241,9 @@ test('the table is absent: the bus is on, and still nothing is appended', async 
     kind: 'reserve',
     operationId: 'op-absent',
   });
-  assert.equal(plan.statements.length, 2, 'code may ship before its migration');
+  await env.DB.batch(plan.statements);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM inventory_ledger'), 1, 'code may ship before the event migration');
+  assert.equal(count(raw, "SELECT stock_reserved AS n FROM products WHERE id = 'p1'"), 1);
 });
 
 // -------------------------------------------------------------- the on cases
@@ -254,8 +259,9 @@ test('the outbox row rides in the caller’s own batch', async () => {
     operationId: 'op2',
     actorUserId: null,
   });
-  assert.equal(plan.statements.length, 3, 'the ledger row, the counter and ONE outbox row');
   await env.DB.batch(plan.statements);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM inventory_ledger'), 1);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM core_outbox_events'), 1, 'one event per ledger row');
   const stored = row<{ event_type: string; envelope: string; aggregate_id: string }>(
     raw,
     'SELECT event_type, envelope, aggregate_id FROM core_outbox_events'
@@ -303,7 +309,7 @@ test('a movement whose guard stopped holding writes NO event: the batch commits,
     kind: 'reserve',
     operationId: 'op-race',
   });
-  assert.equal(plan.statements.length, 3, 'the ledger row, the counter and ONE guarded outbox row');
+  const before = row(raw, "SELECT updated_at FROM products WHERE id = 'p1'")!.updated_at;
 
   // The race: between the pre-check and the batch, a concurrent reservation
   // takes the whole stock, so `stock - stock_reserved >= 10` no longer holds.
@@ -314,6 +320,7 @@ test('a movement whose guard stopped holding writes NO event: the batch commits,
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM inventory_ledger'), 0, 'the guard refused the ledger row');
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM core_outbox_events'), 0, 'and therefore refused the event');
   assert.equal(count(raw, "SELECT stock_reserved AS n FROM products WHERE id = 'p1'"), 10, 'the counter did not move twice');
+  assert.equal(row(raw, "SELECT updated_at FROM products WHERE id = 'p1'")!.updated_at, before, 'a refused movement does not advance the revision');
 });
 
 test('the same guard lets the event through when the movement DID happen', async () => {
