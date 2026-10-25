@@ -55,8 +55,15 @@ export function investorProjectionStaleSql(contractExpr='e.contract_id'){
 }
 /** Order-scoped recovery must not replay other orders sharing a contract. */
 export function investorOrderProjectionStaleSql(orderExpr:string){
-  return `EXISTS(SELECT 1 FROM investor_allocation_results ip JOIN order_item_inventory_allocations ia ON ia.id=ip.allocation_id
-    WHERE ia.order_id=${orderExpr} AND (ip.pending=1 OR json_extract(ip.snapshot,'$.source_fingerprint') IS NOT (${fingerprintSql.replace(/\?1/g,'ia.order_id')})))`;
+  // An interrupted first posting has neither a projection nor necessarily an
+  // error marker. Find each missing contract/allocation pair as well as stale
+  // rows; the bounded recovery cursor then uses the normal fenced writer.
+  return `(EXISTS(SELECT 1 FROM investor_allocation_results ip JOIN order_item_inventory_allocations ia ON ia.id=ip.allocation_id
+    WHERE ia.order_id=${orderExpr} AND (ip.pending=1 OR json_extract(ip.snapshot,'$.source_fingerprint') IS NOT (${fingerprintSql.replace(/\?1/g,'ia.order_id')})))
+    OR EXISTS(SELECT 1 FROM order_item_inventory_allocations ia JOIN inventory_lots l ON l.id=ia.lot_id
+      JOIN investment_contracts c ON c.incoming_id=l.incoming_id AND c.state='active'
+      WHERE ia.order_id=${orderExpr} AND ia.released_at IS NULL
+        AND NOT EXISTS(SELECT 1 FROM investor_allocation_results ip WHERE ip.allocation_id=ia.id AND ip.contract_id=c.id)))`;
 }
 
 /** A mixed funded line needs evidence before money or stock can be refunded. */

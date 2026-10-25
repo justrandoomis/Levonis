@@ -166,6 +166,50 @@ test('pending principal evidence and its projection commit atomically against co
   assert.equal(count(s.raw,"SELECT COALESCE(SUM(accrued_iqd),0) n FROM finance_investor_earnings"),0);
 });
 
+test('automatic recovery finds a delivered investor sale whose first projection and failure marker were never written',async()=>{
+  const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);
+  await sale(s,'missing-projection',['lot-a'],false);
+  assert.equal(count(s.raw,'SELECT COUNT(*) n FROM investor_allocation_results'),0);
+  assert.equal(count(s.raw,'SELECT COUNT(*) n FROM finance_posting_errors'),0);
+  assert.equal(count(s.raw,'SELECT COUNT(*) n FROM finance_order_costs'),0);
+  const report=await drainOrderFinanceRecovery({DB:s.db} as Env);
+  assert.deepEqual([report.scanned,report.completed,report.failed],[1,1,0],JSON.stringify(report));
+  const account=await participantOverview(s.db,'investor');
+  assert.equal(account.summary.capital_iqd,100);
+  assert.equal(account.summary.capital_pending_iqd,100);
+  assert.equal(account.summary.investor_profit_iqd,140);
+  assert.equal(account.summary.available_iqd,0,'recovery cannot invent collection');
+  const events=count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events');
+  assert.equal((await drainOrderFinanceRecovery({DB:s.db} as Env)).scanned,0);
+  assert.equal(count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events'),events);
+});
+
+test('automatic first-projection recovery records proven capital despite an unrelated unverified cost and never duplicates it',async()=>{
+  const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);
+  await sale(s,'missing-partial',['lot-a'],false);
+  s.raw.exec("INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_basis) VALUES('missing-unknown','missing-partial','foreign','Unverified accessory',1,0,0,'unrecorded')");
+  assert.equal(count(s.raw,'SELECT COUNT(*) n FROM finance_posting_errors'),0);
+  const report=await drainOrderFinanceRecovery({DB:s.db} as Env);
+  assert.deepEqual([report.scanned,report.pending,report.failed],[1,1,0],JSON.stringify(report));
+  const account=await participantOverview(s.db,'investor');
+  assert.equal(account.summary.capital_iqd,100);
+  assert.equal(account.summary.capital_pending_iqd,100);
+  assert.equal(account.summary.investor_profit_iqd,0);
+  assert.equal(account.summary.available_iqd,0);
+  assert.equal(account.summary.reconciliation_pending,true);
+  const events=count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events');
+  await drainOrderFinanceRecovery({DB:s.db} as Env);
+  assert.equal(count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events'),events);
+});
+
+test('missing-projection recovery ignores released allocations, undelivered orders and lots without investor contracts',async()=>{
+  const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);
+  await sale(s,'released',['lot-a']);await sale(s,'undelivered',['lot-a']);await sale(s,'owner-only',['lot-b']);
+  s.raw.exec("UPDATE order_item_inventory_allocations SET released_at='2026-10-25' WHERE order_id='released';UPDATE orders SET status='processing',delivered_at=NULL WHERE id='undelivered'");
+  assert.equal((await drainOrderFinanceRecovery({DB:s.db} as Env)).scanned,0);
+  assert.equal(count(s.raw,'SELECT COUNT(*) n FROM investor_allocation_results'),0);
+});
+
 test('an investor awaiting an unrelated cost cannot stop staff reconciliation or withhold an independently known fixed wage',async()=>{
   const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);
   s.raw.exec("UPDATE finance_staff SET user_id='other',start_work_date='2026-01-01' WHERE id='staff_hussein'");
