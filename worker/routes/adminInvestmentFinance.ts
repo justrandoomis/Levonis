@@ -8,6 +8,7 @@ import { baghdadDay, dateValue, fence, journalPlan, periodOpen, requireCapabilit
 import { investmentContractSummary, investorOrderSplit, refreshInvestorContract, type InvestmentContract } from '../lib/investorFinance';
 import { adminInvestmentProfilesRoutes } from './adminInvestmentProfiles';
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
+import { remainingAllocationQtySql } from '../lib/inventoryAllocationQuantity';
 
 export const adminInvestmentFinanceRoutes = new Hono<AppContext>();
 adminInvestmentFinanceRoutes.use('*', requireAdmin);
@@ -126,7 +127,7 @@ adminInvestmentFinanceRoutes.post('/lot-cost-adjustments',async c=>{
   const lots=(await db.prepare(`SELECT l.*,COALESCE((SELECT v.unit_cost_iqd FROM inventory_lot_cost_versions v WHERE v.lot_id=l.id ORDER BY version DESC LIMIT 1),l.unit_cost_iqd) AS effective,
     COALESCE((SELECT MAX(version) FROM inventory_lot_cost_versions WHERE lot_id=l.id),0) AS cost_version FROM inventory_lots l WHERE incoming_id=? ORDER BY id`).bind(incoming).all<{id:string;qty_remaining:number;unit_cost_iqd:number|null;effective:number|null;cost_version:number}>()).results??[];
   if(lots.some(l=>l.effective===null))throw badRequest('أكمل تكلفة الاستلام الأصلية أولًا؛ لا يمكن تصحيح أصل مجهول','UNKNOWN_LOT_COST');
-  const sold=(await db.prepare(`SELECT a.*,a.qty-(SELECT COALESCE(SUM(r.qty),0) FROM order_item_inventory_allocations r WHERE r.order_item_id=a.order_item_id AND r.lot_id=a.lot_id AND r.released_at IS NOT NULL) AS net_qty,
+  const sold=(await db.prepare(`SELECT a.*,${remainingAllocationQtySql()} AS net_qty,
     COALESCE((SELECT SUM(s.unit_delta_iqd) FROM lot_cost_adjustment_shares s WHERE s.allocation_id=a.id),0) AS late_delta FROM order_item_inventory_allocations a JOIN inventory_lots l ON l.id=a.lot_id WHERE l.incoming_id=? AND a.released_at IS NULL ORDER BY a.id`).bind(incoming).all<{id:string;lot_id:string;order_id:string;qty:number;net_qty:number;unit_cost_iqd:number|null;late_delta:number}>()).results??[];
   if(sold.some(a=>a.unit_cost_iqd===null))throw badRequest('توجد مبيعات بتكلفة أصل مجهولة','UNKNOWN_LOT_COST');
   const physical=lots.reduce((s,l)=>s+l.qty_remaining,0),consumed=sold.reduce((s,a)=>s+Math.max(0,a.net_qty),0);
@@ -142,7 +143,7 @@ adminInvestmentFinanceRoutes.post('/lot-cost-adjustments',async c=>{
     if(v.qty>0&&v.delta)statements.push(db.prepare('INSERT INTO lot_cost_adjustment_shares(adjustment_id,lot_id,qty,amount_iqd,unit_delta_iqd) VALUES (?,?,?,?,?)').bind(id,v.lot.id,v.qty,v.delta*v.qty,v.delta));
   }
   for(const v of allocated){
-    statements.push(...fence(db,`(SELECT qty-(SELECT COALESCE(SUM(r.qty),0) FROM order_item_inventory_allocations r WHERE r.order_item_id=a.order_item_id AND r.lot_id=a.lot_id AND r.released_at IS NOT NULL) FROM order_item_inventory_allocations a WHERE a.id=?)=? AND (SELECT COALESCE(SUM(unit_delta_iqd),0) FROM lot_cost_adjustment_shares WHERE allocation_id=?)=?`,[v.a.id,v.qty,v.a.id,v.a.late_delta]));
+    statements.push(...fence(db,`(SELECT ${remainingAllocationQtySql()} FROM order_item_inventory_allocations a WHERE a.id=?)=? AND (SELECT COALESCE(SUM(unit_delta_iqd),0) FROM lot_cost_adjustment_shares WHERE allocation_id=?)=?`,[v.a.id,v.qty,v.a.id,v.a.late_delta]));
     if(v.delta)statements.push(db.prepare('INSERT INTO lot_cost_adjustment_shares(adjustment_id,lot_id,allocation_id,qty,amount_iqd,unit_delta_iqd) VALUES (?,?,?,?,?,?)').bind(id,v.a.lot_id,v.a.id,v.qty,v.delta*v.qty,v.delta));
   }
   statements.push(...journalPlan(db,{key:`lot-cost:${id}`,day,title:'تصحيح فاتورة تكلفة المخزون',source:'lot-cost',sourceId:id,actor:user.id},amount>0?[{account:'1200',debit:amount},{account:'2000',credit:amount}]:[{account:'2000',debit:-amount},{account:'1200',credit:-amount}]).statements);

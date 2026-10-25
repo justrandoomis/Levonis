@@ -40,6 +40,7 @@ import type { StockMove, StockScope } from './inventory';
 import { fence } from './operations';
 import { conflict } from './http';
 import { planUnitOriginConsumption, planReleaseUnitOrigins, unitOriginsInstalled } from './inventoryUnitOrigins';
+import { remainingAllocationQtySql } from './inventoryAllocationQuantity';
 
 /** Lots exist only for units on a shelf. Capacity scopes are promises. */
 export const LOT_SCOPES: readonly StockScope[] = ['base', 'option', 'color', 'variant'];
@@ -502,10 +503,11 @@ export async function planLotRestore(
 ): Promise<LotPlan> {
   const { results } = await db
     .prepare(
-      `SELECT id, order_item_id, lot_id, scope, scope_id, qty, unit_cost_iqd
-         FROM order_item_inventory_allocations
-        WHERE order_id = ? AND released_at IS NULL
-        ORDER BY id`
+      `SELECT a.id, a.order_item_id, a.lot_id, a.scope, a.scope_id, a.qty, a.unit_cost_iqd,
+              ${remainingAllocationQtySql()} AS remaining_qty
+         FROM order_item_inventory_allocations a
+        WHERE a.order_id = ? AND a.released_at IS NULL
+        ORDER BY a.id`
     )
     .bind(orderId)
     .all<{
@@ -515,6 +517,7 @@ export async function planLotRestore(
       scope: StockScope;
       scope_id: string;
       qty: number;
+      remaining_qty: number;
       unit_cost_iqd: number | null;
     }>();
 
@@ -560,8 +563,6 @@ export async function planLotRestore(
     .all<{ idempotency_key: string; order_item_id: string; lot_id: string; qty: number }>();
   const released = new Set((releasedKeys.results ?? []).map((r) => r.idempotency_key));
   if ([...released].some(key => key.startsWith(`${operation}:${orderId}:`))) return EMPTY;
-  const returned = new Map<string, number>();
-  for (const r of releasedKeys.results ?? []) { const key = `${r.order_item_id}:${r.lot_id}`; returned.set(key, (returned.get(key) ?? 0) + r.qty); }
   const budget = new Map<string, number>();
   if (opts.qtyByLine) for (const [k, v] of Object.entries(opts.qtyByLine)) budget.set(k, Math.max(0, Math.floor(v)));
 
@@ -576,7 +577,7 @@ export async function planLotRestore(
     // defensible; this one is deterministic and matches the direction of
     // travel, so a return and an immediate re-sale leave the shelf where it
     // started.
-    const remaining = Math.max(0, r.qty - (returned.get(`${r.order_item_id}:${r.lot_id}`) ?? 0));
+    const remaining = r.remaining_qty;
     let give = originEvidence ? Math.min(remaining,originEvidence.get(r.id)??0) : evidence ? Math.min(remaining,evidence.get(r.id)??0) : remaining;
     if (opts.qtyByLine) {
       const left = budget.get(r.order_item_id) ?? 0;

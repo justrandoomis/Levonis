@@ -57,6 +57,39 @@ async function setup() {
   return { raw, db, failing, env, boss, order, finishStaffJobs, historicalPosting, costs };
 }
 
+test('first delivery recovery restores missing employee wages without an investor, old cost row or failure marker', async () => {
+  const x = await setup();
+  // The order was delivered after the staff jobs had finished, but its first
+  // financial hook never ran. There is no failed projection to select yet.
+  await x.finishStaffJobs();
+  x.order('first-wages', 'snapshot');
+  assert.equal(x.costs('first-wages').length, 0);
+  assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM finance_posting_errors'), 0);
+  const jobs = all(x.raw, 'SELECT * FROM finance_staff_reconciliations ORDER BY staff_id');
+  const report = await drainOrderFinanceRecovery(x.env);
+  assert.deepEqual([report.scanned, report.completed, report.pending, report.failed], [1, 1, 0, 0], JSON.stringify(report));
+  // Two pieces: revenue 100,000 - recorded cost 40,000 = 60,000.
+  assert.equal((await participantOverview(x.db, 'hussein')).summary.available_iqd, 1200);
+  assert.equal((await participantOverview(x.db, 'sajjad')).summary.available_iqd, 6000);
+  assert.equal(count(x.raw, "SELECT COUNT(*) n FROM accounting_entries WHERE event_key='sale:first-wages'"), 1);
+  assert.equal(count(x.raw, "SELECT COUNT(*) n FROM accounting_entries WHERE event_key='cogs:first-wages'"), 1);
+  assert.deepEqual(all(x.raw, 'SELECT * FROM finance_staff_reconciliations ORDER BY staff_id'), jobs);
+  const journals = all(x.raw, 'SELECT * FROM accounting_entries ORDER BY id');
+  assert.equal((await drainOrderFinanceRecovery(x.env)).scanned, 0);
+  assert.deepEqual(all(x.raw, 'SELECT * FROM accounting_entries ORDER BY id'), journals);
+});
+
+test('first delivery recovery checkpoints an order with no applicable employee wages without inventing any', async () => {
+  const x = await setup(); await x.finishStaffJobs();
+  x.order('before-employment', 'snapshot');
+  x.raw.exec("UPDATE orders SET delivered_at='2026-08-01T10:00:00Z' WHERE id='before-employment'");
+  const report = await drainOrderFinanceRecovery(x.env);
+  assert.equal(report.completed, 1, JSON.stringify(report));
+  assert.equal(x.costs('before-employment').length, 0);
+  assert.equal(count(x.raw, "SELECT COUNT(*) n FROM finance_staff_basis WHERE order_id='before-employment'"), 1);
+  assert.equal((await drainOrderFinanceRecovery(x.env)).scanned, 0);
+});
+
 test('automatic recovery materializes 2% and 10% after completed staff jobs, posts missing COGS and replays once', async () => {
   const x = await setup(); x.order('known'); await x.finishStaffJobs();
   assert.deepEqual(x.costs('known').map(c => [c.amount_iqd, c.state]), [[null, 'pending_cost'], [null, 'pending_cost']]);

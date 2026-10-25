@@ -29,10 +29,15 @@ export interface OrderFinanceRecoveryReport {
 // shared basis fingerprint also finds legacy percentages and source writes
 // interrupted before they could record a failure. Reuse the exact payable
 // guard's inputs instead of inventing a second definition of a fresh wage.
+// A missing first checkpoint has no cost row to inspect, even when there is
+// no investor. Replaying it also records a checkpoint when no wage applies.
 // Genuine unknown costs remain candidates, but the rotating cursor prevents
 // them from starving later orders. Refund posting has its own writer and is
 // intentionally not claimed by this delivery-only repair.
 const candidate = `o.seller_type='levonis' AND o.status='delivered' AND o.delivered_at IS NOT NULL AND (
+  (EXISTS(SELECT 1 FROM order_items oi WHERE oi.order_id=o.id)
+    AND NOT EXISTS(SELECT 1 FROM finance_staff_basis b WHERE b.order_id=o.id))
+  OR
   EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.order_id=o.id AND c.staff_id IS NOT NULL AND c.state<>'reversed' AND (
     c.state='pending_cost' OR EXISTS(SELECT 1 FROM finance_wage_targets t WHERE t.cost_id=c.id AND t.amount_iqd IS NULL)
     OR (COALESCE((SELECT basis FROM finance_wage_targets t WHERE t.cost_id=c.id),CASE WHEN json_valid(c.snapshot) THEN json_extract(c.snapshot,'$.rule.basis') END) IN ('profit_percent','revenue_percent')

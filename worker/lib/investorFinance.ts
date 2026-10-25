@@ -7,6 +7,7 @@ import { allocateExact, baghdadDay, fence, journalPlan, periodOpen } from './ope
 import { getOrderProfitBase, type OrderProfitBase } from './orderProfit';
 import { participantNetFingerprintSql, participantNetProfit } from './participantProfit';
 import { employmentInstalled, investorEmploymentPendingSql } from './financeEmployment';
+import { remainingAllocationQtySql } from './inventoryAllocationQuantity';
 
 export type InvestmentContract = {
   id: string; incoming_id: string; user_id: string; name: string; principal_iqd: number;
@@ -261,17 +262,18 @@ export async function investorParticipantSources(db: D1Database, userId: string)
 /** Cost corrections initially stay in inventory, then follow delivered/returned quantities. */
 export async function recognizeLateCosts(db: D1Database, orderId: string, day = baghdadDay(), actor?: string) {
   if(!await investorFinanceInstalled(db))return;
-  const shares = (await db.prepare(`SELECT s.rowid AS row_id,s.*,a.qty AS sold_qty,o.status,
-    (SELECT COALESCE(SUM(r.qty),0) FROM order_item_inventory_allocations r WHERE r.order_item_id=a.order_item_id AND r.lot_id=a.lot_id AND r.released_at IS NOT NULL) AS restored
+  const shares = (await db.prepare(`SELECT s.rowid AS row_id,s.*,o.status,${remainingAllocationQtySql()} AS net_qty
     FROM lot_cost_adjustment_shares s JOIN order_item_inventory_allocations a ON a.id=s.allocation_id JOIN orders o ON o.id=a.order_id WHERE a.order_id=?`).bind(orderId)
-    .all<{ row_id: number; adjustment_id: string; allocation_id: string; unit_delta_iqd: number; recognized_iqd: number; version: number; qty: number; sold_qty: number; restored: number; status: string }>()).results ?? [];
+    .all<{ row_id: number; adjustment_id: string; allocation_id: string; unit_delta_iqd: number; recognized_iqd: number; version: number; qty: number; net_qty: number; status: string }>()).results ?? [];
   for (const s of shares) {
-    const target = s.status === 'delivered' ? Math.min(s.qty, Math.max(0, s.sold_qty - s.restored)) * s.unit_delta_iqd : 0;
+    const target = s.status === 'delivered' ? Math.min(s.qty, s.net_qty) * s.unit_delta_iqd : 0;
     const delta = target - s.recognized_iqd;
     if (!delta) continue;
     await periodOpen(db, day);
     await db.batch([
       ...fence(db, 'EXISTS(SELECT 1 FROM lot_cost_adjustment_shares WHERE rowid=? AND version=?)', [s.row_id, s.version]),
+      ...fence(db, `(SELECT ${remainingAllocationQtySql()} FROM order_item_inventory_allocations a WHERE a.id=?)=?
+        AND (SELECT status FROM orders WHERE id=?)=?`, [s.allocation_id,s.net_qty,orderId,s.status]),
       ...journalPlan(db, { key: `late-cogs:${s.adjustment_id}:${s.allocation_id}:${s.version}`, day, title: 'تسوية تكلفة دفعة مباعة', source: 'lot-cost', sourceId: s.adjustment_id, actor }, delta > 0
         ? [{ account: '5000', debit: delta }, { account: '1200', credit: delta }]
         : [{ account: '1200', debit: -delta }, { account: '5000', credit: -delta }]).statements,

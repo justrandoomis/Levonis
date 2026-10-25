@@ -10,7 +10,7 @@ import {getOrderProfitBase} from '../worker/lib/orderProfit';
 import {fifoQueues,planLotConsumption,planLotRestore} from '../worker/lib/inventoryLots';
 import {baghdadDay,journalPlan} from '../worker/lib/operations';
 import {recordReturnFinancials,runOrderFinancialEffects} from '../worker/lib/orderFinance';
-import {requestWithdrawal,changeWithdrawalState,payWithdrawal,participantOverview} from '../worker/lib/financeParticipants';
+import {requestWithdrawal,changeWithdrawalState,payWithdrawal,participantOverview,reconcileStaffOrderCosts} from '../worker/lib/financeParticipants';
 import {adminFinancePeopleRoutes} from '../worker/routes/adminFinancePeople';
 import {adminFinanceOperationsRoutes} from '../worker/routes/adminFinanceOperations';
 import {continueStaffReconciliation} from '../worker/lib/financeStaffAccrual';
@@ -18,6 +18,8 @@ import {adminInventoryRoutes} from '../worker/routes/adminInventory';
 import type {Env} from '../worker/lib/types';
 import { drainOrderFinanceRecovery } from '../worker/lib/financeOrderRecovery';
 import { adminFinanceWorkspaceRoutes } from '../worker/routes/adminFinanceWorkspace';
+import { participantReport } from '../worker/lib/financeParticipantReports';
+import { financeRange } from '../worker/lib/financeRange';
 const ADMIN={id:'admin',email:'boss@x.co',role:'admin' as const};
 function setup(){
   const raw=freshDb();raw.exec(`INSERT INTO users(id,email,role,admin_scope,name) VALUES ('admin','boss@x.co','admin','full','Owner'),('investor','investor@x.co','admin','assistant','Investor'),('other','other@x.co','admin','assistant','Other'),('buyer','buyer@x.co','customer',NULL,'Buyer');
@@ -43,7 +45,7 @@ async function sale(s:ReturnType<typeof setup>,id='order',lots=['lot-a','lot-b']
   s.raw.prepare(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,shipping_iqd,created_at,delivered_at) VALUES (?,'buyer','delivered','{}','standard','{}','cash',?,1500,?,?,0,?,?)`).run(id,total,total,total,new Date().toISOString(),new Date().toISOString());
   s.raw.prepare(`INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES (?,?,'part','قطعة',?,?,?,100,'snapshot')`).run(`${id}-item`,id,qty,unit,qty*unit);
   let cogs=0;
-  for(const [i,lot] of lots.entries()){const cost=count(s.raw,'SELECT unit_cost_iqd n FROM inventory_lots WHERE id=?',lot);cogs+=cost;s.raw.prepare('INSERT INTO order_item_inventory_allocations(id,order_id,order_item_id,lot_id,scope,scope_id,qty,unit_cost_iqd,cogs_iqd,idempotency_key) VALUES (?,?,?,?,\'base\',\'\',1,?,?,?)').run(`${id}-a${i}`,id,`${id}-item`,lot,cost,cost,`${id}:${lot}`);s.raw.prepare('UPDATE inventory_lots SET qty_remaining=qty_remaining-1 WHERE id=?').run(lot);}
+  for(const [i,lot] of lots.entries()){const cost=count(s.raw,'SELECT unit_cost_iqd n FROM inventory_lots WHERE id=?',lot);cogs+=cost;s.raw.prepare('INSERT INTO order_item_inventory_allocations(id,order_id,order_item_id,lot_id,scope,scope_id,qty,unit_cost_iqd,cogs_iqd,idempotency_key) VALUES (?,?,?,?,\'base\',\'\',1,?,?,?)').run(`${id}-a${i}`,id,`${id}-item`,lot,cost,cost,`${id}:${lot}:${i}`);s.raw.prepare('UPDATE inventory_lots SET qty_remaining=qty_remaining-1 WHERE id=?').run(lot);}
   if(ownerLine){
     s.raw.prepare("INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES(?,?,'foreign','Owner product',1,?,?,100,'snapshot')").run(`${id}-owner-line`,id,unit,unit);
     cogs+=100;
@@ -206,6 +208,8 @@ test('missing-projection recovery ignores released allocations, undelivered orde
   const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);
   await sale(s,'released',['lot-a']);await sale(s,'undelivered',['lot-a']);await sale(s,'owner-only',['lot-b']);
   s.raw.exec("UPDATE order_item_inventory_allocations SET released_at='2026-10-25' WHERE order_id='released';UPDATE orders SET status='processing',delivered_at=NULL WHERE id='undelivered'");
+  // Employee first-posting recovery is independent of the investor selector.
+  for(const id of ['released','owner-only'])await reconcileStaffOrderCosts(s.db,id);
   assert.equal((await drainOrderFinanceRecovery({DB:s.db} as Env)).scanned,0);
   assert.equal(count(s.raw,'SELECT COUNT(*) n FROM investor_allocation_results'),0);
 });
@@ -347,6 +351,43 @@ test('linked expense changes and voids immediately block stale investor withdraw
   await assert.rejects(payWithdrawal(s.db,'admin',withdrawal,{id:crypto.randomUUID(),amount:10,reference:'cash',receipt_url:''}),/مستحقات|مصدر|تسوية/);
   await syncInvestorOrder(s.db,'order');await payWithdrawal(s.db,'admin',withdrawal,{id:crypto.randomUUID(),amount:10,reference:'cash',receipt_url:''});
 });
+
+test('a partial return consumes a same-lot release once across split allocations and later cost revisions',async()=>{
+  const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);
+  await sale(s,'split-return',['lot-a','lot-a']);await syncInvestorOrder(s.db,'split-return');
+  const revise=async(unit:number)=>{
+    const response=await post(s.app,'/i/lot-cost-adjustments',{operation_id:crypto.randomUUID(),incoming_id:'inc-a',new_unit_cost_iqd:unit,adjustment_day:baghdadDay()});
+    const data=await json(response);assert.equal(response.status,200,JSON.stringify(data));assert.deepEqual(data.pending_orders,[]);
+  };
+  await revise(150);
+  s.raw.exec("INSERT INTO return_cases(id,order_id,order_item_id,user_id,qty,reason,state,resolution) VALUES ('split-refund','split-return','split-return-item','buyer',1,'defective','resolved','refund')");
+  const restore=await planLotRestore(s.db,'split-return',{lineIds:['split-return-item'],qtyByLine:{'split-return-item':1},operation:'return:split-refund'});
+  await s.db.batch(restore.statements);
+  await recordReturnFinancials({DB:s.db} as Env,{caseId:'split-refund',orderId:'split-return',itemId:'split-return-item',refundIqd:500,qty:1,restocked:true,actor:'admin',day:baghdadDay(),cogsIqd:100});
+  // One piece remains sold. The 50-dinar adjustment is reversed for only
+  // the returned piece, not for both allocations sharing its inventory lot.
+  assert.equal(count(s.raw,'SELECT SUM(recognized_iqd) n FROM lot_cost_adjustment_shares WHERE allocation_id IS NOT NULL'),50);
+  assert.equal((await getOrderProfitBase(s.db,'split-return')).lines[0].cogs_iqd,150);
+  assert.equal((await investorOrderSplit(s.db,'split-return')).pending,false);
+  await revise(125);
+  assert.equal(count(s.raw,'SELECT SUM(recognized_iqd) n FROM lot_cost_adjustment_shares WHERE allocation_id IS NOT NULL'),25);
+  assert.equal((await getOrderProfitBase(s.db,'split-return')).lines[0].cogs_iqd,125);
+  assert.equal((await investorOrderSplit(s.db,'split-return')).allocations.reduce((n,a)=>n+a.profit_iqd,0),131);
+  const entries=count(s.raw,'SELECT COUNT(*) n FROM accounting_entries');
+  await recognizeLateCosts(s.db,'split-return');await syncInvestorOrder(s.db,'split-return');
+  assert.equal(count(s.raw,'SELECT COUNT(*) n FROM accounting_entries'),entries);
+  assert.equal(count(s.raw,'SELECT SUM(debit_iqd-credit_iqd) n FROM accounting_lines'),0);
+  s.raw.exec("INSERT INTO return_cases(id,order_id,order_item_id,user_id,qty,reason,state,resolution) VALUES ('split-refund-two','split-return','split-return-item','buyer',1,'defective','resolved','refund')");
+  const second=await planLotRestore(s.db,'split-return',{qtyByLine:{'split-return-item':1},operation:'return:split-refund-two'});
+  assert.equal(second.allocations.reduce((n,a)=>n+a.qty,0),1,'the first release must not hide the other sold piece');
+  await s.db.batch(second.statements);
+  await recordReturnFinancials({DB:s.db} as Env,{caseId:'split-refund-two',orderId:'split-return',itemId:'split-return-item',refundIqd:500,qty:1,restocked:true,actor:'admin',day:baghdadDay(),cogsIqd:100});
+  assert.equal(count(s.raw,"SELECT qty_remaining n FROM inventory_lots WHERE id='lot-a'"),3);
+  assert.equal((await getOrderProfitBase(s.db,'split-return')).lines[0].cogs_iqd,0);
+  assert.equal(count(s.raw,'SELECT SUM(recognized_iqd) n FROM lot_cost_adjustment_shares WHERE allocation_id IS NOT NULL'),0);
+  assert.equal((await participantOverview(s.db,'investor')).summary.capital_iqd,0);
+  assert.equal((await planLotRestore(s.db,'split-return',{qtyByLine:{'split-return-item':1},operation:'return:split-refund-two'})).statements.length,0);
+});
 test('capital loss journal cannot consume more than actual funded principal across sales and physical counts',async()=>{
   const s=setup(),c=await contract(s,'inc-a','investor',{principal_iqd:50});await fund(s,c.operation_id,50);
   await sale(s,'loss',['lot-a'],true,1);await syncInvestorOrder(s.db,'loss');
@@ -384,6 +425,56 @@ test('available contract profit subtracts actual paid and held liabilities and c
   s.raw.exec(`INSERT INTO finance_withdrawals(id,user_id,amount_iqd,paid_iqd,state,created_at,updated_at) VALUES ('withdraw','investor',70,20,'part_paid','2026-10-04','2026-10-04');`);
   s.raw.prepare('INSERT INTO finance_withdrawal_allocations(withdrawal_id,source_kind,source_id,amount_iqd,paid_iqd) VALUES (\'withdraw\',\'investor_profit\',?,70,20)').run(`invprofit:${a.operation_id}`);
   const summary=(await investmentContractSummary(s.db,a.operation_id)).summary;assert.equal(summary.available_profit_iqd,70);assert.equal(summary.recovered_capital_iqd,50);assert.equal(summary.paid_profit_iqd,20);
+});
+
+test('capital charts and period totals reconcile to funded principal without counting the cap again in each period',async()=>{
+  const s=setup(),c=await contract(s,'inc-a','investor',{principal_iqd:150});await fund(s,c.operation_id,150);
+  assert.ok(row(s.raw,"SELECT user_id FROM investment_profiles WHERE user_id='investor'"));
+  for(const [id,delivered] of [['earlier-sale','2026-09-30T20:59:59Z'],['later-sale','2026-09-30T21:00:00Z']]){
+    await sale(s,id,['lot-a']);s.raw.prepare('UPDATE orders SET delivered_at=? WHERE id=?').run(delivered,id);await syncInvestorOrder(s.db,id);
+  }
+  const before=count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events');
+  const whole=await participantReport(s.db,financeRange({}));
+  const september=await participantReport(s.db,financeRange({month:'2026-09'}));
+  const october=await participantReport(s.db,financeRange({month:'2026-10'}));
+  assert.equal((await participantOverview(s.db,'investor')).summary.capital_iqd,150);
+  assert.equal(whole.capital.recovered_iqd,150,'the chart must not report the raw 200 when only 150 was funded');
+  assert.equal(whole.capital.period_recovered_iqd,150);
+  assert.equal(september.capital.period_recovered_iqd,100);
+  assert.equal(october.capital.period_recovered_iqd,50);
+  assert.equal(september.capital.period_recovered_iqd+october.capital.period_recovered_iqd,whole.capital.recovered_iqd);
+  assert.equal(whole.capital.remaining_iqd,0);
+  assert.equal(september.capital.recovered_iqd,150,'report filters never change cumulative capital');
+  for(const [month,expected] of [['2026-09',100],['2026-10',50]] as const){
+    const profiles=await json(await get(s.app,`/i/profiles?month=${month}`));
+    const view=profiles.profiles.find((p:{user_id:string})=>p.user_id==='investor');
+    assert.equal(view.capital.recovered_iqd,150);
+    assert.equal(view.period.recovered_capital_iqd,expected,'the investor profile and accounting chart use the same period basis');
+  }
+  assert.equal(count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events'),before,'reading a report cannot create money');
+  await sale(s,'loss-sale',['lot-a'],true,1);await syncInvestorOrder(s.db,'loss-sale');
+  const afterLoss=await participantReport(s.db,financeRange({}));
+  assert.equal(afterLoss.capital.loss_iqd,99);
+  assert.equal(afterLoss.capital.recovered_iqd,51);
+  assert.equal(afterLoss.capital.period_recovered_iqd,51);
+  assert.equal(afterLoss.capital.received_iqd,afterLoss.capital.recovered_iqd+afterLoss.capital.loss_iqd+afterLoss.capital.remaining_iqd);
+});
+
+test('late-cost recognition rejects a concurrent return before writing its journal',async()=>{
+  const s=setup();await sale(s,'cost-race',['lot-a','lot-a']);
+  s.raw.exec("DELETE FROM order_item_inventory_allocations WHERE id='cost-race-a1';UPDATE order_item_inventory_allocations SET qty=2,cogs_iqd=200 WHERE id='cost-race-a0'");
+  const response=await post(s.app,'/i/lot-cost-adjustments',{operation_id:crypto.randomUUID(),incoming_id:'inc-a',new_unit_cost_iqd:150,adjustment_day:baghdadDay()});
+  assert.equal(response.status,200,JSON.stringify(await json(response)));
+  const restore=await planLotRestore(s.db,'cost-race',{qtyByLine:{'cost-race-item':1},operation:'first-return'});await s.db.batch(restore.statements);
+  const before=count(s.raw,'SELECT COUNT(*) n FROM accounting_entries');
+  const gate=s.pauseOn('UPDATE lot_cost_adjustment_shares SET recognized_iqd');
+  const writing=recognizeLateCosts(s.db,'cost-race');await gate.waiting;
+  const second=await planLotRestore(s.db,'cost-race',{qtyByLine:{'cost-race-item':1},operation:'second-return'});await s.db.batch(second.statements);
+  gate.resume();await assert.rejects(writing,/CHECK/);
+  assert.equal(count(s.raw,'SELECT COUNT(*) n FROM accounting_entries'),before);
+  assert.equal(count(s.raw,'SELECT SUM(recognized_iqd) n FROM lot_cost_adjustment_shares WHERE allocation_id IS NOT NULL'),100);
+  await recognizeLateCosts(s.db,'cost-race');
+  assert.equal(count(s.raw,'SELECT SUM(recognized_iqd) n FROM lot_cost_adjustment_shares WHERE allocation_id IS NOT NULL'),0);
 });
 test('investor migration is replay-safe on populated tables and hooks degrade before installation',async()=>{
   const s=setup();await contract(s);const before=count(s.raw,'SELECT COUNT(*) n FROM investment_contracts');s.raw.exec(readFileSync(new URL('../migrations/0165_inventory_investors.sql',import.meta.url),'utf8'));assert.equal(count(s.raw,'SELECT COUNT(*) n FROM investment_contracts'),before);

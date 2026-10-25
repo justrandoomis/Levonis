@@ -11,6 +11,7 @@ import { fence, requireCapability, whole } from '../lib/operations';
 import { financeRange, financeRangeArgs, inFinanceRangeSql } from '../lib/financeRange';
 import { participantSources, participantSummary } from '../lib/financeParticipants';
 import { purchaseFundingSummary, type InvestorProfile } from '../lib/purchaseFunding';
+import { investorReportedAllocationsSql } from '../lib/investorCapitalReporting';
 
 export const adminInvestmentProfilesRoutes=new Hono<AppContext>();
 /**
@@ -38,7 +39,7 @@ adminInvestmentProfilesRoutes.get('/profiles',async c=>{
     const contracts=(await db.prepare("SELECT id,incoming_id,capital_share_bps FROM investment_contracts WHERE user_id=? AND state='active'").bind(profile.user_id).all<{id:string;incoming_id:string;capital_share_bps:number}>()).results??[];
     const inventory=await Promise.all(contracts.map(contract=>investorInventoryCapital(db,contract)));
     const capitalTotal=(key:'inventory_iqd'|'received_iqd')=>inventory.some(row=>row[key]===null)?null:inventory.reduce((sum,row)=>sum+row[key]!,0);
-    const period=(await db.prepare(`SELECT COALESCE(SUM(r.profit_iqd),0) AS earned_iqd,COALESCE(SUM(r.capital_iqd),0) AS recovered_capital_iqd FROM investor_allocation_results r JOIN investment_contracts c ON c.id=r.contract_id JOIN order_item_inventory_allocations a ON a.id=r.allocation_id JOIN orders o ON o.id=a.order_id WHERE c.user_id=? AND o.status='delivered' AND ${inFinanceRangeSql("date(o.delivered_at,'+3 hours')")}`).bind(profile.user_id,...financeRangeArgs(range)).first())!;
+    const period=(await db.prepare(`SELECT COALESCE(SUM(r.profit_iqd),0) AS earned_iqd,COALESCE(SUM(r.recovered_iqd),0) AS recovered_capital_iqd FROM (${investorReportedAllocationsSql}) r WHERE r.user_id=? AND ${inFinanceRangeSql('r.earning_day')}`).bind(profile.user_id,...financeRangeArgs(range)).first())!;
     const adjustments=await db.prepare(`SELECT COALESCE(SUM(e.amount_iqd),0) AS adjustments_iqd FROM investor_finance_events e JOIN investment_contracts c ON c.id=e.contract_id WHERE c.user_id=? AND e.kind='profit_correction' AND ${inFinanceRangeSql('e.event_day')}`).bind(profile.user_id,...financeRangeArgs(range)).first();
     const paid=await db.prepare(`SELECT COALESCE(SUM(l.amount_iqd),0) AS paid_iqd FROM finance_withdrawal_payment_lines l JOIN finance_withdrawal_payments p ON p.id=l.payment_id JOIN finance_withdrawals w ON w.id=p.withdrawal_id WHERE w.user_id=? AND l.source_kind='investor_profit' AND ${inFinanceRangeSql('p.payment_day')}`).bind(profile.user_id,...financeRangeArgs(range)).first();
     // «مسترد من المبيعات» is capital recovered from sales only; the investment
