@@ -5,7 +5,7 @@ import { financeEarningsRoutes } from '../worker/routes/financeEarnings';
 import { adminFinancePeopleRoutes } from '../worker/routes/adminFinancePeople';
 import { adminFinanceOperationsRoutes } from '../worker/routes/adminFinanceOperations';
 import { ruleScopeRank, validateRuleScope } from '../worker/lib/financeRuleScopes';
-import { reconcileStaffOrderCosts } from '../worker/lib/financeParticipants';
+import { participantSummary, reconcileStaffOrderCosts, type ParticipantSource } from '../worker/lib/financeParticipants';
 import { baghdadDay } from '../worker/lib/operations';
 import { planOrderFinanceSnapshot, runOrderFinancialEffects } from '../worker/lib/orderFinance';
 import { reconcileFinanceOrder } from '../worker/lib/financeReconcile';
@@ -29,6 +29,41 @@ function setup() {
   return {raw,db,failing,make,cost,self:make('staff'),boss:make('boss','full')};
 }
 const request=(app:ReturnType<typeof stubApp>,id='withdrawal-1',amount=7000)=>post(app,'/e/withdrawals',{operation_id:id,amount_iqd:amount});
+
+test('pending earnings and capital deduct earlier payments once, including an eligibility reduction', () => {
+  for(const kind of ['staff','investor_profit','investor_capital'] as const)for(const eligible of [false,true]) {
+    for(let accrued=0;accrued<=100;accrued+=10)for(let amount=0;amount<=accrued;amount+=10)for(let paid=0;paid<=120;paid+=10){
+      const source:ParticipantSource={id:'source',kind,title:'Source',order_id:null,day:'2026-10-25',amount_iqd:amount,accrued_iqd:accrued,paid_iqd:paid,held_iqd:0,available_iqd:0,state:eligible?'available':'pending',eligible,version:1};
+      const summary=participantSummary([source]),ledger=summary.ledgers[kind];
+      const pending=summary.pending_iqd;
+      assert.equal(ledger.net_iqd,accrued-paid);
+      assert.equal(ledger.available_iqd,eligible?Math.max(0,amount-paid):0);
+      assert.equal(ledger.available_iqd+pending,Math.max(0,accrued-paid),'available + pending equals unpaid accrual');
+      assert.equal(ledger.debt_iqd,Math.max(0,paid-accrued));
+      for(const value of [pending,ledger.net_iqd,ledger.available_iqd,ledger.debt_iqd])assert.ok(Number.isSafeInteger(value));
+    }
+  }
+});
+
+test('employee cards match their own history for unlinked staff and exclude the account’s pending investment', async()=>{
+  const {raw,cost,boss}=setup();cost();cost('unlinked',3000,'staff_hussein');
+  raw.exec(`INSERT INTO incoming_inventory(id,product_id,scope,qty_ordered,purchase_unit_iqd) VALUES ('pending-investment','p','base',1,20000);
+    INSERT INTO investment_contracts(id,incoming_id,user_id,name,principal_iqd,capital_share_bps,profit_share_bps,loss_share_bps,created_by,created_at,request_json)
+    VALUES ('pending-contract','pending-investment','staff','Investment',20000,10000,3500,0,'boss','now','{}');
+    INSERT INTO finance_investor_earnings(id,user_id,contract_id,kind,title,amount_iqd,accrued_iqd,state,day,updated_at)
+    VALUES ('invprofit:pending-contract','staff','pending-contract','investor_profit','Pending investment',0,200,'pending','2026-10-25','now')`);
+  const list=await json(await get(boss,'/a/staff?from=2026-10-01&to=2026-10-25'));
+  for(const [id,total] of [['staff_sajjad',10000],['staff_hussein',3000]] as const){
+    const card=list.staff.find((s:{id:string})=>s.id===id);
+    const history=await json(await get(boss,`/a/staff/${id}/history`));
+    assert.equal(card.balance.staff_iqd,total);
+    assert.equal(card.balance.staff_net_iqd,history.account.summary.staff_net_iqd);
+    assert.equal(card.balance.staff_available_iqd,history.account.summary.staff_available_iqd);
+    assert.equal(card.balance.staff_paid_iqd,0);
+    assert.equal(card.balance.pending_iqd,0,'pending investment money is not part of the wage account');
+    assert.equal(card.balance.staff_iqd-card.balance.staff_paid_iqd,card.balance.staff_net_iqd);
+  }
+});
 
 test('self earnings exposes only the signed-in participant; assistants cannot query privileged account lists',async()=>{
   const {raw,cost,self,make,boss}=setup();cost();cost('someone-else',90000,'staff_hussein');
@@ -83,10 +118,33 @@ test('numeric corrections need only the new amount and carry already-paid reduct
   let data=await json(await get(self,'/e'));assert.equal(data.summary.available_iqd,0);assert.equal(data.summary.debt_iqd,4000);
   assert.equal(row<{before_iqd:number;after_iqd:number}>(raw,'SELECT before_iqd,after_iqd FROM finance_cost_adjustments')?.before_iqd,10000);
   cost('next',10000);data=await json(await get(self,'/e'));assert.equal(data.summary.available_iqd,6000);
+  assert.equal(data.entries.reduce((sum:number,e:{available_iqd:number})=>sum+e.available_iqd,0),6000,'entry availability includes the previous overpayment, just like the withdrawal');
+  const history=await json(await get(boss,'/a/staff/staff_sajjad/history'));
+  assert.equal(history.account.entries.reduce((sum:number,e:{available_iqd:number})=>sum+e.available_iqd,0),history.account.summary.staff_available_iqd);
   assert.equal((await request(self,'carryforward',6001)).status,400);assert.equal((await request(self,'carryforward',6000)).status,200);
   assert.equal((await post(boss,'/a/withdrawals/carryforward/approve')).status,200);
   const paid=await post(boss,'/a/withdrawals/carryforward/pay',{operation_id:'carryforward-pay',reference:'receipt'});assert.equal(paid.status,200,JSON.stringify(await json(paid)));
   assert.equal((await json(await get(self,'/e'))).summary.available_iqd,0);
+});
+
+test('advance cash is counted once in cumulative payments and deducted from both detail and summary availability',async()=>{
+  const {cost,self,boss}=setup();cost();
+  const paid=await post(boss,'/f/staff/staff_sajjad/payments',{operation_id:'advance-for-audit',amount_iqd:2500,kind:'advance'});
+  assert.equal(paid.status,200,JSON.stringify(await json(paid)));
+  const account=await json(await get(self,'/e'));
+  assert.equal(account.summary.staff_iqd,10000);
+  assert.equal(account.summary.staff_paid_iqd,2500);
+  assert.equal(account.summary.earnings_paid_iqd,2500);
+  assert.equal(account.summary.paid_iqd,2500);
+  assert.equal(account.summary.staff_net_iqd,7500);
+  assert.equal(account.summary.staff_available_iqd,7500);
+  assert.equal(account.entries.reduce((sum:number,e:{available_iqd:number})=>sum+e.available_iqd,0),7500);
+  const history=await json(await get(boss,'/a/staff/staff_sajjad/history'));
+  assert.equal(history.account.entries.reduce((sum:number,e:{available_iqd:number})=>sum+e.available_iqd,0),7500);
+  const payroll=(await json(await get(boss,'/f/payroll'))).staff.find((s:{id:string})=>s.id==='staff_sajjad');
+  assert.equal(payroll.net_iqd,7500);
+  assert.equal(payroll.available_iqd,7500);
+  assert.equal(payroll.cash_paid_iqd,2500);
 });
 test('numeric wage correction cannot silently consume pending withdrawal funds',async()=>{
   const {cost,self,boss}=setup();cost();await request(self);

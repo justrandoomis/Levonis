@@ -62,6 +62,30 @@ test('funding is allocated once across items; agreement is not cash and overfund
   assert.equal((await post(x.app,'/p/documents',p.body)).status,200);assert.equal(count(x.raw,'SELECT COUNT(*) n FROM investment_contracts'),2);
 });
 
+test('profile inventory capital uses actual receipt remainder units and reconciles to sold principal',async()=>{
+  const x=await setup(),p=await x.create(x.payload({funding:{mode:'investor',user_id:'investor',agreed_iqd:1000003,received_iqd:1000003,reference:'CASH',profit_share_bps:3500,loss_share_bps:0}}));
+  await x.receive(p.id,p.detail,1);
+  let profile=(await json(await get(x.app,'/i/profiles'))).profiles[0];
+  assert.equal(profile.capital.used_iqd,200001,'the first received unit gets its actual principal remainder');
+  assert.equal(profile.capital.inventory_iqd,200001);
+  await x.sale('sold-remainder');
+  profile=(await json(await get(x.app,'/i/profiles'))).profiles[0];
+  assert.equal(profile.capital.used_iqd,200001,'received principal is historical, not remaining stock');
+  assert.equal(profile.capital.inventory_iqd,0);
+  assert.equal(profile.capital.recovered_iqd,200001);
+  assert.equal(profile.capital.inventory_iqd+profile.capital.recovered_iqd,profile.capital.used_iqd);
+  const contract=String(x.raw.prepare('SELECT id FROM investment_contracts').get()!.id);
+  const detail=await investmentContractSummary(x.db,contract);
+  assert.equal(detail.summary.inventory_capital_iqd,profile.capital.inventory_iqd);
+  assert.equal(detail.summary.recovered_capital_iqd,profile.capital.recovered_iqd);
+  const next=await json(await get(x.app,`/p/documents/${p.id}`));
+  await x.receive(p.id,next);
+  profile=(await json(await get(x.app,'/i/profiles'))).profiles[0];
+  assert.equal(profile.capital.used_iqd,1000003);
+  assert.equal(profile.capital.inventory_iqd,800002);
+  assert.equal(profile.capital.received_iqd,profile.capital.inventory_iqd+profile.capital.recovered_iqd);
+});
+
 test('changing investor defaults leaves previous agreements untouched and uses the new default for later batches',async()=>{
   const x=await setup(),first=await x.create();assert.equal((await post(x.app,'/i/profiles',{user_id:'investor',version:1,default_profit_share_bps:4000})).status,200);
   const next=await x.create(x.payload({funding:{mode:'investor',user_id:'investor',agreed_iqd:3000000,received_iqd:0}}));

@@ -9,6 +9,8 @@ import { isOwner, projectForAdmin } from '../lib/adminScope';
 import { newId } from '../lib/crypto';
 import { audit, auditStatements } from '../lib/audit';
 import { requireSelection, productSelections } from '../lib/inventorySelection';
+import { planProcurementImportStock } from '../lib/procurementImportStock';
+import { planProcurementReceivingStock } from '../lib/procurementReceivingStock';
 import { planReceive, type IncomingRow } from '../lib/inventoryReceiving';
 import {
   baghdadDay,
@@ -933,6 +935,9 @@ adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
     changed = 0;
   const seen = new Set<string>();
   const receivedProducts = new Set<string>();
+  const initializedProducts = new Set<string>();
+  const initializedSelections = new Set<string>();
+  const importStockStatements: D1PreparedStatement[] = [];
   for (const rawLine of raw) {
     const r = rawLine as Record<string, unknown>,
       line = d.lines.find((l) => l.line_id === r.line_id);
@@ -954,13 +959,26 @@ adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
     } else if (Array.isArray(r.unit_origin_ids) && r.unit_origin_ids.length) {
       throw badRequest('هذا البند لا يحتوي سجلات قطع منفردة', 'INVALID_UNIT_ORIGINS');
     }
-    if (qty > 0 && selected.stock === null) throw badRequest('فعّل تتبع مخزون النسخة قبل الاستلام');
     if (qty === 0 && rejected === 0) continue;
     if (qty > 0 && line.product_id) receivedProducts.add(line.product_id);
     changed += qty + rejected;
     if (qty + line.qty_received > line.qty_ordered) throw badRequest('المستلم يتجاوز كمية الشراء');
     if (rejected + line.rejected_qty > line.qty_ordered - line.qty_received - qty)
       throw badRequest('الكمية المرفوضة أكبر من المتبقي');
+    if (qty > 0) {
+      const selectionKey = JSON.stringify([selected.product_id, selected.scope, selected.scope_id]);
+      if (!initializedSelections.has(selectionKey)) {
+        // Validate the selected opening balance before an undecided import's
+        // setup initializes its other, not-yet-received choices to zero.
+        const tracking = await planProcurementReceivingStock(c.env.DB, selected, user.id);
+        statements.push(...tracking);
+        if (!initializedProducts.has(selected.product_id)) {
+          importStockStatements.push(...await planProcurementImportStock(c.env.DB, selected.product_id, selected, user.id, calculatedAt));
+          initializedProducts.add(selected.product_id);
+        }
+        initializedSelections.add(selectionKey);
+      }
+    }
     statements.push(
       ...fence(
         c.env.DB,
@@ -1023,6 +1041,7 @@ adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
       );
   }
   if (!changed) throw badRequest('أدخل كمية مستلمة أو مرفوضة');
+  statements.push(...importStockStatements);
   if (total > 0) {
     const prior =
       (

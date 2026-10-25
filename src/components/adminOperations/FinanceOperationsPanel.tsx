@@ -65,6 +65,7 @@ type Cost = {
   qty: number;
 };
 type StaffBalance = Named & {
+  net_iqd?: number; available_iqd?: number; held_iqd?: number; debt_iqd?: number; cash_paid_iqd?: number;
   due_iqd: number;
   approved_iqd: number;
   paid_iqd: number;
@@ -513,8 +514,10 @@ function Payroll({ config, onChanged, initialOrderId = '' }: { config: Config; o
             loc('الموظف', 'Employee'),
             loc('المستحق الكلي', 'Total earned'),
             loc('المعتمد', 'Approved'),
-            loc('المسدّد', 'Settled'),
+            loc('المدفوعات والسلف', 'Payments and advances', 'پارەدان و پێشەکییەکان'),
             loc('الباقي', 'Balance'),
+            loc('متاح للسحب', 'Available to withdraw', 'بەردەست بۆ ڕاکێشان'),
+            loc('الدين المتبقي', 'Remaining debt', 'قەرزی ماوە'),
             loc('سلفة متبقية', 'Advance balance'),
             loc('تكاليف معلقة', 'Pending costs'),
           ]}
@@ -524,8 +527,10 @@ function Payroll({ config, onChanged, initialOrderId = '' }: { config: Config; o
               <Cell>{nameOf(s)}</Cell>
               <Cell>{money(s.due_iqd)}</Cell>
               <Cell>{money(s.approved_iqd)}</Cell>
-              <Cell>{money(s.paid_iqd)}</Cell>
-              <Cell>{money(s.due_iqd - s.paid_iqd)}</Cell>
+              <Cell>{money(s.cash_paid_iqd ?? s.paid_iqd + s.advance_balance_iqd)}</Cell>
+              <Cell>{money(s.net_iqd ?? s.due_iqd - s.paid_iqd - s.advance_balance_iqd)}</Cell>
+              <Cell>{money(s.available_iqd)}</Cell>
+              <Cell>{money(s.debt_iqd)}</Cell>
               <Cell>{money(s.advance_balance_iqd)}</Cell>
               <Cell>{s.pending_costs}</Cell>
             </tr>

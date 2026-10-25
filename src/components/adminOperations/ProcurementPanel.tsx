@@ -10,7 +10,6 @@ import PurchaseLineCosts, { type ExtraChargeView } from './PurchaseLineCosts';
 import PurchaseUnitOrigins, { PurchaseUnitReceiveFields, SavedPurchaseUnitOrigins } from './PurchaseUnitOrigins';
 import type { PurchaseSerialResult } from './PurchaseUnitSerial';
 import { copyPurchaseUnits, purchaseReceiptDraft, purchaseReceiptValid, purchaseUnitRows, purchaseUnitsValid, purchaseUnitsWire, type PurchaseReceiptDraft } from './procurementUnitOrigins';
-import PricingSummaryBar from './PricingSummaryBar';
 import InlineProcurementPricing, { currentInlinePrice, inlinePriceKey, inlinePricingRequestKey, type InlinePriceDraft, type InlinePriceQuote } from './InlineProcurementPricing';
 import BatchSnapshotCard from '../adminInventory/BatchSnapshotCard';
 import { extraOnStep, previewDraft, previewSaved, type PreviewChoices, type PricingPreview, type PricingSummary } from './procurementPricing';
@@ -781,7 +780,8 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
                 return { title: c.title, scope: c.scope, amount_iqd: c.amount_iqd, unit_amount_iqd: c.unit_amount_iqd, basis: c.basis, covers: c.applies_to && [...new Set(selected.lines.filter((x) => c.applies_to!.includes(estimateLineKey(x, 0))).map((x) => x.label))], covered, share_iqd: c.allocations ? c.allocations.find((a) => a.line_id === l.line_id)?.amount_iqd ?? 0 : null, status: 'counted' };
               })}
             />
-            <PricingSummaryBar summary={savedPricing?.lines.find((x) => x.line_id === l.line_id)?.pricing_summary} label={l.label} readOnlyLabel directFirst notInstalled={pricingOff} onEdit={() => editPricing(l.product_id)} />
+            <InlineProcurementPricing line={l} purchaseDraft={null} value={{}} onChange={() => {}} onSaved={() => setPricingRevision((n) => n + 1)} revision={pricingRevision}
+              summary={savedPricing?.lines.find((x) => x.line_id === l.line_id)?.pricing_summary ?? null} readOnly onAdvanced={() => editPricing(l.product_id)} />
             {/* An engine-priced product's price is the engine's (ENGINE_MANAGED): no manual price update. */}
 
             <SavedPurchaseUnitOrigins key={`${selected.purchase.id}:${l.line_id}`} value={l.unit_origins} serialBlockedHint={selected.purchase.status === 'draft' || selected.purchase.cost_state !== 'final' ? loc('أكمل الكمية والتكاليف النهائية وأكد الشراء قبل تسجيل الأرقام التسلسلية.', 'Finish quantities and final costs, then confirm the purchase before registering serials.', 'بڕ و تێچووی کۆتایی تەواو بکە و کڕین پشتڕاست بکەرەوە پێش تۆمارکردنی ژمارەکان.') : undefined} onSerialSave={selected.purchase.cost_state === 'final' && ['ordered', 'partial', 'received'].includes(selected.purchase.status) ? async (unit, read) => {

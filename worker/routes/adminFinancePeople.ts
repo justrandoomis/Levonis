@@ -48,7 +48,7 @@ adminFinancePeopleRoutes.get('/staff/:id/history',async c=>{
     db.prepare('SELECT v.*,u.name AS actor_name FROM finance_wage_versions v LEFT JOIN users u ON u.id=v.actor_id WHERE v.staff_id=? ORDER BY recorded_at DESC,revision DESC').bind(id).all(),
     db.prepare('SELECT a.*,c.order_id,c.rule_name FROM finance_cost_adjustments a JOIN finance_order_costs c ON c.id=a.cost_id WHERE c.staff_id=? ORDER BY a.created_at DESC LIMIT 200').bind(id).all(),
     participantSources(db,id,'staff'),participantAdvanceState(db,id,'staff')]);
-  const account={summary:participantSummary(wages,advance.balance),entries:participantEntries(wages,false)};
+  const account={summary:participantSummary(wages,advance.balance),entries:participantEntries(wages,false,advance.balance)};
   return c.json({success:true,staff:person,periods:periods.results??[],versions:changes.results??[],adjustments:adjustments.results??[],account});
 });
 adminFinancePeopleRoutes.get('/accounts',async(c)=>{
@@ -74,11 +74,14 @@ adminFinancePeopleRoutes.get('/staff',async(c)=>{
   const cutoffByStaff=new Map(cutoffRows.map(row=>[row.staff_id,{orders:row.orders,first_day:row.first_day}]));
   const histories=await wageVersions(db);
   const currentRules=new Map<string,import('../lib/financeWageTimeline').EffectiveWageRule>();
-  const balances=new Map<string,Awaited<ReturnType<typeof participantOverview>>['summary']>();
+  const balances=new Map<string,ReturnType<typeof participantSummary>>();
   for(const employee of staff.results??[]){
     const person=employee as unknown as import('../lib/financeEmployment').EmploymentStaff;
     for(const rule of effectiveWageRules(histories.filter(v=>v.staff_id===person.id),person,baghdadDay()))currentRules.set(rule.id,rule);
-    if(person.user_id)balances.set(person.id,(await participantOverview(db,person.user_id,{foldProfitShare:false})).summary);
+    const [sources,advance]=await Promise.all([participantSources(db,person.id,'staff'),participantAdvanceState(db,person.id,'staff')]);
+    const balance=participantSummary(sources,advance.balance);
+    balance.reconciliation_pending ||= (jobs.results??[]).some(job=>job.staff_id===person.id&&job.state!=='complete');
+    balances.set(person.id,balance);
   }
   const rr=(rules.results??[]).map(r=>{const current=currentRules.get(String(r.id));return current?{...r,...current,version:r.version}:r;}).map((r)=>({...r,scope:readRuleScope(r)??{catalog_ids:r.target_type==='catalog'?[r.target_id]:[],product_ids:r.target_type==='product'?[r.target_id]:[],excluded_product_ids:[]}}));
   const ids=[...new Set(rr.flatMap((r)=>[...r.scope.product_ids,...r.scope.excluded_product_ids]))];

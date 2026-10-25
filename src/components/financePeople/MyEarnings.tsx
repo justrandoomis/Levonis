@@ -77,7 +77,7 @@ export default function MyEarnings() {
         <EarningsAvailable earnings={balance('earnings')} capital={balance('capital')} />
         <div className="fp-stat"><span>{loc('قيد الاستحقاق', 'Pending')}</span><Money value={s.earnings_pending_iqd ?? 0} /></div>
         <div className="fp-stat"><span>{loc('محجوز للسحب', 'Reserved')}</span><Money value={s.earnings_held_iqd ?? s.held_iqd} /></div>
-        <div className="fp-stat"><span>{loc('تم تسديده', 'Paid')}</span><Money value={s.earnings_paid_iqd ?? s.paid_iqd} /></div>
+        <div className="fp-stat"><span>{loc('المدفوعات والسلف', 'Payments and advances', 'پارەدان و پێشەکییەکان')}</span><Money value={s.earnings_paid_iqd ?? s.paid_iqd} /></div>
       </div>
       {data.employment?.filter((e) => !e.archived && (e.first_earning_day || !e.active || !e.has_rules || (e.reconciliation_state && e.reconciliation_state !== 'complete'))).map((employment, index) => <div className="fp-note" key={index} role="status">
         {employment.first_earning_day && <p>{loc('تُحتسب أجورك على الطلبات المسلّمة من ', 'Delivery earnings start on ')}<strong>{dateLabel(employment.first_earning_day, lang)}</strong>{loc(' بتوقيت بغداد، ضمن الأقسام والمنتجات المحددة لك.', ' in Baghdad time, for your assigned categories and products.')}</p>}
@@ -89,7 +89,7 @@ export default function MyEarnings() {
       </div>)}
       {!!s.reconciliation_pending && !calculating && <p className="fp-note">{loc('بعض المستحقات تنتظر إكمال تسويتها المالية؛ الرصيد المتاح أعلاه قابل لطلب السحب.', 'Some earnings await reconciliation. The available balance above can be requested for withdrawal.')}</p>}
       {!!s.advance_balance_iqd && <p className="fp-note">{loc('حُسمت السلف غير المسواة من المبلغ المتاح: ', 'Unsettled advances deducted from available earnings: ')}<Money value={s.advance_balance_iqd} /></p>}
-      {!!s.pending_costs && <p className="fp-note">{loc(`يوجد ${s.pending_costs} استحقاق بانتظار تثبيت التكلفة؛ لم يدخل في المجموع بعد.`, `${s.pending_costs} earnings await final costs and are not included in the total yet.`)}</p>}
+      {!!s.pending_costs && <p className="fp-note">{loc(`يوجد ${s.pending_costs} استحقاق لم يكتمل حسابه. إن كانت له قيمة سابقة فهي ضمن الرصيد المحسوب، لكنها غير متاحة للسحب حتى تثبيت الحساب.`, `${s.pending_costs} earnings have incomplete calculations. Any previously recorded amount remains in the calculated balance but is unavailable until verified.`, `${s.pending_costs} شایستە ژمێریارییەکەی تەواو نەبووە. ئەگەر بڕێکی پێشوو تۆمار کرابێت لە باڵانسی ژمێردراودایە، بەڵام تا پشتڕاستکردنەوە بەردەست نییە بۆ ڕاکێشان.`)}</p>}
       {!!s.debt_iqd && <p className="fp-note">{loc('الدين المتبقي الآن: ', 'Remaining debt now: ')}<Money value={s.debt_iqd} /> · {loc('ينخفض تلقائيًا من الأرباح الجديدة في الحساب نفسه، دون خصم إضافي أو مساس برأس المال.', 'Covered by future earnings in the same account, without another deduction or use of investment principal.')}</p>}
       <EarningsSources summary={s} capitalAvailable={balance('capital')} onWithdrawCapital={() => startWithdrawal('capital')} />
       {returnView.show_batches && data.investment && <Surface title={loc('دفعات استثماري', 'My investment batches')} hint={loc('رأس المال مستقل عن الأرباح. الإتاحة تتطلب التسليم والتحصيل وتثبيت التكلفة والتمويل.', 'Principal is separate from profit. Availability requires delivery, collection, verified costs and funding.')}>

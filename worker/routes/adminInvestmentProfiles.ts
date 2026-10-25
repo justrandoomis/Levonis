@@ -1,3 +1,4 @@
+import { investorInventoryCapital } from '../lib/investorInventoryCapital';
 import { investmentLegacy } from '../lib/investmentLegacy';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -33,14 +34,16 @@ adminInvestmentProfilesRoutes.get('/profiles',async c=>{
       COALESCE((SELECT SUM(principal_iqd) FROM investment_contracts WHERE user_id=?1 AND state='active'),0) AS allocated_iqd,
       COALESCE((SELECT SUM(r.amount_iqd-r.allocated_iqd) FROM purchase_investor_receipts r JOIN purchase_investor_agreements a ON a.purchase_id=r.purchase_id WHERE a.user_id=?1),0) AS unallocated_iqd,
       COALESCE((SELECT SUM(l.amount_iqd) FROM investor_capital_losses l JOIN investment_contracts c ON c.id=l.contract_id WHERE c.user_id=?1),0) AS loss_iqd,
-      COALESCE((SELECT SUM(MIN(c.principal_iqd*i.qty_received/i.qty_ordered,COALESCE((SELECT SUM(e.amount_iqd) FROM investor_finance_events e WHERE e.contract_id=c.id AND e.kind='funding'),0))) FROM investment_contracts c JOIN incoming_inventory i ON i.id=c.incoming_id WHERE c.user_id=?1 AND c.state='active'),0) AS used_iqd,
-      (SELECT COUNT(*) FROM investment_contracts WHERE user_id=?1 AND state='active') AS contracts_count`).bind(profile.user_id).first<{agreed_iqd:number;received_iqd:number;allocated_iqd:number;unallocated_iqd:number;loss_iqd:number;used_iqd:number;contracts_count:number}>();
+      (SELECT COUNT(*) FROM investment_contracts WHERE user_id=?1 AND state='active') AS contracts_count`).bind(profile.user_id).first<{agreed_iqd:number;received_iqd:number;allocated_iqd:number;unallocated_iqd:number;loss_iqd:number;contracts_count:number}>();
+    const contracts=(await db.prepare("SELECT id,incoming_id,capital_share_bps FROM investment_contracts WHERE user_id=? AND state='active'").bind(profile.user_id).all<{id:string;incoming_id:string;capital_share_bps:number}>()).results??[];
+    const inventory=await Promise.all(contracts.map(contract=>investorInventoryCapital(db,contract)));
+    const capitalTotal=(key:'inventory_iqd'|'received_iqd')=>inventory.some(row=>row[key]===null)?null:inventory.reduce((sum,row)=>sum+row[key]!,0);
     const period=(await db.prepare(`SELECT COALESCE(SUM(r.profit_iqd),0) AS earned_iqd,COALESCE(SUM(r.capital_iqd),0) AS recovered_capital_iqd FROM investor_allocation_results r JOIN investment_contracts c ON c.id=r.contract_id JOIN order_item_inventory_allocations a ON a.id=r.allocation_id JOIN orders o ON o.id=a.order_id WHERE c.user_id=? AND o.status='delivered' AND ${inFinanceRangeSql("date(o.delivered_at,'+3 hours')")}`).bind(profile.user_id,...financeRangeArgs(range)).first())!;
     const adjustments=await db.prepare(`SELECT COALESCE(SUM(e.amount_iqd),0) AS adjustments_iqd FROM investor_finance_events e JOIN investment_contracts c ON c.id=e.contract_id WHERE c.user_id=? AND e.kind='profit_correction' AND ${inFinanceRangeSql('e.event_day')}`).bind(profile.user_id,...financeRangeArgs(range)).first();
     const paid=await db.prepare(`SELECT COALESCE(SUM(l.amount_iqd),0) AS paid_iqd FROM finance_withdrawal_payment_lines l JOIN finance_withdrawal_payments p ON p.id=l.payment_id JOIN finance_withdrawals w ON w.id=p.withdrawal_id WHERE w.user_id=? AND l.source_kind='investor_profit' AND ${inFinanceRangeSql('p.payment_day')}`).bind(profile.user_id,...financeRangeArgs(range)).first();
     // «مسترد من المبيعات» is capital recovered from sales only; the investment
     // remainder returned to the investor's «أرباحي» is its own figure.
-    result.push({...profile,capital:{...capital,recovered_iqd:balance.capital_iqd-balance.capital_surplus_iqd,returned_surplus_iqd:balance.capital_surplus_iqd,paid_iqd:balance.capital_paid_iqd},balance,period:{...period,...adjustments,...paid}});
+    result.push({...profile,capital:{...capital,used_iqd:capitalTotal('received_iqd'),inventory_iqd:capitalTotal('inventory_iqd'),recovered_iqd:balance.capital_iqd-balance.capital_surplus_iqd,returned_surplus_iqd:balance.capital_surplus_iqd,paid_iqd:balance.capital_paid_iqd},balance,period:{...period,...adjustments,...paid}});
   }
   const accounts=(await db.prepare("SELECT id,name,email,role,admin_scope FROM users WHERE role='admin' AND admin_scope='assistant' ORDER BY name").all()).results??[];
   return c.json({success:true,profiles:result,accounts,range,totals:{agreed_iqd:result.reduce((n,p)=>n+(p.capital.agreed_iqd??0),0),received_iqd:result.reduce((n,p)=>n+(p.capital.received_iqd??0),0),available_profit_iqd:result.reduce((n,p)=>n+p.balance.available_earnings_iqd,0),period_profit_iqd:result.reduce((n,p)=>n+Number(p.period.earned_iqd??0),0)}});

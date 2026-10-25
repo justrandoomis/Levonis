@@ -45,6 +45,9 @@ test('a saved selection keeps its canonical USD/IQD quote and profit when other 
   assert.equal(review.customer_price_usd, '11.99', 'step 4 reads the same saved selection quote as step 3');
   assert.equal(review.customer_price_iqd, p.customer_price_iqd);
   assert.equal(review.preview.complete, false, 'the review must still explain the incomplete product');
+  const receipt=await json(await post(w.app,path,identity));
+  assert.equal(receipt.customer_price_usd,'11.99','receipt reads saved selection inputs without a purchase draft');
+  assert.equal(receipt.customer_price_iqd,p.customer_price_iqd);
   const profit = purchaseProfit(review.customer_price_iqd, 2, 23838, 4500);
   assert.equal(profit.profit_iqd, review.customer_price_iqd * 2 - 23838);
   assert.equal(profit.owner_iqd! + profit.investor_iqd!, profit.profit_iqd);

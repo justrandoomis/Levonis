@@ -19,7 +19,7 @@ import {
 } from '../lib/operations';
 import { settleAdvance } from '../lib/payrollAdvance';
 import { validateRuleScope, readRuleScope } from '../lib/financeRuleScopes';
-import { commitParticipantStatements, effectiveStaffCostSql, heldSourceSql, staffAdvanceSql, staffPaymentBudget, staffReconciliationBlockedSql } from '../lib/financeParticipants';
+import { commitParticipantStatements, effectiveStaffCostSql, heldSourceSql, participantAdvanceState, participantSources, participantSummary, staffAdvanceSql, staffPaymentBudget, staffReconciliationBlockedSql } from '../lib/financeParticipants';
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
 import { orderGoods, postStoredRefund, runOrderFinancialEffects, type CostRule } from '../lib/orderFinance';
 import { operationsReport } from '../lib/operationsReport';
@@ -382,7 +382,13 @@ adminFinanceOperationsRoutes.get('/payroll', async (c) => {
   )
     .bind(staffId, staffId, offset)
     .all();
-  return c.json({ success: true, staff: results ?? [], payments: payments.results ?? [], costs: costs.results ?? [], offset });
+  const staff = await Promise.all((results ?? []).map(async person => {
+    const [sources,advance] = await Promise.all([participantSources(db,String(person.id),'staff'),participantAdvanceState(db,String(person.id),'staff')]);
+    const balance = participantSummary(sources,advance.balance);
+    return {...person,net_iqd:balance.staff_net_iqd,available_iqd:balance.staff_available_iqd,held_iqd:balance.staff_held_iqd,
+      debt_iqd:balance.staff_debt_iqd,cash_paid_iqd:balance.staff_paid_iqd,pending_costs:balance.pending_costs};
+  }));
+  return c.json({ success: true, staff, payments: payments.results ?? [], costs: costs.results ?? [], offset });
 });
 adminFinanceOperationsRoutes.post('/staff/:id/payments', async (c) => {
   const user = c.get('user')!;

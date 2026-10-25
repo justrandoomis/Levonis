@@ -828,6 +828,11 @@ export const COST_REFUSALS = {
     en: 'To track quantity, enter the stock quantity first.',
     ckb: 'بۆ بەدواداچوونی بڕ، سەرەتا بڕی کۆگا بنووسە.',
   },
+  STOCK_RECOUNT_REQUIRED: {
+    ar: 'يلزم مطابقة مخزون النسخة مع دفعاتها وحجوزاتها السابقة قبل الاستلام.',
+    en: 'Reconcile this selection’s stock with its existing lots and reservations before receiving.',
+    ckb: 'پێش وەرگرتن، کۆگای ئەم هەڵبژاردەیە لەگەڵ پارت و بڕە گیراوەکانی پێشووی بەراورد و ڕێک بخە.',
+  },
   // «بلا تتبّع (حسب الطلب)» sells by pre-order only: a direct sale needs a recorded stock (worker/routes/products.ts
   // `directUsable`), so the choice is refused while the product offers no pre-order — it would publish a price no
   // customer can order.

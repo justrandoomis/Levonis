@@ -2,16 +2,18 @@ import { employmentDay, readEmploymentPeriods } from './EmploymentPeriodsFields'
 import { Sheet } from '../financeWorkspace/ui';
 import { dateLabel, Loading, Money, PEOPLE, Surface, useLanguage, useRemote } from './shared';
 import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
+import StaffBalanceBreakdown, { type StaffBalance } from './StaffBalanceBreakdown';
 
 type WagePeriod={id:string;starts_on:string;ends_before:string|null;snapshot:string;reason:string};
 type WageEntry={id:string;kind:string;title:string;order_id:string|null;accrued_iqd:number;paid_iqd:number;available_iqd:number;state:string;pending_cost?:number};
-type History={staff:{inactive_periods_json:string};periods:WagePeriod[];versions:{id:string;recorded_at:string;actor_name:string;reason:string}[];adjustments:{id:string;order_id:string;adjustment_day:string;earning_day:string|null;delta_iqd:number;before_iqd:number;after_iqd:number;reason:string;rule_name:string}[];account:{entries:WageEntry[];summary:{staff_net_iqd:number;staff_available_iqd:number;staff_debt_iqd:number;earnings_held_iqd:number}}|null};
+type History={staff:{inactive_periods_json:string};periods:WagePeriod[];versions:{id:string;recorded_at:string;actor_name:string;reason:string}[];adjustments:{id:string;order_id:string;adjustment_day:string;earning_day:string|null;delta_iqd:number;before_iqd:number;after_iqd:number;reason:string;rule_name:string}[];account:{entries:WageEntry[];summary:StaffBalance & {earnings_held_iqd:number}}|null};
 export default function StaffHistorySheet({staff,onClose}:{staff:{id:string;name:string};onClose:()=>void}){
   const {loc,lang}=useLanguage(),remote=useRemote<History>(`${PEOPLE}/staff/${encodeURIComponent(staff.id)}/history`),data=remote.data;
   useFreshOnReturn(remote.load,{pollWhileVisibleMs:30_000,minIntervalMs:5_000,enabled:!remote.loading});
   return <Sheet title={staff.name} subtitle={loc('سجل الأجور والتسويات','Wage history and adjustments')} onClose={onClose} wide={false}><div className="ap fp fp-stack">
     {!data?<Loading error={remote.error} retry={remote.load}/>:<>
     {data.account&&<div className="fp-stats">{[[loc('الرصيد','Balance'),data.account.summary.staff_net_iqd],[loc('متاح للسحب','Available'),data.account.summary.staff_available_iqd],[loc('الدين المتبقي','Remaining debt'),data.account.summary.staff_debt_iqd],[loc('محجوز','Reserved'),data.account.summary.earnings_held_iqd]].map(([label,value])=><div className="fp-stat" key={label}><span>{label}</span><Money value={Number(value)}/></div>)}</div>}
+    {data.account&&<StaffBalanceBreakdown balance={data.account.summary}/>}
     {data.account&&<details className="fp-detail"><summary>{loc('تفاصيل الأجور حسب الطلب','Wages by order','وردەکاریی کرێ بەپێی داواکاری')}</summary><div className="fp-rows">{data.account.entries.filter(e=>e.kind==='staff').map(e=><div className="fp-rule" key={e.id}>
       <strong>{e.title}</strong><p className="fp-muted"><bdi>{e.order_id}</bdi></p>
       {e.state==='pending_cost'||e.pending_cost?<p className="fp-note">{loc('بانتظار تثبيت التكلفة؛ المبلغ النهائي غير محسوب بعد.','Awaiting verified cost; the final wage is not yet calculated.','چاوەڕێی پشتڕاستکردنەوەی تێچوو؛ کرێی کۆتایی هێشتا هەژمار نەکراوە.')}</p>:<div className="fp-row"><span>{loc('الأجر المستحق','Earned wage','کرێی شایستە')}</span><Money value={e.accrued_iqd}/></div>}

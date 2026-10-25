@@ -14,6 +14,52 @@ function imported(raw: DatabaseSync, id: string) {
 const decision = (raw: DatabaseSync, id: string) => raw.prepare('SELECT stock_decision FROM product_source_refs WHERE product_id = ?').get(id)?.stock_decision;
 const stock = (raw: DatabaseSync, id: string) => raw.prepare('SELECT stock FROM products WHERE id = ?').get(id)?.stock;
 
+test('receiving unconfigured imported choices initializes stock in the same transaction, once, even without published pricing', async () => {
+  const w = pricingWorld();
+  imported(w.raw, AMS);
+  w.raw.prepare('UPDATE product_option_values SET stock=NULL WHERE product_id=?').run(AMS);
+  const group = w.raw.prepare('SELECT group_id FROM product_option_values WHERE id=?').get(AMS_MODEL)!.group_id!;
+  w.raw.prepare("INSERT INTO product_option_values(id,product_id,group_id,name_en,active,stock) VALUES ('receipt-second',?,?,'Second',1,NULL)").run(AMS, group);
+  const lines = [AMS_MODEL, 'receipt-second'].map((id, i) => ({ product_id: AMS, scope: 'option', scope_id: id, qty_ordered: i + 2, source_unit_amount: 12, weight_g: 25, volume_mm3: 0 }));
+  const id = await w.save(w.draft({ lines }));
+  w.raw.exec("CREATE TEMP TRIGGER fail_receipt BEFORE INSERT ON incoming_inventory_receipts BEGIN SELECT RAISE(ABORT,'failed receipt'); END");
+  const operationId = crypto.randomUUID();
+  assert.equal((await w.receive(id, operationId)).status, 500);
+  assert.equal(w.raw.prepare('SELECT stock FROM product_option_values WHERE id=?').get(AMS_MODEL)?.stock, null);
+  assert.equal(decision(w.raw, AMS), 'not_configured');
+  assert.equal(w.raw.prepare('SELECT COUNT(*) AS n FROM inventory_lots WHERE product_id=?').get(AMS)?.n, 0);
+  w.raw.exec('DROP TRIGGER fail_receipt');
+  const received = await w.receive(id, operationId);
+  assert.equal(received.status, 200, JSON.stringify(received));
+  assert.equal((await w.receive(id, operationId)).status, 200);
+  assert.deepEqual(w.raw.prepare('SELECT stock FROM product_option_values WHERE product_id=? ORDER BY id').all(AMS).map(r=>r.stock), [2,3]);
+  assert.equal(decision(w.raw, AMS), 'tracked');
+  assert.equal(w.raw.prepare('SELECT SUM(qty_remaining) AS n FROM inventory_lots WHERE product_id=?').get(AMS)?.n, 5);
+  assert.equal(w.raw.prepare('SELECT COUNT(*) AS n FROM pricing_v2_sku_results WHERE product_id=?').get(AMS)?.n, 0, 'receipt does not publish or invent a selling price');
+});
+
+test('a first receipt tracks an ordinary untracked selection; existing stock and reservations are never guessed', async () => {
+  for (const mode of ['BASE','COLOR','VARIANT_COMBINATION'] as const) {
+    const w=pricingWorld(), pid=`receive-${mode}`;
+    seedOptionless(w.raw,pid,{colours:mode==='BASE'?0:2,saleTypes:['direct_sale']});
+    w.raw.prepare('UPDATE products SET inventory_mode=?,stock=NULL WHERE id=?').run(mode,pid);
+    const scope=mode==='BASE'?'base':mode==='COLOR'?'color':'variant';
+    const scopeId=scope==='base'?'':scope==='color'?`${pid}_c0`:`${pid}_v0`;
+    if(scope==='variant')w.raw.prepare('INSERT INTO product_variants(id,product_id,combo_key,active,stock) VALUES (?,?,?,1,NULL)').run(scopeId,pid,`c:${pid}_c0`);
+    if(scope==='color')w.raw.prepare('UPDATE product_colors SET stock=NULL WHERE product_id=?').run(pid);
+    const id=await w.save(w.draft({lines:[{product_id:pid,scope,scope_id:scopeId,qty_ordered:2,source_unit_amount:10,weight_g:10,volume_mm3:0}]}));
+    const table=scope==='base'?'products':scope==='color'?'product_colors':'product_variants', rowId=scope==='base'?pid:scopeId;
+    const reserved=scope==='base'?'stock_reserved':'reserved';
+    w.raw.prepare(`UPDATE ${table} SET ${reserved}=1 WHERE id=?`).run(rowId);
+    assert.equal((await w.receive(id,crypto.randomUUID())).body.code,'STOCK_RECOUNT_REQUIRED');
+    w.raw.prepare(`UPDATE ${table} SET ${reserved}=0 WHERE id=?`).run(rowId);
+    const result=await w.receive(id,crypto.randomUUID());
+    assert.equal(result.status,200,JSON.stringify(result));
+    assert.equal(w.raw.prepare(`SELECT stock FROM ${table} WHERE id=?`).get(rowId)?.stock,2);
+    if(scope==='color')assert.equal(w.raw.prepare('SELECT stock FROM product_colors WHERE id=?').get(`${pid}_c1`)?.stock,null,'unrelated existing choices retain their policy');
+  }
+});
+
 test('an inventory price save configures an imported purchase atomically, without making the incoming quantity available', async () => {
   const w = pricingWorld();
   const pid = 'import-inline-base';
@@ -67,6 +113,9 @@ test('an inventory price save configures an imported purchase atomically, withou
   assert.equal(stock(w.raw, pid), 2, 'only receiving the purchase adds its quantity to available stock');
   assert.equal(w.raw.prepare('SELECT qty_received FROM incoming_inventory WHERE product_id = ?').get(pid)?.qty_received, 2);
   assert.equal(w.raw.prepare('SELECT SUM(qty_remaining) AS n FROM inventory_lots WHERE product_id = ?').get(pid)?.n, 2);
+  const oversell = await post(v2App(w.raw), '/api/cart/items', { productId: pid, qty: 3, fulfillmentType: 'direct_sale' });
+  assert.equal((await json(oversell)).code, 'QTY_UNAVAILABLE', 'published pricing cannot bypass the received quantity');
+  assert.equal(stock(w.raw, pid), 2);
 });
 
 test('batch setup follows each inventory mode, preserves quantities and reservations, and refuses a raced stock decision', async () => {

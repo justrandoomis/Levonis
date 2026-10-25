@@ -77,6 +77,9 @@ test('partial, repeated, whole and nested transfers preserve every dinar of rece
   const original = all(x.raw, 'SELECT * FROM purchase_investor_lot_capital ORDER BY lot_id,contract_id');
   const first = await transfer(x, x.lots[0].id, 2);
   assert.equal((await investmentContractSummary(x.db, x.contract)).summary.inventory_capital_iqd, 33333);
+  const profile=(await json(await get(x.app,'/i/profiles'))).profiles[0];
+  assert.equal(profile.capital.used_iqd,33333,'a transfer does not receive the principal again');
+  assert.equal(profile.capital.inventory_iqd,33333);
   assert.deepEqual(row(x.raw, 'SELECT unit_principal_iqd,qty FROM purchase_investor_lot_capital WHERE lot_id=?', first.target), { unit_principal_iqd: 6667, qty: 2 });
   assert.equal((await post(x.app, '/s/transfers', first.body)).status, 200);
   const nested = await transfer(x, first.target, 1, 'shelf-b');

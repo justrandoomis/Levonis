@@ -117,13 +117,18 @@ export function participantSummary(entries: ParticipantSource[],advanceBalance=0
       pending_settlement_reserve_iqd:Math.max(0,net-spendable),
       reservation_conflict_iqd:Math.max(0,held-Math.max(0,spendable))};
   };
-  const pending=(s:ParticipantSource)=>Math.max(0,s.accrued_iqd-s.amount_iqd)+(s.eligible?0:Math.max(0,s.amount_iqd-s.paid_iqd));
+  // A past payment also covers pending accrual after eligibility decreases.
+  // Subtract it once before separating available from pending; otherwise a
+  // partially paid source can show more pending money than it still owes.
+  const pending=(s:ParticipantSource)=>Math.max(0,s.accrued_iqd-Math.max(s.paid_iqd,s.eligible?s.amount_iqd:0));
   const staff=ledger('staff'),profit=ledger('investor_profit'),capital=ledger('investor_capital');
   const earningsAvailable=staff.available_iqd+profit.available_iqd;
   return {
     ledgers:{staff,investor_profit:profit,investor_capital:capital},
     net_balance_iqd:staff.net_iqd+profit.net_iqd,staff_net_iqd:staff.net_iqd,
     staff_available_iqd:staff.available_iqd,investor_profit_available_iqd:profit.available_iqd,
+    staff_paid_iqd:staff.paid_iqd+advanceBalance,staff_held_iqd:staff.held_iqd,
+    staff_pending_settlement_reserve_iqd:staff.pending_settlement_reserve_iqd,
     reconciliation_pending:entries.some((s)=>!!s.blocked),
     pending_settlement_reserve_iqd:staff.pending_settlement_reserve_iqd+profit.pending_settlement_reserve_iqd+capital.pending_settlement_reserve_iqd,
     reservation_conflict_iqd:staff.reservation_conflict_iqd+profit.reservation_conflict_iqd+capital.reservation_conflict_iqd,
@@ -131,10 +136,10 @@ export function participantSummary(entries: ParticipantSource[],advanceBalance=0
     advance_balance_iqd:advanceBalance,
     available_earnings_iqd:earningsAvailable,earnings_available_iqd:earningsAvailable,
     available_capital_iqd:capital.available_iqd,capital_available_iqd:capital.available_iqd,
-    earnings_paid_iqd:staff.paid_iqd+profit.paid_iqd,capital_paid_iqd:capital.paid_iqd,
+    earnings_paid_iqd:staff.paid_iqd+profit.paid_iqd+advanceBalance,capital_paid_iqd:capital.paid_iqd,
     earnings_held_iqd:staff.held_iqd+profit.held_iqd,capital_held_iqd:capital.held_iqd,
     earned_iqd:sum(s=>s.kind==='investor_capital'?0:s.accrued_iqd),
-    available_iqd:earningsAvailable+capital.available_iqd,held_iqd:sum(s=>s.held_iqd),paid_iqd:sum(s=>s.paid_iqd),
+    available_iqd:earningsAvailable+capital.available_iqd,held_iqd:sum(s=>s.held_iqd),paid_iqd:sum(s=>s.paid_iqd)+advanceBalance,
     pending_iqd:sum(pending),earnings_pending_iqd:sum(s=>s.kind==='investor_capital'?0:pending(s)),
     investor_profit_pending_iqd:sum(s=>s.kind==='investor_profit'?pending(s):0),
     capital_pending_iqd:sum(s=>s.kind==='investor_capital'?pending(s):0),
@@ -174,7 +179,7 @@ export async function participantOverview(db: D1Database, userId: string, opts: 
   const investment=await investorAccountProgress(db,userId,entries,participantWithdrawableSources(entries,advance.balance));
   // No movements log («سجل الحركات»): the owner removed it from «أرباحي» on
   // 2026-10-10. Balances come from the same sources; no ledger row changed.
-  return { summary, employment, investment, entries: participantEntries(entries, fold), withdrawals: (withdrawals.results ?? []).map((w)=>({id:w.id,amount_iqd:w.amount_iqd,paid_iqd:w.paid_iqd,state:w.state,balance_type:w.balance_type,created_at:w.created_at,reference:w.reference,receipt_url:w.receipt_url,note:w.note})) };
+  return { summary, employment, investment, entries: participantEntries(entries, fold, advance.balance), withdrawals: (withdrawals.results ?? []).map((w)=>({id:w.id,amount_iqd:w.amount_iqd,paid_iqd:w.paid_iqd,state:w.state,balance_type:w.balance_type,created_at:w.created_at,reference:w.reference,receipt_url:w.receipt_url,note:w.note})) };
 }
 /**
  * What the participant reads of their own sources (DECISIONS row 220). A
@@ -193,12 +198,13 @@ export async function participantOverview(db: D1Database, userId: string, opts: 
  * share of profit paid as it is earned is that by construction — pinned for
  * the owner's ruling.)
  */
-export function participantEntries(entries: ParticipantSource[], fold = true) {
+export function participantEntries(entries: ParticipantSource[], fold = true, advanceBalance = 0) {
   type Out = Omit<ParticipantSource, 'eligible' | 'version' | 'staff_id' | 'blocked' | 'basis'>;
   const out: Out[] = [];
   const folded = new Map<string, Out>();
+  const budgets = participantWithdrawableSources(entries, advanceBalance);
   for (const { eligible: _e, version: _v, staff_id: _s, blocked, basis, ...e } of entries) {
-    const row: Out = { ...e, state: blocked ? 'pending_reconciliation' : e.state };
+    const row: Out = { ...e, available_iqd: budgets.get(e.id) ?? 0, state: blocked ? 'pending_reconciliation' : e.state };
     if (!fold || e.kind !== 'staff' || basis !== 'profit_percent') { out.push(row); continue; }
     const key = `${e.title}\u0000${row.state}`;
     const into = folded.get(key);
@@ -210,7 +216,7 @@ export function participantEntries(entries: ParticipantSource[], fold = true) {
     }
     if (String(e.day ?? '') > String(into.day ?? '')) into.day = e.day;
     into.amount_iqd += e.amount_iqd; into.accrued_iqd += e.accrued_iqd; into.paid_iqd += e.paid_iqd;
-    into.held_iqd += e.held_iqd; into.available_iqd += e.available_iqd;
+    into.held_iqd += e.held_iqd; into.available_iqd += row.available_iqd;
     if (e.pending_payment_cover_iqd !== undefined) into.pending_payment_cover_iqd = (into.pending_payment_cover_iqd ?? 0) + e.pending_payment_cover_iqd;
     if (e.pending_cost) into.pending_cost = 1;
   }

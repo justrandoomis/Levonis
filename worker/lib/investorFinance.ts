@@ -1,5 +1,7 @@
+import { investorInventoryCapital } from './investorInventoryCapital';
+import { planPendingInvestorCapital, type VerifiedCapitalAllocation } from './investorPendingCapital';
 import { newId } from './crypto';
-import { isConfirmedOrderCost } from './financeLedger';
+import { hasUnknownRefund, isConfirmedOrderCost } from './financeLedger';
 import { badRequest, conflict, notFound } from './http';
 import { allocateExact, baghdadDay, fence, journalPlan, periodOpen } from './operations';
 import { getOrderProfitBase, type OrderProfitBase } from './orderProfit';
@@ -97,13 +99,14 @@ export async function investorOrderSplit(db: D1Database, orderId: string, previe
       -COALESCE((SELECT SUM(cogs_iqd) FROM finance_refund_facts WHERE order_id=?3 AND disposition='restock' AND posted_at IS NOT NULL),0) AS cogs,
     EXISTS(SELECT 1 FROM finance_refund_facts WHERE order_id=?3 AND posted_at IS NULL) AS refund_pending`).bind(`sale:${orderId}`,`cogs:${orderId}`,orderId).first<{sale:number;cogs:number;refund_pending:number}>();
   const out: Array<{ allocation_id: string; lot_id: string; contract_id: string; user_id: string; qty: number; profit_basis_iqd: number; profit_iqd: number; capital_iqd: number; loss_iqd: number; raw_loss_iqd:number;eligible: boolean; snapshot: string }> = [];
+  const capitalAllocations: VerifiedCapitalAllocation[] = [];
   let totalBasis = 0, investorProfit = 0, investorLoss = 0, pending = false;
   if(delivered&&contracts.length&&(!posting?.sale||posting.refund_pending||base.lines.some(l=>l.cogs_iqd===null)||posting.cogs!==base.lines.reduce((n,l)=>n+Number(l.cogs_iqd??0),0)))pending=true;
   for (const line of base.lines) {
     if (line.profit_basis_iqd !== null) totalBasis += line.profit_basis_iqd;
     const rows = line.allocations;
     const net=netProfit.get(line.id);
-    if (!rows.length || net == null || line.cogs_iqd === null || !isConfirmedOrderCost(line.cost_confidence) || (line.cost_confidence !== 'manual_verified' && rows.some(a => a.cogs_iqd === null))) {
+    if (!rows.length || line.cogs_iqd === null || !isConfirmedOrderCost(line.cost_confidence) || (line.cost_confidence !== 'manual_verified' && rows.some(a => a.cogs_iqd === null))) {
       if (rows.some(a => contracts.some(c => c.incoming_id === origins.find(o => o.id === a.id)?.incoming_id))) pending = true;
       continue;
     }
@@ -114,17 +117,23 @@ export async function investorOrderSplit(db: D1Database, orderId: string, previe
     const revenue = signedShares(line.retained_revenue_iqd, weights.some(q => q > 0) ? weights : rows.map(a => a.qty));
     const originalCogs = rows.map(a => Number(a.cogs_iqd ?? 0) - Number(a.returned_cogs_iqd ?? 0) + (a.late_cost_iqd ?? 0));
     const costOverride = signedShares(line.cogs_iqd - originalCogs.reduce((n, v) => n + v, 0), rows.map(a => a.qty));
-    const expenses = signedShares(line.retained_revenue_iqd - line.cogs_iqd - net, rows.map(a => a.qty));
+    const expenses = net == null ? null : signedShares(line.retained_revenue_iqd - line.cogs_iqd - net, rows.map(a => a.qty));
     for (const [i, a] of rows.entries()) {
       const lateCost = a.late_cost_iqd === undefined ? (adjustments.find(v => v.allocation_id === a.id)?.unit_delta ?? 0) * Math.max(0, a.qty - Number(a.returned_qty ?? 0)) : 0;
       const cost = originalCogs[i] + costOverride[i] + lateCost;
-      const profit = revenue[i] - cost - expenses[i];
+      const profit = expenses === null ? null : revenue[i] - cost - expenses[i];
       totalBasis -= lateCost;
       for (const c of contracts.filter(c => c.incoming_id === origins.find(o => o.id === a.id)?.incoming_id)) {
         const principalUnit=capitalUnits.find(p=>p.lot_id===a.lot_id&&p.contract_id===c.id);
         if(exactContracts.some(p=>p.contract_id===c.id)&&!principalUnit){pending=true;continue;}
         const assignedPrincipal=(principalUnit?.unit_principal_iqd??0)*weights[i];
         const recovered=principalUnit?(cost>0&&revenue[i]<cost?Number(BigInt(assignedPrincipal)*BigInt(Math.max(0,revenue[i]))/BigInt(cost)):assignedPrincipal):percent(Math.max(0,Math.min(cost,revenue[i])),c.capital_share_bps);
+        // Principal is provable from this lot, its retained revenue and cost
+        // even when a different expense still prevents calculating net profit.
+        // Unresolved refund amounts must never be taken as evidence of revenue.
+        if (!hasUnknownRefund(line)) capitalAllocations.push({ allocation_id:a.id,lot_id:a.lot_id,contract_id:c.id,contract_version:c.version,
+          capital_iqd:recovered,qty:weights[i],snapshot:JSON.stringify({source_fingerprint:sourceFingerprint,contract_version:c.version,qty:weights[i],principal_iqd:recovered,revenue:revenue[i],cost,delivered}) });
+        if (profit === null) { pending = true; continue; }
         const earned = percent(Math.max(0, profit), c.profit_share_bps);
         const loss = percent(Math.max(0, -profit), c.loss_share_bps);
         investorProfit += earned;
@@ -133,7 +142,7 @@ export async function investorOrderSplit(db: D1Database, orderId: string, previe
           qty: weights[i], profit_basis_iqd: profit, profit_iqd: earned,
           capital_iqd: recovered,
           loss_iqd: loss,raw_loss_iqd:loss,eligible: delivered && collected,
-          snapshot: JSON.stringify({ version: base.version, profit_basis:'net_excluding_store_promotion_v2',source_fingerprint:sourceFingerprint,contract_version: c.version, qty: weights[i], principal_iqd:recovered, revenue: revenue[i], cost, expenses: expenses[i], profit, collected, delivered }) });
+          snapshot: JSON.stringify({ version: base.version, profit_basis:'net_excluding_store_promotion_v2',source_fingerprint:sourceFingerprint,contract_version: c.version, qty: weights[i], principal_iqd:recovered, revenue: revenue[i], cost, expenses: expenses![i], profit, collected, delivered }) });
       }
     }
   }
@@ -149,7 +158,7 @@ export async function investorOrderSplit(db: D1Database, orderId: string, previe
   investorLoss=out.reduce((n,a)=>n+a.loss_iqd,0);
   const cap=Math.max(0,[...netProfit.values()].reduce<number>((sum,value)=>sum+(value??0),0));
   if(investorProfit>cap&&out.length){const shares=signedShares(cap,out.map(a=>a.profit_iqd));out.forEach((a,i)=>{a.profit_iqd=shares[i];a.snapshot=JSON.stringify({...JSON.parse(a.snapshot),profit_share_iqd:shares[i]});});investorProfit=cap;}
-  return { allocations: out, investor_profit_iqd: delivered ? investorProfit : 0, investor_loss_iqd: delivered ? investorLoss : 0,
+  return { allocations: out, capital_allocations: capitalAllocations, investor_profit_iqd: delivered ? investorProfit : 0, investor_loss_iqd: delivered ? investorLoss : 0,
     investor_net_iqd: delivered ? investorProfit - investorLoss : 0,
     // A partial sum of known lines is not the owner's net profit. Keep this
     // uncertainty separate from the eligibility of a verified investor lot.
@@ -183,8 +192,13 @@ export async function syncInvestorOrder(db: D1Database, orderId: string, opts: {
   if (order.status !== 'delivered') return;
   const split = await investorOrderSplit(db, orderId);
   if (split.pending) {
-    const contracts = (await db.prepare(`SELECT DISTINCT c.* FROM investment_contracts c JOIN investor_allocation_results r ON r.contract_id=c.id JOIN order_item_inventory_allocations a ON a.id=r.allocation_id WHERE a.order_id=?`).bind(orderId).all<InvestmentContract>()).results ?? [];
-    await db.batch([...fence(db,`(SELECT ${fingerprintSql.replace(/\?1/g, '?2')})=?3`,[orderId,split.source_fingerprint]),db.prepare(`UPDATE investor_allocation_results SET pending=1,eligible=0,version=version+1 WHERE allocation_id IN (SELECT id FROM order_item_inventory_allocations WHERE order_id=?) AND pending=0`).bind(orderId),...contracts.flatMap(c=>planInvestorSources(db,c,day))]);
+    const capital = split.capital_allocations ?? [];
+    const contracts = (await db.prepare(`SELECT c.* FROM investment_contracts c WHERE c.id IN
+      (SELECT r.contract_id FROM investor_allocation_results r JOIN order_item_inventory_allocations a ON a.id=r.allocation_id WHERE a.order_id=?)
+      OR c.id IN (SELECT value FROM json_each(?))`).bind(orderId,JSON.stringify(capital.map(a=>a.contract_id))).all<InvestmentContract>()).results ?? [];
+    const principal = await planPendingInvestorCapital(db,orderId,capital,day,opts.actor);
+    await db.batch([...fence(db,`(SELECT ${fingerprintSql.replace(/\?1/g, '?2')})=?3`,[orderId,split.source_fingerprint]),...principal,
+      db.prepare(`UPDATE investor_allocation_results SET pending=1,eligible=0,version=version+1 WHERE allocation_id IN (SELECT id FROM order_item_inventory_allocations WHERE order_id=?) AND pending=0`).bind(orderId),...contracts.flatMap(c=>planInvestorSources(db,c,day))]);
     throw conflict('أرباح المستثمر معلقة حتى تثبيت التكلفة وأصل المرتجع','INVESTOR_PENDING');
   }
   await periodOpen(db, day);
@@ -196,13 +210,14 @@ export async function syncInvestorOrder(db: D1Database, orderId: string, opts: {
     if (old?.snapshot === a.snapshot && !(old as unknown as {pending?:number})?.pending) continue;
     touched.add(a.contract_id);
     const version = (old?.version ?? 0) + 1;
+    const firstProfit = !old || JSON.parse(old.snapshot).capital_only_pending === true;
     const statements: D1PreparedStatement[] = [...fence(db, old
       ? 'EXISTS(SELECT 1 FROM investor_allocation_results WHERE allocation_id=? AND contract_id=? AND version=?)'
       : 'NOT EXISTS(SELECT 1 FROM investor_allocation_results WHERE allocation_id=? AND contract_id=?)', old ? [a.allocation_id, a.contract_id, old.version] : [a.allocation_id, a.contract_id])];
     for (const [field, kind, before] of [
-      ['profit_iqd', old ? 'profit_correction' : 'profit', old?.profit_iqd ?? 0],
+      ['profit_iqd', firstProfit ? 'profit' : 'profit_correction', old?.profit_iqd ?? 0],
       ['capital_iqd', old ? 'capital_correction' : 'capital_recovered', old?.capital_iqd ?? 0],
-      ['loss_iqd', old ? 'loss_correction' : 'loss', old?.loss_iqd ?? 0],
+      ['loss_iqd', firstProfit ? 'loss' : 'loss_correction', old?.loss_iqd ?? 0],
     ] as const) {
       const delta = (field==='loss_iqd'?a.raw_loss_iqd:a[field]) - before;
       if (!delta) continue;
@@ -262,30 +277,18 @@ export async function investmentContractSummary(db: D1Database, id: string) {
   const contract = await db.prepare('SELECT c.*,u.name AS user_name FROM investment_contracts c JOIN users u ON u.id=c.user_id WHERE c.id=?').bind(id).first<InvestmentContract>();
   if (!contract) throw notFound('Investment contract not found');
   const funded = (await db.prepare("SELECT COALESCE(SUM(amount_iqd),0) AS n FROM investor_finance_events WHERE contract_id=? AND kind='funding'").bind(id).first<{ n: number }>())?.n ?? 0;
-  const inventory = (await db.prepare(`SELECT SUM(l.qty_remaining*COALESCE((SELECT v.unit_cost_iqd FROM inventory_lot_cost_versions v WHERE v.lot_id=l.id ORDER BY version DESC LIMIT 1),l.unit_cost_iqd)) AS n,
-    SUM(CASE WHEN l.unit_cost_iqd IS NULL THEN l.qty_remaining ELSE 0 END) AS unknown FROM inventory_lots l WHERE l.incoming_id=?`).bind(contract.incoming_id).first<{ n: number; unknown: number }>());
-  // Old location splits may predate principal inheritance. For an exact
-  // procurement contract, a known subset is not the whole balance and the
-  // historical funding ratio is not a substitute for missing receipt evidence.
-  // Exhausted lots do not obscure the capital still on the shelf; a restored
-  // unevidenced unit makes the next read unknown again.
-  const exactInventory=await db.prepare(`SELECT
-    EXISTS(SELECT 1 FROM purchase_investor_allocations WHERE contract_id=?1) AS exact,
-    COALESCE(SUM(l.qty_remaining*p.unit_principal_iqd),0) AS n,
-    COALESCE(SUM(CASE WHEN p.lot_id IS NULL THEN l.qty_remaining ELSE 0 END),0) AS missing_qty
-    FROM inventory_lots l LEFT JOIN purchase_investor_lot_capital p ON p.lot_id=l.id AND p.contract_id=?1
-    WHERE l.incoming_id=?2 AND l.qty_remaining>0`).bind(id,contract.incoming_id).first<{exact:number;n:number;missing_qty:number}>();
+  const inventory = await investorInventoryCapital(db, contract);
   const sources = (await investorParticipantSources(db, contract.user_id)).filter(s => s.contract_id === id);
   const {participantSources,participantWithdrawableSources}=await import('./financeParticipants');
   const budgets=participantWithdrawableSources(await participantSources(db,contract.user_id));
   const available=(kind:string)=>budgets.get(`${kind==='investor_profit'?'invprofit':'invcapital'}:${id}`)??0;
   const loss = (await db.prepare("SELECT COALESCE(amount_iqd,0) AS n FROM investor_capital_losses WHERE contract_id=?").bind(id).first<{ n: number }>())?.n ?? 0;
   return { contract, summary: { funded_iqd: funded, principal_iqd: contract.principal_iqd,
-    inventory_capital_iqd: exactInventory?.exact ? exactInventory.missing_qty>0?null:exactInventory.n : inventory?.unknown ? null : percent(inventory?.n ?? 0, contract.capital_share_bps),
+    inventory_capital_iqd: inventory.inventory_iqd,
     accrued_profit_iqd: sources.find(s => s.kind === 'investor_profit')?.accrued_iqd ?? 0,
     available_profit_iqd: available('investor_profit'),available_capital_iqd:available('investor_capital'),
     paid_profit_iqd:sources.find(s=>s.kind==='investor_profit')?.paid_iqd??0,paid_capital_iqd:sources.find(s=>s.kind==='investor_capital')?.paid_iqd??0,
-    recovered_capital_iqd: sources.find(s => s.kind === 'investor_capital')?.amount_iqd ?? 0, loss_iqd: loss }, sources };
+    recovered_capital_iqd: sources.find(s => s.kind === 'investor_capital')?.accrued_iqd ?? 0, loss_iqd: loss }, sources };
 }
 
 export async function refreshInvestorContract(db: D1Database, id: string, day = baghdadDay()) {

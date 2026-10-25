@@ -74,6 +74,9 @@ test('uncollected delivered capital is visible as pending capital without becomi
   assert.equal(account.summary.available_earnings_iqd,0);
   assert.equal(account.summary.pending_iqd,240);
   assert.equal(account.summary.capital_pending_iqd,100);
+  const detail=await investmentContractSummary(s.db,c.operation_id);
+  assert.equal(detail.summary.recovered_capital_iqd,100,'contract and participant agree on accrued principal before collection');
+  assert.equal(detail.summary.available_capital_iqd,0,'accrual is not cash available to withdraw');
   await assert.rejects(requestWithdrawal({DB:s.db} as Env,'investor','no-invented-cash',1,'capital'));
   s.raw.exec("INSERT INTO finance_collections(id,order_id,payer,amount_iqd,collection_day,actor_id,created_at) VALUES ('actual-collection','uncollected','customer',500,'2026-10-24','admin','2026-10-24')");
   await syncInvestorOrder(s.db,'uncollected');
@@ -82,6 +85,85 @@ test('uncollected delivered capital is visible as pending capital without becomi
   assert.equal(collected.summary.available_capital_iqd,100);
   assert.equal(collected.summary.available_earnings_iqd,140);
   assert.equal(collected.summary.pending_iqd,0);
+});
+
+test('a verified sold lot records principal while another line is unresolved, once only, without inventing profit or cash',async()=>{
+  const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);
+  await sale(s,'partial',['lot-a'],false);
+  s.raw.exec("INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_basis) VALUES('pending-accessory','partial','foreign','Unverified accessory',1,0,0,'unrecorded')");
+  await assert.rejects(syncInvestorOrder(s.db,'partial'),/معلقة/);
+  let account=await participantOverview(s.db,'investor');
+  assert.equal(account.summary.capital_iqd,100);
+  assert.equal(account.summary.capital_pending_iqd,100);
+  assert.equal(account.summary.available_capital_iqd,0);
+  assert.equal(account.summary.investor_profit_iqd,0);
+  assert.equal(account.summary.reconciliation_pending,true);
+  assert.equal(count(s.raw,"SELECT COUNT(*) n FROM accounting_entries WHERE event_key LIKE 'investor-profit:%'"),0);
+  const events=count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events');
+  const result=row(s.raw,"SELECT * FROM investor_allocation_results WHERE allocation_id='partial-a0'");
+  await assert.rejects(syncInvestorOrder(s.db,'partial'),/معلقة/);
+  assert.equal(count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events'),events);
+  assert.deepEqual(row(s.raw,"SELECT * FROM investor_allocation_results WHERE allocation_id='partial-a0'"),result);
+  await assert.rejects(requestWithdrawal({DB:s.db} as Env,'investor','partial-no-cash',1,'capital'));
+  s.raw.exec(`INSERT INTO inventory_lots(id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,total_cost_iqd,cost_basis,received_at)
+    VALUES('accessory-proof','foreign','base','',1,0,0,0,'received','2026-10-25');
+    INSERT INTO order_item_inventory_allocations(id,order_id,order_item_id,lot_id,scope,scope_id,qty,unit_cost_iqd,cogs_iqd,idempotency_key)
+    VALUES('accessory-allocation','partial','pending-accessory','accessory-proof','base','',1,0,0,'partial:accessory-proof')`);
+  await syncInvestorOrder(s.db,'partial');
+  account=await participantOverview(s.db,'investor');
+  assert.equal(account.summary.capital_iqd,100);
+  assert.equal(account.summary.investor_profit_iqd,140);
+  assert.equal(account.summary.available_capital_iqd,0);
+  assert.equal(count(s.raw,"SELECT COUNT(*) n FROM investor_finance_events WHERE kind IN ('capital_recovered','capital_correction')"),1);
+  assert.equal(count(s.raw,"SELECT COUNT(*) n FROM investor_finance_events WHERE kind='profit'"),1,'completion posts initial profit, not a correction of nonexistent profit');
+  s.raw.exec("INSERT INTO finance_collections(id,order_id,payer,amount_iqd,collection_day,actor_id,created_at) VALUES ('partial-collected','partial','customer',500,'2026-10-25','admin','2026-10-25')");
+  await syncInvestorOrder(s.db,'partial');
+  account=await participantOverview(s.db,'investor');
+  assert.equal(account.summary.available_capital_iqd,100);
+  assert.equal(account.summary.available_earnings_iqd,140);
+  assert.equal(account.summary.pending_iqd,0);
+  assert.equal(count(s.raw,'SELECT SUM(debit_iqd-credit_iqd) n FROM accounting_lines'),0);
+});
+
+test('pending capital cannot use an unverified funded cost or a refund with no amount',async()=>{
+  for(const missing of ['cost','refund'] as const){
+    const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);await sale(s,'unsafe',['lot-a']);
+    if(missing==='cost')s.raw.exec("UPDATE order_item_inventory_allocations SET unit_cost_iqd=NULL,cogs_iqd=NULL WHERE id='unsafe-a0';UPDATE order_items SET cost_iqd=NULL,cost_basis='unrecorded' WHERE id='unsafe-item'");
+    else s.raw.exec("INSERT INTO return_cases(id,order_id,order_item_id,user_id,qty,reason,state,resolution) VALUES('unknown-refund','unsafe','unsafe-item','buyer',1,'defective','resolved','refund')");
+    await assert.rejects(syncInvestorOrder(s.db,'unsafe'),/معلقة/);
+    assert.equal(count(s.raw,'SELECT COUNT(*) n FROM investor_allocation_results'),0,missing);
+    assert.equal(count(s.raw,"SELECT COUNT(*) n FROM investor_finance_events WHERE kind='capital_recovered'"),0,missing);
+    assert.equal((await participantOverview(s.db,'investor')).summary.available_capital_iqd,0,missing);
+  }
+});
+
+test('an unresolved direct expense holds profit but does not hide verified principal even after collection',async()=>{
+  const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);await sale(s,'expense-pending',['lot-a']);
+  s.raw.exec(`INSERT INTO expense_categories(id,slug,name_ar) VALUES('unknown-expense','unknown-expense','Expense');
+    INSERT INTO finance_order_costs(id,order_id,order_item_id,rule_id,rule_version,rule_name,group_key,category_id,milestone,qty,amount_iqd,cost_day,state,snapshot)
+    VALUES('unknown-direct','expense-pending','expense-pending-item','unknown-rule',1,'Unresolved cost','test','unknown-expense','delivered',1,NULL,'2026-10-25','pending_cost','{}')`);
+  const split=await investorOrderSplit(s.db,'expense-pending');
+  assert.equal(split.allocations.length,0);
+  assert.equal(split.capital_allocations?.[0].capital_iqd,100);
+  await assert.rejects(syncInvestorOrder(s.db,'expense-pending'),/معلقة/);
+  const account=await participantOverview(s.db,'investor');
+  assert.equal(account.summary.capital_iqd,100);
+  assert.equal(account.summary.available_capital_iqd,0);
+  assert.equal(account.summary.investor_profit_iqd,0);
+  assert.equal(account.summary.reconciliation_pending,true);
+  assert.equal(count(s.raw,"SELECT COUNT(*) n FROM investor_finance_events WHERE kind IN ('profit','loss')"),0);
+});
+
+test('pending principal evidence and its projection commit atomically against concurrent order changes',async()=>{
+  const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);await sale(s,'race',['lot-a']);
+  s.raw.exec("INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_basis) VALUES('race-unknown','race','foreign','Unknown',1,0,0,'unrecorded')");
+  const gate=s.pauseOn('INSERT INTO investor_allocation_results');
+  const syncing=syncInvestorOrder(s.db,'race');await gate.waiting;
+  s.raw.exec("UPDATE order_items SET unit_price_iqd=300,line_total_iqd=300 WHERE id='race-item'");
+  gate.resume();await assert.rejects(syncing);
+  assert.equal(count(s.raw,'SELECT COUNT(*) n FROM investor_allocation_results'),0);
+  assert.equal(count(s.raw,"SELECT COUNT(*) n FROM investor_finance_events WHERE kind='capital_recovered'"),0);
+  assert.equal(count(s.raw,"SELECT COALESCE(SUM(accrued_iqd),0) n FROM finance_investor_earnings"),0);
 });
 
 test('an investor awaiting an unrelated cost cannot stop staff reconciliation or withhold an independently known fixed wage',async()=>{
