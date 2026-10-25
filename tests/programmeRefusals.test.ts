@@ -195,6 +195,9 @@ const REQUIRED: Record<string, readonly string[]> = {
   // Incoming stock linked to the product (DECISIONS row 249): a cancelled purchase's cost is never applied, and the
   // stock level never changes under batches on the shelf or open purchases.
   'Purchase ↔ product link (DECISIONS row 249)': ['PRICING_REVIEW_PURCHASE_CANCELLED', 'INVENTORY_MODE_HAS_STOCK'],
+  // Receipt tracking may initialize an empty counter, but prior lots or
+  // reservations require a verified opening count (procurementReceivingStock).
+  'Receipt opening stock evidence': ['STOCK_RECOUNT_REQUIRED'],
   // FINANCE-DECISIONS §7: participant shares use net profit after all deductions;
   // unknown costs, an unapplied migration or an oversized allocation cannot pay out.
   'Net participant profit (FINANCE-DECISIONS §7)': ['NET_PROFIT_PENDING', 'NET_PROFIT_UPDATE_REQUIRED', 'NET_PROFIT_ALLOCATION_LIMIT'],
