@@ -217,9 +217,10 @@ test('staff shares use net profit after every recorded deduction and recover his
   assert.equal(count(x.raw, 'SELECT SUM(debit_iqd-credit_iqd) n FROM accounting_lines'), 0);
 });
 
-test('store promotion never reduces or blocks employee earnings when added, edited or allocated across later sales', async () => {
+test('store promotion never reduces or blocks existing employee earnings when added, edited or allocated across later sales', async () => {
   const x = await earningsFixture({ percentage: true });
   const before = (await participantOverview(x.db, 'employee')).summary;
+  const originalCosts = all(x.raw, "SELECT * FROM finance_order_costs WHERE order_id='order' ORDER BY id");
   const fingerprint = () => x.db.prepare(`SELECT ${staffBasisFingerprintSql("'order'")} value`).first<{ value: string }>();
   const source = (await fingerprint())!.value;
   x.raw.exec(`INSERT INTO expense_categories(id,slug,name_ar) VALUES ('promotion-expense','promotion-expense','Promotion');
@@ -235,9 +236,15 @@ test('store promotion never reduces or blocks employee earnings when added, edit
       VALUES ('later','buyer','delivered','{}','standard','{}','cash',50000,1500,50000,50000,'2026-09-23','2026-09-23');
     INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd) VALUES ('later-line','later','p','Printer',1,50000,50000);`);
   assert.equal((await fingerprint())!.value, source, 'changing promotion allocation across orders cannot freeze wages');
-  assert.equal((await drainOrderFinanceRecovery(x.env)).scanned, 0);
+  // The newly delivered order has no first posting, so recovery must inspect
+  // it independently of the unchanged promotion/percentage fingerprint.
+  const recovery = await drainOrderFinanceRecovery(x.env);
+  assert.deepEqual([recovery.scanned,recovery.pending,recovery.failed],[1,1,0],JSON.stringify(recovery));
   x.raw.exec("UPDATE finance_monthly_promotions SET enabled=0 WHERE id='store-promotion'");
-  assert.deepEqual((await participantOverview(x.db, 'employee')).summary, before);
+  assert.deepEqual((await participantOverview(x.db, 'employee')).summary, {
+    ...before,reconciliation_pending:true,pending_costs:before.pending_costs+1,
+  }, 'only the new order awaits its missing cost; every existing money balance stays unchanged');
+  assert.deepEqual(all(x.raw, "SELECT * FROM finance_order_costs WHERE order_id='order' ORDER BY id"),originalCosts);
   assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM finance_cost_adjustments'), 0);
 });
 
