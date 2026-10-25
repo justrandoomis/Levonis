@@ -43,7 +43,7 @@ const candidate = `o.seller_type='levonis' AND o.status='delivered' AND o.delive
     AND NOT EXISTS(SELECT 1 FROM finance_staff_basis b WHERE b.order_id=o.id AND b.basis_fingerprint=(${staffBasisFingerprintSql('o.id')})))
   OR ${investorOrderProjectionStaleSql('o.id')}
   OR EXISTS(SELECT 1 FROM finance_posting_errors e WHERE e.order_id=o.id AND e.event_key IN (
-    'delivered:'||o.id,'cogs:'||o.id,'investor:'||o.id,'workspace-reconciliation:'||o.id,'automatic-finance:'||o.id)))`;
+    'delivered:'||o.id,'cogs:'||o.id,'investor:'||o.id,'investor-pending:'||o.id,'workspace-reconciliation:'||o.id,'automatic-finance:'||o.id)))`;
 
 function checkpoint(value: string): Checkpoint {
   try {

@@ -161,10 +161,10 @@ export function planInvestorSources(db: D1Database, contract: InvestmentContract
   // Two orders cannot publish a source calculated from an earlier read.
   return ['investor_profit','investor_capital'].map(kind => db.prepare(`
     WITH totals AS (SELECT COALESCE(SUM(profit_iqd),0) AS accrued,COALESCE(SUM(CASE WHEN eligible=1 THEN profit_iqd ELSE 0 END),0) AS available,
-      COALESCE(SUM(CASE WHEN eligible=1 THEN capital_iqd ELSE 0 END),0) AS capital,COALESCE(SUM(loss_iqd),0) AS loss,COALESCE(MAX(pending),0) AS pending FROM investor_allocation_results WHERE contract_id=?1),
+      COALESCE(SUM(capital_iqd),0) AS accrued_capital,COALESCE(SUM(CASE WHEN eligible=1 THEN capital_iqd ELSE 0 END),0) AS capital,COALESCE(SUM(loss_iqd),0) AS loss,COALESCE(MAX(pending),0) AS pending FROM investor_allocation_results WHERE contract_id=?1),
     funds AS (SELECT COALESCE(SUM(CASE WHEN kind='funding' THEN amount_iqd ELSE 0 END),0) AS funded,
       COALESCE(SUM(CASE WHEN allocation_id IS NULL AND kind IN ('loss','loss_correction') THEN amount_iqd ELSE 0 END),0) AS physical_loss FROM investor_finance_events WHERE contract_id=?1),
-    value AS (SELECT CASE WHEN ?2='investor_profit' THEN accrued ELSE MAX(0,MIN(capital,funded-loss-physical_loss)) END AS accrued,
+    value AS (SELECT CASE WHEN ?2='investor_profit' THEN accrued ELSE MAX(0,MIN(accrued_capital,funded-loss-physical_loss)) END AS accrued,
       CASE WHEN pending=1 THEN 0 WHEN ?2='investor_profit' THEN CASE WHEN funded>=?3 THEN MAX(0,available) ELSE 0 END ELSE MAX(0,MIN(capital,funded-loss-physical_loss)) END AS amount FROM totals,funds)
     INSERT INTO finance_investor_earnings(id,user_id,contract_id,kind,title,amount_iqd,accrued_iqd,state,day,updated_at)
     SELECT ?4,?5,?1,?2,?6,amount,accrued,CASE WHEN amount>0 THEN 'available' ELSE 'pending' END,?7,?8 FROM value WHERE 1

@@ -47,7 +47,7 @@ async function changeContext(db:D1Database,ruleId:string,input:WageChangeInput,a
 
 // Completed and interrupted previews from an older calculation must be
 // reviewed again after a deploy, even when their source rows did not change.
-const PREVIEW_CALCULATION_VERSION=6;
+const PREVIEW_CALCULATION_VERSION=7;
 type PreviewDetail={order_id:string;earning_day:string;affected:boolean;units:number;previous_iqd:number;corrected_iqd:number|null;delta_iqd:number;manual_overrides:number;pending_costs:number;investor_delta_iqd:number|null;owner_delta_iqd:number|null};
 type PreviewWork={calculation_version:number;projected:ParticipantSource[];detail:PreviewDetail[];affectedCostIds:string[];affectedInvestorIds:string[];pendingTargets:Record<string,number|null>;previous:number;corrected:number;knownCorrected:number;delta:number;units:number;unknown:number;manual:number;investorDelta:number;ownerDelta:number;profitUnknown:number;investorUnknown:number;matched:number;reviewed:number};
 type PreviewPage={cursor:string;work?:PreviewWork};
@@ -89,10 +89,10 @@ export async function previewWageChange(db:D1Database,ruleId:string,input:WageCh
       return [...base.costs.filter(c=>!ids.has(String(c.id))),...values.map((t,index)=>({
         ...(t.cost??{}),id:t.cost?.id??`preview:${index}`,order_id:id,order_item_id:t.line_id,staff_id:staff.id,
         effective_amount_iqd:t.amount,state:t.amount===null?'pending_cost':'due',
-        snapshot:JSON.stringify({rule:t.rule}),wage_rule_snapshot:JSON.stringify(t.rule),
+        snapshot:JSON.stringify({rule:t.rule,line_ids:t.line_ids}),wage_rule_snapshot:JSON.stringify(t.rule),wage_line_ids_json:JSON.stringify(t.line_ids),
       }))];
     };
-    if(targets.some(t=>t.rule.basis==='profit_percent')&&targets.some(t=>t.rule.basis!=='profit_percent'&&t.amount!==t.cost?.effective_iqd)){
+    if(targets.some(t=>t.rule.basis==='profit_percent')&&targets.some(t=>t.rule.basis!=='profit_percent')){
       const projected=(await getOrderProfitBases(db,[id],{costOverrides:{[id]:simulate(targets)}}))[0];
       targets=await planStaffWages(db,staff,projected,[...versions,added]);
     }

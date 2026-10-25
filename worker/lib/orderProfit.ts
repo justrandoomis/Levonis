@@ -6,6 +6,7 @@ import type { OrderCostProjection, ProjectedOrderFinance } from './orderCostProj
 import { COST_BASIS, isConfirmedOrderCost, normalizeCostBasis } from './financeLedger';
 import { membershipDiscountAtLine } from './orderMembership';
 import { participantNetFingerprintSql } from './participantProfit';
+import { financialCostLines } from './financeCostScope';
 
 type Row = Record<string, unknown>;
 const n = (v: unknown) => Number(v ?? 0);
@@ -182,7 +183,7 @@ export async function getOrderProfitBases(db: D1Database, orderIds: string[], op
   const adjustedCost = present.has('finance_cost_adjustments') ? 'c.amount_iqd+COALESCE((SELECT SUM(a.delta_iqd) FROM finance_cost_adjustments a WHERE a.cost_id=c.id),0)' : 'c.amount_iqd';
   const scopeJoin = present.has('finance_line_departments') ? 'LEFT JOIN finance_line_departments fd ON fd.order_item_id=i.id' : '';
   const scopes = present.has('finance_line_departments') ? "CASE WHEN fd.order_item_id IS NOT NULL THEN COALESCE(fd.main_catalog_id,'') ELSE COALESCE(p.category_id,'') END main_catalog_id,CASE WHEN fd.order_item_id IS NOT NULL THEN COALESCE(fd.sub_catalog_id,'') ELSE COALESCE(p.sub_category_id,'') END sub_catalog_id,CASE WHEN fd.order_item_id IS NOT NULL THEN fd.main_name ELSE COALESCE(mc.name_ar,'') END main_name,CASE WHEN fd.order_item_id IS NOT NULL THEN fd.sub_name ELSE COALESCE(sc.name_ar,'') END sub_name,fd.captured_at department_snapshot_at,fd.is_legacy department_snapshot_legacy" : "COALESCE(p.category_id,'') main_catalog_id,COALESCE(p.sub_category_id,'') sub_catalog_id,COALESCE(mc.name_ar,'') main_name,COALESCE(sc.name_ar,'') sub_name,NULL department_snapshot_at,1 department_snapshot_legacy";
-  const [orders, items, allocs, costs, refunds, expenses, collections, revisions, lateCosts,legacyRefunds] = await Promise.all([
+  const [orders, items, allocs, costs, refunds, expenses, collections, revisions, lateCosts,legacyRefunds,wageTargets] = await Promise.all([
     db.prepare('SELECT o.*,u.name customer_name FROM orders o LEFT JOIN users u ON u.id=o.user_id WHERE o.id IN (SELECT value FROM json_each(?)) ORDER BY o.id').bind(ids).all<Row>(),
     db.prepare(`SELECT i.*,${scopes} FROM order_items i LEFT JOIN products p ON p.id=i.product_id LEFT JOIN catalogs mc ON mc.id=p.category_id LEFT JOIN catalogs sc ON sc.id=p.sub_category_id ${scopeJoin} WHERE i.order_id IN (SELECT value FROM json_each(?)) ORDER BY i.id`).bind(ids).all<GoodsLine>(),
     db.prepare('SELECT a.*,l.incoming_id FROM order_item_inventory_allocations a LEFT JOIN inventory_lots l ON l.id=a.lot_id WHERE a.order_id IN (SELECT value FROM json_each(?)) ORDER BY a.id').bind(ids).all<Allocation>(),
@@ -198,12 +199,14 @@ export async function getOrderProfitBases(db: D1Database, orderIds: string[], op
       CASE WHEN o.gini_paid_iqd>0 THEN 'gini' ELSE 'wallet' END channel
       FROM return_cases r JOIN orders o ON o.id=r.order_id LEFT JOIN stock_return_inspections si ON si.return_case_id=r.id
       WHERE r.order_id IN (SELECT value FROM json_each(?)) AND r.state='resolved' AND r.resolution='refund' AND NOT EXISTS(SELECT 1 FROM finance_refund_facts f WHERE f.case_id=r.id)`).bind(ids).all<Row>(),
+    present.has('finance_wage_targets')?db.prepare('SELECT wt.* FROM finance_wage_targets wt JOIN finance_order_costs c ON c.id=wt.cost_id WHERE c.order_id IN (SELECT value FROM json_each(?))').bind(ids).all<Row>():Promise.resolve({results:[] as Row[]}),
   ]);
   return (orders.results ?? []).map((order) => {
     const orderId = s(order.id);
     const orderAllocs = (allocs.results ?? []).filter((a) => a.order_id === orderId);
     const goods = calculateGoods(order, (items.results ?? []).filter((i) => i.order_id === orderId), orderAllocs);
-    const orderCosts = options.costOverrides?.[orderId]??(costs.results ?? []).filter((c) => c.order_id === orderId);
+    const orderCosts:Row[] = options.costOverrides?.[orderId]??(costs.results ?? []).filter((c) => c.order_id === orderId)
+      .map(c=>({...c,wage_line_ids_json:wageTargets.results.find(t=>t.cost_id===c.id)?.line_ids_json}));
     const originalRefunds=(refunds.results??[]).filter((r)=>r.order_id===orderId);
     const legacy:Row[]=(legacyRefunds.results??[]).filter((r)=>r.order_id===orderId).map((r):Row=>{
       if(r.disposition==='damage')return {...r,cogs_iqd:0,legacy:true};
@@ -262,7 +265,7 @@ export async function getOrderProfitBases(db: D1Database, orderIds: string[], op
     }
     for (const c of orderCosts) {
       if (c.state === 'reversed') continue;
-      const targets = c.order_item_id ? lines.filter((l) => l.id === c.order_item_id) : lines;
+      const targets = financialCostLines(c,lines);
       const shares = spread(n(c.effective_amount_iqd), targets.map((l) => l.net_goods_iqd || l.qty));
       targets.forEach((l, i) => {
         if (c.state === 'pending_cost') { l.pending_costs = n(l.pending_costs) + 1; return; }
@@ -290,7 +293,7 @@ export async function getOrderProfitBase(db: D1Database, orderId: string): Promi
 /** A source fence protects corrections from a refund, collection or FIFO
  * posting that arrives after the editor has read its current calculation. */
 export async function profitSourceFingerprint(db:D1Database,orderId:string) {
-  const present=(await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('finance_cost_adjustments','lot_cost_adjustment_shares')").all<{name:string}>()).results??[];
+  const present=(await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('finance_cost_adjustments','lot_cost_adjustment_shares','finance_wage_targets')").all<{name:string}>()).results??[];
   const has=new Set(present.map((r)=>r.name));
   const legacy=`json_array(
     (SELECT json_array(status,updated_at,price_adjustment_iqd,shipping_iqd,cod_tax_iqd,due_on_delivery_iqd,gini_paid_iqd,points_discount_iqd,benefit_snapshot) FROM orders WHERE id=?1),
@@ -304,7 +307,7 @@ export async function profitSourceFingerprint(db:D1Database,orderId:string) {
     (SELECT json_group_array(json_array(e.id,e.state)) FROM accounting_entries e WHERE (e.source_type='order' AND e.source_id=?1) OR (e.source_type='return' AND e.source_id IN (SELECT id FROM return_cases WHERE order_id=?1))),
     ${has.has('finance_cost_adjustments')?"(SELECT json_group_array(json_array(a.id,a.delta_iqd)) FROM finance_cost_adjustments a JOIN finance_order_costs c ON c.id=a.cost_id WHERE c.order_id=?1)":'NULL'},
     ${has.has('lot_cost_adjustment_shares')?"(SELECT json_group_array(json_array(s.adjustment_id,s.allocation_id,s.unit_delta_iqd,s.recognized_iqd)) FROM lot_cost_adjustment_shares s JOIN order_item_inventory_allocations a ON a.id=s.allocation_id WHERE a.order_id=?1)":'NULL'})`;
-  const sql=has.has('finance_cost_adjustments')?participantNetFingerprintSql(legacy,'?1'):legacy;
+  const sql=has.has('finance_cost_adjustments')?participantNetFingerprintSql(legacy,'?1',false,has.has('finance_wage_targets')):legacy;
   const value=(await db.prepare(`SELECT ${sql} value`).bind(orderId).first<{value:string}>())!.value;
   return {sql,value};
 }

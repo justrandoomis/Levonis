@@ -10,7 +10,7 @@ import { staffPeriodReport } from '../lib/financeParticipantReports';
 import { financeRange, financeRangeArgs, inFinanceRangeSql } from '../lib/financeRange';
 import { newId } from '../lib/crypto';
 import { baghdadDay, dateValue, fence, journalPlan, periodOpen, requireCapability, whole } from '../lib/operations';
-import { changeWithdrawalState, effectiveStaffCostSql, heldSourceSql, participantOverview, payWithdrawal, staffPaidSql } from '../lib/financeParticipants';
+import { changeWithdrawalState, effectiveStaffCostSql, heldSourceSql, participantOverview, participantSources, participantSummary, participantAdvanceState, participantEntries, payWithdrawal, staffPaidSql } from '../lib/financeParticipants';
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
 import { readRuleScope, type ScopedCostRule } from '../lib/financeRuleScopes';
 import { employmentDate, publicReconciliation, queueStaffReconciliation, readStaff, readStaffReconciliation, staffDateEligible, updateStaffEmployment } from '../lib/financeEmployment';
@@ -43,11 +43,12 @@ for(const action of ['preview','apply'] as const)adminFinancePeopleRoutes.post(`
 adminFinancePeopleRoutes.get('/staff/:id/history',async c=>{
   await requireCapability(c.env,c.get('user')!,'rules');
   const db=c.env.DB,id=c.req.param('id'),person=await readStaff(db,id);if(!person)throw notFound('الموظف غير موجود');
-  const [periods,changes,adjustments,account]=await Promise.all([
+  const [periods,changes,adjustments,wages,advance]=await Promise.all([
     db.prepare('SELECT * FROM finance_wage_periods WHERE staff_id=? ORDER BY rule_id,starts_on DESC').bind(id).all(),
     db.prepare('SELECT v.*,u.name AS actor_name FROM finance_wage_versions v LEFT JOIN users u ON u.id=v.actor_id WHERE v.staff_id=? ORDER BY recorded_at DESC,revision DESC').bind(id).all(),
     db.prepare('SELECT a.*,c.order_id,c.rule_name FROM finance_cost_adjustments a JOIN finance_order_costs c ON c.id=a.cost_id WHERE c.staff_id=? ORDER BY a.created_at DESC LIMIT 200').bind(id).all(),
-    person.user_id?participantOverview(db,person.user_id,{foldProfitShare:false}):Promise.resolve(null)]);
+    participantSources(db,id,'staff'),participantAdvanceState(db,id,'staff')]);
+  const account={summary:participantSummary(wages,advance.balance),entries:participantEntries(wages,false)};
   return c.json({success:true,staff:person,periods:periods.results??[],versions:changes.results??[],adjustments:adjustments.results??[],account});
 });
 adminFinancePeopleRoutes.get('/accounts',async(c)=>{

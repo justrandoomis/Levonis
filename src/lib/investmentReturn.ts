@@ -39,6 +39,8 @@ export interface InvestmentReturnStrings {
   sourcesSurplus: string;
   batchesReturned: string;
   batchesPending: string;
+  capitalAccrued: string;
+  capitalPending: string;
 }
 
 export const INVESTMENT_RETURN_STRINGS: Readonly<Record<Language, InvestmentReturnStrings>> = {
@@ -62,6 +64,8 @@ export const INVESTMENT_RETURN_STRINGS: Readonly<Record<Language, InvestmentRetu
     sourcesSurplus: 'منه فائض تمويل الشحنات',
     batchesReturned: 'فائض تمويل أُعيد إليك',
     batchesPending: 'يعود إليك عند استلام بقية تمويلك',
+    capitalAccrued: 'رأس المال المستحق من المبيعات والفائض',
+    capitalPending: 'رأس مال ينتظر التحصيل أو إكمال التسوية',
   },
   en: {
     footerRow: "Returns to the investor's earnings",
@@ -83,6 +87,8 @@ export const INVESTMENT_RETURN_STRINGS: Readonly<Record<Language, InvestmentRetu
     sourcesSurplus: 'Of which shipment funding surplus',
     batchesReturned: 'Funding surplus returned to you',
     batchesPending: 'Returns to you once the rest of your funding is received',
+    capitalAccrued: 'Capital due from sales and funding surplus',
+    capitalPending: 'Capital awaiting collection or settlement',
   },
   ckb: {
     footerRow: 'دەگەڕێتەوە بۆ جزدانی قازانجی وەبەرهێنەر',
@@ -104,6 +110,8 @@ export const INVESTMENT_RETURN_STRINGS: Readonly<Record<Language, InvestmentRetu
     sourcesSurplus: 'لەمەش زیادەی پارەدارکردنی بارەکان',
     batchesReturned: 'زیادەی پارەدارکردن کە بۆت گەڕێندرایەوە',
     batchesPending: 'کاتێک ماوەی پارەدارکردنەکەت وەرگیرا بۆت دەگەڕێتەوە',
+    capitalAccrued: 'سەرمایەی شایستە لە فرۆشتن و زیادەی پارەدارکردن',
+    capitalPending: 'سەرمایەی چاوەڕێی کۆکردنەوەی پارە یان یەکلایی‌کردنەوە',
   },
 };
 

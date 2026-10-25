@@ -8,7 +8,7 @@ import { api, Button, dateLabel, Dialog, EARNINGS, Empty, Feedback, Field, Loadi
 
 type Entry = { id: string; kind: 'staff' | 'investor_profit' | 'investor_capital'; title: string; order_id?: string; day: string; amount_iqd: number; accrued_iqd?: number; paid_iqd: number; held_iqd: number; available_iqd: number; state: string };
 export type EarningsData = {
-  summary: { earnings_pending_iqd?: number; net_balance_iqd?: number; staff_debt_iqd?: number; investor_profit_debt_iqd?: number; earned_iqd: number; available_iqd: number; held_iqd: number; paid_iqd: number; pending_iqd: number; staff_iqd: number; investor_profit_iqd: number; capital_iqd: number; earnings_paid_iqd?: number; earnings_held_iqd?: number; earnings_available_iqd?: number; capital_available_iqd?: number; capital_surplus_iqd?: number; pending_costs?: number; debt_iqd?: number; advance_balance_iqd?: number; reconciliation_pending?: boolean };
+  summary: { capital_pending_iqd?: number; earnings_pending_iqd?: number; net_balance_iqd?: number; staff_debt_iqd?: number; investor_profit_debt_iqd?: number; earned_iqd: number; available_iqd: number; held_iqd: number; paid_iqd: number; pending_iqd: number; staff_iqd: number; investor_profit_iqd: number; capital_iqd: number; earnings_paid_iqd?: number; earnings_held_iqd?: number; earnings_available_iqd?: number; capital_available_iqd?: number; capital_surplus_iqd?: number; pending_costs?: number; debt_iqd?: number; advance_balance_iqd?: number; reconciliation_pending?: boolean };
   entries: Entry[]; withdrawals: Withdrawal[];
   investment?: {unallocated_iqd:number;returned_surplus_iqd?:number;pending_surplus_iqd?:number;batches:{id:string;name:string;state:string;principal_iqd:number;received_iqd:number;qty_received:number;delivered_qty:number;remaining_qty:number;earned_iqd:number;available_iqd:number;paid_iqd:number;recovered_capital_iqd:number;capital_paid_iqd:number}[]};
   employment?: { start_work_date: string | null; first_earning_day: string | null; active: number; archived: number; has_rules: number; reconciliation_state: string | null; processed_orders: number }[];
@@ -36,7 +36,8 @@ export function EarningsSources({ summary, capitalAvailable, onWithdrawCapital }
   return <Surface title={loc('مصادر مستحقاتك', 'Your earnings sources')}><div className="fp-rows">
     <div className="fp-row"><span>{loc('أجور العمل', 'Work earnings')}</span><Money value={summary.staff_iqd} /></div>
     <div className="fp-row"><span>{loc('أرباح الاستثمار', 'Investment profits')}</span><Money value={summary.investor_profit_iqd} /></div>
-    <div className="fp-row"><span>{loc('رأس المال المسترد', 'Recovered capital')}</span><Money value={summary.capital_iqd} /></div>
+    <div className="fp-row"><span>{ir.capitalAccrued}</span><Money value={summary.capital_iqd} /></div>
+    {!!summary.capital_pending_iqd && <div className="fp-row"><span>{ir.capitalPending}</span><Money value={summary.capital_pending_iqd} /></div>}
     {investorReturnView(summary, null).sources_surplus_iqd > 0 && <div className="fp-row"><span className="fp-row-meta">{ir.sourcesSurplus}</span><Money value={investorReturnView(summary, null).sources_surplus_iqd} /></div>}
     {capitalAvailable > 0 && <div className="fp-row"><div><span>{loc('رأس المال المتاح للسحب', 'Capital available to withdraw')}</span><p className="fp-row-meta"><Money value={capitalAvailable} /></p></div><Button size="sm" onClick={onWithdrawCapital}>{loc('سحب رأس المال', 'Withdraw capital')}</Button></div>}
   </div></Surface>;

@@ -13,7 +13,7 @@ import { AccountPicker, api, Button, dateLabel, Dialog, Empty, Feedback, Field, 
 
 type Named = { id: string; name?: string; name_ar?: string; name_en?: string; parent_id?: string | null };
 type Scope = { catalog_ids: string[]; product_ids: string[]; excluded_product_ids: string[] };
-type Staff = { id: string; name: string; role: string; active: number; user_id: string | null; employment_version: number; inactive_periods_json?: string; cutoff_earnings?: { orders: number; first_day: string } | null; start_work_date?: string | null; archived_at?: string | null; period?: {earned_iqd:number;paid_iqd:number;adjustments_iqd:number;pending_costs:number}; account_name?: string; account_email?: string; balance?: { staff_net_iqd: number; staff_available_iqd: number; staff_debt_iqd: number; pending_costs?: number } };
+type Staff = { id: string; name: string; role: string; active: number; user_id: string | null; employment_version: number; inactive_periods_json?: string; cutoff_earnings?: { orders: number; first_day: string } | null; start_work_date?: string | null; archived_at?: string | null; period?: {earned_iqd:number;paid_iqd:number;adjustments_iqd:number;pending_costs:number}; account_name?: string; account_email?: string; balance?: { reconciliation_pending?: boolean; staff_net_iqd: number; staff_available_iqd: number; staff_debt_iqd: number; pending_costs?: number } };
 type Rule = { id: string; version: number; name: string; staff_id: string | null; amount: number; basis: string; milestone: string; requires_assignment: number; active: number; scope?: Scope; target_type?: string; target_id?: string; cap_iqd?: number | null; group_key?: string; category_id?: string; center_id?: string | null; priority?: number; effective_from?: string; effective_to?: string | null; employment_effective_default?: number };
 type StaffWrite = { staff?: Staff; reconciliation?: Reconciliation | null };
 type Config = { can_manage_staff?: boolean; staff: Staff[]; catalogs: Named[]; rules: Rule[]; scope_products: Named[]; reconciliations?: Reconciliation[] };
@@ -40,7 +40,7 @@ export default function PeoplePanel({ onChanged, from, to, month }: PanelProps =
   const canManage = config?.can_manage_staff === true;
   useFreshOnReturn(async () => { await remote.load(); if (mounted.current) onChanged?.(); }, {
     pollWhileVisibleMs: 30_000, minIntervalMs: 30_000,
-    enabled: !!config?.staff.some(person => person.period?.pending_costs || person.balance?.pending_costs) && !remote.loading && !op.busy && !editor && !personEditor && !history && !removing && !linking,
+    enabled: !!config?.staff.some(person => person.period?.pending_costs || person.balance?.pending_costs || person.balance?.reconciliation_pending) && !remote.loading && !op.busy && !editor && !personEditor && !history && !removing && !linking,
   });
   const live = config?.staff.filter((person) => !person.archived_at) ?? [];
   const archived = config?.staff.filter((person) => person.archived_at) ?? [];

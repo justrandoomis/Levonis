@@ -26,11 +26,20 @@ export async function reconcileFinanceOrder(db:D1Database,orderId:string,opts:{a
       else await db.prepare('UPDATE finance_posting_errors SET message=? WHERE event_key=?')
         .bind('تكلفة البضاعة مثبتة، لكن قيد مصروفها المحاسبي لم يُرحّل؛ يعيد النظام محاولة الترحيل تلقائيًا.',`cogs:${orderId}`).run();
     }
-    await syncInvestorOrder(db,orderId,opts);
-    await db.prepare('DELETE FROM finance_posting_errors WHERE event_key=?').bind(`investor:${orderId}`).run();
-    return {complete:true};
+    try {
+      await syncInvestorOrder(db,orderId,opts);
+    } catch(e) {
+      if((e as {code?:string}).code!=='INVESTOR_PENDING')throw e;
+      // Staff and workspace projections above succeeded. Missing investor
+      // evidence is a durable pending state, not a failure of every employee.
+      await recordFinancialFailure(db,orderId,'investor-pending',e);
+      await db.prepare('DELETE FROM finance_posting_errors WHERE event_key=?').bind(`investor:${orderId}`).run();
+      return {complete:false,staff_complete:true,pending:true};
+    }
+    await db.prepare('DELETE FROM finance_posting_errors WHERE event_key IN (?,?)').bind(`investor:${orderId}`,`investor-pending:${orderId}`).run();
+    return {complete:true,staff_complete:true,pending:false};
   }catch(e){
     await recordFinancialFailure(db,orderId,'investor',e);
-    return {complete:false};
+    return {complete:false,staff_complete:false,pending:false};
   }
 }

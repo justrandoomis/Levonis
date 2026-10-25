@@ -65,7 +65,7 @@ for (const correctBeforeDelete of [false, true]) {
         [{ id: 'ip', product_id: null }, { id: 'iq', product_id: null }, { id: 'ir', product_id: 'r' }]);
       assert.notEqual((await profitSourceFingerprint(w.db, 'o')).value, fingerprint.value);
       const wageSource=String(w.raw.prepare(`SELECT ${staffBasisFingerprintSql('?1')} value`).get('o')!.value);
-      assert.match(wageSource, /^\["participant-net-v1",/);
+      assert.match(wageSource, /^\["participant-net-v2",/);
       assert.ok(wageSource.includes(JSON.stringify(w.snapshot())),
         'net-profit recovery retains the original membership evidence and the deleted-product identities');
       await correctMembershipSale(w.db, 'o', w.day);

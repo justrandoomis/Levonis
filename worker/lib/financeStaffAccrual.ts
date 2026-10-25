@@ -26,7 +26,7 @@ export async function continueStaffReconciliation(env:Env,staffId:string,revisio
           await runOrderFinancialEffects(env,order.id,milestone,day,{staffId,employmentVersion:job.revision,rules,skipReconcile:true});
       }
       const reconciled=await reconcileFinanceOrder(db,order.id,{actor:job.actor_id??undefined,day});
-      if(!reconciled.complete)throw new Error((await db.prepare('SELECT message FROM finance_posting_errors WHERE event_key=?').bind(`investor:${order.id}`).first<{message:string}>())?.message??'تعذر تحديث التسوية المالية');
+      if(!reconciled.staff_complete)throw new Error((await db.prepare('SELECT message FROM finance_posting_errors WHERE event_key=?').bind(`investor:${order.id}`).first<{message:string}>())?.message??'تعذر تحديث التسوية المالية');
       const after=(await db.prepare(`SELECT (SELECT COUNT(*) FROM finance_order_costs WHERE order_id=? AND staff_id=?)+(SELECT COUNT(*) FROM finance_cost_adjustments a JOIN finance_order_costs c ON c.id=a.cost_id WHERE c.order_id=? AND c.staff_id=?) AS n`).bind(order.id,staffId,order.id,staffId).first<{n:number}>())!.n;
       processed++;if(after!==before)adjusted++;
       await db.batch([...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=?) AND EXISTS(SELECT 1 FROM finance_staff_reconciliations WHERE staff_id=? AND revision=? AND cursor=?)',[staffId,job.revision,staffId,job.revision,cursor]),

@@ -481,6 +481,7 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   // These forms do not upload media; receipt files stay in the existing payment sources.
   'finance_cost_adjustments.recalculation_key': 'financial reconciliation identity',
   'finance_wage_changes.preview_json': 'server wage impact, amounts and source identifiers',
+  'finance_wage_targets.line_ids_json': 'server-calculated order-item ids covered by the current wage target; no media fields',
   'finance_wage_changes.request_json': 'effective wage rule, scope ids, date and reason',
   'finance_wage_preview_jobs.input_json': 'wage preview parameters',
   'finance_wage_preview_jobs.preview_token': 'optimistic preview fingerprint',

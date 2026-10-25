@@ -2,6 +2,7 @@ import { reportAdjustments } from './financeReportOverlay';
 import { spread, workspaceInstalled, type OrderProfitBase } from './orderProfit';
 import { conflict } from './http';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
+import { financialCostLines } from './financeCostScope';
 
 type Row = Record<string, unknown>;
 const n = (value: unknown) => Number(value ?? 0);
@@ -34,7 +35,7 @@ export async function participantNetProfit(db: D1Database, base: OrderProfitBase
   const costs = new Map(base.lines.map(line => [line.id, { amount: 0, pending: false }]));
   for (const cost of base.costs) {
     if (cost.state === 'reversed' || (forStaff && isProfitShare(cost))) continue;
-    const targets = cost.order_item_id ? base.lines.filter(line => line.id === cost.order_item_id) : base.lines;
+    const targets = financialCostLines(cost,base.lines);
     const shares = spread(n(cost.effective_amount_iqd), targets.map(line => line.net_goods_iqd || line.qty));
     targets.forEach((line, index) => {
       const assigned = costs.get(line.id)!;
@@ -73,12 +74,12 @@ export async function participantNetProfit(db: D1Database, base: OrderProfitBase
 /** Same source definition for calculation fences, payout guards and recovery.
  * Versioning queues old entitlements; deductions added later invalidate them
  * immediately. Full-month inputs keep overhead independent of report filters.
- * Keep the v1 shape and an empty promotion slot so unaffected wages remain
- * payable. Old fingerprints carrying a promotion or its allocation differ
- * and queue restoration; future promotion changes cannot stale balances. */
-export function participantNetFingerprintSql(baseSql: string, order: string, staffCosts = false): string {
+ * Allocation revisions also invalidate historical participant shares. The
+ * target's existing revision fields keep this SQL compatible before the new
+ * optional line_ids_json column has been applied. */
+export function participantNetFingerprintSql(baseSql: string, order: string, staffCosts = false, wageTargets = true): string {
   const month = monthSql(order);
-  return `json_array('participant-net-v1',json((${baseSql})),
+  return `json_array('participant-net-v2',json((${baseSql})),
     (SELECT json_array(coupon_snapshot,coupon_discount_iqd,points_discount_iqd,
       CASE WHEN EXISTS(SELECT 1 FROM order_items mi WHERE mi.order_id=${order} AND mi.membership_discount_iqd>0) THEN benefit_snapshot END)
       FROM orders WHERE id=${order}),
@@ -87,6 +88,10 @@ export function participantNetFingerprintSql(baseSql: string, order: string, sta
     (SELECT json_group_array(json_array(id,order_item_id,state,credited_iqd)) FROM
       (SELECT * FROM price_protection_claims WHERE order_id=${order} ORDER BY id)),
     json('[]'),
+    (SELECT json_group_array(json_array(pc.id,CASE WHEN json_valid(pc.snapshot) THEN json_extract(pc.snapshot,'$.line_ids') END,${wageTargets?'wt.wage_version_id,wt.basis,wt.employment_version,wt.updated_at':'NULL,NULL,NULL,NULL'}))
+      FROM (SELECT * FROM finance_order_costs WHERE order_id=${order} ORDER BY id) pc
+      ${wageTargets?'LEFT JOIN finance_wage_targets wt ON wt.cost_id=pc.id':''}
+      ${staffCosts?"WHERE pc.staff_id IS NULL OR COALESCE(wt.basis,json_extract(pc.snapshot,'$.rule.basis'),'')<>'profit_percent'":''}),
     (SELECT json_group_array(json_array(e.id,e.amount_iqd,e.expense_day)) FROM
       (SELECT * FROM operating_expenses ORDER BY id) e WHERE substr(e.expense_day,1,7)=${month} AND ${generalExpense}),
     CASE WHEN EXISTS(SELECT 1 FROM operating_expenses e WHERE substr(e.expense_day,1,7)=${month} AND e.amount_iqd>0 AND ${generalExpense})

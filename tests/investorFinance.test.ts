@@ -38,12 +38,16 @@ async function contract(s:ReturnType<typeof setup>,incoming='inc-a',user='invest
   return body;
 }
 async function fund(s:ReturnType<typeof setup>,id:string,amount:number){const body={operation_id:crypto.randomUUID(),amount_iqd:amount,payment_day:baghdadDay(),reference:'cash receipt'};const res=await post(s.app,`/i/contracts/${id}/funding`,body);assert.equal(res.status,200,JSON.stringify(await json(res.clone())));return body;}
-async function sale(s:ReturnType<typeof setup>,id='order',lots=['lot-a','lot-b'],paid=true,unit=500){
-  const qty=lots.length,total=qty*unit;
+async function sale(s:ReturnType<typeof setup>,id='order',lots=['lot-a','lot-b'],paid=true,unit=500,ownerLine=false){
+  const qty=lots.length,total=qty*unit+(ownerLine?unit:0);
   s.raw.prepare(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,shipping_iqd,created_at,delivered_at) VALUES (?,'buyer','delivered','{}','standard','{}','cash',?,1500,?,?,0,?,?)`).run(id,total,total,total,new Date().toISOString(),new Date().toISOString());
-  s.raw.prepare(`INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES (?,?,'part','قطعة',?,?,?,100,'snapshot')`).run(`${id}-item`,id,qty,unit,total);
+  s.raw.prepare(`INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES (?,?,'part','قطعة',?,?,?,100,'snapshot')`).run(`${id}-item`,id,qty,unit,qty*unit);
   let cogs=0;
   for(const [i,lot] of lots.entries()){const cost=count(s.raw,'SELECT unit_cost_iqd n FROM inventory_lots WHERE id=?',lot);cogs+=cost;s.raw.prepare('INSERT INTO order_item_inventory_allocations(id,order_id,order_item_id,lot_id,scope,scope_id,qty,unit_cost_iqd,cogs_iqd,idempotency_key) VALUES (?,?,?,?,\'base\',\'\',1,?,?,?)').run(`${id}-a${i}`,id,`${id}-item`,lot,cost,cost,`${id}:${lot}`);s.raw.prepare('UPDATE inventory_lots SET qty_remaining=qty_remaining-1 WHERE id=?').run(lot);}
+  if(ownerLine){
+    s.raw.prepare("INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES(?,?,'foreign','Owner product',1,?,?,100,'snapshot')").run(`${id}-owner-line`,id,unit,unit);
+    cogs+=100;
+  }
   s.raw.prepare("UPDATE products SET stock=stock-? WHERE id='part'").run(qty);
   if(paid)s.raw.prepare("INSERT INTO finance_collections(id,order_id,payer,amount_iqd,collection_day,actor_id,created_at) VALUES (?,?,'customer',?,?,'admin',?)").run(`${id}-collection`,id,total,baghdadDay(),new Date().toISOString());
   await s.db.batch([...journalPlan(s.db,{key:`sale:${id}`,day:baghdadDay(),title:'Sale',source:'order',sourceId:id,actor:'admin'},[{account:'1100',debit:total},{account:'4000',credit:total}]).statements,...journalPlan(s.db,{key:`cogs:${id}`,day:baghdadDay(),title:'COGS',source:'order',sourceId:id,actor:'admin'},[{account:'5000',debit:cogs},{account:'1200',credit:cogs}]).statements]);
@@ -58,6 +62,59 @@ test('mixed FIFO origins accrue 35 percent separately, capital is not profit, de
   const before=count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events');await syncInvestorOrder(s.db,'order',{actor:'admin'});assert.equal(count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events'),before);
   assert.equal((await investmentContractSummary(s.db,a.operation_id)).summary.available_profit_iqd,140);
   assert.equal(count(s.raw,'SELECT SUM(debit_iqd-credit_iqd) n FROM accounting_lines'),0);
+});
+
+test('uncollected delivered capital is visible as pending capital without becoming withdrawable',async()=>{
+  const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);
+  await sale(s,'uncollected',['lot-a'],false);await syncInvestorOrder(s.db,'uncollected');
+  const account=await participantOverview(s.db,'investor');
+  assert.equal(account.summary.capital_iqd,100);
+  assert.equal(account.summary.available_capital_iqd,0);
+  assert.equal(account.summary.investor_profit_iqd,140);
+  assert.equal(account.summary.available_earnings_iqd,0);
+  assert.equal(account.summary.pending_iqd,240);
+  assert.equal(account.summary.capital_pending_iqd,100);
+  await assert.rejects(requestWithdrawal({DB:s.db} as Env,'investor','no-invented-cash',1,'capital'));
+  s.raw.exec("INSERT INTO finance_collections(id,order_id,payer,amount_iqd,collection_day,actor_id,created_at) VALUES ('actual-collection','uncollected','customer',500,'2026-10-24','admin','2026-10-24')");
+  await syncInvestorOrder(s.db,'uncollected');
+  const collected=await participantOverview(s.db,'investor');
+  assert.equal(collected.summary.capital_iqd,100);
+  assert.equal(collected.summary.available_capital_iqd,100);
+  assert.equal(collected.summary.available_earnings_iqd,140);
+  assert.equal(collected.summary.pending_iqd,0);
+});
+
+test('an investor awaiting an unrelated cost cannot stop staff reconciliation or withhold an independently known fixed wage',async()=>{
+  const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);
+  s.raw.exec("UPDATE finance_staff SET user_id='other',start_work_date='2026-01-01' WHERE id='staff_hussein'");
+  const owner=stubApp(s.db,ADMIN,a=>a.route('/operations',adminFinanceOperationsRoutes));
+  const added=await post(owner,'/operations/rules',{staff_id:'staff_hussein',basis:'order',amount:2500,milestone:'delivered'});
+  assert.equal(added.status,200,JSON.stringify(await json(added)));
+  await sale(s,'mixed-unknown',['lot-a'],false,5000);
+  s.raw.exec("INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_basis) VALUES('unknown-line','mixed-unknown','foreign','Accessory without confirmed cost',1,100,100,'unrecorded')");
+  await sale(s,'z-later-known',['lot-a'],true,5000);
+  const job=await continueStaffReconciliation({DB:s.db} as Env,'staff_hussein');
+  assert.equal(job?.state,'complete',JSON.stringify(job));
+  const wage=await participantOverview(s.db,'other');
+  assert.equal(job?.processed_orders,2,'the later known order is not starved by missing investor evidence');
+  assert.equal(wage.summary.staff_iqd,5000);
+  assert.equal(wage.summary.staff_available_iqd,5000);
+  assert.equal((await participantOverview(s.db,'investor')).summary.available_earnings_iqd,0);
+  assert.ok(count(s.raw,"SELECT COUNT(*) n FROM finance_posting_errors WHERE event_key='investor-pending:mixed-unknown'"),'the owner still sees the unresolved investor cost');
+});
+test('an investor bears only the wages assigned to the funded product, including per-order scoped pay',async()=>{
+  const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);
+  s.raw.exec("UPDATE finance_staff SET user_id='other',start_work_date='2026-01-01' WHERE id='staff_hussein'");
+  const owner=stubApp(s.db,ADMIN,a=>a.route('/operations',adminFinanceOperationsRoutes));
+  const added=await post(owner,'/operations/rules',{staff_id:'staff_hussein',basis:'order',amount:2500,milestone:'delivered',scope:{catalog_ids:[],product_ids:['part'],excluded_product_ids:[]}});
+  assert.equal(added.status,200,JSON.stringify(await json(added)));
+  await sale(s,'scoped-investor',['lot-a'],true,5000,true);
+  const job=await continueStaffReconciliation({DB:s.db} as Env,'staff_hussein');
+  assert.equal(job?.state,'complete',JSON.stringify(job));
+  const split=await investorOrderSplit(s.db,'scoped-investor');
+  assert.equal(split.pending,false);
+  assert.equal(split.investor_profit_iqd,840,'(5000 revenue - 100 actual cost - 2500 printer wage) × 35%');
+  assert.equal((await participantOverview(s.db,'investor')).summary.investor_profit_available_iqd,840);
 });
 test('investor-only recovery deducts coupons, points, credited protection and monthly expenses from historical profit',async()=>{
   const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);await sale(s,'order',['lot-a']);await syncInvestorOrder(s.db,'order');

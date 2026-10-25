@@ -512,7 +512,7 @@ export async function runOrderFinancialEffects(
   // The delivery call posts sale/COGS immediately after its preparation pass.
   // Publishing investors in that inner pass would require a sale not posted yet.
   if(deferDeliveryReconcile) await reconcileStaffOrderCosts(db,orderId,{day});
-  else if(!staffOnly?.skipReconcile){const reconciled=await reconcileFinanceOrder(db, orderId, { day });if(!reconciled.complete)throw new Error('تغيرت بيانات الطلب أثناء التسوية؛ أعد المحاولة');}
+  else if(!staffOnly?.skipReconcile){const reconciled=await reconcileFinanceOrder(db, orderId, { day });if(!reconciled.complete&&!reconciled.pending)throw new Error('تغيرت بيانات الطلب أثناء التسوية؛ أعد المحاولة');}
 }
 export async function recordReturnFinancials(
   env: Env,

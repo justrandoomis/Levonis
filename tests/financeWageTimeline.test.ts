@@ -41,6 +41,51 @@ async function setup(ruleOverrides:Record<string,unknown>={}){
   return {raw,db,boss,self,app,staffId:staff.id as string,ruleId:rule.id as string,order,drain,earnings,preview,apply,pay};
 }
 
+test('a printer-only per-order wage is charged to its matching lines before accessory profit shares',async()=>{
+  const x=await setup({basis:'order',amount:2500,scope:{catalog_ids:[],product_ids:['printer'],excluded_product_ids:[]}});
+  x.raw.exec("INSERT INTO products(id,name,slug,price_iqd) VALUES('accessory','Accessory','scoped-wage-accessory',50000)");
+  const added=await post(x.boss,'/operations/rules',{staff_id:x.staffId,basis:'profit_percent',amount:1000,
+    group_key:'accessory-profit',scope:{catalog_ids:[],product_ids:['accessory'],excluded_product_ids:[]}});
+  assert.equal(added.status,200,JSON.stringify(await json(added)));
+  await x.order('scoped-cost',1,'2026-09-20T12:00:00Z');
+  x.raw.exec("INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES('accessory-line','scoped-cost','accessory','Accessory',1,50000,50000,20000,'snapshot')");
+  await x.drain();
+  assert.equal((await x.earnings()).summary.staff_iqd,5500,'2500 printer fee plus 10% of the accessory net margin of 30000');
+  const {getOrderProfitBase}=await import('../worker/lib/orderProfit');
+  const base=await getOrderProfitBase(x.db,'scoped-cost');
+  assert.deepEqual(base.lines.map(l=>[l.id,l.wages_iqd]),[['accessory-line',3000],['line:scoped-cost',2500]]);
+  const original=row(x.raw,'SELECT snapshot FROM finance_order_costs WHERE rule_id=?',x.ruleId);
+  await x.pay(5500);
+  const payments=all(x.raw,'SELECT * FROM finance_staff_payments');
+  const change=await x.apply(2500,'2026-09-15',{basis:'order',scope:{catalog_ids:[],product_ids:['accessory'],excluded_product_ids:[]}});
+  assert.equal(change.preview.corrected_iqd,5250,'same fixed amount, now deducted from the accessory scope before its 10% share');
+  assert.equal((await x.earnings()).summary.staff_iqd,5250);
+  assert.equal((await x.earnings()).summary.debt_iqd,250,'only a real paid overpayment becomes debt');
+  assert.deepEqual((await getOrderProfitBase(x.db,'scoped-cost')).lines.map(l=>[l.id,l.wages_iqd]),[['accessory-line',5250],['line:scoped-cost',0]]);
+  assert.deepEqual(row(x.raw,'SELECT snapshot FROM finance_order_costs WHERE rule_id=?',x.ruleId),original);
+  assert.deepEqual(all(x.raw,'SELECT * FROM finance_staff_payments'),payments);
+  const corrections=all(x.raw,'SELECT * FROM finance_cost_adjustments');
+  await post(x.boss,'/operations/orders/scoped-cost/reconcile',{});
+  assert.deepEqual(all(x.raw,'SELECT * FROM finance_cost_adjustments'),corrections,'a replay must not post the same correction twice');
+  const history=await json(await get(x.boss,`/people/staff/${x.staffId}/history`));
+  assert.equal(history.account.summary.staff_iqd,5250);
+  assert.equal(history.account.entries.length,2);
+  assert.ok(history.account.entries.every((e:{order_id:string})=>e.order_id==='scoped-cost'));
+  x.raw.prepare("UPDATE finance_wage_targets SET amount_iqd=NULL WHERE cost_id IN(SELECT id FROM finance_order_costs WHERE staff_id=? AND order_item_id='accessory-line')").run(x.staffId);
+  const {staffPeriodReport}=await import('../worker/lib/financeParticipantReports');
+  const {financeRange}=await import('../worker/lib/financeRange');
+  assert.equal((await staffPeriodReport(x.db,financeRange({from:'2026-09-01',to:'2026-09-30'}))).get(x.staffId)?.pending_costs,1,'a recalculation waiting for costs must not disappear from the period warning');
+});
+
+test('wage scope reads and ordinary reconciliation tolerate the allocation column not being migrated yet',async()=>{
+  const x=await setup({basis:'order',amount:2500,scope:{catalog_ids:[],product_ids:['printer'],excluded_product_ids:[]}});
+  x.raw.exec('ALTER TABLE finance_wage_targets DROP COLUMN line_ids_json');
+  await x.order('legacy-scope',1,'2026-09-20T12:00:00Z');await x.drain();
+  assert.equal((await x.earnings()).summary.staff_iqd,2500);
+  const {getOrderProfitBase}=await import('../worker/lib/orderProfit');
+  assert.equal((await getOrderProfitBase(x.db,'legacy-scope')).lines[0].wages_iqd,2500);
+});
+
 test('paid 100,000 becomes corrected 70,000; 30,000 debt is covered by future wages once, then 5,000 becomes withdrawable',async()=>{
   const x=await setup();await x.order('before',4,'2026-09-14T12:00:00Z');await x.order('after',6,'2026-09-15T12:00:00Z');await x.drain();
   assert.equal((await x.earnings()).summary.available_iqd,100000);await x.pay(100000);

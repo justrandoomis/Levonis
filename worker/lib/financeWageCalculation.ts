@@ -11,6 +11,7 @@ import { readRuleScope } from './financeRuleScopes';
 import { readNeverLinkedLines } from './financeDeletedProductScope';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { participantNetProfit } from './participantProfit';
+import { financialCostLines } from './financeCostScope';
 
 export interface WageCost {
   id:string;order_item_id:string|null;rule_id:string;staff_id:string;state:string;snapshot:string;
@@ -72,9 +73,7 @@ export async function planStaffWages(db:D1Database,staff:EmploymentStaff,base:Or
     const universal=scope?!scope.catalog_ids.length&&!scope.product_ids.length&&!scope.excluded_product_ids.length
       :(!current.scope_json||current.scope_json==='{}')&&current.target_type==='all';
     if(universal)continue;
-    const saved=JSON.parse(cost.snapshot) as {line_ids?:unknown};
-    const affected=cost.order_item_id?[cost.order_item_id]
-      :Array.isArray(saved.line_ids)&&saved.line_ids.length?saved.line_ids:base.lines.map(line=>line.id);
+    const affected=financialCostLines(base.costs.find(c=>c.id===cost.id)??{...cost},base.lines).map(line=>line.id);
     if(affected.some(id=>typeof id==='string'&&unknownLines.has(id)))
       throw conflict(serverMessage('WAGE_SCOPE_REVIEW_REQUIRED'),'WAGE_SCOPE_REVIEW_REQUIRED');
   }
@@ -103,7 +102,7 @@ export async function planStaffWages(db:D1Database,staff:EmploymentStaff,base:Or
   for(const cost of manual){
     const rule=(JSON.parse(cost.snapshot) as {rule:EffectiveWageRule}).rule;
     const amount=eligible?cost.manual_iqd!:0;
-    result.push({cost,rule,line_id:cost.order_item_id,amount,qty:0,base_iqd:null,manual:true,line_ids:cost.order_item_id?[cost.order_item_id]:base.lines.map(l=>l.id)});
+    result.push({cost,rule,line_id:cost.order_item_id,amount,qty:0,base_iqd:null,manual:true,line_ids:financialCostLines(base.costs.find(c=>c.id===cost.id)??{...cost},base.lines).map(l=>l.id)});
     used.set(rule.id,(used.get(rule.id)??0)+amount);
   }
   for(const {rule,ids} of groups.values()){
@@ -140,6 +139,7 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
   const base=await getOrderProfitBase(db,orderId),earningDay=deliveryDay(base.order);
   const managed=new Set(versions.map(v=>v.rule_id));if(!earningDay)return {adjusted:0,managed:new Set<string>(),netCostsChanged:false};
   const source=await profitSourceFingerprint(db,orderId);
+  const scopeInstalled=(await db.prepare('PRAGMA table_info(finance_wage_targets)').all<{name:string}>()).results.some(c=>c.name==='line_ids_json');
   const statements:D1PreparedStatement[]=[],day=opts.day??baghdadDay(),now=new Date().toISOString();let adjusted=0,netCostsChanged=false;
   const reservationTargets:Array<{cost_id:string;amount_iqd:number}>=[];
   for(const staff of employees){
@@ -151,8 +151,10 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
       const previous=base.costs.find(c=>c.id===cost?.id);
       const previousRule=JSON.parse(String(previous?.wage_rule_snapshot??'null'))??JSON.parse(String(previous?.snapshot??'{}')).rule;
       const previousBasis=previous?previousRule?.basis:rule.basis;
+      const scopeChanged=!!previous&&JSON.stringify(financialCostLines(previous,base.lines).map(l=>l.id).sort())!==JSON.stringify([...target.line_ids].sort());
+      if(scopeChanged&&!scopeInstalled)throw conflict(serverMessage('NET_PROFIT_UPDATE_REQUIRED'),'NET_PROFIT_UPDATE_REQUIRED');
       if((rule.basis!=='profit_percent'||previousBasis!=='profit_percent')&&
-        (!cost||amount!==cost.effective_iqd||(cost.state==='pending_cost'&&amount!==null)||previousBasis!==rule.basis))netCostsChanged=true;
+        (!cost||amount!==cost.effective_iqd||(cost.state==='pending_cost'&&amount!==null)||previousBasis!==rule.basis||scopeChanged))netCostsChanged=true;
       const id=cost?.id??newId('oc'),liability='2100';
       if(cost&&cost.held_iqd>0&&amount!==null&&amount<cost.paid_iqd+cost.held_iqd)throw conflict('طلب سحب مفتوح يحتاج إعادة اعتماد قبل تخفيض الاستحقاق');
       if(cost&&amount!==null)reservationTargets.push({cost_id:id,amount_iqd:amount});
@@ -182,6 +184,8 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
       }
       statements.push(db.prepare(`INSERT INTO finance_wage_targets(cost_id,wage_version_id,amount_iqd,basis,employment_version,earning_day,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(cost_id) DO UPDATE SET wage_version_id=excluded.wage_version_id,amount_iqd=excluded.amount_iqd,basis=excluded.basis,employment_version=excluded.employment_version,earning_day=excluded.earning_day,updated_at=excluded.updated_at WHERE wage_version_id IS NOT excluded.wage_version_id OR amount_iqd IS NOT excluded.amount_iqd OR basis<>excluded.basis OR employment_version<>excluded.employment_version OR earning_day<>excluded.earning_day`)
         .bind(id,rule.wage_version_id??null,amount,rule.basis,staff.employment_version,earningDay,now));
+      if(scopeInstalled)statements.push(db.prepare('UPDATE finance_wage_targets SET line_ids_json=?,updated_at=? WHERE cost_id=? AND line_ids_json IS NOT ?')
+        .bind(JSON.stringify([...target.line_ids].sort()),now,id,JSON.stringify([...target.line_ids].sort())));
     }
   }
   if(statements.length){
