@@ -147,8 +147,13 @@ test('the availability chip and the «طريقة التوفر» chooser share ON
   assert.ok(usableAt > 0 && usableAt < product.indexOf('const effectiveMode:'));
   assert.match(product, /const showTransports = effectivePreorder &&/);
 
-  // The badge and the shelf note both read the derived state.
-  assert.match(product, /const modeBadge =\s*\n\s*effectiveMode === 'preorder'/);
+  // A missing choice is neutral, not a stockout. Once the selection's quote
+  // is ready, the badge and shelf note still share the derived server state.
+  const badge = /const modeBadge =([\s\S]*?);\n/.exec(product);
+  assert.ok(badge, 'the page still derives one badge');
+  assert.match(badge[1], /selectionPending && \(hasSelection \|\| effectiveMode === 'unavailable'\)/);
+  assert.match(badge[1], /label: choicePending \? s.chooseOption : s.updatingPrice/);
+  assert.match(badge[1], /:\s*effectiveMode === 'preorder'/);
   assert.match(product, /:\s*effectiveMode === 'direct_sale'/);
   assert.match(product, /if \(!availability \|\| effectiveMode !== 'direct_sale'\) return '';/);
   // …and the note itself never says «متوفر» about an empty shelf. Widening

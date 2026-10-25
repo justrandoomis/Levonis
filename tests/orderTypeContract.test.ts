@@ -69,10 +69,11 @@ test('the product page sends the order type it was told, and never one it guesse
   // This file's job is the WIRING: that the page calls it, with the buyer's
   // press and with the neutral facts.
   assert.match(derived![1], /resolveOrderType\(orderType, modesArr\)/);
-  assert.match(
-    page,
-    /import \{ resolveOrderType, resolveTransport, routeIsUsable \} from '\.\.\/lib\/productSelection'/
-  );
+  const selectionImports = /import \{([^}]+)\} from '\.\.\/lib\/productSelection'/.exec(page);
+  assert.ok(selectionImports, 'the page imports the shared selection rules');
+  for (const name of ['resolveOrderType', 'resolveTransport', 'routeIsUsable']) {
+    assert.ok(selectionImports[1].split(',').map((part) => part.trim()).includes(name), `${name} stays imported`);
+  }
   // …and the facts it needs are declared ABOVE it.
   const usableAt = page.indexOf('const modesArr =');
   assert.ok(usableAt > 0 && usableAt < page.indexOf('const requestedOrderType:'));
