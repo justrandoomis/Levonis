@@ -46,13 +46,13 @@ test('the server no longer builds the log: the module is gone and nothing import
   assert.doesNotMatch(overview, /\.\.\.history\b/);
 });
 
-test("the owner's views of the same account are unchanged", () => {
-  // The staff history sheet reads the account summary; the payout screen reads
-  // the account earnings. Both are served by participantOverview, as before —
-  // unfolded (`foldProfitShare:false`): the owner keeps every per-order wage row
-  // that the participant reads folded per day (DECISIONS row 220).
+test("the owner's history keeps every staff wage row, independently of the account's investments", () => {
+  // Staff history uses its own wages and advances; the payout screen reads
+  // the whole account. Both stay unfolded for the owner (DECISIONS row 220).
+  // Route-level balances, advances and account isolation are exercised in
+  // financeParticipants.test.ts; this guards the owner's detailed presentation.
   const routes = codeOf('worker/routes/adminFinancePeople.ts');
-  assert.match(routes, /\/staff\/:id\/history'[\s\S]*?participantOverview\(db,person\.user_id,\{foldProfitShare:false\}\)/);
+  assert.match(routes, /\/staff\/:id\/history'[\s\S]*?participantEntries\(wages,false,advance\.balance\)/);
   assert.match(routes, /\/accounts\/:id\/earnings'[\s\S]*?participantOverview\(c\.env\.DB,c\.req\.param\('id'\),\{foldProfitShare:false\}\)/);
   assert.match(codeOf('src/components/financePeople/StaffHistorySheet.tsx'), /data\.account\.summary\.staff_net_iqd/);
 });
