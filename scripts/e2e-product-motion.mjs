@@ -68,7 +68,7 @@ const result = await build({
   loader: { '.css': 'empty' },
   define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env': JSON.stringify({ DEV: false, PROD: true, MODE: 'production', BASE_URL: '/', SSR: false }) },
 });
-const css = `:root{--color-surface:#eee;--color-surface-selected:#ddd;--duration-ui:250ms;--ease-move:cubic-bezier(.77,0,.175,1)}*{box-sizing:border-box}body{margin:0}main{height:100vh;overflow-y:auto}header{height:64px}button{min-width:44px;min-height:44px}a{display:block}.card{width:160px;height:130px;position:relative;overflow:hidden;background:#eee;margin-left:24px;border-radius:16px}.hero{width:calc(100% - 32px);height:340px;max-width:760px;position:relative;overflow:hidden;margin:0 16px;background:#eee;border-radius:16px}.full,.w-full{width:100%}.full,.h-full{height:100%}.fixed{position:fixed}.flex{display:flex}.items-center{align-items:center}.justify-center{justify-content:center}.relative{position:relative}.absolute{position:absolute}.inset-0{inset:0}.overflow-hidden{overflow:hidden}.object-cover{object-fit:cover}.object-contain{object-fit:contain}.top{object-position:50% 4%}.p-3{padding:12px}.opacity-100{opacity:1}.bg-surface{background:#eee}.skeleton{background:#ccc}[data-lightbox]{height:82vh;width:calc(100vw - 32px);max-width:1200px}[data-overlay-scrim]{width:100%;height:100%;background:#000c;border:0}.zoom{position:absolute;right:8px;bottom:8px}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden}@media(min-width:800px){.hero{height:520px}}` + readFileSync(join(ROOT, 'src/components/motion/media.css'), 'utf8');
+const css = `:root{--color-surface:#eee;--color-surface-selected:#ddd;--duration-ui:.25s;--duration-quick:.15s;--ease-drawer:cubic-bezier(.32,.72,0,1);--ease-move:cubic-bezier(.77,0,.175,1)}*{box-sizing:border-box}body{margin:0}main{height:100vh;overflow-y:auto}header{height:64px}button{min-width:44px;min-height:44px}a{display:block}.card{width:160px;height:130px;position:relative;overflow:hidden;background:#eee;margin-left:24px;border-radius:16px}.hero{width:calc(100% - 32px);height:340px;max-width:760px;position:relative;overflow:hidden;margin:0 16px;background:#eee;border-radius:16px}.full,.w-full{width:100%}.full,.h-full{height:100%}.fixed{position:fixed}.flex{display:flex}.items-center{align-items:center}.justify-center{justify-content:center}.relative{position:relative}.absolute{position:absolute}.inset-0{inset:0}.overflow-hidden{overflow:hidden}.object-cover{object-fit:cover}.object-contain{object-fit:contain}.top{object-position:50% 4%}.p-3{padding:12px}.opacity-100{opacity:1}.bg-surface{background:#eee}.skeleton{background:#ccc}[data-lightbox]{height:82vh;width:calc(100vw - 32px);max-width:1200px}[data-overlay-scrim]{width:100%;height:100%;background:#000c;border:0}.zoom{position:absolute;right:8px;bottom:8px}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden}@media(min-width:800px){.hero{height:520px}}` + readFileSync(join(ROOT, 'src/components/motion/media.css'), 'utf8');
 const html = '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>' + css + '</style></head><body><div id="root"></div><script src="/harness.js" type="module"></script></body></html>';
 const svg = (name) => '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600"><rect width="600" height="600" fill="' + (name.includes('-b') ? '#d26b35' : name.includes('-c') ? '#458463' : '#3570a0') + '"/><rect x="120" y="80" width="360" height="440" rx="28" fill="#ddd"/><circle cx="300" cy="300" r="100" fill="#222"/></svg>';
 const server = createServer((request, response) => {
@@ -130,30 +130,56 @@ async function touch(context, page, dx, dy = 0) {
   return page.evaluate(() => ({ events: window.gestureTrace, action: getComputedStyle(document.querySelector('[data-gallery-hero]')).touchAction }));
 }
 const index = (page) => page.locator('#index').textContent();
-async function actualProduct(single = false, search = '') {
+async function actualProduct(single = false, search = '', priced = false) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   await context.addInitScript(() => { window.motionConfig = { actual: true }; });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   const options = [{ id: 'option-a', name_en: 'Version A', name_ar: 'النسخة الأولى' }, ...single ? [] : [{ id: 'option-b', name_en: 'Version B', name_ar: 'النسخة الثانية' }]];
-  const colors = [{ id: 'red', name_en: 'Red', name_ar: 'أحمر', hex: '#ff0000' }, ...single ? [] : [{ id: 'blue', name_en: 'Blue', name_ar: 'أزرق', hex: '#0000ff' }]];
+  const colors = priced ? [] : [{ id: 'red', name_en: 'Red', name_ar: 'أحمر', hex: '#ff0000' }, ...single ? [] : [{ id: 'blue', name_en: 'Blue', name_ar: 'أزرق', hex: '#0000ff' }]];
   const detail = { success: true, source: 'catalog', favorite: false, price_status: 'unpriced',
     product: { id: 'test', slug: 'test', name_ar: 'منتج الاختبار', name_en: 'Test product', price_iqd: null, options, colors,
       media: [{ url: '/large-a.svg', primary: true }, { url: '/large-b.svg', color_id: 'red', option_value_id: 'option-a' }], warranty_plans: [] },
     initial_selection: { option_id: 'option-a', option_value_ids: ['option-a'], color_id: 'red', fulfillment_type: 'direct_sale' },
     relations: { inventory_mode: 'VARIANT_COMBINATION', option_groups: [{ id: 'version', name_en: 'Version', kind: 'version', default_value_id: 'option-a', values: options }], colors, images: [], variants: [] },
   };
+  const price = { regular_iqd: 119, applied_iqd: 119, unit_subtotal_iqd: 119, applied_tier: 'regular', transport: null, warranty: null, errors: [], qty: 1, line_total_iqd: 119 };
+  const available = (id) => ({ mode: id === 'option-a' ? 'direct_sale' : 'unavailable', reason: id === 'option-a' ? null : 'OUT_OF_STOCK', selling_type: 'direct_sale',
+    stock: { tracked: true, scope: 'OPTION', on_hand: id === 'option-a' ? 12 : 0, available: id === 'option-a' ? 12 : 0, reserved: 0, max_qty: id === 'option-a' ? 12 : 0 },
+    selection: { option_required: true, color_required: false, option_id: id || null, option_value_ids: id ? [id] : [], color_id: null, complete: !!id, errors: id ? [] : ['OPTION_REQUIRED'] },
+    modes: [{ type: 'direct_sale', usable: id === 'option-a', reason: id === 'option-a' ? null : 'OUT_OF_STOCK' }],
+    preorder: { enabled: false, usable: false, reason: null, transports: [] }, qty_ok: id === 'option-a' });
+  if (priced) Object.assign(detail, { price_status: 'priced', pricing: price, availability: available('option-a'),
+    product: { ...detail.product, price_iqd: 119, selling_type: 'direct_sale' },
+    initial_selection: { ...detail.initial_selection, color_id: null },
+    relations: { ...detail.relations, inventory_mode: 'OPTION' },
+    price_levels: { base: price, option: { 'option-a': price, 'option-b': price }, color: {}, combo: {}, complete: true } });
+  const quoteRequests = [];
+  await context.addInitScript(() => {
+    window.photoDurations = [];
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function(frames, options) {
+      if (this.matches('[data-photo-zoom],[data-product-transition]')) window.photoDurations.push(options.duration);
+      return animate.call(this, frames, options);
+    };
+  });
   await page.route(/^https?:\/\/(?!127\.0\.0\.1[:/])/, (route) => route.abort());
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
-    const body = path === '/api/products/test' ? detail : path === '/api/settings/public' ? { settings: {} } : { success: true, user: null, items: [], products: [], reviews: [], total: 0, price_status: 'unpriced', quote: null };
+    let body = path === '/api/products/test' ? detail : path === '/api/settings/public' ? { settings: {} } : { success: true, user: null, items: [], products: [], reviews: [], total: 0, price_status: 'unpriced', quote: null };
+    if (priced && path === '/api/auth/me') body = { user: { id: 'fixture-user', username: 'tester', name: 'Tester', role: 'user' } };
+    if (priced && path === '/api/products/test/quote') {
+      const request = route.request().postDataJSON(); quoteRequests.push(request);
+      const id = request.optionValueIds?.[0] || request.optionId;
+      body = { success: true, price_status: 'priced', quote: { ...price, errors: id ? [] : ['OPTION_REQUIRED'] }, availability: available(id) };
+    }
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
   });
   await page.goto(base + '/product/test' + search);
   const manifest = JSON.parse(readFileSync(join(ROOT, 'dist/.vite/manifest.json'), 'utf8'));
   for (const sheet of manifest['index.html'].css) await page.addStyleTag({ content: readFileSync(join(ROOT, 'dist', sheet), 'utf8') });
   await page.waitForSelector('[data-option-groups]');
-  return { page, context, errors };
+  return { page, context, errors, quoteRequests };
 }
 try {
   {
@@ -350,6 +376,7 @@ try {
     await page.locator('[data-gallery-hero]').scrollIntoViewIfNeeded();
     await page.locator('[data-gallery-hero] img[data-main-image]').click();
     await page.waitForSelector('[data-photo-zoom]');
+    check('compiled CSS keeps the photo zoom visibly running for 250 milliseconds', await page.evaluate(() => window.photoDurations.at(-1) === 250));
     check('tapping the actual product photo opens its enlarged viewer', await page.getByRole('dialog', { name: 'صور المنتج', exact: true }).count() === 1);
     await page.keyboard.press('Escape');
     await page.waitForSelector('[data-overlay="product-lightbox"]', { state: 'detached' });
@@ -361,6 +388,26 @@ try {
     check('a deliberate variant link still restores its requested option', await page.locator('[data-option-value="option-a"]').filter({ visible: true }).first().getAttribute('aria-pressed') === 'true');
     check('a deliberate variant link still restores its photo', await page.locator('[data-gallery-hero] img[data-main-image]').getAttribute('src') === '/large-b.svg');
     check('explicit selection links raise no runtime errors', errors.length === 0);
+    await context.close();
+  }
+  {
+    const { page, context, errors, quoteRequests } = await actualProduct(false, '', true);
+    await page.waitForTimeout(600);
+    const signals = page.locator('[data-product-signals]').filter({ visible: true });
+    const cta = page.getByTestId('product-cta').filter({ visible: true });
+    check('an empty quote was actually returned with OUT_OF_STOCK', quoteRequests.some((q) => !q.optionId && !q.optionValueIds?.length));
+    check('stocked versions remain available before a choice', (await signals.textContent()).includes('بيع مباشر'));
+    check('unselected versions never show a sold-out warning', !(await page.locator('body').textContent()).includes('نفد المخزون حاليًا'));
+    check('buying asks for a version and stays disabled without choosing one', await cta.isDisabled() && (await cta.textContent()).includes('اختر'));
+    check('a stocked default has not silently selected a version', await page.locator('[data-option-value][aria-pressed="true"]').count() === 0);
+    await page.locator('[data-option-value="option-a"]').filter({ visible: true }).click();
+    check('a pending selected quote never flashes an unavailable purchase label', !(await cta.textContent()).includes('غير متوفر'));
+    await page.waitForFunction(() => Array.from(document.querySelectorAll('[data-testid="product-cta"]')).some((el) => !el.disabled));
+    check('the stocked selection becomes buyable only with its exact quote', !(await cta.isDisabled()));
+    await page.locator('[data-option-value="option-b"]').filter({ visible: true }).click();
+    await page.waitForFunction(() => document.body.textContent.includes('نفد المخزون حاليًا'));
+    check('a genuinely sold-out selection still blocks purchase and reports its stock', await cta.isDisabled() && (await signals.textContent()).includes('غير متوفر'));
+    check('priced stock rendering has no runtime errors', errors.length === 0);
     await context.close();
   }
   console.log('PASS ' + checks + ' product motion browser checks');

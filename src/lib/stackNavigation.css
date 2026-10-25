@@ -1,0 +1,26 @@
+/* BrewedOps Stack push: https://brewedops.cloud/motionlibrary/?id=transitions-stack-push
+   Retreat 28%, incoming 120%, reversed on Back.
+   Snapshots are browser-owned; layout and fixed controls never transform. */
+html.lv-stack-vt { --stack-front: 120%; --stack-rear: -28%; }
+html.lv-stack-vt[dir='rtl'] { --stack-front: -120%; --stack-rear: 28%; }
+html.lv-stack-vt::view-transition-group(root) { animation: none; }
+html.lv-stack-vt::view-transition-image-pair(root) { background: rgb(16 24 40); }
+html.lv-stack-vt::view-transition-old(root),
+html.lv-stack-vt::view-transition-new(root) {
+  mix-blend-mode: normal;
+  animation-duration: var(--duration-ui);
+  animation-timing-function: var(--ease-drawer);
+  animation-fill-mode: both;
+}
+html.lv-stack-vt::view-transition-old(root) { animation-name: lv-stack-retreat; z-index: 1; }
+html.lv-stack-vt::view-transition-new(root) { animation-name: lv-stack-enter; z-index: 2; box-shadow: 0 0 26px rgb(16 24 40 / .14); }
+html.lv-stack-vt[data-stack-back]::view-transition-old(root) { animation-name: lv-stack-leave; z-index: 2; }
+html.lv-stack-vt[data-stack-back]::view-transition-new(root) { animation-name: lv-stack-return; z-index: 1; box-shadow: none; }
+@keyframes lv-stack-retreat { to { transform: translateX(var(--stack-rear)); opacity: .84; } }
+@keyframes lv-stack-enter { from { transform: translateX(var(--stack-front)); } }
+@keyframes lv-stack-leave { to { transform: translateX(var(--stack-front)); } }
+@keyframes lv-stack-return { from { transform: translateX(var(--stack-rear)); opacity: .84; } }
+@media (prefers-reduced-motion: reduce) {
+  html.lv-stack-vt::view-transition-old(root),
+  html.lv-stack-vt::view-transition-new(root) { animation: none; }
+}

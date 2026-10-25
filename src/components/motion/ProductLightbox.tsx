@@ -7,6 +7,7 @@ import DissolveImage from './DissolveImage';
 import GallerySurface from './GallerySurface';
 import { take } from './ProductTransition';
 import { usePrefersReducedMotion } from '../../lib/motion';
+import { cssTimeMs } from '../../lib/motionTime';
 
 type Props = {
   open: boolean;
@@ -65,8 +66,8 @@ function Photo({ hero, spatial, ...props }: Props) {
       ? [{ opacity: present ? 0 : 1 }, { opacity: present ? 1 : 0 }]
       : [{ transform: present ? transform : current }, { transform: present ? 'none' : transform }];
     flight.current = el.animate(frames, {
-      duration: parseFloat(css.getPropertyValue(gentle ? '--duration-quick' : '--duration-ui')) || (gentle ? 150 : 250),
-      easing: gentle ? 'linear' : css.getPropertyValue('--ease-move').trim() || 'cubic-bezier(0.77, 0, 0.175, 1)',
+      duration: cssTimeMs(css.getPropertyValue(gentle ? '--duration-quick' : '--duration-ui'), gentle ? 150 : 250),
+      easing: gentle ? 'linear' : css.getPropertyValue('--ease-drawer').trim() || 'cubic-bezier(.32,.72,0,1)',
       fill: 'both',
     });
     flight.current.onfinish = end;

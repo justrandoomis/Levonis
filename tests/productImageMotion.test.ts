@@ -27,3 +27,12 @@ test('a tap, small drift or a vertical/ambiguous gesture never changes the photo
   for (const [x, y] of [[0, 0], [12, 0], [8, 150], [90, 90]]) assert.equal(gallerySwipeStep(x, y, 390, 'ltr'), 0);
   assert.equal(gallerySwipeStep(70, 0, 1400, 'ltr'), -1, 'desktop swipe distance is capped');
 });
+
+
+test('production CSS seconds and source milliseconds produce the same visible duration', async () => {
+  const { cssTimeMs } = await import('../src/lib/motionTime');
+  for (const value of ['250ms', '.25s', ' 0.250s ']) assert.equal(cssTimeMs(value, 1), 250);
+  assert.equal(cssTimeMs('.15s', 1), 150);
+  assert.equal(cssTimeMs('0ms', 250), 0);
+  for (const value of ['', 'auto', 'NaN', '-10ms', '250']) assert.equal(cssTimeMs(value, 250), 250);
+});

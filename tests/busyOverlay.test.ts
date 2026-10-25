@@ -504,7 +504,9 @@ test('the route wait takes the screen too — the third reason is reachable', ()
 test('a navigation that is still pending holds the screen, not only a mounted fallback', () => {
   const code = stripComments(router);
   assert.match(code, /const \[pending, startTransition\] = React\.useTransition\(\);/);
-  assert.match(code, /history\.listen\(\(update\) => \{\s*startTransition\(\(\) => setState\(\{ action: update\.action, location: update\.location \}\)\);/);
+  assert.match(code, /history\.listen\(\(update\) => \{\s*const commit = \(\) => startTransition\(\(\) => setState\(\{ action: update\.action, location: update\.location \}\)\);/);
+  assert.match(code, /motion\.current\.begin\(update.action, update.location, commit\)/);
+  assert.match(code, /else commit\(\)/);
   assert.match(code, /useBusy\(pending, 'route'\);/);
   assert.match(code, /createBrowserHistory\(\{ window, v5Compat: true \}\)/);
   assert.match(code, /<Router location=\{state\.location\} navigationType=\{state\.action\} navigator=\{history\}>/);

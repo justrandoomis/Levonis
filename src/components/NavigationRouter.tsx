@@ -1,6 +1,8 @@
 import React from 'react';
 import { Router, UNSAFE_createBrowserHistory as createBrowserHistory } from 'react-router-dom';
 import { useBusy } from '../lib/busy';
+import { afterCriticalPaint } from '../lib/afterCriticalPaint';
+import type { createStackNavigation } from '../lib/stackNavigation';
 
 /**
  * THE BROWSER ROUTER, WITH ITS WAIT MADE VISIBLE.
@@ -44,11 +46,31 @@ export default function NavigationRouter({ children }: { children: React.ReactNo
   const [history] = React.useState(() => createBrowserHistory({ window, v5Compat: true }));
   const [state, setState] = React.useState(() => ({ action: history.action, location: history.location }));
   const [pending, startTransition] = React.useTransition();
+  const motion = React.useRef<ReturnType<typeof createStackNavigation> | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    let loading = false;
+    const warm = () => {
+      if (loading) return;
+      loading = true;
+      void import('../lib/stackNavigation').then(({ createStackNavigation }) => {
+        if (active) motion.current = createStackNavigation();
+      }).catch(() => { loading = false; });
+    };
+    const cancel = afterCriticalPaint(warm);
+    document.addEventListener('pointerdown', warm, { once: true, passive: true });
+    return () => { active = false; cancel(); document.removeEventListener('pointerdown', warm); motion.current?.dispose(); motion.current = null; };
+  }, []);
+
+  React.useEffect(() => { motion.current?.committed(state.location.key); }, [state.location.key]);
 
   React.useLayoutEffect(
     () =>
       history.listen((update) => {
-        startTransition(() => setState({ action: update.action, location: update.location }));
+        const commit = () => startTransition(() => setState({ action: update.action, location: update.location }));
+        if (motion.current) motion.current.begin(update.action, update.location, commit);
+        else commit();
       }),
     [history]
   );

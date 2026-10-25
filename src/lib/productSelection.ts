@@ -37,6 +37,17 @@ export type RouteFacts = {
 
 export type OrderType = '' | 'direct_sale' | 'pre_order';
 
+/** Detail availability may prove that a stocked SKU exists without choosing
+ * it for the customer. An empty quote cannot disprove that browsing fact.
+ * Base-stock products and explicit choices still use the latest server quote. */
+export function browsingAvailability<T extends { selection: { option_required: boolean; color_required: boolean } }>(
+  detail: T | null, quote: T | null, hasSelection: boolean
+): T | null {
+  return !hasSelection && (detail?.selection.option_required || detail?.selection.color_required)
+    ? detail
+    : quote ?? detail;
+}
+
 /**
  * THE ORDER TYPE EVERY REQUEST CARRIES.
  *

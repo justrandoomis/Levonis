@@ -295,6 +295,7 @@ html {
   --duration-press: 100ms;
   --duration-quick: 150ms;
   --duration-ui: 250ms;
+  --ease-drawer: cubic-bezier(.32, .72, 0, 1);
   --ease-move: cubic-bezier(0.77, 0, 0.175, 1);
   /* Release and settle: a clay control coming back up (already the
      lv-choice-mark curve). */

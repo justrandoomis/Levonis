@@ -321,9 +321,9 @@ test('the channel sentence names the channel the SERVER picked', () => {
 
 test('the affordance sits under «طريقة التوفر» and only where an alert can be honest', () => {
   const product = read(PRODUCT);
-  assert.match(product, /import StockAlertPanel from '\.\.\/components\/product\/StockAlertPanel';/);
+  assert.match(product, /const StockAlertPanel = React\.lazy\(\(\) => import\('\.\.\/components\/product\/StockAlertPanel'\)\);/);
   // Offered exactly when the SERVER says direct sale is offered and empty.
-  assert.match(product, /const directOutOfStock = modesArr\.some\(/);
+  assert.match(product, /const directOutOfStock = !selectionPending && modesArr\.some\(/);
   assert.match(product, /m\.type === 'direct_sale' && !m\.usable && m\.reason === 'OUT_OF_STOCK'/);
   // …and never for a product or selection with no price (DECISIONS row 240, default D7): stock is not set
   // for what cannot be bought, and «طلب السعر» is the affordance there.

@@ -90,7 +90,7 @@ import { tierLabel } from '../components/subscription/tierMeta';
 import { OfferSaving, SALE_PRICE } from '../components/ui/OfferBadge';
 import Countdown from '../components/ui/Countdown';
 import ConditionPanel from '../components/product/ConditionPanel';
-import StockAlertPanel from '../components/product/StockAlertPanel';
+const StockAlertPanel = React.lazy(() => import('../components/product/StockAlertPanel'));
 import { UNPRICED_TEXT } from '../lib/priceStatus';
 import {
   addressWithout,
@@ -110,7 +110,7 @@ import {
   type StockAlertWish,
 } from '../components/product/stockAlertTargets';
 import { conditionKindLabel, type ConditionEntry } from '../lib/condition';
-import { resolveOrderType, resolveTransport, routeIsUsable } from '../lib/productSelection';
+import { browsingAvailability, resolveOrderType, resolveTransport, routeIsUsable } from '../lib/productSelection';
 import { pairedUsd, scaleUsdLine, unitUsdBase, useMoney, type UsdLine } from '../CurrencyContext';
 import { CommunityStoreLink } from './community/access';
 import CompareBadge from '../components/compare/CompareBadge';
@@ -1509,7 +1509,10 @@ export default function Product() {
    * the old gate hid the price for the whole of that window, the figure the
    * customer was reading vanished each time they asked for one more.
    */
-  const availability = liveAvailability ?? baseAvailability;
+  // The detail response proves a real stocked SKU exists. An empty quote
+  // describes no SKU, so its OUT_OF_STOCK must not erase that browsing fact.
+  const hasSelection = optionValueIds.length > 0 || !!colorId;
+  const availability = browsingAvailability(baseAvailability, liveAvailability, hasSelection);
 
   /**
    * WHICH WAYS OF BUYING ARE ACTUALLY OPEN, straight from the server.
@@ -2822,13 +2825,20 @@ export default function Product() {
   const isDirectVideo = (u: string) => /\.(mp4|webm|mov|m4v)(\?|$)/i.test(u);
   const descriptionVideos = product.description_videos ?? [];
 
+  const requestSelectionComplete =
+    (relationOptionGroups.length > 0
+      ? relationOptionGroups.every((g) => g.values.some((v) => optionValueIds.includes(v.id)))
+      : options.length === 0 || optionValueIds.length > 0) &&
+    (orderedColors.length === 0 || !!colorId);
+  const choicePending = !requestSelectionComplete;
   const mode = availability?.mode ?? (source === 'community' ? 'unavailable' : 'direct_sale');
-  const selectionComplete = availability ? availability.selection.complete : true;
+  const selectionComplete = requestSelectionComplete && (availability ? availability.selection.complete : true);
   /**
    * THE QUOTE IN HAND ANSWERS THE SELECTION ON SCREEN. Anything else is a
    * previous selection's answer — still a real number, but not this one's.
    */
   const quoteFresh = !!quote && quotedFor === priceKey;
+  const selectionPending = choicePending || (hasSelection && !quoteFresh);
   const quoteErrors = quoteFresh ? (quote!.errors ?? []) : [];
 
   /**
@@ -3131,6 +3141,7 @@ export default function Product() {
     // No shelf word without a price (rows 239-240): stock is not set for what cannot be bought.
     if (noPrice) return '';
     if (!availability || effectiveMode !== 'direct_sale') return '';
+    if (selectionPending) return !hasSelection ? s.inStock : ''; // No count from an unchosen SKU.
     if (!availability.stock.tracked) return s.untracked;
     const left = availability.stock.available ?? 0;
     if (left > 0 && left <= 5) return s.lowStock.replace('{n}', String(left));
@@ -3143,7 +3154,9 @@ export default function Product() {
   })();
 
   const modeBadge =
-    effectiveMode === 'preorder'
+    selectionPending && (hasSelection || effectiveMode === 'unavailable')
+      ? { label: choicePending ? s.chooseOption : s.updatingPrice, cls: 'text-text-secondary border-border-subtle', icon: <Package className="w-3.5 h-3.5" /> }
+      : effectiveMode === 'preorder'
       ? { label: s.preorderMode, cls: 'bg-amber-500/10 text-amber-300 border-amber-500/30', icon: <Clock className="w-3.5 h-3.5" /> }
       : effectiveMode === 'direct_sale'
         ? { label: s.directSale, cls: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30', icon: <Package className="w-3.5 h-3.5" /> }
@@ -3178,7 +3191,7 @@ export default function Product() {
    * `modes` is the server's own per-type verdict, so this sentence appears
    * exactly when direct sale is offered-but-empty and pre-order is open.
    */
-  const directOutOfStock = modesArr.some(
+  const directOutOfStock = !selectionPending && modesArr.some(
     (m) => m.type === 'direct_sale' && !m.usable && m.reason === 'OUT_OF_STOCK'
   );
   const directSoldOutPreorderOpen = preUsable && directOutOfStock;
@@ -3461,11 +3474,6 @@ export default function Product() {
    * 1024 px, its 48 px button in the phone bar below that (`requestBarSlot`).
    * Mounted in ONE of the two layouts only, so the caller's rows are read once.
    */
-  const requestSelectionComplete =
-    (relationOptionGroups.length > 0
-      ? relationOptionGroups.every((g) => g.values.some((v) => optionValueIds.includes(v.id)))
-      : options.length === 0 || optionValueIds.length > 0) &&
-    (orderedColors.length === 0 || !!colorId);
   const unpricedBlock = (wide: boolean) => (
     <div className="lv-surface p-4" data-price-status="unpriced" data-unpriced-scope={catalogOnly ? 'product' : 'selection'}>
       <p className="text-text-muted font-black text-xl sm:text-2xl leading-snug">{tr(UNPRICED_TEXT.ar, UNPRICED_TEXT.en, UNPRICED_TEXT.ckb)}</p>
@@ -3995,7 +4003,7 @@ export default function Product() {
                 {/* CLOSED, AND IT SAYS WHY. Never a dead chip with no sentence. */}
                 {!directUsable ? (
                   <span className="block text-[11px] font-medium text-warning leading-snug mt-1" data-mode-closed>
-                    {reasonText(s, modeOf('direct_sale')?.reason)}
+                    {selectionPending ? (choicePending ? s.chooseOption : s.updatingPrice) : reasonText(s, modeOf('direct_sale')?.reason)}
                   </span>
                 ) : null}
               </span>
@@ -4025,7 +4033,7 @@ export default function Product() {
                 ) : null}
                 {!preUsable ? (
                   <span className="block text-[11px] font-medium text-warning leading-snug mt-1" data-mode-closed>
-                    {reasonText(s, modeOf('pre_order')?.reason)}
+                    {selectionPending ? (choicePending ? s.chooseOption : s.updatingPrice) : reasonText(s, modeOf('pre_order')?.reason)}
                   </span>
                 ) : null}
               </span>
@@ -4056,6 +4064,7 @@ export default function Product() {
         competing with something that is not an alternative to it.
       */}
       {stockAlertOffered ? (
+        <ChunkBoundary compact><React.Suspense fallback={<div className="min-h-16" aria-hidden="true" />}>
         <StockAlertPanel
           productId={product.id}
           productSlug={product.slug}
@@ -4069,6 +4078,7 @@ export default function Product() {
           intent={alertIntent}
           onIntentConsumed={consumeAlertIntent}
         />
+        </React.Suspense></ChunkBoundary>
       ) : null}
 
       {showTransports ? (
@@ -4826,7 +4836,7 @@ export default function Product() {
 
   const statusMessages = (
     <div className="space-y-2" aria-live="polite">
-      {mode === 'unavailable' && availability?.reason ? (
+      {!selectionPending && mode === 'unavailable' && availability?.reason ? (
         <p className="lv-alert lv-alert-danger text-red-200 text-[13px]">
           {/* A colour-stock filament with no colour chosen answers «unavailable» only because no colour
               is: beside «اختر لونًا أولًا» the sentence asks for one, never «نفد المخزون». */}
@@ -4847,7 +4857,7 @@ export default function Product() {
           {s.directSoldOutPreorderOpen}
         </p>
       ) : null}
-      {mode !== 'unavailable' && shownBlockingCodes.length > 0
+      {!selectionPending && mode !== 'unavailable' && shownBlockingCodes.length > 0
         ? shownBlockingCodes.map((code) => (
             <p key={code} className="lv-alert lv-alert-warning text-amber-100 text-[13px]">
               {reasonText(s, code)}
@@ -4861,7 +4871,7 @@ export default function Product() {
           stack, immediately over the CTA. The legend chip on the transport
           panel points at the control that answers it; a third copy between
           them was just noise. */}
-      {availability && !availability.qty_ok && mode !== 'unavailable' && !colourMulti ? (
+      {!selectionPending && availability && !availability.qty_ok && mode !== 'unavailable' && !colourMulti ? (
         <p className="lv-alert lv-alert-warning text-amber-100 text-[13px]">
           {s.qtyCapped.replace('{n}', String(availability.stock.max_qty))}
         </p>
@@ -4922,7 +4932,9 @@ export default function Product() {
     chosen: chosenColour ? { name: chosenColour.name, qty } : null,
   });
   const buyButtonLabel =
-    buyKind === 'signIn'
+    isAuthenticated && selectionPending && !addingToCart
+      ? !choicePending ? s.updatingPrice : colourToChoose && !chosenColour ? cs.chooseColourFirst : s.OPTION_REQUIRED
+      : buyKind === 'signIn'
       ? s.signInToBuy
       : buyKind === 'adding'
         ? s.adding
@@ -4939,7 +4951,7 @@ export default function Product() {
                   : s.unavailable;
   /** The full name for assistive tech when the visible label shortened a long colour name. */
   const buyButtonAria =
-    buyKind === 'addedColour' ? addedLabel(cl, lastAdded!) : buyKind === 'addColour' ? addLabel(cl, [{ name: chosenColour!.name, qty }]) : undefined;
+    selectionPending ? undefined : buyKind === 'addedColour' ? addedLabel(cl, lastAdded!) : buyKind === 'addColour' ? addLabel(cl, [{ name: chosenColour!.name, qty }]) : undefined;
   /** ⚡ names what it buys too (principle 2): the press goes straight to an order. */
   const quickBuyCapsuleLabel = chosenColour ? quickBuyLabel(cl, { name: chosenColour.name, qty }, { short: true }) : undefined;
   const quickBuyCapsuleAria = chosenColour ? quickBuyLabel(cl, { name: chosenColour.name, qty }) : undefined;

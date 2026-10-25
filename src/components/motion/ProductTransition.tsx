@@ -1,11 +1,16 @@
 // Lucian UX/UI Prompt #328 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#328
 import React, { useLayoutEffect } from 'react';
 import { Link, useLocation, type LinkProps } from 'react-router-dom';
+import { cssTimeMs } from '../../lib/motionTime';
 
 type Box = { x: number; y: number; width: number; height: number };
 type Picture = { rect: Box; plane: Box; url: string; width: number; height: number; background: string; radius: string };
 type Journey = { href: string; origin: string; productId: string; photo: Picture; returning: boolean; cancel: () => void };
 let journey: Journey | null = null;
+/** The photo owns this navigation; a simultaneous page push would move it twice. */
+export function ownsProductNavigation(from: string, to: string): boolean {
+  return !!journey && ((from === journey.origin && to === journey.href) || (from === journey.href && to === journey.origin));
+}
 const reduce = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const route = () => window.location.pathname + window.location.search;
 const visible = (rect: Box) => rect.width > 4 && rect.height > 4 && rect.y + rect.height > 0 && rect.y < innerHeight;
@@ -146,10 +151,10 @@ function travel(saved: Journey) {
     const sx = from.rect.width / to.rect.width, sy = from.rect.height / to.rect.height;
     place(to);
     const css = getComputedStyle(document.documentElement);
-    const timing = { duration: parseFloat(css.getPropertyValue('--duration-ui')) || 250, easing: css.getPropertyValue('--ease-move').trim() || 'cubic-bezier(0.77, 0, 0.175, 1)', fill: 'both' as const };
+    const timing = { duration: cssTimeMs(css.getPropertyValue('--duration-ui'), 250), easing: css.getPropertyValue('--ease-drawer').trim() || 'cubic-bezier(.32,.72,0,1)', fill: 'both' as const };
     if (!layer.animate || reduce()) { settle(); return; }
     animations = [
-      layer.animate([{ transform: `translate(${from.rect.x - to.rect.x}px,${from.rect.y - to.rect.y}px) scale(${sx},${sy})` }, { transform: 'none' }], timing),
+      layer.animate([{ transform: `translate(${from.rect.x - to.rect.x}px,${from.rect.y - to.rect.y}px) scale(${sx},${sy})`, borderRadius: `${(parseFloat(from.radius) || 0) / sx}px / ${(parseFloat(from.radius) || 0) / sy}px` }, { transform: 'none', borderRadius: to.radius }], timing),
       image.animate([{ transform: `translate(${(from.plane.x - from.rect.x) / sx - (to.plane.x - to.rect.x)}px,${(from.plane.y - from.rect.y) / sy - (to.plane.y - to.rect.y)}px) scale(${from.plane.width / to.plane.width / sx},${from.plane.height / to.plane.height / sy})` }, { transform: 'none' }], timing),
     ];
     animations[0].onfinish = settle;
