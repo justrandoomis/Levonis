@@ -635,74 +635,61 @@ adminProductsRoutes.get('/', async (c) => {
   // lives on options or exact option×colour variants. That made a perfectly
   // tracked product appear “unlimited”. These expressions project the same
   // authoritative level the storefront uses, aggregated only for the compact
-  // management list. NULL at a required direct level is mapped to sold out in
-  // the response below — never to unlimited.
+  // management list. An untracked alternative contributes no units; it must
+  // not hide the known stock of its siblings. Missing/all-NULL stock still
+  // maps to zero below, never to unlimited.
+  const hasFulfillmentsSql = `EXISTS (SELECT 1 FROM product_option_fulfillment af WHERE af.product_id = products.id)`;
   const hasDirectSql = `(CASE
-    WHEN EXISTS (SELECT 1 FROM product_option_fulfillment af WHERE af.product_id = products.id)
+    WHEN ${hasFulfillmentsSql}
       THEN EXISTS (
         SELECT 1 FROM product_option_fulfillment df
          WHERE df.product_id = products.id AND df.fulfillment_type = 'direct_sale' AND df.enabled = 1
       )
     ELSE selling_type IN ('direct_sale', 'bundle') OR sale_types LIKE '%direct_sale%' OR sale_types LIKE '%bundle%'
   END)`;
+  // Imported selections may not have fulfillment cells yet. In that case
+  // they inherit the product's sale types, just like hasDirectSql. Requiring
+  // a cell unconditionally made a successful receipt show as zero here.
+  // Once cells exist, retain their explicit direct/pre-order restrictions.
+  const directOptionSql = `(NOT ${hasFulfillmentsSql} OR EXISTS (
+    SELECT 1 FROM product_option_fulfillment df
+     WHERE df.product_id = products.id AND df.option_id = ov.id
+       AND df.fulfillment_type = 'direct_sale' AND df.enabled = 1
+  ))`;
+  const directVariantSql = `(NOT ${hasFulfillmentsSql} OR EXISTS (
+    SELECT 1 FROM product_option_fulfillment df
+     WHERE df.product_id = products.id AND df.fulfillment_type = 'direct_sale' AND df.enabled = 1
+       AND instr('|' || pv.combo_key || '|', '|o:' || df.option_id || '|') > 0
+  ))`;
   const displayStockSql = `(CASE inventory_mode
     WHEN 'OPTION' THEN (
-      SELECT CASE
-        WHEN COUNT(*) = 0 OR SUM(CASE WHEN ov.stock IS NULL THEN 1 ELSE 0 END) > 0 THEN NULL
-        ELSE SUM(ov.stock)
-      END
+      SELECT SUM(ov.stock)
       FROM product_option_values ov
-      WHERE ov.product_id = products.id AND ov.active = 1
-        AND EXISTS (
-          SELECT 1 FROM product_option_fulfillment df
-           WHERE df.product_id = products.id AND df.option_id = ov.id
-             AND df.fulfillment_type = 'direct_sale' AND df.enabled = 1
-        )
+      WHERE ov.product_id = products.id AND ov.active = 1 AND ${directOptionSql}
     )
     WHEN 'COLOR' THEN (
-      SELECT CASE
-        WHEN COUNT(*) = 0 OR SUM(CASE WHEN pc.stock IS NULL THEN 1 ELSE 0 END) > 0 THEN NULL
-        ELSE SUM(pc.stock)
-      END
+      SELECT SUM(pc.stock)
       FROM product_colors pc WHERE pc.product_id = products.id AND pc.active = 1
     )
     WHEN 'VARIANT_COMBINATION' THEN (
-      SELECT CASE
-        WHEN COUNT(*) = 0 OR SUM(CASE WHEN pv.stock IS NULL THEN 1 ELSE 0 END) > 0 THEN NULL
-        ELSE SUM(pv.stock)
-      END
+      SELECT SUM(pv.stock)
       FROM product_variants pv
-      WHERE pv.product_id = products.id AND pv.active = 1
-        AND EXISTS (
-          SELECT 1 FROM product_option_fulfillment df
-           WHERE df.product_id = products.id AND df.fulfillment_type = 'direct_sale' AND df.enabled = 1
-             AND instr('|' || pv.combo_key || '|', '|o:' || df.option_id || '|') > 0
-        )
+      WHERE pv.product_id = products.id AND pv.active = 1 AND ${directVariantSql}
     )
     ELSE stock
   END)`;
   const displayReservedSql = `(CASE inventory_mode
     WHEN 'OPTION' THEN COALESCE((
       SELECT SUM(COALESCE(ov.reserved, 0)) FROM product_option_values ov
-      WHERE ov.product_id = products.id AND ov.active = 1
-        AND EXISTS (
-          SELECT 1 FROM product_option_fulfillment df
-           WHERE df.product_id = products.id AND df.option_id = ov.id
-             AND df.fulfillment_type = 'direct_sale' AND df.enabled = 1
-        )
+      WHERE ov.product_id = products.id AND ov.active = 1 AND ov.stock IS NOT NULL AND ${directOptionSql}
     ), 0)
     WHEN 'COLOR' THEN COALESCE((
       SELECT SUM(COALESCE(pc.reserved, 0)) FROM product_colors pc
-       WHERE pc.product_id = products.id AND pc.active = 1
+       WHERE pc.product_id = products.id AND pc.active = 1 AND pc.stock IS NOT NULL
     ), 0)
     WHEN 'VARIANT_COMBINATION' THEN COALESCE((
       SELECT SUM(COALESCE(pv.reserved, 0)) FROM product_variants pv
-      WHERE pv.product_id = products.id AND pv.active = 1
-        AND EXISTS (
-          SELECT 1 FROM product_option_fulfillment df
-           WHERE df.product_id = products.id AND df.fulfillment_type = 'direct_sale' AND df.enabled = 1
-             AND instr('|' || pv.combo_key || '|', '|o:' || df.option_id || '|') > 0
-        )
+      WHERE pv.product_id = products.id AND pv.active = 1 AND pv.stock IS NOT NULL AND ${directVariantSql}
     ), 0)
     ELSE stock_reserved
   END)`;
