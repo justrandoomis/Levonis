@@ -301,6 +301,15 @@ export const ROUTES: readonly RouteRule[] = [
   // `requires: 'none'` is the point of it, and the route's own per-bucket rate
   // limits do the work an auth gate would otherwise do.
   { prefix: '/api/print-quote', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'upload', note: 'guest uploads a model and is quoted for it' },
+  // Levonis Print Cloud (0215, docs/PRINT_CLOUD.md, DECISIONS row 270): the
+  // workshop's own printers rented by the hour, owned beside the print engine
+  // (packages/contracts/src/ownership.ts). The core answers on the apex, the
+  // `cloud` system subdomain and hosts outside the root, and refuses every
+  // merchant storefront itself (worker/lib/printCloud/http.ts), so `root` here
+  // only lets a request reach that check.
+  { prefix: '/api/admin/print-cloud', hosts: 'main', owner: 'MARKETPLACE', flipPhase: 6, requires: 'admin', rateClass: 'admin-write', note: 'worker/routes/printCloudAdmin.ts — operator (assistant), money (full) and cost (owner) doors, judged per route in the core' },
+  { prefix: '/api/print-cloud/v1/agent', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'write', note: 'the workshop agent: a bearer token the core checks against a stored hash; no session' },
+  { prefix: '/api/print-cloud/v1', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'upload', note: 'catalogue, quotes and the signed payment webhook answer without a session; /me, orders, files, projects and jobs need one (the core\'s requireAuth)' },
 
   // ------------------------------------------------------- leaves (phase 4)
   { prefix: '/api/chats', hosts: 'root', owner: 'CHAT', flipPhase: 4, requires: 'auth', rateClass: 'write' },

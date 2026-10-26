@@ -169,7 +169,13 @@ export async function queuedJobs(db: D1Database, now: Date, limit = 200): Promis
  * assignment is its own batch; a machine taken meanwhile is skipped, never
  * double-booked.
  */
-export async function runScheduler(db: D1Database, config: PrintCloudConfig, now: Date, limit = 20): Promise<{ assigned: Array<{ job_id: string; printer_id: string }>; waiting: number }> {
+export async function runScheduler(
+  db: D1Database,
+  config: PrintCloudConfig,
+  now: Date,
+  limit = 20,
+  unitFits?: () => boolean
+): Promise<{ assigned: Array<{ job_id: string; printer_id: string }>; waiting: number; more: boolean }> {
   const actor: Actor = { type: 'system', id: 'scheduler' };
   const assigned: Array<{ job_id: string; printer_id: string }> = [];
   const taken = new Set<string>();
@@ -177,6 +183,8 @@ export async function runScheduler(db: D1Database, config: PrintCloudConfig, now
   let waiting = 0;
   for (const job of queue) {
     if (assigned.length >= limit) break;
+    // Out of room for one more job's look and assignment: the rest wait for the next run.
+    if (unitFits && !unitFits()) return { assigned, waiting, more: true };
     if (!(await dependencyMet(db, job))) {
       waiting++;
       continue;
@@ -200,7 +208,7 @@ export async function runScheduler(db: D1Database, config: PrintCloudConfig, now
     }
     if (!done) waiting++;
   }
-  return { assigned, waiting };
+  return { assigned, waiting, more: false };
 }
 
 export interface QueueEstimate {

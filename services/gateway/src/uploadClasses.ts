@@ -64,6 +64,8 @@ export const UPLOAD_CLASSES: readonly BodyClass[] = [
   // converted to WebP by the route; its own 8 MB cap is the ceiling.
   { prefix: '/api/trade-in/requests', methods: ['POST'], kind: 'multipart', maxBytes: 8 * MB, source: 'worker/routes/tradeIn.ts#PHOTO_MAX_BYTES', routeFile: 'tradeIn.ts' },
   { prefix: '/api/print-quote/uploads', methods: ['POST'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/routes/printQuote.ts#MODEL_MAX_BYTES', routeFile: 'printQuote.ts' },
+  // Levonis Print Cloud (0215): a customer's model, STL/3MF/OBJ; the owner may lower the limit in settings, never raise it past this.
+  { prefix: '/api/print-cloud/v1/files', methods: ['POST'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/lib/printCloud/settings.ts#MODEL_UPLOAD_CEILING_BYTES', routeFile: 'printCloud.ts' },
   // Main-page brand marks and service icons. Small by design and WebP-only —
   // the route refuses anything else by magic bytes — so the gateway's ceiling
   // is the route's own limit rather than the generic 40 MB upload class.

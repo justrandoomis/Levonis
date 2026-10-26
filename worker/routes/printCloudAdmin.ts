@@ -25,9 +25,10 @@ import { jsonObject, requireAdmin } from '../lib/http';
 import { limitByMethod } from '../lib/ratelimit';
 import { canMoveMoney, canViewCost, canWriteCost, requireCostRead } from '../lib/costAccess';
 import { requireFinancialScope } from '../lib/walletAdjust';
+import { countingD1 } from '../lib/d1Count';
 import { ADAPTERS, integrationBacklog } from '../lib/printCloud/adapters';
 import { pcAudit } from '../lib/printCloud/audit';
-import { runPrintCloudTasks, taskOverview } from '../lib/printCloud/background';
+import { roomWithin, runPrintCloudTasks, taskOverview } from '../lib/printCloud/background';
 import { approveBuyback, markBuybackPaid, rejectBuyback } from '../lib/printCloud/buyback';
 import { ENTITIES, categories, createEntity, listEntity, replacePriceTiers, stripCost, updateCategoryBuyback, updateEntity, type EntityKey } from '../lib/printCloud/catalog';
 import { creditAccountId, debitAvailable, grantCredits } from '../lib/printCloud/credits';
@@ -715,7 +716,12 @@ adminPrintCloudRoutes.get('/reconcile', requireFinancialScope, async (c) => ok(c
 
 adminPrintCloudRoutes.get('/tasks', async (c) => ok(c, await taskOverview(c.env.DB)));
 
-adminPrintCloudRoutes.post('/tasks/run', async (c) => ok(c, await runPrintCloudTasks(c.env, { limit: queryInt(c, 'limit', 10, 1, 25) })));
+adminPrintCloudRoutes.post('/tasks/run', async (c) => {
+  // One request is one D1 invocation: the run stays within 600 statements of it, a task at a time.
+  const counted = countingD1(c.env.DB);
+  const room = roomWithin(() => counted.executed, 600);
+  return ok(c, await runPrintCloudTasks({ ...c.env, DB: counted.db }, { limit: queryInt(c, 'limit', 10, 1, 25), room }));
+});
 
 adminPrintCloudRoutes.get('/audit', requireFinancialScope, async (c) => {
   const target = c.req.query('target');

@@ -580,7 +580,7 @@ export async function closeUnpaidOrder(
 }
 
 /** The sweep: unpaid orders whose stock hold has run out. Bounded; each order its own batch. */
-export async function expireUnpaidOrders(db: D1Database, now: Date, limit = 25): Promise<{ expired: number; failed: number }> {
+export async function expireUnpaidOrders(db: D1Database, now: Date, limit = 25, unitFits?: () => boolean): Promise<{ expired: number; failed: number; more: boolean }> {
   const due = await many<OrderRow>(
     db,
     "SELECT * FROM pc_orders WHERE status = 'awaiting_payment' AND stock_hold_expires_at <= ? ORDER BY stock_hold_expires_at LIMIT ?",
@@ -590,6 +590,8 @@ export async function expireUnpaidOrders(db: D1Database, now: Date, limit = 25):
   let expired = 0;
   let failed = 0;
   for (const order of due) {
+    // Out of room for one more order: the rest wait for the next run.
+    if (unitFits && !unitFits()) return { expired, failed, more: true };
     try {
       await runBatch(db, await closeUnpaidOrder(db, order, 'expired', 'system', now, 'stock hold expired'));
       expired++;
@@ -597,7 +599,7 @@ export async function expireUnpaidOrders(db: D1Database, now: Date, limit = 25):
       failed++;
     }
   }
-  return { expired, failed };
+  return { expired, failed, more: due.length === limit };
 }
 
 // ------------------------------------------------------------------ refunds

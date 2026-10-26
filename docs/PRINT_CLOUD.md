@@ -205,7 +205,7 @@ delivered or bought back.
 ### 6.1 Uploads, storage and retention
 
 `POST /files` (multipart): STL (binary and ASCII), 3MF and OBJ, up to
-`max_upload_bytes` (50 MB). The **bytes** must prove the format — a renamed
+`max_upload_bytes` (40 MB, also the ceiling the gateway enforces). The **bytes** must prove the format — a renamed
 file is refused; a 3MF archive's directory is read without inflating anything
 (too many entries, path traversal, executable or script entries, and an archive
 with no `.model` part are refused). Objects go
@@ -391,9 +391,15 @@ Sixteen checks; a mismatch is **reported**, never silently repaired.
 `low_inventory_scan`, `schedule_queue`, `slicing_lease_sweep`, `reconcile`.
 Each claim takes a lease; a failure retries with backoff and dies after its
 last attempt; every attempt is logged (`pc_background_job_logs`). The platform's
-quarter-hour cron runs it as its last step with its own share of the tick's
-statement budget (`worker/index.ts`), and an admin may run due work by hand
-(`POST /admin/print-cloud/tasks/run`).
+quarter-hour cron runs it as its LAST step with its own share of the tick's D1
+statement budget — 120, cut to what the earlier steps left
+(`quarterHourPrintCloudBudget`, `worker/lib/quarterHourBudget.ts` step 8). A
+task starts, and each unit of its work (one order, one lot, one notice, one
+assignment, one lease, the whole reconciliation) runs, only while a whole unit
+still fits; a task cut short is queued again and finishes on a later tick
+(`tests/printCloudOperations.test.ts`, `tests/fxSweepBudget.test.ts`). An admin
+may run due work by hand (`POST /admin/print-cloud/tasks/run`, within 600
+statements of that request).
 
 ## 13. Configuration
 

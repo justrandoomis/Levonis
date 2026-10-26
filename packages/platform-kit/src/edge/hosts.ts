@@ -56,8 +56,8 @@
 export const SYSTEM_SUBDOMAINS: ReadonlySet<string> = new Set([
   // 1. RUNNING SERVICES. Handing one of these to a merchant takes a live
   //    product down. `studio` serves LEVO Studio; `send` and `mail` carry
-  //    outbound email.
-  'www', 'studio', 'mail', 'send', 'api', 'app', 'community', 'support',
+  //    outbound email; `cloud` serves Levonis Print Cloud (docs/PRINT_CLOUD.md).
+  'www', 'studio', 'mail', 'send', 'api', 'app', 'community', 'support', 'cloud',
 
   // 2. MAIL INFRASTRUCTURE. A merchant on any of these does not just get a
   //    page — they get a name the world already trusts to speak for this

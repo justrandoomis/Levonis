@@ -27,16 +27,23 @@
  *      trade-in offer and credit expiry, the cut-over stamp, completion
  *      catch-up, re-issue notices): its own 120, cut to what is left after the
  *      price-request sweep (`quarterHourServicesBudget`).
- *   7. LAST, the request-model cache (P1-04, DECISIONS row 266, worker/lib/
+ *   7. the request-model cache (P1-04, DECISIONS row 266, worker/lib/
  *      requestModelBackfill.ts): version-1 print rows whose v3 model was never
  *      materialised, 25 a page at 11 statements — its own 40, cut to what is
  *      left after the services sweep (`quarterHourRequestModelBudget`). Its
  *      first page is sized so that a failing batch's whole descent to one
  *      request and that request's `error` mark fit (40 for 25), so a tick
  *      always moves. One indexed read when nothing is pending.
+ *   8. LAST, Levonis Print Cloud's durable tasks (DECISIONS row 270, worker/
+ *      lib/printCloud/background.ts): order and credit expiry, file analysis,
+ *      URL imports, the scheduler, slicing leases, low-balance notices, the
+ *      daily reconciliation — its own 120, cut to what is left after the
+ *      request-model cache (`quarterHourPrintCloudBudget`). A task starts, and
+ *      each unit of its work runs, only while a whole unit still fits; the
+ *      rest waits for the next tick. Nothing at all on a database without 0215.
  *
  * So the invocation's total is at most max(step 1, `QUARTER_HOUR_TICK_LIMIT`):
- * steps 2 to 7 never take it over the limit, and step 1 is bounded by its
+ * steps 2 to 8 never take it over the limit, and step 1 is bounded by its
  * jobs' own bounds — measured at those bounds, together with steps 2 and 3,
  * by tests/fxSweepBudget.test.ts on the real `scheduled()`.
  *
@@ -121,4 +128,15 @@ export const REQUEST_MODEL_TICK_BUDGET = 40;
  */
 export function quarterHourRequestModelBudget(usedBefore: number): number {
   return Math.max(0, Math.min(REQUEST_MODEL_TICK_BUDGET, QUARTER_HOUR_TICK_LIMIT - Math.max(0, Math.ceil(usedBefore))));
+}
+
+/** Levonis Print Cloud's own sub-budget (0215): the periodic enqueue and a few bounded tasks. */
+export const PRINT_CLOUD_TICK_BUDGET = 120;
+
+/**
+ * PRINT CLOUD'S SHARE: its own 120, cut to what everything before it left of
+ * `QUARTER_HOUR_TICK_LIMIT`, never below zero. It runs last.
+ */
+export function quarterHourPrintCloudBudget(usedBefore: number): number {
+  return Math.max(0, Math.min(PRINT_CLOUD_TICK_BUDGET, QUARTER_HOUR_TICK_LIMIT - Math.max(0, Math.ceil(usedBefore))));
 }
