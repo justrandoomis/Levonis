@@ -44,7 +44,11 @@ export type MediaDomain =
    *  `assist/<uploader id>/<attachments|video|audio>/…`, private, read through
    *  the gate in worker/routes/uploads.ts (the uploader; staff once a ticket
    *  names it). */
-  | 'assist';
+  | 'assist'
+  /** 0215 — a Print Cloud customer's 3D model: `print-cloud/<user id>/models/<file id>.<stl|3mf|obj>`,
+   *  private, never served by /files; only the owner's download door and the
+   *  workshop agent's job-scoped door stream it (worker/routes/printCloud*.ts). */
+  | 'print-cloud';
 
 export interface MediaKeyInput {
   visibility: MediaVisibility;

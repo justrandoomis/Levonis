@@ -798,6 +798,8 @@ export const NOT_LIBRARY_HOLDERS: Readonly<Record<string, string>> = {
       'community_request_files.file_key', 'community_request_files.preview_key', 'community_offer_files.file_key',
       'community_offer_drafts.files_json', 'community_order_updates.file_key', 'product_files.file_key', 'product_files.preview_key',
       'community_post_files.file_key', 'community_post_files.preview_key', 'viewer_grants.file_key', 'print_analyses.file_key',
+      // 0215: a Print Cloud customer's model, print-cloud/<uid>/models/… in the private bucket.
+      'pc_model_files.storage_key',
     ].map((k) => [k, PRIVATE])
   ),
   ...Object.fromEntries(['users.avatar_key', 'users.profile_json', 'reviews.media', 'merchant_reviews.images'].map((k) => [k, PERSON])),
