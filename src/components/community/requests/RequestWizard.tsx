@@ -298,9 +298,11 @@ export default function RequestWizard({
   const [liveOffers, setLiveOffers] = useState(0);
   /**
    * Q2: is this request budget shown to merchants? This wizard has no switch
-   * (the request editor brings it), so a new request keeps it hidden; only a
-   * request already sent to one store with a budget typed for it reads true.
-   * The hint under the field says which, and never more than the server does.
+   * (the request editor brings it), so the server answers for the request
+   * (`budget_visible` of its draft): true for a request made in a store chat
+   * for that one store, or a board request whose switch is on; a new request
+   * and a repeat of a request to one store read false. The hint under the
+   * field says which, and never more than the server does.
    */
   const [budgetShown, setBudgetShown] = useState(false);
   const [catalog, setCatalog] = useState<Catalog | null>(null);

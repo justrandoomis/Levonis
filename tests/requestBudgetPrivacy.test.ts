@@ -18,8 +18,14 @@
  *
  * A DIRECT request (one store, from its chat): the budget typed into the
  * sheet is shown to that store (critique 3), not before the send (a draft is
- * its customer's alone), and its chat card loses it at the reader when the
- * request stops showing it (critique 6) while the stored card keeps it.
+ * its customer's alone), including a row written before the sheet stored the
+ * switch (it stores it off; no row is rewritten). A chat card loses it at the
+ * reader when the request stops showing it (critique 6) while the stored card
+ * keeps it. A REPEAT of a direct request is a board draft with the switch
+ * off: the budget typed for one store never reaches the board's workshops.
+ *
+ * THE CLIENT: the wizard hint is in three languages with a Sorani of its own
+ * (plan R5, row 183), and no public card renders a budget.
  *
  * A database without the column (before 0208) reads it hidden.
  *
@@ -28,6 +34,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { asD1, get, json, post, row, stubApp, type Mount, type StubUser } from './fixtures/app';
 import { fund, newDraft, offerOn, world, PLA } from './fixtures/requestModelWorld';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
@@ -266,12 +275,52 @@ test('a direct request: the store reads the budget typed for it once sent — ne
   }
 });
 
+test('a direct request written before the sheet stored the switch (stored off): its store still reads the budget typed for it, nobody else does', async () => {
+  const raw = world();
+  const { chatId, id } = await directDraft(raw);
+  assert.equal((await post(app(raw, BUYER), `/api/chats/${chatId}/print-requests/${id}/send`, {})).status, 201);
+  // Every live chat-born direct request written before B0 holds the switch off (the sheet never set it).
+  raw.exec(`UPDATE community_requests SET budget_visible = 0 WHERE id = '${id}'`);
+  // The store it was typed for: the request page, the card and the revisions.
+  assert.equal(await pageBudget(raw, ELIGIBLE, id), 30000, 'the store on the request page');
+  assert.equal(await cardBudget(raw, ELIGIBLE, chatId), 30000, 'the store on the card');
+  assert.deepEqual(await revisionBudgets(raw, ELIGIBLE, id), [30000], 'the store on the revisions');
+  // The customer, and the wizard hint they read: the store sees it.
+  assert.equal(await cardBudget(raw, BUYER, chatId), 30000, 'the customer on the card');
+  assert.equal((await read(raw, BUYER, `/api/marketplace/print/requests/${id}/draft`)).draft.budget_visible, true, 'the wizard hint says merchants see it');
+  // Nobody else, ever.
+  for (const u of [GUEST, MEMBER, INELIGIBLE]) {
+    assert.equal((await get(app(raw, u), `/api/marketplace/requests/${id}`)).status, 404, `a direct request is nobody else's (${u?.id ?? 'guest'})`);
+    assert.equal(budgetOn((await read(raw, u, '/api/marketplace/requests')).requests, id), 'absent', 'never on the board');
+  }
+  // The accepted order: the store quotes in its conversation, the customer
+  // accepts, and the store reads the budget on its copy of the job too.
+  const quoted = await post(app(raw, ELIGIBLE), `/api/chats/${chatId}/quotes`, {
+    request_id: id, price_iqd: 20000, completion_days: 3, delivery_method: 'pickup', valid_days: 7,
+  });
+  const quote = await json(quoted);
+  assert.equal(quoted.status, 201, JSON.stringify(quote));
+  fund(raw, 'buyer', 60000);
+  const accepted = await post(app(raw, BUYER), `/api/marketplace/offers/${quote.message.card.ref}/accept`, {
+    expected_price_iqd: quote.message.card.original.price_iqd,
+    offer_revision: quote.message.card.original.revision,
+  });
+  const body = await json(accepted);
+  assert.equal(accepted.status, 201, JSON.stringify(body));
+  const orderId = String(body.order?.id ?? '');
+  const theirs = await read(raw, ELIGIBLE, `/api/marketplace/orders/${orderId}`);
+  assert.equal(theirs.order.request_snapshot.spec.budget_iqd, 30000, 'the store on the accepted order');
+  assert.equal(await pageBudget(raw, ELIGIBLE, id), 30000, 'the store on the request page, once engaged');
+});
+
 test('the chat card: the stored card keeps the budget; the store loses it at the reader when the request stops showing it (critique 6)', async () => {
   const raw = world();
   const { chatId, id } = await directDraft(raw);
   assert.equal((await post(app(raw, BUYER), `/api/chats/${chatId}/print-requests/${id}/send`, {})).status, 201);
-  // The customer turns it off later (the request editor's switch): the stored card is not rewritten…
-  raw.exec(`UPDATE community_requests SET budget_visible = 0 WHERE id = '${id}'`);
+  // A direct request the chat-sheet rule does not cover (here the same row
+  // with no conversation of origin) follows the switch alone. Turned off
+  // later: the stored card is not rewritten…
+  raw.exec(`UPDATE community_requests SET budget_visible = 0, origin_chat_id = NULL WHERE id = '${id}'`);
   const stored = row<{ card_snapshot: string }>(raw, `SELECT card_snapshot FROM chat_messages WHERE chat_id = ? AND card_type = 'print_request'`, chatId)!;
   assert.equal(JSON.parse(stored.card_snapshot).budget_iqd, 30000, 'the stored card keeps what it was sent with');
   // …but the store reads it without the budget, and the customer still with it.
@@ -284,6 +333,49 @@ test('the chat card: the stored card keeps the budget; the store loses it at the
   assert.equal(await cardBudget(raw, ELIGIBLE, chatId), 30000, 'the store, switch on');
 });
 
+// ------------------------------------------------------------------ a repeat
+
+/** «إعادة الطلب»: the repeat of a request, as a draft; its id. */
+async function repeatOf(raw: DatabaseSync, id: string): Promise<string> {
+  const res = await post(app(raw, BUYER), `/api/marketplace/print/requests/${id}/repeat`, {});
+  const body = await json(res);
+  assert.equal(res.status, 201, JSON.stringify(body));
+  return String(body.request_id);
+}
+const switchOf = (raw: DatabaseSync, id: string) =>
+  ({ ...row<{ visibility: string; budget_visible: number; budget_iqd: number | null }>(raw, 'SELECT visibility, budget_visible, budget_iqd FROM community_requests WHERE id = ?', id)! });
+
+test('a repeat of a direct request is a board draft with the switch OFF: the budget typed for one store reaches no workshop of the board', async () => {
+  const raw = world();
+  const { chatId, id } = await directDraft(raw);
+  assert.equal(switchOf(raw, id).budget_visible, 1, 'the sheet shows it to its one store');
+  assert.equal((await post(app(raw, BUYER), `/api/chats/${chatId}/print-requests/${id}/send`, {})).status, 201);
+  const copy = await repeatOf(raw, id);
+  assert.deepEqual(switchOf(raw, copy), { visibility: 'public', budget_visible: 0, budget_iqd: 30000 }, 'a board draft: the figure is kept for its customer, hidden from merchants');
+  assert.equal((await read(raw, BUYER, `/api/marketplace/print/requests/${copy}/draft`)).draft.budget_visible, false, 'the wizard hint says hidden');
+  // The live wizard publishes it: its body names no switch.
+  const pub = await post(app(raw, BUYER), `/api/marketplace/print/requests/${copy}/publish`, { ...PLA, budget_iqd: 30000 });
+  assert.equal(pub.status, 200, JSON.stringify(await json(pub.clone())));
+  // The eligible workshop: its page, both boards and its notification carry no budget.
+  assert.equal(await pageBudget(raw, ELIGIBLE, copy), null, 'request page (the eligible workshop)');
+  assert.equal(budgetOn((await read(raw, ELIGIBLE, '/api/merchant/workshop/board')).requests, copy), null, 'workshop board');
+  assert.equal(budgetOn((await read(raw, ELIGIBLE, '/api/community/requests?for=me')).requests, copy), null, '«طلبات تناسبك»');
+  const note = told(raw, copy);
+  assert.ok(note, 'the eligible workshop was told');
+  assert.ok(!/30[,.٬]?000/.test(note!) && !SAYS_BUDGET.test(note!), 'the notification says no budget, in any language');
+  // The customer keeps their own figure; the source still shows it to its store.
+  assert.equal(await pageBudget(raw, BUYER, copy), 30000, 'the customer');
+  assert.equal(await pageBudget(raw, ELIGIBLE, id), 30000, 'the direct source, to its store');
+});
+
+test('a repeat of a board request keeps its switch, off or on', async () => {
+  for (const visible of [false, true]) {
+    const raw = world();
+    const copy = await repeatOf(raw, await job(raw, visible));
+    assert.deepEqual(switchOf(raw, copy), { visibility: 'public', budget_visible: visible ? 1 : 0, budget_iqd: 25000 }, `switch ${visible ? 'on' : 'off'}`);
+  }
+});
+
 test('cardPublic strips a print request budget unless the reader was cleared for it, and never sends the flag', () => {
   const m = { card_type: 'print_request', card_ref: 'r1', card_snapshot: JSON.stringify({ title: 't', budget_iqd: 30000 }) };
   assert.equal(cardPublic(m, undefined)!.original.budget_iqd, null, 'no state read: hidden');
@@ -294,4 +386,44 @@ test('cardPublic strips a print request budget unless the reader was cleared for
   // Another card type is untouched.
   const quote = { card_type: 'quote', card_ref: 'o1', card_snapshot: JSON.stringify({ price_iqd: 5, budget_iqd: 7 }) };
   assert.equal(cardPublic(quote, { status: 'pending', actions: [] })!.original.budget_iqd, 7);
+});
+
+// ---------------------------------------------------------------- the client
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const source = (p: string) => readFileSync(join(ROOT, p), 'utf8');
+/** Every three-string `loc('ar', 'en', 'ckb')` call, with its arguments (as in tests/clayPolishSorani.test.ts). */
+const THREE_ARG_LOC = /\bloc\(\s*(['"`])((?:(?!\1)[^\\]|\\.)*)\1\s*,\s*(['"`])((?:(?!\3)[^\\]|\\.)*)\3\s*,\s*(['"`])((?:(?!\5)[^\\]|\\.)*)\5\s*\)/g;
+/** A letter Sorani writes and Arabic does not. */
+const SORANI_LETTER = /[ەڵۆێڕڤگچپژ]/;
+
+test('the wizard budget hint is in three languages, and its Sorani is its own (plan R5, row 183)', () => {
+  const wizard = source('src/components/community/requests/RequestWizard.tsx');
+  const calls = [...wizard.matchAll(THREE_ARG_LOC)];
+  for (const [ar, en] of [
+    ['لا يراها التجار ولا العموم.', 'Hidden from merchants and the public.'],
+    ['يراها التجار الذين يمكنهم صنع طلبك، ولا تظهر للعموم.', 'Merchants who can make your request see it; it is never public.'],
+  ]) {
+    const call = calls.find((m) => m[2] === ar && m[4] === en);
+    assert.ok(call, `RequestWizard.tsx says «${en}» in all three languages`);
+    const ckb = call![6];
+    assert.ok(ckb.trim().length > 0, `the Sorani of «${en}» is written`);
+    assert.notEqual(ckb, ar, `the Sorani of «${en}» is not the Arabic copied`);
+    assert.match(ckb, SORANI_LETTER, `the Sorani of «${en}» is Sorani`);
+  }
+  // The promise the old hint made is gone in every language.
+  assert.doesNotMatch(wizard, /يراها التجار\. اتركها|Merchants see it\. Leave it|بازرگانەکان دەیبینن\./, 'the old «merchants see it» hint is back');
+});
+
+test('no public request card renders a budget: the hub card and the board card of /requests', () => {
+  const card = source('src/components/community/hub/RequestCard.tsx');
+  assert.doesNotMatch(card, /budget_iqd/, 'hub/RequestCard.tsx reads budget_iqd again');
+  assert.doesNotMatch(card, /loc\('الميزانية'/, 'hub/RequestCard.tsx labels a budget again');
+  const page = source('src/pages/Requests.tsx');
+  const start = page.indexOf('function AllRequests(');
+  assert.ok(start > 0, 'the board card of /requests is AllRequests');
+  const next = page.indexOf('\nfunction ', start + 1);
+  const board = page.slice(start, next > 0 ? next : undefined);
+  assert.doesNotMatch(board, /budget_iqd/, 'the AllRequests card reads budget_iqd again');
+  assert.doesNotMatch(board, /loc\('الميزانية'/, 'the AllRequests card labels a budget again');
 });

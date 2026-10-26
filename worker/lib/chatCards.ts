@@ -30,7 +30,7 @@ import { safeParse } from './types';
 import { HttpError, badRequest } from './http';
 import { newId } from './crypto';
 import { isSchemaMissing } from './membershipBenefits';
-import { budgetShown } from './requestBudget';
+import { budgetSwitchOf } from './requestBudget';
 import { threadRole, type StoreThread } from './chatThread';
 import { approvedAtSql, merchantIsPublic, storeIsPublic, withApprovalSchema } from './merchantApproval';
 
@@ -677,6 +677,7 @@ async function printRequestCurrents(
   const read = (withSwitch: boolean) =>
     env.DB.prepare(
       `SELECT r.id, r.state, r.expires_at, r.customer_id, r.target_merchant_id, r.community_order_id,
+              r.visibility, r.created_by, r.origin_chat_id,
               ${withSwitch ? 'r.budget_visible' : '0'} AS budget_visible,
               (SELECT o.id FROM community_offers o WHERE o.request_id = r.id AND o.state IN ('pending','superseded')
                 ORDER BY o.created_at DESC LIMIT 1) AS live_offer_id
@@ -708,9 +709,12 @@ async function printRequestCurrents(
       offer_id: (r.live_offer_id as string | null) ?? null,
       order_id: (r.community_order_id as string | null) ?? null,
       // Q2 (row 268, critique 6): the customer and staff read the budget the
-      // card was sent with; the store only while the customer shows it NOW.
-      // Decided here, at the reader, and read by `cardPublic`.
-      [SHOW_BUDGET]: viewer !== 'merchant' || budgetShown(r.budget_visible),
+      // card was sent with; the store only while the request shows it NOW —
+      // the switch, or a request the chat sheet made for this store
+      // (critique 3, `budgetSwitchOf`, including rows written before the
+      // sheet stored the switch). Decided here, at the reader, and read by
+      // `cardPublic`.
+      [SHOW_BUDGET]: viewer !== 'merchant' || budgetSwitchOf(r) === 1,
     });
   }
   return out;

@@ -18,6 +18,12 @@
  * `engaged`). Nobody else, ever: the public board, the community list,
  * search, a guest, a member, the public API.
  *
+ * A REQUEST THE CHAT SHEET MADE FOR ONE STORE (critique 3) is the one place
+ * the switch is not the whole answer: a budget typed in that short in-chat
+ * form was written for that store, so its store reads it (`budgetSwitchOf`).
+ * The sheet now stores the switch on, but every such row written before it
+ * stores it off, and B0 rewrites no row (no migration): the rule is read here.
+ *
  * Stored bytes are never rewritten. A revision spec, an order's request
  * snapshot and a chat card keep the budget they were written with; a reader
  * who may not see it gets them without it (`stripSpecBudget`). A database
@@ -32,6 +38,34 @@ export type BudgetReader = 'owner' | 'admin' | 'merchant' | 'public';
 
 /** The switch, as a row stores it: on only when exactly 1. A row without the column reads off. */
 export const budgetShown = (visible: unknown): boolean => Number(visible ?? 0) === 1;
+
+/**
+ * A DIRECT REQUEST THE CUSTOMER MADE IN A STORE'S CONVERSATION (0151:
+ * `visibility = 'direct'`, `created_by = 'customer'`, `origin_chat_id` set):
+ * the chat sheet's own row. Its only merchant readers are the store it is
+ * addressed to (the file policy's `eligible`, and `engaged` once its offer is
+ * accepted), never a workshop of the board. A row read without those columns
+ * answers no, which keeps the budget hidden.
+ *
+ * NOTE for the request editor's direct send (P1-06 2b, B0b): it records the
+ * conversation at send too, so its rows match this test. Before it ships the
+ * switch for a direct request, replace this read rule with a data fix of the
+ * sheet's old rows (a DECISIONS row) or narrow the test, or that switch will
+ * not hide the budget from the store.
+ */
+export const madeInChatForOneStore = (r: Record<string, unknown>): boolean =>
+  r.visibility === 'direct' && r.created_by === 'customer' && typeof r.origin_chat_id === 'string' && r.origin_chat_id !== '';
+
+/**
+ * The switch AS A MERCHANT THE REQUEST IS MEANT FOR READS IT, from a request
+ * row: on when the customer turned it on, and on for a request the chat sheet
+ * made for one store (a budget typed there is for that store, critique 3,
+ * including the rows written before the sheet stored the switch). Every
+ * other reader still goes through `budgetFor`, so a guest, a member and a
+ * workshop the request is not for never read it either way.
+ */
+export const budgetSwitchOf = (r: Record<string, unknown> | null | undefined): 0 | 1 =>
+  r && (budgetShown(r.budget_visible) || madeInChatForOneStore(r)) ? 1 : 0;
 
 /** The budget this reader may see, or null. */
 export function budgetFor(budget: unknown, visible: unknown, reader: BudgetReader): number | null {
@@ -85,11 +119,15 @@ export const snapshotHasBudget = (snapshot: Record<string, unknown>): boolean =>
   (snapshot.budget_iqd !== null && snapshot.budget_iqd !== undefined) ||
   (!!snapshot.spec && typeof snapshot.spec === 'object' && (snapshot.spec as Record<string, unknown>).budget_iqd != null);
 
-/** The switch of one request, read on its own (a reader whose query cannot name the column). Off when absent. */
+/**
+ * The switch of one request as a merchant it is meant for reads it
+ * (`budgetSwitchOf`), read on its own (a reader whose query cannot name the
+ * columns). The whole row, so a database without a column reads it off.
+ */
 export async function budgetVisibleOf(db: D1Database, requestId: string): Promise<boolean> {
   try {
-    const row = await db.prepare('SELECT budget_visible FROM community_requests WHERE id = ?').bind(requestId).first<{ budget_visible: unknown }>();
-    return budgetShown(row?.budget_visible);
+    const row = await db.prepare('SELECT * FROM community_requests WHERE id = ?').bind(requestId).first<Record<string, unknown>>();
+    return budgetSwitchOf(row) === 1;
   } catch (e) {
     if (isMissingSchema(e)) return false;
     throw e;

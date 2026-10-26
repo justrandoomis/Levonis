@@ -163,7 +163,7 @@ import { isSchemaMissing } from '../lib/membershipBenefits';
 // A board deal's conversation: the request thread, found or created by the chat door's own helper.
 import { openStoreThread } from './chats';
 // Q2 (row 268): the budget is the customer's, shown to a merchant only when they say so.
-import { budgetFor, budgetReaderOf, budgetVisibleOf, snapshotHasBudget, stripSnapshotBudget, type BudgetReader } from '../lib/requestBudget';
+import { budgetFor, budgetReaderOf, budgetSwitchOf, budgetVisibleOf, snapshotHasBudget, stripSnapshotBudget, type BudgetReader } from '../lib/requestBudget';
 
 export const marketplaceRoutes = new Hono<AppContext>();
 
@@ -241,11 +241,12 @@ export function partyRequest(r: Record<string, unknown>, reader: Exclude<BudgetR
 /**
  * The public whitelist for a reader who may be shown the budget (Q2,
  * worker/lib/requestBudget.ts): the customer and an admin always, a merchant
- * the request is meant for only when the customer turned the switch on. The
+ * the request is meant for only when the customer turned the switch on (or
+ * typed it in the chat sheet for that one store, `budgetSwitchOf`). The
  * reader is NAMED by every caller — never a list's index (`rows.map(fn)`).
  */
 export function requestForReader(r: Record<string, unknown>, reader: BudgetReader) {
-  return { ...publicRequest(r), budget_iqd: budgetFor(r.budget_iqd, r.budget_visible, reader) };
+  return { ...publicRequest(r), budget_iqd: budgetFor(r.budget_iqd, budgetSwitchOf(r), reader) };
 }
 
 /** A JSON id list column, read defensively. */
@@ -423,7 +424,7 @@ marketplaceRoutes.get('/requests/:id', requireCommunityOpen, async (c) => {
   // member, a merchant the job is not for and a guest never do (critique 2:
   // the contract's `merchants`, not every merchant account).
   const isAdmin = user?.role === 'admin';
-  const budgetAsked = !party && !isAdmin && !!user && budgetFor(r.budget_iqd, r.budget_visible, 'merchant') !== null;
+  const budgetAsked = !party && !isAdmin && !!user && budgetFor(r.budget_iqd, budgetSwitchOf(r), 'merchant') !== null;
   const { reader } = (files.results.length || budgetAsked) && user
     ? await fileReader(c.env, r as unknown as RequestForAccess, user, { allowAdmin: true })
     : { reader: null };

@@ -116,7 +116,7 @@ import {
 } from '../lib/requestEstimate';
 import { REQUEST_MODEL_LIMITS } from '@levonis/contracts/requestModel';
 import { isMissingSchema } from '../lib/merchantApproval';
-import { budgetFor, budgetReaderOf, budgetVisibleOf, stripSpecBudget } from '../lib/requestBudget';
+import { budgetFor, budgetReaderOf, budgetSwitchOf, budgetVisibleOf, stripSpecBudget } from '../lib/requestBudget';
 import { orderCoverageFacts } from '../lib/chatCards';
 
 /**
@@ -1755,7 +1755,10 @@ async function draftShape(env: Env, requestId: string) {
     budget_iqd: r?.budget_iqd === null || r?.budget_iqd === undefined ? null : Number(r.budget_iqd),
     expires_at: (r?.expires_at as string | null) ?? null,
     live_offers: Number(live?.n ?? 0),
-    budget_visible: Number(r?.budget_visible ?? 0) === 1,
+    // Does a merchant the request is meant for read the budget (Q2)? What the
+    // wizard hint says: the switch, or a request the chat sheet made for one
+    // store, whose store reads it (worker/lib/requestBudget.ts `budgetSwitchOf`).
+    budget_visible: budgetSwitchOf(r) === 1,
     schema_version: model?.schema_version ?? 1,
     model: model ? { ...projectModel(model, 'owner'), origin: model.origin, stale: model.stale } : null,
     print: p
@@ -2557,7 +2560,9 @@ printRequestRoutes.post('/requests/:id/repeat', requireCommunityOpen, requireAut
   // The model and the budget's visibility (P1-04, Q2) ride along: a
   // version-3 source is copied part for part, its ids made anew and every
   // file pointer moved to the COPIED file. A version-1 source needs nothing —
-  // the copy's v1 row synthesises the same model.
+  // the copy's v1 row synthesises the same model. The switch rides along only
+  // from a board source: a direct source's budget was for its one store, and
+  // its repeat is a board draft (`copyRequestModel`).
   await copyRequestModel(c.env.DB, sourceId, newRequestId, fileIdMap, now);
 
   await audit(c.env.DB, user.id, 'print.request_repeated', newRequestId, { from: sourceId, state: 'draft' });
@@ -2577,8 +2582,17 @@ printRequestRoutes.post('/requests/:id/repeat', requireCommunityOpen, requireAut
  */
 async function copyRequestModel(db: D1Database, sourceId: string, newId_: string, fileIdMap: Map<string, string>, ts: string): Promise<void> {
   try {
+    // Q2: the switch is the customer's word FOR THE BOARD. A direct source
+    // (one store, often its chat sheet, which turns it on for that store)
+    // repeats as a board draft, which starts hidden: the budget reaches the
+    // workshops of the board only when the customer shows it there.
     await db
-      .prepare('UPDATE community_requests SET budget_visible = (SELECT s.budget_visible FROM community_requests s WHERE s.id = ?1) WHERE id = ?2')
+      .prepare(
+        `UPDATE community_requests
+            SET budget_visible = (SELECT CASE WHEN s.visibility = 'direct' THEN 0 ELSE s.budget_visible END
+                                    FROM community_requests s WHERE s.id = ?1)
+          WHERE id = ?2`
+      )
       .bind(sourceId, newId_)
       .run();
     const read = await readRequestModel(db, sourceId, { restamp: false });
