@@ -6,16 +6,17 @@
 import { fence } from '../../operations';
 import { importStockNotConfigured } from '../../importStock';
 import { COMPLETENESS_LIST_VERSION, recomputeCompleteness, recomputeCost } from '../../productCompleteness';
-import type { RepriceBudget } from '../autoReprice';
 import { receivedShelfExistsSql } from './shelf';
 import { loadV2Read } from './api';
 import { evaluateV2Write, storedDesired } from './evaluate';
 import { v2WriteStatements, V2_PRICING_STATEMENT_CAP } from './write';
 
 type Pending = { product_id: string; inputs_seq: number; write_seq: number };
+/** The repair needs only a shared statement counter, not the automatic repricer. */
+type RecoveryBudget = { canSpend(n: number): boolean; spend(n: number): boolean };
 const READ_ROOM = 60; // V2 reads, installation probes and writer preparation, including a cold binding.
 
-export async function recoverReceivedPricing(db: D1Database, budget: RepriceBudget): Promise<{ recovered: string[]; refreshed: number; skipped: number; slugs: string[] }> {
+export async function recoverReceivedPricing(db: D1Database, budget: RecoveryBudget): Promise<{ recovered: string[]; refreshed: number; skipped: number; slugs: string[] }> {
   const report = { recovered: [] as string[], refreshed: 0, skipped: 0, slugs: [] as string[] };
   if (!budget.spend(1)) return report;
   let pending: Pending[];
