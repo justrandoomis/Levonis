@@ -15,6 +15,9 @@
  * page and the revisions, the accepted merchant on the order — and still
  * never the public board, a guest, a member or a merchant the job is not for
  * (critique 2: the contract's `merchants`, not every merchant account).
+ * A merchant reads it on the CURRENT revision only: a figure an earlier
+ * revision stored while the switch was off stays hidden once it goes on
+ * (review B0-R2-PRIV-1).
  *
  * A DIRECT request (one store, from its chat): the budget typed into the
  * sheet is shown to that store (critique 3), not before the send (a draft is
@@ -194,6 +197,38 @@ test('switch on: the merchants the request is meant for read it — never the bo
   assert.ok((await revisionBudgets(raw, MEMBER, id)).every((b) => b === null), 'a member');
   assert.ok((await revisionBudgets(raw, INELIGIBLE, id)).every((b) => b === null), 'a workshop it is not for');
   assert.ok((await revisionBudgets(raw, GUEST, id)).every((b) => b === null), 'a guest');
+});
+
+test('a budget typed while hidden stays hidden on its revision once the switch goes on: a merchant reads the current revision only (B0-R2-PRIV-1)', async () => {
+  const raw = world();
+  // Revision 1: 50 000 with the switch off (the default). The eligible workshop reads nothing, and offers.
+  const id = await newDraft(raw, { budget_iqd: 50000 });
+  let res = await post(app(raw, BUYER), `/api/marketplace/print/requests/${id}/publish`, { ...PLA, budget_iqd: 50000, budget_visible: false });
+  assert.equal(res.status, 200, JSON.stringify(await json(res.clone())));
+  await offerOn(raw, id, 40000);
+  const pairs = async (u: StubUser | null) =>
+    ((await read(raw, u, `/api/marketplace/print/requests/${id}/revisions`)).revisions as Array<{ revision: number; spec: Record<string, unknown> }>)
+      .map((r) => [r.revision, r.spec.budget_iqd]);
+  assert.deepEqual(await pairs(ELIGIBLE), [[1, null]], 'hidden on revision 1');
+  // Revision 2: a priced change (two pieces) over the offer, a lower 30 000, and the switch now on.
+  res = await post(app(raw, BUYER), `/api/marketplace/print/requests/${id}/publish`, { ...PLA, quantity: 2, budget_iqd: 30000, budget_visible: true });
+  assert.equal(res.status, 200, JSON.stringify(await json(res.clone())));
+  // The stored revisions keep what was typed; nothing is rewritten.
+  assert.deepEqual(
+    raw
+      .prepare(`SELECT revision, json_extract(spec, '$.budget_iqd') AS b FROM community_request_revisions WHERE request_id = ? ORDER BY revision`)
+      .all(id)
+      .map((r) => [Number(r.revision), Number(r.b)]),
+    [[1, 50000], [2, 30000]]
+  );
+  // The eligible workshop that offered: the full history, the budget on the current revision only.
+  assert.deepEqual(await pairs(ELIGIBLE), [[1, null], [2, 30000]], 'the 50 000 typed while hidden never reaches a merchant');
+  assert.equal(await pageBudget(raw, ELIGIBLE, id), 30000, 'the request page shows the current budget');
+  // The customer and an admin still read every stored figure; a member and a workshop it is not for read none.
+  assert.deepEqual(await pairs(BUYER), [[1, 50000], [2, 30000]], 'the customer');
+  assert.deepEqual(await pairs(ADMIN), [[1, 50000], [2, 30000]], 'an admin');
+  assert.deepEqual(await pairs(MEMBER), [[2, null]], 'a member');
+  assert.deepEqual(await pairs(INELIGIBLE), [[2, null]], 'a workshop it is not for');
 });
 
 test('the accepted order: the stored snapshot keeps the budget; the merchant reads it only with the switch', async () => {

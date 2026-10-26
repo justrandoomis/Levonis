@@ -1878,6 +1878,15 @@ printRequestRoutes.get('/requests/:id/revisions', async (c) => {
    * is eligible, or a sent direct request's store; `engaged`: the accepted
    * merchant). Having once offered is not enough (critique 2): a merchant
    * whose offer a revision made ineligible keeps the history, not the budget.
+   *
+   * THE CURRENT REVISION ONLY (review B0-R2-PRIV-1). The switch is read from
+   * the request as it is NOW, so it says nothing about the figure an earlier
+   * revision stored: a budget typed while the switch was off (a higher limit
+   * the customer later lowered) must not reach a merchant once it goes on.
+   * A merchant reads the budget on the current revision alone, whose spec is
+   * rewritten in place on every unpriced change and so always holds the
+   * budget the switch now governs; every earlier revision reads without it.
+   * The customer and an admin still read every stored figure.
    */
   const isAdmin = user?.role === 'admin';
   let budgetReader = budgetReaderOf({ isOwner, isAdmin, reader: null });
@@ -1892,8 +1901,10 @@ printRequestRoutes.get('/requests/:id/revisions', async (c) => {
   }
   let prev: Record<string, unknown> | null = null;
   let prevFiles: RevisionFile[] = [];
+  const currentRevision = Number(request.revision ?? 1);
   const revisions = (results ?? []).map((row) => {
-    const spec = stripSpecBudget(projectSpec(parseJson<Record<string, unknown>>(row.spec, {}), party), budgetVisible, budgetReader);
+    const shownHere = budgetVisible === 1 && Number(row.revision) === currentRevision ? 1 : 0;
+    const spec = stripSpecBudget(projectSpec(parseJson<Record<string, unknown>>(row.spec, {}), party), shownHere, budgetReader);
     const files = parseJson<RevisionFile[]>(row.files, []);
     const changes: string[] = prev
       ? REVISION_FIELDS.filter((k) => JSON.stringify(spec[k] ?? null) !== JSON.stringify(prev![k] ?? null))
