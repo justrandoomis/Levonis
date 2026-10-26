@@ -110,12 +110,12 @@ function template(pair: FxPairId, sqls: string[], name: string): string {
 }
 
 let copies = 0;
-function copyOf(file: string): DatabaseSync {
+function copyOf(file: string): { raw: DatabaseSync; path: string } {
   const target = join(dir, `c${++copies}.db`);
   copyFileSync(file, target);
   const raw = new DatabaseSync(target);
   raw.exec('PRAGMA foreign_keys = ON;');
-  return raw;
+  return { raw, path: target };
 }
 
 async function runMatrix(pair: FxPairId, a: string, held: string, outcomes: Record<string, PairOutcome>) {
@@ -125,7 +125,7 @@ async function runMatrix(pair: FxPairId, a: string, held: string, outcomes: Reco
     const file = template(pair, sqls, `${pair}-${stateName}`);
     for (const [outcomeName, outcome] of Object.entries(outcomes)) {
       for (const trigger of TRIGGERS) {
-        const raw = copyOf(file);
+        const { raw, path: copyPath } = copyOf(file);
         const db = asD1(raw);
         const leasedElsewhere = stateName === 'leased_by_another';
         // Our claim, as claimLease writes it (another run's live lease is left in place).
@@ -146,6 +146,9 @@ async function runMatrix(pair: FxPairId, a: string, held: string, outcomes: Reco
           if (!(leasedElsewhere && isFenceMiss(e))) problems.push(`${label}: ${e instanceof Error ? e.message.slice(0, 160) : String(e)}`);
         } finally {
           raw.close();
+          // Almost a thousand full-schema copies are exercised here. Keeping
+          // them until process exit exhausts the CI runner's temporary quota.
+          rmSync(copyPath, { force: true });
         }
       }
     }
