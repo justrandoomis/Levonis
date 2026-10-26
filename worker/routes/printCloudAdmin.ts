@@ -23,7 +23,7 @@ import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { jsonObject, requireAdmin } from '../lib/http';
 import { limitByMethod } from '../lib/ratelimit';
-import { canMoveMoney, canViewCost, canWriteCost, requireCostRead } from '../lib/costAccess';
+import { canMoveMoney, canViewCost, canWriteCost, requireCostRead, requireCostWrite } from '../lib/costAccess';
 import { requireFinancialScope } from '../lib/walletAdjust';
 import { countingD1 } from '../lib/d1Count';
 import { ADAPTERS, integrationBacklog } from '../lib/printCloud/adapters';
@@ -32,7 +32,7 @@ import { roomWithin, runPrintCloudTasks, taskOverview } from '../lib/printCloud/
 import { approveBuyback, markBuybackPaid, rejectBuyback } from '../lib/printCloud/buyback';
 import { ENTITIES, categories, createEntity, listEntity, replacePriceTiers, stripCost, updateCategoryBuyback, updateEntity, type EntityKey } from '../lib/printCloud/catalog';
 import { creditAccountId, debitAvailable, grantCredits } from '../lib/printCloud/credits';
-import { idempotent, many, one, runBatch, type Stmt } from '../lib/printCloud/db';
+import { fence, idempotent, many, one, runBatch, type Stmt } from '../lib/printCloud/db';
 import { invalid, pcError } from '../lib/printCloud/errors';
 import { advanceShipment } from '../lib/printCloud/fulfillment';
 import { currentUser, idempotencyKey, ok, pcGate, queryInt, requestConfig, staffActor } from '../lib/printCloud/http';
@@ -64,7 +64,7 @@ import { reconcile } from '../lib/printCloud/reconcile';
 import { operationsReport, parseRange, profitReport, revenueReport } from '../lib/printCloud/reports';
 import { COST_SETTING_KEYS, configWrite, publicSettings } from '../lib/printCloud/settings';
 import { adjustUp, allocateWithoutSale, deallocate, position, receiveStock, removePhysical, stockOverview } from '../lib/printCloud/warehouse';
-import { iso, optIso, optString, parseJson, pcId, reqInt, reqString } from '../lib/printCloud/util';
+import { iso, mulDivRound, optIso, optString, parseJson, pcId, reqInt, reqString } from '../lib/printCloud/util';
 import type { ShipmentStatus } from '../lib/printCloud/shipments';
 
 export const adminPrintCloudRoutes = new Hono<AppContext>();
@@ -192,7 +192,11 @@ adminPrintCloudRoutes.get('/stock/lots', requireCostRead, async (c) => {
   );
 });
 
-/** A supplier delivery. Its cost is the owner's to state; an operator may receive with the cost left for the owner. */
+/**
+ * A supplier delivery. Its cost is the owner's to state; an operator may
+ * receive it with the cost PENDING (`cost_known` = 0, never a free zero),
+ * which the owner states later at POST /stock/lots/:id/cost.
+ */
 adminPrintCloudRoutes.post('/stock/receive', async (c) => {
   const user = currentUser(c);
   const body = await jsonObject(c);
@@ -202,11 +206,11 @@ adminPrintCloudRoutes.post('/stock/receive', async (c) => {
   const r = receiveStock(c.env.DB, {
     variantId,
     qty: reqInt(body.qty, 'qty', { min: 1, max: 100_000_000 }),
-    totalCostIqd: body.total_cost_iqd === undefined ? 0 : reqInt(body.total_cost_iqd, 'total_cost_iqd', { min: 0, max: 10_000_000_000 }),
+    totalCostIqd: body.total_cost_iqd === undefined ? null : reqInt(body.total_cost_iqd, 'total_cost_iqd', { min: 0, max: 10_000_000_000 }),
     locationId: typeof body.location_id === 'string' ? body.location_id : null,
     lotCode: optString(body.lot_code, 'lot_code', 80),
     supplier: optString(body.supplier, 'supplier', 120),
-    notes: body.total_cost_iqd === undefined ? `${optString(body.notes, 'notes', 400)} [cost pending]`.trim() : optString(body.notes, 'notes', 500),
+    notes: optString(body.notes, 'notes', 500),
     actorId: user.id,
     now: new Date(),
   });
@@ -214,7 +218,39 @@ adminPrintCloudRoutes.post('/stock/receive', async (c) => {
   return ok(c, { lot_id: r.lotId, position: await position(c.env.DB, variantId) }, 201);
 });
 
-/** A count correction: positive adds an (unknown-cost) adjustment lot, negative takes units off the shelf. */
+/**
+ * The owner states what a cost-pending lot cost — once: the batch is fenced
+ * on the lot still being pending, so two statements of it cannot both land
+ * (the same cost sent again answers as recorded). Units that already left
+ * the lot keep their ledger rows; the profit report values them from this
+ * cost (reports.ts `profitReport`). The audit names the act, never the cost:
+ * full admins read that trail.
+ */
+adminPrintCloudRoutes.post('/stock/lots/:id/cost', requireCostWrite, async (c) => {
+  const user = currentUser(c);
+  const body = await jsonObject(c);
+  const totalCostIqd = reqInt(body.total_cost_iqd, 'total_cost_iqd', { min: 0, max: 10_000_000_000 });
+  const lot = await one<{ id: string; variant_id: string; received_qty: number; total_cost_iqd: number; cost_known: number }>(
+    c.env.DB,
+    'SELECT id, variant_id, received_qty, total_cost_iqd, cost_known FROM pc_stock_lots WHERE id = ?',
+    param(c, 'id')
+  );
+  if (!lot) throw pcError('NOT_FOUND');
+  const unitMilli = mulDivRound(totalCostIqd, 1000, Number(lot.received_qty));
+  const answer = { lot_id: lot.id, variant_id: lot.variant_id, total_cost_iqd: totalCostIqd, unit_cost_milli_iqd: unitMilli, cost_known: true };
+  if (Number(lot.cost_known) === 1) {
+    if (Number(lot.total_cost_iqd) === totalCostIqd) return ok(c, { ...answer, replayed: true });
+    throw pcError('INVALID_TRANSITION', { reason: 'cost_already_recorded' });
+  }
+  await runBatch(c.env.DB, [
+    fence(c.env.DB, 'STATE_CHANGED', '(SELECT cost_known FROM pc_stock_lots WHERE id = ?) = 0', [lot.id]),
+    c.env.DB.prepare('UPDATE pc_stock_lots SET total_cost_iqd = ?, unit_cost_milli_iqd = ?, cost_known = 1 WHERE id = ?').bind(totalCostIqd, unitMilli, lot.id),
+    ...(await pcAudit(c.env.DB, user.id, 'stock.lot_cost', lot.id, { variant_id: lot.variant_id })),
+  ]);
+  return ok(c, { ...answer, replayed: false });
+});
+
+/** A count correction: positive adds an adjustment lot (its cost pending), negative takes units off the shelf. */
 adminPrintCloudRoutes.post('/stock/adjust', async (c) => {
   const user = currentUser(c);
   const body = await jsonObject(c);
@@ -362,16 +398,33 @@ adminPrintCloudRoutes.get('/orders/:id', requireFinancialScope, async (c) => {
   return ok(c, o);
 });
 
-/** The manual adapter: a cash or transfer receipt the workshop holds. Same exactly-once door as every adapter. */
+/**
+ * The manual adapter: a cash or transfer receipt the workshop holds. Same
+ * exactly-once door as every adapter. The event is the receipt AS ENTERED for
+ * this order — order, amount and reference — so the same entry twice is one
+ * event, while a corrected amount or one reference covering two orders is
+ * not swallowed as a duplicate of a different entry.
+ */
 adminPrintCloudRoutes.post('/orders/:id/confirm-payment', requireFinancialScope, async (c) => {
   const user = currentUser(c);
   const body = await jsonObject(c);
   const reference = reqString(body.reference, 'reference', { max: 120 });
+  const orderId = param(c, 'id');
+  const amountIqd = reqInt(body.amount_iqd, 'amount_iqd', { min: 0, max: 10_000_000_000 });
+  // One receipt pays an order once. Re-entering a receipt already APPLIED to this order — even with a
+  // mistyped amount — is that receipt again, not new money to put on the refund desk.
+  const applied = await one<{ amount_iqd: number }>(
+    c.env.DB,
+    "SELECT amount_iqd FROM pc_payment_events WHERE provider = 'manual' AND order_id = ? AND outcome = 'applied' AND provider_event_id = 'manual:' || order_id || ':' || amount_iqd || ':' || ?",
+    orderId,
+    reference
+  );
+  if (applied) return ok(c, { outcome: 'duplicate_event', order_id: orderId, previous_outcome: 'applied', previous_amount_iqd: Number(applied.amount_iqd) });
   const result = await confirmPayment(c.env.DB, {
     provider: 'manual',
-    eventId: `manual:${reference}`,
-    orderId: param(c, 'id'),
-    amountIqd: reqInt(body.amount_iqd, 'amount_iqd', { min: 0, max: 10_000_000_000 }),
+    eventId: `manual:${orderId}:${amountIqd}:${reference}`,
+    orderId,
+    amountIqd,
     actorId: user.id,
     payloadHash: 'manual',
     now: new Date(),

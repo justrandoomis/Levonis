@@ -19,7 +19,7 @@
  *            that purchase's lot, ungranted grams of that purchase's lot.
  */
 import { many, one, fence, runBatch, type Planned, type Stmt } from './db';
-import { invalid, pcError } from './errors';
+import { classifyDbError, invalid, pcError } from './errors';
 import { integrationEvent, membershipTier } from './adapters';
 import { pcAudit } from './audit';
 import { grantCredits, debitAvailable, creditAccountId } from './credits';
@@ -28,9 +28,8 @@ import { pcNotify } from './notify';
 import { assertPaymentAvailable, paymentInstructions, type PaymentProvider } from './payments';
 import { priceQuote, type PricedLine, type PricedQuote, type QuoteLineInput } from './pricing';
 import type { PrintCloudConfig } from './settings';
-import { createShipment, deliveryFee, parseAddress, shipmentInventoryItem, type DeliveryAddress } from './shipments';
+import { createShipment, deliveryFee, parseAddress, shipmentCancelStatements, shipmentInventoryItem, type DeliveryAddress } from './shipments';
 import { activeHolds, convertHoldToAllocation, deallocate, holdStock, releaseHold } from './warehouse';
-import { shipmentCancelStatements } from './fulfillment';
 import { addSeconds, iso, mulDivRound, parseJson, pcId } from './util';
 
 export interface StoredQuote extends PricedQuote {
@@ -387,11 +386,14 @@ async function fulfillmentStatements(db: D1Database, order: OrderRow, p: Confirm
   ];
   for (const hold of holds) s.push(...convertHoldToAllocation(db, hold, order.user_id, p.actorId, p.now));
   if (order.kind === 'shipping') {
-    // A delivery fee paid: its shipment may now be prepared.
+    // A delivery fee paid: its shipment may now be prepared — only one still
+    // waiting for this fee. A shipment cancelled meanwhile fails the fence;
+    // confirmPayment re-reads and records the payment for the refund desk.
     s.push(
       db
         .prepare("UPDATE pc_shipments SET status = 'preparing', updated_at = ? WHERE fee_order_id = ? AND status = 'awaiting_payment'")
-        .bind(iso(p.now), order.id)
+        .bind(iso(p.now), order.id),
+      fence(db, 'STATE_CHANGED', "EXISTS (SELECT 1 FROM pc_shipments WHERE fee_order_id = ? AND status = 'preparing')", [order.id])
     );
   }
   const deliveryLines: OrderLineRow[] = [];
@@ -460,17 +462,15 @@ async function fulfillmentStatements(db: D1Database, order: OrderRow, p: Confirm
     });
     s.push(shipment.statement);
     s.push(db.prepare('UPDATE pc_orders SET shipment_id = ? WHERE id = ?').bind(shipment.id, order.id));
-    for (const line of deliveryLines) {
-      const r = reserveInventory(db, {
-        userId: order.user_id,
-        variantId: line.variant_id as string,
-        qty: line.quantity,
-        purpose: 'delivery',
-        refId: shipment.id,
-        actorId: p.actorId,
-        now: p.now,
-      });
-      s.push(...r.statements, shipmentInventoryItem(db, shipment.id, r.reservationId, line.variant_id as string, line.quantity));
+    // One reservation and one item per variant: a shipment holds at most one
+    // active reservation per account (uq_pc_inventory_reservations_active),
+    // and an order may carry a variant on several delivery lines — its stock
+    // hold was merged the same way.
+    const perVariant = new Map<string, number>();
+    for (const line of deliveryLines) perVariant.set(line.variant_id as string, (perVariant.get(line.variant_id as string) ?? 0) + line.quantity);
+    for (const [variantId, qty] of perVariant) {
+      const r = reserveInventory(db, { userId: order.user_id, variantId, qty, purpose: 'delivery', refId: shipment.id, actorId: p.actorId, now: p.now });
+      s.push(...r.statements, shipmentInventoryItem(db, shipment.id, r.reservationId, variantId, qty));
     }
   }
   s.push(
@@ -497,48 +497,76 @@ async function fulfillmentStatements(db: D1Database, order: OrderRow, p: Confirm
   return s;
 }
 
+export interface PaymentResult {
+  outcome: PaymentOutcome;
+  order_id: string;
+  /** On 'duplicate_event': what the first copy of that event was recorded as. */
+  previous_outcome?: string;
+}
+
 /**
  * The ONE door every payment confirmation goes through, whatever the adapter.
  *
  *   - an event already recorded for (provider, event id) changes nothing and
- *     answers 'duplicate_event' — a webhook delivered twice grants once;
+ *     answers 'duplicate_event' with the outcome first recorded — a webhook
+ *     delivered twice grants once;
  *   - a different event for an order already paid is recorded as
  *     'duplicate_order' (for the refund desk) and grants nothing;
  *   - a wrong amount is recorded and grants nothing;
+ *   - a delivery fee whose shipment no longer waits for it, and an order
+ *     whose fulfilment the database keeps refusing (a CHECK, a unique key —
+ *     never an outage), are recorded as 'order_not_payable' and grant
+ *     nothing: the money is listed for the refund desk instead of a 500 the
+ *     provider retries forever;
  *   - otherwise the order is fulfilled, once.
  */
-export async function confirmPayment(db: D1Database, p: ConfirmInput): Promise<{ outcome: PaymentOutcome; order_id: string }> {
+export async function confirmPayment(db: D1Database, p: ConfirmInput): Promise<PaymentResult> {
   const seen = await one<{ outcome: string }>(
     db,
     'SELECT outcome FROM pc_payment_events WHERE provider = ? AND provider_event_id = ?',
     p.provider,
     p.eventId
   );
-  if (seen) return { outcome: 'duplicate_event', order_id: p.orderId };
-  const record = async (outcome: Exclude<PaymentOutcome, 'duplicate_event' | 'applied'>, known: boolean) => {
+  if (seen) return { outcome: 'duplicate_event', order_id: p.orderId, previous_outcome: seen.outcome };
+  const record = async (outcome: Exclude<PaymentOutcome, 'duplicate_event' | 'applied'>, known: boolean, detail: Record<string, unknown> = {}): Promise<PaymentResult> => {
     try {
-      await db.batch([eventInsert(db, p, outcome, known), ...(await pcAudit(db, p.actorId, `payment.${outcome}`, p.orderId, { provider: p.provider, event_id: p.eventId, amount_iqd: p.amountIqd }))]);
+      await db.batch([
+        eventInsert(db, p, outcome, known),
+        ...(await pcAudit(db, p.actorId, `payment.${outcome}`, p.orderId, { provider: p.provider, event_id: p.eventId, amount_iqd: p.amountIqd, ...detail })),
+      ]);
     } catch (e) {
       if (!/UNIQUE constraint failed: pc_payment_events/.test(String(e instanceof Error ? e.message : e))) throw e;
-      return { outcome: 'duplicate_event' as const, order_id: p.orderId };
+      return { outcome: 'duplicate_event', order_id: p.orderId };
     }
     return { outcome, order_id: p.orderId };
   };
+  let refused: string | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     const order = await one<OrderRow>(db, 'SELECT * FROM pc_orders WHERE id = ?', p.orderId);
     if (!order) return record('unknown_order', false);
     if (order.status !== 'awaiting_payment') return record(order.paid_at ? 'duplicate_order' : 'order_not_payable', true);
     if (order.total_iqd !== p.amountIqd) return record('amount_mismatch', true);
+    if (order.kind === 'shipping') {
+      const shipment = await one<{ status: string }>(db, 'SELECT status FROM pc_shipments WHERE fee_order_id = ?', order.id);
+      if (shipment?.status !== 'awaiting_payment') return record('order_not_payable', true, { reason: 'shipment_not_awaiting_payment', shipment_status: shipment?.status ?? null });
+    }
     try {
       await db.batch(await fulfillmentStatements(db, order, p));
       return { outcome: 'applied', order_id: order.id };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (/UNIQUE constraint failed: pc_payment_events/.test(msg)) return { outcome: 'duplicate_event', order_id: p.orderId };
+      refused = null;
       if (/PC_FENCE:STATE_CHANGED|UNIQUE constraint failed: pc_payments/.test(msg)) continue;
-      throw e;
+      // Any other refusal the database expressed is not an outage: the same
+      // event retried would meet it again. Re-plan in case a concurrent write
+      // caused it; if it persists, record it below. Anything unrecognised is
+      // an outage — a 500, nothing recorded, so a retry can still apply it.
+      if (!classifyDbError(e)) throw e;
+      refused = msg.slice(0, 300);
     }
   }
+  if (refused) return record('order_not_payable', true, { reason: 'fulfilment_refused', error: refused });
   throw pcError('STATE_CHANGED');
 }
 
@@ -564,11 +592,13 @@ export async function closeUnpaidOrder(
   ];
   for (const hold of await activeHolds(db, order.id)) s.push(...releaseHold(db, hold, actorId, now, reason));
   if (order.kind === 'shipping' && order.shipment_id) {
-    // An unpaid delivery fee takes its shipment with it, and frees what it held.
+    // An unpaid delivery fee takes its shipment with it, and frees what it
+    // held — fenced, so a shipment that moved on is never stripped.
     s.push(
       db
         .prepare("UPDATE pc_shipments SET status = 'cancelled', closed_at = ?, updated_at = ? WHERE id = ? AND status = 'awaiting_payment'")
         .bind(iso(now), iso(now), order.shipment_id),
+      fence(db, 'STATE_CHANGED', '(SELECT status FROM pc_shipments WHERE id = ?) = ?', [order.shipment_id, 'cancelled']),
       ...(await shipmentCancelStatements(db, order.shipment_id, actorId, now))
     );
   }
@@ -704,7 +734,10 @@ export async function planLineRefund(
   const remainingOnLine = line.final_price_iqd - line.refunded_iqd;
   const amount = p.amountIqd ?? Math.min(defaultAmount, remainingOnLine);
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > remainingOnLine) throw invalid('amount_iqd', 'out_of_range');
-  const after = Number(order.refunded_iqd) + amount;
+  // Fenced on a fresh op_token, not on the resulting total: a concurrent
+  // refund of the same amount reaches the same total, and only the token
+  // tells that this batch's UPDATE is the one that matched.
+  const token = pcId('tok');
   s.push(
     db
       .prepare(
@@ -715,11 +748,11 @@ export async function planLineRefund(
     db
       .prepare(
         `UPDATE pc_orders SET refunded_iqd = refunded_iqd + ?,
-                status = CASE WHEN refunded_iqd + ? >= paid_iqd THEN 'refunded' ELSE 'partially_refunded' END, updated_at = ?
-          WHERE id = ? AND refunded_iqd = ?`
+                status = CASE WHEN refunded_iqd + ? >= paid_iqd THEN 'refunded' ELSE 'partially_refunded' END, updated_at = ?, op_token = ?
+          WHERE id = ? AND refunded_iqd = ? AND status IN ('fulfilled', 'partially_refunded')`
       )
-      .bind(amount, amount, iso(p.now), order.id, order.refunded_iqd),
-    fence(db, 'STATE_CHANGED', '(SELECT refunded_iqd FROM pc_orders WHERE id = ?) = ?', [order.id, after]),
+      .bind(amount, amount, iso(p.now), token, order.id, order.refunded_iqd),
+    fence(db, 'STATE_CHANGED', '(SELECT op_token FROM pc_orders WHERE id = ?) = ?', [order.id, token]),
     integrationEvent(db, { adapter: 'accounting', kind: 'refund.recorded', refId: refundId, payload: { order_id: order.id, amount_iqd: amount, method: p.method }, now: p.now }),
     ...(await pcAudit(db, p.actorId, 'order.refund', order.id, { refund_id: refundId, line_id: line.id, amount_iqd: amount, quantity: qty, reason: p.reason })),
   );

@@ -7,10 +7,17 @@
  *
  * Every read and write is scoped to the owner: another customer's project,
  * model, file or plate answers NOT_FOUND, never FORBIDDEN, so ids leak nothing.
+ *
+ * A job prints the project's models AS THEY ARE: the slicer measured them,
+ * the customer confirmed that estimate, the agent fetches those files. So
+ * from analysis until the print is over (or while a failure that may be
+ * reprinted waits) what a job prints — its models' files, quantities,
+ * orientation and colours — cannot change; the customer sends the job back
+ * to editing or cancels it first.
  */
-import { many, one, runBatch, type Stmt } from './db';
+import { fence, many, one, runBatch, type Stmt } from './db';
 import { invalid, pcError } from './errors';
-import { shelfPack, validatePlacements, type Bed, type PackItem, type Placement, type PlateArranger } from './plates';
+import { orientedFootprint, shelfPack, validatePlacements, type Bed, type PackItem, type Placement, type PlateArranger, type PlateIssue } from './plates';
 import { iso, optString, parseJson, pcId, reqInt, reqString } from './util';
 
 export const PROJECT_TYPES = ['generic', 'keychain', 'medal', 'magnetic', 'nfc', 'led', 'nameplate', 'storage', 'holder', 'figure', 'mechanical'] as const;
@@ -124,6 +131,23 @@ export async function ownedProject(db: D1Database, userId: string, projectId: st
   return p;
 }
 
+/** The project's jobs that print its models as they are now (see the header). */
+const JOBS_PRINTING_MODELS = `SELECT j.id, j.status FROM pc_print_jobs j
+  WHERE j.project_id = ?
+    AND (j.status IN ('analyzing', 'ready', 'awaiting_confirmation', 'confirmed', 'queued', 'preparing', 'printing', 'paused')
+         OR (j.status = 'failed' AND EXISTS (SELECT 1 FROM pc_failures f WHERE f.id = j.failure_id AND f.status = 'reported')))`;
+
+/**
+ * May the project's models change? Refused while a job prints them; the
+ * returned fence re-checks it inside the edit's own batch, so an analysis or
+ * a confirmation that lands first makes the edit fail, never slip past.
+ */
+async function modelsEditable(db: D1Database, projectId: string): Promise<Stmt> {
+  const job = await one<{ id: string; status: string }>(db, `${JOBS_PRINTING_MODELS} LIMIT 1`, projectId);
+  if (job) throw pcError('INVALID_TRANSITION', { reason: 'project_models_in_use', job_id: job.id, job_status: job.status });
+  return fence(db, 'STATE_CHANGED', `NOT EXISTS (${JOBS_PRINTING_MODELS})`, [projectId]);
+}
+
 export async function createProject(db: D1Database, userId: string, body: Record<string, unknown>, now: Date) {
   const id = pcId('pcpj');
   const type = body.project_type ?? 'generic';
@@ -205,6 +229,7 @@ export async function addProjectModel(db: D1Database, userId: string, projectId:
   const assignments = await parseAssignments(db, body.material_assignments);
   const tags = Array.isArray(body.tags) ? body.tags.filter((t): t is string => typeof t === 'string').map((t) => t.trim().toLowerCase().slice(0, 40)).slice(0, 20) : [];
   await runBatch(db, [
+    await modelsEditable(db, projectId),
     db
       .prepare(
         `INSERT INTO pc_project_models (id, project_id, user_id, file_id, import_id, name, quantity, transform_json, material_assignments_json, tags_json, created_at, updated_at)
@@ -257,7 +282,21 @@ export async function updateProjectModel(db: D1Database, userId: string, modelId
     vals.push(f.id);
   }
   if (!sets.length) throw invalid('body', 'empty');
-  await runBatch(db, [db.prepare(`UPDATE pc_project_models SET ${sets.join(', ')}, updated_at = ? WHERE id = ?`).bind(...vals, iso(now), modelId)]);
+  const s: Stmt[] = [];
+  // What a job prints is frozen while one prints it; the model's name is not part of that.
+  if (body.quantity !== undefined || body.transform !== undefined || body.material_assignments !== undefined || body.file_id !== undefined) {
+    s.push(await modelsEditable(db, m.project_id));
+  }
+  s.push(db.prepare(`UPDATE pc_project_models SET ${sets.join(', ')}, updated_at = ? WHERE id = ?`).bind(...vals, iso(now), modelId));
+  if (body.transform !== undefined || body.file_id !== undefined) {
+    // A plate was checked against the model's old shape; it proves nothing about the new one.
+    s.push(
+      db
+        .prepare('UPDATE pc_plates SET valid = 0, issues_json = ?, updated_at = ? WHERE id IN (SELECT plate_id FROM pc_plate_items WHERE project_model_id = ?)')
+        .bind(JSON.stringify([{ code: 'MODEL_CHANGED', keys: [modelId] } satisfies PlateIssue]), iso(now), modelId)
+    );
+  }
+  await runBatch(db, s);
 }
 
 /** A copy for printing again without re-uploading: same source files, same configuration, new ids. */
@@ -362,14 +401,85 @@ async function bedOf(db: D1Database, printerModelId: string): Promise<Bed> {
   return { x_um: m.build_x_mm * 1000, y_um: m.build_y_mm * 1000, z_um: m.build_z_mm * 1000 };
 }
 
-async function modelFootprints(db: D1Database, projectId: string) {
-  const rows = await many<{ id: string; quantity: number; transform_json: string; size_x_um: number | null; size_y_um: number | null; size_z_um: number | null; status: string | null }>(
+interface ModelShape {
+  id: string;
+  quantity: number;
+  transform_json: string;
+  size_x_um: number | null;
+  size_y_um: number | null;
+  size_z_um: number | null;
+  status: string | null;
+}
+
+async function modelShapes(db: D1Database, projectId: string): Promise<Map<string, ModelShape>> {
+  const rows = await many<ModelShape>(
     db,
     `SELECT m.id, m.quantity, m.transform_json, f.size_x_um, f.size_y_um, f.size_z_um, f.status
        FROM pc_project_models m LEFT JOIN pc_model_files f ON f.id = m.file_id WHERE m.project_id = ?`,
     projectId
   );
   return new Map(rows.map((r) => [r.id, r]));
+}
+
+/**
+ * How one model stands on a bed: its file's box turned by the model's own
+ * rotation, its scale, and whether that orientation is known before slicing
+ * (an auto-oriented model's is not).
+ */
+function standing(models: Map<string, ModelShape>, modelId: string) {
+  const m = models.get(modelId);
+  if (!m) throw pcError('NOT_FOUND', { field: 'project_model_id' });
+  if (m.status !== 'ready' || m.size_x_um === null) throw pcError('FILE_NOT_READY', { project_model_id: modelId });
+  const t = parseJson<{ scale_ppm?: number; rotation_x_mdeg?: number; rotation_y_mdeg?: number; rotation_z_mdeg?: number; orientation?: string }>(m.transform_json, {});
+  return {
+    footprint: orientedFootprint(
+      { x_um: Number(m.size_x_um), y_um: Number(m.size_y_um), z_um: Number(m.size_z_um) },
+      { x_mdeg: t.rotation_x_mdeg, y_mdeg: t.rotation_y_mdeg, z_mdeg: t.rotation_z_mdeg }
+    ),
+    scale: t.scale_ppm ?? 1_000_000,
+    known: t.orientation !== 'auto',
+  };
+}
+
+const modelOfKey = (key: string): string => key.split('#')[0];
+
+/** The bed, the height and each other — plus every instance whose footprint cannot be known until it is sliced. */
+function placementIssues(placements: Placement[], models: Map<string, ModelShape>, bed: Bed, spacing: number): PlateIssue[] {
+  const unknown = placements.filter((p) => !standing(models, modelOfKey(p.key)).known).map((p) => p.key);
+  return [...validatePlacements(placements, bed, spacing), ...(unknown.length ? [{ code: 'ORIENTATION_UNKNOWN' as const, keys: unknown }] : [])];
+}
+
+/**
+ * A stored plate checked again against its models AS THEY ARE NOW — what a
+ * job is created from and sliced against, never the flag alone. What only the
+ * plate's own record knows is kept: instances the arranger could not place
+ * (never stored), and a model changed since the plate was made.
+ */
+export async function plateIssues(db: D1Database, projectId: string, plateId: string): Promise<PlateIssue[]> {
+  const plate = await one<{ printer_model_id: string; spacing_um: number; issues_json: string }>(
+    db,
+    'SELECT printer_model_id, spacing_um, issues_json FROM pc_plates WHERE id = ? AND project_id = ?',
+    plateId,
+    projectId
+  );
+  if (!plate) throw pcError('NOT_FOUND', { field: 'plate_id' });
+  const bed = await bedOf(db, plate.printer_model_id);
+  const models = await modelShapes(db, projectId);
+  const items = await many<{ project_model_id: string; instance_no: number; x_um: number; y_um: number; rotation_z_mdeg: number; scale_ppm: number }>(
+    db,
+    'SELECT project_model_id, instance_no, x_um, y_um, rotation_z_mdeg, scale_ppm FROM pc_plate_items WHERE plate_id = ? ORDER BY project_model_id, instance_no',
+    plateId
+  );
+  const placements: Placement[] = items.map((it) => ({
+    key: `${it.project_model_id}#${it.instance_no}`,
+    x_um: Number(it.x_um),
+    y_um: Number(it.y_um),
+    rotation_z_mdeg: Number(it.rotation_z_mdeg),
+    scale_ppm: Number(it.scale_ppm),
+    footprint: standing(models, it.project_model_id).footprint,
+  }));
+  const recorded = parseJson<PlateIssue[]>(plate.issues_json, []).filter((i) => i.code === 'NOT_ARRANGEABLE' || i.code === 'MODEL_CHANGED');
+  return [...placementIssues(placements, models, bed, Number(plate.spacing_um)), ...recorded];
 }
 
 /**
@@ -390,14 +500,7 @@ export async function createPlate(
   const printerModelId = reqString(body.printer_model_id, 'printer_model_id', { max: 120 });
   const bed = await bedOf(db, printerModelId);
   const spacing = body.spacing_um === undefined ? 5000 : reqInt(body.spacing_um, 'spacing_um', { min: 0, max: 50000 });
-  const models = await modelFootprints(db, projectId);
-  const footprintOf = (modelId: string) => {
-    const m = models.get(modelId);
-    if (!m) throw pcError('NOT_FOUND', { field: 'project_model_id' });
-    if (m.status !== 'ready' || m.size_x_um === null) throw pcError('FILE_NOT_READY', { project_model_id: modelId });
-    const t = parseJson<{ scale_ppm?: number }>(m.transform_json, {});
-    return { footprint: { x_um: Number(m.size_x_um), y_um: Number(m.size_y_um), z_um: Number(m.size_z_um) }, scale: t.scale_ppm ?? 1_000_000 };
-  };
+  const models = await modelShapes(db, projectId);
   let placements: Placement[] = [];
   let arrangement: 'manual' | 'arranged' = 'manual';
   let algorithm = '';
@@ -413,7 +516,7 @@ export async function createPlate(
       : [...models.values()].map((m) => ({ model: m.id, count: Number(m.quantity) }));
     if (wanted.reduce((s, w) => s + w.count, 0) > 400) throw invalid('instances', 'too_many');
     for (const w of wanted) {
-      const f = footprintOf(w.model);
+      const f = standing(models, w.model);
       for (let n = 1; n <= w.count; n++) items.push({ key: `${w.model}#${n}`, footprint: f.footprint, scale_ppm: f.scale });
     }
     const res = arranger.arrange(items, bed, spacing);
@@ -428,7 +531,7 @@ export async function createPlate(
     placements = raw.map((x, i) => {
       const o = (x ?? {}) as Record<string, unknown>;
       const modelId = reqString(o.project_model_id, `placements[${i}].project_model_id`, { max: 120 });
-      const f = footprintOf(modelId);
+      const f = standing(models, modelId);
       const n = (counters.get(modelId) ?? 0) + 1;
       counters.set(modelId, n);
       const key = `${modelId}#${n}`;
@@ -443,7 +546,7 @@ export async function createPlate(
       };
     });
   }
-  const issues = [...validatePlacements(placements, bed, spacing), ...(unplaced.length ? [{ code: 'NOT_ARRANGEABLE' as const, keys: unplaced }] : [])];
+  const issues = [...placementIssues(placements, models, bed, spacing), ...(unplaced.length ? [{ code: 'NOT_ARRANGEABLE' as const, keys: unplaced }] : [])];
   const plateId = pcId('pcpl');
   const s: Stmt[] = [
     db

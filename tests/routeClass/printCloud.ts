@@ -6,7 +6,8 @@
  * stock COUNTS, shipments and estimates are `op`. Prices, payments, refunds,
  * balance adjustments, buybacks, agent credentials and revenue are `money`.
  * What the workshop PAID — stock lot costs, machine acquisition, the profit
- * computed from them — is `cost_read`. On the mixed `op` doors the split is
+ * computed from them — is `cost_read`; stating a pending lot's cost is
+ * `cost_write`. On the mixed `op` doors the split is
  * per FIELD, in the handler: a price field needs money scope, a cost field
  * the owner (worker/lib/printCloud/catalog.ts `assertWritable`), and every
  * catalogue answer leaves through `stripCost`.
@@ -34,15 +35,16 @@ export default {
           cls: 'op',
           path: '/api/admin/print-cloud/catalog/locations',
           body: { code: 'RACK-A', name: 'Rack A' },
-          why: 'price fields need money scope and cost fields the owner, per field; the answer is cost-stripped',
+          why: 'price fields (and every term that decides a price: windows, limits, switches, tiers, registering a machine) need money scope and cost fields the owner, per field; the answer is cost-stripped',
         },
-        'PATCH /catalog/:entity/:id': { cls: 'op', noBody: 'updates a catalogue row the role fixture does not seed; price and cost fields are refused per field' },
+        'PATCH /catalog/:entity/:id': { cls: 'op', noBody: 'updates a catalogue row the role fixture does not seed; price terms (a tier, a window, a limit, a switch) and cost fields are refused per field' },
         'PUT /variants/:id/price-tiers': 'money',
         'GET /categories': 'op',
         'PATCH /categories/:code/buyback': 'money',
         'GET /price-changes': 'money',
         'GET /stock': { cls: 'op', why: 'counts only: on hand, held, customer-owned, sellable; no lot cost' },
         'GET /stock/lots': 'cost_read',
+        'POST /stock/lots/:id/cost': 'cost_write',
         'POST /stock/receive': { cls: 'op', noBody: 'receives a lot of a variant the role fixture does not seed; its cost field is the owner’s, refused per field' },
         'POST /stock/adjust': { cls: 'op', noBody: 'a count correction of a variant the role fixture does not seed' },
         'POST /stock/waste': { cls: 'op', noBody: 'records waste of a variant the role fixture does not seed' },

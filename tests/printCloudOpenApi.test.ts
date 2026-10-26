@@ -67,8 +67,8 @@ test('documented money and cost doors wear the matching guard in the source', ()
     const re = new RegExp(`adminPrintCloudRoutes\\.${op.method}\\('${hono.replace(/[/.]/g, '\\$&')}',([^\\n]*)`);
     const line = re.exec(src)?.[1] ?? '';
     if (op.access === 'admin_money') assert.match(line, /requireFinancialScope/, `${op.method.toUpperCase()} ${op.path} is documented as money`);
-    if (op.access === 'admin_cost') assert.match(line, /requireCostRead/, `${op.method.toUpperCase()} ${op.path} is documented as cost`);
-    if (op.access === 'admin_op') assert.doesNotMatch(line, /requireFinancialScope|requireCostRead/, `${op.method.toUpperCase()} ${op.path} is documented as op`);
+    if (op.access === 'admin_cost') assert.match(line, /requireCost(Read|Write)/, `${op.method.toUpperCase()} ${op.path} is documented as cost`);
+    if (op.access === 'admin_op') assert.doesNotMatch(line, /requireFinancialScope|requireCost(Read|Write)/, `${op.method.toUpperCase()} ${op.path} is documented as op`);
   }
 });
 
@@ -81,6 +81,7 @@ test('the document names an owner-only cost field to the owner alone', () => {
     );
   assert.deepEqual(costProps(openApiDocument()), [], 'the public document');
   assert.deepEqual(costProps(openApiDocument({ withCost: true })).sort(), [
+    'LotCostRequest.total_cost_iqd',
     'MaintenanceRequest.cost_iqd',
     'MaintenanceUpdate.cost_iqd',
     'ReceiveRequest.total_cost_iqd',

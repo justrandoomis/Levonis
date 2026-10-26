@@ -27,13 +27,13 @@ import { many, one, fence, planned, runBatch, type Stmt } from './db';
 import { invalid, pcError } from './errors';
 import { integrationEvent } from './adapters';
 import { pcAudit } from './audit';
-import { activeReservationForJob, releaseCredits, reserveCredits, settleCredits, creditAccountId } from './credits';
+import { activeReservationForJob, expireDueCredits, releaseCredits, reserveCredits, settleCredits, creditAccountId } from './credits';
 import { activeInventoryReservations, inventoryAccountId, releaseInventory, reserveInventory, settleInventory } from './inventory';
 import { pcNotify, type PcNotice } from './notify';
 import { fitsBuildVolume } from './files';
-import { DEFAULT_SETTINGS, parseSettings, type PrintSettings } from './projects';
+import { DEFAULT_SETTINGS, parseSettings, plateIssues, type PrintSettings } from './projects';
 import type { PrintCloudConfig, Responsible } from './settings';
-import { removePhysical } from './warehouse';
+import { removePhysical, type BatchLots, type PhysicalMove } from './warehouse';
 import { addSeconds, iso, parseJson, pcId, reqInt, reqString } from './util';
 
 export const JOB_STATUSES = [
@@ -59,7 +59,8 @@ export const TRANSITIONS: Readonly<Record<JobStatus, readonly JobStatus[]>> = {
   uploaded: ['analyzing', 'draft', 'cancelled'],
   analyzing: ['ready', 'uploaded', 'cancelled'],
   ready: ['awaiting_confirmation', 'draft', 'cancelled'],
-  awaiting_confirmation: ['confirmed', 'queued', 'ready', 'draft', 'cancelled'],
+  // No edge skips `confirmed`: confirmation is the only door that reserves, so nothing reaches the queue unreserved.
+  awaiting_confirmation: ['confirmed', 'ready', 'draft', 'cancelled'],
   confirmed: ['queued', 'cancelled'],
   queued: ['preparing', 'cancelled'],
   preparing: ['printing', 'queued', 'failed', 'cancelled'],
@@ -140,7 +141,9 @@ export async function loadJob(db: D1Database, jobId: string, userId?: string): P
 
 /**
  * The status flip, fenced: matches only the status AND token this request
- * read, writes a fresh token, and records who did it.
+ * read, writes a fresh token, and records who did it. A caller that chains a
+ * second flip in the same batch passes the token, so the second matches what
+ * the first wrote.
  */
 export function transition(
   db: D1Database,
@@ -150,10 +153,10 @@ export function transition(
   event: string,
   now: Date,
   detail: Record<string, unknown> = {},
-  set: Record<string, unknown> = {}
+  set: Record<string, unknown> = {},
+  token: string = pcId('tok')
 ): Stmt[] {
   if (!canTransition(job.status, to)) throw pcError('INVALID_TRANSITION', { from: job.status, to });
-  const token = pcId('tok');
   const cols = Object.keys(set);
   for (const c of cols) if (!/^[a-z_]+$/.test(c)) throw new Error(`bad column ${c}`);
   return [
@@ -282,7 +285,7 @@ export async function createJob(db: D1Database, userId: string, input: CreateJob
     );
     if (!plate) throw pcError('NOT_FOUND', { field: 'plate_id' });
     if (plate.printer_model_id !== model.id) throw pcError('INCOMPATIBLE_PRINTER', { reason: 'plate_for_another_model' });
-    if (!plate.valid) throw invalid('plate_id', 'plate_not_valid');
+    if (!plate.valid || (await plateIssues(db, project.id, input.plate_id)).length) throw invalid('plate_id', 'plate_not_valid');
     plateLabel = plate.label;
   }
   if (input.depends_on_job_id) {
@@ -296,6 +299,7 @@ export async function createJob(db: D1Database, userId: string, input: CreateJob
     base = parseJson(prof.settings_json, DEFAULT_SETTINGS);
   }
   const settings = parseSettings(input.settings, base);
+  if (input.plate_id && settings.orientation === 'auto') throw invalid('settings.orientation', 'plate_needs_fixed_orientation');
   const copies = input.copies === undefined ? 1 : reqInt(input.copies, 'copies', { min: 1, max: 500 });
   const accessories = await parseAccessories(db, input.accessories);
   const active = await one<{ n: number }>(
@@ -367,6 +371,11 @@ export interface SlicingInput {
 
 /** Everything a slicer needs to measure this job, after checking the job can be sliced at all. */
 export async function slicingInput(db: D1Database, job: JobRow): Promise<SlicingInput> {
+  return (await measuredInput(db, job)).input;
+}
+
+/** The slicing input, and the model rows it was read from (what an analysis fences on). */
+async function measuredInput(db: D1Database, job: JobRow): Promise<{ input: SlicingInput; models: ModelInput[] }> {
   const models = await jobModels(db, job.project_id);
   if (!filesReady(models)) throw pcError('FILE_NOT_READY');
   const printer = await one<{ id: string; code: string; brand: string; model_name: string; max_colors: number; supported_materials_json: string; build_x_mm: number; build_y_mm: number; build_z_mm: number }>(
@@ -388,8 +397,12 @@ export async function slicingInput(db: D1Database, job: JobRow): Promise<Slicing
     if (!fit.any_orientation) throw pcError('INCOMPATIBLE_PRINTER', { reason: 'model_exceeds_build_volume', project_model_id: m.id });
     out.push({ project_model_id: m.id, file_id: m.file_id as string, quantity: Number(m.quantity), transform: parseJson(m.transform_json, {}), material_assignments: assignments });
   }
+  const settings: PrintSettings = parseJson(job.settings_json, DEFAULT_SETTINGS);
   let plate: SlicingInput['plate'] = null;
   if (job.plate_id) {
+    // The plate is checked again against the models as they are now; a layout cannot survive auto-orientation.
+    if (settings.orientation === 'auto') throw invalid('settings.orientation', 'plate_needs_fixed_orientation');
+    if ((await plateIssues(db, job.project_id, job.plate_id)).length) throw invalid('plate_id', 'plate_not_valid');
     plate = await many(
       db,
       'SELECT project_model_id, instance_no, x_um, y_um, rotation_z_mdeg, scale_ppm, variant_id FROM pc_plate_items WHERE plate_id = ? ORDER BY project_model_id, instance_no',
@@ -412,24 +425,53 @@ export async function slicingInput(db: D1Database, job: JobRow): Promise<Slicing
     }
     variants.push({ variant_id: v.id, sku: v.sku, material: v.material, color_name: v.color_name, color_hex: v.color_hex, diameter_um: v.diameter_um });
   }
-  return {
+  const input: SlicingInput = {
     job_id: job.id,
     printer_model: { id: printer.id, code: printer.code, brand: printer.brand, model_name: printer.model_name },
-    settings: parseJson(job.settings_json, DEFAULT_SETTINGS),
+    settings,
     copies: job.copies,
     plate,
     models: out,
     variants,
   };
+  return { input, models };
+}
+
+/**
+ * The batch guard that the project's models are still exactly the rows the
+ * plan read: an edit that lands between reading them and committing the
+ * analysis would leave the slicer measuring files the job no longer prints.
+ */
+function modelsUnchanged(db: D1Database, projectId: string, models: ModelInput[]): Stmt {
+  const read = models.map((m) => ({
+    id: m.id,
+    file_id: m.file_id,
+    quantity: Number(m.quantity),
+    transform_json: m.transform_json,
+    material_assignments_json: m.material_assignments_json,
+  }));
+  return fence(
+    db,
+    'STATE_CHANGED',
+    `(SELECT COUNT(*) FROM pc_project_models WHERE project_id = ?) = ?
+     AND NOT EXISTS (SELECT 1 FROM json_each(?) e WHERE NOT EXISTS (
+       SELECT 1 FROM pc_project_models m
+        WHERE m.id = json_extract(e.value, '$.id') AND m.project_id = ? AND m.file_id IS json_extract(e.value, '$.file_id')
+          AND m.quantity = json_extract(e.value, '$.quantity') AND m.transform_json = json_extract(e.value, '$.transform_json')
+          AND m.material_assignments_json = json_extract(e.value, '$.material_assignments_json')))`,
+    [projectId, read.length, JSON.stringify(read), projectId]
+  );
 }
 
 /**
  * Ask for a real estimate. The job moves to `analyzing` and a slicing
  * request waits for a slicer (the workshop agent running a slicer CLI, or an
  * operator entering a desktop slicer's figures). With no slicer connected
- * the job simply waits in `analyzing` — no figure is ever invented.
+ * (`slicerConnected`: printers.ts `slicerAvailability`, a slicer agent heard
+ * from lately — never a token alone) the job simply waits in `analyzing`,
+ * `awaiting_slicer` — no figure is ever invented.
  */
-export async function requestAnalysis(db: D1Database, job: JobRow, actor: Actor, now: Date) {
+export async function requestAnalysis(db: D1Database, job: JobRow, actor: Actor, now: Date, slicerConnected: boolean) {
   let current = job;
   if (current.status === 'draft') {
     const models = await jobModels(db, job.project_id);
@@ -438,10 +480,12 @@ export async function requestAnalysis(db: D1Database, job: JobRow, actor: Actor,
     current = await loadJob(db, job.id);
   }
   if (current.status !== 'uploaded') throw pcError('INVALID_TRANSITION', { from: current.status, to: 'analyzing' });
-  const input = await slicingInput(db, current);
+  const { input, models } = await measuredInput(db, current);
   const requestId = pcId('pcsr');
+  // From here the project's models are frozen (projects.ts); the fence closes the gap before that.
   await runBatch(db, [
     ...transition(db, current, 'analyzing', actor, 'analysis_requested', now, { slicing_request_id: requestId }),
+    modelsUnchanged(db, current.project_id, models),
     db
       .prepare(
         `INSERT INTO pc_slicing_requests (id, job_id, adapter, status, input_json, attempts, created_at, updated_at)
@@ -449,11 +493,7 @@ export async function requestAnalysis(db: D1Database, job: JobRow, actor: Actor,
       )
       .bind(requestId, current.id, JSON.stringify(input), iso(now), iso(now)),
   ]);
-  const slicer = await one<{ n: number }>(
-    db,
-    `SELECT COUNT(*) AS n FROM pc_agents WHERE active = 1 AND capabilities_json LIKE '%"slicer"%'`
-  );
-  return { job_id: current.id, status: 'analyzing' as const, slicing_request_id: requestId, slicer: Number(slicer?.n ?? 0) > 0 ? 'queued' : 'awaiting_slicer' };
+  return { job_id: current.id, status: 'analyzing' as const, slicing_request_id: requestId, slicer: slicerConnected ? 'queued' : 'awaiting_slicer' };
 }
 
 export interface EstimateInput {
@@ -473,15 +513,28 @@ export function parseEstimate(raw: unknown): EstimateInput {
   if (!raw || typeof raw !== 'object') throw invalid('estimate', 'object_required');
   const r = raw as Record<string, unknown>;
   if (!Array.isArray(r.materials) || !r.materials.length || r.materials.length > 16) throw invalid('materials', 'array_required');
-  const materials = r.materials.map((m, i) => {
+  // A slicer reports filament per slot; two slots loaded from one spool are one variant, so its lines are summed
+  // (an estimate and a job hold one row per variant).
+  const byVariant = new Map<string, EstimateInput['materials'][number]>();
+  for (const [i, m] of r.materials.entries()) {
     const o = (m ?? {}) as Record<string, unknown>;
-    return {
+    const line = {
       variant_id: reqString(o.variant_id, `materials[${i}].variant_id`, { max: 120 }),
       model_grams: reqInt(o.model_grams, `materials[${i}].model_grams`, { min: 0, max: 1_000_000 }),
       support_grams: reqInt(o.support_grams ?? 0, `materials[${i}].support_grams`, { min: 0, max: 1_000_000 }),
       purge_grams: reqInt(o.purge_grams ?? 0, `materials[${i}].purge_grams`, { min: 0, max: 1_000_000 }),
     };
-  });
+    const seen = byVariant.get(line.variant_id);
+    if (!seen) {
+      byVariant.set(line.variant_id, line);
+      continue;
+    }
+    for (const k of ['model_grams', 'support_grams', 'purge_grams'] as const) {
+      seen[k] += line[k];
+      if (seen[k] > 1_000_000) throw invalid(`materials[${i}].${k}`, 'too_large');
+    }
+  }
+  const materials = [...byVariant.values()];
   return {
     duration_seconds: reqInt(r.duration_seconds, 'duration_seconds', { min: 1, max: 60 * 24 * 3600 }),
     layer_count: r.layer_count === undefined || r.layer_count === null ? null : reqInt(r.layer_count, 'layer_count', { min: 1, max: 1_000_000 }),
@@ -664,12 +717,29 @@ export async function projection(db: D1Database, job: JobRow) {
   };
 }
 
-/** ready → awaiting_confirmation, with the projection the customer confirms against. */
+/**
+ * ready → awaiting_confirmation, with the projection the customer confirms
+ * against. Reviewing a job that already awaits confirmation renews its window
+ * with a fresh projection: the way on once the window has passed, without
+ * throwing away the measured estimate.
+ */
 export async function reviewJob(db: D1Database, job: JobRow, actor: Actor, config: PrintCloudConfig, now: Date) {
-  if (job.status !== 'ready') throw pcError('INVALID_TRANSITION', { from: job.status, to: 'awaiting_confirmation' });
+  if (job.status !== 'ready' && job.status !== 'awaiting_confirmation') throw pcError('INVALID_TRANSITION', { from: job.status, to: 'awaiting_confirmation' });
   const proj = await projection(db, job);
   const expires = iso(addSeconds(now, config.confirmation_ttl_minutes * 60));
-  await runBatch(db, transition(db, job, 'awaiting_confirmation', actor, 'reviewed', now, { sufficient: proj.sufficient }, { confirmation_expires_at: expires }));
+  if (job.status === 'ready') {
+    await runBatch(db, transition(db, job, 'awaiting_confirmation', actor, 'reviewed', now, { sufficient: proj.sufficient }, { confirmation_expires_at: expires }));
+  } else {
+    // Same status, so not a transition: the same compare-and-swap on the token, and its own event.
+    const token = pcId('tok');
+    await runBatch(db, [
+      db
+        .prepare('UPDATE pc_print_jobs SET confirmation_expires_at = ?, op_token = ?, updated_at = ? WHERE id = ? AND status = ? AND op_token = ?')
+        .bind(expires, token, iso(now), job.id, job.status, job.op_token),
+      fence(db, 'STATE_CHANGED', '(SELECT op_token FROM pc_print_jobs WHERE id = ?) = ?', [job.id, token]),
+      jobEvent(db, job, 'review_renewed', actor, now, { sufficient: proj.sufficient, previous_expiry: job.confirmation_expires_at }),
+    ]);
+  }
   return { ...proj, status: 'awaiting_confirmation' as const, confirmation_expires_at: expires };
 }
 
@@ -680,9 +750,11 @@ export async function reviewJob(db: D1Database, job: JobRow, actor: Actor, confi
  */
 export async function planConfirm(db: D1Database, job: JobRow, actor: Actor, now: Date) {
   if (job.status !== 'awaiting_confirmation') throw pcError('INVALID_TRANSITION', { from: job.status, to: 'confirmed' });
-  if (job.confirmation_expires_at && job.confirmation_expires_at <= iso(now)) throw pcError('QUOTE_EXPIRED', { reason: 'confirmation_window_passed' });
+  if (job.confirmation_expires_at && job.confirmation_expires_at <= iso(now)) throw pcError('QUOTE_EXPIRED', { reason: 'confirmation_window_passed', action: 'review_again' });
   const est = await currentEstimate(db, job);
   const reqs = await jobRequirements(db, job.id);
+  // Hours whose package expired go first, so this reservation can only hold hours that are still good.
+  await expireDueCredits(db, job.user_id, job.tier_id, now);
   const s: Stmt[] = [];
   s.push(...reserveCredits(db, { userId: job.user_id, tierId: job.tier_id, jobId: job.id, seconds: est.duration_seconds, actorId: actor.id, now }).statements);
   for (const r of reqs) {
@@ -691,8 +763,11 @@ export async function planConfirm(db: D1Database, job: JobRow, actor: Actor, now
     );
   }
   const to: JobStatus = job.needs_operator_approval ? 'confirmed' : 'queued';
-  s.push(...transition(db, job, to, actor, 'confirmed', now, { reserved_seconds: est.duration_seconds, materials: reqs }, to === 'queued' ? { queued_at: iso(now) } : {}));
+  const confirmedToken = pcId('tok');
+  s.push(...transition(db, job, 'confirmed', actor, 'confirmed', now, { reserved_seconds: est.duration_seconds, materials: reqs }, {}, confirmedToken));
   if (to === 'queued') {
+    // No operator approval needed: on to the queue in the same batch, through `confirmed` like every job.
+    s.push(...transition(db, { ...job, status: 'confirmed', op_token: confirmedToken }, 'queued', actor, 'queued_without_approval', now, {}, { queued_at: iso(now) }));
     s.push(queueEntry(db, job, now));
     s.push(notifyJob(db, job, 'job_queued', 'confirm'));
   }
@@ -706,10 +781,16 @@ export function queueEntry(db: D1Database, job: JobRow, now: Date): Stmt {
     .bind(pcId('pcqe'), job.id, job.priority, iso(now), iso(now));
 }
 
-/** Operator approval: confirmed → queued. */
+/**
+ * Operator approval: confirmed → queued. Only a CONFIRMED job — the customer
+ * confirmed it and its hours and materials are reserved — is approved; the
+ * batch also proves its hours are still held.
+ */
 export async function approveJob(db: D1Database, job: JobRow, actor: Actor, now: Date) {
+  if (job.status !== 'confirmed') throw pcError('INVALID_TRANSITION', { from: job.status, to: 'queued' });
   const s = [
     ...transition(db, job, 'queued', actor, 'approved', now, {}, { approved_by: actor.id, approved_at: iso(now), queued_at: iso(now) }),
+    fence(db, 'STATE_CHANGED', "EXISTS (SELECT 1 FROM pc_credit_reservations WHERE job_id = ? AND state = 'active')", [job.id]),
     queueEntry(db, job, now),
     notifyJob(db, job, 'job_queued', 'approve'),
     ...(await pcAudit(db, actor.id, 'job.approve', job.id)),
@@ -848,6 +929,12 @@ async function settleJob(
     creditValue = out.value;
   }
   const materials: SettlementPlan['materials'] = [];
+  // One plan of the shelf for the whole batch: a variant's billed grams and the grams the
+  // workshop absorbs are drawn from its lots one after the other, never twice from one snapshot.
+  const lots: BatchLots = new Map();
+  const takeOffShelf = async (move: Omit<PhysicalMove, 'refType' | 'refId' | 'actorId' | 'now'>) => {
+    s.push(...(await removePhysical(db, { ...move, refType: 'print_job', refId: job.id, actorId: actor.id, now }, lots)).statements);
+  };
   const reservations = await activeInventoryReservations(db, 'print_job', job.id);
   const seen = new Set<string>();
   for (const r of reservations) {
@@ -857,63 +944,32 @@ async function settleJob(
     s.push(...out.statements);
     materialValue += out.value;
     if (out.billed > 0) {
-      s.push(
-        ...(
-          await removePhysical(db, {
-            variantId: r.variant_id,
-            qty: out.billed,
-            type: 'consume_customer',
-            fromAllocated: true,
-            userId: job.user_id,
-            refType: 'print_job',
-            refId: job.id,
-            entryKey: `consume_customer:${job.id}:${r.variant_id}`,
-            actorId: actor.id,
-            now,
-          })
-        ).statements
-      );
+      await takeOffShelf({
+        variantId: r.variant_id,
+        qty: out.billed,
+        type: 'consume_customer',
+        fromAllocated: true,
+        userId: job.user_id,
+        entryKey: `consume_customer:${job.id}:${r.variant_id}`,
+      });
     }
     const absorbed = Math.max(0, use.physical - out.billed);
     if (absorbed > 0) {
-      s.push(
-        ...(
-          await removePhysical(db, {
-            variantId: r.variant_id,
-            qty: absorbed,
-            type: 'consume_workshop',
-            fromAllocated: false,
-            refType: 'print_job',
-            refId: job.id,
-            entryKey: `consume_workshop:${job.id}:${r.variant_id}`,
-            reason: note,
-            actorId: actor.id,
-            now,
-          })
-        ).statements
-      );
+      await takeOffShelf({ variantId: r.variant_id, qty: absorbed, type: 'consume_workshop', fromAllocated: false, entryKey: `consume_workshop:${job.id}:${r.variant_id}`, reason: note });
     }
     materials.push({ variant_id: r.variant_id, actual: use.physical, billed: out.billed, released: out.released, workshop_absorbed: absorbed });
   }
   // A variant used that was never reserved (an unplanned purge colour): the workshop's own stock, never the customer's.
   for (const [variantId, use] of billable.materials) {
     if (seen.has(variantId) || use.physical <= 0) continue;
-    s.push(
-      ...(
-        await removePhysical(db, {
-          variantId,
-          qty: use.physical,
-          type: 'consume_workshop',
-          fromAllocated: false,
-          refType: 'print_job',
-          refId: job.id,
-          entryKey: `consume_workshop:${job.id}:${variantId}`,
-          reason: 'not reserved for this job',
-          actorId: actor.id,
-          now,
-        })
-      ).statements
-    );
+    await takeOffShelf({
+      variantId,
+      qty: use.physical,
+      type: 'consume_workshop',
+      fromAllocated: false,
+      entryKey: `consume_workshop:${job.id}:${variantId}`,
+      reason: 'not reserved for this job',
+    });
     materials.push({ variant_id: variantId, actual: use.physical, billed: 0, released: 0, workshop_absorbed: use.physical });
   }
   return { statements: s, billedSeconds, creditValue, materialValue, materials };
@@ -1243,13 +1299,27 @@ async function reprintStatements(db: D1Database, job: JobRow, newJobId: string, 
 export async function autoConfirmReprint(db: D1Database, jobId: string, config: PrintCloudConfig, now: Date): Promise<'queued' | 'confirmed' | 'waiting_for_customer'> {
   const actor: Actor = { type: 'system', id: 'system' };
   try {
-    let job = await loadJob(db, jobId);
+    const job = await loadJob(db, jobId);
     if (job.status !== 'ready') return 'waiting_for_customer';
+    // A balance that cannot cover it leaves the reprint where it is.
+    if (!(await projection(db, job)).sufficient) return 'waiting_for_customer';
     await reviewJob(db, job, actor, config, now);
-    job = await loadJob(db, jobId);
+  } catch {
+    return 'waiting_for_customer';
+  }
+  try {
     const result = await planned(db, async () => planConfirm(db, await loadJob(db, jobId), actor, now));
     return result.status === 'queued' ? 'queued' : 'confirmed';
   } catch {
+    // Reviewed, then refused (the balance moved in between): back to `ready` for the customer.
+    try {
+      const job = await loadJob(db, jobId);
+      if (job.status === 'awaiting_confirmation') {
+        await runBatch(db, transition(db, job, 'ready', actor, 'auto_confirm_failed', now, {}, { confirmation_expires_at: null }));
+      }
+    } catch {
+      // The customer moved it first; whatever they did stands.
+    }
     return 'waiting_for_customer';
   }
 }
@@ -1259,7 +1329,8 @@ export async function autoConfirmReprint(db: D1Database, jobId: string, config: 
 export async function jobView(db: D1Database, job: JobRow, staleSeconds: number, now: Date) {
   const events = await many<Record<string, unknown>>(
     db,
-    'SELECT from_status, to_status, event, actor_type, detail_json, created_at FROM pc_print_job_events WHERE job_id = ? ORDER BY created_at, id',
+    // rowid keeps one batch's events (confirmed, then queued) in the order they were written.
+    'SELECT from_status, to_status, event, actor_type, detail_json, created_at FROM pc_print_job_events WHERE job_id = ? ORDER BY created_at, rowid',
     job.id
   );
   const requirements = await jobRequirements(db, job.id);

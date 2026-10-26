@@ -49,6 +49,7 @@ import { PAYMENT_PROVIDERS, verifyGatewaySignature, type PaymentProvider } from 
 import { parseQuoteLines, priceQuote, ownedQty, topUpQuantity } from '../lib/printCloud/pricing';
 import { addProjectModel, createPlate, createProject, duplicateProject, projectView, saveProfile, updateProject, updateProjectModel } from '../lib/printCloud/projects';
 import { accessorySuggestions, decideRecommendation, printerRecommendations } from '../lib/printCloud/recommendations';
+import { machineReadySql, slicerAvailability, telemetryFresh } from '../lib/printCloud/printers';
 import { estimateQueue, reschedule } from '../lib/printCloud/queue';
 import { dashboardCredits, dashboardFiles, dashboardInventory, dashboardJobs, dashboardPrinters, transactions } from '../lib/printCloud/reports';
 import { enqueueTask } from '../lib/printCloud/tasks';
@@ -67,11 +68,11 @@ printCloudRoutes.get('/openapi.json', (c) => c.json(openApiDocument({ withCost: 
 
 printCloudRoutes.get('/status', async (c) => {
   const { config } = await requestConfig(c);
-  const slicers = await one<{ n: number }>(c.env.DB, `SELECT COUNT(*) AS n FROM pc_agents WHERE active = 1 AND capabilities_json LIKE '%"slicer"%'`);
   return ok(c, {
     installed: await printCloudInstalled(c.env.DB),
     enabled: config.enabled,
-    slicer: Number(slicers?.n ?? 0) > 0 ? 'connected' : 'not_connected',
+    // `connected` only for a slicer agent heard from within the staleness window — never for a token alone.
+    slicer: await slicerAvailability(c.env.DB, config.telemetry_stale_seconds, new Date()),
     delivery: { enabled: config.delivery.enabled, pickup_enabled: config.delivery.pickup_enabled },
     integrations: ADAPTERS.map((a) => ({ name: a.name, connected: a.connected })),
   });
@@ -79,10 +80,13 @@ printCloudRoutes.get('/status', async (c) => {
 
 printCloudRoutes.use('*', enabledGate);
 
-printCloudRoutes.get('/printers', async (c) => ok(c, await publicPrinterModels(c.env.DB)));
+/** The scheduler's own test of a machine that can take work now: no other count of «idle» machines is shown. */
+const machinesReady = async (c: Context<AppContext>) => machineReadySql((await requestConfig(c)).config.telemetry_stale_seconds, new Date());
+
+printCloudRoutes.get('/printers', async (c) => ok(c, await publicPrinterModels(c.env.DB, await machinesReady(c))));
 
 printCloudRoutes.get('/printers/:id', async (c) => {
-  const models = await publicPrinterModels(c.env.DB);
+  const models = await publicPrinterModels(c.env.DB, await machinesReady(c));
   const model = models.find((m) => m.id === c.req.param('id'));
   if (!model) throw pcError('NOT_FOUND');
   return ok(c, { ...model, packages: await publicPackages(c.env.DB, new Date(), String(model.tier_id)) });
@@ -92,10 +96,14 @@ printCloudRoutes.get('/printers/:id/availability', async (c) => {
   const db = c.env.DB;
   const model = await one<{ id: string }>(db, 'SELECT id FROM pc_printer_models WHERE id = ? AND active = 1', c.req.param('id'));
   if (!model) throw pcError('NOT_FOUND');
-  const machines = await many<{ status: string; busy: number }>(
+  const { config } = await requestConfig(c);
+  const now = new Date();
+  const ready = machineReadySql(config.telemetry_stale_seconds, now);
+  const machines = await many<{ status: string; adapter: string; machine_state: string | null; received_at: string | null; ready: number }>(
     db,
-    `SELECT p.status, EXISTS (SELECT 1 FROM pc_printer_assignments a WHERE a.printer_id = p.id AND a.state = 'active') AS busy
-       FROM pc_printers p WHERE p.model_id = ?`,
+    `SELECT p.status, p.adapter, t.machine_state, t.received_at, (${ready.sql}) AS ready
+       FROM pc_printers p LEFT JOIN pc_printer_telemetry t ON t.printer_id = p.id WHERE p.model_id = ?`,
+    ...ready.params,
     model.id
   );
   const queued = await one<{ n: number }>(db, "SELECT COUNT(*) AS n FROM pc_print_jobs WHERE printer_model_id = ? AND status = 'queued'", model.id);
@@ -103,7 +111,12 @@ printCloudRoutes.get('/printers/:id/availability', async (c) => {
     printer_model_id: model.id,
     machines_total: machines.length,
     machines_active: machines.filter((m) => m.status === 'active').length,
-    machines_idle: machines.filter((m) => m.status === 'active' && !m.busy).length,
+    // Idle as the scheduler means it: a machine silent, unreachable, in error or running its own print is not available.
+    machines_idle: machines.filter((m) => m.ready).length,
+    // Active agent machines not heard from, or that their agent cannot reach.
+    machines_offline: machines.filter(
+      (m) => m.status === 'active' && m.adapter === 'agent' && (!telemetryFresh(m.received_at, config.telemetry_stale_seconds, now) || m.machine_state === 'offline')
+    ).length,
     machines_in_maintenance: machines.filter((m) => m.status === 'maintenance').length,
     jobs_waiting: Number(queued?.n ?? 0),
   });
@@ -167,9 +180,10 @@ auth.use('*', requireAuth);
 auth.get('/me/dashboard', async (c) => {
   const user = currentUser(c);
   const db = c.env.DB;
+  const ready = await machinesReady(c);
   const [credits, printers, inventory, jobs, files] = await Promise.all([
     dashboardCredits(db, user.id),
-    dashboardPrinters(db, user.id),
+    dashboardPrinters(db, user.id, ready),
     dashboardInventory(db, user.id, null),
     dashboardJobs(db, user.id),
     dashboardFiles(db, user.id),
@@ -222,7 +236,7 @@ auth.post('/me/credits/convert', limitRoute('pc_write', 300), async (c) => {
   return ok(c, { ...out.result, replayed: out.replayed });
 });
 
-auth.get('/me/printers', async (c) => ok(c, await dashboardPrinters(c.env.DB, currentUser(c).id)));
+auth.get('/me/printers', async (c) => ok(c, await dashboardPrinters(c.env.DB, currentUser(c).id, await machinesReady(c))));
 
 auth.get('/me/inventory', async (c) => ok(c, await dashboardInventory(c.env.DB, currentUser(c).id, c.req.query('category') ?? null)));
 
@@ -552,7 +566,13 @@ auth.patch('/jobs/:id', async (c) => {
   return ok(c, { job_id: job.id, status: 'draft' });
 });
 
-auth.post('/jobs/:id/analyze', limitRoute('pc_write', 300), async (c) => ok(c, await requestAnalysis(c.env.DB, await ownJob(c), customerActor(c), new Date()), 202));
+auth.post('/jobs/:id/analyze', limitRoute('pc_write', 300), async (c) => {
+  const job = await ownJob(c);
+  const { config } = await requestConfig(c);
+  const now = new Date();
+  const slicer = await slicerAvailability(c.env.DB, config.telemetry_stale_seconds, now);
+  return ok(c, await requestAnalysis(c.env.DB, job, customerActor(c), now, slicer === 'connected'), 202);
+});
 
 auth.get('/jobs/:id/projection', async (c) => ok(c, await projection(c.env.DB, await ownJob(c))));
 

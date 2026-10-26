@@ -34,7 +34,7 @@ export const OPERATIONS: readonly Operation[] = [
   { method: 'get', path: '/status', base: C, tag: 'meta', summary: 'Service status: installed, enabled, slicer connection, integration adapters', access: 'public' },
   { method: 'get', path: '/printers', base: C, tag: 'printers', summary: 'Printer models with specifications, credit tier and machine counts', access: 'public' },
   { method: 'get', path: '/printers/{id}', base: C, tag: 'printers', summary: 'One printer model with its credit packages', access: 'public' },
-  { method: 'get', path: '/printers/{id}/availability', base: C, tag: 'printers', summary: 'Machines active, idle, in maintenance; jobs waiting', access: 'public' },
+  { method: 'get', path: '/printers/{id}/availability', base: C, tag: 'printers', summary: 'Machines active, idle (able to take work now), offline, in maintenance; jobs waiting', access: 'public' },
   { method: 'get', path: '/packages', base: C, tag: 'pricing', summary: 'Printing-hour packages (filter tier_id)', access: 'public' },
   { method: 'get', path: '/store/categories', base: C, tag: 'store', summary: 'Product categories', access: 'public' },
   { method: 'get', path: '/store/products', base: C, tag: 'store', summary: 'Materials and accessories with price tiers and sellable stock', access: 'public' },
@@ -53,7 +53,7 @@ export const OPERATIONS: readonly Operation[] = [
   { method: 'patch', path: '/me/inventory/{variantId}/alert', base: C, tag: 'inventory', summary: 'Set the low-balance alert threshold', access: 'customer', body: 'AlertRequest' },
   { method: 'post', path: '/me/inventory/top-up-quote', base: C, tag: 'inventory', summary: 'Quote the quantity that tops a balance up to a target (default 1 kg)', access: 'customer', body: 'TopUpRequest' },
   { method: 'get', path: '/me/inventory/reorder-suggestions', base: C, tag: 'inventory', summary: 'Shortfalls of pending jobs and the purchase that covers them', access: 'customer' },
-  { method: 'get', path: '/me/transactions', base: C, tag: 'dashboard', summary: 'Purchases, usage, refunds, buybacks and deliveries', access: 'customer' },
+  { method: 'get', path: '/me/transactions', base: C, tag: 'dashboard', summary: 'Purchases, usage, refunds, buybacks and deliveries, newest first (limit; before = the previous page next_before)', access: 'customer' },
   // quotes and orders
   { method: 'post', path: '/quotes', base: C, tag: 'orders', summary: 'Create a stored, expiring quote', access: 'customer', body: 'QuoteRequest' },
   { method: 'get', path: '/quotes/{id}', base: C, tag: 'orders', summary: 'A stored quote', access: 'customer' },
@@ -113,7 +113,7 @@ export const OPERATIONS: readonly Operation[] = [
   // agent
   { method: 'get', path: '/printers', base: G, tag: 'agent', summary: 'Printers bound to this agent', access: 'agent' },
   { method: 'post', path: '/printers/{id}/telemetry', base: G, tag: 'agent', summary: 'Report telemetry', access: 'agent', body: 'Telemetry' },
-  { method: 'post', path: '/jobs/{id}/events', base: G, tag: 'agent', summary: 'started | paused | resumed | completed | failed (idempotent by state)', access: 'agent', body: 'AgentJobEvent' },
+  { method: 'post', path: '/jobs/{id}/events', base: G, tag: 'agent', summary: 'started | paused | resumed | completed | failed (idempotent: by state; paused and resumed by event_id)', access: 'agent', body: 'AgentJobEvent' },
   { method: 'get', path: '/commands', base: G, tag: 'agent', summary: 'Operator commands for this agent printers (since)', access: 'agent' },
   { method: 'post', path: '/slicing/claim', base: G, tag: 'agent', summary: 'Claim a slicing request under a lease', access: 'agent' },
   { method: 'post', path: '/slicing/{id}/result', base: G, tag: 'agent', summary: 'Post measured slicer figures', access: 'agent', body: 'Estimate' },
@@ -132,7 +132,8 @@ export const OPERATIONS: readonly Operation[] = [
   { method: 'patch', path: '/categories/{code}/buyback', base: A, tag: 'pricing', summary: 'Buyback switch and rate per category', access: 'admin_money', body: 'BuybackRule' },
   { method: 'get', path: '/price-changes', base: A, tag: 'pricing', summary: 'Price change history', access: 'admin_money' },
   { method: 'get', path: '/stock', base: A, tag: 'stock', summary: 'On hand, held, customer-owned and sellable per variant', access: 'admin_op' },
-  { method: 'get', path: '/stock/lots', base: A, tag: 'stock', summary: 'Physical lots with costs', access: 'admin_cost' },
+  { method: 'get', path: '/stock/lots', base: A, tag: 'stock', summary: 'Physical lots with costs (cost_known 0: cost pending)', access: 'admin_cost' },
+  { method: 'post', path: '/stock/lots/{id}/cost', base: A, tag: 'stock', summary: 'State the cost of a cost-pending lot, once; units already used are valued from it', access: 'admin_cost', body: 'LotCostRequest' },
   { method: 'post', path: '/stock/receive', base: A, tag: 'stock', summary: 'Receive a supplier lot (cost: owner)', access: 'admin_op', body: 'ReceiveRequest' },
   { method: 'post', path: '/stock/adjust', base: A, tag: 'stock', summary: 'Count correction', access: 'admin_op', body: 'AdjustRequest' },
   { method: 'post', path: '/stock/waste', base: A, tag: 'stock', summary: 'Record waste or damage', access: 'admin_op', body: 'WasteRequest' },
@@ -179,7 +180,7 @@ export const OPERATIONS: readonly Operation[] = [
   { method: 'post', path: '/buybacks/{id}/reject', base: A, tag: 'buyback', summary: 'Reject (units released)', access: 'admin_money', body: 'NoteRequest' },
   { method: 'post', path: '/buybacks/{id}/paid', base: A, tag: 'buyback', summary: 'Record the payout', access: 'admin_money', body: 'PaidRequest' },
   { method: 'get', path: '/reports/revenue', base: A, tag: 'reports', summary: 'Cash collected, deferred and recognised revenue (from, to)', access: 'admin_money' },
-  { method: 'get', path: '/reports/profit', base: A, tag: 'reports', summary: 'Costs, gross and net profit (owner)', access: 'admin_cost' },
+  { method: 'get', path: '/reports/profit', base: A, tag: 'reports', summary: 'Costs, gross and net profit, refunds by their effect, cost-pending use (owner)', access: 'admin_cost' },
   { method: 'get', path: '/reports/operations', base: A, tag: 'reports', summary: 'Utilisation, failure rate, material use', access: 'admin_op' },
   { method: 'get', path: '/reconcile', base: A, tag: 'reports', summary: 'Run every reconciliation check (report only)', access: 'admin_money' },
   { method: 'get', path: '/tasks', base: A, tag: 'admin', summary: 'Background work by kind and status, recent failures', access: 'admin_op' },
@@ -295,10 +296,11 @@ const SCHEMAS: Record<string, unknown> = {
     chamber_temp_dc: { type: 'integer' },
     errors: { type: 'array' },
     camera: { type: 'object' },
-    reported_at: { type: 'string', format: 'date-time' },
+    reported_at: { type: 'string', format: 'date-time', description: 'When the reading was taken, by the agent clock' },
+    sent_at: { type: 'string', format: 'date-time', description: 'When the agent sent it, by the same clock; with reported_at it dates a buffered reading without trusting the clock' },
   }),
   Consumption: obj({ printed_seconds: int(0), materials: { type: 'array', items: obj({ variant_id: str, qty: int(0) }, ['variant_id', 'qty']) } }, ['printed_seconds']),
-  AgentJobEvent: obj({ event: { enum: ['started', 'paused', 'resumed', 'completed', 'failed'] }, printer_id: str, printed_seconds: int(0), materials: { type: 'array' }, reason_code: str, reason: str }, ['event', 'printer_id']),
+  AgentJobEvent: obj({ event: { enum: ['started', 'paused', 'resumed', 'completed', 'failed'] }, printer_id: str, event_id: { type: 'string', pattern: '^[A-Za-z0-9_.:-]{8,120}$', description: 'Unique per job; required for paused and resumed' }, printed_seconds: int(0), materials: { type: 'array' }, reason_code: str, reason: str }, ['event', 'printer_id']),
   Estimate: obj(
     {
       duration_seconds: int(1),
@@ -323,6 +325,7 @@ const SCHEMAS: Record<string, unknown> = {
   ),
   BuybackRule: obj({ buyback_enabled: { type: 'boolean' }, buyback_rate_bps: int(0) }),
   ReceiveRequest: obj({ variant_id: str, qty: int(1), total_cost_iqd: ownerCost, location_id: str, lot_code: str, supplier: str, notes: str }, ['variant_id', 'qty']),
+  LotCostRequest: obj({ total_cost_iqd: ownerCost }, ['total_cost_iqd']),
   AdjustRequest: obj({ variant_id: str, qty_delta: { type: 'integer' }, reason: str }, ['variant_id', 'qty_delta', 'reason']),
   WasteRequest: obj({ variant_id: str, qty: int(1), type: { enum: ['waste', 'damage'] }, reason: str }, ['variant_id', 'qty', 'reason']),
   CreditAdjust: obj({ tier_id: str, seconds: { type: 'integer' }, reason: str, compensation: { type: 'boolean' } }, ['tier_id', 'seconds', 'reason']),
@@ -379,7 +382,8 @@ function schemasFor(withCost: boolean): Record<string, unknown> {
       continue;
     }
     const kept = Object.fromEntries(Object.entries(props).filter(([, p]) => p['x-levonis-access'] !== 'owner'));
-    out[name] = { ...(schema as object), properties: kept };
+    const required = ((schema as { required?: string[] }).required ?? []).filter((r) => r in kept);
+    out[name] = { ...(schema as object), properties: kept, required };
   }
   return out;
 }

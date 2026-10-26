@@ -329,8 +329,10 @@ export async function fileView(db: D1Database, file: FileRow) {
 export async function liveJobsUsingFile(db: D1Database, fileId: string): Promise<number> {
   const row = await one<{ n: number }>(
     db,
+    // A failed job whose failure is still undecided may yet be reprinted from this file.
     `SELECT COUNT(*) AS n FROM pc_print_jobs j
-      WHERE j.status NOT IN ('completed', 'failed', 'cancelled', 'reprint_requested')
+      WHERE (j.status NOT IN ('completed', 'failed', 'cancelled', 'reprint_requested')
+             OR (j.status = 'failed' AND EXISTS (SELECT 1 FROM pc_failures f WHERE f.id = j.failure_id AND f.status = 'reported')))
         AND EXISTS (SELECT 1 FROM pc_project_models m WHERE m.project_id = j.project_id AND m.file_id = ?)`,
     fileId
   );

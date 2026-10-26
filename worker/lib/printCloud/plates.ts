@@ -3,9 +3,11 @@
  *
  * What this does, exactly: every placed instance is reduced to the
  * axis-aligned rectangle its footprint occupies (its bounding box, scaled and
- * rotated about Z). A placement is VALID when every rectangle, grown by half
- * the spacing on each side, lies inside the bed and overlaps no other, and
- * every instance is no taller than the build height.
+ * rotated about Z). The footprint is the model's box AS IT STANDS on the bed —
+ * the file's box turned by the model's own transform (`orientedFootprint`) —
+ * so a part laid flat is checked flat. A placement is VALID when every
+ * rectangle, grown by half the spacing on each side, lies inside the bed and
+ * overlaps no other, and every instance is no taller than the build height.
  *
  * `shelfPack` is a real arrangement algorithm — rows of bounding boxes,
  * tallest first, each instance tried at 0° and 90° — named `bbox_shelf_v1`.
@@ -37,8 +39,36 @@ export interface Bed {
 }
 
 export interface PlateIssue {
-  code: 'OUT_OF_BED' | 'TOO_TALL' | 'COLLISION' | 'NOT_ARRANGEABLE';
+  /**
+   * ORIENTATION_UNKNOWN: the model is auto-oriented, so its footprint is not
+   * known until it is sliced. MODEL_CHANGED: a model on the plate was turned
+   * or swapped after the plate was checked; the plate must be made again.
+   */
+  code: 'OUT_OF_BED' | 'TOO_TALL' | 'COLLISION' | 'NOT_ARRANGEABLE' | 'ORIENTATION_UNKNOWN' | 'MODEL_CHANGED';
   keys: string[];
+}
+
+// Snapped to 1e-9 so a right angle is exactly a right angle (cos 90° is 6e-17 in floating point).
+const snap = (v: number): number => Math.round(v * 1e9) / 1e9;
+
+const radians = (mdeg: number): number => ((mdeg / 1000) * Math.PI) / 180;
+
+/**
+ * The file's bounding box turned by the model's own rotation — about X, then
+ * Y, then Z (R = Rz·Ry·Rx, the order the slicer applies the transform). Each
+ * extent is Σ |R_ij|·size_j: exact for quarter turns, and for any other
+ * angle a box that still contains the turned part. A placement then turns
+ * this box about Z for its own rotation.
+ */
+export function orientedFootprint(box: Footprint, rotation: { x_mdeg?: number; y_mdeg?: number; z_mdeg?: number }): Footprint {
+  const [ax, ay, az] = [radians(rotation.x_mdeg ?? 0), radians(rotation.y_mdeg ?? 0), radians(rotation.z_mdeg ?? 0)];
+  const rx = [[1, 0, 0], [0, Math.cos(ax), -Math.sin(ax)], [0, Math.sin(ax), Math.cos(ax)]];
+  const ry = [[Math.cos(ay), 0, Math.sin(ay)], [0, 1, 0], [-Math.sin(ay), 0, Math.cos(ay)]];
+  const rz = [[Math.cos(az), -Math.sin(az), 0], [Math.sin(az), Math.cos(az), 0], [0, 0, 1]];
+  const mul = (a: number[][], b: number[][]) => a.map((r) => b[0].map((_, j) => r.reduce((sum, v, k) => sum + v * b[k][j], 0)));
+  const size = [box.x_um, box.y_um, box.z_um];
+  const [x, y, z] = mul(rz, mul(ry, rx)).map((r) => Math.ceil(snap(r.reduce((sum, v, j) => sum + snap(Math.abs(v)) * size[j], 0))));
+  return { x_um: x, y_um: y, z_um: z };
 }
 
 /** The axis-aligned rectangle (centre-based) an instance occupies on the bed. */
@@ -46,10 +76,9 @@ export function occupied(p: Placement): { minX: number; maxX: number; minY: numb
   const sx = Math.round((p.footprint.x_um * p.scale_ppm) / 1_000_000);
   const sy = Math.round((p.footprint.y_um * p.scale_ppm) / 1_000_000);
   const sz = Math.round((p.footprint.z_um * p.scale_ppm) / 1_000_000);
-  const theta = ((p.rotation_z_mdeg / 1000) * Math.PI) / 180;
-  // Snapped to 1e-9 so a right angle is exactly a right angle (cos 90° is 6e-17 in floating point).
-  const c = Math.round(Math.abs(Math.cos(theta)) * 1e9) / 1e9;
-  const s = Math.round(Math.abs(Math.sin(theta)) * 1e9) / 1e9;
+  const theta = radians(p.rotation_z_mdeg);
+  const c = snap(Math.abs(Math.cos(theta)));
+  const s = snap(Math.abs(Math.sin(theta)));
   const w = Math.ceil(sx * c + sy * s);
   const h = Math.ceil(sx * s + sy * c);
   return { minX: p.x_um - w / 2, maxX: p.x_um + w / 2, minY: p.y_um - h / 2, maxY: p.y_um + h / 2, height: sz };
