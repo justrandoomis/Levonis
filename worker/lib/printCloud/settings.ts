@@ -59,6 +59,14 @@ export interface PrintCloudConfig {
   cost_electricity_iqd_per_kwh: number;
 }
 
+/**
+ * The largest model the service accepts, whatever the settings say: the
+ * gateway's body class for POST /api/print-cloud/v1/files is read from this
+ * constant (services/gateway/src/uploadClasses.ts), and 40 MB is the
+ * platform's largest accepted body.
+ */
+export const MODEL_UPLOAD_CEILING_BYTES = 40 * 1024 * 1024;
+
 export const DEFAULT_IMPORT_PROVIDERS: ImportProvider[] = [
   { id: 'makerworld', hosts: ['makerworld.com'], api_url: '', download_hosts: [], enabled: true },
   { id: 'printables', hosts: ['printables.com'], api_url: '', download_hosts: [], enabled: true },
@@ -79,7 +87,7 @@ export const DEFAULT_CONFIG: PrintCloudConfig = Object.freeze({
   telemetry_stale_seconds: 120,
   failure_policy: { workshop: 'no_charge', customer: 'charge_printed', model: 'charge_printed', undetermined: 'manual_review' },
   free_reprint_on_workshop_failure: true,
-  max_upload_bytes: 50 * 1024 * 1024,
+  max_upload_bytes: MODEL_UPLOAD_CEILING_BYTES,
   max_active_jobs_per_customer: 25,
   low_inventory_default_g: 100,
   delivery: { enabled: true, pickup_enabled: true, flat_fee_iqd: 5000, fee_by_governorate: {} },
@@ -147,7 +155,7 @@ export function normalizeConfig(raw: unknown): PrintCloudConfig {
       undetermined: pick(fp.undetermined, POLICIES, d.failure_policy.undetermined),
     },
     free_reprint_on_workshop_failure: bool(r.free_reprint_on_workshop_failure, d.free_reprint_on_workshop_failure),
-    max_upload_bytes: clampInt(r.max_upload_bytes, d.max_upload_bytes, 1024, 95 * 1024 * 1024),
+    max_upload_bytes: clampInt(r.max_upload_bytes, d.max_upload_bytes, 1024, MODEL_UPLOAD_CEILING_BYTES),
     max_active_jobs_per_customer: clampInt(r.max_active_jobs_per_customer, d.max_active_jobs_per_customer, 1, 500),
     low_inventory_default_g: clampInt(r.low_inventory_default_g, d.low_inventory_default_g, 0, 100_000),
     delivery: {

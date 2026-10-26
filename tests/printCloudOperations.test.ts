@@ -35,6 +35,9 @@ import {
   upload,
 } from './fixtures/printCloud';
 import { expireUnpaidOrders } from '../worker/lib/printCloud/orders';
+import { printCloudTick } from '../worker/lib/printCloud/background';
+import { countingD1 } from '../worker/lib/d1Count';
+import { PRINT_CLOUD_TICK_BUDGET } from '../worker/lib/quarterHourBudget';
 
 const H = 3600;
 
@@ -125,8 +128,8 @@ test('unpaid orders expire: the held stock returns to the shelf exactly once', a
   const o = await ok(w.a, 'POST', `${API}/orders`, { quote_id: q.quote_id, payment_method: 'manual' }, idem('o'));
   assert.equal(row(w, 'SELECT reserved_qty FROM pc_stock_positions WHERE variant_id = ?', cat.gold)?.reserved_qty, 100);
   const later = new Date(Date.now() + 2 * H * 1000);
-  assert.deepEqual(await expireUnpaidOrders(w.db, later), { expired: 1, failed: 0 });
-  assert.deepEqual(await expireUnpaidOrders(w.db, later), { expired: 0, failed: 0 });
+  assert.deepEqual(await expireUnpaidOrders(w.db, later), { expired: 1, failed: 0, more: false });
+  assert.deepEqual(await expireUnpaidOrders(w.db, later), { expired: 0, failed: 0, more: false });
   assert.equal(row(w, 'SELECT reserved_qty FROM pc_stock_positions WHERE variant_id = ?', cat.gold)?.reserved_qty, 0);
   assert.equal(row(w, 'SELECT status FROM pc_orders WHERE id = ?', o.order_id)?.status, 'expired');
   // A payment that arrives after expiry is recorded for the refund desk and grants nothing.
@@ -414,4 +417,35 @@ test('background work is durable: a task that fails is retried with backoff and 
               VALUES ('bj3', 'expire_orders', '{}', 'x3', 'running', 1, 3, '2000-01-01T00:00:00.000Z', 'old', '2000-01-01T00:00:00.000Z', '2000-01-01T00:00:00.000Z', '2000-01-01T00:00:00.000Z')`);
   await w.runTasks();
   assert.equal(row(w, "SELECT status FROM pc_background_jobs WHERE id = 'bj3'")?.status, 'succeeded');
+});
+
+test('the cron step stays inside its share: a backlog bigger than one tick is worked a bounded piece at a time, and later ticks finish it', async () => {
+  const w = pcWorld();
+  const cat = await seedCatalog(w);
+  for (let i = 0; i < 12; i++) {
+    const q = await ok(w.a, 'POST', `${API}/quotes`, { lines: [{ kind: 'material', variant_id: cat.white, quantity: 100 }] });
+    await ok(w.a, 'POST', `${API}/orders`, { quote_id: q.quote_id, payment_method: 'manual' }, idem(`backlog-${i}`));
+  }
+  await w.runTasks(0);
+  w.raw.exec("UPDATE pc_orders SET stock_hold_expires_at = '2000-01-01T00:00:00.000Z'");
+  const waiting = () => Number(row(w, "SELECT COUNT(*) AS n FROM pc_orders WHERE status = 'awaiting_payment'")?.n);
+  assert.equal(waiting(), 12);
+  const counted = countingD1(w.db);
+  const env = { DB: counted.db, BUCKET: w.bucket, R2_PRIVATE: w.bucket } as never;
+  const spent: number[] = [];
+  while (waiting() > 0 && spent.length < 12) {
+    const before = counted.executed;
+    await printCloudTick(env, { budget: PRINT_CLOUD_TICK_BUDGET, used: () => counted.executed });
+    spent.push(counted.executed - before);
+  }
+  assert.equal(waiting(), 0, `every hold expired, over ${spent.length} ticks`);
+  assert.ok(spent.length >= 2, `twelve expiries do not fit one share (${spent.join(', ')})`);
+  for (const n of spent) assert.ok(n <= PRINT_CLOUD_TICK_BUDGET, `a tick spent ${n} of ${PRINT_CLOUD_TICK_BUDGET} (${spent.join(', ')})`);
+  assert.equal(row(w, 'SELECT reserved_qty FROM pc_stock_positions WHERE variant_id = ?', cat.white)?.reserved_qty, 0, 'every gram back on the shelf');
+  assert.ok(rows(w, "SELECT message FROM pc_background_job_logs WHERE message LIKE '%the rest next run%'").length >= 1, 'a task cut short says so');
+  // No share, no work: not even the schema probe.
+  const before = counted.executed;
+  assert.equal(await printCloudTick(env, { budget: 10, used: () => counted.executed }), null);
+  assert.equal(counted.executed, before);
+  await reconcileClean(w);
 });

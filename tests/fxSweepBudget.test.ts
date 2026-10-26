@@ -50,7 +50,7 @@ import { listPricedProducts } from '../worker/lib/pricingEngine/load';
 import { AUTO_REPRICE_SWEEP_BUDGET, D1_INVOCATION_STATEMENT_LIMIT, QUARTER_HOUR_RESERVE, quarterHourSweepBudget, sweepStaleEnginePrices } from '../worker/lib/fx/reprice';
 import { statementBudget } from '../worker/lib/fx/budget';
 import { countingD1, d1Base } from '../worker/lib/d1Count';
-import { COMPLETENESS_TICK_BUDGET, QUARTER_HOUR_TICK_LIMIT, REQUEST_MODEL_TICK_BUDGET, SERVICES_TICK_BUDGET, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourRequestModelBudget, quarterHourSearchBudget, quarterHourServicesBudget } from '../worker/lib/quarterHourBudget';
+import { COMPLETENESS_TICK_BUDGET, PRINT_CLOUD_TICK_BUDGET, QUARTER_HOUR_TICK_LIMIT, REQUEST_MODEL_TICK_BUDGET, SERVICES_TICK_BUDGET, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourPrintCloudBudget, quarterHourRequestModelBudget, quarterHourSearchBudget, quarterHourServicesBudget } from '../worker/lib/quarterHourBudget';
 import { drainStaffReconciliations } from '../worker/lib/financeStaffAccrual';
 import { INDEX_FAILED_MARK, INDEX_STAMP, backfillSearchIndex } from '../worker/lib/search/store';
 import { resetEventBus } from '../worker/lib/eventBus';
@@ -77,6 +77,8 @@ const COMPLETENESS_FIRST = /^SELECT 1 AS x FROM product_completeness LIMIT 1$|^S
 const SERVICES_FIRST = /^SELECT intake_at, valuation_version FROM trade_in_requests LIMIT 0$|WHERE status IN \('submitted','under_review','value_changed'\) AND intake_at IS NULL AND offer_expires_at IS NULL/;
 /** The request-model cache's first statement (P1-04, worker/lib/requestModelBackfill.ts, after the services sweep): its page read. */
 const REQUEST_MODEL_FIRST = /FROM community_print_requests\s+WHERE model_mirror = '' AND schema_version = 1/;
+/** Levonis Print Cloud's step (0215, DECISIONS row 270): the first statement that names one of its tables. */
+const PRINT_CLOUD_FIRST = /\bpc_[a-z_]+/;
 
 class CountStmt {
   constructor(
@@ -145,10 +147,13 @@ async function tick(raw: DatabaseSync) {
   } finally {
     console.error = original;
   }
-  // The request-model cache runs last of all (worker/index.ts, P1-04), the services sweep before it, the
-  // completeness catch-up before that, on what the engine sweep left.
-  const rm = d1.log.findIndex((sql) => REQUEST_MODEL_FIRST.test(sql));
-  const tail = rm === -1 ? d1.log.length : rm;
+  // Print Cloud's tasks run last of all (worker/index.ts, DECISIONS row 270), the request-model cache
+  // (P1-04) before them, the services sweep before it, the completeness catch-up before that, on what
+  // the engine sweep left.
+  const pc = d1.log.findIndex((sql) => PRINT_CLOUD_FIRST.test(sql));
+  const cloud = pc === -1 ? d1.log.length : pc;
+  const rm = d1.log.slice(0, cloud).findIndex((sql) => REQUEST_MODEL_FIRST.test(sql));
+  const tail = rm === -1 ? cloud : rm;
   const svc = d1.log.slice(0, tail).findIndex((sql) => SERVICES_FIRST.test(sql));
   const stop = svc === -1 ? tail : svc;
   const last = d1.log.slice(0, stop).findIndex((sql) => COMPLETENESS_FIRST.test(sql));
@@ -161,7 +166,7 @@ async function tick(raw: DatabaseSync) {
   const probes = d1.log.flatMap((sql, i) => (sql === CATCH_UP_FIRST ? [i] : []));
   assert.ok(probes.length <= 1, 'the catch-up probe runs once a tick, and no other job runs it');
   const own = probes.length === 1 && probes[0] < jobs ? probes[0] : jobs;
-  return { total: d1.log.length, own, catchUp: jobs - own, jobs, sweep: sweepEnd - jobs, recovery: end - sweepEnd, completeness: stop - end, services: tail - stop, requestModel: d1.log.length - tail, log: d1.log, errors };
+  return { total: d1.log.length, own, catchUp: jobs - own, jobs, sweep: sweepEnd - jobs, recovery: end - sweepEnd, completeness: stop - end, services: tail - stop, requestModel: cloud - tail, printCloud: d1.log.length - cloud, log: d1.log, errors };
 }
 
 // ------------------------------------------------------------- the world, every job at its bound
@@ -364,7 +369,12 @@ test('the usual tick at its bounds — 200 upload sessions expired and 200 delet
   assert.ok(withSweep.services > 0, 'the services sweep looked');
   assert.ok(withSweep.services <= servicesShare && servicesShare <= SERVICES_TICK_BUDGET, `the services sweep spent ${withSweep.services} of its ${servicesShare}`);
   // The request-model cache (P1-04) after it: one indexed read when nothing is pending.
-  assert.ok(withSweep.requestModel >= 1 && withSweep.requestModel <= quarterHourRequestModelBudget(withSweep.total - withSweep.requestModel), `the request-model cache spent ${withSweep.requestModel}`);
+  const beforeCloud = withSweep.total - withSweep.printCloud;
+  assert.ok(withSweep.requestModel >= 1 && withSweep.requestModel <= quarterHourRequestModelBudget(beforeCloud - withSweep.requestModel), `the request-model cache spent ${withSweep.requestModel}`);
+  // Print Cloud's tasks (DECISIONS row 270) last of all, within their own share of what everything before them left.
+  const cloudShare = quarterHourPrintCloudBudget(beforeCloud);
+  assert.ok(withSweep.printCloud >= 1 && withSweep.printCloud <= cloudShare && cloudShare <= PRINT_CLOUD_TICK_BUDGET, `Print Cloud spent ${withSweep.printCloud} of its ${cloudShare}`);
+  assert.ok(withSweep.log.slice(beforeCloud).every((sql) => /\bpc_[a-z_]+|^SELECT COUNT\(\*\) AS n FROM sqlite_master/.test(sql)), 'nothing but Print Cloud after its step began');
   console.log(`usual quarter-hour tick at its bounds: jobs ${withSweep.jobs}, sweep ${withSweep.sweep} (share ${share}), completeness ${withSweep.completeness} (share ${completenessShare}), services ${withSweep.services} (share ${servicesShare}), total ${withSweep.total} < ${D1_INVOCATION_STATEMENT_LIMIT}`);
 });
 
@@ -444,14 +454,16 @@ test('the request-model cache LAST, at its bound: within its own 40 of what the 
   seedUnbuiltRequestModels(current);
   const t = await tick(current);
   assert.deepEqual(t.errors, [], 'no job reported an error');
-  const share = quarterHourRequestModelBudget(t.total - t.requestModel);
+  const beforeCloud = t.total - t.printCloud;
+  const share = quarterHourRequestModelBudget(beforeCloud - t.requestModel);
   assert.ok(t.total < D1_INVOCATION_STATEMENT_LIMIT, `the tick executed ${t.total} statements`);
   assert.ok(t.requestModel <= share && share <= REQUEST_MODEL_TICK_BUDGET, `the request-model cache spent ${t.requestModel} of its ${share}`);
+  assert.ok(t.printCloud <= quarterHourPrintCloudBudget(beforeCloud), `Print Cloud after it, within its share (${t.printCloud})`);
   assert.ok(t.requestModel > 20, `the cache worked up to its share (${t.requestModel})`);
   const built = count(current, "SELECT COUNT(*) AS n FROM community_print_requests WHERE request_id LIKE 'req_rm_%' AND model_mirror <> ''");
   assert.ok(built >= 50 && built < 100, `whole pages built, the rest left for the next tick (${built})`);
   // Nothing of the earlier steps after the cache began.
-  assert.ok(t.log.slice(t.total - t.requestModel).every((sql) => !/trade_in_requests|pricing_(?:sku_costs|v2_sku_results)|upload_sessions|FROM outbox|search_tokens|product_completeness/.test(sql)));
+  assert.ok(t.log.slice(beforeCloud - t.requestModel).every((sql) => !/trade_in_requests|pricing_(?:sku_costs|v2_sku_results)|upload_sessions|FROM outbox|search_tokens|product_completeness/.test(sql)));
   console.log(`request-model cache at its bound: ${t.requestModel} of ${share}, ${built} built, total ${t.total} < ${D1_INVOCATION_STATEMENT_LIMIT}`);
 });
 

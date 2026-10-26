@@ -57,12 +57,20 @@ const FORBIDDEN_MODULES = ['three-slicer', 'occt-import-js', 'three', 'vinext', 
  *  NOTE THE ABSENCE OF A CLIENT-SIDE ENTRY. The browser never parses a model:
  *  measurement decides a price, so it happens on the server where the customer
  *  cannot edit it, and the viewer receives a derived mesh rather than a parser.
- *  That is why this entry is under worker/ and there is no src/ counterpart. */
+ *  That is why this entry is under worker/ and there is no src/ counterpart.
+ *
+ *  worker/lib/printCloud/files.ts (Levonis Print Cloud, 0215) reads a 3MF's
+ *  central directory BEFORE the file is stored, to refuse an archive with path
+ *  traversal, an executable entry, too many entries or no model part. Its
+ *  `unzipSync` filter returns false for every entry, so nothing is inflated:
+ *  no mesh, no G-code, no engine — the measurement itself stays with
+ *  modelGeometry.ts above. Worker-only, like that entry. */
 const FFLATE_ALLOWLIST = new Set([
   join('src', 'components', 'adminProducts', 'ImportPanel.tsx'),
   join('worker', 'routes', 'template.ts'),
   join('worker', 'routes', 'adminImport.ts'),
   join('worker', 'lib', 'modelGeometry.ts'),
+  join('worker', 'lib', 'printCloud', 'files.ts'),
 ]);
 
 const SCAN_DIRS = ['src', 'worker'];

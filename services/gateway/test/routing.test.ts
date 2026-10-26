@@ -124,6 +124,10 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/marketplace': 'MARKETPLACE',
   '/api/print-quote': 'MARKETPLACE',
   '/api/admin/print-quote': 'MARKETPLACE',
+  // 0215 — Levonis Print Cloud, owned beside the print engine (DECISIONS row 270).
+  '/api/print-cloud/v1/agent': 'MARKETPLACE',
+  '/api/print-cloud/v1': 'MARKETPLACE',
+  '/api/admin/print-cloud': 'MARKETPLACE',
   '/api/notifications': 'NOTIFICATIONS',
   '/api/store-orders': 'MARKETPLACE',
   '/api/community-reviews': 'MARKETPLACE',

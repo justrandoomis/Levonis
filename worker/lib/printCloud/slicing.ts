@@ -99,7 +99,7 @@ export async function submitSlicingFailure(db: D1Database, agent: AgentRow, requ
 }
 
 /** Leases that ran out: back to the queue, or — after the last attempt — failed and the customer told. */
-export async function sweepSlicingLeases(db: D1Database, now: Date) {
+export async function sweepSlicingLeases(db: D1Database, now: Date, unitFits?: () => boolean) {
   const expired = await many<SlicingRequestRow>(
     db,
     "SELECT id, job_id, status, input_json, claimed_by, lease_until, attempts FROM pc_slicing_requests WHERE status = 'claimed' AND lease_until < ? LIMIT 50",
@@ -108,6 +108,7 @@ export async function sweepSlicingLeases(db: D1Database, now: Date) {
   let requeued = 0;
   let failed = 0;
   for (const r of expired) {
+    if (unitFits && !unitFits()) return { requeued, failed, more: true };
     if (r.attempts >= SLICING_MAX_ATTEMPTS) {
       await slicingFailed(db, r.id, 'SLICER_LEASE_EXPIRED', { type: 'system', id: 'system' }, now).catch(() => undefined);
       failed++;
@@ -119,7 +120,7 @@ export async function sweepSlicingLeases(db: D1Database, now: Date) {
       requeued++;
     }
   }
-  return { requeued, failed };
+  return { requeued, failed, more: expired.length === 50 };
 }
 
 /** May this agent download this file? Only for a job it is slicing or printing. */

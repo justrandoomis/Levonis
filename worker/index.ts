@@ -40,7 +40,7 @@ import { runFxScheduler } from './lib/fx/scheduler';
 import { quarterHourSweepBudget, sweepStaleEnginePrices, recoverReceivedPricing } from './lib/fx/reprice';
 import { statementBudget } from './lib/fx/budget';
 import { countingD1 } from './lib/d1Count';
-import { QUARTER_HOUR_TICK_LIMIT, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourPriceRequestBudget, quarterHourRequestModelBudget, quarterHourSearchBudget, quarterHourServicesBudget } from './lib/quarterHourBudget';
+import { QUARTER_HOUR_TICK_LIMIT, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourPriceRequestBudget, quarterHourPrintCloudBudget, quarterHourRequestModelBudget, quarterHourSearchBudget, quarterHourServicesBudget } from './lib/quarterHourBudget';
 import { catchUpRequestModels } from './lib/requestModelBackfill';
 import { runServicesSweep } from './lib/tradeInSweep';
 import { sweepCompleteness } from './lib/productCompleteness';
@@ -1418,9 +1418,9 @@ export default {
         })
         // LAST (DECISIONS row 270): Print Cloud's durable background work — order and
         // credit expiry, file analysis, URL imports, the scheduler, slicing leases,
-        // low-balance notices, the daily reconciliation. A task starts only while what
-        // the steps above left keeps 150 statements in hand. Never throws.
-        .then(() => printCloudTick(tickEnv, { limit: 8, canContinue: () => used() < QUARTER_HOUR_TICK_LIMIT - 150 }))
+        // low-balance notices, the daily reconciliation — within its own 120 of what
+        // the steps above left (quarterHourPrintCloudBudget). Never throws.
+        .then(() => printCloudTick(tickEnv, { limit: 8, budget: quarterHourPrintCloudBudget(used()), used }))
     );
   },
 };

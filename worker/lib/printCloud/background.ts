@@ -34,6 +34,31 @@ type RunnerEnv = Pick<Env, 'DB' | 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE'>;
 export const LEASE_SECONDS = 120;
 export const TASK_TIMEOUT_MS = 25_000;
 
+/** Whether `n` more D1 statements fit in what the caller may still spend. */
+export type Room = (n: number) => boolean;
+
+/**
+ * THE MOST STATEMENTS ONE UNIT OF TASK WORK SENDS: one order expired, one
+ * credit lot expired, one low-balance notice, one queue assignment, one
+ * slicing lease swept, one file measured, one import step — or the whole
+ * reconciliation (sixteen reads). Every loop asks for this much room before
+ * each unit, so a bounded run never overshoots its share
+ * (tests/printCloudOperations.test.ts measures a run at its bound).
+ */
+export const PRINT_CLOUD_UNIT_STATEMENTS = 30;
+
+/** A task's own statements around its work: the claim (read, update, fence), the settings read, the first list read, the close (update, log), and slack. */
+export const PRINT_CLOUD_TASK_OVERHEAD = 8;
+
+/** A `Room` over a monotonic statement counter: `budget` statements from the moment it is made. */
+export function roomWithin(used: () => number, budget: number): Room {
+  const start = used();
+  return (n) => used() - start + n <= budget;
+}
+
+/** Room for one more unit of a loop, and the close that follows it. */
+const unitFits = (room: Room | undefined) => !room || room(PRINT_CLOUD_UNIT_STATEMENTS + 2);
+
 interface TaskRow {
   id: string;
   kind: TaskKind;
@@ -51,23 +76,34 @@ async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   }
 }
 
+interface Outcome {
+  summary: string;
+  /** The loop stopped for room, not for want of work: the task runs again. */
+  more?: boolean;
+}
+
 /** The work itself. Each handler is idempotent and returns a short summary for the log. */
-async function handle(env: RunnerEnv, task: TaskRow, now: Date): Promise<string> {
+async function handle(env: RunnerEnv, task: TaskRow, now: Date, room?: Room): Promise<Outcome> {
   const db = env.DB;
   const payload = JSON.parse(task.payload_json || '{}') as Record<string, unknown>;
   const { config } = await loadConfig(db);
   switch (task.kind) {
     case 'analyze_model_file':
-      return `file ${String(payload.file_id)}: ${await analyseStoredFile(env, String(payload.file_id), now)}`;
+      return { summary: `file ${String(payload.file_id)}: ${await analyseStoredFile(env, String(payload.file_id), now)}` };
     case 'import_model_url':
-      return `import ${String(payload.import_id)}: ${await processImport(env, String(payload.import_id), config, now)}`;
+      return { summary: `import ${String(payload.import_id)}: ${await processImport(env, String(payload.import_id), config, now)}` };
     case 'expire_orders': {
-      const r = await expireUnpaidOrders(db, now);
-      return `expired ${r.expired}, failed ${r.failed}`;
+      const r = await expireUnpaidOrders(db, now, 25, room ? () => unitFits(room) : undefined);
+      return { summary: `expired ${r.expired}, failed ${r.failed}`, more: r.more };
     }
     case 'expire_credit_lots': {
       let n = 0;
+      let more = false;
       for (const lot of await expiredLots(db, now)) {
+        if (!unitFits(room)) {
+          more = true;
+          break;
+        }
         const acct = await one<{ available_seconds: number }>(db, 'SELECT available_seconds FROM pc_credit_accounts WHERE id = ?', lot.account_id);
         // Only seconds that are not reserved for a confirmed job can expire.
         const seconds = Math.min(Number(lot.seconds_remaining), Number(acct?.available_seconds ?? 0));
@@ -86,7 +122,7 @@ async function handle(env: RunnerEnv, task: TaskRow, now: Date): Promise<string>
         await runBatch(db, out.statements);
         n++;
       }
-      return `expired lots ${n}`;
+      return { summary: `expired lots ${n}`, more };
     }
     case 'low_inventory_scan': {
       const low = await many<{ id: string; user_id: string; variant_id: string; available_qty: number; unit_code: string; name_en: string; low_stock_alert_qty: number | null }>(
@@ -99,7 +135,14 @@ async function handle(env: RunnerEnv, task: TaskRow, now: Date): Promise<string>
           LIMIT 100`,
         config.low_inventory_default_g
       );
+      let more = false;
+      let sent = 0;
       for (const a of low) {
+        if (!unitFits(room)) {
+          more = true;
+          break;
+        }
+        sent++;
         await runBatch(db, [
           pcNotify(db, {
             userId: a.user_id,
@@ -113,19 +156,19 @@ async function handle(env: RunnerEnv, task: TaskRow, now: Date): Promise<string>
           db.prepare('UPDATE pc_inventory_accounts SET low_stock_notified_at = ? WHERE id = ?').bind(iso(now), a.id),
         ]);
       }
-      return `low balances ${low.length}`;
+      return { summary: `low balances ${sent} of ${low.length}`, more };
     }
     case 'schedule_queue': {
-      const r = await runScheduler(db, config, now);
-      return `assigned ${r.assigned.length}, waiting ${r.waiting}`;
+      const r = await runScheduler(db, config, now, 20, room ? () => unitFits(room) : undefined);
+      return { summary: `assigned ${r.assigned.length}, waiting ${r.waiting}`, more: r.more };
     }
     case 'reconcile': {
       const r = await reconcile(db);
-      return `reconciliation ${r.ok ? 'clean' : 'issues: ' + r.checks.filter((c) => !c.ok).map((c) => c.name).join(',')}`;
+      return { summary: `reconciliation ${r.ok ? 'clean' : 'issues: ' + r.checks.filter((c) => !c.ok).map((c) => c.name).join(',')}` };
     }
     case 'slicing_lease_sweep': {
-      const r = await sweepSlicingLeases(db, now);
-      return `requeued ${r.requeued}, failed ${r.failed}`;
+      const r = await sweepSlicingLeases(db, now, room ? () => unitFits(room) : undefined);
+      return { summary: `requeued ${r.requeued}, failed ${r.failed}`, more: r.more };
     }
   }
 }
@@ -171,28 +214,42 @@ export interface RunReport {
   dead: number;
 }
 
-/** Run up to `limit` due tasks. Never throws: a broken task is recorded, the next one still runs. */
+/**
+ * Run up to `limit` due tasks. Never throws: a broken task is recorded, the
+ * next one still runs. With `room`, a task starts only while its overhead and
+ * one unit of work fit, and a task whose loop stopped for room is queued
+ * again (its attempt not counted) for the next run.
+ */
 export async function runPrintCloudTasks(
   env: RunnerEnv,
-  opts: { limit?: number; now?: () => Date; canContinue?: () => boolean } = {}
+  opts: { limit?: number; now?: () => Date; room?: Room } = {}
 ): Promise<RunReport> {
   const report: RunReport = { ran: 0, succeeded: 0, failed: 0, dead: 0 };
   const clock = opts.now ?? (() => new Date());
   if (!(await printCloudInstalled(env.DB))) return report;
   const db = env.DB;
   for (let i = 0; i < (opts.limit ?? 10); i++) {
-    if (opts.canContinue && !opts.canContinue()) break;
+    if (opts.room && !opts.room(PRINT_CLOUD_TASK_OVERHEAD + PRINT_CLOUD_UNIT_STATEMENTS)) break;
     const now = clock();
     const task = await claim(db, now);
     if (!task) break;
     report.ran++;
     try {
-      const summary = await withTimeout(handle(env, task, now), TASK_TIMEOUT_MS);
+      const outcome = await withTimeout(handle(env, task, now, opts.room), TASK_TIMEOUT_MS);
       const done = clock();
-      await db.batch([
-        db.prepare("UPDATE pc_background_jobs SET status = 'succeeded', finished_at = ?, updated_at = ?, last_error = NULL WHERE id = ?").bind(iso(done), iso(done), task.id),
-        log(db, task, 'info', summary, done),
-      ]);
+      await db.batch(
+        outcome.more
+          ? [
+              db
+                .prepare("UPDATE pc_background_jobs SET status = 'queued', run_after = ?, attempts = attempts - 1, lease_token = NULL, lease_until = NULL, updated_at = ? WHERE id = ?")
+                .bind(iso(done), iso(done), task.id),
+              log(db, task, 'info', `${outcome.summary}; the rest next run`, done),
+            ]
+          : [
+              db.prepare("UPDATE pc_background_jobs SET status = 'succeeded', finished_at = ?, updated_at = ?, last_error = NULL WHERE id = ?").bind(iso(done), iso(done), task.id),
+              log(db, task, 'info', outcome.summary, done),
+            ]
+      );
       report.succeeded++;
     } catch (e) {
       const done = clock();
@@ -225,17 +282,23 @@ export async function enqueuePeriodic(db: D1Database, now: Date): Promise<void> 
   await db.batch(statements);
 }
 
+/** The periodic enqueue's statements: the schema probe and six inserts. */
+const PERIODIC_STATEMENTS = 7;
+
 /**
  * The cron step: enqueue the periodic work, then run a bounded number of due
- * tasks while `canContinue` says the invocation's shared D1 budget allows
- * another (worker/index.ts passes the quarter-hour share-out). Never throws.
+ * tasks within `budget` statements of the invocation's counter `used`
+ * (worker/index.ts passes `quarterHourPrintCloudBudget`, worker/lib/
+ * quarterHourBudget.ts step 8). Nothing when not even the enqueue and one
+ * task fit. Never throws.
  */
-export async function printCloudTick(env: RunnerEnv, opts: { limit?: number; canContinue?: () => boolean } = {}): Promise<RunReport | null> {
+export async function printCloudTick(env: RunnerEnv, opts: { limit?: number; budget?: number; used?: () => number } = {}): Promise<RunReport | null> {
   try {
-    if (opts.canContinue && !opts.canContinue()) return null;
+    const room = opts.used && opts.budget !== undefined ? roomWithin(opts.used, opts.budget) : undefined;
+    if (room && !room(PERIODIC_STATEMENTS + PRINT_CLOUD_TASK_OVERHEAD + PRINT_CLOUD_UNIT_STATEMENTS)) return null;
     if (!(await printCloudInstalled(env.DB))) return null;
     await enqueuePeriodic(env.DB, new Date());
-    return await runPrintCloudTasks(env, { limit: opts.limit ?? 8, canContinue: opts.canContinue });
+    return await runPrintCloudTasks(env, { limit: opts.limit ?? 8, room });
   } catch (e) {
     console.error('print cloud tick rejected:', e instanceof Error ? e.name : 'unknown');
     return null;

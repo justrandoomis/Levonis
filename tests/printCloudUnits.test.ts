@@ -126,7 +126,13 @@ test('job state machine: only declared transitions; terminal states lead nowhere
   assert.equal(canTransition('queued', 'printing'), false, 'nothing prints without a machine assigned');
   const seen = new Set(['draft']);
   const walk = ['draft'];
-  while (walk.length) for (const n of TRANSITIONS[walk.pop() as keyof typeof TRANSITIONS]) if (!seen.has(n)) (seen.add(n), walk.push(n));
+  while (walk.length) {
+    for (const n of TRANSITIONS[walk.pop() as keyof typeof TRANSITIONS]) {
+      if (seen.has(n)) continue;
+      seen.add(n);
+      walk.push(n);
+    }
+  }
   assert.deepEqual([...seen].sort(), [...JOB_STATUSES].sort());
   assert.ok(!CUSTOMER_CANCELLABLE.includes('printing'), 'a customer cannot cancel a running print; they ask an operator');
 });

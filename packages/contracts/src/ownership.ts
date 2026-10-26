@@ -308,6 +308,24 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // What actually happened, which is what turns the estimate into a
     // calibration rather than a permanent guess (§15).
     'print_actuals', 'print_failures', 'printer_calibration_stats',
+    // 0215 — Levonis Print Cloud (docs/PRINT_CLOUD.md, DECISIONS row 270): the
+    // workshop's OWN printers rented to customers by the hour, with their
+    // materials, files, jobs, queue and ledgers. One aggregate written only by
+    // worker/lib/printCloud; it sits beside the print engine it is the
+    // workshop-side twin of, and moves as one block if it becomes a service.
+    'pc_fence', 'pc_operations', 'pc_settings', 'pc_units', 'pc_credit_tiers', 'pc_printer_models', 'pc_agents',
+    'pc_printers', 'pc_printer_maintenance', 'pc_printer_telemetry', 'pc_printer_events', 'pc_credit_packages',
+    'pc_credit_conversion_rules', 'pc_product_categories', 'pc_products', 'pc_variants', 'pc_price_tiers',
+    'pc_promotions', 'pc_price_changes', 'pc_quotes', 'pc_quote_lines', 'pc_orders', 'pc_order_lines', 'pc_payments',
+    'pc_payment_events', 'pc_refunds', 'pc_credit_accounts', 'pc_credit_lots', 'pc_credit_reservations',
+    'pc_credit_ledger', 'pc_credit_lot_draws', 'pc_warehouse_locations', 'pc_stock_positions', 'pc_stock_lots',
+    'pc_stock_holds', 'pc_warehouse_ledger', 'pc_inventory_accounts', 'pc_inventory_lots', 'pc_inventory_reservations',
+    'pc_inventory_ledger', 'pc_inventory_lot_draws', 'pc_model_files', 'pc_model_imports', 'pc_model_import_logs',
+    'pc_projects', 'pc_project_members', 'pc_project_models', 'pc_print_profiles', 'pc_plates', 'pc_plate_items',
+    'pc_print_jobs', 'pc_print_job_events', 'pc_job_requirements', 'pc_slicing_requests', 'pc_estimates',
+    'pc_estimate_materials', 'pc_queue_entries', 'pc_printer_assignments', 'pc_consumption_records', 'pc_failures',
+    'pc_shipments', 'pc_shipment_items', 'pc_buyback_requests', 'pc_accessory_rules', 'pc_recommendations',
+    'pc_background_jobs', 'pc_background_job_logs', 'pc_integration_events',
   ]),
   ...owned('reviews', ['reviews', 'review_rewards', 'gift_entitlements', 'gift_pool_items', 'gift_redemptions', 'gift_pools', 'review_media']),
   ...owned('devices', [
