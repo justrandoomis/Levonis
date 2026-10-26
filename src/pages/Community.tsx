@@ -60,6 +60,7 @@ import { forgetHome } from '../components/community/hub/useHomeData';
 import { BoardRailFrame, boardRailRemembered, workshopHint } from '../components/community/hub/rails';
 import { communityHubApi, type CommunityProduct, type CommunityRequest, type CommunityStore } from '../components/community/hub/api';
 import { useSearchBox } from '../components/community/search/useSearchBox';
+import CommunitySurface from '../components/community/CommunitySurface';
 
 const ProjectsPanel = React.lazy(() => import('../components/community/hub/ProjectsPanel'));
 const CreatorsPanel = React.lazy(() => import('../components/community/hub/CreatorsPanel'));
@@ -273,7 +274,7 @@ export default function Community() {
   }
 
   return (
-    <div className="w-full min-h-screen pb-28 text-text-primary">
+    <CommunitySurface className="w-full min-h-screen pb-28 text-text-primary">
       {/* The search bar is FLOATING CHROME: content passes under it, and a
           short gradient says so where the overlap is real (`.scroll-edge`).
           Its height is fixed (h-16) so the tab strip can stick exactly
@@ -382,7 +383,7 @@ export default function Community() {
           </TabPanels>
         </div>
       </div>
-    </div>
+    </CommunitySurface>
   );
 }
 

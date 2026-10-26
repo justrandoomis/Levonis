@@ -71,7 +71,7 @@
  *   window was closed and its data was not there.
  */
 
-import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 // `m`, not `motion`: this module is in every visitor's first load, and the
 // `motion` proxy carries every feature the library has. The features (drag
@@ -86,6 +86,20 @@ import { layerAbove, pushLayer, recentlyPressed } from './overlayStack';
 
 import { UI_LAYERS, overlayLayer } from './overlayLayers';
 export { UI_LAYERS, overlayLayer } from './overlayLayers';
+
+/**
+ * THE SCOPE A PORTAL BELONGS TO (community UI plan B1, tokens.md §4.4). A
+ * themed scope (src/components/community/CommunitySurface.tsx) re-declares
+ * its tokens on its own root; a window or a menu is portalled into <body>,
+ * outside it, so the root provides its stamp here and both portal roots below
+ * carry it. Null outside every scope: nothing is stamped. Declared in this
+ * module, not its own, so the storefront pays no extra file for it.
+ */
+export interface SurfaceStamp {
+  'data-surface': string;
+  'data-theme': 'dark' | 'light';
+}
+export const SurfaceContext = createContext<SurfaceStamp | null>(null);
 
 /**
  * Every sentence here already existed, written by hand in all three languages,
@@ -383,6 +397,9 @@ export function Overlay({
   const atRest = useMotionFeaturesFailed();
   const { dir, lang } = useLanguage();
   const strings = STRINGS[lang] ?? STRINGS.ar;
+  // A window opened from a themed scope (the community) re-enters it on its
+  // portal root, so it paints in the scope tokens (SurfaceContext above).
+  const surface = useContext(SurfaceContext);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const layerRef = useRef<HTMLDivElement | null>(null);
   const originRef = useRef<string | undefined>(undefined);
@@ -573,6 +590,7 @@ export function Overlay({
           style={{ zIndex: zRef.current ?? overlayLayer(z) }}
           data-overlay={testId ?? true}
           data-overlay-mode={mode}
+          {...surface}
         >
           <MotionFeatures>
           {mode === 'modal' && (
@@ -772,6 +790,7 @@ export function Anchored({
   const autoId = useId();
   const id = idProp ?? autoId;
   const { dir } = useLanguage();
+  const surface = useContext(SurfaceContext);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const zRef = useRef<number | undefined>(undefined);
   const [position, setPosition] = useState<{
@@ -884,6 +903,7 @@ export function Anchored({
           role={role}
           aria-label={label}
           data-anchored={testId ?? true}
+          {...surface}
           initial={atRest ? false : { opacity: 0, scale: m.reduced ? 1 : 0.92, y: m.travel(-6) }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: m.reduced ? 1 : 0.92, y: m.travel(-6) }}

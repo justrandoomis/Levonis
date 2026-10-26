@@ -713,3 +713,45 @@ test('the sign-in screen is clay on the app cream (D4): every auth text ink read
   // A bare .lv-alert in this sheet restyled every app alert (index.css) once /auth had loaded.
   for (const [f, src] of sheets) assert.doesNotMatch(src, /\.lv-alert\b/, `${f} styles the app's .lv-alert`);
 });
+
+// --------------------------------------------------------------------- 10
+/**
+ * THE COMMUNITY SCOPE (community UI plan B1; DECISIONS row 270). Its lazy sheet
+ * (src/styles/community.css) re-tints the clay PRIMITIVES under
+ * `[data-surface='community']` and never redeclares a composite (they resolve
+ * on the scope root, which carries `data-theme`); every shadow it writes is a
+ * clay composite or one of its two gold composites, built from primitives,
+ * y-only, at most four layers and one blurred; D-3 (owner override: the solid
+ * sand fill with ink text) is the five `--cm-sel-*` variables on one class,
+ * keyed to the aria state; and D-4 keeps the text field the house well.
+ */
+test('the community scope re-tints primitives only, its shadows are clay, and its selection is the five --cm-sel-* variables (D-3)', () => {
+  const sheet = stripCssComments(read('src/styles/community.css'));
+  assert.doesNotMatch(sheet, /--clay-(?:0|lift|1|2|3|dock|press|well)\s*:/, 'the community sheet redeclares a clay composite');
+  const retinted = [...sheet.matchAll(/--clay-([a-z-]+)\s*:/g)].map((m) => m[1]);
+  assert.ok(retinted.length >= 6, 'the community scope re-tints no clay primitive');
+  for (const name of retinted) assert.ok(clayPrimitives('dark').includes(name), `--clay-${name} is not a generated primitive`);
+  // The two gold composites: colour only through var(), no sideways cast, ≤ 4 layers, one blurred.
+  for (const name of ['cm-gold-shadow', 'cm-sel-shadow']) {
+    const value = new RegExp(`--${name}:\\s*([^;]+);`).exec(sheet)?.[1];
+    assert.ok(value, `--${name} is missing`);
+    assert.doesNotMatch(value!, /#[0-9a-f]{3,8}\b|rgba?\(|oklch\(/i, `--${name} hard-codes a colour`);
+    const parts = value!.split(',').map((p) => p.trim());
+    assert.ok(parts.length <= 4, `--${name} has ${parts.length} layers`);
+    assert.equal(parts.filter(isBlurred).length, 1, `--${name} must paint exactly one blurred layer`);
+    for (const p of parts) {
+      const x = p.replace(/var\([^)]*\)/g, '').replace(/\binset\b/, '').trim().split(/\s+/)[0];
+      assert.equal(parseFloat(x), 0, `--${name} casts sideways (${p})`);
+    }
+  }
+  // Every shadow the sheet draws is none, a clay composite or a gold composite.
+  for (const m of sheet.matchAll(/(?:^|[;{\s])(box-shadow|--tw-shadow):\s*([^;}]+)/g)) {
+    assert.match(m[2].trim(), /^(?:none|var\(--(?:clay-[a-z0-9]+|cm-(?:gold|sel)-shadow|tw-shadow)\))$/, `community.css: a shadow that is not clay: ${m[2].trim()}`);
+  }
+  // D-3: one class, five variables, the aria state as the key.
+  const sel = /\.cm-sel:is\(\[aria-pressed='true'\], \[aria-checked='true'\][^{]*\{([^}]*)\}/.exec(sheet)?.[1] ?? '';
+  for (const v of ['--cm-sel-ink', '--cm-sel-bg', '--cm-sel-edge', '--cm-sel-shadow']) assert.ok(sel.includes(`var(${v})`), `.cm-sel does not read ${v}`);
+  assert.match(sheet, /\.cm-check \{[^}]*background: var\(--cm-sel-badge\);/, 'the check badge (the non-colour cue) does not read --cm-sel-badge');
+  // D-4: the text field stays the house well with its 3:1 line — the sheet never re-skins it.
+  assert.doesNotMatch(sheet, /\.lv-input/, 'the community sheet re-skins the house field');
+});

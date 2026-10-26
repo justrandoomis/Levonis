@@ -1,0 +1,418 @@
+/*
+ * THE COMMUNITY SCOPE (community UI plan B1; tokens: the reference study,
+ * tokens.md §1–§3). Imported by src/components/community/CommunitySurface.tsx
+ * only, so it is a lazy stylesheet: a storefront visitor never downloads it,
+ * and nothing in it applies outside `[data-surface='community']`.
+ *
+ * 1. TOKENS. The reference palette (blue charcoal and sand gold) re-declared
+ *    on the scope root, which also carries `data-theme`, so the clay
+ *    composites of src/index.css (declared on every `[data-theme]`) re-resolve
+ *    there with these primitives. 0,2,0 beats the generated 0,1,0 block on the
+ *    same element whatever the order; the generated block is not touched.
+ *    Aliases are re-declared too (`--color-accent`, `--color-black`): the
+ *    generator writes them as literals. Light keeps the cream system.
+ * 2. DECISIONS (community UI plan §2, DECISIONS row 270). D-1 the palette;
+ *    D-2 the one primary verb is the sand-gold GRADIENT with ink text
+ *    (owner override); D-3 a selection is the SOLID sand fill with ink text,
+ *    always with a non-colour cue (a check badge, a thumb, a knob position,
+ *    the chosen value written out, and the aria state), through the five
+ *    `--cm-sel-*` variables on `.cm-sel` (owner override); D-4 text fields
+ *    stay wells with a 3:1 line; D-5 cards at 18px; D-6 the like colour.
+ * 3. COMPONENTS (`@layer components`, so a utility still wins): only what a
+ *    utility cannot say (the scoped colours, the clay, the states). Geometry
+ *    is written with utilities the app already ships, so the kit in
+ *    src/components/community/kit/ adds almost nothing to the main sheet.
+ *    Shadows are composed from the clay primitives and the scoped
+ *    `--cm-gold-rim/-base` only (y-only, at most four layers, one blurred at
+ *    rest): tests/claySystem.test.ts.
+ * 4. RE-SKINS of shared controls the kit wraps (Segmented, TabStrip, Switch,
+ *    IconButton, NumberInput). Unlayered, because those draw with utilities,
+ *    and each one is reached only through its `cm-` class inside the scope.
+ *
+ * tests/communityScope.test.ts recomputes every text and boundary pair below.
+ */
+
+/* The layer order of src/index.css, stated again: if this sheet is parsed
+   first, its `@layer components` would otherwise rank BELOW Tailwind's base
+   (the preflight would flatten every button). */
+@layer theme, base, components, utilities;
+
+/* ------------------------------------------------------------- 1. tokens */
+[data-surface='community'] {
+  --radius-xl: 1.125rem;
+  --cm-gold-ink: #15100a;
+  --cm-sel-ink: #15100a;
+  --cm-wait-bg: #e0bc86;
+  --cm-wait-ink: #17120b;
+  --cm-gold-shadow: inset 0 1px 0 var(--cm-gold-rim), inset 0 -2px 0 var(--cm-gold-base), 0 4px 12px -6px var(--clay-ambient);
+  --cm-sel-shadow: inset 0 1px 0 var(--cm-gold-rim), inset 0 -2px 0 var(--cm-gold-base), 0 1px 2px var(--clay-contact);
+}
+
+[data-surface='community'][data-theme='dark'] {
+  --color-black: #121619;
+  --color-canvas: #121619;
+  --color-surface: #22272c;
+  --color-surface-raised: #282e33;
+  --color-surface-selected: #2e343a;
+  --color-border-subtle: #2b3036;
+  --color-text-secondary: #adb8c5;
+  --color-text-muted: #97a2ae;
+  --color-danger: #ed7177;
+  --color-gold: #f0d18c;
+  --color-accent: #f0d18c;
+  --color-gold-fill: #dcbc8c;
+  --clay-rim: rgb(255 255 255/.08);
+  --clay-base: rgb(0 0 0/.28);
+  --clay-contact: rgb(0 0 0/.45);
+  --clay-ambient: rgb(0 0 0/.6);
+  --clay-well-bg: #1a1f23;
+  --clay-field: #737a85;
+  --cm-card-1: #252b30;
+  --cm-card-2: #1e2328;
+  --cm-track: #1f2429;
+  --cm-contour: rgb(0 0 0/.35);
+  --cm-gold-1: #e7cca1;
+  --cm-gold-2: #c8a777;
+  --cm-gold-edge: rgb(0 0 0/.35);
+  --cm-gold-rim: rgb(255 246 226/.55);
+  --cm-gold-base: rgb(92 64 26/.22);
+  --cm-gold-line: #e9c79a;
+  --cm-outline-bg: #2c2b28;
+  --cm-outline-edge: #e3c590;
+  --cm-sel-bg: #dcbc8c;
+  --cm-sel-edge: #c8a777;
+  --cm-sel-badge: #171c1e;
+  --cm-like: #fb415c;
+  --cm-step-on: #d6b686;
+  --cm-step-off: #262c31;
+  --cm-drop-edge: #4a525b;
+  --cm-open-bg: #2d4434;
+  --cm-open-ink: #abefb8;
+  --cm-open-dot: #8fe19f;
+  --cm-prog-bg: #243446;
+  --cm-prog-ink: #b4d0f5;
+  --cm-prog-dot: #6f9bd1;
+  --cm-stop-bg: #3f2a2e;
+  --cm-stop-ink: #f4b0b4;
+  --cm-stop-dot: #ed7177;
+}
+
+[data-surface='community'][data-theme='light'] {
+  --color-gold: #6a5426;
+  --color-accent: #6a5426;
+  --color-gold-fill: #d6b77f;
+  --cm-card-1: #eee8dc;
+  --cm-card-2: #e8e0d1;
+  --cm-track: #e8e0d1;
+  --cm-contour: rgb(58 46 28/.16);
+  --cm-gold-1: #e4c795;
+  --cm-gold-2: #c09b62;
+  --cm-gold-edge: #7a5c30;
+  --cm-gold-rim: rgb(255 248 232/.6);
+  --cm-gold-base: rgb(92 64 26/.2);
+  --cm-gold-line: #7a5c30;
+  --cm-outline-bg: #ece2cf;
+  --cm-outline-edge: #7a5c30;
+  --cm-sel-bg: #d6b77f;
+  --cm-sel-edge: #7a5c30;
+  --cm-sel-badge: #2b2418;
+  --cm-like: #ad3036;
+  --cm-step-on: #8a6a3c;
+  --cm-step-off: #d3c9b6;
+  --cm-drop-edge: #a89b83;
+  --cm-open-bg: #d6dbcc;
+  --cm-open-ink: #1a6a43;
+  --cm-open-dot: #1f8a54;
+  --cm-prog-bg: #d5dce4;
+  --cm-prog-ink: #2d5f9a;
+  --cm-prog-dot: #2d5f9a;
+  --cm-stop-bg: #ecd2cc;
+  --cm-stop-ink: #8f2328;
+  --cm-stop-dot: #ad3037;
+}
+
+/* --------------------------------------------------------- 3. components */
+@layer components {
+  /* A CARD: the reference body gradient and a 1px contour that separates it
+     from a page only 1.2:1 darker (the clay is `shadow-sm`/`shadow-lg`). */
+  .cm-card {
+    background: linear-gradient(180deg, var(--cm-card-1), var(--cm-card-2));
+  }
+  .cm-card,
+  .cm-card-raised,
+  .cm-raised,
+  .cm-line {
+    border: 1px solid var(--cm-contour);
+  }
+
+  /* BUTTONS: `.lv-button` gives geometry, focus, busy, disabled and the
+     press; these give the colour. 0,2,0 so the order of the sheets never
+     decides. */
+  .lv-button.cm-btn-gold {
+    color: var(--cm-gold-ink);
+    background: linear-gradient(180deg, var(--cm-gold-1), var(--cm-gold-2));
+    border: 1px solid var(--cm-gold-edge);
+    --tw-shadow: var(--cm-gold-shadow);
+  }
+  .lv-button.cm-btn-gold:hover:not(:disabled):not([aria-disabled='true']) {
+    filter: brightness(1.04);
+  }
+  .lv-button.cm-btn-gold:active:not(:disabled):not([aria-disabled='true']),
+  .lv-button.cm-btn-gold[data-busy] {
+    filter: brightness(0.93);
+    --tw-shadow: var(--clay-press);
+  }
+  .lv-button:is(.cm-btn-gold, .cm-btn-outline):is(:disabled, [aria-disabled='true']):not([data-busy]) {
+    opacity: 1;
+    filter: none;
+    color: var(--color-text-muted);
+    background: var(--clay-well-bg);
+    border-color: var(--color-border-subtle);
+  }
+  .lv-button.cm-btn-clay {
+    border-color: var(--cm-contour);
+  }
+  .lv-button.cm-btn-outline {
+    color: var(--color-gold);
+    background: var(--cm-outline-bg);
+    border: 1.5px solid var(--cm-outline-edge);
+  }
+  .lv-button.cm-btn-outline:hover:not(:disabled):not([aria-disabled='true']) {
+    border-color: var(--cm-gold-line);
+  }
+  .lv-button.cm-btn-cta {
+    min-block-size: 52px;
+    padding-inline: 1.25rem;
+    font-size: 1rem;
+  }
+  .lv-button.cm-btn-compact {
+    position: relative;
+    min-block-size: 36px;
+  }
+  .lv-button.cm-btn-compact,
+  .cm-chip,
+  .cm-tile-icon,
+  .cm-media {
+    border-radius: 12px;
+  }
+
+  /* D-3: A SELECTION IS THE SOLID SAND FILL WITH INK TEXT. The state lives
+     in the aria attribute (on the control or its parent), never only in the
+     colour: a tile adds the check badge, a thumb its shape, a knob its place. */
+  .cm-sel:is([aria-pressed='true'], [aria-checked='true'], [aria-selected='true'], [aria-current='page'], [data-selected='true']),
+  :is([aria-pressed='true'], [aria-checked='true'], [aria-selected='true']) > .cm-sel {
+    color: var(--cm-sel-ink);
+    background: var(--cm-sel-bg);
+    border-color: var(--cm-sel-edge);
+    --tw-shadow: var(--cm-sel-shadow);
+    box-shadow: var(--tw-shadow);
+  }
+
+  /* The check badge: an ink disc with a sand check in the inline-start top
+     corner of a chosen tile, over the icon well (IMG_8474, IMG_8482). */
+  .cm-check {
+    display: none;
+    inset-inline-start: 6px;
+    color: var(--cm-sel-bg);
+    background: var(--cm-sel-badge);
+  }
+  [aria-checked='true'] > .cm-check {
+    display: inline-flex;
+  }
+
+  /* A RAISED CONTROL ON A CARD: a chip, a tile, a select row. */
+  .cm-raised {
+    color: var(--color-text-primary);
+    background: var(--color-surface-raised);
+    --tw-shadow: var(--clay-lift);
+    box-shadow: var(--tw-shadow);
+    transition: background-color 150ms ease, color 150ms ease, box-shadow 100ms ease;
+  }
+  :is(button, a).cm-raised:hover:not(:disabled, [aria-disabled='true'], [aria-pressed='true'], [aria-checked='true']),
+  :is(button, a):hover > .cm-raised:not([data-selected]) {
+    background-color: var(--color-surface-selected);
+  }
+  :is(button, a).cm-raised:active:not(:disabled, [aria-disabled='true']),
+  :is(button, a):active > .cm-raised {
+    --tw-shadow: var(--clay-press);
+  }
+  .cm-raised:is(:disabled, [aria-disabled='true']),
+  :disabled > .cm-raised {
+    opacity: 0.4;
+    --tw-shadow: none;
+    cursor: not-allowed;
+  }
+
+  /* A second line and an icon well: muted and gold at rest, the ink of the
+     sand fill once chosen. */
+  .cm-sub {
+    color: var(--color-text-muted);
+  }
+  .cm-tile-icon {
+    color: var(--color-gold);
+    background: var(--color-surface-selected);
+  }
+  [aria-checked='true'] .cm-sub,
+  [aria-checked='true'] > .cm-tile-icon {
+    color: inherit;
+  }
+  [aria-checked='true'] > .cm-tile-icon {
+    background: var(--cm-gold-1);
+  }
+
+  /* The status pill: information, flat, a dot and the word. */
+  .cm-pill {
+    color: var(--pill-ink);
+    background: var(--pill-bg);
+  }
+  .cm-pill::before {
+    content: '';
+    inline-size: 7px;
+    block-size: 7px;
+    border-radius: 999px;
+    background: var(--pill-dot, var(--pill-ink));
+  }
+  .cm-pill-open { --pill-bg: var(--cm-open-bg); --pill-ink: var(--cm-open-ink); --pill-dot: var(--cm-open-dot); }
+  .cm-pill-waiting { --pill-bg: var(--cm-wait-bg); --pill-ink: var(--cm-wait-ink); }
+  .cm-pill-progress { --pill-bg: var(--cm-prog-bg); --pill-ink: var(--cm-prog-ink); --pill-dot: var(--cm-prog-dot); }
+  .cm-pill-done { --pill-bg: var(--color-surface-selected); --pill-ink: var(--color-text-secondary); --pill-dot: var(--color-text-muted); }
+  .cm-pill-cancelled { --pill-bg: var(--cm-stop-bg); --pill-ink: var(--cm-stop-ink); --pill-dot: var(--cm-stop-dot); }
+
+  /* The progress steps. */
+  .cm-steps > span {
+    background: var(--cm-step-off);
+  }
+  .cm-steps > [data-on] {
+    background: var(--cm-step-on);
+  }
+
+  /* The sunk zones: the drop zone and the add tile, a dashed edge, the gold
+     edge while a file is dragged over. */
+  .cm-drop {
+    color: var(--color-text-muted);
+    background: var(--clay-well-bg);
+    border: 1.5px dashed var(--cm-drop-edge);
+  }
+  .cm-drop[data-over] {
+    border-color: var(--cm-gold-line);
+  }
+  .cm-media[data-selected] {
+    outline: 2px solid var(--cm-gold-line);
+    outline-offset: -2px;
+  }
+
+  /* The bottom action bar: sticky over the shell bar and the safe area. */
+  .cm-dock {
+    inset-block-end: var(--shell-bottom-inset, 0px);
+    padding-block-end: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  /* The current row of a list: dimpled, with a 2px gold start bar. */
+  .cm-row[aria-current='page'] {
+    background: var(--clay-well-bg);
+    box-shadow: var(--clay-press);
+  }
+  .cm-row[aria-current='page']::before {
+    content: '';
+    position: absolute;
+    inset-block: 14px;
+    inset-inline-start: 0;
+    inline-size: 2px;
+    border-radius: 2px;
+    background: var(--color-gold);
+  }
+  .cm-field::-webkit-search-cancel-button {
+    appearance: none;
+  }
+}
+
+/* ------------------------------------------------------------ 4. re-skins */
+/* Segmented as a sand track: a raised rail, 36px options in a 44px track,
+   each still a 44px target, and the thumb the D-3 selection. */
+[data-surface='community'] .cm-seg {
+  block-size: 44px;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 14px;
+  border-color: var(--cm-contour);
+  background: var(--cm-track);
+  box-shadow: var(--clay-0);
+}
+[data-surface='community'] .cm-seg > [role='radio'] {
+  min-block-size: 0;
+  border-radius: 12px;
+  font-size: 0.875rem;
+}
+[data-surface='community'] .cm-seg > [role='radio']::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  inset-block: -4px;
+}
+[data-surface='community'] .cm-seg > [aria-checked='true'] {
+  color: var(--cm-sel-ink);
+}
+[data-surface='community'] .cm-seg [data-segmented-indicator] {
+  border-radius: 12px;
+  border-color: var(--cm-sel-edge);
+  background: var(--cm-sel-bg);
+  box-shadow: var(--cm-sel-shadow);
+}
+
+/* The quantity stepper (NumberInput kind="quantity"): a 48px well, two
+   raised 56px keys, the figure 18/700 in the middle. */
+[data-surface='community'] .cm-stepper .lv-well {
+  min-block-size: 48px;
+}
+[data-surface='community'] .cm-stepper .lv-well > button {
+  inline-size: 56px;
+  block-size: 40px;
+  border: 1px solid var(--cm-contour);
+  border-radius: 12px;
+  color: var(--color-text-primary);
+}
+[data-surface='community'] .cm-stepper input {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+/* TabStrip with the gold underline: 3px, round ends, a 1px baseline; a long
+   Sorani label wraps at 320px instead of widening the page. */
+[data-surface='community'] .cm-tabs {
+  border-block-end: 1px solid var(--color-border-subtle);
+}
+[data-surface='community'] .cm-tabs [data-tab] {
+  min-width: 0;
+  font-size: 0.9375rem;
+  white-space: normal;
+}
+[data-surface='community'] .cm-tabs [data-tab-active] {
+  font-weight: 700;
+}
+[data-surface='community'] .cm-tabs [data-tab-indicator] {
+  block-size: 3px;
+  border-radius: 999px;
+}
+
+/* Switch: ON is the sand fill with the ink knob; the knob place is the
+   non-colour cue, and the light edge keeps the track 3:1 on the cream card. */
+[data-surface='community'] .cm-switch [data-switch='on'] > span {
+  border-color: var(--cm-sel-edge);
+  background: var(--cm-sel-bg);
+}
+[data-surface='community'] .cm-switch [data-switch='on'] > span > span {
+  background: var(--cm-sel-ink);
+}
+
+/* IconButton at 40 drawn (44 hit), round or square, the danger ink. */
+[data-surface='community'] .cm-icon > [data-icon-disc] {
+  inline-size: 40px;
+  block-size: 40px;
+  border-color: var(--cm-contour);
+}
+[data-surface='community'] .cm-icon-sq > [data-icon-disc] {
+  border-radius: 12px;
+}
+[data-surface='community'] .cm-icon-danger {
+  color: var(--color-danger);
+}

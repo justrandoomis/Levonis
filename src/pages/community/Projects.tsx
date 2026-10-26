@@ -21,6 +21,7 @@ import ProjectCard, { ProjectCardSkeleton } from '../../components/community/pro
 import { POST_KINDS, projectsApi, type PostCard, type PostFilters, type PostKind } from '../../components/community/projects/api';
 import { useProjectStrings } from '../../components/community/projects/strings';
 import { useSearchBox } from '../../components/community/search/useSearchBox';
+import CommunitySurface from '../../components/community/CommunitySurface';
 
 /** The community's cross-entity search under the bar (Phase 3) — fetched the first time the box is focused. */
 const SearchOverlay = React.lazy(() => import('../../components/community/search/SearchOverlay'));
@@ -72,7 +73,7 @@ export default function ProjectsPage() {
   const newLink = isAuthenticated ? { to: '/community/projects/new' } : { to: '/auth', state: { from: '/community/projects/new' } };
 
   return (
-    <div className="min-h-screen pb-28 text-text-primary">
+    <CommunitySurface className="min-h-screen pb-28 text-text-primary">
       <div className="material scroll-edge sticky top-0 z-40 h-16 px-4">
         <div className="mx-auto flex h-full max-w-6xl items-center gap-3">
           <IconButton
@@ -170,7 +171,7 @@ export default function ProjectsPage() {
 
         <ProjectsGrid filters={{ kind, tag, q }} />
       </div>
-    </div>
+    </CommunitySurface>
   );
 }
 

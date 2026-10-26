@@ -61,6 +61,7 @@ import { offersLabel } from '../components/community/hub/copy';
 import { lazy, Suspense } from 'react';
 import { Sheet } from '../components/ui/Sheet';
 import { useTimelineStrings } from '../components/community/requests/timelineStrings';
+import CommunitySurface from '../components/community/CommunitySurface';
 const OrderTimeline = lazy(() => import('../components/community/requests/OrderTimeline'));
 
 /**
@@ -185,84 +186,86 @@ export default function Requests() {
   if (deepLinked) return null;
 
   return (
-    <div className="min-h-screen text-text-secondary pb-28">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-6">
-        <h1 className="text-text-primary font-bold text-lg mb-1">
-          {loc('طلبات العملاء', 'Customer requests', 'داواکاری کڕیاران')}
-        </h1>
-        <p className="text-text-muted text-[12.5px] mb-5">
-          {loc(
-            'اطلب شيئًا مخصصًا، واستقبل عروضًا من التجار.',
-            'Ask for something custom, and receive offers from merchants.',
-            'داوای شتێکی تایبەت بکە و ئۆفەر لە بازرگانەکانەوە وەربگرە.'
-          )}
-        </p>
+    <CommunitySurface>
+      <div className="min-h-screen text-text-secondary pb-28">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-6">
+          <h1 className="text-text-primary font-bold text-lg mb-1">
+            {loc('طلبات العملاء', 'Customer requests', 'داواکاری کڕیاران')}
+          </h1>
+          <p className="text-text-muted text-[12.5px] mb-5">
+            {loc(
+              'اطلب شيئًا مخصصًا، واستقبل عروضًا من التجار.',
+              'Ask for something custom, and receive offers from merchants.',
+              'داوای شتێکی تایبەت بکە و ئۆفەر لە بازرگانەکانەوە وەربگرە.'
+            )}
+          </p>
 
-        {/* The sections are filter chips (pressed when chosen, never an ink
-            fill); «طلب جديد» is the page's one primary. The row scrolls
-            sideways, so it pads the button's cast in rather than cutting it. */}
-        <div className="flex items-center gap-1.5 mb-3 -mt-2 py-2 overflow-x-auto hide-scrollbar">
-          {([['board', loc('كل الطلبات', 'All requests', 'هەموو داواکاریەکان')],
-             ['mine', loc('طلباتي', 'My requests', 'داواکاریەکانم')],
-             ...(user ? [['orders', loc('تنفيذ طلباتي', 'My custom orders', 'داواکاریە تایبەتەکانم')] as [View, string]] : []),
-            ] as Array<[View, string]>).map(([v, label]) => (
-            <FilterChip key={v} on={view === v} onClick={() => setView(v)}>
-              {label}
-            </FilterChip>
-          ))}
-          {(
-            <button
-              type="button"
-              onClick={() => {
-                if (closed) return;
-                if (user) setView('new');
-                else signIn();
+          {/* The sections are filter chips (pressed when chosen, never an ink
+              fill); «طلب جديد» is the page's one primary. The row scrolls
+              sideways, so it pads the button's cast in rather than cutting it. */}
+          <div className="flex items-center gap-1.5 mb-3 -mt-2 py-2 overflow-x-auto hide-scrollbar">
+            {([['board', loc('كل الطلبات', 'All requests', 'هەموو داواکاریەکان')],
+               ['mine', loc('طلباتي', 'My requests', 'داواکاریەکانم')],
+               ...(user ? [['orders', loc('تنفيذ طلباتي', 'My custom orders', 'داواکاریە تایبەتەکانم')] as [View, string]] : []),
+              ] as Array<[View, string]>).map(([v, label]) => (
+              <FilterChip key={v} on={view === v} onClick={() => setView(v)}>
+                {label}
+              </FilterChip>
+            ))}
+            {(
+              <button
+                type="button"
+                onClick={() => {
+                  if (closed) return;
+                  if (user) setView('new');
+                  else signIn();
+                }}
+                aria-disabled={closed || undefined}
+                aria-describedby={closed ? 'requests-closed-note' : undefined}
+                className="lv-button lv-button-primary lv-button-sm ms-auto shrink-0 gap-1.5"
+              >
+                <Plus className="w-4 h-4" aria-hidden="true" />
+                {loc('طلب جديد', 'New', 'نوێ')}
+              </button>
+            )}
+            {closed && (
+              <span id="requests-closed-note" className="sr-only">
+                {loc('ليفو كوميونيتي تحت الصيانة', 'Levo Community is under maintenance', `${t('community')} — ${t('maintenanceMain')}`)}
+              </span>
+            )}
+          </div>
+
+          {view === 'new' ? (
+            /* WIZARD v2 (W5-A). Four steps, a DRAFT all the way until «انشر»,
+               and «احفظ كمسودة» at any point. Finishing a draft or editing a
+               published request happens on the request's own page
+               (src/pages/community/Request.tsx); either way it is the same
+               `community_requests` row, and publishing is what notifies the
+               merchants who can make it. */
+            <RequestWizard
+              key="new"
+              initialLink={carriedLink || undefined}
+              onDone={(id, how) => {
+                // Back from the request lands on «طلباتي», where it now is.
+                navigate('/requests?view=mine', { replace: true });
+                // A request this person just PUBLISHED: its page asks about the
+                // notification channels (ChannelNudge), once — never a draft.
+                navigate(requestPath(id), how === 'published' ? { state: { published: true } } : undefined);
               }}
-              aria-disabled={closed || undefined}
-              aria-describedby={closed ? 'requests-closed-note' : undefined}
-              className="lv-button lv-button-primary lv-button-sm ms-auto shrink-0 gap-1.5"
-            >
-              <Plus className="w-4 h-4" aria-hidden="true" />
-              {loc('طلب جديد', 'New', 'نوێ')}
-            </button>
-          )}
-          {closed && (
-            <span id="requests-closed-note" className="sr-only">
-              {loc('ليفو كوميونيتي تحت الصيانة', 'Levo Community is under maintenance', `${t('community')} — ${t('maintenanceMain')}`)}
-            </span>
+              onCancel={() => setView('board')}
+            />
+          ) : view === 'orders' ? (
+            <MyCommunityOrders />
+          ) : view === 'mine' ? (
+            <MyRequestsList onOpen={openRequestId} />
+          ) : (
+            // A PLUS member with no store yet has no workshop: «مناسب لي» is the
+            // workshop's board, and it answered them 404.
+            <RequestList onOpen={openRequest} canOffer={!!me?.store && !!me?.can.offers} onClosed={setClosed} />
           )}
         </div>
-
-        {view === 'new' ? (
-          /* WIZARD v2 (W5-A). Four steps, a DRAFT all the way until «انشر»,
-             and «احفظ كمسودة» at any point. Finishing a draft or editing a
-             published request happens on the request's own page
-             (src/pages/community/Request.tsx); either way it is the same
-             `community_requests` row, and publishing is what notifies the
-             merchants who can make it. */
-          <RequestWizard
-            key="new"
-            initialLink={carriedLink || undefined}
-            onDone={(id, how) => {
-              // Back from the request lands on «طلباتي», where it now is.
-              navigate('/requests?view=mine', { replace: true });
-              // A request this person just PUBLISHED: its page asks about the
-              // notification channels (ChannelNudge), once — never a draft.
-              navigate(requestPath(id), how === 'published' ? { state: { published: true } } : undefined);
-            }}
-            onCancel={() => setView('board')}
-          />
-        ) : view === 'orders' ? (
-          <MyCommunityOrders />
-        ) : view === 'mine' ? (
-          <MyRequestsList onOpen={openRequestId} />
-        ) : (
-          // A PLUS member with no store yet has no workshop: «مناسب لي» is the
-          // workshop's board, and it answered them 404.
-          <RequestList onOpen={openRequest} canOffer={!!me?.store && !!me?.can.offers} onClosed={setClosed} />
-        )}
       </div>
-    </div>
+    </CommunitySurface>
   );
 }
 

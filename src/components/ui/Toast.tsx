@@ -193,6 +193,11 @@ export function Toaster({ aboveNav = false }: { aboveNav?: boolean } = {}) {
 
   if (typeof document === 'undefined' || !drawing) return null;
   const visible = list.slice(0, VISIBLE);
+  // The shell mounts this outside every page, so a toast raised on a themed
+  // page (the community scope root, `.cm-surface`) copies the stamp of that root
+  // when it renders, and paints in the scope tokens (./Overlay.tsx SurfaceContext).
+  const scope = document.querySelector('.cm-surface');
+  const surface = scope instanceof HTMLElement ? { 'data-surface': scope.dataset.surface, 'data-theme': scope.dataset.theme } : null;
   const paused = hovered || focusedIn || hidden;
   const closeLabel = loc('إغلاق', 'Dismiss', 'داخستن');
 
@@ -201,6 +206,7 @@ export function Toaster({ aboveNav = false }: { aboveNav?: boolean } = {}) {
       <section
         aria-label={loc('الإشعارات', 'Notifications', 'ئاگادارکردنەوەکان')}
         data-toaster
+        {...surface}
         onPointerEnter={() => setHovered(true)}
         onPointerLeave={() => setHovered(false)}
         onFocus={() => setFocusedIn(true)}

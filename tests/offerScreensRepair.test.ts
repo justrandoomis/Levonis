@@ -249,6 +249,11 @@ const { LanguageProvider } = await import('../src/LanguageContext');
 const { WalletProvider } = await import('../src/WalletContext');
 const { CurrencyProvider } = await import('../src/CurrencyContext');
 const { MemoryRouter } = await import('react-router-dom');
+// The request page is stamped with the community scope (community UI plan
+// B1), whose root imports its lazy stylesheet; Node cannot load a .css file,
+// so a sheet resolves to an empty module here (Vite serves it in the app).
+const { register } = await import('node:module');
+register(`data:text/javascript,${encodeURIComponent("export async function load(url, context, next) { return url.endsWith('.css') ? { format: 'module', source: '', shortCircuit: true } : next(url, context); }")}`);
 const { AcceptedOffer } = await import('../src/pages/community/Request');
 const { SubstitutionText } = await import('../src/components/community/requests/SubstitutionText');
 const { apiRefusal } = await import('../src/lib/refusalStrings');

@@ -37,6 +37,7 @@ import ActionRow from '../../components/community/social/ActionRow';
 import FollowUserButton from '../../components/community/social/FollowUserButton';
 import { LinkRow } from '../../components/community/links/LinkCard';
 import VariantImg from '../../components/ui/VariantImg';
+import CommunitySurface from '../../components/community/CommunitySurface';
 
 /** «قد يعجبك» — other pieces on the same material, printer or tags (Phase 3), a lazy rail below the doors. */
 const RecommendRail = React.lazy(() => import('../../components/community/search/RecommendRail'));
@@ -141,7 +142,7 @@ export default function ProjectPage() {
   ) : null;
 
   return (
-    <div className="min-h-screen pb-8 text-text-primary">
+    <CommunitySurface className="min-h-screen pb-8 text-text-primary">
       <div className="material scroll-edge sticky top-0 z-40 h-14 px-4">
         <div className="mx-auto flex h-full max-w-3xl items-center gap-2">
           <IconButton
@@ -311,7 +312,7 @@ export default function ProjectPage() {
         </div>
       )}
       {confirmDialog}
-    </div>
+    </CommunitySurface>
   );
 }
 

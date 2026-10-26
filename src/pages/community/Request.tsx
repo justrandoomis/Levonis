@@ -86,6 +86,7 @@ import { Skeleton, SkeletonGroup } from '../../components/ui/Skeleton';
 import { useToast } from '../../components/ui/Toast';
 import { CommunityLoadError } from './access';
 import { approvalGateText } from '../../lib/approvalGate';
+import CommunitySurface from '../../components/community/CommunitySurface';
 
 /** The wizard finishes a draft or edits the request in place (a lazy chunk: most visitors never edit). */
 const RequestWizard = lazy(() => import('../../components/community/requests/RequestWizard'));
@@ -210,40 +211,42 @@ export default function RequestPage() {
   const nudge = <ChannelNudge context="request" active={requestJustCreated} />;
 
   return (
-    <>
-      {editing ? (
-        <div className="min-h-screen pb-28 text-text-primary" data-request-editing={id}>
-          <TopBar onBack={() => setEditing(false)} kicker={s.editRequest} />
-          <div className="mx-auto max-w-2xl px-4 pt-4">
-            <Suspense fallback={<PageSkeleton />}>
-              <RequestWizard
-                key={id}
-                requestId={id}
-                onDone={(_rid, how) => {
-                  setEditing(false);
-                  setVersion((v) => v + 1);
-                  if (how === 'published') setRequestJustCreated(true);
-                }}
-                onCancel={() => setEditing(false)}
-              />
-            </Suspense>
+    <CommunitySurface>
+      <>
+        {editing ? (
+          <div className="min-h-screen pb-28 text-text-primary" data-request-editing={id}>
+            <TopBar onBack={() => setEditing(false)} kicker={s.editRequest} />
+            <div className="mx-auto max-w-2xl px-4 pt-4">
+              <Suspense fallback={<PageSkeleton />}>
+                <RequestWizard
+                  key={id}
+                  requestId={id}
+                  onDone={(_rid, how) => {
+                    setEditing(false);
+                    setVersion((v) => v + 1);
+                    if (how === 'published') setRequestJustCreated(true);
+                  }}
+                  onCancel={() => setEditing(false)}
+                />
+              </Suspense>
+            </div>
           </div>
-        </div>
-      ) : (
-        <RequestDetail
-          // Keyed on the request: another request never inherits this one's offers, files or answers.
-          key={id}
-          request={{ id }}
-          me={me ?? null}
-          meReady={me !== undefined}
-          version={version}
-          onBack={goBack}
-          onEdit={() => setEditing(true)}
-          onNewRequest={() => (user ? navigate('/requests?view=new') : signIn())}
-        />
-      )}
-      {nudge}
-    </>
+        ) : (
+          <RequestDetail
+            // Keyed on the request: another request never inherits this one's offers, files or answers.
+            key={id}
+            request={{ id }}
+            me={me ?? null}
+            meReady={me !== undefined}
+            version={version}
+            onBack={goBack}
+            onEdit={() => setEditing(true)}
+            onNewRequest={() => (user ? navigate('/requests?view=new') : signIn())}
+          />
+        )}
+        {nudge}
+      </>
+    </CommunitySurface>
   );
 }
 

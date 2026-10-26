@@ -41,6 +41,7 @@ import { useSocial } from '../../components/community/social/SocialContext';
 import { followersLabel, socialLang, useSocialStrings } from '../../components/community/social/strings';
 import { dateLocale } from '../../components/orders/format';
 import VariantImg from '../../components/ui/VariantImg';
+import CommunitySurface from '../../components/community/CommunitySurface';
 
 const TABS = ['projects', 'posts', 'about'] as const;
 type Tab = (typeof TABS)[number];
@@ -154,7 +155,7 @@ export default function CreatorPage() {
   const notFound = error instanceof ApiError && error.status === 404;
 
   return (
-    <div className="min-h-screen pb-28 text-text-primary">
+    <CommunitySurface className="min-h-screen pb-28 text-text-primary">
       <div className="material scroll-edge sticky top-0 z-40 h-14 px-4">
         <div className="mx-auto flex h-full max-w-3xl items-center gap-2">
           <IconButton
@@ -298,7 +299,7 @@ export default function CreatorPage() {
       </div>
       {creator && <ReportSheet open={reporting} onClose={() => setReporting(false)} target={{ type: 'user', id: creator.id }} />}
       {confirmDialog}
-    </div>
+    </CommunitySurface>
   );
 }
 
