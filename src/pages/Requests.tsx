@@ -5,10 +5,10 @@
  * money is held until the work is done.
  *
  * WHAT THIS PAGE SHOWS AND DOES NOT. The board is public, so it shows the JOB
- * — title, quantity, material, budget, governorate — and a display name. It
- * never shows a phone, an email or an address, and that is enforced by the
- * server's SELECT list rather than by this page choosing what to render
- * (§24). If this component asked for more, it would not get it.
+ * — title, quantity, material, governorate — and never a phone, an email, an
+ * address or the budget (Q2: private by default, never on the public board).
+ * That is enforced by the server whitelist rather than by this page choosing
+ * what to render (§24). If this component asked for more, it would not get it.
  *
  * ACCEPTING AN OFFER MOVES MONEY, so the confirmation says so plainly: the
  * amount leaves the customer's available balance and is HELD, not paid, and
@@ -466,11 +466,6 @@ function AllRequests({
           <p className="text-text-secondary text-[12.5px] line-clamp-2 leading-relaxed mb-2.5">{r.description}</p>
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11.5px] text-text-muted">
-            {r.budget_iqd !== null && (
-              <span className="text-gold font-semibold" dir="ltr">
-                {loc('الميزانية', 'Budget', 'بودجە')}: {iqd(r.budget_iqd)}
-              </span>
-            )}
             {r.quantity > 1 && <span>×{r.quantity}</span>}
             {r.material && <span>{r.material}</span>}
             {r.governorate && (

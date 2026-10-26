@@ -1,9 +1,10 @@
 /**
  * A PRINT REQUEST ON THE BOARD, as a card that opens it.
  *
- * It says what the job IS — how many, in what, for how much, where, by when —
- * and how many offers it has, because that is what decides whether a workshop
- * taps it. The card used to say «بانتظار العروض» over every request, including
+ * It says what the job IS — how many, in what, where, by when — and how many
+ * offers it has, because that is what decides whether a workshop taps it.
+ * Never the budget (Q2): it is private by default and the public board never
+ * carries it, so the card has no cell for it at all. The card used to say «بانتظار العروض» over every request, including
  * one that already had three, and led nowhere: the request's own page
  * (`/requests/<id>`, where offers are made and compared) was never linked
  * from here. Its OWN address — not the board's old `/requests?request=`,
@@ -22,7 +23,6 @@
 import { Link } from 'react-router-dom';
 import { CalendarClock, MapPin, Paperclip } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
-import { useMoney } from '../../../CurrencyContext';
 import { GOVERNORATE_LABELS } from '../../../lib/governorates';
 import { offersLabel, shortDate, timeAgo } from './copy';
 import { fill, useHubStrings } from './strings';
@@ -34,7 +34,6 @@ const CHIP = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-
 export default function RequestCard({ request: r, compact = false }: { request: CommunityRequest; compact?: boolean }) {
   const { lang, loc } = useLanguage();
   const s = useHubStrings();
-  const { money } = useMoney();
   const place = r.governorate ? GOVERNORATE_LABELS[r.governorate]?.[lang] ?? '' : '';
   const offers = r.offer_count ?? 0;
   const deadline = shortDate(r.deadline, lang);
@@ -55,11 +54,6 @@ export default function RequestCard({ request: r, compact = false }: { request: 
           {w}
         </span>
       ))}
-      {r.budget_iqd != null && r.budget_iqd > 0 && (
-        <span className={`${CHIP} font-semibold text-gold`}>
-          {loc('الميزانية', 'Budget', 'بودجە')}: <bdi className="tabular-nums">{money(r.budget_iqd)}</bdi>
-        </span>
-      )}
       {(r.quantity ?? 1) > 1 && (
         <span className={`${CHIP} tabular-nums`}>
           {ofParts && <>{loc('الأطقم', 'Sets', 'سێت')}: </>}
