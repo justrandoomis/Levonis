@@ -13,7 +13,9 @@ pricing measures. Received V2-priced goods sold only direct do not need a
 supplier freight estimate. Empty tracked direct-only selections do not hold
 available V2 selections. Images, category, name and genuine pricing gaps remain
 required. Completeness version 2 refreshes existing verdicts, and price, shelf,
-stock and colour-measure changes invalidate them.
+stock and colour-measure changes invalidate them. Confirming a receipt immediately
+recomputes the touched products and purges visibility when a hold clears; the
+owner's listing and summary both wait for the bounded initial recovery.
 
 Migration 0214 snapshots existing cost-mode, active, received products whose
 latest data-only pricing save came from the price editor and which have no

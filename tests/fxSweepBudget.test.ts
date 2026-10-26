@@ -63,6 +63,8 @@ import { writeV2 } from './fixtures/pricingV2';
 const SWEEP_FIRST = /FROM product_pricing_state s JOIN products p ON p\.id = s\.product_id\s+WHERE s\.mode = 'engine'/;
 /** The search-index catch-up's first statement (jobs.ts `catchUpSearchIndex`): no other quarter-hour job runs it. */
 const CATCH_UP_FIRST = 'PRAGMA table_info("search_tokens")';
+/** One-time saved-price repair runs after repricing and has its own bounded share. */
+const RECEIVED_RECOVERY_FIRST = /^SELECT product_id, inputs_seq, write_seq FROM pricing_received_recovery/;
 /**
  * The completeness catch-up's first statement (productCompleteness.ts `sweepCompleteness`, after the engine
  * sweep): its presence probe on the tick's counted binding, or its facts read once the table is known.
@@ -151,13 +153,15 @@ async function tick(raw: DatabaseSync) {
   const stop = svc === -1 ? tail : svc;
   const last = d1.log.slice(0, stop).findIndex((sql) => COMPLETENESS_FIRST.test(sql));
   const end = last === -1 ? stop : last;
-  const first = d1.log.slice(0, end).findIndex((sql) => SWEEP_FIRST.test(sql));
-  const jobs = first === -1 ? end : first;
+  const recovery = d1.log.slice(0, end).findIndex((sql) => RECEIVED_RECOVERY_FIRST.test(sql));
+  const sweepEnd = recovery === -1 ? end : recovery;
+  const first = d1.log.slice(0, sweepEnd).findIndex((sql) => SWEEP_FIRST.test(sql));
+  const jobs = first === -1 ? sweepEnd : first;
   // The tick's own jobs end where the catch-up's probe begins (it runs once, after them, or not at all).
   const probes = d1.log.flatMap((sql, i) => (sql === CATCH_UP_FIRST ? [i] : []));
   assert.ok(probes.length <= 1, 'the catch-up probe runs once a tick, and no other job runs it');
   const own = probes.length === 1 && probes[0] < jobs ? probes[0] : jobs;
-  return { total: d1.log.length, own, catchUp: jobs - own, jobs, sweep: end - jobs, completeness: stop - end, services: tail - stop, requestModel: d1.log.length - tail, log: d1.log, errors };
+  return { total: d1.log.length, own, catchUp: jobs - own, jobs, sweep: sweepEnd - jobs, recovery: end - sweepEnd, completeness: stop - end, services: tail - stop, requestModel: d1.log.length - tail, log: d1.log, errors };
 }
 
 // ------------------------------------------------------------- the world, every job at its bound
@@ -346,12 +350,14 @@ test('the usual tick at its bounds — 200 upload sessions expired and 200 delet
   assert.ok(withSweep.total <= Math.max(withSweep.jobs, D1_INVOCATION_STATEMENT_LIMIT - QUARTER_HOUR_RESERVE));
   assert.equal(withSweep.jobs, without.jobs, `the jobs executed the same statements with and without sweep work (${withSweep.jobs} / ${without.jobs})`);
   assert.ok(without.sweep <= 4, `nothing stale: one indexed read and the rates (${without.sweep})`);
+  assert.ok(without.recovery <= 2, 'no saved receipt prices or old holds: two indexed recovery reads');
+  assert.ok(withSweep.recovery <= Math.min(200, quarterHourSearchBudget(withSweep.jobs + withSweep.sweep)), 'recovery spends only what the preceding jobs left');
   // The sweep's first statement comes after every job's last: it ran LAST.
   assert.ok(withSweep.log.slice(withSweep.jobs).every((sql) => !/upload_sessions|finance_staff_reconciliations|FROM outbox|search_tokens/.test(sql)));
   // The completeness catch-up (0184) after the sweep, within its own share of what the sweep left.
-  const completenessShare = quarterHourCompletenessBudget(withSweep.jobs + withSweep.sweep);
+  const completenessShare = quarterHourCompletenessBudget(withSweep.jobs + withSweep.sweep + withSweep.recovery);
   assert.ok(withSweep.completeness <= completenessShare && completenessShare <= COMPLETENESS_TICK_BUDGET, `the completeness catch-up spent ${withSweep.completeness} of its ${completenessShare}`);
-  const lateSweep = withSweep.log.slice(withSweep.jobs + withSweep.sweep).filter((sql) => /(?:INSERT INTO|UPDATE) pricing_(?:sku_costs|v2_sku_results)|upload_sessions|FROM outbox|search_tokens/.test(sql));
+  const lateSweep = withSweep.log.slice(withSweep.jobs + withSweep.sweep + withSweep.recovery).filter((sql) => /(?:INSERT INTO|UPDATE) pricing_(?:sku_costs|v2_sku_results)|upload_sessions|FROM outbox|search_tokens/.test(sql));
   assert.deepEqual(lateSweep, [], 'nothing of the sweep or the jobs after the completeness catch-up began');
   // The services sweep (S-P2) last of all, within its own share of what everything before it left.
   const servicesShare = quarterHourServicesBudget(withSweep.total - withSweep.services);

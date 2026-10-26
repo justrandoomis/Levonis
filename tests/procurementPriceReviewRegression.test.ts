@@ -25,10 +25,10 @@ const { EarningsAvailable } = await import('../src/components/financePeople/MyEa
 
 const selection = { product_id: AMS, scope: 'option' as const, scope_id: AMS_MODEL, label: 'Selected model' };
 
-test('a saved selection keeps its canonical USD/IQD quote and profit when other models still prevent publication', async () => {
+test('a saved selection keeps its canonical USD/IQD quote and profit when other stocked models still prevent publication', async () => {
   const w = pricingWorld();
   const group = w.raw.prepare('SELECT group_id FROM product_option_values WHERE id=?').get(AMS_MODEL)!.group_id!;
-  w.raw.prepare("INSERT INTO product_option_values(id,product_id,group_id,name_en,active,stock) VALUES ('unpriced-other',?,?,'Other',1,0)").run(AMS, group);
+  w.raw.prepare("INSERT INTO product_option_values(id,product_id,group_id,name_en,active,stock) VALUES ('unpriced-other',?,?,'Other',1,1)").run(AMS, group);
   w.raw.prepare("INSERT INTO product_option_fulfillment(id,product_id,option_id,fulfillment_type,enabled) VALUES ('other-direct',?,'unpriced-other','direct_sale',1)").run(AMS);
   const path = '/api/admin/pricing/procurement/line-pricing';
   const draft = w.draft();

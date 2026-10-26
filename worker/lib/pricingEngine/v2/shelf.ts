@@ -94,6 +94,12 @@ const SCOPE_OF_MODE: Readonly<Record<InventoryMode, ShelfIdentity['scope']>> = {
   VARIANT_COMBINATION: 'variant',
 };
 
+/** Received units in the product's current stock scope; contains no monetary value. */
+export const receivedShelfExistsSql = (product: string): string => `EXISTS (
+  SELECT 1 FROM inventory_lots l WHERE l.product_id=${product}.id AND l.qty_remaining>0
+    AND l.scope=CASE ${product}.inventory_mode WHEN 'OPTION' THEN 'option' WHEN 'COLOR' THEN 'color'
+      WHEN 'VARIANT_COMBINATION' THEN 'variant' ELSE 'base' END )`;
+
 const CHUNK = 50;
 const isMissing = (e: unknown): boolean => /no such (table|column)/i.test(e instanceof Error ? e.message : String(e));
 const whole = (v: unknown): number | null => {

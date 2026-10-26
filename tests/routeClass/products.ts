@@ -50,6 +50,7 @@ export default {
         'POST /:id/purchase-review/:reviewId/preview': { cls: 'cost_read', why: 'the review’s price change: prices in memory, writes nothing; POST only for its path' },
         'POST /:id/purchase-review/:reviewId/apply': { cls: 'cost_write', why: 'one V2 batch: the purchase’s cost inputs, the prices they move and the review marked applied' },
         'POST /:id/purchase-review/:reviewId/dismiss': { cls: 'cost_write', why: '«أبقِ التكلفة الحالية»: the review is dismissed, nothing else moves' },
+        'POST /pricing/recover-received': { cls: 'cost_write', body: {}, why: 'owner-authorized recovery of unchanged saved prices in the one-time received-stock snapshot' },
         // «ناقص» / «إخفاء المنتجات الناقصة عن الزبائن» (owner brief 2026-10-10,
         // worker/routes/adminCompleteness.ts): every admin reads a product's
         // missing fields (a non-owner reads one OWNER_DATA item for the private

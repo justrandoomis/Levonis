@@ -6,7 +6,8 @@
 import { fence } from '../../operations';
 import { importStockNotConfigured } from '../../importStock';
 import { COMPLETENESS_LIST_VERSION, recomputeCompleteness, recomputeCost } from '../../productCompleteness';
-import type { StatementBudget } from '../../fx/budget';
+import type { RepriceBudget } from '../autoReprice';
+import { receivedShelfExistsSql } from './shelf';
 import { loadV2Read } from './api';
 import { evaluateV2Write, storedDesired } from './evaluate';
 import { v2WriteStatements, V2_PRICING_STATEMENT_CAP } from './write';
@@ -14,7 +15,7 @@ import { v2WriteStatements, V2_PRICING_STATEMENT_CAP } from './write';
 type Pending = { product_id: string; inputs_seq: number; write_seq: number };
 const READ_ROOM = 60; // V2 reads, installation probes and writer preparation, including a cold binding.
 
-export async function recoverReceivedPricing(db: D1Database, budget: StatementBudget): Promise<{ recovered: string[]; refreshed: number; skipped: number; slugs: string[] }> {
+export async function recoverReceivedPricing(db: D1Database, budget: RepriceBudget): Promise<{ recovered: string[]; refreshed: number; skipped: number; slugs: string[] }> {
   const report = { recovered: [] as string[], refreshed: 0, skipped: 0, slugs: [] as string[] };
   if (!budget.spend(1)) return report;
   let pending: Pending[];
@@ -77,7 +78,7 @@ export async function recoverReceivedPricing(db: D1Database, budget: StatementBu
       JOIN product_pricing_state s ON s.product_id=p.id AND s.mode='engine' AND s.pricing_method IN ('cost','usd')
       JOIN product_completeness pc ON pc.product_id=p.id AND pc.list_version < ?
       WHERE p.status='active' AND COALESCE(p.composition,'')=''
-        AND EXISTS (SELECT 1 FROM inventory_lots l WHERE l.product_id=p.id AND l.qty_remaining>0)
+        AND ${receivedShelfExistsSql('p')}
       ORDER BY p.id LIMIT ?`).bind(COMPLETENESS_LIST_VERSION, n).all<{ id: string }>()).results ?? [];
     if (rows.length) {
       budget.spend(1 + recomputeCost(rows.length));

@@ -362,20 +362,23 @@ export default function AdminProducts() {
   const pMin = priceMinQ !== '' ? Number(priceMinQ) || 0 : band?.min;
   const pMax = priceMaxQ !== '' ? Number(priceMaxQ) || 0 : band?.max;
 
+  const recoverReceived = useCallback(async () => {
+    if (!user?.is_owner) return;
+    receivedRecoveryRef.current ??= (async () => {
+      for (let i = 0; i < 3; i++) {
+        const r = await api.post<{ recovered: number; refreshed: number }>('/api/admin/products-v2/pricing/recover-received', {});
+        if (!r.recovered && !r.refreshed) break;
+      }
+    })().catch(() => { /* The bounded scheduled repair also retries. Listing remains available. */ });
+    await receivedRecoveryRef.current;
+  }, [user?.is_owner]);
+
   const load = useCallback(async () => {
     const seq = ++seqRef.current;
     setLoading(true);
     setLoadErr(null);
     try {
-      if (user?.is_owner) {
-        receivedRecoveryRef.current ??= (async () => {
-          for (let i = 0; i < 3; i++) {
-            const r = await api.post<{ recovered: number; refreshed: number }>('/api/admin/products-v2/pricing/recover-received', {});
-            if (!r.recovered && !r.refreshed) break;
-          }
-        })().catch(() => { /* The bounded scheduled repair also retries. Listing remains available. */ });
-        await receivedRecoveryRef.current;
-      }
+      await recoverReceived();
       const params = new URLSearchParams();
       params.set('limit', String(limit));
       params.set('offset', String((page - 1) * limit));
@@ -409,15 +412,15 @@ export default function AdminProducts() {
       if (seq === seqRef.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, status, brand, catalog, stockF, pMin, pMax, days, featuredOnly, incompleteOnly, requestedOnly, needsPricingOnly, sort, page, limit, user?.is_owner]);
+  }, [query, status, brand, catalog, stockF, pMin, pMax, days, featuredOnly, incompleteOnly, requestedOnly, needsPricingOnly, sort, page, limit, recoverReceived]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   const loadAux = useCallback(() => {
-    api
-      .get<AdminProductsStats>('/api/admin/products-v2/stats')
+    recoverReceived()
+      .then(() => api.get<AdminProductsStats>('/api/admin/products-v2/stats'))
       .then((d) => {
         setStats(d);
         // The banner's count: what customers SEE without a price — never a composition or a product hidden
@@ -431,7 +434,7 @@ export default function AdminProducts() {
     api.get<{ catalogs: Array<{ id: string; name_ar?: string; name?: string }> }>('/api/admin/taxonomy/catalogs')
       .then((d) => setCatalogs(d.catalogs ?? []))
       .catch(() => {});
-  }, []);
+  }, [recoverReceived]);
   useEffect(loadAux, [loadAux]);
 
   const reloadAll = useCallback(() => {

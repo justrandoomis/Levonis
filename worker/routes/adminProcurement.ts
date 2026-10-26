@@ -11,6 +11,7 @@ import { audit, auditStatements } from '../lib/audit';
 import { requireSelection, productSelections } from '../lib/inventorySelection';
 import { planProcurementImportStock } from '../lib/procurementImportStock';
 import { planProcurementReceivingStock } from '../lib/procurementReceivingStock';
+import { afterProductsChanged } from '../lib/completenessHooks';
 import { planReceive, type IncomingRow } from '../lib/inventoryReceiving';
 import {
   baghdadDay,
@@ -1079,6 +1080,7 @@ adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
   statements.push(...(await arrivedBells(c, id, [...receivedProducts])));
   await commitPurchase(c.env.DB, d.purchase, statements);
   await audit(c.env.DB, user.id, 'purchase.received', id, { event_id: eventId });
+  await afterProductsChanged(c, [...receivedProducts]);
   // The owner's own answer names the products whose review of this purchase waits (ids and states, never a figure).
   return c.json({ success: true, ...(isOwner(c.env, user) ? { price_reviews: await priceReviewsOf(c.env.DB, id) } : {}) });
 });

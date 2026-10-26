@@ -66,6 +66,7 @@ export const OWNED_TABLES: OwnedTable[] = [
   // of those triggers off for the rest of THIS batch, so a deletion goes
   // through exactly as for a manual product. Nothing else ever deletes it.
   { table: 'product_pricing_state', by: { column: 'product_id' } },
+  { table: 'pricing_received_recovery', by: { column: 'product_id' } },
   // ---- the relational product model -------------------------------------
   // Link rows first: they name a group, an option value AND a colour.
   {
@@ -1046,7 +1047,7 @@ export async function blockingReferences(db: DeletionDb, productId: string): Pro
 const ENGINE_PRIVATE_TABLES: ReadonlySet<string> = new Set([
   'product_pricing_state', 'pricing_inputs', 'pricing_rules', 'pricing_sku_costs', 'pricing_direct_purchase',
   'pricing_price_points', 'pricing_preorder_discounts', 'pricing_v2_sku_results', 'pricing_legacy_snapshots',
-  'pricing_v2_purchase_reviews',
+  'pricing_v2_purchase_reviews', 'pricing_received_recovery',
 ]);
 
 /**

@@ -77,7 +77,10 @@ test('the FX module is imported only by the cron, the pricing workspace, the pub
   for (const f of ['worker/routes/misc.ts', 'worker/routes/products.ts', 'worker/routes/adminProducts.ts']) {
     const src = worker.find((w) => w.f === f)!.src;
     const fx = [...src.matchAll(/from\s+['"]([^'"]*\/fx\/[^'"]+)['"]/g)].map((m) => m[1]);
-    assert.deepEqual(fx, ['../lib/fx/displayRate'], f);
+    // The owner's bounded receipt-price recovery uses the statement counter,
+    // which reads no currency and changes no exchange rate.
+    assert.deepEqual(fx.sort(), (f === 'worker/routes/adminProducts.ts'
+      ? ['../lib/fx/displayRate', '../lib/fx/budget'] : ['../lib/fx/displayRate']).sort(), f);
   }
 });
 

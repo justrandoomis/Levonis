@@ -133,6 +133,7 @@ test('received cost and price writes invalidate old completeness verdicts', asyn
 
 test('pricing an incoming imported choice publishes only its saved price and receives quantity only on receipt', async () => {
   const w = await world(true, true);
+  assert.equal(w.raw.prepare('SELECT held FROM product_completeness WHERE product_id=?').get(pid)?.held, 0, 'receipt clears the old missing-cost/package hold immediately');
   assert.equal(w.raw.prepare('SELECT stock FROM product_colors WHERE id=?').get(selection.scope_id)?.stock, 2);
   assert.equal(w.raw.prepare('SELECT stock FROM product_colors WHERE id=?').get(`${pid}_c1`)?.stock, 0);
   assert.equal(w.raw.prepare('SELECT COUNT(*) AS n FROM pricing_v2_sku_results WHERE product_id=?').get(pid)?.n, 1);

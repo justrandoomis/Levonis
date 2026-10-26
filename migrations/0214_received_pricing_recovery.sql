@@ -23,4 +23,4 @@ SELECT s.product_id, s.inputs_seq, s.write_seq
    AND EXISTS (SELECT 1 FROM inventory_lots l WHERE l.product_id = p.id AND l.qty_remaining > 0
      AND l.unit_cost_iqd IS NOT NULL
      AND l.scope = CASE p.inventory_mode WHEN 'OPTION' THEN 'option' WHEN 'COLOR' THEN 'color'
-       WHEN 'VARIANT_COMBINATION' THEN 'variant' ELSE 'base' END);
+       WHEN 'VARIANT_COMBINATION' THEN 'variant' ELSE 'base' END );
