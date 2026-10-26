@@ -116,6 +116,13 @@ import { merchantCatalogRoutes } from './routes/merchantCatalog';
 // Files on products (§9.4): the merchant's editor and the shopfront's list/viewer/download.
 import { merchantProductFileRoutes, publicProductFileRoutes } from './routes/productFiles';
 import { adminPrintQuoteRoutes, printQuoteRoutes } from './routes/printQuote';
+// LEVONIS PRINT CLOUD (docs/PRINT_CLOUD.md): the public and customer API, the
+// workshop agent's door, the administration API, and the durable background
+// runner the quarter-hour tick drives.
+import { printCloudRoutes } from './routes/printCloud';
+import { printCloudAgentRoutes } from './routes/printCloudAgent';
+import { adminPrintCloudRoutes } from './routes/printCloudAdmin';
+import { printCloudTick } from './lib/printCloud/background';
 import { membershipsRoutes } from './routes/memberships';
 import { telegramRoutes } from './routes/telegram';
 import { invoiceRoutes } from './routes/invoices';
@@ -503,6 +510,13 @@ app.route('/api/farm', farmRoutes);
 // same reason the farm is, and it carries no requireAuth of its own: a guest
 // may upload and be quoted, and each route states its own guard.
 app.route('/api/print-quote', printQuoteRoutes);
+// LEVONIS PRINT CLOUD. Before the '/api' misc catch-all for the same reason
+// the farm is. The workshop agent's door FIRST: its prefix lies inside the
+// customer API's, and the customer router's session gate must never answer an
+// agent's bearer-token request. Each router carries its own host, schema and
+// enabled gates (worker/lib/printCloud/http.ts) — never a merchant storefront.
+app.route('/api/print-cloud/v1/agent', printCloudAgentRoutes);
+app.route('/api/print-cloud/v1', printCloudRoutes);
 // «المقارنة» — comparing two machines on the shop's own spec sheet. Mounted
 // before the '/api' misc catch-all for the same reason the farm is, and
 // deliberately with NO auth of its own: a comparison is a reason to visit the
@@ -579,6 +593,9 @@ app.route('/api/admin/community', adminCommunityRoutes);
 app.route('/api/admin/merchant-applications', adminMerchantApplicationRoutes);
 // The printer-model economics editor (Admin → مجتمع ليفو → تسعير الطباعة).
 app.route('/api/admin/print-quote', adminPrintQuoteRoutes);
+// Print Cloud administration: the workshop operator (assistant admin), money
+// (full admin) and cost (owner) doors, each declared on its route.
+app.route('/api/admin/print-cloud', adminPrintCloudRoutes);
 // «الرسائل» in the support console: the shop's order threads and the three
 // waiting counts. Under /api/admin/* so the apex-only guard covers it, with its
 // own requireAdmin inside.
@@ -1399,6 +1416,11 @@ export default {
         .catch((error) => {
           console.error('scheduled request-model cache rejected:', error instanceof Error ? error.name : 'unknown');
         })
+        // LAST (DECISIONS row 270): Print Cloud's durable background work — order and
+        // credit expiry, file analysis, URL imports, the scheduler, slicing leases,
+        // low-balance notices, the daily reconciliation. A task starts only while what
+        // the steps above left keeps 150 statements in hand. Never throws.
+        .then(() => printCloudTick(tickEnv, { limit: 8, canContinue: () => used() < QUARTER_HOUR_TICK_LIMIT - 150 }))
     );
   },
 };

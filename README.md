@@ -64,6 +64,7 @@ the resources and secrets described there.
 ## Documentation
 
 - `docs/FEATURE_MATRIX.md` — every route/control, its behavior and status
+- `docs/PRINT_CLOUD.md` — Levonis Print Cloud (cloud.levonis-iq.com): remote printer rental backend, API, roles, adapters, what is not connected
 - `docs/SECURITY.md` — security model, fixed vulnerabilities, remaining risks
 - `docs/CLEANUP.md` — what was removed from the original project and why
 - `docs/CLOUDFLARE_SETUP.md` — Phase 2 configuration + Phase 3 deployment

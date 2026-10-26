@@ -28,3 +28,14 @@ ANTHROPIC_API_KEY=
 # key). Any value works locally. Never commit a real value; on the live Worker
 # it is a dashboard SECRET that no workflow puts or deletes.
 SECURITY_CANARY_KEY=
+
+# Levonis Print Cloud (docs/PRINT_CLOUD.md §13.1). All optional.
+# DEVELOPMENT ONLY: 'on' lets a customer pay their own order from the API
+# (POST /api/print-cloud/v1/orders/:id/dev-pay). Never set it on a deployed Worker.
+PRINT_CLOUD_DEV_PAYMENTS=
+# HMAC secret (>= 32 chars) of the payment-gateway webhook; without it the
+# gateway adapter is off. On the live Worker it is a dashboard SECRET.
+PRINT_CLOUD_PAYMENT_WEBHOOK_SECRET=
+# Signs short-lived model download links (>= 32 chars); without it signed
+# links are refused and owners download directly.
+PRINT_CLOUD_FILE_URL_SECRET=

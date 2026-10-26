@@ -87,6 +87,9 @@ import { adminFinanceReportRoutes } from '../../worker/routes/adminFinanceReport
 import { financeEarningsRoutes } from '../../worker/routes/financeEarnings';
 import { farmAdminRoutes } from '../../worker/routes/farmAdmin';
 import { adminPrintQuoteRoutes, printQuoteRoutes } from '../../worker/routes/printQuote';
+import { printCloudRoutes } from '../../worker/routes/printCloud';
+import { printCloudAgentRoutes } from '../../worker/routes/printCloudAgent';
+import { adminPrintCloudRoutes } from '../../worker/routes/printCloudAdmin';
 import { adminPriceReportRoutes, priceReportRoutes } from '../../worker/routes/priceReports';
 import { priceRequestRoutes } from '../../worker/routes/priceRequests';
 import { catalogImportOpsRoutes } from '../../worker/routes/catalogImportOps';
@@ -216,6 +219,10 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/admin/security', adminSecurityRoutes as Router],
   ['/api/print-quote', printQuoteRoutes as Router],
   ['/api/admin/print-quote', adminPrintQuoteRoutes as Router],
+  // Levonis Print Cloud (DECISIONS row 270): the agent door first, as worker/index.ts mounts it.
+  ['/api/print-cloud/v1/agent', printCloudAgentRoutes as Router],
+  ['/api/print-cloud/v1', printCloudRoutes as Router],
+  ['/api/admin/print-cloud', adminPrintCloudRoutes as Router],
   ['/api/price-reports', priceReportRoutes as Router],
   ['/api/price-requests', priceRequestRoutes as Router],
   // The Bambu import (DECISIONS row 241): the ops door answers every session role the uniform 404 (no bearer

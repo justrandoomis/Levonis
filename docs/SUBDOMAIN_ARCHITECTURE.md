@@ -134,7 +134,7 @@ custom domain can be mapped to a store without touching a single order (§69).
 
 ### Which names a merchant can never have, and why
 
-`SYSTEM_SUBDOMAINS` in `worker/lib/hosts.ts` holds **146 names**, checked
+`SYSTEM_SUBDOMAINS` in `worker/lib/hosts.ts` holds **147 names**, checked
 **before** `reserved_slugs` and kept in code on purpose: a wildcard that
 resolves before the database answers is a wildcard that has to be safe without
 it. They are grouped by *why*, because the reason decides whether a future name
@@ -142,7 +142,7 @@ belongs there:
 
 | Group | Examples | Why |
 |---|---|---|
-| Running services | `www`, `studio`, `mail`, `send`, `api`, `app`, `community`, `support` | Handing one over takes a live product down. `send` and `mail` carry outbound email |
+| Running services | `www`, `studio`, `mail`, `send`, `api`, `app`, `community`, `support`, `cloud` | Handing one over takes a live product down. `send` and `mail` carry outbound email; `cloud` is Print Cloud |
 | Mail infrastructure | `smtp`, `mx`, `dkim`, `dmarc`, `spf`, `bounce`, `postmaster` | These names already speak for this domain's email to the rest of the internet |
 | The phishing surface | `login`, `signin`, `verify`, `reset`, `password`, `secure`, `account`, `my` | A merchant controls the *content* of their storefront. On `login.levonis-iq.com` they would get a valid certificate on the real brand's domain and write the page our own customers are looking at |
 | Platform functions | `admin`, `checkout`, `cart`, `wallet`, `orders`, `invoice`, `refunds` | A shop at `checkout.` is indistinguishable from the platform doing the same thing |

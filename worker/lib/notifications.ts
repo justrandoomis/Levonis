@@ -201,7 +201,15 @@ export type NotificationKind =
    * only (worker/lib/securityEvents.ts) — a cost request from a session,
    * network or browser not seen in 30 days. No figure, at most a few a day.
    */
-  | 'security_alert';
+  | 'security_alert'
+  /**
+   * «الطباعة السحابية» (0215, docs/PRINT_CLOUD.md §10): Levonis Print Cloud's
+   * own news to its customer — a purchase fulfilled, an estimate ready, a
+   * print started, finished or failed, a shipment ready, a material running
+   * low, a buyback decided (worker/lib/printCloud/notify.ts). The Sorani text
+   * rides in `meta.title_ckb` / `meta.body_ckb` like the grouped kinds.
+   */
+  | 'print_cloud';
 
 export interface NotificationInput {
   userId: string;
@@ -237,6 +245,8 @@ export interface NotificationInput {
     | 'gift'
     // A price-protection claim ('price_protection').
     | 'price_protection'
+    // 0215 — a Print Cloud order, job, shipment, inventory balance or buyback ('print_cloud').
+    | 'print_cloud_order' | 'print_cloud_job' | 'print_cloud_shipment' | 'print_cloud_inventory' | 'print_cloud_buyback'
     | '';
   entity_id?: string;
   meta?: Record<string, unknown>;

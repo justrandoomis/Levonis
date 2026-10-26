@@ -146,6 +146,21 @@ export interface Env {
   ALWASEET_BASE_URL?: string;
   ALWASEET_USERNAME?: string;
   ALWASEET_PASSWORD?: string;
+  /**
+   * LEVONIS PRINT CLOUD (docs/PRINT_CLOUD.md §13). All three optional; each
+   * feature they open stays honestly off without them.
+   *  - PRINT_CLOUD_DEV_PAYMENTS: exactly 'on' enables the DEVELOPMENT payment
+   *    adapter (a customer «pays» their own order). Never set it in a deployed
+   *    environment; workflow 7 carries vars forward and none names it.
+   *  - PRINT_CLOUD_PAYMENT_WEBHOOK_SECRET: a SECRET (≥ 32 chars) a payment
+   *    processor signs its webhook with; unset = the gateway adapter is off.
+   *  - PRINT_CLOUD_FILE_URL_SECRET: a SECRET (≥ 32 chars) for short-lived
+   *    signed model-file download links; unset = links refused (503), the
+   *    owner's authenticated download still works.
+   */
+  PRINT_CLOUD_DEV_PAYMENTS?: string;
+  PRINT_CLOUD_PAYMENT_WEBHOOK_SECRET?: string;
+  PRINT_CLOUD_FILE_URL_SECRET?: string;
 
   // ------------------------------------------------------------------ Phase 1
   // The event bus and the named entrypoints (02-MIGRATION-PLAN.md 1.6). EVERY
