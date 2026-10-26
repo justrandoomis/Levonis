@@ -240,8 +240,11 @@ CREATE INDEX IF NOT EXISTS idx_pc_printer_maintenance_window ON pc_printer_maint
 CREATE TABLE IF NOT EXISTS pc_printer_telemetry (
   printer_id TEXT PRIMARY KEY REFERENCES pc_printers(id),
   agent_id TEXT,
+  -- When the stored reading was TAKEN, on the server clock (printers.ts ingestTelemetry).
   received_at TEXT NOT NULL,
   reported_at TEXT,
+  -- When the agent last reached the cloud for this printer, any reading: the connection's own liveness.
+  arrived_at TEXT,
   machine_state TEXT NOT NULL CHECK (machine_state IN ('idle', 'preparing', 'printing', 'paused', 'finished', 'error', 'offline')),
   job_id TEXT,
   progress_permille INTEGER CHECK (progress_permille IS NULL OR (progress_permille >= 0 AND progress_permille <= 1000)),
@@ -689,6 +692,10 @@ CREATE TABLE IF NOT EXISTS pc_stock_lots (
   -- Cost (owner only): per base unit in thousandths of a dinar, and the total paid.
   unit_cost_milli_iqd INTEGER NOT NULL DEFAULT 0 CHECK (unit_cost_milli_iqd >= 0),
   total_cost_iqd INTEGER NOT NULL DEFAULT 0 CHECK (total_cost_iqd >= 0),
+  -- 0 while the owner has not stated the cost (received without one, found by
+  -- a count): the zeros above then mean UNKNOWN, never free. Stated once, by
+  -- POST /admin/print-cloud/stock/lots/{id}/cost.
+  cost_known INTEGER NOT NULL DEFAULT 1 CHECK (cost_known IN (0, 1)),
   received_at TEXT NOT NULL,
   received_by TEXT,
   levonis_lot_ref TEXT,
@@ -732,6 +739,22 @@ CREATE TABLE IF NOT EXISTS pc_warehouse_ledger (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_pc_warehouse_ledger_variant ON pc_warehouse_ledger(variant_id, created_at);
+
+-- Which stock lot each unit that left the shelf came from, at the cost known
+-- when it left. cost_known = 0: the lot's cost was not stated then, so
+-- cost_iqd is 0 and the profit report values the units from the cost the
+-- owner states later — or reports them as cost pending.
+CREATE TABLE IF NOT EXISTS pc_stock_lot_draws (
+  id TEXT PRIMARY KEY,
+  lot_id TEXT NOT NULL REFERENCES pc_stock_lots(id),
+  ledger_entry_key TEXT NOT NULL,
+  qty INTEGER NOT NULL CHECK (qty > 0),
+  cost_iqd INTEGER NOT NULL CHECK (cost_iqd >= 0),
+  cost_known INTEGER NOT NULL CHECK (cost_known IN (0, 1)),
+  created_at TEXT NOT NULL,
+  UNIQUE (lot_id, ledger_entry_key)
+);
+CREATE INDEX IF NOT EXISTS idx_pc_stock_lot_draws_pending ON pc_stock_lot_draws(lot_id, created_at) WHERE cost_known = 0;
 
 -- ------------------------------------------------------------------ customer-owned inventory
 
@@ -1327,6 +1350,14 @@ BEGIN
   SELECT RAISE(ABORT, 'PC_APPEND_ONLY');
 END;
 CREATE TRIGGER IF NOT EXISTS trg_pc_inventory_lot_draws_no_delete BEFORE DELETE ON pc_inventory_lot_draws
+BEGIN
+  SELECT RAISE(ABORT, 'PC_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_pc_stock_lot_draws_no_update BEFORE UPDATE ON pc_stock_lot_draws
+BEGIN
+  SELECT RAISE(ABORT, 'PC_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_pc_stock_lot_draws_no_delete BEFORE DELETE ON pc_stock_lot_draws
 BEGIN
   SELECT RAISE(ABORT, 'PC_APPEND_ONLY');
 END;

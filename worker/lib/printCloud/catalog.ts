@@ -12,7 +12,7 @@
  *
  * Nothing here is a hardcoded printer: «X2D Combo» is a row an admin creates.
  */
-import { many, one, type Stmt } from './db';
+import { fence, many, one, type Stmt } from './db';
 import { invalid, pcError } from './errors';
 import { iso, optIso, pcId } from './util';
 
@@ -25,7 +25,17 @@ export interface FieldSpec {
   min?: number;
   max?: number;
   values?: readonly string[];
-  /** A price: changing it is a money act and is recorded in pc_price_changes. */
+  /**
+   * The column takes NULL, and null clears it. Every other optional column is
+   * NOT NULL with a DEFAULT, which SQLite applies only when the column is left
+   * out — so null is refused there, never sent to the database.
+   */
+  nullable?: boolean;
+  /**
+   * A price, or a term that decides what a customer pays (an offer's switch,
+   * window and limits; the tier that bills a machine): changing it is a money
+   * act and is recorded in pc_price_changes.
+   */
   money?: boolean;
   /** What the workshop paid: owner-only to read and write. */
   cost?: boolean;
@@ -62,7 +72,8 @@ export const ENTITIES = {
       { name: 'custom_hours_enabled', kind: 'bool', money: true },
       { name: 'min_custom_seconds', kind: 'int', min: 60, max: 10_000_000, money: true },
       { name: 'custom_step_seconds', kind: 'int', min: 60, max: 10_000_000, money: true },
-      { name: 'active', kind: 'bool' },
+      // Switching a tier on reopens its hourly sale and its packages.
+      { name: 'active', kind: 'bool', money: true },
     ],
   },
   printer_models: {
@@ -71,7 +82,8 @@ export const ENTITIES = {
     idPrefix: 'pcpm',
     order: 'brand, model_name',
     fields: [
-      { name: 'tier_id', kind: 'ref', required: true },
+      // The tier whose hours pay for every job on this model.
+      { name: 'tier_id', kind: 'ref', required: true, money: true },
       { name: 'code', kind: 'code', required: true, immutable: true },
       { name: 'brand', kind: 'string', required: true, max: 80 },
       { name: 'model_name', kind: 'string', required: true, max: 120 },
@@ -83,14 +95,14 @@ export const ENTITIES = {
       { name: 'ams_systems_json', kind: 'json_array' },
       { name: 'max_colors', kind: 'int', min: 1, max: 64 },
       { name: 'supported_materials_json', kind: 'json_array' },
-      { name: 'max_nozzle_temp_c', kind: 'int', min: 0, max: 600 },
-      { name: 'max_bed_temp_c', kind: 'int', min: 0, max: 300 },
+      { name: 'max_nozzle_temp_c', kind: 'int', min: 0, max: 600, nullable: true },
+      { name: 'max_bed_temp_c', kind: 'int', min: 0, max: 300, nullable: true },
       { name: 'enclosed', kind: 'bool' },
       { name: 'camera', kind: 'bool' },
       { name: 'average_power_w', kind: 'int', min: 0, max: 10000 },
       { name: 'quality_rank', kind: 'int', min: 0, max: 100 },
       { name: 'spec_json', kind: 'json_object' },
-      { name: 'levonis_product_id', kind: 'string', max: 80 },
+      { name: 'levonis_product_id', kind: 'string', max: 80, nullable: true },
       { name: 'active', kind: 'bool' },
     ],
   },
@@ -112,11 +124,11 @@ export const ENTITIES = {
       { name: 'status', kind: 'enum', values: ['active', 'maintenance', 'retired'] },
       { name: 'adapter', kind: 'enum', values: ['manual', 'agent'] },
       { name: 'connection_ref', kind: 'string', max: 200 },
-      { name: 'agent_id', kind: 'ref' },
-      { name: 'acquisition_cost_iqd', kind: 'int', min: 0, max: 10_000_000_000, cost: true },
-      { name: 'acquired_at', kind: 'iso', cost: true },
-      { name: 'expected_life_hours', kind: 'int', min: 1, max: 1_000_000, cost: true },
-      { name: 'residual_value_iqd', kind: 'int', min: 0, max: 10_000_000_000, cost: true },
+      { name: 'agent_id', kind: 'ref', nullable: true },
+      { name: 'acquisition_cost_iqd', kind: 'int', min: 0, max: 10_000_000_000, cost: true, nullable: true },
+      { name: 'acquired_at', kind: 'iso', cost: true, nullable: true },
+      { name: 'expected_life_hours', kind: 'int', min: 1, max: 1_000_000, cost: true, nullable: true },
+      { name: 'residual_value_iqd', kind: 'int', min: 0, max: 10_000_000_000, cost: true, nullable: true },
       { name: 'maintenance_reserve_iqd_per_hour', kind: 'int', min: 0, max: 10_000_000, cost: true },
       { name: 'notes', kind: 'text', max: 2000 },
     ],
@@ -134,15 +146,16 @@ export const ENTITIES = {
       // The hours of a package are what customers bought; never changed under them.
       { name: 'seconds', kind: 'int', required: true, min: 60, max: 100_000_000, immutable: true },
       { name: 'price_iqd', kind: 'int', required: true, min: 0, max: 1_000_000_000, money: true },
-      { name: 'min_quantity', kind: 'int', min: 1, max: 1000 },
-      { name: 'max_quantity', kind: 'int', min: 1, max: 1000 },
-      { name: 'max_per_customer', kind: 'int', min: 1, max: 100_000 },
-      { name: 'expires_after_days', kind: 'int', min: 1, max: 3650, money: true },
+      // The terms of the offer — how many, to whom, when, whether at all — are part of its price.
+      { name: 'min_quantity', kind: 'int', min: 1, max: 1000, money: true },
+      { name: 'max_quantity', kind: 'int', min: 1, max: 1000, money: true },
+      { name: 'max_per_customer', kind: 'int', min: 1, max: 100_000, money: true, nullable: true },
+      { name: 'expires_after_days', kind: 'int', min: 1, max: 3650, money: true, nullable: true },
       { name: 'bundle_json', kind: 'json_array', money: true },
-      { name: 'valid_from', kind: 'iso' },
-      { name: 'valid_until', kind: 'iso' },
+      { name: 'valid_from', kind: 'iso', money: true, nullable: true },
+      { name: 'valid_until', kind: 'iso', money: true, nullable: true },
       { name: 'sort', kind: 'int', min: -1000, max: 1000 },
-      { name: 'active', kind: 'bool' },
+      { name: 'active', kind: 'bool', money: true },
     ],
   },
   conversion_rules: {
@@ -168,10 +181,10 @@ export const ENTITIES = {
       { name: 'brand', kind: 'string', max: 80 },
       ...NAME_FIELDS,
       { name: 'description_json', kind: 'json_object' },
-      { name: 'material', kind: 'string', max: 40 },
-      { name: 'grade', kind: 'string', max: 40 },
+      { name: 'material', kind: 'string', max: 40, nullable: true },
+      { name: 'grade', kind: 'string', max: 40, nullable: true },
       { name: 'tags_json', kind: 'json_array' },
-      { name: 'levonis_product_id', kind: 'string', max: 80 },
+      { name: 'levonis_product_id', kind: 'string', max: 80, nullable: true },
       { name: 'active', kind: 'bool' },
     ],
   },
@@ -186,17 +199,17 @@ export const ENTITIES = {
       ...NAME_FIELDS,
       { name: 'color_name', kind: 'string', max: 80 },
       { name: 'color_hex', kind: 'string', max: 9 },
-      { name: 'diameter_um', kind: 'int', min: 100, max: 5000 },
+      { name: 'diameter_um', kind: 'int', min: 100, max: 5000, nullable: true },
       // A variant's base unit is what every balance of it is counted in: fixed at creation.
       { name: 'unit_code', kind: 'ref', required: true, immutable: true },
       { name: 'min_purchase_qty', kind: 'int', min: 1, max: 10_000_000 },
       { name: 'purchase_step_qty', kind: 'int', min: 1, max: 10_000_000 },
       { name: 'max_purchase_qty', kind: 'int', min: 1, max: 10_000_000 },
-      { name: 'max_per_customer_qty', kind: 'int', min: 1, max: 100_000_000 },
+      { name: 'max_per_customer_qty', kind: 'int', min: 1, max: 100_000_000, nullable: true },
       { name: 'fulfillment_modes_json', kind: 'json_array' },
       { name: 'low_stock_threshold_qty', kind: 'int', min: 0, max: 100_000_000 },
       { name: 'attributes_json', kind: 'json_object' },
-      { name: 'levonis_variant_ref', kind: 'string', max: 120 },
+      { name: 'levonis_variant_ref', kind: 'string', max: 120, nullable: true },
       { name: 'active', kind: 'bool' },
     ],
   },
@@ -206,17 +219,19 @@ export const ENTITIES = {
     idPrefix: 'pcpromo',
     order: 'created_at',
     fields: [
-      { name: 'code', kind: 'code', immutable: true },
+      // No code: the promotion applies automatically to everyone in its scope.
+      { name: 'code', kind: 'code', immutable: true, nullable: true },
       ...NAME_FIELDS,
       { name: 'scope', kind: 'string', required: true, max: 80, money: true },
       { name: 'percent_bps', kind: 'int', min: 0, max: 10000, money: true },
       { name: 'amount_off_iqd', kind: 'int', min: 0, max: 100_000_000, money: true },
       { name: 'min_subtotal_iqd', kind: 'int', min: 0, max: 1_000_000_000, money: true },
-      { name: 'membership', kind: 'string', max: 40, money: true },
-      { name: 'starts_at', kind: 'iso' },
-      { name: 'ends_at', kind: 'iso' },
-      { name: 'max_redemptions', kind: 'int', min: 1, max: 10_000_000 },
-      { name: 'active', kind: 'bool' },
+      { name: 'membership', kind: 'string', max: 40, money: true, nullable: true },
+      // Whether, when and how often the discount applies is the discount.
+      { name: 'starts_at', kind: 'iso', money: true, nullable: true },
+      { name: 'ends_at', kind: 'iso', money: true, nullable: true },
+      { name: 'max_redemptions', kind: 'int', min: 1, max: 10_000_000, money: true, nullable: true },
+      { name: 'active', kind: 'bool', money: true },
     ],
   },
   locations: {
@@ -258,6 +273,7 @@ const NO_UPDATED_AT = new Set(['pc_warehouse_locations', 'pc_accessory_rules']);
 function validateField(f: FieldSpec, v: unknown): unknown {
   if (v === null) {
     if (f.required) throw invalid(f.name, 'required');
+    if (!f.nullable) throw invalid(f.name, 'null_not_allowed');
     return null;
   }
   switch (f.kind) {
@@ -286,8 +302,12 @@ function validateField(f: FieldSpec, v: unknown): unknown {
     case 'enum':
       if (typeof v !== 'string' || !(f.values ?? []).includes(v)) throw invalid(f.name, 'not_allowed');
       return v;
-    case 'iso':
-      return optIso(v, f.name);
+    case 'iso': {
+      // optIso reads '' as "no date": only a nullable column may hold none.
+      const at = optIso(v, f.name);
+      if (at === null && !f.nullable) throw invalid(f.name, 'iso_date_required');
+      return at;
+    }
     case 'json_array':
       if (!Array.isArray(v) || v.length > 200) throw invalid(f.name, 'array_required');
       return JSON.stringify(v).length > 20000 ? (() => { throw invalid(f.name, 'too_large'); })() : JSON.stringify(v);
@@ -353,6 +373,9 @@ export function createEntity(
 ): { id: string; statements: Stmt[]; row: Record<string, unknown> } {
   const known = new Set(spec.fields.map((f) => f.name));
   for (const k of Object.keys(body)) if (!known.has(k) && k !== 'id') throw invalid(k, 'unknown_field');
+  // Registering a machine puts it on a tier's hours, and a retired machine re-registered under another
+  // model would be a re-tier with no price record: like moving one across tiers, it needs money scope.
+  if (spec.key === 'printers' && !access.canMoveMoney) throw pcError('FORBIDDEN', { field: 'model_id', reason: 'financial_scope_required' }, 403);
   const row: Record<string, unknown> = {};
   for (const f of spec.fields) {
     if (body[f.name] === undefined) {
@@ -377,9 +400,25 @@ export function createEntity(
 }
 
 /**
+ * The tiers of the model a machine leaves and the one it joins. A machine's
+ * model decides which tier's hours pay for its work, so a move to a model of
+ * ANOTHER tier reprices the machine.
+ */
+async function modelTiers(db: D1Database, fromModel: string, toModel: string): Promise<{ from: string; to: string }> {
+  const models = await many<{ id: string; tier_id: string }>(db, 'SELECT id, tier_id FROM pc_printer_models WHERE id IN (?, ?)', fromModel, toModel);
+  const tierOf = (modelId: string) => models.find((m) => m.id === modelId)?.tier_id;
+  const to = tierOf(toModel);
+  if (to === undefined) throw pcError('VALIDATION', { field: 'model_id', reason: 'unknown_reference' });
+  return { from: tierOf(fromModel) ?? '', to };
+}
+
+/**
  * Validate a patch and build its UPDATE. A changed MONEY field writes a
- * `pc_price_changes` row in the same batch. Prices already paid live on the
- * order lines and lots, so nothing here can change a purchased balance.
+ * `pc_price_changes` row in the same batch, and so does a machine moved to a
+ * model of another tier — a money act too; a move within one tier is the
+ * operator's, fenced on the tiers still matching when the batch commits.
+ * Prices already paid live on the order lines and lots, so nothing here can
+ * change a purchased balance.
  */
 export async function updateEntity(
   db: D1Database,
@@ -404,27 +443,40 @@ export async function updateEntity(
   if (!Object.keys(patch).length) throw invalid('body', 'empty');
   crossCheck(spec, { ...before, ...patch });
   const changed = Object.keys(patch).filter((k) => before[k] !== patch[k]);
+  const priceBefore: Record<string, unknown> = {};
+  const priceAfter: Record<string, unknown> = {};
+  for (const k of changed.filter((k) => byName.get(k)?.money)) {
+    priceBefore[k] = before[k];
+    priceAfter[k] = patch[k];
+  }
+  const statements: Stmt[] = [];
+  if (spec.key === 'printers' && changed.includes('model_id')) {
+    const tiers = await modelTiers(db, String(before.model_id), String(patch.model_id));
+    if (tiers.from !== tiers.to) {
+      if (!access.canMoveMoney) throw pcError('FORBIDDEN', { field: 'model_id', reason: 'financial_scope_required' }, 403);
+      Object.assign(priceBefore, { model_id: before.model_id, tier_id: tiers.from });
+      Object.assign(priceAfter, { model_id: patch.model_id, tier_id: tiers.to });
+    } else {
+      // Before the UPDATE: the machine's tier as it stands must be the tier of the model it joins.
+      statements.push(
+        fence(
+          db,
+          'STATE_CHANGED',
+          `(SELECT m.tier_id FROM pc_printers p JOIN pc_printer_models m ON m.id = p.model_id WHERE p.id = ?)
+             = (SELECT tier_id FROM pc_printer_models WHERE id = ?)`,
+          [id, patch.model_id]
+        )
+      );
+    }
+  }
   const sets = Object.keys(patch).map((k) => `${k} = ?`);
   const values = Object.values(patch);
   if (!NO_UPDATED_AT.has(spec.table)) {
     sets.push('updated_at = ?');
     values.push(iso(now));
   }
-  const statements: Stmt[] = [db.prepare(`UPDATE ${spec.table} SET ${sets.join(', ')} WHERE id = ?`).bind(...values, id)];
-  const moneyChanged = changed.filter((k) => byName.get(k)?.money);
-  if (moneyChanged.length) {
-    statements.push(
-      priceChangeStmt(
-        db,
-        spec.key,
-        id,
-        Object.fromEntries(moneyChanged.map((k) => [k, before[k]])),
-        Object.fromEntries(moneyChanged.map((k) => [k, patch[k]])),
-        actorId,
-        now
-      )
-    );
-  }
+  statements.push(db.prepare(`UPDATE ${spec.table} SET ${sets.join(', ')} WHERE id = ?`).bind(...values, id));
+  if (Object.keys(priceBefore).length) statements.push(priceChangeStmt(db, spec.key, id, priceBefore, priceAfter, actorId, now));
   return { statements, before, changed };
 }
 
@@ -528,7 +580,8 @@ export async function replacePriceTiers(
 
 // ------------------------------------------------------------------ public reads
 
-export async function publicPrinterModels(db: D1Database) {
+/** `ready`: the test of a machine that can take work now, over `pc_printers p` (printers.ts `machineReadySql`) — what «idle» counts. */
+export async function publicPrinterModels(db: D1Database, ready: { sql: string; params: unknown[] }) {
   return many<Record<string, unknown>>(
     db,
     `SELECT m.id, m.code, m.brand, m.model_name, m.tier_id, t.code AS tier_code, t.name_ar AS tier_name_ar, t.name_en AS tier_name_en,
@@ -536,11 +589,11 @@ export async function publicPrinterModels(db: D1Database) {
             m.ams_systems_json, m.max_colors, m.supported_materials_json, m.max_nozzle_temp_c, m.max_bed_temp_c, m.enclosed, m.camera,
             m.quality_rank, m.spec_json,
             (SELECT COUNT(*) FROM pc_printers p WHERE p.model_id = m.id AND p.status = 'active') AS machines_active,
-            (SELECT COUNT(*) FROM pc_printers p WHERE p.model_id = m.id AND p.status = 'active'
-               AND NOT EXISTS (SELECT 1 FROM pc_printer_assignments a WHERE a.printer_id = p.id AND a.state = 'active')) AS machines_idle
+            (SELECT COUNT(*) FROM pc_printers p WHERE p.model_id = m.id AND ${ready.sql}) AS machines_idle
        FROM pc_printer_models m JOIN pc_credit_tiers t ON t.id = m.tier_id
       WHERE m.active = 1 AND t.active = 1
-      ORDER BY m.brand, m.model_name`
+      ORDER BY m.brand, m.model_name`,
+    ...ready.params
   );
 }
 

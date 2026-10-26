@@ -6,10 +6,12 @@
  * fenced UPDATE with a fresh token, so two runners never take the same row —
  * runs the handler with a deadline, and records the outcome: succeeded, or
  * failed with the next attempt backed off exponentially, or dead after its
- * last attempt. A runner that dies mid-task leaves a lease that expires, and
- * the row is claimed again. Every handler is idempotent (it re-reads state
- * and acts only on what is still to do), so a retried task cannot double an
- * effect. Each attempt writes a log line.
+ * last attempt. A runner that dies mid-task (killed, so no outcome is ever
+ * recorded) leaves a lease that expires; the claim already set that attempt's
+ * backoff, so the row is claimed again after it, behind fresher due work —
+ * and after the LAST attempt it is dead, never claimed again. Every handler is
+ * idempotent (it re-reads state and acts only on what is still to do), so a
+ * retried task cannot double an effect. Each attempt writes a log line.
  *
  * Runners: the quarter-hour cron (bounded, after the platform's own jobs), a
  * `waitUntil` after the request that enqueued the work, and the operator's
@@ -25,7 +27,7 @@ import { runScheduler } from './queue';
 import { reconcile } from './reconcile';
 import { sweepSlicingLeases } from './slicing';
 import { enqueueTask, type TaskKind } from './tasks';
-import { debitAvailable, expiredLots } from './credits';
+import { expiredLots, planLotExpiry } from './credits';
 import { pcNotify } from './notify';
 import { addSeconds, iso, pcId } from './util';
 
@@ -41,7 +43,7 @@ export type Room = (n: number) => boolean;
  * THE MOST STATEMENTS ONE UNIT OF TASK WORK SENDS: one order expired, one
  * credit lot expired, one low-balance notice, one queue assignment, one
  * slicing lease swept, one file measured, one import step — or the whole
- * reconciliation (sixteen reads). Every loop asks for this much room before
+ * reconciliation (twenty-one reads). Every loop asks for this much room before
  * each unit, so a bounded run never overshoots its share
  * (tests/printCloudOperations.test.ts measures a run at its bound).
  */
@@ -56,8 +58,8 @@ export function roomWithin(used: () => number, budget: number): Room {
   return (n) => used() - start + n <= budget;
 }
 
-/** Room for one more unit of a loop, and the close that follows it. */
-const unitFits = (room: Room | undefined) => !room || room(PRINT_CLOUD_UNIT_STATEMENTS + 2);
+/** Room for one more unit of a loop (or `statements` of a larger one), and the close that follows it. */
+const unitFits = (room: Room | undefined, statements = PRINT_CLOUD_UNIT_STATEMENTS) => !room || room(statements + 2);
 
 interface TaskRow {
   id: string;
@@ -98,37 +100,49 @@ async function handle(env: RunnerEnv, task: TaskRow, now: Date, room?: Room): Pr
     }
     case 'expire_credit_lots': {
       let n = 0;
+      let failed = 0;
+      let firstError = '';
       let more = false;
       for (const lot of await expiredLots(db, now)) {
         if (!unitFits(room)) {
           more = true;
           break;
         }
-        const acct = await one<{ available_seconds: number }>(db, 'SELECT available_seconds FROM pc_credit_accounts WHERE id = ?', lot.account_id);
-        // Only seconds that are not reserved for a confirmed job can expire.
-        const seconds = Math.min(Number(lot.seconds_remaining), Number(acct?.available_seconds ?? 0));
-        if (seconds <= 0) continue;
-        const out = await debitAvailable(db, {
-          userId: lot.user_id,
-          tierId: lot.tier_id,
-          seconds,
-          type: 'expire',
-          entryKey: `expire:${lot.id}`,
-          lotId: lot.id,
-          actorId: 'system',
-          note: `package expiry ${lot.expires_at}`,
-          now,
-        });
-        await runBatch(db, out.statements);
-        n++;
+        // Only the lot's free part expires (credits.ts). A lot that cannot
+        // expire now — a job confirmed meanwhile — waits for the next run and
+        // never holds back the lots behind it.
+        try {
+          const planned = await planLotExpiry(db, lot, now);
+          if (!planned) continue;
+          await runBatch(db, planned.statements);
+          n++;
+        } catch (e) {
+          failed++;
+          firstError ||= e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+        }
       }
+      // The lots that could expire did; a lot that failed fails the task, so the error is retried and stays visible.
+      if (failed) throw new Error(`expired lots ${n}, failed ${failed}: ${firstError}`.slice(0, 400));
       return { summary: `expired lots ${n}`, more };
     }
     case 'low_inventory_scan': {
-      const low = await many<{ id: string; user_id: string; variant_id: string; available_qty: number; unit_code: string; name_en: string; low_stock_alert_qty: number | null }>(
+      // The variant's three names and the unit's labels: each body of the notice reads its own (notify.ts `material`).
+      const low = await many<{
+        id: string;
+        user_id: string;
+        variant_id: string;
+        available_qty: number;
+        unit_code: string;
+        name_ar: string;
+        name_en: string;
+        name_ckb: string;
+        label_ar: string | null;
+        label_ckb: string | null;
+        low_stock_alert_qty: number | null;
+      }>(
         db,
-        `SELECT a.id, a.user_id, a.variant_id, a.available_qty, a.unit_code, v.name_en, a.low_stock_alert_qty
-           FROM pc_inventory_accounts a JOIN pc_variants v ON v.id = a.variant_id
+        `SELECT a.id, a.user_id, a.variant_id, a.available_qty, a.unit_code, v.name_ar, v.name_en, v.name_ckb, u.label_ar, u.label_ckb, a.low_stock_alert_qty
+           FROM pc_inventory_accounts a JOIN pc_variants v ON v.id = a.variant_id LEFT JOIN pc_units u ON u.code = a.unit_code
           WHERE a.available_qty <= COALESCE(a.low_stock_alert_qty, CASE WHEN a.unit_code = 'g' THEN ? ELSE -1 END)
             AND a.consumed_qty > 0
             AND (a.low_stock_notified_at IS NULL OR a.low_stock_notified_at < a.updated_at)
@@ -150,7 +164,8 @@ async function handle(env: RunnerEnv, task: TaskRow, now: Date, room?: Room): Pr
             entity: 'print_cloud_inventory',
             entityId: a.variant_id,
             link: '/print-cloud/inventory',
-            vars: { qty: String(a.available_qty), unit: a.unit_code, name: a.name_en },
+            vars: { qty: String(a.available_qty) },
+            material: a,
             eventKey: `inventory_low:${a.id}:${a.available_qty}`,
           }),
           db.prepare('UPDATE pc_inventory_accounts SET low_stock_notified_at = ? WHERE id = ?').bind(iso(now), a.id),
@@ -159,8 +174,8 @@ async function handle(env: RunnerEnv, task: TaskRow, now: Date, room?: Room): Pr
       return { summary: `low balances ${sent} of ${low.length}`, more };
     }
     case 'schedule_queue': {
-      const r = await runScheduler(db, config, now, 20, room ? () => unitFits(room) : undefined);
-      return { summary: `assigned ${r.assigned.length}, waiting ${r.waiting}`, more: r.more };
+      const r = await runScheduler(db, config, now, 20, room ? (statements?: number) => unitFits(room, statements) : undefined);
+      return { summary: `assigned ${r.assigned.length}, released ${r.released.length}, waiting ${r.waiting}`, more: r.more };
     }
     case 'reconcile': {
       const r = await reconcile(db);
@@ -173,32 +188,64 @@ async function handle(env: RunnerEnv, task: TaskRow, now: Date, room?: Room): Pr
   }
 }
 
-/** Claim one due task under a lease. Null when there is nothing due or another runner won. */
-async function claim(db: D1Database, now: Date): Promise<TaskRow | null> {
+/** The wait after failed attempt number `attempts`, before the next one. */
+const backoffSeconds = (attempts: number) => Math.min(3600, 30 * 2 ** (attempts - 1));
+
+/** What a runner that died in a task's last attempt leaves in its row. */
+const LEASE_EXPIRED_AFTER_LAST_ATTEMPT = 'LEASE_EXPIRED_AFTER_LAST_ATTEMPT';
+
+/** Due: queued and its time has come, or running under a lease that expired (its runner died) once that attempt's backoff is over. */
+const DUE = "(status = 'queued' AND run_after <= ?) OR (status = 'running' AND lease_until < ? AND run_after <= ?)";
+
+/**
+ * Claim one due task under a lease. Null when there is nothing due or another
+ * runner won; 'retired' when the due row was a spent lease — its runner died
+ * in the last attempt — now recorded dead instead of run again.
+ */
+async function claim(db: D1Database, now: Date): Promise<TaskRow | 'retired' | null> {
   const due = await one<TaskRow & { status: string }>(
     db,
-    `SELECT id, kind, payload_json, attempts, max_attempts, status FROM pc_background_jobs
-      WHERE (status = 'queued' AND run_after <= ?) OR (status = 'running' AND lease_until < ?)
-      ORDER BY run_after, id LIMIT 1`,
+    `SELECT id, kind, payload_json, attempts, max_attempts, status FROM pc_background_jobs WHERE ${DUE} ORDER BY run_after, id LIMIT 1`,
+    iso(now),
     iso(now),
     iso(now)
   );
   if (!due) return null;
   const token = pcId('lease');
+  if (due.status === 'running' && due.attempts >= due.max_attempts) {
+    try {
+      await runBatch(db, [
+        db
+          .prepare(
+            `UPDATE pc_background_jobs SET status = 'dead', lease_token = ?, lease_until = NULL, last_error = ?, finished_at = ?, updated_at = ?
+              WHERE id = ? AND attempts = ? AND status = 'running' AND lease_until < ?`
+          )
+          .bind(token, LEASE_EXPIRED_AFTER_LAST_ATTEMPT, iso(now), iso(now), due.id, due.attempts, iso(now)),
+        fence(db, 'STATE_CHANGED', '(SELECT lease_token FROM pc_background_jobs WHERE id = ?) = ?', [due.id, token]),
+        log(db, due, 'error', LEASE_EXPIRED_AFTER_LAST_ATTEMPT, now),
+      ]);
+    } catch {
+      return null;
+    }
+    return 'retired';
+  }
+  // run_after is set as if this attempt had already failed: should the runner
+  // die in it, the row is due again only after the lease and that backoff.
+  const attempts = due.attempts + 1;
   try {
     await runBatch(db, [
       db
         .prepare(
-          `UPDATE pc_background_jobs SET status = 'running', lease_token = ?, lease_until = ?, attempts = attempts + 1, updated_at = ?
-            WHERE id = ? AND attempts = ? AND ((status = 'queued' AND run_after <= ?) OR (status = 'running' AND lease_until < ?))`
+          `UPDATE pc_background_jobs SET status = 'running', lease_token = ?, lease_until = ?, run_after = ?, attempts = attempts + 1, updated_at = ?
+            WHERE id = ? AND attempts = ? AND (${DUE})`
         )
-        .bind(token, iso(addSeconds(now, LEASE_SECONDS)), iso(now), due.id, due.attempts, iso(now), iso(now)),
+        .bind(token, iso(addSeconds(now, LEASE_SECONDS)), iso(addSeconds(now, LEASE_SECONDS + backoffSeconds(attempts))), iso(now), due.id, due.attempts, iso(now), iso(now), iso(now)),
       fence(db, 'STATE_CHANGED', '(SELECT lease_token FROM pc_background_jobs WHERE id = ?) = ?', [due.id, token]),
     ]);
   } catch {
     return null;
   }
-  return { ...due, attempts: due.attempts + 1 };
+  return { ...due, attempts };
 }
 
 function log(db: D1Database, task: TaskRow, level: 'info' | 'warning' | 'error', message: string, now: Date) {
@@ -233,6 +280,10 @@ export async function runPrintCloudTasks(
     const now = clock();
     const task = await claim(db, now);
     if (!task) break;
+    if (task === 'retired') {
+      report.dead++;
+      continue;
+    }
     report.ran++;
     try {
       const outcome = await withTimeout(handle(env, task, now, opts.room), TASK_TIMEOUT_MS);
@@ -255,7 +306,7 @@ export async function runPrintCloudTasks(
       const done = clock();
       const message = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
       const dead = task.attempts >= task.max_attempts;
-      const backoff = Math.min(3600, 30 * 2 ** (task.attempts - 1));
+      const backoff = backoffSeconds(task.attempts);
       await db
         .batch([
           db

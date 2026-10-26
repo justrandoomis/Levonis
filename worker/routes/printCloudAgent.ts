@@ -11,10 +11,11 @@
 import { Hono } from 'hono';
 import type { Context, Next } from 'hono';
 import type { AppContext } from '../lib/types';
-import { jsonObject } from '../lib/http';
+import { HttpError, jsonObject } from '../lib/http';
 import { limitRoute } from '../lib/ratelimit';
 import { mediaBucket } from '../lib/mediaStorage';
-import { many, one } from '../lib/printCloud/db';
+import { pcAudit } from '../lib/printCloud/audit';
+import { many, one, runBatch } from '../lib/printCloud/db';
 import { invalid, pcError } from '../lib/printCloud/errors';
 import { ok, pcGate, requestConfig } from '../lib/printCloud/http';
 import {
@@ -24,10 +25,9 @@ import {
   parseConsumption,
   parseEstimate,
   parseFailure,
-  pauseJob,
   reportCompletion,
-  resumeJob,
   startJob,
+  transition,
   type Actor,
   type JobStatus,
 } from '../lib/printCloud/jobs';
@@ -80,37 +80,77 @@ printCloudAgentRoutes.post('/printers/:id/telemetry', async (c) => {
 
 const EVENT_TARGET: Record<string, JobStatus> = { started: 'printing', paused: 'paused', resumed: 'printing', completed: 'completed', failed: 'failed' };
 
+/** The agent's own name for one event, unique per job: what a re-sent copy is recognised by. */
+const AGENT_EVENT_ID = /^[A-Za-z0-9_.:-]{8,120}$/;
+
+/** The job's event row that recorded this agent event id, if one did. */
+const agentEventRecorded = (db: D1Database, jobId: string, eventId: string) =>
+  one<{ id: string }>(
+    db,
+    "SELECT id FROM pc_print_job_events WHERE job_id = ? AND actor_type = 'agent' AND json_extract(detail_json, '$.agent_event_id') = ? LIMIT 1",
+    jobId,
+    eventId
+  );
+
 /**
- * A job event from the machine. Each one is a state-machine transition; an
- * event re-sent after it was applied answers `already_applied` and changes
- * nothing, so a flaky workshop network cannot start, bill or fail a job twice.
+ * A job event from the machine. Each one is a state-machine transition, and
+ * an event re-sent after it was applied answers `already_applied` and
+ * changes nothing, so a flaky workshop network cannot start, pause, bill or
+ * fail a job twice:
+ *   - `started` moves a job only out of `preparing`. Once it has started, a
+ *     late or repeated `started` is already applied: it never resumes a job
+ *     an operator paused, nor restarts its clock.
+ *   - `paused` and `resumed` alternate, so the job's state cannot tell a
+ *     re-sent pause from a new one. Each carries the agent's `event_id`,
+ *     recorded on the job's event row in the transition's own batch; an id
+ *     already recorded is already applied, whatever the job did since.
+ *   - `completed` and `failed` are applied once, by state.
  */
 printCloudAgentRoutes.post('/jobs/:id/events', async (c) => {
   const agent = agentOf(c);
   if (!agentCan(agent, 'job_control')) throw pcError('FORBIDDEN', { capability: 'job_control' });
+  const db = c.env.DB;
   const body = await jsonObject(c);
   const event = reqString(body.event, 'event', { max: 20 });
   if (!(event in EVENT_TARGET)) throw invalid('event', 'not_allowed');
   const printerId = reqString(body.printer_id, 'printer_id', { max: 120 });
-  await agentPrinter(c.env.DB, agent, printerId);
-  const job = await loadJob(c.env.DB, c.req.param('id'));
-  const assignment = await one<{ printer_id: string }>(c.env.DB, "SELECT printer_id FROM pc_printer_assignments WHERE job_id = ? AND state = 'active'", job.id);
+  const toggles = event === 'paused' || event === 'resumed';
+  const eventId = body.event_id === undefined && !toggles ? null : reqString(body.event_id, 'event_id', { max: 120 });
+  if (eventId !== null && !AGENT_EVENT_ID.test(eventId)) throw invalid('event_id', 'invalid');
+  await agentPrinter(db, agent, printerId);
+  const job = await loadJob(db, c.req.param('id'));
+  const applied = (status: string) => ok(c, { job_id: job.id, status, already_applied: true });
+  if (eventId && (await agentEventRecorded(db, job.id, eventId))) return applied(job.status);
   const target = EVENT_TARGET[event];
-  if (job.status === target || (event === 'completed' && job.status === 'completed')) return ok(c, { job_id: job.id, status: job.status, already_applied: true });
+  if (job.status === target) return applied(job.status);
+  if (event === 'started' && job.status !== 'preparing' && job.started_at) return applied(job.status);
+  const assignment = await one<{ printer_id: string }>(db, "SELECT printer_id FROM pc_printer_assignments WHERE job_id = ? AND state = 'active'", job.id);
   if (!assignment || assignment.printer_id !== printerId) throw pcError('NOT_FOUND', { reason: 'job_not_on_this_printer' });
   const actor: Actor = { type: 'agent', id: agent.id };
   const now = new Date();
   const { config } = await requestConfig(c);
+  const recorded = eventId ? { agent_event_id: eventId } : {};
   switch (event) {
     case 'started':
-      await startJob(c.env.DB, job, actor, now);
+      if (job.status !== 'preparing') throw pcError('INVALID_TRANSITION', { from: job.status, to: 'printing' });
+      await startJob(db, job, actor, now);
       break;
     case 'paused':
-      await pauseJob(c.env.DB, job, actor, now, typeof body.reason === 'string' ? body.reason.slice(0, 200) : 'agent');
+    case 'resumed': {
+      // pauseJob / resumeJob, with the agent's event id on the event row in the same batch as the flip.
+      const reason = event === 'paused' ? { reason: typeof body.reason === 'string' ? body.reason.slice(0, 200) : 'agent' } : {};
+      try {
+        await runBatch(db, [
+          ...transition(db, job, target, actor, event, now, { ...reason, ...recorded }),
+          ...(await pcAudit(db, actor.id, event === 'paused' ? 'job.pause' : 'job.resume', job.id, { ...reason, ...recorded })),
+        ]);
+      } catch (e) {
+        // The same event racing itself: the copy that lost finds the winner's row.
+        if (eventId && e instanceof HttpError && e.code === 'STATE_CHANGED' && (await agentEventRecorded(db, job.id, eventId))) return applied((await loadJob(db, job.id)).status);
+        throw e;
+      }
       break;
-    case 'resumed':
-      await resumeJob(c.env.DB, job, actor, now);
-      break;
+    }
     case 'completed': {
       const consumption = parseConsumption(body);
       if (config.agent_reports_need_verification) return ok(c, await reportCompletion(c.env.DB, job, consumption, actor, now), 202);

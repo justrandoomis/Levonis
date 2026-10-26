@@ -1028,6 +1028,7 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'pc_credit_lot_draws.ledger_entry_key': 'the ledger entry a draw belongs to',
   'pc_inventory_ledger.entry_key': 'ledger de-duplication token',
   'pc_inventory_lot_draws.ledger_entry_key': 'the ledger entry a draw belongs to',
+  'pc_stock_lot_draws.ledger_entry_key': 'the warehouse ledger entry a stock lot draw belongs to',
   'pc_warehouse_ledger.entry_key': 'ledger de-duplication token',
   'pc_model_files.analysis_json': 'measured size, volume, triangle count and validation words of a model; no derived object',
   'pc_model_imports.url': 'the external model page address the customer pasted',

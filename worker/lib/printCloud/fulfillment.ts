@@ -7,7 +7,8 @@
  * payment door as everything else: printing hours never pay for delivery and
  * a delivery fee never touches printing hours. A shipment waits in
  * 'awaiting_payment' until that order is paid; if it expires unpaid, the
- * shipment is cancelled and any material held for it is released.
+ * shipment is cancelled and any material held for it is released, and a
+ * shipment cancelled while it waits closes that order in the same batch.
  *
  * Material shipped home is RESERVED when the request is made (so a print
  * cannot use it meanwhile) and leaves the customer's inventory and the
@@ -16,11 +17,21 @@
 import { many, one, fence, runBatch, type Planned, type Stmt } from './db';
 import { invalid, pcError } from './errors';
 import { pcAudit } from './audit';
-import { releaseInventory, reserveInventory, settleInventory, type InventoryReservationRow } from './inventory';
+import { reserveInventory, settleInventory, type InventoryReservationRow } from './inventory';
 import { pcNotify } from './notify';
+import { closeUnpaidOrder, type OrderRow } from './orders';
 import { assertPaymentAvailable, paymentInstructions, type PaymentProvider } from './payments';
 import type { PrintCloudConfig } from './settings';
-import { createShipment, deliveryFee, parseAddress, shipmentInventoryItem, shipmentJobItem, type DeliveryAddress, type ShipmentStatus } from './shipments';
+import {
+  createShipment,
+  deliveryFee,
+  parseAddress,
+  shipmentCancelStatements,
+  shipmentInventoryItem,
+  shipmentJobItem,
+  type DeliveryAddress,
+  type ShipmentStatus,
+} from './shipments';
 import { removePhysical } from './warehouse';
 import { addSeconds, iso, pcId, reqInt, reqString } from './util';
 
@@ -151,19 +162,22 @@ const SHIPMENT_TRANSITIONS: Record<ShipmentStatus, readonly ShipmentStatus[]> = 
   cancelled: [],
 };
 
-/** Release everything a shipment held and take its items off it. Statements only. */
-export async function shipmentCancelStatements(db: D1Database, shipmentId: string, actorId: string, now: Date): Promise<Stmt[]> {
-  const s: Stmt[] = [
-    db.prepare('UPDATE pc_shipment_items SET live = 0 WHERE shipment_id = ?').bind(shipmentId),
-    db.prepare('UPDATE pc_print_jobs SET shipment_id = NULL WHERE shipment_id = ?').bind(shipmentId),
-  ];
-  const holds = await many<InventoryReservationRow>(
-    db,
-    "SELECT id, account_id, user_id, variant_id, purpose, ref_id, qty_reserved, qty_consumed, qty_released, state FROM pc_inventory_reservations WHERE purpose = 'delivery' AND ref_id = ? AND state = 'active'",
-    shipmentId
-  );
-  for (const r of holds) s.push(...releaseInventory(db, r, actorId, now, 'shipment cancelled'));
-  return s;
+interface ShipmentRow {
+  id: string;
+  user_id: string;
+  kind: string;
+  status: ShipmentStatus;
+  fee_order_id: string | null;
+}
+
+const SHIPMENT_SELECT = 'SELECT id, user_id, kind, status, fee_order_id FROM pc_shipments WHERE id = ?';
+
+interface AdvanceInput {
+  carrier?: string;
+  tracking_ref?: string;
+  note?: string;
+  actorId: string;
+  now: Date;
 }
 
 /**
@@ -171,22 +185,39 @@ export async function shipmentCancelStatements(db: D1Database, shipmentId: strin
  * material item — out of the customer's inventory and off the workshop
  * shelf — in the same batch as the status flip.
  */
-export async function advanceShipment(
-  db: D1Database,
-  shipmentId: string,
-  to: ShipmentStatus,
-  p: { carrier?: string; tracking_ref?: string; note?: string; actorId: string; now: Date }
-) {
-  const sh = await one<{ id: string; user_id: string; kind: string; status: ShipmentStatus; fee_order_id: string | null }>(
-    db,
-    'SELECT id, user_id, kind, status, fee_order_id FROM pc_shipments WHERE id = ?',
-    shipmentId
-  );
+export async function advanceShipment(db: D1Database, shipmentId: string, to: ShipmentStatus, p: AdvanceInput) {
+  const sh = await one<ShipmentRow>(db, SHIPMENT_SELECT, shipmentId);
   if (!sh) throw pcError('NOT_FOUND');
+  return advanceFrom(db, sh, to, p);
+}
+
+/** One transition, planned from ONE read of the shipment and fenced on it. */
+async function advanceFrom(db: D1Database, sh: ShipmentRow, to: ShipmentStatus, p: AdvanceInput) {
   if (!SHIPMENT_TRANSITIONS[sh.status].includes(to)) throw pcError('INVALID_TRANSITION', { from: sh.status, to });
   if (to === 'awaiting_payment' || (sh.status === 'awaiting_payment' && to === 'preparing')) throw pcError('INVALID_TRANSITION', { reason: 'paid_through_the_fee_order' });
   if (to === 'ready_for_pickup' && sh.kind !== 'pickup') throw pcError('INVALID_TRANSITION', { reason: 'not_a_pickup' });
   if (to === 'shipped' && sh.kind !== 'delivery') throw pcError('INVALID_TRANSITION', { reason: 'not_a_delivery' });
+  const feeOrder = sh.status === 'awaiting_payment' && to === 'cancelled' && sh.fee_order_id ? await one<OrderRow>(db, 'SELECT * FROM pc_orders WHERE id = ?', sh.fee_order_id) : null;
+  // A fee order that was paid moved (or is moving) the shipment on: refuse. One already closed unpaid —
+  // a state an older two-step cancellation could leave — has nothing left to close: the plain path below cancels.
+  if (feeOrder && !['awaiting_payment', 'cancelled', 'expired'].includes(feeOrder.status)) throw pcError('STATE_CHANGED');
+  if (feeOrder && feeOrder.status === 'awaiting_payment') {
+    // Still waiting for its fee: the fee order is closed in the SAME batch,
+    // and closing it cancels this shipment and releases what it held
+    // (closeUnpaidOrder). Cancelling the shipment alone would leave the fee
+    // payable for a delivery that will never happen. The order flip is
+    // op_token fenced, so a payment that lands first makes this refuse.
+    const order = feeOrder;
+    await runBatch(db, [
+      ...(await closeUnpaidOrder(db, order, 'cancelled', p.actorId, p.now, p.note ?? 'shipment cancelled')),
+      fence(db, 'STATE_CHANGED', '(SELECT status FROM pc_shipments WHERE id = ?) = ?', [sh.id, 'cancelled']),
+      db
+        .prepare('UPDATE pc_shipments SET carrier = COALESCE(?, carrier), tracking_ref = COALESCE(?, tracking_ref), notes = COALESCE(?, notes) WHERE id = ?')
+        .bind(p.carrier ?? null, p.tracking_ref ?? null, p.note ?? null, sh.id),
+      ...(await pcAudit(db, p.actorId, 'shipment.advance', sh.id, { from: sh.status, to, tracking_ref: p.tracking_ref ?? null, fee_order_id: order.id })),
+    ]);
+    return { shipment_id: sh.id, status: to };
+  }
   const s: Stmt[] = [
     db
       .prepare(
@@ -242,22 +273,16 @@ export async function advanceShipment(
   return { shipment_id: sh.id, status: to };
 }
 
-/** The customer cancels a shipment before it leaves the workshop (materials released). */
+/**
+ * The customer cancels a shipment before it leaves the workshop (materials
+ * released). One batch, planned from the state the customer saw: an unpaid
+ * fee order is closed with it, and a fee paid meanwhile makes it refuse.
+ */
 export async function cancelShipmentByCustomer(db: D1Database, userId: string, shipmentId: string, now: Date) {
-  const sh = await one<{ status: string; fee_order_id: string | null }>(db, 'SELECT status, fee_order_id FROM pc_shipments WHERE id = ? AND user_id = ?', shipmentId, userId);
+  const sh = await one<ShipmentRow>(db, `${SHIPMENT_SELECT} AND user_id = ?`, shipmentId, userId);
   if (!sh) throw pcError('NOT_FOUND');
   if (sh.status !== 'awaiting_payment' && sh.status !== 'preparing') throw pcError('INVALID_TRANSITION', { from: sh.status, to: 'cancelled' });
-  const s: Stmt[] = [];
-  if (sh.status === 'awaiting_payment' && sh.fee_order_id) {
-    s.push(
-      db
-        .prepare("UPDATE pc_orders SET status = 'cancelled', cancelled_at = ?, updated_at = ? WHERE id = ? AND status = 'awaiting_payment'")
-        .bind(iso(now), iso(now), sh.fee_order_id),
-      db.prepare("UPDATE pc_payments SET status = 'rejected' WHERE order_id = ? AND status = 'pending'").bind(sh.fee_order_id)
-    );
-  }
-  await runBatch(db, s);
-  return advanceShipment(db, shipmentId, 'cancelled', { actorId: userId, now, note: 'cancelled by customer' });
+  return advanceFrom(db, sh, 'cancelled', { actorId: userId, now, note: 'cancelled by customer' });
 }
 
 export async function shipmentView(db: D1Database, shipmentId: string, userId?: string) {

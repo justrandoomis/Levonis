@@ -1,11 +1,25 @@
 /**
  * RECONCILIATION (docs/PRINT_CLOUD.md §11): prove every cache equals the
- * ledger it caches, every reservation belongs to a live job, every paid order
- * has exactly one confirmed payment, and every gram a customer used left the
- * shelf. It REPORTS inconsistencies with the evidence; it never writes a
- * corrective value, because a correction is a decision with an author.
+ * ledger it caches, every lot equals its own draws, every reservation belongs
+ * to a live job, every printer and job holds at most one active assignment,
+ * every paid order has exactly one confirmed payment, and every gram a
+ * customer used left the shelf. It REPORTS inconsistencies with the evidence;
+ * it never writes a corrective value, because a correction is a decision with
+ * an author.
+ *
+ * Per lot, not only in total: units moved from one lot's remainder to
+ * another's leave every total intact, so each lot is held to the draws that
+ * took from it — what was drawn equals the sum of its draws, and their value
+ * is exactly the cumulative valuation of lots.ts, round(paid × drawn / total)
+ * (`roundedShare`), so never more than was paid for the lot.
  */
 import { many } from './db';
+
+/** round(value × qty / total) half up in SQLite integers — lots.ts `drawValue`'s cumulative share (util.ts `mulDivRound`). */
+const roundedShare = (value: string, qty: string, total: string) => `(2 * ${value} * ${qty} + ${total}) / (2 * ${total})`;
+
+/** States in which a job is on a machine: an active printer assignment exists exactly for them (queue.ts, jobs.ts). */
+const ON_THE_FLOOR = "('preparing', 'printing', 'paused')";
 
 export interface Check {
   name: string;
@@ -42,6 +56,17 @@ export async function reconcile(db: D1Database): Promise<{ ok: boolean; checks: 
       )
     ),
     check(
+      'credit_lots_equal_their_draws',
+      many(
+        db,
+        `SELECT l.id AS lot_id, l.account_id, l.seconds_total - l.seconds_remaining AS drawn, COALESCE(SUM(d.seconds), 0) AS draws,
+                l.paid_iqd, COALESCE(SUM(d.value_iqd), 0) AS drawn_value
+           FROM pc_credit_lots l LEFT JOIN pc_credit_lot_draws d ON d.lot_id = l.id
+          GROUP BY l.id
+         HAVING drawn <> draws OR drawn_value <> ${roundedShare('l.paid_iqd', 'draws', 'l.seconds_total')}`
+      )
+    ),
+    check(
       'credit_reservations_equal_reserved',
       many(
         db,
@@ -72,6 +97,17 @@ export async function reconcile(db: D1Database): Promise<{ ok: boolean; checks: 
       )
     ),
     check(
+      'inventory_lots_equal_their_draws',
+      many(
+        db,
+        `SELECT l.id AS lot_id, l.account_id, l.qty_total - l.qty_remaining AS drawn, COALESCE(SUM(d.qty), 0) AS draws,
+                l.paid_iqd, COALESCE(SUM(d.value_iqd), 0) AS drawn_value
+           FROM pc_inventory_lots l LEFT JOIN pc_inventory_lot_draws d ON d.lot_id = l.id
+          GROUP BY l.id
+         HAVING drawn <> draws OR drawn_value <> ${roundedShare('l.paid_iqd', 'draws', 'l.qty_total')}`
+      )
+    ),
+    check(
       'inventory_reservations_equal_reserved',
       many(
         db,
@@ -99,6 +135,23 @@ export async function reconcile(db: D1Database): Promise<{ ok: boolean; checks: 
         `SELECT p.variant_id, p.on_hand_qty, COALESCE(SUM(l.on_hand_qty), 0) AS lots_on_hand
            FROM pc_stock_positions p LEFT JOIN pc_stock_lots l ON l.variant_id = p.variant_id
           GROUP BY p.variant_id HAVING p.on_hand_qty <> lots_on_hand`
+      )
+    ),
+    check(
+      // A stock lot's draws at a known cost are valued after the ones taken
+      // while its cost was pending (cost 0): together, the lot's cumulative
+      // share of what was drawn less the share of the pending prefix.
+      'stock_lots_equal_their_draws',
+      many(
+        db,
+        `SELECT l.id AS lot_id, l.variant_id, l.received_qty - l.on_hand_qty AS drawn, COALESCE(SUM(d.qty), 0) AS draws,
+                COALESCE(SUM(CASE WHEN d.cost_known = 0 THEN d.qty ELSE 0 END), 0) AS draws_cost_pending,
+                l.cost_known, COALESCE(SUM(d.cost_iqd), 0) AS drawn_cost
+           FROM pc_stock_lots l LEFT JOIN pc_stock_lot_draws d ON d.lot_id = l.id
+          GROUP BY l.id
+         HAVING drawn <> draws
+             OR (l.cost_known = 0 AND draws_cost_pending <> draws)
+             OR drawn_cost <> ${roundedShare('l.total_cost_iqd', 'draws', 'l.received_qty')} - ${roundedShare('l.total_cost_iqd', 'draws_cost_pending', 'l.received_qty')}`
       )
     ),
     check(
@@ -145,6 +198,27 @@ export async function reconcile(db: D1Database): Promise<{ ok: boolean; checks: 
         `SELECT j.id AS job_id, j.status FROM pc_print_jobs j
           WHERE j.status IN ('confirmed', 'queued', 'preparing', 'printing', 'paused')
             AND NOT EXISTS (SELECT 1 FROM pc_credit_reservations r WHERE r.job_id = j.id AND r.state = 'active')`
+      )
+    ),
+    check(
+      // The partial unique indexes refuse a second one; this proves it independently of them.
+      'one_active_assignment_per_printer_and_job',
+      many(
+        db,
+        `SELECT 'printer' AS kind, printer_id AS ref_id, COUNT(*) AS active FROM pc_printer_assignments WHERE state = 'active' GROUP BY printer_id HAVING COUNT(*) > 1
+         UNION ALL
+         SELECT 'job', job_id, COUNT(*) FROM pc_printer_assignments WHERE state = 'active' GROUP BY job_id HAVING COUNT(*) > 1`
+      )
+    ),
+    check(
+      'active_assignments_match_jobs_on_the_floor',
+      many(
+        db,
+        `SELECT 'assignment_without_job_on_the_floor' AS kind, a.job_id, a.printer_id, j.status FROM pc_printer_assignments a LEFT JOIN pc_print_jobs j ON j.id = a.job_id
+          WHERE a.state = 'active' AND (j.id IS NULL OR j.status NOT IN ${ON_THE_FLOOR})
+         UNION ALL
+         SELECT 'job_on_the_floor_without_assignment', j.id, NULL, j.status FROM pc_print_jobs j
+          WHERE j.status IN ${ON_THE_FLOOR} AND NOT EXISTS (SELECT 1 FROM pc_printer_assignments a WHERE a.job_id = j.id AND a.state = 'active')`
       )
     ),
     check(

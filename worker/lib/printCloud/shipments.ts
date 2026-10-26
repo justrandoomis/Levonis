@@ -1,11 +1,12 @@
 /**
  * Shipment primitives: the rows a pickup or a home delivery is made of. The
  * flows that create and advance them live in fulfillment.ts and orders.ts;
- * these builders only write rows, so both can use them without importing
- * each other.
+ * these builders only build statements, so both can use them and
+ * fulfillment.ts can close a fee order (orders.ts) without a cycle.
  */
-import type { Stmt } from './db';
+import { many, type Stmt } from './db';
 import { invalid } from './errors';
+import { releaseInventory, type InventoryReservationRow } from './inventory';
 import { iso, pcId } from './util';
 import { normalizeGovernorate } from '../iraqGovernorates';
 
@@ -86,4 +87,19 @@ export function shipmentInventoryItem(db: D1Database, shipmentId: string, reserv
       "INSERT INTO pc_shipment_items (id, shipment_id, item_type, inventory_reservation_id, variant_id, qty, live) VALUES (?, ?, 'inventory', ?, ?, ?, 1)"
     )
     .bind(pcId('pcsi'), shipmentId, reservationId, variantId, qty);
+}
+
+/** Release everything a shipment held and take its items off it. Statements only. */
+export async function shipmentCancelStatements(db: D1Database, shipmentId: string, actorId: string, now: Date): Promise<Stmt[]> {
+  const s: Stmt[] = [
+    db.prepare('UPDATE pc_shipment_items SET live = 0 WHERE shipment_id = ?').bind(shipmentId),
+    db.prepare('UPDATE pc_print_jobs SET shipment_id = NULL WHERE shipment_id = ?').bind(shipmentId),
+  ];
+  const holds = await many<InventoryReservationRow>(
+    db,
+    "SELECT id, account_id, user_id, variant_id, purpose, ref_id, qty_reserved, qty_consumed, qty_released, state FROM pc_inventory_reservations WHERE purpose = 'delivery' AND ref_id = ? AND state = 'active'",
+    shipmentId
+  );
+  for (const r of holds) s.push(...releaseInventory(db, r, actorId, now, 'shipment cancelled'));
+  return s;
 }

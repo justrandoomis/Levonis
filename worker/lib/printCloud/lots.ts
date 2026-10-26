@@ -54,6 +54,19 @@ export function planDraws(lots: LotState[], qty: number): { draws: LotDraw[]; sh
   return { draws, shortfall: Math.max(0, left), value };
 }
 
+/**
+ * Take a plan's draws out of the lot states it was made from, in place. A
+ * batch that draws the same lots twice plans the second draw from what the
+ * first left: its fences then expect the quantities the first draw's UPDATEs
+ * leave behind, and its values continue each lot's cumulative count.
+ */
+export function applyDraws(lots: LotState[], draws: LotDraw[]): void {
+  for (const d of draws) {
+    const lot = lots.find((l) => l.id === d.lotId);
+    if (lot) lot.remaining -= d.qty;
+  }
+}
+
 /** The value of `qty` units taken from `lots` in order, without drawing (an estimate for a buyback request). */
 export function previewValue(lots: LotState[], qty: number): number {
   return planDraws(lots, qty).value;

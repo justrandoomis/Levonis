@@ -13,13 +13,17 @@
  * variant's sellable quantity is still ≥ 0 — so the same last 100 g can never
  * be held by two orders, whatever order their requests arrive in. Payment
  * converts the hold to an allocation; a print, a delivery or a waste record
- * takes it off the shelf, lot by lot (FIFO), each lot valued at its cost.
+ * takes it off the shelf, lot by lot (FIFO), each lot valued at its cost and
+ * each lot's share kept (`pc_stock_lot_draws`). A lot received without a cost
+ * is cost PENDING (`cost_known` = 0) until the owner states it: what leaves
+ * it meanwhile is recorded at no cost and flagged, and the profit report
+ * values it once the cost is known (reports.ts `profitReport`).
  *
  * Every physical movement is one append-only `pc_warehouse_ledger` row.
  */
 import { fence, many, one, type Stmt } from './db';
 import { pcError } from './errors';
-import { planDraws, type LotState } from './lots';
+import { applyDraws, planDraws, type LotState } from './lots';
 import { iso, mulDivRound, pcId } from './util';
 
 export type WarehouseEntryType =
@@ -128,7 +132,8 @@ export const sellable = (p: StockPosition): number => Number(p.on_hand_qty) - Nu
 export interface ReceiveInput {
   variantId: string;
   qty: number;
-  totalCostIqd: number;
+  /** What the lot cost; null when the owner has not stated it yet (cost pending). */
+  totalCostIqd: number | null;
   locationId?: string | null;
   lotCode?: string;
   supplier?: string;
@@ -137,12 +142,13 @@ export interface ReceiveInput {
   now: Date;
 }
 
-/** A delivery from a supplier: a new physical lot at its cost, on hand and sellable. */
+/** A delivery from a supplier: a new physical lot at its cost (or cost pending), on hand and sellable. */
 export function receiveStock(db: D1Database, r: ReceiveInput): { lotId: string; statements: Stmt[] } {
   if (!Number.isSafeInteger(r.qty) || r.qty <= 0) throw pcError('VALIDATION', { field: 'qty' });
-  if (!Number.isSafeInteger(r.totalCostIqd) || r.totalCostIqd < 0) throw pcError('VALIDATION', { field: 'total_cost_iqd' });
+  if (r.totalCostIqd !== null && (!Number.isSafeInteger(r.totalCostIqd) || r.totalCostIqd < 0)) throw pcError('VALIDATION', { field: 'total_cost_iqd' });
   const lotId = pcId('pcsl');
-  const unitMilli = mulDivRound(r.totalCostIqd, 1000, r.qty);
+  const totalCost = r.totalCostIqd ?? 0;
+  const unitMilli = mulDivRound(totalCost, 1000, r.qty);
   return {
     lotId,
     statements: [
@@ -150,8 +156,8 @@ export function receiveStock(db: D1Database, r: ReceiveInput): { lotId: string; 
       db
         .prepare(
           `INSERT INTO pc_stock_lots (id, variant_id, location_id, lot_code, supplier, received_qty, on_hand_qty, unit_cost_milli_iqd,
-             total_cost_iqd, received_at, received_by, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+             total_cost_iqd, cost_known, received_at, received_by, notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .bind(
           lotId,
@@ -162,7 +168,8 @@ export function receiveStock(db: D1Database, r: ReceiveInput): { lotId: string; 
           r.qty,
           r.qty,
           unitMilli,
-          r.totalCostIqd,
+          totalCost,
+          r.totalCostIqd === null ? 0 : 1,
           iso(r.now),
           r.actorId,
           (r.notes ?? '').slice(0, 500)
@@ -176,7 +183,7 @@ export function receiveStock(db: D1Database, r: ReceiveInput): { lotId: string; 
         dOnHand: r.qty,
         dReserved: 0,
         dAllocated: 0,
-        cost: r.totalCostIqd,
+        cost: totalCost,
         actorId: r.actorId,
         now: r.now,
       }),
@@ -306,19 +313,49 @@ export interface PhysicalMove {
 }
 
 /**
+ * The stock lots one batch has planned against, per variant. A batch that
+ * takes one variant off the shelf more than once (a job's billed grams AND
+ * the grams the workshop absorbs) passes the same map to every move, so each
+ * move plans from what the earlier ones left — two plans read from one
+ * snapshot would fence the same lot on the same quantity, and the second
+ * fence could never hold.
+ */
+export type BatchLots = Map<string, LotState[]>;
+
+/**
  * Units physically leave the shelf: drawn from the oldest stock lots, each
  * lot fenced on the quantity the plan read, the cost recorded. On-hand can
  * never go negative (ck_pc_stock_on_hand → STOCK_DEFICIT): the workshop must
  * receive stock before it can record using stock it does not have.
+ *
+ * Each lot's share is a `pc_stock_lot_draws` row. It counts as valued at a
+ * KNOWN cost only when, inside this batch, the lot's cost is known and is the
+ * one the plan valued it at: a pending lot whose cost the owner states between
+ * the plan and the batch leaves this share flagged pending at cost 0, and the
+ * profit report values it from the stated cost — never a known zero.
  */
-export async function removePhysical(db: D1Database, m: PhysicalMove): Promise<{ statements: Stmt[]; cost: number }> {
+export async function removePhysical(db: D1Database, m: PhysicalMove, batchLots?: BatchLots): Promise<{ statements: Stmt[]; cost: number }> {
   if (!Number.isSafeInteger(m.qty) || m.qty <= 0) throw pcError('VALIDATION', { field: 'qty' });
-  const plan = planDraws(await stockLots(db, m.variantId), m.qty);
+  let lots = batchLots?.get(m.variantId);
+  if (!lots) {
+    lots = await stockLots(db, m.variantId);
+    batchLots?.set(m.variantId, lots);
+  }
+  const plan = planDraws(lots, m.qty);
   if (plan.shortfall > 0) throw pcError('STOCK_DEFICIT', { variant_id: m.variantId, missing: plan.shortfall });
+  applyDraws(lots, plan.draws);
   const statements: Stmt[] = [];
   for (const d of plan.draws) {
     statements.push(fence(db, 'STATE_CHANGED', '(SELECT on_hand_qty FROM pc_stock_lots WHERE id = ?) = ?', [d.lotId, d.expectedRemaining]));
     statements.push(db.prepare('UPDATE pc_stock_lots SET on_hand_qty = on_hand_qty - ? WHERE id = ?').bind(d.qty, d.lotId));
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO pc_stock_lot_draws (id, lot_id, ledger_entry_key, qty, cost_iqd, cost_known, created_at)
+           SELECT ?, id, ?, ?, ?, CASE WHEN cost_known = 1 AND total_cost_iqd = ? THEN 1 ELSE 0 END, ? FROM pc_stock_lots WHERE id = ?`
+        )
+        .bind(pcId('pcsd'), m.entryKey, d.qty, d.value, lots.find((l) => l.id === d.lotId)?.value ?? 0, iso(m.now), d.lotId)
+    );
   }
   statements.push(positionDelta(db, m.variantId, -m.qty, 0, m.fromAllocated ? -m.qty : 0, m.now));
   statements.push(
@@ -397,15 +434,15 @@ export function allocateWithoutSale(
   ];
 }
 
-/** A count found MORE than the books say: a zero-cost adjustment lot (cost is unknown, never invented). */
+/** A count found MORE than the books say: an adjustment lot whose cost is pending (unknown, never invented). */
 export function adjustUp(db: D1Database, p: { variantId: string; qty: number; reason: string; actorId: string; now: Date }): Stmt[] {
   const lotId = pcId('pcsl');
   return [
     ensurePosition(db, p.variantId, p.now),
     db
       .prepare(
-        `INSERT INTO pc_stock_lots (id, variant_id, lot_code, received_qty, on_hand_qty, unit_cost_milli_iqd, total_cost_iqd, received_at, received_by, notes)
-         VALUES (?, ?, 'ADJUSTMENT', ?, ?, 0, 0, ?, ?, ?)`
+        `INSERT INTO pc_stock_lots (id, variant_id, lot_code, received_qty, on_hand_qty, unit_cost_milli_iqd, total_cost_iqd, cost_known, received_at, received_by, notes)
+         VALUES (?, ?, 'ADJUSTMENT', ?, ?, 0, 0, 0, ?, ?, ?)`
       )
       .bind(lotId, p.variantId, p.qty, p.qty, iso(p.now), p.actorId, p.reason.slice(0, 500)),
     positionDelta(db, p.variantId, p.qty, 0, 0, p.now),

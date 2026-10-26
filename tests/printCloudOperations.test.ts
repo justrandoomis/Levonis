@@ -253,7 +253,8 @@ test('the agent: scoped to its printers; stale telemetry is said to be stale; a 
   assert.equal(fresh.connectivity, 'online');
   assert.equal(fresh.telemetry.live, true);
   assert.deepEqual(fresh.telemetry.camera, { available: true, stream_id: 'cam-1' }, 'camera metadata only — no URL, no credential');
-  w.raw.prepare("UPDATE pc_printer_telemetry SET received_at = '2000-01-01T00:00:00.000Z' WHERE printer_id = ?").run(cat.printers[0]);
+  // Silence: neither a reading nor a connection since 2000.
+  w.raw.prepare("UPDATE pc_printer_telemetry SET received_at = '2000-01-01T00:00:00.000Z', arrived_at = '2000-01-01T00:00:00.000Z' WHERE printer_id = ?").run(cat.printers[0]);
   const stale = (await ok(w.assistant, 'GET', `${ADMIN}/printers`)).find((p: Record<string, string>) => p.id === cat.printers[0]);
   assert.equal(stale.connectivity, 'offline');
   assert.equal(stale.telemetry.stale, true);

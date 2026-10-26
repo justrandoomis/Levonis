@@ -21,7 +21,7 @@
 import { many, one, fence, runBatch } from './db';
 import { pcError } from './errors';
 import { loadJob, recordEstimate, slicingFailed, type EstimateInput } from './jobs';
-import type { AgentRow } from './printers';
+import { agentCan, type AgentRow } from './printers';
 import { addSeconds, iso, pcId } from './util';
 
 export const SLICING_LEASE_SECONDS = 10 * 60;
@@ -123,21 +123,28 @@ export async function sweepSlicingLeases(db: D1Database, now: Date, unitFits?: (
   return { requeued, failed, more: expired.length === 50 };
 }
 
-/** May this agent download this file? Only for a job it is slicing or printing. */
+/**
+ * May this agent download this file? Only for a job it is slicing (holding
+ * the claim, with the `slicer` capability) or printing (a job on one of its
+ * printers, with `job_control`). A token scoped to telemetry or the camera
+ * reads no customer's model, whatever its printers are running.
+ */
 export async function agentMayReadFile(db: D1Database, agent: AgentRow, fileId: string): Promise<boolean> {
-  const row = await one<{ n: number }>(
-    db,
-    `SELECT
-       (SELECT COUNT(*) FROM pc_slicing_requests r JOIN pc_print_jobs j ON j.id = r.job_id
+  const branches: string[] = [];
+  const params: string[] = [];
+  if (agentCan(agent, 'slicer')) {
+    branches.push(`(SELECT COUNT(*) FROM pc_slicing_requests r JOIN pc_print_jobs j ON j.id = r.job_id
           JOIN pc_project_models m ON m.project_id = j.project_id
-         WHERE r.claimed_by = ? AND r.status = 'claimed' AND m.file_id = ?)
-     + (SELECT COUNT(*) FROM pc_printer_assignments a JOIN pc_printers p ON p.id = a.printer_id
+         WHERE r.claimed_by = ? AND r.status = 'claimed' AND m.file_id = ?)`);
+    params.push(agent.id, fileId);
+  }
+  if (agentCan(agent, 'job_control')) {
+    branches.push(`(SELECT COUNT(*) FROM pc_printer_assignments a JOIN pc_printers p ON p.id = a.printer_id
           JOIN pc_print_jobs j ON j.id = a.job_id JOIN pc_project_models m ON m.project_id = j.project_id
-         WHERE p.agent_id = ? AND a.state = 'active' AND m.file_id = ?) AS n`,
-    agent.id,
-    fileId,
-    agent.id,
-    fileId
-  );
+         WHERE p.agent_id = ? AND a.state = 'active' AND m.file_id = ?)`);
+    params.push(agent.id, fileId);
+  }
+  if (!branches.length) return false;
+  const row = await one<{ n: number }>(db, `SELECT ${branches.join(' + ')} AS n`, ...params);
   return Number(row?.n ?? 0) > 0;
 }

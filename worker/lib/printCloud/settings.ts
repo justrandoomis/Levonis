@@ -102,11 +102,14 @@ const pick = <T extends string>(v: unknown, allowed: readonly T[], def: T): T =>
   typeof v === 'string' && (allowed as readonly string[]).includes(v) ? (v as T) : def;
 
 const HOST_RE = /^(?=.{1,253}$)([a-z0-9-]{1,63}\.)+[a-z]{2,63}$/;
+const GOVERNORATE_RE = /^[a-z_]{2,40}$/;
+const MAX_GOVERNORATES = 30;
+const MAX_PROVIDERS = 20;
 
 function normalizeProviders(v: unknown): ImportProvider[] {
   if (!Array.isArray(v)) return DEFAULT_IMPORT_PROVIDERS.map((p) => ({ ...p }));
   const out: ImportProvider[] = [];
-  for (const raw of v.slice(0, 20)) {
+  for (const raw of v.slice(0, MAX_PROVIDERS)) {
     if (!raw || typeof raw !== 'object') continue;
     const p = raw as Record<string, unknown>;
     const id = typeof p.id === 'string' && /^[a-z0-9_-]{2,40}$/.test(p.id) ? p.id : '';
@@ -132,8 +135,8 @@ export function normalizeConfig(raw: unknown): PrintCloudConfig {
   const del = r.delivery && typeof r.delivery === 'object' ? (r.delivery as Record<string, unknown>) : {};
   const fees: Record<string, number> = {};
   if (del.fee_by_governorate && typeof del.fee_by_governorate === 'object') {
-    for (const [k, v] of Object.entries(del.fee_by_governorate as Record<string, unknown>).slice(0, 30)) {
-      if (/^[a-z_]{2,40}$/.test(k) && typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 && v <= 1_000_000) fees[k] = v;
+    for (const [k, v] of Object.entries(del.fee_by_governorate as Record<string, unknown>).slice(0, MAX_GOVERNORATES)) {
+      if (GOVERNORATE_RE.test(k) && typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 && v <= 1_000_000) fees[k] = v;
     }
   }
   return {
@@ -194,11 +197,99 @@ export function publicSettings(config: PrintCloudConfig): Omit<PrintCloudConfig,
 
 export const COST_SETTING_KEYS = ['cost_electricity_iqd_per_kwh'] as const;
 
+const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+const has = (o: Record<string, unknown>, k: string) => Object.prototype.hasOwnProperty.call(o, k);
+
+/**
+ * The stored configuration with a patch laid over it KEY BY KEY at every
+ * level: a patch naming one delivery or failure-policy key changes that key
+ * alone, and every sibling keeps the value the owner set. Governorate fees
+ * merge one by one, and a fee set to null removes that governorate. A list
+ * (`import_providers`) is replaced whole.
+ */
+function mergeConfig(current: PrintCloudConfig, patch: Record<string, unknown>): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...current, ...patch };
+  if (patch.failure_policy !== undefined) {
+    if (!isObject(patch.failure_policy)) throw invalid('failure_policy', 'object_required');
+    merged.failure_policy = { ...current.failure_policy, ...patch.failure_policy };
+  }
+  if (patch.delivery !== undefined) {
+    if (!isObject(patch.delivery)) throw invalid('delivery', 'object_required');
+    const fees = patch.delivery.fee_by_governorate;
+    if (fees !== undefined && !isObject(fees)) throw invalid('delivery.fee_by_governorate', 'object_required');
+    const kept = Object.entries({ ...current.delivery.fee_by_governorate, ...fees }).filter(([, fee]) => fee !== null);
+    if (kept.length > MAX_GOVERNORATES) throw invalid('delivery.fee_by_governorate', 'too_many');
+    merged.delivery = { ...current.delivery, ...patch.delivery, fee_by_governorate: Object.fromEntries(kept) };
+  }
+  return merged;
+}
+
+/** Why a stated value did not survive normalisation, in the words the catalogue's validators use. */
+function refusal(kept: unknown, asked: unknown): string {
+  if (typeof kept === 'number') return typeof asked === 'number' && Number.isSafeInteger(asked) ? 'out_of_range' : 'integer_required';
+  if (typeof kept === 'boolean') return 'boolean_required';
+  if (typeof kept === 'string') return 'not_allowed';
+  return 'invalid_value';
+}
+
+/**
+ * A value the patch states must come out of normalisation exactly as stated.
+ * normalizeConfig is the safety net of every READ: it swaps anything out of
+ * range, of the wrong type or unknown for the default. On a WRITE that swap
+ * would change a business rule nobody asked to change, so it is refused.
+ */
+function assertKept(path: string, asked: unknown, kept: unknown): void {
+  if (isObject(kept)) {
+    if (!isObject(asked)) throw invalid(path, 'object_required');
+    for (const [k, v] of Object.entries(asked)) {
+      if (!has(kept, k)) throw invalid(`${path}.${k}`, 'unknown_setting');
+      assertKept(`${path}.${k}`, v, kept[k]);
+    }
+    return;
+  }
+  if (Array.isArray(kept)) {
+    if (!Array.isArray(asked)) throw invalid(path, 'array_required');
+    if (asked.length !== kept.length) throw invalid(path, 'invalid_value');
+    asked.forEach((v, i) => assertKept(`${path}[${i}]`, v, kept[i]));
+    return;
+  }
+  if (asked !== kept) throw invalid(path, refusal(kept, asked));
+}
+
+/** Every stated key of a patch, checked against the configuration it produced. */
+function assertPatchKept(patch: Record<string, unknown>, next: PrintCloudConfig): void {
+  for (const [key, asked] of Object.entries(patch)) {
+    if (key === 'delivery') {
+      const { fee_by_governorate: fees, ...rest } = asked as Record<string, unknown>;
+      assertKept('delivery', rest, next.delivery);
+      for (const [g, fee] of Object.entries((fees ?? {}) as Record<string, unknown>)) {
+        const path = `delivery.fee_by_governorate.${g}`;
+        if (!GOVERNORATE_RE.test(g)) throw invalid(path, 'not_allowed');
+        if (fee !== null && (!has(next.delivery.fee_by_governorate, g) || next.delivery.fee_by_governorate[g] !== fee)) throw invalid(path, refusal(0, fee));
+      }
+    } else if (key === 'import_providers') {
+      // Each provider on its own, so a dropped one is named rather than shifting the rest.
+      if (!Array.isArray(asked)) throw invalid(key, 'array_required');
+      if (asked.length > MAX_PROVIDERS) throw invalid(key, 'too_many');
+      asked.forEach((p, i) => {
+        const [kept] = normalizeProviders([p]);
+        if (!kept) throw invalid(`${key}[${i}]`, 'invalid_value');
+        assertKept(`${key}[${i}]`, p, kept);
+      });
+      if (next.import_providers.length !== asked.length) throw invalid(key, 'duplicate');
+    } else {
+      assertKept(key, asked, next[key as keyof PrintCloudConfig]);
+    }
+  }
+}
+
 /**
  * The statement that writes a new configuration, fenced on the version the
  * editor read (a stale editor's save aborts with STATE_CHANGED). The patch is
- * merged over the stored config and normalised; unknown keys are refused so a
- * typo is an error, not a silent no-op.
+ * merged over the stored config key by key (`mergeConfig`) and every value it
+ * states is validated against the bounds of `normalizeConfig`: an unknown key
+ * or a value out of range is refused, so a typo is an error, never a silent
+ * no-op or a silent default.
  */
 export function configWrite(
   db: D1Database,
@@ -209,8 +300,8 @@ export function configWrite(
 ): { next: PrintCloudConfig; statements: Stmt[] } {
   const known = new Set(Object.keys(DEFAULT_CONFIG));
   for (const k of Object.keys(patch)) if (!known.has(k)) throw invalid(k, 'unknown_setting');
-  const merged = { ...current.config, ...patch };
-  const next = normalizeConfig(merged);
+  const next = normalizeConfig(mergeConfig(current.config, patch));
+  assertPatchKept(patch, next);
   const value = JSON.stringify(next);
   const statements: Stmt[] = [];
   if (current.version === 0) {

@@ -20,12 +20,12 @@ DECISIONS row 270 records the decision and its open owner questions.
 
 | | |
 |---|---|
-| Migration | `migrations/0215_print_cloud.sql` — 68 `pc_*` tables, triggers and indexes; touches no existing table |
+| Migration | `migrations/0215_print_cloud.sql` — 69 `pc_*` tables, triggers and indexes; touches no existing table |
 | Library | `worker/lib/printCloud/*.ts` (one module per domain, listed per section below) |
 | Routers | `worker/routes/printCloud.ts` (customer), `printCloudAgent.ts` (workshop agent), `printCloudAdmin.ts` (administration) |
 | Mounts | `/api/print-cloud/v1`, `/api/print-cloud/v1/agent`, `/api/admin/print-cloud` (`worker/index.ts`) |
 | Hosts | the main host, the `cloud` system subdomain, and foreign hosts outside the root; **never** a merchant storefront (`printCloudHostAllowed`, `worker/lib/printCloud/http.ts`) |
-| OpenAPI | `GET /api/print-cloud/v1/openapi.json` — generated from `worker/lib/printCloud/openapi.ts`; 147 operations, and `tests/printCloudOpenApi.test.ts` fails if a route and its documentation disagree. Owner-only cost fields are described in the owner's copy only |
+| OpenAPI | `GET /api/print-cloud/v1/openapi.json` — generated from `worker/lib/printCloud/openapi.ts`; 148 operations, and `tests/printCloudOpenApi.test.ts` fails if a route and its documentation disagree. Owner-only cost fields are described in the owner's copy only |
 | Default state | **closed**: `pc_settings.enabled = false`, customer doors answer `503 PRINT_CLOUD_DISABLED` (admins still work) until the owner opens the service |
 | Without the migration | reads see an empty, closed service (lists empty, a named record 404, `GET /status` says `installed: false`) — exactly the answers of a migrated database with no data; every write answers `503 PRINT_CLOUD_NOT_INSTALLED` before any statement; the cron step does nothing (`tests/costDeployAhead.test.ts`) |
 
@@ -88,6 +88,10 @@ Owner-managed rows, all through `POST/PATCH /api/admin/print-cloud/catalog/{enti
 - **Promotions**, **warehouse locations**, **accessory rules**, **conversion rules**.
 
 Every price edit writes a `pc_price_changes` row (who, before, after). A
+price is also every term that decides what a customer pays — a promotion's or
+a package's switch, window and limits, a tier's switch, a printer model's tier,
+a machine moved to a model of another tier, a machine registered at all — so
+each needs money scope. A
 catalogue answer leaves through `stripCost` unless the caller is the owner.
 
 ## 3. Printing-hour credits — `credits.ts`
@@ -107,8 +111,14 @@ recognised for a lot always sum to exactly what was paid for it (`lots.ts`).
 
 Credits never expire. An administrator may set `expires_after_days` on a
 package; the package then states it to the customer before purchase and the
-`expire_credit_lots` task releases only the unused, unreserved part of an
-expired lot, with its own ledger rows.
+`expire_credit_lots` task takes only the FREE part of an expired lot, with its
+own ledger rows. Reservations hold the expiring lots first, so hours a job
+reserved before the expiry stay for that job (what it gives back expires on a
+later run). A confirmation first expires the customer's due lots itself, so a
+job confirmed after an expiry — before the sweep came by — can only reserve
+hours that are still good. Converted hours keep the expiry they were bought
+under. A lot that fails to expire fails the task (retried, its error visible
+in `GET /admin/print-cloud/tasks`).
 
 ### 3.3 Reservation and settlement
 
@@ -195,8 +205,10 @@ customer's threshold or `low_inventory_default_g`.
 Not the same thing as what customers own. `pc_stock_positions` per variant and
 location: `on_hand`, `held` (unpaid orders), `allocated` (bought, still on the
 shelf for customers), with `sellable = on_hand − held − allocated` fenced
-non-negative. Stock lots record supplier cost (owner-only); consumption draws
-them FIFO; every movement is a `pc_warehouse_ledger` row. Customer-owned
+non-negative. Stock lots record supplier cost (owner-only) — or cost
+pending, when an operator receives a lot (or a count finds one) without it;
+consumption draws them FIFO, each lot's share kept (`pc_stock_lot_draws`);
+every movement is a `pc_warehouse_ledger` row. Customer-owned
 material stays physically in the warehouse as an allocation until printed,
 delivered or bought back.
 
@@ -273,7 +285,13 @@ Terminal: `completed`, `cancelled`, `reprint_requested`.
 Confirmed jobs wait in `pc_queue_entries` by priority and time. The scheduler
 (task `schedule_queue`, or `POST /admin/print-cloud/queue/run`) assigns a job
 only to a printer of the right model that is idle, live (fresh telemetry for an
-agent printer), loaded with compatible material, and not in maintenance. A
+agent printer, in which the agent reaches it and it runs no print of its own),
+loaded with compatible material, and not in maintenance. A pass reads the whole
+queue a page at a time and spends its statement share only on work, so jobs no
+machine can take never hide the ones behind them. A job that depends on
+another runs once that print is made — the job or its reprint; when it can no
+longer be made (cancelled, or failed and closed without a reprint) the waiting
+job is cancelled, its reservations released and the customer told. A
 partial unique index makes two active assignments on one printer impossible —
 scheduler, operator and database all refuse. Customers see their position and
 an estimate built from real queued durations.
@@ -342,13 +360,24 @@ list of printers and capabilities (`telemetry`, `job_control`, `slicer`,
 
 Agent doors: `GET /printers`, `POST /printers/{id}/telemetry`,
 `POST /jobs/{id}/events` (`started`, `paused`, `resumed`, `completed`,
-`failed`; idempotent by state), `GET /commands`, `POST /slicing/claim`,
+`failed`; `started` only out of `preparing`, `paused` and `resumed` carry the
+agent's `event_id`, and a re-sent event answers `already_applied` and changes
+nothing), `GET /commands`, `POST /slicing/claim`,
 `POST /slicing/{id}/result`, `POST /slicing/{id}/failure`, `GET /files/{id}`
-(only a file of a job it is slicing or printing).
+(only a file of a job it is slicing, with `slicer`, or printing, with
+`job_control`).
 
 Telemetry older than `telemetry_stale_seconds` is reported **stale**, never as
-live; a silent agent printer receives no work. Camera data is metadata only
-(availability, stream id, resolution).
+live; a silent agent printer receives no work. A reading is dated by when it
+was taken: its arrival less its age, the age being `sent_at - reported_at` (two
+readings of the agent's one clock, so clock skew cancels; without `sent_at`,
+`now - reported_at`). One older than the stored reading is answered
+`superseded` and changes nothing. «Back from silence» (`connection_restored`,
+and `reconcile_needed` for a print finished meanwhile) is judged by the gap
+between POST arrivals on the server clock — once per outage, however many
+buffered readings the reconnection flushes. `GET /status`
+calls the slicer `connected` only when a slicer agent called in within the same
+window. Camera data is metadata only (availability, stream id, resolution).
 
 ## 10. Dashboards, notifications and administration
 
@@ -356,7 +385,9 @@ live; a silent agent printer receives no work. Camera data is metadata only
 
 `/me/dashboard` gathers balances, reservations, active jobs, queue positions,
 shipments and reminders; `/me/transactions` merges the credit, inventory and
-order histories. Customers are notified (three languages) on payment, job
+order histories, paged on a strict (time, ledger, id) cursor (`next_before`),
+so rows one batch wrote at one instant are never skipped between pages.
+Customers are notified (three languages) on payment, job
 transitions, failures, shipment changes and low inventory.
 
 ### 10.2 Administration — `routes/printCloudAdmin.ts`
@@ -374,15 +405,24 @@ admin route for the platform's role-matrix sweeps.
 
 Reports: revenue (cash collected and revenue recognised from lot draws),
 profit (owner only — revenue minus material, machine and electricity cost),
-operations (utilisation, failures, queue).
+operations (utilisation, failures, queue). A refund of unused hours or grams
+gives back deferred value, never revenue: profit moves only by what was paid
+back beyond (or kept of) that value, or by a refunded delivery fee. Units
+drawn from a lot whose cost is still pending are listed (`cost_pending`,
+`cost_complete: false`), never costed as a known zero; the owner states the
+lot's cost once (`POST /admin/print-cloud/stock/lots/{id}/cost`) and the
+units already used are then valued from it in the period they left.
 
 ## 11. Reconciliation — `reconcile.ts`
 
 `GET /admin/print-cloud/reconcile` and the daily `reconcile` task prove that
 every cached balance equals its ledger and lots: credit and inventory accounts,
-lot remainders, stock positions, holds and allocations, active reservations
-against job states, one assignment per printer, paid orders against payments.
-Sixteen checks; a mismatch is **reported**, never silently repaired.
+each credit, inventory and stock lot against its own draws (remainder and
+value), stock positions, holds and allocations, active reservations against
+job states, one active assignment per printer and per job (also enforced by
+the partial unique indexes) and only for jobs on a machine, paid orders
+against payments. Twenty-one checks; a mismatch is **reported**, never
+silently repaired.
 
 ## 12. Background work — `background.ts`, `tasks.ts`
 
@@ -421,7 +461,9 @@ One versioned row (`pc_settings`), edited with `PATCH /admin/print-cloud/setting
 next-pack cap, overage policies, operator approval, agent verification,
 telemetry staleness, failure policy, free reprint, upload limit, active-job
 limit, low-inventory default, delivery fees, import providers, electricity
-tariff.
+tariff. A patch merges key by key at every level (a governorate fee set to
+`null` is removed; `import_providers` is replaced whole), and a value out of
+range or of the wrong type is refused `VALIDATION`, never replaced by a default.
 
 ### 13.3 Local development
 

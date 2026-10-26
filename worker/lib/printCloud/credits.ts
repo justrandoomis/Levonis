@@ -16,13 +16,19 @@
  * proves the cache equals the ledger sum. Lots record what each second was
  * bought for, so a consumed second is valued at its own purchase price.
  *
+ * A reservation names no lot: settlement draws the account's lots in spend
+ * order (expiring first, then oldest), so the first `reserved` seconds of that
+ * order are the ones the open reservations hold, and only the seconds beyond
+ * them are FREE (`freeSeconds`) — to convert, debit or expire.
+ *
  * Every function here RETURNS statements; the caller composes them into the
  * one batch of its operation (a job confirmation reserves credits and
  * materials together, or neither).
  */
-import { fence, many, one, type Stmt } from './db';
+import { HttpError } from '../http';
+import { fence, many, one, runBatch, type Stmt } from './db';
 import { pcError } from './errors';
-import { planDraws, type LotDraw, type LotState } from './lots';
+import { drawValue, planDraws, type LotDraw, type LotState } from './lots';
 import { addSeconds, iso, mulDivFloor, pcId } from './util';
 
 export const creditAccountId = (userId: string, tierId: string): string => `pcca_${userId}__${tierId}`;
@@ -152,8 +158,18 @@ function drawStatements(db: D1Database, draws: LotDraw[], entryKey: string, now:
   return out;
 }
 
+/** A credit lot as a plan sees it: its draw state and the expiry it carries. */
+export interface CreditLotState extends LotState {
+  expiresAt: string | null;
+}
+
+/** One planned draw, with the expiry of the lot it comes from (a conversion carries it on). */
+export interface CreditDraw extends LotDraw {
+  expiresAt: string | null;
+}
+
 /** The account's lots with seconds left, in the order they are spent: expiring first, then oldest. */
-export async function spendableLots(db: D1Database, accountId: string, onlyLotId?: string): Promise<LotState[]> {
+export async function spendableLots(db: D1Database, accountId: string, onlyLotId?: string): Promise<CreditLotState[]> {
   const rows = await many<CreditLotRow>(
     db,
     `SELECT id, account_id, source, seconds_total, seconds_remaining, paid_iqd, expires_at, created_at, order_line_id
@@ -162,7 +178,66 @@ export async function spendableLots(db: D1Database, accountId: string, onlyLotId
       ORDER BY CASE WHEN expires_at IS NULL THEN 1 ELSE 0 END, expires_at, created_at, id`,
     ...(onlyLotId ? [accountId, onlyLotId] : [accountId])
   );
-  return rows.map((r) => ({ id: r.id, total: Number(r.seconds_total), remaining: Number(r.seconds_remaining), value: Number(r.paid_iqd) }));
+  return rows.map((r) => ({ id: r.id, total: Number(r.seconds_total), remaining: Number(r.seconds_remaining), value: Number(r.paid_iqd), expiresAt: r.expires_at }));
+}
+
+/**
+ * Each lot's FREE seconds, for lots in spend order: the open reservations hold
+ * the first `reserved` seconds of that order (settlement draws them there), so
+ * a lot is free only beyond them.
+ */
+function freeSeconds(lots: LotState[], reserved: number): number[] {
+  let held = Math.max(0, reserved);
+  return lots.map((lot) => {
+    const h = Math.min(lot.remaining, held);
+    held -= h;
+    return lot.remaining - h;
+  });
+}
+
+/**
+ * Draw `qty` free seconds, in spend order, skipping the held ones — and, with
+ * `notExpiredAt`, every lot whose expiry has passed by then. A draw is valued
+ * on the lot's real remaining count (`drawValue`): a lot's seconds are
+ * fungible, only how many of them may go is limited.
+ */
+function planFreeDraws(lots: CreditLotState[], reserved: number, qty: number, notExpiredAt?: Date): { draws: CreditDraw[]; shortfall: number; value: number } {
+  const free = freeSeconds(lots, reserved);
+  const cutoff = notExpiredAt ? iso(notExpiredAt) : null;
+  const draws: CreditDraw[] = [];
+  let left = qty;
+  let value = 0;
+  lots.forEach((lot, i) => {
+    if (left <= 0 || free[i] <= 0) return;
+    if (cutoff !== null && lot.expiresAt !== null && lot.expiresAt <= cutoff) return;
+    const k = Math.min(free[i], left);
+    const v = drawValue(lot, k);
+    draws.push({ lotId: lot.id, qty: k, value: v, expectedRemaining: lot.remaining, expiresAt: lot.expiresAt });
+    value += v;
+    left -= k;
+  });
+  return { draws, shortfall: Math.max(0, left), value };
+}
+
+interface AccountBalance {
+  available: number;
+  reserved: number;
+}
+
+async function accountBalance(db: D1Database, accountId: string): Promise<AccountBalance> {
+  const a = await one<{ available_seconds: number; reserved_seconds: number }>(db, 'SELECT available_seconds, reserved_seconds FROM pc_credit_accounts WHERE id = ?', accountId);
+  return { available: Number(a?.available_seconds ?? 0), reserved: Number(a?.reserved_seconds ?? 0) };
+}
+
+/**
+ * The balance a free-seconds plan read is still the balance. Every draw,
+ * grant, reservation and settlement moves one of the two numbers, so an
+ * unchanged pair means the held prefix — and so each lot's free part — is
+ * what the plan saw: a job confirmed meanwhile aborts the batch instead of
+ * having its hours taken.
+ */
+function balanceUnchanged(db: D1Database, accountId: string, b: AccountBalance): Stmt {
+  return fence(db, 'STATE_CHANGED', '(SELECT available_seconds = ? AND reserved_seconds = ? FROM pc_credit_accounts WHERE id = ?)', [b.available, b.reserved, accountId]);
 }
 
 // ------------------------------------------------------------------ grant
@@ -176,6 +251,8 @@ export interface GrantInput {
   orderLineId?: string | null;
   orderId?: string | null;
   expiresAfterDays?: number | null;
+  /** An expiry already fixed — the one converted seconds were bought under. Wins over `expiresAfterDays`. */
+  expiresAt?: string | null;
   entryKey: string;
   actorId: string;
   note?: string;
@@ -187,7 +264,7 @@ export function grantCredits(db: D1Database, g: GrantInput): { lotId: string; st
   if (!Number.isSafeInteger(g.seconds) || g.seconds <= 0) throw pcError('VALIDATION', { field: 'seconds' });
   const accountId = creditAccountId(g.userId, g.tierId);
   const lotId = pcId('pclot');
-  const expiresAt = g.expiresAfterDays ? iso(addSeconds(g.now, g.expiresAfterDays * 86400)) : null;
+  const expiresAt = g.expiresAt !== undefined ? g.expiresAt : g.expiresAfterDays ? iso(addSeconds(g.now, g.expiresAfterDays * 86400)) : null;
   const type: CreditEntryType = g.source === 'purchase' ? 'purchase' : g.source === 'conversion' ? 'conversion_in' : g.source === 'compensation' ? 'compensation' : 'adjust_credit';
   return {
     lotId,
@@ -408,53 +485,66 @@ export async function settleCredits(
 
 // ------------------------------------------------------------------ adjustments, refunds, conversion, expiry
 
+interface DebitInput {
+  userId: string;
+  tierId: string;
+  seconds: number;
+  type: 'refund' | 'adjust_debit' | 'conversion_out' | 'expire';
+  entryKey: string;
+  lotId?: string;
+  orderId?: string | null;
+  actorId: string;
+  note?: string;
+  now: Date;
+}
+
+/** The lot draws, the ledger row and the account change of one debit of the available balance. */
+function debitStatements(db: D1Database, accountId: string, p: DebitInput, plan: { draws: LotDraw[]; value: number }): Stmt[] {
+  return [
+    ...drawStatements(db, plan.draws, p.entryKey, p.now),
+    ledgerStmt(db, {
+      entryKey: p.entryKey,
+      accountId,
+      userId: p.userId,
+      tierId: p.tierId,
+      type: p.type,
+      dAvailable: -p.seconds,
+      dReserved: 0,
+      dConsumed: 0,
+      lotId: p.lotId ?? null,
+      orderId: p.orderId ?? null,
+      value: plan.value,
+      actorId: p.actorId,
+      note: p.note,
+      now: p.now,
+    }),
+    accountDelta(db, accountId, -p.seconds, 0, 0, p.now),
+  ];
+}
+
 /**
- * Take seconds out of the AVAILABLE balance, drawn from lots (FIFO, or one
- * named lot for a refund of that purchase). The account CHECK refuses taking
- * more than is available, so reserved hours can never be refunded away.
+ * Take seconds out of the AVAILABLE balance. Without `lotId` they are FREE
+ * seconds, drawn in spend order past the ones confirmed jobs hold, under a
+ * fence on the balance the plan read; `notExpiredAt` also leaves out every lot
+ * already past its expiry. With `lotId` (a refund of that purchase) they come
+ * from that lot. Either way the account CHECK refuses taking more than is
+ * available, so reserved hours can never be refunded away.
  */
 export async function debitAvailable(
   db: D1Database,
-  p: {
-    userId: string;
-    tierId: string;
-    seconds: number;
-    type: 'refund' | 'adjust_debit' | 'conversion_out' | 'expire';
-    entryKey: string;
-    lotId?: string;
-    orderId?: string | null;
-    actorId: string;
-    note?: string;
-    now: Date;
-  }
-): Promise<{ statements: Stmt[]; value: number }> {
+  p: Omit<DebitInput, 'type'> & { type: 'refund' | 'adjust_debit' | 'conversion_out'; notExpiredAt?: Date }
+): Promise<{ statements: Stmt[]; value: number; draws: CreditDraw[] }> {
   if (!Number.isSafeInteger(p.seconds) || p.seconds <= 0) throw pcError('VALIDATION', { field: 'seconds' });
   const accountId = creditAccountId(p.userId, p.tierId);
-  const plan = planDraws(await spendableLots(db, accountId, p.lotId), p.seconds);
+  if (p.lotId) {
+    const plan = planFreeDraws(await spendableLots(db, accountId, p.lotId), 0, p.seconds);
+    if (plan.shortfall > 0) throw pcError('INSUFFICIENT_CREDIT');
+    return { value: plan.value, draws: plan.draws, statements: debitStatements(db, accountId, p, plan) };
+  }
+  const balance = await accountBalance(db, accountId);
+  const plan = planFreeDraws(await spendableLots(db, accountId), balance.reserved, p.seconds, p.notExpiredAt);
   if (plan.shortfall > 0) throw pcError('INSUFFICIENT_CREDIT');
-  return {
-    value: plan.value,
-    statements: [
-      ...drawStatements(db, plan.draws, p.entryKey, p.now),
-      ledgerStmt(db, {
-        entryKey: p.entryKey,
-        accountId,
-        userId: p.userId,
-        tierId: p.tierId,
-        type: p.type,
-        dAvailable: -p.seconds,
-        dReserved: 0,
-        dConsumed: 0,
-        lotId: p.lotId ?? null,
-        orderId: p.orderId ?? null,
-        value: plan.value,
-        actorId: p.actorId,
-        note: p.note,
-        now: p.now,
-      }),
-      accountDelta(db, accountId, -p.seconds, 0, 0, p.now),
-    ],
-  };
+  return { value: plan.value, draws: plan.draws, statements: [balanceUnchanged(db, accountId, balance), ...debitStatements(db, accountId, p, plan)] };
 }
 
 export interface ConversionRule {
@@ -468,8 +558,10 @@ export interface ConversionRule {
 
 /**
  * Move hours between tiers under an ENABLED rule, at the customer's request.
- * The value of the seconds taken travels with them into the new lot, so the
- * converted hours are recognised at what the customer actually paid.
+ * Only free hours not yet past their expiry move. The value of the seconds
+ * taken travels with them, so the converted hours are recognised at what the
+ * customer actually paid — and so does their EXPIRY: an hour bought under a
+ * package that expires still expires, on the same date, in the new tier.
  */
 export async function convertCredits(
   db: D1Database,
@@ -487,31 +579,140 @@ export async function convertCredits(
     actorId: p.actorId,
     note: `rule ${p.rule.id}`,
     now: p.now,
+    notExpiredAt: p.now,
   });
-  const into = grantCredits(db, {
-    userId: p.userId,
-    tierId: p.rule.to_tier_id,
-    seconds: received,
-    paidIqd: out.value,
-    source: 'conversion',
-    entryKey: `conversion_in:${p.opKey}`,
-    actorId: p.actorId,
-    note: `rule ${p.rule.id}`,
-    now: p.now,
+  // One new lot per expiry among the drawn lots (spend order keeps equal
+  // expiries together), with that absolute date and the value of its draws.
+  const groups: Array<{ expiresAt: string | null; drawn: number; value: number }> = [];
+  for (const d of out.draws) {
+    const last = groups[groups.length - 1];
+    if (last && last.expiresAt === d.expiresAt) {
+      last.drawn += d.qty;
+      last.value += d.value;
+    } else groups.push({ expiresAt: d.expiresAt, drawn: d.qty, value: d.value });
+  }
+  // The received seconds are shared cumulatively, so the lots sum to exactly
+  // `received`; a group too small for a whole second hands its value on.
+  const lots: Array<{ expiresAt: string | null; seconds: number; value: number }> = [];
+  let drawn = 0;
+  let given = 0;
+  let pending = 0;
+  for (const g of groups) {
+    drawn += g.drawn;
+    const seconds = mulDivFloor(drawn, p.rule.ratio_num, p.rule.ratio_den) - given;
+    given += seconds;
+    if (seconds > 0) {
+      lots.push({ expiresAt: g.expiresAt, seconds, value: g.value + pending });
+      pending = 0;
+    } else if (lots.length) lots[lots.length - 1].value += g.value;
+    else pending += g.value;
+  }
+  const statements = [...out.statements];
+  lots.forEach((l, i) => {
+    statements.push(
+      ...grantCredits(db, {
+        userId: p.userId,
+        tierId: p.rule.to_tier_id,
+        seconds: l.seconds,
+        paidIqd: l.value,
+        source: 'conversion',
+        expiresAt: l.expiresAt,
+        // '#' cannot occur in an Idempotency-Key (db.ts KEY_RE), so a group's key never equals another conversion's.
+        entryKey: i === 0 ? `conversion_in:${p.opKey}` : `conversion_in:${p.opKey}#${i}`,
+        actorId: p.actorId,
+        note: `rule ${p.rule.id}`,
+        now: p.now,
+      }).statements
+    );
   });
-  return { statements: [...out.statements, ...into.statements], receivedSeconds: received, value: out.value };
+  return { statements, receivedSeconds: received, value: out.value };
 }
 
-/** Lots whose configured expiry has passed and still hold seconds (only ever set by an explicit package rule). */
-export async function expiredLots(db: D1Database, now: Date, limit = 50): Promise<Array<CreditLotRow & { user_id: string; tier_id: string }>> {
+/**
+ * Lots whose configured expiry has passed and still hold seconds (only ever
+ * set by an explicit package rule), earliest expiry first — only from accounts
+ * where some of those seconds are FREE. Expired lots come first in spend
+ * order, so the open reservations hold them first: an account has expired
+ * seconds to take exactly when they add up to more than it has reserved (and
+ * it has any available). A lot wholly held for jobs therefore never fills the
+ * page ahead of lots that can expire.
+ */
+export async function expiredLots(
+  db: D1Database,
+  now: Date,
+  limit = 50,
+  accountId?: string
+): Promise<Array<CreditLotRow & { user_id: string; tier_id: string }>> {
   return many(
     db,
-    `SELECT id, account_id, user_id, tier_id, source, seconds_total, seconds_remaining, paid_iqd, expires_at, created_at, order_line_id
-       FROM pc_credit_lots WHERE expires_at IS NOT NULL AND expires_at <= ? AND seconds_remaining > 0
-      ORDER BY expires_at LIMIT ?`,
-    iso(now),
-    limit
+    `SELECT l.id, l.account_id, l.user_id, l.tier_id, l.source, l.seconds_total, l.seconds_remaining, l.paid_iqd, l.expires_at, l.created_at, l.order_line_id
+       FROM pc_credit_lots l JOIN pc_credit_accounts a ON a.id = l.account_id
+      WHERE l.expires_at IS NOT NULL AND l.expires_at <= ?1 AND l.seconds_remaining > 0 AND a.available_seconds > 0
+        ${accountId ? 'AND a.id = ?3' : ''}
+        AND (SELECT COALESCE(SUM(x.seconds_remaining), 0) FROM pc_credit_lots x
+              WHERE x.account_id = a.id AND x.expires_at IS NOT NULL AND x.expires_at <= ?1 AND x.seconds_remaining > 0) > a.reserved_seconds
+      ORDER BY l.expires_at, l.id LIMIT ?2`,
+    ...(accountId ? [iso(now), limit, accountId] : [iso(now), limit])
   );
+}
+
+/**
+ * Expire, now, every free expired second of one customer's tier — before a
+ * confirmation reserves hours. Reservations hold the expiring lots first, so
+ * a job confirmed after a lot's expiry but before the sweep would otherwise
+ * shield the seconds that should have gone and spend them. Each lot is its
+ * own batch, exactly as the sweep would run it; a pass a concurrent runner
+ * already made is simply skipped.
+ */
+export async function expireDueCredits(db: D1Database, userId: string, tierId: string, now: Date): Promise<number> {
+  let expired = 0;
+  for (const lot of await expiredLots(db, now, 50, creditAccountId(userId, tierId))) {
+    const planned = await planLotExpiry(db, lot, now);
+    if (!planned) continue;
+    try {
+      await runBatch(db, planned.statements);
+      expired += planned.seconds;
+    } catch (e) {
+      if (!(e instanceof HttpError && e.code === 'STATE_CHANGED')) throw e;
+    }
+  }
+  return expired;
+}
+
+/**
+ * Expire the FREE part of one lot whose expiry has passed (§3.2): seconds the
+ * open reservations hold stay for their jobs, and what a job gives back later
+ * expires on a later run. Null when nothing of the lot is free now.
+ *
+ * A lot can therefore expire in several passes. Each is keyed by the seconds
+ * the lot held before it — they only ever go down — so a later pass has a key
+ * of its own, while two runners planning the same pass still collide.
+ */
+export async function planLotExpiry(
+  db: D1Database,
+  lot: Pick<CreditLotRow, 'id' | 'account_id' | 'expires_at'> & { user_id: string; tier_id: string },
+  now: Date
+): Promise<{ seconds: number; statements: Stmt[] } | null> {
+  const balance = await accountBalance(db, lot.account_id);
+  const lots = await spendableLots(db, lot.account_id);
+  const at = lots.findIndex((l) => l.id === lot.id);
+  if (at < 0) return null;
+  const seconds = Math.min(freeSeconds(lots, balance.reserved)[at], balance.available);
+  if (seconds <= 0) return null;
+  const target = lots[at];
+  const draw: LotDraw = { lotId: target.id, qty: seconds, value: drawValue(target, seconds), expectedRemaining: target.remaining };
+  const p: DebitInput = {
+    userId: lot.user_id,
+    tierId: lot.tier_id,
+    seconds,
+    type: 'expire',
+    entryKey: `expire:${target.id}:${target.remaining}`,
+    lotId: target.id,
+    actorId: 'system',
+    note: `package expiry ${lot.expires_at}`,
+    now,
+  };
+  return { seconds, statements: [balanceUnchanged(db, lot.account_id, balance), ...debitStatements(db, lot.account_id, p, { draws: [draw], value: draw.value })] };
 }
 
 // ------------------------------------------------------------------ reads

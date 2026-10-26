@@ -20,7 +20,7 @@ import { integrationEvent } from './adapters';
 import { pcAudit } from './audit';
 import { inventoryAccountId, inventoryLots, releaseInventory, reserveInventory, settleInventory, type InventoryReservationRow } from './inventory';
 import { planDraws } from './lots';
-import { pcNotify } from './notify';
+import { pcNotify, type NoticeMaterial } from './notify';
 import { deallocate } from './warehouse';
 import { iso, mulDivRound, pcId } from './util';
 
@@ -98,6 +98,17 @@ async function load(db: D1Database, id: string, userId?: string): Promise<{ b: B
   return { b, res };
 }
 
+/** The variant a decision notice names, with its unit's labels: each language reads its own words. */
+function material(db: D1Database, variantId: string) {
+  return one<NoticeMaterial>(
+    db,
+    `SELECT v.name_ar, v.name_en, v.name_ckb, v.unit_code, u.label_ar, u.label_ckb
+       FROM pc_variants v LEFT JOIN pc_units u ON u.code = v.unit_code
+      WHERE v.id = ?`,
+    variantId
+  );
+}
+
 function flip(db: D1Database, b: BuybackRow, to: string, extra: { value?: number | null; payout?: string; decidedBy: string; note: string }, now: Date): Stmt[] {
   return [
     db
@@ -116,7 +127,7 @@ export async function approveBuyback(db: D1Database, id: string, actorId: string
   if (b.status !== 'requested') throw pcError('INVALID_TRANSITION', { from: b.status, to: 'approved' });
   const out = await settleInventory(db, res, b.qty, { type: 'buyback', policy: 'cap_at_reserved', actorId, now, note: `buyback ${b.id}` });
   const value = mulDivRound(out.value, b.rate_bps, 10000);
-  const v = await one<{ name_ar: string; name_en: string; unit_code: string }>(db, 'SELECT name_ar, name_en, unit_code FROM pc_variants WHERE id = ?', b.variant_id);
+  const v = await material(db, b.variant_id);
   await runBatch(db, [
     ...flip(db, b, 'approved', { value, payout: 'pending', decidedBy: actorId, note }, now),
     ...out.statements,
@@ -137,7 +148,8 @@ export async function approveBuyback(db: D1Database, id: string, actorId: string
       entity: 'print_cloud_buyback',
       entityId: b.id,
       link: `/print-cloud/inventory`,
-      vars: { qty: String(b.qty), unit: v?.unit_code ?? '', name: v?.name_en ?? '', value: String(value) },
+      vars: { qty: String(b.qty), value: String(value) },
+      material: v,
       eventKey: `buyback_approved:${b.id}`,
     }),
     integrationEvent(db, { adapter: 'accounting', kind: 'buyback.approved', refId: b.id, payload: { value_iqd: value, purchase_value_iqd: out.value, qty: b.qty }, now }),
@@ -149,7 +161,7 @@ export async function approveBuyback(db: D1Database, id: string, actorId: string
 export async function rejectBuyback(db: D1Database, id: string, actorId: string, now: Date, note: string) {
   const { b, res } = await load(db, id);
   if (b.status !== 'requested') throw pcError('INVALID_TRANSITION', { from: b.status, to: 'rejected' });
-  const v = await one<{ name_en: string }>(db, 'SELECT name_en FROM pc_variants WHERE id = ?', b.variant_id);
+  const v = await material(db, b.variant_id);
   await runBatch(db, [
     ...flip(db, b, 'rejected', { decidedBy: actorId, note }, now),
     ...releaseInventory(db, res, actorId, now, 'buyback rejected'),
@@ -159,7 +171,7 @@ export async function rejectBuyback(db: D1Database, id: string, actorId: string,
       entity: 'print_cloud_buyback',
       entityId: b.id,
       link: `/print-cloud/inventory`,
-      vars: { name: v?.name_en ?? '' },
+      material: v,
       eventKey: `buyback_rejected:${b.id}`,
     }),
     ...(await pcAudit(db, actorId, 'buyback.reject', b.id, { note })),

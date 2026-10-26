@@ -3,6 +3,8 @@
  * (`user_notifications`, worker/lib/notifications.ts — the NotificationAdapter
  * is the platform's own bell, connected). Every message exists in Arabic,
  * English and Sorani; the Sorani travels in `meta.title_ckb` / `meta.body_ckb`.
+ * A material a body names is named in that body's language, its unit too
+ * (`material`), never in English for everyone.
  *
  * Statements, not sends: a notification lands in the SAME batch as the event
  * it reports (a fulfilled order, a finished print), and its `eventKey` makes a
@@ -37,7 +39,54 @@ interface Text {
   body_ckb: string;
 }
 
-const fill = (s: string, vars: Record<string, string>): string => s.replace(/\{(\w+)\}/g, (_, k: string) => vars[k] ?? '');
+/** A value each language reads in its own words: a material's name, a unit. */
+export interface Words {
+  ar: string;
+  en: string;
+  ckb: string;
+}
+
+/**
+ * A template value: one string every language shows as it is (a quantity, an
+ * amount, the customer's own job title), or each language's own words — so an
+ * Arabic body never carries an English name.
+ */
+export type NoticeVar = string | Words;
+
+const fill = (s: string, vars: Record<string, NoticeVar>, lang: keyof Words): string =>
+  s.replace(/\{(\w+)\}/g, (_, k: string) => {
+    const v = vars[k];
+    return typeof v === 'string' ? v : (v?.[lang] ?? '');
+  });
+
+/**
+ * The material a notice names, as the event's own query reads it: the
+ * variant's three names (pc_variants) and its unit's code and labels
+ * (pc_units, LEFT JOINed on the code).
+ */
+export interface NoticeMaterial {
+  name_ar: string | null;
+  name_en: string | null;
+  name_ckb: string | null;
+  unit_code: string | null;
+  label_ar: string | null;
+  label_ckb: string | null;
+}
+
+/**
+ * `{name}` and `{unit}` in each language. Arabic and Sorani read the unit's
+ * own word («100 غرام», «100 گرام»), never its code; English keeps the symbol
+ * («100 g»), since label_en is a singular noun that does not agree with a
+ * number («100 gram»). A label that is somehow missing falls back to the
+ * symbol, never to another language's word.
+ */
+function materialWords(r: NoticeMaterial | null): { name: Words; unit: Words } {
+  const code = r?.unit_code ?? '';
+  return {
+    name: { ar: r?.name_ar ?? '', en: r?.name_en ?? '', ckb: r?.name_ckb ?? '' },
+    unit: { ar: r?.label_ar || code, en: code, ckb: r?.label_ckb || code },
+  };
+}
 
 const TEXT: Record<PcNotice, Text> = {
   order_fulfilled: {
@@ -164,24 +213,37 @@ const TEXT: Record<PcNotice, Text> = {
 
 export type PcEntity = 'print_cloud_order' | 'print_cloud_job' | 'print_cloud_shipment' | 'print_cloud_inventory' | 'print_cloud_buyback';
 
-/** The notification statement for one Print Cloud event, ready for the event's own batch. */
+/**
+ * The notification statement for one Print Cloud event, ready for the event's
+ * own batch. A notice about a material passes its row as `material`, which
+ * fills `{name}` and `{unit}` in each body's own language.
+ */
 export function pcNotify(
   db: D1Database,
-  p: { userId: string; notice: PcNotice; entity: PcEntity; entityId: string; link: string; vars?: Record<string, string>; eventKey: string }
+  p: {
+    userId: string;
+    notice: PcNotice;
+    entity: PcEntity;
+    entityId: string;
+    link: string;
+    vars?: Record<string, NoticeVar>;
+    material?: NoticeMaterial | null;
+    eventKey: string;
+  }
 ): Stmt {
   const t = TEXT[p.notice];
-  const vars = p.vars ?? {};
+  const vars: Record<string, NoticeVar> = { ...(p.material === undefined ? {} : materialWords(p.material)), ...p.vars };
   const input: NotificationInput = {
     userId: p.userId,
     kind: 'print_cloud',
     title_ar: t.title_ar,
     title_en: t.title_en,
-    body_ar: fill(t.body_ar, vars),
-    body_en: fill(t.body_en, vars),
+    body_ar: fill(t.body_ar, vars, 'ar'),
+    body_en: fill(t.body_en, vars, 'en'),
     link: p.link,
     entity_type: p.entity,
     entity_id: p.entityId,
-    meta: { notice: p.notice, title_ckb: t.title_ckb, body_ckb: fill(t.body_ckb, vars) },
+    meta: { notice: p.notice, title_ckb: t.title_ckb, body_ckb: fill(t.body_ckb, vars, 'ckb') },
     eventKey: `pc:${p.eventKey}`,
   };
   return notifyStatement(db, input).stmt;
