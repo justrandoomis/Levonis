@@ -106,7 +106,7 @@ test('the whitelist itself: publicRequest names nobody; partyRequest adds the di
     email: CUSTOMER.email, phone: CUSTOMER.phone, avatar_key: CUSTOMER.avatar, notes: 'private',
   };
   assertNoIdentity(publicRequest(row), 'publicRequest');
-  const party = partyRequest(row) as Record<string, unknown>;
+  const party = partyRequest(row, 'owner') as Record<string, unknown>;
   assert.equal(party.customer_name, CUSTOMER.name);
   const { customer_name: _name, ...rest } = party;
   assertNoIdentity(rest, 'partyRequest beyond the name');
@@ -164,4 +164,57 @@ test('acceptance 34: the public API never named the customer and still does not'
   assert.ok(JSON.stringify(list).includes('Vacuum clip'));
   assertNoIdentity(list, 'public API list');
   assertNoIdentity(await read(raw, GUEST, '/api/public/v1/community/requests/r_board'), 'public API request');
+});
+
+// ---------------------------------------------------------------- Q2 (B0, row 268)
+
+/**
+ * ACCEPTANCE 34, the rest of it (plan P1-06 Q2, build item B0): a public view
+ * carries no phone, no address, no original file and no private budget. The
+ * customer keeps a saved address and a phone; the request has an ORIGINAL
+ * (role `source`, Q5) beside its listing, and a budget the customer SHOWS to
+ * merchants — and still none of it reaches a public reader; the budget
+ * reaches only the workshop the engine found eligible, and only because the
+ * switch is on.
+ */
+test('acceptance 34: no public view carries a phone, an address, the original or the budget — the switch shows it to an eligible workshop only', async () => {
+  const raw = seed();
+  raw.exec(`
+    INSERT INTO addresses (id,user_id,label,name,phone,address,landmark,is_default,governorate,area)
+      VALUES ('addr1','${CUSTOMER.id}','Home','Hadi J','+9647709998877','Street 77, house 12','near the old bakery',1,'baghdad','Mansour');
+    INSERT INTO community_request_files (id, request_id, file_key, file_name, content_type, size_bytes, kind)
+      VALUES ('crf_src','r_board','requests/${CUSTOMER.id}/src.step','clip-design.step','model/step',4096,'model');
+    INSERT INTO community_request_sources (id, request_id, kind, file_id, role) VALUES ('rps_crf_src','r_board','file','crf_src','source');
+    UPDATE community_requests SET budget_visible = 1 WHERE id = 'r_board';
+  `);
+  const secrets = ['+9647709998877', 'Street 77', 'old bakery', `requests/${CUSTOMER.id}/`, '15000'];
+  const noSecrets = (payload: unknown, where: string) => {
+    const text = JSON.stringify(payload);
+    for (const s of secrets) assert.equal(text.includes(s), false, `${where}: «${s}» is served`);
+  };
+  for (const user of [GUEST, STRANGER]) {
+    const who = user?.id ?? 'guest';
+    noSecrets(await read(raw, user, '/api/community/requests'), `community list (${who})`);
+    noSecrets(await read(raw, user, '/api/community/search?q=clip&types=requests'), `search (${who})`);
+    noSecrets(await read(raw, user, '/api/marketplace/requests'), `board (${who})`);
+    const page = await read(raw, user, '/api/marketplace/requests/r_board');
+    noSecrets(page, `request page (${who})`);
+    assert.equal((page.request as Record<string, unknown>).budget_iqd, null);
+    const original = (page.files as Array<Record<string, unknown>>).find((f) => f.id === 'crf_src');
+    assert.ok(original, 'the original is LISTED (its name is public, the contract says so)');
+    assert.equal(original!.url, null, `the original's bytes are nobody's but the accepted merchant's (${who})`);
+  }
+  noSecrets(await read(raw, GUEST, '/api/public/v1/community/requests'), 'public API list');
+  noSecrets(await read(raw, GUEST, '/api/public/v1/community/requests/r_board'), 'public API request');
+  // The public board, even to the eligible workshop: never the budget.
+  noSecrets(await read(raw, WORKSHOP, '/api/marketplace/requests'), 'board (the eligible workshop)');
+  noSecrets(await read(raw, WORKSHOP, '/api/community/requests'), 'community list (the eligible workshop)');
+  // The workshop the engine found eligible reads the budget the customer shows — on its own board, nowhere public.
+  const mine = await read(raw, WORKSHOP, '/api/community/requests?for=me');
+  assert.equal((mine.requests as Array<Record<string, unknown>>)[0].budget_iqd, 15000);
+  noSecrets({ ...mine, requests: (mine.requests as Array<Record<string, unknown>>).map(({ budget_iqd: _b, ...r }) => r) }, 'the workshop board beyond the budget');
+  // Switch off: nobody but the customer.
+  raw.exec(`UPDATE community_requests SET budget_visible = 0 WHERE id = 'r_board'`);
+  assert.equal(((await read(raw, WORKSHOP, '/api/community/requests?for=me')).requests as Array<Record<string, unknown>>)[0].budget_iqd, null);
+  assert.equal(((await read(raw, OWNER, '/api/marketplace/requests/r_board')).request as Record<string, unknown>).budget_iqd, 15000, 'the customer reads their own');
 });

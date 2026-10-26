@@ -116,6 +116,7 @@ import {
 } from '../lib/requestEstimate';
 import { REQUEST_MODEL_LIMITS } from '@levonis/contracts/requestModel';
 import { isMissingSchema } from '../lib/merchantApproval';
+import { budgetFor, budgetReaderOf, budgetVisibleOf, stripSpecBudget } from '../lib/requestBudget';
 import { orderCoverageFacts } from '../lib/chatCards';
 
 /**
@@ -1535,15 +1536,17 @@ export async function publishRequest(
   // notification is composed from the ROW, not from this call's payload. A
   // republish that does not resend them must still tell merchants the deadline
   // and budget the customer set the first time round.
-  const forMatching = await env.DB.prepare(
-    'SELECT governorate, delivery_pref, deadline, budget_iqd, revision FROM community_requests WHERE id = ?'
-  )
+  //
+  // The whole row: `budget_visible` (0208) is read where it exists, and a
+  // database without it reads the budget as hidden (Q2, row 268).
+  const forMatching = await env.DB.prepare('SELECT * FROM community_requests WHERE id = ?')
     .bind(requestId)
     .first<{
       governorate: string;
       delivery_pref: string;
       deadline: string | null;
       budget_iqd: number | null;
+      budget_visible?: number | null;
       revision: number;
     }>();
   const revision = Number(forMatching?.revision ?? readRevision);
@@ -1587,7 +1590,8 @@ export async function publishRequest(
     dimensions: dimsLabel,
     governorate: String(forMatching?.governorate ?? request.governorate ?? ''),
     deadline: String(forMatching?.deadline ?? ''),
-    budget_iqd: typeof forMatching?.budget_iqd === 'number' ? forMatching.budget_iqd : null,
+    // Told only to the eligible workshops, and only when the customer shows it to merchants (Q2).
+    budget_iqd: budgetFor(forMatching?.budget_iqd, forMatching?.budget_visible, 'merchant'),
     ...(byParts ? { parts: notificationParts(model!.next, mats) } : {}),
   });
   const matched = await matchRequest(env, requestId, {
@@ -1862,10 +1866,31 @@ printRequestRoutes.get('/requests/:id/revisions', async (c) => {
     isOwner ? 'owner' : user?.role === 'admin' ? 'admin'
       : user && (results ?? []).some((row) => String(row.spec ?? '').includes('"model"')) && (await isEngagedMerchant(c.env.DB, requestId, user.id))
         ? 'accepted' : 'public';
+  /**
+   * THE BUDGET (Q2, row 268): every stored spec keeps the budget it was
+   * written with; this read empties it for a reader who may not see it. The
+   * customer and an admin read it. A merchant reads it only while the
+   * customer shows it to merchants, and only a merchant the request is meant
+   * for — the file policy's reader (`eligible`: a workshop whose live verdict
+   * is eligible, or a sent direct request's store; `engaged`: the accepted
+   * merchant). Having once offered is not enough (critique 2): a merchant
+   * whose offer a revision made ineligible keeps the history, not the budget.
+   */
+  const isAdmin = user?.role === 'admin';
+  let budgetReader = budgetReaderOf({ isOwner, isAdmin, reader: null });
+  let budgetVisible = 0;
+  const specsCarryBudget = (results ?? []).some((row) => parseJson<Record<string, unknown>>(row.spec, {}).budget_iqd != null);
+  if (budgetReader === 'public' && user && specsCarryBudget) {
+    if (await budgetVisibleOf(c.env.DB, requestId)) {
+      const { reader } = await fileReader(c.env, request, user, { allowAdmin: true });
+      budgetReader = budgetReaderOf({ isOwner, isAdmin, reader });
+      budgetVisible = 1;
+    }
+  }
   let prev: Record<string, unknown> | null = null;
   let prevFiles: RevisionFile[] = [];
   const revisions = (results ?? []).map((row) => {
-    const spec = projectSpec(parseJson<Record<string, unknown>>(row.spec, {}), party);
+    const spec = stripSpecBudget(projectSpec(parseJson<Record<string, unknown>>(row.spec, {}), party), budgetVisible, budgetReader);
     const files = parseJson<RevisionFile[]>(row.files, []);
     const changes: string[] = prev
       ? REVISION_FIELDS.filter((k) => JSON.stringify(spec[k] ?? null) !== JSON.stringify(prev![k] ?? null))

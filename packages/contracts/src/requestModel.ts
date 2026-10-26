@@ -191,12 +191,16 @@ export const OFFER_LIMITS = {
  * `projectModel` enforces.
  *
  *   public     anyone the board lets in (the job as merchants price it)
- *   merchants  an eligible merchant and the accepted one
+ *   merchants  an eligible merchant, the accepted one, and the store a sent
+ *              direct request is addressed to — never merely a merchant
+ *              account, nor one that once offered (P1-06 server critique 2)
  *   accepted   the accepted merchant (and the customer, and an admin)
  *   owner      the customer and an admin only
  *
  * The customer's identity is never on this list below `accepted`
- * (conflict 62); the budget is `merchants` only when the customer shows it.
+ * (conflict 62); the budget is `merchants` only when the customer shows it
+ * (worker/lib/requestBudget.ts), and never on a public list, search or the
+ * public API whatever the switch says.
  * A `source` file's bytes, preview and costing are `accepted`; that it is
  * attached — its kind and file name on the request's file list — is public,
  * like every attachment (`files.listing`), and no projection below `accepted`
@@ -229,3 +233,22 @@ export const REQUEST_FIELD_VISIBILITY: Readonly<Record<string, RequestFieldAudie
   customer_identity: 'accepted',
   address: 'accepted',
 };
+
+/**
+ * WHAT EACH CLASS OF ATTACHMENT GIVES EACH AUDIENCE (P1-06, docs/DECISIONS.md
+ * row 268) — the file matrix of worker/lib/requestFilePolicy.ts
+ * (`mayReadBytes`, `previewGrantFor`) said in the audiences above, for the
+ * request editor's «ما يراه الآخرون».
+ *
+ *   listing  its kind and its file name on the request's file list
+ *   preview  a simplified 3D preview (models)
+ *   bytes    the file itself
+ *
+ * `source` is a file of any class the customer marked as the original (Q5).
+ */
+export const REQUEST_FILE_VISIBILITY = {
+  image: { listing: 'public', bytes: 'merchants' },
+  document: { listing: 'public', bytes: 'merchants' },
+  model: { listing: 'public', preview: 'merchants', bytes: 'accepted' },
+  source: { listing: 'public', preview: 'accepted', bytes: 'accepted' },
+} as const satisfies Record<string, { listing: RequestFieldAudience; bytes: RequestFieldAudience; preview?: RequestFieldAudience }>;

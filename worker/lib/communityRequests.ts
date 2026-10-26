@@ -147,13 +147,18 @@ export async function merchantTakesNewWork(
  * after «the customer» and «the engaged merchant» — the request page, its
  * files, its revisions. False for a board request, and on a database behind
  * 0151 (no direct request exists there).
+ *
+ * And false while the request is still a DRAFT (P1-06, row 268): a draft is
+ * its customer's alone until it is sent — the store learns of it, its title,
+ * its budget and its customer's name when the send writes its card into
+ * their conversation, not before.
  */
 export async function isDirectMerchant(db: D1Database, requestId: string, userId: string): Promise<boolean> {
   try {
     const row = await db
       .prepare(
         `SELECT 1 AS x FROM community_requests r JOIN community_merchants m ON m.id = r.target_merchant_id
-          WHERE r.id = ? AND r.visibility = 'direct' AND m.user_id = ?`
+          WHERE r.id = ? AND r.visibility = 'direct' AND r.state <> 'draft' AND m.user_id = ?`
       )
       .bind(requestId, userId)
       .first();

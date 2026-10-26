@@ -34,6 +34,7 @@ import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { requireStoreOwner } from '../lib/merchantAuth';
 import { isMissingSchema, merchantApproved } from '../lib/merchantApproval';
+import { budgetFor } from '../lib/requestBudget';
 import { communityClosedRefusal, communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { merchantTakesNewWork, type RequestForAccess } from '../lib/communityRequests';
 import { getMediaObject } from '../lib/mediaStorage';
@@ -132,6 +133,7 @@ merchantWorkshopRoutes.get('/board', async (c) => {
       : '';
   const boardSql = (withRoles: boolean) =>
     `SELECT r.id, r.title, r.description, r.quantity, r.material, r.color, r.dimensions, r.budget_iqd,
+            ${withRoles ? 'r.budget_visible' : '0'} AS budget_visible,
             r.deadline, r.governorate, r.delivery_pref, r.state, r.offer_count, r.created_at, r.expires_at,
             r.revision, r.customer_notes, COALESCE(r.published_at, r.created_at) AS sort_at,
             p.process, p.process_unsure, p.material_id, p.material_unsure,
@@ -184,7 +186,10 @@ merchantWorkshopRoutes.get('/board', async (c) => {
       material: r.material,
       color: r.color,
       dimensions: r.dimensions,
-      budget_iqd: r.budget_iqd,
+      // Every row is a job this workshop is eligible for: the budget when the
+      // customer shows it to merchants, else null (Q2, row 268). A database
+      // before 0208 has no switch, and its budgets read hidden.
+      budget_iqd: budgetFor(r.budget_iqd, r.budget_visible, 'merchant'),
       deadline: r.deadline,
       governorate: r.governorate,
       delivery_pref: r.delivery_pref,

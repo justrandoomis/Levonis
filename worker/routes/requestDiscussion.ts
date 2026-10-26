@@ -111,7 +111,7 @@ async function loadRequestFor(db: D1Database, id: string, viewerId: string): Pro
                  WHERE o.request_id = r.id AND m.user_id = ?2 AND o.state = 'accepted'
                    AND (EXISTS (SELECT 1 FROM community_orders co WHERE co.offer_id = o.id AND co.state NOT IN ('cancelled','refunded'))
                         OR NOT EXISTS (SELECT 1 FROM community_orders co WHERE co.offer_id = o.id))) END AS v_engaged,
-              CASE WHEN ?2 = '' OR r.visibility <> 'direct' THEN 0 ELSE EXISTS (
+              CASE WHEN ?2 = '' OR r.visibility <> 'direct' OR r.state = 'draft' THEN 0 ELSE EXISTS (
                 SELECT 1 FROM community_merchants dm WHERE dm.id = r.target_merchant_id AND dm.user_id = ?2) END AS v_direct,
               CASE WHEN ?2 = '' THEN 0 ELSE EXISTS (SELECT 1 FROM community_merchants wm WHERE wm.user_id = ?2) END AS v_merchant
          FROM community_requests r WHERE r.id = ?1`

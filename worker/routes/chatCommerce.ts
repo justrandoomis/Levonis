@@ -58,7 +58,8 @@ import {
   type ResolvedCard,
 } from '../lib/chatCards';
 import { assertMayWriteInThread, isClientIdClash, notifyStoreThread, publicPage, storedClientMessage } from './chats';
-import { offerShape, publicRequest, readOfferTerms } from './marketplace';
+import { offerShape, readOfferTerms, requestForReader } from './marketplace';
+import { isSchemaMissing } from '../lib/membershipBenefits';
 
 export const chatCommerceRoutes = new Hono<AppContext>();
 chatCommerceRoutes.use('*', requireAuth);
@@ -185,9 +186,20 @@ chatCommerceRoutes.post('/:id/print-requests', requireCommunityOpen, async (c) =
       thread.merchant_id, chatId
     )
     .run();
+  // A budget typed into this sheet is written FOR this one store: it is shown
+  // to it (Q2 critique 3, docs/DECISIONS.md row 268 — the request editor asks
+  // with a switch; this short in-chat form addresses one store by
+  // construction). A database before 0208 has no switch: the budget then
+  // reads hidden to the store, which is Q2's default.
+  if (job.budget_iqd !== null) {
+    await c.env.DB.prepare('UPDATE community_requests SET budget_visible = 1 WHERE id = ?').bind(id).run().catch((e) => {
+      if (!isSchemaMissing(e)) throw e;
+    });
+  }
   await audit(c.env.DB, user.id, 'community.direct_request_drafted', id, { store: thread.store_id, chat: chatId });
   const row = await c.env.DB.prepare('SELECT * FROM community_requests WHERE id = ?').bind(id).first<Record<string, unknown>>();
-  return c.json({ success: true, request: publicRequest(row!) }, 201);
+  // The customer's own draft: their budget comes back to them.
+  return c.json({ success: true, request: requestForReader(row!, 'owner') }, 201);
 });
 
 /**
@@ -242,7 +254,7 @@ chatCommerceRoutes.post('/:id/print-requests/:rid/send', requireCommunityOpen, a
   await afterCard(c, thread, chatId, messageId, ts, card);
   const message = await existingCard(c, chatId, 'print_request', requestId);
   const row = await c.env.DB.prepare('SELECT * FROM community_requests WHERE id = ?').bind(requestId).first<Record<string, unknown>>();
-  return c.json({ success: true, request: publicRequest(row!), message }, 201);
+  return c.json({ success: true, request: requestForReader(row!, 'owner'), message }, 201);
 });
 
 // ================================================================ quotes
