@@ -92,8 +92,9 @@ const COLUMNS = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' } as cons
  * choose in the writing direction. Several: a group of checkboxes, each its
  * own Tab stop, Space toggles. A chosen tile is the sand fill with ink text
  * and the check badge on its inline-start top corner. A tile with a subtitle
- * holds its icon in a 40px well (IMG_8474); a one-line tile centres a bare
- * icon and its title (IMG_8473, IMG_8482).
+ * holds its icon in a 40px well, the badge over the corner of the well
+ * (IMG_8474); a one-line tile centres a bare icon and its title, the badge
+ * seated on the tile corner, clear of both (`data-corner`, IMG_8482).
  */
 export function ChoiceTiles(props: ChoiceTilesProps) {
   const { items, label, columns = 2, className = '' } = props;
@@ -166,7 +167,7 @@ export function ChoiceTiles(props: ChoiceTilesProps) {
               <span className="block text-[15px] font-bold">{it.title}</span>
               {it.subtitle && <span className="cm-sub block text-[12px]">{it.subtitle}</span>}
             </span>
-            <span aria-hidden="true" className="cm-check absolute top-1.5 size-5 items-center justify-center rounded-full">
+            <span aria-hidden="true" data-corner={it.subtitle ? undefined : true} className="cm-check absolute size-5 items-center justify-center rounded-full">
               <Check className="h-3 w-3" strokeWidth={3.5} />
             </span>
           </button>
@@ -194,7 +195,8 @@ export interface FilterSelectProps {
 /**
  * A filter chip that opens its options. At rest it says the filter («الحالة
  * ⌄»); once a value is chosen it says the value in the sand fill, and a ×
- * beside it clears it. The chosen row of the list says «محدد».
+ * beside it clears it. The options are radio items (`menuitemradio`, the
+ * chosen one `aria-checked`), and the chosen row also says «محدد».
  */
 export function FilterSelect({ label, icon, options, value, onChange, className = '' }: FilterSelectProps) {
   const s = useKitStrings();
@@ -208,6 +210,7 @@ export function FilterSelect({ label, icon, options, value, onChange, className 
           id: o.id,
           label: o.label,
           icon: o.id === value ? <Check className="h-4 w-4" /> : <span className="block h-4 w-4" />,
+          checked: o.id === value,
           hint: o.id === value ? s.selected : undefined,
           onSelect: () => onChange(o.id),
         }))}

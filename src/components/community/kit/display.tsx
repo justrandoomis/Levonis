@@ -18,7 +18,7 @@
  */
 import React, { useId } from 'react';
 import { Link } from 'react-router-dom';
-import { ExternalLink, GripVertical, Plus, X } from 'lucide-react';
+import { Check, ExternalLink, GripVertical, Plus, X } from 'lucide-react';
 import VariantImg from '../../ui/VariantImg';
 import { OnwardChevron, TextLink } from './buttons';
 import { useKitStrings } from './strings';
@@ -188,7 +188,7 @@ export interface MediaTileProps {
   removeLabel?: string;
   /** Draw the drag handle (the caller wires the reorder). */
   draggable?: boolean;
-  /** The chosen cover: a 2px gold line. */
+  /** The chosen cover: a 2px gold line outside the photo, the check badge, and «الغلاف» said aloud. */
   selected?: boolean;
   sizes?: string;
   className?: string;
@@ -207,13 +207,24 @@ export function MediaTile({ src, alt, ratio = '4 / 3', index, count, onRemove, r
           <span className="sr-only">{s.photo(index, count)}</span>
         </span>
       )}
+      {selected && (
+        <>
+          <span className="sr-only">{s.cover}</span>
+          <span aria-hidden="true" className="cm-check absolute size-6 items-center justify-center rounded-full">
+            <Check className="h-3.5 w-3.5" strokeWidth={3.5} />
+          </span>
+        </>
+      )}
+      {/* The remove disc sits 10px in (`cm-media-x`), so its 44px hit is whole
+          inside the clipped tile; its focus ring has a canvas halo under the
+          gold, so it shows over a light photo as well as a dark one. */}
       {onRemove && (
-        <button type="button" onClick={onRemove} aria-label={removeLabel ?? `${s.remove}: ${alt}`} className="lv-hit absolute top-2 start-2 inline-flex size-6 items-center justify-center rounded-full bg-onyx/70 text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+        <button type="button" onClick={onRemove} aria-label={removeLabel ?? `${s.remove}: ${alt}`} className="cm-media-x lv-hit absolute inline-flex size-6 items-center justify-center rounded-full bg-onyx/70 text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas">
           <X aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={2.5} />
         </button>
       )}
       {draggable && (
-        <span aria-hidden="true" title={s.reorder} className="absolute top-2 end-2 inline-flex size-6 items-center justify-center rounded-sm bg-onyx/70 text-snow">
+        <span aria-hidden="true" title={s.reorder} className="cm-media-grip absolute inline-flex size-6 items-center justify-center rounded-sm bg-onyx/70 text-snow">
           <GripVertical className="h-3.5 w-3.5" />
         </span>
       )}

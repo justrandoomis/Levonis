@@ -125,3 +125,43 @@ export function subscribeToasterHosts(listener: () => void): () => void {
     hostListeners.delete(listener);
   };
 }
+
+// ------------------------------------------------ the scope a toast wears
+/*
+ * A themed page scope (the community, src/components/community/CommunitySurface.tsx)
+ * re-declares the tokens on its own root, and the Toaster is portalled into
+ * <body>, outside it. The scope root publishes its stamp here while it is
+ * mounted, and again when the theme changes; the Toaster wears the newest
+ * one. So a toast follows a theme switch, and drops the stamp as soon as the
+ * scope is gone (it used to copy the stamp from the DOM while it rendered,
+ * and kept the old theme until the queue changed).
+ */
+export interface ToastSurface {
+  'data-surface': string;
+  'data-theme': 'dark' | 'light';
+}
+
+let surfaces: ToastSurface[] = [];
+const surfaceListeners = new Set<() => void>();
+
+/** Publish a scope stamp; the returned function withdraws it. */
+export function publishToastSurface(stamp: ToastSurface): () => void {
+  surfaces = [...surfaces, stamp];
+  for (const l of surfaceListeners) l();
+  return () => {
+    surfaces = surfaces.filter((s) => s !== stamp);
+    for (const l of surfaceListeners) l();
+  };
+}
+
+/** The stamp the toasts wear now: the newest scope on screen, or none. */
+export function toastSurface(): ToastSurface | null {
+  return surfaces[surfaces.length - 1] ?? null;
+}
+
+export function subscribeToastSurface(listener: () => void): () => void {
+  surfaceListeners.add(listener);
+  return () => {
+    surfaceListeners.delete(listener);
+  };
+}

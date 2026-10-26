@@ -13,15 +13,17 @@
  *
  * Portals leave the root, so the stamp travels with them: `SurfaceContext`
  * (src/components/ui/Overlay.tsx) for Overlay and Anchored (sheets, menus,
- * dialogs opened from inside), and the shell Toaster copies the stamp of the
- * `.cm-surface` on screen when it draws a toast.
+ * dialogs opened from inside), and the toast store (src/lib/toastStore.ts)
+ * for the shell Toaster: the root publishes its stamp while it is mounted,
+ * again on a theme switch, and withdraws it when it leaves.
  *
  * The stylesheet is imported HERE and only here, so it rides in this lazy
  * module and never reaches a storefront visitor (tests/communityScope.test.ts).
  */
-import React, { useMemo } from 'react';
+import React, { useLayoutEffect, useMemo } from 'react';
 import '../../styles/community.css';
 import { useTheme } from '../../lib/theme';
+import { publishToastSurface } from '../../lib/toastStore';
 import { SurfaceContext, type SurfaceStamp } from '../ui/Overlay';
 
 export interface CommunitySurfaceProps {
@@ -32,6 +34,7 @@ export interface CommunitySurfaceProps {
 export default function CommunitySurface({ children, className = '' }: CommunitySurfaceProps) {
   const { theme } = useTheme();
   const stamp = useMemo<SurfaceStamp>(() => ({ 'data-surface': 'community', 'data-theme': theme }), [theme]);
+  useLayoutEffect(() => publishToastSurface(stamp), [stamp]);
   return (
     <SurfaceContext.Provider value={stamp}>
       <div {...stamp} className={`cm-surface bg-canvas text-text-primary ${className}`}>

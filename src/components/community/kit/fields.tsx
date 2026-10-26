@@ -282,11 +282,13 @@ export function DropZone({ title, subtitle, formats, accept, multiple = true, di
           setOver(false);
           if (!disabled) take(e.dataTransfer.files);
         }}
-        className="cm-drop flex min-h-28 w-full flex-col items-center justify-center gap-1 rounded-md p-3 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40"
+        className="cm-drop cm-drop-zone flex min-h-28 w-full items-center justify-center rounded-md p-3 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40"
       >
-        <UploadCloud aria-hidden="true" className="h-8 w-8 text-text-secondary" strokeWidth={1.5} />
-        <span className="text-[15px] font-bold text-text-primary">{title}</span>
-        {subtitle && <span className="text-ui-sm text-text-muted">{subtitle}</span>}
+        <span className="flex min-w-0 flex-col gap-1">
+          <span className="text-[15px] font-bold text-text-primary">{title}</span>
+          {subtitle && <span className="text-ui-sm text-text-muted">{subtitle}</span>}
+        </span>
+        <UploadCloud aria-hidden="true" className="h-8 w-8 shrink-0 text-text-secondary" strokeWidth={1.5} />
       </button>
       <input ref={pick} type="file" hidden accept={accept} multiple={multiple} onChange={(e) => take(e.currentTarget.files)} />
       {cameraLabel && !fine && (

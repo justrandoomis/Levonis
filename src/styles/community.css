@@ -58,6 +58,11 @@
   --color-text-secondary: #adb8c5;
   --color-text-muted: #97a2ae;
   --color-danger: #ed7177;
+  /* The status inks, lifted with the grounds: an lv-chip mixes 12% of its
+     tone into the raised fill, which the scope raised from #191c21 to
+     #282e33, so the house #6f9bd1 and #42b77a fell to 4.02 and 4.49:1 there. */
+  --color-info: #84acdd;
+  --color-success: #4cc387;
   --color-gold: #f0d18c;
   --color-accent: #f0d18c;
   --color-gold-fill: #dcbc8c;
@@ -98,6 +103,11 @@
 }
 
 [data-surface='community'][data-theme='light'] {
+  /* The status inks one step darker than the house, so they hold 4.5:1 on
+     the selected fill (#ddd4c3) as well as on every other ground. */
+  --color-info: #2b5d98;
+  --color-success: #186942;
+  --color-warning: #844f04;
   --color-gold: #6a5426;
   --color-accent: #6a5426;
   --color-gold-fill: #d6b77f;
@@ -209,14 +219,29 @@
   }
 
   /* The check badge: an ink disc with a sand check in the inline-start top
-     corner of a chosen tile, over the icon well (IMG_8474, IMG_8482). */
+     corner of a chosen tile. A tile with a subtitle seats it over the corner
+     of its icon well (IMG_8474). A one-line tile centres its icon and title
+     across the whole tile, so its badge sits ON the tile corner, 8px out:
+     the disc then lies in the 12px inline padding and outside the tile, never
+     over the label or the icon at 320 or 390 (IMG_8482). A chosen photo
+     (MediaTile) wears it at the bottom inline-end. */
   .cm-check {
     display: none;
+    inset-block-start: 6px;
     inset-inline-start: 6px;
     color: var(--cm-sel-bg);
     background: var(--cm-sel-badge);
   }
-  [aria-checked='true'] > .cm-check {
+  .cm-check[data-corner] {
+    inset-block-start: -8px;
+    inset-inline-start: -8px;
+  }
+  .cm-media > .cm-check {
+    inset-block: auto 8px;
+    inset-inline: auto 8px;
+  }
+  [aria-checked='true'] > .cm-check,
+  .cm-media[data-selected] > .cm-check {
     display: inline-flex;
   }
 
@@ -296,9 +321,38 @@
   .cm-drop[data-over] {
     border-color: var(--cm-gold-line);
   }
+  /* The drop zone is one centred row (IMG_8474): the two lines at the inline
+     start, the cloud at the inline end. The subtitle has no intrinsic width
+     (`contain`), so the row wraps only when the TITLE cannot sit beside the
+     cloud (a long Sorani title in a narrow zone), and then the cloud goes
+     above it (`wrap-reverse`). */
+  .cm-drop-zone {
+    flex-wrap: wrap-reverse;
+    align-content: center;
+    gap: 0.25rem 1rem;
+  }
+  .cm-drop-zone > span {
+    flex: 1 1 auto;
+    max-inline-size: 16rem;
+  }
+  .cm-drop-zone > span > span + span {
+    contain: inline-size;
+  }
+  /* The chosen cover: the gold line drawn OUTSIDE the photo, on the card
+     (a line on the photo vanished over a light one), plus the check badge. */
   .cm-media[data-selected] {
     outline: 2px solid var(--cm-gold-line);
-    outline-offset: -2px;
+    outline-offset: 2px;
+  }
+  /* The overlays sit 10px in, so the 44px hit of the 24px remove disc ends
+     at the tile edge and the overflow clip of the tile never cuts it. */
+  .cm-media-x {
+    inset-block-start: 10px;
+    inset-inline-start: 10px;
+  }
+  .cm-media-grip {
+    inset-block-start: 10px;
+    inset-inline-end: 10px;
   }
 
   /* The bottom action bar: sticky over the shell bar and the safe area. */
@@ -342,6 +396,17 @@
   min-block-size: 0;
   border-radius: 12px;
   font-size: 0.875rem;
+  font-weight: 600;
+}
+/* A 1px divider between two neighbouring unchosen options (IMG_8482,
+   «فائقة | دقيقة»), in the middle of the 4px gap; ::after is the hit. */
+[data-surface='community'] .cm-seg > [aria-checked='false'] + [aria-checked='false']::before {
+  content: '';
+  position: absolute;
+  inset-block: 9px;
+  inset-inline-start: -3px;
+  inline-size: 1px;
+  background: var(--color-border-subtle);
 }
 [data-surface='community'] .cm-seg > [role='radio']::after {
   content: '';
@@ -351,6 +416,7 @@
 }
 [data-surface='community'] .cm-seg > [aria-checked='true'] {
   color: var(--cm-sel-ink);
+  font-weight: 700;
 }
 [data-surface='community'] .cm-seg [data-segmented-indicator] {
   border-radius: 12px;
@@ -360,9 +426,13 @@
 }
 
 /* The quantity stepper (NumberInput kind="quantity"): a 48px well, two
-   raised 56px keys, the figure 18/700 in the middle. */
+   raised 56px keys, the figure 18/700 in the middle. The row is an LTR
+   island like the figure it holds: minus on the left, plus on the right in
+   every language, as IMG_8482 draws it (plus at the inline start in RTL),
+   and the Tab order (minus, figure, plus) still runs the way it is drawn. */
 [data-surface='community'] .cm-stepper .lv-well {
   min-block-size: 48px;
+  direction: ltr;
 }
 [data-surface='community'] .cm-stepper .lv-well > button {
   inline-size: 56px;

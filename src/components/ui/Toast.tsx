@@ -56,6 +56,8 @@ import {
   dismissToast as dismiss,
   isToasterHost,
   subscribeToasterHosts,
+  subscribeToastSurface,
+  toastSurface,
   subscribeToasts as subscribe,
   toast,
   toastQueue as snapshot,
@@ -179,6 +181,10 @@ export function Toaster({ aboveNav = false }: { aboveNav?: boolean } = {}) {
   useEffect(() => claimToasterHost(me), [me]);
   const drawing = useSyncExternalStore(subscribeToasterHosts, () => isToasterHost(me), () => false);
   const list = useSyncExternalStore(subscribe, snapshot, snapshot);
+  // A toast raised on a themed page (the community scope) wears the stamp the
+  // scope root publishes (lib/toastStore.ts), so it paints in the scope tokens
+  // and follows a theme switch; none outside every scope.
+  const surface = useSyncExternalStore(subscribeToastSurface, toastSurface, () => null);
   const { loc } = useLanguage();
   const [hovered, setHovered] = useState(false);
   const [focusedIn, setFocusedIn] = useState(false);
@@ -193,11 +199,6 @@ export function Toaster({ aboveNav = false }: { aboveNav?: boolean } = {}) {
 
   if (typeof document === 'undefined' || !drawing) return null;
   const visible = list.slice(0, VISIBLE);
-  // The shell mounts this outside every page, so a toast raised on a themed
-  // page (the community scope root, `.cm-surface`) copies the stamp of that root
-  // when it renders, and paints in the scope tokens (./Overlay.tsx SurfaceContext).
-  const scope = document.querySelector('.cm-surface');
-  const surface = scope instanceof HTMLElement ? { 'data-surface': scope.dataset.surface, 'data-theme': scope.dataset.theme } : null;
   const paused = hovered || focusedIn || hidden;
   const closeLabel = loc('إغلاق', 'Dismiss', 'داخستن');
 

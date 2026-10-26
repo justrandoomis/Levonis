@@ -10,14 +10,20 @@
  *     page of `/community/store/:slug/p/:productSlug` (plan R17), so the scope
  *     is stamped on the community page roots only;
  *  c. Overlay and Anchored stamp the scope on their portal roots, and the
- *     shell Toaster copies the stamp of the scope root on screen;
+ *     shell Toaster wears the stamp the scope root publishes to the toast
+ *     store (so a toast follows a theme switch and drops the stamp when the
+ *     scope leaves);
  *  d. every text and boundary pair of the scope meets WCAG AA in both
  *     themes, computed from the CSS values themselves;
  *  e. D-2 and D-3 as the owner overrode them: the primary is the sand-gold
  *     gradient with ink text, a selection the solid sand fill with ink text
  *     and a non-colour cue, both inside the scope only;
  *  f. the kit words exist in Arabic, English and Sorani, and no Sorani value
- *     is the Arabic copied (row 183).
+ *     is the Arabic copied (row 183);
+ *  g. the kit review (round 1): the tile badge stays out of the content box,
+ *     the segmented divider and weights, the stepper keys as drawn, the drop
+ *     zone row, the photo tile overlays and its chosen cover, and the filter
+ *     options as radio items.
  *
  * Run: node --import tsx --test tests/communityScope.test.ts
  */
@@ -26,8 +32,9 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BEGIN, END, buildBlock, contrast, parseColor } from '../scripts/theme-tokens.mjs';
+import { BEGIN, END, buildBlock, contrast, parseColor, rgbToOklch } from '../scripts/theme-tokens.mjs';
 import { KIT_STRINGS } from '../src/components/community/kit/strings';
+import { publishToastSurface, subscribeToastSurface, toastSurface, type ToastSurface } from '../src/lib/toastStore';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -78,6 +85,17 @@ function color(value: string, ground?: Rgb): Rgb {
   return parseColor(v);
 }
 const ratio = (a: Rgb, b: Rgb) => contrast(a, b);
+
+/** `color-mix(in oklab, a p, b)` for two opaque colours, as the browser paints it. */
+function mixOklab(a: Rgb, b: Rgb, p: number): Rgb {
+  const lab = (rgb: Rgb) => {
+    const [L, C, H] = rgbToOklch(rgb);
+    return [L, C * Math.cos((H * Math.PI) / 180), C * Math.sin((H * Math.PI) / 180)];
+  };
+  const [L, A, B] = lab(a).map((v, i) => v * p + lab(b)[i] * (1 - p));
+  const H = ((Math.atan2(B, A) * 180) / Math.PI + 360) % 360;
+  return parseColor(`oklch(${(L * 100).toFixed(6)}% ${Math.hypot(A, B).toFixed(6)} ${H.toFixed(6)})`);
+}
 
 // ----------------------------------------------------------------------- a
 test('a. the scope token blocks are 0,2,0, hand-written outside the generated markers, in a sheet only CommunitySurface imports', () => {
@@ -148,7 +166,7 @@ test('b. CommunityGate carries no scope; the scope root stamps the surface and t
 });
 
 // ----------------------------------------------------------------------- c
-test('c. Overlay and Anchored stamp the scope on their portal roots; the Toaster copies the root on screen', () => {
+test('c. Overlay and Anchored stamp the scope on their portal roots; the Toaster wears the stamp the scope root publishes', () => {
   const overlay = read('src/components/ui/Overlay.tsx');
   assert.match(overlay, /export const SurfaceContext = createContext<SurfaceStamp \| null>\(null\);/);
   assert.equal((overlay.match(/const surface = useContext\(SurfaceContext\);/g) ?? []).length, 2, 'Overlay and Anchored each read the scope');
@@ -157,8 +175,36 @@ test('c. Overlay and Anchored stamp the scope on their portal roots; the Toaster
   // Both portal roots render into <body>, so the stamp is what carries the scope.
   assert.equal((overlay.match(/document\.body\s*\)/g) ?? []).length, 2);
   const toast = read('src/components/ui/Toast.tsx');
-  assert.match(toast, /document\.querySelector\('\.cm-surface'\)/);
+  // Read from React state, never from the DOM while rendering: a stamp copied at
+  // render time kept the old theme after a switch until the queue changed.
+  assert.doesNotMatch(strip(toast), /querySelector\(['"]\.cm-surface/, 'the Toaster copies the scope stamp from the DOM');
+  assert.match(toast, /const surface = useSyncExternalStore\(subscribeToastSurface, toastSurface, \(\) => null\);/);
   assert.match(toast, /data-toaster\s*\{\.\.\.surface\}/);
+  // The scope root publishes its stamp on mount and on every theme switch, and withdraws it on unmount.
+  assert.match(read('src/components/community/CommunitySurface.tsx'), /useLayoutEffect\(\(\) => publishToastSurface\(stamp\), \[stamp\]\);/);
+});
+
+test('c2. the toast stamp follows the scope: published on mount, replaced on a theme switch, withdrawn when the scope leaves', () => {
+  const seen: Array<string | null> = [];
+  const stop = subscribeToastSurface(() => seen.push(toastSurface()?.['data-theme'] ?? null));
+  assert.equal(toastSurface(), null, 'a stamp outside every scope');
+  const dark: ToastSurface = { 'data-surface': 'community', 'data-theme': 'dark' };
+  const light: ToastSurface = { 'data-surface': 'community', 'data-theme': 'light' };
+  const withdrawDark = publishToastSurface(dark);
+  assert.equal(toastSurface(), dark);
+  // A theme switch: React runs the cleanup of the old stamp, then publishes the new one.
+  withdrawDark();
+  const withdrawLight = publishToastSurface(light);
+  assert.equal(toastSurface(), light, 'the toast kept the old theme after a switch');
+  // Two scope roots during a route change: the newest wins, and the other leaving keeps it.
+  const next: ToastSurface = { 'data-surface': 'community', 'data-theme': 'light' };
+  const withdrawNext = publishToastSurface(next);
+  withdrawLight();
+  assert.equal(toastSurface(), next);
+  withdrawNext();
+  assert.equal(toastSurface(), null, 'the stamp outlived the scope');
+  assert.deepEqual(seen, ['dark', null, 'light', 'light', 'light', null]);
+  stop();
 });
 
 // ----------------------------------------------------------------------- d
@@ -215,11 +261,21 @@ test('d. every scoped text and boundary pair meets WCAG AA in both themes (compu
       }
       need('light selection edge vs the sand', ratio(c('cm-sel-edge'), c('cm-sel-bg')), 3);
     }
+    // The status inks (an lv-chip, an alert, a state word) on every ground, and the lv-chip
+    // under its own ink: 12% of the tone mixed into the raised fill in OKLab (src/index.css).
+    for (const tone of ['color-success', 'color-warning', 'color-info']) {
+      for (const [g, rgb] of grounds) need(`${theme} --${tone} on ${g}`, ratio(c(tone), rgb), 4.5);
+      need(`${theme} lv-chip --${tone} on its 12% mix over raised`, ratio(c(tone), mixOklab(c(tone), c('color-surface-raised'), 0.12)), 4.5);
+    }
+    // The chosen cover line is drawn outside the photo, on the card or the page (1.4.11).
+    for (const [g, rgb] of grounds.slice(0, 5)) need(`${theme} cover line vs ${g}`, ratio(c('cm-gold-line'), rgb), 3);
     need(`${theme} like colour on the card`, ratio(c('cm-like'), card), 3);
     need(`${theme} step on vs the canvas`, ratio(c('cm-step-on'), canvas), 3);
     need(`${theme} switch knob on the sand`, ratio(c('cm-sel-ink'), c('cm-sel-bg')), 3);
   }
   assert.deepEqual(failures, [], `contrast under the floor:\n${failures.join('\n')}`);
+  // The chip recipe the mix above models.
+  assert.match(indexCss, /\.lv-chip \{\s*background-color: color-mix\(in oklab, var\(--chip\) 12%, var\(--color-surface-raised\)\);/);
 });
 
 // ----------------------------------------------------------------------- e
@@ -246,7 +302,7 @@ test('e. D-2 and D-3 as the owner overrode them: a gold gradient primary and a s
   const controls = read('src/components/community/kit/controls.tsx');
   assert.match(controls, /role=\{props\.multiple \? 'checkbox' : 'radio'\}\s*aria-checked=\{on\}/);
   assert.match(controls, /className="cm-check /);
-  assert.match(css, /\[aria-checked='true'\] > \.cm-check \{\s*display: inline-flex;/);
+  assert.match(css, /\[aria-checked='true'\] > \.cm-check,\s*\.cm-media\[data-selected\] > \.cm-check \{\s*display: inline-flex;/);
   assert.match(read('src/components/community/FilterChip.tsx'), /data-selected=\{on \|\| undefined\} className="cm-raised cm-chip cm-sel /);
   assert.match(css, /\[data-surface='community'\] \.cm-seg \[data-segmented-indicator\] \{[^}]*background: var\(--cm-sel-bg\);/);
   assert.match(css, /\[data-surface='community'\] \.cm-switch \[data-switch='on'\] > span \{[^}]*background: var\(--cm-sel-bg\);/);
@@ -273,4 +329,64 @@ test('f. the kit words: every key in Arabic, English and Sorani, the Sorani its 
     // Counters and steps keep Latin digits in every language (plan R13).
     if (/\d/.test(ar)) for (const s of [ar, en, ckb]) assert.match(s, /3.*4/, `${key}: a count lost its Latin digits`);
   }
+});
+
+// ----------------------------------------------------------------------- g
+test('g. the kit review: badge, segmented, stepper, drop zone, photo tile and filter options', () => {
+  const controls = read('src/components/community/kit/controls.tsx');
+  const display = read('src/components/community/kit/display.tsx');
+  const fields = read('src/components/community/kit/fields.tsx');
+  const px = (v: string) => parseFloat(v) * (v.endsWith('rem') ? 16 : 1);
+  const decl = (selector: string, prop: string) => {
+    const at = css.indexOf(`${selector} {`);
+    assert.ok(at >= 0, `${SHEET}: no rule \`${selector}\``);
+    const body = css.slice(css.indexOf('{', at) + 1, css.indexOf('}', at));
+    return new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+);`).exec(body)?.[1].trim();
+  };
+
+  // B1-F1. A one-line tile centres its icon and title across the tile, so its badge sits on the
+  // tile corner: the 20px disc, 8px out, ends where the 12px inline padding ends, so it can never
+  // cover the label or the icon (the content box), at any width or in any language.
+  assert.match(controls, /data-corner=\{it\.subtitle \? undefined : true\} className="cm-check absolute size-5 /);
+  assert.match(controls, /className=\{`cm-raised cm-sel relative flex min-h-14 w-full items-center rounded-md px-3 py-2 /);
+  const corner = px(decl('.cm-check[data-corner]', 'inset-inline-start') ?? 'NaN');
+  assert.equal(px(decl('.cm-check[data-corner]', 'inset-block-start') ?? 'NaN'), corner);
+  assert.ok(corner < 0 && corner + 20 <= 12, `the corner badge reaches ${corner + 20}px into a tile whose content starts at 12px`);
+  // A two-line tile keeps it over the corner of its 40px icon well (IMG_8474).
+  assert.equal(decl('.cm-check', 'inset-inline-start'), '6px');
+
+  // B1-F2. The unchosen options 14/600, the chosen 14/700, and a 1px divider between two unchosen neighbours.
+  assert.equal(decl("[data-surface='community'] .cm-seg > [role='radio']", 'font-weight'), '600');
+  assert.equal(decl("[data-surface='community'] .cm-seg > [aria-checked='true']", 'font-weight'), '700');
+  const divider = "[data-surface='community'] .cm-seg > [aria-checked='false'] + [aria-checked='false']::before";
+  assert.equal(decl(divider, 'inline-size'), '1px');
+  assert.equal(decl(divider, 'background'), 'var(--color-border-subtle)');
+
+  // B1-F3. The stepper row is an LTR island like its figure: minus on the left, plus on the right,
+  // as IMG_8482 draws it in Arabic, with the Tab order running the way it is drawn.
+  assert.equal(decl("[data-surface='community'] .cm-stepper .lv-well", 'direction'), 'ltr');
+
+  // B1-F4. The drop zone is one row (the two lines, then the cloud at the inline end) that wraps,
+  // cloud above, only when the title cannot sit beside the cloud.
+  assert.match(fields, /className="cm-drop cm-drop-zone flex [^"]*"\s*>\s*<span className="flex min-w-0 flex-col gap-1">[\s\S]*?<\/span>\s*<UploadCloud /);
+  assert.equal(decl('.cm-drop-zone', 'flex-wrap'), 'wrap-reverse');
+  assert.equal(decl('.cm-drop-zone > span > span + span', 'contain'), 'inline-size');
+
+  // A11Y-2. The 24px remove disc sits at least 10px in: its 44px hit ends inside the clipped tile.
+  assert.match(display, /className="cm-media-x lv-hit absolute inline-flex size-6 /);
+  for (const side of ['inset-block-start', 'inset-inline-start']) assert.ok(px(decl('.cm-media-x', side) ?? '0') >= (44 - 24) / 2, `the remove hit is clipped at ${side}`);
+  assert.match(display, /className="cm-media-grip absolute /);
+  assert.doesNotMatch(display, /lv-hit absolute top-2 start-2/);
+  // A11Y-3. Its focus ring has a canvas halo under the gold, so it shows over a light photo too.
+  assert.match(display, /cm-media-x[^"]*focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas/);
+  // A11Y-4. The chosen cover: the line outside the photo, the check badge, and the word said aloud.
+  assert.ok(px(decl('.cm-media[data-selected]', 'outline-offset') ?? '0') > 0, 'the cover line is drawn on the photo');
+  assert.match(css, /\.cm-media\[data-selected\] > \.cm-check \{\s*display: inline-flex;/);
+  assert.match(display, /\{selected && \(\s*<>\s*<span className="sr-only">\{s\.cover\}<\/span>\s*<span aria-hidden="true" className="cm-check /);
+  for (const lang of ['ar', 'en', 'ckb'] as const) assert.ok(KIT_STRINGS[lang].cover, `${lang}: no cover word`);
+
+  // A11Y-5. The filter options are radio items, the chosen one checked (the word «محدد» stays visible).
+  const menu = read('src/components/ui/Menu.tsx');
+  assert.match(menu, /\.\.\.\(entry\.checked === undefined \? null : \{ role: 'menuitemradio', 'aria-checked': entry\.checked \}\)/);
+  assert.match(controls, /checked: o\.id === value,\s*hint: o\.id === value \? s\.selected : undefined,/);
 });

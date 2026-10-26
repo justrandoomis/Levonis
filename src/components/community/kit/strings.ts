@@ -22,6 +22,8 @@ export interface KitStrings {
   removeFilter: string;
   remove: string;
   reorder: string;
+  /** The chosen cover photo, read after its picture (the badge is drawn, this is said). */
+  cover: string;
   /** The progress steps read aloud: «الخطوة 2 من 4». */
   step: (n: number, total: number) => string;
   /** A photo counter read aloud: «الصورة 1 من 3». */
@@ -43,6 +45,7 @@ const STRINGS: Record<'ar' | 'en' | 'ckb', KitStrings> = {
     removeFilter: 'إزالة التصفية',
     remove: 'إزالة',
     reorder: 'اسحب لإعادة الترتيب',
+    cover: 'الغلاف',
     step: (n, total) => `الخطوة ${n} من ${total}`,
     photo: (n, total) => `الصورة ${n} من ${total}`,
     decrease: 'إنقاص',
@@ -60,6 +63,7 @@ const STRINGS: Record<'ar' | 'en' | 'ckb', KitStrings> = {
     removeFilter: 'Remove filter',
     remove: 'Remove',
     reorder: 'Drag to reorder',
+    cover: 'Cover',
     step: (n, total) => `Step ${n} of ${total}`,
     photo: (n, total) => `Photo ${n} of ${total}`,
     decrease: 'Decrease',
@@ -77,6 +81,7 @@ const STRINGS: Record<'ar' | 'en' | 'ckb', KitStrings> = {
     removeFilter: 'لابردنی فلتەر',
     remove: 'لابردن',
     reorder: 'ڕایبکێشە بۆ گۆڕینی ڕیزبەندی',
+    cover: 'بەرگ',
     step: (n, total) => `هەنگاوی ${n} لە ${total}`,
     photo: (n, total) => `وێنەی ${n} لە ${total}`,
     decrease: 'کەمکردنەوە',
