@@ -9,6 +9,7 @@
  */
 import { api } from '../../../lib/api';
 import type { PostFile, PostFileInput } from '../files/api';
+import type { PostMaterialFamily, PostPrinterBrand, PostSort, TrendingWindow } from '../../../../packages/contracts/src/communityFilters';
 
 export const POST_KINDS = ['project', 'post', 'tutorial', 'timelapse', 'before_after'] as const;
 export type PostKind = (typeof POST_KINDS)[number];
@@ -159,6 +160,15 @@ export interface PostFilters {
   store?: string;
   product?: string;
   tag?: string;
+  /**
+   * The filter sheet (plan B3), each from the closed lists of
+   * packages/contracts/src/communityFilters.ts: a material family, a printer
+   * brand, the order, and only projects with a file to download.
+   */
+  material?: PostMaterialFamily | '';
+  printer?: PostPrinterBrand | '';
+  sort?: PostSort | '';
+  has_files?: '1' | '';
 }
 
 export interface PostPage {
@@ -187,7 +197,13 @@ const toPage = (d: RawPage): PostPage => ({
 export const projectsApi = {
   list: (filters: PostFilters, cursor: string | null = null, limit = 18) =>
     api.get<RawPage>(`/api/community/posts?${qs(filters, cursor, limit)}`).then(toPage),
-  trending: (limit = 12) => api.get<{ posts: PostCard[] }>(`/api/community/posts/trending?limit=${limit}`).then((d) => d.posts ?? []),
+  trending: (limit = 12, days?: TrendingWindow) =>
+    projectsApi.trendingWindow(limit, days).then((d) => d.posts),
+  /** The rail with the window it read (`window_days`, 7 or 30); an older Worker reads 30 and says nothing. */
+  trendingWindow: (limit = 12, days?: TrendingWindow) =>
+    api
+      .get<{ posts?: PostCard[]; window_days?: number }>(`/api/community/posts/trending?limit=${limit}${days ? `&days=${days}` : ''}`)
+      .then((d) => ({ posts: d.posts ?? [], window_days: typeof d.window_days === 'number' ? d.window_days : 30 })),
   get: (id: string) => api.get<{ post: Post }>(`/api/community/posts/${encodeURIComponent(id)}`).then((d) => d.post),
   mine: (cursor: string | null = null, limit = 24) =>
     api.get<{ posts: MyPost[]; next_cursor?: string | null }>(`/api/community/my-posts?${qs({}, cursor, limit)}`)

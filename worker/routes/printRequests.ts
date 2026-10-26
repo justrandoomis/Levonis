@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env, SessionUser } from '../lib/types';
 import { requireAuth, badRequest, notFound, conflict, str, int, HttpError } from '../lib/http';
+import { feedCursor } from '../lib/feedCursor';
 import { newId, randomToken, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
@@ -2762,8 +2763,20 @@ async function copyRequestModel(db: D1Database, sourceId: string, newId_: string
  * who is asking; emitting a public URL here would quietly make every uploaded
  * model world-readable.
  */
+/**
+ * «طلباتي» — the customer's own requests, newest first, a page at a time
+ * (plan B3: `limit`, default 50 as before, and `cursor`, `<created_at>|<id>`;
+ * `next_cursor` is present exactly when a next page exists).
+ *
+ * `cover_url` is the customer's own first picture on the request (the first
+ * file whose type is an image, in upload order) as the authorised file ROUTE
+ * (`/api/marketplace/requests/<id>/files/<file>`), never a storage key: only
+ * this list, owner-scoped in SQL, carries a request picture (rule R3).
+ */
 printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
   const user = c.get('user')!;
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 50, def: 50 });
+  const cursor = feedCursor(c.req.query('cursor'));
   // THE SUMMARY (P1-05): parts, pieces a set and the review — read through
   // the fingerprint (`requestSummarySql`), the review only for an effective
   // version-3 row — and R10, the model files the estimate did not price.
@@ -2798,24 +2811,33 @@ printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
             o.price_iqd AS accepted_price_iqd, o.completion_days AS accepted_days,
             m.name AS accepted_merchant_name,
             co.offer_snapshot AS accepted_offer_snapshot, co.request_snapshot AS accepted_request_snapshot,
-            (SELECT COUNT(*) FROM community_request_files cf WHERE cf.request_id = r.id) AS file_count
+            (SELECT COUNT(*) FROM community_request_files cf WHERE cf.request_id = r.id) AS file_count,
+            (SELECT ci.id FROM community_request_files ci
+              WHERE ci.request_id = r.id AND ci.content_type LIKE 'image/%'
+              ORDER BY ci.created_at, ci.id LIMIT 1) AS cover_file_id
        FROM community_requests r
        LEFT JOIN community_print_requests p ON p.request_id = r.id
        LEFT JOIN community_request_files f ON f.id = p.primary_file_id
        LEFT JOIN community_offers o ON o.id = r.accepted_offer_id
        LEFT JOIN community_merchants m ON m.id = o.merchant_id
        LEFT JOIN community_orders co ON co.id = r.community_order_id
-      WHERE r.customer_id = ?
-      ORDER BY r.created_at DESC
-      LIMIT 50`;
+      WHERE r.customer_id = ?1
+        AND (?2 = '' OR r.created_at < ?2 OR (r.created_at = ?2 AND r.id < ?3))
+      ORDER BY r.created_at DESC, r.id DESC
+      LIMIT ?4`;
   };
   let results: Record<string, unknown>[] | undefined;
   try {
-    results = (await c.env.DB.prepare(listSql(true)).bind(user.id).all<Record<string, unknown>>()).results;
+    results = (await c.env.DB.prepare(listSql(true)).bind(user.id, cursor.at, cursor.id, limit + 1).all<Record<string, unknown>>()).results;
   } catch (e) {
     if (!isMissingSchema(e)) throw e;
-    results = (await c.env.DB.prepare(listSql(false)).bind(user.id).all<Record<string, unknown>>()).results;
+    results = (await c.env.DB.prepare(listSql(false)).bind(user.id, cursor.at, cursor.id, limit + 1).all<Record<string, unknown>>()).results;
   }
+  results = results ?? [];
+  const more = results.length > limit;
+  if (more) results.length = limit;
+  const lastRow = results[results.length - 1];
+  const next_cursor = more && lastRow ? `${String(lastRow.created_at)}|${String(lastRow.id)}` : null;
 
   return c.json({
     success: true,
@@ -2831,6 +2853,10 @@ printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
       governorate: String(r.governorate ?? ''),
       offer_count: Number(r.offer_count ?? 0),
       file_count: Number(r.file_count ?? 0),
+      /** The owner's own first picture, as its authorised route (plan B3); null without one. */
+      cover_url: r.cover_file_id
+        ? `/api/marketplace/requests/${encodeURIComponent(String(r.id))}/files/${encodeURIComponent(String(r.cover_file_id))}`
+        : null,
       created_at: String(r.created_at ?? ''),
       revision: Number(r.revision ?? 1),
       expires_at: (r.expires_at as string | null) ?? null,
@@ -2884,5 +2910,6 @@ printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
           }
         : null,
     })),
+    next_cursor,
   });
 });

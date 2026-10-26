@@ -12,25 +12,70 @@
  * A response for a key that is no longer the one on screen is dropped — a fast
  * typist's first search must not overwrite their last.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { communityHubApi, type FeedKind, type Page } from './api';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { communityHubApi, type FeedKind, type Page, type RequestFilters, type StoreFilters } from './api';
 import { socialApi } from '../social/api';
+import type { CreatorSort, FeedFrom } from '../../../../packages/contracts/src/communityFilters';
 import { FRESH_MS, feedCache as cache, forgetCommunityFeed, type FeedEntry as Entry } from './feedCache';
 
 export { forgetCommunityFeed };
+
+/**
+ * A list's filters (plan B3), as the query names them: `governorate`, `tech`,
+ * `service` (stores); `process`, `offers` (requests); `sort`, `has_store`,
+ * `approved` (makers); `from` (the following feed). Empty values are no
+ * filter. They are part of the memory's key, so a filtered list never shows
+ * the unfiltered one's rows.
+ */
+export type FeedFilters = Readonly<Record<string, string>>;
+const NO_FILTERS: FeedFilters = {};
+
+/** The filters as one stable string: sorted, empty values dropped. */
+export function feedFilterKey(filters: FeedFilters): string {
+  const p = new URLSearchParams();
+  for (const k of Object.keys(filters).sort()) if (filters[k]) p.set(k, filters[k]);
+  return p.toString();
+}
+
+/**
+ * The makers directory without a search reads the FEATURED order (the most
+ * projects first) unless a sort is chosen; a search reads the newest
+ * activity. Part of the key, so the two orders never share a memory.
+ */
+const creatorsFeatured = (q: string, filters: FeedFilters) => !q && !filters.sort;
 
 /**
  * The feeds have no `total` (a cursor over a river) and ignore `q`; the
  * makers' directory searches by it. All page with limit+1 on the server, so
  * `next` is null on the last page.
  */
-const LOADERS: Record<FeedKind, (q: string, cursor: string | null) => Promise<Page<{ id: string }>>> = {
-  products: communityHubApi.products,
-  merchants: communityHubApi.merchants,
-  requests: communityHubApi.requests,
-  creators: (q, cursor) => socialApi.creators({ q }, cursor, 18).then((p) => ({ rows: p.creators, next: p.next, total: p.total })),
+const LOADERS: Record<FeedKind, (q: string, cursor: string | null, filters: FeedFilters) => Promise<Page<{ id: string }>>> = {
+  products: (q, cursor) => communityHubApi.products(q, cursor),
+  merchants: (q, cursor, f) =>
+    communityHubApi.merchants(q, cursor, {
+      governorate: f.governorate,
+      tech: f.tech as StoreFilters['tech'],
+      service: f.service as StoreFilters['service'],
+    }),
+  requests: (q, cursor, f) =>
+    communityHubApi.requests(q, cursor, { process: f.process as RequestFilters['process'], offers: f.offers as RequestFilters['offers'] }),
+  creators: (q, cursor, f) =>
+    socialApi
+      .creators(
+        {
+          q,
+          featured: creatorsFeatured(q, f),
+          sort: (f.sort || undefined) as CreatorSort | undefined,
+          has_store: f.has_store === '1',
+          approved: f.approved === '1',
+        },
+        cursor,
+        18
+      )
+      .then((p) => ({ rows: p.creators, next: p.next, total: p.total })),
   'feed:foryou': (_q, cursor) => socialApi.feed('foryou', cursor, 12).then((p) => ({ rows: p.posts, next: p.next, total: null })),
-  'feed:following': (_q, cursor) => socialApi.feed('following', cursor, 12).then((p) => ({ rows: p.posts, next: p.next, total: null })),
+  'feed:following': (_q, cursor, f) =>
+    socialApi.feed('following', cursor, 12, (f.from || undefined) as FeedFrom | undefined).then((p) => ({ rows: p.posts, next: p.next, total: null })),
 };
 
 function fresh(key: string): Entry | null {
@@ -54,8 +99,17 @@ export interface CommunityFeed<T> {
   forgetOthers: () => void;
 }
 
-export function useCommunityFeed<T extends { id: string }>(kind: FeedKind, q: string, viewer: string): CommunityFeed<T> {
-  const key = `${viewer}|${kind}|${q}`;
+export function useCommunityFeed<T extends { id: string }>(
+  kind: FeedKind,
+  q: string,
+  viewer: string,
+  filters: FeedFilters = NO_FILTERS
+): CommunityFeed<T> {
+  const filterKey = feedFilterKey(filters);
+  const featured = kind === 'creators' && creatorsFeatured(q, filters) ? '|featured' : '';
+  const key = `${viewer}|${kind}|${q}|${filterKey}${featured}`;
+  // The filters as the key spells them: a new object with the same values is the same list.
+  const stable = useMemo<FeedFilters>(() => Object.fromEntries(new URLSearchParams(filterKey)), [filterKey]);
   const [slot, setSlot] = useState<{ key: string; entry: Entry | null }>(() => ({ key, entry: fresh(key) }));
   const [error, setError] = useState<unknown>(null);
   const [more, setMore] = useState<'idle' | 'loading' | 'error'>('idle');
@@ -77,7 +131,7 @@ export function useCommunityFeed<T extends { id: string }>(kind: FeedKind, q: st
     }
     setSlot({ key, entry: null });
     let alive = true;
-    LOADERS[kind](q, null)
+    LOADERS[kind](q, null, stable)
       .then((p) => {
         if (!alive) return;
         const e: Entry = { rows: p.rows, next: p.next, total: p.total, at: Date.now() };
@@ -90,14 +144,14 @@ export function useCommunityFeed<T extends { id: string }>(kind: FeedKind, q: st
     return () => {
       alive = false;
     };
-  }, [key, kind, q, nonce]);
+  }, [key, kind, q, stable, nonce]);
 
   const loadMore = useCallback(() => {
     const e = entry;
     if (!e || !e.next || more === 'loading') return;
     const k = key;
     setMore('loading');
-    LOADERS[kind](q, e.next)
+    LOADERS[kind](q, e.next, stable)
       .then((p) => {
         if (current.current !== k) return;
         const seen = new Set(e.rows.map((r) => r.id));
@@ -114,7 +168,7 @@ export function useCommunityFeed<T extends { id: string }>(kind: FeedKind, q: st
       .catch(() => {
         if (current.current === k) setMore('error');
       });
-  }, [entry, more, key, kind, q]);
+  }, [entry, more, key, kind, q, stable]);
 
   const reload = useCallback(() => {
     cache.delete(key);

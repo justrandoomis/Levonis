@@ -7,7 +7,9 @@ import { rateLimit } from '../lib/ratelimit';
 import { membershipBadges } from '../lib/entitlements';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { feedCursor, nextFeedCursor } from '../lib/feedCursor';
-import { requestBoardVisible } from '../lib/requestBoard';
+import { requestBoardFilterSql, requestBoardVisible } from '../lib/requestBoard';
+import { governorateParam, optionalOneOf } from '../lib/listParams';
+import { DIRECTORY_SERVICES, DIRECTORY_TECHS, DIRECTORY_WORKS_MAX, REQUEST_OFFER_STATES, REQUEST_PROCESSES } from '@levonis/contracts/communityFilters';
 import { communityAdminDoor, communityClosedRefusal, communityGate, communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { audit } from '../lib/audit';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
@@ -354,17 +356,77 @@ export function directoryCard(m: Record<string, unknown>, badges: { pro: Set<str
   };
 }
 
+/**
+ * THE DIRECTORY'S FILTERS (plan B3), ANDed into its `where` so `total` stays
+ * exact; each placeholder holds '' (no filter) or a validated value:
+ *   governorate  the STORE's governorate (the one its page publishes; the
+ *                merchant row's own is never read);
+ *   tech         `fdm` | `resin` — what the workshop prints with: the
+ *                technologies 0159 derives onto its request preferences, and
+ *                only when it has none on record, its active printers. The
+ *                preference itself is never served;
+ *   service      `design` — an active design service on the store.
+ */
+const directoryFilterSql = (gov: string, tech: string, service: string) => `
+        AND (${gov} = '' OR s.governorate = ${gov})
+        AND (${tech} = '' OR CASE
+              WHEN EXISTS (SELECT 1 FROM merchant_request_prefs rp
+                            WHERE rp.merchant_id = cm.id AND json_valid(rp.technologies) AND json_array_length(rp.technologies) > 0)
+              THEN EXISTS (SELECT 1 FROM merchant_request_prefs rp, json_each(rp.technologies) tj
+                            WHERE rp.merchant_id = cm.id AND json_valid(rp.technologies) AND tj.value = ${tech})
+              ELSE EXISTS (SELECT 1 FROM merchant_printers mp WHERE mp.merchant_id = cm.id AND mp.active = 1 AND mp.technology = ${tech})
+            END)
+        AND (${service} = '' OR EXISTS (SELECT 1 FROM merchant_services sv
+                                          WHERE sv.store_id = s.id AND sv.active = 1 AND sv.kind = ${service}))`;
+
+/**
+ * A STORE'S WORKS ON ITS DIRECTORY CARD (plan B3): up to three finished works
+ * with a picture from its own showcase, in the store's order — the rows its
+ * page already serves (GET /api/storefront/:slug/showcase). One windowed read
+ * for the whole page of stores, never one per card, under the same public
+ * predicate as the cards themselves.
+ */
+async function directoryWorks(db: D1Database, storeIds: string[], schema: boolean) {
+  const out = new Map<string, Array<{ id: string; title: string; imageUrl: string | null }>>();
+  if (!storeIds.length) return out;
+  const { results } = await db
+    .prepare(
+      `SELECT id, store_id, title, image_key FROM (
+         SELECT w.id, w.store_id, w.title, w.image_key,
+                ROW_NUMBER() OVER (PARTITION BY w.store_id ORDER BY w.sort_order, w.created_at, w.id) AS nth
+           FROM merchant_showcase w
+           JOIN merchant_stores s ON s.id = w.store_id
+           JOIN community_merchants cm ON cm.id = s.merchant_id
+          WHERE w.kind = 'work' AND w.active = 1 AND COALESCE(w.image_key, '') <> ''
+            AND w.store_id IN (SELECT value FROM json_each(?1))
+            AND ${storePublicSql('s')} AND ${merchantPublicSql('cm', schema)}
+       ) WHERE nth <= ?2
+       ORDER BY store_id, nth`
+    )
+    .bind(JSON.stringify(storeIds), DIRECTORY_WORKS_MAX)
+    .all<{ id: string; store_id: string; title: string; image_key: string }>();
+  for (const w of results ?? []) {
+    const list = out.get(w.store_id) ?? [];
+    list.push({ id: String(w.id), title: String(w.title ?? ''), imageUrl: fileUrl(w.image_key) });
+    out.set(w.store_id, list);
+  }
+  return out;
+}
+
 communityRoutes.get('/merchants', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 48, def: 24 });
   const cursor = feedCursor(c.req.query('cursor'));
   const q = likePattern(c.req.query('q'));
+  const governorate = governorateParam(c.req.query('governorate'));
+  const tech = optionalOneOf(c.req.query('tech'), 'tech', DIRECTORY_TECHS);
+  const service = optionalOneOf(c.req.query('service'), 'service', DIRECTORY_SERVICES);
   const root = rootDomainFrom(c.env);
   const viewer = c.get('user')?.id ?? '';
   const from = COMMUNITY_DIRECTORY_FROM;
-  const [{ results }, total] = await withApprovalSchema((schema) => {
-    const visible = `${communityDirectoryVisible('?1', schema)} AND ${merchantBlockSql('?5')}`;
-    const visibleCount = `${communityDirectoryVisible('?1', schema)} AND ${merchantBlockSql('?2')}`;
-    return Promise.all([
+  const [{ results }, total, works] = await withApprovalSchema(async (schema) => {
+    const visible = `${communityDirectoryVisible('?1', schema)} AND ${merchantBlockSql('?5')} ${directoryFilterSql('?6', '?7', '?8')}`;
+    const visibleCount = `${communityDirectoryVisible('?1', schema)} AND ${merchantBlockSql('?2')} ${directoryFilterSql('?3', '?4', '?5')}`;
+    const [page, count] = await Promise.all([
       c.env.DB.prepare(
         `SELECT ${COMMUNITY_DIRECTORY_COLUMNS},
                 EXISTS (SELECT 1 FROM follows f WHERE f.merchant_id = cm.id AND f.user_id = ?5) AS viewer_follows
@@ -372,16 +434,22 @@ communityRoutes.get('/merchants', async (c) => {
           WHERE ${visible}
             AND (?2 = '' OR cm.created_at < ?2 OR (cm.created_at = ?2 AND cm.id < ?3))
           ORDER BY cm.created_at DESC, cm.id DESC LIMIT ?4`
-      ).bind(q, cursor.at, cursor.id, limit, viewer).all<Record<string, unknown>>(),
+      ).bind(q, cursor.at, cursor.id, limit, viewer, governorate, tech, service).all<Record<string, unknown>>(),
       cursor.at === ''
-        ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${from} WHERE ${visibleCount}`).bind(q, viewer).first<{ n: number }>()
+        ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${from} WHERE ${visibleCount}`).bind(q, viewer, governorate, tech, service).first<{ n: number }>()
         : Promise.resolve(null),
     ]);
+    const storeIds = page.results.map((m) => String(m.store_id ?? '')).filter((x) => x !== '');
+    return [page, count, await directoryWorks(c.env.DB, storeIds, schema)] as const;
   });
   const badges = await membershipBadges(c.env.DB, results.map((m) => m.user_id));
   return c.json({
     success: true,
-    merchants: results.map((m) => ({ ...directoryCard(m, badges, root), following: !!m.viewer_follows })),
+    merchants: results.map((m) => ({
+      ...directoryCard(m, badges, root),
+      following: !!m.viewer_follows,
+      works: works.get(String(m.store_id ?? '')) ?? [],
+    })),
     next_cursor: nextFeedCursor(results, limit),
     total: total ? Number(total.n) : null,
   });
@@ -417,6 +485,9 @@ communityRoutes.get('/requests', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 48, def: 20 });
   const cursor = feedCursor(c.req.query('cursor'));
   const q = likePattern(c.req.query('q'));
+  // The board's filters (plan B3, worker/lib/requestBoard.ts `requestBoardFilterSql`).
+  const process = optionalOneOf(c.req.query('process'), 'process', REQUEST_PROCESSES);
+  const offers = optionalOneOf(c.req.query('offers'), 'offers', REQUEST_OFFER_STATES);
   const visible = requestBoardVisible('?1', '?2');
   const now = new Date().toISOString();
   /**
@@ -478,20 +549,28 @@ communityRoutes.get('/requests', async (c) => {
           WHERE ${visible}
             AND r.customer_id <> ?7
             AND ${fits}
+            ${requestBoardFilterSql('?8', '?9', schema)}
             AND (?3 = '' OR r.created_at < ?3 OR (r.created_at = ?3 AND r.id < ?4))
           ORDER BY r.created_at DESC, r.id DESC LIMIT ?5`;
     const readMine = (schema: boolean) =>
-      c.env.DB.prepare(mineSql(schema)).bind(now, q, cursor.at, cursor.id, limit + 1, mine.merchant.id, user.id).all<Record<string, unknown>>();
+      c.env.DB.prepare(mineSql(schema)).bind(now, q, cursor.at, cursor.id, limit + 1, mine.merchant.id, user.id, process, offers).all<Record<string, unknown>>();
+    const countMine = (schema: boolean) =>
+      c.env.DB.prepare(
+        `SELECT COUNT(*) AS n FROM community_requests r
+           LEFT JOIN community_print_requests p ON p.request_id = r.id
+          WHERE ${visible} AND r.customer_id <> ?4 AND ${eligibleVerdictSql('r', '?3')}
+            ${requestBoardFilterSql('?5', '?6', schema)}`
+      ).bind(now, q, mine.merchant.id, user.id, process, offers).first<{ n: number }>();
     const [{ results: rows }, total] = await Promise.all([
       readMine(true).catch((e) => {
         if (isMissingSchema(e)) return readMine(false);
         throw e;
       }),
       cursor.at === ''
-        ? c.env.DB.prepare(
-            `SELECT COUNT(*) AS n FROM community_requests r
-              WHERE ${visible} AND r.customer_id <> ?4 AND ${eligibleVerdictSql('r', '?3')}`
-          ).bind(now, q, mine.merchant.id, user.id).first<{ n: number }>()
+        ? countMine(true).catch((e) => {
+            if (isMissingSchema(e)) return countMine(false);
+            throw e;
+          })
         : Promise.resolve(null),
     ]);
     const page = rows.slice(0, limit);
@@ -517,17 +596,27 @@ communityRoutes.get('/requests', async (c) => {
          FROM community_requests r
          LEFT JOIN community_print_requests p ON p.request_id = r.id
         WHERE ${visible}
+          ${requestBoardFilterSql('?6', '?7', schema)}
           AND (?3 = '' OR r.created_at < ?3 OR (r.created_at = ?3 AND r.id < ?4))
         ORDER BY r.created_at DESC, r.id DESC LIMIT ?5`;
   const readAll = (schema: boolean) =>
-    c.env.DB.prepare(allSql(schema)).bind(now, q, cursor.at, cursor.id, limit).all<Record<string, unknown>>();
+    c.env.DB.prepare(allSql(schema)).bind(now, q, cursor.at, cursor.id, limit, process, offers).all<Record<string, unknown>>();
+  const countAll = (schema: boolean) =>
+    c.env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM community_requests r
+         LEFT JOIN community_print_requests p ON p.request_id = r.id
+        WHERE ${visible} ${requestBoardFilterSql('?3', '?4', schema)}`
+    ).bind(now, q, process, offers).first<{ n: number }>();
   const [{ results }, total] = await Promise.all([
     readAll(true).catch((e) => {
       if (isMissingSchema(e)) return readAll(false);
       throw e;
     }),
     cursor.at === ''
-      ? c.env.DB.prepare(`SELECT COUNT(*) AS n FROM community_requests r WHERE ${visible}`).bind(now, q).first<{ n: number }>()
+      ? countAll(true).catch((e) => {
+          if (isMissingSchema(e)) return countAll(false);
+          throw e;
+        })
       : Promise.resolve(null),
   ]);
   return c.json({
@@ -736,7 +825,14 @@ communityRoutes.get('/followed', requireAuth, async (c) => {
   )
     .bind(user.id)
     .all<Record<string, unknown>>();
-  const badges = await membershipBadges(c.env.DB, results.map((m) => m.user_id));
+  // The works too (plan B3), read the directory way: one windowed read, under
+  // the public predicate, so an unavailable shop has none to show.
+  const [badges, works] = await Promise.all([
+    membershipBadges(c.env.DB, results.map((m) => m.user_id)),
+    withApprovalSchema((schema) =>
+      directoryWorks(c.env.DB, results.map((m) => String(m.store_id ?? '')).filter((x) => x !== ''), schema)
+    ),
+  ]);
   return c.json({
     success: true,
     merchants: results.map((m) =>
@@ -759,7 +855,7 @@ communityRoutes.get('/followed', requireAuth, async (c) => {
             store_slug: null,
             store_url: null,
           }
-        : { ...directoryCard(m, badges, root), unavailable: false, following: true }
+        : { ...directoryCard(m, badges, root), unavailable: false, following: true, works: works.get(String(m.store_id ?? '')) ?? [] }
     ),
   });
 });

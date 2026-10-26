@@ -49,7 +49,7 @@ import { requestImageRendition } from '../lib/imageVariants';
 import { parseVariantWidth } from '../lib/imageConvert';
 import { getTierStatus, benefits, membershipBadges } from '../lib/entitlements';
 import { requireOfferPrivileges, requireWithdrawPrivileges, storeForUser } from '../lib/merchantAuth';
-import { approvedAtSql, isMissingSchema, merchantApproved, withApprovalSchema } from '../lib/merchantApproval';
+import { approvedAtSql, isMissingSchema, merchantApproved, storeIsPublic, withApprovalSchema } from '../lib/merchantApproval';
 import { feeFor, autoCompleteDays } from '../lib/merchantOps';
 import {
   escrowForOrder,
@@ -112,7 +112,9 @@ import {
 } from '../lib/requestRevisions';
 import { getSetting } from '../lib/settings';
 import { feedCursor, nextFeedCursor } from '../lib/feedCursor';
-import { requestBoardVisible } from '../lib/requestBoard';
+import { requestBoardFilterSql, requestBoardVisible } from '../lib/requestBoard';
+import { governorateParam, optionalOneOf } from '../lib/listParams';
+import { REQUEST_OFFER_STATES, REQUEST_PROCESSES } from '@levonis/contracts/communityFilters';
 import { likePattern } from '../lib/sqlLike';
 import { notifyStatement } from '../lib/notifications';
 // Eligibility as data (W5-B): the offer gate, the file matrix and the re-match.
@@ -337,6 +339,16 @@ export function offerShape(o: Record<string, unknown>, badges: { pro: Set<string
           rating_count: o.m_rating_count,
           completed_orders: o.m_completed,
           store_slug: o.s_slug ?? null,
+          /**
+           * The store's logo as its public route and the governorate its page
+           * publishes (plan B3) — only on a read that selected them (the
+           * offers list), and the logo only of a store the public may see.
+           * Never the merchant row's own place or any contact.
+           */
+          ...(o.s_logo !== undefined
+            ? { logo_url: o.s_logo && storeIsPublic({ status: o.s_status }) ? `/files/${String(o.s_logo)}` : null }
+            : {}),
+          ...(o.s_governorate !== undefined ? { governorate: String(o.s_governorate ?? '') } : {}),
         }
       : null,
   };
@@ -355,7 +367,11 @@ marketplaceRoutes.get('/requests', requireCommunityOpen, async (c) => {
   const cursor = feedCursor(c.req.query('cursor'));
   const q = likePattern(c.req.query('q'));
   const category = c.req.query('category') || '';
-  const governorate = c.req.query('governorate') || '';
+  // One of the eighteen ids (the column holds ids); the process and the offers
+  // filters (plan B3) are the community list's own (`requestBoardFilterSql`).
+  const governorate = governorateParam(c.req.query('governorate'));
+  const process = optionalOneOf(c.req.query('process'), 'process', REQUEST_PROCESSES);
+  const offers = optionalOneOf(c.req.query('offers'), 'offers', REQUEST_OFFER_STATES);
 
   // The summary (P1-05) rides the print row; a database before 0208 reads the v1 derivation.
   const boardSql = (schema: boolean) =>
@@ -369,10 +385,11 @@ marketplaceRoutes.get('/requests', requireCommunityOpen, async (c) => {
       WHERE ${requestBoardVisible('?1', '?2')}
         AND (?3 = '' OR r.category = ?3)
         AND (?4 = '' OR r.governorate = ?4)
+        ${requestBoardFilterSql('?8', '?9', schema)}
         AND (?5 = '' OR r.created_at < ?5 OR (r.created_at = ?5 AND r.id < ?6))
       ORDER BY r.created_at DESC, r.id DESC LIMIT ?7`;
   const read = (schema: boolean) =>
-    c.env.DB.prepare(boardSql(schema)).bind(nowIso(), q, category, governorate, cursor.at, cursor.id, limit).all<Record<string, unknown>>();
+    c.env.DB.prepare(boardSql(schema)).bind(nowIso(), q, category, governorate, cursor.at, cursor.id, limit, process, offers).all<Record<string, unknown>>();
   const { results } = await read(true).catch((e) => {
     if (isMissingSchema(e)) return read(false);
     throw e;
@@ -1622,7 +1639,8 @@ marketplaceRoutes.get('/requests/:id/offers', requireAuth, async (c) => {
     `SELECT o.*, m.user_id AS m_user_id, m.name AS m_name, m.verified AS m_verified, m.badge AS m_badge,
             m.badge_override AS m_badge_override, m.rating_avg_x100 AS m_rating,
             m.rating_count AS m_rating_count, m.completed_orders AS m_completed,
-            s.slug AS s_slug, r.revision AS r_revision, r.community_order_id AS r_order_id,
+            s.slug AS s_slug, s.logo_key AS s_logo, s.governorate AS s_governorate, s.status AS s_status,
+            r.revision AS r_revision, r.community_order_id AS r_order_id,
             r.accepted_offer_id AS r_accepted_offer_id, vm.eligible AS vm_eligible
        FROM community_offers o
        JOIN community_requests r ON r.id = o.request_id

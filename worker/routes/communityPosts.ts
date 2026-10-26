@@ -39,6 +39,15 @@ import { audit } from '../lib/audit';
 import { notify } from '../lib/notifications';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { feedCursor } from '../lib/feedCursor';
+import { optionalOneOf } from '../lib/listParams';
+import {
+  POST_MATERIAL_FAMILIES,
+  POST_MATERIAL_IDS,
+  POST_PRINTER_BRANDS,
+  POST_PRINTER_IDS,
+  POST_SORTS,
+  TRENDING_WINDOWS,
+} from '@levonis/contracts/communityFilters';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { communityGate } from '../lib/communityGate';
 import { membershipBadges } from '../lib/entitlements';
@@ -267,13 +276,53 @@ export function nextPostCursor(rows: Array<Record<string, unknown>>, limit: numb
 // -------------------------------------------------------------- reading
 
 /**
- * THE PROJECTS FEED — published public posts, newest first, a page at a time,
- * narrowed by kind, author, store, product, tag or a search term (all on the
- * server, like every other community list).
+ * A post's engagement, the one order «الأكثر تفاعلًا» and the trending rail
+ * share: a save weighs most, then a comment, then a like; a view least.
+ */
+const POST_SCORE_SQL = '(p.like_count * 3 + p.comment_count * 4 + p.save_count * 5 + p.view_count)';
+const postScore = (p: Record<string, unknown>) =>
+  Number(p.like_count ?? 0) * 3 + Number(p.comment_count ?? 0) * 4 + Number(p.save_count ?? 0) * 5 + Number(p.view_count ?? 0);
+
+/**
+ * A column as WORDS for a whole-word match: lower-cased, the joiners of
+ * «PLA+», «PLA-CF» and «PA/CF» turned into spaces, and a space at each end,
+ * so `LIKE '% pla %'` finds «PLA Matte» and «Silk PLA» but not «PLAY».
+ */
+const wordsOf = (col: string) =>
+  `(' ' || lower(replace(replace(replace(replace(COALESCE(${col}, ''), '+', ' '), '-', ' '), '/', ' '), ',', ' ')) || ' ')`;
+
+/** A popular page's cursor: `<score>|<published_at>|<id>` — refused when it is not one. */
+function popularCursor(raw: string | undefined): { score: number; at: string; id: string } | null {
+  const v = (raw ?? '').slice(0, 200);
+  if (!v) return null;
+  const parts = v.split('|');
+  const score = Number(parts[0]);
+  if (parts.length !== 3 || !/^\d{1,12}$/.test(parts[0]) || !Number.isSafeInteger(score) || !parts[1] || !parts[2]) {
+    throw badRequest('That page of popular projects is not one this list gave');
+  }
+  return { score, at: parts[1], id: parts[2] };
+}
+
+/**
+ * THE PROJECTS FEED — published public posts, a page at a time, narrowed by
+ * kind, author, store, product, tag or a search term (all on the server, like
+ * every other community list).
+ *
+ * THE FILTER SHEET (plan B3; packages/contracts/src/communityFilters.ts), each
+ * a closed list and each ANDed into the one `where`, so `total` counts exactly
+ * what the page can show:
+ *   `material`  a family (`pla`, `petg`, `resin`…) found as a word in the
+ *               author's material or the catalogue product's name;
+ *   `printer`   a brand (`bambu`, `prusa`, `creality`…) found in the author's
+ *               printer or the catalogue product's name;
+ *   `has_files=1` a project with at least one file its readers may download
+ *               (the download door's own `downloadable`);
+ *   `sort`      `newest` (the default) or `popular` — the trending rail's
+ *               engagement order over the whole list, paged by
+ *               (score, published_at, id).
  */
 communityPostRoutes.get('/posts', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 48, def: 18 });
-  const cursor = feedCursor(c.req.query('cursor'));
   const q = likePattern(c.req.query('q'));
   const kindRaw = (c.req.query('kind') ?? '').trim();
   const kind = (POST_KINDS as readonly string[]).includes(kindRaw) ? kindRaw : '';
@@ -285,6 +334,16 @@ communityPostRoutes.get('/posts', async (c) => {
   const store = str(c.req.query('store'), 'store', { max: 60, required: false });
   const product = str(c.req.query('product'), 'product', { max: 60, required: false });
   const tag = str(c.req.query('tag'), 'tag', { max: 30, required: false }).toLowerCase();
+  const material = optionalOneOf(c.req.query('material'), 'material', POST_MATERIAL_IDS);
+  const printer = optionalOneOf(c.req.query('printer'), 'printer', POST_PRINTER_IDS);
+  const hasFiles = optionalOneOf(c.req.query('has_files'), 'has_files', ['1', '0'] as const) === '1' ? 1 : 0;
+  const sort = optionalOneOf(c.req.query('sort'), 'sort', POST_SORTS) || 'newest';
+  const popular = sort === 'popular' ? popularCursor(c.req.query('cursor')) : null;
+  const cursor = sort === 'popular' ? { at: popular?.at ?? '', id: popular?.id ?? '' } : feedCursor(c.req.query('cursor'));
+  // The words each family or brand is known by, as a JSON list bound like any
+  // value ('[]' is no filter, so `json_each` never reads an empty string).
+  const materialWords = JSON.stringify(material ? POST_MATERIAL_FAMILIES[material] : []);
+  const printerWords = JSON.stringify(printer ? POST_PRINTER_BRANDS[printer] : []);
   const root = rootDomainFrom(c.env);
   const viewerId = c.get('user')?.id ?? '';
   const where = `${POST_PUBLIC_SQL}
@@ -295,23 +354,43 @@ communityPostRoutes.get('/posts', async (c) => {
           AND (?3 = '' OR u.username = ?3)
           AND (?4 = '' OR p.store_id = ?4)
           AND (?5 = '' OR p.product_id = ?5)
-          AND (?6 = '' OR EXISTS (SELECT 1 FROM json_each(p.tags) t WHERE lower(t.value) = ?6))`;
+          AND (?6 = '' OR EXISTS (SELECT 1 FROM json_each(p.tags) t WHERE lower(t.value) = ?6))
+          AND (?12 = '[]' OR EXISTS (SELECT 1 FROM json_each(?12) mw
+                                     WHERE ${wordsOf('p.material')} LIKE '% ' || mw.value || ' %'
+                                        OR ${wordsOf('mp.name')} LIKE '% ' || mw.value || ' %'))
+          AND (?13 = '[]' OR EXISTS (SELECT 1 FROM json_each(?13) pw
+                                     WHERE lower(COALESCE(p.printer_name, '')) LIKE '%' || pw.value || '%'
+                                        OR lower(COALESCE(pp.name, '')) LIKE '%' || pw.value || '%'))
+          AND (?14 = 0 OR EXISTS (SELECT 1 FROM community_post_files pf WHERE pf.post_id = p.id AND pf.downloadable = 1))`;
+  const page =
+    sort === 'popular'
+      ? `AND (?7 = '' OR ${POST_SCORE_SQL} < ?15
+                 OR (${POST_SCORE_SQL} = ?15 AND (p.published_at < ?7 OR (p.published_at = ?7 AND p.id < ?8))))
+          ORDER BY ${POST_SCORE_SQL} DESC, p.published_at DESC, p.id DESC LIMIT ?9`
+      : `AND (?7 = '' OR p.published_at < ?7 OR (p.published_at = ?7 AND p.id < ?8))
+          ORDER BY p.published_at DESC, p.id DESC LIMIT ?9`;
+  const filters = [materialWords, printerWords, hasFiles] as const;
   const [{ results }, total] = await Promise.all([
     withApprovalSchema((schema) =>
-      c.env.DB.prepare(
-        `SELECT ${postColumns(schema)} ${POST_FROM}
-          WHERE ${where}
-            AND (?7 = '' OR p.published_at < ?7 OR (p.published_at = ?7 AND p.id < ?8))
-          ORDER BY p.published_at DESC, p.id DESC LIMIT ?9`
-      )
-        .bind(q, kind, author, store, product, tag, cursor.at, cursor.id, limit + 1, viewerId, notKind)
+      c.env.DB.prepare(`SELECT ${postColumns(schema)} ${POST_FROM} WHERE ${where} ${page}`)
+        .bind(q, kind, author, store, product, tag, cursor.at, cursor.id, limit + 1, viewerId, notKind, ...filters, ...(sort === 'popular' ? [popular?.score ?? 0] : []))
         .all<Record<string, unknown>>()
     ),
     cursor.at === ''
-      ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${POST_FROM} WHERE ${where}`).bind(q, kind, author, store, product, tag, '', '', 0, viewerId, notKind).first<{ n: number }>()
+      ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${POST_FROM} WHERE ${where}`)
+          .bind(q, kind, author, store, product, tag, '', '', 0, viewerId, notKind, ...filters)
+          .first<{ n: number }>()
       : Promise.resolve(null),
   ]);
-  const next_cursor = nextPostCursor(results, limit);
+  let next_cursor: string | null;
+  if (sort === 'popular') {
+    const more = results.length > limit;
+    if (more) results.length = limit;
+    const last = results[results.length - 1];
+    next_cursor = more && last ? `${postScore(last)}|${String(last.published_at)}|${String(last.id)}` : null;
+  } else {
+    next_cursor = nextPostCursor(results, limit);
+  }
   return c.json({
     success: true,
     posts: await withViewerFlags(c.env.DB, viewerId || null, results.map((p) => postCard(p, root))),
@@ -320,23 +399,32 @@ communityPostRoutes.get('/posts', async (c) => {
   });
 });
 
-/** Trending: the most engaged public posts of the last 30 days — a rail, not a page. */
+/**
+ * Trending: the most engaged public posts of the last `days` — a rail, not a
+ * page. `days` is 7 or 30 (the default), and the answer says which window it
+ * read (`window_days`), so a heading never says «هذا الأسبوع» over a month.
+ */
 communityPostRoutes.get('/posts/trending', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 24, def: 12 });
-  const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const days = Number(optionalOneOf(c.req.query('days'), 'days', TRENDING_WINDOWS) || '30');
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
   const root = rootDomainFrom(c.env);
   const viewerId = c.get('user')?.id ?? '';
   const { results } = await withApprovalSchema((schema) =>
     c.env.DB.prepare(
       `SELECT ${postColumns(schema)} ${POST_FROM}
         WHERE ${POST_PUBLIC_SQL} AND p.published_at >= ?1 AND ${postExclusionSql('?3')}
-        ORDER BY (p.like_count * 3 + p.comment_count * 4 + p.save_count * 5 + p.view_count) DESC, p.published_at DESC, p.id DESC
+        ORDER BY ${POST_SCORE_SQL} DESC, p.published_at DESC, p.id DESC
         LIMIT ?2`
     )
       .bind(since, limit, viewerId)
       .all<Record<string, unknown>>()
   );
-  return c.json({ success: true, posts: await withViewerFlags(c.env.DB, viewerId || null, results.map((p) => postCard(p, root))) });
+  return c.json({
+    success: true,
+    window_days: days,
+    posts: await withViewerFlags(c.env.DB, viewerId || null, results.map((p) => postCard(p, root))),
+  });
 });
 
 /** One post with its media, for its page. */
@@ -431,6 +519,28 @@ interface PostFileRow {
   position: number;
 }
 
+/** The extension a post file is drawn with, by its stored type: the key's own suffix, or the MIME's. */
+const POST_FILE_EXT_BY_MIME: Record<string, string> = {
+  'model/stl': 'stl',
+  'model/3mf': '3mf',
+  'model/obj': 'obj',
+  'model/step': 'step',
+  'application/step': 'step',
+  'application/pdf': 'pdf',
+  'application/vnd.ms-package.3dmanufacturing-3dmodel+xml': '3mf',
+};
+
+/**
+ * `name.ext` without the key (plan B3): the stored key ends with the
+ * extension the upload door classified the bytes as; a key without one falls
+ * back to the stored MIME type. The author's free-text name is never asked.
+ */
+export function postFileExt(fileKey: unknown, mime: unknown): string {
+  const fromKey = /\.([a-z0-9]{1,8})$/i.exec(String(fileKey ?? '').split('/').pop() ?? '')?.[1];
+  if (fromKey) return fromKey.toLowerCase();
+  return POST_FILE_EXT_BY_MIME[String(mime ?? '').toLowerCase()] ?? '';
+}
+
 async function postFiles(env: Env, id: string) {
   const { results } = await env.DB.prepare(
     'SELECT id, file_key, kind, name, bytes, mime, preview_key, downloadable, downloads FROM community_post_files WHERE post_id = ? ORDER BY position, id'
@@ -442,6 +552,8 @@ async function postFiles(env: Env, id: string) {
     name: String(f.name ?? ''),
     bytes: Number(f.bytes ?? 0),
     kind: String(f.kind) as FileKind,
+    /** `stl`, `3mf`, `pdf`… for «name.ext» (plan B3); '' when the type is unknown. */
+    ext: postFileExt(f.file_key, f.mime),
     downloadable: Number(f.downloadable) === 1,
     has_preview: !!f.preview_key,
     /** The author's own view only — what the composer sends back. */

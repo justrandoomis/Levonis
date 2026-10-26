@@ -7,6 +7,7 @@
  * decides what a visitor may see — the server's SELECT lists do.
  */
 import { api } from '../../../lib/api';
+import type { DirectoryService, DirectoryTech, RequestOffersFilter, RequestProcessFilter } from '../../../../packages/contracts/src/communityFilters';
 
 export interface StoreRef {
   id: string;
@@ -64,6 +65,28 @@ export interface CommunityStore {
   followers?: number;
   product_count?: number;
   following?: boolean;
+  /** Up to three finished works from its own showcase (plan B3); absent on an older Worker. */
+  works?: StoreWork[];
+}
+
+/** A finished work on a store card: a picture the store page already shows. */
+export interface StoreWork {
+  id: string;
+  title: string;
+  imageUrl: string | null;
+}
+
+/** The stores directory filters (plan B3): a governorate id, what it prints with, a design service. */
+export interface StoreFilters {
+  governorate?: string;
+  tech?: DirectoryTech | '';
+  service?: DirectoryService | '';
+}
+
+/** The request board filters (plan B3): the process a request names, and whether it has offers yet. */
+export interface RequestFilters {
+  process?: RequestProcessFilter | '';
+  offers?: RequestOffersFilter | '';
 }
 
 export interface CommunityRequest {
@@ -107,9 +130,10 @@ export interface Page<T> {
  */
 export type FeedKind = 'products' | 'merchants' | 'requests' | 'creators' | 'feed:foryou' | 'feed:following';
 
-function query(q: string, cursor: string | null, limit: number): string {
+function query(q: string, cursor: string | null, limit: number, filters: object = {}): string {
   const p = new URLSearchParams();
   if (q) p.set('q', q);
+  for (const [k, v] of Object.entries(filters)) if (v) p.set(k, String(v));
   if (cursor) p.set('cursor', cursor);
   p.set('limit', String(limit));
   return p.toString();
@@ -117,18 +141,18 @@ function query(q: string, cursor: string | null, limit: number): string {
 
 type Raw<K extends string, T> = { [key in K]: T[] } & { next_cursor?: string | null; total?: number | null };
 
-async function page<K extends string, T>(path: string, key: K, q: string, cursor: string | null, limit: number): Promise<Page<T>> {
-  const d = await api.get<Raw<K, T>>(`${path}?${query(q, cursor, limit)}`);
+async function page<K extends string, T>(path: string, key: K, q: string, cursor: string | null, limit: number, filters?: object): Promise<Page<T>> {
+  const d = await api.get<Raw<K, T>>(`${path}?${query(q, cursor, limit, filters)}`);
   return { rows: Array.isArray(d[key]) ? d[key] : [], next: d.next_cursor ?? null, total: typeof d.total === 'number' ? d.total : null };
 }
 
 export const communityHubApi = {
   products: (q: string, cursor: string | null) =>
     page<'products', CommunityProduct>('/api/community/products', 'products', q, cursor, 24),
-  merchants: (q: string, cursor: string | null) =>
-    page<'merchants', CommunityStore>('/api/community/merchants', 'merchants', q, cursor, 24),
-  requests: (q: string, cursor: string | null) =>
-    page<'requests', CommunityRequest>('/api/community/requests', 'requests', q, cursor, 20),
+  merchants: (q: string, cursor: string | null, filters?: StoreFilters) =>
+    page<'merchants', CommunityStore>('/api/community/merchants', 'merchants', q, cursor, 24, filters),
+  requests: (q: string, cursor: string | null, filters?: RequestFilters) =>
+    page<'requests', CommunityRequest>('/api/community/requests', 'requests', q, cursor, 20, filters),
   works: () => api.get<{ works: CommunityWork[] }>('/api/community/works?limit=12').then((d) => d.works ?? []),
   /** The home's short first pages — a rail or three rows, never a directory. */
   few: {
