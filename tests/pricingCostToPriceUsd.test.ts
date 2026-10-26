@@ -337,6 +337,8 @@ test('the storefront never recomputes: only the owner pricing router, the engine
       '../lib/pricingEngine/v2/purchaseReview',
       // The «يحتاج تسعيرًا» queue (A.8): an admin read of what is missing, never a figure.
       '../lib/pricingEngine/v2/queue',
+      // The owner-only drain of migration 0214's unchanged saved receipt prices.
+      '../lib/pricingEngine/v2/receivedRecovery',
       '../lib/pricingEngine/v2/write',
       '../lib/pricingEngine/whatIf',
     ],

@@ -16,17 +16,21 @@ import { FORM_INPUT_FIELDS } from '../productInputs';
 import { inputInvalid } from '../whatIf';
 import { desiredFor, evaluateDesired, loadV2Read, parseV2Wire, storedMethodOf, v2Answer } from './api';
 import type { V2Evaluation } from './evaluate';
+import { importStockNotConfigured } from '../../importStock';
+import { withPreparedProcurementStock } from '../../procurementImportStock';
 
 export async function procurementLinePricing(c: Context<AppContext>, body: Record<string, unknown>, purchase: PurchaseForPricing | null) {
   if (typeof body.product_id !== 'string' || !body.product_id) throw inputInvalid('product_id');
-  const read = await loadV2Read(c.env.DB, body.product_id);
-  if (!read) throw notFound('Product not found');
+  const storedRead = await loadV2Read(c.env.DB, body.product_id);
+  if (!storedRead) throw notFound('Product not found');
   const scope = body.scope;
   const id = typeof body.scope_id === 'string' ? body.scope_id : '';
   if (!['base', 'option', 'color', 'variant'].includes(String(scope)) || (scope === 'base' ? id !== '' : !id)) throw inputInvalid('scope');
-  const levels = purchaseSkuLevels(read.loaded);
+  const levels = purchaseSkuLevels(storedRead.loaded);
   const narrow = skuLevelOf({ scope: scope as 'color' | 'variant', scope_id: id }, levels);
   if ((scope === 'color' || scope === 'variant') && !narrow && !levels?.variants.has(id)) throw inputInvalid('scope_id');
+  const read = await importStockNotConfigured(c.env.DB, storedRead.loaded.id)
+    ? { ...storedRead, loaded: withPreparedProcurementStock(storedRead.loaded, { scope, scope_id: id }) } : storedRead;
   const options = { viewer: 'owner' as const, env: c.env, user: c.get('user'), now: new Date().toISOString() };
   const pricing: Record<string, unknown> = { method: storedMethodOf(read) ?? 'cost' };
   const inputs: Array<Record<string, unknown>> = [];

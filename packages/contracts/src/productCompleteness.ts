@@ -28,7 +28,7 @@ export interface CompletenessText {
 export type CompletenessLang = keyof CompletenessText;
 
 /** Bumped whenever an entry is added, removed or its rule changes: every stored verdict is then stale. */
-export const COMPLETENESS_LIST_VERSION = 1;
+export const COMPLETENESS_LIST_VERSION = 2;
 
 export const COMPLETENESS_CODES = ['NAME_AR', 'PRICE', 'COST', 'ENGINE_INPUTS', 'IMAGE', 'CATEGORY', 'PACKAGE_WEIGHT', 'PACKAGE_BOX'] as const;
 export type CompletenessCode = (typeof COMPLETENESS_CODES)[number];

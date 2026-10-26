@@ -30,7 +30,9 @@ import {
 } from '../lib/http';
 import { audit } from '../lib/audit';
 import { purgeCatalogueAfterWrite } from '../lib/edgePolicy';
-import { completenessAfterWrite } from '../lib/completenessHooks';
+import { completenessAfterWrite, purgeVisibility } from '../lib/completenessHooks';
+import { recoverReceivedPricing } from '../lib/pricingEngine/v2/receivedRecovery';
+import { statementBudget } from '../lib/fx/budget';
 import { registerCompletenessRoutes } from './adminCompleteness';
 import { completenessInstalled, listing } from '../lib/listing';
 import { loadInfoCompleteness, loadInfoCompletenessCard } from '../lib/knowledge/infoCompleteness';
@@ -141,7 +143,7 @@ import { ProductMediaIngestError, verifyStoredProductMedia, type ProductMediaRef
 import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
 import { loadPrinterFitIds, printerOptions } from '../lib/printerFits';
 import { loadImportStock } from '../lib/importStock';
-import { planProcurementImportStock } from '../lib/procurementImportStock';
+import { planProcurementImportStock, withPreparedProcurementStock } from '../lib/procurementImportStock';
 
 /** Kept under its old name: the diff is now the contract's (productPersistence). */
 export const priceHistoryDeltas = sharedPriceHistoryDeltas;
@@ -912,6 +914,13 @@ const requireReviewOwner = (c: Context<AppContext>) => {
   const user = c.get('user')!;
   if (!canWriteCost(c.env, user) || !canViewCost(c.env, user)) throw costRefusal(c.env, user, { fields: ['purchase_review'] });
 };
+// Drain only the one-time repair snapshot, never arbitrary or future drafts.
+adminProductsRoutes.post('/pricing/recover-received', limitRoute('pricing-write', 600), async (c) => {
+  requireReviewOwner(c);
+  const report = await recoverReceivedPricing(c.env.DB, statementBudget(400));
+  if (report.slugs.length) await purgeVisibility(c, report.slugs);
+  return c.json({ success: true, recovered: report.recovered.length, refreshed: report.refreshed, skipped: report.skipped });
+});
 adminProductsRoutes.get('/:id/purchase-review', limitRoute('pricing-read', 1200), async (c) => {
   requireReviewOwner(c);
   // Row 249: every pending review, one per purchase, oldest first; `purchase_review` (the newest) stays for older readers.
@@ -1493,11 +1502,11 @@ adminProductsRoutes.put('/:id/pricing', limitRoute('pricing-write', 600), async 
     }
     throw new HttpError(409, serverMessage('PRICING_CHANGED'), 'PRICING_CHANGED', { section: 3 });
   }
-  const desired = desiredFor(read, wire, { viewer, env: c.env, user, now });
-  const ev = await evaluateDesired(read, desired);
-  const stockSetup = body.procurement_stock === undefined ? [] : await planProcurementImportStock(
-    db, pid, v2Body(body.procurement_stock, ['scope', 'scope_id']) as { scope: unknown; scope_id: unknown }, user.id, now,
-  );
+  const stockSelection = body.procurement_stock === undefined ? null : v2Body(body.procurement_stock, ['scope', 'scope_id']) as { scope: unknown; scope_id: unknown };
+  const stockSetup = stockSelection === null ? [] : await planProcurementImportStock(db, pid, stockSelection, user.id, now);
+  const pricedRead = stockSetup.length && stockSelection ? { ...read, loaded: withPreparedProcurementStock(read.loaded, stockSelection) } : read;
+  const desired = desiredFor(pricedRead, wire, { viewer, env: c.env, user, now });
+  const ev = await evaluateDesired(pricedRead, desired);
   const verdict = await gateV2({
     c,
     ev,

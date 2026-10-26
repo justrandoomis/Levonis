@@ -9,6 +9,28 @@ import { badRequest } from './http';
 import { importStockNotConfigured, TRACKED_STOCK_SQL, trackedStockBinds } from './importStock';
 import { requireSelection } from './inventorySelection';
 import { fence } from './operations';
+import type { ProductDoc } from './productModel';
+import type { ProductRelationsView } from './productOverlay';
+
+/** The same zero initialization as the guarded batch, for its pricing preview.
+ * Quantities are never received here; existing stock remains exactly as read. */
+export function withPreparedProcurementStock<T extends { doc: ProductDoc; view?: ProductRelationsView }>(loaded: T, selection: { scope: unknown; scope_id: unknown }): T {
+  const view = loaded.view;
+  if (!view) return loaded;
+  const { scope, scope_id } = selection;
+  const group = scope === 'option' ? view.values.find((v) => v.id === scope_id)?.group_id : null;
+  const tracked = <T extends { stock: number | null; active: number | boolean }>(row: T): T => row.active && row.stock === null ? { ...row, stock: 0 } : row;
+  return {
+    ...loaded,
+    doc: scope === 'base' && loaded.doc.stock === null ? { ...loaded.doc, stock: 0 } : loaded.doc,
+    view: {
+      ...view,
+      values: scope === 'option' ? view.values.map((v) => v.group_id === group ? tracked(v) : v) : view.values,
+      colors: scope === 'color' ? view.colors.map(tracked) : view.colors,
+      variants: scope === 'variant' ? view.variants.map(tracked) : view.variants,
+    },
+  };
+}
 
 const invalidStock = () => badRequest(
   serverMessage('PRICING_INPUT_INVALID').replaceAll('{field}', 'procurement_stock'),

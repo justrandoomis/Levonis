@@ -63,3 +63,6 @@ export function sweepStaleEnginePrices(env: Env, opts: SweepOptions): Promise<Au
     onBlocked: (items) => notifyOwnerRepriceBlocked(env, items),
   });
 }
+
+// One-time received-price recovery shares the scheduled pricing boundary.
+export { recoverReceivedPricing } from '../pricingEngine/v2/receivedRecovery';

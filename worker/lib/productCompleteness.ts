@@ -13,7 +13,7 @@
  *                   above zero, or the USD pricing inputs resolve a supplier
  *                   cost for it (`resolveSkuInputs`, the engine's own resolver,
  *                   per model or for every one of its SKUs). Stock-purchase
- *                   inputs count only for selections offering direct sale.
+ *                   inputs and known received-lot costs count only for selections offering direct sale.
  *   ENGINE_INPUTS ★ (engine products only) every model resolves a minimum
  *                   profit (`resolveRuleAt`, including a stock minimum for a
  *                   direct selection), and the engine's last repricing
@@ -23,7 +23,9 @@
  *   PACKAGE_WEIGHT  the packaged weight above zero on the product, or on every
  *                   model
  *   PACKAGE_BOX     the box's three sides above zero on the product, or on
- *                   every model
+ *                   every model. Confirmed pricing measures count too; received, V2-priced
+ *                   direct-only goods need no supplier freight estimate. Empty tracked
+ *                   direct-only choices are excluded from the V2 requirements.
  *
  * ★ private: the verified owner alone reads which; every other admin reads one
  * OWNER_DATA item; a customer reads nothing (the product is simply not there
@@ -59,12 +61,14 @@ import type { OptionV2 } from './pricing';
 import type { ProductDoc } from './productModel';
 import type { ProductRelationsView } from './productOverlay';
 import { loadProducts } from './pricingEngine/load';
-import { chainOf, chainOfUnit, loadProductsPricing, type InputWrite, type ProductPricingData, type RuleWrite, type StoredInputRow, type StoredRuleRow } from './pricingEngine/store';
+import { chainOf, chainOfUnit, loadProductsPricing, packagesOf, type InputWrite, type ProductPricingData, type RuleWrite, type StoredInputRow, type StoredRuleRow } from './pricingEngine/store';
 import { directPurchaseStore, pruneDirectPurchase } from './pricingEngine/directPurchase';
 import { legacyCostOf, modelsOf, sellableSkus } from './pricingEngine/legacy';
 import { saleAvailability } from '../routes/products';
 import { sha256Hex } from './crypto';
 import { completenessInstalled } from './listing';
+import { emptyDirectStock } from './pricingEngine/stockEligibility';
+import { hasKnownShelfCost, loadShelves, shelfItemsSql, type ProductShelf } from './pricingEngine/v2/shelf';
 
 export { COMPLETENESS_LIST_VERSION };
 
@@ -77,9 +81,9 @@ export const COMPLETENESS_CHUNK = 25;
 /**
  * Statements one recompute of `n` (≤ COMPLETENESS_CHUNK) products spends: the
  * facts and the rules signature (2), the relational load (the row and its nine
- * relation reads, 10), the pricing store and direct purchase overlay (5), the switch (1), one upsert each.
+ * relation reads, 10), the pricing store and direct purchase overlay (5), the shelf (1), the switch (1), one upsert each.
  */
-export const recomputeCost = (n: number): number => (n > 0 ? 2 + 10 + 5 + 1 + n : 0);
+export const recomputeCost = (n: number): number => (n > 0 ? 2 + 10 + 5 + 1 + 1 + n : 0);
 
 /** The engine's blocked-repricing codes that name a missing INPUT (never the environment's). */
 const INPUT_BLOCK_CODES: ReadonlySet<string> = new Set([
@@ -112,16 +116,20 @@ const FACTS_SQL = `SELECT p.id AS id, p.slug AS slug, p.status AS status, p.upda
   COALESCE(p.composition, '') AS composition,
   (CASE WHEN COALESCE(p.category_id, '') <> '' AND EXISTS (SELECT 1 FROM catalogs c WHERE c.id = p.category_id) THEN 1 ELSE 0 END) AS cat_ok,
   (SELECT COUNT(*) FROM product_images i WHERE i.product_id = p.id AND COALESCE(i.quarantined, 0) = 0) AS images,
-  COALESCE(s.mode, 'manual') AS mode, COALESCE(s.inputs_seq, 0) AS inputs_seq, COALESCE(s.reprice_blocked_code, '') AS blocked,
+  COALESCE(s.mode, 'manual') AS mode, COALESCE(s.inputs_seq, 0) AS inputs_seq, COALESCE(s.write_seq, 0) AS write_seq,
+  ${shelfItemsSql('p.id')} AS shelf_sig, COALESCE(s.reprice_blocked_code, '') AS blocked,
   (SELECT COUNT(*) || ':' || COALESCE(MAX(pi.updated_at), '') || ':' || TOTAL(pi.version) FROM pricing_inputs pi WHERE pi.product_id = p.id) AS inputs_sig,
   (SELECT COUNT(*) || ':' || COALESCE(MAX(r.updated_at), '') || ':' || TOTAL(r.version) FROM pricing_rules r WHERE r.product_id = p.id) AS rules_sig,
-  (SELECT COUNT(*) || ':' || TOTAL(v.active) || ':' || TOTAL(v.merged_into IS NOT NULL) || ':' || TOTAL(v.cost_iqd IS NOT NULL) || ':' || TOTAL(v.cost_adjust_iqd IS NOT NULL)
+  (SELECT COUNT(*) || ':' || TOTAL(v.active) || ':' || TOTAL(v.stock IS NULL) || ':' || TOTAL(v.stock > 0) || ':' || TOTAL(v.merged_into IS NOT NULL) || ':' || TOTAL(v.cost_iqd IS NOT NULL) || ':' || TOTAL(v.cost_adjust_iqd IS NOT NULL)
           || ':' || TOTAL(COALESCE(v.package_weight_g, 0) > 0) || ':' || TOTAL(COALESCE(v.package_width_mm, 0) > 0 AND COALESCE(v.package_depth_mm, 0) > 0 AND COALESCE(v.package_height_mm, 0) > 0)
      FROM product_option_values v WHERE v.product_id = p.id) AS values_sig,
   (SELECT COUNT(*) || ':' || TOTAL(g.active) FROM product_option_groups g WHERE g.product_id = p.id) AS groups_sig,
   (SELECT COUNT(*) || ':' || TOTAL(f.enabled) || ':' || TOTAL(f.cost_iqd IS NOT NULL) || ':' || TOTAL(f.cost_adjust_iqd IS NOT NULL) FROM product_option_fulfillment f WHERE f.product_id = p.id) AS cells_sig,
   (SELECT COUNT(*) || ':' || TOTAL(t.enabled) || ':' || TOTAL(t.cost_iqd IS NOT NULL) || ':' || TOTAL(t.cost_adjust_iqd IS NOT NULL) FROM product_option_transports t WHERE t.product_id = p.id) AS routes_sig,
-  (SELECT COUNT(*) || ':' || TOTAL(k.active) FROM product_colors k WHERE k.product_id = p.id) AS colors_sig,
+  (SELECT COUNT(*) || ':' || TOTAL(k.active) || ':' || TOTAL(k.stock IS NULL) || ':' || TOTAL(k.stock > 0) || ':' || TOTAL(COALESCE(k.package_weight_g, 0) > 0)
+          || ':' || TOTAL(COALESCE(k.package_width_mm, 0) > 0 AND COALESCE(k.package_depth_mm, 0) > 0 AND COALESCE(k.package_height_mm, 0) > 0)
+     FROM product_colors k WHERE k.product_id = p.id) AS colors_sig,
+  (SELECT COUNT(*) || ':' || TOTAL(v.active) || ':' || TOTAL(v.stock IS NULL) || ':' || TOTAL(v.stock > 0) FROM product_variants v WHERE v.product_id = p.id) AS variants_sig,
   pc.facts_key AS stored_key, pc.list_version AS stored_version, pc.complete AS stored_complete, pc.held AS stored_held,
   pc.missing_json AS stored_missing
 FROM products p
@@ -141,6 +149,8 @@ export interface FactsRow {
   images: number;
   mode: string;
   inputs_seq: number;
+  write_seq?: number;
+  shelf_sig?: string | null;
   blocked: string;
   inputs_sig: string;
   rules_sig: string;
@@ -149,6 +159,7 @@ export interface FactsRow {
   cells_sig: string;
   routes_sig: string;
   colors_sig: string;
+  variants_sig?: string;
   stored_key: string | null;
   stored_version: number | null;
   stored_complete: number | null;
@@ -167,6 +178,8 @@ export async function factsKeyOf(f: FactsRow, globalSig: string): Promise<string
       Number(f.images) || 0,
       f.mode,
       Number(f.inputs_seq) || 0,
+      Number(f.write_seq) || 0,
+      f.shelf_sig ?? '',
       f.blocked ?? '',
       f.inputs_sig ?? '',
       f.rules_sig ?? '',
@@ -175,6 +188,7 @@ export async function factsKeyOf(f: FactsRow, globalSig: string): Promise<string
       f.cells_sig ?? '',
       f.routes_sig ?? '',
       f.colors_sig ?? '',
+      f.variants_sig ?? '',
       globalSig,
     ])
   );
@@ -212,6 +226,7 @@ export interface EvaluationInput {
   mode: 'manual' | 'engine';
   inputs: readonly Partial<StoredInputRow>[];
   rules: readonly PricingRuleRow[];
+  shelf?: ProductShelf | null;
   /** Stock-purchase evidence applies only to selections offering direct sale. */
   direct?: { inputs: readonly Partial<StoredInputRow>[]; rules: readonly PricingRuleRow[] };
   /** The main section is set and exists. */
@@ -248,11 +263,14 @@ export function evaluateCompleteness(e: EvaluationInput): CompletenessItem[] {
   const out: CompletenessItem[] = [];
   const add = (code: CompletenessCode, option_id = '') => out.push({ code, option_id });
   const { doc } = e;
-  const { models } = modelsOf(doc, e.view);
-  const realModels = models.filter((m): m is OptionV2 => !!m);
+  const allModels = modelsOf(doc, e.view).models;
   // The SKUs a customer can buy, by model (FX-7: a supplier cost may sit on a colour or SKU level).
   const sku = sellableSkus(doc, e.view);
-  const unitsOf = (modelId: string) => (sku.overflow ? [] : sku.skus.filter((s) => (s.model?.id ?? '') === modelId));
+  const channelsOf = (u: (typeof sku.skus)[number]) => saleAvailability(doc, { optionValueIds: u.option_value_ids, colorId: u.color?.id ?? null }).modes.map((m) => m.type);
+  const requiredUnits = sku.skus.filter((u) => !e.method || !emptyDirectStock(doc, e.view, { option_value_ids: u.option_value_ids, color_id: u.color?.id ?? null }, channelsOf(u)));
+  const models = !sku.overflow && requiredUnits.length ? allModels.filter((m) => requiredUnits.some((u) => (u.model?.id ?? '') === (m?.id ?? ''))) : allModels;
+  const realModels = models.filter((m): m is OptionV2 => !!m);
+  const unitsOf = (modelId: string) => (sku.overflow ? [] : requiredUnits.filter((s) => (s.model?.id ?? '') === modelId));
   const offersDirect = (optionIds: string[], colorId: string | null = null) =>
     saleAvailability(doc, { optionValueIds: optionIds, colorId }).modes.some((m) => m.type === 'direct_sale');
   const directForModel = (modelId: string) => {
@@ -262,7 +280,9 @@ export function evaluateCompleteness(e: EvaluationInput): CompletenessItem[] {
       ? units.every((u) => offersDirect(u.option_value_ids, u.color?.id ?? null))
       : offersDirect(modelId ? [modelId] : []);
   };
-  const unitChain = (u: (typeof sku.skus)[number]) => ({ option_value_ids: u.option_value_ids, color_id: u.color?.id ?? null, combo_key: u.combo_key });
+  const packages = packagesOf(doc);
+  const unitChain = (u: (typeof sku.skus)[number]) => ({ option_value_ids: u.option_value_ids, color_id: u.color?.id ?? null, combo_key: u.combo_key, packaged: packages(u.option_value_ids, u.color?.id ?? null) });
+  const onShelf = (u: (typeof sku.skus)[number]) => !!e.method && offersDirect(u.option_value_ids, u.color?.id ?? null) && hasKnownShelfCost(e.shelf, unitChain(u));
 
   if (!String(doc.name_ar ?? '').trim()) add('NAME_AR');
   if (e.mode !== 'engine' && !positive(doc.price_iqd)) add('PRICE');
@@ -276,7 +296,7 @@ export function evaluateCompleteness(e: EvaluationInput): CompletenessItem[] {
     if (supplierResolves(chainOf(e.inputs, modelId))) continue;
     if (directForModel(modelId) && supplierResolves(chainOf(e.direct!.inputs, modelId))) continue;
     const units = unitsOf(modelId);
-    if (units.length && units.every((u) => supplierResolves(chainOfUnit(e.inputs, unitChain(u))) ||
+    if (units.length && units.every((u) => onShelf(u) || supplierResolves(chainOfUnit(e.inputs, unitChain(u))) ||
       (!!e.direct && offersDirect(u.option_value_ids, u.color?.id ?? null) && supplierResolves(chainOfUnit(e.direct.inputs, unitChain(u)))))) continue;
     add('COST', modelId);
   }
@@ -298,9 +318,20 @@ export function evaluateCompleteness(e: EvaluationInput): CompletenessItem[] {
   if (!(doc.media ?? []).length) add('IMAGE');
   if (!e.category_ok) add('CATEGORY');
 
+  // Pricing holds confirmed shipping measures too. Goods already received for
+  // direct sale need no supplier freight estimate: their landed cost is known.
+  // A pre-order still needs its measures, and an unknown-cost lot proves nothing.
+  const measures = requiredUnits.map((u) => {
+    const received = onShelf(u) && channelsOf(u).length === 1;
+    const resolved = resolveSkuInputs(chainOfUnit(e.inputs, unitChain(u))).inputs;
+    return {
+      weight: received || positive(u.model?.package_weight_g) || positive(u.color?.package_weight_g) || (e.mode === 'engine' && Number(resolved.weight?.value) > 0),
+      box: received || hasBox(u.model) || hasBox(u.color) || (e.mode === 'engine' && Number(resolved.cbm?.effective) > 0),
+    };
+  });
   const dims = doc.dimensions;
-  if (!positive(dims?.package_weight_g) && !(realModels.length > 0 && realModels.every((m) => positive(m.package_weight_g)))) add('PACKAGE_WEIGHT');
-  if (!hasBox(dims) && !(realModels.length > 0 && realModels.every((m) => hasBox(m)))) add('PACKAGE_BOX');
+  if (!positive(dims?.package_weight_g) && !(realModels.length > 0 && realModels.every((m) => positive(m.package_weight_g))) && !(measures.length && measures.every((m) => m.weight))) add('PACKAGE_WEIGHT');
+  if (!hasBox(dims) && !(realModels.length > 0 && realModels.every((m) => hasBox(m))) && !(measures.length && measures.every((m) => m.box))) add('PACKAGE_BOX');
 
   return out;
 }
@@ -420,8 +451,8 @@ export async function recomputeCompleteness(
     statements += 1;
   }
   const idsToLoad = ordinary.map((f) => f.id);
-  const [loaded, pricing] = await Promise.all([loadProducts(db, idsToLoad), loadProductsPricing(db, idsToLoad)]);
-  statements += 10 + 5;
+  const [loaded, pricing, shelves] = await Promise.all([loadProducts(db, idsToLoad), loadProductsPricing(db, idsToLoad), loadShelves(db, idsToLoad)]);
+  statements += 10 + 5 + 1;
   const switchOn = await hideSwitchOn(db);
   statements += 1;
   const now = opts.now ?? new Date().toISOString();
@@ -438,6 +469,7 @@ export async function recomputeCompleteness(
       mode: f.mode === 'engine' ? 'engine' : 'manual',
       inputs: p?.inputs ?? [],
       rules: p?.rules ?? [],
+      shelf: shelves.get(f.id) ?? null,
       ...(p?.direct_purchase ? { direct: directPurchaseStore(p) } : {}),
       category_ok: Number(f.cat_ok) === 1,
       blocked: String(f.blocked ?? ''),

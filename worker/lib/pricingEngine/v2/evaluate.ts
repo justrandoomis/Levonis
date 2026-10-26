@@ -39,6 +39,7 @@ import { refuseUnreadSkus, skuTableOf, type EngineControl } from '../engineWrite
 import { discountsOf, pointsOf, type StoredV2Result, type V2Store } from './store';
 import { staleReasonsV2 } from './stale';
 import { shelfOfSku, shelfSignature, type ProductShelf } from './shelf';
+import { emptyDirectStock } from '../stockEligibility';
 
 /** One planned V2 price: the dinar figure every engine plan carries, and the V2 maths behind it. */
 export interface V2PlanPrice {
@@ -130,6 +131,7 @@ export interface V2Row {
 /** A channel the maths leaves unsold rather than missing (written as off): its reason. */
 export type BlockCode = 'V2_ROUTE_BELOW_COST' | 'V2_ROUTE_NO_SUPPLIER' | 'V2_ROUTE_SHELF_CHEAPER' | 'V2_STOCK_SOLD_OUT';
 const BLOCK_CODES: ReadonlySet<string> = new Set<BlockCode>(['V2_ROUTE_BELOW_COST', 'V2_ROUTE_NO_SUPPLIER', 'V2_ROUTE_SHELF_CHEAPER', 'V2_STOCK_SOLD_OUT']);
+const EMPTY_STOCK_GAPS = new Set(['SUPPLIER_COST_MISSING', 'SUPPLIER_CURRENCY_MISSING', 'SHIPPING_PROFILE_MISSING', 'WEIGHT_MISSING', 'CBM_MISSING', 'TARGET_PROFIT_MISSING', 'V2_PRICE_MISSING']);
 
 /** Spec §5.4: what is missing, grouped — a code, the field's NAME, the level, how many SKUs, and the first SKU's name. */
 export interface GroupedMissing {
@@ -299,6 +301,15 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
     result.skus.forEach((s, n) => {
       const unit = units[n]!;
       const sku = skus[n]!;
+      // Received, priced choices can publish while another direct-only choice
+      // has zero physical stock and no pricing inputs. Its channel is explicitly
+      // written OFF, so neither the cart nor a legacy fallback can sell it.
+      const missing = s.issues.filter((i) => i.severity === 'error');
+      if (!s.channels.length && missing.length && missing.every((i) => EMPTY_STOCK_GAPS.has(i.code)) &&
+        emptyDirectStock(loaded.doc, loaded.view, { option_value_ids: sku.option_value_ids, color_id: sku.color_id }, sku.channels)) {
+        blocked.push({ option_id: unit.option_id, combo_key: sku.combo_key, channel: 'direct_sale', code: 'V2_STOCK_SOLD_OUT' });
+        return;
+      }
       for (const channel of sku.channels) {
         const priced = s.channels.find((c) => c.channel === channel);
         if (priced) {
@@ -349,7 +360,7 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
       const today = unit.channels.find((c) => c.channel === channel) ?? null;
       // The clean start (DECISIONS row 222, addendum A.7): a product's FIRST V2 write starts from nothing.
       // An old dinar price is never shown beside it, never moves a 15% / 30% gate and never seeds a row.
-      const oldIqd = kind === 'v2_create' ? null : today?.ok ? today.prepaid_iqd : null;
+      const oldIqd = kind === 'v2_create' || !storedResults.length ? null : today?.ok ? today.prepaid_iqd : null;
       const p = prices.find((x) => x.combo_key === sku.combo_key && x.channel === channel) ?? null;
       const newIqd = p ? p.price.computed_price_iqd : null;
       const c = p?.price.v2 ?? null;

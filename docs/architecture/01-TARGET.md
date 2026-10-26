@@ -137,6 +137,11 @@ Intermediate rename artefacts inside rebuild migrations belong to the owner of t
 
 `tests/ownership.test.ts` (new) generates `TABLE_OWNER` from this table and fails if a migration creates a table absent from it or if two services claim one table.
 
+Migration 0214 adds `pricing_received_recovery` to **Catalog** ownership: the
+one-time snapshot of saved procurement pricing awaiting the owner's requested
+received-stock correction. It carries product IDs, sequence fences and repair
+status; the normal V2 writer retains ownership of the published prices.
+
 ### 2.2 Column-level ownership on the rows several services write
 
 One writer service per table; other domains issue commands. Column groups keep their semantic owner, but only the table owner executes SQL.

@@ -37,7 +37,7 @@ import { catchUpSearchIndex, runDurableJobs } from './lib/jobs';
 import { drainStaffReconciliations } from './lib/financeStaffAccrual';
 import { drainOrderFinanceRecovery } from './lib/financeOrderRecovery';
 import { runFxScheduler } from './lib/fx/scheduler';
-import { quarterHourSweepBudget, sweepStaleEnginePrices } from './lib/fx/reprice';
+import { quarterHourSweepBudget, sweepStaleEnginePrices, recoverReceivedPricing } from './lib/fx/reprice';
 import { statementBudget } from './lib/fx/budget';
 import { countingD1 } from './lib/d1Count';
 import { QUARTER_HOUR_TICK_LIMIT, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourPriceRequestBudget, quarterHourRequestModelBudget, quarterHourSearchBudget, quarterHourServicesBudget } from './lib/quarterHourBudget';
@@ -1356,6 +1356,11 @@ export default {
         .then(() => sweepStaleEnginePrices(tickEnv, { trigger: 'sweep', budget: statementBudget(quarterHourSweepBudget(used())) }))
         .catch((error) => {
           console.error('scheduled engine repricing rejected:', error instanceof Error ? error.name : 'unknown');
+        })
+        .then(() => recoverReceivedPricing(tickEnv.DB, statementBudget(Math.min(200, quarterHourSearchBudget(used())))))
+        .then((report) => (report.slugs.length ? purgeCatalogueFromJob(env, report.slugs) : undefined))
+        .catch((error) => {
+          console.error('received pricing recovery rejected:', error instanceof Error ? error.name : 'unknown');
         })
         // LAST: products whose required-field verdict is missing or stale
         // (owner brief 2026-10-10), within what the engine sweep left; a product

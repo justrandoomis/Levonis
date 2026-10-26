@@ -230,6 +230,14 @@ function identitiesOf(shelf: ProductShelf, sku: { option_value_ids: readonly str
   }
 }
 
+/** Receipt evidence for completeness; establishing a recorded landed cost
+ * does not require an exchange rate. A recorded zero cost is valid. */
+export function hasKnownShelfCost(shelf: ProductShelf | null | undefined, sku: { option_value_ids: readonly string[]; color_id: string | null; combo_key: string }): boolean {
+  if (!shelf) return false;
+  const ids = identitiesOf(shelf, sku);
+  return ids.length > 0 && ids.every((i) => i.units > 0 && i.cost_iqd !== null);
+}
+
 /**
  * Row 249: one identity's cost in whole dinars at today's U — the higher of its rated batches' highest
  * micro-dollars × U (rounded UP to the dinar) and its unrated batches' dinars as paid. Null: no known cost,

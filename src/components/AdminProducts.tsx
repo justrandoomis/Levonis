@@ -309,6 +309,7 @@ export default function AdminProducts() {
   const menuTriggerRef = useRef<HTMLElement | null>(null);
   const headerBtnRef = useRef<HTMLButtonElement>(null);
   const seqRef = useRef(0);
+  const receivedRecoveryRef = useRef<Promise<void> | null>(null);
 
   // ⌘K / Ctrl+K opens the quick-find, like the reference top bar. Matched on
   // the physical key so an Arabic or Kurdish layout (where e.key is 'ن')
@@ -366,6 +367,15 @@ export default function AdminProducts() {
     setLoading(true);
     setLoadErr(null);
     try {
+      if (user?.is_owner) {
+        receivedRecoveryRef.current ??= (async () => {
+          for (let i = 0; i < 3; i++) {
+            const r = await api.post<{ recovered: number; refreshed: number }>('/api/admin/products-v2/pricing/recover-received', {});
+            if (!r.recovered && !r.refreshed) break;
+          }
+        })().catch(() => { /* The bounded scheduled repair also retries. Listing remains available. */ });
+        await receivedRecoveryRef.current;
+      }
       const params = new URLSearchParams();
       params.set('limit', String(limit));
       params.set('offset', String((page - 1) * limit));
@@ -399,7 +409,7 @@ export default function AdminProducts() {
       if (seq === seqRef.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, status, brand, catalog, stockF, pMin, pMax, days, featuredOnly, incompleteOnly, requestedOnly, needsPricingOnly, sort, page, limit]);
+  }, [query, status, brand, catalog, stockF, pMin, pMax, days, featuredOnly, incompleteOnly, requestedOnly, needsPricingOnly, sort, page, limit, user?.is_owner]);
 
   useEffect(() => {
     load();
