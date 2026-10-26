@@ -28,6 +28,8 @@
  * form was written for that store, so its store reads it (`budgetSwitchOf`).
  * The sheet now stores the switch on, but every such row written before it
  * stores it off, and B0 rewrites no row (no migration): the rule is read here.
+ * It holds only until the customer writes the switch on that row in the
+ * request editor: from then on the stored switch decides (`chatSwitchMark`).
  *
  * Stored bytes are never rewritten. A revision spec, an order's request
  * snapshot and a chat card keep the budget they were written with; a reader
@@ -47,8 +49,10 @@ export const budgetShown = (visible: unknown): boolean => Number(visible ?? 0) =
 /**
  * The private `notes` mark the request editor's entries leave on the draft
  * they make (`entry:<kind>:<id>`, worker/routes/requestEntries.ts
- * `originNote`). `notes` is written when a request is created and never
- * after, and no reader but the customer's own rows returns it.
+ * `originNote`), and the draft save leaves on a chat-sheet row whose switch
+ * it writes (`entry:chat:<chat id>`, `chatSwitchMark`). `notes` is written
+ * when a request is created and, on a chat-sheet row, by that save; never
+ * otherwise. No reader but the customer's own rows returns it.
  */
 export const ENTRY_NOTE_PREFIX = 'entry:';
 
@@ -68,6 +72,14 @@ export const ENTRY_NOTE_PREFIX = 'entry:';
  * here: the editor asks with the switch «اعرض ميزانيتي للتجار», and only the
  * switch decides what their store reads. The chat sheet's rows written before
  * it stored the switch keep this read rule (no row is rewritten).
+ *
+ * NARROWED AGAIN FOR THE EDITOR'S SWITCH ON A SHEET ROW (B3 round 1): the
+ * editor opens a chat-sheet draft too, shows its switch as `budgetSwitchOf`
+ * reads it, and sends it through its own door. A customer who turns the
+ * switch OFF there must be obeyed, so the draft save that writes the switch
+ * on such a row marks it (`chatSwitchMark`), and the mark ends this rule for
+ * that row: from then on the stored switch alone decides, as the editor said.
+ * A sheet row whose switch was never written keeps the rule.
  */
 export const madeInChatForOneStore = (r: Record<string, unknown>): boolean =>
   r.visibility === 'direct' &&
@@ -75,6 +87,17 @@ export const madeInChatForOneStore = (r: Record<string, unknown>): boolean =>
   typeof r.origin_chat_id === 'string' &&
   r.origin_chat_id !== '' &&
   !String(r.notes ?? '').startsWith(ENTRY_NOTE_PREFIX);
+
+/**
+ * The mark a write of the switch leaves on a row the chat sheet made for one
+ * store (`entry:chat:<chat id>` in `notes`), or null for any other row. It
+ * starts with `ENTRY_NOTE_PREFIX`, so `madeInChatForOneStore` no longer covers
+ * the row and `budgetSwitchOf` reads its stored switch. Written by the draft
+ * save in the same UPDATE as the switch (worker/routes/printRequests.ts
+ * `budgetVisibleSet`); never an idle-draft origin (`entry:project|product|store`).
+ */
+export const chatSwitchMark = (r: Record<string, unknown>): string | null =>
+  madeInChatForOneStore(r) ? `${ENTRY_NOTE_PREFIX}chat:${String(r.origin_chat_id)}` : null;
 
 /**
  * The switch AS A MERCHANT THE REQUEST IS MEANT FOR READS IT, from a request

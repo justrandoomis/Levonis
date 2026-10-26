@@ -16,7 +16,10 @@
  *   the send opens the thread and writes the card in one go; revision 1 is
  *   recorded with the model; a second send answers the same card; the budget
  *   follows Q2 on the request page and on the card; another store's offer is
- *   still refused by 0151.
+ *   still refused by 0151;
+ *   a draft the CHAT SHEET made, opened in the editor: the switch the editor
+ *   shows is the one obeyed. Turned off there and sent through the editor's
+ *   door, its store reads no budget on the page or on the card (B3 round 1).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -151,4 +154,57 @@ test('a direct draft is sent, not published: the send asks the title first, then
   // 0151: another store still cannot offer on it.
   const other = await post(as(raw, 'owner2'), `/api/marketplace/requests/${id}/offers`, { price_iqd: 9000, delivery_method: 'pickup' });
   assert.notEqual(other.status, 201);
+});
+
+test('a chat-sheet draft switched OFF in the editor and sent there: the store reads no budget on the page or on the card', async () => {
+  const raw = world();
+  const open = await post(as(raw, 'buyer'), '/api/chats/open', { merchantId: 'm1' });
+  assert.equal(open.status, 200, JSON.stringify(await json(open.clone())));
+  const chatId = String((await json(open)).chatId);
+  const made = await post(as(raw, 'buyer'), `/api/chats/${chatId}/print-requests`, {
+    title: 'A phone stand', description: 'A stand for my phone, matte black please', quantity: 1, budget_iqd: 25000,
+  });
+  const madeBody = await json(made);
+  assert.equal(made.status, 201, JSON.stringify(madeBody));
+  const id = String(madeBody.request.id);
+  // The editor opens the sheet's draft: a budget typed for this store, shown to it.
+  const opened = await json(await get(as(raw, 'buyer'), `/api/marketplace/print/requests/${id}/draft`));
+  assert.equal(opened.draft.budget_visible, true);
+
+  // The customer turns the switch OFF in the editor: the editor reads it back off.
+  const saved = await put(as(raw, 'buyer'), `/api/marketplace/print/requests/${id}/draft`, { budget_visible: false });
+  const savedBody = await json(saved);
+  assert.equal(saved.status, 200, JSON.stringify(savedBody));
+  assert.equal(savedBody.draft.budget_visible, false, 'what the editor shows is what the store will read');
+  const stored = row<{ budget_visible: number; notes: string }>(raw, 'SELECT budget_visible, notes FROM community_requests WHERE id = ?', id)!;
+  assert.deepEqual({ ...stored }, { budget_visible: 0, notes: `entry:chat:${chatId}` }, 'the switch, and the mark that ends the sheet rule');
+
+  // Sent through the editor's door.
+  const sent = await post(as(raw, 'buyer'), `/api/marketplace/print/requests/${id}/send`);
+  const sentBody = await json(sent);
+  assert.equal(sent.status, 201, JSON.stringify(sentBody));
+  assert.equal(sentBody.chat_id, chatId);
+  type Card = { card: { type: string; original: Record<string, unknown> } | null };
+  const cardFor = async (viewer: string) =>
+    ((await json(await get(as(raw, viewer), `/api/chats/${chatId}/messages`))).messages as Card[]).find((m) => m.card?.type === 'print_request')!.card!.original.budget_iqd;
+  // The store: not on the request page, not on the card.
+  assert.equal((await json(await get(as(raw, 'owner'), `/api/marketplace/requests/${id}`))).request.budget_iqd, null, 'the store on the request page');
+  assert.equal(await cardFor('owner'), null, 'the store on the card');
+  // The customer still reads their own, on both.
+  assert.equal((await json(await get(as(raw, 'buyer'), `/api/marketplace/requests/${id}`))).request.budget_iqd, 25000);
+  assert.equal(await cardFor('buyer'), 25000);
+
+  // A sheet draft whose switch the editor never wrote keeps the sheet rule:
+  // saved in the editor without naming the switch, the store still reads it.
+  const other = await json(await post(as(raw, 'buyer'), `/api/chats/${chatId}/print-requests`, {
+    title: 'A cable clip', description: 'Two cable clips for a desk, white', quantity: 2, budget_iqd: 9000,
+  }));
+  const otherId = String(other.request.id);
+  raw.prepare('UPDATE community_requests SET budget_visible = 0 WHERE id = ?').run(otherId);
+  const kept = await put(as(raw, 'buyer'), `/api/marketplace/print/requests/${otherId}/draft`, { title: 'Two cable clips' });
+  assert.equal(kept.status, 200);
+  assert.equal((await json(kept)).draft.budget_visible, true);
+  assert.equal(row<{ notes: string }>(raw, 'SELECT notes FROM community_requests WHERE id = ?', otherId)!.notes, '', 'no mark without a written switch');
+  assert.equal((await post(as(raw, 'buyer'), `/api/marketplace/print/requests/${otherId}/send`)).status, 201);
+  assert.equal((await json(await get(as(raw, 'owner'), `/api/marketplace/requests/${otherId}`))).request.budget_iqd, 9000);
 });

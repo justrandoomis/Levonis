@@ -9,7 +9,9 @@
  *                      cleared description); a stale window is refused
  *                      DRAFT_CHANGED, and the comparison is INSIDE the write:
  *                      a save landing between the read and the write still
- *                      loses (critique 11)
+ *                      loses (critique 11), even one stamped in the same
+ *                      millisecond: the guard asks the row count, not the
+ *                      clock
  *   the publish        asks the title and the description of a draft born
  *                      empty
  *   provenance         a link pointed elsewhere no longer carries origin_*
@@ -169,6 +171,64 @@ test('critique 11: a stale window is refused DRAFT_CHANGED, and the comparison i
   const flush = await put(as(raw, 'buyer'), `/api/marketplace/print/requests/${id}/draft`, { schema_version: 3, title: 'On leave' });
   assert.equal(flush.status, 200);
   assert.equal(row<{ title: string }>(raw, 'SELECT title FROM community_requests WHERE id = ?', id)!.title, 'On leave');
+});
+
+test('critique 11: two saves stamped in the same millisecond — the one that lost the row is refused, not mixed in', async () => {
+  const raw = world();
+  const born = await blank(raw);
+  const id = born.body.request_id as string;
+  const stamp = (born.body.draft as { updated_at: string }).updated_at;
+  const quantity = () => row<{ quantity: number }>(raw, 'SELECT quantity FROM community_request_parts WHERE request_id = ? ORDER BY position LIMIT 1', id)!.quantity;
+  const partsBefore = quantity();
+
+  // Both windows hold `stamp`. Window A's save lands between window B's read
+  // and B's write, and both are stamped T: the row then carries B's own new
+  // stamp, which a guard comparing stamps would take for B's write.
+  const T = '2031-03-03T03:03:03.033Z';
+  const RealDate = Date;
+  class FrozenDate extends RealDate {
+    constructor(...a: unknown[]) {
+      if (a.length === 0) super(T);
+      else super(...(a as [string]));
+    }
+    static now() {
+      return RealDate.parse(T);
+    }
+  }
+  const d1 = asD1(raw);
+  const batch = d1.batch.bind(d1);
+  let armed = true;
+  (d1 as unknown as { batch: typeof d1.batch }).batch = (async (stmts: D1PreparedStatement[]) => {
+    if (armed) {
+      armed = false;
+      raw.prepare(`UPDATE community_requests SET title = 'Window A', updated_at = ? WHERE id = ? AND updated_at = ?`).run(T, id, stamp);
+    }
+    return batch(stmts);
+  }) as typeof d1.batch;
+  (globalThis as { Date: DateConstructor }).Date = FrozenDate as unknown as DateConstructor;
+  let b: Response;
+  try {
+    b = await put(as(raw, 'buyer', { db: d1 }), `/api/marketplace/print/requests/${id}/draft`, {
+      schema_version: 3, title: 'Window B', expected_updated_at: stamp,
+      parts: [{ process: 'unsure', quantity: 7, materials: [{ material_id: 'unsure', colors: [{ mode: 'any' }] }] }],
+    });
+  } finally {
+    (globalThis as { Date: DateConstructor }).Date = RealDate;
+  }
+  const bBody = await json(b);
+  assert.equal(b.status, 409, JSON.stringify(bBody));
+  assert.equal(bBody.code, 'DRAFT_CHANGED');
+  assert.equal(bBody.details.draft.title, 'Window A', 'B is handed the draft as A left it');
+  // Nothing of B was written: not its title, not its part.
+  const now = row<{ title: string; updated_at: string }>(raw, 'SELECT title, updated_at FROM community_requests WHERE id = ?', id)!;
+  assert.deepEqual({ ...now }, { title: 'Window A', updated_at: T });
+  assert.equal(quantity(), partsBefore, 'no mixed draft: B’s part quantity is not in it');
+  // B, still holding the stamp it started from, cannot overwrite A either.
+  const again = await put(as(raw, 'buyer'), `/api/marketplace/print/requests/${id}/draft`, {
+    schema_version: 3, title: 'Window B again', expected_updated_at: stamp,
+  });
+  assert.equal(again.status, 409);
+  assert.equal(row<{ title: string }>(raw, 'SELECT title FROM community_requests WHERE id = ?', id)!.title, 'Window A');
 });
 
 test('critique 14: a link pointed elsewhere no longer carries the provenance of a handoff', async () => {

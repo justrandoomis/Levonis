@@ -16,7 +16,13 @@
  *   A file that is not downloadable is never copied; a copy whose bytes are
  *   not what the post's ledger says is dropped (COPY_CHANGED) and leaves no
  *   object behind; a retry of a file already copied makes no second copy.
- *   A post the reader may not read answers ENTRY_NOT_FOUND and makes nothing.
+ *   A post the reader may not read answers ENTRY_NOT_FOUND and makes nothing,
+ *   and so does a portfolio piece whose customer has not consented (pending)
+ *   or declined: hidden from every public list, it is copied by nobody but
+ *   its author.
+ *   A file the live composer stored under the author's name WITHOUT its
+ *   extension is copied under its stored type, and its bytes are still
+ *   classified against that type.
  *   No projection below the owner carries `origin_*`, a sha256 or the author.
  */
 import { test } from 'node:test';
@@ -239,6 +245,79 @@ test('a project the reader may not read answers ENTRY_NOT_FOUND and makes nothin
     assert.equal(r.body.code, 'ENTRY_NOT_FOUND', id);
   }
   assert.equal(count(raw, `SELECT COUNT(*) AS n FROM community_requests WHERE customer_id = 'buyer'`), 0);
+});
+
+test('a portfolio piece whose customer has not consented or declined is copied by nobody but its author (POST_PUBLIC_SQL)', async () => {
+  const raw = world();
+  const bucket = new MemoryBucket();
+  project(raw, bucket, { id: 'pdeclined' });
+  project(raw, bucket, { id: 'ppending' });
+  raw.prepare(`UPDATE community_posts SET consent_status = 'declined' WHERE id = 'pdeclined'`).run();
+  raw.prepare(`UPDATE community_posts SET consent_status = 'pending' WHERE id = 'ppending'`).run();
+  for (const id of ['pdeclined', 'ppending']) {
+    const r = await enter(raw, bucket, id);
+    assert.equal(r.status, 404, id);
+    assert.equal(r.body.code, 'ENTRY_NOT_FOUND', id);
+  }
+  assert.equal(count(raw, `SELECT COUNT(*) AS n FROM community_requests WHERE customer_id = 'buyer'`), 0);
+  assert.equal([...bucket.objects.keys()].filter((k) => k.startsWith('requests/')).length, 0, 'no copy under requests/');
+  // The author still starts a request from their own piece.
+  const mine = await enter(raw, bucket, 'pdeclined', 'owner');
+  assert.equal(mine.status, 201, JSON.stringify(mine.body));
+
+  // Declined after a request was made from it: a retry copies nothing more.
+  const p = project(raw, bucket, { id: 'plater', badLedger: true });
+  const born = await enter(raw, bucket, p.id);
+  assert.equal(born.status, 201);
+  raw.prepare(`UPDATE file_objects SET sha256 = ? WHERE object_key = (SELECT file_key FROM community_post_files WHERE id = 'plater_a')`).run(sha(p.a));
+  raw.prepare(`UPDATE community_posts SET consent_status = 'declined' WHERE id = 'plater'`).run();
+  const retry = await post(as(raw, 'buyer', bucket), `/api/marketplace/print/requests/${born.body.request_id}/copy-from-project`, { post_id: p.id });
+  assert.equal(retry.status, 404);
+  assert.equal((await json(retry)).code, 'ENTRY_NOT_FOUND');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM community_request_files WHERE request_id = ?', born.body.request_id), 2, 'the skipped file stays uncopied');
+});
+
+test('a file the composer stored without its extension is copied under its stored type, and its bytes still decide', async () => {
+  const raw = world();
+  const bucket = new MemoryBucket();
+  const id = 'pcomposer';
+  raw.prepare(
+    `INSERT INTO community_posts (id,author_id,kind,title,body,state,visibility,tags,published_at)
+     VALUES (?, 'owner', 'project', 'Cable clip set', 'Two clips', 'published', 'public', '[]', '2026-10-01T00:00:00.000Z')`
+  ).run(id);
+  // As projects/FileComposer.tsx stores them: «Cable clip (large).stl» → «Cable clip (large)».
+  const a = stl(20), b = stl(30);
+  const files: Array<[string, string, string, Uint8Array, string]> = [
+    [`${id}_a`, 'Cable clip (large)', `users/owner/private/${id}_a.stl`, a, 'model/stl'],
+    // A suffix that is not a file type, on a key without one: the stored MIME names it.
+    [`${id}_b`, 'Bracket v1.2', `users/owner/private/${id}_b`, b, 'model/stl'],
+    // The stored type says STL, the bytes are a PDF: refused, as an upload would be.
+    [`${id}_c`, 'Not a model', `users/owner/private/${id}_c.stl`, PDF, 'model/stl'],
+  ];
+  files.forEach(([fid, name, key, bytes, mime], i) => {
+    void bucket.put(key, bytes, { httpMetadata: { contentType: mime } });
+    raw.prepare(
+      `INSERT INTO community_post_files (id, post_id, file_key, kind, name, bytes, mime, downloadable, position) VALUES (?,?,?,?,?,?,?,1,?)`
+    ).run(fid, id, key, 'model', name, bytes.byteLength, mime, i);
+    raw.prepare(
+      `INSERT INTO file_objects (object_key, visibility, domain, owner_id, entity_id, mime_type, byte_size, original_name, sha256, purpose)
+       VALUES (?, 'private', 'users', 'owner', ?, ?, ?, ?, ?, 'post')`
+    ).run(key, id, mime, bytes.byteLength, name, sha(bytes));
+  });
+  const born = await enter(raw, bucket, id);
+  assert.equal(born.status, 201, JSON.stringify(born.body));
+  assert.equal(born.body.copied.files, 2);
+  assert.deepEqual(born.body.copied.skipped, [{ name: 'Not a model.stl', code: 'COPY_KIND', post_file_id: `${id}_c` }]);
+  const rid = born.body.request_id as string;
+  const stored = raw.prepare('SELECT file_name, kind, file_key FROM community_request_files WHERE request_id = ? ORDER BY created_at, id').all(rid) as Array<Record<string, string>>;
+  assert.deepEqual(stored.map((f) => f.file_name).sort(), ['Bracket v1.2.stl', 'Cable clip (large).stl']);
+  assert.ok(stored.every((f) => f.kind === 'model' && f.file_key.startsWith('requests/buyer/') && f.file_key.endsWith('.stl')));
+  const sources = raw.prepare(`SELECT origin_ref, sha256 FROM community_request_sources WHERE request_id = ? ORDER BY position`).all(rid) as Array<Record<string, string>>;
+  assert.deepEqual(sources.map((x) => [x.origin_ref, x.sha256]), [[`${id}_a`, sha(a)], [`${id}_b`, sha(b)]]);
+  // Each is a part, named as the author named it.
+  const parts = born.body.draft.model.parts as Array<{ name: string; measured_file_id: string }>;
+  assert.deepEqual(parts.map((x) => x.name), ['Cable clip (large)', 'Bracket v1.2']);
+  assert.ok(parts.every((x) => typeof x.measured_file_id === 'string' && x.measured_file_id !== ''));
 });
 
 test('below the owner, no projection of the copied request carries origin_*, a sha256 or the author', async () => {

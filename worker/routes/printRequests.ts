@@ -117,7 +117,7 @@ import {
 } from '../lib/requestEstimate';
 import { REQUEST_MODEL_LIMITS } from '@levonis/contracts/requestModel';
 import { isMissingSchema } from '../lib/merchantApproval';
-import { ENTRY_NOTE_PREFIX, budgetReaderOf, budgetSwitchOf, budgetVisibleOf, stripSpecBudget } from '../lib/requestBudget';
+import { ENTRY_NOTE_PREFIX, budgetReaderOf, budgetSwitchOf, budgetVisibleOf, chatSwitchMark, stripSpecBudget } from '../lib/requestBudget';
 import { orderCoverageFacts } from '../lib/chatCards';
 
 /**
@@ -1178,11 +1178,23 @@ function readBudgetVisible(input: Record<string, unknown>): boolean | undefined 
   return input.budget_visible === undefined ? undefined : input.budget_visible === true || input.budget_visible === 1;
 }
 
-/** `budget_visible = ?` for a request row that has the column (a database before 0208 has nowhere to keep it). */
+/**
+ * `budget_visible = ?` for a request row that has the column (a database before 0208 has nowhere to keep it).
+ *
+ * On a row the chat sheet made for one store, the switch written here is the
+ * customer's word from then on: the row is marked (`chatSwitchMark`) in the
+ * same write, so the chat sheet's read rule stops covering it and the store
+ * reads exactly the switch the editor showed (row 268 note, B3 round 1).
+ */
 function budgetVisibleSet(request: Record<string, unknown>, visible: boolean | undefined, sets: string[], vals: Array<string | number | null>): void {
   if (visible === undefined || !Object.prototype.hasOwnProperty.call(request, 'budget_visible')) return;
   sets.push('budget_visible = ?');
   vals.push(visible ? 1 : 0);
+  const mark = chatSwitchMark(request);
+  if (mark) {
+    sets.push('notes = ?');
+    vals.push(mark);
+  }
 }
 
 /** What a model write carries into the publish or the draft save. */
@@ -1706,7 +1718,10 @@ printRequestRoutes.put('/requests/:id/draft', requireAuth, async (c) => {
  * it. The comparison is INSIDE the update (`AND updated_at = ?`), so a save
  * that lands between this read and the write leaves the update with nothing
  * to touch, the guard statement after it aborts the whole batch, and the
- * answer is 409 DRAFT_CHANGED with the draft as it now is. The read-time
+ * answer is 409 DRAFT_CHANGED with the draft as it now is. The guard asks
+ * the update's own row count (`changes()`), never the clock: two saves
+ * stamped in the same millisecond carry the same `updated_at`, so a guard
+ * comparing stamps would let the losing one through. The read-time
  * comparison before it only spares the work of planning a write already
  * known to be stale; it decides nothing on its own. A body without the stamp
  * (an older client, the page-leave flush) keeps the old behaviour: the last
@@ -1767,11 +1782,14 @@ export async function saveDraft(
           WHERE id = ? AND customer_id = ? AND state = 'draft'${expected !== undefined ? ' AND updated_at = ?' : ''}`
       ).bind(...vals, requestId, userId, ...(expected !== undefined ? [expected] : [])),
       // A publish — or, with `expected_updated_at`, another window's save —
-      // that landed first leaves this save with nothing to write.
+      // that landed first leaves this save with nothing to write. Keyed on
+      // the row count of the update just above (it must stay the statement
+      // right before this one), never on the stamps: another window's save
+      // stamped in the same millisecond carries this save's own `ts`.
       env.DB.prepare(
-        `UPDATE community_requests SET updated_at = CASE WHEN state = 'draft' AND updated_at = ?2 THEN updated_at ELSE NULL END
+        `UPDATE community_requests SET updated_at = CASE WHEN changes() = 1 THEN updated_at ELSE NULL END
           WHERE id = ?1`
-      ).bind(requestId, ts),
+      ).bind(requestId),
       ...(model ? reviewFenceStatement(env.DB, model.before) : []),
       printRowStatement(env.DB, requestId, w, null, 0, ts),
       ...(model

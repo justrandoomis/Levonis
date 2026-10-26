@@ -65,9 +65,9 @@ import { visibleStoreProduct } from '../lib/productVisibility';
 import { assertStoreTakesDirect, directRequest, type DirectStore } from '../lib/directRequests';
 import { copyIntoRequest, ledgerSha256, type CopySource } from '../lib/requestHandoff';
 import { ENTRY_NOTE_PREFIX } from '../lib/requestBudget';
-import { REQUEST_FILE_LIMITS } from '../../packages/contracts/src/requestFiles';
+import { REQUEST_FILE_LIMITS, requestFileKind } from '../../packages/contracts/src/requestFiles';
 import { assertSendable, draftShape, saveDraft } from './printRequests';
-import { loadPost, mayRead } from './communityPosts';
+import { loadPost, mayRead, postFileExt } from './communityPosts';
 import { customerKnowsMerchant, openStoreThread } from './chats';
 import { sendDirectDraft, sentDirectCard } from './chatCommerce';
 
@@ -166,15 +166,24 @@ const extOf = (key: string) => (/\.([a-z0-9]{1,8})$/i.exec(key)?.[1] ?? '').toLo
 // ------------------------------------------------------------------ project
 
 /**
+ * The consent states the public may see a post in: none needed, or granted
+ * (never pending or declined), the rule of every public list
+ * (communityPosts.ts `POST_PUBLIC_SQL`).
+ */
+const CONSENT_SHOWN: ReadonlySet<string> = new Set(['not_needed', 'granted']);
+
+/**
  * A project the reader may copy from: their own, or one the PUBLIC may read
- * (published, public or unlisted, not hidden by Levonis). Never through the
- * consent party's door, and never through an admin's reach into a hidden or
- * unpublished post (critique 9): `mayRead` is asked as a guest.
+ * (published, public or unlisted, not hidden by Levonis, and its customer's
+ * consent not pending or declined, as every public list asks). Never through
+ * the consent party's door, and never through an admin's reach into a hidden
+ * or unpublished post (critique 9): `mayRead` is asked as a guest.
  */
 async function readableProject(c: Context<AppContext>, postId: string): Promise<Record<string, unknown>> {
   const user = c.get('user')!;
   const p = await loadPost(c.env, postId).catch(() => null);
-  if (!p || !(user.id === p.author_id || mayRead(p, null, null))) throw entryNotFound();
+  const mine = !!p && user.id === p.author_id;
+  if (!p || !(mine || (mayRead(p, null, null) && CONSENT_SHOWN.has(String(p.consent_status))))) throw entryNotFound();
   if (user.id !== p.author_id && (await blockedEither(c.env.DB, user.id, String(p.author_id)).catch(() => false))) throw entryNotFound();
   return p;
 }
@@ -190,19 +199,25 @@ async function projectFiles(c: Context<AppContext>, post: Record<string, unknown
   const mine = user.id === post.author_id;
   const meta = { title: String(post.title ?? '').slice(0, 140) };
   const { results } = await c.env.DB.prepare(
-    `SELECT id, file_key, kind, name, downloadable FROM community_post_files WHERE post_id = ? ORDER BY (kind = 'model') DESC, position, id`
+    `SELECT id, file_key, kind, name, mime, downloadable FROM community_post_files WHERE post_id = ? ORDER BY (kind = 'model') DESC, position, id`
   )
     .bind(postId)
-    .all<{ id: string; file_key: string; kind: string; name: string; downloadable: number }>();
+    .all<{ id: string; file_key: string; kind: string; name: string; mime: string | null; downloadable: number }>();
   const out: ProjectFile[] = [];
   for (const f of results ?? []) {
     if (!mine && Number(f.downloadable) !== 1) continue;
     if (only && !only.has(f.id)) continue;
+    // The live composer stores the author's name WITHOUT its extension
+    // (src/components/community/projects/FileComposer.tsx). Such a copy is
+    // named by the stored type (`postFileExt`: the key's suffix, else the
+    // MIME), and its bytes are still classified against that name before
+    // anything is written (requestHandoff.ts `copyIntoRequest`).
+    const named = String(f.name ?? '');
     out.push({
       postFileId: f.id,
       visibility: 'private',
       key: f.file_key,
-      name: String(f.name || `file.${extOf(f.file_key)}`),
+      name: requestFileKind(named) ? named : `${named || 'file'}.${postFileExt(f.file_key, f.mime)}`,
       expectedSha256: await ledgerSha256(c.env.DB, f.file_key),
       sourceKind: 'project_post',
       origin: { id: postId, ref: f.id, meta },
