@@ -1705,6 +1705,15 @@ export function readModelInput(body: Record<string, unknown>, ctx: ModelInputCon
         } else {
           const parsed = urlIn ? parseModelLink(urlIn, ctx.providers) : null;
           if (!parsed || parsed.canonical_url.length > LIMITS.linkCanonicalMax) throw badRequest('That link is not a valid https address', 'BAD_URL');
+          // A link the customer pointed somewhere else is no longer the one a
+          // server handoff made: its provenance does not travel with the edit
+          // (P1-06, row 268).
+          if (prev && prev.canonical_url !== parsed.canonical_url) {
+            next.origin_id = '';
+            next.origin_ref = '';
+            next.origin_hash = '';
+            next.origin_meta = {};
+          }
           next.url = urlIn;
           next.canonical_url = parsed.canonical_url;
           next.provider = parsed.provider.slice(0, 60);

@@ -44,6 +44,7 @@ import { ownedMediaKey } from '../lib/mediaRefs';
 import { benefits, getTierStatus } from '../lib/entitlements';
 import { isConstraintAbort } from '../lib/walletOps';
 import { DRAFT_TTL_DAYS, composeSnapshot, recordOfferRevisionStatement, recordRevisionStatement } from '../lib/requestRevisions';
+import { assertSendable } from './printRequests';
 import { merchantTakesNewWork, offerCountStatement } from '../lib/communityRequests';
 import { assertDirectStanding, directRequest } from '../lib/directRequests';
 import { storeThreadOf, threadRole, type StoreThread } from '../lib/chatThread';
@@ -222,6 +223,33 @@ chatCommerceRoutes.post('/:id/print-requests/:rid/send', requireCommunityOpen, a
     if (sent) return c.json({ success: true, message: sent, replayed: true });
     throw conflict('This request was already sent', 'REQUEST_NOT_DRAFT');
   }
+  return sendDirectDraft(c, { requestId, chatId, thread });
+});
+
+/**
+ * SEND A DIRECT DRAFT TO ITS STORE: the draft becomes an open request and its
+ * card lands in the store's conversation with this customer IN THE SAME BATCH
+ * (the card is written only if the request really moved). Shared by the
+ * conversation's «إرسال» above and the request editor's «أرسل إلى المتجر»
+ * (worker/routes/requestEntries.ts; P1-06, docs/DECISIONS.md row 268), which
+ * opens the thread only now: a draft is its customer's alone, and the store
+ * hears of it when it is sent (critique 1).
+ *
+ * Before anything moves, the job is asked what the publish door asks
+ * (`assertSendable`, critique 5): a title and a description (a draft the
+ * editor made may be born empty), and no part a workshop cannot print as
+ * asked. `origin_chat_id` is written here, in the batch that opens the
+ * request, when the draft did not have it yet.
+ */
+export async function sendDirectDraft(
+  c: Context<AppContext>,
+  p: { requestId: string; chatId: string; thread: StoreThread }
+): Promise<Response> {
+  const { requestId, chatId, thread } = p;
+  const user = c.get('user')!;
+  const row0 = await c.env.DB.prepare('SELECT * FROM community_requests WHERE id = ?').bind(requestId).first<Record<string, unknown>>();
+  if (!row0) throw notInThread('This request');
+  await assertSendable(c.env, row0);
   const ctx = await storeById(c.env.DB, thread.store_id);
   const takes = !!ctx && (await merchantTakesNewWork(c.env.DB, {
     merchantStatus: ctx.merchant.status,
@@ -237,9 +265,11 @@ chatCommerceRoutes.post('/:id/print-requests/:rid/send', requireCommunityOpen, a
   const messageId = newId('msg');
   const res = await c.env.DB.batch([
     c.env.DB.prepare(
-      `UPDATE community_requests SET state = 'open', status = 'open', expires_at = ?, updated_at = ?
-        WHERE id = ? AND customer_id = ? AND state = 'draft' AND visibility = 'direct'`
-    ).bind(expires, ts, requestId, user.id),
+      `UPDATE community_requests SET state = 'open', status = 'open', expires_at = ?, updated_at = ?,
+              origin_chat_id = COALESCE(origin_chat_id, ?)
+        WHERE id = ? AND customer_id = ? AND state = 'draft' AND visibility = 'direct'
+          AND (origin_chat_id IS NULL OR origin_chat_id = ?)`
+    ).bind(expires, ts, chatId, requestId, user.id, chatId),
     cardInsertStatement(
       c.env.DB,
       { id: messageId, chatId, senderId: user.id, card, createdAt: ts },
@@ -254,8 +284,13 @@ chatCommerceRoutes.post('/:id/print-requests/:rid/send', requireCommunityOpen, a
   await afterCard(c, thread, chatId, messageId, ts, card);
   const message = await existingCard(c, chatId, 'print_request', requestId);
   const row = await c.env.DB.prepare('SELECT * FROM community_requests WHERE id = ?').bind(requestId).first<Record<string, unknown>>();
-  return c.json({ success: true, request: requestForReader(row!, 'owner'), message }, 201);
-});
+  return c.json({ success: true, request: requestForReader(row!, 'owner'), message, chat_id: chatId }, 201);
+}
+
+/** The card a sent direct request already has in its thread — the answer to a second send. */
+export async function sentDirectCard(c: Context<AppContext>, chatId: string, requestId: string) {
+  return existingCard(c, chatId, 'print_request', requestId);
+}
 
 // ================================================================ quotes
 

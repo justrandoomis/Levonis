@@ -700,7 +700,7 @@ async function printRequestCurrents(
   const read = (withSwitch: boolean) =>
     env.DB.prepare(
       `SELECT r.id, r.state, r.expires_at, r.customer_id, r.target_merchant_id, r.community_order_id,
-              r.visibility, r.created_by, r.origin_chat_id,
+              r.visibility, r.created_by, r.origin_chat_id, r.notes,
               ${withSwitch ? 'r.budget_visible' : '0'} AS budget_visible,
               (SELECT o.id FROM community_offers o WHERE o.request_id = r.id AND o.state IN ('pending','superseded')
                 ORDER BY o.created_at DESC LIMIT 1) AS live_offer_id

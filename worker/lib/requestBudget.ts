@@ -45,6 +45,14 @@ export type BudgetReader = 'owner' | 'admin' | 'merchant' | 'public';
 export const budgetShown = (visible: unknown): boolean => Number(visible ?? 0) === 1;
 
 /**
+ * The private `notes` mark the request editor's entries leave on the draft
+ * they make (`entry:<kind>:<id>`, worker/routes/requestEntries.ts
+ * `originNote`). `notes` is written when a request is created and never
+ * after, and no reader but the customer's own rows returns it.
+ */
+export const ENTRY_NOTE_PREFIX = 'entry:';
+
+/**
  * A DIRECT REQUEST THE CUSTOMER MADE IN A STORE'S CONVERSATION (0151:
  * `visibility = 'direct'`, `created_by = 'customer'`, `origin_chat_id` set):
  * the chat sheet's own row. Its only merchant readers are the store it is
@@ -52,14 +60,21 @@ export const budgetShown = (visible: unknown): boolean => Number(visible ?? 0) =
  * accepted), never a workshop of the board. A row read without those columns
  * answers no, which keeps the budget hidden.
  *
- * NOTE for the request editor's direct send (P1-06 2b, B0b): it records the
- * conversation at send too, so its rows match this test. Before it ships the
- * switch for a direct request, replace this read rule with a data fix of the
- * sheet's old rows (a DECISIONS row) or narrow the test, or that switch will
- * not hide the budget from the store.
+ * NARROWED FOR THE REQUEST EDITOR'S DIRECT SEND (P1-06 2b, B0b): the editor's
+ * store and product entries make a direct draft too, and its send records the
+ * conversation, so after the send such a row has every mark above. It also
+ * carries the editor's entry mark in `notes` (`ENTRY_NOTE_PREFIX`), which the
+ * chat sheet never writes (it stores `notes = ''`). Those rows are left out
+ * here: the editor asks with the switch «اعرض ميزانيتي للتجار», and only the
+ * switch decides what their store reads. The chat sheet's rows written before
+ * it stored the switch keep this read rule (no row is rewritten).
  */
 export const madeInChatForOneStore = (r: Record<string, unknown>): boolean =>
-  r.visibility === 'direct' && r.created_by === 'customer' && typeof r.origin_chat_id === 'string' && r.origin_chat_id !== '';
+  r.visibility === 'direct' &&
+  r.created_by === 'customer' &&
+  typeof r.origin_chat_id === 'string' &&
+  r.origin_chat_id !== '' &&
+  !String(r.notes ?? '').startsWith(ENTRY_NOTE_PREFIX);
 
 /**
  * The switch AS A MERCHANT THE REQUEST IS MEANT FOR READS IT, from a request

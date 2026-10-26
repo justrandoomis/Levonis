@@ -116,7 +116,7 @@ import {
 } from '../lib/requestEstimate';
 import { REQUEST_MODEL_LIMITS } from '@levonis/contracts/requestModel';
 import { isMissingSchema } from '../lib/merchantApproval';
-import { budgetReaderOf, budgetSwitchOf, budgetVisibleOf, stripSpecBudget } from '../lib/requestBudget';
+import { ENTRY_NOTE_PREFIX, budgetReaderOf, budgetSwitchOf, budgetVisibleOf, stripSpecBudget } from '../lib/requestBudget';
 import { orderCoverageFacts } from '../lib/chatCards';
 
 /**
@@ -1310,19 +1310,49 @@ async function planModelWrite(
   // P1-05 (D2): a job of parts publishes — save a part no workshop can print
   // as asked. Refused with the part named, and nothing written; a draft keeps
   // it, and the live estimate shows it unpriced with the same code.
-  if (opts.strict) {
-    for (const part of next.parts) {
-      const code = unsupportedPart(part, mats);
-      if (!code) continue;
-      const words: Record<string, string> = {
-        PART_PROCESS_MIXED: 'One part cannot be printed in an FDM material and a resin together — make them two parts',
-        PART_RESIN_MULTI_MATERIAL: 'A resin part prints in one material — choose one, or split it into parts',
-        PART_MATERIAL_UNKNOWN: 'One of the materials is no longer in the catalogue — choose another',
-      };
-      throw badRequest(words[code], code, { part_id: part.id, position: part.position });
-    }
-  }
+  if (opts.strict) assertPartsPrintable(next.parts, mats);
   return { w, before: read, next, budgetVisible };
+}
+
+const PART_REFUSAL_WORDS: Record<string, string> = {
+  PART_PROCESS_MIXED: 'One part cannot be printed in an FDM material and a resin together — make them two parts',
+  PART_RESIN_MULTI_MATERIAL: 'A resin part prints in one material — choose one, or split it into parts',
+  PART_MATERIAL_UNKNOWN: 'One of the materials is no longer in the catalogue — choose another',
+};
+
+/** The first part no workshop can print as asked, refused with its id and place (P1-05, D2). */
+function assertPartsPrintable(parts: ModelState['parts'], mats: PrintMaterial[]): void {
+  for (const part of parts) {
+    const code = unsupportedPart(part, mats);
+    if (code) throw badRequest(PART_REFUSAL_WORDS[code], code, { part_id: part.id, position: part.position });
+  }
+}
+
+/** A draft born empty (the editor's entry door, row 268) says what it is before anyone sees it. */
+function assertRequestText(request: Record<string, unknown>): void {
+  const title = String(request.title ?? '').trim();
+  if (title.length < 4 || title.length > 140) {
+    throw badRequest('Write a title of 4 to 140 characters before publishing', 'REQUEST_TITLE_REQUIRED');
+  }
+  if (String(request.description ?? '').trim().length < 10) {
+    throw badRequest('Describe what you need in at least 10 characters before publishing', 'REQUEST_DESCRIPTION_REQUIRED');
+  }
+}
+
+/**
+ * WHAT A DIRECT REQUEST MUST SAY BEFORE IT IS SENT TO ITS STORE — the publish
+ * door's own checks, for the doors that send instead of publishing
+ * (worker/routes/chatCommerce.ts `sendDirectDraft`, from the conversation or
+ * the request editor; P1-06 critique 5, docs/DECISIONS.md row 268): a title
+ * of 4–140 characters, a description of 10 or more, and — for a version-3
+ * request — no part a workshop cannot print as asked (PART_*, with the part
+ * named).
+ */
+export async function assertSendable(env: Env, request: Record<string, unknown>): Promise<void> {
+  assertRequestText(request);
+  const read = await readRequestModel(env.DB, String(request.id ?? ''));
+  if (!read || read.schema_version !== 3 || !read.schema) return;
+  assertPartsPrintable(read.parts, await materials(env));
 }
 
 /** What a merchant is told of a job of parts (D10): counts, sets, every material and process, the review. */
@@ -1385,14 +1415,25 @@ export async function publishRequest(
   env: Env,
   userId: string,
   requestId: string,
-  input: Record<string, unknown>
+  input: Record<string, unknown>,
+  opts: { requireText?: boolean } = {}
 ): Promise<PublishOutcome> {
   const request = await ownedRequest({ env }, requestId, userId);
   const state = String(request.state);
   if (!['open', 'receiving_offers', 'draft'].includes(state)) {
     throw conflict('This request is no longer open', 'REQUEST_NOT_OPEN');
   }
+  // A DIRECT request is sent to its one store through their conversation
+  // (worker/routes/chatCommerce.ts `sendDirectDraft`), which writes the card in
+  // the same batch; opened here it would stand open with no store ever told
+  // (P1-06, row 268).
+  if (request.visibility === 'direct') {
+    throw conflict('This request is for one store — send it to the store in your conversation', 'REQUEST_IS_DIRECT');
+  }
   const firstPublish = state === 'draft';
+  // A draft may be born empty (the editor's entry door, row 268); the board
+  // never shows one without a title and a description.
+  if (firstPublish && opts.requireText) assertRequestText(request);
   if (!firstPublish && isPast(request.expires_at as string | null)) {
     throw conflict('This request has expired', 'REQUEST_EXPIRED');
   }
@@ -1624,7 +1665,7 @@ printRequestRoutes.post('/requests/:id/publish', requireCommunityOpen, requireAu
   const user = c.get('user')!;
   const requestId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const out = await publishRequest(c.env, user.id, requestId, body);
+  const out = await publishRequest(c.env, user.id, requestId, body, { requireText: true });
   return c.json({ success: true, request_id: requestId, published: true, ...out });
 });
 
@@ -1645,22 +1686,61 @@ printRequestRoutes.put('/requests/:id/draft', requireAuth, async (c) => {
   const user = c.get('user')!;
   const requestId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const request = await ownedRequest(c, requestId, user.id);
-  if (request.state !== 'draft') throw conflict('Only a draft can be saved this way', 'REQUEST_NOT_DRAFT');
+  return c.json({ success: true, draft: await saveDraft(c.env, user.id, requestId, body) });
+});
 
-  const stored = await c.env.DB.prepare('SELECT * FROM community_print_requests WHERE request_id = ?')
+/**
+ * THE DRAFT SAVE ITSELF — the PUT above, and the entry doors
+ * (worker/routes/requestEntries.ts), which seed a new draft through it.
+ *
+ * A DRAFT HOLDS WHATEVER THE CUSTOMER HAS TYPED SO FAR (P1-06, row 268): a
+ * title of 0 to 140 characters and a description of 0 to 6000. A customer
+ * who clears the description to rewrite it saves the empty one, so the old
+ * text never comes back on another device. The minimums are the publish
+ * door's and the send door's (REQUEST_TITLE_REQUIRED,
+ * REQUEST_DESCRIPTION_REQUIRED).
+ *
+ * A STALE WINDOW CANNOT OVERWRITE A NEWER DRAFT (critique 11): a body that
+ * names `expected_updated_at` is written only while the row still carries
+ * it. The comparison is INSIDE the update (`AND updated_at = ?`), so a save
+ * that lands between this read and the write leaves the update with nothing
+ * to touch, the guard statement after it aborts the whole batch, and the
+ * answer is 409 DRAFT_CHANGED with the draft as it now is. The read-time
+ * comparison before it only spares the work of planning a write already
+ * known to be stale; it decides nothing on its own. A body without the stamp
+ * (an older client, the page-leave flush) keeps the old behaviour: the last
+ * save wins.
+ */
+export async function saveDraft(
+  env: Env,
+  userId: string,
+  requestId: string,
+  body: Record<string, unknown>
+): Promise<DraftShape> {
+  const request = await ownedRequest({ env }, requestId, userId);
+  if (request.state !== 'draft') throw conflict('Only a draft can be saved this way', 'REQUEST_NOT_DRAFT');
+  const expected = body.expected_updated_at === undefined || body.expected_updated_at === null
+    ? undefined
+    : str(body.expected_updated_at, 'expected_updated_at', { min: 1, max: 40 });
+  const changedElsewhere = async () =>
+    new HttpError(409, 'This draft was changed in another window — load the latest', 'DRAFT_CHANGED', {
+      draft: await draftShape(env, requestId),
+    });
+  if (expected !== undefined && String(request.updated_at ?? '') !== expected) throw await changedElsewhere();
+
+  const stored = await env.DB.prepare('SELECT * FROM community_print_requests WHERE request_id = ?')
     .bind(requestId)
     .first<Record<string, unknown>>();
-  const mats = await materials(c.env);
+  const mats = await materials(env);
   // P1-04: a v3 body, or a version-3 draft, is saved through the model.
   const model = isModelBody(body) || Number(stored?.schema_version ?? 1) === 3
-    ? await planModelWrite(c.env, requestId, body, stored ?? null, request, mats, { strict: false, draft: true })
+    ? await planModelWrite(env, requestId, body, stored ?? null, request, mats, { strict: false, draft: true })
     : null;
   // A draft save always carries the wizard's state; an empty body is not "as stored".
-  const w = model?.w ?? (await readWizardInput(c.env, requestId, { process: body.process ?? 'unsure', ...body }, stored ?? null, request, mats, { strict: false }));
+  const w = model?.w ?? (await readWizardInput(env, requestId, { process: body.process ?? 'unsure', ...body }, stored ?? null, request, mats, { strict: false }));
 
-  const title = body.title === undefined ? undefined : str(body.title, 'title', { min: 4, max: 140 });
-  const description = body.description === undefined ? undefined : str(body.description, 'description', { min: 10, max: 6000 });
+  const title = body.title === undefined ? undefined : str(body.title, 'title', { min: 0, max: 140, required: false });
+  const description = body.description === undefined ? undefined : str(body.description, 'description', { min: 0, max: 6000, required: false });
   const sets: string[] = ['quantity = ?', 'material = ?', 'color = ?', 'expires_at = ?', 'updated_at = ?'];
   const ts = new Date().toISOString();
   const vals: Array<string | number | null> = [
@@ -1680,36 +1760,64 @@ printRequestRoutes.put('/requests/:id/draft', requireAuth, async (c) => {
   budgetVisibleSet(request, model ? model.budgetVisible : readBudgetVisible(body), sets, vals);
 
   try {
-    await c.env.DB.batch([
-      c.env.DB.prepare(
-        `UPDATE community_requests SET ${sets.join(', ')} WHERE id = ? AND customer_id = ? AND state = 'draft'`
-      ).bind(...vals, requestId, user.id),
-      // A publish that landed first leaves this save with nothing to write.
-      c.env.DB.prepare(
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE community_requests SET ${sets.join(', ')}
+          WHERE id = ? AND customer_id = ? AND state = 'draft'${expected !== undefined ? ' AND updated_at = ?' : ''}`
+      ).bind(...vals, requestId, userId, ...(expected !== undefined ? [expected] : [])),
+      // A publish — or, with `expected_updated_at`, another window's save —
+      // that landed first leaves this save with nothing to write.
+      env.DB.prepare(
         `UPDATE community_requests SET updated_at = CASE WHEN state = 'draft' AND updated_at = ?2 THEN updated_at ELSE NULL END
           WHERE id = ?1`
       ).bind(requestId, ts),
-      ...(model ? reviewFenceStatement(c.env.DB, model.before) : []),
-      printRowStatement(c.env.DB, requestId, w, null, 0, ts),
+      ...(model ? reviewFenceStatement(env.DB, model.before) : []),
+      printRowStatement(env.DB, requestId, w, null, 0, ts),
       ...(model
-        ? modelWriteStatements(c.env.DB, [{ request_id: requestId, model: model.next, schema_version: 3 }], ts)
-        : v1CacheResetStatements(c.env.DB, requestId, stored ?? null)),
+        ? modelWriteStatements(env.DB, [{ request_id: requestId, model: model.next, schema_version: 3 }], ts)
+        : v1CacheResetStatements(env.DB, requestId, stored ?? null)),
     ]);
   } catch (e) {
     if (model && isMissingSchema(e)) throw modelUnavailable();
     if (!isRequestGuardAbort(e)) throw e;
+    const now = await env.DB.prepare('SELECT state FROM community_requests WHERE id = ?').bind(requestId).first<{ state: string }>();
+    if (expected !== undefined && now?.state === 'draft') throw await changedElsewhere();
     throw conflict('This request is no longer a draft — reload it', 'REQUEST_NOT_DRAFT');
   }
-  return c.json({ success: true, draft: await draftShape(c.env, requestId) });
-});
+  return draftShape(env, requestId);
+}
 
 /**
  * EVERYTHING THE WIZARD NEEDS TO PICK UP WHERE THE CUSTOMER LEFT OFF — a
  * draft to finish, or a published request to edit. Owner only (a stranger's
  * id is a 404, never a refusal that confirms it exists). `live_offers` lets
  * the wizard warn that a material change will supersede standing offers.
+ *
+ * P1-06 (row 268): `updated_at` is what the editor sends back as
+ * `expected_updated_at`, and `direct` names the one store a DIRECT request is
+ * addressed to (null for a board request), for the customer only.
  */
-async function draftShape(env: Env, requestId: string) {
+export type DraftShape = Awaited<ReturnType<typeof draftShape>>;
+
+/** The store a direct request is addressed to, as its customer reads it. Null on the board, and on a database behind 0151. */
+async function directOf(env: Env, r: Record<string, unknown> | null): Promise<{ merchant_id: string; store_name: string; store_slug: string; chat_id: string | null } | null> {
+  if (!r || r.visibility !== 'direct' || !r.target_merchant_id) return null;
+  const store = await env.DB.prepare(
+    `SELECT m.name AS merchant_name, s.name AS store_name, s.slug AS store_slug
+       FROM community_merchants m LEFT JOIN merchant_stores s ON s.merchant_id = m.id
+      WHERE m.id = ?`
+  )
+    .bind(String(r.target_merchant_id))
+    .first<{ merchant_name: string | null; store_name: string | null; store_slug: string | null }>();
+  return {
+    merchant_id: String(r.target_merchant_id),
+    store_name: String(store?.store_name || store?.merchant_name || ''),
+    store_slug: String(store?.store_slug ?? ''),
+    chat_id: r.origin_chat_id ? String(r.origin_chat_id) : null,
+  };
+}
+
+export async function draftShape(env: Env, requestId: string) {
   const r = await env.DB.prepare('SELECT * FROM community_requests WHERE id = ?').bind(requestId).first<Record<string, unknown>>();
   const p = await env.DB.prepare('SELECT * FROM community_print_requests WHERE request_id = ?')
     .bind(requestId)
@@ -1728,10 +1836,13 @@ async function draftShape(env: Env, requestId: string) {
   // The model (P1-04): every source and part, in order, for the customer —
   // synthesised from the v1 row while the request is version 1.
   const model = await readRequestModel(env.DB, requestId);
+  const direct = await directOf(env, r);
   return {
     id: String(r?.id ?? requestId),
     state: String(r?.state ?? ''),
     revision: Number(r?.revision ?? 1),
+    updated_at: String(r?.updated_at ?? ''),
+    direct,
     title: String(r?.title ?? ''),
     description: String(r?.description ?? ''),
     customer_notes: String(r?.customer_notes ?? ''),
@@ -2449,7 +2560,11 @@ printRequestRoutes.post('/requests/:id/repeat', requireCommunityOpen, requireAut
       src.budget_iqd ?? null, null, String(src.governorate ?? ''),
       // A repeat of a DIRECT request (0151) is a board draft: it names no store,
       // and the customer publishes it — or sends it to a store — themselves.
-      String(src.delivery_pref ?? ''), String(src.notes ?? ''), src.visibility === 'direct' ? 'public' : String(src.visibility ?? 'public'),
+      // The editor's entry mark (P1-06) stays with the request it was made
+      // for: the copy is not an idle draft of that project, product or store.
+      String(src.delivery_pref ?? ''),
+      String(src.notes ?? '').startsWith(ENTRY_NOTE_PREFIX) ? '' : String(src.notes ?? ''),
+      src.visibility === 'direct' ? 'public' : String(src.visibility ?? 'public'),
       now, now, expires, String(src.customer_notes ?? '')
     )
     .run();
