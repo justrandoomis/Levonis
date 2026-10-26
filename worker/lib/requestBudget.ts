@@ -12,11 +12,16 @@
  * DIRECT request was sent to. Being a merchant account is not enough, and
  * neither is having once offered on it (critique 2 of the P1-06 server list):
  * every door asks the one authority that already knows — the workshop board
- * and «طلبات تناسبك» (`eligible = 1` on this revision), the match
- * notification (sent to the eligible only), and the file policy's reader
- * (`fileReader`: `eligible`, which a sent direct request's store also is, and
- * `engaged`). Nobody else, ever: the public board, the community list,
- * search, a guest, a member, the public API.
+ * and «طلبات تناسبك» (`eligible = 1` on this revision), and the file policy's
+ * reader (`fileReader`: `eligible`, which a sent direct request's store also
+ * is, and `engaged`). Nobody else, ever: the public board, the community
+ * list, search, a guest, a member, the public API.
+ *
+ * NO NOTIFICATION CARRIES IT, whatever the switch says: a stored notification
+ * is composed once and never rewritten, so a budget in it would outlive a
+ * switch turned off later (worker/routes/printRequests.ts `PrintMatchFacts`).
+ * And a chat card shows it only to a reader its thread names (fail closed,
+ * worker/lib/chatCards.ts `cardBudgetReader`).
  *
  * A REQUEST THE CHAT SHEET MADE FOR ONE STORE (critique 3) is the one place
  * the switch is not the whole answer: a budget typed in that short in-chat

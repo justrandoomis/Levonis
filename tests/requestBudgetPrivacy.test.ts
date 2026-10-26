@@ -11,24 +11,31 @@
  * order (whose stored snapshot keeps it).
  *
  * With «اعرض ميزانيتي للتجار» ON: the merchants the request is meant for read
- * it — the eligible workshop on its boards, its notification, the request
- * page and the revisions, the accepted merchant on the order — and still
- * never the public board, a guest, a member or a merchant the job is not for
- * (critique 2: the contract's `merchants`, not every merchant account).
+ * it — the eligible workshop on its boards, the request page and the
+ * revisions, the accepted merchant on the order — and still never the public
+ * board, a guest, a member or a merchant the job is not for (critique 2: the
+ * contract's `merchants`, not every merchant account).
  * A merchant reads it on the CURRENT revision only: a figure an earlier
  * revision stored while the switch was off stays hidden once it goes on
  * (review B0-R2-PRIV-1).
+ *
+ * THE MATCH NOTIFICATION NEVER CARRIES IT, switch on or off: it is stored
+ * once at publish and never rewritten, so a budget in it would outlive a
+ * switch turned off later (B0 polish).
  *
  * A DIRECT request (one store, from its chat): the budget typed into the
  * sheet is shown to that store (critique 3), not before the send (a draft is
  * its customer's alone), including a row written before the sheet stored the
  * switch (it stores it off; no row is rewritten). A chat card loses it at the
  * reader when the request stops showing it (critique 6) while the stored card
- * keeps it. A REPEAT of a direct request is a board draft with the switch
- * off: the budget typed for one store never reaches the board's workshops.
+ * keeps it, and FAILS CLOSED: a thread that cannot be resolved shows it to
+ * nobody but an explicit staff read (B0 polish, probe C). A REPEAT of a
+ * direct request is a board draft with the switch off: the budget typed for
+ * one store never reaches the board's workshops.
  *
- * THE CLIENT: the wizard hint is in three languages with a Sorani of its own
- * (plan R5, row 183), and no public card renders a budget.
+ * THE CLIENT: the wizard hint and the chat card budget label are in three
+ * languages with a Sorani of their own (plan R5, row 183), and no public card
+ * renders a budget.
  *
  * A database without the column (before 0208) reads it hidden.
  *
@@ -51,7 +58,9 @@ import { chatRoutes } from '../worker/routes/chats';
 import { chatCommerceRoutes } from '../worker/routes/chatCommerce';
 import { publicApiRoutes } from '../worker/routes/publicApi';
 import { budgetFor, budgetReaderOf, stripSnapshotBudget, stripSpecBudget } from '../worker/lib/requestBudget';
-import { cardPublic } from '../worker/lib/chatCards';
+import { cardBudgetReader, cardPublic } from '../worker/lib/chatCards';
+import type { StoreThread } from '../worker/lib/chatThread';
+import { printMatchNotification, type PrintMatchFacts } from '../worker/routes/printRequests';
 
 const mount: Mount = (a) => {
   a.route('/api/marketplace/print', printRequestRoutes);
@@ -179,13 +188,14 @@ test('switch on: the merchants the request is meant for read it — never the bo
   assert.equal(await pageBudget(raw, MEMBER, id), null, 'request page (a member)');
   assert.equal(await pageBudget(raw, INELIGIBLE, id), null, 'request page (a resin workshop the PLA job is not for)');
   assert.equal(await pageBudget(raw, ELIGIBLE, id), 25000, 'request page (the eligible workshop)');
-  // The eligible workshop's own boards and its notification.
+  // The eligible workshop's own boards; its notification never names it (stored once, it could not follow the switch).
   assert.equal(budgetOn((await read(raw, ELIGIBLE, '/api/merchant/workshop/board')).requests, id), 25000, 'workshop board');
   assert.equal(budgetOn((await read(raw, ELIGIBLE, '/api/community/requests?for=me')).requests, id), 25000, '«طلبات تناسبك»');
   assert.equal(budgetOn((await read(raw, INELIGIBLE, '/api/merchant/workshop/board')).requests, id), 'absent', 'not on the resin board');
   assert.equal(budgetOn((await read(raw, INELIGIBLE, '/api/community/requests?for=me')).requests, id), 'absent', 'not for the resin workshop');
   const note = told(raw, id);
-  assert.ok(note && NAMES_25000.test(note), 'the notification names it');
+  assert.ok(note, 'the eligible workshop was told');
+  assert.ok(!NAMES_25000.test(note!) && !SAYS_BUDGET.test(note!), 'the notification says no budget, in any language, even with the switch on');
   assert.equal(
     row<{ n: number }>(raw, `SELECT COUNT(*) AS n FROM user_notifications WHERE user_id = 'owner2' AND entity_id = ?`, id)!.n,
     0,
@@ -197,6 +207,41 @@ test('switch on: the merchants the request is meant for read it — never the bo
   assert.ok((await revisionBudgets(raw, MEMBER, id)).every((b) => b === null), 'a member');
   assert.ok((await revisionBudgets(raw, INELIGIBLE, id)).every((b) => b === null), 'a workshop it is not for');
   assert.ok((await revisionBudgets(raw, GUEST, id)).every((b) => b === null), 'a guest');
+});
+
+/** Every stored notification about one request, every language of it (ckb rides in `meta`). */
+const everyNotice = (raw: DatabaseSync, id: string) =>
+  (raw.prepare('SELECT title_ar, title_en, body_ar, body_en, meta FROM user_notifications WHERE entity_id = ?').all(id) as Array<Record<string, unknown>>)
+    .map((n) => [n.title_ar, n.title_en, n.body_ar, n.body_en, n.meta].join('\n'));
+
+test('the stored match notification never carries the budget: not with the switch on, so nothing outlives it once the customer turns it off (B0 polish)', async () => {
+  const raw = world();
+  const id = await job(raw, true);
+  const before = everyNotice(raw, id);
+  assert.ok(before.length > 0, 'the eligible workshop was told');
+  for (const n of before) assert.ok(!NAMES_25000.test(n) && !SAYS_BUDGET.test(n), `no budget in a stored notification, switch on: ${n}`);
+  // The customer turns the switch off. The eligible workshop loses it on every read…
+  const off = await post(app(raw, BUYER), `/api/marketplace/print/requests/${id}/publish`, { ...PLA, budget_iqd: 25000, budget_visible: false });
+  assert.equal(off.status, 200, JSON.stringify(await json(off.clone())));
+  assert.equal(row<{ v: number }>(raw, 'SELECT budget_visible AS v FROM community_requests WHERE id = ?', id)!.v, 0);
+  assert.equal(await pageBudget(raw, ELIGIBLE, id), null, 'request page, switch off');
+  assert.equal(budgetOn((await read(raw, ELIGIBLE, '/api/merchant/workshop/board')).requests, id), null, 'workshop board, switch off');
+  // …and the notification stored while it was on has nothing to take back.
+  const after = everyNotice(raw, id);
+  assert.ok(after.length >= before.length);
+  for (const n of after) assert.ok(!NAMES_25000.test(n) && !SAYS_BUDGET.test(n), `no budget in a stored notification, switch off: ${n}`);
+});
+
+test('the match notification composer has no budget to say: a caller that hands it one gets none back', () => {
+  const facts = {
+    title: 'A phone stand', process: 'fdm', quality: 'standard', quantity: 2,
+    material: { name_ar: 'بولي لاكتيك', name_en: 'PLA' }, material_id: 'pla', color_hex: '', dimensions: '',
+    governorate: 'baghdad', deadline: '', budget_iqd: 25000,
+  } as unknown as PrintMatchFacts;
+  const { title, body } = printMatchNotification(facts);
+  const all = [title.ar, title.en, title.ckb, body.ar, body.en, body.ckb].join('\n');
+  assert.ok(!NAMES_25000.test(all) && !SAYS_BUDGET.test(all), all);
+  assert.ok(body.en.includes('PLA') && body.ckb.includes('بەغدا'), 'the rest of the job is still said');
 });
 
 test('a budget typed while hidden stays hidden on its revision once the switch goes on: a merchant reads the current revision only (B0-R2-PRIV-1)', async () => {
@@ -368,6 +413,37 @@ test('the chat card: the stored card keeps the budget; the store loses it at the
   assert.equal(await cardBudget(raw, ELIGIBLE, chatId), 30000, 'the store, switch on');
 });
 
+test('the chat card fails closed: a thread that cannot be resolved shows the budget to nobody, switch off or on (B0 polish, probe C)', async () => {
+  const raw = world();
+  const { chatId, id } = await directDraft(raw);
+  assert.equal((await post(app(raw, BUYER), `/api/chats/${chatId}/print-requests/${id}/send`, {})).status, 201);
+  // As above: a direct request the chat-sheet rule does not cover, switch off.
+  raw.exec(`UPDATE community_requests SET budget_visible = 0, origin_chat_id = NULL WHERE id = '${id}'`);
+  assert.equal(await cardBudget(raw, ELIGIBLE, chatId), null, 'resolved thread, switch off: the store reads none');
+  assert.equal(await cardBudget(raw, BUYER, chatId), 30000, 'resolved thread: its customer reads it');
+  // The thread stops resolving: its store row is gone (`storeThreadOf` also answers null on a failed lookup).
+  raw.exec(`PRAGMA foreign_keys = OFF; UPDATE chats SET store_id = 'gone' WHERE id = '${chatId}'; PRAGMA foreign_keys = ON;`);
+  assert.equal(await cardBudget(raw, ELIGIBLE, chatId), null, 'unresolved thread, switch off: the store reads none (it used to fall back to staff and read it)');
+  assert.equal(await cardBudget(raw, BUYER, chatId), null, 'unresolved thread: no side is named, so no budget on the card');
+  raw.exec(`UPDATE community_requests SET budget_visible = 1 WHERE id = '${id}'`);
+  assert.equal(await cardBudget(raw, ELIGIBLE, chatId), null, 'unresolved thread, switch on: still none');
+  // Nothing is lost: the stored card keeps it, and its customer reads it on the request itself.
+  const stored = row<{ card_snapshot: string }>(raw, `SELECT card_snapshot FROM chat_messages WHERE chat_id = ? AND card_type = 'print_request'`, chatId)!;
+  assert.equal(JSON.parse(stored.card_snapshot).budget_iqd, 30000);
+  assert.equal(await pageBudget(raw, BUYER, id), 30000);
+});
+
+test('cardBudgetReader: an explicit staff read and a resolved customer always, a resolved store by the switch, anyone else never', () => {
+  const thread: StoreThread = { store_id: 's1', merchant_id: 'm1', context_type: 'store', context_id: 'buyer', customer_id: 'buyer', seller_id: 'owner' };
+  assert.equal(cardBudgetReader(thread, 'buyer', false), 'always', 'the customer of a resolved thread');
+  assert.equal(cardBudgetReader(thread, 'owner', false), 'switch', 'the store of a resolved thread');
+  assert.equal(cardBudgetReader(thread, 'stranger', false), 'never', 'neither side of it');
+  assert.equal(cardBudgetReader(thread, 'admin1', true), 'always', 'an explicit staff read');
+  assert.equal(cardBudgetReader(null, 'buyer', false), 'never', 'no thread: not even a would-be customer');
+  assert.equal(cardBudgetReader(null, 'owner', false), 'never', 'no thread: never the store');
+  assert.equal(cardBudgetReader(null, 'admin1', true), 'always', 'an explicit staff read needs no thread');
+});
+
 // ------------------------------------------------------------------ a repeat
 
 /** «إعادة الطلب»: the repeat of a request, as a draft; its id. */
@@ -448,6 +524,15 @@ test('the wizard budget hint is in three languages, and its Sorani is its own (p
   }
   // The promise the old hint made is gone in every language.
   assert.doesNotMatch(wizard, /يراها التجار\. اتركها|Merchants see it\. Leave it|بازرگانەکان دەیبینن\./, 'the old «merchants see it» hint is back');
+});
+
+test('the chat print request card labels the budget in three languages, and its Sorani is its own (plan R5, row 183)', () => {
+  const cards = source('src/components/chat/cards/DealCards.tsx');
+  const label = [...cards.matchAll(THREE_ARG_LOC)].find((m) => m[2] === 'الميزانية' && m[4] === 'Budget');
+  assert.ok(label, 'DealCards.tsx labels the budget with loc(ar, en, ckb)');
+  assert.notEqual(label![6], label![2], 'the Sorani is not the Arabic copied');
+  assert.match(label![6], SORANI_LETTER, 'the Sorani is Sorani');
+  assert.doesNotMatch(cards, /loc\('الميزانية', 'Budget'\)/, 'a two-language budget label is back (Sorani readers would read Arabic)');
 });
 
 test('no public request card renders a budget: the hub card and the board card of /requests', () => {

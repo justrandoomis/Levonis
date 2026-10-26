@@ -664,11 +664,34 @@ async function storeCurrents(
 
 const OPEN_REQUEST = new Set(['open', 'receiving_offers']);
 
+/**
+ * WHO READS A PRINT REQUEST CARD BUDGET ON THIS PAGE (Q2, docs/DECISIONS.md
+ * row 268), decided once per read and FAILING CLOSED:
+ *
+ *   always  an explicit staff read, and the customer of a resolved thread
+ *   switch  the store of a resolved thread, while the request shows it
+ *           (`budgetSwitchOf`)
+ *   never   everyone else: a thread that could not be resolved (no store row,
+ *           a lookup that failed), or a reader who is neither of its sides
+ *
+ * The role a reader falls back to for the card ACTIONS (`staff`: none) is
+ * not a reason to show a budget.
+ */
+export type CardBudgetReader = 'always' | 'switch' | 'never';
+
+export function cardBudgetReader(thread: StoreThread | null, viewerId: string, staff: boolean): CardBudgetReader {
+  if (staff) return 'always';
+  if (!thread) return 'never';
+  const role = threadRole(thread, viewerId);
+  return role === 'customer' ? 'always' : role === 'merchant' ? 'switch' : 'never';
+}
+
 async function printRequestCurrents(
   env: Env,
   rows: CardRow[],
   thread: StoreThread | null,
-  viewer: CardViewer
+  viewer: CardViewer,
+  budgetReader: CardBudgetReader
 ): Promise<Map<string, CardCurrent>> {
   const out = new Map<string, CardCurrent>();
   const ids = [...new Set(rows.map((r) => r.card_ref))];
@@ -712,9 +735,10 @@ async function printRequestCurrents(
       // card was sent with; the store only while the request shows it NOW —
       // the switch, or a request the chat sheet made for this store
       // (critique 3, `budgetSwitchOf`, including rows written before the
-      // sheet stored the switch). Decided here, at the reader, and read by
-      // `cardPublic`.
-      [SHOW_BUDGET]: viewer !== 'merchant' || budgetSwitchOf(r) === 1,
+      // sheet stored the switch); anyone else, or any reader of a thread
+      // that could not be resolved, never (`cardBudgetReader`). Decided
+      // here, at the reader, and read by `cardPublic`.
+      [SHOW_BUDGET]: budgetReader === 'always' || (budgetReader === 'switch' && budgetSwitchOf(r) === 1),
     });
   }
   return out;
@@ -922,6 +946,9 @@ export async function currentCardStates(
   const out = new Map<string, CardCurrent>();
   if (!byType.size) return out;
   const viewer: CardViewer = staff ? 'staff' : thread ? (threadRole(thread, viewerId) ?? 'staff') : 'staff';
+  // Not `viewer`: its `staff` is also the fallback of a reader no thread names,
+  // and that reader must never get a budget (fail closed, Q2 row 268).
+  const budgetReader = cardBudgetReader(thread, viewerId, staff);
   const loaders: Array<Promise<void>> = [];
   for (const [type, rows] of byType) {
     const load = async (): Promise<Map<string, CardCurrent>> => {
@@ -931,7 +958,7 @@ export async function currentCardStates(
         case 'store':
           return storeCurrents(env, rows, storeOpen);
         case 'print_request':
-          return printRequestCurrents(env, rows, thread, viewer);
+          return printRequestCurrents(env, rows, thread, viewer, budgetReader);
         case 'quote':
           return quoteCurrents(env, rows, thread, viewer);
         case 'custom_order':

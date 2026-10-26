@@ -116,7 +116,7 @@ import {
 } from '../lib/requestEstimate';
 import { REQUEST_MODEL_LIMITS } from '@levonis/contracts/requestModel';
 import { isMissingSchema } from '../lib/merchantApproval';
-import { budgetFor, budgetReaderOf, budgetSwitchOf, budgetVisibleOf, stripSpecBudget } from '../lib/requestBudget';
+import { budgetReaderOf, budgetSwitchOf, budgetVisibleOf, stripSpecBudget } from '../lib/requestBudget';
 import { orderCoverageFacts } from '../lib/chatCards';
 
 /**
@@ -670,14 +670,6 @@ const PROCESS_LABEL: Record<PrintProcess, Trilingual> = {
   resin: { ar: 'راتنج', en: 'Resin', ckb: 'ڕەزین' },
 };
 
-/** Western digits with thousands separators and the local currency word —
- *  how worker/lib/orderNotify.ts, receipts.ts and routes/support.ts already
- *  write money, so a merchant sees one format wherever a number reaches them. */
-function iqdText(n: number): Trilingual {
-  const num = Math.trunc(n).toLocaleString('en-US');
-  return { ar: `${num} د.ع`, en: `${num} IQD`, ckb: `${num} دینار` };
-}
-
 /**
  * A value that is about to be written into an `_en` slot, or the fallback.
  *
@@ -727,7 +719,11 @@ export interface PrintMatchFacts {
   governorate: string;
   /** ISO date or ''. */
   deadline: string;
-  budget_iqd: number | null;
+  // NO BUDGET, by construction (Q2, docs/DECISIONS.md row 268): the stored
+  // notification is composed once, at publish, and never rewritten, so a
+  // budget written into it would outlive the switch the customer turns off
+  // later. A merchant the request is meant for reads it on the request
+  // itself, where every read asks the switch as it is now.
   /**
    * A JOB OF PARTS (P1-05, D10): the request's quantity is then the number of
    * SETS, so «العدد» would be the wrong number. Given, the body names the
@@ -762,7 +758,7 @@ export interface PrintMatchFacts {
  * API is forbidden. There is no honest way to render that sentence in English,
  * so this does not try. It composes the body from the request's STRUCTURED
  * fields instead — material, process, quality, quantity, size, colour,
- * governorate, deadline, budget. Every one of them is enum-like or numeric,
+ * governorate, deadline. Every one of them is enum-like or numeric,
  * which is exactly why every one of them CAN be said in three languages
  * truthfully. They are also the facts a merchant opens a request to check.
  *
@@ -822,7 +818,7 @@ export function printMatchNotification(f: PrintMatchFacts): { title: Trilingual;
       // obvious interpolation is wrong for exactly the range a one-off print job
       // lands in. The merchant needs the number, not the grammar, so the label
       // goes in front and the agreement question disappears. This also matches
-      // the «التسليم …» / «الميزانية …» shape of the parts beside it.
+      // the «موعد التسليم …» shape of the part beside it.
       push({ ar: `العدد ${f.quantity}`, en: `${f.quantity} pcs`, ckb: `${f.quantity} دانە` });
     }
   }
@@ -849,10 +845,7 @@ export function printMatchNotification(f: PrintMatchFacts): { title: Trilingual;
     const day = f.deadline.slice(0, 10);
     push({ ar: `موعد التسليم ${day}`, en: `due ${day}`, ckb: `گەیاندن ${day}` });
   }
-  if (f.budget_iqd !== null && f.budget_iqd > 0) {
-    const m = iqdText(f.budget_iqd);
-    push({ ar: `الميزانية ${m.ar}`, en: `budget ${m.en}`, ckb: `بودجە ${m.ckb}` });
-  }
+  // Never the budget (Q2, row 268): see `PrintMatchFacts`.
 
   const body: Trilingual = {
     ar: parts.map((p) => p.ar).join(' · '),
@@ -1436,7 +1429,7 @@ export async function publishRequest(
    * THE REQUEST ROW CATCHES UP WITH THE WIZARD.
    *
    * The public board card (`publicRequest()` reads `material`, `color`,
-   * `dimensions`, `budget_iqd`, `governorate` from the row) and the matcher's
+   * `dimensions`, `governorate` from the row; never the budget, Q2) and the matcher's
    * `governorate` and `delivery_pref` — which decide which merchants are
    * eligible at all — live on the request row, so the publish writes them there
    * in the same commit that makes it public. Only fields the caller actually
@@ -1532,21 +1525,17 @@ export async function publishRequest(
 
   // Re-read, so the matcher sees what was just written.
   //
-  // `deadline` and `budget_iqd` join the re-read because the merchant's
-  // notification is composed from the ROW, not from this call's payload. A
-  // republish that does not resend them must still tell merchants the deadline
-  // and budget the customer set the first time round.
-  //
-  // The whole row: `budget_visible` (0208) is read where it exists, and a
-  // database without it reads the budget as hidden (Q2, row 268).
-  const forMatching = await env.DB.prepare('SELECT * FROM community_requests WHERE id = ?')
+  // `deadline` joins the re-read because the merchant's notification is
+  // composed from the ROW, not from this call's payload. A republish that does
+  // not resend it must still tell merchants the deadline the customer set the
+  // first time round. Never the budget: the notification carries none (Q2,
+  // row 268, `PrintMatchFacts`).
+  const forMatching = await env.DB.prepare('SELECT governorate, delivery_pref, deadline, revision FROM community_requests WHERE id = ?')
     .bind(requestId)
     .first<{
       governorate: string;
       delivery_pref: string;
       deadline: string | null;
-      budget_iqd: number | null;
-      budget_visible?: number | null;
       revision: number;
     }>();
   const revision = Number(forMatching?.revision ?? readRevision);
@@ -1590,8 +1579,6 @@ export async function publishRequest(
     dimensions: dimsLabel,
     governorate: String(forMatching?.governorate ?? request.governorate ?? ''),
     deadline: String(forMatching?.deadline ?? ''),
-    // Told only to the eligible workshops, and only when the customer shows it to merchants (Q2).
-    budget_iqd: budgetFor(forMatching?.budget_iqd, forMatching?.budget_visible, 'merchant'),
     ...(byParts ? { parts: notificationParts(model!.next, mats) } : {}),
   });
   const matched = await matchRequest(env, requestId, {
