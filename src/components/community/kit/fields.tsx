@@ -206,7 +206,7 @@ export interface SelectButtonProps extends Omit<React.ComponentPropsWithRef<'but
   /** Shown muted while there is no value (defaults to «اختر»). */
   placeholder?: React.ReactNode;
   icon?: React.ReactNode;
-  /** A CSS colour: the 24px swatch before the chevron (a filament colour). */
+  /** A CSS colour: the 24px swatch at the inline start, before the value (a filament colour), ringed in the field line. */
   swatch?: string;
   expanded?: boolean;
 }
@@ -228,11 +228,11 @@ export function SelectButton({ label, value, placeholder, icon, swatch, expanded
           {icon}
         </span>
       )}
+      {swatch && <span aria-hidden="true" className="cm-swatch size-6 shrink-0 rounded-full" style={{ background: swatch }} />}
       <span className="min-w-0 flex-1 text-start">
         {label && <span className="block text-ui-xs text-text-muted">{label}</span>}
         <span className={`block truncate text-[15px] ${empty ? 'text-text-muted' : ''}`}>{empty ? (placeholder ?? s.choose) : value}</span>
       </span>
-      {swatch && <span aria-hidden="true" className="cm-line size-6 shrink-0 rounded-full" style={{ background: swatch }} />}
       <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-text-secondary" />
     </button>
   );

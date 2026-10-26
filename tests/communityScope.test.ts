@@ -23,7 +23,11 @@
  *  g. the kit review (round 1): the tile badge stays out of the content box,
  *     the segmented divider and weights, the stepper keys as drawn, the drop
  *     zone row, the photo tile overlays and its chosen cover, and the filter
- *     options as radio items.
+ *     options as radio items;
+ *  h. the kit review (round 2): the one-line tile badge inside the tile with
+ *     its seat kept clear, the tile icons in the primary ink, the swatch ringed
+ *     and at the inline start, the busy gold spinner in the ink, and no
+ *     apostrophe in an English comment of the scope sheet.
  *
  * Run: node --import tsx --test tests/communityScope.test.ts
  */
@@ -85,6 +89,9 @@ function color(value: string, ground?: Rgb): Rgb {
   return parseColor(v);
 }
 const ratio = (a: Rgb, b: Rgb) => contrast(a, b);
+
+/** An opaque colour at alpha `a` painted over a ground (sRGB compositing, as the browser does). */
+const over = (fg: Rgb, a: number, ground: Rgb): Rgb => fg.map((c, i) => c * a + ground[i] * (1 - a));
 
 /** `color-mix(in oklab, a p, b)` for two opaque colours, as the browser paints it. */
 function mixOklab(a: Rgb, b: Rgb, p: number): Rgb {
@@ -227,12 +234,16 @@ test('d. every scoped text and boundary pair meets WCAG AA in both themes (compu
       ['track', c('cm-track')],
       ['well', c('clay-well-bg')],
     ];
-    // Text: the three inks on every ground; the gold ink (links, the active tab) on every ground.
+    // The menu row highlight (ui/Menu: `focus:bg-white/[0.07]`, the hover follows the focus):
+    // 7% of --color-white over the raised menu. A hint («محدد») and a destructive row sit on it.
+    const highlight = over(c('color-white'), 0.07, c('color-surface-raised'));
+    // Text: the three inks on every ground and on the menu highlight; the gold ink (links, the active tab) too.
     for (const ink of ['color-text-primary', 'color-text-secondary', 'color-text-muted', 'color-gold']) {
-      for (const [g, rgb] of grounds) need(`${theme} --${ink} on ${g}`, ratio(c(ink), rgb), 4.5);
+      for (const [g, rgb] of [...grounds, ['menu highlight', highlight] as [string, Rgb]]) need(`${theme} --${ink} on ${g}`, ratio(c(ink), rgb), 4.5);
     }
-    // The danger ink sits on the page, a card or a raised control (the trash key), never on a selected fill.
-    for (const [g, rgb] of grounds.slice(0, 5)) need(`${theme} --color-danger on ${g}`, ratio(c('color-danger'), rgb), 4.5);
+    // The danger ink: the page, a card, a raised control (the trash key), a selected fill, and a
+    // destructive menu row under the highlight («حظر الناشر»).
+    for (const [g, rgb] of [...grounds, ['menu highlight', highlight] as [string, Rgb]]) need(`${theme} --color-danger on ${g}`, ratio(c('color-danger'), rgb), 4.5);
     need(`${theme} error ink on raised`, ratio(c('color-error-ink'), c('color-surface-raised')), 4.5);
     // D-2: the gold primary, ink on both stops of the gradient.
     for (const stop of ['cm-gold-1', 'cm-gold-2']) need(`${theme} gold label on --${stop}`, ratio(c('cm-gold-ink'), c(stop)), 4.5);
@@ -274,6 +285,8 @@ test('d. every scoped text and boundary pair meets WCAG AA in both themes (compu
     need(`${theme} switch knob on the sand`, ratio(c('cm-sel-ink'), c('cm-sel-bg')), 3);
   }
   assert.deepEqual(failures, [], `contrast under the floor:\n${failures.join('\n')}`);
+  // The menu highlight the grounds above model.
+  assert.match(read('src/components/ui/Menu.tsx'), /focus:bg-white\/\[0\.07\]/);
   // The chip recipe the mix above models.
   assert.match(indexCss, /\.lv-chip \{\s*background-color: color-mix\(in oklab, var\(--chip\) 12%, var\(--color-surface-raised\)\);/);
 });
@@ -344,14 +357,9 @@ test('g. the kit review: badge, segmented, stepper, drop zone, photo tile and fi
     return new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+);`).exec(body)?.[1].trim();
   };
 
-  // B1-F1. A one-line tile centres its icon and title across the tile, so its badge sits on the
-  // tile corner: the 20px disc, 8px out, ends where the 12px inline padding ends, so it can never
-  // cover the label or the icon (the content box), at any width or in any language.
-  assert.match(controls, /data-corner=\{it\.subtitle \? undefined : true\} className="cm-check absolute size-5 /);
+  // B1-F1, as round 2 moved it: the badge sits INSIDE the tile (test h).
+  assert.match(controls, /className="cm-check absolute size-5 /);
   assert.match(controls, /className=\{`cm-raised cm-sel relative flex min-h-14 w-full items-center rounded-md px-3 py-2 /);
-  const corner = px(decl('.cm-check[data-corner]', 'inset-inline-start') ?? 'NaN');
-  assert.equal(px(decl('.cm-check[data-corner]', 'inset-block-start') ?? 'NaN'), corner);
-  assert.ok(corner < 0 && corner + 20 <= 12, `the corner badge reaches ${corner + 20}px into a tile whose content starts at 12px`);
   // A two-line tile keeps it over the corner of its 40px icon well (IMG_8474).
   assert.equal(decl('.cm-check', 'inset-inline-start'), '6px');
 
@@ -389,4 +397,101 @@ test('g. the kit review: badge, segmented, stepper, drop zone, photo tile and fi
   const menu = read('src/components/ui/Menu.tsx');
   assert.match(menu, /\.\.\.\(entry\.checked === undefined \? null : \{ role: 'menuitemradio', 'aria-checked': entry\.checked \}\)/);
   assert.match(controls, /checked: o\.id === value,\s*hint: o\.id === value \? s\.selected : undefined,/);
+});
+
+// ----------------------------------------------------------------------- h
+test('h. the kit review, round 2: badge seat, tile icon ink, swatch, busy spinner, comments', () => {
+  const controls = read('src/components/community/kit/controls.tsx');
+  const fields = read('src/components/community/kit/fields.tsx');
+  const raw = read(SHEET);
+  const px = (v: string) => parseFloat(v) * (v.endsWith('rem') ? 16 : 1);
+  const body = (source: string, selector: string) => {
+    const at = source.indexOf(`${selector} {`);
+    assert.ok(at >= 0, `${SHEET}: no rule \`${selector}\``);
+    return source.slice(source.indexOf('{', at) + 1, source.indexOf('}', at));
+  };
+  const decl = (selector: string, prop: string, source = css) =>
+    new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+);`).exec(body(source, selector))?.[1].trim();
+
+  // B1R2-FID-1. The badge is INSIDE the inline-start top corner of every tile (IMG_8482), 6px in
+  // (inset from the padding edge, so never above or beside the tile), the same as a subtitle tile.
+  assert.doesNotMatch(controls, /data-corner/);
+  assert.doesNotMatch(css, /\.cm-check\[data-corner\]/, 'the badge is seated outside the tile again');
+  const inset = px(decl('.cm-check', 'inset-inline-start') ?? 'NaN');
+  assert.equal(px(decl('.cm-check', 'inset-block-start') ?? 'NaN'), inset);
+  assert.ok(inset >= 0 && inset <= 8, `the badge sits ${inset}px from the tile corner`);
+  const disc = 20; // size-5
+  assert.match(controls, /className="cm-check absolute size-5 items-center justify-center rounded-full"/);
+  const seat = inset + disc;
+  // A one-line tile: the tile pads 12px (px-3) and 8px (py-2); its body pads the rest of the seat on
+  // BOTH inline sides, so every centred line ends before the disc and the label stays centred.
+  assert.match(controls, /rounded-md px-3 py-2 [^`]*\$\{it\.subtitle \? 'gap-3 text-start' : 'cm-tile-one'\}/);
+  assert.match(controls, /<span className="cm-tile-body flex min-w-0 flex-1 flex-wrap items-center justify-center [^"]*text-center">/);
+  const tilePadInline = 12;
+  const tilePadBlock = 8;
+  const wide = px(decl('.cm-tile-body', 'padding-inline') ?? 'NaN');
+  assert.ok(tilePadInline + wide >= seat, `a one-line label may start ${tilePadInline + wide}px in, under the ${seat}px badge seat`);
+  // The body wraps (icon above the title, the title over two lines) instead of running under the disc.
+  assert.equal(decl('.cm-tile-body', 'align-content'), 'center');
+  // A narrow tile measures itself: under the threshold the body takes the whole width and starts
+  // under the seat instead, so the words keep room and the first line still clears the disc.
+  assert.equal(decl('.cm-tile-one', 'container-type'), 'inline-size');
+  const narrow = /@container \(width < (\d+)px\) \{\s*\.cm-tile-body \{([^}]*)\}/.exec(css);
+  assert.ok(narrow, 'no narrow-tile rule');
+  const threshold = Number(narrow![1]);
+  const narrowDecl = (prop: string) => new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+);`).exec(narrow![2])?.[1].trim();
+  assert.equal(px(narrowDecl('padding-inline') ?? 'NaN'), 0);
+  assert.ok(tilePadBlock + px(narrowDecl('padding-block-start') ?? 'NaN') >= seat, 'a narrow tile starts its first line beside the disc');
+  // Above the threshold the seat leaves the words at least 44px (a 15/700 word such as «متأكدًا»);
+  // a 375px phone (tiles of 100px, a 74px content box) keeps the centred label.
+  assert.ok(threshold - 2 * wide >= 44, `a wide tile leaves its words ${threshold - 2 * wide}px`);
+  assert.ok(threshold <= 74, 'a 375px phone loses the centred label');
+
+  // B1R2-FID-2. The glyph in a tile icon well is the primary ink (IMG_8474, IMG_8477); gold line
+  // icons are the menu ListRow (IMG_8478). A chosen well takes the ink of the sand.
+  assert.equal(decl('.cm-tile-icon', 'color'), 'var(--color-text-primary)');
+  assert.match(css, /\[aria-checked='true'\] \.cm-sub,\s*\[aria-checked='true'\] > \.cm-tile-icon \{\s*color: inherit;/);
+  assert.match(read('src/components/community/kit/display.tsx'), /text-gold/, 'the ListRow lost its gold icon');
+
+  // B1R2-FID-3. The swatch: ringed in the field line (a black filament keeps an edge on the raised
+  // row), and at the inline start, before the value (IMG_8482).
+  assert.equal(decl('.cm-swatch', 'border'), '1.5px solid var(--clay-field)');
+  assert.match(fields, /\{swatch && <span aria-hidden="true" className="cm-swatch size-6 shrink-0 rounded-full" style=\{\{ background: swatch \}\} \/>\}\s*<span className="min-w-0 flex-1 text-start">/);
+  assert.doesNotMatch(fields, /cm-line size-6/);
+  for (const theme of ['dark', 'light'] as const) {
+    const v = V(theme);
+    const ring = color(v['clay-field']);
+    const row = color(v['color-surface-raised']);
+    assert.ok(ratio(ring, row) >= 3, `${theme}: the swatch ring is ${ratio(ring, row).toFixed(2)}:1 on the row`);
+    assert.ok(ratio(ring, color('#111111')) >= 3, `${theme}: the ring does not part a black filament from its edge`);
+  }
+
+  // B1R2-FID-4. The busy gold button: the spinner is drawn in the ink, its track a quarter of it.
+  // The rule is UNLAYERED (outside @layer components), so it beats the spinner utilities.
+  const spin = "[data-surface='community'] .cm-btn-gold .lv-spin";
+  assert.equal(decl(spin, 'border-top-color'), 'var(--cm-gold-ink)');
+  assert.equal(decl(spin, 'border-color'), 'color-mix(in oklab, var(--cm-gold-ink) 25%, transparent)');
+  const layerAt = css.indexOf('@layer components {');
+  let depth = 0;
+  let layerEnd = -1;
+  for (let i = css.indexOf('{', layerAt); i < css.length && layerEnd < 0; i++) {
+    if (css[i] === '{') depth++;
+    else if (css[i] === '}' && --depth === 0) layerEnd = i;
+  }
+  assert.ok(css.indexOf(`${spin} {`) > layerEnd && layerEnd > layerAt, 'the spinner rule sits inside the components layer, under the utilities');
+  const spinner = read('src/components/ui/Spinner.tsx');
+  assert.match(spinner, /className=\{`lv-spin rounded-full border-gold\/25 border-t-gold /, 'the spinner no longer draws with lv-spin and the gold border utilities');
+  assert.match(read('src/components/community/kit/buttons.tsx'), /\{busy \? <Spinner /);
+  for (const theme of ['dark', 'light'] as const) {
+    const v = V(theme);
+    for (const stop of ['cm-gold-1', 'cm-gold-2']) {
+      // A state indicator: 3:1 on both stops, also under the 0.93 brightness of the busy press.
+      const fill = color(v[stop]).map((ch) => ch * 0.93);
+      assert.ok(ratio(color(v['cm-gold-ink']), fill) >= 3, `${theme}: the busy spinner is ${ratio(color(v['cm-gold-ink']), fill).toFixed(2)}:1 on --${stop}`);
+    }
+  }
+
+  // B1R2-REG-1. No word-internal apostrophe in an English comment of the scope sheet.
+  const comments = (raw.match(/\/\*[\s\S]*?\*\//g) ?? []).join('\n');
+  assert.deepEqual(comments.match(/\p{L}['\u2019]\p{L}/gu) ?? [], [], `${SHEET}: an apostrophe in a comment`);
 });

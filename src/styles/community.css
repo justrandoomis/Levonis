@@ -26,15 +26,16 @@
  *    `--cm-gold-rim/-base` only (y-only, at most four layers, one blurred at
  *    rest): tests/claySystem.test.ts.
  * 4. RE-SKINS of shared controls the kit wraps (Segmented, TabStrip, Switch,
- *    IconButton, NumberInput). Unlayered, because those draw with utilities,
- *    and each one is reached only through its `cm-` class inside the scope.
+ *    IconButton, NumberInput, the Spinner of a busy gold button). Unlayered,
+ *    because those draw with utilities, and each one is reached only through
+ *    its `cm-` class inside the scope.
  *
  * tests/communityScope.test.ts recomputes every text and boundary pair below.
  */
 
 /* The layer order of src/index.css, stated again: if this sheet is parsed
-   first, its `@layer components` would otherwise rank BELOW Tailwind's base
-   (the preflight would flatten every button). */
+   first, its `@layer components` would otherwise rank BELOW the Tailwind base
+   layer (the preflight would flatten every button). */
 @layer theme, base, components, utilities;
 
 /* ------------------------------------------------------------- 1. tokens */
@@ -56,8 +57,12 @@
   --color-surface-selected: #2e343a;
   --color-border-subtle: #2b3036;
   --color-text-secondary: #adb8c5;
-  --color-text-muted: #97a2ae;
-  --color-danger: #ed7177;
+  /* Muted and danger one step lighter than the reference picks (#97a2ae,
+     #ed7177), so a hint or a destructive row still reads 4.5:1 on the menu
+     highlight (7% of --color-white over raised, #363c41) and on the
+     selected fill. The muted stays inside the range the references sample. */
+  --color-text-muted: #9da8b4;
+  --color-danger: #f3898e;
   /* The status inks, lifted with the grounds: an lv-chip mixes 12% of its
      tone into the raised fill, which the scope raised from #191c21 to
      #282e33, so the house #6f9bd1 and #42b77a fell to 4.02 and 4.49:1 there. */
@@ -108,6 +113,9 @@
   --color-info: #2b5d98;
   --color-success: #186942;
   --color-warning: #844f04;
+  /* The danger ink the same way: 4.5:1 on the selected fill and on the menu
+     highlight (7% of --color-white over raised, #e1dbd1). */
+  --color-danger: #a62d34;
   --color-gold: #6a5426;
   --color-accent: #6a5426;
   --color-gold-fill: #d6b77f;
@@ -218,12 +226,9 @@
     box-shadow: var(--tw-shadow);
   }
 
-  /* The check badge: an ink disc with a sand check in the inline-start top
-     corner of a chosen tile. A tile with a subtitle seats it over the corner
-     of its icon well (IMG_8474). A one-line tile centres its icon and title
-     across the whole tile, so its badge sits ON the tile corner, 8px out:
-     the disc then lies in the 12px inline padding and outside the tile, never
-     over the label or the icon at 320 or 390 (IMG_8482). A chosen photo
+  /* The check badge: an ink disc with a sand check INSIDE the inline-start
+     top corner of a chosen tile, 6px in (IMG_8482, IMG_8474). A tile with a
+     subtitle has it over the corner of its icon well. A chosen photo
      (MediaTile) wears it at the bottom inline-end. */
   .cm-check {
     display: none;
@@ -232,9 +237,27 @@
     color: var(--cm-sel-bg);
     background: var(--cm-sel-badge);
   }
-  .cm-check[data-corner] {
-    inset-block-start: -8px;
-    inset-inline-start: -8px;
+  /* A one-line tile centres its icon and title in a body that keeps clear of
+     the badge seat (6px in plus the 20px disc: 26px) on BOTH sides, so the
+     label stays centred and never meets the disc: the tile pads 12px, the
+     body 14px more. The body wraps when the row cannot hold it (the icon
+     above the title, then the title over two lines). In a narrow tile (a
+     content box under 72px, a tile under about 98px: three across on a 360px
+     phone) that seat would leave the words no room, so there the body takes
+     the whole width and starts under the seat instead (8px of tile padding
+     plus 20px), and the tile grows. */
+  .cm-tile-one {
+    container-type: inline-size;
+  }
+  .cm-tile-body {
+    align-content: center;
+    padding-inline: 14px;
+  }
+  @container (width < 72px) {
+    .cm-tile-body {
+      padding-inline: 0;
+      padding-block-start: 20px;
+    }
   }
   .cm-media > .cm-check {
     inset-block: auto 8px;
@@ -268,13 +291,14 @@
     cursor: not-allowed;
   }
 
-  /* A second line and an icon well: muted and gold at rest, the ink of the
-     sand fill once chosen. */
+  /* A second line and an icon well: muted and the primary ink at rest
+     (IMG_8474, IMG_8477: the glyphs in the well are near white; gold line
+     icons belong to the menu ListRow), the ink of the sand fill once chosen. */
   .cm-sub {
     color: var(--color-text-muted);
   }
   .cm-tile-icon {
-    color: var(--color-gold);
+    color: var(--color-text-primary);
     background: var(--color-surface-selected);
   }
   [aria-checked='true'] .cm-sub,
@@ -283,6 +307,12 @@
   }
   [aria-checked='true'] > .cm-tile-icon {
     background: var(--cm-gold-1);
+  }
+
+  /* A colour swatch (SelectButton): ringed in the field line, so a black or
+     a white filament still has an edge on the raised row (IMG_8482). */
+  .cm-swatch {
+    border: 1.5px solid var(--clay-field);
   }
 
   /* The status pill: information, flat, a dot and the word. */
@@ -472,6 +502,14 @@
 }
 [data-surface='community'] .cm-switch [data-switch='on'] > span > span {
   background: var(--cm-sel-ink);
+}
+
+/* The busy gold button: the spinner in the ink, its track a quarter of it.
+   The house arc is gold, which on the gold fill read 1.25:1 in dark (a state
+   indicator needs 3:1). Unlayered, so it beats the spinner utilities. */
+[data-surface='community'] .cm-btn-gold .lv-spin {
+  border-color: color-mix(in oklab, var(--cm-gold-ink) 25%, transparent);
+  border-top-color: var(--cm-gold-ink);
 }
 
 /* IconButton at 40 drawn (44 hit), round or square, the danger ink. */

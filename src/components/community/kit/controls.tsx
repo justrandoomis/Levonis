@@ -91,10 +91,13 @@ const COLUMNS = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' } as cons
  * Choice tiles. One answer: a radiogroup, one Tab stop, the arrows move and
  * choose in the writing direction. Several: a group of checkboxes, each its
  * own Tab stop, Space toggles. A chosen tile is the sand fill with ink text
- * and the check badge on its inline-start top corner. A tile with a subtitle
- * holds its icon in a 40px well, the badge over the corner of the well
- * (IMG_8474); a one-line tile centres a bare icon and its title, the badge
- * seated on the tile corner, clear of both (`data-corner`, IMG_8482).
+ * and the check badge inside its inline-start top corner, 6px in. A tile with
+ * a subtitle holds its icon in a 40px well, the badge over the corner of the
+ * well (IMG_8474). A one-line tile centres a bare icon and its title in a body
+ * that keeps clear of the badge seat on both sides, so the label stays
+ * centred (IMG_8482); the body wraps (the icon above the title, then the
+ * title over two lines) when the row is too narrow, and in a very narrow
+ * tile it starts under the seat instead (`.cm-tile-body`).
  */
 export function ChoiceTiles(props: ChoiceTilesProps) {
   const { items, label, columns = 2, className = '' } = props;
@@ -151,23 +154,31 @@ export function ChoiceTiles(props: ChoiceTilesProps) {
             disabled={it.disabled}
             data-choice={it.id}
             onClick={() => press(it.id)}
-            className={`cm-raised cm-sel relative flex min-h-14 w-full items-center rounded-md px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${it.subtitle ? 'gap-3 text-start' : 'justify-center gap-2 text-center'}`}
+            className={`cm-raised cm-sel relative flex min-h-14 w-full items-center rounded-md px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${it.subtitle ? 'gap-3 text-start' : 'cm-tile-one'}`}
           >
-            {it.icon &&
-              (it.subtitle ? (
-                <span aria-hidden="true" className="cm-tile-icon flex size-10 shrink-0 items-center justify-center">
-                  {it.icon}
+            {it.subtitle ? (
+              <>
+                {it.icon && (
+                  <span aria-hidden="true" className="cm-tile-icon flex size-10 shrink-0 items-center justify-center">
+                    {it.icon}
+                  </span>
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-bold">{it.title}</span>
+                  <span className="cm-sub block text-[12px]">{it.subtitle}</span>
                 </span>
-              ) : (
-                <span aria-hidden="true" className="shrink-0">
-                  {it.icon}
-                </span>
-              ))}
-            <span className={it.subtitle ? 'min-w-0 flex-1' : 'min-w-0'}>
-              <span className="block text-[15px] font-bold">{it.title}</span>
-              {it.subtitle && <span className="cm-sub block text-[12px]">{it.subtitle}</span>}
-            </span>
-            <span aria-hidden="true" data-corner={it.subtitle ? undefined : true} className="cm-check absolute size-5 items-center justify-center rounded-full">
+              </>
+            ) : (
+              <span className="cm-tile-body flex min-w-0 flex-1 flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center">
+                {it.icon && (
+                  <span aria-hidden="true" className="shrink-0">
+                    {it.icon}
+                  </span>
+                )}
+                <span className="min-w-0 text-[15px] font-bold leading-tight">{it.title}</span>
+              </span>
+            )}
+            <span aria-hidden="true" className="cm-check absolute size-5 items-center justify-center rounded-full">
               <Check className="h-3 w-3" strokeWidth={3.5} />
             </span>
           </button>
