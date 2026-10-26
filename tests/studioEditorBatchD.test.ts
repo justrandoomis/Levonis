@@ -38,6 +38,8 @@ const CHOOSER_TSX = read('studio/app/components/sheets/printer-choice.tsx');
 const GLOBALS_CSS = read('studio/app/globals.css');
 const THEME_TS = read('studio/app/editor-theme.ts');
 const CARRYOVER_TS = read('studio/app/settings-carryover.ts');
+const OVERFLOW_TSX = read('studio/app/components/mobile/overflow-sheet.tsx');
+const VIEWPORT_TSX = read('studio/app/components/mobile/viewport-card.tsx');
 
 /** Block and line comments removed, so prose can never satisfy a match. */
 function code(source: string): string {
@@ -158,28 +160,29 @@ test('closing the chooser answers the question instead of repeating it forever',
 });
 
 // =========================================================================
-// 10 — THE TOOL TRAY SHORTENS SO THE BED SHOWS
+// 10 — NOTHING COVERS THE BED, AND EVERY TOOL STAYS REACHABLE
 // =========================================================================
+//
+// The owner asked for a way to shorten the tool list so the bed shows behind
+// it. The phone shell (plan item C6) answers that by removing the list from
+// over the bed altogether: the bed is a card in the page column, the four
+// transform tools sit under it, and every other tool lives in the «المزيد»
+// sheet. The card also opens to the full screen and back.
 
-test('the tray carries a shrink/grow control that keeps every tool reachable', () => {
+test('the phone draws no tool list over the bed, and the overflow sheet carries every tool', () => {
   const body = code(CLIENT_TSX);
-  assert.match(body, /data-levo-action="tray-height"/);
-  assert.match(body, /setTrayCompact\(\(value\) => !value\)/);
-  assert.match(body, /aria-label=\{trayCompact \? t\.expand : t\.collapse\}/);
-  assert.match(body, /className=\{`mobile-tooltray\$\{trayCompact \? " compact" : ""\}`\}/);
+  assert.ok(!/mobile-tooltray/.test(body), 'no tray is drawn over the bed any more');
+  assert.ok(!/mobile-tooltray/.test(GLOBALS_CSS), 'and no tray rule is left behind');
+  assert.match(body, /sheet === "more" \? \(\s*<OverflowSheet/);
+  for (const action of ['duplicate', 'split', 'on-bed', 'paint', 'cut', 'auto-orient', 'delete', 'add-plate', 'undo', 'redo', 'zoom-all', 'zoom-bed']) {
+    assert.match(OVERFLOW_TSX, new RegExp(`tile\\("${action}"`), `the overflow sheet still reaches ${action}`);
+  }
 });
 
-test('shrinking changes the height and hides nothing', () => {
-  assert.match(GLOBALS_CSS, /\.mobile-tooltray\.compact \{ max-height: min\(28dvh, 190px\); \}/);
-  // The tray must still scroll at the smaller height, or shortening it WOULD
-  // hide tools.
-  assert.match(GLOBALS_CSS, /\.mobile-tooltray \{[^}]*overflow-y: auto;/s);
-  // And the control that grows it back must stay on screen.
-  assert.match(GLOBALS_CSS, /\.mobile-tooltray > header \{ position: sticky;/);
-  assert.ok(
-    !/\.mobile-tooltray\.compact[^{]*\{[^}]*display:\s*none/.test(GLOBALS_CSS),
-    'compact must never remove a group — the owner asked for a shorter list, not a smaller one',
-  );
+test('the bed card opens to the full screen and back', () => {
+  assert.match(VIEWPORT_TSX, /data-levo-action="viewport-expand"/);
+  assert.match(code(CLIENT_TSX), /data-viewport=\{viewportExpanded \? "expanded" : "card"\}/);
+  assert.match(GLOBALS_CSS, /\.studio-app\[data-viewport="expanded"\] \.editor-area \{\s*position: fixed;/);
 });
 
 // =========================================================================
@@ -201,15 +204,14 @@ test('adding a plate moves the camera to it, from either add control', () => {
 // 12 — THE FILES CARD NO LONGER COVERS THE SETTINGS PANEL
 // =========================================================================
 
-test('the settings panel outranks the empty-bed card and the tool tray', () => {
+test('the settings panel outranks the empty-bed card', () => {
   const sidebar = /\.sidebar \{ position: absolute; z-index: (\d+);/.exec(THEME_TS);
   assert.ok(sidebar, 'the mobile sidebar rule moved — re-check the stacking order');
   const panelZ = Number(sidebar[1]);
   const cardZ = Number(/\.empty-upload-card \{[^}]*z-index: (\d+);/s.exec(GLOBALS_CSS)![1]);
-  const trayZ = Number(/\.mobile-tooltray \{[^}]*z-index: (\d+);/s.exec(GLOBALS_CSS)![1]);
   const progressZ = Number(/\.import-progress \{[^}]*z-index: (\d+);/s.exec(GLOBALS_CSS)![1]);
   assert.ok(panelZ > cardZ, `settings (${panelZ}) must sit above the empty-bed Files card (${cardZ})`);
-  assert.ok(panelZ > trayZ, `settings (${panelZ}) must sit above the tool tray (${trayZ})`);
+  // The tool tray this once also had to outrank is gone (section 10).
   assert.ok(panelZ < progressZ, `the import row (${progressZ}) must stay above settings (${panelZ}) — it is the only sign a file is loading`);
 });
 
