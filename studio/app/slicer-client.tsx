@@ -20,7 +20,11 @@
  *   shadow surfaces by the adapter (EDITOR_SHADOW_CSS);
  * - APK/update-check UI removed from the web (mandate §12): no download link
  *   anywhere, native update wiring dropped; native printer bridges stay in
- *   the tree but remain capability-gated and unreachable on the web.
+ *   the tree but remain capability-gated and unreachable on the web;
+ * - below 900px the phone shell of plan item C6 (components/mobile/*): one
+ *   scrolling column of clay cards around the SAME engine mount the desktop
+ *   uses, so crossing 900px never rebuilds the engine (globals.css, THE PHONE
+ *   SHELL); a device-local light/dark theme (app/theme.ts).
  *
  * The engine settings flow is unchanged: one settings object drives the
  * Viewport and the engine's SettingsPanel (SettingsBook), machine keys stay
@@ -35,7 +39,7 @@ import { uiTree } from "three-slicer/data";
 import type { ViewportEvent, ViewportProps } from "three-slicer/viewer";
 import { registerExtendedModelLoaders } from "./model-loaders";
 import {
-  arrangeCurrentObjects, autoOrientObjects, createEngineAdapter, cutObject, cutRange, isHeavyImport, seatNewObjects,
+  applyOrientationPreset, arrangeCurrentObjects, autoOrientObjects, createEngineAdapter, cutObject, cutRange, isHeavyImport, seatNewObjects,
   type CutKeep, type EngineTestId,
 } from "./engine-adapter";
 import { currentDeviceProfile } from "./device-profile";
@@ -47,18 +51,24 @@ import { applyMachineLock } from "./machine-lock";
 import { carryUserEdits, changedKeys, type PresetSelection } from "./settings-carryover";
 import {
   DEFAULT_INFILL_ID,
+  DEFAULT_MATERIAL_ID,
   DEFAULT_PROFILE_ID,
   INFILL,
+  MATERIALS,
   PROFILES,
   QUALITY,
   STRENGTH,
+  availableMaterial,
   isInfillId,
+  isMaterialId,
+  materialsFor,
   isProfileId,
   printerChoiceAnswered,
   readStoredProfileId,
   storePrinterChoiceDeclined,
   storeProfileId,
   type InfillId,
+  type MaterialId,
   type ProfileId,
   type QualityId,
   type StrengthId,
@@ -82,6 +92,10 @@ import {
 } from "./project-store";
 import { useProjectPersistence } from "./hooks/use-project-persistence";
 import { useStudioMode } from "./hooks/use-studio-mode";
+import { useStudioTheme } from "./hooks/use-studio-theme";
+import { createDimensionCache, formatDimensions } from "./model-dimensions";
+import { currentPreset, type OrientationPreset, type Vec3 } from "./auto-orient";
+import { runPreflight } from "./makerworld/preflight";
 import ProjectsPanel from "./components/projects-panel";
 import { captureEngineThumbnail } from "./thumbnail";
 
@@ -113,8 +127,6 @@ import type {
 import {
   DEFAULT_LOCALE,
   DICTIONARIES,
-  LOCALES,
-  LOCALE_NAMES,
   applyLocaleToDocument,
   dateLocaleFor,
   readStoredLocale,
@@ -130,8 +142,19 @@ import PrintSheet from "./components/sheets/print";
 import ConnectSheet, { type LanAction } from "./components/sheets/connect";
 import AboutSheet from "./components/sheets/about";
 import CutSheet from "./components/sheets/cut";
+import StudioTopBar from "./components/mobile/top-bar";
+import ModeSegmented from "./components/mobile/mode-segmented";
+import ViewportCard from "./components/mobile/viewport-card";
+import TransformToolBar, { type GizmoTool } from "./components/mobile/transform-tool-bar";
+import PrintSettingsCard from "./components/mobile/print-settings-card";
+import ModelInfoCard from "./components/mobile/model-info-card";
+import ReadinessBanner from "./components/mobile/readiness-banner";
+import { readinessOf } from "./components/mobile/readiness";
+import PrimarySliceButton from "./components/mobile/primary-slice-button";
+import ExportSection from "./components/mobile/export-section";
+import OverflowSheet, { type OverflowAction } from "./components/mobile/overflow-sheet";
 
-type Sheet = "setup" | "printer" | "projects" | "print" | "connect" | "about" | "cut" | "signout" | null;
+type Sheet = "setup" | "printer" | "projects" | "print" | "connect" | "about" | "cut" | "signout" | "more" | null;
 type EditorStatus = "loading" | "editing" | "slicing" | "ready" | "error";
 type CanvasMode = "prepare" | "preview";
 
@@ -263,14 +286,16 @@ function downloadBlob(blob: Blob, name: string) {
 const MB = 1024 * 1024;
 
 /**
- * The three locales, as a segmented control rather than a native <select>.
- *
- * Three fixed choices are exactly what a segmented control is for, and on a
- * phone it needs no picker sheet — which matters because this is the copy a
- * 320px screen can reach. The autonyms are the same ones the header's select
- * shows, imported rather than restated.
+ * The engine's print estimate (seconds), in the reader's words: «2 ساعة و5
+ * دقيقة», "2 h 5 min". Latin digits, as every readout in the Studio.
  */
-const LOCALE_OPTIONS = LOCALES.map((id) => ({ id, label: LOCALE_NAMES[id] }));
+function formatDuration(seconds: number, t: { durationHours: string; durationMinutes: string }): string {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  const hours = Math.floor(minutes / 60);
+  return hours > 0
+    ? templateText(t.durationHours, { h: hours, m: minutes % 60 })
+    : templateText(t.durationMinutes, { m: minutes });
+}
 
 /**
  * Turn an opened account revision into the editor's restore record. Shared
@@ -290,6 +315,7 @@ function recordFromOpened(opened: OpenedRemoteProject, id: string, name: string)
     strength: typeof manifest?.settings?.strength === "string" ? manifest.settings.strength : "standard",
     support: Boolean(manifest?.settings?.support),
     infill: typeof manifest?.settings?.infill === "string" ? manifest.settings.infill : undefined,
+    material: typeof manifest?.settings?.material === "string" ? manifest.settings.material : undefined,
     settings: manifest?.settings?.global as SlicerSettings | undefined,
     objectCount: manifest?.objects?.length,
     plateCount: manifest?.plates?.count,
@@ -314,6 +340,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const [strength, setStrength] = useState<StrengthId>("standard");
   const [infill, setInfill] = useState<InfillId>(DEFAULT_INFILL_ID);
   const [support, setSupport] = useState(false);
+  /** The «الخامة» row: only materials whose engine preset ships for this printer. */
+  const [material, setMaterial] = useState<MaterialId>(DEFAULT_MATERIAL_ID);
   /**
    * THE FIRST-RUN PRINTER QUESTION.
    *
@@ -349,20 +377,24 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const [downgradeOfferFor, setDowngradeOfferFor] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<ImportProgressState | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [toolTrayOpen, setToolTrayOpen] = useState(false);
   /**
-   * THE TOOL TRAY, SHORTENED SO THE BED IS VISIBLE BEHIND IT.
+   * THE PHONE SHELL'S OWN STATE (plan item C6).
    *
-   * «اضافة زر تقصير وتطويل قائمة الادوات لكي يتمكن المستخدم من استخدام الادوات
-   *  و رؤية النتيجة على سرير الطباعة بصورة اوضح رؤية ما خلف القائمة.»
-   *
-   * The tray is up to 62dvh of the screen, which is most of the bed on a
-   * phone: you tap Rotate, the object turns, and you cannot see it turn. This
-   * is the state behind the header's shrink/grow button. Shortened it keeps
-   * every group — the tray already scrolls — so nothing becomes unreachable;
-   * it only stops standing in front of the thing being edited.
+   * `viewportExpanded` is the in-app full-height viewport behind the card's
+   * expand button (there is no Fullscreen API on an iPhone). `activeGizmo`
+   * is which transform tile is pressed; it is re-read from the engine's own
+   * rail after every tile tap, objects event and scene gesture, because a
+   * keyboard shortcut can change it behind the shell's back. `sceneTick`
+   * makes the size readout, the orientation chips and the file chip re-read
+   * the scene, which emits no event of its own when a transform changes.
    */
-  const [trayCompact, setTrayCompact] = useState(false);
+  const [viewportExpanded, setViewportExpanded] = useState(false);
+  const [activeGizmo, setActiveGizmo] = useState<GizmoTool | null>("move");
+  const [sceneTick, setSceneTick] = useState(0);
+  const [saving, setSaving] = useState(false);
+  /** What the last automatic orient wrote per object: the «تلقائي» chip reads it. */
+  const [autoRotations, setAutoRotations] = useState<ReadonlyMap<number, Vec3>>(() => new Map());
+  const [dimensionCache] = useState(createDimensionCache);
   const [handyProjectReady, setHandyProjectReady] = useState(false);
   const [arrangeUndoAvailable, setArrangeUndoAvailable] = useState(false);
   const [orientUndoAvailable, setOrientUndoAvailable] = useState(false);
@@ -544,7 +576,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
 
   const profile = PROFILES[profileId];
   const t = DICTIONARIES[locale];
-  const requestedPresetKey = `${profileId}:${quality}:${strength}:${support}:${infill}`;
+  const requestedPresetKey = `${profileId}:${quality}:${strength}:${support}:${infill}:${material}`;
   const profileLoading = loadedPresetKey !== requestedPresetKey;
   /**
    * The dictionary, for the preset effect's async continuation.
@@ -624,13 +656,13 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     const namesPart = objects.map((object) => `${object.id}:${object.name}`).sort().join(",");
     return [
       projectName.trim(),
-      `${profileId}:${quality}:${strength}:${support}:${infill}`,
+      `${profileId}:${quality}:${strength}:${support}:${infill}:${material}`,
       `plates=${plateCount}`,
       namesPart,
       adapter.sceneFingerprint(),
       settingsPart,
     ].join("|");
-  }, [adapter, infill, objects, plateCount, profileId, projectName, quality, settings, strength, support]);
+  }, [adapter, infill, material, objects, plateCount, profileId, projectName, quality, settings, strength, support]);
 
   const persistence = useProjectPersistence({
     user: user?.id ? { id: user.id } : null,
@@ -645,7 +677,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       project: { name: projectName.trim() || "LEVO Project" },
       engine: { name: "three-slicer", version: "0.2.2" },
       printer: { profileId, model: profile.model, nozzle: profile.nozzle },
-      settings: { quality, strength, support, infill, global: settings as unknown as Record<string, unknown> },
+      settings: { quality, strength, support, infill, material, global: settings as unknown as Record<string, unknown> },
       objects: objects.map((object) => ({ id: object.id, name: object.name, extruder: object.extruder })),
       plates: { count: plateCount },
       painting: { extruderAssignments: objects.some((object) => object.extruder > 1) },
@@ -661,6 +693,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       strength,
       support,
       infill,
+      material,
       settings,
       objectCount: objects.length,
       plateCount,
@@ -747,6 +780,21 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     adapter.setHostAttribute("data-levo-mode", studioMode.mode);
   }, [adapter, studioMode.mode]);
 
+  /*
+   * THE THEME (DECISIONS row 271, D-14): system, light or dark, kept on this
+   * device (app/theme.ts). The page follows `data-theme` on <html>; the
+   * engine's shadow roots follow the same answer through a host attribute,
+   * so its panels, plate bar and stats card change with the page. The canvas
+   * itself stays the engine's dark island in both.
+   */
+  const studioTheme = useStudioTheme();
+  useEffect(() => {
+    adapter.setHostAttribute("data-levo-theme", studioTheme.resolved);
+  }, [adapter, studioTheme.resolved]);
+  useEffect(() => {
+    adapter.setHostAttribute("data-levo-viewport", viewportExpanded ? "expanded" : "card");
+  }, [adapter, viewportExpanded]);
+
   // -- locale ----------------------------------------------------------------
   useEffect(() => { setLocale(readStoredLocale()); }, []);
   useEffect(() => { applyLocaleToDocument(locale); }, [locale]);
@@ -767,6 +815,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     setProfileId(id);
     storeProfileId(id);
     setPrinterAsk(false);
+    // A material the new printer has no engine preset for is not kept.
+    setMaterial((current) => availableMaterial(id, current));
   }, []);
 
   useEffect(() => {
@@ -834,9 +884,9 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   useEffect(() => {
     const requestId = profileRequestRef.current + 1;
     profileRequestRef.current = requestId;
-    const nextSelection: PresetSelection = { printerId: profileId, quality, strength, support, infill };
+    const nextSelection: PresetSelection = { printerId: profileId, quality, strength, support, infill, material };
     setProfileLoadState(null);
-    loadPrinterProfile(profile, quality, strength, support, infill)
+    loadPrinterProfile(profile, quality, strength, support, infill, material)
       .then((loaded) => {
         if (profileRequestRef.current !== requestId) return;
         machineRef.current = loaded.machine;
@@ -867,6 +917,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
             previousSelection: loadedSelectionRef.current,
             nextSelection,
             processKeys: loaded.processKeys,
+            filamentKeys: loaded.filamentKeys,
           });
           setSettings(carried.settings);
           userEditedKeysRef.current = new Set(carried.kept);
@@ -896,7 +947,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       });
     // slicing.clearResults is identity-stable per hook instance.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [infill, profile, quality, requestedPresetKey, strength, support]);
+  }, [infill, material, profile, quality, requestedPresetKey, strength, support]);
 
   // -- settings (engine SettingsPanel binding stays; machine keys locked) ----
   const setEditorSettings: Dispatch<SetStateAction<SlicerSettings>> = useCallback((next) => {
@@ -938,11 +989,22 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   }, [adapter, t.actionUnavailable]);
 
   const runTool = useCallback((testId: EngineTestId) => {
-    setToolTrayOpen(false);
     void adapter.runPrepareAction(testId).then((clicked) => {
       if (!clicked) setNotice(t.actionUnavailable);
+      // The engine owns which gizmo is on; read its answer, not our guess.
+      setActiveGizmo((current) => adapter.activeGizmo() ?? current);
     });
   }, [adapter, t.actionUnavailable]);
+
+  /**
+   * A transform tile. The tile turns at once (the press has to answer the
+   * finger), and runTool then re-reads the engine's own rail, so a tap the
+   * engine refused cannot leave the wrong tile pressed.
+   */
+  const chooseGizmo = useCallback((tool: GizmoTool) => {
+    setActiveGizmo(tool);
+    runTool(tool === "move" ? "gizmo-move" : tool === "rotate" ? "gizmo-rotate" : "gizmo-scale");
+  }, [runTool]);
 
   const shortcut = useCallback((key: string) => {
     if (!adapter.sendShortcut(key)) setNotice(t.actionUnavailable);
@@ -1023,7 +1085,6 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     if (!rawFiles.length || orchestrator.busy) return;
     setError("");
     setNotice("");
-    setToolTrayOpen(false);
     /**
      * REFUSED AT SELECTION, NOT AFTER THE WAIT.
      *
@@ -1109,7 +1170,6 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
 
   const handlePickedFiles = useCallback((files: File[]) => {
     setNotice("");
-    setToolTrayOpen(false);
     void importSelectedFiles(files);
   }, [importSelectedFiles]);
 
@@ -1143,7 +1203,6 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   }, []);
 
   const arrangeAll = useCallback(async () => {
-    setToolTrayOpen(false);
     if (!objects.length) { setNotice(t.arrangeUnavailable); return; }
     const result = await arrangeCurrentObjects(adapter, {
       bedWidth: profile.bedWidth,
@@ -1169,8 +1228,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
    * The busy flag is set BEFORE the yield, so the button reports itself as
    * working rather than looking dead on a big part.
    */
-  const orientAll = useCallback(async () => {
-    setToolTrayOpen(false);
+  const orientAll = useCallback(async (ids?: ReadonlySet<number>) => {
     if (!objects.length) { setNotice(t.orientUnavailable); return; }
     setOrienting(true);
     setNotice(t.orientBusy);
@@ -1180,12 +1238,20 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     await new Promise((resolve) => setTimeout(resolve, 0));
     let result;
     try {
-      result = autoOrientObjects(adapter, { selectedPlate });
+      result = autoOrientObjects(adapter, { selectedPlate, ids });
     } finally {
       api?.suspendRendering(false);
       setOrienting(false);
     }
     if (!result.ok) { setNotice(t.orientUnavailable); return; }
+    // What auto-orient wrote is what «تلقائي» means for these objects from
+    // now on — until a later rotation moves them off it.
+    setAutoRotations((current) => {
+      const next = new Map(current);
+      for (const entry of result.rotations ?? []) next.set(entry.id, entry.rot);
+      return next;
+    });
+    setSceneTick((tick) => tick + 1);
     orientUndoRef.current = result.undo;
     raiseUndo("orient", Boolean(result.undo));
     const total = result.orientedCount + result.alreadyBestCount + result.skippedCount;
@@ -1224,7 +1290,6 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
    * by the model rather than by a guess cannot ask for a cut that misses.
    */
   const openCut = useCallback(() => {
-    setToolTrayOpen(false);
     const range = cutRange(adapter);
     if (!range || range.max - range.min <= 0.001) { setNotice(t.cutUnavailable); return; }
     setCutBounds({ min: range.min, max: range.max });
@@ -1412,7 +1477,9 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     // Drafts and manifests written before the infill control existed carry no
     // pattern at all; they get the default rather than a guess.
     const restoredInfill = typeof saved.infill === "string" && isInfillId(saved.infill) ? saved.infill : DEFAULT_INFILL_ID;
-    const restoredKey = `${restoredProfile}:${restoredQuality}:${restoredStrength}:${restoredSupport}:${restoredInfill}`;
+    // Projects saved before the material row carry none, and they were PLA.
+    const restoredMaterial = isMaterialId(saved.material) ? availableMaterial(restoredProfile, saved.material) : DEFAULT_MATERIAL_ID;
+    const restoredKey = `${restoredProfile}:${restoredQuality}:${restoredStrength}:${restoredSupport}:${restoredInfill}:${restoredMaterial}`;
     profileRequestRef.current += 1;
     restoredSettingsRef.current = saved.settings && restoredKey !== requestedPresetKey
       ? { key: restoredKey, settings: saved.settings }
@@ -1433,6 +1500,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     setStrength(restoredStrength);
     setSupport(restoredSupport);
     setInfill(restoredInfill);
+    setMaterial(restoredMaterial);
     if (saved.settings) setSettings(saved.settings);
     setObjects([]);
     setWorkspaceKey((value) => value + 1);
@@ -2003,7 +2071,6 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
 
   const openPrintCenter = useCallback(() => {
     if (!printReady && !currentStale) { setNotice(t.printNotReady); return; }
-    setToolTrayOpen(false);
     setSidebarOpen(false);
     setSheet("print");
   }, [currentStale, printReady, t.printNotReady]);
@@ -2107,6 +2174,10 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       // import row is holding — see importWaitRef above.
       if (importWaitRef.current && event.value.length > importWaitRef.current.baselineObjects) endImportWait();
       setObjects(event.value);
+      // The phone shell re-reads the scene (size, orientation, file chip) and
+      // the engine's active gizmo on every objects change.
+      setSceneTick((tick) => tick + 1);
+      setActiveGizmo((current) => adapter.activeGizmo() ?? current);
       const ids = event.value.map((object) => object.id);
       noteHeavyImport(ids);
       orchestrator.notifyObjects(ids);
@@ -2146,7 +2217,6 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       if (event.value !== "off") sessionHasPaintRef.current = true;
     } else if (event.type === "canvasMode") {
       setCanvasMode(event.value);
-      if (event.value === "preview") setToolTrayOpen(false);
     } else if (event.type === "slicing") {
       setStatus(event.value ? "slicing" : "editing");
     } else if (event.type === "notice") {
@@ -2216,6 +2286,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     cutUndoRef.current = null;
     setCutUndoAvailable(false);
     setArrangeUndoAvailable(false);
+    setAutoRotations(new Map());
     setObjects([]);
     projectFilesRef.current = [];
     setProjectId(crypto.randomUUID());
@@ -2230,7 +2301,6 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     endImportWait();
     setImportProgress(null);
     setSidebarOpen(false);
-    setToolTrayOpen(false);
     setHandyProjectReady(false);
     exportIntentRef.current = null;
     if (exportIntentTimerRef.current !== null) {
@@ -2407,13 +2477,242 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         : sheet === "connect" ? t.connectTitle
           : sheet === "cut" ? t.cutTitle
             : sheet === "signout" ? t.signOut
-              : t.settings;
+              : sheet === "more" ? t.moreTitle
+                : t.settings;
 
   const savedStateLabel = displaySavedKind === "full"
     ? t.savedLocalFull
     : displaySavedKind === "source-only"
       ? t.savedLocalSourceOnly
       : t.autosaved;
+
+  // -- the phone shell (plan item C6) ----------------------------------------
+  /**
+   * The scene emits no event when a model is moved, turned or selected, so
+   * the size readout, the orientation chips and the file chip re-read it after
+   * the engine's own gesture signal (onSceneEdit: pointer up, key up), once
+   * the gesture has settled. Cheap: the size cache skips any object whose
+   * rotation and scale did not change.
+   */
+  useEffect(() => {
+    let timer: number | null = null;
+    const unsubscribe = adapter.onSceneEdit(() => {
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
+        setSceneTick((tick) => tick + 1);
+        setActiveGizmo((current) => adapter.activeGizmo() ?? current);
+      }, 180);
+    });
+    return () => {
+      unsubscribe();
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [adapter]);
+
+  /** Escape gives the page back from the expanded viewport (no sheet open). */
+  useEffect(() => {
+    if (!viewportExpanded || sheet) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setViewportExpanded(false);
+      setSidebarOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [sheet, viewportExpanded]);
+
+  const toggleViewportExpanded = useCallback(() => {
+    setViewportExpanded((value) => {
+      // Closing the full view closes the engine panel that needed it.
+      if (value) setSidebarOpen(false);
+      return !value;
+    });
+  }, []);
+
+  /**
+   * What the scene is, read for the phone shell: each object's measured size,
+   * the selected one (or the only one), the orientation preset the targets
+   * are in, and the name for the file chip. Re-read when `objects` changes
+   * and on every settled gesture (`sceneTick`).
+   */
+  const sceneFacts = useMemo(() => {
+    void sceneTick;
+    const snapshots = objects.length ? adapter.sceneSnapshot() : [];
+    dimensionCache.retain(snapshots.map((snapshot) => snapshot.id));
+    const measured = snapshots.map((snapshot) => ({ snapshot, dims: dimensionCache.measure(snapshot) }));
+    let selectedId: number | null = null;
+    try {
+      selectedId = adapter.api()?.selectedObjectId() || null;
+    } catch {
+      selectedId = null;
+    }
+    const selected = measured.find((entry) => entry.snapshot.id === selectedId) ?? (measured.length === 1 ? measured[0] : null);
+    const targets = selected ? [selected.snapshot] : measured.map((entry) => entry.snapshot);
+    const name = selected ? (objects.find((object) => object.id === selected.snapshot.id)?.name ?? selected.snapshot.name) : null;
+    return {
+      measured,
+      selectedId: selected?.snapshot.id ?? null,
+      dimensions: selected?.dims ? formatDimensions(selected.dims) : null,
+      needsSelection: !selected && measured.length > 1,
+      orientation: currentPreset(targets, autoRotations),
+      fileLabel: name || (measured.length > 1 ? `${projectName.trim() || "LEVO Project"} · ${measured.length}` : null),
+    };
+  }, [adapter, autoRotations, dimensionCache, objects, projectName, sceneTick]);
+
+  /**
+   * THE PREFLIGHT, MOUNTED AT LAST. makerworld/preflight.ts was written for
+   * the MakerWorld step and never shown; it now decides whether the banner
+   * may say «جاهز للتقطيع»: a model larger than the printer in every
+   * in-plane orientation is a blocker, measured from the same sizes the
+   * readout shows.
+   */
+  const preflight = useMemo(() => {
+    const sizes = new Map(sceneFacts.measured.map((entry) => [entry.snapshot.id, entry.dims]));
+    return runPreflight({
+      objects: objects.map((object) => {
+        const dims = sizes.get(object.id);
+        return {
+          id: object.id,
+          name: object.name,
+          extruder: object.extruder,
+          visible: object.visible,
+          widthMm: dims?.width,
+          depthMm: dims?.depth,
+          heightMm: dims?.height,
+        };
+      }),
+      plateCount,
+      profile: {
+        id: profile.id,
+        model: profile.model,
+        shortName: profile.shortName,
+        nozzle: profile.nozzle,
+        bedWidthMm: profile.bedWidth,
+        bedDepthMm: profile.bedDepth,
+        bedHeightMm: profile.bedHeight,
+      },
+      profileVerified: profileLoadState?.verified ?? true,
+      missingPresets: profileLoadState?.missingPresets.map((preset) => preset.presetName) ?? [],
+    });
+  }, [objects, plateCount, profile, profileLoadState, sceneFacts]);
+
+  /**
+   * The orientation chips. «تلقائي» is the existing auto-orient; the other two
+   * are fixed rotations (engine-adapter applyOrientationPreset). Each one
+   * applies to the selected object, or to every object when none is selected,
+   * and each is undone from the message row like the other whole-scene edits.
+   */
+  const orientTo = useCallback(async (preset: OrientationPreset) => {
+    if (!objects.length) { setNotice(t.orientUnavailable); return; }
+    const ids = sceneFacts.selectedId !== null ? new Set([sceneFacts.selectedId]) : undefined;
+    if (preset === "auto") { await orientAll(ids); return; }
+    const result = applyOrientationPreset(adapter, { preset, ids, selectedPlate });
+    if (!result.ok) { setNotice(t.orientUnavailable); return; }
+    setAutoRotations((current) => {
+      const next = new Map(current);
+      for (const entry of sceneFacts.measured) {
+        if (!ids || ids.has(entry.snapshot.id)) next.delete(entry.snapshot.id);
+      }
+      return next;
+    });
+    orientUndoRef.current = result.undo;
+    raiseUndo("orient", Boolean(result.undo));
+    setNotice(result.changedCount ? templateText(t.orientPresetDone, { count: result.changedCount }) : t.orientNoChange);
+    setSceneTick((tick) => tick + 1);
+  }, [adapter, objects.length, orientAll, raiseUndo, sceneFacts, selectedPlate, t.orientNoChange, t.orientPresetDone, t.orientUnavailable]);
+
+  /**
+   * «كل الإعدادات»: the engine's full side panel. In Simple it does not exist,
+   * so asking for it is asking for Advanced. On a phone the panel needs the
+   * whole screen, so the viewport expands under it.
+   */
+  const openAllSettings = useCallback(() => {
+    setSheet(null);
+    if (simpleMode) studioMode.setMode("advanced");
+    setSidebarOpen(true);
+    if (typeof window !== "undefined" && window.matchMedia?.("(max-width: 899px)").matches) setViewportExpanded(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simpleMode, studioMode.setMode]);
+
+  /**
+   * «حفظ»: save now, and say where it went. A signed-in session that is not
+   * linked to an account project yet gets one first (named after the
+   * project); a guest gets a draft on this device and the sign-in hint. The
+   * answer is read from the sync state AFTER the save settles, so a failed
+   * upload is never reported as saved.
+   */
+  const syncStateRef = useRef(persistence.state);
+  useEffect(() => { syncStateRef.current = persistence.state; }, [persistence.state]);
+  const saveProjectNow = useCallback(async () => {
+    if (!objects.length || saving) return;
+    setSaving(true);
+    try {
+      if (user?.id && !syncStateRef.current.remoteProjectId) {
+        await persistence.createRemoteProjectAndLink(projectName.trim() || "LEVO Project");
+      }
+      await saveNow();
+      await nextFrame();
+      const sync = syncStateRef.current;
+      if (sync.status === "failed" || sync.conflict) setNotice(t.saveFailed);
+      else setNotice(user?.id && sync.status === "synced" ? t.savedToAccount : t.savedDraftGuest);
+    } catch {
+      setNotice(t.saveFailed);
+    } finally {
+      setSaving(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [objects.length, persistence.createRemoteProjectAndLink, projectName, saveNow, saving, t.saveFailed, t.savedDraftGuest, t.savedToAccount, user?.id]);
+
+  /**
+   * The back chevron leaves the editor. A guest's work is already a draft on
+   * this device (and pagehide flushes the last edits), so only two things are
+   * worth a question: a slice in progress, and a signed-in session with
+   * changes the account does not have yet.
+   */
+  const confirmLeave = useCallback(() => {
+    const sync = syncStateRef.current;
+    const unsavedAccountWork = Boolean(user?.id) && objects.length > 0 && (sync.dirty || sync.status === "failed" || sync.status === "uploading");
+    if (status !== "slicing" && !unsavedAccountWork) return true;
+    return window.confirm(t.leaveConfirm);
+  }, [objects.length, status, t.leaveConfirm, user?.id]);
+
+  /** The overflow sheet's actions: the sheet closes first, then the action runs. */
+  const runOverflow = useCallback((action: OverflowAction) => {
+    setSheet(null);
+    if (action === "projects") void openProjects();
+    else if (action === "new-project") newProject();
+    else if (action === "duplicate") runTool("tool-duplicate");
+    else if (action === "delete") runTool("tool-delete");
+    else if (action === "split") runTool("tool-split");
+    else if (action === "on-bed") runTool("tool-onbed");
+    else if (action === "paint") runTool("gizmo-paint");
+    else if (action === "cut") openCut();
+    else if (action === "auto-orient") void orientAll();
+    else if (action === "delete-all") deleteAll();
+    else if (action === "add-plate") clickControl("plate-add");
+    else if (action === "slice-all") triggerSlice(true);
+    else if (action === "toggle-preview") clickControl(canvasMode === "preview" ? "mode-prepare" : "mode-preview");
+    else if (action === "zoom-all") shortcut("z");
+    else if (action === "zoom-bed") shortcut("b");
+    else if (action === "undo") clickControl("undo");
+    else if (action === "redo") clickControl("redo");
+    else if (action === "makerworld") prepareForBambuHandy();
+    else if (action === "share-gcode") void shareCurrentGcode();
+    else if (action === "export-all") clickControl("export-all");
+    else if (action === "print-sheet") openPrintCenter();
+    else if (action === "settings") setSheet("setup");
+    else if (action === "all-settings") openAllSettings();
+    else if (action === "sign-out") setSheet("signout");
+    else if (action === "connect") setSheet("connect");
+    else if (action === "about") setSheet("about");
+  }, [canvasMode, clickControl, deleteAll, newProject, openAllSettings, openCut, openPrintCenter, openProjects, orientAll, prepareForBambuHandy, runTool, shareCurrentGcode, shortcut, triggerSlice]);
+
+  /** The infill density the kernel will use, for the «الملء» row. */
+  const effectiveInfill = useMemo(() => {
+    const value = Number.parseFloat(String((settings as unknown as Record<string, unknown>).sparse_infill_density));
+    return Number.isFinite(value) && value >= 0 ? value : STRENGTH[strength].infill;
+  }, [settings, strength]);
 
   /*
     ONE MESSAGE SLOT, IN THIS ORDER: an error; the slow-slice warning when the
@@ -2431,8 +2730,44 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const staleBannerShown = currentStale && !messageText && status !== "slicing";
   const heavyWarningShown = Boolean(heavyImportText) && !messageText && !staleBannerShown;
 
+  /*
+    THE READINESS BANNER (phone): its kind comes from components/mobile/
+    readiness.ts, which never returns a success over a blocker, an outdated
+    result or a missing preset; its second line carries the real numbers.
+  */
+  const readiness = readinessOf({
+    objectCount: objects.length,
+    importing: Boolean(importProgress),
+    engineReady: Boolean(Viewport),
+    profileLoading,
+    profileVerified: profileLoadState?.verified ?? true,
+    slicing: status === "slicing",
+    errored: status === "error",
+    resultState: currentResultState,
+    preflightOk: preflight.ok,
+  });
+  const oversizedCount = preflight.findings.find((finding) => finding.code === "object-exceeds-bed")?.objectIds?.length ?? 0;
+  const sliceStats = printReady ? slicing.stats(selectedPlate) : null;
+  const estimateSeconds = Number(sliceStats?.time_estimate);
+  // The engine's own stats card counts the layers it printed; the banner says
+  // the same number rather than the preview's layer count beside it.
+  const slicedLayers = Number(sliceStats?.layers) > 0 ? Number(sliceStats?.layers) : slicing.layerCount;
+  const readinessDetail = readiness === "blocked"
+    ? (currentResultState === "rejected-over-bed" && !oversizedCount
+      ? templateText(t.overBedError, { printer: profile.shortName })
+      : templateText(t.tooBigHelp, { count: oversizedCount, printer: profile.model, bed: `${profile.bedWidth} × ${profile.bedDepth} × ${profile.bedHeight}` }))
+    : readiness === "stale"
+      ? (heavyImportText ? `${t.staleHelp} ${heavyImportText}` : t.staleHelp)
+      : readiness === "fallback"
+        ? templateText(t.presetFallbackWarning, { presets: profileLoadState?.missingPresets.map((preset) => preset.presetName).join(" · ") || "—" })
+        : readiness === "sliced"
+          ? (Number.isFinite(estimateSeconds) && estimateSeconds > 0
+            ? templateText(t.slicedEstimate, { layers: slicedLayers || "—", time: formatDuration(estimateSeconds, t) })
+            : templateText(t.slicedSummary, { layers: slicedLayers || "—" }))
+          : t.readyToSliceHelp;
+
   return (
-    <main className="studio-app">
+    <main className="studio-app" data-viewport={viewportExpanded ? "expanded" : "card"}>
       <StudioHeader
         t={t}
         locale={locale}
@@ -2471,254 +2806,196 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         onToggleSidebar={() => setSidebarOpen((value) => !value)}
       />
 
-      <section
-        className="editor-area"
-        aria-busy={Boolean(importProgress)}
-        onDragOverCapture={(event) => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }}
-        onDropCapture={handleDropFiles}
-      >
-        <div className="viewport-mount" ref={viewportMountRef}>
-          {viewportElement ?? (
-            <div className="editor-loader" aria-live="polite"><span /><strong>{t.loading}</strong><small>{profile.shortName} · {profile.bed}</small></div>
-          )}
+      {/*
+        ONE TREE FOR BOTH LAYOUTS (globals.css, THE PHONE SHELL). On a desktop
+        `.studio-scroll` is the workspace under the header and every `.m-only`
+        piece is hidden; below 900px the header is hidden and this becomes the
+        reference column. The engine mount sits in the same place in both, so
+        a tablet turning across 900px keeps its scene.
+      */}
+      <div className="studio-scroll">
+        <StudioTopBar
+          t={t}
+          importDisabled={!Viewport || Boolean(importProgress)}
+          onPickFiles={handlePickedFiles}
+          saveDisabled={!objects.length}
+          saving={saving}
+          onSave={() => void saveProjectNow()}
+          onLeave={confirmLeave}
+        />
+
+        <div className="m-moderow m-only">
+          <button className="m-btn m-more" type="button" onClick={() => setSheet("more")} aria-haspopup="dialog" data-levo-action="more">
+            <Icon name="more" /><span>{t.more}</span>
+          </button>
+          <ModeSegmented t={t} mode={studioMode.mode} onMode={studioMode.setMode} />
         </div>
 
-        {Viewport && !objects.length && status !== "error" && <section className="empty-upload-card" aria-label={t.files}>
-          <span className="empty-upload-icon"><Icon name="file" /></span>
-          <strong>{t.files}</strong>
-          <p>{t.formatsShort}</p>
-          <FileSelectControl className="empty-upload-action" label={t.add} disabled={Boolean(importProgress)} onFiles={handlePickedFiles}><Icon name="plus" /><span>{t.add}</span></FileSelectControl>
-          <small>{t.fileLimit}</small>
-        </section>}
-
-        {importProgress && <div className="import-progress" role="status" aria-live="polite">
-          <span className="import-spinner" />
-          {/*
-            «وتحميل من ١ ل١٠٠ اثناء تحميل الملف للبرنامج» — the bar alone
-            answers "is it moving", not "how far". On a 400 MB file those are
-            different questions, and the second is the one somebody watching a
-            phone for thirty seconds is actually asking.
-
-            Floored, never rounded: 99.7% must not read «100» while the file is
-            still being parsed, and clamped at 99 for the same reason — the
-            hundred belongs to the finished import, which is the moment this
-            whole row disappears. Latin digits and `dir="ltr"`, so «٪100» does
-            not reorder into nonsense in an Arabic or Kurdish layout.
-          */}
-          {/*
-            AND WHERE THERE IS NO NUMBER, THERE IS NO NUMBER.
-
-            The engine does not report how far through a mesh it is, so the
-            post-dispatch wait has nothing to floor — and a percentage invented
-            to fill the space would be the one thing this row must never do.
-            The percent is dropped and the bar runs without a value, which is
-            what `<progress>` with no `value` means natively: working, length
-            unknown.
-          */}
-          <div><strong>{importProgress.label}</strong><small>{importProgress.extracted ? `${importProgress.extracted} ${t.objects}` : t.formatsShort}</small></div>
-          {!importProgress.indeterminate && (
-            <span className="import-progress-percent" dir="ltr">
-              {Math.min(99, Math.max(1, Math.floor(Math.max(0, Math.min(1, importProgress.ratio)) * 100)))}%
-            </span>
-          )}
-          {importProgress.indeterminate
-            ? <progress max="1" />
-            : <progress max="1" value={Math.max(0, Math.min(1, importProgress.ratio))} />}
-        </div>}
-
-        {messageText && <div className={`editor-message ${error ? "error" : "notice"}`} role={error ? "alert" : "status"}>
-          <span>{messageText}</span>
-          {error && downgradeOfferFor === error && <button className="message-action" data-levo-action="simplified-retry" title={t.simplifiedRetryHelp} onClick={simplifiedRetry}>{t.simplifiedRetry}</button>}
-          {!error && arrangeUndoAvailable && <button className="message-action" onClick={undoArrange}>{t.arrangeUndo}</button>}
-          {!error && orientUndoAvailable && <button className="message-action" onClick={undoOrient}>{t.orientUndo}</button>}
-          {!error && cutUndoAvailable && <button className="message-action" onClick={undoCut}>{t.cutUndo}</button>}
-          <button onClick={() => { setError(""); setNotice(""); setDowngradeOfferFor(null); if (status === "error") setStatus("editing"); }} aria-label={t.close}><Icon name="close" /></button>
-        </div>}
-
-        {heavyWarningShown && <div className="editor-message notice" role="status" data-levo-warning="heavy-import">
-          <span>{heavyImportText}</span>
-          <button onClick={() => { setHeavyImportTriangles(null); if (noticeIsOnlyImported) setNotice(""); }} aria-label={t.close}><Icon name="close" /></button>
-        </div>}
-
-        {staleBannerShown && <div className="stale-banner" role="status">
-          <Icon name="warning" /><span>{heavyImportText ? `${t.staleHelp} ${heavyImportText}` : t.staleHelp}</span>
-          <button onClick={() => triggerSlice(false)}>{t.slice}</button>
-        </div>}
-
-        {/* Desktop home for the shell's own actions — see .shell-actions in
-            globals.css for why they need one at all. */}
-        <div className="shell-actions" role="group" aria-label={t.editTools}>
-          <button data-levo-action="auto-arrange-desktop" disabled={!objects.length} onClick={() => void arrangeAll()}>
-            <Icon name="arrange" /><span>{t.arrange}</span>
-          </button>
-          <button data-levo-action="auto-orient" disabled={!objects.length || orienting} onClick={() => void orientAll()}>
-            <Icon name="orient" /><span>{t.orient}</span>
-          </button>
-          <button data-levo-action="cut" disabled={!objects.length} onClick={openCut}>
-            <Icon name="cut" /><span>{t.cut}</span>
-          </button>
-          {/* Saving the project belongs on the canvas, not only in the header
-              and not behind a slice. The header can be lost — that is exactly
-              what the owner hit — and a project is worth saving long before
-              anything has been sliced. */}
-          <button data-levo-action="save-project" disabled={!objects.length} onClick={saveBambuProject}>
-            <Icon name="save" /><span>{t.saveProjectFile}</span>
-          </button>
+        <div className="studio-messages">
+          {messageText && <div className={`editor-message ${error ? "error" : "notice"}`} role={error ? "alert" : "status"}>
+            <span>{messageText}</span>
+            {error && downgradeOfferFor === error && <button className="message-action" data-levo-action="simplified-retry" title={t.simplifiedRetryHelp} onClick={simplifiedRetry}>{t.simplifiedRetry}</button>}
+            {!error && arrangeUndoAvailable && <button className="message-action" onClick={undoArrange}>{t.arrangeUndo}</button>}
+            {!error && orientUndoAvailable && <button className="message-action" onClick={undoOrient}>{t.orientUndo}</button>}
+            {!error && cutUndoAvailable && <button className="message-action" onClick={undoCut}>{t.cutUndo}</button>}
+            <button onClick={() => { setError(""); setNotice(""); setDowngradeOfferFor(null); if (status === "error") setStatus("editing"); }} aria-label={t.close}><Icon name="close" /></button>
+          </div>}
+          {heavyWarningShown && <div className="editor-message notice" role="status" data-levo-warning="heavy-import">
+            <span>{heavyImportText}</span>
+            <button onClick={() => { setHeavyImportTriangles(null); if (noticeIsOnlyImported) setNotice(""); }} aria-label={t.close}><Icon name="close" /></button>
+          </div>}
+          {staleBannerShown && <div className="stale-banner" role="status">
+            <Icon name="warning" /><span>{heavyImportText ? `${t.staleHelp} ${heavyImportText}` : t.staleHelp}</span>
+            <button onClick={() => triggerSlice(false)}>{t.slice}</button>
+          </div>}
         </div>
 
-        {/*
-          THE TOOL TRAY, GROUPED.
+        <ViewportCard
+          t={t}
+          busy={Boolean(importProgress)}
+          onDragOverCapture={(event) => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }}
+          onDropCapture={handleDropFiles}
+          overlay={Viewport ? {
+            fileLabel: sceneFacts.fileLabel,
+            expanded: viewportExpanded,
+            hasObjects: objects.length > 0,
+            onToggleExpanded: toggleViewportExpanded,
+            onResetView: () => { if (!adapter.frame()) shortcut("z"); },
+            onViewBed: () => shortcut("b"),
+          } : null}
+        >
+          <div className="viewport-mount" ref={viewportMountRef}>
+            {viewportElement ?? (
+              <div className="editor-loader" aria-live="polite"><span /><strong>{t.loading}</strong><small>{profile.shortName} · {profile.bed}</small></div>
+            )}
+          </div>
 
-          It was twenty identical tiles in one flat grid: a mode (move) sat
-          beside a destructive action (delete) sat beside a history step (undo)
-          sat beside an output (save), all the same size, the same weight and
-          the same colour. Nothing said which of them changes the selected
-          object, which changes the whole plate, and which cannot be taken
-          back. The apple-design skill asks for hierarchy from proximity before
-          boxes (§4) and for competing emphasis to be removed (§15); a flat
-          grid of twenty serves neither.
+          {Viewport && !objects.length && status !== "error" && <section className="empty-upload-card" aria-label={t.files}>
+            <span className="empty-upload-icon"><Icon name="file" /></span>
+            <strong>{t.files}</strong>
+            <p>{t.formatsShort}</p>
+            <FileSelectControl className="empty-upload-action" label={t.add} disabled={Boolean(importProgress)} onFiles={handlePickedFiles}><Icon name="plus" /><span>{t.add}</span></FileSelectControl>
+            <small>{t.fileLimit}</small>
+          </section>}
 
-          Five groups now, each with a quiet label, in the order a print is
-          actually made: put something on the bed, shape it, lay the plate out,
-          look at it, then keep it. Destructive actions are the only ones that
-          carry colour, and they sit at the end of their own group rather than
-          in the middle of the grid where a thumb lands by accident.
+          {importProgress && <div className="import-progress" role="status" aria-live="polite">
+            <span className="import-spinner" />
+            {/*
+              «وتحميل من ١ ل١٠٠ اثناء تحميل الملف للبرنامج» — the bar alone
+              answers "is it moving", not "how far". On a 400 MB file those are
+              different questions, and the second is the one somebody watching a
+              phone for thirty seconds is actually asking.
 
-          NOTHING WAS DROPPED. Every control that was in the flat grid is still
-          here, and two that were reachable on a desktop and NOWHERE on a phone
-          have been added: "new project" (the header button that carries it is
-          display:none below 900px) and the language switch (removed outright
-          below 350px, which locked a small phone to whatever locale happened
-          to be stored).
-        */}
-        {toolTrayOpen && <section className={`mobile-tooltray${trayCompact ? " compact" : ""}`} aria-label={t.editTools}>
-          {/*
-            SHRINK / GROW, BESIDE CLOSE.
+              Floored, never rounded: 99.7% must not read «100» while the file is
+              still being parsed, and clamped at 99 for the same reason — the
+              hundred belongs to the finished import, which is the moment this
+              whole row disappears. Latin digits and `dir="ltr"`, so «٪100» does
+              not reorder into nonsense in an Arabic or Kurdish layout.
+            */}
+            {/*
+              AND WHERE THERE IS NO NUMBER, THERE IS NO NUMBER.
 
-            «اضافة زر تقصير وتطويل قائمة الادوات ... رؤية ما خلف القائمة.»
+              The engine does not report how far through a mesh it is, so the
+              post-dispatch wait has nothing to floor — and a percentage invented
+              to fill the space would be the one thing this row must never do.
+              The percent is dropped and the bar runs without a value, which is
+              what `<progress>` with no `value` means natively: working, length
+              unknown.
+            */}
+            <div><strong>{importProgress.label}</strong><small>{importProgress.extracted ? `${importProgress.extracted} ${t.objects}` : t.formatsShort}</small></div>
+            {!importProgress.indeterminate && (
+              <span className="import-progress-percent" dir="ltr">
+                {Math.min(99, Math.max(1, Math.floor(Math.max(0, Math.min(1, importProgress.ratio)) * 100)))}%
+              </span>
+            )}
+            {importProgress.indeterminate
+              ? <progress max="1" />
+              : <progress max="1" value={Math.max(0, Math.min(1, importProgress.ratio))} />}
+          </div>}
 
-            Shrinking does NOT remove anything: the tray already scrolls, so
-            every group stays reachable at either height — it just stops being
-            two thirds of the screen while you watch an object rotate. The
-            header stays pinned, so the control that grows it back is always
-            under the same thumb that shrank it.
-
-            The chevron is the whole state cue (skill §3): it points down when
-            the tray is tall (press to shorten) and up when it is short.
-          */}
-          <header>
-            <span><strong>{t.editTools}</strong><small>{t.editToolsHelp}</small></span>
-            <button
-              onClick={() => setTrayCompact((value) => !value)}
-              aria-label={trayCompact ? t.expand : t.collapse}
-              aria-expanded={!trayCompact}
-              data-levo-action="tray-height"
-            >
-              <Icon name={trayCompact ? "chevronUp" : "chevronDown"} />
+          {/* Desktop home for the shell's own actions — see .shell-actions in
+              globals.css for why they need one at all. */}
+          <div className="shell-actions" role="group" aria-label={t.editTools}>
+            <button data-levo-action="auto-arrange-desktop" disabled={!objects.length} onClick={() => void arrangeAll()}>
+              <Icon name="arrange" /><span>{t.arrange}</span>
             </button>
-            <button onClick={() => setToolTrayOpen(false)} aria-label={t.close}><Icon name="close" /></button>
-          </header>
-
-          <div className="toolgroup" role="group" aria-label={t.files}>
-            <p className="toolgroup-label">{t.files}</p>
-            <div className="mobile-toolgrid">
-              <FileSelectControl className="tool-upload-action" label={t.add} disabled={!Viewport || Boolean(importProgress)} onFiles={handlePickedFiles}><Icon name="file" /><span>{t.add}</span></FileSelectControl>
-              <button onClick={() => { void openProjects(); setToolTrayOpen(false); }}><Icon name="layers" /><span>{t.projects}</span></button>
-              <button onClick={() => { newProject(); setToolTrayOpen(false); }}><Icon name="plus" /><span>{t.newProject}</span></button>
-            </div>
+            <button data-levo-action="auto-orient" disabled={!objects.length || orienting} onClick={() => void orientAll()}>
+              <Icon name="orient" /><span>{t.orient}</span>
+            </button>
+            <button data-levo-action="cut" disabled={!objects.length} onClick={openCut}>
+              <Icon name="cut" /><span>{t.cut}</span>
+            </button>
+            {/* Saving the project belongs on the canvas, not only in the header
+                and not behind a slice. The header can be lost — that is exactly
+                what the owner hit — and a project is worth saving long before
+                anything has been sliced. */}
+            <button data-levo-action="save-project" disabled={!objects.length} onClick={saveBambuProject}>
+              <Icon name="save" /><span>{t.saveProjectFile}</span>
+            </button>
           </div>
+        </ViewportCard>
 
-          <div className="toolgroup" role="group" aria-label={t.editTools}>
-            <p className="toolgroup-label">{t.tools}</p>
-            <div className="mobile-toolgrid">
-              <button onClick={() => runTool("gizmo-move")}><Icon name="move" /><span>{t.move}</span></button>
-              <button onClick={() => runTool("gizmo-rotate")}><Icon name="rotate" /><span>{t.rotate}</span></button>
-              <button onClick={() => runTool("gizmo-scale")}><Icon name="scale" /><span>{t.scale}</span></button>
-              <button onClick={() => runTool("gizmo-paint")}><Icon name="paint" /><span>{t.paint}</span></button>
-              <button onClick={() => runTool("tool-duplicate")}><Icon name="copy" /><span>{t.duplicate}</span></button>
-              <button onClick={() => runTool("tool-split")}><Icon name="split" /><span>{t.split}</span></button>
-              <button onClick={() => runTool("tool-onbed")}><Icon name="bed" /><span>{t.onBed}</span></button>
-              <button className="danger" onClick={() => runTool("tool-delete")}><Icon name="trash" /><span>{t.remove}</span></button>
-            </div>
-          </div>
+        <TransformToolBar
+          t={t}
+          active={objects.length ? activeGizmo : null}
+          disabled={!objects.length || status === "slicing"}
+          onTool={chooseGizmo}
+          onArrange={() => void arrangeAll()}
+        />
 
-          <div className="toolgroup" role="group" aria-label={t.arrange}>
-            <p className="toolgroup-label">{t.plate}</p>
-            <div className="mobile-toolgrid">
-              <button onClick={() => void arrangeAll()}><Icon name="arrange" /><span>{t.arrange}</span></button>
-              <button data-levo-action="auto-orient-tray" disabled={orienting} onClick={() => void orientAll()}><Icon name="orient" /><span>{t.orient}</span></button>
-              <button data-levo-action="cut-tray" onClick={openCut}><Icon name="cut" /><span>{t.cut}</span></button>
-              <button onClick={() => { clickControl("plate-add"); setToolTrayOpen(false); }}><Icon name="layers" /><span>{t.addPlate}</span></button>
-              <button className="danger" onClick={deleteAll}><Icon name="trash" /><span>{t.deleteAll}</span></button>
-            </div>
-          </div>
+        <PrintSettingsCard
+          t={t}
+          printerName={profile.model}
+          onOpenPrinter={() => { setPrinterDraft(profileId); setSheet("printer"); }}
+          material={material}
+          materials={materialsFor(profileId)}
+          onMaterial={setMaterial}
+          quality={quality}
+          effectiveLayer={effectiveLayerHeight}
+          onQuality={setQuality}
+          strength={strength}
+          effectiveInfill={effectiveInfill}
+          onStrength={setStrength}
+          support={support}
+          onSupport={setSupport}
+          disabled={!Viewport || status === "slicing"}
+          showAllSettings={!simpleMode}
+          onAllSettings={openAllSettings}
+        />
 
-          <div className="toolgroup" role="group" aria-label={t.preview}>
-            <p className="toolgroup-label">{t.preview}</p>
-            <div className="mobile-toolgrid">
-              <button onClick={() => { shortcut("z"); setToolTrayOpen(false); }}><Icon name="fit" /><span>{t.fit}</span></button>
-              <button onClick={() => { shortcut("b"); setToolTrayOpen(false); }}><Icon name="bed" /><span>{t.bed}</span></button>
-              <button onClick={() => { clickControl("undo"); setToolTrayOpen(false); }}><Icon name="undo" /><span>{t.undo}</span></button>
-              <button onClick={() => { clickControl("redo"); setToolTrayOpen(false); }}><Icon name="redo" /><span>{t.redo}</span></button>
-            </div>
-          </div>
+        <ModelInfoCard
+          t={t}
+          dimensions={sceneFacts.dimensions}
+          needsSelection={sceneFacts.needsSelection}
+          orientation={sceneFacts.orientation}
+          disabled={!objects.length || orienting || status === "slicing"}
+          onOrient={(preset) => void orientTo(preset)}
+        />
 
-          <div className="toolgroup" role="group" aria-label={t.save}>
-            <p className="toolgroup-label">{t.printExport}</p>
-            <div className="mobile-toolgrid">
-              <button onClick={() => { saveBambuProject(); setToolTrayOpen(false); }}><Icon name="save" /><span>{t.save}</span></button>
-              {plateCount > 1 && <button onClick={() => { triggerSlice(true); setToolTrayOpen(false); }}><Icon name="slice" /><span>{t.sliceAll}</span></button>}
-              <button onClick={() => { openPrintCenter(); setToolTrayOpen(false); }}><Icon name="print" /><span>{t.printExport}</span></button>
-            </div>
-          </div>
+        {readiness && <ReadinessBanner t={t} kind={readiness} detail={readinessDetail} />}
 
-          {/*
-            THE LANGUAGE, WHERE A SMALL PHONE CAN REACH IT.
+        <PrimarySliceButton
+          t={t}
+          slicing={status === "slicing"}
+          progress={slicing.progress}
+          retrySuffix={retrySuffix}
+          printReady={printReady}
+          stale={currentStale}
+          disabled={!objects.length || !Viewport || Boolean(importProgress)}
+          onPress={primaryAction}
+        />
 
-            The header's <select> is the only locale switcher in the app and it
-            is removed outright below 350px, so a 320px phone was locked to
-            whatever locale was persisted — in an app whose whole point is that
-            it speaks Arabic, English and Kurdish. Here it is a segmented
-            control rather than a select: three fixed choices are a segmented
-            control's exact job, and it needs no native picker on a phone.
-          */}
-          <div className="toolgroup" role="group" aria-label={t.language}>
-            <p className="toolgroup-label">{t.language}</p>
-            <div className="locale-segments" role="radiogroup" aria-label={t.language}>
-              {LOCALE_OPTIONS.map((option) => (
-                <button
-                  key={option.id}
-                  role="radio"
-                  aria-checked={locale === option.id}
-                  className={locale === option.id ? "active" : ""}
-                  onClick={() => changeLocale(option.id)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>}
-
-        <div className="mobile-primarybar">
-          <FileSelectControl className="mobile-nav-item" label={t.files} disabled={!Viewport || Boolean(importProgress)} onFiles={handlePickedFiles}><Icon name="file" /><span>{t.files}</span></FileSelectControl>
-          <button className={`mobile-nav-item ${toolTrayOpen ? "active" : ""}`} onClick={() => { setSidebarOpen(false); setToolTrayOpen((value) => !value); }} aria-expanded={toolTrayOpen}><Icon name="move" /><span>{t.tools}</span></button>
-          <button className={`mobile-primary-action ${status === "slicing" ? "cancel" : ""} ${printReady ? "ready" : ""}`} onClick={primaryAction} disabled={!objects.length}>
-            <Icon name={printReady ? "print" : "slice"} /><span>{status === "slicing" ? `${t.cancel} ${Math.round(slicing.progress * 100)}%` : printReady ? t.print : t.slice}</span>
-          </button>
-          <button className={`mobile-nav-item ${canvasMode === "preview" ? "active" : ""}`} onClick={() => clickControl(canvasMode === "preview" ? "mode-prepare" : "mode-preview")} disabled={!objects.length}><Icon name="layers" /><span>{canvasMode === "preview" ? t.prepare : t.preview}</span></button>
-          {/* Simple mode has no engine panel to open, so Settings is the Setup
-              sheet — the essentials, and the switch to Advanced. */}
-          <button
-            className={`mobile-nav-item ${(simpleMode ? sheet === "setup" : sidebarOpen) ? "active" : ""}`}
-            onClick={() => {
-              setToolTrayOpen(false);
-              if (simpleMode) setSheet("setup");
-              else setSidebarOpen((value) => !value);
-            }}
-          ><Icon name="settings" /><span>{t.settings}</span></button>
-        </div>
-      </section>
+        <ExportSection
+          t={t}
+          hasObjects={objects.length > 0}
+          gcodeReady={printReady}
+          stale={currentStale}
+          gcodeCaption={`${profile.shortName} · ${t.plate} ${selectedPlate + 1}`}
+          onExport3mf={saveBambuProject}
+          onExportGcode={() => { downloadCurrentGcode(); }}
+          onMore={printReady || currentStale ? openPrintCenter : null}
+        />
+      </div>
 
       {/*
         THE SHEET'S DISMISS PATHS, ALL THREE OF THEM REAL.
@@ -2754,11 +3031,31 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
             onPointerDown={beginSheetDrag}
           />
           <header>
-            <div><strong>{sheetTitle}</strong><span>{profile.shortName} · {profile.nozzle.toFixed(1)} mm · PLA</span></div>
+            <div><strong>{sheetTitle}</strong><span>{profile.shortName} · {profile.nozzle.toFixed(1)} mm · {MATERIALS[material].type}</span></div>
             <button onClick={() => setSheet(null)} aria-label={t.close}><Icon name="close" /></button>
           </header>
 
-          {sheet === "signout" ? (
+          {sheet === "more" ? (
+            <OverflowSheet
+              t={t}
+              locale={locale}
+              onLocale={changeLocale}
+              theme={studioTheme.preference}
+              onTheme={studioTheme.setPreference}
+              hasObjects={objects.length > 0}
+              importDisabled={!Viewport || Boolean(importProgress)}
+              plateCount={plateCount}
+              canvasMode={canvasMode}
+              printReady={printReady}
+              stale={currentStale}
+              freshPlateCount={freshPlateCount}
+              orienting={orienting}
+              signedIn={Boolean(user?.id)}
+              nativeApp={nativeEnvironment.native}
+              run={runOverflow}
+              onPickFiles={(files) => { setSheet(null); handlePickedFiles(files); }}
+            />
+          ) : sheet === "signout" ? (
             <SignOutSheet t={t} busy={signingOut} onConfirm={(purge) => void signOut(purge)} onCancel={() => setSheet(null)} />
           ) : sheet === "cut" ? (
             <CutSheet
@@ -2798,13 +3095,13 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
               onSupport={setSupport}
               mode={studioMode.mode}
               onMode={studioMode.setMode}
-              onOpenAdvanced={() => {
-                setSheet(null);
-                // In Simple mode "all settings" means Advanced: the panel it
-                // opens does not exist in Simple at any width.
-                if (simpleMode) studioMode.setMode("advanced");
-                setSidebarOpen(true);
-              }}
+              theme={studioTheme.preference}
+              onTheme={studioTheme.setPreference}
+              // In Simple mode "all settings" means Advanced: the panel it
+              // opens does not exist in Simple at any width — see
+              // openAllSettings, which carries the same rule:
+              // if (simpleMode) studioMode.setMode("advanced");
+              onOpenAdvanced={openAllSettings}
               onClose={() => setSheet(null)}
             />
           ) : sheet === "projects" ? (

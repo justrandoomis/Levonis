@@ -60,6 +60,20 @@ test("renders the production slicer shell and security policy", needsBuild, asyn
   // the SSR HTML. Browser-side mounting is covered by the Playwright smoke.
   assert.match(html, /جارٍ تحميل LEVO Studio/);
   assert.doesNotMatch(html, /X2D/);
+
+  // TWO THEMES (plan item C6, changed deliberately): the server guesses dark,
+  // the inline boot script applies the stored or system choice before first
+  // paint, and the browser chrome has a colour for each theme.
+  assert.match(html, /<html lang="ar" dir="rtl" data-theme="dark">/);
+  assert.match(html, /localStorage\.getItem\("levo-studio-theme"\)/);
+  assert.match(html, /<meta name="theme-color" content="#121619" media="\(prefers-color-scheme: dark\)"\/>/);
+  assert.match(html, /<meta name="theme-color" content="#e3dacb" media="\(prefers-color-scheme: light\)"\/>/);
+  // The boot screen already draws the phone column's viewport card.
+  assert.match(html, /class="boot-card"/);
+  // Cairo is self-hosted (font-src 'self'), and its Arabic subset is fetched
+  // with the document, once.
+  assert.equal((html.match(/<link rel="preload" href="\/fonts\/cairo\/cairo-v31-arabic\.woff2" as="font"/g) ?? []).length, 1);
+  assert.match(response.headers.get("content-security-policy") ?? "", /font-src 'self'/);
 });
 
 /**

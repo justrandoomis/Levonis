@@ -24,7 +24,10 @@ export type IconName =
   | "plus" | "file" | "move" | "rotate" | "scale" | "copy" | "trash" | "fit"
   | "bed" | "layers" | "slice" | "print" | "save" | "share" | "undo" | "redo"
   | "split" | "paint" | "info" | "settings" | "close" | "check" | "external"
-  | "arrange" | "orient" | "cut" | "warning" | "chevronUp" | "chevronDown";
+  | "arrange" | "orient" | "cut" | "warning" | "chevronUp" | "chevronDown"
+  // The phone shell (plan item C6): the reference screen's glyphs.
+  | "upload" | "document" | "chevronBack" | "cube" | "resetView" | "shrink"
+  | "spool" | "infill" | "supports" | "boxUpright" | "boxSide" | "cubeAuto" | "more";
 
 export function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
@@ -61,6 +64,29 @@ export function Icon({ name }: { name: IconName }) {
     // press to shorten it"; up means the opposite. No second cue is needed.
     chevronUp: <><path d="m6 15 6-6 6 6"/></>,
     chevronDown: <><path d="m6 9 6 6 6-6"/></>,
+    // «استيراد»: a tray with the arrow leaving it upward.
+    upload: <><path d="M12 15V4"/><path d="m7 9 5-5 5 5"/><path d="M5 14v6h14v-6"/></>,
+    // «حفظ», the file chip and the export tiles: a page with two lines.
+    document: <><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></>,
+    // Drawn pointing right, which is "back" in Arabic and Sorani; the
+    // stylesheet turns it round in English.
+    chevronBack: <><path d="m9 6 6 6-6 6"/></>,
+    cube: <><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4 7.5 8 4.5 8-4.5"/><path d="M12 12v9"/></>,
+    // «إعادة العرض»: a counter-clockwise turn back to the start.
+    resetView: <><path d="M4 4v5h5"/><path d="M4.6 14a8 8 0 1 0 1.8-8.2L4 9"/></>,
+    // The expand corners turned inward: back from the full-screen view.
+    shrink: <><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></>,
+    // «الخامة»: a filament spool seen from the side.
+    spool: <><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></>,
+    // «الملء»: three cells of a honeycomb.
+    infill: <><path d="m8 3 3.5 2v4L8 11 4.5 9V5z"/><path d="m16 3 3.5 2v4L16 11l-3.5-2V5z"/><path d="m12 11 3.5 2v4L12 19l-3.5-2v-4z"/></>,
+    // «الدعامات»: pillars standing on the bed under a part.
+    supports: <><path d="M3 21h18"/><path d="M4 4h16"/><path d="M7 4v17M12 4v17M17 4v17"/></>,
+    // The three orientation chips: upright, automatic, lying on its side.
+    boxUpright: <><path d="M6 7 9.5 3.5H18V17l-3.5 3.5H6z"/><path d="M6 7h8.5v13.5M14.5 7 18 3.5"/></>,
+    boxSide: <><path d="M3 10.5 6.5 7H21v8.5L17.5 19H3z"/><path d="M3 10.5h14.5V19M17.5 10.5 21 7"/></>,
+    cubeAuto: <><path d="m11 6 7 4v8l-7 4-7-4v-8z"/><path d="m4 10 7 4 7-4"/><path d="M11 14v8"/><path d="M19 2v4M17 4h4"/></>,
+    more: <><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></>,
   };
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -102,6 +128,14 @@ export function FileSelectControl({
     </label>
   );
 }
+
+/**
+ * Where the phone top bar's back chevron goes: the LEVONIS community, which is
+ * where the Studio is opened from (its Studio card is a plain link here). A
+ * plain navigation, guarded in the shell when leaving would stop a slice or
+ * leave account changes unsaved.
+ */
+export const STUDIO_BACK_URL = "https://levonis-iq.com/community";
 
 /** S2 auth-handoff routes on the Studio worker (never the retired oai paths). */
 export const SIGN_IN_HREF = "/auth/login?return_to=%2F";

@@ -1,6 +1,6 @@
 {
-  "origin": "http://127.0.0.1:8811",
-  "run": "67aa3e16",
+  "origin": "http://127.0.0.1:5261",
+  "run": "b2821c4a",
   "desktopSimple": {
     "mode": "simple",
     "sidebar": "none",
@@ -160,7 +160,7 @@
     },
     {
       "ok": true,
-      "m": "the header slice action is desktop-only"
+      "m": "the desktop header (and its slice action) is desktop-only"
     },
     {
       "ok": true,
@@ -168,7 +168,11 @@
     },
     {
       "ok": true,
-      "m": "Settings opens the Setup sheet (with the mode switch) in Simple"
+      "m": "the mode switch is on the page, set to Simple"
+    },
+    {
+      "ok": true,
+      "m": "the overflow's Settings opens the Setup sheet (with the mode switch) in Simple"
     },
     {
       "ok": true,
@@ -197,7 +201,7 @@
     {
       "ok": true,
       "m": "a forged levonis_session beside the Studio cookie: the Studio session still works",
-      "detail": "simple-b-67aa3e16"
+      "detail": "simple-b-b2821c4a"
     },
     {
       "ok": true,
@@ -213,6 +217,6 @@
       "m": "…and changed nothing"
     }
   ],
-  "passed": 28,
-  "total": 28
+  "passed": 29,
+  "total": 29
 }

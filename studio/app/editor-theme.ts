@@ -1,11 +1,11 @@
 /**
  * LEVONIS editor theme (slice S6).
  *
- * Lightweight design tokens copied from the main store's theme
- * (`src/index.css` — the LEVONIS greens, LEVONIS gold, Cairo type) — token values
- * only, never store bundles (mandate §2). The same values are mirrored as CSS
- * custom properties in `app/globals.css` (`:root`); keep both in sync when a
- * token changes.
+ * Lightweight design tokens: the reference ladder for dark, the store's
+ * cream ladder for light (`src/index.css`), LEVONIS gold and Cairo type —
+ * token values only, never store bundles (mandate §2). The same values are
+ * mirrored as CSS custom properties in `app/globals.css` (`:root` and
+ * `:root[data-theme="light"]`); keep both in sync when a token changes.
  *
  * `EDITOR_SHADOW_CSS` is the stylesheet the S4 engine adapter injects into
  * every three-slicer shadow root (`EngineAdapter#setThemeCss` /
@@ -23,85 +23,131 @@
 
 /** Store-derived identity tokens (values copied from src/index.css). */
 export const LEVONIS_TOKENS = {
-  /** Store gold family — the one accent the Studio spends. */
+  /** Store gold family — the brand gold the Studio spends. */
   gold: "#BAA369",
   goldLight: "#FFE55C",
-  /** Store type stack (Cairo is the store's face; system fallbacks apply). */
+  /** Store type stack (Cairo is the store's face; globals.css self-hosts it). */
   fontSans: '"Cairo", Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif',
 } as const;
 
 /**
- * Studio surfaces — the BLACK system. Mirrors `:root` in app/globals.css, whose
- * comment carries the full rationale; the short version is that the base is
- * true black and elevation is a ladder of neutral greys rather than a hue.
+ * Studio surfaces, DARK — the reference ladder. Mirrors `:root` in
+ * app/globals.css, whose comment carries the full rationale: a blue-charcoal
+ * page, cards one step lighter, raised controls one more, and a sand-gold
+ * clay for the one primary.
  *
  * These values cross into the ENGINE's shadow roots via EDITOR_SHADOW_CSS
  * below, so the vendored slicer's chrome sits on the same ladder as ours
  * instead of showing its own palette through.
  */
 export const STUDIO_SURFACES = {
-  shell: "#000000",
-  header: "#0A0A0B",
-  panel: "#111113",
-  surface: "#17171A",
-  surfaceStrong: "#212125",
-  canvas: "#000000",
-  line: "#2C2C31",
-  lineSoft: "#1C1C20",
-  text: "#F5F5F7",
-  muted: "#98989F",
-  accent: LEVONIS_TOKENS.gold,
-  accentStrong: "#9C8752",
-  accentSoft: "#1C180E",
-  accentInk: "#171106",
-  danger: "#FF453A",
-  dangerSurface: "#2A1411",
-  warning: "#FF9F0A",
-  warningSurface: "#2B1C06",
-  success: "#30D158",
-  successSurface: "#0E2A16",
+  shell: "#121619",
+  header: "#1A1F23",
+  panel: "#22272C",
+  surface: "#282E33",
+  surfaceStrong: "#2E343A",
+  canvas: "#16191E",
+  line: "#2B3036",
+  lineSoft: "#1F2429",
+  text: "#F2F3F5",
+  muted: "#97A2AE",
+  accent: "#DCBC8C",
+  accentStrong: "#C8A777",
+  accentSoft: "#2C2B28",
+  accentInk: "#15100A",
+  /** Gold as text on this ladder (an open settings page, a selected row). */
+  goldText: "#F0D18C",
+  danger: "#ED7177",
+  dangerSurface: "#3A2427",
+  warning: "#F0B35A",
+  warningSurface: "#33291A",
+  success: "#67CB98",
+  successSurface: "#1F3230",
   /*
    * Mirrors the tokens of the same name in globals.css, whose :root comment
    * carries the reasoning. They are here because these values cross into the
-   * ENGINE's shadow roots through EDITOR_SHADOW_CSS below, and a shadow root
-   * cannot see the page's custom properties unless we put them there.
+   * ENGINE's shadow roots through EDITOR_SHADOW_CSS below.
    *
-   * `shadowCast` is the one that was wrong rather than missing: the engine
-   * chrome cast an olive-tinted shadow, hex 040806, onto a black canvas.
+   * `shadowCast` once carried an olive tint, hex 040806, onto the canvas. In
+   * dark it is black.
    */
   shadowCast: "#000000",
-  idle: "#5B5B63",
-  track: "#3A3A40",
+  idle: "#5E6873",
+  track: "#3A4148",
 } as const;
 
-const T = STUDIO_SURFACES;
+/**
+ * Studio surfaces, LIGHT — the site's cream ladder. Mirrors
+ * `:root[data-theme="light"]` in app/globals.css. The canvas is the one value
+ * that does not change: the engine clears its WebGL canvas to a fixed dark
+ * colour, so the viewport is a dark island in both themes and its frame
+ * matches it.
+ */
+export const STUDIO_SURFACES_LIGHT = {
+  shell: "#E3DACB",
+  header: "#E8E0D1",
+  panel: "#EBE4D6",
+  surface: "#F0EADF",
+  surfaceStrong: "#DDD4C3",
+  canvas: "#16191E",
+  line: "#CFC5B2",
+  lineSoft: "#DDD4C3",
+  text: "#16181B",
+  muted: "#595C62",
+  accent: "#6F592B",
+  accentStrong: "#5A4721",
+  accentSoft: "#E6DCC6",
+  accentInk: "#F6F1E7",
+  goldText: "#6A5426",
+  danger: "#AD3037",
+  dangerSurface: "#F1D9D3",
+  warning: "#87520A",
+  warningSurface: "#F1E2C4",
+  success: "#165C3A",
+  successSurface: "#DADACA",
+  /** A warm ink, as the site's light clay uses; black would grey the cream. */
+  shadowCast: "#3A2E1C47",
+  idle: "#8B8478",
+  track: "#CFC5B2",
+} as const satisfies Record<keyof typeof STUDIO_SURFACES, string>;
+
+type SurfaceKey = keyof typeof STUDIO_SURFACES;
 
 /**
- * HOW FAR UP THE ENGINE'S OWN CONTROLS MUST SIT ON A PHONE.
- *
- * The shell's bottom bar is `--mobile-bar-height` (68px) PLUS the safe-area
- * inset, and it is `position: absolute; bottom: 0` over the canvas. The engine
- * parks its plate bar and its status line inside the same canvas, and they
- * were pinned at 76px and 72px — numbers chosen when the bar was shorter and
- * before anyone had a home indicator.
- *
- * On a phone with a 34px inset the bar is ~102px tall, so the plate tabs, the
- * add/remove-plate buttons and the whole status readout were BEHIND it, with
- * no way to reach them: the tray does not re-provide plate switching, only
- * plate-add.
- *
- * So the offsets are computed from the bar rather than guessed next to it.
- * `env(safe-area-inset-bottom)` resolves inside a shadow root exactly as it
- * does on the page — it is a viewport-level value, not an inherited property —
- * which is what lets this stay in sync without the shell passing anything in.
- * tests/theme-tokens.test.mjs pins the 68px against globals.css so the two
- * cannot drift apart again.
+ * The custom property each surface becomes inside the engine's shadow root.
+ * One set of rules below reads them, and the host attribute
+ * `data-levo-theme` (set by the shell from app/theme.ts) picks which values
+ * are in force — so a theme change is an attribute flip, not a re-injected
+ * stylesheet.
  */
-const MOBILE_BAR_HEIGHT_PX = 68;
-/** Clear of the bar, plus a thumb's worth of margin so the edges do not touch. */
-const ABOVE_BAR = `calc(${MOBILE_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + 10px)`;
-const ABOVE_BAR_TIGHT = `calc(${MOBILE_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + 6px)`;
+function surfaceVars(surfaces: Record<SurfaceKey, string>): string {
+  return (Object.keys(surfaces) as SurfaceKey[])
+    .map((key) => `--lv-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}: ${surfaces[key]};`)
+    .join(" ");
+}
 
+/** `var(--lv-…)` for a surface key, so the rules below cannot misspell one. */
+const T = Object.fromEntries(
+  (Object.keys(STUDIO_SURFACES) as SurfaceKey[]).map((key) => [
+    key,
+    `var(--lv-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)})`,
+  ]),
+) as Record<SurfaceKey, string>;
+
+/**
+ * HOW FAR UP THE ENGINE'S OWN CONTROLS SIT ON A PHONE.
+ *
+ * They used to clear the shell's 68px bottom bar plus the safe-area inset
+ * (ABOVE_BAR). The phone shell has no bottom bar now: the canvas is a card in
+ * the middle of a scrolling column (globals.css, THE PHONE SHELL), so the
+ * plate bar, the status line and the stats card only need to clear the card's
+ * rounded corner, `--engine-dock-gap` in globals.css. When the viewport is
+ * expanded over the whole screen the card's edge is the screen's edge, and
+ * then the safe-area inset is added back. tests/theme-tokens.test.mjs pins
+ * both numbers to each other.
+ */
+const ENGINE_DOCK_GAP_PX = 8;
+const DOCK_BOTTOM = "var(--lv-dock-bottom)";
 /**
  * SIMPLE MODE: THE ENGINE CONTROLS IT HIDES (P1-10; GAP-MAP conflict 23).
  *
@@ -153,7 +199,18 @@ const SIMPLE_ORPHAN_SEPARATOR_SELECTOR = SIMPLE_MODE_HIDDEN_ENGINE_TOOLS
  * `EngineAdapter#setHostAttribute`).
  */
 export const EDITOR_SHADOW_CSS = `
-  :host { color-scheme: dark; background: ${T.shell} !important; color: ${T.text} !important; font-family: ${LEVONIS_TOKENS.fontSans}; }
+  :host { ${surfaceVars(STUDIO_SURFACES)} --lv-dock-bottom: ${ENGINE_DOCK_GAP_PX}px; color-scheme: dark; background: ${T.shell} !important; color: ${T.text} !important; font-family: ${LEVONIS_TOKENS.fontSans}; }
+  :host([data-levo-theme="light"]) { ${surfaceVars(STUDIO_SURFACES_LIGHT)} color-scheme: light; }
+  :host([data-levo-viewport="expanded"]) { --lv-dock-bottom: calc(env(safe-area-inset-bottom) + ${ENGINE_DOCK_GAP_PX}px); }
+  /* WHAT FLOATS ON THE CANVAS STAYS PART OF THE ISLAND. The gizmo rail, the
+     view toolbar, the plate tabs and the stats card sit on (or against) the
+     dark canvas, and the rail and toolbar draw their icons as light images.
+     In the light theme they keep the dark values, re-declared on those
+     elements, so their icons do not fade into a cream panel. */
+  :host([data-levo-theme="light"]) :is(.left-rail, .vp-top-toolbar, .plate-bar, .stats-card, .bed-warn, .brush-panel) { ${surfaceVars(STUDIO_SURFACES)} color-scheme: dark; }
+  /* THE CANVAS IS A DARK ISLAND IN BOTH THEMES: the engine clears it to a
+     fixed dark colour, so the frame around it stays dark too. */
+  .viewport-col { background: ${T.canvas}; }
   .app-shell { direction: ltr; background: ${T.shell}; color: ${T.text}; }
   .topbar, .left-rail { background: ${T.header}; border-color: ${T.lineSoft}; }
   /* THE ENGINE'S OWN BRAND IS NOT OUR BRAND. The vendored slicer paints a
@@ -174,8 +231,7 @@ export const EDITOR_SHADOW_CSS = `
      a deploy nobody read. Plain prose only in this block. */
   .tb-logo { display: none !important; }
   .tb-btn, .tb-icon, .tb-tabs, .tb-tabs button { background: ${T.surface}; border-color: ${T.line}; border-radius: 6px; color: ${T.text}; }
-  .tb-tabs button.on, .left-rail button.on { background: ${T.accent}; color: ${T.accentInk}; }
-  .viewport-col { background: ${T.canvas}; }
+  .tb-tabs button.on, .left-rail button.on, .plate-tab.on { background: ${T.accent}; color: ${T.accentInk}; border-color: ${T.accentStrong}; }
   .vp-top-toolbar, .plate-bar, .brush-panel, .stats-card, .help-card { background: ${T.header}; border-color: ${T.line}; border-radius: 7px; box-shadow: 0 10px 24px ${T.shadowCast}; }
   .vp-top-toolbar button:hover:not(:disabled), .left-rail button:hover { background: ${T.surfaceStrong}; }
   .sidebar { background: ${T.panel}; color: ${T.text}; border-color: ${T.line}; }
@@ -185,7 +241,7 @@ export const EDITOR_SHADOW_CSS = `
   .settings-book { display: flex; flex-direction: column; gap: 6px; }
   .settings-book > details { border: 1px solid ${T.line}; border-radius: 6px; overflow: hidden; background: ${T.panel}; }
   .settings-book > details > summary { min-height: 44px; padding: 11px; cursor: pointer; color: ${T.text}; font-weight: 650; background: ${T.surface}; list-style-position: inside; }
-  .settings-book > details[open] > summary { color: ${LEVONIS_TOKENS.goldLight}; border-bottom: 1px solid ${T.line}; }
+  .settings-book > details[open] > summary { color: ${T.goldText}; border-bottom: 1px solid ${T.line}; }
   .settings-panel, .settings-panel .sp-top, .settings-panel .sp-body, .settings-panel .page,
   .settings-panel .group, .settings-panel .row, .sc-fold-body, .slice-menu,
   .slice-menu button { background: ${T.panel} !important; color: ${T.text} !important; border-color: ${T.line} !important; }
@@ -217,11 +273,14 @@ export const EDITOR_SHADOW_CSS = `
   @media (max-width: 899px) {
     .app-shell { font-size: 12px; }
     .topbar, .left-rail, .vp-top-toolbar { display: none !important; }
-    .plate-bar { right: 8px; bottom: ${ABOVE_BAR}; padding: 4px; }
+    .plate-bar { right: 8px; bottom: ${DOCK_BOTTOM}; padding: 4px; }
     .plate-bar button { min-width: 44px; height: 44px; }
-    .vp-status { bottom: ${ABOVE_BAR_TIGHT}; left: 9px; right: 58px; font-size: 11px; }
-    .bed-warn, .stats-card { left: 8px; bottom: calc(${ABOVE_BAR} + 44px); max-width: calc(100% - 68px); }
-    .brush-panel { top: 8px; left: 8px; width: min(280px, calc(100vw - 16px)); }
+    /* One line in the card: the full keyboard hint is a desktop affordance,
+       and three lines of it covered a third of a phone-sized viewport. */
+    .vp-status { bottom: ${DOCK_BOTTOM}; left: 9px; right: 104px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bed-warn, .stats-card { left: 8px; bottom: calc(${DOCK_BOTTOM} + 52px); max-width: calc(100% - 68px); }
+    /* Below the shell's overlay toolbar, which owns the top 50px of the card. */
+    .brush-panel { top: 54px; left: 8px; width: min(280px, calc(100vw - 16px)); }
     /* z-index 33, not 14 — «عندما اضغط على زر الاعدادات قائمة اختار الملف
        تصير امام الاعدادات».
 
@@ -236,10 +295,10 @@ export const EDITOR_SHADOW_CSS = `
        this panel lost to it: the Files card painted over the settings the
        person had just opened.
 
-       33 puts the panel above that card and above the mobile tool tray (31),
-       and still below the import progress row (46) — which must stay visible
+       33 puts the panel above that card and still below the import
+       progress row (46) — which must stay visible
        over everything, because it is the only sign that a file is loading. */
-    .sidebar { position: absolute; z-index: 33; top: 0; right: 0; bottom: ${ABOVE_BAR_TIGHT}; width: min(94vw, 420px); flex-basis: auto; box-shadow: -16px 0 34px ${T.shadowCast}; }
+    .sidebar { position: absolute; z-index: 33; top: 0; right: 0; bottom: ${DOCK_BOTTOM}; width: min(94vw, 420px); flex-basis: auto; box-shadow: -16px 0 34px ${T.shadowCast}; }
     :host([data-levo-sidebar="closed"]) .sidebar { display: none; }
     :host([data-levo-sidebar="open"]) .sidebar { display: flex; }
     .sidebar-scroll { padding: 8px 8px 82px; }

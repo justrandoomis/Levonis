@@ -1,37 +1,45 @@
 # Mobile UX
 
-LEVO presents the same editor state on desktop and mobile instead of maintaining a simplified second slicer.
+LEVO presents the same editor state on desktop and mobile instead of maintaining a simplified second slicer. Below 900 px the editor is laid out as the owner's reference screen (IMG_8466): one scrolling column of clay cards around the same engine the desktop uses.
 
-## Touch workflow
+## The phone column (plan item C6)
 
-- The workspace opens immediately with a visible build plate and a large, explicit model/ZIP upload card.
-- The persistent five-action bar exposes Files, Tools, Slice/Cancel/Print, Prepare/Preview, and Settings without horizontal scrolling.
-- Tools opens an expandable grid with Add, Move, Rotate, Scale, Duplicate, Delete, Split, Place on Bed, Support Paint, Zoom All, Zoom Bed, Undo, Redo, Add Plate, Save 3MF, Slice All, and Delete All.
-- Once slicing succeeds, the central action changes to Print and opens actual G-code download, file sharing, project save, multi-plate export, and the official Bambu handoff guidance.
-- The native plate switcher, overflow warning, progress/status, preview layer controls, and settings drawer remain available above the LEVO bar.
-- Quick setup uses compact X2D/H2D, quality, strength, and support choices. The complete Orca-style process, motion, filament, object, and preview controls remain in the responsive drawer.
-- Arabic/RTL is the initial product language; English is available from the header. Coordinates, file names, and the embedded technical editor stay LTR.
+Top to bottom, as the reference draws it:
+
+1. **Top bar.** A back chevron to the LEVONIS community, «LEVO Studio» over «تجهيز ملفات الطباعة», then «حفظ» and, at the end edge, «استيراد» (gold outline), in the order of the reference. Save writes to the account when signed in (creating the account project the first time) and to a draft on this device otherwise, and says which. Leaving during a slice, or with account changes not yet saved, asks first.
+2. **«المزيد» and the mode.** The overflow entry sits on the start side; the Simple / Advanced switch («مبسط» / «متقدم») on the end side, a radiogroup the arrow keys walk in the writing direction.
+3. **Viewport card.** About 46% of the screen tall, with an overlay toolbar along its top edge: expand (an in-app full-height view, since iPhone has no Fullscreen API), «إعادة العرض», the bed view, and the file name in LTR. The canvas stays the engine's dark island in both themes. One finger orbits inside the card; the page scrolls from anywhere outside it.
+4. **Transform tiles.** Move, Rotate, Size, Arrange. The pressed tile is read from the engine's own gizmo rail, never guessed.
+5. **Print settings.** Printer (opens the printer grid), material, layer height, infill, supports, and «كل الإعدادات» in Advanced. The rows list only what is real: materials whose engine preset ships for the printer (PLA Basic, and PETG Basic where the engine has it), the Quality and Strength tiers, and the value the kernel will actually use, marked «(مخصص)» when a hand edit moved it off every tier.
+6. **Model size and orientation.** The size is measured from the model's own vertices after scale and rotation. The three orientation chips (as imported, automatic, on its side) turn the selected object, or every object when none is selected, with an undo; the pressed chip is read from the current rotation.
+7. **Readiness banner.** Driven by the real preflight and the slice result: hidden while there is nothing to judge, then blocked (danger), outdated (warning), generic fallback presets (warning), sliced (success) or «جاهز للتقطيع» (success). It never shows success over a blocker.
+8. **«تقطيع المجسم».** The one gold primary. It shows progress with cancel while slicing (and the retry rung), «أعد التقطيع» when the result is outdated, and «الطباعة والتصدير» once the result is fresh.
+9. **«تصدير الملف».** 3MF always; G-code only from a fresh result, otherwise «متاح بعد التقطيع» or «أعد التقطيع أولًا». «المزيد من خيارات التصدير» opens the print sheet once there is a result.
+
+## Nothing is dropped
+
+The reference leaves out most of the editor. Everything the old five-action bar and tool tray reached is in the overflow sheet («المزيد»), grouped in the order a print is made: files (add, projects, new project); object tools (duplicate, split, place on bed, support paint, cut, auto-orient, delete); the plate (add a plate, slice all, delete all); the view (prepare / preview, zoom all, zoom bed, undo, redo); output (MakerWorld 3MF, share G-code, every plate, print and export); settings (the Setup sheet, all settings); account and printer (sign in or out, connect a printer); language; appearance; and the platform status with the source-code link. That link (AGPL-3.0-or-later) is two taps from the main screen: «المزيد», then «المصدر وإشعارات المكتبات».
 
 ## Desktop workflow
 
-At 900 px and wider, LEVO removes the duplicated phone controls and exposes the native full workspace: top project actions, prepare/preview tabs, gizmos, object tools, right sidebar, plate tabs, slice current/all, and G-code export. The LEVO header adds explicit Files and Print & Export entry points.
+At 900 px and wider, LEVO keeps the native full workspace: top project actions, prepare/preview tabs, gizmos, object tools, right sidebar, plate tabs, slice current/all, and G-code export. The LEVO header adds explicit Files and Print & Export entry points. It is re-tinted with the same tokens and is otherwise unchanged. The phone column and the desktop are one DOM tree told apart by the stylesheet, so a tablet turning across 900 px keeps its scene.
 
 ## Visual system
 
-- Neutral charcoal surfaces use one green action accent and fixed semantic warning/error colors.
-- Cards, bars, dialogs, and native engine panels are opaque, compact, and use restrained 5–10 px corners; there are no decorative gradients or backdrop blur.
-- Five equal bottom actions, compact 4-column tool grids below 420 px, and a 350 px breakpoint preserve target size on narrow phones.
-- Safe-area insets protect controls on notched devices, while short landscape screens receive reduced bar and tray heights.
+- Two themes, chosen per device (system, light or dark) in the overflow sheet or in Settings. Dark is the reference's blue charcoal; light is the site's cream. The browser chrome colour follows the theme.
+- Clay grammar (site row 207): one light from above, a lit top rim, a shaded base and a soft cast. Cards, tiles and controls are raised; the transform tray is an inset well.
+- Sand-gold clay marks the one primary («تقطيع المجسم», owner override D-2) and the current mode, transform tool and orientation (owner override D-3), each with aria-checked or aria-pressed and a heavier label as the non-colour cue. In light, every sand fill carries a 1 px edge so it keeps a 3:1 boundary on cream.
+- Cairo is self-hosted (arabic and latin subsets plus the six-letter Sorani patch), because the CSP is `font-src 'self'` and documents are cross-origin isolated.
 
 ## Accessibility and resilience
 
-- Buttons have visible labels or accessible names and keyboard focus indicators.
-- Modal sheets use dialog semantics, close explicitly or by their solid backdrop, and honor device safe areas.
-- Error and notice banners use alert/status roles.
-- Slicing progress is reflected in visible state and the primary action.
+- Every control is at least 44 px tall; text is at least 11 px (the reference draws captions near 9 pt).
+- Buttons have visible labels or accessible names and keyboard focus indicators; the focus ring is its own token in each theme.
+- Modal sheets use dialog semantics, close by the handle (drag or keys), the backdrop or Escape, and take focus when they open. Escape also returns from the expanded viewport.
+- The readiness banner is a polite status, or an alert when it reports a blocker. Error and notice rows use alert and status roles.
 - Reduced-motion preferences disable nonessential animation.
-- Picker and drag/drop use the same format normalization, ZIP analysis, progress, and no-fixed-app-cap behavior.
+- Picker and drag/drop use the same format normalization, ZIP analysis, progress, and size limits.
 
 ## Known UX gaps
 
-Focus trapping inside the setup/status sheet and complete localization of engine-owned English labels/errors remain incomplete. Unsupported geometry tools stay visible but disabled in the native object toolbar so their status is discoverable rather than hidden.
+Focus trapping inside the sheets and complete localization of engine-owned English labels and errors remain incomplete. The engine's own canvas does not follow the light theme (its clear colour is fixed in the vendored build), so the viewport stays dark in both themes. Unsupported geometry tools stay visible but disabled in the native object toolbar in Advanced mode so their status is discoverable rather than hidden.

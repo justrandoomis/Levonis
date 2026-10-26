@@ -19,7 +19,17 @@
  */
 
 import type { SlicerSettings } from "three-slicer";
-import { INFILL, STRENGTH, type InfillId, type PrinterProfile, type QualityId, type StrengthId } from "./printer-profiles";
+import {
+  DEFAULT_MATERIAL_ID,
+  INFILL,
+  STRENGTH,
+  materialPresetFor,
+  type InfillId,
+  type MaterialId,
+  type PrinterProfile,
+  type QualityId,
+  type StrengthId,
+} from "./printer-profiles";
 
 /** Where each of the three preset layers actually came from. */
 export type PresetSource = "engine" | "fallback";
@@ -63,6 +73,13 @@ export interface LoadedProfileResult {
    * there is nothing for Quality to take).
    */
   processKeys: string[];
+  /**
+   * Keys the chosen MATERIAL's filament preset carries — what the material
+   * row owns, the way processKeys is what Quality owns. Picking PETG after
+   * PLA is a request for that whole filament preset, so a hand-edited nozzle
+   * temperature does not survive it (app/settings-carryover.ts).
+   */
+  filamentKeys: string[];
   /** True only when machine, process and filament presets all loaded from the engine. */
   verified: boolean;
   /** Explicit needs-attention list — empty when `verified` is true. */
@@ -105,6 +122,7 @@ export async function loadPrinterProfile(
   strength: StrengthId,
   support: boolean,
   infill: InfillId,
+  material: MaterialId = DEFAULT_MATERIAL_ID,
 ): Promise<LoadedProfileResult> {
   const api = await import("three-slicer/settings");
   const missingPresets: MissingPreset[] = [];
@@ -131,9 +149,13 @@ export async function loadPrinterProfile(
   }
   const process = engineProcess ?? {};
 
-  const engineFilament = filamentApi.settingsFor(profile.materialPreset);
+  // A material this printer has no preset for is never offered (see
+  // materialsFor), so this only falls back to PLA for a restored project
+  // that named one; the PLA preset name is then what was requested.
+  const filamentName = materialPresetFor(profile, material) ?? profile.materialPreset;
+  const engineFilament = filamentApi.settingsFor(filamentName);
   if (!engineFilament) {
-    missingPresets.push({ kind: "filament", presetName: profile.materialPreset });
+    missingPresets.push({ kind: "filament", presetName: filamentName });
     presetStatus.filament = "fallback";
   }
   const filament = engineFilament ?? {};
@@ -142,7 +164,7 @@ export async function loadPrinterProfile(
     printer_model: profile.model,
     printer_settings_id: profile.presetName,
     print_settings_id: processName,
-    filament_settings_id: [profile.materialPreset],
+    filament_settings_id: [filamentName],
   };
   const lockedMachine = { ...machine, ...identity };
   const combined: SlicerSettings = {
@@ -165,6 +187,7 @@ export async function loadPrinterProfile(
     machine: lockedMachine,
     machineKeys: [...api.printerKeys, "printer_model", "printer_settings_id"],
     processKeys: Object.keys(process),
+    filamentKeys: Object.keys(filament),
     verified: missingPresets.length === 0,
     missingPresets,
     presetStatus,

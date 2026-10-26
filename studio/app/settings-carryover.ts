@@ -6,8 +6,8 @@
  * so the layer height snapped back on every keystroke. This is the other way
  * the owner's edits disappeared, and it is quieter.
  *
- * The editor has five coarse selectors — printer, quality, strength, support
- * and infill pattern — and changing any of them rebuilt the settings map FROM
+ * The editor has six coarse selectors — printer, material, quality, strength,
+ * support and infill pattern — and changing any of them rebuilt the settings map FROM
  * SCRATCH:
  *
  *     setSettings(restored ?? loaded.settings);   // then setNotice("")
@@ -27,6 +27,9 @@
  *   quality   → every key the newly chosen PROCESS preset carries, because
  *               choosing "Draft" after "Fine" is asking for that whole preset;
  *               a hand-edited layer height must not survive it.
+ *   material  → every key the newly chosen FILAMENT preset carries, for the
+ *               same reason: PETG after PLA is a request for PETG's
+ *               temperatures, and a PLA temperature must not survive it.
  *   printer   → everything. A different machine's presets are a different
  *               world, and carrying edits across is what the engine's own
  *               `printerKeys` list exists to prevent.
@@ -41,13 +44,15 @@
 
 import type { SlicerSettings } from "three-slicer";
 
-/** The five selectors, as the shell holds them. */
+/** The selectors, as the shell holds them. */
 export interface PresetSelection {
   printerId: string;
   quality: string;
   strength: string;
   support: boolean;
   infill: string;
+  /** Absent in selections recorded before the material row existed. */
+  material?: string;
 }
 
 /** Keys the Strength tier writes — `profile-loader.ts` sets exactly these. */
@@ -78,6 +83,8 @@ export interface CarryOverInput {
   nextSelection: PresetSelection;
   /** Keys the NEW quality's process preset carries. */
   processKeys: readonly string[];
+  /** Keys the NEW material's filament preset carries (empty when unknown). */
+  filamentKeys?: readonly string[];
 }
 
 export interface CarryOverResult {
@@ -96,7 +103,7 @@ export interface CarryOverResult {
  * is not a special case so much as the general rule with an empty carry set.
  */
 export function carryUserEdits(input: CarryOverInput): CarryOverResult {
-  const { loaded, previous, editedKeys, previousSelection, nextSelection, processKeys } = input;
+  const { loaded, previous, editedKeys, previousSelection, nextSelection, processKeys, filamentKeys = [] } = input;
   const settings = { ...loaded } as Record<string, unknown>;
   const previousRecord = previous as unknown as Record<string, unknown>;
 
@@ -109,6 +116,7 @@ export function carryUserEdits(input: CarryOverInput): CarryOverResult {
     if (previousSelection.strength !== nextSelection.strength) for (const key of STRENGTH_KEYS) owned.add(key);
     if (previousSelection.support !== nextSelection.support) for (const key of SUPPORT_KEYS) owned.add(key);
     if (previousSelection.infill !== nextSelection.infill) for (const key of INFILL_KEYS) owned.add(key);
+    if ((previousSelection.material ?? "pla") !== (nextSelection.material ?? "pla")) for (const key of filamentKeys) owned.add(key);
   }
 
   const overwritten: string[] = [];

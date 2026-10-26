@@ -7,8 +7,9 @@
  *
  *   S6  a first visit opens in Simple at desktop AND phone width: the engine
  *       side panel is not displayed at either, the dead engine controls are
- *       gone, and there is still a way to slice (header on desktop, bottom
- *       bar on the phone) — Settings on the phone opens the Setup sheet;
+ *       gone, and there is still a way to slice (header on desktop, the gold
+ *       button of the phone column) — the mode switch is on the phone page,
+ *       and the overflow's Settings opens the Setup sheet;
  *   10  warnings in Simple (regression): an over-bed model shows the engine's
  *       bed warning, and slicing it puts the over-bed refusal in the shell's
  *       own message row, with the side panel hidden the whole time;
@@ -260,11 +261,17 @@ try {
   state = await engineState(pp);
   report.phoneSimple = state;
   assert(state.mode === "simple" && state.sidebar === "none", "Simple on a phone: no side panel", `${state.mode} / ${state.sidebar}`);
-  assert((await shellDisplay(pp, ".header-slice-action")) === "none", "the header slice action is desktop-only");
-  assert((await shellDisplay(pp, ".mobile-primary-action")) !== "none", "the phone keeps its own slice action");
-  await pp.locator(".mobile-primarybar .mobile-nav-item", { hasText: "Settings" }).click();
+  // CHANGED DELIBERATELY (plan item C6): the phone is the reference column.
+  // The desktop header, with its slice action, is hidden there; the column
+  // has its own gold slice button and the mode switch on the page itself.
+  assert((await shellDisplay(pp, ".studio-header")) === "none", "the desktop header (and its slice action) is desktop-only");
+  assert((await shellDisplay(pp, '[data-levo-action="phone-slice"]')) !== "none", "the phone keeps its own slice action");
+  assert((await pp.locator('[data-levo-control="mode"] [data-levo-mode-choice="simple"][aria-checked="true"]').count()) === 1, "the mode switch is on the page, set to Simple");
+  // Settings is still one sheet away, through the overflow.
+  await pp.locator('[data-levo-action="more"]').click();
+  await pp.locator('[data-levo-more="settings"]').click();
   const sheetOpen = await pp.waitForSelector(".studio-sheet .mode-control", { timeout: 10_000 }).then(() => true, () => false);
-  assert(sheetOpen, "Settings opens the Setup sheet (with the mode switch) in Simple");
+  assert(sheetOpen, "the overflow's Settings opens the Setup sheet (with the mode switch) in Simple");
   state = await engineState(pp);
   assert(state.sidebar === "none", "…and never a side panel that Simple hides", state.sidebar);
   await phone.close();

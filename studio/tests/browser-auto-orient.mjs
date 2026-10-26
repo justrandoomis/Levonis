@@ -131,6 +131,15 @@ const readScene = () =>
 
 const browser = await chromium.launch({ executablePath, args: ["--no-sandbox"] });
 const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+// A printer is already chosen, as on a returning visit: on a first visit the
+// printer chooser opens over the editor (batch D, item 9) and its backdrop
+// would take the Auto-orient click. The chooser has its own checks in
+// browser-batch-d.mjs.
+await context.addInitScript(() => {
+  try {
+    if (!window.localStorage.getItem("levo-studio-printer")) window.localStorage.setItem("levo-studio-printer", "bbl-x2d-04");
+  } catch { /* storage blocked: the chooser will show and the click below will say so */ }
+});
 const page = await context.newPage();
 
 console.log(`\nAUTO-ORIENT in a browser — ${target}\n`);
@@ -170,13 +179,9 @@ check("sitting on the bed", Math.abs(before[0]?.lowestY ?? 9) < 0.5, `lowestY ${
 check("standing up, 90mm tall, before anything is pressed", heightBefore > 89,
   `height ${heightBefore.toFixed(2)}mm`);
 
-// The button lives in the tool tray, which is collapsed on first paint.
+// On a desktop the button is in the shell actions above the bed (on a phone
+// the same action is in the «المزيد» sheet and on the «تلقائي» chip).
 const orient = page.locator('[data-levo-action="auto-orient"]');
-if ((await orient.count()) === 0 || !(await orient.first().isVisible())) {
-  const tray = page.locator('[data-levo-action="tool-tray"], button:has-text("Tools"), .tool-tray-toggle');
-  if (await tray.count()) await tray.first().click({ timeout: 10_000 }).catch(() => {});
-  await page.waitForTimeout(400);
-}
 check("the Auto-orient control is in the editor", (await orient.count()) > 0, `${await orient.count()} found`);
 
 await orient.first().click({ timeout: 20_000 });

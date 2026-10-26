@@ -234,6 +234,72 @@ export function isProfileId(value: string): value is ProfileId {
 }
 
 /**
+ * THE MATERIAL, AS ONLY THE PRESETS THE ENGINE ACTUALLY SHIPS.
+ *
+ * The reference screen has a «الخامة» row reading "PETG". Until now there was
+ * no material choice at all: every printer loaded its PLA Basic filament
+ * preset, and the sheet header said "· PLA" because that was the only truth.
+ *
+ * A row that offers a material must not offer one the engine cannot load, so
+ * the table below lists, per printer, the filament preset that really exists
+ * in the installed engine's `data/filaments.js` (tests/printer-choice.test.mjs
+ * reads that file and fails if a name here is missing from it). PLA Basic is
+ * each printer's existing `materialPreset`. PETG Basic is offered where the
+ * engine has a Bambu PETG Basic preset for that machine or for the family the
+ * profile already borrows its process presets from (the X1 and X1E use the
+ * X1C's, as the P1S does for PLA). The P1P has no PETG Basic preset in this
+ * engine build, so it is not offered there: the row lists PLA only.
+ *
+ * Should a preset still fail to load, profile-loader.ts reports it as a
+ * missing preset and the readiness banner says so: never a silent fallback.
+ */
+export type MaterialId = "pla" | "petg";
+
+export const MATERIALS = {
+  pla: { label: "PLA Basic", type: "PLA" },
+  petg: { label: "PETG Basic", type: "PETG" },
+} as const satisfies Record<MaterialId, { label: string; type: string }>;
+
+export const DEFAULT_MATERIAL_ID: MaterialId = "pla";
+
+export function isMaterialId(value: unknown): value is MaterialId {
+  return value === "pla" || value === "petg";
+}
+
+/** PETG Basic, per printer: an engine preset name, or absent when none ships. */
+export const PETG_PRESETS: Partial<Record<ProfileId, string>> = {
+  "bbl-x2d-04": "Bambu PETG Basic @BBL X2D 0.4 nozzle",
+  "bbl-h2d-04": "Bambu PETG Basic @BBL H2D 0.4 nozzle",
+  "bbl-h2c-04": "Bambu PETG Basic @BBL H2C 0.4 nozzle",
+  "bbl-h2s-04": "Bambu PETG Basic @BBL H2S",
+  "bbl-h2dp-04": "Bambu PETG Basic @BBL H2DP 0.4 nozzle",
+  "bbl-p2s-04": "Bambu PETG Basic @BBL P2S 0.4 nozzle",
+  "bbl-p1s-04": "Bambu PETG Basic @BBL X1C",
+  "bbl-x1c-04": "Bambu PETG Basic @BBL X1C",
+  "bbl-x1-04": "Bambu PETG Basic @BBL X1C",
+  "bbl-x1e-04": "Bambu PETG Basic @BBL X1C",
+  "bbl-a1-04": "Bambu PETG Basic @BBL A1",
+  "bbl-a1m-04": "Bambu PETG Basic @BBL A1M 0.4 nozzle",
+  "bbl-a2l-04": "Bambu PETG Basic @BBL A2L 0.4 nozzle",
+};
+
+/** The filament preset a printer loads for a material, or null when none ships. */
+export function materialPresetFor(profile: PrinterProfile, material: MaterialId): string | null {
+  if (material === "pla") return profile.materialPreset;
+  return isProfileId(profile.id) ? PETG_PRESETS[profile.id] ?? null : null;
+}
+
+/** The materials a printer can really load, in display order. */
+export function materialsFor(profileId: ProfileId): MaterialId[] {
+  return (Object.keys(MATERIALS) as MaterialId[]).filter((id) => materialPresetFor(PROFILES[profileId], id) !== null);
+}
+
+/** A material the printer can load: the one asked for, or PLA when it has none. */
+export function availableMaterial(profileId: ProfileId, material: MaterialId): MaterialId {
+  return materialsFor(profileId).includes(material) ? material : DEFAULT_MATERIAL_ID;
+}
+
+/**
  * THE PRINTER IS ASKED FOR, NOT ASSUMED.
  *
  * «خلي الشخص يختار طابعته اول ما يدخل، لان حاليا من دخلت اختارلي x2d مباشرة.»

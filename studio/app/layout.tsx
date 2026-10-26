@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { preload } from "react-dom";
 import "./globals.css";
+import { THEME_BOOT_SCRIPT, THEME_CHROME_COLORS } from "./theme";
 
 export const metadata: Metadata = {
   title: "LEVO Studio — تجهيز ملفات الطباعة",
@@ -39,8 +41,16 @@ export const viewport: Viewport = {
    * a strip directly above a pure-black application, which is the one place a
    * tint is impossible to miss. The surfaces moved and the frame around them
    * did not.
+   *
+   * There are two themes now (app/theme.ts), so there are two colours, each
+   * the page ground of its theme. The media pair covers the `system` choice
+   * before any script runs; THEME_BOOT_SCRIPT rewrites both when the person
+   * pinned light or dark on this device.
    */
-  themeColor: "#000000",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: THEME_CHROME_COLORS.dark },
+    { media: "(prefers-color-scheme: light)", color: THEME_CHROME_COLORS.light },
+  ],
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -59,12 +69,21 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // The Arabic subset of the self-hosted Cairo is wanted by the first frame
+  // (the boot screen is Arabic), so it is fetched with the document rather
+  // than after the stylesheet is parsed.
+  preload("/fonts/cairo/cairo-v31-arabic.woff2", { as: "font", type: "font/woff2", crossOrigin: "anonymous" });
   // Arabic is the default locale and RTL is the default chrome direction;
   // the boot script above re-applies a persisted choice before first paint.
+  //
+  // `data-theme="dark"` is the server's guess; the theme boot script replaces
+  // it with the stored choice (or the system one) before first paint, and
+  // suppressHydrationWarning tells React that difference is intended.
   return (
-    <html lang="ar" dir="rtl">
+    <html lang="ar" dir="rtl" data-theme="dark" suppressHydrationWarning>
       <body>
         <script dangerouslySetInnerHTML={{ __html: LOCALE_BOOT_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         {children}
       </body>
     </html>

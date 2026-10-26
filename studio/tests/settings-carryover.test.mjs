@@ -216,3 +216,36 @@ test("changedKeys reports a key that appeared or disappeared", () => {
   assert.deepEqual(changedKeys({ a: 1 }, { a: 1, b: 2 }), ["b"]);
   assert.deepEqual(changedKeys({ a: 1, b: 2 }, { a: 1 }), ["b"]);
 });
+
+test("CHANGING MATERIAL takes every key its new filament preset carries, and nothing else", () => {
+  // PETG after PLA is a request for PETG's temperatures: a PLA nozzle
+  // temperature typed by hand must not survive it, while a hand-tuned infill
+  // density (the Strength row's) must.
+  const previous = loadedFor({ nozzle_temperature: [235], sparse_infill_density: 22 });
+  const out = carryUserEdits({
+    loaded: loadedFor({ nozzle_temperature: [255] }),
+    previous,
+    editedKeys: new Set(["nozzle_temperature", "sparse_infill_density"]),
+    previousSelection: { ...SELECTION, material: "pla" },
+    nextSelection: { ...SELECTION, material: "petg" },
+    processKeys: ["layer_height", "initial_layer_height"],
+    filamentKeys: ["nozzle_temperature", "filament_flow_ratio"],
+  });
+  assert.deepEqual(out.settings.nozzle_temperature, [255], "the new filament's temperature applies");
+  assert.equal(out.settings.sparse_infill_density, 22, "the infill is not the material's");
+  assert.deepEqual(out.overwritten, ["nozzle_temperature"]);
+  assert.deepEqual(out.kept, ["sparse_infill_density"]);
+
+  // A selection recorded before the material row existed reads as PLA, so
+  // nothing is taken on the first load after the upgrade.
+  const legacy = carryUserEdits({
+    loaded: loadedFor(),
+    previous: loadedFor({ nozzle_temperature: [235] }),
+    editedKeys: new Set(["nozzle_temperature"]),
+    previousSelection: SELECTION,
+    nextSelection: { ...SELECTION, material: "pla" },
+    processKeys: [],
+    filamentKeys: ["nozzle_temperature"],
+  });
+  assert.deepEqual(legacy.kept, ["nozzle_temperature"]);
+});

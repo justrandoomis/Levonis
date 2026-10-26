@@ -1,5 +1,5 @@
 {
-  "target": "http://127.0.0.1:8799/",
+  "target": "http://127.0.0.1:5261/",
   "viewport": {
     "width": 390,
     "height": 844
@@ -60,21 +60,26 @@
     },
     {
       "ok": true,
-      "m": "the header's setup control is reachable"
+      "m": "the page's printer row is reachable"
     },
     {
       "ok": true,
       "m": "and it already shows the printer that was chosen, not the seed",
-      "detail": "A1 mini 0.20"
+      "detail": "Bambu Lab A1 mini"
     },
     {
       "ok": true,
       "m": "the setup sheet has printer / quality / strength / infill",
-      "detail": "الطابعة | الجودة | القوة | نوع الحشو"
+      "detail": "وضع المحرر | الطابعة | الجودة | القوة | نوع الحشو | المظهر"
     },
     {
       "ok": true,
-      "m": "the last group offers exactly three patterns",
+      "m": "the infill group is in the sheet",
+      "detail": "index 4"
+    },
+    {
+      "ok": true,
+      "m": "the infill group offers exactly three patterns",
       "detail": "3 buttons"
     },
     {
@@ -85,7 +90,7 @@
     {
       "ok": true,
       "m": "«تظيف قائمة اسفل قائمة القوة» — under Strength",
-      "detail": "1015 -> 1122"
+      "detail": "1105 -> 1212"
     },
     {
       "ok": true,
@@ -120,35 +125,106 @@
     },
     {
       "ok": true,
-      "m": "the Tools button opens the tray"
+      "m": "the overflow carries «projects»"
     },
     {
       "ok": true,
-      "m": "the tray is on screen"
+      "m": "the overflow carries «new-project»"
     },
     {
       "ok": true,
-      "m": "shortening really shortens it",
-      "detail": "440px -> 190px"
+      "m": "the overflow carries «duplicate»"
     },
     {
       "ok": true,
-      "m": "and removes nothing — the tray still scrolls",
-      "detail": "22 tools either way"
+      "m": "the overflow carries «split»"
     },
     {
       "ok": true,
-      "m": "the header stays put, so the control can be pressed again"
+      "m": "the overflow carries «on-bed»"
     },
     {
       "ok": true,
-      "m": "and it grows back",
-      "detail": "190px -> 440px"
+      "m": "the overflow carries «paint»"
     },
     {
       "ok": true,
-      "m": "more of the print bed shows behind it",
-      "detail": "250px of bed recovered"
+      "m": "the overflow carries «cut»"
+    },
+    {
+      "ok": true,
+      "m": "the overflow carries «auto-orient»"
+    },
+    {
+      "ok": true,
+      "m": "the overflow carries «delete»"
+    },
+    {
+      "ok": true,
+      "m": "the overflow carries «add-plate»"
+    },
+    {
+      "ok": true,
+      "m": "the overflow carries «delete-all»"
+    },
+    {
+      "ok": true,
+      "m": "the overflow carries «toggle-preview»"
+    },
+    {
+      "ok": true,
+      "m": "the overflow carries «zoom-all»"
+    },
+    {
+      "ok": true,
+      "m": "the overflow carries «zoom-bed»"
+    },
+    {
+      "ok": true,
+      "m": "the overflow carries «undo»"
+    },
+    {
+      "ok": true,
+      "m": "the overflow carries «redo»"
+    },
+    {
+      "ok": true,
+      "m": "the overflow carries «makerworld»"
+    },
+    {
+      "ok": true,
+      "m": "the overflow carries «settings»"
+    },
+    {
+      "ok": true,
+      "m": "the overflow carries «all-settings»"
+    },
+    {
+      "ok": true,
+      "m": "the overflow carries «connect»"
+    },
+    {
+      "ok": true,
+      "m": "the overflow carries «about»"
+    },
+    {
+      "ok": true,
+      "m": "the overflow carries «source»"
+    },
+    {
+      "ok": true,
+      "m": "the AGPL source link is two taps from the main screen",
+      "detail": "https://github.com/aliamer229/Levo_slicer"
+    },
+    {
+      "ok": true,
+      "m": "expand gives the bed the whole screen",
+      "detail": "388px -> 844px"
+    },
+    {
+      "ok": true,
+      "m": "and Escape brings the card back",
+      "detail": "388px"
     }
   ]
 }

@@ -458,22 +458,40 @@ test("the Editor mode choice is the first thing in Settings, above the printer",
 });
 
 test("Simple keeps a way to slice and to print at every width", async () => {
-  const [client, header, css] = await Promise.all([
+  /**
+   * CHANGED DELIBERATELY (plan item C6). The phone's way to slice was the
+   * bottom bar's primary action and its Settings opened the Setup sheet; the
+   * reference column replaces both with the gold «تقطيع المجسم» button and the
+   * mode switch on the page itself. What this test keeps pinning is the
+   * promise: a slice action and a print action in Simple at every width.
+   */
+  const [client, header, css, slice, mode] = await Promise.all([
     read("../app/slicer-client.tsx"),
     read("../app/components/header.tsx"),
     read("../app/globals.css"),
+    read("../app/components/mobile/primary-slice-button.tsx"),
+    read("../app/components/mobile/mode-segmented.tsx"),
   ]);
   // Desktop: the header carries the slice action in Simple (the panel that
   // has it in Advanced is hidden), the print action once a result is ready.
   assert.match(header, /props\.simpleMode && !props\.printReady && \(/);
   assert.match(header, /onClick=\{props\.sliceAction\.onClick\}/);
   assert.match(client, /onClick: primaryAction,/);
-  // Phone: the bar's primary action is mode-independent, and Settings opens
-  // the Setup sheet in Simple instead of a panel that does not exist there.
-  assert.match(client, /className=\{`mobile-primary-action/);
-  assert.match(client, /if \(simpleMode\) setSheet\("setup"\);/);
-  // The header slice button is desktop-only; the phone bar has its own.
-  assert.match(css, /\.studio-actions \.header-slice-action \{ display: none; \}|\.studio-actions \.header-slice-action\s*\{\s*display:\s*none/);
+  // Phone: the gold button runs the same mode-independent primary action,
+  // and turns into «الطباعة والتصدير» once the result is fresh.
+  assert.match(client, /<PrimarySliceButton[\s\S]{0,600}onPress=\{primaryAction\}/);
+  assert.match(slice, /props\.printReady\s*\?\s*t\.printExport/);
+  assert.doesNotMatch(client.slice(client.indexOf("<PrimarySliceButton"), client.indexOf("<PrimarySliceButton") + 600), /simpleMode|studioMode/);
+  // The desktop header, with its slice action, is the desktop's; the phone
+  // column has its own.
+  const phone = /@media \(max-width: 899px\) \{([\s\S]*?)\n\}/.exec(css.slice(css.indexOf("THE PHONE SHELL")))?.[1] ?? "";
+  assert.match(phone, /\.shell-actions, \.studio-header \{ display: none; \}/);
+  // The mode switch is on the page, bound to the same mode the Setup sheet
+  // sets, as a radiogroup the arrow keys walk in the writing direction.
+  assert.match(client, /<ModeSegmented t=\{t\} mode=\{studioMode\.mode\} onMode=\{studioMode\.setMode\} \/>/);
+  assert.match(mode, /role="radiogroup"/);
+  assert.match(mode, /aria-checked=\{mode === id\}/);
+  assert.match(mode, /rtl \? "ArrowLeft" : "ArrowRight"/);
   // In Simple "all settings" switches to Advanced instead of opening nothing.
   assert.match(client, /if \(simpleMode\) studioMode\.setMode\("advanced"\);/);
 });

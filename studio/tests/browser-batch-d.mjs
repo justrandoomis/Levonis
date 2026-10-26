@@ -124,32 +124,37 @@ console.log("\nfirst visit: the printer is asked for");
   // 9b — THE INFILL CONTROL, UNDER STRENGTH
   // =======================================================================
   console.log("\nthe infill control");
-  // `.profile-button` is the header control that opens the Setup sheet — it
-  // shows the current printer's short name, which is also worth checking.
-  const setupButton = page.locator(".profile-button");
-  assert(await setupButton.isVisible(), "the header's setup control is reachable");
+  // CHANGED DELIBERATELY (plan item C6): on a phone the desktop header, and
+  // its `.profile-button`, are hidden. The printer is a row on the page's
+  // print-settings card, and the Setup sheet is one tap into the overflow.
+  const printerRow = page.locator('[data-levo-card="print-settings"] button[aria-haspopup="dialog"]');
+  assert(await printerRow.isVisible(), "the page's printer row is reachable");
   assert(
-    /A1 mini|A1M/i.test((await setupButton.innerText()).replace(/\s+/g, " ")),
+    /A1 mini|A1M/i.test((await printerRow.innerText()).replace(/\s+/g, " ")),
     "and it already shows the printer that was chosen, not the seed",
-    (await setupButton.innerText()).replace(/\s+/g, " "),
+    (await printerRow.innerText()).replace(/\s+/g, " "),
   );
-  await setupButton.click();
+  await page.locator('[data-levo-action="more"]').click();
+  await page.locator('[data-levo-more="settings"]').click();
   await page.waitForTimeout(700);
 
   const legends = await page.locator(".setup-body legend").allInnerTexts();
-  assert(legends.length === 4, "the setup sheet has printer / quality / strength / infill", legends.join(" | "));
+  assert(legends.length >= 4, "the setup sheet has printer / quality / strength / infill", legends.join(" | "));
 
+  // Found by what it offers, not by position: the sheet also carries the
+  // mode (first) and the appearance (last).
   const groups = page.locator(".setup-body fieldset");
-  const groupCount = await groups.count();
-  const infill = groups.nth(groupCount - 1);
+  const infillIndex = await groups.evaluateAll((sets) => sets.findIndex((set) => /Gyroid/.test(set.textContent ?? "")));
+  assert(infillIndex > 0, "the infill group is in the sheet", `index ${infillIndex}`);
+  const infill = groups.nth(infillIndex);
   const infillButtons = infill.locator(".segmented-control button");
-  assert(await infillButtons.count() === 3, "the last group offers exactly three patterns", `${await infillButtons.count()} buttons`);
+  assert(await infillButtons.count() === 3, "the infill group offers exactly three patterns", `${await infillButtons.count()} buttons`);
 
   const patternLabels = (await infill.locator(".segmented-control button strong").allInnerTexts()).map((s) => s.trim());
   assert(new Set(patternLabels).size === 3, "three distinct pattern names", patternLabels.join(" / "));
 
   // And it really is UNDER Strength, not beside it.
-  const strengthBox = await groups.nth(groupCount - 2).boundingBox();
+  const strengthBox = await groups.nth(infillIndex - 1).boundingBox();
   const infillBox = await infill.boundingBox();
   assert(infillBox.y > strengthBox.y, "«تظيف قائمة اسفل قائمة القوة» — under Strength", `${Math.round(strengthBox.y)} -> ${Math.round(infillBox.y)}`);
 
@@ -186,9 +191,15 @@ console.log("\ndeclining the question");
 }
 
 // =========================================================================
-// 10 — THE TOOL TRAY SHORTENS, AND HIDES NOTHING
+// 10 — THE OVERFLOW HOLDS EVERY TOOL, AND THE VIEW EXPANDS AND COMES BACK
 // =========================================================================
-console.log("\nthe tool tray shrinks and grows");
+// CHANGED DELIBERATELY (plan item C6). The phone had a tool tray that could be
+// shortened so the bed showed behind it («زر تقصير وتطويل قائمة الادوات»). The
+// reference column gives the bed its own card instead, with an expand button
+// for the full-screen view, and moves every tool the tray held into the
+// overflow sheet. What this section keeps checking is the promise: nothing is
+// out of reach, and the bed can be seen in full.
+console.log("\nthe overflow holds every tool; the view expands and comes back");
 {
   const ctx = await browser.newContext({ viewport: PHONE, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
@@ -198,40 +209,28 @@ console.log("\nthe tool tray shrinks and grows");
   await page.goto(target, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(3000);
 
-  const opened = await page.evaluate(() => {
-    const tools = [...document.querySelectorAll(".mobile-primarybar button")].find((b) => b.getAttribute("aria-expanded") !== null);
-    if (!tools) return false;
-    tools.click();
-    return true;
-  });
-  assert(opened, "the Tools button opens the tray");
+  await page.locator('[data-levo-action="more"]').click();
+  await page.waitForSelector('[data-levo-sheet="more"]', { timeout: 10_000 });
+  const tools = await page.evaluate(() => [...document.querySelectorAll("[data-levo-more]")].map((el) => el.getAttribute("data-levo-more")));
+  for (const tool of ["projects", "new-project", "duplicate", "split", "on-bed", "paint", "cut", "auto-orient", "delete", "add-plate", "delete-all",
+    "toggle-preview", "zoom-all", "zoom-bed", "undo", "redo", "makerworld", "settings", "all-settings", "connect", "about", "source"]) {
+    assert(tools.includes(tool), `the overflow carries «${tool}»`);
+  }
+  const source = await page.locator('[data-levo-more="source"]').getAttribute("href");
+  assert(/^https:\/\/github\.com\//.test(source ?? ""), "the AGPL source link is two taps from the main screen", source);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+
+  const card = page.locator(".editor-area");
+  const cardBox = await card.boundingBox();
+  await page.locator('[data-levo-action="viewport-expand"]').click();
   await page.waitForTimeout(500);
-
-  const tray = page.locator(".mobile-tooltray");
-  assert(await tray.isVisible(), "the tray is on screen");
-  const tallBox = await tray.boundingBox();
-  const tallTools = await tray.locator(".mobile-toolgrid button, .mobile-toolgrid .file-select-control").count();
-
-  await page.locator('[data-levo-action="tray-height"]').click();
+  const fullBox = await card.boundingBox();
+  assert(fullBox.height >= PHONE.height - 1 && fullBox.width >= PHONE.width - 1, "expand gives the bed the whole screen", `${Math.round(cardBox.height)}px -> ${Math.round(fullBox.height)}px`);
+  await page.keyboard.press("Escape");
   await page.waitForTimeout(500);
-  const shortBox = await tray.boundingBox();
-  const shortTools = await tray.locator(".mobile-toolgrid button, .mobile-toolgrid .file-select-control").count();
-
-  assert(shortBox.height < tallBox.height - 40, "shortening really shortens it", `${Math.round(tallBox.height)}px -> ${Math.round(shortBox.height)}px`);
-  assert(shortTools === tallTools, "and removes nothing — the tray still scrolls", `${tallTools} tools either way`);
-  assert(await tray.locator("header").isVisible(), "the header stays put, so the control can be pressed again");
-
-  await page.locator('[data-levo-action="tray-height"]').click();
-  await page.waitForTimeout(500);
-  const grownBox = await tray.boundingBox();
-  assert(grownBox.height > shortBox.height + 40, "and it grows back", `${Math.round(shortBox.height)}px -> ${Math.round(grownBox.height)}px`);
-
-  // More of the bed is visible when the tray is short. That is the point.
-  assert(
-    PHONE.height - shortBox.height > PHONE.height - tallBox.height,
-    "more of the print bed shows behind it",
-    `${Math.round(tallBox.height - shortBox.height)}px of bed recovered`,
-  );
+  const backBox = await card.boundingBox();
+  assert(Math.abs(backBox.height - cardBox.height) < 2, "and Escape brings the card back", `${Math.round(backBox.height)}px`);
   await ctx.close();
 }
 

@@ -1,5 +1,14 @@
 /**
- * THE BLACK SYSTEM IS THE ONLY SYSTEM, AND IT IS SPELLED IN TOKENS.
+ * THE SYSTEM IS SPELLED IN TOKENS — NOW IN TWO THEMES.
+ *
+ * CHANGED DELIBERATELY (plan item C6, decision D-14, DECISIONS row 271). This
+ * file used to pin the BLACK system: pure #000000 and neutral greys. The
+ * owner's later instruction is to match the reference screens, which are blue
+ * charcoal with a sand-gold clay, in dark AND light. So the ladder tests below
+ * now pin the reference ladder in dark and the site's cream ladder in light,
+ * each kept close to grey on its own axis; everything else this file guards
+ * (no literal colour in a rule, a type floor, a radius scale, the engine
+ * mirror) stands and now covers both themes.
  *
  * WHY THIS EXISTS. The Studio moved from a dark OLIVE palette to black in one
  * pass over `:root`. That pass was real and it was not enough: roughly thirty
@@ -46,15 +55,22 @@ const theme = await readFile(themeUrl, "utf8");
 const rules = css.replace(/\/\*[\s\S]*?\*\//g, "");
 
 /**
- * Everything inside `:root { … }` — where a literal is not only allowed but
- * required. Taken from the COMMENT-STRIPPED text, so that removing it from the
- * body below actually removes it: the block in the original source is mostly
- * prose, and subtracting that string from the stripped rules matches nothing.
+ * The two token blocks — `:root { … }` (dark, the default) and
+ * `:root[data-theme="light"] { … }` — where a literal is not only allowed but
+ * required. Taken from the COMMENT-STRIPPED text, so that removing them from
+ * the body below actually removes them.
  */
 const root = /:root\s*\{([\s\S]*?)\n\}/.exec(rules)?.[1] ?? "";
+const light = /:root\[data-theme="light"\]\s*\{([\s\S]*?)\n\}/.exec(rules)?.[1] ?? "";
 assert.ok(root.length > 400, "the :root block should be findable and substantial");
-/** The rules a component is actually painted by — every declaration outside :root. */
-const body = rules.replace(root, "");
+assert.ok(light.length > 400, "the light block should be findable and substantial");
+/** The rules a component is actually painted by — every declaration outside the token blocks. */
+const body = rules.replace(root, "").replace(light, "");
+
+/** A token's 6-digit hex value in a block, upper-cased; null when absent. */
+const hexOf = (block, token) => new RegExp(`--${token}:\\s*(#[0-9A-Fa-f]{6});`).exec(block)?.[1]?.toUpperCase() ?? null;
+/** The value in force in a theme: light inherits what it does not re-declare. */
+const themeHex = (theme, token) => (theme === "light" ? hexOf(light, token) : null) ?? hexOf(root, token);
 
 test("no rule in the stylesheet spells a colour out", () => {
   const literals = body.match(/#[0-9A-Fa-f]{3,8}\b/g) ?? [];
@@ -77,42 +93,112 @@ test("no rule names a colour by any other spelling either", () => {
   }
 });
 
-test("the ladder itself is black, not a tinted near-black", () => {
-  // A near-black with a hue is the exact thing the owner asked to be rid of,
-  // and it is hard to see in isolation — #0A0C05 looks black until it sits
-  // next to one. The base and the canvas must be pure.
-  for (const token of ["--shell", "--canvas"]) {
-    const value = new RegExp(`${token}:\\s*([^;]+);`).exec(root)?.[1]?.trim();
-    assert.equal(value, "#000000", `${token} must be true black`);
-  }
-  // And every neutral in the ladder must be neutral: R, G and B within a
-  // couple of steps of each other. An olive grey fails this; a real grey does not.
-  for (const token of ["--header", "--panel", "--surface", "--surface-strong", "--line", "--line-soft", "--text", "--muted", "--idle", "--track"]) {
-    const value = new RegExp(`${token}:\\s*(#[0-9A-Fa-f]{6});`).exec(root)?.[1];
-    assert.ok(value, `${token} is missing from :root`);
+/**
+ * THE LADDERS, EACH ON ITS OWN AXIS.
+ *
+ * Dark is the reference's blue charcoal; light is the site's cream. A neutral
+ * may lean only one way per theme and only a little: blue at or above red in
+ * dark, red at or above blue in light, and never far from grey. That is what
+ * keeps an olive (green high, blue low) or a stray warm cast out of the dark
+ * ladder, which is how the old palette survived once already.
+ */
+const LADDER = ["shell", "canvas", "header", "panel", "surface", "surface-strong", "line", "line-soft", "well", "card-1", "card-2",
+  "text", "text-2", "muted", "ink-disabled", "field", "idle", "track"];
+
+test("the dark ladder is the reference's blue charcoal, and stays close to grey", () => {
+  assert.equal(themeHex("dark", "shell"), "#121619", "the page is the reference ground");
+  assert.equal(themeHex("dark", "panel"), "#22272C", "cards are the reference card");
+  assert.equal(themeHex("dark", "surface"), "#282E33", "raised controls are the reference raised fill");
+  for (const token of LADDER) {
+    const value = themeHex("dark", token);
+    assert.ok(value, `--${token} is missing from :root`);
     const [r, g, b] = [1, 3, 5].map((i) => parseInt(value.slice(i, i + 2), 16));
-    const spread = Math.max(r, g, b) - Math.min(r, g, b);
-    assert.ok(spread <= 8, `${token} (${value}) carries a hue — spread ${spread}`);
+    assert.ok(b >= r, `--${token} (${value}) leans warm in the dark ladder`);
+    assert.ok(Math.max(r, g, b) - Math.min(r, g, b) <= 26, `--${token} (${value}) is a colour, not a neutral`);
+  }
+});
+
+test("the light ladder is the site's cream, and the viewport stays a dark island", () => {
+  assert.equal(themeHex("light", "shell"), "#E3DACB", "the light page is the site's IVORY");
+  assert.equal(themeHex("light", "panel"), "#EBE4D6", "light cards are the site's PAPER");
+  // The engine clears its canvas to a fixed dark colour; the frame matches it.
+  assert.equal(themeHex("light", "canvas"), themeHex("dark", "canvas"));
+  for (const token of LADDER.filter((name) => name !== "canvas")) {
+    const value = themeHex("light", token);
+    assert.ok(value, `--${token} has no light value`);
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(value.slice(i, i + 2), 16));
+    // The grounds lean warm; the inks are the site's neutral greys
+    // (#16181b, #45484e), which lean a hair blue and stay grey.
+    const ink = ["text", "text-2", "muted", "ink-disabled"].includes(token);
+    if (!ink) assert.ok(r >= b, `--${token} (${value}) leans cold in the light ladder`);
+    // The site's cream is warmer than the charcoal is blue: its hairline
+    // #cfc5b2 spreads 29 and its field edge #7c715c 32. Copied values, so the
+    // bound follows them.
+    assert.ok(Math.max(r, g, b) - Math.min(r, g, b) <= 32, `--${token} (${value}) is a colour, not a neutral`);
   }
 });
 
 test("gold is the only accent, and the semantics are the only other colours", () => {
-  const hues = (root.match(/^\s*--([\w-]+):\s*(#[0-9A-Fa-f]{6});/gm) ?? [])
-    .map((line) => /--([\w-]+):\s*(#[0-9A-Fa-f]{6})/.exec(line))
-    .filter(Boolean)
-    .map(([, name, value]) => {
-      const [r, g, b] = [1, 3, 5].map((i) => parseInt(value.slice(i, i + 2), 16));
-      return { name, value, spread: Math.max(r, g, b) - Math.min(r, g, b) };
-    })
-    .filter((t) => t.spread > 8)
-    .map((t) => t.name);
+  // Every coloured token in either block must be accounted for: the gold
+  // family, one of the four semantic families and the ink that goes on them,
+  // or ink drawn on the dark canvas. A fifth family appearing here is a second
+  // accent, which §7 of the skill forbids.
+  const allowed = /^(levo-gold|accent|accent-strong|accent-ink|accent-tint|accent-tint-border|on-accent-tint|on-accent-muted|muted-on-tint|gold-1|gold-2|gold-ink|gold-text|gold-line|gold-outline-fill|gold-edge|focus|danger|danger-surface|danger-border|on-danger|warning|warning-surface|warning-border|warning-ink|on-warning|success|success-surface|success-border|success-icon|success-caption|on-canvas|on-canvas-muted|on-canvas-line|knob|shadow-cast)$/;
+  for (const [name, block] of [[":root", root], ["light", light]]) {
+    const coloured = (block.match(/^\s*--([\w-]+):\s*(#[0-9A-Fa-f]{6});/gm) ?? [])
+      .map((line) => /--([\w-]+):\s*(#[0-9A-Fa-f]{6})/.exec(line))
+      .filter(Boolean)
+      .map(([, token]) => token)
+      .filter((token) => !LADDER.includes(token));
+    const strays = coloured.filter((token) => !allowed.test(token));
+    assert.deepEqual(strays, [], `${name}: unexplained coloured tokens — a second accent is forbidden: ${strays.join(", ")}`);
+  }
+});
 
-  // Every coloured token must be accounted for: the gold family, or one of the
-  // four semantic families and the ink that goes on them. A fifth family
-  // appearing here is a second accent, which §7 of the skill forbids.
-  const allowed = /^(levo-gold|accent|accent-strong|accent-ink|accent-tint|accent-tint-border|on-accent-tint|on-accent-muted|muted-on-tint|danger|danger-surface|danger-border|on-danger|warning|warning-surface|warning-border|warning-ink|on-warning|success|success-surface)$/;
-  const strays = hues.filter((name) => !allowed.test(name));
-  assert.deepEqual(strays, [], `unexplained coloured tokens — a second accent is forbidden: ${strays.join(", ")}`);
+/**
+ * CONTRAST, COMPUTED FROM THE TOKENS, IN BOTH THEMES (WCAG 2.x, sRGB).
+ * Text 4.5:1; a non-text boundary 3:1 (1.4.11) — the field edge, the focus
+ * ring, the gold-outline edge, and in light the 1px edge that gives a sand
+ * selection its boundary on a cream card (sand itself is about 1.2:1 there).
+ */
+const luminance = (hex) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => {
+  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+};
+
+test("both themes meet contrast on every surface they paint", () => {
+  const TEXT = [
+    ["text", "shell"], ["text", "panel"], ["text", "surface"], ["text", "well"], ["text", "card-1"], ["text", "card-2"],
+    ["text-2", "shell"], ["text-2", "panel"], ["muted", "shell"], ["muted", "panel"], ["muted", "surface"],
+    ["gold-ink", "gold-1"], ["gold-ink", "gold-2"], ["gold-text", "shell"], ["gold-text", "panel"], ["gold-text", "surface"],
+    ["text", "gold-outline-fill"], ["accent-ink", "accent"],
+    ["success", "success-surface"], ["success-caption", "success-surface"],
+    ["on-warning", "warning-surface"], ["on-danger", "danger-surface"],
+    ["on-canvas", "canvas"], ["on-canvas-muted", "canvas"],
+  ];
+  const BOUNDARY = [["field", "surface"], ["field", "panel"], ["focus", "shell"], ["focus", "panel"], ["gold-line", "gold-outline-fill"], ["success-icon", "success-surface"]];
+  for (const mode of ["dark", "light"]) {
+    for (const [fg, bg] of TEXT) {
+      const ratio = contrast(themeHex(mode, fg), themeHex(mode, bg));
+      assert.ok(ratio >= 4.5, `${mode}: --${fg} on --${bg} is ${ratio.toFixed(2)}:1, below 4.5`);
+    }
+    for (const [fg, bg] of BOUNDARY) {
+      const ratio = contrast(themeHex(mode, fg), themeHex(mode, bg));
+      assert.ok(ratio >= 3, `${mode}: --${fg} against --${bg} is ${ratio.toFixed(2)}:1, below 3`);
+    }
+  }
+  // The light sand selection: the fill alone cannot carry the boundary, so
+  // the edge drawn by --clay-gold must.
+  assert.ok(contrast(themeHex("light", "gold-1"), themeHex("light", "panel")) < 3, "if sand alone passed, the edge would be decoration");
+  for (const bg of ["panel", "surface", "well"]) {
+    assert.ok(contrast(themeHex("light", "gold-edge"), themeHex("light", bg)) >= 3, `light gold edge on --${bg}`);
+  }
+  assert.match(root, /--clay-gold:[^;]*0 0 0 1px var\(--gold-edge\)/, "the sand selection draws its edge");
 });
 
 test("nothing is set below the type floor", () => {
@@ -138,30 +224,33 @@ test("touch targets keep their floor, and the floor is a token", () => {
   assert.equal(tapMin, "44", "44px is the floor for anything tappable (skill §6, §12)");
 });
 
-test("the engine shadow theme mirrors the page, so a shadow root is not a hole", () => {
-  // These values cross into the vendored engine's shadow roots, which cannot
-  // see the page's custom properties. If the two drift, the engine's own
-  // chrome keeps the previous palette and shows it through the middle of the
-  // app — which is exactly how the olive survived the first black pass.
-  for (const [token, key] of [
-    ["--shell", "shell"],
-    ["--header", "header"],
-    ["--panel", "panel"],
-    ["--surface", "surface"],
-    ["--surface-strong", "surfaceStrong"],
-    ["--line", "line"],
-    ["--line-soft", "lineSoft"],
-    ["--text", "text"],
-    ["--muted", "muted"],
-    ["--idle", "idle"],
-    ["--track", "track"],
-  ]) {
-    const page = new RegExp(`${token}:\\s*(#[0-9A-Fa-f]{6});`).exec(root)?.[1];
-    const shadow = new RegExp(`\\b${key}:\\s*"(#[0-9A-Fa-f]{6})"`).exec(theme)?.[1];
-    assert.ok(page, `${token} missing from globals.css :root`);
-    assert.ok(shadow, `${key} missing from STUDIO_SURFACES`);
-    assert.equal(shadow.toUpperCase(), page.toUpperCase(), `${token} and STUDIO_SURFACES.${key} have drifted`);
+test("the engine shadow theme mirrors the page in both themes, so a shadow root is not a hole", () => {
+  // These values cross into the vendored engine's shadow roots, which get
+  // them as --lv-* properties. If the two drift, the engine's own chrome
+  // keeps the previous palette and shows it through the middle of the app —
+  // which is exactly how the olive survived the first black pass.
+  const pairs = [
+    ["shell", "shell"], ["canvas", "canvas"], ["header", "header"], ["panel", "panel"], ["surface", "surface"],
+    ["surface-strong", "surfaceStrong"], ["line", "line"], ["line-soft", "lineSoft"], ["text", "text"],
+    ["muted", "muted"], ["idle", "idle"], ["track", "track"],
+  ];
+  const surfaces = (name) => {
+    const at = theme.indexOf(`export const ${name} = {`);
+    assert.ok(at > 0, `${name} is missing from editor-theme.ts`);
+    return theme.slice(at, theme.indexOf("}", at));
+  };
+  for (const [mode, name] of [["dark", "STUDIO_SURFACES"], ["light", "STUDIO_SURFACES_LIGHT"]]) {
+    const block = surfaces(name);
+    for (const [token, key] of pairs) {
+      const page = themeHex(mode, token);
+      const shadow = new RegExp(`\\b${key}:\\s*"(#[0-9A-Fa-f]{6})"`).exec(block)?.[1];
+      assert.ok(page, `--${token} missing for ${mode}`);
+      assert.ok(shadow, `${key} missing from ${name}`);
+      assert.equal(shadow.toUpperCase(), page, `--${token} (${mode}) and ${name}.${key} have drifted`);
+    }
   }
+  // The light values reach the engine through its host attribute.
+  assert.match(theme, /:host\(\[data-levo-theme="light"\]\) \{ \$\{surfaceVars\(STUDIO_SURFACES_LIGHT\)\}/);
 });
 
 test("the engine chrome casts a black shadow, not a tinted one", () => {
@@ -176,55 +265,44 @@ test("the engine chrome casts a black shadow, not a tinted one", () => {
 });
 
 test("the file header describes the design that is actually in the file", () => {
-  // It described "a very dark olive family" for as long as the file was black.
-  // A header comment is the first thing the next editor reads, and one that
-  // describes the previous design is worse than none.
+  // It described "a very dark olive family" for as long as the file was black,
+  // and then the black system for as long as it was not. A header comment is
+  // the first thing the next editor reads, and one that describes the previous
+  // design is worse than none.
   const header = css.slice(0, css.indexOf(":root"));
   assert.ok(!/olive family/i.test(header) || /no longer/i.test(header), "the header still advertises the olive palette");
-  assert.match(css, /THE BLACK SYSTEM/, "the rationale for the ladder must stay with it");
+  assert.match(header, /two themes/i, "the header must say there are two themes");
+  assert.match(header, /black system[\s\S]{0,120}no longer/i, "the header must say the black system is gone");
+  assert.match(css, /THE REFERENCE LADDER/, "the rationale for the ladder must stay with it");
 });
 
-test("the engine chrome is parked above the shell's bar, from the same number", () => {
+test("the engine chrome docks inside the viewport card, from the same number", () => {
   /**
-   * The shell's bottom bar is `--mobile-bar-height` plus the safe-area inset,
-   * absolutely positioned over the canvas. The engine parks its plate bar and
-   * its status line inside that same canvas, and those offsets were hard-coded
-   * at 76px and 72px — chosen when the bar was shorter and before anyone had a
-   * home indicator. On a phone with a 34px inset the bar is ~102px tall, so
-   * the plate tabs and the whole status readout sat BEHIND it, unreachable:
-   * the tool tray re-provides plate-ADD but never plate switching.
-   *
-   * Both sides now derive from one number. This is the test that keeps them
-   * derived from the SAME one.
+   * CHANGED DELIBERATELY WITH THE PHONE SHELL. The engine's plate bar, status
+   * line and side panel used to clear the shell's 68px bottom bar plus the
+   * safe-area inset — a bar that sat over the canvas and once hid the plate
+   * tabs behind it. The reference column has no bottom bar: the canvas is a
+   * card in a scrolling page, so the engine's chrome only clears the card's
+   * rounded corner, and the safe-area inset comes back only when the viewport
+   * is expanded over the whole screen. Both sides still derive from one
+   * number, and this is the test that keeps them derived from the SAME one.
    */
-  // `:root` carries a desktop default and the mobile block OVERRIDES it, so
-  // the number to compare against is the one in force below 900px — which is
-  // the only width the engine's mobile rules apply at.
-  assert.ok(/--mobile-bar-height:\s*\d+px/.test(root), "--mobile-bar-height must be a token");
-  const shadow = /const MOBILE_BAR_HEIGHT_PX = (\d+);/.exec(theme)?.[1];
-  assert.ok(shadow, "editor-theme.ts must name the bar height it is clearing");
-  const mobile = /@media \(max-width: 899px\) \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? "";
-  const inForce = /--mobile-bar-height:\s*(\d+)px/.exec(mobile)?.[1];
-  assert.equal(
-    inForce,
-    shadow,
-    "editor-theme.ts and the mobile --mobile-bar-height disagree — the engine would be parked at the wrong height"
-  );
+  assert.doesNotMatch(rules, /--mobile-bar-height/, "the bottom bar is gone; nothing should still be clearing it");
+  const page = /--engine-dock-gap:\s*(\d+)px/.exec(root)?.[1];
+  assert.ok(page, "--engine-dock-gap must be a token");
+  const shadow = /const ENGINE_DOCK_GAP_PX = (\d+);/.exec(theme)?.[1];
+  assert.equal(shadow, page, "editor-theme.ts and globals.css disagree on the dock gap");
 
-  // And every engine element that lives at the bottom of the canvas clears it,
-  // safe area included. A bare `bottom: NNpx` here is the bug coming back.
   const shadowCss = /EDITOR_SHADOW_CSS = `([\s\S]*?)\n`;/.exec(theme)?.[1] ?? "";
+  assert.match(shadowCss, /:host\(\[data-levo-viewport="expanded"\]\) \{ --lv-dock-bottom: calc\(env\(safe-area-inset-bottom\) \+ \$\{ENGINE_DOCK_GAP_PX\}px\); \}/,
+    "the expanded viewport is the screen's edge, so it clears the safe area");
   const mobileShadow = /@media \(max-width: 899px\) \{([\s\S]*?)\n {2}\}/.exec(shadowCss)?.[1] ?? "";
   assert.ok(mobileShadow.length > 200, "the engine's mobile block should be findable");
   for (const selector of [".plate-bar", ".vp-status", ".sidebar"]) {
     const rule = new RegExp(`\\${selector}[^{]*\\{[^}]*\\}`).exec(mobileShadow)?.[0] ?? "";
     assert.ok(rule, `${selector} should have a mobile rule`);
-    assert.ok(
-      /bottom:\s*(calc\()?\$\{ABOVE_BAR/.test(rule),
-      `${selector} must clear the shell bar — found: ${/bottom:[^;]*/.exec(rule)?.[0]}`
-    );
+    assert.ok(/bottom:\s*\$\{DOCK_BOTTOM\}/.test(rule), `${selector} must dock from the one number — found: ${/bottom:[^;]*/.exec(rule)?.[0]}`);
   }
-  assert.match(theme, /env\(safe-area-inset-bottom\)/, "the inset must be part of the offset");
 });
 
 /**
@@ -364,8 +442,6 @@ test("LTR is pinned to readouts, not to sentences", () => {
     ".print-action-grid",    // file formats
     ".connection-method-tabs",
     ".lan-connection-form",  // an IP, a serial, an access code
-    ".mobile-toolgrid",
-    ".mobile-primarybar",
     ".discovered-printers button small",
     ".connected-printer-card strong, .connected-printer-card small",
   ];

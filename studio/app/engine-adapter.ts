@@ -30,7 +30,7 @@ import {
   type ArrangePlan,
 } from "./plate-packing";
 import { planSeats, type SeatedFootprint, type SeatRequest } from "./spawn-seating";
-import { autoOrient, lowestPoint } from "./auto-orient";
+import { autoOrient, lowestPoint, sideEuler, IMPORTED_EULER, type Vec3 } from "./auto-orient";
 import { cutByPlane, extentAlong, type CutPlane } from "./plane-cut";
 
 // ---------------------------------------------------------------------------
@@ -428,6 +428,24 @@ export class EngineAdapter {
 
   private queryControl(testId: string): HTMLElement | null {
     return this.root()?.querySelector<HTMLElement>(`[data-testid="${testId}"]`) ?? null;
+  }
+
+  /**
+   * Which transform gizmo the engine has active, read from its own rail.
+   *
+   * The engine reports no event for it, but its gizmo buttons carry the class
+   * `on` for the active mode (`oi` in viewer/dist/Viewport.js) — and they keep
+   * doing so while the rail is hidden on a phone. Reading that is the truth
+   * even after a keyboard shortcut changed the mode behind the shell's back.
+   * Null when the rail cannot be read (engine not mounted, paint mode on).
+   */
+  activeGizmo(): "move" | "rotate" | "scale" | null {
+    const root = this.root();
+    if (!root) return null;
+    for (const [testId, name] of [["gizmo-move", "move"], ["gizmo-rotate", "rotate"], ["gizmo-scale", "scale"]] as const) {
+      if (root.querySelector(`[data-testid="${testId}"]`)?.classList.contains("on")) return name;
+    }
+    return null;
   }
 
   /** True when the control exists and is not a disabled button. */
@@ -1110,6 +1128,12 @@ export interface AutoOrientSceneResult {
   /** True when a hull had to be approximated; the UI says so rather than not. */
   approximated: boolean;
   undo: (() => boolean) | null;
+  /**
+   * The rotation each measured object ended in (oriented or already best),
+   * so the shell can tell later whether an object is still in its automatic
+   * orientation — the «تلقائي» chip is read from the scene, not remembered.
+   */
+  rotations?: Array<{ id: number; rot: Vec3 }>;
 }
 
 const EMPTY_ORIENT: Omit<AutoOrientSceneResult, "ok" | "reason"> = {
@@ -1160,6 +1184,7 @@ export function autoOrientObjects(
   let skippedCount = 0;
   let lockedCount = 0;
   let approximated = false;
+  const rotations: Array<{ id: number; rot: Vec3 }> = [];
 
   for (const snapshot of snapshots) {
     if (wanted && !wanted.has(snapshot.id)) continue;
@@ -1180,8 +1205,10 @@ export function autoOrientObjects(
     if (result.hullFaces === 0) approximated = true;
     if (!result.improved) {
       alreadyBestCount++;
+      rotations.push({ id: snapshot.id, rot: { x: snapshot.rot.x, y: snapshot.rot.y, z: snapshot.rot.z } });
       continue;
     }
+    rotations.push({ id: snapshot.id, rot: { x: result.euler.x, y: result.euler.y, z: result.euler.z } });
 
     const scale = { x: snapshot.scale.x, y: snapshot.scale.y, z: snapshot.scale.z };
     const before = lowestPoint(positions, { x: snapshot.rot.x, y: snapshot.rot.y, z: snapshot.rot.z }, scale);
@@ -1213,6 +1240,70 @@ export function autoOrientObjects(
     lockedCount,
     approximated,
     undo: captured && orientedCount ? () => adapter.restoreSceneState(captured) : null,
+    rotations,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Orientation presets: as imported, and on its side (the third is auto-orient)
+// ---------------------------------------------------------------------------
+
+export interface OrientationPresetOptions {
+  preset: "imported" | "side";
+  /** Restrict to these ids; empty/omitted means every object. */
+  ids?: ReadonlySet<number>;
+  selectedPlate?: number;
+}
+
+export interface OrientationPresetResult {
+  ok: boolean;
+  reason?: "engine-unavailable" | "no-objects";
+  /** Objects whose rotation actually changed. */
+  changedCount: number;
+  undo: (() => boolean) | null;
+}
+
+/**
+ * Puts objects into a fixed orientation, by the same mechanism as
+ * autoOrientObjects above: write the rotation into the snapshot, re-seat by
+ * the DIFFERENCE of lowest points so the part neither sinks nor floats, and
+ * hand the whole list back through `restoreScene`. Undoable through a
+ * captured scene state, like every other whole-scene change here.
+ */
+export function applyOrientationPreset(adapter: EngineAdapter, options: OrientationPresetOptions): OrientationPresetResult {
+  const api = adapter.api();
+  if (!api) return { ok: false, reason: "engine-unavailable", changedCount: 0, undo: null };
+  const snapshots = api.sceneSnapshot();
+  if (!snapshots.length) return { ok: false, reason: "no-objects", changedCount: 0, undo: null };
+  const captured = adapter.captureSceneState(options.selectedPlate ?? 0);
+  let changedCount = 0;
+  for (const snapshot of snapshots) {
+    if (options.ids?.size && !options.ids.has(snapshot.id)) continue;
+    const positions = snapshot.localPos;
+    if (!(positions instanceof Float32Array) || positions.length < 9) continue;
+    const scale = { x: snapshot.scale.x, y: snapshot.scale.y, z: snapshot.scale.z };
+    const target = options.preset === "imported" ? IMPORTED_EULER : sideEuler(positions, scale);
+    const current = { x: snapshot.rot.x, y: snapshot.rot.y, z: snapshot.rot.z };
+    if (Math.abs(current.x - target.x) < 1e-6 && Math.abs(current.y - target.y) < 1e-6 && Math.abs(current.z - target.z) < 1e-6) continue;
+    const before = lowestPoint(positions, current, scale);
+    const after = lowestPoint(positions, target, scale);
+    // Plain assignment for the reason autoOrientObjects gives: the runtime
+    // object is a THREE.Euler whose accessors write the fields restoreScene reads.
+    snapshot.rot.x = target.x;
+    snapshot.rot.y = target.y;
+    snapshot.rot.z = target.z;
+    snapshot.pos.y += before - after;
+    changedCount++;
+  }
+  if (changedCount) {
+    api.restoreScene(snapshots);
+    api.frame();
+    adapter.notifySceneEdited();
+  }
+  return {
+    ok: true,
+    changedCount,
+    undo: captured && changedCount ? () => adapter.restoreSceneState(captured) : null,
   };
 }
 

@@ -8,28 +8,29 @@ import { LEVONIS_TOKENS, STUDIO_SURFACES } from "./editor-theme";
  *
  * These two screens — the bundle still loading, and the bundle refusing to
  * load — are the only thing on screen for the whole engine download on a cold
- * cache. They were written with Tailwind's zinc scale spelled out inline
- * (#0a0a0a, #e4e4e7, #a1a1aa, #3f3f46, #18181b) and `fontFamily: system-ui`.
+ * cache. They were once written with Tailwind's zinc scale spelled out inline
+ * and `fontFamily: system-ui`, so the first thing a visitor saw was a
+ * DIFFERENT ground than the app that follows, and then the page changed
+ * underneath them when the real shell mounted.
  *
- * So the first thing a visitor saw was a DIFFERENT near-black than the app
- * that follows, with Arabic set in whatever face the operating system picks
- * rather than Cairo — and then the page changed underneath them when the real
- * shell mounted. The values come from the same tokens as everything else now,
- * imported rather than copied, so they cannot drift again.
- *
- * `globals.css` is not loaded yet at this point, which is why these are inline
- * styles and not classes, and why the tokens are read from TypeScript.
+ * TWO THEMES NOW. The colours are the theme's own custom properties, so the
+ * boot screen is light or dark exactly as the boot script in layout.tsx
+ * decided before first paint; each var() carries the dark value from
+ * STUDIO_SURFACES as its fallback, for the moment before the stylesheet
+ * arrives. On a phone the loading line sits in a card the size of the
+ * viewport card (globals.css `.boot-card`), so the column the reader is
+ * about to see is already there in outline.
  */
 const BOOT_SCREEN = {
   minHeight: "100dvh",
   display: "grid",
   placeItems: "center",
-  background: STUDIO_SURFACES.shell,
-  color: STUDIO_SURFACES.text,
+  background: `var(--shell, ${STUDIO_SURFACES.shell})`,
+  color: `var(--text, ${STUDIO_SURFACES.text})`,
   fontFamily: LEVONIS_TOKENS.fontSans,
 } as const;
 
-const BOOT_MUTED = STUDIO_SURFACES.muted;
+const BOOT_MUTED = `var(--muted, ${STUDIO_SURFACES.muted})`;
 
 const BOOT_RETRY = {
   // 44px is the touch floor the rest of the app keeps; the recovery control on
@@ -37,9 +38,9 @@ const BOOT_RETRY = {
   minHeight: "44px",
   padding: "0.6rem 1.4rem",
   borderRadius: "12px",
-  border: `1px solid ${STUDIO_SURFACES.line}`,
-  background: STUDIO_SURFACES.surface,
-  color: STUDIO_SURFACES.text,
+  border: `1px solid var(--line, ${STUDIO_SURFACES.line})`,
+  background: `var(--surface, ${STUDIO_SURFACES.surface})`,
+  color: `var(--text, ${STUDIO_SURFACES.text})`,
   fontFamily: "inherit",
   fontSize: "13px",
   cursor: "pointer",
@@ -143,8 +144,10 @@ export default function EditorBoot({ user = null }: { user?: EditorUser }) {
     // Minimal shell while the editor bundle loads — mirrors the editor's own
     // dark ground so there is no white flash; no fake progress numbers.
     return (
-      <div aria-busy="true" style={{ ...BOOT_SCREEN, color: BOOT_MUTED }}>
-        <p style={{ lineHeight: 1.7 }}>جارٍ تحميل LEVO Studio…</p>
+      <div aria-busy="true" className="boot-screen" style={{ ...BOOT_SCREEN, color: BOOT_MUTED }}>
+        <div className="boot-card">
+          <p style={{ lineHeight: 1.7 }}>جارٍ تحميل LEVO Studio…</p>
+        </div>
       </div>
     );
   }

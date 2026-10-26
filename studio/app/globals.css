@@ -1,16 +1,23 @@
 @import "tailwindcss";
 
 /*
- * LEVO Studio chrome — LEVONIS identity (slice S6).
+ * LEVO Studio chrome — LEVONIS identity, in two themes.
  *
- * The surface system is BLACK, and :root below carries the whole rationale.
- * This paragraph used to describe a "very dark olive family" copied from the
- * store's green identity; that is no longer what this file paints, and a
- * header comment that describes the previous design is worse than none — it
- * is the first thing the next editor reads. LEVONIS gold and the Cairo type
- * stack still come from the store (token values only, never store bundles,
- * mandate §2). The same values feed the engine shadow theme in
- * app/editor-theme.ts; keep both in sync.
+ * The surfaces follow the owner's reference screens (IMG_8466/8467/8471): a
+ * blue-charcoal ladder with sand-gold clay in dark, and the site's own cream
+ * ladder in light (DECISIONS row 271, plan item C6, decision D-14). The first
+ * token block below carries the dark values and the rationale; the second,
+ * keyed on data-theme="light", re-declares the same names for light.
+ * app/theme.ts decides which one is in
+ * force (system, light or dark, kept on this device) and the boot script in
+ * layout.tsx applies it before first paint. The same dark values feed the
+ * engine shadow theme in app/editor-theme.ts (STUDIO_SURFACES, and
+ * STUDIO_SURFACES_LIGHT for the light block); keep both in sync.
+ *
+ * The black system this file used to describe (pure #000000 with neutral
+ * greys, an owner decision of its time) is no longer what it paints: the
+ * owner's later instruction is to match the reference screens, which are
+ * blue charcoal. tests/theme-tokens.test.mjs was changed deliberately with it.
  *
  * Direction: the chrome follows the document dir (ar/ckb → RTL, en → LTR).
  * `.viewport-mount`, `.studio-status` and other technical readouts are pinned
@@ -18,71 +25,120 @@
  *
  * Touch: primary controls keep ≥44px hit targets; on coarse pointers every
  * header/toolbar control is raised to 44px. Safe areas are respected at the
- * header top and the mobile bar bottom.
+ * top of the phone column and at the bottom of its scroll.
+ *
+ * Phones (below 900px) get the reference's single scrolling column of clay
+ * cards (the PHONE SHELL section near the end of this file). Desktops keep
+ * the full workspace, re-tinted.
  */
+
+/*
+ * CAIRO, SELF-HOSTED. The font was named in every font-family here and never
+ * loaded: the CSP is font-src 'self' and documents are cross-origin isolated,
+ * so no third-party font origin can serve it, and phones fell back to the
+ * system face. The two subsets are the site's own files (public/fonts/cairo/
+ * LICENSE), plus the site's six-letter Sorani patch for the letters Cairo
+ * lacks (ە ێ ۆ ڵ ڕ ۊ); its weight range matches Cairo's so the browser
+ * consults it, as src/index.css explains.
+ */
+@font-face { font-family: "Cairo"; font-style: normal; font-weight: 300 900; font-display: swap; src: url("/fonts/cairo/cairo-v31-arabic.woff2") format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC; }
+@font-face { font-family: "Cairo"; font-style: normal; font-weight: 300 900; font-display: swap; src: url("/fonts/cairo/cairo-v31-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Cairo"; font-style: normal; font-weight: 300 900; font-display: swap; src: url("/fonts/cairo-kurdish-patch.woff2") format("woff2"); unicode-range: U+0693, U+0695, U+06B5, U+06C6, U+06CE, U+06D5; }
 
 :root {
   /*
-   * THE BLACK SYSTEM.
+   * THE REFERENCE LADDER (dark).
    *
-   * The Studio used to be dark OLIVE — #0A0C05 shell, #1B2010 surfaces — a
-   * tint carried over from the store's green identity. Against a 3D bed it
-   * read as a colour cast on every surface, and on an OLED phone a tinted
-   * near-black still lights every pixel. The owner asked for black, so the
-   * base IS black and elevation is carried by neutral greys instead of hue.
+   * Sampled from the reference screens with PIL (scratch tokens.md §1 and §8):
+   * the page is blue charcoal, cards are one step lighter and raised controls
+   * one more, and an inset tray sits one step below the card. Elevation is
+   * still a ladder, but on a charcoal ground a soft clay shadow reads, so the
+   * clay grammar of the site (row 207: one light from above, a lit top rim, a
+   * shaded base and a cast below) is used for the phone cards.
    *
-   * ELEVATION IS A LADDER, NOT A GLOW. Each step up is a lighter neutral, and
-   * a surface is told apart from the one under it by that step plus a 1px
-   * hairline — never by a shadow (invisible on black) and never by an accent
-   * border. Steps are deliberately close together: on black, small luminance
-   * differences read clearly, and large ones look like separate apps.
+   *   shell         #121619   the page behind everything
+   *   canvas        #16191E   the 3D viewport, a dark island in both themes
+   *   header        #1A1F23   fixed chrome on desktop
+   *   panel         #22272C   cards and sheets
+   *   surface       #282E33   raised controls on a card
+   *   surfaceStrong #2E343A   a pressed or selected neutral control
+   *   well          #1C2125   the inset tray the transform tiles sit in
    *
-   *   canvas/shell  #000000   the bed, and the page behind everything
-   *   header        #0A0A0B   fixed chrome
-   *   panel         #111113   sheets and side panels
-   *   surface       #17171A   cards, inputs, resting controls
-   *   surfaceStrong #212125   a raised or pressed control
+   * Every neutral leans blue (blue channel at or above red) and stays close to
+   * grey; tests/theme-tokens.test.mjs holds both, so an olive or a warm cast
+   * cannot creep back into the dark ladder.
    *
-   * THE GOLD STAYS, AND STAYS RARE. #BAA369 is Levonis and is the one accent
-   * in the app. It marks the primary action, the current selection and
-   * membership — nothing else. It is never simultaneously the border, the
-   * background, the text and the shadow of one element.
+   * THE GOLD. #BAA369 is the brand gold. The reference spends a lighter SAND
+   * gold as a clay fill: a vertical gradient from --gold-1 to --gold-2 with
+   * near-black ink. It marks the one primary verb on the screen (D-2) and, in
+   * this app only, the current selection of a segmented control, a tool tile
+   * or an orientation chip (D-3, owner override recorded in DECISIONS row
+   * 270), always beside a non-colour cue (aria-checked or aria-pressed, plus a
+   * heavier label). Gold text on dark is --gold-text.
    *
-   * SEMANTICS ARE APPLE'S DARK-MODE SYSTEM COLOURS, which are tuned for exactly
-   * this: saturated enough to read on black without vibrating.
+   * SEMANTICS are tuned to the charcoal: a muted green ready banner (the
+   * reference's own), a soft red, an amber.
    */
+  color-scheme: dark;
 
   /* Neutral elevation ladder */
-  --shell: #000000;
-  --canvas: #000000;
-  --header: #0A0A0B;
-  --panel: #111113;
-  --surface: #17171A;
-  --surface-strong: #212125;
-  --line: #2C2C31;
-  --line-soft: #1C1C20;
+  --shell: #121619;
+  --canvas: #16191E;
+  --header: #1A1F23;
+  --panel: #22272C;
+  --surface: #282E33;
+  --surface-strong: #2E343A;
+  --line: #2B3036;
+  --line-soft: #1F2429;
+  --well: #1C2125;
+  --card-1: #252B30;
+  --card-2: #1E2328;
 
   /* Type. `muted` is quiet by luminance, not only by size (skill §5). */
-  --text: #F5F5F7;
-  --muted: #98989F;
+  --text: #F2F3F5;
+  --text-2: #ADB8C5;
+  --muted: #97A2AE;
+  --ink-disabled: #7D8893;
+  /* The 3:1 boundary of a text-entry field (WCAG 1.4.11). */
+  --field: #737A85;
 
-  /* The single accent */
+  /* The accent family */
   --levo-gold: #BAA369;
-  --accent: var(--levo-gold);
-  --accent-strong: #9C8752;
-  --accent-ink: #171106;          /* text ON a gold fill */
-  --accent-tint: #1C180E;         /* gold at rest, as a surface */
-  --accent-tint-border: #463C24;
-  --on-accent-tint: #E4D5AC;
-  --muted-on-tint: #ADA183;
+  --accent: #DCBC8C;
+  --accent-strong: #C8A777;
+  --accent-ink: #15100A;          /* text ON a gold fill */
+  --accent-tint: #2C2B28;         /* gold at rest, as a surface */
+  --accent-tint-border: #5A4B30;
+  --on-accent-tint: #F0D18C;
+  --muted-on-tint: #C9BB9C;
+  --gold-1: #E7CCA1;              /* sand clay, top of the gradient */
+  --gold-2: #C8A777;              /* sand clay, bottom of the gradient */
+  --gold-ink: #15100A;
+  --gold-text: #F0D18C;           /* gold as text and line icons on dark */
+  --gold-line: #E3C590;           /* the gold-outline button's edge */
+  --gold-outline-fill: #2C2B28;
+  --gold-edge: rgb(0 0 0 / .35);  /* the contour of a gold fill */
+  --focus: #D2C392;
 
-  /* Apple dark-mode semantics */
-  --danger: #FF453A;
-  --danger-surface: #2A1411;
-  --warning: #FF9F0A;
-  --warning-surface: #2B1C06;
-  --success: #30D158;
-  --success-surface: #0E2A16;
+  /*
+   * INK ON THE CANVAS. The viewport is a dark island in both themes, so what
+   * is drawn straight onto it (the overlay toolbar, the loader) uses these in
+   * both themes, and the light block does not re-declare them.
+   */
+  --on-canvas: #E9EDF1;
+  --on-canvas-muted: #A9B3BE;
+  --on-canvas-line: #3A4148;
+
+  /* Semantics */
+  --danger: #ED7177;
+  --danger-surface: #3A2427;
+  --warning: #F0B35A;
+  --warning-surface: #33291A;
+  --success: #67CB98;
+  --success-surface: #1F3230;
+  --success-border: #233A35;
+  --success-icon: #56A57F;
+  --success-caption: #A3B4B2;
 
   /*
    * TOUCH GEOMETRY. 44px is the floor for anything tappable; the bars are
@@ -90,8 +146,14 @@
    * rather than eating into them.
    */
   --header-height: 56px;
-  --mobile-bar-height: 64px;
   --tap-min: 44px;
+  /*
+   * How far the engine's own chrome (plate bar, status line, stats card) sits
+   * from the bottom edge of the canvas. It used to clear a 68px bottom bar on
+   * phones; the reference column has no bottom bar, so it only clears the
+   * card's rounded corner. editor-theme.ts states the same number.
+   */
+  --engine-dock-gap: 8px;
 
   /* Radii: soft enough to feel like a touch UI, tight enough to stay technical. */
   --radius-sm: 8px;
@@ -105,49 +167,67 @@
   /*
    * THE TOKENS THE RULES BELOW WERE STILL WORKING AROUND.
    *
-   * The ladder above landed in one pass, but roughly thirty colours further
-   * down this file were left spelled out: #5F7268 for a resting status dot,
-   * #3C5448 for a spinner track, #D3DED5 and #C9D4CC for text, #45564C for a
-   * switch, #050B08 for every shadow. Every one of them is OLIVE — they are
-   * the old palette surviving inside rules nobody re-read — and on black they
-   * read as a green cast on exactly the small, repeated details the eye
-   * notices: a dot, a ring, a toggle, the edge of a card.
-   *
-   * There is no such thing as a one-off colour in a design system. Each of
-   * these now names what it is FOR, so the next colour question has an answer
-   * that is not a hex code.
+   * Roughly thirty colours further down this file were once spelled out as
+   * hex — #5F7268 for a resting status dot, #3C5448 for a spinner track,
+   * #45564C for a switch — the old olive palette surviving inside rules
+   * nobody re-read. There is no such thing as a one-off colour in a design
+   * system: each of these names what it is FOR.
    */
-
-  /* A shadow on black is BLACK. An olive shadow tints the surface it falls on. */
   --shadow-cast: #000000;
-  /* Nothing is happening, and that is not a failure — neutral, never a hue. */
-  --idle: #5B5B63;
+  /* Nothing is happening, and that is not a failure. */
+  --idle: #5E6873;
   /* The unfilled half of a control: a switch track, a spinner's ring. */
-  --track: #3A3A40;
+  --track: #3A4148;
 
   /* Semantic borders and the ink that goes ON a semantic surface. */
   --warning-border: #6B5427;
   --on-warning: #F0CB86;
   --warning-ink: #241B06;
-  --danger-border: #7A3F38;
-  --on-danger: #FFAAA0;
-  /* The thumb of a switch — an object, not type; the one pure white here. */
+  --danger-border: #7A3F44;
+  --on-danger: #FFB4B7;
+  /* The thumb of a switch — an object, not type. */
   --knob: #FFFFFF;
   /* A second, quieter ink on a GOLD fill — a caption under a button's label. */
   --on-accent-muted: #4A3A12;
+
+  /*
+   * CLAY (row 207, values from the site's src/index.css, re-tinted for the
+   * charcoal ground as scratch tokens.md §2 measured them). The composites
+   * are declared here once; because the light block below re-declares the
+   * primitives on the same element, each composite resolves with the
+   * primitives of the theme in force.
+   */
+  --clay-rim: rgb(255 255 255 / .08);
+  --clay-base: rgb(0 0 0 / .28);
+  --clay-contact: rgb(0 0 0 / .45);
+  --clay-ambient: rgb(0 0 0 / .6);
+  --clay-sink: rgb(0 0 0 / .5);
+  --clay-contour: rgb(0 0 0 / .35);
+  --gold-rim: rgb(255 246 226 / .55);
+  --gold-base: rgb(92 64 26 / .22);
+  --clay-0: inset 0 1px 0 var(--clay-rim);
+  --clay-lift: var(--clay-0), 0 1px 2px var(--clay-contact), 0 3px 8px -3px var(--clay-ambient);
+  --clay-1: var(--clay-0), inset 0 -2px 0 var(--clay-base), 0 4px 12px -6px var(--clay-ambient);
+  --clay-press: inset 0 2px 5px var(--clay-sink), inset 0 -1px 0 var(--clay-rim);
+  --clay-well: inset 0 1px 3px var(--clay-sink), inset 0 -1px 0 var(--clay-rim);
+  --clay-gold: inset 0 1px 0 var(--gold-rim), inset 0 -2px 0 var(--gold-base), 0 0 0 1px var(--gold-edge), 0 6px 14px -6px var(--clay-ambient);
+  /*
+   * The two fills the reference paints as a vertical gradient. They are
+   * tokens, built only from the stops above, so no rule spells a gradient
+   * out (tests/editor-capabilities.test.mjs allows exactly these two).
+   */
+  --gold-clay: linear-gradient(180deg, var(--gold-1), var(--gold-2));
+  --card-clay: linear-gradient(180deg, var(--card-1), var(--card-2));
 
   /*
    * TYPE HAS A FLOOR, AND IT IS NOT 8.5px.
    *
    * Captions in this file were set at 8.5px, 8.8px, 9px and 9.5px. On a phone
    * that is unreadable in Latin and genuinely illegible in Arabic, whose
-   * letterforms carry meaning in marks that vanish first — and the owner asked
-   * for a redesign aimed at small screens above all. A quiet label is quiet
-   * because of its COLOUR and its weight (skill §5), not because it has been
-   * shrunk past reading.
-   *
-   * Three sizes, and nothing between them. Arabic gets the line height it
-   * needs at every step.
+   * letterforms carry meaning in marks that vanish first. A quiet label is
+   * quiet because of its COLOUR and its weight (skill §5), not because it has
+   * been shrunk past reading. The reference draws its captions at about 9pt;
+   * they are built at the 11px floor.
    */
   --text-body: 13px;
   --text-label: 12px;
@@ -161,7 +241,7 @@
    * components/projects-panel.tsx styles itself from --levo-panel-* with
    * hardcoded fallbacks including a blue #3d6ef7 accent — a different product's
    * palette living inside this one. Mapping those names onto the ladder above
-   * makes the panel obey the black system without touching its markup.
+   * makes the panel obey this system without touching its markup.
    */
   --levo-panel-fg: var(--text);
   --levo-panel-inset: var(--surface);
@@ -173,19 +253,86 @@
    * TWO OF THE EIGHT WERE NEVER MAPPED, AND NOBODY COULD SEE IT.
    *
    * The panel writes `var(--levo-ok, #3fbf6f)` and `var(--levo-warn, #e2a93b)`
-   * on its sync badges. Six of its eight tokens were mapped onto the ladder
-   * above; these two were missed — so the fallback fired, and the "synced" and
-   * "degraded" badges were painted in the OTHER product's green and amber,
-   * inside an app whose semantic colours are Apple's dark-mode system ones.
-   *
-   * A missing custom property is silent by design: the fallback is a feature,
-   * and it is exactly why the gap survived. Mapping them is the fix; the
-   * stylesheet test that refuses a spelled-out colour in a rule is what stops
-   * the next one, because a NEW unmapped token would have to arrive with a hex
-   * fallback beside it.
+   * on its sync badges. A missing custom property is silent by design: the
+   * fallback is a feature, and it is exactly why the gap survived. Mapping
+   * them is the fix; the stylesheet test that refuses a spelled-out colour in
+   * a rule is what stops the next one.
    */
   --levo-ok: var(--success);
   --levo-warn: var(--warning);
+}
+
+:root[data-theme="light"] {
+  /*
+   * THE LIGHT THEME IS THE SITE'S OWN CREAM (src/index.css [data-theme='light'],
+   * the owner's «كريمي لا أبيض ساطع»): the same ladder order, page below card
+   * below raised control, a well under the card, warm-ink clay shadows.
+   *
+   * Two things carry over from dark on purpose:
+   *  - the canvas: the engine paints its own dark clear colour, so the
+   *    viewport card stays a dark island and its frame matches it;
+   *  - the sand clay fill: a light gold with near-black ink. On a cream card
+   *    sand is only 1.3 to 1.9:1, so every gold fill here also carries the
+   *    1px --gold-edge contour, which is what gives it the 3:1 a non-text
+   *    boundary needs (WCAG 1.4.11).
+   */
+  color-scheme: light;
+  --shell: #E3DACB;
+  --canvas: #16191E;
+  --header: #E8E0D1;
+  --panel: #EBE4D6;
+  --surface: #F0EADF;
+  --surface-strong: #DDD4C3;
+  --line: #CFC5B2;
+  --line-soft: #DDD4C3;
+  --well: #E2D9C9;
+  --card-1: #EEE8DC;
+  --card-2: #E8E0D1;
+  --text: #16181B;
+  --text-2: #45484E;
+  --muted: #595C62;
+  --ink-disabled: #6B6E74;
+  --field: #7C715C;
+  --accent: #6F592B;
+  --accent-strong: #5A4721;
+  --accent-ink: #F6F1E7;
+  --accent-tint: #E6DCC6;
+  --accent-tint-border: #C9B88F;
+  --on-accent-tint: #4A3A12;
+  --muted-on-tint: #5A4A24;
+  --on-accent-muted: #E6DCC6;
+  --gold-text: #6A5426;
+  --gold-line: #7A5C30;
+  --gold-outline-fill: #ECE2CF;
+  --gold-edge: #7A5C30;
+  --focus: #6F592B;
+  --danger: #AD3037;
+  --danger-surface: #F1D9D3;
+  --danger-border: #D9A39C;
+  --on-danger: #7A1F24;
+  --warning: #87520A;
+  --warning-surface: #F1E2C4;
+  --warning-border: #D6B77A;
+  --on-warning: #5E3A08;
+  --warning-ink: #FFF7E6;
+  --success: #165C3A;
+  --success-surface: #DADACA;
+  --success-border: #B9C7B0;
+  --success-icon: #1F8A54;
+  --success-caption: #45484E;
+  --shadow-cast: rgb(58 46 28 / .28);
+  --idle: #8B8478;
+  --track: #CFC5B2;
+  --knob: #FBF8F1;
+  --clay-rim: rgb(255 253 248 / .8);
+  --clay-base: rgb(58 46 28 / .08);
+  --clay-contact: rgb(58 46 28 / .1);
+  --clay-ambient: rgb(58 46 28 / .18);
+  --clay-sink: rgb(58 46 28 / .16);
+  --clay-contour: rgb(58 46 28 / .14);
+  --gold-rim: rgb(255 250 238 / .7);
+  --gold-base: rgb(92 64 26 / .18);
+  --shadow: 0 -8px 32px rgba(58, 46, 28, 0.22);
 }
 
 * { box-sizing: border-box; }
@@ -203,11 +350,11 @@ body {
 }
 button, input, select { font: inherit; }
 button { color: inherit; }
-button:focus-visible, a:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:focus-visible, a:focus-visible, select:focus-visible, [role="button"]:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 button:disabled { cursor: not-allowed; }
 .file-select-control { position: relative; cursor: pointer; }
 .file-select-control[aria-disabled="true"] { cursor: not-allowed; opacity: .45; }
-.file-select-control:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
+.file-select-control:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
 .native-file-input { position: absolute; z-index: 2; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .native-file-input:disabled { cursor: not-allowed; }
 
@@ -367,11 +514,11 @@ button:disabled { cursor: not-allowed; }
   justify-content: center;
   gap: 10px;
   background: var(--canvas);
-  color: var(--text);
+  color: var(--on-canvas);
 }
-.editor-loader span { width: 34px; height: 34px; border: 3px solid var(--track); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+.editor-loader span { width: 34px; height: 34px; border: 3px solid var(--on-canvas-line); border-top-color: var(--gold-1); border-radius: 50%; animation: spin .8s linear infinite; }
 .editor-loader strong { font-size: 14px; }
-.editor-loader small { color: var(--muted); direction: ltr; }
+.editor-loader small { color: var(--on-canvas-muted); direction: ltr; }
 
 .empty-upload-card {
   position: absolute;
@@ -441,15 +588,31 @@ button:disabled { cursor: not-allowed; }
 .import-progress progress:indeterminate { background: var(--surface); }
 .import-progress progress:indeterminate::-webkit-progress-bar { background: var(--surface); }
 
-.editor-message {
+/*
+ * ONE MESSAGE SLOT, NOW IN ITS OWN BOX. The error or notice row, the slow-slice
+ * warning and the outdated-result banner used to be three absolutely placed
+ * siblings over the canvas. They sit in `.studio-messages` now: on a desktop
+ * that box floats over the canvas exactly where they did; on a phone it is an
+ * ordinary block in the column above the viewport card, where a message is
+ * read rather than laid over the model.
+ */
+.studio-messages {
   position: absolute;
   z-index: 45;
   top: 12px;
   left: 50%;
   width: min(600px, calc(100% - 28px));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+.studio-messages:empty { display: none; }
+.studio-messages > * { pointer-events: auto; }
+.editor-message {
   min-height: 44px;
   padding: 9px 9px 9px 14px;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -591,14 +754,8 @@ button:disabled { cursor: not-allowed; }
 .shell-actions svg { width: 15px; height: 15px; flex: 0 0 auto; }
 
 .stale-banner {
-  position: absolute;
-  z-index: 44;
-  top: 12px;
-  left: 50%;
-  width: min(600px, calc(100% - 28px));
   min-height: 44px;
   padding: 8px 10px;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 9px;
@@ -611,8 +768,6 @@ button:disabled { cursor: not-allowed; }
 .stale-banner svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .stale-banner span { flex: 1; min-width: 0; line-height: 1.4; }
 .stale-banner button { min-height: 34px; padding: 0 14px; flex: 0 0 auto; border: 1px solid var(--accent-strong); border-radius: var(--radius-sm); background: var(--accent); color: var(--accent-ink); font-size: 11px; font-weight: 850; cursor: pointer; }
-
-.mobile-tooltray, .mobile-primarybar { display: none; }
 
 .sheet-backdrop {
   position: fixed;
@@ -954,144 +1109,482 @@ button:disabled { cursor: not-allowed; }
   .studio-actions > :is(button, a, .file-select-control) > span { display: none; }
 }
 
+/*
+ * =========================================================================
+ * THE PHONE SHELL (below 900px): the reference column, IMG_8466.
+ * =========================================================================
+ *
+ * The phone used to be a fixed full-screen canvas with a five-action bottom
+ * bar and a tool tray over the bed. The reference is a SCROLLING COLUMN OF
+ * CLAY CARDS: a top bar, the mode switch, a viewport card about 44% of the
+ * screen tall, four transform tiles, the print settings, the model's size and
+ * orientation, a readiness banner, one gold primary and the export tiles.
+ * Everything the reference leaves out is one tap away in the overflow sheet.
+ *
+ * The scroll lives in `.studio-scroll`, never on the root: `.studio-app`
+ * stays position: fixed and editor-boot.tsx still puts any root scroll back,
+ * because those two defences are what keep the header reachable on an iPad.
+ *
+ * ONE DOM, TWO LAYOUTS. The engine mounts once, inside `.viewport-mount`, and
+ * moving that node would rebuild the engine and lose the scene. So the phone
+ * and the desktop are the same tree and only this stylesheet tells them
+ * apart: the phone pieces carry `.m-only`, and the desktop header is hidden
+ * below 900px. Turning a tablet across 900px keeps the model where it is.
+ *
+ * TOUCH. The reference draws 20 to 30pt controls; every one here is built at
+ * the 44px floor, so the column is longer than the drawing and scrolls. The
+ * canvas keeps `touch-action: none`: one finger orbits inside the card, and
+ * the page scrolls from anywhere outside it.
+ */
+.studio-scroll { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+@media (min-width: 900px) {
+  .m-only { display: none !important; }
+}
+
+/* -- shared clay controls ------------------------------------------------- */
+.m-btn {
+  min-height: var(--tap-min);
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--clay-contour);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--clay-lift);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.m-btn svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.m-btn:active:not(:disabled, [aria-disabled="true"]) { box-shadow: var(--clay-press); transform: translateY(1px); }
+.m-btn:disabled, .m-btn[aria-disabled="true"] { opacity: .4; box-shadow: none; cursor: not-allowed; }
+/* «استيراد»: the gold-outline button (D-2). Gold is the edge and the icon,
+   never the fill: the one gold fill on the screen is the slice button. */
+.m-btn--outline { border: 1.5px solid var(--gold-line); background: var(--gold-outline-fill); }
+.m-btn--outline svg { color: var(--gold-text); }
+.m-btn--icon { width: var(--tap-min); padding: 0; }
+@media (hover: hover) {
+  .m-btn:hover:not(:disabled, [aria-disabled="true"]) { background: var(--surface-strong); }
+  .m-btn--outline:hover:not([aria-disabled="true"]) { background: var(--gold-outline-fill); border-color: var(--gold-1); }
+}
+
+/*
+ * THE SAND SELECTION (owner override D-3, Studio scope): the current mode,
+ * the active transform tool and the current orientation take the solid sand
+ * clay with dark ink. Colour is never the only cue: each control states its
+ * state as aria-checked or aria-pressed, and the label turns heavier. In the
+ * light theme the --gold-edge ring in --clay-gold is #7A5C30, which gives the
+ * sand its 3:1 edge on a cream card (WCAG 1.4.11).
+ */
+.m-sel[aria-checked="true"], .m-sel[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--gold-clay);
+  box-shadow: var(--clay-gold);
+  color: var(--gold-ink);
+  font-weight: 800;
+}
+
+.m-card {
+  padding: 12px;
+  border: 1px solid var(--clay-contour);
+  border-radius: var(--radius-lg);
+  background: var(--card-clay);
+  box-shadow: var(--clay-1);
+}
+.m-card__title { margin: 0 0 4px; color: var(--text); font-size: 15px; font-weight: 800; }
+
+/* -- top bar ---------------------------------------------------------------- */
+.m-topbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
+.m-topbar__brand { min-width: 0; flex: 1 1 150px; display: flex; align-items: center; gap: 2px; }
+.m-topbar__back {
+  width: var(--tap-min);
+  height: var(--tap-min);
+  flex: 0 0 auto;
+  margin-inline-start: -10px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  color: var(--text);
+}
+.m-topbar__back svg { width: 22px; height: 22px; }
+/* The chevron is drawn pointing right, which is "back" in Arabic and Sorani;
+   in English the same glyph turns round. */
+:root[dir="ltr"] .m-topbar__back svg { transform: scaleX(-1); }
+.m-topbar__title { min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.m-topbar__title strong { overflow: hidden; color: var(--text); font-size: 21px; font-weight: 800; letter-spacing: -.01em; text-overflow: ellipsis; white-space: nowrap; }
+.m-topbar__title span { color: var(--text-2); font-size: 13px; line-height: var(--leading-tight); }
+.m-topbar__actions { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+
+/* -- mode row: the overflow entry on the start side, the mode on the end -- */
+.m-moderow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.m-seg {
+  min-width: 0;
+  flex: 0 1 220px;
+  padding: 4px;
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 4px;
+  border-radius: var(--radius);
+  background: var(--line-soft);
+  box-shadow: var(--clay-well);
+}
+.m-seg button {
+  min-width: 0;
+  min-height: var(--tap-min);
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* -- the viewport card's overlay toolbar ------------------------------------ */
+.vp-overlay {
+  position: absolute;
+  z-index: 20;
+  top: 6px;
+  inset-inline: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  pointer-events: none;
+}
+.vp-overlay > * { pointer-events: auto; }
+.vp-tools { flex: 0 0 auto; display: flex; align-items: center; }
+.vp-tool {
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--on-canvas);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.vp-tool svg { width: 20px; height: 20px; flex: 0 0 auto; }
+.vp-tool:disabled { opacity: .4; cursor: not-allowed; }
+.vp-tool[aria-pressed="true"] { color: var(--gold-1); }
+.vp-divider { width: 1px; height: 20px; margin-inline: 2px; background: var(--on-canvas-line); }
+.vp-file { min-width: 0; min-height: var(--tap-min); padding-inline: 6px; display: inline-flex; align-items: center; gap: 6px; color: var(--on-canvas); font-size: 13px; }
+.vp-file svg { width: 18px; height: 18px; flex: 0 0 auto; color: var(--on-canvas-muted); }
+.vp-file > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* -- transform tiles ---------------------------------------------------------- */
+.m-tools {
+  padding: 6px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  border-radius: var(--radius-lg);
+  background: var(--well);
+  box-shadow: var(--clay-well);
+}
+.m-tool {
+  min-width: 0;
+  min-height: 60px;
+  padding: 6px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--clay-contour);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--clay-lift);
+  color: var(--text);
+  font-size: var(--text-label);
+  font-weight: 700;
+  cursor: pointer;
+}
+.m-tool svg { width: 20px; height: 20px; }
+.m-tool > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-tool:active:not(:disabled) { box-shadow: var(--clay-press); transform: translateY(1px); }
+.m-tool:disabled { opacity: .4; box-shadow: none; cursor: not-allowed; }
+
+/* -- print settings rows ---------------------------------------------------- */
+.m-setting { min-height: 52px; display: grid; grid-template-columns: minmax(104px, 36%) minmax(0, 1fr); align-items: center; gap: 10px; }
+.m-setting + .m-setting { border-top: 1px solid var(--line); }
+.m-setting__label { min-width: 0; display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 13px; font-weight: 600; }
+.m-setting__label svg { width: 18px; height: 18px; flex: 0 0 auto; color: var(--text-2); }
+.m-setting__value { position: relative; min-width: 0; }
+.m-setting__value :is(select, button) {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding-block: 0;
+  padding-inline: 12px 36px;
+  appearance: none;
+  border: 1px solid var(--clay-contour);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--clay-lift);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.m-setting__value select option { background: var(--panel); color: var(--text); }
+.m-setting__value :is(select, button):disabled { opacity: .5; box-shadow: none; cursor: not-allowed; }
+.m-setting__value > svg { position: absolute; top: 50%; inset-inline-end: 12px; width: 16px; height: 16px; transform: translateY(-50%); color: var(--text-2); pointer-events: none; }
+.m-setting__note { margin: 4px 0 2px; color: var(--on-warning); font-size: var(--text-caption); line-height: 1.5; }
+
+/* -- model size and orientation ------------------------------------------- */
+.m-model { display: grid; grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr); align-items: center; gap: 12px; }
+.m-model__divider { align-self: stretch; background: var(--line); }
+.m-model__label { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 13px; font-weight: 600; }
+.m-model__label svg { width: 18px; height: 18px; flex: 0 0 auto; color: var(--text-2); }
+.m-model__dims { margin: 6px 0 0; color: var(--text); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.m-model__hint { margin: 6px 0 0; color: var(--muted); font-size: var(--text-label); line-height: 1.45; }
+.m-orient { margin-top: 6px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.m-orient button {
+  min-width: 0;
+  min-height: var(--tap-min);
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--clay-contour);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--clay-lift);
+  color: var(--text);
+  cursor: pointer;
+}
+.m-orient button svg { width: 20px; height: 20px; }
+.m-orient button:disabled { opacity: .4; box-shadow: none; cursor: not-allowed; }
+
+/* -- readiness banner ---------------------------------------------------------- */
+.m-banner {
+  padding: 10px 14px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 2px 10px;
+  border: 1px solid var(--success-border);
+  border-radius: var(--radius-lg);
+  background: var(--success-surface);
+}
+.m-banner__icon { width: 24px; height: 24px; grid-row: 1 / 3; display: grid; place-items: center; border-radius: 50%; background: var(--success-icon); color: var(--success-surface); }
+.m-banner__icon svg { width: 15px; height: 15px; }
+.m-banner strong { color: var(--success); font-size: 15px; font-weight: 800; }
+.m-banner small { color: var(--success-caption); font-size: var(--text-label); line-height: 1.5; }
+.m-banner[data-tone="warning"] { border-color: var(--warning-border); background: var(--warning-surface); }
+.m-banner[data-tone="warning"] .m-banner__icon { background: var(--warning); color: var(--warning-ink); }
+.m-banner[data-tone="warning"] :is(strong, small) { color: var(--on-warning); }
+.m-banner[data-tone="danger"] { border-color: var(--danger-border); background: var(--danger-surface); }
+.m-banner[data-tone="danger"] .m-banner__icon { background: var(--danger); color: var(--danger-surface); }
+.m-banner[data-tone="danger"] :is(strong, small) { color: var(--on-danger); }
+
+/* -- the one gold primary (D-2) --------------------------------------------- */
+.m-slice {
+  position: relative;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--gold-clay);
+  box-shadow: var(--clay-gold);
+  color: var(--gold-ink);
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.m-slice > :not(.m-slice__fill) { position: relative; }
+.m-slice svg { width: 20px; height: 20px; flex: 0 0 auto; }
+.m-slice__fill { position: absolute; inset-block: 0; inset-inline-start: 0; background: var(--gold-base); transition: width .16s linear; }
+.m-slice:active:not(:disabled) { box-shadow: var(--clay-press); transform: translateY(1px); }
+.m-slice:disabled { background: var(--surface); box-shadow: none; color: var(--ink-disabled); cursor: not-allowed; }
+
+/* -- export tiles ---------------------------------------------------------- */
+.m-export > h2 { margin: 2px 2px 8px; color: var(--text); font-size: 13px; font-weight: 700; }
+.m-export__row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.m-export__tile {
+  min-width: 0;
+  min-height: 58px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid var(--clay-contour);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--clay-lift);
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+.m-export__tile svg { width: 22px; height: 22px; flex: 0 0 auto; }
+.m-export__tile > span { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.m-export__tile b { font-size: 14px; font-weight: 700; }
+.m-export__tile small { color: var(--muted); font-size: var(--text-caption); line-height: var(--leading-tight); }
+.m-export__tile:disabled { box-shadow: none; color: var(--ink-disabled); cursor: not-allowed; }
+.m-export__tile:disabled small { color: var(--ink-disabled); }
+.m-export__more {
+  min-height: var(--tap-min);
+  margin-top: 4px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--gold-text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.m-export__more svg { width: 16px; height: 16px; }
+/* A "go to" chevron points toward the end of the line: left in Arabic and
+   Sorani, right in English. The glyph is drawn pointing right. */
+:root[dir="rtl"] .m-export__more svg { transform: scaleX(-1); }
+
+/* -- the overflow sheet ------------------------------------------------------ */
+.more-body { display: flex; flex-direction: column; gap: 2px; }
+/*
+ * GROUPS, NOT A GRID OF TWENTY. Proximity and a quiet label do the work a box
+ * would otherwise be asked to do (skill §4), so the groups carry a hairline
+ * between them and nothing else. The label is quiet by COLOUR and tracking,
+ * not by being shrunk below the caption floor (skill §5).
+ */
+.toolgroup + .toolgroup { border-top: 1px solid var(--line-soft); }
+.toolgroup-label { margin: 0; padding: 10px 4px 4px; color: var(--muted); font-size: var(--text-caption); font-weight: 750; letter-spacing: .06em; }
+.more-grid { padding: 4px 0 10px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.more-grid :is(button, a, .file-select-control) {
+  min-width: 0;
+  min-height: 64px;
+  padding: 6px 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid var(--clay-contour);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--clay-lift);
+  color: var(--text);
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.more-grid :is(button, a, .file-select-control):active { box-shadow: var(--clay-press); }
+.more-grid :is(button, a, .file-select-control).danger { background: var(--danger-surface); color: var(--on-danger); }
+.more-grid :is(button, .file-select-control):disabled, .more-grid .file-select-control[aria-disabled="true"] { opacity: .4; box-shadow: none; cursor: not-allowed; }
+.more-grid svg { width: 21px; height: 21px; }
+.more-grid span { max-width: 100%; overflow: hidden; font-size: var(--text-caption); line-height: var(--leading-tight); text-overflow: ellipsis; white-space: nowrap; }
+/*
+ * THE LANGUAGE AND THE THEME, AS THREE CHOICES RATHER THAN A PICKER. Three
+ * fixed options are a segmented control's exact job. ONE state cue (skill §3):
+ * the surface lifts and the text stops being quiet; aria-checked says it too.
+ */
+.locale-segments, .theme-segments { padding: 2px 0 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.locale-segments button, .theme-segments button {
+  min-width: 0;
+  min-height: var(--tap-min);
+  padding: 6px 4px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--panel);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: var(--text-label);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.locale-segments button.active, .theme-segments button.active { border-color: var(--line); background: var(--surface); color: var(--text); }
+.more-links { padding: 2px 0 12px; display: grid; gap: 6px; }
+.more-links a { min-height: var(--tap-min); padding: 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: var(--text-label); font-weight: 700; text-decoration: none; }
+.more-links svg { width: 17px; height: 17px; flex: 0 0 auto; }
+
+/* The boot screen (editor-boot.tsx): plain centred text on a desktop. */
+.boot-card { display: grid; place-items: center; }
+
 @media (max-width: 899px) {
-  /* The tool tray owns these two below this width; one home each. */
-  .shell-actions { display: none; }
-  :root { --header-height: 54px; --mobile-bar-height: 68px; }
-  .studio-header { grid-template-columns: 39px minmax(0, 1fr) auto; gap: 8px; padding: calc(7px + env(safe-area-inset-top)) 8px 7px; }
-  .studio-brand { width: 38px; height: 38px; font-size: 13px; }
-  .studio-project strong { font-size: 13px; }
-  .studio-project span { font-size: var(--text-caption); }
-  .studio-status { display: none; }
-  .studio-actions { gap: 2px; }
-  .studio-actions > :is(button, a, .file-select-control, .language-select) { min-width: 40px; width: 40px; height: 40px; padding: 0; }
-  .studio-actions > :is(button, a, .file-select-control) > span { display: none; }
-  .studio-actions .new-project-action, .studio-actions .panel-button, .studio-actions .header-print-action, .studio-actions .header-slice-action { display: none; }
-  .studio-actions svg { width: 18px; height: 18px; }
-  .language-select { width: 52px !important; }
-  .language-select select { max-width: 52px; padding: 0 4px; font-size: var(--text-caption); }
-  .profile-button { width: 42px !important; }
-  .editor-message, .stale-banner { top: 7px; width: calc(100% - 14px); min-height: 40px; font-size: var(--text-caption); }
-  .empty-upload-card { width: min(310px, calc(100% - 26px)); min-height: 224px; padding: 19px; transform: translate(-50%, calc(-50% - 24px)); }
-  .empty-upload-card > strong { font-size: 17px; }
-
-  .mobile-tooltray {
-    position: absolute;
-    z-index: 31;
-    right: 0;
-    bottom: calc(var(--mobile-bar-height) + env(safe-area-inset-bottom));
-    left: 0;
-    max-height: min(62dvh, 440px);
+  /* The phone column owns these below this width; one home each. */
+  .shell-actions, .studio-header { display: none; }
+  :root { --header-height: 54px; }
+  .studio-scroll {
+    padding-block: calc(8px + env(safe-area-inset-top)) calc(28px + env(safe-area-inset-bottom));
+    padding-inline: 16px;
+    gap: 10px;
+    overflow-x: hidden;
     overflow-y: auto;
-    display: block;
-    border-top: 1px solid var(--line);
-    background: var(--header);
-    box-shadow: 0 -12px 30px var(--shadow-cast);
+    overscroll-behavior: contain;
+  }
+  .studio-scroll > * { width: 100%; max-width: 640px; flex: 0 0 auto; margin-inline: auto; }
+  /* The boot screen draws the viewport card's outline while the editor loads. */
+  .boot-screen { align-content: start; padding: calc(64px + env(safe-area-inset-top)) 16px 0; }
+  .boot-card { width: min(640px, calc(100vw - 32px)); height: clamp(260px, 46dvh, 560px); border: 1px solid var(--clay-contour); border-radius: var(--radius-lg); background: var(--canvas); box-shadow: var(--clay-1); color: var(--on-canvas-muted); }
+  /* The viewport card. The canvas inside stays the engine's dark island. */
+  .editor-area {
+    height: clamp(260px, 46dvh, 560px);
+    border: 1px solid var(--clay-contour);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--clay-1);
   }
   /*
-   * SHORTENED — «زر تقصير وتطويل قائمة الادوات ... رؤية ما خلف القائمة».
-   *
-   * Only the height changes. The tray already scrolls (overflow-y: auto
-   * above), so every group is still reachable at this height; it simply stops
-   * covering two thirds of the bed while a tool is being used. One number,
-   * one transition, nothing hidden.
+   * EXPANDED: «تكبير العرض» puts the viewport back over the whole screen,
+   * which is the old full-canvas layout. There is no Fullscreen API on an
+   * iPhone, so it is an in-app state, and the same button (now «تصغير العرض»)
+   * or Escape brings the card back.
    */
-  .mobile-tooltray { transition: max-height .22s ease; }
-  .mobile-tooltray.compact { max-height: min(28dvh, 190px); }
-  /* The header must not scroll away with the groups: the control that grows
-     the tray back has to stay under the thumb that shrank it. */
-  .mobile-tooltray > header { position: sticky; top: 0; z-index: 1; min-height: 58px; padding: 9px 11px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line-soft); background: var(--header); }
-  .mobile-tooltray > header > span { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; }
-  .mobile-tooltray > header strong { font-size: 13px; }
-  .mobile-tooltray > header small { color: var(--muted); font-size: var(--text-caption); }
-  .mobile-tooltray > header button { width: 44px; height: 44px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: var(--radius-sm); display: grid; place-items: center; background: var(--surface); color: var(--text); cursor: pointer; }
-  .mobile-tooltray > header svg { width: 18px; height: 18px; }
-  /*
-   * GROUPS, NOT A GRID OF TWENTY.
-   *
-   * The tray was one flat grid: a mode beside a destructive action beside a
-   * history step beside an output, all the same size and weight. Proximity and
-   * a quiet label do the work a box would otherwise be asked to do (skill §4),
-   * so the groups carry a hairline between them and nothing else — no cards,
-   * no nesting, no second border.
-   *
-   * The label is quiet by COLOUR and letter-spacing, not by being shrunk below
-   * reading (skill §5): it sits at the caption size the whole app now floors
-   * at, in --muted, upper-case-tracked so it reads as a heading rather than as
-   * another control.
-   */
-  .toolgroup + .toolgroup { border-top: 1px solid var(--line-soft); }
-  .toolgroup-label {
+  .studio-app[data-viewport="expanded"] .editor-area {
+    position: fixed;
+    z-index: 70;
+    inset: 0;
+    width: auto;
+    max-width: none;
+    height: auto;
     margin: 0;
-    padding: 10px 10px 2px;
-    color: var(--muted);
-    font-size: var(--text-caption);
-    font-weight: 750;
-    letter-spacing: .06em;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
-  .mobile-toolgrid { padding: 6px 8px 10px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; direction: ltr; }
-
-  /*
-   * THE LANGUAGE, AS THREE CHOICES RATHER THAN A PICKER.
-   *
-   * This is the copy a 320px phone can reach — the header's <select> is
-   * removed at that width. Three fixed options are a segmented control's exact
-   * job, and the autonyms are their own labels, so the control needs no
-   * translation of itself.
-   */
-  .locale-segments { padding: 2px 8px 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-  .locale-segments button {
-    min-width: 0;
-    min-height: var(--tap-min);
-    padding: 6px 4px;
-    border: 1px solid var(--line-soft);
-    border-radius: var(--radius-sm);
-    overflow: hidden;
-    background: var(--panel);
-    color: var(--muted);
-    font-family: inherit;
-    font-size: var(--text-caption);
-    font-weight: 700;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-  /* ONE state cue (skill §3): the surface lifts and the text stops being
-     quiet. No gold fill — the accent belongs to the primary action. */
-  .locale-segments button.active { border-color: var(--line); background: var(--surface); color: var(--text); }
-  .mobile-toolgrid :is(button, .file-select-control) { min-width: 0; min-height: 62px; padding: 6px 3px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; background: var(--panel); color: var(--text); cursor: pointer; }
-  .mobile-toolgrid :is(button, .file-select-control):active { background: var(--surface-strong); }
-  .mobile-toolgrid :is(button, .file-select-control).danger { background: var(--danger-surface); color: var(--on-danger); }
-  .mobile-toolgrid svg { width: 21px; height: 21px; }
-  .mobile-toolgrid span { max-width: 100%; overflow: hidden; font-size: var(--text-caption); text-overflow: ellipsis; white-space: nowrap; }
-
-  .mobile-primarybar {
-    position: absolute;
-    z-index: 32;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    min-height: calc(var(--mobile-bar-height) + env(safe-area-inset-bottom));
-    padding: 6px 5px calc(6px + env(safe-area-inset-bottom));
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    align-items: stretch;
-    gap: 4px;
-    direction: ltr;
-    border-top: 1px solid var(--line);
-    background: var(--header);
-  }
-  .mobile-nav-item, .mobile-primary-action { min-width: 0; height: 56px; padding: 4px 2px; border: 1px solid transparent; border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: transparent; color: var(--muted); cursor: pointer; }
-  .mobile-nav-item.active { border-color: var(--line); background: var(--surface); color: var(--text); }
-  .mobile-nav-item:disabled, .mobile-nav-item[aria-disabled="true"] { opacity: .38; }
-  .mobile-nav-item svg { width: 20px; height: 20px; }
-  .mobile-nav-item span { max-width: 100%; overflow: hidden; font-size: var(--text-caption); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-  .mobile-primary-action { border-color: var(--accent-strong); background: var(--accent); color: var(--accent-ink); font-weight: 900; }
-  .mobile-primary-action.cancel { border-color: var(--warning-border); background: var(--warning); }
-  .mobile-primary-action.ready { border-color: var(--accent-strong); background: var(--accent); }
-  .mobile-primary-action:disabled { opacity: .38; }
-  .mobile-primary-action svg { width: 22px; height: 22px; }
-  .mobile-primary-action span { max-width: 100%; overflow: hidden; font-size: var(--text-caption); text-overflow: ellipsis; white-space: nowrap; }
+  .studio-app[data-viewport="expanded"] .vp-overlay { top: calc(6px + env(safe-area-inset-top)); }
+  /* Messages are read in the column, above the card, not laid over the model. */
+  .studio-messages { position: static; width: 100%; transform: none; }
+  .editor-message { min-height: 44px; font-size: var(--text-label); box-shadow: none; }
+  .editor-message button { width: var(--tap-min); height: var(--tap-min); }
+  .editor-message button.message-action { min-height: var(--tap-min); }
+  /* The readiness banner carries the outdated-result state on a phone, with
+     the re-slice action in the gold button under it. */
+  .stale-banner { display: none; }
+  .empty-upload-card { width: min(310px, calc(100% - 24px)); min-height: 0; padding: 14px 16px; gap: 6px; }
+  .empty-upload-card > strong { margin-top: 0; font-size: 17px; }
+  .empty-upload-icon { width: 40px; height: 40px; }
+  .empty-upload-icon svg { width: 22px; height: 22px; }
+  .import-progress { top: 54px; width: calc(100% - 16px); }
 
   .sheet-backdrop { padding: 0; align-items: flex-end; }
   .studio-sheet { width: 100%; max-height: 91dvh; border-right: 0; border-bottom: 0; border-left: 0; border-radius: var(--radius-sheet) var(--radius-sheet) 0 0; padding-bottom: env(safe-area-inset-bottom); }
@@ -1116,7 +1609,7 @@ button:disabled { cursor: not-allowed; }
   .sheet-handle::before { content: ""; width: 40px; height: 4px; border-radius: 99px; background: var(--track); }
   .sheet-handle:active { cursor: grabbing; }
   .sheet-handle:active::before { background: var(--muted); }
-  .sheet-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; border-radius: var(--radius-sm); }
+  .sheet-handle:focus-visible { outline: 2px solid var(--focus); outline-offset: -4px; border-radius: var(--radius-sm); }
   /* The spring back after a drag that did not go far enough. The inline style
      sets `transition: none` while a finger is down, so this owns every other
      movement — including the release. */
@@ -1124,7 +1617,6 @@ button:disabled { cursor: not-allowed; }
   .studio-sheet > header { min-height: 61px; padding-top: 8px; }
   .studio-sheet > header strong { font-size: 16px; }
   .sheet-body { max-height: calc(91dvh - 66px - env(safe-area-inset-bottom)); padding: 14px; }
-  .import-progress { top: 7px; width: calc(100% - 14px); }
 }
 
 @media (max-width: 540px) {
@@ -1139,34 +1631,29 @@ button:disabled { cursor: not-allowed; }
   .connected-printer-card > button { grid-column: 1 / -1; min-height: 38px; }
 }
 
-@media (max-width: 420px) {
-  .mobile-toolgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .mobile-toolgrid :is(button, .file-select-control) { min-height: 60px; }
-  .studio-project span { display: none; }
+@media (max-width: 380px) {
+  .more-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  /* Size over orientation, so the three chips keep a 44px target each. */
+  .m-model { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .m-model__divider { width: 100%; height: 1px; }
+  .m-topbar__title strong { font-size: 18px; }
+  .m-btn { padding: 0 11px; }
+  .m-setting { grid-template-columns: minmax(92px, 38%) minmax(0, 1fr); gap: 8px; }
 }
 
 @media (max-width: 350px) {
-  .studio-header { grid-template-columns: 35px minmax(0, 1fr) auto; gap: 5px; padding-inline: 6px; }
-  .studio-brand { width: 34px; height: 34px; font-size: 12px; }
-  .studio-actions > :is(button, .file-select-control) { width: 33px; min-width: 33px; }
-  .language-select { display: none !important; }
-  .mobile-primarybar { gap: 2px; padding-inline: 3px; }
-  .mobile-nav-item, .mobile-primary-action { border-radius: var(--radius-sm); }
-  .mobile-nav-item span, .mobile-primary-action span { font-size: var(--text-caption); line-height: var(--leading-tight); }
+  .studio-scroll { padding-inline: 12px; }
   .empty-upload-card { width: calc(100% - 18px); }
+  .vp-tool > span { display: none; }
 }
 
 @media (max-height: 560px) and (orientation: landscape) {
-  :root { --header-height: 48px; --mobile-bar-height: 58px; }
+  :root { --header-height: 48px; }
   .studio-header { padding-top: calc(5px + env(safe-area-inset-top)); padding-bottom: 5px; }
   .studio-brand, .studio-actions > :is(button, .file-select-control) { height: 34px; }
-  .empty-upload-card { min-height: 150px; padding: 12px; gap: 4px; transform: translate(-50%, -54%); }
+  .empty-upload-card { min-height: 150px; padding: 12px; gap: 4px; }
   .empty-upload-icon { width: 38px; height: 38px; }
   .empty-upload-card > small { display: none; }
-  .mobile-nav-item, .mobile-primary-action { height: 46px; }
-  .mobile-tooltray { max-height: 70dvh; }
-  .mobile-tooltray > header { min-height: 48px; }
-  .mobile-toolgrid :is(button, .file-select-control) { min-height: 52px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

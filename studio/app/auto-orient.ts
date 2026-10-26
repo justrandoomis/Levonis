@@ -731,3 +731,89 @@ export function lowestPoint(positions: Float32Array, euler: Vec3, scale: Vec3): 
   }
   return Number.isFinite(lowest) ? lowest : 0;
 }
+
+// ------------------------------------------------------------ orientation presets
+
+/**
+ * THE THREE ORIENTATION CHIPS («اتجاه الطباعة»): as imported, automatic, and
+ * on its side.
+ *
+ * "As imported" is the identity rotation: the engine bakes the file's own
+ * axes into the local mesh (`localPos`), which is why autoOrient above can
+ * score the local geometry directly, so a rotation of zero is the model as
+ * the file had it. "Automatic" is autoOrient's answer. "On its side" turns the
+ * model a quarter turn about a horizontal axis; of the two quarter turns
+ * (about X and about Z) it takes the one that leaves the part lower, which is
+ * the one a person laying a part down would choose.
+ *
+ * Which chip is current is READ from the scene, never remembered: a rotation
+ * that is (within a hair) one of these presets IS that preset, whoever set it.
+ */
+export type OrientationPreset = "imported" | "auto" | "side";
+
+export const ORIENTATION_PRESETS: readonly OrientationPreset[] = ["imported", "auto", "side"];
+
+const QUARTER = Math.PI / 2;
+export const SIDE_CANDIDATES: readonly Vec3[] = [
+  { x: -QUARTER, y: 0, z: 0 },
+  { x: 0, y: 0, z: QUARTER },
+];
+export const IMPORTED_EULER: Vec3 = { x: 0, y: 0, z: 0 };
+
+/** The height (Y extent) a mesh has under a rotation, scale applied. */
+export function heightUnder(positions: ArrayLike<number>, euler: Vec3, scale: Vec3): number {
+  let lowest = Infinity;
+  let highest = -Infinity;
+  for (let i = 0; i + 2 < positions.length; i += 3) {
+    const v = applyEulerXYZ(euler, { x: positions[i] * scale.x, y: positions[i + 1] * scale.y, z: positions[i + 2] * scale.z });
+    if (v.y < lowest) lowest = v.y;
+    if (v.y > highest) highest = v.y;
+  }
+  return Number.isFinite(lowest) ? highest - lowest : 0;
+}
+
+/** The "on its side" rotation for this mesh: the lower of the two quarter turns. */
+export function sideEuler(positions: ArrayLike<number>, scale: Vec3): Vec3 {
+  const [first, second] = SIDE_CANDIDATES;
+  return heightUnder(positions, second, scale) < heightUnder(positions, first, scale) - 1e-6 ? second : first;
+}
+
+/** True when two Euler triples describe the same rotation, to a hair. */
+export function sameRotation(a: Vec3, b: Vec3, epsilon = 1e-3): boolean {
+  // Compare the rotated basis, not the angles: the same rotation has more
+  // than one Euler spelling, and the engine may hand back any of them.
+  for (const axis of [{ x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }, { x: 0, y: 0, z: 1 }]) {
+    const p = applyEulerXYZ(a, axis);
+    const q = applyEulerXYZ(b, axis);
+    if (Math.abs(p.x - q.x) > epsilon || Math.abs(p.y - q.y) > epsilon || Math.abs(p.z - q.z) > epsilon) return false;
+  }
+  return true;
+}
+
+/**
+ * Which preset a set of objects is in, or null when they disagree or sit in a
+ * rotation of their own. `autoRotations` is what the last automatic orient
+ * wrote for each id; an object still at that rotation is "auto".
+ */
+export function currentPreset(
+  objects: ReadonlyArray<{ id: number; rot: Vec3; localPos: ArrayLike<number>; scale: Vec3 }>,
+  autoRotations: ReadonlyMap<number, Vec3>,
+): OrientationPreset | null {
+  if (!objects.length) return null;
+  let found: OrientationPreset | null = null;
+  for (const object of objects) {
+    const rot = { x: object.rot.x, y: object.rot.y, z: object.rot.z };
+    const auto = autoRotations.get(object.id);
+    const preset: OrientationPreset | null = auto && sameRotation(rot, auto)
+      ? "auto"
+      : sameRotation(rot, IMPORTED_EULER)
+        ? "imported"
+        : SIDE_CANDIDATES.some((candidate) => sameRotation(rot, candidate))
+          ? "side"
+          : null;
+    if (preset === null) return null;
+    if (found !== null && found !== preset) return null;
+    found = preset;
+  }
+  return found;
+}

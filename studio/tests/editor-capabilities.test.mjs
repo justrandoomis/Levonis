@@ -240,23 +240,40 @@ test("ZIP packing distributes models deterministically across plates", async () 
   assert.deepEqual(new Set(result.placements.map((placement) => placement.plate)), new Set([0, 1]));
 });
 
-test("mobile visual system uses solid surfaces and expandable controls", async () => {
-  const [app, css] = await Promise.all([
+test("the phone shell is the reference column, on solid clay surfaces", async () => {
+  /**
+   * CHANGED DELIBERATELY (plan item C6). The phone used to be a full-screen
+   * canvas with a five-action bottom bar and a tool tray; this test pinned
+   * those three class names. The owner's reference (IMG_8466) is a scrolling
+   * column of cards, so what is pinned now is that column, in its order, and
+   * that the surfaces stay solid: no blur, and no gradient except the two
+   * clay fills the reference paints, which are tokens built from named stops.
+   */
+  const [app, css, overflow] = await Promise.all([
     readFile(appUrl, "utf8"),
     readFile(cssUrl, "utf8"),
+    readFile(new URL("../app/components/mobile/overflow-sheet.tsx", import.meta.url), "utf8"),
   ]);
-
-  // The tray gained a collapse modifier («زر تقصير وتطويل قائمة الادوات»), so
-  // its class is a template literal now. The base class is what the mobile
-  // visual system is built on; the modifier is appended to it, never instead
-  // of it.
-  assert.match(app, /className=(?:"mobile-tooltray"|\{`mobile-tooltray\$\{)/);
-  assert.match(app, /className="mobile-toolgrid"/);
-  assert.match(app, /className="mobile-primarybar"/);
-  assert.match(css, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
+  assert.match(app, /<div className="studio-scroll">/);
+  const order = ["<StudioTopBar", "<ModeSegmented", "<ViewportCard", "<TransformToolBar", "<PrintSettingsCard", "<ModelInfoCard", "<ReadinessBanner", "<PrimarySliceButton", "<ExportSection"];
+  const at = order.map((tag) => app.indexOf(tag));
+  assert.ok(at.every((index) => index > 0), `every reference row is rendered: ${order.filter((_, i) => at[i] < 0).join(", ")}`);
+  assert.deepEqual([...at].sort((a, b) => a - b), at, "the rows follow the reference order");
+  // The engine mount lives inside the card, once.
+  assert.equal((app.match(/<div className="viewport-mount" ref=\{viewportMountRef\}>/g) ?? []).length, 1);
+  assert.ok(app.indexOf('className="viewport-mount"') > app.indexOf("<ViewportCard"));
+  // Everything the reference drops is in the overflow sheet.
+  assert.match(app, /<OverflowSheet/);
+  assert.match(overflow, /className="more-grid"/);
   assert.match(css, /@media \(max-width: 350px\)/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
-  assert.doesNotMatch(css, /(?:linear|radial|conic)-gradient\(/i);
+  assert.doesNotMatch(css, /(?:radial|conic)-gradient\(/i);
+  const gradients = css.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filter((line) => /linear-gradient\(/i.test(line));
+  assert.deepEqual(
+    gradients.map((line) => line.trim().split(":")[0]),
+    ["--gold-clay", "--card-clay"],
+    "a gradient may only be one of the two clay tokens",
+  );
   assert.doesNotMatch(css, /backdrop-filter/i);
 });
 
@@ -618,7 +635,8 @@ test("the expensive autosave capture is gated on a cheap change signal", async (
   // The signature must cover everything the 3MF depends on.
   assert.match(app, /adapter\.sceneFingerprint\(\)/);
   assert.match(app, /`plates=\$\{plateCount\}`/);
-  assert.match(app, /`\$\{profileId\}:\$\{quality\}:\$\{strength\}:\$\{support\}:\$\{infill\}`/);
+  // The material row joined the preset selection (plan item C6).
+  assert.match(app, /`\$\{profileId\}:\$\{quality\}:\$\{strength\}:\$\{support\}:\$\{infill\}:\$\{material\}`/);
 
   // And the controller must check it BEFORE capturing, not after — a hash of
   // the produced file can only ever skip the upload.

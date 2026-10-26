@@ -161,6 +161,7 @@ export function manifestForDraft(draft: StoredLevoProject): ProjectManifest {
       strength: draft.strength,
       support: Boolean(draft.support),
       ...(typeof draft.infill === "string" ? { infill: draft.infill } : {}),
+      ...(typeof draft.material === "string" ? { material: draft.material } : {}),
       ...(draft.settings ? { global: draft.settings as unknown as Record<string, unknown> } : {}),
     },
     ...(typeof draft.plateCount === "number" ? { plates: { count: draft.plateCount } } : {}),

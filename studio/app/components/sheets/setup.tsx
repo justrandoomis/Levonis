@@ -13,6 +13,7 @@ import { INFILL, PROFILES, PROFILE_IDS, QUALITY, STRENGTH, type InfillId, type P
 import type { MissingPreset } from "../../profile-loader";
 import { templateText, type StudioDictionary } from "../../i18n";
 import { STUDIO_MODES, type StudioMode } from "../../studio-mode";
+import type { ThemePreference } from "../../theme";
 import { Icon } from "../header";
 
 export interface SetupSheetProps {
@@ -33,6 +34,9 @@ export interface SetupSheetProps {
   /** P1-10: Simple (the default for everyone) or Advanced. */
   mode: StudioMode;
   onMode: (mode: StudioMode) => void;
+  /** The device-local appearance (app/theme.ts): system, light or dark. */
+  theme: ThemePreference;
+  onTheme: (theme: ThemePreference) => void;
   onOpenAdvanced: () => void;
   onClose: () => void;
 }
@@ -174,6 +178,29 @@ export default function SetupSheet(props: SetupSheetProps) {
         <span><Icon name="settings" /><b>{t.advanced}</b><small>{props.mode === "simple" ? t.modeSwitchHelp : t.advancedHelp}</small></span>
         <Icon name="layers" />
       </button>
+      {/*
+        APPEARANCE. The phone reaches it from the overflow sheet too; this is
+        the desktop's way to it, beside the other settings that belong to
+        this device rather than to the project.
+      */}
+      <fieldset>
+        <legend>{t.theme}</legend>
+        <div className="theme-segments" role="radiogroup" aria-label={t.theme}>
+          {(["system", "light", "dark"] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={props.theme === id}
+              className={props.theme === id ? "active" : ""}
+              onClick={() => props.onTheme(id)}
+              data-levo-theme-option={id}
+            >
+              {id === "system" ? t.themeSystem : id === "light" ? t.themeLight : t.themeDark}
+            </button>
+          ))}
+        </div>
+      </fieldset>
       <p className="file-limit">{t.fileLimit}</p>
       <p className="file-limit">{t.webLimitsNotice}</p>
       <button className="sheet-done" onClick={props.onClose}>{t.apply}</button>

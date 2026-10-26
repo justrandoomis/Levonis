@@ -124,3 +124,31 @@ test("every offered infill pattern is one the kernel can actually fill with", as
   assert.ok(profiles.isInfillId(profiles.DEFAULT_INFILL_ID));
   assert.equal(profiles.isInfillId("cubic"), false, "a name the engine downgrades must not be selectable");
 });
+
+/**
+ * THE MATERIAL ROW OFFERS ONLY WHAT THE ENGINE SHIPS (plan item C6).
+ *
+ * The reference reads "PETG". A material the engine has no filament preset
+ * for would load generic fallback settings, so every name in the table must
+ * be a preset that exists in the installed engine's data, and a printer with
+ * no PETG Basic preset (the P1P in this build) must not offer PETG at all.
+ */
+test("every offered material is a filament preset the installed engine ships", async () => {
+  const filaments = await readFile(new URL("../node_modules/three-slicer/data/filaments.js", import.meta.url), "utf8");
+  assert.deepEqual(Object.keys(profiles.MATERIALS), ["pla", "petg"]);
+  for (const id of profiles.PROFILE_IDS) {
+    const offered = profiles.materialsFor(id);
+    assert.equal(offered[0], "pla", `${id}: PLA Basic is always first`);
+    for (const material of offered) {
+      const preset = profiles.materialPresetFor(profiles.PROFILES[id], material);
+      assert.ok(preset, `${id} offers ${material} with no preset`);
+      assert.ok(filaments.includes(JSON.stringify(preset)), `${id}: "${preset}" is not in the engine's filaments`);
+    }
+  }
+  assert.deepEqual(profiles.materialsFor("bbl-p1p-04"), ["pla"], "no PETG Basic preset ships for the P1P");
+  assert.deepEqual(profiles.materialsFor("bbl-a1-04"), ["pla", "petg"]);
+  // A material the printer cannot load falls back to PLA, never to a guess.
+  assert.equal(profiles.availableMaterial("bbl-p1p-04", "petg"), "pla");
+  assert.equal(profiles.availableMaterial("bbl-a1-04", "petg"), "petg");
+  assert.equal(profiles.isMaterialId("abs"), false);
+});

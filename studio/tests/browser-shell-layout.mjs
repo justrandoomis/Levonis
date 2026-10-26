@@ -19,6 +19,10 @@
  *   - the header sits at top 0 to begin with;
  *   - and it STILL sits at top 0 after the root is forcibly scrolled, which is
  *     the failure the owner hit;
+ *   - below 900px (added with the phone column, plan item C6): the desktop
+ *     header is hidden, the column scrolls inside the fixed shell, nothing
+ *     runs off the side, every control keeps 44px, in ar/ckb/en at 390 and
+ *     320px, and the top bar survives a forced root scroll;
  *   - EVERY header control lies inside the window (left >= 0, right <=
  *     innerWidth) at every viewport, in Arabic, Sorani and English, in Simple
  *     and in Advanced. The header clips its overflow and cannot scroll, so in
@@ -243,7 +247,69 @@ for (const vp of HEADER_FIT_VIEWPORTS) {
   }
 }
 
+// THE PHONE COLUMN (plan item C6, added deliberately). Below 900px the editor
+// is the reference column: the desktop header is hidden, the page scrolls in
+// `.studio-scroll` (never the root, which keeps the two defences above), no
+// row runs off the side, and every control keeps the 44px floor — in Arabic,
+// Sorani and English, at a 390px phone and a 320px one.
+const PHONE_VIEWPORTS = [
+  { name: "phone-390", width: 390, height: 844 },
+  { name: "phone-320", width: 320, height: 700 },
+];
+const phone = [];
+for (const vp of PHONE_VIEWPORTS) {
+  for (const locale of ["ar", "ckb", "en"]) {
+    const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    await ctx.addInitScript(([lk, lv]) => {
+      try { window.localStorage.setItem(lk, lv); window.localStorage.setItem("levo-studio-printer", "bbl-a1-04"); } catch { /* ignore */ }
+    }, [LOCALE_KEY, locale]);
+    const page = await ctx.newPage();
+    await page.goto(target, { waitUntil: "networkidle" });
+    await page.waitForTimeout(3000);
+    const measured = await page.evaluate(() => {
+      const scroll = document.querySelector(".studio-scroll");
+      const header = document.querySelector(".studio-header");
+      const controls = [];
+      for (const el of scroll?.querySelectorAll("button, a, select, label.file-select-control") ?? []) {
+        const r = el.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) continue;
+        controls.push({ name: (el.getAttribute("aria-label") || el.textContent || "").trim().slice(0, 30), left: r.left, right: r.right, w: r.width, h: r.height });
+      }
+      return {
+        headerDisplay: header ? getComputedStyle(header).display : null,
+        scrollY: getComputedStyle(scroll).overflowY,
+        overflowX: scroll.scrollWidth > scroll.clientWidth + 1,
+        appPosition: getComputedStyle(document.querySelector(".studio-app")).position,
+        topbarTop: document.querySelector(".m-topbar")?.getBoundingClientRect().top ?? null,
+        innerWidth: window.innerWidth,
+        controls,
+      };
+    });
+    const label = `${vp.name} ${locale}`;
+    if (measured.headerDisplay === "none") ok(`${label}: the desktop header is hidden`);
+    else fail(`${label}: the desktop header shows on a phone (${measured.headerDisplay})`);
+    if (measured.scrollY === "auto" && measured.appPosition === "fixed") ok(`${label}: the column scrolls inside a fixed shell`);
+    else fail(`${label}: scroll ${measured.scrollY}, shell ${measured.appPosition}`);
+    if (!measured.overflowX) ok(`${label}: nothing runs off the side`);
+    else fail(`${label}: the column scrolls sideways`);
+    const outside = measured.controls.filter((c) => c.left < -0.5 || c.right > measured.innerWidth + 0.5);
+    const small = measured.controls.filter((c) => c.h < 43.5 || c.w < 43.5);
+    if (outside.length === 0) ok(`${label}: ${measured.controls.length} controls inside the window`);
+    else fail(`${label}: ${outside.map((c) => c.name).join(", ")} outside the window`);
+    if (small.length === 0) ok(`${label}: every control keeps the 44px floor`);
+    else fail(`${label}: below 44px — ${small.map((c) => `${c.name} ${Math.round(c.w)}x${Math.round(c.h)}`).join(", ")}`);
+    // The owner's failure, on a phone: force a root scroll; the top bar stays.
+    await page.evaluate(() => { document.documentElement.style.height = `${window.innerHeight + 160}px`; window.scrollTo(0, 160); });
+    await page.waitForTimeout(400);
+    const after = await page.evaluate(() => document.querySelector(".m-topbar")?.getBoundingClientRect().top ?? null);
+    if (after !== null && after >= -1) ok(`${label}: the top bar survives a forced root scroll (top ${after.toFixed(1)})`);
+    else fail(`${label}: the top bar at ${after} after a forced root scroll`);
+    phone.push({ viewport: vp.name, locale, ...measured, afterForcedScroll: after });
+    await ctx.close();
+  }
+}
+
 await browser.close();
-writeFileSync(REPORT_PATH, JSON.stringify({ target, results, overflow }, null, 2));
+writeFileSync(REPORT_PATH, JSON.stringify({ target, results, overflow, phone }, null, 2));
 console.log(`\n${failures === 0 ? "PASS" : `FAIL (${failures})`} — report: ${REPORT_PATH}`);
 process.exit(failures === 0 ? 0 : 1);

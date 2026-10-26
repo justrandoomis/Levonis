@@ -148,6 +148,7 @@ test("1: the autosave skip reports 'I cannot tell' for a painted session", async
     strength: "s",
     support: "none",
     infill: "balanced",
+    material: "pla",
     plateCount: 1,
   };
 
@@ -165,6 +166,11 @@ test("1: the autosave skip reports 'I cannot tell' for a painted session", async
     adapter: { ...closure.adapter, api: () => ({ ...closure.adapter.api(), hasPaintImport: () => true }) },
   };
   assert.equal(make({ ...importedPaint, sessionHasPaintRef: ref(false) })(), null);
+
+  // The material changes the 3MF (its filament preset), so it changes the
+  // signature: a PLA-to-PETG switch is never skipped as "unchanged".
+  const petg = make({ ...closure, material: "petg", sessionHasPaintRef: ref(false) })();
+  assert.notEqual(petg, clean, "the material is part of what a save writes");
 });
 
 test("1/4: entering any paint mode latches the session, and 'off' does not", async () => {

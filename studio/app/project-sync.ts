@@ -115,6 +115,7 @@ export interface ProjectManifest {
     strength?: string;
     support?: boolean;
     infill?: string;
+    material?: string;
     global?: Record<string, unknown>;
     perObject?: Record<string, Record<string, unknown>>;
   };

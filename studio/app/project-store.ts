@@ -53,6 +53,8 @@ export interface StoredLevoProject {
   support: boolean;
   /** Infill pattern tier. Absent in drafts written before the control existed. */
   infill?: string;
+  /** Material (pla, petg). Absent in drafts written before the material row existed. */
+  material?: string;
   settings?: SlicerSettings;
   objectCount?: number;
   plateCount?: number;
