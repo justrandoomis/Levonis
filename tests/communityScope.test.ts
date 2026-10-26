@@ -27,7 +27,14 @@
  *  h. the kit review (round 2): the one-line tile badge inside the tile with
  *     its seat kept clear, the tile icons in the primary ink, the swatch ringed
  *     and at the inline start, the busy gold spinner in the ink, and no
- *     apostrophe in an English comment of the scope sheet.
+ *     apostrophe in an English comment of the scope sheet; (round 3) a word
+ *     wider than its tile body still 2px clear of the badge;
+ *  i. the kit review (round 3): the chosen segmented label never clipped on a
+ *     phone, the focus drawn off the sand, the menu row focus line, and the
+ *     held button at full ink under reduced motion.
+ *
+ * scripts/e2e-community-kit.mjs measures the same in Chromium on the kit
+ * fixture (tests/browser/community-kit.html).
  *
  * Run: node --import tsx --test tests/communityScope.test.ts
  */
@@ -217,6 +224,7 @@ test('c2. the toast stamp follows the scope: published on mount, replaced on a t
 // ----------------------------------------------------------------------- d
 test('d. every scoped text and boundary pair meets WCAG AA in both themes (computed from the CSS values)', () => {
   const failures: string[] = [];
+  const flushOnSand: string[] = [];
   const need = (label: string, value: number, min: number) => {
     if (!(value >= min)) failures.push(`${label}: ${value.toFixed(2)}:1, under ${min}`);
   };
@@ -258,7 +266,12 @@ test('d. every scoped text and boundary pair meets WCAG AA in both themes (compu
     // Boundaries (WCAG 1.4.11): the field line, the focus ring, the selected cue, the gold edge in light.
     // A field sits on the page, a card or a raised control, and is itself the well.
     for (const [g, rgb] of grounds.filter(([g]) => g !== 'selected' && g !== 'track')) need(`${theme} --clay-field on ${g}`, ratio(c('clay-field'), rgb), 3);
-    for (const [g, rgb] of grounds) need(`${theme} focus ring on ${g}`, ratio(c('color-focus'), rgb), 3);
+    // The focus line on every ground, and inset on the menu row it marks (the row also takes the highlight).
+    for (const [g, rgb] of [...grounds, ['menu highlight', highlight] as [string, Rgb]]) need(`${theme} focus ring on ${g}`, ratio(c('color-focus'), rgb), 3);
+    // On the sand (round 3): a ring flush on a chosen thumb, tile or chip has to read 3:1 against the
+    // fill and its edge, or stand off it with the ground showing between (the rule asserted below).
+    const flush = Math.min(ratio(c('color-focus'), c('cm-sel-bg')), ratio(c('color-focus'), c('cm-sel-edge')));
+    if (flush < 3) flushOnSand.push(`${theme} ${flush.toFixed(2)}:1`);
     const card = c('color-surface');
     if (theme === 'dark') {
       // The sand reads by itself on the dark grounds.
@@ -283,8 +296,33 @@ test('d. every scoped text and boundary pair meets WCAG AA in both themes (compu
     need(`${theme} like colour on the card`, ratio(c('cm-like'), card), 3);
     need(`${theme} step on vs the canvas`, ratio(c('cm-step-on'), canvas), 3);
     need(`${theme} switch knob on the sand`, ratio(c('cm-sel-ink'), c('cm-sel-bg')), 3);
+    // A HELD kit button keeps its full ink under reduced motion too (the rule asserted below), so
+    // the label on its pressed fill: the gold under the 0.93 brightness of the press, the outline on
+    // its fill, the ghost on the well it dents into, the danger on its fill at rest (touch) and
+    // hovered (pointer), the secondary hovered.
+    const pressed = (name: string) => c(name).map((ch) => ch * 0.93);
+    for (const stop of ['cm-gold-1', 'cm-gold-2']) need(`${theme} held gold label on --${stop}`, ratio(pressed('cm-gold-ink'), pressed(stop)), 4.5);
+    need(`${theme} held outline label`, ratio(c('color-gold'), c('cm-outline-bg')), 4.5);
+    need(`${theme} held ghost label on the well`, ratio(c('color-text-secondary'), c('clay-well-bg')), 4.5);
+    for (const p of [0.14, 0.22]) need(`${theme} held danger label on its ${Math.round(p * 100)}% fill`, ratio(c('color-danger-ink'), mixOklab(c('color-danger'), c('color-surface'), p)), 4.5);
+    need(`${theme} held secondary label`, ratio(c('color-text-primary'), mixOklab(c('color-text-primary'), c('color-surface-raised'), 0.08)), 4.5);
   }
   assert.deepEqual(failures, [], `contrast under the floor:\n${failures.join('\n')}`);
+  // The focus off the sand (WCAG 2.4.7, 1.4.11): where a flush ring would not read (dark), the thumb,
+  // the tile and the chip draw a 2px focus line 2px off the control, the utility ring dropped.
+  const offFocus = /\[data-surface='community'\] \.cm-seg > \[role='radio'\]:focus-visible,\s*\[data-surface='community'\] \.cm-sel:focus-visible,\s*\[data-surface='community'\] :focus-visible > \.cm-sel \{([^}]*)\}/.exec(css);
+  assert.ok(offFocus, `a flush ring on the sand reads ${flushOnSand.join(', ') || 'enough'}, and the focus is not drawn off it`);
+  assert.match(offFocus![1], /outline: 2px solid var\(--color-focus\);/);
+  assert.ok(parseFloat(/outline-offset: ([\d.]+)px/.exec(offFocus![1])?.[1] ?? '0') >= 2, 'the focus line touches the sand');
+  assert.match(offFocus![1], /box-shadow: var\(--tw-shadow\);/, 'the utility ring still hugs the sand');
+  assert.ok(flushOnSand.some((f) => f.startsWith('dark')), 'the dark sand reads 3:1 against a flush ring after all: revisit the offset');
+  // The menu row under the keyboard wears the focus line, inset; the tint stays for the pointer.
+  assert.match(css, /\[data-surface='community'\] \[data-menu-item\]:focus-visible \{\s*outline: 2px solid var\(--color-focus\);\s*outline-offset: -2px;\s*\}/);
+  // The held button: the house dims every pressed button to 0.72 under reduced motion (an outline
+  // label fell to 3.2:1 on cream); in the scope the clay dent answers the touch at full ink.
+  assert.match(strip(indexCss), /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?button:active,[\s\S]*?opacity: 0\.72 !important;/);
+  assert.match(indexCss, /\.lv-button:not\(:disabled\):not\(\[aria-disabled='true'\]\):active \{\s*opacity: 1;\s*--tw-shadow: var\(--clay-press\);/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\[data-surface='community'\] \.lv-button:not\(:disabled\):active \{\s*opacity: 1 !important;\s*\}\s*\}/);
   // The menu highlight the grounds above model.
   assert.match(read('src/components/ui/Menu.tsx'), /focus:bg-white\/\[0\.07\]/);
   // The chip recipe the mix above models.
@@ -423,29 +461,55 @@ test('h. the kit review, round 2: badge seat, tile icon ink, swatch, busy spinne
   const disc = 20; // size-5
   assert.match(controls, /className="cm-check absolute size-5 items-center justify-center rounded-full"/);
   const seat = inset + disc;
-  // A one-line tile: the tile pads 12px (px-3) and 8px (py-2); its body pads the rest of the seat on
-  // BOTH inline sides, so every centred line ends before the disc and the label stays centred.
+  // A one-line tile: the tile pads 12px (px-3) and 8px (py-2); its body pads the rest of the seat and
+  // 2px more on BOTH inline sides, so every centred line ends 2px before the disc and the label stays
+  // centred (B1R3-FID-2: at 14px a full line met the disc, 0px apart).
   assert.match(controls, /rounded-md px-3 py-2 [^`]*\$\{it\.subtitle \? 'gap-3 text-start' : 'cm-tile-one'\}/);
-  assert.match(controls, /<span className="cm-tile-body flex min-w-0 flex-1 flex-wrap items-center justify-center [^"]*text-center">/);
+  assert.match(controls, /<span className="cm-tile-body flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-center">/);
   const tilePadInline = 12;
   const tilePadBlock = 8;
+  const clear = 2;
   const wide = px(decl('.cm-tile-body', 'padding-inline') ?? 'NaN');
-  assert.ok(tilePadInline + wide >= seat, `a one-line label may start ${tilePadInline + wide}px in, under the ${seat}px badge seat`);
+  assert.ok(tilePadInline + wide >= seat + clear, `a one-line label may start ${tilePadInline + wide}px in, within ${clear}px of the ${seat}px badge seat`);
+  // B1R3-FID-2. A word wider than the body (FDM «filament», 60.4px at 15/700, in a 47px body) keeps its
+  // width (the title does not shrink under its longest word) and is centred SAFELY: it starts at the
+  // body edge beside the seat and runs out at the inline end, where there is no badge. The
+  // alignment is the component layer alone (a `justify-center` utility would outrank it), with plain
+  // centring first for a browser without `safe`.
+  const tileBody = body(css, '.cm-tile-body');
+  assert.match(tileBody, /justify-content: center;\s*justify-content: safe center;/, 'a word wider than the body is centred into the badge');
+  assert.match(controls, /<span className="text-\[15px\] font-bold leading-tight">\{it\.title\}<\/span>/, 'the title shrinks under its longest word again');
   // The body wraps (icon above the title, the title over two lines) instead of running under the disc.
   assert.equal(decl('.cm-tile-body', 'align-content'), 'center');
   // A narrow tile measures itself: under the threshold the body takes the whole width and starts
-  // under the seat instead, so the words keep room and the first line still clears the disc.
+  // under the seat instead, so the words keep room and the first line still clears the disc by 2px
+  // (the glyphs of a 15px line at leading-tight rise 1px above its box).
   assert.equal(decl('.cm-tile-one', 'container-type'), 'inline-size');
   const narrow = /@container \(width < (\d+)px\) \{\s*\.cm-tile-body \{([^}]*)\}/.exec(css);
   assert.ok(narrow, 'no narrow-tile rule');
   const threshold = Number(narrow![1]);
   const narrowDecl = (prop: string) => new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+);`).exec(narrow![2])?.[1].trim();
   assert.equal(px(narrowDecl('padding-inline') ?? 'NaN'), 0);
-  assert.ok(tilePadBlock + px(narrowDecl('padding-block-start') ?? 'NaN') >= seat, 'a narrow tile starts its first line beside the disc');
-  // Above the threshold the seat leaves the words at least 44px (a 15/700 word such as «متأكدًا»);
+  const glyphRise = 1;
+  assert.ok(tilePadBlock + px(narrowDecl('padding-block-start') ?? 'NaN') - glyphRise >= seat + clear, 'a narrow tile starts its first line within 2px of the disc');
+  // Above the threshold the seat leaves the words at least 40px (a longer word is centred safely);
   // a 375px phone (tiles of 100px, a 74px content box) keeps the centred label.
-  assert.ok(threshold - 2 * wide >= 44, `a wide tile leaves its words ${threshold - 2 * wide}px`);
+  assert.ok(threshold - 2 * wide >= 40, `a wide tile leaves its words ${threshold - 2 * wide}px`);
   assert.ok(threshold <= 74, 'a 375px phone loses the centred label');
+  // Measured: the line that met the disc, as the fixture draws it (content box of the tile, width of
+  // the word at 15/700 in Chromium): «دەزووی» at ckb 375, «filament» at en 390 and en 375. Where the
+  // line starts, from the padding edge on the badge side, against the end of the badge (6 + 20).
+  const cases: [string, number, number][] = [
+    ['ckb 375 «دەزووی»', 74.3, 47.5],
+    ['en 390 «filament»', 79.3, 60.4],
+    ['en 375 «filament»', 74.3, 60.4],
+  ];
+  for (const [name, box, word] of cases) {
+    assert.ok(box >= threshold, `${name}: the tile is narrow here, the case moved`);
+    const room = box - 2 * wide;
+    const start = tilePadInline + wide + Math.max(0, (room - word) / 2); // safe: never before the body edge
+    assert.ok(start - seat >= clear, `${name}: the line starts ${(start - seat).toFixed(1)}px from the badge`);
+  }
 
   // B1R2-FID-2. The glyph in a tile icon well is the primary ink (IMG_8474, IMG_8477); gold line
   // icons are the menu ListRow (IMG_8478). A chosen well takes the ink of the sand.
@@ -494,4 +558,65 @@ test('h. the kit review, round 2: badge seat, tile icon ink, swatch, busy spinne
   // B1R2-REG-1. No word-internal apostrophe in an English comment of the scope sheet.
   const comments = (raw.match(/\/\*[\s\S]*?\*\//g) ?? []).join('\n');
   assert.deepEqual(comments.match(/\p{L}['\u2019]\p{L}/gu) ?? [], [], `${SHEET}: an apostrophe in a comment`);
+});
+
+// ----------------------------------------------------------------------- i
+test('i. the kit review, round 3: the chosen segmented label is never clipped on a phone', () => {
+  const px = (v: string) => parseFloat(v) * (v.endsWith('rem') ? 16 : 1);
+  const decls = (body: string) =>
+    Object.fromEntries(
+      body
+        .split(';')
+        .map((d) => d.trim())
+        .filter(Boolean)
+        .map((d) => [d.slice(0, d.indexOf(':')).trim(), d.slice(d.indexOf(':') + 1).trim()])
+    );
+  const ruleOf = (selector: string) => {
+    const at = css.indexOf(`${selector} {`);
+    assert.ok(at >= 0, `${SHEET}: no rule \`${selector}\``);
+    return decls(css.slice(css.indexOf('{', at) + 1, css.indexOf('}', at)));
+  };
+  const option = "[data-surface='community'] .cm-seg > [role='radio']";
+  const label = `${option} > span:last-child`;
+  // B1R3-FID-1. Each option measures itself and the label wrapper holds the inline room, so the
+  // room and the type can follow the width of ONE option (four across or two across alike).
+  const base = ruleOf(option);
+  assert.equal(base['container-type'], 'inline-size');
+  assert.equal(px(base['padding-inline']), 0, 'the option pads its label itself again (px-2 left 54px of a 70px option)');
+  assert.equal(px(ruleOf(label)['padding-inline']), 4);
+  // The house control draws the label in its LAST span, truncated: the guard this keeps from firing.
+  assert.match(read('src/components/ui/Segmented.tsx'), /<span className="truncate">\{it\.label\}<\/span>\s*\{it\.badge\}\s*<\/span>\s*<\/button>/);
+  const steps = [...css.matchAll(/@container \(width < (\d+)px\) \{\s*([^{]+?)\s*\{([^}]*)\}\s*\}/g)]
+    .filter((m) => m[2].trim() === label)
+    .map((m) => ({ below: Number(m[1]), set: decls(m[3]) }));
+  assert.ok(steps.length >= 2, 'the narrow-option steps are missing');
+  const drawn = (width: number) => {
+    let pad = px(ruleOf(label)['padding-inline']);
+    let size = px(base['font-size']);
+    for (const s of steps) {
+      if (width >= s.below) continue;
+      if (s.set['padding-inline']) pad = px(s.set['padding-inline']);
+      if (s.set['font-size']) size = px(s.set['font-size']);
+    }
+    return { pad, size };
+  };
+  // Measured in the fixture (tests/browser/community-kit.html, Chromium): the width of one of the four
+  // quality options, and the CHOSEN label at 14/700 (a width scales with the type size).
+  const cases: [string, number, string, number][] = [
+    ['en 390', 78, 'Standard', 62.3],
+    ['en 375', 74.3, 'Standard', 62.3],
+    ['en 360', 70.5, 'Standard', 62.3],
+    ['en 320', 60.5, 'Standard', 62.3],
+    ['ckb 320', 60.5, 'ستاندارد', 48.4],
+    ['ar 320', 60.5, 'قياسية', 38.6],
+  ];
+  for (const [name, width, word, at14] of cases) {
+    const { pad, size } = drawn(width);
+    const need = (at14 * size) / 14;
+    assert.ok(need <= width - 2 * pad - 0.5, `${name}: «${word}» needs ${need.toFixed(1)}px of ${(width - 2 * pad).toFixed(1)} (${size}px type, ${pad}px each side): clipped`);
+    assert.ok(pad >= 2, `${name}: the label touches the thumb edge`);
+  }
+  // The reference phone and the common ones keep the 14px type; only a 320px phone steps down.
+  for (const width of [78, 74.3, 70.5]) assert.equal(drawn(width).size, 14, `a ${width}px option lost its 14px label`);
+  assert.ok(drawn(60.5).size >= 12, 'the label steps under 12px');
 });

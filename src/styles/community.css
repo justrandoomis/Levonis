@@ -238,25 +238,31 @@
     background: var(--cm-sel-badge);
   }
   /* A one-line tile centres its icon and title in a body that keeps clear of
-     the badge seat (6px in plus the 20px disc: 26px) on BOTH sides, so the
-     label stays centred and never meets the disc: the tile pads 12px, the
-     body 14px more. The body wraps when the row cannot hold it (the icon
-     above the title, then the title over two lines). In a narrow tile (a
-     content box under 72px, a tile under about 98px: three across on a 360px
-     phone) that seat would leave the words no room, so there the body takes
-     the whole width and starts under the seat instead (8px of tile padding
-     plus 20px), and the tile grows. */
+     the badge seat (6px in plus the 20px disc: 26px) and 2px more on BOTH
+     sides, so the label stays centred and never meets the disc: the tile pads
+     12px, the body 16px more. The body wraps when the row cannot hold it (the
+     icon above the title, then the title over two lines). A word wider than
+     the body (FDM «filament» in a 105px tile) keeps its full width (the title
+     does not shrink under its longest word) and is centred SAFELY: it starts
+     at the body edge beside the seat and runs out at the inline end, where
+     there is no badge. In a narrow tile (a content box under 72px, a tile
+     under about 98px: three across on a 360px phone) that seat would leave
+     the words no room, so there the body takes the whole width and starts
+     under the seat instead (8px of tile padding plus 22px: the glyphs of a
+     15px line rise 1px above it), and the tile grows. */
   .cm-tile-one {
     container-type: inline-size;
   }
   .cm-tile-body {
     align-content: center;
-    padding-inline: 14px;
+    justify-content: center;
+    justify-content: safe center;
+    padding-inline: 16px;
   }
   @container (width < 72px) {
     .cm-tile-body {
       padding-inline: 0;
-      padding-block-start: 20px;
+      padding-block-start: 22px;
     }
   }
   .cm-media > .cm-check {
@@ -422,11 +428,30 @@
   background: var(--cm-track);
   box-shadow: var(--clay-0);
 }
+/* Each option measures itself, so the chosen label (the one thing to read)
+   never ends in an ellipsis: 4px from the thumb edge, 2px on an option under
+   72px (four across on a 360px phone), and 12px type under 64px (four across
+   on a 320px phone, where «Standard» at 14/700 is 62px in 57). */
 [data-surface='community'] .cm-seg > [role='radio'] {
+  container-type: inline-size;
   min-block-size: 0;
+  padding-inline: 0;
   border-radius: 12px;
   font-size: 0.875rem;
   font-weight: 600;
+}
+[data-surface='community'] .cm-seg > [role='radio'] > span:last-child {
+  padding-inline: 4px;
+}
+@container (width < 72px) {
+  [data-surface='community'] .cm-seg > [role='radio'] > span:last-child {
+    padding-inline: 2px;
+  }
+}
+@container (width < 64px) {
+  [data-surface='community'] .cm-seg > [role='radio'] > span:last-child {
+    font-size: 0.75rem;
+  }
 }
 /* A 1px divider between two neighbouring unchosen options (IMG_8482,
    «فائقة | دقيقة»), in the middle of the 4px gap; ::after is the hit. */
@@ -453,6 +478,35 @@
   border-color: var(--cm-sel-edge);
   background: var(--cm-sel-bg);
   box-shadow: var(--cm-sel-shadow);
+}
+
+/* FOCUS ON THE SAND (WCAG 2.4.7, 1.4.11). A ring flush on the dark sand read
+   1.0:1 against the fill and 1.3:1 against its edge, so a thumb, a tile or a
+   chip (chosen or not, one look) draws the focus as the house button does: a
+   2px line 2px off the control, the ground showing between (the ring of the
+   utilities is dropped, the clay kept). */
+[data-surface='community'] .cm-seg > [role='radio']:focus-visible,
+[data-surface='community'] .cm-sel:focus-visible,
+[data-surface='community'] :focus-visible > .cm-sel {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  box-shadow: var(--tw-shadow);
+}
+
+/* A menu row under the keyboard: the 7% tint alone read 1.2:1, so it also
+   wears the focus line, inset; the tint stays for the pointer. */
+[data-surface='community'] [data-menu-item]:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+/* THE PRESS UNDER REDUCED MOTION: the house dims a held button to 0.72, which
+   took an outline, ghost or danger label under 4.5:1 on cream. Here the clay
+   dent (`--clay-press`) answers the touch and the label keeps its full ink. */
+@media (prefers-reduced-motion: reduce) {
+  [data-surface='community'] .lv-button:not(:disabled):active {
+    opacity: 1 !important;
+  }
 }
 
 /* The quantity stepper (NumberInput kind="quantity"): a 48px well, two

@@ -96,8 +96,10 @@ const COLUMNS = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' } as cons
  * well (IMG_8474). A one-line tile centres a bare icon and its title in a body
  * that keeps clear of the badge seat on both sides, so the label stays
  * centred (IMG_8482); the body wraps (the icon above the title, then the
- * title over two lines) when the row is too narrow, and in a very narrow
- * tile it starts under the seat instead (`.cm-tile-body`).
+ * title over two lines) when the row is too narrow, a word wider than the
+ * body starts beside the seat and runs out at the inline end (the title never
+ * shrinks under its longest word), and in a very narrow tile the body starts
+ * under the seat instead (`.cm-tile-body`).
  */
 export function ChoiceTiles(props: ChoiceTilesProps) {
   const { items, label, columns = 2, className = '' } = props;
@@ -169,13 +171,13 @@ export function ChoiceTiles(props: ChoiceTilesProps) {
                 </span>
               </>
             ) : (
-              <span className="cm-tile-body flex min-w-0 flex-1 flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center">
+              <span className="cm-tile-body flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-center">
                 {it.icon && (
                   <span aria-hidden="true" className="shrink-0">
                     {it.icon}
                   </span>
                 )}
-                <span className="min-w-0 text-[15px] font-bold leading-tight">{it.title}</span>
+                <span className="text-[15px] font-bold leading-tight">{it.title}</span>
               </span>
             )}
             <span aria-hidden="true" className="cm-check absolute size-5 items-center justify-center rounded-full">
