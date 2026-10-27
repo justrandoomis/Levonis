@@ -63,6 +63,14 @@ export interface SheetProps extends WholePanelSheetProps {
   header?: React.ReactNode;
   /** An in-flow action bar under the scrolling body, clear of the home indicator. */
   footer?: React.ReactNode;
+  /**
+   * `'dock'`: a bottom sheet at every width. It needs no code here — it
+   * reaches the Overlay through `rest`, which is spread after the default
+   * below. The request editor docks its sheets on a phone held sideways
+   * (wide, but under 480 px tall), where a centred window leaves no room for
+   * a list and its search field.
+   */
+  placement?: 'bottom' | 'dock';
 }
 
 // Only the two words of the grabber button are new; nobody has written them

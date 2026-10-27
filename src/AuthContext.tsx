@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect, useCa
 import { api, ApiError, ApiUser, clearApiSessionRequests } from './lib/api';
 import { clearPageCache } from './lib/pageCache';
 import { AUTH_ME_PATH, clearPrimedRequests, takePrimedJson } from './lib/bootFetch';
-import { privateDrafts, purgeLegacyPrivateDrafts } from './lib/privateDrafts';
+import { REQUEST_EDITOR_COPIES, forgetTabEntries, privateDrafts, purgeLegacyPrivateDrafts } from './lib/privateDrafts';
 import { createSessionAdopter, type SessionAdoption } from './lib/sessionCheck';
 
 export type { SessionAdoption };
@@ -52,6 +52,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Fetched, not imported, so the entry chunk carries none of it (tests/bundleBudget.test.ts).
       const owner = next ? next.id : null;
       void import('./lib/assistOwner').then((m) => m.adoptAssistOwner(owner)).catch(() => {});
+      // The request editor’s tab copies (src/lib/privateDrafts.ts): every
+      // OTHER account’s go. The first check after a reload names the account
+      // the copies belong to, so they stay; a session that ran out (null)
+      // keeps them for the sign-in that follows.
+      if (next) forgetTabEntries(REQUEST_EDITOR_COPIES, `${REQUEST_EDITOR_COPIES}${next.id}.`);
     }
     // Invalidate before rendering the new account; a parent effect runs after
     // child effects and would let their first reads join the old request.
@@ -142,6 +147,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await api.post('/api/auth/logout');
     } finally {
       clearPrimedRequests();
+      // Signing out on purpose leaves nothing of the account in this tab.
+      forgetTabEntries(REQUEST_EDITOR_COPIES);
       setUser(null);
     }
   }, [setUser]);

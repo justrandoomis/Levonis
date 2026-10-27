@@ -269,6 +269,8 @@ interface SessionState {
   state: 'open' | 'completed' | 'aborted' | 'expired';
   received: number[];
   chunk_bytes: number;
+  /** A completed REQUEST session: the file row it landed (worker/routes/uploadSessions.ts). */
+  file?: Record<string, unknown> & { url?: unknown; content_type?: unknown; size_bytes?: unknown };
 }
 
 async function readJson<T>(res: Response): Promise<T> {
@@ -372,6 +374,19 @@ export async function uploadLarge(file: File, purpose: SessionPurpose, opts: Upl
   if (saved && saved.sha256 === sha256) {
     try {
       const state = await requestJson<SessionState>(fetchImpl, 'GET', `/api/uploads/sessions/${encodeURIComponent(saved.session_id)}`, undefined, signal);
+      // THE LAST TRY LANDED: «complete» committed but its answer was lost.
+      // A request session answers with the file it stored, so the retry
+      // adopts it and nothing is uploaded or stored a second time (P1-06).
+      if (state.state === 'completed' && state.file && typeof state.file.url === 'string') {
+        clearResume(storage, storageKey);
+        return {
+          url: state.file.url,
+          mime: String(state.file.content_type ?? file.type ?? ''),
+          bytes: Number(state.file.size_bytes ?? file.size),
+          sha256,
+          file: state.file,
+        };
+      }
       if (state.state === 'open') {
         sessionId = saved.session_id;
         chunk = state.chunk_bytes;
