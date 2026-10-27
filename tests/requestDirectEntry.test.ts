@@ -6,7 +6,7 @@
  *   conversation: the store sees nothing — no thread in its inbox, not the
  *   request page, not its customer's name — until the draft is SENT;
  *   an idle entry is answered again rather than multiplied;
- *   the conversation's own rules: the customer's own store (OWN_REQUEST), a
+ *   the conversation's own rules: the customer's own store (OWN_STORE_REQUEST), a
  *   store not taking custom requests (STORE_NO_CUSTOM_REQUESTS), one not
  *   taking new work (MERCHANT_UNAVAILABLE), one the public may not see
  *   (STORE_UNAVAILABLE);
@@ -26,6 +26,7 @@ import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { asD1, count, get, json, post, put, row, stubApp, type Mount } from './fixtures/app';
 import { world } from './fixtures/requestModelWorld';
+import { REFUSAL_STRINGS, apiRefusal } from '../src/lib/refusalStrings';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { printRequestRoutes } from '../worker/routes/printRequests';
 import { requestEntryRoutes } from '../worker/routes/requestEntries';
@@ -82,7 +83,23 @@ test('the conversation’s rules: own store, no custom requests, no new work, a 
   const raw = world();
   const own = await enter(raw, 'm1', 'owner');
   assert.equal(own.status, 400);
-  assert.equal(own.body.code, 'OWN_REQUEST');
+  assert.equal(own.body.code, 'OWN_STORE_REQUEST', 'a code of its own: OWN_REQUEST is the offer door');
+  // The workshop reads that this is its own store, in each language, never the offer sentence.
+  const said = {
+    ar: 'هذا متجرك، لا يمكنك أن تطلب منه طباعة.',
+    en: 'This is your own store, so you cannot send it a print request.',
+    ckb: 'ئەمە فرۆشگاکەی خۆتە، ناتوانیت داوای چاپی بۆ بنێریت.',
+  } as const;
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    assert.equal(apiRefusal(own.body, lang, 'x'), said[lang], lang);
+    assert.notEqual(said[lang], REFUSAL_STRINGS.OWN_REQUEST[lang], `${lang}: not the offer sentence`);
+  }
+  // The product door asks the same question of the same store.
+  raw.exec(`INSERT INTO community_products (id,merchant_id,store_id,slug,name,status,lifecycle,price_iqd,stock,track_stock)
+            VALUES ('cp1','m1','s1','cable-clip','Cable clip','active','active',5000,10,0)`);
+  const ownProduct = await post(as(raw, 'owner'), '/api/marketplace/print/requests', { entry: { kind: 'product', product_id: 'cp1', store: 'ali3d' } });
+  assert.equal(ownProduct.status, 400);
+  assert.equal((await json(ownProduct)).code, 'OWN_STORE_REQUEST');
   raw.prepare(`UPDATE merchant_stores SET accepts_custom_requests = 0 WHERE id = 's1'`).run();
   assert.equal((await enter(raw, 'm1')).body.code, 'STORE_NO_CUSTOM_REQUESTS');
   raw.prepare(`UPDATE merchant_stores SET accepts_custom_requests = 1, status = 'paused' WHERE id = 's1'`).run();

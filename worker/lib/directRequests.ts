@@ -137,7 +137,8 @@ export interface DirectStore {
  *   a store the public may see (E12) — or one this customer already has
  *   business with (`knows`, the chat door's `customerKnowsMerchant`) —
  *   else the one generic STORE_UNAVAILABLE (C9);
- *   not the customer's own store (OWN_REQUEST);
+ *   not the customer's own store (OWN_STORE_REQUEST — its own code, not the
+ *   offer door's OWN_REQUEST, so the client says «this is your own store»);
  *   taking custom requests (STORE_NO_CUSTOM_REQUESTS);
  *   taking new work (MERCHANT_UNAVAILABLE).
  *
@@ -167,7 +168,7 @@ export async function assertStoreTakesDirect(
       }>()
   );
   if (!m || !m.store_id) throw publicStoreUnavailable();
-  if (m.user_id === customerId) throw new HttpError(400, 'This is your own store', 'OWN_REQUEST');
+  if (m.user_id === customerId) throw new HttpError(400, 'This is your own store', 'OWN_STORE_REQUEST');
   const isPublic = merchantIsPublic(m) && storeIsPublic({ status: m.store_status });
   if (!isPublic && !(await knows(db, customerId, merchantId, m.user_id))) throw publicStoreUnavailable();
   if (Number(m.accepts_custom_requests ?? 1) !== 1) {

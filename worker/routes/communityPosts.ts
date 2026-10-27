@@ -459,9 +459,17 @@ export interface PostReadable {
   admin_hidden_at?: unknown;
   state?: unknown;
   visibility?: unknown;
+  /** A row read without it is never public to a non-author (fail closed). */
+  consent_status?: unknown;
 }
 
-/** May this viewer read this post at all? The author and staff always; everybody else what is public. */
+/**
+ * May this viewer read this post at all? The author and staff always; everybody
+ * else what is public, and the part of a customer only while its consent is not
+ * pending or declined (`POST_PUBLIC_SQL`): a customer who declines AFTER the
+ * piece was published closes its page, comments, files and viewer links to
+ * everyone but the author, staff and that customer.
+ */
 export function mayRead(p: PostReadable, viewer: { id: string; role: string } | null, consentParty: string | null = null): boolean {
   if (viewer && (viewer.id === p.author_id || viewer.role === 'admin')) return true;
   // The customer a workshop asked («صور من قطعتك») may read the piece they
@@ -470,6 +478,7 @@ export function mayRead(p: PostReadable, viewer: { id: string; role: string } | 
   if (viewer && consentParty && viewer.id === consentParty && !p.admin_hidden_at) return true;
   if (p.admin_hidden_at) return false;
   if (p.state !== 'published') return false;
+  if (p.consent_status !== 'not_needed' && p.consent_status !== 'granted') return false;
   return p.visibility === 'public' || p.visibility === 'unlisted';
 }
 

@@ -17,8 +17,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, get, patch, json, count, row, hasColumn, type StubUser, type Mount } from './fixtures/app';
+import { approveMerchants, freshDb, asD1, stubApp, post, get, patch, json, count, row, hasColumn, type StubUser, type Mount } from './fixtures/app';
 import { communityPostRoutes } from '../worker/routes/communityPosts';
+import { communitySocialRoutes } from '../worker/routes/communitySocial';
 import { printRequestRoutes } from '../worker/routes/printRequests';
 
 const SARA: StubUser = { id: 'sara', role: 'customer', email: 'sara@x.co' };
@@ -287,4 +288,81 @@ test('the original downloads only when the author allows it, signed in, as an at
   const drFile = (await files(raw, bucket, SARA, dr))[0];
   assert.equal((await get(as(raw, bucket, EVE), `/api/community/posts/${dr}/files/${drFile.id}/download`)).status, 404);
   assert.equal((await get(as(raw, bucket, SARA), `/api/community/posts/${dr}/files/${drFile.id}/download`)).status, 200);
+});
+
+// =================================================================== consent
+
+/**
+ * A workshop's portfolio piece of a customer's part, shown with their consent
+ * and published — then the customer DECLINES through the real consent door. The
+ * piece leaves every list, and its page, comments, downloads and viewer links
+ * close to a guest and to a stranger (the rule of `POST_PUBLIC_SQL`); the
+ * author still reads all of it, the customer still opens the page and the
+ * files they decided about.
+ */
+test('a published portfolio piece whose customer then declines is closed to everyone but the author and that customer', async () => {
+  const { raw, bucket } = seed();
+  raw.exec(`
+    INSERT INTO users (id,name,email,password_hash,role,username) VALUES ('zed','Zed','zed@x.co','h','customer','zed');
+    INSERT INTO community_merchants (id,user_id,name,status) VALUES ('m_sara','sara','Sara Prints','active');
+    INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name,status) VALUES ('s_sara','m_sara','sara','saraprints','Sara Prints','active');
+    INSERT INTO community_requests (id,customer_id,title,description,status,state,visibility) VALUES
+      ('req_eve','eve','A bracket','A shelf bracket','closed','completed','public');
+    INSERT INTO community_offers (id,request_id,merchant_id,store_id,price_iqd,completion_days,state) VALUES
+      ('off_sara','req_eve','m_sara','s_sara',40000,2,'accepted');
+    UPDATE community_requests SET accepted_offer_id = 'off_sara' WHERE id = 'req_eve';
+  `);
+  approveMerchants(raw);
+  const ZED: StubUser = { id: 'zed', role: 'customer', email: 'zed@x.co' };
+  const withSocial: Mount = (a) => {
+    mount(a);
+    a.route('/api/community', communitySocialRoutes);
+  };
+  const as2 = (user: StubUser | null) => stubApp(asD1(raw), user, withSocial, { env: { BUCKET: bucket } });
+
+  const id = await draft(raw, bucket, { ...PROJECT, request_id: 'req_eve' });
+  assert.equal(row<{ consent_status: string }>(raw, 'SELECT consent_status FROM community_posts WHERE id = ?', id)!.consent_status, 'pending');
+  assert.equal((await post(as2(EVE), `/api/community/posts/${id}/consent`, { decision: 'granted' })).status, 200);
+  assert.equal((await post(as2(SARA), `/api/community/posts/${id}/publish`)).status, 200);
+  const fid = String((await files(raw, bucket, SARA, id))[0].id);
+  const page = `/api/community/posts/${id}`;
+  const comments = `/api/community/posts/${id}/comments`;
+  const download = `/api/community/posts/${id}/files/${fid}/download`;
+  const mint = `/api/community/posts/${id}/files/${fid}/viewer-token`;
+  const inFeed = async () => ((await json(await get(as2(null), '/api/community/posts'))).posts as Array<{ id: string }>).some((p) => p.id === id);
+
+  // Granted and published: the public reads it.
+  assert.equal(await inFeed(), true);
+  assert.equal((await get(as2(null), page)).status, 200);
+  assert.equal((await get(as2(null), comments)).status, 200);
+  assert.equal((await get(as2(ZED), download)).status, 200);
+  const early = await post(as2(null), mint, {}, UA);
+  assert.equal(early.status, 200, await early.clone().text());
+  const earlyToken = (await json(early)).token as string;
+  assert.equal((await get(as2(null), `/api/marketplace/print/viewer/${earlyToken}`, UA)).status, 200);
+
+  // The customer changes their mind on the published piece.
+  const declined = await post(as2(EVE), `/api/community/posts/${id}/consent`, { decision: 'declined' });
+  assert.equal(declined.status, 200);
+  assert.equal((await json(declined)).consent_status, 'declined');
+
+  assert.equal(await inFeed(), false, 'out of every list');
+  for (const [who, viewer] of [['a guest', null], ['a stranger', ZED]] as const) {
+    assert.equal((await get(as2(viewer), page)).status, 404, `${who}: the page`);
+    assert.equal((await get(as2(viewer), comments)).status, 404, `${who}: the comments`);
+    assert.equal((await post(as2(viewer), mint, {}, UA)).status, 404, `${who}: a fresh viewer link`);
+  }
+  assert.equal((await get(as2(ZED), download)).status, 404, 'a stranger: the download');
+  assert.equal((await get(as2(null), download)).status, 401, 'a guest is still asked to sign in first');
+  assert.equal((await get(as2(null), `/api/marketplace/print/viewer/${earlyToken}`, UA)).status, 404, 'the link minted before the decline opens nothing');
+
+  // The author reads all of it; the customer still opens what they decided about.
+  assert.equal((await get(as2(SARA), page)).status, 200);
+  assert.equal((await get(as2(SARA), comments)).status, 200);
+  assert.equal((await get(as2(SARA), download)).status, 200);
+  assert.equal((await post(as2(SARA), mint, {}, UA)).status, 200);
+  const asked = await get(as2(EVE), page);
+  assert.equal(asked.status, 200);
+  assert.equal((await json(asked)).post.viewer.consent, 'declined');
+  assert.equal((await get(as2(EVE), download)).status, 200);
 });

@@ -533,6 +533,13 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'You cannot make an offer on your own request.',
     ckb: 'ناتوانیت ئۆفەر لەسەر داواکاریی خۆت پێشکەش بکەیت.',
   },
+  // The store and product entry doors (worker/lib/directRequests.ts): a
+  // workshop pressed «اطلب طباعة» on its own store or product.
+  OWN_STORE_REQUEST: {
+    ar: 'هذا متجرك، لا يمكنك أن تطلب منه طباعة.',
+    en: 'This is your own store, so you cannot send it a print request.',
+    ckb: 'ئەمە فرۆشگاکەی خۆتە، ناتوانیت داوای چاپی بۆ بنێریت.',
+  },
   REQUEST_NOT_OPEN: {
     ar: 'هذا الطلب لم يعد يستقبل عروضًا.',
     en: 'This request is no longer taking offers.',

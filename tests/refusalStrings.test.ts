@@ -156,8 +156,10 @@ test('every code the table translates is one the server can actually emit', () =
     'worker/lib/requestModel.ts',
     // Readers and offers v3 (P1-05, row 267): what an offer covers and substitutes.
     'worker/lib/offerCoverage.ts',
-    // The request editor's entries (P1-06, row 268): a project, a product or a store.
+    // The request editor's entries (P1-06, row 268): a project, a product or a store,
+    // and the store's own questions they ask (OWN_STORE_REQUEST among them).
     'worker/routes/requestEntries.ts',
+    'worker/lib/directRequests.ts',
     'worker/lib/requestHandoff.ts',
     // Community projects (docs/COMMUNITY_ECOSYSTEM.md Phase 1): the composer
     // decodes POST_* and CONSENT_* beside the field each one names.
@@ -586,6 +588,28 @@ test('every Phase 5 refusal code has real Sorani — not the Arabic pasted acros
     if (/پێشنیار|وەرشە/.test(e.ckb)) problems.push(`${code}: ckb says «پێشنیار»/«وەرشە», the pages say «ئۆفەر»/«وۆرکشۆپ»`);
   }
   assert.deepEqual(problems, []);
+});
+
+/**
+ * THE STORE AND PRODUCT ENTRY DOORS (P1-06, row 268) refuse a workshop's own
+ * store with a code of their own. OWN_REQUEST is the offer door's, and its
+ * sentence («you cannot make an offer on your own request») is the wrong one
+ * for a merchant who pressed «اطلب طباعة» on their own store or product.
+ */
+test('the entry doors refuse a workshop\'s own store in their own words, emitted by the store rule and decoded in ar, en and ckb', () => {
+  const lib = readFileSync(join(ROOT, 'worker/lib/directRequests.ts'), 'utf8');
+  assert.ok(lib.includes("'OWN_STORE_REQUEST'"), 'assertStoreTakesDirect emits OWN_STORE_REQUEST');
+  assert.ok(!/This is your own store', 'OWN_REQUEST'/.test(lib), 'the store rule no longer borrows the offer code');
+  const e = REFUSAL_STRINGS.OWN_STORE_REQUEST;
+  assert.ok(e, 'OWN_STORE_REQUEST has no sentence');
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    assert.ok(e[lang]?.trim(), `OWN_STORE_REQUEST.${lang} is empty`);
+    assert.notEqual(e[lang], REFUSAL_STRINGS.OWN_REQUEST[lang], `OWN_STORE_REQUEST.${lang} is the offer sentence`);
+    assert.equal(apiRefusal({ code: 'OWN_STORE_REQUEST', message: 'This is your own store' }, lang, 'x'), e[lang], lang);
+  }
+  assert.notEqual(e.ckb, e.ar, 'ckb is a copy of the Arabic');
+  assert.ok(/[ەێۆڕڵ]/.test(e.ckb), 'the ckb sentence is Sorani');
+  assert.ok(!/[A-Z]{3,}_[A-Z]/.test(e.ar + e.en + e.ckb), 'a machine code leaked into the sentence');
 });
 
 test('every promo-code refusal the checkout can meet reads in the customer\'s language, on the quote and on the press', () => {
