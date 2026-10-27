@@ -59,7 +59,12 @@ export type EditOp =
   | { op: 'add_layer'; layer: unknown; index?: number }
   | { op: 'set_crop'; layer_id: string; crop: { x: number; y: number; width: number; height: number } | null }
   | { op: 'resize_box'; layer_id: string; width: number; height: number }
-  | { op: 'rename_layer'; layer_id: string; name: string };
+  | { op: 'rename_layer'; layer_id: string; name: string }
+  // The owner's pointing marks (spec §17). People only, never exported, never a
+  // design change — but still an operation, so they share undo, the one gate
+  // (normalizeDocument) and the save path with every other edit.
+  | { op: 'add_annotation'; annotation: unknown }
+  | { op: 'delete_annotation'; annotation_id: string };
 
 export type OpName = EditOp['op'];
 
@@ -68,7 +73,7 @@ export const AI_OPS: ReadonlySet<OpName> = new Set<OpName>([
   'replace_asset', 'apply_background_preset', 'set_visibility', 'reorder_layer', 'set_priority', 'switch_template_variant',
   'create_format_variant', 'set_caption', 'set_alt_text',
 ]);
-export const HUMAN_OPS: ReadonlySet<OpName> = new Set<OpName>([...AI_OPS, 'set_lock', 'rotate_layer', 'delete_layer', 'add_layer', 'set_crop', 'resize_box', 'rename_layer']);
+export const HUMAN_OPS: ReadonlySet<OpName> = new Set<OpName>([...AI_OPS, 'set_lock', 'rotate_layer', 'delete_layer', 'add_layer', 'set_crop', 'resize_box', 'rename_layer', 'add_annotation', 'delete_annotation']);
 /** Operations that re-lay the whole design from its template: the app performs them with `layout.rebuild`, alone in their patch. */
 export const REBUILD_OPS: ReadonlySet<OpName> = new Set<OpName>(['set_priority', 'switch_template_variant', 'create_format_variant']);
 
@@ -76,7 +81,7 @@ export type RefusalCode =
   | 'unknown_op' | 'not_allowed_for_actor' | 'unknown_layer' | 'unknown_relation' | 'locked_layer' | 'wrong_layer_type'
   | 'bound_text' | 'price_like_text' | 'invented_link' | 'invalid_value' | 'below_min_size' | 'color_not_in_palette'
   | 'asset_not_allowed' | 'unknown_background' | 'product_rotation' | 'background_order' | 'duplicate_id' | 'invalid_layer'
-  | 'rebuild_not_alone' | 'unknown_variant';
+  | 'rebuild_not_alone' | 'unknown_variant' | 'unknown_annotation';
 
 export interface OpRefusal {
   index: number;
@@ -157,6 +162,8 @@ export function parseOp(raw: unknown): EditOp | null {
     }
     case 'resize_box': return id('layer_id') && isNum(o.width, 1, COORD) && isNum(o.height, 1, COORD) ? { op: 'resize_box', layer_id: o.layer_id as string, width: o.width, height: o.height } : null;
     case 'rename_layer': return id('layer_id') && typeof o.name === 'string' ? { op: 'rename_layer', layer_id: o.layer_id as string, name: o.name } : null;
+    case 'add_annotation': return o.annotation && typeof o.annotation === 'object' && !Array.isArray(o.annotation) ? { op: 'add_annotation', annotation: o.annotation } : null;
+    case 'delete_annotation': return id('annotation_id') ? { op: 'delete_annotation', annotation_id: o.annotation_id as string } : null;
     default: return null;
   }
 }
@@ -418,6 +425,23 @@ export function applyOps(input: CreativeDocument, rawOps: readonly unknown[], ct
       }
       case 'rename_layer':
         return put({ ...layer!, name: cleanText(op.name, 60).value || layer!.name });
+      case 'add_annotation': {
+        // The gate decides what an annotation may hold (document coordinates,
+        // a capped note, layer ids that exist); a mark it drops or a duplicate
+        // id is refused rather than silently lost.
+        const probe = normalizeDocument({ ...doc, annotations: [...doc.annotations, op.annotation] });
+        const added = probe.ok && probe.doc.annotations.length === doc.annotations.length + 1 ? probe.doc.annotations[probe.doc.annotations.length - 1] : null;
+        if (!added) {
+          const aid = (op.annotation as { id?: unknown }).id;
+          return refuse(typeof aid === 'string' && doc.annotations.some((a) => a.id === aid) ? 'duplicate_id' : 'invalid_value');
+        }
+        doc = { ...doc, annotations: [...doc.annotations, added] };
+        return;
+      }
+      case 'delete_annotation':
+        if (!doc.annotations.some((a) => a.id === op.annotation_id)) return refuse('unknown_annotation');
+        doc = { ...doc, annotations: doc.annotations.filter((a) => a.id !== op.annotation_id) };
+        return;
     }
   });
 
