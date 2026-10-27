@@ -106,11 +106,10 @@ test('the placeholders render the section header and the list the home tab shows
   const home = code('src/pages/Community.tsx');
   assert.doesNotMatch(home, /StoresPanel|function YourStore\(/, 'the stores panel is still on the home');
   assert.match(home, /const moved = legacyTabTarget\(params\);/);
-  // The editor: the wizard of today under its own header.
+  // The editor: the four-step editor of C4, inside this lazy page chunk, under its own wizard header.
   const editor = code('src/pages/community/RequestNew.tsx');
-  assert.match(editor, /const RequestWizard = lazy\(\(\) => import\('\.\.\/\.\.\/components\/community\/requests\/RequestWizard'\)\);/, 'the wizard stays its own chunk');
-  assert.match(editor, /<SectionPageHeader title=\{editing \? s\.editRequest : id \? s\.continueDraft : s\.kicker\}/);
-  assert.match(editor, /<RequestWizard key=\{id \|\| 'new'\} requestId=\{id \|\| undefined\} initialLink=\{carriedLink \|\| undefined\} onDone=\{done\} onCancel=\{goBack\} \/>/);
+  assert.match(editor, /^import RequestEditor, \{ type EditorDone \} from '\.\.\/\.\.\/components\/community\/requests\/editor\/RequestEditor';$/m);
+  assert.match(editor, /<RequestEditor requestId=\{id\} carriedLink=\{carriedLink\} onDone=\{finish\} onLeave=\{goBack\} \/>/);
 });
 
 /** The board forward, run as written (its types stripped). */
@@ -150,7 +149,7 @@ test('every old door still reaches the editor with its state: ?view=new, ?link=,
   // A new request lands on its own page with «طلباتي» behind it, the board never routed in between
   // (B2R2-REG-1, run below); the channel window rides with a PUBLISHED request only.
   assert.match(editor, /if \(!id\) leaveNewRequest\(navigate, requestPath\(rid\), how === 'published', window, fromBoard\);/);
-  assert.match(editor, /const fromBoard = !id && cameFromBoard\(location\.state\);/);
+  assert.match(editor, /const \[fromBoard\] = useState\(\(\) => !id && cameFromBoard\(location\.state\)\);/);
   assert.doesNotMatch(editor, /navigate\(\s*['"`]\/requests\?view=mine|navigate\(\s*MY_REQUESTS/, 'the editor routes the board before the request page again');
   // A draft or an edit published goes back onto the page that opened the editor (B2R1-REG-3).
   assert.match(editor, /else if \(how === 'published'\) returnPublished\(navigate, requestPath\(rid\)\);\s*else goBack\(\);/);
@@ -436,8 +435,8 @@ test('an editor address for a request this person cannot open says so in three l
   assert.match(branch, /<SectionPageHeader title=\{s\.kicker\} backTo="\/requests" \/>/);
   assert.match(branch, /<NotFoundState title=\{s\.notFoundTitle\} description=\{s\.notFoundBody\} \/>/);
   assert.match(branch, /<Link to="\/requests" className="lv-button lv-button-secondary lv-button-sm">\s*\{s\.toBoard\}\s*<\/Link>/);
-  assert.doesNotMatch(branch, /RequestWizard/, 'the wizard is drawn for a request that cannot be opened');
-  assert.ok(start > 0 && start < editor.indexOf('<RequestWizard '), 'the missing state is not decided before the wizard');
+  assert.doesNotMatch(branch, /RequestEditor/, 'the editor is drawn for a request that cannot be opened');
+  assert.ok(start > 0 && start < editor.indexOf('<RequestEditor '), 'the missing state is not decided before the editor');
   // The words exist in all three languages, the Sorani its own (row 183), the English without Arabic script.
   const { REQUEST_STRINGS } = await import('../src/components/community/requests/strings');
   for (const key of ['kicker', 'notFoundTitle', 'notFoundBody', 'toBoard'] as const) {
