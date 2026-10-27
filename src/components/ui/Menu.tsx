@@ -47,14 +47,6 @@ export interface MenuItem {
   disabled?: boolean;
   /** A second, quieter line — for a disabled item, the reason. */
   hint?: string;
-  /**
-   * One choice among the items (a filter value): the item is a radio item,
-   * `role="menuitemradio"` with `aria-checked`, so the chosen one is a state
-   * a screen reader says, not only a word or a tick. Left out: a plain menuitem.
-   * The two attributes are spread as given: the caller writes both, so the
-   * menu every merchant screen loads stays the size it was.
-   */
-  radio?: { role: 'menuitemradio'; 'aria-checked': boolean };
 }
 
 export interface MenuSeparator {
@@ -173,8 +165,6 @@ function MenuList({ id, label, items, start, large, onPick, onTab }: MenuListPro
           role: 'menuitem',
           tabIndex: -1,
           'aria-disabled': entry.disabled || undefined,
-          // One choice among the items: a radio item, its state said aloud.
-          ...entry.radio,
           'data-menu-item': entry.id,
           onPointerMove: (ev: React.PointerEvent<HTMLElement>) => {
             if (ev.pointerType === 'mouse' && document.activeElement !== ev.currentTarget) ev.currentTarget.focus({ preventScroll: true });

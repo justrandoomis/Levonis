@@ -487,11 +487,20 @@ test('g. the kit review: badge, segmented, stepper, drop zone, photo tile and fi
   assert.match(display, /\{selected && \(\s*<>\s*<span className="sr-only">\{s\.cover\}<\/span>\s*<span aria-hidden="true" className="cm-check /);
   for (const lang of ['ar', 'en', 'ckb'] as const) assert.ok(KIT_STRINGS[lang].cover, `${lang}: no cover word`);
 
-  // A11Y-5. The filter options are radio items, the chosen one checked (the word «محدد» stays visible).
+  // A11Y-5, as B1FIX-R3-REG-2 leaves it. The chosen filter option wears the check and says «محدد» in its
+  // name. Its radio role needs a field in ui/Menu.tsx, and that menu is in the frame every merchant
+  // screen loads (+13 B of its 21 B of headroom, for no page that shipped one), so B1 leaves the menu as
+  // it was. The day a page renders a FilterSelect, that same push gives the options the radio role.
   const menu = read('src/components/ui/Menu.tsx');
-  assert.match(menu, /role: 'menuitem',\s*tabIndex: -1,\s*'aria-disabled': entry\.disabled \|\| undefined,\s*\/\/[^\n]*\n\s*\.\.\.entry\.radio,/);
-  assert.match(menu, /radio\?: \{ role: 'menuitemradio'; 'aria-checked': boolean \};/);
-  assert.match(controls, /radio: \{ role: 'menuitemradio', 'aria-checked': o\.id === value \},\s*hint: o\.id === value \? s\.selected : undefined,/);
+  assert.match(controls, /icon: o\.id === value \? <Check className="h-4 w-4" \/> : <span className="block h-4 w-4" \/>,\s*hint: o\.id === value \? s\.selected : undefined,/);
+  for (const lang of ['ar', 'en', 'ckb'] as const) assert.ok(KIT_STRINGS[lang].selected, `${lang}: no «selected» word`);
+  assert.notEqual(KIT_STRINGS.ckb.selected, KIT_STRINGS.ar.selected);
+  const pages = (['src/pages', 'src/components'] as const)
+    .flatMap((dir) => (readdirSync(join(ROOT, dir), { recursive: true }) as string[]).map((f) => `${dir}/${f.split('\\').join('/')}`))
+    .filter((f) => /\.tsx?$/.test(f) && !f.startsWith('src/components/community/kit/'))
+    .filter((f) => /from '[^']*kit\/controls'/.test(read(f)) && /<FilterSelect\b/.test(read(f)));
+  if (pages.length === 0) assert.doesNotMatch(menu, /menuitemradio/, 'B1 grows the menu of every merchant screen for a control no page renders');
+  else assert.match(menu, /menuitemradio/, `${pages.join(', ')} render a FilterSelect: its options must be radio items (menuitemradio, aria-checked) in the same push`);
 });
 
 // ----------------------------------------------------------------------- h
@@ -673,7 +682,7 @@ test('i. the kit review, round 3: the chosen segmented label is never clipped on
 });
 
 // ----------------------------------------------------------------------- j
-test('j. the kit review, round 4: the label-wide tab underline, every held control at full ink, the forced-colours knob', () => {
+test('j. the kit review, round 4: the tab underline (the tab less 16px), every held control at full ink, the forced-colours knob', () => {
   const ruleOf = (selector: string) => {
     const at = css.indexOf(`${selector} {`);
     assert.ok(at >= 0, `${SHEET}: no rule \`${selector}\``);
@@ -687,43 +696,39 @@ test('j. the kit review, round 4: the label-wide tab underline, every held contr
     );
   };
 
-  // B1R4-FID-1. The underline is the label plus 12px on each side (tokens.md §6 #7), not the tab: the
-  // house indicator spans the tab (`start-0 end-0`), so the kit draws its own line inside the label,
-  // still one travelling element per strip, and the house one is not drawn.
+  // B1FIX-R3-FID-1 (was B1R4-FID-1). The underline is the chosen tab less 16px on each side
+  // (tokens.md §6 #7): IMG_8468, IMG_8475 and IMG_8483 draw 146.5px under a 71px label in a tab of
+  // about 178px at 390, neither the whole tab (the house indicator, `start-0 end-0`) nor the label plus
+  // 24px. The kit draws its own line on the tab, still one travelling element per strip, and the house
+  // one is not drawn.
   const controls = read('src/components/community/kit/controls.tsx');
-  assert.match(read('src/components/ui/Tabs.tsx'), /className=\{`absolute bottom-0 start-0 end-0 h-0\.5 rounded-t-full \$\{indicatorClassName\}`\}/);
+  const tabs = read('src/components/ui/Tabs.tsx');
+  assert.match(tabs, /className=\{`absolute bottom-0 start-0 end-0 h-0\.5 rounded-t-full \$\{indicatorClassName\}`\}/);
   assert.match(controls, /indicatorClassName="hidden"/, 'the house indicator (the whole tab) is drawn too');
-  assert.match(controls, /<UnderlineLabel\s+line=\{\s*t\.id === value && \(\s*<motion\.span\s+layoutId=\{`cm-tab-line-\$\{group\}`\}/);
-  assert.match(controls, /\{t\.label\}\s*\{t\.badge\}\s*<\/UnderlineLabel>/);
+  assert.match(controls, /\{t\.label\}\s*\{t\.badge\}\s*\{t\.id === value && \(\s*<motion\.span\s+layoutId=\{`cm-tab-line-\$\{group\}`\}/);
   assert.match(controls, /transition=\{m\.reduced \? \{ duration: 0 \} : m\.spring\('move'\)\}/, 'the line no longer travels, or no longer jumps under reduced motion');
-  // A wrapped label is a box as wide as the tab: the label measures where its words are, every line
-  // of them, without the line it holds, and the line takes those insets less 12px on each side.
-  assert.match(controls, /words\.setEnd\(el, el\.childNodes\.length - \(last instanceof Element && last\.hasAttribute\('data-tab-line'\) \? 1 : 0\)\);/);
-  assert.match(controls, /el\.style\.setProperty\('--cm-tab-left', `\$\{at\.left - box\.left\}px`\);\s*el\.style\.setProperty\('--cm-tab-right', `\$\{box\.right - at\.right\}px`\);/);
-  const line = ruleOf("[data-surface='community'] .cm-tab-line");
-  assert.equal(line['left'], 'calc(var(--cm-tab-left, 0px) - 12px)', 'the underline is not the label plus 24px');
-  assert.equal(line['right'], 'calc(var(--cm-tab-right, 0px) - 12px)', 'the underline is not the label plus 24px');
-  // The rest of the line and of the label box draw with utilities the app already ships (B1FIX-R2-REG-1):
-  // on the bottom edge of the label, 3px, round ends, gold; the label a positioned row, its words centred.
-  assert.match(controls, /className="cm-tab-line absolute bottom-0 h-\[3px\] rounded-full bg-gold"/);
-  assert.match(controls, /<span ref=\{ref\} className="cm-tab-label relative inline-flex items-center gap-1\.5">/);
-  assert.deepEqual(Object.keys(line).sort(), ['left', 'right'], 'the sheet restates what the utilities of the line say');
-  const label = ruleOf("[data-surface='community'] .cm-tab-label");
+  // On the tab: 16px in from each edge (`inset-x-4`, a utility the app already ships), on its bottom
+  // edge, 3px, round ends, gold. The house span around the label is not positioned and the tab is, so
+  // the tab is the box the line is placed in; nothing measures the words any more.
+  assert.match(controls, /className="cm-tab-line absolute inset-x-4 bottom-0 h-\[3px\] rounded-full bg-gold"/);
+  assert.match(tabs, /const classes = `relative \$\{fill \? 'flex-1 px-2'/, 'the house tab is no longer the positioned box of the line');
+  assert.match(tabs, /<span className="inline-flex items-center gap-1\.5">\s*\{t\.label\}/, 'the house span changed: re-check that the tab places the line');
+  assert.doesNotMatch(controls, /UnderlineLabel|--cm-tab-left|--cm-tab-right|useLayoutEffect/, 'the tabs still measure their words');
+  assert.doesNotMatch(controls, /\bfill=\{/, 'a strip is drawn at natural width: the line would no longer be its tab less 16px');
+  assert.match(controls, /export type UnderlineTabsProps = Omit<TabStripProps, 'indicatorClassName' \| 'activeClassName' \| 'idleClassName' \| 'fill'>;/, 'the strip may be drawn at natural width');
+  assert.doesNotMatch(css, /\.cm-tab-line \{/, 'the sheet restates what the utilities of the line say');
+  assert.doesNotMatch(css, /\.cm-tab-label\b/, 'the label box of the measured line is back');
+  // The tab keeps the house block padding (`py-3`), so its bottom edge is the baseline of the strip, and
+  // its 12px of inline room, so a label wraps where it did. It centres its words; when the other label
+  // wraps, both tabs grow (a flex row stretches them), and the line sits on the bottom edge of each, so
+  // it stays on the baseline and does not hop as it travels.
   const tab = ruleOf("[data-surface='community'] .cm-tabs [data-tab]");
-  // The label box takes the block padding of the tab, so its bottom edge (where the line sits) is the
-  // bottom edge of the tab; the tab keeps 12px of inline room, so the line never leaves it.
-  assert.equal(tab['padding-block'], '0');
-  assert.equal(label['padding-block'], '12px');
+  assert.equal(tab['padding-block'], undefined, 'the tab drops the house block padding');
   assert.equal(tab['padding-inline'], '12px');
-  // B1FIX-R1-FID-1. The label FILLS the height of its tab: when the other label wraps, both tabs grow,
-  // and a one-line label centred in its tab left its line 10.7px above the baseline (and the line hopped
-  // as it travelled). The tab and the house span stretch it; the label centres its words.
-  const span = ruleOf("[data-surface='community'] .cm-tabs [data-tab] > span:not([data-tab-indicator])");
   assert.equal(tab['display'], 'flex');
-  assert.equal(tab['align-items'], 'stretch');
-  assert.equal(span['display'], 'flex');
-  assert.equal(span['align-items'], 'stretch', 'the house span centres the label (items-center): the line leaves the baseline');
-  assert.match(read('src/components/ui/Tabs.tsx'), /<span className="inline-flex items-center gap-1\.5">\s*\{t\.label\}/, 'the house span changed: re-check the stretch above');
+  assert.equal(tab['align-items'], 'center');
+  assert.equal(tab['justify-content'], 'center');
+  assert.doesNotMatch(css, /\[data-tab\] > span/, 'the scope restyles the house span again');
   assert.doesNotMatch(css, /\[data-tab-indicator\]\s*\{/, 'the scope still restyles the house indicator');
 
   // B1R4-A11Y-1. Nothing in the scope dims on press: the house rule (0.72 in the base layer, and
@@ -814,7 +819,6 @@ test('l. the fix round 2: the whole kit draws from one sheet, and the chosen tab
   for (const m of ['controls', 'display', 'fields', 'buttons']) assert.doesNotMatch(read(`src/components/community/kit/${m}.tsx`), /import '[^']*\.css'/, `kit/${m}.tsx imports a stylesheet`);
   for (const looks of [
     /\[data-surface='community'\] \.cm-tabs \[data-tab\] \{/,
-    /\[data-surface='community'\] \.cm-tab-line \{/,
     /\[data-surface='community'\] \.cm-switch \[data-switch='on'\] > span \{/,
     /\[data-surface='community'\] \.cm-stepper \.lv-well > button \{/,
     /\[data-surface='community'\] \.cm-seg \[data-segmented-indicator\] \{/,
@@ -827,10 +831,10 @@ test('l. the fix round 2: the whole kit draws from one sheet, and the chosen tab
   assert.equal((scopeCss.match(/@layer theme, base, components, utilities;/g) ?? []).length, 1, 'the layer order is stated more than once');
   assert.equal((scopeCss.match(/@media \(forced-colors: active\)/g) ?? []).length, 1, 'the forced-colours cues are split over several blocks');
   // No rule restates what the house control or a shipped utility already says. The track keeps the
-  // 4px gap of the house (`gap-1`); the baseline of the strip, the label box and the line are
-  // utilities (`border-b border-border-subtle`; `relative inline-flex items-center gap-1.5`;
-  // `absolute bottom-0 h-[3px] rounded-full bg-gold`); a one-line tile is `@container`; the icon well
-  // takes its 12px from the shared radius rule.
+  // 4px gap of the house (`gap-1`); the baseline of the strip and the line are utilities
+  // (`border-b border-border-subtle`; `absolute inset-x-4 bottom-0 h-[3px] rounded-full bg-gold`, on
+  // the tab since B1FIX-R3-FID-1, test j); a one-line tile is `@container`; the icon well takes its
+  // 12px from the shared radius rule.
   const controls = read('src/components/community/kit/controls.tsx');
   assert.match(read('src/components/ui/Segmented.tsx'), /\? 'h-9 box-border gap-0\.5 p-0\.5' : 'gap-1 p-1'/, 'the house track gap changed: re-check the scope track');
   const track = /\[data-surface='community'\] \.cm-seg \{([^}]*)\}/.exec(scopeCss);
@@ -839,8 +843,6 @@ test('l. the fix round 2: the whole kit draws from one sheet, and the chosen tab
   assert.doesNotMatch(scopeCss, /\.cm-tabs \{|\.cm-tile-one\b/, 'a rule restates a shipped utility');
   assert.match(controls, /className=\{`cm-tabs border-b border-border-subtle \$\{className\}`\}/);
   assert.match(scopeCss, /\.lv-button\.cm-btn-compact,\s*\.cm-chip,\s*\.cm-tile-icon,\s*\.cm-media \{\s*border-radius: 12px;/);
-  const label = /\[data-surface='community'\] \.cm-tab-label \{([^}]*)\}/.exec(scopeCss);
-  assert.deepEqual(label![1].split(';').map((d) => d.trim()).filter(Boolean), ['padding-block: 12px']);
 
   // B1FIX-R2-A11Y-1. Forced colours drew the underline of the chosen tab in Canvas: it vanished and the
   // weight of the label was the only cue left. It comes back in Highlight, with the row bar and the ON

@@ -14,8 +14,9 @@
  *   - a FilterSelect menu row under the keyboard wears the focus line, inset;
  *   - a held kit button keeps its full ink under reduced motion (no 0.72 dim);
  *   (round 4)
- *   - the tab underline is the label plus 24px, on the bottom edge of the tab,
- *     3px, inside its tab, at 390 and 1440 in English, Arabic and Sorani; it
+ *   - the tab underline is its tab less 16px on each side (IMG_8468, 8475,
+ *     8483; B1FIX-R3-FID-1), centred under the words, on the bottom edge of
+ *     the tab, 3px, at 390 and 1440 in English, Arabic and Sorani; it
  *     travels to the next tab (a transform in flight) and jumps under
  *     reduced motion;
  *   - every held kit control (link, tab, thumb, select, tile, row, drop zone,
@@ -250,7 +251,8 @@ for (const [lang, width, height] of [['en', 390, 844], ['ar', 390, 844], ['ckb',
     await strip.scrollIntoViewIfNeeded();
     const geo = await page.evaluate(() => {
       const tab = document.querySelector('[data-kit="selection"] .cm-tabs [data-tab-active]');
-      const label = tab.querySelector('.cm-tab-label');
+      // The house span that holds the words (and the line, which the tab places).
+      const label = tab.querySelector(':scope > span:not([data-tab-indicator])');
       const line = tab.querySelector('[data-tab-line]');
       const house = tab.querySelector('[data-tab-indicator]');
       if (!label || !line) return { line: null, houseDrawn: !!house && getComputedStyle(house).display !== 'none' };
@@ -265,12 +267,13 @@ for (const [lang, width, height] of [['en', 390, 844], ['ar', 390, 844], ['ckb',
         return r.getBoundingClientRect();
       });
       const lw = Math.max(...text.map((r) => r.right)) - Math.min(...text.map((r) => r.left));
-      return { tab: box(tab), label: box(label), text: lw, line: line ? box(line) : null, houseDrawn: house ? getComputedStyle(house).display !== 'none' : false, color: line ? getComputedStyle(line).backgroundColor : '', gold: getComputedStyle(tab).color };
+      const words = { l: Math.min(...text.map((r) => r.left)), r: Math.max(...text.map((r) => r.right)) };
+      return { tab: box(tab), label: box(label), words, text: lw, line: line ? box(line) : null, houseDrawn: house ? getComputedStyle(house).display !== 'none' : false, color: line ? getComputedStyle(line).backgroundColor : '', gold: getComputedStyle(tab).color };
     });
     check(`${tag}: the active tab draws one underline (the house indicator is not drawn)`, !!geo.line && !geo.houseDrawn, JSON.stringify({ line: !!geo.line, house: geo.houseDrawn }));
     if (geo.line) {
-      check(`${tag}: the underline is the label plus 24px`, Math.abs(geo.line.w - (geo.text + 24)) <= 0.75, `line ${geo.line.w.toFixed(1)} vs label ${geo.text.toFixed(1)} + 24, tab ${geo.tab.w.toFixed(1)}`);
-      check(`${tag}: … centred on the label`, Math.abs(geo.line.l + geo.line.w / 2 - (geo.label.l + geo.label.w / 2)) <= 0.75, `${(geo.line.l + geo.line.w / 2).toFixed(1)} vs ${(geo.label.l + geo.label.w / 2).toFixed(1)}`);
+      check(`${tag}: the underline is its tab less 16px on each side`, Math.abs(geo.line.l - (geo.tab.l + 16)) <= 0.75 && Math.abs(geo.line.r - (geo.tab.r - 16)) <= 0.75, `line ${geo.line.w.toFixed(1)} [${geo.line.l.toFixed(1)}, ${geo.line.r.toFixed(1)}] in tab ${geo.tab.w.toFixed(1)} [${geo.tab.l.toFixed(1)}, ${geo.tab.r.toFixed(1)}], label ${geo.text.toFixed(1)}`);
+      check(`${tag}: … centred under the words`, Math.abs(geo.line.l + geo.line.w / 2 - (geo.words.l + geo.words.r) / 2) <= 0.75, `${(geo.line.l + geo.line.w / 2).toFixed(1)} vs ${((geo.words.l + geo.words.r) / 2).toFixed(1)}`);
       check(`${tag}: … 3px on the bottom edge of the tab`, Math.abs(geo.line.h - 3) <= 0.1 && Math.abs(geo.line.b - geo.tab.b) <= 0.5, JSON.stringify({ h: geo.line.h, lineBottom: geo.line.b, tabBottom: geo.tab.b }));
       check(`${tag}: … inside its tab`, geo.line.l >= geo.tab.l - 0.5 && geo.line.r <= geo.tab.r + 0.5, JSON.stringify({ line: [geo.line.l, geo.line.r], tab: [geo.tab.l, geo.tab.r] }));
       check(`${tag}: … in the gold of the label`, geo.color === geo.gold, `${geo.color} vs ${geo.gold}`);
@@ -307,16 +310,12 @@ for (const [lang, width, height] of [['en', 390, 844], ['ar', 390, 844], ['ckb',
 for (const reduced of [false, true]) {
   const { context, page, tag } = await open(browser, { theme: 'dark', lang: 'en', reduced, touch: false });
   await page.locator('[data-kit="selection"] .cm-tabs').scrollIntoViewIfNeeded();
-  // Where the line rests under a label: the start of its words less 12px.
+  // Where the line rests in a tab: 16px in from the start of the tab.
   const where = () =>
     page.evaluate(() => {
       const line = document.querySelector('[data-kit="selection"] .cm-tabs [data-tab-line]');
       if (!line) return { left: NaN, home: 0 };
-      const label = line.parentElement;
-      const words = document.createRange();
-      words.setStart(label, 0);
-      words.setEnd(label, label.childNodes.length - 1);
-      return { left: line.getBoundingClientRect().left, home: words.getBoundingClientRect().left - 12 };
+      return { left: line.getBoundingClientRect().left, home: line.closest('[data-tab]').getBoundingClientRect().left + 16 };
     });
   const before = (await where()).left;
   await page.locator('[data-kit="selection"] .cm-tabs [role="tab"][aria-selected="false"]').first().click();

@@ -773,7 +773,8 @@ function operationsCssFiles(): Set<string> {
  * Measured at that fix (vite build, gzip 9; the same with and without a page importing the kit):
  * the community sheet 2,947 B, public CSS 60,974 of 61,440 B, so 466 B are left for B2 to D. The
  * plan budgeted about 1.2 KB for B1; the tokens alone are about 920 B. Keeping the kit at this cost
- * is a deliberate re-cut the owner decides (DECISIONS row 270); otherwise rules get cut.
+ * is a deliberate re-cut the owner decides (DECISIONS row 270); otherwise rules get cut. Until then
+ * the sheet may not grow (B1FIX-R3-REG-1, the test «the community scope costs no more than …»).
  */
 const COMMUNITY_SHEET = 'src/styles/community.css';
 function communitySheets(): string[] {
@@ -806,6 +807,46 @@ test('a community sheet that no build carries yet is counted at its own gzip', a
   const waiting = "@layer theme, base, components, utilities;\n[data-surface='community'] .cm-probe-only { block-size: 44px; }";
   assert.equal(sheetCarried(waiting, built), false);
   assert.ok((await shippedGzip(waiting)) > 40, 'a waiting sheet is counted at nothing');
+});
+
+/**
+ * THE COST OF B1 WAITS ON THE OWNER (community UI plan B1, B1FIX-R3-REG-1). The plan budgets about
+ * 1.2 KB gzip for the community sheet (plan B1 and its risk register). With the whole kit the sheet
+ * was 2,947 B and the scope module (CommunitySurface: the surface and its portal stamping) 911 B of JS
+ * beyond the initial payload, and every community page pays both on its first load: against the live
+ * head, /community +3,963 B, /community/projects +4,036 B, /community/projects/:id +3,962 B,
+ * /requests +4,064 B, /requests/:id +3,949 B (vite build, gzip 9, at the round-3 review). The plan
+ * item does not meet its own budget. Whether the owner accepts that cost or the kit is cut back to the
+ * plan before B1 lands is asked in DECISIONS row 270. Until it is answered, those two figures are the
+ * cost under decision, not a budget to fill: neither may grow. The module names two hashed chunks and
+ * the export letters Rollup deals out across chunks, which move its gzip by a few bytes on any rebuild
+ * (909 to 913 B for the same source), so it is weighed with those set aside: 889 B for the 911 B of the
+ * review. The measured deltas at each landing are written into its commit message (plan R6).
+ */
+const COMMUNITY_SHEET_UNDER_DECISION = 2947;
+const COMMUNITY_SCOPE_JS_UNDER_DECISION = 889;
+/** The gzip of a chunk with the hashed names of other chunks and the cross-chunk export letters masked. */
+const withoutChunkLetters = (path: string) =>
+  gzipSync(
+    Buffer.from(
+      readFileSync(path, 'utf8')
+        .replace(/-[A-Za-z0-9_-]{8}(\.(?:js|css))/g, '-00000000$1')
+        .replace(/import\{([^}]*)\}from/g, (_, list: string) => `import{${list.replace(/[\w$]+ as /g, '? as ')}}from`)
+        .replace(/export\{([^}]*)\}/g, (_, list: string) => `export{${list.replace(/ as [\w$]+/g, ' as ?')}}`)
+    ),
+    { level: 9 }
+  ).length;
+
+test('the community scope costs no more than the figures the owner is asked to accept (DECISIONS row 270)', () => {
+  const files = readdirSync(ASSETS);
+  const sheet = files.find((f) => f.startsWith('CommunitySurface-') && f.endsWith('.css'));
+  const scope = files.find((f) => f.startsWith('CommunitySurface-') && f.endsWith('.js'));
+  assert.ok(sheet && scope, 'the community scope is no longer a lazy chunk with its own sheet');
+  const css = gz(join(ASSETS, sheet!));
+  const js = withoutChunkLetters(join(ASSETS, scope!));
+  console.log(`bundle: community scope ${css} B css (plan about 1.2 KB, ${COMMUNITY_SHEET_UNDER_DECISION} B under decision) and ${gz(join(ASSETS, scope!))} B js, ${js} B without the letters of other chunks (${COMMUNITY_SCOPE_JS_UNDER_DECISION} B under decision), gzip`);
+  assert.ok(css <= COMMUNITY_SHEET_UNDER_DECISION, `the community sheet is ${css} B gzip, more than the ${COMMUNITY_SHEET_UNDER_DECISION} B the owner is asked to accept (DECISIONS row 270): cut a rule, or ask again`);
+  assert.ok(js <= COMMUNITY_SCOPE_JS_UNDER_DECISION, `the community scope module is ${js} B gzip without the letters of other chunks, more than the ${COMMUNITY_SCOPE_JS_UNDER_DECISION} B the owner is asked to accept (DECISIONS row 270)`);
 });
 
 test('the stylesheets stay under their budget', async () => {

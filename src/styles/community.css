@@ -528,43 +528,27 @@
   font-weight: 700;
 }
 
-/* TabStrip with the gold underline: 3px, round ends, as wide as the words of
-   the label plus 12px on each side (tokens.md §6 #7), on the 1px baseline
-   (IMG_8468); a long label wraps on a narrow phone instead of widening the
-   page. The baseline, the label box and the line draw with utilities the app
-   already ships (kit/controls.tsx); the sheet says what they cannot. The
-   label box (`.cm-tab-label`) takes the block padding of the tab and FILLS
-   ITS HEIGHT (the tab and the house span stretch it, the label centres its
-   words), so its bottom edge is the bottom edge of the tab whatever the
-   other tab holds: when one label wraps, both tabs grow, and the line under
-   the one-line label stays on the baseline (a centred label left it 10.7px
-   above, and the line hopped as it travelled). The label measures where its
-   words are (`--cm-tab-left`, `--cm-tab-right`, 0 until it has), and the tab
-   keeps 12px of inline padding, so the line never leaves its tab. */
+/* TabStrip with the gold underline: 3px, round ends, across the chosen tab
+   less 16px on each side (tokens.md §6 #7; IMG_8468, IMG_8475, IMG_8483 draw
+   146.5px in a tab of about 178px at 390, B1FIX-R3-FID-1), on the 1px
+   baseline; a long label wraps on a narrow phone instead of widening the
+   page. The baseline and the line draw with utilities the app already ships
+   (kit/controls.tsx: `inset-x-4` on the tab, which is the positioned box);
+   the sheet says what they cannot. The tab keeps the house block padding and
+   12px of inline room (where a label wraps is as it was), and it centres its
+   words: when one label wraps, both tabs grow, and the line stays on the
+   bottom edge of each, the baseline. */
 [data-surface='community'] .cm-tabs [data-tab] {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
   min-width: 0;
-  padding-block: 0;
   padding-inline: 12px;
   font-size: 0.9375rem;
   white-space: normal;
 }
-[data-surface='community'] .cm-tabs [data-tab] > span:not([data-tab-indicator]) {
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-}
 [data-surface='community'] .cm-tabs [data-tab-active] {
   font-weight: 700;
-}
-[data-surface='community'] .cm-tab-label {
-  padding-block: 12px;
-}
-[data-surface='community'] .cm-tab-line {
-  left: calc(var(--cm-tab-left, 0px) - 12px);
-  right: calc(var(--cm-tab-right, 0px) - 12px);
 }
 
 /* Switch: ON is the sand fill with the ink knob; the knob place is the

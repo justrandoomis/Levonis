@@ -6,8 +6,8 @@
  * (src/styles/community.css, the one sheet of the whole kit) and the
  * utilities the app already ships:
  *
- *   UnderlineTabs   the 3px gold underline under a gold label, as wide as
- *                   the label plus 12px on each side (tokens.md §6 #7)
+ *   UnderlineTabs   the 3px gold underline under a gold label, across its
+ *                   tab less 16px on each side (tokens.md §6 #7)
  *   SegmentedTrack  a raised track whose thumb is the sand selection (D-3)
  *   Toggle          ON is the sand track with the ink knob (D-3)
  *   Stepper         a well holding the figure, two raised 56px keys
@@ -19,7 +19,7 @@
  * The selection is never colour alone: the aria state, plus a thumb, a knob
  * place, a check badge or the chosen value written in the chip.
  */
-import React, { useLayoutEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import { motion } from 'motion/react';
 import { Check, ChevronDown, X } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
@@ -33,54 +33,20 @@ import FilterChip from '../FilterChip';
 import { KitIconButton } from './buttons';
 import { useKitStrings } from './strings';
 
-export type UnderlineTabsProps = Omit<TabStripProps, 'indicatorClassName' | 'activeClassName' | 'idleClassName'>;
-
-/**
- * A tab label that knows where its words are. A long label wraps on a narrow
- * phone, and then its box is as wide as the tab while its lines are not; so
- * the label measures the box its words take (the range of its text and badge,
- * every line) and hands it to the line as two insets (`--cm-tab-left`,
- * `--cm-tab-right`), again whenever it resizes. Every label measures, chosen
- * or not, so the line that travels to a tab finds its place already set.
- */
-function UnderlineLabel({ children, line }: { children: React.ReactNode; line: React.ReactNode }) {
-  const ref = useRef<HTMLSpanElement | null>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const measure = () => {
-      const words = document.createRange();
-      const last = el.lastChild;
-      words.setStart(el, 0);
-      words.setEnd(el, el.childNodes.length - (last instanceof Element && last.hasAttribute('data-tab-line') ? 1 : 0));
-      const at = words.getBoundingClientRect();
-      const box = el.getBoundingClientRect();
-      if (!at.width) return;
-      el.style.setProperty('--cm-tab-left', `${at.left - box.left}px`);
-      el.style.setProperty('--cm-tab-right', `${box.right - at.right}px`);
-    };
-    measure();
-    const watch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
-    watch?.observe(el);
-    void document.fonts?.ready.then(measure);
-    return () => watch?.disconnect();
-  }, [children]);
-  return (
-    <span ref={ref} className="cm-tab-label relative inline-flex items-center gap-1.5">
-      {children}
-      {line}
-    </span>
-  );
-}
+/** A two-tab strip that fills its row: the tabs share the width, as the references draw them. */
+export type UnderlineTabsProps = Omit<TabStripProps, 'indicatorClassName' | 'activeClassName' | 'idleClassName' | 'fill'>;
 
 /**
  * «طلبات المجتمع / طلباتي»: tabs on the canvas, the gold label and underline.
- * The house strip draws its indicator across the whole tab; the reference
- * draws it under the label, 12px past its words on each side (IMG_8468,
- * IMG_8462). So the underline here lives inside the label (`UnderlineLabel`),
- * and the house indicator is not drawn. It is still ONE element per strip
- * that travels from tab to tab (`layoutId`, the spring of the house strip)
- * and jumps under reduced motion.
+ * The references draw the line across the chosen tab less 16px on each side
+ * (IMG_8468, IMG_8475, IMG_8483: 146.5px under a 71px label in a tab of
+ * about 178px at 390), not the whole tab as the house indicator does, and
+ * not the label plus a margin (B1FIX-R3-FID-1). So the house indicator is
+ * not drawn, and the line is drawn on the tab itself (`inset-x-4`, the tab
+ * the nearest positioned box), with no measuring of the words; the label is
+ * centred in the tab, so the line is centred under it. It is still ONE
+ * element per strip that travels from tab to tab (`layoutId`, the spring of
+ * the house strip) and jumps under reduced motion.
  */
 export function UnderlineTabs({ className = '', items, value, group, ...rest }: UnderlineTabsProps) {
   const m = useMotion();
@@ -93,22 +59,19 @@ export function UnderlineTabs({ className = '', items, value, group, ...rest }: 
         ...t,
         badge: undefined,
         label: (
-          <UnderlineLabel
-            line={
-              t.id === value && (
-                <motion.span
-                  layoutId={`cm-tab-line-${group}`}
-                  aria-hidden="true"
-                  data-tab-line
-                  className="cm-tab-line absolute bottom-0 h-[3px] rounded-full bg-gold"
-                  transition={m.reduced ? { duration: 0 } : m.spring('move')}
-                />
-              )
-            }
-          >
+          <>
             {t.label}
             {t.badge}
-          </UnderlineLabel>
+            {t.id === value && (
+              <motion.span
+                layoutId={`cm-tab-line-${group}`}
+                aria-hidden="true"
+                data-tab-line
+                className="cm-tab-line absolute inset-x-4 bottom-0 h-[3px] rounded-full bg-gold"
+                transition={m.reduced ? { duration: 0 } : m.spring('move')}
+              />
+            )}
+          </>
         ),
       }))}
       indicatorClassName="hidden"
@@ -284,8 +247,12 @@ export interface FilterSelectProps {
 /**
  * A filter chip that opens its options. At rest it says the filter («الحالة
  * ⌄»); once a value is chosen it says the value in the sand fill, and a ×
- * beside it clears it. The options are radio items (`menuitemradio`, the
- * chosen one `aria-checked`), and the chosen row also says «محدد».
+ * beside it clears it. The options are house menu items; the chosen row
+ * wears the check and says «محدد» in its name. The radio role
+ * (`menuitemradio`, the chosen one `aria-checked`) needs a field in
+ * ui/Menu.tsx, the menu every merchant screen loads, so it lands with the
+ * first page that renders a FilterSelect and not before
+ * (B1FIX-R3-REG-2; tests/communityScope.test.ts holds that page to it).
  */
 export function FilterSelect({ label, icon, options, value, onChange, className = '' }: FilterSelectProps) {
   const s = useKitStrings();
@@ -299,7 +266,6 @@ export function FilterSelect({ label, icon, options, value, onChange, className 
           id: o.id,
           label: o.label,
           icon: o.id === value ? <Check className="h-4 w-4" /> : <span className="block h-4 w-4" />,
-          radio: { role: 'menuitemradio', 'aria-checked': o.id === value },
           hint: o.id === value ? s.selected : undefined,
           onSelect: () => onChange(o.id),
         }))}
