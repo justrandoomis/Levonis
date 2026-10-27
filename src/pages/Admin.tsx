@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat, Gift, Calculator, ShieldAlert } from 'lucide-react';
+import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat, Gift, Calculator, ShieldAlert, Palette } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { supportTotal, useSupportCounts } from '../components/adminSupport/supportCounts';
 import { useServicesBadge } from '../components/adminTradeIn/servicesBadge';
@@ -128,6 +128,14 @@ const AdminTradeIn = React.lazy(() => import('../components/adminTradeIn/AdminTr
 const AdminPriceProtection = React.lazy(() => import('../components/adminPriceProtection/AdminPriceProtection'));
 // «الأمان» (DECISIONS row 206): decoys, blocks and the security log — the verified owner's alone.
 const AdminSecurity = React.lazy(() => import('../components/adminSecurity/AdminSecurity'));
+/**
+ * «الاستوديو الإبداعي» (docs/CREATIVE_STUDIO.md). The studio is a full-screen
+ * route of its own (/admin/creative-studio, src/App.tsx); this tab is a small
+ * launcher for it, because the entries of the sidebar are tabs (switched through
+ * the unsaved-work guard, kept in `?tab=`) and navigating away on select
+ * would be the one entry that behaves differently.
+ */
+const StudioLauncher = React.lazy(() => import('../components/creativeStudio/StudioLauncher'));
 
 /**
  * What a tab shows while its chunk arrives. Deliberately the panel's own empty
@@ -181,7 +189,8 @@ type AdminTab =
   | 'delivery'
   | 'community'
   | 'printer_farm'
-  | 'security';
+  | 'security'
+  | 'creative_studio';
 
 
 /**
@@ -274,6 +283,12 @@ export default function Admin() {
   const canReviewKyc = user?.can_review_kyc === true;
   /** «استيراد Bambu Lab»: the verified owner only, as the API (requireOwner) and «الأمان». */
   const canSeeCatalogImport = canSeeSecurity;
+  /**
+   * «الاستوديو الإبداعي»: the owner and full-scope admins (docs/CREATIVE_STUDIO.md §1).
+   * An assistant admin is refused by every studio route (403 CREATIVE_SCOPE_REQUIRED),
+   * so the entry is hidden from them; the server decides regardless.
+   */
+  const canUseStudio = user?.isAdmin === true && user?.admin_scope !== 'assistant';
 
   /** People waiting in the support console, for the sidebar badge. */
   const supportWaiting = supportTotal(useSupportCounts());
@@ -319,6 +334,9 @@ export default function Admin() {
     { id: 'coupons', icon: Ticket, label: loc('أكواد الخصم', 'Promo codes', 'کۆدەکانی داشکاندن'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
     { id: 'offers', icon: PercentIcon, label: loc('العروض الخاصة', 'Special offers', 'ئۆفەرە تایبەتەکان'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
     { id: 'ads', icon: Megaphone, label: loc('الإعلانات والنصوص', 'Ads & texts', 'ڕیکلام و دەقەکان'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
+    ...(canUseStudio
+      ? [{ id: 'creative_studio', icon: Palette, label: loc('الاستوديو الإبداعي', 'Creative Studio', 'ستۆدیۆی داهێنەرانە'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') }]
+      : []),
     /* The word «الدعم» exists in this sidebar now, and it is first in the
        Administration group because answering a waiting customer outranks every
        other administrative errand under it. The Kurdish label is the queue's
@@ -497,6 +515,8 @@ export default function Admin() {
         {activeTab === 'community' && <AdminCommunity dir={dir} />}
 
         {activeTab === 'printer_farm' && <AdminFarmConfig />}
+
+        {activeTab === 'creative_studio' && canUseStudio && <StudioLauncher />}
         </React.Suspense>
       </div>
     </DashboardLayout>

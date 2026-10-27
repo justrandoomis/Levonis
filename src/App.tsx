@@ -84,6 +84,8 @@ const RunningCommunityOrders = React.lazy(() =>
   import('./pages/Requests').then((m) => ({ default: m.RunningCommunityOrders }))
 );
 const Admin = React.lazy(() => import('./pages/Admin'));
+// «استوديو Levonis الإبداعي»: a full-screen admin route (the canvas needs the viewport); Konva and its fonts load only here.
+const CreativeStudio = React.lazy(() => import('./pages/CreativeStudio'));
 const LegacyInvestmentRedirect = React.lazy(() => import('./pages/LegacyInvestmentRedirect'));
 const Earnings = React.lazy(() => import('./pages/Earnings'));
 const Warranty = React.lazy(() => import('./pages/Warranty'));
@@ -830,6 +832,7 @@ function AppContent() {
           <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+            <Route path="/admin/creative-studio" element={<AdminRoute><CreativeStudio /></AdminRoute>} />
           <Route path="/invest" element={<ProtectedRoute><LegacyInvestmentRedirect /></ProtectedRoute>} />
           <Route path="/earnings" element={<ProtectedRoute><Earnings /></ProtectedRoute>} />
           <Route path="/admin/invest" element={<ProtectedRoute><LegacyInvestmentRedirect admin /></ProtectedRoute>} />

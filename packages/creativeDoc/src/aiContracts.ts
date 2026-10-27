@@ -353,7 +353,8 @@ export function validateEditPatch(raw: unknown, ctx: PatchContext): PatchVerdict
   if (bad) return { ok: false, code: 'text_refused', detail: bad };
   if (!operations.length) return { ok: true, patch, applied: null };
   const applied = applyOps(ctx.doc, operations, { ...ctx.ops, actor: 'ai' });
-  if (!applied.ok) return { ok: false, code: 'ops_refused', detail: applied.refusals };
+  // `=== false`, not `!`: src/ (a non-strict tsconfig) compiles this file too, and only a literal comparison narrows the union there.
+  if (applied.ok === false) return { ok: false, code: 'ops_refused', detail: applied.refusals };
   return { ok: true, patch, applied };
 }
 
