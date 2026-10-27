@@ -909,7 +909,11 @@ function streamingFetch(input: string | URL | Request, init: RequestInit = {}): 
   if (url.hostname !== '127.0.0.1') return Promise.reject(new Error(`the test transport only dials loopback, not ${url.host}`));
   const aborted = () => new DOMException('This operation was aborted', 'AbortError');
   return new Promise<Response>((resolve, reject) => {
-    const req = http.request(url, { method: init.method ?? 'GET', headers: Object.fromEntries(new Headers(init.headers)) }, (res) => {
+    const outgoing: Record<string, string> = {};
+    new Headers(init.headers).forEach((value, name) => {
+      outgoing[name] = value;
+    });
+    const req = http.request(url, { method: init.method ?? 'GET', headers: outgoing }, (res) => {
       let settled = false;
       const body = new ReadableStream<Uint8Array>({
         start(c) {
@@ -1462,9 +1466,9 @@ test('finding 1 (agent): the 3MF guard — carriers refused however they are nam
   assert.ok(same.ok && same.bytes === clean && same.removed.length === 0);
   // A streamed archive (data descriptors) is rewritten with its sizes in the local headers.
   const streamed = await streamedZip({ '3D/3dmodel.model': '<model/>', 'Metadata/Slic3r_PE.config': EMBEDDED_CONFIG });
-  assert.ok(streamed.readUInt16LE(6) & 0x8, 'precondition: the source writes data descriptors');
+  assert.ok((streamed[6]! | (streamed[7]! << 8)) & 0x8, 'precondition: the source writes data descriptors');
   const rewritten = zipWithout(streamed, new Set(['Metadata/Slic3r_PE.config']));
-  assert.equal(rewritten.readUInt16LE(6) & 0x8, 0);
+  assert.equal((rewritten[6]! | (rewritten[7]! << 8)) & 0x8, 0);
   assert.deepEqual(Object.keys(unzipSync(rewritten)), ['3D/3dmodel.model']);
   assert.equal(readZip(rewritten).read('3D/3dmodel.model')!.toString(), '<model/>');
   // What this reader cannot read is refused, never passed on: the slicer may read what it cannot.
