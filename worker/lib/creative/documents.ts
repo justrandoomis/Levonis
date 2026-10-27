@@ -57,6 +57,7 @@ import { HttpError, badRequest, notFound } from '../http';
 import { likePattern, sqlLikeClause } from '../sqlLike';
 import { brandForDocument } from './brandStore';
 import { approvedClaims } from './claims';
+import { watchEvidence } from './evidence';
 import { intOrNull, jsonObject, namesOf, nowIso, stringList } from './db';
 import { getSnapshots } from './snapshots';
 import { buildSnapshotData } from './store';
@@ -650,6 +651,13 @@ export interface Verification {
   brand: BrandKit;
   /** A bound product has a live PUBLIC offer in the store NOW (fresh data, never the bound snapshot). */
   offerLive: boolean;
+  /**
+   * Documented arrival / back-in-stock for the bound products (the catalogue
+   * watch's recent events), so the checks can judge those words in free text.
+   * Absent when the watch could not be read: the checks then report the claim
+   * check as skipped rather than guess.
+   */
+  claimEvidence?: { arrival: boolean; backInStock: boolean };
 }
 
 /** Does the design show a bound price / availability? (A change to a field it does not show does not block.) */
@@ -681,11 +689,12 @@ export async function verifyDocument(db: D1Database, doc: CreativeDocument): Pro
   const claimsMap = await approvedClaims(db, doc.services.map((s) => s.claim_id));
   const claims: Record<string, ClaimState> = {};
   for (const [id, c] of claimsMap) claims[id] = c;
-  return { snapshots, changes, blocking, claims, brand: await brandForDocument(db, doc.brand_version), offerLive };
+  const claimEvidence = await watchEvidence(db, doc.products.map((p) => p.product_id)).catch(() => undefined);
+  return { snapshots, changes, blocking, claims, brand: await brandForDocument(db, doc.brand_version), offerLive, ...(claimEvidence ? { claimEvidence } : {}) };
 }
 
 export function serverReport(doc: CreativeDocument, v: Verification, final: boolean): QualityReport {
-  return qualityReport(doc, { brand: v.brand, snapshots: v.snapshots, claims: v.claims, verification: v.changes, final, now: nowIso() });
+  return qualityReport(doc, { brand: v.brand, snapshots: v.snapshots, claims: v.claims, verification: v.changes, ...(v.claimEvidence ? { claimEvidence: v.claimEvidence } : {}), final, now: nowIso() });
 }
 
 /**

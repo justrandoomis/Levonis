@@ -30,6 +30,7 @@ import { approximateMeasurer } from '../packages/creativeDoc/src/text';
 import { storeEvidence, watchEvidence } from '../worker/lib/creative/evidence';
 import { jpegOrientation, sniffStudioImage } from '../worker/lib/creative/files';
 import { layerForModel } from '../worker/lib/creative/prompts';
+import { TEMPLATES } from '../packages/creativeDoc/src/templates';
 
 let restore: (() => void) | null = null;
 afterEach(() => {
@@ -151,8 +152,8 @@ test('editor-9 / model-9 / spec-12: the edit prompt offers the template\'s own v
   const res = await post(app, `${BASE}/ai/edit`, { document_id: doc.id, base_version: 1, instruction: 'غيّر نص الزر', scope_ids: ['cta_group'], annotations, idempotency_key: 'edit-prompt-geom-01' });
   assert.equal(res.status, 200, JSON.stringify(await res.clone().json()));
 
-  // editor-9: product_hero has no headline_first.
-  assert.deepEqual(sentBlock(stub, 'allowed').variants, ['product_first', 'price_first', 'feature_first']);
+  // editor-9: exactly the variants product_hero has — not a fixed list.
+  assert.deepEqual(sentBlock(stub, 'allowed').variants, Object.keys(TEMPLATES.product_hero.variants));
   // model-9: the chip's words live in a child of the group the owner tapped.
   assert.match(sentText(stub), /Only these selected layers may be targets: cta_group, cta_chip, cta\./);
   const shown = (sentBlock(stub, 'document').layers as Array<{ id: string }>).map((l) => l.id);
