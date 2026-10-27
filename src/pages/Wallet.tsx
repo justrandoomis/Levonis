@@ -88,6 +88,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     orderQuickBuy: 'شراء سريع',
     orderGift: 'هدية',
     rateRebase: 'تحويل الرصيد إلى سعر الصرف الرسمي — قيمته بالدينار كما هي',
+    printCloudPayment: 'دفع طلب الطباعة السحابية من Levonis',
+    printCloudRefund: 'استرداد لطلب الطباعة السحابية من Levonis',
     addFunds: 'إضافة رصيد',
     withdraw: 'سحب رصيد',
     activity: 'العمليات',
@@ -206,6 +208,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     orderQuickBuy: 'Quick Buy',
     orderGift: 'Gift',
     rateRebase: 'Balance moved to the official exchange rate — its dinar value unchanged',
+    printCloudPayment: 'Levonis Print Cloud order payment',
+    printCloudRefund: 'Levonis Print Cloud order refund',
     addFunds: 'Add funds',
     withdraw: 'Withdraw',
     activity: 'Operations',
@@ -324,6 +328,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     orderQuickBuy: 'کڕینی خێرا',
     orderGift: 'دیاری',
     rateRebase: 'باڵانس گوازرایەوە بۆ نرخی فەرمیی ئاڵوگۆڕ — بەهاکەی بە دینار وەک خۆیەتی',
+    printCloudPayment: 'پارەدانی داواکاریی چاپی هەوریی Levonis',
+    printCloudRefund: 'گەڕاندنەوەی پارەی داواکاریی چاپی هەوریی Levonis',
     addFunds: 'زیادکردنی باڵانس',
     withdraw: 'کێشانەوە',
     activity: 'کردارەکان',
@@ -1319,7 +1325,16 @@ export default function Wallet() {
                         </div>
                         <div className="min-w-0">
                           <h3 className="text-text-primary font-bold text-[14px] truncate">
-                            {tx?.ref === 'RATE_REBASE' ? s.rateRebase : tx?.note || (isDeposit ? s.filterDeposit : s.filterWithdrawal)}
+                            {/* System rows named in the reader's language: the rate move, and Print Cloud's
+                                order debits and refund credits (ids `wtx_pc_…`, worker/lib/printCloud/wallet.ts),
+                                whose ledger note is English. */}
+                            {tx?.ref === 'RATE_REBASE'
+                              ? s.rateRebase
+                              : tx?.id.startsWith('wtx_pc_')
+                                ? tx.type === 'deposit'
+                                  ? s.printCloudRefund
+                                  : s.printCloudPayment
+                                : tx?.note || (isDeposit ? s.filterDeposit : s.filterWithdrawal)}
                           </h3>
                           <div className="text-text-secondary text-[11px] mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span dir="ltr">{tx?.number ?? w?.number}</span>
