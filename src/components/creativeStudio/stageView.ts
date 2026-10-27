@@ -36,7 +36,7 @@
  * and the owner’s annotations (notes). Export renders the content layer
  * alone, at exactly the document’s size.
  */
-import { knockedOut } from './media';
+import { adjustedPicture, knockedOut } from './media';
 import Konva from 'konva/lib/Core';
 import { Text as KText } from 'konva/lib/shapes/Text';
 import { Image as KImage } from 'konva/lib/shapes/Image';
@@ -255,10 +255,17 @@ export class StageView {
     } else if (l.type === 'image') {
       // A product picture whose white backdrop the template knocks out is drawn from its processed copy (the file is never changed).
       const ko = img && l.knockout === 'white' ? knockedOut(img) : null;
-      if (ko) {
-        group.add(new KImage({ name: 'image', image: ko.canvas, listening: false, ...imageFit(l.natural, l.crop, { width: ko.canvas.width, height: ko.canvas.height }, box) }));
-      } else if (img) {
-        group.add(new KImage({ name: 'image', image: img, listening: false, ...imageFit(l.natural, l.crop, { width: img.naturalWidth, height: img.naturalHeight }, box) }));
+      const base = ko ? ko.canvas : img;
+      if (base) {
+        // Colour adjustments only (adjustedPicture): the drawn box, outline and ratio are the picture's own.
+        const drawn = adjustedPicture(base, l.adjust) ?? base;
+        const decoded = drawn instanceof HTMLImageElement ? { width: drawn.naturalWidth, height: drawn.naturalHeight } : { width: drawn.width, height: drawn.height };
+        const glow = l.adjust?.glow ?? 0;
+        group.add(new KImage({
+          name: 'image', image: drawn, listening: false, ...imageFit(l.natural, l.crop, decoded, box),
+          // The gold rim light: the canvas shadow of the picture's own outline, behind it.
+          ...(glow > 0 ? { shadowColor: '#e3b660', shadowBlur: Math.max(4, Math.min(box.width, box.height) * 0.06 * glow), shadowOpacity: Math.min(1, 0.35 + glow * 0.6), shadowOffsetX: 0, shadowOffsetY: 0 } : {}),
+        }));
       } else {
         // Not decoded (yet, or at all): an honest empty frame, never another picture.
         group.add(new KRect({ name: 'pending', width: box.width, height: box.height, stroke: 'rgba(160,160,160,0.7)', dash: [8, 6], strokeWidth: 2, strokeScaleEnabled: false, listening: false }));

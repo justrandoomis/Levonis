@@ -755,6 +755,8 @@ export function buildFromTemplate(input: BuildInput): BuildResult {
 
 const GOLD: Gradient = { kind: 'linear', angle: 90, stops: [{ at: 0, color: '#fbe7ae', opacity: 1 }, { at: 0.5, color: '#e3b660', opacity: 1 }, { at: 1, color: '#b07f2c', opacity: 1 }] };
 const GOLD_LINE = '#d9a64c';
+/** The house look's default picture adjustment: a touch brighter and crisper, warmed toward the gold, with a gold rim light. */
+export const HOUSE_ADJUST = Object.freeze({ brightness: 0.03, contrast: 0.08, warmth: 0.25, glow: 0.45 });
 
 /**
  * The owner's reference post as a template: everything but the picture, the
@@ -934,7 +936,7 @@ function buildHouse(input: BuildInput, templateId: TemplateId, templateVersion: 
     relations.push({ id: 'r_shadow', kind: 'shadow_of', subject: 'product_shadow', target: 'product' });
     layers.push({
       ...base, id: 'product', name: 'Product', role: 'product', type: 'image', x: box.x, y: box.y, asset: { kind: 'product', ref: img.url, slot: 'main' },
-      natural: { width: img.width, height: img.height }, crop, scale, fit: crop ? 'detail' : 'whole', knockout: 'white',
+      natural: { width: img.width, height: img.height }, crop, scale, fit: crop ? 'detail' : 'whole', knockout: 'white', adjust: { ...HOUSE_ADJUST },
     });
   }
 
@@ -1310,6 +1312,8 @@ export function rebuild(doc: CreativeDocument, change: { format?: DocFormat; var
     if (!old || l.role === 'background') return l;
     let next: Layer = l;
     if (next.type === 'text' && old.type === 'text' && old.color !== next.color && inPalette(ctx.brand, old.color)) next = { ...next, color: old.color };
+    // A person's picture adjustment stays with the picture.
+    if (next.type === 'image' && old.type === 'image' && old.adjust !== undefined && old.asset.ref === next.asset.ref) next = { ...next, adjust: old.adjust };
     if (next.type === 'shape' && old.type === 'shape' && next.role !== 'product_shadow' && old.fill && old.fill !== next.fill && inPalette(ctx.brand, old.fill)) next = { ...next, fill: old.fill };
     return old.locked && !next.locked ? { ...next, locked: true } : next;
   });

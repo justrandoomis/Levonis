@@ -149,3 +149,25 @@ test('a chat answer with a price or a link is refused; an idea that fails or nam
     assert.equal(ok.dropped, 2);
   }
 });
+
+test('the house picture is adjusted by default (colour and light only), and a person changes it with one operation', () => {
+  const r = house();
+  const img = r.doc.layers.find((l) => l.id === 'product');
+  assert.ok(img && img.type === 'image' && img.adjust && img.adjust.warmth > 0 && img.adjust.glow > 0);
+  const before = img && img.type === 'image' ? { scale: img.scale, crop: img.crop, natural: img.natural } : null;
+  const ctx = { actor: 'human' as const, brand: kit, allowed: allowedFor(live()) };
+  const out = applyOps(r.doc, [{ op: 'set_picture_adjust', layer_id: 'product', adjust: { brightness: 0.1, contrast: -0.1, warmth: 0.6, glow: 0 }, knockout: null }], ctx);
+  assert.ok(out.ok);
+  if (out.ok) {
+    const after = out.doc.layers.find((l) => l.id === 'product');
+    assert.ok(after && after.type === 'image');
+    if (after && after.type === 'image') {
+      assert.deepEqual(after.adjust, { brightness: 0.1, contrast: -0.1, warmth: 0.6, glow: 0 });
+      assert.equal(after.knockout, null);
+      assert.deepEqual({ scale: after.scale, crop: after.crop, natural: after.natural }, before, 'shape, size and ratio untouched');
+    }
+  }
+  assert.equal(applyOps(r.doc, [{ op: 'set_picture_adjust', layer_id: 'logo', adjust: null, knockout: null }], ctx).ok, false);
+  assert.equal(applyOps(r.doc, [{ op: 'set_picture_adjust', layer_id: 'product', adjust: { brightness: 3, contrast: 0, warmth: 0, glow: 0 }, knockout: null }], ctx).ok, false);
+  assert.equal(applyOps(r.doc, [{ op: 'set_picture_adjust', layer_id: 'product', adjust: null, knockout: null }], { ...ctx, actor: 'ai' }).ok, false, 'people only');
+});

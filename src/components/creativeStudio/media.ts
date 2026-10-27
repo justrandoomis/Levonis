@@ -15,7 +15,7 @@
  * same-origin path is refused here, before a request is made.
  */
 import { SITE_LOGO_VERSIONED_URL } from '../../lib/siteLogo';
-import type { AssetRef } from '../../../packages/creativeDoc/src/schema';
+import type { AssetRef, PictureAdjust } from '../../../packages/creativeDoc/src/schema';
 import type { TextMeasurer } from '../../../packages/creativeDoc/src/text';
 import { knockoutWhite, type KnockoutResult } from '../../../packages/creativeDoc/src/knockout';
 import { assetFileUrl } from './client';
@@ -195,4 +195,53 @@ export function knockoutBounds(url: string, recorded: { width: number; height: n
     img.onerror = () => resolve(null);
     img.src = url;
   });
+}
+
+const adjusted = new WeakMap<HTMLImageElement | HTMLCanvasElement, Map<string, HTMLCanvasElement>>();
+
+/**
+ * A picture with its colour adjustments applied (brightness, contrast, warmth toward the gold palette),
+ * once per picture and setting. Pixels only change colour: the size, the outline and the ratio stay.
+ * Null when there is nothing to change or the pixels cannot be read.
+ */
+export function adjustedPicture(src: HTMLImageElement | HTMLCanvasElement, a: PictureAdjust | null | undefined): HTMLCanvasElement | null {
+  if (!a || (!a.brightness && !a.contrast && !a.warmth) || typeof document === 'undefined') return null;
+  const key = `${a.brightness}|${a.contrast}|${a.warmth}`;
+  let bySetting = adjusted.get(src);
+  const hit = bySetting?.get(key);
+  if (hit) return hit;
+  const w = src instanceof HTMLImageElement ? src.naturalWidth : src.width;
+  const h = src instanceof HTMLImageElement ? src.naturalHeight : src.height;
+  if (!w || !h) return null;
+  const k = Math.min(1, KNOCKOUT_MAX / Math.max(w, h));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(w * k));
+  canvas.height = Math.max(1, Math.round(h * k));
+  const g = canvas.getContext('2d', { willReadFrequently: true });
+  if (!g) return null;
+  g.drawImage(src, 0, 0, canvas.width, canvas.height);
+  let data: ImageData;
+  try {
+    data = g.getImageData(0, 0, canvas.width, canvas.height);
+  } catch {
+    return null;
+  }
+  const px = data.data;
+  const c = 1 + a.contrast;
+  const b = a.brightness * 255;
+  // Warmth multiplies the channels toward the house gold (#e3b660): more red, a little more green, less blue.
+  const wr = 1 + 0.12 * a.warmth, wg = 1 + 0.04 * a.warmth, wb = 1 - 0.16 * a.warmth;
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i + 3] === 0) continue;
+    px[i] = ((px[i] - 128) * c + 128 + b) * wr;
+    px[i + 1] = ((px[i + 1] - 128) * c + 128 + b) * wg;
+    px[i + 2] = ((px[i + 2] - 128) * c + 128 + b) * wb;
+  }
+  g.putImageData(data, 0, 0);
+  if (!bySetting) {
+    bySetting = new Map();
+    adjusted.set(src, bySetting);
+  }
+  bySetting.set(key, canvas);
+  return canvas;
 }

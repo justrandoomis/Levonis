@@ -13,7 +13,7 @@ import { Trash2 } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { Field, Input, Textarea } from '../../ui/Field';
 import { Segmented } from '../../ui/Segmented';
-import { layerBox, type ImageLayer, type Layer, type TextAlign } from '../../../../packages/creativeDoc/src/schema';
+import { layerBox, type ImageLayer, type Layer, type PictureAdjust, type TextAlign } from '../../../../packages/creativeDoc/src/schema';
 import type { EditorApi } from '../editorApi';
 import { lockedAround, topLevel } from '../editorModel';
 import { ROLE_TEXT, S, fill } from '../strings';
@@ -214,6 +214,51 @@ function TextProps({ api, layer }: { api: EditorApi; layer: Extract<Layer, { typ
   );
 }
 
+const NO_ADJUST: PictureAdjust = { brightness: 0, contrast: 0, warmth: 0, glow: 0 };
+
+/** A slider that commits once, when it is let go (one undo step per change). */
+function Slider({ label, value, min, max, onCommit }: { label: string; value: number; min: number; max: number; onCommit: (v: number) => void }) {
+  const [v, setV] = useState(value);
+  useEffect(() => setV(value), [value]);
+  const commit = () => { if (v !== value) onCommit(v); };
+  return (
+    <label className="flex flex-col gap-1 text-[13px] text-text-secondary">
+      <span className="flex justify-between"><span>{label}</span><span className="tabular-nums" dir="ltr">{Math.round(v * 100)}</span></span>
+      <input type="range" min={min} max={max} step={0.01} value={v} onChange={(e) => setV(Number(e.target.value))} onPointerUp={commit} onKeyUp={commit} onBlur={commit} />
+    </label>
+  );
+}
+
+/** The product picture on a dark template: background removal and colour/light only — never its shape or ratio. */
+function PictureAdjustFields({ api, layer }: { api: EditorApi; layer: ImageLayer }) {
+  const { w } = useText();
+  const a = layer.adjust ?? NO_ADJUST;
+  const knockout = layer.knockout === 'white' ? 'white' as const : null;
+  const set = (next: Partial<PictureAdjust>, ko: 'white' | null = knockout) => api.apply([{ op: 'set_picture_adjust', layer_id: layer.id, adjust: { ...a, ...next }, knockout: ko }]);
+  const shadow = api.doc.layers.find((l) => l.role === 'product_shadow' && l.type === 'shape' && (l.id === 'product_shadow' ? layer.id === 'product' : l.id === `product_shadow_${layer.asset.slot}`));
+  return (
+    <fieldset className="flex flex-col gap-2" data-picture-adjust>
+      <legend className="mb-1 text-[13px] font-semibold text-text-secondary">{w(S.propPictureAdjust)}</legend>
+      <p className="text-xs text-text-muted">{w(S.propPictureAdjustHint)}</p>
+      <label className="flex items-center gap-2 text-[13px] text-text-secondary">
+        <input type="checkbox" checked={knockout === 'white'} onChange={(e) => set({}, e.target.checked ? 'white' : null)} data-adjust-knockout />
+        {w(S.propKnockout)}
+      </label>
+      <Slider label={w(S.propBrightness)} value={a.brightness} min={-0.5} max={0.5} onCommit={(v) => set({ brightness: v })} />
+      <Slider label={w(S.propContrast)} value={a.contrast} min={-0.5} max={0.5} onCommit={(v) => set({ contrast: v })} />
+      <Slider label={w(S.propWarmth)} value={a.warmth} min={0} max={1} onCommit={(v) => set({ warmth: v })} />
+      <Slider label={w(S.propGlow)} value={a.glow} min={0} max={1} onCommit={(v) => set({ glow: v })} />
+      {shadow ? (
+        <label className="flex items-center gap-2 text-[13px] text-text-secondary">
+          <input type="checkbox" checked={shadow.visible} onChange={(e) => api.apply([{ op: 'set_visibility', layer_id: shadow.id, visible: e.target.checked }])} />
+          {w(S.propContactShadow)}
+        </label>
+      ) : null}
+      {layer.adjust ? <Button size="sm" variant="ghost" onClick={() => api.apply([{ op: 'set_picture_adjust', layer_id: layer.id, adjust: null, knockout }])}>{w(S.propAdjustReset)}</Button> : null}
+    </fieldset>
+  );
+}
+
 function ImageProps({ api, layer }: { api: EditorApi; layer: ImageLayer }) {
   const { w } = useText();
   const slot = layer.asset.slot ?? 'main';
@@ -228,6 +273,7 @@ function ImageProps({ api, layer }: { api: EditorApi; layer: ImageLayer }) {
         hint={layer.role === 'product' ? w(S.propProductRatio) : undefined}
         onCommit={(scale) => scale > 0 && api.apply([{ op: 'scale_asset_uniform', layer_id: layer.id, factor: Math.min(20, Math.max(0.05, scale / layer.scale)), anchor: 'center' }])}
       />
+      {layer.asset.kind === 'product' ? <PictureAdjustFields api={api} layer={layer} /> : null}
       {pictures.length > 1 ? (
         <fieldset>
           <legend className="mb-1.5 text-[13px] font-semibold text-text-secondary">{w(S.propReplacePicture)}</legend>

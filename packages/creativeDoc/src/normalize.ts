@@ -24,7 +24,7 @@ import {
   VISUAL_PRIORITIES, formatOf, BRAND_TEXT_FIELDS, PRODUCT_TEXT_FIELDS, type Gradient,
   type Annotation, type AssetRef, type Corner, type CreativeDocument, type DocFormat, type FontWeight, type ImageLayer, type Layer,
   type LayerBase, type LayerRole, type ProductBinding, type Relation, type SafeArea, type ServiceBinding, type ShapeLayer,
-  type TextLayer, type TextSource,
+  type TextLayer, type TextSource, type PictureAdjust,
 } from './schema';
 import { cleanText } from './text';
 
@@ -230,7 +230,7 @@ function assetRef(ctx: Ctx, path: string, v: unknown): AssetRef | null {
 }
 
 function imageLayer(ctx: Ctx, path: string, src: Obj, b: LayerBase): ImageLayer | null {
-  ctx.keys(path, src, [...BASE_KEYS, 'asset', 'natural', 'crop', 'scale', 'fit', 'knockout']);
+  ctx.keys(path, src, [...BASE_KEYS, 'asset', 'natural', 'crop', 'scale', 'fit', 'knockout', 'adjust']);
   const asset = assetRef(ctx, `${path}.asset`, src.asset);
   if (!asset) return null;
   const n = isObj(src.natural) ? src.natural : {};
@@ -267,7 +267,26 @@ function imageLayer(ctx: Ctx, path: string, src: Obj, b: LayerBase): ImageLayer 
     crop,
     scale: ctx.num(`${path}.scale`, src.scale, 0.01, 40, 1),
     ...knockoutOf(ctx, path, src.knockout, asset),
+    ...adjustOf(ctx, path, src.adjust, asset),
     fit,
+  };
+}
+
+/** Colour adjustments of a product picture, clamped; anything else is dropped (reported). */
+function adjustOf(ctx: Ctx, path: string, v: unknown, asset: AssetRef): { adjust?: PictureAdjust | null } {
+  if (v === undefined) return {};
+  if (v === null) return { adjust: null };
+  if (!isObj(v) || asset.kind !== 'product') {
+    ctx.push(`${path}.adjust`, 'invalid_value');
+    return { adjust: null };
+  }
+  return {
+    adjust: {
+      brightness: ctx.num(`${path}.adjust.brightness`, v.brightness, -0.5, 0.5, 0),
+      contrast: ctx.num(`${path}.adjust.contrast`, v.contrast, -0.5, 0.5, 0),
+      warmth: ctx.num(`${path}.adjust.warmth`, v.warmth, 0, 1, 0),
+      glow: ctx.num(`${path}.adjust.glow`, v.glow, 0, 1, 0),
+    },
   };
 }
 

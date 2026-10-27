@@ -242,6 +242,20 @@ export interface ImageLayer extends LayerBase {
    * the stored picture is never changed). For catalogue photos on a dark template.
    */
   knockout?: 'white' | null;
+  /** Optional colour adjustments of a product picture (never its shape, size or ratio; nothing generated). */
+  adjust?: PictureAdjust | null;
+}
+
+/**
+ * Non-destructive picture adjustments, drawn by the renderer on the same-origin pixels:
+ * `brightness` and `contrast` −0.5…0.5, `warmth` 0…1 (a tint toward the gold palette),
+ * `glow` 0…1 (a gold rim light behind the picture's own outline).
+ */
+export interface PictureAdjust {
+  brightness: number;
+  contrast: number;
+  warmth: number;
+  glow: number;
 }
 
 export type ShapeKind = 'rect' | 'ellipse' | 'line';

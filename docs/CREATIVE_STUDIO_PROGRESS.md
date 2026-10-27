@@ -265,6 +265,13 @@ select would have been the one entry that behaves differently.
   detail shot). The fixed words are `source: {kind: 'brand'}` (`BRAND_TEXT`): the
   checks accept the site address because the app writes it, a changed one is
   reported, and nobody can retype it. `HOUSE_PALETTE` is part of the approved look.
+- Picture fit (owner, same day): product pictures carry optional non-destructive
+  `adjust` {brightness, contrast, warmth toward gold, glow} beside `knockout`; the
+  renderer changes colour only (`media.ts adjustedPicture`) and draws the gold rim
+  light as the canvas shadow of the picture's own outline — shape, size and ratio
+  never change, nothing is generated. The house look applies `HOUSE_ADJUST` by
+  default; the editor's properties panel has the knockout switch, four sliders, the
+  podium shadow switch and a reset (`set_picture_adjust`, people only).
 - Not done here: the grid has no house-look variant; the logo is drawn with its own
   black square; the e2e «leaving the editor asks first» check was already failing
   before these changes.

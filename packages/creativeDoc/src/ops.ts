@@ -33,7 +33,7 @@ import {
 import { normalizeDocument } from './normalize';
 import {
   FONT_REGISTRY, ID_PATTERN, isHexColor, layerBox, lockedAbove, lockedWithin, touchesLock, withDescendants, MAX_ALT_CHARS, MAX_CAPTION_CHARS, MAX_TEXT_CHARS, VISUAL_PRIORITIES, formatOf,
-  type AssetRef, type CreativeDocument, type DocFormat, type FormatId, type ImageLayer, type Layer, type TextAlign, type VisualPriority,
+  type AssetRef, type CreativeDocument, type DocFormat, type FormatId, type ImageLayer, type Layer, type PictureAdjust, type TextAlign, type VisualPriority,
 } from './schema';
 import { canonicalJson } from './snapshot';
 import { TEMPLATES, isTemplateId, isVariantId, type TemplateDef, type VariantId } from './templates';
@@ -67,6 +67,8 @@ export type EditOp =
   | { op: 'set_crop'; layer_id: string; crop: { x: number; y: number; width: number; height: number } | null }
   | { op: 'resize_box'; layer_id: string; width: number; height: number }
   | { op: 'rename_layer'; layer_id: string; name: string }
+  /** A product picture's colour adjustments and white-backdrop knockout (never its shape, size or ratio). */
+  | { op: 'set_picture_adjust'; layer_id: string; adjust: PictureAdjust | null; knockout: 'white' | null }
   // The owner's pointing marks (spec §17). People only, never exported, never a
   // design change — but still an operation, so they share undo, the one gate
   // (normalizeDocument) and the save path with every other edit.
@@ -80,7 +82,7 @@ export const AI_OPS: ReadonlySet<OpName> = new Set<OpName>([
   'replace_asset', 'apply_background_preset', 'set_visibility', 'reorder_layer', 'set_priority', 'switch_template_variant',
   'create_format_variant', 'set_caption', 'set_alt_text',
 ]);
-export const HUMAN_OPS: ReadonlySet<OpName> = new Set<OpName>([...AI_OPS, 'set_lock', 'rotate_layer', 'delete_layer', 'add_layer', 'set_crop', 'resize_box', 'rename_layer', 'add_annotation', 'delete_annotation']);
+export const HUMAN_OPS: ReadonlySet<OpName> = new Set<OpName>([...AI_OPS, 'set_lock', 'rotate_layer', 'delete_layer', 'add_layer', 'set_crop', 'resize_box', 'rename_layer', 'add_annotation', 'delete_annotation', 'set_picture_adjust']);
 /** Operations that re-lay the whole design from its template: the app performs them with `layout.rebuild`, alone in their patch. */
 export const REBUILD_OPS: ReadonlySet<OpName> = new Set<OpName>(['set_priority', 'switch_template_variant', 'create_format_variant']);
 /** Operations that act on a layer AND everything inside it (a group's children): refused while any of them is locked. */
@@ -170,6 +172,13 @@ export function parseOp(raw: unknown): EditOp | null {
       return { op: 'set_crop', layer_id: o.layer_id as string, crop: { x: c.x as number, y: c.y as number, width: c.width as number, height: c.height as number } };
     }
     case 'resize_box': return id('layer_id') && isNum(o.width, 1, COORD) && isNum(o.height, 1, COORD) ? { op: 'resize_box', layer_id: o.layer_id as string, width: o.width, height: o.height } : null;
+    case 'set_picture_adjust': {
+      if (!id('layer_id') || (o.knockout !== 'white' && o.knockout !== null)) return null;
+      if (o.adjust === null) return { op: 'set_picture_adjust', layer_id: o.layer_id as string, adjust: null, knockout: o.knockout as 'white' | null };
+      const a = o.adjust as Record<string, unknown> | undefined;
+      if (!a || !isNum(a.brightness, -0.5, 0.5) || !isNum(a.contrast, -0.5, 0.5) || !isNum(a.warmth, 0, 1) || !isNum(a.glow, 0, 1)) return null;
+      return { op: 'set_picture_adjust', layer_id: o.layer_id as string, adjust: { brightness: a.brightness as number, contrast: a.contrast as number, warmth: a.warmth as number, glow: a.glow as number }, knockout: o.knockout as 'white' | null };
+    }
     case 'rename_layer': return id('layer_id') && typeof o.name === 'string' ? { op: 'rename_layer', layer_id: o.layer_id as string, name: o.name } : null;
     case 'add_annotation': return o.annotation && typeof o.annotation === 'object' && !Array.isArray(o.annotation) ? { op: 'add_annotation', annotation: o.annotation } : null;
     case 'delete_annotation': return id('annotation_id') ? { op: 'delete_annotation', annotation_id: o.annotation_id as string } : null;
@@ -400,6 +409,9 @@ export function applyOps(input: CreativeDocument, rawOps: readonly unknown[], ct
       }
       case 'set_lock':
         return put({ ...layer!, locked: op.locked });
+      case 'set_picture_adjust':
+        if (layer!.type !== 'image' || layer!.asset.kind !== 'product') return refuse('wrong_layer_type', lid);
+        return put({ ...layer!, adjust: op.adjust, knockout: op.knockout });
       case 'rotate_layer':
         if (layer!.role === 'product' || layer!.role === 'background') return refuse('product_rotation', lid);
         if (layer!.type === 'group') return refuse('wrong_layer_type', lid);
