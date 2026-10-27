@@ -40,8 +40,7 @@ export default function WorksRail() {
   return (
     <section aria-labelledby="community-works-title" data-community-works className="mb-6">
       <h2 id="community-works-title" className="mb-3 text-[15px] font-bold text-text-primary">
-        {/* OWNER: Sorani to be written by hand. */}
-        {loc('من أعمال الورش', 'From the workshops')}
+        {loc('من أعمال الورش', 'From the workshops', 'لە کارەکانی وۆرکشۆپەکان')}
       </h2>
       <div ref={rail.ref} className="-mx-4 -my-2 flex snap-x gap-3 overflow-x-auto px-4 pt-2 pb-3 hide-scrollbar">
         {works.map((w) => (

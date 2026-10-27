@@ -1,29 +1,29 @@
 /**
  * «المتاجر» — the stores directory, a page at a time from
  * /api/community/merchants, searched on the server by the page `q`. Moved
- * out of src/pages/Community.tsx (community UI plan B4) so the home tab and
- * the section page /community/stores render the same list; C5 restyles it.
+ * out of src/pages/Community.tsx (community UI plan B4). The home tab of
+ * today renders it; the section page /community/stores renders the rebuilt
+ * directory (directory/StoresDirectory.tsx, community UI plan C5), so this
+ * file retires with the tab when the home lane (C1) sends `?tab=stores` to
+ * that page.
  *
- * Above the list, the viewer own place in the directory (YourStore) and the
- * works rail. «متابعة» answers at once and is put back if the server says
+ * Above the list, the viewer own place in the directory (directory/YourStore)
+ * and the works rail. «متابعة» answers at once and is put back if the server says
  * no; a guest is asked to sign in and brought back (DECISIONS row 89).
  */
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Plus, Store } from 'lucide-react';
+import { Store } from 'lucide-react';
 import { useAuth } from '../../../AuthContext';
-import { useLanguage } from '../../../LanguageContext';
 import { useSignInPrompt } from '../../../lib/guest';
 import { ApiError } from '../../../lib/api';
 import type { MerchantMe } from '../../../lib/merchant';
-import { merchantHref } from '../../../lib/merchantRoutes';
 import { EmptyState, ErrorState } from '../../ui/AsyncStates';
 import { toast } from '../../ui/Toast';
 import LoadMore from '../../listing/LoadMore';
-import { applicationCta, approvalReason } from '../../merchantApplication/approvalWords';
+import YourStore from '../directory/YourStore';
 import StoreCard from './StoreCard';
 import WorksRail from './WorksRail';
-import { StoreListSkeleton, StoreMark } from './parts';
+import { StoreListSkeleton } from './parts';
 import { NoResults, SearchLine } from './search';
 import { useHubStrings } from './strings';
 import { useCommunityFeed, type CommunityFeed } from './useCommunityFeed';
@@ -97,48 +97,5 @@ export default function StoresPanel({ q, viewer, me, onClear }: { q: string; vie
       {!q && <YourStore me={me} />}
       {body}
     </div>
-  );
-}
-
-/**
- * The viewer own place in the directory: their store, one tap from its
- * workspace, or the way to one. A member with no approval yet is shown the
- * MERCHANT APPLICATION whatever their plan: applying needs no PLUS (owner
- * decision C3). An approved member opens their store when their plan lets
- * them; an older server (no `approved` in its answer) keeps the plan gate.
- * Nothing for anyone else: a button to a door that will not open is the dead
- * control the mandate forbids (src/components/merchant/StoreCta.tsx).
- */
-function YourStore({ me }: { me: MerchantMe | null }) {
-  const { dir, loc } = useLanguage();
-  const s = useHubStrings();
-  if (!me) return null;
-  const applying = !me.store && me.approved === false;
-  if (!me.store && !applying && !me.eligible) return null;
-  const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight;
-  const to = me.store ? merchantHref.home() : '/merchant/start';
-  return (
-    <Link
-      to={to}
-      data-community-your-store={me.store ? 'manage' : applying ? 'apply' : 'create'}
-      className="lv-surface mb-4 flex items-center gap-3 px-4 py-3 active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-    >
-      {me.store ? (
-        <StoreMark src={me.store.logoUrl} />
-      ) : (
-        <span aria-hidden="true" className="lv-well flex h-12 w-12 shrink-0 items-center justify-center rounded-full">
-          <Plus className="h-5 w-5 text-text-secondary" />
-        </span>
-      )}
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14px] font-semibold text-text-primary">
-          {me.store ? s.yourStore : applying ? applicationCta(me.application, loc) : s.createStore}
-        </span>
-        <span dir={me.store ? 'auto' : undefined} className="block truncate text-start text-[12px] text-text-secondary">
-          {me.store ? me.store.name : applying ? approvalReason(me.application, loc) : s.yourStoreHint}
-        </span>
-      </span>
-      <Chevron aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted" />
-    </Link>
   );
 }

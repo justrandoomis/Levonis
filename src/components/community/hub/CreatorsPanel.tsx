@@ -2,7 +2,10 @@
  * «الصنّاع» — the makers' directory: accounts with a public page, newest
  * published project first, searched on the server by the home's `q`
  * (/api/community/creators). Rows in StoreCard's rhythm, each with
- * «متابعة». A lazy tab.
+ * «متابعة». A lazy tab of the home of today; the section page
+ * /community/makers renders the rebuilt directory
+ * (directory/MakersDirectory.tsx, community UI plan C5), so this file retires
+ * with the tab when the home lane (C1) sends `?tab=creators` to that page.
  */
 import { Users } from 'lucide-react';
 import { EmptyState, ErrorState } from '../../ui/AsyncStates';

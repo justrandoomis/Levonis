@@ -1,41 +1,29 @@
 /**
- * «المتاجر» — /community/stores (community UI plan B4, §3). The section page
- * of the stores directory: the section header, then the list the home tab
- * shows today (hub/StoresPanel.tsx, moved out of the home for this), searched
- * on the server by `?q=`. It asks for the viewer merchant standing once, as
- * the home does, so «متجرك» leads the list for a merchant. C5 rebuilds the
- * directory (IMG_8469).
+ * «المتاجر» — /community/stores (community UI plan C5; IMG_8469). The section
+ * page of the stores directory: the section header with its «الأقسام» door,
+ * then the directory (directory/StoresDirectory.tsx): the scoped search, the
+ * governorate sheet and the FDM, resin and design chips, all in the address,
+ * and the store cards with their works. It asks for the viewer merchant
+ * standing once, as the home does, so «متجرك» sits under the chips for a
+ * merchant.
  *
  * Behind CommunityGate (src/App.tsx), as every community page (plan R1).
  */
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
 import { merchantApi, type MerchantMe } from '../../lib/merchant';
 import CommunitySurface from '../../components/community/CommunitySurface';
 import SectionPageHeader, { SectionsButton } from '../../components/community/kit/SectionPageHeader';
 import { useHubStrings } from '../../components/community/hub/strings';
-import { StoreListSkeleton } from '../../components/community/hub/parts';
+import { StoreDirectorySkeleton } from '../../components/community/directory/Skeletons';
 
-// The list arrives after the header: a lazy chunk the home tab shares, so the
-// first paint of the section (and the entry that names it) stays small.
-const StoresPanel = lazy(() => import('../../components/community/hub/StoresPanel'));
+// The directory arrives after the header, its own chunk, so the first paint
+// of the section (and the entry that names it) stays small.
+const StoresDirectory = lazy(() => import('../../components/community/directory/StoresDirectory'));
 
 export default function CommunityStores() {
   const s = useHubStrings();
   const { user } = useAuth();
-  const [params, setParams] = useSearchParams();
-  // The term a link hands over (`?q=`), as the home reads it; «مسح» drops it without a history entry.
-  const q = (params.get('q') ?? '').trim().slice(0, 60);
-  const clear = () =>
-    setParams(
-      (prev) => {
-        const p = new URLSearchParams(prev);
-        p.delete('q');
-        return p;
-      },
-      { replace: true }
-    );
   // Which merchant this viewer is, for «متجرك»: asked only with a session, once per account.
   const userId = user?.id ?? null;
   const [me, setMe] = useState<MerchantMe | null>(null);
@@ -55,10 +43,10 @@ export default function CommunityStores() {
   }, [userId]);
   return (
     <CommunitySurface className="min-h-screen w-full pb-28">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4" data-community-section="stores">
+      <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4" data-community-section="stores">
         <SectionPageHeader title={s.tabs.stores} trailing={<SectionsButton />} />
-        <Suspense fallback={<StoreListSkeleton />}>
-          <StoresPanel q={q} viewer={userId ?? 'guest'} me={me} onClear={clear} />
+        <Suspense fallback={<StoreDirectorySkeleton />}>
+          <StoresDirectory viewer={userId ?? 'guest'} me={me} />
         </Suspense>
       </div>
     </CommunitySurface>
