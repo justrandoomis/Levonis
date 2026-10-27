@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat, Gift, Calculator, ShieldAlert } from 'lucide-react';
+import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat, Gift, Calculator, ShieldAlert, Printer } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { supportTotal, useSupportCounts } from '../components/adminSupport/supportCounts';
 import { useServicesBadge } from '../components/adminTradeIn/servicesBadge';
@@ -126,6 +126,13 @@ const AdminTradeIn = React.lazy(() => import('../components/adminTradeIn/AdminTr
  * only be decided through the raw API.
  */
 const AdminPriceProtection = React.lazy(() => import('../components/adminPriceProtection/AdminPriceProtection'));
+/**
+ * «الطباعة السحابية» — the Levonis Print Cloud console: the service switch,
+ * catalogue and prices, workshop stock, printers and agents, jobs and the
+ * queue, orders, customers, shipments, buybacks, reports and the audit trail
+ * (docs/PRINT_CLOUD.md §10.2). Its own chunk, and each of its sections another.
+ */
+const AdminPrintCloud = React.lazy(() => import('../components/adminPrintCloud/AdminPrintCloud'));
 // «الأمان» (DECISIONS row 206): decoys, blocks and the security log — the verified owner's alone.
 const AdminSecurity = React.lazy(() => import('../components/adminSecurity/AdminSecurity'));
 
@@ -151,6 +158,7 @@ type AdminTab =
   | 'orders'
   | 'trade_in'
   | 'price_protection'
+  | 'print_cloud'
   | 'products'
   | 'catalog_import'
   | 'pricing'
@@ -195,7 +203,7 @@ type AdminTab =
  * `?tab=offers` is «فتح في العروض الخاصة» on the product form's «تخفيض السعر»
  * card (docs/ux/PRODUCT-DISCOUNT.md §6.4).
  */
-const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'price_protection', 'finance', 'inventory', 'earnings', 'pricing', 'products', 'offers', 'security', 'delivery_pricing'];
+const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'price_protection', 'print_cloud', 'finance', 'inventory', 'earnings', 'pricing', 'products', 'offers', 'security', 'delivery_pricing'];
 
 function initialAdminTab(): AdminTab {
   try {
@@ -302,6 +310,9 @@ export default function Admin() {
     // on it (GET /api/admin/services/badge: counts only).
     { id: 'trade_in', icon: Repeat, label: loc('الاستبدال', 'Trade-in', 'گۆڕینەوە'), badge: servicesWaiting?.trade_in ?? 0, ...section('services', 'الخدمات', 'Services', 'خزمەتگوزارییەکان') },
     { id: 'price_protection', icon: ShieldCheck, label: loc('حماية السعر', 'Price protection', 'پاراستنی نرخ'), badge: servicesWaiting?.price_protection ?? 0, ...section('services', 'الخدمات', 'Services', 'خزمەتگوزارییەکان') },
+    // «الطباعة السحابية»: renting the workshop's printers remotely. Every admin sees the workshop floor;
+    // its money and cost screens are offered by scope inside, and the server refuses them regardless.
+    { id: 'print_cloud', icon: Printer, label: loc('الطباعة السحابية', 'Print Cloud', 'چاپی هەوری'), ...section('services', 'الخدمات', 'Services', 'خزمەتگوزارییەکان') },
     { id: 'products', icon: Package, label: t('adminProducts'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') },
     ...(canSeeCatalogImport
       ? [{ id: 'catalog_import', icon: Package, label: loc('استيراد Bambu Lab', 'Bambu Lab import', 'هاوردەکردنی Bambu Lab'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') }]
@@ -390,6 +401,7 @@ export default function Admin() {
 
         {activeTab === 'trade_in' && <AdminTradeIn />}
         {activeTab === 'price_protection' && <AdminPriceProtection />}
+        {activeTab === 'print_cloud' && <AdminPrintCloud />}
 
         {activeTab === 'finance' && canSeeFinance && (
           <AdminFinance />

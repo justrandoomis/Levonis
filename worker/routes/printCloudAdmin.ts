@@ -34,7 +34,7 @@ import { ENTITIES, categories, createEntity, listEntity, replacePriceTiers, stri
 import { creditAccountId, debitAvailable, grantCredits } from '../lib/printCloud/credits';
 import { fence, idempotent, many, one, runBatch, type Stmt } from '../lib/printCloud/db';
 import { invalid, pcError } from '../lib/printCloud/errors';
-import { advanceShipment } from '../lib/printCloud/fulfillment';
+import { advanceShipment, shipmentView } from '../lib/printCloud/fulfillment';
 import { currentUser, idempotencyKey, ok, pcGate, queryInt, requestConfig, staffActor } from '../lib/printCloud/http';
 import { debitInventory, grantInventory } from '../lib/printCloud/inventory';
 import {
@@ -651,6 +651,22 @@ adminPrintCloudRoutes.get('/printers/:id/events', async (c) =>
   ok(c, await many(c.env.DB, 'SELECT * FROM pc_printer_events WHERE printer_id = ? ORDER BY created_at DESC LIMIT ?', param(c, 'id'), queryInt(c, 'limit', 100, 1, 500)))
 );
 
+/**
+ * A printer's maintenance windows, latest start first — the ids `PATCH
+ * /maintenance/{id}` closes or cancels. What a window cost is the owner's:
+ * the column is removed for every other reader.
+ */
+adminPrintCloudRoutes.get('/printers/:id/maintenance', async (c) => {
+  const rows = await many<Record<string, unknown>>(
+    c.env.DB,
+    'SELECT id, printer_id, kind, starts_at, ends_at, status, notes, cost_iqd, created_by, created_at FROM pc_printer_maintenance WHERE printer_id = ? ORDER BY starts_at DESC LIMIT ?',
+    param(c, 'id'),
+    queryInt(c, 'limit', 100, 1, 500)
+  );
+  const cost = costView(c);
+  return ok(c, rows.map(({ cost_iqd, ...r }) => (cost ? { ...r, cost_iqd } : r)));
+});
+
 adminPrintCloudRoutes.post('/printers/:id/commands', async (c) => {
   const body = await jsonObject(c);
   const actor = staffActor(c);
@@ -729,6 +745,12 @@ adminPrintCloudRoutes.get('/shipments', async (c) => {
   );
   const money = canMoveMoney(c.env, c.get('user'));
   return ok(c, rows.map((r) => (money ? r : { ...r, fee_iqd: undefined, fee_order_id: undefined })));
+});
+
+/** One shipment with what it carries — the packing list. The delivery fee, as in the list, for money scope only. */
+adminPrintCloudRoutes.get('/shipments/:id', async (c) => {
+  const view = await shipmentView(c.env.DB, param(c, 'id'));
+  return ok(c, canMoveMoney(c.env, c.get('user')) ? view : { ...view, fee_iqd: undefined, fee_order_id: undefined });
 });
 
 adminPrintCloudRoutes.post('/shipments/:id/advance', async (c) => {

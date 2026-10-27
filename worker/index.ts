@@ -955,7 +955,8 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
       // The main-host resolve answer is public configuration, with no DB read.
       // Start the actual viewer-priced API request in the HTML preload scanner
       // rather than after the entry bundle has downloaded and React mounted.
-      const resolve = { success: true, kind: host.kind, store: null, root_domain: rootDomainFrom(c.env) };
+      // The same shape GET /api/storefront/resolve gives the main host (`system`: no system host here).
+      const resolve = { success: true, kind: host.kind, system: null, store: null, root_domain: rootDomainFrom(c.env) };
       const manifest = opening.route ? await viteManifest(c) : null;
       const chunks = openingChunkPreloads(manifest, opening);
       const html = injectDocumentPreloads(await asset.clone().text(), { ...chunks, image: null, resolve, fetches: opening.fetches });

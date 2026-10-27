@@ -56,6 +56,14 @@ interface StoreContextValue {
    * deployment has no root domain configured: links then stay relative.
    */
   mainSite: string;
+  /**
+   * WHICH SYSTEM HOST this is, as the SERVER classified it (`system` of the
+   * resolve answer, worker/lib/hosts.ts) — `'cloud'` is Levonis Print Cloud's
+   * customer app (src/App.tsx) — or null on the main site, a store and every
+   * other host. Never read from `location.hostname`, for the reason at the top
+   * of this file; an answer from before the field existed reads as null.
+   */
+  system: string | null;
 }
 
 const StoreContext = createContext<StoreContextValue>({
@@ -64,6 +72,7 @@ const StoreContext = createContext<StoreContextValue>({
   unknownStore: false,
   unavailableStore: false,
   mainSite: '',
+  system: null,
 });
 
 const mainSiteOf = (root: unknown): string =>
@@ -95,7 +104,7 @@ export function useStore(): StoreContextValue {
 }
 
 /** The shape `GET /api/storefront/resolve` answers with (and the inline data block repeats). */
-type ResolveAnswer = { success?: boolean; kind: string; store: MerchantStore | null; root_domain?: string | null };
+type ResolveAnswer = { success?: boolean; kind: string; system?: string | null; store: MerchantStore | null; root_domain?: string | null };
 
 /**
  * The document's own answer, when the Worker wrote one. Only a SUCCESS answer
@@ -113,6 +122,8 @@ function inlineResolve(): StoreContextValue | null {
     unknownStore: false,
     unavailableStore: false,
     mainSite: mainSiteOf(d.root_domain),
+    // Read as the server wrote it: the shell compares it to a literal ('cloud').
+    system: d.system || null,
   };
 }
 
@@ -125,6 +136,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         unknownStore: false,
         unavailableStore: false,
         mainSite: '',
+        system: null,
       }
   );
   // Answered by the document: nothing to ask. Read once, at mount, so the
@@ -153,6 +165,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           unknownStore: false,
           unavailableStore: false,
           mainSite: mainSiteOf(d.root_domain),
+          system: d.system || null,
         });
       })
       .catch((e: unknown) => {
@@ -171,6 +184,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           unknownStore: err?.status === 404 && !unavailable,
           unavailableStore: unavailable,
           mainSite,
+          // A refusal is a store host's answer (or a failure, which falls back to the main site).
+          system: null,
         });
       });
     return () => {

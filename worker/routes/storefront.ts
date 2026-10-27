@@ -374,9 +374,14 @@ storefrontRoutes.get('/resolve', (c) => anonymousCached(c, {}, async () => {
   // board or the messenger from a store's host (audit 01 B19). Null when no
   // root domain is configured (a preview deployment): links stay relative.
   const root_domain = root;
+  // WHICH SYSTEM HOST THIS IS, as the server classified it (worker/lib/hosts.ts):
+  // `cloud` is Levonis Print Cloud's customer app (src/App.tsx). Null on every
+  // other kind of host. The browser renders an application from this label and
+  // never from its own reading of the hostname (src/StoreContext.tsx).
+  const system = host.kind === 'system' ? host.system : null;
 
   if (host.kind !== 'merchant' || !host.slug) {
-    return c.json({ success: true, kind: host.kind, store: null, root_domain });
+    return c.json({ success: true, kind: host.kind, system, store: null, root_domain });
   }
 
   // Not one merchant-controlled field — not even the name, which may be the
@@ -386,6 +391,7 @@ storefrontRoutes.get('/resolve', (c) => anonymousCached(c, {}, async () => {
       {
         success: false,
         kind: 'merchant',
+        system,
         store: null,
         error: 'This store is not available right now',
         code: 'STORE_UNAVAILABLE',
@@ -409,6 +415,7 @@ storefrontRoutes.get('/resolve', (c) => anonymousCached(c, {}, async () => {
         {
           success: false,
           kind: 'merchant',
+          system,
           store: null,
           error: 'This store has moved',
           code: 'STORE_MOVED',
@@ -421,12 +428,13 @@ storefrontRoutes.get('/resolve', (c) => anonymousCached(c, {}, async () => {
     // A hostname that looks like a store but is not one. 404 with a shape the
     // SPA can render as "no such store" — never a redirect to the main site,
     // which would make a typo silently look like the platform's own homepage.
-    return c.json({ success: false, kind: 'merchant', store: null, error: 'No such store', root_domain }, 404);
+    return c.json({ success: false, kind: 'merchant', system, store: null, error: 'No such store', root_domain }, 404);
   }
   if (storeHiddenFromPublic(ctx)) return unavailable();
   return c.json({
     success: true,
     kind: 'merchant',
+    system,
     store: await storefrontStore(c.env.DB, ctx, root),
     root_domain,
   });

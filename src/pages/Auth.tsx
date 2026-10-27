@@ -18,7 +18,7 @@ import SocialAuthButton, { TelegramIcon } from '../components/auth/SocialAuthBut
 import CodeAuth from '../components/auth/CodeAuth';
 import TelegramAuth from '../components/auth/TelegramAuth';
 import { sanitizeNextPath } from '../components/auth/nextPath';
-import { storeReturnUrl } from '../components/auth/storeReturn';
+import { appReturnUrl, storeReturnUrl } from '../components/auth/storeReturn';
 import { accountCreatedNotKeptText, sessionNotKeptText } from '../components/auth/sessionStrings';
 import { notKeptNext } from '../lib/sessionCheck';
 import InAppBrowserNotice from '../components/auth/InAppBrowserNotice';
@@ -532,8 +532,10 @@ export default function Auth() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { loginWithGoogle, adoptSession } = useAuth();
   // A shop host (`<slug>.levonis-iq.com`, or a host that looked like one):
-  // Google never runs there — it accepts only the apex as an origin.
-  const { store, unknownStore, unavailableStore, mainSite } = useStore();
+  // Google never runs there — it accepts only the apex as an origin. Nor on a
+  // system host (`system`, the server's label: Print Cloud's cloud.<root>
+  // shows this page only on a local run, src/cloud/auth.tsx).
+  const { store, unknownStore, unavailableStore, mainSite, system } = useStore();
   const onStoreHost = !!store || unknownStore || unavailableStore;
   const { lang, dir } = useLanguage();
   const s = STRINGS[lang];
@@ -578,6 +580,10 @@ export default function Auth() {
   // back (src/App.tsx `StoreHostAuthHandoff`). Only ever a slug — the address
   // is built by `storeReturnUrl`, never read from the query.
   const [storeFromQuery] = useState(() => searchParams.get('store') || '');
+  // ?app=cloud: Levonis Print Cloud handed sign-in to this page (src/cloud/signInUrl.ts
+  // `cloudHandoffUrl`). Only a label of an allowlist — the address is built by
+  // `appReturnUrl`, never read from the query.
+  const [appFromQuery] = useState(() => searchParams.get('app') || '');
   // ProtectedRoute redirects can pass location.state.from (string or location
   // object). Sanitized to a same-origin relative path; falls back to "/".
   const stateFrom = (location.state as { from?: unknown } | null)?.from;
@@ -673,6 +679,7 @@ export default function Auth() {
     googleConfigured &&
     !inApp.inApp &&
     !onStoreHost &&
+    !system &&
     (typeof window === 'undefined' || window.isSecureContext !== false);
   const resetConfigured = caps?.passwordReset ?? false;
   const telegramConfigured = caps?.telegram ?? false;
@@ -794,11 +801,13 @@ export default function Auth() {
     // Signed in for a shop: back to it, on its own host — the cookie is the
     // parent domain's, so the shop already sees the session. Only from the
     // platform's own page; a slug that fails the rules answers null and the
-    // person simply stays here.
-    if (!onStoreHost) {
+    // person simply stays here. The same for Print Cloud (`?app=cloud`): back
+    // to cloud.<root>, the one application label `appReturnUrl` allows.
+    if (!onStoreHost && !system) {
       const back = storeReturnUrl(storeFromQuery, mainSite, dest);
-      if (back) {
-        window.location.assign(back);
+      const backToApp = back ? null : appReturnUrl(appFromQuery, mainSite, dest);
+      if (back || backToApp) {
+        window.location.assign((back ?? backToApp) as string);
         return;
       }
     }
@@ -1492,6 +1501,7 @@ export default function Auth() {
             next={dest}
             referralCode={referralCode}
             store={onStoreHost ? '' : storeFromQuery}
+            app={onStoreHost || system ? '' : appFromQuery}
           />
         )}
       </>

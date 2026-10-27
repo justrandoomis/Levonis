@@ -60,7 +60,9 @@ test('the FX module is imported only by the cron, the pricing workspace, the pub
   // notices and the admin read U through `fx/officialRate` — that one reader, nothing else of FX.
   // A refund of wallet money taken before the one-time rebase reads it there too (order cancel and its
   // repair, price cut, return), and so does the rebase itself, which lives with the wallet, not with FX.
-  const official = ['worker/lib/escrowOps.ts', 'worker/lib/orderCancelOps.ts', 'worker/lib/orderCancelRepair.ts', 'worker/lib/orderPriceAdjust.ts', 'worker/lib/walletNotify.ts', 'worker/lib/walletRateRebase.ts', 'worker/routes/admin.ts', 'worker/routes/adminWalletAdjust.ts', 'worker/routes/memberships.ts', 'worker/routes/orders.ts', 'worker/routes/returns.ts', 'worker/routes/wallet.ts'];
+  // Print Cloud's wallet payments and their refunds (docs/PRINT_CLOUD.md §4.4) read the same rate, the
+  // same way, and refund money taken before the rebase across it like an order cancel does.
+  const official = ['worker/lib/escrowOps.ts', 'worker/lib/orderCancelOps.ts', 'worker/lib/orderCancelRepair.ts', 'worker/lib/orderPriceAdjust.ts', 'worker/lib/printCloud/wallet.ts', 'worker/lib/walletNotify.ts', 'worker/lib/walletRateRebase.ts', 'worker/routes/admin.ts', 'worker/routes/adminWalletAdjust.ts', 'worker/routes/memberships.ts', 'worker/routes/orders.ts', 'worker/routes/returns.ts', 'worker/routes/wallet.ts'];
   for (const f of official) {
     const src = worker.find((w) => w.f === f)!.src;
     assert.deepEqual([...src.matchAll(/from\s+['"]([^'"]*\/fx\/[^'"]+)['"]/g)].map((m) => m[1]!.replace(/^.*\/fx\//, 'fx/')), ['fx/officialRate'], f);

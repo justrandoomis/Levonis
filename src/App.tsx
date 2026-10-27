@@ -108,6 +108,14 @@ const Referrals = React.lazy(() => import('./pages/Referrals'));
 const Bundles = React.lazy(() => import('./pages/Bundles'));
 // An unknown address: a lazy chunk, so the entry carries only this line.
 const NotFound = React.lazy(() => import('./pages/NotFound'));
+/**
+ * LEVONIS PRINT CLOUD, THE WHOLE APPLICATION OF `cloud.<root>` (docs/PRINT_CLOUD.md).
+ * Like a store's host, that host is one application of its own — its header,
+ * its tabs, its pages — decided by the SERVER's classification of the host
+ * (`system` of the resolve answer, src/StoreContext.tsx). It is a chunk of its
+ * own: the entry carries this line and the branch in AppContent, nothing else.
+ */
+const PrintCloudApp = prefetchable(() => import('./cloud/PrintCloudApp'));
 const BundleDetail = prefetchable(() => import('./pages/BundleDetail'));
 
 /**
@@ -689,13 +697,16 @@ function StorefrontApp() {
 function AppBootstrapLayer() {
   const location = useLocation();
   const { isLoaded } = useAuth();
-  const { store, resolved, unknownStore, unavailableStore } = useStore();
+  const { store, resolved, unknownStore, unavailableStore, system } = useStore();
   const homeReady = React.useSyncExternalStore(
     homeCriticalReadyStore.subscribe,
     homeCriticalReadyStore.snapshot,
     homeCriticalReadyStore.serverSnapshot
   );
   const mainHomeNeedsData = !store && !unknownStore && !unavailableStore && location.pathname === '/';
+  // Print Cloud is a work tool with its own header and no dock for the
+  // character, as the admin console and the merchant workspace are.
+  if (system === 'cloud') return null;
 
   /**
    * ITS OWN BOUNDARY, BECAUSE IT IS A SIBLING OF THE ROUTES AND NOT A CHILD.
@@ -784,7 +795,7 @@ function AppContent() {
     };
   }, [location.key, location.hash, navigationType]);
 
-  const { store, resolved, unknownStore, unavailableStore } = useStore();
+  const { store, resolved, unknownStore, unavailableStore, system } = useStore();
   const navSuppressed = useBottomNavSuppressed();
   // The code of a route landing while its fallback is on screen re-renders the
   // shell here, in an ordinary update React does not throttle (src/lib/routeReveal.ts).
@@ -804,6 +815,9 @@ function AppContent() {
   // plus a mount plus a round trip.
   if (!resolved) return <RouteFallback />;
   if (store || unknownStore || unavailableStore) return <StorefrontApp />;
+  // cloud.<root> is Levonis Print Cloud and nothing of the main site: decided
+  // before the main chrome renders, like the store branch above.
+  if (system === 'cloud') return <ChunkBoundary><Suspense fallback={<RouteFallback />}><PrintCloudApp /></Suspense></ChunkBoundary>;
   // Lower-cased on BOTH sides: react-router matches a path case-insensitively,
   // so /Points reaches the router while a case-sensitive test here would send
   // it to the other <Routes> block and render a different tree for the same

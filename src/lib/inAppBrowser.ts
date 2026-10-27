@@ -30,6 +30,7 @@
  */
 
 import { isSystemSlug, isValidSlugSyntax } from '../../worker/lib/hosts';
+import { isReturnApp } from '../components/auth/storeReturn';
 
 export type InAppApp =
   | 'instagram'
@@ -148,13 +149,15 @@ export const IN_APP_NAMES: Record<InAppApp, string> = {
  * to the shop afterwards (src/components/auth/storeReturn.ts), and the other
  * browser's storage has no language yet (src/LanguageContext.tsx reads
  * `?lang=` on /auth). A store value that is not a valid, non-system slug and
- * a language that is not one of the three are dropped.
+ * a language that is not one of the three are dropped. So is an application
+ * label (`app`, Levonis Print Cloud's `cloud`) outside the allowlist of
+ * storeReturn.ts `RETURN_APPS`.
  */
 export function externalAuthUrl(
   origin: string,
   next: string,
   ref = '',
-  carry: { store?: string; lang?: string } = {}
+  carry: { store?: string; lang?: string; app?: string } = {}
 ): string {
   const u = new URL('/auth', origin);
   if (next && next !== '/' && next.startsWith('/') && !next.startsWith('//')) u.searchParams.set('next', next);
@@ -162,6 +165,7 @@ export function externalAuthUrl(
   if (r) u.searchParams.set('ref', r.slice(0, 64));
   const store = carry.store ?? '';
   if (store && isValidSlugSyntax(store) && !isSystemSlug(store)) u.searchParams.set('store', store);
+  if (isReturnApp(carry.app)) u.searchParams.set('app', carry.app);
   if (carry.lang === 'ar' || carry.lang === 'en' || carry.lang === 'ckb') u.searchParams.set('lang', carry.lang);
   return u.toString();
 }
