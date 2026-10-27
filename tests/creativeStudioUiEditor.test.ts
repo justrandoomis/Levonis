@@ -284,9 +284,12 @@ test('spec-2 (editor): bound words are drawn with the design’s pinned kit, and
 test('editor-9 (client): a re-layout to a composition the template does not have is refused — never the template’s first variant in disguise', () => {
   const doc = built();
   assert.equal(doc.template?.id, 'product_hero');
-  assert.equal(relayoutVariant(doc, { kind: 'priority', priority: 'headline' }, 'priced'), null, 'product_hero has no headline-first composition');
-  assert.equal(relayoutVariant(doc, { kind: 'variant', variant: 'headline_first' }, 'priced'), null);
   assert.equal(relayoutVariant(doc, { kind: 'priority', priority: 'price' }, 'priced'), 'price_first');
-  assert.equal(relayoutVariant(doc, { kind: 'variant', variant: 'price_first' }, 'priced'), 'price_first');
+  assert.equal(relayoutVariant(doc, { kind: 'variant', variant: 'feature_first' }, 'priced'), 'feature_first');
+  // A service card has no product-first or price-first composition (buildFromTemplate would lay its first one).
+  const card = { ...doc, template: { id: 'service_card', variant: 'feature_first' } } as CreativeDocument;
+  assert.equal(relayoutVariant(card, { kind: 'priority', priority: 'price' }, 'priced'), null, 'no price-first composition: refused');
+  assert.equal(relayoutVariant(card, { kind: 'variant', variant: 'product_first' }, 'priced'), null);
+  assert.equal(relayoutVariant(card, { kind: 'priority', priority: 'headline' }, 'priced'), 'headline_first');
   assert.equal(relayoutVariant({ ...doc, template: null }, { kind: 'variant', variant: 'price_first' }, 'priced'), null, 'no template, no re-layout');
 });

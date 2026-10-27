@@ -459,7 +459,8 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
     }
     const ctx = rebuildContext(before, data, measureRef.current);
     const result = rebuild(before, change.kind === 'format' ? { format: change.format } : change.kind === 'density' ? { density: change.density } : { variant }, ctx);
-    if (!result) return { ok: false, message: w(S.rebuildUnavailable) };
+    // The package will not drop a binding it cannot draw (a snapshot not loaded, a claim not approved).
+    if (!result) return { ok: false, message: w(S.rebuildKeepsBindings) };
     if (change.kind === 'format') {
       try {
         await autosave.current?.flush();

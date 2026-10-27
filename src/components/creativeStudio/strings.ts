@@ -176,6 +176,7 @@ export const S = {
   boundRefreshApply: t('طبّق البيانات الحالية', 'Apply the current data', 'داتای ئێستا جێبەجێ بکە'),
   rebuildNoVariant: t('لا يوجد في قالب هذا التصميم تكوين بهذا الاختيار؛ لم يتغير شيء.', 'This design’s template has no composition for that choice; nothing changed.', 'قاڵبی ئەم دیزاینە هیچ پێکهاتەیەکی بۆ ئەم هەڵبژاردنە نییە؛ هیچ شتێک نەگۆڕا.'),
   rebuildNoChange: t('إعادة الترتيب لم تغيّر شيئاً في التصميم.', 'The re-layout changed nothing in the design.', 'دووبارە ڕێکخستنەوەکە هیچ شتێکی لە دیزاینەکەدا نەگۆڕی.'),
+  rebuildKeepsBindings: t('لا يمكن إعادة ترتيب التصميم دون فقدان بيانات مرتبطة به (منتج أو خدمة لم تُحمَّل أو لم تُعتمد)؛ لم يتغير شيء.', 'The design cannot be re-laid without losing data it is bound to (a product or service that is not loaded or not approved); nothing changed.', 'دیزاینەکە ناتوانرێت دووبارە ڕێکبخرێتەوە بەبێ لەدەستدانی ئەو داتایەی پێیەوە بەستراوە (بەرهەم یان خزمەتگوزارییەک کە بار نەکراوە یان پەسەند نەکراوە)؛ هیچ شتێک نەگۆڕا.'),
 
   // Layers panel
   layerHide: t('إخفاء', 'Hide', 'شاردنەوە'),

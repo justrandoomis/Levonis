@@ -13,7 +13,7 @@
  */
 import { applyOps, type ApplyResult, type OpsContext } from '../../../packages/creativeDoc/src/ops';
 import {
-  FONT_REGISTRY, layerBox, safeBox, unionBox, withDescendants, type Box, type CreativeDocument, type Layer, type TextLayer,
+  FONT_REGISTRY, layerBox, safeBox, touchesLock, unionBox, withDescendants, type Box, type CreativeDocument, type Layer, type TextLayer,
 } from '../../../packages/creativeDoc/src/schema';
 import { canonicalJson } from '../../../packages/creativeDoc/src/snapshot';
 import { TEMPLATES, variantsFor, type TemplateId, type VariantId } from '../../../packages/creativeDoc/src/templates';
@@ -90,19 +90,11 @@ export function selectableId(doc: CreativeDocument, id: string): string {
 /**
  * Whether a lock holds this layer: its own, an ancestor's, or a descendant's.
  * A group moves, hides and deletes its children with it, so a group with one
- * locked word inside is as locked as the word.
+ * locked word inside is as locked as the word — and applyOps refuses it so.
  */
 export function lockedAround(doc: CreativeDocument, id: string): boolean {
-  const byId = new Map(doc.layers.map((l) => [l.id, l]));
-  if (withDescendants(doc.layers, id).some((x) => byId.get(x)?.locked)) return true;
-  let p = byId.get(id)?.parent ?? null;
-  const seen = new Set<string>();
-  while (p && !seen.has(p)) {
-    if (byId.get(p)?.locked) return true;
-    seen.add(p);
-    p = byId.get(p)?.parent ?? null;
-  }
-  return false;
+  // The package's one definition (schema.ts `touchesLock`): the same rule applyOps refuses by.
+  return touchesLock(doc.layers, id);
 }
 
 /** Whether a layer (or the group it belongs to) may be selected and moved by a person: visible, not the background, no lock holding it. */
