@@ -660,6 +660,9 @@ export const QUALITY_TEXT: Readonly<Record<QualityCode, Tri>> = {
   not_sorani: t('نص بحروف عربية في إعلان سوراني', 'Arabic-only letters in a Sorani ad', 'پیتی تەنها عەرەبی لە ڕیکلامێکی سۆرانیدا'),
   headline_missing: t('لا يوجد عنوان', 'No headline', 'هیچ سەردێڕێک نییە'),
   bound_text_missing: t('نص مربوط بلا بيانات', 'A bound text with no data', 'دەقێکی بەستراو بێ داتا'),
+  unsupported_claim_text: t('نص حر يدّعي ما لا دليل عليه', 'Free text makes a claim with no evidence', 'دەقێکی ئازاد بانگەشەیەک دەکات کە بەڵگەی نییە'),
+  product_too_small: t('صورة المنتج أصغر من حصتها', 'The product picture is smaller than its share', 'وێنەی بەرهەم لە بەشی خۆی بچووکترە'),
+  asset_ratio_mismatch: t('صورة تختلف نسبتها عن المسجّلة', 'A picture whose real ratio differs from the recorded one', 'وێنەیەک کە ڕێژەی ڕاستەقینەی جیاوازە لە تۆمارکراو'),
 };
 
 export const CHECK_TEXT: Readonly<Record<CheckName, Tri>> = {
@@ -670,7 +673,7 @@ export const CHECK_TEXT: Readonly<Record<CheckName, Tri>> = {
   layout: t('التخطيط ومنطقة الأمان', 'Layout and safe area', 'ڕێکخستن و ناوچەی پارێزراو'),
   brand: t('الهوية', 'Brand', 'براند'),
   assets: t('الصور', 'Pictures', 'وێنەکان'),
-  claims: t('مطالبات الخدمة', 'Service claims', 'بانگەشەکانی خزمەتگوزاری'),
+  claims: t('المطالبات', 'Claims', 'بانگەشەکان'),
   language: t('اللغة', 'Language', 'زمان'),
   meta: t('نص المنشور', 'Post text', 'دەقی پۆست'),
 };
@@ -683,7 +686,7 @@ export const SKIP_TEXT: Readonly<Record<CheckName, Tri>> = {
   layout: t('لم يجرِ', 'Did not run', 'ئەنجام نەدرا'),
   brand: t('لم يجرِ', 'Did not run', 'ئەنجام نەدرا'),
   assets: t('لم يُبلَّغ عن حالة تحميل الصور', 'Picture load state not reported', 'دۆخی بارکردنی وێنە ڕاپۆرت نەکرا'),
-  claims: t('لم يجرِ', 'Did not run', 'ئەنجام نەدرا'),
+  claims: t('لم يُبلَّغ عن دليل الوصول أو عودة التوفر', 'Arrival or back-in-stock evidence not reported', 'بەڵگەی گەیشتن یان گەڕانەوەی بەردەستبوون ڕاپۆرت نەکرا'),
   language: t('لم يجرِ', 'Did not run', 'ئەنجام نەدرا'),
   meta: t('لم يجرِ', 'Did not run', 'ئەنجام نەدرا'),
 };

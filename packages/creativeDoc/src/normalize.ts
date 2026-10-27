@@ -474,6 +474,15 @@ export function normalizeDocument(input: unknown): NormalizeResult {
     seen.add(layer.id);
     layers.push(layer);
   }
+  // A product-bound text whose slot has no binding renders from nothing: it becomes free text, so its
+  // words are checked like any typed words (a price in it is `unbound_price_text`), never drawn as bound data.
+  const slots = new Set(products.map((p) => p.slot));
+  for (const [i, l] of layers.entries()) {
+    if (l.type === 'text' && l.source.kind === 'product' && !slots.has(l.source.slot)) {
+      ctx.push(`layers.${l.id}.source`, 'invalid_value');
+      layers[i] = { ...l, source: { kind: 'free' } };
+    }
+  }
   // Parents must be groups that exist; the tree must be acyclic.
   const groups = new Set(layers.filter((l) => l.type === 'group').map((l) => l.id));
   for (const l of layers) {

@@ -62,8 +62,9 @@ test('text: wrapping keeps words whole, fitting never goes under the floor, mone
   assert.equal(formatIqd(1250000, { digits: 'latn', label: 'د.ع' }), '1,250,000 د.ع');
   assert.equal(formatIqd(1250000, { digits: 'arab', label: 'د.ع' }), '١٬٢٥٠٬٠٠٠ د.ع');
   assert.equal(formatIqd(1250000, { digits: 'latn', label: 'IQD' }), 'IQD 1,250,000');
-  for (const t of ['1,250,000 د.ع', '250 ألف', 'IQD 900', '٣٠٠ دينار', '$99']) assert.equal(containsPriceLike(t), true, t);
-  for (const t of ['طابعة A1 مع 4 بكرات', 'دقة 0.1 مم', 'AMS lite']) assert.equal(containsPriceLike(t), false, t);
+  // A number word (ألف, مليون) is a price only next to a currency word or a price word: "16 مليون لون" is a count.
+  for (const t of ['1,250,000 د.ع', '250 ألف دينار', 'السعر 250 ألف', 'IQD 900', '٣٠٠ دينار', '$99']) assert.equal(containsPriceLike(t), true, t);
+  for (const t of ['طابعة A1 مع 4 بكرات', 'دقة 0.1 مم', 'AMS lite', '16 مليون لون']) assert.equal(containsPriceLike(t), false, t);
   assert.deepEqual(claimsIn('الأرخص في العراق وآخر قطعة'), ['cheapest', 'last_piece']);
   assert.deepEqual(claimsIn('الأفضل في العراق'), ['superlative']);
 });

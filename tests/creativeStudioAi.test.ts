@@ -221,6 +221,8 @@ test('idempotency: the same key and request replays the stored result without a 
 
 async function withDesign(raw: DatabaseSync, app: ReturnType<typeof studioApp>) {
   const content = design({
+    // The price layer is bound to a real binding: a text bound to a slot with no binding is free text after normalize.
+    products: [{ slot: 'main', product_id: 'p_print', variant_key: null, snapshot_id: 'snap_fixture_0001' }],
     layers: [
       textLayer('headline', 'headline', 'طابعة جديدة'),
       textLayer('price', 'price', '900,000 د.ع', { y: 400, source: { kind: 'product', slot: 'main', field: 'price' } }),

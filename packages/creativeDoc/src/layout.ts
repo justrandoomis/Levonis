@@ -82,14 +82,34 @@ export function renderSource(source: TextSource, ctx: BindingContext): string | 
   return null;
 }
 
-/** Re-render every bound text layer from the binding context (on open, after re-verification). */
+/**
+ * Re-render every bound text layer from the binding context (on open, after
+ * re-verification). The stored words are never kept as the value: when the
+ * snapshot or claim is there but renders nothing (a "was" line without a live
+ * offer, an unknown availability, a missing translation) the layer becomes
+ * empty, so `bound_text_missing` fires instead of the old words being drawn.
+ * Only data that is not loaded at all leaves the layer as it is (the checks
+ * report the missing binding). Service text renders only from the claim
+ * version the design is bound to: a newer approved version never rewrites a
+ * design in the background (spec §19) — `claim_changed` asks for a person.
+ */
 export function refreshBoundText(doc: CreativeDocument, ctx: BindingContext): CreativeDocument {
   return {
     ...doc,
     layers: doc.layers.map((l) => {
       if (l.type !== 'text' || l.source.kind === 'free') return l;
-      const t = renderSource(l.source, ctx);
-      return t === null || t === l.text ? l : { ...l, text: t };
+      const src = l.source;
+      if (src.kind === 'service') {
+        const bound = doc.services.find((s) => s.claim_id === src.claim_id);
+        const claim = ctx.claims[src.claim_id];
+        if (!bound || !claim || claim.version !== bound.claim_version) return l;
+      }
+      const t = renderSource(src, ctx);
+      if (t === null) {
+        const loaded = src.kind === 'service' || (src.kind === 'product' && !!ctx.snapshots[src.slot]);
+        return loaded && l.text ? { ...l, text: '' } : l;
+      }
+      return t === l.text ? l : { ...l, text: t };
     }),
   };
 }

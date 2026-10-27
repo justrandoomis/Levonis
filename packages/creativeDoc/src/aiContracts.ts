@@ -18,7 +18,7 @@
  * one union is the operation list of an edit.
  */
 import { applyOps, type ApplyResult, type OpsContext } from './ops';
-import { ID_PATTERN, OBJECTIVES, VISUAL_PRIORITIES, type CreativeDocument, type Objective, type VisualPriority } from './schema';
+import { ID_PATTERN, OBJECTIVES, VISUAL_PRIORITIES, withDescendants, type CreativeDocument, type Objective, type VisualPriority } from './schema';
 import { VARIANT_IDS, type VariantId } from './templates';
 import { cleanText, containsPriceLike, containsUrl, unsupportedClaims, type ClaimEvidence, type ClaimKind } from './text';
 
@@ -150,7 +150,12 @@ export function validateIdeas(raw: unknown, ctx: IdeasContext): { ideas: Idea[];
       subhead: C(o.subhead, 160), cta: C(o.cta, 40), caption: C(o.caption, 1200, true), alt_text: C(o.alt_text, 300),
     };
     if (!idea.headline || !idea.reason) return rejected.push({ index, code: 'empty' });
-    const ev = { offer: kinds.some((e) => e.kind === 'offer' && e.ref === target_ref), serviceClaim: kinds.some((e) => e.kind === 'service_claim') };
+    const ev: ClaimEvidence = {
+      offer: kinds.some((e) => e.kind === 'offer' && e.ref === target_ref),
+      serviceClaim: kinds.some((e) => e.kind === 'service_claim'),
+      arrival: kinds.some((e) => e.kind === 'arrival' && e.ref === target_ref),
+      backInStock: kinds.some((e) => e.kind === 'back_in_stock' && e.ref === target_ref),
+    };
     const bad = textProblems([idea.headline, idea.subhead, idea.cta, idea.message, idea.caption, idea.alt_text], ev);
     if (bad) return rejected.push({ index, ...bad });
     out.push(idea);
@@ -315,7 +320,9 @@ export function validateEditPatch(raw: unknown, ctx: PatchContext): PatchVerdict
   const outside = targets.filter((t) => !ids.has(t));
   if (outside.length) return { ok: false, code: 'target_outside_document', detail: outside };
   if (ctx.scope) {
-    const scope = new Set(ctx.scope);
+    // A selection is the outermost group (a chip is its group), so the scope covers what the group holds:
+    // the chip's words and colour are inside it. Locked layers stay refused by the operations themselves.
+    const scope = new Set(ctx.scope.flatMap((id) => withDescendants(ctx.doc.layers, id)));
     const extra = targets.filter((t) => !scope.has(t));
     if (extra.length) return { ok: false, code: 'target_outside_scope', detail: extra };
   }
@@ -449,7 +456,11 @@ export function validateCarousel(raw: unknown, ctx: { evidence: ClaimEvidence; m
     if (bad) return rejected.push({ index, ...bad });
     slides.push(s);
   });
-  return { slides, caption: C(src.caption, 1500, true), rejected };
+  // The caption is ad copy too: a price, a link or an unsupported claim in it is refused like a slide's words.
+  const caption = C(src.caption, 1500, true);
+  const capBad = textProblems([caption], ctx.evidence);
+  if (capBad) rejected.push({ index: -1, code: capBad.code, detail: 'caption' });
+  return { slides, caption: capBad ? '' : caption, rejected };
 }
 
 /** Schema → the `output_config.format` body for the Messages API. */
