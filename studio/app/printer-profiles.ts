@@ -299,6 +299,54 @@ export function availableMaterial(profileId: ProfileId, material: MaterialId): M
   return materialsFor(profileId).includes(material) ? material : DEFAULT_MATERIAL_ID;
 }
 
+/** The filament in force for T1, as the «الخامة» row and the sheet header state it. */
+export interface MaterialInForce {
+  /** The listed material whose preset T1 holds, or null for any other filament. */
+  id: MaterialId | null;
+  /** The preset name the kernel loads for T1 (filament_settings_id[0]). */
+  name: string;
+  /**
+   * What the row prints: the listed label, or for any other filament its name
+   * without the vendor and the printer suffix («Bambu PLA Matte @BBL A1»
+   * reads «PLA Matte»), so the custom mark after it fits a phone row.
+   */
+  label: string;
+  /** Its filament type (filament_type[0]), for the sheet header. */
+  type: string;
+}
+
+/** «Bambu PLA Matte @BBL A1» → «PLA Matte»: the name a row has room for. */
+export function shortFilamentName(name: string): string {
+  const short = name.replace(/\s*@.*$/, "").replace(/^Bambu\s+/, "").trim();
+  return short || name;
+}
+
+/**
+ * WHAT T1 WILL REALLY PRINT WITH, READ FROM THE MAP THE KERNEL SLICES.
+ *
+ * The row used to show the material SELECTOR. An imported 3MF brings its own
+ * filament (a project made for PETG Basic on the A1), the engine puts it on
+ * T1 and the G-code is made with it, while the row still said «PLA Basic»
+ * and the sheet header «PLA». So the answer comes from
+ * `filament_settings_id[0]` and `filament_type[0]`: one of the listed
+ * materials when T1 holds the preset of that material for this printer,
+ * otherwise the name of the filament itself (the row then says it is
+ * custom, as the layer and infill rows do). A map with no filament yet
+ * (before the first preset load) reads as the selector.
+ */
+export function materialInForce(profile: PrinterProfile, settings: unknown, selected: MaterialId): MaterialInForce {
+  const record = (settings ?? {}) as Record<string, unknown>;
+  const first = (value: unknown) => String((Array.isArray(value) ? value[0] : value) ?? "").trim();
+  const name = first(record.filament_settings_id);
+  const type = first(record.filament_type);
+  if (!name) {
+    return { id: selected, name: materialPresetFor(profile, selected) ?? profile.materialPreset, label: MATERIALS[selected].label, type: type || MATERIALS[selected].type };
+  }
+  const listed = isProfileId(profile.id) ? materialsFor(profile.id) : [];
+  const id = listed.find((material) => materialPresetFor(profile, material) === name) ?? null;
+  return { id, name, label: id ? MATERIALS[id].label : shortFilamentName(name), type: type || (id ? MATERIALS[id].type : "") };
+}
+
 /**
  * THE PRINTER IS ASKED FOR, NOT ASSUMED.
  *

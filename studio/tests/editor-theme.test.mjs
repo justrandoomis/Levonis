@@ -175,3 +175,46 @@ test("every engine shadow host takes the theme, mode and viewport, nested ones i
     globalThis.MutationObserver = previous;
   }
 });
+
+test("the engine's own G-code links show only over a fresh result, at every width", async () => {
+  // c6-r3-ha-02: on a phone, «كل الإعدادات» opens the engine panel, whose
+  // «Export G-code» link stayed live after an edit and saved the G-code of
+  // the old layer height while the shell said «نتيجة قديمة».
+  const { EDITOR_SHADOW_CSS } = await loadAppModule("editor-theme");
+  const gate = ':host(:not([data-levo-result="fresh"])) :is([data-testid="gcode-dl"], [data-testid="export-all"]) { display: none !important; }';
+  assert.equal(EDITOR_SHADOW_CSS.split(gate).length - 1, 1, "the gate is in the shadow stylesheet once");
+  // Outside every media query: the desktop panel obeys it too.
+  assert.ok(EDITOR_SHADOW_CSS.indexOf(gate) < EDITOR_SHADOW_CSS.indexOf("@media"), "the gate applies at every width");
+  // A host with no attribute yet (before the first render sets it) is gated.
+  assert.match(gate, /^:host\(:not\(/);
+  // The engine still names the two controls this way.
+  const engine = await readFile(new URL("../node_modules/three-slicer/viewer/dist/Viewport.js", import.meta.url), "utf8");
+  assert.match(engine, /"a", \{ className: "export-btn", href: E, download: `plate_\$\{o \+ 1\}\.gcode`[^}]*"data-testid": "gcode-dl" \}/);
+  assert.match(engine, /"data-testid": "export-all"/);
+  // The shell says "fresh" exactly when its own export would allow G-code.
+  const client = await readFile(new URL("../app/slicer-client.tsx", import.meta.url), "utf8");
+  assert.match(client, /const printReady = status !== "slicing" && status !== "error" && currentResultState === "fresh";/);
+  assert.match(client, /adapter\.setHostAttribute\("data-levo-result", printReady \? "fresh" : "not-fresh"\);\s*\}, \[adapter, printReady\]\);/);
+  // The shell still reaches «export all» by a script click, which a hidden
+  // control takes: clickControl checks only for a disabled button.
+  const adapter = await readFile(new URL("../app/engine-adapter.ts", import.meta.url), "utf8");
+  assert.match(adapter, /clickControl\(testId: EngineTestId\): boolean \{\s*const element = this\.queryControl\(testId\);\s*if \(!element \|\| \(element instanceof HTMLButtonElement && element\.disabled\)\) return false;\s*element\.click\(\);/);
+});
+
+test("on a phone one finger orbits over the stats card and the bed warning too", async () => {
+  // c6-r3-ha-03: a drag that started on the stats card (251 x 110 px of a
+  // 356 x 303 canvas in preview) scrolled the page by 146 px and left the
+  // view where it was.
+  const { EDITOR_SHADOW_CSS } = await loadAppModule("editor-theme");
+  const phone = EDITOR_SHADOW_CSS.slice(EDITOR_SHADOW_CSS.indexOf("@media (max-width: 899px) {"), EDITOR_SHADOW_CSS.indexOf("@media (min-width: 900px) {"));
+  assert.ok(phone.length > 200, "the phone block is findable");
+  assert.match(phone, /\.bed-warn, \.stats-card \{ pointer-events: none; \}/);
+  // Neither holds a control a touch could have been meant for.
+  const engine = await readFile(new URL("../node_modules/three-slicer/viewer/dist/Viewport.js", import.meta.url), "utf8");
+  const start = engine.indexOf("function yi(");
+  const stats = engine.slice(start, engine.indexOf("\n}\n", start));
+  assert.ok(stats.length > 200, "the stats card component is findable");
+  assert.doesNotMatch(stats, /createElement\("(?:button|a|input|select|textarea|details|summary)"/, "the stats card has no control");
+  const warn = engine.slice(engine.indexOf('className: "bed-warn"') - 40, engine.indexOf('"stats-card", "data-testid": "slice-stats"'));
+  assert.doesNotMatch(warn, /onClick|createElement\("(?:button|a|input)"/, "the bed warning has no control");
+});

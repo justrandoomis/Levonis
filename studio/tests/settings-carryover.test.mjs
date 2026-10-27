@@ -537,3 +537,41 @@ test("the shell feeds the engine set to every preset reload and fills it on ever
   assert.match(client, /loadedFilamentKeysRef\.current = loaded\.filamentKeys;/);
   assert.match(client, /engineKeysRef\.current = new Set\(keysAwayFromPreset\(loaded\.settings, restored\)\);/);
 });
+
+test("A DRAFT REOPENED WITH THE SAME SELECTION keeps its own layer height through the next Support flip", async () => {
+  // c6-r3-reg-1: X1C, import custom-settings.3mf (0.12 mm, 40 %, five walls),
+  // the guest draft autosaves, reopen it from Projects with the selection
+  // already in force, flip Support: the G-code said layer_height 0.2 and 49
+  // layers. The same selection means no preset load, so the effect that seeds
+  // a restored project never ran and setSettings bypassed recordEngineWrites:
+  // the draft values were in neither set.
+  const preset = loadedFor({ layer_height: 0.2, sparse_infill_density: 15, wall_loops: 2 });
+  const draft = { ...preset, layer_height: 0.12, sparse_infill_density: 40, wall_loops: 5 };
+  const flip = (engine) => reload({ settings: draft, edited: new Set(), engine, preset }, {
+    loaded: { ...preset, enable_support: true },
+    from: SELECTION,
+    to: { ...SELECTION, support: true },
+    processKeys: ["layer_height", "initial_layer_height"],
+  });
+
+  // The finding, reproduced: with nothing seeded the flip rebuilds the draft.
+  assert.equal(flip(new Set()).out.settings.layer_height, 0.2);
+
+  // Seeded the way restoreProjectRecord now seeds it: what the draft holds
+  // beyond the loaded preset, carried silently.
+  const seeded = new Set(keysAwayFromPreset(preset, draft));
+  assert.deepEqual([...seeded], ["layer_height", "sparse_infill_density", "wall_loops"]);
+  const after = flip(seeded);
+  assert.equal(after.out.settings.layer_height, 0.12, "the draft keeps 0.12 mm");
+  assert.equal(after.out.settings.sparse_infill_density, 40);
+  assert.equal(after.out.settings.wall_loops, 5);
+  assert.equal(after.out.settings.enable_support, true);
+  assert.deepEqual([after.out.overwritten, after.out.kept], [[], []], "and nothing is said: nobody typed these here");
+
+  // The shell seeds both sets on the direct path, the one with no preset load.
+  const { readFile } = await import("node:fs/promises");
+  const client = await readFile(new URL("../app/slicer-client.tsx", import.meta.url), "utf8");
+  const restore = client.slice(client.indexOf("const restoreProjectRecord = useCallback("), client.indexOf("await adapter.dispatchFiles(saved.files);"));
+  assert.match(restore, /restoredSettingsRef\.current = saved\.settings && restoredKey !== requestedPresetKey/);
+  assert.match(restore, /if \(saved\.settings\) setSettings\(saved\.settings\);\s*\/\*[\s\S]*?\*\/\s*if \(saved\.settings && !restoredSettingsRef\.current\) \{\s*userEditedKeysRef\.current = new Set\(\);\s*engineKeysRef\.current = new Set\(keysAwayFromPreset\(loadedPresetRef\.current \?\? saved\.settings, saved\.settings\)\);\s*\}/);
+});

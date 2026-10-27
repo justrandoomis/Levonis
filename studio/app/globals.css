@@ -547,7 +547,16 @@ button:disabled { cursor: not-allowed; }
 .empty-upload-icon svg { width: 28px; height: 28px; }
 .empty-upload-card > strong { margin-top: 3px; font-size: 19px; }
 .empty-upload-card > p { margin: 0; color: var(--muted); direction: ltr; font-size: 11px; letter-spacing: .03em; }
-.empty-upload-card > .file-select-control { min-width: 180px; min-height: 48px; margin-top: 5px; padding: 0 18px; border: 0; border-radius: var(--radius-sm); display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--accent); color: var(--accent-ink); font-weight: 850; cursor: pointer; }
+/*
+ * «إضافة» IS THE ONE PRIMARY VERB OF THE EMPTY SCREEN (D-2), so it takes the
+ * same sand clay as the slice button of the loaded screen, in both themes:
+ * the gradient, near-black ink, the rim, base and cast, and in light the 1px
+ * --gold-edge ring that --clay-gold draws. It used to be the flat --accent,
+ * which the light theme turns into a dark gold with cream ink, a different
+ * kind of button from the primary of the loaded screen.
+ */
+.empty-upload-card > .file-select-control { min-width: 180px; min-height: 48px; margin-top: 5px; padding: 0 18px; border: 0; border-radius: var(--radius-sm); display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--gold-clay); box-shadow: var(--clay-gold); color: var(--gold-ink); font-weight: 850; cursor: pointer; }
+.empty-upload-card > .file-select-control:active:not([aria-disabled="true"]) { box-shadow: var(--clay-press); transform: translateY(1px); }
 .empty-upload-card > .file-select-control svg { width: 19px; height: 19px; }
 .empty-upload-card > small { max-width: 250px; color: var(--muted); font-size: var(--text-caption); line-height: 1.45; }
 
@@ -630,7 +639,9 @@ button:disabled { cursor: not-allowed; }
 .editor-message.error { background: var(--danger-surface); border-color: var(--danger-border); }
 .editor-message > span { flex: 1; min-width: 0; }
 .editor-message button { width: 30px; height: 30px; flex: 0 0 auto; border: 0; border-radius: var(--radius-sm); display: grid; place-items: center; background: var(--surface-strong); cursor: pointer; }
-.editor-message button.message-action { width: auto; min-height: 34px; padding: 0 12px; background: var(--accent); color: var(--accent-ink); font-size: 11px; font-weight: 800; }
+/* An undo in the message slot is a secondary action: the gold outline of
+   «استيراد», never a second gold fill beside the primary of the screen. */
+.editor-message button.message-action { width: auto; min-height: 34px; padding: 0 12px; border: 1.5px solid var(--gold-line); background: var(--gold-outline-fill); color: var(--text); font-size: 11px; font-weight: 800; }
 .editor-message svg { width: 17px; height: 17px; }
 
 /* The cut sheet: a height, what to keep, and whether to close the face. */

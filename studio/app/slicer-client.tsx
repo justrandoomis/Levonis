@@ -61,6 +61,7 @@ import {
   availableMaterial,
   isInfillId,
   isMaterialId,
+  materialInForce,
   materialsFor,
   isProfileId,
   printerChoiceAnswered,
@@ -271,6 +272,9 @@ function nextFrame() {
   return new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
+/** What Tab can land on inside an open sheet (the wrap at its two ends). */
+const SHEET_TABBABLE = "a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]";
+
 function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -343,6 +347,14 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const [support, setSupport] = useState(false);
   /** The «الخامة» row: only materials whose engine preset ships for this printer. */
   const [material, setMaterial] = useState<MaterialId>(DEFAULT_MATERIAL_ID);
+  /**
+   * A tap on the material the selector already holds while T1 holds another
+   * filament (one an imported project brought): the counter runs the preset
+   * effect again, and the ref tells it to carry the reload as a material
+   * change, so the row takes T1 back (chooseMaterial).
+   */
+  const [materialTakeBack, setMaterialTakeBack] = useState(0);
+  const materialTakeBackRef = useRef(false);
   /**
    * THE FIRST-RUN PRINTER QUESTION.
    *
@@ -897,6 +909,10 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     const requestId = profileRequestRef.current + 1;
     profileRequestRef.current = requestId;
     const nextSelection: PresetSelection = { printerId: profileId, quality, strength, support, infill, material };
+    // The material row asked for T1 back from a filament the selector did not
+    // load: the reload is carried as a material change, so the row owns T1.
+    const takeBack = materialTakeBackRef.current;
+    materialTakeBackRef.current = false;
     setProfileLoadState(null);
     loadPrinterProfile(profile, quality, strength, support, infill, material)
       .then((loaded) => {
@@ -929,7 +945,9 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
             loaded: loaded.settings,
             previous: settingsRef.current,
             editedKeys: userEditedKeysRef.current,
-            previousSelection: loadedSelectionRef.current,
+            previousSelection: takeBack && loadedSelectionRef.current
+              ? { ...loadedSelectionRef.current, material: "t1-from-file" }
+              : loadedSelectionRef.current,
             nextSelection,
             processKeys: loaded.processKeys,
             filamentKeys: loaded.filamentKeys,
@@ -967,7 +985,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       });
     // slicing.clearResults is identity-stable per hook instance.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [infill, material, profile, quality, requestedPresetKey, strength, support]);
+  }, [infill, material, materialTakeBack, profile, quality, requestedPresetKey, strength, support]);
 
   // -- settings (engine SettingsPanel binding stays; machine keys locked) ----
   const setEditorSettings: Dispatch<SetStateAction<SlicerSettings>> = useCallback((next) => {
@@ -1549,6 +1567,20 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     setInfill(restoredInfill);
     setMaterial(restoredMaterial);
     if (saved.settings) setSettings(saved.settings);
+    /*
+     * THE SAME SELECTION REOPENS WITHOUT A PRESET LOAD, SO ITS SETS ARE SEEDED
+     * HERE. With the selection of the draft equal to the one in force (the
+     * usual case) the preset effect does not run again, and setSettings bypasses
+     * recordEngineWrites: the layer height, infill and walls of the draft were
+     * in neither set, and the next Support flip rebuilt them from the preset
+     * (0.12 mm came back as 0.2, with nothing said). Seeded the way the
+     * effect seeds a restored project: nothing counts as typed, and what the
+     * draft holds beyond the loaded preset is carried silently.
+     */
+    if (saved.settings && !restoredSettingsRef.current) {
+      userEditedKeysRef.current = new Set();
+      engineKeysRef.current = new Set(keysAwayFromPreset(loadedPresetRef.current ?? saved.settings, saved.settings));
+    }
     setObjects([]);
     setWorkspaceKey((value) => value + 1);
     setSheet(null);
@@ -1999,6 +2031,46 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   }, []);
 
   /**
+   * THE PAGE BEHIND AN OPEN SHEET IS OUT OF REACH, AND FOCUS COMES BACK.
+   *
+   * `aria-modal` claimed a modal while Tab walked out of the sheet onto the
+   * back link, «حفظ», «استيراد», «المزيد» and the mode switch behind it, and
+   * Escape dropped focus on the body (WCAG 2.4.3). The «المزيد» sheet holds
+   * about twenty-five actions, the source link among them, so it has to
+   * behave like the modal it says it is. While any sheet is open every
+   * sibling of the backdrop is `inert` (out of the tab order and the
+   * accessibility tree), including one that renders while it is open; Tab
+   * and Shift+Tab wrap inside the sheet; and when the last sheet closes,
+   * by any path, focus goes back to the control that opened it. Switching
+   * from one sheet to another keeps the first opener.
+   */
+  const sheetOpen = sheet !== null;
+  const sheetOpenerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const active = document.activeElement;
+    sheetOpenerRef.current = active instanceof HTMLElement && active !== document.body ? active : null;
+    const backdrop = sheetRef.current?.closest<HTMLElement>(".sheet-backdrop") ?? null;
+    const page = backdrop?.parentElement ?? null;
+    const hide = () => {
+      if (!page || !backdrop?.isConnected) return;
+      for (const child of page.children) {
+        if (child !== backdrop) (child as HTMLElement).inert = true;
+      }
+    };
+    hide();
+    const observer = new MutationObserver(hide);
+    if (page) observer.observe(page, { childList: true });
+    return () => {
+      observer.disconnect();
+      if (page) for (const child of page.children) (child as HTMLElement).inert = false;
+      const opener = sheetOpenerRef.current;
+      sheetOpenerRef.current = null;
+      if (opener?.isConnected && !opener.closest("[inert]")) opener.focus({ preventScroll: true });
+    };
+  }, [sheetOpen]);
+
+  /**
    * Escape closes the sheet, and opening one moves focus into it.
    *
    * A dialog that declares `aria-modal` and then leaves focus on the page
@@ -2011,7 +2083,25 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   useEffect(() => {
     if (!sheet) return;
     sheetRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setSheet(null); };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setSheet(null); return; }
+      if (event.key !== "Tab") return;
+      const dialog = sheetRef.current;
+      if (!dialog) return;
+      const tabbable = [...dialog.querySelectorAll<HTMLElement>(SHEET_TABBABLE)]
+        .filter((element) => element.tabIndex >= 0 && element.getClientRects().length > 0);
+      if (!tabbable.length) return;
+      const first = tabbable[0];
+      const last = tabbable[tabbable.length - 1];
+      const current = document.activeElement;
+      if (event.shiftKey && (current === first || current === dialog || !dialog.contains(current))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (current === last || !dialog.contains(current))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [sheet]);
@@ -2079,6 +2169,16 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const currentResultState = slicing.resultState(selectedPlate);
   const currentStale = currentResultState === "stale";
   const printReady = status !== "slicing" && status !== "error" && currentResultState === "fresh";
+  /*
+   * The G-code links of the engine follow the same rule as the export of the
+   * shell (app/editor-theme.ts, G-CODE ONLY FROM A FRESH RESULT): they show
+   * only while this is "fresh". Opening «كل الإعدادات» on a phone puts them
+   * in reach, and after an edit they still held the G-code of the old
+   * settings.
+   */
+  useEffect(() => {
+    adapter.setHostAttribute("data-levo-result", printReady ? "fresh" : "not-fresh");
+  }, [adapter, printReady]);
 
   const currentGcodeFile = useCallback(() => {
     const name = `LEVO-${profile.shortName}-plate-${selectedPlate + 1}.gcode`;
@@ -2850,6 +2950,19 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     else if (action === "about") setSheet("about");
   }, [canvasMode, clickControl, deleteAll, newProject, openAllSettings, openCut, openPrintCenter, openProjects, orientAll, prepareForBambuHandy, runTool, shareCurrentGcode, shortcut, triggerSlice]);
 
+  /** The filament the kernel will use for T1, for the «الخامة» row and the sheet header. */
+  const t1Material = useMemo(() => materialInForce(profile, settings, material), [material, profile, settings]);
+  const chooseMaterial = useCallback((id: MaterialId) => {
+    if (id !== material) {
+      setMaterial(id);
+      return;
+    }
+    // The row showed the filament on T1, not the selector, and the person
+    // picked the material the selector already holds: take T1 back to it.
+    materialTakeBackRef.current = true;
+    setMaterialTakeBack((value) => value + 1);
+  }, [material]);
+
   /** The infill density the kernel will use, for the «الملء» row. */
   const effectiveInfill = useMemo(() => {
     const value = Number.parseFloat(String((settings as unknown as Record<string, unknown>).sparse_infill_density));
@@ -3096,8 +3209,9 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
           printerName={profile.model}
           onOpenPrinter={() => { setPrinterDraft(profileId); setSheet("printer"); }}
           material={material}
+          materialInForce={t1Material}
           materials={materialsFor(profileId)}
-          onMaterial={setMaterial}
+          onMaterial={chooseMaterial}
           quality={quality}
           effectiveLayer={effectiveLayerHeight}
           onQuality={setQuality}
@@ -3179,7 +3293,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
             onPointerDown={beginSheetDrag}
           />
           <header>
-            <div><strong>{sheetTitle}</strong><span>{profile.shortName} · {profile.nozzle.toFixed(1)} mm · {MATERIALS[material].type}</span></div>
+            <div><strong>{sheetTitle}</strong><span>{profile.shortName} · {profile.nozzle.toFixed(1)} mm · {t1Material.type || MATERIALS[material].type}</span></div>
             <button onClick={() => setSheet(null)} aria-label={t.close}><Icon name="close" /></button>
           </header>
 

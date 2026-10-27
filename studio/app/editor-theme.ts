@@ -289,6 +289,17 @@ export const EDITOR_SHADOW_CSS = `
   button, .slice-btn, .export-btn, select, input { border-radius: 6px !important; }
   .slice-btn { background: ${T.accent}; color: ${T.accentInk}; }
   .export-btn { background: ${T.surfaceStrong}; color: ${T.text}; border-color: ${T.line}; }
+  /* G-CODE ONLY FROM A FRESH RESULT. The engine keeps its own Export G-code
+     link (and Export all G-code in the slice menu) live after a settings
+     edit, holding the G-code of the old settings, while the shell already
+     says the result is outdated and its own export waits for a new slice.
+     The shell sets data-levo-result on every host to fresh only while the
+     selected plate has a fresh result and nothing is slicing or failed; any
+     other value, or none yet, takes both links away, so a tap can never
+     save a file made with settings that are no longer in force. The shell
+     reaches the engine control by a script click, which a hidden control
+     still takes. Plain prose only in this comment. */
+  :host(:not([data-levo-result="fresh"])) :is([data-testid="gcode-dl"], [data-testid="export-all"]) { display: none !important; }
   .empty-hint { display: none !important; }
   @media (max-width: 899px) {
     .app-shell { font-size: 12px; }
@@ -299,6 +310,12 @@ export const EDITOR_SHADOW_CSS = `
        and three lines of it covered a third of a phone-sized viewport. */
     .vp-status { bottom: ${DOCK_BOTTOM}; left: 9px; right: 104px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .bed-warn, .stats-card { left: 8px; bottom: calc(${DOCK_BOTTOM} + 52px); max-width: calc(100% - 68px); }
+    /* ONE FINGER ORBITS ANYWHERE IN THE CARD. The stats card covers a third
+       of a phone-sized canvas in preview and the bed warning sits in the
+       same place in prepare; a drag that started on either scrolled the page
+       instead of turning the model. Neither holds a control, so they let
+       the touch through to the canvas under them. */
+    .bed-warn, .stats-card { pointer-events: none; }
     /* Below the shell's overlay toolbar, which owns the top 50px of the card. */
     .brush-panel { top: 54px; left: 8px; width: min(280px, calc(100vw - 16px)); }
     /* z-index 33, not 14 — «عندما اضغط على زر الاعدادات قائمة اختار الملف

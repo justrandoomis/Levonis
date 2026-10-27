@@ -535,3 +535,136 @@ test("with the viewport expanded, the page under it is inert, and Escape hands f
   assert.match(escape, /setViewportExpanded\(false\);/);
   assert.match(escape, /querySelector<HTMLElement>\('\[data-levo-action="viewport-expand"\]'\)\?\.focus\(/);
 });
+
+// --------------------------------------------------------------- round 3 review
+
+test("the empty screen's «إضافة» is the sand clay primary, and a message action is never a second gold fill", async () => {
+  // c6-r3-fid-1: «إضافة» was the flat --accent, which the light theme turns
+  // into #6F592B with cream ink, while the loaded screen's primary is the sand
+  // gradient with near-black ink. Both are now the same recipe in both themes.
+  const css = (await read("../app/globals.css")).replace(/\/\*[\s\S]*?\*\//g, "");
+  const rule = (selector) => {
+    const at = css.indexOf(`${selector} {`);
+    assert.ok(at >= 0, `${selector} is findable`);
+    return css.slice(at, css.indexOf("}", at));
+  };
+  const empty = rule(".empty-upload-card > .file-select-control");
+  const slice = rule(".m-slice");
+  for (const declaration of ["background: var(--gold-clay);", "box-shadow: var(--clay-gold);", "color: var(--gold-ink);"]) {
+    assert.ok(empty.includes(declaration), `«إضافة» lacks ${declaration}`);
+    assert.ok(slice.includes(declaration), `the slice button lacks ${declaration}`);
+  }
+  assert.doesNotMatch(empty, /var\(--accent(?:-ink)?\)/, "no flat accent on the empty primary");
+  // --clay-gold carries the rim, the base, the 1px --gold-edge ring (#7A5C30 in
+  // light) and the cast, so the light theme gets its 3:1 edge from it.
+  assert.match(css, /--clay-gold: inset 0 1px 0 var\(--gold-rim\), inset 0 -2px 0 var\(--gold-base\), 0 0 0 1px var\(--gold-edge\), 0 6px 14px -6px var\(--clay-ambient\);/);
+  assert.match(css, /:root\[data-theme="light"\] \{[^}]*--gold-edge: #7A5C30;/);
+  // The undo of an arrange, an orient or a cut is a secondary action: the gold
+  // outline of «استيراد», never the accent fill.
+  const action = rule(".editor-message button.message-action");
+  assert.ok(action.includes("border: 1.5px solid var(--gold-line);"), "the message action draws the gold outline");
+  assert.ok(action.includes("background: var(--gold-outline-fill);"), "on the outline fill");
+  assert.ok(action.includes("color: var(--text);"), "with the body ink");
+  assert.doesNotMatch(action, /var\(--accent(?:-ink)?\)|var\(--gold-clay\)/, "never a second gold fill");
+});
+
+test("the «الخامة» row and the sheet header say the filament T1 really prints with", async () => {
+  // c6-r3-ha-01: an A1 project made for PETG Basic. The engine applies its
+  // project settings, T1 is PETG and the G-code says M104 S255, while the row
+  // said «PLA Basic» and the header «· PLA».
+  const { unzipSync, strFromU8 } = await import("fflate");
+  const fixture = await readFile(new URL("./fixtures/mini-project.3mf", import.meta.url));
+  const project = JSON.parse(strFromU8(unzipSync(new Uint8Array(fixture))["Metadata/project_settings.config"]));
+  Object.assign(project, {
+    printer_model: "Bambu Lab A1",
+    printer_settings_id: "Bambu Lab A1 0.4 nozzle",
+    filament_settings_id: ["Bambu PETG Basic @BBL A1"],
+    filament_type: ["PETG"],
+    nozzle_temperature: ["255"],
+  });
+  const { PROFILES, MATERIALS, materialInForce, materialPresetFor } = await loadAppModule("printer-profiles");
+  const a1 = PROFILES["bbl-a1-04"];
+  // The map the PLA preset load built, then the project settings on top of it,
+  // as the engine writes them after the import.
+  const preset = { filament_settings_id: [materialPresetFor(a1, "pla")], filament_type: ["PLA"], nozzle_temperature: [220] };
+  const sliced = { ...preset, ...project };
+  const shown = materialInForce(a1, sliced, "pla");
+  assert.equal(shown.id, "petg", "the row selects PETG Basic");
+  assert.notEqual(shown.id, "pla", "never «PLA Basic» over a PETG print");
+  assert.equal(MATERIALS[shown.id].label, "PETG Basic");
+  assert.equal(shown.label, "PETG Basic");
+  assert.equal(shown.type, "PETG", "the sheet header says PETG");
+  // The preset the selector loaded still reads as itself.
+  assert.deepEqual(materialInForce(a1, preset, "pla"), { id: "pla", name: "Bambu PLA Basic @BBL A1", label: "PLA Basic", type: "PLA" });
+  // A filament the printer does not list (a generic one, PLA Matte, or PETG
+  // on the P1P, which ships no PETG Basic) reads as its own short name, never
+  // as a listed one.
+  const generic = materialInForce(a1, { ...preset, filament_settings_id: ["Generic PETG @BBL A1"], filament_type: ["PETG"] }, "pla");
+  assert.deepEqual(generic, { id: null, name: "Generic PETG @BBL A1", label: "Generic PETG", type: "PETG" });
+  assert.equal(materialInForce(a1, { filament_settings_id: ["Bambu PLA Matte @BBL A1"], filament_type: ["PLA"] }, "pla").label, "PLA Matte");
+  assert.equal(materialInForce(PROFILES["bbl-p1p-04"], { filament_settings_id: ["Bambu PETG Basic @BBL X1C"], filament_type: ["PETG"] }, "pla").id, null);
+  // Before the first preset load there is no filament: the selector stands.
+  assert.equal(materialInForce(a1, {}, "petg").id, "petg");
+
+  const [card, client] = await Promise.all([read("../app/components/mobile/print-settings-card.tsx"), read("../app/slicer-client.tsx")]);
+  // The row's value is T1, and a filament it does not list is a disabled
+  // «<name> (مخصص)» option in all three languages (t.customValue), as the
+  // layer and infill rows already do.
+  assert.match(card, /const materialShown = props\.materialInForce\.id;/);
+  assert.match(card, /value=\{materialShown \?\? CUSTOM\}/);
+  assert.match(card, /\{materialShown === null && <option value=\{CUSTOM\} disabled>\{templateText\(t\.customValue, \{ value: props\.materialInForce\.label \}\)\}<\/option>\}/);
+  assert.doesNotMatch(card, /value=\{props\.material\}/, "the selector is not what the row shows");
+  assert.match(client, /const t1Material = useMemo\(\(\) => materialInForce\(profile, settings, material\), \[material, profile, settings\]\);/);
+  assert.match(client, /materialInForce=\{t1Material\}/);
+  assert.match(client, /\{profile\.shortName\} · \{profile\.nozzle\.toFixed\(1\)\} mm · \{t1Material\.type \|\| MATERIALS\[material\]\.type\}/);
+  // Picking the material the selector already holds while T1 holds another
+  // one takes T1 back: the reload is carried as a material change.
+  assert.match(client, /onMaterial=\{chooseMaterial\}/);
+  const choose = client.slice(client.indexOf("const chooseMaterial = useCallback("), client.indexOf("}, [material]);", client.indexOf("const chooseMaterial = useCallback(")));
+  assert.match(choose, /if \(id !== material\) \{\s*setMaterial\(id\);\s*return;\s*\}/);
+  assert.match(choose, /materialTakeBackRef\.current = true;\s*setMaterialTakeBack\(\(value\) => value \+ 1\);/);
+  assert.match(client, /previousSelection: takeBack && loadedSelectionRef\.current\s*\? \{ \.\.\.loadedSelectionRef\.current, material: "t1-from-file" \}\s*: loadedSelectionRef\.current,/);
+  assert.match(client, /\}, \[infill, material, materialTakeBack, profile, quality, requestedPresetKey, strength, support\]\);/);
+
+  // And that carry really gives T1 back to the preset.
+  const { carryUserEdits } = await loadAppModule("settings-carryover");
+  const selection = { printerId: "bbl-a1-04", quality: "standard", strength: "standard", support: false, infill: "grid", material: "pla" };
+  const loadedPla = { ...preset, layer_height: 0.2 };
+  const carried = carryUserEdits({
+    loaded: loadedPla,
+    previous: sliced,
+    editedKeys: new Set(),
+    previousSelection: { ...selection, material: "t1-from-file" },
+    nextSelection: selection,
+    processKeys: [],
+    filamentKeys: ["filament_settings_id", "filament_type", "nozzle_temperature"],
+    previousFilamentKeys: ["filament_settings_id", "filament_type", "nozzle_temperature"],
+    engineKeys: new Set(["filament_settings_id", "filament_type", "nozzle_temperature"]),
+  });
+  assert.equal(materialInForce(a1, carried.settings, "pla").id, "pla", "after the take-back the row and the G-code agree on PLA");
+  assert.deepEqual(carried.settings.nozzle_temperature, [220]);
+});
+
+test("the sheets are modal: the page behind is inert, Tab wraps, and focus returns to the opener", async () => {
+  // c6-r3-ha-04: Tab left the «المزيد» sheet 26 times in 60, and Escape put
+  // focus on <body>.
+  const client = await read("../app/slicer-client.tsx");
+  const effect = client.slice(client.indexOf("const sheetOpenerRef = useRef"), client.indexOf("}, [sheetOpen]);"));
+  assert.ok(effect.length > 200, "the modal effect is findable");
+  assert.match(effect, /sheetOpenerRef\.current = active instanceof HTMLElement && active !== document\.body \? active : null;/, "the opener is remembered when a sheet opens");
+  assert.match(effect, /sheetRef\.current\?\.closest<HTMLElement>\("\.sheet-backdrop"\)/);
+  assert.match(effect, /if \(child !== backdrop\) \(child as HTMLElement\)\.inert = true;/, "every sibling of the backdrop goes inert");
+  assert.match(effect, /new MutationObserver\(hide\)/, "including one that renders while the sheet is open");
+  assert.match(effect, /for \(const child of page\.children\) \(child as HTMLElement\)\.inert = false;/, "nothing stays inert after it closes");
+  assert.match(effect, /opener\?\.isConnected && !opener\.closest\("\[inert\]"\)\) opener\.focus\(/, "focus goes back to the opener");
+  // It runs before the effect that moves focus into the sheet, so the opener
+  // is still the focused element when it is read.
+  assert.ok(client.indexOf("}, [sheetOpen]);") < client.indexOf("sheetRef.current?.focus();"), "the opener is read before focus moves into the sheet");
+  // Tab and Shift+Tab wrap at the two ends of the sheet.
+  const keys = client.slice(client.indexOf("sheetRef.current?.focus();"), client.indexOf("}, [sheet]);", client.indexOf("sheetRef.current?.focus();")));
+  assert.match(keys, /if \(event\.key !== "Tab"\) return;/);
+  assert.match(keys, /dialog\.querySelectorAll<HTMLElement>\(SHEET_TABBABLE\)/);
+  assert.match(keys, /event\.preventDefault\(\);\s*last\.focus\(\);/);
+  assert.match(keys, /event\.preventDefault\(\);\s*first\.focus\(\);/);
+  assert.match(client, /<div className="sheet-backdrop"[\s\S]{0,200}?<section\s+ref=\{sheetRef\}/, "the sheet is the child of the backdrop");
+});
