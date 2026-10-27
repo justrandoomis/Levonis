@@ -144,6 +144,7 @@ import { merchantAttentionRoutes, merchantSearchRoutes } from '../../worker/rout
 import { storefrontEventRoutes } from '../../worker/routes/storefrontEvents';
 import { storefrontRoutes } from '../../worker/routes/storefront';
 import { printRequestRoutes } from '../../worker/routes/printRequests';
+import { requestEntryRoutes } from '../../worker/routes/requestEntries';
 import { marketplaceRoutes } from '../../worker/routes/marketplace';
 import { requestDiscussionRoutes } from '../../worker/routes/requestDiscussion';
 import { communityOrderTimelineRoutes } from '../../worker/routes/communityOrderTimeline';
@@ -284,6 +285,7 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/storefront', storefrontRoutes as Router],
   ['/api/product-files', publicProductFileRoutes as Router],
   ['/api/marketplace/print', printRequestRoutes as Router],
+  ['/api/marketplace/print', requestEntryRoutes as Router],
   ['/api/marketplace', marketplaceRoutes as Router],
   ['/api/marketplace', requestDiscussionRoutes as Router],
   ['/api/marketplace', communityOrderTimelineRoutes as Router],

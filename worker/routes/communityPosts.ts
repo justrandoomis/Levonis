@@ -286,7 +286,8 @@ const postScore = (p: Record<string, unknown>) =>
 /**
  * A column as WORDS for a whole-word match: lower-cased, the joiners of
  * «PLA+», «PLA-CF» and «PA/CF» turned into spaces, and a space at each end,
- * so `LIKE '% pla %'` finds «PLA Matte» and «Silk PLA» but not «PLAY».
+ * so `instr(..., ' pla ')` finds «PLA Matte» and «Silk PLA» but not «PLAY» (instr, not LIKE: no
+ * pattern is built, so the D1 pattern byte limit never applies).
  */
 const wordsOf = (col: string) =>
   `(' ' || lower(replace(replace(replace(replace(COALESCE(${col}, ''), '+', ' '), '-', ' '), '/', ' '), ',', ' ')) || ' ')`;
@@ -356,11 +357,11 @@ communityPostRoutes.get('/posts', async (c) => {
           AND (?5 = '' OR p.product_id = ?5)
           AND (?6 = '' OR EXISTS (SELECT 1 FROM json_each(p.tags) t WHERE lower(t.value) = ?6))
           AND (?12 = '[]' OR EXISTS (SELECT 1 FROM json_each(?12) mw
-                                     WHERE ${wordsOf('p.material')} LIKE '% ' || mw.value || ' %'
-                                        OR ${wordsOf('mp.name')} LIKE '% ' || mw.value || ' %'))
+                                     WHERE instr(${wordsOf('p.material')}, ' ' || mw.value || ' ') > 0
+                                        OR instr(${wordsOf('mp.name')}, ' ' || mw.value || ' ') > 0))
           AND (?13 = '[]' OR EXISTS (SELECT 1 FROM json_each(?13) pw
-                                     WHERE lower(COALESCE(p.printer_name, '')) LIKE '%' || pw.value || '%'
-                                        OR lower(COALESCE(pp.name, '')) LIKE '%' || pw.value || '%'))
+                                     WHERE instr(lower(COALESCE(p.printer_name, '')), pw.value) > 0
+                                        OR instr(lower(COALESCE(pp.name, '')), pw.value) > 0))
           AND (?14 = 0 OR EXISTS (SELECT 1 FROM community_post_files pf WHERE pf.post_id = p.id AND pf.downloadable = 1))`;
   const page =
     sort === 'popular'
