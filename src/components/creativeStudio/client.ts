@@ -21,7 +21,7 @@ import type {
   DocumentSummaryDto, EditRequest, EditResponse, ExportDto, ExportKind, IdeaRecordDto, IdeasRequest, IdeasResponse,
   ModelDto, OpportunityDto, ProductDetailDto, ProductListItemDto, ProviderStatusDto, ReviewRequest, ReviewResponse,
   UsageRecordDto, VerifyDto, VersionDto, VersionOrigin, ApproveRequest, ReviewDto, RejectReason, ProviderSettingsRequest,
-  BrandVersionResponse, WatchSyncResponse,
+  BrandVersionResponse, WatchSyncResponse, CampaignDto, CarouselRequest, CarouselResponse, PlanItemDto,
 } from '../../../packages/creativeDoc/src/api';
 import type { BrandKit } from '../../../packages/creativeDoc/src/brand';
 import type { CreativeDocument } from '../../../packages/creativeDoc/src/schema';
@@ -199,6 +199,8 @@ export interface DocumentFilters {
   status?: DocStatus | '';
   format?: string;
   product_id?: string;
+  campaign_id?: string;
+  kind?: 'post' | 'slide' | 'experiment';
   q?: string;
   from?: string;
   to?: string;
@@ -222,7 +224,11 @@ export const documents = {
     return { documents: list<DocumentSummaryDto>(body, 'documents'), migrated: body.migrated !== false };
   },
   get: async (id: string): Promise<DocumentDto> => one<DocumentDto>(await api.get<Body>(`${BASE}/documents/${encodeURIComponent(id)}`), 'document', 'content'),
-  create: async (input: { title: string; content: CreativeDocument; kind?: 'post' | 'slide' | 'experiment'; parent_id?: string | null; origin?: VersionOrigin; job_id?: string | null }): Promise<DocumentDto> =>
+  create: async (input: {
+    title: string; content: CreativeDocument; kind?: 'post' | 'slide' | 'experiment'; parent_id?: string | null; campaign_id?: string | null; origin?: VersionOrigin; job_id?: string | null;
+    /** A retry with the same key answers the design already made (batch and carousel creation never make two). */
+    idempotency_key?: string;
+  }): Promise<DocumentDto> =>
     one<DocumentDto>(await api.post<Body>(`${BASE}/documents`, { kind: 'post', origin: 'template', parent_id: null, job_id: null, ...input }), 'document', 'content'),
   /** Version-fenced: a 409 VERSION_CONFLICT means someone saved after `base_version`, and nothing was written. */
   save: async (id: string, input: { content: CreativeDocument; base_version: number; origin: VersionOrigin; job_id?: string | null; change_summary?: string }): Promise<SaveResult> =>
@@ -276,3 +282,41 @@ export const ai = {
   /** Tells the server the owner applied this answer to `version` (a cancelled or stale job is refused there too). */
   applied: (id: string, documentId: string, version: number) => api.post<Body>(`${BASE}/jobs/${encodeURIComponent(id)}/applied`, { document_id: documentId, version }),
 };
+
+// ---------------------------------------------------------------------------
+// Phase 4: carousels, campaigns, the internal calendar (nothing is published)
+// ---------------------------------------------------------------------------
+
+export const carousel = {
+  /** Claude's slide plan (editable before any slide is designed); the slides are made by `documents.create`. */
+  plan: async (req: CarouselRequest): Promise<CarouselResponse> => one<CarouselResponse>(await api.post<Body>(`${BASE}/ai/carousel`, req, { timeoutMs: AI_TIMEOUT_MS }), 'result', 'slides'),
+};
+
+export const campaigns = {
+  list: async (): Promise<{ campaigns: CampaignDto[]; migrated: boolean }> => {
+    const body = await api.get<Body>(`${BASE}/campaigns`);
+    return { campaigns: list<CampaignDto>(body, 'campaigns'), migrated: body.migrated !== false };
+  },
+  create: async (input: { name: string; notes?: string; starts_on?: string | null; ends_on?: string | null }): Promise<CampaignDto> =>
+    one<CampaignDto>(await api.post<Body>(`${BASE}/campaigns`, input), 'campaign', 'document_count'),
+  update: async (id: string, input: { name?: string; notes?: string; starts_on?: string | null; ends_on?: string | null; archived?: boolean }): Promise<CampaignDto> =>
+    one<CampaignDto>(await api.patch<Body>(`${BASE}/campaigns/${encodeURIComponent(id)}`, input), 'campaign', 'document_count'),
+  /** Moves a design into a campaign, or (null) out of it: no new version, an approval stands. */
+  attach: async (documentId: string, campaignId: string | null): Promise<DocumentSummaryDto> =>
+    one<DocumentSummaryDto>(await api.put<Body>(`${BASE}/documents/${encodeURIComponent(documentId)}/campaign`, { campaign_id: campaignId }), 'document', 'status'),
+};
+
+export const plan = {
+  /** The planned designs between two Baghdad calendar days, both included. */
+  between: async (from: string, to: string): Promise<{ items: PlanItemDto[]; migrated: boolean }> => {
+    const body = await api.get<Body>(`${BASE}/plan${q({ from, to })}`);
+    return { items: list<PlanItemDto>(body, 'items'), migrated: body.migrated !== false };
+  },
+  /** `day` null removes the date. The design's status, version and approval are untouched. */
+  set: (documentId: string, day: string | null) => api.put<Body>(`${BASE}/documents/${encodeURIComponent(documentId)}/plan`, { planned_for: day }),
+};
+
+/** The same-origin url of a recorded export (drawn with the shared image component, never a raw <img>). */
+export function exportFileUrl(id: string): string {
+  return `${BASE}/exports/${encodeURIComponent(id)}/file`;
+}

@@ -26,7 +26,7 @@ const AI =
   'an AI request reaches the provider only with a configured key and a chosen model; the sweep has neither, so it is refused KEY_NOT_CONFIGURED before any studio row or store table is read or written';
 const NEEDS_DESIGN =
   'acts on one stored studio design; the sweep has none, so it is refused 404 before anything is written — and a design holds no cost, price or stock column';
-const NEEDS_ROW = 'acts on one stored studio row (a job, an idea, an asset or a snapshot); the sweep has none, so it is refused 404 before anything is written';
+const NEEDS_ROW = 'acts on one stored studio row (a job, an idea, an asset, a snapshot or a campaign); the sweep has none, so it is refused 404 before anything is written';
 const MULTIPART = 'a multipart file upload; the sweep sends JSON, which is refused 400 before any byte is stored';
 
 /** The smallest valid design: the normaliser fills every other field with its default. */
@@ -87,6 +87,14 @@ export default {
         'POST /documents/:id/approve': { cls: 'op', noBody: NEEDS_DESIGN },
         'POST /documents/:id/reject': { cls: 'op', noBody: NEEDS_DESIGN },
         'GET /documents/:id/reviews': 'op',
+        'PUT /documents/:id/campaign': { cls: 'op', noBody: NEEDS_DESIGN },
+        'PUT /documents/:id/plan': { cls: 'op', noBody: NEEDS_DESIGN },
+        // Campaigns and the internal calendar (nothing is published)
+        'GET /campaigns': 'op',
+        'POST /campaigns': { cls: 'op', body: { name: 'role-matrix campaign' } },
+        'GET /campaigns/:id': 'op',
+        'PATCH /campaigns/:id': { cls: 'op', noBody: NEEDS_ROW },
+        'GET /plan': 'op',
         'POST /documents/:id/exports': { cls: 'op', noBody: MULTIPART },
         'GET /documents/:id/exports': 'op',
         'GET /exports/:id/file': 'op',

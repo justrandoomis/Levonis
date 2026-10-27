@@ -1031,6 +1031,8 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'creative_feedback.document_id': 'a creative_documents id',
   'creative_feedback.reasons_json': 'rejection reason codes',
   'creative_events.evidence_json': 'the availability transition the sync saw: two states and two times',
+  // -- Creative Studio planning (0216): campaign names and planned days, no file ----
+  'creative_document_plans.document_id': 'a creative_documents id',
 };
 
 /**

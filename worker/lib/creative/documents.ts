@@ -198,6 +198,8 @@ export interface DocFilters {
   product_id: string | null;
   format: string | null;
   campaign_id: string | null;
+  /** 'slide' lists carousel slides (spec §20); absent = every kind. */
+  kind?: DocKind | null;
   q: string;
   from: string | null;
   to: string | null;
@@ -220,6 +222,7 @@ export async function listDocuments(db: D1Database, f: DocFilters): Promise<{ do
   if (f.product_id) { where.push('product_id = ?'); args.push(f.product_id); }
   if (f.format) { where.push('format_id = ?'); args.push(f.format); }
   if (f.campaign_id) { where.push('campaign_id = ?'); args.push(f.campaign_id); }
+  if (f.kind) { where.push('kind = ?'); args.push(f.kind); }
   if (f.from) { where.push('updated_at >= ?'); args.push(f.from); }
   if (f.to) { where.push('updated_at <= ?'); args.push(/^\d{4}-\d{2}-\d{2}$/.test(f.to) ? `${f.to}T23:59:59.999Z` : f.to); }
   const pattern = likePattern(f.q);
@@ -334,7 +337,8 @@ export interface CreateInput {
  * mark — a cancel or a second create racing it inserts nothing. An ideas
  * answer is shared by the studio (the ideas list is everyone's) and one answer
  * offers several ideas, so the first design built from it marks it applied
- * and later ones cite it without a second mark.
+ * and later ones cite it without a second mark. A carousel plan is this
+ * actor's own and becomes several slides: the first marks it, the rest cite it.
  */
 export async function createDocument(db: D1Database, actorId: string, input: CreateInput): Promise<DocRow> {
   if (input.idempotency_key) {
@@ -352,8 +356,8 @@ export async function createDocument(db: D1Database, actorId: string, input: Cre
   if (origin === 'ai') {
     if (!jobId) throw badRequest("origin 'ai' needs the job_id of the answer the design was built from", 'INVALID_INPUT');
     const job = await db.prepare('SELECT task, status, actor_id, applied_at FROM creative_jobs WHERE id = ?').bind(jobId).first<{ task: string; status: string; actor_id: string | null; applied_at: string | null }>();
-    if (!job || (job.task !== 'compose' && job.task !== 'ideas') || (job.task === 'compose' && job.actor_id !== actorId)) {
-      throw badRequest('job_id is not one of your compositions, nor an ideas answer', 'INVALID_INPUT');
+    if (!job || (job.task !== 'compose' && job.task !== 'ideas' && job.task !== 'carousel') || (job.task !== 'ideas' && job.actor_id !== actorId)) {
+      throw badRequest('job_id is not one of your compositions or carousel plans, nor an ideas answer', 'INVALID_INPUT');
     }
     if (job.status === 'cancelled') throw new HttpError(409, 'This job was cancelled; its result is never applied.', 'JOB_CANCELLED');
     if (job.status !== 'succeeded') throw new HttpError(409, 'This job has no result to apply.', 'INVALID_INPUT');
@@ -371,13 +375,13 @@ export async function createDocument(db: D1Database, actorId: string, input: Cre
       db
         .prepare(
           `UPDATE creative_jobs SET applied_at = ?, applied_version = 1, document_id = ?
-            WHERE id = ? AND status = 'succeeded' AND applied_at IS NULL AND document_id IS NULL AND (task = 'ideas' OR (task = 'compose' AND actor_id = ?))`
+            WHERE id = ? AND status = 'succeeded' AND applied_at IS NULL AND document_id IS NULL AND (task = 'ideas' OR (task IN ('compose', 'carousel') AND actor_id = ?))`
         )
         .bind(now, id, jobId, actorId),
       db
         .prepare(
           `${columns} SELECT ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?
-            WHERE EXISTS (SELECT 1 FROM creative_jobs WHERE id = ? AND status = 'succeeded' AND (document_id = ? OR task = 'ideas'))`
+            WHERE EXISTS (SELECT 1 FROM creative_jobs WHERE id = ? AND status = 'succeeded' AND (document_id = ? OR task IN ('ideas', 'carousel')))`
         )
         .bind(...values, jobId, id)
     );

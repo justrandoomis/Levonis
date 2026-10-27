@@ -67,6 +67,7 @@ import { carouselContent, composeContent, editContent, ideasContent, reviewConte
 import {
   ensureSettingsRow, isEffort, normalizeBudget, normalizePriorities, normalizeRates, readProviderSettings, type Capabilities, type ProviderSettings,
 } from '../lib/creative/settings';
+import { createCampaign, dayOrNull, getCampaign, listCampaigns, planBetween, setDocumentCampaign, setPlan, updateCampaign, type CampaignInput } from '../lib/creative/planning';
 import { getSnapshot, getSnapshots, normalizeSnapshotImport, storeSnapshot } from '../lib/creative/snapshots';
 import { buildSnapshotData, listProducts, productDetail } from '../lib/creative/store';
 
@@ -726,9 +727,10 @@ R.get('/documents', studio, async (c) => {
   const offset = int(q.offset, 'offset', { min: 0, max: 10_000, def: 0 });
   const productId = q.product_id && /^[A-Za-z0-9_-]{1,64}$/.test(q.product_id) ? q.product_id : null;
   const campaignId = q.campaign_id && ID.test(q.campaign_id) ? q.campaign_id : null;
+  const kind = q.kind ? oneOf(q.kind, 'kind', DOC_KINDS) : null;
   const text = str(q.q, 'q', { max: 60, required: false });
   const out = await readOr(
-    async () => ({ migrated: true, ...(await listDocuments(c.env.DB, { status, product_id: productId, format, campaign_id: campaignId, q: text, from, to, limit, offset })) }),
+    async () => ({ migrated: true, ...(await listDocuments(c.env.DB, { status, product_id: productId, format, campaign_id: campaignId, kind, q: text, from, to, limit, offset })) }),
     { migrated: false, documents: [], total: 0 }
   );
   return ok(c, { ...out, limit, offset });
@@ -856,6 +858,73 @@ R.get('/documents/:id/reviews', studio, async (c) => {
   const row = await readOr(() => getDocRow(c.env.DB, id), null);
   if (!row) throw notFound('Design not found');
   return ok(c, { reviews: await reviews(c.env.DB, id) });
+});
+
+// ---------------------------------------------------------------------------
+// Campaigns and the internal calendar (migration 0216; worker/lib/creative/planning.ts).
+// Nothing here publishes: a planned day is a reminder for a person, and no
+// design's status, version or approval changes when it is planned or grouped.
+// ---------------------------------------------------------------------------
+
+function campaignInput(body: Record<string, unknown>, creating: boolean): CampaignInput {
+  const out: CampaignInput = {};
+  if (creating || body.name !== undefined) out.name = str(body.name, 'name', { min: 1, max: 120 });
+  if (body.notes !== undefined) out.notes = str(body.notes, 'notes', { max: 600, required: false });
+  if (body.starts_on !== undefined) out.starts_on = dayOrNull(body.starts_on, 'starts_on');
+  if (body.ends_on !== undefined) out.ends_on = dayOrNull(body.ends_on, 'ends_on');
+  if (!creating && body.archived !== undefined) out.archived = boolOf(body.archived);
+  return out;
+}
+
+R.get('/campaigns', studio, async (c) => ok(c, await readOr(async () => ({ migrated: true, campaigns: await listCampaigns(c.env.DB) }), { migrated: false, campaigns: [] })));
+
+R.post('/campaigns', studio, async (c) => {
+  const input = campaignInput(await bodyOf(c), true);
+  const campaign = await writeOr503(() => createCampaign(c.env.DB, actorOf(c), { ...input, name: input.name! }));
+  await audit(c.env.DB, actorOf(c), 'creative.campaign.created', campaign.id, {});
+  return ok(c, { campaign }, 201);
+});
+
+R.get('/campaigns/:id', studio, async (c) => {
+  const campaign = await readOr(() => getCampaign(c.env.DB, idParam(c)), null);
+  if (!campaign) throw notFound('Campaign not found');
+  return ok(c, { campaign });
+});
+
+R.patch('/campaigns/:id', studio, async (c) => {
+  const id = idParam(c);
+  const input = campaignInput(await bodyOf(c), false);
+  const campaign = await writeOr503(() => updateCampaign(c.env.DB, actorOf(c), id, input));
+  return ok(c, { campaign });
+});
+
+R.put('/documents/:id/campaign', studio, async (c) => {
+  const id = idParam(c);
+  const body = await bodyOf(c);
+  const campaignId = body.campaign_id === null || body.campaign_id === undefined || body.campaign_id === '' ? null : String(body.campaign_id);
+  if (campaignId !== null && !ID.test(campaignId)) throw badRequest('campaign_id is malformed', 'INVALID_INPUT');
+  const document = await writeOr503(() => setDocumentCampaign(c.env.DB, actorOf(c), id, campaignId));
+  return ok(c, { document });
+});
+
+R.put('/documents/:id/plan', studio, async (c) => {
+  const id = idParam(c);
+  const body = await bodyOf(c);
+  const day = dayOrNull(body.planned_for, 'planned_for');
+  const note = str(body.note, 'note', { max: 300, required: false });
+  const plan = await writeOr503(() => setPlan(c.env.DB, actorOf(c), id, day, note));
+  return ok(c, { plan });
+});
+
+R.get('/plan', studio, async (c) => {
+  const q = c.req.query();
+  // Absent = the next 31 days from today (UTC); the screen sends the Baghdad month it shows.
+  const today = nowIso().slice(0, 10);
+  const from = dayOrNull(q.from, 'from') ?? today;
+  const to = dayOrNull(q.to, 'to') ?? nowIso(Date.parse(`${from}T00:00:00Z`) + 31 * 86400_000).slice(0, 10);
+  if (to < from) throw badRequest('to is before from', 'INVALID_INPUT');
+  if (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`) > 92 * 86400_000) throw badRequest('at most 92 days at once', 'INVALID_INPUT');
+  return ok(c, await readOr(async () => ({ migrated: true, items: await planBetween(c.env.DB, from, to) }), { migrated: false, items: [] }));
 });
 
 // ---------------------------------------------------------------------------

@@ -474,7 +474,7 @@ export interface AssetsResponse { migrated: boolean; assets: AssetDto[] }
 /** POST /assets (multipart: file, kind, label?, note?, product_id?), PATCH /assets/:id {review, note?}, DELETE /assets/:id */
 export interface AssetResponse { asset: AssetDto }
 
-/** GET /documents?status=&product_id=&format=&campaign_id=&q=&from=&to=&limit=&offset= */
+/** GET /documents?status=&product_id=&format=&campaign_id=&kind=&q=&from=&to=&limit=&offset= */
 export interface DocumentsResponse { migrated: boolean; documents: DocumentSummaryDto[]; total: number; limit: number; offset: number }
 /**
  * POST /documents {title, content, kind?, parent_id?, campaign_id?, idempotency_key?, origin?, job_id?} —
@@ -527,3 +527,34 @@ export interface FeedbackListResponse { migrated: boolean; feedback: FeedbackDto
 
 /** POST /watch/sync — one bounded step of the catalogue watch; the first whole pass is a baseline. */
 export interface WatchSyncResponse { processed: number; baseline: boolean; baseline_complete: boolean; pass_complete: boolean; arrivals: number; back_in_stock: number }
+
+// ---------------------------------------------------------------------------
+// Phase 4 — campaigns and the internal calendar (migration 0216; worker/lib/creative/planning.ts).
+// INTERNAL ONLY: nothing is published anywhere; a planned date is a reminder for a person.
+// ---------------------------------------------------------------------------
+
+export interface CampaignDto {
+  id: string;
+  name: string;
+  notes: string;
+  /** 'YYYY-MM-DD' or null. */
+  starts_on: string | null;
+  ends_on: string | null;
+  archived: boolean;
+  document_count: number;
+  created_at: string;
+  updated_at: string;
+}
+/** GET /campaigns */
+export interface CampaignsResponse { migrated: boolean; campaigns: CampaignDto[] }
+/** POST /campaigns {name, notes?, starts_on?, ends_on?}, PATCH /campaigns/:id {name?, notes?, starts_on?, ends_on?, archived?} */
+export interface CampaignResponse { campaign: CampaignDto }
+/** PUT /documents/:id/campaign {campaign_id: string | null} — no new version; an approval stands. */
+export interface DocumentCampaignResponse { document: DocumentSummaryDto }
+
+/** One design on the internal calendar: the day (Asia/Baghdad calendar day) a person means to post it. */
+export interface PlanItemDto { planned_for: string; note: string; document: DocumentSummaryDto }
+/** GET /plan?from=YYYY-MM-DD&to=YYYY-MM-DD (at most 92 days) */
+export interface PlanResponse { migrated: boolean; items: PlanItemDto[] }
+/** PUT /documents/:id/plan {planned_for: 'YYYY-MM-DD' | null, note?} — null removes the date. No new version. */
+export interface DocumentPlanResponse { plan: { planned_for: string; note: string } | null }

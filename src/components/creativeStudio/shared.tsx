@@ -143,7 +143,7 @@ export interface StudioContextValue {
   setLeaveGuard(guard: () => boolean): () => void;
 }
 
-export type StudioTab = 'home' | 'new' | 'editor' | 'brand' | 'claims' | 'assets' | 'archive' | 'settings';
+export type StudioTab = 'home' | 'new' | 'editor' | 'carousel' | 'batch' | 'campaigns' | 'calendar' | 'brand' | 'claims' | 'assets' | 'archive' | 'settings';
 
 /** What «use this idea» carries into New design (screensModel.ideaPrefill): every field of the idea a design can use. */
 export interface NewDesignPrefill {

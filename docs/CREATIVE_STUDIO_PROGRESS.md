@@ -23,7 +23,7 @@ to switch it on — one section per side of the studio.
 | Part | Where | What it guarantees |
 |---|---|---|
 | 18 studio tables | `migrations/0215_creative_studio.sql` | additive only (`CREATE … IF NOT EXISTS`); no store table is written; no column for a prompt, an answer or a key in the usage ledger |
-| The API (55 routes) | `worker/routes/adminCreativeStudio.ts` at `/api/admin/creative-studio` | apex only; `requireAdmin` → rate limit → studio scope (owner + full admins; assistants `403 CREATIVE_SCOPE_REQUIRED`) or `requireOwner` (key, model, budget, rates, brand kit, claims, JSON import); shapes = `packages/creativeDoc/src/api.ts` (response envelopes at its end) |
+| The API (62 routes) | `worker/routes/adminCreativeStudio.ts` at `/api/admin/creative-studio` | apex only; `requireAdmin` → rate limit → studio scope (owner + full admins; assistants `403 CREATIVE_SCOPE_REQUIRED`) or `requireOwner` (key, model, budget, rates, brand kit, claims, JSON import); shapes = `packages/creativeDoc/src/api.ts` (response envelopes at its end) |
 | Provider adapter | `worker/lib/creative/anthropic.ts`, `readBody.ts` (its own capped reader: the FX module is a money boundary it does not import) | the only reader of a key; raw `fetch` through an injectable transport; one host; `redirect: manual`; per-task deadlines; 512 KB body cap; `anthropic-version: 2026-10-21`; structured outputs; effort only when the model lists it; never `temperature`/`top_p`/`top_k`, tools or prefill; 429 retried once (≤ 5 s), 503/529 once, a timeout never; every failure a code |
 | Key vault | `worker/lib/creative/keyVault.ts`, `worker/lib/sealbox.ts` | AES-256-GCM under `CREATIVE_STUDIO_ENC_KEY` (rotation ring), ciphertext bound to its row (AAD); 4-character hint for the owner only; stored key first, then the Worker secret |
 | Prompts | `worker/lib/creative/prompts.ts` | the §28 rules; data in tagged blocks with `<` escaped; product facts through an allow-list without amounts, links or picture URLs; copy in Arabic or English only — never Sorani |
@@ -235,12 +235,20 @@ select would have been the one entry that behaves differently.
 
 ### Not done
 
-- Carousels (`POST /ai/carousel`), campaigns, batch creation, the calendar
-  and grid planning (spec Phase 4): no screen yet, and no button pretends
-  otherwise.
+- Phase 4 is built (2026-10-27; migration `0216_creative_studio_planning.sql`
+  adds `creative_campaigns` and `creative_document_plans`): tabs «كاروسيل»
+  (Claude's plan or empty slides → linked `slide` designs, export all as draft
+  PNGs), «إنتاج دفعة» (sequential, no AI, per-item state, stop, retry failed),
+  «الحملات», «التقويم والشبكة» (Baghdad day, Saturday-first month, 3-column
+  grid simulation). Not done in it: a planned day does NOT move a design to
+  the `scheduled` status (approval semantics untouched); no week view; no
+  manual entry of past real posts beside the grid; no time of day; batch has
+  no family choice and one shared headline; a duplicated slide joins its
+  source's carousel group (duplicate sets `parent_id`); no browser test of
+  the four screens. External publishing is not built and the screens say so.
 - Swapping a design's product, and «use this as a reference»; the editor's
-  re-layouts still pass no template family; archive filters by variant,
-  family or campaign.
+  re-layouts still pass no template family; archive filters by variant
+  or family (campaigns have their own tab).
 - Touch gestures (pinch during a drag, two-finger pan) are fixed in code but
   have no automated touch test.
 - Comparison posts (two products) have no picker in New design yet; the
