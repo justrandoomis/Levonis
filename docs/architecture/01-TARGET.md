@@ -130,12 +130,21 @@ Intermediate rename artefacts inside rebuild migrations belong to the owner of t
 | Config | `admin_settings`, `feature_flags`, `config_versions` (new), `admin_capability_grants` (0204 — staff capabilities such as MERCHANT_REVIEW; a sibling of `admin_private_grants`) |
 | Audit | `audit_log` (legacy, read-only after Phase 3), `audit_events`, `audit_chain_heads` (new) |
 | Analytics | `merchant_store_analytics_daily` (written by the storefront beacon since 0125; re-owned), `merchant_product_analytics_daily`, `storefront_event_marks`, `storefront_salts` (0125), `storefront_vitals_daily`, `storefront_vitals_marks` (real-user speed buckets and their once-per-visitor-day-device marks, migration 0161; DECISIONS row 180), `analytics_events`, `analytics_daily_platform`, `analytics_daily_merchant` (new), `composition_daily_metrics` (new) |
-| Ads | `ads_providers`, `ads_event_map`, `ads_deliveries`, `ads_consent_snapshots`, `ads_dead_letters` (new) |
+| Ads | `ads_providers`, `ads_event_map`, `ads_deliveries`, `ads_consent_snapshots`, `ads_dead_letters` (new); the Creative Studio's `creative_*` tables (0215, in the shared D1 — see below) |
 | Search | `search_products`, `search_stores`, `search_index_state` (new) |
 | Files | `file_objects` (new; + `sha256`, `purpose` in 0156), `media_cleanup_jobs` (new: deferred R2 deletions queued by a permanent product delete, retried until the bucket confirms), `upload_sessions` (0156: a resumable multipart upload in flight — R2 upload id, parts received, the key it becomes) |
 | Platform (one set per service, in the service's own store) | `<svc>_outbox_events`, `<svc>_outbox_deliveries`, `<svc>_processed_events`, `<svc>_idempotency`, `<svc>_sagas` where the service orchestrates (new) |
 
 `tests/ownership.test.ts` (new) generates `TABLE_OWNER` from this table and fails if a migration creates a table absent from it or if two services claim one table.
+
+Migration 0215 adds the Creative Studio's eighteen `creative_*` tables
+(designs, versions, reviews, exports, assets, brand-kit versions, service
+claims, snapshots, AI jobs, usage and spend, ideas, feedback, the catalogue
+watch) to **Ads / Marketing** ownership as their end-state home. Today they
+live in the SHARED D1 and the core serves the studio
+(`worker/routes/adminCreativeStudio.ts`, `/api/admin/creative-studio`, routed
+to CORE by the generic `/api/admin` row); `services/ads` neither owns nor
+touches them (DECISIONS row 270).
 
 Migration 0214 adds `pricing_received_recovery` to **Catalog** ownership: the
 one-time snapshot of saved procurement pricing awaiting the owner's requested

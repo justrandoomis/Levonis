@@ -77,6 +77,7 @@ import { adminOrderInventoryOriginRoutes } from '../../worker/routes/adminOrderI
 import { adminPreorderOriginRoutes } from '../../worker/routes/adminPreorderOrigins';
 import { adminSerialRulesRoutes } from '../../worker/routes/adminSerialRules';
 import { adminSecurityRoutes } from '../../worker/routes/adminSecurity';
+import { adminCreativeStudioRoutes } from '../../worker/routes/adminCreativeStudio';
 import { adminMembershipBenefitRoutes } from '../../worker/routes/adminMembershipBenefits';
 import { adminFinanceOperationsRoutes } from '../../worker/routes/adminFinanceOperations';
 import { adminFinanceWorkspaceRoutes } from '../../worker/routes/adminFinanceWorkspace';
@@ -213,6 +214,8 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/admin', adminRoutes as Router],
   ['/api/admin/farm', farmAdminRoutes as Router],
   ['/api/admin/security', adminSecurityRoutes as Router],
+  // The Creative Studio (DECISIONS row 270): its product reads are the guest card, an allow-list.
+  ['/api/admin/creative-studio', adminCreativeStudioRoutes as Router],
   ['/api/print-quote', printQuoteRoutes as Router],
   ['/api/admin/print-quote', adminPrintQuoteRoutes as Router],
   ['/api/price-reports', priceReportRoutes as Router],

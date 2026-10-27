@@ -17,6 +17,9 @@ export {
   pricingCtxForUser,
   resolveListingCards,
   resolveProductCards,
+  // The Creative Studio's per-option price (worker/lib/creative/store.ts): the same resolver the
+  // product page, the comparison and the printer finder paint each option with.
+  resolveVariantPricing,
   type CatalogListing,
   type PricingCtx,
 } from '../../routes/products';

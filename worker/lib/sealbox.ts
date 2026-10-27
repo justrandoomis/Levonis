@@ -5,6 +5,10 @@
  * "v2:<...>" while v1 stays readable). This is server-side protection with
  * managed keys — it is NOT end-to-end encryption and is never described as
  * such. Ciphertext format: sealed:<keyver>:<iv_b64url>:<ct_b64url>.
+ *
+ * The same ring also seals the Creative Studio's provider key under its own
+ * secret (worker/lib/creative/keyVault.ts) through `sealWith`/`unsealWith`,
+ * which add AES-GCM additional data; `seal`/`unseal` are unchanged.
  */
 
 import { b64url, b64urlDecode } from './crypto';
@@ -44,24 +48,55 @@ export function sealboxConfigured(secret: string | undefined): boolean {
   return !!secret && secret.trim().length > 0;
 }
 
-export async function seal(secret: string | undefined, plaintext: string): Promise<string> {
+/**
+ * THE GENERAL FORM (Creative Studio, DECISIONS row 270): the same key ring and
+ * the same `sealed:<ver>:<iv>:<ct>` format, with two additions the KYC fields
+ * never needed.
+ *
+ *   `aad`         AES-GCM additional data. It is not secret and not stored; it
+ *                 BINDS the ciphertext to where it lives — a ciphertext copied
+ *                 into another row or column fails to open there, because the
+ *                 reader names its own place. The KYC callers pass none, so
+ *                 their bytes are produced exactly as before.
+ *   `secretName`  the Worker secret's name, for the honest error a caller
+ *                 turns into its 503 (the KYC callers keep "KYC_ENC_KEY").
+ *
+ * `seal`/`unseal` below are this with no AAD and the KYC name — the functions
+ * they were (tests/sealbox.test.ts).
+ */
+export interface SealOptions {
+  aad?: string;
+  secretName?: string;
+}
+
+/** AES-GCM parameters (spelled out: the Workers and DOM type libraries name this type differently). */
+interface GcmParams {
+  name: 'AES-GCM';
+  iv: BufferSource;
+  additionalData?: BufferSource;
+}
+
+function gcmParams(iv: Uint8Array, aad: string | undefined): GcmParams {
+  return aad === undefined
+    ? { name: 'AES-GCM', iv: iv as BufferSource }
+    : { name: 'AES-GCM', iv: iv as BufferSource, additionalData: new TextEncoder().encode(aad) as BufferSource };
+}
+
+export async function sealWith(secret: string | undefined, plaintext: string, opts: SealOptions = {}): Promise<string> {
+  const name = opts.secretName ?? 'KYC_ENC_KEY';
   if (!sealboxConfigured(secret)) {
-    throw new Error('KYC_ENC_KEY is not configured'); // caller shows an honest 503
+    throw new Error(name + ' is not configured'); // caller shows an honest 503
   }
   const ring = await importKeys(secret as string);
   const key = ring.keys.get(ring.current);
-  if (!key) throw new Error('KYC_ENC_KEY invalid');
+  if (!key) throw new Error(name + ' invalid');
   const iv = new Uint8Array(12);
   crypto.getRandomValues(iv);
-  const ct = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: iv as BufferSource },
-    key,
-    new TextEncoder().encode(plaintext)
-  );
+  const ct = await crypto.subtle.encrypt(gcmParams(iv, opts.aad), key, new TextEncoder().encode(plaintext));
   return `sealed:${ring.current}:${b64url(iv)}:${b64url(new Uint8Array(ct))}`;
 }
 
-export async function unseal(secret: string | undefined, sealed: string): Promise<string | null> {
+export async function unsealWith(secret: string | undefined, sealed: string, opts: SealOptions = {}): Promise<string | null> {
   if (!sealed || !sealed.startsWith('sealed:')) return null;
   if (!sealboxConfigured(secret)) return null;
   const [, ver, ivB64, ctB64] = sealed.split(':');
@@ -69,13 +104,17 @@ export async function unseal(secret: string | undefined, sealed: string): Promis
   const key = ring.keys.get(ver);
   if (!key) return null; // unknown key version — surfaced as unreadable, never a crash
   try {
-    const pt = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: b64urlDecode(ivB64) as BufferSource },
-      key,
-      b64urlDecode(ctB64) as BufferSource
-    );
+    const pt = await crypto.subtle.decrypt(gcmParams(b64urlDecode(ivB64), opts.aad), key, b64urlDecode(ctB64) as BufferSource);
     return new TextDecoder().decode(pt);
   } catch {
     return null;
   }
+}
+
+export async function seal(secret: string | undefined, plaintext: string): Promise<string> {
+  return sealWith(secret, plaintext);
+}
+
+export async function unseal(secret: string | undefined, sealed: string): Promise<string | null> {
+  return unsealWith(secret, sealed);
 }

@@ -133,6 +133,8 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/admin/serial-rules': 'DEVICES',
   // DECISIONS row 206: «الأمان», the owner's security console, on the owner-only row the table already held for it.
   '/api/admin/security': 'ADMIN',
+  // DECISIONS row 270: the Creative Studio is served by the core (worker/routes/adminCreativeStudio.ts) under the generic admin row.
+  '/api/admin/creative-studio': 'CORE',
 };
 
 /**

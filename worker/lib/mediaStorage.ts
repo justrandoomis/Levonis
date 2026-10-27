@@ -44,7 +44,11 @@ export type MediaDomain =
    *  `assist/<uploader id>/<attachments|video|audio>/…`, private, read through
    *  the gate in worker/routes/uploads.ts (the uploader; staff once a ticket
    *  names it). */
-  | 'assist';
+  | 'assist'
+  /** 0215 — the Creative Studio's files: `creative-studio/assets/<kind>/<id>.<ext>` and
+   *  `creative-studio/exports/<document id>/<id>.<ext>`, private. /files serves no such
+   *  prefix; only the studio's own guarded routes stream them (worker/routes/adminCreativeStudio.ts). */
+  | 'creative-studio';
 
 export interface MediaKeyInput {
   visibility: MediaVisibility;

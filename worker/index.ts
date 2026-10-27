@@ -185,6 +185,7 @@ import { gatewayAssertion } from './entrypoints/gatewayAssertion';
 import { deceptionGate } from './lib/deception/gate';
 import { decoyRoutes } from './routes/decoys';
 import { adminSecurityRoutes } from './routes/adminSecurity';
+import { adminCreativeStudioRoutes } from './routes/adminCreativeStudio';
 
 const app = new Hono<AppContext>();
 
@@ -535,6 +536,12 @@ app.route('/api/admin/farm', farmAdminRoutes);
 // blocks and scores, and the lift. Owner only at its own door (requireOwner),
 // behind the apex-only host guard and the no-store layer above.
 app.route('/api/admin/security', adminSecurityRoutes);
+// «استوديو Levonis الإبداعي» (docs/CREATIVE_STUDIO.md, DECISIONS row 270): the owner's and full admins'
+// ad studio. Under /api/admin/* so the apex-only guard and the no-store layer above cover it; its own doors
+// are requireAdmin, the studio scope (an assistant admin is refused) and requireOwner on the provider key,
+// budget, brand kit and service claims. It READS the store through the public card path and writes only
+// its own creative_* tables.
+app.route('/api/admin/creative-studio', adminCreativeStudioRoutes);
 // The owner's competitor-price queue. Under /api/admin/* so the apex-only host
 // guard above covers it, and it carries its own requireAdmin as well — that
 // function is where the host rule lives, so neither guard depends on a mount

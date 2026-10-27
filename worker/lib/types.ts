@@ -56,6 +56,15 @@ export interface Env {
    * or returned. Without it every assistant task stays in basic mode.
    */
   ANTHROPIC_API_KEY?: string;
+  /**
+   * The Creative Studio's vault key (docs/CREATIVE_STUDIO.md §4, DECISIONS row 270): "v1:<base64 of 32 random
+   * bytes>", a comma-separated ring for rotation (the last key encrypts, older ones still decrypt) — the same
+   * format as KYC_ENC_KEY, never the same value. A Worker SECRET the owner sets in the dashboard; no workflow puts,
+   * reads or deletes it (tests/workflowSecrets.test.ts). Its ONE reader is worker/lib/creative/keyVault.ts, which
+   * seals a provider key the owner typed in the studio settings with it. Without it typing a key is refused
+   * (ENCRYPTION_NOT_CONFIGURED) and the studio uses ANTHROPIC_API_KEY when that is set.
+   */
+  CREATIVE_STUDIO_ENC_KEY?: string;
   EMAIL_API_KEY?: string; // e.g. a Resend API key, enables password-reset email
   EMAIL_FROM?: string;
   TELEGRAM_BOT_TOKEN?: string; // the CUSTOMER bot: linking, OTP, account messages

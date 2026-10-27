@@ -220,7 +220,9 @@ test('S8: requireOwner is verification-aware and has no cost-route callers', () 
   // URLs of the import run — no cost, price or stock fact (tests/catalogImportE2E.test.ts scans its answers).
   // The owner's MERCHANT_REVIEW grants (Community V3 push 1.2, DECISIONS row 257): issuing and revoking an
   // assistant's merchant-review access — no cost, price, wallet or stock fact is read there.
-  for (const f of ['worker/routes/adminCompleteness.ts', 'worker/routes/adminCatalogImport.ts', 'worker/routes/adminMerchantApplications.ts']) allowed.add(f);
+  // The Creative Studio (DECISIONS row 270): the owner's provider key, model, budget and rates, brand-kit versions
+  // and service claims — its product answers are the guest card, an allow-list (tests/creativeStudioStore.test.ts).
+  for (const f of ['worker/routes/adminCompleteness.ts', 'worker/routes/adminCatalogImport.ts', 'worker/routes/adminMerchantApplications.ts', 'worker/routes/adminCreativeStudio.ts']) allowed.add(f);
   assert.deepEqual(callers.filter((f) => !allowed.has(f)), [], 'requireOwner guards no cost route');
   for (const r of COST_ROUTERS) assert.doesNotMatch(code(r.file), /\brequireOwner\b/, `${r.file} uses the cost door, not requireOwner`);
 });

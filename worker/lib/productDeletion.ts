@@ -118,6 +118,9 @@ export const OWNED_TABLES: OwnedTable[] = [
   // enforce the declared ON DELETE CASCADE).
   { table: 'product_price_requests', by: { column: 'product_id' } },
   { table: 'product_price_request_stats', by: { column: 'product_id' } },
+  // The Creative Studio's last-seen card state (0215): a sync cursor's memory of a LIVE product, meaningless once
+  // the product is gone. The arrivals it detected are creative_events, kept as history (HISTORY_TABLES).
+  { table: 'creative_catalog_watch', by: { column: 'product_id' } },
   // ---- the product knowledge model (0194, Bambu import spec §B.9) ----------
   // Each row describes this product and nothing else: where it came from and
   // its stock decision, the source ↔ Levonis id map of its options and images,
@@ -343,6 +346,21 @@ export const HISTORY_TABLES: HistoryTable[] = [
    * legacy box reads active rows only.
    */
   { table: 'gift_pool_items', columns: ['product_id'] },
+  /**
+   * 0215 — THE CREATIVE STUDIO'S HISTORY. A design, its snapshot of the
+   * product's marketing facts, an extra product shot, an idea and a detected
+   * arrival are records of work the owner did or evidence the studio saw; a
+   * product deleted later must not take them along. Each carries what it
+   * needs (the snapshot its own allow-listed copy of the facts, the design its
+   * own content), so only the link is cleared — and a design bound to a
+   * product that no longer exists fails its re-verification («product_missing»)
+   * before any approval or final export.
+   */
+  { table: 'creative_documents', columns: ['product_id'] },
+  { table: 'creative_product_snapshots', columns: ['product_id'] },
+  { table: 'creative_assets', columns: ['product_id'] },
+  { table: 'creative_ideas', columns: ['product_id'] },
+  { table: 'creative_events', columns: ['product_id'] },
 ];
 
 /**

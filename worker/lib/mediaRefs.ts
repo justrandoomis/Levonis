@@ -423,6 +423,20 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
 
   // ---- outbound ----------------------------------------------------------
   { table: 'tg_admin_notifications', column: 'photo_key', kind: 'text', why: 'the picture a Telegram admin notification sends' },
+
+  // ---- the Creative Studio (0215, docs/CREATIVE_STUDIO.md) ------------------
+  /**
+   * The studio's own private files (creative-studio/assets/…, creative-studio/exports/…)
+   * and the product pictures a design draws. A soft-deleted asset keeps its
+   * row and its bytes: an older document version that names it must still
+   * restore. `content_json` is walked because a design names a product picture
+   * by its `/files/products/…` path — while any design or kept version draws
+   * it, the sweeper must not take it.
+   */
+  { table: 'creative_assets', column: 'r2_key', kind: 'text', why: 'a studio asset (logo, background, reference) in the private bucket (0215)' },
+  { table: 'creative_exports', column: 'r2_key', kind: 'text', why: 'an exported design (PNG/JPEG/WebP or Project JSON) in the private bucket (0215)' },
+  { table: 'creative_documents', column: 'content_json', kind: 'json', why: 'a studio design names the product pictures it draws by their /files/ path (0215)' },
+  { table: 'creative_document_versions', column: 'content_json', kind: 'json', why: 'a kept design version still restores the product pictures it drew (0215)' },
 ] as const;
 
 /**
@@ -986,6 +1000,37 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'catalog_import_events.detail': 'event counts and ids',
   'catalog_import_media.source_media_id': 'a source id string (resourceFileId, swatch:<id>, desc:<sha1>)',
   'catalog_import_media.source_url': "the manufacturer's image address the object was ingested from",
+  // -- the Creative Studio (0215): ids, codes, texts and settings; its files are the r2_key sources ----
+  'creative_provider_settings.key_sealed': 'AES-256-GCM ciphertext of the provider key (sealed:v1:…), never an object key',
+  'creative_provider_settings.budget_json': 'daily request/token caps, USD caps, parallelism — numbers only',
+  'creative_provider_settings.rates_json': "the owner's per-million-token rates, their source label and date",
+  'creative_provider_settings.priorities_json': "the owner's priority words for «شنو أنشر اليوم؟», plain text",
+  'creative_provider_settings.capabilities_json': "the chosen model's capability flags (structured outputs, vision, effort)",
+  'creative_jobs.idempotency_key': 'a client request token for idempotent AI calls',
+  'creative_jobs.document_id': 'a creative_documents id',
+  'creative_jobs.target_ids_json': 'layer ids of one design (stable short ids, never paths)',
+  'creative_jobs.result_json': "a validated AI proposal; a picture it names is drawn only once applied to a design, whose content_json is scanned",
+  'creative_usage.document_id': 'a creative_documents id',
+  'creative_brand_versions.kit_json': "a brand kit: colours, type scale, spacing, tone; its logo and backgrounds are creative_assets ids, whose r2_key is scanned",
+  'creative_product_snapshots.variant_key': 'an option id with its kind prefix (ov:<id>), never a key',
+  'creative_product_snapshots.data_json': "a record of the catalogue's facts at fetch time; the design that draws a picture names it in creative_documents.content_json, which is scanned",
+  'creative_service_claims.key': "a claim's short code (warranty, delivery…), never an object key",
+  'creative_service_claim_versions.title_json': 'a claim title in ar/en/ckb',
+  'creative_service_claim_versions.summary_json': 'a claim summary in ar/en/ckb',
+  'creative_service_claim_versions.conditions_json': 'a claim\'s conditions in ar/en/ckb',
+  'creative_service_claim_versions.product_ids_json': 'catalogue product ids the claim applies to',
+  'creative_documents.idempotency_key': 'a client request token for an idempotent create',
+  'creative_documents.needs_review_json': 'reason codes (price_changed, claim_changed…)',
+  'creative_document_versions.document_id': 'a creative_documents id',
+  'creative_reviews.document_id': 'a creative_documents id',
+  'creative_reviews.reasons_json': 'rejection reason codes',
+  'creative_reviews.export_ids_json': 'creative_exports ids; each export row\'s r2_key is scanned',
+  'creative_reviews.qa_json': 'the quality report at approval: check names, issue codes and layer ids',
+  'creative_exports.document_id': 'a creative_documents id',
+  'creative_ideas.idea_json': 'a validated idea: objective, target id, evidence ids and its copy',
+  'creative_feedback.document_id': 'a creative_documents id',
+  'creative_feedback.reasons_json': 'rejection reason codes',
+  'creative_events.evidence_json': 'the availability transition the sync saw: two states and two times',
 };
 
 /**

@@ -33,7 +33,12 @@ export type ErrorCode =
   | 'KEY_NOT_CONFIGURED' | 'ENCRYPTION_NOT_CONFIGURED' | 'MODEL_NOT_SELECTED' | 'BUDGET_EXCEEDED' | 'PARALLEL_LIMIT'
   | 'KEY_REJECTED' | 'MODEL_GONE' | 'PROVIDER_RATE_LIMITED' | 'PROVIDER_OVERLOADED' | 'PROVIDER_TIMEOUT' | 'PROVIDER_ERROR'
   | 'PROVIDER_REFUSED' | 'OUTPUT_TRUNCATED' | 'INVALID_OUTPUT' | 'JOB_CANCELLED' | 'JOB_ALREADY_APPLIED'
-  | 'SOURCE_CHANGED' | 'QA_BLOCKERS' | 'APPROVAL_STALE' | 'UNSUPPORTED_MEDIA' | 'FILE_TOO_LARGE' | 'ASSET_IN_USE' | 'RATE_LIMITED';
+  | 'SOURCE_CHANGED' | 'QA_BLOCKERS' | 'APPROVAL_STALE' | 'UNSUPPORTED_MEDIA' | 'FILE_TOO_LARGE' | 'ASSET_IN_USE' | 'RATE_LIMITED'
+  // Added with the Worker (DECISIONS row 270): the repository's own fresh-sign-in refusal (worker/lib/costAccess.ts
+  // `requireFreshSession` answers 401 REAUTH_REQUIRED — the code every owner screen already handles), visual review
+  // switched off by the owner or unsupported by the chosen model, no private bucket on the deployment, and the same
+  // idempotent AI request still running.
+  | 'REAUTH_REQUIRED' | 'VISION_REVIEW_DISABLED' | 'STORAGE_UNAVAILABLE' | 'JOB_IN_PROGRESS';
 
 // ---------------------------------------------------------------------------
 // Provider (owner)
@@ -399,3 +404,108 @@ export interface ApproveRequest {
   qa: QualityReport;
   export_ids: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Response envelopes — what each endpoint answers (worker/routes/adminCreativeStudio.ts).
+// Every success is `{ success: true, ...<the type below> }`; every refusal is
+// `{ success: false, error, code: ErrorCode, details? }`. A list read on a
+// database without the studio tables answers its envelope with `migrated: false`
+// and empty data; an item read answers 404.
+// ---------------------------------------------------------------------------
+
+/** GET /provider, PUT|DELETE /provider/key, PUT /provider/settings. */
+export type ProviderResponse = ProviderStatusDto;
+/** POST /provider/test — the status after the test, and the test's own outcome. */
+export interface ProviderTestResponse extends ProviderStatusDto { test: { ok: boolean; code: ErrorCode | null } }
+/** GET /provider/models (owner). */
+export interface ModelsResponse { models: ModelDto[] }
+/** PUT /provider/settings body (owner); every field optional, absent = unchanged; `model: null` clears the choice. */
+export interface ProviderSettingsRequest {
+  model?: string | null;
+  effort?: Effort | null;
+  budget?: Partial<BudgetSettings>;
+  rates?: Rates | null;
+  vision_review?: boolean;
+  priorities?: string[];
+}
+
+export interface UsageDayDto { day: string; requests: number; tokens_used: number; est_cost_usd: number | null }
+/** GET /usage?days=1..90 — the ledger (no text, no key) and per-day totals (Asia/Baghdad days). */
+export interface UsageResponse { migrated: boolean; records: UsageRecordDto[]; days: UsageDayDto[]; today: UsageTotals; month: UsageTotals }
+
+/** GET /products?q=&category=&limit=&offset= — the storefront listing as a guest sees it. */
+export interface ProductsResponse { products: ProductListItemDto[]; total: number | null }
+/** GET /products/:id */
+export type ProductResponse = ProductDetailDto;
+/** POST /snapshots, POST /snapshots/import, GET /snapshots/:id */
+export type SnapshotResponse = ProductSnapshot;
+/** POST /snapshots/:id/verify — `fresh` is stored as a NEW live snapshot (bind to it after review). */
+export type VerifyResponse = VerifyDto;
+
+/** GET /brand */
+export type BrandResponse = BrandDto;
+/** GET /brand/versions */
+export interface BrandVersionsResponse { migrated: boolean; versions: BrandVersionDto[] }
+/** POST /brand/versions, POST /brand/versions/:version/approve — the saved version and the kit now in force. */
+export interface BrandSaveResponse { saved: BrandVersionDto; brand: BrandDto }
+
+/** GET /claims — per claim, its approved version and a newer pending one. */
+export interface ClaimsResponse { migrated: boolean; claims: ClaimDto[] }
+/** POST /claims, PUT /claims/:id, POST /claims/:id/approve (`marked`: designs now needing review). */
+export interface ClaimResponse { claim: ClaimDto; marked?: number }
+/** GET /claims/:id/documents */
+export interface ClaimDocumentsResponse { documents: DocumentSummaryDto[] }
+
+/** GET /assets?kind= */
+export interface AssetsResponse { migrated: boolean; assets: AssetDto[] }
+/** POST /assets (multipart: file, kind, label?, note?, product_id?), DELETE /assets/:id */
+export interface AssetResponse { asset: AssetDto }
+
+/** GET /documents?status=&product_id=&format=&campaign_id=&q=&from=&to=&limit=&offset= */
+export interface DocumentsResponse { migrated: boolean; documents: DocumentSummaryDto[]; total: number; limit: number; offset: number }
+/** POST /documents, GET|PUT /documents/:id, POST …/restore, …/duplicate, …/status */
+export interface DocumentResponse { document: DocumentDto }
+/** GET /documents/:id/versions */
+export interface VersionsResponse { versions: VersionDto[] }
+/** GET /documents/:id/versions/:version */
+export interface VersionContentResponse { version: VersionDto; content: CreativeDocument; issues: DocIssue[] }
+/** POST /documents/:id/approve — `qa` is the SERVER's report (the checks the Worker re-ran). */
+export interface ApproveResponse { document: DocumentDto; review: ReviewDto; qa: QualityReport }
+/** POST /documents/:id/reject {reasons: RejectReason[], note} */
+export interface RejectResponse { document: DocumentDto; review: ReviewDto }
+/** GET /documents/:id/reviews */
+export interface ReviewsResponse { reviews: ReviewDto[] }
+/** POST /documents/:id/exports (multipart: file + meta = JSON {version, kind, final, width, height}) */
+export interface ExportResponse { export: ExportDto }
+/** GET /documents/:id/exports */
+export interface ExportsResponse { exports: ExportDto[] }
+
+/** GET /jobs */
+export interface JobsResponse { migrated: boolean; jobs: JobDto[] }
+/** POST /jobs/:id/cancel, POST /jobs/:id/applied {document_id, version} */
+export interface JobResponse { job: JobDto }
+
+/** GET /opportunities */
+export interface OpportunitiesResponse { migrated: boolean; opportunities: OpportunityDto[] }
+/** GET /ideas */
+export interface IdeasListResponse { migrated: boolean; ideas: IdeaRecordDto[] }
+/** PATCH /ideas/:id {status} */
+export interface IdeaResponse { idea: IdeaRecordDto }
+
+export interface FeedbackDto {
+  id: string;
+  document_id: string | null;
+  kind: 'reject' | 'note' | 'like';
+  reasons: RejectReason[];
+  note: string;
+  scope: 'document' | 'brand';
+  created_at: string;
+  created_by_name: string | null;
+}
+/** POST /feedback {document_id?, kind, reasons, note, scope} */
+export interface FeedbackResponse { feedback: FeedbackDto }
+/** GET /feedback */
+export interface FeedbackListResponse { migrated: boolean; feedback: FeedbackDto[] }
+
+/** POST /watch/sync — one bounded step of the catalogue watch; the first whole pass is a baseline. */
+export interface WatchSyncResponse { processed: number; baseline: boolean; baseline_complete: boolean; pass_complete: boolean; arrivals: number; back_in_stock: number }
