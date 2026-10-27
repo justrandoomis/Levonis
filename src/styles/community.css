@@ -500,11 +500,24 @@
   outline-offset: -2px;
 }
 
-/* THE PRESS UNDER REDUCED MOTION: the house dims a held button to 0.72, which
-   took an outline, ghost or danger label under 4.5:1 on cream. Here the clay
-   dent (`--clay-press`) answers the touch and the label keeps its full ink. */
+/* THE PRESS KEEPS THE INK (WCAG 1.4.3). The house dims every held control to
+   0.72 (src/index.css: in the base layer, and again with !important under
+   reduced motion), which took a held link, tab, thumb, select, tile, row or
+   drop zone line under 4.5:1 in both themes (an outline, ghost or danger
+   button too). In the scope nothing dims on press: the clay dent
+   (`--clay-press`) and the hover fill answer the touch, and every label keeps
+   its full ink. In the components layer, so it beats the base dim and an
+   opacity a control sets for itself (a utility) still wins over it. Under
+   reduced motion the house dim is !important, so this one is too, and it
+   leaves out a control whose own opacity is a plain utility (a hidden
+   overlay link); a disabled control keeps its own look. */
+@layer components {
+  [data-surface='community'] :is(button, summary, [role='button'], [role='tab'], a[href], label[for]):not(:disabled, [aria-disabled='true']):active {
+    opacity: 1;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  [data-surface='community'] .lv-button:not(:disabled):active {
+  [data-surface='community'] :is(button, summary, [role='button'], [role='tab'], a[href], label[for]):not(:disabled, [aria-disabled='true'], [class^='opacity-'], [class*=' opacity-']):active {
     opacity: 1 !important;
   }
 }
@@ -530,22 +543,46 @@
   font-weight: 700;
 }
 
-/* TabStrip with the gold underline: 3px, round ends, a 1px baseline; a long
-   Sorani label wraps at 320px instead of widening the page. */
+/* TabStrip with the gold underline: 3px, round ends, as wide as the words of
+   the label plus 12px on each side (tokens.md §6 #7), on a 1px baseline; a
+   long label wraps on a narrow phone instead of widening the page. The label
+   box (`.cm-tab-label`, kit/controls.tsx) takes the block padding of the tab,
+   so its bottom edge is the bottom edge of the tab and the line sits there;
+   the label measures where its words are (`--cm-tab-left`, `--cm-tab-right`,
+   0 until it has), and the tab keeps 12px of inline padding, so the line
+   never leaves its tab. */
 [data-surface='community'] .cm-tabs {
   border-block-end: 1px solid var(--color-border-subtle);
 }
 [data-surface='community'] .cm-tabs [data-tab] {
   min-width: 0;
+  padding-block: 0;
+  padding-inline: 12px;
   font-size: 0.9375rem;
   white-space: normal;
+}
+[data-surface='community'] .cm-tabs [data-tab] > span:not([data-tab-indicator]) {
+  display: flex;
+  justify-content: center;
 }
 [data-surface='community'] .cm-tabs [data-tab-active] {
   font-weight: 700;
 }
-[data-surface='community'] .cm-tabs [data-tab-indicator] {
+[data-surface='community'] .cm-tab-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding-block: 12px;
+}
+[data-surface='community'] .cm-tab-line {
+  position: absolute;
+  left: calc(var(--cm-tab-left, 0px) - 12px);
+  right: calc(var(--cm-tab-right, 0px) - 12px);
+  inset-block-end: 0;
   block-size: 3px;
   border-radius: 999px;
+  background: var(--color-gold);
 }
 
 /* Switch: ON is the sand fill with the ink knob; the knob place is the
@@ -556,6 +593,14 @@
 }
 [data-surface='community'] .cm-switch [data-switch='on'] > span > span {
   background: var(--cm-sel-ink);
+}
+/* Forced colours replace that ink with Canvas, so the ON knob vanished into
+   its track and an ON switch read as an empty one. The house knob ink there
+   (src/index.css): Highlight when ON. */
+@media (forced-colors: active) {
+  [data-surface='community'] .cm-switch [data-switch='on'] > span > span {
+    background: Highlight;
+  }
 }
 
 /* The busy gold button: the spinner in the ink, its track a quarter of it.

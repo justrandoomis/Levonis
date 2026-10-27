@@ -11,20 +11,19 @@
  * gate also wraps `/community/store/:slug/p/:productSlug`, which renders the
  * storefront product page and must keep the storefront palette (plan R17).
  *
- * Portals leave the root, so the stamp travels with them: `SurfaceContext`
- * (src/components/ui/Overlay.tsx) for Overlay and Anchored (sheets, menus,
- * dialogs opened from inside), and the toast store (src/lib/toastStore.ts)
- * for the shell Toaster: the root publishes its stamp while it is mounted,
- * again on a theme switch, and withdraws it when it leaves.
+ * Portals leave the root, so the pair travels with them through
+ * ./scopePortals.ts: the windows and menus opened from inside the scope and
+ * the shell toast stack wear it, and follow a theme switch. Nothing of this
+ * is in the house primitives (ui/Overlay, ui/Toast, lib/toastStore), so a
+ * storefront visit carries none of it (tests/bundleBudget.test.ts).
  *
  * The stylesheet is imported HERE and only here, so it rides in this lazy
  * module and never reaches a storefront visitor (tests/communityScope.test.ts).
  */
-import React, { useLayoutEffect, useMemo } from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import '../../styles/community.css';
 import { useTheme } from '../../lib/theme';
-import { publishToastSurface } from '../../lib/toastStore';
-import { SurfaceContext, type SurfaceStamp } from '../ui/Overlay';
+import { carryScope } from './scopePortals';
 
 export interface CommunitySurfaceProps {
   children: React.ReactNode;
@@ -33,13 +32,11 @@ export interface CommunitySurfaceProps {
 
 export default function CommunitySurface({ children, className = '' }: CommunitySurfaceProps) {
   const { theme } = useTheme();
-  const stamp = useMemo<SurfaceStamp>(() => ({ 'data-surface': 'community', 'data-theme': theme }), [theme]);
-  useLayoutEffect(() => publishToastSurface(stamp), [stamp]);
+  const root = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => (root.current ? carryScope(root.current) : undefined), []);
   return (
-    <SurfaceContext.Provider value={stamp}>
-      <div {...stamp} className={`cm-surface bg-canvas text-text-primary ${className}`}>
-        {children}
-      </div>
-    </SurfaceContext.Provider>
+    <div ref={root} data-surface="community" data-theme={theme} className={`cm-surface bg-canvas text-text-primary ${className}`}>
+      {children}
+    </div>
   );
 }

@@ -56,8 +56,6 @@ import {
   dismissToast as dismiss,
   isToasterHost,
   subscribeToasterHosts,
-  subscribeToastSurface,
-  toastSurface,
   subscribeToasts as subscribe,
   toast,
   toastQueue as snapshot,
@@ -181,10 +179,6 @@ export function Toaster({ aboveNav = false }: { aboveNav?: boolean } = {}) {
   useEffect(() => claimToasterHost(me), [me]);
   const drawing = useSyncExternalStore(subscribeToasterHosts, () => isToasterHost(me), () => false);
   const list = useSyncExternalStore(subscribe, snapshot, snapshot);
-  // A toast raised on a themed page (the community scope) wears the stamp the
-  // scope root publishes (lib/toastStore.ts), so it paints in the scope tokens
-  // and follows a theme switch; none outside every scope.
-  const surface = useSyncExternalStore(subscribeToastSurface, toastSurface, () => null);
   const { loc } = useLanguage();
   const [hovered, setHovered] = useState(false);
   const [focusedIn, setFocusedIn] = useState(false);
@@ -207,7 +201,6 @@ export function Toaster({ aboveNav = false }: { aboveNav?: boolean } = {}) {
       <section
         aria-label={loc('الإشعارات', 'Notifications', 'ئاگادارکردنەوەکان')}
         data-toaster
-        {...surface}
         onPointerEnter={() => setHovered(true)}
         onPointerLeave={() => setHovered(false)}
         onFocus={() => setFocusedIn(true)}

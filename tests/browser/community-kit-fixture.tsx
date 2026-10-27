@@ -24,6 +24,10 @@ import { GoldButton, KitButton, KitIconButton, TextLink, type KitVariant } from 
 import { ChoiceTiles, FilterSelect, SegmentedTrack, Stepper, Toggle, UnderlineTabs } from '../../src/components/community/kit/controls';
 import { CountedField, DropZone, SearchField, SelectButton } from '../../src/components/community/kit/fields';
 import { ActionDock, KitAvatar, KitCard, ListRow, MediaAddTile, MediaTile, SectionCard, SectionHead, StatePill, StepProgress, type StateTone } from '../../src/components/community/kit/display';
+import { Overlay, Sheet } from '../../src/components/ui/Overlay';
+import ToasterGate from '../../src/components/ui/ToasterGate';
+import { toast } from '../../src/lib/toastStore';
+import { setThemePreference, useTheme } from '../../src/lib/theme';
 import '../../src/index.css';
 
 const params = new URLSearchParams(location.search);
@@ -397,6 +401,9 @@ function Kit() {
               </div>
             </div>
           </Panel>
+          <Panel id="portals" title={t('النوافذ والإشعارات', 'Windows and notices', 'پەنجەرەکان و ئاگادارکردنەوەکان')}>
+            <Portals />
+          </Panel>
           <Panel id="dock" title={t('شريط الإجراء', 'Action bar', 'شریتی کردار')}>
             <div className="relative overflow-hidden rounded-lg">
               <ActionDock>
@@ -415,10 +422,80 @@ function Kit() {
   );
 }
 
+/**
+ * The portals of the scope (src/components/community/scopePortals.ts): a sheet
+ * opened from inside, a confirmation opened from that sheet, and a toast. The
+ * shell below (outside the scope) opens a window of its own, switches the
+ * theme and takes the community page away.
+ */
+function Portals() {
+  const t = useT();
+  const [sheet, setSheet] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <div className="flex flex-wrap gap-2" data-kit-row="portals">
+      <KitButton data-kit-open="sheet" onClick={() => setSheet(true)}>
+        {t('افتح نافذة', 'Open a sheet', 'پەنجەرەیەک بکەرەوە')}
+      </KitButton>
+      <KitButton data-kit-open="toast" onClick={() => toast.success(t('حُفظ المشروع', 'Project saved', 'پڕۆژەکە پاشەکەوت کرا'), { duration: Infinity })}>
+        {t('أظهر إشعارًا', 'Show a notice', 'ئاگادارییەک پیشان بدە')}
+      </KitButton>
+      <Sheet open={sheet} onClose={() => setSheet(false)} label={t('نافذة من صفحة المجتمع', 'A sheet from the community page', 'پەنجەرەیەک لە پەڕەی کۆمەڵگەوە')} testId="kit-sheet">
+        <div className="flex flex-col gap-3 p-4">
+          <p className="text-[15px] text-text-primary">{t('نافذة من صفحة المجتمع', 'A sheet from the community page', 'پەنجەرەیەک لە پەڕەی کۆمەڵگەوە')}</p>
+          <KitButton data-kit-open="confirm" onClick={() => setConfirm(true)}>
+            {t('تأكيد', 'Confirm', 'دڵنیاکردنەوە')}
+          </KitButton>
+        </div>
+      </Sheet>
+      <Overlay open={confirm} onClose={() => setConfirm(false)} alert label={t('هل تريد المتابعة؟', 'Continue?', 'بەردەوام دەبیت؟')} testId="kit-confirm">
+        <div className="flex flex-col gap-3 p-4">
+          <p className="text-[15px] text-text-primary">{t('هل تريد المتابعة؟', 'Continue?', 'بەردەوام دەبیت؟')}</p>
+          <KitButton data-kit-close="confirm" onClick={() => setConfirm(false)}>
+            {t('إغلاق', 'Close', 'داخستن')}
+          </KitButton>
+        </div>
+      </Overlay>
+    </div>
+  );
+}
+
+/** The fixture as a page in the shell: the scope, then a shell bar outside it, and the shell toast stack. */
+function Shell() {
+  const t = useT();
+  const { theme: shown } = useTheme();
+  const [page, setPage] = useState(true);
+  const [shellWindow, setShellWindow] = useState(false);
+  return (
+    <>
+      {page && <Kit />}
+      <div data-kit-shell className="flex flex-wrap gap-2 p-4">
+        <button type="button" data-kit-shell="window" className="lv-button lv-button-secondary" onClick={() => setShellWindow(true)}>
+          {t('نافذة من خارج المجتمع', 'A window from outside the community', 'پەنجەرەیەک لە دەرەوەی کۆمەڵگە')}
+        </button>
+        <button type="button" data-kit-shell="theme" className="lv-button lv-button-secondary" onClick={() => setThemePreference(shown === 'dark' ? 'light' : 'dark', null)}>
+          {t('تبديل المظهر', 'Switch the theme', 'گۆڕینی ڕووکار')}
+        </button>
+        <button type="button" data-kit-shell="page" className="lv-button lv-button-secondary" onClick={() => setPage((v) => !v)}>
+          {page ? t('إخفاء صفحة المجتمع', 'Hide the community page', 'شاردنەوەی پەڕەی کۆمەڵگە') : t('إظهار صفحة المجتمع', 'Show the community page', 'پیشاندانی پەڕەی کۆمەڵگە')}
+        </button>
+      </div>
+      <Overlay open={shellWindow} onClose={() => setShellWindow(false)} label={t('نافذة من خارج المجتمع', 'A window from outside the community', 'پەنجەرەیەک لە دەرەوەی کۆمەڵگە')} testId="kit-shell-window">
+        <div className="p-4">
+          <button type="button" data-kit-close="shell" className="lv-button lv-button-secondary" onClick={() => setShellWindow(false)}>
+            {t('إغلاق', 'Close', 'داخستن')}
+          </button>
+        </div>
+      </Overlay>
+      <ToasterGate />
+    </>
+  );
+}
+
 createRoot(document.getElementById('root')!).render(
   <MemoryRouter>
     <LanguageProvider>
-      <Kit />
+      <Shell />
     </LanguageProvider>
   </MemoryRouter>
 );

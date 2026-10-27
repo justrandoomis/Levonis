@@ -4,7 +4,8 @@
  * keyboard (TabStrip, Segmented, Switch, NumberInput, Menu) and gives it the
  * reference look through one `cm-` class of src/styles/community.css:
  *
- *   UnderlineTabs   the 3px gold underline under a gold label
+ *   UnderlineTabs   the 3px gold underline under a gold label, as wide as
+ *                   the label plus 12px on each side (tokens.md §6 #7)
  *   SegmentedTrack  a raised track whose thumb is the sand selection (D-3)
  *   Toggle          ON is the sand track with the ink knob (D-3)
  *   Stepper         a well holding the figure, two raised 56px keys
@@ -16,9 +17,11 @@
  * The selection is never colour alone: the aria state, plus a thumb, a knob
  * place, a check badge or the chosen value written in the chip.
  */
-import React, { useRef } from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
+import { motion } from 'motion/react';
 import { Check, ChevronDown, X } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
+import { useMotion } from '../../../lib/motion';
 import { Menu } from '../../ui/Menu';
 import { NumberInput, type NumberInputProps } from '../../ui/NumberInput';
 import { Segmented, type SegmentedProps } from '../../ui/Segmented';
@@ -30,12 +33,83 @@ import { useKitStrings } from './strings';
 
 export type UnderlineTabsProps = Omit<TabStripProps, 'indicatorClassName' | 'activeClassName' | 'idleClassName'>;
 
-/** «طلبات المجتمع / طلباتي»: tabs on the canvas, the gold label and underline. */
-export function UnderlineTabs({ className = '', ...rest }: UnderlineTabsProps) {
+/**
+ * A tab label that knows where its words are. A long label wraps on a narrow
+ * phone, and then its box is as wide as the tab while its lines are not; so
+ * the label measures the box its words take (the range of its text and badge,
+ * every line) and hands it to the line as two insets (`--cm-tab-left`,
+ * `--cm-tab-right`), again whenever it resizes. Every label measures, chosen
+ * or not, so the line that travels to a tab finds its place already set.
+ */
+function UnderlineLabel({ children, line }: { children: React.ReactNode; line: React.ReactNode }) {
+  const ref = useRef<HTMLSpanElement | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const words = document.createRange();
+      const last = el.lastChild;
+      words.setStart(el, 0);
+      words.setEnd(el, el.childNodes.length - (last instanceof Element && last.hasAttribute('data-tab-line') ? 1 : 0));
+      const at = words.getBoundingClientRect();
+      const box = el.getBoundingClientRect();
+      if (!at.width) return;
+      el.style.setProperty('--cm-tab-left', `${at.left - box.left}px`);
+      el.style.setProperty('--cm-tab-right', `${box.right - at.right}px`);
+    };
+    measure();
+    const watch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    watch?.observe(el);
+    void document.fonts?.ready.then(measure);
+    return () => watch?.disconnect();
+  }, [children]);
+  return (
+    <span ref={ref} className="cm-tab-label">
+      {children}
+      {line}
+    </span>
+  );
+}
+
+/**
+ * «طلبات المجتمع / طلباتي»: tabs on the canvas, the gold label and underline.
+ * The house strip draws its indicator across the whole tab; the reference
+ * draws it under the label, 12px past its words on each side (IMG_8468,
+ * IMG_8462). So the underline here lives inside the label (`UnderlineLabel`),
+ * and the house indicator is not drawn. It is still ONE element per strip
+ * that travels from tab to tab (`layoutId`, the spring of the house strip)
+ * and jumps under reduced motion.
+ */
+export function UnderlineTabs({ className = '', items, value, group, ...rest }: UnderlineTabsProps) {
+  const m = useMotion();
   return (
     <TabStrip
       {...rest}
-      indicatorClassName="bg-gold"
+      group={group}
+      value={value}
+      items={items.map((t) => ({
+        ...t,
+        badge: undefined,
+        label: (
+          <UnderlineLabel
+            line={
+              t.id === value && (
+                <motion.span
+                  layoutId={`cm-tab-line-${group}`}
+                  aria-hidden="true"
+                  data-tab-line
+                  className="cm-tab-line"
+                  transition={m.reduced ? { duration: 0 } : m.spring('move')}
+                />
+              )
+            }
+          >
+            {t.label}
+            {t.badge}
+          </UnderlineLabel>
+        ),
+      }))}
+      indicatorClassName="hidden"
       activeClassName="text-gold"
       idleClassName="text-text-secondary hover:text-text-primary"
       className={`cm-tabs ${className}`}
@@ -223,7 +297,7 @@ export function FilterSelect({ label, icon, options, value, onChange, className 
           id: o.id,
           label: o.label,
           icon: o.id === value ? <Check className="h-4 w-4" /> : <span className="block h-4 w-4" />,
-          checked: o.id === value,
+          radio: { role: 'menuitemradio', 'aria-checked': o.id === value },
           hint: o.id === value ? s.selected : undefined,
           onSelect: () => onChange(o.id),
         }))}

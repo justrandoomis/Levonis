@@ -9,10 +9,11 @@
  *  b. `CommunityGate` carries no scope: it also wraps the storefront product
  *     page of `/community/store/:slug/p/:productSlug` (plan R17), so the scope
  *     is stamped on the community page roots only;
- *  c. Overlay and Anchored stamp the scope on their portal roots, and the
- *     shell Toaster wears the stamp the scope root publishes to the toast
- *     store (so a toast follows a theme switch and drops the stamp when the
- *     scope leaves);
+ *  c. the portals (windows, menus, the shell toast stack) carry the scope
+ *     through src/components/community/scopePortals.ts, from the DOM, and the
+ *     house primitives (ui/Overlay, ui/Toast, lib/toastStore) carry nothing of
+ *     it, so no storefront visit pays for it (round 4: a React context in
+ *     Overlay cost every store page and the first toast about 4 KB);
  *  d. every text and boundary pair of the scope meets WCAG AA in both
  *     themes, computed from the CSS values themselves;
  *  e. D-2 and D-3 as the owner overrode them: the primary is the sand-gold
@@ -31,7 +32,10 @@
  *     wider than its tile body still 2px clear of the badge;
  *  i. the kit review (round 3): the chosen segmented label never clipped on a
  *     phone, the focus drawn off the sand, the menu row focus line, and the
- *     held button at full ink under reduced motion.
+ *     held button at full ink under reduced motion;
+ *  j. the kit review (round 4): the tab underline as wide as the label plus
+ *     24px, every held control at full ink in both motion settings, and the
+ *     ON knob of the Toggle in Highlight under forced colours.
  *
  * scripts/e2e-community-kit.mjs measures the same in Chromium on the kit
  * fixture (tests/browser/community-kit.html).
@@ -45,7 +49,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BEGIN, END, buildBlock, contrast, parseColor, rgbToOklch } from '../scripts/theme-tokens.mjs';
 import { KIT_STRINGS } from '../src/components/community/kit/strings';
-import { publishToastSurface, subscribeToastSurface, toastSurface, type ToastSurface } from '../src/lib/toastStore';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -173,52 +176,41 @@ test('b. CommunityGate carries no scope; the scope root stamps the surface and t
   assert.doesNotMatch(gate, /data-surface|CommunitySurface/, 'CommunityGate is stamped: the storefront product page inside it would turn community');
   assert.doesNotMatch(read('src/App.tsx'), /data-surface/);
   const root = read('src/components/community/CommunitySurface.tsx');
-  assert.match(root, /'data-surface': 'community', 'data-theme': theme/);
   assert.match(root, /const \{ theme \} = useTheme\(\);/);
-  assert.match(root, /<SurfaceContext\.Provider value=\{stamp\}>\s*<div \{\.\.\.stamp\} className=\{`cm-surface /);
+  assert.match(root, /<div ref=\{root\} data-surface="community" data-theme=\{theme\} className=\{`cm-surface /);
   assert.match(root, /import '\.\.\/\.\.\/styles\/community\.css';/);
 });
 
 // ----------------------------------------------------------------------- c
-test('c. Overlay and Anchored stamp the scope on their portal roots; the Toaster wears the stamp the scope root publishes', () => {
+test('c. the portals carry the scope from community code alone; the house primitives carry nothing of it', () => {
+  // B1R4-REG-1/2. A context declared in Overlay made the module impure (a top-level call), so the
+  // shell Toaster and every store page loaded the whole window primitive (+4.2 KB), and the scope root
+  // imported it on every community page (+38.6 KB with the animation core). Byte for byte the three
+  // house modules are what the storefront ships without the community (tests/bundleBudget.test.ts).
+  const house = ['src/components/ui/Overlay.tsx', 'src/components/ui/Toast.tsx', 'src/lib/toastStore.ts'];
+  for (const f of house) {
+    assert.doesNotMatch(strip(read(f)), /data-surface|SurfaceContext|SurfaceStamp|ToastSurface|createContext/, `${f} carries the community scope again`);
+  }
+  const root = read('src/components/community/CommunitySurface.tsx');
+  assert.doesNotMatch(strip(root), /from '\.\.\/ui\/|lib\/toastStore|motion\/react/, 'the scope root imports a house primitive: every community page downloads it');
+  assert.match(root, /import \{ carryScope \} from '\.\/scopePortals';/);
+  assert.match(root, /useLayoutEffect\(\(\) => \(root\.current \? carryScope\(root\.current\) : undefined\), \[\]\);/);
+  // The seam: only the scope root imports it, it imports nothing, and it reads the portal roots the
+  // house primitives already render into <body>.
+  const seam = read('src/components/community/scopePortals.ts');
+  assert.doesNotMatch(strip(seam), /^import /m, 'the portal seam imports a module');
+  const sources = (readdirSync(join(ROOT, 'src'), { recursive: true }) as string[]).filter((f) => /\.tsx?$/.test(f)).map((f) => `src/${f.split('\\').join('/')}`);
+  assert.deepEqual(sources.filter((f) => /from '[./]*scopePortals'/.test(read(f))), ['src/components/community/CommunitySurface.tsx']);
+  assert.match(seam, /const PORTAL = '\[data-overlay\], \[data-anchored\]';/);
+  assert.match(seam, /const TOASTER = '\[data-toaster\]';/);
   const overlay = read('src/components/ui/Overlay.tsx');
-  assert.match(overlay, /export const SurfaceContext = createContext<SurfaceStamp \| null>\(null\);/);
-  assert.equal((overlay.match(/const surface = useContext\(SurfaceContext\);/g) ?? []).length, 2, 'Overlay and Anchored each read the scope');
-  assert.match(overlay, /data-overlay=\{testId \?\? true\}\s*data-overlay-mode=\{mode\}\s*\{\.\.\.surface\}/, 'the window layer is not stamped');
-  assert.match(overlay, /data-anchored=\{testId \?\? true\}\s*\{\.\.\.surface\}/, 'the anchored menu is not stamped');
-  // Both portal roots render into <body>, so the stamp is what carries the scope.
-  assert.equal((overlay.match(/document\.body\s*\)/g) ?? []).length, 2);
-  const toast = read('src/components/ui/Toast.tsx');
-  // Read from React state, never from the DOM while rendering: a stamp copied at
-  // render time kept the old theme after a switch until the queue changed.
-  assert.doesNotMatch(strip(toast), /querySelector\(['"]\.cm-surface/, 'the Toaster copies the scope stamp from the DOM');
-  assert.match(toast, /const surface = useSyncExternalStore\(subscribeToastSurface, toastSurface, \(\) => null\);/);
-  assert.match(toast, /data-toaster\s*\{\.\.\.surface\}/);
-  // The scope root publishes its stamp on mount and on every theme switch, and withdraws it on unmount.
-  assert.match(read('src/components/community/CommunitySurface.tsx'), /useLayoutEffect\(\(\) => publishToastSurface\(stamp\), \[stamp\]\);/);
-});
-
-test('c2. the toast stamp follows the scope: published on mount, replaced on a theme switch, withdrawn when the scope leaves', () => {
-  const seen: Array<string | null> = [];
-  const stop = subscribeToastSurface(() => seen.push(toastSurface()?.['data-theme'] ?? null));
-  assert.equal(toastSurface(), null, 'a stamp outside every scope');
-  const dark: ToastSurface = { 'data-surface': 'community', 'data-theme': 'dark' };
-  const light: ToastSurface = { 'data-surface': 'community', 'data-theme': 'light' };
-  const withdrawDark = publishToastSurface(dark);
-  assert.equal(toastSurface(), dark);
-  // A theme switch: React runs the cleanup of the old stamp, then publishes the new one.
-  withdrawDark();
-  const withdrawLight = publishToastSurface(light);
-  assert.equal(toastSurface(), light, 'the toast kept the old theme after a switch');
-  // Two scope roots during a route change: the newest wins, and the other leaving keeps it.
-  const next: ToastSurface = { 'data-surface': 'community', 'data-theme': 'light' };
-  const withdrawNext = publishToastSurface(next);
-  withdrawLight();
-  assert.equal(toastSurface(), next);
-  withdrawNext();
-  assert.equal(toastSurface(), null, 'the stamp outlived the scope');
-  assert.deepEqual(seen, ['dark', null, 'light', 'light', 'light', null]);
-  stop();
+  assert.match(overlay, /data-overlay=\{testId \?\? true\}/);
+  assert.match(overlay, /data-anchored=\{testId \?\? true\}/);
+  assert.equal((overlay.match(/document\.body\s*\)/g) ?? []).length, 2, 'a window or a menu no longer portals into <body>');
+  assert.match(read('src/components/ui/Toast.tsx'), /<section[^>]*\s+data-toaster\b[\s\S]*?document\.body/);
+  // A theme switch re-stamps from the attribute of the root, and only stamps this module wrote are removed.
+  assert.match(seam, /attributeFilter: \['data-theme'\]/);
+  assert.match(seam, /\} else if \(owner\.has\(el\)\) \{/);
 });
 
 // ----------------------------------------------------------------------- d
@@ -319,10 +311,10 @@ test('d. every scoped text and boundary pair meets WCAG AA in both themes (compu
   // The menu row under the keyboard wears the focus line, inset; the tint stays for the pointer.
   assert.match(css, /\[data-surface='community'\] \[data-menu-item\]:focus-visible \{\s*outline: 2px solid var\(--color-focus\);\s*outline-offset: -2px;\s*\}/);
   // The held button: the house dims every pressed button to 0.72 under reduced motion (an outline
-  // label fell to 3.2:1 on cream); in the scope the clay dent answers the touch at full ink.
+  // label fell to 3.2:1 on cream); in the scope the clay dent answers the touch at full ink (test j
+  // holds every other control to the same).
   assert.match(strip(indexCss), /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?button:active,[\s\S]*?opacity: 0\.72 !important;/);
   assert.match(indexCss, /\.lv-button:not\(:disabled\):not\(\[aria-disabled='true'\]\):active \{\s*opacity: 1;\s*--tw-shadow: var\(--clay-press\);/);
-  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\[data-surface='community'\] \.lv-button:not\(:disabled\):active \{\s*opacity: 1 !important;\s*\}\s*\}/);
   // The menu highlight the grounds above model.
   assert.match(read('src/components/ui/Menu.tsx'), /focus:bg-white\/\[0\.07\]/);
   // The chip recipe the mix above models.
@@ -433,8 +425,9 @@ test('g. the kit review: badge, segmented, stepper, drop zone, photo tile and fi
 
   // A11Y-5. The filter options are radio items, the chosen one checked (the word «محدد» stays visible).
   const menu = read('src/components/ui/Menu.tsx');
-  assert.match(menu, /\.\.\.\(entry\.checked === undefined \? null : \{ role: 'menuitemradio', 'aria-checked': entry\.checked \}\)/);
-  assert.match(controls, /checked: o\.id === value,\s*hint: o\.id === value \? s\.selected : undefined,/);
+  assert.match(menu, /role: 'menuitem',\s*tabIndex: -1,\s*'aria-disabled': entry\.disabled \|\| undefined,\s*\/\/[^\n]*\n\s*\.\.\.entry\.radio,/);
+  assert.match(menu, /radio\?: \{ role: 'menuitemradio'; 'aria-checked': boolean \};/);
+  assert.match(controls, /radio: \{ role: 'menuitemradio', 'aria-checked': o\.id === value \},\s*hint: o\.id === value \? s\.selected : undefined,/);
 });
 
 // ----------------------------------------------------------------------- h
@@ -619,4 +612,96 @@ test('i. the kit review, round 3: the chosen segmented label is never clipped on
   // The reference phone and the common ones keep the 14px type; only a 320px phone steps down.
   for (const width of [78, 74.3, 70.5]) assert.equal(drawn(width).size, 14, `a ${width}px option lost its 14px label`);
   assert.ok(drawn(60.5).size >= 12, 'the label steps under 12px');
+});
+
+// ----------------------------------------------------------------------- j
+test('j. the kit review, round 4: the label-wide tab underline, every held control at full ink, the forced-colours knob', () => {
+  const ruleOf = (selector: string) => {
+    const at = css.indexOf(`${selector} {`);
+    assert.ok(at >= 0, `${SHEET}: no rule \`${selector}\``);
+    return Object.fromEntries(
+      css
+        .slice(css.indexOf('{', at) + 1, css.indexOf('}', at))
+        .split(';')
+        .map((d) => d.trim())
+        .filter(Boolean)
+        .map((d) => [d.slice(0, d.indexOf(':')).trim(), d.slice(d.indexOf(':') + 1).trim()])
+    );
+  };
+
+  // B1R4-FID-1. The underline is the label plus 12px on each side (tokens.md §6 #7), not the tab: the
+  // house indicator spans the tab (`start-0 end-0`), so the kit draws its own line inside the label,
+  // still one travelling element per strip, and the house one is not drawn.
+  const controls = read('src/components/community/kit/controls.tsx');
+  assert.match(read('src/components/ui/Tabs.tsx'), /className=\{`absolute bottom-0 start-0 end-0 h-0\.5 rounded-t-full \$\{indicatorClassName\}`\}/);
+  assert.match(controls, /indicatorClassName="hidden"/, 'the house indicator (the whole tab) is drawn too');
+  assert.match(controls, /<UnderlineLabel\s+line=\{\s*t\.id === value && \(\s*<motion\.span\s+layoutId=\{`cm-tab-line-\$\{group\}`\}/);
+  assert.match(controls, /\{t\.label\}\s*\{t\.badge\}\s*<\/UnderlineLabel>/);
+  assert.match(controls, /transition=\{m\.reduced \? \{ duration: 0 \} : m\.spring\('move'\)\}/, 'the line no longer travels, or no longer jumps under reduced motion');
+  // A wrapped label is a box as wide as the tab: the label measures where its words are, every line
+  // of them, without the line it holds, and the line takes those insets less 12px on each side.
+  assert.match(controls, /words\.setEnd\(el, el\.childNodes\.length - \(last instanceof Element && last\.hasAttribute\('data-tab-line'\) \? 1 : 0\)\);/);
+  assert.match(controls, /el\.style\.setProperty\('--cm-tab-left', `\$\{at\.left - box\.left\}px`\);\s*el\.style\.setProperty\('--cm-tab-right', `\$\{box\.right - at\.right\}px`\);/);
+  const line = ruleOf("[data-surface='community'] .cm-tab-line");
+  assert.equal(line['left'], 'calc(var(--cm-tab-left, 0px) - 12px)', 'the underline is not the label plus 24px');
+  assert.equal(line['right'], 'calc(var(--cm-tab-right, 0px) - 12px)', 'the underline is not the label plus 24px');
+  assert.equal(line['inset-block-end'], '0');
+  assert.equal(line['block-size'], '3px');
+  assert.equal(line['border-radius'], '999px');
+  assert.equal(line['background'], 'var(--color-gold)');
+  const label = ruleOf("[data-surface='community'] .cm-tab-label");
+  assert.equal(label['position'], 'relative');
+  const tab = ruleOf("[data-surface='community'] .cm-tabs [data-tab]");
+  // The label box takes the block padding of the tab, so its bottom edge (where the line sits) is the
+  // bottom edge of the tab; the tab keeps 12px of inline room, so the line never leaves it.
+  assert.equal(tab['padding-block'], '0');
+  assert.equal(label['padding-block'], '12px');
+  assert.equal(tab['padding-inline'], '12px');
+  assert.equal(ruleOf("[data-surface='community'] .cm-tabs [data-tab] > span:not([data-tab-indicator])")['display'], 'flex');
+  assert.doesNotMatch(css, /\[data-tab-indicator\]\s*\{/, 'the scope still restyles the house indicator');
+
+  // B1R4-A11Y-1. Nothing in the scope dims on press: the house rule (0.72 in the base layer, and
+  // !important under reduced motion) took a held link, tab, thumb, select, tile, row and drop zone
+  // line under 4.5:1. Both rules cover every control the house dims, in both motion settings.
+  const pressables = ['button', '[role="button"]', '[role="tab"]', 'a[href]'];
+  const houseBase = /@layer base \{[\s\S]*?button:not\(:disabled\):not\(\[aria-disabled="true"\]\):active,\s*summary:active,\s*\[role="button"\]:not\(\[aria-disabled="true"\]\):active,\s*\[role="tab"\]:not\(\[aria-disabled="true"\]\):active,\s*a\[href\]:active,\s*label\[for\]:active \{\s*opacity: 0\.72;/;
+  assert.match(indexCss, houseBase, 'the house press dim moved: re-check the scope rule against it');
+  const held = /@layer components \{\s*\[data-surface='community'\] :is\(([^)]*)\):not\(:disabled, \[aria-disabled='true'\]\):active \{\s*opacity: 1;\s*\}\s*\}/.exec(css);
+  assert.ok(held, 'a held control in the scope is dimmed to 0.72 (no full-ink rule over the base layer)');
+  const heldReduced = /@media \(prefers-reduced-motion: reduce\) \{\s*\[data-surface='community'\] :is\(([^)]*)\):not\(:disabled, \[aria-disabled='true'\], \[class\^='opacity-'\], \[class\*=' opacity-'\]\):active \{\s*opacity: 1 !important;\s*\}\s*\}/.exec(css);
+  assert.ok(heldReduced, 'a held control in the scope is dimmed to 0.72 under reduced motion');
+  for (const list of [held![1], heldReduced![1]]) {
+    const covered = list.split(',').map((x) => x.trim().replace(/'/g, '"'));
+    for (const p of [...pressables, 'summary', 'label[for]']) assert.ok(covered.includes(p), `${p} still dims when held in the scope`);
+  }
+  // The pairs a held label keeps at full ink (test d holds every ink on every ground): the link and
+  // the chosen tab in gold, the idle tab, a select value or a subtitle on the hover fill, a row line,
+  // a thumb label on the track, the drop zone line in the well. Dimmed to 0.72 over the same ground,
+  // some of them fall under 4.5:1 in each theme, which is what the rules above prevent.
+  for (const theme of ['dark', 'light'] as const) {
+    const v = V(theme);
+    const c = (name: string) => color(v[name]);
+    const dimmedUnder: string[] = [];
+    for (const [ink, ground] of [
+      ['color-gold', 'color-canvas'],
+      ['color-gold', 'color-surface'],
+      ['color-text-secondary', 'color-canvas'],
+      ['color-text-muted', 'color-surface-selected'],
+      ['color-text-muted', 'color-surface-raised'],
+      ['color-text-secondary', 'cm-track'],
+      ['color-text-muted', 'clay-well-bg'],
+    ]) {
+      const r = ratio(c(ink), c(ground));
+      assert.ok(r >= 4.5, `${theme}: a held --${ink} on --${ground} reads ${r.toFixed(2)}:1`);
+      const dimmed = ratio(over(c(ink), 0.72, c(ground)), c(ground));
+      if (dimmed < 4.5) dimmedUnder.push(`--${ink} on --${ground} ${dimmed.toFixed(2)}:1`);
+    }
+    assert.ok(dimmedUnder.length > 0, `${theme}: no pair falls under 4.5:1 when dimmed; the full-ink rule is no longer load-bearing`);
+  }
+
+  // B1R4-A11Y-2. Forced colours turn the scoped knob ink into Canvas: the ON knob vanished. The house
+  // knob there is Highlight when ON, and the scope says so again, at the specificity that hid it.
+  assert.match(indexCss, /\[role='switch'\]\[aria-checked='true'\] span:not\(:has\(span\)\) \{\s*background: Highlight;/);
+  assert.match(css, /@media \(forced-colors: active\) \{\s*\[data-surface='community'\] \.cm-switch \[data-switch='on'\] > span > span \{\s*background: Highlight;\s*\}\s*\}/);
+  assert.ok(css.indexOf('@media (forced-colors: active)') > css.indexOf("[data-surface='community'] .cm-switch [data-switch='on'] > span > span {"), 'the forced-colours knob comes before the rule it overrides');
 });

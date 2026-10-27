@@ -853,3 +853,40 @@ test('the category explorer\'s static closure carries neither the listing gramma
     assert.equal(hit, undefined, `${name} is a static dependency of the explorer`);
   }
 });
+
+/**
+ * THE COMMUNITY SCOPE COSTS THE STOREFRONT NOTHING (community UI plan B1,
+ * review round 4). The scope root once handed its stamp to the portals
+ * through a React context declared in ui/Overlay.tsx. That top-level
+ * `createContext` call made the module impure, so the shell Toaster
+ * (downloaded with the first toast of any page) and every store page, which
+ * only need the layer numbers and the layer stack, loaded the whole window
+ * primitive: about +4.2 KB gzip each, which the storefront figure above could
+ * not see (it already counted Overlay). The scope now reaches the portals from
+ * community code alone (src/components/community/scopePortals.ts), and the
+ * Toaster, the store page and the storefront pages are byte for byte what they
+ * were without it. This holds both halves: neither the Toaster nor the store
+ * page statically loads the window primitive, and no storefront closure
+ * carries any of the scope.
+ */
+test('the shell Toaster and the store page never load the window primitive, and no storefront closure carries the community scope', () => {
+  const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
+  const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
+  const toaster = chunk('Toast');
+  const store = chunk('CommunityStorePage');
+  assert.ok(toaster, 'the shell Toaster has no lazy chunk of its own');
+  assert.ok(store, 'the store page has no lazy chunk of its own');
+  assert.ok(chunk('Overlay'), 'the window primitive has no chunk of its own: this check would see nothing');
+  for (const [name, start] of [['the shell Toaster', toaster!], ['the store page', store!]] as const) {
+    const overlay = [...staticClosure(start)].find((f) => f.startsWith('Overlay-'));
+    assert.equal(overlay, undefined, `${name} statically loads ${overlay}: a top-level call in ui/Overlay.tsx (or a new import of it) put the whole window primitive in its download`);
+  }
+  const entry = entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!;
+  const starts = [entry, toaster!, store!, chunk('Storefront')!, chunk('StorefrontProduct')!];
+  for (const start of starts) {
+    for (const f of staticClosure(start)) {
+      const code = readFileSync(join(ASSETS, f), 'utf8');
+      assert.doesNotMatch(code, /data-surface|cm-surface/, `${f}, in the static closure of ${start}, carries the community scope`);
+    }
+  }
+});
