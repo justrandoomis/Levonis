@@ -571,6 +571,7 @@ function seedAuditRows(raw: DatabaseSync) {
 let templateFile: string | null = null;
 let scratchDir: string | null = null;
 let copies = 0;
+const KEPT_COPIES = 16;
 export function seededCopy(): DatabaseSync {
   if (!templateFile) {
     scratchDir = mkdtempSync(join(tmpdir(), 'levonis-role-matrix-'));
@@ -587,6 +588,15 @@ export function seededCopy(): DatabaseSync {
     });
   }
   const file = join(scratchDir!, `copy-${process.pid}-${(copies += 1)}.db`);
+  // A file run makes hundreds of copies; keep only the recent ones on disk, or
+  // a CI runner temp quota runs out (an open copy keeps its data until closed).
+  if (copies > KEPT_COPIES) {
+    try {
+      rmSync(join(scratchDir!, `copy-${process.pid}-${copies - KEPT_COPIES}.db`), { force: true });
+    } catch {
+      /* best effort */
+    }
+  }
   copyFileSync(templateFile, file);
   // A new database is a new policy archive (the same reset dbThrough makes).
   resetPolicyCorpusMemo();
