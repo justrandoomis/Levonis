@@ -21,16 +21,32 @@
  *   07  the Settings tiers are named in Arabic and Sorani;
  *   08  the About sheet's legal summary and source link are 44 px tall.
  *
+ * Round 3 (c6fix-r3):
+ *
+ *   09  the «تراجع عن القص» offer goes when the objects change by another
+ *       path (delete all, a duplicate, a ZIP import) and still undoes the
+ *       cut when nothing else changed; the cut and the ZIP notices count
+ *       in the reader's language («قطعتين», «مجسمين»);
+ *   10  the Projects sheet tabs: ink on the sand at 4.5:1 or more, 44 px
+ *       tall, a named tablist, one tab stop, the arrows walk, and each tab
+ *       controls the tabpanel it labels;
+ *   11  the chosen connection way carries the check mark and the sand
+ *       selection: its edge or fill 3:1 against the track, its label 4.5:1;
+ *   12  the arrows on the viewport card's own toolbar walk its buttons with
+ *       one tab stop, and move no model: a fresh result stays fresh.
+ *
  * NOT part of `npm test`: it needs a built Studio, a server, and Chromium.
  *
  *   cd studio && npm run build
  *   npx wrangler dev --port 8799 --ip 127.0.0.1 --compatibility-date 2026-05-22
  *   node tests/browser-shell-keys.mjs [http://127.0.0.1:8799/]
  *
- * SHELL_KEYS_SHOTS=<dir> also saves three pictures there: the outdated
- * banner after the key, the Settings sheet, and the carry-over notice.
+ * SHELL_KEYS_SHOTS=<dir> also saves pictures there: the outdated banner
+ * after the key, the Settings sheet, the carry-over notice, and (round 3)
+ * the message row after each undo step, the Projects tabs and the
+ * connection tabs.
  */
-import { existsSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -206,6 +222,26 @@ console.log("\n01/02: keys on the shell and the slice result (ar, dark)");
   await page.keyboard.press("ArrowDown");
   after = await look(page);
   assert(after.x === before.x && after.readiness === "sliced", "ArrowDown walks too, and moves nothing", `${after.focus}, x ${after.x}`);
+
+  // 12: the viewport card's own toolbar takes its arrows too (c6fix-r3-ha-04).
+  await page.locator('[data-levo-action="viewport-expand"]').focus();
+  await page.keyboard.press("ArrowLeft");
+  await page.waitForTimeout(600);
+  after = await look(page);
+  assert(after.focus === "reset-view", "ArrowLeft on expand moves the focus to «إعادة العرض» (right to left)", String(after.focus));
+  assert(after.x === before.x && after.readiness === "sliced" && after.gcodeDisabled === false, "…and moves no model: the result stays fresh", `x ${after.x}, ${after.readiness}`);
+  await page.keyboard.press("ArrowRight");
+  assert((await look(page)).focus === "viewport-expand", "ArrowRight comes back to expand");
+  await page.keyboard.press("End");
+  after = await look(page);
+  assert(after.focus === "view-bed", "End reaches the bed view", String(after.focus));
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowUp");
+  await page.waitForTimeout(600);
+  after = await look(page);
+  assert(after.focus === "reset-view" && after.x === before.x && after.readiness === "sliced", "ArrowDown at the end and ArrowUp stay in the toolbar and move nothing", `${after.focus}, x ${after.x}, ${after.readiness}`);
+  const overlayStops = await page.evaluate(() => [...document.querySelectorAll(".vp-overlay button")].map((b) => b.tabIndex));
+  assert(overlayStops.filter((value) => value === 0).length === 1, "the viewport toolbar is one tab stop", overlayStops.join(","));
 
   // 01: an arrow on «المزيد» reaches the engine's nudge on window.
   await page.locator('[data-levo-action="more"]').focus();
@@ -416,6 +452,157 @@ console.log("\n08: the About sheet (ar, dark)");
   await page.waitForTimeout(300);
   const link = await page.locator(".legal-details a").boundingBox();
   assert(link && link.height >= 44, "«المصدر وإشعارات المكتبات» is at least 44 px tall", link ? `${Math.round(link.width)} x ${Math.round(link.height)}` : "none");
+  await ctx.close();
+}
+
+// =========================================================================
+// 09 — AN UNDO OFFER STANDS ONLY OVER THE OBJECTS IT WAS RAISED OVER
+// =========================================================================
+/** A two-part ZIP built here from the cube, so no archive is kept in the repository. */
+const { zipSync } = require("fflate");
+const cubeBytes = readFileSync(CUBE);
+const TWO_PARTS = { name: "two-parts.zip", mimeType: "application/zip", buffer: Buffer.from(zipSync({ "part-a.stl": new Uint8Array(cubeBytes), "part-b.stl": new Uint8Array(cubeBytes) })) };
+const sceneNames = (page) => page.evaluate(() => window.__vpApi().sceneSnapshot().map((entry) => entry.name ?? String(entry.id)).sort());
+async function moreAction(page, action) {
+  await page.locator('[data-levo-action="more"]').click();
+  await page.waitForSelector('[data-levo-sheet="more"]', { timeout: 10_000 });
+  await page.locator(`[data-levo-more="${action}"]`).click();
+  await page.waitForTimeout(1200);
+}
+async function cutSelected(page) {
+  await page.evaluate(() => { const api = window.__vpApi(); api.selectObject?.(api.sceneSnapshot()[0]?.id); });
+  await page.waitForTimeout(300);
+  await moreAction(page, "cut");
+  await page.locator('[data-levo-cut="apply"]').click();
+  await page.waitForTimeout(2000);
+}
+for (const [lang, theme, offer, cutSaid, undoneSaid, zipSaid] of [
+  ["ar", "dark", "تراجع عن القص", "تم القص إلى قطعتين.", "تم التراجع عن القص.", "تم توزيع مجسمين تلقائيًا على Plate واحدة."],
+  ["ckb", "light", "گەڕاندنەوەی بڕین", "بۆ 2 پارچە بڕدرا.", null, "2 تەن بە شێوەی خۆکار لەسەر 1 Plate دابەش کران."],
+  ["en", "dark", "Undo the cut", "Cut into 2 pieces.", null, "Automatically arranged 2 models across 1 plate."],
+]) {
+  console.log(`\n09: the undo offer and the counted notices (${lang}, ${theme})`);
+  const { ctx, page } = await openStudio(lang, theme);
+  page.on("dialog", (dialog) => dialog.accept().catch(() => {}));
+  const offerButton = () => page.locator(".studio-messages button", { hasText: offer });
+  await load(page, CUBE);
+  await cutSelected(page);
+  let message = (await look(page)).message;
+  assert(message.includes(cutSaid), "the cut says how many pieces in words that agree", message.slice(0, 120));
+  assert(await offerButton().count() === 1, `«${offer}» is offered after the cut`);
+  // Nothing else changed: the offer undoes the cut.
+  await offerButton().click();
+  await page.waitForTimeout(1500);
+  let names = await sceneNames(page);
+  message = (await look(page)).message;
+  assert(names.length === 1 && (!undoneSaid || message.includes(undoneSaid)), "pressed at once, it brings the cube back", `${names.join(", ")} | ${message.slice(0, 80)}`);
+  // A duplicate takes the offer down.
+  await cutSelected(page);
+  assert(await offerButton().count() === 1, "cut again: offered again");
+  await page.evaluate(() => { const api = window.__vpApi(); api.selectObject?.(api.sceneSnapshot()[0]?.id); });
+  await moreAction(page, "duplicate");
+  names = await sceneNames(page);
+  assert(names.length === 3 && await offerButton().count() === 0, "a duplicate takes the offer down", `${names.length} objects, offer ${await offerButton().count()}`);
+  await dismissMessages(page);
+  // Delete all, then a ZIP import: the offer never comes back, and the parts stay.
+  await cutSelected(page);
+  assert(await offerButton().count() === 1, "cut a third time: offered");
+  await moreAction(page, "delete-all");
+  await page.waitForTimeout(800);
+  assert(await offerButton().count() === 0, "«حذف الكل» takes the offer down", (await look(page)).message.slice(0, 80));
+  await page.setInputFiles("input.native-file-input >> nth=0", TWO_PARTS, { timeout: 60_000 });
+  await page.waitForFunction(() => (window.__vpApi?.()?.sceneSnapshot?.() ?? []).length >= 2, null, { timeout: 90_000 });
+  await page.waitForTimeout(3000);
+  names = await sceneNames(page);
+  message = (await look(page)).message;
+  assert(names.join(",") === "part-a.stl,part-b.stl", "the two parts arrive", names.join(", "));
+  assert(message.includes(zipSaid), "the ZIP notice counts the parts in the reader's language", message.slice(0, 120));
+  assert(await offerButton().count() === 0, "and no undo offer stands next to it, so nothing can delete the parts");
+  await shot(page.locator(".studio-messages"), `shell-keys-undo-offer-${lang}-${theme}.png`);
+  await ctx.close();
+}
+
+// =========================================================================
+// 10 + 11 — THE PROJECTS TABS AND THE CONNECTION TABS
+// =========================================================================
+/** Colour helpers for the two measures below, spelled once and run inside the page. */
+const COLOURS = String.raw`
+  const parse = (value) => { const m = String(value).match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
+  const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return Math.round(((Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)) * 100) / 100; };
+  const over = (top, under) => (top.a >= 1 ? top : { r: top.r * top.a + under.r * (1 - top.a), g: top.g * top.a + under.g * (1 - top.a), b: top.b * top.a + under.b * (1 - top.a), a: 1 });
+  const behind = (element) => { const chain = []; for (let e = element; e; e = e.parentElement) chain.push(e); let c = { r: 255, g: 255, b: 255, a: 1 }; for (const e of chain.reverse()) { const bg = parse(getComputedStyle(e).backgroundColor); if (bg && bg.a > 0) c = over(bg, c); } return c; };
+  const fills = (element) => { const image = getComputedStyle(element).backgroundImage; const stops = image && image !== "none" ? [...image.matchAll(/rgba?\([^)]+\)/g)].map((m) => over(parse(m[0]), behind(element))) : []; return stops.length ? stops : [behind(element)]; };
+`;
+const PROJECT_TABS = String.raw`(() => {${COLOURS}
+  const list = document.querySelector(".levo-projects-panel .lpp-tabs");
+  const named = (list?.getAttribute("aria-labelledby") ?? "").split(/\s+/).map((id) => document.getElementById(id)?.textContent.trim() ?? "").join(" ").trim() || list?.getAttribute("aria-label") || "";
+  return {
+    name: named,
+    tabs: [...(list?.querySelectorAll('[role="tab"]') ?? [])].map((tab) => {
+      const panel = document.getElementById(tab.getAttribute("aria-controls") ?? "");
+      return {
+        text: tab.textContent.trim(), selected: tab.getAttribute("aria-selected"), tab: tab.tabIndex, h: Math.round(tab.getBoundingClientRect().height),
+        contrast: Math.min(...fills(tab).map((fill) => ratio(parse(getComputedStyle(tab).color), fill))),
+        panel: panel?.getAttribute("role") ?? null, labelledBy: panel?.getAttribute("aria-labelledby") ?? null, id: tab.id,
+      };
+    }),
+  };
+})()`;
+const CONNECT_TAB = String.raw`(() => {${COLOURS}
+  const tab = document.querySelector('.connection-method-tabs [aria-selected="true"]');
+  const span = tab.querySelector("span");
+  const track = behind(tab.parentElement);
+  const ring = getComputedStyle(tab).boxShadow.match(/(rgba?\([^)]+\)) 0px 0px 0px 1px(?! inset)/)?.[1];
+  const edge = ring ? ratio(over(parse(ring), track), track) : 0;
+  return {
+    text: tab.textContent.trim(),
+    check: Boolean(tab.querySelector('svg path[d="m5 12 4 4L19 6"]')),
+    others: document.querySelectorAll('.connection-method-tabs [aria-selected="false"] svg path[d="m5 12 4 4L19 6"]').length,
+    label: Math.min(...fills(tab).map((fill) => ratio(parse(getComputedStyle(span).color), fill))),
+    boundary: Math.max(edge, Math.min(...fills(tab).map((fill) => ratio(fill, track)))),
+    // The lines the name needs, measured with the two-line clamp lifted.
+    lines: (() => {
+      const kept = span.getAttribute("style");
+      span.style.display = "block";
+      span.style.webkitLineClamp = "unset";
+      const needed = Math.round(span.getBoundingClientRect().height / parseFloat(getComputedStyle(span).lineHeight));
+      if (kept === null) span.removeAttribute("style"); else span.setAttribute("style", kept);
+      return needed;
+    })(),
+  };
+})()`;
+for (const [lang, theme] of [["ar", "dark"], ["ckb", "light"], ["en", "dark"]]) {
+  console.log(`\n10/11: the Projects tabs and the connection tabs (${lang}, ${theme})`);
+  const { ctx, page } = await openStudio(lang, theme);
+  await openMore(page, "projects");
+  const tabs = await page.evaluate(PROJECT_TABS);
+  const chosen = tabs.tabs.find((tab) => tab.selected === "true");
+  assert(tabs.name.length > 0, "the Projects tablist is named", tabs.name);
+  assert(tabs.tabs.length === 2 && tabs.tabs.every((tab) => tab.h >= 44), "both Projects tabs are 44 px tall", tabs.tabs.map((tab) => tab.h).join(","));
+  assert(chosen && chosen.contrast >= 4.5, "the chosen tab reads ink on the sand at 4.5:1 or more", chosen ? `${chosen.text}: ${chosen.contrast}:1` : "none");
+  assert(tabs.tabs.filter((tab) => tab.tab === 0).length === 1 && chosen?.tab === 0, "one tab stop, on the chosen tab");
+  assert(chosen?.panel === "tabpanel" && chosen?.labelledBy === chosen?.id, "the chosen tab controls the tabpanel it labels", JSON.stringify(chosen));
+  const xBefore = await page.evaluate(() => window.__vpApi().sceneSnapshot()[0]?.pos.x ?? null);
+  await page.locator('.levo-projects-panel .lpp-tabs [aria-selected="true"]').focus();
+  await page.keyboard.press("Home");
+  let focus = await focusInfo(page);
+  assert(focus.role === "tab" && focus.selected === "true" && focus.tab === 0, "Home chooses the account tab", focus.text);
+  await page.keyboard.press("End");
+  focus = await focusInfo(page);
+  assert(focus.selected === "true" && focus.text === chosen?.text, "End comes back to the device drafts", focus.text);
+  assert(await page.locator(".studio-sheet").count() === 1 && xBefore === await page.evaluate(() => window.__vpApi().sceneSnapshot()[0]?.pos.x ?? null), "the sheet stays open, and nothing behind it moved");
+  await shot(page.locator(".levo-projects-panel .lpp-header"), `shell-keys-projects-tabs-${lang}-${theme}.png`);
+  await closeSheet(page);
+
+  await openMore(page, "connect");
+  const connect = await page.evaluate(CONNECT_TAB);
+  assert(connect.check && connect.others === 0, "the chosen connection way carries the check mark, and only it", connect.text);
+  assert(connect.label >= 4.5, "its label is 4.5:1 or more on the sand", `${connect.label}:1`);
+  assert(connect.boundary >= 3, "its edge or fill is 3:1 or more against the track", `${connect.boundary}:1`);
+  assert(connect.lines <= 2, "its name fits the two lines it may take, so nothing is cut short", `${connect.text} on ${connect.lines} line(s)`);
+  await shot(page.locator(".connection-method-tabs"), `shell-keys-connect-tabs-${lang}-${theme}.png`);
+  await closeSheet(page);
   await ctx.close();
 }
 

@@ -274,6 +274,11 @@ function nextFrame() {
   return new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
+/** The object ids of a scene as one comparable key, in any order. */
+function sceneIdsKey(ids: Iterable<number>): string {
+  return [...ids].sort((a, b) => a - b).join(",");
+}
+
 /** What Tab can land on inside an open sheet (the wrap at its two ends). */
 const SHEET_TABBABLE = "a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]";
 
@@ -489,6 +494,12 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const arrangeUndoRef = useRef<(() => boolean) | null>(null);
   const orientUndoRef = useRef<(() => boolean) | null>(null);
   const cutUndoRef = useRef<(() => boolean) | null>(null);
+  /**
+   * The object ids the scene held when the undo offer now in the message row
+   * was raised (sceneIdsKey), or null with no offer. The offer stands only
+   * while the scene holds exactly these ids (lowerUndoOffers).
+   */
+  const undoSceneIdsRef = useRef<string | null>(null);
   /**
    * THE STRETCH THE PROGRESS ROW USED TO SKIP.
    *
@@ -975,7 +986,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
             carried.overwritten.length
               ? templateText(text.presetTookEdits, { count: carried.overwritten.length }, localeRef.current)
               : carried.kept.length
-                ? templateText(text.presetKeptEdits, { count: carried.kept.length })
+                ? templateText(text.presetKeptEdits, { count: carried.kept.length }, localeRef.current)
                 : ""
           );
         }
@@ -1089,13 +1100,39 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     else setNotice("");
   }, [adapter, t.actionUnavailable]);
 
+  /**
+   * THE OFFER GOES WHEN THE SCENE IT WOULD RESTORE OVER IS GONE (c6fix-r3-ha-01).
+   *
+   * Each undo restores the whole scene it captured, through restoreScene,
+   * which deletes every object missing from the capture and re-creates every
+   * object it holds. «تراجع عن القص» stayed in the row after «حذف الكل» and a
+   * ZIP import, and pressing it deleted the two imported parts and brought
+   * the cube back. So the offers come down together whenever the objects
+   * change by another path: an objects event whose ids are not the ids the
+   * offer was raised over (delete, delete all, import, duplicate, paste,
+   * split, the engine undo), an import starting, a project opening. And an
+   * undo that finds other ids in the scene when it is pressed says
+   * t.actionUnavailable («هذه الأداة غير متاحة في الوضع الحالي.») and leaves
+   * the plate alone.
+   */
+  const lowerUndoOffers = useCallback(() => {
+    arrangeUndoRef.current = null;
+    orientUndoRef.current = null;
+    cutUndoRef.current = null;
+    undoSceneIdsRef.current = null;
+    setArrangeUndoAvailable(false);
+    setOrientUndoAvailable(false);
+    setCutUndoAvailable(false);
+  }, []);
+
   // -- import (S4 orchestrator: ZIP budgets + deferred archive arrangement) --
+  // Counted in the language of the reader: «مجسمين», «3 مجسمات», "1 model" (c6fix-r3-ha-05).
   const localizeImportNotice = useCallback((entry: ImportNotice): string => {
     if (entry.kind === "imported") return t.imported;
-    if (entry.kind === "archive-arranged") return templateText(t.zipArranged, { models: entry.models, plates: entry.plates });
-    if (entry.kind === "archive-oversized") return templateText(t.zipOversized, { count: entry.count });
-    return templateText(t.zipOverflow, { count: entry.count });
-  }, [t.imported, t.zipArranged, t.zipOverflow, t.zipOversized]);
+    if (entry.kind === "archive-arranged") return templateText(t.zipArranged, { models: entry.models, plates: entry.plates }, locale);
+    if (entry.kind === "archive-oversized") return templateText(t.zipOversized, { count: entry.count }, locale);
+    return templateText(t.zipOverflow, { count: entry.count }, locale);
+  }, [locale, t.imported, t.zipArranged, t.zipOverflow, t.zipOversized]);
 
   const localizeImportError = useCallback((reason: unknown): string => {
     if (reason instanceof ImportError) {
@@ -1198,6 +1235,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     // the time the engine emits the objects (only a ZIP leaves a pending
     // arrangement behind), so `orchestrator.busy` cannot be the guard here.
     if (rawFiles.some((file) => /\.3mf$/i.test(file.name))) restoreInFlightRef.current = true;
+    // New objects are coming that no undo offer captured (c6fix-r3-ha-01).
+    lowerUndoOffers();
     const importNotices: string[] = [];
     try {
       const result = await orchestrator.importFiles(rawFiles, {
@@ -1244,7 +1283,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       setError(localizeImportError(reason));
       setStatus("error");
     }
-  }, [beginImportWait, endImportWait, localizeImportError, localizeImportNotice, objects, orchestrator, profile.bedDepth, profile.bedWidth, selectedPlate, t.fileTooLarge, t.importing, t.zipAnalyzing, t.zipBudgetConfirm]);
+  }, [beginImportWait, endImportWait, localizeImportError, localizeImportNotice, lowerUndoOffers, objects, orchestrator, profile.bedDepth, profile.bedWidth, selectedPlate, t.fileTooLarge, t.importing, t.zipAnalyzing, t.zipBudgetConfirm]);
 
   const handlePickedFiles = useCallback((files: File[]) => {
     setNotice("");
@@ -1278,7 +1317,9 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     setArrangeUndoAvailable(which === "arrange" && available);
     setOrientUndoAvailable(which === "orient" && available);
     setCutUndoAvailable(which === "cut" && available);
-  }, []);
+    // The scene as the operation left it, which is what the offer undoes.
+    undoSceneIdsRef.current = available ? sceneIdsKey(adapter.sceneSnapshot().map((snapshot) => snapshot.id)) : null;
+  }, [adapter]);
 
   const arrangeAll = useCallback(async () => {
     if (!objects.length) { setNotice(t.arrangeUnavailable); return; }
@@ -1292,8 +1333,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     raiseUndo("arrange", Boolean(result.undo));
     // Counted in the reader's language: «مجسم واحد», never «1 مجسمًا».
     const messages = [templateText(t.arrangeDone, { models: result.arrangedCount, plates: Math.max(1, result.platesUsed) }, locale)];
-    if (result.oversizedCount) messages.push(templateText(t.zipOversized, { count: result.oversizedCount }));
-    if (result.overflowCount) messages.push(templateText(t.zipOverflow, { count: result.overflowCount }));
+    if (result.oversizedCount) messages.push(templateText(t.zipOversized, { count: result.oversizedCount }, locale));
+    if (result.overflowCount) messages.push(templateText(t.zipOverflow, { count: result.overflowCount }, locale));
     setNotice(messages.join(" "));
   }, [adapter, locale, objects.length, profile.bedDepth, profile.bedWidth, raiseUndo, selectedPlate, t.arrangeDone, t.arrangeUnavailable, t.zipOverflow, t.zipOversized]);
 
@@ -1337,8 +1378,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     const messages = result.orientedCount
       ? [templateText(t.orientDone, { oriented: result.orientedCount, total }, locale)]
       : [t.orientNoChange];
-    if (result.skippedCount) messages.push(templateText(t.orientSkipped, { skipped: result.skippedCount }));
-    if (result.lockedCount) messages.push(templateText(t.orientLocked, { locked: result.lockedCount }));
+    if (result.skippedCount) messages.push(templateText(t.orientSkipped, { skipped: result.skippedCount }, locale));
+    if (result.lockedCount) messages.push(templateText(t.orientLocked, { locked: result.lockedCount }, locale));
     setNotice(messages.join(" "));
   }, [adapter, locale, objects.length, raiseUndo, selectedPlate, t.orientBusy, t.orientDone, t.orientLocked,
       t.orientNoChange, t.orientSkipped, t.orientUnavailable]);
@@ -1348,19 +1389,25 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
    * restoring the pre-orient scene also throws away an arrangement made after
    * it, and vice versa. Offering the second button afterwards would promise an
    * undo of something that is already gone — so each one clears the other.
+   *
+   * And an undo runs only over the scene it was offered for: when the ids in
+   * the scene are no longer the ids the offer was raised over, it is refused
+   * and nothing is restored (lowerUndoOffers, c6fix-r3-ha-01).
    */
-  const undoOrient = useCallback(() => {
-    const undo = orientUndoRef.current;
-    orientUndoRef.current = null;
-    setOrientUndoAvailable(false);
-    arrangeUndoRef.current = null;
-    setArrangeUndoAvailable(false);
-    cutUndoRef.current = null;
-    setCutUndoAvailable(false);
+  const takeUndo = useCallback((undo: (() => boolean) | null, done: string) => {
+    const offeredOver = undoSceneIdsRef.current;
+    lowerUndoOffers();
+    if (!undo || offeredOver === null || sceneIdsKey(adapter.sceneSnapshot().map((snapshot) => snapshot.id)) !== offeredOver) {
+      setNotice(t.actionUnavailable);
+      return;
+    }
+    // A restore re-creates objects at their captured positions; seating them
+    // again would undo the undo.
     suppressSeating();
-    if (undo?.()) setNotice(t.orientUndone);
-    else setNotice(t.actionUnavailable);
-  }, [suppressSeating, t.actionUnavailable, t.orientUndone]);
+    setNotice(undo() ? done : t.actionUnavailable);
+  }, [adapter, lowerUndoOffers, suppressSeating, t.actionUnavailable]);
+
+  const undoOrient = useCallback(() => takeUndo(orientUndoRef.current, t.orientUndone), [takeUndo, t.orientUndone]);
 
   // -- plane cut (one object into two, undoable) -----------------------------
   /**
@@ -1394,42 +1441,19 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     setSheet(null);
     cutUndoRef.current = result.undo;
     raiseUndo("cut", Boolean(result.undo));
-    const messages = [templateText(t.cutDone, { pieces: result.pieceIds.length })];
+    // Counted in the language of the reader: «قطعتين», never «2 قطعة» (c6fix-r3-ha-05).
+    const messages = [templateText(t.cutDone, { pieces: result.pieceIds.length }, locale)];
     // A cut face that could not be closed leaves a hole in a piece that will
     // then slice badly. Saying so is the difference between a tool and a toy.
-    if (result.openChains) messages.push(templateText(t.cutOpen, { open: result.openChains }));
-    if (result.skippedLoops) messages.push(templateText(t.cutSkipped, { skipped: result.skippedLoops }));
+    if (result.openChains) messages.push(templateText(t.cutOpen, { open: result.openChains }, locale));
+    if (result.skippedLoops) messages.push(templateText(t.cutSkipped, { skipped: result.skippedLoops }, locale));
     setNotice(messages.join(" "));
-  }, [adapter, cutCap, cutKeep, cutOffset, raiseUndo, selectedPlate, t.cutDone, t.cutMissed, t.cutOpen,
+  }, [adapter, cutCap, cutKeep, cutOffset, locale, raiseUndo, selectedPlate, t.cutDone, t.cutMissed, t.cutOpen,
       t.cutSkipped, t.cutUnavailable]);
 
-  const undoCut = useCallback(() => {
-    const undo = cutUndoRef.current;
-    cutUndoRef.current = null;
-    setCutUndoAvailable(false);
-    arrangeUndoRef.current = null;
-    setArrangeUndoAvailable(false);
-    orientUndoRef.current = null;
-    setOrientUndoAvailable(false);
-    suppressSeating();
-    if (undo?.()) setNotice(t.cutUndone);
-    else setNotice(t.actionUnavailable);
-  }, [suppressSeating, t.actionUnavailable, t.cutUndone]);
+  const undoCut = useCallback(() => takeUndo(cutUndoRef.current, t.cutUndone), [takeUndo, t.cutUndone]);
 
-  const undoArrange = useCallback(() => {
-    const undo = arrangeUndoRef.current;
-    arrangeUndoRef.current = null;
-    orientUndoRef.current = null;
-    setOrientUndoAvailable(false);
-    cutUndoRef.current = null;
-    setCutUndoAvailable(false);
-    setArrangeUndoAvailable(false);
-    // A restore re-creates objects at their captured positions; seating them
-    // again would undo the undo.
-    suppressSeating();
-    if (undo?.()) setNotice(t.arrangeUndone);
-    else setNotice(t.actionUnavailable);
-  }, [suppressSeating, t.actionUnavailable, t.arrangeUndone]);
+  const undoArrange = useCallback(() => takeUndo(arrangeUndoRef.current, t.arrangeUndone), [takeUndo, t.arrangeUndone]);
 
   // -- autosave: the S5 sync layer owns debounce, capture, draft + upload ----
   // Any edit signal marks the session dirty; the controller then captures a
@@ -1478,13 +1502,37 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
    * and when that timer finally fires, `contentSignature` — which reads the
    * adapter's transform fingerprint — skips the whole capture if the scene
    * ended up where it started. A drag that goes out and back costs nothing.
+   *
+   * A KEY THAT CHANGES NOTHING IS NOT AN EDIT (c6fix-r3, R3-REG-01/02).
+   * Every keyup on the page is a candidate edit, because the engine nudges
+   * the model on a key pressed anywhere (c6fix-r2-ha-01). Marking each one
+   * dirty made a synced account project «تغييرات غير محفوظة» after a Tab,
+   * made the back chevron ask the leave question with nothing unsaved, and
+   * made «اجعلها النسخة الحالية» pressed with Enter skip the reload: its
+   * keyup left the session dirty, so the editor kept the old version, said
+   * «متزامن», and the next save met a 409. So a notification made of window
+   * keyups and focus-only keys alone (SceneEditSignal.keysOnly: the Tabs that
+   * walk through the engine canvas and its plate tabs on the way to the back
+   * chevron included) marks the session dirty only when the scene
+   * fingerprint has moved since the last one this listener saw
+   * (`autosaveSceneRef`, also taken on every objects event, which is how an
+   * opened or restored project resets it). Anything else (any other event
+   * inside the engine, or a mutation the shell made) marks it dirty as it did
+   * before the window keyup was a signal. A key that deletes or pastes
+   * changes the objects, which the effect above marks dirty. The slice result
+   * is judged on the live scene either way (resultMatches), so a nudge still
+   * makes it stale.
    */
+  const autosaveSceneRef = useRef("");
   useEffect(() => {
-    return adapter.onSceneEdit(() => {
-      // `projectFilesRef` is a ref the import path writes, so it is read at
-      // notification time rather than mirrored: a scene edit cannot arrive
-      // before the files that produced it.
+    return adapter.onSceneEdit((signal) => {
+      const scene = adapter.sceneFingerprint();
+      const moved = scene !== autosaveSceneRef.current;
+      autosaveSceneRef.current = scene;
+      // `projectFilesRef` is read at notification time: an edit cannot
+      // arrive before the files that produced it.
       if (!canAutosaveRef.current || !projectFilesRef.current.length) return;
+      if (signal.keysOnly && !moved) return;
       markDirty();
     });
   }, [adapter, markDirty]);
@@ -2348,7 +2396,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     // where the engine put it and the user is told, rather than finding a
     // silently overlapping plate later.
     if (result.ok && result.unseatedCount) {
-      setNotice(templateText(t.zipOverflow, { count: result.unseatedCount }));
+      setNotice(templateText(t.zipOverflow, { count: result.unseatedCount }, localeRef.current));
     }
   }, [adapter, orchestrator, profile.bedDepth, profile.bedWidth, t.zipOverflow]);
 
@@ -2359,12 +2407,18 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       // The engine has the model. This is the only honest end to the wait the
       // import row is holding — see importWaitRef above.
       if (importWaitRef.current && event.value.length > importWaitRef.current.baselineObjects) endImportWait();
+      // The scene autosave compares a key press with: the objects as they
+      // just arrived, an opened or restored project included.
+      autosaveSceneRef.current = adapter.sceneFingerprint();
+      const ids = event.value.map((object) => object.id);
+      // An undo offer stands only over the objects it was raised over: a
+      // delete, a duplicate, a paste or an import takes it down (c6fix-r3-ha-01).
+      if (undoSceneIdsRef.current !== null && sceneIdsKey(ids) !== undoSceneIdsRef.current) lowerUndoOffers();
       setObjects(event.value);
       // The phone shell re-reads the scene (size, orientation, file chip) and
       // the engine's active gizmo on every objects change.
       setSceneTick((tick) => tick + 1);
       setActiveGizmo((current) => adapter.activeGizmo() ?? current);
-      const ids = event.value.map((object) => object.id);
       noteHeavyImport(ids);
       orchestrator.notifyObjects(ids);
       seatNewObjectsIfNeeded(ids);
@@ -2438,7 +2492,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       setStatus("error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adapter, endImportWait, noteHeavyImport, orchestrator, seatNewObjectsIfNeeded, slicing.handleViewportEvent]);
+  }, [adapter, endImportWait, lowerUndoOffers, noteHeavyImport, orchestrator, seatNewObjectsIfNeeded, slicing.handleViewportEvent]);
 
   const handleSliced = useCallback((payload: SlicePayload) => {
     const outcome = slicing.handleSliced(payload);
@@ -2472,12 +2526,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     // or the values its file brought.
     userEditedKeysRef.current = new Set();
     engineKeysRef.current = new Set();
-    arrangeUndoRef.current = null;
-    orientUndoRef.current = null;
-    setOrientUndoAvailable(false);
-    cutUndoRef.current = null;
-    setCutUndoAvailable(false);
-    setArrangeUndoAvailable(false);
+    lowerUndoOffers();
     setAutoRotations(new Map());
     setObjects([]);
     projectFilesRef.current = [];
@@ -2505,7 +2554,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     setStatus("editing");
     setWorkspaceKey((value) => value + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endImportWait, objects.length, orchestrator, slicing.clearResults, t.newConfirm]);
+  }, [endImportWait, lowerUndoOffers, objects.length, orchestrator, slicing.clearResults, t.newConfirm]);
 
   const deleteAll = useCallback(() => {
     if (!objects.length || !window.confirm(t.deleteAllConfirm)) return;

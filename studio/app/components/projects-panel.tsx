@@ -30,7 +30,7 @@
  * strings are flagged for S6's human translation review pass. Layout uses
  * logical properties so the app chrome's RTL/LTR direction applies.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   studioProjectsApi,
   type ProjectView,
@@ -42,6 +42,7 @@ import {
 import type { PersistenceState } from "../project-sync";
 import { panelErrorKey } from "../panel-errors";
 import { deleteDraft, listDrafts, type StoredLevoProject } from "../project-store";
+import { consumeRovingKey } from "./mobile/roving";
 
 export type PanelLocale = "ar" | "en" | "ckb";
 
@@ -407,6 +408,10 @@ function statusLabel(state: PersistenceState, t: PanelText): string {
 
 type LoadPhase = "loading" | "ready" | "error";
 
+/** The two tabs at the top of the panel, and the account lists, in reading order. */
+const PANEL_TABS = ["account", "device"] as const;
+const PANEL_VIEWS = ["active", "archived", "trash"] as const satisfies readonly ProjectView[];
+
 export default function ProjectsPanel(props: ProjectsPanelProps) {
   const { locale, user, namespace, activeRemoteProjectId, activeDraftId, syncState } = props;
   const api = props.api ?? studioProjectsApi;
@@ -414,6 +419,20 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
 
   const [tab, setTab] = useState<"account" | "device">(user ? "account" : "device");
   const [view, setView] = useState<ProjectView>("active");
+  /*
+   * THE TWO ROWS OF TABS ARE TABS TO THE KEYBOARD TOO (c6fix-r3-ha-02), as
+   * the tabs of the connect sheet are: Tab lands on the chosen tab only,
+   * the arrows, Home and End choose the next one in the writing direction
+   * and go no further (roving.ts, so an arrow here never nudges the model
+   * behind the sheet), the row is named, and each tab controls the one
+   * tabpanel below it, which is labelled by its tab.
+   */
+  const tabsId = useId();
+  const tabId = (name: string) => `${tabsId}-tab-${name}`;
+  const tabPanelId = `${tabsId}-panel`;
+  const viewPanelId = `${tabsId}-view-panel`;
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const viewRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [query, setQuery] = useState("");
   const [remote, setRemote] = useState<RemoteProjectSummary[]>([]);
   const [remotePhase, setRemotePhase] = useState<LoadPhase>("loading");
@@ -1048,32 +1067,37 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
     <section className="levo-projects-panel" aria-label={t.title}>
       <style>{PANEL_CSS}</style>
       <header className="lpp-header">
-        <h2>{t.title}</h2>
-        <div className="lpp-tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === "account"}
-            className={tab === "account" ? "lpp-tab-active" : ""}
-            onClick={() => setTab("account")}
-          >
-            {t.accountTab}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === "device"}
-            className={tab === "device" ? "lpp-tab-active" : ""}
-            onClick={() => setTab("device")}
-          >
-            {t.deviceTab}
-          </button>
+        <h2 id={tabId("title")}>{t.title}</h2>
+        <div className="lpp-tabs" role="tablist" aria-labelledby={tabId("title")}>
+          {PANEL_TABS.map((name, index) => (
+            <button
+              key={name}
+              ref={(node) => { tabRefs.current[index] = node; }}
+              type="button"
+              role="tab"
+              id={tabId(name)}
+              aria-selected={tab === name}
+              aria-controls={tabPanelId}
+              tabIndex={tab === name ? 0 : -1}
+              className={tab === name ? "lpp-tab-active" : ""}
+              onClick={() => setTab(name)}
+              onKeyDown={(event) => {
+                const next = consumeRovingKey(event, index, PANEL_TABS.length);
+                if (next < 0) return;
+                setTab(PANEL_TABS[next]);
+                tabRefs.current[next]?.focus();
+              }}
+            >
+              {name === "account" ? t.accountTab : t.deviceTab}
+            </button>
+          ))}
         </div>
       </header>
 
       {actionError ? <p className="lpp-error" role="alert">{actionError}</p> : null}
       {notice ? <p className="lpp-ok" role="status">{notice}</p> : null}
 
+      <div className="lpp-panel" role="tabpanel" id={tabPanelId} aria-labelledby={tabId(tab)}>
       {tab === "account" ? (
         user && historyFor ? (
           historyView(historyFor)
@@ -1081,23 +1105,41 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
           <>
             {guestWork}
             <div className="lpp-views" role="tablist" aria-label={t.accountTab}>
-              {(["active", "archived", "trash"] as const).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  role="tab"
-                  aria-selected={view === v}
-                  className={view === v ? "lpp-tab-active" : ""}
-                  onClick={() => {
-                    setView(v);
-                    setConfirmDeleteId(null);
-                    setNotice(null);
-                  }}
-                >
-                  {v === "active" ? t.viewActive : v === "archived" ? t.viewArchived : t.viewTrash}
-                </button>
-              ))}
+              {PANEL_VIEWS.map((v, index) => {
+                const chooseView = () => {
+                  setView(v);
+                  setConfirmDeleteId(null);
+                  setNotice(null);
+                };
+                return (
+                  <button
+                    key={v}
+                    ref={(node) => { viewRefs.current[index] = node; }}
+                    type="button"
+                    role="tab"
+                    id={tabId(`view-${v}`)}
+                    aria-selected={view === v}
+                    aria-controls={viewPanelId}
+                    tabIndex={view === v ? 0 : -1}
+                    className={view === v ? "lpp-tab-active" : ""}
+                    onClick={chooseView}
+                    onKeyDown={(event) => {
+                      const next = consumeRovingKey(event, index, PANEL_VIEWS.length);
+                      if (next < 0) return;
+                      if (PANEL_VIEWS[next] !== view) {
+                        setView(PANEL_VIEWS[next]);
+                        setConfirmDeleteId(null);
+                        setNotice(null);
+                      }
+                      viewRefs.current[next]?.focus();
+                    }}
+                  >
+                    {v === "active" ? t.viewActive : v === "archived" ? t.viewArchived : t.viewTrash}
+                  </button>
+                );
+              })}
             </div>
+            <div className="lpp-panel" role="tabpanel" id={viewPanelId} aria-labelledby={tabId(`view-${view}`)}>
             <div className="lpp-toolbar">
               <input
                 type="search"
@@ -1140,6 +1182,7 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
             ) : (
               <ul className="lpp-grid">{remote.map(remoteCard)}</ul>
             )}
+            </div>
           </>
         ) : (
           <div className="lpp-state lpp-guest">
@@ -1173,6 +1216,7 @@ export default function ProjectsPanel(props: ProjectsPanelProps) {
           ) : null}
         </>
       )}
+      </div>
     </section>
   );
 }
@@ -1188,14 +1232,15 @@ const PANEL_CSS = `
 .levo-projects-panel h2{margin:0;font-size:18px}
 .levo-projects-panel h3{margin:0 0 4px;font-size:15px}
 .levo-projects-panel .lpp-tabs{display:flex;gap:4px;background:var(--levo-panel-inset,#1a1d24);border-radius:10px;padding:3px}
-.levo-projects-panel .lpp-tabs button{border:0;background:transparent;color:inherit;padding:7px 12px;border-radius:8px;cursor:pointer;min-height:40px}
-.levo-projects-panel .lpp-tabs .lpp-tab-active{background:var(--levo-accent,#3d6ef7);color:#fff}
+.levo-projects-panel .lpp-panel{display:flex;flex-direction:column;gap:12px}
+.levo-projects-panel .lpp-tabs button{border:0;background:transparent;color:inherit;padding:7px 12px;border-radius:8px;cursor:pointer;min-height:var(--tap-min,44px)}
+.levo-projects-panel .lpp-tabs .lpp-tab-active{background:var(--levo-accent,#3d6ef7);color:var(--levo-accent-ink,#fff);font-weight:700}
 .levo-projects-panel .lpp-toolbar{display:flex;flex-wrap:wrap;gap:8px}
 .levo-projects-panel input{background:var(--levo-panel-inset,#1a1d24);color:inherit;border:1px solid var(--levo-panel-border,#2a2f3a);border-radius:8px;padding:9px 10px;min-height:40px;flex:1;min-inline-size:140px}
 .levo-projects-panel .lpp-create{display:flex;gap:6px;flex:1;min-inline-size:220px}
 .levo-projects-panel button{border:1px solid var(--levo-panel-border,#2a2f3a);background:var(--levo-panel-inset,#1a1d24);color:inherit;border-radius:8px;padding:7px 12px;cursor:pointer;min-height:40px}
 .levo-projects-panel button:disabled{opacity:.5;cursor:default}
-.levo-projects-panel .lpp-primary{background:var(--levo-accent,#3d6ef7);border-color:transparent;color:#fff}
+.levo-projects-panel .lpp-primary{background:var(--levo-accent,#3d6ef7);border-color:transparent;color:var(--levo-accent-ink,#fff)}
 .levo-projects-panel .lpp-danger{color:var(--levo-danger,#ff7a76)}
 .levo-projects-panel .lpp-notice{margin:0;font-size:12px;opacity:.75}
 .levo-projects-panel .lpp-error{margin:0;color:var(--levo-danger,#ff7a76)}
@@ -1228,8 +1273,8 @@ const PANEL_CSS = `
 .levo-projects-panel .lpp-legacy p{margin:0;font-size:12px;opacity:.75}
 .levo-projects-panel .lpp-ok{margin:0;color:var(--levo-ok,#3fbf6f)}
 .levo-projects-panel .lpp-views{display:flex;gap:4px;flex-wrap:wrap}
-.levo-projects-panel .lpp-views button{min-height:36px;padding:5px 12px;font-size:12.5px}
-.levo-projects-panel .lpp-views .lpp-tab-active{background:var(--levo-accent,#3d6ef7);border-color:transparent;color:#fff}
+.levo-projects-panel .lpp-views button{min-height:var(--tap-min,44px);padding:5px 12px;font-size:12.5px}
+.levo-projects-panel .lpp-views .lpp-tab-active{background:var(--levo-accent,#3d6ef7);border-color:transparent;color:var(--levo-accent-ink,#fff);font-weight:700}
 .levo-projects-panel .lpp-purge{color:var(--levo-warn,#e2a93b);opacity:1}
 .levo-projects-panel .lpp-badge-pin{border-color:var(--levo-accent,#3d6ef7);color:var(--levo-accent,#8fb0ff)}
 .levo-projects-panel .lpp-history{display:flex;flex-direction:column;gap:10px}

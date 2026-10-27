@@ -46,7 +46,11 @@ test("a transform gesture marks the session dirty", () => {
 test("it is the SAME signal a drag already fires, not a second one invented for saving", () => {
   // If these ever diverge, a gesture can invalidate a slice without
   // scheduling a save — which is the bug, back again under a new name.
-  assert.match(adapter, /onSceneEdit\(listener: \(\) => void\): \(\) => void/);
+  // Since c6fix-r3 the one signal also says whether only keys that cannot
+  // edit unseen came up (SceneEditSignal), so a Tab is not an unsaved change;
+  // it is still the one signal both readers take.
+  assert.match(adapter, /onSceneEdit\(listener: \(signal: SceneEditSignal\) => void\): \(\) => void/);
+  assert.match(client, /return adapter\.onSceneEdit\(\(signal\) => \{/);
   assert.match(adapter, /notifySceneEdited\(\): void/);
   assert.match(
     adapter,

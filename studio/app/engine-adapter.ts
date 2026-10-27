@@ -340,6 +340,35 @@ const PERSON_INPUT_EVENTS = ["input", "change", "click"] as const;
  */
 const WINDOW_EDIT_EVENTS = ["keyup"] as const;
 
+/**
+ * Keys that only move the focus, or only modify another key. Tab walks
+ * through the engine on the way to the phone back chevron (its canvas, the
+ * plate tabs, «+»), and a Shift comes up after every Shift+Tab.
+ */
+const FOCUS_ONLY_KEYS = new Set(["Tab", "Shift", "Control", "Alt", "Meta"]);
+
+/**
+ * What one scene-edit notification folds together (c6fix-r3, R3-REG-01/02).
+ *
+ * `keysOnly` is true when every event behind it was a key coming up on the
+ * window (WINDOW_EDIT_EVENTS), or a focus-only key (FOCUS_ONLY_KEYS) coming
+ * up inside the engine. Every key press on the page ends in one, so Tab,
+ * Enter on a button of the Projects sheet or a Space on the back chevron is
+ * a candidate edit like an arrow that nudged the model. Outside the engine a
+ * key edits the scene only through the engine shortcuts bound on window
+ * (nudge, turn, delete), and a focus-only key edits nothing anywhere, so
+ * such a notification has changed the scene only when the scene fingerprint
+ * has moved; a reader that keeps work (autosave) asks the fingerprint before
+ * it calls such a press an edit, and the slice result is judged on the live
+ * fingerprint anyway. Every other event inside an engine shadow root (any
+ * other key included, as it always was) and every mutation made through
+ * this adapter is never key-only: a brush stroke, a typed value or a new
+ * plate changes the saved project without moving the fingerprint.
+ */
+export interface SceneEditSignal {
+  keysOnly: boolean;
+}
+
 export class EngineAdapter {
   private container: HTMLElement | null = null;
   private mainHost: HTMLElement | null = null;
@@ -349,10 +378,15 @@ export class EngineAdapter {
   private readonly pendingHosts = new Set<Element>();
   private containerObserver: MutationObserver | null = null;
   private unhookShadow: (() => void) | null = null;
-  private readonly sceneEditListeners = new Set<() => void>();
+  private readonly sceneEditListeners = new Set<(signal: SceneEditSignal) => void>();
   private sceneEditScheduled = false;
+  /** True until an event that is not key-only (SceneEditSignal) joins the pending notification. */
+  private sceneEditKeysOnly = true;
   private readonly hostAttributes = new Map<string, string>();
-  private readonly onRootEditEvent = () => this.scheduleSceneEditNotification();
+  private readonly onRootEditEvent = (event: Event) => this.scheduleSceneEditNotification(
+    event.type === "keyup" && FOCUS_ONLY_KEYS.has((event as KeyboardEvent).key),
+  );
+  private readonly onWindowKeyEvent = () => this.scheduleSceneEditNotification(true);
   private personInput = false;
   private personInputTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly onRootPersonEvent = (event: Event) => {
@@ -397,7 +431,7 @@ export class EngineAdapter {
     this.containerObserver.observe(container, { childList: true, subtree: true });
 
     for (const type of WINDOW_EDIT_EVENTS) {
-      window.addEventListener(type, this.onRootEditEvent, { capture: true, passive: true });
+      window.addEventListener(type, this.onWindowKeyEvent, { capture: true, passive: true });
     }
 
     this.scanExistingRoots(container);
@@ -410,7 +444,7 @@ export class EngineAdapter {
     this.containerObserver = null;
     if (typeof window !== "undefined") {
       for (const type of WINDOW_EDIT_EVENTS) {
-        window.removeEventListener(type, this.onRootEditEvent, { capture: true });
+        window.removeEventListener(type, this.onWindowKeyEvent, { capture: true });
       }
     }
     for (const [root, observer] of this.styledRoots) {
@@ -890,9 +924,10 @@ export class EngineAdapter {
    * WINDOW_EDIT_EVENTS) plus adapter-driven mutations (arrange, restore).
    * Listeners should fingerprint the scene to decide whether anything
    * actually changed — the signal is event-driven and intentionally
-   * over-approximate, never a poll.
+   * over-approximate, never a poll. The signal says whether only keys that
+   * cannot edit unseen came up (SceneEditSignal).
    */
-  onSceneEdit(listener: () => void): () => void {
+  onSceneEdit(listener: (signal: SceneEditSignal) => void): () => void {
     this.sceneEditListeners.add(listener);
     return () => {
       this.sceneEditListeners.delete(listener);
@@ -936,14 +971,17 @@ export class EngineAdapter {
     this.scheduleSceneEditNotification();
   }
 
-  private scheduleSceneEditNotification(): void {
+  private scheduleSceneEditNotification(keyOnly = false): void {
+    if (!keyOnly) this.sceneEditKeysOnly = false;
     if (this.sceneEditScheduled) return;
     this.sceneEditScheduled = true;
     queueMicrotask(() => {
+      const signal: SceneEditSignal = { keysOnly: this.sceneEditKeysOnly };
       this.sceneEditScheduled = false;
+      this.sceneEditKeysOnly = true;
       for (const listener of [...this.sceneEditListeners]) {
         try {
-          listener();
+          listener(signal);
         } catch {
           // Listeners must not break the adapter.
         }

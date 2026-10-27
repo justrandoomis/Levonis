@@ -251,6 +251,8 @@
   --levo-panel-card: var(--panel);
   --levo-panel-border: var(--line);
   --levo-accent: var(--accent);
+  /* The text on that fill: white on the dark sand was 1.81:1 (c6fix-r3-ha-02). */
+  --levo-accent-ink: var(--accent-ink);
   --levo-danger: var(--danger);
   /*
    * TWO OF THE EIGHT WERE NEVER MAPPED, AND NOBODY COULD SEE IT.
@@ -1018,9 +1020,17 @@ button:disabled { cursor: not-allowed; }
 .connection-intro { margin: 0; color: var(--muted); font-size: var(--text-caption); line-height: 1.55; }
 .connection-method-tabs { padding: 4px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; direction: ltr; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--shell); }
 .connection-method-tabs button { min-width: 0; min-height: 48px; padding: 6px; border: 1px solid transparent; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; gap: 7px; background: transparent; color: var(--muted); cursor: pointer; }
-.connection-method-tabs button.active { border-color: var(--line); background: var(--surface); color: var(--text); }
+/*
+ * The chosen way takes the sand selection of .locale-segments (owner override
+ * D-3): the sand fill, ink text and, in light, the #7A5C30 edge of
+ * --clay-gold, with a check mark in place of its icon (connect.tsx). It used
+ * to be one shade off the track, 1.16:1 in light (c6fix-r3-ha-03). A long
+ * name («نفس شبكة Wi‑Fi») takes two lines rather than an ellipsis.
+ */
+.connection-method-tabs button[aria-selected="true"] { border-color: transparent; background: var(--gold-clay); box-shadow: var(--clay-gold); color: var(--gold-ink); }
+.connection-method-tabs button[aria-selected="true"] svg { stroke-width: 2.6; }
 .connection-method-tabs svg { width: 18px; height: 18px; flex: 0 0 auto; }
-.connection-method-tabs span { overflow: hidden; font-size: var(--text-caption); font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.connection-method-tabs span { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: var(--text-caption); font-weight: 800; line-height: var(--leading-tight); text-align: center; }
 .connection-method-panel { padding: 15px; display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); }
 .connection-method-panel > header { display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: center; gap: 10px; }
 .connection-method-panel > header > span { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--header); }

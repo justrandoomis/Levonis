@@ -66,6 +66,12 @@ export default function ConnectSheet(props: ConnectSheetProps) {
    * the next one in the row (the panels are cheap, so the choice follows the
    * focus), the keys go no further (roving.ts), and each tab controls the
    * one tabpanel below it, which is labelled by its tab.
+   *
+   * AND THE CHOSEN ONE IS SEEN WITHOUT COLOUR (c6fix-r3-ha-03). It differed
+   * only by a shade (1.16:1 on the track in light, 1.32:1 in dark) and a
+   * slightly brighter label. It now takes the sand selection of the other
+   * chosen options (globals.css) and a check mark in place of its icon, so
+   * the row keeps its width.
    */
   const baseId = useId();
   const tabId = (tab: ConnectionMode) => `${baseId}-tab-${tab}`;
@@ -97,7 +103,7 @@ export default function ConnectSheet(props: ConnectSheetProps) {
             onClick={() => setMode(tab)}
             onKeyDown={(event) => onTabKeyDown(event, index)}
           >
-            <Icon name={tab === "lan" ? "print" : tab === "cloud" ? "share" : "save"} />
+            <Icon name={mode === tab ? "check" : tab === "lan" ? "print" : tab === "cloud" ? "share" : "save"} />
             <span>{tab === "lan" ? t.lanMethod : tab === "cloud" ? t.cloudMethod : t.usbMethod}</span>
           </button>
         ))}

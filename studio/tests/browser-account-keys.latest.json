@@ -1,0 +1,65 @@
+{
+  "target": "http://127.0.0.1:5263/",
+  "failures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "m": "version 1 is the account project, synced",
+      "detail": "{\"id\":\"b7fd44054b08e302592249568b59a421\",\"head\":1}"
+    },
+    {
+      "ok": true,
+      "m": "one Tab leaves the open project «Synced»",
+      "detail": "Synced / Synced"
+    },
+    {
+      "ok": true,
+      "m": "version 2 (two models) is saved by the autosave",
+      "detail": "{\"id\":\"b7fd44054b08e302592249568b59a421\",\"head\":2}"
+    },
+    {
+      "ok": true,
+      "m": "restored with the keyboard, the editor fetches the version and its file",
+      "detail": "/api/projects?limit=100 · /api/projects/:id · /api/projects/:id/revisions?state=committed · /api/projects?limit=100 · /api/projects/:id · /api/projects/:id/revisions/:id · /api/projects/:id/files/:id"
+    },
+    {
+      "ok": true,
+      "m": "…and holds version 1 again: one model",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "m": "the next edit saves with a 201, never a 409",
+      "detail": "/api/projects/:id/revisions 201"
+    },
+    {
+      "ok": true,
+      "m": "«حفظ» saved the project to the account",
+      "detail": "{\"id\":\"96ecea0fe665923ff93f981f7f11680b\",\"head\":1}"
+    },
+    {
+      "ok": true,
+      "m": "Tab reaches «العودة إلى LEVONIS», through the engine canvas and its plate tabs",
+      "detail": "21 Tab(s)"
+    },
+    {
+      "ok": true,
+      "m": "…and the Tabs moved nothing"
+    },
+    {
+      "ok": true,
+      "m": "Enter on the chevron asks nothing: nothing is unsaved",
+      "detail": ""
+    },
+    {
+      "ok": true,
+      "m": "…and leaves for the main site",
+      "detail": "https://levonis-iq.com/community"
+    },
+    {
+      "ok": true,
+      "m": "no page errors",
+      "detail": ""
+    }
+  ]
+}

@@ -1317,3 +1317,212 @@ test("the About sheet's legal summary and source link are 44 px targets", async 
   assert.match(css, /\.legal-details a \{ margin: 0 12px 12px; min-height: var\(--tap-min\);/);
   assert.match(css, /\.more-links a \{ min-height: var\(--tap-min\);/, "as the «المزيد» copy of the link already was");
 });
+
+// --------------------------------------------------------------- c6fix round 3
+
+test("an undo offer stands only over the objects it was raised over", async () => {
+  // c6fix-r3-ha-01: «تراجع عن القص» stayed in the row after «حذف الكل» and a
+  // ZIP import, and pressing it deleted the two imported parts and brought
+  // the cut cube back. tests/browser-shell-keys.mjs presses it (09).
+  const client = await read("../app/slicer-client.tsx");
+  const lower = client.slice(client.indexOf("const lowerUndoOffers = useCallback"), client.indexOf("}, []);", client.indexOf("const lowerUndoOffers = useCallback")));
+  for (const line of ["arrangeUndoRef.current = null;", "orientUndoRef.current = null;", "cutUndoRef.current = null;", "undoSceneIdsRef.current = null;",
+    "setArrangeUndoAvailable(false);", "setOrientUndoAvailable(false);", "setCutUndoAvailable(false);"]) {
+    assert.ok(lower.includes(line), `lowerUndoOffers: ${line}`);
+  }
+  // The offer remembers the ids of the scene the operation left.
+  assert.match(client, /undoSceneIdsRef\.current = available \? sceneIdsKey\(adapter\.sceneSnapshot\(\)\.map\(\(snapshot\) => snapshot\.id\)\) : null;/);
+  // Any objects event over other ids takes every offer down: delete, delete
+  // all, duplicate, paste, split, the engine undo, an import.
+  const handler = client.slice(client.indexOf("const handleEvent = useCallback"), client.indexOf("} else if (event.type === \"plateCount\")"));
+  assert.match(handler, /const ids = event\.value\.map\(\(object\) => object\.id\);\s*[\s\S]*?if \(undoSceneIdsRef\.current !== null && sceneIdsKey\(ids\) !== undoSceneIdsRef\.current\) lowerUndoOffers\(\);/);
+  // An import takes them down before its objects arrive, and so does a new project.
+  const importer = client.slice(client.indexOf("restoreInFlightRef.current = true;"), client.indexOf("const importNotices: string[] = [];"));
+  assert.match(importer, /lowerUndoOffers\(\);/);
+  const fresh = client.slice(client.indexOf("const newProject = useCallback"), client.indexOf("const deleteAll = useCallback"));
+  assert.match(fresh, /lowerUndoOffers\(\);/);
+  // And an undo pressed over other ids refuses, restoring nothing.
+  const take = client.slice(client.indexOf("const takeUndo = useCallback"), client.indexOf("const undoOrient = useCallback"));
+  assert.match(take, /const offeredOver = undoSceneIdsRef\.current;\s*lowerUndoOffers\(\);\s*if \(!undo \|\| offeredOver === null \|\| sceneIdsKey\(adapter\.sceneSnapshot\(\)\.map\(\(snapshot\) => snapshot\.id\)\) !== offeredOver\) \{\s*setNotice\(t\.actionUnavailable\);\s*return;\s*\}/);
+  assert.ok(take.indexOf("setNotice(t.actionUnavailable);") < take.indexOf("undo()"), "the check comes before the restore");
+  for (const name of ["undoOrient", "undoCut", "undoArrange"]) {
+    assert.match(client, new RegExp(`const ${name} = useCallback\\(\\(\\) => takeUndo\\(`), `${name} goes through takeUndo`);
+  }
+});
+
+test("the Projects sheet tabs read ink on sand, are 44 px tall and walk with the arrows", async () => {
+  // c6fix-r3-ha-02: the chosen tab was #fff on #DCBC8C, 1.81:1, 40 px tall,
+  // every tab a tab stop, the tablist unnamed, aria-controls null.
+  const [panel, css] = await Promise.all([read("../app/components/projects-panel.tsx"), read("../app/globals.css")]);
+  assert.match(panel, /\.lpp-tabs button\{[^}]*min-height:var\(--tap-min,44px\)\}/);
+  assert.match(panel, /\.lpp-views button\{[^}]*min-height:var\(--tap-min,44px\)[^}]*\}/);
+  assert.match(panel, /\.lpp-tabs \.lpp-tab-active\{background:var\(--levo-accent,#3d6ef7\);color:var\(--levo-accent-ink,#fff\);/);
+  assert.match(panel, /\.lpp-views \.lpp-tab-active\{[^}]*color:var\(--levo-accent-ink,#fff\);/);
+  assert.match(panel, /\.lpp-primary\{[^}]*color:var\(--levo-accent-ink,#fff\)\}/);
+  assert.doesNotMatch(panel, /var\(--levo-accent,#3d6ef7\);(?:border-color:transparent;)?color:#fff/, "no white on the accent fill");
+  assert.match(css, /--levo-accent-ink: var\(--accent-ink\);/);
+  // The ink on the accent passes 4.5:1 in both themes.
+  const lum = (hex) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const rules = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const dark = /:root\s*\{([\s\S]*?)\n\}/.exec(rules)?.[1] ?? "";
+  const light = /:root\[data-theme="light"\]\s*\{([\s\S]*?)\n\}/.exec(rules)?.[1] ?? "";
+  for (const [name, block] of [["dark", dark], ["light", light]]) {
+    const accent = /--accent:\s*(#[0-9a-fA-F]{6})/.exec(block)?.[1];
+    const ink = /--accent-ink:\s*(#[0-9a-fA-F]{6})/.exec(block)?.[1];
+    assert.ok(accent && ink, `${name}: the accent tokens are readable`);
+    assert.ok(ratio(accent, ink) >= 4.5, `${name}: ink on the accent is ${ratio(accent, ink).toFixed(2)}:1`);
+  }
+  // Tabs to the keyboard: named, one tab stop, the arrows walk, each controls its labelled panel.
+  assert.match(panel, /<h2 id=\{tabId\("title"\)\}>\{t\.title\}<\/h2>\s*<div className="lpp-tabs" role="tablist" aria-labelledby=\{tabId\("title"\)\}>/);
+  assert.match(panel, /role="tab"\s+id=\{tabId\(name\)\}\s+aria-selected=\{tab === name\}\s+aria-controls=\{tabPanelId\}\s+tabIndex=\{tab === name \? 0 : -1\}/);
+  assert.match(panel, /const next = consumeRovingKey\(event, index, PANEL_TABS\.length\);\s*if \(next < 0\) return;\s*setTab\(PANEL_TABS\[next\]\);\s*tabRefs\.current\[next\]\?\.focus\(\);/);
+  assert.match(panel, /<div className="lpp-panel" role="tabpanel" id=\{tabPanelId\} aria-labelledby=\{tabId\(tab\)\}>/);
+  assert.match(panel, /role="tab"\s+id=\{tabId\(`view-\$\{v\}`\)\}\s+aria-selected=\{view === v\}\s+aria-controls=\{viewPanelId\}\s+tabIndex=\{view === v \? 0 : -1\}/);
+  assert.match(panel, /const next = consumeRovingKey\(event, index, PANEL_VIEWS\.length\);/);
+  assert.match(panel, /<div className="lpp-panel" role="tabpanel" id=\{viewPanelId\} aria-labelledby=\{tabId\(`view-\$\{view\}`\)\}>/);
+});
+
+test("the chosen connection way takes the sand selection and a check mark", async () => {
+  // c6fix-r3-ha-03: the chosen tab was one shade off the track (1.16:1 in
+  // light, 1.32:1 in dark), with no check mark.
+  const [css, connect] = await Promise.all([read("../app/globals.css"), read("../app/components/sheets/connect.tsx")]);
+  const rule = /\.connection-method-tabs button\[aria-selected="true"\] \{([^}]*)\}/.exec(css)?.[1] ?? "";
+  assert.ok(rule, "the chosen tab has its own rule");
+  assert.match(rule, /background: var\(--gold-clay\);/);
+  assert.match(rule, /box-shadow: var\(--clay-gold\);/);
+  assert.match(rule, /color: var\(--gold-ink\);/);
+  assert.doesNotMatch(css, /\.connection-method-tabs button\.active \{ border-color: var\(--line\); background: var\(--surface\);/);
+  assert.match(connect, /<Icon name=\{mode === tab \? "check" : tab === "lan" \? "print"/);
+  // A long name takes two lines rather than an ellipsis.
+  assert.match(css, /\.connection-method-tabs span \{[^}]*-webkit-line-clamp: 2;/);
+});
+
+test("the viewport card's view buttons are one tab stop and keep their arrows", async () => {
+  // c6fix-r3-ha-04: an arrow on expand, «إعادة العرض» or the bed view moved
+  // the model 10 mm, and in the preview it stepped the layer slider.
+  const card = await read("../app/components/mobile/viewport-card.tsx");
+  assert.match(card, /role="toolbar" aria-label=\{t\.viewGroup\}/);
+  assert.match(card, /const next = consumeRovingKey\(event, enabled\.indexOf\(index\), enabled\.length\);\s*if \(next < 0\) return;\s*setStop\(enabled\[next\]\);\s*refs\.current\[enabled\[next\]\]\?\.focus\(\);/);
+  assert.match(card, /const enabled = overlay\.hasObjects \? \[EXPAND, RESET, BED\] : \[EXPAND, BED\];/);
+  for (const name of ["EXPAND", "RESET", "BED"]) {
+    assert.match(card, new RegExp(`tabIndex=\\{tabStop === ${name} \\? 0 : -1\\}\\s*onFocus=\\{\\(\\) => setStop\\(${name}\\)\\}\\s*onKeyDown=\\{\\(event\\) => onKeyDown\\(event, ${name}\\)\\}`), `${name} roves`);
+  }
+});
+
+test("the cut and the import notices are counted in ar, en and ckb", async () => {
+  // c6fix-r3-ha-05: «تم القص إلى 2 قطعة.», «تم توزيع 2 مجسمًا تلقائيًا على 1
+  // Plate.», "1 models exceed the build area", «1 تەن … گەورەترن».
+  const { DICTIONARIES, templateText } = await loadAppModule("i18n/index");
+  const say = (locale, key, values) => templateText(DICTIONARIES[locale][key], values, locale);
+  assert.equal(say("ar", "cutDone", { pieces: 2 }), "تم القص إلى قطعتين.");
+  assert.equal(say("ar", "cutDone", { pieces: 3 }), "تم القص إلى 3 قطع.");
+  assert.equal(say("ar", "zipArranged", { models: 2, plates: 1 }), "تم توزيع مجسمين تلقائيًا على Plate واحدة.");
+  assert.equal(say("ar", "zipArranged", { models: 3, plates: 1 }), "تم توزيع 3 مجسمات تلقائيًا على Plate واحدة.");
+  assert.equal(say("ar", "zipArranged", { models: 11, plates: 2 }), "تم توزيع 11 مجسمًا تلقائيًا على 2 Plate.");
+  assert.equal(say("ar", "zipOversized", { count: 1 }), "يوجد مجسم واحد أكبر من مساحة الطباعة؛ تم توسيطه ويحتاج تصغيرًا أو تقسيمًا.");
+  assert.equal(say("ar", "zipOversized", { count: 2 }), "يوجد مجسمان أكبر من مساحة الطباعة؛ تم توسيطهما ويحتاجان تصغيرًا أو تقسيمًا.");
+  assert.equal(say("ar", "zipOverflow", { count: 1 }), "تعذر توزيع مجسم واحد لأن المحرر يدعم 9 Plates كحد أقصى؛ بقي في موضع الاستيراد للمراجعة اليدوية.");
+  assert.equal(say("ar", "orientSkipped", { skipped: 1 }), "تعذّر قياس مجسم واحد منها فتُرك كما هو.");
+  assert.equal(say("ar", "orientLocked", { locked: 2 }), "لم يُمسّ مجسمان مقفلان.");
+  assert.equal(say("en", "cutDone", { pieces: 2 }), "Cut into 2 pieces.");
+  assert.equal(say("en", "zipArranged", { models: 2, plates: 1 }), "Automatically arranged 2 models across 1 plate.");
+  assert.equal(say("en", "zipOversized", { count: 1 }), "1 model exceeds the build area; it was centered and needs scaling or splitting.");
+  assert.equal(say("en", "zipOversized", { count: 2 }), "2 models exceed the build area; they were centered and need scaling or splitting.");
+  assert.equal(say("en", "zipOverflow", { count: 1 }), "1 model could not be distributed because the editor supports up to 9 plates; it remains at its imported position for manual review.");
+  assert.equal(say("en", "orientSkipped", { skipped: 1 }), "1 could not be measured and was left alone.");
+  assert.equal(say("en", "orientLocked", { locked: 1 }), "1 locked object was not touched.");
+  // Sorani keeps the noun singular after a number; the verb agrees.
+  assert.equal(say("ckb", "zipArranged", { models: 1, plates: 1 }), "1 تەن بە شێوەی خۆکار لەسەر 1 Plate دابەش کرا.");
+  assert.equal(say("ckb", "zipArranged", { models: 2, plates: 1 }), "2 تەن بە شێوەی خۆکار لەسەر 1 Plate دابەش کران.");
+  assert.equal(say("ckb", "zipOversized", { count: 1 }), "1 تەن لە ڕووبەری چاپکردن گەورەترە؛ ناوەندگیر کرا و پێویستی بە بچووککردنەوە یان دابەشکردنە.");
+  assert.equal(say("ckb", "zipOversized", { count: 3 }), "3 تەن لە ڕووبەری چاپکردن گەورەترن؛ ناوەندگیر کران و پێویستیان بە بچووککردنەوە یان دابەشکردنە.");
+  assert.equal(say("ckb", "zipOverflow", { count: 1 }), "1 تەن دابەش نەکرا چونکە دەستکاریکەرەکە زۆرترین 9 Plate پشتگیری دەکات؛ لە شوێنی هاوردەکردنی مایەوە بۆ پێداچوونەوەی دەستی.");
+  assert.equal(say("ckb", "orientSkipped", { skipped: 1 }), "1 نەپێورا و وەک خۆی مایەوە.");
+  for (const locale of ["ar", "en", "ckb"]) {
+    assert.notEqual(DICTIONARIES.ckb.zipOversized, DICTIONARIES.ar.zipOversized);
+    for (const key of ["cutDone", "zipArranged", "zipOversized", "zipOverflow", "orientSkipped", "orientLocked"]) {
+      for (const n of [1, 2, 3, 11]) {
+        assert.doesNotMatch(say(locale, key, { pieces: n, models: n, plates: n, count: n, skipped: n, locked: n }), /[{}#]/, `${locale} ${key} ${n}`);
+      }
+    }
+  }
+  // The shell passes the reader's language at every one of these calls.
+  const client = await read("../app/slicer-client.tsx");
+  assert.match(client, /templateText\(t\.zipArranged, \{ models: entry\.models, plates: entry\.plates \}, locale\)/);
+  assert.match(client, /templateText\(t\.zipOversized, \{ count: entry\.count \}, locale\)/);
+  assert.match(client, /return templateText\(t\.zipOverflow, \{ count: entry\.count \}, locale\);/);
+  assert.match(client, /templateText\(t\.cutDone, \{ pieces: result\.pieceIds\.length \}, locale\)/);
+  assert.match(client, /templateText\(t\.orientSkipped, \{ skipped: result\.skippedCount \}, locale\)/);
+  assert.match(client, /templateText\(t\.orientLocked, \{ locked: result\.lockedCount \}, locale\)/);
+  assert.match(client, /templateText\(t\.zipOverflow, \{ count: result\.unseatedCount \}, localeRef\.current\)/);
+  assert.doesNotMatch(client, /templateText\(t\.(?:cutDone|zipArranged|zipOversized|zipOverflow|orientSkipped|orientLocked), \{[^}]*\}\)/, "no counted notice without its language");
+});
+
+test("a window key that changes nothing is not an edit to keep: it never marks a synced project unsaved", async () => {
+  // R3-REG-01/02: the window keyup of c6fix-r2-ha-01 marked the session
+  // dirty. «Make this the current version» pressed with Enter then skipped
+  // the reload (the editor kept the old version, said «Synced», and the
+  // next save met a 409), one Tab flipped the badge to «Unsaved changes»,
+  // and the phone back chevron asked the leave question with nothing
+  // unsaved. tests/browser-account-keys.mjs presses them.
+  const { EngineAdapter } = await loadAppModule("engine-adapter");
+  const previous = { window: globalThis.window, MutationObserver: globalThis.MutationObserver };
+  const target = new EventTarget();
+  globalThis.window = {
+    addEventListener: (type, listener, options) => target.addEventListener(type, listener, options),
+    removeEventListener: (type, listener, options) => target.removeEventListener(type, listener, options),
+  };
+  globalThis.MutationObserver = class { observe() {} disconnect() {} };
+  try {
+    const adapter = new EngineAdapter();
+    const signals = [];
+    adapter.onSceneEdit((signal) => signals.push(signal.keysOnly));
+    adapter.attach({ querySelectorAll: () => [] });
+    target.dispatchEvent(new Event("keyup"));
+    await Promise.resolve();
+    assert.deepEqual(signals, [true], "a keyup on window alone is a key-only signal");
+    adapter.notifySceneEdited();
+    await Promise.resolve();
+    assert.deepEqual(signals, [true, false], "a mutation through the adapter is never key-only");
+    target.dispatchEvent(new Event("keyup"));
+    adapter.notifySceneEdited();
+    await Promise.resolve();
+    assert.deepEqual(signals, [true, false, false], "a window key and a mutation in one tick: not key-only");
+    // Inside an engine shadow root a key is an edit as it always was, except
+    // a key that only moves the focus: the Tabs through the engine canvas and
+    // its plate tabs on the way to the phone back chevron.
+    const key = (name) => Object.assign(new Event("keyup"), { key: name });
+    adapter.onRootEditEvent(key("ArrowLeft"));
+    await Promise.resolve();
+    assert.deepEqual(signals.slice(3), [false], "an arrow inside the engine is not key-only");
+    adapter.onRootEditEvent(new Event("pointerup"));
+    await Promise.resolve();
+    assert.deepEqual(signals.slice(4), [false], "a pointer inside the engine is not key-only");
+    adapter.onRootEditEvent(key("Tab"));
+    adapter.onRootEditEvent(key("Shift"));
+    target.dispatchEvent(new Event("keyup"));
+    await Promise.resolve();
+    assert.deepEqual(signals.slice(5), [true], "Tab and Shift inside the engine, with the window keyup: key-only");
+    target.dispatchEvent(new Event("keyup"));
+    await Promise.resolve();
+    assert.deepEqual(signals.slice(6), [true], "and the next window key alone is key-only again");
+    adapter.detach();
+  } finally {
+    globalThis.window = previous.window;
+    globalThis.MutationObserver = previous.MutationObserver;
+  }
+  // Autosave asks the fingerprint before it calls a window key an edit; the
+  // objects event resets what it compares with (an opened or restored project).
+  const client = await read("../app/slicer-client.tsx");
+  const listener = client.slice(client.indexOf("const autosaveSceneRef = useRef(\"\");"), client.indexOf("}, [adapter, markDirty]);"));
+  assert.match(listener, /const scene = adapter\.sceneFingerprint\(\);\s*const moved = scene !== autosaveSceneRef\.current;\s*autosaveSceneRef\.current = scene;/);
+  assert.match(listener, /if \(signal\.keysOnly && !moved\) return;\s*markDirty\(\);/);
+  assert.match(client, /autosaveSceneRef\.current = adapter\.sceneFingerprint\(\);\s*const ids = event\.value\.map/);
+  // The slice result is still judged on the live scene, so a nudge stays stale.
+  const hook = await read("../app/hooks/use-slicing-state.ts");
+  assert.match(hook, /return adapter\.onSceneEdit\(refreshSceneFingerprint\);/);
+});

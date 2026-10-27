@@ -54,6 +54,35 @@
     },
     {
       "ok": true,
+      "m": "ArrowLeft on expand moves the focus to «إعادة العرض» (right to left)",
+      "detail": "reset-view"
+    },
+    {
+      "ok": true,
+      "m": "…and moves no model: the result stays fresh",
+      "detail": "x 0, sliced"
+    },
+    {
+      "ok": true,
+      "m": "ArrowRight comes back to expand"
+    },
+    {
+      "ok": true,
+      "m": "End reaches the bed view",
+      "detail": "view-bed"
+    },
+    {
+      "ok": true,
+      "m": "ArrowDown at the end and ArrowUp stay in the toolbar and move nothing",
+      "detail": "reset-view, x 0, sliced"
+    },
+    {
+      "ok": true,
+      "m": "the viewport toolbar is one tab stop",
+      "detail": "-1,0,-1"
+    },
+    {
+      "ok": true,
       "m": "ArrowLeft on «المزيد» moves the model 10 mm (the engine's own nudge)",
       "detail": "x 0 -> -10"
     },
@@ -631,6 +660,318 @@
       "ok": true,
       "m": "«المصدر وإشعارات المكتبات» is at least 44 px tall",
       "detail": "336 x 44"
+    },
+    {
+      "ok": true,
+      "m": "the cut says how many pieces in words that agree",
+      "detail": "تم القص إلى قطعتين.تراجع عن القص"
+    },
+    {
+      "ok": true,
+      "m": "«تراجع عن القص» is offered after the cut"
+    },
+    {
+      "ok": true,
+      "m": "pressed at once, it brings the cube back",
+      "detail": "cube-10mm.stl | تم التراجع عن القص."
+    },
+    {
+      "ok": true,
+      "m": "cut again: offered again"
+    },
+    {
+      "ok": true,
+      "m": "a duplicate takes the offer down",
+      "detail": "3 objects, offer 0"
+    },
+    {
+      "ok": true,
+      "m": "cut a third time: offered"
+    },
+    {
+      "ok": true,
+      "m": "«حذف الكل» takes the offer down",
+      "detail": "حُذفت كل المجسمات (4)."
+    },
+    {
+      "ok": true,
+      "m": "the two parts arrive",
+      "detail": "part-a.stl, part-b.stl"
+    },
+    {
+      "ok": true,
+      "m": "the ZIP notice counts the parts in the reader's language",
+      "detail": "تم توزيع مجسمين تلقائيًا على Plate واحدة."
+    },
+    {
+      "ok": true,
+      "m": "and no undo offer stands next to it, so nothing can delete the parts"
+    },
+    {
+      "ok": true,
+      "m": "the cut says how many pieces in words that agree",
+      "detail": "بۆ 2 پارچە بڕدرا.گەڕاندنەوەی بڕین"
+    },
+    {
+      "ok": true,
+      "m": "«گەڕاندنەوەی بڕین» is offered after the cut"
+    },
+    {
+      "ok": true,
+      "m": "pressed at once, it brings the cube back",
+      "detail": "cube-10mm.stl | بڕینەکە گەڕێندرایەوە."
+    },
+    {
+      "ok": true,
+      "m": "cut again: offered again"
+    },
+    {
+      "ok": true,
+      "m": "a duplicate takes the offer down",
+      "detail": "3 objects, offer 0"
+    },
+    {
+      "ok": true,
+      "m": "cut a third time: offered"
+    },
+    {
+      "ok": true,
+      "m": "«حذف الكل» takes the offer down",
+      "detail": "هەموو تەنەکان سڕدرانەوە (4)."
+    },
+    {
+      "ok": true,
+      "m": "the two parts arrive",
+      "detail": "part-a.stl, part-b.stl"
+    },
+    {
+      "ok": true,
+      "m": "the ZIP notice counts the parts in the reader's language",
+      "detail": "2 تەن بە شێوەی خۆکار لەسەر 1 Plate دابەش کران."
+    },
+    {
+      "ok": true,
+      "m": "and no undo offer stands next to it, so nothing can delete the parts"
+    },
+    {
+      "ok": true,
+      "m": "the cut says how many pieces in words that agree",
+      "detail": "Cut into 2 pieces.Undo the cut"
+    },
+    {
+      "ok": true,
+      "m": "«Undo the cut» is offered after the cut"
+    },
+    {
+      "ok": true,
+      "m": "pressed at once, it brings the cube back",
+      "detail": "cube-10mm.stl | The cut was undone."
+    },
+    {
+      "ok": true,
+      "m": "cut again: offered again"
+    },
+    {
+      "ok": true,
+      "m": "a duplicate takes the offer down",
+      "detail": "3 objects, offer 0"
+    },
+    {
+      "ok": true,
+      "m": "cut a third time: offered"
+    },
+    {
+      "ok": true,
+      "m": "«حذف الكل» takes the offer down",
+      "detail": "Deleted all 4 objects."
+    },
+    {
+      "ok": true,
+      "m": "the two parts arrive",
+      "detail": "part-a.stl, part-b.stl"
+    },
+    {
+      "ok": true,
+      "m": "the ZIP notice counts the parts in the reader's language",
+      "detail": "Automatically arranged 2 models across 1 plate."
+    },
+    {
+      "ok": true,
+      "m": "and no undo offer stands next to it, so nothing can delete the parts"
+    },
+    {
+      "ok": true,
+      "m": "the Projects tablist is named",
+      "detail": "مشاريعي"
+    },
+    {
+      "ok": true,
+      "m": "both Projects tabs are 44 px tall",
+      "detail": "44,44"
+    },
+    {
+      "ok": true,
+      "m": "the chosen tab reads ink on the sand at 4.5:1 or more",
+      "detail": "مسودات هذا الجهاز: 10.46:1"
+    },
+    {
+      "ok": true,
+      "m": "one tab stop, on the chosen tab"
+    },
+    {
+      "ok": true,
+      "m": "the chosen tab controls the tabpanel it labels",
+      "detail": "{\"text\":\"مسودات هذا الجهاز\",\"selected\":\"true\",\"tab\":0,\"h\":44,\"contrast\":10.46,\"panel\":\"tabpanel\",\"labelledBy\":\"_r_0_-tab-device\",\"id\":\"_r_0_-tab-device\"}"
+    },
+    {
+      "ok": true,
+      "m": "Home chooses the account tab",
+      "detail": "حساب LEVONIS"
+    },
+    {
+      "ok": true,
+      "m": "End comes back to the device drafts",
+      "detail": "مسودات هذا الجهاز"
+    },
+    {
+      "ok": true,
+      "m": "the sheet stays open, and nothing behind it moved"
+    },
+    {
+      "ok": true,
+      "m": "the chosen connection way carries the check mark, and only it",
+      "detail": "نفس شبكة Wi‑Fi"
+    },
+    {
+      "ok": true,
+      "m": "its label is 4.5:1 or more on the sand",
+      "detail": "8.33:1"
+    },
+    {
+      "ok": true,
+      "m": "its edge or fill is 3:1 or more against the track",
+      "detail": "8.01:1"
+    },
+    {
+      "ok": true,
+      "m": "its name fits the two lines it may take, so nothing is cut short",
+      "detail": "نفس شبكة Wi‑Fi on 2 line(s)"
+    },
+    {
+      "ok": true,
+      "m": "the Projects tablist is named",
+      "detail": "پڕۆژەکانم"
+    },
+    {
+      "ok": true,
+      "m": "both Projects tabs are 44 px tall",
+      "detail": "44,44"
+    },
+    {
+      "ok": true,
+      "m": "the chosen tab reads ink on the sand at 4.5:1 or more",
+      "detail": "ڕەشنووسەکانی ئەم ئامێرە: 5.94:1"
+    },
+    {
+      "ok": true,
+      "m": "one tab stop, on the chosen tab"
+    },
+    {
+      "ok": true,
+      "m": "the chosen tab controls the tabpanel it labels",
+      "detail": "{\"text\":\"ڕەشنووسەکانی ئەم ئامێرە\",\"selected\":\"true\",\"tab\":0,\"h\":44,\"contrast\":5.94,\"panel\":\"tabpanel\",\"labelledBy\":\"_r_0_-tab-device\",\"id\":\"_r_0_-tab-device\"}"
+    },
+    {
+      "ok": true,
+      "m": "Home chooses the account tab",
+      "detail": "هەژماری LEVONIS"
+    },
+    {
+      "ok": true,
+      "m": "End comes back to the device drafts",
+      "detail": "ڕەشنووسەکانی ئەم ئامێرە"
+    },
+    {
+      "ok": true,
+      "m": "the sheet stays open, and nothing behind it moved"
+    },
+    {
+      "ok": true,
+      "m": "the chosen connection way carries the check mark, and only it",
+      "detail": "هەمان Wi‑Fi"
+    },
+    {
+      "ok": true,
+      "m": "its label is 4.5:1 or more on the sand",
+      "detail": "8.33:1"
+    },
+    {
+      "ok": true,
+      "m": "its edge or fill is 3:1 or more against the track",
+      "detail": "4.46:1"
+    },
+    {
+      "ok": true,
+      "m": "its name fits the two lines it may take, so nothing is cut short",
+      "detail": "هەمان Wi‑Fi on 1 line(s)"
+    },
+    {
+      "ok": true,
+      "m": "the Projects tablist is named",
+      "detail": "My Projects"
+    },
+    {
+      "ok": true,
+      "m": "both Projects tabs are 44 px tall",
+      "detail": "44,44"
+    },
+    {
+      "ok": true,
+      "m": "the chosen tab reads ink on the sand at 4.5:1 or more",
+      "detail": "Drafts on this device: 10.46:1"
+    },
+    {
+      "ok": true,
+      "m": "one tab stop, on the chosen tab"
+    },
+    {
+      "ok": true,
+      "m": "the chosen tab controls the tabpanel it labels",
+      "detail": "{\"text\":\"Drafts on this device\",\"selected\":\"true\",\"tab\":0,\"h\":44,\"contrast\":10.46,\"panel\":\"tabpanel\",\"labelledBy\":\"_r_0_-tab-device\",\"id\":\"_r_0_-tab-device\"}"
+    },
+    {
+      "ok": true,
+      "m": "Home chooses the account tab",
+      "detail": "LEVONIS account"
+    },
+    {
+      "ok": true,
+      "m": "End comes back to the device drafts",
+      "detail": "Drafts on this device"
+    },
+    {
+      "ok": true,
+      "m": "the sheet stays open, and nothing behind it moved"
+    },
+    {
+      "ok": true,
+      "m": "the chosen connection way carries the check mark, and only it",
+      "detail": "Same Wi-Fi"
+    },
+    {
+      "ok": true,
+      "m": "its label is 4.5:1 or more on the sand",
+      "detail": "8.33:1"
+    },
+    {
+      "ok": true,
+      "m": "its edge or fill is 3:1 or more against the track",
+      "detail": "8.01:1"
+    },
+    {
+      "ok": true,
+      "m": "its name fits the two lines it may take, so nothing is cut short",
+      "detail": "Same Wi-Fi on 1 line(s)"
     },
     {
       "ok": true,

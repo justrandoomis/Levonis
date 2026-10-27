@@ -95,9 +95,10 @@ export function applyLocaleToDocument(locale: Locale): void {
  * picked by `Intl.PluralRules` for `locale` (zero, one, two, few, many,
  * other), a missing form falls back to `other`, and `#` is the number in
  * Latin digits, as every readout in the Studio. A value that is not a number
- * («—» before a count is known) takes `other`. Only the Arabic catalogue
- * writes such blocks today; English and Sorani name the unit once («6 min»,
- * «6 خولەک») and need none.
+ * («—» before a count is known) takes `other`. Arabic counts its nouns
+ * this way; English counts "1 piece" and "2 pieces", and Sorani keeps the
+ * noun singular after a number and counts only the verb («کرا», «کران»).
+ * A readout that names its unit once («6 min», «6 خولەک») needs none.
  */
 export function templateText(
   template: string,
