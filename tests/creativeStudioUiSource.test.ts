@@ -118,6 +118,8 @@ test('pictures in the studio UI use the shared image components; the canvas draw
   for (const f of studioFiles.filter((x) => x.endsWith('.tsx'))) assert.doesNotMatch(codeOf(f), /<img\b/, `${f} draws a raw <img>`);
   const media = codeOf(`${DIR}/media.ts`);
   assert.match(media, /SITE_LOGO_VERSIONED_URL/, 'the site logo comes from src/lib/siteLogo.ts');
+  // The studio asks its own leave question (StudioShell’s guard): the dashboard’s src/lib/leaveGuard.ts, shared, became a sub-1 KB chunk.
+  for (const f of studioFiles) assert.doesNotMatch(codeOf(f), /lib\/leaveGuard'/, `${f} imports the dashboard’s leave guard`);
   assert.doesNotMatch(media, /crossOrigin/, 'no cross-origin picture is ever requested for the canvas');
   for (const f of studioFiles) assert.doesNotMatch(codeOf(f), /'\/icons\/|'\/files\/UiUx\//, `${f} names a site-media path`);
   void relative; void readFileSync;

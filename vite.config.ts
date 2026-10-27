@@ -220,6 +220,14 @@ function manualChunks(id: string, meta: ChunkMeta): string | undefined {
   // alone, the helper moved into the core and the entry imported the whole
   // core back for it. Framework code with React's lifetime, not the app's.
   if (/vite\/preload-helper/.test(id)) return 'vendor-react';
+  // THE SITE'S LOGO AND PLATFORM ICON NAMES RIDE WITH THE SHARED ICONS. Two
+  // lazy screens read src/lib/siteLogo.ts — the install sheet (the app icon)
+  // and the Creative Studio (the logo it draws into an ad) — and both already
+  // load vendor-icons. Left to Rollup the module became a 151-byte chunk of
+  // its own (one more request; tests/motionLazy.test.ts counts them). It
+  // imports nothing, so the group swallows nothing; the entry never imports
+  // it (motionLazy also fails if vendor-icons reaches the first paint).
+  if (/[\\/]src[\\/]lib[\\/]siteLogo\.ts$/.test(id)) return 'vendor-icons';
   // THE STORE LAYOUT'S TABLES AS ONE FILE (review 2026-09-30): the package's
   // three leaf tables (tokens, refs, blocks — no runtime imports of their own)
   // and the storefront's token → class lookups (theme.ts, which imports only

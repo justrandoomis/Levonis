@@ -180,8 +180,15 @@ select would have been the one entry that behaves differently.
   `scripts/e2e-creative-studio.mjs` with `tests/browser/creative-studio*`
   (new design → editor; the Arabic headline, the mixed line, the test price
   and logo; overlay edit; transformer scale with the ratio held; save →
-  reload; PNG export pixel-identical to the stage at 1×; checks; an AI edit
-  applied and saved with its job; a version conflict; phone and Sorani).
+  reload; leaving with unsaved work asks first; PNG export pixel-identical to
+  the stage at 1×; checks; an AI edit applied and saved with its job; a
+  version conflict; every other tab; phone and Sorani).
+- **Bundle**: the studio is one lazy chunk (Konva inside it), nothing in the
+  first paint. The studio asks its own leave question (StudioShell) instead of
+  importing the dashboard’s `src/lib/leaveGuard.ts`, and `vite.config.ts`
+  puts `src/lib/siteLogo.ts` (now read by the install sheet and the studio)
+  in `vendor-icons`, which both already load — otherwise each became a
+  sub-1 KB chunk of its own (`tests/motionLazy.test.ts` caps them at 45).
 
 ### Not done
 

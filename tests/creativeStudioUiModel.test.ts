@@ -36,6 +36,8 @@ import { Autosave, type SaveState } from '../src/components/creativeStudio/autos
 import { allowedAssets, evidenceFor, usesTestData, type EditorData } from '../src/components/creativeStudio/editorData';
 import { list, one } from '../src/components/creativeStudio/client';
 import { ApiError } from '../src/lib/api';
+import { SITE_LOGO_VERSIONED_URL } from '../src/lib/siteLogo';
+import { urlForRef } from '../src/components/creativeStudio/media';
 
 const kit = defaultBrandKit();
 
@@ -240,4 +242,13 @@ test('response bodies are decoded strictly: a spread or a named DTO, a list unde
   assert.throws(() => list({ success: true }, 'documents'), (e: unknown) => e instanceof ApiError && e.code === 'INVALID_RESPONSE');
   assert.equal(exportFileName('طباعة', 4, 'png', true), 'levonis-design-v4-draft.png');
   assert.equal(exportFileName('A1 Combo launch!', 4, 'webp', false), 'levonis-a1-combo-launch-v4.webp');
+});
+
+test('the canvas asks only for same-origin pictures: the site logo by the url src/lib/siteLogo.ts decides, products by their /files path', () => {
+  assert.equal(urlForRef({ kind: 'logo', ref: 'site' }), SITE_LOGO_VERSIONED_URL);
+  assert.equal(urlForRef({ kind: 'product', ref: '/files/products/a.webp' }), '/files/products/a.webp');
+  assert.equal(urlForRef({ kind: 'product', ref: 'https://cdn.example.com/a.webp' }), null, 'a cross-origin picture would taint the canvas');
+  assert.equal(urlForRef({ kind: 'product', ref: '//cdn.example.com/a.webp' }), null);
+  assert.equal(urlForRef({ kind: 'product', ref: '/files/../secret' }), null);
+  assert.equal(urlForRef({ kind: 'asset', ref: 'ast_abc123' }), '/api/admin/creative-studio/assets/ast_abc123/file');
 });

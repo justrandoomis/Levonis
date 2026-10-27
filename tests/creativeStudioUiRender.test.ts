@@ -85,7 +85,7 @@ const notReady = (code: ProviderStatusDto['not_ready_code']): ProviderStatusDto 
 });
 const ctx = (provider: ProviderStatusDto | null): StudioContextValue => ({
   user: { isOwner: true, canDesign: true }, provider, brand: { migrated: true, version: null, status: 'default', kit, site_logo: { width: 1254, height: 1254 } },
-  reloadProvider: () => {}, reloadBrand: () => {}, goTab: () => {}, openDocument: () => {}, startNew: () => {},
+  reloadProvider: () => {}, reloadBrand: () => {}, goTab: () => {}, openDocument: () => {}, startNew: () => {}, setLeaveGuard: () => () => {},
 });
 
 test('the admin launcher speaks all three languages and points at the full-screen route', () => {

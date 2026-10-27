@@ -26,7 +26,6 @@ import { Input } from '../ui/Field';
 import { Overlay } from '../ui/Overlay';
 import { TabStrip } from '../ui/Tabs';
 import { toast } from '../ui/Toast';
-import { setLeaveGuard } from '../../lib/leaveGuard';
 import { normalizeDocument } from '../../../packages/creativeDoc/src/normalize';
 import { detectConflicts, rebuild, refreshBoundText, resolveConflict, type ConflictOption, type LayoutConflict } from '../../../packages/creativeDoc/src/layout';
 import type { ApplyResult, OpRefusal, RebuildRequest } from '../../../packages/creativeDoc/src/ops';
@@ -143,6 +142,7 @@ interface CoreProps {
 
 function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }: CoreProps) {
   const docId = meta.id;
+  const { setLeaveGuard } = studio;
   const [history, setHistory] = useState<History>(() => historyOf(initial));
   const doc = history.present;
   const [selection, setSelectionState] = useState<string[]>([]);
@@ -261,7 +261,7 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
       window.removeEventListener('beforeunload', unload);
       off();
     };
-  }, [w]);
+  }, [w, setLeaveGuard]);
 
   // ---- fonts, pictures -----------------------------------------------------
   const fontKeySig = useMemo(() => doc.layers.filter((l) => l.type === 'text').map((l) => (l.type === 'text' ? `${l.font.family}|${l.font.weight}|${l.text}` : '')).join('\n'), [doc.layers]);

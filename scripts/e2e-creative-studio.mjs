@@ -254,6 +254,24 @@ try {
     assert.ok(await page.textContent('[data-save-state]').then((t) => t.includes(String(before.version))), 'the version on screen is the saved one');
   });
 
+  await check('leaving the editor with unsaved work asks first; «stay» keeps the editor, and the work is saved', async () => {
+    const headlineX = async () => Object.values((await db()).docs)[0].content.layers.find((l) => l.id === 'headline').x;
+    const x0 = await headlineX();
+    const c = await centreOf({ id: 'headline' });
+    await page.mouse.click(c.x, c.y);
+    await page.keyboard.press('ArrowLeft'); // a 1 px nudge, unsaved for the next 1.2 s
+    const asked = [];
+    page.once('dialog', (d) => { asked.push(d.type()); void d.dismiss(); });
+    await page.getByRole('tab', { name: 'الهوية', exact: true }).first().click();
+    assert.deepEqual(asked, ['confirm'], 'the studio asked before leaving the editor');
+    assert.equal(await page.getAttribute('[data-studio]', 'data-studio-tab'), 'editor', '«stay» stays');
+    await page.waitForSelector('[data-save-state="saved"]', { timeout: 15000 });
+    assert.equal(await headlineX(), x0 - 1, 'the guard flushed the nudge to the server');
+    await page.keyboard.press('ArrowRight');
+    await page.waitForFunction((x) => Object.values(window.__csDb().docs)[0].content.layers.find((l) => l.id === 'headline').x === x, x0, { timeout: 15000 });
+    await page.waitForSelector('[data-save-state="saved"]', { timeout: 15000 });
+  });
+
   await check('PNG export: exactly the document size, pixel-identical to the stage drawn at 1×', async () => {
     await page.getByRole('tab', { name: 'التصدير' }).click();
     await page.waitForSelector('[data-export-panel]');

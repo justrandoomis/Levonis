@@ -134,6 +134,13 @@ export interface StudioContextValue {
   goTab(tab: StudioTab): void;
   openDocument(id: string): void;
   startNew(prefill?: NewDesignPrefill): void;
+  /**
+   * The open editor registers the question to ask before the studio leaves it
+   * (another tab, «back to admin», a new design); returns the unregister. The
+   * studio’s own, not src/lib/leaveGuard.ts: that one is the dashboard’s, and
+   * importing it here split it into a chunk of its own.
+   */
+  setLeaveGuard(guard: () => boolean): () => void;
 }
 
 export type StudioTab = 'home' | 'new' | 'editor' | 'brand' | 'assets' | 'archive' | 'settings';

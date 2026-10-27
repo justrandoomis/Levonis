@@ -9,11 +9,10 @@
  * CREATIVE_SCOPE_REQUIRED for an assistant admin); this frame only says so
  * instead of drawing screens nobody can use.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
-import { mayLeave } from '../../lib/leaveGuard';
 import { Button } from '../ui/Button';
 import { TabStrip } from '../ui/Tabs';
 import type { BrandDto, ProviderStatusDto } from '../../../packages/creativeDoc/src/api';
@@ -89,11 +88,29 @@ export default function StudioShell() {
     window.history.replaceState(window.history.state, '', url);
   }, [tab, docId]);
 
+  // The open editor’s question before leaving it (unsaved work); one at a time.
+  const leaveGuard = useRef<(() => boolean) | null>(null);
+  const setLeaveGuard = useCallback((guard: () => boolean) => {
+    leaveGuard.current = guard;
+    return () => {
+      if (leaveGuard.current === guard) leaveGuard.current = null;
+    };
+  }, []);
+  const mayLeave = useCallback((): boolean => {
+    const guard = leaveGuard.current;
+    if (!guard) return true;
+    try {
+      return guard();
+    } catch {
+      return true;
+    }
+  }, []);
+
   const goTab = useCallback((next: StudioTab) => {
     if (next === tab) return;
     if (tab === 'editor' && !mayLeave()) return;
     setTab(next);
-  }, [tab]);
+  }, [tab, mayLeave]);
 
   const ctx: StudioContextValue = {
     user: studioUser,
@@ -112,6 +129,7 @@ export default function StudioShell() {
       setNewKey((k) => k + 1);
       setTab('new');
     },
+    setLeaveGuard,
   };
 
   if (!studioUser.canDesign || refused) {
