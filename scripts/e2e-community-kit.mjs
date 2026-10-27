@@ -27,6 +27,15 @@
  *     a sheet and the confirmation opened from it, a menu and the shell toast
  *     stack wear the pair and follow a theme switch; a window opened from the
  *     shell does not; the toast stack loses it when the community page goes.
+ *   (round 5)
+ *   - with the OTHER tab chosen, the underline still sits on the bottom edge
+ *     of its tab and on the baseline of the strip when the first label wraps
+ *     (en 390, ckb 320 and the rest of the matrix, both themes), and every
+ *     frame of its travel runs along that baseline;
+ *   - under forced colours the current ListRow, a current `.cm-sel` chip and
+ *     a pressed filter chip wear the house Highlight line and outline (the
+ *     row its start bar in Highlight too), the idle ones do not, and a focused
+ *     one shows the 2px CanvasText focus line instead.
  *
  * Screenshots go to OUT_DIR (default /tmp/claude-0/shots/community-kit/).
  *
@@ -263,6 +272,29 @@ for (const [lang, width, height] of [['en', 390, 844], ['ar', 390, 844], ['ckb',
       check(`${tag}: … in the gold of the label`, geo.color === geo.gold, `${geo.color} vs ${geo.gold}`);
     }
     await strip.screenshot({ path: `${out}/${tag}-tabs-underline.png` });
+
+    // The OTHER tab chosen (round 5). When one label wraps, both tabs grow; a one-line label
+    // centred in its tab left its line 10.7px above the baseline (en 390, en 320, ckb 320). The
+    // label fills the height of its tab, so the line sits on the tab bottom and on the 1px
+    // baseline of the strip, whichever tab is chosen.
+    await page.locator('[data-kit="selection"] .cm-tabs [role="tab"][aria-selected="false"]').first().click();
+    await page.mouse.move(1, 1);
+    await page.waitForTimeout(300);
+    const second = await page.evaluate(() => {
+      const bar = document.querySelector('[data-kit="selection"] .cm-tabs');
+      const tab = bar.querySelector('[data-tab-active]');
+      const line = tab.querySelector('[data-tab-line]');
+      if (!line) return null;
+      const lr = line.getBoundingClientRect();
+      const tabs = [...bar.querySelectorAll('[data-tab]')].map((x) => x.getBoundingClientRect().height);
+      return { lineBottom: lr.bottom, lineHeight: lr.height, tabBottom: tab.getBoundingClientRect().bottom, baseline: bar.getBoundingClientRect().bottom - parseFloat(getComputedStyle(bar).borderBottomWidth), tabs };
+    });
+    check(`${tag}: the second tab draws its underline`, !!second, 'no line under the chosen tab');
+    if (second) {
+      check(`${tag}: … on the bottom edge of the second tab`, Math.abs(second.lineBottom - second.tabBottom) <= 0.5, JSON.stringify(second));
+      check(`${tag}: … and on the baseline of the strip`, Math.abs(second.lineBottom - second.baseline) <= 0.5 && Math.abs(second.lineHeight - 3) <= 0.1, JSON.stringify(second));
+    }
+    await strip.screenshot({ path: `${out}/${tag}-tabs-second.png` });
     await context.close();
   }
 }
@@ -292,6 +324,41 @@ for (const reduced of [false, true]) {
   if (reduced) check(`${tag} reduced motion: the underline jumps (in place at once)`, Math.abs(mid.left - mid.home) <= 0.75, JSON.stringify(mid));
   else check(`${tag}: the underline travels from the old tab (in flight after 60ms)`, Math.abs(mid.left - mid.home) > 2 && Math.abs(mid.left - before) > 0.5, JSON.stringify({ before, ...mid }));
   await context.close();
+}
+
+// Every frame of the move runs ALONG the baseline (round 5). With a wrapped label in the strip the
+// line under the one-line label sat higher, so it hopped up and down on its way (a translateY of
+// 6.5px at en 390 and 7.6px at ckb 320 in flight).
+for (const [lang, width, height] of [['en', 390, 844], ['ckb', 320, 700]]) {
+  for (const theme of ['dark', 'light']) {
+    const { context, page, tag } = await open(browser, { theme, lang, width, height, reduced: false, touch: false });
+    await page.locator('[data-kit="selection"] .cm-tabs').scrollIntoViewIfNeeded();
+    const flight = await page.evaluate(
+      () =>
+        new Promise((done) => {
+          const bar = document.querySelector('[data-kit="selection"] .cm-tabs');
+          const at = () => {
+            const r = bar.querySelector('[data-tab-line]').getBoundingClientRect();
+            return { left: r.left, off: r.bottom - (bar.getBoundingClientRect().bottom - parseFloat(getComputedStyle(bar).borderBottomWidth)) };
+          };
+          const frames = [at()];
+          bar.querySelector('[role="tab"][aria-selected="false"]').click();
+          const t0 = performance.now();
+          const tick = () => {
+            frames.push(at());
+            if (performance.now() - t0 < 900) requestAnimationFrame(tick);
+            else done(frames);
+          };
+          requestAnimationFrame(tick);
+        })
+    );
+    const start = flight[0].left;
+    const end = flight[flight.length - 1].left;
+    const worst = Math.max(...flight.map((f) => Math.abs(f.off)));
+    check(`${tag}: the underline travels to the other tab (frames in between)`, flight.some((f) => Math.abs(f.left - start) > 2 && Math.abs(f.left - end) > 2), JSON.stringify({ start, end, frames: flight.length }));
+    check(`${tag}: … along the baseline, with no vertical move in any frame`, worst <= 0.5, `${worst.toFixed(2)}px off the baseline at worst, over ${flight.length} frames`);
+    await context.close();
+  }
 }
 
 // ------------------------------------------------- every held control at full ink (round 4)
@@ -377,6 +444,59 @@ for (const theme of ['dark', 'light']) {
   check(`forced colours ${theme}: the ON knobs are drawn in Highlight`, knobs.on.length > 0 && knobs.on.every((c) => c === knobs.highlight), JSON.stringify(knobs));
   check(`forced colours ${theme}: no knob is the Canvas of its track`, [...knobs.on, ...knobs.off].every((c) => c !== knobs.canvas), JSON.stringify(knobs));
   await page.locator('[data-kit-row="toggles"]').screenshot({ path: `${out}/forced-${theme}-switches.png` });
+
+  // The current ListRow and a current or chosen `.cm-sel` (round 5). Forced colours drop the
+  // dimple, the well fill, the gold bar and the sand, so the current row read like every other
+  // row and the current section chip (plan R3 SectionNav, «لك») like every idle one. The house
+  // cue for a selection there: the line and a 1px outline in Highlight; the bar comes back in
+  // Highlight; the focus stays the 2px house line in CanvasText.
+  const cues = await page.evaluate(() => {
+    const host = document.querySelector('[data-kit="cards"]');
+    const nav = document.createElement('nav');
+    nav.setAttribute('data-probe-nav', '');
+    nav.className = 'mt-3 grid grid-cols-3 gap-2';
+    nav.innerHTML = ['#a', '#b', '#c'].map((h, i) => `<a href="${h}"${i === 0 ? ' aria-current="page"' : ''} class="cm-raised cm-sel flex h-12 items-center justify-center rounded-md text-[14px] font-semibold">${['لك', 'المشاريع', 'المتاجر'][i]}</a>`).join('');
+    host.append(nav);
+    const probe = document.createElement('i');
+    document.body.append(probe);
+    probe.style.color = 'Highlight';
+    const highlight = getComputedStyle(probe).color;
+    probe.style.color = 'CanvasText';
+    const text = getComputedStyle(probe).color;
+    probe.remove();
+    const look = (el) => {
+      const cs = getComputedStyle(el);
+      return { outline: `${cs.outlineStyle} ${cs.outlineWidth} ${cs.outlineColor}`, border: cs.borderTopColor };
+    };
+    const rows = [...document.querySelectorAll('.cm-row')].map((r) => ({ current: r.getAttribute('aria-current') === 'page', bar: getComputedStyle(r, '::before').backgroundColor, ...look(r) }));
+    const chips = [...nav.children].map((a) => ({ current: a.hasAttribute('aria-current'), ...look(a) }));
+    const pressed = [...document.querySelectorAll('[data-kit-row="filters"] > button:has(.cm-sel):not(:disabled)')].map((b) => ({ on: b.getAttribute('aria-pressed') === 'true', ...look(b.querySelector('.cm-sel')) }));
+    return { highlight, text, rows, chips, pressed };
+  });
+  const cue = `solid 1px ${cues.highlight}`;
+  const currentRows = cues.rows.filter((r) => r.current);
+  check(`forced colours ${theme}: the current ListRow wears the Highlight outline`, currentRows.length === 1 && currentRows[0].outline === cue, JSON.stringify(currentRows));
+  check(`forced colours ${theme}: … and its start bar in Highlight`, currentRows.length === 1 && currentRows[0].bar === cues.highlight, JSON.stringify(currentRows));
+  check(`forced colours ${theme}: … and no other row does`, cues.rows.filter((r) => !r.current).every((r) => !r.outline.startsWith('solid') && r.bar !== cues.highlight), JSON.stringify(cues.rows));
+  const currentChip = cues.chips.find((c) => c.current);
+  check(`forced colours ${theme}: the current .cm-sel chip wears the Highlight line and outline`, !!currentChip && currentChip.outline === cue && currentChip.border === cues.highlight, JSON.stringify(cues.chips));
+  check(`forced colours ${theme}: … and the idle chips do not`, cues.chips.filter((c) => !c.current).every((c) => !c.outline.startsWith('solid') && c.border !== cues.highlight), JSON.stringify(cues.chips));
+  check(`forced colours ${theme}: a pressed filter chip wears it, an unpressed one does not`, cues.pressed.some((p) => p.on) && cues.pressed.every((p) => (p.on ? p.outline === cue : !p.outline.startsWith('solid'))), JSON.stringify(cues.pressed));
+  // A focused current row and a focused current chip show the focus line, not the selection line.
+  await page.keyboard.press('Shift');
+  for (const [name, sel] of [['the current row', '.cm-row[aria-current="page"]'], ['the current chip', '[data-probe-nav] [aria-current="page"]']]) {
+    const focused = await page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      el.focus();
+      const cs = getComputedStyle(el);
+      return { fv: el.matches(':focus-visible'), outline: `${cs.outlineStyle} ${cs.outlineWidth} ${cs.outlineColor}` };
+    }, sel);
+    check(`forced colours ${theme}: focused, ${name} draws the 2px focus line in CanvasText`, focused.fv && focused.outline === `solid 2px ${cues.text}`, JSON.stringify(focused));
+  }
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.locator('.cm-row').first().locator('xpath=..').screenshot({ path: `${out}/forced-${theme}-rows.png` });
+  await page.locator('[data-probe-nav]').screenshot({ path: `${out}/forced-${theme}-current-chip.png` });
+  await page.locator('[data-kit-row="filters"]').screenshot({ path: `${out}/forced-${theme}-filters.png` });
   await context.close();
 }
 

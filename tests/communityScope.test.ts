@@ -35,7 +35,12 @@
  *     held button at full ink under reduced motion;
  *  j. the kit review (round 4): the tab underline as wide as the label plus
  *     24px, every held control at full ink in both motion settings, and the
- *     ON knob of the Toggle in Highlight under forced colours.
+ *     ON knob of the Toggle in Highlight under forced colours;
+ *  k. the fix round (B1FIX round 1): the looks of the kit controls no page
+ *     renders yet leave the scope sheet and ship with their kit modules; the
+ *     current ListRow and a current or chosen `.cm-sel` keep the house
+ *     Highlight cue under forced colours; the tab label fills its tab, so
+ *     the underline stays on the baseline whichever tab is chosen.
  *
  * scripts/e2e-community-kit.mjs measures the same in Chromium on the kit
  * fixture (tests/browser/community-kit.html).
@@ -54,8 +59,70 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '');
 const SHEET = 'src/styles/community.css';
-const css = strip(read(SHEET));
+/**
+ * The looks of the kit controls no community page renders yet, each sheet beside the kit module
+ * that imports it, so it ships with the first page that imports that module (B1FIX-R1-REG-1: in
+ * the scope sheet they cost every community page 2,937 B of CSS gzip, 2.4 times the plan).
+ */
+const KIT_SHEETS: Record<string, string> = {
+  'src/components/community/kit/controls.css': 'src/components/community/kit/controls.tsx',
+  'src/components/community/kit/display.css': 'src/components/community/kit/display.tsx',
+  'src/components/community/kit/fields.css': 'src/components/community/kit/fields.tsx',
+};
+const scopeCss = strip(read(SHEET));
+const kitCss: Record<string, string> = Object.fromEntries(Object.keys(KIT_SHEETS).map((f) => [f, strip(read(f))]));
+/** Every community rule: the scope sheet, then the kit sheets. */
+const css = [scopeCss, ...Object.values(kitCss)].join('\n');
 const indexCss = read('src/index.css');
+
+/** A sheet without its `@layer components { … }` blocks. */
+function unlayered(source: string): string {
+  let kept = '';
+  let from = 0;
+  for (;;) {
+    const at = source.indexOf('@layer components {', from);
+    if (at < 0) return kept + source.slice(from);
+    kept += source.slice(from, at);
+    let depth = 0;
+    let i = source.indexOf('{', at);
+    for (; i < source.length; i++) {
+      if (source[i] === '{') depth++;
+      else if (source[i] === '}' && --depth === 0) break;
+    }
+    from = i + 1;
+  }
+}
+/** The `@layer components { … }` blocks of a sheet, their contents only. */
+const layered = (source: string): string[] => {
+  const blocks: string[] = [];
+  for (let at = source.indexOf('@layer components {'); at >= 0; at = source.indexOf('@layer components {', at + 1)) {
+    let depth = 0;
+    const open = source.indexOf('{', at);
+    let i = open;
+    for (; i < source.length; i++) {
+      if (source[i] === '{') depth++;
+      else if (source[i] === '}' && --depth === 0) break;
+    }
+    blocks.push(source.slice(open + 1, i));
+  }
+  return blocks;
+};
+/** The parts of a selector list, split at the commas outside brackets and parentheses. */
+function selectorParts(list: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < list.length; i++) {
+    if ('(['.includes(list[i])) depth++;
+    else if (')]'.includes(list[i])) depth--;
+    else if (list[i] === ',' && depth === 0) {
+      parts.push(list.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  parts.push(list.slice(start).trim());
+  return parts.filter(Boolean);
+}
 
 type Theme = 'dark' | 'light';
 type Rgb = number[];
@@ -79,10 +146,10 @@ const generatedVars = (theme: Theme): Record<string, string> => {
   const part = theme === 'light' ? generated.slice(generated.indexOf("[data-theme='light']"), generated.indexOf("[data-theme='dark']")) : generated.slice(generated.indexOf("[data-theme='dark']"));
   return Object.fromEntries([...part.matchAll(/--([a-z0-9-]+):([^;}]+)/g)].map((m) => [m[1], m[2].trim()]));
 };
-const common = rule(css, "[data-surface='community']");
+const common = rule(scopeCss, "[data-surface='community']");
 const scoped: Record<Theme, Record<string, string>> = {
-  dark: rule(css, "[data-surface='community'][data-theme='dark']"),
-  light: rule(css, "[data-surface='community'][data-theme='light']"),
+  dark: rule(scopeCss, "[data-surface='community'][data-theme='dark']"),
+  light: rule(scopeCss, "[data-surface='community'][data-theme='light']"),
 };
 /** What a variable resolves to inside the scope: the scope over the generated theme. */
 const V = (theme: Theme): Record<string, string> => ({ ...generatedVars(theme), ...common, ...scoped[theme] });
@@ -120,38 +187,41 @@ test('a. the scope token blocks are 0,2,0, hand-written outside the generated ma
     const selector = `[data-surface='community'][data-theme='${theme}']`;
     // Two attribute selectors and nothing else: 0,2,0, which beats the generated 0,1,0 block on the same element.
     assert.equal((selector.match(/\[/g) ?? []).length, 2);
-    assert.match(css, new RegExp(`(^|\\n)${selector.replace(/[[\]]/g, '\\$&')} \\{`), `${theme}: the scope block is missing`);
+    assert.match(scopeCss, new RegExp(`(^|\\n)${selector.replace(/[[\]]/g, '\\$&')} \\{`), `${theme}: the scope block is missing`);
     assert.ok(Object.keys(scoped[theme]).length > 10, `${theme}: the scope block is empty`);
   }
-  // Every top-level rule of the sheet (the tokens and the re-skins, outside the
-  // components layer, whose `cm-` classes exist only in community markup) is under the scope.
-  const layer = css.indexOf('@layer components {');
-  let depth = 0;
-  let end = layer;
-  for (let i = css.indexOf('{', layer); i < css.length; i++) {
-    if (css[i] === '{') depth++;
-    else if (css[i] === '}' && --depth === 0) {
-      end = i + 1;
-      break;
+  // Every top-level rule of each community sheet (the tokens and the re-skins, outside the
+  // components layer) is under the scope; every rule in the components layer is keyed to a `cm-`
+  // class, which exists only in community markup.
+  for (const [file, source] of [[SHEET, scopeCss], ...Object.entries(kitCss)]) {
+    for (const m of unlayered(source).matchAll(/(^|\n)([^@\n{}][^{}]*)\{/g)) {
+      const selector = m[2].trim();
+      if (!selector.startsWith('[')) continue;
+      assert.match(selector, /^\[data-surface='community'\]/, `${file}: a rule outside the scope: ${selector}`);
     }
+    for (const block of layered(source)) {
+      for (const m of block.matchAll(/([^{}]+)\{/g)) {
+        if (m[1].trim().startsWith('@')) continue;
+        for (const part of selectorParts(m[1])) assert.match(part, /\.cm-[a-z]|\[data-surface='community'\]/, `${file}: a layered rule not keyed to the community: ${part}`);
+      }
+    }
+    assert.doesNotMatch(source, /:root\s*\{|(^|\n)html\b|(^|[\s,])\[data-theme(=[^\]]*)?\]\s*\{/, `${file} restyles something outside the scope`);
+    // The layer order is stated again, so a sheet parsed first never ranks components under the preflight.
+    assert.match(source, /@layer theme, base, components, utilities;/, `${file}: the layer order is not stated`);
   }
-  const topLevel = css.slice(0, layer) + css.slice(end);
-  for (const m of topLevel.matchAll(/(^|\n)([^@\n{}][^{}]*)\{/g)) {
-    const selector = m[2].trim();
-    if (!selector.startsWith('[')) continue;
-    assert.match(selector, /^\[data-surface='community'\]/, `${SHEET}: a rule outside the scope: ${selector}`);
-  }
-  assert.doesNotMatch(css, /:root\s*\{|(^|\n)html\b|(^|[\s,])\[data-theme(=[^\]]*)?\]\s*\{/, `${SHEET} restyles something outside the scope`);
   // The generated block is untouched by the scope, and index.css carries no scope at all.
   const inside = indexCss.slice(indexCss.indexOf(BEGIN), indexCss.indexOf(END));
   assert.doesNotMatch(inside, /data-surface/, 'the scope leaked into the generated THEME TOKENS block');
   assert.doesNotMatch(strip(indexCss), /data-surface|\.cm-[a-z]/, 'src/index.css carries community scope rules (they belong in the lazy sheet)');
-  // The layer order is stated again, so a sheet parsed first never ranks components under the preflight.
-  assert.match(css, /@layer theme, base, components, utilities;/);
   // Only CommunitySurface imports the sheet, and only community page modules import CommunitySurface.
   const sources = (readdirSync(join(ROOT, 'src'), { recursive: true }) as string[]).filter((f) => /\.tsx?$/.test(f)).map((f) => `src/${f.split('\\').join('/')}`);
   const importers = (needle: RegExp) => sources.filter((f) => needle.test(read(f))).sort();
   assert.deepEqual(importers(/import '[./]*styles\/community\.css'/), ['src/components/community/CommunitySurface.tsx']);
+  // Each kit sheet is imported by its kit module alone, never by the scope root.
+  for (const [sheet, module] of Object.entries(KIT_SHEETS)) {
+    const name = sheet.slice(sheet.lastIndexOf('/') + 1).replace('.', '\\.');
+    assert.deepEqual(importers(new RegExp(`import '[^']*/${name}'`)), [module], `${sheet} is not imported by ${module} alone`);
+  }
   const roots = [
     'src/pages/Community.tsx',
     'src/pages/Requests.tsx',
@@ -345,7 +415,8 @@ test('e. D-2 and D-3 as the owner overrode them: a gold gradient primary and a s
   const controls = read('src/components/community/kit/controls.tsx');
   assert.match(controls, /role=\{props\.multiple \? 'checkbox' : 'radio'\}\s*aria-checked=\{on\}/);
   assert.match(controls, /className="cm-check /);
-  assert.match(css, /\[aria-checked='true'\] > \.cm-check,\s*\.cm-media\[data-selected\] > \.cm-check \{\s*display: inline-flex;/);
+  assert.match(kitCss['src/components/community/kit/controls.css'], /\[aria-checked='true'\] > \.cm-check \{\s*display: inline-flex;/);
+  assert.match(scopeCss, /\.cm-media\[data-selected\] > \.cm-check \{\s*display: inline-flex;/);
   assert.match(read('src/components/community/FilterChip.tsx'), /data-selected=\{on \|\| undefined\} className="cm-raised cm-chip cm-sel /);
   assert.match(css, /\[data-surface='community'\] \.cm-seg \[data-segmented-indicator\] \{[^}]*background: var\(--cm-sel-bg\);/);
   assert.match(css, /\[data-surface='community'\] \.cm-switch \[data-switch='on'\] > span \{[^}]*background: var\(--cm-sel-bg\);/);
@@ -434,7 +505,7 @@ test('g. the kit review: badge, segmented, stepper, drop zone, photo tile and fi
 test('h. the kit review, round 2: badge seat, tile icon ink, swatch, busy spinner, comments', () => {
   const controls = read('src/components/community/kit/controls.tsx');
   const fields = read('src/components/community/kit/fields.tsx');
-  const raw = read(SHEET);
+  const raw = [SHEET, ...Object.keys(KIT_SHEETS)].map(read).join('\n');
   const px = (v: string) => parseFloat(v) * (v.endsWith('rem') ? 16 : 1);
   const body = (source: string, selector: string) => {
     const at = source.indexOf(`${selector} {`);
@@ -528,14 +599,7 @@ test('h. the kit review, round 2: badge seat, tile icon ink, swatch, busy spinne
   const spin = "[data-surface='community'] .cm-btn-gold .lv-spin";
   assert.equal(decl(spin, 'border-top-color'), 'var(--cm-gold-ink)');
   assert.equal(decl(spin, 'border-color'), 'color-mix(in oklab, var(--cm-gold-ink) 25%, transparent)');
-  const layerAt = css.indexOf('@layer components {');
-  let depth = 0;
-  let layerEnd = -1;
-  for (let i = css.indexOf('{', layerAt); i < css.length && layerEnd < 0; i++) {
-    if (css[i] === '{') depth++;
-    else if (css[i] === '}' && --depth === 0) layerEnd = i;
-  }
-  assert.ok(css.indexOf(`${spin} {`) > layerEnd && layerEnd > layerAt, 'the spinner rule sits inside the components layer, under the utilities');
+  assert.ok(unlayered(scopeCss).includes(`${spin} {`), 'the spinner rule sits inside the components layer, under the utilities');
   const spinner = read('src/components/ui/Spinner.tsx');
   assert.match(spinner, /className=\{`lv-spin rounded-full border-gold\/25 border-t-gold /, 'the spinner no longer draws with lv-spin and the gold border utilities');
   assert.match(read('src/components/community/kit/buttons.tsx'), /\{busy \? <Spinner /);
@@ -550,7 +614,7 @@ test('h. the kit review, round 2: badge seat, tile icon ink, swatch, busy spinne
 
   // B1R2-REG-1. No word-internal apostrophe in an English comment of the scope sheet.
   const comments = (raw.match(/\/\*[\s\S]*?\*\//g) ?? []).join('\n');
-  assert.deepEqual(comments.match(/\p{L}['\u2019]\p{L}/gu) ?? [], [], `${SHEET}: an apostrophe in a comment`);
+  assert.deepEqual(comments.match(/\p{L}['\u2019]\p{L}/gu) ?? [], [], 'a community sheet has an apostrophe in a comment');
 });
 
 // ----------------------------------------------------------------------- i
@@ -657,7 +721,16 @@ test('j. the kit review, round 4: the label-wide tab underline, every held contr
   assert.equal(tab['padding-block'], '0');
   assert.equal(label['padding-block'], '12px');
   assert.equal(tab['padding-inline'], '12px');
-  assert.equal(ruleOf("[data-surface='community'] .cm-tabs [data-tab] > span:not([data-tab-indicator])")['display'], 'flex');
+  // B1FIX-R1-FID-1. The label FILLS the height of its tab: when the other label wraps, both tabs grow,
+  // and a one-line label centred in its tab left its line 10.7px above the baseline (and the line hopped
+  // as it travelled). The tab and the house span stretch it; the label centres its words.
+  const span = ruleOf("[data-surface='community'] .cm-tabs [data-tab] > span:not([data-tab-indicator])");
+  assert.equal(tab['display'], 'flex');
+  assert.equal(tab['align-items'], 'stretch');
+  assert.equal(span['display'], 'flex');
+  assert.equal(span['align-items'], 'stretch', 'the house span centres the label (items-center): the line leaves the baseline');
+  assert.equal(label['align-items'], 'center');
+  assert.match(read('src/components/ui/Tabs.tsx'), /<span className="inline-flex items-center gap-1\.5">\s*\{t\.label\}/, 'the house span changed: re-check the stretch above');
   assert.doesNotMatch(css, /\[data-tab-indicator\]\s*\{/, 'the scope still restyles the house indicator');
 
   // B1R4-A11Y-1. Nothing in the scope dims on press: the house rule (0.72 in the base layer, and
@@ -702,6 +775,53 @@ test('j. the kit review, round 4: the label-wide tab underline, every held contr
   // B1R4-A11Y-2. Forced colours turn the scoped knob ink into Canvas: the ON knob vanished. The house
   // knob there is Highlight when ON, and the scope says so again, at the specificity that hid it.
   assert.match(indexCss, /\[role='switch'\]\[aria-checked='true'\] span:not\(:has\(span\)\) \{\s*background: Highlight;/);
-  assert.match(css, /@media \(forced-colors: active\) \{\s*\[data-surface='community'\] \.cm-switch \[data-switch='on'\] > span > span \{\s*background: Highlight;\s*\}\s*\}/);
-  assert.ok(css.indexOf('@media (forced-colors: active)') > css.indexOf("[data-surface='community'] .cm-switch [data-switch='on'] > span > span {"), 'the forced-colours knob comes before the rule it overrides');
+  const controlsCss = kitCss['src/components/community/kit/controls.css'];
+  assert.match(controlsCss, /@media \(forced-colors: active\) \{\s*\[data-surface='community'\] \.cm-switch \[data-switch='on'\] > span > span \{\s*background: Highlight;\s*\}\s*\}/);
+  assert.ok(controlsCss.indexOf('@media (forced-colors: active)') > controlsCss.indexOf("[data-surface='community'] .cm-switch [data-switch='on'] > span > span {"), 'the forced-colours knob comes before the rule it overrides');
+});
+
+// ----------------------------------------------------------------------- k
+test('k. the fix round: the kit control looks leave the scope sheet, the forced-colours selection cue, the tab label filling its tab', () => {
+  // B1FIX-R1-REG-1. Every community page downloads the scope sheet. The looks of the kit controls no
+  // page renders yet (tabs, segmented track, switch, stepper, choice tiles, action dock, drop zone)
+  // live in the kit sheets, which ride with their kit modules; the scope sheet keeps the tokens, the
+  // shared recipes (cards, buttons, chips, the selection and its badge), the focus and the press.
+  const kitOnly: [RegExp, string][] = [
+    [/\.cm-tabs\b|\.cm-tab-(?:label|line)\b/, 'src/components/community/kit/controls.css'],
+    [/\.cm-switch\b/, 'src/components/community/kit/controls.css'],
+    [/\.cm-stepper\b/, 'src/components/community/kit/controls.css'],
+    [/\.cm-tile-(?:one|body|icon)\b/, 'src/components/community/kit/controls.css'],
+    [/\.cm-dock\b/, 'src/components/community/kit/display.css'],
+    [/\.cm-drop-zone\b|\.cm-drop\[data-over\]/, 'src/components/community/kit/fields.css'],
+  ];
+  for (const [looks, sheet] of kitOnly) {
+    assert.doesNotMatch(scopeCss, looks, `${SHEET} carries ${looks}, which no community page renders yet`);
+    assert.match(kitCss[sheet], looks, `${sheet} lost ${looks}`);
+  }
+  // The segmented track: only its focus line stays in the scope sheet (with the tile and the chip).
+  const segInScope = [...scopeCss.matchAll(/[^{}]*\.cm-seg\b[^{}]*\{/g)].map((m) => m[0].trim());
+  assert.deepEqual(segInScope.length, 1, `the segmented track is styled in ${SHEET}: ${segInScope.join(' | ')}`);
+  assert.match(segInScope[0], /:focus-visible/);
+  assert.match(kitCss['src/components/community/kit/controls.css'], /\[data-surface='community'\] \.cm-seg \[data-segmented-indicator\] \{/);
+  // Nothing the scope root imports pulls a kit sheet onto every page.
+  for (const f of ['src/components/community/CommunitySurface.tsx', 'src/components/community/scopePortals.ts', 'src/components/community/FilterChip.tsx']) {
+    assert.doesNotMatch(read(f), /from '\.\/kit\/|kit\/[a-z]+\.css/, `${f} pulls the kit onto every community page`);
+  }
+
+  // B1FIX-R1-A11Y-1. Forced colours drop every background and shadow: the well, the dimple and the
+  // gold bar of the current ListRow, and the sand of a current or chosen `.cm-sel` (the section chip
+  // of plan R3), so the current one read like every other. The house cue (src/index.css): the line
+  // and a 1px outline in Highlight, then the focus line in CanvasText after it.
+  assert.match(indexCss, /\.lv-choice:is\(\[aria-pressed='true'\], \[aria-checked='true'\], \[data-selected='true'\]\),\s*\[aria-current='page'\]\[data-clay-dimple\] \{\s*border-color: Highlight;\s*outline: 1px solid Highlight;/);
+  const forced = /@media \(forced-colors: active\) \{\s*\[data-surface='community'\] :is\(([^{]*)\) \{\s*border-color: Highlight;\s*outline: 1px solid Highlight;\s*\}\s*\[data-surface='community'\] \.cm-row\[aria-current='page'\]::before \{\s*background: Highlight;\s*\}\s*\[data-surface='community'\] :is\(\.cm-row, \.cm-sel\):focus-visible,\s*\[data-surface='community'\] :focus-visible > \.cm-sel \{\s*outline: 2px solid CanvasText;\s*\}\s*\}/.exec(scopeCss);
+  assert.ok(forced, 'the current row and the selection lose their cue under forced colours');
+  const cued = selectorParts(forced![1]);
+  assert.ok(cued.includes(".cm-row[aria-current='page']"), 'the current ListRow has no forced-colours cue');
+  // Every state the D-3 recipe paints, on the control and through its parent.
+  const d3 = /\.cm-sel:is\(([^)]*)\),\s*:is\(([^)]*)\) > \.cm-sel \{\s*color: var\(--cm-sel-ink\);/.exec(scopeCss);
+  assert.ok(d3, 'the D-3 selection rule moved: re-check the forced-colours cue against it');
+  assert.ok(cued.includes(`.cm-sel:is(${d3![1]})`), 'a state the sand paints has no forced-colours cue on the control');
+  assert.ok(cued.includes(`:is(${d3![2]}) > .cm-sel`), 'a state the sand paints has no forced-colours cue through its parent');
+  // After the scope focus line, so the CanvasText focus (as in the house) wins over it and over the cue.
+  assert.ok(scopeCss.indexOf(forced![0]) > scopeCss.indexOf("[data-surface='community'] :focus-visible > .cm-sel {"), 'the forced-colours block comes before the focus line it restates');
 });

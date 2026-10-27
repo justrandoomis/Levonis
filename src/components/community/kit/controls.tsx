@@ -2,7 +2,8 @@
  * THE COMMUNITY CONTROLS (community UI plan B1; tokens.md §6 rows 7–11, 18,
  * 19). Each wraps the house control that already has the semantics and the
  * keyboard (TabStrip, Segmented, Switch, NumberInput, Menu) and gives it the
- * reference look through one `cm-` class of src/styles/community.css:
+ * reference look through one `cm-` class of ./controls.css (imported here, so
+ * it ships with the first page that imports one of them):
  *
  *   UnderlineTabs   the 3px gold underline under a gold label, as wide as
  *                   the label plus 12px on each side (tokens.md §6 #7)
@@ -30,6 +31,7 @@ import { TabStrip, type TabStripProps } from '../../ui/Tabs';
 import FilterChip from '../FilterChip';
 import { KitIconButton } from './buttons';
 import { useKitStrings } from './strings';
+import './controls.css';
 
 export type UnderlineTabsProps = Omit<TabStripProps, 'indicatorClassName' | 'activeClassName' | 'idleClassName'>;
 

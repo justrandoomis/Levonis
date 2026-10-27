@@ -25,10 +25,18 @@
  *    Shadows are composed from the clay primitives and the scoped
  *    `--cm-gold-rim/-base` only (y-only, at most four layers, one blurred at
  *    rest): tests/claySystem.test.ts.
- * 4. RE-SKINS of shared controls the kit wraps (Segmented, TabStrip, Switch,
- *    IconButton, NumberInput, the Spinner of a busy gold button). Unlayered,
- *    because those draw with utilities, and each one is reached only through
- *    its `cm-` class inside the scope.
+ * 4. RE-SKINS of shared controls the kit wraps (IconButton, the Spinner of a
+ *    busy gold button), the focus, the press and the forced-colours cues.
+ *    Unlayered, because those draw with utilities, and each one is reached
+ *    only through its `cm-` class inside the scope.
+ * 5. WHAT SHIPS WITH ITS CONTROL. This sheet rides with every community page,
+ *    so it keeps the tokens, the shared recipes (cards, buttons, chips, the
+ *    selection and its badge, pills, steps), the focus and the press. The
+ *    looks of the kit controls no page renders yet live beside their
+ *    components and are imported by them, so each one ships with the first
+ *    page that imports it: kit/controls.css (tabs, segmented track, switch,
+ *    stepper, choice tiles), kit/display.css (the action dock) and
+ *    kit/fields.css (the drop zone).
  *
  * tests/communityScope.test.ts recomputes every text and boundary pair below.
  */
@@ -209,7 +217,6 @@
   }
   .lv-button.cm-btn-compact,
   .cm-chip,
-  .cm-tile-icon,
   .cm-media {
     border-radius: 12px;
   }
@@ -227,9 +234,10 @@
   }
 
   /* The check badge: an ink disc with a sand check INSIDE the inline-start
-     top corner of a chosen tile, 6px in (IMG_8482, IMG_8474). A tile with a
-     subtitle has it over the corner of its icon well. A chosen photo
-     (MediaTile) wears it at the bottom inline-end. */
+     top corner of a chosen tile, 6px in (IMG_8482, IMG_8474; the tile shows
+     it, kit/controls.css). A tile with a subtitle has it over the corner of
+     its icon well. A chosen photo (MediaTile) wears it at the bottom
+     inline-end. */
   .cm-check {
     display: none;
     inset-block-start: 6px;
@@ -237,39 +245,10 @@
     color: var(--cm-sel-bg);
     background: var(--cm-sel-badge);
   }
-  /* A one-line tile centres its icon and title in a body that keeps clear of
-     the badge seat (6px in plus the 20px disc: 26px) and 2px more on BOTH
-     sides, so the label stays centred and never meets the disc: the tile pads
-     12px, the body 16px more. The body wraps when the row cannot hold it (the
-     icon above the title, then the title over two lines). A word wider than
-     the body (FDM «filament» in a 105px tile) keeps its full width (the title
-     does not shrink under its longest word) and is centred SAFELY: it starts
-     at the body edge beside the seat and runs out at the inline end, where
-     there is no badge. In a narrow tile (a content box under 72px, a tile
-     under about 98px: three across on a 360px phone) that seat would leave
-     the words no room, so there the body takes the whole width and starts
-     under the seat instead (8px of tile padding plus 22px: the glyphs of a
-     15px line rise 1px above it), and the tile grows. */
-  .cm-tile-one {
-    container-type: inline-size;
-  }
-  .cm-tile-body {
-    align-content: center;
-    justify-content: center;
-    justify-content: safe center;
-    padding-inline: 16px;
-  }
-  @container (width < 72px) {
-    .cm-tile-body {
-      padding-inline: 0;
-      padding-block-start: 22px;
-    }
-  }
   .cm-media > .cm-check {
     inset-block: auto 8px;
     inset-inline: auto 8px;
   }
-  [aria-checked='true'] > .cm-check,
   .cm-media[data-selected] > .cm-check {
     display: inline-flex;
   }
@@ -297,22 +276,10 @@
     cursor: not-allowed;
   }
 
-  /* A second line and an icon well: muted and the primary ink at rest
-     (IMG_8474, IMG_8477: the glyphs in the well are near white; gold line
-     icons belong to the menu ListRow), the ink of the sand fill once chosen. */
+  /* A second line: muted (a chosen tile gives it the ink of the sand fill,
+     kit/controls.css). */
   .cm-sub {
     color: var(--color-text-muted);
-  }
-  .cm-tile-icon {
-    color: var(--color-text-primary);
-    background: var(--color-surface-selected);
-  }
-  [aria-checked='true'] .cm-sub,
-  [aria-checked='true'] > .cm-tile-icon {
-    color: inherit;
-  }
-  [aria-checked='true'] > .cm-tile-icon {
-    background: var(--cm-gold-1);
   }
 
   /* A colour swatch (SelectButton): ringed in the field line, so a black or
@@ -347,32 +314,12 @@
     background: var(--cm-step-on);
   }
 
-  /* The sunk zones: the drop zone and the add tile, a dashed edge, the gold
-     edge while a file is dragged over. */
+  /* The sunk zones: the drop zone and the add tile, a dashed edge (the drop
+     zone row and its drag-over edge: kit/fields.css). */
   .cm-drop {
     color: var(--color-text-muted);
     background: var(--clay-well-bg);
     border: 1.5px dashed var(--cm-drop-edge);
-  }
-  .cm-drop[data-over] {
-    border-color: var(--cm-gold-line);
-  }
-  /* The drop zone is one centred row (IMG_8474): the two lines at the inline
-     start, the cloud at the inline end. The subtitle has no intrinsic width
-     (`contain`), so the row wraps only when the TITLE cannot sit beside the
-     cloud (a long Sorani title in a narrow zone), and then the cloud goes
-     above it (`wrap-reverse`). */
-  .cm-drop-zone {
-    flex-wrap: wrap-reverse;
-    align-content: center;
-    gap: 0.25rem 1rem;
-  }
-  .cm-drop-zone > span {
-    flex: 1 1 auto;
-    max-inline-size: 16rem;
-  }
-  .cm-drop-zone > span > span + span {
-    contain: inline-size;
   }
   /* The chosen cover: the gold line drawn OUTSIDE the photo, on the card
      (a line on the photo vanished over a light one), plus the check badge. */
@@ -389,12 +336,6 @@
   .cm-media-grip {
     inset-block-start: 10px;
     inset-inline-end: 10px;
-  }
-
-  /* The bottom action bar: sticky over the shell bar and the safe area. */
-  .cm-dock {
-    inset-block-end: var(--shell-bottom-inset, 0px);
-    padding-block-end: max(0.75rem, env(safe-area-inset-bottom));
   }
 
   /* The current row of a list: dimpled, with a 2px gold start bar. */
@@ -417,69 +358,6 @@
 }
 
 /* ------------------------------------------------------------ 4. re-skins */
-/* Segmented as a sand track: a raised rail, 36px options in a 44px track,
-   each still a 44px target, and the thumb the D-3 selection. */
-[data-surface='community'] .cm-seg {
-  block-size: 44px;
-  gap: 4px;
-  padding: 3px;
-  border-radius: 14px;
-  border-color: var(--cm-contour);
-  background: var(--cm-track);
-  box-shadow: var(--clay-0);
-}
-/* Each option measures itself, so the chosen label (the one thing to read)
-   never ends in an ellipsis: 4px from the thumb edge, 2px on an option under
-   72px (four across on a 360px phone), and 12px type under 64px (four across
-   on a 320px phone, where «Standard» at 14/700 is 62px in 57). */
-[data-surface='community'] .cm-seg > [role='radio'] {
-  container-type: inline-size;
-  min-block-size: 0;
-  padding-inline: 0;
-  border-radius: 12px;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-[data-surface='community'] .cm-seg > [role='radio'] > span:last-child {
-  padding-inline: 4px;
-}
-@container (width < 72px) {
-  [data-surface='community'] .cm-seg > [role='radio'] > span:last-child {
-    padding-inline: 2px;
-  }
-}
-@container (width < 64px) {
-  [data-surface='community'] .cm-seg > [role='radio'] > span:last-child {
-    font-size: 0.75rem;
-  }
-}
-/* A 1px divider between two neighbouring unchosen options (IMG_8482,
-   «فائقة | دقيقة»), in the middle of the 4px gap; ::after is the hit. */
-[data-surface='community'] .cm-seg > [aria-checked='false'] + [aria-checked='false']::before {
-  content: '';
-  position: absolute;
-  inset-block: 9px;
-  inset-inline-start: -3px;
-  inline-size: 1px;
-  background: var(--color-border-subtle);
-}
-[data-surface='community'] .cm-seg > [role='radio']::after {
-  content: '';
-  position: absolute;
-  inset-inline: 0;
-  inset-block: -4px;
-}
-[data-surface='community'] .cm-seg > [aria-checked='true'] {
-  color: var(--cm-sel-ink);
-  font-weight: 700;
-}
-[data-surface='community'] .cm-seg [data-segmented-indicator] {
-  border-radius: 12px;
-  border-color: var(--cm-sel-edge);
-  background: var(--cm-sel-bg);
-  box-shadow: var(--cm-sel-shadow);
-}
-
 /* FOCUS ON THE SAND (WCAG 2.4.7, 1.4.11). A ring flush on the dark sand read
    1.0:1 against the fill and 1.3:1 against its edge, so a thumb, a tile or a
    chip (chosen or not, one look) draws the focus as the house button does: a
@@ -498,6 +376,28 @@
 [data-surface='community'] [data-menu-item]:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: -2px;
+}
+
+/* FORCED COLOURS drop every background and box-shadow, and with them the sand
+   of a selection, the dimple of the current row and its gold bar (a
+   background too): the current ListRow read like every other row, a current
+   or chosen `.cm-sel` like every idle one. The house cue there (src/index.css,
+   `.lv-choice` chosen and `[aria-current='page'][data-clay-dimple]`): the line
+   and a 1px outline in Highlight. The bar of the row comes back in Highlight,
+   and the focus line of the house is stated again after the cue, so a focused
+   chosen control still shows its focus and not the selection line. */
+@media (forced-colors: active) {
+  [data-surface='community'] :is(.cm-row[aria-current='page'], .cm-sel:is([aria-pressed='true'], [aria-checked='true'], [aria-selected='true'], [aria-current='page'], [data-selected='true']), :is([aria-pressed='true'], [aria-checked='true'], [aria-selected='true']) > .cm-sel) {
+    border-color: Highlight;
+    outline: 1px solid Highlight;
+  }
+  [data-surface='community'] .cm-row[aria-current='page']::before {
+    background: Highlight;
+  }
+  [data-surface='community'] :is(.cm-row, .cm-sel):focus-visible,
+  [data-surface='community'] :focus-visible > .cm-sel {
+    outline: 2px solid CanvasText;
+  }
 }
 
 /* THE PRESS KEEPS THE INK (WCAG 1.4.3). The house dims every held control to
@@ -519,87 +419,6 @@
 @media (prefers-reduced-motion: reduce) {
   [data-surface='community'] :is(button, summary, [role='button'], [role='tab'], a[href], label[for]):not(:disabled, [aria-disabled='true'], [class^='opacity-'], [class*=' opacity-']):active {
     opacity: 1 !important;
-  }
-}
-
-/* The quantity stepper (NumberInput kind="quantity"): a 48px well, two
-   raised 56px keys, the figure 18/700 in the middle. The row is an LTR
-   island like the figure it holds: minus on the left, plus on the right in
-   every language, as IMG_8482 draws it (plus at the inline start in RTL),
-   and the Tab order (minus, figure, plus) still runs the way it is drawn. */
-[data-surface='community'] .cm-stepper .lv-well {
-  min-block-size: 48px;
-  direction: ltr;
-}
-[data-surface='community'] .cm-stepper .lv-well > button {
-  inline-size: 56px;
-  block-size: 40px;
-  border: 1px solid var(--cm-contour);
-  border-radius: 12px;
-  color: var(--color-text-primary);
-}
-[data-surface='community'] .cm-stepper input {
-  font-size: 1.125rem;
-  font-weight: 700;
-}
-
-/* TabStrip with the gold underline: 3px, round ends, as wide as the words of
-   the label plus 12px on each side (tokens.md §6 #7), on a 1px baseline; a
-   long label wraps on a narrow phone instead of widening the page. The label
-   box (`.cm-tab-label`, kit/controls.tsx) takes the block padding of the tab,
-   so its bottom edge is the bottom edge of the tab and the line sits there;
-   the label measures where its words are (`--cm-tab-left`, `--cm-tab-right`,
-   0 until it has), and the tab keeps 12px of inline padding, so the line
-   never leaves its tab. */
-[data-surface='community'] .cm-tabs {
-  border-block-end: 1px solid var(--color-border-subtle);
-}
-[data-surface='community'] .cm-tabs [data-tab] {
-  min-width: 0;
-  padding-block: 0;
-  padding-inline: 12px;
-  font-size: 0.9375rem;
-  white-space: normal;
-}
-[data-surface='community'] .cm-tabs [data-tab] > span:not([data-tab-indicator]) {
-  display: flex;
-  justify-content: center;
-}
-[data-surface='community'] .cm-tabs [data-tab-active] {
-  font-weight: 700;
-}
-[data-surface='community'] .cm-tab-label {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding-block: 12px;
-}
-[data-surface='community'] .cm-tab-line {
-  position: absolute;
-  left: calc(var(--cm-tab-left, 0px) - 12px);
-  right: calc(var(--cm-tab-right, 0px) - 12px);
-  inset-block-end: 0;
-  block-size: 3px;
-  border-radius: 999px;
-  background: var(--color-gold);
-}
-
-/* Switch: ON is the sand fill with the ink knob; the knob place is the
-   non-colour cue, and the light edge keeps the track 3:1 on the cream card. */
-[data-surface='community'] .cm-switch [data-switch='on'] > span {
-  border-color: var(--cm-sel-edge);
-  background: var(--cm-sel-bg);
-}
-[data-surface='community'] .cm-switch [data-switch='on'] > span > span {
-  background: var(--cm-sel-ink);
-}
-/* Forced colours replace that ink with Canvas, so the ON knob vanished into
-   its track and an ON switch read as an empty one. The house knob ink there
-   (src/index.css): Highlight when ON. */
-@media (forced-colors: active) {
-  [data-surface='community'] .cm-switch [data-switch='on'] > span > span {
-    background: Highlight;
   }
 }
 
