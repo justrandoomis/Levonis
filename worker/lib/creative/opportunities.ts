@@ -22,6 +22,13 @@
  * a product it has never seen is an arrival, and only a product whose last
  * recorded state was 'unavailable' and is now 'available' is back in stock (a
  * changed description or picture is neither).
+ *
+ * A CHANGED CARD MARKS WHAT WAS RELEASED (spec §25, acceptance 12). When a
+ * product the watch already knew changes its availability, its price status
+ * or its displayed price, every approved or final-exported design (not
+ * archived) that binds it gains the change code in `needs_review`
+ * («availability_changed», «price_status_changed», «price_changed») — once,
+ * in the same batch, never touching the design's content.
  */
 import type { Evidence } from '../../../packages/creativeDoc/src/aiContracts';
 import type { OpportunityDto } from '../../../packages/creativeDoc/src/api';
@@ -29,6 +36,7 @@ import type { Localized } from '../../../packages/creativeDoc/src/snapshot';
 import { newId } from '../crypto';
 import { optimisticSellable, optimisticVisible, runListed } from '../listing';
 import { jsonObject, nowIso } from './db';
+import { staleStatementsForProducts } from './documents';
 import { cardStates, visibleIdsAfter } from './store';
 
 /** One sync call's page: bounded so a single request stays far inside D1's statement budget. */
@@ -47,6 +55,8 @@ export interface SyncReport {
 interface WatchRow {
   product_id: string;
   availability: string;
+  price_status: string;
+  display_price_iqd: number | null;
 }
 
 /**
@@ -64,15 +74,19 @@ export async function syncCatalogWatch(db: D1Database, nowMs = Date.now(), page 
   if (ids.length) {
     const [cards, known] = await Promise.all([
       cardStates(db, ids),
-      db.prepare('SELECT product_id, availability FROM creative_catalog_watch WHERE product_id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(ids)).all<WatchRow>(),
+      db
+        .prepare('SELECT product_id, availability, price_status, display_price_iqd FROM creative_catalog_watch WHERE product_id IN (SELECT value FROM json_each(?))')
+        .bind(JSON.stringify(ids))
+        .all<WatchRow>(),
     ]);
-    const before = new Map((known.results ?? []).map((r) => [r.product_id, r.availability]));
+    const before = new Map((known.results ?? []).map((r) => [r.product_id, r]));
+    const changed = new Map<string, string[]>();
     for (const id of ids) {
       const card = cards.get(id);
       if (!card) continue;
       report.processed += 1;
-      const prev = before.get(id);
-      if (prev === undefined) {
+      const was = before.get(id);
+      if (!was) {
         statements.push(
           db
             .prepare(
@@ -91,6 +105,12 @@ export async function syncCatalogWatch(db: D1Database, nowMs = Date.now(), page 
         }
         continue;
       }
+      const prev = was.availability;
+      const codes: string[] = [];
+      if (prev !== card.availability) codes.push('availability_changed');
+      if (was.price_status !== card.price_status) codes.push('price_status_changed');
+      else if ((was.display_price_iqd ?? null) !== card.display_price_iqd) codes.push('price_changed');
+      if (codes.length) changed.set(id, codes);
       if (!baseline && prev === 'unavailable' && card.availability === 'available') {
         report.back_in_stock += 1;
         statements.push(
@@ -105,6 +125,7 @@ export async function syncCatalogWatch(db: D1Database, nowMs = Date.now(), page 
           .bind(card.availability, card.price_status, card.display_price_iqd, now, id)
       );
     }
+    statements.push(...(await staleStatementsForProducts(db, changed)));
   }
   const passComplete = ids.length < page;
   report.pass_complete = passComplete;

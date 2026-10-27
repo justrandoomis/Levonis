@@ -17,15 +17,33 @@
  * VERSIONS AT MEANINGFUL POINTS, NOT EVERY KEYSTROKE (spec §30). A version row
  * is kept for an AI edit, a restore, a template change, a re-layout, an
  * import, an explicit checkpoint, or when ten minutes have passed since the
- * last kept one. At most 50 are kept per design; pruning never drops a version
- * that was approved or exported final.
+ * last kept one — and ALWAYS for the version that is approved or exported
+ * final, written in the same batch as the approval or the export from the
+ * design row at that version. At most 50 are kept per design; pruning never
+ * drops a version that was approved or exported final.
+ *
+ * THE LOSING WRITER WRITES NOTHING. A D1 batch does not stop at an UPDATE
+ * that matched no row, so every side effect of a save or an approval (its
+ * version row, its job's "applied" mark, its review row, the invalidation of
+ * an approval) is guarded by "the design is still at the base version" and
+ * runs BEFORE the version-fenced document UPDATE: inside the batch's
+ * transaction they all happen, or none does. An AI result's document write is
+ * also conditional on this save holding the job's mark, so a cancel that lands
+ * after the job check can never let the cancelled answer in.
  *
  * APPROVAL BELONGS TO ONE VERSION. Any content change after approval
  * invalidates it (`creative_reviews.invalidated_*`) and the design returns to
  * draft. Approving re-verifies every product binding NOW against the store and
  * re-runs every check the Worker can run without a canvas (data, product
- * binding, claims, safe area and overlap); the editor's measured checks (text
- * fit, fonts, pictures) can only add blockers, never remove one.
+ * binding, claims, safe area and overlap, a discount or limited-time claim
+ * with no live offer, a studio picture nobody approved); the editor's measured
+ * checks (text fit, fonts, pictures) can only add blockers, never remove one.
+ *
+ * STALE AFTER RELEASE (spec §25, acceptance 12). An approved or final-exported
+ * design whose store data changed is marked in `needs_review` (the change
+ * codes, once each) — by the catalogue watch, by a snapshot re-verification,
+ * by an approval or final export that was refused for it, and when the design
+ * is opened. The content is never touched; approving again clears the mark.
  */
 import type { ApproveRequest, DocKind, DocStatus, DocumentDto, DocumentSummaryDto, ExportDto, ReviewDto, VersionDto, VersionOrigin } from '../../../packages/creativeDoc/src/api';
 import type { BrandKit } from '../../../packages/creativeDoc/src/brand';
@@ -33,6 +51,7 @@ import { normalizeDocument, type DocIssue } from '../../../packages/creativeDoc/
 import { qualityReport, type ClaimState, type QualityIssue, type QualityReport } from '../../../packages/creativeDoc/src/quality';
 import type { CreativeDocument } from '../../../packages/creativeDoc/src/schema';
 import { blockingChanges, canonicalJson, compareSnapshots, type Localized, type ProductSnapshot, type SnapshotChange } from '../../../packages/creativeDoc/src/snapshot';
+import { claimsIn } from '../../../packages/creativeDoc/src/text';
 import { newId } from '../crypto';
 import { HttpError, badRequest, notFound } from '../http';
 import { likePattern, sqlLikeClause } from '../sqlLike';
@@ -158,11 +177,15 @@ export async function summaries(db: D1Database, rows: DocRow[]): Promise<Documen
   return rows.map((r) => summaryOf(r, names, thumbs));
 }
 
+/** One design for the editor, with the kit of its pinned brand version — the kit its bound text is rendered with, never a newer one. */
 export async function documentDto(db: D1Database, r: DocRow): Promise<DocumentDto> {
   const [sum] = await summaries(db, [r]);
   const content = readContent(r);
-  const names = await namesOf(db, [r.updated_by]);
-  return { ...sum, content: content.doc, brand_version: r.brand_version, updated_by_name: r.updated_by ? names.get(r.updated_by) ?? null : null, issues: content.issues };
+  const [names, brandKit] = await Promise.all([namesOf(db, [r.updated_by]), brandForDocument(db, content.doc.brand_version)]);
+  return {
+    ...sum, content: content.doc, brand_version: r.brand_version, brand_kit: brandKit,
+    updated_by_name: r.updated_by ? names.get(r.updated_by) ?? null : null, issues: content.issues,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -181,6 +204,14 @@ export interface DocFilters {
   offset: number;
 }
 
+/**
+ * The archive (spec §22). `to` as a bare date includes that whole day (the
+ * column holds full timestamps, and '2026-10-27T13:00Z' sorts after
+ * '2026-10-27'). `q` looks in the title, in the words of the design's visible
+ * text layers (its headline, features, the rendered product name…) and in the
+ * current names of the products it binds — one bound LIKE pattern
+ * (`likePattern`: escaped, at most 48 bytes), never SQL built from the text.
+ */
 export async function listDocuments(db: D1Database, f: DocFilters): Promise<{ documents: DocumentSummaryDto[]; total: number }> {
   const where: string[] = [];
   const args: unknown[] = [];
@@ -189,9 +220,20 @@ export async function listDocuments(db: D1Database, f: DocFilters): Promise<{ do
   if (f.format) { where.push('format_id = ?'); args.push(f.format); }
   if (f.campaign_id) { where.push('campaign_id = ?'); args.push(f.campaign_id); }
   if (f.from) { where.push('updated_at >= ?'); args.push(f.from); }
-  if (f.to) { where.push('updated_at <= ?'); args.push(f.to); }
+  if (f.to) { where.push('updated_at <= ?'); args.push(/^\d{4}-\d{2}-\d{2}$/.test(f.to) ? `${f.to}T23:59:59.999Z` : f.to); }
   const pattern = likePattern(f.q);
-  if (pattern) { where.push(`(${sqlLikeClause(['title'])})`); args.push(pattern); }
+  if (pattern) {
+    where.push(
+      `(${sqlLikeClause(['title'])}
+        OR EXISTS (SELECT 1 FROM json_each(creative_documents.content_json, '$.layers') l
+                    WHERE json_extract(l.value, '$.type') = 'text' AND json_extract(l.value, '$.visible') = 1
+                      AND ${sqlLikeClause(["json_extract(l.value, '$.text')"])})
+        OR EXISTS (SELECT 1 FROM json_each(creative_documents.content_json, '$.products') b
+                     JOIN products p ON p.id = json_extract(b.value, '$.product_id')
+                    WHERE ${sqlLikeClause(['p.name', 'p.name_ar', 'p.name_ku'])}))`
+    );
+    args.push(pattern, pattern, pattern, pattern, pattern);
+  }
   const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const [rows, count] = await Promise.all([
     db.prepare(`SELECT * FROM creative_documents ${clause} ORDER BY updated_at DESC, id LIMIT ? OFFSET ?`).bind(...args, f.limit, f.offset).all<DocRow>(),
@@ -204,35 +246,67 @@ export async function listDocuments(db: D1Database, f: DocFilters): Promise<{ do
 // Writes
 // ---------------------------------------------------------------------------
 
-function versionStatement(db: D1Database, documentId: string, version: number, content: string, origin: VersionOrigin, summary: string, jobId: string | null, actorId: string, now: string): D1PreparedStatement {
+/**
+ * A guard every side effect of one write shares: `sql` is a condition, `args`
+ * its values. A statement carrying it does nothing unless the design is still
+ * at the version the write started from (and, for an AI result, this write
+ * holds the job's mark) — so a write that loses its race leaves no trace.
+ */
+interface Guard {
+  sql: string;
+  args: unknown[];
+}
+
+const atVersion = (documentId: string, version: number): Guard => ({ sql: 'EXISTS (SELECT 1 FROM creative_documents WHERE id = ? AND version = ?)', args: [documentId, version] });
+
+function versionStatement(db: D1Database, documentId: string, version: number, content: string, origin: VersionOrigin, summary: string, jobId: string | null, actorId: string, now: string, guard: Guard): D1PreparedStatement {
   return db
     .prepare(
       `INSERT OR IGNORE INTO creative_document_versions (document_id, version, content_json, origin, change_summary, job_id, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+       SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE ${guard.sql}`
     )
-    .bind(documentId, version, content, origin, summary.slice(0, 300), jobId, actorId, now);
+    .bind(documentId, version, content, origin, summary.slice(0, 300), jobId, actorId, now, ...guard.args);
+}
+
+/**
+ * The version a design is at, kept as a version row FROM THE DESIGN ROW
+ * itself (spec §22, §25, §30): an approval and a final export put their
+ * version in the history in the same batch, so the approved or exported
+ * content can always be viewed and restored. A row that already exists (an AI
+ * save, a checkpoint) keeps its own origin. Nothing is written when the
+ * design has moved past `version`.
+ */
+export function keepVersionStatement(db: D1Database, documentId: string, version: number, summary: string, actorId: string, now: string): D1PreparedStatement {
+  return db
+    .prepare(
+      `INSERT OR IGNORE INTO creative_document_versions (document_id, version, content_json, origin, change_summary, job_id, created_by, created_at)
+       SELECT id, version, content_json, 'manual', ?, NULL, ?, ? FROM creative_documents WHERE id = ? AND version = ?`
+    )
+    .bind(summary, actorId, now, documentId, version);
 }
 
 /** Keep the newest KEEP_VERSIONS rows; never drop a version that was approved or exported final. */
-function pruneStatement(db: D1Database, documentId: string): D1PreparedStatement {
+function pruneStatement(db: D1Database, documentId: string, guard: Guard): D1PreparedStatement {
   return db
     .prepare(
       `DELETE FROM creative_document_versions
-        WHERE document_id = ?1
-          AND version < COALESCE((SELECT MIN(version) FROM (SELECT version FROM creative_document_versions WHERE document_id = ?1 ORDER BY version DESC LIMIT ?2)), 0)
-          AND version NOT IN (SELECT version FROM creative_reviews WHERE document_id = ?1 AND decision = 'approved')
-          AND version NOT IN (SELECT version FROM creative_exports WHERE document_id = ?1 AND final = 1)`
+        WHERE document_id = ?
+          AND version < COALESCE((SELECT MIN(version) FROM (SELECT version FROM creative_document_versions WHERE document_id = ? ORDER BY version DESC LIMIT ?)), 0)
+          AND version NOT IN (SELECT version FROM creative_reviews WHERE document_id = ? AND decision = 'approved')
+          AND version NOT IN (SELECT version FROM creative_exports WHERE document_id = ? AND final = 1)
+          AND ${guard.sql}`
     )
-    .bind(documentId, KEEP_VERSIONS);
+    .bind(documentId, documentId, KEEP_VERSIONS, documentId, documentId, ...guard.args);
 }
 
-/** The approval of this design stops counting: its review row says when and why; the design is a draft again. */
-function invalidateStatements(db: D1Database, documentId: string, reason: string, now: string): D1PreparedStatement[] {
-  return [
-    db
-      .prepare(`UPDATE creative_reviews SET invalidated_at = ?, invalidated_reason = ? WHERE document_id = ? AND decision = 'approved' AND invalidated_at IS NULL`)
-      .bind(now, reason, documentId),
-  ];
+/** The approval of this design stops counting: its review row says when and why; the design is a draft again. A no-op when nothing is approved. */
+function invalidateStatement(db: D1Database, documentId: string, reason: string, now: string, guard?: Guard): D1PreparedStatement {
+  return db
+    .prepare(
+      `UPDATE creative_reviews SET invalidated_at = ?, invalidated_reason = ?
+        WHERE document_id = ? AND decision = 'approved' AND invalidated_at IS NULL${guard ? ` AND ${guard.sql}` : ''}`
+    )
+    .bind(now, reason, documentId, ...(guard?.args ?? []));
 }
 
 export interface CreateInput {
@@ -242,8 +316,25 @@ export interface CreateInput {
   campaign_id: string | null;
   parent_id: string | null;
   idempotency_key: string | null;
+  /** How the design came to be; absent = from its template, or by hand. 'restore' is never a creation. */
+  origin?: Exclude<VersionOrigin, 'restore'> | null;
+  /** With origin 'ai': the compose or ideas job whose answer the design was built from. */
+  job_id?: string | null;
 }
 
+/**
+ * Create a design; version 1 records how it came to be (spec §22, §27, §28).
+ *
+ * A design built from Claude's answer (origin 'ai') names that job, and the
+ * job must be a SUCCEEDED, not cancelled result of a composition or of ideas.
+ * A composition is this actor's own and is applied once: it is marked applied
+ * to version 1 of the new design (`document_id`, `applied_version` 1) in the
+ * SAME batch, and the design is inserted only when this create holds that
+ * mark — a cancel or a second create racing it inserts nothing. An ideas
+ * answer is shared by the studio (the ideas list is everyone's) and one answer
+ * offers several ideas, so the first design built from it marks it applied
+ * and later ones cite it without a second mark.
+ */
 export async function createDocument(db: D1Database, actorId: string, input: CreateInput): Promise<DocRow> {
   if (input.idempotency_key) {
     const existing = await db.prepare('SELECT * FROM creative_documents WHERE idempotency_key = ?').bind(input.idempotency_key).first<DocRow>();
@@ -253,19 +344,52 @@ export async function createDocument(db: D1Database, actorId: string, input: Cre
     }
   }
   const doc = writeContent(input.content);
+  // A template origin for a design with no template would be a false record.
+  const origin: VersionOrigin = !input.origin || (input.origin === 'template' && !doc.template) ? (doc.template ? 'template' : 'manual') : input.origin;
+  const jobId = input.job_id ?? null;
+  if (jobId && origin !== 'ai') throw badRequest("job_id goes with origin 'ai'", 'INVALID_INPUT');
+  if (origin === 'ai') {
+    if (!jobId) throw badRequest("origin 'ai' needs the job_id of the answer the design was built from", 'INVALID_INPUT');
+    const job = await db.prepare('SELECT task, status, actor_id, applied_at FROM creative_jobs WHERE id = ?').bind(jobId).first<{ task: string; status: string; actor_id: string | null; applied_at: string | null }>();
+    if (!job || (job.task !== 'compose' && job.task !== 'ideas') || (job.task === 'compose' && job.actor_id !== actorId)) {
+      throw badRequest('job_id is not one of your compositions, nor an ideas answer', 'INVALID_INPUT');
+    }
+    if (job.status === 'cancelled') throw new HttpError(409, 'This job was cancelled; its result is never applied.', 'JOB_CANCELLED');
+    if (job.status !== 'succeeded') throw new HttpError(409, 'This job has no result to apply.', 'INVALID_INPUT');
+    if (job.task === 'compose' && job.applied_at) throw new HttpError(409, 'This result was already applied.', 'JOB_ALREADY_APPLIED');
+  }
   const id = newId('cdoc');
   const now = nowIso();
   const content = JSON.stringify(doc);
-  await db.batch([
-    db
-      .prepare(
-        `INSERT INTO creative_documents (id, title, status, kind, campaign_id, parent_id, format_id, width, height, product_id, template_id, version,
-                                         content_json, brand_version, idempotency_key, created_by, created_at, updated_by, updated_at)
-         VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(id, input.title, input.kind, input.campaign_id, input.parent_id, doc.format.id, doc.format.width, doc.format.height, mainProduct(doc), doc.template?.id ?? null, content, doc.brand_version, input.idempotency_key, actorId, now, actorId, now),
-    versionStatement(db, id, 1, content, doc.template ? 'template' : 'manual', 'created', null, actorId, now),
-  ]);
+  const values = [id, input.title, input.kind, input.campaign_id, input.parent_id, doc.format.id, doc.format.width, doc.format.height, mainProduct(doc), doc.template?.id ?? null, content, doc.brand_version, input.idempotency_key, actorId, now, actorId, now];
+  const columns = `INSERT INTO creative_documents (id, title, status, kind, campaign_id, parent_id, format_id, width, height, product_id, template_id, version,
+                                         content_json, brand_version, idempotency_key, created_by, created_at, updated_by, updated_at)`;
+  const statements: D1PreparedStatement[] = [];
+  if (jobId) {
+    statements.push(
+      db
+        .prepare(
+          `UPDATE creative_jobs SET applied_at = ?, applied_version = 1, document_id = ?
+            WHERE id = ? AND status = 'succeeded' AND applied_at IS NULL AND document_id IS NULL AND (task = 'ideas' OR (task = 'compose' AND actor_id = ?))`
+        )
+        .bind(now, id, jobId, actorId),
+      db
+        .prepare(
+          `${columns} SELECT ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?
+            WHERE EXISTS (SELECT 1 FROM creative_jobs WHERE id = ? AND status = 'succeeded' AND (document_id = ? OR task = 'ideas'))`
+        )
+        .bind(...values, jobId, id)
+    );
+  } else {
+    statements.push(db.prepare(`${columns} VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`).bind(...values));
+  }
+  statements.push(versionStatement(db, id, 1, content, origin, 'created', jobId, actorId, now, { sql: 'EXISTS (SELECT 1 FROM creative_documents WHERE id = ?)', args: [id] }));
+  const results = await db.batch(statements);
+  if ((results[jobId ? 1 : 0]?.meta?.changes ?? 0) !== 1) {
+    const job = await db.prepare('SELECT status FROM creative_jobs WHERE id = ?').bind(jobId).first<{ status: string }>();
+    if (job?.status === 'cancelled') throw new HttpError(409, 'This job was cancelled; its result is never applied.', 'JOB_CANCELLED');
+    throw new HttpError(409, 'This result was already applied.', 'JOB_ALREADY_APPLIED');
+  }
   return (await getDocRow(db, id))!;
 }
 
@@ -279,14 +403,24 @@ export interface SaveInput {
   checkpoint: boolean;
 }
 
+export interface SaveOutcome {
+  row: DocRow;
+  /** True when this save withdrew a standing approval (the caller audits who). */
+  invalidated: boolean;
+}
+
 /**
  * Save a design. Refuses a stale base (VERSION_CONFLICT) and a fatal document;
  * a content change bumps the version, keeps a version row when meaningful,
  * and invalidates an approval. An AI result (`job_id`) is accepted only from a
- * succeeded, not cancelled, not yet applied job of this design — and it is
- * marked applied in the SAME batch, so a cancel can never slip between.
+ * succeeded, not cancelled, not yet applied job of this design. In the batch
+ * the job is marked applied FIRST (only while the design is at the base
+ * version), and the document write is conditional on that mark — so a cancel
+ * that lands after the check below leaves the design untouched and answers
+ * JOB_CANCELLED. Every other side effect carries the same guard (see the
+ * header), so the loser of a race writes nothing at all.
  */
-export async function saveDocument(db: D1Database, actorId: string, id: string, input: SaveInput): Promise<DocRow> {
+export async function saveDocument(db: D1Database, actorId: string, id: string, input: SaveInput): Promise<SaveOutcome> {
   const row = await requireDoc(db, id);
   if (input.base_version !== row.version) {
     throw new HttpError(409, 'This design changed since you opened it.', 'VERSION_CONFLICT', { current_version: row.version });
@@ -307,10 +441,33 @@ export async function saveDocument(db: D1Database, actorId: string, id: string, 
   }
   if (!changed) {
     if (title !== row.title) await db.prepare('UPDATE creative_documents SET title = ?, updated_by = ?, updated_at = ? WHERE id = ? AND version = ?').bind(title, actorId, now, id, row.version).run();
-    return (await getDocRow(db, id))!;
+    return { row: (await getDocRow(db, id))!, invalidated: false };
   }
   const next = row.version + 1;
-  const wasReviewed = row.status === 'approved' || row.status === 'in_review' || row.approved_version !== null;
+  const base = atVersion(id, row.version);
+  // An AI result: the job is marked applied only while the design is at the base version, and only this save's mark lets the rest through.
+  const marked: Guard | null = input.job_id
+    ? { sql: 'EXISTS (SELECT 1 FROM creative_jobs WHERE id = ? AND applied_at = ? AND applied_version = ?)', args: [input.job_id, now, next] }
+    : null;
+  const guard: Guard = marked ? { sql: `${base.sql} AND ${marked.sql}`, args: [...base.args, ...marked.args] } : base;
+  if (input.job_id) {
+    statements.push(
+      db
+        .prepare(
+          `UPDATE creative_jobs SET applied_at = ?, applied_version = ?
+            WHERE id = ? AND status = 'succeeded' AND applied_at IS NULL AND (document_id IS NULL OR document_id = ?) AND ${base.sql}`
+        )
+        .bind(now, next, input.job_id, id, ...base.args)
+    );
+  }
+  const last = await db.prepare('SELECT MAX(created_at) AS at FROM creative_document_versions WHERE document_id = ?').bind(id).first<{ at: string | null }>();
+  const stale = !last?.at || Date.parse(now) - Date.parse(last.at) >= CHECKPOINT_AFTER_MS;
+  if (MEANINGFUL.has(input.origin) || input.checkpoint || stale || input.job_id) {
+    statements.push(versionStatement(db, id, next, content, input.origin, input.change_summary, input.job_id, actorId, now, guard));
+    statements.push(pruneStatement(db, id, guard));
+  }
+  // Always: an approval committed after the read above is withdrawn too (a no-op when nothing is approved).
+  const invalidateAt = statements.push(invalidateStatement(db, id, 'content_changed', now, guard)) - 1;
   statements.push(
     db
       .prepare(
@@ -318,28 +475,21 @@ export async function saveDocument(db: D1Database, actorId: string, id: string, 
             SET content_json = ?, version = ?, title = ?, format_id = ?, width = ?, height = ?, product_id = ?, template_id = ?, brand_version = ?,
                 status = CASE WHEN status IN ('approved', 'in_review') THEN 'draft' ELSE status END,
                 approved_version = NULL, updated_by = ?, updated_at = ?
-          WHERE id = ? AND version = ?`
+          WHERE id = ? AND version = ?${marked ? ` AND ${marked.sql}` : ''}`
       )
-      .bind(content, next, title, doc.format.id, doc.format.width, doc.format.height, mainProduct(doc), doc.template?.id ?? null, doc.brand_version, actorId, now, id, row.version)
+      .bind(content, next, title, doc.format.id, doc.format.width, doc.format.height, mainProduct(doc), doc.template?.id ?? null, doc.brand_version, actorId, now, id, row.version, ...(marked?.args ?? []))
   );
-  if (wasReviewed) statements.push(...invalidateStatements(db, id, 'content_changed', now));
-  const last = await db.prepare('SELECT MAX(created_at) AS at FROM creative_document_versions WHERE document_id = ?').bind(id).first<{ at: string | null }>();
-  const stale = !last?.at || Date.parse(now) - Date.parse(last.at) >= CHECKPOINT_AFTER_MS;
-  if (MEANINGFUL.has(input.origin) || input.checkpoint || stale || input.job_id) {
-    statements.push(versionStatement(db, id, next, content, input.origin, input.change_summary, input.job_id, actorId, now));
-    statements.push(pruneStatement(db, id));
-  }
-  if (input.job_id) {
-    statements.push(
-      db.prepare(`UPDATE creative_jobs SET applied_at = ?, applied_version = ? WHERE id = ? AND status = 'succeeded' AND applied_at IS NULL`).bind(now, next, input.job_id)
-    );
-  }
   const results = await db.batch(statements);
-  if ((results[0]?.meta?.changes ?? 0) !== 1) {
+  if ((results[results.length - 1]?.meta?.changes ?? 0) !== 1) {
     const current = await getDocRow(db, id);
+    if (input.job_id) {
+      const job = await db.prepare('SELECT status, applied_at FROM creative_jobs WHERE id = ?').bind(input.job_id).first<{ status: string; applied_at: string | null }>();
+      if (job?.status === 'cancelled') throw new HttpError(409, 'This job was cancelled; its result is never applied.', 'JOB_CANCELLED');
+      if (current?.version === row.version && job?.applied_at) throw new HttpError(409, 'This result was already applied.', 'JOB_ALREADY_APPLIED');
+    }
     throw new HttpError(409, 'This design changed since you opened it.', 'VERSION_CONFLICT', { current_version: current?.version ?? null });
   }
-  return (await getDocRow(db, id))!;
+  return { row: (await getDocRow(db, id))!, invalidated: (results[invalidateAt]?.meta?.changes ?? 0) > 0 };
 }
 
 /**
@@ -353,7 +503,7 @@ export async function renameDocument(db: D1Database, actorId: string, id: string
   return (await getDocRow(db, id))!;
 }
 
-export async function restoreDocument(db: D1Database, actorId: string, id: string, version: number, baseVersion: number): Promise<DocRow> {
+export async function restoreDocument(db: D1Database, actorId: string, id: string, version: number, baseVersion: number): Promise<SaveOutcome> {
   const row = await requireDoc(db, id);
   if (baseVersion !== row.version) throw new HttpError(409, 'This design changed since you opened it.', 'VERSION_CONFLICT', { current_version: row.version });
   const v = await db.prepare('SELECT content_json FROM creative_document_versions WHERE document_id = ? AND version = ?').bind(id, version).first<{ content_json: string }>();
@@ -385,25 +535,38 @@ const TRANSITIONS: Readonly<Record<string, readonly DocStatus[]>> = {
   published: ['archived'],
 };
 
-export async function setStatus(db: D1Database, actorId: string, id: string, status: 'draft' | 'in_review' | 'archived', baseVersion: number): Promise<DocRow> {
+/**
+ * Move a design between draft, in review and archived. Answers the status it
+ * came `from` and whether an approval was withdrawn, so the route audits who
+ * did it (spec §32). The status must still be what was read: a write that
+ * loses a race is VERSION_CONFLICT and leaves no trace.
+ */
+export async function setStatus(db: D1Database, actorId: string, id: string, status: 'draft' | 'in_review' | 'archived', baseVersion: number): Promise<{ row: DocRow; from: DocStatus; invalidated: boolean }> {
   const row = await requireDoc(db, id);
   if (baseVersion !== row.version) throw new HttpError(409, 'This design changed since you opened it.', 'VERSION_CONFLICT', { current_version: row.version });
-  if (row.status === status) return row;
+  if (row.status === status) return { row, from: row.status, invalidated: false };
   if (!(TRANSITIONS[row.status] ?? []).includes(status)) throw badRequest(`A ${row.status} design cannot become ${status}`, 'INVALID_INPUT');
   const now = nowIso();
-  const statements: D1PreparedStatement[] = [
+  const guard: Guard = { sql: 'EXISTS (SELECT 1 FROM creative_documents WHERE id = ? AND version = ? AND status = ?)', args: [id, row.version, row.status] };
+  const statements: D1PreparedStatement[] = [];
+  // Taking an approved design back to draft withdraws its approval, on the record.
+  const withdraws = row.status === 'approved' && status === 'draft';
+  if (withdraws) statements.push(invalidateStatement(db, id, 'withdrawn', now, guard));
+  statements.push(
     db
       .prepare(
         `UPDATE creative_documents SET status = ?, archived_at = CASE WHEN ? = 'archived' THEN ? ELSE NULL END,
                 approved_version = CASE WHEN ? = 'archived' THEN approved_version ELSE NULL END, updated_by = ?, updated_at = ?
-          WHERE id = ? AND version = ?`
+          WHERE id = ? AND version = ? AND status = ?`
       )
-      .bind(status, status, now, status, actorId, now, id, row.version),
-  ];
-  // Taking an approved design back to draft withdraws its approval, on the record.
-  if (row.status === 'approved' && status === 'draft') statements.push(...invalidateStatements(db, id, 'withdrawn', now));
-  await db.batch(statements);
-  return (await getDocRow(db, id))!;
+      .bind(status, status, now, status, actorId, now, id, row.version, row.status)
+  );
+  const results = await db.batch(statements);
+  if ((results[results.length - 1]?.meta?.changes ?? 0) !== 1) {
+    const current = await getDocRow(db, id);
+    throw new HttpError(409, 'This design changed since you opened it.', 'VERSION_CONFLICT', { current_version: current?.version ?? null });
+  }
+  return { row: (await getDocRow(db, id))!, from: row.status, invalidated: withdraws && (results[0]?.meta?.changes ?? 0) > 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -485,6 +648,8 @@ export interface Verification {
   blocking: SnapshotChange[];
   claims: Record<string, ClaimState>;
   brand: BrandKit;
+  /** A bound product has a live PUBLIC offer in the store NOW (fresh data, never the bound snapshot). */
+  offerLive: boolean;
 }
 
 /** Does the design show a bound price / availability? (A change to a field it does not show does not block.) */
@@ -503,22 +668,164 @@ export async function verifyDocument(db: D1Database, doc: CreativeDocument): Pro
   const bound = await getSnapshots(db, doc.products.map((p) => p.snapshot_id));
   const snapshots: Verification['snapshots'] = {};
   const changes: Verification['changes'] = {};
+  let offerLive = false;
   for (const b of doc.products) {
     const snap = bound.get(b.snapshot_id);
     if (!snap) continue;
     snapshots[b.slot] = { id: snap.id, data: snap.data, source: snap.source };
     const fresh = await buildSnapshotData(db, b.product_id, b.variant_key);
     changes[b.slot] = compareSnapshots(snap.data, fresh);
+    if (fresh && fresh.price.offer !== null) offerLive = true;
   }
   const blocking = [...new Set(Object.values(changes).flatMap((c) => blockingChanges(c, shows(doc))))];
   const claimsMap = await approvedClaims(db, doc.services.map((s) => s.claim_id));
   const claims: Record<string, ClaimState> = {};
   for (const [id, c] of claimsMap) claims[id] = c;
-  return { snapshots, changes, blocking, claims, brand: await brandForDocument(db, doc.brand_version) };
+  return { snapshots, changes, blocking, claims, brand: await brandForDocument(db, doc.brand_version), offerLive };
 }
 
 export function serverReport(doc: CreativeDocument, v: Verification, final: boolean): QualityReport {
   return qualityReport(doc, { brand: v.brand, snapshots: v.snapshots, claims: v.claims, verification: v.changes, final, now: nowIso() });
+}
+
+/**
+ * A blocker only the Worker can find — it reads the store now and the asset
+ * library — in the shape of a QualityIssue:
+ *   unsupported_claim   a visible free text layer, the caption or the alt text
+ *                       claims a discount or a limited time (`claimsIn`) while
+ *                       no bound product has a live public offer NOW
+ *   asset_not_approved  a visible picture is a studio asset (or logo) that is
+ *                       not approved — waiting for review, rejected, deleted
+ *                       or unknown (`detail` says which)
+ */
+export type ServerIssue = Omit<QualityIssue, 'code'> & { code: QualityIssue['code'] | 'unsupported_claim' | 'asset_not_approved' };
+
+const OFFER_CLAIMS = new Set(['discount', 'limited_time']);
+
+/** Words that promise an offer, with no live offer behind them (spec §9, §25): the edit-time evidence may be weeks old. */
+export function offerClaimIssues(doc: CreativeDocument, offerLive: boolean): ServerIssue[] {
+  if (offerLive) return [];
+  const kinds = (text: string) => claimsIn(text).filter((k) => OFFER_CLAIMS.has(k));
+  const out: ServerIssue[] = [];
+  for (const l of doc.layers) {
+    if (!l.visible || l.type !== 'text' || l.source.kind !== 'free') continue;
+    const k = kinds(l.text);
+    if (k.length) out.push({ code: 'unsupported_claim', severity: 'blocker', layer_ids: [l.id], detail: k.join(',') });
+  }
+  for (const [field, text] of [['caption', doc.caption], ['alt_text', doc.alt_text]] as const) {
+    const k = kinds(text);
+    if (k.length) out.push({ code: 'unsupported_claim', severity: 'blocker', layer_ids: [], detail: `${field}:${k.join(',')}` });
+  }
+  return out;
+}
+
+/** Visible pictures from the studio library that nobody approved (spec §6, §13): only an approved asset reaches a final file. */
+async function assetIssues(db: D1Database, doc: CreativeDocument): Promise<ServerIssue[]> {
+  const layers = doc.layers.filter((l) => l.visible && l.type === 'image' && (l.asset.kind === 'asset' || (l.asset.kind === 'logo' && l.asset.ref !== 'site')));
+  if (!layers.length) return [];
+  const { results } = await db
+    .prepare('SELECT id, review, deleted_at FROM creative_assets WHERE id IN (SELECT value FROM json_each(?))')
+    .bind(JSON.stringify([...new Set(layers.map((l) => (l.type === 'image' ? l.asset.ref : '')))]))
+    .all<{ id: string; review: string; deleted_at: string | null }>();
+  const state = new Map((results ?? []).map((r) => [r.id, r.deleted_at ? 'deleted' : r.review]));
+  return layers.flatMap((l) => {
+    const s = l.type === 'image' ? state.get(l.asset.ref) ?? 'unknown' : 'unknown';
+    return s === 'approved' ? [] : [{ code: 'asset_not_approved' as const, severity: 'blocker' as const, layer_ids: [l.id], detail: s }];
+  });
+}
+
+/** Every blocker the Worker finds at approval or a final export: the report's, then the store's and the library's. */
+export async function serverBlockers(db: D1Database, doc: CreativeDocument, v: Verification, report: QualityReport): Promise<ServerIssue[]> {
+  return [...report.issues.filter((i) => i.severity === 'blocker'), ...offerClaimIssues(doc, v.offerLive), ...(await assetIssues(db, doc))];
+}
+
+// ---------------------------------------------------------------------------
+// Stale after release — `needs_review` (spec §25, acceptance 12)
+// ---------------------------------------------------------------------------
+
+/** A design that left the studio: approved, or exported final (any version) — and not archived. */
+const RELEASED = `archived_at IS NULL AND (approved_version IS NOT NULL OR EXISTS (SELECT 1 FROM creative_exports e WHERE e.document_id = creative_documents.id AND e.final = 1))`;
+
+/** The change codes that make a released design stale: what blocks it now, and an offer claim whose offer is gone. */
+export function staleCodes(doc: CreativeDocument, v: Verification): string[] {
+  return [...new Set<string>([...v.blocking, ...(offerClaimIssues(doc, v.offerLive).length ? ['offer_changed'] : [])])];
+}
+
+/** Add `code` to a released design's needs_review once; nothing else moves (not the content, not updated_at). */
+function markStatement(db: D1Database, documentId: string, code: string): D1PreparedStatement {
+  const list = `CASE WHEN json_valid(needs_review_json) AND json_type(needs_review_json) = 'array' THEN needs_review_json ELSE '[]' END`;
+  return db
+    .prepare(
+      `UPDATE creative_documents SET needs_review_json = json_insert(${list}, '$[#]', ?)
+        WHERE id = ? AND ${RELEASED} AND NOT EXISTS (SELECT 1 FROM json_each(${list}) n WHERE n.value = ?)`
+    )
+    .bind(code, documentId, code);
+}
+
+/** Mark one design (when it is released). True when a code was added. */
+export async function markNeedsReview(db: D1Database, documentId: string, codes: readonly string[]): Promise<boolean> {
+  if (!codes.length) return false;
+  const results = await db.batch(codes.map((code) => markStatement(db, documentId, code)));
+  return results.some((r) => (r.meta?.changes ?? 0) > 0);
+}
+
+/**
+ * The catalogue watch saw these products' card change (codes per product id):
+ * the statements that mark every released design binding one of them.
+ */
+export async function staleStatementsForProducts(db: D1Database, byProduct: ReadonlyMap<string, readonly string[]>): Promise<D1PreparedStatement[]> {
+  if (!byProduct.size) return [];
+  const { results } = await db
+    .prepare(
+      `SELECT DISTINCT creative_documents.id AS id, json_extract(p.value, '$.product_id') AS product_id
+         FROM creative_documents, json_each(creative_documents.content_json, '$.products') p
+        WHERE ${RELEASED} AND json_extract(p.value, '$.product_id') IN (SELECT value FROM json_each(?))
+        LIMIT 400`
+    )
+    .bind(JSON.stringify([...byProduct.keys()]))
+    .all<{ id: string; product_id: string }>();
+  const pairs = new Set<string>();
+  for (const r of results ?? []) for (const code of byProduct.get(r.product_id) ?? []) pairs.add(JSON.stringify([r.id, code]));
+  return [...pairs].map((p) => {
+    const [id, code] = JSON.parse(p) as [string, string];
+    return markStatement(db, id, code);
+  });
+}
+
+/** A snapshot was re-verified with these changes: mark the released designs bound to it for what each one SHOWS. */
+export async function markForSnapshot(db: D1Database, snapshotId: string, changes: readonly SnapshotChange[]): Promise<void> {
+  if (!changes.length) return;
+  const { results } = await db
+    .prepare(
+      `SELECT id, content_json FROM creative_documents
+        WHERE ${RELEASED} AND EXISTS (SELECT 1 FROM json_each(creative_documents.content_json, '$.products') p WHERE json_extract(p.value, '$.snapshot_id') = ?)
+        LIMIT 100`
+    )
+    .bind(snapshotId)
+    .all<{ id: string; content_json: string }>();
+  const statements = (results ?? []).flatMap((r) => blockingChanges(changes, shows(readContent(r).doc)).map((code) => markStatement(db, r.id, code)));
+  if (statements.length) await db.batch(statements);
+}
+
+/**
+ * Opening a released design re-verifies it, so the editor and the archive say
+ * «needs review» as soon as anyone looks — not only after the next approval
+ * or watch pass. It costs one store read per bound product, and only for an
+ * approved or final-exported design; a draft is checked at approval as
+ * before. A failure here never stops the design from opening.
+ */
+export async function recheckReleased(db: D1Database, row: DocRow): Promise<DocRow> {
+  if (row.archived_at) return row;
+  try {
+    if (row.approved_version === null && !(await db.prepare('SELECT 1 FROM creative_exports WHERE document_id = ? AND final = 1 LIMIT 1').bind(row.id).first())) return row;
+    const { doc, ok } = readContent(row);
+    if (!ok) return row;
+    const v = await verifyDocument(db, doc);
+    if (await markNeedsReview(db, row.id, staleCodes(doc, v))) return (await getDocRow(db, row.id)) ?? row;
+  } catch {
+    console.error('creative studio: the open-time re-verification failed');
+  }
+  return row;
 }
 
 /** The client's blockers from checks the Worker cannot run (text fit, fonts, pictures) — they can only ADD blockers. */
@@ -542,12 +849,14 @@ export async function approveDocument(db: D1Database, actorId: string, id: strin
   const { doc, ok } = readContent(row);
   if (!ok) throw new HttpError(400, 'The stored design no longer passes the document checks.', 'INVALID_DOCUMENT');
   const v = await verifyDocument(db, doc);
+  // A released design (approved before, or exported final) that is stale now is marked, whatever this attempt's answer.
+  await markNeedsReview(db, id, staleCodes(doc, v));
   if (v.blocking.length) {
     throw new HttpError(409, 'The store data this design shows has changed; review it before approving.', 'SOURCE_CHANGED', { changes: v.blocking, by_slot: v.changes });
   }
   const report = serverReport(doc, v, true);
   const extra = clientBlockers(req.qa);
-  const blockers = [...report.issues.filter((i) => i.severity === 'blocker'), ...extra];
+  const blockers = [...(await serverBlockers(db, doc, v, report)), ...extra];
   if (blockers.length) throw new HttpError(409, 'The design has quality blockers.', 'QA_BLOCKERS', { issues: blockers.slice(0, 30) });
   const exportIds = [...new Set((req.export_ids ?? []).filter((x): x is string => typeof x === 'string'))].slice(0, 20);
   if (exportIds.length) {
@@ -560,18 +869,22 @@ export async function approveDocument(db: D1Database, actorId: string, id: strin
   const now = nowIso();
   const reviewId = newId('crev');
   const qaRecord = { server: report, client_blockers: extra.length, client_ran: Array.isArray((req.qa as { ran?: unknown })?.ran) ? (req.qa as { ran: unknown[] }).ran.slice(0, 12) : [] };
+  // The approved version enters the history and the review is recorded only while the design is still
+  // at this version and not archived; both run before the fenced UPDATE (see the header).
   const results = await db.batch([
-    db
-      .prepare(`UPDATE creative_documents SET status = 'approved', approved_version = ?, needs_review_json = '[]', updated_by = ?, updated_at = ? WHERE id = ? AND version = ?`)
-      .bind(row.version, actorId, now, id, row.version),
+    keepVersionStatement(db, id, row.version, 'approved', actorId, now),
     db
       .prepare(
         `INSERT INTO creative_reviews (id, document_id, version, decision, reasons_json, note, brand_version, export_ids_json, qa_json, actor_id, created_at)
-         VALUES (?, ?, ?, 'approved', '[]', '', ?, ?, ?, ?, ?)`
+         SELECT ?, ?, ?, 'approved', '[]', '', ?, ?, ?, ?, ?
+          WHERE EXISTS (SELECT 1 FROM creative_documents WHERE id = ? AND version = ? AND status <> 'archived')`
       )
-      .bind(reviewId, id, row.version, doc.brand_version, JSON.stringify(exportIds), JSON.stringify(qaRecord), actorId, now),
+      .bind(reviewId, id, row.version, doc.brand_version, JSON.stringify(exportIds), JSON.stringify(qaRecord), actorId, now, id, row.version),
+    db
+      .prepare(`UPDATE creative_documents SET status = 'approved', approved_version = ?, needs_review_json = '[]', updated_by = ?, updated_at = ? WHERE id = ? AND version = ? AND status <> 'archived'`)
+      .bind(row.version, actorId, now, id, row.version),
   ]);
-  if ((results[0]?.meta?.changes ?? 0) !== 1) throw new HttpError(409, 'The design changed while it was being approved.', 'APPROVAL_STALE');
+  if ((results[2]?.meta?.changes ?? 0) !== 1) throw new HttpError(409, 'The design changed while it was being approved.', 'APPROVAL_STALE');
   const review = (await reviews(db, id)).find((r) => r.id === reviewId)!;
   return { row: (await getDocRow(db, id))!, review, qa: report };
 }
@@ -597,7 +910,7 @@ export async function rejectDocument(db: D1Database, actorId: string, id: string
       .prepare(`UPDATE creative_documents SET status = CASE WHEN status IN ('approved', 'in_review') THEN 'draft' ELSE status END, approved_version = NULL, updated_at = ? WHERE id = ?`)
       .bind(now, id),
   ];
-  if (row.approved_version !== null || row.status === 'approved') statements.push(...invalidateStatements(db, id, 'rejected', now));
+  if (row.approved_version !== null || row.status === 'approved') statements.push(invalidateStatement(db, id, 'rejected', now));
   await db.batch(statements);
   const review = (await reviews(db, id)).find((r) => r.id === reviewId)!;
   return { row: (await getDocRow(db, id))!, review };

@@ -12,12 +12,48 @@
  * can never put an unregistered font or a non-hex colour in front of the
  * editor.
  */
-import type { BrandDto, BrandVersionDto } from '../../../packages/creativeDoc/src/api';
+import type { BrandDto, BrandVersionDto, BrandVersionResponse } from '../../../packages/creativeDoc/src/api';
 import { defaultBrandKit, normalizeBrandKit, type BrandKit } from '../../../packages/creativeDoc/src/brand';
+import { rasterDimensions, validRasterDimensions } from '../imageMetadata';
+import { getMediaObject } from '../mediaStorage';
+import type { Env } from '../types';
 import { isMissingSchema, namesOf, nowIso } from './db';
 
-/** The site's master logo (src/lib/siteLogo.ts: 1254×1254 WebP), drawn as `{kind:'logo', ref:'site'}`. */
+/**
+ * The site's master logo as last recorded (src/lib/siteLogo.ts: the 1254×1254
+ * WebP of September 2026), drawn as `{kind:'logo', ref:'site'}`. The fallback
+ * only: `siteLogoSize` reads the real object's header.
+ */
 export const SITE_LOGO = Object.freeze({ width: 1254, height: 1254 });
+
+/** The R2 key of the site logo — mirrored from `SITE_LOGO_KEY` in src/lib/siteLogo.ts (the Worker cannot import src/; tests hold the two together). */
+export const SITE_LOGO_OBJECT_KEY = 'UiUx/Logo/Logo.webp';
+
+type LogoEnv = Pick<Env, 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE'>;
+
+/**
+ * THE SITE LOGO'S REAL SIZE, from the object the site serves. The owner
+ * replaces `UiUx/Logo/Logo.webp` in place (src/lib/siteLogo.ts), so a size
+ * written in code goes stale the day the mark changes, and a logo placed with
+ * the wrong ratio is drawn squashed. The first 64 bytes (one ranged R2 read)
+ * carry a WebP's or PNG's size; anything unreadable — no bucket, no object, a
+ * header this does not parse — answers the recorded `SITE_LOGO`. Never throws.
+ */
+export async function siteLogoSize(env: LogoEnv): Promise<{ width: number; height: number }> {
+  try {
+    const obj = await getMediaObject(env, 'public', SITE_LOGO_OBJECT_KEY, { range: { offset: 0, length: 64 } });
+    if (obj) {
+      const bytes = new Uint8Array(await obj.arrayBuffer());
+      const riff = bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP';
+      const png = bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+      const size = riff ? rasterDimensions(bytes, 'image/webp') : png ? rasterDimensions(bytes, 'image/png') : null;
+      if (validRasterDimensions(size)) return { width: size.width, height: size.height };
+    }
+  } catch {
+    console.error('creative studio: the site logo header could not be read');
+  }
+  return { ...SITE_LOGO };
+}
 
 interface BrandRow {
   version: number;
@@ -59,6 +95,13 @@ export async function brandForDocument(db: D1Database, version: number | null): 
     if (row) return kitOf(row.kit_json);
   }
   return (await currentBrand(db)).kit;
+}
+
+/** One saved version and its kit — a pending one too, so it can be viewed before it is approved. Null when it does not exist. */
+export async function brandVersion(db: D1Database, version: number): Promise<BrandVersionResponse | null> {
+  const row = await db.prepare('SELECT * FROM creative_brand_versions WHERE version = ?').bind(version).first<BrandRow>();
+  if (!row) return null;
+  return { version: versionDto(row, await namesOf(db, [row.created_by])), kit: kitOf(row.kit_json) };
 }
 
 export async function brandVersions(db: D1Database): Promise<BrandVersionDto[]> {

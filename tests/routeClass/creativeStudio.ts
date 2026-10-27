@@ -58,6 +58,7 @@ export default {
         // Brand
         'GET /brand': 'op',
         'GET /brand/versions': 'op',
+        'GET /brand/versions/:version': 'op',
         'POST /brand/versions': OWNER,
         'POST /brand/versions/:version/approve': OWNER,
         // Claims

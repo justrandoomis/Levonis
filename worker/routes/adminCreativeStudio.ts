@@ -32,6 +32,7 @@ import { isOwner, isUnverifiedOwner, normalizeAdminScope } from '../lib/adminSco
 import { limitByMethod } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { newId } from '../lib/crypto';
+import { deleteMediaObject } from '../lib/mediaStorage';
 import {
   CREATIVE_API, type AiTask, type AssetDto, type AssetKind, type ComposeRequest, type DocKind, type DocStatus, type ExportKind, type FeedbackDto,
   type IdeaRecordDto, type ModelDto, type ProviderStatusDto, type RejectReason, type UsageRecordDto, type VersionOrigin,
@@ -48,13 +49,14 @@ import { compareSnapshots, type ProductSnapshot } from '../../packages/creativeD
 import { FAMILY_IDS, isTemplateId, isVariantId, variantsFor, type FamilyId, type TemplateId, type VariantId } from '../../packages/creativeDoc/src/templates';
 import { keyHintOf, keyState, listModels, validProviderKeyShape, type Transport } from '../lib/creative/anthropic';
 import { aiError, ensureReady, runAi } from '../lib/creative/ai';
-import { approveBrandVersion, brandVersions, currentBrand, saveBrandVersion, SITE_LOGO } from '../lib/creative/brandStore';
+import { approveBrandVersion, brandVersion, brandVersions, currentBrand, saveBrandVersion, siteLogoSize, SITE_LOGO } from '../lib/creative/brandStore';
 import { budgetLeft, imageTokenAllowance, lastDays, usageTotals } from '../lib/creative/budget';
 import { approveClaim, approvedClaims, claimExists, claimInput, claimIsCurrent, claimText, createClaim, documentsUsingClaim, listClaims, reviseClaim } from '../lib/creative/claims';
 import { intOrNull, isMissingSchema, namesOf, nowIso, readOr, schemaMissing, stringList, studioInstalled, writeOr503 } from '../lib/creative/db';
 import {
-  REJECT_REASONS, approveDocument, createDocument, documentDto, duplicateDocument, exportDto, exportsOf, getDocRow, listDocuments, readContent, rejectDocument,
-  requireDoc, renameDocument, restoreDocument, reviews, saveDocument, serverReport, setStatus, summaries, verifyDocument, versionContent, versions, type DocRow, type ExportRow,
+  REJECT_REASONS, approveDocument, createDocument, documentDto, duplicateDocument, exportDto, exportsOf, getDocRow, keepVersionStatement, listDocuments, markForSnapshot,
+  markNeedsReview, readContent, recheckReleased, rejectDocument, requireDoc, renameDocument, restoreDocument, reviews, saveDocument, serverBlockers, serverReport,
+  setStatus, staleCodes, summaries, verifyDocument, versionContent, versions, type DocRow, type ExportRow,
 } from '../lib/creative/documents';
 import { MAX_FILE_BYTES, MAX_PROJECT_JSON_BYTES, assertDeclaredSize, putStudioFile, sha256OfBytes, sniffStudioImage, streamStudioFile, tooLarge, unsupported } from '../lib/creative/files';
 import { IDEMPOTENCY_KEY, cancelJob, jobById, jobDto, markApplied } from '../lib/creative/jobs';
@@ -456,18 +458,36 @@ R.post('/snapshots/:id/verify', studio, async (c) => {
   if (!snap) throw notFound('Snapshot not found');
   const freshData = await buildSnapshotData(c.env.DB, snap.data.product_id, snap.data.variant_key);
   const fresh: ProductSnapshot | null = freshData ? await storeSnapshot(c.env.DB, freshData, 'live', actorOf(c)) : null;
-  return ok(c, { snapshot_id: id, fresh, changes: compareSnapshots(snap.data, freshData) });
+  const changes = compareSnapshots(snap.data, freshData);
+  // An approved or final-exported design bound to this snapshot is marked for what it shows (spec §25).
+  await markForSnapshot(c.env.DB, id, changes);
+  return ok(c, { snapshot_id: id, fresh, changes });
 });
 
 // ---------------------------------------------------------------------------
 // Brand
 // ---------------------------------------------------------------------------
 
-R.get('/brand', studio, async (c) => ok(c, await currentBrand(c.env.DB)));
+/** The kit in force, with the site logo's size read from the file the site serves (brandStore.ts `siteLogoSize`). */
+async function brandNow(c: Context<AppContext>) {
+  const [brand, siteLogo] = await Promise.all([currentBrand(c.env.DB), siteLogoSize(c.env)]);
+  return { ...brand, site_logo: siteLogo };
+}
+
+R.get('/brand', studio, async (c) => ok(c, await brandNow(c)));
 
 R.get('/brand/versions', studio, async (c) => {
   const list = await readOr(async () => ({ migrated: true, versions: await brandVersions(c.env.DB) }), { migrated: false, versions: [] });
   return ok(c, list);
+});
+
+/** One version and its kit (a pending one can be viewed before approval); 404 when it does not exist, as on a database without 0215. */
+R.get('/brand/versions/:version', studio, async (c) => {
+  const version = Number(c.req.param('version'));
+  if (!Number.isInteger(version) || version < 1) throw notFound();
+  const out = await readOr(() => brandVersion(c.env.DB, version), null);
+  if (!out) throw notFound('Brand version not found');
+  return ok(c, out);
 });
 
 R.post('/brand/versions', requireOwner, async (c) => {
@@ -477,7 +497,7 @@ R.post('/brand/versions', requireOwner, async (c) => {
   const note = str(body.note, 'note', { max: 300, required: false });
   const saved = await writeOr503(() => saveBrandVersion(c.env.DB, actorOf(c), n.kit, note, boolOf(body.approve)));
   await audit(c.env.DB, actorOf(c), 'creative.brand.saved', String(saved.version), { status: saved.status });
-  return ok(c, { saved, brand: await currentBrand(c.env.DB) }, 201);
+  return ok(c, { saved, brand: await brandNow(c) }, 201);
 });
 
 R.post('/brand/versions/:version/approve', requireOwner, async (c) => {
@@ -486,7 +506,7 @@ R.post('/brand/versions/:version/approve', requireOwner, async (c) => {
   const saved = await writeOr503(() => approveBrandVersion(c.env.DB, actorOf(c), version));
   if (!saved) throw notFound('Brand version not found');
   await audit(c.env.DB, actorOf(c), 'creative.brand.approved', String(version), {});
-  return ok(c, { saved, brand: await currentBrand(c.env.DB) });
+  return ok(c, { saved, brand: await brandNow(c) });
 });
 
 // ---------------------------------------------------------------------------
@@ -603,12 +623,15 @@ R.post('/assets', studio, async (c) => {
   const sha = await sha256OfBytes(bytes);
   const key = await putStudioFile(c.env, { entityId: 'assets', kind, objectId: id, ext: img.ext }, bytes, { mime: img.mime, width: img.width, height: img.height, ownerId: actorOf(c) });
   const now = nowIso();
+  // The owner's own upload is approved at once; a full admin's waits for a reviewer's verdict (PATCH below) — and until
+  // then it is offered neither to a design nor to Claude, and blocks an approval or a final export (spec §6, §13).
+  const review: AssetDto['review'] = canManage(c) ? 'approved' : 'needs_review';
   await c.env.DB
     .prepare(
       `INSERT INTO creative_assets (id, kind, label, r2_key, mime, bytes, width, height, sha256, provenance, product_id, review, note, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'uploaded', ?, 'approved', ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'uploaded', ?, ?, ?, ?, ?)`
     )
-    .bind(id, kind, label, key, img.mime, bytes.byteLength, img.width, img.height, sha, productId, note, actorOf(c), now)
+    .bind(id, kind, label, key, img.mime, bytes.byteLength, img.width, img.height, sha, productId, review, note, actorOf(c), now)
     .run();
   const row = (await c.env.DB.prepare('SELECT * FROM creative_assets WHERE id = ?').bind(id).first<AssetRow>())!;
   return ok(c, { asset: assetDto(row) }, 201);
@@ -689,6 +712,7 @@ R.delete('/assets/:id', studio, async (c) => {
 const DOC_STATUSES: readonly DocStatus[] = ['idea', 'draft', 'in_review', 'approved', 'scheduled', 'published', 'archived', 'failed'];
 const DOC_KINDS: readonly DocKind[] = ['post', 'slide', 'experiment'];
 const ORIGINS: readonly VersionOrigin[] = ['manual', 'ai', 'template', 'restore', 'relayout', 'import'];
+const CREATE_ORIGINS = ['manual', 'ai', 'template', 'relayout', 'import'] as const;
 
 R.get('/documents', studio, async (c) => {
   const q = c.req.query();
@@ -716,14 +740,21 @@ R.post('/documents', studio, async (c) => {
   const parentId = typeof body.parent_id === 'string' && ID.test(body.parent_id) ? body.parent_id : null;
   const key = body.idempotency_key === undefined || body.idempotency_key === null ? null : idemKey(body.idempotency_key);
   if (body.content === undefined) throw badRequest('content is required', 'INVALID_INPUT');
-  const row = await writeOr503(() => createDocument(c.env.DB, actorOf(c), { title, content: body.content, kind, campaign_id: campaignId, parent_id: parentId, idempotency_key: key }));
+  // How the design came to be (version 1's origin); a restore is never a creation.
+  const origin = body.origin === undefined || body.origin === null ? null : oneOf(body.origin, 'origin', CREATE_ORIGINS);
+  const jobId = typeof body.job_id === 'string' && body.job_id ? body.job_id : null;
+  if (jobId !== null && !ID.test(jobId)) throw badRequest('job_id is malformed', 'INVALID_INPUT');
+  const row = await writeOr503(() =>
+    createDocument(c.env.DB, actorOf(c), { title, content: body.content, kind, campaign_id: campaignId, parent_id: parentId, idempotency_key: key, origin, job_id: jobId })
+  );
   return ok(c, { document: await documentDto(c.env.DB, row) }, 201);
 });
 
+/** Opening an approved or final-exported design re-verifies it, so a stale one says so at once (documents.ts `recheckReleased`). */
 R.get('/documents/:id', studio, async (c) => {
   const row = await readOr(() => getDocRow(c.env.DB, idParam(c)), null);
   if (!row) throw notFound('Design not found');
-  return ok(c, { document: await documentDto(c.env.DB, row) });
+  return ok(c, { document: await documentDto(c.env.DB, await recheckReleased(c.env.DB, row)) });
 });
 
 R.put('/documents/:id', studio, async (c) => {
@@ -735,13 +766,15 @@ R.put('/documents/:id', studio, async (c) => {
   const jobId = typeof body.job_id === 'string' && body.job_id ? body.job_id : null;
   if (jobId !== null && !ID.test(jobId)) throw badRequest('job_id is malformed', 'INVALID_INPUT');
   const title = body.title === undefined || body.title === null ? null : str(body.title, 'title', { max: 120, required: false });
-  const row = await writeOr503(() =>
+  const out = await writeOr503(() =>
     saveDocument(c.env.DB, actorOf(c), id, {
       base_version: base, content: body.content, title, change_summary: str(body.change_summary, 'change_summary', { max: 300, required: false }),
       origin, job_id: jobId, checkpoint: boolOf(body.checkpoint),
     })
   );
-  return ok(c, { document: await documentDto(c.env.DB, row) });
+  // Who withdrew an approval is on the record (spec §32).
+  if (out.invalidated) await audit(c.env.DB, actorOf(c), 'creative.document.approval_invalidated', id, { version: out.row.version, reason: 'content_changed' });
+  return ok(c, { document: await documentDto(c.env.DB, out.row) });
 });
 
 /** A rename only: no new version, no base version, an approval stands (worker/lib/creative/documents.ts `renameDocument`). */
@@ -769,11 +802,14 @@ R.get('/documents/:id/versions/:version', studio, async (c) => {
 });
 
 R.post('/documents/:id/restore', studio, async (c) => {
+  const id = idParam(c);
   const body = await bodyOf(c);
-  const row = await writeOr503(() =>
-    restoreDocument(c.env.DB, actorOf(c), idParam(c), int(body.version, 'version', { min: 1 }), int(body.base_version, 'base_version', { min: 1 }))
-  );
-  return ok(c, { document: await documentDto(c.env.DB, row) });
+  const restored = int(body.version, 'version', { min: 1 });
+  const out = await writeOr503(() => restoreDocument(c.env.DB, actorOf(c), id, restored, int(body.base_version, 'base_version', { min: 1 })));
+  if (out.invalidated) {
+    await audit(c.env.DB, actorOf(c), 'creative.document.approval_invalidated', id, { version: out.row.version, reason: 'content_changed', restored_from: restored });
+  }
+  return ok(c, { document: await documentDto(c.env.DB, out.row) });
 });
 
 R.post('/documents/:id/duplicate', studio, async (c) => {
@@ -784,8 +820,12 @@ R.post('/documents/:id/duplicate', studio, async (c) => {
 R.post('/documents/:id/status', studio, async (c) => {
   const body = await bodyOf(c);
   const status = oneOf(body.status, 'status', ['draft', 'in_review', 'archived'] as const);
-  const row = await writeOr503(() => setStatus(c.env.DB, actorOf(c), idParam(c), status, int(body.base_version, 'base_version', { min: 1 })));
-  return ok(c, { document: await documentDto(c.env.DB, row) });
+  const id = idParam(c);
+  const out = await writeOr503(() => setStatus(c.env.DB, actorOf(c), id, status, int(body.base_version, 'base_version', { min: 1 })));
+  // Every status change, and every approval it withdraws, names who did it (spec §32).
+  if (out.from !== status) await audit(c.env.DB, actorOf(c), 'creative.document.status', id, { from: out.from, to: status, version: out.row.version });
+  if (out.invalidated) await audit(c.env.DB, actorOf(c), 'creative.document.approval_invalidated', id, { version: out.row.version, reason: 'withdrawn' });
+  return ok(c, { document: await documentDto(c.env.DB, out.row) });
 });
 
 R.post('/documents/:id/approve', studio, async (c) => {
@@ -871,9 +911,10 @@ R.post('/documents/:id/exports', studio, async (c) => {
     if (kind === 'background') throw badRequest('A background export is never final', 'INVALID_INPUT');
     // The final export re-verifies what the design SHOWS now — a restore or an old approval does not carry it past a change.
     const v = await verifyDocument(db, doc);
+    await markNeedsReview(db, id, staleCodes(doc, v));
     if (v.blocking.length) throw new HttpError(409, 'The store data this design shows has changed; review it before a final export.', 'SOURCE_CHANGED', { changes: v.blocking, by_slot: v.changes });
     const report = serverReport(doc, v, true);
-    const blockers = report.issues.filter((i) => i.severity === 'blocker');
+    const blockers = await serverBlockers(db, doc, v, report);
     if (blockers.length) throw new HttpError(409, 'The design has quality blockers.', 'QA_BLOCKERS', { issues: blockers.slice(0, 30) });
     sourceCheck = doc.products.length ? (Object.values(v.changes).some((x) => x.length) ? 'changed' : 'fresh') : 'none';
   } else if (doc.products.length) {
@@ -882,13 +923,24 @@ R.post('/documents/:id/exports', studio, async (c) => {
   const exportId = newId('cexp');
   const key = await putStudioFile(c.env, { entityId: 'exports', kind: id, objectId: exportId, ext }, bytes, { mime, width, height, ownerId: actorOf(c) });
   const now = nowIso();
-  await db
+  const insert = db
     .prepare(
       `INSERT INTO creative_exports (id, document_id, version, kind, r2_key, mime, bytes, width, height, sha256, final, source_check, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ? = 0 OR EXISTS (SELECT 1 FROM creative_documents WHERE id = ? AND version = ?)`
     )
-    .bind(exportId, id, version, kind, key, mime, bytes.byteLength, width, height, await sha256OfBytes(bytes), final ? 1 : 0, sourceCheck, actorOf(c), now)
-    .run();
+    .bind(exportId, id, version, kind, key, mime, bytes.byteLength, width, height, await sha256OfBytes(bytes), final ? 1 : 0, sourceCheck, actorOf(c), now, final ? 1 : 0, id, version);
+  if (final) {
+    // The exported version enters the history in the same batch (documents.ts `keepVersionStatement`); a design that
+    // moved on meanwhile records neither, and the file just stored is removed again.
+    const results = await db.batch([keepVersionStatement(db, id, version, 'final export', actorOf(c), now), insert]);
+    if ((results[1]?.meta?.changes ?? 0) !== 1) {
+      await deleteMediaObject(c.env, 'private', key).catch(() => undefined);
+      const current = await getDocRow(db, id);
+      throw new HttpError(409, 'Export the current version of the design.', 'STALE_VERSION', { current_version: current?.version ?? null });
+    }
+  } else {
+    await insert.run();
+  }
   const stored = (await db.prepare('SELECT * FROM creative_exports WHERE id = ?').bind(exportId).first<ExportRow>())!;
   return ok(c, { export: exportDto(stored, CREATIVE_API) }, 201);
 });

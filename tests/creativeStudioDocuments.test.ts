@@ -351,7 +351,7 @@ test('deploy-ahead: on a database without 0215 every read answers the same statu
   const ahead = await studioDb();
   const appBehind = studioApp(behind, OWNER);
   const appAhead = studioApp(ahead, OWNER);
-  const reads = ['/provider', '/usage', '/brand', '/brand/versions', '/claims', '/assets', '/documents', '/jobs', '/ideas', '/feedback', '/opportunities', '/products',
+  const reads = ['/provider', '/usage', '/brand', '/brand/versions', '/brand/versions/1', '/claims', '/assets', '/documents', '/jobs', '/ideas', '/feedback', '/opportunities', '/products',
     '/documents/cdoc_x', '/documents/cdoc_x/versions', '/documents/cdoc_x/versions/1', '/documents/cdoc_x/reviews', '/documents/cdoc_x/exports',
     '/snapshots/csnap_x', '/assets/cast_x/file', '/exports/cexp_x/file', '/claims/cclm_x/documents', '/products/p_none'];
   for (const path of reads) {
