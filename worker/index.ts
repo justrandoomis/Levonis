@@ -1416,7 +1416,7 @@ export default {
         .catch((error) => {
           console.error('scheduled request-model cache rejected:', error instanceof Error ? error.name : 'unknown');
         })
-        // LAST (DECISIONS row 270): Print Cloud's durable background work — order and
+        // LAST (DECISIONS row 271): Print Cloud's durable background work — order and
         // credit expiry, file analysis, URL imports, the scheduler, slicing leases,
         // low-balance notices, the daily reconciliation — within its own 120 of what
         // the steps above left (quarterHourPrintCloudBudget). Never throws.

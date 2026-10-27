@@ -34,7 +34,7 @@
  *      first page is sized so that a failing batch's whole descent to one
  *      request and that request's `error` mark fit (40 for 25), so a tick
  *      always moves. One indexed read when nothing is pending.
- *   8. LAST, Levonis Print Cloud's durable tasks (DECISIONS row 270, worker/
+ *   8. LAST, Levonis Print Cloud's durable tasks (DECISIONS row 271, worker/
  *      lib/printCloud/background.ts): order and credit expiry, file analysis,
  *      URL imports, the scheduler, slicing leases, low-balance notices, the
  *      daily reconciliation — its own 120, cut to what is left after the

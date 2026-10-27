@@ -12,7 +12,7 @@ implemented and what is not connected yet. The customer and admin interfaces
 are **not built** (Phase 9 of the specification is postponed); every screen the
 specification describes has its data API here.
 
-DECISIONS row 270 records the decision and its open owner questions.
+DECISIONS row 271 records the decision and its open owner questions.
 
 ---
 

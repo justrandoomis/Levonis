@@ -308,7 +308,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // What actually happened, which is what turns the estimate into a
     // calibration rather than a permanent guess (§15).
     'print_actuals', 'print_failures', 'printer_calibration_stats',
-    // 0215 — Levonis Print Cloud (docs/PRINT_CLOUD.md, DECISIONS row 270): the
+    // 0215 — Levonis Print Cloud (docs/PRINT_CLOUD.md, DECISIONS row 271): the
     // workshop's OWN printers rented to customers by the hour, with their
     // materials, files, jobs, queue and ledgers. One aggregate written only by
     // worker/lib/printCloud; it sits beside the print engine it is the
