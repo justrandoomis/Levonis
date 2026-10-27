@@ -572,6 +572,8 @@ let templateFile: string | null = null;
 let scratchDir: string | null = null;
 let copies = 0;
 const KEPT_COPIES = 16;
+/** The open copies by number: a deleted file that is still open keeps its blocks, so an old copy is CLOSED before it goes. */
+const openCopies = new Map<number, DatabaseSync>();
 export function seededCopy(): DatabaseSync {
   if (!templateFile) {
     scratchDir = mkdtempSync(join(tmpdir(), 'levonis-role-matrix-'));
@@ -592,6 +594,13 @@ export function seededCopy(): DatabaseSync {
   // a CI runner temp quota runs out (an open copy keeps its data until closed).
   if (copies > KEPT_COPIES) {
     try {
+      const old = openCopies.get(copies - KEPT_COPIES);
+      openCopies.delete(copies - KEPT_COPIES);
+      if (old?.isOpen) old.close();
+    } catch {
+      /* already closed */
+    }
+    try {
       rmSync(join(scratchDir!, `copy-${process.pid}-${copies - KEPT_COPIES}.db`), { force: true });
     } catch {
       /* best effort */
@@ -602,6 +611,7 @@ export function seededCopy(): DatabaseSync {
   resetPolicyCorpusMemo();
   const raw = new DatabaseSync(file);
   raw.exec('PRAGMA foreign_keys = ON;');
+  openCopies.set(copies, raw);
   return raw;
 }
 

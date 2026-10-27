@@ -24,7 +24,7 @@ import { inPalette, kitScale, MIN_FONT_PX, safeAreaFor, scaledSpacing, scaledTyp
 import {
   findLayer, intersects, layerBox, lockedAbove, safeBox, SCHEMA_VERSION, touchesLock, unionBox, withDescendants, contains,
   type AdLocale, type Box, type Corner, type CreativeDocument, type Density, type DocFormat, type ImageLayer, type Layer,
-  type LayerRole, type Objective, type Relation, type ShapeLayer, type TextLayer, type TextSource, BRAND_TEXT, type Gradient,
+  type LayerRole, type Objective, type Relation, type ShapeLayer, type TextLayer, type TextSource, BRAND_TEXT, type Gradient, type FontFamilyId, type FontWeight,
 } from './schema';
 import {
   localized, renderAvailability, renderPrice, type ProductSnapshot, type ServiceClaimText, type SnapshotImage,
@@ -33,7 +33,7 @@ import {
   FAMILIES, GRID_PRODUCTS, TEMPLATES, defaultCta, type BuildEvidence, type FamilyId, type ProductBlock, type StackBlock, type TemplateId,
   type TextBlock, type VariantDef, type VariantId,
 } from './templates';
-import { detectDirection, fitText, toDigits, type TextMeasurer } from './text';
+import { detectDirection, fitText, groupInteger, toDigits, type TextMeasurer } from './text';
 import { FONT_REGISTRY } from './schema';
 
 // ---------------------------------------------------------------------------
@@ -76,6 +76,7 @@ export function renderSource(source: TextSource, ctx: BindingContext): string | 
         case 'brand': return localized(s.data.brand, ctx.locale) || null;
         case 'variant': return localized(s.data.variant_label, ctx.locale) || null;
         case 'model': return modelName(s.data, ctx.locale);
+        case 'price_amount': return priceAmount(s, ctx.brand.digits);
         case 'price': return renderPrice(s, opts).text;
         case 'price_note': return renderPrice(s, opts).was;
         case 'availability': return renderAvailability(s, ctx.locale);
@@ -99,6 +100,13 @@ export function modelName(d: ProductSnapshot['data'], locale: AdLocale): string 
   const spellings = d.brand ? [...new Set([d.brand.ar, d.brand.en, d.brand.ckb].map((b) => (b ?? '').trim()).filter(Boolean))] : [];
   const lead = spellings.find((b) => name.toLowerCase().startsWith(b.toLowerCase()));
   return lead ? name.slice(lead.length).trim() || null : null;
+}
+
+/** The plain amount of a priced product ("2,027,000") — only for a plain price: a "from" or offer line keeps its words. */
+export function priceAmount(s: Pick<ProductSnapshot, 'data' | 'source'>, digits: BrandKit['digits']): string | null {
+  const p = s.data.price;
+  if (s.source === 'test' || p.status !== 'priced' || p.amount_iqd === null || p.from) return null;
+  return groupInteger(p.amount_iqd, digits);
 }
 
 /**
@@ -755,6 +763,8 @@ export function buildFromTemplate(input: BuildInput): BuildResult {
 
 const GOLD: Gradient = { kind: 'linear', angle: 90, stops: [{ at: 0, color: '#fbe7ae', opacity: 1 }, { at: 0.5, color: '#e3b660', opacity: 1 }, { at: 1, color: '#b07f2c', opacity: 1 }] };
 const GOLD_LINE = '#d9a64c';
+/** Words with no Arabic letter: set in the house look's Latin face. */
+const LATIN_ONLY = /^[ -\u024F\u2013\u2014\s]+$/;
 /** The house look's default picture adjustment: a touch brighter and crisper, warmed toward the gold, with a gold rim light. */
 export const HOUSE_ADJUST = Object.freeze({ brightness: 0.03, contrast: 0.08, warmth: 0.25, glow: 0.45 });
 
@@ -777,7 +787,6 @@ function buildHouse(input: BuildInput, templateId: TemplateId, templateVersion: 
   const safe = safeBox({ format: fmt, safe_area });
   const main = input.products.find((p) => p.slot === 'main') ?? null;
   const bind: BindingContext = { snapshots: main ? { main: main.snapshot } : {}, claims: {}, brand: kit, locale: input.locale, slide: input.slide };
-  const fam = FONT_REGISTRY['plex-arabic'];
   const layers: Layer[] = [];
   const relations: Relation[] = [];
   const conflicts: LayoutConflict[] = [];
@@ -786,153 +795,156 @@ function buildHouse(input: BuildInput, templateId: TemplateId, templateVersion: 
   const shape = (id: string, o: Partial<ShapeLayer> & Pick<ShapeLayer, 'x' | 'y' | 'width' | 'height'>): ShapeLayer => ({
     ...base, id, name: id, role: 'decor', type: 'shape', shape: 'ellipse', fill: null, stroke: null, radius: 0, blur: 0, locked: true, ...o,
   });
-  const measureW = (text: string, size: number, weight: TextLayer['font']['weight']) => input.measure(text, { family: fam.family, weight, size });
-  const text = (id: string, role: LayerRole, t: string, source: TextSource, size: number, weight: TextLayer['font']['weight'], x: number, y: number, width: number, o: Partial<TextLayer> = {}): TextLayer => ({
+  /** Latin words (the brand, the model, the digits) are set in the geometric Latin face; anything else in Plex Arabic. */
+  const familyFor = (t: string): FontFamilyId => (LATIN_ONLY.test(t) ? 'montserrat' : 'plex-arabic');
+  const measureW = (t: string, size: number, weight: FontWeight, family: FontFamilyId) => input.measure(t, { family: FONT_REGISTRY[family].family, weight, size });
+  const text = (id: string, role: LayerRole, t: string, source: TextSource, size: number, weight: FontWeight, family: FontFamilyId, x: number, y: number, width: number, o: Partial<TextLayer> = {}): TextLayer => ({
     ...base, id, name: id, role, type: 'text', text: t, source, x, y, width, height: Math.ceil(size * 1.3),
-    font: { family: 'plex-arabic', weight, size, lineHeight: 1.3 }, minSize: Math.min(size, Math.round(18 * u)), maxLines: 1,
+    font: { family, weight, size, lineHeight: 1.3 }, minSize: Math.min(size, Math.round(18 * u)), maxLines: 1,
     color: '#ffffff', align: 'center', direction: 'auto', ...o,
   });
-  /** Two words on one line, each its own layer, centred together in reading order; shrunk together until they fit `maxW`. */
-  const pair = (a: { id: string; role: LayerRole; text: string; source: TextSource; weight: TextLayer['font']['weight']; o?: Partial<TextLayer> }, b: typeof a, size: number, y: number, maxW: number) => {
+  interface Part { id: string; role: LayerRole; text: string; source: TextSource; weight: FontWeight; scale?: number; o?: Partial<TextLayer> }
+  /** Words on one line, each its own layer, centred together in reading order (`lineDir`), shrunk together to fit `maxW`. */
+  const row = (parts: Part[], size: number, y: number, maxW: number, lineDir: 'rtl' | 'ltr') => {
     let sz = size;
-    const gap = () => sz * 0.32;
-    const widths = () => [measureW(a.text, sz, a.weight), measureW(b.text, sz, b.weight)];
-    let [wa, wb] = widths();
-    while (wa + wb + gap() > maxW && sz > 18 * u) {
-      sz = Math.round(sz * 0.94);
-      [wa, wb] = widths();
+    const fams = parts.map((p) => familyFor(p.text));
+    const widths = () => parts.map((p, i) => measureW(p.text, Math.round(sz * (p.scale ?? 1)), p.weight, fams[i]));
+    const gap = () => sz * 0.3;
+    let ws = widths();
+    const total = () => ws.reduce((a, b) => a + b, 0) + gap() * (parts.length - 1);
+    while (total() > maxW && sz > 18 * u) {
+      sz = Math.round(sz * 0.95);
+      ws = widths();
     }
-    const lineDir = detectDirection(`${a.text} ${b.text}`, dir);
-    const total = wa + wb + gap();
-    const left = (W - total) / 2;
-    // In reading order the first word comes first: on the left for a left-to-right line, on the right otherwise.
-    const ax = lineDir === 'ltr' ? left : left + wb + gap();
-    const bx = lineDir === 'ltr' ? left + wa + gap() : left;
+    let x = (W - total()) / 2;
+    const order = lineDir === 'ltr' ? parts.map((_, i) => i) : parts.map((_, i) => parts.length - 1 - i);
     const pad = 4 * u;
-    return {
-      size: sz,
-      layers: [
-        text(a.id, a.role, a.text, a.source, sz, a.weight, ax - pad, y, wa + pad * 2, a.o),
-        text(b.id, b.role, b.text, b.source, sz, b.weight, bx - pad, y, wb + pad * 2, b.o),
-      ],
-    };
+    const out: TextLayer[] = [];
+    for (const i of order) {
+      const p = parts[i];
+      const psz = Math.round(sz * (p.scale ?? 1));
+      // Smaller words sit on the same baseline as the big ones.
+      const dy = (sz - psz) * 1.3 * 0.78;
+      out.push(text(p.id, p.role, p.text, p.source, psz, p.weight, fams[i], x - pad, y + dy, ws[i] + pad * 2, p.o));
+      x += ws[i] + gap();
+    }
+    return { size: sz, layers: out };
   };
+  const radial = (color: string, peak: number): Gradient => ({ kind: 'radial', angle: 0, stops: [{ at: 0, color, opacity: peak }, { at: 0.3, color, opacity: peak * 0.55 }, { at: 0.65, color, opacity: peak * 0.16 }, { at: 1, color, opacity: 0 }] });
+  const glow = (id: string, cx: number, cy: number, r: number, color: string, peak: number) => shape(id, { x: cx - r, y: cy - r, width: r * 2, height: r * 2, gradient: radial(color, peak) });
 
-  // The stage: a lit near-black field with a deep red corner, the red arc that bounds it, and the gold arc.
+  // THE STAGE — broad, soft light only: near-black, a wide gold haze top-left, a deep red haze top-right
+  // fading to black, a warm pool behind the product and on the podium and floor. Every light is a radial
+  // gradient that fades to nothing before its edge, or a heavily blurred shape: no line, no ring, no hard edge.
   layers.push(shape('background', {
-    role: 'background', shape: 'rect', x: 0, y: 0, width: W, height: H, fill: '#070606',
-    gradient: { kind: 'linear', angle: 135, stops: [{ at: 0, color: '#6a0f15', opacity: 1 }, { at: 0.22, color: '#240a0c', opacity: 1 }, { at: 0.42, color: '#090707', opacity: 1 }, { at: 1, color: '#050505', opacity: 1 }] },
+    role: 'background', shape: 'rect', x: 0, y: 0, width: W, height: H, fill: '#070605',
+    gradient: { kind: 'linear', angle: 90, stops: [{ at: 0, color: '#0c0a08', opacity: 1 }, { at: 0.55, color: '#080706', opacity: 1 }, { at: 1, color: '#030303', opacity: 1 }] },
   }));
-  const R = 1045 * u;
-  const cx = W - 780 * u;
-  const cy = 900 * u;
-  layers.push(shape('stage', { x: cx - R, y: cy - R, width: R * 2, height: R * 2, fill: '#0a0908', gradient: { kind: 'radial', angle: 0, stops: [{ at: 0, color: '#1d1813', opacity: 1 }, { at: 0.45, color: '#0b0a09', opacity: 1 }, { at: 0.75, color: '#070606', opacity: 1 }, { at: 1, color: '#060505', opacity: 1 }] } }));
-  layers.push(shape('red_glow', { x: cx - R, y: cy - R, width: R * 2, height: R * 2, stroke: { color: '#a3141b', width: 14 * u }, blur: 26 * u, opacity: 0.8 }));
-  layers.push(shape('red_arc', { x: cx - R, y: cy - R, width: R * 2, height: R * 2, stroke: { color: '#c8222a', width: 2.5 * u }, opacity: 0.9 }));
-  const G = 1280 * u;
-  const gx = 1134 * u;
-  const gy = 1080 * u;
-  layers.push(shape('gold_glow', { x: gx - G, y: gy - G, width: G * 2, height: G * 2, stroke: { color: '#d39a3c', width: 18 * u }, blur: 34 * u, opacity: 0.75 }));
-  layers.push(shape('gold_arc', { x: gx - G, y: gy - G, width: G * 2, height: G * 2, stroke: { color: '#f3cf7d', width: 3 * u }, opacity: 0.95 }));
-  layers.push(shape('warm_light', { x: W * 0.08, y: H * 0.3, width: W * 0.84, height: H * 0.62, gradient: { kind: 'radial', angle: 0, stops: [{ at: 0, color: '#c08a3a', opacity: 0.2 }, { at: 1, color: '#c08a3a', opacity: 0 }] } }));
+  layers.push(glow('gold_glow', -60 * u, 120 * u, 760 * u, '#b8873a', 0.34));
+  layers.push(glow('red_glow', W + 80 * u, -100 * u, 720 * u, '#7a0d14', 0.55));
+  layers.push(glow('warm_light', W / 2, H * 0.56, Math.max(W, H) * 0.5, '#a87a34', 0.2));
 
-  // The logo row: the approved logo beside the wordmark, centred; the tagline under it.
-  let y = safe.y;
-  const markSize = Math.round(46 * u);
+  // THE WORDS — the wordmark and tagline (light, tracked), the brand in white and the model in gold, «بسعر»
+  // and the price digits in gold, the currency — the product's words bound to the snapshot.
+  let y = safe.y - 6 * u;
+  const markSize = Math.round(44 * u);
   const wordmark = BRAND_TEXT.wordmark[input.locale];
-  const wmW = measureW(wordmark, markSize, 400);
-  const logoH = input.logo ? Math.round(62 * u) : 0;
-  const logoW = input.logo ? (input.logo.width / input.logo.height) * logoH : 0;
-  const rowGap = input.logo ? 16 * u : 0;
-  const rowW = logoW + rowGap + wmW;
-  const rowLeft = (W - rowW) / 2;
-  const rowH = Math.max(logoH, markSize * 1.3);
-  if (input.logo) {
-    layers.push({
-      ...base, id: 'logo', name: 'Logo', role: 'logo', type: 'image', x: rowLeft, y: y + (rowH - logoH) / 2, asset: { kind: 'logo', ref: kit.logo.asset },
-      natural: { ...input.logo }, crop: null, scale: logoH / input.logo.height, fit: 'whole',
-    });
-  }
-  layers.push(text('wordmark', 'decor', wordmark, { kind: 'brand', field: 'wordmark' }, markSize, 400, rowLeft + logoW + rowGap - 4 * u, y + (rowH - markSize * 1.3) / 2, wmW + 8 * u, { color: '#f4f1ea', direction: 'ltr' }));
-  y += rowH + 2 * u;
-  const tagSize = Math.round(21 * u);
+  const wmW = measureW(wordmark, markSize, 500, 'montserrat');
+  layers.push(text('wordmark', 'decor', wordmark, { kind: 'brand', field: 'wordmark' }, markSize, 500, 'montserrat', (W - wmW) / 2 - 4 * u, y, wmW + 8 * u, { color: '#f2eee6', direction: 'ltr' }));
+  y += markSize * 1.3 - 4 * u;
+  const tagSize = Math.round(20 * u);
   const tag = BRAND_TEXT.tagline[input.locale];
-  const tagW = measureW(tag, tagSize, 400);
-  layers.push(text('tagline', 'decor', tag, { kind: 'brand', field: 'tagline' }, tagSize, 400, (W - tagW) / 2 - 4 * u, y, tagW + 8 * u, { color: '#bdb4a3', direction: 'ltr' }));
-  y += tagSize * 1.3 + 40 * u;
+  const tagW = measureW(tag, tagSize, 500, 'montserrat');
+  layers.push(text('tagline', 'decor', tag, { kind: 'brand', field: 'tagline' }, tagSize, 500, 'montserrat', (W - tagW) / 2 - 4 * u, y, tagW + 8 * u, { color: '#b9b0a0', direction: 'ltr' }));
+  y += tagSize * 1.3 + 22 * u;
 
-  // The title: the brand in white, the model in gold — both bound to the snapshot.
+  const maxW = safe.width;
   const brandText = main ? renderSource({ kind: 'product', slot: 'main', field: 'brand' }, bind) : null;
   const modelText = main ? renderSource({ kind: 'product', slot: 'main', field: 'model' }, bind) : null;
-  const maxW = safe.width;
   if (brandText && modelText) {
-    const t = pair(
-      { id: 'product_brand', role: 'product_name', text: brandText, source: { kind: 'product', slot: 'main', field: 'brand' }, weight: 600 },
+    const t = row([
+      { id: 'product_brand', role: 'product_name', text: brandText, source: { kind: 'product', slot: 'main', field: 'brand' }, weight: 500 },
       { id: 'product_name', role: 'product_name', text: modelText, source: { kind: 'product', slot: 'main', field: 'model' }, weight: 700, o: { color: '#e3b660', gradient: GOLD } },
-      Math.round(70 * u), y, maxW,
-    );
+    ], Math.round(68 * u), y, maxW, detectDirection(`${brandText} ${modelText}`, dir));
     layers.push(...t.layers);
-    y += t.size * 1.3 + 6 * u;
+    y += t.size * 1.3 + 2 * u;
   } else if (main) {
     const name = renderSource({ kind: 'product', slot: 'main', field: 'name' }, bind) ?? '';
-    const r = fitText(name, { family: fam.family, weight: 700, lineHeight: 1.3 }, { width: maxW, maxHeight: 2 * 70 * u * 1.3, maxLines: 2 }, { max: Math.round(64 * u), min: Math.round(28 * u) }, input.measure);
-    layers.push({ ...text('product_name', 'product_name', name, { kind: 'product', slot: 'main', field: 'name' }, r.size, 700, safe.x, y, maxW, { color: '#e3b660', gradient: GOLD, maxLines: 2 }), height: Math.ceil(r.height) });
-    y += r.height + 6 * u;
+    const family = familyFor(name);
+    const r = fitText(name, { family: FONT_REGISTRY[family].family, weight: 700, lineHeight: 1.3 }, { width: maxW, maxHeight: 2 * 70 * u * 1.3, maxLines: 2 }, { max: Math.round(64 * u), min: Math.round(28 * u) }, input.measure);
+    layers.push({ ...text('product_name', 'product_name', name, { kind: 'product', slot: 'main', field: 'name' }, r.size, 700, family, safe.x, y, maxW, { color: '#e3b660', gradient: GOLD, maxLines: 2 }), height: Math.ceil(r.height) });
+    y += r.height + 2 * u;
   }
-  // The price line: «بسعر» and the bound price in gold.
-  const priceText = main ? renderSource({ kind: 'product', slot: 'main', field: 'price' }, bind) : null;
-  // «بسعر» leads a plain price; a "from" price already has its own lead words.
-  if (priceText && main && main.snapshot.data.price.from) {
-    const sz = Math.round(62 * u);
-    const r = fitText(priceText, { family: fam.family, weight: 700, lineHeight: 1.3 }, { width: maxW, maxHeight: sz * 1.3, maxLines: 1 }, { max: sz, min: Math.round(28 * u) }, input.measure);
-    layers.push(text('price', 'price', priceText, { kind: 'product', slot: 'main', field: 'price' }, r.size, 700, safe.x, y, maxW, { color: '#e3b660', gradient: GOLD }));
-    y += r.size * 1.3;
-  } else if (priceText) {
-    const t = pair(
-      { id: 'price_lead', role: 'price_note', text: BRAND_TEXT.price_lead[input.locale], source: { kind: 'brand', field: 'price_lead' }, weight: 600 },
-      { id: 'price', role: 'price', text: priceText, source: { kind: 'product', slot: 'main', field: 'price' }, weight: 700, o: { color: '#e3b660', gradient: GOLD } },
-      Math.round(62 * u), y, maxW,
-    );
+  const amount = main ? renderSource({ kind: 'product', slot: 'main', field: 'price_amount' }, bind) : null;
+  if (amount) {
+    // «بسعر» · the digits (gold) · «د.ع», in the post's reading order.
+    const t = row([
+      { id: 'price_lead', role: 'price_note', text: BRAND_TEXT.price_lead[input.locale], source: { kind: 'brand', field: 'price_lead' }, weight: 600, scale: 0.86 },
+      { id: 'price', role: 'price', text: amount, source: { kind: 'product', slot: 'main', field: 'price_amount' }, weight: 700, o: { color: '#e3b660', gradient: GOLD, direction: 'ltr' } },
+      { id: 'price_currency', role: 'price_note', text: BRAND_TEXT.currency[input.locale], source: { kind: 'brand', field: 'currency' }, weight: 600, scale: 0.86, o: { color: '#e3b660', gradient: GOLD } },
+    ], Math.round(62 * u), y, maxW, dir);
     layers.push(...t.layers);
     y += t.size * 1.3;
+  } else if (main) {
+    // A price that is not a plain number (from, on request): the bound line as it renders, in Plex.
+    const priceText = renderSource({ kind: 'product', slot: 'main', field: 'price' }, bind) ?? '';
+    const r = fitText(priceText, { family: FONT_REGISTRY['plex-arabic'].family, weight: 700, lineHeight: 1.3 }, { width: maxW, maxHeight: 62 * u * 1.3, maxLines: 1 }, { max: Math.round(60 * u), min: Math.round(26 * u) }, input.measure);
+    layers.push(text('price', 'price', priceText, { kind: 'product', slot: 'main', field: 'price' }, r.size, 700, 'plex-arabic', safe.x, y, maxW, { color: '#e3b660', gradient: GOLD }));
+    y += r.size * 1.3;
   }
 
-  // The pill at the bottom: «اطلب الآن على» over the site address, gold outline.
-  const pillH = Math.round(104 * u);
-  const orderSize = Math.round(25 * u);
-  const siteSize = Math.round(34 * u);
+  // THE PILL at the bottom; the podium stands above it and never overlaps it.
+  const pillH = Math.round(84 * u);
+  const orderSize = Math.round(22 * u);
+  const siteSize = Math.round(30 * u);
   const orderText = BRAND_TEXT.order_on[input.locale];
   const siteText = BRAND_TEXT.site[input.locale];
-  const pillW = Math.min(safe.width, Math.max(measureW(orderText, orderSize, 600), measureW(siteText, siteSize, 600)) + 120 * u);
+  const pillW = Math.min(safe.width, Math.max(measureW(orderText, orderSize, 600, 'plex-arabic'), measureW(siteText, siteSize, 600, 'montserrat')) + 120 * u);
   const pillY = safe.y + safe.height - pillH;
   const pillX = (W - pillW) / 2;
 
-  // The podium: a dark disc with a gold rim light, standing just above the pill.
-  const rx = Math.min(W * 0.36, 360 * u);
-  const ry = 44 * u;
-  const depth = 46 * u;
-  const topY = pillY - 46 * u - depth;
+  // THE PODIUM — a solid, thick, rounded cylinder (clay): a matte dark top face with a soft warm highlight,
+  // a side band lit at its top edge and dark at the bottom, a soft shadow and a faint warm reflection below.
+  const rx = Math.min(W * 0.4, 430 * u);
+  const ry = 46 * u;
+  const depth = 66 * u;
+  const topY = pillY - 18 * u - ry - depth;
   const px0 = W / 2 - rx;
-  layers.push(shape('podium_glow', { x: px0 - 30 * u, y: topY - ry - 10 * u, width: rx * 2 + 60 * u, height: ry * 2 + depth + 40 * u, fill: '#a87a32', blur: 40 * u, opacity: 0.35 }));
-  layers.push(shape('podium_base', { x: px0, y: topY + depth - ry, width: rx * 2, height: ry * 2, fill: '#0b0a09' }));
-  layers.push(shape('podium_side', { shape: 'rect', x: px0, y: topY, width: rx * 2, height: depth, fill: '#141210', gradient: { kind: 'linear', angle: 0, stops: [{ at: 0, color: '#0a0908', opacity: 1 }, { at: 0.5, color: '#2a241c', opacity: 1 }, { at: 1, color: '#0a0908', opacity: 1 }] } }));
-  layers.push(shape('podium_top', { x: px0, y: topY - ry, width: rx * 2, height: ry * 2, fill: '#15120f', stroke: { color: GOLD_LINE, width: 2.5 * u }, gradient: { kind: 'radial', angle: 0, stops: [{ at: 0, color: '#2b241b', opacity: 1 }, { at: 1, color: '#0e0c0a', opacity: 1 }] } }));
+  const baseY = topY + depth;
+  layers.push(shape('floor_light', { x: W / 2 - rx * 1.35, y: baseY - ry * 0.6, width: rx * 2.7, height: ry * 2.6, gradient: radial('#a37530', 0.22) }));
+  layers.push(shape('podium_shadow', { x: px0 + 10 * u, y: baseY - ry * 0.5, width: rx * 2 - 20 * u, height: ry * 2.2, fill: '#000000', blur: 30 * u, opacity: 0.9 }));
+  layers.push(shape('podium_base', { x: px0, y: baseY - ry, width: rx * 2, height: ry * 2, fill: '#070606' }));
+  layers.push(shape('podium_side', {
+    shape: 'rect', x: px0, y: topY, width: rx * 2, height: depth, fill: '#110e0b',
+    gradient: { kind: 'linear', angle: 90, stops: [{ at: 0, color: '#54432f', opacity: 1 }, { at: 0.14, color: '#2e251b', opacity: 1 }, { at: 0.6, color: '#16120e', opacity: 1 }, { at: 1, color: '#080706', opacity: 1 }] },
+  }));
+  // The cylinder's roundness: its two flanks fall into shadow (a sideways gradient over the band).
+  layers.push(shape('podium_shade', {
+    shape: 'rect', x: px0, y: topY, width: rx * 2, height: depth,
+    gradient: { kind: 'linear', angle: 0, stops: [{ at: 0, color: '#000000', opacity: 0.6 }, { at: 0.25, color: '#000000', opacity: 0.1 }, { at: 0.5, color: '#000000', opacity: 0 }, { at: 0.75, color: '#000000', opacity: 0.1 }, { at: 1, color: '#000000', opacity: 0.6 }] },
+  }));
+  // A soft lit lip where the top face meets the side (a lighter disc a hair lower, under the top face).
+  layers.push(shape('podium_lip', { x: px0, y: topY - ry + 4 * u, width: rx * 2, height: ry * 2, fill: '#4a3b28', gradient: { kind: 'linear', angle: 0, stops: [{ at: 0, color: '#1b150f', opacity: 1 }, { at: 0.5, color: '#6a5232', opacity: 1 }, { at: 1, color: '#1b150f', opacity: 1 }] } }));
+  layers.push(shape('podium_top', { x: px0, y: topY - ry, width: rx * 2, height: ry * 2, fill: '#15120f', gradient: { kind: 'radial', angle: 0, stops: [{ at: 0, color: '#3d3226', opacity: 1 }, { at: 0.6, color: '#221c15', opacity: 1 }, { at: 1, color: '#18140f', opacity: 1 }] } }));
+  layers.push(shape('podium_light', { x: px0 + rx * 0.25, y: topY - ry * 0.75, width: rx * 1.5, height: ry * 1.5, fill: '#c39348', blur: 24 * u, opacity: 0.38 }));
 
-  // The product, standing on the podium.
+  // THE PRODUCT — standing on the top face, centred, in the light: a warm back-glow, a soft dark contact shadow.
   const img = main?.image ?? null;
   if (img && main) {
     // Only a box inside the picture is a crop (normalize refuses any other).
     const b = img.bounds && img.bounds.width > 8 && img.bounds.height > 8 && img.bounds.x >= 0 && img.bounds.y >= 0 && img.bounds.x + img.bounds.width <= img.width && img.bounds.y + img.bounds.height <= img.height ? img.bounds : null;
     const crop = b ? { x: b.x, y: b.y, width: b.width, height: b.height } : null;
     const src = crop ?? { width: img.width, height: img.height };
-    const top = y + 26 * u;
-    const foot = topY + ry * 0.35;
+    const foot = topY + ry * 0.3;
+    const top = y + 6 * u;
     const availH = Math.max(H * 0.12, foot - top);
-    const scale = Math.max(0.01, Math.min((W * 0.72) / src.width, availH / src.height, 3));
+    // One rule for every product: as large as the room allows, never wider than 84 % of the post.
+    const scale = Math.max(0.01, Math.min((W * 0.84) / src.width, availH / src.height, 3));
     const w = src.width * scale;
     const h = src.height * scale;
     const box = { x: (W - w) / 2, y: foot - h, width: w, height: h };
-    layers.push(shape('product_shadow', { role: 'product_shadow', x: box.x + w * 0.08, y: foot - 16 * u, width: w * 0.84, height: 30 * u, fill: '#000000', blur: 18 * u, opacity: 0.7, locked: false }));
+    layers.push(glow('product_glow', W / 2, box.y + h * 0.55, Math.max(w, h) * 0.6, '#b98a40', 0.26));
+    layers.push(shape('product_shadow', { role: 'product_shadow', x: box.x + w * 0.06, y: foot - 18 * u, width: w * 0.88, height: 36 * u, fill: '#000000', blur: 20 * u, opacity: 0.85, locked: false }));
     relations.push({ id: 'r_shadow', kind: 'shadow_of', subject: 'product_shadow', target: 'product' });
     layers.push({
       ...base, id: 'product', name: 'Product', role: 'product', type: 'image', x: box.x, y: box.y, asset: { kind: 'product', ref: img.url, slot: 'main' },
@@ -942,13 +954,13 @@ function buildHouse(input: BuildInput, templateId: TemplateId, templateVersion: 
 
   const group = 'cta_group';
   layers.push({ ...base, id: group, name: 'cta group', role: 'cta', type: 'group', x: 0, y: 0 });
-  layers.push(shape('cta_glow', { locked: false, parent: group, shape: 'rect', x: pillX, y: pillY, width: pillW, height: pillH, radius: pillH / 2, stroke: { color: '#c8963f', width: 8 * u }, blur: 18 * u, opacity: 0.6 }));
-  layers.push(shape('cta_chip', { locked: false, parent: group, shape: 'rect', x: pillX, y: pillY, width: pillW, height: pillH, radius: pillH / 2, fill: '#0c0b0a', stroke: { color: GOLD_LINE, width: 2.5 * u }, opacity: 0.92 }));
+  layers.push(shape('cta_glow', { locked: false, parent: group, shape: 'rect', x: pillX + 10 * u, y: pillY + 6 * u, width: pillW - 20 * u, height: pillH - 12 * u, radius: pillH / 2, fill: '#b98a40', blur: 26 * u, opacity: 0.16 }));
+  layers.push(shape('cta_chip', { locked: false, parent: group, shape: 'rect', x: pillX, y: pillY, width: pillW, height: pillH, radius: pillH / 2, fill: '#0b0a09', stroke: { color: GOLD_LINE, width: 1.4 * u }, opacity: 0.95 }));
   const orderH = orderSize * 1.3;
   const siteH = siteSize * 1.3;
   const ty = pillY + (pillH - (orderH + siteH)) / 2 + 2 * u;
-  layers.push({ ...text('cta', 'cta', orderText, { kind: 'brand', field: 'order_on' }, orderSize, 600, pillX, ty, pillW), parent: group, color: '#f1dfb4' });
-  layers.push({ ...text('site', 'cta', siteText, { kind: 'brand', field: 'site' }, siteSize, 600, pillX, ty + orderH, pillW), parent: group, direction: 'ltr' });
+  layers.push({ ...text('cta', 'cta', orderText, { kind: 'brand', field: 'order_on' }, orderSize, 600, 'plex-arabic', pillX, ty, pillW), parent: group, color: '#ecd6a8' });
+  layers.push({ ...text('site', 'cta', siteText, { kind: 'brand', field: 'site' }, siteSize, 600, 'montserrat', pillX, ty + orderH, pillW), parent: group, direction: 'ltr' });
 
   const doc: CreativeDocument = {
     schema_version: SCHEMA_VERSION,
@@ -1257,7 +1269,7 @@ function backgroundInUse(doc: CreativeDocument, kit: BrandKit): { preset: Backgr
 
 /** Ids a template creates; anything else in a document was added by a person and is carried across a rebuild. */
 /** The house look's own drawn layers (buildHouse): made again by a rebuild, never carried as a person's. */
-const HOUSE_LAYERS = new Set(['stage', 'red_glow', 'red_arc', 'gold_glow', 'gold_arc', 'warm_light', 'wordmark', 'tagline', 'product_brand', 'price_lead', 'podium_glow', 'podium_base', 'podium_side', 'podium_top', 'cta_glow', 'site']);
+const HOUSE_LAYERS = new Set(['red_glow', 'gold_glow', 'warm_light', 'wordmark', 'tagline', 'product_brand', 'price_lead', 'price_currency', 'floor_light', 'podium_shadow', 'podium_base', 'podium_side', 'podium_shade', 'podium_lip', 'podium_top', 'podium_light', 'product_glow', 'cta_glow', 'site']);
 
 function isTemplateLayer(id: string): boolean {
   if (HOUSE_LAYERS.has(id)) return true;

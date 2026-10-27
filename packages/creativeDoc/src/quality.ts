@@ -113,7 +113,7 @@ export function qualityReport(doc: CreativeDocument, ctx: QualityContext): Quali
   const visible = doc.layers.filter((l) => l.visible);
   const texts = visible.filter((l): l is TextLayer => l.type === 'text');
   const products = visible.filter((l): l is ImageLayer => l.type === 'image' && l.role === 'product');
-  const showsPrice = texts.some((t) => t.source.kind === 'product' && t.source.field === 'price');
+  const showsPrice = texts.some((t) => t.source.kind === 'product' && (t.source.field === 'price' || t.source.field === 'price_amount'));
   const showsAvailability = texts.some((t) => t.source.kind === 'product' && t.source.field === 'availability');
   const priceAd = doc.objective === 'sell' || doc.priority === 'price';
 
@@ -123,7 +123,7 @@ export function qualityReport(doc: CreativeDocument, ctx: QualityContext): Quali
     const snap = ctx.snapshots[b.slot];
     if (!snap || snap.id !== b.snapshot_id) { add('snapshot_missing', 'blocker', [], b.slot); continue; }
     if (snap.source === 'test') add('test_data', ctx.final ? 'blocker' : 'review', [], b.slot);
-    const priceLayers = texts.filter((t) => t.source.kind === 'product' && t.source.slot === b.slot && t.source.field === 'price').map((t) => t.id);
+    const priceLayers = texts.filter((t) => t.source.kind === 'product' && t.source.slot === b.slot && (t.source.field === 'price' || t.source.field === 'price_amount')).map((t) => t.id);
     if (priceLayers.length && snap.data.price.status !== 'priced') add('price_unavailable', priceAd ? 'blocker' : 'review', priceLayers, snap.data.price.status);
     const v = ctx.verification?.[b.slot];
     if (v) {

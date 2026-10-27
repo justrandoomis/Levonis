@@ -148,7 +148,7 @@ export default function BrandTab() {
             {(['primary', 'display'] as const).map((k) => (
               <Field key={k} label={w(FONT_ROLE_TEXT[k])}>
                 <Select value={kit.fonts[k]} onChange={(e) => set({ fonts: { ...kit.fonts, [k]: e.target.value as FontFamilyId } })}>
-                  {Object.values(FONT_REGISTRY).map((f) => <option key={f.id} value={f.id}>{f.family}</option>)}
+                  {Object.values(FONT_REGISTRY).filter((f) => !f.latinOnly).map((f) => <option key={f.id} value={f.id}>{f.family}</option>)}
                 </Select>
               </Field>
             ))}

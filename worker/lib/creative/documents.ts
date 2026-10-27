@@ -668,7 +668,7 @@ export interface Verification {
 export function shows(doc: CreativeDocument): { price: boolean; availability: boolean } {
   const texts = doc.layers.filter((l) => l.visible && l.type === 'text');
   const bound = (field: string) => texts.some((t) => t.type === 'text' && t.source.kind === 'product' && t.source.field === field);
-  return { price: bound('price') || bound('price_note'), availability: bound('availability') };
+  return { price: bound('price') || bound('price_amount') || bound('price_note'), availability: bound('availability') };
 }
 
 /**

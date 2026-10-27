@@ -272,8 +272,18 @@ select would have been the one entry that behaves differently.
   never change, nothing is generated. The house look applies `HOUSE_ADJUST` by
   default; the editor's properties panel has the knockout switch, four sliders, the
   podium shadow switch and a reset (`set_picture_adjust`, people only).
-- Not done here: the grid has no house-look variant; the logo is drawn with its own
-  black square; the e2e «leaving the editor asks first» check was already failing
+- House look, second pass (owner: "harsh, neon, cheap"): no stroke, ring or arc of
+  light any more — broad radial hazes (gold top-left, deep red top-right, a warm
+  pool on the podium and floor), a solid clay cylinder podium (lit lip, side band,
+  shaded flanks, soft floor shadow) with the pill below it, the Latin title and
+  price digits in self-hosted Montserrat (public/fonts/montserrat, OFL; registry
+  `montserrat`, `latinOnly` — never a kit text font), new bound field
+  `price_amount` and brand word `currency` so «بسعر» · digits · «د.ع» are set
+  apart. The emblem is left out of the house look (its black square showed on
+  the stage); the wordmark is the brand's letters.
+- tests/fixtures/roleMatrix.ts closes an old seeded copy before deleting it: a
+  deleted file that is still open kept its blocks and ran the CI temp quota out.
+- Not done here: the grid has no house-look variant; the e2e «leaving the editor asks first» check was already failing
   before these changes.
 
 ### Not done

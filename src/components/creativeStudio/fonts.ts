@@ -35,7 +35,11 @@ export function registerStudioFonts(): void {
     // `add` lives in lib.dom.iterable, which the tests' config does not load; the browser has it.
     (document.fonts as unknown as { add(f: FontFace): void }).add(face);
   }
+  // Montserrat (the house look's Latin title and digits): one variable file for every weight.
+  const mont = new FontFace(FONT_REGISTRY.montserrat.family, `url(${MONTSERRAT_FILE}) format('woff2')`, { weight: '100 900', style: 'normal', display: 'block' });
+  (document.fonts as unknown as { add(f: FontFace): void }).add(mont);
 }
+export const MONTSERRAT_FILE = '/fonts/montserrat/montserrat-v31-latin-variable.woff2';
 
 export interface FontNeed {
   family: FontFamilyId;

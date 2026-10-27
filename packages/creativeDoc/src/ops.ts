@@ -434,7 +434,7 @@ export function applyOps(input: CreativeDocument, rawOps: readonly unknown[], ct
           const dup = typeof (op.layer as { id?: unknown }).id === 'string' && doc.layers.some((l) => l.id === (op.layer as { id: string }).id);
           return refuse(dup ? 'duplicate_id' : 'invalid_layer');
         }
-        if (added.type === 'text' && added.source.kind === 'product' && added.source.field === 'price' && !doc.products.some((p) => p.slot === (added.source as { slot: string }).slot)) return refuse('invalid_layer');
+        if (added.type === 'text' && added.source.kind === 'product' && (added.source.field === 'price' || added.source.field === 'price_amount') && !doc.products.some((p) => p.slot === (added.source as { slot: string }).slot)) return refuse('invalid_layer');
         // Adding into a locked group changes that group.
         const lock = added.parent ? lockedAbove(doc.layers, added.parent) : null;
         if (lock) return refuse('locked_layer', lock);

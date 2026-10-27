@@ -21,7 +21,7 @@
  */
 import { cleanText } from './text';
 import {
-  isFontFamily, isHexColor, type Corner, type FontFamilyId, type FontWeight, type FormatId, type SafeArea,
+  FONT_REGISTRY, isFontFamily, isHexColor, type Corner, type FontFamilyId, type FontWeight, type FormatId, type SafeArea,
 } from './schema';
 import type { CurrencyLabel, DigitStyle } from './text';
 
@@ -198,8 +198,8 @@ export function normalizeBrandKit(input: unknown): { kit: BrandKit; issues: Bran
 
   const f = obj(src.fonts);
   const fonts = {
-    primary: isFontFamily(f.primary) ? f.primary : def.fonts.primary,
-    display: isFontFamily(f.display) ? f.display : def.fonts.display,
+    primary: isFontFamily(f.primary) && !FONT_REGISTRY[f.primary].latinOnly ? f.primary : def.fonts.primary,
+    display: isFontFamily(f.display) && !FONT_REGISTRY[f.display].latinOnly ? f.display : def.fonts.display,
   };
   if (f.primary !== undefined && !isFontFamily(f.primary)) issues.push({ path: 'fonts.primary', code: 'invalid_value', fatal: false });
   if (f.display !== undefined && !isFontFamily(f.display)) issues.push({ path: 'fonts.display', code: 'invalid_value', fatal: false });
@@ -335,7 +335,7 @@ export function safeAreaFor(kit: BrandKit, format: { id: FormatId; width: number
  * The house look's own colours (templates.ts `levonis_gold`, the owner's approved reference post): the stage,
  * the gold and red light, the podium and the pill. A design made from that template may use them beside the kit's palette.
  */
-export const HOUSE_PALETTE: readonly string[] = ['#000000', '#050505', '#060505', '#070606', '#090707', '#0a0908', '#0b0a09', '#0c0b0a', '#0e0c0a', '#141210', '#15120f', '#1d1813', '#240a0c', '#2a241c', '#2b241b', '#6a0f15', '#a3141b', '#a87a32', '#b07f2c', '#bdb4a3', '#c08a3a', '#c8222a', '#c8963f', '#d39a3c', '#d9a64c', '#e3b660', '#f1dfb4', '#f3cf7d', '#f4f1ea', '#fbe7ae', '#ffffff'];
+export const HOUSE_PALETTE: readonly string[] = ['#000000', '#030303', '#070605', '#070606', '#080706', '#0b0a09', '#0c0a08', '#110e0b', '#15120f', '#16120e', '#18140f', '#1b150f', '#221c15', '#2e251b', '#3d3226', '#4a3b28', '#54432f', '#6a5232', '#7a0d14', '#a37530', '#a87a34', '#b07f2c', '#b8873a', '#b98a40', '#b9b0a0', '#c39348', '#d9a64c', '#e3b660', '#ecd6a8', '#f2eee6', '#fbe7ae', '#ffffff'];
 
 export function inPalette(kit: BrandKit, color: string): boolean {
   return kit.colors.palette.includes(color.toLowerCase());

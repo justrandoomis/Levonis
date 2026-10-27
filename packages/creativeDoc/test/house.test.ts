@@ -71,7 +71,7 @@ test('gradients and the knockout survive a normalize round trip and a rebuild', 
   assert.deepEqual(n.doc!.layers, r.doc.layers);
   const again = rebuild(r.doc, { format: FORMATS.portrait }, { snapshots: { main: live() }, claims: {}, brand: kit, brandVersion: null, evidence: { arrival: false, back_in_stock: false, offer: false }, family: null, logo: null, backgroundNatural: null, measure: approximateMeasurer } as never);
   assert.ok(again);
-  assert.equal(again!.doc.layers.filter((l) => l.id === 'stage').length, 1, 'house layers are made again, not carried twice');
+  assert.equal(again!.doc.layers.filter((l) => l.id === 'gold_glow').length, 1, 'house layers are made again, not carried twice');
   const img = again!.doc.layers.find((l) => l.id === 'product');
   assert.ok(img && img.type === 'image' && img.crop?.width === 900);
 });

@@ -81,7 +81,7 @@ export function formatOf(id: FormatId, width?: number, height?: number): DocForm
 // face it must wait for (spec §8 «انتظر اكتمال تحميل الخطوط»).
 // ---------------------------------------------------------------------------
 
-export type FontFamilyId = 'plex-arabic' | 'cairo';
+export type FontFamilyId = 'plex-arabic' | 'cairo' | 'montserrat';
 export type FontWeight = 400 | 500 | 600 | 700 | 800;
 
 export interface FontDef {
@@ -92,6 +92,8 @@ export interface FontDef {
   /** Characters this family has no glyph for (a quality check flags them; nothing is substituted silently). */
   missing: RegExp | null;
   license: string;
+  /** A Latin display face: used for Latin words in a template (the house title and price digits), never a kit's text font. */
+  latinOnly?: boolean;
 }
 
 export const FONT_REGISTRY: Readonly<Record<FontFamilyId, FontDef>> = Object.freeze({
@@ -106,6 +108,11 @@ export const FONT_REGISTRY: Readonly<Record<FontFamilyId, FontDef>> = Object.fre
   // canvas that drew before the patch arrived would show a fallback glyph.
   cairo: {
     id: 'cairo', family: 'Cairo', weights: [400, 500, 600, 700, 800], missing: /[\u06D5\u06CE\u06C6\u0695\u06B5]/, license: 'OFL-1.1',
+  },
+  // Montserrat, a geometric sans for the house look's Latin title and price digits (the owner's reference post).
+  // Self-hosted under public/fonts/montserrat (Latin subset, variable weight); it has no Arabic.
+  montserrat: {
+    id: 'montserrat', family: 'Montserrat', weights: [500, 600, 700, 800], missing: /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/, license: 'OFL-1.1', latinOnly: true,
   },
 });
 
@@ -163,12 +170,13 @@ export type TextSource =
   /** A fixed brand element of a house template (the site address, the tagline): the app's own words, never a model's. */
   | { kind: 'brand'; field: BrandTextField };
 
-/** `model`: the product name without its brand prefix ("X2D Combo" of "Bambu Lab X2D Combo"). */
-export type ProductTextField = 'name' | 'brand' | 'price' | 'price_note' | 'availability' | 'variant' | 'model';
-export const PRODUCT_TEXT_FIELDS: readonly ProductTextField[] = ['name', 'brand', 'price', 'price_note', 'availability', 'variant', 'model'];
+/** `price_amount`: a plain price's number alone (the house look sets the digits and the currency apart).
+ * `model`: the product name without its brand prefix ("X2D Combo" of "Bambu Lab X2D Combo"). */
+export type ProductTextField = 'name' | 'brand' | 'price' | 'price_note' | 'availability' | 'variant' | 'model' | 'price_amount';
+export const PRODUCT_TEXT_FIELDS: readonly ProductTextField[] = ['name', 'brand', 'price', 'price_note', 'availability', 'variant', 'model', 'price_amount'];
 
-export type BrandTextField = 'site' | 'wordmark' | 'tagline' | 'order_on' | 'price_lead';
-export const BRAND_TEXT_FIELDS: readonly BrandTextField[] = ['site', 'wordmark', 'tagline', 'order_on', 'price_lead'];
+export type BrandTextField = 'site' | 'wordmark' | 'tagline' | 'order_on' | 'price_lead' | 'currency';
+export const BRAND_TEXT_FIELDS: readonly BrandTextField[] = ['site', 'wordmark', 'tagline', 'order_on', 'price_lead', 'currency'];
 
 /** The brand's fixed words. `site` is the shop's own address — the one link a design may carry, because the app writes it. */
 export const BRAND_TEXT: Readonly<Record<BrandTextField, Readonly<Record<AdLocale, string>>>> = Object.freeze({
@@ -177,6 +185,7 @@ export const BRAND_TEXT: Readonly<Record<BrandTextField, Readonly<Record<AdLocal
   tagline: { ar: '3D · PRINT · MORE', en: '3D · PRINT · MORE', ckb: '3D · PRINT · MORE' },
   order_on: { ar: 'اطلب الآن على', en: 'Order now at', ckb: 'ئێستا داوای بکە لە' },
   price_lead: { ar: 'بسعر', en: 'Price', ckb: 'بە نرخی' },
+  currency: { ar: 'د.ع', en: 'IQD', ckb: 'د.ع' },
 });
 
 /** A fill that blends: `linear` along `angle` (degrees, 0 = left → right, 90 = top → bottom) across the box; `radial` from the box centre to its farthest edge. */

@@ -249,7 +249,7 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
     const kit = b.kit;
     const names = mode === 'multi' ? multi.map((m) => localized(m.snapshot.data.name, locale)).join(' ') : snapshot ? localized(snapshot.data.name, locale) : '';
     const sample = perVariant.map((p) => [p.copy.headline, p.copy.subhead, p.copy.cta, ...(p.copy.features ?? [])].join(' ')).join(' ') + ' ' + names + ' 0123456789 د.ع بسعر levonis-iq.com L E V O N I S 3D · PRINT · MORE';
-    const fonts = await ensureNeeds(kitFontNeeds([kit.fonts.primary, kit.fonts.display], sample));
+    const fonts = await ensureNeeds(kitFontNeeds([kit.fonts.primary, kit.fonts.display, ...(template === HOUSE_TEMPLATE ? ['montserrat' as const] : [])], sample));
     if (fonts.failed.length) setError(fill(w(S.fontFailed), { name: fonts.failed.join('، ') }));
     const measure = canvasMeasurer();
     const out: Composition[] = perVariant.map((p) => ({
