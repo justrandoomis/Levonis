@@ -26,9 +26,11 @@
  * محدوده وسوف ينزل تطبيق قريبا».
  */
 
+import { useRef, type KeyboardEvent } from "react";
 import { PROFILES, PROFILE_IDS, type ProfileId } from "../../printer-profiles";
 import type { StudioDictionary } from "../../i18n";
 import { Icon } from "../header";
+import { consumeRovingKey } from "../mobile/roving";
 
 export interface PrinterChoiceSheetProps {
   t: StudioDictionary;
@@ -40,17 +42,36 @@ export interface PrinterChoiceSheetProps {
 
 export default function PrinterChoiceSheet(props: PrinterChoiceSheetProps) {
   const { t, draft } = props;
+  /*
+   * THE GRID IS ONE RADIOGROUP TO THE KEYBOARD TOO (c6fix-r2-ha-04). All
+   * fourteen cards were tab stops and the arrows did nothing. Now Tab lands
+   * on the drafted card (the first, while nothing is drafted), and the
+   * arrows, Home and End move the draft in the order of the grid; the keys
+   * go no further (roving.ts). Moving only drafts: «تطبيق» still confirms.
+   */
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  const draftIndex = draft ? PROFILE_IDS.indexOf(draft) : -1;
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const next = consumeRovingKey(event, index, PROFILE_IDS.length);
+    if (next < 0) return;
+    props.onDraft(PROFILE_IDS[next]);
+    refs.current[next]?.focus();
+  };
   return (
     <div className="sheet-body setup-body printer-choice-body">
       <p className="printer-choice-lede">{t.choosePrinterHelp}</p>
       <div className="profile-grid" role="radiogroup" aria-label={t.choosePrinter}>
-        {PROFILE_IDS.map((id) => (
+        {PROFILE_IDS.map((id, index) => (
           <button
             key={id}
+            ref={(node) => { refs.current[index] = node; }}
+            type="button"
             role="radio"
             aria-checked={draft === id}
+            tabIndex={index === Math.max(draftIndex, 0) ? 0 : -1}
             className={draft === id ? "active" : ""}
             onClick={() => props.onDraft(id)}
+            onKeyDown={(event) => onKeyDown(event, index)}
           >
             <strong>{PROFILES[id].model}</strong>
             <span>{PROFILES[id].bed}</span>

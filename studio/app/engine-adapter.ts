@@ -325,6 +325,20 @@ function nextFrame() {
 const SCENE_EDIT_EVENTS = ["pointerup", "keyup", "change", "click"] as const;
 /** The events a person changes a setting with: typing, picking, ticking, clicking. */
 const PERSON_INPUT_EVENTS = ["input", "change", "click"] as const;
+/**
+ * A KEY PRESSED ANYWHERE CAN EDIT THE SCENE (c6fix-r2-ha-01).
+ *
+ * The engine binds its shortcuts on `window` (viewer/dist/Viewport.js: the
+ * arrows nudge the selected model 10 mm, Delete removes it, PageUp turns
+ * it) and skips only text fields and selects. So an arrow pressed on a shell
+ * button, «المزيد» or the G-code tile itself, moves the model, and the keyup
+ * of that press happens outside every engine shadow root, where the edit
+ * listeners above never hear it: the phone kept «نتيجة التقطيع جاهزة» and
+ * exported the G-code of the old position. The keyup on `window`, in the
+ * capture phase, ends every key press wherever it started, so it is a
+ * candidate edit too; the fingerprint still decides whether anything moved.
+ */
+const WINDOW_EDIT_EVENTS = ["keyup"] as const;
 
 export class EngineAdapter {
   private container: HTMLElement | null = null;
@@ -382,6 +396,10 @@ export class EngineAdapter {
     this.containerObserver = new MutationObserver(() => this.flushPendingHosts());
     this.containerObserver.observe(container, { childList: true, subtree: true });
 
+    for (const type of WINDOW_EDIT_EVENTS) {
+      window.addEventListener(type, this.onRootEditEvent, { capture: true, passive: true });
+    }
+
     this.scanExistingRoots(container);
   }
 
@@ -390,6 +408,11 @@ export class EngineAdapter {
     this.unhookShadow = null;
     this.containerObserver?.disconnect();
     this.containerObserver = null;
+    if (typeof window !== "undefined") {
+      for (const type of WINDOW_EDIT_EVENTS) {
+        window.removeEventListener(type, this.onRootEditEvent, { capture: true });
+      }
+    }
     for (const [root, observer] of this.styledRoots) {
       observer.disconnect();
       this.removeEditListeners(root);
@@ -862,10 +885,12 @@ export class EngineAdapter {
 
   /**
    * Subscribes to *candidate* scene-edit signals: gesture-ending DOM events
-   * inside the engine (pointerup / keyup / change / click) plus adapter-driven
-   * mutations (arrange, restore). Listeners should fingerprint the scene to
-   * decide whether anything actually changed — the signal is event-driven and
-   * intentionally over-approximate, never a poll.
+   * inside the engine (pointerup / keyup / change / click), every keyup on
+   * the window (the engine's key shortcuts listen there, see
+   * WINDOW_EDIT_EVENTS) plus adapter-driven mutations (arrange, restore).
+   * Listeners should fingerprint the scene to decide whether anything
+   * actually changed — the signal is event-driven and intentionally
+   * over-approximate, never a poll.
    */
   onSceneEdit(listener: () => void): () => void {
     this.sceneEditListeners.add(listener);

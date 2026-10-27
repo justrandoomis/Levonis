@@ -847,10 +847,13 @@ button:disabled { cursor: not-allowed; }
 .profile-status.fallback { padding: 9px 10px; border: 1px solid var(--warning-border); border-radius: var(--radius-sm); background: var(--warning-surface); color: var(--on-warning); }
 .profile-status.fallback svg { color: var(--warning); }
 .segmented-control { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; direction: ltr; }
-.segmented-control button { min-width: 0; min-height: 64px; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: var(--panel); cursor: pointer; }
+.segmented-control button { position: relative; min-width: 0; min-height: 64px; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: var(--panel); cursor: pointer; }
 .segmented-control button.active { border-color: var(--accent-strong); background: var(--accent-tint); color: var(--accent); }
 .segmented-control strong { font-size: 11px; }
 .segmented-control span { color: var(--muted); font-size: var(--text-caption); }
+/* The chosen tier says so without colour too: a check mark, as on the printer cards (c6fix-r2-ha-05). */
+.tier-check { position: absolute; top: 5px; inset-inline-end: 5px; display: grid; place-items: center; color: var(--accent); }
+.tier-check svg { width: 13px; height: 13px; }
 /* P1-10 editor mode: two choices, and the line under them says what stays. */
 .segmented-control.mode-control { grid-template-columns: repeat(2, 1fr); }
 .mode-help { margin: 8px 0 0; color: var(--muted); font-size: var(--text-caption); line-height: 1.55; }
@@ -858,9 +861,15 @@ button:disabled { cursor: not-allowed; }
 .support-row > span { display: flex; flex-direction: column; gap: 4px; }
 .support-row strong { font-size: 13px; }
 .support-row small { color: var(--muted); font-size: var(--text-caption); }
-.switch { width: 52px; height: 30px; padding: 3px; border: 0; border-radius: 99px; background: var(--track); cursor: pointer; direction: ltr; }
-.switch i { width: 24px; height: 24px; display: block; border-radius: 50%; background: var(--knob); box-shadow: 0 2px 6px var(--shadow-cast); transition: transform .18s ease; }
-.switch.on { background: var(--accent-strong); }
+/*
+ * A 44 PX TARGET AROUND THE SAME 52 x 30 TRACK (c6fix-r2-ha-03). The button
+ * is a transparent 52 x 44 box; the track is its ::before, a pill 7 px in
+ * from the top and the bottom, and the knob sits 3 px inside the track.
+ */
+.switch { position: relative; width: 52px; height: var(--tap-min); padding: 10px 3px; border: 0; border-radius: 99px; background: transparent; cursor: pointer; direction: ltr; }
+.switch::before { content: ""; position: absolute; inset: 7px 0; border-radius: 99px; background: var(--track); }
+.switch i { position: relative; width: 24px; height: 24px; display: block; border-radius: 50%; background: var(--knob); box-shadow: 0 2px 6px var(--shadow-cast); transition: transform .18s ease; }
+.switch.on::before { background: var(--accent-strong); }
 .switch.on i { transform: translateX(22px); }
 .advanced-button { width: 100%; min-height: 66px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; background: var(--panel); text-align: start; cursor: pointer; }
 .advanced-button > span { min-width: 0; display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 8px; align-items: center; }
@@ -996,9 +1005,10 @@ button:disabled { cursor: not-allowed; }
 .site-links svg { width: 17px; height: 17px; }
 .levonis-rights { margin: 2px 0 0; padding: 10px 4px 0; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: var(--text-caption); line-height: 1.55; text-align: center; }
 .legal-details { border: 1px solid var(--line-soft); border-radius: var(--radius-sm); color: var(--muted); font-size: var(--text-caption); }
-.legal-details summary { padding: 11px 12px; cursor: pointer; color: var(--text); font-weight: 750; }
+/* Both are 44 px targets, as .more-links a is (c6fix-r2-ha-08); the summary keeps its marker. */
+.legal-details summary { min-height: var(--tap-min); padding: 11px 12px; line-height: 22px; cursor: pointer; color: var(--text); font-weight: 750; }
 .legal-details p { margin: 0; padding: 0 12px 10px; line-height: 1.6; }
-.legal-details a { margin: 0 12px 12px; min-height: 38px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--text); text-decoration: none; }
+.legal-details a { margin: 0 12px 12px; min-height: var(--tap-min); display: grid; place-items: center; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--text); text-decoration: none; }
 
 .connection-details-button { width: 100%; min-height: 46px; padding: 0 13px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); cursor: pointer; font-size: 11px; font-weight: 760; }
 .connection-details-button svg { width: 18px; height: 18px; }

@@ -58,12 +58,12 @@ export const ckb: StudioDictionary = {
   bed: "بینینی Plate",
   addPlate: "Plate +",
   arrange: "ڕیزکردنی خۆکار",
-  arrangeDone: "{models} تەن لەسەر {plates} Plate ڕیز کران.",
+  arrangeDone: "{models} تەن لەسەر {plates} Plate ڕیز {models, plural, one {کرا} other {کران}}.",
   arrangeUndo: "گەڕاندنەوەی ڕیزکردن",
   arrangeUndone: "ڕیزکردنەکە گەڕێندرایەوە.",
   arrangeUnavailable: "ڕیزکردنی خۆکار پێویستی بە لانیکەم یەک تەن و بزوێنەرێکی ئامادەیە.",
   orient: "ئاراستەی خۆکار",
-  orientDone: "{oriented} لە {total} تەن بۆ چاپکردن ئاراستە کران.",
+  orientDone: "{oriented} لە {total} تەن بۆ چاپکردن ئاراستە {oriented, plural, one {کرا} other {کران}}.",
   orientNoChange: "هەموو تەنەکان پێشتر لە باشترین ئاراستەی چاپکردندان.",
   orientUndo: "گەڕاندنەوەی ئاراستە",
   orientUndone: "ئاراستەکە گەڕێندرایەوە.",
@@ -119,7 +119,7 @@ export const ckb: StudioDictionary = {
   simplifiedRetryHelp: "پڕکردنەوەکە سادە دەکات و چڕییەکەی کەم دەکاتەوە بۆ ئەوەی بیرگەی کەمتر بەکاربهێنێت، پاشان دووبارە پارچەی دەکات.",
   printNotReady: "سەرەتا Plateەکە پارچە بکە بۆ دروستکردنی فایلی چاپ.",
   printStale: "ئەنجامی پارچەکردن دوای دەستکارییەکانت کۆن بووە. بۆ هەناردەکردن دووبارە پارچەی بکە.",
-  presetTookEdits: "ڕێکخستنە ئامادەکراوە نوێیەکە {count} لە ڕێکخستنە دەستکاریکراوەکانت گۆڕی: {names}. ئەوانی تر وەک خۆی مانەوە.",
+  presetTookEdits: "ڕێکخستنە ئامادەکراوە نوێیەکە {count} لە ڕێکخستنە دەستکاریکراوەکانت گۆڕی. ئەوانی تر وەک خۆی مانەوە.",
   presetKeptEdits: "{count} لە ڕێکخستنە دەستکاریکراوەکانت پارێزران.",
 
   // هاوردەکردن
@@ -169,6 +169,14 @@ export const ckb: StudioDictionary = {
   infillLight: "سووک و خێرا",
   infillBalanced: "هاوسەنگ",
   infillStrong: "بەهێز",
+  // ئاستەکانی کوالیتی و بەهێزی بە ناو، و ژمارەی دیوارەکان لە ژێریاندا.
+  qualityFine: "ورد",
+  qualityStandard: "ئاسایی",
+  qualityDraft: "خێرا",
+  strengthLight: "سووک",
+  strengthStandard: "ئاسایی",
+  strengthStrong: "بەهێز",
+  wallsCount: "{count} دیوار",
 
   choosePrinter: "چاپکەرەکەت هەڵبژێرە",
   choosePrinterHelp: "قەبارەی جێگا و لوولە و هەموو ڕێکخستنە ئامادەکانی دەستکاریکەر لەم هەڵبژاردنەوە دێن. هەر کاتێک بتەوێت لە ڕێکخستندا دەیگۆڕیت.",

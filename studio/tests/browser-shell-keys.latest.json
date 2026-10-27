@@ -1,0 +1,641 @@
+{
+  "target": "http://127.0.0.1:5263/",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "failures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "m": "the tower slices"
+    },
+    {
+      "ok": true,
+      "m": "a fresh result exports its G-code"
+    },
+    {
+      "ok": true,
+      "m": "back in Prepare, the result is still fresh",
+      "detail": "{\"readiness\":\"sliced\",\"gcodeDisabled\":false,\"slice\":\"sliced\",\"x\":0,\"focus\":\"more\",\"message\":\"\"}"
+    },
+    {
+      "ok": true,
+      "m": "ArrowLeft on «تحريك» moves the focus to «تدوير» (right to left)",
+      "detail": "rotate"
+    },
+    {
+      "ok": true,
+      "m": "…and moves no model",
+      "detail": "x 0 -> 0"
+    },
+    {
+      "ok": true,
+      "m": "…and the result stays fresh",
+      "detail": "sliced"
+    },
+    {
+      "ok": true,
+      "m": "End reaches «ترتيب»"
+    },
+    {
+      "ok": true,
+      "m": "Home comes back to «تحريك»"
+    },
+    {
+      "ok": true,
+      "m": "the toolbar is one tab stop, on the focused tile",
+      "detail": "0,-1,-1,-1"
+    },
+    {
+      "ok": true,
+      "m": "ArrowDown walks too, and moves nothing",
+      "detail": "rotate, x 0"
+    },
+    {
+      "ok": true,
+      "m": "ArrowLeft on «المزيد» moves the model 10 mm (the engine's own nudge)",
+      "detail": "x 0 -> -10"
+    },
+    {
+      "ok": true,
+      "m": "…and the banner says the result is outdated",
+      "detail": "stale"
+    },
+    {
+      "ok": true,
+      "m": "…the G-code tile is disabled and the primary is «أعد التقطيع»",
+      "detail": "true / stale"
+    },
+    {
+      "ok": true,
+      "m": "…and nothing is downloaded"
+    },
+    {
+      "ok": true,
+      "m": "sliced again: fresh",
+      "detail": "{\"readiness\":\"sliced\",\"gcodeDisabled\":false,\"slice\":\"sliced\",\"x\":-10,\"focus\":\"more\",\"message\":\"\"}"
+    },
+    {
+      "ok": true,
+      "m": "ArrowLeft on the G-code tile itself: moved, outdated, disabled",
+      "detail": "{\"readiness\":\"stale\",\"gcodeDisabled\":true,\"slice\":\"stale\",\"x\":-20,\"focus\":\"BODY\",\"message\":\"تغيّر المشهد أو الإعدادات بعد التقطيع. أعد التقطيع قبل التصدير — ملف G-code القديم لم يعد مطابقًا للمشروع.تقطيع\"}"
+    },
+    {
+      "ok": true,
+      "m": "a keydown with no keyup still nudges the model",
+      "detail": "x -20 -> -30"
+    },
+    {
+      "ok": true,
+      "m": "pressing the tile then downloads nothing",
+      "detail": "(the tile was enabled: the export itself refused)"
+    },
+    {
+      "ok": true,
+      "m": "…and the banner and the tile catch up: outdated, disabled",
+      "detail": "stale / true"
+    },
+    {
+      "ok": true,
+      "m": "the support switch is named by its label",
+      "detail": "الدعامات"
+    },
+    {
+      "ok": true,
+      "m": "…and the accessibility tree finds it by that name"
+    },
+    {
+      "ok": true,
+      "m": "…in a 44 px box",
+      "detail": "52 x 44"
+    },
+    {
+      "ok": true,
+      "m": "«وضع المحرر» has exactly one checked option",
+      "detail": "مبسطالأساسيات"
+    },
+    {
+      "ok": true,
+      "m": "«وضع المحرر» is one tab stop, on the checked option"
+    },
+    {
+      "ok": true,
+      "m": "«وضع المحرر»: the checked option carries the check mark"
+    },
+    {
+      "ok": true,
+      "m": "«الجودة» has exactly one checked option",
+      "detail": "قياسية0.20 mm"
+    },
+    {
+      "ok": true,
+      "m": "«الجودة» is one tab stop, on the checked option"
+    },
+    {
+      "ok": true,
+      "m": "«الجودة»: the checked option carries the check mark"
+    },
+    {
+      "ok": true,
+      "m": "«القوة» has exactly one checked option",
+      "detail": "قياسية15% · جداران"
+    },
+    {
+      "ok": true,
+      "m": "«القوة» is one tab stop, on the checked option"
+    },
+    {
+      "ok": true,
+      "m": "«القوة»: the checked option carries the check mark"
+    },
+    {
+      "ok": true,
+      "m": "«نوع الحشو» has exactly one checked option",
+      "detail": "Gyroidمتوازن"
+    },
+    {
+      "ok": true,
+      "m": "«نوع الحشو» is one tab stop, on the checked option"
+    },
+    {
+      "ok": true,
+      "m": "«نوع الحشو»: the checked option carries the check mark"
+    },
+    {
+      "ok": true,
+      "m": "«المظهر» has exactly one checked option",
+      "detail": "داكن"
+    },
+    {
+      "ok": true,
+      "m": "«المظهر» is one tab stop, on the checked option"
+    },
+    {
+      "ok": true,
+      "m": "«المظهر»: the checked option carries the check mark"
+    },
+    {
+      "ok": true,
+      "m": "mode, quality, strength, infill pattern and appearance are radiogroups",
+      "detail": "وضع المحرر · الجودة · القوة · نوع الحشو · المظهر"
+    },
+    {
+      "ok": true,
+      "m": "the Quality and Strength tiers carry no English",
+      "detail": "عالية الدقة · قياسية · سريعة · خفيفة · قياسية · قوية"
+    },
+    {
+      "ok": true,
+      "m": "…and the walls are counted in the reader's language",
+      "detail": "10% · جداران · 15% · جداران · 25% · 3 جدران"
+    },
+    {
+      "ok": true,
+      "m": "the infill patterns keep the engine's own names",
+      "detail": "Zigzag · Gyroid · 3D Honeycomb"
+    },
+    {
+      "ok": true,
+      "m": "ArrowRight on a tier moves to the next one and checks it",
+      "detail": "سريعة0.24 mm"
+    },
+    {
+      "ok": true,
+      "m": "Home goes to the first tier",
+      "detail": "عالية الدقة0.12 mm"
+    },
+    {
+      "ok": true,
+      "m": "End goes to the last tier",
+      "detail": "سريعة0.24 mm"
+    },
+    {
+      "ok": true,
+      "m": "and the sheet stays open around it",
+      "detail": "عالية الدقة0.12 mm"
+    },
+    {
+      "ok": true,
+      "m": "End in the mode radiogroup chooses Advanced, on the page too",
+      "detail": "متقدمكل إعدادات المحرك"
+    },
+    {
+      "ok": true,
+      "m": "Home brings Simple back"
+    },
+    {
+      "ok": true,
+      "m": "the printer grid: 14 radios, one tab stop",
+      "detail": "1 tab stop(s)"
+    },
+    {
+      "ok": true,
+      "m": "ArrowDown drafts the next printer (A1 mini after A1)",
+      "detail": "Bambu Lab A1 mini180 × 180 × 180 mmOrca BBL · 0.4 mm"
+    },
+    {
+      "ok": true,
+      "m": "End drafts the last one",
+      "detail": "Bambu Lab A2L330 × 320 × 325 mmOrca BBL · 0.4 mm"
+    },
+    {
+      "ok": true,
+      "m": "«تطبيق» still confirms"
+    },
+    {
+      "ok": true,
+      "m": "ArrowRight selects the next connection tab",
+      "detail": "السحابة"
+    },
+    {
+      "ok": true,
+      "m": "End selects USB",
+      "detail": "USB"
+    },
+    {
+      "ok": true,
+      "m": "each tab controls the tabpanel, which its tab labels; one tab stop",
+      "detail": "{\"panel\":\"tabpanel\",\"labelledBy\":true,\"stops\":1}"
+    },
+    {
+      "ok": true,
+      "m": "the support switch is named by its label",
+      "detail": "پاڵپشتەکان"
+    },
+    {
+      "ok": true,
+      "m": "…and the accessibility tree finds it by that name"
+    },
+    {
+      "ok": true,
+      "m": "…in a 44 px box",
+      "detail": "52 x 44"
+    },
+    {
+      "ok": true,
+      "m": "«دۆخی دەستکاریکەر» has exactly one checked option",
+      "detail": "سادەبنەڕەتییەکان"
+    },
+    {
+      "ok": true,
+      "m": "«دۆخی دەستکاریکەر» is one tab stop, on the checked option"
+    },
+    {
+      "ok": true,
+      "m": "«دۆخی دەستکاریکەر»: the checked option carries the check mark"
+    },
+    {
+      "ok": true,
+      "m": "«کوالیتی» has exactly one checked option",
+      "detail": "ئاسایی0.20 mm"
+    },
+    {
+      "ok": true,
+      "m": "«کوالیتی» is one tab stop, on the checked option"
+    },
+    {
+      "ok": true,
+      "m": "«کوالیتی»: the checked option carries the check mark"
+    },
+    {
+      "ok": true,
+      "m": "«بەهێزی» has exactly one checked option",
+      "detail": "ئاسایی15% · 2 دیوار"
+    },
+    {
+      "ok": true,
+      "m": "«بەهێزی» is one tab stop, on the checked option"
+    },
+    {
+      "ok": true,
+      "m": "«بەهێزی»: the checked option carries the check mark"
+    },
+    {
+      "ok": true,
+      "m": "«شێوەی پڕکردنەوە» has exactly one checked option",
+      "detail": "Gyroidهاوسەنگ"
+    },
+    {
+      "ok": true,
+      "m": "«شێوەی پڕکردنەوە» is one tab stop, on the checked option"
+    },
+    {
+      "ok": true,
+      "m": "«شێوەی پڕکردنەوە»: the checked option carries the check mark"
+    },
+    {
+      "ok": true,
+      "m": "«ڕووکار» has exactly one checked option",
+      "detail": "ڕووناک"
+    },
+    {
+      "ok": true,
+      "m": "«ڕووکار» is one tab stop, on the checked option"
+    },
+    {
+      "ok": true,
+      "m": "«ڕووکار»: the checked option carries the check mark"
+    },
+    {
+      "ok": true,
+      "m": "mode, quality, strength, infill pattern and appearance are radiogroups",
+      "detail": "دۆخی دەستکاریکەر · کوالیتی · بەهێزی · شێوەی پڕکردنەوە · ڕووکار"
+    },
+    {
+      "ok": true,
+      "m": "the Quality and Strength tiers carry no English",
+      "detail": "ورد · ئاسایی · خێرا · سووک · ئاسایی · بەهێز"
+    },
+    {
+      "ok": true,
+      "m": "…and the walls are counted in the reader's language",
+      "detail": "10% · 2 دیوار · 15% · 2 دیوار · 25% · 3 دیوار"
+    },
+    {
+      "ok": true,
+      "m": "the infill patterns keep the engine's own names",
+      "detail": "Zigzag · Gyroid · 3D Honeycomb"
+    },
+    {
+      "ok": true,
+      "m": "ArrowRight on a tier moves to the next one and checks it",
+      "detail": "خێرا0.24 mm"
+    },
+    {
+      "ok": true,
+      "m": "Home goes to the first tier",
+      "detail": "ورد0.12 mm"
+    },
+    {
+      "ok": true,
+      "m": "End goes to the last tier",
+      "detail": "خێرا0.24 mm"
+    },
+    {
+      "ok": true,
+      "m": "and the sheet stays open around it",
+      "detail": "ورد0.12 mm"
+    },
+    {
+      "ok": true,
+      "m": "End in the mode radiogroup chooses Advanced, on the page too",
+      "detail": "پێشکەوتووهەموو ڕێکخستنەکانی بزوێنەر"
+    },
+    {
+      "ok": true,
+      "m": "Home brings Simple back"
+    },
+    {
+      "ok": true,
+      "m": "the printer grid: 14 radios, one tab stop",
+      "detail": "1 tab stop(s)"
+    },
+    {
+      "ok": true,
+      "m": "ArrowDown drafts the next printer (A1 mini after A1)",
+      "detail": "Bambu Lab A1 mini180 × 180 × 180 mmOrca BBL · 0.4 mm"
+    },
+    {
+      "ok": true,
+      "m": "End drafts the last one",
+      "detail": "Bambu Lab A2L330 × 320 × 325 mmOrca BBL · 0.4 mm"
+    },
+    {
+      "ok": true,
+      "m": "«تطبيق» still confirms"
+    },
+    {
+      "ok": true,
+      "m": "ArrowRight selects the next connection tab",
+      "detail": "هەور"
+    },
+    {
+      "ok": true,
+      "m": "End selects USB",
+      "detail": "USB"
+    },
+    {
+      "ok": true,
+      "m": "each tab controls the tabpanel, which its tab labels; one tab stop",
+      "detail": "{\"panel\":\"tabpanel\",\"labelledBy\":true,\"stops\":1}"
+    },
+    {
+      "ok": true,
+      "m": "the support switch is named by its label",
+      "detail": "Support"
+    },
+    {
+      "ok": true,
+      "m": "…and the accessibility tree finds it by that name"
+    },
+    {
+      "ok": true,
+      "m": "…in a 44 px box",
+      "detail": "52 x 44"
+    },
+    {
+      "ok": true,
+      "m": "«Editor mode» has exactly one checked option",
+      "detail": "SimpleThe essentials"
+    },
+    {
+      "ok": true,
+      "m": "«Editor mode» is one tab stop, on the checked option"
+    },
+    {
+      "ok": true,
+      "m": "«Editor mode»: the checked option carries the check mark"
+    },
+    {
+      "ok": true,
+      "m": "«Quality» has exactly one checked option",
+      "detail": "Standard0.20 mm"
+    },
+    {
+      "ok": true,
+      "m": "«Quality» is one tab stop, on the checked option"
+    },
+    {
+      "ok": true,
+      "m": "«Quality»: the checked option carries the check mark"
+    },
+    {
+      "ok": true,
+      "m": "«Strength» has exactly one checked option",
+      "detail": "Standard15% · 2 walls"
+    },
+    {
+      "ok": true,
+      "m": "«Strength» is one tab stop, on the checked option"
+    },
+    {
+      "ok": true,
+      "m": "«Strength»: the checked option carries the check mark"
+    },
+    {
+      "ok": true,
+      "m": "«Infill pattern» has exactly one checked option",
+      "detail": "GyroidBalanced"
+    },
+    {
+      "ok": true,
+      "m": "«Infill pattern» is one tab stop, on the checked option"
+    },
+    {
+      "ok": true,
+      "m": "«Infill pattern»: the checked option carries the check mark"
+    },
+    {
+      "ok": true,
+      "m": "«Appearance» has exactly one checked option",
+      "detail": "Dark"
+    },
+    {
+      "ok": true,
+      "m": "«Appearance» is one tab stop, on the checked option"
+    },
+    {
+      "ok": true,
+      "m": "«Appearance»: the checked option carries the check mark"
+    },
+    {
+      "ok": true,
+      "m": "mode, quality, strength, infill pattern and appearance are radiogroups",
+      "detail": "Editor mode · Quality · Strength · Infill pattern · Appearance"
+    },
+    {
+      "ok": true,
+      "m": "English keeps Fine / Standard / Draft and Light / Standard / Strong",
+      "detail": "Fine · Standard · Draft · Light · Standard · Strong"
+    },
+    {
+      "ok": true,
+      "m": "…and counts the walls in English",
+      "detail": "10% · 2 walls · 15% · 2 walls · 25% · 3 walls"
+    },
+    {
+      "ok": true,
+      "m": "the infill patterns keep the engine's own names",
+      "detail": "Zigzag · Gyroid · 3D Honeycomb"
+    },
+    {
+      "ok": true,
+      "m": "ArrowRight on a tier moves to the next one and checks it",
+      "detail": "Draft0.24 mm"
+    },
+    {
+      "ok": true,
+      "m": "Home goes to the first tier",
+      "detail": "Fine0.12 mm"
+    },
+    {
+      "ok": true,
+      "m": "End goes to the last tier",
+      "detail": "Draft0.24 mm"
+    },
+    {
+      "ok": true,
+      "m": "and the sheet stays open around it",
+      "detail": "Fine0.12 mm"
+    },
+    {
+      "ok": true,
+      "m": "End in the mode radiogroup chooses Advanced, on the page too",
+      "detail": "AdvancedEvery engine setting"
+    },
+    {
+      "ok": true,
+      "m": "Home brings Simple back"
+    },
+    {
+      "ok": true,
+      "m": "the printer grid: 14 radios, one tab stop",
+      "detail": "1 tab stop(s)"
+    },
+    {
+      "ok": true,
+      "m": "ArrowDown drafts the next printer (A1 mini after A1)",
+      "detail": "Bambu Lab A1 mini180 × 180 × 180 mmOrca BBL · 0.4 mm"
+    },
+    {
+      "ok": true,
+      "m": "End drafts the last one",
+      "detail": "Bambu Lab A2L330 × 320 × 325 mmOrca BBL · 0.4 mm"
+    },
+    {
+      "ok": true,
+      "m": "«تطبيق» still confirms"
+    },
+    {
+      "ok": true,
+      "m": "ArrowRight selects the next connection tab",
+      "detail": "Cloud"
+    },
+    {
+      "ok": true,
+      "m": "End selects USB",
+      "detail": "USB"
+    },
+    {
+      "ok": true,
+      "m": "each tab controls the tabpanel, which its tab labels; one tab stop",
+      "detail": "{\"panel\":\"tabpanel\",\"labelledBy\":true,\"stops\":1}"
+    },
+    {
+      "ok": true,
+      "m": "«ترتيب» says the count in words that agree with it",
+      "detail": "تم ترتيب مجسم واحد على Plate واحدة.تراجع عن الترتيب"
+    },
+    {
+      "ok": true,
+      "m": "the orientation chip counts the object",
+      "detail": "تم تغيير اتجاه مجسم واحد.تراجع عن التوجيه"
+    },
+    {
+      "ok": true,
+      "m": "the preset that took an edit back says how many, and names no engine key",
+      "detail": "استبدل الإعداد الجاهز الجديد إعدادًا واحدًا من إعداداتك المعدّلة، وبقيت بقية تعديلاتك كما هي.تراجع عن التوجيه"
+    },
+    {
+      "ok": true,
+      "m": "«ترتيب» says the count in words that agree with it",
+      "detail": "Arranged 1 object across 1 plate.Undo arrangement"
+    },
+    {
+      "ok": true,
+      "m": "the orientation chip counts the object",
+      "detail": "Turned 1 object.Undo orientation"
+    },
+    {
+      "ok": true,
+      "m": "«ترتيب» says the count in words that agree with it",
+      "detail": "1 تەن لەسەر 1 Plate ڕیز کرا.گەڕاندنەوەی ڕیزکردن"
+    },
+    {
+      "ok": true,
+      "m": "the orientation chip counts the object",
+      "detail": "ئاراستەی 1 تەن گۆڕدرا.گەڕاندنەوەی ئاراستە"
+    },
+    {
+      "ok": true,
+      "m": "the preset that took an edit back says how many, and names no engine key",
+      "detail": "ڕێکخستنە ئامادەکراوە نوێیەکە 1 لە ڕێکخستنە دەستکاریکراوەکانت گۆڕی. ئەوانی تر وەک خۆی مانەوە.گەڕاندنەوەی ئاراستە"
+    },
+    {
+      "ok": true,
+      "m": "«المعلومات القانونية» is at least 44 px tall",
+      "detail": "360 x 44"
+    },
+    {
+      "ok": true,
+      "m": "«المصدر وإشعارات المكتبات» is at least 44 px tall",
+      "detail": "336 x 44"
+    },
+    {
+      "ok": true,
+      "m": "no page errors",
+      "detail": ""
+    }
+  ]
+}

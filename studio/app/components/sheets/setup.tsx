@@ -9,16 +9,87 @@
  * an explicit warning (no silent fallback presented as a documented profile).
  */
 
+import { useRef, type KeyboardEvent } from "react";
 import { INFILL, PROFILES, PROFILE_IDS, QUALITY, STRENGTH, type InfillId, type ProfileId, type QualityId, type StrengthId } from "../../printer-profiles";
 import type { MissingPreset } from "../../profile-loader";
-import { templateText, type StudioDictionary } from "../../i18n";
+import { templateText, type Locale, type StudioDictionary } from "../../i18n";
 import { STUDIO_MODES, type StudioMode } from "../../studio-mode";
 import type { ThemePreference } from "../../theme";
 import { Icon } from "../header";
 import ChoiceSegments from "../mobile/choice-segments";
+import { consumeRovingKey } from "../mobile/roving";
+
+interface Tile<T extends string> {
+  id: T;
+  title: string;
+  caption: string;
+}
+
+/**
+ * ONE RADIOGROUP PER CHOICE: the editor mode, Quality, Strength and the
+ * infill pattern (c6fix-r2-ha-04, -05).
+ *
+ * The tiers were plain buttons whose chosen one differed by a gold edge and
+ * gold text alone, so a screen reader heard «Standard 0.20 mm» with nothing
+ * saying it was the one in force (WCAG 4.1.2), and the mode radiogroup had
+ * no arrow keys and two tab stops. Each group is now a radiogroup of radios:
+ * aria-checked on the chosen tile, which also carries the check mark the
+ * printer cards and the appearance carry; Tab lands on the chosen tile (the
+ * first, before anything is chosen); the arrows, Home and End move the
+ * choice in the writing direction of the row, and go no further (roving.ts).
+ * Choosing follows the focus, as in the mode switch on the page.
+ */
+function RadioTiles<T extends string>(props: {
+  className: string;
+  label: string;
+  tiles: ReadonlyArray<Tile<T>>;
+  value: T;
+  onChoose: (id: T) => void;
+  /** The data attribute each tile carries, for the browser checks. */
+  dataName?: "data-levo-mode-option" | "data-levo-tier";
+}) {
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  const checkedIndex = props.tiles.findIndex((tile) => tile.id === props.value);
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const next = consumeRovingKey(event, index, props.tiles.length);
+    if (next < 0) return;
+    props.onChoose(props.tiles[next].id);
+    refs.current[next]?.focus();
+  };
+  return (
+    <div className={props.className} role="radiogroup" aria-label={props.label}>
+      {props.tiles.map((tile, index) => {
+        const checked = index === checkedIndex;
+        const data = props.dataName ? { [props.dataName]: tile.id } : {};
+        return (
+          <button
+            key={tile.id}
+            ref={(node) => { refs.current[index] = node; }}
+            type="button"
+            role="radio"
+            aria-checked={checked}
+            tabIndex={index === Math.max(checkedIndex, 0) ? 0 : -1}
+            className={checked ? "active" : ""}
+            onClick={() => props.onChoose(tile.id)}
+            onKeyDown={(event) => onKeyDown(event, index)}
+            {...data}
+          >
+            <strong>{tile.title}</strong>
+            {/* The row is drawn left to right (.segmented-control); a caption
+                in Arabic or Sorani («25% · 3 جدران») reads in its own direction. */}
+            <span dir="auto">{tile.caption}</span>
+            {checked && <i className="tier-check" aria-hidden="true"><Icon name="check" /></i>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export interface SetupSheetProps {
   t: StudioDictionary;
+  /** For the counted words (the wall count). */
+  locale: Locale;
   profileId: ProfileId;
   quality: QualityId;
   strength: StrengthId;
@@ -43,7 +114,10 @@ export interface SetupSheetProps {
 }
 
 export default function SetupSheet(props: SetupSheetProps) {
-  const { t } = props;
+  const { t, locale } = props;
+  const qualityName: Record<QualityId, string> = { fine: t.qualityFine, standard: t.qualityStandard, draft: t.qualityDraft };
+  const strengthName: Record<StrengthId, string> = { light: t.strengthLight, standard: t.strengthStandard, strong: t.strengthStrong };
+  const infillPurpose: Record<InfillId, string> = { light: t.infillLight, balanced: t.infillBalanced, strong: t.infillStrong };
   return (
     <div className="sheet-body setup-body">
       {/*
@@ -57,21 +131,18 @@ export default function SetupSheet(props: SetupSheetProps) {
       */}
       <fieldset className="mode-fieldset">
         <legend>{t.modeTitle}</legend>
-        <div className="segmented-control mode-control" role="radiogroup" aria-label={t.modeTitle}>
-          {STUDIO_MODES.map((id) => (
-            <button
-              key={id}
-              role="radio"
-              aria-checked={props.mode === id}
-              className={props.mode === id ? "active" : ""}
-              data-levo-mode-option={id}
-              onClick={() => props.onMode(id)}
-            >
-              <strong>{id === "simple" ? t.modeSimple : t.modeAdvanced}</strong>
-              <span>{id === "simple" ? t.modeSimpleShort : t.modeAdvancedShort}</span>
-            </button>
-          ))}
-        </div>
+        <RadioTiles
+          className="segmented-control mode-control"
+          label={t.modeTitle}
+          tiles={STUDIO_MODES.map((id) => ({
+            id,
+            title: id === "simple" ? t.modeSimple : t.modeAdvanced,
+            caption: id === "simple" ? t.modeSimpleShort : t.modeAdvancedShort,
+          }))}
+          value={props.mode}
+          onChoose={(id) => props.onMode(id)}
+          dataName="data-levo-mode-option"
+        />
         <p className="mode-help">{props.mode === "simple" ? t.modeSimpleHelp : t.modeAdvancedHelp}</p>
       </fieldset>
       <fieldset>
@@ -126,25 +197,33 @@ export default function SetupSheet(props: SetupSheetProps) {
       </fieldset>
       <fieldset>
         <legend>{t.quality}</legend>
-        <div className="segmented-control">
-          {(Object.keys(QUALITY) as QualityId[]).map((id) => (
-            <button key={id} className={props.quality === id ? "active" : ""} onClick={() => props.onQuality(id)}>
-              <strong>{QUALITY[id].label}</strong>
-              <span>{QUALITY[id].layer.toFixed(2)} mm</span>
-            </button>
-          ))}
-        </div>
+        <RadioTiles
+          className="segmented-control"
+          label={t.quality}
+          tiles={(Object.keys(QUALITY) as QualityId[]).map((id) => ({
+            id,
+            title: qualityName[id],
+            caption: `${QUALITY[id].layer.toFixed(2)} mm`,
+          }))}
+          value={props.quality}
+          onChoose={(id) => props.onQuality(id)}
+          dataName="data-levo-tier"
+        />
       </fieldset>
       <fieldset>
         <legend>{t.strength}</legend>
-        <div className="segmented-control">
-          {(Object.keys(STRENGTH) as StrengthId[]).map((id) => (
-            <button key={id} className={props.strength === id ? "active" : ""} onClick={() => props.onStrength(id)}>
-              <strong>{STRENGTH[id].label}</strong>
-              <span>{STRENGTH[id].infill}% · {STRENGTH[id].walls} walls</span>
-            </button>
-          ))}
-        </div>
+        <RadioTiles
+          className="segmented-control"
+          label={t.strength}
+          tiles={(Object.keys(STRENGTH) as StrengthId[]).map((id) => ({
+            id,
+            title: strengthName[id],
+            caption: `${STRENGTH[id].infill}% · ${templateText(t.wallsCount, { count: STRENGTH[id].walls }, locale)}`,
+          }))}
+          value={props.strength}
+          onChoose={(id) => props.onStrength(id)}
+          dataName="data-levo-tier"
+        />
       </fieldset>
       {/*
         INFILL PATTERN — THE SHAPE, DIRECTLY UNDER THE AMOUNT.
@@ -162,18 +241,27 @@ export default function SetupSheet(props: SetupSheetProps) {
       */}
       <fieldset>
         <legend>{t.infillPattern}</legend>
-        <div className="segmented-control">
-          {(Object.keys(INFILL) as InfillId[]).map((id) => (
-            <button key={id} className={props.infill === id ? "active" : ""} onClick={() => props.onInfill(id)}>
-              <strong>{INFILL[id].label}</strong>
-              <span>{id === "light" ? t.infillLight : id === "balanced" ? t.infillBalanced : t.infillStrong}</span>
-            </button>
-          ))}
-        </div>
+        <RadioTiles
+          className="segmented-control"
+          label={t.infillPattern}
+          tiles={(Object.keys(INFILL) as InfillId[]).map((id) => ({
+            id,
+            title: INFILL[id].label,
+            caption: infillPurpose[id],
+          }))}
+          value={props.infill}
+          onChoose={(id) => props.onInfill(id)}
+          dataName="data-levo-tier"
+        />
       </fieldset>
+      {/*
+        THE SWITCH IS NAMED BY ITS LABEL (c6fix-r2-ha-03): a screen reader
+        heard «switch», off, with no name. Its 52 x 30 track keeps its look,
+        inside a 44 px target (globals.css .switch).
+      */}
       <div className="support-row">
-        <span><strong>{t.support}</strong><small>{props.support ? t.auto : t.off}</small></span>
-        <button className={`switch ${props.support ? "on" : ""}`} role="switch" aria-checked={props.support} onClick={() => props.onSupport(!props.support)}><i /></button>
+        <span><strong id="setup-support-label">{t.support}</strong><small>{props.support ? t.auto : t.off}</small></span>
+        <button type="button" className={`switch ${props.support ? "on" : ""}`} role="switch" aria-checked={props.support} aria-labelledby="setup-support-label" onClick={() => props.onSupport(!props.support)}><i /></button>
       </div>
       <button className="advanced-button" onClick={props.onOpenAdvanced}>
         <span><Icon name="settings" /><b>{t.advanced}</b><small>{props.mode === "simple" ? t.modeSwitchHelp : t.advancedHelp}</small></span>

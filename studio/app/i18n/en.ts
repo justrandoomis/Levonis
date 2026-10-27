@@ -56,12 +56,12 @@ export const en = {
   bed: "Zoom bed",
   addPlate: "Plate +",
   arrange: "Auto-arrange",
-  arrangeDone: "Arranged {models} objects across {plates} plates.",
+  arrangeDone: "Arranged {models, plural, one {# object} other {# objects}} across {plates, plural, one {# plate} other {# plates}}.",
   arrangeUndo: "Undo arrangement",
   arrangeUndone: "The arrangement was undone.",
   arrangeUnavailable: "Auto-arrange needs at least one object and a running engine.",
   orient: "Auto-orient",
-  orientDone: "Oriented {oriented} of {total} objects for printing.",
+  orientDone: "Oriented {oriented} of {total, plural, one {# object} other {# objects}} for printing.",
   orientNoChange: "Every object is already in its best printing orientation.",
   orientUndo: "Undo orientation",
   orientUndone: "The orientation was undone.",
@@ -117,7 +117,7 @@ export const en = {
   simplifiedRetryHelp: "Simplify the infill and lower its density to use less memory, then slice again.",
   printNotReady: "Slice the plate first to create a printable file.",
   printStale: "The sliced result is outdated after your edits. Re-slice to export.",
-  presetTookEdits: "The new preset replaced {count} setting(s) you had changed: {names}. Everything else you edited was kept.",
+  presetTookEdits: "The new preset replaced {count, plural, one {# setting} other {# settings}} you had changed. Everything else you edited was kept.",
   presetKeptEdits: "{count} setting(s) you had changed were kept.",
 
   // Import
@@ -198,6 +198,14 @@ export const en = {
   infillLight: "Light and fast",
   infillBalanced: "Balanced",
   infillStrong: "Strong",
+  // The Quality and Strength tiers by name, and the wall count under them.
+  qualityFine: "Fine",
+  qualityStandard: "Standard",
+  qualityDraft: "Draft",
+  strengthLight: "Light",
+  strengthStandard: "Standard",
+  strengthStrong: "Strong",
+  wallsCount: "{count, plural, one {# wall} other {# walls}}",
 
   /*
    * FIRST RUN: THE PRINTER IS ASKED FOR.
@@ -363,7 +371,7 @@ export const en = {
   orientImported: "As imported",
   orientAuto: "Automatic",
   orientSide: "On its side",
-  orientPresetDone: "Turned {count} objects.",
+  orientPresetDone: "Turned {count, plural, one {# object} other {# objects}}.",
   readyToSlice: "Ready to slice",
   readyToSliceHelp: "The model is set up with the current print settings.",
   tooBigTitle: "Too big for this printer",

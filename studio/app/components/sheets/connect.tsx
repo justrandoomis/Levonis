@@ -15,12 +15,15 @@
  *   before.
  */
 
-import { useState } from "react";
+import { useId, useRef, useState, type KeyboardEvent } from "react";
 import type { LevoDiscoveredPrinter, LevoNativeEnvironment, LevoPrinterStatus } from "../../native-printer-bridge";
 import type { StudioDictionary } from "../../i18n";
 import { Icon } from "../header";
+import { consumeRovingKey } from "../mobile/roving";
 
 export type ConnectionMode = "lan" | "cloud" | "usb";
+
+const CONNECTION_MODES: readonly ConnectionMode[] = ["lan", "cloud", "usb"];
 export type LanAction = "idle" | "discovering" | "connecting" | "transferring";
 
 export interface ConnectSheetProps {
@@ -56,18 +59,43 @@ export interface ConnectSheetProps {
 export default function ConnectSheet(props: ConnectSheetProps) {
   const { t, nativeEnvironment, printerStatus } = props;
   const [mode, setMode] = useState<ConnectionMode>("lan");
+  /*
+   * THE THREE WAYS ARE TABS TO THE KEYBOARD TOO (c6fix-r2-ha-04). The arrows
+   * did nothing and every tab was a tab stop, and no tab said which panel it
+   * shows. Now Tab lands on the chosen tab, the arrows, Home and End choose
+   * the next one in the row (the panels are cheap, so the choice follows the
+   * focus), the keys go no further (roving.ts), and each tab controls the
+   * one tabpanel below it, which is labelled by its tab.
+   */
+  const baseId = useId();
+  const tabId = (tab: ConnectionMode) => `${baseId}-tab-${tab}`;
+  const panelId = `${baseId}-panel`;
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const next = consumeRovingKey(event, index, CONNECTION_MODES.length);
+    if (next < 0) return;
+    setMode(CONNECTION_MODES[next]);
+    tabRefs.current[next]?.focus();
+  };
+  const panel = { role: "tabpanel", id: panelId, "aria-labelledby": tabId(mode) } as const;
 
   return (
     <div className="sheet-body connect-body">
       <p className="connection-intro">{t.connectionIntro}</p>
       <div className="connection-method-tabs" role="tablist" aria-label={t.connectTitle}>
-        {(["lan", "cloud", "usb"] as ConnectionMode[]).map((tab) => (
+        {CONNECTION_MODES.map((tab, index) => (
           <button
             key={tab}
+            ref={(node) => { tabRefs.current[index] = node; }}
+            type="button"
             role="tab"
+            id={tabId(tab)}
             aria-selected={mode === tab}
+            aria-controls={panelId}
+            tabIndex={mode === tab ? 0 : -1}
             className={mode === tab ? "active" : ""}
             onClick={() => setMode(tab)}
+            onKeyDown={(event) => onTabKeyDown(event, index)}
           >
             <Icon name={tab === "lan" ? "print" : tab === "cloud" ? "share" : "save"} />
             <span>{tab === "lan" ? t.lanMethod : tab === "cloud" ? t.cloudMethod : t.usbMethod}</span>
@@ -76,7 +104,7 @@ export default function ConnectSheet(props: ConnectSheetProps) {
       </div>
 
       {mode === "lan" ? (
-        <section className="connection-method-panel lan-method-panel">
+        <section className="connection-method-panel lan-method-panel" {...panel}>
           <header>
             <span className={props.canLanConnect ? "available" : "unavailable"}><i /></span>
             <div>
@@ -160,7 +188,7 @@ export default function ConnectSheet(props: ConnectSheetProps) {
           </a>
         </section>
       ) : mode === "cloud" ? (
-        <section className="connection-method-panel cloud-method-panel">
+        <section className="connection-method-panel cloud-method-panel" {...panel}>
           <header><span className="available"><i /></span><div><strong>{t.cloudTitle}</strong><small>{t.phonePrint}</small></div></header>
           <p>{t.cloudHelp}</p>
           <ol className="phone-print-steps">
@@ -182,7 +210,7 @@ export default function ConnectSheet(props: ConnectSheetProps) {
           <div className="connection-policy"><Icon name="info" /><div><strong>{t.connectStatus}</strong><p>{t.connectStatusHelp}</p><p>{t.connectNext}</p></div></div>
         </section>
       ) : (
-        <section className="connection-method-panel usb-method-panel">
+        <section className="connection-method-panel usb-method-panel" {...panel}>
           <header><span className="available"><i /></span><div><strong>{t.usbTitle}</strong><small>FAT32 · exFAT</small></div></header>
           <p>{t.usbHelp}</p>
           <ol className="phone-print-steps">

@@ -15,8 +15,12 @@
  * - never stores an over_bed result as exportable output (§1 build-volume row:
  *   a result that exceeds the build volume is rejected, not archived).
  *
- * Scene-edit signals are event-driven: the adapter's gesture listeners plus
+ * Scene-edit signals are event-driven: the adapter's gesture listeners (and
+ * every keyup on the window, where the engine's key shortcuts listen) plus
  * the engine's `objects`/`extruderColors`/`plateCount` events. No polling.
+ * They only make the banner render again: freshness itself is judged on the
+ * scene read at the moment of asking (resultMatches), so an edit whose
+ * signal has not come yet still makes the result stale at export time.
  *
  * MEMORY. A plate's G-code is kept as a Blob, never as a JS string. The
  * difference is not cosmetic: a real plate is tens of megabytes of text, the
@@ -108,6 +112,25 @@ export function rejectionHolds(
   live: { sceneFingerprint: string; settingsRevision: number },
 ): boolean {
   return rejected.sceneFingerprint === live.sceneFingerprint && rejected.settingsRevision === live.settingsRevision;
+}
+
+/**
+ * WHETHER A STORED RESULT STILL DESCRIBES THE PLATE, JUDGED ON THE SCENE AS
+ * IT IS AT THE MOMENT OF ASKING (c6fix-r2-ha-01).
+ *
+ * The fingerprint kept in React state follows the adapter's edit signals, and
+ * a signal can be missing: the engine nudges the selected model on a keydown
+ * anywhere on the page, and while a key is held its keyup has not come yet.
+ * So the result is compared with the scene read now (`live.sceneFingerprint`,
+ * from adapter.sceneFingerprint()); the state only makes the banner render
+ * again. Null means there is no engine to read, and only the settings count.
+ */
+export function resultMatches(
+  stored: { sceneFingerprint: string; settingsRevision: number },
+  live: { sceneFingerprint: string | null; settingsRevision: number },
+): boolean {
+  return stored.settingsRevision === live.settingsRevision
+    && (live.sceneFingerprint === null || stored.sceneFingerprint === live.sceneFingerprint);
 }
 
 /** G-code stays out of React state: results live here, keyed per hook instance. */
@@ -228,27 +251,37 @@ export function useSlicingState(adapter: EngineAdapter | null): SlicingStateApi 
     return adapter.onSceneEdit(refreshSceneFingerprint);
   }, [adapter, refreshSceneFingerprint]);
 
-  const isFresh = useCallback((result: StoredSliceResult) => (
-    result.settingsRevision === settingsRevisionRef.current
-    && result.sceneFingerprint === (adapterRef.current ? sceneFingerprint : result.sceneFingerprint)
-  ), [sceneFingerprint]);
+  /** The scene read now, or null when there is no engine adapter to read. */
+  const liveFingerprint = useCallback((): string | null => adapterRef.current?.sceneFingerprint() ?? null, []);
+
+  // `sceneFingerprint` is not read here: the scene is (resultMatches). It is
+  // a dependency so that every reader derives again when an edit lands.
+  const isFresh = useCallback((result: StoredSliceResult) => resultMatches(result, {
+    sceneFingerprint: liveFingerprint(),
+    settingsRevision: settingsRevisionRef.current,
+  }), [liveFingerprint, sceneFingerprint]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resultState = useCallback<SlicingStateApi["resultState"]>((plate) => {
     const rejected = overBedPlates().get(plate);
     if (rejected && rejectionHolds(rejected, {
-      sceneFingerprint: adapterRef.current ? sceneFingerprint : rejected.sceneFingerprint,
+      sceneFingerprint: liveFingerprint() ?? rejected.sceneFingerprint,
       settingsRevision: settingsRevisionRef.current,
     })) return "rejected-over-bed";
     const stored = results().get(plate);
     if (!stored) return "none";
     return isFresh(stored) ? "fresh" : "stale";
-  }, [isFresh, overBedPlates, results, sceneFingerprint]);
+  }, [isFresh, liveFingerprint, overBedPlates, results]);
 
   const freshGcodeFile = useCallback<SlicingStateApi["freshGcodeFile"]>((plate, fileName) => {
+    // At export time the scene is read again. When it moved without an edit
+    // signal (a key still held), the state catches up here, so the banner
+    // and the G-code tile say «stale» at once, and nothing is handed out.
+    const live = liveFingerprint();
+    if (live !== null && live !== sceneFingerprint) setSceneFingerprint(live);
     const stored = results().get(plate);
     if (!stored || !isFresh(stored)) return null;
     return new File([stored.gcode], fileName, { type: GCODE_MIME });
-  }, [isFresh, results]);
+  }, [isFresh, liveFingerprint, results, sceneFingerprint]);
 
   const staleGcodeFile = useCallback<SlicingStateApi["staleGcodeFile"]>((plate, fileName) => {
     const stored = results().get(plate);

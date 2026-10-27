@@ -37,16 +37,22 @@ export interface PrinterProfile {
   processPresets: Record<QualityId, string>;
 }
 
-export const QUALITY: Record<QualityId, { label: string; layer: number }> = {
-  fine: { label: "Fine", layer: 0.12 },
-  standard: { label: "Standard", layer: 0.2 },
-  draft: { label: "Draft", layer: 0.24 },
+/*
+ * The tiers carry numbers only. Their names are words the person reads, so
+ * they live in the dictionaries (qualityFine … strengthStrong, wallsCount),
+ * in Arabic, English and Sorani: «Fine» and «2 walls» were English in the
+ * Arabic and Sorani Settings sheet (c6fix-r2-ha-07, DECISIONS row 183).
+ */
+export const QUALITY: Record<QualityId, { layer: number }> = {
+  fine: { layer: 0.12 },
+  standard: { layer: 0.2 },
+  draft: { layer: 0.24 },
 };
 
-export const STRENGTH: Record<StrengthId, { label: string; infill: number; walls: number }> = {
-  light: { label: "Light", infill: 10, walls: 2 },
-  standard: { label: "Standard", infill: 15, walls: 2 },
-  strong: { label: "Strong", infill: 25, walls: 3 },
+export const STRENGTH: Record<StrengthId, { infill: number; walls: number }> = {
+  light: { infill: 10, walls: 2 },
+  standard: { infill: 15, walls: 2 },
+  strong: { infill: 25, walls: 3 },
 };
 
 /**

@@ -872,13 +872,16 @@ test("an arrow key a shell group handles stops at the group, and nothing behind 
     globalThis.getComputedStyle = previous;
   }
 
-  const [mode, model, choices, overflow, setup, client] = await Promise.all([
+  const [mode, model, choices, overflow, setup, client, tools, chooser, connect] = await Promise.all([
     read("../app/components/mobile/mode-segmented.tsx"),
     read("../app/components/mobile/model-info-card.tsx"),
     read("../app/components/mobile/choice-segments.tsx"),
     read("../app/components/mobile/overflow-sheet.tsx"),
     read("../app/components/sheets/setup.tsx"),
     read("../app/slicer-client.tsx"),
+    read("../app/components/mobile/transform-tool-bar.tsx"),
+    read("../app/components/sheets/printer-choice.tsx"),
+    read("../app/components/sheets/connect.tsx"),
   ]);
   // Every shell group consumes its keys: the mode, the orientation chips,
   // the language and the appearance.
@@ -890,6 +893,26 @@ test("an arrow key a shell group handles stops at the group, and nothing behind 
   assert.match(overflow, /<ChoiceSegments\s+className="locale-segments"[\s\S]*?followFocus=\{false\}/);
   assert.match(overflow, /<ChoiceSegments\s+className="theme-segments"[\s\S]*?followFocus\s/);
   assert.match(setup, /<ChoiceSegments\s+className="theme-segments"/);
+  // c6fix-r2-ha-02: the transform toolbar too. ArrowLeft on «تحريك» kept the
+  // focus there and moved the selected model 10 mm. The arrows, Home and End
+  // now walk the four tiles, and the one tab stop moves with the focus.
+  assert.match(tools, /role="toolbar"/);
+  assert.match(tools, /const next = consumeRovingKey\(event, index, TILE_COUNT\);\s*if \(next < 0\) return;\s*setStop\(next\);\s*refs\.current\[next\]\?\.focus\(\);/);
+  assert.match(tools, /const TILE_COUNT = 4;/);
+  assert.match(tools, /tabIndex=\{index === stop \? 0 : -1\}[\s\S]*?onFocus=\{\(\) => setStop\(index\)\}[\s\S]*?onKeyDown=\{\(event\) => onKeyDown\(event, index\)\}/);
+  assert.match(tools, /tabIndex=\{stop === ARRANGE \? 0 : -1\}[\s\S]*?onFocus=\{\(\) => setStop\(ARRANGE\)\}[\s\S]*?onKeyDown=\{\(event\) => onKeyDown\(event, ARRANGE\)\}/);
+  // c6fix-r2-ha-04: the sheets' radiogroups and the connection tabs. Every
+  // option was a tab stop and the arrows did nothing.
+  assert.match(setup, /const next = consumeRovingKey\(event, index, props\.tiles\.length\);\s*if \(next < 0\) return;\s*props\.onChoose\(props\.tiles\[next\]\.id\);/);
+  assert.match(setup, /tabIndex=\{index === Math\.max\(checkedIndex, 0\) \? 0 : -1\}/);
+  assert.match(setup, /<RadioTiles\s+className="segmented-control mode-control"\s+label=\{t\.modeTitle\}/);
+  assert.match(chooser, /const next = consumeRovingKey\(event, index, PROFILE_IDS\.length\);\s*if \(next < 0\) return;\s*props\.onDraft\(PROFILE_IDS\[next\]\);/);
+  assert.match(chooser, /tabIndex=\{index === Math\.max\(draftIndex, 0\) \? 0 : -1\}/);
+  assert.match(chooser, /onKeyDown=\{\(event\) => onKeyDown\(event, index\)\}/);
+  assert.match(connect, /const next = consumeRovingKey\(event, index, CONNECTION_MODES\.length\);\s*if \(next < 0\) return;\s*setMode\(CONNECTION_MODES\[next\]\);/);
+  assert.match(connect, /role="tab"\s+id=\{tabId\(tab\)\}\s+aria-selected=\{mode === tab\}\s+aria-controls=\{panelId\}\s+tabIndex=\{mode === tab \? 0 : -1\}/);
+  assert.match(connect, /const panel = \{ role: "tabpanel", id: panelId, "aria-labelledby": tabId\(mode\) \} as const;/);
+  assert.equal(connect.split("{...panel}>").length - 1, 3, "each of the three panels is the tabpanel");
   // While a sheet is open, a key from outside the engine mount stops at the
   // document, before window, where the engine listens.
   const effect = client.slice(client.indexOf("NOTHING BEHIND THE SHEET HEARS A KEY"), client.indexOf("}, [sheet]);", client.indexOf("NOTHING BEHIND THE SHEET HEARS A KEY")));
@@ -1114,4 +1137,183 @@ test("a tap on a sheet's backdrop closes the sheet and reaches nothing under it"
   const close = client.slice(client.indexOf("const closeFromBackdrop = useCallback("), client.indexOf("}, []);", client.indexOf("const closeFromBackdrop = useCallback(")));
   assert.match(close, /if \(pressedHere && event\.target === event\.currentTarget\) setSheet\(null\);/, "the click of a press that began on the backdrop closes it");
   assert.doesNotMatch(client, /className="sheet-backdrop" onPointerDown=\{\(event\) => \{[^}]*setSheet\(null\)/);
+});
+
+// --------------------------------------------------------------- c6fix round 2
+
+test("a key that moves the model anywhere on the page makes the result stale, and the export reads the scene again", async () => {
+  // c6fix-r2-ha-01: the engine nudges the selected model on a keydown on
+  // window. An arrow pressed on «المزيد», on «Print & export» or on the G-code
+  // tile itself moved the model 10 mm, and the banner kept «نتيجة التقطيع
+  // جاهزة» while the tile exported the G-code of the old position: the edit
+  // listeners sat on the engine's shadow roots only, and the keyup of that
+  // press never reached them. tests/browser-shell-keys.mjs presses the keys.
+  const { EngineAdapter } = await loadAppModule("engine-adapter");
+  const previous = { window: globalThis.window, MutationObserver: globalThis.MutationObserver };
+  const target = new EventTarget();
+  const bound = [];
+  globalThis.window = {
+    addEventListener: (type, listener, options) => { bound.push(["add", type, options]); target.addEventListener(type, listener, options); },
+    removeEventListener: (type, listener, options) => { bound.push(["remove", type, options]); target.removeEventListener(type, listener, options); },
+  };
+  globalThis.MutationObserver = class { observe() {} disconnect() {} };
+  try {
+    const adapter = new EngineAdapter();
+    let signals = 0;
+    adapter.onSceneEdit(() => { signals += 1; });
+    adapter.attach({ querySelectorAll: () => [] });
+    assert.deepEqual(bound.filter(([how, type]) => how === "add" && type === "keyup").map(([, , options]) => options), [{ capture: true, passive: true }],
+      "one keyup listener on window, in the capture phase, passive");
+    target.dispatchEvent(new Event("keyup"));
+    await Promise.resolve();
+    assert.equal(signals, 1, "a keyup outside every engine root is a candidate edit");
+    adapter.detach();
+    assert.ok(bound.some(([how, type, options]) => how === "remove" && type === "keyup" && options?.capture === true), "detach unbinds it");
+    target.dispatchEvent(new Event("keyup"));
+    await Promise.resolve();
+    assert.equal(signals, 1, "and nothing is heard after detach");
+  } finally {
+    globalThis.window = previous.window;
+    globalThis.MutationObserver = previous.MutationObserver;
+  }
+
+  // A result is judged on the scene read at the moment of asking.
+  const { resultMatches } = await loadAppModule("hooks/use-slicing-state");
+  const stored = { sceneFingerprint: "1,0.000,0.000,0.000", settingsRevision: 2 };
+  assert.equal(resultMatches(stored, { sceneFingerprint: "1,0.000,0.000,0.000", settingsRevision: 2 }), true, "the same scene and settings: fresh");
+  assert.equal(resultMatches(stored, { sceneFingerprint: "1,-10.000,0.000,0.000", settingsRevision: 2 }), false, "moved 10 mm: stale");
+  assert.equal(resultMatches(stored, { sceneFingerprint: "1,0.000,0.000,0.000", settingsRevision: 3 }), false, "a setting changed: stale");
+  assert.equal(resultMatches(stored, { sceneFingerprint: null, settingsRevision: 2 }), true, "no engine to read: the settings decide");
+
+  const [hook, client] = await Promise.all([read("../app/hooks/use-slicing-state.ts"), read("../app/slicer-client.tsx")]);
+  assert.match(hook, /const liveFingerprint = useCallback\(\(\): string \| null => adapterRef\.current\?\.sceneFingerprint\(\) \?\? null, \[\]\);/);
+  assert.match(hook, /const isFresh = useCallback\(\(result: StoredSliceResult\) => resultMatches\(result, \{\s*sceneFingerprint: liveFingerprint\(\),\s*settingsRevision: settingsRevisionRef\.current,\s*\}\)/);
+  assert.match(hook, /if \(rejected && rejectionHolds\(rejected, \{\s*sceneFingerprint: liveFingerprint\(\) \?\? rejected\.sceneFingerprint,/);
+  // At export time: the state catches up with the scene, and a stale file is refused.
+  const fresh = hook.slice(hook.indexOf("const freshGcodeFile"), hook.indexOf("const staleGcodeFile"));
+  assert.match(fresh, /const live = liveFingerprint\(\);\s*if \(live !== null && live !== sceneFingerprint\) setSceneFingerprint\(live\);\s*const stored = results\(\)\.get\(plate\);\s*if \(!stored \|\| !isFresh\(stored\)\) return null;/);
+  // Every G-code the shell hands out goes through it.
+  assert.match(client, /return slicing\.freshGcodeFile\(selectedPlate, name\);/);
+  assert.match(client, /const gcodeFile = slicing\.freshGcodeFile\(selectedPlate, `\$\{baseName\}\.gcode`\);/);
+});
+
+test("the Settings switch is named by its label and is a 44 px target around the same track", async () => {
+  // c6fix-r2-ha-03: «switch» with no name, in a 52 x 30 box.
+  const [setup, css] = await Promise.all([read("../app/components/sheets/setup.tsx"), read("../app/globals.css")]);
+  assert.match(setup, /<strong id="setup-support-label">\{t\.support\}<\/strong>/);
+  assert.match(setup, /role="switch" aria-checked=\{props\.support\} aria-labelledby="setup-support-label"/);
+  const rule = /\n\.switch \{([^}]*)\}/.exec(css)?.[1] ?? "";
+  assert.match(rule, /width: 52px;/);
+  assert.match(rule, /height: var\(--tap-min\);/, "44 px tall");
+  assert.match(rule, /padding: 10px 3px;/, "the knob sits where it sat: 3 px inside a track 7 px in");
+  assert.match(rule, /background: transparent;/, "the box is the target, not the track");
+  // The track is the same 52 x 30 pill: 44 - 2 x 7 tall.
+  assert.match(css, /\n\.switch::before \{ content: ""; position: absolute; inset: 7px 0; border-radius: 99px; background: var\(--track\); \}/);
+  assert.match(css, /\n\.switch\.on::before \{ background: var\(--accent-strong\); \}/);
+  assert.match(css, /\n\.switch i \{ position: relative;/, "the knob paints above the track");
+  assert.match(css, /--tap-min: 44px;/);
+});
+
+test("the Settings tiers are radiogroups that say which tier is in force, with a check mark", async () => {
+  // c6fix-r2-ha-05: Quality, Strength and the infill pattern were plain
+  // buttons; the chosen one had a gold edge and gold text and nothing else.
+  const [setup, css] = await Promise.all([read("../app/components/sheets/setup.tsx"), read("../app/globals.css")]);
+  const tiles = setup.slice(setup.indexOf("function RadioTiles"), setup.indexOf("export interface SetupSheetProps"));
+  assert.match(tiles, /<div className=\{props\.className\} role="radiogroup" aria-label=\{props\.label\}>/);
+  assert.match(tiles, /role="radio"\s+aria-checked=\{checked\}/);
+  assert.match(tiles, /\{checked && <i className="tier-check" aria-hidden="true"><Icon name="check" \/><\/i>\}/);
+  for (const [label, value, choose] of [["t.quality", "props.quality", "props.onQuality(id)"], ["t.strength", "props.strength", "props.onStrength(id)"], ["t.infillPattern", "props.infill", "props.onInfill(id)"]]) {
+    const at = setup.indexOf(`label={${label}}`);
+    assert.ok(at > 0, `${label} is a radiogroup`);
+    const block = setup.slice(setup.lastIndexOf("<RadioTiles", at), setup.indexOf("/>", at));
+    assert.ok(block.includes(`value={${value}}`) && block.includes(`onChoose={(id) => ${choose}}`), `${label} chooses ${value}`);
+  }
+  assert.doesNotMatch(setup, /<button key=\{id\} className=\{props\.(quality|strength|infill) === id/, "no tier is a plain button any more");
+  assert.match(css, /\.segmented-control button \{ position: relative;/);
+  assert.match(css, /\.tier-check \{ position: absolute;/);
+});
+
+test("the message row counts in the reader's language and never names an engine key", async () => {
+  // c6fix-r2-ha-06: «… استبدل 1 من إعداداتك المعدّلة: layer_height.»,
+  // «تم ترتيب 1 مجسمًا على 1 Plate.», "Arranged 1 objects across 1 plates."
+  // and "Turned 1 objects."
+  const { DICTIONARIES, templateText } = await loadAppModule("i18n/index");
+  const say = (locale, key, values) => templateText(DICTIONARIES[locale][key], values, locale);
+  assert.equal(say("ar", "arrangeDone", { models: 1, plates: 1 }), "تم ترتيب مجسم واحد على Plate واحدة.");
+  assert.equal(say("ar", "arrangeDone", { models: 2, plates: 1 }), "تم ترتيب مجسمين على Plate واحدة.");
+  assert.equal(say("ar", "arrangeDone", { models: 3, plates: 2 }), "تم ترتيب 3 مجسمات على 2 Plate.");
+  assert.equal(say("ar", "arrangeDone", { models: 11, plates: 3 }), "تم ترتيب 11 مجسمًا على 3 Plate.");
+  assert.equal(say("ar", "orientPresetDone", { count: 1 }), "تم تغيير اتجاه مجسم واحد.");
+  assert.equal(say("ar", "orientPresetDone", { count: 2 }), "تم تغيير اتجاه مجسمين.");
+  assert.equal(say("ar", "orientPresetDone", { count: 5 }), "تم تغيير اتجاه 5 مجسمات.");
+  assert.equal(say("ar", "orientDone", { oriented: 1, total: 1 }), "المجسمات الموجّهة للطباعة: 1 من 1.");
+  assert.equal(say("ar", "presetTookEdits", { count: 1 }), "استبدل الإعداد الجاهز الجديد إعدادًا واحدًا من إعداداتك المعدّلة، وبقيت بقية تعديلاتك كما هي.");
+  assert.equal(say("ar", "presetTookEdits", { count: 2 }), "استبدل الإعداد الجاهز الجديد إعدادين من إعداداتك المعدّلة، وبقيت بقية تعديلاتك كما هي.");
+  assert.equal(say("ar", "presetTookEdits", { count: 4 }), "استبدل الإعداد الجاهز الجديد 4 إعدادات من إعداداتك المعدّلة، وبقيت بقية تعديلاتك كما هي.");
+  assert.equal(say("en", "arrangeDone", { models: 1, plates: 1 }), "Arranged 1 object across 1 plate.");
+  assert.equal(say("en", "arrangeDone", { models: 3, plates: 2 }), "Arranged 3 objects across 2 plates.");
+  assert.equal(say("en", "orientPresetDone", { count: 1 }), "Turned 1 object.");
+  assert.equal(say("en", "orientPresetDone", { count: 2 }), "Turned 2 objects.");
+  assert.equal(say("en", "orientDone", { oriented: 1, total: 1 }), "Oriented 1 of 1 object for printing.");
+  assert.equal(say("en", "orientDone", { oriented: 2, total: 3 }), "Oriented 2 of 3 objects for printing.");
+  assert.equal(say("en", "presetTookEdits", { count: 1 }), "The new preset replaced 1 setting you had changed. Everything else you edited was kept.");
+  assert.equal(say("en", "presetTookEdits", { count: 3 }), "The new preset replaced 3 settings you had changed. Everything else you edited was kept.");
+  // Sorani keeps the noun singular after a number; the verb agrees.
+  assert.equal(say("ckb", "arrangeDone", { models: 1, plates: 1 }), "1 تەن لەسەر 1 Plate ڕیز کرا.");
+  assert.equal(say("ckb", "arrangeDone", { models: 3, plates: 2 }), "3 تەن لەسەر 2 Plate ڕیز کران.");
+  assert.equal(say("ckb", "orientDone", { oriented: 1, total: 2 }), "1 لە 2 تەن بۆ چاپکردن ئاراستە کرا.");
+  assert.equal(say("ckb", "orientDone", { oriented: 2, total: 2 }), "2 لە 2 تەن بۆ چاپکردن ئاراستە کران.");
+  assert.equal(say("ckb", "presetTookEdits", { count: 1 }), "ڕێکخستنە ئامادەکراوە نوێیەکە 1 لە ڕێکخستنە دەستکاریکراوەکانت گۆڕی. ئەوانی تر وەک خۆی مانەوە.");
+  for (const locale of ["ar", "en", "ckb"]) {
+    assert.doesNotMatch(DICTIONARIES[locale].presetTookEdits, /\{names\}/, `${locale}: no slot for engine keys`);
+    for (const key of ["arrangeDone", "orientDone", "orientPresetDone", "presetTookEdits"]) {
+      assert.doesNotMatch(say(locale, key, { models: 1, plates: 1, oriented: 1, total: 1, count: 1 }), /[{}]|layer_height/, `${locale} ${key}`);
+    }
+  }
+  // The shell passes the count and the locale, never the keys.
+  const client = await read("../app/slicer-client.tsx");
+  assert.match(client, /templateText\(text\.presetTookEdits, \{ count: carried\.overwritten\.length \}, localeRef\.current\)/);
+  assert.doesNotMatch(client, /carried\.overwritten\.slice|names: carried/);
+  assert.match(client, /templateText\(t\.arrangeDone, \{ models: result\.arrangedCount, plates: Math\.max\(1, result\.platesUsed\) \}, locale\)/);
+  assert.match(client, /templateText\(t\.orientDone, \{ oriented: result\.orientedCount, total \}, locale\)/);
+  assert.match(client, /templateText\(t\.orientPresetDone, \{ count: result\.changedCount \}, locale\)/);
+});
+
+test("the Settings tiers are named in Arabic, English and Sorani, the walls counted", async () => {
+  // c6fix-r2-ha-07: «Fine 0.12 mm» and «Light 10% · 2 walls» in the Arabic
+  // and Sorani sheet. The infill patterns keep the engine's own names.
+  const { DICTIONARIES, templateText } = await loadAppModule("i18n/index");
+  const NAMES = ["qualityFine", "qualityStandard", "qualityDraft", "strengthLight", "strengthStandard", "strengthStrong"];
+  for (const key of NAMES) {
+    const { en, ar, ckb } = { en: DICTIONARIES.en[key], ar: DICTIONARIES.ar[key], ckb: DICTIONARIES.ckb[key] };
+    assert.ok(en && ar && ckb, `${key} exists in all three`);
+    assert.notEqual(ckb, ar, `${key}: the ckb slot must not carry the Arabic (row 183)`);
+    assert.doesNotMatch(ar, /[A-Za-z]/, `${key}: Arabic «${ar}»`);
+    assert.doesNotMatch(ckb, /[A-Za-z]/, `${key}: Sorani «${ckb}»`);
+  }
+  assert.deepEqual([DICTIONARIES.en.qualityFine, DICTIONARIES.en.qualityStandard, DICTIONARIES.en.qualityDraft], ["Fine", "Standard", "Draft"]);
+  const walls = (locale, count) => templateText(DICTIONARIES[locale].wallsCount, { count }, locale);
+  assert.deepEqual([1, 2, 3, 11].map((n) => walls("ar", n)), ["جدار واحد", "جداران", "3 جدران", "11 جدارًا"]);
+  assert.deepEqual([1, 2, 3].map((n) => walls("en", n)), ["1 wall", "2 walls", "3 walls"]);
+  assert.deepEqual([2, 3].map((n) => walls("ckb", n)), ["2 دیوار", "3 دیوار"]);
+
+  const [setup, profiles, client] = await Promise.all([read("../app/components/sheets/setup.tsx"), read("../app/printer-profiles.ts"), read("../app/slicer-client.tsx")]);
+  assert.match(setup, /const qualityName: Record<QualityId, string> = \{ fine: t\.qualityFine, standard: t\.qualityStandard, draft: t\.qualityDraft \};/);
+  assert.match(setup, /const strengthName: Record<StrengthId, string> = \{ light: t\.strengthLight, standard: t\.strengthStandard, strong: t\.strengthStrong \};/);
+  assert.match(setup, /templateText\(t\.wallsCount, \{ count: STRENGTH\[id\]\.walls \}, locale\)/);
+  assert.doesNotMatch(setup, /(QUALITY|STRENGTH)\[id\]\.label|\swalls<|} walls/);
+  assert.match(setup, /title: INFILL\[id\]\.label,/, "the engine's pattern names stay");
+  // From the Quality table to the comment that opens the infill table.
+  const tables = profiles.slice(profiles.indexOf("export const QUALITY"), profiles.indexOf("/**", profiles.indexOf("export const STRENGTH")));
+  assert.match(tables, /export const STRENGTH: Record<StrengthId, \{ infill: number; walls: number \}>/);
+  assert.doesNotMatch(tables, /label:/, "the tiers carry numbers, the dictionaries carry the names");
+  assert.match(client, /<SetupSheet\s+t=\{t\}\s+locale=\{locale\}/);
+});
+
+test("the About sheet's legal summary and source link are 44 px targets", async () => {
+  // c6fix-r2-ha-08: 360 x 39 and 336 x 38.
+  const css = await read("../app/globals.css");
+  assert.match(css, /\.legal-details summary \{ min-height: var\(--tap-min\); padding: 11px 12px; line-height: 22px;/);
+  assert.match(css, /\.legal-details a \{ margin: 0 12px 12px; min-height: var\(--tap-min\);/);
+  assert.match(css, /\.more-links a \{ min-height: var\(--tap-min\);/, "as the «المزيد» copy of the link already was");
 });

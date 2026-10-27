@@ -969,12 +969,11 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
           userEditedKeysRef.current = new Set(carried.kept);
           engineKeysRef.current = new Set(carried.engineKept);
           const text = textRef.current;
+          // The count, never the keys: «layer_height» is the engine's id for
+          // a setting, not a word in Arabic or Sorani (c6fix-r2-ha-06).
           setNotice(
             carried.overwritten.length
-              ? templateText(text.presetTookEdits, {
-                count: carried.overwritten.length,
-                names: carried.overwritten.slice(0, 4).join("، "),
-              })
+              ? templateText(text.presetTookEdits, { count: carried.overwritten.length }, localeRef.current)
               : carried.kept.length
                 ? templateText(text.presetKeptEdits, { count: carried.kept.length })
                 : ""
@@ -1291,11 +1290,12 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     if (!result.ok) { setNotice(t.arrangeUnavailable); return; }
     arrangeUndoRef.current = result.undo;
     raiseUndo("arrange", Boolean(result.undo));
-    const messages = [templateText(t.arrangeDone, { models: result.arrangedCount, plates: Math.max(1, result.platesUsed) })];
+    // Counted in the reader's language: «مجسم واحد», never «1 مجسمًا».
+    const messages = [templateText(t.arrangeDone, { models: result.arrangedCount, plates: Math.max(1, result.platesUsed) }, locale)];
     if (result.oversizedCount) messages.push(templateText(t.zipOversized, { count: result.oversizedCount }));
     if (result.overflowCount) messages.push(templateText(t.zipOverflow, { count: result.overflowCount }));
     setNotice(messages.join(" "));
-  }, [adapter, objects.length, profile.bedDepth, profile.bedWidth, raiseUndo, selectedPlate, t.arrangeDone, t.arrangeUnavailable, t.zipOverflow, t.zipOversized]);
+  }, [adapter, locale, objects.length, profile.bedDepth, profile.bedWidth, raiseUndo, selectedPlate, t.arrangeDone, t.arrangeUnavailable, t.zipOverflow, t.zipOversized]);
 
   // -- auto-orient (BambuStudio's scoring, undoable) -------------------------
   /**
@@ -1335,12 +1335,12 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     raiseUndo("orient", Boolean(result.undo));
     const total = result.orientedCount + result.alreadyBestCount + result.skippedCount;
     const messages = result.orientedCount
-      ? [templateText(t.orientDone, { oriented: result.orientedCount, total })]
+      ? [templateText(t.orientDone, { oriented: result.orientedCount, total }, locale)]
       : [t.orientNoChange];
     if (result.skippedCount) messages.push(templateText(t.orientSkipped, { skipped: result.skippedCount }));
     if (result.lockedCount) messages.push(templateText(t.orientLocked, { locked: result.lockedCount }));
     setNotice(messages.join(" "));
-  }, [adapter, objects.length, raiseUndo, selectedPlate, t.orientBusy, t.orientDone, t.orientLocked,
+  }, [adapter, locale, objects.length, raiseUndo, selectedPlate, t.orientBusy, t.orientDone, t.orientLocked,
       t.orientNoChange, t.orientSkipped, t.orientUnavailable]);
 
   /**
@@ -2223,21 +2223,23 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile.shortName, selectedPlate, slicing.freshGcodeFile]);
 
+  // A refused file says why as of now, not as of the last render: a key may
+  // have moved the model since (c6fix-r2-ha-01), as the LAN path asks too.
   const downloadCurrentGcode = useCallback(() => {
     const file = currentGcodeFile();
     if (!file) {
-      setNotice(currentStale ? t.printStale : t.printNotReady);
+      setNotice(slicing.resultState(selectedPlate) === "stale" ? t.printStale : t.printNotReady);
       return false;
     }
     downloadBlob(file, file.name);
     setNotice("");
     return true;
-  }, [currentGcodeFile, currentStale, t.printNotReady, t.printStale]);
+  }, [currentGcodeFile, selectedPlate, slicing.resultState, t.printNotReady, t.printStale]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const shareCurrentGcode = useCallback(async () => {
     const file = currentGcodeFile();
     if (!file) {
-      setNotice(currentStale ? t.printStale : t.printNotReady);
+      setNotice(slicing.resultState(selectedPlate) === "stale" ? t.printStale : t.printNotReady);
       return;
     }
     const data: ShareData = { files: [file], title: file.name };
@@ -2251,7 +2253,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     }
     downloadBlob(file, file.name);
     setNotice(t.shareUnavailable);
-  }, [currentGcodeFile, currentStale, t.printNotReady, t.printStale, t.shareUnavailable]);
+  }, [currentGcodeFile, selectedPlate, slicing.resultState, t.printNotReady, t.printStale, t.shareUnavailable]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openPrintCenter = useCallback(() => {
     if (!printReady && !currentStale) { setNotice(t.printNotReady); return; }
@@ -2914,9 +2916,9 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     });
     orientUndoRef.current = result.undo;
     raiseUndo("orient", Boolean(result.undo));
-    setNotice(result.changedCount ? templateText(t.orientPresetDone, { count: result.changedCount }) : t.orientNoChange);
+    setNotice(result.changedCount ? templateText(t.orientPresetDone, { count: result.changedCount }, locale) : t.orientNoChange);
     setSceneTick((tick) => tick + 1);
-  }, [adapter, objects.length, orientAll, raiseUndo, sceneFacts, selectedPlate, t.orientNoChange, t.orientPresetDone, t.orientUnavailable]);
+  }, [adapter, locale, objects.length, orientAll, raiseUndo, sceneFacts, selectedPlate, t.orientNoChange, t.orientPresetDone, t.orientUnavailable]);
 
   /**
    * «كل الإعدادات»: the engine's full side panel. In Simple it does not exist,
@@ -3417,6 +3419,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
           ) : sheet === "setup" ? (
             <SetupSheet
               t={t}
+              locale={locale}
               profileId={profileId}
               quality={quality}
               strength={strength}
