@@ -36,6 +36,7 @@ export type PcErrorCode =
   | 'PAYMENT_ADAPTER_DISABLED'
   | 'PAYMENT_SIGNATURE_INVALID'
   | 'ORDER_NOT_PAYABLE'
+  | 'INSUFFICIENT_BALANCE'
   | 'FILE_TOO_LARGE'
   | 'FILE_TYPE_NOT_SUPPORTED'
   | 'FILE_REJECTED'
@@ -176,6 +177,13 @@ const WORDS: Record<PcErrorCode, Words> = {
     ar: 'هذا الطلب لا ينتظر الدفع',
     en: 'This order is not awaiting payment',
     ckb: 'ئەم داواکارییە چاوەڕوانی پارەدان نییە',
+  },
+  // 402: the request is right and the order payable — the wallet is short. Nothing was debited.
+  INSUFFICIENT_BALANCE: {
+    status: 402,
+    ar: 'رصيد محفظة Levonis لا يكفي لدفع هذا الطلب، ولم يُخصم أي مبلغ',
+    en: 'Your Levonis wallet balance is not enough to pay this order; nothing was charged',
+    ckb: 'باڵانسی جزدانی Levonis بەس نییە بۆ پارەدانی ئەم داواکارییە، هیچ پارەیەک نەبڕدرا',
   },
   FILE_TOO_LARGE: {
     status: 413,

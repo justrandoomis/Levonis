@@ -13,15 +13,24 @@
  *                   the API console. On only when PRINT_CLOUD_DEV_PAYMENTS is
  *                   exactly 'on' — never set in a deployed environment — and
  *                   every confirmation it produces is labelled provider 'dev'.
- *   levonis_wallet  NOT CONNECTED (adapters.ts): answers ADAPTER_NOT_CONNECTED.
+ *   levonis_wallet  the customer pays from their own Levonis wallet
+ *                   (POST /orders/{id}/pay/wallet, wallet.ts): the wallet
+ *                   debit, the confirmation and the fulfilment are ONE D1
+ *                   batch. On unless the owner switched it off
+ *                   (`wallet_payment_enabled`, settings.ts).
  *
  * Whatever the adapter, a confirmation goes through ONE function,
  * `confirmPayment` (orders.ts): an event is recorded once per
  * (provider, event id), and an order is fulfilled once whatever arrives.
+ * The wallet adapter (orders.ts `planWalletPayment`) puts the same fulfilment
+ * statements in its own batch beside the debit, because its money moves inside
+ * the database — the debit must land with the confirmation or not at all —
+ * where every other adapter reports money that already moved outside.
  */
 import { timingSafeEqual } from '../crypto';
 import type { Env } from '../types';
 import { pcError } from './errors';
+import type { PrintCloudConfig } from './settings';
 
 export type PaymentProvider = 'dev' | 'manual' | 'gateway' | 'levonis_wallet';
 export const PAYMENT_PROVIDERS: readonly PaymentProvider[] = ['dev', 'manual', 'gateway', 'levonis_wallet'];
@@ -31,7 +40,16 @@ export interface PcPaymentEnv {
   PRINT_CLOUD_PAYMENT_WEBHOOK_SECRET?: string;
 }
 
-export function paymentAvailable(env: Partial<Env> & PcPaymentEnv, provider: PaymentProvider): boolean {
+/**
+ * Is this adapter on? The wallet's switch is a SETTING (the owner's money
+ * rule), the others are environment facts; a caller that holds no
+ * configuration reads the wallet at its default (on).
+ */
+export function paymentAvailable(
+  env: Partial<Env> & PcPaymentEnv,
+  provider: PaymentProvider,
+  config?: Pick<PrintCloudConfig, 'wallet_payment_enabled'>
+): boolean {
   switch (provider) {
     case 'manual':
       return true;
@@ -40,13 +58,19 @@ export function paymentAvailable(env: Partial<Env> & PcPaymentEnv, provider: Pay
     case 'gateway':
       return typeof env.PRINT_CLOUD_PAYMENT_WEBHOOK_SECRET === 'string' && env.PRINT_CLOUD_PAYMENT_WEBHOOK_SECRET.length >= 32;
     case 'levonis_wallet':
+      return config ? config.wallet_payment_enabled === true : true;
+    default:
+      // A method this build does not know is never «available».
       return false;
   }
 }
 
-export function assertPaymentAvailable(env: Partial<Env> & PcPaymentEnv, provider: PaymentProvider): void {
-  if (provider === 'levonis_wallet') throw pcError('ADAPTER_NOT_CONNECTED', { adapter: 'wallet_payment' });
-  if (!paymentAvailable(env, provider)) throw pcError('PAYMENT_ADAPTER_DISABLED', { provider });
+export function assertPaymentAvailable(
+  env: Partial<Env> & PcPaymentEnv,
+  provider: PaymentProvider,
+  config?: Pick<PrintCloudConfig, 'wallet_payment_enabled'>
+): void {
+  if (!paymentAvailable(env, provider, config)) throw pcError('PAYMENT_ADAPTER_DISABLED', { provider });
 }
 
 /** What the customer is told to do next, per adapter. No secret, no internal id beyond the order's. */
@@ -69,7 +93,8 @@ export function paymentInstructions(provider: PaymentProvider, order: { id: stri
     case 'dev':
       return { provider, action: 'dev_confirm', reference: order.id, amount_iqd: order.total_iqd, development_only: true };
     case 'levonis_wallet':
-      return { provider, action: 'not_connected', reference: order.id, amount_iqd: order.total_iqd };
+      // The customer confirms the exact amount, then the client calls the door below with an Idempotency-Key.
+      return { provider, action: 'pay_from_wallet', reference: order.id, amount_iqd: order.total_iqd, pay_path: `/api/print-cloud/v1/orders/${order.id}/pay/wallet` };
   }
 }
 

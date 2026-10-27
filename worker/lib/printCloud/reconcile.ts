@@ -3,8 +3,10 @@
  * ledger it caches, every lot equals its own draws, every credit hold is
  * recorded on its lot and its reservation alike, every reservation belongs
  * to a live job, every printer and job holds at most one active assignment,
- * every paid order has exactly one confirmed payment, and every gram a
- * customer used left the shelf. It REPORTS inconsistencies with the evidence;
+ * every paid order has exactly one confirmed payment, every order paid from
+ * the Levonis wallet holds its one debit there and was never credited back
+ * more than it took, and every gram a customer used left the shelf. It
+ * REPORTS inconsistencies with the evidence;
  * it never writes a corrective value, because a correction is a decision with
  * an author.
  *
@@ -15,6 +17,7 @@
  * (`roundedShare`), so never more than was paid for the lot.
  */
 import { many } from './db';
+import { WALLET_REFUND_TX_PREFIX, WALLET_TX_PREFIX } from './wallet';
 
 /** round(value × qty / total) half up in SQLite integers — lots.ts `drawValue`'s cumulative share (util.ts `mulDivRound`). */
 const roundedShare = (value: string, qty: string, total: string) => `(2 * ${value} * ${qty} + ${total}) / (2 * ${total})`;
@@ -262,6 +265,36 @@ export async function reconcile(db: D1Database): Promise<{ ok: boolean; checks: 
            FROM pc_orders o
           WHERE (o.status IN ('fulfilled', 'partially_refunded', 'refunded') AND (SELECT COUNT(*) FROM pc_payments p WHERE p.order_id = o.id AND p.status = 'confirmed') <> 1)
              OR (o.status IN ('awaiting_payment', 'cancelled', 'expired') AND EXISTS (SELECT 1 FROM pc_payments p WHERE p.order_id = o.id AND p.status = 'confirmed'))`
+      )
+    ),
+    check(
+      // The platform wallet and Print Cloud agree (wallet.ts): an order confirmed as paid from the wallet holds its
+      // one approved debit `wtx_pc_<order>` when it cost anything, and its refund credits never add up to more than
+      // that debit; no such debit exists for an order that was not paid from the wallet. (A full refund returns the
+      // debit exactly — tests/printCloudWallet.test.ts — except across the one-time wallet rebase, which rescales it
+      // by design, so equality is not asserted here.) The ledger is read by key: the order's own debit id, and the
+      // primary-key range of Print Cloud debits.
+      'wallet_payments_match_the_wallet',
+      many(
+        db,
+        `SELECT * FROM (
+           SELECT 'wallet_paid_order' AS kind, o.id AS order_id, o.user_id, o.status, o.paid_iqd,
+                  COALESCE((SELECT d.amount FROM wallet_transactions d
+                             WHERE d.id = '${WALLET_TX_PREFIX}' || o.id AND d.user_id = o.user_id AND d.type = 'withdrawal'
+                               AND d.currency = 'USD' AND d.status = 'approved'), 0) AS debited_cents,
+                  COALESCE((SELECT SUM(c.amount) FROM wallet_transactions c
+                             WHERE c.user_id = o.user_id AND c.ref = o.id AND c.type = 'deposit' AND c.currency = 'USD'
+                               AND c.status = 'approved' AND substr(c.id, 1, ${WALLET_REFUND_TX_PREFIX.length}) = '${WALLET_REFUND_TX_PREFIX}'), 0) AS refunded_cents
+             FROM pc_orders o
+            WHERE EXISTS (SELECT 1 FROM pc_payments p WHERE p.order_id = o.id AND p.status = 'confirmed' AND p.provider = 'levonis_wallet')
+         ) x
+          WHERE (x.paid_iqd > 0 AND x.debited_cents <= 0)
+             OR x.refunded_cents > x.debited_cents
+         UNION ALL
+         SELECT 'debit_without_wallet_payment', t.ref, t.user_id, t.status, NULL, t.amount, NULL
+           FROM wallet_transactions t
+          WHERE t.id >= '${WALLET_TX_PREFIX}pco_' AND t.id < '${WALLET_TX_PREFIX}pco\`' AND t.status = 'approved'
+            AND NOT EXISTS (SELECT 1 FROM pc_payments p WHERE p.order_id = t.ref AND p.status = 'confirmed' AND p.provider = 'levonis_wallet')`
       )
     ),
     check(

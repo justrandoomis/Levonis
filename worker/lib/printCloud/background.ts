@@ -45,7 +45,7 @@ export type Room = (n: number) => boolean;
  * THE MOST STATEMENTS ONE UNIT OF TASK WORK SENDS: one order expired, one
  * credit lot expired, one low-balance notice, one queue assignment, one
  * slicing lease swept, one file measured, one import step — or the whole
- * reconciliation (twenty-three reads). Every loop asks for this much room
+ * reconciliation (twenty-four reads). Every loop asks for this much room
  * before each unit, so a bounded run never overshoots its share
  * (tests/printCloudOperations.test.ts measures a run at its bound). The one
  * larger unit, the scheduler's release of a stranded job, asks for its own

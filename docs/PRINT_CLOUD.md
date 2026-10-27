@@ -25,7 +25,7 @@ DECISIONS row 271 records the decision and its open owner questions.
 | Routers | `worker/routes/printCloud.ts` (customer), `printCloudAgent.ts` (workshop agent), `printCloudAdmin.ts` (administration) |
 | Mounts | `/api/print-cloud/v1`, `/api/print-cloud/v1/agent`, `/api/admin/print-cloud` (`worker/index.ts`) |
 | Hosts | the main host, the `cloud` system subdomain, and foreign hosts outside the root; **never** a merchant storefront (`printCloudHostAllowed`, `worker/lib/printCloud/http.ts`) |
-| OpenAPI | `GET /api/print-cloud/v1/openapi.json` — generated from `worker/lib/printCloud/openapi.ts`; 148 operations, and `tests/printCloudOpenApi.test.ts` fails if a route and its documentation disagree. Owner-only cost fields are described in the owner's copy only |
+| OpenAPI | `GET /api/print-cloud/v1/openapi.json` — generated from `worker/lib/printCloud/openapi.ts`; 150 operations, and `tests/printCloudOpenApi.test.ts` fails if a route and its documentation disagree. Owner-only cost fields are described in the owner's copy only |
 | Default state | **closed**: `pc_settings.enabled = false`, customer doors answer `503 PRINT_CLOUD_DISABLED` (admins still work) until the owner opens the service |
 | Without the migration | reads see an empty, closed service (lists empty, a named record 404, `GET /status` says `installed: false`) — exactly the answers of a migrated database with no data; every write answers `503 PRINT_CLOUD_NOT_INSTALLED` before any statement; the cron step does nothing (`tests/costDeployAhead.test.ts`) |
 
@@ -35,11 +35,12 @@ English and Sorani (`worker/lib/printCloud/errors.ts`; a Sorani string is never
 the Arabic one — `tests/printCloudUnits.test.ts`).
 
 Idempotency: every door that moves money, hours or grams on the customer's
-behalf (`POST /orders`, `POST /jobs/:id/confirm`, `POST /shipments`,
-`POST /me/credits/convert`, admin balance adjustments and refunds) takes an
-`Idempotency-Key` header. The first answer is stored in `pc_operations` in the
-SAME batch as the business writes; a replay returns it, and the same key with a
-different request body is refused `IDEMPOTENCY_KEY_REUSED`.
+behalf (`POST /orders`, `POST /orders/:id/pay/wallet`, `POST /jobs/:id/confirm`,
+`POST /shipments`, `POST /me/credits/convert`, admin balance adjustments and
+refunds) takes an `Idempotency-Key` header. The first answer is stored in
+`pc_operations` in the SAME batch as the business writes; a replay returns it,
+and the same key with a different request body is refused
+`IDEMPOTENCY_KEY_REUSED`.
 
 ### 1.1 Customer API (`/api/print-cloud/v1`)
 
@@ -50,8 +51,9 @@ Public: `GET /status`, `/printers`, `/printers/{id}`, `/printers/{id}/availabili
 Signed-in customer: `/me/dashboard`, `/me/credits` (+ `/ledger`,
 `/reservations`, `POST /convert`), `/me/printers`, `/me/inventory` (+ `/ledger`,
 `PATCH /{variantId}/alert`, `POST /top-up-quote`, `/reorder-suggestions`),
-`/me/transactions`; quotes and orders (`POST /quotes`, `POST /orders`,
-`POST /orders/{id}/cancel`, `POST /orders/{id}/dev-pay` — development only);
+`/me/transactions`, `/me/wallet` (§4.4); quotes and orders (`POST /quotes`,
+`POST /orders`, `POST /orders/{id}/cancel`, `POST /orders/{id}/pay/wallet`
+(§4.4), `POST /orders/{id}/dev-pay` — development only);
 files (`POST /files`, list, read, delete, download, signed links); imports;
 projects (create, update, duplicate, models, plates, accessory suggestions,
 printer recommendations); print profiles; jobs (`POST /jobs`, `PATCH`,
@@ -230,11 +232,83 @@ the same batch as the payment row.
 | `manual` | always on: a full admin records a cash or transfer receipt (`POST /admin/print-cloud/orders/{id}/confirm-payment`, audited) |
 | `gateway` | on only when `PRINT_CLOUD_PAYMENT_WEBHOOK_SECRET` (≥ 32 chars) is set. `POST /payments/webhook` with `X-PrintCloud-Signature: t=<unix>,v1=<hex HMAC-SHA256(secret, "t.body")>`, five-minute window, body `{event_id, order_id, amount_iqd, status:"succeeded"}`. **No processor is contracted**; this is the tested contract one must meet |
 | `dev` | development only: `PRINT_CLOUD_DEV_PAYMENTS=on` lets a customer pay their own order; labelled provider `dev`. Never set it on a deployed Worker |
-| `levonis_wallet` | **not connected**: answers `ADAPTER_NOT_CONNECTED` |
+| `levonis_wallet` | **connected**: the customer pays from their own Levonis wallet (`POST /orders/{id}/pay/wallet`, below). On unless a money-scope admin sets `wallet_payment_enabled: false` (§13.2), which answers `503 PAYMENT_ADAPTER_DISABLED` |
 
 Refunds (`POST /admin/print-cloud/orders/{id}/refunds`, idempotent) return only
 the unused hours and grams of that purchase's own lots — for hours, the lot's
-free part (never seconds a job holds), and nothing once it has expired.
+free part (never seconds a job holds), and nothing once it has expired. The
+money goes back the way it came: an order paid from the Levonis wallet is
+credited back to the wallet in the refund's own batch (below); a manual,
+gateway or development payment's refund is recorded for the money desk under
+its `method` (`manual` when left out) — the money returns outside the system.
+
+#### The Levonis wallet — `wallet.ts`
+
+`GET /me/wallet` → `{ connected, available_iqd, exchange_rate }`: `connected`
+is false only while the owner has switched wallet payments off;
+`available_iqd` is the SAME figure the Levonis wallet page prints
+(`walletIqdAvailable` over the spendable cents — settled minus active holds,
+so a pending withdrawal's money is not spendable — and the dinar remainders
+recorded by migration 0108); `exchange_rate` is the platform's one official
+IQD per USD (`fx/officialRate.ts`). It reads platform tables only, so it
+answers on a database without 0215 too (from the default settings).
+
+`POST /orders/{id}/pay/wallet` (own order, `Idempotency-Key`, body `{}`) pays
+the order's whole `total_iqd` in ONE D1 batch: the `pc_operations` row of the
+key, the wallet debit, then everything `confirmPayment` writes (the payment
+event `wallet:<order>`, the order's fenced flip to fulfilled, the confirmed
+payment, the grants, the stock allocations, the shipment, the notice, the
+outbox and the audit) — the money moves exactly when the order is confirmed,
+or not at all. 201 `{ order_id, status: "paid", provider: "levonis_wallet",
+amount_iqd, charged_usd_cents, exchange_rate, wallet_tx_id }`; a replay of the
+key returns the first answer (200, `replayed: true`). Any awaiting order of
+the customer's may be paid this way; the order then records `levonis_wallet`
+as its payment method.
+
+- **Asked in dinars first.** A total above the wallet page's figure is refused
+  `402 INSUFFICIENT_BALANCE { available_iqd, required_iqd }` before anything is
+  written (a refusal is not stored: top up and retry with the same key).
+- **Charged in cents by the platform's rules.** `walletSpendCents` floors the
+  total and caps it at the cents on hand, at least one cent: `CHECK (amount >
+  0)` forbids a zero debit, so a total under one cent's worth is charged one
+  cent (as the membership purchase is). The debit is the platform's one
+  conditional spend (`usdSpendStatement`, `wtx_pc_<order>`, ref = the order,
+  `created_by = 'system'`), recording the total's dinars and the rate when the
+  ledger has 0108's columns — so the wallet page falls by the total (by the
+  cents' worth when the wallet's deposits recorded too few remainders to carry
+  the debit's own; never by more than the total).
+- **A zero total** is confirmed with no debit (nothing to collect), as
+  `confirmPayment` confirms a zero amount for any adapter.
+- **Exactly one payment, at most one debit.** Two wallet payments with
+  different keys collide on the debit's primary key and the event's unique
+  key; a manual receipt or a gateway webhook that lands first takes the
+  order's state and the wallet batch fails its fence (a receipt that lands
+  second is recorded `duplicate_order` for the refund desk). A batch the
+  database refused is classified from the facts read again —
+  `409 ORDER_NOT_PAYABLE` (paid, cancelled, expired — also past the order's
+  own deadline before the sweep ran — or a delivery fee whose shipment no
+  longer waits), else `402 INSUFFICIENT_BALANCE`, else re-planned (twice),
+  then the database's own refusal or `409 STATE_CHANGED`. An outage is a 500,
+  never a refusal. Nothing is charged in any refused case.
+- **Refunds** of a wallet-paid order credit the wallet in the refund's batch:
+  an approved deposit `wtx_pc_<refund id>` (ref = the order,
+  `created_by = 'admin'`) recording the refund's dinars at the debit's rate;
+  the refund row is `paid_out`. The cents are CUMULATIVE — after refunds
+  totalling R of the P dinars paid, the wallet has had back floor(D × R / P)
+  of the D cents debited — so the refunded cents never exceed the debit (also
+  fenced in the batch), the whole paid amount, in one refund or many, returns
+  exactly D, and the refund batch's fence on the order's refunded total keeps
+  two refunds from crediting the same step. One full refund mirrors the debit
+  to the dinar; refunds in parts may leave the page up to 13 IQD (one cent's
+  worth) per refund above the pre-order figure, never below, because a row's
+  cents worth more than its dinars record no negative remainder. A refund
+  worth under one cent is refused `VALIDATION below_one_cent` with
+  `min_amount_iqd`. `method` may be left out or `levonis_wallet` for a
+  wallet-paid order; another method is refused (`order_paid_from_wallet` —
+  cash as well would refund it twice), and `levonis_wallet` for any other
+  order is refused (`order_not_paid_from_wallet` — it would mint money).
+  Switching wallet payments off never strands money: refunds still go to the
+  wallet.
 
 ## 5. Inventory — `inventory.ts`, `warehouse.ts`
 
@@ -428,14 +502,17 @@ rejects or marks it paid; cancelling returns them once.
 |---|---|
 | identity | **connected** — customers are Levonis users; the shared session identifies them |
 | notification | **connected** — in-app notices (`user_notifications`, kind `print_cloud`, three languages) |
-| wallet_payment | not connected (`ADAPTER_NOT_CONNECTED`) |
+| wallet_payment | **connected** — orders paid from the customer's Levonis wallet in one batch with their confirmation, refunds credited back (§4.4); reported not connected while the owner has switched wallet payments off |
 | product_catalog | link only — a Print Cloud product may carry a Levonis product id; no sync |
 | inventory | standalone ledger — not merged with `inventory_lots` |
 | orders, accounting | outbox — events queued in `pc_integration_events`, not delivered |
 | membership | not connected — membership-limited promotions do not apply |
 
-Nothing in Print Cloud writes a Levonis wallet, product, order or inventory
-row. `GET /status` and `GET /admin/print-cloud/adapters` report this table.
+Print Cloud writes a Levonis wallet row only through the wallet adapter — the
+debit of an order paid from the wallet and the credit of its refund, each in
+the Print Cloud batch it belongs to — and no Levonis product, order or
+inventory row. `GET /status` and `GET /admin/print-cloud/adapters` report this
+table.
 
 ## 9. The workshop agent — `printers.ts`, `routes/printCloudAgent.ts`
 
@@ -548,8 +625,13 @@ lots' free parts and holds, each active credit reservation against its hold
 rows and each lot's holds against the active reservations on it, stock
 positions, holds and allocations, active reservations against job states,
 one active assignment per printer and per job (also enforced by the partial
-unique indexes) and only for jobs on a machine, paid orders against payments.
-Twenty-three checks; a mismatch is **reported**, never silently repaired.
+unique indexes) and only for jobs on a machine, paid orders against payments,
+orders paid from the Levonis wallet against the wallet ledger (one debit,
+refund credits never above it, no debit without a wallet payment).
+Twenty-four checks; a mismatch is **reported**, never silently repaired. The
+platform's own wallet reconciliation (`walletReconciliationReport`) reads the
+Print Cloud debit as a system purchase (`created_by = 'system'`), never as a
+payout without a request.
 
 ## 12. Background work — `background.ts`, `tasks.ts`
 
@@ -594,10 +676,14 @@ One versioned row (`pc_settings`), edited with `PATCH /admin/print-cloud/setting
 (`settings.ts`): `enabled`, quote/hold/confirmation durations, rounding, the
 next-pack cap, overage policies, operator approval, agent verification,
 telemetry staleness, failure policy, free reprint, upload limit, active-job
-limit, low-inventory default, delivery fees, import providers, electricity
-tariff. A patch merges key by key at every level (a governorate fee set to
-`null` is removed; `import_providers` is replaced whole), and a value out of
-range or of the wrong type is refused `VALIDATION`, never replaced by a default.
+limit, low-inventory default, delivery fees, import providers,
+`wallet_payment_enabled` (default `true`: paying from the Levonis wallet;
+`false` refuses new wallet payments `503 PAYMENT_ADAPTER_DISABLED` and reports
+the adapter not connected — refunds of wallet-paid orders still go to the
+wallet), electricity tariff. A patch merges key by key at every level (a
+governorate fee set to `null` is removed; `import_providers` is replaced
+whole), and a value out of range or of the wrong type is refused `VALIDATION`,
+never replaced by a default.
 
 ### 13.3 Local development
 
@@ -625,6 +711,7 @@ rules. Sign up a user through the normal Levonis flow, then buy a package
 | `tests/printCloudOperations.test.ts` | gates, roles, idempotency, expiry, imports and SSRF, uploads, plates, the agent, refunds, conversion, fulfilment, append-only ledgers, buyback reservations, durable tasks |
 | `tests/printCloudUnits.test.ts` | money arithmetic, apportioning, lot valuation, the pricing engine, promotions, the state machine, plates, file sniffing, webhook signatures, settings, three languages, error mapping, hosts |
 | `tests/printCloudOpenApi.test.ts` | the document equals the routers; access classes match the guards |
+| `tests/printCloudWallet.test.ts` | the Levonis wallet adapter on funded wallets with dinar testimony: the page figure, the one-batch payment, 402 in three languages with nothing written, holds, races (wallet × wallet, wallet × manual, wallet × gateway, wallet × cancel), replays, expiry, zero totals, delivery fees, the owner switch, refunds (partial, full, racing, under a cent, other methods), deploy ahead of 0215 and 0108 |
 
 Concurrency is proven with `RaceD1` (`tests/fixtures/printCloud.ts`), which
 interleaves a competing request immediately before a batch and enforces D1's
@@ -649,8 +736,8 @@ Cloudflare dashboard (docs/SUBDOMAIN_ARCHITECTURE.md).
    printers (Bambu LAN/MQTT, OctoPrint, Moonraker) and runs a slicer CLI
    (Bambu Studio / OrcaSlicer / PrusaSlicer), speaking §9. Without it jobs wait
    for an operator's manual estimate and manual start/finish.
-2. **A payment processor** that can sign the §4.4 webhook — or the Levonis
-   wallet adapter, once its contract is decided.
+2. **A payment processor** that can sign the §4.4 webhook, for card
+   payments. (Paying from the Levonis wallet is connected — §4.4.)
 3. **Provider APIs** for URL imports (MakerWorld, Printables, Thingiverse) with
    terms that permit downloads; until then imports save the link only.
 4. **DNS/route** for `cloud.levonis-iq.com`.
@@ -660,15 +747,16 @@ Cloudflare dashboard (docs/SUBDOMAIN_ARCHITECTURE.md).
 
 Implemented and tested on real persisted records: everything in §§2–12 — the
 catalogue, credits, pricing and quotes, orders with holds, the payment door
-and its manual/gateway/dev adapters, customer inventory, the warehouse, files
-and their validation, imports (link saving and authorised download), projects,
+and its manual/gateway/dev adapters, the Levonis wallet adapter (payments and
+refunds, §4.4), customer inventory, the warehouse, files and their
+validation, imports (link saving and authorised download), projects,
 plates, the job state machine, the queue and scheduler, the agent protocol,
 the slicing request/lease/result protocol, failures and reprints,
 fulfilment, buyback, recommendations, reports, reconciliation, background
 work, RBAC, audit and the OpenAPI document.
 
-Not connected (honestly reported by `/status` and `/adapters`): the Levonis
-wallet, catalogue sync, shared inventory, order/accounting delivery (outbox
-only), membership pricing; a contracted payment processor; provider download
-APIs; the agent program and slicer themselves (the cloud side of their
-protocol is built); the customer and admin interfaces (Phase 9).
+Not connected (honestly reported by `/status` and `/adapters`): catalogue
+sync, shared inventory, order/accounting delivery (outbox only), membership
+pricing; a contracted payment processor; provider download APIs; the agent
+program and slicer themselves (the cloud side of their protocol is built); the
+customer and admin interfaces (Phase 9).
