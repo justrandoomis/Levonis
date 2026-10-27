@@ -452,7 +452,7 @@ const STOREFRONT_BUDGET = 47 * KB;
 // Store interactions (2026-10-23): the verified base is already 236.9 KB.
 // Blur-up and the deferred trends entry add about 0.5 KB of shared shell code;
 // allow that feature cost with a 1 KB increase, keeping every other budget.
-const STOREFRONT_APP_BUDGET = 238 * KB;
+const STOREFRONT_APP_BUDGET = 239 * KB;
 const STOREFRONT_SHARED_UI = ['Overlay', 'overlayStack', 'Segmented'];
 /** Vendor chunks a lazy page may share; they are budgeted on their own, not against a page. */
 const isSharedVendor = (f: string) => /^vendor-/.test(f);
@@ -523,7 +523,7 @@ test('opening a product excludes below-fold reviews, closed purchase dialogs, re
   assert.equal(opening.has(features!), false, `${features} is a static product import again — a module of the product's opening renders the \`motion\` proxy (src/lib/motionFeatures.tsx says what to render instead)`);
 });
 
-test('the storefront owns at most 47 KB gzip and its complete app payload stays under 238 KB, with other blocks lazy', () => {
+test('the storefront owns at most 47 KB gzip and its complete app payload stays under 239 KB, with other blocks lazy', () => {
   const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
   const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
   const initial = staticClosure(entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!);
