@@ -8,9 +8,13 @@ picked up, delivered or sold back.
 
 This document covers the BACKEND as built: data model, guarantees, flows, API,
 roles, adapters, configuration, tests, deployment, and an honest list of what is
-implemented and what is not connected yet. The customer and admin interfaces
-are **not built** (Phase 9 of the specification is postponed); every screen the
-specification describes has its data API here.
+implemented and what is not connected yet. The interfaces are built on it:
+the customer app on `cloud.<root>` (`src/cloud/`, Arabic, English and Sorani;
+the host's resolve answer names the `cloud` system label and `src/App.tsx`
+loads the app as its own lazy chunk; sign-in hands off to the apex and returns
+through an allowlist of one label) and the administration console in the main
+site's admin («الطباعة السحابية», `src/components/adminPrintCloud/`). The
+workshop agent program is `tools/print-cloud-agent/` (docs/PRINT_CLOUD_AGENT.md).
 
 DECISIONS row 271 records the decision and its open owner questions.
 
@@ -845,5 +849,6 @@ pricing; a contracted payment processor; provider download APIs; a workshop
 agent and slicer running on the workshop LAN (the cloud side of their
 protocol is built, and the agent program exists in `tools/print-cloud-agent/`
 — tested against the simulator and local fakes only; no real printer or
-slicer binary has run it yet, docs/PRINT_CLOUD_AGENT.md); the customer and
-admin interfaces (Phase 9).
+slicer binary has run it yet, docs/PRINT_CLOUD_AGENT.md). The customer app
+and the admin console are built; the service still opens only when the owner
+switches it on after entering the catalogue and prices.
