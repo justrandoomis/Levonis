@@ -52,7 +52,7 @@ const KB = 1024;
  * 60 KB, and the budget is re-cut to 120 KB: comfortable headroom for ordinary
  * work, tight enough that re-eagering a page is caught the same day.
  */
-const ENTRY_BUDGET = 68 * KB; // 72 → 68 (speed audit 2026-10-16: 62.8 KB measured)
+const ENTRY_BUDGET = 69 * KB; // 72 → 68 (speed audit 2026-10-16: 62.8 KB measured); 68 → 69 (2026-10-27: Print Cloud, Creative Studio and the community routes brought it to 68.0 KB)
 /** §10: any single route chunk. */
 const CHUNK_BUDGET = 250 * KB;
 /**
