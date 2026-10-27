@@ -119,6 +119,12 @@ converted or expired. Always, and proven by reconciliation (§11):
     reserved  = Σ seconds held on them = Σ the active reservations' hold rows
 
 so which hours a job holds is a record, never inferred from an order of lots.
+A reservation gives its holds back — a cancellation, a release, a settlement —
+in **one** statement however many lots they are on: a single `UPDATE` takes
+each lot's own hold row off it (`unholdAll`), in the batch whose flip of the
+reservation is fenced, a fence that also proves the hold rows sum to what the
+account moves. A release is five statements and no read, for one lot or a
+hundred.
 
 ### 3.2 Expiry
 
@@ -133,20 +139,35 @@ lot's expiry has come:
 - **no debit draws it**: a refund, an admin debit and a conversion take only
   free parts of lots not yet expired, and a credit line whose lot has expired
   refunds nothing;
-- **the `expire_credit_lots` task takes exactly its free part**, with its own
-  ledger rows. The task's page holds only lots that have a free part (the
-  filter is per lot), so lots wholly held for jobs never crowd out the ones
-  that can expire. Each pass is fenced on the lot's remainder and holds and
-  keyed by what the lot had left, so a lot may expire in several passes.
+- **the `expire_credit_lots` task takes its free part** — less what a free
+  reprint still waiting for its confirmation is entitled to there (below) —
+  with its own ledger rows. The task's page holds only lots that have
+  something to expire (the filter is per lot), so lots wholly held for jobs,
+  or wholly owed to a pending reprint, never crowd out the ones that can
+  expire. Each pass is fenced on the lot's remainder and holds, and on the
+  pending reprints' entitlement there not having grown, and keyed by what the
+  lot had left, so a lot may expire in several passes.
 
 Hours a job came to hold before the expiry stay that job's: it prints from
 them, and what it gives back (a cancellation, a settlement under the
 estimate) is free and expires on the next run. The one exception is a **free reprint after a
 workshop failure**: it inherits what its failed parent held and gave back,
 lot by lot, taken first even past the expiry — and only that much — so the
-customer loses no hour to the workshop's failure. Converted hours keep the
-expiry they were bought under. A lot that fails to expire fails the task
-(retried, its error visible in `GET /admin/print-cloud/tasks`).
+customer loses no hour to the workshop's failure. The failure's resolution
+gives the parent's holds back and the reprint's confirmation holds them again:
+two batches, and the sweep may run between them. So the entitlement is
+derived from records, not from timing — the parent's hold rows less what its
+settlement consumed, for a reprint its failure names
+(`pc_failures.reprint_job_id`, resolved as the workshop's) and that names it
+(`pc_print_jobs.parent_job_id`) — and **while that reprint is not yet
+confirmed** (`ready` or `awaiting_confirmation`) the sweep leaves those seconds
+on their lots: a sweep racing the automatic confirmation, or running while
+the reprint waits for the customer, takes none of them. Whoever confirms it —
+the system on the customer's behalf, or the customer by hand — holds them.
+Once the reprint is confirmed (it then holds them, and gives back like any
+job) or cancelled, normal expiry resumes. Converted hours keep the expiry
+they were bought under. A lot that fails to expire fails the task (retried,
+its error visible in `GET /admin/print-cloud/tasks`).
 
 ### 3.3 Reservation and settlement
 
@@ -321,24 +342,46 @@ loaded with compatible material, and not in maintenance. A pass reads the whole
 queue a page at a time and spends its statement share only on work, so jobs no
 machine can take never hide the ones behind them. A job that depends on
 another runs once that print is made — the job or its reprint; when it can no
-longer be made (cancelled, or failed and closed without a reprint) the waiting
-job is cancelled, its reservations released and the customer told. That release
-is three reads and one fenced batch, and a pass bounded by a statement share
-runs it only when all of it fits: it asks for 14 statements and 4 per
-reservation (`releaseCost`, never below what a release sends, measured from one
-reservation to the most a job holds in `tests/printCloudFixes-queue2.test.ts`).
-A release that does not fit is skipped (counted `deferred`) and the pass goes
-on placing the jobs behind it; a pass that deferred one asks to run again only
-if it also changed something. The largest job — its hours, 16 colours and 20
-accessories, 162 statements — is larger than the quarter-hour share (120, §12),
-so the cron leaves it queued, its reservations held and the queue showing
-`dependency_cannot_complete`. The operator releases it: with
-`POST /admin/print-cloud/queue/run`, a pass without a share (the request's own
-invocation), or with `POST /admin/print-cloud/tasks/run`, whose scheduling pass
-leads the due work inside that run's 600 statements. A
-partial unique index makes two active assignments on one printer impossible —
-scheduler, operator and database all refuse. Customers see their position and
-an estimate built from real queued durations.
+longer be made the waiting job is cancelled, its reservations released and the
+customer told. A print can no longer be made when it is cancelled, failed and
+closed without a reprint, or — judged across the whole chain
+(`dependencyStates`, one statement) — stranded itself: a job before a machine
+(queued, or earlier) whose own dependency can no longer be made, however far
+up. A stranded job is dead for whatever waits on it even while its own release
+waits for room: with head ← Large ← Small and the head cancelled, the queue
+shows both `dependency_cannot_complete` and the cron releases Small while
+Large waits (`tests/printCloudFixes-round4-queue.test.ts`). A dependency is
+fixed when its job is created and a reprint waits for nothing, so the walk ends
+and a dead answer is final.
+
+Releasing a stranded job is three reads and one fenced batch, and a bounded
+pass runs it only when all of it fits: it asks for 15 statements and 4 per
+reservation (`releaseCost`, never below what a release sends). Nothing in it
+grows with the lots the job's hours are held on — one statement gives every
+hold back (§3.1) — and its size is measured from one reservation to the most a
+job holds in `tests/printCloudFixes-queue2.test.ts`, and with the hours on a
+hundred lots in `tests/printCloudFixes-round4-credits.test.ts`. A release that does not fit is
+skipped — deferred, and named in the pass's answer (`deferred`) — and the pass
+goes on placing the jobs behind it; a pass that deferred one asks to run again
+(`more`) only if it also changed something. The largest job — its hours, 16
+colours and 20 accessories, 163 statements — is larger than the quarter-hour
+share (120, §12), so the cron leaves it queued, its reservations held and the
+queue showing `dependency_cannot_complete`. The operator releases it, with
+`POST /admin/print-cloud/queue/run` or `POST /admin/print-cloud/tasks/run`
+(whose scheduling pass leads the due work): each is a pass within 600
+statements of its own request, and D1 allows 1,000 an invocation. A backlog of
+large releases therefore goes a few a run — seven of the largest take three
+runs — and the queue run's answer names the releases it deferred and sets
+`more` until none is left, so the operator runs it again.
+
+No runner of the queue is unbounded: the cron has its share, the operator's
+doors their 600, and the runner after an upload or an import (`waitUntil`)
+claims only the kind of work its own request enqueued, within 300 statements
+(§12) — a customer's request never works the scheduler's backlog, and a pass
+left due waits for the cron or the operator. A partial unique index makes two
+active assignments on one printer impossible — scheduler, operator and
+database all refuse. Customers see their position and an estimate built from
+real queued durations.
 
 ### 7.6 Execution and settlement
 
@@ -351,7 +394,9 @@ Completion settles hours and every material from the job's reservation; with
 A failure records who is responsible; `failure_policy` decides the charge
 (workshop → nothing; customer or model → printed seconds and failed grams,
 never beyond the reservation; undetermined → manual review). A verified
-workshop failure queues a free reprint automatically.
+workshop failure queues a free reprint automatically, on the hours its parent
+held — even expired ones, which wait for it until it is confirmed or
+cancelled (§3.2).
 
 ### 7.8 Recommendations — `recommendations.ts`
 
@@ -496,7 +541,13 @@ still fits; a task cut short is queued again and finishes on a later tick
 (`tests/printCloudOperations.test.ts`, `tests/fxSweepBudget.test.ts`). An admin
 may run due work by hand (`POST /admin/print-cloud/tasks/run`, within 600
 statements of that request); a scheduling pass leads it, at most one a minute,
-so a release too large for the cron's share is done there (§7.5).
+so a release too large for the cron's share is done there (§7.5). The runner a
+request starts after its answer (`waitUntil` after `POST /files` and
+`POST /imports`, `runAfterRequest`) claims only the kinds of work that
+request enqueued — `analyze_model_file` after an upload; `import_model_url`,
+and the analysis of the file an import brings in, after an import (the claim
+filters on them) — at most two tasks within 300 statements of that
+invocation; every other due task waits for the cron or the admin's run.
 
 ## 13. Configuration
 

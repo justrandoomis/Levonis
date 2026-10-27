@@ -1064,6 +1064,8 @@ CREATE TABLE IF NOT EXISTS pc_print_jobs (
 );
 CREATE INDEX IF NOT EXISTS idx_pc_print_jobs_user ON pc_print_jobs(user_id, status, created_at);
 CREATE INDEX IF NOT EXISTS idx_pc_print_jobs_status ON pc_print_jobs(status, priority, queued_at);
+-- A job's reprints: the scheduler walks a dependency's chain down them on every page (queue.ts `dependencyStates`).
+CREATE INDEX IF NOT EXISTS idx_pc_print_jobs_parent ON pc_print_jobs(parent_job_id) WHERE parent_job_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS pc_print_job_events (
   id TEXT PRIMARY KEY,

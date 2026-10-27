@@ -16,10 +16,11 @@
  *
  * A job that depends on another waits for that print to be MADE: the job
  * itself completing, or a reprint of it (down its `parent_job_id` chain).
- * A dependency that can no longer be made — cancelled, or failed and closed
- * without a reprint — releases the job waiting on it: the scheduler cancels
- * it, every reservation given back and the customer told, instead of holding
- * their hours and grams for a print that cannot come.
+ * A dependency that can no longer be made — cancelled, failed and closed
+ * without a reprint, or itself waiting on one that cannot be made, however
+ * far up — releases the job waiting on it: the scheduler cancels it, every
+ * reservation given back and the customer told, instead of holding their
+ * hours and grams for a print that cannot come.
  *
  * Conflicts are impossible by construction, not by care: an assignment is a
  * row in `pc_printer_assignments` with a partial UNIQUE index on the printer
@@ -155,12 +156,27 @@ export async function printerVerdicts(db: D1Database, job: JobRow, config: Print
 /** Where a job's dependency stands: made, still to be made, or never to be made. */
 type DependencyState = 'met' | 'pending' | 'dead';
 
+/** The states before a machine: a job in one has yet to pass its own dependency (the scheduler and `assignJob` check it there). */
+const BEFORE_A_MACHINE = "'draft', 'uploaded', 'analyzing', 'ready', 'awaiting_confirmation', 'confirmed', 'queued'";
+
 /**
- * The state of every dependency of these jobs, in one statement. A
- * dependency is MET when it, or a reprint of it (any job down its
- * `parent_job_id` chain), completed; PENDING while some job of that chain
- * can still complete — live, or failed with its failure still open (it may
- * yet be reprinted); DEAD when none can.
+ * The state of every dependency of these jobs, in one statement, judged
+ * across the whole chain. A dependency is MET when it, or a reprint of it
+ * (any job down its `parent_job_id` chain), completed. It is PENDING while
+ * some job of that chain can still complete: one on a machine or past it
+ * (preparing, printing, paused, or failed with its failure still open — it
+ * may yet be reprinted), one before a machine that waits for nothing, or one
+ * before a machine whose OWN dependency is met or pending — the same
+ * question, asked up the chain (`upstream`). It is DEAD when none can.
+ *
+ * So a dependency that is itself stranded — queued, or anywhere before a
+ * machine, waiting on a print that cannot come — is dead for whatever waits
+ * on it, even while its own release is deferred for room (`runScheduler`):
+ * the scheduler releases the jobs behind it and the queue tells their
+ * customers, without waiting for that release. A dependency is fixed when its
+ * job is created and names a job that already exists (`createJob`), so a chain
+ * has no cycle; a reprint waits for nothing; and a stranded job can only end
+ * cancelled — so the walk ends, and a dead answer never comes back to life.
  */
 async function dependencyStates(db: D1Database, jobs: JobRow[]): Promise<Map<string, DependencyState>> {
   const out = new Map<string, DependencyState>();
@@ -168,13 +184,17 @@ async function dependencyStates(db: D1Database, jobs: JobRow[]): Promise<Map<str
   if (!deps.length) return out;
   const rows = await many<{ root: string; met: number; alive: number }>(
     db,
-    `WITH RECURSIVE chain(root, id, status) AS (
-       SELECT id, id, status FROM pc_print_jobs WHERE id IN (SELECT value FROM json_each(?))
+    `WITH RECURSIVE chain(root, id, status, dep, upstream) AS (
+       SELECT id, id, status, depends_on_job_id, 0 FROM pc_print_jobs WHERE id IN (SELECT value FROM json_each(?))
        UNION
-       SELECT c.root, j.id, j.status FROM pc_print_jobs j JOIN chain c ON j.parent_job_id = c.id
+       SELECT c.root, j.id, j.status, j.depends_on_job_id, c.upstream FROM pc_print_jobs j JOIN chain c ON j.parent_job_id = c.id
+       UNION
+       SELECT c.root, j.id, j.status, j.depends_on_job_id, 1 FROM chain c JOIN pc_print_jobs j ON j.id = c.dep
+        WHERE c.status IN (${BEFORE_A_MACHINE})
      )
-     SELECT root, MAX(status = 'completed') AS met,
-            MAX(status NOT IN ('completed', 'cancelled', 'reprint_requested', 'failed')
+     SELECT root, MAX(upstream = 0 AND status = 'completed') AS met,
+            MAX((upstream = 1 AND status = 'completed')
+                OR (status NOT IN ('completed', 'cancelled', 'reprint_requested', 'failed') AND (dep IS NULL OR status NOT IN (${BEFORE_A_MACHINE})))
                 OR (status = 'failed' AND EXISTS (SELECT 1 FROM pc_failures f WHERE f.job_id = chain.id AND f.status = 'reported'))) AS alive
        FROM chain GROUP BY root`,
     JSON.stringify(deps)
@@ -254,49 +274,42 @@ async function stillQueued(db: D1Database, jobId: string): Promise<JobRow | null
 /**
  * WHAT RELEASING A STRANDED JOB SENDS, AT MOST — measured, from one
  * reservation to the most a job holds (its hours, 16 colours and 20
- * accessories), in tests/printCloudFixes-queue2.test.ts. Three reads (the job,
- * its hours, its materials) and a batch of the transition (three), the queue
- * entry, the assignment, the slicing request, the notice and the audit row
- * (three with the event bus on, after its outbox probe once an isolate); then
- * four per reservation (its flip, its fence, its account, its ledger); and for
- * its hours one read of the lots they are held on and one statement per lot
- * hold given back (credits.ts `releaseCredits`). No ceiling: the room asked
- * before a release is the whole release, so a release larger than the share
- * is skipped, never squeezed in (`runScheduler`).
+ * accessories), in tests/printCloudFixes-queue2.test.ts, and with its hours
+ * held on a hundred lots in tests/printCloudFixes-round4-credits.test.ts.
+ * Three reads (the job, its hours, its materials) and a batch of the
+ * transition (three), the queue entry, the assignment, the slicing request,
+ * the notice and the audit row (three with the event bus on, after its outbox
+ * probe once an isolate), and the one statement that gives back every hold of
+ * its hours, however many lots they are held on (credits.ts `unholdAll`);
+ * then four per reservation (its flip, its fence, its account, its ledger).
+ * Nothing grows with the lots, so the reservations are the whole measure. No
+ * ceiling: the room asked before a release is the whole release, so a release
+ * larger than the share is skipped, never squeezed in (`runScheduler`).
  */
 const RELEASE_BASE_STATEMENTS = 15;
 const RELEASE_PER_RESERVATION = 4;
-const RELEASE_PER_HOLD = 1;
 
-interface HeldCount {
-  reservations: number;
-  holds: number;
-}
-
-const releaseCost = (c: HeldCount): number => RELEASE_BASE_STATEMENTS + RELEASE_PER_RESERVATION * c.reservations + RELEASE_PER_HOLD * c.holds;
+const releaseCost = (reservations: number): number => RELEASE_BASE_STATEMENTS + RELEASE_PER_RESERVATION * reservations;
 
 /**
  * How many reservations each of these jobs holds (its hours and each
- * material), and on how many lots its hours are held: one statement for a
- * page's stranded jobs. A queued job never gains either, so a count read with
- * the page can only be above what its release meets later.
+ * material): one statement for a page's stranded jobs. A queued job never
+ * gains one, so a count read with the page can only be above what its
+ * release meets later.
  */
-async function reservationCounts(db: D1Database, jobIds: string[]): Promise<Map<string, HeldCount>> {
+async function reservationCounts(db: D1Database, jobIds: string[]): Promise<Map<string, number>> {
   if (!jobIds.length) return new Map();
   const ids = JSON.stringify(jobIds);
-  const rows = await many<{ job_id: string; reservations: number; holds: number }>(
+  const rows = await many<{ job_id: string; n: number }>(
     db,
-    `SELECT job_id, SUM(r) AS reservations, SUM(h) AS holds FROM (
-       SELECT job_id, 1 AS r, 0 AS h FROM pc_credit_reservations WHERE state = 'active' AND job_id IN (SELECT value FROM json_each(?1))
+    `SELECT job_id, COUNT(*) AS n FROM (
+       SELECT job_id FROM pc_credit_reservations WHERE state = 'active' AND job_id IN (SELECT value FROM json_each(?1))
        UNION ALL
-       SELECT ref_id, 1, 0 FROM pc_inventory_reservations WHERE purpose = 'print_job' AND state = 'active' AND ref_id IN (SELECT value FROM json_each(?1))
-       UNION ALL
-       SELECT r.job_id, 0, 1 FROM pc_credit_reservation_lots l JOIN pc_credit_reservations r ON r.id = l.reservation_id
-        WHERE r.state = 'active' AND r.job_id IN (SELECT value FROM json_each(?1))
+       SELECT ref_id FROM pc_inventory_reservations WHERE purpose = 'print_job' AND state = 'active' AND ref_id IN (SELECT value FROM json_each(?1))
      ) GROUP BY job_id`,
     ids
   );
-  return new Map(rows.map((r) => [r.job_id, { reservations: Number(r.reservations), holds: Number(r.holds) }]));
+  return new Map(rows.map((r) => [r.job_id, Number(r.n)]));
 }
 
 /** A queued job whose dependency can no longer be made: cancelled with every reservation released, the customer told. */
@@ -328,16 +341,21 @@ async function releaseStranded(db: D1Database, jobId: string, now: Date): Promis
  * machine taken meanwhile is skipped, never double-booked.
  *
  * A release asks for all it sends (`releaseCost`, sized to the job's
- * reservations). One that does not fit is skipped — deferred, not waited on —
- * and the pass goes on placing the jobs behind it, so a large stranded job
- * never hides them. A release larger than any quarter-hour share (the largest
- * job's is) is left to a run with the room: the operator's queue run, which
- * passes no `unitFits`, or the admin task run (600 statements).
+ * reservations). One that does not fit is skipped — deferred, not waited on,
+ * and named in the answer (`deferred`) — and the pass goes on placing the
+ * jobs behind it, so a large stranded job never hides them; the jobs that
+ * wait on it are dead too (`dependencyStates`), so they are released behind
+ * it. A release larger than any quarter-hour share (the largest job's is) is
+ * left to a run with more room: the operator's queue run or the admin task
+ * run, each within 600 statements of its own request.
  *
  * Out of room, or past a deferred release, the pass asks to run again
  * (`more`) only if it changed something: one that only looked would look at
  * the same jobs again, so it ends, and the next quarter hour's pass starts
- * afresh.
+ * afresh. A pass that stops at its `limit` of changes always asks again.
+ *
+ * Every runner passes `unitFits` (the cron's share, the operator's 600); a
+ * pass without it is unbounded and releases whatever it meets — tests only.
  */
 export async function runScheduler(
   db: D1Database,
@@ -345,13 +363,13 @@ export async function runScheduler(
   now: Date,
   limit = 20,
   unitFits?: (statements?: number) => boolean
-): Promise<{ assigned: Array<{ job_id: string; printer_id: string }>; released: string[]; waiting: number; deferred: number; more: boolean }> {
+): Promise<{ assigned: Array<{ job_id: string; printer_id: string }>; released: string[]; waiting: number; deferred: string[]; more: boolean }> {
   const actor: Actor = { type: 'system', id: 'scheduler' };
   const assigned: Array<{ job_id: string; printer_id: string }> = [];
   const released: string[] = [];
+  const deferred: string[] = [];
   const taken = new Set<string>();
   let waiting = 0;
-  let deferred = 0;
   const result = (more: boolean) => ({ assigned, released, waiting, deferred, more });
   if (unitFits && !unitFits()) return result(true);
   // The check before the reads covers them and the first standard unit; a larger unit always asks.
@@ -373,17 +391,18 @@ export async function runScheduler(
     const needs = await needsOf(db, page);
     const dependencies = await dependencyStates(db, page);
     // A run without a bound releases whatever it meets: only a bounded one sizes its releases.
-    const held = unitFits ? await reservationCounts(db, page.filter((j) => dependencyOf(j, dependencies) === 'dead').map((j) => j.id)) : new Map<string, HeldCount>();
+    const held = unitFits ? await reservationCounts(db, page.filter((j) => dependencyOf(j, dependencies) === 'dead').map((j) => j.id)) : new Map<string, number>();
     for (const job of page) {
-      if (assigned.length + released.length >= limit) return result(false);
+      // At its limit the pass has changed something and jobs remain unread: ask to run again.
+      if (assigned.length + released.length >= limit) return result(true);
       const dependency = dependencyOf(job, dependencies);
       if (dependency === 'pending') {
         waiting++;
         continue;
       }
       if (dependency === 'dead') {
-        if (unitFits && !room(releaseCost(held.get(job.id) ?? { reservations: 0, holds: 0 }))) {
-          deferred++;
+        if (unitFits && !room(releaseCost(held.get(job.id) ?? 0))) {
+          deferred.push(job.id);
           continue;
         }
         if (await releaseStranded(db, job.id, now)) released.push(job.id);
@@ -423,7 +442,7 @@ export async function runScheduler(
     if (!room()) return result(changed());
     after = page[page.length - 1];
   }
-  return result(deferred > 0 && changed());
+  return result(deferred.length > 0 && changed());
 }
 
 export interface QueueEstimate {

@@ -13,11 +13,13 @@
  * idempotent (it re-reads state and acts only on what is still to do), so a
  * retried task cannot double an effect. Each attempt writes a log line.
  *
- * Runners: the quarter-hour cron (bounded, after the platform's own jobs), a
- * `waitUntil` after the request that enqueued the work, and the operator's
- * «run now» door.
+ * Runners, every one bounded by the D1 statements of its own invocation: the
+ * quarter-hour cron (its share, after the platform's own jobs), a `waitUntil`
+ * after the request that enqueued the work (only the kinds that request
+ * enqueued, `runAfterRequest`), and the operator's «run now» door.
  */
 import type { Env } from '../types';
+import { countingD1 } from '../d1Count';
 import { many, one, runBatch, fence, printCloudInstalled } from './db';
 import { expireUnpaidOrders } from './orders';
 import { analyseStoredFile } from './files';
@@ -62,6 +64,11 @@ export function roomWithin(used: () => number, budget: number): Room {
 
 /** Room for one more unit of a loop (or `statements` of a larger one), and the close that follows it. */
 const unitFits = (room: Room | undefined, statements = PRINT_CLOUD_UNIT_STATEMENTS) => !room || room(statements + 2);
+
+/** A scheduling pass's `unitFits` within a room (queue.ts `runScheduler`): a standard unit, or a release's own measured size, and the close after it. */
+export function schedulerRoom(room: Room): (statements?: number) => boolean {
+  return (statements) => unitFits(room, statements);
+}
 
 interface TaskRow {
   id: string;
@@ -177,8 +184,8 @@ async function handle(env: RunnerEnv, task: TaskRow, now: Date, room?: Room): Pr
       return { summary: `low balances ${sent} of ${low.length}`, more };
     }
     case 'schedule_queue': {
-      const r = await runScheduler(db, config, now, 20, room ? (statements?: number) => unitFits(room, statements) : undefined);
-      return { summary: `assigned ${r.assigned.length}, released ${r.released.length}, deferred ${r.deferred}, waiting ${r.waiting}`, more: r.more };
+      const r = await runScheduler(db, config, now, 20, room ? schedulerRoom(room) : undefined);
+      return { summary: `assigned ${r.assigned.length}, released ${r.released.length}, deferred ${r.deferred.length}, waiting ${r.waiting}`, more: r.more };
     }
     case 'reconcile': {
       const r = await reconcile(db);
@@ -201,17 +208,20 @@ const LEASE_EXPIRED_AFTER_LAST_ATTEMPT = 'LEASE_EXPIRED_AFTER_LAST_ATTEMPT';
 const DUE = "(status = 'queued' AND run_after <= ?) OR (status = 'running' AND lease_until < ? AND run_after <= ?)";
 
 /**
- * Claim one due task under a lease. Null when there is nothing due or another
- * runner won; 'retired' when the due row was a spent lease — its runner died
- * in the last attempt — now recorded dead instead of run again.
+ * Claim one due task under a lease — of these `kinds` only, when named. Null
+ * when there is nothing due or another runner won; 'retired' when the due row
+ * was a spent lease — its runner died in the last attempt — now recorded dead
+ * instead of run again.
  */
-async function claim(db: D1Database, now: Date): Promise<TaskRow | 'retired' | null> {
+async function claim(db: D1Database, now: Date, kinds?: readonly TaskKind[]): Promise<TaskRow | 'retired' | null> {
   const due = await one<TaskRow & { status: string }>(
     db,
-    `SELECT id, kind, payload_json, attempts, max_attempts, status FROM pc_background_jobs WHERE ${DUE} ORDER BY run_after, id LIMIT 1`,
+    `SELECT id, kind, payload_json, attempts, max_attempts, status FROM pc_background_jobs
+      WHERE (${DUE}) ${kinds ? 'AND kind IN (SELECT value FROM json_each(?))' : ''} ORDER BY run_after, id LIMIT 1`,
     iso(now),
     iso(now),
-    iso(now)
+    iso(now),
+    ...(kinds ? [JSON.stringify(kinds)] : [])
   );
   if (!due) return null;
   const token = pcId('lease');
@@ -265,14 +275,15 @@ export interface RunReport {
 }
 
 /**
- * Run up to `limit` due tasks. Never throws: a broken task is recorded, the
- * next one still runs. With `room`, a task starts only while its overhead and
- * one unit of work fit, and a task whose loop stopped for room is queued
- * again (its attempt not counted) for the next run.
+ * Run up to `limit` due tasks — of these `kinds` only, when named (the claim
+ * takes no other). Never throws: a broken task is recorded, the next one
+ * still runs. With `room`, a task starts only while its overhead and one unit
+ * of work fit, and a task whose loop stopped for room is queued again (its
+ * attempt not counted) for the next run.
  */
 export async function runPrintCloudTasks(
   env: RunnerEnv,
-  opts: { limit?: number; now?: () => Date; room?: Room } = {}
+  opts: { limit?: number; now?: () => Date; room?: Room; kinds?: readonly TaskKind[] } = {}
 ): Promise<RunReport> {
   const report: RunReport = { ran: 0, succeeded: 0, failed: 0, dead: 0 };
   const clock = opts.now ?? (() => new Date());
@@ -281,7 +292,7 @@ export async function runPrintCloudTasks(
   for (let i = 0; i < (opts.limit ?? 10); i++) {
     if (opts.room && !opts.room(PRINT_CLOUD_TASK_OVERHEAD + PRINT_CLOUD_UNIT_STATEMENTS)) break;
     const now = clock();
-    const task = await claim(db, now);
+    const task = await claim(db, now, opts.kinds);
     if (!task) break;
     if (task === 'retired') {
       report.dead++;
@@ -323,6 +334,23 @@ export async function runPrintCloudTasks(
     }
   }
   return report;
+}
+
+/** What the runner after a request may spend of that request's invocation (D1 allows 1,000 queries in one). */
+export const AFTER_REQUEST_STATEMENTS = 300;
+
+/**
+ * The runner a request starts after its answer (`waitUntil`, after
+ * `POST /files` and `POST /imports`): only the `kinds` of work that request
+ * enqueued (an import's, with the analysis of the file it brings in), at most
+ * `limit` tasks, within `AFTER_REQUEST_STATEMENTS` of the invocation. A
+ * customer's request never works the scheduler's backlog or the periodic
+ * work: whatever else is due waits for the cron and the operator's doors,
+ * each bounded by its own invocation.
+ */
+export function runAfterRequest(env: RunnerEnv, kinds: readonly TaskKind[], limit = 2): Promise<RunReport> {
+  const counted = countingD1(env.DB);
+  return runPrintCloudTasks({ ...env, DB: counted.db }, { limit, kinds, room: roomWithin(() => counted.executed, AFTER_REQUEST_STATEMENTS) });
 }
 
 /**

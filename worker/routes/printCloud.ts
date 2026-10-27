@@ -19,7 +19,7 @@ import { limitRoute } from '../lib/ratelimit';
 import { mediaBucket } from '../lib/mediaStorage';
 import { canViewCost } from '../lib/costAccess';
 import { ADAPTERS } from '../lib/printCloud/adapters';
-import { runPrintCloudTasks } from '../lib/printCloud/background';
+import { runAfterRequest } from '../lib/printCloud/background';
 import { buybackQuote, cancelBuyback, requestBuyback } from '../lib/printCloud/buyback';
 import { categories, publicPackages, publicPrinterModels, publicStoreCatalog } from '../lib/printCloud/catalog';
 import { activeReservationForJob, convertCredits, type ConversionRule } from '../lib/printCloud/credits';
@@ -418,7 +418,8 @@ auth.post('/files', limitRoute('pc_upload', 120), async (c) => {
     stored.statement,
     enqueueTask(c.env.DB, { kind: 'analyze_model_file', payload: { file_id: stored.fileId }, dedupeKey: `analyze:${stored.fileId}`, now }),
   ]);
-  afterResponse(c, runPrintCloudTasks(c.env, { limit: 2 }));
+  // The measurement it enqueued, and nothing else, inside a bound of this invocation (background.ts `runAfterRequest`).
+  afterResponse(c, runAfterRequest(c.env, ['analyze_model_file']));
   return ok(c, { file_id: stored.fileId, status: 'uploaded', format: validated.format, size_bytes: validated.size, sha256: validated.sha256 }, 201);
 });
 
@@ -483,7 +484,8 @@ auth.post('/imports', limitRoute('pc_import', 60), async (c) => {
   const body = await jsonObject(c);
   const { config } = await requestConfig(c);
   const result = await startImport(c.env.DB, { userId: currentUser(c).id, url: reqString(body.url, 'url', { max: 2000 }), config, now: new Date() });
-  afterResponse(c, runPrintCloudTasks(c.env, { limit: 2 }));
+  // The import it enqueued, and the measurement of the file that import brings in, inside a bound of this invocation.
+  afterResponse(c, runAfterRequest(c.env, ['import_model_url', 'analyze_model_file']));
   return ok(c, result, 202);
 });
 
