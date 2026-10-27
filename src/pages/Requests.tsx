@@ -257,8 +257,10 @@ export default function Requests() {
                 type="button"
                 onClick={() => {
                   if (closed) return;
-                  // A step forward to the editor, so Back returns to the board.
-                  if (user) navigate('/requests/new');
+                  // A step forward to the editor, so Back returns to the board; the
+                  // editor leaves a new request with «طلباتي» in the place of this
+                  // board entry (RequestNew.tsx leaveNewRequest, B2R3-REG-1).
+                  if (user) navigate('/requests/new', { state: { from: 'board' } });
                   else signIn();
                 }}
                 aria-disabled={closed || undefined}

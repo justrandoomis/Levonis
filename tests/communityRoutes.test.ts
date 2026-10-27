@@ -26,6 +26,12 @@
  * wait in a view transition); an editor address for a request this person
  * cannot open says so in the reader language instead of drawing the wizard
  * (L10N-1, `requestMissing`).
+ *
+ * Fix round 3 (B2R3): a new request opened from the board «طلب جديد» steps
+ * back onto the board and rewrites that entry as «طلباتي», so the board never
+ * stays behind «طلباتي» unchanged on screen, and two Backs leave as they did
+ * when the board opened the wizard in place (REG-1, run below on a history
+ * that starts at the board).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -135,8 +141,9 @@ test('every old door still reaches the editor with its state: ?view=new, ?link=,
   // Replaced, with the router state (printLink, project), so Back never lands on the forward.
   assert.match(board, /if \(view === 'new'\) \{\s*navigate\(newRequestTarget\(params\), \{ replace: true, state: location\.state \}\);\s*return;\s*\}/);
   assert.match(board, /if \(deepLinked \|\| view === 'new'\) return null;/, 'nothing of the board flashes first');
-  // The board own «طلب جديد» is a step forward, so Back returns to the board.
-  assert.match(board, /if \(user\) navigate\('\/requests\/new'\);\s*else signIn\(\);/);
+  // The board own «طلب جديد» is a step forward, so Back returns to the board; it marks the editor
+  // entry as pushed from the board, so a new request leaves «طلباتي» in its place (B2R3-REG-1).
+  assert.match(board, /if \(user\) navigate\('\/requests\/new', \{ state: \{ from: 'board' \} \}\);\s*else signIn\(\);/);
   assert.doesNotMatch(board, /<RequestWizard\b|import RequestWizard/, 'the board still opens the wizard in place');
 
   // The editor reads both halves of a carried link: the state (a signed-in tap) and ?link= (it survives sign-in).
@@ -144,7 +151,8 @@ test('every old door still reaches the editor with its state: ?view=new, ?link=,
   assert.match(editor, /const fromState = \(state as \{ printLink\?: unknown \} \| null\)\?\.printLink;\s*return typeof fromState === 'string' \? fromState : params\.get\('link'\) \?\? '';/);
   // A new request lands on its own page with «طلباتي» behind it, the board never routed in between
   // (B2R2-REG-1, run below); the channel window rides with a PUBLISHED request only.
-  assert.match(editor, /if \(!id\) leaveNewRequest\(navigate, requestPath\(rid\), how === 'published'\);/);
+  assert.match(editor, /if \(!id\) leaveNewRequest\(navigate, requestPath\(rid\), how === 'published', window, fromBoard\);/);
+  assert.match(editor, /const fromBoard = !id && cameFromBoard\(location\.state\);/);
   assert.doesNotMatch(editor, /navigate\(\s*['"`]\/requests\?view=mine|navigate\(\s*MY_REQUESTS/, 'the editor routes the board before the request page again');
   // A draft or an edit published goes back onto the page that opened the editor (B2R1-REG-3).
   assert.match(editor, /else if \(how === 'published'\) returnPublished\(navigate, requestPath\(rid\)\);\s*else goBack\(\);/);
@@ -167,14 +175,20 @@ async function editorFn<T>(name: string, scope: Record<string, unknown> = {}): P
  * a PUSH is held in a view transition until the script settles. The board,
  * mounting at `?view=`, strips it with a router replace of the BROWSER entry
  * it is on, which also calls off a commit still held (src/pages/Requests.tsx).
+ * A step back from the script (`navigate(-1)`) moves the browser at once and
+ * tells the router first, whose commit is held like a push, then the page
+ * listeners; a later router write calls off a commit still held. The history
+ * starts where a test says, the last entry being the editor.
  */
-function historyWorld() {
-  type Entry = { url: string; state: Record<string, unknown> };
-  const entries: Entry[] = [
-    { url: '/community', state: { usr: null, key: 'home', idx: 0 } },
-    { url: '/requests/new', state: { usr: { printLink: 'https://www.printables.com/model/1-bracket' }, key: 'edit', idx: 1 } },
-  ];
-  let at = 1;
+type Entry = { url: string; state: Record<string, unknown> };
+const FROM_COMMUNITY: Entry[] = [
+  { url: '/community', state: { usr: null, key: 'home', idx: 0 } },
+  { url: '/requests/new', state: { usr: { printLink: 'https://www.printables.com/model/1-bracket' }, key: 'edit', idx: 1 } },
+];
+function historyWorld(start: Entry[] = FROM_COMMUNITY) {
+  const entries: Entry[] = start.map((e) => ({ url: e.url, state: { ...e.state } }));
+  let at = entries.length - 1;
+  let listeners: Array<() => void> = [];
   const log: string[] = [];
   const mounted: string[] = [];
   let renders: string[] = [];
@@ -197,19 +211,46 @@ function historyWorld() {
         entries[at] = { url, state };
       },
     },
+    location: {
+      get pathname() {
+        return entries[at].url.split('?')[0];
+      },
+    },
+    addEventListener(type: string, fn: () => void, opts?: { once?: boolean }) {
+      assert.equal(type, 'popstate');
+      assert.equal(opts?.once, true, 'the listener outlives the one step back');
+      listeners.push(fn);
+    },
+  };
+  const popstate = () => {
+    const now = listeners;
+    listeners = [];
+    now.forEach((fn) => fn());
   };
   const navigate: Nav = (to, opts) => {
+    if (to === -1) {
+      log.push('router back');
+      if (at === 0) {
+        log.push('left the app');
+        return;
+      }
+      at -= 1;
+      held = [entries[at].url];
+      popstate();
+      return;
+    }
     const url = String(to);
     if (opts?.replace) {
       log.push(`router replace ${url}`);
       entries[at] = { url, state: { usr: opts.state ?? null, key: `k${log.length}`, idx: entries[at].state.idx } };
       renders.push(url);
+      held = [];
       return;
     }
     log.push(`router push ${url}`);
     entries.splice(at + 1, entries.length, { url, state: { usr: opts?.state ?? null, key: `k${log.length}`, idx: at + 1 } });
     at += 1;
-    held.push(url);
+    held = [url];
   };
   const settle = () => {
     const now = renders;
@@ -219,11 +260,15 @@ function historyWorld() {
     held = [];
     later.forEach(mount);
   };
+  /** The person presses Back: the page behind is drawn, or the app is left when nothing of it is behind. */
   const back = () => {
+    if (at === 0) return 'left the app';
     at -= 1;
     mount(entries[at].url);
+    popstate();
+    return entries[at].url;
   };
-  return { entries, log, mounted, win, navigate, settle, back, here: () => entries[at], behind: () => entries[at - 1], ahead: () => entries[at + 1] };
+  return { entries, log, mounted, win, navigate, settle, back, at: () => at, here: () => entries[at], behind: () => entries[at - 1], ahead: () => entries[at + 1] };
 }
 
 test('a new request lands on its own page with «طلباتي» behind it, and no board mounts between the two writes (B2R2-REG-1)', async () => {
@@ -278,6 +323,92 @@ test('a new request lands on its own page with «طلباتي» behind it, and n
   assert.deepEqual(refused.log, ['router replace /requests/rq_new']);
   assert.deepEqual(refused.mounted, ['/requests/rq_new']);
   assert.deepEqual(refused.here().state.usr, { published: true });
+});
+
+test('a new request opened from the board «طلب جديد» puts «طلباتي» in the place of the board: two Backs leave, each one changing the screen (B2R3-REG-1)', async () => {
+  type Leave = (navigate: Nav, path: string, published: boolean, win: unknown, fromBoard?: boolean) => void;
+  const leave = await editorFn<Leave>('leaveNewRequest', { MY_REQUESTS: '/requests?view=mine' });
+  const fromBoard = await editorFn<(state: unknown) => boolean>('cameFromBoard');
+  // The board pushed the editor with its mark; any other door (a forward, a link, the request page) did not.
+  assert.equal(fromBoard({ from: 'board' }), true);
+  for (const other of [null, undefined, {}, { printLink: 'x' }, { from: 'community' }, 'board']) assert.equal(fromBoard(other), false, JSON.stringify(other));
+  const FROM_BOARD: Entry[] = [
+    { url: '/requests', state: { usr: null, key: 'board', idx: 0 } },
+    { url: '/requests/new', state: { usr: { from: 'board' }, key: 'edit', idx: 1 } },
+  ];
+
+  // What the harness saw (the editor entry rewritten, the board left behind it): three entries
+  // of this app, and the Back from «طلباتي» lands on another /requests entry, where the mounted
+  // board keeps the view it had: nothing changes on screen, and a third Back is needed to leave.
+  const before = historyWorld(FROM_BOARD);
+  leave(before.navigate, '/requests/rq_new', true, before.win);
+  before.settle();
+  assert.deepEqual(before.entries.map((e) => e.url), ['/requests', '/requests?view=mine', '/requests/rq_new'], 'the world no longer models the bug');
+
+  // Marked from the board: one step back onto the board, its entry rewritten as «طلباتي», then the request page.
+  const board = historyWorld(FROM_BOARD);
+  leave(board.navigate, '/requests/rq_new', true, board.win, true);
+  board.settle();
+  assert.deepEqual(board.log, ['router back', 'replaceState /requests?view=mine', 'router push /requests/rq_new']);
+  assert.deepEqual(board.mounted, ['/requests/rq_new'], 'the board mounted between the step back and the request page');
+  assert.deepEqual(board.entries.map((e) => e.url), ['/requests?view=mine', '/requests/rq_new'], 'the board is still behind «طلباتي»');
+  assert.equal(board.here().state.idx, 1);
+  assert.deepEqual(board.here().state.usr, { published: true }, 'the channel window mark is lost');
+  assert.equal(board.behind().state.idx, 0);
+  assert.equal(board.behind().state.usr, null);
+  assert.notEqual(board.behind().state.key, 'board', 'the scroll of the board is carried onto «طلباتي»');
+  // Back 1: «طلباتي», the board mounting at ?view=mine (a page of its own, not the board kept on screen);
+  // its strip stays on its own entry. Back 2: out of the app, as when the board opened the wizard in place.
+  assert.equal(board.back(), '/requests');
+  assert.equal(board.mounted.at(-1), '/requests?view=mine');
+  assert.equal(board.ahead().url, '/requests/rq_new', 'the strip landed on the request entry');
+  assert.equal(board.back(), 'left the app');
+
+  // Saved as a draft from the board: the same way, with no mark.
+  const saved = historyWorld(FROM_BOARD);
+  leave(saved.navigate, '/requests/rq_new', false, saved.win, true);
+  saved.settle();
+  assert.deepEqual(saved.entries.map((e) => e.url), ['/requests?view=mine', '/requests/rq_new']);
+  assert.equal(saved.here().state.usr, null);
+
+  // The board deeper in the history (the home, then the board): «طلباتي» in the place of the board, the home behind it.
+  const deeper = historyWorld([
+    { url: '/community', state: { usr: null, key: 'home', idx: 0 } },
+    { url: '/requests', state: { usr: null, key: 'board', idx: 1 } },
+    { url: '/requests/new', state: { usr: { from: 'board' }, key: 'edit', idx: 2 } },
+  ]);
+  leave(deeper.navigate, '/requests/rq_new', true, deeper.win, true);
+  deeper.settle();
+  assert.deepEqual(deeper.entries.map((e) => e.url), ['/community', '/requests?view=mine', '/requests/rq_new']);
+  assert.equal(deeper.back(), '/requests');
+  assert.equal(deeper.back(), '/community');
+
+  // A step back that lands somewhere other than the board rewrites nothing: the request page follows that page.
+  const elsewhere = historyWorld([
+    { url: '/requests/rq_old', state: { usr: null, key: 'old', idx: 0 } },
+    { url: '/requests/new', state: { usr: { from: 'board' }, key: 'edit', idx: 1 } },
+  ]);
+  leave(elsewhere.navigate, '/requests/rq_new', true, elsewhere.win, true);
+  elsewhere.settle();
+  assert.deepEqual(elsewhere.log, ['router back', 'router push /requests/rq_new']);
+  assert.deepEqual(elsewhere.entries.map((e) => e.url), ['/requests/rq_old', '/requests/rq_new']);
+
+  // A mark with nothing of this app behind (the editor first in its tab): the editor entry is rewritten, as from any door.
+  const alone = historyWorld([{ url: '/requests/new', state: { usr: { from: 'board' }, key: 'edit', idx: 0 } }]);
+  leave(alone.navigate, '/requests/rq_new', true, alone.win, true);
+  alone.settle();
+  assert.deepEqual(alone.log, ['replaceState /requests?view=mine', 'router push /requests/rq_new']);
+  assert.deepEqual(alone.entries.map((e) => e.url), ['/requests?view=mine', '/requests/rq_new']);
+
+  // A window that refuses the rewrite after the step back: the board as it was, the request page after it.
+  const refused = historyWorld(FROM_BOARD);
+  refused.win.history.replaceState = () => {
+    throw new Error('SecurityError');
+  };
+  leave(refused.navigate, '/requests/rq_new', true, refused.win, true);
+  refused.settle();
+  assert.deepEqual(refused.entries.map((e) => e.url), ['/requests', '/requests/rq_new']);
+  assert.deepEqual(refused.mounted, ['/requests/rq_new']);
 });
 
 test('an editor address for a request this person cannot open says so in three languages, with the way to the board (B2R2-L10N-1)', async () => {

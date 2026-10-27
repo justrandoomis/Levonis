@@ -208,13 +208,22 @@ export default function RequestListCard(props: RequestListCardProps) {
 
   // «بغداد • 4 قطع • PETG»: the governorate, the pieces (and the sets of a parts job) and the
   // material, the reader own words. It wraps between its words rather than cutting the
-  // material off; each bullet stays at the end of the line it closes.
+  // material off; each bullet stays at the end of the line it closes, glued to it by a
+  // no-break space. That space stays outside the hidden bullet, so the name of the card
+  // link keeps its words apart («بغداد 4 قطع PETG», never «بغداد4 قطعPETG», B2R3-A11Y-1):
+  // a plain space after the bullet is not enough, as Chromium leaves it out of the name
+  // before a part that opens with a digit in a right-to-left line.
   const meta: React.ReactNode[] = [place, pieces, sets, material].filter(Boolean);
   const metaLine = (
     <span className="block break-words text-[13px] leading-snug text-text-secondary">
       {meta.map((part, i) => (
         <React.Fragment key={i}>
-          {i > 0 && <span aria-hidden="true">{'\u00a0• '}</span>}
+          {i > 0 && (
+            <>
+              {'\u00a0'}
+              <span aria-hidden="true">{'• '}</span>
+            </>
+          )}
           <bdi>{part}</bdi>
         </React.Fragment>
       ))}

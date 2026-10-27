@@ -277,7 +277,9 @@ export function ListRow({ label, sublabel, icon, to, href, current = false, onCl
         </span>
       )}
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-base font-medium">{label}</span>
+        {/* The label wraps rather than losing its end to an ellipsis: a Sorani row
+            at 320px takes two lines inside the 56px row (B2R3-FID-1). */}
+        <span className="block break-words text-base font-medium">{label}</span>
         {sublabel && <span className="cm-sub block truncate text-[12px]">{sublabel}</span>}
       </span>
       {href ? <ExternalLink aria-hidden="true" className="h-4 w-4 shrink-0 text-gold" /> : <OnwardChevron className="h-[18px] w-[18px] shrink-0 text-gold" />}

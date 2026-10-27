@@ -157,7 +157,9 @@ const STRINGS: Record<'ar' | 'en' | 'ckb', KitStrings> = {
     communityHome: 'پەڕەی کۆمەڵگە',
     yourAccount: 'هەژمارەکەت',
     yourAccountHint: 'هەژمار و ڕێکخستنەکانت بەڕێوە ببە',
-    storesIFollow: 'ئەو فرۆشگایانەی شوێنیان دەکەوم',
+    // † for the Sorani reader: the word of the «شوێنکەوتووەکانم» tab, one line in the menu row
+    // from 360px (B2R3-FID-1; «ئەو فرۆشگایانەی شوێنیان دەکەوم» lost its verb to an ellipsis).
+    storesIFollow: 'فرۆشگا شوێنکەوتووەکانم',
     langTheme: 'زمان و ڕووکار',
     myStore: 'فرۆشگاکەم',
     openStore: 'فرۆشگاکەت بکەرەوە',

@@ -32,6 +32,11 @@
  * hairline bars (FID-1); the «المجتمع» glyph is three people of closed shapes
  * (FID-2); the menu popover stays open under its language sheet (A11Y-1) and
  * the row says while that sheet is on its way, Escape calling it off (A11Y-2).
+ *
+ * Fix round 3 (B2R3): a menu row label wraps instead of losing its end to an
+ * ellipsis, and the Sorani «Stores I follow» says the word of its tab
+ * (FID-1); the name of a row or aside card link keeps the words of its meta
+ * line apart, the no-break space outside the hidden bullet (A11Y-1).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -172,12 +177,48 @@ test('the row: the pill beside the chevron in an end column, the short state wor
   // Nothing is cut: the title alone keeps one line; the meta wraps between its words, each bullet
   // glued to the word before it; the counts wrap whole, each count in one piece.
   assert.equal(row.match(/\btruncate\b/g)?.length, 1, 'only the title is held to one line');
-  assert.match(row, /<span class="block break-words text-\[13px\] leading-snug text-text-secondary"><bdi>بغداد<\/bdi><span aria-hidden="true">\u00a0• <\/span>/);
+  assert.match(row, /<span class="block break-words text-\[13px\] leading-snug text-text-secondary"><bdi>بغداد<\/bdi>\u00a0<span aria-hidden="true">• <\/span>/);
   assert.match(row, /<span class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-0\.5 overflow-hidden text-\[13px\] leading-snug text-text-secondary"><span class="inline-flex items-center gap-1 whitespace-nowrap" data-request-offers="3">/);
   // The bar between the counts hangs outside the attachments: at the start of a line it is clipped, never left alone there.
   assert.match(row, /<span class="relative inline-flex items-center gap-1 whitespace-nowrap" data-request-files="2"><span aria-hidden="true" class="absolute end-full me-1\.5 text-text-muted">\|<\/span>/);
   const src = code('src/components/community/requests/RequestListCard.tsx');
   assert.doesNotMatch(src, /className="truncate">\{attachmentsWord/, 'the attachments word is cut again');
+});
+
+/** What a screen reader reads of a card: the markup without its aria-hidden nodes, the tags dropped (never a space added). */
+function spoken(html: string): string {
+  return html
+    .replace(/<svg\b[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/svg>/g, '')
+    .replace(/<span\b[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, '')
+    .replace(/<[^>]+>/g, '');
+}
+
+test('the name of a row or aside card keeps the words of its meta line apart: the space is outside the hidden bullet (B2R3-A11Y-1)', () => {
+  const escape = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // A plain request, and a job of 2 parts ordered as 4 sets of 5: the sets ride between the pieces and the material.
+  const job = { ...leaky, summary: { parts_count: 2, pieces_per_set: 5 } };
+  const want = {
+    ar: { plain: ['بغداد', '4 قطع', 'PETG'], job: ['بغداد', '20 قطعة', 'الأطقم: ×4', 'PETG'] },
+    en: { plain: ['Baghdad', '4 pieces', 'PETG'], job: ['Baghdad', '20 pieces', 'Sets: ×4', 'PETG'] },
+    ckb: { plain: ['بەغدا', '4 پارچە', 'PETG'], job: ['بەغدا', '20 پارچە', 'سێت: ×4', 'PETG'] },
+  } as const;
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    for (const variant of ['row', 'aside'] as const) {
+      for (const kind of ['plain', 'job'] as const) {
+        const request = (kind === 'job' ? job : leaky) as unknown as Extract<Card, { variant: 'row' }>['request'];
+        const html = card({ variant, request }, lang);
+        const words = want[lang][kind];
+        const said = spoken(html);
+        // Each part whole, then whitespace (a no-break space reads as one) before the next: never «بغداد4 قطعPETG».
+        assert.match(said, new RegExp(words.map(escape).join('\\s+')), `${lang} ${variant} ${kind}: the parts run together in «${said}»`);
+        for (let i = 1; i < words.length; i++) {
+          assert.ok(!said.includes(words[i - 1] + words[i]), `${lang} ${variant} ${kind}: «${words[i - 1]}${words[i]}» is one word to a screen reader`);
+        }
+        // The bullet is still drawn, hidden from the name, glued to the part before it.
+        assert.equal(html.split(' <span aria-hidden="true">• </span><bdi>').length - 1, words.length - 1, `${lang} ${variant} ${kind}: the bullets`);
+      }
+    }
+  }
 });
 
 test('the list card is the board anatomy without a budget: the pill, the meta row, «الموعد المطلوب» in a row of its own, «عرض الطلب» and the counts', () => {
@@ -479,6 +520,22 @@ test('a liked heart wears the scoped like colour and falls back to gold outside 
   const sheet = read('src/styles/community.css');
   assert.equal(sheet.match(/--cm-like:/g)?.length, 2);
   assert.doesNotMatch(read('src/index.css'), /--cm-like/);
+});
+
+test('a menu row label wraps rather than losing its end, and the Sorani «Stores I follow» says the word of its tab (B2R3-FID-1)', async () => {
+  // The kit ListRow (used by the sections menu alone): the label breaks onto a second line inside the
+  // 56px row; nothing of it is cut by an ellipsis (plan AC-std 1, ckb at 320px).
+  const kit = code('src/components/community/kit/display.tsx');
+  const listRow = kit.slice(kit.indexOf('export function ListRow('), kit.indexOf('\n}\n', kit.indexOf('export function ListRow(')));
+  assert.match(listRow, /<span className="block break-words text-base font-medium">\{label\}<\/span>/);
+  assert.doesNotMatch(listRow, /truncate text-base|text-base[^"]*truncate/, 'the row label is cut by an ellipsis again');
+  assert.match(listRow, /cm-row relative flex min-h-14 items-center/, 'the row keeps its 56px');
+  // «فرۆشگا شوێنکەوتووەکانم»: the tab word of the hub («شوێنکەوتووەکانم») after the stores, one line from 360px.
+  const { HUB_STRINGS } = await import('../src/components/community/hub/strings');
+  assert.equal(KIT_STRINGS.ckb.storesIFollow, 'فرۆشگا شوێنکەوتووەکانم');
+  assert.ok(KIT_STRINGS.ckb.storesIFollow.endsWith(HUB_STRINGS.ckb.tabs.following), 'the Sorani row drifted from the tab word');
+  assert.equal(KIT_STRINGS.ar.storesIFollow, 'المتاجر التي أتابعها');
+  assert.equal(KIT_STRINGS.en.storesIFollow, 'Stores I follow');
 });
 
 test('the new kit words are in three languages, the Sorani its own', () => {

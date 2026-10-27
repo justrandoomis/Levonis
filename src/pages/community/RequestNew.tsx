@@ -86,6 +86,11 @@ export function returnPublished(navigate: NavigateFunction, path: string, win: W
 /** Where a new request leaves «طلباتي», behind its own page. */
 export const MY_REQUESTS = '/requests?view=mine';
 
+/** The router state the board «طلب جديد» pushes the editor with: the entry behind the editor is the board. */
+export function cameFromBoard(state: unknown): boolean {
+  return (state as { from?: unknown } | null)?.from === 'board';
+}
+
 /**
  * A NEW REQUEST LANDS ON ITS OWN PAGE, WITH «طلباتي» BEHIND IT (B2R2-REG-1).
  * The editor entry is rewritten in place as «طلباتي» with
@@ -101,12 +106,50 @@ export const MY_REQUESTS = '/requests?view=mine';
  * from it reaches «طلباتي», where the request now is, and the board mounts
  * only then. A window that refuses the rewrite gets the request page in place
  * of the editor: never the board in between.
+ *
+ * OPENED FROM THE BOARD «طلب جديد» (B2R3-REG-1), the entry behind the editor is
+ * the board itself. Rewriting the editor entry would leave the board behind
+ * «طلباتي», and the board is not remounted between two /requests entries, so
+ * the Back from «طلباتي» onto it changed nothing on screen and leaving took
+ * three Backs. So the editor steps back onto the board, as returnPublished
+ * does, and once the browser is there that entry is rewritten as «طلباتي» and
+ * the request page pushed after it: «طلباتي», then the request, and two Backs
+ * leave, as when the board opened the wizard in place. A step back that lands
+ * anywhere else rewrites nothing and only pushes the request page.
  */
-export function leaveNewRequest(navigate: NavigateFunction, path: string, published: boolean, win: Window = window): void {
+export function leaveNewRequest(navigate: NavigateFunction, path: string, published: boolean, win: Window = window, fromBoard = false): void {
   const state = published ? { published: true } : undefined;
-  try {
+  const asMine = () => {
     const held = (win.history.state ?? {}) as Record<string, unknown>;
     win.history.replaceState({ ...held, usr: null, key: Math.random().toString(36).slice(2, 10) }, '', MY_REQUESTS);
+  };
+  let boardBehind = false;
+  if (fromBoard) {
+    try {
+      const idx = (win.history.state as { idx?: unknown } | null)?.idx;
+      boardBehind = typeof idx === 'number' && idx > 0;
+    } catch {
+      boardBehind = false;
+    }
+  }
+  if (boardBehind) {
+    win.addEventListener(
+      'popstate',
+      () => {
+        try {
+          if (win.location.pathname === '/requests') asMine();
+        } catch {
+          // A window that refuses the rewrite keeps the board as it was.
+        }
+        navigate(path, { state });
+      },
+      { once: true }
+    );
+    navigate(-1);
+    return;
+  }
+  try {
+    asMine();
   } catch {
     navigate(path, { replace: true, state });
     return;
@@ -127,6 +170,7 @@ export default function RequestNew() {
   const s = useRequestStrings();
   const editing = !!id && location.pathname.endsWith('/edit');
   const carriedLink = id ? '' : carriedPrintLink(location.state, params);
+  const fromBoard = !id && cameFromBoard(location.state);
   // Back: to the request this screen is about, else to the board.
   const goBack = useGoBack(id ? requestPath(id) : '/requests');
 
@@ -154,7 +198,7 @@ export default function RequestNew() {
    * request), else as Back would.
    */
   const done = (rid: string, how: 'published' | 'saved') => {
-    if (!id) leaveNewRequest(navigate, requestPath(rid), how === 'published');
+    if (!id) leaveNewRequest(navigate, requestPath(rid), how === 'published', window, fromBoard);
     else if (how === 'published') returnPublished(navigate, requestPath(rid));
     else goBack();
   };

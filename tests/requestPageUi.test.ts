@@ -277,7 +277,7 @@ test('the old ?request= address is REPLACED by /requests/<id>, carrying the rest
   assert.match(board, /const openRequestId = useCallback\(\(id: string\) => navigate\(requestPath\(id\)\), \[navigate\]\);/, 'opening a request is a step forward to its page');
   // A new request is written at /requests/new (community UI plan B4), which the board forwards to.
   const editor = code('src/pages/community/RequestNew.tsx');
-  assert.match(editor, /if \(!id\) leaveNewRequest\(navigate, requestPath\(rid\), how === 'published'\);/);
+  assert.match(editor, /if \(!id\) leaveNewRequest\(navigate, requestPath\(rid\), how === 'published', window, fromBoard\);/);
   assert.match(editor, /const state = published \? \{ published: true \} : undefined;/, 'the channel window rides with a PUBLISHED request only');
   // «طلباتي» is written behind the request page outside the router, so no board mounts between (B2R2-REG-1;
   // tests/communityRoutes.test.ts runs it against a history whose pushes wait in a view transition).
