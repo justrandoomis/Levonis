@@ -14,7 +14,7 @@
  * records the value owed (paid out manually until the Levonis wallet
  * adapter is connected). Rejection or cancellation releases them, once.
  */
-import { one, fence, runBatch, type Stmt } from './db';
+import { one, fence, runBatch, type Planned, type Stmt } from './db';
 import { invalid, pcError } from './errors';
 import { integrationEvent } from './adapters';
 import { pcAudit } from './audit';
@@ -58,22 +58,38 @@ export async function buybackQuote(db: D1Database, userId: string, variantId: st
   };
 }
 
-export async function requestBuyback(db: D1Database, userId: string, variantId: string, qty: number, now: Date) {
+/**
+ * A sell-back request, PLANNED: the units are reserved (ck_pc_inventory_available
+ * refuses grams the customer no longer has free) and the request recorded at
+ * the quote's value. POST /buybacks runs it under the customer's
+ * Idempotency-Key (db.ts `idempotent`): the key's operation row is the batch's
+ * first statement, so a retry after a lost answer replays the first answer
+ * instead of reserving the units a second time.
+ */
+export async function planBuybackRequest(
+  db: D1Database,
+  userId: string,
+  variantId: string,
+  qty: number,
+  now: Date
+): Promise<Planned<Awaited<ReturnType<typeof buybackQuote>> & { buyback_id: string; status: 'requested' }>> {
   if (!Number.isSafeInteger(qty) || qty <= 0) throw invalid('qty', 'integer_required');
   const quote = await buybackQuote(db, userId, variantId, qty);
   const id = pcId('pcbb');
   const r = reserveInventory(db, { userId, variantId, qty, purpose: 'buyback', refId: id, actorId: userId, now });
-  await runBatch(db, [
-    ...r.statements,
-    db
-      .prepare(
-        `INSERT INTO pc_buyback_requests (id, user_id, variant_id, qty, rate_bps, estimated_value_iqd, lots_json, reservation_id, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'requested', ?, ?)`
-      )
-      .bind(id, userId, variantId, qty, quote.rate_bps, quote.estimated_value_iqd, JSON.stringify(quote.lots), r.reservationId, iso(now), iso(now)),
-    ...(await pcAudit(db, userId, 'buyback.request', id, { variant_id: variantId, qty, estimated_value_iqd: quote.estimated_value_iqd })),
-  ]);
-  return { buyback_id: id, status: 'requested', ...quote };
+  return {
+    statements: [
+      ...r.statements,
+      db
+        .prepare(
+          `INSERT INTO pc_buyback_requests (id, user_id, variant_id, qty, rate_bps, estimated_value_iqd, lots_json, reservation_id, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'requested', ?, ?)`
+        )
+        .bind(id, userId, variantId, qty, quote.rate_bps, quote.estimated_value_iqd, JSON.stringify(quote.lots), r.reservationId, iso(now), iso(now)),
+      ...(await pcAudit(db, userId, 'buyback.request', id, { variant_id: variantId, qty, estimated_value_iqd: quote.estimated_value_iqd })),
+    ],
+    result: { buyback_id: id, status: 'requested', ...quote },
+  };
 }
 
 interface BuybackRow {

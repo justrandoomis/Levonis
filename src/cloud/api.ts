@@ -15,7 +15,8 @@
  *
  * MONEY DOORS TAKE AN IDEMPOTENCY KEY: placing an order, paying it from the
  * wallet, confirming a job (it reserves hours and grams), requesting a
- * shipment, converting hours. The CALLER makes the key once per intent — when
+ * shipment, converting hours, requesting a sell-back (it reserves the grams).
+ * The CALLER makes the key once per intent — when
  * the customer opens the confirmation, not when they press — sends the same
  * key on every retry of that intent, and makes a new one only for a new
  * intent (after a success, or when what is sent changes: the same key with a
@@ -237,16 +238,27 @@ export const getDashboard = (opts?: RequestOptions) => get<T.Dashboard>('/me/das
 /** GET /me/credits — hours by class and the purchase lots. */
 export const getCredits = (opts?: RequestOptions) => get<T.CreditsSummary>('/me/credits', opts);
 
-/** GET /me/credits/ledger — newest first; `before` is the previous page's last `created_at`. */
-export const listCreditLedger = (page: { before?: string; limit?: number } = {}, opts?: RequestOptions) =>
+/**
+ * GET /me/credits/ledger — newest first. The next page is EXACT with the last
+ * row's `created_at` as `before` and its `id` as `before_id` (rows one batch
+ * wrote at one instant are never skipped); `before` alone means «strictly
+ * before that instant».
+ */
+export const listCreditLedger = (page: { before?: string; before_id?: string; limit?: number } = {}, opts?: RequestOptions) =>
   get<T.CreditLedgerEntry[]>(`/me/credits/ledger${qs(page)}`, opts);
 
 /** GET /me/credits/reservations. */
 export const listCreditReservations = (opts?: RequestOptions) => get<T.CreditReservation[]>('/me/credits/reservations', opts);
 
+/** GET /me/credits/conversions — the conversions the workshop allows out of the customer's classes (enabled rules, with their ratio). */
+export const listCreditConversions = (opts?: RequestOptions) => get<T.CreditConversionRule[]>('/me/credits/conversions', opts);
+
 /** POST /me/credits/convert — MONEY DOOR: only under a rule the owner enabled. */
 export const convertCredits = (body: T.ConvertRequest, idempotencyKey: string, opts?: RequestOptions) =>
   post<T.ConvertResult>('/me/credits/convert', body, keyed(idempotencyKey, opts));
+
+/** POST /me/credits/convert/quote — what the same body would give now, by the conversion's own plan; nothing is written. */
+export const quoteCreditConversion = (body: T.ConvertRequest, opts?: RequestOptions) => post<T.ConvertQuote>('/me/credits/convert/quote', body, opts);
 
 /** GET /me/printers — the printer models the customer holds hours for. */
 export const listMyPrinters = (opts?: RequestOptions) => get<T.MyPrinterModel[]>('/me/printers', opts);
@@ -254,8 +266,8 @@ export const listMyPrinters = (opts?: RequestOptions) => get<T.MyPrinterModel[]>
 /** GET /me/inventory — the customer's own material at the workshop (optionally one category). */
 export const listInventory = (category?: string, opts?: RequestOptions) => get<T.InventoryBalance[]>(`/me/inventory${qs({ category })}`, opts);
 
-/** GET /me/inventory/ledger. */
-export const listInventoryLedger = (page: { variant_id?: string; before?: string; limit?: number } = {}, opts?: RequestOptions) =>
+/** GET /me/inventory/ledger — newest first (optionally one variant), paged exactly like the credit ledger: `before` + `before_id`. */
+export const listInventoryLedger = (page: { variant_id?: string; before?: string; before_id?: string; limit?: number } = {}, opts?: RequestOptions) =>
   get<T.InventoryLedgerEntry[]>(`/me/inventory/ledger${qs(page)}`, opts);
 
 /** PATCH /me/inventory/{variantId}/alert — the low-balance threshold (null: the default). */
@@ -448,6 +460,9 @@ export const getQueue = (opts?: RequestOptions) => get<T.QueueAnswer>('/queue', 
 export const createShipment = (body: T.ShipmentRequest, idempotencyKey: string, opts?: RequestOptions) =>
   post<T.ShipmentCreated>('/shipments', body, keyed(idempotencyKey, opts));
 
+/** POST /shipments/quote — the fee, its rule, the start and what would leave, for the same body; the same refusals; nothing is written. */
+export const quoteShipment = (body: T.ShipmentRequest, opts?: RequestOptions) => post<T.ShipmentQuote>('/shipments/quote', body, opts);
+
 /** GET /shipments. */
 export const listShipments = (opts?: RequestOptions) => get<T.ShipmentSummary[]>('/shipments', opts);
 
@@ -460,8 +475,9 @@ export const cancelShipment = (id: string, opts?: RequestOptions) => post<T.Ship
 /** POST /buybacks/quote — what selling material back would pay, lot by lot. */
 export const buybackQuote = (variantId: string, qty: number, opts?: RequestOptions) => post<T.BuybackQuote>('/buybacks/quote', { variant_id: variantId, qty }, opts);
 
-/** POST /buybacks — request a buyback (the units are reserved). */
-export const requestBuyback = (variantId: string, qty: number, opts?: RequestOptions) => post<T.BuybackRequested>('/buybacks', { variant_id: variantId, qty }, opts);
+/** POST /buybacks — MONEY DOOR: request a buyback (the units are reserved); a replay of the key answers the first request. */
+export const requestBuyback = (variantId: string, qty: number, idempotencyKey: string, opts?: RequestOptions) =>
+  post<T.BuybackRequested>('/buybacks', { variant_id: variantId, qty }, keyed(idempotencyKey, opts));
 
 /** GET /buybacks. */
 export const listBuybacks = (opts?: RequestOptions) => get<T.BuybackSummary[]>('/buybacks', opts);

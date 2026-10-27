@@ -1,21 +1,23 @@
 /**
  * /account/hours — PRINTING HOURS, CLASS BY CLASS (GET /me/credits,
- * /me/credits/reservations, /me/credits/ledger; POST /me/credits/convert).
+ * /me/credits/reservations, /me/credits/ledger, /me/credits/conversions; POST
+ * /me/credits/convert/quote, /me/credits/convert).
  *
  * Per printer class: what is in the account (free + held), free, held for
  * prints and used — the server's own seconds — and the purchases that make it
  * up, each with its own expiry as the server applies it (a lot is past its
  * expiry from the instant named; what a print already holds stays with that
- * print, credits.ts). Then the hours held by prints, the latest movements, and
- * the conversion between classes.
+ * print, credits.ts). Then the hours held by prints, every movement (paged on
+ * the server's exact cursor), and the conversion between classes.
  *
- * THE CONVERSION CANNOT BE PREVIEWED BY NUMBER. No customer door states which
- * pairs the workshop allows or at what ratio (the rules are an admin
- * catalogue), so the screen never guesses what will arrive: the confirmation
- * says the workshop's rule decides it, and the result shows the server's own
- * `received_seconds`. A pair the workshop does not allow is refused
- * CONVERSION_DISABLED, in the server's words. The request is a money door:
- * one Idempotency-Key per intent (shared.tsx `useIntentKey`).
+ * THE CONVERSION IS THE SERVER'S, BEFORE AND AFTER. Only the pairs the
+ * workshop allows are offered (GET /me/credits/conversions — its enabled
+ * rules, with their ratio); before the confirmation the server's own quote
+ * says what would arrive, from which purchases and with which expiry (POST
+ * /me/credits/convert/quote — the very plan the conversion writes), and the
+ * result shows the conversion's own `received_seconds`. Nothing is worked out
+ * on this side. The request is a money door: one Idempotency-Key per intent
+ * (shared.tsx `useIntentKey`).
  */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -25,18 +27,29 @@ import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { Field, Select } from '../../../components/ui/Field';
 import { NumberInput } from '../../../components/ui/NumberInput';
 import { Skeleton } from '../../../components/ui/Skeleton';
-import { cloudErrorText, convertCredits, getCredits, listCreditLedger, listCreditReservations, listPrinters } from '../../api';
+import { cloudErrorText, convertCredits, getCredits, listCreditConversions, listCreditLedger, listCreditReservations, quoteCreditConversion } from '../../api';
 import { useCloud } from '../../CloudContext';
 import { formatDate, formatDateTime, formatDuration, hoursParts } from '../../format';
 import { creditEntry, hoursText, lotSource, sect } from '../../strings/account';
 import { tx, useCloudText } from '../../text';
-import type { ConvertResult, CreditLot, CreditReservation, CreditTierBalance, PrinterModel } from '../../types';
+import type { ConvertQuote, ConvertResult, CreditConversionRule, CreditLot, CreditReservation, CreditTierBalance } from '../../types';
 import { ArrowLeftRight, Clock, CloudEmptyState, CloudErrorState, CloudPageSkeleton, SectionHeader } from '../../ui';
 import { useCloudQuery } from '../../useCloudQuery';
-import { creditFigures, expiryTone, ledgerMovement, lotExpiry, MIN_CONVERT_SECONDS, tierOptions, typedSeconds, type LotExpiry } from './logic';
-import { CapNote, Figures, MoneyLine, MovementFigure, SubPageHeader, useIntentKey, useStatusWord } from './shared';
+import {
+  conversionSources,
+  conversionTargets,
+  creditFigures,
+  expiryTone,
+  ledgerMovement,
+  lotExpiry,
+  MIN_CONVERT_SECONDS,
+  ratioInHours,
+  typedSeconds,
+  type LotExpiry,
+} from './logic';
+import { CapNote, Figures, LoadMore, MoneyLine, MovementFigure, SubPageHeader, useIntentKey, useLedgerPages, useStatusWord } from './shared';
 
-/** How many movements the page asks for; the full history pages exactly in Transactions. */
+/** Movements per page (the server allows 1–200); the next page is asked on the exact cursor. */
 const LEDGER_PAGE = 50;
 /** The server's own cap on the reservations it lists (GET /me/credits/reservations). */
 const RESERVATIONS_CAP = 200;
@@ -195,20 +208,20 @@ function Ledger({ tierName }: { tierName: TierNames }) {
   const { t, lang } = useCloudText();
   const { dashboardVersion } = useCloud();
   const word = useStatusWord();
-  const ledger = useCloudQuery((signal) => listCreditLedger({ limit: LEDGER_PAGE }, { signal }), [dashboardVersion]);
+  const ledger = useLedgerPages((cursor, signal) => listCreditLedger({ limit: LEDGER_PAGE, ...cursor }, { signal }), LEDGER_PAGE, [dashboardVersion]);
   return (
     <section aria-labelledby="cloud-hours-ledger" className="space-y-2">
       <SectionHeader id="cloud-hours-ledger" title={t(hoursText.ledgerTitle)} link={{ to: '/account/transactions', label: t(sect.fullHistory) }} />
       {ledger.error ? (
         <CloudErrorState compact error={ledger.error} onRetry={ledger.reload} />
-      ) : !ledger.data ? (
+      ) : !ledger.rows ? (
         <Skeleton className="h-24 w-full rounded-xl" />
-      ) : ledger.data.length === 0 ? (
+      ) : ledger.rows.length === 0 ? (
         <p className="text-[13px] text-text-muted">{t(hoursText.ledgerEmpty)}</p>
       ) : (
         <>
           <ul className="lv-surface divide-y divide-border-subtle overflow-hidden">
-            {ledger.data.map((e) => (
+            {ledger.rows.map((e) => (
               <li key={e.id} className="flex items-center gap-3 px-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-text-primary">
@@ -230,10 +243,26 @@ function Ledger({ tierName }: { tierName: TierNames }) {
               </li>
             ))}
           </ul>
-          <CapNote shown={ledger.data.length} cap={LEDGER_PAGE} history />
+          {ledger.moreError ? <CloudErrorState compact error={ledger.moreError} onRetry={ledger.loadMore} /> : null}
+          {ledger.next ? (
+            <LoadMore onMore={ledger.loadMore} loading={ledger.loadingMore} />
+          ) : (
+            <p className="text-center text-[12px] text-text-muted">{t(sect.historyEnd)}</p>
+          )}
         </>
       )}
     </section>
+  );
+}
+
+/** A purchase's part in a conversion: how much, and the expiry it carries (a converted hour keeps its date). */
+function LotPart({ seconds, expiresAt, now }: { seconds: number; expiresAt: string | null; now: number }) {
+  const { lang } = useCloudText();
+  const expiryWord = useExpiryWord();
+  return (
+    <span className="block tabular-nums">
+      <bdi>{formatDuration(seconds, lang)}</bdi> · {expiryWord(lotExpiry(expiresAt, now))}
+    </span>
   );
 }
 
@@ -241,42 +270,68 @@ function ConvertHours({ tiers }: { tiers: CreditTierBalance[] }) {
   const { t, lang } = useCloudText();
   const cloud = useCloud();
   const [open, setOpen] = useState(false);
-  const printers = useCloudQuery<PrinterModel[] | null>((signal) => (open ? listPrinters({ signal }) : Promise.resolve(null)), [open]);
-  const sources = tiers.filter((x) => x.available_seconds > 0);
+  // The workshop's own rules out of the customer's classes: the only pairs offered, read when the form opens.
+  const rules = useCloudQuery<CreditConversionRule[] | null>((signal) => (open ? listCreditConversions({ signal }) : Promise.resolve(null)), [open, cloud.dashboardVersion]);
+  const allowed = rules.data ?? [];
+  const sources = conversionSources(tiers, allowed);
   // A class a conversion just emptied is no longer a source: the first one that still has hours is.
   const [fromPick, setFrom] = useState('');
   const from = sources.some((x) => x.tier_id === fromPick) ? fromPick : (sources[0]?.tier_id ?? '');
-  const [to, setTo] = useState('');
+  const targets = conversionTargets(allowed, from);
+  const [toPick, setTo] = useState('');
+  const rule = targets.find((r) => r.to_tier_id === toPick) ?? (targets.length === 1 ? targets[0] : null);
   const [hours, setHours] = useState<{ value: number | null; valid: boolean }>({ value: null, valid: true });
   const [minutes, setMinutes] = useState<{ value: number | null; valid: boolean }>({ value: null, valid: true });
+  const [quote, setQuote] = useState<ConvertQuote | null>(null);
+  const [quoting, setQuoting] = useState(false);
+  const [quoteError, setQuoteError] = useState<{ for: string; text: string } | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ConvertResult | null>(null);
 
-  const options = tierOptions(tiers, printers.data ?? []);
-  const nameOf = (id: string) => {
-    const o = options.find((x) => x.id === id);
-    return o ? tx(o.name, lang) || o.code : id;
+  const nameOf = (id: string): string => {
+    const own = tiers.find((x) => x.tier_id === id);
+    if (own) return tx(own.name, lang) || own.code;
+    const into = allowed.find((r) => r.to_tier_id === id);
+    if (into) return tx(into.to_name, lang) || into.to_code;
+    const out = allowed.find((r) => r.from_tier_id === id);
+    return out ? tx(out.from_name, lang) || out.from_code : id;
   };
   const fromTier = tiers.find((x) => x.tier_id === from) ?? null;
-  const targets = options.filter((o) => o.id !== from);
   const typed = hours.valid && minutes.valid ? typedSeconds(hours.value, minutes.value) : null;
   const entered = hours.value !== null || minutes.value !== null;
   const problem =
-    from && to && from === to
-      ? t(hoursText.sameClass)
-      : !entered || typed === null
-        ? null
-        : typed < MIN_CONVERT_SECONDS
-          ? t(hoursText.tooLittle)
-          : fromTier && typed > fromTier.available_seconds
-            ? t(hoursText.tooMuch)
-            : null;
+    !entered || typed === null
+      ? null
+      : typed < MIN_CONVERT_SECONDS
+        ? t(hoursText.tooLittle)
+        : fromTier && typed > fromTier.available_seconds
+          ? t(hoursText.tooMuch)
+          : null;
   const body =
-    fromTier && to && to !== from && typed !== null && typed >= MIN_CONVERT_SECONDS && typed <= fromTier.available_seconds
-      ? { from_tier_id: from, to_tier_id: to, seconds: typed }
+    fromTier && rule && typed !== null && typed >= MIN_CONVERT_SECONDS && typed <= fromTier.available_seconds
+      ? { from_tier_id: from, to_tier_id: rule.to_tier_id, seconds: typed }
       : null;
   const intent = useIntentKey('convert', body);
+  // The quote is the server's answer for THIS body; a changed choice drops it.
+  const shown = quote && body && quote.from_tier_id === body.from_tier_id && quote.to_tier_id === body.to_tier_id && quote.converted_seconds === body.seconds ? quote : null;
+  const signature = JSON.stringify(body);
+  const refusal = quoteError && quoteError.for === signature ? quoteError.text : null;
+
+  const review = async () => {
+    if (!body) return;
+    setQuoteError(null);
+    setQuoting(true);
+    try {
+      setQuote(await quoteCreditConversion(body));
+      setError(null);
+      setConfirming(true);
+    } catch (e) {
+      setQuoteError({ for: signature, text: cloudErrorText(e, lang) });
+    } finally {
+      setQuoting(false);
+    }
+  };
 
   const submit = async () => {
     if (!body) return;
@@ -285,6 +340,7 @@ function ConvertHours({ tiers }: { tiers: CreditTierBalance[] }) {
       const done = await convertCredits(body, intent.key);
       setResult(done);
       setConfirming(false);
+      setQuote(null);
       intent.renew();
       setHours({ value: null, valid: true });
       setMinutes({ value: null, valid: true });
@@ -294,6 +350,7 @@ function ConvertHours({ tiers }: { tiers: CreditTierBalance[] }) {
     }
   };
 
+  const now = Date.now();
   return (
     <section aria-labelledby="cloud-hours-convert" className="lv-surface space-y-3 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -317,62 +374,103 @@ function ConvertHours({ tiers }: { tiers: CreditTierBalance[] }) {
         </p>
       ) : null}
       <div id="cloud-hours-convert-form" hidden={!open} className="space-y-3">
-        {!open ? null : sources.length === 0 ? (
-            <p className="text-[13px] text-text-muted">{t(hoursText.nothingToConvert)}</p>
-          ) : printers.error ? (
-            <CloudErrorState compact error={printers.error} onRetry={printers.reload} />
-          ) : !printers.data ? (
-            <Skeleton className="h-11 w-full rounded-xl" />
-          ) : targets.length === 0 ? (
-            <p className="text-[13px] text-text-muted">{t(hoursText.noTarget)}</p>
-          ) : (
-            <>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label={t(hoursText.from)} hint={fromTier ? t(hoursText.convertAvailable, { amount: formatDuration(fromTier.available_seconds, lang) }) : undefined}>
-                  <Select value={from} onChange={(e) => setFrom(e.currentTarget.value)}>
-                    {sources.map((s) => (
-                      <option key={s.tier_id} value={s.tier_id}>
-                        {tx(s.name, lang) || s.code}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label={t(hoursText.to)}>
-                  <Select value={to} onChange={(e) => setTo(e.currentTarget.value)}>
-                    <option value="">{t(hoursText.choose)}</option>
-                    {targets.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {tx(o.name, lang) || o.code}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label={t(hoursText.hoursField)}>
-                  <NumberInput kind="number" decimals={0} min={0} value={hours.value} onValueChange={(value, valid) => setHours({ value, valid })} />
-                </Field>
-                <Field label={t(hoursText.minutesField)}>
-                  <NumberInput kind="number" decimals={0} min={0} max={59} value={minutes.value} onValueChange={(value, valid) => setMinutes({ value, valid })} />
-                </Field>
-              </div>
-              {problem ? (
-                <p role="alert" className="text-[13px] font-semibold text-danger">
-                  {problem}
-                </p>
-              ) : null}
-              <Button variant="primary" disabled={!body} onClick={() => setConfirming(true)}>
-                {t(hoursText.review)}
-              </Button>
-            </>
-          )}
+        {!open ? null : rules.error ? (
+          <CloudErrorState compact error={rules.error} onRetry={rules.reload} />
+        ) : !rules.data ? (
+          <Skeleton className="h-11 w-full rounded-xl" />
+        ) : allowed.length === 0 ? (
+          <p className="text-[13px] text-text-muted">{t(hoursText.noRules)}</p>
+        ) : (
+          <>
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-text-primary">{t(hoursText.rulesTitle)}</h3>
+              <ul className="space-y-1">
+                {allowed.map((r) => {
+                  const ratio = ratioInHours(r);
+                  return (
+                    <li key={r.rule_id} className="text-[13px] text-text-secondary">
+                      {t(hoursText.ruleLine, {
+                        given: formatDuration(ratio.given, lang),
+                        from: tx(r.from_name, lang) || r.from_code,
+                        received: formatDuration(ratio.received, lang),
+                        to: tx(r.to_name, lang) || r.to_code,
+                      })}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+            {sources.length === 0 ? (
+              <p className="text-[13px] text-text-muted">{t(hoursText.nothingToConvert)}</p>
+            ) : (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label={t(hoursText.from)} hint={fromTier ? t(hoursText.convertAvailable, { amount: formatDuration(fromTier.available_seconds, lang) }) : undefined}>
+                    <Select value={from} onChange={(e) => setFrom(e.currentTarget.value)}>
+                      {sources.map((x) => (
+                        <option key={x.tier_id} value={x.tier_id}>
+                          {tx(x.name, lang) || x.code}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label={t(hoursText.to)}>
+                    <Select value={rule?.to_tier_id ?? ''} onChange={(e) => setTo(e.currentTarget.value)}>
+                      {targets.length > 1 ? <option value="">{t(hoursText.choose)}</option> : null}
+                      {targets.map((r) => (
+                        <option key={r.rule_id} value={r.to_tier_id}>
+                          {tx(r.to_name, lang) || r.to_code}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label={t(hoursText.hoursField)}>
+                    <NumberInput kind="number" decimals={0} min={0} value={hours.value} onValueChange={(value, valid) => setHours({ value, valid })} />
+                  </Field>
+                  <Field label={t(hoursText.minutesField)}>
+                    <NumberInput kind="number" decimals={0} min={0} max={59} value={minutes.value} onValueChange={(value, valid) => setMinutes({ value, valid })} />
+                  </Field>
+                </div>
+                {problem ? (
+                  <p role="alert" className="text-[13px] font-semibold text-danger">
+                    {problem}
+                  </p>
+                ) : null}
+                {refusal ? (
+                  <p role="alert" className="text-[13px] font-semibold text-danger">
+                    {refusal}
+                  </p>
+                ) : null}
+                <Button variant="primary" disabled={!body} loading={quoting} onClick={review}>
+                  {t(hoursText.review)}
+                </Button>
+              </>
+            )}
+          </>
+        )}
       </div>
       <ConfirmDialog
-        open={confirming && !!body}
+        open={confirming && !!body && !!shown}
         title={t(hoursText.confirmTitle)}
         consequence={
-          body ? (
+          body && shown ? (
             <span className="block space-y-2">
-              <span className="block">{t(hoursText.confirmGive, { amount: formatDuration(body.seconds, lang), from: nameOf(body.from_tier_id) })}</span>
-              <span className="block">{t(hoursText.confirmReceive, { to: nameOf(body.to_tier_id) })}</span>
+              <span className="block">{t(hoursText.confirmGive, { amount: formatDuration(shown.converted_seconds, lang), from: nameOf(shown.from_tier_id) })}</span>
+              <span className="block font-semibold text-text-primary">
+                {t(hoursText.confirmReceive, { amount: formatDuration(shown.received_seconds, lang), to: nameOf(shown.to_tier_id) })}
+              </span>
+              <span className="block">
+                <span className="block">{t(hoursText.takenFrom)}</span>
+                {shown.draws.map((d) => (
+                  <LotPart key={d.lot_id} seconds={d.seconds} expiresAt={d.expires_at} now={now} />
+                ))}
+              </span>
+              <span className="block">
+                <span className="block">{t(hoursText.arrivesAs)}</span>
+                {shown.receives.map((l, i) => (
+                  <LotPart key={i} seconds={l.seconds} expiresAt={l.expires_at} now={now} />
+                ))}
+              </span>
               <span className="block">{t(hoursText.confirmRules)}</span>
             </span>
           ) : null

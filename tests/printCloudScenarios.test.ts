@@ -394,7 +394,7 @@ test('buyback: 500 g left of a 1 kg lot bought for 24,250 IQD at 50 % pays 6,063
   assert.equal(quote.estimated_value_iqd, 6063);
   assert.equal(quote.rate_bps, 5000);
   await refused(w.a, 'POST', `${API}/buybacks/quote`, { variant_id: cat.white, qty: 501 }, 'INSUFFICIENT_INVENTORY');
-  const req = await ok(w.a, 'POST', `${API}/buybacks`, { variant_id: cat.white, qty: 500 });
+  const req = await ok(w.a, 'POST', `${API}/buybacks`, { variant_id: cat.white, qty: 500 }, idem('bb'));
   // Reserved: no print can use the grams being sold back.
   assert.deepEqual([(await owned(w.a, cat.white)).available_qty, (await owned(w.a, cat.white)).reserved_qty], [0, 500]);
   const sellableBefore = row(w, 'SELECT on_hand_qty - reserved_qty - allocated_qty AS s FROM pc_stock_positions WHERE variant_id = ?', cat.white)?.s;

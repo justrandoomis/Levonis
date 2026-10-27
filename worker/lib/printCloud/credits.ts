@@ -737,33 +737,96 @@ export interface ConversionRule {
 }
 
 /**
- * Move hours between tiers under an ENABLED rule, at the customer's request.
- * Only free hours not yet past their expiry move. The value of the seconds
- * taken travels with them, so the converted hours are recognised at what the
- * customer actually paid — and so does their EXPIRY: an hour bought under a
- * package that expires still expires, on the same date, in the new tier.
+ * The rule POST /me/credits/convert and its quote convert under: the owner's
+ * own pair, and only while it is switched on — a pair with no rule and a rule
+ * switched off are the same refusal.
  */
-export async function convertCredits(
-  db: D1Database,
-  p: { userId: string; rule: ConversionRule; seconds: number; opKey: string; actorId: string; now: Date }
-): Promise<{ statements: Stmt[]; receivedSeconds: number; value: number }> {
+export async function conversionRule(db: D1Database, fromTierId: string, toTierId: string): Promise<ConversionRule> {
+  const rule = await one<ConversionRule>(db, 'SELECT * FROM pc_credit_conversion_rules WHERE from_tier_id = ? AND to_tier_id = ?', fromTierId, toTierId);
+  if (!rule || !rule.enabled) throw pcError('CONVERSION_DISABLED');
+  return rule;
+}
+
+/**
+ * The conversions the customer may ask for (GET /me/credits/conversions):
+ * every ENABLED rule out of a class they hold an account in, with its ratio
+ * and both classes' names — the rules `conversionRule` accepts, and no other.
+ */
+export async function conversionOptions(db: D1Database, userId: string) {
+  const rows = await many<{
+    id: string;
+    from_tier_id: string;
+    to_tier_id: string;
+    ratio_num: number;
+    ratio_den: number;
+    from_code: string;
+    from_name_ar: string;
+    from_name_en: string;
+    from_name_ckb: string;
+    to_code: string;
+    to_name_ar: string;
+    to_name_en: string;
+    to_name_ckb: string;
+  }>(
+    db,
+    `SELECT r.id, r.from_tier_id, r.to_tier_id, r.ratio_num, r.ratio_den,
+            f.code AS from_code, f.name_ar AS from_name_ar, f.name_en AS from_name_en, f.name_ckb AS from_name_ckb,
+            t.code AS to_code, t.name_ar AS to_name_ar, t.name_en AS to_name_en, t.name_ckb AS to_name_ckb
+       FROM pc_credit_conversion_rules r
+       JOIN pc_credit_accounts a ON a.user_id = ? AND a.tier_id = r.from_tier_id
+       JOIN pc_credit_tiers f ON f.id = r.from_tier_id
+       JOIN pc_credit_tiers t ON t.id = r.to_tier_id
+      WHERE r.enabled = 1
+      ORDER BY f.code, t.code`,
+    userId
+  );
+  return rows.map((r) => ({
+    rule_id: r.id,
+    from_tier_id: r.from_tier_id,
+    to_tier_id: r.to_tier_id,
+    // to_seconds = floor(from_seconds × ratio_num / ratio_den), the one formula `planConversion` applies.
+    ratio_num: Number(r.ratio_num),
+    ratio_den: Number(r.ratio_den),
+    from_code: r.from_code,
+    from_name: { ar: r.from_name_ar, en: r.from_name_en, ckb: r.from_name_ckb },
+    to_code: r.to_code,
+    to_name: { ar: r.to_name_ar, en: r.to_name_en, ckb: r.to_name_ckb },
+  }));
+}
+
+/** What one conversion takes and gives at `now`: the one plan `convertCredits` writes and POST /me/credits/convert/quote shows. */
+export interface ConversionPlan {
+  /** The account the seconds leave. */
+  accountId: string;
+  receivedSeconds: number;
+  /** What the drawn seconds were bought for: it travels with them. */
+  value: number;
+  /** The FREE seconds taken, lot by lot, in spend order (expiring first, then oldest) — never held, never past expiry. */
+  draws: CreditDraw[];
+  /** The lots the receiving class gets: one per expiry among the draws, with that expiry and the value of its draws. */
+  lots: Array<{ expiresAt: string | null; seconds: number; value: number }>;
+}
+
+/**
+ * Plan converting `seconds` under `rule` — reads only. Only free hours not
+ * yet past their expiry move (a shortfall is INSUFFICIENT_CREDIT); what
+ * arrives is floor(seconds × ratio), shared over one new lot per expiry
+ * among the drawn lots, each carrying that absolute date and the value of its
+ * draws. Both doors call it: the quote shows the plan, the conversion writes
+ * it, so the preview is never a second formula.
+ */
+export async function planConversion(db: D1Database, p: { userId: string; rule: ConversionRule; seconds: number; now: Date }): Promise<ConversionPlan> {
   if (!p.rule.enabled) throw pcError('CONVERSION_DISABLED');
+  if (!Number.isSafeInteger(p.seconds) || p.seconds <= 0) throw pcError('VALIDATION', { field: 'seconds' });
   const received = mulDivFloor(p.seconds, p.rule.ratio_num, p.rule.ratio_den);
   if (received <= 0) throw pcError('QUANTITY_NOT_ALLOWED', { field: 'seconds' });
-  const out = await debitAvailable(db, {
-    userId: p.userId,
-    tierId: p.rule.from_tier_id,
-    seconds: p.seconds,
-    type: 'conversion_out',
-    entryKey: `conversion_out:${p.opKey}`,
-    actorId: p.actorId,
-    note: `rule ${p.rule.id}`,
-    now: p.now,
-  });
+  const accountId = creditAccountId(p.userId, p.rule.from_tier_id);
+  const plan = planFreeDraws(await accountLots(db, accountId), p.seconds, p.now);
+  if (plan.shortfall > 0) throw pcError('INSUFFICIENT_CREDIT');
   // One new lot per expiry among the drawn lots (spend order keeps equal
   // expiries together), with that absolute date and the value of its draws.
   const groups: Array<{ expiresAt: string | null; drawn: number; value: number }> = [];
-  for (const d of out.draws) {
+  for (const d of plan.draws) {
     const last = groups[groups.length - 1];
     if (last && last.expiresAt === d.expiresAt) {
       last.drawn += d.qty;
@@ -772,7 +835,7 @@ export async function convertCredits(
   }
   // The received seconds are shared cumulatively, so the lots sum to exactly
   // `received`; a group too small for a whole second hands its value on.
-  const lots: Array<{ expiresAt: string | null; seconds: number; value: number }> = [];
+  const lots: ConversionPlan['lots'] = [];
   let drawn = 0;
   let given = 0;
   let pending = 0;
@@ -786,8 +849,35 @@ export async function convertCredits(
     } else if (lots.length) lots[lots.length - 1].value += g.value;
     else pending += g.value;
   }
-  const statements = [...out.statements];
-  lots.forEach((l, i) => {
+  return { accountId, receivedSeconds: received, value: plan.value, draws: plan.draws, lots };
+}
+
+/**
+ * Move hours between tiers under an ENABLED rule, at the customer's request:
+ * the plan above, written. The value of the seconds taken travels with them,
+ * so the converted hours are recognised at what the customer actually paid —
+ * and so does their EXPIRY: an hour bought under a package that expires still
+ * expires, on the same date, in the new tier. Each draw is fenced on its
+ * lot's remainder and ck_pc_credit_lot_held refuses taking seconds a hold
+ * landing meanwhile needs (the caller re-plans), exactly as a debit is.
+ */
+export async function convertCredits(
+  db: D1Database,
+  p: { userId: string; rule: ConversionRule; seconds: number; opKey: string; actorId: string; now: Date }
+): Promise<{ statements: Stmt[]; receivedSeconds: number; value: number; plan: ConversionPlan }> {
+  const plan = await planConversion(db, p);
+  const debit: DebitInput = {
+    userId: p.userId,
+    tierId: p.rule.from_tier_id,
+    seconds: p.seconds,
+    type: 'conversion_out',
+    entryKey: `conversion_out:${p.opKey}`,
+    actorId: p.actorId,
+    note: `rule ${p.rule.id}`,
+    now: p.now,
+  };
+  const statements = debitStatements(db, plan.accountId, debit, { draws: plan.draws, value: plan.value });
+  plan.lots.forEach((l, i) => {
     statements.push(
       ...grantCredits(db, {
         userId: p.userId,
@@ -804,7 +894,7 @@ export async function convertCredits(
       }).statements
     );
   });
-  return { statements, receivedSeconds: received, value: out.value };
+  return { statements, receivedSeconds: plan.receivedSeconds, value: plan.value, plan };
 }
 
 /**

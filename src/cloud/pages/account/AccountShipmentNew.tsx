@@ -1,25 +1,30 @@
 /**
- * /account/shipments/new — ASK FOR A PICKUP OR A DELIVERY (POST /shipments,
- * a money door: it may open a delivery-fee order).
+ * /account/shipments/new — ASK FOR A PICKUP OR A DELIVERY (POST
+ * /shipments/quote, then POST /shipments — a money door: it may open a
+ * delivery-fee order).
  *
- * WHAT CAN LEAVE. Finished prints (GET /jobs, `completed`) that are not
- * already on a shipment — read from the customer's own shipments, since a job
- * does not say which shipment carries it — and free material whose catalogue
- * row lets it leave the workshop (`fulfillment_modes` names `delivery`; the
- * server refuses the rest). Pickup and delivery are offered only as the
- * workshop offers them (GET /status `delivery`).
+ * WHAT CAN LEAVE. Finished prints (GET /jobs, `completed`) on no shipment —
+ * the server names the live shipment each one is on (`shipment_id`), and it
+ * refuses a second one itself (ALREADY_IN_SHIPMENT), so nothing here reads
+ * the shipments to find out — and free material whose catalogue row lets it
+ * leave the workshop (`fulfillment_modes` names `delivery`; the server
+ * refuses the rest). Pickup and delivery are offered only as the workshop
+ * offers them (GET /status `delivery`).
  *
- * THE FEE IS THE SERVER'S. No customer door states the delivery fee of a
- * governorate before the request, so the screen does not guess one: it says
- * the fee is set by the workshop and shown once the request is made, as an
- * order of its own that nothing leaves before; the answer's `fee_iqd` is then
- * shown on the shipment's page. Governorates are the server's own eighteen
- * (packages/shipping `IRAQ_GOVERNORATES`, the list `parseAddress` accepts).
+ * THE FEE IS THE SERVER'S, BEFORE THE CONFIRMATION. «Review» sends the very
+ * body the request will carry to POST /shipments/quote — the request's own
+ * assessment — and the confirmation states its answer: the fee and the rule
+ * that set it (the owner's fee for the governorate, or the flat fee; pickup
+ * is free), what leaves, and that nothing leaves before the fee is paid. A
+ * refusal (a print already on a shipment, more material than is free…) is the
+ * server's own, shown before anything is sent. Governorates are the server's
+ * own eighteen (packages/shipping `IRAQ_GOVERNORATES`, the list
+ * `parseAddress` accepts).
  *
  * One Idempotency-Key per intent (shared.tsx `useIntentKey`): a request whose
  * answer was lost, sent again, is the same request.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../../../components/ui/Button';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
@@ -28,23 +33,21 @@ import { NumberInput } from '../../../components/ui/NumberInput';
 import { Segmented } from '../../../components/ui/Segmented';
 import { Checkbox } from '../../../components/ui/Switch';
 import { toast } from '../../../lib/toastStore';
-import { IRAQ_GOVERNORATES } from '../../../../packages/shipping/src/iraqGovernorates';
-import { cloudErrorText, createShipment, getShipment, listInventory, listJobs, listShipments, listStoreProducts } from '../../api';
+import { IRAQ_GOVERNORATES, governorateName } from '../../../../packages/shipping/src/iraqGovernorates';
+import { cloudErrorText, createShipment, listInventory, listJobs, listStoreProducts, quoteShipment } from '../../api';
 import { useCloud } from '../../CloudContext';
 import { formatQuantity } from '../../format';
 import { sect, shipmentKind, shipText } from '../../strings/account';
 import { tx, useCloudText } from '../../text';
-import type { ShipmentRequest, ShipmentView, Tri } from '../../types';
+import type { ShipmentQuote, ShipmentRequest, Tri } from '../../types';
 import { CloudErrorState, CloudPageSkeleton, Info, SectionHeader } from '../../ui';
 import { useCloudQuery } from '../../useCloudQuery';
-import { ADDRESS_MAX, addressProblems, deliverableVariants, jobsOnShipments, shipmentsToCheck, type AddressDraft, type AddressProblem } from './logic';
-import { SubPageHeader, useIntentKey } from './shared';
+import { ADDRESS_MAX, addressProblems, deliverableVariants, type AddressDraft, type AddressProblem } from './logic';
+import { MoneyLine, SubPageHeader, useIntentKey } from './shared';
 
 type Kind = 'pickup' | 'delivery';
 type Typed = { value: number | null; valid: boolean };
 
-/** How many of the customer's shipments are read to know which prints are taken: the most recent ones, newest first. */
-const CHECK_CAP = 30;
 const GOVERNORATE_IDS: ReadonlySet<string> = new Set(IRAQ_GOVERNORATES.map((g) => g.id));
 const PROBLEM_WORDS: Record<AddressProblem, Tri> = { required: sect.required, format: shipText.phoneFormat, too_long: sect.tooLong };
 const enc = encodeURIComponent;
@@ -64,21 +67,13 @@ export default function AccountShipmentNew() {
 
   const base = useCloudQuery(
     (signal) =>
-      Promise.all([listJobs({ signal }), listInventory(undefined, { signal }), listStoreProducts(undefined, { signal }), listShipments({ signal })]).then(
-        ([jobs, inventory, products, shipments]) => ({ jobs, inventory, products, shipments })
-      ),
+      Promise.all([listJobs({ signal }), listInventory(undefined, { signal }), listStoreProducts(undefined, { signal })]).then(([jobs, inventory, products]) => ({
+        jobs,
+        inventory,
+        products,
+      })),
     [cloud.dashboardVersion]
   );
-  const toCheck = useMemo(() => shipmentsToCheck(base.data?.shipments ?? []), [base.data]);
-  const details = useCloudQuery(
-    (signal) => (base.data ? Promise.allSettled(toCheck.slice(0, CHECK_CAP).map((s) => getShipment(s.id, { signal }))) : Promise.resolve(null)),
-    [base.data, toCheck]
-  );
-  const taken = useMemo(() => {
-    if (!details.data) return null;
-    const read = details.data.filter((r): r is PromiseFulfilledResult<ShipmentView> => r.status === 'fulfilled').map((r) => r.value);
-    return { jobs: jobsOnShipments(read), partial: read.length < details.data.length || toCheck.length > CHECK_CAP };
-  }, [details.data, toCheck]);
 
   const [jobPick, setJobPick] = useState<ReadonlySet<string>>(new Set());
   const [itemPick, setItemPick] = useState<Record<string, Typed>>({});
@@ -86,6 +81,9 @@ export default function AccountShipmentNew() {
   const [tried, setTried] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quote, setQuote] = useState<{ for: string; answer: ShipmentQuote } | null>(null);
+  const [quoting, setQuoting] = useState(false);
+  const [quoteError, setQuoteError] = useState<{ for: string; text: string } | null>(null);
 
   const completed = base.data?.jobs.completed ?? [];
   const deliverable = deliverableVariants(base.data?.products ?? []);
@@ -102,7 +100,8 @@ export default function AccountShipmentNew() {
     if (row && deliverableVariants(base.data.products).has(row.variant_id)) setItemPick({ [row.variant_id]: { value: row.available_qty, valid: true } });
   }, [base.data, preselect]);
 
-  const jobIds = completed.filter((j) => jobPick.has(j.id) && !taken?.jobs.has(j.id)).map((j) => j.id);
+  // A print the server names a live shipment for has left, or is about to: never offered again.
+  const jobIds = completed.filter((j) => jobPick.has(j.id) && !j.shipment_id).map((j) => j.id);
   const items = rows.flatMap((r) => {
     const p = itemPick[r.variant_id];
     return p && p.valid && p.value != null && p.value >= 1 && p.value <= r.available_qty ? [{ variant_id: r.variant_id, qty: p.value }] : [];
@@ -134,6 +133,10 @@ export default function AccountShipmentNew() {
         }
       : null;
   const intent = useIntentKey('shipment', body);
+  // The quote is the server's answer for THIS body: any change to what would be sent drops it.
+  const signature = JSON.stringify(body);
+  const shown = quote && quote.for === signature ? quote.answer : null;
+  const refusal = quoteError && quoteError.for === signature ? quoteError.text : null;
 
   const problemOf = (key: keyof AddressDraft) => (tried && problems[key] ? t(PROBLEM_WORDS[problems[key]!]) : undefined);
   const setPart = (key: keyof AddressDraft) => (e: { currentTarget: { value: string } }) => {
@@ -141,14 +144,25 @@ export default function AccountShipmentNew() {
     setAddress((a) => ({ ...a, [key]: value }));
   };
 
-  const review = () => {
+  const review = async () => {
     setTried(true);
-    if (body) {
-      setError(null);
-      setConfirming(true);
-    } else {
+    if (!body) {
       // On the next frame the fields carry aria-invalid: focus the first one.
       requestAnimationFrame(() => focusFirstInvalid(formRef.current));
+      return;
+    }
+    // The request's own assessment, for the very body it will carry: the fee and what leaves, or the refusal.
+    setQuoteError(null);
+    setQuoting(true);
+    try {
+      const answer = await quoteShipment(body);
+      setQuote({ for: signature, answer });
+      setError(null);
+      setConfirming(true);
+    } catch (e) {
+      setQuoteError({ for: signature, text: cloudErrorText(e, lang) });
+    } finally {
+      setQuoting(false);
     }
   };
 
@@ -187,7 +201,7 @@ export default function AccountShipmentNew() {
       </div>
     );
   }
-  if (!base.data || !taken) {
+  if (!base.data) {
     return (
       <div>
         {header}
@@ -225,7 +239,7 @@ export default function AccountShipmentNew() {
         ) : (
           <ul className="lv-surface divide-y divide-border-subtle overflow-hidden">
             {completed.map((job) => {
-              const on = taken.jobs.get(job.id);
+              const on = job.shipment_id ?? null;
               const title = job.title.trim() || t(sect.untitledPrint);
               return (
                 <li key={job.id} className="flex flex-wrap items-center justify-between gap-x-3 px-3 py-1">
@@ -252,7 +266,6 @@ export default function AccountShipmentNew() {
             })}
           </ul>
         )}
-        {taken.partial ? <p className="text-[12px] leading-relaxed text-text-muted">{t(shipText.checkingShipments)}</p> : null}
       </section>
 
       <section aria-labelledby="cloud-ship-material" className="space-y-2">
@@ -344,20 +357,41 @@ export default function AccountShipmentNew() {
           {t(shipText.nothingChosen)}
         </p>
       ) : null}
-      <Button variant="primary" block onClick={review}>
+      {refusal ? (
+        <p role="alert" className="text-[13px] font-semibold text-danger">
+          {refusal}
+        </p>
+      ) : null}
+      <Button variant="primary" block loading={quoting} onClick={review}>
         {t(shipText.review)}
       </Button>
 
       <ConfirmDialog
-        open={confirming && !!body}
+        open={confirming && !!body && !!shown}
         title={t(shipText.confirmTitle)}
         consequence={
-          body && kind ? (
+          shown ? (
             <span className="block space-y-2">
-              <span className="block font-semibold text-text-primary">{t(shipmentKind[kind])}</span>
-              <span className="block">{t(shipText.confirmCounts, { prints: jobIds.length, materials: items.length })}</span>
-              {items.length > 0 ? <span className="block">{t(shipText.confirmHold)}</span> : null}
-              <span className="block">{kind === 'delivery' ? t(shipText.feeNotice) : t(shipText.pickupNotice)}</span>
+              <span className="block font-semibold text-text-primary">{t(shipmentKind[shown.kind])}</span>
+              <span className="block">{t(shipText.confirmCounts, { prints: shown.jobs.length, materials: shown.items.length })}</span>
+              {shown.items.length > 0 ? <span className="block">{t(shipText.confirmHold)}</span> : null}
+              {shown.kind === 'pickup' ? (
+                <span className="block">{t(shipText.pickupNotice)}</span>
+              ) : shown.fee_iqd > 0 ? (
+                <>
+                  <span className="block font-semibold text-text-primary">
+                    <MoneyLine text={shipText.feeLine} iqd={shown.fee_iqd} />
+                  </span>
+                  <span className="block text-[13px]">
+                    {shown.fee_rule === 'governorate' && shown.governorate
+                      ? t(shipText.feeGovernorate, { governorate: governorateName(shown.governorate, lang) })
+                      : t(shipText.feeFlat)}
+                  </span>
+                  <span className="block">{t(shipText.feeAfter)}</span>
+                </>
+              ) : (
+                <span className="block">{t(shipText.feeNone)}</span>
+              )}
             </span>
           ) : null
         }

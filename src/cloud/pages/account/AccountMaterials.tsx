@@ -5,8 +5,9 @@
  *
  * One row per variant, in that variant's own unit (grams of one colour, pieces
  * of one magnet — never added together), with what is free to use and what
- * prints hold; a row opens its own page (the reminder, the top-up, the
- * movements). Above them, when prints waiting for the customer's confirmation
+ * prints hold, «running low» at the amount the server reminds at (the
+ * customer's own, else the workshop's default the row states — grams only);
+ * a row opens its own page (the reminder, the top-up, the movements). Above them, when prints waiting for the customer's confirmation
  * need more than they own, the server's own reorder suggestion, priced on
  * demand as a stored quote that goes on into the store's cart.
  */

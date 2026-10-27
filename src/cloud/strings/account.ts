@@ -75,6 +75,7 @@ export const sect = {
   required: { ar: 'هذا الحقل مطلوب.', en: 'This is required.', ckb: 'ئەمە پێویستە.' },
   tooLong: { ar: 'النص أطول من المسموح.', en: 'This is too long.', ckb: 'ئەمە زۆر درێژە.' },
   untitledPrint: { ar: 'طباعة بلا عنوان', en: 'Untitled print', ckb: 'چاپی بێ ناونیشان' },
+  historyEnd: { ar: 'هذه كل الحركات.', en: 'That is every movement.', ckb: 'ئەوە هەموو جووڵەکان بوو.' },
 } satisfies Record<string, Tri>;
 
 /** Hours: the balance per printer class, its purchases, its holds, its movements and the conversion. */
@@ -128,9 +129,16 @@ export const hoursText = {
   ledgerEmpty: { ar: 'لا حركات بعد.', en: 'No movements yet.', ckb: 'هێشتا هیچ جووڵەیەک نییە.' },
   convertTitle: { ar: 'تحويل الساعات بين الفئات', en: 'Convert hours between classes', ckb: 'گۆڕینی کاتژمێر لە نێوان پۆلەکاندا' },
   convertIntro: {
-    ar: 'يجوز التحويل فقط حيث تسمح به الورشة. إن لم يكن مسموحًا لاختيارك فسيُقال لك ذلك ولن يتغيّر شيء.',
-    en: 'Conversion works only where the workshop allows it. If it is not allowed for your choice, you will be told so and nothing changes.',
-    ckb: 'گۆڕین تەنها ئەو کاتە دەکرێت کە کارگە ڕێگەی پێدابێت. ئەگەر بۆ هەڵبژاردنەکەت ڕێگەپێدراو نەبێت، پێت دەوترێت و هیچ ناگۆڕێت.',
+    ar: 'تُعرض فقط التحويلات التي تسمح بها الورشة وبنسبتها هي، وترى ما سيصلك قبل أن تؤكد.',
+    en: 'Only the conversions the workshop allows are offered, at its own rate, and you see what you would receive before you confirm.',
+    ckb: 'تەنها ئەو گۆڕینانە پیشان دەدرێن کە کارگە ڕێگەی پێداون، بە ڕێژەی خۆی، و پێش پشتڕاستکردنەوە دەبینیت چیت پێدەگات.',
+  },
+  rulesTitle: { ar: 'التحويلات المسموح بها', en: 'Allowed conversions', ckb: 'گۆڕینە ڕێگەپێدراوەکان' },
+  ruleLine: { ar: '{given} من {from} تصير {received} في {to}', en: '{given} of {from} becomes {received} of {to}', ckb: '{given} لە {from} دەبێتە {received} لە {to}' },
+  noRules: {
+    ar: 'لا تسمح الورشة الآن بأي تحويل من فئاتك.',
+    en: 'The workshop allows no conversion out of your classes right now.',
+    ckb: 'ئێستا کارگە هیچ گۆڕینێک لە پۆلەکانتەوە ڕێگە پێنادات.',
   },
   convertOpen: { ar: 'ابدأ تحويلًا', en: 'Start a conversion', ckb: 'گۆڕینێک دەست پێبکە' },
   convertHide: { ar: 'إخفاء', en: 'Hide', ckb: 'شاردنەوە' },
@@ -142,15 +150,12 @@ export const hoursText = {
   convertAvailable: { ar: 'المتاح في هذه الفئة: {amount}', en: 'Available in this class: {amount}', ckb: 'بەردەست لەم پۆلەدا: {amount}' },
   tooMuch: { ar: 'أكثر من المتاح لك في هذه الفئة.', en: 'More than you have available in this class.', ckb: 'زیاترە لەوەی لەم پۆلەدا بەردەستتە.' },
   tooLittle: { ar: 'دقيقة واحدة على الأقل.', en: 'At least one minute.', ckb: 'لانیکەم یەک خولەک.' },
-  sameClass: { ar: 'اختر فئتين مختلفتين.', en: 'Choose two different classes.', ckb: 'دوو پۆلی جیاواز هەڵبژێرە.' },
   review: { ar: 'مراجعة التحويل', en: 'Review the conversion', ckb: 'پێداچوونەوە بە گۆڕینەکەدا' },
   confirmTitle: { ar: 'تحويل هذه الساعات؟', en: 'Convert these hours?', ckb: 'ئەم کاتژمێرانە بگۆڕدرێن؟' },
   confirmGive: { ar: 'تخرج {amount} من فئة {from}.', en: '{amount} leave the {from} class.', ckb: '{amount} لە پۆلی {from} دەردەچن.' },
-  confirmReceive: {
-    ar: 'عدد الساعات التي تصلك في فئة {to} تحدده قاعدة الورشة، ويظهر بعد إتمام التحويل.',
-    en: 'How many hours you receive in {to} is set by the workshop’s rule and shown once it is done.',
-    ckb: 'ژمارەی ئەو کاتژمێرانەی لە پۆلی {to} وەریدەگریت ڕێسای کارگە دیاری دەکات و دوای تەواوبوون پیشان دەدرێت.',
-  },
+  confirmReceive: { ar: 'تصلك {amount} في فئة {to}.', en: 'You receive {amount} in the {to} class.', ckb: '{amount} لە پۆلی {to} وەردەگریت.' },
+  takenFrom: { ar: 'تخرج من مشترياتك هذه:', en: 'Taken from these purchases of yours:', ckb: 'لەم کڕینانەت دەبردرێت:' },
+  arrivesAs: { ar: 'وتصل هكذا:', en: 'They arrive as:', ckb: 'بەم شێوەیە دەگەن:' },
   confirmRules: {
     ar: 'لا تُحوَّل الساعات المحجوزة لطباعات ولا المنتهية صلاحيتها، وتحتفظ الساعات المحوّلة بتاريخ انتهائها.',
     en: 'Hours held for prints or past their expiry do not move; converted hours keep their expiry date.',
@@ -162,8 +167,11 @@ export const hoursText = {
     en: 'Done: {given} of {from} became {received} of {to}.',
     ckb: 'تەواو بوو: {given} لە {from} بوو بە {received} لە {to}.',
   },
-  noTarget: { ar: 'لا توجد فئة أخرى للتحويل إليها.', en: 'There is no other class to convert to.', ckb: 'هیچ پۆلێکی تر نییە بۆ گۆڕین بۆی.' },
-  nothingToConvert: { ar: 'لا ساعات متاحة للتحويل.', en: 'You have no available hours to convert.', ckb: 'هیچ کاتژمێرێکی بەردەستت نییە بۆ گۆڕین.' },
+  nothingToConvert: {
+    ar: 'لا ساعات متاحة لديك في فئة تسمح الورشة بالتحويل منها.',
+    en: 'You have no available hours in a class the workshop converts from.',
+    ckb: 'هیچ کاتژمێرێکی بەردەستت نییە لە پۆلێکدا کە کارگە گۆڕینی لێوە ڕێگە پێدەدات.',
+  },
 } satisfies Record<string, Tri>;
 
 /** Where a purchase lot of hours came from (`pc_credit_lots.source`). */
@@ -246,10 +254,16 @@ export const materialsText = {
     ckb: 'کاتێک بەردەستی ئەم کەرەستەیە دادەبەزێتە ئەم بڕە بیرت دەخەینەوە.',
   },
   alertCurrent: { ar: 'التذكير عند {qty}', en: 'Reminder at {qty}', ckb: 'بیرخستنەوە لە {qty}' },
-  alertDefault: { ar: 'التذكير عند الكمية الافتراضية للورشة', en: 'Reminder at the workshop’s default amount', ckb: 'بیرخستنەوە لە بڕی بنەڕەتیی کارگە' },
+  alertDefault: { ar: 'التذكير عند الكمية الافتراضية للورشة: {qty}', en: 'Reminder at the workshop’s default: {qty}', ckb: 'بیرخستنەوە لە بڕی بنەڕەتیی کارگە: {qty}' },
+  alertNone: {
+    ar: 'لا تذكير حتى تحدد كمية: ليس للورشة كمية افتراضية لهذه الوحدة.',
+    en: 'No reminder until you set an amount: the workshop has no default for this unit.',
+    ckb: 'تا بڕێک دیاری نەکەیت بیرخستنەوە نییە: کارگە بڕی بنەڕەتیی بۆ ئەم یەکەیە نییە.',
+  },
   alertLabel: { ar: 'ذكّرني عند', en: 'Remind me at', ckb: 'بیرم بخەرەوە لە' },
   alertSave: { ar: 'حفظ التذكير', en: 'Save reminder', ckb: 'پاشەکەوتکردنی بیرخستنەوە' },
   alertUseDefault: { ar: 'استخدم الافتراضي', en: 'Use the default', ckb: 'بنەڕەتی بەکاربهێنە' },
+  alertRemove: { ar: 'إلغاء تذكيري', en: 'Remove my reminder', ckb: 'بیرخستنەوەکەم لابە' },
   alertSaved: { ar: 'حُفظ التذكير', en: 'Reminder saved', ckb: 'بیرخستنەوە پاشەکەوت کرا' },
   topUpTitle: { ar: 'زيادة الرصيد', en: 'Top up', ckb: 'زیادکردنی باڵانس' },
   topUpBody: {
@@ -259,6 +273,7 @@ export const materialsText = {
   },
   topUpTarget: { ar: 'زِد رصيدي إلى', en: 'Top up to', ckb: 'باڵانسەکەم بگەیەنە' },
   topUpHint: { ar: 'اتركه فارغًا لاعتماد الكمية المعتادة لدى الورشة.', en: 'Leave it empty for the workshop’s usual amount.', ckb: 'بەتاڵی بهێڵەوە بۆ بڕی ئاسایی کارگە.' },
+  topUpHintTo: { ar: 'اتركه فارغًا لزيادة رصيدك إلى {qty}.', en: 'Leave it empty to top up to {qty}.', ckb: 'بەتاڵی بهێڵەوە بۆ گەیاندنی باڵانسەکەت بە {qty}.' },
   topUpPrice: { ar: 'سعّر الزيادة', en: 'Price the top-up', ckb: 'نرخی زیادکردنەکە دابنێ' },
   topUpEnough: { ar: 'تملك {owned}، وهذا يبلغ {target} أو يزيد.', en: 'You own {owned}, already {target} or more.', ckb: '{owned}ت هەیە، کە {target} یان زیاترە.' },
   topUpBuy: { ar: 'اشترِ {qty} لتملك {after}', en: 'Buy {qty} to own {after}', ckb: '{qty} بکڕە بۆ ئەوەی {after}ت هەبێت' },
@@ -345,9 +360,18 @@ export const shipText = {
     ckb: 'وەرگرتن لە کارگە بێ کرێیە؛ کاتێک ئامادە بوو پێت دەوترێت.',
   },
   feeNotice: {
-    ar: 'أجرة التوصيل إلى محافظتك تحددها الورشة، وتظهر بعد إرسال الطلب كدفعة منفصلة. لا يغادر شيء قبل دفعها، ويمكنك الإلغاء حتى ذلك الحين.',
-    en: 'The delivery fee for your governorate is set by the workshop and shown after you send the request, as a separate payment. Nothing leaves before it is paid, and you can cancel until then.',
-    ckb: 'کرێی گەیاندن بۆ پارێزگاکەت کارگە دیاری دەکات و دوای ناردنی داواکارییەکە وەک پارەدانێکی جیا پیشان دەدرێت. پێش دانی هیچ شتێک دەرناچێت و تا ئەو کاتە دەتوانیت هەڵیبوەشێنیتەوە.',
+    ar: 'ترى أجرة التوصيل التي تحددها الورشة لمحافظتك قبل أن تؤكد، وتُدفع كدفعة منفصلة. لا يغادر شيء قبل دفعها، ويمكنك الإلغاء حتى ذلك الحين.',
+    en: 'You see the delivery fee the workshop sets for your governorate before you confirm; it is paid as a separate payment. Nothing leaves before it is paid, and you can cancel until then.',
+    ckb: 'پێش پشتڕاستکردنەوە ئەو کرێی گەیاندنە دەبینیت کە کارگە بۆ پارێزگاکەت دیاری دەکات؛ وەک پارەدانێکی جیا دەدرێت. پێش دانی هیچ شتێک دەرناچێت و تا ئەو کاتە دەتوانیت هەڵیبوەشێنیتەوە.',
+  },
+  feeLine: { ar: 'أجرة التوصيل: {amount}', en: 'Delivery fee: {amount}', ckb: 'کرێی گەیاندن: {amount}' },
+  feeGovernorate: { ar: 'أجرة الورشة لمحافظة {governorate}', en: 'The workshop’s fee for {governorate}', ckb: 'کرێی کارگە بۆ پارێزگای {governorate}' },
+  feeFlat: { ar: 'أجرة التوصيل الموحّدة لدى الورشة', en: 'The workshop’s flat delivery fee', ckb: 'کرێی یەکسانی گەیاندنی کارگە' },
+  feeNone: { ar: 'لا أجرة توصيل إلى هذه المحافظة.', en: 'No delivery fee to this governorate.', ckb: 'بۆ ئەم پارێزگایە کرێی گەیاندن نییە.' },
+  feeAfter: {
+    ar: 'تُدفع كدفعة منفصلة، ولا يغادر شيء قبل دفعها. يمكنك الإلغاء حتى ذلك الحين.',
+    en: 'It is paid as a separate payment; nothing leaves before it is paid, and you can cancel until then.',
+    ckb: 'وەک پارەدانێکی جیا دەدرێت؛ پێش دانی هیچ شتێک دەرناچێت و تا ئەو کاتە دەتوانیت هەڵیبوەشێنیتەوە.',
   },
   nothingChosen: { ar: 'اختر طباعة أو مادة واحدة على الأقل.', en: 'Choose at least one print or material.', ckb: 'لانیکەم چاپێک یان کەرەستەیەک هەڵبژێرە.' },
   review: { ar: 'مراجعة الطلب', en: 'Review the request', ckb: 'پێداچوونەوە بە داواکارییەکەدا' },
@@ -366,11 +390,6 @@ export const shipText = {
     ckb: 'کرێی گەیاندن {amount} — بیدە بۆ ئەوەی گەیاندن دەست پێبکات.',
   },
   stepsLabel: { ar: 'مراحل الشحنة', en: 'Shipment progress', ckb: 'قۆناغەکانی ناردن' },
-  checkingShipments: {
-    ar: 'لم نتمكن من قراءة كل شحناتك، فقد تظهر طباعة مضافة سابقًا.',
-    en: 'Some of your shipments could not be read, so a print already on one may still be listed.',
-    ckb: 'هەندێک لە ناردنەکانت نەخوێندرانەوە، بۆیە لەوانەیە چاپێک کە پێشتر خراوەتە ناردنێکەوە هێشتا پیشان بدرێت.',
-  },
 } satisfies Record<string, Tri>;
 
 /** pickup or delivery (pc_shipments.kind). */

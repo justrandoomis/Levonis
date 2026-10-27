@@ -11,7 +11,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ADMIN, API, buy, estimatedJob, ok, owned, pcWorld, reconcileClean, rows, runToPrinting, seedCatalog, type World } from './fixtures/printCloud';
+import { ADMIN, API, buy, estimatedJob, idem, ok, owned, pcWorld, reconcileClean, rows, runToPrinting, seedCatalog, type World } from './fixtures/printCloud';
 import { enqueueTask } from '../worker/lib/printCloud/tasks';
 
 const H = 3600;
@@ -56,7 +56,7 @@ async function buybackWorld(): Promise<{ w: World; white: string }> {
 
 test('c29: an approved buyback tells the customer in Arabic, English and Sorani, each with its own name and unit', async () => {
   const { w, white } = await buybackWorld();
-  const req = await ok(w.a, 'POST', `${API}/buybacks`, { variant_id: white, qty: 100 });
+  const req = await ok(w.a, 'POST', `${API}/buybacks`, { variant_id: white, qty: 100 }, idem('bb'));
   const approved = await ok(w.full, 'POST', `${ADMIN}/buybacks/${req.buyback_id}/approve`, { note: 'ok' });
   const [b] = notices(w, 'buyback_approved');
   assert.ok(b, 'the approval notice was written');
@@ -67,7 +67,7 @@ test('c29: an approved buyback tells the customer in Arabic, English and Sorani,
 
 test('c29: a rejected buyback names the material in each reader’s language', async () => {
   const { w, white } = await buybackWorld();
-  const req = await ok(w.a, 'POST', `${API}/buybacks`, { variant_id: white, qty: 100 });
+  const req = await ok(w.a, 'POST', `${API}/buybacks`, { variant_id: white, qty: 100 }, idem('bb'));
   await ok(w.full, 'POST', `${ADMIN}/buybacks/${req.buyback_id}/reject`, { note: 'not now' });
   const [b] = notices(w, 'buyback_rejected');
   assert.ok(b, 'the rejection notice was written');
