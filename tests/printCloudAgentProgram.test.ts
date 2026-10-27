@@ -1060,6 +1060,45 @@ async function httpFake(handler: (req: Seen) => { status: number; json?: unknown
   return { url: `http://127.0.0.1:${(server.address() as net.AddressInfo).port}`, seen, close: () => server.close() };
 }
 
+/**
+ * THE DRIVERS' TRANSPORT, GIVEN EXPLICITLY. `npm run test:unit` preloads
+ * scripts/test-no-network.mjs, which replaces `globalThis.fetch` with a
+ * refusal, so a driver left on the global fetch never reaches the fake above
+ * (CI shard 12 said exactly that). This is a fetch over node:http that only
+ * dials the loopback fakes; the multipart body is serialized by the platform's
+ * own Request, so what the fake receives is what fetch would have sent.
+ */
+async function localFetch(input: string | URL | Request, init: RequestInit = {}): Promise<Response> {
+  const url = new URL(input instanceof Request ? input.url : String(input));
+  if (url.hostname !== '127.0.0.1') throw new Error(`the test transport only dials the loopback fakes, not ${url.host}`);
+  const method = init.method ?? 'GET';
+  const headers = new Headers(init.headers);
+  let body: Buffer | undefined;
+  if (init.body !== undefined && init.body !== null) {
+    const encoded = new Request(url, { method, headers, body: init.body });
+    body = Buffer.from(await encoded.arrayBuffer());
+    const type = encoded.headers.get('content-type');
+    if (type) headers.set('content-type', type);
+  }
+  return new Promise<Response>((resolve, reject) => {
+    const req = http.request(url, { method, headers: Object.fromEntries(headers) }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (c: Buffer) => chunks.push(c));
+      res.on('end', () => {
+        const status = res.statusCode ?? 500;
+        const out = new Headers();
+        for (const [k, v] of Object.entries(res.headers)) if (typeof v === 'string') out.set(k, v);
+        resolve(new Response(status === 204 || status === 304 ? null : Buffer.concat(chunks), { status, headers: out }));
+      });
+      res.on('error', reject);
+    });
+    req.on('error', reject);
+    init.signal?.addEventListener('abort', () => req.destroy(new Error('aborted')), { once: true });
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
 const formOf = async (s: Seen) => new Response(s.body, { headers: { 'content-type': s.type ?? '' } }).formData();
 
 test('OctoPrint driver against an HTTP fake: X-Api-Key, multipart upload, select + start, the job states read honestly', async () => {
@@ -1078,7 +1117,7 @@ test('OctoPrint driver against an HTTP fake: X-Api-Key, multipart upload, select
     return { status: 404, json: { error: 'no' } };
   });
   try {
-    const d = createOctoPrint({ base_url: fake.url, api_key: 'octo-key-123' });
+    const d = createOctoPrint({ base_url: fake.url, api_key: 'octo-key-123' }, { fetch: localFetch });
     assert.equal((await d.status()).state, 'idle');
     await d.upload({ name: 'lv_pcj_9.gcode', bytes: Buffer.from('G28\nG1 X10\n') });
     const up = fake.seen.find((s) => s.url === '/api/files/local')!;
@@ -1115,7 +1154,7 @@ test('OctoPrint driver against an HTTP fake: X-Api-Key, multipart upload, select
     fake.close();
   }
   // OctoPrint itself gone: the driver says unreachable (the runner reports offline).
-  const gone = createOctoPrint({ base_url: 'http://127.0.0.1:9', api_key: 'k', timeout_seconds: 2 });
+  const gone = createOctoPrint({ base_url: 'http://127.0.0.1:9', api_key: 'k', timeout_seconds: 2 }, { fetch: localFetch });
   await assert.rejects(gone.status(), (e: unknown) => (e as { code?: string }).code === 'UNREACHABLE');
 });
 
@@ -1134,7 +1173,7 @@ test('Moonraker driver against an HTTP fake: objects query, slicer-estimate rema
     return { status: 404 };
   });
   try {
-    const d = createMoonraker({ base_url: fake.url, api_key: 'moon-key' });
+    const d = createMoonraker({ base_url: fake.url, api_key: 'moon-key' }, { fetch: localFetch });
     assert.equal((await d.status()).state, 'idle');
     await d.upload({ name: 'lv_pcj_5.gcode', bytes: Buffer.from('G28\n') });
     const form = await formOf(fake.seen.find((s) => s.url === '/server/files/upload')!);
