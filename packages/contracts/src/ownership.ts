@@ -314,7 +314,8 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // worker/lib/printCloud; it sits beside the print engine it is the
     // workshop-side twin of, and moves as one block if it becomes a service.
     'pc_fence', 'pc_operations', 'pc_settings', 'pc_units', 'pc_credit_tiers', 'pc_printer_models', 'pc_agents',
-    'pc_printers', 'pc_printer_maintenance', 'pc_printer_telemetry', 'pc_printer_events', 'pc_credit_packages',
+    'pc_printers', 'pc_printer_maintenance', 'pc_printer_telemetry', 'pc_printer_events',
+    'pc_credit_packages',
     'pc_credit_conversion_rules', 'pc_product_categories', 'pc_products', 'pc_variants', 'pc_price_tiers',
     'pc_promotions', 'pc_price_changes', 'pc_quotes', 'pc_quote_lines', 'pc_orders', 'pc_order_lines', 'pc_payments',
     'pc_payment_events', 'pc_refunds', 'pc_credit_accounts', 'pc_credit_lots', 'pc_credit_reservations',

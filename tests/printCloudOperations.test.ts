@@ -25,6 +25,7 @@ import {
   ok,
   owned,
   pcWorld,
+  reading,
   readyFile,
   reconcileClean,
   refused,
@@ -246,9 +247,9 @@ test('the agent: scoped to its printers; stale telemetry is said to be stale; a 
   await ok(w.owner, 'PATCH', `${ADMIN}/catalog/printers/${cat.printers[0]}`, { adapter: 'agent', agent_id: agent.agent_id, connection_ref: 'lan-1' });
   const mine = await ok(w.guest, 'GET', `${AGENT}/printers`, undefined, bearer);
   assert.deepEqual(mine.map((p: Record<string, string>) => p.id), [cat.printers[0]]);
-  assert.equal((await call(w.guest, 'POST', `${AGENT}/printers/${cat.printers[1]}/telemetry`, { machine_state: 'idle' }, bearer)).status, 404, 'not its printer');
-  assert.equal((await call(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, { machine_state: 'idle' }, { Authorization: `Bearer ${other.token}` })).status, 404);
-  await ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, { machine_state: 'idle', nozzle_temp_dc: 245, camera: { available: true, stream_id: 'cam-1', url: 'rtsp://user:pw@10.0.0.5' } }, bearer);
+  assert.equal((await call(w.guest, 'POST', `${AGENT}/printers/${cat.printers[1]}/telemetry`, reading({ machine_state: 'idle' }), bearer)).status, 404, 'not its printer');
+  assert.equal((await call(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, reading({ machine_state: 'idle' }), { Authorization: `Bearer ${other.token}` })).status, 404);
+  await ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, reading({ machine_state: 'idle', nozzle_temp_dc: 245, camera: { available: true, stream_id: 'cam-1', url: 'rtsp://user:pw@10.0.0.5' } }), bearer);
   const fresh = (await ok(w.assistant, 'GET', `${ADMIN}/printers`)).find((p: Record<string, string>) => p.id === cat.printers[0]);
   assert.equal(fresh.connectivity, 'online');
   assert.equal(fresh.telemetry.live, true);
@@ -268,7 +269,7 @@ test('the agent: scoped to its printers; stale telemetry is said to be stale; a 
   assert.equal((await ok(w.a, 'POST', `${API}/jobs/${jobId}/confirm`, undefined, idem('c'))).status, 'queued');
   assert.equal((await ok(w.assistant, 'POST', `${ADMIN}/queue/run`)).assigned.length, 0);
   // The printer reports again after the silence: the reconnection is recorded.
-  await ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, { machine_state: 'idle' }, bearer);
+  await ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, reading({ machine_state: 'idle' }), bearer);
   assert.ok(rows(w, "SELECT kind FROM pc_printer_events WHERE printer_id = ?", cat.printers[0]).some((e) => e.kind === 'connection_restored'));
   assert.deepEqual((await ok(w.assistant, 'POST', `${ADMIN}/queue/run`)).assigned, [{ job_id: jobId, printer_id: cat.printers[0] }]);
   // An event for a job on another printer, or a job not assigned to it, is refused.
