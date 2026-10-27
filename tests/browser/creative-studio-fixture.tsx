@@ -51,7 +51,7 @@ const provider: ProviderStatusDto = {
   can_manage: true, ready: false, not_ready_code: 'KEY_NOT_CONFIGURED',
 };
 
-interface Db { seq: number; docs: Record<string, DocumentDto>; versions: Record<string, Array<{ version: number; origin: string; job_id: string | null; content: unknown; created_at: string }>>; exports: number; puts: number; applied: Array<{ job: string; version: number }>; cancelled: string[] }
+interface Db { seq: number; docs: Record<string, DocumentDto>; versions: Record<string, Array<{ version: number; origin: string; job_id: string | null; content: unknown; created_at: string }>>; exports: number; puts: number; applied: Array<{ job: string; version: number }>; cancelled: string[]; jobs?: number }
 const KEY = 'cs-e2e-db';
 const load = (): Db => {
   try {
@@ -93,9 +93,21 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   if (method === 'GET' && path === '/provider') return ok(aiReady ? { ...provider, ready: true, not_ready_code: null, model: 'model-e2e-fixture', key: { source: 'worker_secret', hint: null, set_at: null } } : { ...provider });
   if (method === 'POST' && path === '/ai/edit') {
     if (!aiReady) return fail(503, 'KEY_NOT_CONFIGURED', 'no key');
+    // `cs-e2e-ai-delay` (ms) holds the answer back, the way a slow model does; an abort ends the wait like a real fetch.
+    const delay = Number(sessionStorage.getItem('cs-e2e-ai-delay') ?? 0);
+    if (delay > 0) {
+      await new Promise<void>((resolve, reject) => {
+        const t = setTimeout(resolve, delay);
+        init?.signal?.addEventListener('abort', () => { clearTimeout(t); reject(new DOMException('aborted', 'AbortError')); });
+      });
+    }
+    // One job per request, as the Worker records them (the first is job_e2e_1).
+    const jobs = load();
+    jobs.jobs = (jobs.jobs ?? 0) + 1;
+    save(jobs);
     // The STUB's answer (marked): one bounded operation on the selected headline, for the version asked about.
     return ok({
-      job_id: 'job_e2e_1',
+      job_id: `job_e2e_${jobs.jobs}`,
       patch: {
         schema_version: 1, document_id: body.document_id, base_document_version: body.base_version, intent: 'shorten',
         target_layer_ids: ['headline'], operations: [{ op: 'set_text', layer_id: 'headline', value: 'طباعة دقيقة بألوان أكثر' }],

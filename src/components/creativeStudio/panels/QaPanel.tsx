@@ -1,7 +1,7 @@
 /**
  * «الفحص» — the deterministic checks of packages/creativeDoc/src/quality.ts,
  * run here with what only the browser knows: the real measurer, which fonts
- * really loaded, which pictures really decoded, and the server’s
+ * really loaded, which pictures really decoded and at what size, and the server’s
  * re-verification of the bound store data (POST /snapshots/:id/verify).
  *
  * Blockers / needs a look / suggestions, then the checks that RAN and the
@@ -31,6 +31,8 @@ export function reportFor(api: Pick<EditorApi, 'data' | 'measure' | 'fonts' | 'i
     measure: api.measure,
     fontsLoaded: api.fonts.loaded,
     assetsLoaded: api.images.loadedRefs(),
+    // The size each picture really decoded at: a recorded size with another ratio is a blocker the checks name.
+    decodedSizes: api.images.decodedSizes(),
     final,
     now: new Date().toISOString(),
   });

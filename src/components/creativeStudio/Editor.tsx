@@ -10,10 +10,31 @@
  *
  * SAVING IS HONEST. Autosave (~1.2 s after the last change) sends the version
  * the editor started from; «محفوظ» appears only after the server’s 200; a 409
- * stops and asks (open theirs / keep mine as a new design); offline keeps a
- * local recovery draft (content + base version + time, nothing else) that is
- * offered on the next open when it is newer than the server copy. Leaving the
- * page, hiding the tab or opening another design flushes first.
+ * stops and asks (open theirs / keep mine as a new design); a save whose
+ * answer was lost is checked against the server before anything is called a
+ * conflict. Offline keeps a local recovery draft (content + base version +
+ * time, nothing else). On the next open it is offered as a plain restore ONLY
+ * when it was made on the version the server still has; when the server moved
+ * on it can be kept as a new design or deleted, never laid over the newer
+ * version. It is never refreshed during a conflict, and it is removed once
+ * the screen holds what the server holds again. Leaving the page, hiding the
+ * tab or opening another design flushes first.
+ *
+ * OPENING NEVER WRITES. The stored design is what opens. Bound words (price,
+ * availability, a service claim) are drawn with the design’s PINNED brand
+ * kit; if the data now would draw them differently, a notice says so and
+ * offers «طبّق البيانات الحالية» as an ordinary, undoable edit — an approved
+ * design is never rewritten, nor its approval withdrawn, by being opened
+ * (spec §6, §19, §25).
+ *
+ * ONE STAGE, BOTH LAYOUTS. Desktop (≥ 1024 px) and phone share one tree: the
+ * stage box keeps its place whatever is around it, so an iPad rotation or a
+ * resized window never strands the canvas on a detached element (and if the
+ * element ever does change, the stage is rebuilt on the new one). Desktop:
+ * the preview large in the middle, the chat on the physical RIGHT in every
+ * language, layers in a panel that folds away at any width, properties only
+ * for a selection (spec §16). Phone: the preview owns the screen; everything
+ * else is a bottom sheet with 44 px targets.
  *
  * FONTS BEFORE PIXELS. Nothing is measured or drawn until every face the
  * design uses has loaded (fonts.ts); a face that fails is a visible warning
@@ -27,31 +48,33 @@ import { Overlay } from '../ui/Overlay';
 import { TabStrip } from '../ui/Tabs';
 import { toast } from '../ui/Toast';
 import { normalizeDocument } from '../../../packages/creativeDoc/src/normalize';
-import { detectConflicts, rebuild, refreshBoundText, resolveConflict, type ConflictOption, type LayoutConflict } from '../../../packages/creativeDoc/src/layout';
+import { detectConflicts, rebuild, resolveConflict, type ConflictOption, type LayoutConflict } from '../../../packages/creativeDoc/src/layout';
 import type { ApplyResult, OpRefusal, RebuildRequest } from '../../../packages/creativeDoc/src/ops';
-import type { DocumentDto, VerifyDto } from '../../../packages/creativeDoc/src/api';
+import type { DocStatus, DocumentDto, VerifyDto } from '../../../packages/creativeDoc/src/api';
+import type { BrandKit } from '../../../packages/creativeDoc/src/brand';
 import type { Annotation, CreativeDocument, Density, ViewTransform } from '../../../packages/creativeDoc/src/schema';
-import { TEMPLATES, variantsFor, type TemplateId, type VariantId } from '../../../packages/creativeDoc/src/templates';
+import { TEMPLATES, type TemplateId, type VariantId } from '../../../packages/creativeDoc/src/templates';
 import { ai, assets as assetsApi, brand as brandApi, documents, store } from './client';
 import { Autosave, type SaveState } from './autosave';
 import ConflictsDialog, { type PendingConflict } from './ConflictsDialog';
-import type { EditorApi } from './editorApi';
-import { allowedAssets, bindingContext, rebuildContext, usesTestData, type EditorData } from './editorData';
+import type { AiApplyResult, EditorApi, RebuildOutcome } from './editorApi';
+import { allowedAssets, bindingContext, boundRefresh, rebuildContext, usesTestData, type EditorData } from './editorData';
 import {
-  RECOVERY_PREFIX, commit, draftWorthOffering, historyOf, nudgeOps, parseDraft, redo, reset, runHumanOps, serializeDraft, topLevel, undo, type History, type RecoveryDraft,
+  RECOVERY_PREFIX, commit, draftOffer, dropStep, historyOf, keyBelongsToControl, lockedAround, nudgeOps, parseDraft, redo, relayoutVariant, reset, runHumanOps, serializeDraft, topLevel, undo,
+  type DraftOffer, type History, type RecoveryDraft,
 } from './editorModel';
 import { ensureFonts, registerStudioFonts, type FontState } from './fonts';
 import { canvasMeasurer, ImageStore } from './media';
 import AssetsPanel from './panels/AssetsPanel';
-import ChatPanel from './panels/ChatPanel';
+import ChatPanel, { useChatSession } from './panels/ChatPanel';
 import ExportPanel from './panels/ExportPanel';
 import FormatsPanel from './panels/FormatsPanel';
 import LayersPanel from './panels/LayersPanel';
 import PhonePreview from './panels/PhonePreview';
-import PropertiesPanel from './panels/PropertiesPanel';
+import PropertiesPanel, { PostText } from './panels/PropertiesPanel';
 import QaPanel from './panels/QaPanel';
 import { StageView, type Tool } from './stageView';
-import { FORMAT_TEXT, REFUSAL_TEXT, S, fill } from './strings';
+import { ERROR_TEXT, FORMAT_TEXT, REFUSAL_TEXT, ROLE_TEXT, S, fill } from './strings';
 import TextOverlay from './TextOverlay';
 import { RemoteView, failText, shortTime, useMediaQuery, useRemote, useStudio, useText } from './shared';
 import { canonicalJson, type ProductSnapshot } from '../../../packages/creativeDoc/src/snapshot';
@@ -102,6 +125,9 @@ function fitView(box: { width: number; height: number }, doc: CreativeDocument):
   return { scale, offsetX: (box.width - doc.format.width * scale) / 2, offsetY: (box.height - doc.format.height * scale) / 2 };
 }
 
+/** What a re-layout produced inside the editor, or why it did not: every refusal and every no-op is a reason, never a silent success. */
+type Relayout = { ok: true; doc: CreativeDocument } | { ok: true; created: DocumentDto } | { ok: false; message: string };
+
 /** Exported for the static render test (tests/creativeStudioUiRender.test.ts). */
 export function EditorReady({ meta, data }: { meta: DocumentDto; data: EditorData }) {
   const studio = useStudio();
@@ -110,12 +136,12 @@ export function EditorReady({ meta, data }: { meta: DocumentDto; data: EditorDat
   const wide = useMediaQuery('(min-width: 1280px)');
 
   // ---- the document --------------------------------------------------------
+  // The STORED design opens, exactly; bound words are re-drawn only when the owner asks (the notice below).
   const start = useMemo(() => {
     const n = normalizeDocument(meta.content);
     if (!n.ok) return { ok: false as const, issues: n.issues };
-    // Bound words are drawn from the snapshots on every open (spec §9).
-    return { ok: true as const, doc: refreshBoundText(n.doc, bindingContext(n.doc, data)) };
-  }, [meta, data]);
+    return { ok: true as const, doc: n.doc };
+  }, [meta]);
 
   if (start.ok === false) {
     return (
@@ -162,15 +188,26 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
   const [pendingConflict, setPendingConflict] = useState<PendingConflict | null>(null);
   const [conflictMsg, setConflictMsg] = useState('');
   const [verification, setVerification] = useState<Record<string, VerifyDto>>({});
-  const [recovery, setRecovery] = useState<RecoveryDraft | null>(null);
+  const [recovery, setRecoveryState] = useState<{ draft: RecoveryDraft; offer: DraftOffer } | null>(null);
   const [title, setTitle] = useState(meta.title);
+  const [docStatus, setDocStatus] = useState<DocStatus>(meta.status);
+  // The kit bound words are drawn with: the design's pinned brand version, else the kit in force.
+  const [textKit, setTextKit] = useState<BrandKit>(meta.brand_kit ?? data.brand.kit);
+  const [bound, setBound] = useState(() => boundRefresh(initial, bindingContext(initial, data, meta.brand_kit ?? data.brand.kit)));
   const [rightTab, setRightTab] = useState<RightTab>('chat');
-  const [leftOpen, setLeftOpen] = useState(true);
+  // null = the default for the width (open on a wide screen); a person's choice wins from then on.
+  const [leftOpen, setLeftOpen] = useState<boolean | null>(null);
   const [sheet, setSheet] = useState<null | 'layers' | 'props' | 'chat' | RightTab>(null);
   const [boxSize, setBoxSize] = useState({ width: 0, height: 0 });
+  const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);
+  const [stageEpoch, setStageEpoch] = useState(0);
 
   const stageRef = useRef<StageView | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const attachStage = useCallback((el: HTMLDivElement | null) => {
+    containerRef.current = el;
+    setStageEl(el);
+  }, []);
   const autosave = useRef<Autosave | null>(null);
   const docRef = useRef(doc);
   docRef.current = doc;
@@ -180,9 +217,19 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
   saveStateRef.current = saveState;
   const measureRef = useRef(measure);
   measureRef.current = measure;
+  const desktopRef = useRef(desktop);
+  desktopRef.current = desktop;
+  const recoveryRef = useRef(recovery);
   const suppressSave = useRef<CreativeDocument | null>(null);
-  const fitted = useRef(false);
   const draftKey = RECOVERY_PREFIX + docId;
+
+  const setRecovery = (r: { draft: RecoveryDraft; offer: DraftOffer } | null) => {
+    recoveryRef.current = r;
+    setRecoveryState(r);
+  };
+  const dropDraft = useCallback(() => {
+    try { localStorage.removeItem(draftKey); } catch { /* storage unavailable */ }
+  }, [draftKey]);
 
   const allowed = useMemo(() => allowedAssets(doc, data), [doc.products, data]); // eslint-disable-line react-hooks/exhaustive-deps
   const allowedRef = useRef(allowed);
@@ -194,28 +241,36 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
   const setSelection = useCallback((ids: string[]) => setSelectionState(ids), []);
   const commitDoc = useCallback((next: CreativeDocument) => setHistory((h) => commit(h, next)), []);
 
+  // The conversation with Claude lives here, so a panel unmounting never loses it (ChatPanel.tsx).
+  const apiRef = useRef<EditorApi | null>(null);
+  const chat = useChatSession(() => apiRef.current!);
+
   // ---- autosave + recovery -------------------------------------------------
   useEffect(() => {
     const a = new Autosave(
       {
         save: (content, base, m) => documents.save(docId, { content, base_version: base, origin: m.origin, job_id: m.job_id }),
+        // Only after a save whose answer was lost: did it land?
+        load: async () => {
+          const d = await documents.get(docId);
+          return { content: d.content, version: d.version, updated_at: d.updated_at };
+        },
         onState: (s) => setSaveState(s),
         onSaved: (content, r) => {
           setVersion(r.version);
           versionRef.current = r.version;
-          if (content === docRef.current) {
-            try { localStorage.removeItem(draftKey); } catch { /* storage unavailable */ }
-          }
+          if (content === docRef.current) dropDraft();
         },
       },
-      // The opened document is the saved baseline unless it REALLY differs from the server copy
-      // (bound words re-drawn from a newer snapshot) — the normaliser’s key order is not a change.
-      { content: canonicalJson(initial) === canonicalJson(meta.content) ? initial : meta.content, version: meta.version },
+      // The opened design IS the server copy: opening schedules no save, whatever a refresh would draw.
+      { content: initial, version: meta.version },
     );
     autosave.current = a;
     try {
       const draft = parseDraft(localStorage.getItem(draftKey));
-      if (draftWorthOffering(draft, { version: meta.version, updated_at: meta.updated_at, content: meta.content })) setRecovery(draft);
+      const offer = draftOffer(draft, { version: meta.version, content: initial });
+      if (draft && offer) setRecovery({ draft, offer });
+      else if (draft) dropDraft();
     } catch { /* storage unavailable */ }
     const online = () => { if (a.current === 'offline') void a.retry(); };
     window.addEventListener('online', online);
@@ -233,11 +288,19 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
     }
     autosave.current?.change(doc);
     const t = setTimeout(() => {
-      if (!autosave.current?.hasUnsaved) return;
+      const a = autosave.current;
+      if (!a) return;
+      // In a conflict the draft stays as it was: made on the old version, it can only come back as a copy.
+      if (a.current === 'conflict') return;
+      if (!a.hasUnsaved) {
+        // The screen holds what the server holds: nothing to recover (a draft on offer waits for the owner's answer).
+        if (!recoveryRef.current) dropDraft();
+        return;
+      }
       try { localStorage.setItem(draftKey, serializeDraft(doc, versionRef.current, new Date())); } catch { /* storage full or blocked: the server copy stays the record */ }
     }, 400);
     return () => clearTimeout(t);
-  }, [doc, draftKey]);
+  }, [doc, draftKey, dropDraft]);
 
   // Flush when the tab is hidden; ask before leaving with unsaved work.
   useEffect(() => {
@@ -295,8 +358,10 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
     onAnnotate: (_a: Omit<Annotation, 'id' | 'note'>) => {},
     onViewChange: (_v: ViewTransform) => {},
   });
+  // The stage lives on the element the box renders NOW: should React ever give the box a new element, the
+  // old stage is destroyed and a new one drawn there (`stageEpoch` re-runs everything that feeds it).
   useEffect(() => {
-    const el = containerRef.current;
+    const el = stageEl;
     if (!el) return;
     const sv = new StageView(el, {
       onSelect: (ids) => cb.current.onSelect(ids),
@@ -306,6 +371,7 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
       onViewChange: (v) => cb.current.onViewChange(v),
     }, { measure: () => measureRef.current, image: (ref) => images.get(ref) });
     stageRef.current = sv;
+    setStageEpoch((n) => n + 1);
     const ro = new ResizeObserver(() => {
       sv.setSize(el.clientWidth, el.clientHeight);
       setBoxSize({ width: el.clientWidth, height: el.clientHeight });
@@ -314,14 +380,16 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
     return () => {
       ro.disconnect();
       sv.destroy();
-      stageRef.current = null;
+      if (stageRef.current === sv) stageRef.current = null;
     };
-  }, [images]);
+  }, [images, stageEl]);
 
+  // Fit on the first size, and again when the layout changes (desktop ↔ phone): the box is another shape then.
+  const fittedFor = useRef<boolean | null>(null);
   useEffect(() => {
     if (!boxSize.width || !boxSize.height) return;
-    if (!fitted.current) {
-      fitted.current = true;
+    if (fittedFor.current !== desktopRef.current) {
+      fittedFor.current = desktopRef.current;
       setView(fitView(boxSize, docRef.current));
     }
   }, [boxSize]);
@@ -335,10 +403,10 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
       sv.invalidateText();
     }
     sv.render(doc, selection);
-  }, [doc, selection, fontsReady, measure, imageTick]);
-  useLayoutEffect(() => { stageRef.current?.setView(view); }, [view]);
-  useEffect(() => { stageRef.current?.setTool(tool); }, [tool]);
-  useEffect(() => { stageRef.current?.setEditing(editing); }, [editing, doc, fontsReady]);
+  }, [doc, selection, fontsReady, measure, imageTick, stageEpoch]);
+  useLayoutEffect(() => { stageRef.current?.setView(view); }, [view, stageEpoch]);
+  useEffect(() => { stageRef.current?.setTool(tool); }, [tool, stageEpoch]);
+  useEffect(() => { stageRef.current?.setEditing(editing); }, [editing, doc, fontsReady, stageEpoch]);
 
   // ---- applying changes ----------------------------------------------------
   const apply = useCallback((ops: unknown[]): boolean => {
@@ -363,79 +431,101 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
     return true;
   }, [commitDoc, opsCtx, w]);
 
-  const rebuildTo = useCallback(async (change: RebuildRequest | { kind: 'density'; density: Density }) => {
+  /**
+   * A re-layout from the template, computed but not committed. Another SIZE is
+   * created as a linked design here (with `jobId`, as Claude's: origin `ai`
+   * and its job). Refused, without a template, without a composition for the
+   * choice, or changing nothing → a reason, never a pretend success.
+   */
+  const relayout = useCallback(async (change: RebuildRequest | { kind: 'density'; density: Density }, jobId: string | null): Promise<Relayout> => {
     const before = docRef.current;
-    if (!before.template || !(before.template.id in TEMPLATES)) {
-      toast.info(w(S.rebuildUnavailable));
-      return;
-    }
+    if (!before.template || !(before.template.id in TEMPLATES)) return { ok: false, message: w(S.rebuildUnavailable) };
     // The same refusals as everywhere: the operation is checked before the package re-lays the design.
     if (change.kind !== 'density') {
       const op = change.kind === 'variant' ? { op: 'switch_template_variant', variant: change.variant }
         : change.kind === 'priority' ? { op: 'set_priority', priority: change.priority }
         : { op: 'create_format_variant', format: change.format.id, ...(change.format.id === 'custom' ? { width: change.format.width, height: change.format.height } : {}) };
       const check = runHumanOps(before, [op], opsCtx());
-      if (check.ok === false) {
-        toast.error(`${w(S.refused)} ${refusalText(check.refusals, w)}`);
-        return;
-      }
+      if (check.ok === false) return { ok: false, message: `${w(S.refused)} ${refusalText(check.refusals, w)}` };
     }
-    const tpl = TEMPLATES[before.template.id as TemplateId];
     let variant: VariantId | undefined;
-    if (change.kind === 'variant') variant = change.variant;
-    if (change.kind === 'priority') {
+    if (change.kind === 'variant' || change.kind === 'priority') {
       const main = before.products[0];
       const status = main ? data.snapshots[main.slot]?.data.price.status ?? null : null;
-      variant = variantsFor(tpl.id, before.objective, status).find((v) => tpl.variants[v]?.priority === change.priority)
-        ?? (Object.keys(tpl.variants) as VariantId[]).find((v) => tpl.variants[v]?.priority === change.priority);
-      if (!variant) {
-        toast.info(w(S.rebuildUnavailable));
-        return;
-      }
+      // A composition this template does not have would silently fall back to its first one.
+      const v = relayoutVariant(before, change, status);
+      if (!v) return { ok: false, message: w(S.rebuildNoVariant) };
+      variant = v;
     }
     const ctx = rebuildContext(before, data, measureRef.current);
     const result = rebuild(before, change.kind === 'format' ? { format: change.format } : change.kind === 'density' ? { density: change.density } : { variant }, ctx);
-    if (!result) {
-      toast.info(w(S.rebuildUnavailable));
-      return;
-    }
+    if (!result) return { ok: false, message: w(S.rebuildUnavailable) };
     if (change.kind === 'format') {
       try {
         await autosave.current?.flush();
         const label = change.format.id === 'custom' ? `${change.format.width}×${change.format.height}` : w(FORMAT_TEXT[change.format.id]);
-        const created = await documents.create({ title: `${title} — ${label}`.slice(0, 120), content: result.doc, parent_id: docId, origin: 'relayout' });
-        toast.success(w(S.formatsCreated));
-        studio.openDocument(created.id);
+        const created = await documents.create({ title: `${title} — ${label}`.slice(0, 120), content: result.doc, parent_id: docId, origin: jobId ? 'ai' : 'relayout', job_id: jobId });
+        return { ok: true, created };
       } catch (e) {
-        toast.error(failText(e, lang));
+        return { ok: false, message: failText(e, lang) };
       }
-      return;
     }
-    commitDoc(result.doc);
+    if (canonicalJson(result.doc) === canonicalJson(before)) return { ok: false, message: w(S.rebuildNoChange) };
+    return { ok: true, doc: result.doc };
+  }, [data, docId, lang, opsCtx, title, w]);
+
+  const rebuildTo = useCallback(async (change: RebuildRequest | { kind: 'density'; density: Density }): Promise<RebuildOutcome | null> => {
+    const r = await relayout(change, null);
+    if (r.ok === false) {
+      toast.info(r.message);
+      return null;
+    }
+    if ('created' in r) {
+      toast.success(w(S.formatsCreated));
+      studio.openDocument(r.created.id);
+      return { kind: 'created', id: r.created.id, version: r.created.version };
+    }
+    commitDoc(r.doc);
     toast.info(w(S.rebuildDone));
-  }, [commitDoc, data, docId, lang, opsCtx, studio, title, w]);
+    return { kind: 'doc', doc: r.doc };
+  }, [commitDoc, relayout, studio, w]);
   const rebuildRef = useRef(rebuildTo);
   rebuildRef.current = rebuildTo;
 
-  const applyAi = useCallback(async (applied: Extract<ApplyResult, { ok: true }>, jobId: string): Promise<boolean> => {
+  const applyAi = useCallback(async (applied: Extract<ApplyResult, { ok: true }>, jobId: string): Promise<AiApplyResult> => {
     const a = autosave.current;
-    if (!a) return false;
+    if (!a) return { ok: false, message: w(S.saveFailed) };
+    let next = applied.doc;
     if (applied.rebuild) {
-      await rebuildRef.current(applied.rebuild);
-      const after = docRef.current;
-      suppressSave.current = after;
-      const res = await a.saveAs(after, { origin: 'ai', job_id: jobId });
-      if (!res) return false;
-      await ai.applied(jobId, docId, res.version).catch((e: unknown) => toast.error(failText(e, lang)));
-      return true;
+      const r = await relayout(applied.rebuild, jobId);
+      if (r.ok === false) {
+        // Nothing was applied: the job must never be applied later either.
+        void ai.cancel(jobId).catch(() => undefined);
+        return { ok: false, message: fill(w(S.chatNotApplied), { why: r.message }) };
+      }
+      if ('created' in r) {
+        // The answer became the NEW design's version 1 (origin ai + job); the job is applied to THAT design.
+        await ai.applied(jobId, r.created.id, r.created.version).catch((e: unknown) => toast.error(failText(e, lang)));
+        toast.success(w(S.formatsCreated));
+        studio.openDocument(r.created.id);
+        return { ok: true };
+      }
+      next = r.doc;
     }
-    suppressSave.current = applied.doc;
-    setHistory((h) => commit(h, applied.doc));
-    const res = await a.saveAs(applied.doc, { origin: 'ai', job_id: jobId });
-    if (!res) return false;
+    suppressSave.current = next;
+    setHistory((h) => commit(h, next));
+    const res = await a.saveAs(next, { origin: 'ai', job_id: jobId });
+    if (!res) {
+      if (a.lastErrorCode === 'JOB_CANCELLED') {
+        // Cancelled meanwhile (spec §29): the answer leaves the screen, so no later save can carry it.
+        setHistory((h) => dropStep(h, next));
+        return { ok: false, message: w(ERROR_TEXT.JOB_CANCELLED) };
+      }
+      return { ok: false, message: w(S.saveFailed) };
+    }
     await ai.applied(jobId, docId, res.version).catch((e: unknown) => toast.error(failText(e, lang)));
-    return true;
-  }, [docId, lang]);
+    return { ok: true };
+  }, [docId, lang, relayout, studio, w]);
 
   const editText = useCallback((id: string) => {
     const d = docRef.current;
@@ -469,8 +559,12 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
   // ---- keyboard ------------------------------------------------------------
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // A control that handled the key already (a tab strip's arrows, a radio group) keeps it.
+      if (e.defaultPrevented) return;
       const t = e.target as HTMLElement | null;
-      if (t && (t.closest('input, textarea, select, [contenteditable="true"]') || t.closest('[data-overlay-panel]'))) return;
+      if (t && typeof t.closest === 'function' && (t.closest('input, textarea, select, [contenteditable="true"]') || t.closest('[data-overlay-panel]'))) return;
+      // Enter / Space / arrows / Backspace / Delete on a focused button, tab, radio… belong to it; the stage and the body keep every shortcut.
+      if (keyBelongsToControl(e.key, t, containerRef.current)) return;
       const mod = e.ctrlKey || e.metaKey;
       if (mod && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
@@ -491,7 +585,10 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
       if (!ids.length) return;
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        if (apply(ids.map((id) => ({ op: 'delete_layer', layer_id: id })))) setSelectionState([]);
+        // A lock on the layer, its group or anything inside it keeps it (a group's delete takes its children).
+        const free = ids.filter((id) => !lockedAround(docRef.current, id));
+        if (free.length < ids.length) toast.info(w(S.propLockedNote));
+        if (free.length && apply(free.map((id) => ({ op: 'delete_layer', layer_id: id })))) setSelectionState([]);
         return;
       }
       if (e.key === 'Enter' && ids.length === 1) {
@@ -507,7 +604,7 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [apply, editText, tool]);
+  }, [apply, editText, tool, w]);
 
   // ---- version conflict ----------------------------------------------------
   const reloadTheirs = async () => {
@@ -515,11 +612,18 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
       const fresh = await documents.get(docId);
       const n = normalizeDocument(fresh.content);
       if (!n.ok) throw new Error(w(S.editorLoadFailed));
-      const next = refreshBoundText(n.doc, bindingContext(n.doc, data));
-      suppressSave.current = next;
-      setHistory(reset(next));
+      const kit = fresh.brand_kit ?? data.brand.kit;
+      suppressSave.current = n.doc;
+      setHistory(reset(n.doc));
       setVersion(fresh.version);
-      autosave.current?.rebase(next, fresh.version);
+      versionRef.current = fresh.version;
+      autosave.current?.rebase(n.doc, fresh.version);
+      setDocStatus(fresh.status);
+      setTextKit(kit);
+      setBound(boundRefresh(n.doc, bindingContext(n.doc, data, kit)));
+      // Their copy is the record now: the local draft of the overridden work must never come back as a «restore».
+      dropDraft();
+      setRecovery(null);
     } catch (e) {
       toast.error(failText(e, lang));
     }
@@ -527,10 +631,56 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
   const keepMine = async () => {
     try {
       const created = await documents.create({ title: `${title} (2)`.slice(0, 120), content: docRef.current, parent_id: docId, origin: 'manual' });
+      dropDraft();
       studio.openDocument(created.id);
     } catch (e) {
       toast.error(failText(e, lang));
     }
+  };
+
+  // ---- recovery draft ------------------------------------------------------
+  // A plain restore only onto the version the draft was made on (also after this session's own saves).
+  const recoveryOffer: DraftOffer | null = recovery ? (recovery.offer === 'restore' && recovery.draft.base_version === version ? 'restore' : 'conflict') : null;
+  const restoreDraft = () => {
+    if (!recovery) return;
+    const n = normalizeDocument(recovery.draft.content);
+    setRecovery(null);
+    if (!n.ok) {
+      dropDraft();
+      toast.error(w(S.editorLoadFailed));
+      return;
+    }
+    commitDoc(n.doc);
+  };
+  const keepDraftAsNew = async () => {
+    if (!recovery) return;
+    const n = normalizeDocument(recovery.draft.content);
+    if (!n.ok) {
+      dropDraft();
+      setRecovery(null);
+      toast.error(w(S.editorLoadFailed));
+      return;
+    }
+    try {
+      const created = await documents.create({ title: `${title} (2)`.slice(0, 120), content: n.doc, parent_id: docId, origin: 'manual' });
+      dropDraft();
+      setRecovery(null);
+      studio.openDocument(created.id);
+    } catch (e) {
+      toast.error(failText(e, lang));
+    }
+  };
+  const deleteDraft = () => {
+    dropDraft();
+    setRecovery(null);
+  };
+
+  // ---- bound words ---------------------------------------------------------
+  const applyBound = () => {
+    const now = docRef.current;
+    const r = boundRefresh(now, bindingContext(now, data, textKit));
+    setBound(null);
+    if (r) commitDoc(r.doc);
   };
 
   // ---- the panels' handle --------------------------------------------------
@@ -541,7 +691,9 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
     flush: async () => { await autosave.current?.flush(); },
     current: () => ({ doc: docRef.current, version: versionRef.current, saveState: autosave.current?.current ?? saveStateRef.current }),
     applyAi, rebuildTo, verification, setVerification, editText, openDocument: studio.openDocument, goSettings: () => studio.goTab('settings'),
+    chat,
   };
+  apiRef.current = api;
 
   const onConflictOption = (c: LayoutConflict, option: ConflictOption) => {
     if (!pendingConflict) return;
@@ -577,6 +729,8 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
   const saveLabel = saveState === 'saving' ? S.saveSaving : saveState === 'saved' ? S.saveSaved : saveState === 'dirty' ? S.saveDirty : saveState === 'failed' ? S.saveFailed : saveState === 'offline' ? S.saveOffline : saveState === 'conflict' ? S.saveConflict : S.saveIdle;
   const saveTone = saveState === 'failed' || saveState === 'conflict' ? 'text-danger' : saveState === 'offline' ? 'text-warning' : saveState === 'saved' ? 'text-success' : 'text-text-muted';
   const testData = usesTestData(doc, data);
+  const hasSelection = selection.some((id) => doc.layers.some((l) => l.id === id));
+  const leftShown = leftOpen ?? wide;
 
   const rightTabs: Array<{ id: RightTab; label: string }> = [
     { id: 'chat', label: w(S.panelChat) },
@@ -617,28 +771,41 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
         <IconButton label={w(S.undo)} icon={<Undo2 className="h-4 w-4" />} disabled={!history.past.length} onClick={() => setHistory(undo)} />
         <IconButton label={w(S.redo)} icon={<Redo2 className="h-4 w-4" />} disabled={!history.future.length} onClick={() => setHistory(redo)} />
         <IconButton label={w(S.zoomOut)} icon={<Minus className="h-4 w-4" />} onClick={() => zoom(1 / 1.2)} />
-        <span className="w-12 text-center text-xs tabular-nums text-text-muted" dir="ltr">{Math.round(view.scale * 100)}%</span>
+        <span className="w-12 text-center text-xs tabular-nums text-text-muted" dir="ltr" data-zoom>{Math.round(view.scale * 100)}%</span>
         <IconButton label={w(S.zoomIn)} icon={<Plus className="h-4 w-4" />} onClick={() => zoom(1.2)} />
         <IconButton label={w(S.zoomFit)} icon={<Maximize className="h-4 w-4" />} onClick={fit} />
       </div>
     </div>
   );
 
+  const reviewed = docStatus === 'approved' || docStatus === 'in_review';
   const banners = (
     <>
       {testData ? <p className="bg-warning/10 px-3 py-1.5 text-sm text-warning" role="status" data-test-banner>{w(S.testDataBanner)}</p> : null}
       {fonts.failed.map((f) => <p key={f} className="bg-danger/10 px-3 py-1.5 text-sm text-danger" role="alert" data-font-failed>{fill(w(S.fontFailed), { name: f })}</p>)}
       {images.failedRefs().length ? <p className="bg-danger/10 px-3 py-1.5 text-sm text-danger" role="alert">{w(S.imageFailed)}</p> : null}
-      {recovery ? (
-        <div className="flex flex-wrap items-center gap-2 bg-surface px-3 py-2 text-sm" role="alert" data-recovery>
+      {bound ? (
+        <div className="flex flex-wrap items-center gap-2 bg-warning/10 px-3 py-2 text-sm" role={reviewed ? 'alert' : 'status'} data-bound-refresh={docStatus}>
+          <span className="font-semibold text-text-primary">{w(S.boundRefreshTitle)}</span>
+          <span className="text-text-secondary">{fill(w(S.boundRefreshBody), { names: [...new Set(bound.changed.map((id) => { const l = doc.layers.find((x) => x.id === id); return l ? w(ROLE_TEXT[l.role]) : id; }))].join('، ') })}</span>
+          {reviewed ? <span className="font-semibold text-warning">{w(docStatus === 'approved' ? S.boundRefreshApproved : S.boundRefreshInReview)}</span> : null}
+          <Button size="sm" onClick={applyBound}>{w(S.boundRefreshApply)}</Button>
+        </div>
+      ) : null}
+      {recovery && recoveryOffer === 'restore' ? (
+        <div className="flex flex-wrap items-center gap-2 bg-surface px-3 py-2 text-sm" role="alert" data-recovery="restore">
           <span className="font-semibold text-text-primary">{w(S.recoveryTitle)}</span>
-          <span className="text-text-secondary">{fill(w(S.recoveryBody), { time: shortTime(recovery.saved_at, lang) })}</span>
-          <Button size="sm" variant="primary" onClick={() => {
-            const n = normalizeDocument(recovery.content);
-            if (n.ok) commitDoc(n.doc);
-            setRecovery(null);
-          }}>{w(S.recoveryRestore)}</Button>
-          <Button size="sm" variant="ghost" onClick={() => { try { localStorage.removeItem(draftKey); } catch { /* ignore */ } setRecovery(null); }}>{w(S.recoveryDrop)}</Button>
+          <span className="text-text-secondary">{fill(w(S.recoveryBody), { time: shortTime(recovery.draft.saved_at, lang) })}</span>
+          <Button size="sm" variant="primary" onClick={restoreDraft}>{w(S.recoveryRestore)}</Button>
+          <Button size="sm" variant="ghost" onClick={deleteDraft}>{w(S.recoveryDrop)}</Button>
+        </div>
+      ) : null}
+      {recovery && recoveryOffer === 'conflict' ? (
+        <div className="flex flex-wrap items-center gap-2 bg-surface px-3 py-2 text-sm" role="alert" data-recovery="conflict">
+          <span className="font-semibold text-text-primary">{w(S.recoveryConflictTitle)}</span>
+          <span className="text-text-secondary">{fill(w(S.recoveryConflictBody), { time: shortTime(recovery.draft.saved_at, lang), base: recovery.draft.base_version, n: version })}</span>
+          <Button size="sm" variant="primary" onClick={() => void keepDraftAsNew()}>{w(S.recoveryKeepAsNew)}</Button>
+          <Button size="sm" variant="ghost" onClick={deleteDraft}>{w(S.recoveryDrop)}</Button>
         </div>
       ) : null}
       {saveState === 'conflict' ? (
@@ -653,8 +820,8 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
   );
 
   const stageBox = (
-    <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden" style={{ background: 'repeating-conic-gradient(rgba(127,127,127,0.08) 0% 25%, transparent 0% 50%) 0 0 / 24px 24px' }}>
-      <div ref={containerRef} className="absolute inset-0 touch-none" role="application" aria-label={w(S.canvasLabel)} data-stage tabIndex={0} />
+    <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden" dir={dir} style={{ background: 'repeating-conic-gradient(rgba(127,127,127,0.08) 0% 25%, transparent 0% 50%) 0 0 / 24px 24px' }}>
+      <div ref={attachStage} className="absolute inset-0 touch-none" role="application" aria-label={w(S.canvasLabel)} data-stage tabIndex={0} />
       {!fontsReady ? <p className="absolute inset-x-0 top-2 text-center text-sm text-text-muted" role="status">{w(S.fontsLoading)}</p> : null}
       {editingLayer && editingLayer.type === 'text' && editingScreen ? (
         <TextOverlay
@@ -670,39 +837,35 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
     </div>
   );
 
-  if (desktop) {
-    return (
-      <div className="flex h-full min-h-0 flex-col" dir={dir} data-editor data-doc-id={docId}>
-        {header}
-        {banners}
-        <div className="flex min-h-0 flex-1">
-          {leftOpen || wide ? (
-            <aside className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto border-e border-border-subtle p-3" aria-label={`${w(S.panelProperties)} / ${w(S.panelLayers)}`}>
-              {!wide ? <Button size="sm" variant="ghost" icon={<ChevronRight className="h-4 w-4" />} onClick={() => setLeftOpen(false)}>{fill(w(S.hidePanel), { name: w(S.panelLayers) })}</Button> : null}
-              <section>
-                <h2 className="mb-2 text-sm font-semibold text-text-secondary">{w(S.panelProperties)}</h2>
-                <PropertiesPanel api={api} />
-              </section>
-              <section>
-                <h2 className="mb-2 text-sm font-semibold text-text-secondary">{w(S.panelLayers)}</h2>
-                <LayersPanel api={api} />
-              </section>
-            </aside>
-          ) : (
-            <div className="flex shrink-0 flex-col border-e border-border-subtle p-1">
-              <IconButton label={fill(w(S.showPanel), { name: w(S.panelLayers) })} icon={<ChevronLeft className="h-4 w-4" />} onClick={() => setLeftOpen(true)} />
-            </div>
-          )}
-          {stageBox}
-          <aside className="flex w-96 shrink-0 flex-col border-s border-border-subtle" aria-label={w(S.panelChat)}>
-            <div className="overflow-x-auto px-2"><TabStrip group="editor-right" items={rightTabs} value={rightTab} onChange={(id) => setRightTab(id as RightTab)} /></div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-3" data-right-panel={rightTab}>{panelFor(rightTab)}</div>
-          </aside>
-        </div>
-        {pendingConflict ? <ConflictsDialog pending={pendingConflict} message={conflictMsg} onOption={onConflictOption} onKeep={() => { commitDoc(pendingConflict.candidate); setPendingConflict(null); }} onRevert={() => setPendingConflict(null)} /> : null}
-      </div>
-    );
-  }
+  // Desktop: layers (and properties, for a selection) fold away at any width; physically on the left.
+  const layersAside = leftShown ? (
+    <aside className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border-subtle p-3" dir={dir} aria-label={`${w(S.panelProperties)} / ${w(S.panelLayers)}`} data-layers-aside>
+      <Button size="sm" variant="ghost" icon={<ChevronLeft className="h-4 w-4" />} onClick={() => setLeftOpen(false)}>{fill(w(S.hidePanel), { name: w(S.panelLayers) })}</Button>
+      {hasSelection ? (
+        <section data-properties-section>
+          <h2 className="mb-2 text-sm font-semibold text-text-secondary">{w(S.panelProperties)}</h2>
+          <PropertiesPanel api={api} />
+        </section>
+      ) : null}
+      <section>
+        <h2 className="mb-2 text-sm font-semibold text-text-secondary">{w(S.panelLayers)}</h2>
+        <LayersPanel api={api} />
+      </section>
+      {!hasSelection ? <PostText api={api} /> : null}
+    </aside>
+  ) : (
+    <div className="flex shrink-0 flex-col items-center gap-1 border-r border-border-subtle p-1" dir={dir} data-layers-rail>
+      <IconButton label={fill(w(S.showPanel), { name: w(S.panelLayers) })} icon={<ChevronRight className="h-4 w-4" />} onClick={() => setLeftOpen(true)} />
+      {hasSelection ? <IconButton label={fill(w(S.showPanel), { name: w(S.panelProperties) })} icon={<SlidersHorizontal className="h-4 w-4" />} onClick={() => setLeftOpen(true)} /> : null}
+    </div>
+  );
+  // Desktop: the chat and its tools, physically on the RIGHT in Arabic and in English (spec §16).
+  const chatAside = (
+    <aside className={`flex ${wide ? 'w-96' : 'w-80'} shrink-0 flex-col border-l border-border-subtle`} dir={dir} aria-label={w(S.panelChat)} data-chat-aside>
+      <div className="overflow-x-auto px-2"><TabStrip group="editor-right" items={rightTabs} value={rightTab} onChange={(id) => setRightTab(id as RightTab)} /></div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-3" data-right-panel={rightTab}>{panelFor(rightTab)}</div>
+    </aside>
+  );
 
   // Phone: the preview owns the screen; everything else is a bottom sheet with 44 px targets.
   const phoneButtons: Array<{ id: 'layers' | 'props' | 'chat' | 'more'; label: string; icon: ReactNode }> = [
@@ -712,30 +875,38 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
     { id: 'more', label: w(S.panelExport), icon: <MoreHorizontal className="h-5 w-5" /> },
   ];
   const sheetTitle = sheet === 'layers' ? w(S.panelLayers) : sheet === 'props' ? w(S.panelProperties) : sheet === 'chat' ? w(S.panelChat) : sheet ? rightTabs.find((t) => t.id === sheet)?.label ?? '' : '';
+  const editButton = (() => {
+    if (selection.length !== 1) return null;
+    const l = doc.layers.find((x) => x.id === selection[0]);
+    const text = l && (l.type === 'text' || (l.type === 'group' && doc.layers.some((x) => x.parent === l.id && x.type === 'text')));
+    return text ? <Button size="sm" onClick={() => editText(selection[0])}>{w(S.propEditText)}</Button> : null;
+  })();
+
   return (
-    <div className="flex h-full min-h-0 flex-col" dir={dir} data-editor data-doc-id={docId}>
+    <div className="flex h-full min-h-0 flex-col" dir={dir} data-editor data-doc-id={docId} data-layout={desktop ? 'desktop' : 'phone'}>
       {header}
       {banners}
-      {stageBox}
-      {selection.length === 1 ? (
-        <div className="flex gap-2 border-t border-border-subtle px-2 py-1">
-          {(() => {
-            const l = doc.layers.find((x) => x.id === selection[0]);
-            const text = l && (l.type === 'text' || (l.type === 'group' && doc.layers.some((x) => x.parent === l.id && x.type === 'text')));
-            return text ? <Button size="sm" onClick={() => editText(selection[0])}>{w(S.propEditText)}</Button> : null;
-          })()}
-        </div>
+      {/* ONE tree for both layouts: the stage box is always the second child of this row, so crossing the
+          breakpoint keeps its element (and the canvas on it). The row is LTR so the chat sits physically right. */}
+      <div className="flex min-h-0 flex-1" dir="ltr" data-editor-row>
+        {desktop ? layersAside : null}
+        {stageBox}
+        {desktop ? chatAside : null}
+      </div>
+      {!desktop && selection.length === 1 ? <div className="flex gap-2 border-t border-border-subtle px-2 py-1">{editButton}</div> : null}
+      {!desktop ? (
+        <nav className="grid grid-cols-4 border-t border-border-subtle" aria-label={w(S.studioShort)}>
+          {phoneButtons.map((b) => (
+            <button key={b.id} type="button" className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" onClick={() => setSheet(b.id === 'more' ? 'export' : b.id)}>
+              {b.icon}
+              <span>{b.label}</span>
+            </button>
+          ))}
+        </nav>
       ) : null}
-      <nav className="grid grid-cols-4 border-t border-border-subtle" aria-label={w(S.studioShort)}>
-        {phoneButtons.map((b) => (
-          <button key={b.id} type="button" className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" onClick={() => setSheet(b.id === 'more' ? 'export' : b.id)}>
-            {b.icon}
-            <span>{b.label}</span>
-          </button>
-        ))}
-      </nav>
-      {/* Mounted only while open: the sheet is built on demand, and a server render never meets a portal. */}
-      {sheet ? <Overlay open onClose={() => setSheet(null)} placement="dock" label={sheetTitle} panelClassName="max-h-[80dvh] w-full overflow-y-auto">
+      {/* Mounted only while open: the sheet is built on demand, and a server render never meets a portal. The
+          chat inside it keeps its request and answer in the editor (useChatSession), so closing it loses nothing. */}
+      {!desktop && sheet ? <Overlay open onClose={() => setSheet(null)} placement="dock" label={sheetTitle} panelClassName="max-h-[80dvh] w-full overflow-y-auto">
         {() => (
           <div className="flex flex-col gap-3 p-4" dir={dir}>
             {sheet && sheet !== 'layers' && sheet !== 'props' && sheet !== 'chat' ? (

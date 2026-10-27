@@ -50,6 +50,10 @@ type Entry = { state: 'loading' | 'loaded' | 'failed'; img: HTMLImageElement; wa
 /**
  * Loads and keeps the decoded pictures. `loadedRefs()` is the set the quality
  * check reads (`assetsLoaded`): a ref is in it only after the picture decoded.
+ * `decodedSizes()` is the size each one REALLY decoded at (`decodedSizes`,
+ * keyed the same way): a file replaced in place, or a photo whose EXIF
+ * rotation the upload's header read missed, has another ratio than the one
+ * recorded — the renderer then draws it contained and the checks say so.
  */
 export class ImageStore {
   private entries = new Map<string, Entry>();
@@ -101,6 +105,15 @@ export class ImageStore {
       img.onerror = () => settle(false);
       img.src = url;
     });
+  }
+
+  /** The decoded pixel size of each picture that loaded, by `asset.ref` (like `loadedRefs`). */
+  decodedSizes(): Record<string, { width: number; height: number }> {
+    const out: Record<string, { width: number; height: number }> = {};
+    for (const [key, e] of this.entries) {
+      if (e.state === 'loaded' && e.img.naturalWidth > 0 && e.img.naturalHeight > 0) out[key.slice(key.indexOf(':') + 1)] = { width: e.img.naturalWidth, height: e.img.naturalHeight };
+    }
+    return out;
   }
 
   /** Refs (as stored in the document, `asset.ref`) whose picture decoded. */

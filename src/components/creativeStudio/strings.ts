@@ -166,6 +166,16 @@ export const S = {
   testDataBanner: t('هذا التصميم مبني على بيانات تجريبية موسومة', 'This design is built on marked test data', 'ئەم دیزاینە لەسەر داتای تاقیکاریی نیشانکراو دروستکراوە'),
   rebuildDone: t('أُعيد ترتيب التصميم من القالب.', 'The design was re-laid from its template.', 'دیزاینەکە لە قاڵبەکەیەوە دووبارە ڕێکخرایەوە.'),
   rebuildUnavailable: t('هذا التصميم بلا قالب؛ لا يمكن إعادة ترتيبه آلياً.', 'This design has no template; it cannot be re-laid automatically.', 'ئەم دیزاینە قاڵبی نییە؛ ناتوانرێت خۆکارانە دووبارە ڕێکبخرێتەوە.'),
+  recoveryConflictTitle: t('مسودة محلية على نسخة أقدم', 'A local draft made on an older version', 'ڕەشنووسێکی ناوخۆیی لەسەر وەشانێکی کۆنتر'),
+  recoveryConflictBody: t('على هذا الجهاز نسخة من {time} بُنيت على النسخة {base}، والخادم الآن على النسخة {n}. لن تُستعاد فوق النسخة الأحدث: احفظها كتصميم جديد أو احذفها.', 'This device holds a copy from {time} made on version {base}; the server is now at version {n}. It is not restored over the newer version: keep it as a new design, or delete it.', 'ئەم ئامێرە کۆپییەکی {time}ی هەیە کە لەسەر وەشانی {base} دروستکراوە، و ڕاژەکار ئێستا گەیشتووەتە وەشانی {n}. بەسەر وەشانە نوێترەکەدا ناگەڕێنرێتەوە: وەک دیزاینێکی نوێ پاشەکەوتی بکە یان بیسڕەوە.'),
+  recoveryKeepAsNew: t('احفظها كتصميم جديد', 'Keep it as a new design', 'وەک دیزاینێکی نوێ پاشەکەوتی بکە'),
+  boundRefreshTitle: t('تغيّرت البيانات المرتبطة بهذا التصميم', 'The data this design is bound to changed', 'ئەو داتایەی ئەم دیزاینە پێیەوە بەستراوە گۆڕاوە'),
+  boundRefreshBody: t('يعرض التصميم كلماته المحفوظة. البيانات الحالية تغيّر: {names}.', 'The design shows its saved words. The current data would change: {names}.', 'دیزاینەکە وشە پاشەکەوتکراوەکانی خۆی پیشان دەدات. داتای ئێستا ئەمانە دەگۆڕێت: {names}.'),
+  boundRefreshApproved: t('هذا التصميم معتمد: تطبيق البيانات الحالية ينشئ نسخة جديدة ويسحب الاعتماد حتى يُعتمد من جديد.', 'This design is approved: applying the current data makes a new version and withdraws the approval until it is approved again.', 'ئەم دیزاینە پەسەندکراوە: جێبەجێکردنی داتای ئێستا وەشانێکی نوێ دروست دەکات و پەسەندکردنەکە دەکشێنێتەوە تا دووبارە پەسەند دەکرێتەوە.'),
+  boundRefreshInReview: t('هذا التصميم قيد المراجعة: تطبيق البيانات الحالية ينشئ نسخة جديدة تحتاج مراجعة.', 'This design is in review: applying the current data makes a new version that needs review.', 'ئەم دیزاینە لە پێداچوونەوەدایە: جێبەجێکردنی داتای ئێستا وەشانێکی نوێ دروست دەکات کە پێویستی بە پێداچوونەوە هەیە.'),
+  boundRefreshApply: t('طبّق البيانات الحالية', 'Apply the current data', 'داتای ئێستا جێبەجێ بکە'),
+  rebuildNoVariant: t('لا يوجد في قالب هذا التصميم تكوين بهذا الاختيار؛ لم يتغير شيء.', 'This design’s template has no composition for that choice; nothing changed.', 'قاڵبی ئەم دیزاینە هیچ پێکهاتەیەکی بۆ ئەم هەڵبژاردنە نییە؛ هیچ شتێک نەگۆڕا.'),
+  rebuildNoChange: t('إعادة الترتيب لم تغيّر شيئاً في التصميم.', 'The re-layout changed nothing in the design.', 'دووبارە ڕێکخستنەوەکە هیچ شتێکی لە دیزاینەکەدا نەگۆڕی.'),
 
   // Layers panel
   layerHide: t('إخفاء', 'Hide', 'شاردنەوە'),
@@ -253,6 +263,14 @@ export const S = {
   chatRejectedPatch: t('رفض التطبيق رد Claude لأنه خالف القواعد: {code}', 'The app refused Claude’s answer for breaking the rules: {code}', 'ئەپەکە وەڵامی Claude ی ڕەتکردەوە چونکە یاساکانی شکاند: {code}'),
   chatReason: t('السبب', 'Reason', 'هۆکار'),
   chatWarnings: t('تنبيهات', 'Warnings', 'ئاگادارکردنەوەکان'),
+  chatScopeIncludes: t('ويشمل ما بداخله: {names}', 'Including what is inside: {names}', 'لەگەڵ ئەوەی لەناویدایە: {names}'),
+  chatStopped: t('أوقفنا انتظار الرد. ربما وصل الطلب إلى Claude وما زال يُعالج، وقد تُحتسب تكلفته رغم الإيقاف؛ ولن يُطبق رده هنا.', 'We stopped waiting for the answer. The request may already have reached Claude and still be processed, and it may be charged although it was stopped; its answer will not be applied here.', 'چاوەڕوانیی وەڵاممان ڕاگرت. لەوانەیە داواکارییەکە گەیشتبێتە Claude و هێشتا کاری لەسەر بکرێت، و لەوانەیە تێچووەکەی هەژمار بکرێت هەرچەندە ڕاگیرا؛ وەڵامەکەی لێرە جێبەجێ ناکرێت.'),
+  chatDiscarded: t('تُجوهل الرد ولن يُطبق. الطلب عولج فعلاً وتُحتسب تكلفته.', 'The answer was discarded and will not be applied. The request was already processed, and its cost counts.', 'وەڵامەکە فڕێدرا و جێبەجێ ناکرێت. داواکارییەکە پێشتر کاری لەسەر کراوە و تێچووەکەی هەژمار دەکرێت.'),
+  chatUsageLink: t('سجل الاستهلاك في الإعدادات', 'The usage log in Settings', 'تۆماری بەکارهێنان لە ڕێکخستنەکاندا'),
+  chatDiffRebuildVariant: t('يُعاد ترتيب التصميم من قالبه إلى التكوين «{name}»', 'The design is re-laid from its template as «{name}»', 'دیزاینەکە لە قاڵبەکەیەوە وەک «{name}» دووبارە ڕێکدەخرێتەوە'),
+  chatDiffRebuildPriority: t('يُعاد ترتيب التصميم من قالبه ليبرز «{name}» أولاً', 'The design is re-laid from its template so that «{name}» stands out first', 'دیزاینەکە لە قاڵبەکەیەوە دووبارە ڕێکدەخرێتەوە تا «{name}» یەکەم دەربکەوێت'),
+  chatDiffRebuildFormat: t('يُنشأ تصميم مرتبط جديد بمقاس {name}؛ هذا التصميم لا يتغير', 'A new linked design is made at {name}; this design does not change', 'دیزاینێکی پەیوەستی نوێ بە قەبارەی {name} دروست دەکرێت؛ ئەم دیزاینە ناگۆڕێت'),
+  chatNotApplied: t('لم يُطبّق رد Claude وأُلغي طلبه: {why}', 'Claude’s answer was not applied and its request was cancelled: {why}', 'وەڵامەکەی Claude جێبەجێ نەکرا و داواکارییەکەی هەڵوەشێنرایەوە: {why}'),
 
   // Conflicts dialog
   conflictsDialogTitle: t('التعديل يسبب تعارضاً', 'The edit causes a conflict', 'دەستکارییەکە ناکۆکی دروست دەکات'),

@@ -8,11 +8,11 @@
  */
 import type { AssetDto, BrandDto, ClaimDto, OpportunityDto, ProductListItemDto } from '../../../packages/creativeDoc/src/api';
 import type { BrandKit } from '../../../packages/creativeDoc/src/brand';
-import type { BindingContext, RebuildContext } from '../../../packages/creativeDoc/src/layout';
+import { refreshBoundText, type BindingContext, type RebuildContext } from '../../../packages/creativeDoc/src/layout';
 import type { AllowedAssets } from '../../../packages/creativeDoc/src/ops';
 import type { ClaimState } from '../../../packages/creativeDoc/src/quality';
 import type { CreativeDocument } from '../../../packages/creativeDoc/src/schema';
-import type { ProductSnapshot, ServiceClaimText } from '../../../packages/creativeDoc/src/snapshot';
+import { canonicalJson, type ProductSnapshot, type ServiceClaimText } from '../../../packages/creativeDoc/src/snapshot';
 import type { BuildEvidence } from '../../../packages/creativeDoc/src/templates';
 import { formatIqd, type TextMeasurer } from '../../../packages/creativeDoc/src/text';
 
@@ -58,8 +58,29 @@ export function claimTexts(claims: readonly ClaimDto[]): Record<string, ServiceC
   return Object.fromEntries(claims.filter((c) => c.status === 'approved').map((c) => [c.id, claimText(c)]));
 }
 
-export function bindingContext(doc: CreativeDocument, data: EditorData): BindingContext {
-  return { snapshots: data.snapshots, claims: claimTexts(data.claims), brand: data.brand.kit, locale: doc.locale, slide: doc.slide };
+/**
+ * The data bound text is drawn from. `kit` is the design's PINNED brand kit
+ * (`DocumentDto.brand_kit`, the kit of its `brand_version`) when the server
+ * sends it — a newer kit (other digits, another currency label) never
+ * rewrites a design made with an older one. The kit in force otherwise.
+ */
+export function bindingContext(doc: CreativeDocument, data: EditorData, kit: Pick<BrandKit, 'digits' | 'currency_label'> = data.brand.kit): BindingContext {
+  return { snapshots: data.snapshots, claims: claimTexts(data.claims), brand: kit, locale: doc.locale, slide: doc.slide };
+}
+
+/**
+ * The bound text a design would show if it were drawn from the data now, or
+ * null when it shows exactly that already. The editor opens the STORED design
+ * either way and never saves this on its own: an approved design is not
+ * rewritten (and its approval withdrawn) because it was opened. `changed`
+ * names the layers whose words would change, for the notice that offers it.
+ */
+export function boundRefresh(doc: CreativeDocument, ctx: BindingContext): { doc: CreativeDocument; changed: string[] } | null {
+  const next = refreshBoundText(doc, ctx);
+  if (canonicalJson(next) === canonicalJson(doc)) return null;
+  const before = new Map(doc.layers.map((l) => [l.id, l]));
+  const changed = next.layers.filter((l) => l.type === 'text' && before.get(l.id)?.type === 'text' && (before.get(l.id) as { text: string }).text !== l.text).map((l) => l.id);
+  return { doc: next, changed };
 }
 
 /**

@@ -9,10 +9,17 @@ import type { AllowedAssets, ApplyResult, RebuildRequest } from '../../../packag
 import type { CreativeDocument, Density } from '../../../packages/creativeDoc/src/schema';
 import type { TextMeasurer } from '../../../packages/creativeDoc/src/text';
 import type { SaveState } from './autosave';
+import type { ChatSession } from './panels/ChatPanel';
 import type { EditorData } from './editorData';
 import type { FontState } from './fonts';
 import type { ImageStore } from './media';
 import type { StageView, Tool } from './stageView';
+
+/** What a re-layout produced: this design re-laid (one undo step), or a NEW linked design (another size). */
+export type RebuildOutcome = { kind: 'doc'; doc: CreativeDocument } | { kind: 'created'; id: string; version: number };
+
+/** An applied AI answer: saved (and the server told), or why nothing was — never a success that saved nothing. */
+export type AiApplyResult = { ok: true } | { ok: false; message: string };
 
 export interface EditorApi {
   docId: string;
@@ -42,15 +49,20 @@ export interface EditorApi {
   /**
    * Commits an AI answer the owner confirmed and saves it as an `ai` version
    * with its job id, then tells the server it was applied. A rebuild request
-   * in it (another variant, priority or size) is performed by the package’s
-   * own re-layout. Resolves false when nothing was saved.
+   * in it (another variant or priority) is performed by the package’s own
+   * re-layout; another size becomes a NEW linked design carrying the job.
+   * A re-layout that is refused or changes nothing cancels the job and
+   * says why; a save refused because the job was cancelled takes the
+   * answer back off the screen.
    */
-  applyAi(applied: Extract<ApplyResult, { ok: true }>, jobId: string): Promise<boolean>;
-  /** A re-layout the package computes from the template (variant, priority, format, density). */
-  rebuildTo(change: RebuildRequest | { kind: 'density'; density: Density }): Promise<void>;
+  applyAi(applied: Extract<ApplyResult, { ok: true }>, jobId: string): Promise<AiApplyResult>;
+  /** A re-layout the package computes from the template (variant, priority, format, density); null when refused or a no-op (the reason is shown). */
+  rebuildTo(change: RebuildRequest | { kind: 'density'; density: Density }): Promise<RebuildOutcome | null>;
   verification: Record<string, VerifyDto>;
   setVerification(v: Record<string, VerifyDto>): void;
   editText(id: string): void;
   openDocument(id: string): void;
   goSettings(): void;
+  /** The conversation with Claude — kept by the editor, so a tab switch or a closed sheet never loses a request or its answer. */
+  chat: ChatSession;
 }

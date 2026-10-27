@@ -15,7 +15,7 @@ import { Field, Input, Textarea } from '../../ui/Field';
 import { Segmented } from '../../ui/Segmented';
 import { layerBox, type ImageLayer, type Layer, type TextAlign } from '../../../../packages/creativeDoc/src/schema';
 import type { EditorApi } from '../editorApi';
-import { topLevel } from '../editorModel';
+import { lockedAround, topLevel } from '../editorModel';
 import { ROLE_TEXT, S, fill } from '../strings';
 import { useText } from '../shared';
 import VariantImg from '../../ui/VariantImg';
@@ -102,7 +102,8 @@ export default function PropertiesPanel({ api }: { api: EditorApi }) {
   const layer = doc.layers.find((l) => l.id === ids[0]);
   if (!layer) return null;
   const box = layerBox(layer, doc.layers);
-  const locked = layer.locked;
+  // A lock on the layer, on its group or on anything inside it holds the whole selection.
+  const locked = lockedAround(doc, layer.id);
   const name = layer.name && layer.name !== layer.id ? layer.name : w(ROLE_TEXT[layer.role]);
   return (
     <div className="flex flex-col gap-3" data-properties={layer.id}>
@@ -113,7 +114,7 @@ export default function PropertiesPanel({ api }: { api: EditorApi }) {
       {locked ? (
         <div className="flex flex-col gap-2">
           <p className="text-sm text-text-secondary">{w(S.propLockedNote)}</p>
-          {layer.role !== 'background' ? <Button size="sm" onClick={() => api.apply([{ op: 'set_lock', layer_id: layer.id, locked: false }])}>{w(S.layerUnlock)}</Button> : null}
+          {layer.locked && layer.role !== 'background' ? <Button size="sm" onClick={() => api.apply([{ op: 'set_lock', layer_id: layer.id, locked: false }])}>{w(S.layerUnlock)}</Button> : null}
         </div>
       ) : (
         <>
@@ -153,7 +154,7 @@ export default function PropertiesPanel({ api }: { api: EditorApi }) {
  * the alt text, committed when the field is left (`set_caption`,
  * `set_alt_text`) so they share undo and the save path with the design.
  */
-function PostText({ api }: { api: EditorApi }) {
+export function PostText({ api }: { api: EditorApi }) {
   const { w } = useText();
   const [caption, setCaption] = useState(api.doc.caption);
   const [alt, setAlt] = useState(api.doc.alt_text);

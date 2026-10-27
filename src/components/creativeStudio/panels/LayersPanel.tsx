@@ -4,6 +4,11 @@
  * (`set_visibility`, `set_lock`, `reorder_layer`), so they are undoable and
  * meet the same rules as everything else: the background stays at the
  * bottom, a locked layer refuses every change but being unlocked.
+ *
+ * A click on a row selects what a click on the canvas would (a chip's group),
+ * except on a LOCKED row: that selects the layer itself, so its lock can be
+ * seen and lifted — never its group, which would carry the locked layer along
+ * in a move or a delete.
  */
 import { ChevronDown, ChevronUp, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
 import { IconButton } from '../../ui/Button';
@@ -32,7 +37,8 @@ export default function LayersPanel({ api }: { api: EditorApi }) {
   return (
     <ul className="flex flex-col gap-1" aria-label={w(S.panelLayers)} data-layers-panel>
       {rows.map((l) => {
-        const sel = selection.includes(selectableId(doc, l.id));
+        const target = l.locked ? l.id : selectableId(doc, l.id);
+        const sel = selection.includes(l.id) || selection.includes(selectableId(doc, l.id));
         const name = l.name && l.name !== l.id ? l.name : w(ROLE_TEXT[l.role]);
         const isBg = l.role === 'background';
         // What the layer SHOWS (its words), and its state — never an internal id.
@@ -43,7 +49,7 @@ export default function LayersPanel({ api }: { api: EditorApi }) {
               type="button"
               className="min-h-11 min-w-0 flex-1 rounded-lg px-2 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               aria-pressed={sel}
-              onClick={() => !isBg && api.setSelection([selectableId(doc, l.id)])}
+              onClick={() => !isBg && api.setSelection([target])}
             >
               <span className="block truncate text-sm text-text-primary">{w(ROLE_TEXT[l.role])}</span>
               {detail ? <span className="block truncate text-xs text-text-muted" dir="auto">{detail}</span> : null}

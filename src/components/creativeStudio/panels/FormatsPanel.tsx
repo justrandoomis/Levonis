@@ -21,7 +21,7 @@ export default function FormatsPanel({ api }: { api: EditorApi }) {
   const [cw, setCw] = useState('1200');
   const [ch, setCh] = useState('628');
   const tpl = doc.template && doc.template.id in TEMPLATES ? TEMPLATES[doc.template.id as TemplateId] : null;
-  const run = async (fn: () => Promise<void>) => {
+  const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     try {
       await fn();

@@ -14,7 +14,10 @@
  *   text overlay → the product is scaled with the transformer (its ratio must
  *   not move) → autosave → RELOAD from the stub → the same design → PNG export
  *   pixel-compared with the stage drawn at 1× (expected ~0 %) → screenshots at
- *   1440×900 and 390×844 (and one in Sorani).
+ *   1440×900 and 390×844 (and one in Sorani). On the way: the window crosses
+ *   the 1024 px desktop/phone breakpoint and back (the canvas stays drawn and
+ *   selectable), a slow Claude answer survives a switch to another tab, and
+ *   a local draft made on an older version is never offered as a restore.
  *
  * Run: node scripts/e2e-creative-studio.mjs
  *   PLAYWRIGHT_MODULE  where playwright lives (default: `playwright`)
@@ -255,6 +258,36 @@ try {
     assert.ok(await page.textContent('[data-save-state]').then((t) => t.includes(String(before.version))), 'the version on screen is the saved one');
   });
 
+  await check('crossing the 1024 px breakpoint (an iPad turning) keeps the canvas drawn and selectable, both ways; the chat sits on the physical right', async () => {
+    const side = await page.evaluate(() => ({ chat: document.querySelector('[data-chat-aside]').getBoundingClientRect().left, stage: document.querySelector('[data-stage]').getBoundingClientRect().right }));
+    assert.ok(side.chat >= side.stage - 1, `the chat is right of the preview in Arabic: ${JSON.stringify(side)}`);
+    for (const width of [800, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.waitForFunction((d) => document.querySelector('[data-editor]').getAttribute('data-layout') === d, width >= 1024 ? 'desktop' : 'phone');
+      await page.waitForFunction(() => {
+        const live = window.Konva.stages.filter((s) => s.container().hasAttribute('data-stage'));
+        return live.length === 1 && live[0].container().isConnected && live[0].width() > 100 && !!live[0].findOne('#headline');
+      }, null, { timeout: 10000 });
+      const state = await page.evaluate(() => {
+        const stage = window.Konva.stages.find((s) => s.container().hasAttribute('data-stage'));
+        const el = stage.container();
+        // A pixel at the middle of the design, read from the content canvas the screen shows.
+        const cx = Math.round(stage.x() + 540 * stage.scaleX());
+        const cy = Math.round(stage.y() + 540 * stage.scaleY());
+        const px = stage.findOne('.content').getCanvas()._canvas.getContext('2d').getImageData(cx, cy, 1, 1).data;
+        return { same: el === document.querySelector('[data-stage]'), canvases: el.querySelectorAll('canvas').length, alpha: px[3], inside: cx > 0 && cy > 0 && cx < stage.width() && cy < stage.height() };
+      });
+      assert.ok(state.same && state.canvases >= 1 && state.inside && state.alpha > 0, `${width}px: ${JSON.stringify(state)}`);
+      await page.keyboard.press('Escape');
+      const c = await centreOf({ id: 'headline' });
+      await page.mouse.click(c.x, c.y);
+      await page.waitForFunction(() => window.Konva.stages.find((s) => s.container().hasAttribute('data-stage')).findOne('Transformer').nodes().length === 1, null, { timeout: 10000 });
+      await page.screenshot({ path: `${out}/15-breakpoint-${width}.png` });
+    }
+    // Past the double-click window, so the next step's first click is not read as a second one.
+    await page.waitForTimeout(600);
+  });
+
   await check('leaving the editor with unsaved work asks first; «stay» keeps the editor, and the work is saved', async () => {
     const headlineX = async () => Object.values((await db()).docs)[0].content.layers.find((l) => l.id === 'headline').x;
     const x0 = await headlineX();
@@ -268,6 +301,12 @@ try {
     assert.equal(await page.getAttribute('[data-studio]', 'data-studio-tab'), 'editor', '«stay» stays');
     await page.waitForSelector('[data-save-state="saved"]', { timeout: 15000 });
     assert.equal(await headlineX(), x0 - 1, 'the guard flushed the nudge to the server');
+    // Focus is on the studio tab now: its arrow keys move between tabs and never nudge the layer behind them.
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(150);
+    assert.equal(await page.getAttribute('[data-save-state]', 'data-save-state'), 'saved', 'an arrow on a focused tab is the tab’s');
+    // On the stage the shortcuts stay.
+    await page.focus('[data-stage]');
     await page.keyboard.press('ArrowRight');
     await page.waitForFunction((x) => Object.values(window.__csDb().docs)[0].content.layers.find((l) => l.id === 'headline').x === x, x0, { timeout: 15000 });
     await page.waitForSelector('[data-save-state="saved"]', { timeout: 15000 });
@@ -354,6 +393,32 @@ try {
     assert.deepEqual(saved.applied, [{ job: 'job_e2e_1', version: saved.docs[id].version }], 'the server is told which version the answer became');
   });
 
+  await check('a slow Claude answer survives a switch to another tab — answer and words intact; «stop» and Discard say a sent request may still cost', async () => {
+    await page.evaluate(() => sessionStorage.setItem('cs-e2e-ai-delay', '2500'));
+    const c = await centreOf({ id: 'headline' });
+    await page.mouse.click(c.x, c.y);
+    await page.getByRole('tab', { name: 'المحادثة' }).click();
+    await page.fill('[data-chat-panel] textarea', 'اختصر العنوان');
+    await page.getByRole('button', { name: 'أرسل إلى Claude' }).click();
+    await page.getByRole('button', { name: 'أوقف الطلب' }).waitFor();
+    await page.getByRole('tab', { name: 'الفحص' }).click();
+    await page.waitForSelector('[data-qa-panel]');
+    await page.waitForTimeout(3200);
+    await page.getByRole('tab', { name: 'المحادثة' }).click();
+    await page.waitForSelector('[data-patch-preview]', { timeout: 10000 });
+    assert.equal(await page.inputValue('[data-chat-panel] textarea'), 'اختصر العنوان', 'the typed instruction is still there');
+    const jobs = (await db()).jobs;
+    await page.getByRole('button', { name: 'تجاهل' }).click();
+    await page.waitForFunction((j) => window.__csDb().cancelled.includes(`job_e2e_${j}`), jobs);
+    assert.ok((await page.textContent('[data-chat-note]')).includes('تُحتسب تكلفته'), 'Discard says the request was processed and costs');
+    await page.getByRole('button', { name: 'أرسل إلى Claude' }).click();
+    await page.waitForTimeout(500); // the request is on its way (the stub holds the answer 2.5 s)
+    await page.getByRole('button', { name: 'أوقف الطلب' }).click();
+    await page.waitForSelector('[data-chat-note]');
+    assert.ok((await page.textContent('[data-chat-note]')).includes('قد تُحتسب تكلفته'), '«stop» says a sent request may still be charged');
+    await page.evaluate(() => sessionStorage.removeItem('cs-e2e-ai-delay'));
+  });
+
   await check('a version conflict stops autosave and offers «open theirs» — nothing is overwritten silently', async () => {
     // Someone else saves first: the stub's copy moves ahead of the version this editor started from.
     const theirs = await page.evaluate(() => {
@@ -377,6 +442,20 @@ try {
       return stage.findOne('#headline').findOne('.text').text().replace(/\n/g, ' ') === t;
     }, 'نسخة شخص آخر');
     assert.ok((await page.textContent('[data-save-state]')).includes(String(theirs)));
+    const drafts = () => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('levonis.creativeStudio.draft.')));
+    assert.deepEqual(await drafts(), [], 'their copy is the record: the overridden draft can never come back as a «restore»');
+    // A draft made on an OLDER version (the case that used to overwrite their save): offered only as a copy.
+    await page.evaluate((v) => {
+      const d = window.__csDb();
+      const id = Object.keys(d.docs)[0];
+      localStorage.setItem(`levonis.creativeStudio.draft.${id}`, JSON.stringify({ content: { ...d.docs[id].content, caption: 'local draft' }, base_version: v - 1, saved_at: new Date(Date.now() + 86400000).toISOString() }));
+    }, theirs);
+    await page.reload({ waitUntil: 'networkidle' });
+    await waitEditor();
+    await page.waitForSelector('[data-recovery="conflict"]');
+    assert.equal(await page.getByRole('button', { name: 'استعد المسودة' }).count(), 0, 'no plain restore over a newer version, whatever the draft’s clock says');
+    await page.getByRole('button', { name: 'احذفها' }).click();
+    assert.deepEqual(await drafts(), []);
     await page.evaluate(() => sessionStorage.removeItem('cs-e2e-ai'));
   });
 

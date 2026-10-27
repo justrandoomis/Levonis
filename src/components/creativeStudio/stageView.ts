@@ -19,6 +19,18 @@
  * product name in an Arabic ad still sits on the ad’s start edge. There is no
  * letter spacing, ever (it breaks Arabic joining).
  *
+ * A PICTURE IS NEVER STRETCHED. It is drawn into its box from the size it
+ * really decoded at: a crop recorded in the stored natural size is scaled to
+ * the decoded pixels, and a picture whose decoded RATIO is not the recorded
+ * one (a file replaced in place, an EXIF-rotated photo) is drawn whole and
+ * contained, centred in the box — never squashed to fit. Export draws these
+ * same nodes, so it agrees.
+ *
+ * ONE GESTURE AT A TIME. A second finger never starts a second gesture: it
+ * cancels the one in progress (the nodes go back where the document says, the
+ * guides go away) and becomes a pinch, which zooms about the fingers' midpoint
+ * and follows it, so two fingers also pan.
+ *
  * WHAT IS NEVER EXPORTED lives on its own layers: the document frame and
  * safe-area guide, snap guides, the marquee and the transformer (overlay),
  * and the owner’s annotations (notes). Export renders the content layer
@@ -41,7 +53,7 @@ import {
 } from '../../../packages/creativeDoc/src/schema';
 import type { TextMeasurer } from '../../../packages/creativeDoc/src/text';
 import {
-  dragOps, isInteractive, marqueeHits, selectableId, selectionBox, snapMove, snapTargets, textFrame, topLevel, transformOps, type Guide,
+  dragOps, imageFit, isInteractive, marqueeHits, selectableId, selectionBox, snapMove, snapTargets, textFrame, topLevel, transformOps, type Guide,
 } from './editorModel';
 
 export type Tool = 'select' | 'pin' | 'box' | 'arrow';
@@ -90,11 +102,12 @@ export class StageView {
   private tool: Tool = 'select';
   private epoch = 0;
   private gesture:
-    | { kind: 'drag'; ids: string[]; start: { x: number; y: number }; box: Box; targets: { xs: number[]; ys: number[] }; base: Map<KNode, { x: number; y: number }>; dx: number; dy: number; moved: boolean }
-    | { kind: 'marquee'; start: { x: number; y: number }; additive: boolean; moved: boolean }
-    | { kind: 'note'; start: { x: number; y: number }; tool: Exclude<Tool, 'select'> }
+    | { kind: 'drag'; pointer: number; ids: string[]; start: { x: number; y: number }; box: Box; targets: { xs: number[]; ys: number[] }; base: Map<KNode, { x: number; y: number }>; dx: number; dy: number; moved: boolean }
+    | { kind: 'marquee'; pointer: number; start: { x: number; y: number }; additive: boolean; moved: boolean }
+    | { kind: 'note'; pointer: number; start: { x: number; y: number }; tool: Exclude<Tool, 'select'> }
     | null = null;
-  private pinch: { dist: number; scale: number; mid: { x: number; y: number } } | null = null;
+  /** A two-finger gesture: the spread and scale it began with, and the document point under the fingers' midpoint then. */
+  private pinch: { dist: number; scale: number; anchor: { x: number; y: number } } | null = null;
   private removeNative: () => void;
 
   constructor(container: HTMLDivElement, private cb: StageCallbacks, private deps: StageDeps) {
@@ -116,7 +129,9 @@ export class StageView {
     this.transformer.on('transformend', () => this.endTransform());
     this.stage.on('pointerdown', (e) => this.onDown(e));
     this.stage.on('pointermove', () => this.onMove());
-    this.stage.on('pointerup pointercancel', () => this.onUp());
+    this.stage.on('pointerup', () => this.onUp());
+    // The browser took the pointer away: nothing the gesture did is committed.
+    this.stage.on('pointercancel', () => this.cancelGesture());
     this.stage.on('dblclick dbltap', (e) => {
       const id = this.layerIdAt(e.target);
       if (id && this.doc && isInteractive(this.doc, id)) this.cb.onEditText(id);
@@ -237,10 +252,7 @@ export class StageView {
       }));
     } else if (l.type === 'image') {
       if (img) {
-        group.add(new KImage({
-          name: 'image', image: img, width: box.width, height: box.height, listening: false,
-          ...(l.crop ? { crop: { x: l.crop.x, y: l.crop.y, width: l.crop.width, height: l.crop.height } } : {}),
-        }));
+        group.add(new KImage({ name: 'image', image: img, listening: false, ...imageFit(l.natural, l.crop, { width: img.naturalWidth, height: img.naturalHeight }, box) }));
       } else {
         // Not decoded (yet, or at all): an honest empty frame, never another picture.
         group.add(new KRect({ name: 'pending', width: box.width, height: box.height, stroke: 'rgba(160,160,160,0.7)', dash: [8, 6], strokeWidth: 2, strokeScaleEnabled: false, listening: false }));
@@ -339,18 +351,26 @@ export class StageView {
   private onDown(e: KonvaEventObject<PointerEvent>) {
     const doc = this.doc;
     if (!doc || this.pinch) return;
+    const pointer = e.evt.pointerId ?? 1;
+    if (this.gesture) {
+      // A second finger is the start of a pinch, never a second gesture; the same pointer again means its
+      // release was missed (let go outside the window) — either way the old gesture is undone first.
+      const second = this.gesture.pointer !== pointer;
+      this.cancelGesture();
+      if (second) return;
+    }
     // The transformer’s own handles transform; they are not a click on the canvas.
     if ((e.target.getParent() as unknown) === this.transformer || (e.target as unknown) === this.transformer) return;
     const at = this.pointerDoc();
     if (!at) return;
     if (this.tool !== 'select') {
-      this.gesture = { kind: 'note', start: at, tool: this.tool };
+      this.gesture = { kind: 'note', pointer, start: at, tool: this.tool };
       return;
     }
     const id = this.layerIdAt(e.target);
     const additive = !!e.evt.shiftKey;
     if (!id || !isInteractive(doc, id)) {
-      this.gesture = { kind: 'marquee', start: at, additive, moved: false };
+      this.gesture = { kind: 'marquee', pointer, start: at, additive, moved: false };
       return;
     }
     if (additive) {
@@ -371,7 +391,7 @@ export class StageView {
         }
       }
     }
-    this.gesture = { kind: 'drag', ids, start: at, box, targets: snapTargets(doc, ids), base, dx: 0, dy: 0, moved: false };
+    this.gesture = { kind: 'drag', pointer, ids, start: at, box, targets: snapTargets(doc, ids), base, dx: 0, dy: 0, moved: false };
   }
 
   private onMove() {
@@ -444,6 +464,22 @@ export class StageView {
     }
   }
 
+  /** Abandon the gesture in progress: dragged nodes go back to where the document puts them, guides and the marquee go away. */
+  private cancelGesture(): void {
+    const g = this.gesture;
+    this.gesture = null;
+    if (!g) return;
+    if (g.kind === 'drag') {
+      for (const [node, p] of g.base) node.position(p);
+      this.drawGuides([]);
+      this.transformer.forceUpdate();
+      this.content.batchDraw();
+    } else if (g.kind === 'marquee') {
+      this.marquee.visible(false);
+    }
+    this.overlay.batchDraw();
+  }
+
   private endTransform() {
     const doc = this.doc;
     if (!doc || this.selection.length !== 1) return;
@@ -502,11 +538,15 @@ export class StageView {
     const mid = { x: (a.clientX + b.clientX) / 2 - rect.left, y: (a.clientY + b.clientY) / 2 - rect.top };
     const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
     if (!this.pinch) {
-      this.gesture = null;
-      this.pinch = { dist, scale: this.view.scale, mid };
+      // A one-finger drag or marquee that was under way is undone, not left half-applied on screen.
+      this.cancelGesture();
+      this.pinch = { dist, scale: this.view.scale, anchor: { x: (mid.x - this.view.offsetX) / this.view.scale, y: (mid.y - this.view.offsetY) / this.view.scale } };
       return;
     }
-    this.zoomAt(mid, this.pinch.scale * (dist / Math.max(1, this.pinch.dist)));
+    // Zoom by the change in spread, and keep the document point that was under the midpoint under it now:
+    // moving both fingers together pans.
+    const scale = Math.min(4, Math.max(0.1, this.pinch.scale * (dist / Math.max(1, this.pinch.dist))));
+    this.cb.onViewChange({ scale, offsetX: mid.x - this.pinch.anchor.x * scale, offsetY: mid.y - this.pinch.anchor.y * scale });
   }
 
   // ---------------------------------------------------------------- export

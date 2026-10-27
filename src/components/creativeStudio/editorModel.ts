@@ -13,8 +13,11 @@
  */
 import { applyOps, type ApplyResult, type OpsContext } from '../../../packages/creativeDoc/src/ops';
 import {
-  FONT_REGISTRY, layerBox, safeBox, unionBox, type Box, type CreativeDocument, type Layer, type TextLayer,
+  FONT_REGISTRY, layerBox, safeBox, unionBox, withDescendants, type Box, type CreativeDocument, type Layer, type TextLayer,
 } from '../../../packages/creativeDoc/src/schema';
+import { canonicalJson } from '../../../packages/creativeDoc/src/snapshot';
+import { TEMPLATES, variantsFor, type TemplateId, type VariantId } from '../../../packages/creativeDoc/src/templates';
+import type { PriceStatus } from '../../../packages/creativeDoc/src/snapshot';
 import { physicalAlign, resolveDirection, wrapText, type TextMeasurer } from '../../../packages/creativeDoc/src/text';
 
 // ---------------------------------------------------------------------------
@@ -56,6 +59,17 @@ export function reset(doc: CreativeDocument): History {
   return historyOf(doc);
 }
 
+/**
+ * Take back the step that made `doc` the present, leaving no redo for it — an
+ * AI answer whose job was cancelled while it was being saved must not stay on
+ * screen (or come back with redo) to be saved later as a person's edit.
+ * Anything committed since is left alone.
+ */
+export function dropStep(h: History, doc: CreativeDocument): History {
+  if (h.present !== doc || !h.past.length) return h;
+  return { past: h.past.slice(0, -1), present: h.past[h.past.length - 1], future: h.future };
+}
+
 // ---------------------------------------------------------------------------
 // Selection
 // ---------------------------------------------------------------------------
@@ -73,11 +87,29 @@ export function selectableId(doc: CreativeDocument, id: string): string {
   return cur ? cur.id : id;
 }
 
-/** Whether a layer (or the group it belongs to) may be selected and moved by a person. */
+/**
+ * Whether a lock holds this layer: its own, an ancestor's, or a descendant's.
+ * A group moves, hides and deletes its children with it, so a group with one
+ * locked word inside is as locked as the word.
+ */
+export function lockedAround(doc: CreativeDocument, id: string): boolean {
+  const byId = new Map(doc.layers.map((l) => [l.id, l]));
+  if (withDescendants(doc.layers, id).some((x) => byId.get(x)?.locked)) return true;
+  let p = byId.get(id)?.parent ?? null;
+  const seen = new Set<string>();
+  while (p && !seen.has(p)) {
+    if (byId.get(p)?.locked) return true;
+    seen.add(p);
+    p = byId.get(p)?.parent ?? null;
+  }
+  return false;
+}
+
+/** Whether a layer (or the group it belongs to) may be selected and moved by a person: visible, not the background, no lock holding it. */
 export function isInteractive(doc: CreativeDocument, id: string): boolean {
   const l = doc.layers.find((x) => x.id === id);
-  if (!l || !l.visible || l.locked || l.role === 'background') return false;
-  return true;
+  if (!l || !l.visible || l.role === 'background') return false;
+  return !lockedAround(doc, id);
 }
 
 /** Ids whose ancestor is also selected are dropped: moving the group moves them already. */
@@ -93,6 +125,16 @@ export function topLevel(doc: CreativeDocument, ids: readonly string[]): string[
     }
     return true;
   });
+}
+
+/**
+ * What a scoped Claude request may touch: the selection's top-level layers
+ * and everything inside them. A chip's words live in a child of the group a
+ * click selects, so «اختصر النص» on the CTA must be able to name them.
+ */
+export function chatScope(doc: CreativeDocument, selection: readonly string[]): string[] {
+  const present = selection.filter((id) => doc.layers.some((l) => l.id === id));
+  return [...new Set(topLevel(doc, present).flatMap((id) => withDescendants(doc.layers, id)))];
 }
 
 export function selectionBox(doc: CreativeDocument, ids: readonly string[]): Box | null {
@@ -193,6 +235,22 @@ export function nudgeOps(doc: CreativeDocument, ids: readonly string[], key: str
   return dragOps(doc, ids, d[0], d[1]);
 }
 
+/** Controls that handle these keys themselves; the editor's shortcuts never take them from a focused one. */
+const CONTROL = 'button, a[href], [role="button"], [role="tab"], [role="radio"], [role="switch"], [role="slider"], [role="option"], [role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="checkbox"], [role="treeitem"]';
+
+/**
+ * True when a key belongs to the focused control, not to the editor: Enter
+ * and Space activate a button, the arrows move inside a tab strip, a radio
+ * group or a slider, and Backspace/Delete on a focused button must not delete
+ * the selected layer behind it. The stage itself and the page body keep every
+ * shortcut.
+ */
+export function keyBelongsToControl(key: string, target: { closest?: (selector: string) => unknown } | null, stage: unknown): boolean {
+  if (!target || target === stage || typeof target.closest !== 'function') return false;
+  if (!(key === 'Enter' || key === ' ' || key === 'Spacebar' || key.startsWith('Arrow') || key === 'Backspace' || key === 'Delete')) return false;
+  return !!target.closest(CONTROL);
+}
+
 /** The box a transformer ended on, in document px (unrotated), plus its rotation. */
 export interface TransformedBox {
   x: number;
@@ -235,6 +293,55 @@ export function transformOps(layer: Layer, before: Box, after: TransformedBox): 
   const rot = Math.round(after.rotation * 10) / 10;
   if (Math.abs(rot - layer.rotation) > 0.05 && layer.type !== 'group') ops.push({ op: 'rotate_layer', layer_id: layer.id, rotation: ((rot + 540) % 360) - 180 });
   return ops;
+}
+
+/** A decoded picture whose ratio is off the recorded one by more than this is drawn contained, not stretched. */
+export const RATIO_TOLERANCE = 0.005;
+
+/**
+ * How a decoded picture fills its layer box. The crop (stored in the recorded
+ * natural size) is scaled to the decoded pixels; when the decoded ratio is
+ * not the recorded one, the whole picture is drawn contained and centred
+ * (one scale), because the recorded crop and box no longer describe it.
+ */
+export function imageFit(
+  natural: { width: number; height: number },
+  crop: { x: number; y: number; width: number; height: number } | null,
+  decoded: { width: number; height: number },
+  box: { width: number; height: number },
+): { x: number; y: number; width: number; height: number; crop?: { x: number; y: number; width: number; height: number } } {
+  if (!(decoded.width > 0 && decoded.height > 0) || !(natural.width > 0 && natural.height > 0)) {
+    return { x: 0, y: 0, width: box.width, height: box.height, ...(crop ? { crop: { ...crop } } : {}) };
+  }
+  const off = Math.abs((decoded.width / decoded.height) / (natural.width / natural.height) - 1) > RATIO_TOLERANCE;
+  if (!off) {
+    const kx = decoded.width / natural.width;
+    const ky = decoded.height / natural.height;
+    return { x: 0, y: 0, width: box.width, height: box.height, ...(crop ? { crop: { x: crop.x * kx, y: crop.y * ky, width: crop.width * kx, height: crop.height * ky } } : {}) };
+  }
+  const s = Math.min(box.width / decoded.width, box.height / decoded.height);
+  const width = decoded.width * s;
+  const height = decoded.height * s;
+  return { x: (box.width - width) / 2, y: (box.height - height) / 2, width, height };
+}
+
+/**
+ * The composition a variant or priority re-layout lands on, or null when the
+ * design's template has none for it. `buildFromTemplate` would otherwise fall
+ * back to the template's first variant and re-lay the design as something
+ * nobody asked for (an AI «headline first» on a template without one).
+ */
+export function relayoutVariant(
+  doc: Pick<CreativeDocument, 'template' | 'objective'>,
+  change: { kind: 'variant'; variant: VariantId } | { kind: 'priority'; priority: CreativeDocument['priority'] },
+  priceStatus: PriceStatus | null,
+): VariantId | null {
+  if (!doc.template || !(doc.template.id in TEMPLATES)) return null;
+  const tpl = TEMPLATES[doc.template.id as TemplateId];
+  if (change.kind === 'variant') return tpl.variants[change.variant] ? change.variant : null;
+  return variantsFor(tpl.id, doc.objective, priceStatus).find((v) => tpl.variants[v]?.priority === change.priority)
+    ?? (Object.keys(tpl.variants) as VariantId[]).find((v) => tpl.variants[v]?.priority === change.priority)
+    ?? null;
 }
 
 /** Run operations as a person. One place, so the editor never forgets the actor. */
@@ -333,11 +440,23 @@ export function parseDraft(raw: string | null): RecoveryDraft | null {
   }
 }
 
-/** A draft is offered only when it is newer than the server copy and says something the server copy does not. */
-export function draftWorthOffering(draft: RecoveryDraft | null, server: { version: number; updated_at: string; content: CreativeDocument }): boolean {
-  if (!draft) return false;
-  if (Date.parse(draft.saved_at) <= Date.parse(server.updated_at)) return false;
-  return JSON.stringify(draft.content) !== JSON.stringify(server.content);
+export type DraftOffer = 'restore' | 'conflict';
+
+/**
+ * What a recovery draft found on open is offered as. Never decided by
+ * clocks: the device's and the server's need not agree, and a rename moves
+ * `updated_at` without a new version.
+ *  - nothing: no draft, or it says exactly what the server copy says;
+ *  - `restore`: the draft was made on the very version the server still has,
+ *    so laying it back on top overwrites nobody;
+ *  - `conflict`: the server moved on since (someone else, another device, or
+ *    a save whose answer was lost) — the draft can be kept as a NEW design or
+ *    deleted, never laid over the newer version.
+ */
+export function draftOffer(draft: RecoveryDraft | null, server: { version: number; content: unknown }): DraftOffer | null {
+  if (!draft) return null;
+  if (canonicalJson(draft.content) === canonicalJson(server.content)) return null;
+  return draft.base_version === server.version ? 'restore' : 'conflict';
 }
 
 // ---------------------------------------------------------------------------

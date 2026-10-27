@@ -34,6 +34,9 @@ const { default: StudioShell } = await import('../src/components/creativeStudio/
 const { AiNotReady, StudioContext } = await import('../src/components/creativeStudio/shared');
 const { EditorReady } = await import('../src/components/creativeStudio/Editor');
 const { default: QaPanel } = await import('../src/components/creativeStudio/panels/QaPanel');
+const { default: ChatPanel } = await import('../src/components/creativeStudio/panels/ChatPanel');
+const { validateEditPatch } = await import('../packages/creativeDoc/src/aiContracts');
+const { allowedAssets } = await import('../src/components/creativeStudio/editorData');
 const { ERROR_TEXT, S } = await import('../src/components/creativeStudio/strings');
 const { defaultBrandKit } = await import('../packages/creativeDoc/src/brand');
 const { buildFromTemplate } = await import('../packages/creativeDoc/src/layout');
@@ -153,4 +156,26 @@ test('the checks panel lists the checks that ran and the ones that did not — n
   assert.match(out, /Font that did not load|A font that did not load/, 'fonts not reported loaded is a blocker, not a pass');
   assert.match(out, /A picture that did not load/, 'pictures not decoded are a blocker');
   assert.match(out, /Marked test data/);
+});
+
+test('a Claude answer that re-lays the design says so before Apply (never «changed elements: —»)', () => {
+  const data = { brand: ctx(null).brand!, snapshots: { main: snapshot }, claims: [], assets: [], opportunities: [] };
+  const patch = {
+    schema_version: 1, document_id: 'doc_test_1', base_document_version: 3, intent: 'priority', target_layer_ids: [],
+    operations: [{ op: 'set_priority', priority: 'price' }], reason: 'السعر أولاً (رد اختبار)', warnings: [], clarification: '',
+  };
+  const verdict = validateEditPatch(patch, { documentId: 'doc_test_1', version: 3, doc, scope: null, evidence: { offer: false, serviceClaim: false }, ops: { brand: kit, allowed: allowedAssets(doc, data), measure: approximateMeasurer } });
+  assert.ok(verdict.ok === true && verdict.applied?.rebuild, JSON.stringify(verdict));
+  const res = { job_id: 'job_test_1', patch: verdict.ok === true ? verdict.patch : (patch as never), usage: { input_tokens: 10, output_tokens: 5, est_cost_usd: null, model: 'model-test-fixture' } };
+  const chat = { whole: true, setWhole: () => {}, text: 'السعر أولاً', setText: () => {}, phase: { kind: 'preview', res, verdict, base: doc, version: 3 }, applying: true, send: async () => {}, stop: () => {}, apply: async () => {}, discard: () => {}, retry: () => {} };
+  const api = {
+    docId: 'doc_test_1', doc, version: 3, saveState: 'saved', selection: [], provider: notReady(null), tool: 'select', setTool: () => {}, apply: () => true, goSettings: () => {}, data, chat,
+  } as unknown as EditorApi;
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const out = html(createElement(ChatPanel, { api, pending: null, onPendingDone: () => {} }), lang);
+    assert.match(out, /data-patch-rebuild="priority"/, lang);
+    assert.ok(out.includes(S.chatDiffRebuildPriority[lang].split('«')[0].trim()), `${lang}: the re-layout is named`);
+    assert.ok(!out.includes(`${S.chatDiffChanged[lang]}: </span>—`), `${lang}: no empty «changed» line pretending nothing happens`);
+    assert.match(out, /<button[^>]*disabled=""[^>]*>[^<]*(<[^>]+>)*[^<]*(تجاهل|Discard|فڕێدان)/, `${lang}: Discard is off while Apply saves`);
+  }
 });

@@ -12,7 +12,7 @@
  *  - autosave says «saved» only after the server's answer, stops on a version
  *    conflict, reports offline, and saves an applied AI answer with its job;
  *  - the local recovery draft holds content, base version and time — nothing
- *    else;
+ *    else (how it is offered: tests/creativeStudioUiEditor.test.ts);
  *  - only the bound variant's own same-origin pictures and approved assets
  *    are placeable;
  *  - a response body is decoded strictly (spread or named DTO, never a guess).
@@ -29,7 +29,7 @@ import { NO_EVIDENCE } from '../packages/creativeDoc/src/templates';
 import { approximateMeasurer } from '../packages/creativeDoc/src/text';
 import type { AssetDto, BrandDto } from '../packages/creativeDoc/src/api';
 import {
-  HISTORY_DEPTH, commit, draftWorthOffering, dragOps, exportFileName, historyOf, marqueeHits, nudgeOps, parseDraft, redo, runHumanOps,
+  HISTORY_DEPTH, commit, draftOffer, dragOps, exportFileName, historyOf, marqueeHits, nudgeOps, parseDraft, redo, runHumanOps,
   selectableId, serializeDraft, snapMove, snapTargets, textFrame, topLevel, transformOps, undo,
 } from '../src/components/creativeStudio/editorModel';
 import { Autosave, type SaveState } from '../src/components/creativeStudio/autosave';
@@ -205,7 +205,7 @@ test('autosave: «saved» only after the server answered, a 409 stops it, a netw
   assert.equal(a.current, 'saved');
 });
 
-test('the recovery draft holds content, base version and time — nothing else — and is offered only when newer and different', () => {
+test('the recovery draft holds content, base version and time — nothing else — and is offered only when it says something new', () => {
   const doc = built();
   const raw = serializeDraft(doc, 7, new Date('2026-10-27T10:00:00Z'));
   assert.deepEqual(Object.keys(JSON.parse(raw)).sort(), ['base_version', 'content', 'saved_at']);
@@ -214,10 +214,10 @@ test('the recovery draft holds content, base version and time — nothing else �
   assert.equal(draft.base_version, 7);
   assert.equal(parseDraft('{"content":1}'), null);
   assert.equal(parseDraft('not json'), null);
-  const server = { version: 7, updated_at: '2026-10-27T09:00:00Z', content: { ...doc, caption: 'server' } };
-  assert.equal(draftWorthOffering(draft, server), true);
-  assert.equal(draftWorthOffering(draft, { ...server, updated_at: '2026-10-27T11:00:00Z' }), false, 'older than the server copy');
-  assert.equal(draftWorthOffering(draft, { ...server, content: doc }), false, 'says nothing new');
+  const server = { version: 7, content: { ...doc, caption: 'server' } };
+  assert.equal(draftOffer(draft, server), 'restore', 'made on the version the server still has');
+  assert.equal(draftOffer(draft, { ...server, version: 8 }), 'conflict', 'the server moved on: never a plain restore');
+  assert.equal(draftOffer(draft, { ...server, content: doc }), null, 'says nothing new');
 });
 
 test('only the bound variant’s own same-origin pictures and APPROVED assets can be placed; test data is flagged', () => {
