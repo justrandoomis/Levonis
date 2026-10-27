@@ -290,8 +290,8 @@ test('the six histories of GET /me/transactions are named, and a row leads only 
 });
 
 test('hand-offs: the top-up carries the server’s stored quote into the store’s cart; the picture is the platform’s file', () => {
-  assert.equal(L.storeCartLink('pcq_1'), '/store/cart?quote=pcq_1');
-  assert.equal(L.storeCartLink('a b&c'), '/store/cart?quote=a%20b%26c');
+  assert.equal(L.storeCheckoutLink('pcq_1'), '/store/checkout/pcq_1');
+  assert.equal(L.storeCheckoutLink('a b&c'), '/store/checkout/a%20b%26c');
   assert.equal(L.avatarPath('avatars/u1.webp'), '/files/avatars/u1.webp');
   assert.equal(L.avatarPath(null), null);
 });
@@ -403,7 +403,7 @@ test('the router: full paths, lazy screens, the 404 last; links go to the sectio
   assert.doesNotMatch(router, /^import \w+ from '\.\/Account/m, 'no screen is imported statically');
 
   const home = read(`${ACCOUNT_DIR}/AccountHome.tsx`);
-  for (const to of ['/jobs', '/orders', '/files', '/account/hours', '/account/materials', '/account/shipments', '/account/buyback', '/account/transactions', '/account/settings']) {
+  for (const to of ['/jobs', '/orders', '/library', '/account/hours', '/account/materials', '/account/shipments', '/account/buyback', '/account/transactions', '/account/settings']) {
     assert.ok(home.includes(`to="${to}"`), `the account page leads to ${to}`);
   }
   assert.match(home, /\$\{mainSite\}\/wallet/);
@@ -412,7 +412,7 @@ test('the router: full paths, lazy screens, the 404 last; links go to the sectio
   for (const rel of ACCOUNT_FILES) {
     for (const m of read(rel).matchAll(/\bto=\{?[`"]\/?([a-z-]*)/g)) {
       if (!m[1]) continue;
-      assert.ok(['account', 'jobs', 'orders', 'files', 'store'].includes(m[1]), `${rel}: a link to /${m[1]}`);
+      assert.ok(['account', 'jobs', 'orders', 'library', 'store'].includes(m[1]), `${rel}: a link to /${m[1]}`);
     }
   }
 });

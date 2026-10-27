@@ -4,7 +4,7 @@
  * The shell (src/cloud/PrintCloudApp.tsx) answers a few pages itself — `/`,
  * `/printers`, `/printers/:id`, `/how-it-works`, `/auth` and the 404 — and
  * hands every path under a section's prefixes to that section's own module,
- * which renders its own `<Routes>` with FULL paths (`/files/:id`, not
+ * which renders its own `<Routes>` with FULL paths (`/library/:id`, not
  * `:id`):
  *
  *   print    /print, /files, /projects, /jobs   pages/print/PrintRoutes.tsx   (signed in)
@@ -21,7 +21,7 @@ export type CloudSection = 'print' | 'store' | 'account';
 export type CloudTab = 'home' | CloudSection;
 
 export const SECTION_PREFIXES: Readonly<Record<CloudSection, readonly string[]>> = {
-  print: ['/print', '/files', '/projects', '/jobs'],
+  print: ['/print', '/library', '/projects', '/jobs'],
   store: ['/store', '/orders'],
   account: ['/account'],
 };

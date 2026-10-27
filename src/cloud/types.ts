@@ -419,7 +419,8 @@ export interface WalletPayment {
   amount_iqd: number;
   charged_usd_cents: number;
   exchange_rate: number;
-  wallet_tx_id: string;
+  /** Null for a zero-total order: confirmed with no debit (worker/lib/printCloud/orders.ts `WalletPaymentResult`). */
+  wallet_tx_id: string | null;
 }
 
 // ------------------------------------------------------------------ the customer's balances
@@ -619,6 +620,17 @@ export interface ModelFileSummary {
   created_at: string;
 }
 
+/**
+ * What the measurement noticed about a mesh (worker/lib/modelGeometry.ts
+ * `ModelWarning`): a code the interface words, its weight, and the figures
+ * the wording may use — never a sentence.
+ */
+export interface ModelWarning {
+  code: string;
+  severity: 'info' | 'warning' | 'blocking';
+  detail?: Record<string, number | string>;
+}
+
 /** GET /files/{id}: measured only once the background analysis has run (`geometry` null before). */
 export interface ModelFileView {
   id: string;
@@ -645,7 +657,7 @@ export interface ModelFileView {
     shell_count: number | null;
     watertight: boolean | null;
     overhang_ratio: number | null;
-    warnings: string[];
+    warnings: ModelWarning[];
     title: string | null;
     suggested_material: string | null;
     suggested_colors: string[];

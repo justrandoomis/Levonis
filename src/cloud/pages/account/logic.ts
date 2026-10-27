@@ -357,13 +357,13 @@ export function txHref(row: Pick<TransactionRow, 'ledger' | 'subject_id' | 'ref_
 // ------------------------------------------------------------------ hand-offs
 
 /**
- * «Top up to N» goes on in the store's cart, carrying the server's stored
- * quote: the cart (src/cloud/pages/store) reads it with GET /quotes/{id} and
- * places the order from it, so the price the customer saw here is the one
- * they pay. Nothing is priced on this side.
+ * «Top up to N» goes on in the store's checkout for the server's stored
+ * quote: the checkout (src/cloud/pages/store, `/store/checkout/:quoteId`)
+ * reads it with GET /quotes/{id} and places the order from it, so the price
+ * the customer saw here is the one they pay. Nothing is priced on this side.
  */
-export function storeCartLink(quoteId: string): string {
-  return `/store/cart?quote=${enc(quoteId)}`;
+export function storeCheckoutLink(quoteId: string): string {
+  return `/store/checkout/${enc(quoteId)}`;
 }
 
 /** The customer's picture on Levonis, or null: the platform's own file path for `avatar_key`. */
