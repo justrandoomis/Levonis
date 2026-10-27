@@ -176,9 +176,13 @@ agent prepares it in the background:
    job's input, as `GET /jobs/{id}` states it now, still equals what was
    sliced. Otherwise it downloads the job's models through the file door and
    slices them itself. With neither possible, the job is left `stalled` for an
-   operator (logged once).
-3. **The machine must be free.** Idle — or showing an ended print whose bed
-   an operator has cleared ([Bed clearing](#bed-clearing)) — and not running a
+   operator (logged once). So is a job the door **refuses** (a 409 such as
+   `INCOMPATIBLE_PRINTER` after the printer model was edited, a 400): it is
+   stalled with `stall_reason` `job_door_<code>` and never re-asked every
+   tick. A 403 means the token has no `job_control`, and the agent then
+   prepares no job at all (`job_control.forbidden`).
+3. **The machine must be free.** Idle, or showing an ended print, with its
+   bed known to be clear ([Bed clearing](#bed-clearing)), and not running a
    print of its own.
 4. **Upload, then start — only a job the cloud still holds in `preparing`.**
    Just before starting, the agent asks again whether the job is still on that
@@ -191,7 +195,13 @@ agent prepares it in the background:
    it finishes, `failed` when it is cancelled, faults (the machine's error
    code is the `reason_code`), or forgets the print (said only after two
    looks). The failure is reported `undetermined`: deciding who is
-   responsible stays with an operator (§7.7).
+   responsible stays with an operator (§7.7). The cloud completes only a
+   printing job, so `completed` always goes right after a `resumed`. That
+   covers a pause the agent never saw end: the job was resumed at the printer
+   while the machine or the agent was away, or paused in the console only
+   while the machine kept printing. The `resumed` answers `already_applied`
+   when the cloud already shows the job printing, and the completion reaches
+   the cloud exactly once.
 
 Every event is written into the job's record with its `event_id` **before**
 it is sent; a lost answer or a crash re-sends the same event and the cloud
@@ -200,12 +210,22 @@ again, even while the cloud still lists it (awaiting an operator's
 verification). If the cloud refuses `started` because the job is no longer
 this printer's, the print on the machine belongs to no job and is stopped.
 
-On completion the agent reports `printed_seconds` — the machine's own count
-when it keeps one (simulator, OctoPrint, Moonraker), otherwise the time the
-agent watched it printing. It does **not** measure filament: it omits
-`materials`, which the cloud takes as «used exactly as reserved»
-(`parseConsumption`); with `agent_reports_need_verification` (the default)
-an operator verifies or corrects every agent completion.
+On completion the agent reports `printed_seconds`, which is what the
+customer is billed. It is the machine's own count when the machine keeps one
+(simulator, OctoPrint, Moonraker). Otherwise (Bambu) it is only the time the
+agent **saw** this job's print running. The gap between two looks counts when
+both looks belong to the same run of the agent, the earlier one saw this
+job's print running after its `started`, and the later one still sees it
+running or came within two telemetry intervals. Four things are never
+counted: time while the agent was down, time while the machine was
+unreachable, the unknown part of a long gap in which the print ended, and
+another file printed before this job's (manual start). The watched time is
+saved once a minute and at every stop, so a restart loses only its own
+downtime. The count therefore errs low, never high, and an operator who
+knows better corrects it when verifying. The agent does **not** measure
+filament: it omits `materials`, which the cloud takes as «used exactly as
+reserved» (`parseConsumption`). With `agent_reports_need_verification` (the
+default), an operator verifies or corrects every agent completion.
 
 **Restarts.** Job records and the outbox of events live in the state
 directory; a restarted agent picks every unfinished job up where it was —
@@ -217,23 +237,57 @@ watching a print still running, re-sending an event still pending. A
 the machine's state. A command naming a job that is not the one running is
 skipped; one older than `command_max_age_seconds` is skipped (aged by the
 cloud's `Date` header when present). Commands queued before the agent's
-very first run are history and are skipped. `camera_snapshot` is not
-supported: the protocol carries camera metadata only.
+very first run are history and are skipped. Every poll reads again the
+minute behind the newest command handled. A command is stamped when its
+request starts and committed later, so one stamped earlier can commit after
+one stamped later. Commands already handled are known by their ids, so none
+runs twice. Each command's call to the machine is bounded by the printer's
+`timeout_seconds` (plus two seconds). A machine that never answers fails its
+command and does not hold the loop for the other printers. `camera_snapshot`
+is not supported: the protocol carries camera metadata only.
+
+**Every exchange is bounded, its body included.** Each request to a printer
+host, and to the cloud (`cloud.timeout_seconds`), must finish within its
+timeout, the response body included. A fetch returns at the response headers,
+and a body that then stalls would otherwise hold the call. A model download
+must finish within five minutes.
 
 ### Bed clearing
 
 The protocol has no «bed cleared» signal, and a print started on top of the
-last one damages the machine. So, with `bed_clear: "operator"`, a printer
-whose last print ended (finished, cancelled or faulted — including one the
-agent finds ended when it starts) takes no new print until someone clears the
-plate and says so on the workshop PC:
+last one damages the machine. So, with `bed_clear: "operator"` (the
+default), a print starts only on a bed the agent **knows** is clear: an
+operator cleared it and said so on the workshop PC, and nothing has started
+on it since.
 
 ```bash
-node tools/print-cloud-agent/agent.mjs --config agent.config.json --bed-cleared lan-x2d-1
+sudo -u levonis-agent env $(cat /etc/levonis-agent/env) \
+  node /opt/levonis-agent/tools/print-cloud-agent/agent.mjs --config /etc/levonis-agent/agent.config.json --bed-cleared lan-x2d-1
 ```
 
-It writes a flag the running agent picks up within a second; it never takes
-the agent's lock. `assume_clear` is for machines that clear their own bed.
+**Unknown is occupied.** From the start command on, the bed belongs to that
+job, and the next print waits for a clearance however this one ends:
+finished, cancelled, faulted, or **vanished**. A print vanishes when the
+machine comes back idle after a reboot or a power cut, with half a part on
+the plate. The bed also counts as occupied when the agent knows nothing about
+it: a new agent, a lost or unreadable `bed.json`. So run `--bed-cleared` once
+for each printer before its first job. The one exception is a job's own start
+command that did not take (the machine never showed its file running). That
+job may be sent again without a new clearance.
+
+**A clearance is used exactly once.** The flag goes first. Run it as the
+agent's own user, the owner of the state directory. A flag another user
+writes (`sudo … --bed-cleared` as root) could not be removed by the agent, so
+the CLI refuses to write one (exit 64). If such a flag is there anyway, the
+agent clears nothing and logs `bed.flag_not_removable` once. The clearance is
+judged against what the machine shows at that moment. Given while a print
+still runs, or while the machine cannot be reached, it is refused and logged
+`bed.clear_refused`, because that print will end on the plate. Run it again
+once the print has ended and the plate is clear. A taken clearance logs
+`bed.cleared`.
+
+The flag is picked up within a second and never takes the agent's lock.
+`assume_clear` is for machines that clear their own bed (or the simulator).
 
 ## State
 

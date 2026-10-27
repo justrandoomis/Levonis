@@ -39,6 +39,7 @@ import { existsSync, mkdirSync, renameSync, rmSync, statSync, writeFileSync } fr
 import { basename, join } from 'node:path';
 import { createDriver } from '../drivers/index.mjs';
 import { DriverError, emptyStatus } from '../drivers/common.mjs';
+import { screen3mf } from '../slicers/model3mf.mjs';
 import { CloudError, tokenRejected } from './protocol.mjs';
 import { silentLogger } from './log.mjs';
 
@@ -54,6 +55,10 @@ const MODEL_EXT = /\.(stl|3mf|obj)$/i;
 const CLOUD_ID = /^[A-Za-z0-9_-]{1,120}$/;
 const OUTBOX_MAX = 30;
 const DAY_MS = 86_400_000;
+/** How far behind the commands cursor every poll reads again: under the ten minutes handled ids are kept. */
+const COMMAND_LOOKBACK_MS = 60_000;
+/** A record whose watched print time moved is written at least this often (a crash loses at most this much). */
+const PERSIST_MS = 60_000;
 
 const iso = (ms) => new Date(ms).toISOString();
 const intOrNull = (v, min, max) => (typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max ? v : null);
@@ -141,9 +146,19 @@ export class Runner {
     this.fatal = null;
     this.stopping = false;
     this.warned = new Set();
-    /** @type {Record<string, any>} printer id → what the agent knows about its bed */
-    this.bed = this.state.readJson('bed.json', {}) ?? {};
+    /** @type {Record<string, any>} printer id → what the agent knows about its bed (none: occupied, see readyToStart) */
+    this.bed = this.readBedFile();
     this.commandsState = this.state.readJson('commands.json', null);
+  }
+
+  readBedFile() {
+    try {
+      return this.state.readJson('bed.json', {}) ?? {};
+    } catch (e) {
+      // Unreadable: nothing is known about any bed — and an unknown bed is an occupied one.
+      this.log.error('bed.unreadable', { error: e, note: 'every printer waits for --bed-cleared before its next job' });
+      return {};
+    }
   }
 
   // ------------------------------------------------------------------ lifecycle
@@ -190,6 +205,8 @@ export class Runner {
     this.stopping = true;
     const bounded = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(r, ms).unref?.())]);
     if (this.background.size) await bounded(Promise.allSettled([...this.background]), 10_000);
+    // What was watched of a running print is kept: the next run counts on from it (only the downtime is unseen).
+    for (const rec of this.jobs.values()) if (ACTIVE.includes(rec.phase)) this.saveJob(rec);
     if (!this.fatal) await bounded(this.flushEvents().catch((e) => this.log.warn('agent.stop.flush_failed', { error: e })), 5_000);
     for (const d of this.drivers.values()) await Promise.resolve(d.close?.()).catch(() => undefined);
     this.log.info('agent.stopped', { boot: this.state.boot });
@@ -226,6 +243,19 @@ export class Runner {
     if (this.warned.has(key)) return;
     this.warned.add(key);
     this.log.warn(msg, fields);
+  }
+
+  /**
+   * A driver call made inside the loop, bounded by the printer's own timeout
+   * plus slack: no single machine — a host that never answers, a driver that
+   * hangs — may hold telemetry, events and commands for every printer.
+   */
+  bounded(p, call, what) {
+    return withTimeout(
+      Promise.resolve().then(call),
+      (p.settings?.timeout_seconds ?? 10) * 1000 + 2000,
+      `${what} timed out`
+    );
   }
 
   /** One pass of everything that is due. */
@@ -295,18 +325,48 @@ export class Runner {
     this.state.writeJson('bed.json', this.bed);
   }
 
-  /** `node agent.mjs --bed-cleared <connection_ref>` leaves a flag file; the running agent takes it here. */
-  consumeBedFlags() {
+  /**
+   * `node agent.mjs --bed-cleared <connection_ref>` leaves a flag file; the
+   * running agent takes it here. A clearance is used EXACTLY ONCE: the flag
+   * goes first, and one this process cannot remove (bed-cleared/ made by
+   * another user — `sudo … --bed-cleared`) clears nothing: applied, it would
+   * clear every later print too. And it clears only a bed the machine is not
+   * printing on, as the machine shows it NOW: one given while a print still
+   * runs, or while the machine cannot be reached, is refused and said so —
+   * that print will end on the plate.
+   */
+  async consumeBedFlags() {
     for (const name of this.state.list('bed-cleared')) {
       const p = [...this.printers.values()].find((x) => x.ref !== null && x.ref !== undefined && bedFlagName(x.ref) === name);
       if (!p) continue;
-      this.bed[p.id] = { occupied: false, cleared_at: iso(this.clock()), cleared_file: p.lastStatus?.file ?? null, used_by: null };
+      try {
+        this.state.remove(`bed-cleared/${name}`);
+      } catch (e) {
+        this.warnOnce(`bedflag:${name}`, 'bed.flag_not_removable', {
+          printer_id: p.id,
+          connection_ref: p.ref,
+          error: e,
+          note: "the bed was NOT marked clear: give bed-cleared/ back to the agent's user (or run --bed-cleared as that user), then run it again",
+        });
+        continue;
+      }
+      this.warned.delete(`bedflag:${name}`);
+      const st = p.driver ? await this.bounded(p, () => p.driver.status(), 'status').catch(() => null) : null;
+      if (!st || st.state === 'offline' || RUNNING.includes(st.state)) {
+        this.log.warn('bed.clear_refused', {
+          printer_id: p.id,
+          connection_ref: p.ref,
+          machine_state: st?.state ?? 'unreachable',
+          note: 'a bed is marked clear only while its machine is reachable and not printing: run --bed-cleared again once the print has ended and the plate is clear',
+        });
+        continue;
+      }
+      this.bed[p.id] = { occupied: false, cleared_at: iso(this.clock()), cleared_file: ENDED.includes(st.state) ? st.file : null, used_by: null };
       this.saveBed();
-      this.state.remove(`bed-cleared/${name}`);
       // A job waiting on this bed goes now, not at its next look.
       const waiting = this.activeJob(p);
       if (waiting) waiting.wait_until = null;
-      this.log.info('bed.cleared', { printer_id: p.id, connection_ref: p.ref });
+      this.log.info('bed.cleared', { printer_id: p.id, connection_ref: p.ref, machine_state: st.state });
     }
   }
 
@@ -334,13 +394,30 @@ export class Runner {
     } else if (RUNNING.includes(previous)) mark(st.state);
   }
 
-  /** Can a print start on this machine now? idle, or an ended print whose bed an operator cleared. */
-  readyToStart(p, st) {
-    if (this.bedPolicy(p) === 'assume_clear' && (st.state === 'idle' || st.state === 'finished' || st.state === 'cancelled')) return { ok: true };
-    if (st.state === 'idle' || st.state === 'finished' || st.state === 'cancelled') {
-      return this.bed[p.id]?.occupied ? { ok: false, reason: 'waiting_for_bed_clear' } : { ok: true };
-    }
-    return { ok: false, reason: `machine_${st.state}` };
+  /**
+   * Can this job's print start on this machine now? The machine idle, or
+   * showing an ended print — and, with `bed_clear: operator`, its bed KNOWN to
+   * be clear: an operator cleared it (--bed-cleared) and nothing has started
+   * on it since. Anything else is a plate on the bed: a print that ended, one
+   * that vanished (a reboot, a power cut: the machine back idle with half a
+   * part on it), one another job started — and a bed the agent knows nothing
+   * about (a new agent, a lost bed.json). The one exception is this very
+   * job's own start that did not take (the machine never showed its file
+   * running): it may be sent again.
+   */
+  readyToStart(p, st, rec) {
+    if (st.state !== 'idle' && st.state !== 'finished' && st.state !== 'cancelled') return { ok: false, reason: `machine_${st.state}` };
+    if (this.bedPolicy(p) === 'assume_clear') return { ok: true };
+    const bed = this.bed[p.id];
+    if (bed && bed.occupied === false && !bed.used_by) return { ok: true };
+    if (bed && bed.reason === 'print_started' && bed.used_by === rec.job_id) return { ok: true };
+    return { ok: false, reason: 'waiting_for_bed_clear' };
+  }
+
+  /** From the start command on, the bed is this job's: whatever happens to the print, the next one waits for a clearance. */
+  bedInUse(p, rec) {
+    this.bed[p.id] = { occupied: true, reason: 'print_started', used_by: rec.job_id, since: iso(this.clock()) };
+    this.saveBed();
   }
 
   // ------------------------------------------------------------------ telemetry and the job watcher
@@ -477,10 +554,28 @@ export class Runner {
     this.log.info('job.event_queued', { job_id: rec.job_id, event: kind, event_id });
   }
 
-  /** Print time: the machine's own count when it keeps one, else what the agent watched. */
+  /** Print time: the machine's own count when it keeps one, else what the agent saw (countPrinting). */
   printedSeconds(rec, st) {
     const s = typeof st?.elapsed_seconds === 'number' && st.elapsed_seconds >= 0 ? st.elapsed_seconds : (rec.printing_ms ?? 0) / 1000;
     return Math.min(60 * 24 * 3600, Math.round(s));
+  }
+
+  /**
+   * printed_seconds — what the customer is billed — for a machine that keeps
+   * no print clock of its own (Bambu): the time the agent SAW this job's print
+   * running, and nothing it did not see. The gap between two looks counts
+   * only when both are looks of THIS run of the agent (a downtime was not
+   * seen), the earlier one saw this job's own print running after its
+   * `started`, and the later one still sees it running or came within two
+   * telemetry intervals — when a print ended or paused inside a longer gap is
+   * unknown, so that gap is left out. A look that could not reach the machine
+   * breaks the chain the same way.
+   */
+  countPrinting(rec, st, ours, now) {
+    if (rec.phase !== 'printing' || rec.last_obs_state !== 'printing' || rec.last_obs_ours !== true || rec.last_obs_boot !== this.state.boot || !rec.last_obs_at) return;
+    const gap = Math.max(0, now - Date.parse(rec.last_obs_at));
+    const close = gap <= 2 * Math.max(this.config.intervals.telemetry_ms, this.config.intervals.tick_ms);
+    if (close || (st.state === 'printing' && ours)) rec.printing_ms = (rec.printing_ms ?? 0) + gap;
   }
 
   /**
@@ -490,12 +585,22 @@ export class Runner {
   watch(p, st, now) {
     const rec = this.activeJob(p);
     if (!rec || p.task || !WATCHED.includes(rec.phase)) return;
-    if (st.state === 'offline') return;
+    if (st.state === 'offline') {
+      // Unreachable: a gap in what was seen — no time across it is counted as printing.
+      rec.last_obs_state = 'offline';
+      rec.last_obs_at = iso(now);
+      rec.last_obs_ours = false;
+      return;
+    }
     const ours = this.ours(rec, st);
-    if (rec.last_obs_state === 'printing' && rec.last_obs_at) rec.printing_ms = (rec.printing_ms ?? 0) + Math.max(0, now - Date.parse(rec.last_obs_at));
+    // Ours as far as the machine says: it names this job's file — or none at all while our record prints (as the pause branch reads it).
+    const mine = ours || (!st.file && (rec.phase === 'printing' || rec.phase === 'paused'));
+    this.countPrinting(rec, st, mine, now);
     const changed = rec.last_obs_state !== st.state;
     rec.last_obs_state = st.state;
     rec.last_obs_at = iso(now);
+    rec.last_obs_ours = mine;
+    rec.last_obs_boot = this.state.boot;
     // The machine forgot the print (a reboot) or runs another file: only said after two looks.
     const lost = st.state === 'idle' || (!!st.file && !ours && [...RUNNING, 'finished'].includes(st.state));
     p.lostStreak = lost ? (p.lostStreak ?? 0) + 1 : 0;
@@ -511,6 +616,10 @@ export class Runner {
         printed_seconds: this.printedSeconds(rec, st),
       });
       done(`failed:${reason_code}`);
+      // A print that ended in failure — cancelled, faulted, or forgotten by a machine back idle after a reboot or a
+      // power cut — left what it made on the plate: the next print waits for an operator's --bed-cleared.
+      this.bed[p.id] = { occupied: true, since: iso(now), reason: `failed:${reason_code}` };
+      this.saveBed();
     };
     if (rec.phase === 'uploaded' || rec.phase === 'starting') {
       if (ours && (RUNNING.includes(st.state) || st.state === 'finished')) {
@@ -540,12 +649,19 @@ export class Runner {
       this.queueEvent(rec, 'resumed');
       rec.phase = 'printing';
     } else if (st.state === 'finished' && (ours || !st.file)) {
+      // The cloud completes only a PRINTING job. A pause that ended out of sight (resumed at the printer while the
+      // machine or this agent was away — the record still says paused), or one set in the console alone while the
+      // machine kept printing, is closed first; `resumed` is applied once by its event_id and answers
+      // already_applied when the cloud already shows the job printing. The completion then reaches it exactly once.
+      this.queueEvent(rec, 'resumed');
       this.queueEvent(rec, 'completed', { printed_seconds: this.printedSeconds(rec, st) });
       done('completed');
     } else if (st.state === 'cancelled') failed('print_cancelled');
     else if (st.state === 'error') failed('error');
     else if (lost && p.lostStreak >= 2) failed(st.state === 'idle' ? 'print_lost_machine_idle' : 'print_replaced_on_machine');
-    if (changed || rec.phase === 'done' || rec.phase === 'stalled') this.saveJob(rec);
+    // The watched print time is written once a minute too, so a crash loses at most that much of it.
+    const persistDue = rec.phase === 'printing' && !(Date.parse(rec.updated_at ?? '') > now - PERSIST_MS);
+    if (changed || persistDue || rec.phase === 'done' || rec.phase === 'stalled') this.saveJob(rec);
   }
 
   // ------------------------------------------------------------------ preparing and starting a job
@@ -591,8 +707,21 @@ export class Runner {
         this.warnOnce(`handled:${jobId}`, 'job.already_handled', { job_id: jobId, printer_id: p.id, phase: old.phase, reason: old.done_reason ?? null });
         return;
       }
-      // Taken back before it started, and assigned here again: prepare it again (its print file is kept).
-      Object.assign(old, { printer_id: p.id, connection_ref: p.ref, phase: old.print_file ? 'uploading' : 'assigned', start_attempts: 0, retry_start: false, done_reason: null });
+      // Taken back before it started, and assigned here again: prepare it again (its print file is kept), and watch
+      // it from nothing — no print time is carried over from a machine it never ran on here.
+      Object.assign(old, {
+        printer_id: p.id,
+        connection_ref: p.ref,
+        phase: old.print_file ? 'uploading' : 'assigned',
+        start_attempts: 0,
+        retry_start: false,
+        done_reason: null,
+        printing_ms: 0,
+        last_obs_state: null,
+        last_obs_at: null,
+        last_obs_ours: null,
+        last_obs_boot: null,
+      });
       this.jobs.set(jobId, old);
       this.saveJob(old);
       this.log.info('job.assigned_again', { job_id: jobId, printer_id: p.id });
@@ -622,6 +751,7 @@ export class Runner {
       rec.phase = 'starting';
       rec.last_start_at = rec.last_start_at ?? iso(this.clock());
       this.saveJob(rec);
+      this.bedInUse(p, rec);
       return;
     }
     // 2. The print file (slicing can take minutes: the machine is looked at again after it).
@@ -638,7 +768,7 @@ export class Runner {
       if (!st) return;
     }
     // 3. The machine must be free and its bed clear before anything is put on it.
-    const ready = this.readyToStart(p, st);
+    const ready = this.readyToStart(p, st, rec);
     rec.wait_until = ready.ok ? null : iso(this.clock() + this.config.intervals.telemetry_ms);
     if (!ready.ok) {
       this.warnOnce(`wait:${rec.job_id}:${ready.reason}`, 'job.waiting', {
@@ -672,7 +802,14 @@ export class Runner {
     }
     // …and not started already? Only a job the cloud holds in `preparing` is started: one it shows printing or
     // paused was started before (by an earlier run of this agent whose state was lost, or by an operator).
-    if (this.startedElsewhere(p, rec, await this.cloud.job(rec.job_id))) return;
+    let cloudJob;
+    try {
+      cloudJob = await this.cloud.job(rec.job_id);
+    } catch (e) {
+      if (!this.jobDoorRefused(p, rec, e)) throw e;
+      return;
+    }
+    if (this.startedElsewhere(p, rec, cloudJob)) return;
     // 6. Start — the slice's filament i is the job's variant filaments[i] (the order the materials were mapped in).
     rec.start_attempts = (rec.start_attempts ?? 0) + 1;
     rec.last_start_at = iso(this.clock());
@@ -692,9 +829,9 @@ export class Runner {
       return;
     }
     rec.phase = 'starting';
-    // The clearance is spent: the next print needs the bed cleared again once this one ends.
-    this.bed[p.id] = { occupied: false, used_by: rec.job_id, since: iso(this.clock()) };
-    this.saveBed();
+    // The clearance is spent: from now on the bed is this job's, and the next print needs it cleared again — however
+    // this one ends, even if it vanishes without an end the machine shows (a reboot, a power cut).
+    this.bedInUse(p, rec);
     this.saveJob(rec);
     this.log.info('job.start_sent', { job_id: rec.job_id, printer_id: p.id, file: rec.print_file.name, attempt: rec.start_attempts });
   }
@@ -715,6 +852,34 @@ export class Runner {
   }
 
   /**
+   * The job door ANSWERED a refusal (409 INCOMPATIBLE_PRINTER, a 400, a 403…)
+   * — not an outage, not the token itself: asking again every tick cannot
+   * change it, it only spends the workshop's shared rate limit. The job is left
+   * `stalled` for an operator (a restart tries again); a 403 means the token
+   * has no job_control, so no job is prepared or started at all. True when it
+   * handled `e`; false for an error the caller must rethrow.
+   */
+  jobDoorRefused(p, rec, e) {
+    if (!(e instanceof CloudError) || e.retryable || tokenRejected(e)) return false;
+    if (e.status === 403 && !this.disabled.job_control) {
+      this.disabled.job_control = true;
+      this.log.error('job_control.forbidden', { note: 'the token has no job_control capability: no job is prepared or started' });
+    }
+    rec.phase = 'stalled';
+    rec.stall_reason = `job_door_${e.code ?? e.status}`.slice(0, 60);
+    this.saveJob(rec);
+    this.warnOnce(`door:${rec.job_id}:${rec.stall_reason}`, 'job.input_refused', {
+      job_id: rec.job_id,
+      printer_id: p.id,
+      status: e.status,
+      code: e.code,
+      details: e.details,
+      note: 'the cloud refused to state what this job prints: an operator decides (restart the agent to try again)',
+    });
+    return true;
+  }
+
+  /**
    * What to print for this job: this agent's own slice when it matches the
    * job's input as the cloud states it now, else a fresh slice of the files
    * the cloud names. Null (logged once, the job stalled) when neither is possible.
@@ -725,8 +890,8 @@ export class Runner {
     try {
       job = await this.cloud.job(rec.job_id);
     } catch (e) {
-      if (!(e instanceof CloudError && e.status === 403)) throw e;
-      this.warnOnce('jobdoor403', 'job.input_forbidden', { note: 'the token has no job_control capability' });
+      if (!this.jobDoorRefused(p, rec, e)) throw e;
+      return null;
     }
     if (this.startedElsewhere(p, rec, job)) return null;
     const stall = (reason, fields) => {
@@ -796,9 +961,9 @@ export class Runner {
    */
   async startRefused(rec) {
     const p = this.printers.get(rec.printer_id);
-    const st = p?.driver ? await Promise.resolve(p.driver.status()).catch(() => null) : null;
+    const st = p?.driver ? await this.bounded(p, () => p.driver.status(), 'status').catch(() => null) : null;
     if (p && st && RUNNING.includes(st.state) && this.ours(rec, st)) {
-      await Promise.resolve(p.driver.cancel()).catch((e) => this.log.error('job.cancel_failed', { job_id: rec.job_id, error: e }));
+      await this.bounded(p, () => p.driver.cancel(), 'cancel').catch((e) => this.log.error('job.cancel_failed', { job_id: rec.job_id, error: e }));
       this.log.warn('job.print_cancelled_not_assigned', { job_id: rec.job_id, printer_id: rec.printer_id });
     }
     // Pending events after `started` (paused, completed…) describe a print the cloud never had.
@@ -814,7 +979,7 @@ export class Runner {
     this.nextCommandsAt = this.clock() + this.config.intervals.commands_ms;
     if (!this.commandsState) {
       // First run: what was queued before this agent existed is history, not an instruction. Its ids are
-      // remembered too — the one-millisecond look-back below would otherwise read the last of them again.
+      // remembered too — the look-back below would otherwise read the last of them again.
       let since = null;
       let skipped = 0;
       const handled = {};
@@ -832,22 +997,24 @@ export class Runner {
       if (skipped) this.log.info('commands.history_skipped', { count: skipped });
       return;
     }
+    // A command is stamped when its request starts and committed round trips later, so one stamped earlier can
+    // commit after one stamped later — after this agent has read past its stamp. So every poll reads a window behind
+    // the cursor again; what was handled is known by its id (ids are kept ten minutes, longer than the window).
+    let since = this.commandsState.cursor ? iso(Date.parse(this.commandsState.cursor) - COMMAND_LOOKBACK_MS) : null;
     for (let page = 0; page < 10; page++) {
-      const cursor = this.commandsState.cursor;
-      // One millisecond back: a sibling created in the same millisecond is read again, and known by its id.
-      const since = cursor ? iso(Date.parse(cursor) - 1) : null;
       const { commands, serverNow } = await this.cloud.commands(since);
-      let fresh = 0;
       for (const c of commands) {
         if (this.commandsState.handled[c.id]) continue;
-        fresh++;
         const outcome = await this.execute(c, serverNow);
         this.commandsState.handled[c.id] = c.created_at;
         if (!this.commandsState.cursor || c.created_at > this.commandsState.cursor) this.commandsState.cursor = c.created_at;
         this.state.writeJson('commands.json', this.commandsState);
         this.log.info('command.handled', { command_id: c.id, printer_id: c.printer_id, ...outcome });
       }
-      if (commands.length < 100 || !fresh) break;
+      if (commands.length < 100) break;
+      // A full page, handled or not, is read on from its last stamp — one millisecond back for that stamp's siblings —
+      // so a window holding a hundred handled commands cannot hide a newer one.
+      since = iso(Date.parse(commands[commands.length - 1].created_at) - 1);
     }
     const floor = this.commandsState.cursor ? Date.parse(this.commandsState.cursor) - 10 * 60_000 : 0;
     for (const [id, at] of Object.entries(this.commandsState.handled)) if (Date.parse(String(at)) < floor) delete this.commandsState.handled[id];
@@ -870,19 +1037,20 @@ export class Runner {
       return { command, outcome: 'skipped', reason: 'job_not_running_here', job_id: detail.job_id };
     }
     try {
+      // Each driver call is bounded: a machine that never answers fails its command, it does not hold the loop.
       if (command === 'pause') {
         if (rec) rec.pause_reason = 'operator_command';
-        await p.driver.pause();
-      } else if (command === 'resume') await p.driver.resume();
+        await this.bounded(p, () => p.driver.pause(), 'pause');
+      } else if (command === 'resume') await this.bounded(p, () => p.driver.resume(), 'resume');
       else if (command === 'stop') {
         if (rec) {
           rec.stop_requested = true;
           this.saveJob(rec);
         }
-        await p.driver.cancel();
+        await this.bounded(p, () => p.driver.cancel(), 'cancel');
       } else if (command === 'light_on' || command === 'light_off') {
         if (!p.driver.light) return { command, outcome: 'skipped', reason: 'unsupported_by_driver' };
-        await p.driver.light(command === 'light_on');
+        await this.bounded(p, () => p.driver.light(command === 'light_on'), 'light');
       } else if (command === 'camera_snapshot') return { command, outcome: 'skipped', reason: 'unsupported: the protocol carries camera metadata only' };
       else return { command, outcome: 'skipped', reason: 'unknown_command' };
     } catch (e) {
@@ -941,8 +1109,16 @@ export class Runner {
         }
         const ext = MODEL_EXT.exec(got.filename ?? '')?.[1]?.toLowerCase();
         if (!ext) return { ok: false, error_code: 'UNSUPPORTED_MODEL_FORMAT', detail: `file ${f.file_id} is not STL, 3MF or OBJ` };
+        let bytes = got.bytes;
+        if (ext === '3mf') {
+          // Customer-authored printer commands never reach the slicer: carriers refused, saved slicer config removed.
+          const screened = screen3mf(bytes);
+          if (!screened.ok) return { ok: false, error_code: screened.error_code, detail: `file ${f.file_id}: ${screened.detail}` };
+          if (screened.removed.length) this.log.info('model.config_removed', { file_id: f.file_id, parts: screened.removed });
+          bytes = screened.bytes;
+        }
         const path = join(workDir, `${f.file_id}.${ext}`);
-        writeFileSync(path, got.bytes);
+        writeFileSync(path, bytes);
         local.set(f.file_id, path);
       }
       const result = await /** @type {any} */ (this.slicer).slice({ input, files: local, workDir });

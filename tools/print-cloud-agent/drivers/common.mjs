@@ -83,9 +83,13 @@ export async function fileBytes(file) {
 }
 
 /**
- * One HTTP exchange with a printer host on the LAN, bounded by a timeout.
- * Answers parsed JSON (or text); throws DriverError UNREACHABLE for a
- * network failure and REFUSED (with the status) for an HTTP refusal.
+ * One HTTP exchange with a printer host on the LAN, bounded by a timeout —
+ * the WHOLE exchange: a fetch resolves at the response headers, and a host
+ * (or anything answering on its LAN address) that then stalls the body would
+ * otherwise hold the call, and through an operator command the agent's whole
+ * loop. Answers parsed JSON (or text); throws DriverError UNREACHABLE for a
+ * network failure or the deadline, REFUSED (with the status) for an HTTP
+ * refusal.
  *
  * @param {typeof fetch} fetchFn
  * @param {string} url
@@ -101,15 +105,17 @@ export async function httpCall(fetchFn, url, opts = {}) {
     }, opts.timeoutMs ?? 10_000);
   });
   let res;
+  let text;
   try {
     res = await Promise.race([fetchFn(url, { method: opts.method ?? 'GET', headers: opts.headers, body: opts.body, signal: controller.signal }), timeout]);
+    // The body is part of the exchange: the same deadline bounds it (its abort also ends a stalled read).
+    text = await Promise.race([res.text().catch(() => ''), timeout]);
   } catch (e) {
     if (e instanceof DriverError) throw e;
     throw new DriverError('UNREACHABLE', `${opts.method ?? 'GET'} ${new URL(url).pathname}: ${/** @type {Error} */ (e)?.message ?? String(e)}`, { cause: e });
   } finally {
     clearTimeout(timer);
   }
-  const text = await res.text().catch(() => '');
   let parsed = null;
   if (text) {
     try {

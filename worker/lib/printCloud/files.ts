@@ -8,7 +8,9 @@
  *     `sniffFormat`); a renamed file is refused, not trusted;
  *   - a 3MF is a ZIP: its entry list is read WITHOUT inflating anything and
  *     refused on path traversal, absolute paths, executables or scripts,
- *     nested archives, too many entries, or a missing 3D model part;
+ *     nested archives, too many entries, or a missing 3D model part — and,
+ *     with its own code (MODEL_CONTAINS_GCODE), on a part a slicer turns into
+ *     printer commands (see SLICER_GCODE_PART);
  *   - SHA-256 of the content; stored in the PRIVATE bucket under
  *     `print-cloud/<owner>/models/<file>.<ext>`, which /files never serves.
  *
@@ -34,11 +36,27 @@ export type SupportedExtension = (typeof SUPPORTED_EXTENSIONS)[number];
 
 const MAX_ARCHIVE_ENTRIES = 1000;
 const FORBIDDEN_ENTRY = /\.(exe|dll|bat|cmd|com|scr|ps1|psm1|vbs|vbe|js|jse|wsf|wsh|hta|msi|jar|sh|bash|py|php|pl|rb|app|apk|lnk|zip|rar|7z|gz|tar)$/i;
+/**
+ * Parts a slicer turns into PRINTER COMMANDS: PrusaSlicer's per-layer custom
+ * G-code (a «custom» entry's text is written into the G-code verbatim at its
+ * layer), Bambu Studio's / OrcaSlicer's per-plate one, and any G-code file (a
+ * sliced plate). The workshop never runs a customer's machine commands, so
+ * such a model is refused at upload with its own code. Matched as the slicers
+ * match them, and wider: case-blind, `\` read as `/`, in any folder. The
+ * workshop agent refuses the same parts before slicing (files stored before
+ * this check) and removes the slicer configuration a project 3MF saves
+ * (tools/print-cloud-agent/slicers/model3mf.mjs) — that config is in nearly
+ * every slicer-saved 3MF, so it is not refused here.
+ */
+const SLICER_GCODE_PART = /(^|\/)(prusa_slicer_custom_gcode_per_print_z\.xml|custom_gcode_per_layer\.xml)$/i;
+const GCODE_FILE = /\.(gcode|gco|g|bgcode|bgc)$/i;
 
 export interface ArchiveInspection {
   ok: boolean;
   entries: number;
   reason?: 'ARCHIVE_UNREADABLE' | 'ARCHIVE_TOO_MANY_ENTRIES' | 'ARCHIVE_PATH_TRAVERSAL' | 'ARCHIVE_DANGEROUS_ENTRY' | 'ARCHIVE_NO_MODEL';
+  /** The part that carries printer commands (refused as MODEL_CONTAINS_GCODE, not FILE_REJECTED). */
+  gcodePart?: string;
   detail?: string;
 }
 
@@ -65,6 +83,7 @@ export function inspect3mfArchive(bytes: Uint8Array): ArchiveInspection {
       return { ok: false, entries: names.length, reason: 'ARCHIVE_PATH_TRAVERSAL', detail: n.slice(0, 120) };
     }
     if (FORBIDDEN_ENTRY.test(norm)) return { ok: false, entries: names.length, reason: 'ARCHIVE_DANGEROUS_ENTRY', detail: n.slice(0, 120) };
+    if (SLICER_GCODE_PART.test(norm) || GCODE_FILE.test(norm)) return { ok: false, entries: names.length, gcodePart: n.slice(0, 120) };
   }
   if (!names.some((n) => /\.model$/i.test(n))) return { ok: false, entries: names.length, reason: 'ARCHIVE_NO_MODEL' };
   return { ok: true, entries: names.length };
@@ -108,6 +127,7 @@ export async function validateUpload(bytes: Uint8Array, originalName: string, ma
   if (sniffed !== expected) throw pcError('FILE_TYPE_NOT_SUPPORTED', { reason: 'CONTENT_DOES_NOT_MATCH_EXTENSION', detected: sniffed });
   if (expected === '3mf') {
     const archive = inspect3mfArchive(bytes);
+    if (archive.gcodePart) throw pcError('MODEL_CONTAINS_GCODE', { part: archive.gcodePart });
     if (!archive.ok) throw pcError('FILE_REJECTED', { reason: archive.reason, detail: archive.detail ?? '' });
   }
   return { extension: expected as SupportedExtension, format: sniffed, sha256: await sha256OfBytes(bytes), size: bytes.byteLength };

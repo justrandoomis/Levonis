@@ -15,6 +15,8 @@ export interface SlicePlan {
   pauseLayers: number[];
 }
 
+/** Is a model's transform the identity for a job oriented `orientation` (unscaled, whole turns only, oriented as the job)? */
+export function identityTransform(transform: unknown, orientation: 'auto' | 'as_uploaded'): boolean;
 export function planSlice(input: Record<string, any>, cfg: Record<string, any>): { ok: true; plan: SlicePlan } | SliceFailure;
 
 export interface CliResult {

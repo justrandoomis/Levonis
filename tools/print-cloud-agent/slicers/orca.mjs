@@ -16,6 +16,10 @@
  *   wall_loops ← walls                          enable_support ← supports ≠ none
  *   support_type ← tree(auto) | normal(auto)    brim_type ← outer_only | no_brim
  * ("auto" supports keep the profile's own support type.)
+ *   gcode_label_objects ← "0", always: object names come from the customer's
+ *   3MF, and OrcaSlicer writes them unescaped into `; printing object <name>`
+ *   lines — a newline in a name would start a printer command. (OrcaSlicer's
+ *   key; not verified against Bambu Studio, which is expected to ignore it.)
  */
 import { existsSync, readdirSync } from 'node:fs';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
@@ -32,6 +36,8 @@ export function orcaProcessOverrides(settings) {
   else if (settings.supports === 'normal') Object.assign(o, { enable_support: '1', support_type: 'normal(auto)' });
   else if (settings.supports === 'auto') o.enable_support = '1';
   if (typeof settings.brim === 'boolean') o.brim_type = settings.brim ? 'outer_only' : 'no_brim';
+  // No object label: a customer's object name never reaches the G-code (see the header).
+  o.gcode_label_objects = '0';
   return o;
 }
 

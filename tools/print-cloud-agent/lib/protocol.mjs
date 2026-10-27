@@ -75,8 +75,7 @@ function retryAfterMs(value, now) {
   return Number.isNaN(at) ? null : Math.max(0, at - now);
 }
 
-async function readBody(res) {
-  const text = await res.text();
+function parseBody(text) {
   if (!text) return null;
   try {
     return JSON.parse(text);
@@ -145,15 +144,14 @@ export class CloudClient {
       if (res) {
         if (res.status >= 200 && res.status < 300) {
           if (opts.download) {
-            const bytes = await this.readBytes(res);
-            this.log.debug('cloud.request', { method, path: url.pathname, status: res.status, ms: this.clock() - started, bytes: bytes.length });
-            return { status: res.status, data: null, headers: res.headers, bytes };
+            this.log.debug('cloud.request', { method, path: url.pathname, status: res.status, ms: this.clock() - started, bytes: res.bytes.length });
+            return { status: res.status, data: null, headers: res.headers, bytes: res.bytes };
           }
-          const parsed = await readBody(res);
+          const parsed = parseBody(res.text);
           this.log.debug('cloud.request', { method, path: url.pathname, status: res.status, ms: this.clock() - started });
           return { status: res.status, data: parsed && typeof parsed === 'object' && 'data' in parsed ? parsed.data : parsed, headers: res.headers };
         }
-        const parsed = await readBody(res).catch(() => null);
+        const parsed = parseBody(res.text);
         const code = parsed && typeof parsed.code === 'string' ? parsed.code : null;
         const retryable = res.status >= 500 || res.status === 429 || (res.status === 409 && code === 'STATE_CHANGED' && opts.retryStateChanged !== false);
         last = new CloudError({ status: res.status, code, message: typeof parsed?.error === 'string' ? parsed.error : undefined, details: parsed?.details ?? null, retryable });
@@ -169,7 +167,15 @@ export class CloudClient {
     throw last ?? new CloudError({ status: 0, message: 'no attempt made', retryable: true });
   }
 
-  /** One HTTP exchange bounded by a timeout, whether or not the fetch honours its abort signal. */
+  /**
+   * One HTTP exchange — the response AND its body — bounded by a timeout,
+   * whether or not the fetch honours its abort signal. A fetch resolves at
+   * the headers: a body that then stalls would otherwise hold the agent's
+   * loop (or, for a model download, every later slicing claim). An error
+   * answer's body is read under the same deadline and may come back empty:
+   * its status is the answer.
+   * @returns {Promise<{ status: number, headers: Headers, text?: string, bytes?: Buffer }>}
+   */
   async once(method, url, opts, timeoutMs) {
     const controller = new AbortController();
     const body = typeof opts.body === 'function' ? opts.body() : opts.body;
@@ -183,10 +189,14 @@ export class CloudClient {
       }, timeoutMs);
     });
     try {
-      return await Promise.race([
+      const res = await Promise.race([
         this.fetch(url.toString(), { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal }),
         timeout,
       ]);
+      const ok = res.status >= 200 && res.status < 300;
+      if (ok && opts.download) return { status: res.status, headers: res.headers, bytes: await Promise.race([this.readBytes(res), timeout]) };
+      if (ok) return { status: res.status, headers: res.headers, text: await Promise.race([res.text(), timeout]) };
+      return { status: res.status, headers: res.headers, text: await Promise.race([res.text(), timeout]).catch(() => '') };
     } finally {
       clearTimeout(timer);
     }

@@ -31,6 +31,7 @@
  * each other's readings).
  */
 import { closeSync, constants as fsConstants, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeSync } from 'node:fs';
+import { uptime } from 'node:os';
 import { dirname, join } from 'node:path';
 
 export const STATE_FILE = 'state.json';
@@ -163,12 +164,38 @@ function pidAlive(pid) {
   }
 }
 
+/** The kernel's id of this boot (Linux), or null where there is none. */
+function currentBootId() {
+  try {
+    return readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Was this lock taken before the machine last booted? Then nobody holds it,
+ * whatever its pid names now: after a power cut that pid belongs to another
+ * process — or to one of this process's own threads, which kill(pid, 0) also
+ * answers — and a pid alone would keep the agent down for good (exit 78,
+ * which the service never restarts). The kernel's boot id decides where there
+ * is one (it does not depend on a clock that may come back wrong after a
+ * power cut); elsewhere, or for a lock written before boot ids were recorded,
+ * the lock's own time against the boot time.
+ */
+function takenBeforeThisBoot(holder, bootId) {
+  if (bootId && typeof holder.boot_id === 'string' && holder.boot_id) return holder.boot_id !== bootId;
+  const since = Date.parse(String(holder.since));
+  return Number.isFinite(since) && since < Date.now() - uptime() * 1000;
+}
+
 function takeLock(dir, clock) {
   const path = join(dir, LOCK_FILE);
+  const bootId = currentBootId();
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const fd = openSync(path, 'wx', 0o600);
-      writeSync(fd, JSON.stringify({ pid: process.pid, since: new Date(clock()).toISOString() }));
+      writeSync(fd, JSON.stringify({ pid: process.pid, boot_id: bootId, since: new Date(clock()).toISOString() }));
       fsyncSync(fd);
       closeSync(fd);
       return path;
@@ -180,10 +207,11 @@ function takeLock(dir, clock) {
       } catch {
         holder = null;
       }
-      if (holder && pidAlive(holder.pid) && holder.pid !== process.pid) {
+      if (holder && !takenBeforeThisBoot(holder, bootId) && pidAlive(holder.pid) && holder.pid !== process.pid) {
         throw new StateError('STATE_LOCKED', `another agent process (pid ${holder.pid}) is using ${dir}: two processes must never share one boot counter`);
       }
-      // A lock left by a process that is gone (or by this very process in a test that reopened the state).
+      // A lock left by a process that is gone — before this boot, or since — or by this very process in a test that
+      // reopened the state.
       rmSync(path, { force: true });
     }
   }
