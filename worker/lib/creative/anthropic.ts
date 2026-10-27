@@ -37,9 +37,9 @@
  * when its outcome is unknown (spec §29).
  */
 import type { AiTask, Effort } from '../../../packages/creativeDoc/src/api';
-import { readCapped } from '../fx/readCapped';
 import type { Env } from '../types';
 import { openProviderKey } from './keyVault';
+import { readBodyCapped } from './readBody';
 import type { Capabilities } from './settings';
 
 export const PROVIDER_HOST = 'api.anthropic.com';
@@ -234,7 +234,7 @@ async function attempt(url: string, init: RequestInit, timeoutMs: number, fetchI
     await res.body?.cancel().catch(() => undefined);
     return { kind: 'response', res: { status: res.status, text: null, headers: res.headers } };
   }
-  const body = await readCapped(res, RESPONSE_CAP_BYTES, signal);
+  const body = await readBodyCapped(res, RESPONSE_CAP_BYTES, signal);
   if (!body.ok) {
     // A 200 whose body could not be read whole: it was processed (billed), its usage is unknown.
     return { kind: 'failed', code: body.code === 'TIMEOUT' ? 'PROVIDER_TIMEOUT' : 'PROVIDER_ERROR', billing: 'unknown' };

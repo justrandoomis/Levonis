@@ -22,7 +22,8 @@ import { OWNER, MERCHANT_HOST, all, get, json as body, post, put, send } from '.
 import {
   ASSISTANT, BASE, ENC_KEY, FULL, MODEL_A, MODEL_B, SECRET_KEY, TYPED_KEY, deepStrings, message, standardProvider, stubProvider, studioApp, studioDb,
 } from './fixtures/creativeStudio';
-import { messagesBody } from '../worker/lib/creative/anthropic';
+import { RESPONSE_CAP_BYTES, messagesBody } from '../worker/lib/creative/anthropic';
+import { readBodyCapped } from '../worker/lib/creative/readBody';
 import { NO_CAPABILITIES } from '../worker/lib/creative/settings';
 import { sealWith, unsealWith } from '../worker/lib/sealbox';
 import { PROVIDER_KEY_AAD, openProviderKey, sealProviderKey } from '../worker/lib/creative/keyVault';
@@ -279,4 +280,23 @@ test('AI routes refuse before anything when no key or no model is configured', a
   assert.equal(r2.status, 409);
   assert.equal((await body(r2)).code, 'MODEL_NOT_SELECTED');
   assert.equal(all(raw, 'SELECT * FROM creative_jobs').length, 0);
+});
+
+test('the answer reader: a declared or streamed body over the cap is TOO_LARGE, a fired deadline TIMEOUT, a whole body its text', async () => {
+  const big = new Uint8Array(RESPONSE_CAP_BYTES + 1);
+  assert.deepEqual(await readBodyCapped(new Response(big, { headers: { 'content-length': String(big.byteLength) } }), RESPONSE_CAP_BYTES), { ok: false, code: 'TOO_LARGE' });
+  // No content-length: the stream itself is counted and cancelled past the cap.
+  let pulled = 0;
+  const endless = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pulled += 1;
+      controller.enqueue(new Uint8Array(64 * 1024));
+    },
+  });
+  assert.deepEqual(await readBodyCapped(new Response(endless), RESPONSE_CAP_BYTES), { ok: false, code: 'TOO_LARGE' });
+  assert.ok(pulled <= RESPONSE_CAP_BYTES / (64 * 1024) + 2, 'reading stops at the cap, not at the end of an endless body');
+  // A body that never finishes: the attempt's deadline ends the read.
+  const stalled = new ReadableStream<Uint8Array>({ pull: () => new Promise<void>(() => undefined) });
+  assert.deepEqual(await readBodyCapped(new Response(stalled), RESPONSE_CAP_BYTES, AbortSignal.timeout(20)), { ok: false, code: 'TIMEOUT' });
+  assert.deepEqual(await readBodyCapped(Response.json({ ok: 'yes' }), RESPONSE_CAP_BYTES), { ok: true, text: '{"ok":"yes"}' });
 });
