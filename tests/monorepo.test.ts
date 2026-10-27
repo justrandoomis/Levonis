@@ -22,8 +22,11 @@ const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 // storefront; pure for the same reason the pricing engine is.
 // `catalog` (wave 2, W2-F): the product variant model shared by the Worker and the
 // editor/storefront; pure for the same reason.
-const PURE_PACKAGES = ['pricing', 'shipping', 'storeLayout', 'catalog'];
-const ALL_PACKAGES = ['platform-kit', 'contracts', 'pricing', 'shipping', 'storeLayout', 'catalog'];
+// `creativeDoc` (Creative Studio, docs/CREATIVE_STUDIO.md): the ad document, its
+// bounded operations and AI contracts, shared by the Worker and the studio editor;
+// pure so the gate the Worker runs is byte-for-byte the gate the editor runs.
+const PURE_PACKAGES = ['pricing', 'shipping', 'storeLayout', 'catalog', 'creativeDoc'];
+const ALL_PACKAGES = ['platform-kit', 'contracts', 'pricing', 'shipping', 'storeLayout', 'catalog', 'creativeDoc'];
 
 test('root workspaces and per-package manifests', () => {
   const pkg = JSON.parse(read('package.json')) as { workspaces?: string[]; scripts: Record<string, string> };

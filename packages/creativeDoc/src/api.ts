@@ -1,0 +1,401 @@
+/**
+ * THE HTTP CONTRACT between the Worker (`worker/routes/adminCreativeStudio.ts`)
+ * and the studio SPA (`src/components/creativeStudio/`). One file, imported by
+ * both (the SPA imports it by relative path, `import type` only).
+ *
+ * Mount: `/api/admin/creative-studio` (apex host only, like every admin router).
+ * Bodies are `{ success: true, ...dto }` or `{ success: false, error, code, details? }`.
+ *
+ * ROLES (spec §32, adapted to the repository's model):
+ *   owner           the verified owner (INITIAL_ADMIN_EMAIL): provider key, model,
+ *                   budget, rates, brand-kit versions and approval, service claims
+ *   full admin      designer + reviewer: documents, AI requests, exports, approval
+ *   assistant admin refused (403 CREATIVE_SCOPE_REQUIRED) — no studio access yet
+ * Every check is on the server; the SPA only hides what it cannot use.
+ *
+ * DEPLOY-AHEAD (CLAUDE.md rule 2): every read tolerates a database without the
+ * studio tables — list reads answer 200 `{ migrated: false, ... }` with empty
+ * data, item reads answer 404; writes answer 503 CREATIVE_SCHEMA_MISSING.
+ */
+import type { Idea, Proposal, ReviewNote, CarouselSlidePlan, EditPatch } from './aiContracts';
+import type { BrandKit } from './brand';
+import type { DocIssue } from './normalize';
+import type { QualityReport } from './quality';
+import type { Annotation, CreativeDocument, DocFormat, Objective, VisualPriority, Density } from './schema';
+import type { Localized, ProductSnapshot, ProductSnapshotData, SnapshotAvailability, SnapshotChange, SnapshotImage, SnapshotPrice, PriceStatus } from './snapshot';
+import type { TemplateId, VariantId, FamilyId } from './templates';
+
+export const CREATIVE_API = '/api/admin/creative-studio';
+
+export type ErrorCode =
+  | 'CREATIVE_SCHEMA_MISSING' | 'CREATIVE_SCOPE_REQUIRED' | 'OWNER_ONLY' | 'OWNER_EMAIL_UNVERIFIED' | 'FRESH_SESSION_REQUIRED'
+  | 'NOT_FOUND' | 'INVALID_INPUT' | 'INVALID_DOCUMENT' | 'VERSION_CONFLICT' | 'STALE_VERSION' | 'IDEMPOTENCY_KEY_REUSED'
+  | 'KEY_NOT_CONFIGURED' | 'ENCRYPTION_NOT_CONFIGURED' | 'MODEL_NOT_SELECTED' | 'BUDGET_EXCEEDED' | 'PARALLEL_LIMIT'
+  | 'KEY_REJECTED' | 'MODEL_GONE' | 'PROVIDER_RATE_LIMITED' | 'PROVIDER_OVERLOADED' | 'PROVIDER_TIMEOUT' | 'PROVIDER_ERROR'
+  | 'PROVIDER_REFUSED' | 'OUTPUT_TRUNCATED' | 'INVALID_OUTPUT' | 'JOB_CANCELLED' | 'JOB_ALREADY_APPLIED'
+  | 'SOURCE_CHANGED' | 'QA_BLOCKERS' | 'APPROVAL_STALE' | 'UNSUPPORTED_MEDIA' | 'FILE_TOO_LARGE' | 'ASSET_IN_USE' | 'RATE_LIMITED';
+
+// ---------------------------------------------------------------------------
+// Provider (owner)
+// ---------------------------------------------------------------------------
+
+export type Effort = 'low' | 'medium' | 'high';
+
+export interface BudgetSettings {
+  /** Hard caps, enforced on the server with a reservation before every call. */
+  daily_requests: number;
+  daily_tokens: number;
+  /** USD caps apply only when rates are set (no rates → token and request caps only). */
+  daily_usd: number | null;
+  monthly_usd: number | null;
+  /** Concurrent AI calls per studio (batch create obeys it too). */
+  max_parallel: number;
+  /** Automatic fix rounds after a quality check (spec §23: default 2). */
+  auto_fix_rounds: number;
+}
+
+export interface Rates {
+  input_per_mtok_usd: number;
+  output_per_mtok_usd: number;
+  /** Where the owner took the numbers from, and when — costs are always labelled ESTIMATED. */
+  source: string;
+  as_of: string;
+}
+
+export interface UsageTotals {
+  requests: number;
+  input_tokens: number;
+  output_tokens: number;
+  /** Estimated from the owner's rates; null when no rates are set. Never billing data. */
+  est_cost_usd: number | null;
+}
+
+export interface ProviderStatusDto {
+  migrated: boolean;
+  provider: 'anthropic';
+  /** `stored`: the owner's key, encrypted in D1. `worker_secret`: the Worker secret ANTHROPIC_API_KEY. */
+  key: { source: 'stored' | 'worker_secret' | 'none'; hint: string | null; set_at: string | null };
+  /** CREATIVE_STUDIO_ENC_KEY is set and a seal/unseal round trip works — required to store a key. */
+  encryption_ready: boolean;
+  /** The owner's choice from the live model list (never a default written in the repository). */
+  model: string | null;
+  effort: Effort | null;
+  last_test: { ok: boolean; at: string; code: string | null } | null;
+  capabilities: { structured_outputs: boolean | null; vision: boolean | null; effort: boolean | null };
+  budget: BudgetSettings;
+  rates: Rates | null;
+  vision_review: boolean;
+  today: UsageTotals;
+  month: UsageTotals;
+  /** True for the owner: the settings page is editable. */
+  can_manage: boolean;
+  /** AI requests can be made now (key + model + budget left). */
+  ready: boolean;
+  /** Why not, when not ready. */
+  not_ready_code: ErrorCode | null;
+}
+
+export interface ModelDto {
+  id: string;
+  display_name: string;
+  created_at: string | null;
+  structured_outputs: boolean | null;
+  vision: boolean | null;
+  effort: boolean | null;
+}
+
+export interface UsageRecordDto {
+  id: string;
+  created_at: string;
+  task: AiTask;
+  model: string | null;
+  status: 'ok' | 'error' | 'cancelled' | 'refused';
+  error_code: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  est_cost_usd: number | null;
+  actor_name: string | null;
+  document_id: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Store (read-only)
+// ---------------------------------------------------------------------------
+
+export interface ProductListItemDto {
+  id: string;
+  slug: string;
+  name: Localized;
+  brand: Localized | null;
+  image: { url: string; same_origin: boolean; width: number | null; height: number | null } | null;
+  price_status: PriceStatus;
+  display_price_iqd: number | null;
+  availability: SnapshotAvailability;
+  has_variants: boolean;
+  category_id: string | null;
+}
+
+export interface ProductVariantDto {
+  key: string;
+  label: Localized;
+  images: SnapshotImage[];
+  price: SnapshotPrice;
+  availability: SnapshotAvailability;
+}
+
+export interface ProductDetailDto {
+  id: string;
+  slug: string;
+  path: string;
+  name: Localized;
+  brand: Localized | null;
+  category: Localized | null;
+  images: SnapshotImage[];
+  price: SnapshotPrice;
+  availability: SnapshotAvailability;
+  variants: ProductVariantDto[];
+  specs: ProductSnapshotData['specs'];
+  contents: ProductSnapshotData['contents'];
+}
+
+export interface VerifyDto {
+  snapshot_id: string;
+  fresh: ProductSnapshot | null;
+  changes: SnapshotChange[];
+}
+
+// ---------------------------------------------------------------------------
+// Brand and claims
+// ---------------------------------------------------------------------------
+
+export interface BrandDto {
+  migrated: boolean;
+  /** null = no saved version yet: the default kit, pending the owner's approval. */
+  version: number | null;
+  status: 'default' | 'pending' | 'approved';
+  kit: BrandKit;
+  /** The site logo's natural size (src/lib/siteLogo.ts serves the file). */
+  site_logo: { width: number; height: number };
+}
+
+export interface BrandVersionDto {
+  version: number;
+  status: 'pending' | 'approved';
+  note: string;
+  created_at: string;
+  created_by_name: string | null;
+  approved_at: string | null;
+}
+
+export interface ClaimDto {
+  id: string;
+  key: string;
+  version: number;
+  status: 'pending' | 'approved' | 'retired';
+  title: Localized;
+  summary: Localized;
+  conditions: Localized;
+  details_path: string | null;
+  product_ids: string[];
+  valid_from: string | null;
+  valid_until: string | null;
+  last_verified_at: string | null;
+  source_note: string;
+  approved_at: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Assets
+// ---------------------------------------------------------------------------
+
+export type AssetKind = 'logo' | 'background' | 'reference_liked' | 'reference_rejected' | 'product_extra' | 'icon' | 'element';
+
+export interface AssetDto {
+  id: string;
+  kind: AssetKind;
+  label: string;
+  mime: string;
+  width: number | null;
+  height: number | null;
+  bytes: number;
+  /** spec §38: original catalogue picture / uploaded by a person / generated / derived. */
+  provenance: 'uploaded' | 'catalog' | 'generated' | 'derived';
+  derived_from: string | null;
+  product_id: string | null;
+  review: 'approved' | 'needs_review' | 'rejected';
+  note: string;
+  created_at: string;
+  /** Same-origin url the editor draws (`/api/admin/creative-studio/assets/<id>/file`). */
+  url: string;
+}
+
+// ---------------------------------------------------------------------------
+// Documents
+// ---------------------------------------------------------------------------
+
+export type DocStatus = 'idea' | 'draft' | 'in_review' | 'approved' | 'scheduled' | 'published' | 'archived' | 'failed';
+export type DocKind = 'post' | 'slide' | 'experiment';
+export type VersionOrigin = 'manual' | 'ai' | 'template' | 'restore' | 'relayout' | 'import';
+
+export interface DocumentSummaryDto {
+  id: string;
+  title: string;
+  status: DocStatus;
+  kind: DocKind;
+  format: DocFormat;
+  product_id: string | null;
+  product_name: Localized | null;
+  template_id: string | null;
+  version: number;
+  approved_version: number | null;
+  /** Why an approved design needs review again (price changed, claim changed…); empty when it does not. */
+  needs_review: string[];
+  campaign_id: string | null;
+  parent_id: string | null;
+  updated_at: string;
+  created_at: string;
+  /** The latest export's id, for a thumbnail. */
+  thumb_export_id: string | null;
+}
+
+export interface DocumentDto extends DocumentSummaryDto {
+  content: CreativeDocument;
+  brand_version: number | null;
+  updated_by_name: string | null;
+  /** Normaliser issues found when the stored content was read (non-fatal; fatal content is never stored). */
+  issues: DocIssue[];
+}
+
+export interface VersionDto {
+  version: number;
+  origin: VersionOrigin;
+  change_summary: string;
+  created_at: string;
+  created_by_name: string | null;
+  job_id: string | null;
+}
+
+export type RejectReason = 'product_small' | 'crowded' | 'text_long' | 'background_off' | 'wrong_variant_image' | 'unclear' | 'other';
+
+export interface ReviewDto {
+  id: string;
+  version: number;
+  decision: 'approved' | 'rejected';
+  reasons: RejectReason[];
+  note: string;
+  brand_version: number | null;
+  export_ids: string[];
+  actor_name: string | null;
+  created_at: string;
+  invalidated_at: string | null;
+  invalidated_reason: string | null;
+}
+
+export type ExportKind = 'png' | 'jpeg' | 'webp' | 'project_json' | 'background';
+
+export interface ExportDto {
+  id: string;
+  document_id: string;
+  version: number;
+  kind: ExportKind;
+  width: number | null;
+  height: number | null;
+  bytes: number;
+  final: boolean;
+  /** The server's re-verification of the bound data at export time. */
+  source_check: 'fresh' | 'changed' | 'unverified' | 'none';
+  created_at: string;
+  url: string;
+}
+
+// ---------------------------------------------------------------------------
+// AI
+// ---------------------------------------------------------------------------
+
+export type AiTask = 'test' | 'ideas' | 'compose' | 'edit' | 'review' | 'carousel';
+export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+
+export interface JobDto {
+  id: string;
+  task: AiTask;
+  status: JobStatus;
+  document_id: string | null;
+  base_version: number | null;
+  error_code: string | null;
+  created_at: string;
+  finished_at: string | null;
+  applied_at: string | null;
+}
+
+export interface AiUsageDto {
+  input_tokens: number;
+  output_tokens: number;
+  est_cost_usd: number | null;
+  model: string;
+}
+
+/** Deterministic evidence for «شنو أنشر اليوم؟» — computed from the studio's own records, shown with or without AI. */
+export interface OpportunityDto {
+  id: string;
+  kind: 'arrival' | 'back_in_stock' | 'offer' | 'coverage_gap' | 'service_claim' | 'owner_priority' | 'education_topic' | 'history';
+  ref: string;
+  label: Localized;
+  detail: string;
+  detected_at: string | null;
+}
+
+export interface IdeaRecordDto extends Idea {
+  id: string;
+  status: 'new' | 'used' | 'dismissed';
+  job_id: string;
+  created_at: string;
+}
+
+export interface IdeasRequest { count: number; priorities: string[]; idempotency_key: string }
+export interface IdeasResponse { job_id: string; ideas: IdeaRecordDto[]; rejected: number; notes: string[]; usage: AiUsageDto }
+
+export interface ComposeRequest {
+  /** A product snapshot (product posts) or an approved claim (service posts). */
+  snapshot_id: string | null;
+  claim_id: string | null;
+  objective: Objective;
+  priority: VisualPriority;
+  density: Density;
+  template: TemplateId;
+  family: FamilyId | null;
+  variants: VariantId[];
+  locale: 'ar' | 'en';
+  /** The owner's own words about this post (optional). */
+  brief: string;
+  idempotency_key: string;
+}
+export interface ComposeResponse { job_id: string; proposals: Proposal[]; rejected: number; warnings: string[]; missing: string[]; usage: AiUsageDto }
+
+export interface EditRequest {
+  document_id: string;
+  base_version: number;
+  instruction: string;
+  /** Selected / pointed-at layers; null = the owner asked for a design-wide change. */
+  scope_ids: string[] | null;
+  annotations: Annotation[];
+  idempotency_key: string;
+}
+export interface EditResponse {
+  job_id: string;
+  /** The validated patch; the editor previews it and applies it locally after the owner confirms. */
+  patch: EditPatch;
+  usage: AiUsageDto;
+}
+
+export interface ReviewRequest { document_id: string; version: number; image_base64: string; idempotency_key: string }
+export interface ReviewResponse { job_id: string; notes: ReviewNote[]; summary: string; usage: AiUsageDto }
+
+export interface CarouselRequest { snapshot_id: string | null; claim_id: string | null; topic: string; slides: number; locale: 'ar' | 'en'; idempotency_key: string }
+export interface CarouselResponse { job_id: string; slides: CarouselSlidePlan[]; caption: string; rejected: number; usage: AiUsageDto }
+
+export interface ApproveRequest {
+  version: number;
+  /** The editor's full report (text fit, fonts and assets are measured in the browser); the server re-runs every check it can. */
+  qa: QualityReport;
+  export_ids: string[];
+}

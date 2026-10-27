@@ -1,0 +1,13 @@
+{
+  "name": "@levonis/creativeDoc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Levonis Creative Studio as data: the versioned ad document (scene graph of text, image, shape and group layers with stable ids), the bounded edit operations both people and Claude use, the one normaliser every document passes, the AI output contracts and their validators, the brand kit, the templates and their stack layout, and the deterministic quality checks. Pure: no I/O, no Cloudflare bindings, no imports from worker/ or services/.",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json"
+  }
+}

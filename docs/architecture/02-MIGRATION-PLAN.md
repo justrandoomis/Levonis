@@ -91,8 +91,10 @@ Levonis/
 │   ├── shipping/                     # (new) pure quote engine: shipping.ts iraqGovernorates.ts
 │   ├── storeLayout/                  # (merchant platform wave 2, W2-C) pure store-page schema: schema.ts tokens.ts blocks.ts text.ts refs.ts
 │   │                                 #   normalize.ts defaults.ts data.ts — one normaliser for Worker (write + read), builder and storefront
-│   └── catalog/                      # (merchant platform wave 2, W2-F) pure product model: variants.ts lifecycle.ts legacy.ts palette.ts
-│                                     #   attributes.ts — one variant gate for the Worker (authoritative), the editor and the storefront
+│   ├── catalog/                      # (merchant platform wave 2, W2-F) pure product model: variants.ts lifecycle.ts legacy.ts palette.ts
+│   │                                 #   attributes.ts — one variant gate for the Worker (authoritative), the editor and the storefront
+│   └── creativeDoc/                  # (Creative Studio, docs/CREATIVE_STUDIO.md) pure ad document: schema.ts normalize.ts ops.ts layout.ts
+│                                     #   templates.ts brand.ts snapshot.ts quality.ts aiContracts.ts api.ts — one gate for Worker and editor
 ├── services/
 │   ├── gateway/        wrangler.jsonc package.json OWNERSHIP.json SECRETS.md src/{index.ts,routes.ts,capabilities.ts,pipeline.ts,cache.ts,limiter.ts,principal.ts,uploadClasses.ts} tests/
 │   ├── probes/         (1.0) throwaway Workers, one per platform question; deleted after the results are recorded in 04-DECISIONS.md ADR-017

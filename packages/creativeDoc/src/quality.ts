@@ -1,0 +1,203 @@
+/**
+ * DETERMINISTIC QUALITY CHECKS (spec §23, §44 layer 1).
+ *
+ * These are facts the app can prove: the picture belongs to the bound
+ * product and variant, the price came from a verified source, the product is
+ * not transformed, the fonts and pictures are really loaded, the text fits,
+ * essentials are inside the safe area, nothing overlaps that should not.
+ * Visual taste is NOT judged here (that is the optional model review, which
+ * is advice only).
+ *
+ *   blocker   blocks approval and the final export (a draft or preview can
+ *             still be exported, clearly marked)
+ *   review    shown as needing a person's look
+ *   optional  a suggestion
+ *
+ * The report lists which checks RAN and which were SKIPPED (no measurer, no
+ * font list, no re-verification yet). "Passed" means exactly the checks that
+ * ran — never a quality score (spec §44).
+ */
+import type { BrandKit } from './brand';
+import { detectConflicts, textFits } from './layout';
+import { FONT_REGISTRY, layerBox, safeBox, type CreativeDocument, type ImageLayer, type TextLayer } from './schema';
+import { blockingChanges, type ProductSnapshot, type ServiceClaimText, type SnapshotChange } from './snapshot';
+import { containsPriceLike, type TextMeasurer } from './text';
+
+export type Severity = 'blocker' | 'review' | 'optional';
+
+export type QualityCode =
+  | 'snapshot_missing' | 'wrong_variant_image' | 'test_data' | 'price_unavailable' | 'unbound_price_text' | 'source_changed'
+  | 'unverified_source' | 'product_transformed' | 'product_detail_crop' | 'low_resolution' | 'font_weight' | 'missing_glyph'
+  | 'font_not_loaded' | 'text_overflow' | 'small_text' | 'outside_safe_area' | 'overlap' | 'off_canvas' | 'off_palette'
+  | 'asset_missing' | 'dense' | 'claim_missing' | 'claim_changed' | 'conditions_missing' | 'alt_text_missing'
+  | 'caption_missing' | 'not_sorani' | 'headline_missing' | 'bound_text_missing';
+
+export interface QualityIssue {
+  code: QualityCode;
+  severity: Severity;
+  layer_ids: string[];
+  detail?: string;
+}
+
+export type CheckName = 'data' | 'product' | 'fonts' | 'text_fit' | 'layout' | 'brand' | 'assets' | 'claims' | 'language' | 'meta';
+
+export interface QualityReport {
+  issues: QualityIssue[];
+  blockers: number;
+  ran: CheckName[];
+  skipped: Array<{ check: CheckName; why: string }>;
+}
+
+export interface ClaimState extends ServiceClaimText {
+  approved: boolean;
+  valid_until: string | null;
+}
+
+export interface QualityContext {
+  brand: BrandKit;
+  /** Snapshots by product binding slot. */
+  snapshots: Readonly<Record<string, Pick<ProductSnapshot, 'id' | 'data' | 'source'>>>;
+  /** Claims by id, with their approval state. */
+  claims: Readonly<Record<string, ClaimState>>;
+  /** Re-verification result per slot (fresh vs bound snapshot); absent = not verified yet. */
+  verification?: Readonly<Record<string, SnapshotChange[]>>;
+  measure?: TextMeasurer;
+  /** CSS family+weight keys ("IBM Plex Sans Arabic|700") the browser reports loaded. */
+  fontsLoaded?: ReadonlySet<string>;
+  /** Image refs that decoded successfully in the renderer. */
+  assetsLoaded?: ReadonlySet<string>;
+  /** `final`: approval or a final export — unverified data becomes a blocker. */
+  final: boolean;
+  /** "now" as an ISO string (passed in: the package has no clock). */
+  now: string;
+}
+
+const ARABIC_ONLY = /[\u0629\u0649\u064A\u0643]/;
+
+export function fontKey(family: string, weight: number): string {
+  return `${family}|${weight}`;
+}
+
+export function qualityReport(doc: CreativeDocument, ctx: QualityContext): QualityReport {
+  const issues: QualityIssue[] = [];
+  const ran: CheckName[] = [];
+  const skipped: QualityReport['skipped'] = [];
+  const add = (code: QualityCode, severity: Severity, layer_ids: string[] = [], detail?: string) => issues.push({ code, severity, layer_ids, ...(detail ? { detail } : {}) });
+  const visible = doc.layers.filter((l) => l.visible);
+  const texts = visible.filter((l): l is TextLayer => l.type === 'text');
+  const products = visible.filter((l): l is ImageLayer => l.type === 'image' && l.role === 'product');
+  const showsPrice = texts.some((t) => t.source.kind === 'product' && t.source.field === 'price');
+  const showsAvailability = texts.some((t) => t.source.kind === 'product' && t.source.field === 'availability');
+  const priceAd = doc.objective === 'sell' || doc.priority === 'price';
+
+  // DATA — every binding has its snapshot; prices and availability come from it.
+  ran.push('data');
+  for (const b of doc.products) {
+    const snap = ctx.snapshots[b.slot];
+    if (!snap || snap.id !== b.snapshot_id) { add('snapshot_missing', 'blocker', [], b.slot); continue; }
+    if (snap.source === 'test') add('test_data', ctx.final ? 'blocker' : 'review', [], b.slot);
+    const priceLayers = texts.filter((t) => t.source.kind === 'product' && t.source.slot === b.slot && t.source.field === 'price').map((t) => t.id);
+    if (priceLayers.length && snap.data.price.status !== 'priced') add('price_unavailable', priceAd ? 'blocker' : 'review', priceLayers, snap.data.price.status);
+    const v = ctx.verification?.[b.slot];
+    if (v) {
+      const blocking = blockingChanges(v, { price: showsPrice, availability: showsAvailability });
+      if (blocking.length) add('source_changed', 'blocker', [], blocking.join(','));
+      else if (v.length) add('source_changed', 'review', [], v.join(','));
+    } else if (ctx.final && (showsPrice || showsAvailability)) {
+      add('unverified_source', 'blocker', [], b.slot);
+    }
+  }
+  for (const t of texts) {
+    if (t.source.kind === 'free' && containsPriceLike(t.text)) add('unbound_price_text', 'blocker', [t.id]);
+    if (t.source.kind !== 'free' && !t.text) add('bound_text_missing', 'blocker', [t.id]);
+  }
+
+  // PRODUCT — the right picture, untransformed.
+  ran.push('product');
+  for (const p of products) {
+    const slot = p.asset.slot ?? 'main';
+    const binding = doc.products.find((b) => b.slot === slot);
+    const snap = ctx.snapshots[slot];
+    const img = snap?.data.images.find((i) => i.url === p.asset.ref);
+    if (!binding || !snap || !img) add('wrong_variant_image', 'blocker', [p.id], 'not a picture of the bound product');
+    else if (img.variant_key !== null && binding.variant_key !== null && img.variant_key !== binding.variant_key) add('wrong_variant_image', 'blocker', [p.id], `picture of ${img.variant_key}, bound ${binding.variant_key}`);
+    if (p.rotation !== 0) add('product_transformed', 'blocker', [p.id], 'rotated');
+    if (p.fit === 'detail') add('product_detail_crop', 'review', [p.id]);
+    if (p.scale > 1.6) add('low_resolution', 'review', [p.id], `drawn at ${p.scale.toFixed(2)}× its pixels`);
+  }
+
+  // FONTS — registered weight, glyph coverage, really loaded.
+  ran.push('fonts');
+  for (const t of texts) {
+    const def = FONT_REGISTRY[t.font.family];
+    if (!def.weights.includes(t.font.weight)) add('font_weight', 'blocker', [t.id]);
+    if (def.missing && def.missing.test(t.text)) add('missing_glyph', 'review', [t.id], def.family);
+  }
+  if (ctx.fontsLoaded) {
+    const missing = texts.filter((t) => !ctx.fontsLoaded!.has(fontKey(FONT_REGISTRY[t.font.family].family, t.font.weight))).map((t) => t.id);
+    if (missing.length) add('font_not_loaded', 'blocker', missing);
+  } else skipped.push({ check: 'fonts', why: 'font load state not reported' });
+
+  // TEXT FIT — measured with the same measurer the renderer uses.
+  if (ctx.measure) {
+    ran.push('text_fit');
+    const over = texts.filter((t) => !textFits(t, ctx.measure!)).map((t) => t.id);
+    if (over.length) add('text_overflow', 'blocker', over);
+    const floor = (20 * doc.format.width) / 1080;
+    const small = texts.filter((t) => t.font.size < Math.min(t.minSize, floor) - 0.01).map((t) => t.id);
+    if (small.length) add('small_text', 'review', small);
+  } else skipped.push({ check: 'text_fit', why: 'no text measurer (the Worker cannot measure; the editor runs this check)' });
+
+  // LAYOUT — safe area, overlap, off-canvas.
+  ran.push('layout');
+  for (const c of detectConflicts(doc)) {
+    if (c.code === 'outside_safe_area') add('outside_safe_area', 'blocker', c.layer_ids);
+    if (c.code === 'overlap') add('overlap', 'blocker', c.layer_ids);
+  }
+  const canvas = { x: 0, y: 0, width: doc.format.width, height: doc.format.height };
+  const off = visible.filter((l) => l.type !== 'group' && l.role !== 'background').filter((l) => {
+    const b = layerBox(l, doc.layers);
+    return b && (b.x + b.width <= canvas.x || b.y + b.height <= canvas.y || b.x >= canvas.width || b.y >= canvas.height);
+  }).map((l) => l.id);
+  if (off.length) add('off_canvas', 'review', off);
+  void safeBox;
+
+  // BRAND — palette and density.
+  ran.push('brand');
+  const offPalette = visible.filter((l) => (l.type === 'text' && !ctx.brand.colors.palette.includes(l.color)) || (l.type === 'shape' && l.role !== 'product_shadow' && l.fill !== null && !ctx.brand.colors.palette.includes(l.fill) && l.role !== 'background')).map((l) => l.id);
+  if (offPalette.length) add('off_palette', 'review', offPalette);
+  if (texts.length > ctx.brand.density.max_text_layers) add('dense', 'review', texts.map((t) => t.id), `${texts.length} > ${ctx.brand.density.max_text_layers}`);
+  if (!texts.some((t) => t.role === 'headline')) add('headline_missing', 'review');
+
+  // ASSETS — every picture really decoded.
+  if (ctx.assetsLoaded) {
+    ran.push('assets');
+    const missing = visible.filter((l): l is ImageLayer => l.type === 'image').filter((l) => !ctx.assetsLoaded!.has(l.asset.ref)).map((l) => l.id);
+    if (missing.length) add('asset_missing', 'blocker', missing);
+  } else skipped.push({ check: 'assets', why: 'asset load state not reported' });
+
+  // CLAIMS — approved, current, conditions kept.
+  ran.push('claims');
+  for (const s of doc.services) {
+    const c = ctx.claims[s.claim_id];
+    if (!c || !c.approved || (c.valid_until !== null && c.valid_until < ctx.now)) { add('claim_missing', 'blocker', [], s.claim_id); continue; }
+    if (c.version !== s.claim_version) add('claim_changed', ctx.final ? 'blocker' : 'review', [], `${s.claim_version} → ${c.version}`);
+    const hasConditions = Object.values(c.conditions).some((x) => x.trim());
+    const shown = texts.some((t) => t.source.kind === 'service' && t.source.claim_id === s.claim_id && t.source.field === 'conditions');
+    if (hasConditions && !shown) add('conditions_missing', 'blocker', [], s.claim_id);
+  }
+
+  // LANGUAGE — a Sorani ad is not Arabic text in disguise (DECISIONS row 183).
+  ran.push('language');
+  if (doc.locale === 'ckb') {
+    const arabic = texts.filter((t) => t.source.kind === 'free' && ARABIC_ONLY.test(t.text)).map((t) => t.id);
+    if (arabic.length) add('not_sorani', 'review', arabic);
+  }
+
+  // META — words outside the picture.
+  ran.push('meta');
+  if (!doc.alt_text.trim()) add('alt_text_missing', 'optional');
+  if (!doc.caption.trim()) add('caption_missing', 'optional');
+
+  return { issues, blockers: issues.filter((i) => i.severity === 'blocker').length, ran, skipped };
+}
