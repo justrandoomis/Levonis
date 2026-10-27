@@ -281,15 +281,21 @@ export function templateForProduct(image: { width: number | null; height: number
  * The variants worth proposing for an objective, in order (spec §12: the
  * proposals follow the post's goal; a price layout needs a real public price).
  */
-export function variantsFor(template: TemplateId, objective: Objective, priceStatus: PriceStatus | null): VariantId[] {
-  const available = Object.keys(TEMPLATES[template].variants) as VariantId[];
+export function variantsFor(template: TemplateId, objective: Objective, priceStatus: PriceStatus | null, priority?: VisualPriority): VariantId[] {
+  const def = TEMPLATES[template];
+  const available = Object.keys(def.variants) as VariantId[];
   const priced = priceStatus === 'priced';
+  // A lesson or a feature post never leads with a price (spec §7: the composition follows the goal).
   const order: VariantId[] =
-    objective === 'education' || objective === 'feature' ? ['feature_first', 'product_first', 'headline_first', 'price_first']
+    objective === 'education' || objective === 'feature' ? ['feature_first', 'product_first', 'headline_first']
     : objective === 'service_trust' ? ['feature_first', 'headline_first', 'product_first']
-    : objective === 'sell' ? ['product_first', 'price_first', 'feature_first']
-    : ['product_first', 'feature_first', 'price_first'];
-  return order.filter((v) => available.includes(v) && (v !== 'price_first' || priced));
+    : objective === 'sell' ? ['product_first', 'price_first', 'feature_first', 'headline_first']
+    : ['product_first', 'feature_first', 'price_first', 'headline_first'];
+  const allowed = order.filter((v) => available.includes(v) && (v !== 'price_first' || priced));
+  if (!priority) return allowed;
+  // The element the owner chose as most important leads (spec §11), when this template has a variant for it.
+  const lead = allowed.find((v) => def.variants[v]?.priority === priority);
+  return lead ? [lead, ...allowed.filter((v) => v !== lead)] : allowed;
 }
 
 /** The call to action that matches what the product can actually do right now (spec §9: availability is never overstated). */
