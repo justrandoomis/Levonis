@@ -299,7 +299,7 @@ export const S = {
   reviewRejectReasons: t('أسباب الرفض', 'Reasons for rejecting', 'هۆکارەکانی ڕەتکردنەوە'),
   reviewRejectNote: t('ملاحظة (اختياري)', 'Note (optional)', 'تێبینی (ئارەزوومەندانە)'),
   reviewRejectSend: t('سجّل الرفض', 'Record the rejection', 'ڕەتکردنەوەکە تۆمار بکە'),
-  reviewRejected: t('سُجّل الرفض وأسبابه.', 'The rejection and its reasons were recorded.', 'ڕەتکردنەوەکە و هۆکارەکانی تۆمار کران.'),
+  reviewRejected: t('سُجّل الرفض وأسبابه، وتُراعى في الاقتراحات القادمة.', 'The rejection and its reasons were recorded; later suggestions take them into account.', 'ڕەتکردنەوەکە و هۆکارەکانی تۆمار کران و لە پێشنیارەکانی داهاتوودا ڕەچاو دەکرێن.'),
   reviewNeedReason: t('اختر سبباً واحداً على الأقل.', 'Choose at least one reason.', 'لانیکەم یەک هۆکار هەڵبژێرە.'),
   reviewArchive: t('أرشفة', 'Archive', 'ئەرشیفکردن'),
   reviewArchiveConfirm: t('تأكيد الأرشفة', 'Confirm archiving', 'دڵنیابوونەوە لە ئەرشیفکردن'),

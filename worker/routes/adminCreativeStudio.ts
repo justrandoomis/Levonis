@@ -60,7 +60,7 @@ import { MAX_FILE_BYTES, MAX_PROJECT_JSON_BYTES, assertDeclaredSize, putStudioFi
 import { IDEMPOTENCY_KEY, cancelJob, jobById, jobDto, markApplied } from '../lib/creative/jobs';
 import { encryptionReady, sealProviderKey } from '../lib/creative/keyVault';
 import { collectOpportunities, syncCatalogWatch } from '../lib/creative/opportunities';
-import { carouselContent, composeContent, editContent, ideasContent, reviewContent, testContent } from '../lib/creative/prompts';
+import { carouselContent, composeContent, editContent, ideasContent, reviewContent, testContent, type FeedbackMemory } from '../lib/creative/prompts';
 import {
   ensureSettingsRow, isEffort, normalizeBudget, normalizePriorities, normalizeRates, readProviderSettings, type Capabilities, type ProviderSettings,
 } from '../lib/creative/settings';
@@ -114,6 +114,32 @@ const idemKey = (v: unknown) => {
 };
 const boolOf = (v: unknown) => v === true || v === 'true' || v === 1;
 const DATE_Q = /^\d{4}-\d{2}-\d{2}(?:T[\d:.]+Z)?$/;
+
+/**
+ * The studio's visual memory for a prompt (spec §22): the last 30 days of
+ * rejections — reason counts and the five latest notes. Tolerates a database
+ * without the studio tables (an empty memory).
+ */
+async function feedbackMemory(db: D1Database): Promise<FeedbackMemory> {
+  const since = new Date(Date.now() - 30 * 86400_000).toISOString();
+  const rows = await readOr(
+    async () => (await db.prepare(`SELECT reasons_json, note FROM creative_feedback WHERE kind = 'reject' AND created_at >= ? ORDER BY created_at DESC LIMIT 60`).bind(since).all<{ reasons_json: string; note: string | null }>()).results ?? [],
+    [] as Array<{ reasons_json: string; note: string | null }>
+  );
+  const reasons: Record<string, number> = {};
+  const notes: string[] = [];
+  for (const r of rows) {
+    let list: unknown = [];
+    try {
+      list = JSON.parse(r.reasons_json);
+    } catch {
+      list = [];
+    }
+    for (const x of Array.isArray(list) ? list : []) if (typeof x === 'string' && (REJECT_REASONS as readonly string[]).includes(x)) reasons[x] = (reasons[x] ?? 0) + 1;
+    if (r.note && r.note.trim() && notes.length < 5) notes.push(r.note.trim());
+  }
+  return { reasons, notes };
+}
 
 // ---------------------------------------------------------------------------
 // Provider (owner)
@@ -953,6 +979,7 @@ R.post('/ai/ideas', studio, async (c) => {
         priorities: [...ready.settings.priorities, ...requested],
         history: (history.results ?? []).map((h) => ({ product_id: h.product_id, objective: String((readContent(h).doc.objective)), approved_at: h.updated_at })),
         brand: (await currentBrand(db)).kit,
+        feedback: await feedbackMemory(db),
       }),
       schema: IDEAS_SCHEMA,
       validate: (raw) => {
@@ -1035,7 +1062,7 @@ R.post('/ai/compose', studio, async (c) => {
       documentId: null,
       baseVersion: null,
       targetIds: [],
-      content: composeContent({ snapshot: snapshot?.data ?? null, claim: claim ? claimText(claim) : null, objective, priority, density, template, family, variants, locale, brief, brand }),
+      content: composeContent({ snapshot: snapshot?.data ?? null, claim: claim ? claimText(claim) : null, objective, priority, density, template, family, variants, locale, brief, brand, feedback: await feedbackMemory(db) }),
       schema: COMPOSE_SCHEMA,
       validate: (raw) => {
         const v = validateCompose(raw, { variants, evidence, maxFeatures: brand.density.max_features });
@@ -1201,7 +1228,7 @@ R.post('/ai/carousel', studio, async (c) => {
       documentId: null,
       baseVersion: null,
       targetIds: [],
-      content: carouselContent({ snapshot: snapshot?.data ?? null, claim: claim ? claimText(claim) : null, topic, slides, locale, brand: (await currentBrand(db)).kit }),
+      content: carouselContent({ snapshot: snapshot?.data ?? null, claim: claim ? claimText(claim) : null, topic, slides, locale, brand: (await currentBrand(db)).kit, feedback: await feedbackMemory(db) }),
       schema: CAROUSEL_SCHEMA,
       validate: (raw) => {
         const v = validateCarousel(raw, { evidence, maxSlides: slides });
