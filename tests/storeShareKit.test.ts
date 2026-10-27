@@ -242,6 +242,7 @@ test('THROUGH THE WORKER: the apex home primes public opening data without chang
   assert.deepEqual(JSON.parse(resolve[1]), {
     success: true,
     kind: 'main',
+    system: null,
     store: null,
     root_domain: APEX,
   });

@@ -75,9 +75,11 @@ export interface InAppBrowserNoticeProps {
   /** The shop that handed sign-in to this page (`?store=`), so the other
    *  browser still goes back to it afterwards. Validated again in the URL builder. */
   store?: string;
+  /** The platform application that did (`?app=cloud`), likewise; allowlisted in the URL builder. */
+  app?: string;
 }
 
-export default function InAppBrowserNotice({ info, next, referralCode = '', store = '' }: InAppBrowserNoticeProps) {
+export default function InAppBrowserNotice({ info, next, referralCode = '', store = '', app = '' }: InAppBrowserNoticeProps) {
   const { lang } = useLanguage();
   // OWNER: Sorani to be written by hand. (ckb reads the Arabic until then.)
   const s = lang === 'en' ? EN : AR;
@@ -86,7 +88,7 @@ export default function InAppBrowserNotice({ info, next, referralCode = '', stor
   // Only a language the reader CHOSE travels (src/LanguageContext.tsx
   // `chosenLang`): the WebView's default must not overwrite the other
   // browser's own stored choice.
-  const url = externalAuthUrl(window.location.origin, next, referralCode, { store, lang: chosenLang() ?? undefined });
+  const url = externalAuthUrl(window.location.origin, next, referralCode, { store, app, lang: chosenLang() ?? undefined });
   const appName = info.app ? IN_APP_NAMES[info.app] : '';
   const why = appName ? s.whyNamed.replace('{app}', appName) : s.whyGeneric;
   const safari = info.os === 'ios' ? safariSchemeUrl(url) : null;

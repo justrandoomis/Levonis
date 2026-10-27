@@ -380,7 +380,7 @@ test("the platform's product page carries its chunk, its lead image and the apex
   const lead = '/files/products/filament-pla/main.webp';
   const responsive = productImagePreload(lead);
   assert.ok(html.includes(`<link rel="preload" as="image" fetchpriority="high" href="${lead}" imagesrcset="${responsive.imageSrcSet}" imagesizes="${responsive.imageSizes}">`));
-  assert.deepEqual(inline(html), { success: true, kind: 'main', store: null, root_domain: APEX });
+  assert.deepEqual(inline(html), { success: true, kind: 'main', system: null, store: null, root_domain: APEX });
   assert.equal(res.headers.get('Cache-Control'), DOCUMENT_SHARED_CACHE_CONTROL);
   assert.match(res.headers.get('ETag') ?? '', /^W\/"/);
   // A store's product on its host: the store's answer, the product's picture.
@@ -411,7 +411,7 @@ test('a light-theme main image: the lead is preloaded once per theme, under its 
   assert.equal((html.match(/<link rel="preload" as="image"/g) ?? []).length, 2);
   assert.match(html, /property="og:image" content="https:\/\/levonis-iq\.com\/files\/products\/filament-pla\/main\.webp"/);
   assert.ok(links(html, 'modulepreload').includes('/assets/Product-p1.js'), 'the page-code head start remains');
-  assert.deepEqual(inline(html), { success: true, kind: 'main', store: null, root_domain: APEX });
+  assert.deepEqual(inline(html), { success: true, kind: 'main', system: null, store: null, root_domain: APEX });
   // localStorage can override either system preference: the browser chooses by media query,
   // never the server. Neither a system hint nor any visitor cookie may specialize this public document.
   for (const preference of ['light', 'dark']) {
@@ -538,7 +538,7 @@ test('the main homepage starts its viewer-priced API in the document without emb
   const res = await call(APEX, '/');
   const html = await res.text();
   assert.match(html, /<link rel="preload" as="fetch" crossorigin href="\/api\/home">/);
-  assert.deepEqual(inline(html), { success: true, kind: 'main', store: null, root_domain: APEX });
+  assert.deepEqual(inline(html), { success: true, kind: 'main', system: null, store: null, root_domain: APEX });
   assert.doesNotMatch(html, /display_price_iqd|viewer_tier|filament-pla/);
   assert.equal(assetCalls.includes(MANIFEST_PATH), false, 'home adds no manifest or database dependency');
   assert.notEqual(res.headers.get('ETag'), 'W/"asset"');

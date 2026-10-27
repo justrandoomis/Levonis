@@ -168,7 +168,7 @@ test('a category page carries its page code, its first read and the resolve answ
   const res = await call(APEX, '/categories/printer-accessories');
   assert.equal(res.status, 200);
   const html = await res.text();
-  assert.deepEqual(inline(html), { success: true, kind: 'main', store: null, root_domain: APEX });
+  assert.deepEqual(inline(html), { success: true, kind: 'main', system: null, store: null, root_domain: APEX });
   assert.deepEqual(fetches(html), ['/api/catalog/printer-accessories']);
   assert.deepEqual(
     links(html, 'modulepreload'),

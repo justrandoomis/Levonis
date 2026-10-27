@@ -105,6 +105,24 @@ test('B19: every resolve answer names the configured root domain, and /me does t
   assert.equal((await json(await get(merchant(asD1(raw)), '/api/merchant/me'))).root_domain, 'levonis-iq.com');
 });
 
+test('every resolve answer names the server-classified system label: `cloud` on cloud.<root>, null on every other host', async () => {
+  // src/App.tsx renders Levonis Print Cloud from this label and never from the
+  // browser's own reading of the hostname (src/StoreContext.tsx).
+  const raw = withStore(seed());
+  const answer = async (h: string) => json(await get(host(raw, h), '/api/storefront/resolve'));
+  const cloud = await answer('cloud.levonis-iq.com');
+  assert.equal(cloud.kind, 'system');
+  assert.equal(cloud.system, 'cloud');
+  assert.equal(cloud.store, null);
+  assert.equal(cloud.root_domain, 'levonis-iq.com');
+  assert.equal((await answer('studio.levonis-iq.com')).system, 'studio');
+  for (const h of ['levonis-iq.com', 'ali3d.levonis-iq.com', 'nosuch.levonis-iq.com', 'a.b.levonis-iq.com', 'example.net']) {
+    const body = await answer(h);
+    assert.ok('system' in body, `${h}: the answer has no system field`);
+    assert.equal(body.system, null, h);
+  }
+});
+
 // ============================================================ B23 — API words
 
 test('B23: every literal segment of the storefront router is a reserved slug (and `p`)', async () => {

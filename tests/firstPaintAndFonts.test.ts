@@ -114,9 +114,10 @@ test('a chunk that never arrives cannot blank the shop', () => {
   // /assets/Auth-*.js aborted, /auth unmounted the root to a blank screen).
   assert.equal(
     (APP.match(/<ChunkBoundary\b/g) ?? []).length,
-    4,
-    'the storefront routes, the full-screen routes, the main routes and the mascot each need one'
+    5,
+    'the storefront routes, Levonis Print Cloud (cloud.<root>), the full-screen routes, the main routes and the mascot each need one'
   );
+  assert.match(APP, /if \(system === 'cloud'\) return <ChunkBoundary><Suspense fallback=\{<RouteFallback \/>\}><PrintCloudApp \/><\/Suspense><\/ChunkBoundary>;/);
   const fullScreen = APP.slice(APP.indexOf('if (isFullScreenRoute) {'), APP.indexOf('{!shellHasToaster && <ToasterGate />}'));
   assert.match(fullScreen, /<ChunkBoundary>\s*<Suspense fallback=\{<RouteFallback \/>\}>\s*<Routes>/, 'the full-screen Routes sit inside a ChunkBoundary');
   assert.match(fullScreen, /<\/Routes>\s*<\/Suspense>\s*<\/ChunkBoundary>/);
