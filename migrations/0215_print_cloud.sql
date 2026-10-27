@@ -242,9 +242,13 @@ CREATE TABLE IF NOT EXISTS pc_printer_telemetry (
   agent_id TEXT,
   -- When the stored reading was TAKEN, on the server clock (printers.ts ingestTelemetry).
   received_at TEXT NOT NULL,
+  -- The same moment on the clock of `agent_id`: that agent's later readings are ordered by it.
   reported_at TEXT,
-  -- When the agent last reached the cloud for this printer, any reading: the connection's own liveness.
+  -- When the agent last reached the cloud for this printer, any reading: the connection's own liveness. Never moves back.
   arrived_at TEXT,
+  -- The last outage of that connection: the arrival before the silence, and the POST that ended it.
+  outage_from TEXT,
+  outage_to TEXT,
   machine_state TEXT NOT NULL CHECK (machine_state IN ('idle', 'preparing', 'printing', 'paused', 'finished', 'error', 'offline')),
   job_id TEXT,
   progress_permille INTEGER CHECK (progress_permille IS NULL OR (progress_permille >= 0 AND progress_permille <= 1000)),
@@ -586,6 +590,11 @@ CREATE TABLE IF NOT EXISTS pc_credit_accounts (
 );
 
 -- What was bought, at what price: the value of a consumed second is its lot's.
+-- `seconds_held` of the remainder are held for confirmed jobs (their rows in
+-- pc_credit_reservation_lots); the rest is the lot's FREE part, the only part
+-- a debit, a conversion or an expiry may take. The account's available
+-- seconds are the sum of its lots' free parts, its reserved seconds the sum
+-- of their holds (reconcile.ts).
 CREATE TABLE IF NOT EXISTS pc_credit_lots (
   id TEXT PRIMARY KEY,
   account_id TEXT NOT NULL REFERENCES pc_credit_accounts(id),
@@ -595,12 +604,17 @@ CREATE TABLE IF NOT EXISTS pc_credit_lots (
   order_line_id TEXT REFERENCES pc_order_lines(id),
   seconds_total INTEGER NOT NULL CHECK (seconds_total > 0),
   seconds_remaining INTEGER NOT NULL CONSTRAINT ck_pc_credit_lot_remaining CHECK (seconds_remaining >= 0),
+  seconds_held INTEGER NOT NULL DEFAULT 0,
   paid_iqd INTEGER NOT NULL DEFAULT 0 CHECK (paid_iqd >= 0),
   expires_at TEXT,
   created_at TEXT NOT NULL,
-  CHECK (seconds_remaining <= seconds_total)
+  CHECK (seconds_remaining <= seconds_total),
+  CONSTRAINT ck_pc_credit_lot_held CHECK (seconds_held >= 0 AND seconds_held <= seconds_remaining)
 );
 CREATE INDEX IF NOT EXISTS idx_pc_credit_lots_account ON pc_credit_lots(account_id, created_at);
+-- The expiry sweep's page: only lots with a free part to expire are indexed.
+CREATE INDEX IF NOT EXISTS idx_pc_credit_lots_expirable ON pc_credit_lots(expires_at, id)
+  WHERE expires_at IS NOT NULL AND seconds_remaining > seconds_held;
 
 CREATE TABLE IF NOT EXISTS pc_credit_reservations (
   id TEXT PRIMARY KEY,
@@ -618,6 +632,19 @@ CREATE TABLE IF NOT EXISTS pc_credit_reservations (
   CHECK (state = 'active' OR seconds_consumed + seconds_released = seconds_reserved)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_pc_credit_reservations_active_job ON pc_credit_reservations(job_id) WHERE state = 'active';
+
+-- Append-only. The lots a reservation holds, in the order it took them
+-- (rowid): its settlement consumes from them in that order and releases the
+-- rest of each, so a reservation only ever spends the seconds it held. While
+-- the reservation is active a lot's seconds_held is the sum of these rows.
+CREATE TABLE IF NOT EXISTS pc_credit_reservation_lots (
+  reservation_id TEXT NOT NULL REFERENCES pc_credit_reservations(id),
+  lot_id TEXT NOT NULL REFERENCES pc_credit_lots(id),
+  seconds INTEGER NOT NULL CHECK (seconds > 0),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (reservation_id, lot_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pc_credit_reservation_lots_lot ON pc_credit_reservation_lots(lot_id);
 
 -- Append-only. The account row is a cache of this ledger; the reconciliation
 -- job proves they agree and reports — never repairs — when they do not.
@@ -1334,6 +1361,14 @@ BEGIN
   SELECT RAISE(ABORT, 'PC_APPEND_ONLY');
 END;
 CREATE TRIGGER IF NOT EXISTS trg_pc_credit_lot_draws_no_delete BEFORE DELETE ON pc_credit_lot_draws
+BEGIN
+  SELECT RAISE(ABORT, 'PC_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_pc_credit_reservation_lots_no_update BEFORE UPDATE ON pc_credit_reservation_lots
+BEGIN
+  SELECT RAISE(ABORT, 'PC_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_pc_credit_reservation_lots_no_delete BEFORE DELETE ON pc_credit_reservation_lots
 BEGIN
   SELECT RAISE(ABORT, 'PC_APPEND_ONLY');
 END;

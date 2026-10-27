@@ -27,7 +27,7 @@ import { many, one, fence, planned, runBatch, type Stmt } from './db';
 import { invalid, pcError } from './errors';
 import { integrationEvent } from './adapters';
 import { pcAudit } from './audit';
-import { activeReservationForJob, expireDueCredits, releaseCredits, reserveCredits, settleCredits, creditAccountId } from './credits';
+import { activeReservationForJob, releaseCredits, releasedHolds, reserveCredits, settleCredits, creditAccountId, type LotShare } from './credits';
 import { activeInventoryReservations, inventoryAccountId, releaseInventory, reserveInventory, settleInventory } from './inventory';
 import { pcNotify, type PcNotice } from './notify';
 import { fitsBuildVolume } from './files';
@@ -746,17 +746,17 @@ export async function reviewJob(db: D1Database, job: JobRow, actor: Actor, confi
 /**
  * Confirm: reserve the estimated seconds and every required material, per
  * variant, in ONE batch with the transition. The balance CHECKs refuse an
- * overdraw, so a job is either fully reserved or not confirmed at all.
+ * overdraw, so a job is either fully reserved or not confirmed at all. The
+ * hours held are ones still good at `now` (credits.ts `reserveCredits`), and
+ * first whatever `entitled` names — a free reprint's inheritance.
  */
-export async function planConfirm(db: D1Database, job: JobRow, actor: Actor, now: Date) {
+export async function planConfirm(db: D1Database, job: JobRow, actor: Actor, now: Date, entitled: LotShare[] = []) {
   if (job.status !== 'awaiting_confirmation') throw pcError('INVALID_TRANSITION', { from: job.status, to: 'confirmed' });
   if (job.confirmation_expires_at && job.confirmation_expires_at <= iso(now)) throw pcError('QUOTE_EXPIRED', { reason: 'confirmation_window_passed', action: 'review_again' });
   const est = await currentEstimate(db, job);
   const reqs = await jobRequirements(db, job.id);
-  // Hours whose package expired go first, so this reservation can only hold hours that are still good.
-  await expireDueCredits(db, job.user_id, job.tier_id, now);
   const s: Stmt[] = [];
-  s.push(...reserveCredits(db, { userId: job.user_id, tierId: job.tier_id, jobId: job.id, seconds: est.duration_seconds, actorId: actor.id, now }).statements);
+  s.push(...(await reserveCredits(db, { userId: job.user_id, tierId: job.tier_id, jobId: job.id, seconds: est.duration_seconds, actorId: actor.id, now, entitled })).statements);
   for (const r of reqs) {
     s.push(
       ...reserveInventory(db, { userId: job.user_id, variantId: r.variant_id, qty: r.qty, purpose: 'print_job', refId: job.id, actorId: actor.id, now }).statements
@@ -802,7 +802,7 @@ export async function approveJob(db: D1Database, job: JobRow, actor: Actor, now:
 async function releaseAll(db: D1Database, job: JobRow, actor: Actor, now: Date, note: string): Promise<Stmt[]> {
   const s: Stmt[] = [];
   const credit = await activeReservationForJob(db, job.id);
-  if (credit) s.push(...releaseCredits(db, credit, actor.id, now, note));
+  if (credit) s.push(...(await releaseCredits(db, credit, actor.id, now, note)));
   for (const r of await activeInventoryReservations(db, 'print_job', job.id)) s.push(...releaseInventory(db, r, actor.id, now, note));
   return s;
 }
@@ -1295,20 +1295,28 @@ async function reprintStatements(db: D1Database, job: JobRow, newJobId: string, 
  * A free reprint after a verified workshop failure is confirmed on the
  * customer's behalf when their balance covers it; otherwise it waits in
  * `ready` for them (and they were told). Never forced through.
+ *
+ * It inherits what its failed parent held and gave back (credits.ts
+ * `releasedHolds`), taken first and even past the package's expiry: the
+ * customer loses no hour to the workshop's failure. Nothing in between
+ * expires them — a confirmation runs no expiry, and the sweep is not part of
+ * this request.
  */
 export async function autoConfirmReprint(db: D1Database, jobId: string, config: PrintCloudConfig, now: Date): Promise<'queued' | 'confirmed' | 'waiting_for_customer'> {
   const actor: Actor = { type: 'system', id: 'system' };
+  let inherited: LotShare[] = [];
   try {
     const job = await loadJob(db, jobId);
     if (job.status !== 'ready') return 'waiting_for_customer';
     // A balance that cannot cover it leaves the reprint where it is.
     if (!(await projection(db, job)).sufficient) return 'waiting_for_customer';
+    if (job.parent_job_id) inherited = await releasedHolds(db, job.parent_job_id);
     await reviewJob(db, job, actor, config, now);
   } catch {
     return 'waiting_for_customer';
   }
   try {
-    const result = await planned(db, async () => planConfirm(db, await loadJob(db, jobId), actor, now));
+    const result = await planned(db, async () => planConfirm(db, await loadJob(db, jobId), actor, now, inherited));
     return result.status === 'queued' ? 'queued' : 'confirmed';
   } catch {
     // Reviewed, then refused (the balance moved in between): back to `ready` for the customer.

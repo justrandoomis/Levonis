@@ -1,6 +1,7 @@
 /**
  * RECONCILIATION (docs/PRINT_CLOUD.md §11): prove every cache equals the
- * ledger it caches, every lot equals its own draws, every reservation belongs
+ * ledger it caches, every lot equals its own draws, every credit hold is
+ * recorded on its lot and its reservation alike, every reservation belongs
  * to a live job, every printer and job holds at most one active assignment,
  * every paid order has exactly one confirmed payment, and every gram a
  * customer used left the shelf. It REPORTS inconsistencies with the evidence;
@@ -47,12 +48,15 @@ export async function reconcile(db: D1Database): Promise<{ ok: boolean; checks: 
       )
     ),
     check(
+      // Not only in total: what is available is exactly the lots' free parts,
+      // what is reserved exactly the seconds held on them.
       'credit_lots_cover_balance',
       many(
         db,
-        `SELECT a.id AS account_id, a.available_seconds + a.reserved_seconds AS balance, COALESCE(SUM(l.seconds_remaining), 0) AS lots_remaining
+        `SELECT a.id AS account_id, a.available_seconds, a.reserved_seconds,
+                COALESCE(SUM(l.seconds_remaining - l.seconds_held), 0) AS lots_free, COALESCE(SUM(l.seconds_held), 0) AS lots_held
            FROM pc_credit_accounts a LEFT JOIN pc_credit_lots l ON l.account_id = a.id
-          GROUP BY a.id HAVING balance <> lots_remaining`
+          GROUP BY a.id HAVING a.available_seconds <> lots_free OR a.reserved_seconds <> lots_held`
       )
     ),
     check(
@@ -64,6 +68,35 @@ export async function reconcile(db: D1Database): Promise<{ ok: boolean; checks: 
            FROM pc_credit_lots l LEFT JOIN pc_credit_lot_draws d ON d.lot_id = l.id
           GROUP BY l.id
          HAVING drawn <> draws OR drawn_value <> ${roundedShare('l.paid_iqd', 'draws', 'l.seconds_total')}`
+      )
+    ),
+    check(
+      // Each active reservation holds exactly what it reserved, on lots of its own account.
+      'credit_reservations_equal_their_holds',
+      many(
+        db,
+        `SELECT r.id AS reservation_id, r.job_id, r.seconds_reserved, COALESCE(SUM(h.seconds), 0) AS held,
+                COALESCE(SUM(CASE WHEN h.lot_id IS NOT NULL AND l.account_id IS NOT r.account_id THEN 1 ELSE 0 END), 0) AS foreign_lots
+           FROM pc_credit_reservations r
+           LEFT JOIN pc_credit_reservation_lots h ON h.reservation_id = r.id
+           LEFT JOIN pc_credit_lots l ON l.id = h.lot_id
+          WHERE r.state = 'active'
+          GROUP BY r.id HAVING r.seconds_reserved <> held OR foreign_lots > 0`
+      )
+    ),
+    check(
+      // A lot holds exactly the holds of the ACTIVE reservations on it — a
+      // settled or released reservation's rows stay, as history — and never
+      // more than it has left (ck_pc_credit_lot_held, proven independently).
+      'credit_lot_holds_equal_active_reservations',
+      many(
+        db,
+        `SELECT l.id AS lot_id, l.account_id, l.seconds_remaining, l.seconds_held, COALESCE(x.held, 0) AS active_holds
+           FROM pc_credit_lots l
+           LEFT JOIN (SELECT h.lot_id, SUM(h.seconds) AS held FROM pc_credit_reservation_lots h
+                        JOIN pc_credit_reservations r ON r.id = h.reservation_id AND r.state = 'active' GROUP BY h.lot_id) x
+             ON x.lot_id = l.id
+          WHERE l.seconds_held <> COALESCE(x.held, 0) OR l.seconds_held < 0 OR l.seconds_held > l.seconds_remaining`
       )
     ),
     check(

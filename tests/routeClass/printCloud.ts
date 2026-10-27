@@ -98,7 +98,7 @@ export default {
         'GET /reports/operations': 'op',
         'GET /reconcile': 'money',
         'GET /tasks': 'op',
-        'POST /tasks/run': { cls: 'op', body: {}, why: 'runs due background work; reads no cost' },
+        'POST /tasks/run': { cls: 'op', body: {}, why: 'runs a scheduling pass and due background work; reads no cost' },
         'GET /audit': 'money',
       },
     },

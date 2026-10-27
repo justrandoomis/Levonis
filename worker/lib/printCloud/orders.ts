@@ -22,7 +22,7 @@ import { many, one, fence, runBatch, type Planned, type Stmt } from './db';
 import { classifyDbError, invalid, pcError } from './errors';
 import { integrationEvent, membershipTier } from './adapters';
 import { pcAudit } from './audit';
-import { grantCredits, debitAvailable, creditAccountId } from './credits';
+import { grantCredits, debitAvailable, freeSecondsAt } from './credits';
 import { grantInventory, reserveInventory, debitInventory } from './inventory';
 import { pcNotify } from './notify';
 import { assertPaymentAvailable, paymentInstructions, type PaymentProvider } from './payments';
@@ -636,7 +636,8 @@ export async function expireUnpaidOrders(db: D1Database, now: Date, limit = 25, 
 
 /**
  * Refund (part of) one paid order line — only what the customer has NOT
- * used. Credits: unconsumed, unreserved seconds of the lot that line bought.
+ * used. Credits: the FREE part of the lot that line bought — never seconds a
+ * confirmed job holds on it, and nothing once the lot's expiry has come.
  * Materials: unused, unreserved units of the lot that line bought, which go
  * back to the workshop's sellable stock. The money leaves through `method`;
  * this records it, never moves it.
@@ -656,18 +657,13 @@ export async function planLineRefund(
   let defaultAmount = 0;
   const refundId = pcId('pcrf');
   if (line.kind === 'credit_package' || line.kind === 'credit_hours') {
-    const lot = await one<{ id: string; seconds_total: number; seconds_remaining: number; paid_iqd: number }>(
+    const lot = await one<{ id: string; seconds_remaining: number; seconds_held: number; expires_at: string | null }>(
       db,
-      'SELECT id, seconds_total, seconds_remaining, paid_iqd FROM pc_credit_lots WHERE order_line_id = ?',
+      'SELECT id, seconds_remaining, seconds_held, expires_at FROM pc_credit_lots WHERE order_line_id = ?',
       line.id
     );
     if (!lot) throw pcError('NOT_FOUND', { reason: 'lot_missing' });
-    const acct = await one<{ available_seconds: number }>(
-      db,
-      'SELECT available_seconds FROM pc_credit_accounts WHERE id = ?',
-      creditAccountId(order.user_id, line.tier_id as string)
-    );
-    const refundable = Math.min(Number(lot.seconds_remaining), Number(acct?.available_seconds ?? 0));
+    const refundable = freeSecondsAt(lot, p.now);
     qty = p.quantity ?? refundable;
     if (qty <= 0 || qty > refundable) throw pcError('INSUFFICIENT_CREDIT', { refundable_seconds: refundable });
     const debit = await debitAvailable(db, {

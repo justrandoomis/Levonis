@@ -296,6 +296,7 @@ const CHECK_CODES: Record<string, PcErrorCode> = {
   ck_pc_credit_available: 'INSUFFICIENT_CREDIT',
   ck_pc_credit_reserved: 'STATE_CHANGED',
   ck_pc_credit_lot_remaining: 'STATE_CHANGED',
+  ck_pc_credit_lot_held: 'STATE_CHANGED',
   ck_pc_inventory_available: 'INSUFFICIENT_INVENTORY',
   ck_pc_inventory_reserved: 'STATE_CHANGED',
   ck_pc_inventory_lot_remaining: 'STATE_CHANGED',

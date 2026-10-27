@@ -184,7 +184,7 @@ export const OPERATIONS: readonly Operation[] = [
   { method: 'get', path: '/reports/operations', base: A, tag: 'reports', summary: 'Utilisation, failure rate, material use', access: 'admin_op' },
   { method: 'get', path: '/reconcile', base: A, tag: 'reports', summary: 'Run every reconciliation check (report only)', access: 'admin_money' },
   { method: 'get', path: '/tasks', base: A, tag: 'admin', summary: 'Background work by kind and status, recent failures', access: 'admin_op' },
-  { method: 'post', path: '/tasks/run', base: A, tag: 'admin', summary: 'Run due background work now', access: 'admin_op' },
+  { method: 'post', path: '/tasks/run', base: A, tag: 'admin', summary: 'Run a scheduling pass, then due background work, now', access: 'admin_op' },
   { method: 'get', path: '/audit', base: A, tag: 'admin', summary: 'Print Cloud audit trail (target)', access: 'admin_money' },
 ];
 
@@ -296,7 +296,7 @@ const SCHEMAS: Record<string, unknown> = {
     chamber_temp_dc: { type: 'integer' },
     errors: { type: 'array' },
     camera: { type: 'object' },
-    reported_at: { type: 'string', format: 'date-time', description: 'When the reading was taken, by the agent clock' },
+    reported_at: { type: 'string', format: 'date-time', description: "When the reading was taken, by the agent clock; this agent's readings are ordered by it, so an earlier one never replaces a later one" },
     sent_at: { type: 'string', format: 'date-time', description: 'When the agent sent it, by the same clock; with reported_at it dates a buffered reading without trusting the clock' },
   }),
   Consumption: obj({ printed_seconds: int(0), materials: { type: 'array', items: obj({ variant_id: str, qty: int(0) }, ['variant_id', 'qty']) } }, ['printed_seconds']),
