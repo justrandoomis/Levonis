@@ -37,15 +37,15 @@ export default function ExportSection(props: ExportSectionProps) {
       <h2 id="m-export-title">{t.exportFile}</h2>
       <div className="m-export__row">
         <button type="button" className="m-export__tile" onClick={props.onExport3mf} disabled={!props.hasObjects} data-levo-action="export-3mf">
-          <Icon name="document" />
           <span><b>{t.export3mf}</b></span>
+          <Icon name="document" />
         </button>
         <button type="button" className="m-export__tile" onClick={props.onExportGcode} disabled={!props.gcodeReady} data-levo-action="export-gcode">
-          <Icon name="document" />
           <span>
             <b>{t.exportGcode}</b>
             <small>{props.gcodeReady ? props.gcodeCaption : props.stale ? t.resliceFirst : t.availableAfterSlice}</small>
           </span>
+          <Icon name="document" />
         </button>
       </div>
       {props.onMore && (

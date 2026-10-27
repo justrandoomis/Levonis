@@ -368,6 +368,8 @@ export const en = {
   readyToSliceHelp: "The model is set up with the current print settings.",
   tooBigTitle: "Too big for this printer",
   tooBigHelp: "{count} object(s) do not fit the {printer} build volume ({bed} mm). Scale, rotate or cut them first.",
+  outsideBedTitle: "Outside the build area",
+  offBedHelp: "{count} object(s) sit outside the {printer} bed, wholly or in part. Drag them back onto the bed or tap Arrange.",
   presetFallbackTitle: "Generic settings in use",
   slicedSummary: "{layers} layers, ready to export.",
   slicedEstimate: "{layers} layers, about {time} to print.",

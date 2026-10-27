@@ -15,7 +15,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { loadAppModule } from "./lib/load-app-module.mjs";
 
-const { carryUserEdits, changedKeys, INFILL_KEYS, STRENGTH_KEYS, SUPPORT_KEYS } = await loadAppModule("settings-carryover");
+const { carryUserEdits, changedKeys, recordEdits, sameSetting, INFILL_KEYS, STRENGTH_KEYS, SUPPORT_KEYS } = await loadAppModule("settings-carryover");
 
 const SELECTION = { printerId: "bbl-x2d-04", quality: "fine", strength: "standard", support: false, infill: "balanced" };
 
@@ -248,4 +248,81 @@ test("CHANGING MATERIAL takes every key its new filament preset carries, and not
     filamentKeys: ["nozzle_temperature"],
   });
   assert.deepEqual(legacy.kept, ["nozzle_temperature"]);
+});
+
+test("AN ENGINE WRITE-BACK IS NOT AN EDIT: only a person counts, and only away from the preset", () => {
+  // The reviewer's case: a fresh session, no hand edits, and the engine writes
+  // its filament keys back after the preset load. Recorded as edits, they made
+  // «الملء» say «تم الاحتفاظ بـ 12 من إعداداتك المعدّلة».
+  const preset = loadedFor({ fan_max_speed: 100, filament_cost: 20, close_fan_the_first_x_layers: 1 });
+  const engineWrite = { ...preset, fan_max_speed: [100], filament_cost: ["24.99"], close_fan_the_first_x_layers: [3] };
+  const quiet = recordEdits({ before: preset, after: engineWrite, preset, edited: new Set(), byPerson: false });
+  assert.deepEqual([...quiet], [], "no person, no edit");
+
+  // Nothing recorded, so the next phone-row change has nothing to report.
+  const carried = carryUserEdits({
+    loaded: loadedFor({ sparse_infill_density: 25 }),
+    previous: engineWrite,
+    editedKeys: quiet,
+    previousSelection: SELECTION,
+    nextSelection: { ...SELECTION, strength: "strong" },
+    processKeys: [],
+  });
+  assert.deepEqual(carried.kept, []);
+  assert.deepEqual(carried.overwritten, []);
+
+  // A person typing a value is an edit…
+  const typed = recordEdits({ before: preset, after: { ...preset, layer_height: 0.16 }, preset, edited: new Set(), byPerson: true });
+  assert.deepEqual([...typed], ["layer_height"]);
+  // …a person's write that only re-spells the preset value is not…
+  const respelled = recordEdits({ before: preset, after: { ...preset, fan_max_speed: ["100"] }, preset, edited: new Set(), byPerson: true });
+  assert.deepEqual([...respelled], []);
+  // …and setting a key back to the preset takes it off the list.
+  const back = recordEdits({ before: { ...preset, layer_height: 0.16 }, after: preset, preset, edited: new Set(["layer_height"]), byPerson: true });
+  assert.deepEqual([...back], []);
+  // An engine write never removes what the person did.
+  const kept = recordEdits({ before: preset, after: engineWrite, preset, edited: new Set(["layer_height"]), byPerson: false });
+  assert.deepEqual([...kept], ["layer_height"]);
+});
+
+test("sameSetting reads one value the way the engine does, however it is spelled", () => {
+  assert.ok(sameSetting(0.2, "0.2"));
+  assert.ok(sameSetting([220], 220));
+  assert.ok(sameSetting(["220"], [220]));
+  assert.ok(sameSetting(true, "1"));
+  assert.ok(sameSetting(false, "false"));
+  assert.ok(sameSetting(undefined, null));
+  assert.ok(sameSetting([220, 225], ["220", "225"]));
+  assert.ok(!sameSetting(0.2, 0.16));
+  assert.ok(!sameSetting([220, 225], [220]));
+  assert.ok(!sameSetting("gyroid", "grid"));
+});
+
+test("only trusted input inside the engine marks a settings write as the person's", async () => {
+  const { EngineAdapter } = await loadAppModule("engine-adapter");
+  const adapter = new EngineAdapter();
+  const listeners = {};
+  const root = { addEventListener: (type, fn) => { (listeners[type] ??= []).push(fn); }, removeEventListener() {} };
+  adapter.addEditListeners(root);
+  for (const type of ["input", "change", "click"]) assert.ok(listeners[type]?.length, `${type} is listened for`);
+  const fire = (type, isTrusted) => { for (const fn of listeners[type]) fn({ type, isTrusted }); };
+  assert.equal(adapter.isPersonEditing(), false);
+  fire("change", false);
+  assert.equal(adapter.isPersonEditing(), false, "a synthetic event is not a person");
+  fire("input", true);
+  assert.equal(adapter.isPersonEditing(), true, "a person typing in a panel");
+  // The flag lasts for the event, not after it: a write-back later is not theirs.
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(adapter.isPersonEditing(), false);
+});
+
+test("the shell records an edit only for a write the person made", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const client = await readFile(new URL("../app/slicer-client.tsx", import.meta.url), "utf8");
+  const setter = client.slice(client.indexOf("const setEditorSettings"), client.indexOf("// -- adapter-backed controls"));
+  // Asked when the write arrives, not later inside the updater.
+  assert.ok(setter.indexOf("const byPerson = adapter.isPersonEditing();") < setter.indexOf("setSettings((current) => {"));
+  assert.match(setter, /userEditedKeysRef\.current = recordEdits\(\{\s*before: current,\s*after: locked,\s*preset: loadedPresetRef\.current,\s*edited: userEditedKeysRef\.current,\s*byPerson,\s*\}\);/);
+  assert.doesNotMatch(setter, /changedKeys\(current, locked\)/, "every changed key is no longer an edit");
+  assert.match(client, /loadedPresetRef\.current = loaded\.settings;/);
 });

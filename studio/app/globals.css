@@ -128,6 +128,9 @@
   --on-canvas: #E9EDF1;
   --on-canvas-muted: #A9B3BE;
   --on-canvas-line: #3A4148;
+  /* The focus ring of a control drawn on the canvas: the light --focus
+     (#6F592B) is 2.6:1 there, this is 10:1 (WCAG 1.4.11, 2.4.7). */
+  --on-canvas-focus: #D2C392;
 
   /* Semantics */
   --danger: #ED7177;
@@ -1284,6 +1287,7 @@ button:disabled { cursor: not-allowed; }
 .vp-tool:disabled { opacity: .4; cursor: not-allowed; }
 .vp-tool[aria-pressed="true"] { color: var(--gold-1); }
 .vp-divider { width: 1px; height: 20px; margin-inline: 2px; background: var(--on-canvas-line); }
+.vp-overlay :is(button, a):focus-visible { outline-color: var(--on-canvas-focus); }
 .vp-file { min-width: 0; min-height: var(--tap-min); padding-inline: 6px; display: inline-flex; align-items: center; gap: 6px; color: var(--on-canvas); font-size: 13px; }
 .vp-file svg { width: 18px; height: 18px; flex: 0 0 auto; color: var(--on-canvas-muted); }
 .vp-file > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

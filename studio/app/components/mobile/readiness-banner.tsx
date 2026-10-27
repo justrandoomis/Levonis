@@ -11,22 +11,20 @@
 
 import type { StudioDictionary } from "../../i18n";
 import { Icon } from "../header";
-import { toneOf, type ReadinessKind } from "./readiness";
+import { readinessTitleKey, toneOf, type ReadinessKind } from "./readiness";
 
 export interface ReadinessBannerProps {
   t: StudioDictionary;
   kind: ReadinessKind;
   /** The second line, already worded for the state (the shell knows the numbers). */
   detail: string;
+  /** Models too big for the printer: a block with none is about placement. */
+  oversizedCount: number;
 }
 
-export default function ReadinessBanner({ t, kind, detail }: ReadinessBannerProps) {
+export default function ReadinessBanner({ t, kind, detail, oversizedCount }: ReadinessBannerProps) {
   const tone = toneOf(kind);
-  const title = kind === "ready" ? t.readyToSlice
-    : kind === "sliced" ? t.printReady
-      : kind === "stale" ? t.stale
-        : kind === "fallback" ? t.presetFallbackTitle
-          : t.tooBigTitle;
+  const title = t[readinessTitleKey(kind, oversizedCount)];
   return (
     <div
       className="m-banner m-only"

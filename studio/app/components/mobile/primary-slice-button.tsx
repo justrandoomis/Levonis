@@ -54,8 +54,8 @@ export default function PrimarySliceButton(props: PrimarySliceButtonProps) {
       data-state={props.slicing ? "slicing" : props.printReady ? "sliced" : props.stale ? "stale" : "idle"}
     >
       {props.slicing && <span className="m-slice__fill" style={{ width: `${percent}%` }} aria-hidden="true" />}
-      <Icon name={props.printReady && !props.slicing ? "print" : "layers"} />
       <span>{label}</span>
+      <Icon name={props.printReady && !props.slicing ? "print" : "layers"} />
     </button>
   );
 }

@@ -143,7 +143,7 @@ test("gold is the only accent, and the semantics are the only other colours", ()
   // family, one of the four semantic families and the ink that goes on them,
   // or ink drawn on the dark canvas. A fifth family appearing here is a second
   // accent, which §7 of the skill forbids.
-  const allowed = /^(levo-gold|accent|accent-strong|accent-ink|accent-tint|accent-tint-border|on-accent-tint|on-accent-muted|muted-on-tint|gold-1|gold-2|gold-ink|gold-text|gold-line|gold-outline-fill|gold-edge|focus|danger|danger-surface|danger-border|on-danger|warning|warning-surface|warning-border|warning-ink|on-warning|success|success-surface|success-border|success-icon|success-caption|on-canvas|on-canvas-muted|on-canvas-line|knob|shadow-cast)$/;
+  const allowed = /^(levo-gold|accent|accent-strong|accent-ink|accent-tint|accent-tint-border|on-accent-tint|on-accent-muted|muted-on-tint|gold-1|gold-2|gold-ink|gold-text|gold-line|gold-outline-fill|gold-edge|focus|danger|danger-surface|danger-border|on-danger|warning|warning-surface|warning-border|warning-ink|on-warning|success|success-surface|success-border|success-icon|success-caption|on-canvas|on-canvas-muted|on-canvas-line|on-canvas-focus|knob|shadow-cast)$/;
   for (const [name, block] of [[":root", root], ["light", light]]) {
     const coloured = (block.match(/^\s*--([\w-]+):\s*(#[0-9A-Fa-f]{6});/gm) ?? [])
       .map((line) => /--([\w-]+):\s*(#[0-9A-Fa-f]{6})/.exec(line))
@@ -181,7 +181,9 @@ test("both themes meet contrast on every surface they paint", () => {
     ["on-warning", "warning-surface"], ["on-danger", "danger-surface"],
     ["on-canvas", "canvas"], ["on-canvas-muted", "canvas"],
   ];
-  const BOUNDARY = [["field", "surface"], ["field", "panel"], ["focus", "shell"], ["focus", "panel"], ["gold-line", "gold-outline-fill"], ["success-icon", "success-surface"]];
+  const BOUNDARY = [["field", "surface"], ["field", "panel"], ["focus", "shell"], ["focus", "panel"], ["gold-line", "gold-outline-fill"], ["success-icon", "success-surface"],
+    // The ring of a control drawn on the dark canvas island, in both themes.
+    ["on-canvas-focus", "canvas"]];
   for (const mode of ["dark", "light"]) {
     for (const [fg, bg] of TEXT) {
       const ratio = contrast(themeHex(mode, fg), themeHex(mode, bg));
@@ -495,4 +497,17 @@ test("nothing aligns text by a physical edge", () => {
   for (const physical of ["margin-left:", "margin-right:", "padding-left:", "padding-right:"]) {
     assert.ok(!rules.includes(physical), `${physical} — use the -inline- logical property`);
   }
+});
+
+test("a control drawn on the canvas shows a focus ring the canvas does not swallow", () => {
+  // The canvas is dark in both themes; the light --focus is a dark gold made
+  // for cream cards and is 2.6:1 on it. The overlay toolbar takes the canvas
+  // ring instead (WCAG 1.4.11, 2.4.7).
+  assert.ok(contrast(themeHex("light", "focus"), themeHex("light", "canvas")) < 3, "if the light ring passed on the canvas, this rule would be decoration");
+  for (const mode of ["dark", "light"]) {
+    const ratio = contrast(themeHex(mode, "on-canvas-focus"), themeHex(mode, "canvas"));
+    assert.ok(ratio >= 3, `${mode}: the canvas focus ring is ${ratio.toFixed(2)}:1`);
+  }
+  assert.match(body, /\.vp-overlay :is\(button, a\):focus-visible \{ outline-color: var\(--on-canvas-focus\); \}/);
+  assert.equal(hexOf(light, "on-canvas-focus"), null, "like the other canvas inks, light inherits it");
 });

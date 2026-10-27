@@ -11,8 +11,13 @@
  *             engine or the printer profile still loading, a slice running
  *             (the gold button shows its progress), or an engine error (the
  *             message row above the card says it);
- *   blocked   runPreflight found a blocker, or the engine rejected the last
- *             result as over the bed — danger, never success;
+ *   blocked   runPreflight found a blocker, a model sits outside the bed
+ *             (wholly or in part: the engine refuses that slice, so a
+ *             success before it would be a promise it cannot keep), or the
+ *             engine rejected the last result as over the bed — danger,
+ *             never success. Its title names the real cause: «أكبر من حجم
+ *             الطابعة» only when a model is too big, «خارج حدود سطح الطباعة»
+ *             when the models fit and are only misplaced;
  *   stale     a result exists but the scene or the settings changed since —
  *             warning, and the G-code tile is disabled;
  *   fallback  the engine is missing a preset for this printer, so generic
@@ -40,12 +45,18 @@ export interface ReadinessInput {
   resultState: "none" | "fresh" | "stale" | "rejected-over-bed";
   /** runPreflight's verdict: false when it found a blocker. */
   preflightOk: boolean;
+  /**
+   * Models whose footprint leaves the bed of their plate (model-dimensions
+   * objectsOffBed). Optional so that a caller written before the placement
+   * check reads as "nothing known to be off the bed".
+   */
+  offBedCount?: number;
 }
 
 export function readinessOf(input: ReadinessInput): ReadinessKind | null {
   if (input.objectCount <= 0) return null;
   if (input.importing || !input.engineReady || input.profileLoading || input.slicing || input.errored) return null;
-  if (!input.preflightOk || input.resultState === "rejected-over-bed") return "blocked";
+  if (!input.preflightOk || (input.offBedCount ?? 0) > 0 || input.resultState === "rejected-over-bed") return "blocked";
   if (input.resultState === "stale") return "stale";
   if (!input.profileVerified) return "fallback";
   if (input.resultState === "fresh") return "sliced";
@@ -56,4 +67,25 @@ export function toneOf(kind: ReadinessKind): ReadinessTone {
   if (kind === "blocked") return "danger";
   if (kind === "stale" || kind === "fallback") return "warning";
   return "success";
+}
+
+/**
+ * The banner title, as a key of the Studio dictionary.
+ *
+ * A blocked state has two causes and they need different words. A model
+ * larger than the printer gets «أكبر من حجم الطابعة» (tooBigTitle). Every
+ * other block is about WHERE the models are: a model dragged off the bed,
+ * or a result the engine rejected as over the bed when every model fits.
+ * Calling an 8 mm tower «أكبر من حجم الطابعة» because it sits beside the
+ * bed is a false claim about the model, so those get «خارج حدود سطح
+ * الطباعة» (outsideBedTitle).
+ */
+export type ReadinessTitleKey = "readyToSlice" | "printReady" | "stale" | "presetFallbackTitle" | "tooBigTitle" | "outsideBedTitle";
+
+export function readinessTitleKey(kind: ReadinessKind, oversizedCount: number): ReadinessTitleKey {
+  if (kind === "ready") return "readyToSlice";
+  if (kind === "sliced") return "printReady";
+  if (kind === "stale") return "stale";
+  if (kind === "fallback") return "presetFallbackTitle";
+  return oversizedCount > 0 ? "tooBigTitle" : "outsideBedTitle";
 }

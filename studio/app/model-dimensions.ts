@@ -42,11 +42,37 @@ export interface DimensionSource {
 }
 
 /**
+ * Where the scaled and rotated mesh reaches, measured from the object origin
+ * (the snapshot `pos`), in world axes. The size is max minus min; the place
+ * on the bed is `pos` plus these.
+ */
+export interface ModelExtent {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
+}
+
+/**
  * The world-space extent of one object, or null when it has no measurable
  * geometry (an empty or degenerate buffer). A null is reported as "unknown",
  * never as zero: a zero would read as a model that fits anything.
  */
 export function measureSnapshot(snapshot: DimensionSource): ModelDimensions | null {
+  return dimensionsOf(measureExtent(snapshot));
+}
+
+function dimensionsOf(extent: ModelExtent | null): ModelDimensions | null {
+  if (!extent) return null;
+  const dims = { width: extent.maxX - extent.minX, depth: extent.maxZ - extent.minZ, height: extent.maxY - extent.minY };
+  if (!(dims.width > 0) || !(dims.depth > 0) || !(dims.height > 0)) return null;
+  return dims;
+}
+
+/** The extent behind {@link measureSnapshot}, or null when there is no geometry. */
+export function measureExtent(snapshot: DimensionSource): ModelExtent | null {
   const positions = snapshot.localPos;
   if (!positions || positions.length < 3) return null;
   // One matrix for the object, then a plain multiply per vertex: a mesh of a
@@ -77,9 +103,7 @@ export function measureSnapshot(snapshot: DimensionSource): ModelDimensions | nu
     if (z > maxZ) maxZ = z;
   }
   if (!Number.isFinite(minX) || !Number.isFinite(maxY)) return null;
-  const dims = { width: maxX - minX, depth: maxZ - minZ, height: maxY - minY };
-  if (!(dims.width > 0) || !(dims.depth > 0) || !(dims.height > 0)) return null;
-  return dims;
+  return { minX, maxX, minY, maxY, minZ, maxZ };
 }
 
 /**
@@ -89,17 +113,25 @@ export function measureSnapshot(snapshot: DimensionSource): ModelDimensions | nu
  * the object really turned, was scaled, or was replaced.
  */
 export function createDimensionCache() {
-  const cache = new Map<number, { buffer: ArrayLike<number>; key: string; dims: ModelDimensions | null }>();
+  const cache = new Map<number, { buffer: ArrayLike<number>; key: string; extent: ModelExtent | null; dims: ModelDimensions | null }>();
+  const entry = (snapshot: DimensionSource) => {
+    const key = [snapshot.rot.x, snapshot.rot.y, snapshot.rot.z, snapshot.scale.x, snapshot.scale.y, snapshot.scale.z]
+      .map((value) => value.toFixed(6))
+      .join(",");
+    const hit = cache.get(snapshot.id);
+    if (hit && hit.buffer === snapshot.localPos && hit.key === key) return hit;
+    const extent = measureExtent(snapshot);
+    const fresh = { buffer: snapshot.localPos, key, extent, dims: dimensionsOf(extent) };
+    cache.set(snapshot.id, fresh);
+    return fresh;
+  };
   return {
     measure(snapshot: DimensionSource): ModelDimensions | null {
-      const key = [snapshot.rot.x, snapshot.rot.y, snapshot.rot.z, snapshot.scale.x, snapshot.scale.y, snapshot.scale.z]
-        .map((value) => value.toFixed(6))
-        .join(",");
-      const hit = cache.get(snapshot.id);
-      if (hit && hit.buffer === snapshot.localPos && hit.key === key) return hit.dims;
-      const dims = measureSnapshot(snapshot);
-      cache.set(snapshot.id, { buffer: snapshot.localPos, key, dims });
-      return dims;
+      return entry(snapshot).dims;
+    },
+    /** The same pass, read as where the mesh reaches from its origin. */
+    extent(snapshot: DimensionSource): ModelExtent | null {
+      return entry(snapshot).extent;
     },
     /** Forget objects that left the scene. */
     retain(ids: Iterable<number>) {
@@ -121,4 +153,46 @@ export function formatDimensions(dims: ModelDimensions): string {
     return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
   };
   return `${one(dims.width)} × ${one(dims.depth)} × ${one(dims.height)} mm`;
+}
+
+/**
+ * WHICH MODELS SIT OUTSIDE THE BED.
+ *
+ * runPreflight asks whether a model is too BIG for the printer. It never asks
+ * where the model IS, so an 8 mm tower dragged 140 mm off the centre of an A1
+ * read «جاهز للتقطيع», and the slice it promised was then refused by the
+ * engine as over the bed. This is the missing half: each object's footprint
+ * on the bed plane (its `pos` plus the measured extent, world X and Z),
+ * compared with the bed of the plate it belongs to, centred on that plate.
+ *
+ * Wholly or partly outside both count: the engine refuses either. A model
+ * with no measurable geometry is not judged (unknown is not "outside"), and
+ * `toleranceMm` absorbs the float noise of a model placed exactly on an edge.
+ */
+export interface PlacedObject {
+  id: number;
+  pos: { x: number; z: number };
+  extent: ModelExtent | null;
+  /** The centre of the plate the object belongs to (engine platePos). */
+  plateCentre: { x: number; z: number };
+}
+
+export function objectsOffBed(
+  objects: readonly PlacedObject[],
+  bed: { width: number; depth: number },
+  toleranceMm = 0.5,
+): number[] {
+  const halfW = bed.width / 2 + toleranceMm;
+  const halfD = bed.depth / 2 + toleranceMm;
+  const outside: number[] = [];
+  for (const object of objects) {
+    const extent = object.extent;
+    if (!extent) continue;
+    const left = object.pos.x + extent.minX - object.plateCentre.x;
+    const right = object.pos.x + extent.maxX - object.plateCentre.x;
+    const near = object.pos.z + extent.minZ - object.plateCentre.z;
+    const far = object.pos.z + extent.maxZ - object.plateCentre.z;
+    if (left < -halfW || right > halfW || near < -halfD || far > halfD) outside.push(object.id);
+  }
+  return outside;
 }

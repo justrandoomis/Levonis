@@ -8,7 +8,8 @@
  * the account when signed in, as a draft on this device otherwise; the shell
  * says which), and at the very end «استيراد», the gold-outline import (owner
  * override D-2: gold is its edge, never its fill), as the reference places
- * them.
+ * them. In both buttons the icon follows the label, so it sits on the end
+ * side of the word (left in Arabic and Sorani), as the reference draws it.
  *
  * The back link is a plain navigation, so it works with JavaScript off and
  * opens in a new tab on a long press. `onLeave` is asked first and may cancel
@@ -58,10 +59,10 @@ export default function StudioTopBar(props: StudioTopBarProps) {
           aria-busy={props.saving}
           data-levo-action="save-now"
         >
-          <Icon name="document" /><span>{t.saveNow}</span>
+          <span>{t.saveNow}</span><Icon name="document" />
         </button>
         <FileSelectControl className="m-btn m-btn--outline" label={t.import} disabled={props.importDisabled} onFiles={props.onPickFiles}>
-          <Icon name="upload" /><span>{t.import}</span>
+          <span>{t.import}</span><Icon name="upload" />
         </FileSelectControl>
       </div>
     </header>

@@ -323,6 +323,8 @@ function nextFrame() {
 
 /** DOM events inside the engine that can conclude a scene edit gesture. */
 const SCENE_EDIT_EVENTS = ["pointerup", "keyup", "change", "click"] as const;
+/** The events a person changes a setting with: typing, picking, ticking, clicking. */
+const PERSON_INPUT_EVENTS = ["input", "change", "click"] as const;
 
 export class EngineAdapter {
   private container: HTMLElement | null = null;
@@ -337,6 +339,22 @@ export class EngineAdapter {
   private sceneEditScheduled = false;
   private readonly hostAttributes = new Map<string, string>();
   private readonly onRootEditEvent = () => this.scheduleSceneEditNotification();
+  private personInput = false;
+  private personInputTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly onRootPersonEvent = (event: Event) => {
+    // A synthetic event (the shell clicking an engine control for the person,
+    // a test) is not a person changing a setting.
+    if (!event.isTrusted) return;
+    this.personInput = true;
+    if (this.personInputTimer !== null) return;
+    // Live for the rest of this task: the engine handler that writes the
+    // setting runs inside the same dispatch, and an engine write-back that
+    // runs later (an effect, a promise) is past it.
+    this.personInputTimer = setTimeout(() => {
+      this.personInput = false;
+      this.personInputTimer = null;
+    }, 0);
+  };
 
   constructor(options: EngineAdapterOptions = {}) {
     this.themeCss = options.themeCss ?? "";
@@ -849,6 +867,18 @@ export class EngineAdapter {
   }
 
   /**
+   * True while a trusted input, change or click event inside the engine is
+   * being handled: a person typing, picking or clicking in its panels. The
+   * shell asks this when a settings write arrives, so only the writes a person
+   * made count as their edits; the engine writing settings back by itself
+   * (after a preset load, on mount) never does. See settings-carryover.ts
+   * recordEdits.
+   */
+  isPersonEditing(): boolean {
+    return this.personInput;
+  }
+
+  /**
    * Cheap order-insensitive fingerprint of the scene's printable state
    * (ids, transforms, extruders, visibility). Used by stale-result tracking.
    */
@@ -967,6 +997,9 @@ export class EngineAdapter {
     for (const type of SCENE_EDIT_EVENTS) {
       root.addEventListener(type, this.onRootEditEvent, { capture: true, passive: true });
     }
+    for (const type of PERSON_INPUT_EVENTS) {
+      root.addEventListener(type, this.onRootPersonEvent, { capture: true, passive: true });
+    }
   }
 
   private removeEditListeners(root: ShadowRoot): void {
@@ -974,6 +1007,9 @@ export class EngineAdapter {
     this.editListenedRoots.delete(root);
     for (const type of SCENE_EDIT_EVENTS) {
       root.removeEventListener(type, this.onRootEditEvent, { capture: true });
+    }
+    for (const type of PERSON_INPUT_EVENTS) {
+      root.removeEventListener(type, this.onRootPersonEvent, { capture: true });
     }
   }
 

@@ -314,6 +314,8 @@ export const ckb: StudioDictionary = {
   readyToSliceHelp: "تەنەکە بە ڕێکخستنەکانی ئێستای چاپ ئامادەکراوە.",
   tooBigTitle: "بۆ ئەم چاپکەرە زۆر گەورەیە",
   tooBigHelp: "{count} تەن لە قەبارەی چاپی {printer} ({bed} mm) جێیان نابێتەوە. سەرەتا بچووکیان بکەرەوە، بیانسووڕێنە یان بیانبڕە.",
+  outsideBedTitle: "لە دەرەوەی ڕووبەری چاپکردنە",
+  offBedHelp: "{count} تەن بە تەواوی یان بەشێکیان کەوتوونەتە دەرەوەی ڕووبەری چاپکردنی {printer}. بیانکێشەوە ناو ڕووبەرەکە یان «ڕیزکردن» دابگرە.",
   presetFallbackTitle: "ڕێکخستنی گشتی بەکاردێت",
   slicedSummary: "{layers} چین، ئامادەیە بۆ هەناردەکردن.",
   slicedEstimate: "{layers} چین، نزیکەی {time} بۆ چاپکردن.",

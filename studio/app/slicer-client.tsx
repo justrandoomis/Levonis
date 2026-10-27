@@ -48,7 +48,7 @@ import { useSlicingState, type SlicePayload, type SlicingViewportEvent } from ".
 import { EDITOR_SHADOW_CSS } from "./editor-theme";
 import { fallbackMachineSettings, loadPrinterProfile, type MissingPreset } from "./profile-loader";
 import { applyMachineLock } from "./machine-lock";
-import { carryUserEdits, changedKeys, type PresetSelection } from "./settings-carryover";
+import { carryUserEdits, recordEdits, type PresetSelection } from "./settings-carryover";
 import {
   DEFAULT_INFILL_ID,
   DEFAULT_MATERIAL_ID,
@@ -93,7 +93,7 @@ import {
 import { useProjectPersistence } from "./hooks/use-project-persistence";
 import { useStudioMode } from "./hooks/use-studio-mode";
 import { useStudioTheme } from "./hooks/use-studio-theme";
-import { createDimensionCache, formatDimensions } from "./model-dimensions";
+import { createDimensionCache, formatDimensions, objectsOffBed } from "./model-dimensions";
 import { currentPreset, type OrientationPreset, type Vec3 } from "./auto-orient";
 import { runPreflight } from "./makerworld/preflight";
 import ProjectsPanel from "./components/projects-panel";
@@ -453,6 +453,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
    */
   const userEditedKeysRef = useRef<Set<string>>(new Set());
   const loadedSelectionRef = useRef<PresetSelection | null>(null);
+  /** The map the last preset load built: an edit back to it is no edit. */
+  const loadedPresetRef = useRef<SlicerSettings | null>(null);
   /** The live settings map, for the preset effect's async continuation. */
   const settingsRef = useRef<SlicerSettings>(settings);
   const projectFilesRef = useRef<File[]>([]);
@@ -934,6 +936,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
           );
         }
         loadedSelectionRef.current = nextSelection;
+        loadedPresetRef.current = loaded.settings;
         setProfileLoadState({ verified: loaded.verified, missingPresets: loaded.missingPresets });
         slicing.clearResults();
         setHandyProjectReady(false);
@@ -951,6 +954,9 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
 
   // -- settings (engine SettingsPanel binding stays; machine keys locked) ----
   const setEditorSettings: Dispatch<SetStateAction<SlicerSettings>> = useCallback((next) => {
+    // Asked now, while the event that caused this write (if any) is still
+    // being handled; the updater below runs later, during the render.
+    const byPerson = adapter.isPersonEditing();
     setSettings((current) => {
       const proposed = typeof next === "function" ? next(current) : next;
       /**
@@ -969,8 +975,19 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
        * carry them instead of discarding them — app/settings-carryover.ts.
        * Machine keys can never land here: `applyMachineLock` has just pinned
        * them back to the preset, so they compare equal.
+       *
+       * Only a person's own write counts (recordEdits): the engine writing
+       * its filament keys back after a preset load is not an edit, and
+       * counting it made every phone row say «تم الاحتفاظ بـ 12 من إعداداتك
+       * المعدّلة» to someone who had edited nothing.
        */
-      for (const key of changedKeys(current, locked)) userEditedKeysRef.current.add(key);
+      userEditedKeysRef.current = recordEdits({
+        before: current,
+        after: locked,
+        preset: loadedPresetRef.current,
+        edited: userEditedKeysRef.current,
+        byPerson,
+      });
       return locked;
     });
     // Any settings change makes stored slice results stale — never silently
@@ -978,7 +995,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     slicing.notifySettingsChanged();
     setHandyProjectReady(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slicing.notifySettingsChanged]);
+  }, [adapter, slicing.notifySettingsChanged]);
 
   // -- adapter-backed controls ----------------------------------------------
   const clickControl = useCallback((testId: EngineTestId, silent = false) => {
@@ -2510,17 +2527,68 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     };
   }, [adapter]);
 
-  /** Escape gives the page back from the expanded viewport (no sheet open). */
+  /** The phone column (.studio-scroll): the card and everything beside it. */
+  const scrollColumnRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Escape gives the page back from the expanded viewport (no sheet open),
+   * and puts focus back on the expand button, the control that opened it,
+   * instead of leaving it on something that is about to move.
+   */
   useEffect(() => {
     if (!viewportExpanded || sheet) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       setViewportExpanded(false);
       setSidebarOpen(false);
+      window.requestAnimationFrame(() => {
+        scrollColumnRef.current?.querySelector<HTMLElement>('[data-levo-action="viewport-expand"]')?.focus({ preventScroll: true });
+      });
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [sheet, viewportExpanded]);
+
+  /**
+   * THE PAGE UNDER THE EXPANDED VIEWPORT IS OUT OF REACH, FOR THE KEYBOARD TOO.
+   *
+   * Expanded, the card covers the whole screen, but the column behind it
+   * kept its controls in the tab order: Tab walked onto the printer, the
+   * material, the infill and supports selects and the orientation chips, a
+   * focus ring nobody could see on settings that still changed (WCAG 2.4.7,
+   * 2.4.11). So every sibling of the card in the column is `inert` while it
+   * is expanded (out of the tab order, out of the accessibility tree, as it
+   * is out of sight), including a sibling that renders while expanded, and
+   * nothing is left inert after it collapses. If the focused control is one
+   * of those (the «كل الإعدادات» row expands the card), focus moves to the
+   * collapse button rather than being dropped on the body. Crossing to the
+   * desktop layout, where nothing covers the column, collapses the card.
+   */
+  useEffect(() => {
+    const column = scrollColumnRef.current;
+    if (!column || !viewportExpanded) return;
+    const card = column.querySelector<HTMLElement>(":scope > .editor-area");
+    const hide = () => {
+      for (const child of column.children) {
+        if (child !== card) (child as HTMLElement).inert = true;
+      }
+    };
+    hide();
+    const active = document.activeElement;
+    if (card && active && column.contains(active) && !card.contains(active)) {
+      card.querySelector<HTMLElement>('[data-levo-action="viewport-expand"]')?.focus({ preventScroll: true });
+    }
+    const observer = new MutationObserver(hide);
+    observer.observe(column, { childList: true });
+    const phone = window.matchMedia?.("(max-width: 899px)");
+    const onLayout = () => { if (!phone?.matches) setViewportExpanded(false); };
+    phone?.addEventListener?.("change", onLayout);
+    return () => {
+      observer.disconnect();
+      phone?.removeEventListener?.("change", onLayout);
+      for (const child of column.children) (child as HTMLElement).inert = false;
+    };
+  }, [viewportExpanded]);
 
   const toggleViewportExpanded = useCallback(() => {
     setViewportExpanded((value) => {
@@ -2540,7 +2608,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     void sceneTick;
     const snapshots = objects.length ? adapter.sceneSnapshot() : [];
     dimensionCache.retain(snapshots.map((snapshot) => snapshot.id));
-    const measured = snapshots.map((snapshot) => ({ snapshot, dims: dimensionCache.measure(snapshot) }));
+    const measured = snapshots.map((snapshot) => ({ snapshot, dims: dimensionCache.measure(snapshot), extent: dimensionCache.extent(snapshot) }));
     let selectedId: number | null = null;
     try {
       selectedId = adapter.api()?.selectedObjectId() || null;
@@ -2596,6 +2664,30 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       missingPresets: profileLoadState?.missingPresets.map((preset) => preset.presetName) ?? [],
     });
   }, [objects, plateCount, profile, profileLoadState, sceneFacts]);
+
+  /**
+   * WHERE THE MODELS ARE, NOT ONLY HOW BIG. The preflight above measures
+   * size; a model dragged off the bed passes it and the engine then refuses
+   * the slice. Each visible object is placed on the plate it is nearest to
+   * and its footprint compared with that bed (model-dimensions objectsOffBed),
+   * so the banner says «خارج حدود سطح الطباعة» before the slice, not after.
+   */
+  const offBedCount = useMemo(() => {
+    const api = adapter.api();
+    if (!api || !sceneFacts.measured.length) return 0;
+    const placed = sceneFacts.measured
+      .filter((entry) => entry.snapshot.visible !== false)
+      .map((entry) => {
+        let plateCentre = { x: 0, z: 0 };
+        try {
+          plateCentre = api.platePos(adapter.plateOfSnapshot(entry.snapshot, plateCount));
+        } catch {
+          // An engine without plate offsets has one plate, at the origin.
+        }
+        return { id: entry.snapshot.id, pos: entry.snapshot.pos, extent: entry.extent, plateCentre };
+      });
+    return objectsOffBed(placed, { width: profile.bedWidth, depth: profile.bedDepth }).length;
+  }, [adapter, plateCount, profile.bedDepth, profile.bedWidth, sceneFacts]);
 
   /**
    * The orientation chips. «تلقائي» is the existing auto-orient; the other two
@@ -2745,6 +2837,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     errored: status === "error",
     resultState: currentResultState,
     preflightOk: preflight.ok,
+    offBedCount,
   });
   const oversizedCount = preflight.findings.find((finding) => finding.code === "object-exceeds-bed")?.objectIds?.length ?? 0;
   const sliceStats = printReady ? slicing.stats(selectedPlate) : null;
@@ -2753,9 +2846,11 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   // the same number rather than the preview's layer count beside it.
   const slicedLayers = Number(sliceStats?.layers) > 0 ? Number(sliceStats?.layers) : slicing.layerCount;
   const readinessDetail = readiness === "blocked"
-    ? (currentResultState === "rejected-over-bed" && !oversizedCount
-      ? templateText(t.overBedError, { printer: profile.shortName })
-      : templateText(t.tooBigHelp, { count: oversizedCount, printer: profile.model, bed: `${profile.bedWidth} × ${profile.bedDepth} × ${profile.bedHeight}` }))
+    ? (oversizedCount
+      ? templateText(t.tooBigHelp, { count: oversizedCount, printer: profile.model, bed: `${profile.bedWidth} × ${profile.bedDepth} × ${profile.bedHeight}` })
+      : offBedCount
+        ? templateText(t.offBedHelp, { count: offBedCount, printer: profile.model })
+        : templateText(t.overBedError, { printer: profile.shortName }))
     : readiness === "stale"
       ? (heavyImportText ? `${t.staleHelp} ${heavyImportText}` : t.staleHelp)
       : readiness === "fallback"
@@ -2813,7 +2908,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         reference column. The engine mount sits in the same place in both, so
         a tablet turning across 900px keeps its scene.
       */}
-      <div className="studio-scroll">
+      <div className="studio-scroll" ref={scrollColumnRef}>
         <StudioTopBar
           t={t}
           importDisabled={!Viewport || Boolean(importProgress)}
@@ -2972,7 +3067,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
           onOrient={(preset) => void orientTo(preset)}
         />
 
-        {readiness && <ReadinessBanner t={t} kind={readiness} detail={readinessDetail} />}
+        {readiness && <ReadinessBanner t={t} kind={readiness} detail={readinessDetail} oversizedCount={oversizedCount} />}
 
         <PrimarySliceButton
           t={t}

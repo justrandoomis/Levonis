@@ -258,6 +258,15 @@ export const EDITOR_SHADOW_CSS = `
   .settings-panel h2, .settings-panel h3, .settings-panel .lbl, .settings-panel label,
   .settings-panel summary, .settings-panel .key { color: ${T.text} !important; }
   .settings-panel .key, .settings-panel .muted, .settings-panel small { color: ${T.muted} !important; }
+  /* A READ-ONLY CARD STAYS READABLE. The engine draws a read-only panel (here
+     the printer card, with the motion limits folded into it) at opacity .62
+     on its wrapper, which took every label in it to 2.6:1 on the light cards
+     and 3.1:1 on the dark ones (WCAG 1.4.3 asks 4.5:1). The wrapper is inert,
+     which is what makes it read-only; so the labels go back to full
+     strength, and only the inactive controls inside keep the dimming that
+     says they cannot be changed. Plain prose only in this comment. */
+  .vp-readonly { opacity: 1 !important; }
+  .vp-readonly :is(input, select, textarea, button:not(.lbl)) { opacity: .62; }
   .settings-panel input:not([type="checkbox"]):not([type="color"]), .settings-panel select,
   .settings-panel textarea, .settings-panel button { background: ${T.shell} !important; color: ${T.text} !important; border-color: ${T.line} !important; min-height: 34px; }
   .settings-panel input[type="checkbox"], .settings-panel input[type="range"] { accent-color: ${T.accent}; }

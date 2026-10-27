@@ -22,6 +22,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
+import { loadAppModule } from "./lib/load-app-module.mjs";
 
 const themeUrl = new URL("../app/editor-theme.ts", import.meta.url);
 
@@ -61,4 +62,35 @@ test("the vendored engine wordmark stays hidden", async () => {
       'engine\'s "ThreeSlicer RE" wordmark reappears in the Studio top bar, ' +
       "linking away from the editor."
   );
+});
+
+test("a read-only engine card keeps its labels readable in both themes", async () => {
+  const source = await readFile(themeUrl, "utf8");
+  // The engine dims a read-only panel (the printer card, with the motion
+  // limits in it) by putting opacity .62 on its wrapper, which took the
+  // labels to 2.6:1 on the light cards. The wrapper goes back to full
+  // strength; only the inactive controls inside stay dimmed.
+  assert.match(source, /\.vp-readonly \{ opacity: 1 !important; \}/);
+  assert.match(source, /\.vp-readonly :is\(input, select, textarea, button:not\(\.lbl\)\) \{ opacity: \.62; \}/);
+  const { STUDIO_SURFACES, STUDIO_SURFACES_LIGHT } = await loadAppModule("editor-theme");
+  const luminance = (hex) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const contrast = (a, b) => {
+    const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  };
+  // What a .62 wrapper did to the muted label on the light card: blend, then measure.
+  const blend = (fg, bg, alpha) => "#" + [1, 3, 5].map((i) => Math.round(parseInt(fg.slice(i, i + 2), 16) * alpha + parseInt(bg.slice(i, i + 2), 16) * (1 - alpha)).toString(16).padStart(2, "0")).join("");
+  assert.ok(contrast(blend(STUDIO_SURFACES_LIGHT.muted, STUDIO_SURFACES_LIGHT.surface, 0.62), STUDIO_SURFACES_LIGHT.surface) < 4.5, "the finding, reproduced from the tokens");
+  for (const [name, surfaces] of [["dark", STUDIO_SURFACES], ["light", STUDIO_SURFACES_LIGHT]]) {
+    for (const bg of ["panel", "surface"]) {
+      for (const fg of ["muted", "text", "goldText"]) {
+        const ratio = contrast(surfaces[fg], surfaces[bg]);
+        assert.ok(ratio >= 4.5, `${name}: ${fg} on ${bg} is ${ratio.toFixed(2)}:1 at full strength`);
+      }
+    }
+  }
 });

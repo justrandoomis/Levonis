@@ -254,7 +254,8 @@ test("the phone shell is the reference column, on solid clay surfaces", async ()
     readFile(cssUrl, "utf8"),
     readFile(new URL("../app/components/mobile/overflow-sheet.tsx", import.meta.url), "utf8"),
   ]);
-  assert.match(app, /<div className="studio-scroll">/);
+  // The column carries a ref: the expanded viewport makes its other rows inert.
+  assert.match(app, /<div className="studio-scroll" ref=\{scrollColumnRef\}>/);
   const order = ["<StudioTopBar", "<ModeSegmented", "<ViewportCard", "<TransformToolBar", "<PrintSettingsCard", "<ModelInfoCard", "<ReadinessBanner", "<PrimarySliceButton", "<ExportSection"];
   const at = order.map((tag) => app.indexOf(tag));
   assert.ok(at.every((index) => index > 0), `every reference row is rendered: ${order.filter((_, i) => at[i] < 0).join(", ")}`);

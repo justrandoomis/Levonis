@@ -312,6 +312,8 @@ export const ar: StudioDictionary = {
   readyToSliceHelp: "المجسم مُهيأ بإعدادات الطباعة الحالية.",
   tooBigTitle: "أكبر من حجم الطابعة",
   tooBigHelp: "{count} من المجسمات لا تتسع في حجم طباعة {printer} ({bed} مم). صغّرها أو دوّرها أو قصّها أولًا.",
+  outsideBedTitle: "خارج حدود سطح الطباعة",
+  offBedHelp: "{count} من المجسمات خارج سطح طباعة {printer}، كليًا أو جزئيًا. اسحبها إلى داخل السطح أو اضغط «ترتيب».",
   presetFallbackTitle: "تُستخدم إعدادات عامة",
   slicedSummary: "{layers} طبقة، جاهزة للتصدير.",
   slicedEstimate: "{layers} طبقة، نحو {time} للطباعة.",

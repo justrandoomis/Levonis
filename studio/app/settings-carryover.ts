@@ -167,3 +167,71 @@ function sameValue(a: unknown, b: unknown): boolean {
     return false;
   }
 }
+
+/**
+ * WHICH KEYS OF A SETTINGS WRITE ARE EDITS MADE BY THE PERSON.
+ *
+ * Not every write is an edit. The engine writes back on its own: after a
+ * preset load its filament card re-derives the filament keys
+ * (close_fan_the_first_x_layers, fan_max_speed, filament_cost and nine more)
+ * and other panels normalise what they show. Each of those changed keys was
+ * recorded as edited, so changing «الملء» in a fresh session told the person
+ * «تم الاحتفاظ بـ 12 من إعداداتك المعدّلة» and «الخامة» told them a new preset
+ * had replaced 12 of their edits. They had edited nothing.
+ *
+ * So a key counts only when both hold:
+ *
+ *  - `byPerson`: the write happened inside a person's own input in the
+ *    engine's panels (the adapter tracks trusted input, change and click
+ *    events there, see EngineAdapter#isPersonEditing). An engine write-back,
+ *    an effect or a promise continuation is never one;
+ *  - the new value differs from the freshly loaded preset, compared loosely
+ *    (0.2 and "0.2", [220] and 220 are the same setting). Setting a key back
+ *    to the preset value takes it off the list.
+ *
+ * Returns a new set; `edited` is not changed.
+ */
+export function recordEdits(input: {
+  before: SlicerSettings;
+  after: SlicerSettings;
+  /** The map the last preset load built, before any carried edit. */
+  preset: SlicerSettings | null;
+  edited: ReadonlySet<string>;
+  byPerson: boolean;
+}): Set<string> {
+  const next = new Set(input.edited);
+  if (!input.byPerson) return next;
+  const after = input.after as unknown as Record<string, unknown>;
+  const preset = (input.preset ?? {}) as unknown as Record<string, unknown>;
+  for (const key of changedKeys(input.before, input.after)) {
+    if (input.preset && sameSetting(after[key], preset[key])) next.delete(key);
+    else next.add(key);
+  }
+  return next;
+}
+
+/** One setting, written two ways: equal when the engine would read the same value. */
+export function sameSetting(a: unknown, b: unknown): boolean {
+  return settingText(a) === settingText(b);
+}
+
+function settingText(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.length === 1 ? settingText(value[0]) : `[${value.map(settingText).join(",")}]`;
+  }
+  if (value === null || value === undefined) return "";
+  if (typeof value === "boolean") return value ? "1" : "0";
+  if (value === "true") return "1";
+  if (value === "false") return "0";
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const numeric = Number(trimmed);
+    return trimmed !== "" && Number.isFinite(numeric) ? String(numeric) : trimmed;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}

@@ -54,6 +54,12 @@ test("the readiness banner never shows a success it cannot stand behind", async 
   assert.equal(readinessOf({ ...ok, resultState: "rejected-over-bed" }), "blocked");
   assert.equal(toneOf("blocked"), "danger");
 
+  // A model off the bed is blocked before the slice the engine would refuse,
+  // even over a fresh result; a caller that does not know reads as on the bed.
+  assert.equal(readinessOf({ ...ok, offBedCount: 1 }), "blocked");
+  assert.equal(readinessOf({ ...ok, offBedCount: 2, resultState: "fresh" }), "blocked");
+  assert.equal(readinessOf({ ...ok, offBedCount: 0 }), "ready");
+
   // An outdated result is a warning, never «ready».
   assert.equal(readinessOf({ ...ok, resultState: "stale" }), "stale");
   assert.equal(toneOf("stale"), "warning");
@@ -79,15 +85,65 @@ test("the readiness banner never shows a success it cannot stand behind", async 
   }
 });
 
+test("a blocked banner names the real cause: too big, or only misplaced", async () => {
+  const { readinessTitleKey } = await loadAppModule("components/mobile/readiness");
+  const { DICTIONARIES } = await loadAppModule("i18n/index");
+  // An 8 x 8 x 90 mm tower beside an A1 bed is not «أكبر من حجم الطابعة».
+  assert.equal(readinessTitleKey("blocked", 0), "outsideBedTitle");
+  assert.equal(readinessTitleKey("blocked", 1), "tooBigTitle");
+  assert.equal(DICTIONARIES.ar[readinessTitleKey("blocked", 0)], "خارج حدود سطح الطباعة");
+  assert.equal(DICTIONARIES.en[readinessTitleKey("blocked", 0)], "Outside the build area");
+  assert.equal(DICTIONARIES.ar[readinessTitleKey("blocked", 3)], "أكبر من حجم الطابعة");
+  for (const [kind, key] of [["ready", "readyToSlice"], ["sliced", "printReady"], ["stale", "stale"], ["fallback", "presetFallbackTitle"]]) {
+    assert.equal(readinessTitleKey(kind, 0), key);
+    assert.equal(readinessTitleKey(kind, 2), key, "the size count only matters for a block");
+  }
+  const banner = await read("../app/components/mobile/readiness-banner.tsx");
+  assert.match(banner, /const title = t\[readinessTitleKey\(kind, oversizedCount\)\];/);
+  assert.doesNotMatch(banner, /: t\.tooBigTitle;/, "no fall-through that calls every block too big");
+});
+
+test("models off the bed are found from where they are, not only how big they are", async () => {
+  const { objectsOffBed, measureExtent } = await loadAppModule("model-dimensions");
+  const one = { x: 1, y: 1, z: 1 };
+  const zero = { x: 0, y: 0, z: 0 };
+  const a1 = { width: 256, depth: 256 };
+  // The reviewer's case: an 8 x 8 x 90 mm tower moved 140 mm off the centre of an A1.
+  const tower = measureExtent({ id: 1, localPos: box(8, 90, 8), rot: zero, scale: one });
+  assert.deepEqual([tower.minX, tower.maxX, tower.minZ, tower.maxZ], [-4, 4, -4, 4]);
+  const at = (x, z, plateCentre = { x: 0, z: 0 }, extent = tower) => ({ id: 1, pos: { x, z }, extent, plateCentre });
+  assert.deepEqual(objectsOffBed([at(0, 0)], a1), [], "centred: on the bed");
+  assert.deepEqual(objectsOffBed([at(120, 0)], a1), [], "near the edge, still inside");
+  assert.deepEqual(objectsOffBed([at(124, 0)], a1), [], "touching the edge is inside");
+  assert.deepEqual(objectsOffBed([at(140, 0)], a1), [1], "wholly outside");
+  assert.deepEqual(objectsOffBed([at(130, 0)], a1), [1], "partly outside is refused too");
+  assert.deepEqual(objectsOffBed([at(0, -127)], a1), [1], "the depth axis counts as well");
+  // Each object is judged on the bed of its own plate.
+  assert.deepEqual(objectsOffBed([at(0, 296, { x: 0, z: 296 })], a1), [], "the middle of plate 2");
+  assert.deepEqual(objectsOffBed([at(0, 296 + 130, { x: 0, z: 296 })], a1), [1]);
+  // Unknown geometry is not judged, and a smaller bed is smaller.
+  assert.deepEqual(objectsOffBed([at(500, 0, { x: 0, z: 0 }, null)], a1), []);
+  assert.deepEqual(objectsOffBed([at(88, 0)], { width: 180, depth: 180 }), [1], "the A1 mini bed is 180 mm");
+  // A rotation moves the reach: a quarter turn about Z lays the tower along X.
+  const lying = measureExtent({ id: 2, localPos: box(8, 90, 8), rot: { x: 0, y: 0, z: Math.PI / 2 }, scale: one });
+  assert.ok(Math.abs(lying.maxX - 45) < 1e-4, JSON.stringify(lying));
+  assert.deepEqual(objectsOffBed([{ ...at(100, 0), extent: lying }], a1), [1], "lying down, it reaches 145 mm");
+});
+
 test("the shell drives the banner from the real preflight and the real result state", async () => {
   const client = await read("../app/slicer-client.tsx");
   assert.match(client, /import \{ runPreflight \} from "\.\/makerworld\/preflight";/);
   assert.match(client, /return runPreflight\(\{/);
   const call = client.slice(client.indexOf("const readiness = readinessOf({"), client.indexOf("});", client.indexOf("const readiness = readinessOf({")));
-  for (const input of ["preflightOk: preflight.ok", "resultState: currentResultState", "profileVerified: profileLoadState?.verified", "slicing: status === \"slicing\"", "errored: status === \"error\"", "importing: Boolean(importProgress)"]) {
+  for (const input of ["preflightOk: preflight.ok", "offBedCount", "resultState: currentResultState", "profileVerified: profileLoadState?.verified", "slicing: status === \"slicing\"", "errored: status === \"error\"", "importing: Boolean(importProgress)"]) {
     assert.ok(call.includes(input), `readinessOf is not given ${input}`);
   }
-  assert.match(client, /\{readiness && <ReadinessBanner t=\{t\} kind=\{readiness\} detail=\{readinessDetail\} \/>\}/);
+  assert.match(client, /\{readiness && <ReadinessBanner t=\{t\} kind=\{readiness\} detail=\{readinessDetail\} oversizedCount=\{oversizedCount\} \/>\}/);
+  // The placement is measured from the scene and the bed of each plate.
+  assert.match(client, /objectsOffBed\(placed, \{ width: profile\.bedWidth, depth: profile\.bedDepth \}\)/);
+  assert.match(client, /api\.platePos\(adapter\.plateOfSnapshot\(entry\.snapshot, plateCount\)\)/);
+  // The second line says what is wrong: size, then place, then the engine.
+  assert.match(client, /\? \(oversizedCount\s*\? templateText\(t\.tooBigHelp,[\s\S]*?: offBedCount\s*\? templateText\(t\.offBedHelp,[\s\S]*?: templateText\(t\.overBedError,/);
 });
 
 // --------------------------------------------------------------- the size readout
@@ -209,6 +265,7 @@ const NEW_KEYS = [
   "tooBigTitle", "tooBigHelp", "presetFallbackTitle", "slicedSummary", "slicedEstimate", "durationHours", "durationMinutes",
   "sliceModel", "resliceModel", "exportFile", "export3mf", "exportGcode", "availableAfterSlice", "resliceFirst", "moreExport",
   "more", "moreTitle", "viewGroup", "accountGroup", "theme", "themeSystem", "themeLight", "themeDark",
+  "outsideBedTitle", "offBedHelp",
 ];
 
 test("every phone-shell string exists in ar, en and real Sorani", async () => {
@@ -306,4 +363,58 @@ test("the gold primary and the sand selections are the owner's overrides, with a
   assert.match(model, /className="m-sel"\s+aria-pressed=\{props\.orientation === chip\.id\}/);
   // «استيراد» is gold outline, never a second gold fill.
   assert.match(css, /\.m-btn--outline \{ border: 1\.5px solid var\(--gold-line\); background: var\(--gold-outline-fill\); \}/);
+});
+
+// --------------------------------------------------------------- icon side, names, expanded focus
+
+test("the icons sit at the end side of their labels, as the reference draws them", async () => {
+  const [bar, slice, exp, card] = await Promise.all([
+    read("../app/components/mobile/top-bar.tsx"),
+    read("../app/components/mobile/primary-slice-button.tsx"),
+    read("../app/components/mobile/export-section.tsx"),
+    read("../app/components/mobile/viewport-card.tsx"),
+  ]);
+  // The label comes first in the source, so the icon lands on the end side:
+  // left in Arabic and Sorani, trailing in English.
+  assert.match(bar, /<span>\{t\.saveNow\}<\/span><Icon name="document" \/>/);
+  assert.match(bar, /<span>\{t\.import\}<\/span><Icon name="upload" \/>/);
+  assert.match(slice, /<span>\{label\}<\/span>\s*<Icon name=\{props\.printReady && !props\.slicing \? "print" : "layers"\} \/>/);
+  assert.match(exp, /<span><b>\{t\.export3mf\}<\/b><\/span>\s*<Icon name="document" \/>/);
+  assert.match(exp, /<b>\{t\.exportGcode\}<\/b>[\s\S]*?<\/span>\s*<Icon name="document" \/>/);
+  assert.match(card, /<span>\{t\.noModelYet\}<\/span>\}\s*<Icon name="document" \/>/);
+  for (const [name, source] of [["top bar", bar], ["slice", slice], ["export", exp], ["file chip", card]]) {
+    assert.doesNotMatch(source, /<Icon name="(?:document|upload|layers)" \/>\s*<span>/, `${name}: an icon before its label`);
+  }
+  // The icons that are drawn on the start side stay there.
+  assert.match(card, /<Icon name="resetView" \/><span>\{t\.resetView\}<\/span>/);
+});
+
+test("«إعادة العرض» keeps its name when its text is hidden on a narrow phone", async () => {
+  const [card, css] = await Promise.all([read("../app/components/mobile/viewport-card.tsx"), read("../app/globals.css")]);
+  // Under 350px the span goes; the button must still be named (WCAG 4.1.2).
+  const narrow = css.slice(css.indexOf("@media (max-width: 350px) {"));
+  assert.match(narrow.slice(0, narrow.indexOf("\n}")), /\.vp-tool > span \{ display: none; \}/);
+  const reset = /<button[^>]*?data-levo-action="reset-view"[^>]*>/s.exec(card)?.[0] ?? "";
+  assert.ok(reset, "the reset-view button is findable");
+  assert.match(reset, /aria-label=\{t\.resetView\}/);
+  assert.match(reset, /title=\{t\.resetView\}/);
+});
+
+test("with the viewport expanded, the page under it is inert, and Escape hands focus back", async () => {
+  const client = await read("../app/slicer-client.tsx");
+  assert.match(client, /<div className="studio-scroll" ref=\{scrollColumnRef\}>/);
+  const effect = client.slice(client.indexOf("const column = scrollColumnRef.current;"), client.indexOf("const toggleViewportExpanded"));
+  assert.ok(effect.includes("if (!column || !viewportExpanded) return;"), "only while expanded");
+  // Every sibling of the card, including one that renders while expanded.
+  assert.match(effect, /if \(child !== card\) \(child as HTMLElement\)\.inert = true;/);
+  assert.match(effect, /new MutationObserver\(hide\)/);
+  assert.match(effect, /observer\.observe\(column, \{ childList: true \}\)/);
+  // And nothing is left inert after it collapses.
+  assert.match(effect, /return \(\) => \{[\s\S]*?for \(const child of column\.children\) \(child as HTMLElement\)\.inert = false;/);
+  // Focus never stays on a control that just went inert.
+  assert.match(effect, /column\.contains\(active\) && !card\.contains\(active\)/);
+  // Escape collapses and returns focus to the expand button.
+  const escape = client.slice(client.indexOf("if (!viewportExpanded || sheet) return;"), client.indexOf("}, [sheet, viewportExpanded]);"));
+  assert.match(escape, /setViewportExpanded\(false\);/);
+  assert.match(escape, /querySelector<HTMLElement>\('\[data-levo-action="viewport-expand"\]'\)\?\.focus\(/);
 });

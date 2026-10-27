@@ -11,7 +11,12 @@
  *
  * The overlay toolbar (phone only) runs along the card's top edge with no bar
  * behind it, as drawn: expand, «إعادة العرض», a divider and the view cube on
- * the start side; the file name on the end side, in LTR as a file name is.
+ * the start side; the file name on the end side, in LTR as a file name is,
+ * with its document icon after it (the end side of the label, as drawn).
+ *
+ * «إعادة العرض» carries its name in aria-label as well as in the visible
+ * span: under 350px the span is hidden to fit the row, and a button whose
+ * only text is hidden has no accessible name (WCAG 4.1.2).
  */
 
 import type { DragEvent, ReactNode, Ref } from "react";
@@ -62,7 +67,15 @@ export default function ViewportCard({ t, busy, children, onDragOverCapture, onD
             >
               <Icon name={overlay.expanded ? "shrink" : "fit"} />
             </button>
-            <button type="button" className="vp-tool" onClick={overlay.onResetView} disabled={!overlay.hasObjects} data-levo-action="reset-view">
+            <button
+              type="button"
+              className="vp-tool"
+              onClick={overlay.onResetView}
+              disabled={!overlay.hasObjects}
+              aria-label={t.resetView}
+              title={t.resetView}
+              data-levo-action="reset-view"
+            >
               <Icon name="resetView" /><span>{t.resetView}</span>
             </button>
             <span className="vp-divider" aria-hidden="true" />
@@ -71,10 +84,10 @@ export default function ViewportCard({ t, busy, children, onDragOverCapture, onD
             </button>
           </div>
           <span className="vp-file" data-levo-readout="file-name">
-            <Icon name="document" />
             {overlay.fileLabel
               ? <span dir="ltr">{overlay.fileLabel}</span>
               : <span>{t.noModelYet}</span>}
+            <Icon name="document" />
           </span>
         </div>
       )}
