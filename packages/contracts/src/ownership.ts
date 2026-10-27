@@ -428,7 +428,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'creative_provider_settings', 'creative_spend_day', 'creative_usage', 'creative_jobs', 'creative_brand_versions',
     'creative_assets', 'creative_product_snapshots', 'creative_service_claims', 'creative_service_claim_versions',
     'creative_documents', 'creative_document_versions', 'creative_reviews', 'creative_exports', 'creative_ideas',
-    'creative_feedback', 'creative_catalog_watch', 'creative_watch_state', 'creative_events',
+    'creative_feedback', 'creative_catalog_watch', 'creative_watch_state', 'creative_events', 'creative_campaigns', 'creative_document_plans',
   ]),
   ...owned('search', ['search_products', 'search_stores', 'search_index_state']),
   // `media_cleanup_jobs` and `media_object_guards` are FILES tables, not
