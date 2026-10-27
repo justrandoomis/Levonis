@@ -25,7 +25,7 @@ DECISIONS row 271 records the decision and its open owner questions.
 | Routers | `worker/routes/printCloud.ts` (customer), `printCloudAgent.ts` (workshop agent), `printCloudAdmin.ts` (administration) |
 | Mounts | `/api/print-cloud/v1`, `/api/print-cloud/v1/agent`, `/api/admin/print-cloud` (`worker/index.ts`) |
 | Hosts | the main host, the `cloud` system subdomain, and foreign hosts outside the root; **never** a merchant storefront (`printCloudHostAllowed`, `worker/lib/printCloud/http.ts`) |
-| OpenAPI | `GET /api/print-cloud/v1/openapi.json` — generated from `worker/lib/printCloud/openapi.ts`; 151 operations, and `tests/printCloudOpenApi.test.ts` fails if a route and its documentation disagree. Owner-only cost fields are described in the owner's copy only |
+| OpenAPI | `GET /api/print-cloud/v1/openapi.json` — generated from `worker/lib/printCloud/openapi.ts`; 153 operations, and `tests/printCloudOpenApi.test.ts` fails if a route and its documentation disagree. Owner-only cost fields are described in the owner's copy only |
 | Default state | **closed**: `pc_settings.enabled = false`, customer doors answer `503 PRINT_CLOUD_DISABLED` (admins still work) until the owner opens the service |
 | Without the migration | reads see an empty, closed service (lists empty, a named record 404, `GET /status` says `installed: false`) — exactly the answers of a migrated database with no data; every write answers `503 PRINT_CLOUD_NOT_INSTALLED` before any statement; the cron step does nothing (`tests/costDeployAhead.test.ts`) |
 

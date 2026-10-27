@@ -70,6 +70,16 @@ export const SETTING_GROUPS: readonly SettingGroup[] = [
           'داخراو: هەموو دەرگاکانی کڕیار بە هەر کەسێک دەڵێن «هێشتا نەکراوەتەوە» جگە لە بەڕێوەبەرانی پلاتفۆرم'
         ),
       },
+      {
+        path: 'wallet_payment_enabled',
+        kind: 'bool',
+        label: tri('الدفع من محفظة Levonis', 'Payment from the Levonis wallet', 'پارەدان لە جزدانی Levonis'),
+        help: tri(
+          'مطفأ: لا يدفع العملاء من محافظهم؛ واسترداد ما دُفع منها يعود إليها كما هو',
+          'Off: customers cannot pay from their wallet; refunds of what was paid from it still go back to it',
+          'کوژاوە: کڕیاران ناتوانن لە جزدانەکەیان پارە بدەن؛ گەڕاندنەوەی ئەوەی لێی دراوە هێشتا بۆی دەگەڕێتەوە'
+        ),
+      },
     ],
   },
   {
