@@ -12,7 +12,13 @@
  *     `?link=`, `?project=` and the router state are forwarded by the board,
  *     replacing its entry; the request page edits at /requests/:id/edit,
  *     continues a draft at /requests/new/:id, and never publishes a draft
- *     without its review («أكمل وانشر» opens `?step=4`, critique 5).
+ *     without its review (critique 5).
+ *
+ * Fix round 1 (B2R1): a draft or an edit published from the editor goes back
+ * onto the request page that opened it instead of stacking a second copy
+ * (REG-3, `returnPublished`, run below); «أكمل وانشر» is not offered until
+ * the editor opens a draft at its review, `?step=4` (REG-4, a C4 follow-up);
+ * the Following page draws «مجتمع ليفو» under its title (FID-3, IMG_8486).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -70,14 +76,15 @@ test('every new route is lazy and inside CommunityGate, the editor behind Protec
 });
 
 test('the placeholders render the section header and the list the home tab shows today, inside the scope', () => {
-  for (const [file, panel, title] of [
-    ['src/pages/community/Following.tsx', '<FollowingPanel viewer=', 's.tabs.following'],
-    ['src/pages/community/Stores.tsx', '<StoresPanel q={q}', 's.tabs.stores'],
-    ['src/pages/community/Makers.tsx', '<CreatorsPanel q={q}', 's.tabs.creators'],
+  for (const [file, panel, header] of [
+    // «أتابعهم» over «مجتمع ليفو», as IMG_8486 draws it (B2R1-FID-3).
+    ['src/pages/community/Following.tsx', '<FollowingPanel viewer=', '<SectionPageHeader title={s.tabs.following} kicker trailing={<SectionsButton />} />'],
+    ['src/pages/community/Stores.tsx', '<StoresPanel q={q}', '<SectionPageHeader title={s.tabs.stores} trailing={<SectionsButton />} />'],
+    ['src/pages/community/Makers.tsx', '<CreatorsPanel q={q}', '<SectionPageHeader title={s.tabs.creators} trailing={<SectionsButton />} />'],
   ] as const) {
     const src = code(file);
     assert.match(src, /<CommunitySurface\b[^>]*>[\s\S]*<\/CommunitySurface>/, `${file}: the page root is not stamped`);
-    assert.ok(src.includes(`<SectionPageHeader title={${title}} trailing={<SectionsButton />} />`), `${file}: no section header with the sections door`);
+    assert.ok(src.includes(header), `${file}: no section header with the sections door`);
     assert.ok(src.includes(panel), `${file}: not the list of today`);
     // The list is a lazy chunk the home tab shares: the page and the entry that names it stay small.
     assert.match(src, /= lazy\(\(\) => import\('\.\.\/\.\.\/components\/community\/hub\/(FollowingPanel|StoresPanel|CreatorsPanel)'\)\);/, `${file}: the list is imported eagerly`);
@@ -130,20 +137,89 @@ test('every old door still reaches the editor with its state: ?view=new, ?link=,
   assert.match(editor, /const fromState = \(state as \{ printLink\?: unknown \} \| null\)\?\.printLink;\s*return typeof fromState === 'string' \? fromState : params\.get\('link'\) \?\? '';/);
   // A new request leaves «طلباتي» behind it; the channel window rides with a PUBLISHED request only.
   assert.match(editor, /navigate\('\/requests\?view=mine', \{ replace: true \}\);\s*navigate\(requestPath\(rid\), how === 'published' \? \{ state: \{ published: true \} \} : undefined\);/);
-  assert.match(editor, /else if \(how === 'published'\) navigate\(requestPath\(rid\), \{ replace: true, state: \{ published: true \} \}\);\s*else goBack\(\);/);
+  // A draft or an edit published goes back onto the page that opened the editor (B2R1-REG-3).
+  assert.match(editor, /else if \(how === 'published'\) returnPublished\(navigate, requestPath\(rid\)\);\s*else goBack\(\);/);
+});
+
+type Nav = (to: string | number, opts?: { replace?: boolean; state?: unknown }) => void;
+
+/** The editor return, run as written (its types stripped), against a window of our own. */
+async function returnOf(): Promise<(navigate: Nav, path: string, win: unknown) => void> {
+  const src = read('src/pages/community/RequestNew.tsx');
+  const at = src.indexOf('export function returnPublished(');
+  assert.ok(at >= 0, 'the editor no longer returns to the request page');
+  const body = src.slice(at, src.indexOf('\n}\n', at) + 2).replace(/^export /, '');
+  const { code: js } = await transform(body, { loader: 'ts' });
+  return new Function(`${js}; return returnPublished;`)() as (navigate: Nav, path: string, win: unknown) => void;
+}
+
+/** A window with a history index, an address, and the popstate the browser fires after a step back. */
+function fakeWindow(idx: unknown, behindPath: string) {
+  let onPop: (() => void) | null = null;
+  const win = {
+    history: { state: idx === undefined ? null : { idx } },
+    location: { pathname: '/requests/new/rq_1' },
+    addEventListener: (type: string, fn: () => void, opts?: { once?: boolean }) => {
+      assert.equal(type, 'popstate');
+      assert.equal(opts?.once, true, 'the listener outlives the one step back');
+      onPop = fn;
+    },
+  };
+  const calls: unknown[] = [];
+  const navigate: Nav = (to, opts) => {
+    calls.push(opts === undefined ? [to] : [to, opts]);
+    if (to === -1) {
+      // The browser steps back, then tells the page.
+      win.location.pathname = behindPath;
+      onPop?.();
+    }
+  };
+  return { win, calls, navigate, listening: () => onPop !== null };
+}
+
+test('a draft published from the editor goes back onto its request page: one entry for the request, Back leaves it (B2R1-REG-3)', async () => {
+  const returnPublished = await returnOf();
+  const published = { published: true };
+  // Opened from the request page (an entry of this app behind): one step back, and that entry is marked.
+  const back = fakeWindow(2, '/requests/rq_1');
+  returnPublished(back.navigate, '/requests/rq_1', back.win);
+  assert.deepEqual(back.calls, [[-1], ['/requests/rq_1', { replace: true, state: published }]]);
+  // Opened by its address (nothing of this app behind): the request page replaces the editor.
+  for (const idx of [0, undefined, 'x']) {
+    const fresh = fakeWindow(idx, '/elsewhere');
+    returnPublished(fresh.navigate, '/requests/rq_1', fresh.win);
+    assert.deepEqual(fresh.calls, [['/requests/rq_1', { replace: true, state: published }]], `idx ${String(idx)}`);
+    assert.equal(fresh.listening(), false, 'no listener is left behind when nothing steps back');
+  }
+  // Another page behind (never the case today): the request page follows it rather than replacing it.
+  const other = fakeWindow(3, '/requests');
+  returnPublished(other.navigate, '/requests/rq_1', other.win);
+  assert.deepEqual(other.calls, [[-1], ['/requests/rq_1', { replace: false, state: published }]]);
+  // A history that cannot be read is treated as nothing behind.
+  const odd = fakeWindow(1, '/requests/rq_1');
+  Object.defineProperty(odd.win.history, 'state', { get: () => { throw new Error('blocked'); } });
+  returnPublished(odd.navigate, '/requests/rq_1', odd.win);
+  assert.deepEqual(odd.calls, [['/requests/rq_1', { replace: true, state: published }]]);
 });
 
 test('the request page edits at its own address and never publishes a draft without the review', () => {
   const page = code('src/pages/community/Request.tsx');
   assert.match(page, /draft \? `\/requests\/new\/\$\{encodeURIComponent\(rid\)\}` : `\/requests\/\$\{encodeURIComponent\(rid\)\}\/edit`/);
   assert.match(page, /onEdit=\{\(rid, draft\) => navigate\(editPath\(rid, !!draft\)\)\}/);
-  assert.match(page, /onFinish=\{\(rid\) => navigate\(`\$\{editPath\(rid, true\)\}\?step=4`\)\}/, '«أكمل وانشر» opens the draft at its review');
+  // «أكمل وانشر» is not offered while the editor opens at its first step whatever the address says
+  // (B2R1-REG-4): the label would promise the review. The seam stays for C4 (the prop and its words).
+  assert.doesNotMatch(page, /onFinish=\{/, '«أكمل وانشر» is offered before the editor opens a draft at its review');
+  assert.match(page, /\{onFinish && \(\s*<Button variant="primary" size="sm" onClick=\{\(\) => onFinish\(current\.id\)\} data-requests="publish-draft">/);
+  assert.match(page, /loc\('أكمل وانشر', 'Finish and publish', 'تەواوی بکە و بڵاوی بکەرەوە'\)/);
+  // Continuing the draft is then the way forward: the primary button.
+  assert.match(page, /<Button variant=\{onFinish \? 'secondary' : 'primary'\} size="sm" onClick=\{\(\) => onEdit\(current\.id, true\)\} data-requests="continue-draft">/);
   assert.match(page, /onNewRequest=\{\(\) => \(user \? navigate\('\/requests\/new'\) : signIn\(\)\)\}/);
   assert.doesNotMatch(page, /\/publish`/, 'the page publishes a draft by itself (critique 5)');
   assert.doesNotMatch(page, /RequestWizard|setEditing|\{editing \? \(/, 'the wizard is still in place on the request page');
-  assert.match(page, /loc\('أكمل وانشر', 'Finish and publish', 'تەواوی بکە و بڵاوی بکەرەوە'\)/);
-  assert.match(page, /onClick=\{\(\) => onEdit\(current\.id, true\)\} data-requests="continue-draft"/);
   // The channel window is still latched from the router state the editor leaves, and rendered once.
   assert.match(page, /useState\(\(\) => justPublished\(location\.state\)\)/);
   assert.equal(page.match(/\{nudge\}/g)?.length, 1);
+  // The mark is read on every arrival, not only the first render: the editor steps back onto this page and
+  // marks its entry as it lands (returnPublished), so the page can be on screen a moment before its mark.
+  assert.match(page, /if \(!justPublished\(location\.state\)\) return;\s*setRequestJustCreated\(true\);\s*navigate\(\{ pathname: location\.pathname, search: location\.search, hash: location\.hash \}, \{ replace: true, state: null \}\);\s*\}, \[location\]\);/);
 });

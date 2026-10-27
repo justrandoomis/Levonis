@@ -14,9 +14,18 @@
  *   * The follow button is one look for a person and a store, says its state
  *     with aria-pressed, hits 44px and sits above a card link.
  *   * A liked heart wears the scoped like colour (D-6) and falls back to the
- *     gold it was outside the scope; a save keeps the gold.
+ *     gold it was outside the scope; a save keeps the gold. The colour is on
+ *     the mark alone: the number beside it stays in the primary ink.
  *   * The words: the state words and counted nouns of a card in three
  *     languages, the Sorani its own (DECISIONS row 183), Latin digits (R13).
+ *
+ * Fix round 1 (B2R1): the liked count is ink, not scarlet (FID-1); the row
+ * card holds its pill beside the chevron in an end column (FID-2); the
+ * section header draws its line under the title (FID-3); a parts job says one
+ * count of each thing (FID-4); a count word is never cut (FID-5); the menu
+ * popover closes onto its door on Shift+Tab (A11Y-1) and its language row
+ * opens the header sheet itself (REG-1); the estimate names Levonis in Latin
+ * letters (REG-2).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -103,14 +112,66 @@ test('a public request card has no budget field, and prints none, no picture and
   }
 });
 
-test('the glyph says the process: a page for words alone, a drop for resin, and the pieces of a parts job under it', () => {
+test('the glyph says the process: a page for words alone, a drop for resin; a job of parts says its parts under it and each count once (B2R1-FID-4)', () => {
   assert.equal(words.requestGlyph({ file_count: 0, material: 'PLA' }), 'text');
   assert.equal(words.requestGlyph({ file_count: 2, material: 'Standard Resin' }), 'resin');
   assert.equal(words.requestGlyph({ file_count: 1, material: 'PETG' }), 'fdm');
-  const parts = card({ variant: 'list', request: { ...leaky, material: 'Clear Resin', summary: { parts_count: 2, pieces_per_set: 5 } } as unknown as Extract<Card, { variant: 'list' }>['request'] });
-  assert.match(parts, /data-request-glyph="resin"/);
-  assert.match(parts, /5 قطع/, 'the pieces of a set under the glyph');
-  assert.match(parts, /20 قطعة/, 'the pieces of the job: 4 sets of 5');
+  // 2 parts, 5 pieces a set, 4 sets: the parts under the glyph in the words of the live card
+  // (jobCountWords), the pieces of the job once in the meta, and the sets beside them.
+  const job = { ...leaky, material: 'Clear Resin', summary: { parts_count: 2, pieces_per_set: 5 } };
+  const want = {
+    ar: { parts: 'عدد الأجزاء 2', pieces: '20 قطعة', sets: 'الأطقم', perSet: '5 قطع' },
+    en: { parts: '2 parts', pieces: '20 pieces', sets: 'Sets', perSet: '5 pieces' },
+    ckb: { parts: '2 بەش', pieces: '20 پارچە', sets: 'سێت', perSet: '5 پارچە' },
+  } as const;
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    for (const variant of ['row', 'list'] as const) {
+      const html = card({ variant, request: job as unknown as Extract<Card, { variant: 'list' }>['request'] }, lang);
+      assert.match(html, /data-request-glyph="resin"/);
+      assert.ok(html.includes(`data-request-parts="2" class="px-1 text-center text-[12px] font-semibold leading-tight tabular-nums">${want[lang].parts}</span>`), `${lang} ${variant}: the parts under the glyph`);
+      assert.ok(html.includes(want[lang].pieces), `${lang} ${variant}: the pieces of the job, 4 sets of 5`);
+      assert.ok(!html.includes(want[lang].perSet), `${lang} ${variant}: a second count of pieces (the pieces of a set) is on the card`);
+      assert.ok(html.includes(`data-request-sets="4" class="whitespace-nowrap">${want[lang].sets}: <bdi dir="ltr">×4</bdi></span>`), `${lang} ${variant}: the sets, as the live card says them`);
+      // The parts are read with the card: the tile hides only its glyph.
+      assert.doesNotMatch(html, /data-request-glyph="resin"[^>]*aria-hidden/, `${lang} ${variant}: the parts are hidden from a screen reader`);
+    }
+  }
+  // One part, once per set: no parts under the glyph and no sets.
+  const plain = card({ variant: 'list', request: leaky as unknown as Extract<Card, { variant: 'list' }>['request'] });
+  assert.doesNotMatch(plain, /data-request-parts|data-request-sets/);
+  assert.match(plain, /4 قطع/);
+  // One set of a parts job: the parts, and no «×1».
+  const once = card({ variant: 'row', request: { ...job, quantity: 1 } as unknown as Extract<Card, { variant: 'row' }>['request'] });
+  assert.match(once, /data-request-parts="2"/);
+  assert.doesNotMatch(once, /data-request-sets/);
+  assert.match(once, /5 قطع/, 'one set of 5: the pieces of the job');
+});
+
+test('the row: the pill beside the chevron in an end column, the short state word, nothing cut (B2R1-FID-2, FID-5)', () => {
+  const row = card({ variant: 'row', request: leaky as unknown as Extract<Card, { variant: 'row' }>['request'] });
+  // The end column follows the words and holds the pill, then the onward chevron (IMG_8487 row 8).
+  assert.match(row, /<span class="ms-auto flex shrink-0 items-center gap-1\.5" data-request-end="true"><span data-state-pill="open"[^>]*>مفتوح<\/span><svg[^>]*lucide-chevron-left[^>]*>/);
+  assert.equal(row.match(/data-state-pill=/g)?.length, 1, 'one pill on the row');
+  // The words keep 8.5rem beside the tile; a narrower card wraps the end column onto its own line, by width alone.
+  assert.match(row, /class="cm-card flex min-h-\[88px\] flex-wrap items-center gap-x-3 gap-y-2 /);
+  assert.match(row, /<div class="flex min-w-0 grow basis-\[8\.5rem\] flex-col gap-0\.5">/);
+  // The short word on the row, which counts the offers beside it; the board card keeps the full state.
+  assert.doesNotMatch(row, /يستقبل عروضًا/);
+  assert.match(card({ variant: 'list', request: leaky as unknown as Extract<Card, { variant: 'list' }>['request'] }), /data-state-pill="open"[^>]*>يستقبل عروضًا/);
+  assert.match(card({ variant: 'row', request: leaky as unknown as Extract<Card, { variant: 'row' }>['request'] }, 'en'), /data-state-pill="open"[^>]*>Open</);
+  assert.deepEqual(words.requestStateWord('receiving_offers', 'ar', { brief: true }), { word: 'مفتوح', tone: 'open' });
+  assert.deepEqual(words.requestStateWord('receiving_offers', 'ckb', { brief: true }), { word: 'کراوە', tone: 'open' });
+  assert.deepEqual(words.requestStateWord('in_progress', 'ar', { brief: true }), { word: 'قيد التنفيذ', tone: 'progress' }, 'brief folds only the states that take offers');
+  assert.deepEqual(words.requestStateWord('receiving_offers', 'ar', { owner: true, offers: 2, brief: true }), { word: 'بانتظار الاختيار', tone: 'waiting' });
+  // Nothing is cut: the title alone keeps one line; the meta wraps between its words, each bullet
+  // glued to the word before it; the counts wrap whole, each count in one piece.
+  assert.equal(row.match(/\btruncate\b/g)?.length, 1, 'only the title is held to one line');
+  assert.match(row, /<span class="block break-words text-\[13px\] leading-snug text-text-secondary"><bdi>بغداد<\/bdi><span aria-hidden="true">\u00a0• <\/span>/);
+  assert.match(row, /<span class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-0\.5 overflow-hidden text-\[13px\] leading-snug text-text-secondary"><span class="inline-flex items-center gap-1 whitespace-nowrap" data-request-offers="3">/);
+  // The bar between the counts hangs outside the attachments: at the start of a line it is clipped, never left alone there.
+  assert.match(row, /<span class="relative inline-flex items-center gap-1 whitespace-nowrap" data-request-files="2"><span aria-hidden="true" class="absolute end-full me-1\.5 text-text-muted">\|<\/span>/);
+  const src = code('src/components/community/requests/RequestListCard.tsx');
+  assert.doesNotMatch(src, /className="truncate">\{attachmentsWord/, 'the attachments word is cut again');
 });
 
 test('the list card is the board anatomy without a budget: the pill, the meta row, «الموعد المطلوب» across, «عرض الطلب» and the counts', () => {
@@ -171,6 +232,10 @@ test('the card words: state words and counted nouns in three languages, Latin di
   assert.deepEqual(words.requestStateWord('receiving_offers', 'ar', { owner: true, offers: 2 }), { word: 'بانتظار الاختيار', tone: 'waiting' });
   assert.deepEqual(words.requestStateWord('receiving_offers', 'ar', { owner: true, offers: 0 }), { word: 'يستقبل عروضًا', tone: 'open' });
   assert.equal(words.requestStateWord('some_new_state', 'en').word, 'In progress', 'a state the client does not know still reads as words');
+  // The brand stays Latin in every language (tests/brandName.test.ts, B2R1-REG-2), as the wizard writes the estimate.
+  assert.equal(words.CARD_WORDS.ar.estimate, 'تقدير Levonis');
+  assert.equal(words.CARD_WORDS.ckb.estimate, 'خەمڵاندنی Levonis');
+  assert.equal(words.CARD_WORDS.en.estimate, 'Levonis estimate');
   for (const key of Object.keys(words.CARD_WORDS.ar) as Array<keyof typeof words.CARD_WORDS.ar>) {
     assert.ok(words.CARD_WORDS.en[key] && words.CARD_WORDS.ckb[key], `${key}: a language is empty`);
     assert.notEqual(words.CARD_WORDS.ckb[key], words.CARD_WORDS.ar[key], `${key}: the Sorani is the Arabic (row 183)`);
@@ -204,6 +269,18 @@ test('the sections menu: lazy, Studio a plain anchor never prefetched, the commu
   // A guest reaches an account row through sign-in, and reads «تسجيل الدخول» where the account would be.
   assert.match(menu, /const gated = \(path: string\) => \(isAuthenticated \? path : authPathWithSupportRef\(path\)\);/);
   assert.match(menu, /row\('signin', hub\.signIn,/);
+  // «اللغة والمظهر» opens the sheet of the header globe through its own hook, drawn beside the menu
+  // (so a choice outlives the popover closing under it), never a copy of its rules (B2R1-REG-1).
+  assert.match(menu, /import \{ useLangThemeSheet \} from '\.\.\/\.\.\/LangThemeSheet';/);
+  assert.match(menu, /const \[langThemePanel, langThemeToggle, langThemeRef\] = useLangThemeSheet\(false\);/);
+  assert.match(menu, /<MenuBody onNavigate=\{onClose\} onLangTheme=\{langThemeToggle\} langThemeRef=\{langThemeRef\} \/>/);
+  assert.match(menu, /\{langThemePanel\}\s*<\/>/);
+  assert.match(menu, /<button ref=\{langThemeRef\} type="button" onClick=\{onLangTheme\}/);
+  assert.doesNotMatch(menu, /setLang\(|setThemePreference|LangThemePanel|loadedPanel/, 'the menu keeps a copy of the sheet rules');
+  // The popover leaves at either edge the way it came in (B2R1-A11Y-1): past its last row on to what
+  // follows the door, and before its first control onto the door, never to the end of the page.
+  assert.match(menu, /if \(e\.shiftKey\) \{\s*if \(document\.activeElement !== first\.current\) return;\s*e\.preventDefault\(\);\s*onClose\(\);\s*return;\s*\}/);
+  assert.match(menu, /if \(all && document\.activeElement === all\[all\.length - 1\]\) onClose\(\);/);
   // The current row.
   assert.equal(currentSection('/community'), 'home');
   assert.equal(currentSection('/community/stores'), 'stores');
@@ -228,7 +305,8 @@ test('the section header: an h1, a named back that mirrors, the kicker on reques
   const ar = render(createElement(SectionPageHeader, { title: 'المتاجر', kicker: true }), 'ar');
   assert.match(ar, /<h1[^>]*>المتاجر<\/h1>/);
   assert.match(ar, /aria-label="رجوع"/);
-  assert.match(ar, /مجتمع ليفو/);
+  // The line UNDER the title, as IMG_8486 draws «أتابعهم» over «مجتمع ليفو» (B2R1-FID-3).
+  assert.match(ar, /<h1[^>]*>المتاجر<\/h1><p class="text-\[13px\] leading-tight text-text-secondary">مجتمع ليفو<\/p>/);
   assert.match(ar, /lucide-chevron-right/, 'Arabic: the back chevron points to the inline start, the right');
   const en = render(createElement(SectionPageHeader, { title: 'Stores' }), 'en');
   assert.match(en, /aria-label="Back"/);
@@ -267,6 +345,12 @@ test('a liked heart wears the scoped like colour and falls back to gold outside 
   const liked = render(createElement(CountToggle, { ...props, on: true, tone: 'like' }));
   assert.match(liked, /style="color:var\(--cm-like, var\(--color-gold\)\)"/);
   assert.doesNotMatch(liked, /text-gold/);
+  // The scarlet is on the mark alone; the number keeps the primary ink (IMG_8486 «إعجاب 24 ♥»): as text the
+  // scarlet reads 3.9 to 4.5:1 on a dark card, under AA for 13px (B2R1-FID-1).
+  const button = liked.match(/<button[^>]*>/)![0];
+  assert.doesNotMatch(button, /--cm-like|style=/, 'the like colour is on the button, so the number inherits it');
+  assert.match(button, /\btext-text-primary\b/, 'the number beside a liked heart is in the primary ink');
+  assert.match(liked, /<span aria-hidden="true" class="inline-flex" style="color:var\(--cm-like, var\(--color-gold\)\)">/, 'the mark wears the like colour');
   const idle = render(createElement(CountToggle, { ...props, on: false, tone: 'like' }));
   assert.doesNotMatch(idle, /--cm-like/);
   const saved = render(createElement(CountToggle, { ...props, on: true }));

@@ -86,14 +86,21 @@ export interface LangThemeButtonProps {
   className?: string;
 }
 
-/** The header's globe, and the «المظهر واللغة والعملة» sheet it opens. */
-export default function LangThemeButton({ variant = 'home', className = '' }: LangThemeButtonProps) {
+/**
+ * THE SHEET AND ITS RULES, FOR EVERY DOOR TO IT: the header globe below, and
+ * the «اللغة والمظهر» row of the community sections menu
+ * (hub/CommunityMenu.tsx). One copy of the rules, so the doors cannot drift
+ * apart. It hands back, in this order (a list, as useState does, because
+ * every byte of this module rides in the first paint of every store page):
+ *   panel      the sheet, to draw where it outlives the door
+ *   toggle     opens the sheet, or closes it while it is up
+ *   buttonRef  the door: it takes focus before the sheet opens, and the sheet
+ *              gives focus back to it
+ *   open, Panel, closeThen, title, lang   what the globe itself draws
+ */
+export function useLangThemeSheet(withCurrency: boolean) {
   const { lang, setLang, loc, dir } = useLanguage();
   const { preference } = useTheme();
-  // The display currency, on the home header only. Its row — the pick, the
-  // captions, the commit — lives in the lazy panel, so the first paint carries
-  // none of it (tests/bundleBudget.test.ts).
-  const withCurrency = variant === 'home';
   const titleId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -183,6 +190,43 @@ export default function LangThemeButton({ variant = 'home', className = '' }: La
   const langLabel = loc('اللغة', 'Language', 'زمان');
   const themeLabel = loc('المظهر', 'Appearance', 'ڕووکار');
 
+  return [
+    Panel && <Panel
+      open={open}
+      onClose={() => closeThen(null)}
+      onExited={flush}
+      titleId={titleId}
+      title={title}
+      langLabel={langLabel}
+      themeLabel={themeLabel}
+      withCurrency={withCurrency}
+      dir={dir}
+      langPick={langPick}
+      themePick={themePick}
+      chooseLang={chooseLang}
+      chooseTheme={chooseTheme}
+      commit={commit}
+      onRowKeyDownCapture={onRowKeyDownCapture}
+      onRowPointerDownCapture={onRowPointerDownCapture}
+    />,
+    () => (open ? closeThen(null) : openSheet()),
+    buttonRef,
+    open,
+    Panel,
+    closeThen,
+    title,
+    lang,
+  ] as const;
+}
+
+/** The header's globe, and the «المظهر واللغة والعملة» sheet it opens. */
+export default function LangThemeButton({ variant = 'home', className = '' }: LangThemeButtonProps) {
+  // The display currency, on the home header only. Its row — the pick, the
+  // captions, the commit — lives in the lazy panel, so the first paint carries
+  // none of it (tests/bundleBudget.test.ts).
+  const withCurrency = variant === 'home';
+  const [panel, toggle, buttonRef, open, Panel, closeThen, title, lang] = useLangThemeSheet(withCurrency);
+
   const buttonClass =
     variant === 'home'
       ? 'flex h-11 w-11 items-center justify-center rounded-xl bg-surface shadow-xs text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
@@ -197,7 +241,7 @@ export default function LangThemeButton({ variant = 'home', className = '' }: La
         onPointerEnter={prewarmPanel}
         onPointerDown={prewarmPanel}
         onFocus={prewarmPanel}
-        onClick={() => (open ? closeThen(null) : openSheet())}
+        onClick={toggle}
         onKeyDown={(event) => {
           if (open && !Panel && event.key === 'Escape' && !event.nativeEvent.isComposing) {
             event.preventDefault();
@@ -214,24 +258,7 @@ export default function LangThemeButton({ variant = 'home', className = '' }: La
         {variant === 'dash' && <span className="text-xs font-bold uppercase hidden sm:block">{lang}</span>}
       </button>
 
-      {Panel && <Panel
-        open={open}
-        onClose={() => closeThen(null)}
-        onExited={flush}
-        titleId={titleId}
-        title={title}
-        langLabel={langLabel}
-        themeLabel={themeLabel}
-        withCurrency={withCurrency}
-        dir={dir}
-        langPick={langPick}
-        themePick={themePick}
-        chooseLang={chooseLang}
-        chooseTheme={chooseTheme}
-        commit={commit}
-        onRowKeyDownCapture={onRowKeyDownCapture}
-        onRowPointerDownCapture={onRowPointerDownCapture}
-      />}
+      {panel}
     </div>
   );
 }

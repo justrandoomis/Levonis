@@ -45,11 +45,17 @@ const AWAITING_CHOICE: StateWord = { word: { ar: 'بانتظار الاختيا�
 /** A state a newer server adds later still reads as words, not a code. */
 const UNKNOWN: StateWord = { word: { ar: 'قيد المتابعة', en: 'In progress', ckb: 'لە بەدواداچووندایە' }, tone: 'progress' };
 
-/** The state of a request as a card says it, and the tone of its pill. */
-export function requestStateWord(state: string | null | undefined, lang: CardLang, opts: { owner?: boolean; offers?: number } = {}): { word: string; tone: StateTone } {
+/**
+ * The state of a request as a card says it, and the tone of its pill.
+ * `brief`: a card that counts the offers on its own line (the home row) says
+ * «مفتوح» for a request receiving them too, as IMG_8487 draws it beside
+ * «3 عروض»: the count already says that offers are arriving, and the short
+ * word keeps the pill beside the chevron on a phone.
+ */
+export function requestStateWord(state: string | null | undefined, lang: CardLang, opts: { owner?: boolean; offers?: number; brief?: boolean } = {}): { word: string; tone: StateTone } {
   const key = String(state ?? '');
   const takesOffers = key === 'open' || key === 'receiving_offers';
-  const entry = opts.owner && takesOffers && (opts.offers ?? 0) > 0 ? AWAITING_CHOICE : STATES[key] ?? UNKNOWN;
+  const entry = opts.owner && takesOffers && (opts.offers ?? 0) > 0 ? AWAITING_CHOICE : opts.brief && takesOffers ? STATES.open : STATES[key] ?? UNKNOWN;
   return { word: entry.word[lang], tone: entry.tone };
 }
 
@@ -101,6 +107,8 @@ export interface CardWords {
   estimate: string;
   acceptedBy: string;
   repeat: string;
+  /** The sets of a job of parts, before «×n» (the words of the live hub card, hub/RequestCard.tsx). */
+  sets: string;
   /** The glyph tile read aloud when there is no picture: what the job is made with. */
   glyphFdm: string;
   glyphResin: string;
@@ -116,9 +124,11 @@ export const CARD_WORDS: Readonly<Record<CardLang, CardWords>> = {
     budget: 'ميزانيتك',
     budgetHidden: 'مخفية عن التجار والعموم',
     budgetShown: 'يراها التجار الذين يمكنهم صنع طلبك، ولا تظهر للعموم',
-    estimate: 'تقدير ليفونيس',
+    // The brand stays Latin in every language (tests/brandName.test.ts), as the wizard and the print summary write it.
+    estimate: 'تقدير Levonis',
     acceptedBy: 'التاجر المختار',
     repeat: 'إعادة الطلب',
+    sets: 'الأطقم',
     glyphFdm: 'طباعة بالخيوط',
     glyphResin: 'طباعة بالريزن',
     glyphText: 'وصف بلا ملف',
@@ -134,6 +144,7 @@ export const CARD_WORDS: Readonly<Record<CardLang, CardWords>> = {
     estimate: 'Levonis estimate',
     acceptedBy: 'Chosen merchant',
     repeat: 'Request again',
+    sets: 'Sets',
     glyphFdm: 'Filament print',
     glyphResin: 'Resin print',
     glyphText: 'Description only',
@@ -146,9 +157,10 @@ export const CARD_WORDS: Readonly<Record<CardLang, CardWords>> = {
     budget: 'بودجەکەت',
     budgetHidden: 'لە بازرگانان و خەڵکی گشتی شاراوەیە',
     budgetShown: 'ئەو بازرگانانە دەیبینن کە دەتوانن داواکارییەکەت دروست بکەن، بۆ خەڵکی گشتی دەرناکەوێت',
-    estimate: 'خەمڵاندنی لیڤۆنیس',
+    estimate: 'خەمڵاندنی Levonis',
     acceptedBy: 'بازرگانی هەڵبژێردراو',
     repeat: 'دووبارە داوای بکەرەوە',
+    sets: 'سێت',
     glyphFdm: 'چاپی فیلامێنت',
     glyphResin: 'چاپی ڕێزن',
     glyphText: 'تەنها وەسف',

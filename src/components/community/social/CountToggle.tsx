@@ -21,9 +21,11 @@
  * D-6). `gold` (a save) is the gold ink. `like` is the scarlet the
  * references draw for a heart, the scoped `--cm-like`, which exists only
  * inside the community scope: anywhere else the same mark falls back to the
- * gold it always was, so nothing outside the scope changes. Written as an
- * inline colour on the button (the icon fills with `currentColor`), so the
- * tone costs no stylesheet bytes.
+ * gold it always was. Written as an inline colour on the mark alone (the
+ * icon fills with `currentColor`), so the tone costs no stylesheet bytes.
+ * THE NUMBER BESIDE A LIKED HEART IS INK, NOT SCARLET (IMG_8486 «إعجاب 24 ♥»
+ * keeps it in the primary ink): the scarlet is a mark colour, and as text
+ * it reads 3.9 to 4.5:1 on a dark community card, under AA for 13px.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -116,14 +118,14 @@ export default function CountToggle({
       data-social={testAttr}
       data-on={on ? 'true' : 'false'}
       data-tone={tone}
-      style={on && like ? { color: 'var(--cm-like, var(--color-gold))' } : undefined}
       className={`press-scale relative z-10 inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-full px-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-        on ? (like ? '' : 'text-gold') : 'text-text-secondary hover:text-text-primary'
+        on ? (like ? 'text-text-primary' : 'text-gold') : 'text-text-secondary hover:text-text-primary'
       } ${size === 'sm' ? 'text-[12px]' : 'text-[13px]'} ${className}`}
     >
       <motion.span
         aria-hidden="true"
         className="inline-flex"
+        style={on && like ? { color: 'var(--cm-like, var(--color-gold))' } : undefined}
         animate={{ scale: pop ? 1.15 : 1 }}
         transition={m.spring('quick')}
         onAnimationComplete={() => {

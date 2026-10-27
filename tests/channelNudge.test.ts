@@ -402,9 +402,12 @@ test('the window is mounted after an order, a request and a ticket — and nowhe
   assert.ok(checkout.indexOf('<ChannelNudge context="order"') > successBranch);
 
   // Requests and Support: latched on the creation, never on a list. A request is published by its
-  // editor (community UI plan B4), which leaves `{ published: true }` in the router state.
+  // editor (community UI plan B4), which leaves `{ published: true }` in the router state of the
+  // request page it goes back onto (returnPublished; tests/communityRoutes.test.ts runs it).
   assert.match(requests, /useState\(\(\) => justPublished\(location\.state\)\)/);
-  assert.match(read('src/pages/community/RequestNew.tsx'), /how === 'published'\) navigate\(requestPath\(rid\), \{ replace: true, state: \{ published: true \} \}\)/);
+  const editor = read('src/pages/community/RequestNew.tsx');
+  assert.match(editor, /how === 'published'\) returnPublished\(navigate, requestPath\(rid\)\)/);
+  assert.match(editor, /export function returnPublished\([^)]*\): void \{\s*const state = \{ published: true \};/);
   assert.match(requests, /<ChannelNudge context="request" active=\{requestJustCreated\} \/>/);
   assert.match(support, /setTicketJustOpened\(true\)/);
   assert.match(support, /<ChannelNudge context="ticket" active=\{ticketJustOpened\} \/>/);

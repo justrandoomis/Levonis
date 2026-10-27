@@ -28,7 +28,8 @@ export default function CommunityFollowing() {
   return (
     <CommunitySurface className="min-h-screen w-full pb-28">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4" data-community-section="following">
-        <SectionPageHeader title={s.tabs.following} trailing={<SectionsButton />} />
+        {/* «أتابعهم» over «مجتمع ليفو», as IMG_8486 draws the header. */}
+        <SectionPageHeader title={s.tabs.following} kicker trailing={<SectionsButton />} />
         <Suspense fallback={<PostSkeleton />}>
           <FollowingPanel viewer={user?.id ?? 'guest'} composerLink={composerLink} />
         </Suspense>

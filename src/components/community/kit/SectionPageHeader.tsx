@@ -8,7 +8,9 @@
  *              it, one who opened the section by its link goes up to the
  *              community home (`backTo`), never out of the app
  *   title      the page h1, 26/800
- *   kicker     optional, «مجتمع ليفو» at 13px over the title
+ *   kicker     optional, «مجتمع ليفو» at 13px in the secondary ink, UNDER the
+ *              title as a subtitle, where IMG_8486 draws it («أتابعهم» over
+ *              «مجتمع ليفو»)
  *   trailing   the inline-end slot: «الأقسام» (SectionsButton below, the door
  *              to the sections and account menu), «المحفوظات», «حفظ مسودة»,
  *              or a «⋯» menu
@@ -34,7 +36,7 @@ const CommunityMenu = React.lazy(() => import('../hub/CommunityMenu'));
 
 export interface SectionPageHeaderProps {
   title: React.ReactNode;
-  /** The kicker over the title: `true` for «مجتمع ليفو», or words of its own. */
+  /** The line under the title: `true` for «مجتمع ليفو», or words of its own. */
   kicker?: boolean | React.ReactNode;
   /** Where Back goes when there is no page of this app behind this one. */
   backTo?: string;
@@ -67,10 +69,10 @@ export default function SectionPageHeader({ title, kicker, backTo = '/community'
       {/* The title keeps its words whole: on a narrow phone the trailing slot
           wraps under it at the inline end (plan R7) rather than breaking a word. */}
       <div className="flex-auto">
-        {kicker && <p className="text-[13px] font-semibold text-text-secondary">{kicker === true ? s.communityName : kicker}</p>}
         <h1 id={titleId} className="text-[26px] font-extrabold leading-tight text-text-primary">
           {title}
         </h1>
+        {kicker && <p className="text-[13px] leading-tight text-text-secondary">{kicker === true ? s.communityName : kicker}</p>}
       </div>
       {trailing && <div className="ms-auto flex shrink-0 items-center gap-1">{trailing}</div>}
     </header>

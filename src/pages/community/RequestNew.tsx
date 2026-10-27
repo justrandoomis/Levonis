@@ -3,8 +3,8 @@
  * C4 builds the four-step editor with P1-06 folded in:
  *
  *   /requests/new            a new request
- *   /requests/new/:id        a draft, continued («أكمل المسودة»; «أكمل
- *                            وانشر» opens it with `?step=4`, the review)
+ *   /requests/new/:id        a draft, continued («أكمل المسودة»; `?step=4`
+ *                            will open it at its review once C4 reads it)
  *   /requests/:id/edit       a published request, edited
  *
  * Today each renders the wizard the board used to open in place
@@ -14,13 +14,14 @@
  * `project`) here (src/pages/Requests.tsx), and the request page sends its
  * edit and its draft here (src/pages/community/Request.tsx). The step in the
  * address and the project prefill are carried in the location for C4; the
- * wizard of today starts at its first step and has no project source.
+ * wizard of today starts at its first step and has no project source, so
+ * the request page offers no «أكمل وانشر» until the editor honours the step.
  *
  * Behind ProtectedRoute and CommunityGate (src/App.tsx): writing a request
  * needs an account, and the community open to it.
  */
 import { Suspense, lazy } from 'react';
-import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams, type NavigateFunction } from 'react-router-dom';
 import CommunitySurface from '../../components/community/CommunitySurface';
 import SectionPageHeader from '../../components/community/kit/SectionPageHeader';
 import { useRequestStrings } from '../../components/community/requests/strings';
@@ -39,6 +40,38 @@ function carriedPrintLink(state: unknown, params: URLSearchParams): string {
   return typeof fromState === 'string' ? fromState : params.get('link') ?? '';
 }
 
+/**
+ * BACK ONTO THE PAGE THAT OPENED THE EDITOR, MARKED PUBLISHED. The request page
+ * is the one door to a draft or an edit, so the entry behind the editor is that
+ * page: a publish steps back onto it and marks it there (`{ published: true }`,
+ * read once by the page for the channel window). The history then holds one
+ * request page, as the in-place wizard left it, and Back reaches what came
+ * before it. With nothing of this app behind (the editor opened by its
+ * address), the request page replaces the editor; with another page behind, it
+ * follows that page. React Router stamps `idx` on every entry it makes (see
+ * lib/useGoBack.ts).
+ */
+export function returnPublished(navigate: NavigateFunction, path: string, win: Window = window): void {
+  const state = { published: true };
+  let behind = false;
+  try {
+    const idx = (win.history.state as { idx?: unknown } | null)?.idx;
+    behind = typeof idx === 'number' && idx > 0;
+  } catch {
+    behind = false;
+  }
+  if (!behind) {
+    navigate(path, { replace: true, state });
+    return;
+  }
+  // Once the browser has stepped back, the entry is marked: a replace, or a
+  // push when another page is behind. The router hears the step back first,
+  // so the page may arrive a moment before its mark; it reads the mark on
+  // every arrival (src/pages/community/Request.tsx).
+  win.addEventListener('popstate', () => navigate(path, { replace: win.location.pathname === path, state }), { once: true });
+  navigate(-1);
+}
+
 export default function RequestNew() {
   const { id = '' } = useParams();
   const location = useLocation();
@@ -54,13 +87,14 @@ export default function RequestNew() {
    * A request this person just PUBLISHED: its page asks about the
    * notification channels, once (the router state). A new request leaves
    * «طلباتي» behind it, where it now is; a draft or an edit goes back to its
-   * page, replacing this screen when it was published, else as Back would.
+   * page, the one entry that opened this screen (returnPublished: never a
+   * second copy of it, so one Back leaves the request), else as Back would.
    */
   const done = (rid: string, how: 'published' | 'saved') => {
     if (!id) {
       navigate('/requests?view=mine', { replace: true });
       navigate(requestPath(rid), how === 'published' ? { state: { published: true } } : undefined);
-    } else if (how === 'published') navigate(requestPath(rid), { replace: true, state: { published: true } });
+    } else if (how === 'published') returnPublished(navigate, requestPath(rid));
     else goBack();
   };
 

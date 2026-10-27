@@ -183,23 +183,31 @@ export default function RequestPage() {
    * merchant sent here by a match notice must not be
    * asked about the customer's notification channels. The state is dropped
    * from the history entry at once, so Back, Forward or a reload never pops
-   * the window again.
+   * the window again. It is read on every arrival, not only the first
+   * render: the editor steps back onto this page and marks the entry as it
+   * lands (RequestNew.tsx `returnPublished`), so the page can be on screen a
+   * moment before its mark.
    */
-  const [requestJustCreated] = useState(() => justPublished(location.state));
+  const [requestJustCreated, setRequestJustCreated] = useState(() => justPublished(location.state));
   useEffect(() => {
     if (!justPublished(location.state)) return;
+    setRequestJustCreated(true);
     navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { replace: true, state: null });
-    // Once, on arrival.
+    // On each arrival (the router hands a new location object for every entry): a new entry, or the mark landing on this one.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [location]);
 
   /**
    * THE EDITOR HAS ITS OWN ADDRESS (community UI plan B4): a published
    * request is edited at /requests/:id/edit and a draft is continued at
    * /requests/new/:id (src/pages/community/RequestNew.tsx), so Back, a reload
-   * and Android Back all return to the same screen. «أكمل وانشر» opens the
-   * draft at its review (`?step=4`): a draft is never published from here
-   * without the review (critique 5). The editor comes back with
+   * and Android Back all return to the same screen. A draft is never
+   * published from here without the review (critique 5). «أكمل وانشر» (the
+   * draft opened at its review, `?step=4`) is NOT offered yet: the wizard of
+   * today opens at its first step whatever the address says, so the label
+   * would promise what the tap does not do. The draft card says only «أكمل
+   * التعديل» until C4 builds the editor that reads the step; wiring
+   * `onFinish` back is then one line here. The editor comes back with
    * `{ published: true }` in the router state when it published.
    */
   const editPath = (rid: string, draft: boolean) =>
@@ -222,7 +230,6 @@ export default function RequestPage() {
           meReady={me !== undefined}
           onBack={goBack}
           onEdit={(rid, draft) => navigate(editPath(rid, !!draft))}
-          onFinish={(rid) => navigate(`${editPath(rid, true)}?step=4`)}
           onNewRequest={() => (user ? navigate('/requests/new') : signIn())}
         />
         {nudge}
@@ -270,7 +277,7 @@ export function RequestDetail({
   onBack: () => void;
   /** Open the editor on this request: a draft to continue (`draft`), or a published one to edit. */
   onEdit?: (id: string, draft?: boolean) => void;
-  /** «أكمل وانشر»: the draft, opened at its review. */
+  /** «أكمل وانشر»: the draft, opened at its review. Offered only by an editor that opens at the review (C4); none passes it today. */
   onFinish?: (id: string) => void;
   /** «اطلب مثله»: the wizard, for a visitor who wants something like this. */
   onNewRequest?: () => void;
@@ -581,8 +588,9 @@ export function RequestDetail({
                     {loc('أكمل وانشر', 'Finish and publish', 'تەواوی بکە و بڵاوی بکەرەوە')}
                   </Button>
                 )}
+                {/* With no «أكمل وانشر» beside it, continuing is the way forward: the primary button. */}
                 {onEdit && (
-                  <Button variant="secondary" size="sm" onClick={() => onEdit(current.id, true)} data-requests="continue-draft">
+                  <Button variant={onFinish ? 'secondary' : 'primary'} size="sm" onClick={() => onEdit(current.id, true)} data-requests="continue-draft">
                     {s.continueEditing}
                   </Button>
                 )}

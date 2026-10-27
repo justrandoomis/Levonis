@@ -27,11 +27,18 @@
  * scrim close it, focus held inside and given back). From 1024px it is a
  * 360px popover anchored to its trigger (ui/Overlay `Anchored`): focus moves
  * to its first row, Escape or a press outside closes it and gives focus back
- * to the trigger, and Tab past its last row closes it too. Either way the
- * scope travels with the portal (scopePortals.ts), so it wears the
- * community palette in both themes.
+ * to the trigger. The popover is portalled to the end of the page, so the
+ * keyboard leaves it the way it came in: Tab past its last row closes it and
+ * goes on to what follows the trigger, and Shift+Tab before its first control
+ * closes it and lands on the trigger, never on the last link of the page
+ * with the popover still open. Either way the scope travels with the portal
+ * (scopePortals.ts), so it wears the community palette in both themes.
+ *
+ * «اللغة والمظهر» opens the sheet of the header globe itself
+ * (LangThemeSheet.tsx `useLangThemeSheet`): one copy of its rules, never a
+ * second one here.
  */
-import React, { useCallback, useEffect, useId, useRef, useState, type ComponentType, type KeyboardEvent } from 'react';
+import React, { useEffect, useId, useRef, useState, type ComponentType } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Bookmark,
@@ -51,17 +58,16 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../AuthContext';
 import { useLanguage } from '../../../LanguageContext';
-import { STUDIO_URL, type Language } from '../../../translations';
+import { STUDIO_URL } from '../../../translations';
 import { merchantApi, type MerchantMe } from '../../../lib/merchant';
 import { merchantHref } from '../../../lib/merchantRoutes';
 import { authPathWithSupportRef } from '../../../lib/supportRef';
-import { CENTER_REVEAL_MS, setThemePreference, useTheme, type ThemePreference } from '../../../lib/theme';
 import { useMediaQuery } from '../../../lib/useMediaQuery';
 import { useCommunityAccess } from '../../../pages/community/access';
 import { Anchored } from '../../ui/Overlay';
 import { Sheet } from '../../ui/Sheet';
 import VariantImg from '../../ui/VariantImg';
-import type { LangThemePanelProps } from '../../LangThemePanel';
+import { useLangThemeSheet } from '../../LangThemeSheet';
 import { ListRow } from '../kit/display';
 import { useKitStrings } from '../kit/strings';
 import { useSocialStrings } from '../social/strings';
@@ -129,7 +135,8 @@ export default function CommunityMenu({ open, onClose, anchor }: CommunityMenuPr
   const titleId = useId();
   const body = useRef<HTMLDivElement | null>(null);
   const first = useRef<HTMLButtonElement | null>(null);
-  const langTheme = useLangThemeSheet();
+  // The two rows of the dashboard sheet: the display currency is the header globe alone.
+  const [langThemePanel, langThemeToggle, langThemeRef] = useLangThemeSheet(false);
 
   // Focus enters on open, on the first control (the back chevron that closes
   // it): the popover does not move focus by itself, and the sheet, mounted
@@ -140,7 +147,9 @@ export default function CommunityMenu({ open, onClose, anchor }: CommunityMenuPr
     return () => window.clearTimeout(t);
   }, [open, desktop]);
 
-  const content = <MenuBody onNavigate={onClose} onLangTheme={langTheme.openSheet} />;
+  // The sheet itself is drawn below, beside the menu and not inside its rows,
+  // so a choice made in it outlives the popover closing under it.
+  const content = <MenuBody onNavigate={onClose} onLangTheme={langThemeToggle} langThemeRef={langThemeRef} />;
 
   return (
     <>
@@ -151,7 +160,17 @@ export default function CommunityMenu({ open, onClose, anchor }: CommunityMenuPr
             data-community-menu="popover"
             className="max-h-[85vh] overflow-y-auto overscroll-contain"
             onKeyDown={(e) => {
-              if (e.key !== 'Tab' || e.shiftKey) return;
+              // Out at either edge, the way the popover came in: past the last
+              // row on to what follows the trigger (onClose puts focus on the
+              // trigger and the browser moves on from it); before the first
+              // control onto the trigger itself.
+              if (e.key !== 'Tab') return;
+              if (e.shiftKey) {
+                if (document.activeElement !== first.current) return;
+                e.preventDefault();
+                onClose();
+                return;
+              }
               const all = body.current?.querySelectorAll<HTMLElement>('a[href], button');
               if (all && document.activeElement === all[all.length - 1]) onClose();
             }}
@@ -174,7 +193,7 @@ export default function CommunityMenu({ open, onClose, anchor }: CommunityMenuPr
           <div data-community-menu="sheet">{content}</div>
         </Sheet>
       )}
-      {langTheme.panel}
+      {langThemePanel}
     </>
   );
 }
@@ -217,7 +236,7 @@ function TitleRow({ titleId, onClose, firstRef }: { titleId: string; onClose: ()
 }
 
 /** The two groups (the community one only while the community is open to this viewer). */
-function MenuBody({ onNavigate, onLangTheme }: { onNavigate: () => void; onLangTheme: () => void }) {
+function MenuBody({ onNavigate, onLangTheme, langThemeRef }: { onNavigate: () => void; onLangTheme: () => void; langThemeRef: React.RefObject<HTMLButtonElement | null> }) {
   const s = useKitStrings();
   const hub = useHubStrings();
   const social = useSocialStrings();
@@ -277,7 +296,7 @@ function MenuBody({ onNavigate, onLangTheme }: { onNavigate: () => void; onLangT
         {row('followed', s.storesIFollow, <Store className={glyph} />, gated('/followed-stores'))}
         {row('saved', social.savedTitle, <Bookmark className={glyph} />, gated('/community/saved'))}
         {storeRow}
-        <button type="button" onClick={onLangTheme} className="cm-row relative flex min-h-14 w-full items-center gap-3 rounded-sm px-3 text-start text-text-primary hover:bg-surface-selected focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus" aria-haspopup="dialog">
+        <button ref={langThemeRef} type="button" onClick={onLangTheme} className="cm-row relative flex min-h-14 w-full items-center gap-3 rounded-sm px-3 text-start text-text-primary hover:bg-surface-selected focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus" aria-haspopup="dialog">
           <span aria-hidden="true" className="cm-line flex size-9 shrink-0 items-center justify-center rounded-sm bg-surface-raised text-gold shadow-1">
             <Globe className={glyph} />
           </span>
@@ -311,100 +330,4 @@ function MenuGroup({ icon, title, hint, id, children }: { icon: React.ReactNode;
       </nav>
     </section>
   );
-}
-
-// ----------------------------------------------------------- language and theme
-
-type PanelComponent = ComponentType<LangThemePanelProps>;
-let loadedPanel: PanelComponent | null = null;
-
-/**
- * «اللغة والمظهر» from the menu: the same lazy sheet the header globe opens
- * (LangThemePanel), over the menu, with the same rules: a choice closes the
- * sheet and is made once it has gone; an arrow key only moves the pick. The
- * display currency is the header row alone (the dashboard keeps it out too).
- */
-function useLangThemeSheet(): { openSheet: () => void; panel: React.ReactNode } {
-  const { lang, setLang, loc, dir } = useLanguage();
-  const { preference } = useTheme();
-  const s = useKitStrings();
-  const titleId = useId();
-  const [open, setOpen] = useState(false);
-  const [Panel, setPanel] = useState<PanelComponent | null>(() => loadedPanel);
-  const [langPick, setLangPick] = useState<Language>(lang);
-  const [themePick, setThemePick] = useState<ThemePreference>(preference);
-  const pending = useRef<null | (() => void)>(null);
-  const fallback = useRef<number | undefined>(undefined);
-  const navigating = useRef(false);
-
-  const flush = useCallback(() => {
-    window.clearTimeout(fallback.current);
-    const run = pending.current;
-    pending.current = null;
-    run?.();
-  }, []);
-  useEffect(() => () => window.clearTimeout(fallback.current), []);
-
-  const openSheet = () => {
-    setLangPick(lang);
-    setThemePick(preference);
-    setOpen(true);
-    if (loadedPanel) {
-      setPanel(() => loadedPanel);
-      return;
-    }
-    void import('../../LangThemePanel')
-      .then((m) => {
-        loadedPanel = m.default;
-        setPanel(() => m.default);
-      })
-      .catch(() => setOpen(false));
-  };
-
-  /** Close, and make the change once the sheet has gone (or after 900ms, if a hidden tab never reports the exit). */
-  const commit = (change: (() => void) | null) => {
-    if (navigating.current) {
-      navigating.current = false;
-      return;
-    }
-    pending.current = change;
-    setOpen(false);
-    window.clearTimeout(fallback.current);
-    if (change) fallback.current = window.setTimeout(flush, 900);
-  };
-
-  const panel = Panel ? (
-    <Panel
-      open={open}
-      onClose={() => commit(null)}
-      onExited={flush}
-      titleId={titleId}
-      title={s.langTheme}
-      langLabel={loc('اللغة', 'Language', 'زمان')}
-      themeLabel={loc('المظهر', 'Appearance', 'ڕووکار')}
-      withCurrency={false}
-      dir={dir}
-      langPick={langPick}
-      themePick={themePick}
-      chooseLang={(id) => {
-        const next = id as Language;
-        setLangPick(next);
-        commit(next === lang ? null : () => setLang(next));
-      }}
-      chooseTheme={(id) => {
-        const next = id as ThemePreference;
-        setThemePick(next);
-        commit(next === preference ? null : () => setThemePreference(next, { origin: 'center', duration: CENTER_REVEAL_MS }));
-      }}
-      commit={commit}
-      onRowKeyDownCapture={(e: KeyboardEvent) => {
-        navigating.current = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key);
-      }}
-      onRowPointerDownCapture={() => {
-        navigating.current = false;
-      }}
-    />
-  ) : null;
-
-  return { openSheet, panel };
 }

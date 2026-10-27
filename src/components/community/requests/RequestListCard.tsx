@@ -2,9 +2,17 @@
  * A PRINT REQUEST AS A CARD (community UI plan B2; IMG_8487 row 8, IMG_8462
  * (e), IMG_8468, IMG_8483, IMG_8475), in four variants:
  *
- *   row     the home on a phone: the media tile at the start, the title, one
- *           line «governorate • pieces • material», one line «offers |
- *           attachments», the state pill and the onward chevron at the end
+ *   row     the home on a phone: the media tile at the start, the title, the
+ *           line «governorate • pieces • material», the line «offers |
+ *           attachments», and at the end a column of its own holding the
+ *           state pill beside the onward chevron, centred on the card
+ *           (IMG_8487 row 8). The pill says «مفتوح» for a request receiving
+ *           offers too, as the reference does beside «3 عروض»: the count
+ *           says the offers. Words beside the tile keep at least 8.5rem; a
+ *           card narrower than that and the end column (a phone under 375px)
+ *           moves the end column onto a line of its own at the end, the same
+ *           way on every card. Nothing is cut: the meta wraps between its
+ *           words and the counts wrap whole
  *   aside   the desktop home aside: the words at the start, the 104 by 92
  *           media at the end, the state as a word
  *   list    the requests board: the media square at the end, the pill, the
@@ -18,8 +26,15 @@
  * `PublicRequestCard` has no budget field at all, so no public variant can be
  * handed one. A picture (plan R3): a public card draws a neutral glyph tile
  * (a box for filament, a drop for resin, a page for a description with no
- * file, and the pieces of a parts job under it). A person (R10, acceptance
- * 34): no name and no avatar. tests/communityKitUi.test.ts pins all three.
+ * file). A person (R10, acceptance 34): no name and no avatar.
+ * tests/communityKitUi.test.ts pins all three.
+ *
+ * A JOB OF PARTS SAYS ONE COUNT OF EACH THING (P1-05 review 5, as the live
+ * hub card hub/RequestCard.tsx says it): the parts under the tile, in the
+ * words of jobCountWords («عدد الأجزاء 2»); the pieces in the meta, all of
+ * them (the sets times the pieces of a set: «10 قطع», as IMG_8483 counts);
+ * and the sets beside them when there are several («الأطقم: ×2»). Never two
+ * different piece counts on one card.
  *
  * ONE LINK. A public card is one link to `/requests/:id`, the whole card its
  * target, with nothing pressable inside it. The owner card has a button
@@ -39,7 +54,7 @@ import { formatDate } from '../../orders/format';
 import { iqdUnit } from '../../../lib/money';
 import { OnwardChevron, kitButtonClass } from '../kit/buttons';
 import { StatePill } from '../kit/display';
-import { localMaterial } from './mirrors';
+import { jobCountWords, localMaterial } from './mirrors';
 import { RequestThumb } from './RequestFileThumbs';
 import { CARD_WORDS, asCardLang, attachmentsWord, offersWord, piecesWord, requestGlyph, requestStateWord, type CardLang } from './requestWords';
 
@@ -112,6 +127,12 @@ function piecesOf(r: PublicRequestCard): number {
   return sets * perSet;
 }
 
+/** A job of parts (P1-05), as the live hub card decides it: several parts, or more than one piece a set. */
+function partsJob(r: PublicRequestCard): { parts_count: number; pieces_per_set: number } | null {
+  const sum = r.summary;
+  return sum && (sum.parts_count > 1 || sum.pieces_per_set > 1) ? sum : null;
+}
+
 /**
  * The resin glyph (the lucide droplet), drawn here: the droplet icon module is
  * already used by one lazy screen, and a second user would move it into the
@@ -125,21 +146,31 @@ function DropGlyph({ className = '', strokeWidth = 2 }: { className?: string; st
   );
 }
 
-/** The neutral media tile of a public card (plan R3): the process glyph on a well, the pieces of a parts job under it. */
+/**
+ * The neutral media tile of a public card (plan R3): the process glyph on a
+ * well and, for a job of several parts, the parts under it in the words of
+ * the live card (jobCountWords). The pieces are the meta line, counted once.
+ * The glyph is decoration; the parts are read aloud with the rest of the card.
+ */
 function GlyphTile({ r, width, height, L }: { r: PublicRequestCard; width: number; height: number; L: CardLang }) {
   const glyph = requestGlyph(r);
   const Glyph = glyph === 'resin' ? DropGlyph : glyph === 'text' ? FileText : Box;
-  const perSet = Number(r.summary?.pieces_per_set ?? 1);
+  const job = partsJob(r);
+  const parts = job && job.parts_count > 1 ? jobCountWords(job, L)[0] : '';
   const big = Math.min(width, height) >= 88;
   return (
     <span
-      aria-hidden="true"
       data-request-glyph={glyph}
       className="cm-line flex shrink-0 flex-col items-center justify-center gap-1 rounded-md bg-surface-selected text-text-secondary"
       style={{ inlineSize: width, blockSize: height }}
     >
+      {/* Hidden from the reader: lucide marks its icons so, and DropGlyph says so itself. */}
       <Glyph className={big ? 'h-8 w-8' : 'h-6 w-6'} strokeWidth={1.5} />
-      {perSet > 1 && <span className="text-[12px] font-semibold tabular-nums">{piecesWord(perSet, L)}</span>}
+      {parts && (
+        <span data-request-parts={job!.parts_count} className="px-1 text-center text-[12px] font-semibold leading-tight tabular-nums">
+          {parts}
+        </span>
+      )}
     </span>
   );
 }
@@ -162,38 +193,49 @@ export default function RequestListCard(props: RequestListCardProps) {
   const place = r.governorate ? GOVERNORATE_LABELS[r.governorate]?.[L] ?? '' : '';
   const material = localMaterial(r.material, L);
   const pieces = piecesWord(piecesOf(r), L);
-  const state = requestStateWord(r.state, L, { owner: variant === 'owner', offers });
+  // The sets of a job of parts ordered more than once, in the words of the live card: «الأطقم: ×2».
+  const setCount = Math.max(1, Number(r.quantity ?? 1) || 1);
+  const sets = partsJob(r) && setCount > 1 ? (
+    <span data-request-sets={setCount} className="whitespace-nowrap">
+      {w.sets}: <bdi dir="ltr">×{setCount}</bdi>
+    </span>
+  ) : null;
+  // The row counts the offers on a line of its own, so its pill says «مفتوح» for a request receiving them (IMG_8487).
+  const state = requestStateWord(r.state, L, { owner: variant === 'owner', offers, brief: variant === 'row' });
   const deadline = formatDate(r.deadline, lang);
 
-  // «بغداد • 4 قطع • PETG»: the governorate, the pieces and the material, the reader own words.
-  const meta = [place, pieces, material].filter(Boolean);
+  // «بغداد • 4 قطع • PETG»: the governorate, the pieces (and the sets of a parts job) and the
+  // material, the reader own words. It wraps between its words rather than cutting the
+  // material off; each bullet stays at the end of the line it closes.
+  const meta: React.ReactNode[] = [place, pieces, sets, material].filter(Boolean);
   const metaLine = (
-    <span className="block truncate text-[13px] text-text-secondary">
+    <span className="block break-words text-[13px] leading-snug text-text-secondary">
       {meta.map((part, i) => (
         <React.Fragment key={i}>
-          {i > 0 && <span aria-hidden="true"> • </span>}
+          {i > 0 && <span aria-hidden="true">{'\u00a0• '}</span>}
           <bdi>{part}</bdi>
         </React.Fragment>
       ))}
     </span>
   );
-  // «3 عروض | مرفقان»: the offers (or «بانتظار العروض») and the attachments.
+  // «3 عروض | مرفقان»: the offers (or «بانتظار العروض») and the attachments, each word whole,
+  // never cut. A card too narrow for both on one line puts the attachments on the next; the bar
+  // between them hangs in the gap outside the attachments, so at the start of a line it falls
+  // outside the box and is clipped, leaving no bar with nothing before it.
   const counts = (
-    <span className="flex min-w-0 items-center gap-2 whitespace-nowrap text-[13px] text-text-secondary">
-      <span className="inline-flex shrink-0 items-center gap-1" data-request-offers={offers}>
+    <span className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-0.5 overflow-hidden text-[13px] leading-snug text-text-secondary">
+      <span className="inline-flex items-center gap-1 whitespace-nowrap" data-request-offers={offers}>
         <MessageSquare aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.75} />
         {offersWord(offers, L)}
       </span>
       {files > 0 && (
-        <>
-          <span aria-hidden="true" className="text-text-muted">
+        <span className="relative inline-flex items-center gap-1 whitespace-nowrap" data-request-files={files}>
+          <span aria-hidden="true" className="absolute end-full me-1.5 text-text-muted">
             |
           </span>
-          <span className="inline-flex min-w-0 items-center gap-1">
-            <Paperclip aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.75} />
-            <span className="truncate">{attachmentsWord(files, L)}</span>
-          </span>
-        </>
+          <Paperclip aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+          {attachmentsWord(files, L)}
+        </span>
       )}
     </span>
   );
@@ -205,23 +247,23 @@ export default function RequestListCard(props: RequestListCardProps) {
 
   if (variant === 'row') {
     return (
-      <Link to={to} data-request-card="row" data-community-request={r.id} className={`cm-card flex min-h-[88px] items-center gap-3 rounded-xl p-3 shadow-sm active:shadow-press ${LINK_FOCUS} ${className}`}>
+      <Link to={to} data-request-card="row" data-community-request={r.id} className={`cm-card flex min-h-[88px] flex-wrap items-center gap-x-3 gap-y-2 rounded-xl p-3 shadow-sm active:shadow-press ${LINK_FOCUS} ${className}`}>
         <Media r={r} width={64} height={64} L={L} />
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <H dir="auto" className="truncate text-start text-[15px] font-bold text-text-primary">
+        {/* The words keep 8.5rem beside the tile. A card too narrow for that and
+            the end column (a phone under 375px) puts the end column on a line
+            of its own, at the end: the width decides, the same on every card. */}
+        <div className="flex min-w-0 grow basis-[8.5rem] flex-col gap-0.5">
+          <H dir="auto" className="truncate text-start text-[15px] font-bold leading-snug text-text-primary">
             {r.title}
           </H>
           {metaLine}
-          {/* On a phone the pill shares the counts line, at its end (plan R7: a
-              row that packs three things wraps rather than starving the words). */}
-          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-            {counts}
-            <StatePill tone={state.tone} className="ms-auto shrink-0">
-              {state.word}
-            </StatePill>
-          </div>
+          {counts}
         </div>
-        <OnwardChevron className="h-[18px] w-[18px] shrink-0 text-text-secondary" />
+        {/* The end column (IMG_8487 row 8): the state pill beside the chevron, centred on the card. */}
+        <span className="ms-auto flex shrink-0 items-center gap-1.5" data-request-end>
+          <StatePill tone={state.tone}>{state.word}</StatePill>
+          <OnwardChevron className="h-[18px] w-[18px] shrink-0 text-text-secondary" />
+        </span>
       </Link>
     );
   }
@@ -254,6 +296,12 @@ export default function RequestListCard(props: RequestListCardProps) {
       <span className="inline-flex items-center gap-1 tabular-nums">
         <Box aria-hidden="true" className={icon} strokeWidth={1.75} />
         {pieces}
+        {sets && (
+          <>
+            <span aria-hidden="true"> • </span>
+            {sets}
+          </>
+        )}
       </span>
       {place && (
         <span className="inline-flex items-center gap-1">
