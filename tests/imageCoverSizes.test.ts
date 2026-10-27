@@ -47,7 +47,8 @@ test('a feed cover and the cover story ask for what they draw', () => {
   assert.equal(coverStorySizes(null), '(min-width: 1024px) min(1120px, calc(100vw - 32px)), 100vw');
   assert.equal(coverStorySizes(2.4), '(min-width: 1024px) min(1120px, calc(100vw - 32px)), 135vw', 'a 12:5 picture fits the desktop frame; on a phone it is 1.35 × wider than 16:9');
   assert.match(src('src/components/community/feed/PostCard.tsx'), /sizes=\{feedCoverSizes\(p\.cover\)\}/);
-  assert.equal((src('src/components/community/hub/CoverStory.tsx').match(/sizes=\{coverStorySizes\(/g) ?? []).length, 2);
+  // The cover story is the featured project of the home now (community UI plan C1): one photograph, a project or a work.
+  assert.equal((src('src/components/community/hub/FeaturedProject.tsx').match(/coverStorySizes\(/g) ?? []).length, 2);
 });
 
 test('a store picture cropped to fill takes the copy its drawn width needs once it has loaded; the phone hero asks for 150vw', () => {

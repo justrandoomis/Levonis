@@ -133,7 +133,11 @@ export default function BottomNav() {
 
   // Chats already return an authoritative unread count per conversation.
   // Reuse that contract for the shell badge instead of introducing a second
-  // counter or guessing from the most recent message.
+  // counter or guessing from the most recent message. THE ONE READ OF A PAGE:
+  // the count is also published on the root (`data-chat-unread`), where the
+  // community top bar reads it (src/lib/useChatUnread.ts) instead of asking
+  // again. No new binding in the entry: a module there renamed the whole
+  // chunk and cost 84 B gzip (community UI plan C1, measured).
   React.useEffect(() => {
     if (!isAuthenticated) {
       setMessageUnreadCount(0);
@@ -144,9 +148,9 @@ export default function BottomNav() {
       .get<{ chats: Array<{ unread?: number | null }> }>('/api/chats', { mascot: 'silent' })
       .then((d) => {
         if (cancelled) return;
-        setMessageUnreadCount(
-          (d.chats ?? []).reduce((sum, chat) => sum + Math.max(0, Math.trunc(Number(chat.unread) || 0)), 0)
-        );
+        const unread = (d.chats ?? []).reduce((sum, chat) => sum + Math.max(0, Math.trunc(Number(chat.unread) || 0)), 0);
+        setMessageUnreadCount(unread);
+        document.documentElement.dataset.chatUnread = String(unread);
       })
       .catch(() => {});
     return () => {

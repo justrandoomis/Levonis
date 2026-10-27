@@ -1,26 +1,30 @@
 #!/usr/bin/env node
 /**
  * THE COMMUNITY HOME, PHOTOGRAPHED — tests/browser/community-home.html
- * through Playwright: the six tabs, the two old tab names, the guest and the
- * member and the merchant, the empty community, in Arabic, English and
- * Sorani, dark and cream, on a phone and a wide screen. Checks: the landmark
- * each tab promises, no horizontal overflow, no page errors, one <h1>, six
- * tabs, the cover's alt = the project's title, numbered section heads, the
- * feed's rows and the composer dock once the feed is reached, the search
- * turning the page into its results, and a follow flipping on a rail.
+ * through Playwright (community UI plan C1; IMG_8487, IMG_8462): the guest,
+ * the member and the merchant, the empty community, in Arabic, English and
+ * Sorani, dark and cream, on a phone and a wide screen. Checks: one <h1>
+ * after the wordmark, the six sections as links with «لك» the page on screen,
+ * the two verbs (the gold one first), the featured project (its alt is the
+ * project's title, its kicker the honest «مشروع رائج»), the trending cards,
+ * the request rows (never a budget), the makers, the Studio anchor, no
+ * horizontal overflow, no page errors, the feed's rows once reached, the
+ * search turning the page into its results, the avatar opening the sections
+ * and account menu (Escape closes it, focus comes back), ONE GET /api/chats
+ * a page with the badge on the top bar, a like and a follow flipping, and
+ * every old `?tab=` address landing on its section page with its term.
  *
- *   «طلبات تناسبك» (Phase 5d, §9.5): a signed-in WORKSHOP's «لك» leads with
- *   its own board (GET /api/community/requests?for=me, hub/BoardRail.tsx) —
- *   the requests tab's cards in a rail above the cover, «الكل» to the board;
- *   the issue's own section then keeps its plain «طلبات الطباعة»; an empty
+ *   «طلبات تناسبك» (Phase 5d, §9.5): a signed-in WORKSHOP's home has its own
+ *   board under the sections, above the featured project, «عرض الكل» to the
+ *   board; the home's own section keeps its plain «طلبات الطباعة»; an empty
  *   board says so in one sentence with the preferences one tap away; a
  *   customer and a guest see no rail at all.
  *
- *   Link cards (§9.4): a post whose words name a model page carries its card
- *   (title, host, our copy of the picture, «اطلب طباعته»), a video's card has
- *   no print door, an address nobody resolved draws nothing, and the page
- *   asks GET /api/link-cards ONCE per distinct address; the project's story
- *   draws the full card and its door opens the wizard with `?link=`.
+ *   Link cards (§9.4): a post whose words name a model page carries its card,
+ *   a video's card has no print door, an address nobody resolved draws
+ *   nothing, and the page asks GET /api/link-cards ONCE per distinct address;
+ *   the project's story draws the full card and its door opens the request
+ *   editor with `?link=`.
  *
  *   npx vite --port 4191 &   node scripts/e2e-community-home.mjs
  */
@@ -40,8 +44,19 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${name} ${ok ? '' : detail}`);
 };
 
-/** The fixture's trending list opens with card(1), whose title is «مزهرية حلزونية». */
+/** The fixture's trending list opens with card(1), whose title is «مزهرية حلزونية», the featured project. */
 const COVER_TITLE = 'مزهرية حلزونية';
+/** hub/strings.ts trendingKicker: the pick is the 30-day trending one, never «مميز». */
+const KICKERS = ['مشروع رائج', 'Trending project', 'پڕۆژەی باو'];
+/** The old `?tab=` addresses and their section pages (hub/tabs.ts). */
+const REDIRECTS = [
+  ['following', '/community/following'],
+  ['projects', '/community/projects?q=dragon'],
+  ['requests', '/requests?q=dragon'],
+  ['stores', '/community/stores?q=dragon'],
+  ['merchants', '/community/stores?q=dragon'],
+  ['creators', '/community/makers?q=dragon'],
+];
 /** hub/strings.ts requestsForYou — the title of a merchant's own board (hub/BoardRail.tsx). */
 const MERCHANT_HEADS = ['طلبات تناسبك', 'Requests for your workshop', 'داواکاری گونجاو بۆ تۆ'];
 /** hub/strings.ts printRequests — the issue's own section, the board's newest three, for everyone. */
@@ -53,22 +68,14 @@ const PRINT_DOOR = `/requests?view=new&link=${encodeURIComponent(LINKED_MODEL)}`
 const LINK_PICTURE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9e2d3"/><stop offset="1" stop-color="#b8ad96"/></linearGradient></defs><rect width="1200" height="630" fill="url(#g)"/><path d="M260 470 q120 -300 380 -220 t330 90 q80 60 -40 120 t-300 -30 q-170 -30 -230 110 z" fill="#6c7a4a"/><circle cx="880" cy="290" r="22" fill="#111"/></svg>`;
 
 const SCENES = [
-  { tab: 'foryou', viewer: 'guest', extra: 'recent=1', mark: '[data-community-panel="foryou"] [data-community-cover]', issue: true },
-  { tab: 'foryou', viewer: 'merchant', mark: '[data-community-section="requests"]', merchant: true },
-  // «طلبات تناسبك» (Phase 5d): a customer's «لك» has no rail; a workshop with nothing that fits is told so.
-  { tab: 'foryou', viewer: 'customer', mark: '[data-community-panel="foryou"] [data-community-cover]', key: 'foryou-customer', noRail: true },
-  { tab: 'foryou', viewer: 'merchant', extra: 'empty=1', mark: '[data-community-board-empty]', key: 'foryou-merchant-empty', boardEmpty: true },
-  { tab: 'following', viewer: 'guest', mark: '[data-community-following-guest]' },
-  { tab: 'following', viewer: 'customer', mark: '[data-community-following-empty]' },
-  { tab: 'following', viewer: 'customer', extra: 'follows=1', mark: '[data-community-feed="following"] [data-post-card]', key: 'following-feed' },
-  { tab: 'projects', viewer: 'guest', mark: '[data-community-panel="projects"] [data-projects-grid]' },
-  { tab: 'requests', viewer: 'guest', mark: '[data-community-panel="requests"] [data-community-request]' },
-  { tab: 'stores', viewer: 'customer', mark: '[data-community-panel="merchants"] [data-community-store]', storeFollow: true },
-  { tab: 'creators', viewer: 'customer', mark: '[data-community-panel="creators"] [data-community-creator]', creatorFollow: true },
-  { tab: 'products', viewer: 'guest', mark: '[data-community-panel="products"] [data-community-product]', legacy: true },
-  { tab: 'merchants', viewer: 'guest', mark: '[data-community-panel="merchants"]', legacy: true },
-  { tab: 'foryou', viewer: 'guest', extra: 'empty=1', mark: '[data-community-cover="typeset"]', key: 'foryou-empty', empty: true },
-  { tab: 'foryou', viewer: 'customer', extra: 'path=/community/projects/prj_2', mark: '[data-link-card][data-link-variant="full"]', key: 'project-link', project: true },
+  { viewer: 'guest', extra: 'recent=1', mark: '[data-community-panel="foryou"] [data-community-featured]', issue: true },
+  { viewer: 'merchant', mark: '[data-community-section="requests"]', merchant: true },
+  // «طلبات تناسبك» (Phase 5d): a customer's home has no rail; a workshop with nothing that fits is told so.
+  { viewer: 'customer', mark: '[data-community-panel="foryou"] [data-community-featured]', key: 'foryou-customer', noRail: true, member: true },
+  { viewer: 'merchant', extra: 'empty=1', mark: '[data-community-board-empty]', key: 'foryou-merchant-empty', boardEmpty: true },
+  { viewer: 'guest', extra: 'extra=list%3Dproducts', mark: '[data-community-panel="products"] [data-community-product]', key: 'products' },
+  { viewer: 'guest', extra: 'empty=1', mark: '[data-community-featured="typeset"]', key: 'foryou-empty', empty: true },
+  { viewer: 'customer', extra: 'path=/community/projects/prj_2', mark: '[data-link-card][data-link-variant="full"]', key: 'project-link', project: true },
 ];
 
 const browser = await chromium.launch();
@@ -106,10 +113,10 @@ for (const lang of ['ar', 'en', 'ckb']) {
       const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
       for (const s of SCENES) {
-        if (theme === 'light' && !(s.issue || s.tab === 'creators' || s.tab === 'requests')) continue; // cream: the issue and two directories
-        const key = s.key ?? `${s.tab}-${s.viewer}`;
+        if (theme === 'light' && !(s.issue || s.merchant || s.member)) continue; // cream: the home of each viewer
+        const key = s.key ?? `foryou-${s.viewer}`;
         const name = `${tag} ${key}`;
-        await page.goto(`${base}?lang=${lang}&theme=${theme}&tab=${s.tab}&viewer=${s.viewer}${s.extra ? `&${s.extra}` : ''}`, { waitUntil: 'networkidle' });
+        await page.goto(`${base}?lang=${lang}&theme=${theme}&viewer=${s.viewer}${s.extra ? `&${s.extra}` : ''}`, { waitUntil: 'networkidle' });
         const found = await page.waitForSelector(s.mark, { timeout: 10000, state: 'attached' }).then(() => true).catch(() => false);
         await page.waitForTimeout(500);
         check(`${name}: ${s.mark} present`, found);
@@ -132,29 +139,38 @@ for (const lang of ['ar', 'en', 'ckb']) {
           continue;
         }
         check(`${name}: one h1`, (await page.locator('h1').count()) === 1);
-        check(`${name}: six tabs`, (await page.locator('[role="tab"]').count()) === 6, String(await page.locator('[role="tab"]').count()));
-        if (s.legacy) {
-          const active = await page.locator('[role="tab"][aria-selected="true"]').getAttribute('data-tab');
-          check(`${name}: the old name opens ${s.tab === 'products' ? 'foryou' : 'stores'}`, active === (s.tab === 'products' ? 'foryou' : 'stores'), `active=${active}`);
-        }
+        // The six sections are links (D-7): «لك» is the page on screen, each other one its own page.
+        const sections = await page.locator('[data-community-sections] a').evaluateAll((els) => els.map((el) => [el.getAttribute('href'), el.getAttribute('aria-current')]));
+        check(`${name}: six section links, «لك» current`, sections.length === 6 && sections[0][0] === '/community' && sections[0][1] === 'page' && sections.slice(1).every(([, c]) => c === null), JSON.stringify(sections));
+        check(`${name}: no tab strip`, (await page.locator('[role="tab"]').count()) === 0);
+        // No section label is cut (Sorani «شوێنکەوتووەکانم» at 360 px): words wrap whole.
+        const cut = await page.evaluate(() => [...document.querySelectorAll('[data-community-sections] a span')].filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent));
+        check(`${name}: no section label is cut`, cut.length === 0, JSON.stringify(cut));
         if (s.issue) {
           check(`${name}: a guest's home has no workshop rail`, (await page.locator('[data-community-board-rail]').count()) === 0);
-          const alt = await page.locator('[data-community-cover="post"] img').first().getAttribute('alt').catch(() => null);
-          check(`${name}: the cover's alt is the project's title`, alt === COVER_TITLE, `alt=${alt}`);
-          const numbers = await page.locator('[data-section-number]').allInnerTexts();
-          check(`${name}: numbered section heads`, numbers.length >= 5, numbers.join(','));
-          const arabicIndic = numbers.every((n) => /^[٠-٩]+$/.test(n.trim()));
-          check(`${name}: digits follow the language`, lang === 'en' ? !arabicIndic : arabicIndic, numbers.join(','));
-          check(`${name}: quick actions present`, (await page.locator('[data-community-quick-actions] a').count()) === 4);
-          // The four verbs are READABLE: a label wraps to a second line rather
-          // than being cut mid-word (Sorani «پڕۆژەیەک هاوبەش بکە» at 360 px).
-          const clipped = await page.evaluate(() =>
-            [...document.querySelectorAll('[data-community-quick-actions] a > span:last-child')]
-              .filter((el) => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1)
-              .map((el) => el.textContent)
-          );
-          check(`${name}: no quick-action label is clipped`, clipped.length === 0, JSON.stringify(clipped));
-          check(`${name}: the studio link is there`, (await page.locator('[data-testid="community-studio-link"]').count()) === 1);
+          // The top bar reads «LEVONIS», then the page heading (D-8).
+          const order = await page.evaluate(() => {
+            const bar = document.querySelector('[data-community-topbar]');
+            const word = bar?.querySelector('p[lang="en"]');
+            const h1 = document.querySelector('h1');
+            return !!word && !!h1 && (word.compareDocumentPosition(h1) & Node.DOCUMENT_POSITION_FOLLOWING) > 0 && word.textContent?.trim() === 'LEVONIS';
+          });
+          check(`${name}: the wordmark comes before the h1`, order);
+          const alt = await page.locator('[data-community-featured="post"] img').first().getAttribute('alt').catch(() => null);
+          check(`${name}: the featured project's alt is its title`, alt === COVER_TITLE, `alt=${alt}`);
+          const kicker = (await page.locator('[data-community-featured="post"] p').first().innerText()).trim();
+          check(`${name}: the kicker is the honest one`, KICKERS.includes(kicker), kicker);
+          const verbs = await page.locator('[data-community-actions] a').evaluateAll((els) => els.map((el) => [el.getAttribute('data-testid'), el.getAttribute('href')]));
+          check(`${name}: the two verbs, the request first, a guest through sign-in`, verbs.length === 2 && verbs[0][0] === 'community-new-request' && verbs[1][0] === 'community-share-project' && verbs.every(([, h]) => h === '/auth'), JSON.stringify(verbs));
+          check(`${name}: two trending cards beside the featured project`, (await page.locator('[data-community-section="trending"] [data-project-feature]').count()) === (width < 1024 ? 2 : 3));
+          const reqRows = await page.locator('[data-community-section="requests"] [data-community-request]').evaluateAll((els) => els.map((el) => [el.getAttribute('href'), el.textContent ?? '']));
+          check(`${name}: two request rows, each its own page, never a budget`, reqRows.length === 2 && reqRows.every(([h, t]) => /^\/requests\/[^/?#]+$/.test(h ?? '') && !/45,000|45٬000|ميزانية|budget|بودجە/i.test(t)), JSON.stringify(reqRows));
+          check(`${name}: the makers`, (await page.locator('[data-community-section="creators"] [data-community-creator]').count()) >= 2);
+          const studio = page.locator('[data-testid="community-studio-link"]');
+          check(`${name}: the Studio anchor opens its own tab, without an opener`, (await studio.count()) === 1 && (await studio.getAttribute('target')) === '_blank' && (await studio.getAttribute('rel')) === 'noopener noreferrer');
+          // Every control of the first screens is a 44 px target.
+          const small = await page.evaluate(() => [...document.querySelectorAll('[data-community-topbar] a, [data-community-topbar] button, [data-community-actions] a, [data-community-sections] a, [data-community-featured] a')].map((el) => el.getBoundingClientRect()).filter((r) => r.width > 0 && (r.width < 44 || r.height < 44)).length);
+          check(`${name}: the first screen's targets are 44 px`, small === 0, String(small));
           // Reach the feed: it is a lazy chunk mounted as its section approaches.
           await page.locator('[data-community-section="feed"]').scrollIntoViewIfNeeded();
           const rows = await page.waitForSelector('[data-community-feed="foryou"] [data-post-card]', { timeout: 10000 }).then(() => true).catch(() => false);
@@ -191,7 +207,7 @@ for (const lang of ['ar', 'en', 'ckb']) {
             check(`${name}: the next page asked nothing new about the same addresses`, ((await page.evaluate(() => window.__linkAsks)) ?? []).length === 3);
           }
           check(`${name}: the colophon counts`, (await page.locator('[data-community-colophon]').count()) === 1);
-          check(`${name}: «وسوم رائجة» under the cover`, (await page.locator('[data-community-trending-tags] a').count()) === 4);
+          check(`${name}: «وسوم رائجة» under the feed`, (await page.locator('[data-community-trending-tags] a').count()) === 4);
           await page.evaluate(() => window.scrollTo(0, 0));
 
           // THE OVERLAY (Phase 3). Focus opens it on its empty state: this
@@ -246,7 +262,7 @@ for (const lang of ['ar', 'en', 'ckb']) {
           // The page behind HOLDS STILL while the panel is open: no ?q= yet, the issue and its verbs remain.
           await page.waitForTimeout(700);
           check(`${name}: the URL waits while the panel is open`, !new URL(page.url()).searchParams.has('q'), page.url());
-          check(`${name}: the issue stays behind the panel`, (await page.locator('[data-community-quick-actions]').count()) === 1 && (await page.locator('[data-projects-grid]').count()) === 0);
+          check(`${name}: the home stays behind the panel`, (await page.locator('[data-community-actions]').count()) === 1 && (await page.locator('[data-projects-grid]').count()) === 0);
           // A new letter does not remount the rows: the sections node is the same element
           // («تني» still answers, so the block stays; a space would take the grey word).
           const before = await page.evaluate(() => { const el = document.querySelector('[data-search-sections]'); if (el) el.setAttribute('data-e2e-mark', '1'); return !!el; });
@@ -259,8 +275,8 @@ for (const lang of ['ar', 'en', 'ckb']) {
           // Escape: the panel steps aside and the URL contract resumes — the page becomes the projects search.
           await page.keyboard.press('Escape');
           const grid = await page.waitForSelector('[data-projects-grid]', { timeout: 8000, state: 'attached' }).then(() => true).catch(() => false);
-          check(`${name}: once the panel closes, the term turns «لك» into the projects search`, grid);
-          check(`${name}: the verbs step aside while searching`, (await page.locator('[data-community-quick-actions]').count()) === 0);
+          check(`${name}: once the panel closes, the term turns the home into the projects search`, grid);
+          check(`${name}: the verbs step aside while searching`, (await page.locator('[data-community-actions]').count()) === 0);
           check(`${name}: the box keeps its direction after closing`, (await input.getAttribute('dir')) === 'auto');
           // A click reopens it with the term still in the box; ↓ ↓ Enter: past the «ابحث في…» chip to the first suggestion, and through it.
           await input.click();
@@ -286,10 +302,11 @@ for (const lang of ['ar', 'en', 'ckb']) {
           const cards = await page.locator('[data-community-board-cards] [data-community-request]').evaluateAll((els) => els.map((el) => el.getAttribute('href')));
           // Review 2026-09-30: a request's own address, never the board's ?request= and its redirect (+26 KB, a serial hop).
           check(`${name}: the rail's cards open their requests`, cards.length >= 1 && cards.length <= 6 && cards.every((h) => /^\/requests\/[^/?#]+$/.test(h ?? '')), cards.join(' '));
-          check(`${name}: «الكل» opens the whole board`, (await page.locator('[data-community-board-all]').getAttribute('href')) === '/requests');
+          check(`${name}: «عرض الكل» opens the whole board`, (await page.locator('[data-community-board-all]').getAttribute('href')) === '/requests');
+          const navY = (await page.locator('[data-community-sections]').boundingBox())?.y ?? Infinity;
           const railY = (await page.locator('[data-community-board-rail]').boundingBox())?.y ?? Infinity;
-          const coverY = (await page.locator('[data-community-cover]').first().boundingBox())?.y ?? -Infinity;
-          check(`${name}: the rail leads, above the cover`, railY < coverY, `rail=${railY} cover=${coverY}`);
+          const coverY = (await page.locator('[data-community-featured]').first().boundingBox())?.y ?? -Infinity;
+          check(`${name}: the rail sits under the sections, above the featured project`, navY < railY && railY < coverY, `nav=${navY} rail=${railY} featured=${coverY}`);
           const cardBox = await page.locator('[data-community-board-cards] [data-community-request]').first().boundingBox();
           check(`${name}: a rail card is a card, not the screen`, !!cardBox && cardBox.width <= 300, JSON.stringify(cardBox));
           await page.locator('[data-community-board-rail]').screenshot({ path: `${out}/board-rail-${tag}.png` });
@@ -319,21 +336,48 @@ for (const lang of ['ar', 'en', 'ckb']) {
           const emptyFeed = await page.waitForSelector('[data-community-section="feed"] [role="status"], [data-community-section="feed"] h3', { timeout: 10000 }).then(() => true).catch(() => false);
           check(`${name}: the empty feed says the first issue is being written`, emptyFeed);
         }
-        if (s.storeFollow) {
-          const btn = page.locator('[data-community-panel="merchants"] [data-community-follow]').first();
-          check(`${name}: store follow starts off`, (await btn.getAttribute('aria-pressed')) === 'false');
-          await btn.click();
+        if (s.member) {
+          // ONE GET /api/chats a page: the bottom bar reads it, the top bar shows the same count.
+          await page.waitForTimeout(600);
+          const asks = ((await page.evaluate(() => window.__chatAsks)) ?? []).length;
+          check(`${name}: one GET /api/chats for the page`, asks === 1, String(asks));
+          const chats = page.locator('[data-community-chats]');
+          check(`${name}: the top bar says the unread messages`, /3/.test((await chats.getAttribute('aria-label')) ?? '') && (await chats.locator('[data-nav-badge="messages"]').innerText()).trim() === '3');
+          // The avatar opens the sections and account menu, Escape closes it, focus comes back.
+          const avatar = page.locator('[data-community-avatar]');
+          check(`${name}: the avatar is a dialog door`, (await avatar.getAttribute('aria-haspopup')) === 'dialog' && (await avatar.getAttribute('aria-expanded')) === 'false');
+          await avatar.click();
+          const menu = await page.waitForSelector('[role="dialog"]', { timeout: 8000 }).then(() => true).catch(() => false);
+          check(`${name}: the avatar opens the menu`, menu && (await avatar.getAttribute('aria-expanded')) === 'true');
           await page.waitForTimeout(500);
-          check(`${name}: store follow flips on`, (await btn.getAttribute('aria-pressed')) === 'true');
-        }
-        if (s.creatorFollow) {
-          const btn = page.locator('[data-community-panel="creators"] [data-social="follow"]').first();
-          check(`${name}: creator follow starts off`, (await btn.getAttribute('aria-pressed')) === 'false');
-          await btn.click();
+          await page.screenshot({ path: `${out}/menu-${tag}.png`, fullPage: false });
+          await page.keyboard.press('Escape');
+          await page.waitForTimeout(600);
+          check(`${name}: Escape closes the menu`, (await avatar.getAttribute('aria-expanded')) === 'false');
+          check(`${name}: focus comes back to the avatar`, await page.evaluate(() => document.activeElement?.hasAttribute('data-community-avatar') ?? false));
+          // A like on a trending card flips, and a follow on a maker row.
+          const like = page.locator('[data-community-section="trending"] [data-social="like"]').first();
+          const was = await like.getAttribute('aria-pressed');
+          await like.click();
           await page.waitForTimeout(500);
-          check(`${name}: creator follow flips on`, (await btn.getAttribute('aria-pressed')) === 'true');
+          check(`${name}: a trending like flips`, (await like.getAttribute('aria-pressed')) !== was);
+          const follow = page.locator('[data-community-section="creators"] [data-social="follow"]').first();
+          const before = await follow.getAttribute('aria-pressed');
+          await follow.click();
+          await page.waitForTimeout(500);
+          check(`${name}: a maker follow flips`, (await follow.getAttribute('aria-pressed')) !== before, String(before));
         }
         await page.screenshot({ path: `${out}/${key}-${tag}.png`, fullPage: true });
+      }
+      // THE OLD ADDRESSES (§3): each lands on its section page, with its term, and never loops.
+      if (theme === 'dark' && lang === 'ar') {
+        for (const [old, target] of REDIRECTS) {
+          await page.goto(`${base}?lang=${lang}&theme=${theme}&viewer=guest&tab=${old}${old === 'following' ? '' : `&extra=${encodeURIComponent('q=dragon')}`}`, { waitUntil: 'networkidle' });
+          const went = await page.waitForSelector('[data-elsewhere]', { timeout: 8000 }).then((el) => el.getAttribute('data-elsewhere')).catch(() => null);
+          check(`${tag} ?tab=${old}: lands on ${target}`, went === target, String(went));
+        }
+        await page.goto(`${base}?lang=${lang}&theme=${theme}&viewer=guest&tab=products`, { waitUntil: 'networkidle' });
+        check(`${tag} ?tab=products: the home's products list`, await page.waitForSelector('[data-community-panel="products"]', { timeout: 8000 }).then(() => true).catch(() => false));
       }
       check(`${tag}: no page errors`, errors.length === 0, errors.join(' | '));
       await context.close();

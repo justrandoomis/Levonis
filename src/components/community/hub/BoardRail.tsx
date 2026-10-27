@@ -20,12 +20,13 @@ import { Link } from 'react-router-dom';
 import type { MerchantMe } from '../../../lib/merchant';
 import { merchantHref } from '../../../lib/merchantRoutes';
 import { dropPageCache, writePageCache } from '../../../lib/pageCache';
-import { ArrowGlyph } from '../../home/v2/SectionHead';
+import { TextLink } from '../kit/buttons';
+import { useLanguage } from '../../../LanguageContext';
 import { offersV2Api, type BoardForMeRow } from '../requests/api';
 import RequestCard from './RequestCard';
 import type { CommunityRequest } from './api';
 import { Rail, Reveal } from './parts';
-import { BOARD_RAIL_CACHE, BoardRailHead, BoardSkeleton, boardRailMemo, rememberWorkshop, type BoardRailMemo } from './rails';
+import { BOARD_RAIL_CACHE, BoardRailHead, BoardSkeleton, boardRailMemo, rememberWorkshop, type BoardRailMemo } from './boardFrame';
 import { useHubStrings } from './strings';
 
 /** A rail, not a directory: the first page's newest few; «الكل» opens the whole board. */
@@ -42,6 +43,7 @@ export function boardCard(r: BoardForMeRow): CommunityRequest {
 
 export default function BoardRail({ viewer, me }: { viewer: string; me: MerchantMe | null }) {
   const s = useHubStrings();
+  const { t } = useLanguage();
   const [memo, setMemo] = useState<BoardRailMemo<BoardForMeRow> | null>(() => boardRailMemo<BoardForMeRow>(viewer));
   const [failed, setFailed] = useState(false);
   const merchant = !!me?.store;
@@ -82,14 +84,9 @@ export default function BoardRail({ viewer, me }: { viewer: string; me: Merchant
     <Reveal labelledBy="community-s-board" data-community-board-rail="">
       <BoardRailHead
         all={
-          <Link
-            to={BOARD_ALL_PATH}
-            data-community-board-all
-            className="-me-2 inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-          >
-            <span>{s.all}</span>
-            <ArrowGlyph />
-          </Link>
+          <TextLink to={BOARD_ALL_PATH} data-community-board-all aria-label={`${t('seeAll')}: ${s.requestsForYou}`} className="-me-1 shrink-0 px-1">
+            {t('seeAll')}
+          </TextLink>
         }
       />
       {memo === null ? (

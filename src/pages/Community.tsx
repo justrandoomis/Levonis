@@ -1,68 +1,74 @@
 /**
- * LEVO COMMUNITY — /community. «مجتمع ليفو», typeset like an issue of a
- * maker magazine (docs/COMMUNITY_HOME_PLAN.md): a masthead, four verbs, one
- * cover story, then numbered sections in the owner's order — photographs on
- * the canvas separated by hairlines, never boxes on boxes.
+ * LEVO COMMUNITY — /community, the community home (community UI plan C1;
+ * IMG_8487 on a phone, IMG_8462 from `lg`).
  *
- * SIX SECTIONS, ONE SEARCH. «لك» is the issue (hub/ForYouPanel.tsx);
- * «أتابعهم» the feed of the makers and stores the viewer follows;
- * «المشاريع», «طلبات الطباعة», «المتاجر» and «الصنّاع» are directories a page
- * at a time from their own /api/community doors, and the search box searches
- * the list on screen ON THE SERVER — never a filter over the rows the page
- * happens to hold. The tab and the term live in the URL (`?tab=`, `?q=`;
- * hub/tabs.ts resolves the two old names), so Back, a reload and a shared
- * link all land on the same list. While a term is set, the cover, the verbs
- * and the rails step aside: the page is its results.
+ *   top bar   the wordmark «LEVONIS» and the page h1 «مجتمع ليفو», the chats
+ *             with their unread badge, the bell, and the avatar that opens
+ *             the sections and account menu (hub/TopBar.tsx). From `lg` it
+ *             carries the search in its middle, and the h1 is the large title
+ *             under it with the line «ما يطبعه الصنّاع. وما تحتاجه الورش.»
+ *   search    one cross-entity box, «ابحث عن مشروع، صانع أو متجر»: focus opens
+ *             the overlay of every kind of result; Enter writes `?q=` and the
+ *             home becomes the projects that answer it
+ *   verbs     «اطلب طباعة», the one gold primary, and «شارك مشروعًا»
+ *             (hub/HubActions.tsx)
+ *   sections  six links, one per section page, «لك» the page on screen
+ *             (hub/SectionNav.tsx: a 3 by 2 grid on a phone, a track from `lg`)
+ *   the home  the featured project, trending, requests, makers, Levo Studio and
+ *             what follows them (hub/ForYouPanel.tsx)
  *
- * EVERY CARD GOES SOMEWHERE REAL. A product opens the page it can be bought
- * on; a store opens the store; a request opens the request, where offers are
- * made and compared; a project opens the project; a maker opens their page.
+ * EVERY SECTION HAS ITS OWN PAGE NOW (D-7). The home tabs are gone; an old
+ * `?tab=` address is sent to its page with `replace`, the term kept
+ * (hub/tabs.ts). `?list=products` is the home own list of community products.
+ * While a term is set, the issue steps aside: the page is its results.
  *
- * A NEW REQUEST IS THE WIZARD. «طلب طباعة» opens the four-step wizard on
- * /requests (docs/DECISIONS.md row 131), which is the one road onto the
- * board; «شارك مشروعًا» opens the project composer. A guest goes through
- * sign-in first and comes back to the door they chose.
+ * A NEW REQUEST IS THE EDITOR. «اطلب طباعة» opens /requests/new; «شارك
+ * مشروعًا» opens the project composer. A guest goes through sign-in first and
+ * comes back to the door they chose.
  *
  * The page sits behind CommunityGate (src/App.tsx): while the owner keeps the
  * community under maintenance, a refused visitor never reaches it.
  */
 import React, { Suspense, useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { useGoBack } from '../lib/useGoBack';
-import { ArrowLeft, ArrowRight, Box, Calculator, ClipboardList, Plus, Search, X } from 'lucide-react';
-import { IconButton } from '../components/ui/Button';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { Box, Calculator, Search, X } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
-import { STUDIO_URL } from '../translations';
 import { useAuth } from '../AuthContext';
 import { merchantApi, type MerchantMe } from '../lib/merchant';
-import { TabStrip, TabPanels } from '../components/ui/Tabs';
-import { EmptyState, ErrorState } from '../components/ui/AsyncStates';
-import { ProductGridSkeleton } from '../components/ui/Skeleton';
-import LoadMore from '../components/listing/LoadMore';
-import ProductTile from '../components/community/hub/ProductTile';
-import RequestCard from '../components/community/hub/RequestCard';
-import QuickActions from '../components/community/hub/QuickActions';
-import ForYouPanel, { NEW_PROJECT_PATH } from '../components/community/hub/ForYouPanel';
-import { RequestListSkeleton, StoreListSkeleton } from '../components/community/hub/parts';
-import { NoResults, SearchLine } from '../components/community/hub/search';
+import { useMediaQuery } from '../lib/useMediaQuery';
+import { AsideSkeleton, HOME_GRID, MainSkeleton } from '../components/community/hub/HomeSkeleton';
+import { PostSkeleton, StoreListSkeleton } from '../components/community/hub/parts';
+import HubActions from '../components/community/hub/HubActions';
+import SectionNav from '../components/community/hub/SectionNav';
+import TopBar from '../components/community/hub/TopBar';
 import { useHubStrings } from '../components/community/hub/strings';
-import { TAB_IDS, canonicalParams, resolveTab, type CommunityTab } from '../components/community/hub/tabs';
-import { useCommunityFeed, type CommunityFeed } from '../components/community/hub/useCommunityFeed';
-import { BoardRailFrame, boardRailRemembered, workshopHint } from '../components/community/hub/rails';
-import type { CommunityProduct, CommunityRequest } from '../components/community/hub/api';
+import { legacyTabTarget } from '../components/community/hub/tabs';
+import { warmHome } from '../components/community/hub/useHomeData';
+import { BoardRailFrame, boardRailRemembered, workshopHint } from '../components/community/hub/boardFrame';
 import { useSearchBox } from '../components/community/search/useSearchBox';
 import CommunitySurface from '../components/community/CommunitySurface';
 
+/**
+ * THE HOME BODY IS A CHUNK OF ITS OWN (hub/ForYouPanel.tsx: the main column,
+ * the aside, and what follows them). The entry names every chunk the first
+ * chunk of this page needs (its preload list, on every visit); the body uses
+ * the community kit, the like and save buttons and the request card, and
+ * those stay out of that list (plan R6). The page starts the reads of the body
+ * (hub/useHomeData.ts) while the chunk is on its way, holds the skeleton at
+ * the cards' heights meanwhile, and keeps the sections and the workshop
+ * board mounted throughout.
+ */
+const loadHome = () => import('../components/community/hub/ForYouPanel');
+const HomeMain = React.lazy(() => loadHome().then((m) => ({ default: m.HomeMain })));
+const HomeAside = React.lazy(() => loadHome().then((m) => ({ default: m.HomeAside })));
+const HomeBelow = React.lazy(() => loadHome().then((m) => ({ default: m.HomeBelow })));
+/** The home own list of community products (`?list=products`). */
+const ProductsPanel = React.lazy(() => import('../components/community/hub/ProductsPanel'));
+/** The home with a term: the projects that answer it. */
 const ProjectsPanel = React.lazy(() => import('../components/community/hub/ProjectsPanel'));
-const CreatorsPanel = React.lazy(() => import('../components/community/hub/CreatorsPanel'));
-// The stores directory and the following feed are their own modules: the home
-// tabs and the section pages /community/stores and /community/following render
-// them (community UI plan B4).
-const StoresPanel = React.lazy(() => import('../components/community/hub/StoresPanel'));
-const FollowingPanel = React.lazy(() => import('../components/community/hub/FollowingPanel'));
 /** The cross-entity search under the bar (Phase 3) — fetched the first time the box is focused. */
 const SearchOverlay = React.lazy(() => import('../components/community/search/SearchOverlay'));
-/** «طلبات تناسبك» (Phase 5d): the workshop's own board, leading a merchant's «لك» — a lazy chunk nobody else fetches. */
+/** «طلبات تناسبك» (Phase 5d): the workshop's own board, leading a merchant's home — a lazy chunk nobody else fetches. */
 const BoardRail = React.lazy(() => import('../components/community/hub/BoardRail'));
 
 /**
@@ -72,33 +78,29 @@ const BoardRail = React.lazy(() => import('../components/community/hub/BoardRail
  */
 export { default as CommunitySections } from './community/Sections';
 
-/** The wizard, on the requests page. */
-const NEW_REQUEST_PATH = '/requests?view=new';
+/** The request editor (community UI plan B4, C4). */
+const NEW_REQUEST_PATH = '/requests/new';
+/** The project composer. */
+const NEW_PROJECT_PATH = '/community/projects/new';
 
-const PRODUCT_GRID = 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5';
+/** From `lg`: the desktop dashboard (IMG_8462). */
+const WIDE_QUERY = '(min-width: 1024px)';
 
-/** How many «عرض المزيد» can honestly promise: the first page's total, less what is shown. */
-function remaining(feed: CommunityFeed<{ id: string }>): number {
-  if (!feed.hasMore || !feed.rows) return 0;
-  return Math.max(1, (feed.total ?? 0) - feed.rows.length);
+/** An old `?tab=` address goes to its section page, once and without a history entry. */
+export default function Community() {
+  const [params] = useSearchParams();
+  const moved = legacyTabTarget(params);
+  return moved ? <Navigate to={moved} replace /> : <CommunityHome />;
 }
 
-export default function Community() {
-  // A visitor who came from another page goes back to it; one who opened
-  // the community by its link goes home (it used to leave the site).
-  const goBack = useGoBack('/');
-  const { dir } = useLanguage();
+function CommunityHome() {
   const s = useHubStrings();
   const { user, isAuthenticated } = useAuth();
   const [params, setParams] = useSearchParams();
-  const { tab, list, legacy } = resolveTab(params);
+  const list = params.get('list') === 'products' ? 'products' : null;
   const q = (params.get('q') ?? '').trim().slice(0, 60);
   const viewer = user?.id ?? 'guest';
-
-  // The two old names are rewritten in place, so Back never lands on them.
-  useEffect(() => {
-    if (legacy) setParams(canonicalParams(params), { replace: true });
-  }, [legacy, params, setParams]);
+  const wide = useMediaQuery(WIDE_QUERY);
 
   /**
    * THE BOX AND THE URL. What is typed shows at once; the URL — and so the
@@ -108,11 +110,11 @@ export default function Community() {
    *
    * WHILE THE OVERLAY IS OPEN THE URL WAITS. The overlay already asks the
    * server twice per settled keystroke (suggestions and the sections); the
-   * tab's own list behind a full-height panel would be a third read nobody
-   * sees — and on «لك» it would swap the issue for the projects search under
-   * the panel. So the debounce is suspended while the panel is open and
-   * resumes the moment it steps aside (Escape, a tap outside): the box and
-   * the URL then agree again within 300 ms; Enter writes it at once.
+   * home own results behind a full-height panel would be a third read nobody
+   * sees, and would swap the home for the projects search under the panel.
+   * So the debounce is suspended while the panel is open and resumes the
+   * moment it steps aside (Escape, a tap outside): the box and the URL then
+   * agree again within 300 ms; Enter writes it at once.
    */
   const box = useSearchBox(params, setParams);
   const [draft, setDraft] = useState(q);
@@ -143,10 +145,10 @@ export default function Community() {
   }, [draft, q, setParams, box.open]);
 
   /**
-   * THE OVERLAY IS THE CROSS-ENTITY VIEW; THE TAB IS THE DEEP LIST. The box
-   * opens the overlay on focus (search/useSearchBox.ts); Enter — or a row of
-   * the overlay that says «ابحث في…» — writes the term to the URL at once, on
-   * the current tab, and the overlay steps aside so the tab's list answers.
+   * THE OVERLAY IS THE CROSS-ENTITY VIEW; THE HOME RESULTS ARE THE PROJECTS.
+   * The box opens the overlay on focus (search/useSearchBox.ts); Enter — or a
+   * row of the overlay that says «ابحث في…» — writes the term to the URL at
+   * once, and the overlay steps aside so the results answer.
    */
   const submitSearch = (term: string) => {
     const next = term.trim().slice(0, 60);
@@ -177,21 +179,10 @@ export default function Community() {
     );
   };
 
-  // Tabs are history entries, as they were: Back walks back along them. A
-  // tab change leaves the products list and the projects filters behind.
-  const chooseTab = (id: string) => {
-    const p = new URLSearchParams(params);
-    p.set('tab', (TAB_IDS as readonly string[]).includes(id) ? id : 'foryou');
-    p.delete('list');
-    p.delete('kind');
-    p.delete('tag');
-    setParams(p);
-  };
-
   /**
-   * Which merchant this viewer is, for «طلبات تناسبك» and «متجرك» — asked only
-   * with a session, and once per account: keyed on the id, not on the user
-   * object, which a session refresh replaces without anyone having changed.
+   * Which merchant this viewer is, for «طلبات تناسبك» — asked only with a
+   * session, and once per account: keyed on the id, not on the user object,
+   * which a session refresh replaces without anyone having changed.
    */
   const userId = user?.id ?? null;
   const [me, setMe] = useState<MerchantMe | null>(null);
@@ -222,115 +213,109 @@ export default function Community() {
     };
   }, [userId]);
 
+  // The reads of the home body start with the page, not after its chunk (it is lazy).
+  const issue = list !== 'products' && !q;
+  useEffect(() => {
+    if (issue) warmHome(viewer);
+  }, [issue, viewer]);
+
   // A guest goes through sign-in first and comes back to the door they chose.
-  const newRequestLink = isAuthenticated
-    ? { to: NEW_REQUEST_PATH }
-    : { to: '/auth', state: { from: NEW_REQUEST_PATH } };
+  const newRequestLink = isAuthenticated ? { to: NEW_REQUEST_PATH } : { to: '/auth', state: { from: NEW_REQUEST_PATH } };
   const composerLink = isAuthenticated ? { to: NEW_PROJECT_PATH } : { to: '/auth', state: { from: NEW_PROJECT_PATH } };
 
-  const placeholder =
-    list === 'products'
-      ? s.search.products
-      : tab === 'stores'
-        ? s.search.stores
-        : tab === 'requests'
-          ? s.search.requests
-          : tab === 'creators'
-            ? s.search.creators
-            : s.search.projects;
+  const placeholder = list === 'products' ? s.search.products : s.searchAll;
+  const searchForm = (
+    <form
+      ref={box.barRef}
+      role="search"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submitSearch(draft);
+      }}
+      className="relative min-w-0"
+    >
+      <label htmlFor="community-search" className="sr-only">
+        {placeholder}
+      </label>
+      <Search aria-hidden="true" className="pointer-events-none absolute start-4 top-1/2 h-5 w-5 -translate-y-1/2 text-text-muted" />
+      <input
+        id="community-search"
+        type="search"
+        enterKeyHint="search"
+        autoComplete="off"
+        // Latin runs left to right in an Arabic page, and stays put when the overlay closes.
+        dir="auto"
+        className={`lv-input w-full ps-12 pe-11 [&::-webkit-search-cancel-button]:appearance-none ${wide ? 'rounded-full' : 'rounded-md'}`}
+        value={draft}
+        maxLength={60}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder={placeholder}
+        data-community-search
+        {...box.inputProps}
+      />
+      {draft && (
+        <button
+          type="button"
+          onClick={clearSearch}
+          aria-label={s.clearSearch}
+          className="absolute end-1 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-full text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
+    </form>
+  );
 
-  const lazyFallback = <StoreListSkeleton />;
+  const nav = <SectionNav variant={wide ? 'track' : 'grid'} />;
   let panel: React.ReactNode;
-  if (tab === 'foryou' && list === 'products') panel = <ProductsPanel q={q} viewer={viewer} onClear={clearSearch} />;
-  else if (tab === 'foryou' && !q) panel = <ForYouPanel viewer={viewer} me={me} composerLink={composerLink} tools={<ToolsSection />} />;
-  else if (tab === 'following' && !q) panel = <FollowingPanel viewer={viewer} composerLink={composerLink} />;
-  else if (tab === 'requests') panel = <RequestsPanel q={q} viewer={viewer} onClear={clearSearch} newRequestLink={newRequestLink} />;
-  else if (tab === 'stores') panel = <StoresPanel q={q} viewer={viewer} me={me} onClear={clearSearch} />;
-  else if (tab === 'creators') panel = <CreatorsPanel q={q} viewer={viewer} onClear={clearSearch} />;
-  // «لك» and «أتابعهم» while a term is set: the projects search.
-  else panel = <ProjectsPanel q={q} />;
-  /**
-   * «طلبات تناسبك» (Phase 5d, docs/COMMUNITY_ECOSYSTEM.md §9.5): a signed-in
-   * WORKSHOP's «لك» leads with the open requests its printers can make (GET
-   * /api/community/requests?for=me, hub/BoardRail.tsx). The frame is the same
-   * for every signed-in viewer, so `me` arriving later mounts the rail beside
-   * the issue instead of rebuilding it; the rail itself is fetched only for a
-   * workshop — or at once, on Back, for the viewer it led a moment ago. The
-   * issue's own print-requests section then keeps its plain title (`me` is
-   * not handed to it): it is the board's newest three, and «طلبات تناسبك»
-   * is the rail's.
-   */
-  if (tab === 'foryou' && !q && list !== 'products' && isAuthenticated) {
-    // Decided at FIRST paint where the device already knows (review 2026-09-30):
-    // the rail's frame is there before the issue paints, not pushed above it later.
-    const workshop = !!me?.store || boardRailRemembered(viewer) || (!meAsked && workshopHint(viewer));
+  if (list === 'products' || q) {
     panel = (
-      <div className="flex flex-col gap-8">
-        {workshop && (
-          <Suspense fallback={<BoardRailFrame />}>
-            <BoardRail viewer={viewer} me={me} />
-          </Suspense>
-        )}
-        <ForYouPanel viewer={viewer} me={null} composerLink={composerLink} tools={<ToolsSection />} />
+      <div className="flex flex-col gap-6">
+        {nav}
+        <Suspense fallback={<StoreListSkeleton />}>{list === 'products' ? <ProductsPanel q={q} viewer={viewer} onClear={clearSearch} /> : <ProjectsPanel q={q} />}</Suspense>
+      </div>
+    );
+  } else {
+    /**
+     * «طلبات تناسبك» (Phase 5d, docs/COMMUNITY_ECOSYSTEM.md §9.5): a signed-in
+     * WORKSHOP's home leads with the open requests its printers can make (GET
+     * /api/community/requests?for=me, hub/BoardRail.tsx), under the sections.
+     * Decided at FIRST paint where the device already knows (review
+     * 2026-09-30): the frame of the rail is there before the home paints,
+     * not pushed above it later. The own «طلبات الطباعة» of the home is the
+     * newest of the board, for everyone.
+     */
+    const workshop = isAuthenticated && (!!me?.store || boardRailRemembered(viewer) || (!meAsked && workshopHint(viewer)));
+    panel = (
+      <div data-community-panel="foryou" className="flex flex-col gap-8">
+        <div className={HOME_GRID}>
+          <div className="flex min-w-0 flex-col gap-6">
+            {nav}
+            {workshop && (
+              <Suspense fallback={<BoardRailFrame />}>
+                <BoardRail viewer={viewer} me={me} />
+              </Suspense>
+            )}
+            <Suspense fallback={<MainSkeleton wide={wide} />}>
+              <HomeMain viewer={viewer} wide={wide} />
+            </Suspense>
+          </div>
+          <div className="flex min-w-0 flex-col gap-6">
+            <Suspense fallback={<AsideSkeleton />}>
+              <HomeAside viewer={viewer} wide={wide} />
+            </Suspense>
+          </div>
+        </div>
+        <Suspense fallback={<PostSkeleton />}>
+          <HomeBelow viewer={viewer} composerLink={composerLink} tools={<ToolsSection />} />
+        </Suspense>
       </div>
     );
   }
 
   return (
     <CommunitySurface className="w-full min-h-screen pb-28 text-text-primary">
-      {/* The search bar is FLOATING CHROME: content passes under it, and a
-          short gradient says so where the overlap is real (`.scroll-edge`).
-          Its height is fixed (h-16) so the tab strip can stick exactly
-          beneath it. */}
-      <div className="material scroll-edge sticky top-0 z-40 h-16 px-4">
-        <div className="mx-auto flex h-full max-w-6xl items-center gap-3">
-          <IconButton
-            label={s.back}
-            onClick={goBack}
-            className="-ms-2"
-            icon={dir === 'rtl' ? <ArrowRight className="h-5 w-5" /> : <ArrowLeft className="h-5 w-5" />}
-          />
-          <form
-            ref={box.barRef}
-            role="search"
-            onSubmit={(e) => {
-              e.preventDefault();
-              submitSearch(draft);
-            }}
-            className="relative min-w-0 flex-1 lg:max-w-2xl"
-          >
-            <label htmlFor="community-search" className="sr-only">
-              {placeholder}
-            </label>
-            <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-            <input
-              id="community-search"
-              type="search"
-              enterKeyHint="search"
-              autoComplete="off"
-              // Latin runs left to right in an Arabic page, and stays put when the overlay closes.
-              dir="auto"
-              className="lv-input w-full rounded-full ps-10 pe-10 [&::-webkit-search-cancel-button]:appearance-none"
-              value={draft}
-              maxLength={60}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={placeholder}
-              data-community-search
-              {...box.inputProps}
-            />
-            {draft && (
-              <button
-                type="button"
-                onClick={clearSearch}
-                aria-label={s.clearSearch}
-                className="absolute end-1.5 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </form>
-        </div>
-      </div>
+      <TopBar wide={wide} search={wide ? searchForm : undefined} />
 
       {box.ever && (
         <Suspense fallback={null}>
@@ -342,70 +327,39 @@ export default function Community() {
             onClose={box.close}
             inputRef={box.inputRef}
             barRef={box.barRef}
-            scopeLabel={list === 'products' ? s.communityProducts : s.tabs[tab]}
+            scopeLabel={list === 'products' ? s.communityProducts : s.tabs.projects}
           />
         </Suspense>
       )}
 
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-5">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
-          <header className="min-w-0">
-            <p className="flex items-center gap-2 text-[11px] font-semibold text-gold">
-              <span aria-hidden="true" className="h-px w-4 bg-gold" />
-              {s.kicker}
-            </p>
-            <h1 className="mt-1 text-[24px] font-black leading-tight text-text-primary">{s.title}</h1>
-          </header>
-          {/* While a search is running, the page is its results: the verbs step
-              aside so the answer is not pushed below the fold of a phone. */}
-          {!q && <QuickActions newRequestLink={newRequestLink} composerLink={composerLink} />}
-        </div>
-
-        {/* The sections. ONE travelling underline (TabStrip), each tab wired
-            to the panel it controls, and bodies that arrive from the side the
-            change came from — in Arabic, "forward" is leftward. */}
-        <div className="material material-thin scroll-edge sticky top-16 z-30 -mx-4 overflow-x-auto px-4 hide-scrollbar">
-          <TabStrip
-            group="community"
-            panels
-            fill={false}
-            label={s.sections}
-            value={tab}
-            onChange={chooseTab}
-            indicatorClassName="bg-gold"
-            activeClassName="text-text-primary"
-            idleClassName="text-text-muted hover:text-text-secondary"
-            items={TAB_IDS.map((id) => ({ id, label: s.tabs[id] }))}
-            className="mx-auto min-w-max max-w-6xl"
-          />
-        </div>
-
-        <div className="min-h-[380px]">
-          <TabPanels value={panelKey(tab, list, q)} order={[...TAB_IDS]} group="community">
-            <Suspense fallback={lazyFallback}>{panel}</Suspense>
-          </TabPanels>
-        </div>
+      <div className={`mx-auto flex max-w-6xl flex-col px-4 ${wide ? 'gap-6 pt-6' : 'gap-3 pt-3'}`}>
+        {wide ? (
+          <div className="flex items-center justify-between gap-6">
+            <header className="min-w-0">
+              <h1 className="text-4xl font-black leading-tight text-text-primary">{s.title}</h1>
+              <p className="mt-1 text-lg text-text-secondary">{s.dek}</p>
+            </header>
+            {/* While a search is running, the page is its results: the verbs step aside. */}
+            {!q && <HubActions wide newRequestLink={newRequestLink} composerLink={composerLink} />}
+          </div>
+        ) : (
+          <>
+            {searchForm}
+            {!q && <HubActions wide={false} newRequestLink={newRequestLink} composerLink={composerLink} />}
+          </>
+        )}
+        <div className={`min-h-[380px] ${wide ? '' : 'pt-1'}`}>{panel}</div>
       </div>
     </CommunitySurface>
   );
 }
 
-/** The panel's identity for the slide: the tab, and whether it is showing the products list or a search. */
-function panelKey(tab: CommunityTab, list: 'products' | null, q: string): string {
-  return list ? `${tab}:products` : q && (tab === 'foryou' || tab === 'following') ? `${tab}:search` : tab;
-}
-
 // ------------------------------------------------------------------- pieces
 
 /**
- * «أدوات الصانع» (mandate §9). LEVO Studio is a plain full-page navigation to
- * its own subdomain (STUDIO_URL, the one configurable constant in
- * src/translations.ts), opened in its own tab so the store behind it keeps
- * its cart and scroll — no iframe, no prefetch, no slicer code in this bundle
- * (tests/store-isolation.test.ts pins all of that). A working href is not a
- * claim that the Studio is deployed; publishing it is a separate owner step
- * (docs/DECISIONS.md row 30). The calculator prices from the shop's own
- * filament. The library is not built yet and says so.
+ * «أدوات الصانع»: the calculator prices from the shop's own filament; the
+ * library is not built yet and says so. Levo Studio has its own card in the
+ * home (hub/StudioCard.tsx).
  */
 function ToolsSection() {
   const { t } = useLanguage();
@@ -415,20 +369,6 @@ function ToolsSection() {
   const tile = 'lv-surface relative flex h-24 w-[200px] shrink-0 snap-start flex-col justify-center overflow-hidden p-4 text-start';
   return (
     <div className="-mx-4 -my-2 flex snap-x gap-3 overflow-x-auto px-4 pt-2 pb-3 hide-scrollbar">
-      <a
-        href={STUDIO_URL}
-        target="_blank"
-        data-testid="community-studio-link"
-        rel="noopener noreferrer"
-        aria-label={`${t('studioCardTitle')} — ${t('studioOpen')}`}
-        className={`${tile} active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
-      >
-        <div aria-hidden="true" className="absolute bottom-0 end-2 opacity-35">
-          <Box aria-hidden="true" className="h-20 w-20 text-sage" />
-        </div>
-        <h3 className="mb-1 text-sm font-bold text-text-primary">{t('studioCardTitle')}</h3>
-        <p className="text-xs font-medium text-sage">{t('studioOpen')}</p>
-      </a>
       <Link
         to="/tools"
         className={`${tile} active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
@@ -446,98 +386,6 @@ function ToolsSection() {
         <h3 className="mb-1 text-sm font-bold text-text-primary">{s.library}</h3>
         <p className="text-xs text-text-muted">{t('comingSoon')}</p>
       </div>
-    </div>
-  );
-}
-
-// ------------------------------------------------------------------- panels
-
-function ProductsPanel({ q, viewer, onClear }: { q: string; viewer: string; onClear: () => void }) {
-  const s = useHubStrings();
-  const feed = useCommunityFeed<CommunityProduct>('products', q, viewer);
-  if (feed.error) return <ErrorState error={feed.error} onRetry={feed.reload} />;
-  if (!feed.rows) return <ProductGridSkeleton count={8} className={PRODUCT_GRID} />;
-  if (feed.rows.length === 0) {
-    return q ? (
-      <NoResults q={q} onClear={onClear} />
-    ) : (
-      <EmptyState icon={<Box aria-hidden="true" className="h-6 w-6" />} title={s.noProducts} description={s.noProductsHint} />
-    );
-  }
-  return (
-    <div data-community-panel="products">
-      {!q && <h2 className="mb-3 text-[22px] font-black leading-tight text-text-primary">{s.communityProducts}</h2>}
-      <SearchLine q={q} total={feed.total} />
-      <div className={PRODUCT_GRID}>
-        {feed.rows.map((p, i) => (
-          <ProductTile key={p.id} product={p} eager={i < 4} />
-        ))}
-      </div>
-      <LoadMore remaining={remaining(feed)} state={feed.more} onMore={feed.loadMore} />
-    </div>
-  );
-}
-
-function RequestsPanel({
-  q,
-  viewer,
-  onClear,
-  newRequestLink,
-}: {
-  q: string;
-  viewer: string;
-  onClear: () => void;
-  newRequestLink: { to: string; state?: unknown };
-}) {
-  const { t } = useLanguage();
-  const s = useHubStrings();
-  const feed = useCommunityFeed<CommunityRequest>('requests', q, viewer);
-
-  let body: React.ReactNode;
-  if (feed.error) body = <ErrorState error={feed.error} onRetry={feed.reload} />;
-  else if (!feed.rows) body = <RequestListSkeleton />;
-  else if (feed.rows.length === 0) {
-    body = q ? (
-      <NoResults q={q} onClear={onClear} />
-    ) : (
-      <EmptyState
-        icon={<ClipboardList aria-hidden="true" className="h-6 w-6" />}
-        title={s.noOpenRequests}
-        description={s.describeHint}
-        action={
-          <Link to={newRequestLink.to} state={newRequestLink.state} className="lv-button lv-button-primary mt-1 gap-2">
-            <Plus aria-hidden="true" className="h-4 w-4" />
-            {s.postRequest}
-          </Link>
-        }
-      />
-    );
-  } else {
-    body = (
-      <>
-        <SearchLine q={q} total={feed.total} />
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {feed.rows.map((r) => (
-            <RequestCard key={r.id} request={r} />
-          ))}
-        </div>
-        <LoadMore remaining={remaining(feed)} state={feed.more} onMore={feed.loadMore} />
-      </>
-    );
-  }
-
-  return (
-    <div data-community-panel="requests">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <p className="text-[12.5px] leading-relaxed text-text-secondary">{s.requestsHint}</p>
-        <Link
-          to="/requests"
-          className="inline-flex min-h-11 shrink-0 items-center rounded-full px-2 text-[12.5px] font-semibold text-sage hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-        >
-          {t('seeAll')}
-        </Link>
-      </div>
-      {body}
     </div>
   );
 }

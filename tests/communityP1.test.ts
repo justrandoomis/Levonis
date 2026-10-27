@@ -149,7 +149,8 @@ test('C10/C13/C14: the offer links the merchant, a failed follow says so, and Ba
   assert.doesNotMatch(sf, /if \(!\(e instanceof ApiError\)\) throw e;/, 'a follow error is no longer swallowed');
   assert.match(sf, /data-follow-error/);
   assert.match(sf, /const goBack = useGoBack\(backTo\);/);
-  assert.match(code('src/pages/Community.tsx'), /const goBack = useGoBack\('\/'\);/);
+  // The community home has no back arrow now (community UI plan C1 R1): it is a place, not a step.
+  assert.doesNotMatch(code('src/components/community/hub/TopBar.tsx'), /useGoBack/);
 });
 
 test('C6: publishing or closing a request drops the community page\'s remembered request lists', () => {

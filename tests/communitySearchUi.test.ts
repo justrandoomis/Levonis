@@ -164,8 +164,10 @@ test('a combobox said out loud: the input names the listbox, the rows are option
   assert.match(overlay, /row\.getAttribute\('data-search-remember'\)/);
   // «الكل» for requests lands on the tab that reads ?q=.
   assert.equal(fallbackMore('requests', 'x y'), '/community?tab=requests&q=x%20y');
+  // The requests tab is the board now (community UI plan C1): the old address goes there with the term.
   const home = code('src/pages/Community.tsx');
-  assert.match(home, /<RequestsPanel q=\{q\}/, 'the requests tab does not read the term');
+  assert.match(home, /const moved = legacyTabTarget\(params\);/, 'the old requests tab is sent to the board, the term kept');
+  assert.match(code('src/components/community/hub/tabs.ts'), /requests: '\/requests',/);
   assert.match(home, /params\.get\('q'\)/);
   assert.match(overlay, /ac\.abort\(\)/, 'a stale request is not aborted');
   assert.match(overlay, /ghostFor\(value, r\.text, textDir\)/, 'the grey completion is not the shared ghost');

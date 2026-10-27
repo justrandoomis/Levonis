@@ -1,15 +1,20 @@
 /**
- * THE COMMUNITY HOME IN A BROWSER — src/pages/Community.tsx with every door
- * it knocks on answered locally, so the issue can be seen and photographed
- * without a worker: `?tab=foryou|following|projects|requests|stores|creators`
- * (and the two old names), `&lang=ar|en|ckb`, `&theme=dark|light`,
- * `&viewer=guest|customer|merchant`, `&empty=1` for a community with nothing
- * in it yet (the typeset cover, the first-issue feed).
+ * THE COMMUNITY HOME IN A BROWSER — src/pages/Community.tsx (community UI
+ * plan C1) with every door it knocks on answered locally, so the home can be
+ * seen and photographed without a worker: `&lang=ar|en|ckb`,
+ * `&theme=dark|light`, `&viewer=guest|customer|merchant`, `&empty=1` for a
+ * community with nothing in it yet (the typeset featured card, the
+ * first-issue feed), `&tab=<old name>` for the old addresses the home sends
+ * to their section pages (every other page is `Elsewhere`, which names its
+ * address), and the bottom bar beside it (the one read of /api/chats a page,
+ * `window.__chatAsks`).
  * scripts/e2e-community-home.mjs drives it (Playwright).
  */
+import { Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider } from '../../src/AuthContext';
+import { clearPrimedRequests } from '../../src/lib/bootFetch';
 import { LanguageProvider } from '../../src/LanguageContext';
 import { WalletProvider } from '../../src/WalletContext';
 import { CurrencyProvider } from '../../src/CurrencyContext';
@@ -22,7 +27,7 @@ import '../../src/index.css';
 
 const params = new URLSearchParams(location.search);
 const lang = params.get('lang') === 'en' ? 'en' : params.get('lang') === 'ckb' ? 'ckb' : 'ar';
-const tab = params.get('tab') ?? 'foryou';
+const tab = params.get('tab');
 const viewer = params.get('viewer') ?? 'guest';
 const empty = params.get('empty') === '1';
 localStorage.setItem('levo_lang', lang);
@@ -66,6 +71,9 @@ const LINK_CARDS: Record<string, Record<string, unknown>> = {
 /** Every GET /api/link-cards the page made — one per distinct address is the contract. */
 const linkAsks: string[] = [];
 (window as unknown as { __linkAsks: string[] }).__linkAsks = linkAsks;
+/** Every GET /api/chats the page made — one a page is the contract (src/lib/useChatUnread.ts). */
+const chatAsks: string[] = [];
+(window as unknown as { __chatAsks: string[] }).__chatAsks = chatAsks;
 
 const MAKERS = [
   { id: 'sara', username: 'sara', name: 'سارة كريم', avatarUrl: picture('#7a8c5a', 'vase', 200, 200), bio: 'أطبع في البيت منذ 2021 — ألعاب مفصلية وقطع غيار لا تُباع.' },
@@ -225,6 +233,11 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const refused = (status: number) => new Response(JSON.stringify({ success: false }), { status, headers: { 'content-type': 'application/json' } });
   if (p === '/api/auth/me' || p === '/api/me') return me ? ok({ user: me }) : refused(401);
   if (p === '/api/community/access') return ok({ closed: false, admin: false, may_enter: true });
+  if (p === '/api/chats' && method === 'GET') {
+    chatAsks.push(location.href);
+    return me ? ok({ chats: [{ id: 'c1', unread: 2 }, { id: 'c2', unread: 1 }, { id: 'c3', unread: 0 }] }) : refused(401);
+  }
+  if (p === '/api/cart') return me ? ok({ items: [], item_count: 0 }) : refused(401);
   if (p === '/api/merchant/me') return me ? ok(merchantMe) : refused(401);
   // ---- the social graph ----
   if (p === '/api/community/me/social') return me ? ok({ following_users: [...graph.following], following_stores: [...graph.followingStores], blocked: [...graph.blocked], muted: [...graph.muted] }) : refused(401);
@@ -381,6 +394,16 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   if (init?.method && init.method !== 'GET') return ok({});
   return realFetch(input, init);
 }) as typeof window.fetch;
+// The boot reads (src/lib/bootFetch.ts) went out at module evaluation, before the doors above were
+// answered here: drop them, so the session and the rest are asked again, locally.
+clearPrimedRequests();
+
+/**
+ * The bottom bar, as the app shell mounts it beside every page: it makes the one read of
+ * /api/chats a page. Loaded lazily, so its imports (the boot reads among them) run after the
+ * doors above are answered locally.
+ */
+const BottomNav = lazy(() => import('../../src/components/BottomNav'));
 
 /** Where a link went: a page that names its address, so a navigation can be checked. */
 function Elsewhere() {
@@ -395,7 +418,9 @@ function Elsewhere() {
 const extra = params.get('extra') ? `&${params.get('extra')}` : '';
 // `&path=/community/projects/prj_2`: open on a page other than the home (the project's story with its link card).
 // The project route is mounted only then, so every other navigation still lands on `Elsewhere`, which names its address.
-const start = params.get('path') || `/community?tab=${encodeURIComponent(tab)}${extra}`;
+// `&tab=` opens an old address of the home, which sends it to its section page (community UI plan C1, §3).
+const homeQuery = [tab ? `tab=${encodeURIComponent(tab)}` : '', extra.slice(1)].filter(Boolean).join('&');
+const start = params.get('path') || `/community${homeQuery ? `?${homeQuery}` : ''}`;
 const projectRoute = (params.get('path') ?? '').startsWith('/community/projects/');
 
 // The app's own provider order (src/App.tsx): Auth → Language → Wallet → Currency → Social.
@@ -427,6 +452,9 @@ createRoot(document.getElementById('root')!).render(
                 )}
                 <Route path="*" element={<Elsewhere />} />
               </Routes>
+              <Suspense fallback={null}>
+                <BottomNav />
+              </Suspense>
             </SocialProvider>
           </MemoryRouter>
           <Toaster />

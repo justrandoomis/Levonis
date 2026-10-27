@@ -102,6 +102,11 @@ function load(viewer: string): Promise<HomeData> {
   return promise;
 }
 
+/** Start the composite read before the home body has arrived (the page asks while that chunk loads). */
+export function warmHome(viewer: string): void {
+  void load(viewer);
+}
+
 export function useHomeData(viewer: string): { data: HomeData | null; stale: boolean } {
   const [state, setState] = useState<{ viewer: string; data: HomeData | null; stale: boolean }>(() => {
     const hit = readPageCache<{ viewer: string; data: HomeData }>(KEY);

@@ -224,7 +224,8 @@ test('the Studio entry is a plain anchor to the configurable STUDIO_URL constant
   // inline; the hero and the services grid own it now, so the guard follows
   // the link rather than being relaxed to let it slip out of view.
   const entries = [
-    ['src/pages/Community.tsx', join(ROOT, 'src', 'pages', 'Community.tsx'), '..'],
+    // The community home's Studio card (community UI plan C1 R11) carries its entry now.
+    ['src/components/community/hub/StudioCard.tsx', join(ROOT, 'src', 'components', 'community', 'hub', 'StudioCard.tsx'), '../../..'],
     ['src/components/home/Hero.tsx', join(ROOT, 'src', 'components', 'home', 'Hero.tsx'), '../..'],
     ['src/components/home/ServicesGrid.tsx', join(ROOT, 'src', 'components', 'home', 'ServicesGrid.tsx'), '../..'],
   ] as const;

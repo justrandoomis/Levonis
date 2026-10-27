@@ -12,7 +12,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../../AuthContext';
 import { useSignInPrompt } from '../../../lib/guest';
 import { EmptyState } from '../../ui/AsyncStates';
-import type { DoorLink } from './QuickActions';
+import type { DoorLink } from './HubActions';
 import { CreatorRailSkeleton, PostSkeleton, SectionHead } from './parts';
 import { CreatorsRail, StoresRail } from './rails';
 import { useHubStrings } from './strings';

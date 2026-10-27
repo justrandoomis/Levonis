@@ -1,127 +1,190 @@
 /**
- * «لك» — THE ISSUE. The cover, then the numbered sections in the owner's
- * order: the week's trending projects, three print requests (the ones that
- * suit a merchant's workshop when the viewer runs one), featured makers,
- * featured stores, six community products, the feed of latest projects, the
- * maker's tools, and the colophon. Every section but the feed is one read of
- * hub/useHomeData.ts and hides itself when its read failed or came back
- * empty; the feed alone says when it could not load.
+ * «لك» — THE COMMUNITY HOME (community UI plan C1; IMG_8487, IMG_8462).
  *
- * The feed is a lazy chunk (feed/FeedList.tsx), mounted when its section
- * comes within 400 px of the screen, so the first paint carries the issue
- * and not the river.
+ * One tree for both layouts, in three parts the page places (src/pages/
+ * Community.tsx): the main column, the aside and what follows them. A phone
+ * reads it top to bottom: the sections and, for a merchant, the workshop
+ * board (the page own, so they stay mounted while this chunk arrives), the
+ * featured project, «الرائج هذا الشهر», «طلبات الطباعة», «صنّاع مميزون»
+ * and Levo Studio. From `lg` the same order is a grid: the main column holds
+ * the sections track, the featured project and three trending cards; the
+ * aside beside it holds the requests, the makers and Studio, its top level
+ * with the track. Below both: the featured stores, the community products,
+ * the latest projects (the feed, mounted as it approaches), the «وسوم رائجة»
+ * row, the maker tools and the colophon.
  *
- * ONE LAYOUT, DECIDED ONCE. Everything above the feed — the cover, the
- * «وسوم رائجة» row, which sections exist and their numbers — is decided from
- * the one composite (useHomeData.ts, trending folded in), so nothing arrives
- * later to push the first screen down or renumber a section after paint.
+ * Every section but the feed is one read of ./useHomeData.ts (trending is the
+ * last 30 days, so the head says «هذا الشهر», plan R9) and hides itself when
+ * its read failed or came back empty; the feed alone says when it could not
+ * load. Nothing arrives later to push the first screen down: the layout is
+ * decided from the one composite, and the skeleton has the cards heights.
+ *
+ * A lazy chunk of the page (src/pages/Community.tsx): the kit modules it uses
+ * are named by that chunk, not by the entry (plan R6).
+ *
+ * A request row is the shared public card (requests/RequestListCard.tsx),
+ * handed the public whitelist only: never a budget, a person or a request
+ * picture (plan R2, R3, R10).
  */
 import React, { Suspense, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useInView } from 'motion/react';
+import { Box, Users } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
-import type { MerchantMe } from '../../../lib/merchant';
 import { EmptyState } from '../../ui/AsyncStates';
-import { Skeleton } from '../../ui/Skeleton';
-import ProjectCard from '../projects/ProjectCard';
-import CoverStory, { pickCover } from './CoverStory';
-import ProductTile from './ProductTile';
-import RequestCard from './RequestCard';
-import type { DoorLink } from './QuickActions';
-import { CreatorRailSkeleton, PostSkeleton, ProjectRailSkeleton, Rail, Reveal, SectionHead } from './parts';
-import { CreatorsRail, StoresRail } from './rails';
-import { colophon, hubLang, useHubStrings } from './strings';
-import { useHomeData, type HomeData } from './useHomeData';
+import ProjectFeatureCard from '../projects/ProjectFeatureCard';
+import RequestListCard, { type PublicRequestCard } from '../requests/RequestListCard';
+import { SectionHead } from '../kit/display';
+import { useSocial } from '../social/SocialContext';
 import TrendingTags from '../search/TrendingTags';
+import type { CommunityRequest } from './api';
+import AsideCard from './AsideCard';
+import FeaturedProject, { pickFeatured } from './FeaturedProject';
+import { AsideSkeleton, MainSkeleton } from './HomeSkeleton';
+import type { DoorLink } from './HubActions';
+import MakerRow from './MakerRow';
+import ProductTile from './ProductTile';
+import StudioCard from './StudioCard';
+import { PostSkeleton, Reveal } from './parts';
+import { StoresRail } from './rails';
+import { colophon, hubLang, useHubStrings } from './strings';
+import { useHomeData } from './useHomeData';
 
 const FeedList = React.lazy(() => import('../feed/FeedList'));
 
-export const NEW_PROJECT_PATH = '/community/projects/new';
+/** What a public row may carry: the whitelist, copied field by field, so no budget can ride along (plan R2). */
+export function publicCard(r: CommunityRequest): PublicRequestCard {
+  return {
+    id: r.id,
+    title: r.title,
+    quantity: r.quantity,
+    material: r.material,
+    governorate: r.governorate,
+    state: r.state,
+    offer_count: r.offer_count,
+    file_count: r.file_count,
+    deadline: r.deadline,
+    created_at: r.created_at,
+    summary: r.summary ? { parts_count: r.summary.parts_count, pieces_per_set: r.summary.pieces_per_set } : null,
+  };
+}
 
-export default function ForYouPanel({
-  viewer,
-  me,
-  composerLink,
-  tools,
-}: {
-  viewer: string;
-  me: MerchantMe | null;
-  composerLink: DoorLink;
-  /** «أدوات الصانع» — the page's own, because the Studio anchor is pinned there. */
-  tools: React.ReactNode;
-}) {
+
+/** The main column after the sections: the featured project and «الرائج هذا الشهر». */
+export function HomeMain({ viewer, wide }: { viewer: string; wide: boolean }) {
+  const s = useHubStrings();
+  const { data } = useHomeData(viewer);
+  if (!data) return <MainSkeleton wide={wide} />;
+  const featured = pickFeatured(data.trending, data.works);
+  const featuredId = featured.kind === 'post' ? featured.post.id : null;
+  const trending = (data.trending ?? []).filter((p) => p.id !== featuredId).slice(0, wide ? 3 : 2);
+  return (
+    <>
+      <FeaturedProject featured={featured} wide={wide} />
+      {trending.length > 0 && (
+        <section aria-labelledby="community-s-trending" data-community-section="trending">
+          <SectionHead id="community-s-trending" title={s.trending} to="/community/projects" />
+          <div className={`grid ${wide ? 'grid-cols-3 gap-4' : 'grid-cols-2 gap-3'}`}>
+            {trending.map((p, i) => (
+              <ProjectFeatureCard key={p.id} post={p} wide={wide} eager={i < 2} />
+            ))}
+          </div>
+        </section>
+      )}
+    </>
+  );
+}
+
+/** The aside from `lg` (after the trending cards on a phone): the requests, the makers, Levo Studio. */
+export function HomeAside({ viewer, wide }: { viewer: string; wide: boolean }) {
+  const s = useHubStrings();
+  const social = useSocial();
+  const { data } = useHomeData(viewer);
+  if (!data) return <AsideSkeleton />;
+  const requests = (data.requests ?? []).slice(0, 2).map(publicCard);
+  const makers = (data.creators ?? []).filter((c) => !social.blocked.has(c.id)).slice(0, wide ? 3 : 2);
+  return (
+    <>
+      {requests.length > 0 &&
+        (wide ? (
+          <AsideCard id="community-s-requests" title={s.printRequests} icon={<Box className="h-[22px] w-[22px]" strokeWidth={1.75} />} footer={{ to: '/requests', label: s.browseRequests }} data-community-section="requests">
+            <ul className="divide-y divide-border-subtle px-3">
+              {requests.map((r) => (
+                <li key={r.id} className="py-1.5">
+                  <RequestListCard variant="aside" request={r} />
+                </li>
+              ))}
+            </ul>
+          </AsideCard>
+        ) : (
+          <section aria-labelledby="community-s-requests" data-community-section="requests">
+            <SectionHead id="community-s-requests" title={s.printRequests} to="/requests" />
+            <ul className="flex flex-col gap-2">
+              {requests.map((r) => (
+                <li key={r.id}>
+                  <RequestListCard variant="row" request={r} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      {makers.length > 0 &&
+        (wide ? (
+          <AsideCard id="community-s-creators" title={s.featuredCreators} icon={<Users className="h-[22px] w-[22px]" strokeWidth={1.75} />} data-community-section="creators">
+            <ul className="divide-y divide-border-subtle pb-2">
+              {makers.map((c) => (
+                <MakerRow key={c.id} creator={c} wide />
+              ))}
+            </ul>
+          </AsideCard>
+        ) : (
+          <section aria-labelledby="community-s-creators" data-community-section="creators">
+            <SectionHead id="community-s-creators" title={s.featuredCreators} />
+            <ul className="cm-card divide-y divide-border-subtle rounded-xl shadow-sm">
+              {makers.map((c) => (
+                <MakerRow key={c.id} creator={c} />
+              ))}
+            </ul>
+          </section>
+        ))}
+      <StudioCard wide={wide} />
+    </>
+  );
+}
+
+/** Below the grid: the featured stores, the community products, the feed, the tags, the tools, the colophon. */
+export function HomeBelow({ viewer, composerLink, tools }: { viewer: string; composerLink: DoorLink; tools: React.ReactNode }) {
   const { lang } = useLanguage();
   const s = useHubStrings();
   const { data } = useHomeData(viewer);
-
-  if (!data) return <IssueSkeleton />;
-
-  const cover = pickCover(data.trending, data.works);
-  // The makers and stores rails are trending's rows when it has them (ranked
-  // by the last 30 days' likes, orders and follows), else the featured reads
-  // — chosen inside the composite, so the section set is fixed at first paint.
-  const creators = data.creators;
-  const merchants = data.merchants;
-  const sections = visibleSections(data);
-  const number = (key: string) => sections.indexOf(key) + 1;
+  if (!data) return <PostSkeleton />;
   const totals = data.totals;
-
   return (
-    <div data-community-panel="foryou" className="flex flex-col gap-8">
-      <CoverStory cover={cover} />
-      <TrendingTags tags={data.tags} />
-
-      {sections.includes('trending') && (
-        <Reveal labelledBy="community-s-trending" data-community-section="trending">
-          <SectionHead index={number('trending')} id="community-s-trending" title={s.trending} to="/community?tab=projects" />
-          <Rail>
-            {data.trending!.map((p, i) => (
-              <ProjectCard key={p.id} post={p} variant="rail" eager={i < 2} />
-            ))}
-          </Rail>
-        </Reveal>
-      )}
-
-      {sections.includes('requests') && (
-        <Reveal labelledBy="community-s-requests" data-community-section="requests">
-          <SectionHead index={number('requests')} id="community-s-requests" title={me?.store ? s.requestsForYou : s.printRequests} to="/requests" />
-          <div>
-            {data.requests!.map((r) => (
-              <RequestCard key={r.id} request={r} compact />
-            ))}
-          </div>
-        </Reveal>
-      )}
-
-      {sections.includes('creators') && (
-        <Reveal labelledBy="community-s-creators" data-community-section="creators">
-          <SectionHead index={number('creators')} id="community-s-creators" title={s.featuredCreators} to="/community?tab=creators" />
-          <CreatorsRail creators={creators!} />
-        </Reveal>
-      )}
-
-      {sections.includes('stores') && (
+    <>
+      {data.merchants && data.merchants.length > 0 && (
         <Reveal labelledBy="community-s-stores" data-community-section="stores">
-          <SectionHead index={number('stores')} id="community-s-stores" title={s.featuredStores} to="/community?tab=stores" />
-          <StoresRail stores={merchants!} works={data.works} />
+          <SectionHead id="community-s-stores" title={s.featuredStores} to="/community/stores" />
+          <StoresRail stores={data.merchants} works={data.works} />
         </Reveal>
       )}
 
-      {sections.includes('products') && (
+      {data.products && data.products.length > 0 && (
         <Reveal labelledBy="community-s-products" data-community-section="products">
-          <SectionHead index={number('products')} id="community-s-products" title={s.communityProducts} to="/community?tab=foryou&list=products" />
+          <SectionHead id="community-s-products" title={s.communityProducts} to="/community?list=products" />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {data.products!.map((p) => (
+            {data.products.map((p) => (
               <ProductTile key={p.id} product={p} />
             ))}
           </div>
         </Reveal>
       )}
 
-      <FeedSection index={number('feed')} composerLink={composerLink} />
+      <FeedSection composerLink={composerLink} />
+
+      <TrendingTags tags={data.tags} />
 
       <Reveal labelledBy="community-s-tools" data-community-section="tools">
-        <SectionHead index={number('tools')} id="community-s-tools" title={s.makerTools} />
+        <SectionHead id="community-s-tools" title={s.makerTools} />
         {tools}
       </Reveal>
 
@@ -130,30 +193,18 @@ export default function ForYouPanel({
           {colophon(totals.projects, totals.merchants, hubLang(lang))}
         </p>
       )}
-    </div>
+    </>
   );
 }
 
-/** The sections with something to show, in the owner's order — the numbering follows. */
-function visibleSections(d: HomeData): string[] {
-  const out: string[] = [];
-  if (d.trending && d.trending.length > 0) out.push('trending');
-  if (d.requests && d.requests.length > 0) out.push('requests');
-  if (d.creators && d.creators.length > 0) out.push('creators');
-  if (d.merchants && d.merchants.length > 0) out.push('stores');
-  if (d.products && d.products.length > 0) out.push('products');
-  out.push('feed', 'tools');
-  return out;
-}
-
 /** «أحدث المشاريع» — the feed, mounted as its section approaches. */
-function FeedSection({ index, composerLink }: { index: number; composerLink: DoorLink }) {
+function FeedSection({ composerLink }: { composerLink: DoorLink }) {
   const s = useHubStrings();
   const ref = useRef<HTMLDivElement | null>(null);
   const near = useInView(ref, { once: true, margin: '400px 0px' });
   return (
     <section ref={ref} aria-labelledby="community-s-feed" data-community-section="feed">
-      <SectionHead index={index} id="community-s-feed" title={s.latestProjects} to="/community?tab=projects" />
+      <SectionHead id="community-s-feed" title={s.latestProjects} to="/community/projects" />
       {near ? (
         <Suspense fallback={<PostSkeleton />}>
           {/* A reading column on a wide screen: a post is not a banner. */}
@@ -180,23 +231,5 @@ export function FeedEmpty({ composerLink }: { composerLink: DoorLink }) {
         </Link>
       }
     />
-  );
-}
-
-/** The issue's shape while its first pages are on their way: cover, a rail, a rail, the feed. */
-function IssueSkeleton() {
-  return (
-    <div data-community-panel="foryou" aria-busy="true" className="flex flex-col gap-8">
-      <Skeleton className="-mx-4 aspect-video rounded-none lg:mx-0 lg:aspect-[12/5] lg:rounded-2xl" />
-      <div>
-        <Skeleton className="mb-3 h-6 w-1/2" />
-        <ProjectRailSkeleton />
-      </div>
-      <div>
-        <Skeleton className="mb-3 h-6 w-1/2" />
-        <CreatorRailSkeleton />
-      </div>
-      <PostSkeleton />
-    </div>
   );
 }
