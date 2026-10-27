@@ -105,6 +105,8 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     });
   }
   if (method === 'POST' && (m = path.match(/^\/jobs\/([^/]+)\/applied$/))) {
+    // The Worker requires both (worker/routes/adminCreativeStudio.ts; tests/creativeStudioContract.test.ts).
+    if (typeof body.document_id !== 'string' || !body.document_id) return fail(400, 'INVALID_INPUT', 'document_id is required');
     db.applied.push({ job: m[1], version: Number(body.version) });
     save(db);
     return ok({ job: { id: m[1], status: 'succeeded' } });
@@ -114,7 +116,7 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     save(db);
     return ok({ job: { id: m[1], status: 'cancelled' } });
   }
-  if (method === 'GET' && path === '/provider/usage') return ok({ usage: [] });
+  if (method === 'GET' && path === '/usage') return ok({ migrated: true, records: [], days: [], today: provider.today, month: provider.month });
   if (method === 'GET' && path === '/brand') return ok({ migrated: true, version: null, status: 'default', kit: defaultBrandKit(), site_logo: { width: 600, height: 600 } });
   if (method === 'GET' && path === '/brand/versions') return ok({ versions: [] });
   if (method === 'GET' && path === '/claims') return ok({ claims: [] });
@@ -165,7 +167,9 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       return ok({ document: doc });
     }
     if (method === 'PATCH') {
-      if (typeof body.title === 'string') doc.title = body.title;
+      // A rename only: the Worker changes no version for it.
+      if (typeof body.title !== 'string' || !body.title) return fail(400, 'INVALID_INPUT', 'title is required');
+      doc.title = body.title;
       save(db);
       return ok({ document: doc });
     }
@@ -174,9 +178,16 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     return ok({ versions: (db.versions[m[1]] ?? []).map((v) => ({ version: v.version, origin: v.origin, change_summary: '', created_at: v.created_at, created_by_name: 'TEST OWNER', job_id: null })).reverse() });
   }
   if (method === 'POST' && (m = path.match(/^\/documents\/([^/]+)\/exports$/))) {
+    // The Worker reads the facts from ONE JSON field, `meta`, beside the file.
+    let meta: Record<string, unknown>;
+    try {
+      meta = JSON.parse(String(body.meta)) as Record<string, unknown>;
+    } catch {
+      return fail(400, 'INVALID_INPUT', 'meta must be JSON');
+    }
     db.exports += 1;
     save(db);
-    return ok({ export: { id: `exp_e2e_${db.exports}`, document_id: m[1], version: Number(body.version), kind: body.kind, width: Number(body.width), height: Number(body.height), bytes: 1, final: body.final === 'true', source_check: 'fresh', created_at: NOW, url: '' } });
+    return ok({ export: { id: `exp_e2e_${db.exports}`, document_id: m[1], version: Number(meta.version), kind: meta.kind, width: Number(meta.width), height: Number(meta.height), bytes: 1, final: meta.final === true, source_check: 'fresh', created_at: NOW, url: '' } });
   }
   return fail(404, 'NOT_FOUND', `not stubbed: ${method} ${path}`);
 }) as typeof window.fetch;

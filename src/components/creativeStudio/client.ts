@@ -18,7 +18,7 @@
 import { api, ApiError } from '../../lib/api';
 import type {
   AssetDto, AssetKind, BrandDto, BrandVersionDto, ClaimDto, ComposeRequest, ComposeResponse, DocStatus, DocumentDto,
-  DocumentSummaryDto, EditRequest, EditResponse, ExportDto, ExportKind, IdeaRecordDto, IdeasRequest, IdeasResponse, JobDto,
+  DocumentSummaryDto, EditRequest, EditResponse, ExportDto, ExportKind, IdeaRecordDto, IdeasRequest, IdeasResponse,
   ModelDto, OpportunityDto, ProductDetailDto, ProductListItemDto, ProviderStatusDto, ReviewRequest, ReviewResponse,
   UsageRecordDto, VerifyDto, VersionDto, VersionOrigin, BudgetSettings, Rates, Effort, ApproveRequest, ReviewDto,
 } from '../../../packages/creativeDoc/src/api';
@@ -77,13 +77,14 @@ export function idempotencyKey(): string {
 export const provider = {
   status: async (): Promise<ProviderStatusDto> => one<ProviderStatusDto>(await api.get<Body>(`${BASE}/provider`), 'provider_status', 'can_manage'),
   /** The key goes to the server in the request body and nowhere else; the answer carries only a hint. */
-  saveKey: (key: string) => api.put<Body>(`${BASE}/provider/key`, { key }),
+  saveKey: (key: string) => api.put<Body>(`${BASE}/provider/key`, { api_key: key }),
   removeKey: () => api.delete<Body>(`${BASE}/provider/key`),
   test: () => api.post<Body>(`${BASE}/provider/test`, {}, { timeoutMs: AI_TIMEOUT_MS }),
   models: async (): Promise<ModelDto[]> => list<ModelDto>(await api.get<Body>(`${BASE}/provider/models`, { timeoutMs: 45000 }), 'models'),
   saveSettings: (s: { model?: string | null; effort?: Effort | null; budget?: BudgetSettings; rates?: Rates | null; vision_review?: boolean }) =>
     api.put<Body>(`${BASE}/provider/settings`, s),
-  usage: async (): Promise<UsageRecordDto[]> => list<UsageRecordDto>(await api.get<Body>(`${BASE}/provider/usage`), 'usage'),
+  /** The ledger (codes and counts, never text): GET /usage answers `{ records, days, today, month }`. */
+  usage: async (): Promise<UsageRecordDto[]> => list<UsageRecordDto>(await api.get<Body>(`${BASE}/usage`), 'records'),
 };
 
 // ---------------------------------------------------------------------------
@@ -125,7 +126,9 @@ export const assets = {
     form.set('label', label);
     return one<AssetDto>(await api.post<Body>(`${BASE}/assets`, form, { timeoutMs: UPLOAD_TIMEOUT_MS }), 'asset', 'review');
   },
-  review: (id: string, review: AssetDto['review'], note = '') => api.patch<Body>(`${BASE}/assets/${encodeURIComponent(id)}`, { review, note }),
+  /** A reviewer's verdict: only approved assets are offered to designs and to Claude. */
+  review: async (id: string, review: AssetDto['review'], note?: string): Promise<AssetDto> =>
+    one<AssetDto>(await api.patch<Body>(`${BASE}/assets/${encodeURIComponent(id)}`, note === undefined ? { review } : { review, note }), 'asset', 'review'),
   remove: (id: string) => api.delete<Body>(`${BASE}/assets/${encodeURIComponent(id)}`),
 };
 
@@ -170,7 +173,11 @@ export const documents = {
   /** Version-fenced: a 409 VERSION_CONFLICT means someone saved after `base_version`, and nothing was written. */
   save: async (id: string, input: { content: CreativeDocument; base_version: number; origin: VersionOrigin; job_id?: string | null; change_summary?: string }): Promise<SaveResult> =>
     saveResultOf(await api.put<Body>(`${BASE}/documents/${encodeURIComponent(id)}`, { job_id: null, change_summary: '', ...input })),
-  patch: (id: string, input: { title?: string; status?: DocStatus }) => api.patch<Body>(`${BASE}/documents/${encodeURIComponent(id)}`, input),
+  /** A rename: no new version, an approval stands. */
+  rename: (id: string, title: string) => api.patch<Body>(`${BASE}/documents/${encodeURIComponent(id)}`, { title }),
+  /** Draft / in review / archived, version-fenced like a save. */
+  setStatus: async (id: string, status: Extract<DocStatus, 'draft' | 'in_review' | 'archived'>, baseVersion: number): Promise<SaveResult> =>
+    saveResultOf(await api.post<Body>(`${BASE}/documents/${encodeURIComponent(id)}/status`, { status, base_version: baseVersion })),
   versions: async (id: string): Promise<VersionDto[]> => list<VersionDto>(await api.get<Body>(`${BASE}/documents/${encodeURIComponent(id)}/versions`), 'versions'),
   version: async (id: string, version: number): Promise<{ content: CreativeDocument }> => {
     const body = await api.get<Body>(`${BASE}/documents/${encodeURIComponent(id)}/versions/${version}`);
@@ -178,18 +185,17 @@ export const documents = {
     if (!holder.content || typeof holder.content !== 'object') throw invalid('content');
     return { content: holder.content as CreativeDocument };
   },
-  restore: async (id: string, version: number): Promise<SaveResult> => saveResultOf(await api.post<Body>(`${BASE}/documents/${encodeURIComponent(id)}/restore`, { version })),
+  /** A restore is a new version on top of `baseVersion` (the version the archive was showing); bound data is re-verified before approval. */
+  restore: async (id: string, version: number, baseVersion: number): Promise<SaveResult> =>
+    saveResultOf(await api.post<Body>(`${BASE}/documents/${encodeURIComponent(id)}/restore`, { version, base_version: baseVersion })),
   approve: async (id: string, req: ApproveRequest): Promise<ReviewDto> => one<ReviewDto>(await api.post<Body>(`${BASE}/documents/${encodeURIComponent(id)}/approve`, req), 'review', 'decision'),
   exports: async (id: string): Promise<ExportDto[]> => list<ExportDto>(await api.get<Body>(`${BASE}/documents/${encodeURIComponent(id)}/exports`), 'exports'),
   /** Records an export the browser rendered; `final` is refused by the server unless the design is clean and verified. */
   uploadExport: async (id: string, input: { file: Blob; kind: ExportKind; version: number; final: boolean; width: number | null; height: number | null }): Promise<ExportDto> => {
     const form = new FormData();
     form.set('file', input.file);
-    form.set('kind', input.kind);
-    form.set('version', String(input.version));
-    form.set('final', input.final ? 'true' : 'false');
-    if (input.width !== null) form.set('width', String(input.width));
-    if (input.height !== null) form.set('height', String(input.height));
+    // The Worker reads the export's facts from ONE JSON field (POST /documents/:id/exports).
+    form.set('meta', JSON.stringify({ version: input.version, kind: input.kind, final: input.final, width: input.width, height: input.height }));
     return one<ExportDto>(await api.post<Body>(`${BASE}/documents/${encodeURIComponent(id)}/exports`, form, { timeoutMs: UPLOAD_TIMEOUT_MS }), 'export', 'kind');
   },
 };
@@ -205,8 +211,7 @@ export const ai = {
   compose: async (req: ComposeRequest): Promise<ComposeResponse> => one<ComposeResponse>(await api.post<Body>(`${BASE}/ai/compose`, req, { timeoutMs: AI_TIMEOUT_MS }), 'result', 'proposals'),
   edit: async (req: EditRequest, signal?: AbortSignal): Promise<EditResponse> => one<EditResponse>(await api.post<Body>(`${BASE}/ai/edit`, req, { timeoutMs: AI_TIMEOUT_MS, signal }), 'result', 'patch'),
   review: async (req: ReviewRequest): Promise<ReviewResponse> => one<ReviewResponse>(await api.post<Body>(`${BASE}/ai/review`, req, { timeoutMs: AI_TIMEOUT_MS }), 'result', 'notes'),
-  job: async (id: string): Promise<JobDto> => one<JobDto>(await api.get<Body>(`${BASE}/jobs/${encodeURIComponent(id)}`), 'job', 'status'),
   cancel: (id: string) => api.post<Body>(`${BASE}/jobs/${encodeURIComponent(id)}/cancel`, {}),
   /** Tells the server the owner applied this answer to `version` (a cancelled or stale job is refused there too). */
-  applied: (id: string, version: number) => api.post<Body>(`${BASE}/jobs/${encodeURIComponent(id)}/applied`, { version }),
+  applied: (id: string, documentId: string, version: number) => api.post<Body>(`${BASE}/jobs/${encodeURIComponent(id)}/applied`, { document_id: documentId, version }),
 };

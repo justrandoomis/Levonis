@@ -117,7 +117,7 @@ function Versions({ doc, onRestored }: { doc: DocumentSummaryDto; onRestored(): 
   const restore = async (v: VersionDto) => {
     setMessage('');
     try {
-      await documents.restore(doc.id, v.version);
+      await documents.restore(doc.id, v.version, doc.version);
       setMessage(w(S.archiveRestored));
       reload();
       onRestored();

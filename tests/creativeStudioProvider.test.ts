@@ -296,7 +296,15 @@ test('the answer reader: a declared or streamed body over the cap is TOO_LARGE, 
   assert.deepEqual(await readBodyCapped(new Response(endless), RESPONSE_CAP_BYTES), { ok: false, code: 'TOO_LARGE' });
   assert.ok(pulled <= RESPONSE_CAP_BYTES / (64 * 1024) + 2, 'reading stops at the cap, not at the end of an endless body');
   // A body that never finishes: the attempt's deadline ends the read.
+  // Node's AbortSignal.timeout() timer is unref'd: with nothing else pending, the event loop would empty
+  // before it fires and the runner would cancel this test. A plain (ref'd) timer keeps the loop alive.
   const stalled = new ReadableStream<Uint8Array>({ pull: () => new Promise<void>(() => undefined) });
-  assert.deepEqual(await readBodyCapped(new Response(stalled), RESPONSE_CAP_BYTES, AbortSignal.timeout(20)), { ok: false, code: 'TIMEOUT' });
+  const deadline = new AbortController();
+  const timer = setTimeout(() => deadline.abort(), 20);
+  try {
+    assert.deepEqual(await readBodyCapped(new Response(stalled), RESPONSE_CAP_BYTES, deadline.signal), { ok: false, code: 'TIMEOUT' });
+  } finally {
+    clearTimeout(timer);
+  }
   assert.deepEqual(await readBodyCapped(Response.json({ ok: 'yes' }), RESPONSE_CAP_BYTES), { ok: true, text: '{"ok":"yes"}' });
 });

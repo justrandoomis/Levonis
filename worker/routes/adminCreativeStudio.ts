@@ -54,7 +54,7 @@ import { approveClaim, approvedClaims, claimExists, claimInput, claimIsCurrent, 
 import { intOrNull, isMissingSchema, namesOf, nowIso, readOr, schemaMissing, stringList, studioInstalled, writeOr503 } from '../lib/creative/db';
 import {
   REJECT_REASONS, approveDocument, createDocument, documentDto, duplicateDocument, exportDto, exportsOf, getDocRow, listDocuments, readContent, rejectDocument,
-  requireDoc, restoreDocument, reviews, saveDocument, serverReport, setStatus, summaries, verifyDocument, versionContent, versions, type DocRow, type ExportRow,
+  requireDoc, renameDocument, restoreDocument, reviews, saveDocument, serverReport, setStatus, summaries, verifyDocument, versionContent, versions, type DocRow, type ExportRow,
 } from '../lib/creative/documents';
 import { MAX_FILE_BYTES, MAX_PROJECT_JSON_BYTES, assertDeclaredSize, putStudioFile, sha256OfBytes, sniffStudioImage, streamStudioFile, tooLarge, unsupported } from '../lib/creative/files';
 import { IDEMPOTENCY_KEY, cancelJob, jobById, jobDto, markApplied } from '../lib/creative/jobs';
@@ -596,6 +596,41 @@ R.get('/assets/:id/file', studio, async (c) => {
   return res;
 });
 
+/**
+ * A reviewer's verdict on an asset. Only `approved` assets are offered to a
+ * design or to Claude; rejecting one an approved design or the approved brand
+ * kit uses is refused like a delete would be (ASSET_IN_USE).
+ */
+R.patch('/assets/:id', studio, async (c) => {
+  const id = idParam(c);
+  const body = await bodyOf(c);
+  const review = oneOf(body.review, 'review', ['approved', 'needs_review', 'rejected'] as const);
+  const note = body.note === undefined || body.note === null ? null : str(body.note, 'note', { max: 300, required: false });
+  const db = c.env.DB;
+  const row = await writeOr503(() => db.prepare('SELECT * FROM creative_assets WHERE id = ?').bind(id).first<AssetRow>());
+  if (!row || row.deleted_at) throw notFound('Asset not found');
+  if (review !== 'approved') {
+    const used = await db
+      .prepare(
+        `SELECT d.id FROM creative_documents d
+          WHERE d.approved_version IS NOT NULL
+            AND EXISTS (SELECT 1 FROM json_each(d.content_json, '$.layers') l WHERE json_extract(l.value, '$.asset.ref') = ?)
+          LIMIT 5`
+      )
+      .bind(id)
+      .all<{ id: string }>();
+    const brand = await currentBrand(db);
+    const inKit = brand.status === 'approved' && (brand.kit.logo.asset === id || brand.kit.backgrounds.some((b) => b.asset_id === id));
+    if ((used.results ?? []).length || inKit) {
+      throw new HttpError(409, 'This asset is used by an approved design or the approved brand kit.', 'ASSET_IN_USE', { documents: (used.results ?? []).map((r) => r.id), brand_kit: inKit });
+    }
+  }
+  await db.prepare('UPDATE creative_assets SET review = ?, note = COALESCE(?, note) WHERE id = ? AND deleted_at IS NULL').bind(review, note, id).run();
+  await audit(db, actorOf(c), 'creative.asset.reviewed', id, { review });
+  const next = (await db.prepare('SELECT * FROM creative_assets WHERE id = ?').bind(id).first<AssetRow>())!;
+  return ok(c, { asset: assetDto(next) });
+});
+
 R.delete('/assets/:id', studio, async (c) => {
   const id = idParam(c);
   const db = c.env.DB;
@@ -680,6 +715,14 @@ R.put('/documents/:id', studio, async (c) => {
       origin, job_id: jobId, checkpoint: boolOf(body.checkpoint),
     })
   );
+  return ok(c, { document: await documentDto(c.env.DB, row) });
+});
+
+/** A rename only: no new version, no base version, an approval stands (worker/lib/creative/documents.ts `renameDocument`). */
+R.patch('/documents/:id', studio, async (c) => {
+  const body = await bodyOf(c);
+  const title = str(body.title, 'title', { min: 1, max: 120 });
+  const row = await writeOr503(() => renameDocument(c.env.DB, actorOf(c), idParam(c), title));
   return ok(c, { document: await documentDto(c.env.DB, row) });
 });
 

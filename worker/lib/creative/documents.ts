@@ -342,6 +342,17 @@ export async function saveDocument(db: D1Database, actorId: string, id: string, 
   return (await getDocRow(db, id))!;
 }
 
+/**
+ * Rename a design. A title is not design content (spec §25 ties an approval to
+ * the content of one version), so a rename makes no new version, needs no base
+ * version and leaves an approval standing.
+ */
+export async function renameDocument(db: D1Database, actorId: string, id: string, title: string): Promise<DocRow> {
+  await requireDoc(db, id);
+  await db.prepare('UPDATE creative_documents SET title = ?, updated_by = ?, updated_at = ? WHERE id = ?').bind(title, actorId, nowIso(), id).run();
+  return (await getDocRow(db, id))!;
+}
+
 export async function restoreDocument(db: D1Database, actorId: string, id: string, version: number, baseVersion: number): Promise<DocRow> {
   const row = await requireDoc(db, id);
   if (baseVersion !== row.version) throw new HttpError(409, 'This design changed since you opened it.', 'VERSION_CONFLICT', { current_version: row.version });

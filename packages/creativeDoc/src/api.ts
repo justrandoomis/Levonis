@@ -458,12 +458,12 @@ export interface ClaimDocumentsResponse { documents: DocumentSummaryDto[] }
 
 /** GET /assets?kind= */
 export interface AssetsResponse { migrated: boolean; assets: AssetDto[] }
-/** POST /assets (multipart: file, kind, label?, note?, product_id?), DELETE /assets/:id */
+/** POST /assets (multipart: file, kind, label?, note?, product_id?), PATCH /assets/:id {review, note?}, DELETE /assets/:id */
 export interface AssetResponse { asset: AssetDto }
 
 /** GET /documents?status=&product_id=&format=&campaign_id=&q=&from=&to=&limit=&offset= */
 export interface DocumentsResponse { migrated: boolean; documents: DocumentSummaryDto[]; total: number; limit: number; offset: number }
-/** POST /documents, GET|PUT /documents/:id, POST …/restore, …/duplicate, …/status */
+/** POST /documents, GET|PUT|PATCH /documents/:id (PATCH = rename only, no new version), POST …/restore, …/duplicate, …/status */
 export interface DocumentResponse { document: DocumentDto }
 /** GET /documents/:id/versions */
 export interface VersionsResponse { versions: VersionDto[] }

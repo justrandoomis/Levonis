@@ -479,6 +479,10 @@ export const ERROR_TEXT: Readonly<Record<ErrorCode | 'NETWORK' | 'TIMEOUT' | 'IN
   RATE_LIMITED: t('طلبات كثيرة؛ انتظر قليلاً ثم أعد المحاولة.', 'Too many requests; wait a moment and try again.', 'داواکارییەکی زۆر؛ کەمێک چاوەڕێ بکە و دووبارە هەوڵ بدەرەوە.'),
   NETWORK: t('لا اتصال بالخادم.', 'No connection to the server.', 'هیچ پەیوەندییەک بە ڕاژەکارەوە نییە.'),
   TIMEOUT: t('انتهت مهلة الطلب؛ ربما اكتمل على الخادم.', 'The request timed out; it may still have completed on the server.', 'کاتی داواکارییەکە تەواو بوو؛ لەوانەیە لە ڕاژەکار تەواو بووبێت.'),
+  REAUTH_REQUIRED: t('سجّل الدخول من جديد لإتمام هذا الإجراء.', 'Sign in again to complete this action.', 'دووبارە بچۆ ژوورەوە بۆ تەواوکردنی ئەم کارە.'),
+  VISION_REVIEW_DISABLED: t('المراجعة البصرية غير مفعّلة؛ يفعّلها المالك من الإعدادات.', 'Visual review is turned off; the owner can turn it on in Settings.', 'پێداچوونەوەی بینراو ناچالاکە؛ خاوەنەکە دەتوانێت لە ڕێکخستنەکانەوە چالاکی بکات.'),
+  STORAGE_UNAVAILABLE: t('تخزين الملفات غير متاح الآن؛ حاول لاحقاً.', 'File storage is not available right now; try again later.', 'هەڵگرتنی فایل ئێستا بەردەست نییە؛ دواتر هەوڵ بدەرەوە.'),
+  JOB_IN_PROGRESS: t('هذا الطلب ما زال قيد التنفيذ؛ انتظر نتيجته.', 'This request is still running; wait for its result.', 'ئەم داواکارییە هێشتا بەردەوامە؛ چاوەڕێی ئەنجامەکەی بکە.'),
   INVALID_RESPONSE: t('رد غير متوقع من الخادم.', 'An unexpected answer from the server.', 'وەڵامێکی چاوەڕواننەکراو لە ڕاژەکارەوە.'),
 };
 

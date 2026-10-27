@@ -426,16 +426,16 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
       suppressSave.current = after;
       const res = await a.saveAs(after, { origin: 'ai', job_id: jobId });
       if (!res) return false;
-      await ai.applied(jobId, res.version).catch((e: unknown) => toast.error(failText(e, lang)));
+      await ai.applied(jobId, docId, res.version).catch((e: unknown) => toast.error(failText(e, lang)));
       return true;
     }
     suppressSave.current = applied.doc;
     setHistory((h) => commit(h, applied.doc));
     const res = await a.saveAs(applied.doc, { origin: 'ai', job_id: jobId });
     if (!res) return false;
-    await ai.applied(jobId, res.version).catch((e: unknown) => toast.error(failText(e, lang)));
+    await ai.applied(jobId, docId, res.version).catch((e: unknown) => toast.error(failText(e, lang)));
     return true;
-  }, [lang]);
+  }, [docId, lang]);
 
   const editText = useCallback((id: string) => {
     const d = docRef.current;
@@ -607,7 +607,7 @@ function EditorCore({ meta, data, initial, studio, lang, dir, w, desktop, wide }
         value={title}
         maxLength={120}
         onChange={(e) => setTitle(e.target.value)}
-        onBlur={() => { if (title.trim() && title !== meta.title) void documents.patch(docId, { title: title.trim() }).catch((e: unknown) => toast.error(failText(e, lang))); }}
+        onBlur={() => { if (title.trim() && title !== meta.title) void documents.rename(docId, title.trim()).catch((e: unknown) => toast.error(failText(e, lang))); }}
       />
       <span className={`text-sm ${saveTone}`} role="status" aria-live="polite" data-save-state={saveState}>
         {w(saveLabel)} · {fill(w(S.saveVersion), { n: version })}
