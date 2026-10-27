@@ -8,7 +8,7 @@
  *   an idle entry is answered again rather than multiplied;
  *   the conversation's own rules: the customer's own store (OWN_STORE_REQUEST), a
  *   store not taking custom requests (STORE_NO_CUSTOM_REQUESTS), one not
- *   taking new work (MERCHANT_UNAVAILABLE), one the public may not see
+ *   taking new work (STORE_NOT_TAKING_WORK), one the public may not see
  *   (STORE_UNAVAILABLE);
  *   the board's publish door refuses it (REQUEST_IS_DIRECT), and the send
  *   asks the publish door's questions (REQUEST_TITLE_REQUIRED) before any
@@ -103,7 +103,11 @@ test('the conversation’s rules: own store, no custom requests, no new work, a 
   raw.prepare(`UPDATE merchant_stores SET accepts_custom_requests = 0 WHERE id = 's1'`).run();
   assert.equal((await enter(raw, 'm1')).body.code, 'STORE_NO_CUSTOM_REQUESTS');
   raw.prepare(`UPDATE merchant_stores SET accepts_custom_requests = 1, status = 'paused' WHERE id = 's1'`).run();
-  assert.equal((await enter(raw, 'm1')).body.code, 'MERCHANT_UNAVAILABLE');
+  const paused = await enter(raw, 'm1');
+  assert.equal(paused.body.code, 'STORE_NOT_TAKING_WORK', 'a code of its own: MERCHANT_UNAVAILABLE asks for another offer');
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    assert.notEqual(REFUSAL_STRINGS.STORE_NOT_TAKING_WORK[lang], REFUSAL_STRINGS.MERCHANT_UNAVAILABLE[lang], `${lang}: the store sentence is not the offer sentence`);
+  }
   raw.prepare(`UPDATE merchant_stores SET status = 'active' WHERE id = 's1'`).run();
   raw.prepare(`UPDATE community_merchants SET approved_at = NULL WHERE id = 'm1'`).run();
   const hidden = await enter(raw, 'm1');

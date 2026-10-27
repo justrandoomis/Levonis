@@ -140,7 +140,8 @@ export interface DirectStore {
  *   not the customer's own store (OWN_STORE_REQUEST — its own code, not the
  *   offer door's OWN_REQUEST, so the client says «this is your own store»);
  *   taking custom requests (STORE_NO_CUSTOM_REQUESTS);
- *   taking new work (MERCHANT_UNAVAILABLE).
+ *   taking new work (STORE_NOT_TAKING_WORK: its own code, because the offer door's
+ *   MERCHANT_UNAVAILABLE sentence asks the customer to choose another offer).
  *
  * Nothing is written and no conversation is opened: the store hears of a
  * request when it is SENT, never when its customer starts writing it.
@@ -180,7 +181,7 @@ export async function assertStoreTakesDirect(
     merchantApproved: merchantApproved(m),
     ownerUserId: m.user_id,
   });
-  if (!takes) throw conflict('This store is not taking new work right now', 'MERCHANT_UNAVAILABLE');
+  if (!takes) throw conflict('This store is not taking new work right now', 'STORE_NOT_TAKING_WORK');
   return {
     merchantId: m.id,
     merchantUserId: m.user_id,

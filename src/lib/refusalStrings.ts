@@ -540,6 +540,13 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This is your own store, so you cannot send it a print request.',
     ckb: 'ئەمە فرۆشگاکەی خۆتە، ناتوانیت داوای چاپی بۆ بنێریت.',
   },
+  // The same doors: the store is paused, restricted or no longer approved. Its
+  // own code, because MERCHANT_UNAVAILABLE (the offer door) asks for another offer.
+  STORE_NOT_TAKING_WORK: {
+    ar: 'هذا المتجر لا يستقبل أعمالًا جديدة حاليًا.',
+    en: 'This store is not taking new work right now.',
+    ckb: 'ئەم فرۆشگایە ئێستا کاری نوێ وەرناگرێت.',
+  },
   REQUEST_NOT_OPEN: {
     ar: 'هذا الطلب لم يعد يستقبل عروضًا.',
     en: 'This request is no longer taking offers.',
