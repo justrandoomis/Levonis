@@ -20,9 +20,9 @@
  * `changeFormat` re-lays a document out for another size from the same
  * template, copy and bindings — it never scales a finished picture (spec §24).
  */
-import { safeAreaFor, scaledSpacing, scaledType, type BackgroundPreset, type BrandKit } from './brand';
+import { inPalette, kitScale, MIN_FONT_PX, safeAreaFor, scaledSpacing, scaledType, type BackgroundPreset, type BrandKit } from './brand';
 import {
-  findLayer, intersects, layerBox, safeBox, SCHEMA_VERSION, unionBox, withDescendants, contains,
+  findLayer, intersects, layerBox, lockedAbove, safeBox, SCHEMA_VERSION, touchesLock, unionBox, withDescendants, contains,
   type AdLocale, type Box, type Corner, type CreativeDocument, type Density, type DocFormat, type ImageLayer, type Layer,
   type LayerRole, type Objective, type Relation, type ShapeLayer, type TextLayer, type TextSource,
 } from './schema';
@@ -119,8 +119,11 @@ const BACKDROP_ROLES: ReadonlySet<LayerRole> = new Set(['background', 'product_s
 export interface BuildProduct {
   slot: string;
   snapshot: Pick<ProductSnapshot, 'id' | 'data' | 'source'>;
-  /** The chosen picture — it must belong to this product/variant and be same-origin. */
-  image: Pick<SnapshotImage, 'url'> & { width: number; height: number };
+  /**
+   * The chosen picture — it must belong to this product/variant and be same-origin. Null when a
+   * person removed the picture from the design: the product's bound words are still drawn.
+   */
+  image: (Pick<SnapshotImage, 'url'> & { width: number; height: number }) | null;
 }
 
 export interface BuildCopy {
@@ -152,6 +155,8 @@ export interface BuildInput {
   backgroundNatural: { width: number; height: number } | null;
   /** Override the brand's default background. */
   background?: BackgroundPreset | null;
+  /** Template blocks, by the layer id they would get, that a person removed: left out, never regenerated (a deleted CTA stays deleted). */
+  omit?: readonly string[];
   slide: { index: number; count: number } | null;
   caption: string;
   alt_text: string;
@@ -191,6 +196,8 @@ interface ProductItem {
   id: string;
   block: ProductBlock;
   product: BuildProduct;
+  /** The picture drawn (a product item exists only when there is one). */
+  image: NonNullable<BuildProduct['image']>;
   gapAfter: number;
   height: number;
   width: number;
@@ -266,26 +273,28 @@ function colorFor(role: LayerRole, kit: BrandKit): string {
 }
 
 function makeTextItems(blocks: readonly StackBlock[], input: BuildInput, bind: BindingContext, slot: string | null, docWidth: number, colWidth: number, dropped: string[]): Item[] {
-  const sp = scaledSpacing(input.brand, docWidth);
+  const sp = scaledSpacing(input.brand, input.format.width, input.format.height);
   const gap = (g: 'small' | 'medium' | 'large') => (g === 'small' ? sp.small : g === 'medium' ? sp.medium : sp.large);
   const out: Item[] = [];
   for (const block of blocks) {
     if (block.kind === 'product') {
       const pslot = slot ?? block.productSlot;
       const product = input.products.find((p) => p.slot === pslot);
-      if (!product) continue;
-      out.push({ kind: 'product', id: `product${suffix(pslot)}`, block, product, gapAfter: gap(block.gapAfter), height: 0, width: 0, scale: 0 });
+      const id = `product${suffix(pslot)}`;
+      if (!product || !product.image || input.omit?.includes(id)) continue;
+      out.push({ kind: 'product', id, block, product, image: product.image, gapAfter: gap(block.gapAfter), height: 0, width: 0, scale: 0 });
       continue;
     }
     if (block.detailedOnly && input.density === 'brief') continue;
     const entries = textOf(block, input, bind, block.text.source === 'product' ? (slot ?? undefined) : undefined);
-    const style = scaledType(input.brand, block.type, docWidth);
+    const style = scaledType(input.brand, block.type, input.format.width, input.format.height);
     const maxCount = block.text.slot === 'features' ? Math.min(input.brand.density.max_features, input.density === 'brief' ? 2 : input.brand.density.max_features) : 1;
     if (block.text.slot === 'features' && entries.length > maxCount) for (let i = maxCount; i < entries.length; i++) dropped.push(`feature_${i + 1}`);
     entries.slice(0, maxCount).forEach((e, i, arr) => {
       const base = baseIdOf(block);
       const id = block.text.slot === 'features' ? `feature_${i + 1}` : `${base}${block.text.source === 'product' && slot ? suffix(slot) : ''}`;
-      const size = Math.round(style.size * block.boost);
+      if (input.omit?.includes(id)) return;
+      const size = Math.max(MIN_FONT_PX, Math.round(style.size * block.boost));
       const chip = block.chip
         ? { fill: block.role === 'cta' ? input.brand.colors.accent : input.brand.colors.surface, padX: Math.round(size * 0.9), padY: Math.round(size * 0.42) }
         : null;
@@ -298,6 +307,7 @@ function makeTextItems(blocks: readonly StackBlock[], input: BuildInput, bind: B
       });
     });
     void colWidth;
+    void docWidth;
   }
   return out;
 }
@@ -323,9 +333,12 @@ function stackHeight(items: readonly Item[]): number {
 
 /**
  * Lay one column out. Returns the items with sizes, the drawn product, the
- * blocks it had to drop and whether the content fit at all.
+ * blocks it had to drop, whether the content fit at all, and — when it did
+ * not — whose fault it is: words that do not fit even at their floor
+ * (`overflowIds`), or a product that cannot reach its share of the height
+ * (`short`, its id).
  */
-function solveColumn(items: Item[], area: Box, measure: TextMeasurer, dropped: string[]): { items: Item[]; fits: boolean; overflowIds: string[] } {
+function solveColumn(items: Item[], area: Box, measure: TextMeasurer, dropped: string[]): { items: Item[]; fits: boolean; overflowIds: string[]; short: string | null } {
   const overflowIds: string[] = [];
   let live = items.slice();
   for (const it of live) if (it.kind === 'text' && !fitItem(it, area.width, it.maxSize, measure)) overflowIds.push(it.id);
@@ -333,7 +346,7 @@ function solveColumn(items: Item[], area: Box, measure: TextMeasurer, dropped: s
   // The product's share of the height is capped by what its column WIDTH lets it reach: a wide
   // picture in a narrow column cannot use more height, so text never shrinks for room it would
   // not fill, and a width-bound picture is not a "content too long" conflict.
-  const widthCap = product ? ((area.width * product.block.widthFrac) / product.product.image.width) * product.product.image.height : 0;
+  const widthCap = product ? ((area.width * product.block.widthFrac) / product.image.width) * product.image.height : 0;
   const minProduct = product ? Math.min(product.block.minFrac * area.height, widthCap) : 0;
 
   const textAndGaps = () => stackHeight(live.filter((i) => i.kind === 'text')) + live.filter((i) => i.kind === 'product').reduce((a, i) => a + i.gapAfter, 0);
@@ -366,8 +379,9 @@ function solveColumn(items: Item[], area: Box, measure: TextMeasurer, dropped: s
   dropWhileTight(Infinity);
   const remaining = area.height - textAndGaps();
   let fits = remaining >= minProduct - 0.5;
+  let short: string | null = null;
   if (product) {
-    const { width: nw, height: nh } = product.product.image;
+    const { width: nw, height: nh } = product.image;
     const maxH = Math.max(0, Math.min(product.block.maxFrac * area.height, remaining));
     const maxW = area.width * product.block.widthFrac;
     if (product.block.minFrac === 0 && maxH < area.height * 0.12) {
@@ -375,15 +389,19 @@ function solveColumn(items: Item[], area: Box, measure: TextMeasurer, dropped: s
       dropped.push(product.id);
       live = live.filter((i) => i !== product);
     } else {
-      const scale = Math.min(maxW / nw, Math.max(maxH, area.height * 0.08) / nh, 2.5);
+      // Never a zero (or negative) scale, whatever is left: normalize's own floor is the least a picture is drawn at.
+      const scale = Math.max(0.01, Math.min(maxW / nw, Math.max(maxH, area.height * 0.08) / nh, 2.5));
       product.scale = scale;
       product.width = nw * scale;
       product.height = nh * scale;
-      if (product.height < minProduct - 0.5) fits = false;
+      if (product.height < minProduct - 0.5) {
+        fits = false;
+        short = product.id;
+      }
     }
   }
   if (stackHeight(live) > area.height + 0.5) fits = false;
-  return { items: live, fits, overflowIds };
+  return { items: live, fits, overflowIds, short };
 }
 
 interface Placement {
@@ -392,9 +410,16 @@ interface Placement {
   y: number;
   colX: number;
   colWidth: number;
+  /**
+   * The column it was laid out in: `main` for a one-column stack (and a split's words), a
+   * product slot for a pair's product columns, `top`/`bottom` for a pair's full-width rows.
+   * The relations chain the blocks of ONE column — a full-width headline is never tied to a
+   * product's column just because the two start at the same x.
+   */
+  col: string;
 }
 
-function placeColumn(items: readonly Item[], area: Box, justify: VariantDef['justify']): Placement[] {
+function placeColumn(items: readonly Item[], area: Box, justify: VariantDef['justify'], col = 'main'): Placement[] {
   const used = stackHeight(items);
   const spare = Math.max(0, area.height - used);
   const gaps = Math.max(1, items.length - 1);
@@ -403,7 +428,7 @@ function placeColumn(items: readonly Item[], area: Box, justify: VariantDef['jus
   items.forEach((item, i) => {
     const h = item.kind === 'text' ? item.outer : item.height;
     const x = item.kind === 'product' ? area.x + (area.width - item.width) / 2 : area.x;
-    out.push({ item, x, y, colX: area.x, colWidth: area.width });
+    out.push({ item, x, y, colX: area.x, colWidth: area.width, col });
     y += h + (i < items.length - 1 ? item.gapAfter + (justify === 'spread' ? spare / gaps : 0) : 0);
   });
   return out;
@@ -423,15 +448,15 @@ function layersFromPlacements(placements: readonly Placement[], input: BuildInpu
       const img: ImageLayer = {
         id: it.id, name: it.id === 'product' ? 'Product' : `Product ${it.product.slot}`, role: 'product', parent: null,
         x: p.x, y: p.y, rotation: 0, opacity: 1, visible: true, locked: false, type: 'image',
-        asset: { kind: 'product', ref: it.product.image.url, slot: it.product.slot },
-        natural: { width: it.product.image.width, height: it.product.image.height }, crop: null, scale: it.scale, fit: 'whole',
+        asset: { kind: 'product', ref: it.image.url, slot: it.product.slot },
+        natural: { width: it.image.width, height: it.image.height }, crop: null, scale: it.scale, fit: 'whole',
       };
       if (it.block.shadow && kit.shadow.enabled) {
         const sh = shadowGeometry(layerBox(img)!, kit);
         layers.push({
           id: `product_shadow${suffix(it.product.slot)}`, name: 'Product shadow', role: 'product_shadow', parent: null,
           ...sh, rotation: 0, opacity: kit.shadow.opacity, visible: true, locked: false, type: 'shape', shape: 'ellipse',
-          fill: '#000000', stroke: null, radius: 0, blur: kit.shadow.blur * (input.format.width / 1080),
+          fill: '#000000', stroke: null, radius: 0, blur: kit.shadow.blur * kitScale(input.format.width, input.format.height),
         });
         relations.push({ id: `r_shadow${suffix(it.product.slot)}`, kind: 'shadow_of', subject: `product_shadow${suffix(it.product.slot)}`, target: it.id });
       }
@@ -485,10 +510,12 @@ function cornerPosition(corner: Corner, safe: Box, box: { width: number; height:
  * A side-by-side split suits a square or a 4:5 post; on a tall story the two
  * columns would leave the product a strip of the screen. There the same blocks
  * STACK — words that lead, the product, then the bound facts — so a format
- * change re-distributes the design instead of shrinking it (spec §24).
+ * change re-distributes the design instead of shrinking it (spec §24). A split
+ * whose picture a person removed stacks too: its words get the whole width
+ * instead of half of it beside an empty column.
  */
-function responsiveVariant(variant: VariantDef, fmt: DocFormat): VariantDef {
-  if (variant.layout !== 'split' || fmt.height / fmt.width < 1.5) return variant;
+function responsiveVariant(variant: VariantDef, fmt: DocFormat, pictureless = false): VariantDef {
+  if (variant.layout !== 'split' || (fmt.height / fmt.width < 1.5 && !pictureless)) return variant;
   const product = variant.blocks.find((b): b is ProductBlock => b.kind === 'product');
   const texts = variant.blocks.filter((b): b is TextBlock => b.kind === 'text').map((b) => ({ ...b, align: 'center' as const }));
   const leads = (b: TextBlock) => b.text.source === 'copy' && (b.text.slot === 'badge' || b.text.slot === 'headline' || b.text.slot === 'subhead' || b.text.slot === 'features');
@@ -502,13 +529,15 @@ function responsiveVariant(variant: VariantDef, fmt: DocFormat): VariantDef {
 export function buildFromTemplate(input: BuildInput): BuildResult {
   const tpl = TEMPLATES[input.template];
   const fmt = input.format;
-  const variant = responsiveVariant(tpl.variants[input.variant] ?? Object.values(tpl.variants)[0]!, fmt);
+  const mainPicture = input.products.find((p) => p.slot === 'main');
+  const pictureless = !!mainPicture && (!mainPicture.image || !!input.omit?.includes('product'));
+  const variant = responsiveVariant(tpl.variants[input.variant] ?? Object.values(tpl.variants)[0]!, fmt, pictureless);
   const dir: 'rtl' | 'ltr' = input.locale === 'en' ? 'ltr' : 'rtl';
   const kit = input.brand;
   const safe_area = safeAreaFor(kit, fmt);
   const docShell = { format: fmt, safe_area };
   const safe = safeBox(docShell);
-  const sp = scaledSpacing(kit, fmt.width);
+  const sp = scaledSpacing(kit, fmt.width, fmt.height);
   const dropped: string[] = [];
   const conflicts: LayoutConflict[] = [];
   const bind: BindingContext = {
@@ -542,7 +571,7 @@ export function buildFromTemplate(input: BuildInput): BuildResult {
   let area: Box = { ...safe };
   let logoLayer: ImageLayer | null = null;
   if (input.logo && kit.logo.show_by_default) {
-    const w = kit.logo.width * (fmt.width / 1080);
+    const w = kit.logo.width * kitScale(fmt.width, fmt.height);
     const scale = w / input.logo.width;
     const h = input.logo.height * scale;
     const pos = cornerPosition(kit.logo.corner, safe, { width: w, height: h }, 0, dir);
@@ -557,6 +586,7 @@ export function buildFromTemplate(input: BuildInput): BuildResult {
 
   const placements: Placement[] = [];
   const overflow: string[] = [];
+  const short: string[] = [];
   let fitsAll = true;
 
   if (variant.layout === 'stack') {
@@ -564,6 +594,7 @@ export function buildFromTemplate(input: BuildInput): BuildResult {
     const r = solveColumn(items, area, input.measure, dropped);
     fitsAll = r.fits;
     overflow.push(...r.overflowIds);
+    if (r.short) short.push(r.short);
     placements.push(...placeColumn(r.items, area, variant.justify));
   } else if (variant.layout === 'split') {
     const gutter = sp.medium;
@@ -583,7 +614,8 @@ export function buildFromTemplate(input: BuildInput): BuildResult {
       const prodItems = makeTextItems([prodBlock], input, bind, null, fmt.width, prodW, dropped);
       const pr = solveColumn(prodItems, prodCol, input.measure, dropped);
       if (!pr.fits) fitsAll = false;
-      placements.push(...placeColumn(pr.items, prodCol, 'center'));
+      if (pr.short) short.push(pr.short);
+      placements.push(...placeColumn(pr.items, prodCol, 'center', 'product'));
     }
   } else {
     // pair: headline across the top, two product columns, the CTA across the bottom.
@@ -595,8 +627,8 @@ export function buildFromTemplate(input: BuildInput): BuildResult {
     for (const it of [...topItems, ...botItems]) if (it.kind === 'text' && !fitItem(it, area.width, it.maxSize, input.measure)) overflow.push(it.id);
     const topH = stackHeight(topItems) + (topItems.length ? sp.large : 0);
     const botH = stackHeight(botItems) + (botItems.length ? sp.large : 0);
-    placements.push(...placeColumn(topItems, { ...area, height: topH }, 'start'));
-    placements.push(...placeColumn(botItems, { ...area, y: area.y + area.height - botH + (botItems.length ? sp.large : 0), height: botH }, 'start'));
+    placements.push(...placeColumn(topItems, { ...area, height: topH }, 'start', 'top'));
+    placements.push(...placeColumn(botItems, { ...area, y: area.y + area.height - botH + (botItems.length ? sp.large : 0), height: botH }, 'start', 'bottom'));
     const mid: Box = { x: area.x, y: area.y + topH, width: area.width, height: area.height - topH - botH };
     const gutter = sp.large;
     const colW = (mid.width - gutter) / 2;
@@ -609,7 +641,8 @@ export function buildFromTemplate(input: BuildInput): BuildResult {
       const r = solveColumn(items, col, input.measure, dropped);
       if (!r.fits) fitsAll = false;
       overflow.push(...r.overflowIds);
-      placements.push(...placeColumn(r.items, col, 'center'));
+      if (r.short) short.push(r.short);
+      placements.push(...placeColumn(r.items, col, 'center', slot));
     });
   }
 
@@ -622,7 +655,8 @@ export function buildFromTemplate(input: BuildInput): BuildResult {
   for (const slot of input.products.map((p) => p.slot)) {
     const pid = `product${suffix(slot)}`;
     if (!layers.some((l) => l.id === pid)) continue;
-    const column = placements.filter((p) => p.colX === placements.find((q) => q.item.id === pid)?.colX);
+    const col = placements.find((q) => q.item.id === pid)?.col;
+    const column = placements.filter((p) => p.col === col);
     const ordered = column.slice().sort((a, b) => a.y - b.y).map((p) => (p.item.kind === 'text' && p.item.chip ? `${p.item.id}_group` : p.item.id));
     const pIdx = ordered.indexOf(pid);
     if (pIdx >= 0 && variant.layout !== 'split') {
@@ -660,7 +694,10 @@ export function buildFromTemplate(input: BuildInput): BuildResult {
     alt_text: input.alt_text,
     slide: input.slide,
   };
-  if (!fitsAll) conflicts.push({ code: 'content_too_long', layer_ids: overflow.length ? overflow : ['headline'], options: ['shorten_text', 'switch_density', 'switch_variant', 'split_carousel'] });
+  // A product that cannot reach its share is reported on the product — not as an over-long headline —
+  // with what really gives it room: another composition, fewer words, or a carousel.
+  if (short.length) conflicts.push({ code: 'product_too_small', layer_ids: short, options: ['switch_variant', 'switch_density', 'shorten_text', 'split_carousel'] });
+  if (!fitsAll && (overflow.length || !short.length)) conflicts.push({ code: 'content_too_long', layer_ids: overflow.length ? overflow : ['headline'], options: ['shorten_text', 'switch_density', 'switch_variant', 'split_carousel'] });
   for (const c of detectConflicts(doc, { measure: input.measure })) if (!conflicts.some((x) => x.code === c.code && x.layer_ids.join() === c.layer_ids.join())) conflicts.push(c);
   return { doc, conflicts, dropped: [...new Set(dropped)] };
 }
@@ -697,9 +734,13 @@ function dependentsOf(relations: readonly Relation[], id: string): Relation[] {
 }
 
 /**
- * Recompute ONLY the layers that depend on `changed` (spec §14). Locked
- * layers are never moved by propagation. Returns the new document and the ids
- * that moved, so the editor can show what else an edit touched (spec §16).
+ * Recompute ONLY the layers that depend on `changed` (spec §14). Locks hold
+ * through the tree: a dependent that is locked, sits inside a locked group or
+ * holds a locked layer (a chip group whose words are locked) is never moved
+ * or reshaped — it stays where it is, its own dependents are left alone, and
+ * whatever that leaves (an overlap, a gap) is for `detectConflicts` to report.
+ * Returns the new document and the ids that moved, so the editor can show
+ * what else an edit touched (spec §16).
  */
 export function relayoutDependents(doc: CreativeDocument, changed: readonly string[], kit?: Pick<BrandKit, 'shadow'>): { doc: CreativeDocument; moved: string[] } {
   let layers = doc.layers.slice();
@@ -749,7 +790,7 @@ export function relayoutDependents(doc: CreativeDocument, changed: readonly stri
       }
       for (const m of targets) {
         const sub = layers.find((x) => x.id === m.subject);
-        if (!sub || sub.locked) continue;
+        if (!sub || touchesLock(layers, sub.id)) continue;
         if (m.reshape) {
           layers = layers.map((l) => (l.id === m.subject && l.type === 'shape' ? { ...l, ...m.reshape } : l));
         } else if (Math.abs(m.dx) > 0.01 || Math.abs(m.dy) > 0.01) {
@@ -763,7 +804,7 @@ export function relayoutDependents(doc: CreativeDocument, changed: readonly stri
   return { doc: { ...doc, layers }, moved };
 }
 
-/** Re-apply anchors (after a format or safe-area change). */
+/** Re-apply anchors (after a format or safe-area change). A locked layer, or one a lock protects, keeps its place. */
 export function applyAnchors(doc: CreativeDocument): CreativeDocument {
   const safe = safeBox(doc);
   let layers = doc.layers.slice();
@@ -771,7 +812,7 @@ export function applyAnchors(doc: CreativeDocument): CreativeDocument {
     if (r.kind !== 'anchor') continue;
     const l = layers.find((x) => x.id === r.subject);
     const b = l ? layerBox(l, layers) : null;
-    if (!l || !b || l.locked) continue;
+    if (!l || !b || touchesLock(layers, l.id)) continue;
     const pos = cornerPosition(r.corner, safe, b, r.margin, doc.direction);
     layers = moveBy(layers, l.id, pos.x - b.x, pos.y - b.y);
   }
@@ -823,11 +864,12 @@ export function textFits(l: TextLayer, measure: TextMeasurer): boolean {
  * `split_carousel`, `move_layer`) or that cannot resolve this conflict.
  */
 export function resolveConflict(doc: CreativeDocument, conflict: LayoutConflict, option: ConflictOption, ctx: { measure: TextMeasurer; brand: BrandKit }): CreativeDocument | null {
+  // A lock holds here too: a locked text, or one inside a locked group, is never resized by a resolution.
   if (option === 'reduce_font') {
     let changed = false;
     const ids: string[] = [];
     const layers = doc.layers.map((l) => {
-      if (l.type !== 'text' || !conflict.layer_ids.includes(l.id) || l.locked) return l;
+      if (l.type !== 'text' || !conflict.layer_ids.includes(l.id) || lockedAbove(doc.layers, l.id)) return l;
       const r = fitText(l.text, { family: FONT_REGISTRY[l.font.family].family, weight: l.font.weight, lineHeight: l.font.lineHeight }, { width: l.width, maxHeight: l.height, maxLines: l.maxLines }, { max: l.font.size, min: l.minSize }, ctx.measure);
       if (!r.fits || r.size === l.font.size) return l;
       changed = true;
@@ -839,7 +881,7 @@ export function resolveConflict(doc: CreativeDocument, conflict: LayoutConflict,
   if (option === 'grow_box') {
     const ids: string[] = [];
     const layers = doc.layers.map((l) => {
-      if (l.type !== 'text' || !conflict.layer_ids.includes(l.id) || l.locked) return l;
+      if (l.type !== 'text' || !conflict.layer_ids.includes(l.id) || lockedAbove(doc.layers, l.id)) return l;
       const r = fitText(l.text, { family: FONT_REGISTRY[l.font.family].family, weight: l.font.weight, lineHeight: l.font.lineHeight }, { width: l.width, maxHeight: Infinity, maxLines: l.maxLines }, { max: l.font.size, min: l.font.size }, ctx.measure);
       if (r.lines.length > l.maxLines || r.overlongWord) return l;
       ids.push(l.id);
@@ -850,7 +892,7 @@ export function resolveConflict(doc: CreativeDocument, conflict: LayoutConflict,
     return detectConflicts(next, { measure: ctx.measure }).some((c) => c.code === 'outside_safe_area') ? null : next;
   }
   if (option === 'shrink_product') {
-    const product = doc.layers.find((l): l is ImageLayer => l.type === 'image' && l.role === 'product' && !l.locked);
+    const product = doc.layers.find((l): l is ImageLayer => l.type === 'image' && l.role === 'product' && !touchesLock(doc.layers, l.id));
     if (!product) return null;
     const original = product.scale;
     let current = doc;
@@ -920,6 +962,26 @@ export interface RebuildContext {
   measure: TextMeasurer;
 }
 
+/**
+ * The background a document shows now, as a preset a build can draw: the
+ * kit's own preset when it is one, otherwise the same colour (or approved
+ * asset) as it stands. Null when there is no background layer.
+ */
+function backgroundInUse(doc: CreativeDocument, kit: BrandKit): { preset: BackgroundPreset; natural: { width: number; height: number } | null } | null {
+  const l = doc.layers.find((x) => x.role === 'background');
+  if (l?.type === 'shape' && l.fill) {
+    const fill = l.fill;
+    const preset: BackgroundPreset = kit.backgrounds.find((b) => b.kind === 'solid' && b.color === fill) ?? { id: 'in_use', label: 'In use', kind: 'solid', color: fill, asset_id: null };
+    return { preset, natural: null };
+  }
+  if (l?.type === 'image' && l.asset.kind === 'asset') {
+    const ref = l.asset.ref;
+    const preset: BackgroundPreset = kit.backgrounds.find((b) => b.kind === 'asset' && b.asset_id === ref) ?? { id: 'in_use', label: 'In use', kind: 'asset', color: kit.colors.background, asset_id: ref };
+    return { preset, natural: { ...l.natural } };
+  }
+  return null;
+}
+
 /** Ids a template creates; anything else in a document was added by a person and is carried across a rebuild. */
 function isTemplateLayer(id: string): boolean {
   return /^(background|logo|product(_shadow)?(_[a-z0-9]+)?|headline|subhead|body|cta|badge|feature_\d+|product_name(_[a-z0-9]+)?|price(_[a-z0-9]+)?|price_note(_[a-z0-9]+)?|availability(_[a-z0-9]+)?|service_(title|summary|conditions)|slide_number)(_chip|_group)?$/.test(id);
@@ -930,23 +992,50 @@ function isTemplateLayer(id: string): boolean {
  * density, keeping its words, bindings and chosen pictures (spec §24, §45-ي).
  * Layers a person added are carried over at the same relative position
  * inside the safe area, with ONE scale factor (never stretched).
+ *
+ * What the person chose and a re-layout can keep, it keeps: the background in
+ * use (preset or colour), a CTA they deleted or hid stays out, a product
+ * picture they deleted stays out while the product's bound words stay, a
+ * colour they gave a text or a chip stays when the brand palette still has
+ * it, and a lock stays set.
+ *
+ * Returns null — the callers' «re-layout unavailable» — rather than drop a
+ * binding it cannot draw: a product whose snapshot is not loaded, a service
+ * claim that is not in the approved list, or more than one service binding
+ * (a template draws one). Dropping them would silently take the bound words
+ * and the checks that guard them out of the design.
  */
 export function rebuild(doc: CreativeDocument, change: { format?: DocFormat; variant?: VariantId; density?: Density }, ctx: RebuildContext): BuildResult | null {
-  if (!doc.template) return null;
+  if (!doc.template || !(doc.template.id in TEMPLATES)) return null;
   const products: BuildProduct[] = [];
   for (const b of doc.products) {
     const snap = ctx.snapshots[b.slot];
-    const img = doc.layers.find((l): l is ImageLayer => l.type === 'image' && l.role === 'product' && l.asset.slot === b.slot);
-    if (!snap || !img) continue;
-    products.push({ slot: b.slot, snapshot: snap, image: { url: img.asset.ref, width: img.natural.width, height: img.natural.height } });
+    if (!snap) return null;
+    const img = doc.layers.find((l): l is ImageLayer => l.type === 'image' && l.role === 'product' && (l.asset.slot ?? 'main') === b.slot && l.visible);
+    products.push({ slot: b.slot, snapshot: snap, image: img ? { url: img.asset.ref, width: img.natural.width, height: img.natural.height } : null });
   }
+  if (doc.services.length > 1) return null;
   const service = doc.services[0] ? ctx.claims[doc.services[0].claim_id] ?? null : null;
+  if (doc.services.length && !service) return null;
+  const bg = backgroundInUse(doc, ctx.brand);
   const format = change.format ?? doc.format;
   const result = buildFromTemplate({
     template: doc.template.id as TemplateId, variant: change.variant ?? (doc.template.variant as VariantId), format, locale: doc.locale,
     objective: doc.objective, density: change.density ?? doc.density, brand: ctx.brand, brandVersion: ctx.brandVersion,
     products, service, copy: extractCopy(doc), evidence: ctx.evidence, family: ctx.family, logo: doc.layers.some((l) => l.id === 'logo') ? ctx.logo : null,
-    backgroundNatural: ctx.backgroundNatural, slide: doc.slide, caption: doc.caption, alt_text: doc.alt_text, measure: ctx.measure,
+    backgroundNatural: bg ? bg.natural : ctx.backgroundNatural, background: bg?.preset ?? null,
+    omit: doc.layers.some((l) => l.type === 'text' && l.role === 'cta' && l.visible) ? [] : ['cta'],
+    slide: doc.slide, caption: doc.caption, alt_text: doc.alt_text, measure: ctx.measure,
+  });
+  // The person's colours and locks, on the layers the template made again under the same id.
+  const before = new Map(doc.layers.map((l) => [l.id, l]));
+  result.doc.layers = result.doc.layers.map((l): Layer => {
+    const old = before.get(l.id);
+    if (!old || l.role === 'background') return l;
+    let next: Layer = l;
+    if (next.type === 'text' && old.type === 'text' && old.color !== next.color && inPalette(ctx.brand, old.color)) next = { ...next, color: old.color };
+    if (next.type === 'shape' && old.type === 'shape' && next.role !== 'product_shadow' && old.fill && old.fill !== next.fill && inPalette(ctx.brand, old.fill)) next = { ...next, fill: old.fill };
+    return old.locked && !next.locked ? { ...next, locked: true } : next;
   });
   // Carry person-added layers.
   const oldSafe = safeBox(doc);

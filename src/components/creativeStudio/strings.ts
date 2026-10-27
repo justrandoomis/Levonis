@@ -710,6 +710,7 @@ export const REFUSAL_TEXT: Readonly<Record<RefusalCode, Tri>> = {
   invalid_layer: t('عنصر غير صالح', 'Invalid element', 'توخمی نادروست'),
   rebuild_not_alone: t('إعادة الترتيب تُطلب وحدها', 'A re-layout must be requested alone', 'دووبارە ڕێکخستنەوە دەبێت بە تەنها داوا بکرێت'),
   unknown_variant: t('تكوين غير متاح', 'Composition not available', 'پێکهاتە بەردەست نییە'),
+  priority_unavailable: t('لا يوجد في هذا القالب تكوين يبرز هذا العنصر', 'This template has no composition that leads with that element', 'ئەم قاڵبە پێکهاتەیەکی نییە کە ئەم توخمە بخاتە پێشەوە'),
   unknown_annotation: t('علامة غير موجودة', 'No such mark', 'نیشانەیەکی وا نییە'),
 };
 

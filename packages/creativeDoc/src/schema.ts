@@ -143,7 +143,10 @@ export interface LayerBase {
   rotation: number;
   opacity: number;
   visible: boolean;
-  /** A locked layer is never changed by Claude, and the editor refuses to move it until it is unlocked by a person. */
+  /**
+   * A locked layer is never changed by Claude, and the editor refuses to move it until it is unlocked by a person.
+   * The lock holds through the tree: everything inside a locked group is locked too (`lockedAbove`).
+   */
   locked: boolean;
 }
 
@@ -422,6 +425,34 @@ export function withDescendants(layers: readonly Layer[], id: string): string[] 
   const out = [id];
   for (let i = 0; i < out.length; i++) for (const l of layers) if (l.parent === out[i]) out.push(l.id);
   return out;
+}
+
+/**
+ * LOCKS HOLD THROUGH THE TREE (spec §23, §34-7). A lock protects the layer
+ * that carries it and everything inside it: a child of a locked group is as
+ * locked as the group. These three answers are the one definition the ops,
+ * the relation propagation and the editor all use.
+ */
+
+/** The locked layer protecting `id`: itself or the nearest locked group above it, or null. */
+export function lockedAbove(layers: readonly Layer[], id: string): string | null {
+  const seen = new Set<string>();
+  for (let l = layers.find((x) => x.id === id); l && !seen.has(l.id); l = l.parent ? layers.find((x) => x.id === l!.parent) : undefined) {
+    if (l.locked) return l.id;
+    seen.add(l.id);
+  }
+  return null;
+}
+
+/** A locked layer among `id` and its descendants, or null — acting on a whole group would carry it along. */
+export function lockedWithin(layers: readonly Layer[], id: string): string | null {
+  const inside = new Set(withDescendants(layers, id));
+  return layers.find((l) => inside.has(l.id) && l.locked)?.id ?? null;
+}
+
+/** True when moving, hiding, deleting or reordering `id` would change a locked layer (it, a group above it, or one inside it). */
+export function touchesLock(layers: readonly Layer[], id: string): boolean {
+  return lockedAbove(layers, id) !== null || lockedWithin(layers, id) !== null;
 }
 
 /** True when a colour is a literal `#RRGGBB` (the only form a document stores). */

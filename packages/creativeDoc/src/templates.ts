@@ -9,10 +9,11 @@
  * same template re-flows into 1080×1080, 1080×1350 and 1080×1920 instead of
  * stretching (spec §24).
  *
- * VARIANTS are the three genuinely different compositions the studio
- * proposes before final output (spec §12): product-first, price-first and
- * feature-first. Which ones apply follows the objective — a lesson is never
- * forced into a price ad (`variantsFor`).
+ * VARIANTS are the genuinely different compositions the studio proposes
+ * before final output (spec §12): product-first, price-first, feature-first
+ * and headline-first (the message leads). Which ones apply, and which three
+ * are proposed, follows the objective — a lesson is never forced into a price
+ * ad, and an unpriced product still gets three (`variantsFor`).
  *
  * FAMILIES (new arrival, back in stock, price offer, education, comparison,
  * service) choose a template, a default variant and an objective. A family's
@@ -144,6 +145,11 @@ export const TEMPLATES: Readonly<Record<TemplateId, TemplateDef>> = {
         id: 'feature_first', label: VARIANT_LABELS.feature_first, priority: 'feature', layout: 'stack', justify: 'center',
         blocks: [headline(), features({ optional: false, keep: 7 }), P({ minFrac: 0.3, maxFrac: 0.45 }), productName({ gapAfter: 'small' }), price({ boost: 0.85 }), cta()],
       },
+      // The message leads: a large headline set from the start edge, the product still a real share of the post, then the bound name, the price and the CTA.
+      headline_first: {
+        id: 'headline_first', label: VARIANT_LABELS.headline_first, priority: 'headline', layout: 'stack', justify: 'center',
+        blocks: [badge({ align: 'start' }), headline({ boost: 1.2, maxLines: 3, align: 'start', gapAfter: 'large' }), subhead({ align: 'start' }), P({ minFrac: 0.38, maxFrac: 0.52 }), productName({ align: 'start', boost: 0.9 }), price({ align: 'start' }), cta({ align: 'start' })],
+      },
     },
   },
   // (ب) Filament or an accessory: compact or round products sit beside the words, not under them.
@@ -162,6 +168,11 @@ export const TEMPLATES: Readonly<Record<TemplateId, TemplateDef>> = {
       feature_first: {
         id: 'feature_first', label: VARIANT_LABELS.feature_first, priority: 'feature', layout: 'split', textColumn: 0.56, justify: 'center',
         blocks: [headline({ align: 'start', maxLines: 3 }), features({ align: 'start', optional: false, keep: 7 }), productName({ align: 'start' }), price({ align: 'start', boost: 0.85 }), cta({ align: 'start' }), P({ minFrac: 0.42, maxFrac: 0.7, widthFrac: 0.9 })],
+      },
+      // The message leads: the headline takes the full width above the product instead of half of it beside it.
+      headline_first: {
+        id: 'headline_first', label: VARIANT_LABELS.headline_first, priority: 'headline', layout: 'stack', justify: 'center',
+        blocks: [badge({ align: 'start' }), headline({ boost: 1.2, maxLines: 3, align: 'start', gapAfter: 'large' }), subhead({ align: 'start' }), P({ minFrac: 0.38, maxFrac: 0.5, widthFrac: 0.7 }), productName({ align: 'start', boost: 0.9 }), price({ align: 'start' }), cta({ align: 'start' })],
       },
     },
   },

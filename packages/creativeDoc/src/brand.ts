@@ -295,24 +295,39 @@ export function normalizeBrandKit(input: unknown): { kit: BrandKit; issues: Bran
   return { kit, issues, ok: !issues.some((i) => i.fatal) };
 }
 
-/** A type style scaled to a document width (the kit is written for 1080 px). */
-export function scaledType(kit: BrandKit, role: TypeRole, docWidth: number): TypeStyle & { family: FontFamilyId } {
-  const s = kit.type[role];
-  const k = docWidth / 1080;
-  return { ...s, size: Math.round(s.size * k), min: Math.max(Math.round(s.min * k), 12), family: s.face === 'display' ? kit.fonts.display : kit.fonts.primary };
+/** The smallest font size a document stores (normalizeDocument's floor): a scaled style never goes under it. */
+export const MIN_FONT_PX = 8;
+
+/**
+ * How much a kit written for 1080 px scales on a document: by its SHORTER
+ * side. The three post formats are 1080 wide, so nothing changes for them; a
+ * landscape custom size (a 1200×628 link ad, a 1584×396 banner) scales by its
+ * height, so its type, logo, gaps and margins still fit its height instead of
+ * swallowing it.
+ */
+export function kitScale(docWidth: number, docHeight: number = docWidth): number {
+  return Math.min(docWidth, docHeight) / 1080;
 }
 
-export function scaledSpacing(kit: BrandKit, docWidth: number): BrandKit['spacing'] {
-  const k = docWidth / 1080;
+/** A type style scaled to a document (the kit is written for 1080 px), never under the stored floor. */
+export function scaledType(kit: BrandKit, role: TypeRole, docWidth: number, docHeight?: number): TypeStyle & { family: FontFamilyId } {
+  const s = kit.type[role];
+  const k = kitScale(docWidth, docHeight);
+  const size = Math.max(MIN_FONT_PX, Math.round(s.size * k));
+  return { ...s, size, min: Math.max(MIN_FONT_PX, Math.min(size, Math.max(Math.round(s.min * k), 12))), family: s.face === 'display' ? kit.fonts.display : kit.fonts.primary };
+}
+
+export function scaledSpacing(kit: BrandKit, docWidth: number, docHeight?: number): BrandKit['spacing'] {
+  const k = kitScale(docWidth, docHeight);
   return { unit: kit.spacing.unit * k, small: kit.spacing.small * k, medium: kit.spacing.medium * k, large: kit.spacing.large * k };
 }
 
-/** The safe area for any format (custom sizes take the nearest preset's margins, scaled). */
+/** The safe area for any format (custom sizes take the nearest preset's margins, scaled by the shorter side). */
 export function safeAreaFor(kit: BrandKit, format: { id: FormatId; width: number; height: number }): SafeArea {
   if (format.id !== 'custom') return { ...kit.safe_area[format.id] };
   const ratio = format.height / format.width;
   const base = ratio >= 1.6 ? kit.safe_area.story : ratio >= 1.15 ? kit.safe_area.portrait : kit.safe_area.square;
-  const k = format.width / 1080;
+  const k = kitScale(format.width, format.height);
   return { top: base.top * k, right: base.right * k, bottom: base.bottom * k, left: base.left * k };
 }
 

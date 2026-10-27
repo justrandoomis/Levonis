@@ -13,12 +13,18 @@
  * (layout.ts), and any conflict the result has is returned with its options
  * so the editor can show them before the owner commits.
  *
- * What Claude may never do, whatever the patch says: touch a locked layer,
- * write into a bound text (a price, an availability, a product name), write
- * price-like text or a link anywhere, use a colour outside the brand palette,
- * place a picture that is not one of the bound product's own pictures, lock,
- * delete, rotate or crop anything, or approve/publish/configure — those are
- * not operations at all.
+ * What Claude may never do, whatever the patch says: touch a locked layer
+ * (or anything inside a locked group), re-lay a design that has a locked
+ * layer, write into a bound text (a price, an availability, a product name),
+ * write price-like text or a link anywhere, use a colour outside the brand
+ * palette, place a picture that is not one of the bound product's own
+ * pictures, lock, delete, rotate or crop anything, or approve/publish/
+ * configure — those are not operations at all.
+ *
+ * LOCKS HOLD THROUGH THE TREE, for people and Claude alike (spec §23,
+ * §34-7): a layer inside a locked group is locked, an operation on a whole
+ * group is refused while anything inside it is locked, and the relations
+ * re-laid after an edit never move a locked layer either (layout.ts).
  */
 import { inPalette, type BrandKit } from './brand';
 import {
@@ -26,10 +32,11 @@ import {
 } from './layout';
 import { normalizeDocument } from './normalize';
 import {
-  FONT_REGISTRY, ID_PATTERN, isHexColor, layerBox, withDescendants, MAX_ALT_CHARS, MAX_CAPTION_CHARS, MAX_TEXT_CHARS, VISUAL_PRIORITIES, formatOf,
+  FONT_REGISTRY, ID_PATTERN, isHexColor, layerBox, lockedAbove, lockedWithin, touchesLock, withDescendants, MAX_ALT_CHARS, MAX_CAPTION_CHARS, MAX_TEXT_CHARS, VISUAL_PRIORITIES, formatOf,
   type AssetRef, type CreativeDocument, type DocFormat, type FormatId, type ImageLayer, type Layer, type TextAlign, type VisualPriority,
 } from './schema';
-import { isVariantId, type VariantId } from './templates';
+import { canonicalJson } from './snapshot';
+import { TEMPLATES, isTemplateId, isVariantId, type TemplateDef, type VariantId } from './templates';
 import { cleanText, containsPriceLike, containsUrl, fitText, type TextMeasurer } from './text';
 
 export type Anchor = 'center' | 'top' | 'bottom' | 'start' | 'end';
@@ -76,12 +83,14 @@ export const AI_OPS: ReadonlySet<OpName> = new Set<OpName>([
 export const HUMAN_OPS: ReadonlySet<OpName> = new Set<OpName>([...AI_OPS, 'set_lock', 'rotate_layer', 'delete_layer', 'add_layer', 'set_crop', 'resize_box', 'rename_layer', 'add_annotation', 'delete_annotation']);
 /** Operations that re-lay the whole design from its template: the app performs them with `layout.rebuild`, alone in their patch. */
 export const REBUILD_OPS: ReadonlySet<OpName> = new Set<OpName>(['set_priority', 'switch_template_variant', 'create_format_variant']);
+/** Operations that act on a layer AND everything inside it (a group's children): refused while any of them is locked. */
+const SUBTREE_OPS: ReadonlySet<OpName> = new Set<OpName>(['move_layer', 'nudge_layer', 'set_visibility', 'delete_layer', 'reorder_layer']);
 
 export type RefusalCode =
   | 'unknown_op' | 'not_allowed_for_actor' | 'unknown_layer' | 'unknown_relation' | 'locked_layer' | 'wrong_layer_type'
   | 'bound_text' | 'price_like_text' | 'invented_link' | 'invalid_value' | 'below_min_size' | 'color_not_in_palette'
   | 'asset_not_allowed' | 'unknown_background' | 'product_rotation' | 'background_order' | 'duplicate_id' | 'invalid_layer'
-  | 'rebuild_not_alone' | 'unknown_variant' | 'unknown_annotation';
+  | 'rebuild_not_alone' | 'unknown_variant' | 'priority_unavailable' | 'unknown_annotation';
 
 export interface OpRefusal {
   index: number;
@@ -209,8 +218,21 @@ export function applyOps(input: CreativeDocument, rawOps: readonly unknown[], ct
     const lid = layerIdOf(op);
     const layer = lid ? get(lid) : undefined;
     if (lid && !layer) return refuse('unknown_layer', lid);
-    // A locked layer only accepts being unlocked, and only by a person.
-    if (layer && layer.locked && op.op !== 'set_lock') return refuse('locked_layer', lid);
+    // A locked layer — or one inside a locked group — only accepts being unlocked, and only by a
+    // person; renaming is a label in the layers panel, never a change to the design. An operation
+    // on a whole group is refused while anything inside it is locked. The refusal names the
+    // locked layer.
+    if (layer && op.op !== 'set_lock' && op.op !== 'rename_layer') {
+      const lock = lockedAbove(doc.layers, layer.id) ?? (SUBTREE_OPS.has(op.op) ? lockedWithin(doc.layers, layer.id) : null);
+      if (lock) return refuse('locked_layer', lock);
+    }
+    // A rebuild re-lays EVERY layer from the template, so Claude may not start one while the owner
+    // has locked anything (spec §34-7). The background is stored locked by design and changes only
+    // through its presets, so it does not count.
+    if (ctx.actor === 'ai' && REBUILD_OPS.has(op.op)) {
+      const locked = doc.layers.find((l) => l.locked && l.role !== 'background');
+      if (locked) return refuse('locked_layer', locked.id);
+    }
     const aiText = (value: string): RefusalCode | null => {
       if (ctx.actor !== 'ai') return null;
       if (containsPriceLike(value)) return 'price_like_text';
@@ -269,7 +291,8 @@ export function applyOps(input: CreativeDocument, rawOps: readonly unknown[], ct
         const rel = doc.relations.find((r) => r.id === op.relation_id);
         if (!rel || rel.kind === 'anchor' || rel.kind === 'shadow_of') return refuse('unknown_relation');
         const subjects = rel.kind === 'order' ? rel.members.slice(1) : [rel.subject];
-        if (subjects.some((s) => get(s)?.locked)) return refuse('locked_layer', subjects.find((s) => get(s)?.locked));
+        const lock = subjects.map((s) => lockedAbove(doc.layers, s) ?? lockedWithin(doc.layers, s)).find((x) => x !== null);
+        if (lock) return refuse('locked_layer', lock);
         doc = { ...doc, relations: doc.relations.map((r) => (r.id === rel.id ? { ...rel, gap: op.gap } : r)) };
         // Re-lay from the relation's anchor end so its subject moves to the new gap.
         const from = rel.kind === 'order' ? rel.members[0] : rel.target;
@@ -339,22 +362,25 @@ export function applyOps(input: CreativeDocument, rawOps: readonly unknown[], ct
         return put({ ...layer!, visible: op.visible });
       case 'reorder_layer': {
         if (layer!.role === 'background') return refuse('background_order', lid);
-        const layers = doc.layers.slice();
-        const from = layers.findIndex((l) => l.id === layer!.id);
-        const bottom = layers.findIndex((l) => l.role === 'background') + 1; // nothing goes under the background
-        let to = op.to === 'front' ? layers.length - 1 : op.to === 'back' ? bottom : op.to === 'forward' ? from + 1 : from - 1;
-        to = Math.max(bottom, Math.min(layers.length - 1, to));
-        const [moved] = layers.splice(from, 1);
-        layers.splice(to, 0, moved);
+        const layers = reorderBlock(doc.layers, layer!.id, op.to);
+        // What anyone sees is the paint order of the drawn (non-group) layers: a reorder that
+        // leaves it as it was changes nothing — no undo step, nothing to save.
+        if (paintOrder(layers) === paintOrder(doc.layers)) return;
         doc = { ...doc, layers };
         changed.add(layer!.id);
         return;
       }
-      case 'set_priority':
+      case 'set_priority': {
+        // The app performs a priority as the template variant that leads with it (`layout.rebuild`);
+        // a template with no such variant cannot, so the preview says so instead of re-laying anyway.
+        const tpl = templateOf(doc);
+        if (!tpl || !Object.values(tpl.variants).some((v) => v?.priority === op.priority)) return refuse('priority_unavailable');
         rebuild = { kind: 'priority', priority: op.priority };
         return;
+      }
       case 'switch_template_variant':
-        if (!doc.template) return refuse('unknown_variant');
+        // Only a variant the document's own template has (the layout would otherwise fall back to its first one).
+        if (!templateOf(doc)?.variants[op.variant]) return refuse('unknown_variant');
         rebuild = { kind: 'variant', variant: op.variant };
         return;
       case 'create_format_variant': {
@@ -397,6 +423,9 @@ export function applyOps(input: CreativeDocument, rawOps: readonly unknown[], ct
           return refuse(dup ? 'duplicate_id' : 'invalid_layer');
         }
         if (added.type === 'text' && added.source.kind === 'product' && added.source.field === 'price' && !doc.products.some((p) => p.slot === (added.source as { slot: string }).slot)) return refuse('invalid_layer');
+        // Adding into a locked group changes that group.
+        const lock = added.parent ? lockedAbove(doc.layers, added.parent) : null;
+        if (lock) return refuse('locked_layer', lock);
         const layers = doc.layers.slice();
         const at = op.index === undefined ? layers.length : Math.max(layers.findIndex((l) => l.role === 'background') + 1, Math.min(layers.length, op.index));
         layers.splice(at, 0, added);
@@ -447,14 +476,14 @@ export function applyOps(input: CreativeDocument, rawOps: readonly unknown[], ct
 
   if (refusals.length) return { ok: false, refusals };
 
-  // Only the dependents of what changed move (spec §14).
+  // Only the dependents of what changed move (spec §14), and never a locked one (layout.ts).
   doc = relayoutDependents(doc, [...changed], ctx.brand).doc;
-  // A product picture's own contact shadow follows it even if the relation was removed by hand.
+  // A product picture's own contact shadow follows it even if the relation was removed by hand — unless the owner locked it.
   for (const id of changed) {
     const l = doc.layers.find((x) => x.id === id);
     if (l?.type === 'image' && l.role === 'product') {
       const sh = doc.layers.find((x) => x.type === 'shape' && x.role === 'product_shadow' && doc.relations.some((r) => r.kind === 'shadow_of' && r.subject === x.id && r.target === id));
-      if (sh && sh.type === 'shape') {
+      if (sh && sh.type === 'shape' && !touchesLock(doc.layers, sh.id)) {
         const g = shadowGeometry(layerBox(l)!, ctx.brand);
         doc = { ...doc, layers: doc.layers.map((x) => (x.id === sh.id ? { ...sh, ...g } : x)) };
       }
@@ -464,10 +493,54 @@ export function applyOps(input: CreativeDocument, rawOps: readonly unknown[], ct
   const check = normalizeDocument(doc);
   if (!check.ok) return { ok: false, refusals: [{ index: -1, op: 'result', code: 'invalid_value' }] };
   const conflicts = detectConflicts(check.doc, { measure: ctx.measure });
+  // Operations that change nothing are no edit: the caller gets its own document back, so there is
+  // no undo step, nothing to save, and the diff says so (spec §16).
+  if (!rebuild && canonicalJson(check.doc) === canonicalJson(input)) return { ok: true, doc: input, changed: [], moved: [], conflicts, rebuild: null };
   // What else moved — compared with the input, so a dependent moved inside an operation is reported too (spec §16).
   const before = new Map(input.layers.map((l) => [l.id, l]));
   const moved = check.doc.layers.filter((l) => !changed.has(l.id) && before.has(l.id) && geometryChanged(before.get(l.id)!, l)).map((l) => l.id);
   return { ok: true, doc: check.doc, changed: [...changed], moved, conflicts, rebuild };
+}
+
+/** The document's template definition, or null for a hand-made document (or a template this build does not know). */
+function templateOf(doc: CreativeDocument): TemplateDef | null {
+  return doc.template && isTemplateId(doc.template.id) ? TEMPLATES[doc.template.id] : null;
+}
+
+/** The order the renderer paints: the drawn (non-group) layers, bottom first. */
+function paintOrder(layers: readonly Layer[]): string {
+  return layers.filter((l) => l.type !== 'group').map((l) => l.id).join('\n');
+}
+
+/**
+ * A reorder in paint order (array order, spec §15). The layer moves together
+ * with everything inside it as ONE block, and steps past whole sibling blocks:
+ * a group's children are never left behind, a group child stays inside its
+ * group's block, and nothing goes under the background.
+ */
+function reorderBlock(layers: readonly Layer[], id: string, to: 'front' | 'back' | 'forward' | 'backward'): Layer[] {
+  const target = layers.find((l) => l.id === id)!;
+  const blockIds = new Set(withDescendants(layers, id));
+  const block = layers.filter((l) => blockIds.has(l.id));
+  const rest = layers.filter((l) => !blockIds.has(l.id));
+  const indexIn = (list: readonly Layer[], ids: ReadonlySet<string>) => list.flatMap((l, i) => (ids.has(l.id) ? [i] : []));
+  // The sibling blocks (same parent), bottom first, with where each starts now and where it lies in `rest`.
+  const siblings = rest
+    .filter((l) => l.parent === target.parent)
+    .map((s) => {
+      const ids = new Set(withDescendants(layers, s.id));
+      const at = indexIn(rest, ids);
+      return { layer: s, start: Math.min(...indexIn(layers, ids)), first: Math.min(...at), last: Math.max(...at) };
+    })
+    .sort((a, b) => a.start - b.start);
+  const start = Math.min(...indexIn(layers, blockIds));
+  const pos = siblings.filter((s) => s.start < start).length;
+  const floor = siblings.reduce((n, s, i) => (s.layer.role === 'background' ? i + 1 : n), 0);
+  const want = to === 'front' ? siblings.length : to === 'back' ? floor : to === 'forward' ? pos + 1 : pos - 1;
+  const next = Math.max(floor, Math.min(siblings.length, want));
+  if (!siblings.length || next === pos) return layers.slice();
+  const at = next === siblings.length ? Math.max(...siblings.map((s) => s.last)) + 1 : siblings[next].first;
+  return [...rest.slice(0, at), ...block, ...rest.slice(at)];
 }
 
 function geometryChanged(a: Layer, b: Layer): boolean {
