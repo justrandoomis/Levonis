@@ -117,9 +117,14 @@ duplicate ids, future schemas, oversize documents).
 - **No model id is written in the repository**: the owner picks from the live
   `GET /v1/models` list; the choice is a D1 row.
 - **What a model never does**: state a price, an availability or a claim the
-  request did not prove (discount, cheapest, last piece, rating, warranty term);
-  write a link; write Sorani; touch a locked layer; approve, publish or change
-  settings. Each is enforced by code, not only by the prompt.
+  request did not prove (discount, cheapest, last piece, rating, warranty term,
+  arrival, back in stock); write a link; write Sorani; touch a locked layer (or
+  anything inside a locked group); approve, publish or change settings. Each is
+  enforced by code, not only by the prompt. The text guards are a **pattern
+  check** over a normalised copy of the words (invisible characters, harakat
+  and tatweel dropped, Persian and Arabic-Indic digits read as digits) — they
+  catch the common phrasings in Arabic, English and Sorani, not every possible
+  wording; the final checks re-run them on every visible free text at approval.
 - **Budget**: daily requests and tokens always capped; USD caps when the owner
   sets rates (costs are always labelled *estimated*). A worst-case reservation
   is taken before every call and settled after; usage rows carry no text, key

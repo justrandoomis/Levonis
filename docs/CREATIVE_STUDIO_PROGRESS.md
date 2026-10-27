@@ -12,6 +12,11 @@ to switch it on — one section per side of the studio.
 > يعمل الذكاء الاصطناعي بمجرد اختيار النموذج من صفحة الإعدادات، لأن سر العامل
 > `ANTHROPIC_API_KEY` موجود أصلاً على الموقع الحي. لكتابة مفتاح آخر في الإعدادات
 > أضِف السر `CREATIVE_STUDIO_ENC_KEY` أولاً (طريقته أدناه).
+>
+> **لم يُنفَّذ بعد أي طلب حي إلى Anthropic** (حتى 2026-10-27): كل اختبارات
+> الذكاء الاصطناعي تستخدم مزوداً بديلاً بنفس شكل الطلب والجواب. أول تجربة حية
+> تكون من «اختبار الاتصال» في الإعدادات بعد النشر؛ سيُسجَّل هنا تاريخها والنموذج
+> والنتيجة.
 
 ### Built (migration `0215_creative_studio.sql`)
 
@@ -22,16 +27,21 @@ to switch it on — one section per side of the studio.
 | Provider adapter | `worker/lib/creative/anthropic.ts`, `readBody.ts` (its own capped reader: the FX module is a money boundary it does not import) | the only reader of a key; raw `fetch` through an injectable transport; one host; `redirect: manual`; per-task deadlines; 512 KB body cap; `anthropic-version: 2026-10-21`; structured outputs; effort only when the model lists it; never `temperature`/`top_p`/`top_k`, tools or prefill; 429 retried once (≤ 5 s), 503/529 once, a timeout never; every failure a code |
 | Key vault | `worker/lib/creative/keyVault.ts`, `worker/lib/sealbox.ts` | AES-256-GCM under `CREATIVE_STUDIO_ENC_KEY` (rotation ring), ciphertext bound to its row (AAD); 4-character hint for the owner only; stored key first, then the Worker secret |
 | Prompts | `worker/lib/creative/prompts.ts` | the §28 rules; data in tagged blocks with `<` escaped; product facts through an allow-list without amounts, links or picture URLs; copy in Arabic or English only — never Sorani |
-| Budget | `worker/lib/creative/budget.ts` | one conditional UPDATE reserves the worst case (requests, tokens, USD with rates, parallel calls); settled with real usage, released when the provider did not process the request, the worst case kept when the outcome is unknown; a crashed reservation is released after 5 minutes |
+| Budget | `worker/lib/creative/budget.ts`, `ai.ts` | one conditional UPDATE reserves the worst case (requests, tokens, USD with rates, parallel calls); settled with real usage, released when the provider did not process the request, the worst case kept when the outcome is unknown; the call and its settle run under `waitUntil`; a reservation stranded by a dead Worker is settled after 5 minutes **at its worst case** with an `INTERRUPTED` usage row — once, however many sweeps race; a picture in a visual review is counted by its pixel allowance, not its base64 size; deadlines 110 s (ideas, compositions, review, carousel) and 45 s (edit) |
 | Jobs | `worker/lib/creative/jobs.ts` | idempotency (same key + same request = stored result, no second call; different request = 409), cancel, applied once; a cancelled job's late result is never stored as usable |
 | Store connector | `worker/lib/creative/store.ts` | read-only, through the public card path (`pricingCtxForUser(db, null)`, `resolveListingCards`, `priceFromCard`, `cardAvailability`, `resolveVariantPricing`); an allow-list snapshot with a sha256 hash; unpriced never 0, pre-order never available, membership teaser apart |
-| Opportunities + catalogue watch | `worker/lib/creative/opportunities.ts` | live public offers, arrivals after the baseline, back-in-stock from a recorded unavailable → available, coverage gaps (30 days), approved claims, education topics, owner priorities, recent approved designs; the first whole sync pass is a baseline that announces nothing |
-| Designs | `worker/lib/creative/documents.ts` | `normalizeDocument` on every write and read; `VERSION_CONFLICT` instead of overwriting; versions at meaningful points (AI, restore, template, relayout, import, checkpoint, ≥ 10 min), 50 kept, approved and final-exported versions never pruned; approval of one version, invalidated by any later content change; approval and a final export re-verify every binding against the store now (`SOURCE_CHANGED`) and re-run the server's checks (`QA_BLOCKERS`) |
+| Opportunities + catalogue watch | `worker/lib/creative/opportunities.ts`, `evidence.ts` | live public offers, arrivals after the baseline, back-in-stock from a recorded unavailable → available, coverage gaps (30 days), approved claims, education topics, owner priorities (typed in Settings — never inferred), recent approved designs; the first whole sync pass is a baseline that announces nothing; a price or availability change of a product a released design shows marks that design `needs_review`. AI copy may claim an offer, an arrival or a return to stock only with evidence read from the store and the watch **at request time** (`evidence.ts`), never from a stored snapshot |
+| Designs | `worker/lib/creative/documents.ts` | `normalizeDocument` on every write and read; `VERSION_CONFLICT` instead of overwriting; versions at meaningful points (AI, restore, template, relayout, import, checkpoint, ≥ 10 min), 50 kept, approved and final-exported versions never pruned; approval of one version, invalidated by any later content change; approved and final-exported versions always keep a version row; the losing side of a concurrent save, approval or AI apply writes nothing (no history row, no job mark, no review); approval and a final export re-verify every binding against the store now (`SOURCE_CHANGED`), re-run the server's checks (`QA_BLOCKERS`, plus `unsupported_claim` for offer words with no live offer and `asset_not_approved`); opening an approved or final-exported design re-verifies it and records price / availability / offer changes in `needs_review` without touching its content; status changes and withdrawn approvals are in `audit_log`; `POST /documents` records `origin` and the AI job (`job_id`, marked applied in the same write); archive search covers titles, visible text and product names, and a bare «to» date includes its day |
 | Files | `worker/lib/creative/files.ts` | PNG/JPEG/WebP by magic bytes only (SVG and animated refused), 15 MB, header-only dimensions, stored byte-for-byte in the private bucket under `creative-studio/…`, served `private, no-store` with a sandbox CSP |
 | Registries | `packages/contracts/src/ownership.ts` (owner `ads`), `worker/lib/mediaRefs.ts` (the `r2_key` and design columns are media sources), `worker/lib/productDeletion.ts` (studio history keeps its rows), `worker/lib/schemaVersion.ts` (208), `worker/lib/storeLayout.ts`, `tests/routeClass/creativeStudio.ts`, role matrix, gateway routing, `services/gateway/src/uploadClasses.ts` (the two 15 MB upload doors), `tests/listingPredicateGuard.test.ts` (the connector's VISIBLE/SELLABLE calls, counted; `docs/PRICING-V2.md` §9) | the repository's sweeps cover the studio from day one |
 
 Tests: `tests/creativeStudioProvider.test.ts`, `tests/creativeStudioAi.test.ts`,
-`tests/creativeStudioDocuments.test.ts`, `tests/creativeStudioStore.test.ts`
+`tests/creativeStudioDocuments.test.ts`, `tests/creativeStudioStore.test.ts`,
+`tests/creativeStudioVersions.test.ts`, `tests/creativeStudioReleased.test.ts`,
+`tests/creativeStudioArchive.test.ts`, `tests/creativeStudioAiSpend.test.ts`,
+`tests/creativeStudioAiEvidence.test.ts`, `tests/creativeStudioMemory.test.ts`,
+`tests/creativeStudioContract.test.ts` and `tests/creativeStudioScreensContract.test.ts`
+(the real client driven into the real router)
 (the role-matrix, deploy-ahead and host-guard sweeps walk every studio route too).
 
 ### Not built yet (Worker side)
@@ -41,9 +51,14 @@ Tests: `tests/creativeStudioProvider.test.ts`, `tests/creativeStudioAi.test.ts`,
   the schema only so a later integration needs no migration.
 - **No batch creation** (spec §21): every AI request is one request; there is no
   queue or cron-driven batch, and the parallel limit applies per request.
-- **The catalogue watch runs when someone presses sync** (`POST /watch/sync`, a
-  bounded page per call). No cron drives it yet; adding one is a new cron entry
-  and dispatch branch (`tests/scheduledCronDispatch.test.ts`).
+- **The catalogue watch runs when someone presses «تحديث الكتالوج»** on Home
+  (it repeats `POST /watch/sync` until a pass completes; the first pass is a
+  baseline). No cron drives it yet; adding one is a new cron entry and dispatch
+  branch (`tests/scheduledCronDispatch.test.ts`).
+- **Uploaded assets**: the owner's uploads are approved at once; a full admin's
+  wait for review (`PATCH /assets/:id`), and an unapproved asset blocks approval
+  and the final export. A full admin may still approve their own upload (the
+  roles were not changed).
 - **Advanced engines** (spec §38–46: image generation, background removal, 3D,
   OCR) are not connected; only the visual review (Claude vision, owner-enabled)
   is.
@@ -105,8 +120,11 @@ select would have been the one entry that behaves differently.
   contact shadow) use a canvas shadow, which scales with the view.
 - **Interaction**: click / shift-click / marquee; a click on a chip selects its
   group; a Transformer with corner anchors and kept ratio for pictures (no
-  rotation for products and the logo), side anchors for text; locked layers
-  are not selectable; drag with snapping to the safe area, the centre lines
+  rotation for products and the logo), side anchors for text; a lock holds
+  through the tree — a locked layer, anything inside a locked group, and a
+  group with something locked inside cannot be selected, dragged, deleted or
+  changed, by a person or by Claude (`packages/creativeDoc` refuses the same
+  ops); a second finger cancels a drag cleanly and two fingers pinch and pan; drag with snapping to the safe area, the centre lines
   and other layers, guides on a layer that is never exported; arrows (Shift
   ×10), Delete, Ctrl/Cmd+Z, Shift+Z / Ctrl+Y, Escape, Enter; Ctrl+wheel and
   pinch zoom, wheel pan, zoom buttons and fit. Every edit is an operation run
@@ -121,18 +139,30 @@ select would have been the one entry that behaves differently.
   floor, one-factor scale, brand-palette swatches only, alignment, rotation,
   delete; caption and alt text when nothing is selected), assets (the bound
   variant's own same-origin pictures, approved assets, background presets,
-  add text). Desktop: properties + layers on the start side (collapsible below
-  1280 px), the stage in the middle, chat and tools on the end side. Phone:
-  the stage owns the screen, everything else is a bottom sheet, 44 px targets.
+  add text). Desktop (spec §16): the stage large, the chat and tools on the
+  physical right in Arabic and English, layers in an aside that folds away at
+  every width, properties only when something is selected; the stage survives
+  crossing the 1024 px breakpoint (an iPad rotation). Phone: the stage owns the
+  screen, everything else is a bottom sheet, 44 px targets.
 - **History and saving**: undo/redo of whole documents (60 steps); autosave
   1.2 s after the last change with `base_version`; «محفوظ» only after a 200;
   failed / offline / conflict said plainly; 409 → open theirs or keep mine as
-  a new design; flush on tab hide, before leaving (leave guard and
-  `beforeunload`) and before an AI request or a final export; a recovery draft
-  in localStorage (content + base version + time only) offered on the next
-  open when it is newer than the server copy and different.
-- **Chat and pointing**: instructions scoped to the selection (named before
-  sending) or explicitly design-wide; pin / box / arrow marks with a note,
+  a new design; a save whose answer was lost is checked against the server
+  before anything is called a conflict; flush on tab hide, before leaving
+  (leave guard and `beforeunload`) and before an AI request or a final export;
+  a recovery draft in localStorage (content + base version only) — restored
+  only onto the same server version, otherwise offered as a new design or
+  deleted, never refreshed during a conflict. **Opening never writes**: bound
+  text is drawn with the design's pinned brand kit (`brand_kit`), and when the
+  store's data now differs the editor says so and offers «طبّق البيانات
+  الحالية» as an ordinary, undoable edit.
+- **Chat and pointing**: instructions scoped to the selection with what is
+  inside it (named before sending) or explicitly design-wide; the request and
+  its answer survive switching panels or closing the phone sheet, and leaving
+  the editor cancels an unapplied answer; marks reach Claude with their
+  position (a pin's point, a box, an arrow's ends and the layers under them);
+  a re-layout an answer needs is named before Apply, and an answer that changes
+  nothing is cancelled, never reported as applied; pin / box / arrow marks with a note,
   stored as document coordinates in `doc.annotations` through two new
   people-only operations, never exported; `POST /ai/edit` → the patch is
   re-validated here (`validateEditPatch` on this document and version) and
@@ -158,12 +188,20 @@ select would have been the one entry that behaves differently.
 - **Flows**: Home («شنو أنشر اليوم؟» opportunities with or without AI, ideas
   with their reason and evidence, recent drafts), New design (product →
   variant → same-origin picture → goal, priority, density, size, language →
-  template → three compositions built with `buildFromTemplate` and drawn by
-  the real renderer → choose), service posts from approved claims, other
+  family (new arrival, back in stock, price offer, education, service; badges
+  only with evidence) → template → up to three compositions, the chosen visual
+  priority first, built with `buildFromTemplate` and drawn by the real renderer
+  → choose; a design from Claude's composition or idea records the AI job),
+  service posts from approved claims — written, revised and approved by the
+  owner in the «الخدمات المعتمدة» tab, which also lists the designs using each
+  claim — ideas showing audience, message, CTA, post type, composition, caption
+  and alt text and carrying them into New design, «تحديث الكتالوج», other
   sizes as linked designs, variant / priority / density re-layouts, Brand
-  (binding rules, preferences saved as a new version, approval), Assets
-  (upload, review state, delete), Archive (filters, search, versions,
-  side-by-side comparison, restore), Settings (owner: key — password field,
+  (binding rules, preferences saved as a new version that stays on screen,
+  any version viewable, a logo picker over approved logos, approval), Assets
+  (upload with its real review state, delete), Archive (product, status,
+  format and date filters, search, versions, side-by-side comparison, restore,
+  duplicate as a draft), Settings (owner priorities; owner: key — password field,
   autocomplete off, cleared once saved, never stored in the browser — test,
   live model list, effort, budget, rates with source and date, vision review,
   usage; others read-only).
@@ -176,13 +214,18 @@ select would have been the one entry that behaves differently.
   `ErrorCode` of the contract (`strings.ts`).
 - **Tests**: `tests/creativeStudioUiStrings.test.ts`,
   `tests/creativeStudioUiModel.test.ts`, `tests/creativeStudioUiSource.test.ts`,
-  `tests/creativeStudioUiRender.test.ts`; browser e2e
+  `tests/creativeStudioUiRender.test.ts`, `tests/creativeStudioUiEditor.test.ts`,
+  `tests/creativeStudioScreensModel.test.ts`; the package's own tests
+  (`packages/creativeDoc/test/`: guards, locks, rebuild, compositions, sizes,
+  structure, layout, quality); browser e2e
   `scripts/e2e-creative-studio.mjs` with `tests/browser/creative-studio*`
   (new design → editor; the Arabic headline, the mixed line, the test price
   and logo; overlay edit; transformer scale with the ratio held; save →
   reload; leaving with unsaved work asks first; PNG export pixel-identical to
   the stage at 1×; checks; an AI edit applied and saved with its job; a
-  version conflict; every other tab; phone and Sorani).
+  slow answer surviving a panel switch, with honest stop/discard; the
+  1440 → 800 → 1440 breakpoint; a version conflict with no draft left
+  behind; every other tab; phone and Sorani — 18 checks).
 - **Bundle**: the studio is one lazy chunk (Konva inside it), nothing in the
   first paint. The studio asks its own leave question (StudioShell) instead of
   importing the dashboard’s `src/lib/leaveGuard.ts`, and `vite.config.ts`
@@ -193,7 +236,13 @@ select would have been the one entry that behaves differently.
 ### Not done
 
 - Carousels (`POST /ai/carousel`), campaigns, batch creation, the calendar
-  and grid planning: no screen yet, and no button pretends otherwise.
+  and grid planning (spec Phase 4): no screen yet, and no button pretends
+  otherwise.
+- Swapping a design's product, and «use this as a reference»; the editor's
+  re-layouts still pass no template family; archive filters by variant,
+  family or campaign.
+- Touch gestures (pinch during a drag, two-finger pan) are fixed in code but
+  have no automated touch test.
 - Comparison posts (two products) have no picker in New design yet; the
   template exists in the package.
 - Rebinding a design to a FRESH snapshot after a source change (the checks
@@ -207,12 +256,15 @@ select would have been the one entry that behaves differently.
 
 - Tested in Chromium (Playwright, headless) only; Safari and Firefox are not
   verified — `ctx.direction` and canvas shadows there are untested.
-- The HTTP contract fixes the DTOs but not every route's envelope;
-  `client.ts` reads a DTO either spread or under its name and refuses
-  anything else as `INVALID_RESPONSE`. The route names are the ones listed
-  for the Worker; a mismatch shows as that error, never as a guess.
+- `client.ts` reads a DTO either spread or under its name and refuses anything
+  else as `INVALID_RESPONSE`; `tests/creativeStudioContract.test.ts` and
+  `tests/creativeStudioScreensContract.test.ts` drive the real client into the
+  real router, so a path or field mismatch fails a test.
 - `POST /ai/edit` is a single request: «stop» aborts the browser's wait, but
-  without a job id yet the server is not told; its late answer is never applied.
+  without a job id yet the server is not told; its late answer is never applied,
+  and the screen says that a request already sent may still be charged.
+- The price, link and claim guards are a pattern check (see
+  `docs/CREATIVE_STUDIO.md`), not a proof that no wording slips through.
 - A soft shape that is rotated is drawn crisp with a halo (the canvas-shadow
   technique needs an unrotated shape); templates never rotate shadows.
 - The recovery draft lives in this browser's localStorage only.
