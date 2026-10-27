@@ -1,6 +1,7 @@
 /**
  * «حفظ» — the bookmark on a post. A save is private: the count is the
  * author's to see on the card, the list is the viewer's at /community/saved.
+ * A saved mark keeps the gold tone (CountToggle `tone`, plan B2).
  */
 import { Bookmark } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
@@ -37,6 +38,7 @@ export default function SaveButton({ postId, saved, count, size = 'md', showCoun
       }
       onChange={onChange}
       failText={s.actionFailed}
+      tone="gold"
       className={className}
       data-social="save"
     />

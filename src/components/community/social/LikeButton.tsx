@@ -1,6 +1,7 @@
 /**
  * «إعجاب» — the heart on a post. See CountToggle for the behaviour; this
- * file only names the write and the words.
+ * file only names the write and the words. A liked heart wears the like tone
+ * (`--cm-like`, DECISIONS row 270 D-6) inside the community scope.
  */
 import { Heart } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
@@ -33,6 +34,7 @@ export default function LikeButton({ postId, liked, count, size = 'md', onChange
       toggle={(next) => (next ? socialApi.like(postId) : socialApi.unlike(postId)).then((r) => ({ on: !!r.liked, count: Number(r.likes ?? 0) }))}
       onChange={onChange}
       failText={s.actionFailed}
+      tone="like"
       className={className}
       data-social="like"
     />

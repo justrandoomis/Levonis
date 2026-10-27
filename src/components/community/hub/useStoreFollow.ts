@@ -5,8 +5,13 @@
  * is put back if the server says no; a guest is sent to sign in and brought
  * back; the session graph (SocialContext) and the directory's remembered
  * pages are told, so every other card of the same shop agrees.
+ *
+ * THE BUTTON IS THE SHARED ONE (community UI plan B2): `followProps(m)` is
+ * what a store card spreads into kit/FollowButton.tsx, the look a maker card
+ * wears too, or null on the own shop of the viewer.
  */
 import { useState } from 'react';
+import type { FollowButtonProps } from '../kit/FollowButton';
 import { useAuth } from '../../../AuthContext';
 import { useSignInPrompt } from '../../../lib/guest';
 import { ApiError } from '../../../lib/api';
@@ -60,5 +65,12 @@ export function useStoreFollow() {
 
   const canFollow = (m: CommunityStore) => m.user_id !== user?.id;
 
-  return { view, toggle, busy, canFollow };
+  /** The shared follow button for one store as the viewer sees it now, or null on their own shop. */
+  const followProps = (raw: CommunityStore, size: FollowButtonProps['size'] = 'sm'): FollowButtonProps | null => {
+    if (!canFollow(raw)) return null;
+    const m = view(raw);
+    return { following: !!m.following, onToggle: () => void toggle(raw), busy: busy === m.id, size, name: m.name, 'data-social': 'follow-store' };
+  };
+
+  return { view, toggle, busy, canFollow, followProps };
 }

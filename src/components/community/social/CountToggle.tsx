@@ -16,6 +16,14 @@
  * A 44 px round target that sits ABOVE a card's stretched link
  * (`relative z-10`), says its state (`aria-pressed`), and hides its number at
  * zero. A guest is taken to sign in and brought back here.
+ *
+ * THE TONE OF THE MARK WHEN ON (community UI plan B2, DECISIONS row 270
+ * D-6). `gold` (a save) is the gold ink. `like` is the scarlet the
+ * references draw for a heart, the scoped `--cm-like`, which exists only
+ * inside the community scope: anywhere else the same mark falls back to the
+ * gold it always was, so nothing outside the scope changes. Written as an
+ * inline colour on the button (the icon fills with `currentColor`), so the
+ * tone costs no stylesheet bytes.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -39,6 +47,8 @@ export interface CountToggleProps {
   onChange?: (on: boolean, count: number) => void;
   /** Said when the write is refused. */
   failText: string;
+  /** The ink of the mark when on: `gold` (default) or `like` (the scoped scarlet, gold outside the scope). */
+  tone?: 'gold' | 'like';
   className?: string;
   'data-social'?: string;
 }
@@ -54,6 +64,7 @@ export default function CountToggle({
   toggle,
   onChange,
   failText,
+  tone = 'gold',
   className = '',
   'data-social': testAttr,
 }: CountToggleProps) {
@@ -95,6 +106,7 @@ export default function CountToggle({
   };
 
   const iconSize = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
+  const like = tone === 'like';
   return (
     <button
       type="button"
@@ -103,8 +115,10 @@ export default function CountToggle({
       aria-label={`${on ? labelOn : labelOff}${count > 0 ? ` — ${countLabel(count)}` : ''}`}
       data-social={testAttr}
       data-on={on ? 'true' : 'false'}
+      data-tone={tone}
+      style={on && like ? { color: 'var(--cm-like, var(--color-gold))' } : undefined}
       className={`press-scale relative z-10 inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-full px-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-        on ? 'text-gold' : 'text-text-secondary hover:text-text-primary'
+        on ? (like ? '' : 'text-gold') : 'text-text-secondary hover:text-text-primary'
       } ${size === 'sm' ? 'text-[12px]' : 'text-[13px]'} ${className}`}
     >
       <motion.span
@@ -116,7 +130,7 @@ export default function CountToggle({
           if (pop) setPop(false);
         }}
       >
-        {icon(on, `${iconSize} transition-colors ${on ? 'fill-gold' : ''}`)}
+        {icon(on, `${iconSize} transition-colors ${on ? (like ? 'fill-current' : 'fill-gold') : ''}`)}
       </motion.span>
       {count > 0 && (
         <span aria-hidden="true" className="relative inline-flex min-w-5 justify-center overflow-hidden font-semibold tabular-nums">

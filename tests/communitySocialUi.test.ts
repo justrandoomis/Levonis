@@ -58,7 +58,9 @@ test('no <button> inside a link, anywhere in the social components', () => {
 });
 
 test('every toggle says its state with aria-pressed, and sits above a card link', () => {
-  for (const f of ['CountToggle.tsx', 'FollowUserButton.tsx']) {
+  // The follow look is the shared kit button (community UI plan B2), FollowUserButton its behaviour.
+  assert.match(code(`${DIR}/FollowUserButton.tsx`), /<FollowButton\b/);
+  for (const f of ['CountToggle.tsx', '../kit/FollowButton.tsx']) {
     const src = code(`${DIR}/${f}`);
     assert.match(src, /aria-pressed=\{/, `${f}: no aria-pressed`);
     assert.match(src, /relative z-10/, `${f}: not lifted above the stretched link`);
@@ -134,7 +136,7 @@ test('tokens only: no hex, no dark: variant, no physical left/right utility, no 
 });
 
 test('springs come from useMotion, the comments sheet is a lazy chunk, and the writes are idempotent verbs', () => {
-  for (const f of ['CountToggle.tsx', 'FollowUserButton.tsx']) {
+  for (const f of ['CountToggle.tsx', '../kit/FollowButton.tsx']) {
     const src = code(`${DIR}/${f}`);
     assert.match(src, /useMotion\(\)/, `${f} does not use the motion kit`);
     assert.doesNotMatch(src, /transition=\{\{\s*duration/, `${f} invents a duration`);
