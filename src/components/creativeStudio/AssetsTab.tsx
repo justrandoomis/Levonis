@@ -1,9 +1,12 @@
 /**
  * «الأصول» — logos, backgrounds, extra product shots, icons and references
  * uploaded by a person (spec §38: every asset keeps where it came from and
- * its review state). An upload starts as «بانتظار المراجعة»; only approved
- * assets can enter a design. The file is checked by the server by its bytes,
- * not its name; the studio serves it back only through its own route.
+ * its review state). The SERVER sets an upload's review: the owner's is
+ * approved at once, another admin's starts as «بانتظار المراجعة». Every text
+ * here follows the review the server answered with (`uploadedText`), never an
+ * assumption; only approved assets can enter a design or reach Claude. The
+ * file is checked by the server by its bytes, not its name; the studio serves
+ * it back only through its own route.
  */
 import { useRef, useState } from 'react';
 import { Button } from '../ui/Button';
@@ -15,6 +18,7 @@ import type { AssetDto, AssetKind } from '../../../packages/creativeDoc/src/api'
 import { assets as assetsApi } from './client';
 import { ASSET_KIND_TEXT, REVIEW_STATE_TEXT, S, fill } from './strings';
 import { RemoteView, failText, shortTime, useRemote, useText } from './shared';
+import { uploadedText } from './screensModel';
 
 const KINDS: AssetKind[] = ['logo', 'background', 'product_extra', 'icon', 'element', 'reference_liked', 'reference_rejected'];
 
@@ -38,7 +42,7 @@ export default function AssetsTab() {
       setFile(null);
       setLabel('');
       if (input.current) input.current.value = '';
-      setMessage({ tone: 'ok', text: w(S.assetsUploaded) });
+      setMessage({ tone: 'ok', text: w(uploadedText(created.review)) });
     } catch (e) {
       setMessage({ tone: 'error', text: failText(e, lang) });
     } finally {
@@ -71,7 +75,7 @@ export default function AssetsTab() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4" data-assets-tab>
-      <Card title={w(S.assetsUpload)}>
+      <Card title={w(S.assetsUpload)} description={w(S.assetsReviewHelp)}>
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label={w(S.assetsKind)}>
             <Select value={kind} onChange={(e) => setKind(e.target.value as AssetKind)}>

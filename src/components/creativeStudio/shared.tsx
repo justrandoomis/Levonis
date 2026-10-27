@@ -143,14 +143,21 @@ export interface StudioContextValue {
   setLeaveGuard(guard: () => boolean): () => void;
 }
 
-export type StudioTab = 'home' | 'new' | 'editor' | 'brand' | 'assets' | 'archive' | 'settings';
+export type StudioTab = 'home' | 'new' | 'editor' | 'brand' | 'claims' | 'assets' | 'archive' | 'settings';
 
+/** What «use this idea» carries into New design (screensModel.ideaPrefill): every field of the idea a design can use. */
 export interface NewDesignPrefill {
   mode?: 'product' | 'service';
   productId?: string;
+  /** Preselected once the approved claims are loaded. */
   claimId?: string;
   objective?: import('../../../packages/creativeDoc/src/schema').Objective;
+  /** The idea's composition direction: its visual priority is preselected, so this variant leads. */
+  variant?: import('../../../packages/creativeDoc/src/templates').VariantId;
   copy?: { headline: string; subhead?: string; cta?: string; features?: string[] };
+  caption?: string;
+  alt?: string;
+  /** The ideas job: a design built from the idea's own words is recorded as Claude's (origin 'ai'). */
   jobId?: string;
 }
 

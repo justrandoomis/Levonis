@@ -98,6 +98,8 @@ export interface ProviderStatusDto {
   ready: boolean;
   /** Why not, when not ready. */
   not_ready_code: ErrorCode | null;
+  /** The owner's own priorities (PUT /provider/settings `priorities`), never the opportunity kinds. Absent from a Worker that predates it. */
+  priorities?: string[];
 }
 
 export interface ModelDto {

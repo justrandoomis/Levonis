@@ -4,19 +4,29 @@
  * The OPPORTUNITIES are deterministic: computed by the server from the shop’s
  * own records (arrivals, returns to stock, live offers, coverage gaps,
  * approved services) and shown with or without AI. Claude’s IDEAS appear
- * only when the provider is ready and the owner asks; each says why and
- * which evidence it rests on (an idea without evidence is refused upstream).
- * Then the recent drafts and the two ways to start.
+ * only when the provider is ready and the owner asks; each shows every field
+ * the contract validates (audience, message, CTA, post type, composition,
+ * caption, alt text), says why and which evidence it rests on (an idea
+ * without evidence is refused upstream), and «use this idea» carries all of
+ * it into New design. The request sends NO priorities: the owner’s own live
+ * in Settings, and the opportunity kinds on screen are not priorities.
+ * «تحديث الكتالوج» runs the catalogue watch to the end of a pass (arrivals
+ * and returns to stock are detected only by it), and says when that pass was
+ * only the baseline. Then the recent drafts and the two ways to start.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { StatusChip } from '../ui/Badge';
-import type { IdeaRecordDto, IdeasResponse, OpportunityDto } from '../../../packages/creativeDoc/src/api';
+import type { IdeaRecordDto, IdeasResponse } from '../../../packages/creativeDoc/src/api';
 import { localized } from '../../../packages/creativeDoc/src/snapshot';
-import { ai, documents, idempotencyKey } from './client';
+import { VARIANT_LABELS } from '../../../packages/creativeDoc/src/templates';
+import { ai, documents, idempotencyKey, watch } from './client';
 import { FORMAT_TEXT, OBJECTIVE_TEXT, OPPORTUNITY_TEXT, STATUS_TEXT, S, fill } from './strings';
 import { AiNotReady, RemoteView, failText, shortTime, useRemote, useStudio, useText } from './shared';
+import { ideaPrefill, ideasRequest, runCatalogSync, type SyncTotals } from './screensModel';
+
+const POST_TYPE_TEXT = { single: S.homePostSingle, carousel: S.homePostCarousel, story: S.homePostStory } as const;
 
 export default function Home() {
   const studio = useStudio();
@@ -27,13 +37,15 @@ export default function Home() {
   const [ideasBusy, setIdeasBusy] = useState(false);
   const [ideasError, setIdeasError] = useState('');
   const ready = studio.provider?.ready === true;
+  const [sync, setSync] = useState<{ running: boolean; totals: SyncTotals | null; error: string }>({ running: false, totals: null, error: '' });
+  const gone = useRef(false);
+  useEffect(() => () => { gone.current = true; }, []);
 
-  const askIdeas = async (list: OpportunityDto[]) => {
+  const askIdeas = async () => {
     setIdeasError('');
     setIdeasBusy(true);
     try {
-      const priorities = [...new Set(list.map((o) => o.kind))];
-      setIdeas(await ai.ideas({ count: 5, priorities, idempotency_key: idempotencyKey() }));
+      setIdeas(await ai.ideas(ideasRequest(idempotencyKey())));
     } catch (e) {
       setIdeasError(failText(e, lang));
     } finally {
@@ -41,16 +53,27 @@ export default function Home() {
     }
   };
 
-  const startFromIdea = (idea: IdeaRecordDto) => {
-    studio.startNew({
-      mode: idea.target_kind === 'service' ? 'service' : 'product',
-      productId: idea.target_kind === 'product' ? idea.target_ref : undefined,
-      claimId: idea.target_kind === 'service' ? idea.target_ref : undefined,
-      objective: idea.objective,
-      copy: { headline: idea.headline, subhead: idea.subhead, cta: idea.cta },
-      jobId: idea.job_id,
-    });
+  const syncCatalog = async () => {
+    setSync({ running: true, totals: null, error: '' });
+    let last: SyncTotals | null = null;
+    try {
+      last = await runCatalogSync(() => watch.sync(), (t) => { last = t; if (!gone.current) setSync({ running: true, totals: t, error: '' }); }, () => gone.current);
+      if (!gone.current) setSync({ running: false, totals: last, error: '' });
+      reloadOpps();
+    } catch (e) {
+      if (!gone.current) setSync({ running: false, totals: last, error: failText(e, lang) });
+    }
   };
+
+  const syncText = (t: SyncTotals | null, running: boolean): string => {
+    if (!t) return running ? fill(w(S.homeSyncProgress), { n: 0 }) : '';
+    if (running) return fill(w(S.homeSyncProgress), { n: t.processed });
+    if (!t.complete) return fill(w(S.homeSyncPartial), { n: t.processed });
+    if (t.baseline) return fill(w(S.homeSyncBaseline), { n: t.processed });
+    return fill(w(S.homeSyncDone), { n: t.processed, arrivals: t.arrivals, back: t.back_in_stock });
+  };
+
+  const startFromIdea = (idea: IdeaRecordDto) => studio.startNew(ideaPrefill(idea));
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4" data-studio-home>
@@ -60,7 +83,14 @@ export default function Home() {
         <Button onClick={() => studio.startNew({ mode: 'service' })}>{w(S.homeStartService)}</Button>
       </div>
 
-      <Card title={w(S.homeQuestion)} description={w(S.homeEvidenceNote)}>
+      <Card
+        title={w(S.homeQuestion)}
+        description={w(S.homeEvidenceNote)}
+        action={<Button size="sm" loading={sync.running} onClick={syncCatalog} data-sync-catalog>{w(S.homeSyncCatalog)}</Button>}
+      >
+        <p className="mb-2 text-xs text-text-muted">{w(S.homeSyncHint)}</p>
+        {sync.running || sync.totals ? <p className="mb-3 text-sm text-text-secondary" role="status" data-sync-status={sync.running ? 'running' : sync.totals?.baseline ? 'baseline' : sync.totals?.complete ? 'done' : 'partial'}>{syncText(sync.totals, sync.running)}</p> : null}
+        {sync.error ? <p className="mb-3 text-sm text-danger" role="alert">{sync.error}</p> : null}
         <RemoteView remote={opps} onRetry={reloadOpps} compact>
           {(list) => (
             <>
@@ -81,7 +111,7 @@ export default function Home() {
               <div className="mt-4 flex flex-col gap-2">
                 <h3 className="text-sm font-semibold text-text-primary">{w(S.homeIdeas)}</h3>
                 {ready ? (
-                  <Button size="sm" loading={ideasBusy} onClick={() => askIdeas(list)}>{w(S.homeAskIdeas)}</Button>
+                  <Button size="sm" loading={ideasBusy} onClick={askIdeas}>{w(S.homeAskIdeas)}</Button>
                 ) : (
                   <AiNotReady provider={studio.provider} onSettings={() => studio.goTab('settings')} />
                 )}
@@ -94,7 +124,21 @@ export default function Home() {
                         <li key={idea.id} className="rounded-lg border border-border-subtle p-3">
                           <p className="text-sm font-semibold text-text-primary">{idea.headline}</p>
                           {idea.subhead ? <p className="text-sm text-text-secondary">{idea.subhead}</p> : null}
-                          <p className="mt-1 text-xs text-text-muted">{w(OBJECTIVE_TEXT[idea.objective])}</p>
+                          <p className="mt-1 text-xs text-text-muted">{w(OBJECTIVE_TEXT[idea.objective])} · {w(POST_TYPE_TEXT[idea.post_type])} · {w(S.homeIdeaLayout)}: {VARIANT_LABELS[idea.layout][lang]}</p>
+                          <dl className="mt-2 grid gap-x-3 gap-y-1 text-sm sm:grid-cols-[max-content_1fr]" data-idea-fields>
+                            {([
+                              [S.homeIdeaAudience, idea.audience],
+                              [S.homeIdeaMessage, idea.message],
+                              [S.homeIdeaCta, idea.cta],
+                              [S.homeIdeaCaption, idea.caption],
+                              [S.homeIdeaAlt, idea.alt_text],
+                            ] as const).filter(([, v]) => v).map(([label, v]) => (
+                              <div key={label.en} className="contents">
+                                <dt className="text-text-muted">{w(label)}</dt>
+                                <dd className="min-w-0 whitespace-pre-line text-text-primary">{v}</dd>
+                              </div>
+                            ))}
+                          </dl>
                           <p className="mt-1 text-sm"><span className="text-text-muted">{w(S.homeIdeaWhy)}: </span>{idea.reason}</p>
                           <p className="mt-1 text-xs text-text-muted">
                             {w(S.homeIdeaEvidence)}: {idea.evidence_ids.map((id) => {

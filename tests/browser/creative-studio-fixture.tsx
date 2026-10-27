@@ -20,7 +20,7 @@ import { LanguageProvider } from '../../src/LanguageContext';
 import { AuthContext } from '../../src/AuthContext';
 import CreativeStudio from '../../src/pages/CreativeStudio';
 import { defaultBrandKit } from '../../packages/creativeDoc/src/brand';
-import type { DocumentDto, ProviderStatusDto } from '../../packages/creativeDoc/src/api';
+import type { ClaimDto, DocumentDto, ProviderStatusDto } from '../../packages/creativeDoc/src/api';
 import type { ProductSnapshot } from '../../packages/creativeDoc/src/snapshot';
 import '../../src/index.css';
 
@@ -74,6 +74,85 @@ async function bodyOf(init?: RequestInit): Promise<Record<string, unknown>> {
   return {};
 }
 
+// ---------------------------------------------------------------------------
+// Studio screens (agent E): service claims, the catalogue watch, duplicate,
+// owner settings. Kept in sessionStorage like the documents above; answered
+// before the routes below, which never see these paths.
+// ---------------------------------------------------------------------------
+interface ScreensDb { claims: ClaimDto[]; syncs: number; settings: Record<string, unknown> }
+const SCREENS_KEY = 'cs-e2e-screens';
+const loadScreens = (): ScreensDb => {
+  try {
+    const raw = sessionStorage.getItem(SCREENS_KEY);
+    if (raw) return JSON.parse(raw) as ScreensDb;
+  } catch { /* fresh */ }
+  return { claims: [], syncs: 0, settings: {} };
+};
+const saveScreens = (db: ScreensDb) => sessionStorage.setItem(SCREENS_KEY, JSON.stringify(db));
+(window as unknown as { __csScreens: () => ScreensDb }).__csScreens = loadScreens;
+
+function screensRoute(method: string, path: string, body: Record<string, unknown>, db: Db): Response | null {
+  const sdb = loadScreens();
+  let m: RegExpMatchArray | null;
+  const claimOf = (id: string, key: string, version: number): ClaimDto => ({
+    id, key, version, status: 'pending', title: body.title as ClaimDto['title'], summary: body.summary as ClaimDto['summary'], conditions: body.conditions as ClaimDto['conditions'],
+    details_path: (body.details_path as string | null) ?? null, product_ids: (body.product_ids as string[]) ?? [], valid_from: (body.valid_from as string | null) ?? null,
+    valid_until: (body.valid_until as string | null) ?? null, last_verified_at: (body.last_verified_at as string | null) ?? null, source_note: String(body.source_note ?? ''), approved_at: null,
+  });
+  if (method === 'GET' && path === '/claims') return ok({ migrated: true, claims: sdb.claims.filter((c) => c.status !== 'retired') });
+  if (method === 'POST' && path === '/claims') {
+    const c = claimOf(`cclm_e2e_${sdb.claims.length + 1}`, String(body.key), 1);
+    sdb.claims.push(c);
+    saveScreens(sdb);
+    return ok({ claim: c });
+  }
+  if (method === 'PUT' && (m = path.match(/^\/claims\/([^/]+)$/))) {
+    const mine = sdb.claims.filter((c) => c.id === m![1]);
+    if (!mine.length) return fail(404, 'NOT_FOUND', 'no claim');
+    const c = claimOf(m[1], mine[0].key, Math.max(...mine.map((x) => x.version)) + 1);
+    sdb.claims = sdb.claims.filter((x) => !(x.id === c.id && x.status === 'pending')).concat(c);
+    saveScreens(sdb);
+    return ok({ claim: c });
+  }
+  if (method === 'POST' && (m = path.match(/^\/claims\/([^/]+)\/approve$/))) {
+    const target = sdb.claims.find((c) => c.id === m![1] && c.status === 'pending' && (body.version === undefined || c.version === body.version));
+    if (!target) return fail(404, 'NOT_FOUND', 'no pending version');
+    for (const c of sdb.claims) if (c.id === target.id && c.status === 'approved') c.status = 'retired';
+    target.status = 'approved';
+    target.approved_at = NOW;
+    saveScreens(sdb);
+    return ok({ claim: target, marked: 0 });
+  }
+  if (method === 'GET' && (m = path.match(/^\/claims\/([^/]+)\/documents$/))) {
+    const docs = Object.values(db.docs).filter((d) => d.content.services.some((s) => s.claim_id === m![1]));
+    return ok({ documents: docs.map(({ content: _c, issues: _i, brand_version: _b, updated_by_name: _u, ...summary }) => summary) });
+  }
+  if (method === 'POST' && path === '/watch/sync') {
+    // The first pass is the baseline: three steps of a marked TEST catalogue.
+    sdb.syncs += 1;
+    saveScreens(sdb);
+    const baseline = sdb.syncs <= 3;
+    return ok({ processed: sdb.syncs === 3 ? 7 : sdb.syncs > 3 ? 1 : 50, baseline, baseline_complete: sdb.syncs >= 3, pass_complete: sdb.syncs >= 3, arrivals: 0, back_in_stock: 0 });
+  }
+  if (method === 'POST' && (m = path.match(/^\/documents\/([^/]+)\/duplicate$/))) {
+    const src = db.docs[m[1]];
+    if (!src) return fail(404, 'NOT_FOUND', 'no document');
+    db.seq += 1;
+    const id = `doc_e2e_${db.seq}`;
+    const now = new Date().toISOString();
+    db.docs[id] = { ...src, id, title: `${src.title} (2)`, status: 'draft', version: 1, approved_version: null, parent_id: src.id, created_at: now, updated_at: now };
+    db.versions[id] = [{ version: 1, origin: 'manual', job_id: null, content: src.content, created_at: now }];
+    save(db);
+    return ok({ document: db.docs[id] });
+  }
+  if (method === 'PUT' && path === '/provider/settings') {
+    sdb.settings = { ...sdb.settings, ...body };
+    saveScreens(sdb);
+    return ok({ ...provider, ...(sdb.settings.priorities ? { priorities: sdb.settings.priorities } : {}) });
+  }
+  return null;
+}
+
 const realFetch = window.fetch.bind(window);
 window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
@@ -90,6 +169,8 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   // `cs-e2e-ai` switches the stub provider to READY so the e2e can walk the AI edit path. The
   // model name below is a fixture string, not a model id the studio knows: the studio never names one.
   const aiReady = sessionStorage.getItem('cs-e2e-ai') === '1';
+  const screens = screensRoute(method, path, body, db);
+  if (screens) return screens;
   if (method === 'GET' && path === '/provider') return ok(aiReady ? { ...provider, ready: true, not_ready_code: null, model: 'model-e2e-fixture', key: { source: 'worker_secret', hint: null, set_at: null } } : { ...provider });
   if (method === 'POST' && path === '/ai/edit') {
     if (!aiReady) return fail(503, 'KEY_NOT_CONFIGURED', 'no key');

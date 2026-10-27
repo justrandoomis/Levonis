@@ -20,11 +20,12 @@ import type {
   AssetDto, AssetKind, BrandDto, BrandVersionDto, ClaimDto, ComposeRequest, ComposeResponse, DocStatus, DocumentDto,
   DocumentSummaryDto, EditRequest, EditResponse, ExportDto, ExportKind, IdeaRecordDto, IdeasRequest, IdeasResponse,
   ModelDto, OpportunityDto, ProductDetailDto, ProductListItemDto, ProviderStatusDto, ReviewRequest, ReviewResponse,
-  UsageRecordDto, VerifyDto, VersionDto, VersionOrigin, BudgetSettings, Rates, Effort, ApproveRequest, ReviewDto, RejectReason,
+  UsageRecordDto, VerifyDto, VersionDto, VersionOrigin, ApproveRequest, ReviewDto, RejectReason, ProviderSettingsRequest,
+  BrandVersionResponse, WatchSyncResponse,
 } from '../../../packages/creativeDoc/src/api';
 import type { BrandKit } from '../../../packages/creativeDoc/src/brand';
 import type { CreativeDocument } from '../../../packages/creativeDoc/src/schema';
-import type { ProductSnapshot } from '../../../packages/creativeDoc/src/snapshot';
+import type { Localized, ProductSnapshot } from '../../../packages/creativeDoc/src/snapshot';
 
 /** Mirrors `CREATIVE_API` in the contract (a type-only import cannot carry the value). */
 export const BASE = '/api/admin/creative-studio';
@@ -81,8 +82,8 @@ export const provider = {
   removeKey: () => api.delete<Body>(`${BASE}/provider/key`),
   test: () => api.post<Body>(`${BASE}/provider/test`, {}, { timeoutMs: AI_TIMEOUT_MS }),
   models: async (): Promise<ModelDto[]> => list<ModelDto>(await api.get<Body>(`${BASE}/provider/models`, { timeoutMs: 45000 }), 'models'),
-  saveSettings: (s: { model?: string | null; effort?: Effort | null; budget?: BudgetSettings; rates?: Rates | null; vision_review?: boolean }) =>
-    api.put<Body>(`${BASE}/provider/settings`, s),
+  /** Every field optional, absent = unchanged (screensModel.settingsPayload sends the model and the priorities only when they changed). */
+  saveSettings: (s: ProviderSettingsRequest) => api.put<Body>(`${BASE}/provider/settings`, s),
   /** The ledger (codes and counts, never text): GET /usage answers `{ records, days, today, month }`. */
   usage: async (): Promise<UsageRecordDto[]> => list<UsageRecordDto>(await api.get<Body>(`${BASE}/usage`), 'records'),
 };
@@ -108,9 +109,62 @@ export const store = {
 export const brand = {
   get: async (): Promise<BrandDto> => one<BrandDto>(await api.get<Body>(`${BASE}/brand`), 'brand', 'kit'),
   versions: async (): Promise<BrandVersionDto[]> => list<BrandVersionDto>(await api.get<Body>(`${BASE}/brand/versions`), 'versions'),
-  saveVersion: (kit: BrandKit, note: string) => api.post<Body>(`${BASE}/brand/versions`, { kit, note }),
+  /** Saves a NEW version; answers the saved version (`BrandSaveResponse.saved`), or null from a Worker that does not say. */
+  saveVersion: async (kit: BrandKit, note: string): Promise<BrandVersionDto | null> => {
+    const body = await api.post<Body>(`${BASE}/brand/versions`, { kit, note });
+    const saved = body.saved;
+    return saved && typeof saved === 'object' && typeof (saved as Body).version === 'number' ? (saved as BrandVersionDto) : null;
+  },
+  /** One version and its kit — a pending version can be read before it is approved (404 from a Worker without the route). */
+  version: async (version: number): Promise<BrandVersionResponse> => {
+    const body = await api.get<Body>(`${BASE}/brand/versions/${encodeURIComponent(String(version))}`);
+    const v = body.version;
+    const kit = body.kit;
+    if (!v || typeof v !== 'object' || typeof (v as Body).version !== 'number' || !kit || typeof kit !== 'object') throw invalid('version');
+    return { version: v as BrandVersionDto, kit: kit as BrandKit };
+  },
   approve: (version: number) => api.post<Body>(`${BASE}/brand/versions/${version}/approve`, {}),
   claims: async (): Promise<ClaimDto[]> => list<ClaimDto>(await api.get<Body>(`${BASE}/claims`), 'claims'),
+};
+
+/** What the owner writes for a service claim (worker/lib/creative/claims.ts `claimInput`); the key is set once, at creation. */
+export interface ClaimInputBody {
+  title: Localized;
+  summary: Localized;
+  conditions: Localized;
+  details_path: string | null;
+  product_ids: string[];
+  valid_from: string | null;
+  valid_until: string | null;
+  last_verified_at: string | null;
+  source_note: string;
+}
+
+/**
+ * Service claims (owner): every write is a NEW pending version; approval
+ * retires the older approved one and marks the designs bound to it
+ * (`marked`). Reading is open to every studio user.
+ */
+export const claims = {
+  list: async (): Promise<ClaimDto[]> => list<ClaimDto>(await api.get<Body>(`${BASE}/claims`), 'claims'),
+  create: async (key: string, input: ClaimInputBody): Promise<ClaimDto> => one<ClaimDto>(await api.post<Body>(`${BASE}/claims`, { key, ...input }), 'claim', 'status'),
+  revise: async (id: string, input: ClaimInputBody): Promise<ClaimDto> => one<ClaimDto>(await api.put<Body>(`${BASE}/claims/${encodeURIComponent(id)}`, input), 'claim', 'status'),
+  /** `version` null = the newest pending version. */
+  approve: async (id: string, version: number | null): Promise<{ claim: ClaimDto; marked: number }> => {
+    const body = await api.post<Body>(`${BASE}/claims/${encodeURIComponent(id)}/approve`, version === null ? {} : { version });
+    return { claim: one<ClaimDto>(body, 'claim', 'status'), marked: typeof body.marked === 'number' ? body.marked : 0 };
+  },
+  /** The designs bound to this claim (spec §19). */
+  documents: async (id: string): Promise<DocumentSummaryDto[]> => list<DocumentSummaryDto>(await api.get<Body>(`${BASE}/claims/${encodeURIComponent(id)}/documents`), 'documents'),
+};
+
+// ---------------------------------------------------------------------------
+// Catalogue watch
+// ---------------------------------------------------------------------------
+
+export const watch = {
+  /** ONE bounded step of the catalogue watch; screensModel.runCatalogSync repeats it until `pass_complete`. */
+  sync: async (): Promise<WatchSyncResponse> => one<WatchSyncResponse>(await api.post<Body>(`${BASE}/watch/sync`, {}, { timeoutMs: 45000 }), 'sync', 'pass_complete'),
 };
 
 // ---------------------------------------------------------------------------
@@ -173,6 +227,9 @@ export const documents = {
   /** Version-fenced: a 409 VERSION_CONFLICT means someone saved after `base_version`, and nothing was written. */
   save: async (id: string, input: { content: CreativeDocument; base_version: number; origin: VersionOrigin; job_id?: string | null; change_summary?: string }): Promise<SaveResult> =>
     saveResultOf(await api.put<Body>(`${BASE}/documents/${encodeURIComponent(id)}`, { job_id: null, change_summary: '', ...input })),
+  /** A copy as a new draft (version 1, same bindings); the original is untouched. */
+  duplicate: async (id: string): Promise<DocumentDto> =>
+    one<DocumentDto>(await api.post<Body>(`${BASE}/documents/${encodeURIComponent(id)}/duplicate`, {}), 'document', 'content'),
   /** A rename: no new version, an approval stands. */
   rename: (id: string, title: string) => api.patch<Body>(`${BASE}/documents/${encodeURIComponent(id)}`, { title }),
   /** Draft / in review / archived, version-fenced like a save. */

@@ -7,8 +7,16 @@
  * and saved as a NEW version (POST /brand/versions) through the same gate the
  * server uses (`normalizeBrandKit`); a design keeps the version it was made
  * with. Approving a version is the owner’s too. Everyone else reads.
+ *
+ * The FORM says which kit it shows. After a save it stays on what was saved
+ * (the kit in force is still the last APPROVED one, so re-reading it would
+ * snap the form back); any version can be opened in the form before it is
+ * approved (GET /brand/versions/:version — a Worker without that route says
+ * so instead of failing). The logo is the site's own or an APPROVED logo
+ * asset, picked here.
  */
 import { useEffect, useState } from 'react';
+import { ApiError } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Field, Input, Select, Textarea } from '../ui/Field';
@@ -16,7 +24,7 @@ import { StatusChip } from '../ui/Badge';
 import { BINDING_RULES, TYPE_ROLES, normalizeBrandKit, type BrandKit, type TypeRole } from '../../../packages/creativeDoc/src/brand';
 import { FONT_REGISTRY, isHexColor, type FontFamilyId } from '../../../packages/creativeDoc/src/schema';
 import { assets as assetsApi, brand as brandApi } from './client';
-import { COLOR_KEY_TEXT, CORNER_TEXT, FONT_ROLE_TEXT, ROLE_TEXT, S } from './strings';
+import { COLOR_KEY_TEXT, CORNER_TEXT, FONT_ROLE_TEXT, ROLE_TEXT, S, fill } from './strings';
 import { RemoteView, failText, shortTime, useRemote, useStudio, useText } from './shared';
 
 const COLOR_KEYS = ['background', 'surface', 'text', 'text_muted', 'accent', 'accent_text', 'price'] as const;
@@ -27,13 +35,18 @@ export default function BrandTab() {
   const { lang, w } = useText();
   const [versions, reloadVersions] = useRemote(() => brandApi.versions(), []);
   const [bgAssets] = useRemote(() => assetsApi.list('background'), []);
+  const [logoAssets] = useRemote(() => assetsApi.list('logo'), []);
+  // The version the form shows when it is not the kit in force: just saved, or opened from the list.
+  const [pinned, setPinned] = useState<{ version: number; status: 'pending' | 'approved' } | null>(null);
   const brand = studio.brand;
   const owner = studio.user.isOwner;
   const [kit, setKit] = useState<BrandKit | null>(brand?.kit ?? null);
   const [note, setNote] = useState('');
   const [newColor, setNewColor] = useState('#');
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
-  useEffect(() => setKit(brand?.kit ?? null), [brand]);
+  useEffect(() => {
+    if (pinned === null) setKit(brand?.kit ?? null);
+  }, [brand, pinned]);
 
   if (!brand || !kit) return <p className="p-6 text-sm text-text-muted" role="status">{w(S.loading)}</p>;
 
@@ -46,9 +59,16 @@ export default function BrandTab() {
       return;
     }
     try {
-      await brandApi.saveVersion(n.kit, note.trim().slice(0, 300));
+      const saved = await brandApi.saveVersion(n.kit, note.trim().slice(0, 300));
       setNote('');
-      setMessage({ tone: 'ok', text: w(S.brandSaved) });
+      // The form stays on what was saved; the kit in force is re-read for everything else.
+      setKit(n.kit);
+      if (saved) {
+        setPinned({ version: saved.version, status: saved.status });
+        setMessage({ tone: 'ok', text: fill(w(S.brandSavedPending), { n: saved.version }) });
+      } else {
+        setMessage({ tone: 'ok', text: w(S.brandSaved) });
+      }
       studio.reloadBrand();
       reloadVersions();
     } catch (e) {
@@ -59,11 +79,22 @@ export default function BrandTab() {
     setMessage(null);
     try {
       await brandApi.approve(version);
+      setPinned(null);
       setMessage({ tone: 'ok', text: w(S.brandApproved) });
       studio.reloadBrand();
       reloadVersions();
     } catch (e) {
       setMessage({ tone: 'error', text: failText(e, lang) });
+    }
+  };
+  const view = async (version: number) => {
+    setMessage(null);
+    try {
+      const v = await brandApi.version(version);
+      setKit(v.kit);
+      setPinned({ version: v.version.version, status: v.version.status });
+    } catch (e) {
+      setMessage({ tone: 'error', text: e instanceof ApiError && e.status === 404 ? w(S.brandViewUnavailable) : failText(e, lang) });
     }
   };
   const status = brand.status === 'approved' ? S.brandVersionApproved : brand.status === 'pending' ? S.brandVersionPending : S.brandVersionDefault;
@@ -75,6 +106,12 @@ export default function BrandTab() {
         <StatusChip tone={brand.status === 'approved' ? 'success' : 'warning'}>{w(status)}{brand.version ? ` · v${brand.version}` : ''}</StatusChip>
       </div>
       {!owner ? <p className="text-sm text-text-muted">{w(S.brandOwnerOnly)}</p> : null}
+      <div className="flex flex-wrap items-center gap-2" role="status" data-brand-form-shows={pinned ? pinned.version : 'current'}>
+        <p className="text-sm text-text-secondary">
+          {pinned ? fill(w(S.brandFormShows), { n: pinned.version, status: w(pinned.status === 'approved' ? S.brandVersionApproved : S.brandVersionPending) }) : w(S.brandFormCurrent)}
+        </p>
+        {pinned ? <Button size="sm" variant="ghost" onClick={() => setPinned(null)}>{w(S.brandBackToCurrent)}</Button> : null}
+      </div>
 
       <Card title={w(S.brandRules)}>
         <ul className="flex flex-col gap-2" data-binding-rules>
@@ -132,7 +169,17 @@ export default function BrandTab() {
 
           <section className="grid gap-2 sm:grid-cols-3">
             <h3 className="text-sm font-semibold text-text-primary sm:col-span-3">{w(S.brandLogo)}</h3>
-            <p className="text-sm text-text-secondary sm:col-span-3">{kit.logo.asset === 'site' ? w(S.brandLogoSite) : kit.logo.asset}</p>
+            <Field label={w(S.brandLogoPick)} hint={w(S.brandLogoPickHint)} className="sm:col-span-3">
+              <Select value={kit.logo.asset} onChange={(e) => set({ logo: { ...kit.logo, asset: e.target.value } })} data-logo-pick>
+                <option value="site">{w(S.brandLogoSite)}</option>
+                {logoAssets.status === 'ready'
+                  ? logoAssets.data.filter((a) => a.review === 'approved').map((a) => <option key={a.id} value={a.id}>{a.label || a.id}</option>)
+                  : null}
+                {kit.logo.asset !== 'site' && !(logoAssets.status === 'ready' && logoAssets.data.some((a) => a.id === kit.logo.asset && a.review === 'approved'))
+                  ? <option value={kit.logo.asset}>{kit.logo.asset}</option>
+                  : null}
+              </Select>
+            </Field>
             <Field label={w(S.brandLogoWidth)}><Input type="number" ltr value={kit.logo.width} onChange={(e) => set({ logo: { ...kit.logo, width: Number(e.target.value) } })} /></Field>
             <Field label={w(S.brandLogoCorner)}>
               <Select value={kit.logo.corner} onChange={(e) => set({ logo: { ...kit.logo, corner: e.target.value as BrandKit['logo']['corner'] } })}>
@@ -200,6 +247,7 @@ export default function BrandTab() {
                   <span className="text-sm font-semibold text-text-primary">v{v.version}</span>
                   <StatusChip tone={v.status === 'approved' ? 'success' : 'warning'}>{w(v.status === 'approved' ? S.brandVersionApproved : S.brandVersionPending)}</StatusChip>
                   <span className="min-w-0 flex-1 text-xs text-text-muted">{v.note} · {shortTime(v.created_at, lang)}{v.created_by_name ? ` · ${v.created_by_name}` : ''}</span>
+                  <Button size="sm" variant="ghost" onClick={() => view(v.version)} data-brand-view={v.version}>{w(S.brandView)}</Button>
                   {owner && v.status === 'pending' ? <Button size="sm" onClick={() => approve(v.version)}>{w(S.brandApprove)}</Button> : null}
                 </li>
               ))}

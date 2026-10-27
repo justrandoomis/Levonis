@@ -1,7 +1,9 @@
 /**
  * «تصميم جديد» — the main path of the brief (spec §11, §12, §33):
- * product → variant → picture → goal, priority, amount of text, size,
- * language → template → THREE compositions side by side → choose → editor.
+ * product → variant → picture → family, goal, priority, amount of text,
+ * size, language → template → UP TO THREE compositions side by side (as many
+ * as the template has for the goal; the screen says how many) → choose →
+ * editor.
  *
  *  - Only the product’s own SAME-ORIGIN pictures can be chosen (a picture
  *    from another site would taint the export canvas); remote ones are shown
@@ -14,7 +16,20 @@
  *    Claude writes each one’s copy and reason (POST /ai/compose); without it,
  *    a person writes the copy once and the three layouts are built from it.
  *    A Sorani ad’s words are always typed by a person (DECISIONS row 262).
- *  - A service post starts from an APPROVED claim (service_card).
+ *  - The visual PRIORITY is a real choice: only the priorities the template
+ *    can honour for the goal are offered, the chosen one's composition leads
+ *    (`variantsFor`'s 4th argument), and changing it drops stale compositions.
+ *  - A FAMILY sets the goal, the template and the leading composition, and is
+ *    passed to the layout and to Claude. Its badge («وصل حديثاً», «عاد
+ *    للتوفر», «عرض خاص») is drawn only with evidence from the shop's own
+ *    records — an offer on the snapshot, an arrival or a return to stock in
+ *    the opportunities — and the screen says why when it is not.
+ *  - A service post starts from an APPROVED claim (service_card); with none,
+ *    the screen links to «الخدمات المعتمدة».
+ *  - From an IDEA: the claim and the idea's composition are preselected, its
+ *    caption and alt text carried into the build. A design built from
+ *    Claude's words (a composition, or the idea's own headline) is created
+ *    with origin 'ai' and its job; from the template alone, 'template'.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../ui/Button';
@@ -25,9 +40,9 @@ import VariantImg from '../ui/VariantImg';
 import { AI_COPY_LOCALES } from '../../../packages/creativeDoc/src/aiContracts';
 import type { ClaimDto, ComposeResponse, ProductDetailDto, ProductListItemDto } from '../../../packages/creativeDoc/src/api';
 import { buildFromTemplate, type BuildCopy, type BuildResult } from '../../../packages/creativeDoc/src/layout';
-import { CUSTOM_FORMAT_LIMITS, FORMATS, OBJECTIVES, VISUAL_PRIORITIES, formatOf, type AdLocale, type Density, type DocFormat, type FormatId, type Objective, type VisualPriority } from '../../../packages/creativeDoc/src/schema';
+import { CUSTOM_FORMAT_LIMITS, FORMATS, MAX_ALT_CHARS, MAX_CAPTION_CHARS, OBJECTIVES, formatOf, type AdLocale, type Density, type DocFormat, type FormatId, type Objective, type VisualPriority } from '../../../packages/creativeDoc/src/schema';
 import { localized, type ProductSnapshot } from '../../../packages/creativeDoc/src/snapshot';
-import { TEMPLATES, VARIANT_LABELS, templateForProduct, variantsFor, type TemplateId, type VariantId } from '../../../packages/creativeDoc/src/templates';
+import { FAMILIES, NO_EVIDENCE, TEMPLATES, VARIANT_LABELS, templateForProduct, type FamilyId, type TemplateId, type VariantId } from '../../../packages/creativeDoc/src/templates';
 import { containsPriceLike } from '../../../packages/creativeDoc/src/text';
 import { ai, assets as assetsApi, brand as brandApi, documents, idempotencyKey, store } from './client';
 import { backgroundNatural, claimText, evidenceFor, logoNatural, searchPriceLabel } from './editorData';
@@ -37,10 +52,15 @@ import DocThumb from './DocThumb';
 import {
   AVAILABILITY_TEXT, CONFLICT_TEXT, DENSITY_TEXT, FORMAT_TEXT, LOCALE_TEXT, OBJECTIVE_TEXT, PRICE_STATUS_TEXT, PRIORITY_TEXT, S, fill,
 } from './strings';
-import { AiNotReady, RemoteView, failText, useRemote, useStudio, useText, type NewDesignPrefill } from './shared';
+import { AiNotReady, RemoteView, codeOf, failText, useRemote, useStudio, useText, type NewDesignPrefill } from './shared';
+import {
+  PRODUCT_FAMILIES, compositionVariants, createOrigin, effectivePriority, familyBadge, familyChoice, familyForObjective, ideaJobFor, initialPriority,
+  isJobRefusal, supportedPriorities,
+} from './screensModel';
 
 interface Picture { url: string; width: number; height: number }
-interface Composition { variant: VariantId; reason: string; result: BuildResult }
+/** `jobId`: the job whose words this composition carries (Claude's composition, or the idea's own headline); null = the template's. */
+interface Composition { variant: VariantId; reason: string; result: BuildResult; jobId: string | null }
 
 const PRODUCT_TEMPLATES: TemplateId[] = ['product_hero', 'compact_product', 'education_slide'];
 
@@ -65,8 +85,10 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
   const [snapshot, setSnapshot] = useState<ProductSnapshot | null>(null);
   const [picture, setPicture] = useState<Picture | null>(null);
   const [claim, setClaim] = useState<ClaimDto | null>(null);
+  const [claimMissing, setClaimMissing] = useState(false);
   const [objective, setObjective] = useState<Objective>(prefill?.objective ?? (prefill?.mode === 'service' ? 'service_trust' : 'sell'));
-  const [priority, setPriority] = useState<VisualPriority>('product');
+  const [family, setFamily] = useState<FamilyId | null>(() => familyForObjective(prefill?.objective ?? (prefill?.mode === 'service' ? 'service_trust' : 'sell'), prefill?.mode ?? 'product'));
+  const [priority, setPriority] = useState<VisualPriority>(initialPriority(prefill));
   const [density, setDensity] = useState<Density>('brief');
   const [formatId, setFormatId] = useState<FormatId>('square');
   const [customW, setCustomW] = useState('1080');
@@ -74,7 +96,10 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
   const [locale, setLocale] = useState<AdLocale>(lang === 'en' ? 'en' : 'ar');
   const [template, setTemplate] = useState<TemplateId>(prefill?.mode === 'service' ? 'service_card' : 'product_hero');
   const [brief, setBrief] = useState('');
-  const [copy, setCopy] = useState({ headline: prefill?.copy?.headline ?? '', subhead: prefill?.copy?.subhead ?? '', features: (prefill?.copy?.features ?? []).join('\n'), cta: prefill?.copy?.cta ?? '' });
+  const [copy, setCopy] = useState({
+    headline: prefill?.copy?.headline ?? '', subhead: prefill?.copy?.subhead ?? '', features: (prefill?.copy?.features ?? []).join('\n'), cta: prefill?.copy?.cta ?? '',
+    caption: prefill?.caption ?? '', alt: prefill?.alt ?? '',
+  });
   const [compositions, setCompositions] = useState<Composition[] | null>(null);
   const [composeInfo, setComposeInfo] = useState<Pick<ComposeResponse, 'warnings' | 'missing' | 'job_id'> | null>(null);
   const [busy, setBusy] = useState<'' | 'product' | 'snapshot' | 'compose' | 'create'>('');
@@ -95,6 +120,16 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
   useEffect(() => {
     if (prefill?.productId) void chooseProduct(prefill.productId);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A service named by an idea is preselected once the approved claims are known (once: the owner may then change it).
+  const claimPrefilled = useRef(false);
+  useEffect(() => {
+    if (claimPrefilled.current || extras.status !== 'ready' || !prefill?.claimId) return;
+    claimPrefilled.current = true;
+    const found = extras.data.claims.find((c) => c.id === prefill.claimId && c.status === 'approved');
+    if (found) setClaim(found);
+    else setClaimMissing(true);
+  }, [extras, prefill]);
 
   // Search as the owner types (debounced; a late answer never replaces a newer one).
   useEffect(() => {
@@ -155,17 +190,22 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
       return;
     }
     setPicture({ url: img.url, ...size });
-    setTemplate(templateForProduct(size));
+    // The picture's proportions pick between the two product templates; a lesson family keeps its own.
+    setTemplate(family && FAMILIES[family].template !== 'product_hero' ? FAMILIES[family].template : templateForProduct(size));
     setCompositions(null);
   };
 
   const format: DocFormat | null = formatId === 'custom' ? formatOf('custom', Number(customW), Number(customH)) : { ...FORMATS[formatId] };
   const priceStatus = snapshot?.data.price.status ?? null;
-  const variants = useMemo(() => variantsFor(template, objective, priceStatus).slice(0, 3), [template, objective, priceStatus]);
+  const priorities = useMemo(() => supportedPriorities(template, objective, priceStatus), [template, objective, priceStatus]);
+  const prio = effectivePriority(priority, priorities);
+  const variants = useMemo(() => compositionVariants(template, objective, priceStatus, prio), [template, objective, priceStatus, prio]);
+  const evidence = extras.status === 'ready' ? evidenceFor(product?.id ?? null, snapshot, extras.data.opportunities) : NO_EVIDENCE;
+  const badge = familyBadge(family, evidence);
   const aiReady = studio.provider?.ready === true && (AI_COPY_LOCALES as readonly string[]).includes(locale);
   const readyForCompose = !!format && (mode === 'service' ? !!claim : !!snapshot && (template === 'education_slide' || !!picture));
 
-  const build = async (perVariant: Array<{ variant: VariantId; copy: BuildCopy; reason: string; caption: string; alt: string }>) => {
+  const build = async (perVariant: Array<{ variant: VariantId; copy: BuildCopy; reason: string; caption: string; alt: string; jobId: string | null }>) => {
     if (extras.status !== 'ready' || !format) return;
     const { brand: b, assets, opportunities } = extras.data;
     const kit = b.kit;
@@ -176,11 +216,12 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
     const out: Composition[] = perVariant.map((p) => ({
       variant: p.variant,
       reason: p.reason,
+      jobId: p.jobId,
       result: buildFromTemplate({
         template, variant: p.variant, format, locale, objective, density, brand: kit, brandVersion: b.version,
         products: snapshot && picture ? [{ slot: 'main', snapshot, image: picture }] : [],
         service: mode === 'service' && claim ? claimText(claim) : null,
-        copy: p.copy, evidence: evidenceFor(product?.id ?? null, snapshot, opportunities), family: null,
+        copy: p.copy, evidence: evidenceFor(product?.id ?? null, snapshot, opportunities), family,
         logo: logoNatural(kit, b, assets), backgroundNatural: backgroundNatural(kit, assets),
         slide: null, caption: p.caption, alt_text: p.alt, measure,
       }),
@@ -210,7 +251,8 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
     setBusy('compose');
     setComposeInfo(null);
     try {
-      await build(variants.map((v) => ({ variant: v, copy: c, reason: VARIANT_LABELS[v][lang], caption: '', alt: '' })));
+      const jobId = ideaJobFor(prefill, c.headline);
+      await build(variants.map((v) => ({ variant: v, copy: c, reason: VARIANT_LABELS[v][lang], caption: copy.caption.trim(), alt: copy.alt.trim(), jobId })));
     } finally {
       setBusy('');
     }
@@ -221,7 +263,7 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
     setBusy('compose');
     try {
       const res = await ai.compose({
-        snapshot_id: snapshot?.id ?? null, claim_id: mode === 'service' ? claim?.id ?? null : null, objective, priority, density, template, family: null,
+        snapshot_id: snapshot?.id ?? null, claim_id: mode === 'service' ? claim?.id ?? null : null, objective, priority: prio, density, template, family,
         variants, locale: locale === 'en' ? 'en' : 'ar', brief: brief.trim().slice(0, 600), idempotency_key: idempotencyKey(),
       });
       setComposeInfo({ warnings: res.warnings, missing: res.missing, job_id: res.job_id });
@@ -229,7 +271,10 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
         setError(w(S.chatDiffNothing));
         return;
       }
-      await build(res.proposals.map((p) => ({ variant: p.variant, copy: { headline: p.headline, subhead: p.subhead || undefined, cta: p.cta || undefined, features: p.features }, reason: p.reason, caption: p.caption, alt: p.alt_text })));
+      await build(res.proposals.map((p) => ({
+        variant: p.variant, copy: { headline: p.headline, subhead: p.subhead || undefined, cta: p.cta || undefined, features: p.features }, reason: p.reason,
+        caption: p.caption || copy.caption.trim(), alt: p.alt_text || copy.alt.trim(), jobId: res.job_id,
+      })));
     } catch (e) {
       setError(failText(e, lang));
     } finally {
@@ -243,13 +288,33 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
     try {
       const headline = c.result.doc.layers.find((l) => l.id === 'headline');
       const title = (headline && headline.type === 'text' ? headline.text : '') || (snapshot ? localized(snapshot.data.name, lang) : claim ? localized(claim.title, lang) : w(S.tabNew));
-      const created = await documents.create({ title: title.slice(0, 120), content: c.result.doc, origin: composeInfo ? 'ai' : 'template', job_id: composeInfo?.job_id ?? null });
+      const input = { title: title.slice(0, 120), content: c.result.doc };
+      const origin = createOrigin(c.jobId);
+      let created;
+      try {
+        created = await documents.create({ ...input, ...origin });
+      } catch (e) {
+        // A job the server will not link (an ideas job already used for another design, a cancelled one): the design is still made, from the template.
+        if (origin.origin !== 'ai' || !isJobRefusal(codeOf(e))) throw e;
+        created = await documents.create({ ...input, ...createOrigin(null) });
+      }
       studio.openDocument(created.id);
     } catch (e) {
       setError(failText(e, lang));
     } finally {
       setBusy('');
     }
+  };
+
+  const chooseFamily = (f: FamilyId | null) => {
+    setFamily(f);
+    setCompositions(null);
+    setComposeInfo(null);
+    if (!f) return;
+    const c = familyChoice(f);
+    setObjective(c.objective);
+    setTemplate(c.template);
+    setPriority(c.priority);
   };
 
   const pictures = snapshot ? snapshot.data.images.filter((i) => i.variant_key === null || variantKey === null || i.variant_key === variantKey) : [];
@@ -259,8 +324,8 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
       {(ex) => (
         <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4" data-new-design>
           <div className="flex flex-wrap gap-2">
-            <Button variant={mode === 'product' ? 'primary' : 'secondary'} aria-pressed={mode === 'product'} onClick={() => { setMode('product'); setTemplate('product_hero'); setObjective('sell'); setCompositions(null); }}>{w(S.homeStartProduct)}</Button>
-            <Button variant={mode === 'service' ? 'primary' : 'secondary'} aria-pressed={mode === 'service'} onClick={() => { setMode('service'); setTemplate('service_card'); setObjective('service_trust'); setCompositions(null); }}>{w(S.homeStartService)}</Button>
+            <Button variant={mode === 'product' ? 'primary' : 'secondary'} aria-pressed={mode === 'product'} onClick={() => { setMode('product'); setTemplate('product_hero'); setObjective('sell'); setFamily(null); setCompositions(null); }}>{w(S.homeStartProduct)}</Button>
+            <Button variant={mode === 'service' ? 'primary' : 'secondary'} aria-pressed={mode === 'service'} onClick={() => { setMode('service'); setTemplate('service_card'); setObjective('service_trust'); setFamily('service'); setCompositions(null); }}>{w(S.homeStartService)}</Button>
           </div>
 
           {mode === 'product' ? (
@@ -335,8 +400,12 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
             </>
           ) : (
             <Card title={w(S.newServiceTitle)}>
+              {claimMissing ? <p className="mb-2 text-sm text-warning" role="status">{w(S.newIdeaClaimMissing)}</p> : null}
               {ex.claims.filter((c) => c.status === 'approved').length === 0 ? (
-                <p className="text-sm text-text-muted">{w(S.newNoClaims)}</p>
+                <div className="flex flex-col items-start gap-2" data-no-claims>
+                  <p className="text-sm text-text-muted">{w(S.newNoClaims)}</p>
+                  <Button size="sm" onClick={() => studio.goTab('claims')} data-open-claims>{w(S.newOpenClaims)}</Button>
+                </div>
               ) : (
                 <ul className="flex flex-col gap-2">
                   {ex.claims.filter((c) => c.status === 'approved').map((c) => (
@@ -356,14 +425,22 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
           {(mode === 'service' ? !!claim : !!snapshot) ? (
             <Card title={w(S.newStepGoal)}>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {mode === 'product' ? (
+                  <Field label={w(S.newFamily)} hint={w(S.newFamilyHint)}>
+                    <Select value={family ?? ''} onChange={(e) => chooseFamily(e.target.value ? (e.target.value as FamilyId) : null)} data-family>
+                      <option value="">{w(S.newFamilyNone)}</option>
+                      {PRODUCT_FAMILIES.map((f) => <option key={f} value={f}>{FAMILIES[f].label[lang]}</option>)}
+                    </Select>
+                  </Field>
+                ) : null}
                 <Field label={w(S.newObjective)}>
-                  <Select value={objective} onChange={(e) => { setObjective(e.target.value as Objective); setCompositions(null); }}>
+                  <Select value={objective} onChange={(e) => { const next = e.target.value as Objective; setObjective(next); if (family && FAMILIES[family].objective !== next) setFamily(null); setCompositions(null); setComposeInfo(null); }}>
                     {OBJECTIVES.map((o) => <option key={o} value={o}>{w(OBJECTIVE_TEXT[o])}</option>)}
                   </Select>
                 </Field>
-                <Field label={w(S.newPriority)}>
-                  <Select value={priority} onChange={(e) => setPriority(e.target.value as VisualPriority)}>
-                    {VISUAL_PRIORITIES.filter((p) => p !== 'price' || priceStatus === 'priced').map((p) => <option key={p} value={p}>{w(PRIORITY_TEXT[p])}</option>)}
+                <Field label={w(S.newPriority)} hint={w(S.newPriorityHint)}>
+                  <Select value={prio} onChange={(e) => { setPriority(e.target.value as VisualPriority); setCompositions(null); setComposeInfo(null); }} data-priority>
+                    {priorities.map((p) => <option key={p} value={p}>{w(PRIORITY_TEXT[p])}</option>)}
                   </Select>
                 </Field>
                 <Field label={w(S.newDensity)}>
@@ -388,6 +465,13 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
                   </Select>
                 </Field>
               </div>
+              {badge.kind !== 'none' ? (
+                <p className={`mt-3 text-sm ${badge.kind === 'drawn' ? 'text-success' : 'text-text-secondary'}`} role="status" data-badge-state={badge.kind}>
+                  {badge.kind === 'drawn'
+                    ? fill(w(S.newBadgeDrawn), { text: badge.text[locale] })
+                    : fill(w(badge.needs === 'arrival' ? S.newBadgeNoArrival : badge.needs === 'back_in_stock' ? S.newBadgeNoBack : S.newBadgeNoOffer), { text: badge.text[locale] })}
+                </p>
+              ) : null}
             </Card>
           ) : null}
 
@@ -399,6 +483,7 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
                 </div>
               ) : <p className="text-sm text-text-secondary">{TEMPLATES.service_card.label[lang]}</p>}
               <p className="mt-2 text-xs text-text-muted">{variants.map((v) => VARIANT_LABELS[v][lang]).join(' · ')}</p>
+              <p className="mt-1 text-xs text-text-muted" data-composition-count={variants.length}>{fill(w(S.newCompositionCount), { n: variants.length })}</p>
             </Card>
           ) : null}
 
@@ -424,6 +509,8 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
                   <Field label={w(S.newSubhead)} optional><Input value={copy.subhead} maxLength={160} onChange={(e) => setCopy({ ...copy, subhead: e.target.value })} /></Field>
                   <Field label={w(S.newFeatures)} optional><Textarea rows={3} value={copy.features} onChange={(e) => setCopy({ ...copy, features: e.target.value })} /></Field>
                   <Field label={w(S.newCta)} optional><Input value={copy.cta} maxLength={40} onChange={(e) => setCopy({ ...copy, cta: e.target.value })} /></Field>
+                  <Field label={w(S.newCaption)} optional><Textarea rows={2} value={copy.caption} maxLength={MAX_CAPTION_CHARS} onChange={(e) => setCopy({ ...copy, caption: e.target.value })} data-copy-caption /></Field>
+                  <Field label={w(S.newAlt)} optional><Input value={copy.alt} maxLength={MAX_ALT_CHARS} onChange={(e) => setCopy({ ...copy, alt: e.target.value })} data-copy-alt /></Field>
                   <Button loading={busy === 'compose'} onClick={buildManual} data-build-manual>{w(S.newBuild)}</Button>
                 </section>
               </div>

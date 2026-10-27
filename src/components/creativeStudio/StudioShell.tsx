@@ -1,7 +1,7 @@
 /**
  * The studio’s frame: who is looking, the provider and brand status every
- * screen reads, and the tabs (Home, New design, Editor, Brand, Assets,
- * Archive, Settings). The open design and tab live in the URL
+ * screen reads, and the tabs (Home, New design, Editor, Brand, Approved
+ * services, Assets, Archive, Settings). The open design and tab live in the URL
  * (`?tab=…&doc=…`) so a reload reopens the same design; switching away from
  * the editor unmounts it, which flushes its autosave first.
  *
@@ -23,11 +23,16 @@ import Home from './Home';
 import NewDesign from './NewDesign';
 import Editor from './Editor';
 import BrandTab from './BrandTab';
+import ClaimsTab from './ClaimsTab';
 import AssetsTab from './AssetsTab';
 import ArchiveTab from './ArchiveTab';
 import SettingsTab from './SettingsTab';
 
-const TABS: StudioTab[] = ['home', 'new', 'editor', 'brand', 'assets', 'archive', 'settings'];
+const TABS: StudioTab[] = ['home', 'new', 'editor', 'brand', 'claims', 'assets', 'archive', 'settings'];
+
+const TAB_LABEL: Readonly<Record<StudioTab, keyof typeof S>> = {
+  home: 'tabHome', new: 'tabNew', editor: 'tabEditor', brand: 'tabBrand', claims: 'tabClaims', assets: 'tabAssets', archive: 'tabArchive', settings: 'tabSettings',
+};
 
 function fromUrl(): { tab: StudioTab; doc: string | null } {
   try {
@@ -143,7 +148,7 @@ export default function StudioShell() {
 
   const items = TABS.filter((t) => t !== 'editor' || docId).map((t) => ({
     id: t,
-    label: w(t === 'home' ? S.tabHome : t === 'new' ? S.tabNew : t === 'editor' ? S.tabEditor : t === 'brand' ? S.tabBrand : t === 'assets' ? S.tabAssets : t === 'archive' ? S.tabArchive : S.tabSettings),
+    label: w(S[TAB_LABEL[t]]),
   }));
 
   return (
@@ -166,6 +171,7 @@ export default function StudioShell() {
           {tab === 'editor' && docId ? <Editor key={docId} docId={docId} /> : null}
           {tab === 'editor' && !docId ? <p className="p-6 text-sm text-text-muted">{w(S.editorEmpty)}</p> : null}
           {tab === 'brand' ? <BrandTab /> : null}
+          {tab === 'claims' ? <ClaimsTab /> : null}
           {tab === 'assets' ? <AssetsTab /> : null}
           {tab === 'archive' ? <ArchiveTab /> : null}
           {tab === 'settings' ? <SettingsTab /> : null}

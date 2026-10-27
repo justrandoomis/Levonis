@@ -183,6 +183,7 @@ async function providerStatus(c: Context<AppContext>, given?: ProviderSettings):
     can_manage: owner,
     ready: notReady === null,
     not_ready_code: notReady,
+    priorities: s.priorities,
   };
 }
 

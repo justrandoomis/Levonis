@@ -10,19 +10,26 @@
  * of this and is shown as the source when it is the one in use.
  *
  * THE MODEL comes from Anthropic’s live list (GET /provider/models), never a
- * name written in the code. Costs are ESTIMATES from rates the owner typed,
+ * name written in the code, and is sent only when the owner changed it — the
+ * server checks a model against that live list, which is down while a key is
+ * revoked, and the caps must stay savable then (screensModel.settingsPayload).
+ * THE OWNER'S PRIORITIES are typed here, one per line, and are what Claude is
+ * told the owner prioritises. Costs are ESTIMATES from rates the owner typed,
  * with their source and date. Everyone but the owner reads the status only.
+ * There is no «automatic fix rounds» field: the studio has no automatic fix
+ * loop, so the setting would control nothing.
  */
 import { useEffect, useState } from 'react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
-import { Field, Input, Select } from '../ui/Field';
+import { Field, Input, Select, Textarea } from '../ui/Field';
 import { Switch } from '../ui/Switch';
 import { StatusChip } from '../ui/Badge';
 import type { BudgetSettings, Effort, ModelDto, ProviderStatusDto, Rates, UsageTotals } from '../../../packages/creativeDoc/src/api';
 import { provider as providerApi } from './client';
 import { EFFORT_TEXT, ERROR_TEXT, JOB_TEXT, S, TASK_TEXT, fill } from './strings';
 import { RemoteView, failText, shortTime, useRemote, useStudio, useText } from './shared';
+import { settingsPayload } from './screensModel';
 
 export default function SettingsTab() {
   const studio = useStudio();
@@ -56,6 +63,7 @@ function SettingsBody({ s, owner, lang, w, onChanged }: { s: ProviderStatusDto; 
   const [budget, setBudget] = useState<BudgetSettings>(s.budget);
   const [rates, setRates] = useState<Rates | null>(s.rates);
   const [vision, setVision] = useState(s.vision_review);
+  const [priorities, setPriorities] = useState((s.priorities ?? []).join('\n'));
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [usage, reloadUsage] = useRemote(() => providerApi.usage(), []);
   useEffect(() => {
@@ -64,6 +72,7 @@ function SettingsBody({ s, owner, lang, w, onChanged }: { s: ProviderStatusDto; 
     setBudget(s.budget);
     setRates(s.rates);
     setVision(s.vision_review);
+    setPriorities((s.priorities ?? []).join('\n'));
   }, [s]);
 
   const say = (tone: 'ok' | 'error', text: string) => setMessage({ tone, text });
@@ -111,7 +120,7 @@ function SettingsBody({ s, owner, lang, w, onChanged }: { s: ProviderStatusDto; 
   const saveSettings = async () => {
     setMessage(null);
     try {
-      await providerApi.saveSettings({ model: model || null, effort: effort || null, budget, rates, vision_review: vision });
+      await providerApi.saveSettings(settingsPayload(s, { model, effort, budget, rates, vision, priorities }));
       say('ok', w(S.setSaved));
       onChanged();
     } catch (e) {
@@ -187,7 +196,6 @@ function SettingsBody({ s, owner, lang, w, onChanged }: { s: ProviderStatusDto; 
           <Field label={w(S.setMaxParallel)}><Input type="number" ltr min={1} value={budget.max_parallel} onChange={(e) => setBudget({ ...budget, max_parallel: num(e.target.value) })} /></Field>
           <Field label={w(S.setDailyUsd)}><Input type="number" ltr min={0} step="0.01" value={budget.daily_usd ?? ''} onChange={(e) => setBudget({ ...budget, daily_usd: e.target.value === '' ? null : num(e.target.value) })} /></Field>
           <Field label={w(S.setMonthlyUsd)}><Input type="number" ltr min={0} step="0.01" value={budget.monthly_usd ?? ''} onChange={(e) => setBudget({ ...budget, monthly_usd: e.target.value === '' ? null : num(e.target.value) })} /></Field>
-          <Field label={w(S.setFixRounds)}><Input type="number" ltr min={0} max={5} value={budget.auto_fix_rounds} onChange={(e) => setBudget({ ...budget, auto_fix_rounds: num(e.target.value) })} /></Field>
         </fieldset>
       </Card>
 
@@ -204,7 +212,15 @@ function SettingsBody({ s, owner, lang, w, onChanged }: { s: ProviderStatusDto; 
           ) : null}
           <Switch checked={vision} onChange={setVision} label={w(S.setVision)} description={w(S.setVisionHint)} disabled={!owner} />
         </fieldset>
-        {owner ? <Button className="mt-3" variant="primary" onClick={saveSettings}>{w(S.setSaveSettings)}</Button> : null}
+      </Card>
+
+      <Card title={w(S.setPriorities)}>
+        <fieldset disabled={!owner}>
+          <Field label={w(S.setPriorities)} hint={w(S.setPrioritiesHint)}>
+            <Textarea rows={3} value={priorities} onChange={(e) => setPriorities(e.target.value)} data-owner-priorities />
+          </Field>
+        </fieldset>
+        {owner ? <Button className="mt-3" variant="primary" onClick={saveSettings} data-save-settings>{w(S.setSaveSettings)}</Button> : null}
       </Card>
 
       {message ? <p className={`text-sm ${message.tone === 'ok' ? 'text-success' : 'text-danger'}`} role={message.tone === 'ok' ? 'status' : 'alert'} data-settings-message>{message.text}</p> : null}
