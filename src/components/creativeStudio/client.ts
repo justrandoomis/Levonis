@@ -20,7 +20,7 @@ import type {
   AssetDto, AssetKind, BrandDto, BrandVersionDto, ClaimDto, ComposeRequest, ComposeResponse, DocStatus, DocumentDto,
   DocumentSummaryDto, EditRequest, EditResponse, ExportDto, ExportKind, IdeaRecordDto, IdeasRequest, IdeasResponse,
   ModelDto, OpportunityDto, ProductDetailDto, ProductListItemDto, ProviderStatusDto, ReviewRequest, ReviewResponse,
-  UsageRecordDto, VerifyDto, VersionDto, VersionOrigin, BudgetSettings, Rates, Effort, ApproveRequest, ReviewDto,
+  UsageRecordDto, VerifyDto, VersionDto, VersionOrigin, BudgetSettings, Rates, Effort, ApproveRequest, ReviewDto, RejectReason,
 } from '../../../packages/creativeDoc/src/api';
 import type { BrandKit } from '../../../packages/creativeDoc/src/brand';
 import type { CreativeDocument } from '../../../packages/creativeDoc/src/schema';
@@ -176,8 +176,12 @@ export const documents = {
   /** A rename: no new version, an approval stands. */
   rename: (id: string, title: string) => api.patch<Body>(`${BASE}/documents/${encodeURIComponent(id)}`, { title }),
   /** Draft / in review / archived, version-fenced like a save. */
-  setStatus: async (id: string, status: Extract<DocStatus, 'draft' | 'in_review' | 'archived'>, baseVersion: number): Promise<SaveResult> =>
-    saveResultOf(await api.post<Body>(`${BASE}/documents/${encodeURIComponent(id)}/status`, { status, base_version: baseVersion })),
+  setStatus: async (id: string, status: Extract<DocStatus, 'draft' | 'in_review' | 'archived'>, baseVersion: number): Promise<DocumentDto> =>
+    one<DocumentDto>(await api.post<Body>(`${BASE}/documents/${encodeURIComponent(id)}/status`, { status, base_version: baseVersion }), 'document', 'content'),
+  /** A reviewer's rejection of the current version, with its reasons (stored as feedback too). */
+  reject: async (id: string, reasons: RejectReason[], note: string): Promise<ReviewDto> =>
+    one<ReviewDto>(await api.post<Body>(`${BASE}/documents/${encodeURIComponent(id)}/reject`, { reasons, note }), 'review', 'decision'),
+  reviews: async (id: string): Promise<ReviewDto[]> => list<ReviewDto>(await api.get<Body>(`${BASE}/documents/${encodeURIComponent(id)}/reviews`), 'reviews'),
   versions: async (id: string): Promise<VersionDto[]> => list<VersionDto>(await api.get<Body>(`${BASE}/documents/${encodeURIComponent(id)}/versions`), 'versions'),
   version: async (id: string, version: number): Promise<{ content: CreativeDocument }> => {
     const body = await api.get<Body>(`${BASE}/documents/${encodeURIComponent(id)}/versions/${version}`);

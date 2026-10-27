@@ -330,26 +330,40 @@ function solveColumn(items: Item[], area: Box, measure: TextMeasurer, dropped: s
   let live = items.slice();
   for (const it of live) if (it.kind === 'text' && !fitItem(it, area.width, it.maxSize, measure)) overflowIds.push(it.id);
   const product = live.find((i): i is ProductItem => i.kind === 'product');
-  const minProduct = product ? product.block.minFrac * area.height : 0;
+  // The product's share of the height is capped by what its column WIDTH lets it reach: a wide
+  // picture in a narrow column cannot use more height, so text never shrinks for room it would
+  // not fill, and a width-bound picture is not a "content too long" conflict.
+  const widthCap = product ? ((area.width * product.block.widthFrac) / product.product.image.width) * product.product.image.height : 0;
+  const minProduct = product ? Math.min(product.block.minFrac * area.height, widthCap) : 0;
 
   const textAndGaps = () => stackHeight(live.filter((i) => i.kind === 'text')) + live.filter((i) => i.kind === 'product').reduce((a, i) => a + i.gapAfter, 0);
-  // 1) shrink lower-priority text toward its floor, 2) drop optional blocks, lowest keep first.
+  // Crowding is solved in the brief's order (spec §8): first a gentle size step on the
+  // lower-priority words (down to 85 %), then a change of COMPOSITION — optional blocks
+  // leave, lowest priority first — and only then sizes go down to the readable floor.
   const byKeep = () => live.filter((i): i is TextItem => i.kind === 'text').sort((a, b) => a.block.keep - b.block.keep);
-  let guard = 0;
-  while (area.height - textAndGaps() < minProduct && guard++ < 60) {
-    const shrinkable = byKeep().find((i) => i.size > i.minSize);
-    if (shrinkable) {
-      fitItem(shrinkable, area.width, Math.max(shrinkable.minSize, Math.round(shrinkable.size * 0.9)), measure);
-      continue;
+  const tight = () => area.height - textAndGaps() < minProduct;
+  const shrinkTo = (floorOf: (i: TextItem) => number) => {
+    let guard = 0;
+    while (tight() && guard++ < 60) {
+      const it = byKeep().find((i) => i.size > floorOf(i));
+      if (!it) return;
+      fitItem(it, area.width, Math.max(floorOf(it), Math.round(it.size * 0.92)), measure);
     }
-    const droppable = byKeep().find((i) => i.block.optional);
-    if (droppable) {
+  };
+  const dropWhileTight = (maxKeep: number) => {
+    while (tight()) {
+      const droppable = byKeep().find((i) => i.block.optional && i.block.keep <= maxKeep);
+      if (!droppable) return;
       dropped.push(droppable.id);
       live = live.filter((i) => i !== droppable);
-      continue;
     }
-    break;
-  }
+  };
+  shrinkTo((i) => Math.max(i.minSize, Math.round(i.maxSize * 0.85)));
+  // Low-priority extras leave first; a high-priority optional block (an evidence-backed badge)
+  // leaves only after every size has reached its floor.
+  dropWhileTight(6);
+  shrinkTo((i) => i.minSize);
+  dropWhileTight(Infinity);
   const remaining = area.height - textAndGaps();
   let fits = remaining >= minProduct - 0.5;
   if (product) {
@@ -467,11 +481,28 @@ function cornerPosition(corner: Corner, safe: Box, box: { width: number; height:
   };
 }
 
+/**
+ * A side-by-side split suits a square or a 4:5 post; on a tall story the two
+ * columns would leave the product a strip of the screen. There the same blocks
+ * STACK — words that lead, the product, then the bound facts — so a format
+ * change re-distributes the design instead of shrinking it (spec §24).
+ */
+function responsiveVariant(variant: VariantDef, fmt: DocFormat): VariantDef {
+  if (variant.layout !== 'split' || fmt.height / fmt.width < 1.5) return variant;
+  const product = variant.blocks.find((b): b is ProductBlock => b.kind === 'product');
+  const texts = variant.blocks.filter((b): b is TextBlock => b.kind === 'text').map((b) => ({ ...b, align: 'center' as const }));
+  const leads = (b: TextBlock) => b.text.source === 'copy' && (b.text.slot === 'badge' || b.text.slot === 'headline' || b.text.slot === 'subhead' || b.text.slot === 'features');
+  const blocks: StackBlock[] = product
+    ? [...texts.filter(leads), { ...product, minFrac: Math.max(0.36, product.minFrac * 0.8), maxFrac: Math.min(0.6, product.maxFrac), widthFrac: Math.min(0.9, product.widthFrac) }, ...texts.filter((b) => !leads(b))]
+    : texts;
+  return { ...variant, layout: 'stack', blocks };
+}
+
 /** Make a document from a template — the "three compositions" each come from here (spec §12). */
 export function buildFromTemplate(input: BuildInput): BuildResult {
   const tpl = TEMPLATES[input.template];
-  const variant = tpl.variants[input.variant] ?? Object.values(tpl.variants)[0]!;
   const fmt = input.format;
+  const variant = responsiveVariant(tpl.variants[input.variant] ?? Object.values(tpl.variants)[0]!, fmt);
   const dir: 'rtl' | 'ltr' = input.locale === 'en' ? 'ltr' : 'rtl';
   const kit = input.brand;
   const safe_area = safeAreaFor(kit, fmt);

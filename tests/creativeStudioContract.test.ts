@@ -179,6 +179,25 @@ test('the studio client and the Worker agree on every route the editor uses (one
     const review = await documents.approve(doc.id, { version: 3, qa, export_ids: [exp.id] });
     assert.equal(review.decision, 'approved');
 
+    // --- the review workflow the editor's «المراجعة والاعتماد» section drives ----------
+    const history = await documents.reviews(doc.id);
+    assert.equal(history[0].decision, 'approved');
+    // an edit after approval withdraws it and the design is a draft again (spec §25)
+    const changed: CreativeDocument = { ...reopened.content, caption: 'نسخة بعد الاعتماد' };
+    const v4 = await documents.save(doc.id, { content: changed, base_version: 3, origin: 'manual' });
+    assert.equal(v4.version, 4);
+    const afterEdit = await documents.get(doc.id);
+    assert.equal(afterEdit.status, 'draft');
+    assert.equal(afterEdit.approved_version, null);
+    assert.ok((await documents.reviews(doc.id)).some((r) => r.decision === 'approved' && r.invalidated_at), 'the old approval is marked withdrawn');
+    const inReview = await documents.setStatus(doc.id, 'in_review', 4);
+    assert.equal(inReview.status, 'in_review');
+    const rejected = await documents.reject(doc.id, ['crowded', 'text_long'], 'خفّف النص');
+    assert.equal(rejected.decision, 'rejected');
+    assert.deepEqual([...rejected.reasons].sort(), ['crowded', 'text_long']);
+    const archived = await documents.setStatus(doc.id, 'archived', (await documents.get(doc.id)).version);
+    assert.equal(archived.status, 'archived');
+
     // --- ideas, saved ideas, visual review, cancel ---------------------------------------
     const opps = await ai.opportunities();
     const topic = opps.find((o) => o.kind === 'education_topic');
@@ -196,7 +215,7 @@ test('the studio client and the Worker agree on every route the editor uses (one
     assert.equal(ideas.ideas.length, 1);
     assert.ok(ideas.ideas[0].id);
     assert.equal((await ai.savedIdeas()).length, 1);
-    const rev = await ai.review({ document_id: doc.id, version: 3, image_base64: PNG_1x1.toString('base64'), idempotency_key: 'contract-review-001' });
+    const rev = await ai.review({ document_id: doc.id, version: (await documents.get(doc.id)).version, image_base64: PNG_1x1.toString('base64'), idempotency_key: 'contract-review-001' });
     assert.equal(rev.summary, 'متوازن');
     await assert.rejects(ai.cancel(edit.job_id), (e: unknown) => e instanceof ApiError && typeof e.code === 'string', 'an applied job cannot be cancelled');
     assert.ok(prov.messages().length >= 4);

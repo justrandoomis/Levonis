@@ -107,13 +107,15 @@ const P = (o: Partial<ProductBlock> = {}): ProductBlock => ({
 
 const headline = (o: Partial<TextBlock> = {}) => T('headline', { slot: 'headline', source: 'copy' }, 'headline', { keep: 9, ...o });
 const subhead = (o: Partial<TextBlock> = {}) => T('subhead', { slot: 'subhead', source: 'copy' }, 'subhead', { optional: true, keep: 3, detailedOnly: true, ...o });
-const badge = (o: Partial<TextBlock> = {}) => T('badge', { slot: 'badge', source: 'copy' }, 'badge', { optional: true, keep: 2, maxLines: 1, chip: true, gapAfter: 'small', ...o });
+// A badge only exists with evidence (or the owner's own words), and it IS the message of a family post — it outranks the other optional blocks.
+const badge = (o: Partial<TextBlock> = {}) => T('badge', { slot: 'badge', source: 'copy' }, 'badge', { optional: true, keep: 7, maxLines: 1, chip: true, gapAfter: 'small', ...o });
 const productName = (o: Partial<TextBlock> = {}) => T('product_name', { slot: 'product_name', source: 'product' }, 'product_name', { keep: 8, gapAfter: 'small', ...o });
 const price = (o: Partial<TextBlock> = {}) => T('price', { slot: 'price', source: 'product' }, 'price', { keep: 8, maxLines: 1, gapAfter: 'small', ...o });
 const priceNote = (o: Partial<TextBlock> = {}) => T('price_note', { slot: 'price_note', source: 'product' }, 'price_note', { optional: true, keep: 4, maxLines: 1, ...o });
 const availability = (o: Partial<TextBlock> = {}) => T('price_note', { slot: 'availability', source: 'product' }, 'availability', { optional: true, keep: 6, maxLines: 1, ...o });
 const features = (o: Partial<TextBlock> = {}) => T('feature', { slot: 'features', source: 'copy' }, 'feature', { optional: true, keep: 4, maxLines: 2, ...o });
-const cta = (o: Partial<TextBlock> = {}) => T('cta', { slot: 'cta', source: 'copy' }, 'cta', { optional: true, keep: 7, maxLines: 1, chip: true, gapAfter: 'small', ...o });
+// The call to action is one of the four essentials of an ad (spec §5: headline, product, price, CTA): never dropped for room, only shrunk to its floor.
+const cta = (o: Partial<TextBlock> = {}) => T('cta', { slot: 'cta', source: 'copy' }, 'cta', { optional: false, keep: 8, maxLines: 1, chip: true, gapAfter: 'small', ...o });
 
 const L = (ar: string, en: string, ckb: string): Localized => ({ ar, en, ckb });
 
@@ -132,15 +134,15 @@ export const TEMPLATES: Readonly<Record<TemplateId, TemplateDef>> = {
     variants: {
       product_first: {
         id: 'product_first', label: VARIANT_LABELS.product_first, priority: 'product', layout: 'stack', justify: 'center',
-        blocks: [badge(), headline(), subhead(), P({ minFrac: 0.36, maxFrac: 0.58 }), productName(), price(), availability(), cta({ gapAfter: 'small' })],
+        blocks: [badge(), headline(), subhead(), P({ minFrac: 0.5, maxFrac: 0.64 }), productName(), price(), availability(), cta({ gapAfter: 'small' })],
       },
       price_first: {
         id: 'price_first', label: VARIANT_LABELS.price_first, priority: 'price', layout: 'stack', justify: 'center',
-        blocks: [badge(), headline({ boost: 0.82 }), P({ minFrac: 0.3, maxFrac: 0.46 }), productName(), price({ boost: 1.45, gapAfter: 'small' }), priceNote(), availability(), cta()],
+        blocks: [badge(), headline({ boost: 0.82 }), P({ minFrac: 0.36, maxFrac: 0.5 }), productName(), price({ boost: 1.45, gapAfter: 'small' }), priceNote(), availability(), cta()],
       },
       feature_first: {
         id: 'feature_first', label: VARIANT_LABELS.feature_first, priority: 'feature', layout: 'stack', justify: 'center',
-        blocks: [headline(), features({ optional: false, keep: 7 }), P({ minFrac: 0.26, maxFrac: 0.42 }), productName({ gapAfter: 'small' }), price({ boost: 0.85 }), cta()],
+        blocks: [headline(), features({ optional: false, keep: 7 }), P({ minFrac: 0.3, maxFrac: 0.45 }), productName({ gapAfter: 'small' }), price({ boost: 0.85 }), cta()],
       },
     },
   },

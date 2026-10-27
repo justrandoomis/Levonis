@@ -17,13 +17,14 @@
 import { useRef, useState } from 'react';
 import { Button } from '../../ui/Button';
 import { normalizeDocument } from '../../../../packages/creativeDoc/src/normalize';
-import type { ExportDto, ExportKind } from '../../../../packages/creativeDoc/src/api';
+import type { ExportKind } from '../../../../packages/creativeDoc/src/api';
 import { documents } from '../client';
 import type { EditorApi } from '../editorApi';
 import { exportFileName } from '../editorModel';
 import { EXPORT_KIND_TEXT, S, fill } from '../strings';
 import { canvasBlob, downloadBlob, failText, useText } from '../shared';
 import { reportFor, verifyAll } from './QaPanel';
+import ReviewSection from './ReviewSection';
 
 const TYPES: Record<'png' | 'jpeg' | 'webp', { mime: string; ext: string; quality?: number }> = {
   png: { mime: 'image/png', ext: 'png' },
@@ -34,7 +35,8 @@ const TYPES: Record<'png' | 'jpeg' | 'webp', { mime: string; ext: string; qualit
 export default function ExportPanel({ api }: { api: EditorApi }) {
   const { lang, w } = useText();
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
-  const [finalExport, setFinalExport] = useState<ExportDto | null>(null);
+  /** Bumped after a final export so the review section re-reads the server (approval needs that export). */
+  const [reviewKey, setReviewKey] = useState(0);
   const fileInput = useRef<HTMLInputElement>(null);
   const { doc } = api;
   const bg = doc.layers.find((l) => l.role === 'background');
@@ -83,24 +85,11 @@ export default function ExportPanel({ api }: { api: EditorApi }) {
       }
       const blob = await render(kind);
       if (!blob) return;
-      const rec = await documents.uploadExport(api.docId, { file: blob, kind: kind as ExportKind, version: now.version, final: true, width: now.doc.format.width, height: now.doc.format.height });
-      setFinalExport(rec);
+      await documents.uploadExport(api.docId, { file: blob, kind: kind as ExportKind, version: now.version, final: true, width: now.doc.format.width, height: now.doc.format.height });
+      setReviewKey((k) => k + 1);
       const name = exportFileName(api.meta.title, now.version, TYPES[kind].ext, false);
       downloadBlob(blob, name);
       setMessage({ tone: 'ok', text: `${fill(w(S.exportDone), { name })} ${fill(w(S.exportRecorded), { n: now.version })}` });
-    } catch (e) {
-      setMessage({ tone: 'error', text: failText(e, lang) });
-    }
-  };
-
-  const approve = async () => {
-    if (!finalExport) return;
-    setMessage(null);
-    try {
-      const now = api.current();
-      const report = reportFor(api, now.doc, true);
-      await documents.approve(api.docId, { version: now.version, qa: report, export_ids: [finalExport.id] });
-      setMessage({ tone: 'ok', text: w(S.brandApproved) });
     } catch (e) {
       setMessage({ tone: 'error', text: failText(e, lang) });
     }
@@ -154,7 +143,6 @@ export default function ExportPanel({ api }: { api: EditorApi }) {
           {(['png', 'jpeg', 'webp'] as const).map((k) => <Button key={k} size="sm" variant="primary" data-export-final={k} onClick={() => final(k)}>{w(EXPORT_KIND_TEXT[k])}</Button>)}
         </div>
         <p className="text-xs text-text-muted">{w(S.exportFinalBlocked)}</p>
-        {finalExport ? <Button size="sm" variant="accent" onClick={approve}>{w(S.brandApprove)}</Button> : null}
       </section>
       <section className="flex flex-col gap-2">
         <Button size="sm" onClick={projectJson}>{w(S.exportJson)}</Button>
@@ -163,6 +151,7 @@ export default function ExportPanel({ api }: { api: EditorApi }) {
         <input ref={fileInput} type="file" accept="application/json,.json" className="hidden" aria-hidden="true" tabIndex={-1} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void importJson(f); }} />
       </section>
       {message ? <p className={`text-sm ${message.tone === 'ok' ? 'text-success' : 'text-danger'}`} role={message.tone === 'ok' ? 'status' : 'alert'} data-export-message>{message.text}</p> : null}
+      <ReviewSection api={api} refreshKey={reviewKey} />
     </div>
   );
 }

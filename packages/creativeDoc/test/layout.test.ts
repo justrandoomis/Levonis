@@ -106,3 +106,38 @@ test('service card keeps the conditions line', () => {
   assert.equal(cond.text, 'الشروط التجريبية تنطبق');
   assert.deepEqual(r.doc.services, [{ claim_id: 'claim_warranty_1', claim_version: 3 }]);
 });
+
+test('product-first makes the product the hero: at least 40 % of a square post`s height with ordinary copy', () => {
+  const r = built({ copy: { headline: 'طباعة دقيقة لكل مشروع', cta: 'اطلبها الآن' } });
+  const p = r.doc.layers.find((l): l is ImageLayer => l.id === 'product')!;
+  assert.ok(layerBox(p)!.height / 1080 >= 0.4, `product height ${Math.round(layerBox(p)!.height)} of 1080`);
+  // crowding order (spec §8): an optional extra leaves before the price is shrunk to its floor
+  const price = r.doc.layers.find((l) => l.id === 'price') as TextLayer;
+  assert.ok(price.font.size > price.minSize, `price ${price.font.size}px stays above its ${price.minSize}px floor`);
+});
+
+test('a split layout re-stacks on a tall story instead of leaving the product a strip', () => {
+  const tall = product(snapshot(), 1); // the 900×900 picture
+  const square = built({ template: 'compact_product', variant: 'product_first', products: [tall] });
+  const story = built({ template: 'compact_product', variant: 'product_first', products: [tall], format: FORMATS.story });
+  const ps = layerBox(square.doc.layers.find((l) => l.id === 'product')!)!;
+  const pt = layerBox(story.doc.layers.find((l) => l.id === 'product')!)!;
+  assert.ok(pt.width > ps.width * 1.4, `story product ${Math.round(pt.width)}px vs square ${Math.round(ps.width)}px`);
+  const headline = story.doc.layers.find((l) => l.id === 'headline')!;
+  assert.ok(headline.y < pt.y, 'the words that lead come first, then the product');
+  assert.deepEqual(story.conflicts, []);
+});
+
+test('a picture limited by its column width is not reported as content that is too long', () => {
+  // a wide picture forced into the compact (side-by-side) template: smaller, but not a conflict
+  const r = built({ template: 'compact_product', variant: 'product_first' });
+  assert.equal(r.conflicts.some((c) => c.code === 'content_too_long'), false, JSON.stringify(r.conflicts));
+});
+
+test('the call to action is never dropped for room — only shrunk to its floor', () => {
+  const long = 'عنوان طويل جداً يشرح مزايا الطابعة الجديدة كلها بالتفصيل الممل';
+  for (const variant of ['product_first', 'price_first', 'feature_first'] as const) {
+    const r = built({ variant, copy: { headline: long, subhead: long, cta: 'اطلبها الآن', features: ['ميزة أولى طويلة نوعاً ما', 'ميزة ثانية طويلة نوعاً ما'] }, density: 'detailed' });
+    assert.ok(r.doc.layers.some((l) => l.id === 'cta'), `${variant}: CTA kept`);
+  }
+});
