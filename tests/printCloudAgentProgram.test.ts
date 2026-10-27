@@ -1080,8 +1080,12 @@ async function localFetch(input: string | URL | Request, init: RequestInit = {})
     const type = encoded.headers.get('content-type');
     if (type) headers.set('content-type', type);
   }
+  const outgoing: Record<string, string> = {};
+  headers.forEach((value, name) => {
+    outgoing[name] = value;
+  });
   return new Promise<Response>((resolve, reject) => {
-    const req = http.request(url, { method, headers: Object.fromEntries(headers) }, (res) => {
+    const req = http.request(url, { method, headers: outgoing }, (res) => {
       const chunks: Buffer[] = [];
       res.on('data', (c: Buffer) => chunks.push(c));
       res.on('end', () => {
