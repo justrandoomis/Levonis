@@ -100,6 +100,7 @@ export default {
         'GET /exports/:id/file': 'op',
         // AI
         'POST /ai/ideas': { cls: 'op', noBody: AI },
+        'POST /ai/chat': { cls: 'op', noBody: AI },
         'POST /ai/compose': { cls: 'op', noBody: AI },
         'POST /ai/edit': { cls: 'op', noBody: AI },
         'POST /ai/review': { cls: 'op', noBody: AI },
