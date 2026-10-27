@@ -230,8 +230,9 @@ test('spec-13: a scoped request on a chip reaches its words — the scope is the
     operations: [{ op: 'set_text', layer_id: words.id, value: 'اطلب الآن' }], reason: '', warnings: [], clarification: '',
   };
   const ctx = (scope: string[]) => ({ documentId: 'doc_test', version: 3, doc, scope, evidence: { offer: false, serviceClaim: false }, ops: { brand: kit, allowed: allowedAssets(doc, data()), measure: approximateMeasurer } });
+  // The package's validator expands the scope too (model-9), so even a bare group scope now reaches its words.
   const before = validateEditPatch(patch, ctx(topLevel(doc, [group.id])));
-  assert.ok(before.ok === false && before.code === 'target_outside_scope', 'the old scope refused every answer');
+  assert.ok(before.ok === true, 'the validator expands a group scope to what is inside it');
   const after = validateEditPatch(patch, ctx(chatScope(doc, [group.id])));
   assert.ok(after.ok === true && after.applied, JSON.stringify(after));
 });
