@@ -302,7 +302,7 @@ test('MONEY DOORS: an Idempotency-Key exactly where the server keys a door — n
   const keyed = OPERATIONS.filter((o) => o.base === 'admin' && o.idempotent).map((o) => o.path).sort();
   assert.deepEqual([...IDEMPOTENT_DOORS].sort(), keyed, 'the console knows the keyed doors');
   const minting = FILES.filter((f) => /newIdempotencyKey\(/.test(readFileSync(f, 'utf8'))).map((f) => relative(CONSOLE, f)).sort();
-  assert.deepEqual(minting, ['sections/CustomersSection.tsx', 'sections/OrdersSection.tsx'], 'only the balance and refund screens mint a key');
+  assert.deepEqual(minting, ['sections/CustomersSection.tsx', 'sections/OrdersSection.tsx', 'sections/StockSection.tsx'], 'only the balance, refund and stock screens mint a key');
   const orders = readFileSync(join(CONSOLE, 'sections/OrdersSection.tsx'), 'utf8');
   const payment = /pc\.post<PaymentResult>\(`\/orders\/\$\{enc\(o\.id\)\}\/confirm-payment`, (\{[^}]*\})\)/.exec(orders);
   assert.ok(payment, 'the manual payment is posted with its body and nothing else');
@@ -310,6 +310,8 @@ test('MONEY DOORS: an Idempotency-Key exactly where the server keys a door — n
   assert.match(orders, /pc\.post<RefundAnswer>\(`\/orders\/\$\{enc\(o\.id\)\}\/refunds`, planned\.body, planned\.key\)/, 'a refund carries the key of its plan');
   const customers = readFileSync(join(CONSOLE, 'sections/CustomersSection.tsx'), 'utf8');
   assert.match(customers, /\/adjust`,[\s\S]{0,400}?\n\s*key\n\s*\)/, 'a balance correction carries its key');
+  const stock = readFileSync(join(CONSOLE, 'sections/StockSection.tsx'), 'utf8');
+  assert.match(stock, /`\/stock\/\$\{kind\}`, body, keyFor\(body\)\)/, 'a stock movement carries the key of its body');
 });
 
 test('COST AND MONEY: the console reads its access hints fail-closed, and money sections are gated', () => {

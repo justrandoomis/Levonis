@@ -6,6 +6,10 @@
  * A material a body names is named in that body's language, its unit too
  * (`material`), never in English for everyone.
  *
+ * A link is a path of the customer app on cloud.<root> (src/cloud: /jobs/:id,
+ * /orders/:id, /account/shipments/:id, /account/materials, /account/hours,
+ * /account/buyback): the apex's bell opens a `print_cloud` link on that host.
+ *
  * Statements, not sends: a notification lands in the SAME batch as the event
  * it reports (a fulfilled order, a finished print), and its `eventKey` makes a
  * replay a no-op.

@@ -239,7 +239,7 @@ export async function seedCatalog(w: World, opts: { approval?: boolean; secondPr
   const rings = await variant(ringProduct.id, 'RING-25', 'Keychain ring 25 mm', 'حلقة ميدالية 25 مم', 'ئەڵقەی کلیلدان 25 ملم', 'pc');
   await ok(w.owner, 'PUT', `${ADMIN}/variants/${magnets}/price-tiers`, { tiers: [{ mode: 'bracket', min_qty: 1, unit_price_milli_iqd: 250000 }, { mode: 'pack', min_qty: 10, pack_price_iqd: 2000 }] });
   await ok(w.owner, 'PUT', `${ADMIN}/variants/${rings}/price-tiers`, { tiers: [{ mode: 'bracket', min_qty: 1, unit_price_milli_iqd: 300000 }] });
-  const receive = (variantId: string, qty: number, cost: number) => ok(w.owner, 'POST', `${ADMIN}/stock/receive`, { variant_id: variantId, qty, total_cost_iqd: cost, supplier: 'Bambu Lab' });
+  const receive = (variantId: string, qty: number, cost: number) => ok(w.owner, 'POST', `${ADMIN}/stock/receive`, { variant_id: variantId, qty, total_cost_iqd: cost, supplier: 'Bambu Lab' }, idem('stock'));
   await receive(white, 20000, 400000);
   await receive(black, 5000, 100000);
   await receive(red, 5000, 100000);

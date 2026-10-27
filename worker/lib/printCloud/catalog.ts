@@ -600,12 +600,13 @@ export async function publicPrinterModels(db: D1Database, ready: { sql: string; 
 export async function publicPackages(db: D1Database, now: Date, tierId?: string | null) {
   return many<Record<string, unknown>>(
     db,
-    `SELECT id, tier_id, code, name_ar, name_en, name_ckb, kind, seconds, price_iqd, min_quantity, max_quantity, max_per_customer,
-            expires_after_days, bundle_json, valid_from, valid_until, sort
-       FROM pc_credit_packages
-      WHERE active = 1 AND (valid_from IS NULL OR valid_from <= ?) AND (valid_until IS NULL OR valid_until > ?)
-        ${tierId ? 'AND tier_id = ?' : ''}
-      ORDER BY tier_id, sort, seconds`,
+    // A package of a printer class switched off is not offered: the quote refuses it (`tier_active`).
+    `SELECT p.id, p.tier_id, p.code, p.name_ar, p.name_en, p.name_ckb, p.kind, p.seconds, p.price_iqd, p.min_quantity, p.max_quantity, p.max_per_customer,
+            p.expires_after_days, p.bundle_json, p.valid_from, p.valid_until, p.sort
+       FROM pc_credit_packages p JOIN pc_credit_tiers t ON t.id = p.tier_id
+      WHERE p.active = 1 AND t.active = 1 AND (p.valid_from IS NULL OR p.valid_from <= ?) AND (p.valid_until IS NULL OR p.valid_until > ?)
+        ${tierId ? 'AND p.tier_id = ?' : ''}
+      ORDER BY p.tier_id, p.sort, p.seconds`,
     ...(tierId ? [iso(now), iso(now), tierId] : [iso(now), iso(now)])
   );
 }

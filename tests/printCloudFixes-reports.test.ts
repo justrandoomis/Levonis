@@ -124,7 +124,7 @@ test('c17: a lot received without a cost is cost-pending; the profit report flag
   const cat = await seedCatalog(w);
   const green = await newFilament(w);
   // The operator receives the delivery; the cost is the owner's to state.
-  const received = await ok(w.assistant, 'POST', `${ADMIN}/stock/receive`, { variant_id: green, qty: 1000, supplier: 'Bambu Lab' });
+  const received = await ok(w.assistant, 'POST', `${ADMIN}/stock/receive`, { variant_id: green, qty: 1000, supplier: 'Bambu Lab' }, idem('stock'));
   const lot = (await ok(w.owner, 'GET', `${ADMIN}/stock/lots?variant_id=${green}`)).find((l: Json) => l.id === received.lot_id);
   assert.deepEqual([lot.cost_known, lot.total_cost_iqd], [0, 0], 'pending, not free');
 
@@ -132,7 +132,7 @@ test('c17: a lot received without a cost is cost-pending; the profit report flag
   const { jobId } = await estimatedJob(w, w.a, cat, { seconds: H, materials: [{ variant_id: green, model_grams: 100 }] });
   await runToPrinting(w, w.a, jobId, cat.printers[0]);
   await ok(w.assistant, 'POST', `${ADMIN}/jobs/${jobId}/complete`, { printed_seconds: H, materials: [{ variant_id: green, qty: 100 }] });
-  await ok(w.assistant, 'POST', `${ADMIN}/stock/waste`, { variant_id: green, qty: 50, reason: 'tangled spool end' });
+  await ok(w.assistant, 'POST', `${ADMIN}/stock/waste`, { variant_id: green, qty: 50, reason: 'tangled spool end' }, idem('stock'));
 
   const pending = await profit(w);
   assert.equal(pending.cost_complete, false, 'the report never presents an unknown cost as a recorded zero');
@@ -163,11 +163,11 @@ test('c17: a lot received without a cost is cost-pending; the profit report flag
   assert.equal(valued.gross_profit, valued.recognised_revenue - 2500);
 
   // Later use is valued as it happens, continuing the lot: the next 50 g cost 1,250.
-  await ok(w.assistant, 'POST', `${ADMIN}/stock/waste`, { variant_id: green, qty: 50, reason: 'calibration' });
+  await ok(w.assistant, 'POST', `${ADMIN}/stock/waste`, { variant_id: green, qty: 50, reason: 'calibration' }, idem('stock'));
   assert.equal((await profit(w)).operating_costs.material_waste_and_workshop_use, 2500);
 
   // A count that finds more than the books is an adjustment lot of unknown cost too.
-  await ok(w.assistant, 'POST', `${ADMIN}/stock/adjust`, { variant_id: green, qty_delta: 5, reason: 'found a sample' });
+  await ok(w.assistant, 'POST', `${ADMIN}/stock/adjust`, { variant_id: green, qty_delta: 5, reason: 'found a sample' }, idem('stock'));
   const adjustment = rows<{ cost_known: number }>(w, "SELECT cost_known FROM pc_stock_lots WHERE variant_id = ? AND lot_code = 'ADJUSTMENT'", green);
   assert.deepEqual(adjustment.map((l) => l.cost_known), [0]);
   await reconcileClean(w);
@@ -177,7 +177,7 @@ test('c17: a print settled while the owner states the lot cost is valued from th
   const w = pcWorld();
   const cat = await seedCatalog(w);
   const green = await newFilament(w);
-  const received = await ok(w.assistant, 'POST', `${ADMIN}/stock/receive`, { variant_id: green, qty: 1000 });
+  const received = await ok(w.assistant, 'POST', `${ADMIN}/stock/receive`, { variant_id: green, qty: 1000 }, idem('stock'));
   await buy(w.a, [{ kind: 'credit_package', package_id: cat.packages.h6 }, { kind: 'material', variant_id: green, quantity: 200 }]);
   const { jobId } = await estimatedJob(w, w.a, cat, { seconds: H, materials: [{ variant_id: green, model_grams: 100 }] });
   await runToPrinting(w, w.a, jobId, cat.printers[0]);
@@ -231,7 +231,7 @@ test('p0: reconciliation proves every credit, inventory and stock lot against it
   // Two lots of each kind in one account, the older one partly drawn by a print.
   await buy(w.a, [{ kind: 'credit_package', package_id: cat.packages.h6 }, { kind: 'material', variant_id: cat.white, quantity: 250 }]);
   await buy(w.a, [{ kind: 'credit_package', package_id: cat.packages.h6 }, { kind: 'material', variant_id: cat.white, quantity: 250 }]);
-  await ok(w.owner, 'POST', `${ADMIN}/stock/receive`, { variant_id: cat.white, qty: 1000, total_cost_iqd: 20000 });
+  await ok(w.owner, 'POST', `${ADMIN}/stock/receive`, { variant_id: cat.white, qty: 1000, total_cost_iqd: 20000 }, idem('stock'));
   const { jobId } = await estimatedJob(w, w.a, cat, { seconds: H, materials: [{ variant_id: cat.white, model_grams: 100 }] });
   await runToPrinting(w, w.a, jobId, cat.printers[0]);
   await ok(w.assistant, 'POST', `${ADMIN}/jobs/${jobId}/complete`, { printed_seconds: H, materials: [{ variant_id: cat.white, qty: 100 }] });

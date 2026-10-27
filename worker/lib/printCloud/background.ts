@@ -176,7 +176,7 @@ async function handle(env: RunnerEnv, task: TaskRow, now: Date, room?: Room): Pr
             notice: 'inventory_low',
             entity: 'print_cloud_inventory',
             entityId: a.variant_id,
-            link: '/print-cloud/inventory',
+            link: '/account/materials',
             vars: { qty: String(a.available_qty) },
             material: a,
             eventKey: `inventory_low:${a.id}:${a.available_qty}`,

@@ -205,7 +205,8 @@ test('every shipment status the server stores has its words and its tone; only t
   assert.deepEqual([...L.SHIPMENT_STATUSES].sort(), [...statuses].sort());
   assert.deepEqual(Object.keys(S.shipmentStatus).sort(), [...statuses].sort());
   for (const s of statuses) assert.ok(L.shipmentTone(s), s);
-  assert.deepEqual(statuses.filter(L.shipmentCancellable).sort(), ['awaiting_payment', 'preparing']);
+  assert.deepEqual(statuses.filter((s) => L.shipmentCancellable(s)).sort(), ['awaiting_payment', 'preparing']);
+  assert.deepEqual(statuses.filter((s) => L.shipmentCancellable(s, 5000)).sort(), ['awaiting_payment'], 'a paid delivery fee is the workshop’s to cancel');
   assert.match(read('worker/lib/printCloud/fulfillment.ts'), /sh\.status !== 'awaiting_payment' && sh\.status !== 'preparing'/);
   assert.deepEqual(Object.keys(S.shipmentKind).sort(), ['delivery', 'pickup']);
 });

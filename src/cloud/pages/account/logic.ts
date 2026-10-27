@@ -233,9 +233,19 @@ export function shipmentTone(status: string): Tone {
   return SHIPMENT_TONE[status as ShipmentStatus] ?? 'neutral';
 }
 
-/** The server's own rule (fulfillment.ts `cancelShipmentByCustomer`): only before it leaves the workshop. */
-export function shipmentCancellable(status: string): boolean {
-  return status === 'awaiting_payment' || status === 'preparing';
+/**
+ * The server's own rule (fulfillment.ts `cancelShipmentByCustomer`): only
+ * before it leaves the workshop, and never once its delivery fee is paid
+ * (preparing with a fee) — that one is the workshop's to cancel, deciding the
+ * fee's refund, so cancelling here never keeps a paid fee without a word.
+ */
+export function shipmentCancellable(status: string, feeIqd = 0): boolean {
+  return status === 'awaiting_payment' || (status === 'preparing' && !(feeIqd > 0));
+}
+
+/** Preparing with its delivery fee paid: the customer asks the workshop to cancel. */
+export function shipmentFeePaid(status: string, feeIqd: number): boolean {
+  return status === 'preparing' && feeIqd > 0;
 }
 
 export type StepState = 'done' | 'current' | 'upcoming';

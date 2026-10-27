@@ -20,6 +20,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
+import { useStore } from '../../StoreContext';
+import { appReturnUrl } from '../auth/storeReturn';
 import { useLanguage } from '../../LanguageContext';
 import { ApiError } from '../../lib/api';
 import { Anchored, Sheet } from '../ui/Overlay';
@@ -246,6 +248,7 @@ function NotificationBellSession() {
   const { isAuthenticated, user } = useAuth();
   const { loc, dir } = useLanguage();
   const navigate = useNavigate();
+  const { mainSite } = useStore();
   const phone = usePhone();
   const titleId = useId();
   const bellRef = useRef<HTMLButtonElement>(null);
@@ -377,9 +380,15 @@ function NotificationBellSession() {
           .then((r) => setUnread(r.unread))
           .catch(() => void refreshCount());
       }
-      if (n.link) navigate(n.link);
+      if (!n.link) return;
+      // A Print Cloud notice links to a page of the customer app on
+      // cloud.<root> (worker/lib/printCloud/notify.ts): built on that host
+      // through the allowlisted builder, never followed as an apex path.
+      const cloud = n.kind === 'print_cloud' ? appReturnUrl('cloud', mainSite, n.link) : null;
+      if (cloud) window.location.assign(cloud);
+      else navigate(n.link);
     },
-    [close, navigate, refreshCount]
+    [close, navigate, refreshCount, mainSite]
   );
 
   const markAll = useCallback(() => {

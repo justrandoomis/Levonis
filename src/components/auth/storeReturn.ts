@@ -19,7 +19,8 @@ import { sanitizeNextPath } from './nextPath';
  *
  * Its own module, not nextPath.ts: src/App.tsx imports `sanitizeNextPath`
  * into the entry chunk, and this one would bring the platform's host table
- * (worker/lib/hosts.ts) with it. Only the lazy sign-in page needs it.
+ * (worker/lib/hosts.ts) with it. Only lazy chunks need it: the sign-in page,
+ * and the notification bell (a Print Cloud notice opens on cloud.<root>).
  */
 export function storeReturnUrl(slug: unknown, mainSite: string, path: unknown): string | null {
   if (typeof slug !== 'string' || !isValidSlugSyntax(slug) || isSystemSlug(slug)) return null;

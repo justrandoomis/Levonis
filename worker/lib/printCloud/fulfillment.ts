@@ -356,7 +356,7 @@ async function advanceFrom(db: D1Database, sh: ShipmentRow, to: ShipmentStatus, 
         notice: to === 'shipped' ? 'shipment_shipped' : 'shipment_ready',
         entity: 'print_cloud_shipment',
         entityId: sh.id,
-        link: `/print-cloud/shipments/${sh.id}`,
+        link: `/account/shipments/${sh.id}`,
         eventKey: `${to}:${sh.id}`,
       })
     );
@@ -370,11 +370,18 @@ async function advanceFrom(db: D1Database, sh: ShipmentRow, to: ShipmentStatus, 
  * The customer cancels a shipment before it leaves the workshop (materials
  * released). One batch, planned from the state the customer saw: an unpaid
  * fee order is closed with it, and a fee paid meanwhile makes it refuse.
+ *
+ * A shipment whose delivery fee is PAID (preparing with a fee — paid through
+ * its fee order, or as a line of the store order that bought it) is not the
+ * customer's to cancel: cancelling would keep the fee without a word. The
+ * workshop cancels it and decides the fee's refund (admin advance + refund).
  */
 export async function cancelShipmentByCustomer(db: D1Database, userId: string, shipmentId: string, now: Date) {
-  const sh = await one<ShipmentRow>(db, `${SHIPMENT_SELECT} AND user_id = ?`, shipmentId, userId);
+  const sh = await one<ShipmentRow & { fee_iqd: number }>(db, 'SELECT id, user_id, kind, status, fee_order_id, fee_iqd FROM pc_shipments WHERE id = ? AND user_id = ?', shipmentId, userId);
   if (!sh) throw pcError('NOT_FOUND');
   if (sh.status !== 'awaiting_payment' && sh.status !== 'preparing') throw pcError('INVALID_TRANSITION', { from: sh.status, to: 'cancelled' });
+  if (sh.status === 'preparing' && Number(sh.fee_iqd) > 0) throw pcError('INVALID_TRANSITION', { from: sh.status, to: 'cancelled', reason: 'delivery_fee_paid', action: 'ask_workshop' });
+  // The batch is fenced on the status read here: a fee paid meanwhile moves it to preparing, and the batch refuses.
   return advanceFrom(db, sh, 'cancelled', { actorId: userId, now, note: 'cancelled by customer' });
 }
 

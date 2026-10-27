@@ -7,9 +7,10 @@
  * `data`. A refusal is the platform `ApiError` with a stable `code` and
  * `details.messages` in three languages (refusal.ts reads it).
  *
- * IDEMPOTENCY. The server takes an `Idempotency-Key` on exactly three admin
- * doors — credit and inventory adjustments and refunds — and the callers mint
- * one per dialog (`newIdempotencyKey`), reused by every retry of it. The
+ * IDEMPOTENCY. The server takes an `Idempotency-Key` on exactly six admin
+ * doors — credit and inventory adjustments, refunds, and the stock receipt,
+ * count correction and write-off — and the callers mint one per dialog
+ * (`newIdempotencyKey`), reused by every retry of it. The
  * manual payment door takes none: its receipt (order, amount, reference) IS
  * the event id, so the same receipt entered twice is recorded once.
  *
@@ -46,7 +47,14 @@ export { newIdempotencyKey };
  * true`) — the console sends one on these and on nothing else
  * (tests/printCloudAdminUi.test.ts holds both lists together).
  */
-export const IDEMPOTENT_DOORS = ['/customers/{userId}/credits/adjust', '/customers/{userId}/inventory/adjust', '/orders/{id}/refunds'] as const;
+export const IDEMPOTENT_DOORS = [
+  '/customers/{userId}/credits/adjust',
+  '/customers/{userId}/inventory/adjust',
+  '/orders/{id}/refunds',
+  '/stock/receive',
+  '/stock/adjust',
+  '/stock/waste',
+] as const;
 
 /** `?a=1&b=2` from the defined, non-empty values only. */
 export function query(params: Record<string, string | number | null | undefined>): string {
@@ -351,6 +359,8 @@ export interface JobDetail {
   printed_seconds: number | null;
   estimate: JobEstimate | null;
   requirements: Array<{ variant_id: string; kind: string; qty: number }>;
+  /** What a slicer measures (admin view only): the job's own variants and model files; null when it cannot be sliced as it stands. */
+  slicing?: { variants: Array<{ variant_id: string }>; models: Array<{ project_model_id: string; file_id: string; quantity: number }> } | null;
   reservations: {
     credits: { id: string; seconds_reserved: number; seconds_consumed: number; seconds_released: number; state: string } | null;
     materials: Array<{ variant_id: string; qty_reserved: number; qty_consumed: number; qty_released: number; state: string }>;

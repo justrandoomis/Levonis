@@ -41,7 +41,8 @@ the Arabic one — `tests/printCloudUnits.test.ts`).
 Idempotency: every door that moves money, hours or grams on the customer's
 behalf (`POST /orders`, `POST /orders/:id/pay/wallet`, `POST /jobs/:id/confirm`,
 `POST /shipments`, `POST /me/credits/convert`, `POST /buybacks`, admin balance
-adjustments and refunds) takes an `Idempotency-Key` header — required: without
+adjustments and refunds, and the workshop's stock receipt, count correction
+and write-off) takes an `Idempotency-Key` header — required: without
 one the door refuses `IDEMPOTENCY_KEY_REQUIRED` and writes nothing. The first answer is stored in
 `pc_operations` in the SAME batch as the business writes; a replay returns it,
 and the same key with a different request body is refused
@@ -708,6 +709,8 @@ unique indexes) and only for jobs on a machine, paid orders against payments,
 orders paid from the Levonis wallet against the wallet ledger (one debit,
 refund credits never above it, no debit without a wallet payment).
 Twenty-four checks; a mismatch is **reported**, never silently repaired. The
+report reads with money scope; a stock lot's evidence column `drawn_cost` (what
+the workshop paid) is left out for anyone who may not read cost. The
 platform's own wallet reconciliation (`walletReconciliationReport`) reads the
 Print Cloud debit as a system purchase (`created_by = 'system'`), never as a
 payout without a request.
@@ -751,7 +754,8 @@ Bindings used: `DB` (D1), the private R2 bucket (`mediaBucket(env, 'private')`).
 ### 13.2 Settings
 
 One versioned row (`pc_settings`), edited with `PATCH /admin/print-cloud/settings`
-(money scope; `cost_*` keys owner only), normalised on every read
+(money scope; `cost_*` keys and `enabled` — opening or closing the service —
+owner only, `403 FORBIDDEN` for anyone else), normalised on every read
 (`settings.ts`): `enabled`, quote/hold/confirmation durations, rounding, the
 next-pack cap, overage policies, operator approval, agent verification,
 telemetry staleness, failure policy, free reprint, upload limit, active-job

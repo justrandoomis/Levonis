@@ -19,7 +19,7 @@ import { toast } from '../../../../lib/toastStore';
 import { pc, parseJsonColumn, type ConsumptionRecord, type JobDetail, type PrinterStatus } from '../../api';
 import { ACTION_TARGET, DESTRUCTIVE, actionsFor, type JobAction } from '../../jobRules';
 import { JOB_STATUS, PROVENANCE, RESPONSIBLE, MACHINE_STATE, labelOf, tri, type Tri } from '../../i18n';
-import { ago, duration, formatDateTime, num, permille, qty } from '../../format';
+import { ago, arrow, duration, formatDateTime, num, permille, qty } from '../../format';
 import { pcRefusal } from '../../refusal';
 import { useRefs, type RefLists } from '../../refs';
 import { Act, Id, IntField, Json, KV, LoadState, Note, RefreshButton, SelectField, T, TextArea, TextField, Tray, W, useLoad, usePcLang } from '../../ui';
@@ -29,6 +29,9 @@ import type { Go } from '../../AdminPrintCloud';
 
 const S = {
   customer: tri('العميل', 'Customer', 'کڕیار'),
+  responsible: tri('من يتحمّل العطل', 'Who is responsible', 'کێ بەرپرسە'),
+  fromEstimate: tri('من التقدير — ضع رقم الطابعة مكانه', 'From the estimate — replace it with the printer’s figure', 'لە خەمڵاندنەوە — ژمارەی چاپکەرەکەی لە جێ دابنێ'),
+  measuredOnly: tri('ما قاسته الطابعة فعلاً، لا التقدير.', 'What the printer actually measured, not the estimate.', 'ئەوەی چاپکەرەکە بەڕاستی پێوای، نەک خەمڵاندنەکە.'),
   model: tri('طراز الطابعة', 'Printer model', 'مۆدێلی چاپکەر'),
   tier: tri('فئة الساعات', 'Hour tier', 'پلەی کاتژمێر'),
   copies: tri('النسخ', 'Copies', 'دانەکان'),
@@ -220,7 +223,7 @@ function JobBody({ job: j, refs, reload, go }: { job: JobDetail; refs: RefLists;
               rows={[
                 [t(S.source), labelOf(PROVENANCE, e.provenance, lang)],
                 [t(S.duration), duration(e.duration_seconds, lang)],
-                [t(S.grams), <bdi key="g" dir="ltr">{num(e.model_grams)} / {num(e.support_grams)} / {num(e.purge_grams)} g</bdi>],
+                [t(S.grams), <bdi key="g" dir="ltr">{num(e.model_grams)} / {num(e.support_grams)} / {qty(e.purge_grams, 'g', lang)}</bdi>],
                 [t(S.colorChanges), num(e.color_changes)],
                 e.layer_count !== null ? [t(S.layers), num(e.layer_count)] : null,
                 e.slicer_name ? [t(S.slicer), <bdi key="s" dir="ltr">{`${e.slicer_name} ${e.slicer_version ?? ''}`.trim()}</bdi>] : null,
@@ -236,7 +239,7 @@ function JobBody({ job: j, refs, reload, go }: { job: JobDetail; refs: RefLists;
               <ul className="space-y-0.5">
                 {e.materials.map((m) => (
                   <li key={m.variant_id} className={T.text2}>
-                    {refs.name('variants', m.variant_id)}: <bdi dir="ltr">{num(m.model_grams)} / {num(m.support_grams)} / {num(m.purge_grams)} g</bdi>
+                    {refs.name('variants', m.variant_id)}: <bdi dir="ltr">{num(m.model_grams)} / {num(m.support_grams)} / {qty(m.purge_grams, 'g', lang)}</bdi>
                   </li>
                 ))}
               </ul>
@@ -349,7 +352,7 @@ function JobBody({ job: j, refs, reload, go }: { job: JobDetail; refs: RefLists;
         <ol className="space-y-1.5 text-[12.5px]">
           {j.events.map((ev, i) => (
             <li key={i} className={T.text2}>
-              <span className={T.text3}>{formatDateTime(ev.created_at, lang)}</span> · {ev.from_status ? `${labelOf(JOB_STATUS, ev.from_status, lang)} → ` : ''}
+              <span className={T.text3}>{formatDateTime(ev.created_at, lang)}</span> · {ev.from_status ? `${labelOf(JOB_STATUS, ev.from_status, lang)} ${arrow(lang)} ` : ''}
               {labelOf(JOB_STATUS, ev.to_status, lang)} · <bdi dir="ltr" className="font-mono">{ev.event}</bdi> · <bdi dir="ltr">{ev.actor_type}</bdi>
             </li>
           ))}
@@ -373,15 +376,24 @@ function Actions({ job: j, pending, refs, reload, go }: { job: JobDetail; pendin
   const [printerId, setPrinterId] = useState('');
   const [seconds, setSeconds] = useState<number | null>(j.estimate?.duration_seconds ?? null);
   const [lines, setLines] = useState<MatLine[]>(() => j.reservations.materials.map((m) => ({ variant_id: m.variant_id, qty: m.qty_reserved })));
+  // The failure's own figures start EMPTY: what was printed and wasted before
+  // it stopped is measured, never the estimate (which would bill a 20-minute
+  // failure as the whole print).
+  const [failSeconds, setFailSeconds] = useState<number | null>(null);
+  const [failLines, setFailLines] = useState<MatLine[]>([]);
   const [reasonCode, setReasonCode] = useState('');
   const [responsible, setResponsible] = useState('undetermined');
   const [description, setDescription] = useState('');
   const [recordId, setRecordId] = useState(pending[0]?.id ?? '');
   const [asReported, setAsReported] = useState(true);
   // the manual estimate
-  const [estLines, setEstLines] = useState<Array<{ variant_id: string; model: number | null; support: number | null; purge: number | null }>>(() =>
-    j.requirements.filter((r) => r.kind === 'filament').map((r) => ({ variant_id: r.variant_id, model: null, support: 0, purge: 0 }))
-  );
+  // Seeded with the job's own filaments: its requirements once estimated, else
+  // the slicing input's variants (a first estimate has no filament line yet).
+  const ownVariants = j.slicing?.variants.map((v) => v.variant_id) ?? [];
+  const [estLines, setEstLines] = useState<Array<{ variant_id: string; model: number | null; support: number | null; purge: number | null }>>(() => {
+    const filament = j.requirements.filter((r) => r.kind === 'filament').map((r) => r.variant_id);
+    return (filament.length ? filament : ownVariants).map((variant_id) => ({ variant_id, model: null, support: 0, purge: 0 }));
+  });
   const [layers, setLayers] = useState<number | null>(null);
   const [colorChanges, setColorChanges] = useState<number | null>(0);
   const [slicerName, setSlicerName] = useState('');
@@ -483,7 +495,12 @@ function Actions({ job: j, pending, refs, reload, go }: { job: JobDetail; pendin
       return (
         <div className="space-y-3">
           <p className={`text-[12px] leading-relaxed ${T.text3}`}>{t(S.completeHelp)}</p>
-          <DurationInput label={t(S.printedTime)} value={seconds} onChange={setSeconds} />
+          <DurationInput
+            label={t(S.printedTime)}
+            value={seconds}
+            onChange={setSeconds}
+            hint={seconds !== null && seconds === j.estimate?.duration_seconds ? t(S.fromEstimate) : undefined}
+          />
           <MaterialLines lines={lines} onChange={setLines} refs={refs} label={t(S.usedMaterials)} />
           <Act kind="primary" disabled={seconds === null} onClick={() => run('complete', { printed_seconds: seconds, materials: cleanLines(lines) })}>
             {t(ACTION_LABEL.complete)}
@@ -529,21 +546,21 @@ function Actions({ job: j, pending, refs, reload, go }: { job: JobDetail; pendin
           <p className={`text-[12px] leading-relaxed ${T.text3}`}>{t(S.failHelp)}</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <TextField label={t(S.reasonCode)} value={reasonCode} onChange={setReasonCode} maxLength={60} ltr placeholder="adhesion, spaghetti, nozzle_clog…" />
-            <SelectField label={t(S.customer)} value={responsible} options={Object.keys(RESPONSIBLE).map((r) => ({ value: r, label: labelOf(RESPONSIBLE, r, lang) }))} onChange={setResponsible} />
+            <SelectField label={t(S.responsible)} value={responsible} options={Object.keys(RESPONSIBLE).map((r) => ({ value: r, label: labelOf(RESPONSIBLE, r, lang) }))} onChange={setResponsible} />
           </div>
           <TextArea label={t(S.description)} value={description} onChange={setDescription} maxLength={2000} rows={2} />
-          <DurationInput label={t(S.printedTime)} value={seconds} onChange={setSeconds} />
-          <MaterialLines lines={lines} onChange={setLines} refs={refs} label={t(S.failedMaterials)} />
+          <DurationInput label={t(S.printedTime)} value={failSeconds} onChange={setFailSeconds} hint={t(S.measuredOnly)} />
+          <MaterialLines lines={failLines} onChange={setFailLines} refs={refs} label={t(S.failedMaterials)} />
           <Act
             kind="danger"
-            disabled={!reasonCode.trim()}
+            disabled={!reasonCode.trim() || failSeconds === null}
             onClick={() =>
               run('fail', {
                 reason_code: reasonCode.trim(),
                 responsible,
                 ...(description.trim() ? { description: description.trim() } : {}),
-                printed_seconds: seconds ?? 0,
-                failed_materials: cleanLines(lines),
+                printed_seconds: failSeconds,
+                failed_materials: cleanLines(failLines),
               })
             }
           >
@@ -562,7 +579,14 @@ function Actions({ job: j, pending, refs, reload, go }: { job: JobDetail; pendin
             <legend className={`text-[12px] font-semibold ${T.text2}`}>{t(S.materials)}</legend>
             {estLines.map((l, i) => (
               <div key={i} className="flex flex-wrap items-end gap-2">
-                <SelectField className="min-w-[12rem] flex-1" label={t(S.variant)} value={l.variant_id} placeholder="—" options={refs.options('variants')} onChange={(v) => setEstLines(estLines.map((x, k) => (k === i ? { ...x, variant_id: v } : x)))} />
+                <SelectField
+                  className="min-w-[12rem] flex-1"
+                  label={t(S.variant)}
+                  value={l.variant_id}
+                  placeholder="—"
+                  options={ownVariants.length ? refs.options('variants').filter((o) => ownVariants.includes(o.value)) : refs.options('variants')}
+                  onChange={(v) => setEstLines(estLines.map((x, k) => (k === i ? { ...x, variant_id: v } : x)))}
+                />
                 <IntField className="w-28" label={t(S.modelG)} value={l.model} onChange={(v) => setEstLines(estLines.map((x, k) => (k === i ? { ...x, model: v } : x)))} />
                 <IntField className="w-28" label={t(S.supportG)} value={l.support} onChange={(v) => setEstLines(estLines.map((x, k) => (k === i ? { ...x, support: v } : x)))} />
                 <IntField className="w-28" label={t(S.purgeG)} value={l.purge} onChange={(v) => setEstLines(estLines.map((x, k) => (k === i ? { ...x, purge: v } : x)))} />

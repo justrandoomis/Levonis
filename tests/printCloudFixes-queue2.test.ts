@@ -58,7 +58,7 @@ async function wideWorkshop(w: World, cat: Catalog): Promise<Wide> {
   const variant = async (body: Record<string, unknown>, tiers: unknown[], stock: number) => {
     const id = (await ok(w.owner, 'POST', `${ADMIN}/catalog/variants`, body)).id as string;
     await ok(w.owner, 'PUT', `${ADMIN}/variants/${id}/price-tiers`, { tiers });
-    await ok(w.owner, 'POST', `${ADMIN}/stock/receive`, { variant_id: id, qty: stock, total_cost_iqd: stock * 10, supplier: 'Bambu Lab' });
+    await ok(w.owner, 'POST', `${ADMIN}/stock/receive`, { variant_id: id, qty: stock, total_cost_iqd: stock * 10, supplier: 'Bambu Lab' }, idem('stock'));
     return id;
   };
   const filaments = [cat.white, cat.black, cat.red, cat.gold];

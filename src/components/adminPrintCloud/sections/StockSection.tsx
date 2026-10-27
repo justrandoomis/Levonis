@@ -12,14 +12,14 @@
  * owner states it once (`POST /stock/lots/{id}/cost`). The lots list and its
  * costs exist only for the owner (`GET /stock/lots`, cost read).
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Boxes, PackagePlus, Scale, Trash2 } from 'lucide-react';
 import { Money } from '../../ui/Money';
 import { Sheet } from '../../ui/Sheet';
 import { StatusChip } from '../../ui/Badge';
 import { toast } from '../../../lib/toastStore';
 import { usePcAccess } from '../access';
-import { pc, type Row, type StockLot, type StockRow } from '../api';
+import { newIdempotencyKey, pc, type Row, type StockLot, type StockRow } from '../api';
 import { tri, type Tri } from '../i18n';
 import { formatDateTime, num, qty } from '../format';
 import { pcRefusal } from '../refusal';
@@ -190,6 +190,14 @@ function MoveSheet({ kind, row, costWrite, onClose, onDone }: { kind: 'receive' 
   const [reason, setReason] = useState('');
   const [failure, setFailure] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
+  // One Idempotency-Key per movement: the same body re-sent after a lost
+  // answer carries the same key (moved once); a changed body gets a new one.
+  const sent = useRef<{ body: string; key: string } | null>(null);
+  const keyFor = (body: Record<string, unknown>) => {
+    const json = JSON.stringify(body);
+    if (sent.current?.body !== json) sent.current = { body: json, key: newIdempotencyKey() };
+    return sent.current.key;
+  };
 
   const amountError = kind === 'adjust' ? (amount === null || amount === 0 ? t(S.deltaRequired) : null) : amount === null || amount <= 0 ? t(S.qtyRequired) : null;
   const reasonError = kind !== 'receive' && !reason.trim() ? t(S.reasonRequired) : null;
@@ -199,23 +207,22 @@ function MoveSheet({ kind, row, costWrite, onClose, onDone }: { kind: 'receive' 
     setFailure(null);
     if (amountError || reasonError) return;
     try {
-      let out: { position: { on_hand_qty: number; reserved_qty: number; allocated_qty: number } };
-      if (kind === 'receive') {
-        out = await pc.post('/stock/receive', {
-          variant_id: row.variant_id,
-          qty: amount,
-          ...(location ? { location_id: location } : {}),
-          ...(lotCode.trim() ? { lot_code: lotCode.trim() } : {}),
-          ...(supplier.trim() ? { supplier: supplier.trim() } : {}),
-          ...(notes.trim() ? { notes: notes.trim() } : {}),
-          // The cost is the owner's: never sent by anyone else, never sent empty.
-          ...(costWrite && cost !== null ? { total_cost_iqd: cost } : {}),
-        });
-      } else if (kind === 'adjust') {
-        out = await pc.post('/stock/adjust', { variant_id: row.variant_id, qty_delta: amount, reason: reason.trim() });
-      } else {
-        out = await pc.post('/stock/waste', { variant_id: row.variant_id, qty: amount, type: wasteKind, reason: reason.trim() });
-      }
+      const body: Record<string, unknown> =
+        kind === 'receive'
+          ? {
+              variant_id: row.variant_id,
+              qty: amount,
+              ...(location ? { location_id: location } : {}),
+              ...(lotCode.trim() ? { lot_code: lotCode.trim() } : {}),
+              ...(supplier.trim() ? { supplier: supplier.trim() } : {}),
+              ...(notes.trim() ? { notes: notes.trim() } : {}),
+              // The cost is the owner's: never sent by anyone else, never sent empty.
+              ...(costWrite && cost !== null ? { total_cost_iqd: cost } : {}),
+            }
+          : kind === 'adjust'
+            ? { variant_id: row.variant_id, qty_delta: amount, reason: reason.trim() }
+            : { variant_id: row.variant_id, qty: amount, type: wasteKind, reason: reason.trim() };
+      const out = await pc.post<{ position: { on_hand_qty: number; reserved_qty: number; allocated_qty: number } }>(`/stock/${kind}`, body, keyFor(body));
       const p = out.position;
       toast.success(`${t(S.done)}: ${qty(p.on_hand_qty, row.unit_code, lang)} · ${qty(p.on_hand_qty - p.reserved_qty - p.allocated_qty, row.unit_code, lang)}`);
       onDone();

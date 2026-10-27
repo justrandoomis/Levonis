@@ -27,7 +27,7 @@ import { many, one, fence, planned, runBatch, type Stmt } from './db';
 import { invalid, pcError } from './errors';
 import { integrationEvent } from './adapters';
 import { pcAudit } from './audit';
-import { activeReservationForJob, releaseCredits, reprintEntitlement, reserveCredits, settleCredits, creditAccountId } from './credits';
+import { activeReservationForJob, holdableSeconds, releaseCredits, reprintEntitlement, reserveCredits, settleCredits } from './credits';
 import { activeInventoryReservations, inventoryAccountId, releaseInventory, reserveInventory, settleInventory } from './inventory';
 import { pcNotify, type PcNotice } from './notify';
 import { fitsBuildVolume } from './files';
@@ -192,7 +192,7 @@ function notifyJob(db: D1Database, job: JobRow, notice: PcNotice, key: string): 
     notice,
     entity: 'print_cloud_job',
     entityId: job.id,
-    link: `/print-cloud/jobs/${job.id}`,
+    link: `/jobs/${job.id}`,
     vars: { title: job.title || job.id },
     eventKey: `${notice}:${job.id}:${key}`,
   });
@@ -669,11 +669,13 @@ async function currentEstimate(db: D1Database, job: JobRow): Promise<EstimateRow
  * material needed, what is available now, and what would remain — plus the
  * top-up that would cover any shortfall. Reads only.
  */
-export async function projection(db: D1Database, job: JobRow) {
+export async function projection(db: D1Database, job: JobRow, now: Date = new Date()) {
   const est = await currentEstimate(db, job);
   const reqs = await jobRequirements(db, job.id);
-  const acct = await one<{ available_seconds: number }>(db, 'SELECT available_seconds FROM pc_credit_accounts WHERE id = ?', creditAccountId(job.user_id, job.tier_id));
-  const available = Number(acct?.available_seconds ?? 0);
+  // What confirming would hold now — never hours whose expiry has come but the
+  // sweep has not yet taken (the cached available balance still counts them).
+  const entitled = job.parent_job_id ? await reprintEntitlement(db, job.id) : [];
+  const available = await holdableSeconds(db, job.user_id, job.tier_id, now, entitled);
   const materials = [];
   for (const r of reqs) {
     const a = await one<{ available_qty: number; unit_code: string }>(
@@ -725,7 +727,7 @@ export async function projection(db: D1Database, job: JobRow) {
  */
 export async function reviewJob(db: D1Database, job: JobRow, actor: Actor, config: PrintCloudConfig, now: Date) {
   if (job.status !== 'ready' && job.status !== 'awaiting_confirmation') throw pcError('INVALID_TRANSITION', { from: job.status, to: 'awaiting_confirmation' });
-  const proj = await projection(db, job);
+  const proj = await projection(db, job, now);
   const expires = iso(addSeconds(now, config.confirmation_ttl_minutes * 60));
   if (job.status === 'ready') {
     await runBatch(db, transition(db, job, 'awaiting_confirmation', actor, 'reviewed', now, { sufficient: proj.sufficient }, { confirmation_expires_at: expires }));
@@ -1316,7 +1318,7 @@ export async function autoConfirmReprint(db: D1Database, jobId: string, config: 
     const job = await loadJob(db, jobId);
     if (job.status !== 'ready') return 'waiting_for_customer';
     // A balance that cannot cover it leaves the reprint where it is.
-    if (!(await projection(db, job)).sufficient) return 'waiting_for_customer';
+    if (!(await projection(db, job, now)).sufficient) return 'waiting_for_customer';
     await reviewJob(db, job, actor, config, now);
   } catch {
     return 'waiting_for_customer';
@@ -1374,8 +1376,15 @@ export async function jobView(db: D1Database, job: JobRow, staleSeconds: number,
     );
     if (t) {
       const age = (now.getTime() - Date.parse(String(t.received_at))) / 1000;
-      const live = age <= staleSeconds && t.job_id === job.id;
-      telemetry = { ...t, stale: age > staleSeconds, live, age_seconds: Math.max(0, Math.floor(age)) };
+      const mine = t.job_id === job.id;
+      const live = age <= staleSeconds && mine;
+      // A reading that names another job (the print before this one on a shared
+      // printer) is someone else's: only the machine's own state and heat go
+      // out with this job, never that job's id or progress.
+      const reading = mine
+        ? t
+        : { machine_state: t.machine_state, job_id: null, progress_permille: null, layer: null, total_layers: null, remaining_seconds: null, nozzle_temp_dc: t.nozzle_temp_dc, bed_temp_dc: t.bed_temp_dc, received_at: t.received_at };
+      telemetry = { ...reading, stale: age > staleSeconds, live, age_seconds: Math.max(0, Math.floor(age)) };
     }
   }
   const failure = job.failure_id ? await one<Record<string, unknown>>(db, 'SELECT id, reason_code, responsible, status, policy, billable_seconds, reprint_job_id, created_at, resolved_at FROM pc_failures WHERE id = ?', job.failure_id) : null;

@@ -26,7 +26,7 @@ import { tx, useCloudText } from '../../text';
 import type { ShipmentCreated } from '../../types';
 import { Box, Check, CloudErrorState, CloudPageSkeleton, Info, MapPin, Package, SectionHeader } from '../../ui';
 import { useCloudQuery } from '../../useCloudQuery';
-import { shipmentCancellable, shipmentSteps } from './logic';
+import { shipmentCancellable, shipmentFeePaid, shipmentSteps } from './logic';
 import { ShipmentPill, SubPageHeader, useStatusWord } from './shared';
 
 const enc = encodeURIComponent;
@@ -196,7 +196,7 @@ export default function AccountShipment() {
         </section>
       ) : null}
 
-      {shipmentCancellable(sh.status) ? (
+      {shipmentCancellable(sh.status, sh.fee_iqd) ? (
         <div className="space-y-2">
           <p className="flex items-start gap-2 text-[12px] leading-relaxed text-text-muted">
             <Info aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
@@ -206,6 +206,11 @@ export default function AccountShipment() {
             {t(shipText.cancel)}
           </Button>
         </div>
+      ) : shipmentFeePaid(sh.status, sh.fee_iqd) ? (
+        <p className="flex items-start gap-2 text-[12px] leading-relaxed text-text-muted">
+          <Info aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+          {t(shipText.cancelFeePaid)}
+        </p>
       ) : null}
 
       <ConfirmDialog

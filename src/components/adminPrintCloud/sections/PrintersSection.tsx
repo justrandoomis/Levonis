@@ -34,7 +34,7 @@ import { iqdUnit } from '../../../lib/money';
 import { usePcAccess } from '../access';
 import { pc, parseJsonColumn, type Agent, type MaintenanceWindow, type PrinterEvent, type PrinterStatus, type Row } from '../api';
 import { AGENT_CAPABILITY, CONNECTIVITY, MACHINE_STATE, MAINTENANCE_KIND, MAINTENANCE_STATUS, PRINTER_COMMAND, PRINTER_STATUS, labelOf, tri, type Tri } from '../i18n';
-import { ago, ageOf, duration, formatDateTime, fromLocalInput, num, permille, temp, toLocalInput } from '../format';
+import { ago, ageOf, arrow, duration, formatDateTime, fromLocalInput, microns, num, permille, temp, toLocalInput } from '../format';
 import { pcRefusal } from '../refusal';
 import { invalidateRefs } from '../refs';
 import { Act, Chips, Empty, Id, IntField, Json, KV, LoadState, Note, RefreshButton, SectionHead, SelectField, T, TextArea, TextField, Tray, W, useLoad, usePcLang } from '../ui';
@@ -340,7 +340,7 @@ function PrinterSheet({ printer: p, onClose, onChanged }: { printer: PrinterStat
           rows={[
             [t(S.model), <bdi key="m" dir="ltr" className="font-mono">{p.model_code}</bdi>],
             [t(S.location), p.location || '—'],
-            [t(S.nozzle), <bdi key="n" dir="ltr">{num(p.nozzle_um)} µm</bdi>],
+            [t(S.nozzle), <bdi key="n">{microns(p.nozzle_um, lang)}</bdi>],
             [t(S.materials), p.materials.length ? <bdi key="ma" dir="ltr">{p.materials.join(', ')}</bdi> : t(S.anyMaterial)],
             [t(S.operating), duration(p.operating_seconds, lang)],
           ]}
@@ -358,7 +358,7 @@ function PrinterSheet({ printer: p, onClose, onChanged }: { printer: PrinterStat
                     <li key={w.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--ap-border)] pb-2 text-[12.5px]">
                       <div className="min-w-0">
                         <p className={T.text1}>
-                          {labelOf(MAINTENANCE_KIND, w.kind, lang)} · {formatDateTime(w.starts_at, lang)} → {formatDateTime(w.ends_at, lang)}
+                          {labelOf(MAINTENANCE_KIND, w.kind, lang)} · {formatDateTime(w.starts_at, lang)} {arrow(lang)} {formatDateTime(w.ends_at, lang)}
                         </p>
                         <p className={T.text3}>
                           {w.notes}
