@@ -69,6 +69,7 @@ import {
   storePrinterChoiceDeclined,
   storeProfileId,
   type InfillId,
+  type ListedFilamentPresets,
   type MaterialId,
   type ProfileId,
   type QualityId,
@@ -341,6 +342,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
    */
   const [sheetDrag, setSheetDrag] = useState(0);
   const sheetRef = useRef<HTMLElement | null>(null);
+  /** True while a press that began on the backdrop itself is in progress. */
+  const backdropPressRef = useRef(false);
   const [profileId, setProfileId] = useState<ProfileId>(DEFAULT_PROFILE_ID);
   const [quality, setQuality] = useState<QualityId>("standard");
   const [strength, setStrength] = useState<StrengthId>("standard");
@@ -369,6 +372,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   // verified/missing state comes from profileLoadState, never from this seed.
   const [settings, setSettings] = useState<SlicerSettings>(() => fallbackMachineSettings(PROFILES[DEFAULT_PROFILE_ID]));
   const [loadedPresetKey, setLoadedPresetKey] = useState("");
+  // The listed materials' filament presets, which the «الخامة» row compares T1 with.
+  const [listedFilaments, setListedFilaments] = useState<ListedFilamentPresets>({});
   const [profileLoadState, setProfileLoadState] = useState<ProfileLoadState | null>(null);
   const [status, setStatus] = useState<EditorStatus>("loading");
   const [canvasMode, setCanvasMode] = useState<CanvasMode>("prepare");
@@ -981,10 +986,12 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         setProfileLoadState({ verified: loaded.verified, missingPresets: loaded.missingPresets });
         slicing.clearResults();
         setHandyProjectReady(false);
+        setListedFilaments(loaded.listedFilaments);
         setLoadedPresetKey(requestedPresetKey);
       })
       .catch((reason: unknown) => {
         if (profileRequestRef.current !== requestId) return;
+        setListedFilaments({});
         setLoadedPresetKey(requestedPresetKey);
         setProfileLoadState({ verified: false, missingPresets: [] });
         console.warn("[levo-studio] printer profile load failed", reason);
@@ -2037,6 +2044,16 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     node.addEventListener("pointercancel", end);
   }, []);
 
+  /** The backdrop closes the sheet on the click of a press that began on it (see the markup). */
+  const pressBackdrop = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    backdropPressRef.current = event.target === event.currentTarget;
+  }, []);
+  const closeFromBackdrop = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    const pressedHere = backdropPressRef.current;
+    backdropPressRef.current = false;
+    if (pressedHere && event.target === event.currentTarget) setSheet(null);
+  }, []);
+
   /**
    * THE PAGE BEHIND AN OPEN SHEET IS OUT OF REACH, AND FOCUS COMES BACK.
    *
@@ -2990,8 +3007,12 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   /** The filament the kernel will use for T1, for the «الخامة» row and the sheet header. */
   // The selector stands in for T1 only until the first preset load has
   // finished; after it, the map is what the kernel slices (c6-r4-ha-01).
+  // A listed name counts only at that preset's temperatures (c6fix-r1-ha-02).
   const presetLoaded = loadedPresetKey !== "";
-  const t1Material = useMemo(() => materialInForce(profile, settings, material, presetLoaded), [material, presetLoaded, profile, settings]);
+  const t1Material = useMemo(
+    () => materialInForce(profile, settings, material, presetLoaded, listedFilaments),
+    [listedFilaments, material, presetLoaded, profile, settings],
+  );
   const chooseMaterial = useCallback((id: MaterialId) => {
     if (id !== material) {
       setMaterial(id);
@@ -3313,8 +3334,20 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         Escape, and focus that starts inside the dialog rather than wherever it
         happened to be on the page behind. `aria-modal` was already claimed;
         this is the behaviour that claim implies.
+
+        A TAP ON THE BACKDROP CLOSES THE SHEET AND NOTHING ELSE (c6fix-r1-ha-01).
+        The backdrop used to close the sheet on pointerdown. On a touch screen
+        the click of a tap is hit-tested after pointerup, by which time the
+        backdrop was gone, so the click landed on whatever sat under it: the
+        back chevron left the Studio and lost the model, «حفظ» saved and
+        «استيراد» opened the file picker. The sheet now closes on the click,
+        and only when the press also began on the backdrop itself, so the
+        whole gesture (pointerdown, pointerup and click) ends on the backdrop.
+        A press that starts inside the sheet and is released outside it (a
+        slider or a text selection) does not close it. The handle drag is its
+        own gesture (beginSheetDrag) and is unaffected.
       */}
-      {sheet && <div className="sheet-backdrop" onPointerDown={(event) => { if (event.target === event.currentTarget) setSheet(null); }}>
+      {sheet && <div className="sheet-backdrop" onPointerDown={pressBackdrop} onClick={closeFromBackdrop}>
         <section
           ref={sheetRef}
           className="studio-sheet"

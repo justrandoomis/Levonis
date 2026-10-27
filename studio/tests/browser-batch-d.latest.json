@@ -1,5 +1,5 @@
 {
-  "target": "http://127.0.0.1:5261/",
+  "target": "http://127.0.0.1:8863/",
   "viewport": {
     "width": 390,
     "height": 844
@@ -225,6 +225,98 @@
       "ok": true,
       "m": "and Escape brings the card back",
       "detail": "388px"
+    },
+    {
+      "ok": true,
+      "m": "the back chevron is on the top bar"
+    },
+    {
+      "ok": true,
+      "m": "with «المزيد» open, the back chevron lies under the backdrop",
+      "detail": "(362, 30) sheet-backdrop"
+    },
+    {
+      "ok": true,
+      "m": "a tap there closes the sheet",
+      "detail": "the back chevron"
+    },
+    {
+      "ok": true,
+      "m": "…and stays in the Studio with the model",
+      "detail": "http://127.0.0.1:8863/ · 1 object(s)"
+    },
+    {
+      "ok": true,
+      "m": "…and runs nothing under it: no save, no message",
+      "detail": "(no message)"
+    },
+    {
+      "ok": true,
+      "m": "…and opens no file picker",
+      "detail": "0"
+    },
+    {
+      "ok": true,
+      "m": "«حفظ» is on the top bar"
+    },
+    {
+      "ok": true,
+      "m": "with «المزيد» open, «حفظ» lies under the backdrop",
+      "detail": "(167, 30) sheet-backdrop"
+    },
+    {
+      "ok": true,
+      "m": "a tap there closes the sheet",
+      "detail": "«حفظ»"
+    },
+    {
+      "ok": true,
+      "m": "…and stays in the Studio with the model",
+      "detail": "http://127.0.0.1:8863/ · 1 object(s)"
+    },
+    {
+      "ok": true,
+      "m": "…and runs nothing under it: no save, no message",
+      "detail": "(no message)"
+    },
+    {
+      "ok": true,
+      "m": "…and opens no file picker",
+      "detail": "0"
+    },
+    {
+      "ok": true,
+      "m": "«استيراد» is on the top bar"
+    },
+    {
+      "ok": true,
+      "m": "with «المزيد» open, «استيراد» lies under the backdrop",
+      "detail": "(66, 30) sheet-backdrop"
+    },
+    {
+      "ok": true,
+      "m": "a tap there closes the sheet",
+      "detail": "«استيراد»"
+    },
+    {
+      "ok": true,
+      "m": "…and stays in the Studio with the model",
+      "detail": "http://127.0.0.1:8863/ · 1 object(s)"
+    },
+    {
+      "ok": true,
+      "m": "…and runs nothing under it: no save, no message",
+      "detail": "(no message)"
+    },
+    {
+      "ok": true,
+      "m": "…and opens no file picker",
+      "detail": "0"
+    },
+    {
+      "ok": true,
+      "m": "a mouse click on the backdrop closes the sheet too, and stays",
+      "detail": "http://127.0.0.1:8863/"
     }
   ]
 }

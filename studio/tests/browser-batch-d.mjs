@@ -12,7 +12,9 @@
  *       not greet the same person on every visit;
  *   9b  the infill control exists under Strength and offers three patterns;
  *   10  the tool tray really gets shorter, and nothing disappears when it does
- *       («زر تقصير وتطويل قائمة الادوات»).
+ *       («زر تقصير وتطويل قائمة الادوات»);
+ *   C6  a tap on an open sheet's backdrop closes the sheet and reaches
+ *       nothing under it: not the back chevron, «حفظ» or «استيراد».
  *
  * NOT part of `npm test`: it needs a built Studio, a server, and Chromium.
  *
@@ -27,6 +29,7 @@ import { fileURLToPath } from "node:url";
 
 const STUDIO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPORT_PATH = join(STUDIO_ROOT, "tests", "browser-batch-d.latest.json");
+const TOWER = join(STUDIO_ROOT, "tests", "fixtures", "tower-8x8x90.stl");
 const target = process.argv.find((a) => a.startsWith("http")) ?? "http://127.0.0.1:8799/";
 
 function findChromium() {
@@ -231,6 +234,75 @@ console.log("\nthe overflow holds every tool; the view expands and comes back");
   await page.waitForTimeout(500);
   const backBox = await card.boundingBox();
   assert(Math.abs(backBox.height - cardBox.height) < 2, "and Escape brings the card back", `${Math.round(backBox.height)}px`);
+  await ctx.close();
+}
+
+// =========================================================================
+// C6 — A TAP ON A SHEET'S BACKDROP CLOSES THE SHEET, AND ONLY THE SHEET
+// =========================================================================
+// c6fix-r1-ha-01: the backdrop closed the sheet on pointerdown. The click of
+// a tap is hit-tested after pointerup, when the backdrop was already gone, so
+// it landed on the top bar under it: the back chevron left the Studio and the
+// model was lost, «حفظ» saved a draft, «استيراد» opened the file picker.
+console.log("\na tap on a sheet's backdrop reaches nothing under it");
+{
+  const ctx = await browser.newContext({ viewport: PHONE, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  await page.addInitScript(([key, value]) => {
+    try { window.localStorage.setItem(key, value); } catch { /* ignore */ }
+  }, [PRINTER_KEY, "bbl-a1-04"]);
+  let chooser = 0;
+  page.on("filechooser", () => { chooser += 1; });
+  await page.goto(target, { waitUntil: "load", timeout: 90_000 });
+  await page.waitForFunction(() => Boolean(window.__vpApi), null, { timeout: 90_000 });
+  await page.setInputFiles("input.native-file-input >> nth=0", TOWER, { timeout: 60_000 });
+  await page.waitForFunction(() => (window.__vpApi?.()?.sceneSnapshot?.() ?? []).length > 0, null, { timeout: 90_000 });
+  await page.waitForTimeout(1500);
+  const dismiss = page.locator(".studio-messages .editor-message button[aria-label]");
+  if (await dismiss.count()) await dismiss.last().click();
+  await page.waitForTimeout(300);
+  const home = page.url();
+  const look = () => page.evaluate(() => ({
+    url: location.href,
+    sheet: Boolean(document.querySelector(".studio-sheet")),
+    message: document.querySelector(".studio-messages")?.textContent.trim() ?? "",
+    objects: (() => { try { return window.__vpApi().sceneSnapshot().length; } catch { return null; } })(),
+  }));
+  const points = await page.evaluate(() => Object.fromEntries([
+    ["the back chevron", ".m-topbar__back"],
+    ["«حفظ»", '[data-levo-action="save-now"]'],
+    ["«استيراد»", ".m-topbar .m-btn--outline"],
+  ].map(([name, selector]) => {
+    const box = document.querySelector(selector)?.getBoundingClientRect();
+    return [name, box ? { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) } : null];
+  })));
+  for (const [name, point] of Object.entries(points)) {
+    assert(point !== null, `${name} is on the top bar`);
+    if (!point) continue;
+    await page.locator('[data-levo-action="more"]').click();
+    await page.waitForSelector('[data-levo-sheet="more"]', { timeout: 10_000 });
+    await page.waitForTimeout(400);
+    const under = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.className ?? null, [point.x, point.y]);
+    assert(under === "sheet-backdrop", `with «المزيد» open, ${name} lies under the backdrop`, `(${point.x}, ${point.y}) ${under}`);
+    const before = await look();
+    await page.touchscreen.tap(point.x, point.y);
+    await page.waitForTimeout(1200);
+    const after = await look();
+    assert(!after.sheet, `a tap there closes the sheet`, name);
+    assert(after.url === home && after.objects === before.objects && after.objects > 0, `…and stays in the Studio with the model`, `${after.url} · ${after.objects} object(s)`);
+    assert(after.message === before.message, `…and runs nothing under it: no save, no message`, after.message.slice(0, 80) || "(no message)");
+    assert(chooser === 0, `…and opens no file picker`, `${chooser}`);
+    if (after.sheet) { await page.keyboard.press("Escape"); await page.waitForTimeout(300); }
+  }
+  // A mouse click on the backdrop still closes the sheet.
+  await page.locator('[data-levo-action="more"]').click();
+  await page.waitForSelector('[data-levo-sheet="more"]', { timeout: 10_000 });
+  await page.waitForTimeout(400);
+  const back = points["the back chevron"];
+  if (back) await page.mouse.click(back.x, back.y);
+  await page.waitForTimeout(800);
+  const clicked = await look();
+  assert(!clicked.sheet && clicked.url === home, "a mouse click on the backdrop closes the sheet too, and stays", clicked.url);
   await ctx.close();
 }
 

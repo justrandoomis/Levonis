@@ -1,6 +1,6 @@
 {
-  "origin": "http://127.0.0.1:5261",
-  "run": "b2821c4a",
+  "origin": "http://127.0.0.1:8863",
+  "run": "385231fd",
   "desktopSimple": {
     "mode": "simple",
     "sidebar": "none",
@@ -44,6 +44,9 @@
   },
   "importNotice": "Files were added to the project.",
   "desktopSliceMessage": "X2D: the model or generated path exceeds the selected build volume. The result was rejected and cannot be exported.",
+  "desktopToolsAfterSheetEscape": 0,
+  "desktopFocusAfterSheet": "profile-button",
+  "desktopToolsAfterSecondEscape": 16,
   "desktopAdvanced": {
     "mode": "advanced",
     "sidebar": "flex",
@@ -138,6 +141,11 @@
     },
     {
       "ok": true,
+      "m": "Escape closes the Setup sheet and nothing behind it: the engine stays in the refused slice's preview",
+      "detail": "0 tool controls"
+    },
+    {
+      "ok": true,
       "m": "Advanced shows the engine side panel at desktop width",
       "detail": "flex"
     },
@@ -201,7 +209,7 @@
     {
       "ok": true,
       "m": "a forged levonis_session beside the Studio cookie: the Studio session still works",
-      "detail": "simple-b-b2821c4a"
+      "detail": "simple-b-385231fd"
     },
     {
       "ok": true,
@@ -217,6 +225,6 @@
       "m": "…and changed nothing"
     }
   ],
-  "passed": 29,
-  "total": 29
+  "passed": 30,
+  "total": 30
 }

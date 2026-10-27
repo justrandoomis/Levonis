@@ -301,16 +301,17 @@ export function availableMaterial(profileId: ProfileId, material: MaterialId): M
 
 /** The filament in force for T1, as the «الخامة» row and the sheet header state it. */
 export interface MaterialInForce {
-  /** The listed material whose preset T1 holds, or null for any other filament. */
+  /** The listed material whose preset T1 holds (its name and its temperatures), or null for any other filament. */
   id: MaterialId | null;
   /** The preset name the kernel loads for T1 (filament_settings_id[0]), empty for an unnamed filament. */
   name: string;
   /**
-   * What the row prints: the listed label, or for any other filament its name
-   * without the vendor and the printer suffix («Bambu PLA Matte @BBL A1»
-   * reads «PLA Matte»), so the custom mark after it fits a phone row. An
-   * unnamed filament reads as its type («PLA»), or as nothing when it has
-   * none either.
+   * What the row prints: the listed label (also for a listed preset name
+   * at other temperatures, which the row marks custom), or for any other
+   * filament its name without the vendor and the printer suffix («Bambu PLA
+   * Matte @BBL A1» reads «PLA Matte»), so the custom mark after it fits a
+   * phone row. An unnamed filament reads as its type («PLA»), or as nothing
+   * when it has none either.
    */
   label: string;
   /** Its filament type (filament_type[0]), for the sheet header. */
@@ -331,6 +332,56 @@ export function shortFilamentName(name: string): string {
  * is on the first screen; tests/phone-shell.test.mjs pins them to the schema.
  */
 export const KERNEL_FILAMENT_DEFAULTS = { filament_settings_id: "", filament_type: "PLA" } as const;
+
+/**
+ * The temperatures a filament preset sets for T1, with the schema default the
+ * kernel prints when the map does not hold one (config-schema.json, pinned by
+ * tests/phone-shell.test.mjs like KERNEL_FILAMENT_DEFAULTS). A name alone does
+ * not make T1 the listed material: these decide whether it still prints as
+ * that preset (materialInForce).
+ */
+export const KERNEL_TEMPERATURE_DEFAULTS = {
+  nozzle_temperature: 200,
+  nozzle_temperature_initial_layer: 200,
+  hot_plate_temp: 45,
+  hot_plate_temp_initial_layer: 45,
+  cool_plate_temp: 35,
+  cool_plate_temp_initial_layer: 35,
+  eng_plate_temp: 45,
+  eng_plate_temp_initial_layer: 45,
+  textured_plate_temp: 45,
+  textured_plate_temp_initial_layer: 45,
+  supertack_plate_temp: 35,
+  supertack_plate_temp_initial_layer: 35,
+} as const;
+
+/** The filament presets of the listed materials as the profile loader read them from the engine. */
+export type ListedFilamentPresets = Partial<Record<MaterialId, Record<string, unknown>>>;
+
+/** The first entry of a per-filament value, as a number (NaN when there is none). */
+function firstNumber(value: unknown): number {
+  const first = Array.isArray(value) ? value[0] : value;
+  return first == null || first === "" ? Number.NaN : Number(first);
+}
+
+/**
+ * Does T1 print at the temperatures of this preset? Every temperature the
+ * preset sets is compared with the one the kernel will use: the map value,
+ * or the schema default when the map does not hold the key. With no preset
+ * to compare with (the engine shipped none) the name decides, as before.
+ */
+function holdsPresetTemperatures(record: Record<string, unknown>, preset: Record<string, unknown> | undefined): boolean {
+  if (!preset) return true;
+  for (const key of Object.keys(KERNEL_TEMPERATURE_DEFAULTS) as (keyof typeof KERNEL_TEMPERATURE_DEFAULTS)[]) {
+    if (!Object.prototype.hasOwnProperty.call(preset, key)) continue;
+    const expected = firstNumber(preset[key]);
+    if (!Number.isFinite(expected)) continue;
+    const held = Object.prototype.hasOwnProperty.call(record, key) && record[key] != null;
+    const actual = held ? firstNumber(record[key]) : KERNEL_TEMPERATURE_DEFAULTS[key];
+    if (actual !== expected) return false;
+  }
+  return true;
+}
 
 /**
  * WHAT T1 WILL REALLY PRINT WITH, READ FROM THE MAP THE KERNEL SLICES.
@@ -355,8 +406,23 @@ export const KERNEL_FILAMENT_DEFAULTS = { filament_settings_id: "", filament_typ
  * null with its type as the label, so the row shows «PLA (مخصص)» and picking
  * PLA Basic takes T1 back. An empty label (no type either) is for the card
  * to name as a custom filament in the person's language.
+ *
+ * A NAME IS NOT A PRESET (c6fix-r1-ha-02). A project that names PETG Basic
+ * but heats T1 to 230 °C (the preset prints at 245 °C) read «PETG Basic»
+ * over a G-code at M104 S230, and since the row already showed PETG Basic a
+ * native select offered no way to take T1 back. T1 is the listed material
+ * only when its temperatures are the ones the profile loader read for that
+ * preset (`presets`, see holdsPresetTemperatures); otherwise `id` is null and
+ * the label is the listed name, so the row reads «PETG Basic (مخصص)» and
+ * PETG Basic stays a choice that takes T1 back.
  */
-export function materialInForce(profile: PrinterProfile, settings: unknown, selected: MaterialId, presetLoaded: boolean): MaterialInForce {
+export function materialInForce(
+  profile: PrinterProfile,
+  settings: unknown,
+  selected: MaterialId,
+  presetLoaded: boolean,
+  presets: ListedFilamentPresets = {},
+): MaterialInForce {
   const record = (settings ?? {}) as Record<string, unknown>;
   const held = (key: keyof typeof KERNEL_FILAMENT_DEFAULTS) => Object.prototype.hasOwnProperty.call(record, key) && record[key] != null;
   const first = (key: keyof typeof KERNEL_FILAMENT_DEFAULTS) => {
@@ -372,8 +438,9 @@ export function materialInForce(profile: PrinterProfile, settings: unknown, sele
   const type = first("filament_type");
   if (!name) return { id: null, name: "", label: type, type };
   const listed = isProfileId(profile.id) ? materialsFor(profile.id) : [];
-  const id = listed.find((material) => materialPresetFor(profile, material) === name) ?? null;
-  return { id, name, label: id ? MATERIALS[id].label : shortFilamentName(name), type: type || (id ? MATERIALS[id].type : "") };
+  const named = listed.find((material) => materialPresetFor(profile, material) === name) ?? null;
+  const id = named && holdsPresetTemperatures(record, presets[named]) ? named : null;
+  return { id, name, label: named ? MATERIALS[named].label : shortFilamentName(name), type: type || (named ? MATERIALS[named].type : "") };
 }
 
 /**

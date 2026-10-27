@@ -236,7 +236,32 @@ try {
     for (const el of mount.querySelectorAll("*")) if (el.shadowRoot?.querySelector(".app-shell")) return el.getAttribute("data-levo-mode") === "advanced";
     return false;
   }, null, { timeout: 10_000 });
+  // Escape closes the Setup sheet, and only the sheet: while a sheet is open
+  // no key reaches the engine behind it (c6-r4-ha-02). This step used to lean
+  // on that Escape also reaching the engine, which took it out of the preview
+  // the refused slice left it in (no tool controls there). Kept on purpose
+  // (c6fix-r1-reg-1): one key closes one thing. So the engine is brought back
+  // to Prepare here deliberately, with a second Escape once the sheet is gone
+  // (the engine's own shortcut out of the preview), pressed where a keyboard
+  // user is: on the Setup button the sheet handed focus back to.
   await page.keyboard.press("Escape");
+  await page.locator(".studio-sheet").waitFor({ state: "detached", timeout: 10_000 });
+  const engineTools = () => page.evaluate(() => {
+    const mount = document.querySelector(".viewport-mount");
+    for (const el of mount.querySelectorAll("*")) if (el.shadowRoot?.querySelector(".app-shell")) return el.shadowRoot.querySelectorAll("[data-testid^=tool-]").length;
+    return -1;
+  });
+  const toolsAfterSheetEscape = await engineTools();
+  report.desktopToolsAfterSheetEscape = toolsAfterSheetEscape;
+  assert(toolsAfterSheetEscape === 0, "Escape closes the Setup sheet and nothing behind it: the engine stays in the refused slice's preview", `${toolsAfterSheetEscape} tool controls`);
+  report.desktopFocusAfterSheet = await page.evaluate(() => document.activeElement?.className ?? null);
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => {
+    const mount = document.querySelector(".viewport-mount");
+    for (const el of mount.querySelectorAll("*")) if (el.shadowRoot?.querySelector(".app-shell")) return el.shadowRoot.querySelectorAll("[data-testid^=tool-]").length > 0;
+    return false;
+  }, null, { timeout: 10_000 }).catch(() => null);
+  report.desktopToolsAfterSecondEscape = await engineTools();
   state = await engineState(page);
   report.desktopAdvanced = state;
   assert(state.sidebar !== "none", "Advanced shows the engine side panel at desktop width", state.sidebar);

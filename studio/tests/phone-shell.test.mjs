@@ -589,8 +589,11 @@ test("the «الخامة» row and the sheet header say the filament T1 really p
   // as the engine writes them after the import.
   const preset = { filament_settings_id: [materialPresetFor(a1, "pla")], filament_type: ["PLA"], nozzle_temperature: [220] };
   const sliced = { ...preset, ...project };
+  // Without the loader's presets the name alone decides. The client passes
+  // them, and at 255 °C the row reads «PETG Basic (مخصص)» (c6fix-r1-ha-02,
+  // the 230 °C test below); the type and the header are PETG either way.
   const shown = materialInForce(a1, sliced, "pla", true);
-  assert.equal(shown.id, "petg", "the row selects PETG Basic");
+  assert.equal(shown.id, "petg", "by name, the row selects PETG Basic");
   assert.notEqual(shown.id, "pla", "never «PLA Basic» over a PETG print");
   assert.equal(MATERIALS[shown.id].label, "PETG Basic");
   assert.equal(shown.label, "PETG Basic");
@@ -617,7 +620,7 @@ test("the «الخامة» row and the sheet header say the filament T1 really p
   assert.match(card, /const customMaterialText = props\.materialInForce\.label\s*\? templateText\(t\.customValue, \{ value: props\.materialInForce\.label \}\)\s*: t\.customFilament;/);
   assert.doesNotMatch(card, /value=\{props\.material\}/, "the selector is not what the row shows");
   assert.match(client, /const presetLoaded = loadedPresetKey !== "";/);
-  assert.match(client, /const t1Material = useMemo\(\(\) => materialInForce\(profile, settings, material, presetLoaded\), \[material, presetLoaded, profile, settings\]\);/);
+  assert.match(client, /const t1Material = useMemo\(\s*\(\) => materialInForce\(profile, settings, material, presetLoaded, listedFilaments\),\s*\[listedFilaments, material, presetLoaded, profile, settings\],\s*\);/);
   assert.match(client, /materialInForce=\{t1Material\}/);
   assert.match(client, /\{profile\.shortName\} · \{profile\.nozzle\.toFixed\(1\)\} mm · \{t1Material\.type \|\| MATERIALS\[material\]\.type\}/);
   // Picking the material the selector already holds while T1 holds another
@@ -716,6 +719,114 @@ test("a 3MF with process settings only: the «الخامة» row says «PLA (م�
   assert.equal(MATERIALS[back.id].label, "PLA Basic");
   assert.deepEqual(carried.settings.nozzle_temperature, [220]);
   assert.equal(Number(carried.settings.layer_height), 0.12, "the file's own layer height stays");
+});
+
+test("a 3MF that names PETG Basic at 230 °C: the «الخامة» row says «PETG Basic (مخصص)», and PETG Basic takes T1 back", async () => {
+  // c6fix-r1-ha-02: the row matched a listed material by
+  // filament_settings_id[0] alone. A project naming «Bambu PETG Basic @BBL
+  // A1» with nozzle_temperature 230 read «PETG Basic» over a G-code at
+  // M104 S230 (the preset prints at 245), and with PETG Basic already shown a
+  // native select fires no change, so nothing could take T1 back.
+  const { unzipSync, zipSync, strFromU8, strToU8 } = await import("fflate");
+  const fixture = unzipSync(new Uint8Array(await readFile(new URL("./fixtures/mini-project.3mf", import.meta.url))));
+  const projectFor = (over) => zipSync({
+    ...fixture,
+    "Metadata/project_settings.config": strToU8(JSON.stringify({
+      printer_model: "Bambu Lab A1",
+      printer_settings_id: "Bambu Lab A1 0.4 nozzle",
+      layer_height: "0.2",
+      filament_settings_id: ["Bambu PETG Basic @BBL A1"],
+      filament_type: ["PETG"],
+      nozzle_temperature: ["230"],
+      hot_plate_temp: ["70"],
+      ...over,
+    })),
+  });
+  // Imported as the engine imports it (its own normalizer, then a settings
+  // write the shell passes through its machine lock), as in the test above.
+  const { normalizeProjectSettings } = await import("three-slicer/settings");
+  const { applyMachineLock } = await loadAppModule("machine-lock");
+  const machine = { printer_model: "Bambu Lab A1", printer_settings_id: "Bambu Lab A1 0.4 nozzle", printable_area: [[0, 0], [256, 0], [256, 256], [0, 256]], printable_height: 256, nozzle_diameter: [0.4] };
+  const importProject = (over = {}) => {
+    const archive = projectFor(over);
+    const imported = normalizeProjectSettings(JSON.parse(strFromU8(unzipSync(archive)["Metadata/project_settings.config"])));
+    return applyMachineLock(imported.settings, machine);
+  };
+
+  // The presets are the ones the profile loader reads from the engine, the
+  // same object the client hands to the row (listedFilaments).
+  const { KERNEL_TEMPERATURE_DEFAULTS, PROFILES, MATERIALS, materialInForce } = await loadAppModule("printer-profiles");
+  const { loadPrinterProfile } = await loadAppModule("profile-loader");
+  const a1 = PROFILES["bbl-a1-04"];
+  const loadedPla = await loadPrinterProfile(a1, "standard", "standard", false, "balanced", "pla");
+  const presets = loadedPla.listedFilaments;
+  assert.deepEqual(Object.keys(presets).sort(), ["petg", "pla"], "the loader holds both listed presets of the A1");
+  assert.deepEqual([presets.petg.nozzle_temperature[0], presets.petg.hot_plate_temp[0]], [245, 70], "PETG Basic on the A1 prints at 245 / 70");
+  assert.deepEqual([presets.pla.nozzle_temperature[0], presets.pla.hot_plate_temp[0]], [220, 65], "PLA Basic on the A1 prints at 220 / 65");
+
+  // The kernel prints its schema default for a temperature the map does not hold.
+  const schema = JSON.parse(await readFile(new URL("../node_modules/three-slicer/data/config-schema.json", import.meta.url), "utf8"));
+  for (const [key, value] of Object.entries(KERNEL_TEMPERATURE_DEFAULTS)) assert.deepEqual(schema[key].default, [value], `${key} default`);
+
+  // 230 °C under the PETG Basic name: custom, with the listed name.
+  const hot = importProject();
+  const shown = materialInForce(a1, hot, "pla", true, presets);
+  assert.deepEqual(shown, { id: null, name: "Bambu PETG Basic @BBL A1", label: "PETG Basic", type: "PETG" });
+  assert.notEqual(shown.id, "petg", "never «PETG Basic» over a G-code at M104 S230");
+  const { DICTIONARIES, templateText } = await loadAppModule("i18n/index");
+  assert.equal(templateText(DICTIONARIES.ar.customValue, { value: shown.label }), "PETG Basic (مخصص)");
+  assert.equal(templateText(DICTIONARIES.en.customValue, { value: shown.label }), "PETG Basic (custom)");
+  assert.equal(templateText(DICTIONARIES.ckb.customValue, { value: shown.label }), "PETG Basic (تایبەت)");
+  // The same with the selector already on PETG: the row still says custom,
+  // so PETG Basic is an option the select can change to.
+  assert.equal(materialInForce(a1, hot, "petg", true, presets).id, null);
+
+  // At the preset temperatures the name is the preset.
+  assert.equal(materialInForce(a1, importProject({ nozzle_temperature: ["245"] }), "pla", true, presets).id, "petg");
+  // A plate temperature the map does not hold is the kernel default (45), not the preset 70.
+  const noPlate = importProject({ nozzle_temperature: ["245"], hot_plate_temp: undefined });
+  assert.equal(Object.prototype.hasOwnProperty.call(noPlate, "hot_plate_temp"), false);
+  assert.equal(materialInForce(a1, noPlate, "pla", true, presets).id, null, "M140 S45 is not PETG Basic");
+  // Another plate temperature, and the 255 °C project of c6-r3-ha-01.
+  assert.equal(materialInForce(a1, importProject({ nozzle_temperature: ["245"], hot_plate_temp: ["80"] }), "pla", true, presets).id, null);
+  assert.equal(materialInForce(a1, importProject({ nozzle_temperature: ["255"] }), "pla", true, presets).label, "PETG Basic");
+  // With no preset to compare with (the engine shipped none) the name decides, as before.
+  assert.equal(materialInForce(a1, hot, "pla", true, {}).id, "petg");
+
+  // PETG Basic takes T1 back. From the PLA selector it is a material change;
+  // with the selector already on PETG it is the take-back reload. Either way
+  // the PETG preset's filament keys replace the file's.
+  const { carryUserEdits, recordEngineWrites } = await loadAppModule("settings-carryover");
+  const loadedPetg = await loadPrinterProfile(a1, "standard", "standard", false, "balanced", "petg");
+  const selection = { printerId: "bbl-a1-04", quality: "standard", strength: "standard", support: false, infill: "balanced" };
+  for (const [selector, previousMaterial] of [["pla", "pla"], ["petg", "t1-from-file"]]) {
+    const before = selector === "pla" ? loadedPla : loadedPetg;
+    const engineKeys = recordEngineWrites({ before: before.settings, after: hot, preset: before.settings, engine: new Set(), byPerson: false });
+    const carried = carryUserEdits({
+      loaded: loadedPetg.settings,
+      previous: hot,
+      editedKeys: new Set(),
+      previousSelection: { ...selection, material: previousMaterial },
+      nextSelection: { ...selection, material: "petg" },
+      processKeys: loadedPetg.processKeys,
+      filamentKeys: loadedPetg.filamentKeys,
+      previousFilamentKeys: before.filamentKeys,
+      engineKeys,
+    });
+    const back = materialInForce(a1, carried.settings, "petg", true, loadedPetg.listedFilaments);
+    assert.equal(back.id, "petg", `after picking PETG Basic (selector ${selector}) the row and the G-code agree`);
+    assert.equal(MATERIALS[back.id].label, "PETG Basic");
+    assert.deepEqual(carried.settings.nozzle_temperature, [245]);
+  }
+  // A plain preset load reads as itself, PLA and PETG.
+  assert.equal(materialInForce(a1, loadedPla.settings, "pla", true, presets).id, "pla");
+  assert.equal(materialInForce(a1, loadedPetg.settings, "petg", true, presets).id, "petg");
+
+  // The loader hands the presets over and the client passes them to the row.
+  const [loader, client] = await Promise.all([read("../app/profile-loader.ts"), read("../app/slicer-client.tsx")]);
+  assert.match(loader, /listedFilaments,\n/);
+  assert.match(client, /setListedFilaments\(loaded\.listedFilaments\);\s*setLoadedPresetKey\(requestedPresetKey\);/);
+  assert.match(client, /setListedFilaments\(\{\}\);\s*setLoadedPresetKey\(requestedPresetKey\);/);
 });
 
 // --------------------------------------------------------------- keys
@@ -987,4 +1098,20 @@ test("the sheets are modal: the page behind is inert, Tab wraps, and focus retur
   assert.match(keys, /event\.preventDefault\(\);\s*last\.focus\(\);/);
   assert.match(keys, /event\.preventDefault\(\);\s*first\.focus\(\);/);
   assert.match(client, /<div className="sheet-backdrop"[\s\S]{0,200}?<section\s+ref=\{sheetRef\}/, "the sheet is the child of the backdrop");
+});
+
+test("a tap on a sheet's backdrop closes the sheet and reaches nothing under it", async () => {
+  // c6fix-r1-ha-01: the backdrop closed the sheet on pointerdown. On a touch
+  // screen the click of the tap is hit-tested after pointerup, when the
+  // backdrop was already gone, so it landed on the top bar under it: the back
+  // chevron left the Studio, «حفظ» saved and «استيراد» opened the file picker.
+  // tests/browser-batch-d.mjs taps those points on a phone.
+  const client = await read("../app/slicer-client.tsx");
+  assert.match(client, /<div className="sheet-backdrop" onPointerDown=\{pressBackdrop\} onClick=\{closeFromBackdrop\}>/);
+  const press = client.slice(client.indexOf("const pressBackdrop = useCallback("), client.indexOf("}, []);", client.indexOf("const pressBackdrop = useCallback(")));
+  assert.match(press, /backdropPressRef\.current = event\.target === event\.currentTarget;/, "pointerdown only marks the press");
+  assert.doesNotMatch(press, /setSheet/, "and never closes the sheet");
+  const close = client.slice(client.indexOf("const closeFromBackdrop = useCallback("), client.indexOf("}, []);", client.indexOf("const closeFromBackdrop = useCallback(")));
+  assert.match(close, /if \(pressedHere && event\.target === event\.currentTarget\) setSheet\(null\);/, "the click of a press that began on the backdrop closes it");
+  assert.doesNotMatch(client, /className="sheet-backdrop" onPointerDown=\{\(event\) => \{[^}]*setSheet\(null\)/);
 });

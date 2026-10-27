@@ -23,8 +23,11 @@ import {
   DEFAULT_MATERIAL_ID,
   INFILL,
   STRENGTH,
+  isProfileId,
   materialPresetFor,
+  materialsFor,
   type InfillId,
+  type ListedFilamentPresets,
   type MaterialId,
   type PrinterProfile,
   type QualityId,
@@ -80,6 +83,13 @@ export interface LoadedProfileResult {
    * temperature does not survive it (app/settings-carryover.ts).
    */
   filamentKeys: string[];
+  /**
+   * The filament preset of every material the row lists for this printer,
+   * as the engine ships it. The «الخامة» row compares T1 with these, so a
+   * project that names PETG Basic at other temperatures is not called PETG
+   * Basic (printer-profiles.ts materialInForce).
+   */
+  listedFilaments: ListedFilamentPresets;
   /** True only when machine, process and filament presets all loaded from the engine. */
   verified: boolean;
   /** Explicit needs-attention list — empty when `verified` is true. */
@@ -160,6 +170,13 @@ export async function loadPrinterProfile(
   }
   const filament = engineFilament ?? {};
 
+  const listedFilaments: ListedFilamentPresets = {};
+  for (const id of isProfileId(profile.id) ? materialsFor(profile.id) : []) {
+    const name = materialPresetFor(profile, id);
+    const preset = name ? filamentApi.settingsFor(name) : null;
+    if (preset) listedFilaments[id] = preset as Record<string, unknown>;
+  }
+
   const identity: SlicerSettings = {
     printer_model: profile.model,
     printer_settings_id: profile.presetName,
@@ -188,6 +205,7 @@ export async function loadPrinterProfile(
     machineKeys: [...api.printerKeys, "printer_model", "printer_settings_id"],
     processKeys: Object.keys(process),
     filamentKeys: Object.keys(filament),
+    listedFilaments,
     verified: missingPresets.length === 0,
     missingPresets,
     presetStatus,
