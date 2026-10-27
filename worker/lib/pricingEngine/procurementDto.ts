@@ -65,6 +65,7 @@ export function summaryDto(s: LineSummary) {
     usd_iqd_rate: s.usd_iqd_rate,
     document_rate: s.document_rate,
     store_price_iqd: s.store_price_iqd,
+    cost_basis: s.cost_basis,
   };
 }
 

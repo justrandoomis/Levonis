@@ -1,5 +1,5 @@
 import type { CostProfile } from '../../../packages/contracts/src/procurementCost';
-import { exactProcurementUnitDefault, procurementCostSource, procurementDiscountSet } from '../../../packages/contracts/src/procurementCost';
+import { exactProcurementUnitDefault, procurementDiscountSet } from '../../../packages/contracts/src/procurementCost';
 import type { Selection } from './shared';
 import type { PurchaseUnitOrigin } from './procurementUnitOrigins';
 
@@ -9,7 +9,7 @@ export type ProcurementDraftLine = Selection & {
   invoiced_qty: number;
   purchase_cost_mode?: 'unit' | 'total';
   source_total_amount?: number | string;
-  /** «السعر بعد الخصم»: the unit price after the supplier discount, in the purchase currency; '' or absent for none. */
+  /** A retired supplier discount an older draft carries (DECISIONS row 273): kept on the line, never sent. */
   discounted_unit_amount?: number | string;
   unit_conversion_inexact?: boolean;
   unit_origins?: PurchaseUnitOrigin[];
@@ -62,21 +62,10 @@ export function changeLineQuantity(line: ProcurementDraftLine, qty: number): Pro
   return { ...next, source_total_amount: line.source_unit_amount === '' ? '' : Number((Number(line.source_unit_amount) * qty).toFixed(6)) };
 }
 
-/** Why a typed «السعر بعد الخصم» cannot be saved, or null: blank, or a price
- * at or below the raw price in the same currency precision. */
-export function discountProblem(line: ProcurementDraftLine, currency: string): 'invalid' | 'above' | null {
-  if (!procurementDiscountSet(line.discounted_unit_amount)) return null;
-  const value = Number(line.discounted_unit_amount);
-  if (!Number.isFinite(value) || value < 0 || (currency === 'IQD' && !Number.isInteger(value))) return 'invalid';
-  const raw = procurementCostSource({ ...line, discounted_unit_amount: '' });
-  if (raw.amount == null || raw.amount === '' || !Number.isFinite(Number(raw.amount))) return null;
-  const rawUnitTimesQty = raw.mode === 'total' ? Number(raw.amount) : Number(raw.amount) * line.qty_ordered;
-  return value * line.qty_ordered > rawUnitTimesQty + 1e-9 ? 'above' : null;
-}
-
-/** A saved line with a discount stores the price it was costed at (the
- * discounted unit price); its raw before-discount input lives in the saved
- * request. Editing or copying it restores both from there. */
+/** A line saved by the older screen with a supplier discount stored the
+ * discounted unit price; its raw before-discount input lives in the saved
+ * request. Editing or copying it restores the raw price from there (row 273:
+ * the line is costed from it again). */
 export function restoreLineDiscounts<T extends ProcurementDraftLine>(lines: T[], requestJson: string | null | undefined): T[] {
   let sent: Array<Record<string, unknown>> = [];
   try { const body = JSON.parse(requestJson || '{}'); if (Array.isArray(body.lines)) sent = body.lines; } catch { return lines; }

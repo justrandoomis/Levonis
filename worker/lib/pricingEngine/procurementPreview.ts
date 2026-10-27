@@ -30,7 +30,7 @@ import { directPurchaseStore } from './directPurchase';
 import { priceSku, resolveSkuInputs, ROUNDING_STEP_IQD, type ChannelPrice, type PricingIssue } from '@levonis/pricing/costToPrice';
 import { resolveRuleAt, type PricingRuleRow, type RuleTarget } from '@levonis/pricing/ruleResolution';
 import { channelOfRoute, ROUTE_PROFILE, PREORDER_ROUTES, type PreorderRoute, type ShippingProfile, type SkuChannel } from '@levonis/pricing/skuChannel';
-import { procurementExact, quotientProcurementExact, ceilProcurementExact, type ProcurementExact } from '@levonis/contracts/procurementCost';
+import { procurementExact, procurementExactText, quotientProcurementExact, ceilProcurementExact, ceilToPlaces, divProcurementExact, type ProcurementExact } from '@levonis/contracts/procurementCost';
 import { sameRate } from '@levonis/pricing/fxChain';
 import { sha256Hex } from '../crypto';
 import type { PricingContext } from '../../routes/cart';
@@ -48,7 +48,9 @@ import {
   minimumProfitWrites,
   pricingScopeOf,
   purchaseIneligibility,
+  shipmentUsdIqd,
   skuLevelOf,
+  supplierUnitText,
   type DerivedProduct,
   type DirectSaleExtraDraft,
   type MinimumProfitDraft,
@@ -173,6 +175,8 @@ export interface LineSummary {
   /** The document's own rate when it differs from the central one (N1). */
   document_rate: string | null;
   store_price_iqd: number | null;
+  /** Row 273: the cost is this shipment's landed cost ('shipment'), or the product's own at the central rates. */
+  cost_basis: 'shipment' | 'central';
 }
 
 const emptySummary = (): LineSummary => ({
@@ -214,6 +218,7 @@ const emptySummary = (): LineSummary => ({
   final_price_usd: null,
   usd_iqd_rate: null,
   document_rate: null,
+  cost_basis: 'central',
   store_price_iqd: null,
 });
 
@@ -429,7 +434,7 @@ export function lineSummary(p: PurchaseForPricing, line: PurchaseLineForPricing,
       documentRate = null;
     }
   }
-  return modelSummary({
+  const summary = modelSummary({
     productId: input.loaded.id,
     model: model ?? null,
     inputs: mergedInputs(directPurchaseStore(input.stored).inputs, preview.derived.entries.map((e) => e.write)),
@@ -444,6 +449,54 @@ export function lineSummary(p: PurchaseForPricing, line: PurchaseLineForPricing,
     documentRate,
     packages: packagesOf(input.loaded.doc),
   });
+  fillFromShipment(summary, p, line, rates);
+  return summary;
+}
+
+/**
+ * DECISIONS row 273 (amends row 224 on the purchase screen): the bar's cost of an unsaved purchase line is
+ * THIS shipment's landed unit cost — its raw price at the document's rate,
+ * its freight at the document's freight rate and its extra charges — in dollars at the shipment's dollar
+ * rate, the same figure the inline final cost starts from. The minimum profit is the rule's, as before. A
+ * line without its landed figures (a saved purchase) reads the product's own cost at the central rates.
+ */
+function fillFromShipment(out: LineSummary, p: PurchaseForPricing, line: PurchaseLineForPricing, rates: PricingRates | null): void {
+  const landed = line.landed;
+  const U = shipmentUsdIqd(p, rates);
+  if (out.state !== 'ok' || !landed || !U || !Number.isSafeInteger(line.qty) || line.qty <= 0) return;
+  const unit = (dinars: number) => divProcurementExact(procurementExact(BigInt(Math.max(0, dinars))), line.qty);
+  const raw = unit(landed.raw_iqd);
+  const freight = unit(landed.freight_iqd);
+  const extras = unit(landed.extras_iqd);
+  const total = unit(landed.raw_iqd + landed.freight_iqd + landed.extras_iqd);
+  const usdText = (iqd: ProcurementExact) => procurementExactText(ceilToPlaces(quotientProcurementExact(iqd, U), 6));
+  const k = halfUpCents(quotientProcurementExact(total, U));
+  const [s, h, a] = allocateCents([toCents(raw, U), toCents(freight, U), toCents(extras, U)], k);
+  const supplier = supplierUnitText(line);
+  if (supplier && p.currency !== 'IQD') {
+    out.supplier_original_amount = supplier;
+    out.supplier_original_currency = p.currency as LineSummary['supplier_original_currency'];
+    out.iqd_converted = null;
+  }
+  out.supplier_cost_usd = usdText(raw);
+  out.supplier_cost_cents = s!;
+  if (p.profile) {
+    out.basis = p.profile.shipping_basis;
+    if (p.profile.shipping_basis === 'weight') out.effective_weight_g = line.weight_g;
+    else out.effective_cbm = procurementExactText(divProcurementExact(procurementExact(BigInt(Math.max(0, line.volume_mm3))), 1_000_000_000));
+    out.shipping_rate = landed.freight_rate_iqd === null ? out.shipping_rate : String(landed.freight_rate_iqd);
+  }
+  out.shipping_cost_iqd = Number(ceilProcurementExact(freight));
+  out.shipping_cost_usd = usdText(freight);
+  out.shipping_cost_cents = h!;
+  out.additional_cost_iqd = Number(ceilProcurementExact(extras));
+  out.additional_cost_usd = usdText(extras);
+  out.additional_cost_cents = a!;
+  out.current_total_cost_usd = usdText(total);
+  out.current_total_cost_cents = k;
+  if (out.target_profit_cents !== null) out.final_price_cents = k + out.target_profit_cents;
+  out.usd_iqd_rate = procurementExactText(ceilToPlaces(U, 6));
+  out.cost_basis = 'shipment';
 }
 
 /** What one model's bar is computed from: the product's inputs and rules (drafts laid over), the rates. */

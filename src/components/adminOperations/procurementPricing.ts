@@ -52,6 +52,8 @@ export interface PricingSummary {
   usd_iqd_rate: string | null;
   document_rate: string | null;
   store_price_iqd: number | null;
+  /** DECISIONS row 273: `shipment` when the cost is the own landed cost of this purchase (absent from an older server). */
+  cost_basis?: 'shipment' | 'central';
 }
 
 export interface PricingLine {

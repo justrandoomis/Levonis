@@ -41,8 +41,14 @@ test('a saved selection keeps its canonical USD/IQD quote and profit when other 
   assert.equal(saved.status, 200, JSON.stringify(await json(saved)));
   const selections = await productSelections(w.db, AMS);
   assert.equal(selections.find(s => s.scope_id === AMS_MODEL)?.selling_price_iqd, null, 'there is no published product price yet');
-  const review = await json(await post(w.app, path, { ...identity, draft }));
+  // DECISIONS row 273: the screen pins a typed and saved final cost (`keep_cost`) while this shipment is unchanged.
+  const review = await json(await post(w.app, path, { ...identity, draft, keep_cost: true }));
   assert.equal(review.customer_price_usd, '11.99', 'step 4 reads the same saved selection quote as step 3');
+  assert.equal(review.final_cost_usd, '7.180121');
+  // Without the pin (the shipment changed since), the card starts again from the landed cost of the shipment.
+  const moved = await json(await post(w.app, path, { ...identity, draft }));
+  assert.equal(moved.final_cost_usd, '502.8125');
+  assert.equal((await post(w.app, path, { ...identity, draft, keep_cost: 'yes' })).status, 400);
   assert.equal(review.customer_price_iqd, p.customer_price_iqd);
   assert.equal(review.preview.complete, false, 'the review must still explain the incomplete product');
   const receipt=await json(await post(w.app,path,identity));
@@ -63,7 +69,10 @@ test('a quote cannot survive changed selection, cost, revision or pending edits;
     inlinePricingRequestKey(selection, { ...draft, currency: 'USD' }, {}, 0),
     inlinePricingRequestKey(selection, draft, {}, 1),
     inlinePricingRequestKey(selection, draft, { customer_price_usd: '15' }, 0),
+    inlinePricingRequestKey(selection, draft, {}, 0, true),
   ]) assert.equal(currentInlinePrice(quote, changed), null);
+  // The pin of a saved final cost travels only with a purchase draft (row 273).
+  assert.equal(inlinePricingRequestKey(selection, null, {}, 0, true), inlinePricingRequestKey(selection, null, {}, 0));
   assert.equal(currentInlinePrice({ ...quote, price: 0 }, key), 0);
   for (const price of [NaN, Infinity, -Infinity, null]) assert.equal(currentInlinePrice({ ...quote, price }, key), null);
 });

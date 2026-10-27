@@ -82,21 +82,19 @@ export function exactProcurementUnitDefault(sourceTotal: number | string, qty: n
   return unitNumerator * BigInt(qty) * denominator === numerator * unitDivisor ? candidate : null;
 }
 
-/** «السعر بعد الخصم»: a purchase line's optional unit price after the supplier
- * discount, in the document's currency, on the wire as `discounted_unit_amount`.
- * Blank means no discount: the line is costed from its raw input. */
+/** `discounted_unit_amount`: a supplier discount an older purchase screen sent with a line
+ * (DECISIONS row 273: retired; «السعر بعد الخصم» is the product's sale price, not a supplier
+ * discount). Still read, so an old draft opens with its raw price; it never costs a line. */
 export const procurementDiscountSet = (value: unknown): boolean => value !== undefined && value !== null && value !== '';
 
-/** The supplier amount a line is costed at, and how: the discounted unit price
- * when one is typed (the raw input then stays only as the before-discount
- * price), else the raw unit price or raw line total as entered. */
+/** The supplier amount a line is costed at, and how: the raw unit price or raw
+ * line total as entered (a retired supplier discount on the wire is ignored). */
 export function procurementCostSource(line: {
   purchase_cost_mode?: string | null;
   source_unit_amount?: number | string | null;
   source_total_amount?: number | string | null;
   discounted_unit_amount?: number | string | null;
 }): { mode: 'unit' | 'total'; amount: number | string | null | undefined; discounted: boolean } {
-  if (procurementDiscountSet(line.discounted_unit_amount)) return { mode: 'unit', amount: line.discounted_unit_amount, discounted: true };
   return line.purchase_cost_mode === 'total'
     ? { mode: 'total', amount: line.source_total_amount, discounted: false }
     : { mode: 'unit', amount: line.source_unit_amount, discounted: false };

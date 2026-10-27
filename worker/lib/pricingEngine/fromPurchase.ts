@@ -94,6 +94,13 @@ export interface PurchaseLineForPricing {
   volume_mm3: number;
   /** Today's direct-sale store price of the selection (the old reference column), IQD. */
   store_price_iqd: number | null;
+  /**
+   * This shipment's own landed figures for the whole line, in whole dinars, exactly as the document stores
+   * them (the lot cost): the raw purchase at the document's rate, the route freight at the document's freight
+   * rate, and the extra charges' shares. Present for an unsaved draft read by the purchase POST's parser;
+   * absent for a saved purchase, whose pricing reads stay as they were (DECISIONS row 273).
+   */
+  landed?: { raw_iqd: number; freight_iqd: number; extras_iqd: number; freight_rate_iqd: number | null };
 }
 
 export interface PurchaseChargeForPricing {
@@ -127,6 +134,41 @@ export const PROFILE_OF_ROUTE: Readonly<Record<'germany_land' | 'china_air' | 'c
 };
 
 const SUPPLIER: ReadonlySet<string> = new Set(['USD', 'EUR', 'CNY']);
+
+/**
+ * DECISIONS row 273: the dollar rate of THIS shipment (IQD per USD, exact). A dollar document: its own
+ * rate. A euro or yuan document: the dollar its rate implies through the approved central cross (rate ÷ E
+ * or ÷ C), so the supplier's euros or yuan are the same dollars the engine reads and only the dinars of this
+ * shipment move. A dinar document: its U (row 249), else the central U. Null when a figure is missing.
+ */
+export function shipmentUsdIqd(p: Pick<PurchaseForPricing, 'currency' | 'exchange_rate' | 'usd_iqd'>, rates: Pick<PricingRates, 'usd_iqd' | 'eur_usd' | 'cny_usd'> | null): ProcurementExact | null {
+  try {
+    const positive = (x: ProcurementExact | null) => (x && x.num > 0n ? x : null);
+    if (p.currency === 'IQD') return positive(procurementExact(p.usd_iqd?.rate ?? rates?.usd_iqd ?? '0'));
+    if (!Number.isFinite(p.exchange_rate) || p.exchange_rate <= 0) return null;
+    const doc = procurementExact(String(p.exchange_rate));
+    if (p.currency === 'USD') return positive(doc);
+    const cross = p.currency === 'EUR' ? rates?.eur_usd : p.currency === 'CNY' ? rates?.cny_usd : null;
+    if (!cross) return null;
+    return positive(quotientProcurementExact(doc, procurementExact(cross)));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * DECISIONS row 273: one selection's landed unit cost on THIS shipment, in dinars (exact): every line of the
+ * selection, Σ (raw + freight + extras) ÷ Σ qty — the «تكلفة القطعة الفعلية لهذه الشحنة» the purchase
+ * screen shows and the lots carry. Null when a line lacks its landed figures or the selection is not bought.
+ */
+export function shipmentUnitLandedIqd(p: Pick<PurchaseForPricing, 'lines'>, match: (line: PurchaseLineForPricing) => boolean): ProcurementExact | null {
+  const lines = p.lines.filter(match);
+  if (!lines.length || lines.some((l) => !l.landed || !Number.isSafeInteger(l.qty) || l.qty <= 0)) return null;
+  const dinars = lines.reduce((n, l) => n + l.landed!.raw_iqd + l.landed!.freight_iqd + l.landed!.extras_iqd, 0);
+  const qty = lines.reduce((n, l) => n + l.qty, 0);
+  if (!Number.isSafeInteger(dinars) || dinars <= 0) return null;
+  return divProcurementExact(procurementExact(BigInt(dinars)), qty);
+}
 
 /** Why a purchase cannot feed pricing (§3.1), or null. */
 export function purchaseIneligibility(p: Pick<PurchaseForPricing, 'status' | 'cost_state' | 'lines'>): 'status' | 'estimated' | 'no_lines' | null {

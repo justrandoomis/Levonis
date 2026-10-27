@@ -41,6 +41,14 @@ export function draftForPricing(parsed: ParsedDraft, b: Record<string, unknown>,
       weight_g: l.weight,
       volume_mm3: l.volume,
       store_price_iqd: Number.isSafeInteger(l.sel.selling_price_iqd) ? l.sel.selling_price_iqd : null,
+      // DECISIONS row 273: the shipment's own dinars, as the save stores them for this line's lots.
+      // A freight-looking charge the owner has not confirmed (pricing_role 'excluded') stays out, as the card says.
+      landed: {
+        raw_iqd: l.total,
+        freight_iqd: l.autoShipping,
+        extras_iqd: l.charges - l.autoShipping - parsed.charges.reduce((n, c, j) => n + (c.pricing_role === 'excluded' ? parsed.shares[j]![index]! : 0), 0),
+        freight_rate_iqd: parsed.shippingRate,
+      },
     })),
     charges: parsed.charges.map((c, j) => ({
       title: c.title,

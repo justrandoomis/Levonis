@@ -1,14 +1,21 @@
 /** Inline procurement pricing uses the normal V2 preview and prices-only writer.
  * A typed final cost adjusts the supplier component after freight and extras;
- * it never rewrites a purchase, a received lot or its accounting cost. */
+ * it never rewrites a purchase, a received lot or its accounting cost.
+ *
+ * DECISIONS row 273 (amends row 224 on this screen): with an unsaved purchase,
+ * the final cost the card starts from is THIS shipment's landed unit cost (the
+ * document's rate, its raw supplier price, its freight and charges)
+ * at the shipment's dollar rate (`shipmentUsdIqd`), not the product's stored
+ * inputs at the central rates. It is applied exactly like a typed final cost,
+ * so the preview, its hash and the saved prices all carry the same figure. */
 import type { Context } from 'hono';
 import type { AppContext } from '../../types';
 import { notFound } from '../../http';
 import { replacementCost, resolveSkuInputs } from '@levonis/pricing/costToPrice';
 import { parseV2Usd } from '@levonis/pricing/priceV2';
 import { resolveRuleAt } from '@levonis/pricing/ruleResolution';
-import { addProcurementExact, ceilToPlaces, procurementExact, procurementExactText, quotientProcurementExact, typedDecimalText } from '@levonis/contracts/procurementCost';
-import { deriveProductEntries, mergedRules, openSeedFields, skuLevelOf, type PurchaseForPricing } from '../fromPurchase';
+import { addProcurementExact, ceilToPlaces, floorToPlaces, procurementExact, procurementExactText, quotientProcurementExact, typedDecimalText } from '@levonis/contracts/procurementCost';
+import { deriveProductEntries, mergedRules, openSeedFields, shipmentUnitLandedIqd, shipmentUsdIqd, skuLevelOf, type PurchaseForPricing } from '../fromPurchase';
 import { purchaseSkuLevels, unitRuleTarget } from '../procurementPreview';
 import { chainOfUnit, packagesOf } from '../store';
 import { unitColorId, unitComboKey, unitOptionIds } from '../legacy';
@@ -53,10 +60,17 @@ export async function procurementLinePricing(c: Context<AppContext>, body: Recor
     return profile && read.rates ? replacementCost(resolved, profile, read.rates.central) : null;
   };
 
-  // Existing pricing wins. A new/unpriced selection can use this unsaved
-  // purchase to fill its missing inputs without leaving the inventory screen.
-  if (!replacementOf(ev)?.ok && purchase) {
-    const lines = purchase.lines.filter((l) => l.product_id === read.loaded.id && l.scope === scope && l.scope_id === id);
+  // Row 273: this shipment's landed unit cost in dollars, when the draft carries it for this selection.
+  const bought = (l: PurchaseForPricing['lines'][number]) => l.product_id === read.loaded.id && l.scope === scope && l.scope_id === id;
+  // `keep_cost`: the owner typed and saved a final cost against this same shipment; it stays the cost.
+  if (body.keep_cost !== undefined && typeof body.keep_cost !== 'boolean') throw inputInvalid('keep_cost');
+  const shipmentRate = purchase && body.keep_cost !== true ? shipmentUsdIqd(purchase, read.rates) : null;
+  const shipmentLanded = purchase && shipmentRate ? shipmentUnitLandedIqd(purchase, bought) : null;
+  const shipmentUsd = shipmentLanded && shipmentRate ? ceilToPlaces(quotientProcurementExact(shipmentLanded, shipmentRate), 6) : null;
+  // A new/unpriced selection fills its missing inputs from this unsaved purchase (fill only: what is stored
+  // stays). With the shipment's own cost, the route and measure it may still need come from it too.
+  if ((!replacementOf(ev)?.ok || shipmentUsd) && purchase) {
+    const lines = purchase.lines.filter(bought);
     const derived = deriveProductEntries({ ...purchase, lines }, read.loaded.id, read.stored, {
       optIn: new Set(lines.map((l) => l.key)), prefer: false, usePurchase: true, rates: read.rates, levels,
     });
@@ -86,24 +100,56 @@ export async function procurementLinePricing(c: Context<AppContext>, body: Recor
     if (text && !parseV2Usd(text)) throw inputInvalid('minimum_profit_usd');
     setProfit(text);
   }
-  if (body.final_cost_usd !== undefined) {
-    if (typeof body.final_cost_usd !== 'string') throw inputInvalid('final_cost_usd');
-    const amount = parseV2Usd(typedDecimalText(body.final_cost_usd.trim()), { zero: false });
-    if (!amount) throw inputInvalid('final_cost_usd');
+  // The supplier component that makes the engine's cost exactly `amount` after its freight and extras. A
+  // shipment's cost that cannot be represented (no route to freight it, or freight above it) leaves the
+  // inputs as they were, and the card reads the product's own cost as before; a typed one is refused.
+  const applyFinalCost = async (amount: ReturnType<typeof procurementExact>, typed: boolean) => {
     // A temporary supplier amount lets the same cost resolver calculate the
     // freight even when the supplier cost has never been entered.
     const at = inputs.find((i) => i.scope === target.scope && i.scope_id === target.scope_id);
     const input = at ?? { ...target };
+    const before = at ? { ...at } : null;
+    const undo = () => {
+      if (!before) inputs.splice(inputs.indexOf(input), 1);
+      else { for (const k of Object.keys(input)) delete input[k]; Object.assign(input, before); }
+    };
     if (!at) inputs.push(input);
     Object.assign(input, { supplier_cost_amount: '1', supplier_cost_currency: 'USD' });
     ev = await evaluate();
     const replacement = replacementOf(ev);
-    if (!replacement?.ok || !read.rates?.usd_iqd) throw inputInvalid('final_cost_usd_requires_freight');
+    if (!replacement?.ok || !read.rates?.usd_iqd) {
+      if (typed) throw inputInvalid('final_cost_usd_requires_freight');
+      undo();
+      return false;
+    }
     const charges = addProcurementExact(procurementExact(replacement.cost.shipping_cost_exact), procurementExact(replacement.cost.additional_cost_iqd));
     const chargesUsd = quotientProcurementExact(charges, procurementExact(read.rates.usd_iqd));
     const supplier = addProcurementExact(amount, { num: -chargesUsd.num, den: chargesUsd.den });
-    if (supplier.num <= 0n) throw inputInvalid('final_cost_usd_below_freight');
-    input.supplier_cost_amount = procurementExactText(ceilToPlaces(supplier, 6));
+    if (supplier.num <= 0n) {
+      if (typed) throw inputInvalid('final_cost_usd_below_freight');
+      undo();
+      return false;
+    }
+    // Down at the sixth place, so the engine reads back exactly the final cost asked (freight ÷ U rarely ends
+    // within six places; rounding up would show $700.000001 for a typed $700). The gap is under a millionth of
+    // a dollar, and the price above it is still rounded up to its step.
+    const supplierText = procurementExactText(floorToPlaces(supplier, 6));
+    if (!parseV2Usd(supplierText, { zero: false })) {
+      if (typed) throw inputInvalid('final_cost_usd_below_freight');
+      undo();
+      return false;
+    }
+    input.supplier_cost_amount = supplierText;
+    return true;
+  };
+  let fromShipment = false;
+  if (body.final_cost_usd !== undefined) {
+    if (typeof body.final_cost_usd !== 'string') throw inputInvalid('final_cost_usd');
+    const amount = parseV2Usd(typedDecimalText(body.final_cost_usd.trim()), { zero: false });
+    if (!amount) throw inputInvalid('final_cost_usd');
+    await applyFinalCost(amount, true);
+  } else if (shipmentUsd && shipmentUsd.num > 0n) {
+    fromShipment = await applyFinalCost(shipmentUsd, false);
   }
   ev = await evaluate();
   const usd = (amount: string | number) => read.rates?.usd_iqd ? procurementExactText(ceilToPlaces(quotientProcurementExact(procurementExact(amount), procurementExact(read.rates.usd_iqd)), 6)) : null;
@@ -165,14 +211,19 @@ export async function procurementLinePricing(c: Context<AppContext>, body: Recor
   const replacement = replacementOf(ev);
   const rule = resolveRuleAt(mergedRules(read.stored, ev.ruleWrites), 'target_profit', ruleTarget, { usdIqdRate: read.rates?.usd_iqd ?? null });
   const row = ev.rows.find((r) => r.combo_key === selection.combo_key && r.channel === 'direct_sale') ?? ev.rows.find((r) => r.combo_key === selection.combo_key);
+  const finalCostUsd = replacement?.ok ? usd(replacement.cost.replacement_exact) : null;
   return {
     pricing,
     preview: v2Answer({ viewer: 'owner', read, ev }),
-    final_cost_usd: replacement?.ok ? usd(replacement.cost.replacement_exact) : null,
+    final_cost_usd: finalCostUsd,
     minimum_profit_usd: rule.status === 'active' ? rule.amount_usd ?? (rule.amount_iqd === null ? null : usd(rule.amount_iqd)) : null,
     customer_price_usd: row?.owner?.usd_ceil6 ?? row?.usd_exact ?? null,
     customer_price_iqd: row?.new_iqd ?? null,
     profit_scope: profitScope,
     cost_from_purchase: inputs.length > 0 && body.final_cost_usd === undefined,
+    // Row 273: where the final cost came from — this shipment (its landed unit dinars and dollar rate), or null.
+    shipment: fromShipment && shipmentLanded && shipmentRate
+      ? { landed_cost_iqd: procurementExactText(ceilToPlaces(shipmentLanded, 3)), usd_iqd: procurementExactText(ceilToPlaces(shipmentRate, 6)), final_cost_usd: finalCostUsd ?? procurementExactText(shipmentUsd!) }
+      : null,
   };
 }

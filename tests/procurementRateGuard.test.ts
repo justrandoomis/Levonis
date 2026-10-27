@@ -199,15 +199,22 @@ test('the purchase panel never seeds 1 for a foreign currency; it prefills, bloc
   assert.match(panel, /data-purchase-rate="far"/);
 });
 
-test('«Keep this session’s draft» (serials or pending price edits, local only) shows no rate refusal; the server draft save still waits for the rate', () => {
+test('«حفظ مسودة» saves to the server whenever it can and always answers beside the button; the rate check comes before the server (row 273)', () => {
   const panel = src('src/components/adminOperations/ProcurementPanel.tsx');
-  const handler = panel.match(/onClick=\{\(\) => \{ saveLocal\(\);([^\n]*?)\}\}>\{hasDraftSerials/)?.[1];
-  assert.ok(handler, 'the draft button handler');
-  // The rate refusal sits inside the branch that sends the draft to the server…
-  assert.match(handler, /^ if \(!pendingInlinePrices && costsValid && originsValid && !hasDraftSerials\) \{ if \(!rateReady\) \{ op\.setError\([^;]*\); return; \} op\.run\(\(\) => save\('draft'\)/);
-  // …so a local-only keep (serials or pending inline prices) never reaches it.
-  assert.equal(handler.indexOf('!rateReady') > handler.indexOf('!hasDraftSerials'), true);
-  assert.equal(handler.indexOf('!rateReady') > handler.indexOf('!pendingInlinePrices'), true);
+  const handler = panel.slice(panel.indexOf('const saveDraft = async () => {'), panel.indexOf('const saveLocal = () => {'));
+  assert.ok(handler.length > 0, 'the draft handler');
+  // Kept in this session first, then each reason it cannot reach the server is said, in order.
+  const order = ['saveLocal();', '!lines.length', '!costsValid || !originsValid', '!rateReady', "draftBody('draft', true, false)", 'api.put', 'api.post'];
+  order.reduce((at, needle) => { const i = handler.indexOf(needle, at); assert.ok(i >= at, needle); return i; }, 0);
+  // Pending inline prices and serials no longer hold the purchase back (they stay in the editor and the session).
+  assert.doesNotMatch(handler, /if \(pendingInlinePrices\)\s*return|hasDraftSerials\)\s*return/);
+  assert.match(handler, /rateStand === 'far' && rateConfirmed \? \{ confirm_rate: true \}/);
+  // Every outcome is a note beside the button, never only the banner at the top of the page.
+  assert.equal((handler.match(/setDraftNote\(\{ tone:/g) ?? []).length >= 5, true);
+  assert.match(panel, /data-purchase-draft-note=\{draftNote\.tone\}/);
+  assert.match(panel, /onClick=\{\(\) => void saveDraft\(\)\}/);
+  // A saved draft keeps the editor on it: the next save updates the same document.
+  assert.match(handler, /setEditId\(r\.id\)/);
 });
 
 /** Every `loc()` call of a file: its argument texts (null for a non-literal) and its line. */

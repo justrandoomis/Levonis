@@ -21,7 +21,7 @@ type Answer = Record<string, any>;
 const summaryOf = (body: Answer, i = 0) => body.lines[i].pricing_summary;
 const productOf = (body: Answer) => body.products[0];
 
-test('the summary is the cost at the CENTRAL rates — the brief’s $500 / +$120, never the document’s rates — and no price of the old engine', async () => {
+test('the summary is THIS shipment’s landed cost (row 273): the document’s rate, freight and charges — and no price of the old engine', async () => {
   const w = pricingWorld();
   // The document says 1,800 IQD/EUR and 5,000 IQD/kg; the central rates are EUR 1.1 × 1,600 and 3,200 IQD/kg.
   const r = await w.preview({ draft: w.draft({ exchange_rate: 1800 }), pricing: { minimum_profits: [{ product_id: AMS, scope: 'product', amount_usd: '120' }] } });
@@ -29,15 +29,18 @@ test('the summary is the cost at the CENTRAL rates — the brief’s $500 / +$12
   assert.match(r.headers.get('cache-control') ?? '', /no-store/);
   const s = summaryOf(r.body);
   assert.equal(s.state, 'ok');
-  assert.equal(s.current_total_cost_cents, 50_000);
+  assert.equal(s.cost_basis, 'shipment');
+  // 450 × 1,800 + 2.5 kg × 5,000 = 822,500 IQD at the shipment's dollar (1,800 ÷ 1.1): $502.64 (half-up cents).
+  assert.equal(s.current_total_cost_cents, 50_264);
   assert.equal(s.target_profit_cents, 12_000);
   // The clean start (review 2026-10-14): the card shows no price of the old engine — the V2 review in
   // section ٣ is the one price sheet; the store price is the V2 one (null: the product needs pricing).
   for (const k of ['final_price_cents', 'final_price_usd', 'preorder_base_iqd', 'direct_sale_extra_iqd', 'direct_sale_price_iqd', 'rounding_added_iqd', 'store_price_iqd']) assert.equal(s[k], null, k);
-  assert.equal(s.shipping_cost_iqd, 8_000, 'the central 3,200 IQD/kg, not the document’s 5,000');
+  assert.equal(s.shipping_cost_iqd, 12_500, 'the document’s 5,000 IQD/kg × 2.5 kg, not the central 3,200');
+  assert.equal(s.shipping_rate, '5000');
   assert.equal(s.document_rate, '1800', 'N1 names the document’s own rate when it differs');
   assert.equal(s.cross_rate, '1.1');
-  assert.equal(s.usd_iqd_rate, '1600');
+  assert.equal(s.usd_iqd_rate, '1636.363637', 'the dollar this document’s euro rate implies');
   // «تفاصيل»: the 13 items are all there, and rows 4 + 7 + 8 = row 9 in cents.
   for (const k of ['supplier_original_amount', 'supplier_original_currency', 'cross_rate', 'supplier_cost_cents', 'effective_weight_g', 'shipping_cost_iqd', 'shipping_cost_cents', 'additional_cost_iqd', 'current_total_cost_cents', 'minimum_target_profit_usd', 'usd_iqd_rate'])
     assert.ok(s[k] !== undefined && s[k] !== null, k);
@@ -48,14 +51,16 @@ test('the summary is the cost at the CENTRAL rates — the brief’s $500 / +$12
   assert.equal(row<{ n: number }>(w.raw, 'SELECT COUNT(*) AS n FROM purchase_orders')!.n, 0);
 });
 
-test('the card freights a model on its own package, as V2 prices it (row 247): 1,200 g, never the purchase’s 2,500 g', async () => {
+test('the card’s cost follows the shipment’s own freight (row 273): 2.5 kg at the document’s rate, even where V2 freights the model on its 1,200 g package (row 247)', async () => {
   const w = pricingWorld();
   w.raw.exec(`UPDATE product_option_values SET package_weight_g = 1200 WHERE id = '${AMS_MODEL}'`);
   const r = await w.preview({ draft: w.draft(), pricing: { minimum_profits: [{ product_id: AMS, scope: 'product', amount_usd: '120' }] } });
   assert.equal(r.status, 200, JSON.stringify(r.body));
   const s = summaryOf(r.body);
-  assert.equal(s.effective_weight_g, 1200);
-  assert.equal(s.shipping_cost_iqd, 3_840, 'the central 3,200 IQD/kg × 1.2 kg');
+  assert.equal(s.effective_weight_g, 2500);
+  assert.equal(s.shipping_cost_iqd, 12_500, 'the document’s 5,000 IQD/kg × 2.5 kg');
+  // 450 × 1,760 + 12,500 = 804,500 IQD ÷ 1,600.
+  assert.equal(s.current_total_cost_cents, 50_281);
 });
 
 test('the freight words: the shared regex catches «گواستنەوە» and «ناردن», and the editor re-exports it', () => {

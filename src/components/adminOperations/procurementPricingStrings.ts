@@ -69,6 +69,8 @@ export interface ProcurementPricingStrings {
   excludedListed: Fill;
   migratedDinars: string;
   n1: string;
+  /** DECISIONS row 273: on the purchase screen the cost is that of this shipment. */
+  n1Shipment: string;
   n1Doc: Fill;
   n2: Fill3;
   n3: Fill;
@@ -174,6 +176,7 @@ const ar: ProcurementPricingStrings = {
   excludedListed: (titles) => `مستبعد من التسعير: ${titles}`,
   migratedDinars: 'قيمة مرحّلة بالدينار، معروضة بالدولار بسعر اليوم',
   n1: 'التسعير يستخدم أسعار الصرف والشحن المركزية الحالية، لا أسعار هذا المستند',
+  n1Shipment: 'التكلفة هنا هي تكلفة هذه الشحنة الفعلية: سعر الصرف والشحن والمصاريف المكتوبة في هذا المستند',
   n1Doc: (rate) => `سعر هذا المستند: ${rate}`,
   n2: (pre, x, direct) => `سعر البيع المباشر = ${pre} + زيادة البيع المباشر ${x} = ${direct}`,
   n3: (n) => `فوق 1,000 د.ع يُقرَّب السعر لأعلى إلى أقرب 250 د.ع (+${n})`,
@@ -274,6 +277,7 @@ const en: ProcurementPricingStrings = {
   excludedListed: (titles) => `Left out of pricing: ${titles}`,
   migratedDinars: "A migrated amount in dinars, shown in USD at today's rate",
   n1: "Pricing uses today's central exchange and shipping rates, not this document's rates",
+  n1Shipment: "The cost here is this shipment's landed cost: the exchange rate, freight and charges entered on this document",
   n1Doc: (rate) => `This document's rate: ${rate}`,
   n2: (pre, x, direct) => `Direct sale price = ${pre} + Direct Sale Extra ${x} = ${direct}`,
   n3: (n) => `Above 1,000 IQD, rounded up to the next 250 IQD (+${n})`,
@@ -374,6 +378,7 @@ const ckb: ProcurementPricingStrings = {
   excludedListed: (titles) => `لە نرخدانان دەرکراوە: ${titles}`,
   migratedDinars: 'بڕێکی گوازراوە بە دینار، بە نرخی ئەمڕۆ بە دۆلار پیشان دراوە',
   n1: 'نرخدانان نرخە ناوەندییەکانی ئێستای ئاڵوگۆڕ و ناردن بەکاردەهێنێت، نەک نرخەکانی ئەم بەڵگەنامەیە',
+  n1Shipment: 'تێچووی ئێرە تێچووی ڕاستەقینەی ئەم بارەیە: نرخی ئاڵوگۆڕ و ناردن و ئەو خەرجییانەی لەم بەڵگەنامەیەدا نووسراون',
   n1Doc: (rate) => `نرخی ئەم بەڵگەنامەیە: ${rate}`,
   n2: (pre, x, direct) => `نرخی فرۆشتنی ڕاستەوخۆ = ${pre} + زیادەی فرۆشتنی ڕاستەوخۆ ${x} = ${direct}`,
   n3: (n) => `لە سەروو 1,000 د.ع، بەرەو سەرەوە بۆ نزیکترین 250 د.ع خڕ دەکرێتەوە (+${n})`,

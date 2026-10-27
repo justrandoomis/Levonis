@@ -11,27 +11,52 @@ import InlineProcurementPricing from '../src/components/adminOperations/InlinePr
 const path = '/api/admin/pricing/procurement/line-pricing';
 const selection = { product_id: AMS, scope: 'option', scope_id: AMS_MODEL };
 
-test('unpriced inventory shows its cost without a profit, then saves a fractional profit through V2 and reloads it', async () => {
+test('unpriced inventory shows THIS shipment’s cost without a profit, then saves a fractional profit through V2 and reloads it', async () => {
   const w = pricingWorld();
   const body = { ...selection, draft: w.draft() };
   const initial = await json(await post(w.app, path, body));
-  assert.equal(initial.final_cost_usd, '500', JSON.stringify(initial));
+  // DECISIONS row 273: the shipment's landed unit cost — EUR 450 × 1,760 + 2.5 kg × 5,000 = 804,500 IQD — at the
+  // shipment's dollar rate (1,760 ÷ EUR/USD 1.1 = 1,600): $502.8125, never the central freight of 3,200 IQD/kg.
+  assert.equal(initial.final_cost_usd, '502.8125', JSON.stringify(initial));
+  assert.deepEqual(initial.shipment, { landed_cost_iqd: '804500', usd_iqd: '1600', final_cost_usd: '502.8125' });
+  assert.equal(initial.cost_from_purchase, true);
   assert.equal(initial.minimum_profit_usd, null);
   assert.equal(initial.customer_price_usd, null);
   assert.equal(initial.customer_price_iqd, null);
   const preview = await json(await post(w.app, path, { ...body, minimum_profit_usd: '50.051' }));
   assert.equal(preview.preview.complete, true, JSON.stringify(preview));
+  assert.equal(preview.final_cost_usd, '502.8125');
   assert.equal(preview.minimum_profit_usd, '50.051');
-  assert.equal(preview.customer_price_usd, '550.051');
-  assert.equal(preview.customer_price_iqd, 880250);
+  assert.equal(preview.customer_price_usd, '552.8635');
+  assert.equal(preview.customer_price_iqd, 884750);
   const app = v2App(w.raw);
   const save = await put(app, `/api/admin/products-v2/${AMS}/pricing`, { pricing: preview.pricing, seq: preview.preview.seq, preview_hash: preview.preview.review_hash, confirm_large_change: true });
   assert.equal(save.status, 200, JSON.stringify(await json(save)));
+  // What was saved is what was shown: the product alone (no purchase) now reads the same cost and price.
+  const stored = await json(await post(w.app, path, selection));
+  assert.equal(stored.final_cost_usd, '502.8125');
+  assert.equal(stored.customer_price_iqd, 884750);
+  assert.equal(stored.shipment, null);
   const reloaded = await json(await post(w.app, path, { ...selection, draft: w.draft({ lines: [{ ...body.draft.lines[0], source_unit_amount: 900 }] }) }));
-  assert.equal(reloaded.final_cost_usd, '500', 'existing cost is prefilled, not overwritten by a new purchase');
+  // A new shipment at EUR 900 is the card's cost now: 900 × 1,760 + 12,500 = 1,596,500 IQD ÷ 1,600.
+  assert.equal(reloaded.final_cost_usd, '997.8125', 'the card follows this shipment, not the stored cost');
   assert.equal(reloaded.minimum_profit_usd, '50.051');
-  assert.equal(reloaded.customer_price_iqd, 880250);
+  const rated = await json(await post(w.app, path, { ...selection, draft: w.draft({ exchange_rate: 1650 }) }));
+  // The document's rate moves both the dinars and the dollar: (450 × 1,650 + 12,500) ÷ (1,650 ÷ 1.1) = $503.333334.
+  assert.equal(rated.final_cost_usd, '503.333334');
   assert.equal(w.raw.prepare('SELECT COUNT(*) AS n FROM purchase_orders').get()?.n, 0, 'pricing never invents a purchase or inventory');
+});
+
+test('the extra charges move the shipment’s final cost; an unconfirmed freight-looking charge stays out; a retired supplier discount changes nothing', async () => {
+  const w = pricingWorld();
+  const line = { ...w.draft().lines[0], discounted_unit_amount: 400 };
+  const charge = { title: 'جمارك', scope: 'unit', unit_amount_iqd: 16_000, basis: 'quantity', applies_to: null };
+  const p = await json(await post(w.app, path, { ...selection, draft: w.draft({ lines: [line], charges: [charge] }) }));
+  // 450 × 1,760 + 12,500 + 16,000 = 820,500 IQD ÷ 1,600 (the raw price: the old supplier discount is ignored).
+  assert.equal(p.final_cost_usd, '512.8125', JSON.stringify(p));
+  const freight = { ...charge, title: 'شحن محلي' };
+  const left = await json(await post(w.app, path, { ...selection, draft: w.draft({ lines: [line], charges: [freight] }) }));
+  assert.equal(left.final_cost_usd, '502.8125', 'a freight-looking charge waits for the owner before it is priced');
 });
 
 test('editing final cost preserves freight once, saves the exact selection, and does not mutate purchase economics', async () => {

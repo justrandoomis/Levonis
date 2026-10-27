@@ -5,14 +5,17 @@ import { contractRefusal, refusalLang } from '../../lib/refusalStrings';
 import { UsdInput } from '../adminProducts/form/v2/v2Ui';
 import type { V2Answer, V2DraftWire } from '../adminProducts/form/v2/v2Model';
 import PricingSummaryBar from './PricingSummaryBar';
+import InlineSaleDiscount from './InlineSaleDiscount';
 import type { PricingSummary } from './procurementPricing';
 import { money, T, type Selection } from './shared';
 
 export type InlinePriceDraft = { final_cost_usd?: string; minimum_profit_usd?: string; customer_price_usd?: string };
-type PriceSelection = Pick<Selection, 'product_id' | 'scope' | 'scope_id' | 'label'>;
+type PriceSelection = Pick<Selection, 'product_id' | 'scope' | 'scope_id' | 'label'> & Partial<Pick<Selection, 'option_id' | 'color_id'>>;
 export const inlinePriceKey = (line: PriceSelection) => `${line.product_id}:${line.scope}:${line.scope_id}`;
-export const inlinePricingRequestKey = (line: PriceSelection, draft: Record<string, unknown> | null, value: InlinePriceDraft, revision: number) =>
-  JSON.stringify([{ product_id: line.product_id, scope: line.scope, scope_id: line.scope_id, ...(draft ? { draft } : {}), ...value }, revision]);
+/** `keepCost` (DECISIONS row 273): a final cost the owner typed and saved for this very shipment stays the cost,
+ * instead of the landed cost of the shipment, until the shipment itself changes. */
+export const inlinePricingRequestKey = (line: PriceSelection, draft: Record<string, unknown> | null, value: InlinePriceDraft, revision: number, keepCost = false) =>
+  JSON.stringify([{ product_id: line.product_id, scope: line.scope, scope_id: line.scope_id, ...(draft ? { draft } : {}), ...(draft && keepCost ? { keep_cost: true } : {}), ...value }, revision]);
 export type InlinePriceQuote = { requestKey: string; price: number | null };
 export const currentInlinePrice = (quote: InlinePriceQuote | undefined, requestKey: string): number | null =>
   quote?.requestKey === requestKey && typeof quote.price === 'number' && Number.isFinite(quote.price) ? quote.price : null;
@@ -25,14 +28,18 @@ interface LinePrice {
   customer_price_iqd: number | null;
   profit_scope: 'product' | 'option' | 'color' | 'sku';
   cost_from_purchase: boolean;
+  /** DECISIONS row 273: the final cost is the landed unit cost of this shipment at its dollar rate (absent from an older server). */
+  shipment?: { landed_cost_iqd: string; usd_iqd: string; final_cost_usd: string } | null;
 }
 
-export default function InlineProcurementPricing({ line, purchaseDraft, value, onChange, onSaved, revision, summary, onAdvanced, readOnly = false, onQuote }: {
+export default function InlineProcurementPricing({ line, purchaseDraft, value, onChange, onSaved, revision, summary, onAdvanced, readOnly = false, onQuote, keepCost = false }: {
   line: PriceSelection;
   purchaseDraft: Record<string, unknown> | null;
   value: InlinePriceDraft;
   onChange: (value: InlinePriceDraft) => void;
-  onSaved: () => void;
+  /** Receives the edits that were saved (a typed final cost among them, or not). */
+  onSaved: (saved: InlinePriceDraft) => void;
+  keepCost?: boolean;
   revision: number;
   summary: PricingSummary | null;
   onAdvanced: () => void;
@@ -51,7 +58,7 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
   const valid = (value.final_cost_usd === undefined || /^(?:\d+)(?:\.\d{1,6})?$/.test(value.final_cost_usd))
     && (value.minimum_profit_usd === undefined || value.minimum_profit_usd === '' || /^(?:\d+)(?:\.\d{1,6})?$/.test(value.minimum_profit_usd))
     && (value.customer_price_usd === undefined || /^(?:\d+)(?:\.\d{1,6})?$/.test(value.customer_price_usd));
-  const requestKey = inlinePricingRequestKey(line, purchaseDraft, value, revision);
+  const requestKey = inlinePricingRequestKey(line, purchaseDraft, value, revision, keepCost);
   useEffect(() => {
     if (!valid) return;
     const controller = new AbortController();
@@ -95,7 +102,7 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
         ...(confirmedKey === requestKey ? { confirm_large_change: true } : {}),
       });
       setSaved(true);
-      onSaved();
+      onSaved(value);
     } catch (e) {
       setError(e);
       // An obsolete preview must be read again before retrying its save.
@@ -147,6 +154,13 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
         price: result?.customer_price_iqd ?? null,
       }} />
       <p className={`mt-2 text-xs ${T.text3}`}>{loc('عدّل التكلفة أو الربح أو سعر الزبون بالدولار ثم احفظ. في التسعير حسب التكلفة، تعديل سعر الزبون يعيد حساب الربح. يظهر سعر الدينار بعد التقريب المعتمد. تكلفة الشحنة المحاسبية تبقى حسب بيانات الشراء أعلاه.', 'Edit cost, profit or customer price in USD, then save. Cost-based pricing recalculates profit when you edit the customer price. IQD reflects the configured rounding. The shipment’s accounting cost follows the purchase fields above.', 'تێچوو، قازانج یان نرخی کڕیار بە دۆلار دەستکاری بکە و پاشەکەوت بکە. لە نرخدانی بەپێی تێچوو، گۆڕینی نرخی کڕیار قازانج دووبارە دەژمێرێتەوە. نرخی دینار بەپێی خڕکردنەوەکەیە. تێچووی ژمێریاریی بارەکە بەپێی زانیاریی کڕینی سەرەوەیە.')}</p>
+      <InlineSaleDiscount productId={line.product_id} label={line.label} revision={revision} onAdvanced={onAdvanced}
+        modelId={line.scope === 'option' ? line.scope_id : line.option_id ?? null} colorId={line.scope === 'color' ? line.scope_id : line.color_id ?? null} />
+      {result?.shipment && value.final_cost_usd === undefined && <p className={`mt-1 text-xs ${T.text2}`} data-procurement-shipment-cost>{loc(
+        `التكلفة النهائية هي تكلفة هذه الشحنة: ${money(Number(result.shipment.landed_cost_iqd))} للقطعة ÷ ${result.shipment.usd_iqd} د.ع للدولار = $${result.shipment.final_cost_usd}. تتحدث مع سعر الصرف والشحن والكمية والسعر الخام والمصاريف.`,
+        `Final cost is this shipment’s cost: ${money(Number(result.shipment.landed_cost_iqd))} per unit ÷ ${result.shipment.usd_iqd} IQD per USD = $${result.shipment.final_cost_usd}. It follows the exchange rate, freight, quantity, raw price and charges.`,
+        `تێچووی کۆتایی تێچووی ئەم بارەیە: ${money(Number(result.shipment.landed_cost_iqd))} بۆ هەر پارچەیەک ÷ ${result.shipment.usd_iqd} د.ع بۆ هەر دۆلارێک = $${result.shipment.final_cost_usd}. لەگەڵ نرخی ئاڵوگۆڕ، ناردن، بڕ، نرخی خاو و خەرجییەکان نوێ دەبێتەوە.`,
+      )}</p>}
       {result?.preview.method === 'usd' && <p className={`mt-1 text-xs ${T.text3}`}>{loc('هذا المنتج يستخدم سعر بيع ثابتاً؛ تغيير التكلفة أو الربح يحافظ على قاعدة تسعيره.', 'This product uses a fixed selling price; cost and profit edits preserve its pricing method.', 'ئەم بەرهەمە نرخی فرۆشتنی جێگیری هەیە؛ دەستکاریکردنی تێچوو و قازانج شێوازی نرخدانەکە دەپارێزێت.')}</p>}
       {result && !result.preview.complete && <p role="status" className={`mt-2 text-sm ${T.text2}`}>{loc('سعر هذا الخيار معاينة. يمكن حفظ بياناته، لكن نشر المنتج ينتظر استكمال بيانات بقية خياراته من إعدادات التسعير.', 'This selection’s price is a preview. Its inputs can be saved, but publishing requires completing the remaining pricing inputs in Pricing settings.', 'نرخی ئەم هەڵبژاردەیە پێشبینییە. زانیارییەکانی پاشەکەوت دەکرێن، بەڵام بڵاوکردنەوە پێویستی بە تەواوکردنی زانیارییە ماوەکانی نرخدان هەیە لە ڕێکخستنەکانی نرخدان.')}</p>}
       {dirty && result && (result.preview.changes?.length ?? 0) > 0 && <details className={`mt-2 text-xs ${T.text2}`}>

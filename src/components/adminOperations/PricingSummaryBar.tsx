@@ -180,7 +180,7 @@ function PricingDetails({ summary: d, level }: { summary: PricingSummary; level:
       </dl>
       <ul className="grid gap-1 border-t border-[var(--ap-border)] pt-2">
         <li>
-          {s.n1}
+          {d.cost_basis === 'shipment' ? s.n1Shipment : s.n1}
           {d.document_rate && <span className="block"><Fig>{s.n1Doc(d.document_rate)}</Fig></span>}
         </li>
         {d.direct_sale_price_iqd != null && d.preorder_base_iqd != null && d.direct_sale_extra_iqd != null && (

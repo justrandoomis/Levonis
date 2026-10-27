@@ -732,7 +732,7 @@ async function procurementPreview(c: Context<AppContext>, purchase: PurchaseForP
 // Read-only preparation for the inline fields. The existing V2 writer remains
 // the only save path, including its sequence, hash, audit and confirmation gates.
 adminPricingRoutes.post('/procurement/line-pricing', async (c) => {
-  const body = strictBody(await jsonObject(c), ['product_id', 'scope', 'scope_id', 'draft', 'final_cost_usd', 'minimum_profit_usd', 'customer_price_usd']);
+  const body = strictBody(await jsonObject(c), ['product_id', 'scope', 'scope_id', 'draft', 'keep_cost', 'final_cost_usd', 'minimum_profit_usd', 'customer_price_usd']);
   let purchase: PurchaseForPricing | null = null;
   if (body.draft !== undefined && body.draft !== null) {
     if (!isRecord(body.draft)) throw inputInvalid('draft');

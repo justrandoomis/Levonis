@@ -10,9 +10,8 @@
  * refusals; the ids it mints for the incoming row and the line are used by the
  * save alone.
  */
-import { procurementDiscountSet, procurementSelectionKey, type CostProfile } from '../../packages/contracts/src/procurementCost';
-import { serverMessage } from '../../packages/contracts/src/costRefusals';
-import { badRequest, conflict, HttpError, str } from './http';
+import { procurementSelectionKey, type CostProfile } from '../../packages/contracts/src/procurementCost';
+import { badRequest, conflict, str } from './http';
 import { newId } from './crypto';
 import { requireSelection, type Selection } from './inventorySelection';
 import { decimal, whole } from './operations';
@@ -83,15 +82,9 @@ export async function parseProcurementDraft(db: D1Database, b: Record<string, un
     const costMode=r.purchase_cost_mode==='total'?'total':'unit';
     const entered=decimal(costMode==='total' ? (profile ? r.source_total_amount : r.source_total_amount??r.purchase_total_iqd) : (profile ? r.source_unit_amount : r.source_unit_amount??r.purchase_unit_iqd),'تكلفة الشراء الخام');
     if(currency==='IQD')whole(entered,'تكلفة الشراء بالدينار');
-    // «السعر بعد الخصم» (procurementCostSource): an optional unit price after the supplier discount. When typed it is
-    // the price the line is costed at; the raw input stays recorded as the before-discount price.
-    let discounted: number | null = null;
-    if (procurementDiscountSet(r.discounted_unit_amount)) {
-      discounted = decimal(r.discounted_unit_amount, 'السعر بعد الخصم');
-      if (currency === 'IQD') whole(discounted, 'السعر بعد الخصم بالدينار');
-      if (discounted * qty > (costMode === 'total' ? entered : entered * qty) + 1e-9)
-        throw new HttpError(400, serverMessage('PURCHASE_DISCOUNT_ABOVE_PRICE'), 'PURCHASE_DISCOUNT_ABOVE_PRICE');
-    }
+    // DECISIONS row 273: the supplier discount an older screen sent (`discounted_unit_amount`) is retired and
+    // ignored; a line is costed from its raw supplier price, so an old draft still saves.
+    const discounted: number | null = null;
     const costed = discounted ?? entered, costedMode = discounted === null ? costMode : 'unit';
     const total = profile
       ? procurementAmount(costedMode === 'total' ? [costed, rate] : [costed, rate, qty])

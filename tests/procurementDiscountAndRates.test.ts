@@ -8,9 +8,10 @@
  *    invoice total) follows a new quantity; «reload route rates» starts the
  *    rate at the approved central rate, never the route's last saved one; an
  *    edit at a new rate re-costs the stored line and the lot it is received as.
- * 2. An optional unit price after the supplier discount: when typed, the line
- *    is costed from it (screen and server alike), the raw supplier price stays
- *    recorded as the before-discount price, and an edit restores both.
+ * 2. DECISIONS row 273: «السعر بعد الخصم» is the product's sale price (the
+ *    purchase card writes «تخفيض السعر»), never a supplier discount. A retired
+ *    `discounted_unit_amount` an older draft carries is ignored: the line is
+ *    costed from its raw supplier price, and an old saved line restores it.
  *
  * Run: node --import tsx --test tests/procurementDiscountAndRates.test.ts
  */
@@ -18,13 +19,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { get, json, post, put } from './fixtures/app';
+import { get, json, put } from './fixtures/app';
 import { AMS, AMS_MODEL, pricingWorld } from './fixtures/procurementPricing';
 import { ROOT } from './fixtures/d1';
 import { purchaseEstimate } from '../src/components/adminOperations/purchaseEstimate';
-import { changeLineCostProfile, changeLineQuantity, discountProblem, restoreLineDiscounts, type ProcurementDraftLine } from '../src/components/adminOperations/procurementCostDraft';
+import { changeLineQuantity, restoreLineDiscounts, type ProcurementDraftLine } from '../src/components/adminOperations/procurementCostDraft';
 import { procurementCostSource } from '../packages/contracts/src/procurementCost';
-import { COST_REFUSALS } from '../packages/contracts/src/costRefusals';
 
 const line = (extra: Partial<ProcurementDraftLine> = {}) => ({
   product_id: AMS, scope: 'option', scope_id: AMS_MODEL, label: 'AMS', sku: '', stock: null, reserved: 0,
@@ -43,13 +43,10 @@ test('the estimate is re-derived from the current rate and freight: nothing is k
   assert.equal(at(1700, 6000).unit_iqd, (1_530_000 + 30_000) / 2);
 });
 
-test('«السعر بعد الخصم» is the price the estimate costs, in unit and total input alike', () => {
-  const discounted = purchaseEstimate([line({ discounted_unit_amount: 400 })], [], 1760, 0, undefined, shipping(5000))[0];
-  assert.equal(discounted.purchase_iqd, 1_408_000);
-  const fromTotal = purchaseEstimate([line({ purchase_cost_mode: 'total', source_total_amount: 900, discounted_unit_amount: 400 })], [], 1760, 0)[0];
-  assert.equal(fromTotal.purchase_iqd, 1_408_000);
-  // Blank: the raw input, as before.
-  assert.equal(purchaseEstimate([line({ discounted_unit_amount: '' })], [], 1760, 0)[0].purchase_iqd, 1_584_000);
+test('a retired supplier discount on a line is ignored: the raw price is the cost, in unit and total input alike', () => {
+  assert.equal(purchaseEstimate([line({ discounted_unit_amount: 400 })], [], 1760, 0, undefined, shipping(5000))[0].purchase_iqd, 1_584_000);
+  assert.equal(purchaseEstimate([line({ purchase_cost_mode: 'total', source_total_amount: 900, discounted_unit_amount: 400 })], [], 1760, 0)[0].purchase_iqd, 1_584_000);
+  assert.deepEqual(procurementCostSource({ purchase_cost_mode: 'unit', source_unit_amount: 450, discounted_unit_amount: 400 }), { mode: 'unit', amount: 450, discounted: false });
   assert.deepEqual(procurementCostSource({ purchase_cost_mode: 'total', source_total_amount: 900 }), { mode: 'total', amount: 900, discounted: false });
 });
 
@@ -69,72 +66,53 @@ test('a new quantity re-derives the line total of a unit price and the unit aver
   assert.equal(changeLineQuantity(line({ invoiced_qty: 1 }), 3).invoiced_qty, 1);
 });
 
-test('a discount above the raw price is refused on screen; a route change clears it', () => {
-  assert.equal(discountProblem(line({ discounted_unit_amount: 400 }), 'EUR'), null);
-  assert.equal(discountProblem(line({ discounted_unit_amount: 451 }), 'EUR'), 'above');
-  assert.equal(discountProblem(line({ purchase_cost_mode: 'total', source_total_amount: 900, discounted_unit_amount: 450 }), 'EUR'), null);
-  assert.equal(discountProblem(line({ discounted_unit_amount: 1.5, source_unit_amount: 5 }), 'IQD'), 'invalid');
-  assert.equal(discountProblem(line({ discounted_unit_amount: NaN }), 'EUR'), 'invalid');
-  assert.equal(changeLineCostProfile(line({ discounted_unit_amount: 400 }), null).discounted_unit_amount, '');
-});
-
-test('the discount is saved as the cost, the raw price stays recorded, an edit restores both and a new rate re-costs the lot', async () => {
+test('an old draft with a supplier discount still saves at its raw price; an old saved line restores it; a new rate re-costs the lot', async () => {
   const w = pricingWorld();
-  const body = w.draft({ lines: [{ ...w.draft().lines[0], discounted_unit_amount: 400 }] });
+  const body = w.draft({ lines: [{ ...w.draft().lines[0], discounted_unit_amount: 451 }] });
   const id = await w.save(body);
-  const stored = w.raw.prepare(`SELECT l.source_unit_amount, l.purchase_cost_mode, l.source_total_amount, i.purchase_total_iqd, l.charges_iqd
+  const stored = w.raw.prepare(`SELECT l.source_unit_amount, l.purchase_cost_mode, i.purchase_total_iqd, l.charges_iqd
     FROM purchase_lines l JOIN incoming_inventory i ON i.id = l.incoming_id WHERE l.purchase_id = ?`).get(id) as Record<string, number | string | null>;
-  assert.equal(stored.source_unit_amount, 400);
-  assert.equal(stored.purchase_cost_mode, 'unit');
-  assert.equal(stored.purchase_total_iqd, 400 * 1760 * 2);
+  assert.equal(stored.source_unit_amount, 450);
+  assert.equal(stored.purchase_total_iqd, 450 * 1760 * 2);
   assert.equal(stored.charges_iqd, 25_000);
-  // The next purchase's prefill is the raw supplier price, not this purchase's discount.
-  assert.equal((w.raw.prepare('SELECT source_unit_amount FROM procurement_selection_cost_defaults WHERE product_id = ?').get(AMS) as { source_unit_amount: number }).source_unit_amount, 450);
-  // An edit restores the raw price and the discount from the saved request.
+  // A line the older screen saved at its discounted price restores the raw price from the saved request.
   const doc = await json(await get(w.app, `/api/admin/procurement/documents/${id}`));
-  const restored = restoreLineDiscounts(doc.lines as ProcurementDraftLine[], doc.purchase.request_json as string);
-  assert.equal(restored[0].source_unit_amount, 450);
-  assert.equal(restored[0].discounted_unit_amount, 400);
+  const lines = (doc.lines as ProcurementDraftLine[]).map((l) => ({ ...l, source_unit_amount: 400 }));
+  const request = JSON.stringify({ lines: [{ ...body.lines[0], source_unit_amount: 450, discounted_unit_amount: 400 }] });
+  assert.equal(restoreLineDiscounts(lines, request)[0].source_unit_amount, 450);
   // The edit at a new rate and freight re-costs the stored line, and the lot is received at it.
   const edit = await put(w.app, `/api/admin/procurement/documents/${id}`, {
     ...w.draft({ exchange_rate: 1700, shipping_rate_iqd: 6000, cost_profile_version: w.profileVersion() }),
-    lines: [{ ...body.lines[0], source_unit_amount: restored[0].source_unit_amount, discounted_unit_amount: restored[0].discounted_unit_amount }],
+    lines: [{ ...body.lines[0], discounted_unit_amount: 400 }],
     version: doc.purchase.version,
   });
   assert.equal(edit.status, 200, JSON.stringify(await json(edit)));
   const after = w.raw.prepare('SELECT i.purchase_total_iqd, l.charges_iqd FROM purchase_lines l JOIN incoming_inventory i ON i.id = l.incoming_id WHERE l.purchase_id = ?').get(id) as { purchase_total_iqd: number; charges_iqd: number };
-  assert.deepEqual({ ...after }, { purchase_total_iqd: 400 * 1700 * 2, charges_iqd: 30_000 });
+  assert.deepEqual({ ...after }, { purchase_total_iqd: 450 * 1700 * 2, charges_iqd: 30_000 });
   const received = await w.receive(id, `rcv_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`);
   assert.equal(received.status, 200, JSON.stringify(received.body));
   const lots = w.raw.prepare('SELECT unit_cost_iqd FROM inventory_lots').all() as Array<{ unit_cost_iqd: number }>;
   assert.ok(lots.length > 0);
-  for (const lot of lots) assert.equal(lot.unit_cost_iqd, (400 * 1700 * 2 + 30_000) / 2);
-});
-
-test('the server refuses a discount above the raw price, in three languages, and the preview costs the discount', async () => {
-  const w = pricingWorld();
-  const res = await post(w.app, '/api/admin/procurement/documents', w.draft({ lines: [{ ...w.draft().lines[0], discounted_unit_amount: 451 }] }));
-  assert.equal(res.status, 400);
-  assert.equal((await json(res)).code, 'PURCHASE_DISCOUNT_ABOVE_PRICE');
-  assert.equal(Number((w.raw.prepare('SELECT COUNT(*) AS n FROM purchase_orders').get() as { n: number }).n), 0);
-  const s = COST_REFUSALS.PURCHASE_DISCOUNT_ABOVE_PRICE;
-  assert.ok(s.ar && s.en && s.ckb && (s.ckb as string) !== s.ar);
-  // The pricing card reads the draft through the same parser: the discounted price is the one it sees.
+  for (const lot of lots) assert.equal(lot.unit_cost_iqd, (450 * 1700 * 2 + 30_000) / 2);
+  // The pricing card reads the same parser: the retired discount changes nothing.
   const full = await w.preview({ draft: w.draft() });
   const cut = await w.preview({ draft: w.draft({ lines: [{ ...w.draft().lines[0], discounted_unit_amount: 300 }] }) });
-  assert.equal(full.status, 200, JSON.stringify(full.body));
   assert.equal(cut.status, 200, JSON.stringify(cut.body));
-  assert.notDeepEqual(cut.body.lines, full.body.lines);
+  assert.deepEqual(cut.body.lines, full.body.lines);
 });
 
 const panel = readFileSync(join(ROOT, 'src/components/adminOperations/ProcurementPanel.tsx'), 'utf8');
 
-test('the panel: route rates reload at the approved rate, quantity re-derives, the discount field in three languages', () => {
-  assert.doesNotMatch(panel, /exchange_rate: profile\.exchange_rate \?\? NaN/, 'reloading route rates never brings back the route\'s old saved rate');
+test('the panel: route rates reload at the approved rate, quantity re-derives, no supplier discount field; the sale price sits in the line card', () => {
+  assert.doesNotMatch(panel, /exchange_rate: profile\.exchange_rate \?\? NaN/, 'reloading route rates never brings back the old saved rate of the route');
   assert.match(panel, /exchange_rate: prefillRate\(cfg\.approved_rates \?\? \[\], profile\.currency\)/);
   assert.match(panel, /changeLineQuantity\(x, v === '' \? NaN : Number\(v\)\)/);
-  assert.match(panel, /loc\('السعر بعد الخصم', 'Price after discount', 'نرخ دوای داشکاندن'\)/);
-  assert.match(panel, /discountProblem\(l, header\.currency\) === null/, 'a refused discount blocks the save');
+  assert.doesNotMatch(panel, /loc\('السعر بعد الخصم'/, 'no supplier discount input on the purchase line');
+  assert.match(panel, /discounted_unit_amount: _retired/, 'a retired discount is never sent');
   assert.match(panel, /restoreLineDiscounts\(/);
-  assert.match(panel, /discounted_unit_amount: '', cost_source: 'unknown'/, 'a currency switch clears the discount with the raw price');
+  const card = readFileSync(join(ROOT, 'src/components/adminOperations/InlineProcurementPricing.tsx'), 'utf8');
+  assert.match(card, /<InlineSaleDiscount /);
+  const sale = readFileSync(join(ROOT, 'src/components/adminOperations/InlineSaleDiscount.tsx'), 'utf8');
+  assert.match(sale, /loc\('السعر بعد الخصم \(\$\)', 'Price after discount \(\$\)', 'نرخ دوای داشکاندن \(\$\)'\)/);
+  assert.match(sale, /\/api\/admin\/offers\/\$\{encodeURIComponent\(productId\)\}/, 'the same door as «تخفيض السعر»');
 });
