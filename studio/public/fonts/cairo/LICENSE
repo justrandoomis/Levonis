@@ -7,6 +7,9 @@ bytes). LEVO Studio self-hosts them because its Content-Security-Policy is
 font-src 'self' and its documents are cross-origin isolated, so no third-party
 font origin can be used. ../cairo-kurdish-patch.woff2 is the site's six-letter
 Sorani patch (Vazirmatn, SIL Open Font License 1.1); see OPEN_SOURCE_NOTICES.md.
+Its copyright is: Copyright 2015 The Vazirmatn Project Authors
+(https://github.com/rastikerdar/vazirmatn). The same OFL 1.1 text below
+applies to it.
 
 The licence text below is the OFL.txt shipped with the font at
 https://github.com/google/fonts/tree/main/ofl/cairo

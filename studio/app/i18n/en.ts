@@ -370,6 +370,8 @@ export const en = {
   tooBigHelp: "{count} object(s) do not fit the {printer} build volume ({bed} mm). Scale, rotate or cut them first.",
   outsideBedTitle: "Outside the build area",
   offBedHelp: "{count} object(s) sit outside the {printer} bed, wholly or in part. Drag them back onto the bed or tap Arrange.",
+  emptyPlateTitle: "This plate is empty",
+  emptyPlateHelp: "Plate {plate} has no model on it, and slicing works on the current plate only. Add a model to it or switch to a plate that has one.",
   presetFallbackTitle: "Generic settings in use",
   slicedSummary: "{layers} layers, ready to export.",
   slicedEstimate: "{layers} layers, about {time} to print.",

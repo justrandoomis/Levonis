@@ -18,6 +18,24 @@
 import type { StudioDictionary } from "../../i18n";
 import { Icon } from "../header";
 
+/**
+ * A Latin token joined by a hyphen («G-code») is one word to the reader, but
+ * a line may break after its hyphen: at 390 px the Sorani label wrapped as
+ * «هەناردەکردنی G-» over «code», and the English one did at 320 px. Each such
+ * token is drawn as one unbreakable, direction-isolated run, so the label
+ * wraps only between words, and the font keeps drawing its own hyphen (the
+ * Cairo subsets have no glyph for U+2011, the non-breaking hyphen).
+ */
+const HYPHENATED_TOKEN = /([A-Za-z0-9]+(?:-[A-Za-z0-9]+)+)/;
+
+export function keepTokensWhole(label: string) {
+  return label.split(HYPHENATED_TOKEN).map((part, index) => (
+    index % 2 === 1
+      ? <bdi key={index} dir="ltr" className="m-export__token">{part}</bdi>
+      : part
+  ));
+}
+
 export interface ExportSectionProps {
   t: StudioDictionary;
   hasObjects: boolean;
@@ -37,12 +55,12 @@ export default function ExportSection(props: ExportSectionProps) {
       <h2 id="m-export-title">{t.exportFile}</h2>
       <div className="m-export__row">
         <button type="button" className="m-export__tile" onClick={props.onExport3mf} disabled={!props.hasObjects} data-levo-action="export-3mf">
-          <span><b>{t.export3mf}</b></span>
+          <span><b>{keepTokensWhole(t.export3mf)}</b></span>
           <Icon name="document" />
         </button>
         <button type="button" className="m-export__tile" onClick={props.onExportGcode} disabled={!props.gcodeReady} data-levo-action="export-gcode">
           <span>
-            <b>{t.exportGcode}</b>
+            <b>{keepTokensWhole(t.exportGcode)}</b>
             <small>{props.gcodeReady ? props.gcodeCaption : props.stale ? t.resliceFirst : t.availableAfterSlice}</small>
           </span>
           <Icon name="document" />

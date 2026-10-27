@@ -314,11 +314,18 @@ export const ar: StudioDictionary = {
   tooBigHelp: "{count} من المجسمات لا تتسع في حجم طباعة {printer} ({bed} مم). صغّرها أو دوّرها أو قصّها أولًا.",
   outsideBedTitle: "خارج حدود سطح الطباعة",
   offBedHelp: "{count} من المجسمات خارج سطح طباعة {printer}، كليًا أو جزئيًا. اسحبها إلى داخل السطح أو اضغط «ترتيب».",
+  emptyPlateTitle: "Plate الحالية فارغة",
+  emptyPlateHelp: "لا يوجد مجسم على Plate {plate}، والتقطيع يعمل على Plate الحالية وحدها. أضف مجسمًا إليها أو انتقل إلى Plate فيها مجسم.",
   presetFallbackTitle: "تُستخدم إعدادات عامة",
-  slicedSummary: "{layers} طبقة، جاهزة للتصدير.",
-  slicedEstimate: "{layers} طبقة، نحو {time} للطباعة.",
-  durationHours: "{h} ساعة و{m} دقيقة",
-  durationMinutes: "{m} دقيقة",
+  /*
+   * Counted forms (i18n/index.ts templateText): «طبقة واحدة»، «طبقتان»،
+   * «6 طبقات»، «49 طبقة». The duration follows «نحو», so its dual is
+   * «ساعتين» and «دقيقتين», and a whole hour drops «و0 دقيقة».
+   */
+  slicedSummary: "{layers, plural, one {طبقة واحدة} two {طبقتان} few {# طبقات} other {# طبقة}}، جاهزة للتصدير.",
+  slicedEstimate: "{layers, plural, one {طبقة واحدة} two {طبقتان} few {# طبقات} other {# طبقة}}، نحو {time} للطباعة.",
+  durationHours: "{h, plural, one {ساعة واحدة} two {ساعتين} few {# ساعات} other {# ساعة}}{m, plural, zero {} one { ودقيقة واحدة} two { ودقيقتين} few { و# دقائق} other { و# دقيقة}}",
+  durationMinutes: "{m, plural, one {دقيقة واحدة} two {دقيقتين} few {# دقائق} other {# دقيقة}}",
   sliceModel: "تقطيع المجسم",
   resliceModel: "أعد التقطيع",
   exportFile: "تصدير الملف",

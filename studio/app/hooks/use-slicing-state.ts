@@ -82,9 +82,37 @@ interface StoredSliceResult {
   completedAt: number;
 }
 
+/**
+ * A plate whose last result the engine rejected as over the bed, and the
+ * scene and settings that rejection was about.
+ */
+interface RejectedSlice {
+  sceneFingerprint: string;
+  settingsRevision: number;
+}
+
+/**
+ * WHETHER AN OVER-BED REJECTION STILL DESCRIBES THE PLATE.
+ *
+ * A rejection is a verdict on one scene under one set of settings. It used to
+ * outlive both: after «ترتيب» put the model back on the bed (the very action
+ * the banner recommends), the plate still read "rejected-over-bed" and the
+ * banner kept saying «خارج حدود سطح الطباعة» until the next slice. Once the
+ * scene or the settings have moved on, the rejection says nothing about the
+ * plate any more: it reads as no result, and the before-slice placement check
+ * (objectsOffBed) decides whether the plate is blocked. The same rule as a
+ * stored result going stale, minus the result.
+ */
+export function rejectionHolds(
+  rejected: RejectedSlice,
+  live: { sceneFingerprint: string; settingsRevision: number },
+): boolean {
+  return rejected.sceneFingerprint === live.sceneFingerprint && rejected.settingsRevision === live.settingsRevision;
+}
+
 /** G-code stays out of React state: results live here, keyed per hook instance. */
 const SLICE_RESULTS = new Map<symbol, Map<number, StoredSliceResult>>();
-const OVER_BED_PLATES = new Map<symbol, Set<number>>();
+const OVER_BED_PLATES = new Map<symbol, Map<number, RejectedSlice>>();
 
 /** How often (at most) progress updates re-render, matching the monolith. */
 const PROGRESS_THROTTLE_MS = 160;
@@ -170,13 +198,13 @@ export function useSlicingState(adapter: EngineAdapter | null): SlicingStateApi 
     return map;
   }, [instanceId]);
 
-  const overBedPlates = useCallback((): Set<number> => {
-    let set = OVER_BED_PLATES.get(instanceId);
-    if (!set) {
-      set = new Set();
-      OVER_BED_PLATES.set(instanceId, set);
+  const overBedPlates = useCallback((): Map<number, RejectedSlice> => {
+    let map = OVER_BED_PLATES.get(instanceId);
+    if (!map) {
+      map = new Map();
+      OVER_BED_PLATES.set(instanceId, map);
     }
-    return set;
+    return map;
   }, [instanceId]);
 
   useEffect(() => () => {
@@ -206,11 +234,15 @@ export function useSlicingState(adapter: EngineAdapter | null): SlicingStateApi 
   ), [sceneFingerprint]);
 
   const resultState = useCallback<SlicingStateApi["resultState"]>((plate) => {
-    if (overBedPlates().has(plate)) return "rejected-over-bed";
+    const rejected = overBedPlates().get(plate);
+    if (rejected && rejectionHolds(rejected, {
+      sceneFingerprint: adapterRef.current ? sceneFingerprint : rejected.sceneFingerprint,
+      settingsRevision: settingsRevisionRef.current,
+    })) return "rejected-over-bed";
     const stored = results().get(plate);
     if (!stored) return "none";
     return isFresh(stored) ? "fresh" : "stale";
-  }, [isFresh, overBedPlates, results]);
+  }, [isFresh, overBedPlates, results, sceneFingerprint]);
 
   const freshGcodeFile = useCallback<SlicingStateApi["freshGcodeFile"]>((plate, fileName) => {
     const stored = results().get(plate);
@@ -234,15 +266,21 @@ export function useSlicingState(adapter: EngineAdapter | null): SlicingStateApi 
 
   const handleSliced = useCallback<SlicingStateApi["handleSliced"]>((payload) => {
     const overBed = Boolean(payload.stats.over_bed || payload.stats.over_bed_model);
+    const currentFingerprint = adapterRef.current?.sceneFingerprint() ?? "";
     if (overBed) {
-      // Never store an out-of-volume result as exportable output.
+      // Never store an out-of-volume result as exportable output. Remember
+      // what was rejected (the scene as the run saw it, see below) so that
+      // an edit afterwards retires the verdict (rejectionHolds).
       results().delete(payload.plate);
-      overBedPlates().add(payload.plate);
+      overBedPlates().set(payload.plate, {
+        sceneFingerprint: sliceStartFingerprintRef.current ?? currentFingerprint,
+        settingsRevision: sliceStartSettingsRevisionRef.current,
+      });
+      setSceneFingerprint(currentFingerprint);
       setResultsVersion((value) => value + 1);
       return { stored: false, overBed: true, plate: payload.plate };
     }
     overBedPlates().delete(payload.plate);
-    const currentFingerprint = adapterRef.current?.sceneFingerprint() ?? "";
     // The payload string becomes garbage the moment this returns; only the
     // Blob is retained. See the MEMORY note at the top of this file.
     const gcode = new Blob([payload.gcode], { type: GCODE_MIME });
@@ -308,7 +346,7 @@ export function useSlicingState(adapter: EngineAdapter | null): SlicingStateApi 
         }
       }
       const rejected = overBedPlates();
-      for (const plate of [...rejected]) {
+      for (const plate of [...rejected.keys()]) {
         if (plate >= event.value) {
           rejected.delete(plate);
           dropped = true;

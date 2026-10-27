@@ -326,3 +326,214 @@ test("the shell records an edit only for a write the person made", async () => {
   assert.doesNotMatch(setter, /changedKeys\(current, locked\)/, "every changed key is no longer an edit");
   assert.match(client, /loadedPresetRef\.current = loaded\.settings;/);
 });
+
+// =========================================================================
+// WHAT NOBODY TYPED: AN IMPORTED 3MF AND THE AMS FILAMENT SLOTS (C6 round 2)
+// =========================================================================
+
+const { recordEngineWrites, keysAwayFromPreset } = await loadAppModule("settings-carryover");
+
+/** Run one settings write through both recorders, the way setEditorSettings does. */
+const write = (state, after, byPerson) => ({
+  settings: after,
+  edited: recordEdits({ before: state.settings, after, preset: state.preset, edited: state.edited, byPerson }),
+  engine: recordEngineWrites({ before: state.settings, after, preset: state.preset, engine: state.engine, byPerson }),
+  preset: state.preset,
+});
+
+/** Run one selector change the way the preset effect does. */
+const reload = (state, { loaded, from, to, processKeys = [], filamentKeys = [], previousFilamentKeys = [] }) => {
+  const out = carryUserEdits({
+    loaded,
+    previous: state.settings,
+    editedKeys: state.edited,
+    engineKeys: state.engine,
+    previousSelection: from,
+    nextSelection: to,
+    processKeys,
+    filamentKeys,
+    previousFilamentKeys,
+  });
+  return { out, state: { settings: out.settings, edited: new Set(out.kept), engine: new Set(out.engineKept), preset: loaded } };
+};
+
+test("AN IMPORTED 3MF KEEPS ITS SETTINGS when Support, Infill or a material-free row changes, and says nothing", () => {
+  // The reviewer's fixture: a project whose own settings are layer 0.12,
+  // infill 40 % and five walls. The engine applies them with no person's
+  // event, so they are not edits; they were then reset by the Support switch
+  // (0.2 / 15 / 2 in the draft and in the G-code, 49 layers instead of 82).
+  const preset = loadedFor({ layer_height: 0.2, sparse_infill_density: 15, wall_loops: 2 });
+  let state = { settings: preset, edited: new Set(), engine: new Set(), preset };
+  state = write(state, { ...preset, layer_height: 0.12, sparse_infill_density: 40, wall_loops: 5 }, false);
+  assert.deepEqual([...state.edited], [], "the import is not the person's edit");
+  assert.deepEqual([...state.engine].sort(), ["layer_height", "sparse_infill_density", "wall_loops"]);
+
+  const support = reload(state, {
+    loaded: { ...preset, enable_support: true },
+    from: SELECTION,
+    to: { ...SELECTION, support: true },
+    processKeys: ["layer_height", "initial_layer_height"],
+  });
+  assert.equal(support.out.settings.layer_height, 0.12, "the Support switch does not own the layer height");
+  assert.equal(support.out.settings.sparse_infill_density, 40);
+  assert.equal(support.out.settings.wall_loops, 5);
+  assert.equal(support.out.settings.enable_support, true, "and the switch itself works");
+  assert.deepEqual([support.out.overwritten, support.out.kept], [[], []], "no notice: nobody typed these");
+
+  // The phone's infill pattern row, then a second Support change (its select): still 0.12.
+  const pattern = reload(support.state, {
+    loaded: { ...preset, enable_support: true, sparse_infill_pattern: "grid" },
+    from: { ...SELECTION, support: true },
+    to: { ...SELECTION, support: true, infill: "grid" },
+  });
+  assert.equal(pattern.out.settings.layer_height, 0.12);
+  assert.equal(pattern.out.settings.sparse_infill_density, 40, "the pattern row does not own the density");
+  const off = reload(pattern.state, {
+    loaded: { ...preset, sparse_infill_pattern: "grid" },
+    from: { ...SELECTION, support: true, infill: "grid" },
+    to: { ...SELECTION, support: false, infill: "grid" },
+  });
+  assert.equal(off.out.settings.layer_height, 0.12, "a second flip keeps it too");
+
+  // A selector still takes back what it owns: Strength the density and walls,
+  // Quality the layer height.
+  const strength = reload(off.state, {
+    loaded: { ...preset, sparse_infill_density: 25, wall_loops: 3, sparse_infill_pattern: "grid" },
+    from: { ...SELECTION, infill: "grid" },
+    to: { ...SELECTION, infill: "grid", strength: "strong" },
+  });
+  assert.equal(strength.out.settings.sparse_infill_density, 25);
+  assert.equal(strength.out.settings.wall_loops, 3);
+  assert.equal(strength.out.settings.layer_height, 0.12);
+  const quality = reload(strength.state, {
+    loaded: { ...preset, layer_height: 0.16, sparse_infill_density: 25, wall_loops: 3, sparse_infill_pattern: "grid" },
+    from: { ...SELECTION, infill: "grid", strength: "strong" },
+    to: { ...SELECTION, infill: "grid", strength: "strong", quality: "standard" },
+    processKeys: ["layer_height", "initial_layer_height"],
+  });
+  assert.equal(quality.out.settings.layer_height, 0.16, "choosing a quality is choosing its layer height");
+  assert.deepEqual(quality.out.overwritten, [], "still no notice: the person never typed any of it");
+
+  // A printer change starts over, the file's values included.
+  const printer = reload(state, { loaded: preset, from: SELECTION, to: { ...SELECTION, printerId: "bbl-a1" } });
+  assert.equal(printer.out.settings.layer_height, 0.2);
+  assert.deepEqual(printer.out.engineKept, []);
+});
+
+/** The engine's AMS expansion on an X1C: four filament slots. */
+const AMS = {
+  filament_settings_id: ["Bambu PLA Basic @BBL X1C", "Bambu PLA Matte @BBL X1C", "Bambu PLA Matte @BBL X1C", "Bambu PLA Matte @BBL X1C"],
+  filament_type: ["PLA", "PLA", "PLA", "PLA"],
+  nozzle_temperature: [220, 220, 220, 220],
+  filament_density: [1.26, 1.32, 1.32, 1.32],
+  filament_cost: [24.99, 24.99, 24.99, 24.99],
+};
+const PLA_KEYS = ["filament_settings_id", "filament_type", "nozzle_temperature", "filament_density", "filament_cost"];
+
+test("THE AMS FILAMENT LIST SURVIVES a Support, Infill or Quality change: T2 to T4 are not cut to «—»", () => {
+  const preset = loadedFor({
+    filament_settings_id: ["Bambu PLA Basic @BBL X1C"], filament_type: ["PLA"], nozzle_temperature: [220],
+    filament_density: [1.26], filament_cost: [24.99],
+  });
+  let state = { settings: preset, edited: new Set(), engine: new Set(), preset };
+  // The filament card spreads the keys over the four slots on its own.
+  state = write(state, { ...preset, ...AMS }, false);
+  assert.deepEqual([...state.edited], []);
+  for (const [to, loaded, processKeys] of [
+    [{ ...SELECTION, support: true }, { ...preset, enable_support: true }, []],
+    [{ ...SELECTION, infill: "grid" }, { ...preset, sparse_infill_pattern: "grid" }, []],
+    [{ ...SELECTION, quality: "standard" }, { ...preset, layer_height: 0.2 }, ["layer_height", "initial_layer_height"]],
+    [{ ...SELECTION, strength: "strong" }, { ...preset, sparse_infill_density: 25 }, []],
+  ]) {
+    const { out } = reload(state, { loaded, from: SELECTION, to, processKeys, filamentKeys: PLA_KEYS, previousFilamentKeys: PLA_KEYS });
+    assert.equal(out.settings.filament_settings_id.length, 4, `${JSON.stringify(to)}: the four slots stay`);
+    assert.deepEqual(out.settings.filament_settings_id, AMS.filament_settings_id);
+    assert.deepEqual(out.settings.nozzle_temperature, [220, 220, 220, 220]);
+    assert.deepEqual(out.settings.filament_density, AMS.filament_density);
+    assert.deepEqual(out.overwritten, [], "and no notice");
+    assert.ok(out.engineKept.includes("filament_settings_id"), "still carried at the next change");
+  }
+});
+
+test("A MATERIAL CHANGE with four slots replaces T1 only; T2 to T4 keep their filaments", () => {
+  const preset = loadedFor({
+    filament_settings_id: ["Bambu PLA Basic @BBL X1C"], filament_type: ["PLA"], nozzle_temperature: [220],
+    filament_density: [1.26], filament_cost: [24.99],
+  });
+  let state = { settings: preset, edited: new Set(), engine: new Set(), preset };
+  state = write(state, { ...preset, ...AMS }, false);
+  const petg = loadedFor({
+    filament_settings_id: ["Bambu PETG Basic @BBL X1C"], filament_type: ["PETG"], nozzle_temperature: [255],
+    filament_density: [1.25], filament_cost: [24.99], filament_retraction_length: [0.4],
+  });
+  const PETG_KEYS = [...PLA_KEYS, "filament_retraction_length"];
+  const { out, state: next } = reload(state, {
+    loaded: petg,
+    from: { ...SELECTION, material: "pla" },
+    to: { ...SELECTION, material: "petg" },
+    filamentKeys: PETG_KEYS,
+    previousFilamentKeys: PLA_KEYS,
+  });
+  assert.deepEqual(out.settings.filament_settings_id, ["Bambu PETG Basic @BBL X1C", "Bambu PLA Matte @BBL X1C", "Bambu PLA Matte @BBL X1C", "Bambu PLA Matte @BBL X1C"]);
+  assert.deepEqual(out.settings.nozzle_temperature, [255, 220, 220, 220], "T1 takes PETG's temperature");
+  assert.deepEqual(out.settings.filament_type, ["PETG", "PLA", "PLA", "PLA"]);
+  assert.deepEqual(out.settings.filament_density, [1.25, 1.32, 1.32, 1.32]);
+  assert.deepEqual(out.settings.filament_retraction_length, [0.4, null, null, null], "a key only PETG has is T1's alone, as the engine writes it");
+  assert.deepEqual(out.overwritten, [], "nothing the person typed was taken");
+
+  // And back to PLA: the PETG-only key leaves T1 again, and is dropped when no slot has it.
+  const back = reload(next, {
+    loaded: preset,
+    from: { ...SELECTION, material: "petg" },
+    to: { ...SELECTION, material: "pla" },
+    filamentKeys: PLA_KEYS,
+    previousFilamentKeys: PETG_KEYS,
+  });
+  assert.deepEqual(back.out.settings.filament_settings_id, AMS.filament_settings_id);
+  assert.deepEqual(back.out.settings.nozzle_temperature, [220, 220, 220, 220]);
+  assert.equal("filament_retraction_length" in back.out.settings, false);
+
+  // A person's own T1 temperature is still taken by the material, and said so.
+  const typed = write(state, { ...state.settings, nozzle_temperature: [230, 220, 220, 220] }, true);
+  const taken = reload(typed, {
+    loaded: petg,
+    from: { ...SELECTION, material: "pla" },
+    to: { ...SELECTION, material: "petg" },
+    filamentKeys: PETG_KEYS,
+    previousFilamentKeys: PLA_KEYS,
+  });
+  assert.deepEqual(taken.out.settings.nozzle_temperature, [255, 220, 220, 220]);
+  assert.deepEqual(taken.out.overwritten, ["nozzle_temperature"]);
+});
+
+test("recordEngineWrites keeps what nobody typed, and only while it differs from the preset", () => {
+  const preset = loadedFor();
+  const file = recordEngineWrites({ before: preset, after: { ...preset, layer_height: 0.08 }, preset, engine: new Set(), byPerson: false });
+  assert.deepEqual([...file], ["layer_height"]);
+  // A value the engine moves back to the preset leaves the set…
+  const back = recordEngineWrites({ before: { ...preset, layer_height: 0.08 }, after: preset, preset, engine: file, byPerson: false });
+  assert.deepEqual([...back], []);
+  // …a respelling of the preset value never enters it…
+  const respelled = recordEngineWrites({ before: preset, after: { ...preset, layer_height: "0.12" }, preset, engine: new Set(), byPerson: false });
+  assert.deepEqual([...respelled], []);
+  // …and a person typing over it makes it theirs (recordEdits), not the engine's.
+  const typed = recordEngineWrites({ before: { ...preset, layer_height: 0.08 }, after: { ...preset, layer_height: 0.1 }, preset, engine: file, byPerson: true });
+  assert.deepEqual([...typed], []);
+  // A restored project brings what it holds beyond its preset.
+  // (layer_height "0.12" is the preset's 0.12 respelled, so it is not one.)
+  assert.deepEqual(
+    keysAwayFromPreset(preset, { ...preset, layer_height: "0.12", wall_loops: 5, ...AMS }),
+    ["filament_cost", "filament_density", "filament_settings_id", "filament_type", "nozzle_temperature", "wall_loops"],
+  );
+});
+
+test("the shell feeds the engine set to every preset reload and fills it on every write", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const client = await readFile(new URL("../app/slicer-client.tsx", import.meta.url), "utf8");
+  const setter = client.slice(client.indexOf("const setEditorSettings"), client.indexOf("// -- adapter-backed controls"));
+  assert.match(setter, /engineKeysRef\.current = recordEngineWrites\(\{\s*before: current,\s*after: locked,\s*preset: loadedPresetRef\.current,\s*engine: engineKeysRef\.current,\s*byPerson,\s*\}\);/);
+  assert.match(client, /previousFilamentKeys: loadedFilamentKeysRef\.current,\s*engineKeys: engineKeysRef\.current,/);
+  assert.match(client, /engineKeysRef\.current = new Set\(carried\.engineKept\);/);
+  assert.match(client, /loadedFilamentKeysRef\.current = loaded\.filamentKeys;/);
+  assert.match(client, /engineKeysRef\.current = new Set\(keysAwayFromPreset\(loaded\.settings, restored\)\);/);
+});

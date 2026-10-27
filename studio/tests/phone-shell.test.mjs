@@ -72,17 +72,55 @@ test("the readiness banner never shows a success it cannot stand behind", async 
   assert.equal(readinessOf({ ...ok, resultState: "fresh" }), "sliced");
   assert.equal(toneOf("sliced"), "success");
 
+  // THE EMPTY CURRENT PLATE (c6-r2-ha-01): one model on plate 1, «+ Plate»,
+  // and plate 2 is the current one. The slice acts on plate 2 and the engine
+  // refuses it («Plate 2 has no objects»), so the banner is a warning that
+  // says so, never «جاهز للتقطيع». A caller that cannot place the models
+  // (no count) is not judged empty.
+  assert.equal(readinessOf({ ...ok, objectCount: 1, plateObjectCount: 0 }), "empty");
+  assert.equal(readinessOf({ ...ok, objectCount: 3, plateObjectCount: 0, resultState: "stale" }), "empty");
+  assert.equal(readinessOf({ ...ok, objectCount: 1, plateObjectCount: 0, offBedCount: 1 }), "empty", "the slice of this plate is refused whatever the others hold");
+  assert.equal(toneOf("empty"), "warning");
+  assert.equal(readinessOf({ ...ok, objectCount: 2, plateObjectCount: 1 }), "ready");
+  assert.equal(readinessOf({ ...ok, objectCount: 1 }), "ready", "an unknown plate count is not an empty plate");
+  assert.equal(readinessOf({ ...ok, objectCount: 0, plateObjectCount: 0 }), null, "no model anywhere: hidden, the card says import");
+
   // Exhaustively: a success tone only ever comes with no blocker, a verified
-  // profile and a result that is not stale.
+  // profile, a result that is not stale and a model on the current plate.
   const bools = [true, false];
   for (const preflightOk of bools) for (const profileVerified of bools) {
     for (const resultState of ["none", "fresh", "stale", "rejected-over-bed"]) {
-      const kind = readinessOf({ ...ok, preflightOk, profileVerified, resultState });
-      if (kind && toneOf(kind) === "success") {
-        assert.ok(preflightOk && profileVerified && (resultState === "none" || resultState === "fresh"), `${kind} with ${JSON.stringify({ preflightOk, profileVerified, resultState })}`);
+      for (const plateObjectCount of [undefined, 0, 1]) {
+        const kind = readinessOf({ ...ok, preflightOk, profileVerified, resultState, plateObjectCount });
+        if (kind && toneOf(kind) === "success") {
+          assert.ok(preflightOk && profileVerified && plateObjectCount !== 0 && (resultState === "none" || resultState === "fresh"), `${kind} with ${JSON.stringify({ preflightOk, profileVerified, resultState, plateObjectCount })}`);
+        }
       }
     }
   }
+});
+
+test("an over-bed rejection stops describing the plate once the scene or the settings move on", async () => {
+  // c6-r2-ha-02: the engine rejected the slice of a tower at (140, 0); «ترتيب»
+  // put it back on the bed and the banner still said «خارج حدود سطح الطباعة»,
+  // because the rejection was cleared only by a new slice.
+  const { rejectionHolds } = await loadAppModule("hooks/use-slicing-state");
+  const rejected = { sceneFingerprint: "tower@140,0", settingsRevision: 3 };
+  assert.equal(rejectionHolds(rejected, { sceneFingerprint: "tower@140,0", settingsRevision: 3 }), true, "nothing changed: still rejected");
+  assert.equal(rejectionHolds(rejected, { sceneFingerprint: "tower@-116,116", settingsRevision: 3 }), false, "arranged: the rejection is about a scene that is gone");
+  assert.equal(rejectionHolds(rejected, { sceneFingerprint: "tower@140,0", settingsRevision: 4 }), false, "a settings change (a brim, a skirt) may have been the cause");
+
+  // After «ترتيب»: no rejection, no result, nothing off the bed: not blocked.
+  const { readinessOf } = await loadAppModule("components/mobile/readiness");
+  const base = { objectCount: 1, importing: false, engineReady: true, profileLoading: false, profileVerified: true, slicing: false, errored: false, preflightOk: true, plateObjectCount: 1 };
+  assert.equal(readinessOf({ ...base, resultState: "rejected-over-bed", offBedCount: 1 }), "blocked", "before: rejected and off the bed");
+  assert.equal(readinessOf({ ...base, resultState: "none", offBedCount: 0 }), "ready", "after arranging: the placement check decides");
+  assert.equal(readinessOf({ ...base, resultState: "none", offBedCount: 1 }), "blocked", "moved, but still off the bed: still blocked");
+
+  const hook = await read("../app/hooks/use-slicing-state.ts");
+  assert.match(hook, /const rejected = overBedPlates\(\)\.get\(plate\);\s*if \(rejected && rejectionHolds\(rejected, \{/);
+  assert.match(hook, /overBedPlates\(\)\.set\(payload\.plate, \{\s*sceneFingerprint: sliceStartFingerprintRef\.current \?\? currentFingerprint,\s*settingsRevision: sliceStartSettingsRevisionRef\.current,\s*\}\);/);
+  assert.doesNotMatch(hook, /if \(overBedPlates\(\)\.has\(plate\)\) return "rejected-over-bed";/);
 });
 
 test("a blocked banner names the real cause: too big, or only misplaced", async () => {
@@ -94,7 +132,7 @@ test("a blocked banner names the real cause: too big, or only misplaced", async 
   assert.equal(DICTIONARIES.ar[readinessTitleKey("blocked", 0)], "خارج حدود سطح الطباعة");
   assert.equal(DICTIONARIES.en[readinessTitleKey("blocked", 0)], "Outside the build area");
   assert.equal(DICTIONARIES.ar[readinessTitleKey("blocked", 3)], "أكبر من حجم الطابعة");
-  for (const [kind, key] of [["ready", "readyToSlice"], ["sliced", "printReady"], ["stale", "stale"], ["fallback", "presetFallbackTitle"]]) {
+  for (const [kind, key] of [["ready", "readyToSlice"], ["sliced", "printReady"], ["stale", "stale"], ["fallback", "presetFallbackTitle"], ["empty", "emptyPlateTitle"]]) {
     assert.equal(readinessTitleKey(kind, 0), key);
     assert.equal(readinessTitleKey(kind, 2), key, "the size count only matters for a block");
   }
@@ -135,13 +173,16 @@ test("the shell drives the banner from the real preflight and the real result st
   assert.match(client, /import \{ runPreflight \} from "\.\/makerworld\/preflight";/);
   assert.match(client, /return runPreflight\(\{/);
   const call = client.slice(client.indexOf("const readiness = readinessOf({"), client.indexOf("});", client.indexOf("const readiness = readinessOf({")));
-  for (const input of ["preflightOk: preflight.ok", "offBedCount", "resultState: currentResultState", "profileVerified: profileLoadState?.verified", "slicing: status === \"slicing\"", "errored: status === \"error\"", "importing: Boolean(importProgress)"]) {
+  for (const input of ["preflightOk: preflight.ok", "offBedCount", "plateObjectCount", "resultState: currentResultState", "profileVerified: profileLoadState?.verified", "slicing: status === \"slicing\"", "errored: status === \"error\"", "importing: Boolean(importProgress)"]) {
     assert.ok(call.includes(input), `readinessOf is not given ${input}`);
   }
   assert.match(client, /\{readiness && <ReadinessBanner t=\{t\} kind=\{readiness\} detail=\{readinessDetail\} oversizedCount=\{oversizedCount\} \/>\}/);
   // The placement is measured from the scene and the bed of each plate.
   assert.match(client, /objectsOffBed\(placed, \{ width: profile\.bedWidth, depth: profile\.bedDepth \}\)/);
   assert.match(client, /api\.platePos\(adapter\.plateOfSnapshot\(entry\.snapshot, plateCount\)\)/);
+  // The empty-plate count is the selected plate's visible models, not every plate's.
+  assert.match(client, /entry\.snapshot\.visible !== false && adapter\.plateOfSnapshot\(entry\.snapshot, plateCount\) === selectedPlate/);
+  assert.match(client, /readiness === "empty"\s*\? templateText\(t\.emptyPlateHelp, \{ plate: selectedPlate \+ 1 \}\)/);
   // The second line says what is wrong: size, then place, then the engine.
   assert.match(client, /\? \(oversizedCount\s*\? templateText\(t\.tooBigHelp,[\s\S]*?: offBedCount\s*\? templateText\(t\.offBedHelp,[\s\S]*?: templateText\(t\.overBedError,/);
 });
@@ -265,7 +306,7 @@ const NEW_KEYS = [
   "tooBigTitle", "tooBigHelp", "presetFallbackTitle", "slicedSummary", "slicedEstimate", "durationHours", "durationMinutes",
   "sliceModel", "resliceModel", "exportFile", "export3mf", "exportGcode", "availableAfterSlice", "resliceFirst", "moreExport",
   "more", "moreTitle", "viewGroup", "accountGroup", "theme", "themeSystem", "themeLight", "themeDark",
-  "outsideBedTitle", "offBedHelp",
+  "outsideBedTitle", "offBedHelp", "emptyPlateTitle", "emptyPlateHelp",
 ];
 
 test("every phone-shell string exists in ar, en and real Sorani", async () => {
@@ -275,9 +316,10 @@ test("every phone-shell string exists in ar, en and real Sorani", async () => {
     assert.ok(en && ar && ckb, `${key} must exist in all three`);
     assert.notEqual(ckb, ar, `${key}: the ckb slot must not carry the Arabic (row 183)`);
     if (!/^[\s{}A-Za-z0-9().,·%-]+$/.test(ckb)) assert.notEqual(ckb, en, `${key}: ckb must be translated`);
-    // Placeholders survive translation.
+    // Placeholders survive translation (in Arabic, possibly as a counted block).
     for (const slot of en.match(/\{\w+\}/g) ?? []) {
-      assert.ok(ar.includes(slot) && ckb.includes(slot), `${key}: ${slot} is lost in a translation`);
+      const counted = `${slot.slice(0, -1)}, plural,`;
+      assert.ok((ar.includes(slot) || ar.includes(counted)) && ckb.includes(slot), `${key}: ${slot} is lost in a translation`);
     }
   }
   // The reference's words, in Arabic.
@@ -288,6 +330,81 @@ test("every phone-shell string exists in ar, en and real Sorani", async () => {
   assert.equal(ar.availableAfterSlice, "متاح بعد التقطيع");
   assert.equal(ar.modeSimple, "مبسط");
   assert.equal(ar.infill, "الملء");
+});
+
+test("Arabic counts say «دقيقتين», «6 دقائق» and «11 دقيقة», never «6 دقيقة» or «5 طبقة»", async () => {
+  // c6-r2-ha-04: the sliced banner read «49 طبقة، نحو 6 دقيقة للطباعة.»
+  const { DICTIONARIES, templateText } = await loadAppModule("i18n/index");
+  const { ar, en, ckb } = DICTIONARIES;
+  const minutes = (m, locale = "ar") => templateText(DICTIONARIES[locale].durationMinutes, { m }, locale);
+  assert.deepEqual([1, 2, 3, 10, 11].map((m) => minutes(m)), ["دقيقة واحدة", "دقيقتين", "3 دقائق", "10 دقائق", "11 دقيقة"]);
+  assert.equal(minutes(100), "100 دقيقة");
+  const hours = (h, m) => templateText(ar.durationHours, { h, m }, "ar");
+  assert.deepEqual([1, 2, 3, 10, 11].map((h) => hours(h, 5)), ["ساعة واحدة و5 دقائق", "ساعتين و5 دقائق", "3 ساعات و5 دقائق", "10 ساعات و5 دقائق", "11 ساعة و5 دقائق"]);
+  assert.equal(hours(2, 1), "ساعتين ودقيقة واحدة");
+  assert.equal(hours(2, 2), "ساعتين ودقيقتين");
+  assert.equal(hours(3, 0), "3 ساعات", "a whole hour drops «و0 دقيقة»");
+  const layers = (n) => templateText(ar.slicedSummary, { layers: n }, "ar");
+  assert.deepEqual([1, 2, 3, 10, 11].map(layers), [
+    "طبقة واحدة، جاهزة للتصدير.", "طبقتان، جاهزة للتصدير.", "3 طبقات، جاهزة للتصدير.", "10 طبقات، جاهزة للتصدير.", "11 طبقة، جاهزة للتصدير.",
+  ]);
+  assert.equal(layers("—"), "— طبقة، جاهزة للتصدير.", "an unknown count takes the general form");
+  // The reviewer's two banners, now grammatical.
+  assert.equal(templateText(ar.slicedEstimate, { layers: 49, time: minutes(6) }, "ar"), "49 طبقة، نحو 6 دقائق للطباعة.");
+  assert.equal(templateText(ar.slicedEstimate, { layers: 82, time: minutes(10) }, "ar"), "82 طبقة، نحو 10 دقائق للطباعة.");
+  assert.equal(templateText(ar.slicedEstimate, { layers: 5, time: minutes(2) }, "ar"), "5 طبقات، نحو دقيقتين للطباعة.");
+  // English and Sorani stay as they were: the unit once, after the number.
+  assert.deepEqual([1, 2, 3, 11].map((m) => minutes(m, "en")), ["1 min", "2 min", "3 min", "11 min"]);
+  assert.deepEqual([1, 2, 3, 11].map((m) => minutes(m, "ckb")), ["1 خولەک", "2 خولەک", "3 خولەک", "11 خولەک"]);
+  assert.equal(templateText(en.slicedSummary, { layers: 3 }, "en"), "3 layers, ready to export.");
+  assert.equal(templateText(ckb.durationHours, { h: 2, m: 5 }, "ckb"), "2 کاتژمێر و 5 خولەک");
+  // Every call site of the counted strings passes the locale.
+  const client = await read("../app/slicer-client.tsx");
+  assert.match(client, /templateText\(t\.slicedEstimate, \{ layers: slicedLayers \|\| "—", time: formatDuration\(estimateSeconds, t, locale\) \}, locale\)/);
+  assert.match(client, /templateText\(t\.slicedSummary, \{ layers: slicedLayers \|\| "—" \}, locale\)/);
+  assert.match(client, /templateText\(t\.durationHours, \{ h: hours, m: minutes % 60 \}, locale\)/);
+  assert.match(client, /templateText\(t\.durationMinutes, \{ m: minutes \}, locale\)/);
+});
+
+test("«G-code» is one unbreakable token on the export tile", async () => {
+  // C6-R2-FID-1: at 390 px the Sorani label wrapped as «هەناردەکردنی G-» over
+  // «code», and the English one did at 320 px.
+  const exp = await read("../app/components/mobile/export-section.tsx");
+  const css = await read("../app/globals.css");
+  const pattern = new RegExp(exp.match(/const HYPHENATED_TOKEN = \/(.+)\/;/)[1]);
+  const { DICTIONARIES } = await loadAppModule("i18n/index");
+  for (const locale of ["ar", "en", "ckb"]) {
+    const parts = DICTIONARIES[locale].exportGcode.split(pattern);
+    assert.deepEqual(parts.filter((_, index) => index % 2 === 1), ["G-code"], `${locale}: G-code is split out whole`);
+    assert.equal(parts.join(""), DICTIONARIES[locale].exportGcode, `${locale}: nothing is lost`);
+    assert.deepEqual(DICTIONARIES[locale].export3mf.split(pattern).length, 1, `${locale}: 3MF has no hyphen to guard`);
+  }
+  assert.match(exp, /<bdi key=\{index\} dir="ltr" className="m-export__token">\{part\}<\/bdi>/);
+  assert.match(css, /\.m-export__token \{ white-space: nowrap; \}/);
+});
+
+test("every self-hosted font is credited, with its copyright and licence", async () => {
+  // C6-R2-REG-3: the Sorani patch (a Vazirmatn subset) and the two Cairo
+  // subsets ship in public/fonts, and the notices file named none of them.
+  const { readdir } = await import("node:fs/promises");
+  const notices = await read("../OPEN_SOURCE_NOTICES.md");
+  const license = await read("../public/fonts/cairo/LICENSE");
+  const files = [];
+  const walk = async (dir) => {
+    for (const entry of await readdir(new URL(dir, import.meta.url), { withFileTypes: true })) {
+      if (entry.isDirectory()) await walk(`${dir}${entry.name}/`);
+      else if (/\.woff2?$/.test(entry.name)) files.push(`${dir}${entry.name}`.replace("../", ""));
+    }
+  };
+  await walk("../public/fonts/");
+  assert.deepEqual(files.sort(), ["public/fonts/cairo-kurdish-patch.woff2", "public/fonts/cairo/cairo-v31-arabic.woff2", "public/fonts/cairo/cairo-v31-latin.woff2"]);
+  for (const file of files) assert.ok(notices.includes(`\`${file}\``), `${file} is not named in OPEN_SOURCE_NOTICES.md`);
+  const fonts = notices.slice(notices.indexOf("## Fonts"), notices.indexOf("## Application dependencies"));
+  assert.match(fonts, /### Cairo[\s\S]*Copyright 2009 The Cairo Project Authors[\s\S]*SIL Open Font License 1\.1 \(OFL-1\.1\)/);
+  assert.match(fonts, /### Vazirmatn[\s\S]*Copyright 2015 The Vazirmatn Project Authors[\s\S]*SIL Open Font License 1\.1 \(OFL-1\.1\)/);
+  assert.match(fonts, /public\/fonts\/cairo\/LICENSE/, "the notice points at the licence text");
+  assert.match(license, /Copyright 2015 The Vazirmatn Project Authors/, "the licence file carries the patch copyright too");
+  assert.match(license, /Copyright 2009 The Cairo Project Authors/);
 });
 
 // --------------------------------------------------------------- nothing dropped
@@ -379,8 +496,8 @@ test("the icons sit at the end side of their labels, as the reference draws them
   assert.match(bar, /<span>\{t\.saveNow\}<\/span><Icon name="document" \/>/);
   assert.match(bar, /<span>\{t\.import\}<\/span><Icon name="upload" \/>/);
   assert.match(slice, /<span>\{label\}<\/span>\s*<Icon name=\{props\.printReady && !props\.slicing \? "print" : "layers"\} \/>/);
-  assert.match(exp, /<span><b>\{t\.export3mf\}<\/b><\/span>\s*<Icon name="document" \/>/);
-  assert.match(exp, /<b>\{t\.exportGcode\}<\/b>[\s\S]*?<\/span>\s*<Icon name="document" \/>/);
+  assert.match(exp, /<span><b>\{keepTokensWhole\(t\.export3mf\)\}<\/b><\/span>\s*<Icon name="document" \/>/);
+  assert.match(exp, /<b>\{keepTokensWhole\(t\.exportGcode\)\}<\/b>[\s\S]*?<\/span>\s*<Icon name="document" \/>/);
   assert.match(card, /<span>\{t\.noModelYet\}<\/span>\}\s*<Icon name="document" \/>/);
   for (const [name, source] of [["top bar", bar], ["slice", slice], ["export", exp], ["file chip", card]]) {
     assert.doesNotMatch(source, /<Icon name="(?:document|upload|layers)" \/>\s*<span>/, `${name}: an icon before its label`);

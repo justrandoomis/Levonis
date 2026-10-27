@@ -94,3 +94,84 @@ test("a read-only engine card keeps its labels readable in both themes", async (
     }
   }
 });
+
+test("the engine greys read on both ladders, in every nested panel", async () => {
+  // c6-r2-ha-03: the vendored panels write their quiet text in fixed greys,
+  // and only the main engine host took the light theme, so a nested panel
+  // (All settings, Motion) stayed on the dark ladder inside a cream sidebar.
+  const { EDITOR_SHADOW_CSS, STUDIO_SURFACES: dark, STUDIO_SURFACES_LIGHT: light } = await loadAppModule("editor-theme");
+  assert.ok(EDITOR_SHADOW_CSS.includes(".settings-panel .unit, .settings-panel .pts, .purge-grid th, .bp-note, .muted { color: var(--lv-muted) !important; }"));
+  assert.ok(EDITOR_SHADOW_CSS.includes(".sc-dirty { color: var(--lv-warning) !important; }"));
+  const luminance = (hex) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const contrast = (a, b) => {
+    const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  };
+  // The reviewer's measurements, reproduced from the engine's own colours.
+  assert.equal(contrast("#888888", dark.panel).toFixed(2), "4.25", "the unit on the dark panel");
+  assert.equal(contrast("#AEBCC6", light.panel).toFixed(2), "1.54", "T1 on the light panel");
+  assert.equal(contrast("#8B98A2", light.panel).toFixed(2), "2.33", "the bed note on the light panel");
+  assert.equal(contrast("#C47F00", light.surface).toFixed(2), "2.75", "Modified on the light card");
+  // The token pairs that replace them clear 4.5:1 on every surface they sit on.
+  const pairs = [
+    ["muted on the dark panel", dark.muted, dark.panel, "5.80"],
+    ["muted on the light panel", light.muted, light.panel, "5.30"],
+    ["warning on the light card", light.warning, light.surface, "5.41"],
+  ];
+  for (const [name, fg, bg, ratio] of pairs) assert.equal(contrast(fg, bg).toFixed(2), ratio, name);
+  for (const [name, surfaces] of [["dark", dark], ["light", light]]) {
+    for (const bg of ["panel", "surface", "shell"]) {
+      for (const fg of ["muted", "warning"]) {
+        const ratio = contrast(surfaces[fg], surfaces[bg]);
+        assert.ok(ratio >= 4.5, `${name}: ${fg} on ${bg} is ${ratio.toFixed(2)}:1`);
+      }
+    }
+  }
+});
+
+test("every engine shadow host takes the theme, mode and viewport, nested ones included", async () => {
+  const { EngineAdapter } = await loadAppModule("engine-adapter");
+  const previous = globalThis.MutationObserver;
+  globalThis.MutationObserver = class { observe() {} disconnect() {} };
+  try {
+    const host = () => {
+      const attributes = new Map();
+      return { isConnected: true, attributes, setAttribute: (name, value) => attributes.set(name, value), getAttribute: (name) => attributes.get(name) ?? null };
+    };
+    const root = (shell) => {
+      const element = host();
+      return {
+        host: element,
+        querySelector: (selector) => (shell && selector === ".app-shell" ? {} : null),
+        querySelectorAll: () => [],
+        addEventListener() {},
+        removeEventListener() {},
+      };
+    };
+    const adapter = new EngineAdapter();
+    const main = root(true);
+    const nested = [root(false), root(false)];
+    adapter.adoptRoot(main);
+    for (const panel of nested) adapter.adoptRoot(panel);
+    adapter.setHostAttribute("data-levo-theme", "light");
+    adapter.setHostAttribute("data-levo-mode", "advanced");
+    adapter.setHostAttribute("data-levo-viewport", "expanded");
+    for (const [name, r] of [["main", main], ["nested 1", nested[0]], ["nested 2", nested[1]]]) {
+      assert.equal(r.host.getAttribute("data-levo-theme"), "light", `${name} host`);
+      assert.equal(r.host.getAttribute("data-levo-mode"), "advanced", `${name} host`);
+      assert.equal(r.host.getAttribute("data-levo-viewport"), "expanded", `${name} host`);
+    }
+    // A panel that opens later (Motion, in All settings) takes them on adoption.
+    const late = root(false);
+    adapter.adoptRoot(late);
+    assert.equal(late.host.getAttribute("data-levo-theme"), "light", "a host adopted after the flip");
+    adapter.setHostAttribute("data-levo-theme", "dark");
+    assert.equal(late.host.getAttribute("data-levo-theme"), "dark", "and follows the next flip");
+  } finally {
+    globalThis.MutationObserver = previous;
+  }
+});

@@ -426,12 +426,20 @@ export class EngineAdapter {
   }
 
   /**
-   * Sets an attribute on the engine's shadow host (e.g. `data-levo-sidebar`).
-   * Remembered and re-applied if the host remounts.
+   * Sets an attribute on the engine's shadow hosts (e.g. `data-levo-theme`).
+   * Remembered and re-applied when a host remounts.
+   *
+   * EVERY HOST, NOT ONLY THE MAIN ONE. The engine nests shadow roots: each
+   * settings panel (All settings, Motion, the filament and printer cards)
+   * renders inside its own host within the main root. EDITOR_SHADOW_CSS is
+   * injected into each of them, and its `:host` rule declares the dark
+   * surface values there; only `:host([data-levo-theme="light"])` swaps them.
+   * With the attribute on the main host alone, every nested panel kept the
+   * dark #22272C ladder inside the cream sidebar of the light theme.
    */
   setHostAttribute(name: string, value: string): void {
     this.hostAttributes.set(name, value);
-    this.host()?.setAttribute(name, value);
+    for (const root of this.styledRoots.keys()) (root.host as HTMLElement).setAttribute(name, value);
   }
 
   // -- theme injection ------------------------------------------------------
@@ -961,6 +969,8 @@ export class EngineAdapter {
   private adoptRoot(root: ShadowRoot): void {
     if (this.styledRoots.has(root)) return;
     this.ensureStyle(root);
+    // A host adopted after the shell set its attributes takes them too.
+    this.applyHostAttributes(root.host as HTMLElement);
     // One light childList observer per root: re-asserts the theme style if the
     // engine replaces its children, and adopts nested hosts revealed by
     // re-renders. This observer reacts to events only — no timers.

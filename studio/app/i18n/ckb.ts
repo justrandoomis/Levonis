@@ -316,6 +316,8 @@ export const ckb: StudioDictionary = {
   tooBigHelp: "{count} تەن لە قەبارەی چاپی {printer} ({bed} mm) جێیان نابێتەوە. سەرەتا بچووکیان بکەرەوە، بیانسووڕێنە یان بیانبڕە.",
   outsideBedTitle: "لە دەرەوەی ڕووبەری چاپکردنە",
   offBedHelp: "{count} تەن بە تەواوی یان بەشێکیان کەوتوونەتە دەرەوەی ڕووبەری چاپکردنی {printer}. بیانکێشەوە ناو ڕووبەرەکە یان «ڕیزکردن» دابگرە.",
+  emptyPlateTitle: "Plateی ئێستا بەتاڵە",
+  emptyPlateHelp: "هیچ تەنێک لەسەر Plate {plate} نییە، و پارچەکردن تەنها Plateی ئێستا دەگرێتەوە. تەنێکی بۆ زیاد بکە یان بڕۆ بۆ Plateێک کە تەنی لەسەرە.",
   presetFallbackTitle: "ڕێکخستنی گشتی بەکاردێت",
   slicedSummary: "{layers} چین، ئامادەیە بۆ هەناردەکردن.",
   slicedEstimate: "{layers} چین، نزیکەی {time} بۆ چاپکردن.",

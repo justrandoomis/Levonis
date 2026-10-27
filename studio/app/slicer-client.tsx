@@ -48,7 +48,7 @@ import { useSlicingState, type SlicePayload, type SlicingViewportEvent } from ".
 import { EDITOR_SHADOW_CSS } from "./editor-theme";
 import { fallbackMachineSettings, loadPrinterProfile, type MissingPreset } from "./profile-loader";
 import { applyMachineLock } from "./machine-lock";
-import { carryUserEdits, recordEdits, type PresetSelection } from "./settings-carryover";
+import { carryUserEdits, keysAwayFromPreset, recordEdits, recordEngineWrites, type PresetSelection } from "./settings-carryover";
 import {
   DEFAULT_INFILL_ID,
   DEFAULT_MATERIAL_ID,
@@ -286,15 +286,16 @@ function downloadBlob(blob: Blob, name: string) {
 const MB = 1024 * 1024;
 
 /**
- * The engine's print estimate (seconds), in the reader's words: «2 ساعة و5
- * دقيقة», "2 h 5 min". Latin digits, as every readout in the Studio.
+ * The engine's print estimate (seconds), in the reader's words: «ساعتين
+ * و5 دقائق», "2 h 5 min". Latin digits, as every readout in the Studio; the
+ * Arabic noun takes its counted form (i18n templateText).
  */
-function formatDuration(seconds: number, t: { durationHours: string; durationMinutes: string }): string {
+function formatDuration(seconds: number, t: { durationHours: string; durationMinutes: string }, locale: Locale): string {
   const minutes = Math.max(1, Math.round(seconds / 60));
   const hours = Math.floor(minutes / 60);
   return hours > 0
-    ? templateText(t.durationHours, { h: hours, m: minutes % 60 })
-    : templateText(t.durationMinutes, { m: minutes });
+    ? templateText(t.durationHours, { h: hours, m: minutes % 60 }, locale)
+    : templateText(t.durationMinutes, { m: minutes }, locale);
 }
 
 /**
@@ -455,6 +456,15 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const loadedSelectionRef = useRef<PresetSelection | null>(null);
   /** The map the last preset load built: an edit back to it is no edit. */
   const loadedPresetRef = useRef<SlicerSettings | null>(null);
+  /**
+   * The keys the engine or an imported file set away from that preset, which
+   * nobody typed: a 3MF's own layer height, the filament list spread over the
+   * AMS slots. Carried silently by the next selector change, never counted
+   * as the person's edits (settings-carryover.ts recordEngineWrites).
+   */
+  const engineKeysRef = useRef<Set<string>>(new Set());
+  /** The filament keys the last preset load's material carried. */
+  const loadedFilamentKeysRef = useRef<readonly string[]>([]);
   /** The live settings map, for the preset effect's async continuation. */
   const settingsRef = useRef<SlicerSettings>(settings);
   const projectFilesRef = useRef<File[]>([]);
@@ -910,6 +920,9 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         if (restored) {
           setSettings(restored);
           userEditedKeysRef.current = new Set();
+          // What the saved project holds beyond its preset (its file values,
+          // its spread filament slots) survives the next selector change.
+          engineKeysRef.current = new Set(keysAwayFromPreset(loaded.settings, restored));
           setNotice("");
         } else {
           const carried = carryUserEdits({
@@ -920,9 +933,12 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
             nextSelection,
             processKeys: loaded.processKeys,
             filamentKeys: loaded.filamentKeys,
+            previousFilamentKeys: loadedFilamentKeysRef.current,
+            engineKeys: engineKeysRef.current,
           });
           setSettings(carried.settings);
           userEditedKeysRef.current = new Set(carried.kept);
+          engineKeysRef.current = new Set(carried.engineKept);
           const text = textRef.current;
           setNotice(
             carried.overwritten.length
@@ -937,6 +953,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         }
         loadedSelectionRef.current = nextSelection;
         loadedPresetRef.current = loaded.settings;
+        loadedFilamentKeysRef.current = loaded.filamentKeys;
         setProfileLoadState({ verified: loaded.verified, missingPresets: loaded.missingPresets });
         slicing.clearResults();
         setHandyProjectReady(false);
@@ -986,6 +1003,19 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         after: locked,
         preset: loadedPresetRef.current,
         edited: userEditedKeysRef.current,
+        byPerson,
+      });
+      /*
+       * And what the write moved that the person did not type (a 3MF's
+       * project settings, the filament list spread over the AMS slots) is
+       * remembered apart, so the next selector change carries it instead of
+       * resetting it to the preset with nothing said.
+       */
+      engineKeysRef.current = recordEngineWrites({
+        before: current,
+        after: locked,
+        preset: loadedPresetRef.current,
+        engine: engineKeysRef.current,
         byPerson,
       });
       return locked;
@@ -2295,8 +2325,10 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     seenObjectIdsRef.current = new Set();
     everSeenObjectIdsRef.current = new Set();
     restoreInFlightRef.current = false;
-    // A new project starts from the preset, not from the last project's edits.
+    // A new project starts from the preset, not from the last project's edits
+    // or the values its file brought.
     userEditedKeysRef.current = new Set();
+    engineKeysRef.current = new Set();
     arrangeUndoRef.current = null;
     orientUndoRef.current = null;
     setOrientUndoAvailable(false);
@@ -2690,6 +2722,24 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   }, [adapter, plateCount, profile.bedDepth, profile.bedWidth, sceneFacts]);
 
   /**
+   * THE PLATE THE SLICE ACTS ON, NOT THE WHOLE SCENE. `objects` counts every
+   * plate, while the slice, its result and the G-code are the current
+   * plate's. After «+ Plate» the new, empty plate is the current one, and the
+   * banner said «جاهز للتقطيع» over it until the engine refused the slice
+   * («Plate 2 has no objects»). So the visible models are counted on the
+   * selected plate, by the nearest-plate rule (adapter plateOfSnapshot) the
+   * placement check above uses.
+   * Undefined while the scene cannot be read, so nothing is judged empty
+   * from a missing snapshot.
+   */
+  const plateObjectCount = useMemo(() => {
+    if (!sceneFacts.measured.length) return undefined;
+    return sceneFacts.measured.filter((entry) => (
+      entry.snapshot.visible !== false && adapter.plateOfSnapshot(entry.snapshot, plateCount) === selectedPlate
+    )).length;
+  }, [adapter, plateCount, sceneFacts, selectedPlate]);
+
+  /**
    * The orientation chips. «تلقائي» is the existing auto-orient; the other two
    * are fixed rotations (engine-adapter applyOrientationPreset). Each one
    * applies to the selected object, or to every object when none is selected,
@@ -2838,6 +2888,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     resultState: currentResultState,
     preflightOk: preflight.ok,
     offBedCount,
+    plateObjectCount,
   });
   const oversizedCount = preflight.findings.find((finding) => finding.code === "object-exceeds-bed")?.objectIds?.length ?? 0;
   const sliceStats = printReady ? slicing.stats(selectedPlate) : null;
@@ -2845,21 +2896,23 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   // The engine's own stats card counts the layers it printed; the banner says
   // the same number rather than the preview's layer count beside it.
   const slicedLayers = Number(sliceStats?.layers) > 0 ? Number(sliceStats?.layers) : slicing.layerCount;
-  const readinessDetail = readiness === "blocked"
-    ? (oversizedCount
-      ? templateText(t.tooBigHelp, { count: oversizedCount, printer: profile.model, bed: `${profile.bedWidth} × ${profile.bedDepth} × ${profile.bedHeight}` })
-      : offBedCount
-        ? templateText(t.offBedHelp, { count: offBedCount, printer: profile.model })
-        : templateText(t.overBedError, { printer: profile.shortName }))
-    : readiness === "stale"
-      ? (heavyImportText ? `${t.staleHelp} ${heavyImportText}` : t.staleHelp)
-      : readiness === "fallback"
-        ? templateText(t.presetFallbackWarning, { presets: profileLoadState?.missingPresets.map((preset) => preset.presetName).join(" · ") || "—" })
-        : readiness === "sliced"
-          ? (Number.isFinite(estimateSeconds) && estimateSeconds > 0
-            ? templateText(t.slicedEstimate, { layers: slicedLayers || "—", time: formatDuration(estimateSeconds, t) })
-            : templateText(t.slicedSummary, { layers: slicedLayers || "—" }))
-          : t.readyToSliceHelp;
+  const readinessDetail = readiness === "empty"
+    ? templateText(t.emptyPlateHelp, { plate: selectedPlate + 1 })
+    : readiness === "blocked"
+      ? (oversizedCount
+        ? templateText(t.tooBigHelp, { count: oversizedCount, printer: profile.model, bed: `${profile.bedWidth} × ${profile.bedDepth} × ${profile.bedHeight}` })
+        : offBedCount
+          ? templateText(t.offBedHelp, { count: offBedCount, printer: profile.model })
+          : templateText(t.overBedError, { printer: profile.shortName }))
+      : readiness === "stale"
+        ? (heavyImportText ? `${t.staleHelp} ${heavyImportText}` : t.staleHelp)
+        : readiness === "fallback"
+          ? templateText(t.presetFallbackWarning, { presets: profileLoadState?.missingPresets.map((preset) => preset.presetName).join(" · ") || "—" })
+          : readiness === "sliced"
+            ? (Number.isFinite(estimateSeconds) && estimateSeconds > 0
+              ? templateText(t.slicedEstimate, { layers: slicedLayers || "—", time: formatDuration(estimateSeconds, t, locale) }, locale)
+              : templateText(t.slicedSummary, { layers: slicedLayers || "—" }, locale))
+            : t.readyToSliceHelp;
 
   return (
     <main className="studio-app" data-viewport={viewportExpanded ? "expanded" : "card"}>

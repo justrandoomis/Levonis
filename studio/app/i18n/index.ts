@@ -82,10 +82,55 @@ export function applyLocaleToDocument(locale: Locale): void {
   document.documentElement.dir = dirFor(locale);
 }
 
-/** Replaces `{key}` placeholders. Missing values are left visible on purpose. */
-export function templateText(template: string, values: Record<string, string | number>): string {
+/**
+ * Replaces `{key}` placeholders. Missing values are left visible on purpose.
+ *
+ * A placeholder may also be a COUNTED block, for a language whose noun
+ * changes with the number:
+ *
+ *     {m, plural, one {دقيقة واحدة} two {دقيقتين} few {# دقائق} other {# دقيقة}}
+ *
+ * Arabic says «دقيقة واحدة», «دقيقتين», «6 دقائق», «11 دقيقة»: a bare number
+ * before a singular noun («6 دقيقة», «5 طبقة») is not Arabic. The form is
+ * picked by `Intl.PluralRules` for `locale` (zero, one, two, few, many,
+ * other), a missing form falls back to `other`, and `#` is the number in
+ * Latin digits, as every readout in the Studio. A value that is not a number
+ * («—» before a count is known) takes `other`. Only the Arabic catalogue
+ * writes such blocks today; English and Sorani name the unit once («6 min»,
+ * «6 خولەک») and need none.
+ */
+export function templateText(
+  template: string,
+  values: Record<string, string | number>,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const counted = template.includes(", plural,") ? countedForms(template, values, locale) : template;
   return Object.entries(values).reduce(
     (result, [key, value]) => result.split(`{${key}}`).join(String(value)),
-    template,
+    counted,
   );
+}
+
+const COUNTED_BLOCK = /\{(\w+), plural,((?:\s*(?:zero|one|two|few|many|other)\s*\{[^{}]*\})+)\s*\}/g;
+const COUNTED_FORM = /(zero|one|two|few|many|other)\s*\{([^{}]*)\}/g;
+const pluralRules = new Map<Locale, Intl.PluralRules>();
+
+function countedForms(template: string, values: Record<string, string | number>, locale: Locale): string {
+  return template.replace(COUNTED_BLOCK, (block, key: string, body: string) => {
+    if (!Object.prototype.hasOwnProperty.call(values, key)) return block;
+    const value = values[key];
+    const forms = new Map<string, string>();
+    for (const [, category, text] of body.matchAll(COUNTED_FORM)) forms.set(category, text);
+    const count = typeof value === "number" ? value : Number(value);
+    let category = "other";
+    if (typeof value === "number" || (String(value).trim() !== "" && Number.isFinite(count))) {
+      let rules = pluralRules.get(locale);
+      if (!rules) {
+        rules = new Intl.PluralRules(locale);
+        pluralRules.set(locale, rules);
+      }
+      category = rules.select(count);
+    }
+    return (forms.get(category) ?? forms.get("other") ?? "").split("#").join(String(value));
+  });
 }

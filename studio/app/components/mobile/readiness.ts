@@ -11,6 +11,11 @@
  *             engine or the printer profile still loading, a slice running
  *             (the gold button shows its progress), or an engine error (the
  *             message row above the card says it);
+ *   empty     the CURRENT plate has no visible model while another plate
+ *             has one. The slice and the export act on the current plate
+ *             only, and the engine refuses that slice («Plate 2 has no
+ *             objects»), so «جاهز للتقطيع» there was a promise it could not
+ *             keep — warning, saying to switch plates or add a model;
  *   blocked   runPreflight found a blocker, a model sits outside the bed
  *             (wholly or in part: the engine refuses that slice, so a
  *             success before it would be a promise it cannot keep), or the
@@ -29,7 +34,7 @@
  * a success would be easy to show by mistake.
  */
 
-export type ReadinessKind = "ready" | "sliced" | "stale" | "blocked" | "fallback";
+export type ReadinessKind = "ready" | "sliced" | "stale" | "blocked" | "fallback" | "empty";
 export type ReadinessTone = "success" | "warning" | "danger";
 
 export interface ReadinessInput {
@@ -51,11 +56,18 @@ export interface ReadinessInput {
    * check reads as "nothing known to be off the bed".
    */
   offBedCount?: number;
+  /**
+   * Visible models on the CURRENT plate, the one the slice acts on. Optional:
+   * a caller that cannot place the models on plates (no scene snapshot yet)
+   * leaves it out, and the plate is not judged empty.
+   */
+  plateObjectCount?: number;
 }
 
 export function readinessOf(input: ReadinessInput): ReadinessKind | null {
   if (input.objectCount <= 0) return null;
   if (input.importing || !input.engineReady || input.profileLoading || input.slicing || input.errored) return null;
+  if (input.plateObjectCount !== undefined && input.plateObjectCount <= 0) return "empty";
   if (!input.preflightOk || (input.offBedCount ?? 0) > 0 || input.resultState === "rejected-over-bed") return "blocked";
   if (input.resultState === "stale") return "stale";
   if (!input.profileVerified) return "fallback";
@@ -65,7 +77,7 @@ export function readinessOf(input: ReadinessInput): ReadinessKind | null {
 
 export function toneOf(kind: ReadinessKind): ReadinessTone {
   if (kind === "blocked") return "danger";
-  if (kind === "stale" || kind === "fallback") return "warning";
+  if (kind === "stale" || kind === "fallback" || kind === "empty") return "warning";
   return "success";
 }
 
@@ -80,12 +92,13 @@ export function toneOf(kind: ReadinessKind): ReadinessTone {
  * bed is a false claim about the model, so those get «خارج حدود سطح
  * الطباعة» (outsideBedTitle).
  */
-export type ReadinessTitleKey = "readyToSlice" | "printReady" | "stale" | "presetFallbackTitle" | "tooBigTitle" | "outsideBedTitle";
+export type ReadinessTitleKey = "readyToSlice" | "printReady" | "stale" | "presetFallbackTitle" | "emptyPlateTitle" | "tooBigTitle" | "outsideBedTitle";
 
 export function readinessTitleKey(kind: ReadinessKind, oversizedCount: number): ReadinessTitleKey {
   if (kind === "ready") return "readyToSlice";
   if (kind === "sliced") return "printReady";
   if (kind === "stale") return "stale";
   if (kind === "fallback") return "presetFallbackTitle";
+  if (kind === "empty") return "emptyPlateTitle";
   return oversizedCount > 0 ? "tooBigTitle" : "outsideBedTitle";
 }

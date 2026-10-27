@@ -1448,6 +1448,8 @@ button:disabled { cursor: not-allowed; }
 .m-export__tile svg { width: 22px; height: 22px; flex: 0 0 auto; }
 .m-export__tile > span { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .m-export__tile b { font-size: 14px; font-weight: 700; }
+/* «G-code» never breaks at its hyphen (export-section.tsx keepTokensWhole). */
+.m-export__token { white-space: nowrap; }
 .m-export__tile small { color: var(--muted); font-size: var(--text-caption); line-height: var(--leading-tight); }
 .m-export__tile:disabled { box-shadow: none; color: var(--ink-disabled); cursor: not-allowed; }
 .m-export__tile:disabled small { color: var(--ink-disabled); }

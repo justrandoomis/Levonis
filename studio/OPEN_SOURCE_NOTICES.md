@@ -63,6 +63,31 @@ This project does not copy code from the surveyed Bambu MCP repositories. They w
 - License: MIT
 - Role: incremental, local ZIP archive decompression.
 
+## Fonts
+
+Both fonts are self-hosted under `public/fonts/` and served as they are (the
+Studio's Content-Security-Policy allows no third-party font origin). The SIL
+Open Font License 1.1 text is in `public/fonts/cairo/LICENSE`.
+
+### Cairo
+
+- Copyright 2009 The Cairo Project Authors (https://github.com/Gue3bara/Cairo)
+- License: SIL Open Font License 1.1 (OFL-1.1)
+- Files: `public/fonts/cairo/cairo-v31-arabic.woff2` and
+  `public/fonts/cairo/cairo-v31-latin.woff2`, the arabic and latin subsets of
+  the variable font (weights 300 to 900) as Google Fonts serves them (v31),
+  unmodified.
+
+### Vazirmatn
+
+- Copyright 2015 The Vazirmatn Project Authors (https://github.com/rastikerdar/vazirmatn)
+- License: SIL Open Font License 1.1 (OFL-1.1)
+- File: `public/fonts/cairo-kurdish-patch.woff2`, a six-glyph subset of
+  Vazirmatn Regular 33.003: U+0693, U+0695, U+06B5, U+06C6, U+06CE and U+06D5,
+  the Sorani letters the Cairo subsets do not draw. The file keeps the
+  Vazirmatn names and copyright; `app/globals.css` declares it as one more
+  Cairo face that only those six code points reach.
+
 ## Application dependencies
 
 The application also uses React, Next.js, Vinext, Vite, Three.js, Cloudflare Workers tooling, and their transitive dependencies under their respective licenses. Their package metadata and license files remain available in the dependency distribution produced by `npm ci`.

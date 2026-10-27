@@ -258,6 +258,17 @@ export const EDITOR_SHADOW_CSS = `
   .settings-panel h2, .settings-panel h3, .settings-panel .lbl, .settings-panel label,
   .settings-panel summary, .settings-panel .key { color: ${T.text} !important; }
   .settings-panel .key, .settings-panel .muted, .settings-panel small { color: ${T.muted} !important; }
+  /* THE ENGINE GREYS, ON OUR LADDER. The vendored panels write their quiet
+     text in fixed greys picked for their own dark panel: the units (mm/s) in
+     888888, the point lists in 666666, the flush table head (T1) in
+     AEBCC6, the bed notes in 8B98A2 and the Modified flag in an amber
+     C47F00. On the Studio panels those read 4.25:1 (units, dark), 1.54:1
+     (T1, light), 2.33:1 (notes, light) and 2.75:1 (Modified, light), under
+     the 4.5:1 of WCAG 1.4.3. They take the muted and warning tokens instead,
+     which clear it on both ladders (tests/editor-theme.test.mjs). Plain
+     prose only in this comment. */
+  .settings-panel .unit, .settings-panel .pts, .purge-grid th, .bp-note, .muted { color: ${T.muted} !important; }
+  .sc-dirty { color: ${T.warning} !important; }
   /* A READ-ONLY CARD STAYS READABLE. The engine draws a read-only panel (here
      the printer card, with the motion limits folded into it) at opacity .62
      on its wrapper, which took every label in it to 2.6:1 on the light cards
