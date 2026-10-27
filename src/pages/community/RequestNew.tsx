@@ -19,13 +19,24 @@
  *
  * Behind ProtectedRoute and CommunityGate (src/App.tsx): writing a request
  * needs an account, and the community open to it.
+ *
+ * AN ADDRESS FOR A REQUEST THIS PERSON CANNOT OPEN (B2R2-L10N-1): another
+ * person request, a discarded draft, a stale or mistyped link. The server
+ * answers each with 404 «NOT_FOUND», and the wizard alone drew its empty form
+ * under the server English sentence. The page asks for the draft itself,
+ * beside the wizard (two asks of one address in flight are one request,
+ * lib/api.ts), and says a request it cannot open the way the request page
+ * says it, in the reader language, with the way back to the board.
  */
-import { Suspense, lazy } from 'react';
-import { useLocation, useNavigate, useParams, useSearchParams, type NavigateFunction } from 'react-router-dom';
+import { Suspense, lazy, useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams, useSearchParams, type NavigateFunction } from 'react-router-dom';
 import CommunitySurface from '../../components/community/CommunitySurface';
 import SectionPageHeader from '../../components/community/kit/SectionPageHeader';
+import { requestsApi } from '../../components/community/requests/api';
 import { useRequestStrings } from '../../components/community/requests/strings';
+import { NotFoundState } from '../../components/ui/AsyncStates';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { ApiError } from '../../lib/api';
 import { useGoBack } from '../../lib/useGoBack';
 
 // The wizard is its own chunk, as it was when the board and the request page
@@ -72,6 +83,42 @@ export function returnPublished(navigate: NavigateFunction, path: string, win: W
   navigate(-1);
 }
 
+/** Where a new request leaves «طلباتي», behind its own page. */
+export const MY_REQUESTS = '/requests?view=mine';
+
+/**
+ * A NEW REQUEST LANDS ON ITS OWN PAGE, WITH «طلباتي» BEHIND IT (B2R2-REG-1).
+ * The editor entry is rewritten in place as «طلباتي» with
+ * `history.replaceState`, and never with `navigate`: a router replace draws the
+ * board at once, while the push after it waits inside a view transition
+ * (lib/stackNavigation.ts), and the board, mounting, strips its `?view` with a
+ * replace of its own that lands on the request entry pushed meanwhile. The
+ * page never arrived and its channel window never asked. The rewritten entry
+ * keeps the place of the editor (`idx`), takes a key of its own (the scroll
+ * the shell remembers per key is the editor one) and drops the router state
+ * the editor arrived with (a carried model link would reopen the editor on
+ * Back). The request page is then pushed, marked when it was published: Back
+ * from it reaches «طلباتي», where the request now is, and the board mounts
+ * only then. A window that refuses the rewrite gets the request page in place
+ * of the editor: never the board in between.
+ */
+export function leaveNewRequest(navigate: NavigateFunction, path: string, published: boolean, win: Window = window): void {
+  const state = published ? { published: true } : undefined;
+  try {
+    const held = (win.history.state ?? {}) as Record<string, unknown>;
+    win.history.replaceState({ ...held, usr: null, key: Math.random().toString(36).slice(2, 10) }, '', MY_REQUESTS);
+  } catch {
+    navigate(path, { replace: true, state });
+    return;
+  }
+  navigate(path, { state });
+}
+
+/** The draft read answered that this person has no such request (404 «NOT_FOUND»). */
+export function requestMissing(e: unknown): boolean {
+  return e instanceof ApiError && (e.status === 404 || e.code === 'NOT_FOUND');
+}
+
 export default function RequestNew() {
   const { id = '' } = useParams();
   const location = useLocation();
@@ -83,20 +130,52 @@ export default function RequestNew() {
   // Back: to the request this screen is about, else to the board.
   const goBack = useGoBack(id ? requestPath(id) : '/requests');
 
+  // The request behind a draft or edit address, asked beside the wizard: only
+  // a 404 changes the page; anything else is the wizard own to say.
+  const [missing, setMissing] = useState(false);
+  useEffect(() => {
+    setMissing(false);
+    if (!id) return;
+    let alive = true;
+    requestsApi.draft(id).catch((e: unknown) => {
+      if (alive && requestMissing(e)) setMissing(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
   /**
    * A request this person just PUBLISHED: its page asks about the
    * notification channels, once (the router state). A new request leaves
-   * «طلباتي» behind it, where it now is; a draft or an edit goes back to its
-   * page, the one entry that opened this screen (returnPublished: never a
-   * second copy of it, so one Back leaves the request), else as Back would.
+   * «طلباتي» behind it, where it now is (leaveNewRequest); a draft or an edit
+   * goes back to its page, the one entry that opened this screen
+   * (returnPublished: never a second copy of it, so one Back leaves the
+   * request), else as Back would.
    */
   const done = (rid: string, how: 'published' | 'saved') => {
-    if (!id) {
-      navigate('/requests?view=mine', { replace: true });
-      navigate(requestPath(rid), how === 'published' ? { state: { published: true } } : undefined);
-    } else if (how === 'published') returnPublished(navigate, requestPath(rid));
+    if (!id) leaveNewRequest(navigate, requestPath(rid), how === 'published');
+    else if (how === 'published') returnPublished(navigate, requestPath(rid));
     else goBack();
   };
+
+  if (missing) {
+    return (
+      <CommunitySurface className="min-h-screen w-full pb-28">
+        <div className="mx-auto flex max-w-2xl flex-col gap-2 px-4" data-request-editor="missing">
+          <SectionPageHeader title={s.kicker} backTo="/requests" />
+          <div className="pt-6" data-request-missing>
+            <NotFoundState title={s.notFoundTitle} description={s.notFoundBody} />
+            <div className="mt-2 flex justify-center">
+              <Link to="/requests" className="lv-button lv-button-secondary lv-button-sm">
+                {s.toBoard}
+              </Link>
+            </div>
+          </div>
+        </div>
+      </CommunitySurface>
+    );
+  }
 
   return (
     <CommunitySurface className="min-h-screen w-full pb-28">

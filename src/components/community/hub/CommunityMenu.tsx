@@ -36,7 +36,9 @@
  *
  * «اللغة والمظهر» opens the sheet of the header globe itself
  * (LangThemeSheet.tsx `useLangThemeSheet`): one copy of its rules, never a
- * second one here.
+ * second one here. The menu stays open under that sheet, so the sheet gives
+ * focus back to its row; and while the sheet is still on its way the row is
+ * busy, and Escape or closing the menu calls the sheet off.
  */
 import React, { useEffect, useId, useRef, useState, type ComponentType } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -87,6 +89,27 @@ function HomeGlyph({ className = '' }: { className?: string }) {
   );
 }
 
+/**
+ * The gold glyph of the «المجتمع» group: three people, filled, as IMG_8478
+ * draws it (B2R2-FID-2). Drawn here, as HomeGlyph is, and only of closed
+ * shapes: the lucide group is two open arcs for the person behind, and a
+ * fill turns them into a half moon. One in front (a head and its shoulders)
+ * and one on each side behind it, each side body cut back from the front
+ * one by a narrow gap so the three read apart.
+ */
+function GroupGlyph({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className} data-glyph="group">
+      <circle cx="12" cy="7.75" r="3.75" />
+      <path d="M5.25 19.5a6.75 6.75 0 0 1 13.5 0v.75a.75.75 0 0 1-.75.75H6a.75.75 0 0 1-.75-.75z" />
+      <circle cx="4.5" cy="11" r="2.5" />
+      <path d="M.25 19.5a4.25 4.25 0 0 1 4.938-4.194A8 8 0 0 0 4 19.5V21H1a.75.75 0 0 1-.75-.75z" />
+      <circle cx="19.5" cy="11" r="2.5" />
+      <path d="M23.75 19.5a4.25 4.25 0 0 0-4.938-4.194A8 8 0 0 1 20 19.5V21h3a.75.75 0 0 0 .75-.75z" />
+    </svg>
+  );
+}
+
 /** From Tailwind `lg`: a popover anchored to its trigger. */
 const DESKTOP_QUERY = '(min-width: 1024px)';
 
@@ -129,6 +152,21 @@ function standingOf(userId: string): Promise<MerchantMe | null> {
   return p;
 }
 
+/** What the popover does with a press outside it while the language sheet is up: nothing. */
+const keepOpen = () => {};
+
+/** The «اللغة والمظهر» row and the sheet it opens, as the menu hands them to its body. */
+interface LangRow {
+  ref: React.RefObject<HTMLButtonElement | null>;
+  toggle: () => void;
+  /** The sheet is asked for (it may still be on its way). */
+  open: boolean;
+  /** Asked for, and its chunk not here yet. */
+  busy: boolean;
+  /** Calls the sheet off before it opens. */
+  cancel: () => void;
+}
+
 export default function CommunityMenu({ open, onClose, anchor }: CommunityMenuProps) {
   const desktop = useMediaQuery(DESKTOP_QUERY);
   const s = useKitStrings();
@@ -136,7 +174,8 @@ export default function CommunityMenu({ open, onClose, anchor }: CommunityMenuPr
   const body = useRef<HTMLDivElement | null>(null);
   const first = useRef<HTMLButtonElement | null>(null);
   // The two rows of the dashboard sheet: the display currency is the header globe alone.
-  const [langThemePanel, langThemeToggle, langThemeRef] = useLangThemeSheet(false);
+  const [langThemePanel, langThemeToggle, langThemeRef, langOpen, LangPanel, langCloseThen] = useLangThemeSheet(false);
+  const lang: LangRow = { ref: langThemeRef, toggle: langThemeToggle, open: langOpen, busy: langOpen && !LangPanel, cancel: () => langCloseThen(null) };
 
   // Focus enters on open, on the first control (the back chevron that closes
   // it): the popover does not move focus by itself, and the sheet, mounted
@@ -147,48 +186,64 @@ export default function CommunityMenu({ open, onClose, anchor }: CommunityMenuPr
     return () => window.clearTimeout(t);
   }, [open, desktop]);
 
+  /**
+   * EVERY WAY THE MENU CLOSES CALLS OFF A SHEET STILL ON ITS WAY (B2R2-A11Y-2):
+   * the language sheet asked for while its chunk loads never opens later over
+   * a closed menu, or over the page a row went to.
+   */
+  const close = () => {
+    if (lang.busy) lang.cancel();
+    onClose();
+  };
+
   // The sheet itself is drawn below, beside the menu and not inside its rows,
-  // so a choice made in it outlives the popover closing under it.
-  const content = <MenuBody onNavigate={onClose} onLangTheme={langThemeToggle} langThemeRef={langThemeRef} />;
+  // so a choice made in it outlives anything that closes the menu under it.
+  const content = <MenuBody onNavigate={close} lang={lang} />;
 
   return (
     <>
       {desktop ? (
-        <Anchored open={open} onClose={onClose} anchor={anchor} align="end" role="dialog" label={s.sectionsAndAccount} testId="community-menu" className="w-full max-w-[360px]">
+        /* THE POPOVER STAYS UNDER ITS SHEET (B2R2-A11Y-1). The sheet is drawn
+           outside the popover, so a press inside it is a press outside the
+           popover, which closed it and took away the row the sheet gives
+           focus back to. While the sheet is up a press outside does nothing;
+           the sheet closes alone (its scrim, Escape, a choice) and focus comes
+           back to its row, as it does on a phone. */
+        <Anchored open={open} onClose={lang.open && LangPanel ? keepOpen : close} anchor={anchor} align="end" role="dialog" label={s.sectionsAndAccount} testId="community-menu" className="w-full max-w-[360px]">
           <div
             ref={body}
             data-community-menu="popover"
             className="max-h-[85vh] overflow-y-auto overscroll-contain"
             onKeyDown={(e) => {
               // Out at either edge, the way the popover came in: past the last
-              // row on to what follows the trigger (onClose puts focus on the
+              // row on to what follows the trigger (close puts focus on the
               // trigger and the browser moves on from it); before the first
               // control onto the trigger itself.
               if (e.key !== 'Tab') return;
               if (e.shiftKey) {
                 if (document.activeElement !== first.current) return;
                 e.preventDefault();
-                onClose();
+                close();
                 return;
               }
               const all = body.current?.querySelectorAll<HTMLElement>('a[href], button');
-              if (all && document.activeElement === all[all.length - 1]) onClose();
+              if (all && document.activeElement === all[all.length - 1]) close();
             }}
           >
-            <TitleRow titleId={titleId} onClose={onClose} firstRef={first} />
+            <TitleRow titleId={titleId} onClose={close} firstRef={first} />
             {content}
           </div>
         </Anchored>
       ) : (
         <Sheet
           open={open}
-          onClose={onClose}
+          onClose={close}
           labelledBy={titleId}
           detents={['large']}
           solid
           testId="community-menu"
           panelClassName="bg-canvas sm:max-w-[440px] sm:w-[92vw]"
-          header={<TitleRow titleId={titleId} onClose={onClose} firstRef={first} />}
+          header={<TitleRow titleId={titleId} onClose={close} firstRef={first} />}
         >
           <div data-community-menu="sheet">{content}</div>
         </Sheet>
@@ -236,7 +291,7 @@ function TitleRow({ titleId, onClose, firstRef }: { titleId: string; onClose: ()
 }
 
 /** The two groups (the community one only while the community is open to this viewer). */
-function MenuBody({ onNavigate, onLangTheme, langThemeRef }: { onNavigate: () => void; onLangTheme: () => void; langThemeRef: React.RefObject<HTMLButtonElement | null> }) {
+function MenuBody({ onNavigate, lang }: { onNavigate: () => void; lang: LangRow }) {
   const s = useKitStrings();
   const hub = useHubStrings();
   const social = useSocialStrings();
@@ -278,7 +333,7 @@ function MenuBody({ onNavigate, onLangTheme, langThemeRef }: { onNavigate: () =>
   return (
     <div className="flex flex-col gap-4 px-4 pb-4 pt-2">
       {access?.may_enter !== false && (
-        <MenuGroup icon={<Users className="h-7 w-7" fill="currentColor" strokeWidth={1.5} />} title={s.community} hint={s.communityHint} id="community-menu-community">
+        <MenuGroup icon={<GroupGlyph className="h-7 w-7" />} title={s.community} hint={s.communityHint} id="community-menu-community">
           {section('home', s.communityHome, HomeGlyph)}
           {section('following', hub.tabs.following, Users)}
           {section('projects', hub.tabs.projects, Lightbulb)}
@@ -296,9 +351,26 @@ function MenuBody({ onNavigate, onLangTheme, langThemeRef }: { onNavigate: () =>
         {row('followed', s.storesIFollow, <Store className={glyph} />, gated('/followed-stores'))}
         {row('saved', social.savedTitle, <Bookmark className={glyph} />, gated('/community/saved'))}
         {storeRow}
-        <button ref={langThemeRef} type="button" onClick={onLangTheme} className="cm-row relative flex min-h-14 w-full items-center gap-3 rounded-sm px-3 text-start text-text-primary hover:bg-surface-selected focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus" aria-haspopup="dialog">
+        {/* While the sheet is on its way (its chunk loading on a slow network) the row says so, as
+            the header globe does: open, busy, a spinner in its tile. Escape then calls the sheet off
+            and the menu stays: a handled Escape never reaches the overlay stack (B2R2-A11Y-2). */}
+        <button
+          ref={lang.ref}
+          type="button"
+          onClick={lang.toggle}
+          onKeyDown={(e) => {
+            if (e.key !== 'Escape' || !lang.busy || e.nativeEvent.isComposing) return;
+            e.preventDefault();
+            lang.cancel();
+          }}
+          className="cm-row relative flex min-h-14 w-full items-center gap-3 rounded-sm px-3 text-start text-text-primary hover:bg-surface-selected focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+          aria-haspopup="dialog"
+          aria-expanded={lang.open}
+          aria-busy={lang.busy}
+          data-lang-theme-row
+        >
           <span aria-hidden="true" className="cm-line flex size-9 shrink-0 items-center justify-center rounded-sm bg-surface-raised text-gold shadow-1">
-            <Globe className={glyph} />
+            {lang.busy ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent motion-reduce:animate-none" /> : <Globe className={glyph} />}
           </span>
           <span className="min-w-0 flex-1 truncate text-base font-medium">{s.langTheme}</span>
         </button>

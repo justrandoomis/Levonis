@@ -26,6 +26,12 @@
  * popover closes onto its door on Shift+Tab (A11Y-1) and its language row
  * opens the header sheet itself (REG-1); the estimate names Levonis in Latin
  * letters (REG-2).
+ *
+ * Fix round 2 (B2R2): the list card is one column beside its media, the
+ * deadline over its date and the footer inside it, the facts split by
+ * hairline bars (FID-1); the «المجتمع» glyph is three people of closed shapes
+ * (FID-2); the menu popover stays open under its language sheet (A11Y-1) and
+ * the row says while that sheet is on its way, Escape calling it off (A11Y-2).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -174,7 +180,7 @@ test('the row: the pill beside the chevron in an end column, the short state wor
   assert.doesNotMatch(src, /className="truncate">\{attachmentsWord/, 'the attachments word is cut again');
 });
 
-test('the list card is the board anatomy without a budget: the pill, the meta row, «الموعد المطلوب» across, «عرض الطلب» and the counts', () => {
+test('the list card is the board anatomy without a budget: the pill, the meta row, «الموعد المطلوب» in a row of its own, «عرض الطلب» and the counts', () => {
   const html = card({ variant: 'list', request: leaky as unknown as Extract<Card, { variant: 'list' }>['request'] });
   assert.match(html, /data-state-pill="open"[^>]*>يستقبل عروضًا/);
   assert.match(html, /الموعد المطلوب/);
@@ -264,23 +270,23 @@ test('the sections menu: lazy, Studio a plain anchor never prefetched, the commu
   assert.match(menu, /useCommunityAccess\(\)/);
   // A sheet on a phone, a popover from lg.
   assert.match(menu, /const DESKTOP_QUERY = '\(min-width: 1024px\)';/);
-  assert.match(menu, /<Anchored open=\{open\} onClose=\{onClose\} anchor=\{anchor\}[^>]*role="dialog"[^>]*className="w-full max-w-\[360px\]"/);
+  assert.match(menu, /<Anchored open=\{open\} onClose=\{lang\.open && LangPanel \? keepOpen : close\} anchor=\{anchor\}[^>]*role="dialog"[^>]*className="w-full max-w-\[360px\]"/);
   assert.match(menu, /<Sheet\s[^>]*detents=\{\['large'\]\}/);
   // A guest reaches an account row through sign-in, and reads «تسجيل الدخول» where the account would be.
   assert.match(menu, /const gated = \(path: string\) => \(isAuthenticated \? path : authPathWithSupportRef\(path\)\);/);
   assert.match(menu, /row\('signin', hub\.signIn,/);
   // «اللغة والمظهر» opens the sheet of the header globe through its own hook, drawn beside the menu
-  // (so a choice outlives the popover closing under it), never a copy of its rules (B2R1-REG-1).
+  // (so a choice outlives anything that closes the menu under it), never a copy of its rules (B2R1-REG-1).
   assert.match(menu, /import \{ useLangThemeSheet \} from '\.\.\/\.\.\/LangThemeSheet';/);
-  assert.match(menu, /const \[langThemePanel, langThemeToggle, langThemeRef\] = useLangThemeSheet\(false\);/);
-  assert.match(menu, /<MenuBody onNavigate=\{onClose\} onLangTheme=\{langThemeToggle\} langThemeRef=\{langThemeRef\} \/>/);
+  assert.match(menu, /const \[langThemePanel, langThemeToggle, langThemeRef, langOpen, LangPanel, langCloseThen\] = useLangThemeSheet\(false\);/);
+  assert.match(menu, /<MenuBody onNavigate=\{close\} lang=\{lang\} \/>/);
   assert.match(menu, /\{langThemePanel\}\s*<\/>/);
-  assert.match(menu, /<button ref=\{langThemeRef\} type="button" onClick=\{onLangTheme\}/);
+  assert.match(menu, /<button\s+ref=\{lang\.ref\}\s+type="button"\s+onClick=\{lang\.toggle\}/);
   assert.doesNotMatch(menu, /setLang\(|setThemePreference|LangThemePanel|loadedPanel/, 'the menu keeps a copy of the sheet rules');
   // The popover leaves at either edge the way it came in (B2R1-A11Y-1): past its last row on to what
   // follows the door, and before its first control onto the door, never to the end of the page.
-  assert.match(menu, /if \(e\.shiftKey\) \{\s*if \(document\.activeElement !== first\.current\) return;\s*e\.preventDefault\(\);\s*onClose\(\);\s*return;\s*\}/);
-  assert.match(menu, /if \(all && document\.activeElement === all\[all\.length - 1\]\) onClose\(\);/);
+  assert.match(menu, /if \(e\.shiftKey\) \{\s*if \(document\.activeElement !== first\.current\) return;\s*e\.preventDefault\(\);\s*close\(\);\s*return;\s*\}/);
+  assert.match(menu, /if \(all && document\.activeElement === all\[all\.length - 1\]\) close\(\);/);
   // The current row.
   assert.equal(currentSection('/community'), 'home');
   assert.equal(currentSection('/community/stores'), 'stores');
@@ -298,6 +304,117 @@ test('the sections menu: lazy, Studio a plain anchor never prefetched, the commu
         assert.doesNotMatch(src.slice(m.index!, close < 0 ? undefined : close), /<button\b/, `${f}: a <button> inside <${tag}>`);
       }
     }
+  }
+});
+
+test('the menu stays open under its language sheet, and the row says while the sheet is on its way (B2R2-A11Y-1, A11Y-2)', async () => {
+  const menu = code('src/components/community/hub/CommunityMenu.tsx');
+  // A press inside the sheet (drawn outside the popover) closes nothing while the sheet is up, so the
+  // sheet gives focus back to its row; the sheet closes alone (its scrim, Escape, a choice).
+  assert.match(menu, /const keepOpen = \(\) => \{\};/);
+  assert.match(menu, /<Anchored open=\{open\} onClose=\{lang\.open && LangPanel \? keepOpen : close\}/);
+  // The row knows the sheet: asked for, and busy while its chunk is on the way; cancelling it closes it before it opens.
+  assert.match(menu, /const lang: LangRow = \{ ref: langThemeRef, toggle: langThemeToggle, open: langOpen, busy: langOpen && !LangPanel, cancel: \(\) => langCloseThen\(null\) \};/);
+  // Every way the menu closes calls off a sheet still on its way: never a sheet over a closed menu.
+  assert.match(menu, /const close = \(\) => \{\s*if \(lang\.busy\) lang\.cancel\(\);\s*onClose\(\);\s*\};/);
+  assert.match(menu, /<Sheet\s+open=\{open\}\s+onClose=\{close\}/);
+  assert.equal(menu.match(/<TitleRow titleId=\{titleId\} onClose=\{close\} firstRef=\{first\} \/>/g)?.length, 2, 'a title row closes the menu without calling the sheet off');
+  assert.doesNotMatch(menu, /onClose=\{onClose\}|onNavigate=\{onClose\}/, 'a way out of the menu skips close');
+  // The row says it, as the header globe does: open, busy, and a spinner in its tile while it waits.
+  const row = menu.slice(menu.indexOf('ref={lang.ref}'), menu.indexOf('{s.langTheme}'));
+  assert.match(row, /aria-haspopup="dialog"/);
+  assert.match(row, /aria-expanded=\{lang\.open\}/);
+  assert.match(row, /aria-busy=\{lang\.busy\}/);
+  assert.match(row, /\{lang\.busy \? <span className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent motion-reduce:animate-none" \/> : <Globe className=\{glyph\} \/>\}/);
+  // Escape while it waits calls the sheet off and leaves the menu open: the handled key never reaches the stack.
+  assert.match(row, /onKeyDown=\{\(e\) => \{\s*if \(e\.key !== 'Escape' \|\| !lang\.busy \|\| e\.nativeEvent\.isComposing\) return;\s*e\.preventDefault\(\);\s*lang\.cancel\(\);\s*\}\}/);
+  // ...which the overlay stack honours: a handled Escape is left alone, an unhandled one reaches the top layer.
+  const { handleOverlayKey, pushLayer } = await import('../src/components/ui/overlayStack');
+  let escaped = 0;
+  const pop = pushLayer({ z: 100, trap: null, onEscape: () => escaped++ });
+  const key = (defaultPrevented: boolean) => ({ key: 'Escape', defaultPrevented, isComposing: false, preventDefault() {}, stopPropagation() {} }) as unknown as KeyboardEvent;
+  handleOverlayKey(key(true));
+  assert.equal(escaped, 0, 'a handled Escape closed the menu');
+  handleOverlayKey(key(false));
+  assert.equal(escaped, 1);
+  pop();
+});
+
+test('the «المجتمع» group glyph is three people drawn of closed shapes, not a filled lucide outline (B2R2-FID-2)', () => {
+  const menu = code('src/components/community/hub/CommunityMenu.tsx');
+  assert.match(menu, /<MenuGroup icon=\{<GroupGlyph className="h-7 w-7" \/>\} title=\{s\.community\}/);
+  assert.doesNotMatch(menu, /<Users\b[^>]*fill=/, 'the lucide group is filled again: its open arcs read as a half moon');
+  // The outline group stays on its row, as the other row icons.
+  assert.match(menu, /section\('following', hub\.tabs\.following, Users\)/);
+  const at = menu.indexOf('function GroupGlyph(');
+  const svg = menu.slice(at, menu.indexOf('</svg>', at));
+  assert.match(svg, /<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"/);
+  assert.doesNotMatch(svg, /stroke/, 'a stroke on the filled glyph');
+  assert.equal(svg.match(/<circle /g)?.length, 3, 'three heads');
+  const paths = [...svg.matchAll(/<path d="([^"]+)" \/>/g)].map((m) => m[1]);
+  assert.equal(paths.length, 3, 'three bodies');
+  for (const d of paths) assert.match(d, /^M[^Mm]*z$/i, `an open or compound body: ${d}`);
+});
+
+/** The child elements of the first element of `html` (a tag scan: React writes every element closed). */
+function topChildren(html: string): string[] {
+  const tags = [...html.matchAll(/<(\/?)([a-zA-Z][\w-]*)\b[^>]*?(\/?)>/g)];
+  const out: string[] = [];
+  let depth = 0;
+  for (const m of tags) {
+    const [whole, closing, , selfClosing] = m;
+    if (closing) {
+      depth -= 1;
+      continue;
+    }
+    if (depth === 1) out.push(whole);
+    if (!selfClosing) depth += 1;
+  }
+  return out;
+}
+
+test('the list card is one column beside the media, centred: the deadline and the footer never run under it (B2R2-FID-1)', () => {
+  const html = card({ variant: 'list', request: leaky as unknown as Extract<Card, { variant: 'list' }>['request'] });
+  // The link is a row centred on its cross axis: the column of words, then the media square at the end.
+  assert.match(html, /^<a [^>]*class="cm-card flex items-center gap-3 rounded-xl p-2\.5 shadow-sm /);
+  const kids = topChildren(html);
+  assert.equal(kids.length, 2, `the card has ${kids.length} rows, not a column and its media: ${kids.join(' ')}`);
+  assert.match(kids[0], /^<div class="flex min-w-0 flex-1 flex-col gap-1\.5" data-request-main="true">$/);
+  assert.match(kids[1], /data-request-glyph="fdm"/, 'the media is not the end of the card');
+  // The deadline and the footer close the column: after its start, before the media.
+  const main = html.indexOf('data-request-main');
+  const media = html.indexOf('data-request-glyph');
+  for (const part of ['data-request-facts', 'data-request-needed', 'data-request-footer']) {
+    const atPart = html.indexOf(part);
+    assert.ok(atPart > main && atPart < media, `${part} is not in the column beside the media`);
+  }
+  // The title on one line, as the reference holds it (the whole title is still in the text).
+  assert.match(html, /<h3 dir="auto" class="w-full truncate text-start text-\[17px\] font-bold leading-snug text-text-primary">حامل تثبيت للحائط<\/h3>/);
+  // The facts, split by hairline bars that hang in the gap before a fact (clipped at the start of a line).
+  assert.match(html, /<span data-request-facts="true" class="flex w-full flex-wrap items-center gap-x-3 gap-y-0\.5 overflow-hidden /);
+  const bar = '<span aria-hidden="true" data-fact-bar="true" class="absolute end-full me-1.5 h-3.5 w-px bg-border-subtle"></span>';
+  assert.equal(html.split(bar).length - 1, 2, 'PETG | 4 قطع | بغداد: two bars');
+  assert.ok(html.includes(`<span class="relative inline-flex items-center gap-1">${bar}`), 'a bar outside its fact');
+  // «الموعد المطلوب» over its date, the one cell of its row.
+  assert.match(html, /<div data-request-needed="true" class="flex items-start gap-1\.5 border-t border-border-subtle pt-1\.5">/);
+  assert.match(html, /<span class="flex min-w-0 flex-col"><span class="text-\[13px\] leading-4 text-text-secondary">الموعد المطلوب<\/span><span class="text-\[15px\] font-semibold leading-5 text-text-primary tabular-nums">[^<]+<\/span><\/span>/);
+  assert.match(html, /<div data-request-footer="true" class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border-subtle pt-1\.5"><span class="inline-flex items-center gap-1 text-\[13px\] font-semibold text-gold">عرض الطلب/);
+  // A parts job: the sets are a fact of their own beside the pieces, behind a bar (two lines, not three).
+  const job = card({ variant: 'list', request: { ...leaky, material: 'Clear Resin', summary: { parts_count: 2, pieces_per_set: 5 } } as unknown as Extract<Card, { variant: 'list' }>['request'] });
+  assert.ok(job.includes(`<span class="relative inline-flex items-center gap-1">${bar}<span data-request-sets="4" class="whitespace-nowrap">`), 'the sets ride inside the pieces fact');
+  assert.equal(job.split(bar).length - 1, 3, 'resin | 20 قطعة | الأطقم | بغداد: three bars');
+
+  // The owner card keeps the same anatomy: its own lines join the column, the picture at the end.
+  const owner = card({ variant: 'owner', request: { ...leaky, budget_visible: false, estimate_low_iqd: 38000, estimate_high_iqd: 52000 }, onRepeat: () => undefined });
+  const ownKids = topChildren(owner);
+  assert.equal(ownKids.length, 2, `the owner card has ${ownKids.length} rows: ${ownKids.join(' ')}`);
+  assert.match(ownKids[0], /data-request-main="true"/);
+  assert.match(ownKids[1], /^<img\b/, 'the owner picture is not the end of the card');
+  const ownMain = owner.indexOf('data-request-main');
+  const ownMedia = owner.lastIndexOf('<img');
+  for (const part of ['data-request-budget', 'data-request-needed', 'data-request-footer', 'إعادة الطلب']) {
+    const atPart = owner.indexOf(part);
+    assert.ok(atPart > ownMain && atPart < ownMedia, `${part} is not in the owner column`);
   }
 });
 

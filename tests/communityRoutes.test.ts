@@ -19,6 +19,13 @@
  * (REG-3, `returnPublished`, run below); «أكمل وانشر» is not offered until
  * the editor opens a draft at its review, `?step=4` (REG-4, a C4 follow-up);
  * the Following page draws «مجتمع ليفو» under its title (FID-3, IMG_8486).
+ *
+ * Fix round 2 (B2R2): a new request lands on its own page with «طلباتي»
+ * behind it, written outside the router so no board mounts between the two
+ * writes (REG-1, `leaveNewRequest`, run below against a history whose pushes
+ * wait in a view transition); an editor address for a request this person
+ * cannot open says so in the reader language instead of drawing the wizard
+ * (L10N-1, `requestMissing`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -135,10 +142,180 @@ test('every old door still reaches the editor with its state: ?view=new, ?link=,
   // The editor reads both halves of a carried link: the state (a signed-in tap) and ?link= (it survives sign-in).
   const editor = code('src/pages/community/RequestNew.tsx');
   assert.match(editor, /const fromState = \(state as \{ printLink\?: unknown \} \| null\)\?\.printLink;\s*return typeof fromState === 'string' \? fromState : params\.get\('link'\) \?\? '';/);
-  // A new request leaves «طلباتي» behind it; the channel window rides with a PUBLISHED request only.
-  assert.match(editor, /navigate\('\/requests\?view=mine', \{ replace: true \}\);\s*navigate\(requestPath\(rid\), how === 'published' \? \{ state: \{ published: true \} \} : undefined\);/);
+  // A new request lands on its own page with «طلباتي» behind it, the board never routed in between
+  // (B2R2-REG-1, run below); the channel window rides with a PUBLISHED request only.
+  assert.match(editor, /if \(!id\) leaveNewRequest\(navigate, requestPath\(rid\), how === 'published'\);/);
+  assert.doesNotMatch(editor, /navigate\(\s*['"`]\/requests\?view=mine|navigate\(\s*MY_REQUESTS/, 'the editor routes the board before the request page again');
   // A draft or an edit published goes back onto the page that opened the editor (B2R1-REG-3).
   assert.match(editor, /else if \(how === 'published'\) returnPublished\(navigate, requestPath\(rid\)\);\s*else goBack\(\);/);
+});
+
+/** One exported function of the editor page, run as written (its types stripped), with what it names supplied. */
+async function editorFn<T>(name: string, scope: Record<string, unknown> = {}): Promise<T> {
+  const src = read('src/pages/community/RequestNew.tsx');
+  const at = src.indexOf(`export function ${name}(`);
+  assert.ok(at >= 0, `the editor page no longer has ${name}`);
+  const body = src.slice(at, src.indexOf('\n}\n', at) + 2).replace(/^export /, '');
+  const { code: js } = await transform(body, { loader: 'ts' });
+  return new Function(...Object.keys(scope), `${js}; return ${name};`)(...Object.values(scope)) as T;
+}
+
+/**
+ * A browser history and a router over it, wired as NavigationRouter wires them
+ * (src/components/NavigationRouter.tsx, src/lib/stackNavigation.ts): every
+ * write reaches the browser history at once; a router REPLACE renders at once,
+ * a PUSH is held in a view transition until the script settles. The board,
+ * mounting at `?view=`, strips it with a router replace of the BROWSER entry
+ * it is on, which also calls off a commit still held (src/pages/Requests.tsx).
+ */
+function historyWorld() {
+  type Entry = { url: string; state: Record<string, unknown> };
+  const entries: Entry[] = [
+    { url: '/community', state: { usr: null, key: 'home', idx: 0 } },
+    { url: '/requests/new', state: { usr: { printLink: 'https://www.printables.com/model/1-bracket' }, key: 'edit', idx: 1 } },
+  ];
+  let at = 1;
+  const log: string[] = [];
+  const mounted: string[] = [];
+  let renders: string[] = [];
+  let held: string[] = [];
+  const mount = (url: string) => {
+    mounted.push(url);
+    if (/^\/requests\?(?:.*&)?view=/.test(url)) {
+      log.push('board strips ?view');
+      entries[at] = { ...entries[at], url: '/requests' };
+      held = [];
+    }
+  };
+  const win = {
+    history: {
+      get state() {
+        return entries[at].state;
+      },
+      replaceState(state: Record<string, unknown>, _unused: string, url: string) {
+        log.push(`replaceState ${url}`);
+        entries[at] = { url, state };
+      },
+    },
+  };
+  const navigate: Nav = (to, opts) => {
+    const url = String(to);
+    if (opts?.replace) {
+      log.push(`router replace ${url}`);
+      entries[at] = { url, state: { usr: opts.state ?? null, key: `k${log.length}`, idx: entries[at].state.idx } };
+      renders.push(url);
+      return;
+    }
+    log.push(`router push ${url}`);
+    entries.splice(at + 1, entries.length, { url, state: { usr: opts?.state ?? null, key: `k${log.length}`, idx: at + 1 } });
+    at += 1;
+    held.push(url);
+  };
+  const settle = () => {
+    const now = renders;
+    renders = [];
+    now.forEach(mount);
+    const later = held;
+    held = [];
+    later.forEach(mount);
+  };
+  const back = () => {
+    at -= 1;
+    mount(entries[at].url);
+  };
+  return { entries, log, mounted, win, navigate, settle, back, here: () => entries[at], behind: () => entries[at - 1], ahead: () => entries[at + 1] };
+}
+
+test('a new request lands on its own page with «طلباتي» behind it, and no board mounts between the two writes (B2R2-REG-1)', async () => {
+  type Leave = (navigate: Nav, path: string, published: boolean, win: unknown) => void;
+  const leave = await editorFn<Leave>('leaveNewRequest', { MY_REQUESTS: '/requests?view=mine' });
+
+  // The old two router writes, in this world, are the bug the harness saw: the board mounts first
+  // and its strip takes the request entry, so the request page never arrives.
+  const old = historyWorld();
+  old.navigate('/requests?view=mine', { replace: true });
+  old.navigate('/requests/rq_new', { state: { published: true } });
+  old.settle();
+  assert.deepEqual(old.mounted, ['/requests?view=mine'], 'the world no longer models the race');
+  assert.equal(old.here().url, '/requests');
+
+  const published = historyWorld();
+  leave(published.navigate, '/requests/rq_new', true, published.win);
+  published.settle();
+  // The editor entry is rewritten as «طلباتي» outside the router, then the request page is pushed:
+  // the one router write is the push, so nothing mounts between the two writes.
+  assert.deepEqual(published.log, ['replaceState /requests?view=mine', 'router push /requests/rq_new']);
+  assert.deepEqual(published.mounted, ['/requests/rq_new'], 'something mounted between the rewrite and the request page');
+  assert.equal(published.here().url, '/requests/rq_new', 'the request page entry was overwritten');
+  assert.deepEqual(published.here().state.usr, { published: true }, 'the channel window mark is lost');
+  // Behind it: «طلباتي» in the place of the editor, a key of its own, no carried state (a model link would reopen the editor).
+  assert.equal(published.behind().url, '/requests?view=mine');
+  assert.equal(published.behind().state.idx, 1);
+  assert.equal(published.behind().state.usr, null);
+  assert.equal(typeof published.behind().state.key, 'string');
+  assert.notEqual(published.behind().state.key, 'edit');
+  // Back from the request page lands on «طلباتي»: only then does the board mount, and its strip stays on its own entry.
+  published.back();
+  assert.deepEqual(published.mounted, ['/requests/rq_new', '/requests?view=mine']);
+  assert.equal(published.here().url, '/requests');
+  assert.equal(published.ahead().url, '/requests/rq_new', 'the strip landed on the request entry');
+
+  // Saved as a draft: the same way, with no mark.
+  const saved = historyWorld();
+  leave(saved.navigate, '/requests/rq_new', false, saved.win);
+  saved.settle();
+  assert.deepEqual(saved.log, ['replaceState /requests?view=mine', 'router push /requests/rq_new']);
+  assert.deepEqual(saved.mounted, ['/requests/rq_new']);
+  assert.equal(saved.here().state.usr, null);
+
+  // A window that refuses the rewrite: the request page replaces the editor, never the board between.
+  const refused = historyWorld();
+  refused.win.history.replaceState = () => {
+    throw new Error('SecurityError');
+  };
+  leave(refused.navigate, '/requests/rq_new', true, refused.win);
+  refused.settle();
+  assert.deepEqual(refused.log, ['router replace /requests/rq_new']);
+  assert.deepEqual(refused.mounted, ['/requests/rq_new']);
+  assert.deepEqual(refused.here().state.usr, { published: true });
+});
+
+test('an editor address for a request this person cannot open says so in three languages, with the way to the board (B2R2-L10N-1)', async () => {
+  class ApiError extends Error {
+    constructor(
+      public status: number,
+      message: string,
+      public code?: string
+    ) {
+      super(message);
+    }
+  }
+  const missing = await editorFn<(e: unknown) => boolean>('requestMissing', { ApiError });
+  assert.equal(missing(new ApiError(404, 'Request not found', 'NOT_FOUND')), true, 'the server answer for another person request');
+  assert.equal(missing(new ApiError(404, 'Request not found')), true);
+  assert.equal(missing(new ApiError(410, 'Gone', 'NOT_FOUND')), true);
+  assert.equal(missing(new ApiError(500, 'Internal error', 'INTERNAL')), false, 'any other refusal is the wizard own to say');
+  assert.equal(missing(new ApiError(409, 'Stale', 'STALE_DRAFT')), false);
+  assert.equal(missing(new TypeError('Failed to fetch')), false);
+
+  const editor = code('src/pages/community/RequestNew.tsx');
+  // The draft is asked beside the wizard (one request: lib/api.ts coalesces a GET in flight); only a 404 changes the page.
+  assert.match(editor, /requestsApi\.draft\(id\)\.catch\(\(e: unknown\) => \{\s*if \(alive && requestMissing\(e\)\) setMissing\(true\);\s*\}\);/);
+  // Missing: the request page own words and its way to the board, and no wizard (no empty form, no English sentence).
+  const start = editor.indexOf('if (missing) {');
+  const branch = editor.slice(start, editor.indexOf('\n  return (', start + 20));
+  assert.match(branch, /<SectionPageHeader title=\{s\.kicker\} backTo="\/requests" \/>/);
+  assert.match(branch, /<NotFoundState title=\{s\.notFoundTitle\} description=\{s\.notFoundBody\} \/>/);
+  assert.match(branch, /<Link to="\/requests" className="lv-button lv-button-secondary lv-button-sm">\s*\{s\.toBoard\}\s*<\/Link>/);
+  assert.doesNotMatch(branch, /RequestWizard/, 'the wizard is drawn for a request that cannot be opened');
+  assert.ok(start > 0 && start < editor.indexOf('<RequestWizard '), 'the missing state is not decided before the wizard');
+  // The words exist in all three languages, the Sorani its own (row 183), the English without Arabic script.
+  const { REQUEST_STRINGS } = await import('../src/components/community/requests/strings');
+  for (const key of ['kicker', 'notFoundTitle', 'notFoundBody', 'toBoard'] as const) {
+    for (const lang of ['ar', 'en', 'ckb'] as const) assert.ok(REQUEST_STRINGS[lang][key], `${key}: ${lang} is empty`);
+    assert.notEqual(REQUEST_STRINGS.ckb[key], REQUEST_STRINGS.ar[key], `${key}: the Sorani is the Arabic`);
+    assert.doesNotMatch(REQUEST_STRINGS.en[key], /[؀-ۿ]/, `${key}: the English carries Arabic script`);
+  }
 });
 
 type Nav = (to: string | number, opts?: { replace?: boolean; state?: unknown }) => void;

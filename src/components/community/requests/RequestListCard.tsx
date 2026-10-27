@@ -15,12 +15,14 @@
  *           words and the counts wrap whole
  *   aside   the desktop home aside: the words at the start, the 104 by 92
  *           media at the end, the state as a word
- *   list    the requests board: the media square at the end, the pill, the
- *           title, the icon meta row, «الموعد المطلوب» across the card, and
- *           «عرض الطلب ‹» beside the counts
+ *   list    the requests board (IMG_8483): ONE column of words at the start
+ *           (the pill, the title on one line, the icon facts split by
+ *           hairline bars, a hairline, «الموعد المطلوب» over its date, a
+ *           hairline, «عرض الطلب ‹» and the counts) and the media square at
+ *           the end, centred on the card beside all of it
  *   owner   «طلباتي»: the list anatomy plus what only the owner may read: the
  *           first picture, the budget with who sees it, the estimate, the
- *           chosen merchant, chips, and «إعادة الطلب»
+ *           chosen merchant, chips, and «إعادة الطلب», all in the column
  *
  * WHAT A PUBLIC CARD NEVER CARRIES. The budget (Q2, plan R2): the public type
  * `PublicRequestCard` has no budget field at all, so no public variant can be
@@ -239,12 +241,6 @@ export default function RequestListCard(props: RequestListCardProps) {
       )}
     </span>
   );
-  const title = (
-    <H dir="auto" className="line-clamp-2 break-words text-start text-[17px] font-bold leading-snug text-text-primary">
-      {r.title}
-    </H>
-  );
-
   if (variant === 'row') {
     return (
       <Link to={to} data-request-card="row" data-community-request={r.id} className={`cm-card flex min-h-[88px] flex-wrap items-center gap-x-3 gap-y-2 rounded-xl p-3 shadow-sm active:shadow-press ${LINK_FOCUS} ${className}`}>
@@ -283,140 +279,166 @@ export default function RequestListCard(props: RequestListCardProps) {
     );
   }
 
-  // The list and the owner anatomy (IMG_8468, IMG_8483): words at the start, the media square at the end.
+  // The list and the owner anatomy (IMG_8468, IMG_8483; B2R2-FID-1): every word in ONE column at
+  // the start, and the media square at the end, centred on the card beside all of it. Nothing runs
+  // under the media: the deadline row and the footer close the column, as the reference draws them.
   const icon = 'h-4 w-4 shrink-0 text-text-muted';
+  // «PETG | 4 قطع | بغداد»: each fact behind its icon, a hairline bar between two (IMG_8483). The bar
+  // hangs in the gap before its fact, so a fact that wraps to the start of a line leaves its bar
+  // outside the clipped box: never a bar with nothing before it, as the counts do it. The sets of a
+  // parts job are a fact of their own beside the pieces, so the row wraps in two lines, not three.
+  const factParts: React.ReactNode[] = [
+    material && (
+      <>
+        <Layers aria-hidden="true" className={icon} strokeWidth={1.75} />
+        <bdi>{material}</bdi>
+      </>
+    ),
+    <>
+      <Box aria-hidden="true" className={icon} strokeWidth={1.75} />
+      <span className="tabular-nums">{pieces}</span>
+    </>,
+    sets,
+    place && (
+      <>
+        <MapPin aria-hidden="true" className={icon} strokeWidth={1.75} />
+        {place}
+      </>
+    ),
+  ].filter(Boolean);
   const facts = (
-    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-text-secondary">
-      {material && (
-        <span className="inline-flex items-center gap-1">
-          <Layers aria-hidden="true" className={icon} strokeWidth={1.75} />
-          <bdi>{material}</bdi>
+    <span data-request-facts className="flex w-full flex-wrap items-center gap-x-3 gap-y-0.5 overflow-hidden text-[13px] leading-snug text-text-secondary">
+      {factParts.map((part, i) => (
+        <span key={i} className="relative inline-flex items-center gap-1">
+          {i > 0 && <span aria-hidden="true" data-fact-bar className="absolute end-full me-1.5 h-3.5 w-px bg-border-subtle" />}
+          {part}
         </span>
-      )}
-      <span className="inline-flex items-center gap-1 tabular-nums">
-        <Box aria-hidden="true" className={icon} strokeWidth={1.75} />
-        {pieces}
-        {sets && (
-          <>
-            <span aria-hidden="true"> • </span>
-            {sets}
-          </>
-        )}
-      </span>
-      {place && (
-        <span className="inline-flex items-center gap-1">
-          <MapPin aria-hidden="true" className={icon} strokeWidth={1.75} />
-          {place}
-        </span>
-      )}
+      ))}
     </span>
   );
-  // The plan anatomy without the budget cell: «الموعد المطلوب» takes the full width.
+  // The plan anatomy without the budget cell: «الموعد المطلوب» is the one cell of its row, its label
+  // over its value as IMG_8483 stacks them, so a long date («5 تشرين الثاني 2026») fits the column.
   const needed = (
-    <div className="flex items-center gap-2 border-t border-border-subtle pt-2.5 text-[13px]">
-      <CalendarClock aria-hidden="true" className={icon} strokeWidth={1.75} />
-      <span className="text-text-secondary">{w.neededBy}</span>
-      <span className="ms-auto font-semibold text-text-primary tabular-nums">{deadline || w.flexibleTiming}</span>
+    <div data-request-needed className="flex items-start gap-1.5 border-t border-border-subtle pt-1.5">
+      <CalendarClock aria-hidden="true" className={`${icon} mt-px`} strokeWidth={1.75} />
+      <span className="flex min-w-0 flex-col">
+        <span className="text-[13px] leading-4 text-text-secondary">{w.neededBy}</span>
+        <span className="text-[15px] font-semibold leading-5 text-text-primary tabular-nums">{deadline || w.flexibleTiming}</span>
+      </span>
+    </div>
+  );
+  // «عرض الطلب ‹» at the start and the counts at the end; a column too narrow for both wraps the counts whole.
+  const footer = (end: React.ReactNode) => (
+    <div data-request-footer className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border-subtle pt-1.5">
+      {end}
     </div>
   );
 
   if (variant === 'list') {
     return (
-      <Link to={to} data-request-card="list" data-community-request={r.id} className={`cm-card flex flex-col gap-2.5 rounded-xl p-3 shadow-sm active:shadow-press sm:p-4 ${LINK_FOCUS} ${className}`}>
-        <div className="flex gap-3">
-          <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
+      <Link to={to} data-request-card="list" data-community-request={r.id} className={`cm-card flex items-center gap-3 rounded-xl p-2.5 shadow-sm active:shadow-press sm:p-3 ${LINK_FOCUS} ${className}`}>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5" data-request-main>
+          <div className="flex flex-col items-start gap-0.5">
             <StatePill tone={state.tone}>{state.word}</StatePill>
-            {title}
+            {/* One line, as the reference holds it: the whole title is still read aloud. */}
+            <H dir="auto" className="w-full truncate text-start text-[17px] font-bold leading-snug text-text-primary">
+              {r.title}
+            </H>
             {facts}
           </div>
-          <Media r={r} width={112} height={112} L={L} />
+          {needed}
+          {footer(
+            <>
+              <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-gold">
+                {w.viewRequest}
+                <OnwardChevron />
+              </span>
+              {counts}
+            </>
+          )}
         </div>
-        {needed}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-2.5">
-          <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-gold">
-            {w.viewRequest}
-            <OnwardChevron />
-          </span>
-          {counts}
-        </div>
+        <Media r={r} width={112} height={112} L={L} />
       </Link>
     );
   }
 
-  // The owner card: the title is the link, stretched over the card, and the one button sits above it.
+  // The owner card, the same anatomy: the title is the link, stretched over the card, and the one
+  // button sits above it. What only the owner reads joins the column, between the facts and the deadline.
   const own = r as OwnerRequestCard;
   const { chips = [], onRepeat } = props as Extract<RequestListCardProps, { variant: 'owner' }>;
   const low = own.estimate_low_iqd ?? null;
   const high = own.estimate_high_iqd ?? null;
   return (
-    <article data-request-card="owner" data-community-request={r.id} className={`cm-card relative flex flex-col gap-2.5 rounded-xl p-3 shadow-sm sm:p-4 ${className}`}>
-      <div className="flex gap-3">
-        <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
+    <article data-request-card="owner" data-community-request={r.id} className={`cm-card relative flex items-center gap-3 rounded-xl p-2.5 shadow-sm sm:p-3 ${className}`}>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5" data-request-main>
+        <div className="flex flex-col items-start gap-0.5">
           <StatePill tone={state.tone}>{state.word}</StatePill>
-          <H dir="auto" className="line-clamp-2 break-words text-start text-[17px] font-bold leading-snug text-text-primary">
+          <H dir="auto" className="w-full truncate text-start text-[17px] font-bold leading-snug text-text-primary">
             <Link to={to} className={`rounded-sm after:absolute after:inset-0 after:rounded-xl after:content-[''] ${LINK_FOCUS}`}>
               {r.title}
             </Link>
           </H>
           {facts}
         </div>
-        <Media r={r} width={112} height={112} L={L} cover={own.cover_url} />
-      </div>
-      {chips.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {chips.map((c) => (
-            <StatePill key={c} tone="waiting">
-              {c}
-            </StatePill>
-          ))}
-        </div>
-      )}
-      {own.budget_iqd !== null && own.budget_iqd !== undefined && (
-        <div className="flex flex-col gap-0.5 border-t border-border-subtle pt-2.5 text-[13px]" data-request-budget>
-          <span className="flex items-center gap-2">
-            <span className="text-text-secondary">{w.budget}</span>
-            <span className="ms-auto font-bold text-text-primary">
-              <Iqd value={own.budget_iqd} lang={lang} />
+        {chips.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {chips.map((c) => (
+              <StatePill key={c} tone="waiting">
+                {c}
+              </StatePill>
+            ))}
+          </div>
+        )}
+        {own.budget_iqd !== null && own.budget_iqd !== undefined && (
+          <div className="flex flex-col gap-0.5 border-t border-border-subtle pt-1.5 text-[13px]" data-request-budget>
+            <span className="flex items-center gap-2">
+              <span className="text-text-secondary">{w.budget}</span>
+              <span className="ms-auto font-bold text-text-primary">
+                <Iqd value={own.budget_iqd} lang={lang} />
+              </span>
             </span>
-          </span>
-          {own.budget_visible !== null && own.budget_visible !== undefined && (
-            <span className="text-[12px] text-text-muted" data-request-budget-visible={own.budget_visible ? 'merchants' : 'hidden'}>
-              {own.budget_visible ? w.budgetShown : w.budgetHidden}
-            </span>
-          )}
-        </div>
-      )}
-      {(low !== null || high !== null) && (
-        <span className="flex items-center gap-2 text-[13px]">
-          <span className="text-text-secondary">{w.estimate}</span>
-          <span className="ms-auto font-semibold text-text-primary">
-            {low !== null && <Iqd value={low} lang={lang} />}
-            {low !== null && high !== null && high !== low && (
-              <>
-                {' – '}
-                <Iqd value={high} lang={lang} />
-              </>
+            {own.budget_visible !== null && own.budget_visible !== undefined && (
+              <span className="text-[12px] text-text-muted" data-request-budget-visible={own.budget_visible ? 'merchants' : 'hidden'}>
+                {own.budget_visible ? w.budgetShown : w.budgetHidden}
+              </span>
             )}
-            {low === null && high !== null && <Iqd value={high} lang={lang} />}
+          </div>
+        )}
+        {(low !== null || high !== null) && (
+          <span className="flex flex-wrap items-center gap-x-2 text-[13px]">
+            <span className="text-text-secondary">{w.estimate}</span>
+            <span className="ms-auto font-semibold text-text-primary">
+              {low !== null && <Iqd value={low} lang={lang} />}
+              {low !== null && high !== null && high !== low && (
+                <>
+                  {' – '}
+                  <Iqd value={high} lang={lang} />
+                </>
+              )}
+              {low === null && high !== null && <Iqd value={high} lang={lang} />}
+            </span>
           </span>
-        </span>
-      )}
-      {own.accepted_merchant && (
-        <span className="flex items-center gap-2 text-[13px]">
-          <span className="text-text-secondary">{w.acceptedBy}</span>
-          <bdi className="ms-auto truncate font-semibold text-text-primary">{own.accepted_merchant}</bdi>
-        </span>
-      )}
-      {needed}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-2.5">
-        {counts}
-        {onRepeat && (
-          <button type="button" onClick={onRepeat} className={`${kitButtonClass('secondary', 'compact')} relative z-10`}>
-            <Repeat aria-hidden="true" className="h-4 w-4" />
-            {w.repeat}
-          </button>
+        )}
+        {own.accepted_merchant && (
+          <span className="flex items-center gap-2 text-[13px]">
+            <span className="text-text-secondary">{w.acceptedBy}</span>
+            <bdi className="ms-auto truncate font-semibold text-text-primary">{own.accepted_merchant}</bdi>
+          </span>
+        )}
+        {needed}
+        {footer(
+          <>
+            {counts}
+            {onRepeat && (
+              <button type="button" onClick={onRepeat} className={`${kitButtonClass('secondary', 'compact')} relative z-10`}>
+                <Repeat aria-hidden="true" className="h-4 w-4" />
+                {w.repeat}
+              </button>
+            )}
+          </>
         )}
       </div>
+      <Media r={r} width={112} height={112} L={L} cover={own.cover_url} />
     </article>
   );
 }
