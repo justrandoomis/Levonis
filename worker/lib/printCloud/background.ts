@@ -43,9 +43,11 @@ export type Room = (n: number) => boolean;
  * THE MOST STATEMENTS ONE UNIT OF TASK WORK SENDS: one order expired, one
  * credit lot expired, one low-balance notice, one queue assignment, one
  * slicing lease swept, one file measured, one import step — or the whole
- * reconciliation (twenty-one reads). Every loop asks for this much room before
- * each unit, so a bounded run never overshoots its share
- * (tests/printCloudOperations.test.ts measures a run at its bound).
+ * reconciliation (twenty-three reads). Every loop asks for this much room
+ * before each unit, so a bounded run never overshoots its share
+ * (tests/printCloudOperations.test.ts measures a run at its bound). The one
+ * larger unit, the scheduler's release of a stranded job, asks for its own
+ * measured size, and is skipped when that does not fit (queue.ts `releaseCost`).
  */
 export const PRINT_CLOUD_UNIT_STATEMENTS = 30;
 
@@ -108,9 +110,10 @@ async function handle(env: RunnerEnv, task: TaskRow, now: Date, room?: Room): Pr
           more = true;
           break;
         }
-        // Only the lot's free part expires (credits.ts). A lot that cannot
-        // expire now — a job confirmed meanwhile — waits for the next run and
-        // never holds back the lots behind it.
+        // Only the lot's free part expires (credits.ts), and the page holds
+        // only lots that have one. A lot that changed since it was read — a
+        // hold settled or given back meanwhile — fails its batch and waits for
+        // the next run; it never holds back the lots behind it.
         try {
           const planned = await planLotExpiry(db, lot, now);
           if (!planned) continue;
@@ -175,7 +178,7 @@ async function handle(env: RunnerEnv, task: TaskRow, now: Date, room?: Room): Pr
     }
     case 'schedule_queue': {
       const r = await runScheduler(db, config, now, 20, room ? (statements?: number) => unitFits(room, statements) : undefined);
-      return { summary: `assigned ${r.assigned.length}, released ${r.released.length}, waiting ${r.waiting}`, more: r.more };
+      return { summary: `assigned ${r.assigned.length}, released ${r.released.length}, deferred ${r.deferred}, waiting ${r.waiting}`, more: r.more };
     }
     case 'reconcile': {
       const r = await reconcile(db);
@@ -320,6 +323,22 @@ export async function runPrintCloudTasks(
     }
   }
   return report;
+}
+
+/**
+ * The operator's «run now» door (`POST /admin/print-cloud/tasks/run`): a
+ * scheduling pass leads the due work, so the release of a stranded job too
+ * large for the cron's share (queue.ts `releaseCost`) is done with this run's
+ * room. One such pass a minute, however often the door is used.
+ */
+export async function runTasksByHand(env: RunnerEnv, opts: { limit?: number; room?: Room } = {}): Promise<RunReport> {
+  if (await printCloudInstalled(env.DB)) {
+    const now = new Date();
+    // Due before anything else, so the pass meets the run's whole room.
+    const dedupeKey = `schedule_queue:by_hand:${Math.floor(now.getTime() / 60_000)}`;
+    await env.DB.batch([enqueueTask(env.DB, { kind: 'schedule_queue', dedupeKey, now, runAfter: new Date(0), maxAttempts: 2 })]);
+  }
+  return runPrintCloudTasks(env, opts);
 }
 
 /** The periodic work, enqueued once per quarter hour (the dedupe key names the slot). */

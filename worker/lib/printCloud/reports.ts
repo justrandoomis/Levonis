@@ -30,7 +30,7 @@ export async function dashboardCredits(db: D1Database, userId: string) {
   const balances = await creditBalances(db, userId);
   const purchases = await many<Record<string, unknown>>(
     db,
-    `SELECT l.id, l.tier_id, l.source, l.seconds_total, l.seconds_remaining, l.paid_iqd, l.expires_at, l.created_at, l.order_line_id
+    `SELECT l.id, l.tier_id, l.source, l.seconds_total, l.seconds_remaining, l.seconds_held, l.paid_iqd, l.expires_at, l.created_at, l.order_line_id
        FROM pc_credit_lots l WHERE l.user_id = ? ORDER BY l.created_at DESC LIMIT 100`,
     userId
   );

@@ -10,8 +10,10 @@
  *              (sent_at - reported_at), and «back from silence» by arrivals:
  *              a slow agent clock is live, a buffered flush is one outage.
  *   credits    a confirmation after a lot's expiry cannot shield the expired
- *              seconds; the expiry page skips lots wholly held for jobs; a
- *              conversion's extra groups never collide with another key.
+ *              seconds (round 3: it holds only good hours rather than
+ *              expiring them first); the expiry page skips lots wholly held
+ *              for jobs; a conversion's extra groups never collide with
+ *              another key.
  *   orders     a shipment whose fee order already closed unpaid can still be
  *              cancelled; a receipt already applied, re-entered with a typo,
  *              is that receipt again — never money on the refund desk.
@@ -175,8 +177,9 @@ test('an agent whose clock runs ten minutes slow is live when it says when it se
   assert.equal(first.connectivity, 'online', JSON.stringify(first));
   await a.send({ machine_state: 'idle', reported_at: at(-598), sent_at: at(-597) });
   assert.equal(a.restored(), 0, 'a steady connection is never «restored»');
-  // An hour of silence: the stored reading's arrival is moved back an hour, as if nothing came since.
-  w.raw.prepare('UPDATE pc_printer_telemetry SET arrived_at = ?, received_at = ? WHERE printer_id = ?').run(at(-3600), at(-3600), cat.printers[0]);
+  // An hour of silence: the stored reading's arrival is moved back an hour, as if nothing came since — on the
+  // agent's clock too, since its readings are ordered on it (an unmoved stamp would outrank the whole flush).
+  w.raw.prepare('UPDATE pc_printer_telemetry SET arrived_at = ?, received_at = ?, reported_at = ? WHERE printer_id = ?').run(at(-3600), at(-3600), at(-600 - 3600), cat.printers[0]);
   // Reconnection flushes five buffered readings (50 to 10 minutes old by the agent clock), then a live one.
   for (const minutes of [50, 40, 30, 20, 10]) await a.send({ machine_state: 'idle', reported_at: at(-600 - minutes * 60), sent_at: at(-600) });
   await a.send({ machine_state: 'idle', reported_at: at(-601), sent_at: at(-600) });
@@ -209,22 +212,27 @@ async function expiringPackage(w: World, cat: Catalog): Promise<string> {
   return pkg.id as string;
 }
 
-test('a job confirmed after a lot expired cannot shield it: the confirmation expires it first and reserves only good hours', async () => {
+test('a job confirmed after a lot expired cannot shield it: the confirmation holds only good hours, and the sweep takes the expired lot whole', async () => {
   const w = pcWorld();
   const cat = await seedCatalog(w);
   await buy(w.a, [{ kind: 'credit_package', package_id: await expiringPackage(w, cat) }, { kind: 'material', variant_id: cat.white, quantity: 500 }]);
   await buy(w.a, [{ kind: 'credit_package', package_id: cat.packages.h6 }]);
   w.raw.prepare("UPDATE pc_credit_lots SET expires_at = ? WHERE user_id = 'usr_pc_a' AND expires_at IS NOT NULL").run(PAST);
-  // Before any sweep has run, the customer confirms a 6 h job.
+  const expiredLot = () => row(w, "SELECT seconds_remaining, seconds_held FROM pc_credit_lots WHERE user_id = 'usr_pc_a' AND expires_at IS NOT NULL");
+  // Before any sweep has run, the customer confirms a 6 h job: it holds the plain hours, none of the expired lot.
   const { jobId } = await estimatedJob(w, w.a, cat, { seconds: 6 * H, materials: [{ variant_id: cat.white, model_grams: 20 }] });
   await ok(w.a, 'POST', `${API}/jobs/${jobId}/review`);
   await ok(w.a, 'POST', `${API}/jobs/${jobId}/confirm`, undefined, idem('confirm'));
-  assert.equal(row(w, "SELECT seconds_remaining FROM pc_credit_lots WHERE user_id = 'usr_pc_a' AND expires_at IS NOT NULL")?.seconds_remaining, 0, 'expired');
-  assert.deepEqual([(await credits(w.a, cat.tier)).available_seconds, (await credits(w.a, cat.tier)).reserved_seconds], [0, 6 * H]);
-  // Without good hours left, a second confirmation is refused rather than drawing expired ones.
+  assert.deepEqual(expiredLot(), { seconds_remaining: 6 * H, seconds_held: 0 }, 'not held, so left whole for the sweep');
+  // The unswept expired hours still count as available, yet a second confirmation is refused rather than holding them.
+  assert.deepEqual([(await credits(w.a, cat.tier)).available_seconds, (await credits(w.a, cat.tier)).reserved_seconds], [6 * H, 6 * H]);
   const { jobId: second } = await estimatedJob(w, w.a, cat, { seconds: H, materials: [{ variant_id: cat.white, model_grams: 20 }], title: 'Second' });
   await ok(w.a, 'POST', `${API}/jobs/${second}/review`);
   await refused(w.a, 'POST', `${API}/jobs/${second}/confirm`, undefined, 'INSUFFICIENT_CREDIT', idem('confirm'));
+  await w.db.batch([enqueueTask(w.db, { kind: 'expire_credit_lots', dedupeKey: 'followups-expiry', now: new Date() })]);
+  await w.runTasks();
+  assert.deepEqual(expiredLot(), { seconds_remaining: 0, seconds_held: 0 });
+  assert.deepEqual([(await credits(w.a, cat.tier)).available_seconds, (await credits(w.a, cat.tier)).reserved_seconds], [0, 6 * H]);
   await reconcileClean(w);
 });
 

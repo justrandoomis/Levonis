@@ -1,12 +1,14 @@
 /**
  * LEVONIS PRINT CLOUD — review fixes, credits and background tasks:
  *
- *   c1  an expired lot gives up only its FREE part: the seconds the open
- *       reservations will draw (spend order, expiring first) stay for their
- *       jobs, and a reservation landing while the expiry is planned aborts it;
+ *   c1  an expired lot gives up only its FREE part: the seconds confirmed
+ *       jobs hold on it stay for their jobs, and a confirmation landing while
+ *       the expiry is planned holds none of it (round 3: holds are recorded
+ *       per lot, so it no longer races the planned batch);
  *   c5  a lot that expired while partly reserved finishes expiring once its
- *       job gives seconds back, and one lot that cannot expire never holds
- *       back the lots behind it;
+ *       job gives seconds back, a lot whose holds change under a planned
+ *       expiry refuses that batch visibly, and one lot that cannot expire
+ *       never holds back the lots behind it;
  *   c14 a runner that died in a task's last attempt leaves it dead, not
  *       reclaimed forever, and a crashed attempt backs off behind fresh work;
  *   c19 converted hours keep the expiry they were bought under, and a
@@ -115,7 +117,7 @@ test('c1: only the free part of an expired lot expires, beyond what the open res
   await reconcileClean(w);
 });
 
-test('c1 + c5: a confirmation landing while an expiry is planned expires that lot itself first; the planned batch is refused, the lot behind it still expires, and the failure stays visible', async () => {
+test('c1: a confirmation landing while an expiry is planned holds none of the expired lot, and the planned expiry still lands', async () => {
   const w = pcWorld();
   const cat = await seedCatalog(w);
   const pkg = await expiringPackage(w, cat);
@@ -130,22 +132,52 @@ test('c1 + c5: a confirmation landing while an expiry is planned expires that lo
   w.raw.prepare('UPDATE pc_credit_lots SET expires_at = ? WHERE id = ?').run(PAST, mine);
   w.raw.prepare('UPDATE pc_credit_lots SET expires_at = ? WHERE id = ?').run('2000-01-02T00:00:00.000Z', theirs);
   // Just before the sweep's first expiry batch commits, the customer confirms a 6 h job. The lot had already
-  // expired: the confirmation expires it itself before it reserves, so the job can only hold the plain hours.
+  // expired, so the job holds only the plain hours, and the lot's free part — the expiry's plan — is unchanged.
   w.race.when = (sqls) => sqls.some((s) => s.includes('INSERT INTO pc_credit_lot_draws'));
   w.race.hook = async () => {
     await ok(w.a, 'POST', `${API}/jobs/${jobId}/confirm`, undefined, idem('confirm'));
   };
   const task = await sweepExpiry(w);
   assert.equal(w.race.hook, null, 'the race ran');
-  assert.equal(lot(w, mine)?.seconds_remaining, 0, 'expired by the confirmation, before it reserved');
-  assert.equal(lot(w, theirs)?.seconds_remaining, 0, "another customer's lot behind it still expires");
-  assert.equal(task?.status, 'queued', 'the refused batch fails the task: retried, not hidden');
-  assert.match(String(task?.last_error), /expired lots 1, failed 1/);
+  assert.equal(task?.status, 'succeeded', String(task?.last_error));
+  assert.deepEqual([lot(w, mine)?.seconds_remaining, lot(w, theirs)?.seconds_remaining], [0, 0], 'both expired lots expire whole');
   assert.deepEqual([(await credits(w.a, cat.tier)).available_seconds, (await credits(w.a, cat.tier)).reserved_seconds], [0, 6 * H]);
   await toPrinting(w, jobId);
   await ok(w.assistant, 'POST', `${ADMIN}/jobs/${jobId}/complete`, { printed_seconds: 6 * H, materials: [{ variant_id: cat.white, qty: 30 }] });
   assert.deepEqual([lot(w, mine)?.seconds_remaining, lot(w, plain)?.seconds_remaining], [0, 0], 'the job drew the hours that were still good');
   assert.equal((await credits(w.a, cat.tier)).available_seconds, 0);
+  await reconcileClean(w);
+});
+
+test('c5: an expired lot whose holds change while its expiry is planned refuses the batch; the lot behind it still expires, the failure stays visible, and the next run finishes it', async () => {
+  const w = pcWorld();
+  const cat = await seedCatalog(w);
+  const pkg = await expiringPackage(w, cat);
+  await buy(w.a, [{ kind: 'credit_package', package_id: pkg }, { kind: 'material', variant_id: cat.white, quantity: 500 }]);
+  await buy(w.b, [{ kind: 'credit_package', package_id: pkg }]);
+  const mine = expiringLotOf(w, 'usr_pc_a');
+  const theirs = expiringLotOf(w, 'usr_pc_b');
+  // Confirmed before the expiry, the job holds 2 h of the lot; the other 4 h are free when it expires.
+  const { jobId } = await estimatedJob(w, w.a, cat, { seconds: 2 * H, materials: [{ variant_id: cat.white, model_grams: 30 }] });
+  await runToPrinting(w, w.a, jobId);
+  w.raw.prepare('UPDATE pc_credit_lots SET expires_at = ? WHERE id = ?').run(PAST, mine);
+  w.raw.prepare('UPDATE pc_credit_lots SET expires_at = ? WHERE id = ?').run('2000-01-02T00:00:00.000Z', theirs);
+  // Just before the sweep expires those 4 h, the job completes at 1 h and gives its other hour back to the lot.
+  w.race.when = (sqls) => sqls.some((s) => s.includes('INSERT INTO pc_credit_lot_draws')) && sqls.some((s) => s.includes('seconds_held = ?'));
+  w.race.hook = async () => {
+    await ok(w.assistant, 'POST', `${ADMIN}/jobs/${jobId}/complete`, { printed_seconds: H, materials: [{ variant_id: cat.white, qty: 30 }] });
+  };
+  const task = await sweepExpiry(w);
+  assert.equal(w.race.hook, null, 'the race ran');
+  assert.equal(lot(w, mine)?.seconds_remaining, 5 * H, 'the planned batch saw other holds and was refused');
+  assert.equal(lot(w, theirs)?.seconds_remaining, 0, "another customer's lot behind it still expires");
+  assert.equal(task?.status, 'queued', 'the refused batch fails the task: retried, not hidden');
+  assert.match(String(task?.last_error), /expired lots 1, failed 1/);
+  // The next run expires everything the lot has left: the 4 h that were free and the hour given back.
+  assert.equal((await sweepExpiry(w))?.status, 'succeeded');
+  assert.equal(lot(w, mine)?.seconds_remaining, 0);
+  assert.deepEqual(expiries(w, mine).map((e) => e.delta_available), [-5 * H]);
+  assert.deepEqual([(await credits(w.a, cat.tier)).available_seconds, (await credits(w.a, cat.tier)).consumed_seconds], [0, H]);
   await reconcileClean(w);
 });
 

@@ -252,24 +252,51 @@ async function stillQueued(db: D1Database, jobId: string): Promise<JobRow | null
 }
 
 /**
- * What releasing a stranded job sends: its reads and batch grow with each
- * reservation it gives back (an account read, the reservation, the account,
- * the ledger), so the room asked before it is sized to the job — capped, so
- * that the largest job still fits a fresh share and is never starved.
+ * WHAT RELEASING A STRANDED JOB SENDS, AT MOST — measured, from one
+ * reservation to the most a job holds (its hours, 16 colours and 20
+ * accessories), in tests/printCloudFixes-queue2.test.ts. Three reads (the job,
+ * its hours, its materials) and a batch of the transition (three), the queue
+ * entry, the assignment, the slicing request, the notice and the audit row
+ * (three with the event bus on, after its outbox probe once an isolate); then
+ * four per reservation (its flip, its fence, its account, its ledger); and for
+ * its hours one read of the lots they are held on and one statement per lot
+ * hold given back (credits.ts `releaseCredits`). No ceiling: the room asked
+ * before a release is the whole release, so a release larger than the share
+ * is skipped, never squeezed in (`runScheduler`).
  */
-const RELEASE_BASE_STATEMENTS = 14;
-const RELEASE_PER_RESERVATION = 6;
-const RELEASE_CEILING = 90;
+const RELEASE_BASE_STATEMENTS = 15;
+const RELEASE_PER_RESERVATION = 4;
+const RELEASE_PER_HOLD = 1;
 
-async function releaseCost(db: D1Database, jobId: string): Promise<number> {
-  const row = await one<{ n: number }>(
+interface HeldCount {
+  reservations: number;
+  holds: number;
+}
+
+const releaseCost = (c: HeldCount): number => RELEASE_BASE_STATEMENTS + RELEASE_PER_RESERVATION * c.reservations + RELEASE_PER_HOLD * c.holds;
+
+/**
+ * How many reservations each of these jobs holds (its hours and each
+ * material), and on how many lots its hours are held: one statement for a
+ * page's stranded jobs. A queued job never gains either, so a count read with
+ * the page can only be above what its release meets later.
+ */
+async function reservationCounts(db: D1Database, jobIds: string[]): Promise<Map<string, HeldCount>> {
+  if (!jobIds.length) return new Map();
+  const ids = JSON.stringify(jobIds);
+  const rows = await many<{ job_id: string; reservations: number; holds: number }>(
     db,
-    `SELECT (SELECT COUNT(*) FROM pc_credit_reservations WHERE job_id = ? AND state = 'active')
-          + (SELECT COUNT(*) FROM pc_inventory_reservations WHERE ref_id = ? AND state = 'active') AS n`,
-    jobId,
-    jobId
+    `SELECT job_id, SUM(r) AS reservations, SUM(h) AS holds FROM (
+       SELECT job_id, 1 AS r, 0 AS h FROM pc_credit_reservations WHERE state = 'active' AND job_id IN (SELECT value FROM json_each(?1))
+       UNION ALL
+       SELECT ref_id, 1, 0 FROM pc_inventory_reservations WHERE purpose = 'print_job' AND state = 'active' AND ref_id IN (SELECT value FROM json_each(?1))
+       UNION ALL
+       SELECT r.job_id, 0, 1 FROM pc_credit_reservation_lots l JOIN pc_credit_reservations r ON r.id = l.reservation_id
+        WHERE r.state = 'active' AND r.job_id IN (SELECT value FROM json_each(?1))
+     ) GROUP BY job_id`,
+    ids
   );
-  return Math.min(RELEASE_CEILING, RELEASE_BASE_STATEMENTS + RELEASE_PER_RESERVATION * Number(row?.n ?? 0));
+  return new Map(rows.map((r) => [r.job_id, { reservations: Number(r.reservations), holds: Number(r.holds) }]));
 }
 
 /** A queued job whose dependency can no longer be made: cancelled with every reservation released, the customer told. */
@@ -291,18 +318,26 @@ async function releaseStranded(db: D1Database, jobId: string, now: Date): Promis
  * machine; release a job whose dependency can no longer be made. At most
  * `limit` of those changes a pass; the next pass takes the rest.
  *
- * The machines and their maintenance are read once, and each page's needs
- * and dependencies once, so a job no machine can take now costs no
- * statement: room (`unitFits`, one unit of work and its close) is asked only
- * before WORK — an assignment, a release, the next page. The check before
- * the reads makes room for them and the first unit together. Each assignment
- * is its own batch on the job as it is at that moment: a job cancelled or
- * assigned since its page was read is skipped, a machine taken meanwhile is
- * skipped, never double-booked.
+ * The machines and their maintenance are read once, and each page's needs,
+ * dependencies and (for its stranded jobs) reservations once, so a job no
+ * machine can take now costs no statement: room (`unitFits`, one unit of work
+ * and its close) is asked only before WORK — an assignment, a release, the
+ * next page. The check before the reads makes room for them and the first
+ * unit together. Each assignment is its own batch on the job as it is at that
+ * moment: a job cancelled or assigned since its page was read is skipped, a
+ * machine taken meanwhile is skipped, never double-booked.
  *
- * Out of room, the pass asks to run again (`more`) only if it changed
- * something: one that only looked would look at the same jobs again, so it
- * ends, and the next quarter hour's pass starts afresh.
+ * A release asks for all it sends (`releaseCost`, sized to the job's
+ * reservations). One that does not fit is skipped — deferred, not waited on —
+ * and the pass goes on placing the jobs behind it, so a large stranded job
+ * never hides them. A release larger than any quarter-hour share (the largest
+ * job's is) is left to a run with the room: the operator's queue run, which
+ * passes no `unitFits`, or the admin task run (600 statements).
+ *
+ * Out of room, or past a deferred release, the pass asks to run again
+ * (`more`) only if it changed something: one that only looked would look at
+ * the same jobs again, so it ends, and the next quarter hour's pass starts
+ * afresh.
  */
 export async function runScheduler(
   db: D1Database,
@@ -310,13 +345,15 @@ export async function runScheduler(
   now: Date,
   limit = 20,
   unitFits?: (statements?: number) => boolean
-): Promise<{ assigned: Array<{ job_id: string; printer_id: string }>; released: string[]; waiting: number; more: boolean }> {
+): Promise<{ assigned: Array<{ job_id: string; printer_id: string }>; released: string[]; waiting: number; deferred: number; more: boolean }> {
   const actor: Actor = { type: 'system', id: 'scheduler' };
   const assigned: Array<{ job_id: string; printer_id: string }> = [];
   const released: string[] = [];
   const taken = new Set<string>();
   let waiting = 0;
-  if (unitFits && !unitFits()) return { assigned, released, waiting, more: true };
+  let deferred = 0;
+  const result = (more: boolean) => ({ assigned, released, waiting, deferred, more });
+  if (unitFits && !unitFits()) return result(true);
   // The check before the reads covers them and the first standard unit; a larger unit always asks.
   let first = true;
   const room = (statements?: number) => {
@@ -327,7 +364,7 @@ export async function runScheduler(
     first = false;
     return !unitFits || unitFits(statements);
   };
-  const outOfRoom = () => ({ assigned, released, waiting, more: assigned.length + released.length > 0 });
+  const changed = () => assigned.length + released.length > 0;
   const machines = await machinesOf(db);
   const windows = await plannedWindows(db, now);
   let after: QueuedJob | null = null;
@@ -335,15 +372,20 @@ export async function runScheduler(
     const page = await queuedJobs(db, now, SCHEDULER_PAGE, after);
     const needs = await needsOf(db, page);
     const dependencies = await dependencyStates(db, page);
+    // A run without a bound releases whatever it meets: only a bounded one sizes its releases.
+    const held = unitFits ? await reservationCounts(db, page.filter((j) => dependencyOf(j, dependencies) === 'dead').map((j) => j.id)) : new Map<string, HeldCount>();
     for (const job of page) {
-      if (assigned.length + released.length >= limit) return { assigned, released, waiting, more: false };
+      if (assigned.length + released.length >= limit) return result(false);
       const dependency = dependencyOf(job, dependencies);
       if (dependency === 'pending') {
         waiting++;
         continue;
       }
       if (dependency === 'dead') {
-        if (unitFits && !room(await releaseCost(db, job.id))) return outOfRoom();
+        if (unitFits && !room(releaseCost(held.get(job.id) ?? { reservations: 0, holds: 0 }))) {
+          deferred++;
+          continue;
+        }
         if (await releaseStranded(db, job.id, now)) released.push(job.id);
         continue;
       }
@@ -354,7 +396,7 @@ export async function runScheduler(
       let done = false;
       let gone = false;
       for (const c of candidates) {
-        if (!room()) return outOfRoom();
+        if (!room()) return result(changed());
         const current = await stillQueued(db, job.id);
         if (!current) {
           gone = true;
@@ -378,10 +420,10 @@ export async function runScheduler(
       if (!done && !gone) waiting++;
     }
     if (page.length < SCHEDULER_PAGE) break;
-    if (!room()) return outOfRoom();
+    if (!room()) return result(changed());
     after = page[page.length - 1];
   }
-  return { assigned, released, waiting, more: false };
+  return result(deferred > 0 && changed());
 }
 
 export interface QueueEstimate {

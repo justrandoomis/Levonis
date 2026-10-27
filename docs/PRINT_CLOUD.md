@@ -20,7 +20,7 @@ DECISIONS row 270 records the decision and its open owner questions.
 
 | | |
 |---|---|
-| Migration | `migrations/0215_print_cloud.sql` — 69 `pc_*` tables, triggers and indexes; touches no existing table |
+| Migration | `migrations/0215_print_cloud.sql` — 70 `pc_*` tables, triggers and indexes; touches no existing table |
 | Library | `worker/lib/printCloud/*.ts` (one module per domain, listed per section below) |
 | Routers | `worker/routes/printCloud.ts` (customer), `printCloudAgent.ts` (workshop agent), `printCloudAdmin.ts` (administration) |
 | Mounts | `/api/print-cloud/v1`, `/api/print-cloud/v1/agent`, `/api/admin/print-cloud` (`worker/index.ts`) |
@@ -107,30 +107,60 @@ arrive as **lots** (`pc_credit_lots`) carrying what was paid; spending draws
 lots FIFO (`pc_credit_lot_draws`) with cumulative valuation, so the dinars
 recognised for a lot always sum to exactly what was paid for it (`lots.ts`).
 
+**Holds are recorded per lot.** A reservation names the lots it holds and how
+many seconds of each (`pc_credit_reservation_lots`, append-only), and each lot
+carries the seconds held on it (`seconds_held`, kept between 0 and what the
+lot has left by the named CHECK `ck_pc_credit_lot_held` — a race on the same
+hours aborts the batch and re-plans). A lot's **free part** is
+`seconds_remaining − seconds_held`; only free parts are ever debited,
+converted or expired. Always, and proven by reconciliation (§11):
+
+    available = Σ free parts of the account's lots
+    reserved  = Σ seconds held on them = Σ the active reservations' hold rows
+
+so which hours a job holds is a record, never inferred from an order of lots.
+
 ### 3.2 Expiry
 
 Credits never expire. An administrator may set `expires_after_days` on a
-package; the package then states it to the customer before purchase and the
-`expire_credit_lots` task takes only the FREE part of an expired lot, with its
-own ledger rows. Reservations hold the expiring lots first, so hours a job
-reserved before the expiry stay for that job (what it gives back expires on a
-later run). A confirmation first expires the customer's due lots itself, so a
-job confirmed after an expiry — before the sweep came by — can only reserve
-hours that are still good. Converted hours keep the expiry they were bought
-under. A lot that fails to expire fails the task (retried, its error visible
-in `GET /admin/print-cloud/tasks`).
+package; the package then states it to the customer before purchase. Once a
+lot's expiry has come:
+
+- **nobody new holds it.** A confirmation holds only lots not yet expired, so
+  a job confirmed after the expiry — before the sweep came by — holds only
+  good hours, and is refused `INSUFFICIENT_CREDIT` when they fall short, even
+  while the available balance still counts the unswept expired seconds;
+- **no debit draws it**: a refund, an admin debit and a conversion take only
+  free parts of lots not yet expired, and a credit line whose lot has expired
+  refunds nothing;
+- **the `expire_credit_lots` task takes exactly its free part**, with its own
+  ledger rows. The task's page holds only lots that have a free part (the
+  filter is per lot), so lots wholly held for jobs never crowd out the ones
+  that can expire. Each pass is fenced on the lot's remainder and holds and
+  keyed by what the lot had left, so a lot may expire in several passes.
+
+Hours a job came to hold before the expiry stay that job's: it prints from
+them, and what it gives back (a cancellation, a settlement under the
+estimate) is free and expires on the next run. The one exception is a **free reprint after a
+workshop failure**: it inherits what its failed parent held and gave back,
+lot by lot, taken first even past the expiry — and only that much — so the
+customer loses no hour to the workshop's failure. Converted hours keep the
+expiry they were bought under. A lot that fails to expire fails the task
+(retried, its error visible in `GET /admin/print-cloud/tasks`).
 
 ### 3.3 Reservation and settlement
 
 `POST /jobs/{id}/confirm` reserves the estimated seconds (a job without an
-estimate cannot be confirmed). At settlement the actual seconds are charged and
-the rest released, in one batch:
+estimate cannot be confirmed), holding them on lots in spend order — expiring
+first, then oldest. At settlement the actual seconds are consumed from the
+lots the reservation held, in the order it took them, and the rest of each
+hold is released, in one batch:
 
     24 h bought → 8.9 h reserved → 8.5 h used → 15.5 h available, 0.4 h released
 
 Overage (actual > reserved) follows `time_overage_policy`: `cap_at_reserved`
 (default — the customer is never billed beyond what they approved) or
-`charge_from_balance` (only from available balance, never negative).
+`charge_from_balance` (only from free hours not yet expired, never negative).
 
 ### 3.4 Conversion
 
@@ -182,7 +212,8 @@ the same batch as the payment row.
 | `levonis_wallet` | **not connected**: answers `ADAPTER_NOT_CONNECTED` |
 
 Refunds (`POST /admin/print-cloud/orders/{id}/refunds`, idempotent) return only
-the unused hours and grams of that purchase's own lots.
+the unused hours and grams of that purchase's own lots — for hours, the lot's
+free part (never seconds a job holds), and nothing once it has expired.
 
 ## 5. Inventory — `inventory.ts`, `warehouse.ts`
 
@@ -291,7 +322,20 @@ queue a page at a time and spends its statement share only on work, so jobs no
 machine can take never hide the ones behind them. A job that depends on
 another runs once that print is made — the job or its reprint; when it can no
 longer be made (cancelled, or failed and closed without a reprint) the waiting
-job is cancelled, its reservations released and the customer told. A
+job is cancelled, its reservations released and the customer told. That release
+is three reads and one fenced batch, and a pass bounded by a statement share
+runs it only when all of it fits: it asks for 14 statements and 4 per
+reservation (`releaseCost`, never below what a release sends, measured from one
+reservation to the most a job holds in `tests/printCloudFixes-queue2.test.ts`).
+A release that does not fit is skipped (counted `deferred`) and the pass goes
+on placing the jobs behind it; a pass that deferred one asks to run again only
+if it also changed something. The largest job — its hours, 16 colours and 20
+accessories, 162 statements — is larger than the quarter-hour share (120, §12),
+so the cron leaves it queued, its reservations held and the queue showing
+`dependency_cannot_complete`. The operator releases it: with
+`POST /admin/print-cloud/queue/run`, a pass without a share (the request's own
+invocation), or with `POST /admin/print-cloud/tasks/run`, whose scheduling pass
+leads the due work inside that run's 600 statements. A
 partial unique index makes two active assignments on one printer impossible —
 scheduler, operator and database all refuse. Customers see their position and
 an estimate built from real queued durations.
@@ -371,11 +415,21 @@ Telemetry older than `telemetry_stale_seconds` is reported **stale**, never as
 live; a silent agent printer receives no work. A reading is dated by when it
 was taken: its arrival less its age, the age being `sent_at - reported_at` (two
 readings of the agent's one clock, so clock skew cancels; without `sent_at`,
-`now - reported_at`). One older than the stored reading is answered
-`superseded` and changes nothing. «Back from silence» (`connection_restored`,
-and `reconcile_needed` for a print finished meanwhile) is judged by the gap
-between POST arrivals on the server clock — once per outage, however many
-buffered readings the reconnection flushes. `GET /status`
+`now - reported_at`); freshness is judged by that taken time. Readings are
+ORDERED on the agent's own clock when they can be: one whose `reported_at` is
+earlier than the stored reading's, from the agent that wrote it, is older
+whenever it arrives (a body re-sent with its original stamps, a reading
+overtaken in transit). A reading without `reported_at`, or a row another agent
+wrote (a re-bound printer), is ordered by taken time. An older reading is
+answered `superseded` and changes nothing; the batch re-checks the order, so
+a race cannot slip one past. «Back from silence» is judged by the gap between
+POST arrivals on the server clock (`arrived_at`, which only moves forward):
+the POST that ends a silence — stored or superseded — records the outage on
+the printer's row (`outage_from`, `outage_to`) and writes `connection_restored`,
+once per outage even when two POSTs race at reconnection. A stored `finished`
+reading for the assigned job the record still shows `printing`, taken during
+that outage or the first one taken after it, writes `reconcile_needed` — once
+per job per outage, whichever POST of the flush carries it. `GET /status`
 calls the slicer `connected` only when a slicer agent called in within the same
 window. Camera data is metadata only (availability, stream id, resolution).
 
@@ -418,11 +472,13 @@ units already used are then valued from it in the period they left.
 `GET /admin/print-cloud/reconcile` and the daily `reconcile` task prove that
 every cached balance equals its ledger and lots: credit and inventory accounts,
 each credit, inventory and stock lot against its own draws (remainder and
-value), stock positions, holds and allocations, active reservations against
-job states, one active assignment per printer and per job (also enforced by
-the partial unique indexes) and only for jobs on a machine, paid orders
-against payments. Twenty-one checks; a mismatch is **reported**, never
-silently repaired.
+value), each credit account's available and reserved seconds against its
+lots' free parts and holds, each active credit reservation against its hold
+rows and each lot's holds against the active reservations on it, stock
+positions, holds and allocations, active reservations against job states,
+one active assignment per printer and per job (also enforced by the partial
+unique indexes) and only for jobs on a machine, paid orders against payments.
+Twenty-three checks; a mismatch is **reported**, never silently repaired.
 
 ## 12. Background work — `background.ts`, `tasks.ts`
 
@@ -439,7 +495,8 @@ assignment, one lease, the whole reconciliation) runs, only while a whole unit
 still fits; a task cut short is queued again and finishes on a later tick
 (`tests/printCloudOperations.test.ts`, `tests/fxSweepBudget.test.ts`). An admin
 may run due work by hand (`POST /admin/print-cloud/tasks/run`, within 600
-statements of that request).
+statements of that request); a scheduling pass leads it, at most one a minute,
+so a release too large for the cron's share is done there (§7.5).
 
 ## 13. Configuration
 

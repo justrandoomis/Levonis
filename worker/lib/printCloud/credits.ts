@@ -16,19 +16,30 @@
  * proves the cache equals the ledger sum. Lots record what each second was
  * bought for, so a consumed second is valued at its own purchase price.
  *
- * A reservation names no lot: settlement draws the account's lots in spend
- * order (expiring first, then oldest), so the first `reserved` seconds of that
- * order are the ones the open reservations hold, and only the seconds beyond
- * them are FREE (`freeSeconds`) — to convert, debit or expire.
+ * HOLDS ARE RECORDED, PER LOT. A reservation names the lots it holds
+ * (`pc_credit_reservation_lots`) and each lot carries the seconds held on it
+ * (`seconds_held`, never more than it has left — ck_pc_credit_lot_held). A
+ * lot's FREE part is `seconds_remaining - seconds_held`: the only seconds a
+ * debit, a conversion or an expiry may take. So, always:
+ *
+ *   available = Σ free parts of the account's lots
+ *   reserved  = Σ seconds held on them = Σ active reservations' hold rows
+ *
+ * and reconciliation proves each. A reservation spends only what it held, so
+ * which seconds a job holds is never inferred from an order of lots.
+ *
+ * EXPIRY. A lot whose expiry has come is held by nobody new (a free reprint
+ * inheriting what its failed parent held is the one exception) and drawn by
+ * no debit; the sweep takes its free part, and a hold given back later
+ * becomes free and goes on a later run.
  *
  * Every function here RETURNS statements; the caller composes them into the
  * one batch of its operation (a job confirmation reserves credits and
  * materials together, or neither).
  */
-import { HttpError } from '../http';
-import { fence, many, one, runBatch, type Stmt } from './db';
+import { fence, many, one, type Stmt } from './db';
 import { pcError } from './errors';
-import { drawValue, planDraws, type LotDraw, type LotState } from './lots';
+import { drawValue, type LotDraw, type LotState } from './lots';
 import { addSeconds, iso, mulDivFloor, pcId } from './util';
 
 export const creditAccountId = (userId: string, tierId: string): string => `pcca_${userId}__${tierId}`;
@@ -48,6 +59,7 @@ export interface CreditLotRow {
   source: string;
   seconds_total: number;
   seconds_remaining: number;
+  seconds_held: number;
   paid_iqd: number;
   expires_at: string | null;
   created_at: string;
@@ -144,10 +156,17 @@ export function ensureCreditAccount(db: D1Database, userId: string, tierId: stri
     .bind(creditAccountId(userId, tierId), userId, tierId, iso(now));
 }
 
-function drawStatements(db: D1Database, draws: LotDraw[], entryKey: string, now: Date): Stmt[] {
+/** A draw the batch fences on the lot's holds too: an expiry, which takes exactly the free part the plan read. */
+type FencedDraw = LotDraw & { expectedHeld?: number };
+
+function drawStatements(db: D1Database, draws: FencedDraw[], entryKey: string, now: Date): Stmt[] {
   const out: Stmt[] = [];
   for (const d of draws) {
-    out.push(fence(db, 'STATE_CHANGED', '(SELECT seconds_remaining FROM pc_credit_lots WHERE id = ?) = ?', [d.lotId, d.expectedRemaining]));
+    out.push(
+      d.expectedHeld === undefined
+        ? fence(db, 'STATE_CHANGED', '(SELECT seconds_remaining FROM pc_credit_lots WHERE id = ?) = ?', [d.lotId, d.expectedRemaining])
+        : fence(db, 'STATE_CHANGED', '(SELECT seconds_remaining = ? AND seconds_held = ? FROM pc_credit_lots WHERE id = ?)', [d.expectedRemaining, d.expectedHeld, d.lotId])
+    );
     out.push(db.prepare('UPDATE pc_credit_lots SET seconds_remaining = seconds_remaining - ? WHERE id = ?').bind(d.qty, d.lotId));
     out.push(
       db
@@ -158,8 +177,9 @@ function drawStatements(db: D1Database, draws: LotDraw[], entryKey: string, now:
   return out;
 }
 
-/** A credit lot as a plan sees it: its draw state and the expiry it carries. */
+/** A credit lot as a plan sees it: its draw state, the seconds held on it and the expiry it carries. */
 export interface CreditLotState extends LotState {
+  held: number;
   expiresAt: string | null;
 }
 
@@ -168,76 +188,101 @@ export interface CreditDraw extends LotDraw {
   expiresAt: string | null;
 }
 
-/** The account's lots with seconds left, in the order they are spent: expiring first, then oldest. */
-export async function spendableLots(db: D1Database, accountId: string, onlyLotId?: string): Promise<CreditLotState[]> {
+/** Seconds of one lot: a reservation's hold on it, or a reprint's inheritance of one. */
+export interface LotShare {
+  lotId: string;
+  seconds: number;
+}
+
+/** The account's lots with seconds left (or only `onlyLotId`), in the order they are spent: expiring first, then oldest. */
+async function accountLots(db: D1Database, accountId: string, onlyLotId?: string): Promise<CreditLotState[]> {
   const rows = await many<CreditLotRow>(
     db,
-    `SELECT id, account_id, source, seconds_total, seconds_remaining, paid_iqd, expires_at, created_at, order_line_id
+    `SELECT id, account_id, source, seconds_total, seconds_remaining, seconds_held, paid_iqd, expires_at, created_at, order_line_id
        FROM pc_credit_lots
       WHERE account_id = ? AND seconds_remaining > 0 ${onlyLotId ? 'AND id = ?' : ''}
       ORDER BY CASE WHEN expires_at IS NULL THEN 1 ELSE 0 END, expires_at, created_at, id`,
     ...(onlyLotId ? [accountId, onlyLotId] : [accountId])
   );
-  return rows.map((r) => ({ id: r.id, total: Number(r.seconds_total), remaining: Number(r.seconds_remaining), value: Number(r.paid_iqd), expiresAt: r.expires_at }));
+  return rows.map((r) => ({
+    id: r.id,
+    total: Number(r.seconds_total),
+    remaining: Number(r.seconds_remaining),
+    held: Number(r.seconds_held),
+    value: Number(r.paid_iqd),
+    expiresAt: r.expires_at,
+  }));
+}
+
+/** A lot's FREE part: what it has left beyond the seconds confirmed jobs hold on it. */
+const freePart = (lot: CreditLotState): number => lot.remaining - lot.held;
+
+/** Not yet past its expiry at `cutoff` (an ISO instant). */
+const goodAt = (lot: { expiresAt: string | null }, cutoff: string): boolean => lot.expiresAt === null || lot.expiresAt > cutoff;
+
+/**
+ * The seconds of one lot a debit may take at `now` (a refund of the purchase
+ * that bought it): its free part, and nothing once its expiry has come — what
+ * is left of it then is the sweep's, or the jobs' that hold it.
+ */
+export function freeSecondsAt(lot: Pick<CreditLotRow, 'seconds_remaining' | 'seconds_held' | 'expires_at'>, now: Date): number {
+  if (!goodAt({ expiresAt: lot.expires_at }, iso(now))) return 0;
+  return Math.max(0, Number(lot.seconds_remaining) - Number(lot.seconds_held));
 }
 
 /**
- * Each lot's FREE seconds, for lots in spend order: the open reservations hold
- * the first `reserved` seconds of that order (settlement draws them there), so
- * a lot is free only beyond them.
+ * Draw `qty` FREE seconds of lots not yet past their expiry at `now`, in the
+ * order given. A draw is valued on the lot's real remaining count
+ * (`drawValue`): a lot's seconds are fungible, only how many of them may go
+ * is limited.
  */
-function freeSeconds(lots: LotState[], reserved: number): number[] {
-  let held = Math.max(0, reserved);
-  return lots.map((lot) => {
-    const h = Math.min(lot.remaining, held);
-    held -= h;
-    return lot.remaining - h;
-  });
-}
-
-/**
- * Draw `qty` free seconds, in spend order, skipping the held ones — and, with
- * `notExpiredAt`, every lot whose expiry has passed by then. A draw is valued
- * on the lot's real remaining count (`drawValue`): a lot's seconds are
- * fungible, only how many of them may go is limited.
- */
-function planFreeDraws(lots: CreditLotState[], reserved: number, qty: number, notExpiredAt?: Date): { draws: CreditDraw[]; shortfall: number; value: number } {
-  const free = freeSeconds(lots, reserved);
-  const cutoff = notExpiredAt ? iso(notExpiredAt) : null;
+function planFreeDraws(lots: CreditLotState[], qty: number, now: Date): { draws: CreditDraw[]; shortfall: number; value: number } {
+  const cutoff = iso(now);
   const draws: CreditDraw[] = [];
   let left = qty;
   let value = 0;
-  lots.forEach((lot, i) => {
-    if (left <= 0 || free[i] <= 0) return;
-    if (cutoff !== null && lot.expiresAt !== null && lot.expiresAt <= cutoff) return;
-    const k = Math.min(free[i], left);
+  for (const lot of lots) {
+    if (left <= 0) break;
+    if (freePart(lot) <= 0 || !goodAt(lot, cutoff)) continue;
+    const k = Math.min(freePart(lot), left);
     const v = drawValue(lot, k);
     draws.push({ lotId: lot.id, qty: k, value: v, expectedRemaining: lot.remaining, expiresAt: lot.expiresAt });
     value += v;
     left -= k;
-  });
+  }
   return { draws, shortfall: Math.max(0, left), value };
 }
 
-interface AccountBalance {
-  available: number;
-  reserved: number;
+/** A reservation's holds, in the order it took them: the order its settlement consumes them in. */
+async function reservationHolds(db: D1Database, reservationId: string): Promise<LotShare[]> {
+  const rows = await many<{ lot_id: string; seconds: number }>(db, 'SELECT lot_id, seconds FROM pc_credit_reservation_lots WHERE reservation_id = ? ORDER BY rowid', reservationId);
+  return rows.map((r) => ({ lotId: r.lot_id, seconds: Number(r.seconds) }));
 }
 
-async function accountBalance(db: D1Database, accountId: string): Promise<AccountBalance> {
-  const a = await one<{ available_seconds: number; reserved_seconds: number }>(db, 'SELECT available_seconds, reserved_seconds FROM pc_credit_accounts WHERE id = ?', accountId);
-  return { available: Number(a?.available_seconds ?? 0), reserved: Number(a?.reserved_seconds ?? 0) };
+/** A hold given back to its lot's free part. The lot's CHECK refuses taking back more than is held. */
+function unhold(db: D1Database, h: LotShare): Stmt {
+  return db.prepare('UPDATE pc_credit_lots SET seconds_held = seconds_held - ? WHERE id = ?').bind(h.seconds, h.lotId);
 }
 
 /**
- * The balance a free-seconds plan read is still the balance. Every draw,
- * grant, reservation and settlement moves one of the two numbers, so an
- * unchanged pair means the held prefix — and so each lot's free part — is
- * what the plan saw: a job confirmed meanwhile aborts the batch instead of
- * having its hours taken.
+ * What a job's last reservation held and gave back, per lot, in hold order:
+ * each hold less what its settlement consumed from that lot. A free reprint
+ * inherits it (jobs.ts `autoConfirmReprint`), so hours its failed parent
+ * legitimately held carry over — even once their package has expired — and
+ * no more than that: the rest of an expired lot was never the parent's.
  */
-function balanceUnchanged(db: D1Database, accountId: string, b: AccountBalance): Stmt {
-  return fence(db, 'STATE_CHANGED', '(SELECT available_seconds = ? AND reserved_seconds = ? FROM pc_credit_accounts WHERE id = ?)', [b.available, b.reserved, accountId]);
+export async function releasedHolds(db: D1Database, jobId: string): Promise<LotShare[]> {
+  const rows = await many<{ lot_id: string; seconds: number }>(
+    db,
+    `SELECT h.lot_id,
+            h.seconds - COALESCE((SELECT SUM(d.seconds) FROM pc_credit_lot_draws d
+                                   WHERE d.lot_id = h.lot_id AND d.ledger_entry_key = 'consume:' || h.reservation_id), 0) AS seconds
+       FROM pc_credit_reservation_lots h
+      WHERE h.reservation_id = (SELECT id FROM pc_credit_reservations WHERE job_id = ? AND state <> 'active' ORDER BY created_at DESC LIMIT 1)
+      ORDER BY h.rowid`,
+    jobId
+  );
+  return rows.filter((r) => Number(r.seconds) > 0).map((r) => ({ lotId: r.lot_id, seconds: Number(r.seconds) }));
 }
 
 // ------------------------------------------------------------------ grant
@@ -307,44 +352,74 @@ export interface ReserveInput {
   seconds: number;
   actorId: string;
   now: Date;
+  /** Lots taken first, each up to the seconds given and even past its expiry: a free reprint's inheritance (`releasedHolds`). */
+  entitled?: LotShare[];
 }
 
 /**
- * Hold `seconds` for a job. The account UPDATE moves available → reserved;
- * ck_pc_credit_available aborts the batch when available would go negative,
- * so two jobs racing for the same last hours cannot both reserve them.
+ * Hold `seconds` for a job, lot by lot: first what it is entitled to, then
+ * the free part of every lot not yet past its expiry, in spend order. Seconds
+ * whose expiry has come are never held — even before the sweep takes them,
+ * while the available balance still counts them — so a shortfall is
+ * INSUFFICIENT_CREDIT. Each hold raises its lot's seconds_held, which
+ * ck_pc_credit_lot_held keeps within what the lot has left: two jobs racing
+ * for the same last hours cannot both hold them (the loser re-plans), and the
+ * account UPDATE moves available → reserved.
  */
-export function reserveCredits(db: D1Database, r: ReserveInput): { reservationId: string; statements: Stmt[] } {
+export async function reserveCredits(db: D1Database, r: ReserveInput): Promise<{ reservationId: string; statements: Stmt[] }> {
   if (!Number.isSafeInteger(r.seconds) || r.seconds <= 0) throw pcError('VALIDATION', { field: 'seconds' });
   const accountId = creditAccountId(r.userId, r.tierId);
   const reservationId = pcId('pccr');
-  return {
-    reservationId,
-    statements: [
-      ensureCreditAccount(db, r.userId, r.tierId, r.now),
-      accountDelta(db, accountId, -r.seconds, r.seconds, 0, r.now),
-      db
-        .prepare(
-          `INSERT INTO pc_credit_reservations (id, account_id, user_id, tier_id, job_id, seconds_reserved, state, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, 'active', ?)`
-        )
-        .bind(reservationId, accountId, r.userId, r.tierId, r.jobId, r.seconds, iso(r.now)),
-      ledgerStmt(db, {
-        entryKey: `reserve:${reservationId}`,
-        accountId,
-        userId: r.userId,
-        tierId: r.tierId,
-        type: 'reserve',
-        dAvailable: -r.seconds,
-        dReserved: r.seconds,
-        dConsumed: 0,
-        reservationId,
-        jobId: r.jobId,
-        actorId: r.actorId,
-        now: r.now,
-      }),
-    ],
+  const lots = await accountLots(db, accountId);
+  const cutoff = iso(r.now);
+  const holds = new Map<string, number>();
+  let left = r.seconds;
+  const hold = (lot: CreditLotState, cap: number) => {
+    const taken = holds.get(lot.id) ?? 0;
+    const k = Math.min(freePart(lot) - taken, cap, left);
+    if (k <= 0) return;
+    holds.set(lot.id, taken + k);
+    left -= k;
   };
+  for (const share of r.entitled ?? []) {
+    const lot = lots.find((l) => l.id === share.lotId);
+    if (lot) hold(lot, share.seconds);
+  }
+  for (const lot of lots) if (goodAt(lot, cutoff)) hold(lot, left);
+  if (left > 0) throw pcError('INSUFFICIENT_CREDIT', { shortfall_seconds: left });
+  const statements: Stmt[] = [
+    ensureCreditAccount(db, r.userId, r.tierId, r.now),
+    accountDelta(db, accountId, -r.seconds, r.seconds, 0, r.now),
+    db
+      .prepare(
+        `INSERT INTO pc_credit_reservations (id, account_id, user_id, tier_id, job_id, seconds_reserved, state, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'active', ?)`
+      )
+      .bind(reservationId, accountId, r.userId, r.tierId, r.jobId, r.seconds, iso(r.now)),
+  ];
+  for (const [lotId, seconds] of holds) {
+    statements.push(
+      db.prepare('UPDATE pc_credit_lots SET seconds_held = seconds_held + ? WHERE id = ?').bind(seconds, lotId),
+      db.prepare('INSERT INTO pc_credit_reservation_lots (reservation_id, lot_id, seconds, created_at) VALUES (?, ?, ?, ?)').bind(reservationId, lotId, seconds, iso(r.now))
+    );
+  }
+  statements.push(
+    ledgerStmt(db, {
+      entryKey: `reserve:${reservationId}`,
+      accountId,
+      userId: r.userId,
+      tierId: r.tierId,
+      type: 'reserve',
+      dAvailable: -r.seconds,
+      dReserved: r.seconds,
+      dConsumed: 0,
+      reservationId,
+      jobId: r.jobId,
+      actorId: r.actorId,
+      now: r.now,
+    })
+  );
+  return { reservationId, statements };
 }
 
 /** The flip every settlement and release starts with, and the fence that it really happened in THIS batch. */
@@ -362,11 +437,18 @@ function closeReservation(db: D1Database, res: CreditReservationRow, state: 'set
   ];
 }
 
-/** Give a whole active reservation back (a cancelled job, a job that never ran). Exactly once: the flip is fenced. */
-export function releaseCredits(db: D1Database, res: CreditReservationRow, actorId: string, now: Date, note = ''): Stmt[] {
+/**
+ * Give a whole active reservation back (a cancelled job, a job that never
+ * ran): each hold returns to its lot's free part. Exactly once: the flip is
+ * fenced. What returns to a lot past its expiry is free there, so the next
+ * sweep takes it.
+ */
+export async function releaseCredits(db: D1Database, res: CreditReservationRow, actorId: string, now: Date, note = ''): Promise<Stmt[]> {
   if (res.state !== 'active') throw pcError('STATE_CHANGED');
+  const holds = await reservationHolds(db, res.id);
   return [
     ...closeReservation(db, res, 'released', 0, res.seconds_reserved, now),
+    ...holds.map((h) => unhold(db, h)),
     accountDelta(db, res.account_id, res.seconds_reserved, -res.seconds_reserved, 0, now),
     ledgerStmt(db, {
       entryKey: `release:${res.id}`,
@@ -403,14 +485,16 @@ export interface SettleOutcome {
 /**
  * Settle a reservation against what the job actually used.
  *
- *   billed from the reservation = min(actual, reserved)
- *   released                    = reserved − that
- *   overage                     = actual − reserved, billed from the
- *                                 available balance only under
- *                                 'charge_from_balance', and never beyond it
+ *   billed from the reservation = min(actual, reserved), consumed from the
+ *                                 lots it held, in the order it took them
+ *   released                    = reserved − that: the rest of each hold
+ *                                 returns to its lot's free part
+ *   overage                     = actual − reserved, billed only under
+ *                                 'charge_from_balance', from free seconds
+ *                                 not yet past their expiry, and never
+ *                                 beyond them
  *
- * The billed seconds are drawn from the account's lots (expiring first, then
- * oldest), and each draw records the value it carried.
+ * Each lot drawn gives one draw, valued cumulatively (lots.ts `drawValue`).
  */
 export async function settleCredits(
   db: D1Database,
@@ -425,23 +509,47 @@ export async function settleCredits(
   if (!Number.isSafeInteger(actualSeconds) || actualSeconds < 0) throw pcError('VALIDATION', { field: 'seconds' });
   const fromReservation = Math.min(actualSeconds, res.seconds_reserved);
   const released = res.seconds_reserved - fromReservation;
+  const holds = await reservationHolds(db, res.id);
+  const lots = await accountLots(db, res.account_id);
+  const take = new Map<string, number>();
+  let left = fromReservation;
+  for (const h of holds) {
+    const k = Math.min(h.seconds, left);
+    if (k > 0) take.set(h.lotId, k);
+    left -= k;
+  }
+  if (left > 0) throw pcError('STATE_CHANGED', { reason: 'holds_do_not_cover_reservation' });
   let overage = 0;
   if (actualSeconds > res.seconds_reserved && policy === 'charge_from_balance') {
-    const acct = await one<{ available_seconds: number }>(db, 'SELECT available_seconds FROM pc_credit_accounts WHERE id = ?', res.account_id);
-    // The released remainder is zero here (actual > reserved), so what is
-    // available is exactly the balance outside this job.
-    overage = Math.min(actualSeconds - res.seconds_reserved, Number(acct?.available_seconds ?? 0));
+    // Every hold is consumed whole here, so each lot's free part is exactly
+    // what lies outside this job.
+    const want = actualSeconds - res.seconds_reserved;
+    const cutoff = iso(now);
+    for (const lot of lots) {
+      if (overage >= want) break;
+      if (!goodAt(lot, cutoff)) continue;
+      const k = Math.min(freePart(lot), want - overage);
+      if (k <= 0) continue;
+      take.set(lot.id, (take.get(lot.id) ?? 0) + k);
+      overage += k;
+    }
   }
   const unbilled = actualSeconds - fromReservation - overage;
   const billed = fromReservation + overage;
-  const statements: Stmt[] = [...closeReservation(db, res, 'settled', fromReservation, released, now)];
+  // The holds go back first, so the draws below never leave a lot holding more than it has.
+  const statements: Stmt[] = [...closeReservation(db, res, 'settled', fromReservation, released, now), ...holds.map((h) => unhold(db, h))];
   let value = 0;
   if (billed > 0) {
-    const plan = planDraws(await spendableLots(db, res.account_id), billed);
-    if (plan.shortfall > 0) throw pcError('STATE_CHANGED', { reason: 'lots_do_not_cover_balance' });
-    value = plan.value;
+    const draws: LotDraw[] = [];
+    for (const [lotId, qty] of take) {
+      const lot = lots.find((l) => l.id === lotId);
+      if (!lot || lot.remaining < qty) throw pcError('STATE_CHANGED', { reason: 'lots_do_not_cover_balance' });
+      const v = drawValue(lot, qty);
+      draws.push({ lotId, qty, value: v, expectedRemaining: lot.remaining });
+      value += v;
+    }
     const key = `consume:${res.id}`;
-    statements.push(...drawStatements(db, plan.draws, key, now));
+    statements.push(...drawStatements(db, draws, key, now));
     statements.push(
       ledgerStmt(db, {
         entryKey: key,
@@ -499,7 +607,7 @@ interface DebitInput {
 }
 
 /** The lot draws, the ledger row and the account change of one debit of the available balance. */
-function debitStatements(db: D1Database, accountId: string, p: DebitInput, plan: { draws: LotDraw[]; value: number }): Stmt[] {
+function debitStatements(db: D1Database, accountId: string, p: DebitInput, plan: { draws: FencedDraw[]; value: number }): Stmt[] {
   return [
     ...drawStatements(db, plan.draws, p.entryKey, p.now),
     ledgerStmt(db, {
@@ -523,28 +631,23 @@ function debitStatements(db: D1Database, accountId: string, p: DebitInput, plan:
 }
 
 /**
- * Take seconds out of the AVAILABLE balance. Without `lotId` they are FREE
- * seconds, drawn in spend order past the ones confirmed jobs hold, under a
- * fence on the balance the plan read; `notExpiredAt` also leaves out every lot
- * already past its expiry. With `lotId` (a refund of that purchase) they come
- * from that lot. Either way the account CHECK refuses taking more than is
- * available, so reserved hours can never be refunded away.
+ * Take FREE seconds out of the available balance: never a second a confirmed
+ * job holds, never one whose expiry has come (that is the sweep's). Without
+ * `lotId` they are drawn in spend order; with `lotId` (a refund of that
+ * purchase) only from that lot. Each draw is fenced on the lot's remainder,
+ * and ck_pc_credit_lot_held refuses a debit that a hold landing meanwhile
+ * would leave short — the caller re-plans — so held hours can never be
+ * debited away.
  */
 export async function debitAvailable(
   db: D1Database,
-  p: Omit<DebitInput, 'type'> & { type: 'refund' | 'adjust_debit' | 'conversion_out'; notExpiredAt?: Date }
+  p: Omit<DebitInput, 'type'> & { type: 'refund' | 'adjust_debit' | 'conversion_out' }
 ): Promise<{ statements: Stmt[]; value: number; draws: CreditDraw[] }> {
   if (!Number.isSafeInteger(p.seconds) || p.seconds <= 0) throw pcError('VALIDATION', { field: 'seconds' });
   const accountId = creditAccountId(p.userId, p.tierId);
-  if (p.lotId) {
-    const plan = planFreeDraws(await spendableLots(db, accountId, p.lotId), 0, p.seconds);
-    if (plan.shortfall > 0) throw pcError('INSUFFICIENT_CREDIT');
-    return { value: plan.value, draws: plan.draws, statements: debitStatements(db, accountId, p, plan) };
-  }
-  const balance = await accountBalance(db, accountId);
-  const plan = planFreeDraws(await spendableLots(db, accountId), balance.reserved, p.seconds, p.notExpiredAt);
+  const plan = planFreeDraws(await accountLots(db, accountId, p.lotId), p.seconds, p.now);
   if (plan.shortfall > 0) throw pcError('INSUFFICIENT_CREDIT');
-  return { value: plan.value, draws: plan.draws, statements: [balanceUnchanged(db, accountId, balance), ...debitStatements(db, accountId, p, plan)] };
+  return { value: plan.value, draws: plan.draws, statements: debitStatements(db, accountId, p, plan) };
 }
 
 export interface ConversionRule {
@@ -579,7 +682,6 @@ export async function convertCredits(
     actorId: p.actorId,
     note: `rule ${p.rule.id}`,
     now: p.now,
-    notExpiredAt: p.now,
   });
   // One new lot per expiry among the drawn lots (spend order keeps equal
   // expiries together), with that absolute date and the value of its draws.
@@ -629,60 +731,29 @@ export async function convertCredits(
 }
 
 /**
- * Lots whose configured expiry has passed and still hold seconds (only ever
- * set by an explicit package rule), earliest expiry first — only from accounts
- * where some of those seconds are FREE. Expired lots come first in spend
- * order, so the open reservations hold them first: an account has expired
- * seconds to take exactly when they add up to more than it has reserved (and
- * it has any available). A lot wholly held for jobs therefore never fills the
- * page ahead of lots that can expire.
+ * Lots whose configured expiry has passed (only ever set by an explicit
+ * package rule) and that still have a FREE part, earliest expiry first. The
+ * filter is per lot: a lot wholly held for jobs has nothing to expire now and
+ * is never read, so it cannot fill the page ahead of lots that do.
  */
-export async function expiredLots(
-  db: D1Database,
-  now: Date,
-  limit = 50,
-  accountId?: string
-): Promise<Array<CreditLotRow & { user_id: string; tier_id: string }>> {
+export async function expiredLots(db: D1Database, now: Date, limit = 50): Promise<Array<CreditLotRow & { user_id: string; tier_id: string }>> {
   return many(
     db,
-    `SELECT l.id, l.account_id, l.user_id, l.tier_id, l.source, l.seconds_total, l.seconds_remaining, l.paid_iqd, l.expires_at, l.created_at, l.order_line_id
-       FROM pc_credit_lots l JOIN pc_credit_accounts a ON a.id = l.account_id
-      WHERE l.expires_at IS NOT NULL AND l.expires_at <= ?1 AND l.seconds_remaining > 0 AND a.available_seconds > 0
-        ${accountId ? 'AND a.id = ?3' : ''}
-        AND (SELECT COALESCE(SUM(x.seconds_remaining), 0) FROM pc_credit_lots x
-              WHERE x.account_id = a.id AND x.expires_at IS NOT NULL AND x.expires_at <= ?1 AND x.seconds_remaining > 0) > a.reserved_seconds
-      ORDER BY l.expires_at, l.id LIMIT ?2`,
-    ...(accountId ? [iso(now), limit, accountId] : [iso(now), limit])
+    `SELECT id, account_id, user_id, tier_id, source, seconds_total, seconds_remaining, seconds_held, paid_iqd, expires_at, created_at, order_line_id
+       FROM pc_credit_lots
+      WHERE expires_at IS NOT NULL AND expires_at <= ? AND seconds_remaining > seconds_held
+      ORDER BY expires_at, id LIMIT ?`,
+    iso(now),
+    limit
   );
 }
 
 /**
- * Expire, now, every free expired second of one customer's tier — before a
- * confirmation reserves hours. Reservations hold the expiring lots first, so
- * a job confirmed after a lot's expiry but before the sweep would otherwise
- * shield the seconds that should have gone and spend them. Each lot is its
- * own batch, exactly as the sweep would run it; a pass a concurrent runner
- * already made is simply skipped.
- */
-export async function expireDueCredits(db: D1Database, userId: string, tierId: string, now: Date): Promise<number> {
-  let expired = 0;
-  for (const lot of await expiredLots(db, now, 50, creditAccountId(userId, tierId))) {
-    const planned = await planLotExpiry(db, lot, now);
-    if (!planned) continue;
-    try {
-      await runBatch(db, planned.statements);
-      expired += planned.seconds;
-    } catch (e) {
-      if (!(e instanceof HttpError && e.code === 'STATE_CHANGED')) throw e;
-    }
-  }
-  return expired;
-}
-
-/**
- * Expire the FREE part of one lot whose expiry has passed (§3.2): seconds the
- * open reservations hold stay for their jobs, and what a job gives back later
- * expires on a later run. Null when nothing of the lot is free now.
+ * Expire the FREE part of one lot whose expiry has passed (§3.2): the seconds
+ * jobs hold on it stay for them, and a hold given back later is free and
+ * expires on a later run (unless a free reprint inherits it). Null when
+ * nothing of the lot is free now. The batch is fenced on the lot's remainder
+ * AND its holds as the plan read them, so it takes exactly that free part.
  *
  * A lot can therefore expire in several passes. Each is keyed by the seconds
  * the lot held before it — they only ever go down — so a later pass has a key
@@ -690,17 +761,14 @@ export async function expireDueCredits(db: D1Database, userId: string, tierId: s
  */
 export async function planLotExpiry(
   db: D1Database,
-  lot: Pick<CreditLotRow, 'id' | 'account_id' | 'expires_at'> & { user_id: string; tier_id: string },
+  lot: Pick<CreditLotRow, 'id' | 'account_id'> & { user_id: string; tier_id: string },
   now: Date
 ): Promise<{ seconds: number; statements: Stmt[] } | null> {
-  const balance = await accountBalance(db, lot.account_id);
-  const lots = await spendableLots(db, lot.account_id);
-  const at = lots.findIndex((l) => l.id === lot.id);
-  if (at < 0) return null;
-  const seconds = Math.min(freeSeconds(lots, balance.reserved)[at], balance.available);
+  const [target] = await accountLots(db, lot.account_id, lot.id);
+  if (!target || target.expiresAt === null || goodAt(target, iso(now))) return null;
+  const seconds = freePart(target);
   if (seconds <= 0) return null;
-  const target = lots[at];
-  const draw: LotDraw = { lotId: target.id, qty: seconds, value: drawValue(target, seconds), expectedRemaining: target.remaining };
+  const draw: FencedDraw = { lotId: target.id, qty: seconds, value: drawValue(target, seconds), expectedRemaining: target.remaining, expectedHeld: target.held };
   const p: DebitInput = {
     userId: lot.user_id,
     tierId: lot.tier_id,
@@ -709,10 +777,10 @@ export async function planLotExpiry(
     entryKey: `expire:${target.id}:${target.remaining}`,
     lotId: target.id,
     actorId: 'system',
-    note: `package expiry ${lot.expires_at}`,
+    note: `package expiry ${target.expiresAt}`,
     now,
   };
-  return { seconds, statements: [balanceUnchanged(db, lot.account_id, balance), ...debitStatements(db, lot.account_id, p, { draws: [draw], value: draw.value })] };
+  return { seconds, statements: debitStatements(db, lot.account_id, p, { draws: [draw], value: draw.value }) };
 }
 
 // ------------------------------------------------------------------ reads

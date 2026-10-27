@@ -21,13 +21,12 @@
  * work, and neither is one whose fresh reading says the agent cannot reach
  * it or that it runs a print the cloud did not give it. A reading is dated
  * by when it was TAKEN, not when it arrived, and an older reading never
- * replaces a newer one. When a printer comes back, its readings are compared
- * with the job record and a mismatch is recorded for an operator — never
- * «fixed» by guessing.
+ * replaces a newer one. When a printer comes back, the outage is recorded on
+ * its row and its readings are compared with the job record; a mismatch is
+ * recorded for an operator — never «fixed» by guessing.
  */
 import { randomToken, sha256Hex } from '../crypto';
-import { HttpError } from '../http';
-import { fence, many, one, runBatch, type Stmt } from './db';
+import { fence, many, one, planned, runBatch, type Stmt } from './db';
 import { invalid, pcError } from './errors';
 import { pcAudit } from './audit';
 import { addSeconds, iso, pcId, reqInt, reqString } from './util';
@@ -186,7 +185,12 @@ export interface TelemetryInput {
 
 const optIntIn = (v: unknown, f: string, min: number, max: number) => (v === undefined || v === null ? null : reqInt(v, f, { min, max }));
 
-const agentTime = (v: unknown): string | null => (typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? new Date(v).toISOString() : null);
+/** An agent stamp, normalised; four-digit years only, because one agent's stamps are compared as text (same-clock order). */
+const agentTime = (v: unknown): string | null => {
+  if (typeof v !== 'string' || Number.isNaN(Date.parse(v))) return null;
+  const at = new Date(v).toISOString();
+  return /^\d{4}-/.test(at) ? at : null;
+};
 
 export function parseTelemetry(raw: Record<string, unknown>): TelemetryInput {
   const state = raw.machine_state;
@@ -226,101 +230,152 @@ const EARLIEST_READING = Date.UTC(2000, 0, 1);
  * reporting a finished print the record still shows as printing, is recorded
  * as an event for an operator.
  *
- * ORDER. `received_at` holds when the reading was TAKEN, on the server
- * clock: its arrival less its age. The age is `sent_at - reported_at`, two
- * readings of the AGENT's one clock, so a clock running fast or slow cancels
- * out and a reading buffered while the network was down arrives as old as it
- * is. Without `sent_at` the server clock is the reference (`now -
- * reported_at`, never in the future), and a slow agent clock makes readings
- * look older — stale, never live. Every reader judges freshness from that
- * column. A reading older than the stored one changes nothing and is answered
- * `superseded`: a late copy can never replace the current state, clear an
- * error or pass for live. The upsert and a fence re-check the order inside the
- * batch, so two readings racing each other end with the newer one stored and
- * only its events.
+ * TAKEN. `received_at` holds when the reading was TAKEN, on the server clock:
+ * its arrival less its age. The age is `sent_at - reported_at`, two readings
+ * of the AGENT's one clock, so a clock running fast or slow cancels out and a
+ * reading buffered while the network was down arrives as old as it is.
+ * Without `sent_at` the server clock is the reference (`now - reported_at`,
+ * never in the future), and a slow agent clock makes readings look older —
+ * stale, never live. Every reader judges freshness from that column.
  *
- * SILENCE is a property of the CONNECTION, not of a reading: `arrived_at` is
- * the server time of the agent's last POST for the printer, superseded ones
- * included. A machine is «back» (connection_restored, and reconcile_needed for
- * a print it finished meanwhile) only when that gap passed the window — once
- * per outage, however many buffered readings the reconnection flushes.
+ * ORDER. Travel time is not in the age, so the taken times of two readings
+ * sent promptly follow their ARRIVAL. Readings of the agent that wrote the
+ * stored row are therefore ordered on that agent's own clock: one whose
+ * `reported_at` is earlier than the stored one is older, whenever it arrives
+ * and whatever its `sent_at` says. A reading without `reported_at`, or a row
+ * another agent wrote (the printer was re-bound), is ordered by taken time.
+ * An older reading changes nothing and is answered `superseded`: a late copy
+ * can never replace the current state, clear an error or pass for live. The
+ * pre-read, the upsert's WHERE and the fence after it apply the same order,
+ * so two readings racing each other end with the newer one stored and only
+ * its events. (An agent clock stepped BACK stays behind its own last stamp
+ * until it passes it, or until it sends a reading without one.)
+ *
+ * OUTAGE. Silence is a property of the CONNECTION, not of a reading:
+ * `arrived_at` is the server time of the agent's last POST for the printer,
+ * superseded ones included, and it only moves forward. The POST that finds
+ * it older than the window — stored or superseded — records the outage on the
+ * row (`outage_from` = that last arrival, `outage_to` = now) and writes
+ * connection_restored, in one batch fenced on `arrived_at` still holding the
+ * value read: of two POSTs racing at reconnection one records it, the other
+ * re-reads and only moves `arrived_at`.
+ *
+ * RECONCILE. A STORED reading saying `finished` for the assigned job the
+ * record still shows `printing`, taken during the recorded outage (or the
+ * first one stored that was taken after it), writes reconcile_needed — once
+ * per job per outage (its id is derived from both), whichever POST of the
+ * reconnection carries it, even when the first one was superseded. A finish
+ * reported on a connection steady since then is the agent's own `completed`
+ * event to report, not a reconciliation.
  */
 export async function ingestTelemetry(db: D1Database, agent: AgentRow, printerId: string, t: TelemetryInput, staleSeconds: number, now: Date) {
   await agentPrinter(db, agent, printerId);
   const stated = t.reported_at ? Date.parse(t.reported_at) : null;
   const ageMs = stated === null ? 0 : Math.max(0, (t.sent_at ? Date.parse(t.sent_at) : now.getTime()) - stated);
   const takenAt = iso(new Date(Math.max(EARLIEST_READING, now.getTime() - ageMs)));
-  const superseded = { stored: false, superseded: true, mismatch: false };
-  const previous = await one<{ received_at: string; arrived_at: string | null }>(db, 'SELECT received_at, arrived_at FROM pc_printer_telemetry WHERE printer_id = ?', printerId);
-  // A late copy still proves the connection is alive.
-  const arrived = () =>
-    db.prepare('UPDATE pc_printer_telemetry SET arrived_at = ? WHERE printer_id = ? AND (arrived_at IS NULL OR arrived_at < ?)').bind(iso(now), printerId, iso(now)).run();
-  if (previous && takenAt < previous.received_at) {
-    await arrived();
-    return superseded;
-  }
-  const assigned = await one<{ job_id: string; status: string }>(
-    db,
-    "SELECT a.job_id, j.status FROM pc_printer_assignments a JOIN pc_print_jobs j ON j.id = a.job_id WHERE a.printer_id = ? AND a.state = 'active'",
-    printerId
-  );
-  const s: Stmt[] = [
-    db
-      .prepare(
-        `INSERT INTO pc_printer_telemetry (printer_id, agent_id, received_at, reported_at, arrived_at, machine_state, job_id, progress_permille, layer, total_layers,
-           remaining_seconds, nozzle_temp_dc, bed_temp_dc, chamber_temp_dc, errors_json, camera_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT (printer_id) DO UPDATE SET agent_id = excluded.agent_id, received_at = excluded.received_at, reported_at = excluded.reported_at,
-           arrived_at = excluded.arrived_at,
-           machine_state = excluded.machine_state, job_id = excluded.job_id, progress_permille = excluded.progress_permille, layer = excluded.layer,
-           total_layers = excluded.total_layers, remaining_seconds = excluded.remaining_seconds, nozzle_temp_dc = excluded.nozzle_temp_dc,
-           bed_temp_dc = excluded.bed_temp_dc, chamber_temp_dc = excluded.chamber_temp_dc, errors_json = excluded.errors_json, camera_json = excluded.camera_json
-         WHERE excluded.received_at >= pc_printer_telemetry.received_at`
-      )
-      .bind(
+  return planned<{ stored: boolean; superseded?: true; mismatch: boolean }>(db, async () => {
+    const previous = await one<{
+      agent_id: string | null;
+      received_at: string;
+      reported_at: string | null;
+      arrived_at: string | null;
+      outage_from: string | null;
+      outage_to: string | null;
+    }>(db, 'SELECT agent_id, received_at, reported_at, arrived_at, outage_from, outage_to FROM pc_printer_telemetry WHERE printer_id = ?', printerId);
+    const event = (kind: string, detail: Record<string, unknown>) =>
+      db
+        .prepare("INSERT INTO pc_printer_events (id, printer_id, kind, detail_json, actor_type, actor_id, created_at) VALUES (?, ?, ?, ?, 'agent', ?, ?)")
+        .bind(pcId('pcpe'), printerId, kind, JSON.stringify(detail), agent.id, iso(now));
+
+    // The connection first: every POST proves it alive, and the one that ends a silence records the outage.
+    const lastArrival = previous ? (previous.arrived_at ?? previous.received_at) : null;
+    const restored = !!lastArrival && (now.getTime() - Date.parse(lastArrival)) / 1000 > staleSeconds;
+    const s: Stmt[] = restored
+      ? [
+          fence(db, 'STATE_CHANGED', '(SELECT COALESCE(arrived_at, received_at) FROM pc_printer_telemetry WHERE printer_id = ?) = ?', [printerId, lastArrival]),
+          db.prepare('UPDATE pc_printer_telemetry SET arrived_at = ?, outage_from = ?, outage_to = ? WHERE printer_id = ?').bind(iso(now), lastArrival, iso(now), printerId),
+          event('connection_restored', { silent_since: lastArrival }),
+        ]
+      : [db.prepare('UPDATE pc_printer_telemetry SET arrived_at = ? WHERE printer_id = ? AND (arrived_at IS NULL OR arrived_at < ?)').bind(iso(now), printerId, iso(now))];
+    const outage = restored && lastArrival ? { from: lastArrival, to: iso(now) } : previous?.outage_from && previous.outage_to ? { from: previous.outage_from, to: previous.outage_to } : null;
+
+    const sameClock = !!(previous && previous.agent_id === agent.id && previous.reported_at && t.reported_at);
+    if (previous && (sameClock ? (t.reported_at as string) < (previous.reported_at as string) : takenAt < previous.received_at)) {
+      return { statements: s, result: { stored: false, superseded: true, mismatch: false } };
+    }
+    const assigned = await one<{ job_id: string; status: string }>(
+      db,
+      "SELECT a.job_id, j.status FROM pc_printer_assignments a JOIN pc_print_jobs j ON j.id = a.job_id WHERE a.printer_id = ? AND a.state = 'active'",
+      printerId
+    );
+    s.push(
+      db
+        .prepare(
+          `INSERT INTO pc_printer_telemetry (printer_id, agent_id, received_at, reported_at, arrived_at, machine_state, job_id, progress_permille, layer, total_layers,
+             remaining_seconds, nozzle_temp_dc, bed_temp_dc, chamber_temp_dc, errors_json, camera_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (printer_id) DO UPDATE SET agent_id = excluded.agent_id, received_at = excluded.received_at, reported_at = excluded.reported_at,
+             machine_state = excluded.machine_state, job_id = excluded.job_id, progress_permille = excluded.progress_permille, layer = excluded.layer,
+             total_layers = excluded.total_layers, remaining_seconds = excluded.remaining_seconds, nozzle_temp_dc = excluded.nozzle_temp_dc,
+             bed_temp_dc = excluded.bed_temp_dc, chamber_temp_dc = excluded.chamber_temp_dc, errors_json = excluded.errors_json, camera_json = excluded.camera_json
+           WHERE CASE WHEN pc_printer_telemetry.agent_id = excluded.agent_id AND pc_printer_telemetry.reported_at IS NOT NULL AND excluded.reported_at IS NOT NULL
+                      THEN excluded.reported_at >= pc_printer_telemetry.reported_at
+                      ELSE excluded.received_at >= pc_printer_telemetry.received_at END`
+        )
+        .bind(
+          printerId,
+          agent.id,
+          takenAt,
+          t.reported_at,
+          iso(now),
+          t.machine_state,
+          t.job_id,
+          t.progress_permille,
+          t.layer,
+          t.total_layers,
+          t.remaining_seconds,
+          t.nozzle_temp_dc,
+          t.bed_temp_dc,
+          t.chamber_temp_dc,
+          JSON.stringify(t.errors),
+          JSON.stringify(t.camera)
+        ),
+      // A newer reading stored meanwhile kept its place: the row is not this reading, and the re-plan answers superseded.
+      fence(db, 'STATE_CHANGED', 'EXISTS (SELECT 1 FROM pc_printer_telemetry WHERE printer_id = ? AND agent_id = ? AND received_at = ? AND reported_at IS ?)', [
         printerId,
         agent.id,
         takenAt,
         t.reported_at,
-        iso(now),
-        t.machine_state,
-        t.job_id,
-        t.progress_permille,
-        t.layer,
-        t.total_layers,
-        t.remaining_seconds,
-        t.nozzle_temp_dc,
-        t.bed_temp_dc,
-        t.chamber_temp_dc,
-        JSON.stringify(t.errors),
-        JSON.stringify(t.camera)
-      ),
-    // A newer reading stored meanwhile kept its place: this one, and its events, land nowhere.
-    fence(db, 'STATE_CHANGED', '(SELECT received_at FROM pc_printer_telemetry WHERE printer_id = ?) = ?', [printerId, takenAt]),
-  ];
-  const event = (kind: string, detail: Record<string, unknown>) =>
-    db
-      .prepare("INSERT INTO pc_printer_events (id, printer_id, kind, detail_json, actor_type, actor_id, created_at) VALUES (?, ?, ?, ?, 'agent', ?, ?)")
-      .bind(pcId('pcpe'), printerId, kind, JSON.stringify(detail), agent.id, iso(now));
-  const lastArrival = previous ? (previous.arrived_at ?? previous.received_at) : null;
-  const wasStale = lastArrival ? (now.getTime() - Date.parse(lastArrival)) / 1000 > staleSeconds : false;
-  if (wasStale) s.push(event('connection_restored', { silent_since: lastArrival }));
-  if (t.job_id && assigned && t.job_id !== assigned.job_id) s.push(event('telemetry_job_mismatch', { reported: t.job_id, assigned: assigned.job_id }));
-  if (t.job_id && !assigned) s.push(event('telemetry_job_unassigned', { reported: t.job_id }));
-  if (assigned && wasStale && t.machine_state === 'finished' && assigned.status === 'printing') {
-    s.push(event('reconcile_needed', { job_id: assigned.job_id, machine_state: t.machine_state }));
-  }
-  if (t.machine_state === 'error' && t.errors.length) s.push(event('machine_error', { errors: t.errors }));
-  try {
-    await runBatch(db, s);
-  } catch (e) {
-    if (e instanceof HttpError && e.code === 'STATE_CHANGED') {
-      await arrived();
-      return superseded;
+      ])
+    );
+    if (t.job_id && assigned && t.job_id !== assigned.job_id) s.push(event('telemetry_job_mismatch', { reported: t.job_id, assigned: assigned.job_id }));
+    if (t.job_id && !assigned) s.push(event('telemetry_job_unassigned', { reported: t.job_id }));
+    // Taken during the outage, or the first reading stored that was taken after it.
+    const backFromSilence = !!previous && !!outage && takenAt >= outage.from && (takenAt <= outage.to || previous.received_at < outage.to);
+    if (assigned && outage && backFromSilence && t.machine_state === 'finished' && assigned.status === 'printing') {
+      // Once per job per outage: the id is derived from both, and the job must still be printing on this machine when the batch runs.
+      s.push(
+        db
+          .prepare(
+            `INSERT OR IGNORE INTO pc_printer_events (id, printer_id, kind, detail_json, actor_type, actor_id, created_at)
+             SELECT ?, ?, 'reconcile_needed', ?, 'agent', ?, ?
+              WHERE EXISTS (SELECT 1 FROM pc_printer_assignments a JOIN pc_print_jobs j ON j.id = a.job_id
+                             WHERE a.printer_id = ? AND a.job_id = ? AND a.state = 'active' AND j.status = 'printing')`
+          )
+          .bind(
+            `pcpe_rc_${assigned.job_id}_${Date.parse(outage.from)}`,
+            printerId,
+            JSON.stringify({ job_id: assigned.job_id, machine_state: t.machine_state, silent_since: outage.from }),
+            agent.id,
+            iso(now),
+            printerId,
+            assigned.job_id
+          )
+      );
     }
-    throw e;
-  }
-  return { stored: true, mismatch: !!(t.job_id && assigned && t.job_id !== assigned.job_id) };
+    if (t.machine_state === 'error' && t.errors.length) s.push(event('machine_error', { errors: t.errors }));
+    return { statements: s, result: { stored: true, mismatch: !!(t.job_id && assigned && t.job_id !== assigned.job_id) } };
+  });
 }
 
 /** Every printer as an operator sees it: status, connectivity derived honestly, current job, telemetry with its age. */
