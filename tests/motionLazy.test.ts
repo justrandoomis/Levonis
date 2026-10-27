@@ -52,8 +52,12 @@ const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 const FEATURES_BUDGET = 20 * KB;
 const CORE_BUDGET = 40 * KB;
 const ICONS_BUDGET = 16 * KB;
-/** 138 chunks under 1 KB before the icon chunk, 28 after (small app modules two lazy routes share). */
-const TINY_CHUNKS_MAX = 45;
+/**
+ * 138 chunks under 1 KB before the icon chunk, 28 after (small app modules two lazy routes share).
+ * The community section pages (community UI plan C1, C5) share two more: the home rails and the
+ * search lines, each under 1 KB; the icons still group into one chunk.
+ */
+const TINY_CHUNKS_MAX = 47;
 
 /** Identifiers that only the projection tree, the drag gesture and the pan session carry; they survive minification as property names. */
 const FEATURE_FINGERPRINTS = ['isProjectionDirty', 'resolveTargetDelta', 'scheduleUpdateProjection', 'panSession'];
