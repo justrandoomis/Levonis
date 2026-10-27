@@ -8,7 +8,7 @@
  * server counts them (GET /me/credits, GET /me/inventory); the Levonis
  * wallet's balance (GET /me/wallet), whose deposits live on Levonis itself.
  * The menu leads to the account's own screens and to the sections that own
- * the rest — prints (/jobs), orders (/orders), files (/files).
+ * the rest — prints (/jobs), orders (/orders), files (/library).
  */
 import { useState } from 'react';
 import VariantImg from '../../../components/ui/VariantImg';
@@ -195,7 +195,7 @@ export default function AccountHome() {
         <MenuRow to="/jobs" icon={<Box className="h-5 w-5" />} title={t(account.myPrints)} sub={t(account.myPrintsSub)} />
         <MenuRow to="/account/hours" icon={<Clock className="h-5 w-5" />} title={t(account.hoursCard)} sub={t(account.hoursSub)} />
         <MenuRow to="/account/materials" icon={<Disc3 className="h-5 w-5" />} title={t(account.materials)} sub={t(account.materialsSub)} />
-        <MenuRow to="/files" icon={<Folder className="h-5 w-5" />} title={t(account.files)} sub={t(account.filesSub)} />
+        <MenuRow to="/library" icon={<Folder className="h-5 w-5" />} title={t(account.files)} sub={t(account.filesSub)} />
       </MenuGroup>
 
       <MenuGroup label={t(account.groupMoves)}>

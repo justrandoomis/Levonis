@@ -388,7 +388,7 @@ test('Print Cloud’s pages are lazy chunks; Print and Account sit behind the si
 
 test('each section owns its prefixes; the shell’s own pages belong to none', () => {
   const cases: Array<[string, ReturnType<typeof cloudSection>]> = [
-    ['/print', 'print'], ['/print/new', 'print'], ['/files', 'print'], ['/files/f_1', 'print'], ['/Projects/p_1', 'print'], ['/jobs/j_1', 'print'],
+    ['/print', 'print'], ['/print/new', 'print'], ['/library', 'print'], ['/library/f_1', 'print'], ['/files', null], ['/files/f_1', null], ['/Projects/p_1', 'print'], ['/jobs/j_1', 'print'],
     ['/store', 'store'], ['/store/cart', 'store'], ['/orders', 'store'], ['/orders/pco_1', 'store'],
     ['/account', 'account'], ['/account/shipments/s_1', 'account'],
     ['/', null], ['/printers', null], ['/printers/pm_1', null], ['/how-it-works', null], ['/auth', null],
@@ -530,5 +530,47 @@ test('every Print Cloud source file stays inside the house rules a test elsewher
     assert.doesNotMatch(src, /علاوة/, `${rel}: the forbidden word`);
     assert.doesNotMatch(src, /ليفونيس|لیڤۆنیس|ليڤونيس/, `${rel}: «Levonis» is written in Latin letters`);
     assert.doesNotMatch(src, /localStorage\.setItem|sessionStorage\.setItem/, `${rel}: nothing of the customer's is cached on the device`);
+  }
+});
+
+/**
+ * NO CLOUD SCREEN MAY LIVE ON A PATH THE WORKER ANSWERS FIRST.
+ *
+ * wrangler.jsonc `run_worker_first` sends every listed path to the Worker
+ * before the asset layer, on EVERY host — cloud.<root> included. A cloud
+ * route under one of them works when it is reached by an in-app link and
+ * breaks the moment it is reloaded or opened from a link: the Worker answers
+ * `/files/<id>` with a media lookup, not with the app. That is how the file
+ * library moved from `/files` to `/library`. The root `/` is the one shared
+ * path, and the Worker hands it to the same document on purpose.
+ */
+test('no cloud route sits under a path wrangler.jsonc sends to the Worker first', () => {
+  const wrangler = read('wrangler.jsonc');
+  const blocks = wrangler.match(/"run_worker_first"\s*:\s*\[[^\]]*\]/g) ?? [];
+  assert.ok(blocks.length >= 3, 'top-level, staging and dark each declare run_worker_first');
+  const workerFirst = new Set(blocks.flatMap((b) => [...b.matchAll(/"(\/[^"]*)"/g)].map((m) => m[1]!)));
+  const routes = new Set<string>();
+  const collect = (rel: string) => {
+    for (const m of read(rel).matchAll(/<Route\s+path="([^"]+)"/g)) routes.add(m[1]!);
+  };
+  collect('src/cloud/PrintCloudApp.tsx');
+  const walk = (dir: string) => {
+    for (const name of readdirSync(join(ROOT, dir))) {
+      const rel = `${dir}/${name}`;
+      if (statSync(join(ROOT, rel)).isDirectory()) walk(rel);
+      else if (rel.endsWith('.tsx')) collect(rel);
+    }
+  };
+  walk('src/cloud/pages');
+  for (const prefixes of Object.values(SECTION_PREFIXES)) for (const p of prefixes) routes.add(p);
+  assert.ok(routes.size > 20, `the cloud routes were read (${routes.size})`);
+  for (const route of routes) {
+    if (route === '*' || route === '/') continue;
+    const concrete = route.replace(/:[^/]+/g, 'x').toLowerCase();
+    for (const pattern of workerFirst) {
+      if (pattern === '/') continue;
+      const hit = pattern.endsWith('/*') ? concrete.startsWith(pattern.slice(0, -1)) || concrete === pattern.slice(0, -2) : concrete === pattern;
+      assert.equal(hit, false, `${route} is answered by the Worker first (run_worker_first "${pattern}")`);
+    }
   }
 });

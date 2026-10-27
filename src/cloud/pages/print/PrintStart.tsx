@@ -151,7 +151,7 @@ function FollowFile({ fileId, importId, onAnother }: { fileId: string; importId:
             {t(upload.continue)}
           </Button>
         ) : null}
-        <Link to={`/files/${encodeURIComponent(f.id)}`} className="lv-button lv-button-secondary lv-button-sm">
+        <Link to={`/library/${encodeURIComponent(f.id)}`} className="lv-button lv-button-secondary lv-button-sm">
           {t(upload.inLibrary)}
         </Link>
         <Button variant="ghost" size="sm" icon={<Upload aria-hidden="true" className="h-4 w-4" />} onClick={onAnother}>
@@ -265,7 +265,7 @@ function FollowImport({ importId, onUpload, onAnother }: { importId: string; onU
           <Button variant="primary" icon={<Upload aria-hidden="true" className="h-4 w-4" />} onClick={onUpload}>
             {t(upload.choose)}
           </Button>
-          <Link to={`/files/imports/${encodeURIComponent(imp.id)}`} className="lv-button lv-button-secondary lv-button-sm">
+          <Link to={`/library/imports/${encodeURIComponent(imp.id)}`} className="lv-button lv-button-secondary lv-button-sm">
             {t(library.whatHappened)}
           </Link>
         </div>
@@ -548,7 +548,7 @@ function RecentFiles({ version }: { version: number }) {
   const files = useCloudQuery((signal) => listFiles({ signal }), [version]);
   return (
     <section aria-labelledby="print-recent-files" className="space-y-2">
-      <SectionHeader id="print-recent-files" title={t(print.recentFiles)} link={{ to: '/files', label: t(print.library) }} />
+      <SectionHeader id="print-recent-files" title={t(print.recentFiles)} link={{ to: '/library', label: t(print.library) }} />
       {files.error && !files.data ? (
         <CloudErrorState compact error={files.error} onRetry={files.reload} />
       ) : !files.data ? (
@@ -560,7 +560,7 @@ function RecentFiles({ version }: { version: number }) {
           {files.data.slice(0, 5).map((f) => (
             <li key={f.id}>
               <ListRow
-                to={`/files/${encodeURIComponent(f.id)}`}
+                to={`/library/${encodeURIComponent(f.id)}`}
                 leading={<Box className="h-4 w-4" />}
                 title={<bdi>{f.original_name}</bdi>}
                 meta={`${f.extension.toUpperCase()} · ${formatBytes(f.size_bytes, lang)} · ${formatRelative(f.created_at, lang)}`}
@@ -590,7 +590,7 @@ export default function PrintStart() {
             <Link to="/projects" className="lv-button lv-button-ghost lv-button-sm">
               {t(print.projects)}
             </Link>
-            <Link to="/files" className="lv-button lv-button-ghost lv-button-sm">
+            <Link to="/library" className="lv-button lv-button-ghost lv-button-sm">
               {t(print.library)}
             </Link>
           </nav>

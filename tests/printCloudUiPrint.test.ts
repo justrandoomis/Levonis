@@ -553,7 +553,7 @@ test('every print screen is a lazy chunk; the shared pieces ride with the sectio
   }
   assert.match(routes, /^export \* from '\.\/kit';$/m);
   assert.match(routes, /^export \* from '\.\/model';$/m);
-  for (const path of ['/print', '/files', '/files/:id', '/files/imports/:id', '/projects', '/projects/:id', '/projects/:id/print', '/jobs', '/jobs/:id']) {
+  for (const path of ['/print', '/library', '/library/:id', '/library/imports/:id', '/projects', '/projects/:id', '/projects/:id/print', '/jobs', '/jobs/:id']) {
     assert.ok(routes.includes(`path="${path}"`), path);
   }
   assert.match(routes, /<Route path="\*" element=\{<CloudNotFound \/>\} \/>/);

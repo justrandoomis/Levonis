@@ -74,7 +74,7 @@ function FileRows({ rows }: { rows: ModelFileSummary[] }) {
         {shown.map((f) => (
           <li key={f.id}>
             <ListRow
-              to={`/files/${encodeURIComponent(f.id)}`}
+              to={`/library/${encodeURIComponent(f.id)}`}
               leading={<Box className="h-4 w-4" />}
               title={<bdi>{f.original_name}</bdi>}
               meta={`${f.extension.toUpperCase()} · ${formatBytes(f.size_bytes, lang)} · ${f.source === 'url_import' ? t(library.fromLink) : t(library.uploaded)} · ${formatRelative(f.created_at, lang)}`}
@@ -120,7 +120,7 @@ function ImportRows({ rows }: { rows: ImportSummary[] }) {
         {shown.map((i) => (
           <li key={i.id}>
             <ListRow
-              to={`/files/imports/${encodeURIComponent(i.id)}`}
+              to={`/library/imports/${encodeURIComponent(i.id)}`}
               leading={<Link2 className="h-4 w-4" />}
               title={i.attribution ? <bdi>{i.attribution}</bdi> : <bdi dir="ltr">{hostOf(i.url)}</bdi>}
               meta={`${i.provider} · ${formatRelative(i.created_at, lang)}`}
@@ -275,7 +275,7 @@ function FileDetail() {
       await deleteFile(f.id);
       setAsking(false);
       toast.success(t(library.deleted));
-      navigate('/files', { replace: true });
+      navigate('/library', { replace: true });
     } catch (e) {
       setDeleteError(cloudErrorText(e, lang));
     }
@@ -284,7 +284,7 @@ function FileDetail() {
   return (
     <div className="space-y-4">
       <PageHeader
-        back={{ to: '/files', label: t(print.library) }}
+        back={{ to: '/library', label: t(print.library) }}
         title={<bdi>{f.original_name}</bdi>}
         subtitle={`${f.format.toUpperCase()} · ${formatBytes(f.size_bytes, lang)} · ${formatDateTime(f.created_at, lang)}`}
         actions={
@@ -324,7 +324,7 @@ function FileDetail() {
           <Fact label={t(library.uploadedAt)}>{formatDateTime(f.created_at, lang)}</Fact>
           <Fact label={t(library.source)}>
             {f.source === 'url_import' && f.import_id ? (
-              <Link to={`/files/imports/${encodeURIComponent(f.import_id)}`} className="underline underline-offset-2 hover:text-text-secondary">
+              <Link to={`/library/imports/${encodeURIComponent(f.import_id)}`} className="underline underline-offset-2 hover:text-text-secondary">
                 {t(library.fromLink)}
               </Link>
             ) : (
@@ -383,7 +383,7 @@ function ImportDetail() {
           : t(importBody.pending);
   return (
     <div className="space-y-4">
-      <PageHeader back={{ to: '/files', label: t(print.library) }} title={<bdi>{name}</bdi>} subtitle={`${t(library.importTitle)} · ${formatRelative(imp.created_at, lang)}`} />
+      <PageHeader back={{ to: '/library', label: t(print.library) }} title={<bdi>{name}</bdi>} subtitle={`${t(library.importTitle)} · ${formatRelative(imp.created_at, lang)}`} />
       <RefreshNote error={q.data && q.error ? q.error : null} onRetry={q.reload} />
       <section aria-labelledby="print-import-status" className="lv-surface space-y-3 p-4">
         <SectionHeader id="print-import-status" title={t(library.importTitle)} action={<ImportStatusPill status={imp.status} fileId={imp.file_id} />} />
@@ -395,7 +395,7 @@ function ImportDetail() {
         </dl>
         <div className="flex flex-wrap gap-2">
           {outcome.fileDownloaded && imp.file_id ? (
-            <Link to={`/files/${encodeURIComponent(imp.file_id)}`} className="lv-button lv-button-primary lv-button-sm">
+            <Link to={`/library/${encodeURIComponent(imp.file_id)}`} className="lv-button lv-button-primary lv-button-sm">
               <Box aria-hidden="true" className="h-4 w-4" />
               {t(library.openFile)}
             </Link>

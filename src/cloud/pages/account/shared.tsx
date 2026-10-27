@@ -21,7 +21,7 @@ import { account, buybackStatus, materialsText, payoutStatus, sect, shipmentStat
 import { useCloudText } from '../../text';
 import type { TopUpQuote, Tri } from '../../types';
 import { ExternalLink, PageHeader, forwardChevron } from '../../ui';
-import { buybackTone, movementSign, shipmentTone, storeCartLink, type Movement } from './logic';
+import { buybackTone, movementSign, shipmentTone, storeCheckoutLink, type Movement } from './logic';
 
 // ------------------------------------------------------------------ words
 
@@ -234,7 +234,7 @@ export function CapNote({ shown, cap, history = false }: { shown: number; cap: n
  * The server's answer to «top up» (POST /me/inventory/top-up-quote): already
  * enough, or the quantity to buy, the balance it leads to and the STORED
  * quote's own total and expiry — then the way on, into the store's cart with
- * that quote (logic.ts `storeCartLink`). Nothing here is priced on the client.
+ * that quote (logic.ts `storeCheckoutLink`). Nothing here is priced on the client.
  */
 export function TopUpResult({ result, unit }: { result: TopUpQuote; unit: string }) {
   const { t, lang } = useCloudText();
@@ -260,7 +260,7 @@ export function TopUpResult({ result, unit }: { result: TopUpQuote; unit: string
       </p>
       <p className="text-[12px] text-text-muted">{t(materialsText.priceUntil, { time: formatDateTime(quote.expires_at, lang) })}</p>
       {quote.orderable ? (
-        <Link to={storeCartLink(quote.quote_id)} className="lv-button lv-button-primary w-full">
+        <Link to={storeCheckoutLink(quote.quote_id)} className="lv-button lv-button-primary w-full">
           {t(materialsText.continueInStore)}
         </Link>
       ) : (

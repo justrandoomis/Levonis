@@ -40,9 +40,9 @@ export default function PrintRoutes() {
   return (
     <Routes>
       <Route path="/print" element={<PrintStart />} />
-      <Route path="/files" element={<Library view="files" />} />
-      <Route path="/files/imports/:id" element={<Library view="import" />} />
-      <Route path="/files/:id" element={<Library view="file" />} />
+      <Route path="/library" element={<Library view="files" />} />
+      <Route path="/library/imports/:id" element={<Library view="import" />} />
+      <Route path="/library/:id" element={<Library view="file" />} />
       <Route path="/projects" element={<Projects view="list" />} />
       <Route path="/projects/:id" element={<Projects view="detail" />} />
       <Route path="/projects/:id/print" element={<Configure />} />

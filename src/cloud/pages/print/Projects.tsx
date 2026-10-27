@@ -174,7 +174,7 @@ function ModelName({ project, model, onChanged }: { project: ProjectView; model:
   return (
     <p className="flex min-w-0 items-center gap-1 text-sm font-semibold text-text-primary">
       {model.file_id ? (
-        <Link to={`/files/${encodeURIComponent(model.file_id)}`} className="min-w-0 truncate hover:underline">
+        <Link to={`/library/${encodeURIComponent(model.file_id)}`} className="min-w-0 truncate hover:underline">
           <bdi>{model.name}</bdi>
         </Link>
       ) : (
