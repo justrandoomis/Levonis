@@ -32,6 +32,7 @@ import { Field, focusFirstInvalid, Input, Select, Textarea } from '../../../comp
 import { NumberInput } from '../../../components/ui/NumberInput';
 import { Segmented } from '../../../components/ui/Segmented';
 import { Checkbox } from '../../../components/ui/Switch';
+import { formatFigure } from '../../../lib/localeNumber';
 import { toast } from '../../../lib/toastStore';
 import { IRAQ_GOVERNORATES, governorateName } from '../../../../packages/shipping/src/iraqGovernorates';
 import { cloudErrorText, createShipment, listInventory, listJobs, listStoreProducts, quoteShipment } from '../../api';
@@ -42,7 +43,7 @@ import { tx, useCloudText } from '../../text';
 import type { ShipmentQuote, ShipmentRequest, Tri } from '../../types';
 import { CloudErrorState, CloudPageSkeleton, Info, SectionHeader } from '../../ui';
 import { useCloudQuery } from '../../useCloudQuery';
-import { ADDRESS_MAX, addressProblems, deliverableVariants, type AddressDraft, type AddressProblem } from './logic';
+import { ADDRESS_MAX, addressProblems, deliverableVariants, deliveryPhone, type AddressDraft, type AddressProblem } from './logic';
 import { MoneyLine, SubPageHeader, useIntentKey } from './shared';
 
 type Kind = 'pickup' | 'delivery';
@@ -122,7 +123,7 @@ export default function AccountShipmentNew() {
             ? {
                 delivery_address: {
                   recipient_name: address.recipient_name.trim(),
-                  phone: address.phone.trim(),
+                  phone: deliveryPhone(address.phone),
                   governorate: address.governorate,
                   city: address.city.trim(),
                   address_line: address.address_line.trim(),
@@ -373,7 +374,7 @@ export default function AccountShipmentNew() {
           shown ? (
             <span className="block space-y-2">
               <span className="block font-semibold text-text-primary">{t(shipmentKind[shown.kind])}</span>
-              <span className="block">{t(shipText.confirmCounts, { prints: shown.jobs.length, materials: shown.items.length })}</span>
+              <span className="block">{t(shipText.confirmCounts, { prints: formatFigure(shown.jobs.length, lang), materials: formatFigure(shown.items.length, lang) })}</span>
               {shown.items.length > 0 ? <span className="block">{t(shipText.confirmHold)}</span> : null}
               {shown.kind === 'pickup' ? (
                 <span className="block">{t(shipText.pickupNotice)}</span>

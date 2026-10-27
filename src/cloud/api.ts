@@ -100,9 +100,14 @@ export function cloudErrorCode(e: unknown): string | null {
 /**
  * The words to show for a failed call, in the reader's language: the
  * server's own `details.messages[lang]` when the refusal carries them (every
- * Print Cloud refusal does — worker/lib/printCloud/errors.ts), else the
- * error's message (the house client already words network and server
- * failures in the reader's language), else a plain «something went wrong».
+ * Print Cloud refusal does — worker/lib/printCloud/errors.ts). A refusal
+ * WITHOUT them is the platform's (a 401 from `requireAuth`, a rate limit…),
+ * whose `error` is one English sentence: the reader gets a sentence of ours
+ * instead — «you are signed out» for a 401, else «something went wrong» —
+ * never that English. Only the house client's own sentences are shown as they
+ * are: no answer at all (status 0: network, deadline) and a server failure
+ * with no code, which it already words in the reader's language
+ * (src/lib/requestErrorText.ts).
  */
 export function cloudErrorText(e: unknown, lang: Language): string {
   if (e instanceof ApiError) {
@@ -111,6 +116,9 @@ export function cloudErrorText(e: unknown, lang: Language): string {
       const own = (messages as Record<string, unknown>)[lang];
       if (typeof own === 'string' && own.trim()) return own;
     }
+    if (e.status === 401) return tx(common.signedOut, lang);
+    const clientWords = e.status === 0 || (e.status >= 500 && !e.code);
+    return clientWords && e.message.trim() ? e.message : tx(common.unknownError, lang);
   }
   if (e instanceof Error && e.message.trim()) return e.message;
   return tx(common.unknownError, lang);

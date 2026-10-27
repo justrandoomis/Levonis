@@ -359,8 +359,9 @@ test('what confirming would reserve, what is short and by how much, are the serv
   ]);
   // Each shortfall leads to the store page that covers it.
   assert.equal(M.shortfallLink(short.shortfalls[0]), '/store?tab=hours&tier=tier_std');
-  assert.equal(M.shortfallLink(short.shortfalls[1]), '/store?tab=materials&variant=pcv_white');
-  assert.equal(M.shortfallLink(short.shortfalls[2]), '/store?tab=accessories&variant=pcv_ring');
+  // A material opens that very variant's page (the catalogue reads no ?variant=), asking for the shortfall.
+  assert.equal(M.shortfallLink(short.shortfalls[1]), '/store/variant/pcv_white?qty=19');
+  assert.equal(M.shortfallLink(short.shortfalls[2]), '/store/variant/pcv_ring?qty=2');
   // A server that says «not sufficient» is never overruled by the lines.
   assert.equal(M.projectionDisplay(estimate(), projection({}, [], false)).sufficient, false);
 });

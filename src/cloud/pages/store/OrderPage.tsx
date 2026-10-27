@@ -288,7 +288,8 @@ function CancelSection({ order, onCancelled }: { order: OrderDetail; onCancelled
         open={open}
         destructive
         title={t(words.cancelTitle)}
-        consequence={t(words.cancelBody)}
+        // A delivery fee's order takes its delivery request with it (orders.ts `closeUnpaidOrder`): the dialog says so.
+        consequence={t(order.kind === 'shipping' ? words.cancelBodyShipping : words.cancelBody)}
         confirmLabel={t(words.cancelOrder)}
         cancelLabel={t(words.keepOrder)}
         onConfirm={cancel}
@@ -323,6 +324,7 @@ function LineRows({ order, book }: { order: OrderDetail; book: NameBook }) {
               </span>
               {base != null && base > l.final_price_iqd ? (
                 <span className="text-[11px] text-text-muted line-through">
+                  <span className="sr-only">{t(goods.beforeDiscount)} </span>
                   <Money iqd={base} />
                 </span>
               ) : null}

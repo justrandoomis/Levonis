@@ -31,6 +31,7 @@ import { AmountRows, QuantityPicker, Swatch, useDebounced } from './parts';
 import { couponRefused, quoteLinesOf, refusedLine, type CartLine } from './rules';
 
 function LinePrice({ priced, stale }: { priced: PricedQuote['lines'][number] | undefined; stale: boolean }) {
+  const { t } = useCloudText();
   if (stale || !priced) return <Skeleton className="h-5 w-20 rounded" />;
   return (
     <span className="flex flex-col items-end">
@@ -39,6 +40,7 @@ function LinePrice({ priced, stale }: { priced: PricedQuote['lines'][number] | u
       </span>
       {priced.discount_iqd > 0 ? (
         <span className="text-[11px] text-text-muted line-through">
+          <span className="sr-only">{t(goods.beforeDiscount)} </span>
           <Money iqd={priced.base_price_iqd} />
         </span>
       ) : null}

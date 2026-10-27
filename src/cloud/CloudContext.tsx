@@ -17,6 +17,14 @@
  *                 customer doors may render.
  *   user          the signed-in Levonis account (the shared session cookie:
  *                 signed in on the apex is signed in here).
+ *   refreshStatus()
+ *                 reads the status again WITHOUT blanking it: the slicer and
+ *                 the integrations change while the app is open, so the
+ *                 provider asks again every STATUS_REFRESH_MS while the page
+ *                 is in front of the reader and whenever it comes back into
+ *                 view, and a screen waiting on the slicer (a job being
+ *                 measured) asks on each of its polls. A failed refresh keeps
+ *                 the last answer; the next one tries again.
  *   dashboardVersion / refreshDashboard()
  *                 a screen that moved hours, grams or money (an order paid, a
  *                 job confirmed) calls refreshDashboard() and every screen
@@ -25,7 +33,7 @@
  * Nothing here is cached across visits: every figure is the server's, read
  * when the screen opens.
  */
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../AuthContext';
 import type { ApiUser } from '../lib/api';
 import { useStore } from '../StoreContext';
@@ -38,6 +46,8 @@ export interface CloudContextValue {
   status: CloudStatus | null;
   statusError: unknown;
   reloadStatus: () => void;
+  /** Read the status again, keeping the current one on screen until the answer lands. */
+  refreshStatus: () => void;
   access: CloudAccess;
   /** The customer screens may render: the service is open, or an admin previews it. */
   canUse: boolean;
@@ -56,6 +66,9 @@ export interface CloudContextValue {
 }
 
 const CloudContext = createContext<CloudContextValue | null>(null);
+
+/** How often an open app reads GET /status again (the slicer's «connected» goes stale on the server's own clock). */
+export const STATUS_REFRESH_MS = 120_000;
 
 /** Pure, for the tests: the access a status and a viewer give. */
 export function accessOf(status: CloudStatus | null, statusError: unknown, authReady: boolean, isAdmin: boolean): CloudAccess {
@@ -91,6 +104,31 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
     setStatus(null);
     setStatusVersion((v) => v + 1);
   }, []);
+
+  // A silent re-read: the last answer stays until a newer one lands, and only the latest call may land.
+  const statusSeq = useRef(0);
+  const refreshStatus = useCallback(() => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    const seq = ++statusSeq.current;
+    getStatus()
+      .then((s) => {
+        if (seq !== statusSeq.current) return;
+        setStatus(s);
+        setStatusError(null);
+      })
+      .catch(() => {
+        // Keep the last answer; the next refresh asks again.
+      });
+  }, []);
+  useEffect(() => {
+    const timer = window.setInterval(refreshStatus, STATUS_REFRESH_MS);
+    const onShow = () => refreshStatus();
+    document.addEventListener('visibilitychange', onShow);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onShow);
+    };
+  }, [refreshStatus]);
   const refreshDashboard = useCallback(() => setDashboardVersion((v) => v + 1), []);
 
   // The server's own test of who may use a closed service.
@@ -102,6 +140,7 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       status,
       statusError,
       reloadStatus,
+      refreshStatus,
       access,
       canUse: access === 'open' || access === 'preview',
       user,
@@ -116,7 +155,7 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       dashboardVersion,
       refreshDashboard,
     }),
-    [status, statusError, reloadStatus, access, user, isAuthenticated, isLoaded, isAdmin, mainSite, dashboardVersion, refreshDashboard]
+    [status, statusError, reloadStatus, refreshStatus, access, user, isAuthenticated, isLoaded, isAdmin, mainSite, dashboardVersion, refreshDashboard]
   );
 
   return <CloudContext.Provider value={value}>{children}</CloudContext.Provider>;

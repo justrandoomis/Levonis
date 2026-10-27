@@ -107,6 +107,11 @@ export const common = {
     ckb: 'پەیوەندیت بە ئینتەرنێتەوە بپشکنە و دووبارە هەوڵ بدەرەوە.',
   },
   unknownError: { ar: 'حدث خطأ غير متوقع.', en: 'Something went wrong.', ckb: 'هەڵەیەکی چاوەڕواننەکراو ڕوویدا.' },
+  signedOut: {
+    ar: 'لم تعد مسجّلًا الدخول. سجّل الدخول من جديد ثم أعد المحاولة.',
+    en: 'You are no longer signed in. Sign in again, then try once more.',
+    ckb: 'ئیتر چوونەژوورەوەت نەماوە. دووبارە بچۆ ژوورەوە و پاشان هەوڵ بدەرەوە.',
+  },
   signInTitle: { ar: 'سجّل الدخول للمتابعة', en: 'Sign in to continue', ckb: 'بچۆ ژوورەوە بۆ بەردەوامبوون' },
   signInBody: {
     ar: 'هذه الصفحة لحسابك في Levonis. سننقلك إلى صفحة الدخول ثم نعيدك إلى هنا.',

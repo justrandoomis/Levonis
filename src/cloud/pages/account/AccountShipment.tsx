@@ -185,8 +185,8 @@ export default function AccountShipment() {
             {t(shipText.addressTitle)}
           </h2>
           <p className="text-sm font-semibold text-text-primary">{sh.address.recipient_name}</p>
-          <p dir="ltr" className="text-start text-[13px] text-text-secondary">
-            {sh.address.phone}
+          <p className="text-[13px] text-text-secondary">
+            <bdi dir="ltr">{sh.address.phone}</bdi>
           </p>
           <p className="text-[13px] text-text-secondary">
             {[governorateName(sh.address.governorate, lang), sh.address.city].filter(Boolean).join(' · ')}

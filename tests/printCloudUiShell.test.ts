@@ -178,9 +178,18 @@ test('a refusal is shown in the server’s own words, in the reader’s language
   for (const lang of LANGS) assert.equal(cloudErrorText(refusal, lang), messages[lang], lang);
   assert.equal(cloudErrorCode(refusal), 'INSUFFICIENT_BALANCE');
 
-  // A refusal without the reader's slot reads the error's own message — never another language's slot.
+  // A refusal without the reader's slot reads a sentence of ours in that language — never another language's
+  // slot, and never the server's English `error`.
   const partial = new ApiError(409, 'Order is not payable', 'ORDER_NOT_PAYABLE', { messages: { ar: 'غير قابل للدفع', en: 'Not payable', ckb: '  ' } });
-  assert.equal(cloudErrorText(partial, 'ckb'), 'Order is not payable');
+  assert.equal(cloudErrorText(partial, 'ckb'), tx(common.unknownError, 'ckb'));
+  // A platform refusal (no messages at all): a 401 says «signed out», anything else «something went wrong».
+  const signedOut = new ApiError(401, 'Authentication required', 'UNAUTHORIZED');
+  for (const lang of LANGS) {
+    assert.equal(cloudErrorText(signedOut, lang), tx(common.signedOut, lang), lang);
+    assert.equal(cloudErrorText(new ApiError(429, 'Too many requests', 'RATE_LIMITED'), lang), tx(common.unknownError, lang), lang);
+  }
+  // The house client's own sentences (no answer; a server failure with no code) are already in the reader's language.
+  assert.equal(cloudErrorText(new ApiError(0, 'تعذّر الاتصال بالخادم', 'NETWORK'), 'ar'), 'تعذّر الاتصال بالخادم');
   assert.equal(cloudErrorText(new ApiError(500, 'Server error'), 'en'), 'Server error');
   assert.equal(cloudErrorText(new Error('Network down'), 'ar'), 'Network down');
   for (const lang of LANGS) {
@@ -502,7 +511,7 @@ test('src/cloud/api.ts has a function for every customer door, and names no door
 
 test('money doors send an Idempotency-Key the server accepts, one fresh key per intent', () => {
   const src = read('src/cloud/api.ts');
-  for (const fn of ['convertCredits', 'createOrder', 'payOrderFromWallet', 'confirmJob', 'createShipment']) {
+  for (const fn of ['convertCredits', 'createOrder', 'payOrderFromWallet', 'confirmJob', 'createShipment', 'requestBuyback']) {
     const at = src.indexOf(`export const ${fn} = `);
     assert.ok(at > 0, fn);
     const body = src.slice(at, src.indexOf(';', at));

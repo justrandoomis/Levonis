@@ -16,8 +16,11 @@ import React from 'react';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { useBusy } from '../../lib/busy';
 import { routeReveal } from '../../lib/routeReveal';
+import { common } from '../strings/common';
+import { useCloudText } from '../text';
 
 export function CloudPageSkeleton({ className = '' }: { className?: string }) {
+  const { t } = useCloudText();
   return (
     <div aria-busy="true" aria-live="polite" className={`space-y-4 ${className}`}>
       <Skeleton className="h-7 w-48 rounded-md" />
@@ -26,7 +29,7 @@ export function CloudPageSkeleton({ className = '' }: { className?: string }) {
         <Skeleton className="h-24 rounded-xl" />
       </div>
       <Skeleton className="h-32 rounded-xl" />
-      <span className="sr-only">…</span>
+      <span className="sr-only">{t(common.loading)}</span>
     </div>
   );
 }

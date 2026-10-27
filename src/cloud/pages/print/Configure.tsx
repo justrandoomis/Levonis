@@ -53,8 +53,8 @@ import { tx, useCloudText } from '../../text';
 import type { AccessorySuggestion, PrintSettings, PrinterRecommendations, ProjectModel, ProjectView } from '../../types';
 import { Box, CloudErrorState, CloudPageSkeleton, Disc3, Info, PageHeader, Printer, SectionHeader, ShoppingBag, StatusPill, modelPillState } from '../../ui';
 import { useCloudQuery } from '../../useCloudQuery';
-import { FileStatusPill, printerName, usePrinterModels } from './kit';
-import { printerReasonText, shortfallLink } from './model';
+import { FileStatusPill, Swatch, printerName, usePrinterModels, useVariantNames } from './kit';
+import { printerBadges, printerReasonText, shortfallLink } from './model';
 import { SettingsFields } from './SettingsForm';
 
 interface MaterialOption {
@@ -199,13 +199,8 @@ function PrinterChoice({
 }) {
   const { t, lang } = useCloudText();
   const printers = usePrinterModels();
-  const badges = (id: string) =>
-    [
-      recs.best.best_quality === id ? configure.bestQuality : null,
-      recs.best.shortest_queue === id ? configure.shortestQueue : null,
-      recs.best.most_credit_available === id ? configure.mostCredit : null,
-      recs.best.lowest_cost === id ? configure.lowestCost : null,
-    ].filter((b): b is typeof configure.bestQuality => b !== null);
+  // Only the picks the server's figures back (model.ts `printerBadges`): no «lowest cost» without costs to compare.
+  const badges = (id: string) => printerBadges(recs, id).map((b) => configure[b]);
   if (recs.models.length === 0) return <p className="text-[13px] text-text-muted">{t(configure.noPrinters)}</p>;
   const sorted = [...recs.models].sort((a, b) => Number(b.compatible) - Number(a.compatible));
   return (
@@ -270,6 +265,8 @@ function PrinterChoice({
 
 function AccessoryChoices({ items, onDecided }: { items: AccessorySuggestion[]; onDecided: () => void }) {
   const { t, lang } = useCloudText();
+  // Each suggestion names its item and counts it in that item's own unit — an accepted one is reserved at confirmation.
+  const names = useVariantNames();
   const [problem, setProblem] = useState<string | null>(null);
   const decide = async (id: string, status: 'accepted' | 'rejected') => {
     setProblem(null);
@@ -288,22 +285,32 @@ function AccessoryChoices({ items, onDecided }: { items: AccessorySuggestion[]; 
       <ul className="divide-y divide-border-subtle">
         {items.map((s) => {
           const accepted = s.status === 'accepted';
+          const v = names(s.variant_id);
+          const name = v ? tx(v.name, lang) : t(configure.accessoryUnnamed);
+          // An item this screen could not look up keeps its bare count — never a guessed unit.
+          const qty = (n: number) => (v ? formatQuantity(n, v.unit, lang) : formatFigure(n, lang));
           return (
             <li key={s.recommendation_id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-              <span className="min-w-0 text-[13px] text-text-primary">
-                {t(projectWords.suggested, { qty: formatQuantity(s.suggested_qty, 'pc', lang) })} ·{' '}
-                <span className="text-text-muted">{t(projectWords.youHave, { qty: formatQuantity(s.owned_qty, 'pc', lang) })}</span>
+              <span className="min-w-0 space-y-0.5 text-[13px] text-text-primary">
+                <span className="flex min-w-0 items-center gap-2 font-semibold">
+                  <Swatch hex={v?.colorHex} />
+                  <span className="truncate">{name}</span>
+                </span>
+                <span className="block">
+                  {t(projectWords.suggested, { qty: qty(s.suggested_qty) })} ·{' '}
+                  <span className="text-text-muted">{t(projectWords.youHave, { qty: qty(s.owned_qty) })}</span>
+                </span>
               </span>
               <span className="flex flex-wrap gap-2">
                 {accepted ? <StatusChip tone="success">{t(projectWords.accepted)}</StatusChip> : null}
                 {s.status === 'rejected' ? <StatusChip>{t(projectWords.dismissed)}</StatusChip> : null}
                 {!accepted ? (
-                  <Button size="sm" variant="secondary" onClick={() => decide(s.recommendation_id, 'accepted')}>
+                  <Button size="sm" variant="secondary" aria-label={`${t(projectWords.accept)}: ${name}`} onClick={() => decide(s.recommendation_id, 'accepted')}>
                     {t(projectWords.accept)}
                   </Button>
                 ) : null}
                 {s.status !== 'rejected' ? (
-                  <Button size="sm" variant="ghost" onClick={() => decide(s.recommendation_id, 'rejected')}>
+                  <Button size="sm" variant="ghost" aria-label={`${t(projectWords.dismiss)}: ${name}`} onClick={() => decide(s.recommendation_id, 'rejected')}>
                     {t(projectWords.dismiss)}
                   </Button>
                 ) : null}

@@ -14,6 +14,7 @@ import { useState } from 'react';
 import VariantImg from '../../../components/ui/VariantImg';
 import { Money } from '../../../components/ui/Money';
 import { initialOf } from '../../../lib/initials';
+import { formatFigure } from '../../../lib/localeNumber';
 import { getCredits, getWallet, listInventory } from '../../api';
 import { useCloud } from '../../CloudContext';
 import { formatHours, hoursParts, massParts, progressPercent } from '../../format';
@@ -69,8 +70,8 @@ function Profile() {
           {name}
         </h1>
         {user?.username ? (
-          <p dir="ltr" className="truncate text-start text-[13px] text-text-muted">
-            @{user.username}
+          <p className="truncate text-[13px] text-text-muted">
+            <bdi dir="ltr">@{user.username}</bdi>
           </p>
         ) : null}
       </div>
@@ -98,7 +99,7 @@ function HoursCard({ credits }: { credits: CreditsSummary }) {
   const parts = hoursParts(available, lang);
   const sub =
     tiers.length > 1
-      ? t(account.acrossClasses, { n: tiers.length })
+      ? t(account.acrossClasses, { n: formatFigure(tiers.length, lang) })
       : total > available
         ? t(account.ofTotal, { total: formatHours(total, lang) })
         : tx(tiers[0].name, lang) || tiers[0].code;
@@ -130,7 +131,7 @@ function FilamentCard({ inventory }: { inventory: InventoryBalance[] }) {
   const held = rows.reduce((s, r) => s + r.available_qty + r.reserved_qty + r.consumed_qty, 0);
   const low = rows.some(isLow);
   const parts = massParts(available, lang);
-  const sub = low ? t(account.runningLow) : rows.length === 1 ? tx(rows[0].name, lang) : t(account.materialsCount, { n: rows.length });
+  const sub = low ? t(account.runningLow) : rows.length === 1 ? tx(rows[0].name, lang) : t(account.materialsCount, { n: formatFigure(rows.length, lang) });
   return (
     <StatCard
       to="/account/materials"

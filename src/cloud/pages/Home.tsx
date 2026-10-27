@@ -22,6 +22,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Segmented } from '../../components/ui/Segmented';
+import { formatFigure } from '../../lib/localeNumber';
 import { getDashboard, getJob, getQueue, listPrinters } from '../api';
 import { useCloud } from '../CloudContext';
 import { formatDuration, formatHours, formatMass, formatPercent, formatQuantity, formatRelative, hoursParts, massParts, permillePercent, progressPercent } from '../format';
@@ -54,7 +55,8 @@ import {
   machinePillState,
   modelPillState,
 } from '../ui';
-import { useCloudQuery } from '../useCloudQuery';
+import { useCloudQuery, usePoll } from '../useCloudQuery';
+import { isLow } from './account/logic';
 
 type View = 'prints' | 'printers' | 'filament' | 'history';
 
@@ -119,8 +121,6 @@ function filamentRows(inventory: InventoryBalance[]): InventoryBalance[] {
   return inventory.filter((r) => r.category_kind === 'filament' && r.unit_code === 'g');
 }
 
-const isLow = (r: InventoryBalance) => r.low_stock_alert_qty != null && r.available_qty <= r.low_stock_alert_qty;
-
 function FilamentCard({ data }: { data: Dashboard }) {
   const { t, lang } = useCloudText();
   const rows = filamentRows(data.inventory);
@@ -143,7 +143,7 @@ function FilamentCard({ data }: { data: Dashboard }) {
   const held = rows.reduce((s, r) => s + r.available_qty + r.reserved_qty + r.consumed_qty, 0);
   const low = rows.some(isLow);
   const parts = massParts(available, lang);
-  const sub = low ? t(home.lowStock) : rows.length === 1 ? tx(rows[0].name, lang) : t(home.materialsCount, { n: rows.length });
+  const sub = low ? t(home.lowStock) : rows.length === 1 ? tx(rows[0].name, lang) : t(home.materialsCount, { n: formatFigure(rows.length, lang) });
   return (
     <StatCard
       to="/store?tab=materials"
@@ -161,13 +161,20 @@ function FilamentCard({ data }: { data: Dashboard }) {
 
 // ------------------------------------------------------------------ my prints
 
+/** How often the current print is read again while it is on a machine (as its own page, print/model.ts `jobPollMs`). */
+const CURRENT_POLL_MS = 10_000;
+const ON_A_MACHINE: readonly string[] = ['preparing', 'printing', 'paused'];
+
 function CurrentPrintCard({ job }: { job: JobSummary }) {
   const { t, lang } = useCloudText();
   const titleOf = useJobTitle();
   const view = useCloudQuery((signal) => getJob(job.id, { signal }), [job.id, job.updated_at]);
   const v = view.data;
+  // A reading is «live» only as of the last answer: the card asks again while the print is on a machine
+  // (a hidden tab asks nothing and asks once on return), and a failed re-read is never shown as live.
+  usePoll(view.reload, ON_A_MACHINE.includes(v?.status ?? job.status), CURRENT_POLL_MS);
   const telemetry = v?.telemetry ?? null;
-  const live = !!telemetry && telemetry.live;
+  const live = !view.error && !!telemetry && telemetry.live;
   const percent = live ? permillePercent(telemetry.progress_permille) : null;
   const grams = v?.estimate ? v.estimate.model_grams + v.estimate.support_grams + v.estimate.purge_grams : null;
 
@@ -176,7 +183,7 @@ function CurrentPrintCard({ job }: { job: JobSummary }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-[15px] font-bold text-text-primary">{t(home.currentPrint)}</h3>
         <div className="flex flex-wrap items-center gap-1.5">
-          <StatusPill kind="job" state={jobPillState(job.status)} />
+          <StatusPill kind="job" state={jobPillState(v?.status ?? job.status)} />
           {v?.printer ? <StatusPill kind="printer" state={live ? 'live' : machinePillState(telemetry)} /> : null}
         </div>
       </div>
@@ -230,7 +237,7 @@ function CurrentPrintCard({ job }: { job: JobSummary }) {
               <dd className="text-sm font-bold tabular-nums text-text-primary">
                 {live && telemetry.layer != null && telemetry.total_layers ? (
                   <bdi dir="ltr">
-                    {telemetry.layer} / {telemetry.total_layers}
+                    {formatFigure(telemetry.layer, lang)} / {formatFigure(telemetry.total_layers, lang)}
                   </bdi>
                 ) : (
                   '—'
@@ -272,7 +279,7 @@ function Upcoming({ data }: { data: Dashboard }) {
             {jobs.map((job) => {
               const est = byId.get(job.id);
               const meta = est
-                ? [t(home.position, { n: est.position }), basisText(est.basis, t) ?? (est.estimated_start_at ? t(home.startsAround, { when: formatRelative(est.estimated_start_at, lang) }) : null)]
+                ? [t(home.position, { n: formatFigure(est.position, lang) }), basisText(est.basis, t) ?? (est.estimated_start_at ? t(home.startsAround, { when: formatRelative(est.estimated_start_at, lang) }) : null)]
                     .filter(Boolean)
                     .join(' · ')
                 : null;
@@ -348,7 +355,7 @@ function PrintersStrip({ data, full = false }: { data: Dashboard; full?: boolean
         name: `${m.brand} ${m.model_name}`.trim(),
         active: m.machines_active,
         idle: m.machines_idle,
-        meta: m.machines_active ? t(home.freeOfActive, { idle: m.machines_idle, active: m.machines_active }) : '',
+        meta: m.machines_active ? t(home.freeOfActive, { idle: formatFigure(m.machines_idle, lang), active: formatFigure(m.machines_active, lang) }) : '',
       }));
   const shown = full ? items : items.slice(0, 4);
   return (

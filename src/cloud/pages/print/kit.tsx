@@ -9,7 +9,7 @@
  * small shared chunks of their own (the reasoning of src/cloud/PrintCloudApp.tsx
  * for the ui barrel).
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { StatusChip } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
 import { formatFigure } from '../../../lib/localeNumber';
@@ -106,29 +106,7 @@ export function MoreRow({ hasMore, onMore, total, cap }: { hasMore: boolean; onM
 
 // ------------------------------------------------------------------ asking again
 
-/**
- * Calls `tick` every `ms` while `active` and the page is in front of the
- * reader, and once when it comes back into view. A hidden tab asks nothing.
- */
-export function usePoll(tick: () => void, active: boolean, ms: number | null) {
-  const ref = useRef(tick);
-  ref.current = tick;
-  useEffect(() => {
-    if (!active || !ms) return;
-    const visible = () => typeof document === 'undefined' || document.visibilityState === 'visible';
-    const timer = window.setInterval(() => {
-      if (visible()) ref.current();
-    }, ms);
-    const onShow = () => {
-      if (visible()) ref.current();
-    };
-    document.addEventListener('visibilitychange', onShow);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener('visibilitychange', onShow);
-    };
-  }, [active, ms]);
-}
+export { usePoll } from '../../useCloudQuery';
 
 // ------------------------------------------------------------------ lookups
 
