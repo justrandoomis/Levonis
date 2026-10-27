@@ -28,7 +28,7 @@ import { requireFinancialScope } from '../lib/walletAdjust';
 import { countingD1 } from '../lib/d1Count';
 import { ADAPTERS, integrationBacklog } from '../lib/printCloud/adapters';
 import { pcAudit } from '../lib/printCloud/audit';
-import { roomWithin, runTasksByHand, taskOverview } from '../lib/printCloud/background';
+import { roomWithin, runTasksByHand, schedulerRoom, taskOverview } from '../lib/printCloud/background';
 import { approveBuyback, markBuybackPaid, rejectBuyback } from '../lib/printCloud/buyback';
 import { ENTITIES, categories, createEntity, listEntity, replacePriceTiers, stripCost, updateCategoryBuyback, updateEntity, type EntityKey } from '../lib/printCloud/catalog';
 import { creditAccountId, debitAvailable, grantCredits } from '../lib/printCloud/credits';
@@ -625,7 +625,10 @@ adminPrintCloudRoutes.get('/queue', async (c) => {
 
 adminPrintCloudRoutes.post('/queue/run', async (c) => {
   const { config } = await requestConfig(c);
-  return ok(c, await runScheduler(c.env.DB, config, new Date()));
+  // One request is one D1 invocation: the pass stays within 600 statements of it. A release that does not
+  // fit is deferred and named (`deferred`), and `more` asks the operator to run it again (queue.ts `runScheduler`).
+  const counted = countingD1(c.env.DB);
+  return ok(c, await runScheduler(counted.db, config, new Date(), 20, schedulerRoom(roomWithin(() => counted.executed, 600))));
 });
 
 adminPrintCloudRoutes.get('/printers', async (c) => {

@@ -31,7 +31,12 @@
  * EXPIRY. A lot whose expiry has come is held by nobody new (a free reprint
  * inheriting what its failed parent held is the one exception) and drawn by
  * no debit; the sweep takes its free part, and a hold given back later
- * becomes free and goes on a later run.
+ * becomes free and goes on a later run — except what a free reprint still
+ * waiting for its confirmation is entitled to, which the sweep leaves on the
+ * lot (`pendingEntitlementOn`).
+ *
+ * A reservation gives its holds back in ONE statement however many lots it
+ * holds (`unholdAll`), so a release costs the same for one lot or a hundred.
  *
  * Every function here RETURNS statements; the caller composes them into the
  * one batch of its operation (a job confirmation reserves credits and
@@ -156,16 +161,28 @@ export function ensureCreditAccount(db: D1Database, userId: string, tierId: stri
     .bind(creditAccountId(userId, tierId), userId, tierId, iso(now));
 }
 
-/** A draw the batch fences on the lot's holds too: an expiry, which takes exactly the free part the plan read. */
-type FencedDraw = LotDraw & { expectedHeld?: number };
+/**
+ * A draw the batch fences on more than the lot's remainder: an expiry, which
+ * takes exactly the expirable part the plan read — fenced on the lot's holds,
+ * and on the seconds pending free reprints are entitled to there not having
+ * grown since (they shrink only when a reprint is confirmed, which moves a
+ * hold, or cancelled, which leaves more for a later pass).
+ */
+type FencedDraw = LotDraw & { expiry?: { held: number; entitled: number } };
 
 function drawStatements(db: D1Database, draws: FencedDraw[], entryKey: string, now: Date): Stmt[] {
   const out: Stmt[] = [];
   for (const d of draws) {
     out.push(
-      d.expectedHeld === undefined
+      d.expiry === undefined
         ? fence(db, 'STATE_CHANGED', '(SELECT seconds_remaining FROM pc_credit_lots WHERE id = ?) = ?', [d.lotId, d.expectedRemaining])
-        : fence(db, 'STATE_CHANGED', '(SELECT seconds_remaining = ? AND seconds_held = ? FROM pc_credit_lots WHERE id = ?)', [d.expectedRemaining, d.expectedHeld, d.lotId])
+        : fence(db, 'STATE_CHANGED', `(SELECT seconds_remaining = ? AND seconds_held = ? FROM pc_credit_lots WHERE id = ?) AND ${pendingEntitlementOn('?')} <= ?`, [
+            d.expectedRemaining,
+            d.expiry.held,
+            d.lotId,
+            d.lotId,
+            d.expiry.entitled,
+          ])
     );
     out.push(db.prepare('UPDATE pc_credit_lots SET seconds_remaining = seconds_remaining - ? WHERE id = ?').bind(d.qty, d.lotId));
     out.push(
@@ -259,27 +276,76 @@ async function reservationHolds(db: D1Database, reservationId: string): Promise<
   return rows.map((r) => ({ lotId: r.lot_id, seconds: Number(r.seconds) }));
 }
 
-/** A hold given back to its lot's free part. The lot's CHECK refuses taking back more than is held. */
-function unhold(db: D1Database, h: LotShare): Stmt {
-  return db.prepare('UPDATE pc_credit_lots SET seconds_held = seconds_held - ? WHERE id = ?').bind(h.seconds, h.lotId);
+/**
+ * Every hold of a reservation given back to its lot's free part, in ONE
+ * statement however many lots it holds: each lot the reservation names takes
+ * back exactly its own hold row. The rows are append-only and written with
+ * the reservation, so the UPDATE meets at commit the very holds the
+ * reservation took. It runs only in the batch whose flip of the reservation
+ * is fenced (`closeReservation`, which also proves the rows sum to the
+ * seconds the account moves): exactly once, and the lot's CHECK refuses
+ * taking back more than is held.
+ */
+function unholdAll(db: D1Database, reservationId: string): Stmt {
+  return db
+    .prepare(
+      `UPDATE pc_credit_lots
+          SET seconds_held = seconds_held - (SELECT h.seconds FROM pc_credit_reservation_lots h WHERE h.reservation_id = ?1 AND h.lot_id = pc_credit_lots.id)
+        WHERE id IN (SELECT lot_id FROM pc_credit_reservation_lots WHERE reservation_id = ?1)`
+    )
+    .bind(reservationId);
+}
+
+// ------------------------------------------------------------------ a free reprint's entitlement
+
+/**
+ * WHAT A FREE REPRINT IS ENTITLED TO, read from records, never from timing.
+ * A reprint `c` is a free one when its parent `p` failed and that failure was
+ * resolved as the workshop's with `c` as its reprint (`pc_failures.reprint_job_id`,
+ * and `c.parent_job_id` naming `p`). Per hold row `h` of the parent's closed
+ * reservation `r`, it inherits what the hold kept that the settlement did not
+ * consume (`HOLD_GIVEN_BACK`): hours its parent legitimately held carry over —
+ * even once their package has expired — and no more than that: the rest of
+ * an expired lot was never the parent's.
+ */
+const ENTITLEMENT_SOURCE = `pc_credit_reservation_lots h
+       JOIN pc_credit_reservations r ON r.id = h.reservation_id AND r.state <> 'active'
+       JOIN pc_print_jobs p ON p.id = r.job_id
+       JOIN pc_failures f ON f.id = p.failure_id AND f.responsible = 'workshop'
+       JOIN pc_print_jobs c ON c.id = f.reprint_job_id AND c.parent_job_id = p.id`;
+
+const HOLD_GIVEN_BACK = `MAX(0, h.seconds - COALESCE((SELECT SUM(d.seconds) FROM pc_credit_lot_draws d
+                              WHERE d.lot_id = h.lot_id AND d.ledger_entry_key = 'consume:' || h.reservation_id), 0))`;
+
+/**
+ * A reprint not yet confirmed: its confirmation, automatic or by the
+ * customer, will hold what it is entitled to. Confirmed, it holds them (and
+ * gives them back like any job); cancelled, it never will.
+ */
+const REPRINT_PENDING = "('ready', 'awaiting_confirmation')";
+
+/**
+ * The seconds of one lot (`lot`: a column of the outer query, or `?`) that
+ * free reprints still waiting for their confirmation are entitled to. The
+ * expiry sweep leaves them on the lot, so a sweep that lands between a
+ * workshop failure's resolution (which gives the parent's holds back) and the
+ * reprint's confirmation (which holds them again) takes none of them.
+ */
+function pendingEntitlementOn(lot: string): string {
+  return `COALESCE((SELECT SUM(${HOLD_GIVEN_BACK}) FROM ${ENTITLEMENT_SOURCE}
+                     WHERE h.lot_id = ${lot} AND c.status IN ${REPRINT_PENDING}), 0)`;
 }
 
 /**
- * What a job's last reservation held and gave back, per lot, in hold order:
- * each hold less what its settlement consumed from that lot. A free reprint
- * inherits it (jobs.ts `autoConfirmReprint`), so hours its failed parent
- * legitimately held carry over — even once their package has expired — and
- * no more than that: the rest of an expired lot was never the parent's.
+ * What a free reprint is entitled to, per lot, in its parent's hold order:
+ * taken first by its confirmation (jobs.ts `planConfirm`), even past the
+ * lot's expiry. Nothing for any other job, nor for a reprint of a failure
+ * that was not the workshop's.
  */
-export async function releasedHolds(db: D1Database, jobId: string): Promise<LotShare[]> {
+export async function reprintEntitlement(db: D1Database, jobId: string): Promise<LotShare[]> {
   const rows = await many<{ lot_id: string; seconds: number }>(
     db,
-    `SELECT h.lot_id,
-            h.seconds - COALESCE((SELECT SUM(d.seconds) FROM pc_credit_lot_draws d
-                                   WHERE d.lot_id = h.lot_id AND d.ledger_entry_key = 'consume:' || h.reservation_id), 0) AS seconds
-       FROM pc_credit_reservation_lots h
-      WHERE h.reservation_id = (SELECT id FROM pc_credit_reservations WHERE job_id = ? AND state <> 'active' ORDER BY created_at DESC LIMIT 1)
-      ORDER BY h.rowid`,
+    `SELECT h.lot_id, ${HOLD_GIVEN_BACK} AS seconds FROM ${ENTITLEMENT_SOURCE} WHERE c.id = ? ORDER BY h.rowid`,
     jobId
   );
   return rows.filter((r) => Number(r.seconds) > 0).map((r) => ({ lotId: r.lot_id, seconds: Number(r.seconds) }));
@@ -352,7 +418,7 @@ export interface ReserveInput {
   seconds: number;
   actorId: string;
   now: Date;
-  /** Lots taken first, each up to the seconds given and even past its expiry: a free reprint's inheritance (`releasedHolds`). */
+  /** Lots taken first, each up to the seconds given and even past its expiry: a free reprint's inheritance (`reprintEntitlement`). */
   entitled?: LotShare[];
 }
 
@@ -422,7 +488,12 @@ export async function reserveCredits(db: D1Database, r: ReserveInput): Promise<{
   return { reservationId, statements };
 }
 
-/** The flip every settlement and release starts with, and the fence that it really happened in THIS batch. */
+/**
+ * The flip every settlement and release starts with, and the fence that it
+ * really happened in THIS batch — and that the reservation's hold rows sum to
+ * the seconds it reserved, so `unholdAll` gives back exactly what the account
+ * moves.
+ */
 function closeReservation(db: D1Database, res: CreditReservationRow, state: 'settled' | 'released', consumed: number, released: number, now: Date): Stmt[] {
   const token = pcId('tok');
   return [
@@ -433,22 +504,28 @@ function closeReservation(db: D1Database, res: CreditReservationRow, state: 'set
           WHERE id = ? AND state = 'active'`
       )
       .bind(state, consumed, released, iso(now), token, res.id),
-    fence(db, 'STATE_CHANGED', '(SELECT op_token FROM pc_credit_reservations WHERE id = ?) = ?', [res.id, token]),
+    fence(
+      db,
+      'STATE_CHANGED',
+      '(SELECT op_token FROM pc_credit_reservations WHERE id = ?) = ? AND (SELECT COALESCE(SUM(seconds), 0) FROM pc_credit_reservation_lots WHERE reservation_id = ?) = ?',
+      [res.id, token, res.id, res.seconds_reserved]
+    ),
   ];
 }
 
 /**
  * Give a whole active reservation back (a cancelled job, a job that never
- * ran): each hold returns to its lot's free part. Exactly once: the flip is
- * fenced. What returns to a lot past its expiry is free there, so the next
- * sweep takes it.
+ * ran): every hold returns to its lot's free part in one statement
+ * (`unholdAll`) — five statements and no read, however many lots the hours
+ * are held on. Exactly once: the flip is fenced. What returns to a lot past
+ * its expiry is free there, so the next sweep takes it (unless a free reprint
+ * waiting for its confirmation is entitled to it).
  */
-export async function releaseCredits(db: D1Database, res: CreditReservationRow, actorId: string, now: Date, note = ''): Promise<Stmt[]> {
+export function releaseCredits(db: D1Database, res: CreditReservationRow, actorId: string, now: Date, note = ''): Stmt[] {
   if (res.state !== 'active') throw pcError('STATE_CHANGED');
-  const holds = await reservationHolds(db, res.id);
   return [
     ...closeReservation(db, res, 'released', 0, res.seconds_reserved, now),
-    ...holds.map((h) => unhold(db, h)),
+    unholdAll(db, res.id),
     accountDelta(db, res.account_id, res.seconds_reserved, -res.seconds_reserved, 0, now),
     ledgerStmt(db, {
       entryKey: `release:${res.id}`,
@@ -536,8 +613,8 @@ export async function settleCredits(
   }
   const unbilled = actualSeconds - fromReservation - overage;
   const billed = fromReservation + overage;
-  // The holds go back first, so the draws below never leave a lot holding more than it has.
-  const statements: Stmt[] = [...closeReservation(db, res, 'settled', fromReservation, released, now), ...holds.map((h) => unhold(db, h))];
+  // The holds go back first, all in one statement, so the draws below never leave a lot holding more than it has.
+  const statements: Stmt[] = [...closeReservation(db, res, 'settled', fromReservation, released, now), unholdAll(db, res.id)];
   let value = 0;
   if (billed > 0) {
     const draws: LotDraw[] = [];
@@ -732,9 +809,11 @@ export async function convertCredits(
 
 /**
  * Lots whose configured expiry has passed (only ever set by an explicit
- * package rule) and that still have a FREE part, earliest expiry first. The
- * filter is per lot: a lot wholly held for jobs has nothing to expire now and
- * is never read, so it cannot fill the page ahead of lots that do.
+ * package rule) and that still have something to EXPIRE — a free part beyond
+ * what free reprints waiting for their confirmation are entitled to there —
+ * earliest expiry first. The filter is per lot: a lot wholly held for jobs, or
+ * whose free part a pending reprint is entitled to, has nothing to expire now
+ * and is never read, so it cannot fill the page ahead of lots that do.
  */
 export async function expiredLots(db: D1Database, now: Date, limit = 50): Promise<Array<CreditLotRow & { user_id: string; tier_id: string }>> {
   return many(
@@ -742,6 +821,7 @@ export async function expiredLots(db: D1Database, now: Date, limit = 50): Promis
     `SELECT id, account_id, user_id, tier_id, source, seconds_total, seconds_remaining, seconds_held, paid_iqd, expires_at, created_at, order_line_id
        FROM pc_credit_lots
       WHERE expires_at IS NOT NULL AND expires_at <= ? AND seconds_remaining > seconds_held
+        AND seconds_remaining - seconds_held > ${pendingEntitlementOn('pc_credit_lots.id')}
       ORDER BY expires_at, id LIMIT ?`,
     iso(now),
     limit
@@ -749,26 +829,52 @@ export async function expiredLots(db: D1Database, now: Date, limit = 50): Promis
 }
 
 /**
- * Expire the FREE part of one lot whose expiry has passed (§3.2): the seconds
- * jobs hold on it stay for them, and a hold given back later is free and
- * expires on a later run (unless a free reprint inherits it). Null when
- * nothing of the lot is free now. The batch is fenced on the lot's remainder
- * AND its holds as the plan read them, so it takes exactly that free part.
+ * Expire the FREE part of one lot whose expiry has passed (§3.2), less what
+ * free reprints still waiting for their confirmation are entitled to there:
+ * the seconds jobs hold on it stay for them, the seconds a pending free
+ * reprint will hold stay for it, and a hold given back later is free and
+ * expires on a later run. Null when nothing of the lot can expire now. The
+ * batch is fenced on the lot's remainder AND its holds as the plan read them,
+ * and on the pending entitlement not having grown, so it never takes more
+ * than may expire at commit.
  *
- * A lot can therefore expire in several passes. Each is keyed by the seconds
- * the lot held before it — they only ever go down — so a later pass has a key
- * of its own, while two runners planning the same pass still collide.
+ * A lot can therefore expire in several passes (another once a pending
+ * reprint is cancelled). Each is keyed by the seconds the lot held before it —
+ * they only ever go down — so a later pass has a key of its own, while two
+ * runners planning the same pass still collide.
  */
 export async function planLotExpiry(
   db: D1Database,
   lot: Pick<CreditLotRow, 'id' | 'account_id'> & { user_id: string; tier_id: string },
   now: Date
 ): Promise<{ seconds: number; statements: Stmt[] } | null> {
-  const [target] = await accountLots(db, lot.account_id, lot.id);
-  if (!target || target.expiresAt === null || goodAt(target, iso(now))) return null;
-  const seconds = freePart(target);
+  // The lot and what pending free reprints are entitled to on it, in one read.
+  const row = await one<Pick<CreditLotRow, 'id' | 'seconds_total' | 'seconds_remaining' | 'seconds_held' | 'paid_iqd' | 'expires_at'> & { entitled: number }>(
+    db,
+    `SELECT id, seconds_total, seconds_remaining, seconds_held, paid_iqd, expires_at, ${pendingEntitlementOn('pc_credit_lots.id')} AS entitled
+       FROM pc_credit_lots WHERE id = ? AND account_id = ?`,
+    lot.id,
+    lot.account_id
+  );
+  if (!row || row.expires_at === null || goodAt({ expiresAt: row.expires_at }, iso(now))) return null;
+  const target: CreditLotState = {
+    id: row.id,
+    total: Number(row.seconds_total),
+    remaining: Number(row.seconds_remaining),
+    held: Number(row.seconds_held),
+    value: Number(row.paid_iqd),
+    expiresAt: row.expires_at,
+  };
+  const entitled = Number(row.entitled);
+  const seconds = freePart(target) - entitled;
   if (seconds <= 0) return null;
-  const draw: FencedDraw = { lotId: target.id, qty: seconds, value: drawValue(target, seconds), expectedRemaining: target.remaining, expectedHeld: target.held };
+  const draw: FencedDraw = {
+    lotId: target.id,
+    qty: seconds,
+    value: drawValue(target, seconds),
+    expectedRemaining: target.remaining,
+    expiry: { held: target.held, entitled },
+  };
   const p: DebitInput = {
     userId: lot.user_id,
     tierId: lot.tier_id,
