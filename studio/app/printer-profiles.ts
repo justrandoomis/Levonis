@@ -303,12 +303,14 @@ export function availableMaterial(profileId: ProfileId, material: MaterialId): M
 export interface MaterialInForce {
   /** The listed material whose preset T1 holds, or null for any other filament. */
   id: MaterialId | null;
-  /** The preset name the kernel loads for T1 (filament_settings_id[0]). */
+  /** The preset name the kernel loads for T1 (filament_settings_id[0]), empty for an unnamed filament. */
   name: string;
   /**
    * What the row prints: the listed label, or for any other filament its name
    * without the vendor and the printer suffix («Bambu PLA Matte @BBL A1»
-   * reads «PLA Matte»), so the custom mark after it fits a phone row.
+   * reads «PLA Matte»), so the custom mark after it fits a phone row. An
+   * unnamed filament reads as its type («PLA»), or as nothing when it has
+   * none either.
    */
   label: string;
   /** Its filament type (filament_type[0]), for the sheet header. */
@@ -322,6 +324,15 @@ export function shortFilamentName(name: string): string {
 }
 
 /**
+ * What the kernel uses for a filament key the map does not hold: the
+ * defaults of the engine's config schema (three-slicer/data
+ * config-schema.json), which `settingRaw` falls back to when it slices.
+ * Written out here because the settings module is loaded lazily and this file
+ * is on the first screen; tests/phone-shell.test.mjs pins them to the schema.
+ */
+export const KERNEL_FILAMENT_DEFAULTS = { filament_settings_id: "", filament_type: "PLA" } as const;
+
+/**
  * WHAT T1 WILL REALLY PRINT WITH, READ FROM THE MAP THE KERNEL SLICES.
  *
  * The row used to show the material SELECTOR. An imported 3MF brings its own
@@ -331,17 +342,35 @@ export function shortFilamentName(name: string): string {
  * `filament_settings_id[0]` and `filament_type[0]`: one of the listed
  * materials when T1 holds the preset of that material for this printer,
  * otherwise the name of the filament itself (the row then says it is
- * custom, as the layer and infill rows do). A map with no filament yet
- * (before the first preset load) reads as the selector.
+ * custom, as the layer and infill rows do).
+ *
+ * AN UNNAMED FILAMENT IS STILL A FILAMENT (c6-r4-ha-01). A 3MF whose project
+ * settings hold only process keys (layer 0.12, infill 40 %, five walls)
+ * replaces the map with those keys, so `filament_settings_id` is gone and the
+ * kernel slices with its schema defaults: no preset name, type PLA, 200 °C.
+ * The row said «PLA Basic» (220 °C) over that G-code. Only BEFORE THE FIRST
+ * PRESET LOAD (`presetLoaded` false) does a map without filament keys read as
+ * the selector; after it, a missing key reads as the kernel reads it
+ * (KERNEL_FILAMENT_DEFAULTS), and a filament with no preset name is `id`
+ * null with its type as the label, so the row shows «PLA (مخصص)» and picking
+ * PLA Basic takes T1 back. An empty label (no type either) is for the card
+ * to name as a custom filament in the person's language.
  */
-export function materialInForce(profile: PrinterProfile, settings: unknown, selected: MaterialId): MaterialInForce {
+export function materialInForce(profile: PrinterProfile, settings: unknown, selected: MaterialId, presetLoaded: boolean): MaterialInForce {
   const record = (settings ?? {}) as Record<string, unknown>;
-  const first = (value: unknown) => String((Array.isArray(value) ? value[0] : value) ?? "").trim();
-  const name = first(record.filament_settings_id);
-  const type = first(record.filament_type);
-  if (!name) {
+  const held = (key: keyof typeof KERNEL_FILAMENT_DEFAULTS) => Object.prototype.hasOwnProperty.call(record, key) && record[key] != null;
+  const first = (key: keyof typeof KERNEL_FILAMENT_DEFAULTS) => {
+    if (!held(key)) return KERNEL_FILAMENT_DEFAULTS[key];
+    const value = record[key];
+    return String((Array.isArray(value) ? value[0] : value) ?? "").trim();
+  };
+  if (!presetLoaded && !held("filament_settings_id")) {
+    const type = held("filament_type") ? first("filament_type") : "";
     return { id: selected, name: materialPresetFor(profile, selected) ?? profile.materialPreset, label: MATERIALS[selected].label, type: type || MATERIALS[selected].type };
   }
+  const name = first("filament_settings_id");
+  const type = first("filament_type");
+  if (!name) return { id: null, name: "", label: type, type };
   const listed = isProfileId(profile.id) ? materialsFor(profile.id) : [];
   const id = listed.find((material) => materialPresetFor(profile, material) === name) ?? null;
   return { id, name, label: id ? MATERIALS[id].label : shortFilamentName(name), type: type || (id ? MATERIALS[id].type : "") };

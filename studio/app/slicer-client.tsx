@@ -97,6 +97,7 @@ import { useStudioTheme } from "./hooks/use-studio-theme";
 import { createDimensionCache, formatDimensions, objectsOffBed } from "./model-dimensions";
 import { currentPreset, type OrientationPreset, type Vec3 } from "./auto-orient";
 import { runPreflight } from "./makerworld/preflight";
+import { localizeEngineMessage } from "./engine-messages";
 import ProjectsPanel from "./components/projects-panel";
 import { captureEngineThumbnail } from "./thumbnail";
 
@@ -610,6 +611,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
    * current by its own effect is the same trick `plateCountRef` uses below.
    */
   const textRef = useRef(t);
+  const localeRef = useRef(locale);
 
   // -- account persistence (S5: namespaced drafts + upload pipeline) ---------
   // Engine-driven full snapshot capture: click save-project through the
@@ -767,7 +769,10 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       })
       .catch((reason: unknown) => {
         if (!active) return;
-        setError(reason instanceof Error ? reason.message : "The editor engine could not be loaded.");
+        // The reason is the browser's or the bundler's English; the row says
+        // what happened in the person's language.
+        console.warn("[levo-studio] engine boot failed", reason);
+        setError(textRef.current.engineBootFailed);
         setStatus("error");
       });
     return () => { active = false; };
@@ -898,6 +903,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   useEffect(() => { plateCountRef.current = plateCount; }, [plateCount]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
   useEffect(() => { textRef.current = t; }, [t]);
+  useEffect(() => { localeRef.current = locale; }, [locale]);
 
   useEffect(() => () => {
     if (exportIntentTimerRef.current !== null) window.clearTimeout(exportIntentTimerRef.current);
@@ -981,7 +987,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         if (profileRequestRef.current !== requestId) return;
         setLoadedPresetKey(requestedPresetKey);
         setProfileLoadState({ verified: false, missingPresets: [] });
-        setError(reason instanceof Error ? reason.message : "The printer profile could not be loaded.");
+        console.warn("[levo-studio] printer profile load failed", reason);
+        setError(textRef.current.profileLoadFailed);
       });
     // slicing.clearResults is identity-stable per hook instance.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2079,11 +2086,24 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
    * listener is on the document because the sheet's own contents are the
    * likeliest focus target, and a key pressed inside a field in the sheet
    * still has to reach it.
+   *
+   * NOTHING BEHIND THE SHEET HEARS A KEY (c6-r4-ha-02). The engine binds its
+   * shortcuts on window (arrows nudge the selected model, Delete removes it,
+   * m / r / s pick a gizmo) and skips only text fields, so a key pressed on a
+   * button in the sheet edited the scene the sheet covers. While a sheet is
+   * open, a key that did not start inside the engine's own mount stops at
+   * the document, after the sheet's own handlers (React's) and this one have
+   * run, and never reaches window. The page behind is inert, so no real key
+   * can start inside the engine while a sheet is open; the exception is
+   * only for the Studio's own synthetic shortcuts, dispatched on the engine
+   * shell as the sheet closes.
    */
   useEffect(() => {
     if (!sheet) return;
     sheetRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
+      const mount = viewportMountRef.current;
+      if (!(mount && event.target instanceof Node && mount.contains(event.target))) event.stopPropagation();
       if (event.key === "Escape") { setSheet(null); return; }
       if (event.key !== "Tab") return;
       const dialog = sheetRef.current;
@@ -2371,7 +2391,10 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         suppressNextExportNoticeRef.current = false;
         return;
       }
-      setNotice(event.value);
+      // The engine speaks English; the row speaks the person's language, and
+      // a sentence the map does not know reads as a generic line in Arabic
+      // and Sorani, never as raw English (app/engine-messages.ts).
+      setNotice(localizeEngineMessage(event.value, "notice", textRef.current, localeRef.current));
     } else if (event.type === "error") {
       // An EMPTY value is the engine clearing its own error, which it does in
       // the same commit that starts a slice (its simplified retry included),
@@ -2388,10 +2411,11 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       // An engine error is the other honest end to the wait: no objects are
       // coming, so the row must not sit there until its ceiling runs out.
       endImportWait();
-      setError(event.value);
+      const message = localizeEngineMessage(event.value, "error", textRef.current, localeRef.current);
+      setError(message);
       // The engine renders its retry offer in the same commit as this error,
       // so its button is already in the (possibly hidden) side panel here.
-      setDowngradeOfferFor(adapter.isControlAvailable("downgrade-retry") ? event.value : null);
+      setDowngradeOfferFor(adapter.isControlAvailable("downgrade-retry") ? message : null);
       setStatus("error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2731,6 +2755,19 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   }, []);
 
   /**
+   * Whether the engine has an object selected, read when the «المزيد» sheet
+   * renders: duplicate, split and delete act on the selection only, so their
+   * tiles wait for one (the only model on the bed is not selected by itself).
+   */
+  const engineHasSelection = () => {
+    try {
+      return Boolean(adapter.api()?.selectedObjectId());
+    } catch {
+      return false;
+    }
+  };
+
+  /**
    * What the scene is, read for the phone shell: each object's measured size,
    * the selected one (or the only one), the orientation preset the targets
    * are in, and the name for the file chip. Re-read when `objects` changes
@@ -2951,7 +2988,10 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   }, [canvasMode, clickControl, deleteAll, newProject, openAllSettings, openCut, openPrintCenter, openProjects, orientAll, prepareForBambuHandy, runTool, shareCurrentGcode, shortcut, triggerSlice]);
 
   /** The filament the kernel will use for T1, for the «الخامة» row and the sheet header. */
-  const t1Material = useMemo(() => materialInForce(profile, settings, material), [material, profile, settings]);
+  // The selector stands in for T1 only until the first preset load has
+  // finished; after it, the map is what the kernel slices (c6-r4-ha-01).
+  const presetLoaded = loadedPresetKey !== "";
+  const t1Material = useMemo(() => materialInForce(profile, settings, material, presetLoaded), [material, presetLoaded, profile, settings]);
   const chooseMaterial = useCallback((id: MaterialId) => {
     if (id !== material) {
       setMaterial(id);
@@ -3305,6 +3345,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
               theme={studioTheme.preference}
               onTheme={studioTheme.setPreference}
               hasObjects={objects.length > 0}
+              hasSelection={engineHasSelection()}
               importDisabled={!Viewport || Boolean(importProgress)}
               plateCount={plateCount}
               canvasMode={canvasMode}

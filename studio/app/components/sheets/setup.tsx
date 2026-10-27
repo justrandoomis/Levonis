@@ -15,6 +15,7 @@ import { templateText, type StudioDictionary } from "../../i18n";
 import { STUDIO_MODES, type StudioMode } from "../../studio-mode";
 import type { ThemePreference } from "../../theme";
 import { Icon } from "../header";
+import ChoiceSegments from "../mobile/choice-segments";
 
 export interface SetupSheetProps {
   t: StudioDictionary;
@@ -185,21 +186,19 @@ export default function SetupSheet(props: SetupSheetProps) {
       */}
       <fieldset>
         <legend>{t.theme}</legend>
-        <div className="theme-segments" role="radiogroup" aria-label={t.theme}>
-          {(["system", "light", "dark"] as const).map((id) => (
-            <button
-              key={id}
-              type="button"
-              role="radio"
-              aria-checked={props.theme === id}
-              className={props.theme === id ? "active" : ""}
-              onClick={() => props.onTheme(id)}
-              data-levo-theme-option={id}
-            >
-              {id === "system" ? t.themeSystem : id === "light" ? t.themeLight : t.themeDark}
-            </button>
-          ))}
-        </div>
+        <ChoiceSegments
+          className="theme-segments"
+          label={t.theme}
+          choices={[
+            { id: "system", label: t.themeSystem },
+            { id: "light", label: t.themeLight },
+            { id: "dark", label: t.themeDark },
+          ]}
+          value={props.theme}
+          onChoose={props.onTheme}
+          followFocus
+          dataName="data-levo-theme-option"
+        />
       </fieldset>
       <p className="file-limit">{t.fileLimit}</p>
       <p className="file-limit">{t.webLimitsNotice}</p>

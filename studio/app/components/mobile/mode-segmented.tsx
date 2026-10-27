@@ -9,13 +9,15 @@
  *
  * A radiogroup with the selection following focus: Tab lands on the current
  * option, the arrow keys move in the writing direction (left is "next" in
- * Arabic and Sorani), Home and End jump to the ends. The current option takes
- * the sand clay (owner override D-3) and says so as aria-checked.
+ * Arabic and Sorani), Home and End jump to the ends, and a key it handles
+ * goes no further (roving.ts). The current option takes the sand clay (owner
+ * override D-3) and says so as aria-checked.
  */
 
 import { useRef, type KeyboardEvent } from "react";
 import type { StudioDictionary } from "../../i18n";
 import { STUDIO_MODES, type StudioMode } from "../../studio-mode";
+import { consumeRovingKey } from "./roving";
 
 export interface ModeSegmentedProps {
   t: StudioDictionary;
@@ -26,16 +28,10 @@ export interface ModeSegmentedProps {
 export default function ModeSegmented({ t, mode, onMode }: ModeSegmentedProps) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
-    const forward = rtl ? "ArrowLeft" : "ArrowRight";
-    const backward = rtl ? "ArrowRight" : "ArrowLeft";
-    let next = -1;
-    if (event.key === forward) next = Math.min(STUDIO_MODES.length - 1, index + 1);
-    else if (event.key === backward) next = Math.max(0, index - 1);
-    else if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = STUDIO_MODES.length - 1;
+    // A key the switch handles stops here: it never reaches the engine's
+    // arrow nudge on window (roving.ts, c6-r4-ha-02).
+    const next = consumeRovingKey(event, index, STUDIO_MODES.length);
     if (next < 0) return;
-    event.preventDefault();
     onMode(STUDIO_MODES[next]);
     refs.current[next]?.focus();
   };

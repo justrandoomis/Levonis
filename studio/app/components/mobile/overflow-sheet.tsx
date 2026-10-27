@@ -22,6 +22,7 @@ import type { ReactNode } from "react";
 import { LOCALES, LOCALE_NAMES, type Locale, type StudioDictionary } from "../../i18n";
 import type { ThemePreference } from "../../theme";
 import { FileSelectControl, Icon, SIGN_IN_HREF, type IconName } from "../header";
+import ChoiceSegments from "./choice-segments";
 
 /** The public source of LEVO Studio (AGPL-3.0-or-later §13), as the About sheet links it. */
 export const SOURCE_CODE_URL = "https://github.com/aliamer229/Levo_slicer";
@@ -33,6 +34,12 @@ export interface OverflowSheetProps {
   theme: ThemePreference;
   onTheme: (theme: ThemePreference) => void;
   hasObjects: boolean;
+  /**
+   * True when the engine has an object selected. Duplicate, split and delete
+   * act on the selection only; with none they used to run and answer
+   * «Select an object to duplicate first» (c6-r4-ha-04).
+   */
+  hasSelection: boolean;
   importDisabled: boolean;
   plateCount: number;
   canvasMode: "prepare" | "preview";
@@ -98,13 +105,13 @@ export default function OverflowSheet(props: OverflowSheetProps) {
 
       <Group label={t.editTools}>
         <div className="more-grid">
-          {tile("duplicate", "copy", t.duplicate, { disabled: none })}
-          {tile("split", "split", t.split, { disabled: none })}
+          {tile("duplicate", "copy", t.duplicate, { disabled: none || !props.hasSelection })}
+          {tile("split", "split", t.split, { disabled: none || !props.hasSelection })}
           {tile("on-bed", "bed", t.onBed, { disabled: none })}
           {tile("paint", "paint", t.paint, { disabled: none })}
           {tile("cut", "cut", t.cut, { disabled: none })}
           {tile("auto-orient", "orient", t.orient, { disabled: none || props.orienting })}
-          {tile("delete", "trash", t.remove, { disabled: none, danger: true })}
+          {tile("delete", "trash", t.remove, { disabled: none || !props.hasSelection, danger: true })}
         </div>
       </Group>
 
@@ -152,23 +159,27 @@ export default function OverflowSheet(props: OverflowSheetProps) {
       </Group>
 
       <Group label={t.language}>
-        <div className="locale-segments" role="radiogroup" aria-label={t.language}>
-          {LOCALES.map((id) => (
-            <button key={id} type="button" role="radio" aria-checked={props.locale === id} className={props.locale === id ? "active" : ""} onClick={() => props.onLocale(id)}>
-              {LOCALE_NAMES[id]}
-            </button>
-          ))}
-        </div>
+        <ChoiceSegments
+          className="locale-segments"
+          label={t.language}
+          choices={LOCALES.map((id) => ({ id, label: LOCALE_NAMES[id] }))}
+          value={props.locale}
+          onChoose={props.onLocale}
+          followFocus={false}
+          dataName="data-levo-locale-option"
+        />
       </Group>
 
       <Group label={t.theme}>
-        <div className="theme-segments" role="radiogroup" aria-label={t.theme}>
-          {themes.map((option) => (
-            <button key={option.id} type="button" role="radio" aria-checked={props.theme === option.id} className={props.theme === option.id ? "active" : ""} onClick={() => props.onTheme(option.id)} data-levo-theme-option={option.id}>
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <ChoiceSegments
+          className="theme-segments"
+          label={t.theme}
+          choices={themes}
+          value={props.theme}
+          onChoose={props.onTheme}
+          followFocus
+          dataName="data-levo-theme-option"
+        />
       </Group>
 
       <Group label={t.about}>

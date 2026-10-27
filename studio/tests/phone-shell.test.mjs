@@ -443,7 +443,8 @@ test("everything the reference drops is still reachable, and the AGPL link is tw
   }
   // Language, theme, sign-in and new files live in the sheet itself.
   assert.match(overflow, /LOCALES\.map/);
-  assert.match(overflow, /className="theme-segments" role="radiogroup"/);
+  assert.match(overflow, /<ChoiceSegments\s+className="theme-segments"/);
+  assert.match(overflow, /<ChoiceSegments\s+className="locale-segments"/);
   assert.match(overflow, /href=\{SIGN_IN_HREF\}/);
   assert.match(overflow, /<FileSelectControl/);
 });
@@ -588,23 +589,23 @@ test("the «الخامة» row and the sheet header say the filament T1 really p
   // as the engine writes them after the import.
   const preset = { filament_settings_id: [materialPresetFor(a1, "pla")], filament_type: ["PLA"], nozzle_temperature: [220] };
   const sliced = { ...preset, ...project };
-  const shown = materialInForce(a1, sliced, "pla");
+  const shown = materialInForce(a1, sliced, "pla", true);
   assert.equal(shown.id, "petg", "the row selects PETG Basic");
   assert.notEqual(shown.id, "pla", "never «PLA Basic» over a PETG print");
   assert.equal(MATERIALS[shown.id].label, "PETG Basic");
   assert.equal(shown.label, "PETG Basic");
   assert.equal(shown.type, "PETG", "the sheet header says PETG");
   // The preset the selector loaded still reads as itself.
-  assert.deepEqual(materialInForce(a1, preset, "pla"), { id: "pla", name: "Bambu PLA Basic @BBL A1", label: "PLA Basic", type: "PLA" });
+  assert.deepEqual(materialInForce(a1, preset, "pla", true), { id: "pla", name: "Bambu PLA Basic @BBL A1", label: "PLA Basic", type: "PLA" });
   // A filament the printer does not list (a generic one, PLA Matte, or PETG
   // on the P1P, which ships no PETG Basic) reads as its own short name, never
   // as a listed one.
-  const generic = materialInForce(a1, { ...preset, filament_settings_id: ["Generic PETG @BBL A1"], filament_type: ["PETG"] }, "pla");
+  const generic = materialInForce(a1, { ...preset, filament_settings_id: ["Generic PETG @BBL A1"], filament_type: ["PETG"] }, "pla", true);
   assert.deepEqual(generic, { id: null, name: "Generic PETG @BBL A1", label: "Generic PETG", type: "PETG" });
-  assert.equal(materialInForce(a1, { filament_settings_id: ["Bambu PLA Matte @BBL A1"], filament_type: ["PLA"] }, "pla").label, "PLA Matte");
-  assert.equal(materialInForce(PROFILES["bbl-p1p-04"], { filament_settings_id: ["Bambu PETG Basic @BBL X1C"], filament_type: ["PETG"] }, "pla").id, null);
+  assert.equal(materialInForce(a1, { filament_settings_id: ["Bambu PLA Matte @BBL A1"], filament_type: ["PLA"] }, "pla", true).label, "PLA Matte");
+  assert.equal(materialInForce(PROFILES["bbl-p1p-04"], { filament_settings_id: ["Bambu PETG Basic @BBL X1C"], filament_type: ["PETG"] }, "pla", true).id, null);
   // Before the first preset load there is no filament: the selector stands.
-  assert.equal(materialInForce(a1, {}, "petg").id, "petg");
+  assert.equal(materialInForce(a1, {}, "petg", false).id, "petg");
 
   const [card, client] = await Promise.all([read("../app/components/mobile/print-settings-card.tsx"), read("../app/slicer-client.tsx")]);
   // The row's value is T1, and a filament it does not list is a disabled
@@ -612,9 +613,11 @@ test("the «الخامة» row and the sheet header say the filament T1 really p
   // layer and infill rows already do.
   assert.match(card, /const materialShown = props\.materialInForce\.id;/);
   assert.match(card, /value=\{materialShown \?\? CUSTOM\}/);
-  assert.match(card, /\{materialShown === null && <option value=\{CUSTOM\} disabled>\{templateText\(t\.customValue, \{ value: props\.materialInForce\.label \}\)\}<\/option>\}/);
+  assert.match(card, /\{materialShown === null && <option value=\{CUSTOM\} disabled>\{customMaterialText\}<\/option>\}/);
+  assert.match(card, /const customMaterialText = props\.materialInForce\.label\s*\? templateText\(t\.customValue, \{ value: props\.materialInForce\.label \}\)\s*: t\.customFilament;/);
   assert.doesNotMatch(card, /value=\{props\.material\}/, "the selector is not what the row shows");
-  assert.match(client, /const t1Material = useMemo\(\(\) => materialInForce\(profile, settings, material\), \[material, profile, settings\]\);/);
+  assert.match(client, /const presetLoaded = loadedPresetKey !== "";/);
+  assert.match(client, /const t1Material = useMemo\(\(\) => materialInForce\(profile, settings, material, presetLoaded\), \[material, presetLoaded, profile, settings\]\);/);
   assert.match(client, /materialInForce=\{t1Material\}/);
   assert.match(client, /\{profile\.shortName\} · \{profile\.nozzle\.toFixed\(1\)\} mm · \{t1Material\.type \|\| MATERIALS\[material\]\.type\}/);
   // Picking the material the selector already holds while T1 holds another
@@ -641,8 +644,325 @@ test("the «الخامة» row and the sheet header say the filament T1 really p
     previousFilamentKeys: ["filament_settings_id", "filament_type", "nozzle_temperature"],
     engineKeys: new Set(["filament_settings_id", "filament_type", "nozzle_temperature"]),
   });
-  assert.equal(materialInForce(a1, carried.settings, "pla").id, "pla", "after the take-back the row and the G-code agree on PLA");
+  assert.equal(materialInForce(a1, carried.settings, "pla", true).id, "pla", "after the take-back the row and the G-code agree on PLA");
   assert.deepEqual(carried.settings.nozzle_temperature, [220]);
+});
+
+test("a 3MF with process settings only: the «الخامة» row says «PLA (مخصص)», never «PLA Basic», and PLA Basic takes T1 back", async () => {
+  // c6-r4-ha-01: a project whose settings hold only layer 0.12, infill 40 %
+  // and five walls. The engine replaces the map with those keys, the kernel
+  // slices T1 with its schema defaults (no preset name, PLA, 200 °C), and the
+  // row still said «PLA Basic» (220 °C) over that G-code.
+  const { unzipSync, zipSync, strFromU8, strToU8 } = await import("fflate");
+  const fixture = unzipSync(new Uint8Array(await readFile(new URL("./fixtures/mini-project.3mf", import.meta.url))));
+  const archive = zipSync({
+    ...fixture,
+    "Metadata/project_settings.config": strToU8(JSON.stringify({ layer_height: "0.12", sparse_infill_density: "40%", wall_loops: "5" })),
+  });
+  // Imported as the engine imports it: its own normalizer, then a settings
+  // write that replaces the map, which the shell passes through its machine
+  // lock (slicer-client setEditorSettings).
+  const { normalizeProjectSettings } = await import("three-slicer/settings");
+  const imported = normalizeProjectSettings(JSON.parse(strFromU8(unzipSync(archive)["Metadata/project_settings.config"])));
+  assert.equal(imported.applied, 3, "only the three process keys are in the project");
+  const { applyMachineLock } = await loadAppModule("machine-lock");
+  const machine = { printer_model: "Bambu Lab A1", printer_settings_id: "Bambu Lab A1 0.4 nozzle", printable_area: [[0, 0], [256, 0], [256, 256], [0, 256]], printable_height: 256, nozzle_diameter: [0.4] };
+  const afterImport = applyMachineLock(imported.settings, machine);
+  assert.equal(Object.prototype.hasOwnProperty.call(afterImport, "filament_settings_id"), false, "the import leaves no filament keys in the map");
+
+  // The kernel reads a missing key as its schema default; the row says the same.
+  const { KERNEL_FILAMENT_DEFAULTS, PROFILES, MATERIALS, materialInForce, materialPresetFor } = await loadAppModule("printer-profiles");
+  const schema = JSON.parse(await readFile(new URL("../node_modules/three-slicer/data/config-schema.json", import.meta.url), "utf8"));
+  assert.deepEqual(schema.filament_settings_id.default, [KERNEL_FILAMENT_DEFAULTS.filament_settings_id]);
+  assert.deepEqual(schema.filament_type.default, [KERNEL_FILAMENT_DEFAULTS.filament_type]);
+  const a1 = PROFILES["bbl-a1-04"];
+  const shown = materialInForce(a1, afterImport, "pla", true);
+  assert.deepEqual(shown, { id: null, name: "", label: "PLA", type: "PLA" });
+  assert.notEqual(shown.id, "pla", "never «PLA Basic» over an unnamed filament");
+  // An explicitly empty preset name reads the same way.
+  assert.deepEqual(materialInForce(a1, { filament_settings_id: [""], filament_type: ["PETG"] }, "pla", true), { id: null, name: "", label: "PETG", type: "PETG" });
+  // Only before the first preset load does a map without filament keys read as the selector.
+  assert.equal(materialInForce(a1, afterImport, "pla", false).id, "pla");
+  assert.equal(materialInForce(a1, { filament_settings_id: [""] }, "pla", false).id, null, "an empty name is never the selector");
+  // What the row prints, in all three languages: «PLA (مخصص)», "PLA (custom)», «PLA (تایبەت)».
+  const { DICTIONARIES, templateText } = await loadAppModule("i18n/index");
+  assert.equal(templateText(DICTIONARIES.ar.customValue, { value: shown.label }), "PLA (مخصص)");
+  assert.equal(templateText(DICTIONARIES.en.customValue, { value: shown.label }), "PLA (custom)");
+  assert.equal(templateText(DICTIONARIES.ckb.customValue, { value: shown.label }), "PLA (تایبەت)");
+  // A filament with no type either is named, never blank.
+  assert.equal(materialInForce(a1, { filament_settings_id: [""], filament_type: [""] }, "pla", true).label, "");
+  for (const locale of ["ar", "en", "ckb"]) assert.ok(DICTIONARIES[locale].customFilament, `customFilament in ${locale}`);
+  assert.notEqual(DICTIONARIES.ckb.customFilament, DICTIONARIES.ar.customFilament);
+
+  // Picking PLA Basic (the selector already holds it) takes T1 back: the
+  // reload is carried as a material change, as in the client.
+  const { carryUserEdits, recordEngineWrites } = await loadAppModule("settings-carryover");
+  const loadedPla = { ...machine, filament_settings_id: [materialPresetFor(a1, "pla")], filament_type: ["PLA"], nozzle_temperature: [220], layer_height: 0.2, sparse_infill_density: 15, wall_loops: 2 };
+  const engineKeys = recordEngineWrites({ before: loadedPla, after: afterImport, preset: loadedPla, engine: new Set(), byPerson: false });
+  const selection = { printerId: "bbl-a1-04", quality: "standard", strength: "standard", support: false, infill: "grid", material: "pla" };
+  const carried = carryUserEdits({
+    loaded: loadedPla,
+    previous: afterImport,
+    editedKeys: new Set(),
+    previousSelection: { ...selection, material: "t1-from-file" },
+    nextSelection: selection,
+    processKeys: [],
+    filamentKeys: ["filament_settings_id", "filament_type", "nozzle_temperature"],
+    previousFilamentKeys: ["filament_settings_id", "filament_type", "nozzle_temperature"],
+    engineKeys,
+  });
+  const back = materialInForce(a1, carried.settings, "pla", true);
+  assert.equal(back.id, "pla", "after the take-back the row and the G-code agree on PLA Basic");
+  assert.equal(MATERIALS[back.id].label, "PLA Basic");
+  assert.deepEqual(carried.settings.nozzle_temperature, [220]);
+  assert.equal(Number(carried.settings.layer_height), 0.12, "the file's own layer height stays");
+});
+
+// --------------------------------------------------------------- keys
+
+test("an arrow key a shell group handles stops at the group, and nothing behind an open sheet hears a key", async () => {
+  // c6-r4-ha-02: the engine nudges the selected model 10 mm on any arrow
+  // that reaches window. ArrowLeft on «مبسط» changed the mode AND moved the
+  // model; ArrowLeft on «العربية» or «داكن» moved the model behind the
+  // modal sheet.
+  const { consumeRovingKey, rovingTarget } = await loadAppModule("components/mobile/roving");
+  const previous = globalThis.getComputedStyle;
+  let direction = "rtl";
+  globalThis.getComputedStyle = () => ({ direction });
+  try {
+    const press = (key, extra = {}) => {
+      const event = { key, currentTarget: {}, altKey: false, ctrlKey: false, metaKey: false, ...extra, prevented: false, stopped: false };
+      event.preventDefault = () => { event.prevented = true; };
+      event.stopPropagation = () => { event.stopped = true; };
+      return event;
+    };
+    // Right-to-left: left is next.
+    let event = press("ArrowLeft");
+    assert.equal(consumeRovingKey(event, 0, 3), 1);
+    assert.ok(event.prevented && event.stopped, "a handled arrow never bubbles on to window");
+    assert.equal(rovingTarget(press("ArrowRight"), 1, 3), 0);
+    assert.equal(rovingTarget(press("ArrowDown"), 1, 3), 2);
+    assert.equal(rovingTarget(press("ArrowUp"), 1, 3), 0);
+    assert.equal(rovingTarget(press("Home"), 2, 3), 0);
+    assert.equal(rovingTarget(press("End"), 0, 3), 2);
+    // At an end it stays, and the key is still the group's.
+    event = press("ArrowLeft");
+    assert.equal(consumeRovingKey(event, 2, 3), 2);
+    assert.ok(event.stopped);
+    // Left-to-right: right is next.
+    direction = "ltr";
+    assert.equal(rovingTarget(press("ArrowRight"), 0, 3), 1);
+    // A key the group does not use is left alone, for the page and the engine.
+    for (const other of [press("Delete"), press("m"), press("Tab"), press("ArrowLeft", { ctrlKey: true })]) {
+      assert.equal(consumeRovingKey(other, 0, 3), -1);
+      assert.ok(!other.prevented && !other.stopped, other.key);
+    }
+  } finally {
+    globalThis.getComputedStyle = previous;
+  }
+
+  const [mode, model, choices, overflow, setup, client] = await Promise.all([
+    read("../app/components/mobile/mode-segmented.tsx"),
+    read("../app/components/mobile/model-info-card.tsx"),
+    read("../app/components/mobile/choice-segments.tsx"),
+    read("../app/components/mobile/overflow-sheet.tsx"),
+    read("../app/components/sheets/setup.tsx"),
+    read("../app/slicer-client.tsx"),
+  ]);
+  // Every shell group consumes its keys: the mode, the orientation chips,
+  // the language and the appearance.
+  assert.match(mode, /const next = consumeRovingKey\(event, index, STUDIO_MODES\.length\);/);
+  assert.match(model, /const next = consumeRovingKey\(event, index, 3\);/);
+  assert.match(model, /onKeyDown=\{\(event\) => onKeyDown\(event, index\)\}/);
+  assert.match(choices, /const next = consumeRovingKey\(event, index, props\.choices\.length\);/);
+  assert.match(choices, /tabIndex=\{checked \? 0 : -1\}/);
+  assert.match(overflow, /<ChoiceSegments\s+className="locale-segments"[\s\S]*?followFocus=\{false\}/);
+  assert.match(overflow, /<ChoiceSegments\s+className="theme-segments"[\s\S]*?followFocus\s/);
+  assert.match(setup, /<ChoiceSegments\s+className="theme-segments"/);
+  // While a sheet is open, a key from outside the engine mount stops at the
+  // document, before window, where the engine listens.
+  const effect = client.slice(client.indexOf("NOTHING BEHIND THE SHEET HEARS A KEY"), client.indexOf("}, [sheet]);", client.indexOf("NOTHING BEHIND THE SHEET HEARS A KEY")));
+  assert.ok(effect.length > 200, "the sheet key effect is findable");
+  assert.match(effect, /if \(!sheet\) return;/);
+  assert.match(effect, /if \(!\(mount && event\.target instanceof Node && mount\.contains\(event\.target\)\)\) event\.stopPropagation\(\);/);
+  assert.match(effect, /document\.addEventListener\("keydown", onKey\);/);
+  // And the engine listens on window, so a stop at the document is enough.
+  const engine = await readFile(new URL("../node_modules/three-slicer/viewer/dist/Viewport.js", import.meta.url), "utf8");
+  assert.match(engine, /window\.addEventListener\("keydown", /);
+});
+
+test("the chosen language and appearance are marked without colour, with a 3:1 change", async () => {
+  // c6-r4-ha-03: the chosen option differed by about 1.05:1 in fill and
+  // 2.3 to 2.6:1 in text, with no other cue.
+  const [css, choices] = await Promise.all([read("../app/globals.css"), read("../app/components/mobile/choice-segments.tsx")]);
+  const rule = /\.locale-segments button\[aria-checked="true"\], \.theme-segments button\[aria-checked="true"\] \{([^}]*)\}/.exec(css)?.[1] ?? "";
+  assert.ok(rule, "the chosen option has its own rule");
+  assert.match(rule, /background: var\(--gold-clay\);/);
+  assert.match(rule, /box-shadow: var\(--clay-gold\);/);
+  assert.match(rule, /color: var\(--gold-ink\);/);
+  assert.doesNotMatch(css, /\.locale-segments button\.active, \.theme-segments button\.active \{ border-color: var\(--line\); background: var\(--surface\);/);
+  // The non-colour cue: a check mark before the label, and aria-checked.
+  assert.match(choices, /aria-checked=\{checked\}/);
+  assert.match(choices, /\{checked && <Icon name="check" \/>\}\s*<span>\{choice\.label\}<\/span>/);
+
+  // The 3:1: sand against the unchosen panel in dark; in light the gold edge
+  // of --clay-gold against the cream panel.
+  const token = (scope, name) => new RegExp(`${scope}[\\s\\S]*?--${name}:\\s*(#[0-9a-fA-F]{6})`).exec(css)?.[1];
+  const lum = (hex) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const gold2 = token(":root", "gold-2");
+  const darkPanel = token(":root", "panel");
+  assert.ok(gold2 && darkPanel, "the dark tokens are readable");
+  assert.ok(ratio(gold2, darkPanel) >= 3, `dark: sand on the panel is ${ratio(gold2, darkPanel).toFixed(2)}:1`);
+  const light = css.slice(css.indexOf('[data-theme="light"]'));
+  const lightEdge = /--gold-edge:\s*(#[0-9a-fA-F]{6})/.exec(light)?.[1];
+  const lightPanel = /--panel:\s*(#[0-9a-fA-F]{6})/.exec(light)?.[1];
+  assert.ok(lightEdge && lightPanel, "the light tokens are readable");
+  assert.ok(ratio(lightEdge, lightPanel) >= 3, `light: the gold edge on the panel is ${ratio(lightEdge, lightPanel).toFixed(2)}:1`);
+  assert.match(css, /--clay-gold: [^;]*0 0 0 1px var\(--gold-edge\)/);
+});
+
+// --------------------------------------------------------------- engine sentences
+
+const ENGINE_SENTENCES = [
+  ["notice", "Imported this project's 8 settings and 1 plates.", "engineImportedProject", "Imported this project's "],
+  ["notice", "Imported this project's 3 settings and 4 filaments and 2 plates. Not supported by this slicer, so left out: seam painting, 3 object(s) on plates past this viewer's limit.", "engineImportedProject", " Not supported by this slicer, so left out: "],
+  ["notice", "Imported this project's geometry. Not supported by this slicer, so left out: variable layer height.", "engineImportedProject", "variable layer height"],
+  ["error", "Select an object to duplicate first", "engineSelectToDuplicate"],
+  ["error", "Select an object to copy first", "engineSelectToCopy"],
+  ["error", "Select an object to delete first", "engineSelectToDelete"],
+  ["error", "Select an object to split first", "engineSelectToSplit"],
+  ["error", "Nothing selected — click an object first", "engineNothingSelected"],
+  ["error", "Nothing to export — load a model first", "engineNothingToExport"],
+  ["error", "Upload an STL first", "engineLoadModelFirst"],
+  ["notice", "Object copied (paste with Ctrl+V)", "engineCopied"],
+  ["notice", "Deleted all 3 object(s)", "engineDeletedAll", "Deleted all "],
+  ["notice", "Split into 4 objects", "engineSplitDone", "Split into "],
+  ["error", "No separate parts to split — this is a single connected mesh", "engineSplitSingle"],
+  ["error", "Split failed: out of memory", "engineSplitFailed", "Split failed: "],
+  ["notice", "Memory pressure — finished in economy mode (no preview, G-code can still be downloaded)", "engineEconomy"],
+  ["notice", "Memory pressure — some plates finished in economy mode (no preview, G-code is fine)", "engineEconomySomePlates"],
+  ["notice", "Arachne wall generation failed (degenerate geometry) — finished with classic walls (G-code is fine)", "engineClassicWalls"],
+  ["notice", "Support generation failed (no overhangs) — the slice contains the model only", "engineSupportFailed", ") — the slice contains the model only"],
+  ["notice", "Slice canceled", "engineSliceCanceled"],
+  ["error", "Plate 2 has no objects", "enginePlateEmpty", " has no objects"],
+  ["error", "All plates failed to slice (economy mode included) — try the simplified retry", "engineAllPlatesFailed"],
+  ["error", "Plate 1, 3 failed — the 2 finished result(s) are kept (inspect/export from the tabs)", "enginePlatesFailed", " finished result(s) are kept (inspect/export from the tabs)"],
+  ["error", "Slice failed: kernel abort", "engineSliceFailed", "Slice failed: "],
+  ["error", "Slice failed (economy mode failed too): kernel abort", "engineSliceFailed", "Slice failed (economy mode failed too): "],
+  ["error", "Worker terminated (likely out of memory): worker error", "engineWorkerStopped", "Worker terminated (likely out of memory): "],
+  ["notice", "Saved 2 object(s) as a 3mf project with 120 painted facets.", "engineSaved3mf", "as a 3mf project"],
+  ["notice", "Exported 1 selected object(s) as STL (2400 triangles).", "engineExportedStl", "as STL ("],
+  ["error", "Export failed: quota", "engineExportFailed", "Export failed: "],
+  ["notice", "Exported 3 plate(s) — skipped 1 that extend beyond the bed", "engineExportedPlates", " that extend beyond the bed"],
+  ["error", "Every sliced plate extends beyond the bed — nothing exported", "engineExportAllOverBed"],
+  ["error", "No slice results to export — slice first", "engineNothingSliced"],
+  ["error", "Failed to load bracket.stl: bad header", "engineFileFailed", "Failed to load "],
+  ["error", "Supported formats: STL/OBJ/3MF/AMF/PLY + preset files", "importFailed", "Supported formats: STL/OBJ/3MF/AMF/PLY"],
+  ["error", "No printable moves found in the G-code", "engineGcodeUnreadable"],
+  ["notice", "Only T1 was painted. T1 is the default extruder every unpainted facet already uses, so the slice is unchanged — paint T2 or higher to get a second material.", "enginePaintOnlyT1"],
+  ["notice", "Support is on and T2 is painted. One facet carries one mark, and a support blocker is the same mark as T2 — the painted areas were sliced as T2, not as blocked support.", "enginePaintSupportT2"],
+  ["notice", "The model changed, so the painted regions were reset — the paint is tied to the facets it was brushed onto.", "enginePaintReset"],
+  ["notice", "This project paints both material and support. One facet holds one paint state, so the material painting was imported and the support painting was dropped.", "enginePaintBothImported"],
+  ["notice", "Saved \"My A1\" as an OrcaSlicer machine preset", "enginePresetSaved", "as an OrcaSlicer machine preset"],
+  ["error", "Could not save the printer preset: denied", "enginePresetSaveFailed", "Could not save the printer preset: "],
+  ["error", "No presets found in that file", "enginePresetFileUnreadable"],
+  ["notice", "Loaded Bambu PLA Basic @BBL A1 — 1 warning(s): unknown key", "enginePresetsLoaded", " warning(s): "],
+];
+
+test("the engine's sentences reach the message row in the person's language, never as raw English in Arabic or Sorani", async () => {
+  // c6-r4-ha-04: «Imported this project's 8 settings and 1 plates.» and
+  // «Select an object to duplicate first» in the Arabic and Sorani row.
+  const { engineMessageKey, localizeEngineMessage } = await loadAppModule("engine-messages");
+  const { DICTIONARIES, templateText } = await loadAppModule("i18n/index");
+  const latinSentence = /[A-Za-z]{3,}(?:\s+[A-Za-z]{2,}){2,}/;
+  // A preset or file name is carried as it is (it is a name, not a sentence).
+  const names = ["Bambu PLA Basic @BBL A1", "My A1", "bracket.stl"];
+  for (const [kind, raw, key] of ENGINE_SENTENCES) {
+    assert.equal(engineMessageKey(raw), key, raw);
+    for (const locale of ["ar", "ckb"]) {
+      const text = names.reduce((out, name) => out.split(name).join("·"), localizeEngineMessage(raw, kind, DICTIONARIES[locale], locale));
+      assert.ok(text, `${locale}: ${raw}`);
+      assert.doesNotMatch(text, latinSentence, `${locale} shows English for «${raw}»: ${text}`);
+    }
+    assert.ok(localizeEngineMessage(raw, kind, DICTIONARIES.en, "en"), `en: ${raw}`);
+  }
+  // The numbers and names are carried over, in Arabic with its counted forms.
+  const ar = (raw, kind = "notice") => localizeEngineMessage(raw, kind, DICTIONARIES.ar, "ar");
+  assert.equal(ar("Imported this project's 8 settings and 1 plates."), "استُورد من هذا المشروع: 8 إعدادات، توزيع 1 Plate.");
+  assert.equal(ar("Imported this project's 2 settings."), "استُورد من هذا المشروع: إعدادان.");
+  assert.match(ar("Imported this project's 3 settings and 4 filaments and 2 plates. Not supported by this slicer, so left out: seam painting, 3 object(s) on plates past this viewer's limit."), /وتُرك ما لا يدعمه هذا المحرر: رسم خط الدرز، 3 مجسمات على Plate/);
+  assert.equal(ar("Select an object to duplicate first", "error"), DICTIONARIES.ar.engineSelectToDuplicate);
+  assert.equal(ar("Plate 2 has no objects", "error"), "Plate 2 لا تحوي أي مجسم.");
+  assert.equal(ar("Failed to load bracket.stl: bad header", "error"), "تعذّر فتح bracket.stl.");
+  assert.equal(localizeEngineMessage("Split into 4 objects", "notice", DICTIONARIES.ckb, "ckb"), "بۆ 4 تەن دابەش کرا.");
+  assert.equal(localizeEngineMessage("Imported this project's 8 settings and 1 plates.", "notice", DICTIONARIES.en, "en"), "Imported from this project: 8 settings, the layout of 1 plate.");
+  // An unknown sentence: a generic line in Arabic and Sorani, the engine's
+  // own English in English; an empty one is the engine clearing its message.
+  for (const locale of ["ar", "ckb"]) {
+    assert.equal(localizeEngineMessage("Kernel said something new", "error", DICTIONARIES[locale], locale), DICTIONARIES[locale].engineErrorGeneric);
+    assert.equal(localizeEngineMessage("Kernel said something new", "notice", DICTIONARIES[locale], locale), DICTIONARIES[locale].engineNoticeGeneric);
+  }
+  assert.equal(localizeEngineMessage("Kernel said something new", "notice", DICTIONARIES.en, "en"), "Kernel said something new");
+  assert.equal(localizeEngineMessage("", "error", DICTIONARIES.ar, "ar"), "");
+  void templateText;
+
+  // Every literal the shipped engine passes to its error and notice setters
+  // has a rule: no sentence falls through to the generic line by oversight.
+  const engine = await readFile(new URL("../node_modules/three-slicer/viewer/dist/Viewport.js", import.meta.url), "utf8");
+  for (const [, raw, , fragment] of ENGINE_SENTENCES) {
+    assert.ok(engine.includes(fragment ?? raw), `«${fragment ?? raw}» is no longer an engine sentence`);
+  }
+
+  // The client sends both kinds through the map, and its own two load failures are dictionary lines.
+  const client = await read("../app/slicer-client.tsx");
+  assert.match(client, /setNotice\(localizeEngineMessage\(event\.value, "notice", textRef\.current, localeRef\.current\)\);/);
+  assert.match(client, /const message = localizeEngineMessage\(event\.value, "error", textRef\.current, localeRef\.current\);\s*setError\(message\);/);
+  assert.match(client, /setDowngradeOfferFor\(adapter\.isControlAvailable\("downgrade-retry"\) \? message : null\);/);
+  assert.doesNotMatch(client, /setNotice\(event\.value\)|setError\(event\.value\)/);
+  assert.match(client, /setError\(textRef\.current\.engineBootFailed\);/);
+  assert.match(client, /setError\(textRef\.current\.profileLoadFailed\);/);
+
+  // Duplicate, split and delete wait for a selection instead of answering
+  // «Select an object … first».
+  const overflow = await read("../app/components/mobile/overflow-sheet.tsx");
+  for (const action of ["duplicate", "split", "delete"]) {
+    assert.match(overflow, new RegExp(`tile\\("${action}", "[a-z]+", t\\.[a-z]+, \\{ disabled: none \\|\\| !props\\.hasSelection`), action);
+  }
+  assert.match(client, /hasSelection=\{engineHasSelection\(\)\}/);
+});
+
+const ENGINE_KEYS = [
+  "customFilament", "engineNoticeGeneric", "engineErrorGeneric", "engineImportedProject", "engineImportedSettings", "engineImportedFilaments",
+  "engineImportedPlates", "engineImportedGeometry", "engineImportLeftOut", "engineSkipSeam", "engineSkipFuzzy", "engineSkipVariableLayer",
+  "engineSkipLayerGcode", "engineSkipObjectOverrides", "engineSkipPlatesPastLimit", "engineSkipOther", "engineSelectToDuplicate",
+  "engineSelectToCopy", "engineSelectToDelete", "engineSelectToSplit", "engineNothingSelected", "engineNothingToExport", "engineLoadModelFirst",
+  "engineCopied", "engineDeletedAll", "engineSplitDone", "engineSplitSingle", "engineSplitFailed", "engineEconomy", "engineEconomySomePlates",
+  "engineClassicWalls", "engineSupportFailed", "engineSliceCanceled", "enginePlateEmpty", "engineAllPlatesFailed", "enginePlatesFailed",
+  "engineSliceFailed", "engineWorkerStopped", "engineSaved3mf", "engineExportedStl", "engineExportFailed", "engineExportedPlates",
+  "engineExportSkippedPlates", "engineExportAllOverBed", "engineNothingSliced", "engineFileFailed", "engineGcodeUnreadable",
+  "enginePaintOnlyT1", "enginePaintSupportT2", "enginePaintReset", "enginePaintBothImported", "enginePresetSaved", "enginePresetsLoaded",
+  "enginePresetSaveFailed", "enginePresetFileUnreadable", "engineBootFailed", "profileLoadFailed",
+];
+
+test("every engine line and the custom filament exist in ar, en and real Sorani", async () => {
+  const { DICTIONARIES } = await loadAppModule("i18n/index");
+  const { ENGINE_MESSAGE_RULES } = await loadAppModule("engine-messages");
+  for (const rule of ENGINE_MESSAGE_RULES) assert.ok(ENGINE_KEYS.includes(rule.key) || rule.key === "importFailed", `${rule.key} is checked below`);
+  for (const key of ENGINE_KEYS) {
+    const [en, ar, ckb] = ["en", "ar", "ckb"].map((locale) => DICTIONARIES[locale][key]);
+    assert.ok(en && ar && ckb, `${key} must exist in all three`);
+    assert.notEqual(ckb, ar, `${key}: the ckb slot must not carry the Arabic (row 183)`);
+    assert.notEqual(ckb, en, `${key}: ckb must be translated`);
+    assert.notEqual(ar, en, `${key}: ar must be translated`);
+    for (const slot of en.match(/\{\w+\}/g) ?? []) {
+      const counted = `${slot.slice(0, -1)}, plural,`;
+      assert.ok((ar.includes(slot) || ar.includes(counted)) && ckb.includes(slot), `${key}: ${slot} is lost in a translation`);
+    }
+  }
 });
 
 test("the sheets are modal: the page behind is inert, Tab wraps, and focus returns to the opener", async () => {

@@ -12,11 +12,17 @@
  * model (undoable from the message row), and the chip that matches the
  * model's CURRENT rotation is pressed — read from the scene, so a rotation
  * made by hand with the gizmo leaves no chip pressed rather than a stale one.
+ *
+ * The arrow keys walk the three chips (focus only: turning the model stays a
+ * deliberate press), and a key they use goes no further, so it never also
+ * nudges the model through the engine's own arrow keys (roving.ts).
  */
 
+import { useRef, type KeyboardEvent } from "react";
 import type { StudioDictionary } from "../../i18n";
 import type { OrientationPreset } from "../../auto-orient";
 import { Icon, type IconName } from "../header";
+import { consumeRovingKey } from "./roving";
 
 export interface ModelInfoCardProps {
   t: StudioDictionary;
@@ -31,6 +37,11 @@ export interface ModelInfoCardProps {
 
 export default function ModelInfoCard(props: ModelInfoCardProps) {
   const { t } = props;
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const next = consumeRovingKey(event, index, 3);
+    if (next >= 0) refs.current[next]?.focus();
+  };
   const chips: Array<{ id: OrientationPreset; icon: IconName; label: string }> = [
     { id: "imported", icon: "boxUpright", label: t.orientImported },
     { id: "auto", icon: "cubeAuto", label: t.orientAuto },
@@ -50,9 +61,10 @@ export default function ModelInfoCard(props: ModelInfoCardProps) {
       <div role="group" aria-labelledby="m-orient-label">
         <p className="m-model__label" id="m-orient-label">{t.orientation}</p>
         <div className="m-orient">
-          {chips.map((chip) => (
+          {chips.map((chip, index) => (
             <button
               key={chip.id}
+              ref={(node) => { refs.current[index] = node; }}
               type="button"
               className="m-sel"
               aria-pressed={props.orientation === chip.id}
@@ -60,6 +72,7 @@ export default function ModelInfoCard(props: ModelInfoCardProps) {
               title={chip.label}
               disabled={props.disabled}
               onClick={() => props.onOrient(chip.id)}
+              onKeyDown={(event) => onKeyDown(event, index)}
               data-levo-orient={chip.id}
             >
               <Icon name={chip.icon} />

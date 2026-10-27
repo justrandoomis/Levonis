@@ -282,11 +282,11 @@ test("containment: no engine warning or recovery control is trapped inside the s
     // Engine events the shell puts in its own message row.
     "testid:slice-notice": () => {
       assert.match(engine, /ft\(e, "notice", n\.notice\)/);
-      assert.match(client, /event\.type === "notice"\) \{[\s\S]{0,400}setNotice\(event\.value\)/);
+      assert.match(client, /event\.type === "notice"\) \{[\s\S]{0,700}setNotice\(localizeEngineMessage\(event\.value, "notice", /);
     },
     "testid:slice-err": () => {
       assert.match(engine, /ft\(e, "error", n\.error\)/);
-      assert.match(client, /event\.type === "error"\) \{[\s\S]{0,1200}setError\(event\.value\)/);
+      assert.match(client, /event\.type === "error"\) \{[\s\S]{0,1400}const message = localizeEngineMessage\(event\.value, "error", [^;]*;\s*setError\(message\);/);
     },
     // The retry offer: the shell's error row offers it and clicks the
     // engine's own button through the adapter (a contract test id).
@@ -367,8 +367,8 @@ test("warnings reach the shell in Simple: engine errors and notices are events, 
   assert.match(engine, /ft\(e, "error", n\.error\)/);
   assert.match(engine, /ft\(e, "notice", n\.notice\)/);
   // …and the shell puts both in its own message row, in every mode.
-  assert.match(client, /event\.type === "notice"\) \{[\s\S]{0,400}setNotice\(event\.value\)/);
-  assert.match(client, /event\.type === "error"\) \{[\s\S]{0,1200}setError\(event\.value\)/);
+  assert.match(client, /event\.type === "notice"\) \{[\s\S]{0,700}setNotice\(localizeEngineMessage\(event\.value, "notice", /);
+  assert.match(client, /event\.type === "error"\) \{[\s\S]{0,1400}const message = localizeEngineMessage\(event\.value, "error", [^;]*;\s*setError\(message\);/);
   // The stats card (estimate + over-bed warning) and the bed warning are
   // rendered OUTSIDE the engine's side panel: their elements come before
   // the panel's <aside> in the engine's render tree.
@@ -442,7 +442,8 @@ test("an EMPTY engine error is a clear: it never sets the error status over a sl
   assert.doesNotMatch(empty, /setStatus\("error"\)|endImportWait/);
   // A real error still ends the import wait and shows the error status.
   const real = branch.slice(branch.indexOf("return;"));
-  assert.match(real, /endImportWait\(\);[\s\S]*setError\(event\.value\);[\s\S]*setStatus\("error"\);/);
+  // In the reader's language since c6-r4-ha-04 (app/engine-messages.ts).
+  assert.match(real, /endImportWait\(\);[\s\S]*setError\(message\);[\s\S]*setStatus\("error"\);/);
 });
 
 test("the Editor mode choice is the first thing in Settings, above the printer", async () => {
@@ -491,7 +492,10 @@ test("Simple keeps a way to slice and to print at every width", async () => {
   assert.match(client, /<ModeSegmented t=\{t\} mode=\{studioMode\.mode\} onMode=\{studioMode\.setMode\} \/>/);
   assert.match(mode, /role="radiogroup"/);
   assert.match(mode, /aria-checked=\{mode === id\}/);
-  assert.match(mode, /rtl \? "ArrowLeft" : "ArrowRight"/);
+  // The walk in the writing direction lives in roving.ts since c6-r4-ha-02,
+  // which also keeps the keys it handles from reaching the engine's nudge.
+  assert.match(mode, /consumeRovingKey\(event, index, STUDIO_MODES\.length\)/);
+  assert.match(await read("../app/components/mobile/roving.ts"), /rtl \? "ArrowLeft" : "ArrowRight"/);
   // In Simple "all settings" switches to Advanced instead of opening nothing.
   assert.match(client, /if \(simpleMode\) studioMode\.setMode\("advanced"\);/);
 });

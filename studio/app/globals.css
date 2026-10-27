@@ -1519,8 +1519,13 @@ button:disabled { cursor: not-allowed; }
 .more-grid span { max-width: 100%; overflow: hidden; font-size: var(--text-caption); line-height: var(--leading-tight); text-overflow: ellipsis; white-space: nowrap; }
 /*
  * THE LANGUAGE AND THE THEME, AS THREE CHOICES RATHER THAN A PICKER. Three
- * fixed options are a segmented control's exact job. ONE state cue (skill §3):
- * the surface lifts and the text stops being quiet; aria-checked says it too.
+ * fixed options are a segmented control's exact job (choice-segments.tsx).
+ * The chosen one takes the sand selection of the mode switch (owner override
+ * D-3): the sand fill with ink text, which in dark is far past 3:1 against
+ * the unchosen panel and in light carries the #7A5C30 edge of --clay-gold, so
+ * it keeps a 3:1 boundary on cream (WCAG 1.4.11). It is never colour alone
+ * (WCAG 1.4.1): a check mark comes before its label, and aria-checked says
+ * it too (c6-r4-ha-03).
  */
 .locale-segments, .theme-segments { padding: 2px 0 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .locale-segments button, .theme-segments button {
@@ -1539,7 +1544,16 @@ button:disabled { cursor: not-allowed; }
   white-space: nowrap;
   cursor: pointer;
 }
-.locale-segments button.active, .theme-segments button.active { border-color: var(--line); background: var(--surface); color: var(--text); }
+.locale-segments button, .theme-segments button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+.locale-segments button > span, .theme-segments button > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.locale-segments button > svg, .theme-segments button > svg { width: 15px; height: 15px; flex: 0 0 auto; stroke-width: 2.6; }
+.locale-segments button[aria-checked="true"], .theme-segments button[aria-checked="true"] {
+  border-color: transparent;
+  background: var(--gold-clay);
+  box-shadow: var(--clay-gold);
+  color: var(--gold-ink);
+  font-weight: 800;
+}
 .more-links { padding: 2px 0 12px; display: grid; gap: 6px; }
 .more-links a { min-height: var(--tap-min); padding: 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: var(--text-label); font-weight: 700; text-decoration: none; }
 .more-links svg { width: 17px; height: 17px; flex: 0 0 auto; }

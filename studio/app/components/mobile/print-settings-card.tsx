@@ -12,7 +12,8 @@
  *    filament on T1 (materialInForce): an imported project that brings PETG
  *    Basic reads «PETG Basic», and any other filament reads as its own short
  *    name with «(مخصص)» («PLA Matte (مخصص)»), never as the selector the file
- *    replaced;
+ *    replaced; a filament with no preset name at all (a 3MF that brought
+ *    only process settings) reads as its type, «PLA (مخصص)»;
  *  - layer height and infill: the Quality and Strength tiers that exist
  *    (0.12/0.20/0.24 mm, 10/15/25 %). The value SHOWN is the one the kernel
  *    will use — `settings.layer_height` and `settings.sparse_infill_density`
@@ -84,6 +85,11 @@ export default function PrintSettingsCard(props: PrintSettingsCardProps) {
   const layerIsTier = Math.abs(QUALITY[props.quality].layer - props.effectiveLayer) < 0.0005;
   const infillIsTier = Math.abs(STRENGTH[props.strength].infill - props.effectiveInfill) < 0.05;
   const materialShown = props.materialInForce.id;
+  // An unnamed filament reads as its type, «PLA (مخصص)»; one with no type
+  // either is named in the person's language, never left blank.
+  const customMaterialText = props.materialInForce.label
+    ? templateText(t.customValue, { value: props.materialInForce.label })
+    : t.customFilament;
   // A left-to-right mark first: in an Arabic or Sorani select "0.20 mm"
   // would otherwise be ordered "mm 0.20" (the space between the number and
   // the unit takes the paragraph's direction). Readouts stay LTR (mandate §5).
@@ -107,7 +113,7 @@ export default function PrintSettingsCard(props: PrintSettingsCardProps) {
           disabled={props.disabled || (props.materials.length < 2 && materialShown === props.material)}
           onChange={(event) => { if (event.target.value !== CUSTOM) props.onMaterial(event.target.value as MaterialId); }}
         >
-          {materialShown === null && <option value={CUSTOM} disabled>{templateText(t.customValue, { value: props.materialInForce.label })}</option>}
+          {materialShown === null && <option value={CUSTOM} disabled>{customMaterialText}</option>}
           {props.materials.map((id) => <option key={id} value={id}>{MATERIALS[id].label}</option>)}
         </select>
       </SettingRow>
