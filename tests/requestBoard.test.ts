@@ -74,7 +74,9 @@ test('the board searches title and description on the server — only what the b
 test('the page: a search box that keeps the keyboard, «المزيد» that says it failed, and the request\'s place and dates', () => {
   const page = code('src/pages/Requests.tsx');
   assert.match(page, /if \(q\) p\.set\('q', q\);/);
-  assert.match(page, /return \(\s*<div className="space-y-3">\s*\{search\}\s*\{body\}/, 'one frame for every state');
+  // The search sits above the tabs (community UI plan C3), never remounted while a search loads; the list is one frame for every state.
+  assert.match(page, /return \(\s*<div className="space-y-3" data-requests-board>\s*\{body\}/, 'one frame for every state');
+  assert.match(page, /<SearchField\s+label=\{s\.searchRequests\}/);
   assert.match(page, /setMoreError\(true\);/);
   assert.doesNotMatch(page, /\} catch \{\s*setCursor\(null\);/, 'a failed page no longer hides the rest of the board');
   // The request's place and dates are on its own page (Phase 5, /requests/:id).
@@ -93,7 +95,8 @@ test('every offer count on the request screens is a counted phrase — the works
   assert.equal(offersLabel(5, 'ar', (n) => `<${n}>`), '<5> عروض', 'a screen with its own digits passes its formatter');
   assert.equal(offersLabel(3, 'ckb', (n) => `<${n}>`), '<3> ئۆفەر', 'Sorani keeps its hand-written word');
   assert.equal(offersLabel(1, 'en'), '1 offer');
-  assert.match(code('src/components/print/MyRequestsList.tsx'), /\{offersLabel\(r\.offer_count, lang\)\}/);
+  // «طلباتي» is the owner card (community UI plan C3), which counts the offers in the card words.
+  assert.match(code('src/components/community/requests/RequestListCard.tsx'), /\{offersWord\(offers, L\)\}/);
   assert.match(code('src/components/merchant/workshop/RequestBoard.tsx'), /\{offersLabel\(r\.offer_count, lang, \(n\) => formatFigure\(n, lang\)\)\}/);
   for (const f of ['src/pages/Requests.tsx', 'src/components/print/MyRequestsList.tsx', 'src/components/merchant/workshop/RequestBoard.tsx']) {
     assert.doesNotMatch(code(f), /\} عرض`/, `${f}: «5 عرض»`);

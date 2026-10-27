@@ -68,7 +68,9 @@ test('C4: every request state reads as words, in every language — never the ma
   for (const s of states.slice(0, -1)) assert.ok(REQUEST_STATE_TONE[s], `a tone for ${s}`);
   const list = code('src/components/print/MyRequestsList.tsx');
   assert.doesNotMatch(list, /STATE_TEXT/, '«طلباتي» has no table of its own any more');
-  assert.match(list, /requestStateLabel\(r\.state, loc\)/);
+  // Community UI plan C3: each row is the owner card, which says the state in the card words (requestWords.ts).
+  assert.match(list, /<RequestListCard\s+variant="owner"/);
+  assert.match(code('src/components/community/requests/RequestListCard.tsx'), /requestStateWord\(r\.state, L, \{ owner: variant === 'owner'/);
 });
 
 // ------------------------------------------------------------ C12
@@ -136,7 +138,8 @@ test('C2/C3/C9/C11: the request page follows its address, says failures, and gat
   assert.match(page, /<CommunityLoadError error=\{loadError\}/);
   assert.match(page, /<OnlookerCard me=\{me\} onNewRequest=\{onNewRequest\} \/>/);
   // The customer closes a published request from its page (the server always allowed it).
-  assert.match(page, /\{isOwner && open && \(/);
+  // Community UI plan C3: «أغلق الطلب» is a row of the «⋯» menu of the page header.
+  assert.match(page, /if \(isOwner && open\) menu\.push\(\{ id: 'close', label: s\.closeRequest, destructive: true/);
   assert.match(page, /onConfirm=\{closePublished\}/);
   assert.match(page, /\{me\?\.store && !isCustomer && !isOwner && current\.state !== 'draft' && \(/, 'the workshop card only for a merchant with a store');
   const access = code('src/pages/community/access.tsx');

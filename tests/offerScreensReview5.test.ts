@@ -70,8 +70,10 @@ test('bidi: each side of a substitution is isolated in the reader direction — 
 
 test('bidi: every screen passes the reader direction to its isolates — compare, accept sheet, accepted offer, merchant card, admin line, technical review', () => {
   const compare = code('src/components/community/requests/OfferCompare.tsx');
-  assert.match(compare, /<Row k=\{s\.partsLabel\} dir=\{readerDir\(lang\)\}>/, 'the parts row of the compare column');
-  assert.match(compare, /<SubstitutionText x=\{x\} s=\{s\} dir=\{readerDir\(lang\)\} \/>/);
+  // The offer facts (the details sheet and the compare columns, community UI plan C3) and the accept sheet.
+  const facts = code('src/components/community/requests/OfferDetailsSheet.tsx');
+  assert.match(facts, /<Row k=\{s\.partsLabel\} dir=\{readerDir\(lang\)\}>/, 'the parts row of the offer facts');
+  assert.match(facts, /<SubstitutionText x=\{x\} s=\{s\} dir=\{readerDir\(lang\)\} \/>/);
   assert.match(compare, /<SubstitutionText x=\{x\} s=\{s\} dir=\{readerDir\(L\)\} \/>/);
   assert.match(code('src/pages/community/Request.tsx'), /<SubstitutionText x=\{x\} s=\{s\} dir=\{readerDir\(lang\)\} \/>/);
   const brief = code('src/components/community/requests/OfferComposer.tsx');

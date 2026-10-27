@@ -1,41 +1,48 @@
 /**
- * THE CUSTOMER'S OFFERS, SIDE BY SIDE — V2 (docs/COMMUNITY_ECOSYSTEM.md
- * §9.5, Client 5c). Every offer answers the same questions in the same rows
- * so the eye can run across them; the TOTAL leads, because the total is what
- * the customer agrees to: the price plus the delivery fee, computed on the
- * server (`total_iqd`) and never here.
+ * THE OFFERS TO THE CUSTOMER (docs/COMMUNITY_ECOSYSTEM.md §9.5, Client 5c; community
+ * UI plan C3, IMG_8472, IMG_8479). Each offer is a card (./OfferCard.tsx) in
+ * the radio group «العروض», cheapest live total first; the TOTAL leads,
+ * because the total is what the customer agrees to: the price plus the
+ * delivery fee, computed on the server (`total_iqd`) and never here.
  *
- * A revised offer says «عرض معدّل» with the price it replaced and opens its
- * history; a superseded, expired or no-longer-possible one says why it cannot
- * be taken; the offer's files are URLs on the Worker (a party never sees a
- * key).
+ *   «مقارنة العروض»  a chip over the list once two offers are live: the lazy
+ *                    CompareSheet (the sort, the quick comparison, and the
+ *                    offers side by side on a wide screen)
+ *   «التفاصيل»       the lazy OfferDetailsSheet: every fact of the offer, its
+ *                    message, files and revision history, the store, «اعتذر»
+ *   the dock         the one gold «متابعة مع هذا العرض» under the list
+ *
+ * NOTHING IS CHOSEN FOR THE CUSTOMER (plan R8). No offer starts selected;
+ * only a live offer of a request that still takes offers can be chosen; and
+ * until one is, the dock button is disabled and says why («اختر عرضًا
+ * أولًا»). Choosing moves no money: the button opens the accept sheet.
  *
  * ACCEPTING MOVES MONEY, AND ONLY FOR THE VERSION ON SCREEN. The sheet names
  * the total and the version, says the money is HELD, says who receives the
  * customer's phone and address, lets the customer pick the address for a
  * delivered job, and sends back exactly `expected_total_iqd` and
  * `offer_revision`. OFFER_CHANGED swaps in the fresh terms and asks again;
- * OFFER_STALE says the merchant must re-confirm — both as the refusal's own
+ * OFFER_STALE says the merchant must re-confirm, both as the own sentence of the refusal
  * sentence with a «حدّث» that re-reads the offers.
  */
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AlertTriangle, BadgeCheck, History, MessageCircle, Star } from 'lucide-react';
+import { AlertTriangle, Scale } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { api, ApiError, type ApiAddress } from '../../../lib/api';
 import { apiRefusal } from '../../../lib/refusalStrings';
 import { Sheet } from '../../ui/Sheet';
 import { Button } from '../../ui/Button';
 import { Money } from '../../ui/Money';
-import { Segmented } from '../../ui/Segmented';
-import { StatusChip } from '../../ui/Badge';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/Toast';
-import { CommunityStoreLink } from '../../../pages/community/access';
 import { offersApi } from '../offers/types';
-import { offersV2Api, type CatalogMaterial, type OfferFileV2, type OfferHistoryEntryV2, type OfferV2 } from './api';
+import { KitButton, kitButtonClass } from '../kit/buttons';
+import { ActionDock } from '../kit/display';
+import { offersV2Api, type CatalogMaterial, type OfferFileV2, type OfferV2 } from './api';
 import { FileGlyph } from './OfferComposer';
-import { daysLabel, fill, fillNodes, handoverLabel, jobsLabel, offerStateWords, requestLang, shortDay, useRequestStrings, type RequestLang, type RequestStrings } from './strings';
+import OfferCard from './OfferCard';
+import { daysLabel, fill, handoverLabel, requestLang, useRequestStrings, type RequestStrings } from './strings';
 import VariantImg from '../../ui/VariantImg';
 import { Checkbox } from '../../ui/Switch';
 import {
@@ -47,18 +54,17 @@ import {
   offerIsLive,
   partName,
   partialAckReady,
-  partialLabel,
   sortOffers,
   substitutesSomething,
   substitutionPieces,
   readerDir,
-  type OfferSort,
   type PartRef,
 } from './offerParts';
-import { localMaterial } from './mirrors';
 import { SubstitutionText } from './SubstitutionText';
 
-type Sort = OfferSort;
+/** The two sheets the list opens: lazy, so the request page does not carry them (plan R6). */
+const OfferDetailsSheet = lazy(() => import('./OfferDetailsSheet'));
+const CompareSheet = lazy(() => import('./CompareSheet'));
 
 // The pure helpers live in ./offerParts (P1-05) and are re-exported here for the callers that read them from this file.
 export { acceptBody, bestOffers, offerIsLive, sortOffers };
@@ -66,7 +72,7 @@ export { acceptBody, bestOffers, offerIsLive, sortOffers };
 export interface OfferCompareProps {
   requestId: string;
   offers: OfferV2[];
-  /** The request still takes offers — acceptance and decline are possible. */
+  /** The request still takes offers: a live offer can be chosen, accepted and declined. */
   takingOffers: boolean;
   materials: CatalogMaterial[];
   onChanged: () => void;
@@ -75,22 +81,31 @@ export interface OfferCompareProps {
 }
 
 export default function OfferCompare({ requestId, offers, takingOffers, materials, onChanged, parts = [] }: OfferCompareProps) {
-  const { lang } = useLanguage();
+  const { lang, dir } = useLanguage();
   const s = useRequestStrings();
   const L = requestLang(lang);
   const toast = useToast();
   const navigate = useNavigate();
   const [confirm, confirmDialog] = useConfirm();
-  const [sort, setSort] = useState<Sort>('price');
+  const hintId = useId();
   const [accepting, setAccepting] = useState<OfferV2 | null>(null);
-  const [historyOf, setHistoryOf] = useState<OfferV2 | null>(null);
+  /** The choice of the customer: nobody is chosen for them (plan R8). */
+  const [chosen, setChosen] = useState<string | null>(null);
+  const [detailsOf, setDetailsOf] = useState<{ offer: OfferV2; history: boolean } | null>(null);
+  const [compareOpen, setCompareOpen] = useState(false);
+  /** A lazy sheet stays mounted once its chunk is asked for, so it can close with its motion. */
+  const [asked, setAsked] = useState({ details: false, compare: false });
+  const radios = useRef<Array<HTMLElement | null>>([]);
 
-  // The catalogue name in the reader language: Sorani from the seed, never the Arabic standing in (P1-05 review 3).
-  const matName = (id: string) => localMaterial(id, L, materials) || id;
-
-  const sorted = useMemo(() => sortOffers(offers, sort), [offers, sort]);
-  const best = useMemo(() => bestOffers(offers), [offers]);
+  const sorted = useMemo(() => sortOffers(offers, 'price'), [offers]);
   const liveCount = offers.filter(offerIsLive).length;
+  const canChoose = (o: OfferV2) => takingOffers && offerIsLive(o);
+  const choosable = sorted.filter(canChoose);
+  // A choice that stopped being possible (re-read offers, a withdrawn one) is dropped, never kept silently.
+  const chosenOffer = choosable.find((o) => o.id === chosen) ?? null;
+  useEffect(() => {
+    if (chosen && !chosenOffer) setChosen(null);
+  }, [chosen, chosenOffer]);
 
   async function decline(o: OfferV2) {
     const name = o.merchant?.name ?? s.theMerchant;
@@ -98,6 +113,7 @@ export default function OfferCompare({ requestId, offers, takingOffers, material
     if (!ok) return;
     try {
       await offersApi.decline(o.id);
+      setDetailsOf(null);
       onChanged();
     } catch (e) {
       toast.error(apiRefusal(e, L, s.couldNotDecline));
@@ -113,6 +129,28 @@ export default function OfferCompare({ requestId, offers, takingOffers, material
     }
   }
 
+  const openDetails = (offer: OfferV2, history = false) => {
+    setAsked((a) => ({ ...a, details: true }));
+    setDetailsOf({ offer, history });
+  };
+
+  /** The radio group keyboard: the arrows walk the offers in the writing direction and choose as they go. */
+  function onRadioKey(e: KeyboardEvent<HTMLElement>, at: number) {
+    const next = e.key === 'ArrowDown' || e.key === (dir === 'rtl' ? 'ArrowLeft' : 'ArrowRight');
+    const prev = e.key === 'ArrowUp' || e.key === (dir === 'rtl' ? 'ArrowRight' : 'ArrowLeft');
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      setChosen(choosable[at].id);
+      return;
+    }
+    if (!next && !prev) return;
+    e.preventDefault();
+    const n = choosable.length;
+    const to = (at + (next ? 1 : -1) + n) % n;
+    setChosen(choosable[to].id);
+    radios.current[to]?.focus();
+  }
+
   if (!offers.length) {
     return (
       <p className="py-6 text-center text-[13px] text-text-muted" data-offers="empty">
@@ -121,76 +159,88 @@ export default function OfferCompare({ requestId, offers, takingOffers, material
     );
   }
 
+  const tabStopId = chosenOffer?.id ?? choosable[0]?.id ?? null;
   return (
     <div data-offer-compare>
-      {offers.length > 1 && (
-        <div className="mb-3 max-w-sm">
-          <Segmented
-            group="offer-sort"
-            size="sm"
-            label={s.sortOffers}
-            value={sort}
-            onChange={(id) => setSort(id as Sort)}
-            dataAttr="data-offer-sort"
-            items={[
-              { id: 'price', label: s.sortPrice },
-              { id: 'time', label: s.sortTime },
-              { id: 'rating', label: s.sortRating },
-            ]}
-          />
-        </div>
+      {liveCount >= 2 && (
+        <KitButton
+          size="sm"
+          className="mb-3"
+          icon={<Scale aria-hidden="true" className="h-4 w-4" />}
+          onClick={() => {
+            setAsked((a) => ({ ...a, compare: true }));
+            setCompareOpen(true);
+          }}
+          data-offer-compare-open
+        >
+          {s.compareOffers}
+        </KitButton>
       )}
-      {/* Phone: columns that scroll sideways and snap; wider: a grid of at most TWO — the page's
-          column is max-w-2xl, and three there were ~205 px each, names cut and rows out of line. */}
-      <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0" data-offer-columns>
-        {sorted.map((o) => (
-          <OfferColumn
-            key={o.id}
-            o={o}
-            s={s}
-            lang={L}
-            matName={matName}
-            materials={materials}
-            parts={parts}
-            canAct={takingOffers && offerIsLive(o)}
-            onAccept={() => setAccepting(o)}
-            onDecline={() => decline(o)}
-            onChat={() => chat(o)}
-            onHistory={() => setHistoryOf(o)}
-          />
-        ))}
+      <div role={choosable.length ? 'radiogroup' : undefined} aria-label={s.offersGroup} className="space-y-3" data-offer-list>
+        {sorted.map((o) => {
+          const at = choosable.indexOf(o);
+          return (
+            <OfferCard
+              key={o.id}
+              o={o}
+              s={s}
+              lang={L}
+              parts={parts}
+              materials={materials}
+              selectable={at >= 0}
+              selected={chosenOffer?.id === o.id}
+              tabStop={o.id === tabStopId}
+              onSelect={() => setChosen(o.id)}
+              onDetails={() => openDetails(o)}
+              onChat={() => chat(o)}
+              radioRef={(el) => {
+                if (at >= 0) radios.current[at] = el;
+              }}
+              onRadioKeyDown={(e) => onRadioKey(e, at)}
+            />
+          );
+        })}
       </div>
 
-      {/* The quick comparison (§9.5 «comparison»): which offer wins on each of
-          the three things a customer weighs — only when there is a choice. */}
-      {liveCount >= 2 && (
-        <section aria-labelledby="offer-compare-title" className="lv-surface mt-4 overflow-hidden" data-request-section="compare" data-offer-compare-table>
-          <h3 id="offer-compare-title" className="px-4 pt-3 text-[13px] font-bold text-text-primary">
-            {s.compare}
-          </h3>
-          {/* Only when the picks really left a live partial offer out (P1-05 review 3). */}
-          {best.completeOnly && <p className="px-4 pt-1 text-[11.5px] text-text-muted" data-compare-complete-only>{s.partialCompareNote}</p>}
-          <dl className="divide-y divide-border-subtle/60 px-4 pb-1 pt-1">
-            <CompareRow label={s.cheapest} o={best.cheapest} partial={best.cheapest ? partialLabel(best.cheapest, parts.length, s) : ''} value={best.cheapest ? <Money iqd={best.cheapest.total_iqd} /> : null} />
-            <CompareRow label={s.fastest} o={best.fastest} partial={best.fastest ? partialLabel(best.fastest, parts.length, s) : ''} value={best.fastest ? daysLabel(best.fastest.completion_days, L) : null} />
-            <CompareRow
-              label={s.topRated}
-              o={best.topRated}
-              partial={best.topRated ? partialLabel(best.topRated, parts.length, s) : ''}
-              value={
-                best.topRated ? (
-                  <span className="inline-flex items-center gap-1 tabular-nums">
-                    <Star aria-hidden="true" className="h-3 w-3 fill-gold text-gold" />
-                    {(best.topRated.merchant?.rating ?? 0).toFixed(1)}
-                  </span>
-                ) : (
-                  <span className="text-text-muted">{s.noRatingYet}</span>
-                )
-              }
-            />
-          </dl>
-        </section>
+      {/* The one gold verb of the screen: disabled, and saying why, until the customer chooses. */}
+      {choosable.length > 0 && (
+        <ActionDock className="-mx-4 mt-4 flex-col">
+          {!chosenOffer && (
+            <p id={hintId} className="text-center text-[12px] text-text-muted" data-offer-choose-first>
+              {s.chooseOfferFirst}
+            </p>
+          )}
+          <button
+            type="button"
+            aria-disabled={!chosenOffer || undefined}
+            aria-describedby={chosenOffer ? undefined : hintId}
+            onClick={() => {
+              if (chosenOffer) setAccepting(chosenOffer);
+            }}
+            className={kitButtonClass('gold', 'cta', true)}
+            data-offer-continue={chosenOffer?.id ?? ''}
+          >
+            {s.continueWithOffer}
+          </button>
+        </ActionDock>
       )}
+
+      <Suspense fallback={null}>
+        {asked.details && (
+          <OfferDetailsSheet
+            offer={detailsOf?.offer ?? null}
+            showHistory={!!detailsOf?.history}
+            materials={materials}
+            parts={parts}
+            canAct={!!detailsOf && canChoose(detailsOf.offer)}
+            onClose={() => setDetailsOf(null)}
+            onChat={chat}
+            onDecline={decline}
+            onHistory={(o) => openDetails(o, true)}
+          />
+        )}
+        {asked.compare && <CompareSheet open={compareOpen} offers={offers} materials={materials} parts={parts} onClose={() => setCompareOpen(false)} />}
+      </Suspense>
 
       <AcceptSheet
         offer={accepting}
@@ -199,47 +249,13 @@ export default function OfferCompare({ requestId, offers, takingOffers, material
         onClose={() => setAccepting(null)}
         onAccepted={(o) => {
           setAccepting(null);
+          setChosen(null);
           toast.success(fill(s.youChose, { name: o.merchant?.name ?? s.theMerchant }));
           onChanged();
         }}
         onRefresh={onChanged}
       />
-      <HistorySheet offer={historyOf} onClose={() => setHistoryOf(null)} />
       {confirmDialog}
-    </div>
-  );
-}
-
-function CompareRow({ label, o, value, partial = '' }: { label: string; o: OfferV2 | null; value: ReactNode; partial?: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-2 text-[12.5px]" data-compare-row>
-      <dt className="shrink-0 text-text-muted">{label}</dt>
-      <dd className="flex min-w-0 items-center gap-2 text-end text-text-primary">
-        {o && <bdi className="truncate font-semibold">{o.merchant?.name ?? '—'}</bdi>}
-        {/* A pick from the partial pool says it makes only some parts. */}
-        {o && partial && (
-          <span className="shrink-0" data-compare-partial>
-            <StatusChip tone="warning">{partial}</StatusChip>
-          </span>
-        )}
-        <span className="shrink-0 tabular-nums">{value ?? '—'}</span>
-      </dd>
-    </div>
-  );
-}
-
-/**
- * A fact of the offer. `dir="auto"` is for what the merchant typed; a line the
- * screen writes itself (a substitution) passes the direction of the reader, so a
- * Latin material name at its start does not turn the sentence around.
- */
-function Row({ k, children, dir = 'auto' }: { k: string; children: ReactNode; dir?: 'auto' | 'ltr' | 'rtl' }) {
-  return (
-    <div className="flex items-start justify-between gap-3 py-2">
-      <dt className="shrink-0 text-[12px] text-text-muted">{k}</dt>
-      <dd className="min-w-0 break-words text-end text-[12.5px] text-text-primary" dir={dir}>
-        {children}
-      </dd>
     </div>
   );
 }
@@ -283,223 +299,6 @@ export function Breakdown({ o, s }: { o: Pick<OfferV2, 'price_iqd' | 'delivery_f
   );
 }
 
-function OfferColumn({
-  o,
-  s,
-  lang,
-  matName,
-  materials,
-  parts,
-  canAct,
-  onAccept,
-  onDecline,
-  onChat,
-  onHistory,
-}: {
-  o: OfferV2;
-  s: RequestStrings;
-  lang: RequestLang;
-  matName: (id: string) => string;
-  materials: CatalogMaterial[];
-  parts: PartRef[];
-  canAct: boolean;
-  onAccept: () => void;
-  onDecline: () => void;
-  onChat: () => void;
-  onHistory: () => void;
-}) {
-  const m = o.merchant;
-  const partial = partialLabel(o, parts.length, s);
-  const { covered, uncovered } = coverageOf(o, parts);
-  const subs = substitutionPieces(o, parts, s, lang, materials);
-  const st = offerStateWords(o, s);
-  const history = o.history ?? [];
-  const prev = history.length > 1 ? history[history.length - 2] : null;
-  const until = shortDay(o.valid_until ?? o.expires_at, lang);
-  const sep = listSep(lang);
-  return (
-    <article
-      className="lv-surface flex w-[85%] shrink-0 snap-start flex-col p-4 sm:w-auto"
-      data-offer={o.id}
-      data-offer-state={o.state}
-      data-offer-stale={o.stale ? 'true' : undefined}
-      data-offer-revised={o.revised ? 'true' : undefined}
-      data-offer-partial={partial ? 'true' : undefined}
-      aria-label={m?.name ?? s.theMerchant}
-    >
-      <header className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="flex items-center gap-1.5 text-[14px] font-semibold text-text-primary">
-            <bdi className="truncate">{m?.name ?? '—'}</bdi>
-            {m?.verified && <BadgeCheck aria-label={s.verified} className="h-4 w-4 shrink-0 text-gold" />}
-          </p>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-text-muted">
-            {m?.rating != null && (
-              <span className="inline-flex items-center gap-0.5 tabular-nums">
-                <Star aria-hidden="true" className="h-3 w-3 fill-gold text-gold" />
-                {m.rating.toFixed(1)} ({m.rating_count})
-              </span>
-            )}
-            {!!m?.completed_orders && <span>{jobsLabel(m.completed_orders, lang)}</span>}
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <StatusChip tone={st.tone}>{st.text}</StatusChip>
-          {partial && <StatusChip tone="warning">{partial}</StatusChip>}
-        </div>
-      </header>
-
-      <p className="mt-3 text-[20px] font-bold text-text-primary" data-offer-total={o.total_iqd ?? ''}>
-        <Money iqd={o.total_iqd} />
-      </p>
-      {/* One line tall always, so the rows below line up across columns. */}
-      <Breakdown o={o} s={s} />
-      {o.revised && (
-        <p className="mt-1 flex flex-wrap items-center gap-2 text-[11.5px]" data-offer-edited>
-          <StatusChip tone="info">{s.revised}</StatusChip>
-          {prev && prev.price_iqd !== o.price_iqd && (
-            <span className="text-text-muted" data-offer-was>
-              {fillNodes(s.was, { price: <Money iqd={prev.price_iqd} className="line-through" /> })}
-            </span>
-          )}
-          {history.length > 1 && (
-            <button
-              type="button"
-              onClick={onHistory}
-              className="inline-flex min-h-11 items-center gap-1 rounded-full text-[11.5px] font-semibold text-text-secondary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-              data-offer-history={o.id}
-            >
-              <History aria-hidden="true" className="h-3.5 w-3.5" />
-              {s.history}
-            </button>
-          )}
-        </p>
-      )}
-
-      <dl className="mt-2 divide-y divide-border-subtle/60">
-        <Row k={s.completion}>{o.completion_days ? daysLabel(o.completion_days, lang) : '—'}</Row>
-        <Row k={s.handover}>{handoverLabel(o.delivery_method, s)}</Row>
-        {o.quantity != null && <Row k={s.quantity}>{`×${o.quantity}`}</Row>}
-        {o.color && <Row k={s.colour}>{o.color}</Row>}
-        <Row k={s.materials}>{o.material_ids?.length ? o.material_ids.map(matName).join(sep) : o.materials || '—'}</Row>
-        {parts.length > 1 && (
-          <Row k={s.partsLabel} dir={readerDir(lang)}>
-            <span data-offer-parts>{partial ? covered.map((p) => partName(p, s)).join(sep) : s.allParts}</span>
-            {uncovered.length > 0 && (
-              <span className="block text-[11.5px] text-warning" data-offer-uncovered>
-                {`${s.notIncluded}: ${uncovered.map((p) => partName(p, s)).join(sep)}`}
-              </span>
-            )}
-          </Row>
-        )}
-        {subs.length > 0 && (
-          <Row k={s.substitutesLabel} dir={readerDir(lang)}>
-            {subs.map((x) => (
-              <span key={x.line} className="block" data-offer-substitution>
-                <SubstitutionText x={x} s={s} dir={readerDir(lang)} />
-              </span>
-            ))}
-          </Row>
-        )}
-        <Row k={s.included}>{o.included || '—'}</Row>
-        <Row k={s.warranty}>{o.warranty_terms || '—'}</Row>
-        {o.terms && <Row k={s.terms}>{o.terms}</Row>}
-        <Row k={s.validUntil}>{until || s.openEnded}</Row>
-      </dl>
-      {o.message && (
-        <p className="mt-2 whitespace-pre-line rounded-lg bg-surface-raised px-3 py-2 text-[12.5px] leading-relaxed text-text-secondary" dir="auto">
-          {o.message}
-        </p>
-      )}
-      <OfferFiles files={o.files ?? []} label={s.offerFiles} />
-
-      {o.stale && o.state !== 'accepted' && (
-        <p className="mt-2 flex items-start gap-2 text-[12px] leading-relaxed text-warning" data-offer-note="stale">
-          <AlertTriangle aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          {s.staleNote}
-        </p>
-      )}
-      {o.workshop_unable && o.state === 'pending' && (
-        <p className="mt-2 flex items-start gap-2 text-[12px] leading-relaxed text-warning" data-offer-unable>
-          <AlertTriangle aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          {s.unableNote}
-        </p>
-      )}
-
-      <div className="mt-auto pt-3">
-        {canAct && (
-          <Button variant="primary" block onClick={onAccept} className="whitespace-nowrap" data-offer-accept={o.id}>
-            {s.acceptOffer}
-          </Button>
-        )}
-        <div className="mt-2 flex flex-wrap gap-1">
-          {(o.state === 'pending' || o.state === 'superseded') && (
-            <Button variant="ghost" size="sm" onClick={onChat} icon={<MessageCircle aria-hidden="true" className="h-4 w-4" />} data-offer-chat={o.id}>
-              {s.askMerchant}
-            </Button>
-          )}
-          {m?.store_slug && (
-            // A merchant (or store) id: the link resolves ids, and a slug here answered «no store».
-            <CommunityStoreLink id={o.merchant_id} className="lv-button lv-button-ghost lv-button-sm">
-              {s.viewStore}
-            </CommunityStoreLink>
-          )}
-          {canAct && (
-            <Button variant="ghost" size="sm" onClick={onDecline} data-offer-decline={o.id}>
-              {s.decline}
-            </Button>
-          )}
-        </div>
-      </div>
-    </article>
-  );
-}
-
-/** «كان ٥٠٬٠٠٠» — every version of one offer, newest first. The history rows carry the price; the fee travels with the offer. */
-function HistorySheet({ offer, onClose }: { offer: OfferV2 | null; onClose: () => void }) {
-  const { lang } = useLanguage();
-  const s = useRequestStrings();
-  const L = requestLang(lang);
-  const titleId = useId();
-  const rows: OfferHistoryEntryV2[] = [...(offer?.history ?? [])].reverse();
-  return (
-    <Sheet
-      open={!!offer}
-      onClose={onClose}
-      labelledBy={titleId}
-      panelClassName="w-full sm:max-w-md"
-      testId="offer-history"
-      header={
-        <div className="px-5 pb-1 pt-1">
-          <h2 id={titleId} className="text-[16px] font-bold text-text-primary">
-            {s.history}
-          </h2>
-          {offer?.merchant?.name && (
-            <p className="mt-0.5 text-[12px] text-text-muted">
-              <bdi>{offer.merchant.name}</bdi>
-            </p>
-          )}
-        </div>
-      }
-    >
-      <ol className="divide-y divide-border-subtle/60 px-5 pb-4" data-offer-history-list>
-        {rows.map((h) => (
-          <li key={h.revision} className="flex items-center justify-between gap-3 py-2.5 text-[13px]" data-offer-history-row={h.revision}>
-            <span className="min-w-0">
-              <span className="block font-semibold text-text-primary">{fill(s.version, { n: h.revision })}</span>
-              <span className="block text-[11.5px] text-text-muted">
-                {[h.completion_days ? daysLabel(h.completion_days, L) : '', handoverLabel(h.delivery_method, s), shortDay(h.created_at, L)].filter((x) => x && x !== '—').join(' · ')}
-              </span>
-            </span>
-            <span className={`shrink-0 font-semibold tabular-nums ${h.revision === offer?.revision ? 'text-text-primary' : 'text-text-muted line-through'}`}>
-              <Money iqd={h.price_iqd} />
-            </span>
-          </li>
-        ))}
-      </ol>
-    </Sheet>
-  );
-}
 
 /** A refusal with a way out: its sentence and what «حدّث» does. */
 type Notice = { code: 'OFFER_CHANGED' | 'OFFER_STALE' | 'OFFER_SUBSTITUTION_UNACCEPTED' | 'OFFER_PARTIAL_UNACCEPTED'; text: string };
