@@ -92,15 +92,15 @@ test('the placeholders render the section header and the list the home tab shows
   for (const [file, panel, header] of [
     // «أتابعهم» over «مجتمع ليفو», as IMG_8486 draws it (B2R1-FID-3).
     ['src/pages/community/Following.tsx', '<FollowingPanel viewer=', '<SectionPageHeader title={s.tabs.following} kicker trailing={<SectionsButton />} />'],
-    ['src/pages/community/Stores.tsx', '<StoresPanel q={q}', '<SectionPageHeader title={s.tabs.stores} trailing={<SectionsButton />} />'],
-    ['src/pages/community/Makers.tsx', '<CreatorsPanel q={q}', '<SectionPageHeader title={s.tabs.creators} trailing={<SectionsButton />} />'],
+    ['src/pages/community/Stores.tsx', '<StoresDirectory viewer=', '<SectionPageHeader title={s.tabs.stores} trailing={<SectionsButton />} />'],
+    ['src/pages/community/Makers.tsx', '<MakersDirectory viewer=', '<SectionPageHeader title={s.tabs.creators} trailing={<SectionsButton />} />'],
   ] as const) {
     const src = code(file);
     assert.match(src, /<CommunitySurface\b[^>]*>[\s\S]*<\/CommunitySurface>/, `${file}: the page root is not stamped`);
     assert.ok(src.includes(header), `${file}: no section header with the sections door`);
     assert.ok(src.includes(panel), `${file}: not the list of today`);
     // The list is a lazy chunk the home tab shares: the page and the entry that names it stay small.
-    assert.match(src, /= lazy\(\(\) => import\('\.\.\/\.\.\/components\/community\/hub\/(FollowingPanel|StoresPanel|CreatorsPanel)'\)\);/, `${file}: the list is imported eagerly`);
+    assert.match(src, /= lazy\(\(\) => import\('\.\.\/\.\.\/components\/community\/(hub\/FollowingPanel|directory\/StoresDirectory|directory\/MakersDirectory)'\)\);/, `${file}: the list is imported eagerly`);
   }
   // The stores directory left the home for its own module, and the home tab renders the same one.
   const home = code('src/pages/Community.tsx');
