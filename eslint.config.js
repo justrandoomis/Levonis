@@ -87,5 +87,11 @@ export default tseslint.config(
     // the same reasoning as scripts/.
     files: ['scripts/**/*.{js,mjs}', 'tests/**/*.ts', 'services/*/dev/**/*.{js,mjs}'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
+    // Standalone Node programs shipped with the repository but run elsewhere
+    // (tools/print-cloud-agent runs on the workshop's LAN): Node globals only.
+    files: ['tools/**/*.{js,mjs}'],
+    languageOptions: { globals: { ...globals.node } },
   }
 );

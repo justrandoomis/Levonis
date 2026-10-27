@@ -538,6 +538,8 @@ slicing, with `slicer`, or printing, with `job_control`). Without
 had not sliced the job itself (an operator's estimate, a workshop reprint)
 could not learn what to print.
 
+The agent program is `tools/print-cloud-agent/` (docs/PRINT_CLOUD_AGENT.md).
+
 **Order.** Every telemetry body carries `boot` — the agent's boot counter, an
 integer it persists and raises by one at every start of its process — and
 `seq`, an integer from 0 to 2^53−1 that strictly increases within that boot
@@ -718,6 +720,7 @@ rules. Sign up a user through the normal Levonis flow, then buy a package
 | `tests/printCloudOpenApi.test.ts` | the document equals the routers; access classes match the guards |
 | `tests/printCloudWallet.test.ts` | the Levonis wallet adapter on funded wallets with dinar testimony: the page figure, the one-batch payment, 402 in three languages with nothing written, holds, races (wallet × wallet, wallet × manual, wallet × gateway, wallet × cancel), replays, expiry, zero totals, delivery fees, the owner switch, refunds (partial, full, racing, under a cent, other methods), deploy ahead of 0215 and 0108 |
 | `tests/printCloudAgentJobDoor.test.ts` | the agent's job door `GET /agent/jobs/{id}`: `job_control` only, only a job on one of the agent's printers, its input and file doors, read-only |
+| `tests/printCloudAgentProgram.test.ts` | the workshop agent program (`tools/print-cloud-agent`) against the real app in process: telemetry order and the boot counter, a whole job from slicing claim to completion on the simulator, printing an operator-estimated job through the job door, commands, restarts, failures; MQTT, FTPS, Bambu, OctoPrint and Moonraker drivers against local fakes; slicer figure parsing |
 
 Concurrency is proven with `RaceD1` (`tests/fixtures/printCloud.ts`), which
 interleaves a competing request immediately before a batch and enforces D1's
@@ -738,10 +741,14 @@ Cloudflare dashboard (docs/SUBDOMAIN_ARCHITECTURE.md).
 
 ## 16. External services still required
 
-1. **A workshop agent** — software on the workshop LAN that drives the
-   printers (Bambu LAN/MQTT, OctoPrint, Moonraker) and runs a slicer CLI
-   (Bambu Studio / OrcaSlicer / PrusaSlicer), speaking §9. Without it jobs wait
-   for an operator's manual estimate and manual start/finish.
+1. **The workshop agent, installed and validated** — the program exists
+   (`tools/print-cloud-agent/`, docs/PRINT_CLOUD_AGENT.md): it drives Bambu
+   Lab (LAN MQTT + FTPS), OctoPrint and Moonraker printers, runs an
+   OrcaSlicer / Bambu Studio / PrusaSlicer CLI and speaks §9. It has been
+   exercised only against the simulator and local fakes, **never against a
+   real printer or a real slicer binary**; it still has to be installed on
+   the workshop LAN and validated machine by machine. Until then jobs wait for
+   an operator's manual estimate and manual start/finish.
 2. **A payment processor** that can sign the §4.4 webhook, for card
    payments. (Paying from the Levonis wallet is connected — §4.4.)
 3. **Provider APIs** for URL imports (MakerWorld, Printables, Thingiverse) with
@@ -763,6 +770,9 @@ work, RBAC, audit and the OpenAPI document.
 
 Not connected (honestly reported by `/status` and `/adapters`): catalogue
 sync, shared inventory, order/accounting delivery (outbox only), membership
-pricing; a contracted payment processor; provider download APIs; the agent
-program and slicer themselves (the cloud side of their protocol is built); the
-customer and admin interfaces (Phase 9).
+pricing; a contracted payment processor; provider download APIs; a workshop
+agent and slicer running on the workshop LAN (the cloud side of their
+protocol is built, and the agent program exists in `tools/print-cloud-agent/`
+— tested against the simulator and local fakes only; no real printer or
+slicer binary has run it yet, docs/PRINT_CLOUD_AGENT.md); the customer and
+admin interfaces (Phase 9).

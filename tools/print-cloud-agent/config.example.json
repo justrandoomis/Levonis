@@ -1,0 +1,87 @@
+{
+  "_comment": "Levonis Print Cloud workshop agent — copy to agent.config.json (chmod 600), edit, run: node tools/print-cloud-agent/agent.mjs --config agent.config.json --check. Keys starting with _ are comments. Full reference: docs/PRINT_CLOUD_AGENT.md",
+
+  "cloud": {
+    "base_url": "https://levonis-iq.com",
+    "_token": "The agent token (pca_...) is shown ONCE when an admin creates the agent. It is read from this environment variable and never from this file.",
+    "token_env": "LEVONIS_AGENT_TOKEN",
+    "timeout_seconds": 20
+  },
+
+  "_state_dir": "A directory only this agent uses: boot counter, job records, print files. Back it up as a whole; never restore state.json alone.",
+  "state_dir": "./agent-state",
+
+  "intervals": {
+    "telemetry_seconds": 10,
+    "commands_seconds": 5,
+    "printers_seconds": 30,
+    "slicing_seconds": 15,
+    "tick_ms": 1000
+  },
+
+  "jobs": {
+    "_start_mode": "auto: upload and start an assigned job; manual: upload it and wait for someone to start it on the machine",
+    "start_mode": "auto",
+    "_bed_clear": "operator: after a print ends, the next one starts only after `--bed-cleared <connection_ref>`; assume_clear: for machines that clear their own bed",
+    "bed_clear": "operator",
+    "command_max_age_seconds": 600,
+    "start_timeout_seconds": 300,
+    "max_start_attempts": 3,
+    "prints_retention_days": 14
+  },
+
+  "_printers": "Keyed by the connection_ref the cloud stores for each printer (admin: PATCH /api/admin/print-cloud/catalog/printers/:id {adapter: 'agent', agent_id, connection_ref}). Addresses and credentials below never leave the LAN.",
+  "printers": {
+    "lan-x2d-1": {
+      "driver": "bambu",
+      "host": "192.168.1.50",
+      "serial": "00M09A000000000",
+      "access_code_env": "BAMBU_X2D_1_ACCESS_CODE",
+      "_tls": "The printer certificate is self-signed. pin = its SHA-256 fingerprint (get it with --print-fingerprint 192.168.1.50:8883); ca = ca_file + servername; insecure = no verification, logged as a warning at every connection.",
+      "tls": { "mode": "pin", "fingerprint256": "00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF" },
+      "chamber_sensor": true,
+      "use_ams": true,
+      "color_tolerance": 48,
+      "camera_stream_id": "x2d-1"
+    },
+    "lan-mk4-1": {
+      "driver": "octoprint",
+      "base_url": "http://192.168.1.60",
+      "api_key_env": "OCTOPRINT_MK4_1_KEY"
+    },
+    "lan-voron-1": {
+      "driver": "moonraker",
+      "base_url": "http://192.168.1.70:7125",
+      "api_key_env": "MOONRAKER_VORON_1_KEY"
+    },
+    "lan-sim-1": {
+      "_comment": "A simulated printer for a dry run against the real cloud: bind a test printer to this connection_ref.",
+      "driver": "simulator",
+      "print_seconds": 120,
+      "prepare_seconds": 5,
+      "time_scale": 10,
+      "bed_clear": "assume_clear"
+    }
+  },
+
+  "_slicer": "Optional. Only with the token's `slicer` capability. Profiles must be complete exports (OrcaSlicer/Bambu Studio JSON without an inherits chain; PrusaSlicer .ini).",
+  "slicer": {
+    "kind": "orca",
+    "cli_path": "/opt/orca-slicer/orca-slicer",
+    "profiles_dir": "./profiles",
+    "timeout_seconds": 480,
+    "output": "gcode.3mf",
+    "machines": {
+      "BBL-X2D-COMBO": [
+        { "nozzle_um": 400, "machine": "machine/Bambu Lab X2D 0.4 nozzle.json", "process": "process/0.20mm Standard @BBL X2D.json" }
+      ]
+    },
+    "filaments": {
+      "by_sku": { "PLA-BASIC-COLDWHITE": "filament/Bambu PLA Basic @BBL X2D.json" },
+      "by_material": { "PLA": "filament/Generic PLA @BBL X2D.json", "PETG": "filament/Generic PETG @BBL X2D.json" }
+    },
+    "max_objects": 200
+  },
+
+  "log": { "level": "info" }
+}
