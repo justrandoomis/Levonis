@@ -612,6 +612,14 @@ cost field the owner. Every admin write is audited (`print_cloud.*` actions in
 the platform audit log). `tests/routeClass/printCloud.ts` classifies every
 admin route for the platform's role-matrix sweeps.
 
+The console is Admin → Services → «الطباعة السحابية» (`src/components/adminPrintCloud`,
+one lazy chunk per section). It offers only what the reader's scope allows
+(`can_move_money`, `can_view_cost`, `can_write_cost`, read `=== true`), only the
+job and shipment moves the server's machines allow, and the server's own
+three-language refusal. Two reads exist for it: `GET /printers/{id}/maintenance`
+(the windows `PATCH /maintenance/{id}` closes; their cost for the owner only)
+and `GET /shipments/{id}` (the packing list; the fee for money scope only).
+
 Reports: revenue (cash collected and revenue recognised from lot draws),
 profit (owner only — revenue minus material, machine and electricity cost),
 operations (utilisation, failures, queue). A refund of unused hours or grams
@@ -716,6 +724,8 @@ rules. Sign up a user through the normal Levonis flow, then buy a package
 | `tests/printCloudScenarios.test.ts` | the specification's §36 scenarios: credits 24 h / 8.9 h / 8.5 h, top-up 490 + 250 = 740, gram pricing, multi-material, accessories 20 → 18, queue exclusivity, concurrent last 100 g, duplicate webhook, cancellation, workshop and customer failures, buyback 6,063 IQD, cross-customer isolation |
 | `tests/printCloudAcceptance.test.ts` | §39 end to end on real records: purchase → STL/3MF/OBJ files and an import → five jobs → agent slicer → scheduler → agent events → verification → delivery → notifications, audit, revenue/profit, clean reconciliation |
 | `tests/printCloudOperations.test.ts` | gates, roles, idempotency, expiry, imports and SSRF, uploads, plates, the agent, refunds, conversion, fulfilment, append-only ledgers, buyback reservations, durable tasks |
+| `tests/printCloudAdminUi.test.ts` | the admin console against the server: catalogue fields, settings bounds, job and shipment moves, the price preview, three languages, the keyed money doors |
+| `tests/printCloudAdminReads.test.ts` | the console's two reads: maintenance windows (cost owner-only) and one shipment's packing list (fee money-only) |
 | `tests/printCloudUnits.test.ts` | money arithmetic, apportioning, lot valuation, the pricing engine, promotions, the state machine, plates, file sniffing, webhook signatures, settings, three languages, error mapping, hosts |
 | `tests/printCloudOpenApi.test.ts` | the document equals the routers; access classes match the guards |
 | `tests/printCloudWallet.test.ts` | the Levonis wallet adapter on funded wallets with dinar testimony: the page figure, the one-batch payment, 402 in three languages with nothing written, holds, races (wallet × wallet, wallet × manual, wallet × gateway, wallet × cancel), replays, expiry, zero totals, delivery fees, the owner switch, refunds (partial, full, racing, under a cent, other methods), deploy ahead of 0215 and 0108 |
