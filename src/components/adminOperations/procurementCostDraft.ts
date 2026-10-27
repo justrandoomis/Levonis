@@ -1,5 +1,5 @@
 import type { CostProfile } from '../../../packages/contracts/src/procurementCost';
-import { exactProcurementUnitDefault } from '../../../packages/contracts/src/procurementCost';
+import { exactProcurementUnitDefault, procurementCostSource, procurementDiscountSet } from '../../../packages/contracts/src/procurementCost';
 import type { Selection } from './shared';
 import type { PurchaseUnitOrigin } from './procurementUnitOrigins';
 
@@ -9,6 +9,8 @@ export type ProcurementDraftLine = Selection & {
   invoiced_qty: number;
   purchase_cost_mode?: 'unit' | 'total';
   source_total_amount?: number | string;
+  /** «السعر بعد الخصم»: the unit price after the supplier discount, in the purchase currency; '' or absent for none. */
+  discounted_unit_amount?: number | string;
   unit_conversion_inexact?: boolean;
   unit_origins?: PurchaseUnitOrigin[];
 };
@@ -40,8 +42,56 @@ export function changeLineCostProfile(line: ProcurementDraftLine, profile: CostP
     ...replacement,
     invoiced_qty: line.invoiced_qty,
     purchase_cost_mode: line.purchase_cost_mode,
+    // A discount was typed against the supplier price of the old route.
+    discounted_unit_amount: '',
     unit_origins: line.unit_origins,
   };
+}
+
+/** A new quantity keeps what was typed and recomputes the figure derived from
+ * it: the line total of a unit price, or the unit average of an invoice total.
+ * A default invoice quantity follows the ordered one, also after a blank. */
+export function changeLineQuantity(line: ProcurementDraftLine, qty: number): ProcurementDraftLine {
+  const follows = line.invoiced_qty === line.qty_ordered || !Number.isFinite(line.qty_ordered);
+  const next = { ...line, qty_ordered: qty, invoiced_qty: follows ? qty : line.invoiced_qty };
+  if (!Number.isSafeInteger(qty) || qty < 1) return next;
+  if ((line.purchase_cost_mode || 'unit') === 'total') {
+    const total = line.source_total_amount;
+    return total == null || total === '' ? next : { ...next, source_unit_amount: Number(total) / qty };
+  }
+  return { ...next, source_total_amount: line.source_unit_amount === '' ? '' : Number((Number(line.source_unit_amount) * qty).toFixed(6)) };
+}
+
+/** Why a typed «السعر بعد الخصم» cannot be saved, or null: blank, or a price
+ * at or below the raw price in the same currency precision. */
+export function discountProblem(line: ProcurementDraftLine, currency: string): 'invalid' | 'above' | null {
+  if (!procurementDiscountSet(line.discounted_unit_amount)) return null;
+  const value = Number(line.discounted_unit_amount);
+  if (!Number.isFinite(value) || value < 0 || (currency === 'IQD' && !Number.isInteger(value))) return 'invalid';
+  const raw = procurementCostSource({ ...line, discounted_unit_amount: '' });
+  if (raw.amount == null || raw.amount === '' || !Number.isFinite(Number(raw.amount))) return null;
+  const rawUnitTimesQty = raw.mode === 'total' ? Number(raw.amount) : Number(raw.amount) * line.qty_ordered;
+  return value * line.qty_ordered > rawUnitTimesQty + 1e-9 ? 'above' : null;
+}
+
+/** A saved line with a discount stores the price it was costed at (the
+ * discounted unit price); its raw before-discount input lives in the saved
+ * request. Editing or copying it restores both from there. */
+export function restoreLineDiscounts<T extends ProcurementDraftLine>(lines: T[], requestJson: string | null | undefined): T[] {
+  let sent: Array<Record<string, unknown>> = [];
+  try { const body = JSON.parse(requestJson || '{}'); if (Array.isArray(body.lines)) sent = body.lines; } catch { return lines; }
+  const used = new Set<number>();
+  return lines.map((line) => {
+    const at = sent.findIndex((r, i) => !used.has(i) && procurementDiscountSet(r.discounted_unit_amount)
+      && r.product_id === line.product_id && r.scope === line.scope && (r.scope_id ?? '') === (line.scope_id ?? '')
+      && Number(r.qty_ordered) === line.qty_ordered && Number(r.discounted_unit_amount) === Number(line.source_unit_amount));
+    if (at < 0) return line;
+    used.add(at);
+    const r = sent[at];
+    const mode = r.purchase_cost_mode === 'total' ? 'total' : 'unit';
+    const amount = (v: unknown) => (v == null || v === '' || !Number.isFinite(Number(v)) ? '' : Number(v));
+    return { ...line, purchase_cost_mode: mode, source_unit_amount: amount(r.source_unit_amount), source_total_amount: amount(r.source_total_amount), discounted_unit_amount: Number(r.discounted_unit_amount) };
+  });
 }
 
 export function changePurchaseCostMode(line: ProcurementDraftLine, mode: 'unit' | 'total', unitDecimals: 0 | 6 = 6): ProcurementDraftLine {

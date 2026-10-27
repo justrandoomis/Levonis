@@ -440,6 +440,10 @@ async function fxSnapshotStatements(db: D1Database, id: string, now: string): Pr
   ];
 }
 
+/** A line's raw supplier unit price as the next purchase's prefill (an inexact invoice average stays unknown). */
+const rawDefault = (l: { costMode: 'unit' | 'total'; source: number; sourceTotal: number | null }, qty: number) =>
+  l.costMode === 'total' ? exactProcurementUnitDefault(l.sourceTotal!, qty) : l.source;
+
 async function planDocument(
   db: D1Database,
   b: Record<string, unknown>,
@@ -676,7 +680,8 @@ async function planDocument(
     // The next purchase's prefill learns only a FINAL cost (row 249): an estimate is never offered as the last price.
     if (profile && status === 'ordered' && state === 'final') statements.push(db.prepare(`INSERT INTO procurement_selection_cost_defaults(profile_id,product_id,scope,scope_id,source_unit_amount,weight_g,volume_mm3,updated_by,updated_at)
       VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(profile_id,product_id,scope,scope_id) DO UPDATE SET source_unit_amount=excluded.source_unit_amount,weight_g=excluded.weight_g,volume_mm3=excluded.volume_mm3,updated_by=excluded.updated_by,updated_at=excluded.updated_at`)
-      .bind(profile.id, l.sel.product_id, l.sel.scope, l.sel.scope_id, l.costMode === 'total' ? exactProcurementUnitDefault(l.sourceTotal!, l.qty) : l.source, l.weight, l.volume, actor, now));
+      // The prefill is the raw supplier price: a line's discount belongs to its own purchase.
+      .bind(profile.id, l.sel.product_id, l.sel.scope, l.sel.scope_id, rawDefault(l.beforeDiscount ?? l, l.qty), l.weight, l.volume, actor, now));
   }
   // The double-freight guard's flag (0181, USD design §3.3) is named only when
   // the column exists: on an older database the INSERT is byte-identical to

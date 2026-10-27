@@ -626,6 +626,14 @@ export const COST_REFUSALS = {
     en: 'This purchase cannot be applied to pricing: it must be confirmed and its cost final.',
     ckb: 'ناتوانرێت ئەم کڕینە لە نرخداناندا جێبەجێ بکرێت: دەبێت پشتڕاستکرابێتەوە و تێچووەکەی کۆتایی بێت.',
   },
+  // ---- «السعر بعد الخصم»: a purchase line's unit price after the supplier discount ----
+  // `POST|PUT /api/admin/procurement/documents`: the discounted price may not
+  // exceed the raw supplier price it discounts; neither sentence names a figure.
+  PURCHASE_DISCOUNT_ABOVE_PRICE: {
+    ar: 'السعر بعد الخصم أعلى من سعر الشراء الخام.',
+    en: 'The price after discount is above the raw purchase price.',
+    ckb: 'نرخی دوای داشکاندن لە نرخی کڕینی خاو زیاترە.',
+  },
   // ---- «تغيير الاسم»: a purchase's name at any status (owner request 2026-10-10) ----
   // `PATCH /api/admin/procurement/documents/:id/name`. The name is
   // `purchase_orders.invoice_no` («اسم الشراء أو رقم الفاتورة»); neither

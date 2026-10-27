@@ -149,6 +149,8 @@ const REQUIRED: Record<string, readonly string[]> = {
   'Purchase name (owner request 2026-10-10)': ['PURCHASE_NAME_TOO_LONG', 'PURCHASE_NAME_CHANGED'],
   // Pricing V2 V2-0 F4 (DECISIONS row 224): the purchase document's rate against the approved central rate.
   'Purchase rate (V2-0 F4, row 224)': ['PURCHASE_RATE_NOT_APPROVED', 'PURCHASE_RATE_CONFIRM_REQUIRED'],
+  // Owner request 2026-10-27: «السعر بعد الخصم» on a purchase line may not exceed the raw price it discounts.
+  'Purchase price after discount (owner request 2026-10-27)': ['PURCHASE_DISCOUNT_ABOVE_PRICE'],
   // End-to-end financial consistency audit: a receipt and a concurrent cost edit must not disagree.
   'Inventory consistency (owner request 2026-10-10)': ['INCOMING_CHANGED'],
   'Refund consistency (owner request 2026-10-10)': ['RETURN_REFUND_REVIEW_REQUIRED'],

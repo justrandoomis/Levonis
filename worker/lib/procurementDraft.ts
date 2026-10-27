@@ -10,8 +10,9 @@
  * refusals; the ids it mints for the incoming row and the line are used by the
  * save alone.
  */
-import { procurementSelectionKey, type CostProfile } from '../../packages/contracts/src/procurementCost';
-import { badRequest, conflict, str } from './http';
+import { procurementDiscountSet, procurementSelectionKey, type CostProfile } from '../../packages/contracts/src/procurementCost';
+import { serverMessage } from '../../packages/contracts/src/costRefusals';
+import { badRequest, conflict, HttpError, str } from './http';
 import { newId } from './crypto';
 import { requireSelection, type Selection } from './inventorySelection';
 import { decimal, whole } from './operations';
@@ -24,9 +25,12 @@ export interface DraftLine {
   qty: number;
   unit: number;
   total: number;
+  /** How the line is costed: its discounted unit price when one was typed, else its raw input. */
   costMode: 'unit' | 'total';
   source: number;
   sourceTotal: number | null;
+  /** «السعر بعد الخصم» was typed: the raw supplier input it discounts (the before-discount price), else null. */
+  beforeDiscount: { costMode: 'unit' | 'total'; source: number; sourceTotal: number | null } | null;
   weight: number;
   volume: number;
   invoiceQty: number;
@@ -79,10 +83,20 @@ export async function parseProcurementDraft(db: D1Database, b: Record<string, un
     const costMode=r.purchase_cost_mode==='total'?'total':'unit';
     const entered=decimal(costMode==='total' ? (profile ? r.source_total_amount : r.source_total_amount??r.purchase_total_iqd) : (profile ? r.source_unit_amount : r.source_unit_amount??r.purchase_unit_iqd),'تكلفة الشراء الخام');
     if(currency==='IQD')whole(entered,'تكلفة الشراء بالدينار');
+    // «السعر بعد الخصم» (procurementCostSource): an optional unit price after the supplier discount. When typed it is
+    // the price the line is costed at; the raw input stays recorded as the before-discount price.
+    let discounted: number | null = null;
+    if (procurementDiscountSet(r.discounted_unit_amount)) {
+      discounted = decimal(r.discounted_unit_amount, 'السعر بعد الخصم');
+      if (currency === 'IQD') whole(discounted, 'السعر بعد الخصم بالدينار');
+      if (discounted * qty > (costMode === 'total' ? entered : entered * qty) + 1e-9)
+        throw new HttpError(400, serverMessage('PURCHASE_DISCOUNT_ABOVE_PRICE'), 'PURCHASE_DISCOUNT_ABOVE_PRICE');
+    }
+    const costed = discounted ?? entered, costedMode = discounted === null ? costMode : 'unit';
     const total = profile
-      ? procurementAmount(costMode === 'total' ? [entered, rate] : [entered, rate, qty])
-      : whole(Math.round(costMode === 'total' ? entered * rate : Math.round(entered * rate) * qty), 'إجمالي شراء البند');
-    const unit=Math.floor(total/qty),source=costMode==='total'?entered/qty:entered;
+      ? procurementAmount(costedMode === 'total' ? [costed, rate] : [costed, rate, qty])
+      : whole(Math.round(costedMode === 'total' ? costed * rate : Math.round(costed * rate) * qty), 'إجمالي شراء البند');
+    const unit=Math.floor(total/qty),source=costedMode==='total'?costed/qty:costed;
     const weight = packedMeasure(r.weight_g ?? (profile ? sel.packed_weight_g ?? 0 : sel.weight_g), 'الوزن'),
       volume = packedMeasure(r.volume_mm3 ?? (profile ? sel.packed_volume_mm3 ?? 0 : sel.volume_mm3), 'الحجم');
     if (profile && (profile.shipping_basis === 'weight' ? weight : volume) <= 0)
@@ -93,9 +107,10 @@ export async function parseProcurementDraft(db: D1Database, b: Record<string, un
       qty,
       unit,
       total,
-      costMode,
+      costMode: costedMode,
       source,
-      sourceTotal: costMode === 'total' ? entered : null,
+      sourceTotal: costedMode === 'total' ? costed : null,
+      beforeDiscount: discounted === null ? null : { costMode, source: costMode === 'total' ? entered / qty : entered, sourceTotal: costMode === 'total' ? entered : null },
       weight,
       volume,
       invoiceQty: whole(r.invoiced_qty ?? qty, 'كمية الفاتورة', 0, 100000),

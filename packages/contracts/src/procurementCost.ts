@@ -82,6 +82,26 @@ export function exactProcurementUnitDefault(sourceTotal: number | string, qty: n
   return unitNumerator * BigInt(qty) * denominator === numerator * unitDivisor ? candidate : null;
 }
 
+/** «السعر بعد الخصم»: a purchase line's optional unit price after the supplier
+ * discount, in the document's currency, on the wire as `discounted_unit_amount`.
+ * Blank means no discount: the line is costed from its raw input. */
+export const procurementDiscountSet = (value: unknown): boolean => value !== undefined && value !== null && value !== '';
+
+/** The supplier amount a line is costed at, and how: the discounted unit price
+ * when one is typed (the raw input then stays only as the before-discount
+ * price), else the raw unit price or raw line total as entered. */
+export function procurementCostSource(line: {
+  purchase_cost_mode?: string | null;
+  source_unit_amount?: number | string | null;
+  source_total_amount?: number | string | null;
+  discounted_unit_amount?: number | string | null;
+}): { mode: 'unit' | 'total'; amount: number | string | null | undefined; discounted: boolean } {
+  if (procurementDiscountSet(line.discounted_unit_amount)) return { mode: 'unit', amount: line.discounted_unit_amount, discounted: true };
+  return line.purchase_cost_mode === 'total'
+    ? { mode: 'total', amount: line.source_total_amount, discounted: false }
+    : { mode: 'unit', amount: line.source_unit_amount, discounted: false };
+}
+
 export type ProcurementChargeBasis = 'quantity' | 'value' | 'weight' | 'volume';
 export const PROCUREMENT_CHARGE_BASES: readonly ProcurementChargeBasis[] = ['quantity', 'value', 'weight', 'volume'];
 /** An extra cost actually paid for this shipment: local delivery, customs,

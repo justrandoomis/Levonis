@@ -1,6 +1,6 @@
-import { allocateProcurementCharges, procurementSelectionKey, roundProcurementProduct, type ProcurementChargeBasis } from '../../../packages/contracts/src/procurementCost';
+import { allocateProcurementCharges, procurementCostSource, procurementSelectionKey, roundProcurementProduct, type ProcurementChargeBasis } from '../../../packages/contracts/src/procurementCost';
 
-export type EstimateLine = { product_id?: string; scope?: string; scope_id?: string | null; qty_ordered: number; source_unit_amount: number | string; source_total_amount?: number | string; purchase_cost_mode?: string; selling_price_iqd: number | null; weight_g: number; volume_mm3: number };
+export type EstimateLine = { product_id?: string; scope?: string; scope_id?: string | null; qty_ordered: number; source_unit_amount: number | string; source_total_amount?: number | string; purchase_cost_mode?: string; discounted_unit_amount?: number | string; selling_price_iqd: number | null; weight_g: number; volume_mm3: number };
 export type EstimateCharge = { amount_iqd: number; basis: string; scope?: 'shipment' | 'unit'; unit_amount_iqd?: number | null; applies_to?: readonly string[] | null; review?: boolean };
 export type EstimateShipping = { basis: 'weight' | 'volume'; rate: number };
 /** The key a charge's `applies_to` names; a line without a selection is its own. */
@@ -22,9 +22,10 @@ export function purchaseProfit(price: number | null, qty: number, total: number,
 // at save time — with the same allocator, so the preview is what is saved.
 export function purchaseEstimate(lines: EstimateLine[], charges: EstimateCharge[], rate: number, profitBps: number, included?: number[], shipping?: EstimateShipping) {
   const costs = lines.map((l) => {
-    const source = l.purchase_cost_mode === 'total' ? l.source_total_amount : l.source_unit_amount;
+    // «السعر بعد الخصم», when typed, is the unit price the line is costed at (the server reads the same rule).
+    const { mode, amount: source } = procurementCostSource(l);
     if (source == null || source === '' || !Number.isFinite(Number(source)) || Number(source) < 0 || !Number.isFinite(rate) || rate <= 0) return NaN;
-    return l.purchase_cost_mode === 'total'
+    return mode === 'total'
       ? (shipping ? rounded([source, rate]) : Math.round(Number(source) * rate))
       : (shipping ? rounded([source, rate, l.qty_ordered]) : Math.round(Number(source) * rate) * l.qty_ordered);
   });
