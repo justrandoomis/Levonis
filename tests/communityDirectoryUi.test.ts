@@ -17,7 +17,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
 
@@ -208,8 +208,6 @@ test('every word in Arabic, English and real Sorani', () => {
     // «FDM» is the process name in every language, as the printers write it.
     if (k !== 'fdm') assert.notEqual(at('ckb'), at('ar'), `ckb.${k} copies the Arabic (DECISIONS row 183)`);
   }
-  // The works rail of the home tab says its title in Sorani too.
-  assert.match(code('src/components/community/hub/WorksRail.tsx'), /loc\('من أعمال الورش', 'From the workshops', '[^']+'\)/);
 });
 
 test('the pages: the section header with its door, inside the scope, the directory a lazy chunk', () => {
@@ -225,8 +223,8 @@ test('the pages: the section header with its door, inside the scope, the directo
     assert.match(src, /from '\.\.\/\.\.\/components\/community\/directory\/Skeletons';/);
     assert.doesNotMatch(src, /hub\/(StoresPanel|CreatorsPanel|WorksRail)/, `${file}: still the home tab list`);
   }
-  // The home tab of today keeps its list (the home lane retires it), with «متجرك» from the directory.
-  assert.match(code('src/components/community/hub/StoresPanel.tsx'), /import YourStore from '\.\.\/directory\/YourStore';/);
+  // The home tabs are gone (community UI plan C1): the old panels went with them.
+  for (const gone of ['StoresPanel', 'CreatorsPanel', 'WorksRail']) assert.ok(!existsSync(join(ROOT, `src/components/community/hub/${gone}.tsx`)), `${gone} is still there`);
   // The directory reads no heavy module and adds no stylesheet.
   for (const f of files) {
     assert.doesNotMatch(code(f), /model-viewer|three|\.css'/, `${f} pulls a heavy module or a sheet`);

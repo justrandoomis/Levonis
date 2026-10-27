@@ -27,6 +27,8 @@ const STRINGS = {
     unreadMessages: 'الرسائل غير المقروءة: {n}',
     sectionsAndAccount: 'الأقسام والحساب',
     search: {
+      stores: 'ابحث عن متجر أو ورشة',
+      creators: 'ابحث عن صانع',
       products: 'ابحث في منتجات المجتمع',
     },
     tabs: {
@@ -112,6 +114,8 @@ const STRINGS = {
     unreadMessages: 'Unread messages: {n}',
     sectionsAndAccount: 'Sections and account',
     search: {
+      stores: 'Search stores and workshops',
+      creators: 'Search makers',
       products: 'Search community products',
     },
     tabs: {
@@ -195,6 +199,8 @@ const STRINGS = {
     unreadMessages: 'نامەی نەخوێندراوە: {n}',
     sectionsAndAccount: 'بەشەکان و هەژمار',
     search: {
+      stores: 'بگەڕێ بۆ فرۆشگا یان وۆرکشۆپ',
+      creators: 'بگەڕێ بۆ دروستکەر',
       products: 'لە بەرهەمەکانی کۆمەڵگە بگەڕێ',
     },
     tabs: {

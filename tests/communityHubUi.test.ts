@@ -63,8 +63,8 @@ test('the lists never outgrow a 320 px phone', () => {
   // so on a 320 px Android the directory spilled off the screen edge and the
   // page scrolled sideways. `grid-cols-1` is `minmax(0, 1fr)`: the column is
   // the screen's width, and the card's own `min-w-0` lets it shrink into it.
-  // The stores directory is its own module (community UI plan B4), on /community/stores.
-  const lists = code('src/components/community/hub/StoresPanel.tsx').match(/className="grid [^"]*md:grid-cols-2"/g) ?? [];
+  // The stores directory is its own page (community UI plan C5), on /community/stores.
+  const lists = code('src/components/community/directory/StoresDirectory.tsx').match(/className="grid [^"]*md:grid-cols-2"/g) ?? [];
   assert.equal(lists.length, 1, 'the stores list');
   for (const list of lists) assert.match(list, /\bgrid-cols-1\b/, list);
   assert.match(code('src/components/community/hub/StoreCard.tsx'), /className="relative flex min-w-0 /);

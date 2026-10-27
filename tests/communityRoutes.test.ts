@@ -102,12 +102,10 @@ test('the placeholders render the section header and the list the home tab shows
     // The list is a lazy chunk the home tab shares: the page and the entry that names it stay small.
     assert.match(src, /= lazy\(\(\) => import\('\.\.\/\.\.\/components\/community\/(hub\/FollowingPanel|directory\/StoresDirectory|directory\/MakersDirectory)'\)\);/, `${file}: the list is imported eagerly`);
   }
-  // The stores directory left the home for its own module, and the home tab renders the same one.
+  // The home has no tabs now (community UI plan C1): an old ?tab= address goes to its section page.
   const home = code('src/pages/Community.tsx');
-  assert.doesNotMatch(home, /function StoresPanel\(|function YourStore\(/, 'the stores panel is still a copy inside the home');
-  assert.match(home, /const StoresPanel = React\.lazy\(\(\) => import\('\.\.\/components\/community\/hub\/StoresPanel'\)\);/);
-  assert.match(home, /<StoresPanel q=\{q\} viewer=\{viewer\} me=\{me\} onClear=\{clearSearch\} \/>/);
-  assert.match(code('src/components/community/hub/StoresPanel.tsx'), /export default function StoresPanel\(\{ q, viewer, me, onClear \}/);
+  assert.doesNotMatch(home, /StoresPanel|function YourStore\(/, 'the stores panel is still on the home');
+  assert.match(home, /const moved = legacyTabTarget\(params\);/);
   // The editor: the wizard of today under its own header.
   const editor = code('src/pages/community/RequestNew.tsx');
   assert.match(editor, /const RequestWizard = lazy\(\(\) => import\('\.\.\/\.\.\/components\/community\/requests\/RequestWizard'\)\);/, 'the wizard stays its own chunk');
