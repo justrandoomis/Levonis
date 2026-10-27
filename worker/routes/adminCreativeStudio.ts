@@ -46,13 +46,14 @@ import { normalizeDocument } from '../../packages/creativeDoc/src/normalize';
 import type { AllowedAssets } from '../../packages/creativeDoc/src/ops';
 import { OBJECTIVES, VISUAL_PRIORITIES, type Density, type Objective, type VisualPriority } from '../../packages/creativeDoc/src/schema';
 import { compareSnapshots, type ProductSnapshot } from '../../packages/creativeDoc/src/snapshot';
-import { FAMILY_IDS, isTemplateId, isVariantId, variantsFor, type FamilyId, type TemplateId, type VariantId } from '../../packages/creativeDoc/src/templates';
+import { FAMILY_IDS, TEMPLATES, isTemplateId, isVariantId, variantsFor, type FamilyId, type TemplateId, type VariantId } from '../../packages/creativeDoc/src/templates';
 import { keyHintOf, keyState, listModels, validProviderKeyShape, type Transport } from '../lib/creative/anthropic';
-import { aiError, ensureReady, runAi } from '../lib/creative/ai';
+import { aiError, ensureReady, runAi, type KeepAlive } from '../lib/creative/ai';
 import { approveBrandVersion, brandVersion, brandVersions, currentBrand, saveBrandVersion, siteLogoSize, SITE_LOGO } from '../lib/creative/brandStore';
 import { budgetLeft, imageTokenAllowance, lastDays, usageTotals } from '../lib/creative/budget';
 import { approveClaim, approvedClaims, claimExists, claimInput, claimIsCurrent, claimText, createClaim, documentsUsingClaim, listClaims, reviseClaim } from '../lib/creative/claims';
 import { intOrNull, isMissingSchema, namesOf, nowIso, readOr, schemaMissing, stringList, studioInstalled, writeOr503 } from '../lib/creative/db';
+import { storeEvidence } from '../lib/creative/evidence';
 import {
   REJECT_REASONS, approveDocument, createDocument, documentDto, duplicateDocument, exportDto, exportsOf, getDocRow, keepVersionStatement, listDocuments, markForSnapshot,
   markNeedsReview, readContent, recheckReleased, rejectDocument, requireDoc, renameDocument, restoreDocument, reviews, saveDocument, serverBlockers, serverReport,
@@ -987,8 +988,18 @@ async function subjectOf(db: D1Database, snapshotId: unknown, claimId: unknown):
   return { snapshot, claim };
 }
 
-/** A live public offer is evidence; a manual or test snapshot never is (spec §9). */
-const offerEvidence = (s: ProductSnapshot | null) => !!s && s.source === 'live' && s.data.price.offer !== null;
+/**
+ * The request's `waitUntil`, when the platform gives one: an AI call and the
+ * settle of its reservation then outlive a client that disconnects.
+ */
+function keepAliveOf(c: Context<AppContext>): KeepAlive | undefined {
+  try {
+    const ctx = c.executionCtx;
+    return (work) => ctx.waitUntil(work);
+  } catch {
+    return undefined;
+  }
+}
 
 R.post('/ai/ideas', studio, async (c) => {
   const env = c.env;
@@ -1059,7 +1070,8 @@ R.post('/ai/ideas', studio, async (c) => {
             .bind(id, job.id, JSON.stringify(idea), idea.target_kind === 'product' ? idea.target_ref : null, actorOf(c), nowIso(), job.id)
         ),
     },
-    creativeTransport
+    creativeTransport,
+    keepAliveOf(c)
   );
   const stored = await ideasOfJob(db, out.job.id);
   return ok(c, { job_id: out.job.id, ideas: stored, rejected: out.result.rejected, notes: out.result.notes, usage: out.usage });
@@ -1095,12 +1107,13 @@ R.post('/ai/compose', studio, async (c) => {
   const brief = str(body.brief, 'brief', { max: 600, required: false });
   const ready = await ensureReady(env);
   const { snapshot, claim } = await subjectOf(db, body.snapshot_id, body.claim_id);
-  const allowed = variantsFor(template, objective, snapshot?.data.price.status ?? null);
+  const allowed = variantsFor(template, objective, snapshot?.data.price.status ?? null, priority);
   const asked = (Array.isArray(body.variants) ? body.variants : []).filter(isVariantId) as VariantId[];
   const variants = (asked.length ? asked.filter((v) => allowed.includes(v)) : allowed).slice(0, 3);
   if (!variants.length) throw badRequest('none of the requested variants suits this template and objective', 'INVALID_INPUT');
   const brand = (await currentBrand(db)).kit;
-  const evidence = { offer: offerEvidence(snapshot), serviceClaim: !!claim };
+  // Offer, arrival and back-in-stock wording need what the store proves NOW, not what the snapshot said.
+  const evidence = { ...(await storeEvidence(db, [snapshot])), serviceClaim: !!claim };
   const request: Omit<ComposeRequest, 'idempotency_key'> = {
     snapshot_id: snapshot?.id ?? null, claim_id: claim?.id ?? null, objective, priority, density, template, family, variants, locale, brief,
   };
@@ -1123,7 +1136,8 @@ R.post('/ai/compose', studio, async (c) => {
         return { ok: true, result: { proposals: v.proposals, rejected: v.rejected.length, warnings: v.warnings, missing: v.missing } };
       },
     },
-    creativeTransport
+    creativeTransport,
+    keepAliveOf(c)
   );
   return ok(c, { job_id: out.job.id, ...out.result, usage: out.usage });
 });
@@ -1173,8 +1187,10 @@ R.post('/ai/edit', studio, async (c) => {
   const allowed = await allowedAssetsFor(db, doc, snapshots);
   const claims = await approvedClaims(db, doc.services.map((s) => s.claim_id));
   const now = nowIso();
+  // Offer, arrival and back-in-stock wording need what the store proves NOW for the bound products — a
+  // bound snapshot can be weeks old, and an offer that has ended is no evidence (spec §9, acceptance 12).
   const evidence = {
-    offer: [...snapshots.values()].some(offerEvidence),
+    ...(await storeEvidence(db, doc.products.map((b) => snapshots.get(b.snapshot_id)))),
     serviceClaim: doc.services.some((s) => { const cl = claims.get(s.claim_id); return !!cl && claimIsCurrent(cl, now); }),
   };
   const out = await runAi(
@@ -1191,7 +1207,8 @@ R.post('/ai/edit', studio, async (c) => {
       content: editContent({
         documentId, version: row.version, doc, instruction, scope, annotations, brand,
         allowed: {
-          variants: doc.template ? ['product_first', 'price_first', 'feature_first', 'headline_first'] : [],
+          // The variants this design's template really has: a rebuild to any other is a silent fallback.
+          variants: doc.template && isTemplateId(doc.template.id) ? Object.keys(TEMPLATES[doc.template.id].variants) : [],
           background_presets: brand.backgrounds.map((b) => b.id),
           asset_ids: allowed.assets.map((a) => a.id),
           logos: allowed.logos.map((l) => l.ref),
@@ -1207,7 +1224,8 @@ R.post('/ai/edit', studio, async (c) => {
         return { ok: true, result: { patch: v.patch } };
       },
     },
-    creativeTransport
+    creativeTransport,
+    keepAliveOf(c)
   );
   return ok(c, { job_id: out.job.id, patch: out.result.patch, usage: out.usage });
 });
@@ -1254,7 +1272,8 @@ R.post('/ai/review', studio, async (c) => {
       imageTokens: imageTokenAllowance(img.width, img.height),
       validate: (raw) => ({ ok: true, result: validateReview(raw, { layerIds: new Set(doc.layers.map((l) => l.id)) }) }),
     },
-    creativeTransport
+    creativeTransport,
+    keepAliveOf(c)
   );
   return ok(c, { job_id: out.job.id, notes: out.result.notes, summary: out.result.summary, usage: out.usage });
 });
@@ -1269,7 +1288,7 @@ R.post('/ai/carousel', studio, async (c) => {
   const locale = oneOf(body.locale, 'locale', ['ar', 'en'] as const);
   const ready = await ensureReady(env);
   const { snapshot, claim } = await subjectOf(db, body.snapshot_id, body.claim_id);
-  const evidence = { offer: offerEvidence(snapshot), serviceClaim: !!claim };
+  const evidence = { ...(await storeEvidence(db, [snapshot])), serviceClaim: !!claim };
   const out = await runAi(
     env,
     ready,
@@ -1289,7 +1308,8 @@ R.post('/ai/carousel', studio, async (c) => {
         return { ok: true, result: { slides: v.slides, caption: v.caption, rejected: v.rejected.length } };
       },
     },
-    creativeTransport
+    creativeTransport,
+    keepAliveOf(c)
   );
   return ok(c, { job_id: out.job.id, ...out.result, usage: out.usage });
 });

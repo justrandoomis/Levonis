@@ -30,7 +30,7 @@
  */
 import type { Evidence } from '../../../packages/creativeDoc/src/aiContracts';
 import type { BrandKit } from '../../../packages/creativeDoc/src/brand';
-import { layerBox, intersects, type Annotation, type CreativeDocument, type Layer } from '../../../packages/creativeDoc/src/schema';
+import { layerBox, intersects, withDescendants, type Annotation, type CreativeDocument, type Layer } from '../../../packages/creativeDoc/src/schema';
 import type { ProductSnapshotData, ServiceClaimText } from '../../../packages/creativeDoc/src/snapshot';
 import type { ContentBlock } from './anthropic';
 
@@ -211,6 +211,19 @@ export function carouselContent(i: CarouselInput): ContentBlock[] {
   ];
 }
 
+/** Locked itself, or under a locked group: a lock holds through the tree, so the operations refuse such a layer. */
+export function lockedInTree(l: Layer, all: readonly Layer[]): boolean {
+  const seen = new Set<string>();
+  let cur: Layer | undefined = l;
+  while (cur && !seen.has(cur.id)) {
+    if (cur.locked) return true;
+    seen.add(cur.id);
+    const parent: string | null = cur.parent;
+    cur = parent ? all.find((x) => x.id === parent) : undefined;
+  }
+  return false;
+}
+
 /** A layer as a model sees it: geometry, role and style; a bound text shows its binding, never its value. */
 export function layerForModel(l: Layer, all: readonly Layer[]): Record<string, unknown> {
   const box = layerBox(l, all);
@@ -219,10 +232,12 @@ export function layerForModel(l: Layer, all: readonly Layer[]): Record<string, u
     type: l.type,
     role: l.role,
     name: l.name,
-    locked: l.locked,
+    locked: lockedInTree(l, all),
     visible: l.visible,
     box: box ? { x: Math.round(box.x), y: Math.round(box.y), width: Math.round(box.width), height: Math.round(box.height) } : null,
   };
+  // An operation on a group is refused while anything inside it is locked.
+  if (l.type === 'group') base.contains_locked = withDescendants(all, l.id).slice(1).some((id) => all.find((x) => x.id === id)?.locked === true);
   if (l.type === 'text') {
     base.text = l.source.kind === 'free' ? l.text : `[rendered by the app from ${l.source.kind}${l.source.kind === 'product' ? `.${l.source.field}` : ''}]`;
     base.bound = l.source.kind !== 'free';
@@ -279,16 +294,47 @@ export function editNeighbourhood(doc: CreativeDocument, scope: readonly string[
   return doc.layers.filter((l) => ids.has(l.id));
 }
 
+/** The layers under a point, topmost first: visible, not a group, not the background (what the editor counts as under a mark). */
+export function layersAt(doc: CreativeDocument, p: { x: number; y: number }): string[] {
+  return doc.layers
+    .filter((l) => l.type !== 'group' && l.visible && l.role !== 'background')
+    .filter((l) => {
+      const b = layerBox(l, doc.layers);
+      return !!b && p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height;
+    })
+    .map((l) => l.id)
+    .reverse();
+}
+
+/**
+ * A pointing mark as the model sees it (spec §17): the owner's note, the layers
+ * marked, and the mark's own geometry in document pixels, rounded — a pin's
+ * point, a box's rectangle, an arrow's start and end with the layers under
+ * each. «انقل السعر هنا» or a box over empty space exist only as coordinates.
+ */
+export function annotationForModel(a: Annotation, doc: CreativeDocument): Record<string, unknown> {
+  const base = { id: a.id, kind: a.kind, note: ownerText(a.note, 200), layer_ids: a.layer_ids };
+  const r = Math.round;
+  if (a.kind === 'pin') return { ...base, x: r(a.x), y: r(a.y) };
+  if (a.kind === 'box') return { ...base, x: r(a.x), y: r(a.y), width: r(a.width), height: r(a.height) };
+  const from = { x: r(a.x), y: r(a.y) };
+  const to = { x: r(a.x + a.width), y: r(a.y + a.height) };
+  return { ...base, from, to, from_layer_ids: layersAt(doc, from), to_layer_ids: layersAt(doc, to) };
+}
+
 export function editContent(i: EditInput): ContentBlock[] {
-  const layers = editNeighbourhood(i.doc, i.scope);
+  // A selected group stands for its members: a chip's words live in a child of the group the owner tapped.
+  const scope = i.scope ? [...new Set(i.scope.flatMap((id) => withDescendants(i.doc.layers, id)))] : null;
+  const layers = editNeighbourhood(i.doc, scope);
   const layerIds = new Set(layers.map((l) => l.id));
   return [
     textBlock([
       `Task: turn the owner's request into a bounded edit patch for document "${i.documentId}" at base_document_version ${i.version}. ` +
-        (i.scope
-          ? `Only these selected layers may be targets: ${i.scope.join(', ')}. Design-wide operations are not allowed for a selection.`
+        (scope
+          ? `Only these selected layers may be targets: ${scope.join(', ')}. Design-wide operations are not allowed for a selection.`
           : 'The owner asked for a design-wide change; target only the layers the change needs.') +
-        ' Every operation must name a layer id listed in target_layer_ids. Never write into a bound text, never touch a locked layer, never write a price, a currency or a link. Use only the ids listed in <allowed>. If the request is unclear, return no operations and ask one short question in `clarification`.',
+        ' Every operation must name a layer id listed in target_layer_ids. Never write into a bound text, never touch a locked layer, never write a price, a currency or a link. Use only the ids listed in <allowed>. If the request is unclear, return no operations and ask one short question in `clarification`.' +
+        ' The marks in pointed_at are in document pixels (origin at the top-left of the format): a pin is a point, a box a rectangle, an arrow points from `from` to `to`.',
       block('document', {
         document_id: i.documentId,
         base_document_version: i.version,
@@ -307,7 +353,7 @@ export function editContent(i: EditInput): ContentBlock[] {
       block('allowed', i.allowed),
       block('owner_request', {
         instruction: ownerText(i.instruction, 800),
-        pointed_at: i.annotations.slice(0, 12).map((a) => ({ id: a.id, kind: a.kind, note: ownerText(a.note, 200), layer_ids: a.layer_ids })),
+        pointed_at: i.annotations.slice(0, 12).map((a) => annotationForModel(a, i.doc)),
       }),
       block('brand_rules', { ...brandForCopy(i.brand), min_font_sizes_at_1080: Object.fromEntries(Object.entries(i.brand.type).map(([k, v]) => [k, v.min])) }),
     ]),

@@ -38,7 +38,9 @@ export type ErrorCode =
   // `requireFreshSession` answers 401 REAUTH_REQUIRED — the code every owner screen already handles), visual review
   // switched off by the owner or unsupported by the chosen model, no private bucket on the deployment, and the same
   // idempotent AI request still running.
-  | 'REAUTH_REQUIRED' | 'VISION_REVIEW_DISABLED' | 'STORAGE_UNAVAILABLE' | 'JOB_IN_PROGRESS';
+  | 'REAUTH_REQUIRED' | 'VISION_REVIEW_DISABLED' | 'STORAGE_UNAVAILABLE' | 'JOB_IN_PROGRESS'
+  // A job whose Worker died mid-call: settled at its worst case by the next AI request's sweep (worker/lib/creative/ai.ts).
+  | 'INTERRUPTED';
 
 // ---------------------------------------------------------------------------
 // Provider (owner)

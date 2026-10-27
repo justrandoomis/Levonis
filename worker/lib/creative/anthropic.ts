@@ -17,7 +17,9 @@
  *   - `redirect: 'manual'` — a 3xx is PROVIDER_ERROR, never followed, so the
  *     key header can never reach a second host;
  *   - an AbortSignal deadline per attempt (test 20 s, models 15 s, edit 45 s,
- *     ideas/compose/review/carousel 60 s) and a response body capped at 512 KB;
+ *     ideas/compose/review/carousel 110 s — just under the client's 120 s, so
+ *     a long answer with adaptive thinking has room and the client still hears
+ *     the server's own verdict) and a response body capped at 512 KB;
  *   - every failure is a CODE. A thrown error is mapped from its `name` only;
  *     no provider body, prompt or output reaches a log line.
  *
@@ -51,10 +53,10 @@ export const TIMEOUTS_MS: Readonly<Record<AiTask | 'models', number>> = Object.f
   test: 20_000,
   models: 15_000,
   edit: 45_000,
-  ideas: 60_000,
-  compose: 60_000,
-  review: 60_000,
-  carousel: 60_000,
+  ideas: 110_000,
+  compose: 110_000,
+  review: 110_000,
+  carousel: 110_000,
 });
 
 export const MAX_TOKENS: Readonly<Record<AiTask, number>> = Object.freeze({

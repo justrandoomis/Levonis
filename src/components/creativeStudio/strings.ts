@@ -614,6 +614,7 @@ export const ERROR_TEXT: Readonly<Record<ErrorCode | 'NETWORK' | 'TIMEOUT' | 'IN
   STORAGE_UNAVAILABLE: t('تخزين الملفات غير متاح الآن؛ حاول لاحقاً.', 'File storage is not available right now; try again later.', 'هەڵگرتنی فایل ئێستا بەردەست نییە؛ دواتر هەوڵ بدەرەوە.'),
   JOB_IN_PROGRESS: t('هذا الطلب ما زال قيد التنفيذ؛ انتظر نتيجته.', 'This request is still running; wait for its result.', 'ئەم داواکارییە هێشتا بەردەوامە؛ چاوەڕێی ئەنجامەکەی بکە.'),
   INVALID_RESPONSE: t('رد غير متوقع من الخادم.', 'An unexpected answer from the server.', 'وەڵامێکی چاوەڕواننەکراو لە ڕاژەکارەوە.'),
+  INTERRUPTED: t('انقطع الطلب قبل تسجيل رده؛ قد يُحتسب على الميزانية ولم يُكرر.', 'The request was interrupted before its answer was recorded; it may still count against the budget, and it was not repeated.', 'داواکارییەکە پێش تۆمارکردنی وەڵامەکەی پچڕا؛ لەوانەیە لە بودجە بژمێردرێت و دووبارە نەکرایەوە.'),
 };
 
 export const ROLE_TEXT: Readonly<Record<LayerRole, Tri>> = {

@@ -25,14 +25,14 @@ import type { AiTask, AiUsageDto, ErrorCode } from '../../../packages/creativeDo
 import { newId } from '../crypto';
 import { HttpError } from '../http';
 import type { Env } from '../types';
-import { MAX_TOKENS, createMessage, keyState, messagesBody, type Billing, type ContentBlock, type ProviderErrorCode, type ProviderUsage, type Transport } from './anthropic';
+import { MAX_TOKENS, createMessage, keyState, messagesBody, type Billing, type ContentBlock, type MessagesRequest, type ProviderErrorCode, type ProviderUsage, type Transport } from './anthropic';
 import { estimateCostMicro, estimateInputTokens, releaseStatement, reserve, settleStatement, worstCase, type Reservation } from './budget';
 import { jsonObject, nowIso, schemaMissing } from './db';
 import { failQueued, finishStatement, jobById, markRunning, openJob, requestHash, staleRunning, type JobRow } from './jobs';
 import { SYSTEM_PROMPT } from './prompts';
 import { readProviderSettings, type ProviderSettings } from './settings';
 
-/** A reservation older than this belongs to a Worker that died mid-call (the longest deadline is 60 s plus one retry). */
+/** A reservation older than this belongs to a Worker that died mid-call (a deadline is at most 110 s, and a call is sent at most twice). */
 const STALE_RUNNING_MS = 5 * 60_000;
 
 type AiEnv = Pick<Env, 'DB' | 'ANTHROPIC_API_KEY' | 'CREATIVE_STUDIO_ENC_KEY'>;
@@ -64,6 +64,7 @@ export function statusOf(code: ErrorCode | ProviderErrorCode | string): number {
 }
 
 const MESSAGES: Record<string, string> = {
+  INTERRUPTED: 'The request was interrupted before its answer was recorded. It may still have been billed; it was not repeated.',
   KEY_NOT_CONFIGURED: 'No provider key is configured. The studio works by hand; AI needs a key.',
   MODEL_NOT_SELECTED: 'The owner has not chosen a model yet.',
   BUDGET_EXCEEDED: "Today's AI budget is used up.",
@@ -154,16 +155,51 @@ function usageRow(
     );
 }
 
-/** Return every reservation a crashed Worker left behind (their jobs fail with INTERRUPTED). */
-async function releaseStale(db: D1Database): Promise<void> {
-  const stale = await staleRunning(db, STALE_RUNNING_MS);
-  for (const j of stale) {
-    const statements: D1PreparedStatement[] = [
-      db.prepare(`UPDATE creative_jobs SET status = 'failed', error_code = 'INTERRUPTED', finished_at = ? WHERE id = ? AND status = 'running'`).bind(nowIso(), j.id),
-    ];
-    if (j.reserved_day) statements.push(releaseStatement(db, { day: j.reserved_day, tokens: j.reserved_tokens, usdMicro: j.reserved_usd_micro }));
-    await db.batch(statements);
+/**
+ * Settle every reservation a dead Worker left behind. Its call may have reached
+ * the provider and been billed, so — like a timeout — it is settled at the
+ * reserved WORST CASE, never released as free, and the ledger gets a usage row
+ * (error / INTERRUPTED, counts unknown).
+ *
+ * One batch per job (one transaction), every statement guarded by the job still
+ * being 'running' and the job's own UPDATE last: a second sweep of the same job
+ * (two AI requests arriving together) finds it already failed and changes
+ * nothing, so one reservation is never settled twice — and never takes a live
+ * call's reservation with it.
+ */
+export async function releaseStale(db: D1Database, nowMs = Date.now()): Promise<void> {
+  for (const j of await staleRunning(db, STALE_RUNNING_MS, nowMs)) await settleStale(db, j);
+}
+
+/** One stale job, as one guarded batch (exported for the test that sweeps the same job twice). */
+export async function settleStale(db: D1Database, j: JobRow): Promise<void> {
+  const now = nowIso();
+  const statements: D1PreparedStatement[] = [];
+  if (j.reserved_day) {
+    statements.push(
+      db
+        .prepare(
+          `UPDATE creative_spend_day
+              SET tokens_reserved = MAX(0, tokens_reserved - ?2),
+                  usd_micro_reserved = MAX(0, usd_micro_reserved - ?3),
+                  tokens_used = tokens_used + ?2,
+                  usd_micro_spent = usd_micro_spent + ?3,
+                  in_flight = MAX(0, in_flight - 1)
+            WHERE day = ?1 AND EXISTS (SELECT 1 FROM creative_jobs WHERE id = ?4 AND status = 'running')`
+        )
+        .bind(j.reserved_day, Math.max(0, j.reserved_tokens), Math.max(0, j.reserved_usd_micro), j.id)
+    );
   }
+  statements.push(
+    db
+      .prepare(
+        `INSERT INTO creative_usage (id, created_at, actor_id, task, model, status, error_code, input_tokens, output_tokens, cache_read_tokens, est_cost_micro_usd, rate_source, job_id, document_id)
+         SELECT ?, ?, actor_id, task, NULL, 'error', 'INTERRUPTED', NULL, NULL, NULL, NULL, NULL, id, document_id FROM creative_jobs WHERE id = ? AND status = 'running'`
+      )
+      .bind(newId('cuse'), now, j.id),
+    db.prepare(`UPDATE creative_jobs SET status = 'failed', error_code = 'INTERRUPTED', finished_at = ? WHERE id = ? AND status = 'running'`).bind(now, j.id)
+  );
+  await db.batch(statements);
 }
 
 /** The stored outcome of a replayed job: its result, or the error it ended with. */
@@ -177,18 +213,35 @@ async function replay<T>(db: D1Database, job: JobRow, model: string): Promise<Ai
   throw new HttpError(statusOf(code), MESSAGES[code] ?? 'This request failed.', code, { job_id: job.id, ...(job.result_json ? { reason: jsonObject(job.result_json).reason } : {}) });
 }
 
+/**
+ * Keeps work alive past the response: the route passes `executionCtx.waitUntil`.
+ * Without it, a client that disconnects (the editor's stop button, a closed
+ * tab, the client's own deadline) may cancel the invocation mid-call and leave
+ * its reservation for the stale sweep.
+ */
+export type KeepAlive = (work: Promise<unknown>) => void;
+
 /** Steps 2–6. `ready` comes from `ensureReady` (step 1), which the route calls before building the request. */
-export async function runAi<T>(env: AiEnv, ready: Ready, spec: AiSpec<T>, transport: Transport = {}): Promise<AiOutcome<T>> {
+export async function runAi<T>(env: AiEnv, ready: Ready, spec: AiSpec<T>, transport: Transport = {}, keepAlive?: KeepAlive): Promise<AiOutcome<T>> {
+  const hash = await requestHash(spec.actorId, spec.task, spec.request);
+  const opened = await openJob(env.DB, { task: spec.task, actorId: spec.actorId, key: spec.idempotencyKey, hash, documentId: spec.documentId, baseVersion: spec.baseVersion, targetIds: spec.targetIds });
+  if (opened.kind === 'replay') return replay<T>(env.DB, opened.job, ready.model);
+  // From the reservation to the record of step 6 is one piece of work, kept
+  // alive past a client disconnect: a reservation it takes is always settled.
+  const work = reserveCallRecord(env, ready, spec, transport, opened.job);
+  keepAlive?.(work.catch(() => undefined));
+  return work;
+}
+
+async function reserveCallRecord<T>(env: AiEnv, ready: Ready, spec: AiSpec<T>, transport: Transport, job: JobRow): Promise<AiOutcome<T>> {
   const db = env.DB;
   const { settings, model } = ready;
-  const hash = await requestHash(spec.actorId, spec.task, spec.request);
-  const opened = await openJob(db, { task: spec.task, actorId: spec.actorId, key: spec.idempotencyKey, hash, documentId: spec.documentId, baseVersion: spec.baseVersion, targetIds: spec.targetIds });
-  if (opened.kind === 'replay') return replay<T>(db, opened.job, model);
-  const job = opened.job;
-
   await releaseStale(db);
-  const req = { task: spec.task, model, system: SYSTEM_PROMPT, content: spec.content, schema: spec.schema, effort: settings.effort, capabilities: settings.capabilities };
-  const inputEstimate = estimateInputTokens(JSON.stringify(messagesBody(req)), spec.imageTokens ?? 0);
+  const req: MessagesRequest = { task: spec.task, model, system: SYSTEM_PROMPT, content: spec.content, schema: spec.schema, effort: settings.effort, capabilities: settings.capabilities };
+  // A picture is billed by its pixels (`spec.imageTokens`), not by the length of its base64: the
+  // text estimate is taken with every image's data blanked, so the allowance alone counts it.
+  const sized: MessagesRequest = { ...req, content: req.content.map((b): ContentBlock => (b.type === 'image' ? { ...b, source: { ...b.source, data: '' } } : b)) };
+  const inputEstimate = estimateInputTokens(JSON.stringify(messagesBody(sized)), spec.imageTokens ?? 0);
   const need = worstCase(inputEstimate, MAX_TOKENS[spec.task], settings.rates);
   const reserved = await reserve(db, settings.budget, settings.rates, need);
   if (!reserved.ok) {
