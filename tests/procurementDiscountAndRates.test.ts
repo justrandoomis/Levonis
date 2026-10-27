@@ -118,7 +118,7 @@ test('the server refuses a discount above the raw price, in three languages, and
   assert.equal((await json(res)).code, 'PURCHASE_DISCOUNT_ABOVE_PRICE');
   assert.equal(Number((w.raw.prepare('SELECT COUNT(*) AS n FROM purchase_orders').get() as { n: number }).n), 0);
   const s = COST_REFUSALS.PURCHASE_DISCOUNT_ABOVE_PRICE;
-  assert.ok(s.ar && s.en && s.ckb && s.ckb !== s.ar);
+  assert.ok(s.ar && s.en && s.ckb && (s.ckb as string) !== s.ar);
   // The pricing card reads the draft through the same parser: the discounted price is the one it sees.
   const full = await w.preview({ draft: w.draft() });
   const cut = await w.preview({ draft: w.draft({ lines: [{ ...w.draft().lines[0], discounted_unit_amount: 300 }] }) });
