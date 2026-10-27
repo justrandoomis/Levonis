@@ -220,11 +220,15 @@ test('a. the scope token blocks are 0,2,0, hand-written outside the generated ma
     'src/pages/Community.tsx',
     'src/pages/Requests.tsx',
     'src/pages/community/Creator.tsx',
+    'src/pages/community/Following.tsx',
+    'src/pages/community/Makers.tsx',
     'src/pages/community/Project.tsx',
     'src/pages/community/ProjectComposer.tsx',
     'src/pages/community/Projects.tsx',
     'src/pages/community/Request.tsx',
+    'src/pages/community/RequestNew.tsx',
     'src/pages/community/Saved.tsx',
+    'src/pages/community/Stores.tsx',
   ];
   assert.deepEqual(importers(/from '[./]*components\/community\/CommunitySurface'/), roots);
   for (const f of roots) assert.match(read(f), /<CommunitySurface\b[^>]*>[\s\S]*<\/CommunitySurface>/, `${f}: the page root is not stamped`);

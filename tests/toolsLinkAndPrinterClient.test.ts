@@ -57,10 +57,13 @@ test('the wizard opens on the link source with the carried link, and checks it',
   const effect = wizard.slice(wizard.indexOf('const initialLinkTaken'), wizard.indexOf('function validateStep1'));
   assert.match(effect, /void checkLink\(\)/);
 
+  // The board forwards the carried link to the editor route (community UI plan B4), router state
+  // and ?link= both, and the editor hands it to the wizard.
   const requests = read('src/pages/Requests.tsx');
   assert.match(requests, /printLink/);
-  assert.match(requests, /initialLink=\{carriedLink \|\| undefined\}/);
   assert.match(requests, /carriedLink && user \? 'new' : 'board'/);
+  assert.match(requests, /navigate\(newRequestTarget\(params\), \{ replace: true, state: location\.state \}\)/);
+  assert.match(read('src/pages/community/RequestNew.tsx'), /initialLink=\{carriedLink \|\| undefined\}/);
 });
 
 test('a second file dropped mid-upload cannot price the wrong model', () => {

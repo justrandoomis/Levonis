@@ -29,45 +29,48 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useGoBack } from '../lib/useGoBack';
-import { ArrowLeft, ArrowRight, Box, Calculator, ChevronLeft, ChevronRight, ClipboardList, Plus, Search, Store, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Box, Calculator, ClipboardList, Plus, Search, X } from 'lucide-react';
 import { IconButton } from '../components/ui/Button';
 import { useLanguage } from '../LanguageContext';
 import { STUDIO_URL } from '../translations';
 import { useAuth } from '../AuthContext';
-import { useSignInPrompt } from '../lib/guest';
-import { ApiError } from '../lib/api';
 import { merchantApi, type MerchantMe } from '../lib/merchant';
-import { merchantHref } from '../lib/merchantRoutes';
 import { TabStrip, TabPanels } from '../components/ui/Tabs';
 import { EmptyState, ErrorState } from '../components/ui/AsyncStates';
 import { ProductGridSkeleton } from '../components/ui/Skeleton';
-import { toast } from '../components/ui/Toast';
 import LoadMore from '../components/listing/LoadMore';
 import ProductTile from '../components/community/hub/ProductTile';
-import StoreCard from '../components/community/hub/StoreCard';
 import RequestCard from '../components/community/hub/RequestCard';
-import WorksRail from '../components/community/hub/WorksRail';
 import QuickActions from '../components/community/hub/QuickActions';
 import ForYouPanel, { NEW_PROJECT_PATH } from '../components/community/hub/ForYouPanel';
-import FollowingPanel from '../components/community/hub/FollowingPanel';
-import { RequestListSkeleton, StoreListSkeleton, StoreMark } from '../components/community/hub/parts';
+import { RequestListSkeleton, StoreListSkeleton } from '../components/community/hub/parts';
 import { NoResults, SearchLine } from '../components/community/hub/search';
 import { useHubStrings } from '../components/community/hub/strings';
-import { applicationCta, approvalReason } from '../components/merchantApplication/approvalWords';
 import { TAB_IDS, canonicalParams, resolveTab, type CommunityTab } from '../components/community/hub/tabs';
 import { useCommunityFeed, type CommunityFeed } from '../components/community/hub/useCommunityFeed';
-import { forgetHome } from '../components/community/hub/useHomeData';
 import { BoardRailFrame, boardRailRemembered, workshopHint } from '../components/community/hub/rails';
-import { communityHubApi, type CommunityProduct, type CommunityRequest, type CommunityStore } from '../components/community/hub/api';
+import type { CommunityProduct, CommunityRequest } from '../components/community/hub/api';
 import { useSearchBox } from '../components/community/search/useSearchBox';
 import CommunitySurface from '../components/community/CommunitySurface';
 
 const ProjectsPanel = React.lazy(() => import('../components/community/hub/ProjectsPanel'));
 const CreatorsPanel = React.lazy(() => import('../components/community/hub/CreatorsPanel'));
+// The stores directory and the following feed are their own modules: the home
+// tabs and the section pages /community/stores and /community/following render
+// them (community UI plan B4).
+const StoresPanel = React.lazy(() => import('../components/community/hub/StoresPanel'));
+const FollowingPanel = React.lazy(() => import('../components/community/hub/FollowingPanel'));
 /** The cross-entity search under the bar (Phase 3) — fetched the first time the box is focused. */
 const SearchOverlay = React.lazy(() => import('../components/community/search/SearchOverlay'));
 /** «طلبات تناسبك» (Phase 5d): the workshop's own board, leading a merchant's «لك» — a lazy chunk nobody else fetches. */
 const BoardRail = React.lazy(() => import('../components/community/hub/BoardRail'));
+
+/**
+ * THE SECTION PAGES ARE REACHED THROUGH THIS CHUNK (community UI plan B4):
+ * src/App.tsx names it for /community/following, /community/stores and
+ * /community/makers, and the door loads the page (./community/Sections.tsx).
+ */
+export { default as CommunitySections } from './community/Sections';
 
 /** The wizard, on the requests page. */
 const NEW_REQUEST_PATH = '/requests?view=new';
@@ -472,113 +475,6 @@ function ProductsPanel({ q, viewer, onClear }: { q: string; viewer: string; onCl
       </div>
       <LoadMore remaining={remaining(feed)} state={feed.more} onMore={feed.loadMore} />
     </div>
-  );
-}
-
-function StoresPanel({ q, viewer, me, onClear }: { q: string; viewer: string; me: MerchantMe | null; onClear: () => void }) {
-  const s = useHubStrings();
-  const { user, isAuthenticated } = useAuth();
-  const { signIn } = useSignInPrompt();
-  const feed = useCommunityFeed<CommunityStore>('merchants', q, viewer);
-  const [busy, setBusy] = useState<string | null>(null);
-
-  /**
-   * «متابعة» answers at once and is put back if the server says no. A guest is
-   * asked to sign in and brought back here; a follow is never sent that is sure
-   * to fail (docs/DECISIONS.md row 89).
-   */
-  const toggleFollow = async (m: CommunityStore) => {
-    if (!isAuthenticated) {
-      signIn();
-      return;
-    }
-    if (busy) return;
-    const was = !!m.following;
-    const set = (following: boolean, followers: number) =>
-      feed.patch((rows) => rows.map((r) => (r.id === m.id ? { ...r, following, followers } : r)));
-    setBusy(m.id);
-    set(!was, Math.max(0, (m.followers ?? 0) + (was ? -1 : 1)));
-    try {
-      await (was ? communityHubApi.unfollow(m.id) : communityHubApi.follow(m.id));
-      feed.forgetOthers();
-      forgetHome();
-    } catch (e) {
-      set(was, m.followers ?? 0);
-      if (e instanceof ApiError && e.status === 401) signIn();
-      else toast.error(s.followFailed);
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  let body: React.ReactNode;
-  if (feed.error) body = <ErrorState error={feed.error} onRetry={feed.reload} />;
-  else if (!feed.rows) body = <StoreListSkeleton />;
-  else if (feed.rows.length === 0) {
-    body = q ? <NoResults q={q} onClear={onClear} /> : <EmptyState icon={<Store aria-hidden="true" className="h-6 w-6" />} title={s.noStores} />;
-  } else {
-    body = (
-      <>
-        <SearchLine q={q} total={feed.total} />
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {feed.rows.map((m) => (
-            <StoreCard key={m.id} store={m} canFollow={m.user_id !== user?.id} busy={busy === m.id} onToggleFollow={toggleFollow} />
-          ))}
-        </div>
-        <LoadMore remaining={remaining(feed)} state={feed.more} onMore={feed.loadMore} />
-      </>
-    );
-  }
-
-  return (
-    <div data-community-panel="merchants">
-      {!q && <WorksRail />}
-      {!q && <YourStore me={me} />}
-      {body}
-    </div>
-  );
-}
-
-/**
- * The viewer's own place in the directory: their store, one tap from its
- * workspace — or the way to one. A member with no approval yet is shown the
- * MERCHANT APPLICATION whatever their plan: applying needs no PLUS (owner
- * decision C3). An approved member opens their store when their plan lets
- * them; an older server (no `approved` in its answer) keeps the plan gate.
- * Nothing for anyone else: a button to a door that will not open is the dead
- * control the mandate forbids (src/components/merchant/StoreCta.tsx).
- */
-function YourStore({ me }: { me: MerchantMe | null }) {
-  const { dir, loc } = useLanguage();
-  const s = useHubStrings();
-  if (!me) return null;
-  const applying = !me.store && me.approved === false;
-  if (!me.store && !applying && !me.eligible) return null;
-  const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight;
-  const to = me.store ? merchantHref.home() : '/merchant/start';
-  return (
-    <Link
-      to={to}
-      data-community-your-store={me.store ? 'manage' : applying ? 'apply' : 'create'}
-      className="lv-surface mb-4 flex items-center gap-3 px-4 py-3 active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-    >
-      {me.store ? (
-        <StoreMark src={me.store.logoUrl} />
-      ) : (
-        <span aria-hidden="true" className="lv-well flex h-12 w-12 shrink-0 items-center justify-center rounded-full">
-          <Plus className="h-5 w-5 text-text-secondary" />
-        </span>
-      )}
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14px] font-semibold text-text-primary">
-          {me.store ? s.yourStore : applying ? applicationCta(me.application, loc) : s.createStore}
-        </span>
-        <span dir={me.store ? 'auto' : undefined} className="block truncate text-start text-[12px] text-text-secondary">
-          {me.store ? me.store.name : applying ? approvalReason(me.application, loc) : s.yourStoreHint}
-        </span>
-      </span>
-      <Chevron aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted" />
-    </Link>
   );
 }
 

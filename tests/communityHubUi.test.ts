@@ -61,7 +61,8 @@ test('the lists never outgrow a 320 px phone', () => {
   // page scrolled sideways. `grid-cols-1` is `minmax(0, 1fr)`: the column is
   // the screen's width, and the card's own `min-w-0` lets it shrink into it.
   const page = code('src/pages/Community.tsx');
-  const lists = page.match(/className="grid [^"]*md:grid-cols-2"/g) ?? [];
+  // The stores directory is its own module (community UI plan B4), shared with /community/stores.
+  const lists = (page + code('src/components/community/hub/StoresPanel.tsx')).match(/className="grid [^"]*md:grid-cols-2"/g) ?? [];
   assert.equal(lists.length, 2, 'the stores list and the requests list');
   for (const list of lists) assert.match(list, /\bgrid-cols-1\b/, list);
   assert.match(code('src/components/community/hub/StoreCard.tsx'), /className="relative flex min-w-0 /);

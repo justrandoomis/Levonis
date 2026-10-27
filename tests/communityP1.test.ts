@@ -156,9 +156,10 @@ test('C6: publishing or closing a request drops the community page\'s remembered
   const strip = (p: string) => readFileSync(join(ROOT, p), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const wizard = strip('src/components/community/requests/RequestWizard.tsx');
   assert.match(wizard, /const d = await requestsApi\.publish\(id, wizardPayload\(s, primary\?\.id \?\? '', measured\)\);\s*forgetCommunityFeed\('requests'\);/);
-  // The publish / close / discard buttons live on the request's own page (Phase 5).
+  // The close and discard buttons live on the request's own page (Phase 5); a draft is published by
+  // the editor after its review (community UI plan B4, critique 5), which forgets the lists above.
   const page = strip('src/pages/community/Request.tsx');
-  assert.match(page, /\/publish`, \{\}\);\s*forgetCommunityFeed\('requests'\);/);
+  assert.doesNotMatch(page, /\/publish`/, 'the request page publishes a draft without its review');
   assert.equal(page.match(/\/cancel`\);\s*forgetCommunityFeed\('requests'\);/g)?.length, 2, 'closing a published request and discarding a draft');
   assert.match(page, /import \{ forgetCommunityFeed \} from '\.\.\/\.\.\/components\/community\/hub\/feedCache';/, 'the cache module, not the feed hook');
 });

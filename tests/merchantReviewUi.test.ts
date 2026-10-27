@@ -283,7 +283,8 @@ function fnBody(src: string, signature: string): string {
 }
 
 test('C3 at every entry point: a member with no approval is sent to the application, never to /subscription', () => {
-  const hub = fnBody(code('src/pages/Community.tsx'), 'function YourStore(');
+  // The stores directory moved to its own module (community UI plan B4), YourStore with it.
+  const hub = fnBody(code('src/components/community/hub/StoresPanel.tsx'), 'function YourStore(');
   assert.match(hub, /const applying = !me\.store && me\.approved === false;/);
   assert.match(hub, /if \(!me\.store && !applying && !me\.eligible\) return null;/, 'the plan gates only the store, never the application');
   assert.match(hub, /applicationCta\(me\.application, loc\)/);

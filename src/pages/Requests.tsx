@@ -28,11 +28,11 @@ import { iqd, merchantApi, communityOrdersApi, type MerchantMe, type CommunityOr
 import { GOVERNORATE_LABELS } from '../lib/governorates';
 import MyRequestsList from '../components/print/MyRequestsList';
 /**
- * PRINT REQUESTS v2 (stream W5-A): the four-step wizard with drafts. The
- * offers — compared by the customer, composed by the merchant — live on the
- * request's own page now (src/pages/community/Request.tsx, Client 5c).
+ * A NEW REQUEST HAS ITS OWN ADDRESS (community UI plan B4): /requests/new,
+ * the editor route (src/pages/community/RequestNew.tsx). The offers, compared
+ * by the customer and composed by the merchant, live on the request own page
+ * (src/pages/community/Request.tsx, Client 5c).
  */
-import RequestWizard from '../components/community/requests/RequestWizard';
 import { requestsApi, type CatalogMaterial } from '../components/community/requests/api';
 import { requestPath, requestRedirect, requestStateLabel, requestStateTone } from '../components/community/requests/requestStates';
 import { CommunityLoadError } from './community/access';
@@ -63,6 +63,22 @@ import { Sheet } from '../components/ui/Sheet';
 import { useTimelineStrings } from '../components/community/requests/timelineStrings';
 import CommunitySurface from '../components/community/CommunitySurface';
 const OrderTimeline = lazy(() => import('../components/community/requests/OrderTimeline'));
+
+/**
+ * THE REQUEST EDITOR IS REACHED THROUGH THIS CHUNK (community UI plan B4):
+ * src/App.tsx names it for /requests/new, /requests/new/:id and
+ * /requests/:id/edit, and the editor loads lazily from here, as the wizard
+ * did from this board (./community/RequestNew.tsx). A component, not the
+ * lazy object itself: React refuses a lazy that resolves to another lazy.
+ */
+const RequestNew = lazy(() => import('./community/RequestNew'));
+export function RequestEditor() {
+  return (
+    <Suspense fallback={null}>
+      <RequestNew />
+    </Suspense>
+  );
+}
 
 /**
  * THE REQUEST'S OWN SCREEN, for the one place this page still shows it: the
@@ -96,6 +112,17 @@ interface RequestRow {
 
 type View = 'board' | 'mine' | 'orders' | 'new';
 
+/** The editor address for an old door: the model link and the project it named ride along (they survive a sign-in). */
+export function newRequestTarget(params: URLSearchParams): string {
+  const carry = new URLSearchParams();
+  for (const key of ['link', 'project']) {
+    const value = params.get(key);
+    if (value) carry.set(key, value);
+  }
+  const query = carry.toString();
+  return query ? `/requests/new?${query}` : '/requests/new';
+}
+
 export default function Requests() {
   const { loc, t } = useLanguage();
   const { user } = useAuth();
@@ -128,7 +155,21 @@ export default function Requests() {
     if ((asked === 'new' || asked === 'orders') && user) return asked;
     return carriedLink && user ? 'new' : 'board';
   });
+  /**
+   * THE OLD DOORS STILL OPEN THE EDITOR (plan B4 seam). Every link written
+   * before /requests/new existed (the community verbs, a model link card, a
+   * project «اطلب طباعة مثلها», the price calculator, a store «اطلب عرض سعر»,
+   * the chat sheet) names `?view=new`, `?link=`, `?project=` or router state
+   * (`printLink`, `project`). It is REPLACED by the editor address carrying
+   * all of it, so Back never lands on the forward; nothing of the board
+   * flashes first.
+   */
+  const navigate = useNavigate();
   useEffect(() => {
+    if (view === 'new') {
+      navigate(newRequestTarget(params), { replace: true, state: location.state });
+      return;
+    }
     if (!params.has('view')) return;
     setParams(
       (prev) => {
@@ -163,7 +204,6 @@ export default function Requests() {
    * query and the hash: Back does not walk into a redirect.
    */
   const deepLinked = params.get('request') ?? '';
-  const navigate = useNavigate();
   useEffect(() => {
     if (!deepLinked) return;
     navigate(requestRedirect(deepLinked, params, location.hash), { replace: true });
@@ -174,16 +214,16 @@ export default function Requests() {
   // The board's own merchant read — never on the way through to /requests/<id>
   // (review 2026-09-30: an old link paid a /api/merchant/me it threw away).
   useEffect(() => {
-    if (!user || deepLinked) return;
+    if (!user || deepLinked || view === 'new') return;
     merchantApi.me().then(setMe).catch(() => {});
-  }, [user, deepLinked]);
+  }, [user, deepLinked, view]);
 
   /** Opening a request is a step forward to its own page, so Back returns here. */
   const openRequestId = useCallback((id: string) => navigate(requestPath(id)), [navigate]);
   const openRequest = useCallback((r: RequestRow) => openRequestId(r.id), [openRequestId]);
 
-  // On its way to /requests/<id>: nothing of the board flashes first.
-  if (deepLinked) return null;
+  // On its way to /requests/<id> or to the editor: nothing of the board flashes first.
+  if (deepLinked || view === 'new') return null;
 
   return (
     <CommunitySurface>
@@ -217,7 +257,8 @@ export default function Requests() {
                 type="button"
                 onClick={() => {
                   if (closed) return;
-                  if (user) setView('new');
+                  // A step forward to the editor, so Back returns to the board.
+                  if (user) navigate('/requests/new');
                   else signIn();
                 }}
                 aria-disabled={closed || undefined}
@@ -235,26 +276,7 @@ export default function Requests() {
             )}
           </div>
 
-          {view === 'new' ? (
-            /* WIZARD v2 (W5-A). Four steps, a DRAFT all the way until «انشر»,
-               and «احفظ كمسودة» at any point. Finishing a draft or editing a
-               published request happens on the request's own page
-               (src/pages/community/Request.tsx); either way it is the same
-               `community_requests` row, and publishing is what notifies the
-               merchants who can make it. */
-            <RequestWizard
-              key="new"
-              initialLink={carriedLink || undefined}
-              onDone={(id, how) => {
-                // Back from the request lands on «طلباتي», where it now is.
-                navigate('/requests?view=mine', { replace: true });
-                // A request this person just PUBLISHED: its page asks about the
-                // notification channels (ChannelNudge), once — never a draft.
-                navigate(requestPath(id), how === 'published' ? { state: { published: true } } : undefined);
-              }}
-              onCancel={() => setView('board')}
-            />
-          ) : view === 'orders' ? (
+          {view === 'orders' ? (
             <MyCommunityOrders />
           ) : view === 'mine' ? (
             <MyRequestsList onOpen={openRequestId} />

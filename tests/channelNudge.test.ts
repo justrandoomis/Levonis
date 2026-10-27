@@ -401,8 +401,10 @@ test('the window is mounted after an order, a request and a ticket — and nowhe
   assert.ok(successBranch > 0);
   assert.ok(checkout.indexOf('<ChannelNudge context="order"') > successBranch);
 
-  // Requests and Support: latched on the creation callback, never on a list.
-  assert.match(requests, /setRequestJustCreated\(true\)/);
+  // Requests and Support: latched on the creation, never on a list. A request is published by its
+  // editor (community UI plan B4), which leaves `{ published: true }` in the router state.
+  assert.match(requests, /useState\(\(\) => justPublished\(location\.state\)\)/);
+  assert.match(read('src/pages/community/RequestNew.tsx'), /how === 'published'\) navigate\(requestPath\(rid\), \{ replace: true, state: \{ published: true \} \}\)/);
   assert.match(requests, /<ChannelNudge context="request" active=\{requestJustCreated\} \/>/);
   assert.match(support, /setTicketJustOpened\(true\)/);
   assert.match(support, /<ChannelNudge context="ticket" active=\{ticketJustOpened\} \/>/);
@@ -507,8 +509,9 @@ test('publishing a request does not remount the window — one fetch, one answer
    * The fix is structural, so the assertion is structural: ONE return, with the
    * element in the same position in both branches.
    */
-  // The request's own page (Phase 5): the wizard (editing) and the page are
-  // the two arms; the window sits after both.
+  // The request's own page (Phase 5): the editor has its own address now
+  // (community UI plan B4), so the page is one return and the window sits
+  // after the detail.
   const source = read('src/pages/community/Request.tsx');
   // Comments are stripped first: the note ABOVE the element quotes `{nudge}`
   // to explain itself, and an assertion that counted that would pass for the
@@ -518,8 +521,8 @@ test('publishing a request does not remount the window — one fetch, one answer
   assert.equal(occurrences.length, 1, 'the window is rendered from exactly one place');
   // And that one place is AFTER the branch closes, so the instance survives the
   // board → detail transition rather than being torn down and rebuilt.
-  const branch = code.indexOf('{editing ? (');
-  assert.ok(branch > 0, 'the two screens are one conditional inside one return');
-  assert.ok(code.indexOf('{nudge}') > branch, 'the window sits outside the conditional, not in a arm of it');
+  const branch = code.indexOf('<RequestDetail');
+  assert.ok(branch > 0, 'the detail is rendered inside the one return');
+  assert.ok(code.indexOf('{nudge}') > branch, 'the window sits after the detail, not inside it');
   assert.doesNotMatch(code, /if \(open\)\s*\n\s*return \(/, 'the second early return is gone');
 });

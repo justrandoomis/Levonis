@@ -327,6 +327,14 @@ const CommunitySaved = React.lazy(() => import('./pages/community/Saved'));
 // A print request's own page (Phase 5, §9.5): /requests/:id. The old
 // /requests?request=<id> address is redirected there by pages/Requests.tsx.
 const CommunityRequest = React.lazy(() => import('./pages/community/Request'));
+// The new community addresses (community UI plan B4). The section pages
+// «أتابعهم», «المتاجر» and «الصنّاع» (§3) are reached through the community home
+// chunk, and the request editor at /requests/new, /requests/new/:id and
+// /requests/:id/edit (§4; the old `?view=new` doors forward there) through the
+// board chunk: each door loads its page lazily, and the entry names no new
+// chunk (pages/community/Sections.tsx says why).
+const CommunitySections = React.lazy(() => import('./pages/Community').then((m) => ({ default: m.CommunitySections })));
+const RequestEditor = React.lazy(() => import('./pages/Requests').then((m) => ({ default: m.RequestEditor })));
 const Orders = React.lazy(() => import('./pages/Orders'));
 const OrderDetail = React.lazy(() => import('./pages/OrderDetail'));
 const Community = prefetchable(() => import('./pages/Community'));
@@ -993,6 +1001,20 @@ function AppContent() {
   // This main-site route owns its header while loading, ready or failed. Do
   // not briefly add a shell strip while its anchor subscription is mounting.
   const productRoute = /^\/product\/[^/]+\/?$/.test(pathForShell);
+  // The community section pages and the request editor (community UI plan B4):
+  // one element each answers its addresses.
+  const communitySection = (
+    <CommunityGate>
+      <CommunitySections />
+    </CommunityGate>
+  );
+  const requestEditor = (
+    <ProtectedRoute>
+      <CommunityGate closedExtra={<RunningCommunityOrders />}>
+        <RequestEditor />
+      </CommunityGate>
+    </ProtectedRoute>
+  );
 
   return (
     <div className="h-[100dvh] flex flex-col lv-canvas text-white font-sans overflow-hidden">
@@ -1065,6 +1087,12 @@ function AppContent() {
               needs an account. The creator page /u/:username exists only for
               an account that chose to be public. All behind the same gate:
               they are Levo Community. */}
+          {/* THE SECTION PAGES (community UI plan B4): the sections menu and the
+              home chips open them. Inside the gate, as every community page
+              (plan R1); a guest may browse them, as the home tabs. */}
+          <Route path="/community/following" element={communitySection} />
+          <Route path="/community/stores" element={communitySection} />
+          <Route path="/community/makers" element={communitySection} />
           <Route path="/community/projects" element={<CommunityGate><CommunityProjects /></CommunityGate>} />
           <Route path="/community/projects/new" element={<ProtectedRoute><CommunityGate><CommunityProjectComposer /></CommunityGate></ProtectedRoute>} />
           <Route path="/community/projects/:id" element={<CommunityGate><CommunityProject /></CommunityGate>} />
@@ -1090,6 +1118,11 @@ function AppContent() {
               cancel — /api/marketplace/orders is outside the wall. */}
           <Route path="/requests" element={<CommunityGate closedExtra={<RunningCommunityOrders />}><Requests /></CommunityGate>} />
           <Route path="/requests/:id" element={<CommunityGate closedExtra={<RunningCommunityOrders />}><CommunityRequest /></CommunityGate>} />
+          {/* THE REQUEST EDITOR (plan B4): writing needs an account, and the
+              community open to it; a refused visitor keeps the escrowed orders
+              below the card, as on the board. «new» outranks «:id». */}
+          <Route path="/requests/new/:id?" element={requestEditor} />
+          <Route path="/requests/:id/edit" element={requestEditor} />
           <Route path="/merchant/start" element={<ProtectedRoute><MerchantStart /></ProtectedRoute>} />
           {/* Behind the gate too: the page is a list of COMMUNITY stores and it
               reads /api/community/followed, which the wall refuses. Without

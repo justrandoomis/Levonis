@@ -273,10 +273,12 @@ test('the old ?request= address is REPLACED by /requests/<id>, carrying the rest
   const board = code('src/pages/Requests.tsx');
   assert.match(board, /const deepLinked = params\.get\('request'\) \?\? '';/);
   assert.match(board, /navigate\(requestRedirect\(deepLinked, params, location\.hash\), \{ replace: true \}\);/, 'replaced, so Back does not walk into a redirect');
-  assert.match(board, /if \(deepLinked\) return null;/, 'nothing of the board flashes first');
+  assert.match(board, /if \(deepLinked \|\| view === 'new'\) return null;/, 'nothing of the board flashes first (nor on the way to the editor, plan B4)');
   assert.match(board, /const openRequestId = useCallback\(\(id: string\) => navigate\(requestPath\(id\)\), \[navigate\]\);/, 'opening a request is a step forward to its page');
-  assert.match(board, /navigate\(requestPath\(id\), how === 'published' \? \{ state: \{ published: true \} \} : undefined\);/, 'the channel window rides with a PUBLISHED request only');
-  assert.match(board, /navigate\('\/requests\?view=mine', \{ replace: true \}\);/, 'Back from a new request lands on «طلباتي»');
+  // A new request is written at /requests/new (community UI plan B4), which the board forwards to.
+  const editor = code('src/pages/community/RequestNew.tsx');
+  assert.match(editor, /navigate\(requestPath\(rid\), how === 'published' \? \{ state: \{ published: true \} \} : undefined\);/, 'the channel window rides with a PUBLISHED request only');
+  assert.match(editor, /navigate\('\/requests\?view=mine', \{ replace: true \}\);/, 'Back from a new request lands on «طلباتي»');
   // The detail left this file; the one place it still shows is under the maintenance card, lazily.
   assert.doesNotMatch(board, /function RequestDetail\(/);
   assert.doesNotMatch(board, /function OnlookerCard\(/);
@@ -284,26 +286,28 @@ test('the old ?request= address is REPLACED by /requests/<id>, carrying the rest
   assert.match(board, /<RequestDetail request=\{open\} me=\{null\} onBack=\{\(\) => setOpen\(null\)\} \/>/);
 });
 
-test('the route file: /requests/:id keyed on its id, a real back, the wizard in place, the timeline door lazy', () => {
+test('the route file: /requests/:id keyed on its id, a real back, the editor at its own address, the timeline door lazy', () => {
   const route = code('src/pages/community/Request.tsx');
   assert.match(route, /const \{ id = '' \} = useParams\(\);/);
   assert.match(route, /const goBack = useGoBack\('\/requests'\);/, 'a visitor who arrived by a link goes up to the board, never out of the app');
   assert.match(route, /key=\{id\}/, 'another request never inherits this one\'s offers, files or answers');
-  assert.match(route, /const RequestWizard = lazy\(\(\) => import\('\.\.\/\.\.\/components\/community\/requests\/RequestWizard'\)\);/);
+  // The editor has its own address (community UI plan B4): /requests/:id/edit and /requests/new/:id.
+  assert.doesNotMatch(route, /RequestWizard/);
+  assert.match(route, /onEdit=\{\(rid, draft\) => navigate\(editPath\(rid, !!draft\)\)\}/);
   assert.match(route, /const OrderTimeline = lazy\(\(\) => import\('\.\.\/\.\.\/components\/community\/requests\/OrderTimeline'\)\);/, 'Client 5d\'s timeline, by the agreed path');
   // The channel window: latched from the router state, the state dropped at once, one instance outside the branch.
   assert.match(route, /useState\(\(\) => justPublished\(location\.state\)\)/);
   assert.match(route, /navigate\(\{ pathname: location\.pathname, search: location\.search, hash: location\.hash \}, \{ replace: true, state: null \}\);/);
-  assert.match(route, /if \(how === 'published'\) setRequestJustCreated\(true\);/);
+
   assert.match(route, /<ChannelNudge context="request" active=\{requestJustCreated\} \/>/);
   assert.equal(route.match(/\{nudge\}/g)?.length, 1, 'rendered from exactly one place');
-  assert.ok(route.indexOf('{nudge}') > route.indexOf('{editing ? ('), 'outside the wizard / detail conditional');
+  assert.ok(route.indexOf('{nudge}') > route.indexOf('<RequestDetail'), 'after the detail, not inside it');
   // The old page's rules, kept.
   assert.match(route, /const canOffer = !!me\?\.store && !!me\?\.can\.offers && !isCustomer && open;/);
   assert.match(route, /<OnlookerCard me=\{me\} onNewRequest=\{onNewRequest\} \/>/);
   assert.match(route, /\{me\?\.store && !isCustomer && !isOwner && current\.state !== 'draft' && \(/, 'the workshop card only for a merchant with a store');
   assert.match(route, /\{open && formatDate\(current\.expires_at, lang\) && \(/);
-  assert.match(route, /\/publish`, \{\}\);\s*forgetCommunityFeed\('requests'\);/);
+  assert.doesNotMatch(route, /\/publish`/, 'a draft is published by the editor after its review (critique 5)');
   assert.equal(route.match(/\/cancel`\);\s*forgetCommunityFeed\('requests'\);/g)?.length, 2, 'closing a published request and discarding a draft');
   assert.match(route, /onConfirm=\{closePublished\}/);
   assert.match(route, /\.catch\(\(e: unknown\) => setOffersError\(e\)\)/, 'offers that did not load are not «no offers»');

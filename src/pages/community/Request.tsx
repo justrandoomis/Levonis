@@ -88,8 +88,6 @@ import { CommunityLoadError } from './access';
 import { approvalGateText } from '../../lib/approvalGate';
 import CommunitySurface from '../../components/community/CommunitySurface';
 
-/** The wizard finishes a draft or edits the request in place (a lazy chunk: most visitors never edit). */
-const RequestWizard = lazy(() => import('../../components/community/requests/RequestWizard'));
 /** THE ORDER'S TIMELINE is Client 5d's — mounted in a sheet behind the «آخر تحديث» line. */
 const OrderTimeline = lazy(() => import('../../components/community/requests/OrderTimeline'));
 
@@ -160,7 +158,6 @@ export default function RequestPage() {
   const goBack = useGoBack('/requests');
   const { user, isLoaded } = useAuth();
   const { signIn } = useSignInPrompt();
-  const s = useRequestStrings();
   /** The account's merchant standing; `undefined` while it is being asked, so a workshop never flashes the onlooker's card. */
   const [me, setMe] = useState<MerchantMe | null | undefined>(undefined);
   useEffect(() => {
@@ -182,13 +179,13 @@ export default function RequestPage() {
 
   /**
    * A REQUEST THIS PERSON JUST PUBLISHED. Latched from the router state the
-   * wizard left (src/pages/Requests.tsx) or from the in-place wizard below,
-   * never from a list: a merchant sent here by a match notice must not be
+   * editor left (src/pages/community/RequestNew.tsx), never from a list: a
+   * merchant sent here by a match notice must not be
    * asked about the customer's notification channels. The state is dropped
    * from the history entry at once, so Back, Forward or a reload never pops
    * the window again.
    */
-  const [requestJustCreated, setRequestJustCreated] = useState(() => justPublished(location.state));
+  const [requestJustCreated] = useState(() => justPublished(location.state));
   useEffect(() => {
     if (!justPublished(location.state)) return;
     navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { replace: true, state: null });
@@ -196,54 +193,38 @@ export default function RequestPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** The wizard, in place: a draft to finish or the published request to edit — for THIS request only. */
-  const [editing, setEditing] = useState(false);
-  useEffect(() => setEditing(false), [id]);
-  /** Bumped after the wizard: the detail reads the request again. */
-  const [version, setVersion] = useState(0);
+  /**
+   * THE EDITOR HAS ITS OWN ADDRESS (community UI plan B4): a published
+   * request is edited at /requests/:id/edit and a draft is continued at
+   * /requests/new/:id (src/pages/community/RequestNew.tsx), so Back, a reload
+   * and Android Back all return to the same screen. «أكمل وانشر» opens the
+   * draft at its review (`?step=4`): a draft is never published from here
+   * without the review (critique 5). The editor comes back with
+   * `{ published: true }` in the router state when it published.
+   */
+  const editPath = (rid: string, draft: boolean) =>
+    draft ? `/requests/new/${encodeURIComponent(rid)}` : `/requests/${encodeURIComponent(rid)}/edit`;
 
   /**
-   * THE WINDOW IS RENDERED ONCE, OUTSIDE THE BRANCH: the in-place wizard and
-   * the detail are two arms of one conditional, and publishing a draft moves
-   * from the first to the second in the same breath — one instance, one
-   * reveal, and a dismissal that stays dismissed.
+   * THE WINDOW IS RENDERED ONCE, after the detail, so a request just
+   * published reveals it once and a dismissal stays dismissed.
    */
   const nudge = <ChannelNudge context="request" active={requestJustCreated} />;
 
   return (
     <CommunitySurface>
       <>
-        {editing ? (
-          <div className="min-h-screen pb-28 text-text-primary" data-request-editing={id}>
-            <TopBar onBack={() => setEditing(false)} kicker={s.editRequest} />
-            <div className="mx-auto max-w-2xl px-4 pt-4">
-              <Suspense fallback={<PageSkeleton />}>
-                <RequestWizard
-                  key={id}
-                  requestId={id}
-                  onDone={(_rid, how) => {
-                    setEditing(false);
-                    setVersion((v) => v + 1);
-                    if (how === 'published') setRequestJustCreated(true);
-                  }}
-                  onCancel={() => setEditing(false)}
-                />
-              </Suspense>
-            </div>
-          </div>
-        ) : (
-          <RequestDetail
-            // Keyed on the request: another request never inherits this one's offers, files or answers.
-            key={id}
-            request={{ id }}
-            me={me ?? null}
-            meReady={me !== undefined}
-            version={version}
-            onBack={goBack}
-            onEdit={() => setEditing(true)}
-            onNewRequest={() => (user ? navigate('/requests?view=new') : signIn())}
-          />
-        )}
+        <RequestDetail
+          // Keyed on the request: another request never inherits the offers, files or answers of this one.
+          key={id}
+          request={{ id }}
+          me={me ?? null}
+          meReady={me !== undefined}
+          onBack={goBack}
+          onEdit={(rid, draft) => navigate(editPath(rid, !!draft))}
+          onFinish={(rid) => navigate(`${editPath(rid, true)}?step=4`)}
+          onNewRequest={() => (user ? navigate('/requests/new') : signIn())}
+        />
         {nudge}
       </>
     </CommunitySurface>
@@ -277,6 +258,7 @@ export function RequestDetail({
   me,
   onBack,
   onEdit,
+  onFinish,
   onNewRequest,
   version = 0,
   meReady = true,
@@ -286,8 +268,10 @@ export function RequestDetail({
   /** False while the account's merchant standing is still being asked: the offers wait for it. */
   meReady?: boolean;
   onBack: () => void;
-  /** Open the wizard on this request (a draft to finish, or a published one to edit). */
-  onEdit?: (id: string) => void;
+  /** Open the editor on this request: a draft to continue (`draft`), or a published one to edit. */
+  onEdit?: (id: string, draft?: boolean) => void;
+  /** «أكمل وانشر»: the draft, opened at its review. */
+  onFinish?: (id: string) => void;
   /** «اطلب مثله»: the wizard, for a visitor who wants something like this. */
   onNewRequest?: () => void;
   /** Bumped by the parent after an edit: everything is read again. */
@@ -324,8 +308,6 @@ export function RequestDetail({
   /** P1-05: the parts and summary of the job, read by the print summary and shared with the offers. */
   const [modelExtra, setModelExtra] = useState<PrintModelExtra>({ parts: [], summary: null, revisionHash: '' });
   const partRefs = useMemo(() => modelExtra.parts.map((p) => ({ id: p.id, name: p.name, position: p.position })), [modelExtra.parts]);
-  const [publishing, setPublishing] = useState(false);
-  const [draftError, setDraftError] = useState('');
   const [discardOpen, setDiscardOpen] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [discardError, setDiscardError] = useState('');
@@ -449,27 +431,6 @@ export function RequestDetail({
   useEffect(() => () => unanchor.current?.(), []);
 
   const fallback = s.couldNot;
-
-  /**
-   * A DRAFT IS PUBLISHED FROM ITS OWN PAGE. The wizard's first step saves the
-   * request as a draft (it is invisible until published), so a customer who
-   * left the wizard needs a way to finish. An empty body publishes the spec
-   * already stored.
-   */
-  async function publishDraft() {
-    if (!current) return;
-    setPublishing(true);
-    setDraftError('');
-    try {
-      await api.post(`/api/marketplace/print/requests/${current.id}/publish`, {});
-      forgetCommunityFeed('requests');
-      refreshAll();
-    } catch (e) {
-      setDraftError(apiRefusal(e, L, fallback));
-    } finally {
-      setPublishing(false);
-    }
-  }
 
   async function closePublished() {
     if (!current) return;
@@ -614,15 +575,14 @@ export function RequestDetail({
                 {s.draftTitle}
               </p>
               <p className="mt-1 text-[12.5px] leading-relaxed text-text-secondary">{s.draftBody}</p>
-              <p role="alert" aria-live="polite" className="lv-field-error empty:hidden">
-                {draftError}
-              </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button variant="primary" size="sm" onClick={publishDraft} loading={publishing} loadingLabel={s.publishing} data-requests="publish-draft">
-                  {s.publish}
-                </Button>
+                {onFinish && (
+                  <Button variant="primary" size="sm" onClick={() => onFinish(current.id)} data-requests="publish-draft">
+                    {loc('أكمل وانشر', 'Finish and publish', 'تەواوی بکە و بڵاوی بکەرەوە')}
+                  </Button>
+                )}
                 {onEdit && (
-                  <Button variant="secondary" size="sm" onClick={() => onEdit(current.id)} disabled={publishing} data-requests="continue-draft">
+                  <Button variant="secondary" size="sm" onClick={() => onEdit(current.id, true)} data-requests="continue-draft">
                     {s.continueEditing}
                   </Button>
                 )}
@@ -633,7 +593,6 @@ export function RequestDetail({
                     setDiscardError('');
                     setDiscardOpen(true);
                   }}
-                  disabled={publishing}
                   data-requests="discard-draft"
                 >
                   {s.discardDraft}
