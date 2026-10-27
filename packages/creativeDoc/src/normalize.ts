@@ -21,7 +21,7 @@
 import {
   CUSTOM_FORMAT_LIMITS, FONT_REGISTRY, ID_PATTERN, isFontFamily, isHexColor, LAYER_ROLES, MAX_ALT_CHARS, MAX_ANNOTATIONS,
   MAX_CAPTION_CHARS, MAX_DOCUMENT_BYTES, MAX_LAYERS, MAX_NAME_CHARS, MAX_RELATIONS, MAX_TEXT_CHARS, OBJECTIVES, SCHEMA_VERSION,
-  VISUAL_PRIORITIES, formatOf,
+  VISUAL_PRIORITIES, formatOf, BRAND_TEXT_FIELDS, PRODUCT_TEXT_FIELDS, type Gradient,
   type Annotation, type AssetRef, type Corner, type CreativeDocument, type DocFormat, type FontWeight, type ImageLayer, type Layer,
   type LayerBase, type LayerRole, type ProductBinding, type Relation, type SafeArea, type ServiceBinding, type ShapeLayer,
   type TextLayer, type TextSource,
@@ -130,13 +130,15 @@ function textSource(ctx: Ctx, path: string, v: unknown): TextSource {
       return { kind: 'slide_number' };
     case 'product': {
       const slot = typeof v.slot === 'string' && ID_PATTERN.test(v.slot) ? v.slot : null;
-      const field = ctx.oneOf(`${path}.field`, v.field, ['name', 'brand', 'price', 'price_note', 'availability', 'variant'] as const, 'name');
+      const field = ctx.oneOf(`${path}.field`, v.field, PRODUCT_TEXT_FIELDS, 'name');
       if (!slot) {
         ctx.push(`${path}.slot`, 'invalid_value');
         return { kind: 'free' };
       }
       return { kind: 'product', slot, field };
     }
+    case 'brand':
+      return { kind: 'brand', field: ctx.oneOf(`${path}.field`, v.field, BRAND_TEXT_FIELDS, 'site') };
     case 'service': {
       const claim = typeof v.claim_id === 'string' && ASSET_ID.test(v.claim_id) ? v.claim_id : null;
       if (!claim) {
@@ -151,8 +153,30 @@ function textSource(ctx: Ctx, path: string, v: unknown): TextSource {
   }
 }
 
+/** An optional gradient: absent or null stays absent; a malformed one is dropped (reported), never half-kept. */
+function gradientOf(ctx: Ctx, path: string, v: unknown): Gradient | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  if (!isObj(v) || !Array.isArray(v.stops) || v.stops.length < 2 || v.stops.length > 6) {
+    ctx.push(path, 'invalid_value');
+    return null;
+  }
+  const stops: Gradient['stops'] = [];
+  for (const [i, raw] of (v.stops as unknown[]).entries()) {
+    const st = isObj(raw) ? raw : {};
+    const color = ctx.color(`${path}.stops.${i}.color`, st.color, null);
+    if (!color) {
+      ctx.push(`${path}.stops.${i}`, 'invalid_value');
+      return null;
+    }
+    stops.push({ at: ctx.num(`${path}.stops.${i}.at`, st.at, 0, 1, i / (v.stops.length - 1)), color, opacity: ctx.num(`${path}.stops.${i}.opacity`, st.opacity, 0, 1, 1) });
+  }
+  stops.sort((a, b) => a.at - b.at);
+  return { kind: ctx.oneOf(`${path}.kind`, v.kind, ['linear', 'radial'] as const, 'linear'), angle: ctx.num(`${path}.angle`, v.angle, -360, 360, 90), stops };
+}
+
 function textLayer(ctx: Ctx, path: string, src: Obj, b: LayerBase): TextLayer | null {
-  ctx.keys(path, src, [...BASE_KEYS, 'text', 'source', 'width', 'height', 'font', 'minSize', 'maxLines', 'color', 'align', 'direction']);
+  ctx.keys(path, src, [...BASE_KEYS, 'text', 'source', 'width', 'height', 'font', 'minSize', 'maxLines', 'color', 'align', 'direction', 'gradient']);
   const f = isObj(src.font) ? src.font : {};
   if (!isFontFamily(f.family)) {
     ctx.push(`${path}.font.family`, 'unknown_font');
@@ -175,7 +199,13 @@ function textLayer(ctx: Ctx, path: string, src: Obj, b: LayerBase): TextLayer | 
     color: ctx.color(`${path}.color`, src.color, '#f4f4f1') as string,
     align: ctx.oneOf(`${path}.align`, src.align, ['start', 'center', 'end'] as const, 'start'),
     direction: ctx.oneOf(`${path}.direction`, src.direction, ['rtl', 'ltr', 'auto'] as const, 'auto'),
+    ...withGradient(ctx, path, src),
   };
+}
+
+function withGradient(ctx: Ctx, path: string, src: Obj): { gradient?: Gradient | null } {
+  const g = gradientOf(ctx, `${path}.gradient`, src.gradient);
+  return g === undefined ? {} : { gradient: g };
 }
 
 function assetRef(ctx: Ctx, path: string, v: unknown): AssetRef | null {
@@ -200,7 +230,7 @@ function assetRef(ctx: Ctx, path: string, v: unknown): AssetRef | null {
 }
 
 function imageLayer(ctx: Ctx, path: string, src: Obj, b: LayerBase): ImageLayer | null {
-  ctx.keys(path, src, [...BASE_KEYS, 'asset', 'natural', 'crop', 'scale', 'fit']);
+  ctx.keys(path, src, [...BASE_KEYS, 'asset', 'natural', 'crop', 'scale', 'fit', 'knockout']);
   const asset = assetRef(ctx, `${path}.asset`, src.asset);
   if (!asset) return null;
   const n = isObj(src.natural) ? src.natural : {};
@@ -236,12 +266,21 @@ function imageLayer(ctx: Ctx, path: string, src: Obj, b: LayerBase): ImageLayer 
     natural: { width: nw, height: nh },
     crop,
     scale: ctx.num(`${path}.scale`, src.scale, 0.01, 40, 1),
+    ...knockoutOf(ctx, path, src.knockout, asset),
     fit,
   };
 }
 
+/** Only a product picture may have its white backdrop knocked out; anything else is dropped (reported). */
+function knockoutOf(ctx: Ctx, path: string, v: unknown, asset: AssetRef): { knockout?: 'white' | null } {
+  if (v === undefined) return {};
+  if (v === 'white' && asset.kind === 'product') return { knockout: 'white' };
+  if (v !== null) ctx.push(`${path}.knockout`, 'invalid_value');
+  return { knockout: null };
+}
+
 function shapeLayer(ctx: Ctx, path: string, src: Obj, b: LayerBase): ShapeLayer {
-  ctx.keys(path, src, [...BASE_KEYS, 'shape', 'width', 'height', 'fill', 'stroke', 'radius', 'blur']);
+  ctx.keys(path, src, [...BASE_KEYS, 'shape', 'width', 'height', 'fill', 'stroke', 'radius', 'blur', 'gradient']);
   const st = isObj(src.stroke) ? src.stroke : null;
   const strokeColor = st ? ctx.color(`${path}.stroke.color`, st.color, null) : null;
   return {
@@ -254,6 +293,7 @@ function shapeLayer(ctx: Ctx, path: string, src: Obj, b: LayerBase): ShapeLayer 
     stroke: st && strokeColor ? { color: strokeColor, width: ctx.num(`${path}.stroke.width`, st.width, 0.5, 64, 2) } : null,
     radius: ctx.num(`${path}.radius`, src.radius, 0, 2000, 0),
     blur: ctx.num(`${path}.blur`, src.blur, 0, 200, 0),
+    ...withGradient(ctx, path, src),
   };
 }
 

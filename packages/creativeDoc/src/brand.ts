@@ -331,6 +331,12 @@ export function safeAreaFor(kit: BrandKit, format: { id: FormatId; width: number
   return { top: base.top * k, right: base.right * k, bottom: base.bottom * k, left: base.left * k };
 }
 
+/**
+ * The house look's own colours (templates.ts `levonis_gold`, the owner's approved reference post): the stage,
+ * the gold and red light, the podium and the pill. A design made from that template may use them beside the kit's palette.
+ */
+export const HOUSE_PALETTE: readonly string[] = ['#000000', '#050505', '#060505', '#070606', '#090707', '#0a0908', '#0b0a09', '#0c0b0a', '#0e0c0a', '#141210', '#15120f', '#1d1813', '#240a0c', '#2a241c', '#2b241b', '#6a0f15', '#a3141b', '#a87a32', '#b07f2c', '#bdb4a3', '#c08a3a', '#c8222a', '#c8963f', '#d39a3c', '#d9a64c', '#e3b660', '#f1dfb4', '#f3cf7d', '#f4f1ea', '#fbe7ae', '#ffffff'];
+
 export function inPalette(kit: BrandKit, color: string): boolean {
   return kit.colors.palette.includes(color.toLowerCase());
 }

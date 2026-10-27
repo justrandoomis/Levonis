@@ -42,12 +42,12 @@ import type { ClaimDto, ComposeResponse, ProductDetailDto, ProductListItemDto } 
 import { buildFromTemplate, type BuildCopy, type BuildResult } from '../../../packages/creativeDoc/src/layout';
 import { CUSTOM_FORMAT_LIMITS, FORMATS, MAX_ALT_CHARS, MAX_CAPTION_CHARS, OBJECTIVES, formatOf, type AdLocale, type Density, type DocFormat, type FormatId, type Objective, type VisualPriority } from '../../../packages/creativeDoc/src/schema';
 import { localized, type ProductSnapshot } from '../../../packages/creativeDoc/src/snapshot';
-import { FAMILIES, NO_EVIDENCE, TEMPLATES, VARIANT_LABELS, templateForProduct, type FamilyId, type TemplateId, type VariantId } from '../../../packages/creativeDoc/src/templates';
+import { FAMILIES, GRID_PRODUCTS, HOUSE_TEMPLATE, NO_EVIDENCE, PRODUCT_SLOTS, TEMPLATES, VARIANT_LABELS, templateForProduct, type FamilyId, type TemplateId, type VariantId } from '../../../packages/creativeDoc/src/templates';
 import { containsPriceLike } from '../../../packages/creativeDoc/src/text';
 import { ai, assets as assetsApi, brand as brandApi, documents, idempotencyKey, store } from './client';
 import { backgroundNatural, claimText, evidenceFor, logoNatural, searchPriceLabel } from './editorData';
 import { ensureNeeds, kitFontNeeds } from './fonts';
-import { canvasMeasurer } from './media';
+import { canvasMeasurer, knockoutBounds } from './media';
 import DocThumb from './DocThumb';
 import {
   AVAILABILITY_TEXT, CONFLICT_TEXT, DENSITY_TEXT, FORMAT_TEXT, LOCALE_TEXT, OBJECTIVE_TEXT, PRICE_STATUS_TEXT, PRIORITY_TEXT, S, fill,
@@ -58,11 +58,14 @@ import {
   isJobRefusal, supportedPriorities,
 } from './screensModel';
 
-interface Picture { url: string; width: number; height: number }
+/** `bounds`: the content box once the white backdrop is knocked out (the house look stands it on its podium). */
+interface Picture { url: string; width: number; height: number; bounds?: { x: number; y: number; width: number; height: number } | null }
+/** One product of a multi-product post: its own snapshot and picture. */
+interface MultiItem { snapshot: ProductSnapshot; picture: Picture | null }
 /** `jobId`: the job whose words this composition carries (Claude's composition, or the idea's own headline); null = the template's. */
 interface Composition { variant: VariantId; reason: string; result: BuildResult; jobId: string | null }
 
-const PRODUCT_TEMPLATES: TemplateId[] = ['product_hero', 'compact_product', 'education_slide'];
+const PRODUCT_TEMPLATES: TemplateId[] = [HOUSE_TEMPLATE, 'product_hero', 'compact_product', 'education_slide'];
 
 function naturalSize(url: string): Promise<{ width: number; height: number } | null> {
   return new Promise((resolve) => {
@@ -76,7 +79,8 @@ function naturalSize(url: string): Promise<{ width: number; height: number } | n
 export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | null }) {
   const studio = useStudio();
   const { lang, w } = useText();
-  const [mode, setMode] = useState<'product' | 'service'>(prefill?.mode ?? 'product');
+  const [mode, setMode] = useState<'product' | 'service' | 'multi'>(prefill?.mode ?? 'product');
+  const [multi, setMulti] = useState<MultiItem[]>([]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ProductListItemDto[] | null>(null);
   const [searchError, setSearchError] = useState('');
@@ -87,14 +91,14 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
   const [claim, setClaim] = useState<ClaimDto | null>(null);
   const [claimMissing, setClaimMissing] = useState(false);
   const [objective, setObjective] = useState<Objective>(prefill?.objective ?? (prefill?.mode === 'service' ? 'service_trust' : 'sell'));
-  const [family, setFamily] = useState<FamilyId | null>(() => familyForObjective(prefill?.objective ?? (prefill?.mode === 'service' ? 'service_trust' : 'sell'), prefill?.mode ?? 'product'));
+  const [family, setFamily] = useState<FamilyId | null>(() => familyForObjective(prefill?.objective ?? (prefill?.mode === 'service' ? 'service_trust' : 'sell'), prefill?.mode === 'service' ? 'service' : 'product'));
   const [priority, setPriority] = useState<VisualPriority>(initialPriority(prefill));
   const [density, setDensity] = useState<Density>('brief');
   const [formatId, setFormatId] = useState<FormatId>('square');
   const [customW, setCustomW] = useState('1080');
   const [customH, setCustomH] = useState('1350');
   const [locale, setLocale] = useState<AdLocale>(lang === 'en' ? 'en' : 'ar');
-  const [template, setTemplate] = useState<TemplateId>(prefill?.mode === 'service' ? 'service_card' : 'product_hero');
+  const [template, setTemplate] = useState<TemplateId>(prefill?.mode === 'service' ? 'service_card' : prefill?.mode === 'multi' ? 'product_grid' : HOUSE_TEMPLATE);
   const [brief, setBrief] = useState('');
   const [copy, setCopy] = useState({
     headline: prefill?.copy?.headline ?? '', subhead: prefill?.copy?.subhead ?? '', features: (prefill?.copy?.features ?? []).join('\n'), cta: prefill?.copy?.cta ?? '',
@@ -105,6 +109,11 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
   const [busy, setBusy] = useState<'' | 'product' | 'snapshot' | 'compose' | 'create'>('');
   const [error, setError] = useState('');
   const searchSeq = useRef(0);
+  const resultsRef = useRef<HTMLDivElement | null>(null);
+  // The compositions (or what went wrong) appear below the form: bring them into view, or a click on «build» looks like nothing happened.
+  useEffect(() => {
+    if (compositions || error) resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [compositions, error]);
 
   const [extras, reloadExtras] = useRemote(async () => {
     const [b, claims, assets, opportunities] = await Promise.all([
@@ -133,7 +142,7 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
 
   // Search as the owner types (debounced; a late answer never replaces a newer one).
   useEffect(() => {
-    if (mode !== 'product' || query.trim().length < 2) {
+    if (mode === 'service' || query.trim().length < 2) {
       setResults(null);
       return;
     }
@@ -182,17 +191,46 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
     }
   };
 
+  const pictureOf = async (img: ProductSnapshot['data']['images'][number]): Promise<Picture | null> => {
+    if (!img.same_origin) return null;
+    const size = img.width && img.height ? { width: img.width, height: img.height } : await naturalSize(img.url);
+    if (!size) return null;
+    return { url: img.url, ...size, bounds: await knockoutBounds(img.url, size) };
+  };
+
   const choosePicture = async (img: ProductSnapshot['data']['images'][number]) => {
     if (!img.same_origin) return;
-    const size = img.width && img.height ? { width: img.width, height: img.height } : await naturalSize(img.url);
-    if (!size) {
+    const pic = await pictureOf(img);
+    if (!pic) {
       setError(w(S.imageFailed));
       return;
     }
-    setPicture({ url: img.url, ...size });
-    // The picture's proportions pick between the two product templates; a lesson family keeps its own.
-    setTemplate(family && FAMILIES[family].template !== 'product_hero' ? FAMILIES[family].template : templateForProduct(size));
+    setPicture(pic);
+    // A lesson family keeps its own template; the house look stays; otherwise the picture's proportions pick between the two product templates.
+    setTemplate((t) => (family && FAMILIES[family].template !== 'product_hero' ? FAMILIES[family].template : t === HOUSE_TEMPLATE ? t : templateForProduct(pic)));
     setCompositions(null);
+  };
+
+  /** Multi-product post: each product is bound as a whole, with its first same-origin picture. */
+  const addToMulti = async (id: string) => {
+    setError('');
+    if (multi.length >= GRID_PRODUCTS.max) {
+      setError(w(S.newMultiMax));
+      return;
+    }
+    if (multi.some((m) => m.snapshot.data.product_id === id)) return;
+    setBusy('snapshot');
+    try {
+      const snap = await store.snapshot(id, null);
+      const first = snap.data.images.find((i) => i.same_origin) ?? null;
+      const pic = first ? await pictureOf(first) : null;
+      setMulti((list) => (list.length >= GRID_PRODUCTS.max ? list : [...list, { snapshot: snap, picture: pic }]));
+      setCompositions(null);
+    } catch (e) {
+      setError(failText(e, lang));
+    } finally {
+      setBusy('');
+    }
   };
 
   const format: DocFormat | null = formatId === 'custom' ? formatOf('custom', Number(customW), Number(customH)) : { ...FORMATS[formatId] };
@@ -203,13 +241,14 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
   const evidence = extras.status === 'ready' ? evidenceFor(product?.id ?? null, snapshot, extras.data.opportunities) : NO_EVIDENCE;
   const badge = familyBadge(family, evidence);
   const aiReady = studio.provider?.ready === true && (AI_COPY_LOCALES as readonly string[]).includes(locale);
-  const readyForCompose = !!format && (mode === 'service' ? !!claim : !!snapshot && (template === 'education_slide' || !!picture));
+  const readyForCompose = !!format && (mode === 'service' ? !!claim : mode === 'multi' ? multi.length >= GRID_PRODUCTS.min : !!snapshot && (template === 'education_slide' || !!picture));
 
   const build = async (perVariant: Array<{ variant: VariantId; copy: BuildCopy; reason: string; caption: string; alt: string; jobId: string | null }>) => {
     if (extras.status !== 'ready' || !format) return;
     const { brand: b, assets, opportunities } = extras.data;
     const kit = b.kit;
-    const sample = perVariant.map((p) => [p.copy.headline, p.copy.subhead, p.copy.cta, ...(p.copy.features ?? [])].join(' ')).join(' ') + ' ' + (snapshot ? localized(snapshot.data.name, locale) : '') + ' 0123456789 د.ع';
+    const names = mode === 'multi' ? multi.map((m) => localized(m.snapshot.data.name, locale)).join(' ') : snapshot ? localized(snapshot.data.name, locale) : '';
+    const sample = perVariant.map((p) => [p.copy.headline, p.copy.subhead, p.copy.cta, ...(p.copy.features ?? [])].join(' ')).join(' ') + ' ' + names + ' 0123456789 د.ع بسعر levonis-iq.com L E V O N I S 3D · PRINT · MORE';
     const fonts = await ensureNeeds(kitFontNeeds([kit.fonts.primary, kit.fonts.display], sample));
     if (fonts.failed.length) setError(fill(w(S.fontFailed), { name: fonts.failed.join('، ') }));
     const measure = canvasMeasurer();
@@ -219,9 +258,11 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
       jobId: p.jobId,
       result: buildFromTemplate({
         template, variant: p.variant, format, locale, objective, density, brand: kit, brandVersion: b.version,
-        products: snapshot && picture ? [{ slot: 'main', snapshot, image: picture }] : [],
+        products: mode === 'multi'
+          ? multi.map((m, i) => ({ slot: PRODUCT_SLOTS[i], snapshot: m.snapshot, image: m.picture }))
+          : snapshot && picture ? [{ slot: 'main', snapshot, image: picture }] : [],
         service: mode === 'service' && claim ? claimText(claim) : null,
-        copy: p.copy, evidence: evidenceFor(product?.id ?? null, snapshot, opportunities), family,
+        copy: p.copy, evidence: mode === 'multi' ? NO_EVIDENCE : evidenceFor(product?.id ?? null, snapshot, opportunities), family: mode === 'multi' ? null : family,
         logo: logoNatural(kit, b, assets), backgroundNatural: backgroundNatural(kit, assets),
         slide: null, caption: p.caption, alt_text: p.alt, measure,
       }),
@@ -230,8 +271,10 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
   };
 
   const manualCopy = (): BuildCopy | null => {
-    const headline = copy.headline.trim();
-    if (!headline) {
+    // Without a headline the product's own name leads (bound data, never invented words): manual creation needs no AI and no copy.
+    const fallback = mode === 'multi' ? '' : snapshot ? localized(snapshot.data.name, locale) : claim ? localized(claim.title, locale) : '';
+    const headline = copy.headline.trim() || fallback;
+    if (!headline && mode !== 'multi') {
       setError(w(S.newHeadlineRequired));
       return null;
     }
@@ -263,7 +306,7 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
     setBusy('compose');
     try {
       const res = await ai.compose({
-        snapshot_id: snapshot?.id ?? null, claim_id: mode === 'service' ? claim?.id ?? null : null, objective, priority: prio, density, template, family,
+        snapshot_id: (mode === 'multi' ? multi[0]?.snapshot.id : snapshot?.id) ?? null, claim_id: mode === 'service' ? claim?.id ?? null : null, objective, priority: prio, density, template, family,
         variants, locale: locale === 'en' ? 'en' : 'ar', brief: brief.trim().slice(0, 600), idempotency_key: idempotencyKey(),
       });
       setComposeInfo({ warnings: res.warnings, missing: res.missing, job_id: res.job_id });
@@ -287,7 +330,8 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
     setBusy('create');
     try {
       const headline = c.result.doc.layers.find((l) => l.id === 'headline');
-      const title = (headline && headline.type === 'text' ? headline.text : '') || (snapshot ? localized(snapshot.data.name, lang) : claim ? localized(claim.title, lang) : w(S.tabNew));
+      const title = (headline && headline.type === 'text' ? headline.text : '')
+        || (mode === 'multi' ? multi.map((m) => localized(m.snapshot.data.name, lang)).join(' · ') : snapshot ? localized(snapshot.data.name, lang) : claim ? localized(claim.title, lang) : w(S.tabNew));
       const input = { title: title.slice(0, 120), content: c.result.doc };
       const origin = createOrigin(c.jobId);
       let created;
@@ -324,11 +368,55 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
       {(ex) => (
         <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4" data-new-design>
           <div className="flex flex-wrap gap-2">
-            <Button variant={mode === 'product' ? 'primary' : 'secondary'} aria-pressed={mode === 'product'} onClick={() => { setMode('product'); setTemplate('product_hero'); setObjective('sell'); setFamily(null); setCompositions(null); }}>{w(S.homeStartProduct)}</Button>
+            <Button variant={mode === 'product' ? 'primary' : 'secondary'} aria-pressed={mode === 'product'} onClick={() => { setMode('product'); setTemplate(HOUSE_TEMPLATE); setObjective('sell'); setFamily(null); setCompositions(null); }}>{w(S.homeStartProduct)}</Button>
+            <Button variant={mode === 'multi' ? 'primary' : 'secondary'} aria-pressed={mode === 'multi'} onClick={() => { setMode('multi'); setTemplate('product_grid'); setObjective('sell'); setFamily(null); setCompositions(null); }} data-mode-multi>{w(S.homeStartMulti)}</Button>
             <Button variant={mode === 'service' ? 'primary' : 'secondary'} aria-pressed={mode === 'service'} onClick={() => { setMode('service'); setTemplate('service_card'); setObjective('service_trust'); setFamily('service'); setCompositions(null); }}>{w(S.homeStartService)}</Button>
           </div>
 
-          {mode === 'product' ? (
+          {mode === 'multi' ? (
+            <Card title={w(S.newMultiTitle)} description={w(S.newMultiHint)}>
+              <Field label={w(S.newSearch)}>
+                <Input type="search" value={query} onChange={(e) => setQuery(e.target.value)} autoComplete="off" />
+              </Field>
+              {searchError ? <p className="mt-2 text-sm text-danger" role="alert">{searchError}</p> : null}
+              {results && !results.length ? <p className="mt-2 text-sm text-text-muted">{w(S.newSearchEmpty)}</p> : null}
+              {results && results.length ? (
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3" data-multi-results>
+                  {results.map((p) => {
+                    const chosen = multi.some((m) => m.snapshot.data.product_id === p.id);
+                    return (
+                      <li key={p.id}>
+                        <button type="button" disabled={chosen || multi.length >= GRID_PRODUCTS.max} className="flex w-full items-center gap-3 rounded-xl border border-border-subtle p-2 text-start disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" aria-pressed={chosen} onClick={() => addToMulti(p.id)}>
+                          <span className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-surface">
+                            {p.image ? <VariantImg src={p.image.url} sizes="56px" naturalWidth={p.image.width} alt="" className="h-full w-full object-contain" /> : null}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm text-text-primary">{localized(p.name, lang)}</span>
+                            <span className="block text-xs text-text-muted">{searchPriceLabel(p) ?? w(PRICE_STATUS_TEXT[p.price_status])}</span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+              {busy === 'snapshot' ? <p className="mt-2 text-sm text-text-muted" role="status">{w(S.loading)}</p> : null}
+              <ol className="mt-4 grid gap-2 sm:grid-cols-2" data-multi-chosen>
+                {multi.map((m, i) => (
+                  <li key={m.snapshot.id} className="flex items-center gap-3 rounded-xl border border-border-subtle p-2">
+                    <span className="text-xs text-text-muted">{i + 1}</span>
+                    <span className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-surface">{m.picture ? <VariantImg src={m.picture.url} sizes="48px" naturalWidth={m.picture.width} alt="" className="h-full w-full object-contain" /> : null}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm text-text-primary">{localized(m.snapshot.data.name, lang)}</span>
+                      {!m.picture ? <span className="block text-xs text-warning">{w(S.newMultiNoPicture)}</span> : null}
+                    </span>
+                    <Button size="sm" variant="ghost" onClick={() => { setMulti((list) => list.filter((x) => x !== m)); setCompositions(null); }}>{w(S.newMultiRemove)}</Button>
+                  </li>
+                ))}
+              </ol>
+              {multi.length < GRID_PRODUCTS.min ? <p className="mt-2 text-xs text-text-muted">{w(S.newMultiNeed)}</p> : null}
+            </Card>
+          ) : mode === 'product' ? (
             <>
               <Card title={w(S.newStepProduct)}>
                 <Field label={w(S.newSearch)}>
@@ -422,7 +510,7 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
             </Card>
           )}
 
-          {(mode === 'service' ? !!claim : !!snapshot) ? (
+          {(mode === 'service' ? !!claim : mode === 'multi' ? multi.length >= GRID_PRODUCTS.min : !!snapshot) ? (
             <Card title={w(S.newStepGoal)}>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {mode === 'product' ? (
@@ -481,7 +569,7 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
                 <div className="flex flex-wrap gap-2">
                   {PRODUCT_TEMPLATES.map((t) => <Button key={t} size="sm" variant={template === t ? 'primary' : 'secondary'} aria-pressed={template === t} onClick={() => { setTemplate(t); setCompositions(null); }}>{TEMPLATES[t].label[lang]}</Button>)}
                 </div>
-              ) : <p className="text-sm text-text-secondary">{TEMPLATES.service_card.label[lang]}</p>}
+              ) : <p className="text-sm text-text-secondary">{TEMPLATES[mode === 'multi' ? 'product_grid' : 'service_card'].label[lang]}</p>}
               <p className="mt-2 text-xs text-text-muted">{variants.map((v) => VARIANT_LABELS[v][lang]).join(' · ')}</p>
               <p className="mt-1 text-xs text-text-muted" data-composition-count={variants.length}>{fill(w(S.newCompositionCount), { n: variants.length })}</p>
             </Card>
@@ -505,7 +593,7 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
                 <section className="flex flex-col gap-2" data-manual-copy>
                   <h3 className="text-sm font-semibold text-text-primary">{w(S.newManualCopy)}</h3>
                   <p className="text-xs text-text-muted">{w(S.newManualHint)}</p>
-                  <Field label={w(S.newHeadline)}><Input value={copy.headline} maxLength={90} onChange={(e) => setCopy({ ...copy, headline: e.target.value })} data-copy-headline /></Field>
+                  <Field label={w(S.newHeadline)} hint={mode === 'service' ? undefined : w(S.newHeadlineOptional)}><Input value={copy.headline} maxLength={90} onChange={(e) => setCopy({ ...copy, headline: e.target.value })} data-copy-headline /></Field>
                   <Field label={w(S.newSubhead)} optional><Input value={copy.subhead} maxLength={160} onChange={(e) => setCopy({ ...copy, subhead: e.target.value })} /></Field>
                   <Field label={w(S.newFeatures)} optional><Textarea rows={3} value={copy.features} onChange={(e) => setCopy({ ...copy, features: e.target.value })} /></Field>
                   <Field label={w(S.newCta)} optional><Input value={copy.cta} maxLength={40} onChange={(e) => setCopy({ ...copy, cta: e.target.value })} /></Field>
@@ -519,6 +607,7 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
             </Card>
           ) : null}
 
+          <div ref={resultsRef} className="scroll-mt-4" />
           {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
 
           {compositions ? (

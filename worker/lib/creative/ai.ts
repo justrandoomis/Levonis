@@ -28,7 +28,7 @@ import type { Env } from '../types';
 import { MAX_TOKENS, createMessage, keyState, messagesBody, type Billing, type ContentBlock, type MessagesRequest, type ProviderErrorCode, type ProviderUsage, type Transport } from './anthropic';
 import { estimateCostMicro, estimateInputTokens, releaseStatement, reserve, settleStatement, worstCase, type Reservation } from './budget';
 import { jsonObject, nowIso, schemaMissing } from './db';
-import { failQueued, finishStatement, jobById, markRunning, openJob, requestHash, staleRunning, type JobRow } from './jobs';
+import { failQueued, finishStatement, jobById, markRunning, openJob, requestHash, staleRunning, storedTask, type JobRow } from './jobs';
 import { SYSTEM_PROMPT } from './prompts';
 import { readProviderSettings, type ProviderSettings } from './settings';
 
@@ -147,7 +147,7 @@ function usageRow(
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
-      newId('cuse'), nowIso(), input.actorId, input.task, input.model, input.status, input.code,
+      newId('cuse'), nowIso(), input.actorId, storedTask(input.task), input.model, input.status, input.code,
       input.usage ? input.usage.input_tokens + input.usage.cache_creation_input_tokens : null,
       input.usage ? input.usage.output_tokens : null,
       input.usage ? input.usage.cache_read_input_tokens : null,

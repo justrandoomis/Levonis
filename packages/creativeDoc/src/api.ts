@@ -17,7 +17,7 @@
  * studio tables — list reads answer 200 `{ migrated: false, ... }` with empty
  * data, item reads answer 404; writes answer 503 CREATIVE_SCHEMA_MISSING.
  */
-import type { Idea, Proposal, ReviewNote, CarouselSlidePlan, EditPatch } from './aiContracts';
+import type { ChatIdea, Idea, Proposal, ReviewNote, CarouselSlidePlan, EditPatch } from './aiContracts';
 import type { BrandKit } from './brand';
 import type { DocIssue } from './normalize';
 import type { QualityReport } from './quality';
@@ -328,7 +328,12 @@ export interface ExportDto {
 // AI
 // ---------------------------------------------------------------------------
 
-export type AiTask = 'test' | 'ideas' | 'compose' | 'edit' | 'review' | 'carousel';
+/**
+ * `chat`: the free conversation on Home. Its job and usage rows are STORED under `ideas` (the 0216 CHECK lists
+ * the six tasks above it and is not widened in place — worker/lib/creative/jobs.ts `storedTask`), so a design
+ * made from a chat idea links that job exactly like an ideas answer.
+ */
+export type AiTask = 'test' | 'ideas' | 'compose' | 'edit' | 'review' | 'carousel' | 'chat';
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 
 export interface JobDto {
@@ -369,6 +374,11 @@ export interface IdeaRecordDto extends Idea {
 
 export interface IdeasRequest { count: number; priorities: string[]; idempotency_key: string }
 export interface IdeasResponse { job_id: string; ideas: IdeaRecordDto[]; rejected: number; notes: string[]; usage: AiUsageDto }
+
+/** One turn of the Home conversation; the client keeps the history and sends the last CHAT_LIMITS.turns of it. */
+export interface ChatTurn { role: 'user' | 'assistant'; text: string }
+export interface ChatRequest { messages: ChatTurn[]; idempotency_key: string }
+export interface ChatResponse { job_id: string; reply: string; suggested_ideas: ChatIdea[]; dropped: number; usage: AiUsageDto }
 
 export interface ComposeRequest {
   /** A product snapshot (product posts) or an approved claim (service posts). */

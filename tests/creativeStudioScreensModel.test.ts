@@ -215,3 +215,15 @@ test('service claims: one card per claim, checked like the server, approvable on
   assert.match(read('src/components/creativeStudio/NewDesign.tsx'), /goTab\('claims'\)/);
   assert.match(read('src/components/creativeStudio/StudioShell.tsx'), /'claims'/);
 });
+
+test('a Home opportunity row opens New design: a product row on its product with its goal, a topic row with the goal set', async () => {
+  const { opportunityPrefill, chatIdeaPrefill } = await import('../src/components/creativeStudio/screensModel');
+  assert.deepEqual(opportunityPrefill({ kind: 'offer', ref: 'p_1' }), { mode: 'product', productId: 'p_1', objective: 'sell' });
+  assert.deepEqual(opportunityPrefill({ kind: 'arrival', ref: 'p_2' }), { mode: 'product', productId: 'p_2', objective: 'arrival' });
+  assert.deepEqual(opportunityPrefill({ kind: 'back_in_stock', ref: 'p_3' }), { mode: 'product', productId: 'p_3', objective: 'back_in_stock' });
+  assert.deepEqual(opportunityPrefill({ kind: 'service_claim', ref: 'clm_1' }), { mode: 'service', claimId: 'clm_1', objective: 'service_trust' });
+  assert.deepEqual(opportunityPrefill({ kind: 'education_topic', ref: '' }), { mode: 'product', objective: 'education' });
+  assert.deepEqual(opportunityPrefill({ kind: 'coverage_gap', ref: 'cat_1' }), { mode: 'product', objective: 'sell' });
+  const p = chatIdeaPrefill({ objective: 'sell', product_ref: 'p_1', headline: 'دقة', subhead: '', note: '' }, 'cjob_1');
+  assert.deepEqual(p, { mode: 'product', productId: 'p_1', objective: 'sell', copy: { headline: 'دقة', subhead: undefined }, jobId: 'cjob_1' });
+});

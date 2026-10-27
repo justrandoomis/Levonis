@@ -24,11 +24,17 @@ import type { TypeRole } from './brand';
 import type { AdLocale, LayerRole, Objective, TextAlign, VisualPriority } from './schema';
 import type { Localized, PriceStatus, SnapshotAvailability } from './snapshot';
 
-export type TemplateId = 'product_hero' | 'compact_product' | 'service_card' | 'comparison' | 'education_slide';
+export type TemplateId = 'product_hero' | 'compact_product' | 'service_card' | 'comparison' | 'education_slide' | 'levonis_gold' | 'product_grid';
 export type VariantId = 'product_first' | 'price_first' | 'feature_first' | 'headline_first';
 export type FamilyId = 'new_arrival' | 'back_in_stock' | 'price_offer' | 'education' | 'comparison' | 'service';
 
-export const TEMPLATE_IDS: readonly TemplateId[] = ['product_hero', 'compact_product', 'service_card', 'comparison', 'education_slide'];
+export const TEMPLATE_IDS: readonly TemplateId[] = ['product_hero', 'compact_product', 'service_card', 'comparison', 'education_slide', 'levonis_gold', 'product_grid'];
+/** The brand's house look (the owner's approved reference post): New design starts from it. */
+export const HOUSE_TEMPLATE: TemplateId = 'levonis_gold';
+/** How many products a grid post binds, each with its own snapshot, picture, name and price. */
+export const GRID_PRODUCTS = { min: 2, max: 4 } as const;
+/** The binding slots of a multi-product post, in order. */
+export const PRODUCT_SLOTS = ['main', 'p2', 'p3', 'p4'] as const;
 export const VARIANT_IDS: readonly VariantId[] = ['product_first', 'price_first', 'feature_first', 'headline_first'];
 export const FAMILY_IDS: readonly FamilyId[] = ['new_arrival', 'back_in_stock', 'price_offer', 'education', 'comparison', 'service'];
 
@@ -80,8 +86,11 @@ export interface VariantDef {
   id: VariantId;
   label: Localized;
   priority: VisualPriority;
-  /** `stack`: one column. `split`: text column on the start side, product column on the end side. `pair`: two product columns. */
-  layout: 'stack' | 'split' | 'pair';
+  /**
+   * `stack`: one column. `split`: text column on the start side, product column on the end side. `pair`: two product columns.
+   * `grid`: 2–4 product cells (2 or 3 side by side, 4 as two rows). `house`: the house template's own drawn scene (layout.ts `buildHouse`).
+   */
+  layout: 'stack' | 'split' | 'pair' | 'grid' | 'house';
   blocks: StackBlock[];
   /** For split: the text column's share of the width. */
   textColumn?: number;
@@ -94,7 +103,8 @@ export interface TemplateDef {
   version: number;
   label: Localized;
   /** What kind of subject it is made for (spec §14: a wide printer, a round spool and a service each need their own structure). */
-  subject: 'product_wide' | 'product_compact' | 'service' | 'two_products' | 'lesson';
+  subject: 'product_wide' | 'product_compact' | 'service' | 'two_products' | 'lesson' | 'many_products';
+  /** `products`: the least it binds (a grid binds up to GRID_PRODUCTS.max). */
   needs: { products: 0 | 1 | 2; service: boolean };
   variants: Partial<Record<VariantId, VariantDef>>;
 }
@@ -210,6 +220,30 @@ export const TEMPLATES: Readonly<Record<TemplateId, TemplateDef>> = {
       product_first: {
         id: 'product_first', label: VARIANT_LABELS.product_first, priority: 'product', layout: 'pair', justify: 'center',
         blocks: [headline(), P({ productSlot: 'main', minFrac: 0.3, maxFrac: 0.5, widthFrac: 0.9 }), productName({ text: { slot: 'product_name', source: 'product', productSlot: 'main' } }), price({ text: { slot: 'price', source: 'product', productSlot: 'main' } }), cta()],
+      },
+    },
+  },
+  // THE HOUSE LOOK (the owner's reference post): near-black stage with a gold and a red light arc, the logo and
+  // tagline centred on top, the brand in white and the model in gold, «بسعر» + the bound price, the product on a
+  // dark podium with a gold rim, and the site address in a gold pill. Drawn by `buildHouse` in layout.ts.
+  levonis_gold: {
+    id: 'levonis_gold', version: 1, label: L('ليفونس الذهبي', 'Levonis gold', 'لیڤۆنیسی زێڕین'), subject: 'product_wide',
+    needs: { products: 1, service: false },
+    variants: {
+      product_first: {
+        id: 'product_first', label: VARIANT_LABELS.product_first, priority: 'product', layout: 'house', justify: 'center',
+        blocks: [productName(), price(), P({ minFrac: 0.4, maxFrac: 0.6 })],
+      },
+    },
+  },
+  // Several products in one post (2–4): one cell per product with its own picture, bound name and bound price.
+  product_grid: {
+    id: 'product_grid', version: 1, label: L('عدة منتجات', 'Several products', 'چەند بەرهەمێک'), subject: 'many_products',
+    needs: { products: 2, service: false },
+    variants: {
+      product_first: {
+        id: 'product_first', label: VARIANT_LABELS.product_first, priority: 'product', layout: 'grid', justify: 'center',
+        blocks: [headline(), P({ minFrac: 0.2, maxFrac: 0.62, widthFrac: 0.92 }), productName({ boost: 0.78, maxLines: 2 }), price({ boost: 0.8 }), cta()],
       },
     },
   },

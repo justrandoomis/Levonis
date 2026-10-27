@@ -17,11 +17,11 @@
  * font list, no re-verification yet). "Passed" means exactly the checks that
  * ran — never a quality score (spec §44).
  */
-import type { BrandKit } from './brand';
+import { HOUSE_PALETTE, type BrandKit } from './brand';
 import { detectConflicts, renderSource, textFits } from './layout';
 import { FONT_REGISTRY, layerBox, safeBox, type CreativeDocument, type ImageLayer, type TextLayer } from './schema';
 import { blockingChanges, type ProductSnapshot, type ServiceClaimText, type SnapshotChange } from './snapshot';
-import { TEMPLATES, type ProductBlock, type VariantId } from './templates';
+import { HOUSE_TEMPLATE, TEMPLATES, type ProductBlock, type VariantId } from './templates';
 import { claimsIn, containsPriceLike, unsupportedClaims, type ClaimEvidence, type TextMeasurer } from './text';
 
 export type Severity = 'blocker' | 'review' | 'optional';
@@ -142,10 +142,12 @@ export function qualityReport(doc: CreativeDocument, ctx: QualityContext): Quali
       if (containsPriceLike(t.text)) add('unbound_price_text', 'blocker', [t.id]);
       continue;
     }
-    const bound = src.kind === 'product' ? doc.products.some((b) => b.slot === src.slot) : src.kind === 'service' ? doc.services.some((s) => s.claim_id === src.claim_id) : doc.slide !== null;
+    // A brand element (the site address, the tagline) is the app's own fixed words: always bound, and it must draw exactly them.
+    const bound = src.kind === 'brand' ? true : src.kind === 'product' ? doc.products.some((b) => b.slot === src.slot) : src.kind === 'service' ? doc.services.some((s) => s.claim_id === src.claim_id) : doc.slide !== null;
     if (!bound) add('bound_text_missing', 'blocker', [t.id], 'no binding');
     else if (!t.text) add('bound_text_missing', 'blocker', [t.id]);
     else if (renderSource(src, bindCtx) === null) add('bound_text_missing', 'blocker', [t.id], 'renders nothing');
+    else if (src.kind === 'brand' && t.text !== renderSource(src, bindCtx)) add('bound_text_missing', 'blocker', [t.id], 'not the brand words');
   }
 
   // PRODUCT — the right picture, untransformed.
@@ -160,7 +162,8 @@ export function qualityReport(doc: CreativeDocument, ctx: QualityContext): Quali
     // The renderer draws the picture into natural × scale: a recorded size of another ratio stretches it (spec §13, §34-3).
     if (img && img.width && img.height && ratioOff(p.natural, { width: img.width, height: img.height }) > 0.01) add('product_transformed', 'blocker', [p.id], 'stretched');
     if (p.rotation !== 0) add('product_transformed', 'blocker', [p.id], 'rotated');
-    if (p.fit === 'detail') add('product_detail_crop', 'review', [p.id]);
+    // A knocked-out picture is cropped to its own content box (only backdrop is cut away): not a detail shot.
+    if (p.fit === 'detail' && p.knockout !== 'white') add('product_detail_crop', 'review', [p.id]);
     if (p.scale > 1.6) add('low_resolution', 'review', [p.id], `drawn at ${p.scale.toFixed(2)}× its pixels`);
     // Size: a product reduced to a speck is no ad; one under its template's share needs a look (spec §12, §14).
     const box = layerBox(p)!;
@@ -214,10 +217,15 @@ export function qualityReport(doc: CreativeDocument, ctx: QualityContext): Quali
 
   // BRAND — palette and density.
   ran.push('brand');
-  const offPalette = visible.filter((l) => (l.type === 'text' && !ctx.brand.colors.palette.includes(l.color)) || (l.type === 'shape' && l.role !== 'product_shadow' && l.fill !== null && !ctx.brand.colors.palette.includes(l.fill) && l.role !== 'background')).map((l) => l.id);
+  // The house template's own colours are part of the approved look; its fixed brand words do not count as crowding.
+  const house = doc.template?.id === HOUSE_TEMPLATE;
+  const paletteHas = (c: string) => ctx.brand.colors.palette.includes(c) || (house && HOUSE_PALETTE.includes(c));
+  const offPalette = visible.filter((l) => (l.type === 'text' && !paletteHas(l.color)) || (l.type === 'shape' && l.role !== 'product_shadow' && l.fill !== null && !paletteHas(l.fill) && l.role !== 'background')).map((l) => l.id);
   if (offPalette.length) add('off_palette', 'review', offPalette);
-  if (texts.length > ctx.brand.density.max_text_layers) add('dense', 'review', texts.map((t) => t.id), `${texts.length} > ${ctx.brand.density.max_text_layers}`);
-  if (!texts.some((t) => t.role === 'headline')) add('headline_missing', 'review');
+  const counted = texts.filter((t) => t.source.kind !== 'brand');
+  if (counted.length > ctx.brand.density.max_text_layers) add('dense', 'review', counted.map((t) => t.id), `${counted.length} > ${ctx.brand.density.max_text_layers}`);
+  // In the house look the product's name IS the headline.
+  if (!texts.some((t) => t.role === 'headline' || (house && t.role === 'product_name'))) add('headline_missing', 'review');
 
   // ASSETS — every picture really decoded, at the ratio the document records.
   if (ctx.assetsLoaded || ctx.decodedSizes) {

@@ -147,7 +147,7 @@ export type StudioTab = 'home' | 'new' | 'editor' | 'carousel' | 'batch' | 'camp
 
 /** What «use this idea» carries into New design (screensModel.ideaPrefill): every field of the idea a design can use. */
 export interface NewDesignPrefill {
-  mode?: 'product' | 'service';
+  mode?: 'product' | 'service' | 'multi';
   productId?: string;
   /** Preselected once the approved claims are loaded. */
   claimId?: string;

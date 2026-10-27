@@ -119,6 +119,65 @@ export function textProblems(texts: readonly string[], evidence: ClaimEvidence):
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// 1b) «محادثة» — a free conversation about an idea (Home)
+// ---------------------------------------------------------------------------
+
+export const CHAT_LIMITS = Object.freeze({ turns: 12, chars: 1200, reply: 1500, ideas: 3 });
+
+export const CHAT_SCHEMA: JsonSchema = obj({
+  reply: str,
+  suggested_ideas: {
+    type: 'array',
+    items: obj({
+      objective: en(OBJECTIVES),
+      /** A product id FROM THE REQUEST, or empty. */
+      product_ref: str,
+      headline: str,
+      subhead: str,
+      note: str,
+    }),
+  },
+});
+
+export interface ChatIdea {
+  objective: Objective;
+  product_ref: string;
+  headline: string;
+  subhead: string;
+  note: string;
+}
+
+/**
+ * The structured answer of a chat turn. The reply itself must pass `textProblems` (no price, no link, no claim
+ * the evidence does not cover) or the whole answer is refused; an idea that fails, or names a product the
+ * request did not list, is dropped and counted.
+ */
+export function validateChat(raw: unknown, ctx: { products: ReadonlySet<string>; evidence: ClaimEvidence }): { ok: true; reply: string; ideas: ChatIdea[]; dropped: number } | { ok: false; reason: string } {
+  if (!raw || typeof raw !== 'object') return { ok: false, reason: 'invalid' };
+  const r = raw as Record<string, unknown>;
+  const reply = C(r.reply, CHAT_LIMITS.reply, true);
+  if (!reply) return { ok: false, reason: 'empty' };
+  const bad = textProblems([reply], ctx.evidence);
+  if (bad) return { ok: false, reason: bad.code };
+  const ideas: ChatIdea[] = [];
+  let dropped = 0;
+  for (const it of Array.isArray(r.suggested_ideas) ? r.suggested_ideas : []) {
+    if (ideas.length >= CHAT_LIMITS.ideas || !it || typeof it !== 'object') { dropped++; continue; }
+    const o = it as Record<string, unknown>;
+    const idea: ChatIdea = {
+      objective: (OBJECTIVES as readonly string[]).includes(o.objective as string) ? (o.objective as Objective) : 'sell',
+      product_ref: typeof o.product_ref === 'string' && ctx.products.has(o.product_ref) ? o.product_ref : '',
+      headline: C(o.headline, 90),
+      subhead: C(o.subhead, 160),
+      note: C(o.note, 300, true),
+    };
+    if (!idea.headline || (typeof o.product_ref === 'string' && o.product_ref && !idea.product_ref) || textProblems([idea.headline, idea.subhead, idea.note], ctx.evidence)) { dropped++; continue; }
+    ideas.push(idea);
+  }
+  return { ok: true, reply, ideas, dropped };
+}
+
 export function validateIdeas(raw: unknown, ctx: IdeasContext): { ideas: Idea[]; rejected: Rejected[]; notes: string[] } {
   const out: Idea[] = [];
   const rejected: Rejected[] = [];

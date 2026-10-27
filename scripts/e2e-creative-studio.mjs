@@ -164,6 +164,8 @@ try {
   });
 
   await check('three compositions are built from the template with the real measurer and drawn through the real renderer', async () => {
+    // New design starts on the house look (one composition, no free headline); this path checks the stacked product template.
+    await page.getByRole('button', { name: 'منتج مع سعر', exact: true }).click();
     await page.fill('[data-copy-headline]', HEADLINE);
     await page.click('[data-build-manual]');
     await page.waitForFunction(() => document.querySelectorAll('[data-compositions] [data-doc-thumb="ready"]').length === 3, null, { timeout: 30000 });

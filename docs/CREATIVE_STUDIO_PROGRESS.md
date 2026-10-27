@@ -233,6 +233,42 @@ select would have been the one entry that behaves differently.
   in `vendor-icons`, which both already load — otherwise each became a
   sub-1 KB chunk of its own (`tests/motionLazy.test.ts` caps them at 45).
 
+### 2026-10-27 — owner's live test: create, opportunities, several products, chat, house look
+
+- **"Creating a post does not work"**: the API path worked (reproduced with the real
+  Worker behind the real page, no model chosen). The failure was on the screen:
+  «ابنِ التكوينات» built the compositions (or an error) BELOW the form, out of view,
+  so the click looked like nothing happened; and with no AI a headline was required.
+  New design now scrolls to the result or the error, and an empty headline falls back
+  to the product's own name (manual creation needs no AI and no copy).
+- Home opportunity rows are buttons: a product row opens New design on that product
+  (offer → sell, arrival, back in stock), a service row on its claim, a topic row with
+  its goal (`screensModel.opportunityPrefill`).
+- **Several products** (`product_grid`, 2–4): New design «منشور عدة منتجات» picks the
+  products; each is bound with its own snapshot (`main`, `p2`, `p3`, `p4`), picture,
+  name and price. The comparison's `pair` layout became `pair | grid` (2–3 side by
+  side, 4 as 2×2).
+- **«محادثة»** on Home (`HomeChat.tsx`, `POST /ai/chat`): same adapter, budget and
+  jobs; the last 12 turns are sent; `{reply, suggested_ideas[]}` checked by
+  `validateChat` (`textProblems`: no price, link or unsupported claim — the whole reply
+  is refused; a bad idea is dropped). A suggestion opens New design with its words.
+  The 0216 CHECK lists six tasks and is not widened in place, so a chat job and its
+  usage row are STORED as `ideas` (`jobs.ts storedTask`) — which also lets a design
+  made from a chat idea link that job.
+- **House look `levonis_gold`** (the owner's reference post), New design's default:
+  near-black stage, gold and red light arcs, logo + wordmark + tagline, the brand in
+  white and the model in gold (bound `brand` / new `model` field), «بسعر» + the bound
+  price in gold, the product on a podium with a gold rim, the site address in a gold
+  pill. Drawn by `layout.ts buildHouse` with shapes; documents gained optional
+  `gradient` (shapes, text) and `knockout: 'white'` (product pictures — a flood fill
+  from the edges in the renderer, `knockout.ts`; the content box is the crop, not a
+  detail shot). The fixed words are `source: {kind: 'brand'}` (`BRAND_TEXT`): the
+  checks accept the site address because the app writes it, a changed one is
+  reported, and nobody can retype it. `HOUSE_PALETTE` is part of the approved look.
+- Not done here: the grid has no house-look variant; the logo is drawn with its own
+  black square; the e2e «leaving the editor asks first» check was already failing
+  before these changes.
+
 ### Not done
 
 - Phase 4 is built (2026-10-27; migration `0217_creative_studio_planning.sql`
@@ -251,8 +287,8 @@ select would have been the one entry that behaves differently.
   or family (campaigns have their own tab).
 - Touch gestures (pinch during a drag, two-finger pan) are fixed in code but
   have no automated touch test.
-- Comparison posts (two products) have no picker in New design yet; the
-  template exists in the package.
+- Comparison posts (two products) have no picker of their own; New design's
+  «منشور عدة منتجات» (product_grid) covers 2–4 products.
 - Rebinding a design to a FRESH snapshot after a source change (the checks
   block the final export and say what changed; a new design is the way today).
 - Group / ungroup, distribute, and a crop editor (crop is honoured when

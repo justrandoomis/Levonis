@@ -24,7 +24,8 @@ import { VARIANT_LABELS } from '../../../packages/creativeDoc/src/templates';
 import { ai, documents, idempotencyKey, watch } from './client';
 import { FORMAT_TEXT, OBJECTIVE_TEXT, OPPORTUNITY_TEXT, STATUS_TEXT, S, fill } from './strings';
 import { AiNotReady, RemoteView, failText, shortTime, useRemote, useStudio, useText } from './shared';
-import { ideaPrefill, ideasRequest, runCatalogSync, type SyncTotals } from './screensModel';
+import { ideaPrefill, ideasRequest, opportunityPrefill, runCatalogSync, type SyncTotals } from './screensModel';
+import HomeChat from './HomeChat';
 
 const POST_TYPE_TEXT = { single: S.homePostSingle, carousel: S.homePostCarousel, story: S.homePostStory } as const;
 
@@ -80,8 +81,11 @@ export default function Home() {
       <h1 className="text-xl font-bold text-text-primary">{w(S.homeQuestion)}</h1>
       <div className="flex flex-wrap gap-2">
         <Button variant="primary" onClick={() => studio.startNew({ mode: 'product' })}>{w(S.homeStartProduct)}</Button>
+        <Button onClick={() => studio.startNew({ mode: 'multi' })} data-start-multi>{w(S.homeStartMulti)}</Button>
         <Button onClick={() => studio.startNew({ mode: 'service' })}>{w(S.homeStartService)}</Button>
       </div>
+
+      <HomeChat />
 
       <Card
         title={w(S.homeQuestion)}
@@ -97,13 +101,23 @@ export default function Home() {
               {list.length === 0 ? <p className="text-sm text-text-muted">{w(S.homeNoOpportunities)}</p> : (
                 <ul className="flex flex-col gap-2" data-opportunities>
                   {list.map((o) => (
-                    <li key={o.id} className="flex flex-wrap items-start gap-2 rounded-lg border border-border-subtle p-2">
-                      <StatusChip tone={o.kind === 'arrival' || o.kind === 'back_in_stock' ? 'success' : o.kind === 'offer' ? 'accent' : 'neutral'}>{w(OPPORTUNITY_TEXT[o.kind])}</StatusChip>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm text-text-primary">{localized(o.label, lang)}</span>
-                        {o.detail ? <span className="block text-xs text-text-muted">{o.detail}</span> : null}
-                      </span>
-                      {o.detected_at ? <span className="text-xs text-text-muted">{shortTime(o.detected_at, lang)}</span> : null}
+                    <li key={o.id}>
+                      {/* Each row opens New design: a product row on that product, a topic row with its goal set. */}
+                      <button
+                        type="button"
+                        className="flex w-full flex-wrap items-start gap-2 rounded-lg border border-border-subtle p-2 text-start hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                        onClick={() => studio.startNew(opportunityPrefill(o))}
+                        aria-label={`${w(S.homeOpenOpportunity)}: ${localized(o.label, lang)}`}
+                        data-opportunity={o.kind}
+                      >
+                        <StatusChip tone={o.kind === 'arrival' || o.kind === 'back_in_stock' ? 'success' : o.kind === 'offer' ? 'accent' : 'neutral'}>{w(OPPORTUNITY_TEXT[o.kind])}</StatusChip>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm text-text-primary">{localized(o.label, lang)}</span>
+                          {o.detail ? <span className="block text-xs text-text-muted">{o.detail}</span> : null}
+                        </span>
+                        {o.detected_at ? <span className="text-xs text-text-muted">{shortTime(o.detected_at, lang)}</span> : null}
+                        <span className="text-xs text-accent" aria-hidden="true">{w(S.homeOpenOpportunity)}</span>
+                      </button>
                     </li>
                   ))}
                 </ul>

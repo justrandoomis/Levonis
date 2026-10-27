@@ -17,6 +17,7 @@
 import { SITE_LOGO_VERSIONED_URL } from '../../lib/siteLogo';
 import type { AssetRef } from '../../../packages/creativeDoc/src/schema';
 import type { TextMeasurer } from '../../../packages/creativeDoc/src/text';
+import { knockoutWhite, type KnockoutResult } from '../../../packages/creativeDoc/src/knockout';
 import { assetFileUrl } from './client';
 
 export function canvasMeasurer(): TextMeasurer {
@@ -135,4 +136,63 @@ export class ImageStore {
   private emit() {
     for (const fn of this.listeners) fn();
   }
+}
+
+/** The longest side a knocked-out picture is processed at (the drawn size is never larger on a post). */
+const KNOCKOUT_MAX = 1600;
+const knocked = new WeakMap<HTMLImageElement, { canvas: HTMLCanvasElement; bounds: KnockoutResult['bounds'] }>();
+
+/**
+ * A product picture with its white backdrop made transparent (packages/creativeDoc/src/knockout.ts),
+ * once per decoded picture. `bounds` are in the picture's NATURAL pixels. Null when the pixels cannot
+ * be read (a cross-origin picture; the studio never places one).
+ */
+export function knockedOut(img: HTMLImageElement): { canvas: HTMLCanvasElement; bounds: KnockoutResult['bounds'] } | null {
+  const hit = knocked.get(img);
+  if (hit) return hit;
+  if (!img.naturalWidth || !img.naturalHeight || typeof document === 'undefined') return null;
+  const k = Math.min(1, KNOCKOUT_MAX / Math.max(img.naturalWidth, img.naturalHeight));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * k));
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * k));
+  const g = canvas.getContext('2d', { willReadFrequently: true });
+  if (!g) return null;
+  g.drawImage(img, 0, 0, canvas.width, canvas.height);
+  let data: ImageData;
+  try {
+    data = g.getImageData(0, 0, canvas.width, canvas.height);
+  } catch {
+    return null;
+  }
+  const r = knockoutWhite(data.data, canvas.width, canvas.height);
+  g.putImageData(data, 0, 0);
+  const sx = img.naturalWidth / canvas.width;
+  const sy = img.naturalHeight / canvas.height;
+  const bounds = r.bounds
+    ? { x: Math.floor(r.bounds.x * sx), y: Math.floor(r.bounds.y * sy), width: Math.min(img.naturalWidth - Math.floor(r.bounds.x * sx), Math.ceil(r.bounds.width * sx)), height: Math.min(img.naturalHeight - Math.floor(r.bounds.y * sy), Math.ceil(r.bounds.height * sy)) }
+    : null;
+  const out = { canvas, bounds };
+  knocked.set(img, out);
+  return out;
+}
+
+/**
+ * The content box of a product picture once its white backdrop is knocked out, in the pixels of the size
+ * the store RECORDED for it (`recorded`, which the document's `natural` carries), or null.
+ */
+export function knockoutBounds(url: string, recorded: { width: number; height: number }): Promise<KnockoutResult['bounds']> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const b = knockedOut(img)?.bounds ?? null;
+      if (!b) return resolve(null);
+      const kx = recorded.width / img.naturalWidth;
+      const ky = recorded.height / img.naturalHeight;
+      const x = Math.max(0, Math.floor(b.x * kx));
+      const y = Math.max(0, Math.floor(b.y * ky));
+      resolve({ x, y, width: Math.min(recorded.width - x, Math.ceil(b.width * kx)), height: Math.min(recorded.height - y, Math.ceil(b.height * ky)) });
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
 }

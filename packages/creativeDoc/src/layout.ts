@@ -24,16 +24,16 @@ import { inPalette, kitScale, MIN_FONT_PX, safeAreaFor, scaledSpacing, scaledTyp
 import {
   findLayer, intersects, layerBox, lockedAbove, safeBox, SCHEMA_VERSION, touchesLock, unionBox, withDescendants, contains,
   type AdLocale, type Box, type Corner, type CreativeDocument, type Density, type DocFormat, type ImageLayer, type Layer,
-  type LayerRole, type Objective, type Relation, type ShapeLayer, type TextLayer, type TextSource,
+  type LayerRole, type Objective, type Relation, type ShapeLayer, type TextLayer, type TextSource, BRAND_TEXT, type Gradient,
 } from './schema';
 import {
   localized, renderAvailability, renderPrice, type ProductSnapshot, type ServiceClaimText, type SnapshotImage,
 } from './snapshot';
 import {
-  FAMILIES, TEMPLATES, defaultCta, type BuildEvidence, type FamilyId, type ProductBlock, type StackBlock, type TemplateId,
+  FAMILIES, GRID_PRODUCTS, TEMPLATES, defaultCta, type BuildEvidence, type FamilyId, type ProductBlock, type StackBlock, type TemplateId,
   type TextBlock, type VariantDef, type VariantId,
 } from './templates';
-import { fitText, toDigits, type TextMeasurer } from './text';
+import { detectDirection, fitText, toDigits, type TextMeasurer } from './text';
 import { FONT_REGISTRY } from './schema';
 
 // ---------------------------------------------------------------------------
@@ -58,6 +58,8 @@ export function renderSource(source: TextSource, ctx: BindingContext): string | 
   switch (source.kind) {
     case 'free':
       return null;
+    case 'brand':
+      return BRAND_TEXT[source.field][ctx.locale];
     case 'slide_number':
       return ctx.slide ? toDigits(`${ctx.slide.index}/${ctx.slide.count}`, ctx.brand.digits) : null;
     case 'service': {
@@ -73,6 +75,7 @@ export function renderSource(source: TextSource, ctx: BindingContext): string | 
         case 'name': return localized(s.data.name, ctx.locale) || null;
         case 'brand': return localized(s.data.brand, ctx.locale) || null;
         case 'variant': return localized(s.data.variant_label, ctx.locale) || null;
+        case 'model': return modelName(s.data, ctx.locale);
         case 'price': return renderPrice(s, opts).text;
         case 'price_note': return renderPrice(s, opts).was;
         case 'availability': return renderAvailability(s, ctx.locale);
@@ -80,6 +83,22 @@ export function renderSource(source: TextSource, ctx: BindingContext): string | 
     }
   }
   return null;
+}
+
+/**
+ * The model part of a product's name: the bound variant's own label when the
+ * snapshot is of one option ("X2D Combo"), otherwise the name with its brand
+ * prefix taken off ("Bambu Lab A1 Combo" → "A1 Combo"). Data only — null when
+ * nothing is left, so the checks report it instead of inventing words.
+ */
+export function modelName(d: ProductSnapshot['data'], locale: AdLocale): string | null {
+  const variant = localized(d.variant_label, locale).trim();
+  if (variant) return variant;
+  const name = localized(d.name, locale).trim();
+  // The brand as any of its spellings ("Bambu Lab" inside an Arabic name too); a name that does not start with it has no model part.
+  const spellings = d.brand ? [...new Set([d.brand.ar, d.brand.en, d.brand.ckb].map((b) => (b ?? '').trim()).filter(Boolean))] : [];
+  const lead = spellings.find((b) => name.toLowerCase().startsWith(b.toLowerCase()));
+  return lead ? name.slice(lead.length).trim() || null : null;
 }
 
 /**
@@ -143,7 +162,7 @@ export interface BuildProduct {
    * The chosen picture — it must belong to this product/variant and be same-origin. Null when a
    * person removed the picture from the design: the product's bound words are still drawn.
    */
-  image: (Pick<SnapshotImage, 'url'> & { width: number; height: number }) | null;
+  image: (Pick<SnapshotImage, 'url'> & { width: number; height: number; bounds?: Box | null }) | null;
 }
 
 export interface BuildCopy {
@@ -552,6 +571,7 @@ export function buildFromTemplate(input: BuildInput): BuildResult {
   const mainPicture = input.products.find((p) => p.slot === 'main');
   const pictureless = !!mainPicture && (!mainPicture.image || !!input.omit?.includes('product'));
   const variant = responsiveVariant(tpl.variants[input.variant] ?? Object.values(tpl.variants)[0]!, fmt, pictureless);
+  if (variant.layout === 'house') return buildHouse(input, tpl.id, tpl.version, variant);
   const dir: 'rtl' | 'ltr' = input.locale === 'en' ? 'ltr' : 'rtl';
   const kit = input.brand;
   const safe_area = safeAreaFor(kit, fmt);
@@ -650,19 +670,26 @@ export function buildFromTemplate(input: BuildInput): BuildResult {
     placements.push(...placeColumn(topItems, { ...area, height: topH }, 'start', 'top'));
     placements.push(...placeColumn(botItems, { ...area, y: area.y + area.height - botH + (botItems.length ? sp.large : 0), height: botH }, 'start', 'bottom'));
     const mid: Box = { x: area.x, y: area.y + topH, width: area.width, height: area.height - topH - botH };
-    const gutter = sp.large;
-    const colW = (mid.width - gutter) / 2;
-    const slots = ['main', 'p2'];
+    // pair: the two comparison slots. grid: every bound product (2–4) — 2 or 3 side by side, 4 as two rows of two.
+    const slots = variant.layout === 'pair' ? ['main', 'p2'] : input.products.map((p) => p.slot).slice(0, GRID_PRODUCTS.max);
+    const cols = slots.length === 4 ? 2 : Math.max(1, slots.length);
+    const rows = Math.ceil(slots.length / cols);
+    const gutter = variant.layout === 'pair' ? sp.large : sp.medium;
+    const colW = (mid.width - gutter * (cols - 1)) / cols;
+    const rowH = (mid.height - gutter * (rows - 1)) / rows;
+    const startRight = dir === 'rtl';
     slots.forEach((slot, i) => {
-      const startRight = dir === 'rtl';
-      const x = (i === 0) === startRight ? mid.x + mid.width - colW : mid.x;
-      const col: Box = { x, y: mid.y, width: colW, height: mid.height };
+      const c = i % cols;
+      const r = Math.floor(i / cols);
+      // The first product sits on the reading side's start.
+      const x = startRight ? mid.x + mid.width - colW - c * (colW + gutter) : mid.x + c * (colW + gutter);
+      const col: Box = { x, y: mid.y + r * (rowH + gutter), width: colW, height: rowH };
       const items = makeTextItems(perProduct, input, bind, slot, fmt.width, colW, dropped);
-      const r = solveColumn(items, col, input.measure, dropped);
-      if (!r.fits) fitsAll = false;
-      overflow.push(...r.overflowIds);
-      if (r.short) short.push(r.short);
-      placements.push(...placeColumn(r.items, col, 'center', slot));
+      const res = solveColumn(items, col, input.measure, dropped);
+      if (!res.fits) fitsAll = false;
+      overflow.push(...res.overflowIds);
+      if (res.short) short.push(res.short);
+      placements.push(...placeColumn(res.items, col, 'center', slot));
     });
   }
 
@@ -720,6 +747,230 @@ export function buildFromTemplate(input: BuildInput): BuildResult {
   if (!fitsAll && (overflow.length || !short.length)) conflicts.push({ code: 'content_too_long', layer_ids: overflow.length ? overflow : ['headline'], options: ['shorten_text', 'switch_density', 'switch_variant', 'split_carousel'] });
   for (const c of detectConflicts(doc, { measure: input.measure })) if (!conflicts.some((x) => x.code === c.code && x.layer_ids.join() === c.layer_ids.join())) conflicts.push(c);
   return { doc, conflicts, dropped: [...new Set(dropped)] };
+}
+
+// ---------------------------------------------------------------------------
+// The house look (levonis_gold): a drawn scene, not a stack
+// ---------------------------------------------------------------------------
+
+const GOLD: Gradient = { kind: 'linear', angle: 90, stops: [{ at: 0, color: '#fbe7ae', opacity: 1 }, { at: 0.5, color: '#e3b660', opacity: 1 }, { at: 1, color: '#b07f2c', opacity: 1 }] };
+const GOLD_LINE = '#d9a64c';
+
+/**
+ * The owner's reference post as a template: everything but the picture, the
+ * product's name and its price is the house's own drawing (shapes with
+ * gradients) or the brand's fixed words (`source: brand`) — nothing here is a
+ * model's text. The product stands on the podium: its white backdrop is
+ * knocked out by the renderer, and `image.bounds` (the content box the same
+ * knockout found) is the crop, so its feet sit on the rim, not its padding.
+ */
+function buildHouse(input: BuildInput, templateId: TemplateId, templateVersion: number, variant: VariantDef): BuildResult {
+  const fmt = input.format;
+  const W = fmt.width;
+  const H = fmt.height;
+  const u = Math.min(W, H) / 1080;
+  const kit = input.brand;
+  const dir: 'rtl' | 'ltr' = input.locale === 'en' ? 'ltr' : 'rtl';
+  const safe_area = safeAreaFor(kit, fmt);
+  const safe = safeBox({ format: fmt, safe_area });
+  const main = input.products.find((p) => p.slot === 'main') ?? null;
+  const bind: BindingContext = { snapshots: main ? { main: main.snapshot } : {}, claims: {}, brand: kit, locale: input.locale, slide: input.slide };
+  const fam = FONT_REGISTRY['plex-arabic'];
+  const layers: Layer[] = [];
+  const relations: Relation[] = [];
+  const conflicts: LayoutConflict[] = [];
+  const dropped: string[] = [];
+  const base = { parent: null, rotation: 0, opacity: 1, visible: true, locked: false } as const;
+  const shape = (id: string, o: Partial<ShapeLayer> & Pick<ShapeLayer, 'x' | 'y' | 'width' | 'height'>): ShapeLayer => ({
+    ...base, id, name: id, role: 'decor', type: 'shape', shape: 'ellipse', fill: null, stroke: null, radius: 0, blur: 0, locked: true, ...o,
+  });
+  const measureW = (text: string, size: number, weight: TextLayer['font']['weight']) => input.measure(text, { family: fam.family, weight, size });
+  const text = (id: string, role: LayerRole, t: string, source: TextSource, size: number, weight: TextLayer['font']['weight'], x: number, y: number, width: number, o: Partial<TextLayer> = {}): TextLayer => ({
+    ...base, id, name: id, role, type: 'text', text: t, source, x, y, width, height: Math.ceil(size * 1.3),
+    font: { family: 'plex-arabic', weight, size, lineHeight: 1.3 }, minSize: Math.min(size, Math.round(18 * u)), maxLines: 1,
+    color: '#ffffff', align: 'center', direction: 'auto', ...o,
+  });
+  /** Two words on one line, each its own layer, centred together in reading order; shrunk together until they fit `maxW`. */
+  const pair = (a: { id: string; role: LayerRole; text: string; source: TextSource; weight: TextLayer['font']['weight']; o?: Partial<TextLayer> }, b: typeof a, size: number, y: number, maxW: number) => {
+    let sz = size;
+    const gap = () => sz * 0.32;
+    const widths = () => [measureW(a.text, sz, a.weight), measureW(b.text, sz, b.weight)];
+    let [wa, wb] = widths();
+    while (wa + wb + gap() > maxW && sz > 18 * u) {
+      sz = Math.round(sz * 0.94);
+      [wa, wb] = widths();
+    }
+    const lineDir = detectDirection(`${a.text} ${b.text}`, dir);
+    const total = wa + wb + gap();
+    const left = (W - total) / 2;
+    // In reading order the first word comes first: on the left for a left-to-right line, on the right otherwise.
+    const ax = lineDir === 'ltr' ? left : left + wb + gap();
+    const bx = lineDir === 'ltr' ? left + wa + gap() : left;
+    const pad = 4 * u;
+    return {
+      size: sz,
+      layers: [
+        text(a.id, a.role, a.text, a.source, sz, a.weight, ax - pad, y, wa + pad * 2, a.o),
+        text(b.id, b.role, b.text, b.source, sz, b.weight, bx - pad, y, wb + pad * 2, b.o),
+      ],
+    };
+  };
+
+  // The stage: a lit near-black field with a deep red corner, the red arc that bounds it, and the gold arc.
+  layers.push(shape('background', {
+    role: 'background', shape: 'rect', x: 0, y: 0, width: W, height: H, fill: '#070606',
+    gradient: { kind: 'linear', angle: 135, stops: [{ at: 0, color: '#6a0f15', opacity: 1 }, { at: 0.22, color: '#240a0c', opacity: 1 }, { at: 0.42, color: '#090707', opacity: 1 }, { at: 1, color: '#050505', opacity: 1 }] },
+  }));
+  const R = 1045 * u;
+  const cx = W - 780 * u;
+  const cy = 900 * u;
+  layers.push(shape('stage', { x: cx - R, y: cy - R, width: R * 2, height: R * 2, fill: '#0a0908', gradient: { kind: 'radial', angle: 0, stops: [{ at: 0, color: '#1d1813', opacity: 1 }, { at: 0.45, color: '#0b0a09', opacity: 1 }, { at: 0.75, color: '#070606', opacity: 1 }, { at: 1, color: '#060505', opacity: 1 }] } }));
+  layers.push(shape('red_glow', { x: cx - R, y: cy - R, width: R * 2, height: R * 2, stroke: { color: '#a3141b', width: 14 * u }, blur: 26 * u, opacity: 0.8 }));
+  layers.push(shape('red_arc', { x: cx - R, y: cy - R, width: R * 2, height: R * 2, stroke: { color: '#c8222a', width: 2.5 * u }, opacity: 0.9 }));
+  const G = 1280 * u;
+  const gx = 1134 * u;
+  const gy = 1080 * u;
+  layers.push(shape('gold_glow', { x: gx - G, y: gy - G, width: G * 2, height: G * 2, stroke: { color: '#d39a3c', width: 18 * u }, blur: 34 * u, opacity: 0.75 }));
+  layers.push(shape('gold_arc', { x: gx - G, y: gy - G, width: G * 2, height: G * 2, stroke: { color: '#f3cf7d', width: 3 * u }, opacity: 0.95 }));
+  layers.push(shape('warm_light', { x: W * 0.08, y: H * 0.3, width: W * 0.84, height: H * 0.62, gradient: { kind: 'radial', angle: 0, stops: [{ at: 0, color: '#c08a3a', opacity: 0.2 }, { at: 1, color: '#c08a3a', opacity: 0 }] } }));
+
+  // The logo row: the approved logo beside the wordmark, centred; the tagline under it.
+  let y = safe.y;
+  const markSize = Math.round(46 * u);
+  const wordmark = BRAND_TEXT.wordmark[input.locale];
+  const wmW = measureW(wordmark, markSize, 400);
+  const logoH = input.logo ? Math.round(62 * u) : 0;
+  const logoW = input.logo ? (input.logo.width / input.logo.height) * logoH : 0;
+  const rowGap = input.logo ? 16 * u : 0;
+  const rowW = logoW + rowGap + wmW;
+  const rowLeft = (W - rowW) / 2;
+  const rowH = Math.max(logoH, markSize * 1.3);
+  if (input.logo) {
+    layers.push({
+      ...base, id: 'logo', name: 'Logo', role: 'logo', type: 'image', x: rowLeft, y: y + (rowH - logoH) / 2, asset: { kind: 'logo', ref: kit.logo.asset },
+      natural: { ...input.logo }, crop: null, scale: logoH / input.logo.height, fit: 'whole',
+    });
+  }
+  layers.push(text('wordmark', 'decor', wordmark, { kind: 'brand', field: 'wordmark' }, markSize, 400, rowLeft + logoW + rowGap - 4 * u, y + (rowH - markSize * 1.3) / 2, wmW + 8 * u, { color: '#f4f1ea', direction: 'ltr' }));
+  y += rowH + 2 * u;
+  const tagSize = Math.round(21 * u);
+  const tag = BRAND_TEXT.tagline[input.locale];
+  const tagW = measureW(tag, tagSize, 400);
+  layers.push(text('tagline', 'decor', tag, { kind: 'brand', field: 'tagline' }, tagSize, 400, (W - tagW) / 2 - 4 * u, y, tagW + 8 * u, { color: '#bdb4a3', direction: 'ltr' }));
+  y += tagSize * 1.3 + 40 * u;
+
+  // The title: the brand in white, the model in gold — both bound to the snapshot.
+  const brandText = main ? renderSource({ kind: 'product', slot: 'main', field: 'brand' }, bind) : null;
+  const modelText = main ? renderSource({ kind: 'product', slot: 'main', field: 'model' }, bind) : null;
+  const maxW = safe.width;
+  if (brandText && modelText) {
+    const t = pair(
+      { id: 'product_brand', role: 'product_name', text: brandText, source: { kind: 'product', slot: 'main', field: 'brand' }, weight: 600 },
+      { id: 'product_name', role: 'product_name', text: modelText, source: { kind: 'product', slot: 'main', field: 'model' }, weight: 700, o: { color: '#e3b660', gradient: GOLD } },
+      Math.round(70 * u), y, maxW,
+    );
+    layers.push(...t.layers);
+    y += t.size * 1.3 + 6 * u;
+  } else if (main) {
+    const name = renderSource({ kind: 'product', slot: 'main', field: 'name' }, bind) ?? '';
+    const r = fitText(name, { family: fam.family, weight: 700, lineHeight: 1.3 }, { width: maxW, maxHeight: 2 * 70 * u * 1.3, maxLines: 2 }, { max: Math.round(64 * u), min: Math.round(28 * u) }, input.measure);
+    layers.push({ ...text('product_name', 'product_name', name, { kind: 'product', slot: 'main', field: 'name' }, r.size, 700, safe.x, y, maxW, { color: '#e3b660', gradient: GOLD, maxLines: 2 }), height: Math.ceil(r.height) });
+    y += r.height + 6 * u;
+  }
+  // The price line: «بسعر» and the bound price in gold.
+  const priceText = main ? renderSource({ kind: 'product', slot: 'main', field: 'price' }, bind) : null;
+  // «بسعر» leads a plain price; a "from" price already has its own lead words.
+  if (priceText && main && main.snapshot.data.price.from) {
+    const sz = Math.round(62 * u);
+    const r = fitText(priceText, { family: fam.family, weight: 700, lineHeight: 1.3 }, { width: maxW, maxHeight: sz * 1.3, maxLines: 1 }, { max: sz, min: Math.round(28 * u) }, input.measure);
+    layers.push(text('price', 'price', priceText, { kind: 'product', slot: 'main', field: 'price' }, r.size, 700, safe.x, y, maxW, { color: '#e3b660', gradient: GOLD }));
+    y += r.size * 1.3;
+  } else if (priceText) {
+    const t = pair(
+      { id: 'price_lead', role: 'price_note', text: BRAND_TEXT.price_lead[input.locale], source: { kind: 'brand', field: 'price_lead' }, weight: 600 },
+      { id: 'price', role: 'price', text: priceText, source: { kind: 'product', slot: 'main', field: 'price' }, weight: 700, o: { color: '#e3b660', gradient: GOLD } },
+      Math.round(62 * u), y, maxW,
+    );
+    layers.push(...t.layers);
+    y += t.size * 1.3;
+  }
+
+  // The pill at the bottom: «اطلب الآن على» over the site address, gold outline.
+  const pillH = Math.round(104 * u);
+  const orderSize = Math.round(25 * u);
+  const siteSize = Math.round(34 * u);
+  const orderText = BRAND_TEXT.order_on[input.locale];
+  const siteText = BRAND_TEXT.site[input.locale];
+  const pillW = Math.min(safe.width, Math.max(measureW(orderText, orderSize, 600), measureW(siteText, siteSize, 600)) + 120 * u);
+  const pillY = safe.y + safe.height - pillH;
+  const pillX = (W - pillW) / 2;
+
+  // The podium: a dark disc with a gold rim light, standing just above the pill.
+  const rx = Math.min(W * 0.36, 360 * u);
+  const ry = 44 * u;
+  const depth = 46 * u;
+  const topY = pillY - 46 * u - depth;
+  const px0 = W / 2 - rx;
+  layers.push(shape('podium_glow', { x: px0 - 30 * u, y: topY - ry - 10 * u, width: rx * 2 + 60 * u, height: ry * 2 + depth + 40 * u, fill: '#a87a32', blur: 40 * u, opacity: 0.35 }));
+  layers.push(shape('podium_base', { x: px0, y: topY + depth - ry, width: rx * 2, height: ry * 2, fill: '#0b0a09' }));
+  layers.push(shape('podium_side', { shape: 'rect', x: px0, y: topY, width: rx * 2, height: depth, fill: '#141210', gradient: { kind: 'linear', angle: 0, stops: [{ at: 0, color: '#0a0908', opacity: 1 }, { at: 0.5, color: '#2a241c', opacity: 1 }, { at: 1, color: '#0a0908', opacity: 1 }] } }));
+  layers.push(shape('podium_top', { x: px0, y: topY - ry, width: rx * 2, height: ry * 2, fill: '#15120f', stroke: { color: GOLD_LINE, width: 2.5 * u }, gradient: { kind: 'radial', angle: 0, stops: [{ at: 0, color: '#2b241b', opacity: 1 }, { at: 1, color: '#0e0c0a', opacity: 1 }] } }));
+
+  // The product, standing on the podium.
+  const img = main?.image ?? null;
+  if (img && main) {
+    // Only a box inside the picture is a crop (normalize refuses any other).
+    const b = img.bounds && img.bounds.width > 8 && img.bounds.height > 8 && img.bounds.x >= 0 && img.bounds.y >= 0 && img.bounds.x + img.bounds.width <= img.width && img.bounds.y + img.bounds.height <= img.height ? img.bounds : null;
+    const crop = b ? { x: b.x, y: b.y, width: b.width, height: b.height } : null;
+    const src = crop ?? { width: img.width, height: img.height };
+    const top = y + 26 * u;
+    const foot = topY + ry * 0.35;
+    const availH = Math.max(H * 0.12, foot - top);
+    const scale = Math.max(0.01, Math.min((W * 0.72) / src.width, availH / src.height, 3));
+    const w = src.width * scale;
+    const h = src.height * scale;
+    const box = { x: (W - w) / 2, y: foot - h, width: w, height: h };
+    layers.push(shape('product_shadow', { role: 'product_shadow', x: box.x + w * 0.08, y: foot - 16 * u, width: w * 0.84, height: 30 * u, fill: '#000000', blur: 18 * u, opacity: 0.7, locked: false }));
+    relations.push({ id: 'r_shadow', kind: 'shadow_of', subject: 'product_shadow', target: 'product' });
+    layers.push({
+      ...base, id: 'product', name: 'Product', role: 'product', type: 'image', x: box.x, y: box.y, asset: { kind: 'product', ref: img.url, slot: 'main' },
+      natural: { width: img.width, height: img.height }, crop, scale, fit: crop ? 'detail' : 'whole', knockout: 'white',
+    });
+  }
+
+  const group = 'cta_group';
+  layers.push({ ...base, id: group, name: 'cta group', role: 'cta', type: 'group', x: 0, y: 0 });
+  layers.push(shape('cta_glow', { locked: false, parent: group, shape: 'rect', x: pillX, y: pillY, width: pillW, height: pillH, radius: pillH / 2, stroke: { color: '#c8963f', width: 8 * u }, blur: 18 * u, opacity: 0.6 }));
+  layers.push(shape('cta_chip', { locked: false, parent: group, shape: 'rect', x: pillX, y: pillY, width: pillW, height: pillH, radius: pillH / 2, fill: '#0c0b0a', stroke: { color: GOLD_LINE, width: 2.5 * u }, opacity: 0.92 }));
+  const orderH = orderSize * 1.3;
+  const siteH = siteSize * 1.3;
+  const ty = pillY + (pillH - (orderH + siteH)) / 2 + 2 * u;
+  layers.push({ ...text('cta', 'cta', orderText, { kind: 'brand', field: 'order_on' }, orderSize, 600, pillX, ty, pillW), parent: group, color: '#f1dfb4' });
+  layers.push({ ...text('site', 'cta', siteText, { kind: 'brand', field: 'site' }, siteSize, 600, pillX, ty + orderH, pillW), parent: group, direction: 'ltr' });
+
+  const doc: CreativeDocument = {
+    schema_version: SCHEMA_VERSION,
+    format: { ...fmt },
+    locale: input.locale,
+    direction: dir,
+    objective: input.objective,
+    priority: variant.priority,
+    density: input.density,
+    template: { id: templateId, version: templateVersion, variant: variant.id },
+    brand_version: input.brandVersion,
+    safe_area,
+    products: main ? [{ slot: 'main', product_id: main.snapshot.data.product_id, variant_key: main.snapshot.data.variant_key, snapshot_id: main.snapshot.id }] : [],
+    services: [],
+    layers,
+    relations,
+    annotations: [],
+    caption: input.caption,
+    alt_text: input.alt_text,
+    slide: input.slide,
+  };
+  if (main && !img) dropped.push('product');
+  for (const c of detectConflicts(doc, { measure: input.measure })) conflicts.push(c);
+  return { doc, conflicts, dropped };
 }
 
 function relRefsExist(r: Relation, layers: readonly Layer[]): boolean {
@@ -1003,7 +1254,11 @@ function backgroundInUse(doc: CreativeDocument, kit: BrandKit): { preset: Backgr
 }
 
 /** Ids a template creates; anything else in a document was added by a person and is carried across a rebuild. */
+/** The house look's own drawn layers (buildHouse): made again by a rebuild, never carried as a person's. */
+const HOUSE_LAYERS = new Set(['stage', 'red_glow', 'red_arc', 'gold_glow', 'gold_arc', 'warm_light', 'wordmark', 'tagline', 'product_brand', 'price_lead', 'podium_glow', 'podium_base', 'podium_side', 'podium_top', 'cta_glow', 'site']);
+
 function isTemplateLayer(id: string): boolean {
+  if (HOUSE_LAYERS.has(id)) return true;
   return /^(background|logo|product(_shadow)?(_[a-z0-9]+)?|headline|subhead|body|cta|badge|feature_\d+|product_name(_[a-z0-9]+)?|price(_[a-z0-9]+)?|price_note(_[a-z0-9]+)?|availability(_[a-z0-9]+)?|service_(title|summary|conditions)|slide_number)(_chip|_group)?$/.test(id);
 }
 
@@ -1032,7 +1287,8 @@ export function rebuild(doc: CreativeDocument, change: { format?: DocFormat; var
     const snap = ctx.snapshots[b.slot];
     if (!snap) return null;
     const img = doc.layers.find((l): l is ImageLayer => l.type === 'image' && l.role === 'product' && (l.asset.slot ?? 'main') === b.slot && l.visible);
-    products.push({ slot: b.slot, snapshot: snap, image: img ? { url: img.asset.ref, width: img.natural.width, height: img.natural.height } : null });
+    // A knocked-out picture keeps its content box (its crop), so the house look stands it on the podium again.
+    products.push({ slot: b.slot, snapshot: snap, image: img ? { url: img.asset.ref, width: img.natural.width, height: img.natural.height, bounds: img.knockout === 'white' ? img.crop : null } : null });
   }
   if (doc.services.length > 1) return null;
   const service = doc.services[0] ? ctx.claims[doc.services[0].claim_id] ?? null : null;

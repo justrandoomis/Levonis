@@ -57,6 +57,7 @@ export const TIMEOUTS_MS: Readonly<Record<AiTask | 'models', number>> = Object.f
   compose: 110_000,
   review: 110_000,
   carousel: 110_000,
+  chat: 60_000,
 });
 
 export const MAX_TOKENS: Readonly<Record<AiTask, number>> = Object.freeze({
@@ -66,6 +67,7 @@ export const MAX_TOKENS: Readonly<Record<AiTask, number>> = Object.freeze({
   carousel: 16_000,
   edit: 8_000,
   review: 8_000,
+  chat: 4_000,
 });
 
 /** How long a 429's retry-after may ask for and still get the one retry. */

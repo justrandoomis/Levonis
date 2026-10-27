@@ -160,6 +160,27 @@ export function ideasContent(i: IdeasInput): ContentBlock[] {
   ];
 }
 
+export interface ChatInput {
+  turns: ReadonlyArray<{ role: 'user' | 'assistant'; text: string }>;
+  evidence: IdeasInput['evidence'];
+  products: IdeasInput['products'];
+  services: ReadonlyArray<ServiceClaimText>;
+  brand: BrandKit;
+}
+
+/** A turn of the Home conversation: the owner talks an idea through; the answer is a short reply and, when useful, up to three design ideas. */
+export function chatContent(i: ChatInput): ContentBlock[] {
+  return [
+    textBlock([
+      'Task: you are talking with the shop owner about what to post and how a design should look. Answer the LAST owner message in `reply`, briefly, in the language they wrote in (Arabic or English; if they wrote Sorani Kurdish, answer in Arabic). When the owner asks for a design or an idea, add up to three `suggested_ideas`, each with a short headline (and optional subhead) and, when it is about one product from <store_data>, that product id in `product_ref` (otherwise empty). Prices, links and product facts are drawn by the app; never write them. Earlier turns are context only.',
+      block('evidence', i.evidence.map((e) => ({ id: e.id, kind: e.kind, ref: e.ref, label: e.label, detail: e.detail }))),
+      block('store_data', { products: i.products, services: i.services.map(claimForModel) }),
+      block('owner_request', { conversation: i.turns.map((t) => ({ role: t.role === 'user' ? 'owner' : 'studio', text: ownerText(t.text, 1200) })) }),
+      block('brand_rules', brandForCopy(i.brand)),
+    ]),
+  ];
+}
+
 export interface ComposeInput {
   snapshot: ProductSnapshotData | null;
   claim: ServiceClaimText | null;

@@ -36,6 +36,7 @@
  * and the owner’s annotations (notes). Export renders the content layer
  * alone, at exactly the document’s size.
  */
+import { knockedOut } from './media';
 import Konva from 'konva/lib/Core';
 import { Text as KText } from 'konva/lib/shapes/Text';
 import { Image as KImage } from 'konva/lib/shapes/Image';
@@ -49,7 +50,7 @@ import type { Layer as KLayer } from 'konva/lib/Layer';
 import type { Group as KGroup } from 'konva/lib/Group';
 import type { Node as KNode, KonvaEventObject } from 'konva/lib/Node';
 import {
-  FONT_REGISTRY, layerBox, safeBox, type Annotation, type AssetRef, type Box, type CreativeDocument, type Layer, type ViewTransform,
+  FONT_REGISTRY, layerBox, safeBox, type Annotation, type AssetRef, type Box, type CreativeDocument, type Gradient, type Layer, type ViewTransform,
 } from '../../../packages/creativeDoc/src/schema';
 import type { TextMeasurer } from '../../../packages/creativeDoc/src/text';
 import {
@@ -249,9 +250,14 @@ export class StageView {
         name: 'text', x: f.x - l.x, y: 0, width: f.width, text: f.lines.join('\n'), wrap: 'none', ellipsis: false,
         fontFamily: FONT_REGISTRY[l.font.family].family, fontStyle: String(l.font.weight), fontSize: l.font.size, lineHeight: l.font.lineHeight,
         fill: l.color, align: f.align, direction: f.direction, letterSpacing: 0, listening: false, perfectDrawEnabled: false,
+        ...(l.gradient ? gradientAttrs(l.gradient, f.width, l.font.size * l.font.lineHeight * Math.max(1, f.lines.length), false) : {}),
       }));
     } else if (l.type === 'image') {
-      if (img) {
+      // A product picture whose white backdrop the template knocks out is drawn from its processed copy (the file is never changed).
+      const ko = img && l.knockout === 'white' ? knockedOut(img) : null;
+      if (ko) {
+        group.add(new KImage({ name: 'image', image: ko.canvas, listening: false, ...imageFit(l.natural, l.crop, { width: ko.canvas.width, height: ko.canvas.height }, box) }));
+      } else if (img) {
         group.add(new KImage({ name: 'image', image: img, listening: false, ...imageFit(l.natural, l.crop, { width: img.naturalWidth, height: img.naturalHeight }, box) }));
       } else {
         // Not decoded (yet, or at all): an honest empty frame, never another picture.
@@ -260,13 +266,16 @@ export class StageView {
     } else if (l.type === 'shape') {
       const soft = l.blur > 0 && l.rotation === 0;
       const fill = l.fill ?? undefined;
+      // A soft shape is drawn far away so only its blurred shadow lands: a filled one glows in its fill, an outline in its stroke.
+      const glow = soft ? fill ?? l.stroke?.color : undefined;
       const common = {
         listening: false, fill, stroke: l.stroke?.color, strokeWidth: l.stroke?.width ?? 0, perfectDrawEnabled: false,
-        ...(soft && fill ? { shadowColor: fill, shadowBlur: l.blur, shadowOffsetX: SHADOW_SHIFT, shadowOffsetY: 0, shadowOpacity: 1, shadowForStrokeEnabled: false } : {}),
+        ...(glow ? { shadowColor: glow, shadowBlur: l.blur, shadowOffsetX: SHADOW_SHIFT, shadowOffsetY: 0, shadowOpacity: 1, shadowForStrokeEnabled: !fill } : {}),
       };
-      const shift = soft && fill ? -SHADOW_SHIFT : 0;
-      if (l.shape === 'rect') group.add(new KRect({ ...common, x: shift, width: box.width, height: box.height, cornerRadius: l.radius }));
-      else if (l.shape === 'ellipse') group.add(new KEllipse({ ...common, x: box.width / 2 + shift, y: box.height / 2, radiusX: box.width / 2, radiusY: Math.max(0.5, box.height / 2) }));
+      const shift = glow ? -SHADOW_SHIFT : 0;
+      const grad = (centred: boolean) => (l.gradient && !glow ? gradientAttrs(l.gradient, box.width, box.height, centred) : {});
+      if (l.shape === 'rect') group.add(new KRect({ ...common, ...grad(false), x: shift, width: box.width, height: box.height, cornerRadius: l.radius }));
+      else if (l.shape === 'ellipse') group.add(new KEllipse({ ...common, ...grad(true), x: box.width / 2 + shift, y: box.height / 2, radiusX: box.width / 2, radiusY: Math.max(0.5, box.height / 2) }));
       else group.add(new KLine({ ...common, fill: undefined, points: [0, 0, box.width, box.height], stroke: l.stroke?.color ?? fill, strokeWidth: l.stroke?.width ?? 2 }));
     }
   }
@@ -609,6 +618,35 @@ export class StageView {
 }
 
 /** Every layer a box touches, interactive or not (a note may point at a locked layer). */
+/** `#rrggbb` + opacity as a canvas colour. */
+function rgba(hex: string, a: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+/**
+ * Konva's gradient attributes for a box of `w`×`h`. `centred`: the node's origin is the box centre (an
+ * ellipse), not its corner. Linear runs along `angle` across the whole box; radial from the centre to the
+ * farther half-side.
+ */
+export function gradientAttrs(g: Gradient, w: number, h: number, centred: boolean): Record<string, unknown> {
+  const c = centred ? { x: 0, y: 0 } : { x: w / 2, y: h / 2 };
+  const stops = g.stops.flatMap((s) => [s.at, rgba(s.color, s.opacity)]);
+  if (g.kind === 'radial') {
+    return { fillPriority: 'radial-gradient', fillRadialGradientStartPoint: c, fillRadialGradientEndPoint: c, fillRadialGradientStartRadius: 0, fillRadialGradientEndRadius: Math.max(w, h) / 2, fillRadialGradientColorStops: stops };
+  }
+  const a = (g.angle * Math.PI) / 180;
+  const dx = Math.cos(a);
+  const dy = Math.sin(a);
+  const half = Math.abs((w / 2) * dx) + Math.abs((h / 2) * dy);
+  return {
+    fillPriority: 'linear-gradient',
+    fillLinearGradientStartPoint: { x: c.x - dx * half, y: c.y - dy * half },
+    fillLinearGradientEndPoint: { x: c.x + dx * half, y: c.y + dy * half },
+    fillLinearGradientColorStops: stops,
+  };
+}
+
 function marqueeHitsAll(doc: CreativeDocument, box: Box): string[] {
   const out = new Set<string>();
   for (const l of doc.layers) {

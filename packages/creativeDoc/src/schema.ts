@@ -159,9 +159,33 @@ export type TextSource =
   | { kind: 'free' }
   | { kind: 'product'; slot: string; field: ProductTextField }
   | { kind: 'service'; claim_id: string; field: 'title' | 'summary' | 'conditions' }
-  | { kind: 'slide_number' };
+  | { kind: 'slide_number' }
+  /** A fixed brand element of a house template (the site address, the tagline): the app's own words, never a model's. */
+  | { kind: 'brand'; field: BrandTextField };
 
-export type ProductTextField = 'name' | 'brand' | 'price' | 'price_note' | 'availability' | 'variant';
+/** `model`: the product name without its brand prefix ("X2D Combo" of "Bambu Lab X2D Combo"). */
+export type ProductTextField = 'name' | 'brand' | 'price' | 'price_note' | 'availability' | 'variant' | 'model';
+export const PRODUCT_TEXT_FIELDS: readonly ProductTextField[] = ['name', 'brand', 'price', 'price_note', 'availability', 'variant', 'model'];
+
+export type BrandTextField = 'site' | 'wordmark' | 'tagline' | 'order_on' | 'price_lead';
+export const BRAND_TEXT_FIELDS: readonly BrandTextField[] = ['site', 'wordmark', 'tagline', 'order_on', 'price_lead'];
+
+/** The brand's fixed words. `site` is the shop's own address — the one link a design may carry, because the app writes it. */
+export const BRAND_TEXT: Readonly<Record<BrandTextField, Readonly<Record<AdLocale, string>>>> = Object.freeze({
+  site: { ar: 'levonis-iq.com', en: 'levonis-iq.com', ckb: 'levonis-iq.com' },
+  wordmark: { ar: 'L E V O N I S', en: 'L E V O N I S', ckb: 'L E V O N I S' },
+  tagline: { ar: '3D · PRINT · MORE', en: '3D · PRINT · MORE', ckb: '3D · PRINT · MORE' },
+  order_on: { ar: 'اطلب الآن على', en: 'Order now at', ckb: 'ئێستا داوای بکە لە' },
+  price_lead: { ar: 'بسعر', en: 'Price', ckb: 'بە نرخی' },
+});
+
+/** A fill that blends: `linear` along `angle` (degrees, 0 = left → right, 90 = top → bottom) across the box; `radial` from the box centre to its farthest edge. */
+export interface Gradient {
+  kind: 'linear' | 'radial';
+  angle: number;
+  /** 2–6 stops, `at` from 0 to 1 in order; `opacity` 0–1. */
+  stops: Array<{ at: number; color: string; opacity: number }>;
+}
 
 export interface TextLayer extends LayerBase {
   type: 'text';
@@ -178,6 +202,8 @@ export interface TextLayer extends LayerBase {
   color: string;
   align: TextAlign;
   direction: Direction;
+  /** Optional: the text is painted with this gradient instead of `color` (gold lettering). */
+  gradient?: Gradient | null;
 }
 
 export type AssetKind = 'product' | 'asset' | 'logo';
@@ -210,6 +236,12 @@ export interface ImageLayer extends LayerBase {
   /** THE one scale. Drawn size = (crop ?? natural) × scale on both axes. */
   scale: number;
   fit: 'whole' | 'detail';
+  /**
+   * Optional: `white` draws the picture with its white backdrop made transparent
+   * (a flood fill from the edges, done by the renderer on the same-origin pixels;
+   * the stored picture is never changed). For catalogue photos on a dark template.
+   */
+  knockout?: 'white' | null;
 }
 
 export type ShapeKind = 'rect' | 'ellipse' | 'line';
@@ -224,6 +256,8 @@ export interface ShapeLayer extends LayerBase {
   radius: number;
   /** Gaussian softness in document px (soft contact shadows, clay depth). 0 = crisp. */
   blur: number;
+  /** Optional: painted instead of `fill` (a lit background, a podium's sheen). */
+  gradient?: Gradient | null;
 }
 
 /** A logical container: it has no geometry of its own; moving it moves its children. */

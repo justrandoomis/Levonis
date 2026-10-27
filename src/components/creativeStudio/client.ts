@@ -18,7 +18,7 @@
 import { api, ApiError } from '../../lib/api';
 import type {
   AssetDto, AssetKind, BrandDto, BrandVersionDto, ClaimDto, ComposeRequest, ComposeResponse, DocStatus, DocumentDto,
-  DocumentSummaryDto, EditRequest, EditResponse, ExportDto, ExportKind, IdeaRecordDto, IdeasRequest, IdeasResponse,
+  DocumentSummaryDto, EditRequest, EditResponse, ExportDto, ExportKind, IdeaRecordDto, IdeasRequest, IdeasResponse, ChatRequest, ChatResponse,
   ModelDto, OpportunityDto, ProductDetailDto, ProductListItemDto, ProviderStatusDto, ReviewRequest, ReviewResponse,
   UsageRecordDto, VerifyDto, VersionDto, VersionOrigin, ApproveRequest, ReviewDto, RejectReason, ProviderSettingsRequest,
   BrandVersionResponse, WatchSyncResponse, CampaignDto, CarouselRequest, CarouselResponse, PlanItemDto,
@@ -273,6 +273,7 @@ export const documents = {
 
 export const ai = {
   opportunities: async (): Promise<OpportunityDto[]> => list<OpportunityDto>(await api.get<Body>(`${BASE}/opportunities`), 'opportunities'),
+  chat: async (req: ChatRequest): Promise<ChatResponse> => one<ChatResponse>(await api.post<Body>(`${BASE}/ai/chat`, req, { timeoutMs: AI_TIMEOUT_MS }), 'result', 'reply'),
   ideas: async (req: IdeasRequest): Promise<IdeasResponse> => one<IdeasResponse>(await api.post<Body>(`${BASE}/ai/ideas`, req, { timeoutMs: AI_TIMEOUT_MS }), 'result', 'ideas'),
   savedIdeas: async (): Promise<IdeaRecordDto[]> => list<IdeaRecordDto>(await api.get<Body>(`${BASE}/ideas`), 'ideas'),
   compose: async (req: ComposeRequest): Promise<ComposeResponse> => one<ComposeResponse>(await api.post<Body>(`${BASE}/ai/compose`, req, { timeoutMs: AI_TIMEOUT_MS }), 'result', 'proposals'),

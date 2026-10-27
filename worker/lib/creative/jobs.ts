@@ -83,6 +83,15 @@ export type JobStart =
  * Open the job for a request, or find the one this key already opened. A
  * concurrent duplicate loses the UNIQUE race and reads the winner.
  */
+/**
+ * The task as the database stores it. 0216's CHECK lists six tasks and a CHECK is not widened without
+ * rebuilding the table (migrations here are additive), so a `chat` turn is stored as `ideas`: it is an
+ * ideas conversation, and a design made from one of its suggestions links the job the same way.
+ */
+export function storedTask(task: AiTask): Exclude<AiTask, 'chat'> {
+  return task === 'chat' ? 'ideas' : task;
+}
+
 export async function openJob(
   db: D1Database,
   input: { task: AiTask; actorId: string; key: string; hash: string; documentId: string | null; baseVersion: number | null; targetIds: string[] }
@@ -102,7 +111,7 @@ export async function openJob(
         `INSERT INTO creative_jobs (id, task, status, actor_id, idempotency_key, request_hash, document_id, base_version, target_ids_json, created_at)
          VALUES (?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?)`
       )
-      .bind(id, input.task, input.actorId, input.key, input.hash, input.documentId, input.baseVersion, JSON.stringify(input.targetIds.slice(0, 80)), now)
+      .bind(id, storedTask(input.task), input.actorId, input.key, input.hash, input.documentId, input.baseVersion, JSON.stringify(input.targetIds.slice(0, 80)), now)
       .run();
   } catch (e) {
     if (/UNIQUE/i.test(e instanceof Error ? e.message : String(e))) {

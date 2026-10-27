@@ -17,12 +17,13 @@
  *  - the archive's «to» date includes its own day.
  */
 import type {
-  AssetDto, BudgetSettings, ClaimDto, Effort, IdeaRecordDto, IdeasRequest, ProviderSettingsRequest, ProviderStatusDto, Rates, VersionOrigin, WatchSyncResponse,
+  AssetDto, BudgetSettings, OpportunityDto, ClaimDto, Effort, IdeaRecordDto, IdeasRequest, ProviderSettingsRequest, ProviderStatusDto, Rates, VersionOrigin, WatchSyncResponse,
 } from '../../../packages/creativeDoc/src/api';
 import type { Objective, VisualPriority } from '../../../packages/creativeDoc/src/schema';
 import type { Localized, PriceStatus } from '../../../packages/creativeDoc/src/snapshot';
 import { FAMILIES, TEMPLATES, variantsFor, type BuildEvidence, type FamilyId, type TemplateId, type VariantId } from '../../../packages/creativeDoc/src/templates';
 import type { ClaimInputBody, DocumentFilters } from './client';
+import type { ChatIdea } from '../../../packages/creativeDoc/src/aiContracts';
 import type { NewDesignPrefill } from './shared';
 import { S, type Tri } from './strings';
 
@@ -111,6 +112,33 @@ export function ideaPrefill(idea: IdeaRecordDto): NewDesignPrefill {
     caption: idea.caption,
     alt: idea.alt_text,
     jobId: idea.job_id,
+  };
+}
+
+/**
+ * A Home opportunity row, clicked: a product row opens New design on that product with the goal its
+ * evidence supports (an arrival, a return to stock, a live offer → sell); a service row on that approved
+ * claim; a topic row (a category not posted about, an education topic) with the goal set.
+ */
+export function opportunityPrefill(o: Pick<OpportunityDto, 'kind' | 'ref'>): NewDesignPrefill {
+  switch (o.kind) {
+    case 'offer': return { mode: 'product', productId: o.ref, objective: 'sell' };
+    case 'arrival': return { mode: 'product', productId: o.ref, objective: 'arrival' };
+    case 'back_in_stock': return { mode: 'product', productId: o.ref, objective: 'back_in_stock' };
+    case 'service_claim': return { mode: 'service', claimId: o.ref, objective: 'service_trust' };
+    case 'education_topic': return { mode: 'product', objective: 'education' };
+    default: return { mode: 'product', objective: 'sell' };
+  }
+}
+
+/** A chat suggestion turned into a design: its words and goal, its product when it named one, and the chat job (stored as an ideas job). */
+export function chatIdeaPrefill(idea: ChatIdea, jobId: string): NewDesignPrefill {
+  return {
+    mode: 'product',
+    productId: idea.product_ref || undefined,
+    objective: idea.objective,
+    copy: { headline: idea.headline, subhead: idea.subhead || undefined },
+    jobId,
   };
 }
 

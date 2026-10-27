@@ -38,13 +38,14 @@ import {
   type IdeaRecordDto, type ModelDto, type ProviderStatusDto, type RejectReason, type UsageRecordDto, type VersionOrigin,
 } from '../../packages/creativeDoc/src/api';
 import {
-  CAROUSEL_SCHEMA, COMPOSE_SCHEMA, EDIT_SCHEMA, IDEAS_SCHEMA, REVIEW_SCHEMA, validateCarousel, validateCompose, validateEditPatch, validateIdeas, validateReview,
-  type Idea,
+  CAROUSEL_SCHEMA, CHAT_LIMITS, CHAT_SCHEMA, COMPOSE_SCHEMA, EDIT_SCHEMA, IDEAS_SCHEMA, REVIEW_SCHEMA, validateCarousel, validateChat, validateCompose, validateEditPatch, validateIdeas, validateReview,
+  type ChatIdea, type Idea,
 } from '../../packages/creativeDoc/src/aiContracts';
 import { normalizeBrandKit } from '../../packages/creativeDoc/src/brand';
 import { normalizeDocument } from '../../packages/creativeDoc/src/normalize';
 import type { AllowedAssets } from '../../packages/creativeDoc/src/ops';
 import { OBJECTIVES, VISUAL_PRIORITIES, type Density, type Objective, type VisualPriority } from '../../packages/creativeDoc/src/schema';
+import { cleanText } from '../../packages/creativeDoc/src/text';
 import { compareSnapshots, type ProductSnapshot } from '../../packages/creativeDoc/src/snapshot';
 import { FAMILY_IDS, TEMPLATES, isTemplateId, isVariantId, variantsFor, type FamilyId, type TemplateId, type VariantId } from '../../packages/creativeDoc/src/templates';
 import { keyHintOf, keyState, listModels, validProviderKeyShape, type Transport } from '../lib/creative/anthropic';
@@ -63,7 +64,7 @@ import { MAX_FILE_BYTES, MAX_PROJECT_JSON_BYTES, assertDeclaredSize, putStudioFi
 import { IDEMPOTENCY_KEY, cancelJob, jobById, jobDto, markApplied } from '../lib/creative/jobs';
 import { encryptionReady, sealProviderKey } from '../lib/creative/keyVault';
 import { collectOpportunities, syncCatalogWatch } from '../lib/creative/opportunities';
-import { carouselContent, composeContent, editContent, ideasContent, reviewContent, testContent, type FeedbackMemory } from '../lib/creative/prompts';
+import { carouselContent, chatContent, composeContent, editContent, ideasContent, reviewContent, testContent, type FeedbackMemory } from '../lib/creative/prompts';
 import {
   ensureSettingsRow, isEffort, normalizeBudget, normalizePriorities, normalizeRates, readProviderSettings, type Capabilities, type ProviderSettings,
 } from '../lib/creative/settings';
@@ -1144,6 +1145,66 @@ R.post('/ai/ideas', studio, async (c) => {
   );
   const stored = await ideasOfJob(db, out.job.id);
   return ok(c, { job_id: out.job.id, ideas: stored, rejected: out.result.rejected, notes: out.result.notes, usage: out.usage });
+});
+
+/**
+ * «محادثة» on Home: one turn of a free conversation, through the same adapter, budget and jobs as every AI
+ * call. The client sends the last CHAT_LIMITS.turns turns (the newest is the owner's); the answer is
+ * `{reply, suggested_ideas[]}`, validated by `validateChat` (no price, no link, no unsupported claim).
+ */
+R.post('/ai/chat', studio, async (c) => {
+  const env = c.env;
+  const db = env.DB;
+  const body = await bodyOf(c);
+  const key = idemKey(body.idempotency_key);
+  const raw = Array.isArray(body.messages) ? body.messages.slice(-CHAT_LIMITS.turns) : [];
+  const turns = raw
+    .map((m) => (m && typeof m === 'object' ? (m as Record<string, unknown>) : {}))
+    .map((m) => ({ role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const), text: cleanText(m.text, CHAT_LIMITS.chars, true).value }))
+    .filter((m) => m.text);
+  if (!turns.length || turns[turns.length - 1].role !== 'user') throw badRequest('messages must end with the owner’s message', 'INVALID_INPUT');
+  const ready = await ensureReady(env);
+  const claims = await currentClaims(db);
+  const bundle = await collectOpportunities(db, { priorities: ready.settings.priorities, claims });
+  const listing = await listProducts(db, { q: '', category: '', limit: 12, offset: 0 });
+  const products = new Map(listing.products.map((p) => [p.id, { product_id: p.id, name: { ar: p.name.ar, en: p.name.en }, category_id: p.category_id, availability: p.availability, price_kind: p.price_status, live_public_offer: false }]));
+  for (const o of bundle.opportunities) {
+    if ((o.kind === 'offer' || o.kind === 'arrival' || o.kind === 'back_in_stock') && !products.has(o.ref)) {
+      products.set(o.ref, { product_id: o.ref, name: { ar: o.label.ar, en: o.label.en }, category_id: null, availability: 'unknown', price_kind: 'priced', live_public_offer: o.kind === 'offer' });
+    } else if (o.kind === 'offer' && products.has(o.ref)) products.get(o.ref)!.live_public_offer = true;
+  }
+  // A chat reply claims nothing a single product's evidence would allow: no offer, arrival or service wording.
+  const evidence = { offer: false, serviceClaim: false, arrival: false, backInStock: false };
+  type ChatResult = { reply: string; suggested_ideas: ChatIdea[]; dropped: number };
+  const out = await runAi<ChatResult>(
+    env,
+    ready,
+    {
+      task: 'chat',
+      actorId: actorOf(c),
+      idempotencyKey: key,
+      request: { messages: turns },
+      documentId: null,
+      baseVersion: null,
+      targetIds: [],
+      content: chatContent({
+        turns,
+        evidence: bundle.opportunities.map((o) => ({ id: o.id, kind: o.kind, ref: o.ref, label: { ar: o.label.ar, en: o.label.en }, detail: o.detail })),
+        products: [...products.values()],
+        services: claims.map(claimText),
+        brand: (await currentBrand(db)).kit,
+      }),
+      schema: CHAT_SCHEMA,
+      validate: (answer) => {
+        const v = validateChat(answer, { products: new Set(products.keys()), evidence });
+        if (!v.ok) return { ok: false, reason: v.reason };
+        return { ok: true, result: { reply: v.reply, suggested_ideas: v.ideas, dropped: v.dropped } };
+      },
+    },
+    creativeTransport,
+    keepAliveOf(c)
+  );
+  return ok(c, { job_id: out.job.id, reply: out.result.reply, suggested_ideas: out.result.suggested_ideas, dropped: out.result.dropped, usage: out.usage });
 });
 
 interface IdeaRow {
