@@ -86,6 +86,18 @@ export const UPLOAD_CLASSES: readonly BodyClass[] = [
    * a class matches a prefix, not a pattern.
    */
   { prefix: '/api/admin/taxonomy/catalogs', methods: ['POST'], kind: 'multipart', maxBytes: 2 * MB, source: 'worker/lib/siteMedia.ts#SITE_MEDIA_MAX_BYTES', routeFile: 'adminTaxonomy.ts' },
+  /**
+   * The Creative Studio's two upload doors (DECISIONS row 270): a picture for
+   * the asset library (`POST …/assets`) and an export the editor rendered in
+   * the browser (`POST …/documents/:id/exports`). Both read one multipart file
+   * through the route's `formFile`, capped by MAX_FILE_BYTES; without a class
+   * here the 4 MB admin JSON class would refuse a legitimate 5–15 MB picture
+   * at the edge. Two prefixes rather than the whole mount, so every other
+   * studio mutation keeps the admin JSON cap (`/documents` also takes the JSON
+   * saves; they are authenticated and apex-only, as the policy row says).
+   */
+  { prefix: '/api/admin/creative-studio/assets', methods: ['POST'], kind: 'multipart', maxBytes: 15 * MB, source: 'worker/lib/creative/files.ts#MAX_FILE_BYTES', routeFile: 'adminCreativeStudio.ts' },
+  { prefix: '/api/admin/creative-studio/documents', methods: ['POST'], kind: 'multipart', maxBytes: 15 * MB, source: 'worker/lib/creative/files.ts#MAX_FILE_BYTES', routeFile: 'adminCreativeStudio.ts' },
 ];
 
 export const JSON_CLASSES: readonly BodyClass[] = [

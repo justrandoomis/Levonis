@@ -17,3 +17,16 @@ sublicense, and/or sell copies of the Software, and to permit persons to whom
 the Software is furnished to do so, subject to the conditions in the upstream
 license: <https://github.com/jeremy-prt/bloub/blob/main/LICENSE>.
 
+
+## IBM Plex Sans Arabic (Creative Studio fonts)
+
+The Creative Studio (`/admin/creative-studio`) self-hosts IBM Plex Sans Arabic
+400, 600 and 700 — the complete builds from `@ibm/plex-sans-arabic@1.1.0`,
+unmodified — under `public/fonts/ibm-plex-sans-arabic/`. They are loaded only
+by the studio, never by a storefront page.
+
+Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"
+
+Licensed under the SIL Open Font License, Version 1.1. The full licence text,
+the file list with byte sizes and where the files came from are in
+`public/fonts/ibm-plex-sans-arabic/LICENSE`, beside the fonts.

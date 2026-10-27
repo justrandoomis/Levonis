@@ -48,7 +48,11 @@ export type MediaDomain =
   /** 0215 — a Print Cloud customer's 3D model: `print-cloud/<user id>/models/<file id>.<stl|3mf|obj>`,
    *  private, never served by /files; only the owner's download door and the
    *  workshop agent's job-scoped door stream it (worker/routes/printCloud*.ts). */
-  | 'print-cloud';
+  | 'print-cloud'
+  /** 0216 — the Creative Studio's files: `creative-studio/assets/<kind>/<id>.<ext>` and
+   *  `creative-studio/exports/<document id>/<id>.<ext>`, private. /files serves no such
+   *  prefix; only the studio's own guarded routes stream them (worker/routes/adminCreativeStudio.ts). */
+  | 'creative-studio';
 
 export interface MediaKeyInput {
   visibility: MediaVisibility;

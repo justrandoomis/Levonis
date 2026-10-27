@@ -20,6 +20,13 @@ IRAQ_PARALLEL_FX_API_KEY=
 # value; on the live Worker it is a dashboard SECRET.
 ANTHROPIC_API_KEY=
 
+# Optional: the Creative Studio's vault key (DECISIONS row 270). It encrypts a
+# provider key the owner types in the studio settings (AES-256-GCM); without it
+# typing a key is refused and the studio uses ANTHROPIC_API_KEY when set.
+# Format "v1:<base64 of 32 random bytes>" — e.g. `printf 'v1:%s' "$(openssl rand -base64 32)"`.
+# Never commit a real value; on the live Worker it is a dashboard SECRET.
+CREATIVE_STUDIO_ENC_KEY=
+
 # The deception layer's HMAC key (worker/lib/deception/canary.ts) for the
 # canary tokens in decoy answers, the signed device tag and the network keys.
 # Without it a key is derived from TELEGRAM_WEBHOOK_SECRET (or

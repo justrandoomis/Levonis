@@ -11,6 +11,8 @@
  *
  * ANTHROPIC_API_KEY (the support assistant AI layer, DECISIONS row 262) follows
  * the same rule: a dashboard secret, reported by type only, never written.
+ * CREATIVE_STUDIO_ENC_KEY (the Creative Studio's vault key, DECISIONS row 270)
+ * too: no workflow puts, deletes or reads it.
  *
  * Run: node --import tsx --test tests/workflowSecrets.test.ts
  */
@@ -22,10 +24,12 @@ import { ROOT } from './fixtures/d1';
 
 const NAME = 'IRAQ_PARALLEL_FX_API_KEY';
 const AI_NAME = 'ANTHROPIC_API_KEY';
+/** The Creative Studio's vault key (DECISIONS row 270): a dashboard secret like the two above, never written by a deploy. */
+const VAULT_NAME = 'CREATIVE_STUDIO_ENC_KEY';
 const dir = join(ROOT, '.github/workflows');
 const workflows = readdirSync(dir).filter((f) => /\.ya?ml$/.test(f)).map((f) => ({ f, text: readFileSync(join(dir, f), 'utf8') }));
 
-for (const name of [NAME, AI_NAME]) {
+for (const name of [NAME, AI_NAME, VAULT_NAME]) {
   test(`no workflow puts, deletes, bulk-uploads or --vars ${name}`, () => {
     assert.ok(workflows.length > 5);
     for (const { f, text } of workflows) {
@@ -72,4 +76,5 @@ test('.dev.vars.example names the keys with no value', () => {
   const example = readFileSync(join(ROOT, '.dev.vars.example'), 'utf8');
   assert.match(example, /^IRAQ_PARALLEL_FX_API_KEY=$/m);
   assert.match(example, /^ANTHROPIC_API_KEY=$/m);
+  assert.match(example, /^CREATIVE_STUDIO_ENC_KEY=$/m);
 });

@@ -415,6 +415,21 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'storefront_vitals_daily', 'storefront_vitals_marks',
   ]),
   ...owned('ads', ['ads_providers', 'ads_event_map', 'ads_deliveries', 'ads_consent_snapshots', 'ads_dead_letters']),
+  // 0215 — «استوديو Levonis الإبداعي» (docs/CREATIVE_STUDIO.md, DECISIONS row
+  // 270): the marketing creatives the owner designs, their versions, reviews,
+  // exports, brand kit, approved service claims, AI jobs and spend. Owned by
+  // Ads / Marketing (01-TARGET.md catalogue row 18) as the END-STATE home of
+  // marketing work; TODAY these tables live in the SHARED D1 and the legacy
+  // core serves the studio (worker/routes/adminCreativeStudio.ts), exactly as
+  // the security console's tables are Risk's while the core writes them.
+  // services/ads does not own them in its OWNERSHIP.json and never touches
+  // them: its own five tables stay in its own D1.
+  ...owned('ads', [
+    'creative_provider_settings', 'creative_spend_day', 'creative_usage', 'creative_jobs', 'creative_brand_versions',
+    'creative_assets', 'creative_product_snapshots', 'creative_service_claims', 'creative_service_claim_versions',
+    'creative_documents', 'creative_document_versions', 'creative_reviews', 'creative_exports', 'creative_ideas',
+    'creative_feedback', 'creative_catalog_watch', 'creative_watch_state', 'creative_events',
+  ]),
   ...owned('search', ['search_products', 'search_stores', 'search_index_state']),
   // `media_cleanup_jobs` and `media_object_guards` are FILES tables, not
   // catalogue ones: both coordinate the lifetime of an R2 object key after

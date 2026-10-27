@@ -279,6 +279,14 @@ const EXPECTED_CALLS: Record<string, { visible: number; sellable: number; states
   // `listedScope` read, so a hidden product takes no ranking slot, is never an exact answer, and its code is a miss.
   'worker/lib/search/store.ts': { visible: 1, sellable: 0, states: 0 },
   'worker/lib/search/identifiers.ts': { visible: 1, sellable: 0, states: 0 },
+  // The Creative Studio's store connector (DECISIONS row 270): an owner screen, but an advert is a customer
+  // surface by another road, so it asks the listing's own scope — VISIBLE, and `composition = '' OR sellable`
+  // (default D6) — for its product list, its snapshot read and the catalogue watch's page; the SELLABLE flag
+  // (`sellable_now`) is what decides that a price or an offer may be worded at all. Counted, so a design can
+  // never name a product the shop hides.
+  'worker/lib/creative/store.ts': { visible: 2, sellable: 3, states: 0 },
+  // The studio's opportunities: a live public offer is proposed only on a product the listing would show.
+  'worker/lib/creative/opportunities.ts': { visible: 1, sellable: 1, states: 0 },
 };
 
 /** Every .ts under worker/, relative to the repository root. */

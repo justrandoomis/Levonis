@@ -810,6 +810,12 @@ export const NOT_LIBRARY_HOLDERS: Readonly<Record<string, string>> = {
   'merchant_store_icons.source_key': 'the logo the renditions were cut from — the same key `merchant_stores.logo_key` holds, which is read',
   'link_cards.image_key': 'a re-hosted Open Graph picture under link-cards/, never a library file',
   'upload_sessions.object_key': 'an upload still being assembled: not in the library until it completes',
+  // The Creative Studio (0215): the platform owner's private ad files and designs; a design draws only the admin
+  // catalogue's product pictures (products/…) and its own assets (creative-studio/…), never a store's library.
+  'creative_assets.r2_key': PRIVATE,
+  'creative_exports.r2_key': PRIVATE,
+  'creative_documents.content_json': ADMIN_SHOP,
+  'creative_document_versions.content_json': ADMIN_SHOP,
 };
 
 export interface MediaUse {
