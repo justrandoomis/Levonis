@@ -133,6 +133,7 @@ export const OPERATIONS: readonly Operation[] = [
   { method: 'get', path: '/printers', base: G, tag: 'agent', summary: 'Printers bound to this agent', access: 'agent' },
   { method: 'post', path: '/printers/{id}/telemetry', base: G, tag: 'agent', summary: 'Report telemetry', access: 'agent', body: 'Telemetry' },
   { method: 'post', path: '/jobs/{id}/events', base: G, tag: 'agent', summary: 'started | paused | resumed | completed | failed (idempotent: by state; paused and resumed by event_id)', access: 'agent', body: 'AgentJobEvent' },
+  { method: 'get', path: '/jobs/{id}', base: G, tag: 'agent', summary: 'The print input and files of a job on a printer of this agent (job_control)', access: 'agent' },
   { method: 'get', path: '/commands', base: G, tag: 'agent', summary: 'Operator commands for this agent printers (since)', access: 'agent' },
   { method: 'post', path: '/slicing/claim', base: G, tag: 'agent', summary: 'Claim a slicing request under a lease', access: 'agent' },
   { method: 'post', path: '/slicing/{id}/result', base: G, tag: 'agent', summary: 'Post measured slicer figures', access: 'agent', body: 'Estimate' },

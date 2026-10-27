@@ -25,7 +25,7 @@ DECISIONS row 271 records the decision and its open owner questions.
 | Routers | `worker/routes/printCloud.ts` (customer), `printCloudAgent.ts` (workshop agent), `printCloudAdmin.ts` (administration) |
 | Mounts | `/api/print-cloud/v1`, `/api/print-cloud/v1/agent`, `/api/admin/print-cloud` (`worker/index.ts`) |
 | Hosts | the main host, the `cloud` system subdomain, and foreign hosts outside the root; **never** a merchant storefront (`printCloudHostAllowed`, `worker/lib/printCloud/http.ts`) |
-| OpenAPI | `GET /api/print-cloud/v1/openapi.json` — generated from `worker/lib/printCloud/openapi.ts`; 150 operations, and `tests/printCloudOpenApi.test.ts` fails if a route and its documentation disagree. Owner-only cost fields are described in the owner's copy only |
+| OpenAPI | `GET /api/print-cloud/v1/openapi.json` — generated from `worker/lib/printCloud/openapi.ts`; 151 operations, and `tests/printCloudOpenApi.test.ts` fails if a route and its documentation disagree. Owner-only cost fields are described in the owner's copy only |
 | Default state | **closed**: `pc_settings.enabled = false`, customer doors answer `503 PRINT_CLOUD_DISABLED` (admins still work) until the owner opens the service |
 | Without the migration | reads see an empty, closed service (lists empty, a named record 404, `GET /status` says `installed: false`) — exactly the answers of a migrated database with no data; every write answers `503 PRINT_CLOUD_NOT_INSTALLED` before any statement; the cron step does nothing (`tests/costDeployAhead.test.ts`) |
 
@@ -528,10 +528,15 @@ Agent doors: `GET /printers`, `POST /printers/{id}/telemetry`,
 `POST /jobs/{id}/events` (`started`, `paused`, `resumed`, `completed`,
 `failed`; `started` only out of `preparing`, `paused` and `resumed` carry the
 agent's `event_id`, and a re-sent event answers `already_applied` and changes
-nothing), `GET /commands`, `POST /slicing/claim`,
-`POST /slicing/{id}/result`, `POST /slicing/{id}/failure`, `GET /files/{id}`
-(only a file of a job it is slicing, with `slicer`, or printing, with
-`job_control`).
+nothing), `GET /jobs/{id}` (with `job_control`, only a job holding one of its
+printers: the job's slicing input — models and their files, settings, plate,
+materials — and its file doors; read-only), `GET /commands`,
+`POST /slicing/claim`, `POST /slicing/{id}/result`,
+`POST /slicing/{id}/failure`, `GET /files/{id}` (only a file of a job it is
+slicing, with `slicer`, or printing, with `job_control`). Without
+`GET /jobs/{id}` the file door's printing branch named no file: an agent that
+had not sliced the job itself (an operator's estimate, a workshop reprint)
+could not learn what to print.
 
 **Order.** Every telemetry body carries `boot` — the agent's boot counter, an
 integer it persists and raises by one at every start of its process — and
@@ -712,6 +717,7 @@ rules. Sign up a user through the normal Levonis flow, then buy a package
 | `tests/printCloudUnits.test.ts` | money arithmetic, apportioning, lot valuation, the pricing engine, promotions, the state machine, plates, file sniffing, webhook signatures, settings, three languages, error mapping, hosts |
 | `tests/printCloudOpenApi.test.ts` | the document equals the routers; access classes match the guards |
 | `tests/printCloudWallet.test.ts` | the Levonis wallet adapter on funded wallets with dinar testimony: the page figure, the one-batch payment, 402 in three languages with nothing written, holds, races (wallet × wallet, wallet × manual, wallet × gateway, wallet × cancel), replays, expiry, zero totals, delivery fees, the owner switch, refunds (partial, full, racing, under a cent, other methods), deploy ahead of 0215 and 0108 |
+| `tests/printCloudAgentJobDoor.test.ts` | the agent's job door `GET /agent/jobs/{id}`: `job_control` only, only a job on one of the agent's printers, its input and file doors, read-only |
 
 Concurrency is proven with `RaceD1` (`tests/fixtures/printCloud.ts`), which
 interleaves a competing request immediately before a batch and enforces D1's

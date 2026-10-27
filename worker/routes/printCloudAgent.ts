@@ -26,6 +26,7 @@ import {
   parseEstimate,
   parseFailure,
   reportCompletion,
+  slicingInput,
   startJob,
   transition,
   type Actor,
@@ -160,6 +161,35 @@ printCloudAgentRoutes.post('/jobs/:id/events', async (c) => {
       return ok(c, await failJob(c.env.DB, job, parseFailure({ ...body, responsible: 'undetermined' }), actor, now));
   }
   return ok(c, { job_id: job.id, status: target });
+});
+
+/**
+ * What a job on one of this agent's printers prints: the job's slicing input
+ * (models and their files, settings, plate, materials) and the file doors —
+ * only with `job_control`, and only while the job holds a printer bound to
+ * THIS agent (the scope of the file door's printing branch). Without it that
+ * branch named no file: an agent that had not sliced the job itself — an
+ * operator's estimate, a workshop reprint — could not learn what to print.
+ */
+printCloudAgentRoutes.get('/jobs/:id', async (c) => {
+  const agent = agentOf(c);
+  if (!agentCan(agent, 'job_control')) throw pcError('FORBIDDEN', { capability: 'job_control' });
+  const held = await one<{ printer_id: string }>(
+    c.env.DB,
+    "SELECT a.printer_id FROM pc_printer_assignments a JOIN pc_printers p ON p.id = a.printer_id WHERE a.job_id = ? AND a.state = 'active' AND p.agent_id = ?",
+    c.req.param('id'),
+    agent.id
+  );
+  if (!held) throw pcError('NOT_FOUND');
+  const job = await loadJob(c.env.DB, c.req.param('id'));
+  const input = await slicingInput(c.env.DB, job);
+  return ok(c, {
+    job_id: job.id,
+    status: job.status,
+    printer_id: held.printer_id,
+    input,
+    files: [...new Set(input.models.map((m) => m.file_id))].map((id) => ({ file_id: id, path: `/api/print-cloud/v1/agent/files/${id}` })),
+  });
 });
 
 printCloudAgentRoutes.get('/commands', async (c) => ok(c, await commandsForAgent(c.env.DB, agentOf(c), c.req.query('since') ?? null)));
