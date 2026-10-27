@@ -266,6 +266,13 @@ export interface DocumentSummaryDto {
 export interface DocumentDto extends DocumentSummaryDto {
   content: CreativeDocument;
   brand_version: number | null;
+  /**
+   * The kit of the brand version this design is pinned to (`brand_version`;
+   * the kit in force when that version is gone). Bound text is rendered with
+   * it — the same kit the Worker's checks use — never with a newer kit.
+   * Absent from a Worker that predates it.
+   */
+  brand_kit?: BrandKit;
   updated_by_name: string | null;
   /** Normaliser issues found when the stored content was read (non-fatal; fatal content is never stored). */
   issues: DocIssue[];
@@ -446,6 +453,8 @@ export type VerifyResponse = VerifyDto;
 export type BrandResponse = BrandDto;
 /** GET /brand/versions */
 export interface BrandVersionsResponse { migrated: boolean; versions: BrandVersionDto[] }
+/** GET /brand/versions/:version — one version and its kit (a pending version can be viewed before approval). */
+export interface BrandVersionResponse { version: BrandVersionDto; kit: BrandKit }
 /** POST /brand/versions, POST /brand/versions/:version/approve — the saved version and the kit now in force. */
 export interface BrandSaveResponse { saved: BrandVersionDto; brand: BrandDto }
 
@@ -463,7 +472,12 @@ export interface AssetResponse { asset: AssetDto }
 
 /** GET /documents?status=&product_id=&format=&campaign_id=&q=&from=&to=&limit=&offset= */
 export interface DocumentsResponse { migrated: boolean; documents: DocumentSummaryDto[]; total: number; limit: number; offset: number }
-/** POST /documents, GET|PUT|PATCH /documents/:id (PATCH = rename only, no new version), POST …/restore, …/duplicate, …/status */
+/**
+ * POST /documents {title, content, kind?, parent_id?, campaign_id?, idempotency_key?, origin?, job_id?} —
+ * `origin` 'ai' needs `job_id`: a succeeded, unapplied, uncancelled job of this
+ * actor, marked applied to version 1 in the same write.
+ * GET|PUT|PATCH /documents/:id (PATCH = rename only, no new version), POST …/restore, …/duplicate, …/status
+ */
 export interface DocumentResponse { document: DocumentDto }
 /** GET /documents/:id/versions */
 export interface VersionsResponse { versions: VersionDto[] }

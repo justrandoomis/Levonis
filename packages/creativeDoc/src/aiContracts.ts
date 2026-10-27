@@ -20,7 +20,7 @@
 import { applyOps, type ApplyResult, type OpsContext } from './ops';
 import { ID_PATTERN, OBJECTIVES, VISUAL_PRIORITIES, type CreativeDocument, type Objective, type VisualPriority } from './schema';
 import { VARIANT_IDS, type VariantId } from './templates';
-import { cleanText, containsPriceLike, containsUrl, unsupportedClaims, type ClaimKind } from './text';
+import { cleanText, containsPriceLike, containsUrl, unsupportedClaims, type ClaimEvidence, type ClaimKind } from './text';
 
 type JsonSchema = Record<string, unknown>;
 const str = { type: 'string' } as const;
@@ -108,7 +108,7 @@ export interface Rejected {
 const C = (v: unknown, max: number, multiline = false) => cleanText(v, max, multiline).value;
 
 /** Free text a model wrote: price-like words, links and unsupported claims are refused. */
-export function textProblems(texts: readonly string[], evidence: { offer: boolean; serviceClaim: boolean }): { code: Rejected['code']; detail?: string } | null {
+export function textProblems(texts: readonly string[], evidence: ClaimEvidence): { code: Rejected['code']; detail?: string } | null {
   for (const t of texts) {
     if (!t) continue;
     if (containsPriceLike(t)) return { code: 'price_like_text', detail: t.slice(0, 80) };
@@ -193,7 +193,7 @@ export interface Proposal {
   alt_text: string;
 }
 
-export function validateCompose(raw: unknown, ctx: { variants: readonly VariantId[]; evidence: { offer: boolean; serviceClaim: boolean }; maxFeatures: number }): { proposals: Proposal[]; rejected: Rejected[]; warnings: string[]; missing: string[] } {
+export function validateCompose(raw: unknown, ctx: { variants: readonly VariantId[]; evidence: ClaimEvidence; maxFeatures: number }): { proposals: Proposal[]; rejected: Rejected[]; warnings: string[]; missing: string[] } {
   const src = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const proposals: Proposal[] = [];
   const rejected: Rejected[] = [];
@@ -286,7 +286,7 @@ export interface PatchContext {
    * design-wide operations then need an explicit design-wide request (null).
    */
   scope: readonly string[] | null;
-  evidence: { offer: boolean; serviceClaim: boolean };
+  evidence: ClaimEvidence;
   ops: Omit<OpsContext, 'actor'>;
 }
 
@@ -430,7 +430,7 @@ export interface CarouselSlidePlan {
   uses_product: boolean;
 }
 
-export function validateCarousel(raw: unknown, ctx: { evidence: { offer: boolean; serviceClaim: boolean }; maxSlides: number }): { slides: CarouselSlidePlan[]; caption: string; rejected: Rejected[] } {
+export function validateCarousel(raw: unknown, ctx: { evidence: ClaimEvidence; maxSlides: number }): { slides: CarouselSlidePlan[]; caption: string; rejected: Rejected[] } {
   const src = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const slides: CarouselSlidePlan[] = [];
   const rejected: Rejected[] = [];

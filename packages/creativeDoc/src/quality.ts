@@ -66,6 +66,12 @@ export interface QualityContext {
   fontsLoaded?: ReadonlySet<string>;
   /** Image refs that decoded successfully in the renderer. */
   assetsLoaded?: ReadonlySet<string>;
+  /**
+   * The size each image ref actually decoded at in the renderer (keyed like
+   * `assetsLoaded`). A layer whose recorded size has another ratio is drawn
+   * contained, never stretched — and the checks report it.
+   */
+  decodedSizes?: Readonly<Record<string, { width: number; height: number }>>;
   /** `final`: approval or a final export — unverified data becomes a blocker. */
   final: boolean;
   /** "now" as an ISO string (passed in: the package has no clock). */

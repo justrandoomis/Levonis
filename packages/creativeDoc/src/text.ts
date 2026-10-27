@@ -243,8 +243,25 @@ export const CLAIM_EVIDENCE: Readonly<Record<ClaimKind, ReadonlyArray<'offer' | 
   superlative: ['never'],
 });
 
+/**
+ * The evidence a request carried for the claims its text may make (spec §9,
+ * §10). It is computed by the Worker from the store and the studio's own
+ * records at request time — never from what a model wrote. An absent flag is
+ * false.
+ */
+export interface ClaimEvidence {
+  /** A live public offer on the bound product. */
+  offer: boolean;
+  /** An approved, current service claim bound to the design. */
+  serviceClaim: boolean;
+  /** A documented arrival (recorded by the catalogue watch after its baseline pass). */
+  arrival?: boolean;
+  /** A documented unavailable → available transition (recorded by the catalogue watch). */
+  backInStock?: boolean;
+}
+
 /** The claims in `text` that the supplied evidence does not cover. */
-export function unsupportedClaims(text: string, evidence: { offer: boolean; serviceClaim: boolean }): ClaimKind[] {
+export function unsupportedClaims(text: string, evidence: ClaimEvidence): ClaimKind[] {
   return claimsIn(text).filter((kind) => {
     const needs = CLAIM_EVIDENCE[kind];
     if (needs.includes('never')) return true;
