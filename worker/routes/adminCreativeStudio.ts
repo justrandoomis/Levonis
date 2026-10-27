@@ -56,7 +56,7 @@ import {
   REJECT_REASONS, approveDocument, createDocument, documentDto, duplicateDocument, exportDto, exportsOf, getDocRow, listDocuments, readContent, rejectDocument,
   requireDoc, restoreDocument, reviews, saveDocument, serverReport, setStatus, summaries, verifyDocument, versionContent, versions, type DocRow, type ExportRow,
 } from '../lib/creative/documents';
-import { MAX_PROJECT_JSON_BYTES, assertDeclaredSize, putStudioFile, sha256OfBytes, sniffStudioImage, streamStudioFile, tooLarge, unsupported } from '../lib/creative/files';
+import { MAX_FILE_BYTES, MAX_PROJECT_JSON_BYTES, assertDeclaredSize, putStudioFile, sha256OfBytes, sniffStudioImage, streamStudioFile, tooLarge, unsupported } from '../lib/creative/files';
 import { IDEMPOTENCY_KEY, cancelJob, jobById, jobDto, markApplied } from '../lib/creative/jobs';
 import { encryptionReady, sealProviderKey } from '../lib/creative/keyVault';
 import { collectOpportunities, syncCatalogWatch } from '../lib/creative/opportunities';
@@ -559,7 +559,7 @@ async function formFile(c: Context<AppContext>): Promise<{ bytes: Uint8Array; fo
   }
   const file = form.get('file');
   if (!file || typeof file === 'string' || typeof (file as Blob).arrayBuffer !== 'function') throw badRequest('file is required', 'INVALID_INPUT');
-  if ((file as Blob).size > 15 * 1024 * 1024) throw tooLarge();
+  if ((file as Blob).size > MAX_FILE_BYTES) throw tooLarge();
   return { bytes: new Uint8Array(await (file as Blob).arrayBuffer()), form };
 }
 

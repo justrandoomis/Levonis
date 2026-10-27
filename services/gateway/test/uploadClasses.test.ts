@@ -69,6 +69,14 @@ test('the admin JSON allowance covers the template body the core actually accept
   assert.ok(JSON_CLASSES.some((r) => r.prefix === '/api/admin'), 'admin mutations are authenticated, apex-only and admin-write limited');
 });
 
+test('the Creative Studio: its two upload doors carry a 15 MB picture, every other studio write keeps the admin JSON cap', () => {
+  assert.equal(maxBodyBytes('/api/admin/creative-studio/assets', 'POST'), 15 * MB + FORM_OVERHEAD_BYTES);
+  assert.equal(maxBodyBytes('/api/admin/creative-studio/documents/cdoc_1/exports', 'POST'), 15 * MB + FORM_OVERHEAD_BYTES);
+  assert.equal(maxBodyBytes('/api/admin/creative-studio/provider/settings', 'PUT'), 4 * MB);
+  assert.equal(maxBodyBytes('/api/admin/creative-studio/documents/cdoc_1', 'PUT'), 4 * MB, 'a save is JSON, not the upload class');
+  assert.equal(maxBodyBytes('/api/admin/creative-studio/assets/ca_1/file', 'GET'), DEFAULT_MAX_BODY_BYTES);
+});
+
 test('no class is wider than the largest thing the platform accepts', () => {
   for (const row of BODY_CLASSES) assert.ok(row.maxBytes <= 40 * MB, `${row.prefix}: ${row.maxBytes}`);
 });
