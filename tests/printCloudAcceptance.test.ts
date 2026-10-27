@@ -26,6 +26,7 @@ import {
   ok,
   owned,
   pcWorld,
+  reading,
   reconcileClean,
   row,
   rows,
@@ -205,7 +206,7 @@ test('§39 acceptance: purchase → files → five jobs → slicer → queue →
   // ---- 7. The scheduler assigns compatible machines (fresh telemetry first: an agent printer that is silent gets nothing).
   const silent = await ok(w.assistant, 'POST', `${ADMIN}/queue/run`);
   assert.equal(silent.assigned.length, 0, 'stale telemetry: no machine is trusted');
-  for (const id of cat.printers) await ok(w.guest, 'POST', `${AGENT}/printers/${id}/telemetry`, { machine_state: 'idle', nozzle_temp_dc: 250, bed_temp_dc: 300 }, bearer);
+  for (const id of cat.printers) await ok(w.guest, 'POST', `${AGENT}/printers/${id}/telemetry`, reading({ machine_state: 'idle', nozzle_temp_dc: 250, bed_temp_dc: 300 }), bearer);
 
   // ---- 8. The workshop executes until the queue is empty.
   const completed: string[] = [];
@@ -218,7 +219,7 @@ test('§39 acceptance: purchase → files → five jobs → slicer → queue →
       await ok(w.guest, 'POST', `${AGENT}/jobs/${a.job_id}/events`, { event: 'started', printer_id: a.printer_id }, bearer);
       // Re-sent by a flaky network: already applied, nothing changes.
       assert.equal((await ok(w.guest, 'POST', `${AGENT}/jobs/${a.job_id}/events`, { event: 'started', printer_id: a.printer_id }, bearer)).already_applied, true);
-      await ok(w.guest, 'POST', `${AGENT}/printers/${a.printer_id}/telemetry`, { machine_state: 'printing', job_id: a.job_id, progress_permille: 500, remaining_seconds: 600 }, bearer);
+      await ok(w.guest, 'POST', `${AGENT}/printers/${a.printer_id}/telemetry`, reading({ machine_state: 'printing', job_id: a.job_id, progress_permille: 500, remaining_seconds: 600 }), bearer);
       const actualSeconds = p.seconds - 300;
       const actualGrams = p.grams - 3;
       const report = await call(w.guest, 'POST', `${AGENT}/jobs/${a.job_id}/events`, { event: 'completed', printer_id: a.printer_id, printed_seconds: actualSeconds, materials: [{ variant_id: cat.white, qty: actualGrams }] }, bearer);
@@ -226,7 +227,7 @@ test('§39 acceptance: purchase → files → five jobs → slicer → queue →
       const detail = await ok(w.assistant, 'GET', `${ADMIN}/jobs/${a.job_id}`);
       const record = detail.consumption_records.find((r: Json) => !r.verified);
       await ok(w.assistant, 'POST', `${ADMIN}/jobs/${a.job_id}/verify-completion`, { consumption_record_id: record.id });
-      await ok(w.guest, 'POST', `${AGENT}/printers/${a.printer_id}/telemetry`, { machine_state: 'idle' }, bearer);
+      await ok(w.guest, 'POST', `${AGENT}/printers/${a.printer_id}/telemetry`, reading({ machine_state: 'idle' }), bearer);
       completed.push(a.job_id);
     }
   }

@@ -32,6 +32,7 @@ import {
   idem,
   ok,
   pcWorld,
+  reading,
   readyFile,
   reconcileClean,
   refused,
@@ -193,7 +194,7 @@ test('c12: an agent printer whose fresh reading says offline, printing, paused o
   const agent = await agentOn(w, cat, ['telemetry', 'job_control']);
   await buy(w.a, [{ kind: 'credit_package', package_id: cat.packages.h6 }, { kind: 'material', variant_id: cat.white, quantity: 250 }]);
   const jobId = await queuedJob(w, w.a, cat);
-  const telemetry = (body: Json) => ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, body, agent.bearer);
+  const telemetry = (body: Json) => ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, reading(body), agent.bearer);
   for (const machine_state of ['offline', 'printing', 'paused', 'preparing']) {
     await telemetry({ machine_state, ...(machine_state === 'offline' ? {} : { job_id: 'sd-card-print' }) });
     assert.deepEqual((await ok(w.assistant, 'POST', `${ADMIN}/queue/run`)).assigned, [], `a machine reporting ${machine_state} gets no work`);
@@ -262,15 +263,16 @@ test('c11: a reading is dated by when it was taken: a buffered one is stale, and
   const telemetry = (body: Json) => ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, body, agent.bearer);
   const view = async () => (await ok(w.assistant, 'GET', `${ADMIN}/printers`)).find((p: Json) => p.id === cat.printers[0]);
   const ago = (s: number) => new Date(Date.now() - s * 1000).toISOString();
+  const boot = 1;
   // A reading flushed two hours late is stored, and shown for what it is: stale.
-  assert.equal((await telemetry({ machine_state: 'idle', reported_at: ago(2 * H) })).stored, true);
+  assert.equal((await telemetry({ machine_state: 'idle', boot, seq: 1, reported_at: ago(2 * H), sent_at: ago(0) })).stored, true);
   const buffered = await view();
   assert.equal(buffered.telemetry.stale, true);
   assert.equal(buffered.telemetry.live, false);
   assert.equal(buffered.connectivity, 'offline');
-  // The machine faults now; then a reading from two hours ago arrives.
-  await telemetry({ machine_state: 'error', errors: [{ code: 'HMS_0300', message: 'nozzle' }], reported_at: ago(0) });
-  const late = await telemetry({ machine_state: 'idle', reported_at: ago(2 * H) });
+  // The machine faults now; then that first reading arrives again, re-sent.
+  await telemetry({ machine_state: 'error', errors: [{ code: 'HMS_0300', message: 'nozzle' }], boot, seq: 2, reported_at: ago(0), sent_at: ago(0) });
+  const late = await telemetry({ machine_state: 'idle', boot, seq: 1, reported_at: ago(2 * H), sent_at: ago(0) });
   assert.deepEqual([late.stored, late.superseded], [false, true]);
   const current = await view();
   assert.equal(current.telemetry.machine_state, 'error', 'the error stands');
@@ -282,9 +284,9 @@ test('c11: a reading is dated by when it was taken: a buffered one is stale, and
   await buy(w.a, [{ kind: 'credit_package', package_id: cat.packages.h6 }, { kind: 'material', variant_id: cat.white, quantity: 250 }]);
   await queuedJob(w, w.a, cat);
   assert.deepEqual((await ok(w.assistant, 'POST', `${ADMIN}/queue/run`)).assigned, [], 'a faulted machine gets no work');
-  // An agent clock running ahead cannot freeze the row: its reading counts as taken now, and the next one still lands.
-  await telemetry({ machine_state: 'error', reported_at: new Date(Date.now() + 3 * H * 1000).toISOString() });
-  await telemetry({ machine_state: 'idle' });
+  // An agent clock running ahead cannot freeze the row: its stamp is no age alone, and the next reading still lands.
+  await telemetry({ machine_state: 'error', boot, seq: 3, reported_at: new Date(Date.now() + 3 * H * 1000).toISOString() });
+  await telemetry({ machine_state: 'idle', boot, seq: 4 });
   assert.equal((await view()).telemetry.machine_state, 'idle');
 });
 
@@ -292,7 +294,7 @@ test('c22: a re-sent pause and a late start change nothing', async () => {
   const w = pcWorld();
   const cat = await seedCatalog(w, { approval: false });
   const agent = await agentOn(w, cat, ['telemetry', 'job_control']);
-  await ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, { machine_state: 'idle' }, agent.bearer);
+  await ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, reading({ machine_state: 'idle' }), agent.bearer);
   await buy(w.a, [{ kind: 'credit_package', package_id: cat.packages.h6 }, { kind: 'material', variant_id: cat.white, quantity: 250 }]);
   const jobId = await queuedJob(w, w.a, cat);
   assert.equal((await ok(w.assistant, 'POST', `${ADMIN}/queue/run`)).assigned.length, 1);
@@ -337,14 +339,14 @@ test('c24: idle counts follow the scheduler: a silent, never-connected or faulte
   });
   const only = (idle: number, offline: number) => ({ availability: idle, offline, models: idle, model: idle, mine: idle, dashboard: idle });
   assert.deepEqual(await counts(), only(1, 1), 'never connected: only the manual machine is idle');
-  await ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, { machine_state: 'idle' }, bearer);
+  await ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, reading({ machine_state: 'idle' }), bearer);
   assert.deepEqual(await counts(), only(2, 0));
   w.raw.prepare("UPDATE pc_printer_telemetry SET received_at = '2000-01-01T00:00:00.000Z' WHERE printer_id = ?").run(cat.printers[0]);
   assert.deepEqual(await counts(), only(1, 1), 'silent for hours');
-  await ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, { machine_state: 'error', errors: [{ code: 'HMS_0300' }] }, bearer);
+  await ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, reading({ machine_state: 'error', errors: [{ code: 'HMS_0300' }] }), bearer);
   assert.deepEqual(await counts(), only(1, 0), 'faulted');
   // The manual machine in a maintenance window that is on now is not idle either.
-  await ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, { machine_state: 'idle' }, bearer);
+  await ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, reading({ machine_state: 'idle' }), bearer);
   await ok(w.assistant, 'POST', `${ADMIN}/printers/${cat.printers[1]}/maintenance`, {
     kind: 'calibration',
     starts_at: new Date(Date.now() - 60_000).toISOString(),
@@ -357,7 +359,7 @@ test('c25: the file door needs the capability of the work: a telemetry-only toke
   const w = pcWorld();
   const cat = await seedCatalog(w, { approval: false });
   const camera = await agentOn(w, cat, ['telemetry']);
-  await ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, { machine_state: 'idle' }, camera.bearer);
+  await ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, reading({ machine_state: 'idle' }), camera.bearer);
   await buy(w.a, [{ kind: 'credit_package', package_id: cat.packages.h6 }, { kind: 'material', variant_id: cat.white, quantity: 250 }]);
   const fileId = await readyFile(w, w.a, [40, 30, 10], 'secret.stl');
   const { jobId } = await estimatedJob(w, w.a, cat, { seconds: H, materials: [{ variant_id: cat.white, model_grams: 20 }], fileId });

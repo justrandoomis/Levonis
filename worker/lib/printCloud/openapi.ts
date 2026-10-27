@@ -284,21 +284,41 @@ const SCHEMAS: Record<string, unknown> = {
     ['kind']
   ),
   BuybackRequest: obj({ variant_id: str, qty: int(1) }, ['variant_id', 'qty']),
-  Telemetry: obj({
-    machine_state: { enum: ['idle', 'preparing', 'printing', 'paused', 'finished', 'error', 'offline'] },
-    job_id: str,
-    progress_permille: int(0),
-    layer: int(0),
-    total_layers: int(0),
-    remaining_seconds: int(0),
-    nozzle_temp_dc: { type: 'integer' },
-    bed_temp_dc: { type: 'integer' },
-    chamber_temp_dc: { type: 'integer' },
-    errors: { type: 'array' },
-    camera: { type: 'object' },
-    reported_at: { type: 'string', format: 'date-time', description: "When the reading was taken, by the agent clock; this agent's readings are ordered by it, so an earlier one never replaces a later one" },
-    sent_at: { type: 'string', format: 'date-time', description: 'When the agent sent it, by the same clock; with reported_at it dates a buffered reading without trusting the clock' },
-  }),
+  Telemetry: obj(
+    {
+      machine_state: { enum: ['idle', 'preparing', 'printing', 'paused', 'finished', 'error', 'offline'] },
+      boot: {
+        type: 'integer',
+        minimum: 0,
+        maximum: 9007199254740991,
+        description:
+          'The agent\'s boot counter: it persists it and raises it at every start of its process. With seq it ORDERS readings: a higher boot is a later run. A counter that goes back makes the agent\'s readings superseded until it passes the stored one (the cloud records boot_regressed)',
+      },
+      seq: {
+        type: 'integer',
+        minimum: 0,
+        maximum: 9007199254740991,
+        description: 'Strictly increasing within the boot. A reading whose (boot, seq) is not newer than the stored one is answered superseded and changes nothing (an error still records machine_error once)',
+      },
+      job_id: str,
+      progress_permille: int(0),
+      layer: int(0),
+      total_layers: int(0),
+      remaining_seconds: int(0),
+      nozzle_temp_dc: { type: 'integer' },
+      bed_temp_dc: { type: 'integer' },
+      chamber_temp_dc: { type: 'integer' },
+      errors: { type: 'array' },
+      camera: { type: 'object' },
+      reported_at: { type: 'string', format: 'date-time', description: 'When the reading was taken, by the agent clock. With sent_at it gives the reading its age, for freshness only; never its order' },
+      sent_at: {
+        type: 'string',
+        format: 'date-time',
+        description: 'When the agent sent it, by the same clock. The age is sent_at - reported_at (skew cancels), capped just past the stale window; without both the reading is as old as its arrival',
+      },
+    },
+    ['machine_state', 'boot', 'seq']
+  ),
   Consumption: obj({ printed_seconds: int(0), materials: { type: 'array', items: obj({ variant_id: str, qty: int(0) }, ['variant_id', 'qty']) } }, ['printed_seconds']),
   AgentJobEvent: obj({ event: { enum: ['started', 'paused', 'resumed', 'completed', 'failed'] }, printer_id: str, event_id: { type: 'string', pattern: '^[A-Za-z0-9_.:-]{8,120}$', description: 'Unique per job; required for paused and resumed' }, printed_seconds: int(0), materials: { type: 'array' }, reason_code: str, reason: str }, ['event', 'printer_id']),
   Estimate: obj(

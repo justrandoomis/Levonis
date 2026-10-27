@@ -35,6 +35,7 @@ import {
   ok,
   owned,
   pcWorld,
+  reading,
   readyFile,
   reconcileClean,
   refused,
@@ -159,7 +160,7 @@ async function agentPrinter(w: World, cat: Catalog) {
   const agent = await ok(w.full, 'POST', `${ADMIN}/agents`, { name: 'Bay 1', capabilities: ['telemetry'] });
   await ok(w.owner, 'PATCH', `${ADMIN}/catalog/printers/${cat.printers[0]}`, { adapter: 'agent', agent_id: agent.agent_id, connection_ref: 'lan-1' });
   const bearer = { Authorization: `Bearer ${agent.token}` };
-  const send = (body: Json) => ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, body, bearer);
+  const send = (body: Json) => ok(w.guest, 'POST', `${AGENT}/printers/${cat.printers[0]}/telemetry`, reading(body), bearer);
   const live = async () => (await ok(w.assistant, 'GET', `${ADMIN}/printers`)).find((p: Json) => p.id === cat.printers[0]);
   const restored = () => rows(w, "SELECT id FROM pc_printer_events WHERE printer_id = ? AND kind = 'connection_restored'", cat.printers[0]).length;
   return { send, live, restored };
@@ -177,10 +178,9 @@ test('an agent whose clock runs ten minutes slow is live when it says when it se
   assert.equal(first.connectivity, 'online', JSON.stringify(first));
   await a.send({ machine_state: 'idle', reported_at: at(-598), sent_at: at(-597) });
   assert.equal(a.restored(), 0, 'a steady connection is never «restored»');
-  // An hour of silence: the stored reading's arrival is moved back an hour, as if nothing came since — on the
-  // agent's clock too, since its readings are ordered on it (an unmoved stamp would outrank the whole flush).
-  w.raw.prepare('UPDATE pc_printer_telemetry SET arrived_at = ?, received_at = ?, reported_at = ? WHERE printer_id = ?').run(at(-3600), at(-3600), at(-600 - 3600), cat.printers[0]);
-  // Reconnection flushes five buffered readings (50 to 10 minutes old by the agent clock), then a live one.
+  // An hour of silence: the stored reading's arrival is moved back an hour, as if nothing came since.
+  w.raw.prepare('UPDATE pc_printer_telemetry SET arrived_at = ?, received_at = ? WHERE printer_id = ?').run(at(-3600), at(-3600), cat.printers[0]);
+  // Reconnection flushes five buffered readings (50 to 10 minutes old by the agent clock), next in its sequence, then a live one.
   for (const minutes of [50, 40, 30, 20, 10]) await a.send({ machine_state: 'idle', reported_at: at(-600 - minutes * 60), sent_at: at(-600) });
   await a.send({ machine_state: 'idle', reported_at: at(-601), sent_at: at(-600) });
   assert.equal(a.restored(), 1, 'one outage, one event');

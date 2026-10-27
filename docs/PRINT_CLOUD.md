@@ -456,27 +456,53 @@ nothing), `GET /commands`, `POST /slicing/claim`,
 (only a file of a job it is slicing, with `slicer`, or printing, with
 `job_control`).
 
-Telemetry older than `telemetry_stale_seconds` is reported **stale**, never as
-live; a silent agent printer receives no work. A reading is dated by when it
-was taken: its arrival less its age, the age being `sent_at - reported_at` (two
-readings of the agent's one clock, so clock skew cancels; without `sent_at`,
-`now - reported_at`); freshness is judged by that taken time. Readings are
-ORDERED on the agent's own clock when they can be: one whose `reported_at` is
-earlier than the stored reading's, from the agent that wrote it, is older
-whenever it arrives (a body re-sent with its original stamps, a reading
-overtaken in transit). A reading without `reported_at`, or a row another agent
-wrote (a re-bound printer), is ordered by taken time. An older reading is
-answered `superseded` and changes nothing; the batch re-checks the order, so
-a race cannot slip one past. «Back from silence» is judged by the gap between
-POST arrivals on the server clock (`arrived_at`, which only moves forward):
-the POST that ends a silence — stored or superseded — records the outage on
-the printer's row (`outage_from`, `outage_to`) and writes `connection_restored`,
-once per outage even when two POSTs race at reconnection. A stored `finished`
-reading for the assigned job the record still shows `printing`, taken during
-that outage or the first one taken after it, writes `reconcile_needed` — once
-per job per outage, whichever POST of the flush carries it. `GET /status`
-calls the slicer `connected` only when a slicer agent called in within the same
-window. Camera data is metadata only (availability, stream id, resolution).
+**Order.** Every telemetry body carries `boot` — the agent's boot counter, an
+integer it persists and raises by one at every start of its process — and
+`seq`, an integer from 0 to 2^53−1 that strictly increases within that boot
+(one counter for the process or one per printer: readings are only compared
+for the same printer). Both are required; a body without them is refused
+`VALIDATION`. Readings are ordered by `(boot, seq)` and by nothing else: a
+higher boot is a later run, and within a boot the higher `seq` is newer. Both
+numbers are the agent's own, so neither arrival order nor any clock — not even
+the server's — can reorder a dead process's late reading ahead of the live
+one. A counter that goes back (a lost or restored file) makes the agent's
+readings superseded until it passes the stored one; the cloud writes
+`boot_regressed` once per such boot so an operator sees why, and re-binding the
+printer to a fresh agent token clears it. When the stored reading came from
+another agent (the printer was re-bound), the bound agent's reading replaces
+it, whatever its numbers. A reading that is not newer is
+answered `superseded` and changes no state. No clock is consulted, so a
+replayed body, a reading overtaken in transit, an agent clock stepped back or a
+stamp in the year 2100 cannot reorder anything. The pre-read, the upsert's
+`WHERE` and a fence on the row's fresh `op_token` apply the same order, so two
+racing readings end with the higher one stored and only its events. The batch
+is also fenced on the printer still being bound to the agent. An error reading
+writes `machine_error` once per reading, whether it is stored or superseded
+(the event id is derived from printer, agent, boot and `seq`). A fault reported
+out of order is never lost, though it changes nothing.
+
+**Freshness.** Telemetry older than `telemetry_stale_seconds` is reported
+**stale**, never as live, and a silent agent printer receives no work. A
+reading is dated by when it was taken: its arrival less its age. The age is
+`sent_at - reported_at` when both stamps are present (two readings of the
+agent's one clock, so clock skew cancels). It is 0 for a pair out of order and
+is capped one second past the window, so a huge age makes a reading stale but
+never dates it further back. Without both stamps a reading is as old as its
+arrival. That taken time (`received_at`) is the only thing freshness is judged
+by, and it is written only with its own reading. The stamps are optional and
+never order anything.
+
+**Outages.** «Back from silence» is judged by the gap between POST arrivals on
+the server clock (`arrived_at`, which only moves forward), never by a reading
+or its order. The POST that ends a silence, stored or superseded, records the
+outage on the printer's row (`outage_from`, `outage_to`) and writes
+`connection_restored`, once per outage even when two POSTs race at
+reconnection. A stored `finished` reading for the assigned job that the record
+still shows `printing` writes `reconcile_needed` when it was taken during that
+outage, or is the first one taken after it. That happens once per job per
+outage, whichever POST of the flush carries it. `GET /status` calls the slicer
+`connected` only when a slicer agent called in within the same window. Camera
+data is metadata only (availability, stream id, resolution).
 
 ## 10. Dashboards, notifications and administration
 

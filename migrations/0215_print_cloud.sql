@@ -234,18 +234,26 @@ CREATE TABLE IF NOT EXISTS pc_printer_maintenance (
 );
 CREATE INDEX IF NOT EXISTS idx_pc_printer_maintenance_window ON pc_printer_maintenance(printer_id, status, starts_at);
 
--- The latest telemetry the agent reported, one row per printer. `received_at`
--- is the server clock; a reading older than the configured window is STALE
--- and is answered as such, never as live.
+-- The latest telemetry the agent reported, one row per printer. Readings are
+-- ORDERED by (boot, seq), never by a clock; `received_at` only dates the
+-- stored one for freshness, and a reading older than the configured window is
+-- STALE and is answered as such, never as live.
 CREATE TABLE IF NOT EXISTS pc_printer_telemetry (
   printer_id TEXT PRIMARY KEY REFERENCES pc_printers(id),
   agent_id TEXT,
-  -- When the stored reading was TAKEN, on the server clock (printers.ts ingestTelemetry).
+  -- The stored reading's place in the agent's order: the agent's boot counter (it persists it and adds one at
+  -- every start of its process) and the reading's sequence number within that boot.
+  boot INTEGER NOT NULL CHECK (boot >= 0),
+  seq INTEGER NOT NULL CHECK (seq >= 0),
+  -- Fresh on every stored reading: the batch's fence proves the row holds this request's reading.
+  op_token TEXT NOT NULL DEFAULT '',
+  -- When the stored reading was TAKEN, on the server clock: its arrival less its age, capped just past the stale
+  -- window. Freshness only; never rewritten.
   received_at TEXT NOT NULL,
-  -- The same moment on the clock of `agent_id`: that agent's later readings are ordered by it.
-  reported_at TEXT,
+  -- The same moment with the age uncapped (arrival less sent_at - reported_at): only the outage reconciliation reads it.
+  observed_at TEXT,
   -- When the agent last reached the cloud for this printer, any reading: the connection's own liveness. Never moves back.
-  arrived_at TEXT,
+  arrived_at TEXT NOT NULL,
   -- The last outage of that connection: the arrival before the silence, and the POST that ended it.
   outage_from TEXT,
   outage_to TEXT,

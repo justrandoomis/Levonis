@@ -119,6 +119,14 @@ export const AGENT = '/api/print-cloud/v1/agent';
 let keyCounter = 0;
 export const idem = (label = 'k') => ({ 'Idempotency-Key': `test-${label}-${++keyCounter}-${Date.now()}` });
 
+let readingCounter = 0;
+/**
+ * A telemetry body as the agent sends it (docs/PRINT_CLOUD.md §9): one boot
+ * for the test process, each reading the next of its sequence. A body that
+ * names its own `boot` or `seq` keeps them.
+ */
+export const reading = (body: Record<string, unknown>): Record<string, unknown> => ({ boot: 1, seq: ++readingCounter, ...body });
+
 /** The call must succeed; returns `data`. */
 export async function ok(app: App, method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<Json> {
   const r = await call(app, method, path, body, headers);
