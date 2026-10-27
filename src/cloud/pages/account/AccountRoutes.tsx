@@ -1,51 +1,56 @@
 /**
- * ACCOUNT — the customer's hours ledger, filament, shipments, buybacks,
- * transactions and settings: every address under /account
+ * ACCOUNT — THE CUSTOMER'S OWN RECORDS: every address under /account
  * (src/cloud/routes.ts). The shell mounts this module behind
  * `<RequireSignIn>`, so whoever reaches it is signed in.
  *
- * A PLACEHOLDER. The section's builder replaces this whole file, keeping
- * the default export: a component that takes no props and renders its own
- * `<Routes>` with FULL paths (`/account/shipments/:id`, not `:id`). Until
- * then every address of the section says plainly that its pages are not
- * built yet and points at what already works — the home shows the
- * customer's balances and jobs.
+ *   /account                         the profile, the two balances, the menu
+ *   /account/hours                   hours per printer class, purchases and expiry, holds, movements, conversion
+ *   /account/materials               material owned at the workshop, reorder suggestions
+ *   /account/materials/:variantId    one material: reminder, top-up, movements
+ *   /account/shipments               pickups and deliveries
+ *   /account/shipments/new           ask for one
+ *   /account/shipments/:id           one shipment, its road, cancel
+ *   /account/buyback                 sell unused material back
+ *   /account/transactions            every movement, paged on the server's cursor
+ *   /account/settings                language and appearance
+ *
+ * Every screen is a lazy chunk of its own. Every screen imports the
+ * section's shared pieces (shared.tsx, logic.ts) and its words
+ * (strings/account.ts), so Rollup keeps the three together as ONE chunk the
+ * screens share — never a scatter of small ones by importer set
+ * (tests/motionLazy.test.ts counts those). The rest of Print Cloud is reached
+ * by its own routes: prints /jobs, orders /orders, files /files, the store
+ * /store?tab=….
  */
-import { Link } from 'react-router-dom';
-import { common, nav } from '../../strings/common';
-import { useCloudText } from '../../text';
-import type { Tri } from '../../types';
-import { CloudEmptyState, PageHeader, User } from '../../ui';
+import { Route, Routes } from 'react-router-dom';
+import { prefetchable } from '../../../lib/routeReveal';
+import { CloudNotFound } from '../../shell/Notices';
 
-const words = {
-  title: { ar: 'صفحات الحساب قيد الإنشاء', en: 'The account pages are being built', ckb: 'پەڕەکانی هەژمار هێشتا دروست دەکرێن' },
-  body: {
-    ar: 'هنا سترى سجل ساعاتك وخيوطك وشحناتك والخيوط التي تبيعها للورشة. حتى تجهز، تعرض الرئيسية أرصدتك ومهامك.',
-    en: 'This is where you will see your hours ledger, your filament, your shipments and the filament you sell back to the workshop. Until it is ready, your home shows your balances and your jobs.',
-    ckb: 'لێرە تۆماری کاتژمێرەکانت و فیلامێنتەکەت و ناردنەکانت و ئەو فیلامێنتەی بە کارگەی دەفرۆشیتەوە دەبینیت. تا ئامادە دەبێت، پەڕەی سەرەکی باڵانس و کارەکانت پیشان دەدات.',
-  },
-} satisfies Record<string, Tri>;
+const AccountHome = prefetchable(() => import('./AccountHome'));
+const AccountHours = prefetchable(() => import('./AccountHours'));
+const AccountMaterials = prefetchable(() => import('./AccountMaterials'));
+const AccountMaterial = prefetchable(() => import('./AccountMaterial'));
+const AccountShipments = prefetchable(() => import('./AccountShipments'));
+const AccountShipmentNew = prefetchable(() => import('./AccountShipmentNew'));
+const AccountShipment = prefetchable(() => import('./AccountShipment'));
+const AccountBuyback = prefetchable(() => import('./AccountBuyback'));
+const AccountTransactions = prefetchable(() => import('./AccountTransactions'));
+const AccountSettings = prefetchable(() => import('./AccountSettings'));
 
 export default function AccountRoutes() {
-  const { t } = useCloudText();
   return (
-    <div>
-      <PageHeader title={t(nav.account)} back={{ to: '/', label: t(nav.home) }} />
-      <CloudEmptyState
-        icon={<User className="h-6 w-6" />}
-        title={t(words.title)}
-        body={t(words.body)}
-        action={
-          <>
-            <Link to="/" className="lv-button lv-button-secondary">
-              {t(common.backHome)}
-            </Link>
-            <Link to="/printers" className="lv-button lv-button-ghost">
-              {t(nav.printers)}
-            </Link>
-          </>
-        }
-      />
-    </div>
+    <Routes>
+      <Route path="/account" element={<AccountHome />} />
+      <Route path="/account/hours" element={<AccountHours />} />
+      <Route path="/account/materials" element={<AccountMaterials />} />
+      <Route path="/account/materials/:variantId" element={<AccountMaterial />} />
+      <Route path="/account/shipments" element={<AccountShipments />} />
+      <Route path="/account/shipments/new" element={<AccountShipmentNew />} />
+      <Route path="/account/shipments/:id" element={<AccountShipment />} />
+      <Route path="/account/buyback" element={<AccountBuyback />} />
+      <Route path="/account/transactions" element={<AccountTransactions />} />
+      <Route path="/account/settings" element={<AccountSettings />} />
+      <Route path="*" element={<CloudNotFound />} />
+    </Routes>
   );
 }

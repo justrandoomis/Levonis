@@ -291,6 +291,7 @@ export const RECONCILE_CHECK: Readonly<Record<string, Tri>> = {
   fulfilled_orders_have_one_confirmed_payment: tri('لكل طلب منفَّذ دفعة مؤكدة واحدة', 'Every fulfilled order has one confirmed payment', 'هەر داواکارییەکی جێبەجێکراو یەک پارەدانی پشتڕاستکراوی هەیە'),
   payments_needing_refund: tri('مدفوعات تحتاج استرداداً', 'Payments that need a refund', 'ئەو پارەدانانەی پێویستیان بە گەڕاندنەوەیە'),
   customer_usage_left_the_shelf: tri('ما استهلكه العملاء خرج من الرف', 'Customer usage left the shelf', 'بەکارهێنانی کڕیاران لە ڕەفەکە دەرچوو'),
+  wallet_payments_match_the_wallet: tri('مدفوعات المحفظة تطابق محفظة Levonis', 'Wallet payments match the Levonis wallet', 'پارەدانەکانی جزدان لەگەڵ جزدانی Levonis دەگونجێن'),
 };
 
 // ------------------------------------------------------------------ refusals
