@@ -36,6 +36,10 @@
  *     a pressed filter chip wear the house Highlight line and outline (the
  *     row its start bar in Highlight too), the idle ones do not, and a focused
  *     one shows the 2px CanvasText focus line instead.
+ *   (fix round 2)
+ *   - under forced colours the underline of the chosen tab is Highlight, never
+ *     the Canvas it was (the weight of the label was the only cue left), with
+ *     the first and then the second tab chosen; the idle tab draws no line.
  *
  * Screenshots go to OUT_DIR (default /tmp/claude-0/shots/community-kit/).
  *
@@ -497,6 +501,36 @@ for (const theme of ['dark', 'light']) {
   await page.locator('.cm-row').first().locator('xpath=..').screenshot({ path: `${out}/forced-${theme}-rows.png` });
   await page.locator('[data-probe-nav]').screenshot({ path: `${out}/forced-${theme}-current-chip.png` });
   await page.locator('[data-kit-row="filters"]').screenshot({ path: `${out}/forced-${theme}-filters.png` });
+
+  // The underline of the chosen tab (fix round 2). Forced colours turned its gold background into
+  // Canvas, so the chosen tab differed from the idle one by its weight alone. It comes back in
+  // Highlight, as the row bar does, whichever tab is chosen; the idle tab draws no line.
+  for (const which of ['first', 'second']) {
+    if (which === 'second') {
+      await page.locator('[data-kit="selection"] .cm-tabs [role="tab"][aria-selected="false"]').first().click();
+      await page.mouse.move(1, 1);
+      await page.evaluate(() => document.activeElement?.blur());
+      await page.waitForTimeout(300);
+    }
+    const tabs = await page.evaluate(() => {
+      const probe = document.createElement('i');
+      document.body.append(probe);
+      probe.style.background = 'Highlight';
+      const highlight = getComputedStyle(probe).backgroundColor;
+      probe.style.background = 'Canvas';
+      const canvas = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      const all = [...document.querySelectorAll('[data-kit="selection"] .cm-tabs [role="tab"]')].map((t) => {
+        const line = t.querySelector('[data-tab-line]');
+        return { chosen: t.getAttribute('aria-selected') === 'true', line: line ? getComputedStyle(line).backgroundColor : null, height: line ? line.getBoundingClientRect().height : 0 };
+      });
+      return { highlight, canvas, all };
+    });
+    const chosen = tabs.all.filter((t) => t.chosen);
+    check(`forced colours ${theme}: the underline of the chosen tab (the ${which}) is Highlight, not Canvas`, chosen.length === 1 && chosen[0].line === tabs.highlight && chosen[0].line !== tabs.canvas && chosen[0].height === 3, JSON.stringify(tabs));
+    check(`forced colours ${theme}: … and the idle tab draws no line`, tabs.all.filter((t) => !t.chosen).every((t) => t.line === null), JSON.stringify(tabs));
+    await page.locator('[data-kit="selection"] [role="tablist"]').screenshot({ path: `${out}/forced-${theme}-tabs-${which}.png` });
+  }
   await context.close();
 }
 

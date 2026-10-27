@@ -744,14 +744,10 @@ test('the community scope re-tints primitives only, its shadows are clay, and it
       assert.equal(parseFloat(x), 0, `--${name} casts sideways (${p})`);
     }
   }
-  // Every shadow the sheet draws is none, a clay composite or a gold composite; so is every shadow of
-  // the kit sheets, which hold the looks of the kit controls beside their modules (B1FIX-R1-REG-1).
-  const kitSheets = ['controls', 'display', 'fields'].map((m) => `src/components/community/kit/${m}.css`);
-  for (const [file, source] of [['src/styles/community.css', sheet] as const, ...kitSheets.map((f) => [f, stripCssComments(read(f))] as const)]) {
-    if (file !== 'src/styles/community.css') assert.doesNotMatch(source, /--clay-[a-z-]+\s*:/, `${file}: a kit sheet re-tints or redeclares the clay (the scope sheet alone does)`);
-    for (const m of source.matchAll(/(?:^|[;{\s])(box-shadow|--tw-shadow):\s*([^;}]+)/g)) {
-      assert.match(m[2].trim(), /^(?:none|var\(--(?:clay-[a-z0-9]+|cm-(?:gold|sel)-shadow|tw-shadow)\))$/, `${file}: a shadow that is not clay: ${m[2].trim()}`);
-    }
+  // Every shadow the sheet draws is none, a clay composite or a gold composite. The sheet holds every
+  // look of the kit (B1FIX-R2-REG-1: no community module brings a sheet of its own).
+  for (const m of sheet.matchAll(/(?:^|[;{\s])(box-shadow|--tw-shadow):\s*([^;}]+)/g)) {
+    assert.match(m[2].trim(), /^(?:none|var\(--(?:clay-[a-z0-9]+|cm-(?:gold|sel)-shadow|tw-shadow)\))$/, `community.css: a shadow that is not clay: ${m[2].trim()}`);
   }
   // D-3: one class, five variables, the aria state as the key.
   const sel = /\.cm-sel:is\(\[aria-pressed='true'\], \[aria-checked='true'\][^{]*\{([^}]*)\}/.exec(sheet)?.[1] ?? '';

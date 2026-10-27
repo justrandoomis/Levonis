@@ -22,7 +22,6 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { Camera, ChevronDown, Search, UploadCloud, X } from 'lucide-react';
 import { usePointerFine } from '../../../lib/useMediaQuery';
 import { useKitStrings } from './strings';
-import './fields.css';
 
 const CLEAR =
   'absolute end-0.5 inline-flex h-11 w-11 items-center justify-center rounded-full text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';

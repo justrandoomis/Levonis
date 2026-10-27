@@ -2,8 +2,9 @@
  * THE COMMUNITY CONTROLS (community UI plan B1; tokens.md §6 rows 7–11, 18,
  * 19). Each wraps the house control that already has the semantics and the
  * keyboard (TabStrip, Segmented, Switch, NumberInput, Menu) and gives it the
- * reference look through one `cm-` class of ./controls.css (imported here, so
- * it ships with the first page that imports one of them):
+ * reference look through one `cm-` class of the scope sheet
+ * (src/styles/community.css, the one sheet of the whole kit) and the
+ * utilities the app already ships:
  *
  *   UnderlineTabs   the 3px gold underline under a gold label, as wide as
  *                   the label plus 12px on each side (tokens.md §6 #7)
@@ -31,7 +32,6 @@ import { TabStrip, type TabStripProps } from '../../ui/Tabs';
 import FilterChip from '../FilterChip';
 import { KitIconButton } from './buttons';
 import { useKitStrings } from './strings';
-import './controls.css';
 
 export type UnderlineTabsProps = Omit<TabStripProps, 'indicatorClassName' | 'activeClassName' | 'idleClassName'>;
 
@@ -66,7 +66,7 @@ function UnderlineLabel({ children, line }: { children: React.ReactNode; line: R
     return () => watch?.disconnect();
   }, [children]);
   return (
-    <span ref={ref} className="cm-tab-label">
+    <span ref={ref} className="cm-tab-label relative inline-flex items-center gap-1.5">
       {children}
       {line}
     </span>
@@ -100,7 +100,7 @@ export function UnderlineTabs({ className = '', items, value, group, ...rest }: 
                   layoutId={`cm-tab-line-${group}`}
                   aria-hidden="true"
                   data-tab-line
-                  className="cm-tab-line"
+                  className="cm-tab-line absolute bottom-0 h-[3px] rounded-full bg-gold"
                   transition={m.reduced ? { duration: 0 } : m.spring('move')}
                 />
               )
@@ -114,7 +114,7 @@ export function UnderlineTabs({ className = '', items, value, group, ...rest }: 
       indicatorClassName="hidden"
       activeClassName="text-gold"
       idleClassName="text-text-secondary hover:text-text-primary"
-      className={`cm-tabs ${className}`}
+      className={`cm-tabs border-b border-border-subtle ${className}`}
     />
   );
 }
@@ -232,7 +232,7 @@ export function ChoiceTiles(props: ChoiceTilesProps) {
             disabled={it.disabled}
             data-choice={it.id}
             onClick={() => press(it.id)}
-            className={`cm-raised cm-sel relative flex min-h-14 w-full items-center rounded-md px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${it.subtitle ? 'gap-3 text-start' : 'cm-tile-one'}`}
+            className={`cm-raised cm-sel relative flex min-h-14 w-full items-center rounded-md px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${it.subtitle ? 'gap-3 text-start' : '@container'}`}
           >
             {it.subtitle ? (
               <>

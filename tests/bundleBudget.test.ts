@@ -35,6 +35,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { transformWithEsbuild } from 'vite';
 import { STOREFRONT_FIXED_KB } from '../worker/lib/storeSpeed';
 import { CHUNK_PRELOAD_CAP, chunkPreloads, type ViteManifest } from '../worker/lib/socialPreview';
 
@@ -759,7 +760,55 @@ function operationsCssFiles(): Set<string> {
   }));
 }
 
-test('the stylesheets stay under their budget', () => {
+/**
+ * NO COMMUNITY SHEET WAITS OUTSIDE THE COUNT (community UI plan B1, B1FIX-R2-REG-1). A stylesheet
+ * that a module imports ships with the first page that imports that module; until a page does, no
+ * build carries it, and the total below cannot see it. The community kit once kept the looks of its
+ * controls in three such sheets beside their modules: the public total read 60,326 B, while a page
+ * that used the kit made it 61,383 B (57 B under the gate), and split, the sheets gzipped 338 B more
+ * than in one. The kit is one sheet again (src/styles/community.css, every look of it), and this
+ * counts any community sheet a build does not carry yet at its own minified gzip, as it would ship,
+ * so the headroom never reads better than a page that uses the kit makes it.
+ *
+ * Measured at that fix (vite build, gzip 9; the same with and without a page importing the kit):
+ * the community sheet 2,947 B, public CSS 60,974 of 61,440 B, so 466 B are left for B2 to D. The
+ * plan budgeted about 1.2 KB for B1; the tokens alone are about 920 B. Keeping the kit at this cost
+ * is a deliberate re-cut the owner decides (DECISIONS row 270); otherwise rules get cut.
+ */
+const COMMUNITY_SHEET = 'src/styles/community.css';
+function communitySheets(): string[] {
+  const under = (dir: string) => (existsSync(join(ROOT, dir)) ? (readdirSync(join(ROOT, dir), { recursive: true }) as string[]).filter((f) => f.endsWith('.css')).map((f) => `${dir}/${f.split('\\').join('/')}`) : []);
+  return [COMMUNITY_SHEET, ...under('src/components/community'), ...under('src/pages/community')];
+}
+/** A sheet is carried when one built stylesheet holds every `cm-` class it styles. */
+export function sheetCarried(source: string, built: string[]): boolean {
+  const classes = [...new Set(source.replace(/\/\*[\s\S]*?\*\//g, '').match(/\.cm-[a-z0-9-]+/g) ?? [])];
+  return classes.length > 0 && built.some((css) => classes.every((c) => new RegExp(`\\${c}(?![a-z0-9-])`).test(css)));
+}
+async function shippedGzip(source: string): Promise<number> {
+  const { code } = await transformWithEsbuild(source, 'sheet.css', { loader: 'css', minify: true });
+  return gzipSync(Buffer.from(code), { level: 9 }).length;
+}
+async function pendingCommunityCss(built: string[]): Promise<{ f: string; bytes: number }[]> {
+  const out: { f: string; bytes: number }[] = [];
+  for (const f of communitySheets()) {
+    const source = readFileSync(join(ROOT, f), 'utf8');
+    if (!sheetCarried(source, built)) out.push({ f, bytes: await shippedGzip(source) });
+  }
+  return out;
+}
+
+test('a community sheet that no build carries yet is counted at its own gzip', async () => {
+  const built = readdirSync(ASSETS).filter((f) => f.endsWith('.css')).map((f) => readFileSync(join(ASSETS, f), 'utf8'));
+  // The scope sheet, the whole kit, is in the build: one built stylesheet holds every class it styles.
+  assert.ok(sheetCarried(readFileSync(join(ROOT, COMMUNITY_SHEET), 'utf8'), built), `${COMMUNITY_SHEET} is not in the build, or a kit look fell out of it`);
+  // A sheet beside a module no page imports is not, and it counts what it would ship.
+  const waiting = "@layer theme, base, components, utilities;\n[data-surface='community'] .cm-probe-only { block-size: 44px; }";
+  assert.equal(sheetCarried(waiting, built), false);
+  assert.ok((await shippedGzip(waiting)) > 40, 'a waiting sheet is counted at nothing');
+});
+
+test('the stylesheets stay under their budget', async () => {
   // Keep the existing 60 KiB gate for every stylesheet except the three new,
   // named operations sheets. They have a separate 7.5 KiB combined gate, and
   // the test below proves they cannot enter a customer's static CSS closure.
@@ -771,10 +820,14 @@ test('the stylesheets stay under their budget', () => {
   const operations = operationsCssFiles();
   const baseline = each.filter((x) => !operations.has(x.f));
   const feature = each.filter((x) => operations.has(x.f));
-  const total = baseline.reduce((sum, x) => sum + x.bytes, 0);
+  // Every community sheet a build does not carry yet ships with the first page that imports it: count it now.
+  const pending = await pendingCommunityCss(css.map((f) => readFileSync(join(ASSETS, f), 'utf8')));
+  const total = baseline.reduce((sum, x) => sum + x.bytes, 0) + pending.reduce((sum, x) => sum + x.bytes, 0);
   const operationsTotal = feature.reduce((sum, x) => sum + x.bytes, 0);
-  console.log(`bundle: original/public css ${kb(total)} gzip over ${baseline.length} file(s) — ${baseline.map((x) => `${x.f} ${kb(x.bytes)}`).join(', ')}`);
-  assert.ok(total <= CSS_BUDGET, `the stylesheets total ${kb(total)} gzip, over ${kb(CSS_BUDGET)}`);
+  console.log(`bundle: original/public css ${kb(total)} gzip (${total} B, ${CSS_BUDGET - total} B under the gate) over ${baseline.length} file(s)${pending.length ? ` and ${pending.length} community sheet(s) no build carries yet (${pending.map((x) => `${x.f} ${x.bytes} B`).join(', ')})` : ''} — ${baseline.map((x) => `${x.f} ${kb(x.bytes)}`).join(', ')}`);
+  const scope = each.find((x) => x.f.startsWith('CommunitySurface-'));
+  if (scope) console.log(`bundle: community css (the scope and the whole kit, one sheet) ${scope.bytes} B gzip`);
+  assert.ok(total <= CSS_BUDGET, `the stylesheets total ${kb(total)} gzip, over ${kb(CSS_BUDGET)}${pending.length ? `, ${pending.map((x) => x.f).join(', ')} included (no page imports it yet; it ships with the first that does)` : ''}`);
   console.log(`bundle: private operations css ${kb(operationsTotal)} gzip over ${operations.size} file(s), limit ${kb(OPERATIONS_CSS_BUDGET)} — ${feature.map((x) => `${x.f} ${kb(x.bytes)}`).join(', ')}`);
   assert.ok(operationsTotal <= OPERATIONS_CSS_BUDGET, `the private operations stylesheets total ${kb(operationsTotal)} gzip, over ${kb(OPERATIONS_CSS_BUDGET)}`);
 });

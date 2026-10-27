@@ -22,7 +22,6 @@ import { Check, ExternalLink, GripVertical, Plus, X } from 'lucide-react';
 import VariantImg from '../../ui/VariantImg';
 import { OnwardChevron, TextLink } from './buttons';
 import { useKitStrings } from './strings';
-import './display.css';
 
 type CardTag = 'div' | 'section' | 'article' | 'li' | 'aside';
 
