@@ -117,6 +117,12 @@ for (const [name, handler, code, status, accounting] of FAILURES) {
     if (accounting === 'worst') assert.ok(s.tokens_used > 16000, 'ambiguous: the worst case counts, never zero');
     // A timeout is never re-sent (the outcome is unknown and a re-send could be billed twice).
     if (name === 'timeout' || name === '302') assert.equal(stub.messages().length, 1);
+    // A failed job has nothing to cancel: a press of «إلغاء» answers with it unchanged.
+    const jobId = row<{ id: string }>(raw, 'SELECT id FROM creative_jobs')!.id;
+    const cancel = await post(app, `${BASE}/jobs/${jobId}/cancel`, {});
+    assert.equal(cancel.status, 200);
+    assert.equal((await body(cancel)).job.status, 'failed');
+    assert.equal(row<{ status: string }>(raw, 'SELECT status FROM creative_jobs')!.status, 'failed');
   });
 }
 

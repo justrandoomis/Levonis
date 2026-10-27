@@ -923,11 +923,17 @@ R.post('/ai/ideas', studio, async (c) => {
         if (!v.ideas.length) return { ok: false, reason: 'no_valid_idea', detail: v.rejected.slice(0, 12) };
         return { ok: true, result: { ideas: v.ideas.map((i) => ({ ...i, id: newId('cidea') })), rejected: v.rejected.length, notes: v.notes } };
       },
+      // The batch finishes the job first; the ideas are written only when that
+      // finish took (a cancel that lands mid-call leaves the job cancelled, and
+      // a cancelled job's result is never stored as usable).
       persist: (job, result) =>
         result.ideas.map(({ id, ...idea }) =>
           db
-            .prepare(`INSERT INTO creative_ideas (id, job_id, status, idea_json, product_id, created_by, created_at) VALUES (?, ?, 'new', ?, ?, ?, ?)`)
-            .bind(id, job.id, JSON.stringify(idea), idea.target_kind === 'product' ? idea.target_ref : null, actorOf(c), nowIso())
+            .prepare(
+              `INSERT INTO creative_ideas (id, job_id, status, idea_json, product_id, created_by, created_at)
+               SELECT ?, ?, 'new', ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM creative_jobs WHERE id = ? AND status = 'succeeded')`
+            )
+            .bind(id, job.id, JSON.stringify(idea), idea.target_kind === 'product' ? idea.target_ref : null, actorOf(c), nowIso(), job.id)
         ),
     },
     creativeTransport

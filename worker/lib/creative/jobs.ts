@@ -144,15 +144,26 @@ export async function failQueued(db: D1Database, id: string, code: string): Prom
   await db.prepare(`UPDATE creative_jobs SET status = 'failed', error_code = ?, finished_at = ? WHERE id = ? AND status = 'queued'`).bind(code, nowIso(), id).run();
 }
 
-/** Cancel: queued or running → cancelled. A finished job cannot be cancelled; an applied one certainly not. */
+/**
+ * Cancel: queued, running or succeeded-but-not-applied → cancelled.
+ *
+ * A succeeded job may still be cancelled until it is applied, because the
+ * editor shows a result as a preview first: «إلغاء» then means "never apply
+ * this", and markApplied refuses it from then on. An applied result cannot be
+ * cancelled (the design already holds it; undo is a new version). A failed job
+ * has nothing to cancel and is returned unchanged, like an already-cancelled one,
+ * so a second press of the button is harmless.
+ */
 export async function cancelJob(db: D1Database, id: string): Promise<JobRow> {
   const job = await jobById(db, id);
   if (!job) throw new HttpError(404, 'Job not found', 'NOT_FOUND');
-  if (job.status === 'cancelled') return job;
+  if (job.status === 'cancelled' || job.status === 'failed') return job;
   if (job.applied_at) throw new HttpError(409, 'This result was already applied.', 'JOB_ALREADY_APPLIED');
-  // A succeeded job may still be cancelled until it is applied: «إلغاء» then means "do not apply this".
   await db
-    .prepare(`UPDATE creative_jobs SET status = 'cancelled', cancelled_at = ?, finished_at = COALESCE(finished_at, ?) WHERE id = ? AND applied_at IS NULL AND status <> 'cancelled'`)
+    .prepare(
+      `UPDATE creative_jobs SET status = 'cancelled', cancelled_at = ?, finished_at = COALESCE(finished_at, ?)
+        WHERE id = ? AND applied_at IS NULL AND status IN ('queued', 'running', 'succeeded')`
+    )
     .bind(nowIso(), nowIso(), id)
     .run();
   return (await jobById(db, id))!;

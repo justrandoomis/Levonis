@@ -835,6 +835,11 @@ IQD, with a pre-order discount of $50 = 75,000.
   the selection door validates the chosen product, and the daily-rank query rechecks visibility
   before returning its identity. These two calls expose no price or purchase action, so a
   catalog-only product remains eligible while hidden or catalogue-held products do not.
+  The Creative Studio's store connector (`worker/lib/creative/store.ts`, its opportunities in
+  `worker/lib/creative/opportunities.ts`; DECISIONS row 270) is an owner screen whose output — an
+  advert — is a customer surface by another road, so it asks the listing's own scope (VISIBLE, and
+  `composition = '' OR sellable`) and words a price, an offer or «متوفر» only from the SELLABLE flag
+  and the public card: a design never names a product the shop hides.
 - **SELLABLE**: the old «listed» predicate byte for byte — visible, not held for ANY gap, and
   V2-published. Every PURCHASE path asks it: cart add, read and edit, the quote, checkout, Quick Buy, new
   gifts, bundles and mystery offers, the trade-in target (and, since Services S-P2, its search, the

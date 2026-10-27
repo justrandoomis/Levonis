@@ -243,6 +243,10 @@ export async function runAi<T>(env: AiEnv, ready: Ready, spec: AiSpec<T>, transp
     ...(spec.persist ? spec.persist(job, verdict.result) : []),
   ]);
   const finished = (await jobById(db, job.id))!;
+  // A cancel can land between the check above and the batch: the finish is then
+  // a no-op (it only moves a queued/running job), the persisted rows are skipped
+  // by their own guard, and the caller hears JOB_CANCELLED instead of a result.
+  if (finished.status !== 'succeeded') throw aiError('JOB_CANCELLED', { job_id: job.id });
   return {
     job: finished,
     result: verdict.result,

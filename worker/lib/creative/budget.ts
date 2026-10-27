@@ -14,8 +14,8 @@
  * AFTER THE CALL the reservation is SETTLED with the real usage (or the worst
  * case again when the outcome is unknown — a timeout may still be billed), or
  * RELEASED when the provider certainly did not process the request. A
- * reservation whose Worker died before settling is released by `sweepStale`
- * after five minutes (the longest call deadline is one minute plus one retry),
+ * reservation whose Worker died before settling is released by the next AI
+ * request (`releaseStale` in ./ai.ts) after five minutes (the longest call deadline is one minute plus one retry),
  * so a crash can never wedge the parallel limit for the rest of the day.
  *
  * COST IS AN ESTIMATE, AND SAYS SO. Micro-USD = tokens × the owner's rate per
