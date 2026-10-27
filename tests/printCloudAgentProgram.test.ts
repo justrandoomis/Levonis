@@ -613,6 +613,17 @@ test('an operator\'s estimate: the agent asks the job door what to print, slices
   await a.runner.start();
   await step(a, clock, 0);
   assert.equal(logged(a, 'slicing.claimed').length, 0, 'the operator answered the slicing request: nothing to claim');
+  // A new agent knows nothing about the bed, so it counts as occupied: the operator clears it, on the workshop PC.
+  const cfgPath = join(dir, 'agent.config.json');
+  writeFileSync(cfgPath, JSON.stringify({ cloud: { base_url: 'https://levonis-iq.com', token_env: 'TEST_AGENT_TOKEN' }, state_dir: dir, printers: { 'lan-sim-1': { driver: 'simulator' } } }));
+  const clearBed = async () => {
+    const out: string[] = [];
+    assert.equal(await main(['--config', cfgPath, '--bed-cleared', 'lan-sim-1'], { env: { TEST_AGENT_TOKEN: token }, print: (s) => out.push(s), signals: false }), 0, out.join('\n'));
+    assert.ok(existsSync(join(dir, 'bed-cleared', bedFlagName('lan-sim-1'))));
+  };
+  await clearBed();
+  await step(a, clock, 1_000);
+  assert.equal(logged(a, 'bed.cleared').length, 1);
   assert.deepEqual((await ok(w.assistant, 'POST', `${ADMIN}/queue/run`)).assigned, [{ job_id: one.jobId, printer_id: printer }]);
 
   // What the job door states for it (its scope is tested in tests/printCloudAgentJobDoor.test.ts).
@@ -640,11 +651,7 @@ test('an operator\'s estimate: the agent asks the job door what to print, slices
   assert.equal(logged(a, 'job.waiting')[0]?.reason, 'waiting_for_bed_clear');
   assert.equal(jobStatus(w, two.jobId), 'preparing');
   // The operator clears it and says so on the workshop PC.
-  const cfgPath = join(dir, 'agent.config.json');
-  writeFileSync(cfgPath, JSON.stringify({ cloud: { base_url: 'https://levonis-iq.com', token_env: 'TEST_AGENT_TOKEN' }, state_dir: dir, printers: { 'lan-sim-1': { driver: 'simulator' } } }));
-  const out: string[] = [];
-  assert.equal(await main(['--config', cfgPath, '--bed-cleared', 'lan-sim-1'], { env: { TEST_AGENT_TOKEN: token }, print: (s) => out.push(s), signals: false }), 0);
-  assert.ok(existsSync(join(dir, 'bed-cleared', bedFlagName('lan-sim-1'))));
+  await clearBed();
   await step(a, clock, 1_000);
   assert.deepEqual(sim.uploads.map((u) => u.name), [`lv_${one.jobId}.gcode`, `lv_${two.jobId}.gcode`]);
   await step(a, clock, 10_000);
@@ -1318,14 +1325,19 @@ test('slicing plans: objects = models × quantity × copies on their variant\'s 
   assert.equal(refuse({ settings: { ...input.settings, pause_at_layers: [5] } }), 'PAUSE_AT_LAYER_UNSUPPORTED', 'no pause G-code for that machine');
   assert.equal(refuse({ settings: { ...input.settings, nozzle_um: 600, pause_at_layers: [5] } }), 'ok');
   assert.equal(refuse({ settings: { ...input.settings, nozzle_um: 600, pause_at_layers: [5] } }, { ...cfg, output: 'gcode.3mf' }), 'PAUSE_AT_LAYER_UNSUPPORTED', 'not inside a .gcode.3mf');
+  // The CLI slices each file as uploaded: a model scaled or turned on its own is refused, the identity is not.
+  assert.equal(refuse({ models: [{ ...input.models[0], transform: { scale_ppm: 2_000_000 } }] }), 'TRANSFORM_UNSUPPORTED');
+  assert.equal(refuse({ models: [{ ...input.models[0], transform: { scale_ppm: 1_000_000, rotation_z_mdeg: 0, orientation: 'auto' } }] }), 'ok');
 
-  assert.deepEqual(orcaProcessOverrides(input.settings), { layer_height: '0.12', sparse_infill_density: '25%', wall_loops: '3', enable_support: '1', support_type: 'tree(auto)', brim_type: 'outer_only' });
+  // Object labels are always off: a customer's 3MF object name never reaches the G-code (tests/printCloudAgentFixes.test.ts, finding 1).
+  assert.deepEqual(orcaProcessOverrides(input.settings), { layer_height: '0.12', sparse_infill_density: '25%', wall_loops: '3', enable_support: '1', support_type: 'tree(auto)', brim_type: 'outer_only', gcode_label_objects: '0' });
   assert.deepEqual(
     orcaArgs({ machinePath: 'm.json', processPath: 'p.json', filamentPaths: ['a.json', 'b.json'], objects: [{ filament: 2, path: 'x.stl' }, { filament: 1, path: 'y.stl' }], outDir: 'out', outBase: 'lv_pcj_1', output: 'gcode.3mf', orient: true }),
     ['--slice', '0', '--arrange', '1', '--orient', '1', '--load-settings', 'm.json;p.json', '--load-filaments', 'a.json;b.json', '--load-filament-ids', '2,1', '--outputdir', 'out', '--export-3mf', 'lv_pcj_1.gcode.3mf', 'x.stl', 'y.stl']
   );
   const pr = prusaArgs({ printerIni: 'pr.ini', printIni: 'pp.ini', filamentIni: 'pf.ini', settings: { layer_height_um: 200, infill_percent: 15, walls: 2, supports: 'none', brim: false }, brimWidthMm: 5, outPath: 'o.gcode', objectPaths: ['a.stl'] });
-  assert.deepEqual(pr.args, ['--export-gcode', '--load', 'pr.ini', '--load', 'pp.ini', '--load', 'pf.ini', '--layer-height', '0.2', '--fill-density', '15%', '--perimeters', '2', '--no-support-material', '--brim-width', '0', '--output', 'o.gcode', 'a.stl']);
+  // --merge: every object on one plate (finding 4); labels off whatever the profile says (finding 1).
+  assert.deepEqual(pr.args, ['--export-gcode', '--merge', '--load', 'pr.ini', '--load', 'pp.ini', '--load', 'pf.ini', '--gcode-label-objects', 'disabled', '--layer-height', '0.2', '--fill-density', '15%', '--perimeters', '2', '--no-support-material', '--brim-width', '0', '--output', 'o.gcode', 'a.stl']);
 
   // Pauses go after the Nth layer marker, and only when every requested layer exists.
   const gcodePath = join(freshDir('pauses'), 'p.gcode');

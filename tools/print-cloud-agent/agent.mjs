@@ -22,7 +22,7 @@
  * Exit codes: 0 stopped cleanly · 64 bad arguments · 77 the cloud refused the
  * token · 78 configuration or state refused · 1 anything else.
  */
-import { mkdirSync, realpathSync } from 'node:fs';
+import { mkdirSync, realpathSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ConfigError, loadConfigFile } from './lib/config.mjs';
@@ -67,6 +67,25 @@ export function parseArgs(argv) {
   if (!out.help && !out.version && !out.fingerprint && !out.config) return { ...out, error: '--config is required' };
   if (out.init && out.repair) return { ...out, error: '--init and --repair-state exclude each other' };
   return out;
+}
+
+/**
+ * Why this process may not write a `--bed-cleared` flag, or null. The running
+ * agent must REMOVE a flag to use it (a clearance is used once, then gone), and
+ * one written by another user — `sudo … --bed-cleared` — it cannot remove, so
+ * it would clear nothing. Only the state directory's owner, the agent's own
+ * user, writes it. POSIX only: Windows has no uids.
+ */
+export function flagWriterProblem(stateDir) {
+  if (typeof process.getuid !== 'function') return null;
+  let st;
+  try {
+    st = statSync(stateDir);
+  } catch {
+    return `the state directory ${stateDir} does not exist yet: start the agent once, then clear the bed`;
+  }
+  if (st.uid === process.getuid()) return null;
+  return `run --bed-cleared as the agent's own user (uid ${st.uid}, the owner of ${stateDir}), e.g. sudo -u <agent user> env $(cat <env file>) node … --bed-cleared <ref>: the agent could not remove a flag another user writes, so it would clear nothing`;
 }
 
 /** `--check`: the token, the bindings, one status per configured printer. Sends no telemetry and opens no state. */
@@ -143,11 +162,16 @@ export async function main(argv, io = {}) {
       print(`no printer with connection_ref ${JSON.stringify(args.bedCleared)} in the configuration`);
       return EXIT.USAGE;
     }
+    const problem = flagWriterProblem(config.state_dir);
+    if (problem) {
+      print(problem);
+      return EXIT.USAGE;
+    }
     // A flag file the running agent consumes; it never takes the agent's lock.
     const dir = join(config.state_dir, 'bed-cleared');
     mkdirSync(dir, { recursive: true });
     atomicWriteFile(join(dir, bedFlagName(args.bedCleared)), `${new Date().toISOString()}\n`);
-    print(`bed of ${args.bedCleared} marked clear; the running agent picks it up on its next tick`);
+    print(`bed of ${args.bedCleared} marked clear; the running agent takes it on its next tick if the machine is not printing (log: bed.cleared, or bed.clear_refused)`);
     return EXIT.OK;
   }
 

@@ -12,3 +12,5 @@ export function parseArgs(argv: string[]): {
   error?: string;
 };
 export function main(argv: string[], io?: { env?: Record<string, string | undefined>; print?: (s: string) => void; signals?: boolean }): Promise<number>;
+/** Why this process may not write a --bed-cleared flag (it must be the state directory's owner), or null. */
+export function flagWriterProblem(stateDir: string): string | null;

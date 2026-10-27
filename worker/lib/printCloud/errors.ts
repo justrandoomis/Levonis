@@ -40,6 +40,7 @@ export type PcErrorCode =
   | 'FILE_TOO_LARGE'
   | 'FILE_TYPE_NOT_SUPPORTED'
   | 'FILE_REJECTED'
+  | 'MODEL_CONTAINS_GCODE'
   | 'FILE_NOT_READY'
   | 'STORAGE_NOT_CONFIGURED'
   | 'URL_NOT_ALLOWED'
@@ -203,6 +204,13 @@ const WORDS: Record<PcErrorCode, Words> = {
     ar: 'رُفض الملف بعد الفحص',
     en: 'The file was rejected by validation',
     ckb: 'فایلەکە دوای پشکنین ڕەتکرایەوە',
+  },
+  // A 3MF part a slicer turns into printer commands (files.ts inspect3mfArchive); `details.part` names it.
+  MODEL_CONTAINS_GCODE: {
+    status: 422,
+    ar: 'ملف 3MF يحتوي أوامر للطابعة (G-code مخصّص)، والورشة لا تشغّل أوامر من ملفات النماذج؛ صدّر النموذج من دونها ثم ارفعه',
+    en: 'The 3MF file contains printer commands (custom G-code), which the workshop never runs from a model file; export the model without them and upload it again',
+    ckb: 'فایلی 3MF فەرمانی چاپکەری تێدایە (G-codeی تایبەت)، و کارگەکە هەرگیز فەرمان لە فایلی مۆدێلەوە جێبەجێ ناکات؛ مۆدێلەکە بەبێ ئەو فەرمانانە هەناردە بکە و دووبارە باری بکە',
   },
   FILE_NOT_READY: {
     status: 409,

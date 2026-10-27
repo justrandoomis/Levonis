@@ -18,8 +18,11 @@
  * What v1 cannot slice faithfully it refuses with a code, so the customer is
  * told instead of quoted for something else: a fixed plate layout
  * (PLATE_LAYOUT_UNSUPPORTED), one model with parts in different materials
- * (MULTI_PART_ASSIGNMENT_UNSUPPORTED), pauses inside a .gcode.3mf
- * (PAUSE_AT_LAYER_UNSUPPORTED) and, per slicer, what its CLI cannot express.
+ * (MULTI_PART_ASSIGNMENT_UNSUPPORTED), a model scaled, turned or oriented on
+ * its own (TRANSFORM_UNSUPPORTED — the CLI slices each file as uploaded, and
+ * its --scale / --rotate act on every object at once), pauses inside a
+ * .gcode.3mf (PAUSE_AT_LAYER_UNSUPPORTED) and, per slicer, what its CLI
+ * cannot express.
  */
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -50,6 +53,22 @@ function machineFor(cfg, code, nozzleUm) {
 }
 
 /**
+ * Is a model's transform (worker/lib/printCloud/projects.ts parseTransform)
+ * the identity for a job sliced with `orientation`? Unscaled, turned only by
+ * whole turns, and oriented as the job is. An unknown key is not the identity.
+ */
+export function identityTransform(transform, orientation) {
+  if (transform === undefined || transform === null) return true;
+  if (typeof transform !== 'object' || Array.isArray(transform)) return false;
+  return Object.entries(transform).every(([k, v]) => {
+    if (k === 'scale_ppm') return v === 1_000_000;
+    if (k === 'rotation_x_mdeg' || k === 'rotation_y_mdeg' || k === 'rotation_z_mdeg') return Number.isInteger(v) && v % 360_000 === 0;
+    if (k === 'orientation') return v === orientation;
+    return false;
+  });
+}
+
+/**
  * The job's input → what to slice, or the reason v1 cannot slice it faithfully.
  * @param {Record<string, any>} input  the claim's `input` (worker/lib/printCloud/jobs.ts SlicingInput)
  * @param {Record<string, any>} cfg    the normalised slicer configuration
@@ -66,6 +85,10 @@ export function planSlice(input, cfg) {
     if (used.length !== 1) return fail('MULTI_PART_ASSIGNMENT_UNSUPPORTED', `model ${m.project_model_id} assigns ${used.length} materials to its parts`);
     const slot = variants.findIndex((v) => v.variant_id === used[0]);
     if (slot < 0) return fail('INPUT_INVALID', `variant ${used[0]} of model ${m.project_model_id} is not in the request`);
+    // The CLI slices each file as uploaded: a model scaled, turned or oriented on its own is refused, never quoted unscaled.
+    if (!identityTransform(m.transform, settings.orientation === 'auto' ? 'auto' : 'as_uploaded')) {
+      return fail('TRANSFORM_UNSUPPORTED', `model ${m.project_model_id} is scaled, turned or oriented on its own (${JSON.stringify(m.transform)}); the slicer CLI slices models as uploaded`);
+    }
     const qty = Number.isInteger(m.quantity) && m.quantity > 0 ? m.quantity : 1;
     for (let i = 0; i < qty * copies; i++) objects.push({ file_id: m.file_id, filament: slot + 1 });
   }

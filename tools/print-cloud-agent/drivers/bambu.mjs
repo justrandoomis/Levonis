@@ -148,6 +148,10 @@ export function createBambu(options, deps = {}) {
   };
 
   const open = async () => {
+    // A new connection starts from nothing: what was merged before a disconnect (a reboot, a power cut) is not the
+    // machine now, and the first look after the reconnect must not send it as a fresh reading.
+    report = null;
+    lastReportAt = 0;
     const c = new MqttClient({ connect: connectMqtt, clientId: `levonis-agent-${options.serial}-${process.pid}`, username: 'bblp', password: options.access_code, keepaliveSeconds: 30, log });
     c.on('message', onMessage);
     c.on('close', (reason) => {
@@ -155,7 +159,14 @@ export function createBambu(options, deps = {}) {
       if (!closed) log.warn('bambu.mqtt.closed', { host: options.host, reason });
     });
     await c.open();
-    await c.subscribe(reportTopic, 0);
+    try {
+      await c.subscribe(reportTopic, 0);
+    } catch (e) {
+      // Refused or unanswered: close what was opened, or every retry leaves one more live connection (socket and
+      // keep-alive) on the printer, whose LAN mode admits only a few.
+      c.close();
+      throw e;
+    }
     client = c;
     failures = 0;
     c.publish(requestTopic, { pushing: { sequence_id: String(++seq), command: 'pushall', version: 1, push_target: 1 } });
@@ -194,7 +205,9 @@ export function createBambu(options, deps = {}) {
     async status() {
       const pending = ensure();
       if (!client && pending) await pending;
-      if (!client || !report) throw new DriverError('UNREACHABLE', `no report from the printer at ${options.host}`);
+      // Until this connection's full report (pushall's answer, which carries gcode_state) has landed there is no
+      // picture of the machine — an incremental push alone would read as «idle».
+      if (!client || !report || report.gcode_state === undefined) throw new DriverError('UNREACHABLE', `no report from the printer at ${options.host}`);
       const r = report;
       const printError = num(r.print_error) ?? 0;
       let state = GCODE_STATE[String(r.gcode_state ?? '').toUpperCase()] ?? 'idle';
