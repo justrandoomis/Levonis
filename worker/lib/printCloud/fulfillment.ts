@@ -122,7 +122,7 @@ export async function planShipmentRequest(
   }
   const address = req.kind === 'delivery' ? parseAddress(req.address) : null;
   const fee = address ? deliveryFee(config, address.governorate) : 0;
-  if (fee > 0) assertPaymentAvailable(env, req.provider);
+  if (fee > 0) assertPaymentAvailable(env, req.provider, config);
   const status: ShipmentStatus = fee > 0 ? 'awaiting_payment' : 'preparing';
   const shipment = createShipment(db, { userId, kind: req.kind, status, address, feeIqd: fee, feeOrderId: null, packaging: req.packaging, now });
   const s: Stmt[] = [shipment.statement];

@@ -156,6 +156,11 @@ test('every code the table translates is one the server can actually emit', () =
     'worker/lib/requestModel.ts',
     // Readers and offers v3 (P1-05, row 267): what an offer covers and substitutes.
     'worker/lib/offerCoverage.ts',
+    // The request editor's entries (P1-06, row 268): a project, a product or a store,
+    // and the store's own questions they ask (OWN_STORE_REQUEST among them).
+    'worker/routes/requestEntries.ts',
+    'worker/lib/directRequests.ts',
+    'worker/lib/requestHandoff.ts',
     // Community projects (docs/COMMUNITY_ECOSYSTEM.md Phase 1): the composer
     // decodes POST_* and CONSENT_* beside the field each one names.
     'worker/routes/communityPosts.ts',
@@ -583,6 +588,116 @@ test('every Phase 5 refusal code has real Sorani — not the Arabic pasted acros
     if (/پێشنیار|وەرشە/.test(e.ckb)) problems.push(`${code}: ckb says «پێشنیار»/«وەرشە», the pages say «ئۆفەر»/«وۆرکشۆپ»`);
   }
   assert.deepEqual(problems, []);
+});
+
+/**
+ * THE STORE AND PRODUCT ENTRY DOORS (P1-06, row 268) refuse a workshop's own
+ * store with a code of their own. OWN_REQUEST is the offer door's, and its
+ * sentence («you cannot make an offer on your own request») is the wrong one
+ * for a merchant who pressed «اطلب طباعة» on their own store or product.
+ */
+test('the entry doors refuse a workshop\'s own store in their own words, emitted by the store rule and decoded in ar, en and ckb', () => {
+  const lib = readFileSync(join(ROOT, 'worker/lib/directRequests.ts'), 'utf8');
+  assert.ok(lib.includes("'OWN_STORE_REQUEST'"), 'assertStoreTakesDirect emits OWN_STORE_REQUEST');
+  assert.ok(!/This is your own store', 'OWN_REQUEST'/.test(lib), 'the store rule no longer borrows the offer code');
+  const e = REFUSAL_STRINGS.OWN_STORE_REQUEST;
+  assert.ok(e, 'OWN_STORE_REQUEST has no sentence');
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    assert.ok(e[lang]?.trim(), `OWN_STORE_REQUEST.${lang} is empty`);
+    assert.notEqual(e[lang], REFUSAL_STRINGS.OWN_REQUEST[lang], `OWN_STORE_REQUEST.${lang} is the offer sentence`);
+    assert.equal(apiRefusal({ code: 'OWN_STORE_REQUEST', message: 'This is your own store' }, lang, 'x'), e[lang], lang);
+  }
+  assert.notEqual(e.ckb, e.ar, 'ckb is a copy of the Arabic');
+  assert.ok(/[ەێۆڕڵ]/.test(e.ckb), 'the ckb sentence is Sorani');
+  assert.ok(!/[A-Z]{3,}_[A-Z]/.test(e.ar + e.en + e.ckb), 'a machine code leaked into the sentence');
+});
+
+/**
+ * EVERY REFUSAL THE REQUEST EDITOR AND ITS ENTRIES ANSWER (P1-06, row 268):
+ * publishing a draft, the same-millisecond draft guard, a project, product or
+ * store entry, the copy of a project file and the direct send. The route tests
+ * (requestEntryDoor, requestProductEntry, requestProjectHandoff,
+ * requestDirectEntry) pin the CODE the server sends and never the words the
+ * editor shows, and the whole-table orphan test above only looks the other way
+ * (a sentence for a code no route sends). So deleting any of these sentences
+ * left every suite green while the editor printed the server English. This
+ * list is the parity check: each code has its three sentences, its own Sorani,
+ * is decoded by apiRefusal, and is still emitted by the P1-06 doors.
+ */
+const P1_06_CODES = [
+  'REQUEST_TITLE_REQUIRED',
+  'REQUEST_DESCRIPTION_REQUIRED',
+  'DRAFT_CHANGED',
+  'ENTRY_NOT_FOUND',
+  'COPY_CHANGED',
+  'STORE_UNAVAILABLE',
+  'REQUEST_IS_DIRECT',
+  'OWN_STORE_REQUEST',
+  'STORE_NO_CUSTOM_REQUESTS',
+  'STORE_NOT_TAKING_WORK',
+  'REQUEST_NOT_DRAFT',
+] as const;
+
+/** The P1-06 doors: the entries, the store rule, the copy from a project, the editor routes. */
+const P1_06_DOORS = [
+  'worker/routes/requestEntries.ts',
+  'worker/lib/directRequests.ts',
+  'worker/lib/requestHandoff.ts',
+  'worker/routes/printRequests.ts',
+] as const;
+
+/** A file without its comment lines, so a code named only in a comment never counts as emitted. */
+const codeLines = (src: string) =>
+  src
+    .split('\n')
+    .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
+    .join('\n');
+
+test('every P1-06 entry and editor refusal has ar, en and its own Sorani, decoded by apiRefusal', () => {
+  const table = REFUSAL_STRINGS as Record<string, { ar: string; en: string; ckb: string } | undefined>;
+  const problems: string[] = [];
+  for (const code of P1_06_CODES) {
+    const e = table[code];
+    if (!e) {
+      problems.push(`${code}: absent`);
+      continue;
+    }
+    for (const lang of ['ar', 'en', 'ckb'] as const) {
+      const said = e[lang];
+      if (typeof said !== 'string' || said.trim().length === 0) {
+        problems.push(`${code}.${lang}: empty`);
+        continue;
+      }
+      if (said.includes(code) || /^[A-Z_]{6,}$/.test(said) || /[A-Z]{3,}_[A-Z]/.test(said)) {
+        problems.push(`${code}.${lang}: a machine code in the sentence`);
+      }
+      // What the editor shows: the code decoded, never the server English beside it.
+      const shown = apiRefusal({ code, message: `Server sentence (${code})` }, lang, 'fallback');
+      if (shown !== said) problems.push(`${code}.${lang}: apiRefusal shows «${shown}»`);
+    }
+    if (e.ckb === e.ar) problems.push(`${code}: ckb is a copy of the Arabic`);
+    if (e.ckb === e.en) problems.push(`${code}: ckb is a copy of the English`);
+    if (!/[ەێۆڕڵ]/.test(e.ckb ?? '')) problems.push(`${code}: ckb carries no Sorani-only letter`);
+  }
+  assert.deepEqual(problems, [], problems.join('\n'));
+});
+
+test('every P1-06 refusal code is still emitted by the P1-06 doors', () => {
+  const doors = P1_06_DOORS.map((rel) => codeLines(readFileSync(join(ROOT, rel), 'utf8'))).join('\n');
+  const missing = P1_06_CODES.filter((code) => {
+    // STORE_UNAVAILABLE is the one public answer (C9): the store rule throws it
+    // through the shared helper rather than spelling the code itself.
+    if (code === 'STORE_UNAVAILABLE') return false;
+    return !doors.includes(`'${code}'`);
+  });
+  assert.deepEqual(missing, [], `no P1-06 door emits: ${missing.join(', ')}`);
+
+  const store = codeLines(readFileSync(join(ROOT, 'worker/lib/directRequests.ts'), 'utf8'));
+  assert.ok(/throw publicStoreUnavailable\(\)/.test(store), 'the store rule throws the public STORE_UNAVAILABLE answer');
+  const approval = readFileSync(join(ROOT, 'worker/lib/merchantApproval.ts'), 'utf8');
+  const helper = approval.match(/export function publicStoreUnavailable\(\)[^{]*\{([\s\S]*?)\n\}/);
+  assert.ok(helper, 'merchantApproval.ts declares publicStoreUnavailable');
+  assert.ok(helper[1].includes("'STORE_UNAVAILABLE'"), 'publicStoreUnavailable answers STORE_UNAVAILABLE');
 });
 
 test('every promo-code refusal the checkout can meet reads in the customer\'s language, on the quote and on the press', () => {

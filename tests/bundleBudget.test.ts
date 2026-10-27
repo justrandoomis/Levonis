@@ -35,6 +35,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { transformWithEsbuild } from 'vite';
 import { STOREFRONT_FIXED_KB } from '../worker/lib/storeSpeed';
 import { CHUNK_PRELOAD_CAP, chunkPreloads, type ViteManifest } from '../worker/lib/socialPreview';
 
@@ -759,7 +760,95 @@ function operationsCssFiles(): Set<string> {
   }));
 }
 
-test('the stylesheets stay under their budget', () => {
+/**
+ * NO COMMUNITY SHEET WAITS OUTSIDE THE COUNT (community UI plan B1, B1FIX-R2-REG-1). A stylesheet
+ * that a module imports ships with the first page that imports that module; until a page does, no
+ * build carries it, and the total below cannot see it. The community kit once kept the looks of its
+ * controls in three such sheets beside their modules: the public total read 60,326 B, while a page
+ * that used the kit made it 61,383 B (57 B under the gate), and split, the sheets gzipped 338 B more
+ * than in one. The kit is one sheet again (src/styles/community.css, every look of it), and this
+ * counts any community sheet a build does not carry yet at its own minified gzip, as it would ship,
+ * so the headroom never reads better than a page that uses the kit makes it.
+ *
+ * Measured at that fix (vite build, gzip 9; the same with and without a page importing the kit):
+ * the community sheet 2,947 B, public CSS 60,974 of 61,440 B, so 466 B are left for B2 to D. The
+ * plan budgeted about 1.2 KB for B1; the tokens alone are about 920 B. Keeping the kit at this cost
+ * is accepted in DECISIONS row 270 (7); the sheet may not grow (B1FIX-R3-REG-1, the test «the community scope costs no more than …»).
+ */
+const COMMUNITY_SHEET = 'src/styles/community.css';
+function communitySheets(): string[] {
+  const under = (dir: string) => (existsSync(join(ROOT, dir)) ? (readdirSync(join(ROOT, dir), { recursive: true }) as string[]).filter((f) => f.endsWith('.css')).map((f) => `${dir}/${f.split('\\').join('/')}`) : []);
+  return [COMMUNITY_SHEET, ...under('src/components/community'), ...under('src/pages/community')];
+}
+/** A sheet is carried when one built stylesheet holds every `cm-` class it styles. */
+export function sheetCarried(source: string, built: string[]): boolean {
+  const classes = [...new Set(source.replace(/\/\*[\s\S]*?\*\//g, '').match(/\.cm-[a-z0-9-]+/g) ?? [])];
+  return classes.length > 0 && built.some((css) => classes.every((c) => new RegExp(`\\${c}(?![a-z0-9-])`).test(css)));
+}
+async function shippedGzip(source: string): Promise<number> {
+  const { code } = await transformWithEsbuild(source, 'sheet.css', { loader: 'css', minify: true });
+  return gzipSync(Buffer.from(code), { level: 9 }).length;
+}
+async function pendingCommunityCss(built: string[]): Promise<{ f: string; bytes: number }[]> {
+  const out: { f: string; bytes: number }[] = [];
+  for (const f of communitySheets()) {
+    const source = readFileSync(join(ROOT, f), 'utf8');
+    if (!sheetCarried(source, built)) out.push({ f, bytes: await shippedGzip(source) });
+  }
+  return out;
+}
+
+test('a community sheet that no build carries yet is counted at its own gzip', async () => {
+  const built = readdirSync(ASSETS).filter((f) => f.endsWith('.css')).map((f) => readFileSync(join(ASSETS, f), 'utf8'));
+  // The scope sheet, the whole kit, is in the build: one built stylesheet holds every class it styles.
+  assert.ok(sheetCarried(readFileSync(join(ROOT, COMMUNITY_SHEET), 'utf8'), built), `${COMMUNITY_SHEET} is not in the build, or a kit look fell out of it`);
+  // A sheet beside a module no page imports is not, and it counts what it would ship.
+  const waiting = "@layer theme, base, components, utilities;\n[data-surface='community'] .cm-probe-only { block-size: 44px; }";
+  assert.equal(sheetCarried(waiting, built), false);
+  assert.ok((await shippedGzip(waiting)) > 40, 'a waiting sheet is counted at nothing');
+});
+
+/**
+ * THE ACCEPTED COST OF B1 (community UI plan B1, B1FIX-R3-REG-1; DECISIONS row 270 (7)). The plan budgets about
+ * 1.2 KB gzip for the community sheet (plan B1 and its risk register). With the whole kit the sheet
+ * was 2,947 B and the scope module (CommunitySurface: the surface and its portal stamping) 911 B of JS
+ * beyond the initial payload, and every community page pays both on its first load: against the live
+ * head, /community +3,963 B, /community/projects +4,036 B, /community/projects/:id +3,962 B,
+ * /requests +4,064 B, /requests/:id +3,949 B (vite build, gzip 9, at the round-3 review). The plan
+ * item does not meet its own budget. DECISIONS row 270 (7) accepts that cost as the price of the
+ * reference screenshots in two themes, rather than cutting the kit back to the plan. Those two figures
+ * are the accepted cost, not a budget to fill: neither may grow without a new decision. The module names two hashed chunks and
+ * the export letters Rollup deals out across chunks, which move its gzip by a few bytes on any rebuild
+ * (909 to 913 B for the same source), so it is weighed with those set aside: 889 B for the 911 B of the
+ * review. The measured deltas at each landing are written into its commit message (plan R6).
+ */
+const COMMUNITY_SHEET_UNDER_DECISION = 2947;
+const COMMUNITY_SCOPE_JS_UNDER_DECISION = 889;
+/** The gzip of a chunk with the hashed names of other chunks and the cross-chunk export letters masked. */
+const withoutChunkLetters = (path: string) =>
+  gzipSync(
+    Buffer.from(
+      readFileSync(path, 'utf8')
+        .replace(/-[A-Za-z0-9_-]{8}(\.(?:js|css))/g, '-00000000$1')
+        .replace(/import\{([^}]*)\}from/g, (_, list: string) => `import{${list.replace(/[\w$]+ as /g, '? as ')}}from`)
+        .replace(/export\{([^}]*)\}/g, (_, list: string) => `export{${list.replace(/ as [\w$]+/g, ' as ?')}}`)
+    ),
+    { level: 9 }
+  ).length;
+
+test('the community scope costs no more than the figures DECISIONS row 270 accepts', () => {
+  const files = readdirSync(ASSETS);
+  const sheet = files.find((f) => f.startsWith('CommunitySurface-') && f.endsWith('.css'));
+  const scope = files.find((f) => f.startsWith('CommunitySurface-') && f.endsWith('.js'));
+  assert.ok(sheet && scope, 'the community scope is no longer a lazy chunk with its own sheet');
+  const css = gz(join(ASSETS, sheet!));
+  const js = withoutChunkLetters(join(ASSETS, scope!));
+  console.log(`bundle: community scope ${css} B css (plan about 1.2 KB, ${COMMUNITY_SHEET_UNDER_DECISION} B accepted in DECISIONS row 270) and ${gz(join(ASSETS, scope!))} B js, ${js} B without the letters of other chunks (${COMMUNITY_SCOPE_JS_UNDER_DECISION} B accepted in DECISIONS row 270), gzip`);
+  assert.ok(css <= COMMUNITY_SHEET_UNDER_DECISION, `the community sheet is ${css} B gzip, more than the ${COMMUNITY_SHEET_UNDER_DECISION} B DECISIONS row 270 accepts: cut a rule, or decide again`);
+  assert.ok(js <= COMMUNITY_SCOPE_JS_UNDER_DECISION, `the community scope module is ${js} B gzip without the letters of other chunks, more than the ${COMMUNITY_SCOPE_JS_UNDER_DECISION} B DECISIONS row 270 accepts: cut a rule, or decide again`);
+});
+
+test('the stylesheets stay under their budget', async () => {
   // Keep the existing 60 KiB gate for every stylesheet except the three new,
   // named operations sheets. They have a separate 7.5 KiB combined gate, and
   // the test below proves they cannot enter a customer's static CSS closure.
@@ -771,10 +860,14 @@ test('the stylesheets stay under their budget', () => {
   const operations = operationsCssFiles();
   const baseline = each.filter((x) => !operations.has(x.f));
   const feature = each.filter((x) => operations.has(x.f));
-  const total = baseline.reduce((sum, x) => sum + x.bytes, 0);
+  // Every community sheet a build does not carry yet ships with the first page that imports it: count it now.
+  const pending = await pendingCommunityCss(css.map((f) => readFileSync(join(ASSETS, f), 'utf8')));
+  const total = baseline.reduce((sum, x) => sum + x.bytes, 0) + pending.reduce((sum, x) => sum + x.bytes, 0);
   const operationsTotal = feature.reduce((sum, x) => sum + x.bytes, 0);
-  console.log(`bundle: original/public css ${kb(total)} gzip over ${baseline.length} file(s) — ${baseline.map((x) => `${x.f} ${kb(x.bytes)}`).join(', ')}`);
-  assert.ok(total <= CSS_BUDGET, `the stylesheets total ${kb(total)} gzip, over ${kb(CSS_BUDGET)}`);
+  console.log(`bundle: original/public css ${kb(total)} gzip (${total} B, ${CSS_BUDGET - total} B under the gate) over ${baseline.length} file(s)${pending.length ? ` and ${pending.length} community sheet(s) no build carries yet (${pending.map((x) => `${x.f} ${x.bytes} B`).join(', ')})` : ''} — ${baseline.map((x) => `${x.f} ${kb(x.bytes)}`).join(', ')}`);
+  const scope = each.find((x) => x.f.startsWith('CommunitySurface-'));
+  if (scope) console.log(`bundle: community css (the scope and the whole kit, one sheet) ${scope.bytes} B gzip`);
+  assert.ok(total <= CSS_BUDGET, `the stylesheets total ${kb(total)} gzip, over ${kb(CSS_BUDGET)}${pending.length ? `, ${pending.map((x) => x.f).join(', ')} included (no page imports it yet; it ships with the first that does)` : ''}`);
   console.log(`bundle: private operations css ${kb(operationsTotal)} gzip over ${operations.size} file(s), limit ${kb(OPERATIONS_CSS_BUDGET)} — ${feature.map((x) => `${x.f} ${kb(x.bytes)}`).join(', ')}`);
   assert.ok(operationsTotal <= OPERATIONS_CSS_BUDGET, `the private operations stylesheets total ${kb(operationsTotal)} gzip, over ${kb(OPERATIONS_CSS_BUDGET)}`);
 });
@@ -851,5 +944,42 @@ test('the category explorer\'s static closure carries neither the listing gramma
   for (const name of ['discovery', 'ListingView', 'listingQuery']) {
     const hit = [...closure].find((f) => f.startsWith(`${name}-`));
     assert.equal(hit, undefined, `${name} is a static dependency of the explorer`);
+  }
+});
+
+/**
+ * THE COMMUNITY SCOPE COSTS THE STOREFRONT NOTHING (community UI plan B1,
+ * review round 4). The scope root once handed its stamp to the portals
+ * through a React context declared in ui/Overlay.tsx. That top-level
+ * `createContext` call made the module impure, so the shell Toaster
+ * (downloaded with the first toast of any page) and every store page, which
+ * only need the layer numbers and the layer stack, loaded the whole window
+ * primitive: about +4.2 KB gzip each, which the storefront figure above could
+ * not see (it already counted Overlay). The scope now reaches the portals from
+ * community code alone (src/components/community/scopePortals.ts), and the
+ * Toaster, the store page and the storefront pages are byte for byte what they
+ * were without it. This holds both halves: neither the Toaster nor the store
+ * page statically loads the window primitive, and no storefront closure
+ * carries any of the scope.
+ */
+test('the shell Toaster and the store page never load the window primitive, and no storefront closure carries the community scope', () => {
+  const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
+  const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
+  const toaster = chunk('Toast');
+  const store = chunk('CommunityStorePage');
+  assert.ok(toaster, 'the shell Toaster has no lazy chunk of its own');
+  assert.ok(store, 'the store page has no lazy chunk of its own');
+  assert.ok(chunk('Overlay'), 'the window primitive has no chunk of its own: this check would see nothing');
+  for (const [name, start] of [['the shell Toaster', toaster!], ['the store page', store!]] as const) {
+    const overlay = [...staticClosure(start)].find((f) => f.startsWith('Overlay-'));
+    assert.equal(overlay, undefined, `${name} statically loads ${overlay}: a top-level call in ui/Overlay.tsx (or a new import of it) put the whole window primitive in its download`);
+  }
+  const entry = entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!;
+  const starts = [entry, toaster!, store!, chunk('Storefront')!, chunk('StorefrontProduct')!];
+  for (const start of starts) {
+    for (const f of staticClosure(start)) {
+      const code = readFileSync(join(ASSETS, f), 'utf8');
+      assert.doesNotMatch(code, /data-surface|cm-surface/, `${f}, in the static closure of ${start}, carries the community scope`);
+    }
   }
 });

@@ -30,6 +30,7 @@ import { safeParse } from './types';
 import { HttpError, badRequest } from './http';
 import { newId } from './crypto';
 import { isSchemaMissing } from './membershipBenefits';
+import { budgetSwitchOf } from './requestBudget';
 import { threadRole, type StoreThread } from './chatThread';
 import { approvedAtSql, merchantIsPublic, storeIsPublic, withApprovalSchema } from './merchantApproval';
 
@@ -663,23 +664,54 @@ async function storeCurrents(
 
 const OPEN_REQUEST = new Set(['open', 'receiving_offers']);
 
+/**
+ * WHO READS A PRINT REQUEST CARD BUDGET ON THIS PAGE (Q2, docs/DECISIONS.md
+ * row 268), decided once per read and FAILING CLOSED:
+ *
+ *   always  an explicit staff read, and the customer of a resolved thread
+ *   switch  the store of a resolved thread, while the request shows it
+ *           (`budgetSwitchOf`)
+ *   never   everyone else: a thread that could not be resolved (no store row,
+ *           a lookup that failed), or a reader who is neither of its sides
+ *
+ * The role a reader falls back to for the card ACTIONS (`staff`: none) is
+ * not a reason to show a budget.
+ */
+export type CardBudgetReader = 'always' | 'switch' | 'never';
+
+export function cardBudgetReader(thread: StoreThread | null, viewerId: string, staff: boolean): CardBudgetReader {
+  if (staff) return 'always';
+  if (!thread) return 'never';
+  const role = threadRole(thread, viewerId);
+  return role === 'customer' ? 'always' : role === 'merchant' ? 'switch' : 'never';
+}
+
 async function printRequestCurrents(
   env: Env,
   rows: CardRow[],
   thread: StoreThread | null,
-  viewer: CardViewer
+  viewer: CardViewer,
+  budgetReader: CardBudgetReader
 ): Promise<Map<string, CardCurrent>> {
   const out = new Map<string, CardCurrent>();
   const ids = [...new Set(rows.map((r) => r.card_ref))];
   const now = new Date().toISOString();
-  const { results } = await env.DB.prepare(
-    `SELECT r.id, r.state, r.expires_at, r.customer_id, r.target_merchant_id, r.community_order_id,
-            (SELECT o.id FROM community_offers o WHERE o.request_id = r.id AND o.state IN ('pending','superseded')
-              ORDER BY o.created_at DESC LIMIT 1) AS live_offer_id
-       FROM community_requests r WHERE r.id IN (SELECT value FROM json_each(?))`
-  )
-    .bind(JSON.stringify(ids))
-    .all<Record<string, unknown>>();
+  // `budget_visible` (0208, Q2) where the database has it; without it the budget reads hidden.
+  const read = (withSwitch: boolean) =>
+    env.DB.prepare(
+      `SELECT r.id, r.state, r.expires_at, r.customer_id, r.target_merchant_id, r.community_order_id,
+              r.visibility, r.created_by, r.origin_chat_id, r.notes,
+              ${withSwitch ? 'r.budget_visible' : '0'} AS budget_visible,
+              (SELECT o.id FROM community_offers o WHERE o.request_id = r.id AND o.state IN ('pending','superseded')
+                ORDER BY o.created_at DESC LIMIT 1) AS live_offer_id
+         FROM community_requests r WHERE r.id IN (SELECT value FROM json_each(?))`
+    )
+      .bind(JSON.stringify(ids))
+      .all<Record<string, unknown>>();
+  const { results } = await read(true).catch((e) => {
+    if (isSchemaMissing(e)) return read(false);
+    throw e;
+  });
   const byId = new Map((results ?? []).map((r) => [String(r.id), r]));
   for (const row of rows) {
     const r = byId.get(row.card_ref);
@@ -699,10 +731,21 @@ async function printRequestCurrents(
       actions,
       offer_id: (r.live_offer_id as string | null) ?? null,
       order_id: (r.community_order_id as string | null) ?? null,
+      // Q2 (row 268, critique 6): the customer and staff read the budget the
+      // card was sent with; the store only while the request shows it NOW —
+      // the switch, or a request the chat sheet made for this store
+      // (critique 3, `budgetSwitchOf`, including rows written before the
+      // sheet stored the switch); anyone else, or any reader of a thread
+      // that could not be resolved, never (`cardBudgetReader`). Decided
+      // here, at the reader, and read by `cardPublic`.
+      [SHOW_BUDGET]: budgetReader === 'always' || (budgetReader === 'switch' && budgetSwitchOf(r) === 1),
     });
   }
   return out;
 }
+
+/** The private flag `printRequestCurrents` hands `cardPublic`; never sent to a client. */
+const SHOW_BUDGET = '__show_budget';
 
 async function quoteCurrents(
   env: Env,
@@ -903,6 +946,9 @@ export async function currentCardStates(
   const out = new Map<string, CardCurrent>();
   if (!byType.size) return out;
   const viewer: CardViewer = staff ? 'staff' : thread ? (threadRole(thread, viewerId) ?? 'staff') : 'staff';
+  // Not `viewer`: its `staff` is also the fallback of a reader no thread names,
+  // and that reader must never get a budget (fail closed, Q2 row 268).
+  const budgetReader = cardBudgetReader(thread, viewerId, staff);
   const loaders: Array<Promise<void>> = [];
   for (const [type, rows] of byType) {
     const load = async (): Promise<Map<string, CardCurrent>> => {
@@ -912,7 +958,7 @@ export async function currentCardStates(
         case 'store':
           return storeCurrents(env, rows, storeOpen);
         case 'print_request':
-          return printRequestCurrents(env, rows, thread, viewer);
+          return printRequestCurrents(env, rows, thread, viewer, budgetReader);
         case 'quote':
           return quoteCurrents(env, rows, thread, viewer);
         case 'custom_order':
@@ -943,12 +989,17 @@ export async function currentCardStates(
 /** A card as a thread screen reads it: what it was sent as, and what it is now. */
 export function cardPublic(m: Record<string, unknown>, current: CardCurrent | undefined) {
   if (!isCardType(m.card_type)) return null;
+  const original = safeParse<Record<string, unknown>>(m.card_snapshot, {}) ?? {};
+  const { [SHOW_BUDGET]: showBudget, ...now } = current ?? { status: 'unknown', actions: [] };
   return {
     type: m.card_type,
     kind: CARD_KINDS[m.card_type],
     ref: m.card_ref,
-    original: safeParse<Record<string, unknown>>(m.card_snapshot, {}) ?? {},
-    current: current ?? { status: 'unknown', actions: [] },
+    // A print request's card keeps the budget it was sent with (stored bytes
+    // are never rewritten, Q2 critique 6); a reader the request does not show
+    // it to — or one whose state could not be read — gets the card without it.
+    original: m.card_type === 'print_request' && showBudget !== true && original.budget_iqd != null ? { ...original, budget_iqd: null } : original,
+    current: now as CardCurrent,
   };
 }
 

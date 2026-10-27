@@ -533,6 +533,20 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'You cannot make an offer on your own request.',
     ckb: 'ناتوانیت ئۆفەر لەسەر داواکاریی خۆت پێشکەش بکەیت.',
   },
+  // The store and product entry doors (worker/lib/directRequests.ts): a
+  // workshop pressed «اطلب طباعة» on its own store or product.
+  OWN_STORE_REQUEST: {
+    ar: 'هذا متجرك، لا يمكنك أن تطلب منه طباعة.',
+    en: 'This is your own store, so you cannot send it a print request.',
+    ckb: 'ئەمە فرۆشگاکەی خۆتە، ناتوانیت داوای چاپی بۆ بنێریت.',
+  },
+  // The same doors: the store is paused, restricted or no longer approved. Its
+  // own code, because MERCHANT_UNAVAILABLE (the offer door) asks for another offer.
+  STORE_NOT_TAKING_WORK: {
+    ar: 'هذا المتجر لا يستقبل أعمالًا جديدة حاليًا.',
+    en: 'This store is not taking new work right now.',
+    ckb: 'ئەم فرۆشگایە ئێستا کاری نوێ وەرناگرێت.',
+  },
   REQUEST_NOT_OPEN: {
     ar: 'هذا الطلب لم يعد يستقبل عروضًا.',
     en: 'This request is no longer taking offers.',
@@ -613,6 +627,45 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ar: 'نُشر هذا الطلب بالفعل. حدّث الصفحة وعدّله من صفحته.',
     en: 'This request is already published. Refresh and edit it from its page.',
     ckb: 'ئەم داواکارییە پێشتر بڵاوکراوەتەوە. پەڕەکە نوێ بکەرەوە و لە پەڕەکەی خۆیەوە دەستکاری بکە.',
+  },
+  // ---- the request editor (P1-06, DECISIONS row 268): a draft may be born
+  // empty, so the publish asks for the title and the description; a stale
+  // window cannot overwrite a newer save; a request for one store is sent to it.
+  REQUEST_TITLE_REQUIRED: {
+    ar: 'اكتب عنوانًا من 4 إلى 140 حرفًا قبل النشر.',
+    en: 'Write a title of 4 to 140 characters before publishing.',
+    ckb: 'پێش بڵاوکردنەوە ناونیشانێک بنووسە لە ٤ تا ١٤٠ پیت.',
+  },
+  REQUEST_DESCRIPTION_REQUIRED: {
+    ar: 'صف ما تريده في 10 أحرف على الأقل قبل النشر.',
+    en: 'Describe what you need in at least 10 characters before publishing.',
+    ckb: 'پێش بڵاوکردنەوە ئەوەی پێویستتە لانیکەم بە ١٠ پیت باس بکە.',
+  },
+  DRAFT_CHANGED: {
+    ar: 'تغيّرت المسودة من نافذة أخرى — حمّل الأحدث.',
+    en: 'The draft changed in another window — load the latest.',
+    ckb: 'ڕەشنووسەکە لە پەنجەرەیەکی ترەوە گۆڕا — نوێترینەکە بار بکە.',
+  },
+  // ---- the editor's entries (P1-06, row 268): a project, a product, a store.
+  ENTRY_NOT_FOUND: {
+    ar: 'لم نجد ما تريد أن تطلب طباعته — ربما حُذف أو لم يعد متاحًا.',
+    en: 'We could not find what you want printed. It may have been removed or is no longer available.',
+    ckb: 'ئەوەی دەتەوێت چاپ بکرێت نەدۆزرایەوە — لەوانەیە سڕابێتەوە یان ئیتر بەردەست نەبێت.',
+  },
+  COPY_CHANGED: {
+    ar: 'تغيّر الملف أثناء نسخه — حاول مرة أخرى.',
+    en: 'The file changed while it was being copied. Try again.',
+    ckb: 'فایلەکە لە کاتی کۆپیکردندا گۆڕا — دووبارە هەوڵ بدەرەوە.',
+  },
+  STORE_UNAVAILABLE: {
+    ar: 'هذا المتجر غير متاح الآن.',
+    en: 'This store is not available right now.',
+    ckb: 'ئەم فرۆشگایە ئێستا بەردەست نییە.',
+  },
+  REQUEST_IS_DIRECT: {
+    ar: 'هذا الطلب لمتجر واحد — أرسله إليه من محادثتك معه.',
+    en: 'This request is for one store — send it to the store from your conversation with it.',
+    ckb: 'ئەم داواکارییە بۆ یەک فرۆشگایە — لە گفتوگۆکەت لەگەڵ ئەو فرۆشگایەدا بینێرە.',
   },
   // ---- the request model v3 (P1-04, DECISIONS row 266): sources, parts, materials, colours.
   REQUEST_MODEL_V3: {

@@ -301,7 +301,7 @@ export const ROUTES: readonly RouteRule[] = [
   // `requires: 'none'` is the point of it, and the route's own per-bucket rate
   // limits do the work an auth gate would otherwise do.
   { prefix: '/api/print-quote', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'upload', note: 'guest uploads a model and is quoted for it' },
-  // Levonis Print Cloud (0215, docs/PRINT_CLOUD.md, DECISIONS row 270): the
+  // Levonis Print Cloud (0215, docs/PRINT_CLOUD.md, DECISIONS row 271): the
   // workshop's own printers rented by the hour, owned beside the print engine
   // (packages/contracts/src/ownership.ts). The core answers on the apex, the
   // `cloud` system subdomain and hosts outside the root, and refuses every

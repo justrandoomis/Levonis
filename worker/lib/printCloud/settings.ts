@@ -55,6 +55,14 @@ export interface PrintCloudConfig {
   low_inventory_default_g: number;
   delivery: { enabled: boolean; pickup_enabled: boolean; flat_fee_iqd: number; fee_by_governorate: Record<string, number> };
   import_providers: ImportProvider[];
+  /**
+   * Paying an order from the customer's Levonis wallet (wallet.ts). A money
+   * rule, so a money-scope admin may switch it off: new wallet payments then
+   * answer 503 PAYMENT_ADAPTER_DISABLED and GET /me/wallet says
+   * `connected: false`. Refunds of orders already paid from the wallet still
+   * go back to the wallet — switching payments off never strands money.
+   */
+  wallet_payment_enabled: boolean;
   /** Owner only: the electricity tariff used by the cost reports. */
   cost_electricity_iqd_per_kwh: number;
 }
@@ -92,6 +100,7 @@ export const DEFAULT_CONFIG: PrintCloudConfig = Object.freeze({
   low_inventory_default_g: 100,
   delivery: { enabled: true, pickup_enabled: true, flat_fee_iqd: 5000, fee_by_governorate: {} },
   import_providers: DEFAULT_IMPORT_PROVIDERS,
+  wallet_payment_enabled: true,
   cost_electricity_iqd_per_kwh: 0,
 }) as PrintCloudConfig;
 
@@ -168,6 +177,7 @@ export function normalizeConfig(raw: unknown): PrintCloudConfig {
       fee_by_governorate: fees,
     },
     import_providers: normalizeProviders(r.import_providers),
+    wallet_payment_enabled: bool(r.wallet_payment_enabled, d.wallet_payment_enabled),
     cost_electricity_iqd_per_kwh: clampInt(r.cost_electricity_iqd_per_kwh, d.cost_electricity_iqd_per_kwh, 0, 100_000),
   };
 }

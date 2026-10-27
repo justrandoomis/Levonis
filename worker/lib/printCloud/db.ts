@@ -149,6 +149,19 @@ export interface Outcome<R> {
   replayed: boolean;
 }
 
+export interface IdempotentOptions {
+  /**
+   * For a batch carrying a guard `classifyDbError` cannot read on its own —
+   * the platform wallet's `CHECK (amount > 0)` (walletOps `usdSpendStatement`)
+   * is an unnamed CHECK outside Print Cloud's schema, which the default
+   * mapping would call VALIDATION. Called with every failed batch that is not
+   * a replay of the same key, and `lastAttempt` when no re-plan is left: it
+   * throws the refusal the failure means, answers 'retry' to plan again, or
+   * undefined to fall through to `classifyDbError` (an outage is rethrown).
+   */
+  refusal?: (e: unknown, lastAttempt: boolean) => Promise<'retry' | undefined>;
+}
+
 /**
  * Run an idempotent operation exactly once.
  *
@@ -158,9 +171,10 @@ export interface Outcome<R> {
  *      operation row (carrying that result) is the batch's FIRST statement,
  *      so it lands exactly when the business effects land.
  *   3. A collision on the operation row means a concurrent copy won: its
- *      stored result is the answer. STATE_CHANGED re-plans (twice at most).
+ *      stored result is the answer. STATE_CHANGED re-plans (twice at most),
+ *      as does a failure `opts.refusal` answers 'retry' for.
  */
-export async function idempotent<R>(db: D1Database, spec: OperationSpec, plan: () => Promise<Planned<R>>): Promise<Outcome<R>> {
+export async function idempotent<R>(db: D1Database, spec: OperationSpec, plan: () => Promise<Planned<R>>, opts: IdempotentOptions = {}): Promise<Outcome<R>> {
   if (!validIdempotencyKey(spec.key)) throw pcError('IDEMPOTENCY_KEY_REQUIRED');
   const requestHash = await sha256Hex(canonicalJson(spec.request));
   const stored = async (): Promise<Outcome<R> | null> => {
@@ -193,6 +207,10 @@ export async function idempotent<R>(db: D1Database, spec: OperationSpec, plan: (
       if (isOperationReplay(e)) {
         const won = await stored();
         if (won) return won;
+        throw pcError('STATE_CHANGED');
+      }
+      if (opts.refusal && (await opts.refusal(e, attempt >= 2)) === 'retry') {
+        if (attempt < 2) continue;
         throw pcError('STATE_CHANGED');
       }
       const mapped = classifyDbError(e);

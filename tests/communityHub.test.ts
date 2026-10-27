@@ -225,7 +225,7 @@ function seedRequests(raw: DatabaseSync) {
   `);
 }
 
-test('the request list says what the job is, with the board\'s whitelist and nothing private', async () => {
+test('the request list says what the job is, with the board\'s whitelist and nothing private (no budget, Q2)', async () => {
   const raw = seed();
   seedRequests(raw);
   const body = await json(await get(as(raw, 'viewer'), '/api/community/requests'));
@@ -234,7 +234,8 @@ test('the request list says what the job is, with the board\'s whitelist and not
   const r1 = (body.requests as Row[])[0];
   assert.equal(r1.quantity, 2);
   assert.equal(r1.material, 'PETG');
-  assert.equal(r1.budget_iqd, 15000);
+  // Q2 (docs/DECISIONS.md row 268): a budget is never on a public list, whatever its switch says.
+  assert.equal(r1.budget_iqd, null);
   assert.equal(r1.governorate, 'baghdad');
   assert.equal(r1.offer_count, 3);
   assert.equal(r1.file_count, 2);

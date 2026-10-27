@@ -193,7 +193,9 @@ test('payment webhook signatures: correct, fresh, untampered — or refused', as
   assert.equal(paymentAvailable({}, 'dev'), false, 'the development adapter is off unless explicitly on');
   assert.equal(paymentAvailable({ PRINT_CLOUD_DEV_PAYMENTS: 'true' }, 'dev'), false);
   assert.equal(paymentAvailable({ PRINT_CLOUD_DEV_PAYMENTS: 'on' }, 'dev'), true);
-  assert.equal(paymentAvailable({}, 'levonis_wallet'), false, 'the wallet adapter is not connected');
+  assert.equal(paymentAvailable({}, 'levonis_wallet'), true, 'the wallet adapter is connected, on by default');
+  assert.equal(paymentAvailable({}, 'levonis_wallet', { wallet_payment_enabled: false }), false, 'the owner can switch wallet payments off');
+  assert.equal(paymentAvailable({}, 'levonis_wallet', { wallet_payment_enabled: true }), true);
   assert.equal(paymentAvailable({}, 'manual'), true);
 });
 

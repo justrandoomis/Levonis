@@ -1,6 +1,6 @@
 /**
  * ROUTE CLASSIFICATION — Levonis Print Cloud administration,
- * /api/admin/print-cloud (docs/PRINT_CLOUD.md §10.2, DECISIONS row 270).
+ * /api/admin/print-cloud (docs/PRINT_CLOUD.md §10.2, DECISIONS row 271).
  *
  * The workshop OPERATOR is an assistant admin: the queue, jobs, printers,
  * stock COUNTS, shipments and estimates are `op`. Prices, payments, refunds,

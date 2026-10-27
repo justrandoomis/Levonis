@@ -419,7 +419,7 @@ export async function openStoreThread(
  * one with any account on demand, so counting it let a stranger open a DM
  * first and then the hidden store's thread (review finding 3).
  */
-async function customerKnowsMerchant(db: D1Database, customerId: string, merchantId: string, merchantUserId: string): Promise<boolean> {
+export async function customerKnowsMerchant(db: D1Database, customerId: string, merchantId: string, merchantUserId: string): Promise<boolean> {
   const row = await db
     .prepare(
       `SELECT

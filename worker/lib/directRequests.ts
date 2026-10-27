@@ -22,7 +22,7 @@ import type { Env } from './types';
 import { HttpError, conflict, notFound } from './http';
 import { isSchemaMissing } from './membershipBenefits';
 import { isPast, merchantTakesNewWork } from './communityRequests';
-import { approvedAtSql, merchantApproved, withApprovalSchema } from './merchantApproval';
+import { approvedAtSql, merchantApproved, merchantIsPublic, publicStoreUnavailable, storeIsPublic, withApprovalSchema } from './merchantApproval';
 import { assertMayOffer, type LiveVerdict } from './printMatchingStore';
 
 export interface DirectRequestRow {
@@ -116,4 +116,77 @@ export async function assertMayQuote(env: Env, requestId: string, merchantId: st
   }
   // The live verdict, for a caller that also asks it of each covered part (P1-05).
   return assertMayOffer(env, requestId, merchantId);
+}
+
+/** The store a customer addresses a request to from its page (P1-06): who it is and where it lives. */
+export interface DirectStore {
+  merchantId: string;
+  merchantUserId: string;
+  storeId: string;
+  storeName: string;
+  storeSlug: string;
+}
+
+/**
+ * MAY THIS CUSTOMER ADDRESS A REQUEST TO THIS STORE — the store page's «لهذا
+ * المتجر فقط» and a product page's «اطلب طباعته» (worker/routes/
+ * requestEntries.ts; P1-06, docs/DECISIONS.md row 268). The conversation's
+ * own rules, asked in the same order, so the editor and the chat sheet answer
+ * one store the same way:
+ *
+ *   a store the public may see (E12) — or one this customer already has
+ *   business with (`knows`, the chat door's `customerKnowsMerchant`) —
+ *   else the one generic STORE_UNAVAILABLE (C9);
+ *   not the customer's own store (OWN_STORE_REQUEST — its own code, not the
+ *   offer door's OWN_REQUEST, so the client says «this is your own store»);
+ *   taking custom requests (STORE_NO_CUSTOM_REQUESTS);
+ *   taking new work (STORE_NOT_TAKING_WORK: its own code, because the offer door's
+ *   MERCHANT_UNAVAILABLE sentence asks the customer to choose another offer).
+ *
+ * Nothing is written and no conversation is opened: the store hears of a
+ * request when it is SENT, never when its customer starts writing it.
+ */
+export async function assertStoreTakesDirect(
+  db: D1Database,
+  merchantId: string,
+  customerId: string,
+  knows: (db: D1Database, customerId: string, merchantId: string, merchantUserId: string) => Promise<boolean>
+): Promise<DirectStore> {
+  const m = await withApprovalSchema((schema) =>
+    db
+      .prepare(
+        `SELECT m.id, m.user_id, m.name AS merchant_name, m.status, ${approvedAtSql('m', schema)} AS approved_at,
+                s.id AS store_id, s.status AS store_status, s.name AS store_name, s.slug AS store_slug,
+                s.accepts_custom_requests
+           FROM community_merchants m LEFT JOIN merchant_stores s ON s.merchant_id = m.id
+          WHERE m.id = ?`
+      )
+      .bind(merchantId)
+      .first<{
+        id: string; user_id: string; merchant_name: string | null; status: string; approved_at: string | null;
+        store_id: string | null; store_status: string | null; store_name: string | null; store_slug: string | null;
+        accepts_custom_requests: number | null;
+      }>()
+  );
+  if (!m || !m.store_id) throw publicStoreUnavailable();
+  if (m.user_id === customerId) throw new HttpError(400, 'This is your own store', 'OWN_STORE_REQUEST');
+  const isPublic = merchantIsPublic(m) && storeIsPublic({ status: m.store_status });
+  if (!isPublic && !(await knows(db, customerId, merchantId, m.user_id))) throw publicStoreUnavailable();
+  if (Number(m.accepts_custom_requests ?? 1) !== 1) {
+    throw conflict('This store is not taking custom requests right now', 'STORE_NO_CUSTOM_REQUESTS');
+  }
+  const takes = await merchantTakesNewWork(db, {
+    merchantStatus: m.status,
+    storeStatus: m.store_status,
+    merchantApproved: merchantApproved(m),
+    ownerUserId: m.user_id,
+  });
+  if (!takes) throw conflict('This store is not taking new work right now', 'STORE_NOT_TAKING_WORK');
+  return {
+    merchantId: m.id,
+    merchantUserId: m.user_id,
+    storeId: m.store_id,
+    storeName: String(m.store_name || m.merchant_name || ''),
+    storeSlug: String(m.store_slug ?? ''),
+  };
 }

@@ -40,8 +40,14 @@
  * cached before the deploy still showed merchants no reviewer approved; under
  * the new epoch every colo misses at once and answers through the public
  * predicate (owner decisions C1/C2/C9).
+ *
+ * 2026-10-26 (DECISIONS row 268, owner decision Q2, build item B0): a print
+ * request budget is private by default. Every public API request answer and
+ * search answer cached before the deploy still carried `budget_iqd`; under
+ * the new epoch every colo misses at once and answers through `publicRequest`
+ * and the public API whitelist, whose `budget_iqd` is always null.
  */
-export const CATALOG_CACHE_EPOCH = 'merchant-approval-2026-10-18';
+export const CATALOG_CACHE_EPOCH = 'budget-privacy-2026-10-26';
 
 /** A cache key URL carrying the epoch (appended last, so the declared params keep their order). */
 export function withCacheEpoch(url: string): string {

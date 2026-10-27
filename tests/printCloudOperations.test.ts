@@ -117,9 +117,16 @@ test('idempotency: a replayed order returns the first answer; the same key for a
   const q2 = await ok(w.a, 'POST', `${API}/quotes`, { lines: [{ kind: 'credit_package', package_id: cat.packages.h6 }] });
   w.raw.prepare("UPDATE pc_quotes SET expires_at = '2000-01-01T00:00:00.000Z' WHERE id = ?").run(q2.quote_id);
   await refused(w.a, 'POST', `${API}/orders`, { quote_id: q2.quote_id, payment_method: 'dev' }, 'QUOTE_EXPIRED', idem('exp'));
-  // The levonis_wallet method is an honest «not connected».
+  // The levonis_wallet method places the order and names the wallet door (tests/printCloudWallet.test.ts pays it)…
   const q3 = await ok(w.a, 'POST', `${API}/quotes`, { lines: [{ kind: 'credit_package', package_id: cat.packages.h6 }] });
-  await refused(w.a, 'POST', `${API}/orders`, { quote_id: q3.quote_id, payment_method: 'levonis_wallet' }, 'ADAPTER_NOT_CONNECTED', idem('w'));
+  const viaWallet = await ok(w.a, 'POST', `${API}/orders`, { quote_id: q3.quote_id, payment_method: 'levonis_wallet' }, idem('w'));
+  assert.equal(viaWallet.payment.action, 'pay_from_wallet');
+  assert.equal(viaWallet.payment.pay_path, `/api/print-cloud/v1/orders/${viaWallet.order_id}/pay/wallet`);
+  // …unless the owner switched wallet payments off.
+  const settings = await ok(w.owner, 'GET', `${ADMIN}/settings`);
+  await ok(w.owner, 'PATCH', `${ADMIN}/settings`, { version: settings.version, config: { wallet_payment_enabled: false } });
+  const q4 = await ok(w.a, 'POST', `${API}/quotes`, { lines: [{ kind: 'credit_package', package_id: cat.packages.h6 }] });
+  await refused(w.a, 'POST', `${API}/orders`, { quote_id: q4.quote_id, payment_method: 'levonis_wallet' }, 'PAYMENT_ADAPTER_DISABLED', idem('w-off'));
 });
 
 test('unpaid orders expire: the held stock returns to the shelf exactly once', async () => {

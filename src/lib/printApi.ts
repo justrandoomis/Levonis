@@ -225,6 +225,12 @@ export interface MyRequestRow {
   governorate: string;
   offer_count: number;
   file_count: number;
+  /**
+   * The owner's own first picture, as its authorised route
+   * (`/api/marketplace/requests/:id/files/:fileId`, plan B3); null without
+   * one, absent on an older Worker.
+   */
+  cover_url?: string | null;
   created_at: string;
   /** P1-05: the parts, pieces a set, review and R10 — absent on an older Worker. */
   summary?: { parts_count: number; pieces_per_set: number; review_state: string; estimate_complete: boolean; models_unpriced: number };
@@ -312,7 +318,14 @@ export const printApi = {
       body
     ),
 
-  myRequests: () => api.get<{ requests: MyRequestRow[] }>(`${BASE}/my-requests`),
+  /** A page of the customer's own requests (plan B3: `cursor`, `limit`); `next_cursor` is absent on an older Worker. */
+  myRequests: (cursor: string | null = null, limit?: number) => {
+    const p = new URLSearchParams();
+    if (cursor) p.set('cursor', cursor);
+    if (limit) p.set('limit', String(limit));
+    const qs = p.toString();
+    return api.get<{ requests: MyRequestRow[]; next_cursor?: string | null }>(`${BASE}/my-requests${qs ? `?${qs}` : ''}`);
+  },
 
   facts: (requestId: string) =>
     api.get<{

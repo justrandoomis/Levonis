@@ -34,6 +34,7 @@ import { POST_KINDS, projectsApi, type Post, type PostInput, type PostKind, type
 import { useProjectStrings } from '../../components/community/projects/strings';
 import { warmLinksOnPaste } from '../../components/community/links/useLinkCard';
 import VariantImg from '../../components/ui/VariantImg';
+import CommunitySurface from '../../components/community/CommunitySurface';
 
 type Draft = {
   title: string;
@@ -277,7 +278,7 @@ export default function ProjectComposer() {
   const canLinkStore = !!me?.store;
 
   return (
-    <div className="min-h-screen pb-28 text-text-primary">
+    <CommunitySurface className="min-h-screen pb-28 text-text-primary">
       <div className="material scroll-edge sticky top-0 z-40 h-14 px-4">
         <div className="mx-auto flex h-full max-w-2xl items-center gap-2">
           <IconButton
@@ -467,7 +468,7 @@ export default function ProjectComposer() {
           </div>
         </div>
       )}
-    </div>
+    </CommunitySurface>
   );
 }
 

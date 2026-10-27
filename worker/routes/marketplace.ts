@@ -49,7 +49,7 @@ import { requestImageRendition } from '../lib/imageVariants';
 import { parseVariantWidth } from '../lib/imageConvert';
 import { getTierStatus, benefits, membershipBadges } from '../lib/entitlements';
 import { requireOfferPrivileges, requireWithdrawPrivileges, storeForUser } from '../lib/merchantAuth';
-import { approvedAtSql, isMissingSchema, merchantApproved, withApprovalSchema } from '../lib/merchantApproval';
+import { approvedAtSql, isMissingSchema, merchantApproved, storeIsPublic, withApprovalSchema } from '../lib/merchantApproval';
 import { feeFor, autoCompleteDays } from '../lib/merchantOps';
 import {
   escrowForOrder,
@@ -112,7 +112,9 @@ import {
 } from '../lib/requestRevisions';
 import { getSetting } from '../lib/settings';
 import { feedCursor, nextFeedCursor } from '../lib/feedCursor';
-import { requestBoardVisible } from '../lib/requestBoard';
+import { requestBoardFilterSql, requestBoardVisible } from '../lib/requestBoard';
+import { governorateParam, optionalOneOf } from '../lib/listParams';
+import { REQUEST_OFFER_STATES, REQUEST_PROCESSES } from '@levonis/contracts/communityFilters';
 import { likePattern } from '../lib/sqlLike';
 import { notifyStatement } from '../lib/notifications';
 // Eligibility as data (W5-B): the offer gate, the file matrix and the re-match.
@@ -162,6 +164,8 @@ import { ownedFileObject } from '../lib/fileOwnership';
 import { isSchemaMissing } from '../lib/membershipBenefits';
 // A board deal's conversation: the request thread, found or created by the chat door's own helper.
 import { openStoreThread } from './chats';
+// Q2 (row 268): the budget is the customer's, shown to a merchant only when they say so.
+import { budgetFor, budgetReaderOf, budgetSwitchOf, budgetVisibleOf, snapshotHasBudget, stripSnapshotBudget, type BudgetReader } from '../lib/requestBudget';
 
 export const marketplaceRoutes = new Hono<AppContext>();
 
@@ -186,6 +190,11 @@ const publicSummary = (x: NonNullable<ReturnType<typeof boardSummaryOf>>) => ({
  * workshop actually dealing with them read the name on their own authorised
  * reads — `partyRequest` below, the order and the conversation.
  *
+ * And no BUDGET (Q2, worker/lib/requestBudget.ts): the key stays for the
+ * clients that read it, always null here. A reader who may see it — the
+ * customer, an admin, a merchant the request is meant for while the customer
+ * shows it — gets it from `requestForReader`, never from this whitelist.
+ *
  * Exported for the community page's list (worker/routes/community.ts), so the
  * two lists of the same rows answer with ONE whitelist.
  */
@@ -199,7 +208,8 @@ export function publicRequest(r: Record<string, unknown>) {
     material: r.material,
     color: r.color,
     dimensions: r.dimensions,
-    budget_iqd: r.budget_iqd,
+    /** NEVER PUBLIC (Q2, row 268): a reader who may see it gets it from `requestForReader`. */
+    budget_iqd: null as number | null,
     deadline: r.deadline,
     governorate: r.governorate,
     delivery_pref: r.delivery_pref,
@@ -226,8 +236,19 @@ export function publicRequest(r: Record<string, unknown>) {
  * accepted offer, or the store a direct request was addressed to). Never for
  * a reader of the board.
  */
-export function partyRequest(r: Record<string, unknown>) {
-  return { ...publicRequest(r), customer_name: (r.customer_name as string | null | undefined) ?? null };
+export function partyRequest(r: Record<string, unknown>, reader: Exclude<BudgetReader, 'public'>) {
+  return { ...requestForReader(r, reader), customer_name: (r.customer_name as string | null | undefined) ?? null };
+}
+
+/**
+ * The public whitelist for a reader who may be shown the budget (Q2,
+ * worker/lib/requestBudget.ts): the customer and an admin always, a merchant
+ * the request is meant for only when the customer turned the switch on (or
+ * typed it in the chat sheet for that one store, `budgetSwitchOf`). The
+ * reader is NAMED by every caller — never a list's index (`rows.map(fn)`).
+ */
+export function requestForReader(r: Record<string, unknown>, reader: BudgetReader) {
+  return { ...publicRequest(r), budget_iqd: budgetFor(r.budget_iqd, budgetSwitchOf(r), reader) };
 }
 
 /** A JSON id list column, read defensively. */
@@ -318,6 +339,16 @@ export function offerShape(o: Record<string, unknown>, badges: { pro: Set<string
           rating_count: o.m_rating_count,
           completed_orders: o.m_completed,
           store_slug: o.s_slug ?? null,
+          /**
+           * The store's logo as its public route and the governorate its page
+           * publishes (plan B3) — only on a read that selected them (the
+           * offers list), and the logo only of a store the public may see.
+           * Never the merchant row's own place or any contact.
+           */
+          ...(o.s_logo !== undefined
+            ? { logo_url: o.s_logo && storeIsPublic({ status: o.s_status }) ? `/files/${String(o.s_logo)}` : null }
+            : {}),
+          ...(o.s_governorate !== undefined ? { governorate: String(o.s_governorate ?? '') } : {}),
         }
       : null,
   };
@@ -336,7 +367,11 @@ marketplaceRoutes.get('/requests', requireCommunityOpen, async (c) => {
   const cursor = feedCursor(c.req.query('cursor'));
   const q = likePattern(c.req.query('q'));
   const category = c.req.query('category') || '';
-  const governorate = c.req.query('governorate') || '';
+  // One of the eighteen ids (the column holds ids); the process and the offers
+  // filters (plan B3) are the community list's own (`requestBoardFilterSql`).
+  const governorate = governorateParam(c.req.query('governorate'));
+  const process = optionalOneOf(c.req.query('process'), 'process', REQUEST_PROCESSES);
+  const offers = optionalOneOf(c.req.query('offers'), 'offers', REQUEST_OFFER_STATES);
 
   // The summary (P1-05) rides the print row; a database before 0208 reads the v1 derivation.
   const boardSql = (schema: boolean) =>
@@ -350,10 +385,11 @@ marketplaceRoutes.get('/requests', requireCommunityOpen, async (c) => {
       WHERE ${requestBoardVisible('?1', '?2')}
         AND (?3 = '' OR r.category = ?3)
         AND (?4 = '' OR r.governorate = ?4)
+        ${requestBoardFilterSql('?8', '?9', schema)}
         AND (?5 = '' OR r.created_at < ?5 OR (r.created_at = ?5 AND r.id < ?6))
       ORDER BY r.created_at DESC, r.id DESC LIMIT ?7`;
   const read = (schema: boolean) =>
-    c.env.DB.prepare(boardSql(schema)).bind(nowIso(), q, category, governorate, cursor.at, cursor.id, limit).all<Record<string, unknown>>();
+    c.env.DB.prepare(boardSql(schema)).bind(nowIso(), q, category, governorate, cursor.at, cursor.id, limit, process, offers).all<Record<string, unknown>>();
   const { results } = await read(true).catch((e) => {
     if (isMissingSchema(e)) return read(false);
     throw e;
@@ -397,15 +433,25 @@ marketplaceRoutes.get('/requests/:id', requireCommunityOpen, async (c) => {
   // requestFilePolicy.ts): the list is the request's, the bytes are not. A
   // file this caller may not read carries no URL; a model an eligible
   // merchant may only preview says so. Asked only when there are files.
-  const { reader } = files.results.length && user
+  //
+  // THE BUDGET (Q2, row 268): the customer and an admin read it; a merchant
+  // the request is meant for reads it only while the customer shows it — a
+  // party (the accepted merchant, a sent direct request's store), or a
+  // workshop whose live verdict is ELIGIBLE, asked of the same reader. A
+  // member, a merchant the job is not for and a guest never do (critique 2:
+  // the contract's `merchants`, not every merchant account).
+  const isAdmin = user?.role === 'admin';
+  const budgetAsked = !party && !isAdmin && !!user && budgetFor(r.budget_iqd, budgetSwitchOf(r), 'merchant') !== null;
+  const { reader } = (files.results.length || budgetAsked) && user
     ? await fileReader(c.env, r as unknown as RequestForAccess, user, { allowAdmin: true })
     : { reader: null };
   // A file the customer marked as the SOURCE (Q5, P1-04) is not an eligible merchant's to open or preview.
   const roles = reader === 'eligible' ? await fileSourceRoles(c.env.DB, id) : new Map<string, string>();
+  const budgetReader: BudgetReader = party && !isOwner && !isAdmin ? 'merchant' : budgetReaderOf({ isOwner, isAdmin, reader });
 
   return c.json({
     success: true,
-    request: party ? partyRequest(r) : publicRequest(r),
+    request: party && budgetReader !== 'public' ? partyRequest(r, budgetReader) : requestForReader(r, budgetReader),
     // R2 keys are NEVER returned. What a caller gets is a route on this
     // worker, which re-derives their right to the file on every read — so a
     // link shared after the request closes simply stops working.
@@ -801,7 +847,8 @@ marketplaceRoutes.post('/requests', requireCommunityOpen, requireAuth, async (c)
 
   await audit(c.env.DB, user.id, 'community.request_created', id, { title, state: 'draft' });
   const row = await c.env.DB.prepare('SELECT * FROM community_requests WHERE id = ?').bind(id).first();
-  return c.json({ success: true, request: publicRequest(row as Record<string, unknown>) }, 201);
+  // The customer's own draft: their budget comes back to them (Q2).
+  return c.json({ success: true, request: requestForReader(row as Record<string, unknown>, 'owner') }, 201);
 });
 
 /**
@@ -830,7 +877,7 @@ marketplaceRoutes.get('/my-requests', requireAuth, async (c) => {
       WHERE r.customer_id = ? ORDER BY r.created_at DESC LIMIT 50`
   ).bind(user.id).all();
   // The customer's own list: theirs, so the parties' view.
-  return c.json({ success: true, requests: results.map(partyRequest) });
+  return c.json({ success: true, requests: results.map((r) => partyRequest(r, 'owner')) });
 });
 
 /**
@@ -1592,7 +1639,8 @@ marketplaceRoutes.get('/requests/:id/offers', requireAuth, async (c) => {
     `SELECT o.*, m.user_id AS m_user_id, m.name AS m_name, m.verified AS m_verified, m.badge AS m_badge,
             m.badge_override AS m_badge_override, m.rating_avg_x100 AS m_rating,
             m.rating_count AS m_rating_count, m.completed_orders AS m_completed,
-            s.slug AS s_slug, r.revision AS r_revision, r.community_order_id AS r_order_id,
+            s.slug AS s_slug, s.logo_key AS s_logo, s.governorate AS s_governorate, s.status AS s_status,
+            r.revision AS r_revision, r.community_order_id AS r_order_id,
             r.accepted_offer_id AS r_accepted_offer_id, vm.eligible AS vm_eligible
        FROM community_offers o
        JOIN community_requests r ON r.id = o.request_id
@@ -2992,6 +3040,13 @@ marketplaceRoutes.get('/orders/:id', requireAuth, async (c) => {
   const orderId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const { row, isCustomer, isMerchant } = await loadOrderForParty(c, orderId);
   const [escrow, autoDays] = await Promise.all([escrowForOrder(c.env.DB, orderId), autoCompleteDays(c.env.DB)]);
+  // The job as accepted, its budget only for the customer — or for the
+  // merchant when the customer shows it (Q2, row 268). The stored snapshot is
+  // never rewritten.
+  const snapshot = publicSnapshot(row.request_snapshot);
+  const requestSnapshot = isCustomer || !snapshotHasBudget(snapshot)
+    ? snapshot
+    : stripSnapshotBudget(snapshot, (await budgetVisibleOf(c.env.DB, String(row.request_id ?? ''))) ? 1 : 0, 'merchant');
   return c.json({
     success: true,
     /**
@@ -3008,7 +3063,7 @@ marketplaceRoutes.get('/orders/:id', requireAuth, async (c) => {
       // The job revision this order was accepted on (0130) — both sides see
       // the same job; neither can rewrite it.
       // Its estimate as the parties may read it, whatever an old row holds (review W2-5 p6).
-      request_snapshot: publicSnapshot(row.request_snapshot),
+      request_snapshot: requestSnapshot,
       // Never the raw pair: each side gets the OTHER side's contact, below.
       contact_snapshot: undefined,
     },

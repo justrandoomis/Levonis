@@ -15,10 +15,15 @@
  *            shipment, the notification, the audit row and the integration
  *            events all land in that one batch — or none of them do.
  *   cancel/expire → holds released, redemptions returned, exactly once.
+ *   wallet → `planWalletPayment`: the Levonis wallet debit, the confirmation
+ *            and the fulfilment in ONE batch, under the customer's key.
  *   refund → only what the customer still holds unused: unconsumed seconds of
- *            that purchase's lot, ungranted grams of that purchase's lot.
+ *            that purchase's lot, ungranted grams of that purchase's lot. An
+ *            order paid from the wallet is refunded INTO the wallet, in the
+ *            refund's batch (wallet.ts `planWalletRefundCredit`).
  */
-import { many, one, fence, runBatch, type Planned, type Stmt } from './db';
+import { sha256Hex } from '../crypto';
+import { many, one, fence, idempotent, runBatch, type Outcome, type Planned, type Stmt } from './db';
 import { classifyDbError, invalid, pcError } from './errors';
 import { integrationEvent, membershipTier } from './adapters';
 import { pcAudit } from './audit';
@@ -30,7 +35,19 @@ import { priceQuote, type PricedLine, type PricedQuote, type QuoteLineInput } fr
 import type { PrintCloudConfig } from './settings';
 import { createShipment, deliveryFee, parseAddress, shipmentCancelStatements, shipmentInventoryItem, type DeliveryAddress } from './shipments';
 import { activeHolds, convertHoldToAllocation, deallocate, holdStock, releaseHold } from './warehouse';
-import { addSeconds, iso, mulDivRound, parseJson, pcId } from './util';
+import { addSeconds, canonicalJson, iso, mulDivRound, parseJson, pcId } from './util';
+import {
+  insufficientBalance,
+  planWalletRefundCredit,
+  walletChargeCents,
+  walletDebitStatement,
+  walletDebitTxId,
+  walletPayability,
+  walletPaymentEventId,
+  walletPaymentRefusal,
+  walletPosition,
+  type WalletRefundCredit,
+} from './wallet';
 
 export interface StoredQuote extends PricedQuote {
   quote_id: string;
@@ -163,7 +180,7 @@ export async function planOrderFromQuote(
   env: Record<string, unknown>,
   p: { userId: string; quoteId: string; provider: PaymentProvider; deliveryAddress: unknown; config: PrintCloudConfig; now: Date }
 ): Promise<Planned<OrderSummary>> {
-  assertPaymentAvailable(env, p.provider);
+  assertPaymentAvailable(env, p.provider, p.config);
   const quote = await one<{ id: string; user_id: string; status: string; expires_at: string; snapshot_json: string; promotion_ids_json: string }>(
     db,
     'SELECT id, user_id, status, expires_at, snapshot_json, promotion_ids_json FROM pc_quotes WHERE id = ?',
@@ -363,7 +380,14 @@ function bundleShares(line: OrderLineRow): { creditsPaid: number; items: Array<{
   return { creditsPaid: Math.max(0, line.final_price_iqd - materials), items };
 }
 
-/** Every statement that turns a paid order into the customer's balances. */
+/**
+ * Every statement that turns a paid order into the customer's balances, the
+ * payment event and the confirmed payment row first — fenced on the order
+ * still awaiting payment, so a batch that carries them lands only for an
+ * order nobody else confirmed, cancelled or expired meanwhile.
+ * `confirmPayment` runs them alone; the wallet adapter runs them in the same
+ * batch as its debit (`planWalletPayment`).
+ */
 async function fulfillmentStatements(db: D1Database, order: OrderRow, p: ConfirmInput): Promise<Stmt[]> {
   const lines = await many<OrderLineRow>(db, 'SELECT * FROM pc_order_lines WHERE order_id = ? ORDER BY line_no', order.id);
   const holds = await activeHolds(db, order.id);
@@ -570,6 +594,99 @@ export async function confirmPayment(db: D1Database, p: ConfirmInput): Promise<P
   throw pcError('STATE_CHANGED');
 }
 
+// ------------------------------------------------------------------ the Levonis wallet
+
+export interface WalletPaymentResult {
+  order_id: string;
+  status: 'paid';
+  provider: 'levonis_wallet';
+  amount_iqd: number;
+  /** The cents the wallet gave up; 0 for a zero-total order (nothing to collect, no debit). */
+  charged_usd_cents: number;
+  exchange_rate: number;
+  /** The one debit this order can ever have (`wtx_pc_<order id>`), or null when nothing was charged. */
+  wallet_tx_id: string | null;
+}
+
+/**
+ * Plan paying an own order from the customer's Levonis wallet. Read-only until
+ * its batch runs (`payOrderFromWallet`): the wallet debit, then
+ * `fulfillmentStatements` — the payment event, the order's fenced flip to
+ * fulfilled, the confirmed payment row, the grants, the stock allocations,
+ * the shipment, the notice, the outbox and the audit — so the money moves
+ * exactly when the order is confirmed, or not at all.
+ *
+ * Asked in dinars first, as the price is quoted: an order whose total is above
+ * the balance the wallet page prints is refused INSUFFICIENT_BALANCE before
+ * anything is written. The debit's own guard is not replaced, only preceded —
+ * `usdSpendStatement` still decides, at the instant the batch runs, whether
+ * the spendable cents cover it.
+ */
+export async function planWalletPayment(
+  db: D1Database,
+  p: { userId: string; orderId: string; config: PrintCloudConfig; now: Date }
+): Promise<Planned<WalletPaymentResult>> {
+  if (!p.config.wallet_payment_enabled) throw pcError('PAYMENT_ADAPTER_DISABLED', { provider: 'levonis_wallet' });
+  const order = await one<OrderRow>(db, 'SELECT * FROM pc_orders WHERE id = ?', p.orderId);
+  if (!order || order.user_id !== p.userId) throw pcError('NOT_FOUND');
+  const notPayable = await walletPayability(db, order, p.now);
+  if (notPayable) throw pcError('ORDER_NOT_PAYABLE', notPayable);
+  const position = await walletPosition(db, p.userId);
+  if (order.total_iqd > position.available_iqd) throw insufficientBalance(position.available_iqd, order.total_iqd);
+  const cents = walletChargeCents(order.total_iqd, position.available_cents, position.exchange_rate);
+  const txId = cents > 0 ? walletDebitTxId(order.id) : null;
+  const result: WalletPaymentResult = {
+    order_id: order.id,
+    status: 'paid',
+    provider: 'levonis_wallet',
+    amount_iqd: order.total_iqd,
+    charged_usd_cents: cents,
+    exchange_rate: position.exchange_rate,
+    wallet_tx_id: txId,
+  };
+  const statements: Stmt[] = [];
+  if (txId) {
+    statements.push(
+      await walletDebitStatement(db, { orderId: order.id, userId: p.userId, cents, totalIqd: order.total_iqd, rate: position.exchange_rate, nowIso: iso(p.now) })
+    );
+  }
+  statements.push(
+    ...(await fulfillmentStatements(db, order, {
+      provider: 'levonis_wallet',
+      // One event per order: a second wallet payment of it collides here as well as on the debit's id.
+      eventId: walletPaymentEventId(order.id),
+      orderId: order.id,
+      amountIqd: order.total_iqd,
+      actorId: p.userId,
+      payloadHash: await sha256Hex(canonicalJson({ order_id: order.id, charged_usd_cents: cents, exchange_rate: position.exchange_rate, wallet_tx_id: txId })),
+      now: p.now,
+    })),
+    // The order was placed for one method and paid with this one: its record says how it was paid.
+    db.prepare("UPDATE pc_orders SET payment_method = 'levonis_wallet' WHERE id = ? AND payment_method <> 'levonis_wallet'").bind(order.id)
+  );
+  return { statements, result };
+}
+
+/**
+ * POST /orders/{id}/pay/wallet: `planWalletPayment` under the customer's
+ * Idempotency-Key. The key's operation row is the batch's first statement, so
+ * the first answer is stored exactly when the money moves and a replay returns
+ * it; a refusal stores nothing (top up, retry with the same key). A batch the
+ * database refused is classified from the facts (wallet.ts
+ * `walletPaymentRefusal`); an outage is a 500.
+ */
+export function payOrderFromWallet(
+  db: D1Database,
+  p: { userId: string; orderId: string; key: string; config: PrintCloudConfig; now: Date }
+): Promise<Outcome<WalletPaymentResult>> {
+  return idempotent(
+    db,
+    { actorId: p.userId, scope: 'order.pay.wallet', key: p.key, request: { orderId: p.orderId }, now: p.now },
+    () => planWalletPayment(db, p),
+    { refusal: (e, lastAttempt) => walletPaymentRefusal(db, e, { orderId: p.orderId, userId: p.userId, now: p.now, lastAttempt }) }
+  );
+}
+
 // ------------------------------------------------------------------ cancel / expire
 
 /** Statements that close an unpaid order: holds back on the shelf, redemptions returned, payments rejected. */
@@ -634,24 +751,49 @@ export async function expireUnpaidOrders(db: D1Database, now: Date, limit = 25, 
 
 // ------------------------------------------------------------------ refunds
 
+export type RefundMethod = 'manual' | 'gateway' | 'dev' | 'levonis_wallet';
+export const REFUND_METHODS: readonly RefundMethod[] = ['manual', 'gateway', 'dev', 'levonis_wallet'];
+
+export interface RefundResult {
+  refund_id: string;
+  amount_iqd: number;
+  quantity: number;
+  method: RefundMethod;
+  /** The credit an order paid from the Levonis wallet got back, in this refund's batch; null for every other method. */
+  wallet_credit: { tx_id: string; usd_cents: number; amount_iqd: number | null; exchange_rate: number | null } | null;
+}
+
 /**
  * Refund (part of) one paid order line — only what the customer has NOT
  * used. Credits: the FREE part of the lot that line bought — never seconds a
  * confirmed job holds on it, and nothing once the lot's expiry has come.
  * Materials: unused, unreserved units of the lot that line bought, which go
- * back to the workshop's sellable stock. The money leaves through `method`;
- * this records it, never moves it.
+ * back to the workshop's sellable stock.
+ *
+ * WHERE THE MONEY GOES follows how it came. An order paid from the Levonis
+ * wallet is refunded INTO the wallet, in this batch (wallet.ts
+ * `planWalletRefundCredit`): `method` may be left out or say
+ * 'levonis_wallet'; naming another method for it is refused, because cash
+ * handed back as well as a wallet credit would refund it twice. For every
+ * other order the money leaves through `method` ('manual' when left out):
+ * this records it, never moves it — and 'levonis_wallet' is refused, because
+ * crediting a wallet the order never debited would mint money.
  */
 export async function planLineRefund(
   db: D1Database,
-  p: { orderId: string; lineId: string; quantity: number | null; amountIqd: number | null; reason: string; method: 'manual' | 'gateway' | 'dev'; actorId: string; now: Date }
-): Promise<Planned<{ refund_id: string; amount_iqd: number; quantity: number }>> {
+  p: { orderId: string; lineId: string; quantity: number | null; amountIqd: number | null; reason: string; method: RefundMethod | null; actorId: string; now: Date }
+): Promise<Planned<RefundResult>> {
   const order = await one<OrderRow>(db, 'SELECT * FROM pc_orders WHERE id = ?', p.orderId);
   if (!order) throw pcError('NOT_FOUND');
   if (!['fulfilled', 'partially_refunded'].includes(order.status)) throw pcError('INVALID_TRANSITION', { status: order.status });
   const line = await one<OrderLineRow>(db, 'SELECT * FROM pc_order_lines WHERE id = ? AND order_id = ?', p.lineId, p.orderId);
   if (!line) throw pcError('NOT_FOUND');
   if (!p.reason.trim()) throw invalid('reason', 'required');
+  const paidWith = await one<{ provider: string }>(db, "SELECT provider FROM pc_payments WHERE order_id = ? AND status = 'confirmed'", order.id);
+  const fromWallet = paidWith?.provider === 'levonis_wallet';
+  if (fromWallet && p.method !== null && p.method !== 'levonis_wallet') throw invalid('method', 'order_paid_from_wallet');
+  if (!fromWallet && p.method === 'levonis_wallet') throw invalid('method', 'order_not_paid_from_wallet');
+  const method: RefundMethod = fromWallet ? 'levonis_wallet' : (p.method ?? 'manual');
   const s: Stmt[] = [];
   let qty = 0;
   let defaultAmount = 0;
@@ -730,6 +872,11 @@ export async function planLineRefund(
   const remainingOnLine = line.final_price_iqd - line.refunded_iqd;
   const amount = p.amountIqd ?? Math.min(defaultAmount, remainingOnLine);
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > remainingOnLine) throw invalid('amount_iqd', 'out_of_range');
+  // The wallet's share of this refund, computed against the same order snapshot the fence below holds the batch to.
+  const credit: WalletRefundCredit | null = fromWallet
+    ? await planWalletRefundCredit(db, { order, refundId, amountIqd: amount, nowIso: iso(p.now) })
+    : null;
+  const walletCredit = credit ? { tx_id: credit.tx_id, usd_cents: credit.usd_cents, amount_iqd: credit.amount_iqd, exchange_rate: credit.exchange_rate } : null;
   // Fenced on a fresh op_token, not on the resulting total: a concurrent
   // refund of the same amount reaches the same total, and only the token
   // tells that this batch's UPDATE is the one that matched.
@@ -737,9 +884,10 @@ export async function planLineRefund(
   s.push(
     db
       .prepare(
-        "INSERT INTO pc_refunds (id, order_id, order_line_id, amount_iqd, quantity, reason, method, status, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'recorded', ?, ?)"
+        "INSERT INTO pc_refunds (id, order_id, order_line_id, amount_iqd, quantity, reason, method, status, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       )
-      .bind(refundId, order.id, line.id, amount, qty, p.reason.slice(0, 500), p.method, p.actorId, iso(p.now)),
+      // A wallet refund is paid out by this very batch; every other method is recorded for the money desk.
+      .bind(refundId, order.id, line.id, amount, qty, p.reason.slice(0, 500), method, credit ? 'paid_out' : 'recorded', p.actorId, iso(p.now)),
     db.prepare('UPDATE pc_order_lines SET refunded_iqd = refunded_iqd + ? WHERE id = ?').bind(amount, line.id),
     db
       .prepare(
@@ -749,10 +897,25 @@ export async function planLineRefund(
       )
       .bind(amount, amount, iso(p.now), token, order.id, order.refunded_iqd),
     fence(db, 'STATE_CHANGED', '(SELECT op_token FROM pc_orders WHERE id = ?) = ?', [order.id, token]),
-    integrationEvent(db, { adapter: 'accounting', kind: 'refund.recorded', refId: refundId, payload: { order_id: order.id, amount_iqd: amount, method: p.method }, now: p.now }),
-    ...(await pcAudit(db, p.actorId, 'order.refund', order.id, { refund_id: refundId, line_id: line.id, amount_iqd: amount, quantity: qty, reason: p.reason })),
+    ...(credit?.statements ?? []),
+    integrationEvent(db, {
+      adapter: 'accounting',
+      kind: 'refund.recorded',
+      refId: refundId,
+      payload: { order_id: order.id, amount_iqd: amount, method, ...(walletCredit ? { wallet_tx_id: walletCredit.tx_id, wallet_usd_cents: walletCredit.usd_cents } : {}) },
+      now: p.now,
+    }),
+    ...(await pcAudit(db, p.actorId, 'order.refund', order.id, {
+      refund_id: refundId,
+      line_id: line.id,
+      amount_iqd: amount,
+      quantity: qty,
+      reason: p.reason,
+      method,
+      ...(walletCredit ? { wallet_tx_id: walletCredit.tx_id, wallet_usd_cents: walletCredit.usd_cents } : {}),
+    })),
   );
-  return { statements: s, result: { refund_id: refundId, amount_iqd: amount, quantity: qty } };
+  return { statements: s, result: { refund_id: refundId, amount_iqd: amount, quantity: qty, method, wallet_credit: walletCredit } };
 }
 
 // ------------------------------------------------------------------ reads

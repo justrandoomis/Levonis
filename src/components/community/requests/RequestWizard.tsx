@@ -296,6 +296,15 @@ export default function RequestWizard({
   const [requestId, setRequestId] = useState(initialId ?? '');
   const [state, setState] = useState<string>(initialId ? '' : 'draft');
   const [liveOffers, setLiveOffers] = useState(0);
+  /**
+   * Q2: is this request budget shown to merchants? This wizard has no switch
+   * (the request editor brings it), so the server answers for the request
+   * (`budget_visible` of its draft): true for a request made in a store chat
+   * for that one store, or a board request whose switch is on; a new request
+   * and a repeat of a request to one store read false. The hint under the
+   * field says which, and never more than the server does.
+   */
+  const [budgetShown, setBudgetShown] = useState(false);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [pending, setPending] = useState<PendingFile[]>([]);
   // The previews alive right now, for the unmount below: a closed wizard leaves no object URL behind.
@@ -369,6 +378,7 @@ export default function RequestWizard({
         if (!alive) return;
         setState(d.state);
         setLiveOffers(d.live_offers);
+        setBudgetShown(d.budget_visible === true);
         setFiles(d.files);
         const p = d.print;
         setS({
@@ -1066,7 +1076,15 @@ export default function RequestWizard({
                     }}
                   />
                 </Field>
-                <Field label={loc('ميزانيتك', 'Your budget', 'بودجەکەت')} optional hint={loc('يراها التجار. اتركها فارغة إن لم تكن متأكدًا.', 'Merchants see it. Leave it empty if unsure.', 'بازرگانەکان دەیبینن. ئەگەر دڵنیا نیت بەتاڵی بهێڵەوە.')}>
+                <Field
+                  label={loc('ميزانيتك', 'Your budget', 'بودجەکەت')}
+                  optional
+                  hint={
+                    budgetShown
+                      ? loc('يراها التجار الذين يمكنهم صنع طلبك، ولا تظهر للعموم.', 'Merchants who can make your request see it; it is never public.', 'ئەو بازرگانانەی دەتوانن داواکارییەکەت دروست بکەن دەیبینن، و هەرگیز گشتی نییە.')
+                      : loc('لا يراها التجار ولا العموم.', 'Hidden from merchants and the public.', 'لە بازرگانان و خەڵکی گشتی شاراوەیە.')
+                  }
+                >
                   <NumberInput kind="money" value={s.budget_iqd} onValueChange={(v, ok) => ok && set('budget_iqd', v)} />
                 </Field>
               </div>

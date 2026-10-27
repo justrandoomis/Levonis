@@ -77,6 +77,8 @@ export interface PostFile {
   /** The author ticked «يمكن تنزيله»: a signed-in reader may take the original. */
   downloadable: boolean;
   has_preview: boolean;
+  /** The file type the server derived from the stored type (`stl`, `3mf`, `pdf`); absent on an older Worker (plan B3). */
+  ext?: string;
   key?: string;
 }
 

@@ -6,6 +6,7 @@
  * figure the server will believe.
  */
 import { api } from '../../../lib/api';
+import type { RequestOffersFilter, RequestProcessFilter } from '../../../../packages/contracts/src/communityFilters';
 import type { Estimate } from '../../../lib/printEstimate';
 import type { RequestColourMode, RequestSourceKind } from '../../../../packages/contracts/src/requestModel';
 
@@ -92,7 +93,144 @@ export interface DraftShape {
   schema_version?: 1 | 3;
   /** Every source and part, in order — synthesised from `print` while the request is version 1. */
   model?: DraftModel | null;
+  /** P1-06: what the editor sends back as `expected_updated_at`. Absent on an older Worker. */
+  updated_at?: string;
+  /** P1-06: the one store a DIRECT request is addressed to; null for a board request. */
+  direct?: { merchant_id: string; store_name: string; store_slug: string; chat_id: string | null } | null;
 }
+
+// ---------------------------------------------------------------------------
+//  THE V3 BODY (P1-06, docs/DECISIONS.md row 268): what the request editor
+//  sends to the draft save, the estimate and the publish. Ids it echoes are
+//  the server’s; an id the server never gave (`tmp_…`) names a new source so
+//  a part or a colour can point at it in the same body. It never sends
+//  `source_type`: the server derives it.
+// ---------------------------------------------------------------------------
+
+export interface V3Colour {
+  mode: RequestColourMode;
+  hex?: string;
+  label?: string;
+  ref?: string;
+}
+
+export interface V3Material {
+  id?: string;
+  material_id: string;
+  colors: V3Colour[];
+  finish: string;
+  region_reference: string;
+  requirements: string;
+}
+
+export interface V3Part {
+  id?: string;
+  name: string;
+  quantity: number;
+  process: ProcessChoice;
+  stated_dimensions_mm: Dims | null;
+  measured_file_id: string | null;
+  notes: string;
+  assembly_notes: string;
+  source_ids: string[];
+  materials: V3Material[];
+}
+
+export interface V3Source {
+  id: string;
+  kind: RequestSourceKind;
+  file_id?: string;
+  url?: string;
+  ref_text?: string;
+  note: string;
+  is_primary: boolean;
+  role?: string;
+}
+
+export interface V3Body {
+  schema_version: 3;
+  title?: string;
+  description?: string;
+  quantity: number;
+  quality: Quality;
+  sources: V3Source[];
+  parts: V3Part[];
+  /** Named only when changed (editor/state.ts): the server keeps what the body does not name. */
+  customer_notes?: string;
+  governorate?: string;
+  delivery_pref?: string;
+  deadline?: string;
+  budget_iqd?: number | null;
+  /** Q2: «اعرض ميزانيتي للتجار». */
+  budget_visible?: boolean;
+}
+
+/** Where a new draft comes from (the editor's address: ?project= · ?product=&store= · ?store=). */
+export type EditorEntry =
+  | { kind: 'blank' }
+  | { kind: 'project'; post_id: string }
+  | { kind: 'product'; product_id: string; store: string }
+  | { kind: 'store'; merchant_id: string };
+
+/** What an entry copied: the count, and each file it skipped with its code. */
+export interface EntryCopies {
+  files: number;
+  skipped: Array<{ name: string; code: string; post_file_id: string }>;
+}
+
+const draftPath = (id: string) => `/api/marketplace/print/requests/${encodeURIComponent(id)}/draft`;
+
+export const editorApi = {
+  /**
+   * A new draft, born version 3 (worker/routes/requestEntries.ts): empty, or
+   * from a project (its files copied in), a store product or a store. An idle
+   * draft from the same origin is answered again (`replayed`).
+   */
+  createEntry: (entry: EditorEntry = { kind: 'blank' }, lang?: string) =>
+    api.post<{ request_id: string; replayed: boolean; draft: DraftShape; copied?: EntryCopies }>('/api/marketplace/print/requests', { entry, ...(lang ? { lang } : {}) }),
+  /** A project file the entry skipped, copied again (never one the request already holds). */
+  copyFromProject: (id: string, postId: string, fileIds: string[]) =>
+    api.post<{ draft: DraftShape; copied: EntryCopies & { already: string[] } }>(
+      `/api/marketplace/print/requests/${encodeURIComponent(id)}/copy-from-project`,
+      { post_id: postId, file_ids: fileIds }
+    ),
+  /** A request for one store, sent to it: its conversation opens and its card lands there. */
+  sendDirect: (id: string) =>
+    api.post<{ chat_id: string; replayed?: boolean }>(`/api/marketplace/print/requests/${encodeURIComponent(id)}/send`),
+  draft: (id: string) => api.get<{ draft: DraftShape }>(draftPath(id)),
+  /** `expected` refuses with 409 DRAFT_CHANGED when another window saved first. */
+  save: (id: string, body: V3Body, expected?: string) =>
+    api.put<{ draft: DraftShape }>(draftPath(id), expected ? { ...body, expected_updated_at: expected } : body),
+  publish: (id: string, body: V3Body) =>
+    api.post<PublishResult>(`/api/marketplace/print/requests/${encodeURIComponent(id)}/publish`, body),
+  quote: (id: string, body: V3Body) => api.post<QuoteAnswer>('/api/marketplace/print/quote', { ...body, request_id: id }),
+  cancel: (id: string) => api.post<{ success: boolean }>(`/api/marketplace/requests/${encodeURIComponent(id)}/cancel`),
+  viewerToken: (id: string, fileId: string) =>
+    api.post<{ token: string; url: string }>(
+      `/api/marketplace/print/requests/${encodeURIComponent(id)}/files/${encodeURIComponent(fileId)}/viewer-token`
+    ),
+  /**
+   * The save that must outlive the page (it is leaving): a plain keepalive
+   * request, with no `expected_updated_at` — a save of this same tab still in
+   * flight moves the stamp, and a stale stamp would throw the last words away.
+   * Fire and forget; false when the browser refused to send it.
+   */
+  saveOnLeave: (id: string, body: V3Body): boolean => {
+    try {
+      if (typeof fetch !== 'function') return false;
+      void fetch(draftPath(id), {
+        method: 'PUT',
+        credentials: 'same-origin',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).catch(() => undefined);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+};
 
 /** A colour as the model gives it (packages/contracts/src/requestModel.ts). */
 export interface DraftModelColour {
@@ -121,6 +259,10 @@ export interface DraftModel {
     note: string;
     is_primary: boolean;
     position: number;
+    /** The owner's projection only (P1-06): where a server copy came from — a project, a product. */
+    origin_id?: string;
+    origin_ref?: string;
+    origin_meta?: Record<string, unknown>;
   }>;
   parts: Array<{
     id: string;
@@ -268,6 +410,30 @@ export interface PublishResult {
   revision: number;
   quote: Quote;
   matching: { considered: number; eligible: number; notified: number };
+}
+
+/**
+ * THE PUBLIC BOARD'S FILTERS (`GET /api/marketplace/requests`, plan B3): a
+ * search, a governorate id, the process a request names, whether it has
+ * offers yet. Each value comes from a closed list
+ * (packages/contracts/src/communityFilters.ts, src/lib/governorates.ts); the
+ * server refuses anything else.
+ */
+export interface BoardFilters {
+  q?: string;
+  governorate?: string;
+  process?: RequestProcessFilter | '';
+  offers?: RequestOffersFilter | '';
+}
+
+/** The board's address for these filters and this page. */
+export function boardPath(filters: BoardFilters, cursor: string | null = null, limit?: number): string {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(filters)) if (v) p.set(k, String(v));
+  if (cursor) p.set('cursor', cursor);
+  if (limit) p.set('limit', String(limit));
+  const qs = p.toString();
+  return `/api/marketplace/requests${qs ? `?${qs}` : ''}`;
 }
 
 export const requestsApi = {
@@ -514,6 +680,10 @@ export interface OfferV2 {
     rating_count: number;
     completed_orders: number;
     store_slug: string | null;
+    /** The store logo as its public route, null without one (plan B3); absent on an older Worker. */
+    logo_url?: string | null;
+    /** The governorate the store page publishes (plan B3); absent on an older Worker. */
+    governorate?: string;
   } | null;
 }
 

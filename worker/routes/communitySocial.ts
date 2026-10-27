@@ -45,6 +45,8 @@ import { audit } from '../lib/audit';
 import { notifyGrouped, peopleAr, stampGroupedCkb } from '../lib/notifications';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { feedCursor } from '../lib/feedCursor';
+import { optionalOneOf } from '../lib/listParams';
+import { COMMENT_ORDERS, CREATOR_SORTS, DIRECTORY_WORKS_MAX, FEED_FROM } from '@levonis/contracts/communityFilters';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { communityGate } from '../lib/communityGate';
 import { membershipBadges } from '../lib/entitlements';
@@ -282,11 +284,23 @@ const commentVisibleSql = (v: string, admin: string) => `(
       OR (cm.state = 'hidden' AND (${admin} = 1 OR cm.author_id = ${v}))
   ) AND ${commentAuthorOkSql(v)}`;
 
+/**
+ * A PROJECT'S COMMENTS, a page at a time: oldest first (the thread, the
+ * default), or `order=newest` — the project page's preview of the latest
+ * words (plan B3), paged backwards by the same (created_at, id) key.
+ */
 communitySocialRoutes.get('/posts/:id/comments', async (c) => {
   const id = idParam(c);
   const viewer = c.get('user') ?? null;
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 50, def: 20 });
+  const order = optionalOneOf(c.req.query('order'), 'order', COMMENT_ORDERS) || 'oldest';
   const cursor = feedCursor(c.req.query('cursor'));
+  const page =
+    order === 'newest'
+      ? `AND (?4 = '' OR cm.created_at < ?4 OR (cm.created_at = ?4 AND cm.id < ?5))
+          ORDER BY cm.created_at DESC, cm.id DESC LIMIT ?6`
+      : `AND (?4 = '' OR cm.created_at > ?4 OR (cm.created_at = ?4 AND cm.id > ?5))
+          ORDER BY cm.created_at ASC, cm.id ASC LIMIT ?6`;
   const p = await loadPostHead(c.env, id);
   if (!p || !mayRead(p, viewer)) throw notFound('Project not found');
   if (viewer && (await blockedEither(c.env.DB, viewer.id, p.author_id))) throw notFound('Project not found');
@@ -300,8 +314,7 @@ communitySocialRoutes.get('/posts/:id/comments', async (c) => {
       c.env.DB.prepare(
         `SELECT ${commentColumns(schema)} ${COMMENT_FROM}
           WHERE cm.post_id = ?1 AND ${commentVisibleSql('?2', '?3')}
-            AND (?4 = '' OR cm.created_at > ?4 OR (cm.created_at = ?4 AND cm.id > ?5))
-          ORDER BY cm.created_at ASC, cm.id ASC LIMIT ?6`
+            ${page}`
       )
         .bind(id, v, admin, cursor.at, cursor.id, limit + 1)
         .all<Record<string, unknown>>()
@@ -313,6 +326,7 @@ communitySocialRoutes.get('/posts/:id/comments', async (c) => {
   const next_cursor = nextPostCursor(results, limit, 'created_at');
   return c.json({
     success: true,
+    order,
     comments: results.map((r) => commentPublic(r, viewer, p.author_id)),
     next_cursor,
     total: Number(total?.n ?? 0),
@@ -703,20 +717,22 @@ communitySocialRoutes.post('/reports', requireAuth, async (c) => {
  * muted or blocked (and who blocked them). «أتابع»: by the makers the viewer
  * follows, and by the owners of the stores they follow — one follow of a
  * store is a follow of its maker's posts too (Q3's proposal, the reading side).
+ * `from` (plan B3) reads one half of «أتابع»: `makers` (the people followed)
+ * or `stores` (the owners of the stores followed); `all`, the default, both.
  */
 communitySocialRoutes.get('/feed', async (c) => {
   const scope = oneOf(c.req.query('scope') ?? 'foryou', 'scope', ['foryou', 'following'] as const);
+  const from = optionalOneOf(c.req.query('from'), 'from', FEED_FROM) || 'all';
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 30, def: 12 });
   const cursor = feedCursor(c.req.query('cursor'));
   const viewer = c.get('user') ?? null;
   if (scope === 'following' && !viewer) throw unauthorized();
   const v = viewer?.id ?? '';
   const root = rootDomainFrom(c.env);
-  const scopeSql =
-    scope === 'following'
-      ? `AND p.author_id IN (SELECT uf.user_id FROM user_follows uf WHERE uf.follower_id = ?1
-                            UNION SELECT cm.user_id FROM follows f JOIN community_merchants cm ON cm.id = f.merchant_id WHERE f.user_id = ?1)`
-      : '';
+  const makers = 'SELECT uf.user_id FROM user_follows uf WHERE uf.follower_id = ?1';
+  const stores = 'SELECT cm.user_id FROM follows f JOIN community_merchants cm ON cm.id = f.merchant_id WHERE f.user_id = ?1';
+  const followed = from === 'makers' ? makers : from === 'stores' ? stores : `${makers}\n                            UNION ${stores}`;
+  const scopeSql = scope === 'following' ? `AND p.author_id IN (${followed})` : '';
   const { results } = await withApprovalSchema((schema) =>
     c.env.DB.prepare(
       `SELECT ${postColumns(schema)} ${POST_FROM}
@@ -731,6 +747,7 @@ communitySocialRoutes.get('/feed', async (c) => {
   return c.json({
     success: true,
     scope,
+    ...(scope === 'following' ? { from } : {}),
     posts: await withViewerFlags(c.env.DB, v || null, results.map((p) => postCard(p, root))),
     next_cursor,
   });
@@ -806,11 +823,56 @@ export function creatorCard(r: Record<string, unknown>, badges: { pro: Set<strin
 }
 
 /**
+ * A MAKER'S WORKS ON THEIR CARD (plan B3): up to three of their PUBLIC
+ * projects (`POST_PUBLIC_SQL`: published, public, not hidden, consent settled)
+ * that have a picture, newest first, each as its first picture. One windowed
+ * read for the whole page of makers, never one per card; a clip-only project
+ * has nothing to draw and is left out.
+ */
+export async function creatorWorks(db: D1Database, userIds: string[]): Promise<Map<string, Array<{ id: string; title: string; imageUrl: string | null; width: number | null; height: number | null; url: string }>>> {
+  const out = new Map<string, Array<{ id: string; title: string; imageUrl: string | null; width: number | null; height: number | null; url: string }>>();
+  if (!userIds.length) return out;
+  const { results } = await db
+    .prepare(
+      `SELECT author_id, id, title, media_key, width, height FROM (
+         SELECT p.author_id, p.id, p.title, m.media_key, m.width, m.height,
+                ROW_NUMBER() OVER (PARTITION BY p.author_id ORDER BY p.published_at DESC, p.id DESC) AS nth
+           FROM community_posts p
+           JOIN community_post_media m
+             ON m.id = (SELECT m2.id FROM community_post_media m2
+                         WHERE m2.post_id = p.id AND m2.kind = 'image' ORDER BY m2.sort_order, m2.id LIMIT 1)
+          WHERE ${POST_PUBLIC_SQL} AND p.author_id IN (SELECT value FROM json_each(?1))
+       ) WHERE nth <= ?2
+       ORDER BY author_id, nth`
+    )
+    .bind(JSON.stringify(userIds), DIRECTORY_WORKS_MAX)
+    .all<{ author_id: string; id: string; title: string; media_key: string; width: number | null; height: number | null }>();
+  for (const r of results ?? []) {
+    const list = out.get(r.author_id) ?? [];
+    list.push({
+      id: String(r.id),
+      title: String(r.title ?? ''),
+      imageUrl: fileUrl(r.media_key),
+      width: r.width ?? null,
+      height: r.height ?? null,
+      url: postHref(String(r.id)),
+    });
+    out.set(r.author_id, list);
+  }
+  return out;
+}
+
+/**
  * THE CREATORS LIST — accounts with a page (D4), never across a block.
- * Featured (`featured=1`) orders by published projects then followers; the
- * default by the newest published project. The cursor is an opaque offset:
- * the list is short and its two orders are composite, so an exact
- * `(key, id)` cursor would buy nothing a client could see.
+ * `sort` (plan B3): `recent` (the default) by the newest published project,
+ * `featured` (the old `featured=1`) by published projects then followers,
+ * `followers` by followers then projects. `has_store=1` keeps the makers
+ * with a store the public may see; `approved=1` the approved providers
+ * («مزوّد معتمد», `merchantPublicSql`). Both are ANDed into the one `where`,
+ * so `total` stays exact. Each card carries its works (`creatorWorks`).
+ * The cursor is an opaque offset: the list is short and its orders are
+ * composite, so an exact `(key, id)` cursor would buy nothing a client could
+ * see.
  *
  * THE CANDIDATES COME FIRST. The list starts from the accounts that HAVE a
  * page — `creator_public = 1` (0155's partial index) ∪ live merchants — and
@@ -825,12 +887,23 @@ communitySocialRoutes.get('/creators', async (c) => {
   const offset = int(c.req.query('cursor'), 'cursor', { min: 0, max: 100_000, def: 0 });
   const q = likePattern(c.req.query('q'));
   const featured = c.req.query('featured') === '1';
+  const sort = optionalOneOf(c.req.query('sort'), 'sort', CREATOR_SORTS) || (featured ? 'featured' : 'recent');
+  const hasStore = optionalOneOf(c.req.query('has_store'), 'has_store', ['1', '0'] as const) === '1';
+  const approved = optionalOneOf(c.req.query('approved'), 'approved', ['1', '0'] as const) === '1';
   const viewer = c.get('user') ?? null;
   const v = viewer?.id ?? '';
   const root = rootDomainFrom(c.env);
-  const order = featured ? 'projects DESC, u.follower_count DESC, u.id DESC' : 'last_published DESC NULLS LAST, u.follower_count DESC, u.id DESC';
+  const order =
+    sort === 'featured' ? 'projects DESC, u.follower_count DESC, u.id DESC'
+      : sort === 'followers' ? 'u.follower_count DESC, projects DESC, u.id DESC'
+        : 'last_published DESC NULLS LAST, u.follower_count DESC, u.id DESC';
   const [{ results }, total] = await withApprovalSchema((schema) => {
-    const { where, from, withCounts, columns } = creatorListSql('?1', '?2', schema);
+    const base = creatorListSql('?1', '?2', schema);
+    const { from, withCounts, columns } = base;
+    // `cm` and `s` are the candidate's merchant row and store (LEFT JOINs of `from`).
+    const where = `${base.where}
+          ${approved || hasStore ? `AND cm.id IS NOT NULL AND ${merchantPublicSql('cm', schema)}` : ''}
+          ${hasStore ? `AND s.id IS NOT NULL AND ${storePublicSql('s')}` : ''}`;
     return Promise.all([
       c.env.DB.prepare(
         `SELECT ${columns}
@@ -846,8 +919,11 @@ communitySocialRoutes.get('/creators', async (c) => {
   });
   const more = results.length > limit;
   if (more) results.length = limit;
-  const badges = await membershipBadges(c.env.DB, results.map((r) => r.id));
-  const creators = results.map((r) => creatorCard(r, badges, root));
+  const [badges, works] = await Promise.all([
+    membershipBadges(c.env.DB, results.map((r) => r.id)),
+    creatorWorks(c.env.DB, results.map((r) => String(r.id))),
+  ]);
+  const creators = results.map((r) => ({ ...creatorCard(r, badges, root), works: works.get(String(r.id)) ?? [] }));
   return c.json({
     success: true,
     creators,

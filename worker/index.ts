@@ -98,6 +98,7 @@ import { adminFinancePeopleRoutes } from './routes/adminFinancePeople';
 import { adminInvestmentFinanceRoutes } from './routes/adminInvestmentFinance';
 import { financeEarningsRoutes } from './routes/financeEarnings';
 import { printRequestRoutes } from './routes/printRequests';
+import { requestEntryRoutes } from './routes/requestEntries';
 import { notificationRoutes } from './routes/notifications';
 import { stockAlertRoutes } from './routes/stockAlerts';
 import { compareRoutes } from './routes/compare';
@@ -702,6 +703,9 @@ app.route('/api/product-files', publicProductFileRoutes);
 // /brands before /:id — the more specific prefix is registered first so it can
 // never be shadowed by a parameterised route above it.
 app.route('/api/marketplace/print', printRequestRoutes);
+// The request editor's entry doors (P1-06, row 268): POST /requests (a draft
+// born empty, or from a project, a product or a store), copy-from-project, send.
+app.route('/api/marketplace/print', requestEntryRoutes);
 // The customer-request marketplace: requests, offers, escrowed community orders.
 app.route('/api/marketplace', marketplaceRoutes);
 // The request's discussion and the order's timeline (Phase 5b, docs/COMMUNITY_ECOSYSTEM.md
@@ -1412,7 +1416,7 @@ export default {
         .catch((error) => {
           console.error('scheduled request-model cache rejected:', error instanceof Error ? error.name : 'unknown');
         })
-        // LAST (DECISIONS row 270): Print Cloud's durable background work — order and
+        // LAST (DECISIONS row 271): Print Cloud's durable background work — order and
         // credit expiry, file analysis, URL imports, the scheduler, slicing leases,
         // low-balance notices, the daily reconciliation — within its own 120 of what
         // the steps above left (quarterHourPrintCloudBudget). Never throws.

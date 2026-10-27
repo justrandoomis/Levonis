@@ -18,7 +18,7 @@ import { jsonObject, requireAuth } from '../lib/http';
 import { limitRoute } from '../lib/ratelimit';
 import { mediaBucket } from '../lib/mediaStorage';
 import { canViewCost } from '../lib/costAccess';
-import { ADAPTERS } from '../lib/printCloud/adapters';
+import { adapterStatuses } from '../lib/printCloud/adapters';
 import { runAfterRequest } from '../lib/printCloud/background';
 import { buybackQuote, cancelBuyback, requestBuyback } from '../lib/printCloud/buyback';
 import { categories, publicPackages, publicPrinterModels, publicStoreCatalog } from '../lib/printCloud/catalog';
@@ -43,7 +43,7 @@ import {
   reviewJob,
   type JobRow,
 } from '../lib/printCloud/jobs';
-import { confirmPayment, closeUnpaidOrder, createQuote, orderDetail, planOrderFromQuote, type OrderRow } from '../lib/printCloud/orders';
+import { confirmPayment, closeUnpaidOrder, createQuote, orderDetail, payOrderFromWallet, planOrderFromQuote, type OrderRow } from '../lib/printCloud/orders';
 import { openApiDocument } from '../lib/printCloud/openapi';
 import { PAYMENT_PROVIDERS, verifyGatewaySignature, type PaymentProvider } from '../lib/printCloud/payments';
 import { parseQuoteLines, priceQuote, ownedQty, topUpQuantity } from '../lib/printCloud/pricing';
@@ -55,6 +55,7 @@ import { dashboardCredits, dashboardFiles, dashboardInventory, dashboardJobs, da
 import { enqueueTask } from '../lib/printCloud/tasks';
 import { sha256OfBytes } from '../lib/printCloud/files';
 import { addSeconds, iso, optString, parseJson, reqInt, reqString } from '../lib/printCloud/util';
+import { walletView } from '../lib/printCloud/wallet';
 import { membershipTier } from '../lib/printCloud/adapters';
 
 export const printCloudRoutes = new Hono<AppContext>();
@@ -74,7 +75,8 @@ printCloudRoutes.get('/status', async (c) => {
     // `connected` only for a slicer agent heard from within the staleness window — never for a token alone.
     slicer: await slicerAvailability(c.env.DB, config.telemetry_stale_seconds, new Date()),
     delivery: { enabled: config.delivery.enabled, pickup_enabled: config.delivery.pickup_enabled },
-    integrations: ADAPTERS.map((a) => ({ name: a.name, connected: a.connected })),
+    // The wallet adapter reads its owner switch: built and wired, but «not connected» while switched off.
+    integrations: adapterStatuses(config).map((a) => ({ name: a.name, connected: a.connected })),
   });
 });
 
@@ -312,6 +314,18 @@ auth.get('/me/inventory/reorder-suggestions', async (c) => {
 
 auth.get('/me/transactions', async (c) => ok(c, await transactions(c.env.DB, currentUser(c).id, c.req.query('before') ?? null, queryInt(c, 'limit', 50, 1, 200))));
 
+/**
+ * The customer's Levonis wallet as this service may spend it: `connected`
+ * (false only while the owner has switched wallet payments off), the
+ * spendable balance in dinars — the very figure the wallet page prints — and
+ * the official rate. Platform tables only, beside the settings row: on a
+ * database without Print Cloud's migration it answers from the defaults.
+ */
+auth.get('/me/wallet', async (c) => {
+  const { config } = await requestConfig(c);
+  return ok(c, await walletView(c.env.DB, currentUser(c).id, config));
+});
+
 // ------------------------------------------------------------------ quotes and orders
 
 auth.post('/quotes', limitRoute('pc_price', 600), async (c) => {
@@ -373,6 +387,21 @@ auth.post('/orders/:id/cancel', async (c) => {
   const now = new Date();
   await runBatch(c.env.DB, await closeUnpaidOrder(c.env.DB, o as unknown as OrderRow, 'cancelled', currentUser(c).id, now, 'cancelled by customer'));
   return ok(c, { order_id: o.id, status: 'cancelled' });
+});
+
+/**
+ * Pay an own order's whole total from the Levonis wallet (docs/PRINT_CLOUD.md
+ * §4.4): the wallet debit, the payment confirmation and the fulfilment in ONE
+ * batch, under the customer's Idempotency-Key — a replay returns the first
+ * answer. Refusals: 402 INSUFFICIENT_BALANCE (nothing debited), 409
+ * ORDER_NOT_PAYABLE (paid, cancelled or expired), 503 PAYMENT_ADAPTER_DISABLED.
+ */
+auth.post('/orders/:id/pay/wallet', limitRoute('pc_write', 300), async (c) => {
+  const user = currentUser(c);
+  const key = idempotencyKey(c);
+  const { config } = await requestConfig(c);
+  const out = await payOrderFromWallet(c.env.DB, { userId: user.id, orderId: c.req.param('id'), key, config, now: new Date() });
+  return ok(c, { ...out.result, replayed: out.replayed }, out.replayed ? 200 : 201);
 });
 
 /** DEVELOPMENT ONLY: the customer confirms their own order. Off unless PRINT_CLOUD_DEV_PAYMENTS === 'on'. */

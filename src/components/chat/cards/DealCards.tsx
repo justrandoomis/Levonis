@@ -244,7 +244,7 @@ export function PrintRequestCardView({ card, mine }: Props) {
           </button>
         )}
         <dl className="flex flex-col gap-1">
-          <Fact label={loc('الميزانية', 'Budget')}>{num(s.budget_iqd) ? money(Number(s.budget_iqd)) : ''}</Fact>
+          <Fact label={loc('الميزانية', 'Budget', 'بودجە')}>{num(s.budget_iqd) ? money(Number(s.budget_iqd)) : ''}</Fact>
           <Fact label={loc('مطلوب قبل', 'Needed by')}>{shortDate(s.deadline, lang)}</Fact>
           <Fact label={loc('ملاحظات', 'Notes')}>{str(s.notes)}</Fact>
         </dl>

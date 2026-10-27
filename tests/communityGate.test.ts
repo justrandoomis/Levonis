@@ -53,6 +53,7 @@ import { communityRoutes } from '../worker/routes/community';
 import { adminCommunityRoutes } from '../worker/routes/adminCommunity';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { printRequestRoutes } from '../worker/routes/printRequests';
+import { requestEntryRoutes } from '../worker/routes/requestEntries';
 import { communityReviewRoutes } from '../worker/routes/merchantReviews';
 import { merchantRoutes } from '../worker/routes/merchant';
 import { merchantCatalogRoutes } from '../worker/routes/merchantCatalog';
@@ -99,6 +100,7 @@ function appAs(db: D1Database, userId: string | null, role = 'customer', host = 
   a.route('/api/admin/community', adminCommunityRoutes);
   a.route('/api/community', communityRoutes);
   a.route('/api/marketplace/print', printRequestRoutes);
+  a.route('/api/marketplace/print', requestEntryRoutes); // P1-06: the editor's entry doors
   a.route('/api/marketplace', marketplaceRoutes);
   a.route('/api/community-reviews', communityReviewRoutes);
   a.route('/api/merchant', merchantRoutes);
@@ -155,6 +157,10 @@ const GATED_WRITES: Array<[string, Record<string, unknown>]> = [
   ['/api/marketplace/requests/creq1/offers', { price_iqd: 5000 }],
   ['/api/marketplace/print/requests/creq1/publish', {}],
   ['/api/marketplace/print/requests/creq1/repeat', {}],
+  // P1-06 (row 268): the request editor's entry doors.
+  ['/api/marketplace/print/requests', {}],
+  ['/api/marketplace/print/requests/creq1/copy-from-project', { post_id: 'post1' }],
+  ['/api/marketplace/print/requests/creq1/send', {}],
   ['/api/community-reviews/follow/cm1', {}],
 ];
 

@@ -24,8 +24,10 @@
  *      leaks an Arabic value fails here too instead of shipping.
  *   2. THE BODY NAMES THE REAL FIELDS. A body that is merely free of Arabic is
  *      satisfied by an empty string; these check the material, the process, the
- *      quality, the quantity, the size, the governorate, the deadline and the
- *      budget actually arrive, in the reader's own language.
+ *      quality, the quantity, the size, the governorate and the deadline
+ *      actually arrive, in the reader's own language. Never the budget (Q2,
+ *      docs/DECISIONS.md row 268): a stored notification could not follow the
+ *      customer switch, so it says none at all.
  *   3. THE CUSTOMER'S SENTENCE IS QUOTED, NOT TRANSLATED. It appears only in
  *      the slots whose script it is, behind a marker that says whose words they
  *      are — a quotation is true, a silent translation is not.
@@ -63,7 +65,6 @@ const arabicRequest = (over: Partial<PrintMatchFacts> = {}): PrintMatchFacts => 
   dimensions: '120×80×40 mm',
   governorate: 'baghdad',
   deadline: '2026-10-01',
-  budget_iqd: 75000,
   ...over,
 });
 
@@ -90,22 +91,26 @@ test('every structured field the merchant decides on is named, in each language'
   const { body } = printMatchNotification(arabicRequest());
 
   // English: the material, the process, the quality word the customer pressed,
-  // the count, the measured size, the colour, the governorate, the deadline and
-  // the budget.
-  for (const needle of ['PLA', 'FDM', 'Fine', '4 pcs', '120×80×40 mm', '#1a1a1a', 'Baghdad', 'due 2026-10-01', 'budget 75,000 IQD']) {
+  // the count, the measured size, the colour, the governorate and the deadline.
+  for (const needle of ['PLA', 'FDM', 'Fine', '4 pcs', '120×80×40 mm', '#1a1a1a', 'Baghdad', 'due 2026-10-01']) {
     assert.ok(body.en.includes(needle), `body_en is missing ${needle}: ${JSON.stringify(body.en)}`);
   }
 
   // Arabic: the same facts, said in Arabic rather than transliterated.
-  for (const needle of ['بولي لاكتيك', 'دقيقة', 'العدد 4', 'بغداد', 'موعد التسليم 2026-10-01', 'الميزانية 75,000 د.ع']) {
+  for (const needle of ['بولي لاكتيك', 'دقيقة', 'العدد 4', 'بغداد', 'موعد التسليم 2026-10-01']) {
     assert.ok(body.ar.includes(needle), `body_ar is missing ${needle}: ${JSON.stringify(body.ar)}`);
   }
 
   // Kurdish: composed in Sorani, not silently handed the Arabic.
-  for (const needle of ['ورد', '4 دانە', 'بەغدا', 'گەیاندن 2026-10-01', 'بودجە 75,000 دینار']) {
+  for (const needle of ['ورد', '4 دانە', 'بەغدا', 'گەیاندن 2026-10-01']) {
     assert.ok(body.ckb.includes(needle), `body_ckb is missing ${needle}: ${JSON.stringify(body.ckb)}`);
   }
   assert.notEqual(body.ckb, body.ar);
+
+  // And never the budget, in any language (Q2, row 268).
+  for (const slot of [body.ar, body.en, body.ckb]) {
+    assert.doesNotMatch(slot, /الميزانية|budget|بودجە|IQD|د\.ع|دینار/i, `a budget reached the body: ${JSON.stringify(slot)}`);
+  }
 });
 
 test("the customer's Arabic words are quoted as theirs, and only where the script fits", () => {
@@ -192,7 +197,6 @@ test('a bare request still composes a usable body in all three languages', () =>
     dimensions: '',
     governorate: '',
     deadline: '',
-    budget_iqd: null,
   });
   // No material, no size, no place, no title: the process and the quality are
   // all there is, and an empty notification body would be worse than terse.

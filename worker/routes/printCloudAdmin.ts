@@ -26,7 +26,7 @@ import { limitByMethod } from '../lib/ratelimit';
 import { canMoveMoney, canViewCost, canWriteCost, requireCostRead, requireCostWrite } from '../lib/costAccess';
 import { requireFinancialScope } from '../lib/walletAdjust';
 import { countingD1 } from '../lib/d1Count';
-import { ADAPTERS, integrationBacklog } from '../lib/printCloud/adapters';
+import { adapterStatuses, integrationBacklog } from '../lib/printCloud/adapters';
 import { pcAudit } from '../lib/printCloud/audit';
 import { roomWithin, runTasksByHand, schedulerRoom, taskOverview } from '../lib/printCloud/background';
 import { approveBuyback, markBuybackPaid, rejectBuyback } from '../lib/printCloud/buyback';
@@ -57,7 +57,7 @@ import {
   type FailureDecision,
 } from '../lib/printCloud/jobs';
 import { pcNotify } from '../lib/printCloud/notify';
-import { closeUnpaidOrder, confirmPayment, orderDetail, planLineRefund, type OrderRow } from '../lib/printCloud/orders';
+import { closeUnpaidOrder, confirmPayment, orderDetail, planLineRefund, REFUND_METHODS, type OrderRow, type RefundMethod } from '../lib/printCloud/orders';
 import { createAgent, printerStatuses, queueCommand, revokeAgent } from '../lib/printCloud/printers';
 import { assignJob, estimateQueue, runScheduler, setPriority, unassignJob } from '../lib/printCloud/queue';
 import { reconcile } from '../lib/printCloud/reconcile';
@@ -118,7 +118,10 @@ adminPrintCloudRoutes.patch('/settings', requireFinancialScope, async (c) => {
   return ok(c, { version: current.version + 1, config: costView(c) ? next : publicSettings(next) });
 });
 
-adminPrintCloudRoutes.get('/adapters', async (c) => ok(c, { adapters: ADAPTERS, backlog: await integrationBacklog(c.env.DB) }));
+adminPrintCloudRoutes.get('/adapters', async (c) => {
+  const { config } = await requestConfig(c);
+  return ok(c, { adapters: adapterStatuses(config), backlog: await integrationBacklog(c.env.DB) });
+});
 
 // ------------------------------------------------------------------ catalogue
 
@@ -441,19 +444,27 @@ adminPrintCloudRoutes.post('/orders/:id/cancel', requireFinancialScope, async (c
   return ok(c, { order_id: order.id, status: 'cancelled' });
 });
 
+/**
+ * Refund unused hours, grams or a fee of one line. An order paid from the
+ * Levonis wallet is credited back to the wallet IN THIS BATCH (`method` left
+ * out or 'levonis_wallet'; another method is refused for it); any other order
+ * records the refund for the money desk under `method` ('manual' when left
+ * out). orders.ts `planLineRefund` holds the rule.
+ */
 adminPrintCloudRoutes.post('/orders/:id/refunds', requireFinancialScope, async (c) => {
   const user = currentUser(c);
   const body = await jsonObject(c);
   const now = new Date();
-  const method = body.method === undefined ? 'manual' : body.method;
-  if (method !== 'manual' && method !== 'gateway' && method !== 'dev') throw invalid('method', 'not_allowed');
+  // Left out: the order's own rail decides (the wallet for a wallet-paid order, else 'manual').
+  const method = body.method === undefined || body.method === null ? null : body.method;
+  if (method !== null && !(REFUND_METHODS as readonly unknown[]).includes(method)) throw invalid('method', 'not_allowed');
   const request = {
     orderId: param(c, 'id'),
     lineId: reqString(body.line_id, 'line_id', { max: 120 }),
     quantity: body.quantity === undefined ? null : reqInt(body.quantity, 'quantity', { min: 1, max: 100_000_000 }),
     amountIqd: body.amount_iqd === undefined ? null : reqInt(body.amount_iqd, 'amount_iqd', { min: 1, max: 10_000_000_000 }),
     reason: reqString(body.reason, 'reason', { max: 500 }),
-    method: method as 'manual' | 'gateway' | 'dev',
+    method: method as RefundMethod | null,
   };
   const out = await idempotent(c.env.DB, { actorId: user.id, scope: 'admin.order.refund', key: idempotencyKey(c), request, now }, () =>
     planLineRefund(c.env.DB, { ...request, actorId: user.id, now })

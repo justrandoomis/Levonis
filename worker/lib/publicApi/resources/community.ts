@@ -254,7 +254,7 @@ const PRINT_REQUEST_SCHEMA = object(
     material: string('As the customer wrote it or chose it.'),
     color: string(),
     dimensions: string(),
-    budget_iqd: nullable(integer('The customer\'s budget, when they gave one.')),
+    budget_iqd: nullable(integer('Always null: a customer\'s budget is never public (they may show it to the merchants a request is meant for, never here).')),
     deadline: nullable(string('When they need it, as they stated it.')),
     governorate: nullable(ref('Governorate')),
     delivery_preference: string(),
@@ -270,7 +270,7 @@ const PRINT_REQUEST_SCHEMA = object(
 );
 
 const REQUEST_COLUMNS = `r.id, r.title, r.description, r.category, r.quantity, r.material, r.color, r.dimensions,
-            r.budget_iqd, r.deadline, r.governorate, r.delivery_pref, r.state, r.offer_count, r.created_at, r.expires_at,
+            r.deadline, r.governorate, r.delivery_pref, r.state, r.offer_count, r.created_at, r.expires_at,
             (SELECT COUNT(*) FROM community_request_files f WHERE f.request_id = r.id) AS file_count`;
 
 function printRequest(r: Rec, urls: PublicRequest['urls']) {
@@ -284,7 +284,8 @@ function printRequest(r: Rec, urls: PublicRequest['urls']) {
     material: text(r.material, 80),
     color: text(r.color, 80),
     dimensions: text(r.dimensions, 200),
-    budget_iqd: int(r.budget_iqd),
+    // Never public (Q2, docs/DECISIONS.md row 268): the field stays for clients that read it.
+    budget_iqd: null as number | null,
     deadline: text(r.deadline, 40) || null,
     governorate: governorate(r.governorate),
     delivery_preference: text(r.delivery_pref, 60),

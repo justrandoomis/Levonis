@@ -17,6 +17,7 @@ import ProjectCard, { ProjectCardSkeleton } from '../../components/community/pro
 import type { PostCard } from '../../components/community/projects/api';
 import { socialApi } from '../../components/community/social/api';
 import { useSocialStrings } from '../../components/community/social/strings';
+import CommunitySurface from '../../components/community/CommunitySurface';
 
 export default function SavedPage() {
   const goBack = useGoBack('/community');
@@ -61,7 +62,7 @@ export default function SavedPage() {
 
   const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
   return (
-    <div className="min-h-screen pb-28 text-text-primary">
+    <CommunitySurface className="min-h-screen pb-28 text-text-primary">
       <div className="material scroll-edge sticky top-0 z-40 h-14 px-4">
         <div className="mx-auto flex h-full max-w-6xl items-center gap-2">
           <IconButton
@@ -105,6 +106,6 @@ export default function SavedPage() {
           </>
         )}
       </div>
-    </div>
+    </CommunitySurface>
   );
 }

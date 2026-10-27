@@ -12,6 +12,7 @@
  */
 import { api } from '../../../lib/api';
 import type { PostCard } from '../projects/api';
+import type { CommentOrder, CreatorSort, FeedFrom } from '../../../../packages/contracts/src/communityFilters';
 
 export { creatorHref, projectHref } from '../projects/api';
 export type { PostCard } from '../projects/api';
@@ -55,6 +56,18 @@ export interface CreatorCard {
   stats: { projects: number; followers: number };
   store: { id: string; slug: string; name: string; url: string } | null;
   viewer: { following: boolean };
+  /** Up to three of their public projects with a picture (plan B3); absent on an older Worker. */
+  works?: CreatorWork[];
+}
+
+/** A public project on a maker card: its first picture and its page. */
+export interface CreatorWork {
+  id: string;
+  title: string;
+  imageUrl: string | null;
+  width: number | null;
+  height: number | null;
+  url: string;
 }
 
 export interface CreatorPage {
@@ -87,7 +100,12 @@ export interface ReportInput {
 
 export interface CreatorFilters {
   q?: string;
+  /** The old name of `sort: 'featured'`. */
   featured?: boolean;
+  /** Plan B3: the order, and the two toggles of the makers filter sheet. */
+  sort?: CreatorSort;
+  has_store?: boolean;
+  approved?: boolean;
 }
 
 export interface PostPage {
@@ -121,9 +139,12 @@ export const socialApi = {
     api.get<{ posts: PostCard[]; next_cursor?: string | null }>(`/api/community/saved${paged(cursor, limit)}`).then(toPosts),
 
   // ---- comments -----------------------------------------------------------
-  comments: (postId: string, cursor: string | null = null, limit = 20) =>
+  /** `order: 'newest'` reads the latest first (the project page preview, plan B3); the default is the thread order. */
+  comments: (postId: string, cursor: string | null = null, limit = 20, order?: CommentOrder) =>
     api
-      .get<{ comments: Comment[]; next_cursor?: string | null; total?: number }>(`/api/community/posts/${enc(postId)}/comments${paged(cursor, limit)}`)
+      .get<{ comments: Comment[]; next_cursor?: string | null; total?: number }>(
+        `/api/community/posts/${enc(postId)}/comments${paged(cursor, limit, order && order !== 'oldest' ? { order } : {})}`
+      )
       .then((d): CommentPage => ({
         comments: Array.isArray(d.comments) ? d.comments : [],
         next: d.next_cursor ?? null,
@@ -158,12 +179,20 @@ export const socialApi = {
   report: (input: ReportInput) => api.post<{ report_id: string; replayed?: boolean }>('/api/community/reports', input),
 
   // ---- lists --------------------------------------------------------------
-  feed: (scope: FeedScope, cursor: string | null = null, limit = 12) =>
-    api.get<{ posts: PostCard[]; next_cursor?: string | null }>(`/api/community/feed${paged(cursor, limit, { scope })}`).then(toPosts),
+  /** `from` reads one half of «أتابعهم» (plan B3): the makers followed, or the owners of the stores followed. */
+  feed: (scope: FeedScope, cursor: string | null = null, limit = 12, from?: FeedFrom) =>
+    api
+      .get<{ posts: PostCard[]; next_cursor?: string | null }>(
+        `/api/community/feed${paged(cursor, limit, from && from !== 'all' ? { scope, from } : { scope })}`
+      )
+      .then(toPosts),
   creators: (filters: CreatorFilters = {}, cursor: string | null = null, limit = 18) => {
     const extra: Record<string, string> = {};
     if (filters.q) extra.q = filters.q;
-    if (filters.featured) extra.featured = '1';
+    if (filters.sort) extra.sort = filters.sort;
+    else if (filters.featured) extra.featured = '1';
+    if (filters.has_store) extra.has_store = '1';
+    if (filters.approved) extra.approved = '1';
     return api
       .get<{ creators: CreatorCard[]; next_cursor?: string | null; total?: number | null }>(`/api/community/creators${paged(cursor, limit, extra)}`)
       .then((d): CreatorPage => ({

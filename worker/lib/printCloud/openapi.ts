@@ -54,6 +54,14 @@ export const OPERATIONS: readonly Operation[] = [
   { method: 'post', path: '/me/inventory/top-up-quote', base: C, tag: 'inventory', summary: 'Quote the quantity that tops a balance up to a target (default 1 kg)', access: 'customer', body: 'TopUpRequest' },
   { method: 'get', path: '/me/inventory/reorder-suggestions', base: C, tag: 'inventory', summary: 'Shortfalls of pending jobs and the purchase that covers them', access: 'customer' },
   { method: 'get', path: '/me/transactions', base: C, tag: 'dashboard', summary: 'Purchases, usage, refunds, buybacks and deliveries, newest first (limit; before = the previous page next_before)', access: 'customer' },
+  {
+    method: 'get',
+    path: '/me/wallet',
+    base: C,
+    tag: 'payments',
+    summary: 'The Levonis wallet as Print Cloud may spend it: connected (false while the owner switched wallet payments off), available_iqd (the wallet page figure), exchange_rate (official IQD per USD)',
+    access: 'customer',
+  },
   // quotes and orders
   { method: 'post', path: '/quotes', base: C, tag: 'orders', summary: 'Create a stored, expiring quote', access: 'customer', body: 'QuoteRequest' },
   { method: 'get', path: '/quotes/{id}', base: C, tag: 'orders', summary: 'A stored quote', access: 'customer' },
@@ -61,6 +69,17 @@ export const OPERATIONS: readonly Operation[] = [
   { method: 'get', path: '/orders', base: C, tag: 'orders', summary: 'Order history', access: 'customer' },
   { method: 'get', path: '/orders/{id}', base: C, tag: 'orders', summary: 'One order with lines, payments and refunds', access: 'customer' },
   { method: 'post', path: '/orders/{id}/cancel', base: C, tag: 'orders', summary: 'Cancel an unpaid order (holds released)', access: 'customer' },
+  {
+    method: 'post',
+    path: '/orders/{id}/pay/wallet',
+    base: C,
+    tag: 'payments',
+    summary:
+      'Pay the whole order from the Levonis wallet: debit, confirmation and fulfilment in one batch. 402 INSUFFICIENT_BALANCE {available_iqd, required_iqd} (nothing debited), 409 ORDER_NOT_PAYABLE, 503 PAYMENT_ADAPTER_DISABLED',
+    access: 'customer',
+    body: 'WalletPayRequest',
+    idempotent: true,
+  },
   { method: 'post', path: '/orders/{id}/dev-pay', base: C, tag: 'payments', summary: 'DEVELOPMENT ONLY: confirm own order (PRINT_CLOUD_DEV_PAYMENTS=on)', access: 'customer', body: 'DevPayRequest' },
   // files and imports
   { method: 'post', path: '/files', base: C, tag: 'files', summary: 'Upload an STL, 3MF or OBJ (multipart field "file")', access: 'customer', body: 'FileUpload' },
@@ -114,6 +133,7 @@ export const OPERATIONS: readonly Operation[] = [
   { method: 'get', path: '/printers', base: G, tag: 'agent', summary: 'Printers bound to this agent', access: 'agent' },
   { method: 'post', path: '/printers/{id}/telemetry', base: G, tag: 'agent', summary: 'Report telemetry', access: 'agent', body: 'Telemetry' },
   { method: 'post', path: '/jobs/{id}/events', base: G, tag: 'agent', summary: 'started | paused | resumed | completed | failed (idempotent: by state; paused and resumed by event_id)', access: 'agent', body: 'AgentJobEvent' },
+  { method: 'get', path: '/jobs/{id}', base: G, tag: 'agent', summary: 'The print input and files of a job on a printer of this agent (job_control)', access: 'agent' },
   { method: 'get', path: '/commands', base: G, tag: 'agent', summary: 'Operator commands for this agent printers (since)', access: 'agent' },
   { method: 'post', path: '/slicing/claim', base: G, tag: 'agent', summary: 'Claim a slicing request under a lease', access: 'agent' },
   { method: 'post', path: '/slicing/{id}/result', base: G, tag: 'agent', summary: 'Post measured slicer figures', access: 'agent', body: 'Estimate' },
@@ -144,7 +164,16 @@ export const OPERATIONS: readonly Operation[] = [
   { method: 'get', path: '/orders/{id}', base: A, tag: 'orders', summary: 'Order detail', access: 'admin_money' },
   { method: 'post', path: '/orders/{id}/confirm-payment', base: A, tag: 'payments', summary: 'Record a manual payment (exactly-once)', access: 'admin_money', body: 'ManualPayment' },
   { method: 'post', path: '/orders/{id}/cancel', base: A, tag: 'orders', summary: 'Cancel an unpaid order', access: 'admin_money', body: 'ReasonRequest' },
-  { method: 'post', path: '/orders/{id}/refunds', base: A, tag: 'orders', summary: 'Refund unused hours or material of one line', access: 'admin_money', body: 'RefundRequest', idempotent: true },
+  {
+    method: 'post',
+    path: '/orders/{id}/refunds',
+    base: A,
+    tag: 'orders',
+    summary: 'Refund unused hours or material of one line; an order paid from the Levonis wallet is credited back to the wallet in the same batch',
+    access: 'admin_money',
+    body: 'RefundRequest',
+    idempotent: true,
+  },
   { method: 'get', path: '/payment-events', base: A, tag: 'payments', summary: 'Every payment confirmation received', access: 'admin_money' },
   { method: 'get', path: '/jobs', base: A, tag: 'jobs', summary: 'All jobs (status)', access: 'admin_op' },
   { method: 'get', path: '/jobs/{id}', base: A, tag: 'jobs', summary: 'Job detail with consumption records', access: 'admin_op' },
@@ -223,6 +252,7 @@ const SCHEMAS: Record<string, unknown> = {
   Address: obj({ recipient_name: str, phone: str, governorate: str, city: str, address_line: str, notes: str }, ['recipient_name', 'phone', 'governorate', 'city', 'address_line']),
   GatewayEvent: obj({ event_id: str, order_id: str, amount_iqd: iqd, status: { enum: ['succeeded', 'failed'] } }, ['event_id', 'order_id', 'amount_iqd', 'status']),
   DevPayRequest: obj({ event_id: str, amount_iqd: iqd }),
+  WalletPayRequest: { type: 'object', description: 'Empty: the order total_iqd is what the wallet pays', properties: {}, additionalProperties: false },
   ConvertRequest: obj({ from_tier_id: str, to_tier_id: str, seconds: int(60) }, ['from_tier_id', 'to_tier_id', 'seconds']),
   AlertRequest: obj({ low_stock_alert_qty: { type: ['integer', 'null'], minimum: 0 } }, ['low_stock_alert_qty']),
   TopUpRequest: obj({ variant_id: str, target_qty: int(1), quantity: int(1) }, ['variant_id']),
@@ -279,7 +309,7 @@ const SCHEMAS: Record<string, unknown> = {
       items: { type: 'array', items: obj({ variant_id: str, qty: int(1) }, ['variant_id', 'qty']) },
       delivery_address: { $ref: '#/components/schemas/Address' },
       packaging: str,
-      payment_method: { enum: ['manual', 'gateway', 'dev'] },
+      payment_method: { enum: ['manual', 'gateway', 'dev', 'levonis_wallet'] },
     },
     ['kind']
   ),
@@ -351,7 +381,20 @@ const SCHEMAS: Record<string, unknown> = {
   CreditAdjust: obj({ tier_id: str, seconds: { type: 'integer' }, reason: str, compensation: { type: 'boolean' } }, ['tier_id', 'seconds', 'reason']),
   InventoryAdjust: obj({ variant_id: str, qty: { type: 'integer' }, reason: str, compensation: { type: 'boolean' } }, ['variant_id', 'qty', 'reason']),
   ManualPayment: obj({ reference: str, amount_iqd: iqd }, ['reference', 'amount_iqd']),
-  RefundRequest: obj({ line_id: str, quantity: int(1), amount_iqd: iqd, reason: str, method: { enum: ['manual', 'gateway', 'dev'] } }, ['line_id', 'reason']),
+  RefundRequest: obj(
+    {
+      line_id: str,
+      quantity: int(1),
+      amount_iqd: iqd,
+      reason: str,
+      method: {
+        enum: ['manual', 'gateway', 'dev', 'levonis_wallet'],
+        description:
+          'Left out: the order own rail — the Levonis wallet for an order paid from it (credited in the same batch; a wallet refund under one cent of value is refused below_one_cent with min_amount_iqd), else manual. Another method for a wallet-paid order, or levonis_wallet for any other, is refused VALIDATION',
+      },
+    },
+    ['line_id', 'reason']
+  ),
   AssignRequest: obj({ printer_id: str }, ['printer_id']),
   VerifyRequest: obj({ consumption_record_id: str, printed_seconds: int(0), materials: { type: 'array' } }, ['consumption_record_id']),
   FailureReport: obj(

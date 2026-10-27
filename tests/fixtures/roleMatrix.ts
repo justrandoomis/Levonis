@@ -147,6 +147,7 @@ import { merchantAttentionRoutes, merchantSearchRoutes } from '../../worker/rout
 import { storefrontEventRoutes } from '../../worker/routes/storefrontEvents';
 import { storefrontRoutes } from '../../worker/routes/storefront';
 import { printRequestRoutes } from '../../worker/routes/printRequests';
+import { requestEntryRoutes } from '../../worker/routes/requestEntries';
 import { marketplaceRoutes } from '../../worker/routes/marketplace';
 import { requestDiscussionRoutes } from '../../worker/routes/requestDiscussion';
 import { communityOrderTimelineRoutes } from '../../worker/routes/communityOrderTimeline';
@@ -218,7 +219,7 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/admin/security', adminSecurityRoutes as Router],
   ['/api/print-quote', printQuoteRoutes as Router],
   ['/api/admin/print-quote', adminPrintQuoteRoutes as Router],
-  // Levonis Print Cloud (DECISIONS row 270): the agent door first, as worker/index.ts mounts it.
+  // Levonis Print Cloud (DECISIONS row 271): the agent door first, as worker/index.ts mounts it.
   ['/api/print-cloud/v1/agent', printCloudAgentRoutes as Router],
   ['/api/print-cloud/v1', printCloudRoutes as Router],
   ['/api/admin/print-cloud', adminPrintCloudRoutes as Router],
@@ -291,6 +292,7 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/storefront', storefrontRoutes as Router],
   ['/api/product-files', publicProductFileRoutes as Router],
   ['/api/marketplace/print', printRequestRoutes as Router],
+  ['/api/marketplace/print', requestEntryRoutes as Router],
   ['/api/marketplace', marketplaceRoutes as Router],
   ['/api/marketplace', requestDiscussionRoutes as Router],
   ['/api/marketplace', communityOrderTimelineRoutes as Router],

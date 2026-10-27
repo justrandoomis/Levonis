@@ -77,7 +77,7 @@ const COMPLETENESS_FIRST = /^SELECT 1 AS x FROM product_completeness LIMIT 1$|^S
 const SERVICES_FIRST = /^SELECT intake_at, valuation_version FROM trade_in_requests LIMIT 0$|WHERE status IN \('submitted','under_review','value_changed'\) AND intake_at IS NULL AND offer_expires_at IS NULL/;
 /** The request-model cache's first statement (P1-04, worker/lib/requestModelBackfill.ts, after the services sweep): its page read. */
 const REQUEST_MODEL_FIRST = /FROM community_print_requests\s+WHERE model_mirror = '' AND schema_version = 1/;
-/** Levonis Print Cloud's step (0215, DECISIONS row 270): the first statement that names one of its tables. */
+/** Levonis Print Cloud's step (0215, DECISIONS row 271): the first statement that names one of its tables. */
 const PRINT_CLOUD_FIRST = /\bpc_[a-z_]+/;
 
 class CountStmt {
@@ -147,7 +147,7 @@ async function tick(raw: DatabaseSync) {
   } finally {
     console.error = original;
   }
-  // Print Cloud's tasks run last of all (worker/index.ts, DECISIONS row 270), the request-model cache
+  // Print Cloud's tasks run last of all (worker/index.ts, DECISIONS row 271), the request-model cache
   // (P1-04) before them, the services sweep before it, the completeness catch-up before that, on what
   // the engine sweep left.
   const pc = d1.log.findIndex((sql) => PRINT_CLOUD_FIRST.test(sql));
@@ -371,7 +371,7 @@ test('the usual tick at its bounds — 200 upload sessions expired and 200 delet
   // The request-model cache (P1-04) after it: one indexed read when nothing is pending.
   const beforeCloud = withSweep.total - withSweep.printCloud;
   assert.ok(withSweep.requestModel >= 1 && withSweep.requestModel <= quarterHourRequestModelBudget(beforeCloud - withSweep.requestModel), `the request-model cache spent ${withSweep.requestModel}`);
-  // Print Cloud's tasks (DECISIONS row 270) last of all, within their own share of what everything before them left.
+  // Print Cloud's tasks (DECISIONS row 271) last of all, within their own share of what everything before them left.
   const cloudShare = quarterHourPrintCloudBudget(beforeCloud);
   assert.ok(withSweep.printCloud >= 1 && withSweep.printCloud <= cloudShare && cloudShare <= PRINT_CLOUD_TICK_BUDGET, `Print Cloud spent ${withSweep.printCloud} of its ${cloudShare}`);
   assert.ok(withSweep.log.slice(beforeCloud).every((sql) => /\bpc_[a-z_]+|^SELECT COUNT\(\*\) AS n FROM sqlite_master/.test(sql)), 'nothing but Print Cloud after its step began');
