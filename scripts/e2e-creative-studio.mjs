@@ -18,7 +18,8 @@
  *
  * Run: node scripts/e2e-creative-studio.mjs
  *   PLAYWRIGHT_MODULE  where playwright lives (default: `playwright`)
- *   STUDIO_TEST_URL    an already running fixture (default: starts vite on :4179)
+ *   STUDIO_TEST_URL    an already running fixture (default: starts vite on STUDIO_PORT)
+ *   STUDIO_PORT        the port that vite listens on (default 4179)
  *   OUT_DIR            screenshots and the exported PNG (default /tmp/levonis-diagnostics/creative-studio)
  */
 import assert from 'node:assert/strict';
@@ -30,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const PORT = 4179;
+const PORT = Number(process.env.STUDIO_PORT) || 4179;
 const out = process.env.OUT_DIR || '/tmp/levonis-diagnostics/creative-studio';
 await mkdir(out, { recursive: true });
 
