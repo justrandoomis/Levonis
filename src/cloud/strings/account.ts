@@ -322,6 +322,11 @@ export const shipText = {
   payFeeBody: { ar: 'لا يغادر شيء الورشة قبل دفع الأجرة.', en: 'Nothing leaves the workshop until the fee is paid.', ckb: 'تا کرێکە نەدرێت هیچ شتێک لە کارگە دەرناچێت.' },
   cancel: { ar: 'إلغاء الشحنة', en: 'Cancel the shipment', ckb: 'هەڵوەشاندنەوەی ناردنەکە' },
   cancelTitle: { ar: 'إلغاء هذه الشحنة؟', en: 'Cancel this shipment?', ckb: 'ئەم ناردنە هەڵبوەشێنرێتەوە؟' },
+  cancelFeePaid: {
+    ar: 'دُفعت أجرة توصيل هذه الشحنة، فلا تُلغى من هنا. لإلغائها تواصل مع الورشة، وهي تقرّر ما يُردّ لك من الأجرة.',
+    en: 'This shipment’s delivery fee is paid, so it cannot be cancelled here. To cancel it, contact the workshop — they decide what of the fee is refunded to you.',
+    ckb: 'کرێی گەیاندنی ئەم ناردنە دراوە، بۆیە لێرەوە هەڵناوەشێنرێتەوە. بۆ هەڵوەشاندنەوەی پەیوەندی بە کارگەکەوە بکە — ئەوان بڕیار دەدەن چەندت لە کرێکە بۆ دەگەڕێنرێتەوە.',
+  },
   cancelBody: {
     ar: 'تعود المواد المحجوزة لها إلى رصيدك، وتُغلق أجرة التوصيل إن لم تُدفع.',
     en: 'The material held for it returns to your balance, and an unpaid delivery fee is closed.',

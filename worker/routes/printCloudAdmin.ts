@@ -23,7 +23,7 @@ import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { jsonObject, requireAdmin } from '../lib/http';
 import { limitByMethod } from '../lib/ratelimit';
-import { canMoveMoney, canViewCost, canWriteCost, requireCostRead, requireCostWrite } from '../lib/costAccess';
+import { canMoveMoney, canViewCost, canWriteCost, isOwner, isUnverifiedOwner, requireCostRead, requireCostWrite } from '../lib/costAccess';
 import { requireFinancialScope } from '../lib/walletAdjust';
 import { countingD1 } from '../lib/d1Count';
 import { adapterStatuses, integrationBacklog } from '../lib/printCloud/adapters';
@@ -51,6 +51,7 @@ import {
   recordEstimate,
   resolveFailure,
   resumeJob,
+  slicingInput,
   startJob,
   autoConfirmReprint,
   JOB_STATUSES,
@@ -109,6 +110,12 @@ adminPrintCloudRoutes.patch('/settings', requireFinancialScope, async (c) => {
   const expectedVersion = reqInt(body.version, 'version', { min: 0, max: 1_000_000 });
   const touchesCost = Object.keys(patch).some((k) => (COST_SETTING_KEYS as readonly string[]).includes(k));
   if (touchesCost && !canWriteCost(c.env, c.get('user'))) throw pcError('FORBIDDEN', { reason: 'cost_owner_only' }, 403);
+  // Opening or closing the service is the owner's alone (docs §1) — the console
+  // only offers the switch to the owner, and the server holds the same line.
+  const who = c.get('user');
+  if (Object.prototype.hasOwnProperty.call(patch, 'enabled') && (!isOwner(c.env, who) || isUnverifiedOwner(c.env, who))) {
+    throw pcError('FORBIDDEN', { field: 'enabled', reason: 'owner_only' }, 403);
+  }
   const current = await requestConfig(c);
   if (current.version !== expectedVersion) throw pcError('STATE_CHANGED', { version: current.version });
   const now = new Date();
@@ -205,8 +212,9 @@ adminPrintCloudRoutes.post('/stock/receive', async (c) => {
   const body = await jsonObject(c);
   if (body.total_cost_iqd !== undefined && !canWriteCost(c.env, user)) throw pcError('FORBIDDEN', { field: 'total_cost_iqd', reason: 'cost_owner_only' }, 403);
   const variantId = reqString(body.variant_id, 'variant_id', { max: 120 });
+  const key = idempotencyKey(c);
   if (!(await one(c.env.DB, 'SELECT id FROM pc_variants WHERE id = ?', variantId))) throw pcError('NOT_FOUND', { field: 'variant_id' });
-  const r = receiveStock(c.env.DB, {
+  const input = {
     variantId,
     qty: reqInt(body.qty, 'qty', { min: 1, max: 100_000_000 }),
     totalCostIqd: body.total_cost_iqd === undefined ? null : reqInt(body.total_cost_iqd, 'total_cost_iqd', { min: 0, max: 10_000_000_000 }),
@@ -214,11 +222,14 @@ adminPrintCloudRoutes.post('/stock/receive', async (c) => {
     lotCode: optString(body.lot_code, 'lot_code', 80),
     supplier: optString(body.supplier, 'supplier', 120),
     notes: optString(body.notes, 'notes', 500),
-    actorId: user.id,
-    now: new Date(),
+  };
+  const now = new Date();
+  // Keyed: a delivery re-sent after a lost answer is received once (a second lot would be stock that is not on the shelf).
+  const out = await idempotent(c.env.DB, { actorId: user.id, scope: 'admin.stock.receive', key, request: input, now }, async () => {
+    const r = receiveStock(c.env.DB, { ...input, actorId: user.id, now });
+    return { statements: [...r.statements, ...(await pcAudit(c.env.DB, user.id, 'stock.receive', r.lotId, { variant_id: variantId, qty: input.qty }))], result: { lot_id: r.lotId } };
   });
-  await runBatch(c.env.DB, [...r.statements, ...(await pcAudit(c.env.DB, user.id, 'stock.receive', r.lotId, { variant_id: variantId, qty: body.qty }))]);
-  return ok(c, { lot_id: r.lotId, position: await position(c.env.DB, variantId) }, 201);
+  return ok(c, { lot_id: out.result.lot_id, position: await position(c.env.DB, variantId), replayed: out.replayed }, 201);
 });
 
 /**
@@ -253,7 +264,7 @@ adminPrintCloudRoutes.post('/stock/lots/:id/cost', requireCostWrite, async (c) =
   return ok(c, { ...answer, replayed: false });
 });
 
-/** A count correction: positive adds an adjustment lot (its cost pending), negative takes units off the shelf. */
+/** A count correction: positive adds an adjustment lot (its cost pending), negative takes units off the shelf. Keyed like a receipt. */
 adminPrintCloudRoutes.post('/stock/adjust', async (c) => {
   const user = currentUser(c);
   const body = await jsonObject(c);
@@ -261,27 +272,30 @@ adminPrintCloudRoutes.post('/stock/adjust', async (c) => {
   const delta = reqInt(body.qty_delta, 'qty_delta', { min: -100_000_000, max: 100_000_000 });
   if (delta === 0) throw invalid('qty_delta', 'zero');
   const reason = reqString(body.reason, 'reason', { max: 500 });
+  const key = idempotencyKey(c);
   const now = new Date();
-  const ref = pcId('pcadj');
-  const statements: Stmt[] =
-    delta > 0
-      ? adjustUp(c.env.DB, { variantId, qty: delta, reason, actorId: user.id, now })
-      : (
-          await removePhysical(c.env.DB, {
-            variantId,
-            qty: -delta,
-            type: 'adjust_down',
-            fromAllocated: false,
-            refType: 'adjustment',
-            refId: ref,
-            entryKey: `adjust_down:${ref}`,
-            reason,
-            actorId: user.id,
-            now,
-          })
-        ).statements;
-  await runBatch(c.env.DB, [...statements, ...(await pcAudit(c.env.DB, user.id, 'stock.adjust', variantId, { qty_delta: delta, reason }))]);
-  return ok(c, { position: await position(c.env.DB, variantId) });
+  const out = await idempotent(c.env.DB, { actorId: user.id, scope: 'admin.stock.adjust', key, request: { variantId, delta, reason }, now }, async () => {
+    const ref = pcId('pcadj');
+    const statements: Stmt[] =
+      delta > 0
+        ? adjustUp(c.env.DB, { variantId, qty: delta, reason, actorId: user.id, now })
+        : (
+            await removePhysical(c.env.DB, {
+              variantId,
+              qty: -delta,
+              type: 'adjust_down',
+              fromAllocated: false,
+              refType: 'adjustment',
+              refId: ref,
+              entryKey: `adjust_down:${ref}`,
+              reason,
+              actorId: user.id,
+              now,
+            })
+          ).statements;
+    return { statements: [...statements, ...(await pcAudit(c.env.DB, user.id, 'stock.adjust', variantId, { qty_delta: delta, reason }))], result: { variant_id: variantId } };
+  });
+  return ok(c, { position: await position(c.env.DB, variantId), replayed: out.replayed });
 });
 
 adminPrintCloudRoutes.post('/stock/waste', async (c) => {
@@ -290,21 +304,26 @@ adminPrintCloudRoutes.post('/stock/waste', async (c) => {
   const variantId = reqString(body.variant_id, 'variant_id', { max: 120 });
   const type = body.type === 'damage' ? 'damage' : 'waste';
   const reason = reqString(body.reason, 'reason', { max: 500 });
-  const ref = pcId('pcwst');
-  const out = await removePhysical(c.env.DB, {
-    variantId,
-    qty: reqInt(body.qty, 'qty', { min: 1, max: 100_000_000 }),
-    type,
-    fromAllocated: false,
-    refType: type,
-    refId: ref,
-    entryKey: `${type}:${ref}`,
-    reason,
-    actorId: user.id,
-    now: new Date(),
+  const qty = reqInt(body.qty, 'qty', { min: 1, max: 100_000_000 });
+  const key = idempotencyKey(c);
+  const now = new Date();
+  const out = await idempotent(c.env.DB, { actorId: user.id, scope: 'admin.stock.waste', key, request: { variantId, type, qty, reason }, now }, async () => {
+    const ref = pcId('pcwst');
+    const moved = await removePhysical(c.env.DB, {
+      variantId,
+      qty,
+      type,
+      fromAllocated: false,
+      refType: type,
+      refId: ref,
+      entryKey: `${type}:${ref}`,
+      reason,
+      actorId: user.id,
+      now,
+    });
+    return { statements: [...moved.statements, ...(await pcAudit(c.env.DB, user.id, `stock.${type}`, variantId, { qty, reason }))], result: { variant_id: variantId } };
   });
-  await runBatch(c.env.DB, [...out.statements, ...(await pcAudit(c.env.DB, user.id, `stock.${type}`, variantId, { qty: body.qty, reason }))]);
-  return ok(c, { position: await position(c.env.DB, variantId) });
+  return ok(c, { position: await position(c.env.DB, variantId), replayed: out.replayed });
 });
 
 // ------------------------------------------------------------------ customers (money)
@@ -341,7 +360,7 @@ adminPrintCloudRoutes.post('/customers/:userId/credits/adjust', requireFinancial
         ? grantCredits(c.env.DB, { userId, tierId, seconds, paidIqd: 0, source: body.compensation === true ? 'compensation' : 'adjustment', entryKey, actorId: admin.id, note: reason, now }).statements
         : (await debitAvailable(c.env.DB, { userId, tierId, seconds: -seconds, type: 'adjust_debit', entryKey, actorId: admin.id, note: reason, now })).statements;
     statements.push(
-      pcNotify(c.env.DB, { userId, notice: 'credits_adjusted', entity: 'print_cloud_order', entityId: tierId, link: '/print-cloud/credits', eventKey: entryKey }),
+      pcNotify(c.env.DB, { userId, notice: 'credits_adjusted', entity: 'print_cloud_order', entityId: tierId, link: '/account/hours', eventKey: entryKey }),
       ...(await pcAudit(c.env.DB, admin.id, 'credits.adjust', userId, { tier_id: tierId, seconds, reason }))
     );
     return { statements, result: { user_id: userId, tier_id: tierId, seconds } };
@@ -496,7 +515,10 @@ adminPrintCloudRoutes.get('/jobs/:id', async (c) => {
   const { config } = await requestConfig(c);
   const job = await loadJob(c.env.DB, param(c, 'id'));
   const consumption = await many(c.env.DB, 'SELECT * FROM pc_consumption_records WHERE job_id = ? ORDER BY created_at', job.id);
-  return ok(c, { ...(await jobView(c.env.DB, job, config.telemetry_stale_seconds, new Date())), user_id: job.user_id, consumption_records: consumption });
+  // The slicing input (the job's own variants and model files) lets an operator enter a first estimate by hand:
+  // before it, the requirements hold no filament line. Null when the job cannot be sliced as it stands.
+  const slicing = await slicingInput(c.env.DB, job).catch(() => null);
+  return ok(c, { ...(await jobView(c.env.DB, job, config.telemetry_stale_seconds, new Date())), user_id: job.user_id, consumption_records: consumption, slicing });
 });
 
 adminPrintCloudRoutes.post('/jobs/:id/approve', async (c) => {
@@ -801,7 +823,13 @@ adminPrintCloudRoutes.get('/reports/profit', requireCostRead, async (c) => {
 
 adminPrintCloudRoutes.get('/reports/operations', async (c) => ok(c, await operationsReport(c.env.DB, parseRange(c.req.query('from'), c.req.query('to'), new Date()))));
 
-adminPrintCloudRoutes.get('/reconcile', requireFinancialScope, async (c) => ok(c, await reconcile(c.env.DB)));
+adminPrintCloudRoutes.get('/reconcile', requireFinancialScope, async (c) => {
+  const r = await reconcile(c.env.DB);
+  // A stock lot's evidence carries what the workshop paid for what left it:
+  // cost, the owner's alone — the money admin keeps the check, not the figure.
+  if (!costView(c)) for (const ch of r.checks) ch.issues = ch.issues.map(({ drawn_cost: _cost, ...rest }) => rest);
+  return ok(c, r);
+});
 
 adminPrintCloudRoutes.get('/tasks', async (c) => ok(c, await taskOverview(c.env.DB)));
 

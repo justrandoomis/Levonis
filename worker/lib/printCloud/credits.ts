@@ -422,6 +422,36 @@ export interface ReserveInput {
   entitled?: LotShare[];
 }
 
+/** The holds `reserveCredits` takes for `seconds` (what it is entitled to first, then free parts still good at `cutoff`), and what is left uncovered. */
+function planHolds(lots: CreditLotState[], entitled: LotShare[], cutoff: string, seconds: number): { holds: Map<string, number>; left: number } {
+  const holds = new Map<string, number>();
+  let left = seconds;
+  const hold = (lot: CreditLotState, cap: number) => {
+    const taken = holds.get(lot.id) ?? 0;
+    const k = Math.min(freePart(lot) - taken, cap, left);
+    if (k <= 0) return;
+    holds.set(lot.id, taken + k);
+    left -= k;
+  };
+  for (const share of entitled) {
+    const lot = lots.find((l) => l.id === share.lotId);
+    if (lot) hold(lot, share.seconds);
+  }
+  for (const lot of lots) if (goodAt(lot, cutoff)) hold(lot, left);
+  return { holds, left };
+}
+
+/**
+ * The seconds a confirmation at `now` could hold: exactly `reserveCredits`'
+ * plan, uncapped. Unlike the account's cached available balance it leaves out
+ * a lot whose expiry has come but the sweep has not yet taken — so what the
+ * projection says covers a print is what confirming will hold.
+ */
+export async function holdableSeconds(db: D1Database, userId: string, tierId: string, now: Date, entitled: LotShare[] = []): Promise<number> {
+  const all = Number.MAX_SAFE_INTEGER;
+  return all - planHolds(await accountLots(db, creditAccountId(userId, tierId)), entitled, iso(now), all).left;
+}
+
 /**
  * Hold `seconds` for a job, lot by lot: first what it is entitled to, then
  * the free part of every lot not yet past its expiry, in spend order. Seconds
@@ -436,22 +466,7 @@ export async function reserveCredits(db: D1Database, r: ReserveInput): Promise<{
   if (!Number.isSafeInteger(r.seconds) || r.seconds <= 0) throw pcError('VALIDATION', { field: 'seconds' });
   const accountId = creditAccountId(r.userId, r.tierId);
   const reservationId = pcId('pccr');
-  const lots = await accountLots(db, accountId);
-  const cutoff = iso(r.now);
-  const holds = new Map<string, number>();
-  let left = r.seconds;
-  const hold = (lot: CreditLotState, cap: number) => {
-    const taken = holds.get(lot.id) ?? 0;
-    const k = Math.min(freePart(lot) - taken, cap, left);
-    if (k <= 0) return;
-    holds.set(lot.id, taken + k);
-    left -= k;
-  };
-  for (const share of r.entitled ?? []) {
-    const lot = lots.find((l) => l.id === share.lotId);
-    if (lot) hold(lot, share.seconds);
-  }
-  for (const lot of lots) if (goodAt(lot, cutoff)) hold(lot, left);
+  const { holds, left } = planHolds(await accountLots(db, accountId), r.entitled ?? [], iso(r.now), r.seconds);
   if (left > 0) throw pcError('INSUFFICIENT_CREDIT', { shortfall_seconds: left });
   const statements: Stmt[] = [
     ensureCreditAccount(db, r.userId, r.tierId, r.now),

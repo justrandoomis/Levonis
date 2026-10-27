@@ -372,6 +372,11 @@ export const orders = {
     en: 'The stock held for it goes back on the shelf. Nothing has been charged.',
     ckb: 'ئەو کاڵایانەی بۆی ڕاگیرابوون دەگەڕێنەوە بۆ ڕەفە. هیچ پارەیەک نەبڕدراوە.',
   },
+  cancelBodyShipping: {
+    ar: 'يُلغى معه طلب التوصيل أيضًا، وتبقى المطبوعات والمواد في الورشة. لم يُخصم أي مبلغ.',
+    en: 'This also cancels the delivery request; the prints and material stay at the workshop. Nothing has been charged.',
+    ckb: 'داوای گەیاندنەکەش لەگەڵیدا هەڵدەوەشێتەوە؛ چاپەکان و کەرەستەکان لە کارگە دەمێننەوە. هیچ پارەیەک نەبڕدراوە.',
+  },
   keepOrder: { ar: 'الإبقاء على الطلب', en: 'Keep order', ckb: 'داواکارییەکە بهێڵەرەوە' },
   cancelled: { ar: 'أُلغي الطلب', en: 'Order cancelled', ckb: 'داواکارییەکە هەڵوەشێنرایەوە' },
   linesTitle: { ar: 'ما طلبته', en: 'What you ordered', ckb: 'ئەوەی داوات کرد' },

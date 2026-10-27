@@ -503,7 +503,7 @@ async function fulfillmentStatements(db: D1Database, order: OrderRow, p: Confirm
       notice: 'order_fulfilled',
       entity: 'print_cloud_order',
       entityId: order.id,
-      link: `/print-cloud/orders/${order.id}`,
+      link: `/orders/${order.id}`,
       eventKey: `order_fulfilled:${order.id}`,
     })
   );

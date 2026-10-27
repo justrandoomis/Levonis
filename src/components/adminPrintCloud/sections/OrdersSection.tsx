@@ -350,7 +350,12 @@ function OrderSheet({ orderId, onClose, go }: { orderId: string; onClose: () => 
 
 function OrderBody({ order: o, refs, reload, go, onClose }: { order: OrderDetail; refs: RefLists; reload: () => Promise<void>; go: Go; onClose: () => void }) {
   const { t, lang } = usePcLang();
-  const wallet = o.payment_method === 'levonis_wallet' || o.payments.some((p) => p.provider === 'levonis_wallet' && p.status === 'confirmed');
+  // The rail is the CONFIRMED payment's provider, exactly as the server decides
+  // it (orders.ts planLineRefund): a wallet-chosen order paid in cash at the
+  // workshop is refunded by hand, never into the wallet. The chosen method
+  // only matters while the order still awaits its payment.
+  const wallet =
+    o.status === 'awaiting_payment' ? o.payment_method === 'levonis_wallet' : o.payments.some((p) => p.provider === 'levonis_wallet' && p.status === 'confirmed');
   const lineOf = (id: string | null) => o.lines.find((l) => l.id === id);
   const refundable = o.status === 'fulfilled' || o.status === 'partially_refunded';
   return (
@@ -576,6 +581,8 @@ interface RefundAnswer {
   refund_id: string;
   amount_iqd: number;
   quantity: number;
+  /** The rail the server used (orders.ts planLineRefund) — shown as it is. */
+  method?: string;
   replayed: boolean;
 }
 
@@ -665,7 +672,8 @@ function RefundForm({ order: o, refs, wallet, reload }: { order: OrderDetail; re
         {done && (
           <Note tone="success">
             {t(S.refundDone)}: <Money iqd={done.amount_iqd} />
-            {done.quantity > 0 && line && ` · ${material ? qty(done.quantity, unit, lang) : duration(done.quantity, lang)}`} {done.replayed && t(S.replayed)}
+            {done.quantity > 0 && line && ` · ${material ? qty(done.quantity, unit, lang) : duration(done.quantity, lang)}`}
+            {done.method && REFUND_METHOD[done.method] ? ` · ${t(REFUND_METHOD[done.method])}` : ''} {done.replayed && t(S.replayed)}
           </Note>
         )}
         <SelectField

@@ -12,6 +12,7 @@
 import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Money } from '../../components/ui/Money';
+import { formatFigure } from '../../lib/localeNumber';
 import { getPrinter, getPrinterAvailability } from '../api';
 import { buildVolumeParts, formatDays, formatHours, formatNozzle } from '../format';
 import { common, nav } from '../strings/common';
@@ -45,7 +46,7 @@ function Specs({ model }: { model: PrinterModelDetail }) {
         </Spec>
         {model.nozzle_options_um.length ? <Spec label={t(words.nozzles)}>{model.nozzle_options_um.map((um) => formatNozzle(um, lang)).join(' · ')}</Spec> : null}
         {extruder ? <Spec label={t(words.extruder)}>{t(extruder)}</Spec> : null}
-        <Spec label={t(words.colours)}>{model.max_colors > 1 ? t(words.upToColours, { n: model.max_colors }) : t(words.oneColour)}</Spec>
+        <Spec label={t(words.colours)}>{model.max_colors > 1 ? t(words.upToColours, { n: formatFigure(model.max_colors, lang) }) : t(words.oneColour)}</Spec>
         {model.ams_systems.length ? (
           <Spec label={t(words.colourSystem)}>
             <bdi dir="ltr">{model.ams_systems.join(' · ')}</bdi>
@@ -74,7 +75,7 @@ function Specs({ model }: { model: PrinterModelDetail }) {
 }
 
 function Availability({ id, model }: { id: string; model: PrinterModelDetail }) {
-  const { t } = useCloudText();
+  const { t, lang } = useCloudText();
   const avail = useCloudQuery((signal) => getPrinterAvailability(id, { signal }), [id]);
   const counts: Array<[string, (a: PrinterAvailability) => number]> = [
     [t(words.machinesActive), (a) => a.machines_active],
@@ -100,7 +101,7 @@ function Availability({ id, model }: { id: string; model: PrinterModelDetail }) 
             {counts.map(([label, of]) => (
               <div key={label} className="rounded-xl lv-well px-3 py-2">
                 <dt className="truncate text-[12px] text-text-muted">{label}</dt>
-                <dd className="text-ui-lg font-bold tabular-nums text-text-primary">{of(avail.data!)}</dd>
+                <dd className="text-ui-lg font-bold tabular-nums text-text-primary">{formatFigure(of(avail.data!), lang)}</dd>
               </div>
             ))}
           </dl>

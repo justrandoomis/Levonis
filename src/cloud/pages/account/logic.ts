@@ -10,6 +10,7 @@
  * rule here works one out.
  */
 import type { Tone } from '../../../components/ui/Badge';
+import { toAsciiDigits } from '../../../lib/localeNumber';
 import type {
   BuybackSummary,
   CreditConversionRule,
@@ -233,9 +234,19 @@ export function shipmentTone(status: string): Tone {
   return SHIPMENT_TONE[status as ShipmentStatus] ?? 'neutral';
 }
 
-/** The server's own rule (fulfillment.ts `cancelShipmentByCustomer`): only before it leaves the workshop. */
-export function shipmentCancellable(status: string): boolean {
-  return status === 'awaiting_payment' || status === 'preparing';
+/**
+ * The server's own rule (fulfillment.ts `cancelShipmentByCustomer`): only
+ * before it leaves the workshop, and never once its delivery fee is paid
+ * (preparing with a fee) — that one is the workshop's to cancel, deciding the
+ * fee's refund, so cancelling here never keeps a paid fee without a word.
+ */
+export function shipmentCancellable(status: string, feeIqd = 0): boolean {
+  return status === 'awaiting_payment' || (status === 'preparing' && !(feeIqd > 0));
+}
+
+/** Preparing with its delivery fee paid: the customer asks the workshop to cancel. */
+export function shipmentFeePaid(status: string, feeIqd: number): boolean {
+  return status === 'preparing' && feeIqd > 0;
 }
 
 export type StepState = 'done' | 'current' | 'upcoming';
@@ -263,6 +274,14 @@ export function deliverableVariants(products: Pick<StoreProduct, 'id' | 'fulfill
 /** The server's phone rule for a delivery address (shipments.ts `parseAddress`), for an early word — the server still judges. */
 export const PHONE_RE = /^\+?[0-9 ]{7,20}$/;
 
+/**
+ * The phone as the server reads it, from what the customer typed: Arabic-Indic
+ * and Persian digits (a native keyboard's «٠٧٧٠…» / «۰۷۷۰…») as ASCII, and
+ * nothing but digits, «+» and spaces — exactly as the store's checkout sends
+ * it (store/rules.ts `phoneForServer`). Checked and sent in this form.
+ */
+export const deliveryPhone = (raw: string): string => toAsciiDigits(raw).replace(/[^\d+ ]/g, '').trim();
+
 /** The longest each part of an address may be (shipments.ts `parseAddress`). */
 export const ADDRESS_MAX = { recipient_name: 120, phone: 20, city: 80, address_line: 300, notes: 300 } as const;
 
@@ -288,9 +307,9 @@ export function addressProblems(a: AddressDraft, governorateIds: ReadonlySet<str
   for (const key of ['recipient_name', 'phone', 'city', 'address_line'] as const) {
     const v = a[key].trim();
     if (!v) out[key] = 'required';
-    else if (v.length > ADDRESS_MAX[key]) out[key] = 'too_long';
+    else if ((key === 'phone' ? deliveryPhone(v) : v).length > ADDRESS_MAX[key]) out[key] = 'too_long';
   }
-  if (!out.phone && !PHONE_RE.test(a.phone.trim())) out.phone = 'format';
+  if (!out.phone && !PHONE_RE.test(deliveryPhone(a.phone))) out.phone = 'format';
   if (!governorateIds.has(a.governorate)) out.governorate = 'required';
   if (a.notes.trim().length > ADDRESS_MAX.notes) out.notes = 'too_long';
   return out;
@@ -341,6 +360,18 @@ export const TX_LEDGERS: readonly TransactionRow['ledger'][] = ['credits', 'inve
 export function txStatus(row: Pick<TransactionRow, 'ledger' | 'entry_type'>): string | null {
   const prefix = row.ledger === 'orders' ? 'order_' : row.ledger === 'buybacks' ? 'buyback_' : row.ledger === 'shipments' ? 'shipment_' : null;
   return prefix && row.entry_type.startsWith(prefix) ? row.entry_type.slice(prefix.length) : null;
+}
+
+/**
+ * What a sell-back row may say about money, by its status: the amount once
+ * approved (the final value the workshop recorded), the estimate — labelled
+ * as one — while it waits, and nothing for a declined or cancelled one, which
+ * never owed or paid anything.
+ */
+export function buybackFigure(status: string): 'final' | 'estimated' | null {
+  if (status === 'approved') return 'final';
+  if (status === 'requested') return 'estimated';
+  return null;
 }
 
 /**

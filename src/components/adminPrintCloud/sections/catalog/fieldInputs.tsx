@@ -11,7 +11,7 @@ import { Checkbox } from '../../../ui/Switch';
 import type { Row } from '../../api';
 import { FULFILMENT_MODES, MATERIAL_RE, PROJECT_TYPES, SCOPE_TYPES } from '../../catalogFields';
 import { pick, tri, type Tri } from '../../i18n';
-import { duration } from '../../format';
+import { duration, secondsCount } from '../../format';
 import * as T from '../../../adminProducts/theme';
 import { IntField, Labeled, SelectField, TextArea, TextField, usePcLang } from '../../ui';
 import type { RefLists } from '../../refs';
@@ -57,7 +57,12 @@ export function DurationInput({ label, value, onChange, disabled, error, hint }:
         <p className="lv-field-error">{error}</p>
       ) : (
         <p className={`text-[11px] ${T.text3}`}>
-          {value !== null && <bdi dir="ltr">= {duration(value, lang)} · {value} s</bdi>}
+          {/* No forced direction: the words are the reader's; a forced LTR run scrambles them in ar/ckb. */}
+          {value !== null && (
+            <bdi>
+              = {duration(value, lang)} · {secondsCount(value, lang)}
+            </bdi>
+          )}
           {hint && <span> · {hint}</span>}
         </p>
       )}

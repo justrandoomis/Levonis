@@ -31,7 +31,7 @@ import { toast } from '../../../lib/toastStore';
 import { usePcAccess } from '../access';
 import { pc, type ImportProvider, type PrintCloudConfig, type SettingsAnswer } from '../api';
 import { pick, tri, type Tri } from '../i18n';
-import { duration, megabytes, num } from '../format';
+import { bytesCount, duration, megabytes, num } from '../format';
 import { pcRefusal } from '../refusal';
 import {
   GOVERNORATE_KEY_RE,
@@ -456,8 +456,8 @@ function BytesInput({ field: f, value, disabled, error, onChange }: { field: Set
       hint={
         <>
           {f.help && <span>{pick(f.help, lang)} · </span>}
-          <bdi dir="ltr">
-            {megabytes(value)} = {num(value)} B · {t(S.range)} {num(f.min)}–{num(MODEL_UPLOAD_CEILING_BYTES)} B
+          <bdi>
+            {megabytes(value, lang)} = {bytesCount(value, lang)} · {t(S.range)} {num(f.min)}–{bytesCount(MODEL_UPLOAD_CEILING_BYTES, lang)}
           </bdi>
         </>
       }

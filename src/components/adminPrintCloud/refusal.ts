@@ -15,6 +15,7 @@
 import { ApiError } from '../../lib/api';
 import { apiRefusal, contractRefusal } from '../../lib/refusalStrings';
 import { JOB_STATUS, REASON, labelOf, pick, tri, type Lang, type Tri } from './i18n';
+import { arrow } from './format';
 
 const WORDS = {
   network: tri('تعذّر الاتصال بالخادم — تحقّق من الشبكة وحاول مجدداً.', 'Could not reach the server — check the connection and try again.', 'نەتوانرا پەیوەندی بە ڕاژەکارەوە بکرێت — هێڵەکە بپشکنە و دووبارە هەوڵ بدەرەوە.'),
@@ -49,7 +50,7 @@ export function pcRefusal(e: unknown, lang: Lang, fallback: string, fieldLabel?:
   }
   if (typeof d.reason === 'string' && d.reason) extra.push(labelOf(REASON, d.reason, lang));
   if (Array.isArray(d.reasons)) extra.push(d.reasons.map((r) => labelOf(REASON, String(r), lang)).join('، '));
-  if (typeof d.from === 'string' && typeof d.to === 'string') extra.push(`${labelOf(JOB_STATUS, d.from, lang)} → ${labelOf(JOB_STATUS, d.to, lang)}`);
+  if (typeof d.from === 'string' && typeof d.to === 'string') extra.push(`${labelOf(JOB_STATUS, d.from, lang)} ${arrow(lang)} ${labelOf(JOB_STATUS, d.to, lang)}`);
   for (const key of ['refundable_seconds', 'refundable_qty'] as const) {
     if (typeof d[key] === 'number') extra.push(`${pick(WORDS.refundable, lang)}: ${d[key]}`);
   }

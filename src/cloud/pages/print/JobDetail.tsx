@@ -91,6 +91,7 @@ import {
   eventText,
   failurePartyText,
   failurePolicyText,
+  failureReasonText,
   jobAllows,
   jobPollMs,
   jobStateText,
@@ -158,6 +159,11 @@ function Stepper({ job }: { job: JobView }) {
 function EstimateCard({ job }: { job: JobView }) {
   const { t, lang } = useCloudText();
   const cloud = useCloud();
+  const { refreshStatus } = cloud;
+  // «The slicer is connected» is read again with every poll of a job being measured — never from the app's first load.
+  useEffect(() => {
+    if (job.status === 'analyzing') refreshStatus();
+  }, [job, refreshStatus]);
   const d = projectionDisplay(job.estimate, null);
   if (d.source === 'none') {
     // Only a job still on its way to an estimate is «awaiting» one; later states have their own cards.
@@ -208,13 +214,13 @@ function EstimateCard({ job }: { job: JobView }) {
               <Layers aria-hidden="true" className="h-3.5 w-3.5" />
               {t(jobWords.layers)}
             </dt>
-            <dd className="text-sm font-bold tabular-nums text-text-primary">{d.layerCount}</dd>
+            <dd className="text-sm font-bold tabular-nums text-text-primary">{formatFigure(d.layerCount, lang)}</dd>
           </div>
         ) : null}
       </dl>
       <p className="text-[12px] text-text-muted">
         {t(jobWords.grams, { model: formatMass(g.model, lang), support: formatMass(g.support, lang), purge: formatMass(g.purge, lang) })}
-        {d.colourChanges ? ` · ${t(jobWords.colourChanges)}: ${d.colourChanges}` : ''}
+        {d.colourChanges ? ` · ${t(jobWords.colourChanges)}: ${formatFigure(d.colourChanges, lang)}` : ''}
       </p>
       {d.warnings.length ? (
         <div className="space-y-1">
@@ -717,7 +723,7 @@ function FailureCard({ job }: { job: JobView }) {
       <SectionHeader id="print-job-failure" title={t(jobWords.failure)} />
       <dl className="divide-y divide-border-subtle">
         <Fact label={t(jobWords.reasonLabel)}>
-          <bdi>{f.reason_code}</bdi>
+          <bdi>{failureReasonText(f.reason_code, lang)}</bdi>
         </Fact>
         <Fact label={t(jobWords.responsible)}>{failurePartyText(f.responsible, lang)}</Fact>
         {f.billable_seconds != null && f.status !== 'reported' ? <Fact label={t(jobWords.billedTime)}>{formatDuration(f.billable_seconds, lang)}</Fact> : null}

@@ -448,7 +448,8 @@ function Intake({ onSettled }: { onSettled: () => void }) {
                 </Button>
               </div>
               <ProgressBar value={percent} label={t(upload.progressLabel)} tone="info" />
-              <p className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-text-muted">
+              {/* Hidden from the live region: a byte count on every progress event would flood a screen reader. The bar above holds the figure. */}
+              <p aria-hidden="true" className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-text-muted">
                 <span>{t(upload.sentOf, { done: formatBytes(state.sent, lang), total: formatBytes(state.total, lang) })}</span>
                 {percent != null ? <bdi className="font-semibold tabular-nums text-text-primary">{formatPercent(percent, lang)}</bdi> : null}
               </p>

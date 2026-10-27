@@ -10,7 +10,7 @@
  * cancelled request is never shown as an error. Nothing is cached: every
  * mount asks the server again (a balance read from memory could be stale).
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { isAborted } from '../lib/api';
 
 export interface CloudQuery<T> {
@@ -48,4 +48,28 @@ export function useCloudQuery<T>(load: (signal: AbortSignal) => Promise<T>, deps
 
   const reload = useCallback(() => setVersion((v) => v + 1), []);
   return { data, error, loading, reload };
+}
+
+/**
+ * Calls `tick` every `ms` while `active` and the page is in front of the
+ * reader, and once when it comes back into view. A hidden tab asks nothing.
+ */
+export function usePoll(tick: () => void, active: boolean, ms: number | null) {
+  const ref = useRef(tick);
+  ref.current = tick;
+  useEffect(() => {
+    if (!active || !ms) return;
+    const visible = () => typeof document === 'undefined' || document.visibilityState === 'visible';
+    const timer = window.setInterval(() => {
+      if (visible()) ref.current();
+    }, ms);
+    const onShow = () => {
+      if (visible()) ref.current();
+    };
+    document.addEventListener('visibilitychange', onShow);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onShow);
+    };
+  }, [active, ms]);
 }

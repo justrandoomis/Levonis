@@ -63,6 +63,7 @@ function QuoteLines({ quote }: { quote: QuoteView }) {
             </span>
             {l.discount_iqd > 0 ? (
               <span className="text-[11px] text-text-muted line-through">
+                <span className="sr-only">{t(goods.beforeDiscount)} </span>
                 <Money iqd={l.base_price_iqd} />
               </span>
             ) : null}

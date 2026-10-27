@@ -558,6 +558,7 @@ export const configure = {
     ckb: 'پاشکۆ وەرگیراوەکان دەخرێنە سەر ئەم چاپە و کاتی پشتڕاستکردنەوە لە کۆگاکەت دەگیرێن.',
   },
   buyAccessories: { ar: 'شراء ملحقات', en: 'Buy accessories', ckb: 'کڕینی پاشکۆ' },
+  accessoryUnnamed: { ar: 'ملحق تعذّر تحميل اسمه', en: 'An accessory whose name could not be loaded', ckb: 'پاشکۆیەک کە ناوەکەی بار نەکرا' },
   getEstimate: { ar: 'اطلب تقديرًا من الورشة', en: 'Ask the workshop for an estimate', ckb: 'داوای خەمڵاندن لە کارگە بکە' },
   getEstimateHint: {
     ar: 'لا يُعرض وقت ولا غرامات قبل أن يقيس برنامج التقطيع في الورشة نموذجك. لا يُحجز أو يُخصم شيء الآن.',
@@ -938,6 +939,21 @@ export const failureWords = {
   no_charge: { ar: 'دون أي احتساب عليك', en: 'nothing charged to you', ckb: 'هیچ شتێک لە تۆ نەبڕدرا' },
   charge_printed: { ar: 'احتُسب ما طُبع فقط', en: 'only what printed was charged', ckb: 'تەنها ئەوەی چاپکرا بڕدرا' },
   manual_review: { ar: 'بمراجعة يدوية', en: 'by manual review', ckb: 'بە پێداچوونەوەی دەستی' },
+} satisfies Record<string, Tri>;
+
+/** Why a print failed (`pc_print_failures.reason_code`, the operator's short code). */
+export const failureReason = {
+  adhesion: { ar: 'انفصل النموذج عن سطح الطباعة', en: 'The print came loose from the bed', ckb: 'مۆدێلەکە لە ڕووی چاپ جیابووەوە' },
+  spaghetti: { ar: 'تحوّلت الطباعة إلى خيوط متشابكة', en: 'The print turned into tangled strands', ckb: 'چاپەکە بوو بە داوی تێکئاڵاو' },
+  nozzle_clog: { ar: 'انسدّت فوهة الطابعة', en: 'The nozzle clogged', ckb: 'نۆزڵی چاپکەرەکە گیرا' },
+  layer_shift: { ar: 'انزاحت الطبقات عن مكانها', en: 'The layers shifted', ckb: 'چینەکان لە شوێنی خۆیان لایاندا' },
+  warping: { ar: 'تقوّس النموذج', en: 'The model warped', ckb: 'مۆدێلەکە چەمایەوە' },
+  filament_runout: { ar: 'نفد الخيط أثناء الطباعة', en: 'The filament ran out mid-print', ckb: 'فیلامێنت لە ناوەڕاستی چاپدا تەواو بوو' },
+  filament_tangle: { ar: 'تشابك الخيط', en: 'The filament tangled', ckb: 'فیلامێنتەکە تێکئاڵا' },
+  power_loss: { ar: 'انقطعت الكهرباء', en: 'The power went out', ckb: 'کارەبا بڕا' },
+  printer_error: { ar: 'عطل في الطابعة', en: 'A printer fault', ckb: 'تێکچوونێک لە چاپکەرەکەدا' },
+  model_issue: { ar: 'مشكلة في النموذج نفسه', en: 'A problem in the model itself', ckb: 'کێشەیەک لە خودی مۆدێلەکەدا' },
+  other: { ar: 'سبب آخر ({code})', en: 'Another cause ({code})', ckb: 'هۆکارێکی تر ({code})' },
 } satisfies Record<string, Tri>;
 
 /** The job's events (`pc_print_job_events.event`), as a timeline reads them. */

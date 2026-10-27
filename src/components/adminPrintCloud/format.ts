@@ -18,6 +18,32 @@ const H = tri('ساعة', 'h', 'کاتژمێر');
 const MIN = tri('دقيقة', 'min', 'خولەک');
 const SEC = tri('ثانية', 's', 'چرکە');
 const DAY = tri('يوم', 'd', 'ڕۆژ');
+const MB = tri('ميغابايت', 'MB', 'مێگابایت');
+const BYTES = tri('بايت', 'B', 'بایت');
+const MICRONS = tri('ميكرون', 'µm', 'مایکرۆن');
+
+/**
+ * «from → to» in the reader's direction. U+2192 is not mirrored, so in an RTL
+ * line (ar, ckb) it would point back at the from-value: there the arrow is «←».
+ */
+export function arrow(lang: Lang): string {
+  return lang === 'en' ? '→' : '←';
+}
+
+/** A count of seconds with its unit word: «9,000 ثانية» / «9,000 s». */
+export function secondsCount(n: number | null | undefined, lang: Lang): string {
+  return n === null || n === undefined || !Number.isFinite(n) ? '—' : `${num(n)} ${pick(SEC, lang)}`;
+}
+
+/** A count of bytes with its unit word. */
+export function bytesCount(n: number | null | undefined, lang: Lang): string {
+  return n === null || n === undefined || !Number.isFinite(n) ? '—' : `${num(n)} ${pick(BYTES, lang)}`;
+}
+
+/** Micrometres (a nozzle): «400 ميكرون» / «400 µm». */
+export function microns(n: number | null | undefined, lang: Lang): string {
+  return n === null || n === undefined || !Number.isFinite(n) ? '—' : `${num(n)} ${pick(MICRONS, lang)}`;
+}
 
 /** A count, grouped, Latin digits. */
 export function num(n: number | null | undefined): string {
@@ -63,10 +89,10 @@ export function temp(dc: number | null | undefined): string {
   return `${(dc / 10).toLocaleString('en-US', { maximumFractionDigits: 1 })} °C`;
 }
 
-/** Bytes as megabytes: 41943040 → «40 MB». */
-export function megabytes(bytes: number | null | undefined): string {
+/** Bytes as megabytes: 41943040 → «40 MB» (the unit in the reader's language). */
+export function megabytes(bytes: number | null | undefined, lang: Lang): string {
   if (bytes === null || bytes === undefined || !Number.isFinite(bytes)) return '—';
-  return `${(bytes / 1048576).toLocaleString('en-US', { maximumFractionDigits: 2 })} MB`;
+  return `${(bytes / 1048576).toLocaleString('en-US', { maximumFractionDigits: 2 })} ${pick(MB, lang)}`;
 }
 
 const UNIT_WORDS: Readonly<Record<string, Tri>> = {

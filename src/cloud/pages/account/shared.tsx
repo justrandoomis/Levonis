@@ -138,8 +138,11 @@ export function Figures({ items, className = '' }: { items: FigureItem[]; classN
 
 /**
  * A ledger movement's figure with its sign — «+2h 30m», «−650 g», «45m» —
- * in seconds (`unit` 'seconds') or in a variant's base unit. An LTR island,
- * so the sign stays with its figure in Arabic and Sorani.
+ * in seconds (`unit` 'seconds') or in a variant's base unit. The figure is
+ * isolated in the direction of its own words (dir auto): forced LTR, an
+ * Arabic or Sorani «2 کاتژمێر 30 خولەک» would be drawn with its unit words
+ * swapped. Only the sign sits in an LTR isolate of its own, ahead of the
+ * first figure in the reading direction.
  */
 export function MovementFigure({ movement, unit }: { movement: Movement; unit: 'seconds' | string }) {
   const { lang } = useCloudText();
@@ -147,8 +150,8 @@ export function MovementFigure({ movement, unit }: { movement: Movement; unit: '
   const figure = unit === 'seconds' ? formatDuration(movement.amount, lang) : unit ? formatQuantity(movement.amount, unit, lang) : formatFigure(movement.amount, lang);
   const sign = movementSign(movement.kind);
   return (
-    <bdi dir="ltr" className={`whitespace-nowrap tabular-nums ${sign === '+' ? 'text-success' : 'text-text-primary'}`}>
-      {sign}
+    <bdi className={`whitespace-nowrap tabular-nums ${sign === '+' ? 'text-success' : 'text-text-primary'}`}>
+      {sign ? <bdi dir="ltr">{sign}</bdi> : null}
       {figure}
     </bdi>
   );
@@ -251,11 +254,11 @@ export function useLedgerPages<R extends { id: string; created_at: string }>(
 
 /** The honest line under a list the server caps: only the latest are shown, and where the rest is. */
 export function CapNote({ shown, cap, history = false }: { shown: number; cap: number; history?: boolean }) {
-  const { t } = useCloudText();
+  const { t, lang } = useCloudText();
   if (shown < cap) return null;
   return (
     <p className="text-[12px] leading-relaxed text-text-muted">
-      {t(sect.latestShown, { n: cap })}{' '}
+      {t(sect.latestShown, { n: formatFigure(cap, lang) })}{' '}
       {history ? (
         <Link to="/account/transactions" className="font-semibold text-text-secondary underline-offset-2 hover:underline">
           {t(sect.fullHistory)}

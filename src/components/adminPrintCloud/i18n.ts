@@ -232,6 +232,43 @@ export const ADAPTER: Readonly<Record<string, Tri>> = {
   accounting: tri('المحاسبة', 'Accounting', 'ژمێریاری'),
 };
 
+/**
+ * What each integration does, in the reader's language (the server's own
+ * `note` in worker/lib/printCloud/adapters.ts is a technical English line).
+ * `wallet_payment_off` is the wallet adapter while the owner has it switched off.
+ */
+export const ADAPTER_NOTE: Readonly<Record<string, Tri>> = {
+  identity: tri(
+    'عملاء Print Cloud هم مستخدمو Levonis؛ الجلسة المشتركة تعرّفهم على كل نطاق.',
+    'Customers are Levonis users; the shared session identifies them on every host.',
+    'کڕیارەکانی Print Cloud بەکارهێنەرانی Levonisن؛ دانیشتنە هاوبەشەکە لەسەر هەموو دۆمەینێک دەیانناسێتەوە.'
+  ),
+  notification: tri('إشعارات داخل التطبيق عبر صندوق إشعارات Levonis.', 'In-app notifications through the Levonis inbox.', 'ئاگادارکردنەوەی ناو ئەپ لە ڕێگەی سندوقی ئاگادارکردنەوەکانی Levonis.'),
+  wallet_payment: tri(
+    'تُدفع الطلبات من محفظة العميل في Levonis: خصم واحد من رصيده القابل للصرف مع التأكيد نفسه، ويُردّ استرداد هذه الطلبات إلى المحفظة.',
+    'Orders are paid from the customer’s Levonis wallet: one debit of the spendable balance with the confirmation itself; refunds of such orders are credited back to the wallet.',
+    'داواکارییەکان لە جزدانی Levonis ی کڕیار دەدرێن: یەک بڕین لە باڵانسی خەرجکراو لەگەڵ هەمان پشتڕاستکردنەوە؛ گەڕاندنەوەی پارەی ئەم داواکارییانە دەچێتەوە بۆ جزدانەکە.'
+  ),
+  wallet_payment_off: tri(
+    'مبنيّ لكن المالك أوقفه: الدفعات الجديدة من المحفظة تُرفض، أما استرداد الطلبات المدفوعة من المحفظة فيعود إليها كما هو.',
+    'Built, but switched off by the owner: new wallet payments are refused; refunds of orders already paid from the wallet still go back to it.',
+    'دروستکراوە، بەڵام خاوەن کوژاندوویەتییەوە: پارەدانی نوێ لە جزدان ڕەت دەکرێتەوە؛ گەڕاندنەوەی پارەی ئەو داواکارییانەی لە جزدان دراون هەر بۆ جزدانەکە دەچێتەوە.'
+  ),
+  product_catalog: tri(
+    'قد يحمل منتج Print Cloud رقم منتج في Levonis كرابط فقط؛ لا مزامنة.',
+    'A Print Cloud product may carry a Levonis product id as a link only; no sync.',
+    'بەرهەمێکی Print Cloud دەتوانێت ژمارەی بەرهەمێکی Levonis تەنها وەک بەستەر هەڵبگرێت؛ هاوکاتکردن نییە.'
+  ),
+  inventory: tri(
+    'يحتفظ Print Cloud بسجل مستودعه الخاص إلى أن يُربط بمخزون Levonis.',
+    'Print Cloud keeps its own warehouse ledger until it is integrated with the Levonis inventory.',
+    'Print Cloud تۆماری کۆگای خۆی دەپارێزێت تا لەگەڵ کۆگای Levonis دەبەسترێتەوە.'
+  ),
+  orders: tri('أحداث الطلبات تنتظر في الطابور إلى أن يُربط المحوّل.', 'Order events are queued until the adapter is connected.', 'ڕووداوەکانی داواکاری لە ڕیزدا دەمێننەوە تا ئەداپتەرەکە دەبەسترێت.'),
+  membership: tri('العروض المقصورة على عضوية لا تُطبَّق قبل الربط.', 'Membership-limited promotions do not apply until connected.', 'ئەو پرۆمۆشنانەی تایبەتن بە ئەندامێتی تا بەستنەوە جێبەجێ نابن.'),
+  accounting: tri('أحداث المحاسبة تنتظر في الطابور إلى أن يُربط المحوّل.', 'Accounting events are queued until the adapter is connected.', 'ڕووداوەکانی ژمێریاری لە ڕیزدا دەمێننەوە تا ئەداپتەرەکە دەبەسترێت.'),
+};
+
 export const OUTBOX_STATUS: Readonly<Record<string, Tri>> = {
   pending: tri('بانتظار ربط المحوّل', 'Waiting for the adapter', 'چاوەڕێی بەستنەوەی ئەداپتەرە'),
   delivered: tri('سُلّمت', 'Delivered', 'گەیەنرا'),

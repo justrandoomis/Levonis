@@ -13,7 +13,7 @@ import { Activity, AlertTriangle, ClipboardCheck, PackageOpen, Printer } from 'l
 import { KpiTile } from '../../ui/KpiTile';
 import { StatusChip } from '../../ui/Badge';
 import { pc, type AdaptersAnswer, type Overview, type ServiceStatus } from '../api';
-import { ADAPTER, JOB_STATUS, OUTBOX_STATUS, PRINTER_STATUS, SLICER_STATE, labelOf, tri } from '../i18n';
+import { ADAPTER, ADAPTER_NOTE, JOB_STATUS, OUTBOX_STATUS, PRINTER_STATUS, SLICER_STATE, labelOf, pick, tri } from '../i18n';
 import { num } from '../format';
 import { Empty, LoadState, Note, RefreshButton, SectionHead, T, Tray, useLoad, usePcLang, type Loaded } from '../ui';
 import type { SectionProps } from '../AdminPrintCloud';
@@ -168,17 +168,22 @@ export default function OverviewSection({ go, status }: SectionProps & { status:
           {(a) => (
             <div className="space-y-4">
               <ul className="divide-y divide-[var(--ap-hairline)]">
-                {a.adapters.map((ad) => (
-                  <li key={ad.name} className="flex flex-wrap items-start justify-between gap-2 py-2.5">
-                    <div className="min-w-0">
-                      <p className={`text-[13px] font-semibold ${T.text1}`}>{labelOf(ADAPTER, ad.name, lang)}</p>
-                      <p dir="ltr" className={`mt-0.5 text-[11.5px] ${T.text3}`}>
-                        <span className="font-mono">{ad.implementation}</span> — {ad.note}
-                      </p>
-                    </div>
-                    <StatusChip tone={ad.connected ? 'success' : 'neutral'}>{t(ad.connected ? S.connected : S.notConnected)}</StatusChip>
-                  </li>
-                ))}
+                {a.adapters.map((ad) => {
+                  // The reader's own words for what it does; the server's English note only for an adapter the console does not know yet.
+                  const note = ADAPTER_NOTE[ad.name === 'wallet_payment' && !ad.connected ? 'wallet_payment_off' : ad.name];
+                  return (
+                    <li key={ad.name} className="flex flex-wrap items-start justify-between gap-2 py-2.5">
+                      <div className="min-w-0">
+                        <p className={`text-[13px] font-semibold ${T.text1}`}>{labelOf(ADAPTER, ad.name, lang)}</p>
+                        <p className={`mt-0.5 text-[11.5px] ${T.text3}`}>{note ? pick(note, lang) : <bdi dir="ltr">{ad.note}</bdi>}</p>
+                        <p dir="ltr" className={`text-start font-mono text-[11px] ${T.text3}`}>
+                          {ad.implementation}
+                        </p>
+                      </div>
+                      <StatusChip tone={ad.connected ? 'success' : 'neutral'}>{t(ad.connected ? S.connected : S.notConnected)}</StatusChip>
+                    </li>
+                  );
+                })}
               </ul>
               <div>
                 <h4 className={`mb-2 text-[12.5px] font-bold ${T.text2}`}>{t(S.outbox)}</h4>

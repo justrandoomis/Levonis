@@ -36,7 +36,7 @@ test('c0: a completion that used more than was reserved settles — billed and a
   const w = pcWorld();
   const cat = await seedCatalog(w);
   // Behind the seeded gold lot (100 g for 2,500 IQD) a second one: 500 g for 15,000 IQD.
-  await ok(w.owner, 'POST', `${ADMIN}/stock/receive`, { variant_id: cat.gold, qty: 500, total_cost_iqd: 15000, supplier: 'Bambu Lab' });
+  await ok(w.owner, 'POST', `${ADMIN}/stock/receive`, { variant_id: cat.gold, qty: 500, total_cost_iqd: 15000, supplier: 'Bambu Lab' }, idem('stock'));
   await buy(w.a, [
     { kind: 'credit_package', package_id: cat.packages.h6 },
     { kind: 'material', variant_id: cat.gold, quantity: 100 },

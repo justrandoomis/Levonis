@@ -36,8 +36,8 @@ export default function Landing() {
     <div className="space-y-6">
       <section className="lv-surface-raised p-5 sm:p-6" aria-labelledby="cloud-landing-title">
         <StatusChip tone={open ? 'success' : 'warning'}>{open ? t(guide.open) : t(service.openingSoon)}</StatusChip>
-        <h1 id="cloud-landing-title" dir="ltr" className="mt-3 text-2xl font-extrabold tracking-tight text-text-primary">
-          {CLOUD_TITLE}
+        <h1 id="cloud-landing-title" className="mt-3 text-2xl font-extrabold tracking-tight text-text-primary">
+          <bdi dir="ltr">{CLOUD_TITLE}</bdi>
         </h1>
         <p className="mt-2 max-w-2xl text-base leading-relaxed text-text-secondary">{t(guide.intro)}</p>
         <div className="mt-5 flex flex-wrap items-center gap-2">

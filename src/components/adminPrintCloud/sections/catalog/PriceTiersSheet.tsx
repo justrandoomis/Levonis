@@ -27,6 +27,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Sheet } from '../../../ui/Sheet';
 import { Money } from '../../../ui/Money';
+import { iqdUnit } from '../../../../lib/money';
 import { toast } from '../../../../lib/toastStore';
 import { pc, parseJsonColumn, type PriceChange, type PriceTier, type Row, type SettingsAnswer, type StoreVariant } from '../../api';
 import { tri, type Tri } from '../../i18n';
@@ -232,8 +233,8 @@ export function PriceTiersSheet({ variant, open, onClose }: { variant: Row; open
               onChange={(v) => set(i, { price: v })}
               hint={
                 l.mode === 'bracket' && l.price !== null ? (
-                  <bdi dir="ltr">
-                    = {(l.price / 1000).toLocaleString('en-US', { maximumFractionDigits: 3 })} IQD {t(S.perUnit)}
+                  <bdi>
+                    = {(l.price / 1000).toLocaleString('en-US', { maximumFractionDigits: 3 })} {iqdUnit(lang)} {t(S.perUnit)}
                   </bdi>
                 ) : l.mode === 'pack' && l.price !== null ? (
                   <Money iqd={l.price} />

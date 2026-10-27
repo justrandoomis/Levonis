@@ -19,6 +19,7 @@ import { useCloud } from '../../CloudContext';
 import { formatDateTime } from '../../format';
 import {
   buybackStatus,
+  buybackText,
   creditEntry,
   inventoryEntry,
   orderStatusWord,
@@ -31,7 +32,7 @@ import { tx, useCloudText } from '../../text';
 import type { CreditTierBalance, InventoryBalance, TransactionPage, TransactionRow } from '../../types';
 import { ArrowLeftRight, Clock, CloudEmptyState, CloudErrorState, CloudPageSkeleton, Disc3, HandCoins, ListRow, ShoppingBag, Truck, Wallet } from '../../ui';
 import { useCloudQuery } from '../../useCloudQuery';
-import { ledgerMovement, TX_LEDGERS, txHref, txStatus } from './logic';
+import { buybackFigure, ledgerMovement, TX_LEDGERS, txHref, txStatus } from './logic';
 import { LoadMore, MoneyLine, MovementFigure, SubPageHeader, useStatusWord } from './shared';
 
 /** Rows per page (the server allows 1–200). */
@@ -79,7 +80,13 @@ function TxRow({ row, names }: { row: TransactionRow; names: Names | undefined }
     case 'buybacks':
       title = t(txText.buyback, { status: word(buybackStatus, status) });
       subject = material ? tx(material.name, lang) || material.sku : null;
-      figure = <Money iqd={row.value_iqd} />;
+      // Only an approved sell-back moved money; a pending one is an estimate, a declined or cancelled one nothing.
+      figure =
+        buybackFigure(status) === 'final' ? (
+          <Money iqd={row.value_iqd} />
+        ) : buybackFigure(status) === 'estimated' ? (
+          <MoneyLine text={buybackText.estimated} iqd={row.value_iqd} />
+        ) : null;
       break;
     case 'shipments':
       title = t(txText.shipment, { kind: word(shipmentKind, row.subject_id ?? ''), status: word(shipmentStatus, status) });

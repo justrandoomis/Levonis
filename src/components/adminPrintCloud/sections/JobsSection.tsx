@@ -24,7 +24,7 @@ import { StatusChip } from '../../ui/Badge';
 import { usePcAccess } from '../access';
 import { pc, type FailureRow, type JobRow, type QueueEstimate, type SchedulerRun } from '../api';
 import { JOB_STATUS, QUEUE_BASIS, FAILURE_STATUS, RESPONSIBLE, labelOf, tri, type Tri } from '../i18n';
-import { duration, formatDateTime, num } from '../format';
+import { arrow, duration, formatDateTime, num } from '../format';
 import { pcRefusal } from '../refusal';
 import { Act, Chips, Empty, Id, LoadState, Note, Pager, type PcColumn, PcList, RefreshButton, SectionHead, T, useLoad, usePaged, usePcLang, W } from '../ui';
 import type { SectionProps } from '../AdminPrintCloud';
@@ -217,7 +217,7 @@ function QueuePanel({ onOpen }: { onOpen: (id: string) => void }) {
                     <button type="button" className={T.btnGhostSm} onClick={() => onOpen(a.job_id)}>
                       <Id value={a.job_id} />
                     </button>{' '}
-                    → <Id value={a.printer_id} />
+                    {arrow(lang)} <Id value={a.printer_id} />
                   </li>
                 ))}
               </ul>

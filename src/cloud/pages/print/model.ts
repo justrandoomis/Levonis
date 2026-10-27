@@ -27,6 +27,7 @@ import { jobStatus as jobStatusWords } from '../../strings/common';
 import {
   actorWords,
   eventWords,
+  failureReason,
   failureWords,
   geometryWarning,
   importLog,
@@ -48,6 +49,7 @@ import type {
   JobTelemetry,
   MachineState,
   ModelWarning,
+  PrinterRecommendations,
   QueueBasis,
 } from '../../types';
 
@@ -316,6 +318,20 @@ export function failurePartyText(responsible: string, lang: Language): string {
   return responsible in failureWords ? tx(failureWords[responsible as keyof typeof failureWords], lang) : responsible;
 }
 
+/**
+ * Why a print failed, in words: the operator records a short code
+ * (`adhesion`, `nozzle_clog`… — the admin form's own suggestions); a code this
+ * table does not know is still a sentence in the reader's language around it.
+ */
+const FAILURE_ALIAS: Record<string, keyof typeof failureReason> = { clog: 'nozzle_clog', power: 'power_loss', runout: 'filament_runout', warp: 'warping' };
+
+export function failureReasonText(code: string | null | undefined, lang: Language): string {
+  const raw = (code ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const c = FAILURE_ALIAS[raw] ?? raw;
+  if (c && c in failureReason && c !== 'other') return tx(failureReason[c as keyof typeof failureReason], lang);
+  return tx(failureReason.other, lang, { code: (code ?? '').trim().slice(0, 60) || '—' });
+}
+
 export function failurePolicyText(policy: string | null | undefined, lang: Language): string | null {
   if (policy === 'no_charge' || policy === 'charge_printed' || policy === 'manual_review') return tx(failureWords[policy], lang);
   return null;
@@ -329,6 +345,30 @@ export function queueBasisText(basis: QueueBasis | string, lang: Language): stri
 export function printerReasonText(code: string, lang: Language): string {
   if (code in printerReason && code !== 'other') return tx(printerReason[code as keyof typeof printerReason], lang);
   return tx(printerReason.other, lang, { code: code.slice(0, 40) });
+}
+
+export type PrinterBadge = 'bestQuality' | 'shortestQueue' | 'mostCredit' | 'lowestCost';
+
+/**
+ * The server's picks a printer model may wear — only those its own figures
+ * back. A model's cost exists only with a measured estimate for it, and the
+ * server's «lowest cost» sort cannot order models without one, so «lowest
+ * cost» needs at least two compatible models, every one of them measured;
+ * without an estimate for this job no price was compared at all. «Most hours
+ * held» needs hours actually held in its class. (The server names a model
+ * for every pick even when nothing was compared.)
+ */
+export function printerBadges(recs: Pick<PrinterRecommendations, 'models' | 'best'>, id: string): PrinterBadge[] {
+  const m = recs.models.find((x) => x.printer_model_id === id);
+  if (!m || !m.compatible) return [];
+  const compatible = recs.models.filter((x) => x.compatible);
+  const compared = compatible.length >= 2 && compatible.every((x) => x.credit.estimated_seconds != null);
+  const out: PrinterBadge[] = [];
+  if (recs.best.best_quality === id) out.push('bestQuality');
+  if (recs.best.shortest_queue === id) out.push('shortestQueue');
+  if (recs.best.most_credit_available === id && m.credit.available_seconds > 0) out.push('mostCredit');
+  if (recs.best.lowest_cost === id && compared) out.push('lowestCost');
+  return out;
 }
 
 export function plateIssueText(code: string, lang: Language): string {
@@ -434,11 +474,17 @@ export function projectionDisplay(
   };
 }
 
-/** Where a shortfall is bought: the store's tab for it (the STORE section reads `tab`, `tier` and `variant`). */
+/**
+ * Where a shortfall is bought: hours on the catalogue's tab for the job's
+ * class (`?tab=hours&tier=`); a material on that very variant's page
+ * (`/store/variant/:id`, which opens with `?qty=` — the shortfall, in the
+ * variant's base unit — moved to the nearest quantity the store sells).
+ */
 export function shortfallLink(s: ShortLine): string {
   const id = encodeURIComponent(s.id);
   if (s.kind === 'hours') return `/store?tab=hours&tier=${id}`;
-  return `/store?tab=${s.kind === 'accessory' ? 'accessories' : 'materials'}&variant=${id}`;
+  const qty = Number.isInteger(s.amount) && s.amount > 0 ? `?qty=${s.amount}` : '';
+  return `/store/variant/${id}${qty}`;
 }
 
 // ------------------------------------------------------------------ the printer's reading
