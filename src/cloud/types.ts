@@ -419,7 +419,8 @@ export interface WalletPayment {
   amount_iqd: number;
   charged_usd_cents: number;
   exchange_rate: number;
-  wallet_tx_id: string;
+  /** Null for a zero-total order: confirmed with no debit (worker/lib/printCloud/orders.ts `WalletPaymentResult`). */
+  wallet_tx_id: string | null;
 }
 
 // ------------------------------------------------------------------ the customer's balances

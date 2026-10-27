@@ -1,56 +1,87 @@
 /**
- * STORE — printing hours, filament and accessories, the cart and the
- * customer's orders: every address under /store and /orders
- * (src/cloud/routes.ts). The shell mounts this module WITHOUT a sign-in
- * gate: a visitor may browse, and the screens that need an account (an
- * order, a payment) ask for one themselves with `useSignIn()` or
- * `<RequireSignIn>` (src/cloud/auth.tsx).
+ * STORE — printing hours, filament and accessories, the cart, the quote and
+ * the customer's orders: every address under /store and /orders
+ * (src/cloud/routes.ts). Prices, stock and every rule of a purchase are the
+ * server's (worker/lib/printCloud/pricing.ts, orders.ts, wallet.ts); these
+ * screens show them and ask for them, never compute them.
  *
- * A PLACEHOLDER. The section's builder replaces this whole file, keeping
- * the default export: a component that takes no props and renders its own
- * `<Routes>` with FULL paths (`/orders/:id`, not `:id`). Until then every
- * address of the section says plainly that the store is not built yet and
- * points at what already works — each printer's page lists the hour
- * packages of its class with the server's prices.
+ *   /store                       the catalogue: ?tab=hours|materials|accessories,
+ *                                ?tier=<tier id> (hours of one class), ?cat=<category>
+ *   /store/product/:productId    one product: its variants, a quantity, the
+ *                                server's price for it (?variant=<id>&qty=<n>)
+ *   /store/variant/:variantId    the same page opened from a variant id — the
+ *                                way in for a reorder suggestion (?qty=<n>)
+ *   /store/cart                  the cart (signed in), priced by the server
+ *   /store/checkout/:quoteId     a stored quote: its frozen lines and expiry,
+ *                                the payment method, «Place order». The way in
+ *                                for a quote made elsewhere too, e.g. the
+ *                                account's «top up to N» (POST
+ *                                /me/inventory/top-up-quote answers a stored quote)
+ *   /orders, /orders/:orderId    the customer's orders: pay from the Levonis
+ *                                wallet or at the workshop, cancel an unpaid
+ *                                one, see what was received
+ *
+ * The shell mounts this module WITHOUT a sign-in gate (a visitor may browse
+ * the catalogue, and an admin previews it while the service is closed): the
+ * cart, the quote and the orders ask for an account here, with <RequireSignIn>.
+ *
+ * The catalogue is part of this chunk (the store's front opens with one
+ * request after the shell); every other screen is a lazy chunk of its own.
  */
-import { Link } from 'react-router-dom';
-import { common, nav } from '../../strings/common';
-import { useCloudText } from '../../text';
-import type { Tri } from '../../types';
-import { CloudEmptyState, PageHeader, ShoppingBag } from '../../ui';
-
-const words = {
-  title: { ar: 'المتجر قيد الإنشاء', en: 'The store is being built', ckb: 'فرۆشگاکە هێشتا دروست دەکرێت' },
-  body: {
-    ar: 'هنا ستشتري ساعات الطباعة والخيوط وتتابع طلباتك. حتى يجهز، تعرض صفحة كل طابعة باقات الساعات لفئتها.',
-    en: 'This is where you will buy printing hours and filament and follow your orders. Until it is ready, each printer’s page lists the hour packages of its class.',
-    ckb: 'لێرە کاتژمێری چاپ و فیلامێنت دەکڕیت و بەدواداچوون بۆ داواکارییەکانت دەکەیت. تا ئامادە دەبێت، پەڕەی هەر چاپکەرێک پاکێجەکانی کاتژمێری پۆلەکەی پیشان دەدات.',
-  },
-} satisfies Record<string, Tri>;
+import { useEffect } from 'react';
+import { Route, Routes } from 'react-router-dom';
+import { RequireSignIn } from '../../auth';
+import { useCloud } from '../../CloudContext';
+import { CloudNotFound } from '../../shell/Notices';
+import { adoptCartOwner } from './cart';
+import Catalogue from './Catalogue';
+import { CartPage, CheckoutPage, OrderPage, OrdersPage, ProductPage } from './pages';
 
 export default function StoreRoutes() {
-  const { t } = useCloudText();
+  const { user } = useCloud();
+  const owner = user?.id ?? null;
+  // A cart belongs to the account that filled it: a sign-out or another
+  // account empties it here, before any screen of the section reads it.
+  useEffect(() => adoptCartOwner(owner), [owner]);
+
   return (
-    <div>
-      <PageHeader title={t(nav.store)} back={{ to: '/', label: t(nav.home) }} />
-      <CloudEmptyState
-        icon={<ShoppingBag className="h-6 w-6" />}
-        title={t(words.title)}
-        body={t(words.body)}
-        action={
-          <>
-            <Link to="/printers" className="lv-button lv-button-secondary">
-              {t(nav.printers)}
-            </Link>
-            <Link to="/how-it-works" className="lv-button lv-button-ghost">
-              {t(nav.howItWorks)}
-            </Link>
-            <Link to="/" className="lv-button lv-button-ghost">
-              {t(common.backHome)}
-            </Link>
-          </>
+    <Routes>
+      <Route path="/store" element={<Catalogue />} />
+      <Route path="/store/product/:productId" element={<ProductPage />} />
+      <Route path="/store/variant/:variantId" element={<ProductPage />} />
+      <Route
+        path="/store/cart"
+        element={
+          <RequireSignIn>
+            <CartPage />
+          </RequireSignIn>
         }
       />
-    </div>
+      <Route
+        path="/store/checkout/:quoteId"
+        element={
+          <RequireSignIn>
+            <CheckoutPage />
+          </RequireSignIn>
+        }
+      />
+      <Route
+        path="/orders"
+        element={
+          <RequireSignIn>
+            <OrdersPage />
+          </RequireSignIn>
+        }
+      />
+      <Route
+        path="/orders/:orderId"
+        element={
+          <RequireSignIn>
+            <OrderPage />
+          </RequireSignIn>
+        }
+      />
+      <Route path="*" element={<CloudNotFound />} />
+    </Routes>
   );
 }

@@ -124,6 +124,13 @@ export {
   X,
 };
 
+// The store's own (src/cloud/pages/store): quantities, search, a chosen chip, orders.
+// Each icon here is also an export of the shell chunk's module namespace (PrintCloudApp re-exports
+// the ui barrel), so the store reuses the set above wherever one fits.
+import { Check, Minus, Plus, Receipt, Search } from 'lucide-react';
+
+export { Check, Minus, Plus, Receipt, Search };
+
 /** The chevron that points FORWARD in the reading direction (left in Arabic and Sorani). */
 export const forwardChevron = (dir: 'rtl' | 'ltr') => (dir === 'rtl' ? ChevronLeft : ChevronRight);
 /** The arrow that points BACK in the reading direction. */
