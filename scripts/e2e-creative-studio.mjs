@@ -305,6 +305,86 @@ try {
     await page.screenshot({ path: `${out}/04-editor-checks-1440.png` });
   });
 
+  await check('a Claude edit scoped to the selection: shown as a diff, applied, saved as an `ai` version with its job', async () => {
+    await page.evaluate(() => sessionStorage.setItem('cs-e2e-ai', '1'));
+    await page.reload({ waitUntil: 'networkidle' });
+    await waitEditor();
+    const c = await centreOf({ id: 'headline' });
+    await page.mouse.click(c.x, c.y);
+    await page.getByRole('tab', { name: 'المحادثة' }).click();
+    await page.waitForSelector('[data-chat-panel]');
+    const scope = await page.textContent('[data-chat-scope]');
+    assert.ok(scope.includes('1') && scope.includes('العنوان'), `the target is spelled out before sending: ${scope}`);
+    await page.fill('[data-chat-panel] textarea', 'اختصر العنوان');
+    await page.getByRole('button', { name: 'أرسل إلى Claude' }).click();
+    await page.waitForSelector('[data-patch-preview]');
+    const diff = await page.textContent('[data-patch-preview]');
+    assert.ok(diff.includes('العناصر المعدّلة') && diff.includes('العنوان'), diff);
+    await page.screenshot({ path: `${out}/08-ai-diff-1440.png` });
+    await page.getByRole('button', { name: 'تطبيق' }).click();
+    await page.waitForFunction(() => {
+      const stage = window.Konva.stages.find((s) => s.container().hasAttribute('data-stage'));
+      return stage.findOne('#headline').findOne('.text').text().replace(/\n/g, ' ') === 'طباعة دقيقة بألوان أكثر';
+    });
+    await page.waitForFunction(() => { const d = window.__csDb(); return d.applied.length === 1; }, null, { timeout: 15000 });
+    const saved = await db();
+    const id = Object.keys(saved.docs)[0];
+    const last = saved.versions[id][saved.versions[id].length - 1];
+    assert.equal(last.origin, 'ai');
+    assert.equal(last.job_id, 'job_e2e_1');
+    assert.deepEqual(saved.applied, [{ job: 'job_e2e_1', version: saved.docs[id].version }], 'the server is told which version the answer became');
+  });
+
+  await check('a version conflict stops autosave and offers «open theirs» — nothing is overwritten silently', async () => {
+    // Someone else saves first: the stub's copy moves ahead of the version this editor started from.
+    const theirs = await page.evaluate(() => {
+      const d = window.__csDb();
+      const id = Object.keys(d.docs)[0];
+      d.docs[id].version += 1;
+      d.docs[id].content.layers.find((l) => l.id === 'headline').text = 'نسخة شخص آخر';
+      sessionStorage.setItem('cs-e2e-db', JSON.stringify(d));
+      return d.docs[id].version;
+    });
+    const c = await centreOf({ id: 'headline' });
+    await page.mouse.click(c.x, c.y);
+    await page.keyboard.press('ArrowRight');
+    await page.waitForSelector('[data-version-conflict]', { timeout: 15000 });
+    await page.screenshot({ path: `${out}/09-version-conflict-1440.png` });
+    const stillTheirs = await db();
+    assert.equal(Object.values(stillTheirs.docs)[0].content.layers.find((l) => l.id === 'headline').text, 'نسخة شخص آخر', 'their save is untouched');
+    await page.getByRole('button', { name: 'افتح نسختهم' }).click();
+    await page.waitForFunction((t) => {
+      const stage = window.Konva.stages.find((s) => s.container().hasAttribute('data-stage'));
+      return stage.findOne('#headline').findOne('.text').text().replace(/\n/g, ' ') === t;
+    }, 'نسخة شخص آخر');
+    assert.ok((await page.textContent('[data-save-state]')).includes(String(theirs)));
+    await page.evaluate(() => sessionStorage.removeItem('cs-e2e-ai'));
+  });
+
+  await check('every other tab opens on its real state: Brand, Assets, Archive, Settings, Home', async () => {
+    const tabs = [
+      ['الهوية', '[data-brand-tab]', '10-brand-1440.png'],
+      ['الأصول', '[data-assets-tab]', '11-assets-1440.png'],
+      ['الأرشيف', '[data-archive-list]', '12-archive-1440.png'],
+      ['الإعدادات', '[data-settings-tab] [data-key-source]', '13-settings-1440.png'],
+      ['الرئيسية', '[data-recent-drafts]', '14-home-1440.png'],
+    ];
+    for (const [name, sel, shot] of tabs) {
+      await page.getByRole('tab', { name, exact: true }).first().click();
+      await page.waitForSelector(sel, { timeout: 15000 });
+      // The strip’s indicator travels on a spring; the picture waits for it to land.
+      assert.equal(await page.getByRole('tab', { name, exact: true }).first().getAttribute('aria-selected'), 'true');
+      await page.waitForTimeout(700);
+      await page.screenshot({ path: `${out}/${shot}` });
+    }
+    // The key field is a password field, empty, with autocomplete off.
+    await page.getByRole('tab', { name: 'الإعدادات', exact: true }).first().click();
+    const key = await page.$eval('[data-api-key-input]', (el) => ({ type: el.type, value: el.value, ac: el.autocomplete }));
+    assert.deepEqual(key, { type: 'password', value: '', ac: 'off' });
+    await page.getByRole('tab', { name: 'المحرر', exact: true }).first().click();
+    await waitEditor();
+  });
+
   await check('on a phone: the preview owns the screen, panels are bottom sheets with 44 px targets', async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload({ waitUntil: 'networkidle' });

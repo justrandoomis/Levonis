@@ -79,9 +79,13 @@ export default function AssetsTab() {
             </Select>
           </Field>
           <Field label={w(S.assetsLabel)}><Input value={label} maxLength={80} onChange={(e) => setLabel(e.target.value)} /></Field>
-          <Field label={w(S.assetsFile)}>
-            <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" className="block w-full text-sm text-text-secondary" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          </Field>
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <span className="text-[13px] font-semibold text-text-secondary">{w(S.assetsFile)}</span>
+            {/* The browser’s own file control speaks the browser’s language; this button speaks the reader’s. */}
+            <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" aria-hidden="true" tabIndex={-1} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <Button onClick={() => input.current?.click()}>{w(S.assetsChoose)}</Button>
+            <span className="truncate text-xs text-text-muted" dir="auto">{file ? file.name : w(S.assetsNoFile)}</span>
+          </div>
         </div>
         <Button className="mt-3" variant="primary" disabled={!file} loading={busy} onClick={upload}>{w(S.assetsUpload)}</Button>
         {message ? <p className={`mt-2 text-sm ${message.tone === 'ok' ? 'text-success' : 'text-danger'}`} role={message.tone === 'ok' ? 'status' : 'alert'}>{message.text}</p> : null}

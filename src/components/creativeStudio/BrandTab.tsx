@@ -139,7 +139,10 @@ export default function BrandTab() {
                 {(['top_start', 'top_end', 'bottom_start', 'bottom_end'] as const).map((c) => <option key={c} value={c}>{w(CORNER_TEXT[c])}</option>)}
               </Select>
             </Field>
-            <p className="text-xs text-text-muted sm:col-span-3">{w(S.brandUploadHint)}</p>
+            <div className="flex flex-wrap items-center gap-2 sm:col-span-3">
+              <p className="text-xs text-text-muted">{w(S.brandUploadHint)}</p>
+              <Button size="sm" variant="ghost" onClick={() => studio.goTab('assets')}>{w(S.tabAssets)}</Button>
+            </div>
           </section>
 
           <section className="grid gap-2 sm:grid-cols-2">

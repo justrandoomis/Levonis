@@ -6,7 +6,7 @@
  * re-layout). Pure, so the rules (only the bound variant’s own same-origin
  * pictures, only approved assets) are tested in node.
  */
-import type { AssetDto, BrandDto, ClaimDto, OpportunityDto } from '../../../packages/creativeDoc/src/api';
+import type { AssetDto, BrandDto, ClaimDto, OpportunityDto, ProductListItemDto } from '../../../packages/creativeDoc/src/api';
 import type { BrandKit } from '../../../packages/creativeDoc/src/brand';
 import type { BindingContext, RebuildContext } from '../../../packages/creativeDoc/src/layout';
 import type { AllowedAssets } from '../../../packages/creativeDoc/src/ops';
@@ -14,7 +14,7 @@ import type { ClaimState } from '../../../packages/creativeDoc/src/quality';
 import type { CreativeDocument } from '../../../packages/creativeDoc/src/schema';
 import type { ProductSnapshot, ServiceClaimText } from '../../../packages/creativeDoc/src/snapshot';
 import type { BuildEvidence } from '../../../packages/creativeDoc/src/templates';
-import type { TextMeasurer } from '../../../packages/creativeDoc/src/text';
+import { formatIqd, type TextMeasurer } from '../../../packages/creativeDoc/src/text';
 
 export interface EditorData {
   brand: BrandDto;
@@ -108,4 +108,15 @@ export function rebuildContext(doc: CreativeDocument, data: EditorData, measure:
 /** A snapshot marked `test` anywhere in the design — the editor says so on screen. */
 export function usesTestData(doc: CreativeDocument, data: Pick<EditorData, 'snapshots'>): boolean {
   return doc.products.some((b) => data.snapshots[b.slot]?.source === 'test');
+}
+
+/**
+ * The price beside a product in the studio’s admin search — the guest price
+ * the server computed, as a plain IQD label for the owner choosing a product.
+ * It is never drawn into an ad: an ad’s price is a binding rendered from the
+ * snapshot (`renderPrice`), and the shop’s display-currency hook is for
+ * customer-facing screens, which this is not.
+ */
+export function searchPriceLabel(item: Pick<ProductListItemDto, 'price_status' | 'display_price_iqd'>): string | null {
+  return item.price_status === 'priced' && item.display_price_iqd !== null ? formatIqd(item.display_price_iqd, { digits: 'latn', label: 'IQD' }) : null;
 }

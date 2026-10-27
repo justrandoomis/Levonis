@@ -28,9 +28,9 @@ import { buildFromTemplate, type BuildCopy, type BuildResult } from '../../../pa
 import { CUSTOM_FORMAT_LIMITS, FORMATS, OBJECTIVES, VISUAL_PRIORITIES, formatOf, type AdLocale, type Density, type DocFormat, type FormatId, type Objective, type VisualPriority } from '../../../packages/creativeDoc/src/schema';
 import { localized, type ProductSnapshot } from '../../../packages/creativeDoc/src/snapshot';
 import { TEMPLATES, VARIANT_LABELS, templateForProduct, variantsFor, type TemplateId, type VariantId } from '../../../packages/creativeDoc/src/templates';
-import { containsPriceLike, formatIqd } from '../../../packages/creativeDoc/src/text';
+import { containsPriceLike } from '../../../packages/creativeDoc/src/text';
 import { ai, assets as assetsApi, brand as brandApi, documents, idempotencyKey, store } from './client';
-import { backgroundNatural, claimText, evidenceFor, logoNatural } from './editorData';
+import { backgroundNatural, claimText, evidenceFor, logoNatural, searchPriceLabel } from './editorData';
 import { ensureNeeds, kitFontNeeds } from './fonts';
 import { canvasMeasurer } from './media';
 import DocThumb from './DocThumb';
@@ -282,7 +282,7 @@ export default function NewDesign({ prefill }: { prefill: NewDesignPrefill | nul
                           <span className="min-w-0">
                             <span className="block truncate text-sm text-text-primary">{localized(p.name, lang)}</span>
                             <span className="block text-xs text-text-muted">
-                              {p.price_status === 'priced' && p.display_price_iqd !== null ? formatIqd(p.display_price_iqd, { digits: 'latn', label: 'IQD' }) : w(PRICE_STATUS_TEXT[p.price_status])} · {w(AVAILABILITY_TEXT[p.availability])}
+                              {searchPriceLabel(p) ?? w(PRICE_STATUS_TEXT[p.price_status])} · {w(AVAILABILITY_TEXT[p.availability])}
                             </span>
                           </span>
                         </button>

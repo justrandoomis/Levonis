@@ -226,7 +226,7 @@ export const S = {
   assetsUseBackground: t('استعمل هذه الخلفية', 'Use this background', 'ئەم باکگراوندە بەکاربهێنە'),
 
   // Chat
-  chatScopeSelection: t('{n} عناصر: {names}', '{n} elements: {names}', '{n} توخمی هەڵبژێردراو: {names}'),
+  chatScopeSelection: t('المحدد ({n}): {names}', 'Selected ({n}): {names}', 'هەڵبژێردراو ({n}): {names}'),
   chatScopeWhole: t('التصميم كله', 'The whole design', 'هەموو دیزاینەکە'),
   chatScopeNone: t('حدد عناصر على اللوحة، أو اختر «التصميم كله» صراحة.', 'Select elements on the canvas, or choose «the whole design» explicitly.', 'توخم لەسەر تابلۆکە هەڵبژێرە، یان بە ڕوونی «هەموو دیزاینەکە» هەڵبژێرە.'),
   chatWholeToggle: t('طلب على التصميم كله', 'A request for the whole design', 'داوایەک بۆ هەموو دیزاینەکە'),
@@ -346,6 +346,8 @@ export const S = {
   assetsKind: t('النوع', 'Kind', 'جۆر'),
   assetsLabel: t('الوصف', 'Label', 'وەسف'),
   assetsFile: t('الملف (PNG أو JPEG أو WebP)', 'File (PNG, JPEG or WebP)', 'پەڕگە (PNG یان JPEG یان WebP)'),
+  assetsChoose: t('اختر ملفاً', 'Choose a file', 'پەڕگەیەک هەڵبژێرە'),
+  assetsNoFile: t('لم يُختر ملف', 'No file chosen', 'هیچ پەڕگەیەک هەڵنەبژێردراوە'),
   assetsUploaded: t('رُفع الأصل وينتظر المراجعة.', 'The asset was uploaded and waits for review.', 'کەرەستەکە بارکرا و چاوەڕێی پێداچوونەوەیە.'),
   assetsApprove: t('اعتمد', 'Approve', 'پەسەند بکە'),
   assetsReject: t('ارفض', 'Reject', 'ڕەتی بکەرەوە'),

@@ -51,14 +51,14 @@ const provider: ProviderStatusDto = {
   can_manage: true, ready: false, not_ready_code: 'KEY_NOT_CONFIGURED',
 };
 
-interface Db { seq: number; docs: Record<string, DocumentDto>; versions: Record<string, Array<{ version: number; origin: string; content: unknown; created_at: string }>>; exports: number; puts: number }
+interface Db { seq: number; docs: Record<string, DocumentDto>; versions: Record<string, Array<{ version: number; origin: string; job_id: string | null; content: unknown; created_at: string }>>; exports: number; puts: number; applied: Array<{ job: string; version: number }>; cancelled: string[] }
 const KEY = 'cs-e2e-db';
 const load = (): Db => {
   try {
     const raw = sessionStorage.getItem(KEY);
     if (raw) return JSON.parse(raw) as Db;
   } catch { /* fresh */ }
-  return { seq: 0, docs: {}, versions: {}, exports: 0, puts: 0 };
+  return { seq: 0, docs: {}, versions: {}, exports: 0, puts: 0, applied: [], cancelled: [] };
 };
 const save = (db: Db) => sessionStorage.setItem(KEY, JSON.stringify(db));
 (window as unknown as { __csDb: () => Db }).__csDb = load;
@@ -87,7 +87,33 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const db = load();
   const body = await bodyOf(init);
   let m: RegExpMatchArray | null;
-  if (method === 'GET' && path === '/provider') return ok({ ...provider });
+  // `cs-e2e-ai` switches the stub provider to READY so the e2e can walk the AI edit path. The
+  // model name below is a fixture string, not a model id the studio knows: the studio never names one.
+  const aiReady = sessionStorage.getItem('cs-e2e-ai') === '1';
+  if (method === 'GET' && path === '/provider') return ok(aiReady ? { ...provider, ready: true, not_ready_code: null, model: 'model-e2e-fixture', key: { source: 'worker_secret', hint: null, set_at: null } } : { ...provider });
+  if (method === 'POST' && path === '/ai/edit') {
+    if (!aiReady) return fail(503, 'KEY_NOT_CONFIGURED', 'no key');
+    // The STUB's answer (marked): one bounded operation on the selected headline, for the version asked about.
+    return ok({
+      job_id: 'job_e2e_1',
+      patch: {
+        schema_version: 1, document_id: body.document_id, base_document_version: body.base_version, intent: 'shorten',
+        target_layer_ids: ['headline'], operations: [{ op: 'set_text', layer_id: 'headline', value: 'طباعة دقيقة بألوان أكثر' }],
+        reason: 'اختصرت العنوان كما طلبت (رد اختبار)', warnings: [], clarification: '',
+      },
+      usage: { input_tokens: 1200, output_tokens: 90, est_cost_usd: null, model: 'model-e2e-fixture' },
+    });
+  }
+  if (method === 'POST' && (m = path.match(/^\/jobs\/([^/]+)\/applied$/))) {
+    db.applied.push({ job: m[1], version: Number(body.version) });
+    save(db);
+    return ok({ job: { id: m[1], status: 'succeeded' } });
+  }
+  if (method === 'POST' && (m = path.match(/^\/jobs\/([^/]+)\/cancel$/))) {
+    db.cancelled.push(m[1]);
+    save(db);
+    return ok({ job: { id: m[1], status: 'cancelled' } });
+  }
   if (method === 'GET' && path === '/provider/usage') return ok({ usage: [] });
   if (method === 'GET' && path === '/brand') return ok({ migrated: true, version: null, status: 'default', kit: defaultBrandKit(), site_logo: { width: 600, height: 600 } });
   if (method === 'GET' && path === '/brand/versions') return ok({ versions: [] });
@@ -120,7 +146,7 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       thumb_export_id: null, content, brand_version: null, updated_by_name: 'TEST OWNER', issues: [],
     };
     db.docs[id] = doc;
-    db.versions[id] = [{ version: 1, origin: String(body.origin ?? 'template'), content, created_at: doc.created_at }];
+    db.versions[id] = [{ version: 1, origin: String(body.origin ?? 'template'), job_id: (body.job_id as string | null) ?? null, content, created_at: doc.created_at }];
     save(db);
     return ok({ document: doc });
   }
@@ -133,7 +159,7 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       doc.content = body.content as DocumentDto['content'];
       doc.version += 1;
       doc.updated_at = new Date().toISOString();
-      db.versions[doc.id].push({ version: doc.version, origin: String(body.origin ?? 'manual'), content: doc.content, created_at: doc.updated_at });
+      db.versions[doc.id].push({ version: doc.version, origin: String(body.origin ?? 'manual'), job_id: (body.job_id as string | null) ?? null, content: doc.content, created_at: doc.updated_at });
       db.puts += 1;
       save(db);
       return ok({ document: doc });
