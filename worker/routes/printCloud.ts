@@ -20,13 +20,13 @@ import { mediaBucket } from '../lib/mediaStorage';
 import { canViewCost } from '../lib/costAccess';
 import { adapterStatuses } from '../lib/printCloud/adapters';
 import { runAfterRequest } from '../lib/printCloud/background';
-import { buybackQuote, cancelBuyback, requestBuyback } from '../lib/printCloud/buyback';
+import { buybackQuote, cancelBuyback, planBuybackRequest } from '../lib/printCloud/buyback';
 import { categories, publicPackages, publicPrinterModels, publicStoreCatalog } from '../lib/printCloud/catalog';
-import { activeReservationForJob, convertCredits, type ConversionRule } from '../lib/printCloud/credits';
+import { activeReservationForJob, conversionOptions, conversionRule, convertCredits, planConversion } from '../lib/printCloud/credits';
 import { idempotent, many, one, printCloudInstalled, runBatch } from '../lib/printCloud/db';
 import { invalid, pcError } from '../lib/printCloud/errors';
 import { fileView, liveJobsUsingFile, signFileToken, storeModelFile, validateUpload, verifyFileToken, type FileRow } from '../lib/printCloud/files';
-import { cancelShipmentByCustomer, parseDeliveryRequest, planShipmentRequest, shipmentView } from '../lib/printCloud/fulfillment';
+import { cancelShipmentByCustomer, parseDeliveryRequest, planShipmentRequest, quoteShipmentRequest, shipmentView } from '../lib/printCloud/fulfillment';
 import { afterResponse, currentUser, customerActor, enabledGate, idempotencyKey, ok, pcGate, queryInt, requestConfig } from '../lib/printCloud/http';
 import { startImport } from '../lib/printCloud/imports';
 import { inventoryAccountId } from '../lib/printCloud/inventory';
@@ -46,12 +46,12 @@ import {
 import { confirmPayment, closeUnpaidOrder, createQuote, orderDetail, payOrderFromWallet, planOrderFromQuote, type OrderRow } from '../lib/printCloud/orders';
 import { openApiDocument } from '../lib/printCloud/openapi';
 import { PAYMENT_PROVIDERS, verifyGatewaySignature, type PaymentProvider } from '../lib/printCloud/payments';
-import { parseQuoteLines, priceQuote, ownedQty, topUpQuantity } from '../lib/printCloud/pricing';
+import { parseQuoteLines, priceQuote, ownedQty, topUpQuantity, TOP_UP_DEFAULT_TARGET_QTY } from '../lib/printCloud/pricing';
 import { addProjectModel, createPlate, createProject, duplicateProject, projectView, saveProfile, updateProject, updateProjectModel } from '../lib/printCloud/projects';
 import { accessorySuggestions, decideRecommendation, printerRecommendations } from '../lib/printCloud/recommendations';
 import { machineReadySql, slicerAvailability, telemetryFresh } from '../lib/printCloud/printers';
 import { estimateQueue, reschedule } from '../lib/printCloud/queue';
-import { dashboardCredits, dashboardFiles, dashboardInventory, dashboardJobs, dashboardPrinters, transactions } from '../lib/printCloud/reports';
+import { creditLedgerPage, dashboardCredits, dashboardFiles, dashboardInventory, dashboardJobs, dashboardPrinters, inventoryLedgerPage, transactions } from '../lib/printCloud/reports';
 import { enqueueTask } from '../lib/printCloud/tasks';
 import { sha256OfBytes } from '../lib/printCloud/files';
 import { addSeconds, iso, optString, parseJson, reqInt, reqString } from '../lib/printCloud/util';
@@ -183,10 +183,11 @@ auth.get('/me/dashboard', async (c) => {
   const user = currentUser(c);
   const db = c.env.DB;
   const ready = await machinesReady(c);
+  const { config } = await requestConfig(c);
   const [credits, printers, inventory, jobs, files] = await Promise.all([
     dashboardCredits(db, user.id),
     dashboardPrinters(db, user.id, ready),
-    dashboardInventory(db, user.id, null),
+    dashboardInventory(db, user.id, null, config),
     dashboardJobs(db, user.id),
     dashboardFiles(db, user.id),
   ]);
@@ -195,19 +196,14 @@ auth.get('/me/dashboard', async (c) => {
 
 auth.get('/me/credits', async (c) => ok(c, await dashboardCredits(c.env.DB, currentUser(c).id)));
 
-auth.get('/me/credits/ledger', async (c) => {
-  const user = currentUser(c);
-  const before = c.req.query('before') ?? '9999-12-31';
-  const rows = await many(
-    c.env.DB,
-    `SELECT id, tier_id, entry_type, delta_available, delta_reserved, delta_consumed, job_id, order_id, value_iqd, note, created_at
-       FROM pc_credit_ledger WHERE user_id = ? AND created_at < ? ORDER BY created_at DESC, id DESC LIMIT ?`,
-    user.id,
-    before,
-    queryInt(c, 'limit', 50, 1, 200)
-  );
-  return ok(c, rows);
-});
+/**
+ * Newest first. Paged EXACTLY by the last row's (`created_at`, `id`): send
+ * `before` = its created_at and `before_id` = its id (reports.ts
+ * `ledgerCursor`). `before` alone keeps meaning «strictly before that instant».
+ */
+auth.get('/me/credits/ledger', async (c) =>
+  ok(c, await creditLedgerPage(c.env.DB, currentUser(c).id, { before: c.req.query('before'), beforeId: c.req.query('before_id') }, queryInt(c, 'limit', 50, 1, 200)))
+);
 
 auth.get('/me/credits/reservations', async (c) =>
   ok(
@@ -220,41 +216,77 @@ auth.get('/me/credits/reservations', async (c) =>
   )
 );
 
+/** The body of a conversion and of its quote, read one way. */
+function conversionBody(body: Record<string, unknown>) {
+  return {
+    from: reqString(body.from_tier_id, 'from_tier_id', { max: 120 }),
+    to: reqString(body.to_tier_id, 'to_tier_id', { max: 120 }),
+    seconds: reqInt(body.seconds, 'seconds', { min: 60, max: 100_000_000 }),
+  };
+}
+
+/** The conversions the workshop allows out of the customer's classes: enabled rules only, with their ratio (credits.ts `conversionOptions`). */
+auth.get('/me/credits/conversions', async (c) => ok(c, await conversionOptions(c.env.DB, currentUser(c).id)));
+
 /** Move hours between tiers — only under a rule the owner enabled, at the customer's explicit request. */
 auth.post('/me/credits/convert', limitRoute('pc_write', 300), async (c) => {
   const user = currentUser(c);
-  const body = await jsonObject(c);
-  const from = reqString(body.from_tier_id, 'from_tier_id', { max: 120 });
-  const to = reqString(body.to_tier_id, 'to_tier_id', { max: 120 });
-  const seconds = reqInt(body.seconds, 'seconds', { min: 60, max: 100_000_000 });
+  const { from, to, seconds } = conversionBody(await jsonObject(c));
   const now = new Date();
   const key = idempotencyKey(c);
   const out = await idempotent(c.env.DB, { actorId: user.id, scope: 'credits.convert', key, request: { from, to, seconds }, now }, async () => {
-    const rule = await one<ConversionRule>(c.env.DB, 'SELECT * FROM pc_credit_conversion_rules WHERE from_tier_id = ? AND to_tier_id = ?', from, to);
-    if (!rule || !rule.enabled) throw pcError('CONVERSION_DISABLED');
+    const rule = await conversionRule(c.env.DB, from, to);
     const conv = await convertCredits(c.env.DB, { userId: user.id, rule, seconds, opKey: `${user.id}:${key}`, actorId: user.id, now });
     return { statements: conv.statements, result: { converted_seconds: seconds, received_seconds: conv.receivedSeconds, from_tier_id: from, to_tier_id: to } };
   });
   return ok(c, { ...out.result, replayed: out.replayed });
 });
 
+/**
+ * What converting would give NOW — the very plan POST /me/credits/convert
+ * writes (credits.ts `planConversion`): the same body, the same rule, the
+ * same refusals; the seconds received, the purchase lots they would come
+ * from and the lots they would arrive as, each keeping its expiry. Nothing is
+ * written or held: the conversion itself plans again at its own moment.
+ */
+auth.post('/me/credits/convert/quote', limitRoute('pc_price', 600), async (c) => {
+  const user = currentUser(c);
+  const { from, to, seconds } = conversionBody(await jsonObject(c));
+  const rule = await conversionRule(c.env.DB, from, to);
+  const plan = await planConversion(c.env.DB, { userId: user.id, rule, seconds, now: new Date() });
+  return ok(c, {
+    from_tier_id: from,
+    to_tier_id: to,
+    converted_seconds: seconds,
+    received_seconds: plan.receivedSeconds,
+    ratio_num: Number(rule.ratio_num),
+    ratio_den: Number(rule.ratio_den),
+    draws: plan.draws.map((d) => ({ lot_id: d.lotId, seconds: d.qty, expires_at: d.expiresAt })),
+    receives: plan.lots.map((l) => ({ seconds: l.seconds, expires_at: l.expiresAt })),
+  });
+});
+
 auth.get('/me/printers', async (c) => ok(c, await dashboardPrinters(c.env.DB, currentUser(c).id, await machinesReady(c))));
 
-auth.get('/me/inventory', async (c) => ok(c, await dashboardInventory(c.env.DB, currentUser(c).id, c.req.query('category') ?? null)));
-
-auth.get('/me/inventory/ledger', async (c) => {
-  const user = currentUser(c);
-  const variant = c.req.query('variant_id');
-  const rows = await many(
-    c.env.DB,
-    `SELECT id, variant_id, entry_type, delta_available, delta_reserved, delta_consumed, ref_type, ref_id, value_iqd, note, created_at
-       FROM pc_inventory_ledger WHERE user_id = ? ${variant ? 'AND variant_id = ?' : ''} AND created_at < ? ORDER BY created_at DESC, id DESC LIMIT ?`,
-    ...(variant ? [user.id, variant] : [user.id]),
-    c.req.query('before') ?? '9999-12-31',
-    queryInt(c, 'limit', 50, 1, 200)
-  );
-  return ok(c, rows);
+/** One row per variant owned, each with the two workshop defaults it lives under (reports.ts `dashboardInventory`). */
+auth.get('/me/inventory', async (c) => {
+  const { config } = await requestConfig(c);
+  return ok(c, await dashboardInventory(c.env.DB, currentUser(c).id, c.req.query('category') ?? null, config));
 });
+
+/** Newest first (optionally one `variant_id`), paged exactly like the credit ledger: `before` + `before_id`. */
+auth.get('/me/inventory/ledger', async (c) =>
+  ok(
+    c,
+    await inventoryLedgerPage(
+      c.env.DB,
+      currentUser(c).id,
+      c.req.query('variant_id') || null,
+      { before: c.req.query('before'), beforeId: c.req.query('before_id') },
+      queryInt(c, 'limit', 50, 1, 200)
+    )
+  )
+);
 
 auth.patch('/me/inventory/:variantId/alert', async (c) => {
   const user = currentUser(c);
@@ -274,7 +306,7 @@ auth.post('/me/inventory/top-up-quote', limitRoute('pc_price', 600), async (c) =
   const v = await one<{ purchase_step_qty: number; min_purchase_qty: number }>(c.env.DB, 'SELECT purchase_step_qty, min_purchase_qty FROM pc_variants WHERE id = ? AND active = 1', variantId);
   if (!v) throw pcError('NOT_FOUND');
   const owned = await ownedQty(c.env.DB, user.id, variantId);
-  const target = body.target_qty === undefined ? 1000 : reqInt(body.target_qty, 'target_qty', { min: 1, max: 100_000_000 });
+  const target = body.target_qty === undefined ? TOP_UP_DEFAULT_TARGET_QTY : reqInt(body.target_qty, 'target_qty', { min: 1, max: 100_000_000 });
   const qty = body.quantity === undefined ? topUpQuantity(owned, target, Number(v.purchase_step_qty), Number(v.min_purchase_qty)) : reqInt(body.quantity, 'quantity', { min: 1, max: 100_000_000 });
   if (qty <= 0) return ok(c, { owned_qty: owned, target_qty: target, quantity: 0, quote: null });
   const { config } = await requestConfig(c);
@@ -669,6 +701,19 @@ auth.post('/shipments', limitRoute('pc_write', 300), async (c) => {
   return ok(c, { ...out.result, replayed: out.replayed }, out.replayed ? 200 : 201);
 });
 
+/**
+ * What POST /shipments would do with this very body — by the same assessment
+ * (fulfillment.ts `assessShipmentRequest`): the fee and the rule that set it,
+ * where the shipment would start, what would leave, which ways are offered;
+ * the same refusals. Nothing is written, reserved or ordered.
+ */
+auth.post('/shipments/quote', limitRoute('pc_price', 600), async (c) => {
+  const user = currentUser(c);
+  const req = parseDeliveryRequest(await jsonObject(c));
+  const { config } = await requestConfig(c);
+  return ok(c, await quoteShipmentRequest(c.env.DB, c.env as unknown as Record<string, unknown>, user.id, req, config));
+});
+
 auth.get('/shipments', async (c) =>
   ok(c, await many(c.env.DB, 'SELECT id, kind, status, fee_iqd, fee_order_id, tracking_ref, created_at FROM pc_shipments WHERE user_id = ? ORDER BY created_at DESC LIMIT 200', currentUser(c).id))
 );
@@ -681,9 +726,22 @@ auth.post('/buybacks/quote', async (c) => {
   const body = await jsonObject(c);
   return ok(c, await buybackQuote(c.env.DB, currentUser(c).id, reqString(body.variant_id, 'variant_id', { max: 120 }), reqInt(body.qty, 'qty', { min: 1, max: 100_000_000 })));
 });
+/**
+ * Request a sell-back: the units are reserved until the workshop decides. A
+ * money door like the others: under the customer's Idempotency-Key, stored
+ * in the same batch (buyback.ts `planBuybackRequest`), so a retry after a lost
+ * answer replays it (200, `replayed: true`) instead of reserving twice.
+ */
 auth.post('/buybacks', limitRoute('pc_write', 300), async (c) => {
+  const user = currentUser(c);
   const body = await jsonObject(c);
-  return ok(c, await requestBuyback(c.env.DB, currentUser(c).id, reqString(body.variant_id, 'variant_id', { max: 120 }), reqInt(body.qty, 'qty', { min: 1, max: 100_000_000 }), new Date()), 201);
+  const variantId = reqString(body.variant_id, 'variant_id', { max: 120 });
+  const qty = reqInt(body.qty, 'qty', { min: 1, max: 100_000_000 });
+  const now = new Date();
+  const out = await idempotent(c.env.DB, { actorId: user.id, scope: 'buyback.request', key: idempotencyKey(c), request: { variantId, qty }, now }, () =>
+    planBuybackRequest(c.env.DB, user.id, variantId, qty, now)
+  );
+  return ok(c, { ...out.result, replayed: out.replayed }, out.replayed ? 200 : 201);
 });
 auth.get('/buybacks', async (c) =>
   ok(

@@ -84,6 +84,14 @@ export function priceMaterial(qty: number, tiers: TierRow[], opts: { rounding: n
   return result;
 }
 
+/**
+ * The balance «top up» aims at when the customer names no target, in the
+ * variant's base unit (1,000 g = 1 kg). POST /me/inventory/top-up-quote
+ * applies it and GET /me/inventory states it per row, so a screen can say
+ * what an empty target means instead of guessing.
+ */
+export const TOP_UP_DEFAULT_TARGET_QTY = 1000;
+
 /** «Top up to 1 kg»: how much to buy so the balance reaches `target`, in the variant's step. */
 export function topUpQuantity(owned: number, target: number, step: number, min: number): number {
   if (target <= owned) return 0;

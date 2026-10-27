@@ -30,6 +30,7 @@ import { reconcile } from './reconcile';
 import { sweepSlicingLeases } from './slicing';
 import { enqueueTask, type TaskKind } from './tasks';
 import { expiredLots, planLotExpiry } from './credits';
+import { LOW_STOCK_DEFAULT_UNIT } from './inventory';
 import { pcNotify } from './notify';
 import { addSeconds, iso, pcId } from './util';
 
@@ -153,10 +154,12 @@ async function handle(env: RunnerEnv, task: TaskRow, now: Date, room?: Room): Pr
         db,
         `SELECT a.id, a.user_id, a.variant_id, a.available_qty, a.unit_code, v.name_ar, v.name_en, v.name_ckb, u.label_ar, u.label_ckb, a.low_stock_alert_qty
            FROM pc_inventory_accounts a JOIN pc_variants v ON v.id = a.variant_id LEFT JOIN pc_units u ON u.code = a.unit_code
-          WHERE a.available_qty <= COALESCE(a.low_stock_alert_qty, CASE WHEN a.unit_code = 'g' THEN ? ELSE -1 END)
+          WHERE a.available_qty <= COALESCE(a.low_stock_alert_qty, CASE WHEN a.unit_code = ? THEN ? ELSE -1 END)
             AND a.consumed_qty > 0
             AND (a.low_stock_notified_at IS NULL OR a.low_stock_notified_at < a.updated_at)
           LIMIT 100`,
+        // The workshop's default applies to balances in its unit only (inventory.ts `lowStockDefaultQty`, stated per row by GET /me/inventory).
+        LOW_STOCK_DEFAULT_UNIT,
         config.low_inventory_default_g
       );
       let more = false;

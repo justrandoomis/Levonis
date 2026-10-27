@@ -6,9 +6,11 @@
  * The four figures (yours = free + held, held, free, used — the server's own,
  * in the variant's unit), what was paid for what remains (the customer's own
  * money, never a workshop cost), the low-balance reminder (their own amount,
- * or the workshop's default when they set none — a default no customer door
- * states, so it is named, never numbered), «top up to N» priced by the server
- * as a new purchase, and the movements of this one material.
+ * or the workshop's default the server states on the row — grams only; a
+ * piece has none, and the screen says so), «top up to N» priced by the server
+ * as a new purchase (an empty target means the default target the row
+ * states), and every movement of this one material, paged on the server's
+ * exact cursor.
  */
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -25,10 +27,10 @@ import { tx, useCloudText } from '../../text';
 import type { InventoryBalance, TopUpQuote } from '../../types';
 import { Bell, CloudEmptyState, CloudErrorState, CloudPageSkeleton, HandCoins, PackageSearch, SectionHeader, Truck } from '../../ui';
 import { useCloudQuery } from '../../useCloudQuery';
-import { inventoryFigures, isLow, ledgerMovement } from './logic';
-import { CapNote, Figures, MoneyLine, MovementFigure, SubPageHeader, Swatch, TopUpResult, useStatusWord } from './shared';
+import { inventoryFigures, isLow, ledgerMovement, reminderAmount } from './logic';
+import { Figures, LoadMore, MoneyLine, MovementFigure, SubPageHeader, Swatch, TopUpResult, useLedgerPages, useStatusWord } from './shared';
 
-/** How many movements the page asks for; the full history pages exactly in Transactions. */
+/** Movements per page (the server allows 1–200); the next page is asked on the exact cursor. */
 const LEDGER_PAGE = 50;
 const enc = encodeURIComponent;
 
@@ -51,6 +53,9 @@ function Reminder({ row }: { row: InventoryBalance }) {
     }
   };
   const unchanged = typed.value === row.low_stock_alert_qty;
+  // Their own amount, the workshop's default the server states for this row, or — pieces — none at all.
+  const at = reminderAmount(row);
+  const hasDefault = row.low_stock_alert_default_qty != null;
   return (
     <section aria-labelledby="cloud-material-alert" className="lv-surface space-y-3 p-4">
       <h2 id="cloud-material-alert" className="flex items-center gap-2 text-[17px] font-bold text-text-primary">
@@ -58,7 +63,11 @@ function Reminder({ row }: { row: InventoryBalance }) {
         {t(materialsText.alertTitle)}
       </h2>
       <p className="text-[13px] font-semibold text-text-secondary">
-        {row.low_stock_alert_qty == null ? t(materialsText.alertDefault) : t(materialsText.alertCurrent, { qty: formatQuantity(row.low_stock_alert_qty, row.unit_code, lang) })}
+        {at.source === 'own'
+          ? t(materialsText.alertCurrent, { qty: formatQuantity(at.qty, row.unit_code, lang) })
+          : at.source === 'default'
+            ? t(materialsText.alertDefault, { qty: formatQuantity(at.qty, row.unit_code, lang) })
+            : t(materialsText.alertNone)}
       </p>
       <Field label={t(materialsText.alertLabel)} hint={t(materialsText.alertBody)}>
         <NumberInput kind="number" decimals={0} min={0} unit={unitWord(row.unit_code, lang)} value={typed.value} onValueChange={(value, valid) => setTyped({ value, valid })} />
@@ -74,7 +83,7 @@ function Reminder({ row }: { row: InventoryBalance }) {
         </Button>
         {row.low_stock_alert_qty != null ? (
           <Button variant="ghost" onClick={() => save(null)}>
-            {t(materialsText.alertUseDefault)}
+            {hasDefault ? t(materialsText.alertUseDefault) : t(materialsText.alertRemove)}
           </Button>
         ) : null}
       </div>
@@ -103,7 +112,13 @@ function TopUp({ row }: { row: InventoryBalance }) {
         {t(materialsText.topUpTitle)}
       </h2>
       <p className="text-[13px] leading-relaxed text-text-muted">{t(materialsText.topUpBody)}</p>
-      <Field label={t(materialsText.topUpTarget)} hint={t(materialsText.topUpHint)}>
+      <Field
+        label={t(materialsText.topUpTarget)}
+        hint={
+          // The target the server aims at when none is sent, as it states it on the row.
+          row.top_up_default_target_qty != null ? t(materialsText.topUpHintTo, { qty: formatQuantity(row.top_up_default_target_qty, row.unit_code, lang) }) : t(materialsText.topUpHint)
+        }
+      >
         <NumberInput
           kind="number"
           decimals={0}
@@ -133,18 +148,22 @@ function History({ row }: { row: InventoryBalance }) {
   const { t, lang } = useCloudText();
   const { dashboardVersion } = useCloud();
   const word = useStatusWord();
-  const ledger = useCloudQuery((signal) => listInventoryLedger({ variant_id: row.variant_id, limit: LEDGER_PAGE }, { signal }), [row.variant_id, dashboardVersion]);
+  const ledger = useLedgerPages(
+    (cursor, signal) => listInventoryLedger({ variant_id: row.variant_id, limit: LEDGER_PAGE, ...cursor }, { signal }),
+    LEDGER_PAGE,
+    [row.variant_id, dashboardVersion]
+  );
   return (
     <section aria-labelledby="cloud-material-history" className="space-y-2">
       <SectionHeader id="cloud-material-history" title={t(materialsText.historyTitle)} />
       {ledger.error ? (
         <CloudErrorState compact error={ledger.error} onRetry={ledger.reload} />
-      ) : !ledger.data ? (
+      ) : !ledger.rows ? (
         <Skeleton className="h-24 w-full rounded-xl" />
-      ) : ledger.data.length === 0 ? null : (
+      ) : ledger.rows.length === 0 ? null : (
         <>
           <ul className="lv-surface divide-y divide-border-subtle overflow-hidden">
-            {ledger.data.map((e) => (
+            {ledger.rows.map((e) => (
               <li key={e.id} className="flex items-center gap-3 px-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-text-primary">{word(inventoryEntry, e.entry_type)}</p>
@@ -156,7 +175,12 @@ function History({ row }: { row: InventoryBalance }) {
               </li>
             ))}
           </ul>
-          <CapNote shown={ledger.data.length} cap={LEDGER_PAGE} history />
+          {ledger.moreError ? <CloudErrorState compact error={ledger.moreError} onRetry={ledger.loadMore} /> : null}
+          {ledger.next ? (
+            <LoadMore onMore={ledger.loadMore} loading={ledger.loadingMore} />
+          ) : (
+            <p className="text-center text-[12px] text-text-muted">{t(sect.historyEnd)}</p>
+          )}
         </>
       )}
     </section>

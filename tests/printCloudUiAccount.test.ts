@@ -6,16 +6,20 @@
  *
  *   1. the pure rules the account screens draw with (logic.ts): a lot's
  *      expiry as the server applies it, the four figures of a balance (free is
- *      ALWAYS the server's own number, never worked out), a ledger row's
- *      movement, the states of a shipment and a sell-back and which of them
- *      may still be cancelled, which prints are already on a shipment, the
- *      address the server would refuse, where a transaction row leads;
+ *      ALWAYS the server's own number, never worked out), the reminder amount
+ *      (the customer's own, else the default the server states), a ledger
+ *      row's movement and the exact cursor of the next page, the conversions
+ *      the server allows, the states of a shipment and a sell-back and which
+ *      of them may still be cancelled, the address the server would refuse,
+ *      where a transaction row leads;
  *   2. the section's words: three languages, the Sorani never the Arabic, and
  *      not one figure written into a sentence;
  *   3. source rules a screen could break later without a behavioural test
  *      noticing: a price or a duration typed into the markup, an invented
  *      badge, a money door sent without its Idempotency-Key, a top-up that
- *      assumes the workshop's amount, a link outside the sections' own routes.
+ *      assumes the workshop's amount, a fee or a conversion shown before the
+ *      server's own quote, a print offered again that the server says is on a
+ *      shipment, a link outside the sections' own routes.
  *
  * The server facts the screens restate (the statuses, which states may be
  * cancelled, the caps of the lists, the phone rule) are read from the
@@ -33,7 +37,7 @@ import * as L from '../src/cloud/pages/account/logic';
 import * as S from '../src/cloud/strings/account';
 import { tx } from '../src/cloud/text';
 import { IRAQ_GOVERNORATES } from '../packages/shipping/src/iraqGovernorates';
-import type { CreditTierBalance, InventoryBalance, ShipmentView, StoreCategory, TransactionRow, Tri } from '../src/cloud/types';
+import type { CreditConversionRule, CreditTierBalance, InventoryBalance, StoreCategory, TransactionRow, Tri } from '../src/cloud/types';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const LANGS = ['ar', 'en', 'ckb'] as const;
@@ -81,10 +85,22 @@ test('a balance is four figures; «free» is always the server’s own number, �
   assert.deepEqual(L.creditFigures(tier), { owned: 98280, reserved: 32040, available: 66240, used: 1800 });
 });
 
-test('«running low» only below the customer’s own amount — the workshop’s default is never assumed', () => {
+test('«running low» at the amount the server applies: the customer’s own, else the default the server states — never a guessed one', () => {
+  assert.deepEqual(L.reminderAmount({ low_stock_alert_qty: 50, low_stock_alert_default_qty: 100 }), { source: 'own', qty: 50 });
+  assert.deepEqual(L.reminderAmount({ low_stock_alert_qty: null, low_stock_alert_default_qty: 100 }), { source: 'default', qty: 100 });
+  assert.deepEqual(L.reminderAmount({ low_stock_alert_qty: null, low_stock_alert_default_qty: null }), { source: 'none', qty: null }, 'pieces: no default applies');
+  assert.deepEqual(L.reminderAmount({ low_stock_alert_qty: null }), { source: 'none', qty: null }, 'a row without the stated default is never given one');
   assert.equal(L.isLow({ available_qty: 50, low_stock_alert_qty: null }), false);
   assert.equal(L.isLow({ available_qty: 100, low_stock_alert_qty: 100 }), true);
   assert.equal(L.isLow({ available_qty: 101, low_stock_alert_qty: 100 }), false);
+  assert.equal(L.isLow({ available_qty: 90, low_stock_alert_qty: null, low_stock_alert_default_qty: 100 }), true, 'at the workshop’s default');
+  assert.equal(L.isLow({ available_qty: 101, low_stock_alert_qty: null, low_stock_alert_default_qty: 100 }), false);
+  assert.equal(L.isLow({ available_qty: 90, low_stock_alert_qty: 50, low_stock_alert_default_qty: 100 }), false, 'the customer’s own amount wins');
+  // The default is the server's own: the one the low-inventory scan applies, stated per row by GET /me/inventory.
+  assert.match(read('worker/lib/printCloud/reports.ts'), /low_stock_alert_default_qty: lowStockDefaultQty\(r\.unit_code, config\)/);
+  assert.match(read('worker/lib/printCloud/reports.ts'), /top_up_default_target_qty: TOP_UP_DEFAULT_TARGET_QTY/);
+  assert.match(read('worker/lib/printCloud/background.ts'), /CASE WHEN a\.unit_code = \? THEN \? ELSE -1 END[\s\S]*LOW_STOCK_DEFAULT_UNIT,\s*config\.low_inventory_default_g/);
+  assert.match(read('worker/routes/printCloud.ts'), /body\.target_qty === undefined \? TOP_UP_DEFAULT_TARGET_QTY/);
   const rows = [
     { category_kind: 'filament', unit_code: 'g' },
     { category_kind: 'filament', unit_code: 'mm' },
@@ -149,25 +165,37 @@ test('typed hours and minutes become the server’s seconds; nothing else is acc
   assert.equal(L.MIN_CONVERT_SECONDS, 60);
 });
 
-test('the classes one could convert into: the ones held and the workshop’s, each once', () => {
-  const tiers = [{ tier_id: 't1', code: 'basic', name: { ar: 'أ', en: 'Basic', ckb: 'ب' } }] as CreditTierBalance[];
-  const printers = [
-    { tier_id: 't1', tier_code: 'basic', tier_name: { ar: 'x', en: 'x', ckb: 'y' } },
-    { tier_id: 't2', tier_code: 'pro', tier_name: { ar: 'م', en: 'Pro', ckb: 'پ' } },
-    { tier_id: 't2', tier_code: 'pro', tier_name: { ar: 'م', en: 'Pro', ckb: 'پ' } },
-  ];
-  const options = L.tierOptions(tiers, printers);
-  assert.deepEqual(options.map((o) => o.id), ['t1', 't2']);
-  assert.equal(options[0].name.en, 'Basic', 'the customer’s own balance names its class');
+test('only the conversions the server allows are offered: a class with free hours and a rule out of it, and that rule’s targets', () => {
+  const tier = (tier_id: string, available_seconds: number) => ({ tier_id, code: tier_id, available_seconds }) as CreditTierBalance;
+  const rule = (from_tier_id: string, to_tier_id: string, ratio_num = 1, ratio_den = 1) => ({ rule_id: `${from_tier_id}>${to_tier_id}`, from_tier_id, to_tier_id, ratio_num, ratio_den }) as CreditConversionRule;
+  const tiers = [tier('t1', 7200), tier('t2', 0), tier('t3', 3600)];
+  const rules = [rule('t1', 't2'), rule('t1', 't4'), rule('t2', 't1')];
+  assert.deepEqual(L.conversionSources(tiers, rules).map((t) => t.tier_id), ['t1'], 't2 has no free hours, t3 no rule out of it');
+  assert.deepEqual(L.conversionTargets(rules, 't1').map((r) => r.to_tier_id), ['t2', 't4']);
+  assert.deepEqual(L.conversionTargets(rules, 't3'), [], 'a pair the workshop does not allow is never shown');
+  // A rule restated in whole hours is exact: den hours become num hours under the server's own floor.
+  for (const [num, den] of [[1, 1], [3, 2], [2, 3], [1, 1000], [7, 4]]) {
+    const r = L.ratioInHours({ ratio_num: num, ratio_den: den });
+    assert.equal(Math.floor((r.given * num) / den), r.received, `${num}:${den}`);
+  }
+  assert.match(read('worker/lib/printCloud/credits.ts'), /const received = mulDivFloor\(p\.seconds, p\.rule\.ratio_num, p\.rule\.ratio_den\);/);
 });
 
-test('no customer door lists the conversion rules: the screen must not preview a ratio it cannot know', () => {
-  // If the server ever states the rules to the customer, the hours screen should preview them — this fails to say so.
+test('what a conversion gives is the server’s, before and after: the rules it lists, its quote before the confirmation, its answer after', () => {
   const api = read('src/cloud/api.ts');
-  assert.doesNotMatch(api, /conversion[-_]rules/i);
+  assert.match(api, /get<T\.CreditConversionRule\[\]>\('\/me\/credits\/conversions'/);
+  assert.match(api, /post<T\.ConvertQuote>\('\/me\/credits\/convert\/quote'/);
   const hours = read(`${ACCOUNT_DIR}/AccountHours.tsx`);
-  assert.doesNotMatch(hours, /ratio_num|ratio_den/, 'no ratio is assumed on the client');
-  assert.match(hours, /received_seconds/, 'what arrived is the server’s own answer');
+  assert.match(hours, /listCreditConversions\(\{ signal \}\)/, 'the pairs offered are the server’s rules');
+  assert.match(hours, /setQuote\(await quoteCreditConversion\(body\)\)/, 'the review asks the server first');
+  assert.match(hours, /open=\{confirming && !!body && !!shown\}/, 'no confirmation without the quote of this very body');
+  assert.match(hours, /shown\.received_seconds/, 'what would arrive is the quote’s own figure');
+  assert.match(hours, /result\.received_seconds/, 'what arrived is the conversion’s own answer');
+  assert.doesNotMatch(hours, /ratio_num|ratio_den/, 'no ratio arithmetic on the screen (logic.ts ratioInHours restates the rule)');
+  // The quote and the conversion are one plan on the server.
+  const routes = read('worker/routes/printCloud.ts');
+  assert.match(routes, /const plan = await planConversion\(/);
+  assert.match(read('worker/lib/printCloud/credits.ts'), /export async function convertCredits[\s\S]*?const plan = await planConversion\(db, p\);/);
 });
 
 // ============================================================ shipments
@@ -193,19 +221,18 @@ test('a shipment’s road: pickup is free, a delivery waits for its fee only whe
   assert.equal(L.shipmentSteps('pickup', 'shipped', 0), null, 'a state off its road draws no road');
 });
 
-test('a print already on a shipment is not offered again; a cancelled shipment or a removed item frees it', () => {
-  const sh = (id: string, status: string, items: Array<Record<string, unknown>>) => ({ id, status, items }) as Pick<ShipmentView, 'id' | 'status' | 'items'>;
-  const taken = L.jobsOnShipments([
-    sh('s1', 'preparing', [{ item_type: 'print_job', job_id: 'j1', live: 1 }, { item_type: 'inventory', variant_id: 'v1', qty: 5, live: 1 }]),
-    sh('s2', 'cancelled', [{ item_type: 'print_job', job_id: 'j2', live: 0 }]),
-    sh('s3', 'picked_up', [{ item_type: 'print_job', job_id: 'j3', live: 1 }]),
-    sh('s4', 'awaiting_payment', [{ item_type: 'print_job', job_id: 'j4', live: 0 }]),
-  ]);
-  assert.deepEqual([...taken.entries()].sort(), [['j1', 's1'], ['j3', 's3']]);
-  assert.deepEqual(
-    L.shipmentsToCheck([{ status: 'cancelled' }, { status: 'preparing' }, { status: 'delivered' }] as never).map((s: { status: string }) => s.status),
-    ['preparing', 'delivered']
-  );
+test('a print the server names a shipment for is not offered again — nothing reads the shipments to find out; the fee is the server’s quote', () => {
+  const page = read(`${ACCOUNT_DIR}/AccountShipmentNew.tsx`);
+  assert.match(page, /jobPick\.has\(j\.id\) && !j\.shipment_id/, 'a print on a live shipment is never put in a request');
+  assert.match(page, /const on = job\.shipment_id \?\? null;/);
+  assert.doesNotMatch(page, /listShipments\(|getShipment\(/, 'the old workaround (reading the latest shipments) is gone: the server is the guard');
+  assert.match(page, /const answer = await quoteShipment\(body\);/, 'the review asks the request’s own assessment');
+  assert.match(page, /open=\{confirming && !!body && !!shown\}/, 'no confirmation without the quote of this very body');
+  assert.match(page, /<MoneyLine text=\{shipText\.feeLine\} iqd=\{shown\.fee_iqd\} \/>/, 'the fee shown is the quote’s');
+  // The server facts the screen leans on: GET /jobs names the live shipment, and POST /shipments refuses a second.
+  assert.match(read('worker/lib/printCloud/reports.ts'), /\$\{LIVE_SHIPMENT_OF_JOB_SQL\} AS shipment_id/);
+  assert.match(read('worker/lib/printCloud/fulfillment.ts'), /if \(j\.on_shipment\) throw pcError\('ALREADY_IN_SHIPMENT'/);
+  assert.match(read('worker/routes/printCloud.ts'), /auth\.post\('\/shipments\/quote'[\s\S]*?quoteShipmentRequest\(/);
   assert.deepEqual(
     [...L.deliverableVariants([{ id: 'v1', fulfillment_modes: ['inventory', 'delivery'] }, { id: 'v2', fulfillment_modes: ['inventory'] }])],
     ['v1'],
@@ -287,6 +314,28 @@ test('the six histories of GET /me/transactions are named, and a row leads only 
   assert.equal(L.txHref(row('shipments', 'shipment_preparing', 'delivery', 's1')), '/account/shipments/s1');
   // A credit row's ref_id IS the job's: the server selects it so.
   assert.match(read('worker/lib/printCloud/reports.ts'), /value_iqd, job_id AS ref_id'/);
+});
+
+test('the ledgers page on the server’s exact cursor: the last row’s time AND id, and only after a full page', () => {
+  const rows = [
+    { id: 'pccl_b', created_at: '2026-10-27T10:00:00.000Z' },
+    { id: 'pccl_a', created_at: '2026-10-27T10:00:00.000Z' },
+  ];
+  assert.deepEqual(L.nextLedgerCursor(rows, 2), { before: '2026-10-27T10:00:00.000Z', before_id: 'pccl_a' });
+  assert.equal(L.nextLedgerCursor(rows, 3), null, 'a page that was not full is the last');
+  assert.equal(L.nextLedgerCursor([], 2), null);
+  // Both ledgers are read through it, never capped at their first page.
+  for (const [file, door] of [['AccountHours.tsx', 'listCreditLedger'], ['AccountMaterial.tsx', 'listInventoryLedger']]) {
+    const src = read(`${ACCOUNT_DIR}/${file}`);
+    assert.match(src, new RegExp(`useLedgerPages\\(\\s*\\(cursor, signal\\) => ${door}\\(\\{[^}]*\\.\\.\\.cursor \\}`), `${file} pages ${door} on the cursor`);
+    assert.match(src, /<LoadMore onMore=\{ledger\.loadMore\}/, file);
+  }
+  const shared = read(`${ACCOUNT_DIR}/shared.tsx`);
+  assert.match(shared, /next: nextLedgerCursor\(page, limit\)/);
+  // The server reads (created_at, id) as one strict order — the same the page is sorted in.
+  const reports = read('worker/lib/printCloud/reports.ts');
+  assert.match(reports, /' AND \(created_at < \? OR \(created_at = \? AND id < \?\)\)'/);
+  assert.match(reports, /ORDER BY created_at DESC, id DESC LIMIT \?/);
 });
 
 test('hand-offs: the top-up carries the server’s stored quote into the store’s cart; the picture is the platform’s file', () => {
@@ -374,17 +423,22 @@ test('no invented badge, reward or membership is drawn on the customer’s page'
   }
 });
 
-test('the two money doors of the section send their Idempotency-Key, one per intent', () => {
+test('the three money doors of the section send their Idempotency-Key, one per intent', () => {
   const hours = read(`${ACCOUNT_DIR}/AccountHours.tsx`);
   const ship = read(`${ACCOUNT_DIR}/AccountShipmentNew.tsx`);
+  const sell = read(`${ACCOUNT_DIR}/AccountBuyback.tsx`);
   assert.match(hours, /const intent = useIntentKey\('convert', body\);/);
   assert.match(hours, /convertCredits\(body, intent\.key\)/);
   assert.match(ship, /const intent = useIntentKey\('shipment', body\);/);
   assert.match(ship, /createShipment\(body, intent\.key\)/);
-  for (const src of [hours, ship]) assert.match(src, /intent\.renew\(\);/, 'a new intent only after a success');
+  // A sell-back reserves the grams: the server requires its key (POST /buybacks), made once per quoted intent.
+  assert.match(sell, /const intent = useIntentKey\('buyback', body\);/);
+  assert.match(sell, /requestBuyback\(body\.variant_id, body\.qty, intent\.key\)/);
+  assert.match(read('src/cloud/api.ts'), /export const requestBuyback = \(variantId: string, qty: number, idempotencyKey: string, opts\?: RequestOptions\) =>\s*post<T\.BuybackRequested>\('\/buybacks', \{ variant_id: variantId, qty \}, keyed\(idempotencyKey, opts\)\)/);
+  for (const src of [hours, ship, sell]) assert.match(src, /intent\.renew\(\);/, 'a new intent only after a success');
   // Nothing else in the section moves money.
-  for (const rel of ACCOUNT_FILES.filter((f) => !/AccountHours|AccountShipmentNew/.test(f))) {
-    assert.doesNotMatch(read(rel), /convertCredits\(|createShipment\(|createOrder\(|payOrderFromWallet\(|confirmJob\(/, rel);
+  for (const rel of ACCOUNT_FILES.filter((f) => !/AccountHours|AccountShipmentNew|AccountBuyback/.test(f))) {
+    assert.doesNotMatch(read(rel), /convertCredits\(|createShipment\(|createOrder\(|payOrderFromWallet\(|confirmJob\(|requestBuyback\(/, rel);
   }
   // The key is kept while the body is the same — closing the confirmation does not make a new one.
   const shared = read(`${ACCOUNT_DIR}/shared.tsx`);

@@ -433,6 +433,26 @@ export async function debitInventory(
   };
 }
 
+// ------------------------------------------------------------------ the workshop's default reminder
+
+/**
+ * The unit the workshop's default low-balance reminder counts in
+ * (`low_inventory_default_g`): a balance in grams without its own reminder
+ * amount is reminded at the default; a balance in any other unit (pieces,
+ * sets, millimetres) has no default — no gram figure is ever applied to
+ * pieces — and is reminded only at an amount the customer set.
+ */
+export const LOW_STOCK_DEFAULT_UNIT = 'g';
+
+/**
+ * The reminder amount the workshop applies to a balance of `unitCode` that has
+ * none of its own, or null where no default applies. The low-inventory scan
+ * reminds by this rule (background.ts) and GET /me/inventory states it per row.
+ */
+export function lowStockDefaultQty(unitCode: string, config: { low_inventory_default_g: number }): number | null {
+  return unitCode === LOW_STOCK_DEFAULT_UNIT ? config.low_inventory_default_g : null;
+}
+
 // ------------------------------------------------------------------ reads
 
 export async function activeInventoryReservations(db: D1Database, purpose: InventoryPurpose, refId: string): Promise<InventoryReservationRow[]> {

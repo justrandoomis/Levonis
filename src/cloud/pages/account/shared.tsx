@@ -1,15 +1,15 @@
 /**
  * THE PIECES EVERY ACCOUNT SCREEN SHARES — the grouped menu of the prototype,
  * a sub-page's head with its way back, a row of figures in wells, the state
- * pills of a shipment and a sell-back, a «load more», and the one rule of a
- * money door's Idempotency-Key.
+ * pills of a shipment and a sell-back, a «load more» and a ledger paged on the
+ * server's exact cursor, and the one rule of a money door's Idempotency-Key.
  *
  * Every account screen imports this module, so it, logic.ts and the
  * section's words (src/cloud/strings/account.ts) share one importer set and
  * travel as one chunk — never small shared chunks of their own
  * (tests/motionLazy.test.ts counts those).
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusChip } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
@@ -21,7 +21,8 @@ import { account, buybackStatus, materialsText, payoutStatus, sect, shipmentStat
 import { useCloudText } from '../../text';
 import type { TopUpQuote, Tri } from '../../types';
 import { ExternalLink, PageHeader, forwardChevron } from '../../ui';
-import { buybackTone, movementSign, shipmentTone, storeCheckoutLink, type Movement } from './logic';
+import { useCloudQuery } from '../../useCloudQuery';
+import { buybackTone, movementSign, nextLedgerCursor, shipmentTone, storeCheckoutLink, type LedgerCursor, type Movement } from './logic';
 
 // ------------------------------------------------------------------ words
 
@@ -210,6 +211,42 @@ export function LoadMore({ onMore, loading }: { onMore: () => void; loading: boo
       </Button>
     </div>
   );
+}
+
+/**
+ * A LEDGER, PAGE BY PAGE, on the server's exact cursor (logic.ts
+ * `nextLedgerCursor`: the last row's time AND id — GET /me/credits/ledger and
+ * /me/inventory/ledger take both), so the rows one batch wrote at one instant
+ * are never skipped between pages. The first page reloads with `deps`; pages
+ * loaded after it belong to THAT first page and go with it.
+ */
+export function useLedgerPages<R extends { id: string; created_at: string }>(
+  fetchPage: (cursor: LedgerCursor | null, signal?: AbortSignal) => Promise<R[]>,
+  limit: number,
+  deps: readonly unknown[]
+) {
+  const first = useCloudQuery((signal) => fetchPage(null, signal), deps);
+  const [more, setMore] = useState<{ base: R[]; rows: R[]; next: LedgerCursor | null } | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreError, setMoreError] = useState<unknown>(null);
+  const base = first.data;
+  const extra = more && base && more.base === base ? more : null;
+  const rows = base ? [...base, ...(extra?.rows ?? [])] : undefined;
+  const next = base ? (extra ? extra.next : nextLedgerCursor(base, limit)) : null;
+  const loadMore = async () => {
+    if (!base || !next) return;
+    setLoadingMore(true);
+    setMoreError(null);
+    try {
+      const page = await fetchPage(next);
+      setMore((m) => ({ base, rows: [...(m && m.base === base ? m.rows : []), ...page], next: nextLedgerCursor(page, limit) }));
+    } catch (e) {
+      setMoreError(e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+  return { rows, error: first.error, reload: first.reload, next, loadMore, loadingMore, moreError };
 }
 
 /** The honest line under a list the server caps: only the latest are shown, and where the rest is. */

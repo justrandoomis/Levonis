@@ -43,9 +43,20 @@ export function parseAddress(raw: unknown): DeliveryAddress {
   };
 }
 
-export function deliveryFee(config: { delivery: { flat_fee_iqd: number; fee_by_governorate: Record<string, number> } }, governorate: string): number {
+type FeeConfig = { delivery: { flat_fee_iqd: number; fee_by_governorate: Record<string, number> } };
+
+/**
+ * The delivery fee of a governorate and the rule that set it: the owner's own
+ * fee for that governorate when one is set, else the flat fee. One function
+ * for the fee a request is charged and the fee a quote states.
+ */
+export function deliveryFeeRule(config: FeeConfig, governorate: string): { fee: number; rule: 'governorate' | 'flat' } {
   const specific = config.delivery.fee_by_governorate[governorate];
-  return typeof specific === 'number' ? specific : config.delivery.flat_fee_iqd;
+  return typeof specific === 'number' ? { fee: specific, rule: 'governorate' } : { fee: config.delivery.flat_fee_iqd, rule: 'flat' };
+}
+
+export function deliveryFee(config: FeeConfig, governorate: string): number {
+  return deliveryFeeRule(config, governorate).fee;
 }
 
 export type ShipmentStatus = 'awaiting_payment' | 'preparing' | 'ready_for_pickup' | 'shipped' | 'delivered' | 'picked_up' | 'cancelled';
@@ -74,6 +85,15 @@ export function createShipment(
       .bind(id, p.userId, p.kind, p.status, p.address ? JSON.stringify(p.address) : null, p.packaging ?? 'standard', p.feeIqd, p.feeOrderId, iso(p.now), iso(p.now)),
   };
 }
+
+/**
+ * The shipment a finished print is on, live: the one its live item names (the
+ * partial unique index `uq_pc_shipment_items_job` keeps it to one), or the one
+ * the job row names. Both are written together when a request is made and
+ * cleared together when it is cancelled; a print handed over stays on its
+ * shipment for good. A SQL expression over the job row aliased `j`.
+ */
+export const LIVE_SHIPMENT_OF_JOB_SQL = `COALESCE((SELECT i.shipment_id FROM pc_shipment_items i WHERE i.job_id = j.id AND i.live = 1), j.shipment_id)`;
 
 export function shipmentJobItem(db: D1Database, shipmentId: string, jobId: string): Stmt {
   return db

@@ -502,6 +502,39 @@ export interface ConvertResult {
   replayed: boolean;
 }
 
+/**
+ * GET /me/credits/conversions row: a conversion the workshop allows out of a
+ * class the customer holds hours in (an ENABLED rule — no other is listed).
+ * `to_seconds = floor(from_seconds × ratio_num / ratio_den)`.
+ */
+export interface CreditConversionRule {
+  rule_id: string;
+  from_tier_id: string;
+  to_tier_id: string;
+  ratio_num: number;
+  ratio_den: number;
+  from_code: string;
+  from_name: Tri;
+  to_code: string;
+  to_name: Tri;
+}
+
+/**
+ * POST /me/credits/convert/quote: the conversion's own plan, now — nothing is
+ * written. `draws`: the purchase lots the seconds would leave, in spend order;
+ * `receives`: the lots they would arrive as, each keeping its expiry.
+ */
+export interface ConvertQuote {
+  from_tier_id: string;
+  to_tier_id: string;
+  converted_seconds: number;
+  received_seconds: number;
+  ratio_num: number;
+  ratio_den: number;
+  draws: Array<{ lot_id: string; seconds: number; expires_at: string | null }>;
+  receives: Array<{ seconds: number; expires_at: string | null }>;
+}
+
 /** GET /me/printers row: a printer MODEL the customer holds hours for — not a machine they own. */
 export interface MyPrinterModel {
   printer_model_id: string;
@@ -539,6 +572,13 @@ export interface InventoryBalance {
   brand: string;
   /** What the customer paid for the units still in their lots. */
   remaining_value_iqd: number;
+  /**
+   * The workshop's reminder amount for a row with none of its own — the one
+   * the low-inventory scan applies; grams only, null where no default applies.
+   */
+  low_stock_alert_default_qty?: number | null;
+  /** The balance «top up» aims at when no target is named (POST /me/inventory/top-up-quote). */
+  top_up_default_target_qty?: number;
 }
 
 /** GET /me/inventory/ledger row. */
@@ -970,6 +1010,8 @@ export interface JobSummary {
   printer_model_id: string;
   created_at: string;
   updated_at: string;
+  /** The live shipment a finished print is on (POST /shipments refuses a second: ALREADY_IN_SHIPMENT), or null. */
+  shipment_id?: string | null;
 }
 
 /** GET /jobs (and `jobs` of the dashboard): grouped by where they are. */
@@ -1237,6 +1279,25 @@ export interface ShipmentCreated {
   replayed: boolean;
 }
 
+/**
+ * POST /shipments/quote: what POST /shipments would do with the same body, by
+ * the same assessment — nothing is written. `fee_rule`: a pickup is free; a
+ * delivery pays the owner's fee for its governorate, or the flat fee.
+ */
+export interface ShipmentQuote {
+  kind: 'pickup' | 'delivery';
+  fee_iqd: number;
+  fee_rule: 'pickup' | 'governorate' | 'flat';
+  governorate: string | null;
+  /** Where it would start: waiting for its fee (an order of its own), or being prepared. */
+  status: ShipmentStatus;
+  payment_method: PaymentProvider | null;
+  packaging: string;
+  jobs: Array<{ job_id: string; title: string }>;
+  items: Array<{ variant_id: string; qty: number; unit_code: string; available_qty: number }>;
+  available: { pickup: boolean; delivery: boolean };
+}
+
 /** GET /shipments row. */
 export interface ShipmentSummary {
   id: string;
@@ -1278,10 +1339,11 @@ export interface BuybackQuote {
   lots: Array<{ lot_id: string; qty: number; purchase_value_iqd: number }>;
 }
 
-/** POST /buybacks (201). */
+/** POST /buybacks (201; 200 with `replayed: true` for a key already answered). */
 export interface BuybackRequested extends BuybackQuote {
   buyback_id: string;
   status: 'requested';
+  replayed?: boolean;
 }
 
 /** GET /buybacks row. */

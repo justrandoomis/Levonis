@@ -338,7 +338,8 @@ test('pickup, inventory delivery and an unpaid delivery fee that expires', async
   await ok(w.assistant, 'POST', `${ADMIN}/jobs/${jobId}/complete`, { printed_seconds: H, materials: [{ variant_id: cat.white, qty: 30 }] });
   const pickup = await ok(w.a, 'POST', `${API}/shipments`, { kind: 'pickup', job_ids: [jobId] }, idem('p'));
   assert.deepEqual([pickup.status, pickup.fee_iqd], ['preparing', 0]);
-  await refused(w.a, 'POST', `${API}/shipments`, { kind: 'pickup', job_ids: [jobId] }, 'STATE_CHANGED', idem('p2'));
+  // A print on a live shipment is refused by name, never «try again» (tests/printCloudFixes-account.test.ts).
+  await refused(w.a, 'POST', `${API}/shipments`, { kind: 'pickup', job_ids: [jobId] }, 'ALREADY_IN_SHIPMENT', idem('p2'));
   await ok(w.assistant, 'POST', `${ADMIN}/shipments/${pickup.shipment_id}/advance`, { to: 'ready_for_pickup' });
   await ok(w.assistant, 'POST', `${ADMIN}/shipments/${pickup.shipment_id}/advance`, { to: 'picked_up' });
   // Home delivery of 200 g of owned PLA: reserved at once, taken off the shelf at hand-over.
@@ -393,10 +394,10 @@ test('buyback request reserves the units; cancelling returns them once', async (
   const cat = await seedCatalog(w);
   await ok(w.full, 'PATCH', `${ADMIN}/categories/filaments/buyback`, { buyback_enabled: true, buyback_rate_bps: 5000 });
   await buy(w.a, [{ kind: 'material', variant_id: cat.black, quantity: 250 }]);
-  const req = await ok(w.a, 'POST', `${API}/buybacks`, { variant_id: cat.black, qty: 100 });
+  const req = await ok(w.a, 'POST', `${API}/buybacks`, { variant_id: cat.black, qty: 100 }, idem('bb'));
   assert.equal(req.estimated_value_iqd, 1600);
   // Reserved units cannot be used by a print or sold twice.
-  await refused(w.a, 'POST', `${API}/buybacks`, { variant_id: cat.black, qty: 200 }, 'INSUFFICIENT_INVENTORY');
+  await refused(w.a, 'POST', `${API}/buybacks`, { variant_id: cat.black, qty: 200 }, 'INSUFFICIENT_INVENTORY', idem('bb'));
   await ok(w.a, 'POST', `${API}/buybacks/${req.buyback_id}/cancel`);
   await refused(w.a, 'POST', `${API}/buybacks/${req.buyback_id}/cancel`, {}, 'INVALID_TRANSITION');
   assert.deepEqual([(await owned(w.a, cat.black)).available_qty, (await owned(w.a, cat.black)).reserved_qty], [250, 0]);

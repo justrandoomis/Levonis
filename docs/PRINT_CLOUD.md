@@ -25,7 +25,7 @@ DECISIONS row 271 records the decision and its open owner questions.
 | Routers | `worker/routes/printCloud.ts` (customer), `printCloudAgent.ts` (workshop agent), `printCloudAdmin.ts` (administration) |
 | Mounts | `/api/print-cloud/v1`, `/api/print-cloud/v1/agent`, `/api/admin/print-cloud` (`worker/index.ts`) |
 | Hosts | the main host, the `cloud` system subdomain, and foreign hosts outside the root; **never** a merchant storefront (`printCloudHostAllowed`, `worker/lib/printCloud/http.ts`) |
-| OpenAPI | `GET /api/print-cloud/v1/openapi.json` — generated from `worker/lib/printCloud/openapi.ts`; 153 operations, and `tests/printCloudOpenApi.test.ts` fails if a route and its documentation disagree. Owner-only cost fields are described in the owner's copy only |
+| OpenAPI | `GET /api/print-cloud/v1/openapi.json` — generated from `worker/lib/printCloud/openapi.ts`; 156 operations, and `tests/printCloudOpenApi.test.ts` fails if a route and its documentation disagree. Owner-only cost fields are described in the owner's copy only |
 | Default state | **closed**: `pc_settings.enabled = false`, customer doors answer `503 PRINT_CLOUD_DISABLED` (admins still work) until the owner opens the service |
 | Without the migration | reads see an empty, closed service (lists empty, a named record 404, `GET /status` says `installed: false`) — exactly the answers of a migrated database with no data; every write answers `503 PRINT_CLOUD_NOT_INSTALLED` before any statement; the cron step does nothing (`tests/costDeployAhead.test.ts`) |
 
@@ -36,8 +36,9 @@ the Arabic one — `tests/printCloudUnits.test.ts`).
 
 Idempotency: every door that moves money, hours or grams on the customer's
 behalf (`POST /orders`, `POST /orders/:id/pay/wallet`, `POST /jobs/:id/confirm`,
-`POST /shipments`, `POST /me/credits/convert`, admin balance adjustments and
-refunds) takes an `Idempotency-Key` header. The first answer is stored in
+`POST /shipments`, `POST /me/credits/convert`, `POST /buybacks`, admin balance
+adjustments and refunds) takes an `Idempotency-Key` header — required: without
+one the door refuses `IDEMPOTENCY_KEY_REQUIRED` and writes nothing. The first answer is stored in
 `pc_operations` in the SAME batch as the business writes; a replay returns it,
 and the same key with a different request body is refused
 `IDEMPOTENCY_KEY_REUSED`.
@@ -49,16 +50,31 @@ Public: `GET /status`, `/printers`, `/printers/{id}`, `/printers/{id}/availabili
 `POST /pricing/quote`, `POST /payments/webhook` (signed, §4.4).
 
 Signed-in customer: `/me/dashboard`, `/me/credits` (+ `/ledger`,
-`/reservations`, `POST /convert`), `/me/printers`, `/me/inventory` (+ `/ledger`,
-`PATCH /{variantId}/alert`, `POST /top-up-quote`, `/reorder-suggestions`),
-`/me/transactions`, `/me/wallet` (§4.4); quotes and orders (`POST /quotes`,
+`/reservations`, `/conversions`, `POST /convert`, `POST /convert/quote` — §3.4),
+`/me/printers`, `/me/inventory` (+ `/ledger`, `PATCH /{variantId}/alert`,
+`POST /top-up-quote`, `/reorder-suggestions` — §5.1), `/me/transactions`,
+`/me/wallet` (§4.4); quotes and orders (`POST /quotes`,
 `POST /orders`, `POST /orders/{id}/cancel`, `POST /orders/{id}/pay/wallet`
 (§4.4), `POST /orders/{id}/dev-pay` — development only);
 files (`POST /files`, list, read, delete, download, signed links); imports;
 projects (create, update, duplicate, models, plates, accessory suggestions,
 printer recommendations); print profiles; jobs (`POST /jobs`, `PATCH`,
 `/analyze`, `/projection`, `/review`, `/confirm`, `/cancel`, `/requests`,
-`/reschedule`); `GET /queue`; shipments; buybacks.
+`/reschedule`); `GET /queue`; shipments (`POST /shipments`, `POST /shipments/quote`,
+list, detail, cancel — §8.1); buybacks (§8.2).
+
+The two ledgers (`/me/credits/ledger`, `/me/inventory/ledger`) are newest
+first and paged EXACTLY on the last row's (`created_at`, `id`): the next page
+is `before=<its created_at>&before_id=<its id>` (`reports.ts ledgerCursor`).
+One batch writes several rows at one instant (a payment's purchases, a
+settlement's consume and release), so a page that ended inside that instant
+on the time alone skipped the rest of it. `before` alone keeps its old
+meaning — strictly before that instant — and `before_id` without `before` is
+refused `VALIDATION`. `/me/transactions` has its own exact cursor
+(`next_before`, §10.1); no other Print Cloud list pages — the rest, customer
+and admin, are capped lists (the newest N), and the agent's `GET /commands`
+pages forward by `since` with the agent reading one millisecond back and
+dropping ids it has seen (`tools/print-cloud-agent`).
 
 ### 1.2 Agent API (`/api/print-cloud/v1/agent`) — §9
 
@@ -191,6 +207,18 @@ Moving hours between tiers is **off** until the owner enables a conversion rule
 (`pc_credit_conversion_rules.enabled`, default 0). A conversion moves the value
 of the drawn lots with the hours.
 
+The customer sees what is allowed before asking: `GET /me/credits/conversions`
+lists every ENABLED rule out of a class they hold an account in, with its
+ratio (`to = floor(from × ratio_num / ratio_den)`) and both classes' names —
+exactly the rules `conversionRule` accepts. `POST /me/credits/convert/quote`
+takes the conversion's own body and answers the conversion's own plan
+(`credits.ts planConversion`, the one `convertCredits` writes): the seconds
+received, the purchase lots the hours would come from (free hours not past
+their expiry, expiring first) and the lots they would arrive as, one per
+expiry, each keeping its date. Same refusals (`CONVERSION_DISABLED`,
+`INSUFFICIENT_CREDIT`, `QUANTITY_NOT_ALLOWED`, `VALIDATION`); nothing is
+written or held — the conversion plans again at its own moment.
+
 ## 4. Pricing, quotes, orders and payments — `pricing.ts`, `orders.ts`, `payments.ts`
 
 ### 4.1 Material pricing
@@ -319,7 +347,17 @@ as its payment method.
 never added to pieces. Lots carry their purchase price; ledgers are append-only
 with unique entry keys; jobs reserve and settle each material independently
 (20 magnets owned, a job uses 2 → 18 left). Low-inventory reminders use the
-customer's threshold or `low_inventory_default_g`.
+customer's threshold or `low_inventory_default_g`, which applies to balances
+in grams only (`inventory.ts lowStockDefaultQty`) — no gram figure is ever
+applied to pieces.
+
+Every `GET /me/inventory` row (and the dashboard's) states the two workshop
+defaults it lives under, and no other setting reaches a customer:
+`low_stock_alert_default_qty` (the reminder amount the scan applies while the
+customer set none; null where no default applies) and
+`top_up_default_target_qty` (the balance `POST /me/inventory/top-up-quote`
+aims at when no `target_qty` is sent, `TOP_UP_DEFAULT_TARGET_QTY` = 1,000 in
+the variant's base unit).
 
 ### 5.2 Units
 
@@ -489,12 +527,34 @@ grouped. A delivery request creates a shipping order for the fee
 `preparing`; `shipped`/`picked_up` settles the delivered material and takes it
 off the shelf.
 
+A finished print is on **at most one live shipment**. A request naming a
+print already on one — waiting, being prepared, handed over — is refused
+`ALREADY_IN_SHIPMENT` with the job and that shipment's id; a cancelled
+shipment frees its prints. The batch is the guard, not the plan: the job's
+`shipment_id` is taken by a CAS (completed and on none) followed by a fence
+that it now names this shipment, and the live item collides with any other
+(`uq_pc_shipment_items_job`). Two requests racing for one print make one
+shipment; the loser's batch fails, is planned again and refused by name.
+`GET /jobs` names each finished print's live shipment (`shipment_id`).
+
+`POST /shipments/quote` takes the request's own body and answers the
+request's own assessment (`fulfillment.ts assessShipmentRequest`, from which
+`POST /shipments` plans): `fee_iqd` and the rule that set it (`pickup` — free,
+`governorate` — the owner's fee for it, `flat`), the status it would start in
+(`awaiting_payment` with a fee order of its own, or `preparing`), the prints
+and material that would leave (material only as much as is free), and the
+ways offered now (`available.pickup`, `available.delivery`). Same refusals;
+nothing is written, held or ordered.
+
 ### 8.2 Buyback — `buyback.ts`
 
 Unused filament may be sold back at the category's buyback rate, valued from
 the customer's own purchase lots (500 g left of a 1 kg lot bought for 24,250
 IQD at 50 % → 6,063 IQD). A request reserves the grams; an admin approves,
-rejects or marks it paid; cancelling returns them once.
+rejects or marks it paid; cancelling returns them once. `POST /buybacks` is a
+money door: its required `Idempotency-Key` stores the answer in
+`pc_operations` in the batch that reserves the grams, so a retry after a lost
+answer replays it (200, `replayed: true`) instead of reserving twice.
 
 ### 8.3 Levonis integration adapters — `adapters.ts`
 
@@ -724,6 +784,7 @@ rules. Sign up a user through the normal Levonis flow, then buy a package
 | `tests/printCloudScenarios.test.ts` | the specification's §36 scenarios: credits 24 h / 8.9 h / 8.5 h, top-up 490 + 250 = 740, gram pricing, multi-material, accessories 20 → 18, queue exclusivity, concurrent last 100 g, duplicate webhook, cancellation, workshop and customer failures, buyback 6,063 IQD, cross-customer isolation |
 | `tests/printCloudAcceptance.test.ts` | §39 end to end on real records: purchase → STL/3MF/OBJ files and an import → five jobs → agent slicer → scheduler → agent events → verification → delivery → notifications, audit, revenue/profit, clean reconciliation |
 | `tests/printCloudOperations.test.ts` | gates, roles, idempotency, expiry, imports and SSRF, uploads, plates, the agent, refunds, conversion, fulfilment, append-only ledgers, buyback reservations, durable tasks |
+| `tests/printCloudFixes-account.test.ts` | the account screens' server gaps: one live shipment per print (raced), the exact ledger cursor, the keyed sell-back (raced), the conversion rules and quote, the shipment quote (same refusals), the inventory defaults |
 | `tests/printCloudAdminUi.test.ts` | the admin console against the server: catalogue fields, settings bounds, job and shipment moves, the price preview, three languages, the keyed money doors |
 | `tests/printCloudAdminReads.test.ts` | the console's two reads: maintenance windows (cost owner-only) and one shipment's packing list (fee money-only) |
 | `tests/printCloudUnits.test.ts` | money arithmetic, apportioning, lot valuation, the pricing engine, promotions, the state machine, plates, file sniffing, webhook signatures, settings, three languages, error mapping, hosts |

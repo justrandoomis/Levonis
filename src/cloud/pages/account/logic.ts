@@ -4,23 +4,21 @@
  * Pure functions over the server's own answers (tests/printCloudUiAccount.test.ts
  * holds them). None of them invents a figure: a balance is the server's, a
  * sum is of two numbers the server sent side by side, and a state is a word
- * for a status the server stored. Where the server does not say something —
- * a conversion ratio, a delivery fee before the request — no rule here
- * guesses it; the screen says it is not known yet.
+ * for a status the server stored. What a conversion gives, what a delivery
+ * costs, which prints are already leaving and the workshop's own defaults are
+ * the server's answers too (its quotes, GET /jobs, GET /me/inventory) — no
+ * rule here works one out.
  */
 import type { Tone } from '../../../components/ui/Badge';
 import type {
   BuybackSummary,
+  CreditConversionRule,
   CreditTierBalance,
   InventoryBalance,
-  PrinterModel,
   ShipmentStatus,
-  ShipmentSummary,
-  ShipmentView,
   StoreCategory,
   StoreProduct,
   TransactionRow,
-  Tri,
 } from '../../types';
 
 const finite = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
@@ -56,12 +54,25 @@ export function creditFigures(tier: Pick<CreditTierBalance, 'available_seconds' 
 }
 
 /**
- * Below the customer's OWN reminder amount. The workshop's default amount is
- * a setting no customer door states, so a row without its own amount is never
- * called low here — the reminder itself still comes from the server.
+ * The amount a balance is reminded at, as the server applies it: the
+ * customer's own, or — while they set none — the workshop's default the
+ * server states on the row (`low_stock_alert_default_qty`: grams only; the
+ * low-inventory scan applies no gram figure to pieces). `none`: no reminder
+ * until the customer sets an amount. Never a figure the server did not send.
  */
-export function isLow(row: Pick<InventoryBalance, 'available_qty' | 'low_stock_alert_qty'>): boolean {
-  return row.low_stock_alert_qty != null && row.available_qty <= row.low_stock_alert_qty;
+export type ReminderAmount = { source: 'own' | 'default'; qty: number } | { source: 'none'; qty: null };
+
+export function reminderAmount(row: Pick<InventoryBalance, 'low_stock_alert_qty' | 'low_stock_alert_default_qty'>): ReminderAmount {
+  const own = finite(row.low_stock_alert_qty);
+  if (own !== null) return { source: 'own', qty: own };
+  const fallback = finite(row.low_stock_alert_default_qty);
+  return fallback !== null ? { source: 'default', qty: fallback } : { source: 'none', qty: null };
+}
+
+/** At or below the amount the balance is reminded at (`reminderAmount`): the scan's own threshold, never a guessed one. */
+export function isLow(row: Pick<InventoryBalance, 'available_qty' | 'low_stock_alert_qty' | 'low_stock_alert_default_qty'>): boolean {
+  const at = reminderAmount(row).qty;
+  return at !== null && row.available_qty <= at;
 }
 
 /** Filament counted in grams: the only rows whose quantities may be added together. */
@@ -157,23 +168,50 @@ export function typedSeconds(hours: number | null, minutes: number | null): numb
 /** The server's own floor for a conversion (POST /me/credits/convert: `seconds` ≥ 60). */
 export const MIN_CONVERT_SECONDS = 60;
 
-export interface TierOption {
-  id: string;
-  code: string;
-  name: Tri;
+/**
+ * The classes hours can leave, by the workshop's own rules (GET
+ * /me/credits/conversions lists only the enabled ones): a class the customer
+ * has hours free in, with at least one rule out of it.
+ */
+export function conversionSources(tiers: CreditTierBalance[], rules: Pick<CreditConversionRule, 'from_tier_id'>[]): CreditTierBalance[] {
+  return tiers.filter((t) => t.available_seconds > 0 && rules.some((r) => r.from_tier_id === t.tier_id));
+}
+
+/** The rules out of one class: the only targets offered — a pair the workshop does not allow is never shown. */
+export function conversionTargets<R extends Pick<CreditConversionRule, 'from_tier_id'>>(rules: R[], fromTierId: string): R[] {
+  return rules.filter((r) => r.from_tier_id === fromTierId);
+}
+
+const HOUR = 3600;
+
+/**
+ * A rule's ratio as whole hours, exactly as the server applies it
+ * (`to = floor(from × ratio_num / ratio_den)`): `ratio_den` hours of the source
+ * become `ratio_num` hours of the target — floor(den h × num / den) = num h,
+ * no rounding enters. A restatement of the rule, never an estimate; what a
+ * given amount gives is the server's quote.
+ */
+export function ratioInHours(rule: Pick<CreditConversionRule, 'ratio_num' | 'ratio_den'>): { given: number; received: number } {
+  return { given: rule.ratio_den * HOUR, received: rule.ratio_num * HOUR };
+}
+
+// ------------------------------------------------------------------ the ledgers, page by page
+
+export interface LedgerCursor {
+  before: string;
+  before_id: string;
 }
 
 /**
- * Every printer class the customer could convert into: the ones they hold
- * hours in and the ones the workshop's printers belong to, once each. Which
- * pairs the workshop actually allows is not stated by any customer door —
- * the server answers CONVERSION_DISABLED for a pair it does not allow.
+ * The cursor of the page after `page`: its last row's time AND id — the
+ * server's exact cursor (`before` + `before_id`), so rows one batch wrote at
+ * one instant are never skipped between pages. Null when the page was not
+ * full: there is nothing after it.
  */
-export function tierOptions(tiers: CreditTierBalance[], printers: Pick<PrinterModel, 'tier_id' | 'tier_code' | 'tier_name'>[]): TierOption[] {
-  const out = new Map<string, TierOption>();
-  for (const t of tiers) out.set(t.tier_id, { id: t.tier_id, code: t.code, name: t.name });
-  for (const p of printers) if (!out.has(p.tier_id)) out.set(p.tier_id, { id: p.tier_id, code: p.tier_code, name: p.tier_name });
-  return [...out.values()];
+export function nextLedgerCursor(page: Array<{ id: string; created_at: string }>, limit: number): LedgerCursor | null {
+  if (page.length === 0 || page.length < limit) return null;
+  const last = page[page.length - 1];
+  return { before: last.created_at, before_id: last.id };
 }
 
 // ------------------------------------------------------------------ shipments
@@ -215,29 +253,6 @@ export function shipmentSteps(kind: string, status: string, feeIqd: number): Arr
   if (at < 0) return null;
   const last = at === road.length - 1;
   return road.map((s, i) => ({ status: s, state: i < at || (last && i === at) ? 'done' : i === at ? 'current' : 'upcoming' }));
-}
-
-/**
- * The finished prints already on a shipment that still carries them — every
- * shipment but a cancelled one, whose items the server takes off (`live` 0).
- * Job id → shipment id. A print that has left, or is about to, is not offered
- * again.
- */
-export function jobsOnShipments(details: Array<Pick<ShipmentView, 'id' | 'status' | 'items'>>): Map<string, string> {
-  const out = new Map<string, string>();
-  for (const sh of details) {
-    if (sh.status === 'cancelled') continue;
-    for (const item of sh.items) {
-      const live = Number(item.live ?? 1) === 1;
-      if (item.item_type === 'print_job' && live && typeof item.job_id === 'string') out.set(item.job_id, sh.id);
-    }
-  }
-  return out;
-}
-
-/** The shipments whose items must be read to know which prints are taken: every one not cancelled. */
-export function shipmentsToCheck(list: ShipmentSummary[]): ShipmentSummary[] {
-  return list.filter((s) => s.status !== 'cancelled');
 }
 
 /** The variants the catalogue lets leave the workshop (`fulfillment_modes` names `delivery`; the server refuses the others). */

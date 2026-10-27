@@ -10,6 +10,11 @@
  * them, times the rate. Requesting holds the units until the workshop
  * decides; the final amount is the one it records on approval. A request still
  * waiting can be cancelled, and the units return once.
+ *
+ * Requesting is a money door (it reserves the grams): one Idempotency-Key per
+ * intent (shared.tsx `useIntentKey`), kept across every retry of that intent,
+ * so a request whose answer was lost, sent again, is the same request — the
+ * server replays it instead of holding the grams twice.
  */
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -29,7 +34,7 @@ import type { BuybackQuote, BuybackSummary, InventoryBalance, StoreCategory } fr
 import { CloudEmptyState, CloudErrorState, CloudPageSkeleton, HandCoins, Info, SectionHeader } from '../../ui';
 import { useCloudQuery } from '../../useCloudQuery';
 import { bpsPercent, buybackCancellable, buybackRates, sellableRows } from './logic';
-import { BuybackPill, CapNote, Figures, MoneyLine, PayoutPill, SubPageHeader } from './shared';
+import { BuybackPill, CapNote, Figures, MoneyLine, PayoutPill, SubPageHeader, useIntentKey } from './shared';
 
 /** The server's own cap on the sell-backs it lists (GET /buybacks). */
 const SELLBACKS_CAP = 200;
@@ -89,6 +94,9 @@ function SellForm({ rows, preselect }: { rows: InventoryBalance[]; preselect: st
   const row = rows.find((r) => r.variant_id === variant) ?? null;
   const ready = !!row && qty.valid && qty.value != null && qty.value >= 1 && qty.value <= row.available_qty;
   const tooMuch = !!row && qty.value != null && qty.value > row.available_qty;
+  // What the request will carry: the quoted material and quantity — its key is made once for it.
+  const body = quote ? { variant_id: quote.variant_id, qty: quote.qty } : null;
+  const intent = useIntentKey('buyback', body);
 
   const getQuote = async () => {
     if (!row || !ready || qty.value == null) return;
@@ -102,10 +110,11 @@ function SellForm({ rows, preselect }: { rows: InventoryBalance[]; preselect: st
   };
 
   const request = async () => {
-    if (!quote) return;
+    if (!body) return;
     setConfirmError(null);
     try {
-      await requestBuyback(quote.variant_id, quote.qty);
+      await requestBuyback(body.variant_id, body.qty, intent.key);
+      intent.renew();
       toast.success(t(buybackText.requested));
       setConfirming(false);
       setQuote(null);

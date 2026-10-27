@@ -22,8 +22,11 @@
  */
 import { many, one } from './db';
 import { creditBalances } from './credits';
-import { inventoryBalances } from './inventory';
+import { invalid } from './errors';
+import { inventoryBalances, lowStockDefaultQty } from './inventory';
 import { drawValue } from './lots';
+import { TOP_UP_DEFAULT_TARGET_QTY } from './pricing';
+import { LIVE_SHIPMENT_OF_JOB_SQL } from './shipments';
 import { hoursMinutes, mulDivRound, parseJson } from './util';
 
 export async function dashboardCredits(db: D1Database, userId: string) {
@@ -69,15 +72,88 @@ export async function dashboardPrinters(db: D1Database, userId: string, ready: {
   );
 }
 
-export async function dashboardInventory(db: D1Database, userId: string, category: string | null) {
+/**
+ * The customer's balances, one row per variant. Each row also states the two
+ * workshop defaults it lives under — and only those two settings ever reach
+ * a customer: `low_stock_alert_default_qty`, the reminder amount the
+ * low-inventory scan applies to it while the customer has set none (grams
+ * only; null where no default applies, inventory.ts `lowStockDefaultQty`),
+ * and `top_up_default_target_qty`, the balance «top up» aims at when no target
+ * is named (pricing.ts `TOP_UP_DEFAULT_TARGET_QTY`).
+ */
+export async function dashboardInventory(db: D1Database, userId: string, category: string | null, config: { low_inventory_default_g: number }) {
   const rows = await inventoryBalances(db, userId, category);
-  return rows.map((r) => ({ ...r, name: { ar: r.name_ar, en: r.name_en, ckb: r.name_ckb } }));
+  return rows.map((r) => ({
+    ...r,
+    name: { ar: r.name_ar, en: r.name_en, ckb: r.name_ckb },
+    low_stock_alert_default_qty: lowStockDefaultQty(r.unit_code, config),
+    top_up_default_target_qty: TOP_UP_DEFAULT_TARGET_QTY,
+  }));
 }
 
-export async function dashboardJobs(db: D1Database, userId: string) {
-  const rows = await many<{ id: string; title: string; status: string; printer_model_id: string; created_at: string; updated_at: string }>(
+// ------------------------------------------------------------------ the two ledgers, paged exactly
+
+/**
+ * Where a ledger page starts, newest first. `before` alone keeps its old
+ * meaning — rows strictly before that instant; with `before_id`, the id of
+ * the last row of the previous page, the cursor is EXACT: rows before that
+ * instant, and rows OF that instant whose id sorts before it — the page's own
+ * order (created_at DESC, id DESC). One batch writes several rows at one
+ * instant (a payment's purchases, a settlement's consume and release), so a
+ * page that ends inside such an instant must name the row it ended on, or the
+ * rest of that instant is skipped by every later page.
+ */
+export function ledgerCursor(before: string | null | undefined, beforeId: string | null | undefined): { sql: string; params: string[] } {
+  if (beforeId && !before) throw invalid('before_id', 'requires_before');
+  if (!before) return { sql: '', params: [] };
+  if (!beforeId) return { sql: ' AND created_at < ?', params: [before] };
+  return { sql: ' AND (created_at < ? OR (created_at = ? AND id < ?))', params: [before, before, beforeId] };
+}
+
+/** GET /me/credits/ledger: the customer's hours movements, newest first, from the cursor. */
+export async function creditLedgerPage(db: D1Database, userId: string, cursor: { before?: string | null; beforeId?: string | null }, limit: number) {
+  const cut = ledgerCursor(cursor.before, cursor.beforeId);
+  return many<Record<string, unknown>>(
     db,
-    'SELECT id, title, status, printer_model_id, created_at, updated_at FROM pc_print_jobs WHERE user_id = ? ORDER BY created_at DESC LIMIT 500',
+    `SELECT id, tier_id, entry_type, delta_available, delta_reserved, delta_consumed, job_id, order_id, value_iqd, note, created_at
+       FROM pc_credit_ledger WHERE user_id = ?${cut.sql} ORDER BY created_at DESC, id DESC LIMIT ?`,
+    userId,
+    ...cut.params,
+    limit
+  );
+}
+
+/** GET /me/inventory/ledger: the customer's material movements (optionally of one variant), newest first, from the cursor. */
+export async function inventoryLedgerPage(
+  db: D1Database,
+  userId: string,
+  variantId: string | null,
+  cursor: { before?: string | null; beforeId?: string | null },
+  limit: number
+) {
+  const cut = ledgerCursor(cursor.before, cursor.beforeId);
+  return many<Record<string, unknown>>(
+    db,
+    `SELECT id, variant_id, entry_type, delta_available, delta_reserved, delta_consumed, ref_type, ref_id, value_iqd, note, created_at
+       FROM pc_inventory_ledger WHERE user_id = ?${variantId ? ' AND variant_id = ?' : ''}${cut.sql} ORDER BY created_at DESC, id DESC LIMIT ?`,
+    userId,
+    ...(variantId ? [variantId] : []),
+    ...cut.params,
+    limit
+  );
+}
+
+/**
+ * The customer's jobs, grouped. `shipment_id` names the live shipment a
+ * finished print is on — the very test POST /shipments refuses a second one
+ * by (fulfillment.ts `assessShipmentRequest`) — so a screen knows which
+ * prints can still leave without reading every shipment.
+ */
+export async function dashboardJobs(db: D1Database, userId: string) {
+  const rows = await many<{ id: string; title: string; status: string; printer_model_id: string; created_at: string; updated_at: string; shipment_id: string | null }>(
+    db,
+    `SELECT j.id, j.title, j.status, j.printer_model_id, j.created_at, j.updated_at, ${LIVE_SHIPMENT_OF_JOB_SQL} AS shipment_id
+       FROM pc_print_jobs j WHERE j.user_id = ? ORDER BY j.created_at DESC LIMIT 500`,
     userId
   );
   const group = (statuses: string[]) => rows.filter((r) => statuses.includes(r.status));

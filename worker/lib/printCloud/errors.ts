@@ -50,6 +50,7 @@ export type PcErrorCode =
   | 'CONVERSION_DISABLED'
   | 'BUYBACK_NOT_ALLOWED'
   | 'DELIVERY_NOT_AVAILABLE'
+  | 'ALREADY_IN_SHIPMENT'
   | 'AGENT_UNAUTHORIZED'
   | 'DEPENDENCY_NOT_MET'
   | 'ADAPTER_NOT_CONNECTED';
@@ -262,6 +263,13 @@ const WORDS: Record<PcErrorCode, Words> = {
     ar: 'التوصيل غير متاح لهذا الطلب',
     en: 'Delivery is not available for this request',
     ckb: 'گەیاندن بۆ ئەم داواکارییە بەردەست نییە',
+  },
+  // A finished print is on at most one live shipment (fulfillment.ts); details name the job and that shipment.
+  ALREADY_IN_SHIPMENT: {
+    status: 409,
+    ar: 'هذه الطباعة ضمن شحنة أخرى بالفعل',
+    en: 'This print is already on another shipment',
+    ckb: 'ئەم چاپە پێشتر لە ناردنێکی تردایە',
   },
   AGENT_UNAUTHORIZED: {
     status: 401,
