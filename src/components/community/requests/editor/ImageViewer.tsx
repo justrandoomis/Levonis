@@ -19,7 +19,7 @@
  *     covers the field.
  */
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Star, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Minus, Plus, Star, Trash2, X } from 'lucide-react';
 import { Overlay } from '../../../ui/Overlay';
 import { Button, IconButton } from '../../../ui/Button';
 import { Textarea } from '../../../ui/Field';
@@ -180,7 +180,7 @@ export function ImageViewer({
           <p className="min-w-0 flex-1 text-center text-[13px] font-semibold tabular-nums text-text-secondary" aria-live="polite" data-viewer-position>
             <bdi dir="ltr">{fill(t.position, { n: at + 1, total })}</bdi>
           </p>
-          <IconButton label={zoom > 1 ? t.zoomOut : t.zoomIn} icon={zoom > 1 ? <ZoomOut className="h-5 w-5" /> : <ZoomIn className="h-5 w-5" />} onClick={toggleZoom} />
+          <IconButton label={zoom > 1 ? t.zoomOut : t.zoomIn} icon={zoom > 1 ? <Minus className="h-5 w-5" /> : <Plus className="h-5 w-5" />} onClick={toggleZoom} />
         </div>
 
         <div

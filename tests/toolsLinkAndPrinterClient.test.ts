@@ -47,23 +47,24 @@ test('the calculator\'s «send a print request» step disappears while the commu
   assert.match(tools, /\{quote && !requestsClosed && \(/);
 });
 
-test('the wizard opens on the link source with the carried link, and checks it', () => {
-  // Wizard v2 (W5-A, src/components/community/requests/RequestWizard.tsx):
-  // the carried link fills the LINK source in the initial state and is
-  // checked once on arrival.
-  const wizard = read('src/components/community/requests/RequestWizard.tsx');
-  assert.match(wizard, /initialLink\?: string;/);
-  assert.match(wizard, /initialLink \? \{ \.\.\.EMPTY_WIZARD, source_type: 'link', source_url: initialLink \}/);
-  const effect = wizard.slice(wizard.indexOf('const initialLinkTaken'), wizard.indexOf('function validateStep1'));
-  assert.match(effect, /void checkLink\(\)/);
+test('the editor opens with the carried link, and checks it once on arrival', () => {
+  // The four-step editor (community UI plan C4, src/components/community/requests/editor/RequestEditor.tsx):
+  // the carried link is checked through the server once the blank page is ready, which is the
+  // act that makes the draft; the link becomes a link source of step 1.
+  const editor = read('src/components/community/requests/editor/RequestEditor.tsx');
+  assert.match(editor, /carriedLink: carried = '',/);
+  const effect = editor.slice(editor.indexOf('const carriedLink = useRef(false);'), editor.indexOf('// ---------------------------------------------------------------- uploads'));
+  assert.match(effect, /const link = arrival\.current\.link;/);
+  assert.match(effect, /void addLinkFlowRef\.current\(link\)/);
+  assert.match(editor, /const d = await requestsApi\.checkLink\(url\);/, 'checked by the server, never fetched from the browser');
 
   // The board forwards the carried link to the editor route (community UI plan B4), router state
-  // and ?link= both, and the editor hands it to the wizard.
+  // and ?link= both, and the editor page hands it to the editor.
   const requests = read('src/pages/Requests.tsx');
   assert.match(requests, /printLink/);
   assert.match(requests, /carriedLink && user \? 'new' : 'board'/);
   assert.match(requests, /navigate\(newRequestTarget\(params\), \{ replace: true, state: location\.state \}\)/);
-  assert.match(read('src/pages/community/RequestNew.tsx'), /initialLink=\{carriedLink \|\| undefined\}/);
+  assert.match(read('src/pages/community/RequestNew.tsx'), /<RequestEditor requestId=\{id\} carriedLink=\{carriedLink\}/);
 });
 
 test('a second file dropped mid-upload cannot price the wrong model', () => {

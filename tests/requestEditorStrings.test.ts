@@ -89,9 +89,10 @@ test('one word for a part, and the original file named as its refusal names it',
   assert.match(en.originalHint, /file name is listed/);
 });
 
-test('the bar fits 360 px: the primary step and every status are short in every language', () => {
+test('the header button fits beside a step title: the draft button and every status are short in every language', () => {
   for (const table of [ar, en, ckb]) {
-    assert.ok(table.review.length <= 12, table.review);
+    assert.ok(table.saveDraft.length <= 22, table.saveDraft);
+    assert.ok(table.next.length <= 12 && table.reviewCta.length <= 24 && table.publishCta.length <= 28, table.next);
     for (const k of ['statusSaved', 'statusSaving', 'statusDirty', 'statusFailed', 'statusOffline', 'statusConflict', 'statusEditDirty'] as const) {
       assert.ok(table[k].length <= 22, `${k}: ${table[k]}`);
     }
@@ -117,7 +118,7 @@ test('the editor never shows the sheet grabber words (their Sorani slot is still
   // (tests/bundleBudget.test.ts). Every editor sheet has ONE detent, so a
   // Sorani reader of the editor never meets those words.
   const dir = join(ROOT, 'src/components/community/requests/editor');
-  for (const f of ['MaterialPicker.tsx', 'ColourPicker.tsx', 'ReviewSheet.tsx']) {
+  for (const f of ['MaterialPicker.tsx', 'ColourPicker.tsx', 'DeliveryFields.tsx']) {
     const src = readFileSync(join(dir, f), 'utf8');
     assert.match(src, /detents=\{\['large'\]\}/, f);
     assert.doesNotMatch(src, /dragHandle|'medium'/, f);

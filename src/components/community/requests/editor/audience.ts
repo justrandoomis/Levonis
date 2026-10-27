@@ -17,7 +17,7 @@
  *             came from
  *
  * THE NAME IS NOT «ACCEPTED ONLY» (design critique 7): a merchant with a
- * standing offer reads it in the request's conversation, and the store a
+ * standing offer reads it in the conversation of the request, and the store a
  * direct request is sent to reads it from the start; the phone number and
  * the address wait for acceptance (the contact snapshot).
  */
@@ -45,7 +45,7 @@ const reg = (key: string): PanelGroup => groupOf(REQUEST_FIELD_VISIBILITY[key]);
 
 /**
  * Every row the panel can show, with the registry keys it speaks for. The
- * group of a registry row IS the registry's audience; a file row reads the
+ * group of a registry row IS the audience of the registry; a file row reads the
  * file matrix.
  */
 export const PANEL_ROWS = {
@@ -70,7 +70,7 @@ export const PANEL_ROWS = {
 
 export type PanelRowKey = keyof typeof PANEL_ROWS;
 
-/** The group each row belongs to: the registry's, or the file matrix's, or the parties’ view. */
+/** The group each row belongs to: the registry, or the file matrix, or the parties’ view. */
 export function rowGroup(key: PanelRowKey): PanelGroup {
   if (key === 'models') return groupOf(REQUEST_FILE_VISIBILITY.model.bytes);
   if (key === 'modelPreview') return groupOf(REQUEST_FILE_VISIBILITY.model.preview);

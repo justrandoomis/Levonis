@@ -26,11 +26,11 @@ export default function CustomRequestCtaBlock({ block, store }: BlockProps<'cust
             <Hammer className="w-4 h-4" aria-hidden="true" />
           </div>
           <h2 className="sf-title text-white" dir="auto">
-            {text(s.title) || loc('عندك تصميم؟ نطبعه لك', 'Have a design? We will print it')}
+            {text(s.title) || loc('عندك تصميم؟ نطبعه لك', 'Have a design? We will print it', 'دیزاینت هەیە؟ بۆت چاپ دەکەین')}
           </h2>
         </div>
         <Paragraphs
-          text={text(s.body) || loc('ارفع ملفك واطلب عرض سعر — المبلغ يبقى محجوزًا حتى تستلم عملك.', 'Upload your file and request a quote — your money stays held until you receive the work.')}
+          text={text(s.body) || loc('ارفع ملفك واطلب عرض سعر — المبلغ يبقى محجوزًا حتى تستلم عملك.', 'Upload your file and request a quote — your money stays held until you receive the work.', 'فایلەکەت بەرز بکەرەوە و داوای نرخ بکە — پارەکەت دەپارێزرێت تا کارەکەت وەردەگریت.')}
           className="text-zinc-400 text-[12.5px] leading-relaxed"
         />
         <a
@@ -40,7 +40,6 @@ export default function CustomRequestCtaBlock({ block, store }: BlockProps<'cust
           {text(s.label) || loc('اطلب عرض سعر', 'Request a quote', 'داوای نرخ بکە')}
         </a>
       </div>
-      {/* OWNER: Sorani to be written by hand. */}
     </Column>
   );
 }

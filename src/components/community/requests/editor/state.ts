@@ -25,7 +25,7 @@
  * from what is held (the server keeps a field the body does not name). So an
  * unchanged save of a published request never re-sends a deadline that has
  * since passed, and the hash a merchant priced stays where it was. The
- * budget's switch (Q2, «اعرض ميزانيتي للتجار») is `budgetVisible`, off by
+ * switch of the budget (Q2, «اعرض ميزانيتي للتجار») is `budgetVisible`, off by
  * default.
  *
  * THE MAIN SOURCE. A source the customer marked is the main one; when none
@@ -521,6 +521,33 @@ export function chooseMaterial(s: EditorState, partKey: Key, matKey: Key, materi
   if (!part) return next;
   const procs = [...new Set(part.materials.filter((m) => m.materialId && m.materialId !== 'unsure').map((m) => processOf(m.materialId)).filter(Boolean))];
   return procs.length === 1 ? updatePart(next, partKey, { process: procs[0] as 'fdm' | 'resin' }) : next;
+}
+
+/**
+ * The print method chosen on its tiles (step 2, «طريقة الطباعة»): the part
+ * takes it, and a material of the other method goes back to «لست متأكدًا»
+ * (its colours stay), so the part never names a method its material denies.
+ * Returns the state and whether a material had to go.
+ */
+export function chooseProcess(s: EditorState, partKey: Key, process: ProcessPick, processOf: (id: string) => 'fdm' | 'resin' | ''): [EditorState, boolean] {
+  const part = s.parts.find((p) => p.key === partKey);
+  if (!part) return [s, false];
+  let cleared = false;
+  const materials = part.materials.map((m) => {
+    const own = m.materialId && m.materialId !== 'unsure' ? processOf(m.materialId) : '';
+    if (process !== 'unsure' && own && own !== process) {
+      cleared = true;
+      return { ...m, materialId: 'unsure' };
+    }
+    return m;
+  });
+  return [updatePart(s, partKey, { process, materials }), cleared];
+}
+
+/** The method a part is printed by: its material decides it, else the tile the customer chose. */
+export function partProcess(p: EditorPart, processOf: (id: string) => 'fdm' | 'resin' | ''): ProcessPick {
+  const own = [...new Set(p.materials.filter((m) => m.materialId && m.materialId !== 'unsure').map((m) => processOf(m.materialId)).filter(Boolean))];
+  return own.length === 1 ? (own[0] as 'fdm' | 'resin') : p.process;
 }
 
 /** The part with every material still open: only then is the process the customer’s own choice. */

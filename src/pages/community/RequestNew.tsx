@@ -1,47 +1,49 @@
 /**
- * THE REQUEST EDITOR ROUTES (community UI plan B4, §4), a placeholder until
- * C4 builds the four-step editor with P1-06 folded in:
+ * THE REQUEST EDITOR ROUTES (community UI plan B4 and C4, §4): the four-step
+ * editor of P1-06 (src/components/community/requests/editor/RequestEditor.tsx)
+ * under its own address:
  *
- *   /requests/new            a new request
- *   /requests/new/:id        a draft, continued («أكمل المسودة»; `?step=4`
- *                            will open it at its review once C4 reads it)
- *   /requests/:id/edit       a published request, edited
+ *   /requests/new                   a new request; its draft is born on the
+ *                                   first act and the address becomes
+ *                                   /requests/new/:id?step=1 in place
+ *   /requests/new/:id?step=1..4     a draft, at its step («أكمل وانشر» opens
+ *                                   it at its review, `?step=4`)
+ *   /requests/:id/edit?step=1..4    a published request, edited, saved with
+ *                                   «احفظ التعديلات»
  *
- * Today each renders the wizard the board used to open in place
- * (requests/RequestWizard.tsx), full screen under its own section header.
- * The addresses land first so every door can name them: the board forwards
+ * Every old door lands here with what it carried: the board forwards
  * `?view=new`, `?link=`, `?project=` and the router state (`printLink`,
- * `project`) here (src/pages/Requests.tsx), and the request page sends its
- * edit and its draft here (src/pages/community/Request.tsx). The step in the
- * address and the project prefill are carried in the location for C4; the
- * wizard of today starts at its first step and has no project source, so
- * the request page offers no «أكمل وانشر» until the editor honours the step.
+ * `project`) here (src/pages/Requests.tsx), the request page sends its edit
+ * and its draft here (src/pages/community/Request.tsx), «اطلب طباعة مثلها»
+ * names the project, and the store and product doors name the store
+ * (`?store=`, `?product=&store=`). The editor reads them once, on arrival.
  *
  * Behind ProtectedRoute and CommunityGate (src/App.tsx): writing a request
  * needs an account, and the community open to it.
  *
  * AN ADDRESS FOR A REQUEST THIS PERSON CANNOT OPEN (B2R2-L10N-1): another
  * person request, a discarded draft, a stale or mistyped link. The server
- * answers each with 404 «NOT_FOUND», and the wizard alone drew its empty form
- * under the server English sentence. The page asks for the draft itself,
- * beside the wizard (two asks of one address in flight are one request,
+ * answers each with 404 «NOT_FOUND»; the page asks for the draft itself,
+ * beside the editor (two asks of one address in flight are one request,
  * lib/api.ts), and says a request it cannot open the way the request page
  * says it, in the reader language, with the way back to the board.
  */
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams, type NavigateFunction } from 'react-router-dom';
 import CommunitySurface from '../../components/community/CommunitySurface';
 import SectionPageHeader from '../../components/community/kit/SectionPageHeader';
 import { requestsApi } from '../../components/community/requests/api';
+import RequestEditor, { type EditorDone } from '../../components/community/requests/editor/RequestEditor';
 import { useRequestStrings } from '../../components/community/requests/strings';
 import { NotFoundState } from '../../components/ui/AsyncStates';
-import { Skeleton } from '../../components/ui/Skeleton';
 import { ApiError } from '../../lib/api';
 import { useGoBack } from '../../lib/useGoBack';
 
-// The wizard is its own chunk, as it was when the board and the request page
-// opened it in place: the header paints first, and the entry stays small.
-const RequestWizard = lazy(() => import('../../components/community/requests/RequestWizard'));
+// The editor rides in this page chunk, which the board already loads lazily
+// (src/pages/Requests.tsx): a chunk of its own split the modules it shares
+// with the request page into new chunks, and their names landed in the entry
+// preload map, which the storefront payload has no room for
+// (tests/bundleBudget.test.ts).
 
 const requestPath = (id: string) => `/requests/${encodeURIComponent(id)}`;
 
@@ -168,14 +170,20 @@ export default function RequestNew() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const s = useRequestStrings();
+  // The id this screen was OPENED with: a new request keeps being one after
+  // its draft is born and the address takes its id (the route is one element
+  // for /requests/new and /requests/new/:id, so this page stays mounted).
+  const opened = useRef(id);
   const editing = !!id && location.pathname.endsWith('/edit');
-  const carriedLink = id ? '' : carriedPrintLink(location.state, params);
-  const fromBoard = !id && cameFromBoard(location.state);
-  // Back: to the request this screen is about, else to the board.
-  const goBack = useGoBack(id ? requestPath(id) : '/requests');
+  // A model link a door carried to a new request, read once on arrival.
+  const [carriedLink] = useState(() => (id ? '' : carriedPrintLink(location.state, params)));
+  // Opened from the board «طلب جديد» (B2R3-REG-1), read once: the draft address replaces the state.
+  const [fromBoard] = useState(() => !id && cameFromBoard(location.state));
+  // Back: to the request this screen was opened for, else to the board.
+  const goBack = useGoBack(opened.current ? requestPath(opened.current) : '/requests');
 
-  // The request behind a draft or edit address, asked beside the wizard: only
-  // a 404 changes the page; anything else is the wizard own to say.
+  // The request behind a draft or edit address, asked beside the editor: only
+  // a 404 changes the page; anything else is the editor own to say.
   const [missing, setMissing] = useState(false);
   useEffect(() => {
     setMissing(false);
@@ -195,12 +203,20 @@ export default function RequestNew() {
    * «طلباتي» behind it, where it now is (leaveNewRequest); a draft or an edit
    * goes back to its page, the one entry that opened this screen
    * (returnPublished: never a second copy of it, so one Back leaves the
-   * request), else as Back would.
+   * request), else as Back would. The editor has walked back its own steps
+   * first, so this runs on the entry the editor was opened on.
    */
   const done = (rid: string, how: 'published' | 'saved') => {
+    const id = opened.current;
     if (!id) leaveNewRequest(navigate, requestPath(rid), how === 'published', window, fromBoard);
     else if (how === 'published') returnPublished(navigate, requestPath(rid));
     else goBack();
+  };
+
+  /** A request for one store, SENT: its conversation, with «طلباتي» behind it. */
+  const finish = (d: EditorDone) => {
+    if (d.how === 'sent') leaveNewRequest(navigate, `/chat/${encodeURIComponent(d.chatId)}`, false, window, fromBoard);
+    else done(d.id, d.how);
   };
 
   if (missing) {
@@ -222,12 +238,9 @@ export default function RequestNew() {
   }
 
   return (
-    <CommunitySurface className="min-h-screen w-full pb-28">
-      <div className="mx-auto flex max-w-2xl flex-col gap-2 px-4" data-request-editor={editing ? 'edit' : id ? 'draft' : 'new'}>
-        <SectionPageHeader title={editing ? s.editRequest : id ? s.continueDraft : s.kicker} backTo={id ? requestPath(id) : '/requests'} />
-        <Suspense fallback={<Skeleton className="h-64 w-full rounded-xl" />}>
-          <RequestWizard key={id || 'new'} requestId={id || undefined} initialLink={carriedLink || undefined} onDone={done} onCancel={goBack} />
-        </Suspense>
+    <CommunitySurface className="min-h-screen w-full">
+      <div className="mx-auto flex max-w-2xl flex-col px-4 lg:max-w-3xl" data-request-editor={editing ? 'edit' : id ? 'draft' : 'new'}>
+        <RequestEditor requestId={id} carriedLink={carriedLink} onDone={finish} onLeave={goBack} />
       </div>
     </CommunitySurface>
   );

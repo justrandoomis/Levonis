@@ -2,9 +2,13 @@
  * PRINT REQUESTS v2 (stream W5-A), as shipped, on canned answers.
  *
  * A browser fixture (served only by a local `vite`) for screenshots of the
- * wizard and the offers in Arabic and English at a phone and a desktop width:
+ * request editor (its four steps, community UI plan C4) and the offers in
+ * Arabic and English at a phone and a desktop width:
  *
- *   /tests/browser/print-requests-v2.html?lang=ar|en|ckb&view=wizard|new|offers|merchant|mine|viewer|viewer-full
+ *   /tests/browser/print-requests-v2.html?lang=ar|en|ckb&view=wizard|new|edit|offers|merchant|mine|viewer|viewer-full[&step=1..4]
+ *
+ * The editor reads its step from the address; a signed-out session (no
+ * /api/auth/me here) shows it as a signed-out reader would, without saving.
  *
  * `viewer` is /model-viewer/<token> with the grant a board merchant gets
  * ('preview' — the «معاينة مبسّطة» label); `viewer-full` the customer's.
@@ -17,7 +21,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '../../src/AuthContext';
 import { LanguageProvider } from '../../src/LanguageContext';
 import { Toaster } from '../../src/components/ui/Toast';
-import RequestWizard from '../../src/components/community/requests/RequestWizard';
+import RequestEditor from '../../src/components/community/requests/editor/RequestEditor';
 import OfferCompare from '../../src/components/community/offers/OfferCompare';
 import MerchantOfferPanel from '../../src/components/community/offers/MerchantOfferPanel';
 import ModelViewer from '../../src/pages/ModelViewer';
@@ -93,7 +97,7 @@ function Page() {
       <div className="mx-auto max-w-2xl lg:max-w-5xl">
         {view === 'wizard' || view === 'new' || view === 'edit' ? (
           <div className="mx-auto max-w-2xl">
-            <RequestWizard requestId={view === 'new' ? undefined : 'req_1'} onDone={() => undefined} onCancel={() => undefined} />
+            <RequestEditor requestId={view === 'new' ? '' : 'req_1'} onDone={() => undefined} onLeave={() => undefined} />
           </div>
         ) : view === 'offers' ? (
           <>
@@ -119,7 +123,7 @@ function Page() {
 createRoot(document.getElementById('root')!).render(
   <AuthProvider>
   <LanguageProvider>
-    <MemoryRouter initialEntries={[view.startsWith('viewer') ? '/model-viewer/tok_1' : '/']}>
+    <MemoryRouter initialEntries={[view.startsWith('viewer') ? '/model-viewer/tok_1' : `/requests/new/req_1?step=${params.get('step') ?? '1'}`]}>
       <Page />
       <Toaster />
     </MemoryRouter>

@@ -1,39 +1,62 @@
 /**
- * THE REQUEST EDITOR (plan P1-06, docs/DECISIONS.md row 268) — one page for a
- * new request, a draft and the edit of a published one, in place of the
- * four-step wizard:
+ * THE REQUEST EDITOR IN FOUR STEPS (community UI plan C4, §4; P1-06,
+ * docs/DECISIONS.md row 268): one editor for a new request, a draft and the
+ * edit of a published one, laid out as the references of the owner draw it:
  *
- *   «صف طلبك»    the title and the description (they name the draft);
- *   «ما لديك»    files, pictures, links and written references, together;
- *   «ماذا نطبع»  the job and its parts, materials and colours;
- *   and the bar under the thumb: where the save stands, and «مراجعة».
+ *   1 «الملفات والفكرة»     what the customer has (files, pictures, links,
+ *                           written references), the title, the description
+ *   2 «إعدادات الطباعة»     the method, the material and colour, the quality,
+ *                           the quantity, the size, the notes; more parts
+ *   3 «التسليم والميزانية»  the governorate, the handover, the day, the
+ *                           budget and its switch, the summary
+ *   4 «راجع طلبك»           every card with «تعديل», the estimate, «ما يراه
+ *                           الآخرون», and the verb: «انشر الطلب», «احفظ
+ *                           التعديلات» or «أرسل إلى {store}»
  *
- * THE DRAFT IS BORN ON THE FIRST CHANGE (the entry door, a draft born empty)
- * and the address becomes /requests/new/<id> in place, so a reload, a lost
- * connection or a tap on Back resumes it: what the server does not have yet
- * is in this tab’s copy (sessionMirror.ts) until it does (persistence.ts).
- * A published request opens at /requests/<id>/edit, where nothing is saved
- * until «احفظ التعديلات» — except files, which the upload doors attach at
- * once, as the banner says.
+ * THE STEP LIVES IN THE ADDRESS (`?step=1..4`): a step forward is a new
+ * history entry, so Android Back and the header back walk the steps, and a
+ * reload opens the same step with the same data (the server draft, plus this
+ * tab copy of what the server does not have yet, sessionMirror.ts).
+ *
+ * THE DRAFT IS BORN ON THE FIRST ACT (P1-06 critique 4: nothing is born of a
+ * visit alone): the first keystroke, file or link creates it through the
+ * entry door (POST /api/marketplace/print/requests) and the address becomes
+ * /requests/new/<id>?step=1 in place. An entry from a project («اطلب طباعة
+ * مثلها»: `state.project` or `?project=`), a product or a store is created
+ * on arrival; the server answers an untouched draft of the same origin again
+ * instead of making another. A published request opens at /requests/<id>/edit,
+ * where nothing is saved until «احفظ التعديلات» except files, which the
+ * upload doors attach at once, as the banner says (critique 2).
+ *
+ * LEAVING. The router of this app cannot block a navigation (critique 3), so
+ * the editor flushes with a keepalive save on every way out
+ * (persistence.ts), and its OWN back, on step 1, asks before leaving work the
+ * server could not take: a draft whose save failed, or the unpublished
+ * changes of a published request («تغادر دون حفظ؟»).
+ *
+ * After a publish the steps this visit pushed are walked back first, so the
+ * request page that follows has the board behind it, never the editor
+ * (critique 5); then the page (src/pages/community/RequestNew.tsx) lands on
+ * /requests/:id with `{ published: true }`.
  *
  * No 3D code is loaded here (BASE 6): «عرض ثلاثي الأبعاد» opens the existing
  * viewer in a new tab, which also keeps this page and its unsaved work open.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, MoreVertical, Store } from 'lucide-react';
+import { Ellipsis, Store } from 'lucide-react';
 import { useLanguage } from '../../../../LanguageContext';
 import { useAuth } from '../../../../AuthContext';
 import { ApiError } from '../../../../lib/api';
 import { apiRefusal } from '../../../../lib/refusalStrings';
 import { useSuppressBottomNav } from '../../../../lib/bottomNavSuppress';
-import { useMediaQuery } from '../../../../lib/useMediaQuery';
 import { useSignInPrompt } from '../../../../lib/guest';
-import { Button, IconButton } from '../../../ui/Button';
-import { Field, Input, Textarea, focusFirstInvalid } from '../../../ui/Field';
 import { Menu } from '../../../ui/Menu';
 import { useConfirm } from '../../../ui/ConfirmDialog';
 import { useToast } from '../../../ui/Toast';
+import { ActionDock } from '../../kit/display';
+import { CountedField } from '../../kit/fields';
+import { GoldButton, KitButton, KitIconButton } from '../../kit/buttons';
 import { warmLink } from '../../links/useLinkCard';
 import { forgetCommunityFeed } from '../../hub/feedCache';
 import { requestPath } from '../requestStates';
@@ -46,6 +69,7 @@ import {
   blankState,
   bodyKey,
   chooseMaterial,
+  chooseProcess,
   duplicatePart,
   editorBody,
   fileStored,
@@ -70,16 +94,16 @@ import {
 import { clearMirror, defaultMirrorStorage, dropOtherAccounts, mirrorBase, moveNewMirror, readMirror } from './sessionMirror';
 import { useDraftPersistence } from './persistence';
 import { useUploads, unfinishedUploads } from './uploads';
-import { COMPACT_QUERY, useKeyboardOpen } from './useKeyboardOpen';
-import { ActionBar } from './ActionBar';
+import { useKeyboardOpen } from './useKeyboardOpen';
 import { SourcesArea, sourceName } from './SourcesArea';
 import { gridPictures, type GridPicture } from './ImageGrid';
 import { ImageViewer } from './ImageViewer';
 import { PartsEditor } from './PartsEditor';
-import { ReviewSheet } from './ReviewSheet';
+import { ReviewStep, RequestSummary, type EditTarget } from './ReviewStep';
 import { DeliveryFields } from './DeliveryFields';
 import { AudiencePanel } from './AudiencePanel';
 import { partEstimates } from './estimate';
+import { WizardHeader, stepOf, stepTitle, type WizardStep } from './WizardHeader';
 import { editorLang, editorStrings, fill } from './strings';
 
 type Load =
@@ -89,15 +113,28 @@ type Load =
   | { phase: 'ready' }
   | { phase: 'locked'; requestId: string };
 
+/** How the editor hands the request back to its page. */
+export type EditorDone = { id: string; how: 'published' | 'saved' } | { id: string; how: 'sent'; chatId: string };
+
+/** The history state the editor stamps on a step it pushed: how many steps of this visit lie behind. */
+interface StepMark {
+  editorDepth?: number;
+  focus?: string;
+}
+
 /**
- * WHERE A NEW REQUEST COMES FROM, read from the editor's address (row 268):
- *   ?project=<post>                 a project's files, copied in
- *   ?product=<product>&store=<slug> a store product, for that store only
- *   ?store=<merchant>               «لهذا المتجر فقط»
+ * WHERE A NEW REQUEST COMES FROM, read from the editor address and the
+ * router state (row 268):
+ *   ?project=<post> or state.project   the files of a project, copied in («اطلب طباعة مثلها»)
+ *   ?product=<product>&store=<slug>    a store product, for that store only
+ *   ?store=<merchant>                  «لهذا المتجر فقط»
  * Anything else is a blank request (a carried `?link=` is added on arrival).
  */
-export function entryFrom(params: URLSearchParams): EditorEntry | null {
-  const project = params.get('project')?.trim();
+export function entryFrom(params: URLSearchParams, routerState?: unknown): EditorEntry | null {
+  const carried = (routerState as { project?: unknown } | null)?.project;
+  const fromState =
+    typeof carried === 'string' ? carried : carried && typeof carried === 'object' && typeof (carried as { id?: unknown }).id === 'string' ? (carried as { id: string }).id : '';
+  const project = (params.get('project') ?? fromState).trim();
   if (project) return { kind: 'project', post_id: project };
   const product = params.get('product')?.trim();
   const store = params.get('store')?.trim();
@@ -106,7 +143,7 @@ export function entryFrom(params: URLSearchParams): EditorEntry | null {
   return null;
 }
 
-/** A skipped copy in the reader's words: the editor's own for the copy codes, the refusal table for the rest. */
+/** A skipped copy in the reader words: the editor own for the copy codes, the refusal table for the rest. */
 export function copyReason(code: string, lang: 'ar' | 'en' | 'ckb', t: { copyTooLarge: string; copyKind: string; copyFull: string; copyMissing: string; copyChanged: string; copyFailed: string }): string {
   switch (code) {
     case 'COPY_TOO_LARGE':
@@ -131,7 +168,48 @@ export function editorPath(requestId: string, requestState: string): string {
   return requestState === 'draft' ? `/requests/new/${id}` : `/requests/${id}/edit`;
 }
 
-export default function RequestEditor({ requestId: routeId }: { requestId: string }) {
+/** The query of a step: `step` set, the entry keys of the arrival dropped (they are read once). */
+export function stepSearch(params: URLSearchParams, step: WizardStep): string {
+  const p = new URLSearchParams(params);
+  p.set('step', String(step));
+  for (const k of ['link', 'project', 'product', 'store']) p.delete(k);
+  return `?${p.toString()}`;
+}
+
+/** The step-1 questions the publish asks too: a title of 4–140 and a description of 10 or more. */
+export function describeErrors(s: Pick<EditorState, 'title' | 'description'>, t: { titleError: string; descError: string }): { title?: string; description?: string } {
+  const out: { title?: string; description?: string } = {};
+  const title = s.title.trim();
+  if (title.length < 4 || title.length > 140) out.title = t.titleError;
+  if (s.description.trim().length < 10) out.description = t.descError;
+  return out;
+}
+
+/** Bring an element into view and give it the focus (a heading or a section gets a programmatic tab stop). */
+function focusTarget(id: string): boolean {
+  const el = document.getElementById(id);
+  if (!el) return false;
+  const control = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLButtonElement || el instanceof HTMLSelectElement;
+  if (!control && !el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
+  el.scrollIntoView({ block: 'center' });
+  el.focus({ preventScroll: true });
+  return true;
+}
+
+export default function RequestEditor({
+  requestId: routeId,
+  carriedLink: carried = '',
+  onDone,
+  onLeave,
+}: {
+  requestId: string;
+  /** A model link a door carried to a new request (src/pages/community/RequestNew.tsx reads it). */
+  carriedLink?: string;
+  /** Called once the history entries of the steps are walked back. */
+  onDone: (done: EditorDone) => void;
+  /** Leave the editor (its own back on step 1, once allowed). */
+  onLeave: () => void;
+}) {
   const { lang, dir } = useLanguage();
   const L = editorLang(lang);
   const t = editorStrings(lang);
@@ -140,12 +218,11 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
   const { signIn } = useSignInPrompt();
   const navigate = useNavigate();
   const location = useLocation();
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const toast = useToast();
   const [confirm, confirmDialog] = useConfirm();
   useSuppressBottomNav();
   const keyboard = useKeyboardOpen();
-  const compact = useMediaQuery(COMPACT_QUERY);
   const storage = useMemo(() => defaultMirrorStorage(), []);
   const [touch] = useState(() => typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0);
 
@@ -158,17 +235,22 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
   const [quote, setQuote] = useState<Quote | null>(null);
   const [viewer, setViewer] = useState<number | null>(null);
   const [publishing, setPublishing] = useState(false);
-  const [publishError, setPublishError] = useState('');
+  const [publishError, setPublishError] = useState<{ text: string; closed: boolean } | null>(null);
+  const [processNotes, setProcessNotes] = useState<ReadonlySet<Key>>(() => new Set());
   /** What a project entry copied: the post, the count, and what it skipped (each with «انسخه مجددًا»). */
   const [copies, setCopies] = useState<(EntryCopies & { postId: string; seeded: boolean }) | null>(null);
   const [copying, setCopying] = useState('');
-  const rootRef = useRef<HTMLDivElement | null>(null);
   /** The link flow, for the effect that adds a carried link (it is defined below the render guards). */
   const addLinkFlowRef = useRef<(url: string) => Promise<string>>(async () => '');
   const stateRef = useRef<EditorState | null>(null);
   stateRef.current = state;
   const setState = useCallback((updater: (s: EditorState | null) => EditorState | null) => setStateRaw(updater), []);
   const edit = (fn: (s: EditorState) => EditorState) => setStateRaw((s) => (s ? fn(s) : s));
+
+  const mark = (location.state ?? null) as StepMark | null;
+  const depth = typeof mark?.editorDepth === 'number' ? mark.editorDepth : 0;
+  // A request not born yet has only its first step.
+  const step: WizardStep = state && !state.requestId ? 1 : stepOf(params.get('step'));
 
   const persistence = useDraftPersistence({
     state,
@@ -184,17 +266,19 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
 
   /** The id this page created itself: the address change it causes is not a new load. */
   const createdHere = useRef('');
+  /** The address the editor arrived at, read once: an entry and a carried link. */
+  const arrival = useRef({ entry: routeId ? null : entryFrom(params, location.state), link: routeId ? '' : carried.trim() });
   useEffect(() => {
     if (!userId) return;
     dropOtherAccounts(storage, userId);
     if (routeId && routeId === createdHere.current) return;
     let alive = true;
     setLoad({ phase: 'loading' });
-    const entry = routeId ? null : entryFrom(params);
+    const entry = routeId ? null : arrival.current.entry;
     if (entry) {
       // A draft made from a project, a product or a store: born on the server
       // (an idle one from the same origin is answered again), then loaded at
-      // its own address like every draft.
+      // its own address like every draft, at its first step.
       setLoad({ phase: 'entering', kind: entry.kind });
       editorApi
         .createEntry(entry, lang)
@@ -203,7 +287,7 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
           if (entry.kind === 'project') {
             setCopies({ postId: entry.post_id, files: copied?.files ?? 0, skipped: copied?.skipped ?? [], seeded: (draft.model?.parts.length ?? 0) > 1 });
           }
-          navigate(`/requests/new/${encodeURIComponent(request_id)}`, { replace: true });
+          navigate(`/requests/new/${encodeURIComponent(request_id)}?step=1`, { replace: true });
         })
         .catch((error) => alive && setLoad({ phase: 'failed', error, entry: true }));
       return () => {
@@ -230,7 +314,7 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
         }
         // The right address for what it is: a draft, or a published request.
         const want = editorPath(draft.id, draft.state);
-        if (location.pathname !== want) navigate(`${want}${location.search}`, { replace: true });
+        if (location.pathname !== want) navigate(`${want}${location.search}`, { replace: true, state: location.state });
         const copy = readMirror(storage, userId, draft.id, mirrorBase(fresh));
         persist.current.reset(fresh);
         setStateRaw(copy ? { ...copy, updatedAt: fresh.updatedAt, revision: fresh.revision, liveOffers: fresh.liveOffers, requestState: fresh.requestState } : fresh);
@@ -261,19 +345,17 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
         createdHere.current = request_id;
         const born = hydrate(draft);
         persist.current.reset(born);
-        setStateRaw((cur) =>
-          cur ? { ...cur, requestId: request_id, requestState: 'draft', updatedAt: born.updatedAt, revision: born.revision } : born
-        );
+        setStateRaw((cur) => (cur ? { ...cur, requestId: request_id, requestState: 'draft', updatedAt: born.updatedAt, revision: born.revision } : born));
         const cur = stateRef.current;
         if (cur) moveNewMirror(storage, userId, { ...cur, requestId: request_id, updatedAt: born.updatedAt });
-        navigate(`/requests/new/${encodeURIComponent(request_id)}${location.search}`, { replace: true });
+        navigate(`/requests/new/${encodeURIComponent(request_id)}?step=1`, { replace: true });
         return request_id;
       } finally {
         creating.current = null;
       }
     })();
     return creating.current;
-  }, [navigate, location.search, storage, userId]);
+  }, [navigate, storage, userId]);
 
   // The first change of a blank page creates the draft (critique 4): nothing is born of a visit alone.
   const blankKey = useMemo(() => bodyKey(blankState()), []);
@@ -288,16 +370,13 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
   }, [state, load.phase, blankKey, ensureRequest]);
 
   // A link carried to a blank page (Tools, a link card, an old address) is
-  // checked and added on arrival — which is the act that creates the draft.
+  // checked and added on arrival, which is the act that creates the draft.
   const carriedLink = useRef(false);
   useEffect(() => {
     if (carriedLink.current || load.phase !== 'ready' || !state || state.requestId) return;
-    const link = params.get('link')?.trim();
+    const link = arrival.current.link;
     if (!link) return;
     carriedLink.current = true;
-    const p = new URLSearchParams(params);
-    p.delete('link');
-    setParams(p, { replace: true });
     void addLinkFlowRef.current(link).then((err) => err && toast.error(err));
     // Once, when the blank page is ready.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -311,7 +390,7 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
     try {
       const r = await requestsApi.analyze(requestId, f.id);
       if (r.measure === 'later') setMeasureLater((s) => new Set([...s, f.id]));
-      if (r.analysis) edit((s) => ({ ...s, files: s.files.map((x) => (x.id === f.id ? { ...x, analysis: r.analysis } : x)) }));
+      if (r.analysis) setStateRaw((s) => (s ? { ...s, files: s.files.map((x) => (x.id === f.id ? { ...x, analysis: r.analysis } : x)) } : s));
     } catch {
       // the next visit measures it
     } finally {
@@ -377,8 +456,8 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
 
   // ---------------------------------------------------------------- leaving
 
-  // The browser asks before closing a tab that would lose work: a published
-  // request’s unpublished edits, or a draft the server could not take.
+  // The browser asks before closing a tab that would lose work: the
+  // unpublished edits of a published request, or a draft the server could not take.
   useEffect(() => {
     const risky = !!state && persistence.dirty && (isPublishedEdit(state) || ['failed', 'offline', 'signedOut', 'conflict'].includes(persistence.status));
     if (!risky) return;
@@ -390,13 +469,35 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
     return () => window.removeEventListener('beforeunload', ask);
   }, [state, persistence.dirty, persistence.status]);
 
+  // ---------------------------------------------------------------- a step arrives
+
+  // Each step opens at its top with the focus on its title, or on the card an
+  // «تعديل» of the review named. The first paint of a load keeps the page as it is.
+  const lastStep = useRef<WizardStep | null>(null);
+  useLayoutEffect(() => {
+    if (load.phase !== 'ready' || !state) return;
+    const want = mark?.focus;
+    if (lastStep.current === step && !want) return;
+    const first = lastStep.current === null;
+    lastStep.current = step;
+    requestAnimationFrame(() => {
+      if (want && focusTarget(want)) return;
+      if (first) return;
+      window.scrollTo({ top: 0 });
+      document.getElementById('main-scroll-container')?.scrollTo({ top: 0 });
+      focusTarget('editor-step-title');
+    });
+    // The step and the mark of its entry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, location.key, load.phase]);
+
   // ---------------------------------------------------------------- render guards
 
   if (load.phase === 'loading' || load.phase === 'entering' || (!state && load.phase === 'ready')) {
     const entering = load.phase === 'entering';
     return (
-      <div className="mx-auto max-w-2xl space-y-3 px-4 py-6" aria-busy="true" data-editor={entering ? `entering-${load.kind}` : 'loading'}>
-        <p className={entering ? 'text-[14px] font-semibold text-text-secondary' : 'sr-only'} role="status">
+      <div className="space-y-3 py-6" aria-busy="true" data-editor={entering ? `entering-${load.kind}` : 'loading'}>
+        <p className={entering ? 'text-[15px] font-semibold text-text-secondary' : 'sr-only'} role="status">
           {entering && load.kind === 'project' ? t.copyingProject : t.preparing}
         </p>
         <div className="h-24 animate-pulse rounded-xl bg-surface-selected motion-reduce:animate-none" />
@@ -406,24 +507,24 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
   }
   if (load.phase === 'failed') {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-10 text-center" data-editor="load-failed">
+      <div className="py-10 text-center" data-editor="load-failed">
         <p className="text-[15px] font-semibold text-text-primary">{load.entry ? t.entryFailed : t.loadFailed}</p>
         <p className="mt-1 text-[13px] text-text-secondary">{apiRefusal(load.error, L, '')}</p>
-        <Button className="mt-4" variant="secondary" onClick={() => navigate(0)}>
+        <KitButton className="mt-4" variant="secondary" onClick={() => navigate(0)}>
           {t.retryLoad}
-        </Button>
+        </KitButton>
       </div>
     );
   }
   if (load.phase === 'locked' || !state) {
     const id = load.phase === 'locked' ? load.requestId : '';
     return (
-      <div className="mx-auto max-w-2xl px-4 py-10 text-center" data-editor="not-editable">
+      <div className="py-10 text-center" data-editor="not-editable">
         <p className="text-[15px] font-semibold text-text-primary">{t.notEditable}</p>
         {id && (
-          <Button className="mt-4" variant="primary" onClick={() => navigate(requestPath(id), { replace: true })}>
+          <GoldButton className="mt-4" onClick={() => navigate(requestPath(id), { replace: true })}>
             {t.openRequest}
-          </Button>
+          </GoldButton>
         )}
       </div>
     );
@@ -441,19 +542,72 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
   };
   const pictures: GridPicture[] = gridPictures(s, uploads.rows);
   const estimates = partEstimates(quote, s.parts.length, L, t);
-  const titleText = publishedEdit ? t.titleEdit : s.requestId ? t.titleDraft : t.titleNew;
+  const processOf = (id: string): 'fdm' | 'resin' | '' => catalogue.find((m) => m.id === id)?.process ?? '';
+  const saveRefusal = persistence.error ? apiRefusal(persistence.error, L, t.saveFailed) : '';
 
-  // ---------------------------------------------------------------- actions
+  // ---------------------------------------------------------------- moving between steps
 
-  const goBack = () => {
-    if (location.key !== 'default') navigate(-1);
-    else navigate('/requests?view=mine');
+  /** A step forward: a new history entry, marked with how many steps of this visit lie behind. */
+  const pushStep = (to: WizardStep) => {
+    const mark: StepMark = { editorDepth: depth + 1 };
+    navigate({ pathname: location.pathname, search: stepSearch(params, to) }, { state: mark });
+  };
+  /** A move that is not a step forward (back without a pushed step, an «تعديل» of the review): the entry is replaced. */
+  const jumpStep = (to: WizardStep, focus?: string) => {
+    const mark: StepMark = { editorDepth: depth, ...(focus ? { focus } : {}) };
+    navigate({ pathname: location.pathname, search: stepSearch(params, to) }, { replace: true, state: mark });
+  };
+
+  /** Walk back the steps this visit pushed, then go on (the page behind the editor is what Back reaches next). */
+  const unwind = (then: () => void) => {
+    if (depth <= 0) {
+      then();
+      return;
+    }
+    window.addEventListener('popstate', () => setTimeout(then, 0), { once: true });
+    navigate(-depth);
   };
 
   const flushOnLeave = (e: React.FocusEvent<HTMLElement>) => {
-    const next = e.relatedTarget as Node | null;
-    if (next && e.currentTarget.contains(next)) return;
+    const nextFocus = e.relatedTarget as Node | null;
+    if (nextFocus && e.currentTarget.contains(nextFocus)) return;
     void persistence.flush();
+  };
+
+  const next = async () => {
+    if (step === 1 && !publishedEdit) {
+      const found = describeErrors(s, t);
+      setErrors(found);
+      if (found.title || found.description) {
+        requestAnimationFrame(() => focusTarget(found.title ? 'editor-title' : 'editor-description'));
+        return;
+      }
+    }
+    if (!publishedEdit) await persistence.flush();
+    pushStep((step + 1) as WizardStep);
+  };
+
+  /** The header back: the step before, or, on step 1, out (asking first when work would be lost). */
+  const back = async () => {
+    if (step > 1) {
+      if (depth > 0) navigate(-1);
+      else jumpStep((step - 1) as WizardStep);
+      return;
+    }
+    if (persistence.dirty) {
+      const saved = !publishedEdit && s.requestId ? await persistence.flush() : false;
+      if (!saved) {
+        const ok = await confirm({
+          title: t.leaveTitle,
+          consequence: publishedEdit ? t.leaveBodyEdit : t.leaveBody,
+          confirmLabel: t.leave,
+          cancelLabel: t.stay,
+          destructive: true,
+        });
+        if (!ok) return;
+      }
+    }
+    onLeave();
   };
 
   const pickFiles = async (files: File[]) => {
@@ -477,7 +631,6 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
       return apiRefusal(e, L, t.linkInvalid);
     }
   };
-
   addLinkFlowRef.current = addLinkFlow;
 
   const addTextFlow = (text: string): string => {
@@ -519,33 +672,16 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
     }
   };
 
-  const openReview = async () => {
-    setPublishError('');
+  const publish = async () => {
+    setPublishError(null);
     if (!publishedEdit) {
-      const next: typeof errors = {};
-      const title = s.title.trim();
-      if (title.length < 4 || title.length > 140) next.title = t.titleError;
-      if (s.description.trim().length < 10) next.description = t.descError;
-      setErrors(next);
-      if (next.title || next.description) {
-        requestAnimationFrame(() => focusFirstInvalid(rootRef.current));
+      const found = describeErrors(s, t);
+      if (found.title || found.description) {
+        setErrors(found);
+        jumpStep(1, found.title ? 'editor-title' : 'editor-description');
         return;
       }
-      await persistence.flush();
     }
-    const p = new URLSearchParams(params);
-    p.set('review', '1');
-    setParams(p);
-  };
-  const reviewOpen = params.get('review') === '1';
-  const closeReview = () => {
-    const p = new URLSearchParams(params);
-    p.delete('review');
-    setParams(p, { replace: true });
-  };
-
-  const publish = async () => {
-    setPublishError('');
     if (uploads.failed > 0) {
       const ok = await confirm({ title: t.failedUploadsTitle, consequence: t.failedUploadsBody.replace('{n}', String(uploads.failed)), confirmLabel: t.publishWithout });
       if (!ok) return;
@@ -558,31 +694,29 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
     try {
       const id = await ensureRequest();
       if (!publishedEdit && !(await persistence.flush())) {
-        setPublishError(persistence.status === 'conflict' ? t.conflictTitle : t.saveFailed);
+        setPublishError({ text: persistence.status === 'conflict' ? t.conflictTitle : t.saveFailed, closed: false });
         return;
       }
       const cur = stateRef.current ?? s;
       if (cur.direct && !publishedEdit) {
         // A request for one store is SENT: its conversation opens and its
-        // card lands there; the customer reads the store's offer in it.
+        // card lands there; the customer reads the store offer in it.
         const sent = await editorApi.sendDirect(id);
         clearMirror(storage, userId, id);
         persistence.reset(cur);
         toast.success(fill(t.directSentTitle, { store: cur.direct.store_name }));
-        navigate('/requests?view=mine', { replace: true });
-        navigate(`/chat/${encodeURIComponent(sent.chat_id)}`);
+        unwind(() => onDone({ id, how: 'sent', chatId: sent.chat_id }));
         return;
       }
       await editorApi.publish(id, editorBody(cur));
       forgetCommunityFeed('requests');
       clearMirror(storage, userId, id);
       persistence.reset(cur);
-      if (publishedEdit) toast.success(t.changesSaved);
-      // Back from the request lands on «طلباتي», never in the editor again (critique 5).
-      navigate('/requests?view=mine', { replace: true });
-      navigate(requestPath(id), { state: { published: !publishedEdit } });
+      toast.success(publishedEdit ? t.changesSaved : t.publishedToast);
+      unwind(() => onDone({ id, how: publishedEdit ? 'saved' : 'published' }));
     } catch (e) {
-      setPublishError(apiRefusal(e, L, publishedEdit ? t.saveFailed : s.direct ? t.sendFailed : t.publishFailed));
+      const closed = e instanceof ApiError && e.code === 'COMMUNITY_CLOSED';
+      setPublishError({ text: closed ? t.closedNotice : apiRefusal(e, L, publishedEdit ? t.saveFailed : s.direct ? t.sendFailed : t.publishFailed), closed });
     } finally {
       setPublishing(false);
     }
@@ -591,7 +725,7 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
   const deleteDraft = async () => {
     if (!s.requestId) {
       clearMirror(storage, userId, '');
-      navigate('/requests?view=mine', { replace: true });
+      onLeave();
       return;
     }
     const ok = await confirm({ title: t.deleteDraftTitle, consequence: t.deleteDraftBody, confirmLabel: t.deleteDraft, destructive: true });
@@ -602,7 +736,7 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
       persistence.reset(s);
       forgetCommunityFeed('requests');
       toast.success(t.draftDeleted);
-      navigate('/requests?view=mine', { replace: true });
+      unwind(() => navigate('/requests?view=mine', { replace: true }));
     } catch (e) {
       toast.error(apiRefusal(e, L, t.saveFailed));
     }
@@ -627,7 +761,7 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
     if (ok) await persistence.keepMine();
   };
 
-  /** «انسخه مجددًا»: a skipped project file, copied again — never one the request already holds. */
+  /** «انسخه مجددًا»: a skipped project file, copied again (never one the request already holds). */
   const copyAgain = async (postFileId: string) => {
     if (!copies || !s.requestId) return;
     setCopying(postFileId);
@@ -637,9 +771,7 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
       const fresh = hydrate(d.draft);
       persistence.reset(fresh);
       setStateRaw((cur) => (cur ? { ...fresh, title: cur.title, description: cur.description, delivery: cur.delivery } : fresh));
-      setCopies((c) =>
-        c ? { ...c, files: c.files + d.copied.files, skipped: [...c.skipped.filter((x) => x.post_file_id !== postFileId), ...d.copied.skipped] } : c
-      );
+      setCopies((c) => (c ? { ...c, files: c.files + d.copied.files, skipped: [...c.skipped.filter((x) => x.post_file_id !== postFileId), ...d.copied.skipped] } : c));
     } catch (e) {
       toast.error(apiRefusal(e, L, t.copyFailed));
     } finally {
@@ -664,243 +796,283 @@ export default function RequestEditor({ requestId: routeId }: { requestId: strin
     return true;
   };
 
-  const processOf = (id: string): 'fdm' | 'resin' | '' => catalogue.find((m) => m.id === id)?.process ?? '';
-  const saveRefusal = persistence.error ? apiRefusal(persistence.error, L, t.saveFailed) : '';
-  const BackIcon = dir === 'rtl' ? ArrowRight : ArrowLeft;
+  const dropProcessNote = (key: Key) =>
+    setProcessNotes((cur) => {
+      if (!cur.has(key)) return cur;
+      const n = new Set(cur);
+      n.delete(key);
+      return n;
+    });
 
-  return (
-    <div ref={rootRef} className="mx-auto max-w-2xl px-4 pb-32 pt-3" data-editor-state={s.requestState} data-editor-id={s.requestId || 'new'}>
-      <header className="mb-4 flex items-center gap-1">
-        <IconButton label={t.back} icon={<BackIcon className="h-5 w-5" />} onClick={goBack} data-editor="back" />
-        <h1 className="min-w-0 flex-1 truncate text-[18px] font-bold text-text-primary">{titleText}</h1>
-        {!publishedEdit && (
-          <Menu
-            label={t.pageActions}
-            items={[{ id: 'delete', label: t.deleteDraft, destructive: true, onSelect: () => void deleteDraft() }]}
-            trigger={(props) => <IconButton {...props} label={t.pageActions} icon={<MoreVertical className="h-5 w-5" />} data-editor="page-menu" />}
-          />
-        )}
-      </header>
+  // ---------------------------------------------------------------- the steps
 
-      <div className="space-y-3">
-        {s.direct && (
-          <div className="lv-alert lv-alert-info flex items-start gap-2 text-[13px]" data-editor="direct-banner">
-            <Store aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
-            <div>
-              <p className="font-semibold">
-                <bdi>{t.directBanner.replace('{store}', s.direct.store_name)}</bdi>
-              </p>
-              <p className="mt-0.5 text-[12.5px]">{t.directHint}</p>
-            </div>
-          </div>
-        )}
-        {publishedEdit && (
-          <div className="lv-alert lv-alert-info text-[12.5px]" role="note" data-editor="edit-banner">
-            <p>{t.editBanner}</p>
-            {s.liveOffers > 0 && <p className="mt-1 font-semibold">{t.liveOffersNote.replace('{n}', String(s.liveOffers))}</p>}
-          </div>
-        )}
-        {persistence.status === 'conflict' && (
-          <div className="lv-alert lv-alert-warning text-[13px]" role="alert" data-editor="conflict">
-            <p className="font-semibold">{t.conflictTitle}</p>
-            <p className="mt-0.5 text-[12.5px]">{t.conflictBody}</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Button size="sm" variant="primary" onClick={() => void takeLatest()}>
-                {t.loadLatest}
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => void keepMine()}>
-                {t.keepMine}
-              </Button>
-            </div>
-          </div>
-        )}
-        {persistence.status === 'signedOut' && (
-          <div className="lv-alert lv-alert-warning text-[13px]" role="alert" data-editor="signed-out">
-            <p>{t.sessionExpired}</p>
-            <Button size="sm" variant="primary" className="mt-2" onClick={() => void signBackIn()}>
-              {t.signIn}
-            </Button>
-          </div>
-        )}
-        {persistence.status === 'failed' && saveRefusal && (
-          <p className="lv-field-error" role="alert" data-editor="save-refusal">
-            {t.saveRefused.replace('{reason}', saveRefusal)}
-          </p>
-        )}
-      </div>
+  const delivery = s.delivery ?? s.carried;
+  const working = uploads.working;
+  const verb = publishedEdit ? t.saveChanges : s.direct ? fill(t.sendTo, { store: s.direct.store_name }) : t.publishCta;
 
-      <section className="mt-5" aria-labelledby="editor-describe" onBlur={flushOnLeave}>
-        <h2 id="editor-describe" className="mb-3 text-[15px] font-bold text-text-primary">
-          {t.secDescribe}
-        </h2>
-        <div className="space-y-4">
-          <Field label={t.titleLabel} error={errors.title} required={!publishedEdit} hint={publishedEdit ? t.titleFixed : undefined}>
-            <Input
-              dir="auto"
-              value={s.title}
-              maxLength={140}
-              readOnly={publishedEdit}
-              placeholder={t.titlePlaceholder}
-              onChange={(e) => {
-                const v = e.target.value;
-                edit((cur) => ({ ...cur, title: v }));
-                if (errors.title) setErrors((x) => ({ ...x, title: undefined }));
-              }}
-              data-editor="title"
-            />
-          </Field>
-          <Field label={t.descLabel} error={errors.description} required={!publishedEdit} hint={publishedEdit ? t.descFixed : t.descHint}>
-            <Textarea
-              dir="auto"
-              rows={4}
-              maxLength={6000}
-              value={s.description}
-              readOnly={publishedEdit}
-              onChange={(e) => {
-                const v = e.target.value;
-                edit((cur) => ({ ...cur, description: v }));
-                if (errors.description) setErrors((x) => ({ ...x, description: undefined }));
-              }}
-              data-editor="description"
-            />
-          </Field>
+  const banners = (
+    <div className="space-y-3 empty:hidden">
+      {s.direct && (
+        <div className="lv-alert lv-alert-info flex items-start gap-2 text-[13px]" data-editor="direct-banner">
+          <Store aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-semibold">
+              <bdi>{t.directBanner.replace('{store}', s.direct.store_name)}</bdi>
+            </p>
+            <p className="mt-0.5 text-[13px]">{t.directHint}</p>
+          </div>
         </div>
-      </section>
-
-      <section className="mt-8" aria-labelledby="editor-sources" onBlur={flushOnLeave} data-editor-section="sources">
-        <h2 id="editor-sources" className="mb-2 text-[15px] font-bold text-text-primary">
-          {t.secSources}
-        </h2>
-        {copies && (
-          <div className="mb-3 space-y-2" data-editor="project-copies">
-            {copies.files === 0 && copies.skipped.length === 0 && <p className="lv-alert lv-alert-info text-[12.5px]">{t.projectNoFiles}</p>}
-            {copies.files > 0 && <p className="text-[12px] text-text-muted">{t.projectCopyNote}</p>}
-            {copies.seeded && s.parts.length > 1 && <p className="lv-alert lv-alert-info text-[12.5px]" data-editor="seeded-parts">{t.seededParts}</p>}
-            {copies.skipped.map((x) => (
-              <div key={`${x.post_file_id}:${x.code}`} className="lv-alert lv-alert-warning flex flex-wrap items-center gap-2 text-[12.5px]" data-editor-copy-skipped={x.code}>
-                <p className="min-w-0 flex-1">
-                  <bdi>{fill(t.copySkipped, { name: x.name, reason: copyReason(x.code, L, t) })}</bdi>
-                </p>
-                {x.post_file_id && (
-                  <Button size="sm" variant="secondary" loading={copying === x.post_file_id} onClick={() => void copyAgain(x.post_file_id)}>
-                    {t.copyAgain}
-                  </Button>
-                )}
-              </div>
-            ))}
+      )}
+      {publishedEdit && (
+        <div className="lv-alert lv-alert-info text-[13px]" role="note" data-editor="edit-banner">
+          <p>{t.editBanner}</p>
+          {s.liveOffers > 0 && <p className="mt-1 font-semibold">{t.liveOffersNote.replace('{n}', String(s.liveOffers))}</p>}
+        </div>
+      )}
+      {persistence.status === 'conflict' && (
+        <div className="lv-alert lv-alert-warning text-[13px]" role="alert" data-editor="conflict">
+          <p className="font-semibold">{t.conflictTitle}</p>
+          <p className="mt-0.5 text-[13px]">{t.conflictBody}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <KitButton size="sm" variant="secondary" onClick={() => void takeLatest()}>
+              {t.loadLatest}
+            </KitButton>
+            <KitButton size="sm" variant="ghost" onClick={() => void keepMine()}>
+              {t.keepMine}
+            </KitButton>
           </div>
-        )}
-        <SourcesArea
-          state={s}
-          uploads={uploads}
-          pictures={pictures}
-          touch={touch}
-          unfinished={unfinished}
-          measuring={measuring}
-          measureLater={measureLater}
-          t={t}
-          onPickFiles={(files) => void pickFiles(files)}
-          onAddLink={addLinkFlow}
-          onAddTextRef={addTextFlow}
-          onOpenPicture={(i) => setViewer(i)}
-          onNote={(key, note) => edit((cur) => updateSource(cur, key, { note }))}
-          onPrimary={(key) => edit((cur) => setPrimary(cur, key))}
-          onOriginal={(key, on) => {
-            const [, err] = setOriginal(s, key, on);
-            if (err) return t.originalMeasured;
-            edit((cur) => setOriginal(cur, key, on)[0]);
-            return '';
-          }}
-          onView3d={(fileId) => void view3d(fileId)}
-          onRemove={(key) => void removeSourceFlow(key)}
-        />
-      </section>
+        </div>
+      )}
+      {persistence.status === 'signedOut' && (
+        <div className="lv-alert lv-alert-warning text-[13px]" role="alert" data-editor="signed-out">
+          <p>{t.sessionExpired}</p>
+          <KitButton size="sm" variant="secondary" className="mt-2" onClick={() => void signBackIn()}>
+            {t.signIn}
+          </KitButton>
+        </div>
+      )}
+      {persistence.status === 'failed' && saveRefusal && (
+        <p className="lv-field-error" role="alert" data-editor="save-refusal">
+          {t.saveRefused.replace('{reason}', saveRefusal)}
+        </p>
+      )}
+    </div>
+  );
 
-      <section className="mt-8" aria-labelledby="editor-parts" onBlur={flushOnLeave} data-editor-section="parts">
-        <h2 id="editor-parts" className="mb-3 text-[15px] font-bold text-text-primary">
-          {t.secParts}
-        </h2>
-        <PartsEditor
-          parts={s.parts}
-          sets={s.sets}
-          quality={s.quality}
-          files={s.files}
-          measurable={measurableFiles(s)}
-          measuring={measuring}
-          measureLater={measureLater}
-          catalogue={catalogue}
-          refs={refs}
-          refName={refName}
-          estimates={estimates}
-          lang={L}
-          t={t}
-          onSets={(n) => edit((cur) => ({ ...cur, sets: n }))}
-          onQuality={(q) => edit((cur) => ({ ...cur, quality: q }))}
-          onPart={(key, patch) => edit((cur) => updatePart(cur, key, patch))}
-          onMaterial={(key, mk, patch) => edit((cur) => updateMaterial(cur, key, mk, patch))}
-          onChooseMaterial={(key, mk, id) => edit((cur) => chooseMaterial(cur, key, mk, id, processOf))}
-          onColours={(key, mk, next) => edit((cur) => updateMaterial(cur, key, mk, { colours: next }))}
-          onAddMaterial={(key) => edit((cur) => addMaterial(cur, key)[0])}
-          onRemoveMaterial={(key, mk) => edit((cur) => removeMaterial(cur, key, mk))}
-          onAddPart={() => {
-            const [next, k] = addPart(s);
-            if (k) setStateRaw(next);
-            return k;
-          }}
-          onDuplicate={(key) => {
-            const [next, k] = duplicatePart(s, key);
-            if (k) setStateRaw(next);
-            return k;
-          }}
-          onMove={(key, by) => edit((cur) => movePart(cur, key, by))}
-          onRemove={removePartFlow}
-        />
-      </section>
-
-      <section className="mt-8" aria-labelledby="editor-delivery" onBlur={flushOnLeave} data-editor-section="delivery">
-        <h2 id="editor-delivery" className="mb-3 text-[15px] font-bold text-text-primary">
-          {t.secDelivery}
-        </h2>
-        <DeliveryFields
-          value={s.delivery ?? s.carried}
-          direct={!!s.direct}
-          published={publishedEdit}
-          onChange={(patch) => edit((cur) => ({ ...cur, delivery: { ...(cur.delivery ?? cur.carried), ...patch } }))}
-          lang={L}
-          t={t}
-        />
-      </section>
-
-      <div className="mt-8">
-        <AudiencePanel state={s} t={t} />
-      </div>
-
-      <ActionBar
-        status={persistence.status}
-        edit={publishedEdit}
-        hidden={keyboard}
-        wide={!compact}
-        primaryLabel={t.review}
-        onPrimary={() => void openReview()}
-        onRetry={() => void persistence.saveNow()}
-        onSave={() => void persistence.saveNow()}
-        t={t}
-      />
-
-      <ReviewSheet
-        open={reviewOpen}
-        onClose={closeReview}
+  const stepOne = (
+    <div className="space-y-5" onBlur={flushOnLeave}>
+      {copies && (
+        <div className="space-y-2" data-editor="project-copies">
+          {copies.files === 0 && copies.skipped.length === 0 && <p className="lv-alert lv-alert-info text-[13px]">{t.projectNoFiles}</p>}
+          {copies.files > 0 && <p className="text-ui-xs text-text-muted">{t.projectCopyNote}</p>}
+          {copies.seeded && s.parts.length > 1 && (
+            <p className="lv-alert lv-alert-info text-[13px]" data-editor="seeded-parts">
+              {t.seededParts}
+            </p>
+          )}
+          {copies.skipped.map((x) => (
+            <div key={`${x.post_file_id}:${x.code}`} className="lv-alert lv-alert-warning flex flex-wrap items-center gap-2 text-[13px]" data-editor-copy-skipped={x.code}>
+              <p className="min-w-0 flex-1">
+                <bdi>{fill(t.copySkipped, { name: x.name, reason: copyReason(x.code, L, t) })}</bdi>
+              </p>
+              {x.post_file_id && (
+                <KitButton size="sm" variant="secondary" loading={copying === x.post_file_id} onClick={() => void copyAgain(x.post_file_id)}>
+                  {t.copyAgain}
+                </KitButton>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <SourcesArea
         state={s}
+        uploads={uploads}
+        pictures={pictures}
+        touch={touch}
+        unfinished={unfinished}
+        measuring={measuring}
+        measureLater={measureLater}
+        t={t}
+        onPickFiles={(files) => void pickFiles(files)}
+        onAddLink={addLinkFlow}
+        onAddTextRef={addTextFlow}
+        onOpenPicture={(i) => setViewer(i)}
+        onNote={(key, note) => edit((cur) => updateSource(cur, key, { note }))}
+        onPrimary={(key) => edit((cur) => setPrimary(cur, key))}
+        onOriginal={(key, on) => {
+          const [, err] = setOriginal(s, key, on);
+          if (err) return t.originalMeasured;
+          edit((cur) => setOriginal(cur, key, on)[0]);
+          return '';
+        }}
+        onView3d={(fileId) => void view3d(fileId)}
+        onRemove={(key) => void removeSourceFlow(key)}
+      />
+      <div className="space-y-5" data-editor-section="describe">
+        <CountedField
+          id="editor-title"
+          label={t.reqTitle}
+          max={140}
+          value={s.title}
+          placeholder={t.titlePlaceholder}
+          required={!publishedEdit}
+          disabled={publishedEdit}
+          hint={publishedEdit ? t.titleFixed : undefined}
+          error={errors.title}
+          onValueChange={(v) => {
+            edit((cur) => ({ ...cur, title: v }));
+            if (errors.title) setErrors((x) => ({ ...x, title: undefined }));
+          }}
+        />
+        <CountedField
+          id="editor-description"
+          label={t.reqDesc}
+          multiline
+          rows={4}
+          max={6000}
+          value={s.description}
+          required={!publishedEdit}
+          disabled={publishedEdit}
+          hint={publishedEdit ? t.descFixed : t.descHint}
+          error={errors.description}
+          onValueChange={(v) => {
+            edit((cur) => ({ ...cur, description: v }));
+            if (errors.description) setErrors((x) => ({ ...x, description: undefined }));
+          }}
+        />
+      </div>
+    </div>
+  );
+
+  const stepTwo = (
+    <div id="editor-step-2" onBlur={flushOnLeave}>
+      <PartsEditor
+        parts={s.parts}
+        sets={s.sets}
+        quality={s.quality}
+        qualities={catalog?.qualities}
+        notes={delivery.notes}
+        files={s.files}
+        measurable={measurableFiles(s)}
+        measuring={measuring}
+        measureLater={measureLater}
         catalogue={catalogue}
+        refs={refs}
         refName={refName}
-        working={uploads.working}
-        busy={publishing}
-        error={publishError}
-        onPublish={() => void publish()}
-        quote={quote}
+        estimates={estimates}
+        processNotes={processNotes}
+        lang={L}
+        t={t}
+        onSets={(n) => edit((cur) => ({ ...cur, sets: n }))}
+        onQuality={(q) => edit((cur) => ({ ...cur, quality: q }))}
+        onNotes={(v) => edit((cur) => ({ ...cur, delivery: { ...(cur.delivery ?? cur.carried), notes: v } }))}
+        onPart={(key, patch) => edit((cur) => updatePart(cur, key, patch))}
+        onProcess={(key, proc) => {
+          const [nextState, cleared] = chooseProcess(s, key, proc, processOf);
+          setStateRaw(nextState);
+          if (cleared) setProcessNotes((cur) => new Set([...cur, key]));
+          else dropProcessNote(key);
+        }}
+        onMaterial={(key, mk, patch) => edit((cur) => updateMaterial(cur, key, mk, patch))}
+        onChooseMaterial={(key, mk, id) => {
+          edit((cur) => chooseMaterial(cur, key, mk, id, processOf));
+          dropProcessNote(key);
+        }}
+        onColours={(key, mk, nextColours) => edit((cur) => updateMaterial(cur, key, mk, { colours: nextColours }))}
+        onAddMaterial={(key) => edit((cur) => addMaterial(cur, key)[0])}
+        onRemoveMaterial={(key, mk) => edit((cur) => removeMaterial(cur, key, mk))}
+        onAddPart={() => {
+          const [nextState, k] = addPart(s);
+          if (k) setStateRaw(nextState);
+          return k;
+        }}
+        onDuplicate={(key) => {
+          const [nextState, k] = duplicatePart(s, key);
+          if (k) setStateRaw(nextState);
+          return k;
+        }}
+        onMove={(key, by) => edit((cur) => movePart(cur, key, by))}
+        onRemove={removePartFlow}
+      />
+    </div>
+  );
+
+  const stepThree = (
+    <div className="space-y-3" onBlur={flushOnLeave}>
+      <DeliveryFields
+        value={delivery}
+        direct={!!s.direct}
+        published={publishedEdit}
+        onChange={(patch) => edit((cur) => ({ ...cur, delivery: { ...(cur.delivery ?? cur.carried), ...patch } }))}
         lang={L}
         t={t}
       />
+      <RequestSummary state={s} catalogue={catalogue} refName={refName} lang={L} t={t} />
+      <AudiencePanel state={s} t={t} />
+    </div>
+  );
+
+  const stepFour = (
+    <ReviewStep
+      state={s}
+      catalogue={catalogue}
+      qualities={catalog?.qualities}
+      refName={refName}
+      quote={quote}
+      onEdit={({ step: to, focus }: EditTarget) => jumpStep(to, focus)}
+      lang={L}
+      t={t}
+    />
+  );
+
+  const cta =
+    step === 4
+      ? { label: verb, onClick: () => publish(), disabled: working > 0, busy: publishing, note: working > 0 ? fill(t.waitUploads, { n: working }) : '' }
+      : { label: step === 3 ? t.reviewCta : t.next, onClick: () => next(), disabled: false, busy: false, note: '' };
+
+  return (
+    <div data-editor-state={s.requestState} data-editor-id={s.requestId || 'new'} data-editor-step={step}>
+      <WizardHeader
+        step={step}
+        title={stepTitle(step, t, publishedEdit)}
+        status={persistence.status}
+        edit={publishedEdit}
+        onBack={() => void back()}
+        onSave={() => void (s.requestId ? persistence.saveNow() : ensureRequest().then(() => persistence.saveNow()).catch(() => undefined))}
+        t={t}
+      />
+      <div className="space-y-4 pb-6">
+        {banners}
+        {step === 1 ? stepOne : step === 2 ? stepTwo : step === 3 ? stepThree : stepFour}
+        {step === 4 && publishError && (
+          <p className={publishError.closed ? 'lv-alert lv-alert-info text-[13px]' : 'lv-field-error'} role="alert" data-editor-review-error={publishError.closed ? 'closed' : 'refused'}>
+            {publishError.text}
+          </p>
+        )}
+        {!publishedEdit && (
+          <div className="flex justify-end">
+            <Menu
+              label={t.pageActions}
+              items={[{ id: 'delete', label: t.deleteDraft, destructive: true, onSelect: () => void deleteDraft() }]}
+              trigger={(props) => <KitIconButton {...props} tone="ghost" label={t.pageActions} icon={<Ellipsis className="h-5 w-5" />} data-editor="page-menu" />}
+            />
+          </div>
+        )}
+      </div>
+      <ActionDock className={`bottom-0 -mx-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${keyboard ? 'hidden' : ''}`}>
+        <div className="w-full" data-editor-bar={keyboard ? 'keyboard' : 'shown'}>
+          {cta.note && (
+            <p className="mb-2 text-center text-[13px] font-semibold text-text-secondary" role="status">
+              {cta.note}
+            </p>
+          )}
+          <GoldButton size="cta" block disabled={cta.disabled} loading={cta.busy} onClick={cta.onClick} data-editor={step === 4 ? (s.direct && !publishedEdit ? 'send' : 'publish') : 'primary'}>
+            <span className="truncate">
+              <bdi>{cta.label}</bdi>
+            </span>
+          </GoldButton>
+        </div>
+      </ActionDock>
 
       {viewer !== null && pictures.length > 0 && (
         <ImageViewer

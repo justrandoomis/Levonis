@@ -87,7 +87,7 @@ const html = (node: ReactNode, lang: 'ar' | 'en' | 'ckb' = 'ar') => {
     createElement(AuthContext.Provider, { value: auth as never }, createElement(LanguageProvider, { children: createElement(MemoryRouter, null, node) }))
   );
 };
-const text = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/g, ' ').replace(/\s+/g, ' ');
+const text = (h: string) => h.replace(/[\u2066-\u2069]/g, '').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/g, ' ').replace(/\s+/g, ' ');
 const srcs = (h: string) => [...h.matchAll(/<img[^>]*\ssrc="([^"]*)"/g)].map((m) => m[1].replace(/&amp;/g, '&'));
 
 const ROUTE = '/api/marketplace/requests/req_1/files';
@@ -255,13 +255,12 @@ test('one failure never stops the others: the failed file says why, with its own
   assert.ok(words.includes('رُفع 0 من 2 — 1 لم يُرفع'));
 });
 
-test('the grid: a list of tile buttons, each named «افتح الصورة n من m», and no button inside a button', () => {
+test('one list of every kind: each row its eye and its bin named with the file, and no button inside a button', () => {
   const h = area('ar');
-  assert.match(h, /<ul role="list"[^>]*data-editor-grid/);
-  assert.match(h, /aria-label="افتح الصورة 1 من 3: front\.jpg"/);
-  assert.match(h, /aria-label="افتح الصورة 3 من 3: back\.jpg"/);
+  assert.match(h, /aria-label="اعرض front\.jpg"/, 'a picture opens the in-page viewer');
+  assert.match(h, /aria-label="احذف bracket\.stl"/);
   assert.equal(/<button[^>]*>(?:(?!<\/button>).)*<button/s.test(h), false, 'a control nested in a control');
-  // The failed tile keeps its two buttons, beside the tile button.
+  // The picture grid of P1-06 is still the viewer list and stays a list of tile buttons when it is drawn.
   const s = state();
   const failed: UploadRow = { key: 'up_9', file: fileOf('x.jpg', 'image/jpeg'), name: 'x.jpg', kind: 'image', preview: 'blob:x', status: 'failed', loaded: 0, total: 1, reason: 'no', door: 'simple' };
   const grid = html(createElement(ImageGrid, { pictures: gridPictures(s, [failed]), onOpen: () => undefined, onRetry: () => undefined, onCancel: () => undefined, t: editorStrings('en') }), 'en');
@@ -272,14 +271,10 @@ test('the grid: a list of tile buttons, each named «افتح الصورة n م�
 
 test('the same area in English and in Sorani: its own words in each, never the Arabic standing in', () => {
   const en = text(area('en'));
-  assert.match(en, /What you have|Add files/);
-  assert.ok(en.includes('Add files'));
-  assert.ok(en.includes('Add a link'));
-  assert.ok(en.includes('Add a written reference'));
+  for (const w of ['What you have', 'Model file', 'Model link', 'Description only', 'Reference pictures', 'Attached files', 'Add a file or picture', 'Supported formats:']) assert.ok(en.includes(w), w);
   const ckb = text(area('ckb'));
-  assert.ok(ckb.includes('فایل زیاد بکە'));
-  assert.ok(ckb.includes('بەستەرێک زیاد بکە'));
-  assert.ok(!ckb.includes('أضف ملفات'), 'the Arabic does not stand in for Sorani');
+  for (const w of ['فایلی مۆدێل', 'بەستەری مۆدێل', 'تەنها وەسف', 'وێنەی سەرچاوە', 'فایلە هاوپێچکراوەکان']) assert.ok(ckb.includes(w), w);
+  assert.ok(!ckb.includes('طريقة الطلب') && !ckb.includes('أضف ملفًا'), 'the Arabic does not stand in for Sorani');
 });
 
 test('SourceThumb: the preview, the stored copy, the glyph', () => {

@@ -11,7 +11,7 @@
  * the publish. Parts are matched by their place in the body: a new part has
  * no id the server keeps between two estimates. Pure.
  */
-import { iqdNumber, iqdUnit } from '../../../../lib/money';
+import { iqdUnit } from '../../../../lib/money';
 import { refusalText } from '../../../../lib/refusalStrings';
 import type { Quote } from '../api';
 import type { PartEstimate } from './PartCard';
@@ -28,10 +28,27 @@ interface UncoveredPart {
   refusal?: string;
 }
 
+/**
+ * A line that mixes Arabic or Sorani with Latin names and figures, with every
+ * Latin or number run isolated left to right (U+2066 … U+2069), so
+ * «82×64×41 ملم», «قياسية · 0.20 mm» and «PETG + PLA» keep their order in a
+ * right-to-left line (src/lib/bidi.ts explains the reordering). The same rule
+ * as ui/BidiText `bidiContent`, as a string: importing that module from the
+ * editor split its chunk, and the new chunk name landed in the entry preload
+ * map the storefront payload has no room for (tests/bundleBudget.test.ts).
+ */
+export function isolateLtr(line: string): string {
+  return String(line ?? '').replace(/[0-9A-Za-z](?:[0-9A-Za-z.,×\-–+/ ]*[0-9A-Za-z])?/g, (run) => `\u2066${run}\u2069`);
+}
+
+/** «45,000»: Latin digits in every language (plan R13), grouped. */
+export const latinIqd = (iqd: number): string => Math.round(iqd).toLocaleString('en-US');
+
 export function rangeText(low: number, high: number, lang: EditorLang): string {
-  const a = iqdNumber(low, lang);
-  const b = iqdNumber(high, lang);
-  return low === high ? `${a} ${iqdUnit(lang)}` : `${a}–${b} ${iqdUnit(lang)}`;
+  const a = latinIqd(low);
+  const b = latinIqd(high);
+  // The range is isolated left to right, so «22,000–28,000» never reads backwards in a right-to-left line.
+  return low === high ? `${a} ${iqdUnit(lang)}` : `\u2066${a}–${b}\u2069 ${iqdUnit(lang)}`;
 }
 
 function reasonText(reason: string | undefined, refusal: string | undefined, lang: EditorLang, t: EditorStrings): string {

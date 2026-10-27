@@ -508,22 +508,24 @@ const THREE_ARG_LOC = /\bloc\(\s*(['"`])((?:(?!\1)[^\\]|\\.)*)\1\s*,\s*(['"`])((
 /** A letter Sorani writes and Arabic does not. */
 const SORANI_LETTER = /[ەڵۆێڕڤگچپژ]/;
 
-test('the wizard budget hint is in three languages, and its Sorani is its own (plan R5, row 183)', () => {
-  const wizard = source('src/components/community/requests/RequestWizard.tsx');
-  const calls = [...wizard.matchAll(THREE_ARG_LOC)];
-  for (const [ar, en] of [
-    ['لا يراها التجار ولا العموم.', 'Hidden from merchants and the public.'],
-    ['يراها التجار الذين يمكنهم صنع طلبك، ولا تظهر للعموم.', 'Merchants who can make your request see it; it is never public.'],
-  ]) {
-    const call = calls.find((m) => m[2] === ar && m[4] === en);
-    assert.ok(call, `RequestWizard.tsx says «${en}» in all three languages`);
-    const ckb = call![6];
-    assert.ok(ckb.trim().length > 0, `the Sorani of «${en}» is written`);
-    assert.notEqual(ckb, ar, `the Sorani of «${en}» is not the Arabic copied`);
-    assert.match(ckb, SORANI_LETTER, `the Sorani of «${en}» is Sorani`);
+test('the editor budget lines are in three languages, and their Sorani is their own (plan R5, row 183)', async () => {
+  // The four-step editor (community UI plan C4) replaced the wizard: its switch
+  // «اعرض ميزانيتي للتجار» is off by default and the line under it says what that means now.
+  const { EDITOR_STRINGS } = await import('../src/components/community/requests/editor/strings');
+  const { ar, en, ckb } = EDITOR_STRINGS;
+  assert.equal(ar.budgetOff, 'مخفية عن التجار والعموم.');
+  assert.equal(en.budgetOff, 'Hidden from merchants and the public.');
+  assert.equal(ar.budgetOn, 'يراها التجار الذين يمكنهم صنع طلبك، ولا تظهر للعموم.');
+  for (const k of ['budgetOff', 'budgetOn', 'budgetOnDirect', 'budgetSwitch', 'budgetSwitchDirect'] as const) {
+    assert.ok(ckb[k].trim().length > 0, `the Sorani of ${k} is written`);
+    assert.notEqual(ckb[k], ar[k], `the Sorani of ${k} is not the Arabic copied`);
+    assert.match(ckb[k], SORANI_LETTER, `the Sorani of ${k} is Sorani`);
   }
-  // The promise the old hint made is gone in every language.
-  assert.doesNotMatch(wizard, /يراها التجار\. اتركها|Merchants see it\. Leave it|بازرگانەکان دەیبینن\./, 'the old «merchants see it» hint is back');
+  // The promise the old hint made, and the reference hint «يراها الصنّاع», are nowhere in the editor.
+  const dir = 'src/components/community/requests/editor';
+  for (const f of ['DeliveryFields.tsx', 'ReviewStep.tsx', 'strings.ts']) {
+    assert.doesNotMatch(source(`${dir}/${f}`), /يراها التجار\. اتركها|Merchants see it\. Leave it|بازرگانەکان دەیبینن\.|يراها الصنّاع/, f);
+  }
 });
 
 test('the chat print request card labels the budget in three languages, and its Sorani is its own (plan R5, row 183)', () => {

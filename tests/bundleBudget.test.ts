@@ -346,8 +346,6 @@ test('the split really happened: every page and panel §10 names has a chunk of 
     // The support assistant's + sheet (gallery, camera, voice note): fetched the
     // first time the + is pressed, never with the Support page itself.
     'AssistAttach',
-    // The request editor (P1-06, row 268): /requests/new[/:id] and /requests/:id/edit, its own chunk.
-    'RequestEditor',
     // the manualChunks groups — `vendor-motion` is the features half and
     // `vendor-motion-core` the eager half (P1b); `vendor-icons` the icons the
     // lazy routes share (vite.config.ts `iconChunk`).
@@ -725,7 +723,7 @@ test('the analytics, order and Today screens stay small and never pull in a char
  * of its own and a static import of none of those closures; the announcement
  * sheet opens on a tap from Today, so it is not in Today's closure either.
  */
-const PHASE5_LAZY = ['Request', 'OrderTimeline', 'CustomOrderScreen', 'AnnouncementSheet', 'BoardRail', 'RequestEditor'] as const;
+const PHASE5_LAZY = ['Request', 'OrderTimeline', 'CustomOrderScreen', 'AnnouncementSheet', 'BoardRail', 'RequestNew'] as const;
 
 test('the Phase-5 screens are lazy chunks outside the entry, the store pages, the workspace frame and Today', () => {
   const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));

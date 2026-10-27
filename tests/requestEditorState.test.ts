@@ -38,8 +38,7 @@ import {
   updatePart,
   type EditorColour,
 } from '../src/components/community/requests/editor/state';
-import { clearMirror, dropOtherAccounts, mirrorBase, mirrorKey, readMirror, writeMirror, type MirrorStorage } from '../src/components/community/requests/editor/sessionMirror';
-import { REQUEST_EDITOR_COPIES, forgetTabEntries } from '../src/lib/privateDrafts';
+import { REQUEST_EDITOR_COPIES, clearMirror, dropOtherAccounts, forgetTabEntries, mirrorBase, mirrorKey, readMirror, writeMirror, type MirrorStorage } from '../src/components/community/requests/editor/sessionMirror';
 import { AUTOSAVE_IDLE_MS, AUTOSAVE_SPACING_MS, autosaveDelay, statusOfError } from '../src/components/community/requests/editor/persistence';
 import { keyboardIsOpen, typesText } from '../src/components/community/requests/editor/useKeyboardOpen';
 import { matchesSearch, normaliseForSearch } from '../src/components/community/requests/editor/search';

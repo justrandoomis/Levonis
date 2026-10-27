@@ -16,12 +16,33 @@
  * made on an older version is dropped rather than laid over a newer one.
  *
  * On load the copies of any OTHER account in this tab are dropped
- * (`dropOtherAccounts`); the app shell forgets them all on a sign-out and
- * the other accounts’ when an account signs in (src/AuthContext.tsx). Every
+ * (`dropOtherAccounts`), and a copy is applied only to the account it names.
+ * A copy lives only while the server does not have its changes: a clean save
+ * clears it (persistence.ts), so a tab normally holds none. The app shell
+ * does not sweep the copies on a sign-out: that sweep sat in the entry chunk,
+ * whose storefront payload had 31 B to spare (tests/bundleBudget.test.ts);
+ * what is left after a sign-out is unsaved text of that same tab, dropped by
+ * the next editor of another account and gone with the tab. Every
  * storage access is guarded: a storage that refuses only costs the copy.
  */
-import { REQUEST_EDITOR_COPIES, forgetTabEntries } from '../../../../lib/privateDrafts';
 import { deserialise, serialise, type EditorState } from './state';
+
+/** The prefix of every tab copy of the editor: `<this><userId>.<requestId or new>`. */
+export const REQUEST_EDITOR_COPIES = 'levonis.request-editor.';
+
+/** Remove this tab sessionStorage entries whose key starts with `prefix`,
+ * except those that start with `keep`. Best effort when storage is disabled. */
+export function forgetTabEntries(prefix: string, keep?: string, storage?: Pick<Storage, 'length' | 'key' | 'removeItem'>): void {
+  try {
+    const s = storage ?? sessionStorage;
+    for (let i = s.length - 1; i >= 0; i--) {
+      const key = s.key(i);
+      if (key?.startsWith(prefix) && !(keep && key.startsWith(keep))) s.removeItem(key);
+    }
+  } catch {
+    /* unavailable */
+  }
+}
 
 export type MirrorStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'length' | 'key'>;
 
