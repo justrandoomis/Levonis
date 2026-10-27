@@ -39,10 +39,10 @@ test('coverSizes: the box when the picture is no wider than it, the drawn width 
 });
 
 test('a feed cover and the cover story ask for what they draw', () => {
-  // The verifier's case: a 16:9 cover on a 1280 px desktop is drawn 896 × 504 in the 672 × 504 card.
-  assert.match(feedCoverSizes({ width: 1600, height: 900 }), /^\(min-width: 1024px\) 896px, /);
-  assert.equal(feedCoverSizes({ width: 1000, height: 1000 }), IMAGE_SIZES.feedCover, 'square: the card itself');
-  assert.match(feedCoverSizes({ width: 900, height: 1600 }), /^\(min-width: 1024px\) 672px/, 'a portrait picture in the 4:5 card');
+  // Card v2 (community UI plan C2.1): a 16:9 frame inset in the card, 646 px in the 672 px column.
+  assert.equal(feedCoverSizes({ width: 1600, height: 900 }), IMAGE_SIZES.feedCover, '16:9: the frame itself');
+  assert.equal(feedCoverSizes({ width: 1000, height: 1000 }), IMAGE_SIZES.feedCover, 'square: cropped to the width, the frame itself');
+  assert.match(feedCoverSizes({ width: 2400, height: 1000 }), /^\(min-width: 1024px\) 872\.1px, calc\(calc\(100vw - 58px\) \* 1\.35\)$/, 'a 2.4:1 picture is drawn 1.35 × wider than the frame');
   // The cover story is 1120 px wide at 1280 (it used to say 720).
   assert.equal(coverStorySizes(null), '(min-width: 1024px) min(1120px, calc(100vw - 32px)), 100vw');
   assert.equal(coverStorySizes(2.4), '(min-width: 1024px) min(1120px, calc(100vw - 32px)), 135vw', 'a 12:5 picture fits the desktop frame; on a phone it is 1.35 × wider than 16:9');

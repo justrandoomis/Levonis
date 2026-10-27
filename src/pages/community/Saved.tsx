@@ -6,11 +6,8 @@
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Bookmark } from 'lucide-react';
-import { IconButton } from '../../components/ui/Button';
-import { useLanguage } from '../../LanguageContext';
+import { Bookmark } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
-import { useGoBack } from '../../lib/useGoBack';
 import { EmptyState, ErrorState } from '../../components/ui/AsyncStates';
 import LoadMore from '../../components/listing/LoadMore';
 import ProjectCard, { ProjectCardSkeleton } from '../../components/community/projects/ProjectCard';
@@ -18,10 +15,9 @@ import type { PostCard } from '../../components/community/projects/api';
 import { socialApi } from '../../components/community/social/api';
 import { useSocialStrings } from '../../components/community/social/strings';
 import CommunitySurface from '../../components/community/CommunitySurface';
+import SectionPageHeader from '../../components/community/kit/SectionPageHeader';
 
 export default function SavedPage() {
-  const goBack = useGoBack('/community');
-  const { loc, dir } = useLanguage();
   const { user } = useAuth();
   const s = useSocialStrings();
   const [rows, setRows] = useState<PostCard[] | null>(null);
@@ -60,21 +56,13 @@ export default function SavedPage() {
       .catch(() => setMore('error'));
   };
 
-  const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
   return (
     <CommunitySurface className="min-h-screen pb-28 text-text-primary">
-      <div className="material scroll-edge sticky top-0 z-40 h-14 px-4">
-        <div className="mx-auto flex h-full max-w-6xl items-center gap-2">
-          <IconButton
-            label={loc('رجوع', 'Back', 'گەڕانەوە')}
-            onClick={goBack}
-            className="-ms-2"
-            icon={<Back className="h-5 w-5" />}
-          />
-          <h1 className="min-w-0 flex-1 truncate text-[15px] font-bold">{s.savedTitle}</h1>
-        </div>
+      <div className="mx-auto max-w-6xl px-4">
+        {/* The section header (community UI plan C2.1): back goes to the projects it was opened from. */}
+        <SectionPageHeader title={s.savedTitle} backTo="/community/projects" />
       </div>
-      <div className="mx-auto max-w-6xl px-4 pt-4" data-saved-grid>
+      <div className="mx-auto max-w-6xl px-4 pt-2" data-saved-grid>
         {error ? (
           <ErrorState error={error} onRetry={() => setNonce((n) => n + 1)} className="mt-10" />
         ) : !rows ? (

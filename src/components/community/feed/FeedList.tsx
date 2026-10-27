@@ -10,27 +10,36 @@
  * issue's body, not a rail that can step aside.
  *
  * A lazy chunk: the home mounts it when the feed section approaches.
+ *
+ * «أتابعهم» reads one half of itself with `from` (`?from=makers|stores`, plan
+ * C2.1); the remembered pages are keyed by it, so a segment never shows the
+ * other's rows. Cards are boxed (PostCard v2) with a 12px gap.
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useAuth } from '../../../AuthContext';
 import { ErrorState } from '../../ui/AsyncStates';
 import LoadMore from '../../listing/LoadMore';
 import type { PostCard as PostCardData } from '../projects/api';
 import type { FeedScope } from '../social/api';
-import { PostSkeleton } from '../hub/parts';
+import type { FeedFrom } from '../../../../packages/contracts/src/communityFilters';
 import { useCommunityFeed } from '../hub/useCommunityFeed';
 import { useSocial } from '../social/SocialContext';
 import ComposerDock from './ComposerDock';
 import PostCard, { type PostPatch } from './PostCard';
+import FeedCardSkeleton from './FeedCardSkeleton';
 
 const AUTO_LOADS = 2;
+const NO_FILTERS: Record<string, string> = {};
 
 export default function FeedList({
   scope,
+  from = 'all',
   empty,
   dock,
 }: {
   scope: FeedScope;
+  /** «أتابعهم» only: both halves, or the makers or the stores followed. */
+  from?: FeedFrom;
   /** What to show when the feed has nothing (the caller decides the words). */
   empty: ReactNode;
   /** The composer's door, docked at the end of the list. */
@@ -38,7 +47,8 @@ export default function FeedList({
 }) {
   const { user } = useAuth();
   const viewer = user?.id ?? 'guest';
-  const feed = useCommunityFeed<PostCardData>(scope === 'following' ? 'feed:following' : 'feed:foryou', '', viewer);
+  const filters = useMemo((): Record<string, string> => (scope === 'following' && from !== 'all' ? { from } : NO_FILTERS), [scope, from]);
+  const feed = useCommunityFeed<PostCardData>(scope === 'following' ? 'feed:following' : 'feed:foryou', '', viewer, filters);
   const social = useSocial();
   const [auto, setAuto] = useState(0);
   const sentinel = useRef<HTMLDivElement | null>(null);
@@ -75,7 +85,7 @@ export default function FeedList({
   }, [armed, loadMore]);
 
   if (feed.error) return <ErrorState error={feed.error} onRetry={feed.reload} />;
-  if (!feed.rows) return <PostSkeleton />;
+  if (!feed.rows) return <FeedCardSkeleton />;
   // The viewer's OWN block or mute, made a moment ago, hides the person's rows
   // already on screen; the server drops them from the next uncached read.
   const rows = feed.rows.filter((p) => !social.blocked.has(p.author.id) && !social.muted.has(p.author.id));
@@ -83,7 +93,7 @@ export default function FeedList({
 
   return (
     <div data-community-feed={scope}>
-      <div>
+      <div className="flex flex-col gap-3">
         {rows.map((p, i) => (
           <PostCard key={p.id} post={p} eager={i < 2} onPatch={onPatch} />
         ))}

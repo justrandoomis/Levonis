@@ -16,11 +16,15 @@ export interface SaveButtonProps {
   size?: 'sm' | 'md';
   /** Show the number of saves (the author's own view); off by default — a save is private. */
   showCount?: boolean;
+  /** A visible word in the button (CountToggle `text`). */
+  text?: string;
+  /** Show the number at zero (CountToggle `zero`). */
+  zero?: boolean;
   onChange?: (saved: boolean, count: number) => void;
   className?: string;
 }
 
-export default function SaveButton({ postId, saved, count, size = 'md', showCount = false, onChange, className }: SaveButtonProps) {
+export default function SaveButton({ postId, saved, count, size = 'md', showCount = false, onChange, text, zero, className }: SaveButtonProps) {
   const s = useSocialStrings();
   const { lang } = useLanguage();
   const l = socialLang(lang);
@@ -39,6 +43,8 @@ export default function SaveButton({ postId, saved, count, size = 'md', showCoun
       onChange={onChange}
       failText={s.actionFailed}
       tone="gold"
+      text={text}
+      zero={zero}
       className={className}
       data-social="save"
     />

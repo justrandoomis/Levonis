@@ -90,8 +90,6 @@ test('every new route is lazy and inside CommunityGate, the editor behind Protec
 
 test('the placeholders render the section header and the list the home tab shows today, inside the scope', () => {
   for (const [file, panel, header] of [
-    // «أتابعهم» over «مجتمع ليفو», as IMG_8486 draws it (B2R1-FID-3).
-    ['src/pages/community/Following.tsx', '<FollowingPanel viewer=', '<SectionPageHeader title={s.tabs.following} kicker trailing={<SectionsButton />} />'],
     ['src/pages/community/Stores.tsx', '<StoresPanel q={q}', '<SectionPageHeader title={s.tabs.stores} trailing={<SectionsButton />} />'],
     ['src/pages/community/Makers.tsx', '<CreatorsPanel q={q}', '<SectionPageHeader title={s.tabs.creators} trailing={<SectionsButton />} />'],
   ] as const) {
@@ -102,6 +100,12 @@ test('the placeholders render the section header and the list the home tab shows
     // The list is a lazy chunk the home tab shares: the page and the entry that names it stay small.
     assert.match(src, /= lazy\(\(\) => import\('\.\.\/\.\.\/components\/community\/hub\/(FollowingPanel|StoresPanel|CreatorsPanel)'\)\);/, `${file}: the list is imported eagerly`);
   }
+  // «أتابعهم» over «مجتمع ليفو», as IMG_8486 draws it (B2R1-FID-3); C2.1 moved its feed to feed/FollowingFeed.tsx.
+  const following = code('src/pages/community/Following.tsx');
+  assert.match(following, /<CommunitySurface\b[^>]*>[\s\S]*<\/CommunitySurface>/);
+  assert.ok(following.includes('<SectionPageHeader title={s.tabs.following} kicker trailing={<SectionsButton />} />'));
+  assert.ok(following.includes('<FollowingFeed from={from} composerLink={composerLink} />'));
+  assert.match(following, /= lazy\(\(\) => import\('\.\.\/\.\.\/components\/community\/feed\/FollowingFeed'\)\);/, 'the feed is imported eagerly');
   // The stores directory left the home for its own module, and the home tab renders the same one.
   const home = code('src/pages/Community.tsx');
   assert.doesNotMatch(home, /function StoresPanel\(|function YourStore\(/, 'the stores panel is still a copy inside the home');

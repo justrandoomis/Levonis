@@ -14,11 +14,15 @@ export interface LikeButtonProps {
   liked: boolean;
   count: number;
   size?: 'sm' | 'md';
+  /** A visible word in the button (CountToggle `text`). */
+  text?: string;
+  /** Show the number at zero (CountToggle `zero`). */
+  zero?: boolean;
   onChange?: (liked: boolean, count: number) => void;
   className?: string;
 }
 
-export default function LikeButton({ postId, liked, count, size = 'md', onChange, className }: LikeButtonProps) {
+export default function LikeButton({ postId, liked, count, size = 'md', onChange, text, zero, className }: LikeButtonProps) {
   const s = useSocialStrings();
   const { lang } = useLanguage();
   const l = socialLang(lang);
@@ -35,6 +39,8 @@ export default function LikeButton({ postId, liked, count, size = 'md', onChange
       onChange={onChange}
       failText={s.actionFailed}
       tone="like"
+      text={text}
+      zero={zero}
       className={className}
       data-social="like"
     />
