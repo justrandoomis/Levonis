@@ -307,6 +307,7 @@ export const FINANCIAL_FIELDS = [
   'source_usd_per_eur',
   'source_cny_per_eur',
   'manual_rate',
+  'manual_base_rate',
   'effective_rate',
   'effective_rates_iqd',
   'last_known_good_rate',

@@ -2410,6 +2410,43 @@ export interface PriceLevels {
    * and a wrong key are not the same thing.
    */
   complete: boolean;
+  /** `base` is the cheapest of several options that differ in price: the page says «يبدأ من» (DECISIONS row 275). */
+  base_from?: boolean;
+}
+
+/**
+ * THE PRICE BEFORE A MODEL IS CHOSEN (DECISIONS row 275). A product with an
+ * active option cannot be bought without one (`OPTION_REQUIRED`), so its base
+ * row is a price nobody is charged: every unchosen figure of the product page
+ * (the quote, the ways to buy, `price_levels.base`) is the option of the first
+ * group with the lowest effective price, its live offer included, and
+ * «يبدأ من» when the options differ. These are the candidates: the active,
+ * unmerged values of the first group, in the document order. Empty for a
+ * product without options, which keeps its base price.
+ */
+export function standInOptionIds(doc: Pick<ProductDoc, 'options'>): string[] {
+  const live = doc.options.filter((o) => o.active !== false && !o.merged_into);
+  if (!live.length) return [];
+  const group = live[0]!.group_en ?? '';
+  return live.filter((o) => (o.group_en ?? '') === group).map((o) => o.id);
+}
+
+/** The cheapest candidate among priced levels, and whether the candidates differ. Null when none is priced. */
+export function cheapestStandIn(ids: readonly string[], levelOf: (id: string) => PriceLevel | null | undefined): { optionId: string; level: PriceLevel; from: boolean } | null {
+  let low: { optionId: string; level: PriceLevel } | null = null;
+  let high = 0;
+  for (const id of ids) {
+    const level = levelOf(id);
+    if (!level) continue;
+    if (!low || level.unit_subtotal_iqd < low.level.unit_subtotal_iqd) low = { optionId: id, level };
+    high = Math.max(high, level.unit_subtotal_iqd);
+  }
+  return low ? { ...low, from: high > low.level.unit_subtotal_iqd } : null;
+}
+
+/** The unchosen selection's stand-in option (DECISIONS row 275), each candidate priced as the page prices it. */
+export function unchosenStandIn(doc: ProductDoc, ctx: PricingCtx, offer: OfferView | null | undefined, now: number) {
+  return cheapestStandIn(standInOptionIds(doc), (id) => levelPrice(doc, ctx, offer, id, null, now));
 }
 
 /**
@@ -2498,7 +2535,9 @@ export function priceLevels(
   const combo: Record<string, PriceLevel> = {};
   if (complete) for (const [o, c] of pairs) combo[`${o}|${c}`] = at(o, c);
 
-  return { base: at(null, null), option, color, combo, complete };
+  // DECISIONS row 275: with options, the base is the cheapest option's level — never the unbuyable base row.
+  const stand = cheapestStandIn(standInOptionIds(doc), (id) => option[id]);
+  return { base: stand ? stand.level : at(null, null), option, color, combo, complete, ...(stand ? { base_from: stand.from } : {}) };
 }
 
 /** `PriceLevels` where a level can be null: a selection the engine has not priced (DECISIONS row 240). */
@@ -2508,6 +2547,7 @@ export interface PartialPriceLevels {
   color: Record<string, PriceLevel | null>;
   combo: Record<string, PriceLevel | null>;
   complete: boolean;
+  base_from?: boolean;
 }
 
 /**
@@ -2536,7 +2576,9 @@ export function partialPriceLevels(
     const [o, c] = key.split('|');
     combo[key] = priced.some((sku) => sku.option_value_ids.includes(o) && sku.color_id === c) ? level : null;
   }
-  return { base: full.base, option, color, combo, complete: full.complete };
+  // DECISIONS row 275: the base is the cheapest PRICED option, as on a fully priced product.
+  const stand = cheapestStandIn(standInOptionIds(doc), (id) => option[id]);
+  return { base: stand ? stand.level : full.base, option, color, combo, complete: full.complete, ...(stand ? { base_from: stand.from } : full.base_from !== undefined ? { base_from: full.base_from } : {}) };
 }
 
 /**
@@ -5041,10 +5083,15 @@ export async function catalogProductDetail(
   const initialOptionId = initialOptionValueIds[0] ?? null;
   const initialColorId = initialSelection?.color_id ?? null;
   const now = Date.now();
+  // DECISIONS row 275: with no opening selection on a product sold by option, the opening figures
+  // are the cheapest option's (its sale included), never the base row nobody is charged.
+  const openingStandIn = initialSelection ? null : unchosenStandIn(doc, ctx, offer, now);
+  const openingValueIds = openingStandIn ? [openingStandIn.optionId] : initialOptionValueIds;
+  const openingOptionId = openingValueIds[0] ?? null;
   const resolved = resolveUnitPrice({
     product: doc,
-    optionId: initialOptionId,
-    optionValueIds: initialOptionValueIds,
+    optionId: openingOptionId,
+    optionValueIds: openingValueIds,
     colorId: initialColorId,
     fulfillmentType: initialSelection ? 'direct_sale' : undefined,
     tier: ctx.tier,
@@ -5149,7 +5196,7 @@ export async function catalogProductDetail(
     membership_preview: membershipPreview(
       ctx,
       doc,
-      { optionId: initialOptionId, colorId: initialColorId, optionValueIds: initialOptionValueIds },
+      { optionId: openingOptionId, colorId: initialColorId, optionValueIds: openingValueIds },
       isPrinter
     ),
     // EVERY SELECTION THE CHOOSERS CAN REACH, PRICED HERE (see `priceLevels`).
@@ -5165,7 +5212,7 @@ export async function catalogProductDetail(
     pricing_modes: pricingModes(
       doc,
       ctx,
-      { optionId: initialOptionId, colorId: initialColorId, optionValueIds: initialOptionValueIds },
+      { optionId: openingOptionId, colorId: initialColorId, optionValueIds: openingValueIds },
       isPrinter,
       offer,
       now
@@ -5537,11 +5584,17 @@ productRoutes.post('/:slug/quote', async (c) => {
     }
   }
 
+  // DECISIONS row 275: nothing chosen on a product sold by option — every figure below is the
+  // cheapest option's (its sale included), never the base row nobody is charged. Availability
+  // still answers the real, unchosen selection.
+  const standIn = optionValueIds.length === 0 && !colorId ? unchosenStandIn(doc, ctx, offer, now) : null;
+  const priceValueIds = standIn ? [standIn.optionId] : optionValueIds;
+  const priceOptionId = standIn ? standIn.optionId : optionId;
   const resolved = resolveUnitPrice({
     product: doc,
-    optionId,
+    optionId: priceOptionId,
     // The whole selection names the exact SKU whose stored price (0183) applies.
-    optionValueIds,
+    optionValueIds: priceValueIds,
     colorId,
     transportMethod,
     fulfillmentType,
@@ -5577,11 +5630,11 @@ productRoutes.post('/:slug/quote', async (c) => {
     // §8/§9: what PREMIUM and PRO pay for THIS selection, from the live rules.
     // The page shows the viewer's own line as a price, and the other tier's as
     // the one-line invitation §9 asks for — never a gold advertisement.
-    membership_preview: membershipPreview(ctx, doc, { optionId, colorId, transportMethod, optionValueIds }, isPrinter),
+    membership_preview: membershipPreview(ctx, doc, { optionId: priceOptionId, colorId, transportMethod, optionValueIds: priceValueIds }, isPrinter),
     // The final price of every way to get THIS selection — direct, and each
     // pre-order journey paid in advance or cash on delivery — so the page's
     // pills show the server's numbers and never their own arithmetic.
-    pricing_modes: pricingModes(doc, ctx, { optionId, colorId, optionValueIds }, isPrinter, offer, now),
+    pricing_modes: pricingModes(doc, ctx, { optionId: priceOptionId, colorId, optionValueIds: priceValueIds }, isPrinter, offer, now),
     // Every extended-warranty option priced for THIS selection's regular price
     // (an option surcharge moves a percent fee), so the chooser can show the
     // exact dinar of each plan before one is picked.

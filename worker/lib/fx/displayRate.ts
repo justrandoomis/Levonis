@@ -10,7 +10,7 @@
  * rows 220, 246 and 248). «سعر الصرف يكون رسمي وسائد للموقع»: the figure is the
  * APPLIED USD/IQD every product is priced at (`pricing_fx_rates.rate_iqd`) —
  * on AUTO the market sell plus the owner's adjustment, on MANUAL the rate he
- * typed — exactly, as decimal text. It used to be the market sell the rate was
+ * typed plus the same adjustment (DECISIONS row 274) — exactly, as decimal text. It used to be the market sell the rate was
  * last built from (row 220) so that the adjustment stayed private; the owner
  * chose one official rate for the products, the storefront and the wallet,
  * accepting that the applied rate is visible (row 248 clause (7) resolved).

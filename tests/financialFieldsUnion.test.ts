@@ -89,7 +89,7 @@ const AREAS: Record<string, readonly string[]> = {
     'supplier_cost_amount', 'supplier_cost_currency', 'supplier_input_mode', 'current_supplier_cost_usd_exact', 'current_supplier_cost_iqd',
     'original_input_amount', 'original_input_currency', 'conversion_rate_snapshot', 'conversion_fx_version', 'canonical_supplier_cost_usd',
     'converted_at', 'usd_iqd_rate', 'usd_fx_version', 'cross_rate', 'cross_fx_version', 'market_rate', 'market_buy', 'official_rate',
-    'source_usd_per_eur', 'source_cny_per_eur', 'manual_rate', 'effective_rate', 'effective_rates_iqd', 'last_known_good_rate',
+    'source_usd_per_eur', 'source_cny_per_eur', 'manual_rate', 'manual_base_rate', 'effective_rate', 'effective_rates_iqd', 'last_known_good_rate',
     'pending_market_rate', 'pending_effective_rate', 'adjustment_iqd_per_usd', 'drift_anchor_rate', 'rejected_rate', 'last_observed',
     // owner decision 5: the adjustment's own name (the old wire name above stays in the net); decision 10: the history's old → new
     'market_adjustment_iqd', 'settings_diff',

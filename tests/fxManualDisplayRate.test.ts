@@ -111,13 +111,13 @@ test('MANUAL with no market figure: the adjustment and every other FX field stay
   const raw = manualWorld();
   const { owner, publicSettings, typeRate } = apps(raw);
   await typeRate('1660');
-  // An adjustment saved on MANUAL is no part of the rate in force: the reading does not move, and
-  // the figure is nowhere in the public answers.
+  // An adjustment saved on MANUAL is added to the typed rate (DECISIONS row 274): the reading is the
+  // rate in force, 1,660 + 37.2501, and the adjustment itself is nowhere in the public answers.
   const adj = await put(owner, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: Number(pairOf(raw, 'USD_IQD').owner_version), market_adjustment_iqd: '37.2501' });
   assert.equal(adj.status, 200, await adj.clone().text());
   assert.equal(pairOf(raw, 'USD_IQD').market_adjustment_iqd, '37.2501', 'control: the adjustment was saved');
   for (const s of await publicSettings()) {
-    assert.equal(s.displayUsdRate, '1660');
+    assert.equal(s.displayUsdRate, '1697.2501');
     assert.equal(s.displayUsdRateAttributed, false);
     const fx = Object.keys(s).filter((k) => /fx|adjust|market|manual|cost|effective|applied|pending/i.test(k));
     assert.deepEqual(fx, [], 'no FX key beside the reading and its flag');
@@ -135,7 +135,8 @@ test('a typed rate purges /api/settings/public and the home answers that carry t
 });
 
 test('with a market figure: the reading is the rate in force (DECISIONS row 252) — 1,680 built from the market, credited; then the typed 1,700, the shop\'s own', async () => {
-  // A rate built from the provider (market 1,660 + the owner's 20 = 1,680 in force), then a typed 1,700.
+  // A rate built from the provider (market 1,660 + the owner's 20 = 1,680 in force), then a typed
+  // 1,680 + the same 20 = 1,700 in force (DECISIONS row 274).
   const raw = freshDb();
   raw.exec(OWNER_ROW_SQL);
   raw.exec("UPDATE fx_rate_pairs SET market_adjustment_iqd = '20' WHERE pair = 'USD_IQD'");
@@ -143,8 +144,8 @@ test('with a market figure: the reading is the rate in force (DECISIONS row 252)
   raw.exec("UPDATE fx_rate_pairs SET market_rate = '1660' WHERE pair = 'USD_IQD'");
   const { publicSettings, typeRate } = apps(raw);
   for (const s of await publicSettings()) assert.deepEqual([s.displayUsdRate, s.displayUsdRateAttributed, s.exchangeRate], ['1680', true, 1680]);
-  await typeRate('1700');
-  for (const s of await publicSettings()) assert.deepEqual([s.displayUsdRate, s.displayUsdRateAttributed, s.exchangeRate], ['1700', false, 1700], 'the rate he typed is the one in force');
+  await typeRate('1680');
+  for (const s of await publicSettings()) assert.deepEqual([s.displayUsdRate, s.displayUsdRateAttributed, s.exchangeRate], ['1700', false, 1700], 'the rate he typed + the adjustment is the one in force');
 
   // The provider's last validated reading alone (a typed rate, a reading never applied): the typed rate, uncredited.
   const lone = manualWorld();
@@ -177,8 +178,8 @@ test('back on AUTO before the market rebuilds the rate: a typed rate stays the s
   for (const s of await publicSettings()) assert.deepEqual([s.displayUsdRate, s.displayUsdRateAttributed], ['1680', false]);
   await setMode('AUTO');
   for (const s of await publicSettings()) assert.deepEqual([s.displayUsdRate, s.displayUsdRateAttributed, s.exchangeRate], ['1680', true, 1680]);
-  // The owner types 1,700, then goes back to AUTO; the market has not rebuilt U (no fetch, held, or the dead band).
-  await typeRate('1700');
+  // The owner types 1,680 (+ 20 = 1,700 in force), then goes back to AUTO; the market has not rebuilt U (no fetch, held, or the dead band).
+  await typeRate('1680');
   await setMode('AUTO');
   const usd = pairOf(raw, 'USD_IQD');
   assert.deepEqual([usd.mode, usd.manual_rate, usd.effective_rate], ['AUTO', null, '1700'], 'control: AUTO, the typed rate still in force');

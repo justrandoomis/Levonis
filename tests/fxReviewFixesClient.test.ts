@@ -75,6 +75,7 @@ const pairOf = (over: Partial<FxPairDto> = {}): FxPairDto => ({
   market_adjustment_iqd: '15',
   formula_holds: true,
   manual_rate: null,
+  manual_base_rate: null,
   effective_rate: '1675',
   effective_version: 3,
   effective_source: 'provider',

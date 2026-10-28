@@ -60,7 +60,10 @@ export interface FxStrings {
   /** «market + adjustment = effective», each figure the server's, shown only when it holds (`formula_holds`). */
   formula: Three;
   /** A manual rate is final: the adjustment is not added to it. */
-  manualFinal: string;
+  /** On MANUAL: the adjustment is added to the manual rate too (DECISIONS row 274). */
+  manualPlusAdjustment: string;
+  /** «typed manual + adjustment = effective», each figure the server's. */
+  manualFormula: Three;
   effective: string;
   effectiveIqd: Readonly<Record<'EUR' | 'CNY', string>>;
   computedNote: string;
@@ -212,7 +215,8 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     adjustment: 'زيادة ثابتة على سعر السوق (دينار لكل دولار)',
     adjustmentHint: 'مبلغ ثابت بالدينار يُضاف إلى سعر بيع الدولار في السوق، وليس نسبة. اكتب رقمًا سالبًا للخصم.',
     formula: (market, adj, effective) => `سعر السوق ${market} + الزيادة ${adj} = السعر المعتمد ${effective}`,
-    manualFinal: 'السعر اليدوي نهائي، ولا تُضاف إليه الزيادة.',
+    manualPlusAdjustment: 'تُضاف الزيادة الثابتة إلى السعر اليدوي أيضًا، والناتج هو السعر الذي تُحسب به كل الأسعار.',
+    manualFormula: (manual, adj, effective) => `السعر اليدوي ${manual} + الزيادة ${adj} = السعر المعتمد ${effective}`,
     effective: 'السعر المعتمد',
     effectiveIqd: { EUR: 'اليورو بالدينار (محسوب)', CNY: 'اليوان بالدينار (محسوب)' },
     computedNote: 'محسوب من سعر الدولار المعتمد',
@@ -422,7 +426,8 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     adjustment: 'Market adjustment (fixed IQD per USD)',
     adjustmentHint: 'A fixed number of dinars added to the market sell rate of one dollar — not a percentage. Type a negative number to lower it.',
     formula: (market, adj, effective) => `Market ${market} + adjustment ${adj} = effective ${effective}`,
-    manualFinal: 'A manual rate is final; the adjustment is not added to it.',
+    manualPlusAdjustment: 'The fixed adjustment is added to the manual rate too; the result is the rate every price uses.',
+    manualFormula: (manual, adj, effective) => `Manual ${manual} + adjustment ${adj} = effective ${effective}`,
     effective: 'Effective rate',
     effectiveIqd: { EUR: 'EUR in IQD (computed)', CNY: 'CNY in IQD (computed)' },
     computedNote: 'Computed from the effective dollar rate',
@@ -632,7 +637,8 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     adjustment: 'زیادەی جێگیر لەسەر نرخی بازاڕ (دینار بۆ هەر دۆلارێک)',
     adjustmentHint: 'بڕێکی جێگیری دینارە کە بۆ نرخی فرۆشتنی یەک دۆلار لە بازاڕدا زیاد دەکرێت — ڕێژەی سەدی نییە. بۆ کەمکردنەوە ژمارەیەکی نێگەتیڤ بنووسە.',
     formula: (market, adj, effective) => `نرخی بازاڕ ${market} + زیادە ${adj} = نرخی کارپێکراو ${effective}`,
-    manualFinal: 'نرخی دەستی کۆتاییە و زیادەکەی بۆ زیاد ناکرێت.',
+    manualPlusAdjustment: 'زیادە جێگیرەکە بۆ نرخی دەستیش زیاد دەکرێت، و ئەنجامەکەی ئەو نرخەیە کە هەموو نرخەکان پێی هەژمار دەکرێن.',
+    manualFormula: (manual, adj, effective) => `نرخی دەستی ${manual} + زیادە ${adj} = نرخی کارپێکراو ${effective}`,
     effective: 'نرخی کارپێکراو',
     effectiveIqd: { EUR: 'یۆرۆ بە دینار (هەژمارکراو)', CNY: 'یوان بە دینار (هەژمارکراو)' },
     computedNote: 'لە نرخی کارپێکراوی دۆلارەوە هەژمارکراوە',

@@ -139,7 +139,8 @@ test('wiring: once a product is engine-priced, a manual rate, «استخدم …
   assert.match(card, /const previewed = rates\.engine_products > 0 && !!onPreviewAct;/);
   assert.match(card, /load: \(\) => previewFxManual\(p\.pair, \{ rate \}\),\s*commit: \(preview_hash, confirm\) => setFxManual\(p\.pair, \{ \.\.\.base, rate, preview_hash, \.\.\.confirmOf\(confirm\) \}\)/);
   assert.match(card, /load: \(\) => previewFxManual\(p\.pair, \{ market_adjustment_iqd: adj \}\),\s*commit: \(preview_hash, confirm\) => saveFxSettings\(p\.pair, \{ \.\.\.base, market_adjustment_iqd: adj, preview_hash/);
-  assert.match(card, /onClick=\{\(\) => applyObserved\(p\.last_observed!\.candidate\)\}/);
+  // USD/IQD sends the observed MARKET figure: the adjustment is added to a manual rate (DECISIONS row 274), so the result is the candidate.
+  assert.match(card, /onClick=\{\(\) => applyObserved\(usd && p\.last_observed!\.market_rate \? p\.last_observed!\.market_rate : p\.last_observed!\.candidate\)\}/);
   const ship = codeOf(`${DIR}/ShippingRatesCard.tsx`);
   assert.match(ship, /onPreviewAct=\{engineProducts > 0 \? onPreviewAct : undefined\}/);
   assert.match(ship, /load: \(\) => previewShippingRate\(row\.profile, rate_iqd\)/);

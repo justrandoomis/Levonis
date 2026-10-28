@@ -308,6 +308,8 @@ export interface FxPairDto {
   /** USD/IQD: true when effective = market sell + adjustment exactly, so the card may show the sum (never computed here). */
   formula_holds: boolean;
   manual_rate: string | null;
+  /** While MANUAL: the rate the owner typed; on USD/IQD the rate in force is it + the adjustment (DECISIONS row 274). */
+  manual_base_rate: string | null;
   effective_rate: string | null;
   effective_version: number;
   effective_source: 'provider' | 'manual' | 'review_approved' | null;

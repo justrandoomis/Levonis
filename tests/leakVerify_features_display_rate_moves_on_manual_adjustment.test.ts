@@ -49,7 +49,7 @@ const ownerVersion = (raw: DatabaseSync) => Number(pairOf(raw, 'USD_IQD').owner_
 const publicRate = async (app: ReturnType<typeof world>['app']) =>
   (await json(await get(app, '/api/settings/public'))).settings.displayUsdRate as string | null;
 
-test('MANUAL («إيقاف»), then a new adjustment: no rate moves, so the public dollar rate must not move either', async () => {
+test('MANUAL («إيقاف»), then a new adjustment: the rate in force moves by it (DECISIONS row 274), and the public dollar rate is that rate exactly', async () => {
   const { raw, app } = world();
   // The owner's example, approved: market 1,660 + 20 dinars = 1,680 in force.
   raw.exec("UPDATE fx_rate_pairs SET market_adjustment_iqd = '20' WHERE pair = 'USD_IQD'");
@@ -61,23 +61,16 @@ test('MANUAL («إيقاف»), then a new adjustment: no rate moves, so the publ
   assert.equal(off.status, 200, await off.clone().text());
   assert.equal(pairOf(raw, 'USD_IQD').mode, 'MANUAL');
   assert.equal(pairOf(raw, 'USD_IQD').effective_rate, '1680');
-  const onManual = await publicRate(app);
-  assert.ok(onManual, 'a public dollar rate is served on MANUAL');
+  assert.equal(await publicRate(app), '1680');
 
-  // The owner saves a new adjustment on MANUAL — the card says it moves nothing here.
+  // DECISIONS row 274: the adjustment applies to a manual rate too — 20 → 50 moves the rate in force by 30.
   const adj = await put(app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(raw), market_adjustment_iqd: '50' });
   assert.equal(adj.status, 200, await adj.clone().text());
   const usd = pairOf(raw, 'USD_IQD');
   assert.equal(usd.market_adjustment_iqd, '50');
-  assert.equal(usd.effective_rate, '1680', 'the rate in force did not move');
-  assert.equal(derivedOf(raw).USD!.rate_iqd, '1680', 'no dinar price moved');
-
-  const after = await publicRate(app);
-  assert.equal(
-    after,
-    onManual,
-    `the public displayUsdRate moved from ${onManual} to ${after} although no rate moved: ` +
-      'worker/lib/fx/displayRate.ts subtracts market_adjustment_iqd from a MANUAL rate that never contained it ' +
-      '(effective_source stays non-manual after «إيقاف»), so every USD price shown to every visitor shifts'
-  );
+  assert.equal(usd.mode, 'MANUAL');
+  assert.equal(usd.effective_rate, '1710');
+  assert.equal(usd.manual_rate, '1710', 'on MANUAL the rate in force IS manual_rate (the table CHECK)');
+  assert.equal(derivedOf(raw).USD!.rate_iqd, '1710', 'every dinar price is built at the new rate');
+  assert.equal(await publicRate(app), '1710', 'the public figure is the rate in force, nothing else');
 });

@@ -167,8 +167,8 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
       return;
     }
     setAdjustmentError(null);
-    // On automatic, the adjustment moves the shop's rate: previewed once a product is engine-priced (on manual it moves nothing).
-    if (previewed && p.mode === 'AUTO') {
+    // The adjustment moves the shop's rate in either mode (DECISIONS row 274): previewed once a product is engine-priced.
+    if (previewed) {
       onPreviewAct!({
         label: s.adjustmentLabel,
         load: () => previewFxManual(p.pair, { market_adjustment_iqd: adj }),
@@ -308,7 +308,7 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
                 size="sm"
                 variant="secondary"
                 loading={busy === 'observed'}
-                onClick={() => applyObserved(p.last_observed!.candidate)}
+                onClick={() => applyObserved(usd && p.last_observed!.market_rate ? p.last_observed!.market_rate : p.last_observed!.candidate)}
                 data-fx-use-observed
               >
                 {s.useObserved(fxFigure(p.last_observed.candidate))}
@@ -385,6 +385,12 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
           is held, or on a manual rate it does not, and no sum is better than a wrong one. */}
       {/* Each figure is isolated left-to-right (LRI … PDI): inside an Arabic or Sorani line a bare «−20»
           took the paragraph's direction and read «20−» (FX-1A review: security #2). */}
+      {/* MANUAL (DECISIONS row 274): «السعر اليدوي 1,680 + الزيادة 20 = السعر المعتمد 1,700», the server's figures. */}
+      {usd && p.mode === 'MANUAL' && p.manual_base_rate && p.effective_rate && (
+        <p className="mt-3 text-[12.5px] leading-relaxed text-text-secondary" data-fx-manual-formula>
+          {s.manualFormula(ltrIsolate(fxFigure(p.manual_base_rate)), ltrIsolate(adjustmentFigure(p.market_adjustment_iqd ?? '0')), ltrIsolate(fxFigure(p.effective_rate)))}
+        </p>
+      )}
       {usd && !notSetUp && p.formula_holds && p.market_rate && p.effective_rate && (
         <p className="mt-3 text-[12.5px] leading-relaxed text-text-secondary" data-fx-formula>
           {s.formula(ltrIsolate(fxFigure(p.market_rate)), ltrIsolate(adjustmentFigure(p.market_adjustment_iqd ?? '0')), ltrIsolate(fxFigure(p.effective_rate)))}
@@ -411,7 +417,7 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
           )}
           {p.mode === 'MANUAL' && (
             <p className="mt-1 text-[12px] leading-relaxed text-text-muted" data-fx-manual-final>
-              {s.manualFinal}
+              {s.manualPlusAdjustment}
             </p>
           )}
         </div>

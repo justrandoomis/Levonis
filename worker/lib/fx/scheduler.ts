@@ -266,8 +266,8 @@ export function quoteFor(
 
 const newLogId = () => `fxl_${crypto.randomUUID()}`;
 
-/** A raw log insert's adjustment, as adjustmentOf(): USD/IQD's own while AUTO; NULL on the ECB pairs (the log CHECK) and on a manual rate. */
-const ADJUSTMENT_IN_FORCE = "CASE WHEN pair = 'USD_IQD' AND mode = 'AUTO' THEN market_adjustment_iqd ELSE NULL END";
+/** A raw log insert's adjustment, as adjustmentOf(): USD/IQD's own in either mode (DECISIONS row 274); NULL on the ECB pairs (the log CHECK). */
+const ADJUSTMENT_IN_FORCE = "CASE WHEN pair = 'USD_IQD' THEN market_adjustment_iqd ELSE NULL END";
 
 interface CommitDone {
   report: FxRunReport;

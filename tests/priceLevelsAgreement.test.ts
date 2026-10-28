@@ -19,7 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveUnitPrice, DEFAULT_PRO_POLICY, type PricingProduct, type Tier } from '../worker/lib/pricing';
-import { priceLevels, type PricingCtx } from '../worker/routes/products';
+import { priceLevels, standInOptionIds, type PricingCtx } from '../worker/routes/products';
 import type { ProductDoc } from '../worker/lib/productModel';
 import { LADDER_FIXTURES, col, opt, product } from './pricingLadderFixtures';
 
@@ -65,7 +65,10 @@ test('INVARIANT: every published level equals the resolver for the same selectio
         return { r, where: `${f.name} @${tier}${active ? '' : ' (inactive)'} / ${where}` };
       };
 
-      const base = expect(null, null, 'base');
+      // DECISIONS row 275: with options, nothing chosen is priced at the cheapest option (the base row is unbuyable).
+      const ids = standInOptionIds(asDoc(f.product));
+      const cheapest = ids.length ? ids.reduce((a, id) => (levels.option[id].unit_subtotal_iqd < levels.option[a].unit_subtotal_iqd ? id : a)) : null;
+      const base = expect(cheapest, null, cheapest ? `base = option:${cheapest}` : 'base');
       assert.equal(levels.base.applied_iqd, base.r.applied_iqd, `${base.where} applied`);
       assert.equal(levels.base.regular_iqd, base.r.regular_iqd, `${base.where} regular`);
       assert.equal(levels.base.unit_subtotal_iqd, base.r.unit_subtotal_iqd, `${base.where} subtotal`);

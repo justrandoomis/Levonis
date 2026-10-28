@@ -61,7 +61,7 @@ test('GET /rates: the allow-list DTO — exactly these keys, the key a boolean, 
     'anomaly_threshold_pct', 'attribution', 'bound_max', 'bound_min', 'drift_anchor_at', 'drift_anchor_rate',
     'drift_threshold_pct', 'effective_applied_at', 'effective_rate', 'effective_source', 'effective_version', 'failing_since', 'fetch_status',
     'formula_holds', 'interval_hours', 'last_check_result', 'last_checked_at', 'last_error_code', 'last_known_good_rate', 'last_observed', 'last_successful_at',
-    'manual_rate', 'market_adjustment_iqd', 'market_buy', 'market_rate', 'min_change_pct', 'mode', 'next_check_at', 'official_rate', 'owner_version', 'pair', 'pending',
+    'manual_base_rate', 'manual_rate', 'market_adjustment_iqd', 'market_buy', 'market_rate', 'min_change_pct', 'mode', 'next_check_at', 'official_rate', 'owner_version', 'pair', 'pending',
     'provider', 'published_at', 'rejected', 'status',
   ]);
   assert.deepEqual(b.pairs[0].attribution, { text: 'IQWealth', url: 'https://iraqsm.com' });

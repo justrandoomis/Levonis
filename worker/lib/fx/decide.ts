@@ -145,9 +145,8 @@ export interface FxLogDraft {
   result: string;
   error_code: string | null;
   /**
-   * USD/IQD: the adjustment this row's rate carries (owner decision 5); null on
-   * the ECB pairs and on a manual rate — a manual rate is final and never
-   * includes the adjustment.
+   * USD/IQD: the adjustment this row's rate carries (owner decision 5), on a
+   * manual rate too (DECISIONS row 274); null on the ECB pairs.
    */
   market_adjustment_iqd: string | null;
   /** settings_change rows only: `[{field, before, after}]` as JSON text (owner decision 10). */
@@ -156,14 +155,14 @@ export interface FxLogDraft {
 
 /**
  * The adjustment `row`'s rate in force carries — what a log row of it records:
- * USD/IQD's own while it tracks the market (AUTO); null on an ECB pair, and
- * null on a MANUAL pair, whose rate is the owner's final figure with no
- * adjustment in it («السعر اليدوي نهائي، ولا تُضاف إليه الزيادة»). So the
- * history never shows an adjustment under a manual rate, and the 24-hour
- * guard never re-bases a manual rate onto a later adjustment (FX-1A review #4).
+ * USD/IQD's own, in either mode; null on an ECB pair. Since DECISIONS row 274
+ * the fixed per-dollar margin is added to a MANUAL rate too (the rate in force
+ * is the typed rate + the adjustment, «1,680 + 20 = 1,700»), so a manual rate
+ * carries it exactly as a market-built one does, and the 24-hour guard
+ * re-bases it onto a later adjustment like any other reference.
  */
-export const adjustmentOf = (row: Pick<FxPairRow, 'pair' | 'mode' | 'market_adjustment_iqd'>): string | null =>
-  row.pair === 'USD_IQD' && row.mode === 'AUTO' ? row.market_adjustment_iqd : null;
+export const adjustmentOf = (row: Pick<FxPairRow, 'pair' | 'market_adjustment_iqd'>): string | null =>
+  row.pair === 'USD_IQD' ? row.market_adjustment_iqd : null;
 
 /** Why the owner's bell rings — never a figure. */
 export interface FxAttention {

@@ -827,6 +827,8 @@ interface PriceLevels {
    *  price is then genuinely unknown until the quote lands, and the page says
    *  so rather than guessing. */
   complete: boolean;
+  /** `base` is the cheapest of several options that differ: «يبدأ من» (DECISIONS row 275). */
+  base_from?: boolean;
 }
 
 /**
@@ -3301,6 +3303,8 @@ export default function Product() {
               it does not disappear and it is not replaced by a sentence. Only
               opacity animates, so nothing reflows.
             */}
+            {/* Nothing chosen and the options differ: the figure is the cheapest option's (DECISIONS row 275). */}
+            {!optionId && !colorId && priceLevels?.base_from ? <span className="text-text-secondary text-[12px] font-bold">{s.from}</span> : null}
             <span
               aria-busy={priceIsPending || undefined}
               data-pro-price={appliedMemberTier === 'pro' || undefined}

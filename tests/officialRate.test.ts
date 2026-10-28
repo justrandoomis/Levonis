@@ -235,11 +235,13 @@ test('no applied rate: the legacy setting, then its default — never 0; a fract
   assert.deepEqual(await getPublicDisplayRate(db), { displayUsdRate: '1680.6', displayUsdRateAttributed: true, exchangeRate: 1681 });
 });
 
-test('MANUAL: the rate the owner types is the display rate and the wallet rate, the shop\'s own (never credited)', async () => {
+test('MANUAL: the rate the owner types + the adjustment (DECISIONS row 274) is the display rate and the wallet rate, the shop\'s own (never credited)', async () => {
   const raw = seed();
   await approveUsdAt1680(raw);
   const owner = ownerApp(raw);
-  const res = await put(owner, '/api/admin/pricing/rates/fx/USD_IQD/manual', { owner_version: Number(pairOf(raw, 'USD_IQD').owner_version), rate: '1700' });
+  // The owner types 1,680 with the adjustment of 20 in force: 1,700 is the one official rate.
+  assert.equal(pairOf(raw, 'USD_IQD').market_adjustment_iqd, '20');
+  const res = await put(owner, '/api/admin/pricing/rates/fx/USD_IQD/manual', { owner_version: Number(pairOf(raw, 'USD_IQD').owner_version), rate: '1680' });
   assert.equal(res.status, 200, await res.clone().text());
   assert.equal(pairOf(raw, 'USD_IQD').mode, 'MANUAL');
   const pub = (await json(await get(owner, '/api/settings/public'))).settings;

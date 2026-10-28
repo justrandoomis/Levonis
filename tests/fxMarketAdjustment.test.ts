@@ -146,7 +146,7 @@ test('every log row says which adjustment was in force: USD/IQD carries it, EUR/
   assert.ok(ecb.every((l) => l.market_adjustment_iqd === null), 'every ECB row is NULL');
 });
 
-test('the raw rows carry it too: a provider-budget deferral, a refused commit and a superseded fetch each record the adjustment in force — and none on a manual rate', async () => {
+test('the raw rows carry it too: a provider-budget deferral, a refused commit and a superseded fetch each record the adjustment in force — a manual rate too (DECISIONS row 274)', async () => {
   const T = new Date('2026-10-08T06:00:00.000Z');
   const approved = () => {
     const raw = freshDb();
@@ -164,10 +164,10 @@ test('the raw rows carry it too: a provider-budget deferral, a refused commit an
   m1.state.at = T;
   await runFxScheduler(fxEnv(budget), { now: new Date(T.getTime() + 60_000), scheduledTime: T }, { trigger: 'cron', fetchImpl: m1.f.fetch });
   assert.deepEqual([last(budget).error_code, last(budget).market_adjustment_iqd], ['PROVIDER_BUDGET', '20'], 'a provider-budget deferral');
-  // The same refusal on a MANUAL pair (a refresh): the rate in force is manual, so no adjustment.
+  // The same refusal on a MANUAL pair (a refresh): the manual rate in force carries the adjustment too (DECISIONS row 274).
   budget.exec("UPDATE fx_rate_pairs SET mode = 'MANUAL', manual_rate = effective_rate WHERE pair = 'USD_IQD'");
   await runFxScheduler(fxEnv(budget), { now: new Date(T.getTime() + 120_000) }, { trigger: 'refresh', pairs: ['USD_IQD'], fetchImpl: m1.f.fetch });
-  assert.deepEqual([last(budget).error_code, last(budget).market_adjustment_iqd], ['PROVIDER_BUDGET', null], 'a provider-budget deferral on a manual rate');
+  assert.deepEqual([last(budget).error_code, last(budget).market_adjustment_iqd], ['PROVIDER_BUDGET', '20'], 'a provider-budget deferral on a manual rate');
 
   // A commit a trigger refuses twice: the raw 'commit_refused' row (scheduler recordRefused).
   const refused = approved();
@@ -178,10 +178,10 @@ test('the raw rows carry it too: a provider-budget deferral, a refused commit an
   assert.deepEqual([last(refused).event, last(refused).market_adjustment_iqd], ['commit_refused', '20'], 'a refused commit');
 
   // The owner writes the pair while it is fetched: the raw 'superseded' row (scheduler recordSuperseded)
-  // carries the adjustment in force AFTER the owner's write — +30 — and none when that write made it manual.
+  // carries the adjustment in force AFTER the owner's write — +30 — and the same +20 when that write made it manual.
   for (const [write, want] of [
     [(now: Date) => (rows: Parameters<Parameters<typeof ownerCommit>[1]>[0]) => planSettings(rows[0]!, { owner_version: rows[0]!.owner_version, market_adjustment_iqd: '30' }, { actor: 'usr_owner', now })!, '30'],
-    [(now: Date) => (rows: Parameters<Parameters<typeof ownerCommit>[1]>[0]) => planManualSet(rows[0]!, { owner_version: rows[0]!.owner_version, rate: '1700' }, { actor: 'usr_owner', now }), null],
+    [(now: Date) => (rows: Parameters<Parameters<typeof ownerCommit>[1]>[0]) => planManualSet(rows[0]!, { owner_version: rows[0]!.owner_version, rate: '1700' }, { actor: 'usr_owner', now }), '20'],
   ] as const) {
     const raw = approved();
     const m = market({ sell: 1690 });
@@ -196,11 +196,11 @@ test('the raw rows carry it too: a provider-budget deferral, a refused commit an
     }) as typeof fetch;
     const report = await runFxScheduler(fxEnv(raw), { now: new Date(T.getTime() + 60_000) }, { trigger: 'refresh', pairs: ['USD_IQD'], fetchImpl });
     assert.equal(report.checked[0]!.result, 'SUPERSEDED');
-    assert.deepEqual([last(raw).event, last(raw).market_adjustment_iqd], ['superseded', want], `a superseded fetch (${want ?? 'manual'})`);
+    assert.deepEqual([last(raw).event, last(raw).market_adjustment_iqd], ['superseded', want], `a superseded fetch (${want})`);
   }
 });
 
-test('a manual rate carries no adjustment: «أبقِ سعري الحالي يدويًا» (with its old → new), a refresh while manual, a settings change while manual and a manual set all record NULL; the history sheet never shows an adjustment under a manual rate', async () => {
+test('a manual rate carries the adjustment too (DECISIONS row 274): «أبقِ سعري الحالي يدويًا» (with its old → new), a refresh while manual, a settings change while manual and a manual set all record it, and the rate in force is the typed rate + the adjustment', async () => {
   const { raw, app } = world();
   raw.exec("UPDATE fx_rate_pairs SET market_adjustment_iqd = '20' WHERE pair = 'USD_IQD'");
   applyRate(raw, 'USD_IQD', '1680');
@@ -216,28 +216,30 @@ test('a manual rate carries no adjustment: «أبقِ سعري الحالي يد
   let row = logsOf(raw, 'USD_IQD').at(-1)!;
   assert.equal(row.event, 'mode_change');
   assert.deepEqual(JSON.parse(String(row.settings_diff)), [{ field: 'mode', before: 'AUTO', after: 'MANUAL' }], 'keep-as-manual says old → new');
-  assert.equal(row.market_adjustment_iqd, null, 'the rate is manual from here');
+  assert.equal(row.market_adjustment_iqd, '20', 'the rate in force keeps its adjustment');
   const history = await json(await get(app, `${BASE}/rates/history?pair=USD_IQD`));
   const item = history.items.find((i: { id: string }) => i.id === row.id);
   assert.deepEqual(item.settings_diff, [{ field: 'mode', before: 'AUTO', after: 'MANUAL' }], 'the history sheet gets the diff');
 
-  // A refresh while manual only observes; the candidate it saw includes the adjustment, the manual rate does not.
+  // A refresh while manual only observes; the candidate it saw and the manual rate both include the adjustment.
   await refreshNow(raw, 1700);
   row = logsOf(raw, 'USD_IQD').at(-1)!;
-  assert.deepEqual([row.event, row.pending_rate, row.market_adjustment_iqd], ['observed', '1720', null]);
+  assert.deepEqual([row.event, row.pending_rate, row.market_adjustment_iqd], ['observed', '1720', '20']);
 
-  // The adjustment changed while manual: the diff keeps it, the rate (still the manual 1,680) carries none.
+  // The adjustment changed while manual: the rate in force moves by the change, 1,680 + (30 − 20) = 1,690.
   assert.equal((await put(app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(raw), market_adjustment_iqd: '30' })).status, 200);
   row = logsOf(raw, 'USD_IQD').at(-1)!;
   assert.equal(row.event, 'settings_change');
-  assert.equal(row.effective_after, '1680', 'a manual rate is final');
+  assert.equal(row.effective_after, '1690', 'the adjustment moves a manual rate too');
   assert.deepEqual(JSON.parse(String(row.settings_diff)), [{ field: 'market_adjustment_iqd', before: '20', after: '30' }]);
-  assert.equal(row.market_adjustment_iqd, null);
+  assert.equal(row.market_adjustment_iqd, '30');
+  assert.deepEqual([pairOf(raw, 'USD_IQD').manual_rate, derivedOf(raw).USD!.rate_iqd], ['1690', '1690']);
 
-  // A manual set.
+  // A manual set: the owner types 1,700, the rate in force is 1,700 + 30 = 1,730.
   assert.equal((await put(app, `${BASE}/rates/fx/USD_IQD/manual`, { owner_version: ownerVersion(raw), rate: '1700' })).status, 200);
   row = logsOf(raw, 'USD_IQD').at(-1)!;
-  assert.deepEqual([row.event, row.effective_after, row.market_adjustment_iqd], ['manual_set', '1700', null]);
+  assert.deepEqual([row.event, row.effective_after, row.market_adjustment_iqd], ['manual_set', '1730', '30']);
+  assert.deepEqual([pairOf(raw, 'USD_IQD').manual_rate, derivedOf(raw).USD!.rate_iqd], ['1730', '1730']);
 
   // The history sheet shows «الزيادة» only where the market moved or held a rate.
   assert.equal(RATE_EVENTS.has('manual_set'), false);
@@ -289,6 +291,7 @@ const usdPair = (over: Partial<FxPairDto> = {}): FxPairDto => ({
   market_adjustment_iqd: '20',
   formula_holds: true,
   manual_rate: null,
+  manual_base_rate: null,
   effective_rate: '1680',
   effective_version: 1,
   effective_source: 'review_approved',
@@ -336,7 +339,7 @@ const card = (p: FxPairDto, lang: (typeof LANGS)[number]) =>
   );
 const formulaOf = (html: string) => /<p[^>]*data-fx-formula[^>]*>([^<]*)<\/p>/.exec(html)?.[1] ?? null;
 
-test('the card: «market + adjustment = effective» in ar, en and ckb when it holds; nothing when it does not; a manual rate says the adjustment is not added', () => {
+test('the card: «market + adjustment = effective» in ar, en and ckb when it holds; nothing when it does not; a manual rate shows «manual + adjustment = effective» (DECISIONS row 274)', () => {
   for (const lang of LANGS) {
     const s = FX_STRINGS[lang];
     const shown = formulaOf(card(usdPair(), lang));
@@ -347,10 +350,13 @@ test('the card: «market + adjustment = effective» in ar, en and ckb when it ho
     assert.match(negative!, /−20/, `${lang}: a minus when it lowers the rate`);
     // Each figure is isolated left-to-right: a bare «−20» in an Arabic or Sorani line reads «20−» (FX-1A review: security #2).
     for (const fig of ['1,660', '−20', '1,640']) assert.ok(negative!.includes(`\u2066${fig}\u2069`), `${lang}: «${fig}» isolated in ${JSON.stringify(negative)}`);
-    const manual = card(usdPair({ mode: 'MANUAL', manual_rate: '1700', effective_rate: '1700', effective_source: 'manual', formula_holds: false }), lang);
+    const manual = card(usdPair({ mode: 'MANUAL', manual_rate: '1700', manual_base_rate: '1680', effective_rate: '1700', effective_source: 'manual', formula_holds: false }), lang);
     assert.equal(formulaOf(manual), null);
-    assert.ok(manual.includes(s.manualFinal), `${lang}: the manual hint`);
-    assert.equal(card(usdPair(), lang).includes(s.manualFinal), false, `${lang}: no manual hint in AUTO`);
+    const manualSum = /<p[^>]*data-fx-manual-formula[^>]*>([^<]*)<\/p>/.exec(manual)?.[1] ?? null;
+    assert.equal(manualSum, s.manualFormula(ltrIsolate('1,680'), ltrIsolate('20'), ltrIsolate('1,700')), `${lang}: 1,680 + 20 = 1,700`);
+    assert.ok(manual.includes(s.manualPlusAdjustment), `${lang}: the manual hint`);
+    assert.equal(card(usdPair(), lang).includes(s.manualPlusAdjustment), false, `${lang}: no manual hint in AUTO`);
+    assert.equal(/data-fx-manual-formula/.test(card(usdPair(), lang)), false, `${lang}: no manual sum in AUTO`);
     assert.ok(card(usdPair(), lang).includes(s.adjustment), `${lang}: the label names the fixed dinars`);
   }
   // Saving an adjustment asks for a fresh sign-in, and the card says so before the act, beside «حفظ».

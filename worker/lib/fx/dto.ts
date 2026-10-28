@@ -108,6 +108,20 @@ function formulaHolds(r: FxPairRow): boolean {
   }
 }
 
+/** The rate the owner typed under the manual rate in force (USD/IQD: in force − adjustment); null when not MANUAL. */
+function manualBaseOf(r: FxPairRow): string | null {
+  if (r.mode !== 'MANUAL' || r.manual_rate === null) return null;
+  if (r.pair !== 'USD_IQD') return r.manual_rate;
+  const adj = r.market_adjustment_iqd;
+  const negated = adj.startsWith('-') ? adj.slice(1) : `-${adj.replace(/^\+/, '')}`;
+  try {
+    const v = usdIqdCandidate(r.manual_rate, negated);
+    return /^[0-9.]+$/.test(v) && Number(v) > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The rejection memory of decide() step 8 still holds (24 hours). */
 function rejectionActive(r: Pick<FxPairRow, 'rejected_rate' | 'rejected_at'>, now: Date): boolean {
   if (r.rejected_rate === null || r.rejected_at === null) return false;
@@ -135,6 +149,10 @@ function pairDto(r: FxPairRow, observed: FxLogRow | undefined, now: Date) {
     // the client never computes a rate.
     formula_holds: usd && formulaHolds(r),
     manual_rate: r.manual_rate,
+    // DECISIONS row 274: on USD/IQD the manual rate in force is the typed rate
+    // + the adjustment; the typed part is sent so the card can show
+    // «1,680 + 20 = 1,700» without computing a rate.
+    manual_base_rate: manualBaseOf(r),
     effective_rate: r.effective_rate,
     effective_version: r.effective_version,
     effective_source: r.effective_source,

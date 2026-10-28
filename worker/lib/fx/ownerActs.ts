@@ -9,12 +9,15 @@
  * lease, so it wins over a fetch in flight (that fetch's commit misses its
  * fence and is recorded SUPERSEDED).
  *
- *   manual set     mode MANUAL, manual = effective = v, the drift anchor = v
+ *   manual set     mode MANUAL, manual = effective = v, the drift anchor = v;
+ *                  on USD/IQD v = the typed rate + the adjustment (DECISIONS
+ *                  row 274: «1,680 + 20 = 1,700»; the adjustment applies to a
+ *                  manual rate exactly as it does to the market rate)
  *   adjustment     USD/IQD `market_adjustment_iqd`: a FIXED number of dinars
  *                  per dollar, never a percentage (owner decision 5: market
  *                  1,660 + 20 = 1,680). The effective rate moves by the
- *                  change of the adjustment (never onto a market figure held
- *                  for review),
+ *                  change of the adjustment, in either mode (row 274; never
+ *                  onto a market figure held for review),
  *                  the anchor moves with it, a pending candidate is re-based
  *                  to its own market figure + the new adjustment
  *   approve        USD/IQD: pending MARKET + the CURRENT adjustment
@@ -130,13 +133,6 @@ export function pairParam(raw: string | undefined): FxPairId {
   return raw;
 }
 
-/** The rate of a pair, as typed: positive, at most its decimals, within its bounds (and USD/IQD within 500–10,000). */
-export function rateFor(row: FxPairRow, raw: unknown, field: string): string {
-  const v = positiveDecimal(raw, field, 6, RATE_PLACES[row.pair]);
-  assertInBounds(row, v);
-  return v;
-}
-
 function assertInBounds(row: Pick<FxPairRow, 'pair' | 'bound_min' | 'bound_max'>, v: string): void {
   const ok = withinBounds(v, row.bound_min, row.bound_max) && (row.pair !== 'USD_IQD' || withinBounds(v, USD_IQD_SANITY.min, USD_IQD_SANITY.max));
   if (!ok) throw fxRefusal(400, 'FX_RATE_OUT_OF_BOUNDS');
@@ -215,6 +211,18 @@ function effectiveTo(row: FxPairRow, v: string, ctx: ActContext, source: 'manual
 
 const anchorTo = (v: string, ctx: ActContext): PairSet => ({ drift_anchor_rate: v, drift_anchor_at: iso(ctx.now) });
 
+/**
+ * The rate a typed manual rate puts in force: USD/IQD adds the fixed
+ * adjustment (DECISIONS row 274), the ECB pairs take it as typed. Refused (out
+ * of bounds) when it would not stay positive.
+ */
+export function manualInForce(row: Pick<FxPairRow, 'pair' | 'market_adjustment_iqd'>, typed: string): string {
+  if (row.pair !== 'USD_IQD') return typed;
+  const v = addProcurementExact(procurementExact(typed), procurementExact(row.market_adjustment_iqd, { signed: true }));
+  if (v.num <= 0n) throw fxRefusal(400, 'FX_RATE_OUT_OF_BOUNDS');
+  return procurementExactText(v);
+}
+
 /** `rate + (newAdj − oldAdj)`, exact; refused (out of bounds) when it would not stay positive. */
 function shiftedBy(rate: string, oldAdj: string, newAdj: string): string {
   const v = addProcurementExact(procurementExact(rate), procurementExact(newAdj, { signed: true }), negate(procurementExact(oldAdj, { signed: true })));
@@ -257,15 +265,16 @@ export function planManualSet(row: FxPairRow, raw: unknown, ctx: ActContext): Pl
   assertOwnerVersion(row, ownerVersionOf(b.owner_version));
   previewHash(b.preview_hash);
   const confirm = optionalBool(b.confirm_large_change, 'confirm_large_change');
-  const v = rateFor(row, b.rate, 'rate');
+  const v = manualInForce(row, positiveDecimal(b.rate, 'rate', 6, RATE_PLACES[row.pair]));
+  assertInBounds(row, v);
   const set: PairSet = { mode: 'MANUAL', manual_rate: v, ...effectiveTo(row, v, ctx, 'manual'), ...anchorTo(v, ctx), ...PENDING_CLEARED };
   const changed = row.effective_rate === null || !sameRate(row.effective_rate, v);
   return {
     ...act(
       row,
       set,
-      // A manual rate is final: its row carries no adjustment (FX-1A review #4).
-      [ownerLog(row, { event: 'manual_set', result: 'APPLIED', effective_after: v, change_ppm: row.effective_rate && changed ? changePpm(row.effective_rate, v) : null, market_adjustment_iqd: null })],
+      // The rate in force carries the adjustment (DECISIONS row 274): ownerLog records it.
+      [ownerLog(row, { event: 'manual_set', result: 'APPLIED', effective_after: v, change_ppm: row.effective_rate && changed ? changePpm(row.effective_rate, v) : null })],
       { action: 'fx.manual.set', target: row.pair, detail: { pair: row.pair } },
       { move: { before: row.effective_rate, after: v } }
     ),
@@ -323,13 +332,12 @@ export function planReview(row: FxPairRow, raw: unknown, ctx: ActContext): Plann
       ...act(
         row,
         { mode: 'MANUAL', manual_rate: a, ...anchorTo(a, ctx), ...PENDING_CLEARED },
-        // Old → new like every mode change (owner decision 10; FX-1A review #3); the rate is manual from here, so no adjustment.
+        // Old → new like every mode change (owner decision 10; FX-1A review #3); the rate in force keeps its adjustment (row 274).
         [
           ownerLog(row, {
             event: 'mode_change',
             result: 'MANUAL',
             pending_rate: pending,
-            market_adjustment_iqd: null,
             settings_diff: JSON.stringify([{ field: 'mode', before: row.mode, after: 'MANUAL' } satisfies SettingsDiffEntry]),
           }),
         ],
@@ -486,7 +494,8 @@ export function planSettings(row: FxPairRow, raw: unknown, ctx: ActContext): (Pl
       // Not «latest market + new adjustment»: the latest validated market figure
       // may be a candidate held for review, and an adjustment must never apply
       // a jump the guard is holding (that would walk around §30).
-      if (row.mode === 'AUTO' && mode === 'AUTO' && row.effective_rate !== null) {
+      // On MANUAL too (DECISIONS row 274): the manual rate in force is the typed rate + the adjustment.
+      if (row.mode === mode && row.effective_rate !== null) {
         effective = shiftedBy(row.effective_rate, row.market_adjustment_iqd, adj);
         assertInBounds(bounds, effective);
         // THE ANCHOR MOVES BY THE SAME CHANGE, AND KEEPS ITS TIME: the drift
@@ -499,6 +508,8 @@ export function planSettings(row: FxPairRow, raw: unknown, ctx: ActContext): (Pl
         Object.assign(set, effectiveTo(row, effective, ctx, row.effective_source ?? 'provider'), {
           drift_anchor_rate: anchor,
           ...(row.drift_anchor_at === null ? { drift_anchor_at: iso(ctx.now) } : {}),
+          // The table CHECK: on MANUAL the rate in force IS manual_rate.
+          ...(mode === 'MANUAL' ? { manual_rate: effective } : {}),
         });
       }
       if (row.pending_effective_rate !== null && row.pending_market_rate !== null) {
@@ -561,8 +572,8 @@ export function planSettings(row: FxPairRow, raw: unknown, ctx: ActContext): (Pl
         result: 'APPLIED',
         effective_after: effective,
         change_ppm: row.effective_rate && effective && !sameRate(row.effective_rate, effective) ? changePpm(row.effective_rate, effective) : null,
-        // The adjustment the rate in force carries: none on a manual rate, before or after this act (FX-1A review #4).
-        market_adjustment_iqd: usd && row.mode === 'AUTO' && mode === 'AUTO' ? adjustmentAfter : null,
+        // The adjustment the rate in force carries, in either mode (DECISIONS row 274).
+        market_adjustment_iqd: usd ? adjustmentAfter : null,
         settings_diff: diff(),
       })
     );
@@ -574,8 +585,8 @@ export function planSettings(row: FxPairRow, raw: unknown, ctx: ActContext): (Pl
         event: 'mode_change',
         result: mode,
         effective_after: effective,
-        // Either side of a mode change is a manual rate: no adjustment in it.
-        market_adjustment_iqd: null,
+        // The rate in force keeps the adjustment it carries (DECISIONS row 274).
+        market_adjustment_iqd: usd ? adjustmentAfter : null,
         settings_diff: settingsRow ? null : diff('mode'),
       })
     );
