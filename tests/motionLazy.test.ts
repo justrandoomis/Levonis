@@ -102,8 +102,9 @@ function distIsStale(): boolean {
 
 before(() => {
   if (existsSync(ASSETS) && !distIsStale()) return;
-  execFileSync('npx', ['vite', 'build'], { cwd: ROOT, stdio: 'inherit' });
-  execFileSync('node', ['scripts/write-asset-headers.mjs'], { cwd: ROOT, stdio: 'inherit' });
+  // Vite's own entry, run with this Node: `npx` is npx.cmd on Windows (tests/bundleBudget.test.ts).
+  execFileSync(process.execPath, [join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), 'build'], { cwd: ROOT, stdio: 'inherit' });
+  execFileSync(process.execPath, ['scripts/write-asset-headers.mjs'], { cwd: ROOT, stdio: 'inherit' });
   assert.ok(existsSync(ASSETS), 'vite build produced no dist/assets');
 });
 
