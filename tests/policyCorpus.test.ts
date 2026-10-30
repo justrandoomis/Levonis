@@ -768,3 +768,71 @@ test('a direct-sale price MAY carry the Direct Sale Extra — purchase 4.10, 6.3
     for (const lang of POLICY_LANGS) assert.doesNotMatch(doc.body[lang], ALWAYS[lang], `${doc.key}/${lang}: says every direct sale carries it`);
   }
 });
+
+/**
+ * THE META PIXEL IS DISCLOSED, NOT DENIED — privacy 4 and faq 6 (owner,
+ * 2026-10-31). The main site loads Meta's pixel (src/lib/metaPixel.ts,
+ * src/components/MetaPixel.tsx); version 3 of the privacy policy and faq 5
+ * said there was no advertising network, no marketing cookie and no sharing
+ * for advertising. This pins what the code does to the words a customer
+ * accepts: where it runs, the one event, what Meta receives, the two cookies,
+ * Meta's role — and that no banner and no on-site switch are promised.
+ */
+test('privacy 7.5–7.7, 12.6 and 12.10 describe the Meta Pixel in every language, and no line still denies it', () => {
+  const privacy = published('privacy');
+  for (const lang of POLICY_LANGS) {
+    const body = privacy.body[lang];
+    for (const n of ['4.7', '7.5', '7.6', '7.7', '7.8', '7.9', '12.6', '12.10']) articleOf(body, n);
+    // The names a reader can check against their own browser are the same in every language.
+    for (const token of ['levonis-iq.com', 'ali3d.levonis-iq.com', 'Print Cloud', 'Meta Platforms', 'PageView', '_fbp', '_fbc', 'fbclid', '90']) {
+      assert.ok(body.includes(token), `privacy/${lang} does not name «${token}»`);
+    }
+    for (const n of ['7.5', '7.6', '7.7', '12.6', '12.10']) {
+      assert.ok(articleOf(body, n).includes('Meta'), `privacy ${n}/${lang} does not name Meta`);
+    }
+  }
+
+  const en = (n: string) => articleOf(privacy.body.en, n);
+  assert.match(en('7.5'), /It is not loaded on merchants' store subdomains, such as ali3d\.levonis-iq\.com, or in the Print Cloud application\./);
+  assert.match(en('7.5'), /^- It reports only from public shopping and browsing pages: /m);
+  // /trade-in is the customer's own devices and requests, with request ids in
+  // its query string: it is not reported, so the reported list never names it.
+  const reported: Record<(typeof POLICY_LANGS)[number], RegExp> = { ar: /^- يُبلِّغ من [^\n]*$/m, en: /^- It reports only from [^\n]*$/m, ckb: /^- تەنها بینینی [^\n]*$/m };
+  const TRADE_IN: Record<(typeof POLICY_LANGS)[number], RegExp> = { ar: /الاستبدال/, en: /trade-in/i, ckb: /گۆڕینەوە/ };
+  for (const lang of POLICY_LANGS) {
+    const line = articleOf(privacy.body[lang], '7.5').match(reported[lang]);
+    assert.ok(line, `privacy 7.5/${lang}: the reported-pages line is missing`);
+    assert.doesNotMatch(line[0], TRADE_IN[lang], `privacy 7.5/${lang} lists trade-in as reported`);
+  }
+  assert.match(en('7.5'), /^- It reports nothing from any other page, including the account, settings, wallet, orders, order tracking, chats, sign-in, administration, the merchant dashboard, warranty and receipt pages, and pages opened by a private link\.$/m);
+  assert.match(en('7.6'), /The only event sent is a page view \("PageView"\)\. Meta's automatic event collection \(button clicks, page metadata\) is switched off, and no advanced matching is used: the site sends Meta no name, email address, phone number or account identifier\./);
+  assert.match(en('7.6'), /^- The visitor's IP address, as Meta's servers see it\.$/m);
+  assert.match(en('7.7'), /as a separate controller, under its own terms and privacy policy, outside Iraq/);
+  assert.match(en('12.6'), /_fbp, a browser identifier kept for up to 90 days and renewed on later visits; and _fbc, the ad click identifier, set when the visitor arrives from a Meta ad link carrying fbclid and kept for up to 90 days/);
+  assert.match(en('12.8'), /Blocking only Meta's script or its cookies does not affect using the store\./);
+  assert.match(en('12.10'), /The site shows no consent banner for the Meta Pixel and its cookies, and has no switch of its own to turn them off\./);
+
+  // What version 3 said and the pixel makes false is gone, in every language.
+  const DENIED: Record<(typeof POLICY_LANGS)[number], RegExp[]> = {
+    ar: [/^لا توجد شبكة إعلانات/m, /لا تتبع إعلاني/, /دون تتبع إعلاني/, /ولا يشاركها لغرض إعلاني/, /ولا للتتبع عبر مواقع أخرى/, /تمنع تنفيذ أي شيفرة لم يقدّمها المتجر/],
+    en: [/^There is no advertising network/m, /no advertising tracking/i, /no cross-site tracking cookie/, /share customer data for advertising purposes/, /prevents execution of any code the Store did not itself supply/],
+    ckb: [/^هیچ تۆڕێکی ڕیکلام/m, /بەدواداچوونی ڕیکلامی نییە/, /بەبێ شوێنکەوتنی ڕیکلامی/, /بەدواداچوونی نێوان ماڵپەڕەکان/, /بۆ مەبەستی ڕیکلامی هاوبەشی ناکات/],
+  };
+  for (const lang of POLICY_LANGS) {
+    for (const re of DENIED[lang]) assert.doesNotMatch(privacy.body[lang], re, `privacy/${lang} still says ${re}`);
+  }
+  // The absences that remain are scoped to everything BUT the pixel.
+  assert.match(en('7.8'), /^Apart from the Meta Pixel of articles 7\.5 to 7\.7, there is no advertising network/m);
+
+  // Real Sorani: its own words, never the Arabic pasted across.
+  for (const n of ['4.7', '7.5', '7.6', '7.7', '12.6', '12.10']) {
+    assert.notEqual(articleOf(privacy.body.ckb, n), articleOf(privacy.body.ar, n), `privacy ${n}: the ckb is the ar`);
+    assert.match(articleOf(privacy.body.ckb, n), /[ێۆڕەڵ]/, `privacy ${n}/ckb is not Sorani`);
+  }
+
+  // faq 9.4 routes to the policy and no longer says there is no advertising network.
+  const faq = published('faq');
+  assert.match(articleOf(faq.body.en, '9.4'), /the Meta Pixel[^\n]*there is no other advertising network and no other third-party analytics tool/);
+  assert.match(articleOf(faq.body.ar, '9.4'), /بكسل Meta/);
+  assert.match(articleOf(faq.body.ckb, '9.4'), /پیکسڵی Meta/);
+});

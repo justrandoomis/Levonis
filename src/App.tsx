@@ -54,6 +54,7 @@ import AppBusy from './components/ui/AppBusy';
 // The deception layer's block notice: renders nothing until an API answer says
 // ACCESS_BLOCKED, then downloads its screen (DECISIONS row 206).
 import AccessBlockedGate from './components/security/AccessBlockedGate';
+import MetaPixel from './components/MetaPixel';
 import HostAppleIdentity from './components/pwa/HostAppleIdentity';
 /**
  * SPLIT OUT ON PURPOSE. The viewer is the only screen in the application that
@@ -1242,6 +1243,9 @@ export default function App() {
               <AppBusy />
               <AppContent />
               <AccessBlockedGate />
+              {/* The Meta Pixel: main site, public pages, PageView only
+                  (src/lib/metaPixel.ts says why each limit is there). */}
+              <MetaPixel />
             </StoreProvider>
           </NavigationRouter>
           </CurrencyProvider>

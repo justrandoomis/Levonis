@@ -13,9 +13,16 @@
  *     versions and the same text, in all three languages;
  *   - the version each one replaced is still readable through `?version=`,
  *     out of the archive the previous deploy wrote, untouched by the sync;
- *   - checkout still asks for terms 4 and privacy 3, a Quick Buy profile that
- *     consented at terms 4 / privacy 3 / quick_buy 1 needs no new consent,
- *     and a session opened under that consent still becomes an order.
+ *   - checkout asks for exactly the current consent documents, a Quick Buy
+ *     profile that consented at them needs no new consent, and a session
+ *     opened under that consent still becomes an order.
+ *
+ * SINCE THEN ONE CONSENT DOCUMENT HAS MOVED, ON PURPOSE: privacy 3 → 4 for the
+ * Meta Pixel on the main site (owner, 2026-10-31), with faq 5 → 6 beside it.
+ * That was not a wording change: version 3 promised there was no advertising
+ * network, so a customer who accepted it must be asked again. The last test
+ * below proves that a profile still at privacy 3 is switched off until it
+ * consents to 4.
  *
  * The version numbers are written out on purpose, not read from the
  * registry: a test that compared the registry with itself would stay green
@@ -44,9 +51,18 @@ import { seedCatalogue, orderBody } from './lib/bundles';
 
 const EFFECTIVE = '2026-10-09';
 const MOVED = { purchase: 6, faq: 5, membership: 5, price_protection: 4 } as const;
-/** What each reworded document reads today: price_protection moved again, to 5, for owner decision 6 (DECISIONS row 196). */
-const CURRENT = { ...MOVED, price_protection: 5 } as const;
-const CONSENT = { terms: 4, privacy: 3, quick_buy: 1 } as const;
+/**
+ * What each reworded document reads today: price_protection moved again, to 5,
+ * for owner decision 6 (DECISIONS row 196), and faq to 6 for the Meta Pixel.
+ */
+const CURRENT = { ...MOVED, price_protection: 5, faq: 6 } as const;
+/** The documents that have moved since decision 7, and the day each did. */
+const META_PIXEL_EFFECTIVE = '2026-10-31';
+const EFFECTIVE_SINCE: Readonly<Record<string, string>> = { faq: META_PIXEL_EFFECTIVE };
+/** The consent documents as decision 7 left them — what a customer had accepted before the Meta Pixel. */
+const CONSENT_AT_DECISION_7 = { terms: 4, privacy: 3, quick_buy: 1 } as const;
+/** The consent documents today: privacy moved to 4 for the Meta Pixel; terms and quick_buy did not move. */
+const CONSENT = { ...CONSENT_AT_DECISION_7, privacy: 4 } as const;
 const NAME = { ar: 'زيادة البيع المباشر', en: 'Direct Sale Extra', ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ' } as const;
 const LANGS = ['ar', 'en', 'ckb'] as const;
 const LEDGER = JSON.parse(readFileSync(join(ROOT, 'tests', 'fixtures', 'policyHashes.json'), 'utf8')) as Record<string, string>;
@@ -60,13 +76,15 @@ const ROLES: ReadonlyArray<[string, StubUser | null]> = [
 const policyApp = (raw: DatabaseSync, user: StubUser | null) =>
   stubApp(asD1(raw), user, (a) => a.route('/api/policies', policiesRoutes));
 
-test('only the four reworded documents moved, all on one date; the consent documents and the consent sets did not', () => {
+test('only the four reworded documents moved, all on one date; the consent sets did not, and of the consent documents only privacy has moved since', () => {
   const version = (key: string) => POLICY_DOCUMENTS.find((d) => d.key === key)!;
   for (const [key, v] of Object.entries(CURRENT)) {
     assert.equal(version(key).version, v, key);
-    assert.equal(version(key).effective_at, EFFECTIVE, `${key}: one date for the whole change, the day it was published`);
+    assert.equal(version(key).effective_at, EFFECTIVE_SINCE[key] ?? EFFECTIVE, `${key}: one date for the whole change, the day it was published`);
   }
   for (const [key, v] of Object.entries(CONSENT)) assert.equal(version(key).version, v, `${key} moved: every consent would be asked again`);
+  assert.equal(version('privacy').effective_at, META_PIXEL_EFFECTIVE);
+  assert.notEqual(CONSENT.privacy, CONSENT_AT_DECISION_7.privacy, 'privacy 4 is a new consent, not a reworded one');
   assert.deepEqual([...CHECKOUT_POLICY_KEYS], ['terms', 'privacy']);
   assert.deepEqual([...QUICK_BUY_POLICY_KEYS], ['terms', 'privacy', 'quick_buy']);
 });
@@ -137,7 +155,7 @@ test('?version=5 still serves the archived purchase 5 after the sync writes 6 be
   resetPolicyCorpusMemo();
 });
 
-test('checkout still asks for terms 4 and privacy 3 — the quote lists exactly those', async () => {
+test('checkout asks for terms 4 and privacy 4 — the quote lists exactly those', async () => {
   const raw = seedCatalogue();
   const db = asD1(raw);
   const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
@@ -167,15 +185,15 @@ function quickBuyWorld(): DatabaseSync {
   return raw;
 }
 
-test('a Quick Buy profile that consented at terms 4 / privacy 3 / quick_buy 1 needs no new consent, and its open session still becomes an order', async () => {
+test('a Quick Buy profile that consented at terms 4 / privacy 4 / quick_buy 1 needs no new consent, and its open session still becomes an order', async () => {
   const raw = quickBuyWorld();
   const db = asD1(raw);
   const app = stubApp(db, { id: 'buyer', role: 'customer', email: 's@x.co' }, (a) => {
     a.route('/api/quick-buy', quickBuyRoutes);
     a.route('/api/orders', orderRoutes);
   });
-  // The consent a customer gave before this change, written out, not read
-  // from the registry.
+  // The consent the documents ask for today, written out, not read from the
+  // registry.
   const activated = await json(
     await post(app, '/api/quick-buy/activate', {
       policyAcceptance: [
@@ -214,4 +232,48 @@ test('a Quick Buy profile that consented at terms 4 / privacy 3 / quick_buy 1 ne
     .all() as Array<{ key: string; version: number }>;
   assert.ok(accepted.length >= 2, `only ${accepted.length} acceptance rows`);
   for (const a of accepted) assert.equal(a.version, CONSENT[a.key as keyof typeof CONSENT], `${a.key}@${a.version}`);
+});
+
+test('privacy 4 asks again: a Quick Buy profile still at privacy 3 is off until it consents, and consent naming privacy 3 is refused', async () => {
+  const raw = quickBuyWorld();
+  const db = asD1(raw);
+  const app = stubApp(db, { id: 'buyer', role: 'customer', email: 's@x.co' }, (a) => a.route('/api/quick-buy', quickBuyRoutes));
+  // A profile as it stood before the Meta Pixel: consent to terms 4 / privacy 3 / quick_buy 1.
+  raw
+    .prepare(
+      `INSERT INTO quick_buy_profiles (user_id, enabled, address_id, terms_version, privacy_version, policy_version, consented_at, wallet_consent_at)
+       VALUES ('buyer', 1, 'addr', ?, ?, ?, '2026-10-20T00:00:00.000Z', '2026-10-20T00:00:00.000Z')`
+    )
+    .run(CONSENT_AT_DECISION_7.terms, CONSENT_AT_DECISION_7.privacy, CONSENT_AT_DECISION_7.quick_buy);
+  assert.equal(needsConsent(await loadProfile(db, 'buyer')), true, 'a consent to privacy 3 is not a consent to privacy 4');
+
+  const stale = await post(app, '/api/quick-buy/activate', {
+    policyAcceptance: [
+      { key: 'terms', version: CONSENT_AT_DECISION_7.terms },
+      { key: 'privacy', version: CONSENT_AT_DECISION_7.privacy },
+      { key: 'quick_buy', version: CONSENT_AT_DECISION_7.quick_buy },
+    ],
+    walletConsent: true,
+    addressId: 'addr',
+    idempotencyKey: 'qb-roles-stale',
+  });
+  assert.equal(stale.status, 400);
+  assert.equal((await json(stale)).code, 'POLICY_ACCEPTANCE_REQUIRED');
+
+  const renewed = await json(
+    await post(app, '/api/quick-buy/activate', {
+      policyAcceptance: [
+        { key: 'terms', version: CONSENT.terms },
+        { key: 'privacy', version: CONSENT.privacy },
+        { key: 'quick_buy', version: CONSENT.quick_buy },
+      ],
+      walletConsent: true,
+      addressId: 'addr',
+      idempotencyKey: 'qb-roles-renew',
+    })
+  );
+  assert.equal(renewed.success, true, JSON.stringify(renewed));
+  const profile = await loadProfile(db, 'buyer');
+  assert.equal(profile!.privacy_version, CONSENT.privacy);
+  assert.equal(needsConsent(profile), false);
 });

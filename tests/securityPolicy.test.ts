@@ -25,6 +25,8 @@ import {
   CLOUDFLARE_INSIGHTS_BEACON,
   CLOUDFLARE_INSIGHTS_SCRIPT,
   GOOGLE_SIGNIN_ORIGIN,
+  META_PIXEL_BEACON,
+  META_PIXEL_SCRIPT,
   STATIC_SECURITY_HEADERS,
   STRICT_TRANSPORT_SECURITY,
   asDocument,
@@ -64,7 +66,7 @@ test('an injected inline or eval script is refused — the lock that holds when 
   // theme script, index.html) — a hash admits those exact bytes and nothing
   // else, so an injected script is still refused. tests/themeSystem.test.ts
   // holds the hash to the script.
-  assert.deepEqual(script, ["'self'", `'${THEME_BOOT_SCRIPT_HASH}'`, GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_SCRIPT]);
+  assert.deepEqual(script, ["'self'", `'${THEME_BOOT_SCRIPT_HASH}'`, GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_SCRIPT, META_PIXEL_SCRIPT]);
   assert.match(THEME_BOOT_SCRIPT_HASH, /^sha256-[A-Za-z0-9+/]{43}=$/);
 });
 
@@ -79,6 +81,18 @@ test("Cloudflare's edge-injected analytics beacon may load and report — found 
   assert.equal(CLOUDFLARE_INSIGHTS_SCRIPT, 'https://static.cloudflareinsights.com');
   assert.equal(CLOUDFLARE_INSIGHTS_BEACON, 'https://cloudflareinsights.com');
   assert.ok(!csp.includes('*.cloudflare'), 'no wildcard');
+});
+
+test('the Meta Pixel may load its script and report — exactly those two origins, nothing inline', () => {
+  // src/lib/metaPixel.ts adds fbevents.js from the app's own module: an origin
+  // in script-src, no 'unsafe-inline' (Meta's snippet is inline; it is not used).
+  const csp = spaCsp();
+  assert.ok(directive(csp, 'script-src')?.includes(META_PIXEL_SCRIPT), 'fbevents.js may load');
+  assert.ok(directive(csp, 'connect-src')?.includes(META_PIXEL_BEACON), 'page views may be reported');
+  assert.equal(META_PIXEL_SCRIPT, 'https://connect.facebook.net');
+  assert.equal(META_PIXEL_BEACON, 'https://www.facebook.com');
+  assert.ok(!csp.includes('*.facebook') && !csp.includes('*.fbcdn'), 'no Meta wildcard');
+  assert.ok(!directive(csp, 'frame-src')?.some((s) => s.includes('facebook')), 'Meta may not be framed');
 });
 
 test('Google sign-in keeps working: its origin may load, frame and connect', () => {
@@ -104,9 +118,9 @@ test('the page cannot be framed, re-based, made to submit elsewhere or host plug
   assert.deepEqual(directive(csp, 'object-src'), ["'none'"]);
 });
 
-test('the app talks only to itself (plus Google sign-in and the analytics beacon)', () => {
+test('the app talks only to itself (plus Google sign-in, the analytics beacon and the Meta Pixel)', () => {
   assert.deepEqual(directive(spaCsp(), 'connect-src'), [
-    "'self'", 'blob:', GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_BEACON,
+    "'self'", 'blob:', GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_BEACON, META_PIXEL_BEACON,
   ]);
 });
 

@@ -43,11 +43,26 @@ import type { PolicyDocument } from './types';
  *   google.ts       account the shop owns — worth stating, because the number
  *                   a customer sees is the shop's phone, not a cloud API), the
  *                   Telegram bot, Google sign-in and the web-font host.
+ *   src/lib/        the Meta Pixel — the one advertising script. MAIN SITE
+ *   metaPixel.ts /  only (never a store subdomain, never Print Cloud), a
+ *   src/components/ PageView alone, from an ALLOWLIST of public pages, with
+ *   MetaPixel.tsx   autoConfig off and no advanced matching. Articles 7.5–7.7
+ *                   and 12.6 say exactly that, so a new event, a new page on
+ *                   the list or advanced matching is a new version of this
+ *                   document, not a code change alone.
  *
- * WHAT IS DELIBERATELY ABSENT. There is no advertising network in this
- * codebase, no third-party analytics script and no sale of data, so article
- * 7.5 states those three as absences rather than leaving a customer to assume
- * the usual. There is also NO self-service deletion endpoint, so chapter 9
+ * WHAT IS DELIBERATELY ABSENT. Apart from the Meta Pixel on the main site
+ * (version 4, below), there is no advertising network in this codebase, no
+ * third-party analytics script and no sale of data, so article 7.8 states
+ * those as absences rather than leaving a customer to assume the usual — and
+ * articles 7.5–7.7 name the one exception in full rather than letting the
+ * absences hide it. Cloudflare Web Analytics, which the EDGE injects and this
+ * codebase does not load (worker/lib/securityPolicy.ts), has never been named
+ * apart from the infrastructure provider of article 7.1; version 4 leaves that
+ * as it was. There is NO consent banner and NO on-site switch for the pixel,
+ * so 7.7 and 12.10 say so in those words and point at what the visitor really
+ * controls: the browser and their Meta account settings. There is also NO
+ * self-service deletion endpoint, so chapter 9
  * describes erasure as a request handled by a human — which is what actually
  * happens. Promising a button that does not exist is the failure this corpus
  * cannot afford.
@@ -71,11 +86,36 @@ import type { PolicyDocument } from './types';
  *     so the clauses that carried them are published instead of withheld.
  *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
  *     by number, an article of this document that is itself withheld.
+ *
+ * VERSION 4 — WHY IT MOVED (owner, 2026-10-31). The archive keeps version 3
+ * byte for byte.
+ *   * THE META PIXEL. The owner is adding Meta's pixel to the main site and
+ *     chose to disclose it rather than leave version 3 promising the
+ *     opposite. Version 3 said: no advertising network (7.5); no marketing
+ *     and no cross-site tracking cookie (12.1); no third-party advertising
+ *     cookie and no sharing with an advertising network (12.6); no sharing
+ *     for an advertising purpose (5.6); no advertising tracking (4.5); no
+ *     code the Store did not supply runs in a page (11.2); nothing collected
+ *     beyond service and legal need (1.5). Each is now narrowed to "apart
+ *     from the Meta Pixel" or restated. The pixel itself is the new 7.5
+ *     (where it runs), 7.6 (what Meta receives), 7.7 (purpose and Meta's
+ *     role), the new purpose 4.7, 12.6 (its two cookies) and the new 12.10
+ *     (no banner, no switch). Old 7.5 and 7.6 are now 7.8 and 7.9.
+ *   * NOTHING PROMISED THAT DOES NOT EXIST. There is no consent banner and
+ *     no on-site opt-out, so the text says so, and says what the browser and
+ *     the Meta account settings can do instead.
+ *   * THIS IS A CONSENT DOCUMENT. privacy is in CHECKOUT_POLICY_KEYS and
+ *     QUICK_BUY_POLICY_KEYS, so this version asks every customer to accept
+ *     again at their next order (13.2) and switches every Quick Buy profile
+ *     off until its owner consents again (../quickBuy/profile.ts
+ *     needsConsent). That is the point: a customer who accepted "there is no
+ *     advertising network" has not accepted this. faq moved to 6 with it
+ *     (its 9.4 said the same); faq is not a consent document.
  */
 export const privacy: PolicyDocument = {
   key: 'privacy',
-  version: 3,
-  effective_at: '2026-09-23',
+  version: 4,
+  effective_at: '2026-10-31',
   title: {
     ar: 'سياسة الخصوصية',
     en: 'Privacy Policy',
@@ -97,7 +137,7 @@ export const privacy: PolicyDocument = {
 هذه الوثيقة إحدى وثيقتين يُطلب قبولهما عند إتمام الطلب، والأخرى هي الشروط والأحكام العامة. ويُحفظ القبول موثقاً بنسخته ولغته وتاريخه.
 
 ### 1.5 مبدأ الوثيقة
-لا يجمع المتجر بياناً لا يحتاجه لتنفيذ خدمة أو للوفاء بالتزام قانوني. وكل بند أدناه يذكر البيان والغرض منه معاً، فما لا غرض له لا يُجمع.
+لا يجمع المتجر بياناً لا يحتاجه لتنفيذ خدمة أو للوفاء بالتزام قانوني. والغرض الوحيد خارج هذين هو الإعلان المذكور في المادة 4.7، ولأجله يرسل الموقع الرئيسي إلى Meta ما تذكره المادة 7.6. وكل بند أدناه يذكر البيان والغرض منه معاً، فما لا غرض له لا يُجمع.
 
 ## 2. المصادر
 
@@ -154,10 +194,13 @@ export const privacy: PolicyDocument = {
 تُحفظ مفاتيح حدود المعدل بصيغة مُجزَّأة لا بصيغة المعرّف نفسه، حتى لا يتحول جدول المحاولات الفاشلة إلى قائمة بمن حاول الدخول.
 
 ### 4.5 التحسين
-قياس ما يُستعمل من صفحات المتجر بصورة مجمَّعة، دون بيع بيانات ودون تتبع إعلاني.
+قياس ما يُستعمل من صفحات المتجر بصورة مجمَّعة، دون بيع بيانات. أما قياس إعلانات المتجر فغرض مستقل تبيّنه المادة 4.7.
 
 ### 4.6 الإشعارات
 إرسال ما يخص الطلب والضمان والحساب عبر القنوات التي اختارها الزبون. والرسائل التسويقية تخضع للمادة 8.
+
+### 4.7 الإعلان على فيسبوك وإنستغرام
+قياس أثر إعلانات المتجر على فيسبوك وإنستغرام، وعرض إعلاناته هناك على الجمهور المعنيّ بها، بواسطة بكسل Meta في الموقع الرئيسي. وما يرسله وإلى من مبيَّن في المواد 7.5 إلى 7.7.
 
 ## 5. من يطّلع على البيانات
 
@@ -177,7 +220,7 @@ export const privacy: PolicyDocument = {
 محادثة مجتمع ليفو لا يقرؤها إلا طرفاها. لا يوجد في النظام باب خلفي يتيح للموظف قراءتها. والاستثناء الوحيد أن يقدّم أحد الطرفين المحادثة بنفسه دليلاً في نزاع.
 
 ### 5.6 لا بيع للبيانات
-لا يبيع المتجر بيانات الزبائن ولا يؤجّرها ولا يشاركها لغرض إعلاني.
+لا يبيع المتجر بيانات الزبائن ولا يؤجّرها. والمشاركة الوحيدة لغرض إعلاني هي بكسل Meta في الصفحات العامة من الموقع الرئيسي، في حدود المواد 7.5 إلى 7.7.
 
 ## 6. بيانات الهوية لعضوية PRO
 
@@ -213,11 +256,29 @@ export const privacy: PolicyDocument = {
 ### 7.4 تلغرام وجوجل
 رسائل تلغرام تُرسَل إلى المحادثة الخاصة بالزبون وحدها ولا تُوجَّه إلى مجموعة. وتسجيل الدخول بجوجل يجري بتحقق من رمز هوية لدى جوجل عند اختيار الزبون ذلك، ويطّلع جوجل على واقعة الدخول.
 
-### 7.5 ما لا يوجد
-لا توجد شبكة إعلانات، ولا أداة تحليلات من طرف ثالث داخل الصفحات، ولا مشاركة بيانات لغرض تسويقي خارجي.
+### 7.5 بكسل Meta: أين يعمل
+يحمِّل الموقع الرئيسي levonis-iq.com بكسل Meta، وهو شيفرة تقدّمها شركة Meta Platforms. ولا يُحمَّل في النطاقات الفرعية لمتاجر التجار، مثل ali3d.levonis-iq.com، ولا في تطبيق Print Cloud.
+- يُبلِّغ من صفحات التسوق والتصفح العامة وحدها: الصفحة الرئيسية، وقوائم المنتجات وصفحاتها، والفئات، والمقارنة، والطابعات المستعملة، والحزم، والسلة، وإتمام الطلب، وصفحات المجتمع التي يتصفحها أي أحد (المتاجر والصنّاع والمشاريع والملفات الشخصية العامة)، والأدوات، ومرشد الطابعات، وصفحات السياسات.
+- لا يُبلِّغ بشيء من أي صفحة أخرى، ومنها صفحات الحساب، والإعدادات، والمحفظة، والطلبات، وتتبع الطلب، والمحادثات، وتسجيل الدخول، والإدارة، ولوحة التاجر، والضمان والإيصال، والصفحات التي تُفتح برابط خاص.
 
-### 7.6 نقل البيانات خارج العراق
-قد تُعالَج البيانات على خوادم خارج العراق بحكم طبيعة هذه الخدمات. ويلتزم المتجر باختيار مزودين يوفرون حماية مناسبة تعاقدياً.
+### 7.6 بكسل Meta: ما تتلقاه Meta
+الحدث الوحيد المُرسَل هو مشاهدة صفحة («PageView»). وجمع الأحداث التلقائي لدى Meta (نقرات الأزرار وبيانات الصفحة الوصفية) معطَّل، ولا تُستعمل المطابقة المتقدمة: لا يرسل الموقع إلى Meta اسماً ولا بريداً إلكترونياً ولا رقم هاتف ولا معرّف حساب. ومع كل مشاهدة صفحة تتلقى Meta:
+- عنوان الصفحة كاملاً، بما فيه ما يلي علامة «?».
+- الصفحة المُحيلة.
+- الوقت.
+- معلومات المتصفح والجهاز.
+- عنوان الشبكة (IP) للزائر، كما تراه خوادم Meta.
+- معرّفات Meta الخاصة بها، من ملفات تعريف الارتباط في المادة 12.6.
+وإذا كان الزائر مسجِّلاً دخوله إلى فيسبوك أو إنستغرام في المتصفح نفسه، فقد تربط Meta الزيارة بذلك الحساب وفق سياساتها هي.
+
+### 7.7 بكسل Meta: الغرض ودور Meta
+الغرض قياس أثر إعلانات المتجر على فيسبوك وإنستغرام، وعرض إعلاناته هناك على الجمهور المعنيّ بها. لا تُباع بيانات، ولا تبني المنصة بنفسها ملفاً إعلانياً. وMeta ليست معالِجاً يعمل لحساب المتجر: فهي تعالج هذه البيانات بصفتها مسؤولاً مستقلاً عنها، وفق شروطها وسياسة الخصوصية الخاصة بها، خارج العراق. ولا يطلب الموقع موافقة على البكسل ولا يوفّر مفتاحاً لإيقافه؛ وما بيد الزائر مبيَّن في المادة 12.10.
+
+### 7.8 ما لا يوجد
+عدا بكسل Meta في المواد 7.5 إلى 7.7، لا توجد شبكة إعلانات، ولا أداة تحليلات من طرف ثالث داخل الصفحات، ولا مشاركة بيانات لغرض تسويقي خارجي.
+
+### 7.9 نقل البيانات خارج العراق
+قد تُعالَج البيانات على خوادم خارج العراق بحكم طبيعة هذه الخدمات. ويلتزم المتجر، في المعالِجين المذكورين في المواد 7.1 إلى 7.4، باختيار مزودين يوفرون حماية مناسبة تعاقدياً. أما ما يرسله بكسل Meta فتعالجه Meta خارج العراق وفق شروطها وسياسة الخصوصية الخاصة بها، كما تبيّن المادة 7.7.
 
 ## 8. الإشعارات والتسويق
 
@@ -282,7 +343,7 @@ export const privacy: PolicyDocument = {
 كل الاتصال بالموقع مشفَّر أثناء النقل، والمتصفح مُلزَم باستعمال الاتصال المؤمَّن.
 
 ### 11.2 الحماية داخل الصفحة
-يطبّق الموقع سياسة محتوى تمنع تنفيذ أي شيفرة لم يقدّمها المتجر نفسه، حتى لا يُستغل نص يكتبه تاجر أو زبون في المساس بزائر.
+يطبّق الموقع سياسة محتوى لا يُنفَّذ بموجبها في الصفحة إلا شيفرة المتجر نفسه وشيفرات الخدمات الخارجية التي يحمّلها عن قصد، مثل تسجيل الدخول بجوجل وبكسل Meta؛ أما الشيفرة المحقونة في الصفحة فلا تُنفَّذ. والغرض ألا يُستغل نص يكتبه تاجر أو زبون في المساس بزائر.
 
 ### 11.3 الجلسة
 الجلسة مشتركة بين النطاق الرئيسي ونطاقات التجار حتى يعمل الشراء عليها، ولا يمنح ذلك التاجر أي اطلاع على بيانات الزائر.
@@ -296,7 +357,7 @@ export const privacy: PolicyDocument = {
 ## 12. ملفات تعريف الارتباط والتخزين المحلي
 
 ### 12.1 ما يستعمله المتجر
-يستعمل الموقع والتطبيق ملف تعريف ارتباط واحداً للجلسة، وقدراً محدوداً من التخزين المحلي داخل متصفح الزبون. ولا يوجد في المنصة ملف تعريف ارتباط للتسويق ولا للتتبع عبر مواقع أخرى.
+يستعمل الموقع والتطبيق ملف تعريف ارتباط واحداً للجلسة، وقدراً محدوداً من التخزين المحلي داخل متصفح الزبون. وفي الموقع الرئيسي تضع شيفرة Meta أيضاً ملفات الإعلان المذكورة في المادة 12.6؛ وعداها لا يوجد في المنصة ملف تعريف ارتباط للتسويق.
 
 ### 12.2 ملف الجلسة
 ملف تعريف ارتباط الجلسة هو ما يبقي الزبون داخلاً إلى حسابه بين صفحة وأخرى. وهو ملف ضروري لتشغيل الخدمة: لا يمكن تصفح الحساب ولا إتمام طلب بدونه، ولذلك لا يُطلب فيه رضا منفصل.
@@ -310,17 +371,20 @@ export const privacy: PolicyDocument = {
 ### 12.5 التخزين المحلي
 يُحفظ داخل المتصفح قدر يسير من التفضيلات، مثل طريقة عرض قائمة وصيغة عملة يفضّل الزبون رؤيتها. وهذه بيانات راحة لا تُرسل إلى المتجر ولا تُربط بهوية ولا تُستعمل في تتبع.
 
-### 12.6 لا تتبع إعلاني
-لا يزرع المتجر ملفات لطرف ثالث للإعلان، ولا يبيع بيانات تصفح، ولا يبني ملفاً إعلانياً عن الزبون، ولا يشارك سلوكه في المنصة مع شبكة إعلانات.
+### 12.6 ملفات Meta الإعلانية
+في الموقع الرئيسي تضع شيفرة Meta ملفات تعريف ارتباط من الطرف الأول على نطاق الموقع: \u200E_fbp، وهو معرّف للمتصفح يبقى حتى 90 يوماً ويتجدد مع الزيارات اللاحقة؛ و\u200E_fbc، وهو معرّف النقر على الإعلان، ويُوضع حين يصل الزائر من رابط إعلان لـ Meta يحمل fbclid، ويبقى حتى 90 يوماً. وعدا هذين لا يزرع المتجر ملف تعريف ارتباط إعلانياً، ولا يبيع بيانات تصفح، ولا يبني ملفاً إعلانياً عن الزبون، ولا يشارك سلوكه في المنصة مع شبكة إعلانات غير Meta، ولا مع Meta إلا في حدود المادة 7.6.
 
 ### 12.7 حذفها
-لصاحب الجهاز أن يحذف ملفات تعريف الارتباط والتخزين المحلي من إعدادات متصفحه في أي وقت. وأثر حذف ملف الجلسة هو الخروج من الحساب ولا أكثر.
+لصاحب الجهاز أن يحذف ملفات تعريف الارتباط والتخزين المحلي من إعدادات متصفحه في أي وقت. وأثر حذف ملف الجلسة هو الخروج من الحساب ولا أكثر. وحذف \u200E_fbp أو \u200E_fbc لا أثر له في استعمال المتجر.
 
 ### 12.8 منع الملفات
-من منع ملفات تعريف الارتباط في متصفحه تعذّر عليه الدخول إلى حسابه، لأن الدخول نفسه يقوم عليها. ولا يُعد ذلك عطلاً في الخدمة.
+من منع ملفات تعريف الارتباط في متصفحه تعذّر عليه الدخول إلى حسابه، لأن الدخول نفسه يقوم عليها. ولا يُعد ذلك عطلاً في الخدمة. أما منع شيفرة Meta أو ملفاتها وحدها فلا يؤثر في استعمال المتجر.
 
 ### 12.9 روابط الغير
 قد تتضمن المنصة روابط إلى مواقع لا يديرها المتجر. وما يزرعه ذلك الموقع في جهازك بعد مغادرتك المنصة تحكمه سياسته هو لا هذه الوثيقة.
+
+### 12.10 لا نافذة موافقة ولا مفتاح إيقاف
+لا يعرض الموقع نافذة لطلب الموافقة على بكسل Meta وملفاته، ولا يوفّر مفتاحاً خاصاً به لإيقافها. وما بيد الزائر هو متصفحه — منع ملفات تعريف الارتباط والشيفرات الخارجية أو حذفها، وفق المادتين 12.7 و12.8 — وتفضيلات الإعلانات في إعدادات حسابه لدى Meta.
 
 ## 13. أحكام ختامية
 
@@ -350,7 +414,7 @@ The Arabic text is authoritative and prevails where a translation differs.
 This is one of the two documents whose acceptance is required to place an order; the other is the General Terms and Conditions. Acceptance is recorded with its version, its language and its date.
 
 ### 1.5 Principle
-The Store does not collect data it does not need to perform a service or to meet a legal obligation. Every provision below names the data and its purpose together; anything with no purpose is not collected.
+The Store does not collect data it does not need to perform a service or to meet a legal obligation. The one purpose beyond these is the advertising of article 4.7, for which the main site sends Meta what article 7.6 lists. Every provision below names the data and its purpose together; anything with no purpose is not collected.
 
 ## 2. Sources
 
@@ -407,10 +471,13 @@ One-time codes are never stored in clear and never written to logs; only a deriv
 Rate-limit keys are stored hashed rather than as the identifier itself, so that a table of failed attempts does not become a list of who tried to sign in.
 
 ### 4.5 Improvement
-Measuring, in aggregate, which store pages are used — with no sale of data and no advertising tracking.
+Measuring, in aggregate, which store pages are used — with no sale of data. Measuring the Store's advertising is a separate purpose, set out in article 4.7.
 
 ### 4.6 Notifications
 Sending order, warranty and account messages through the channels the Customer chose. Marketing messages are governed by chapter 8.
+
+### 4.7 Advertising on Facebook and Instagram
+Measuring the effect of the Store's advertising on Facebook and Instagram, and showing the Store's ads to relevant audiences there, through the Meta Pixel on the main site. What it sends, and to whom, is set out in articles 7.5 to 7.7.
 
 ## 5. Who sees the data
 
@@ -430,7 +497,7 @@ On a written legal request from a competent authority, to the extent required.
 A Levo community conversation is readable only by its two parties. There is no back door in the system that lets a staff member read it. The single exception is that a party may themselves submit a conversation as evidence in a dispute.
 
 ### 5.6 No sale of data
-The Store does not sell, rent or share customer data for advertising purposes.
+The Store does not sell or rent customer data. The one sharing for an advertising purpose is the Meta Pixel on the public pages of the main site, within the limits of articles 7.5 to 7.7.
 
 ## 6. Identity data for PRO membership
 
@@ -466,11 +533,29 @@ WhatsApp messages are sent through an intermediary provider that drives **a What
 ### 7.4 Telegram and Google
 Telegram messages go only to the Customer's own private chat and are never routed to a group. Google sign-in verifies an identity token with Google when the Customer chooses it, and Google learns of the sign-in event.
 
-### 7.5 What does not exist
-There is no advertising network, no third-party analytics tool inside the pages, and no sharing of data for external marketing.
+### 7.5 The Meta Pixel: where it runs
+The main site, levonis-iq.com, loads the Meta Pixel, a script supplied by Meta Platforms. It is not loaded on merchants' store subdomains, such as ali3d.levonis-iq.com, or in the Print Cloud application.
+- It reports only from public shopping and browsing pages: the home page, product listings and product pages, categories, compare, used printers, bundles, the cart, checkout, the community pages anyone can browse (stores, makers, projects and public profiles), tools, the printer finder and the policy pages.
+- It reports nothing from any other page, including the account, settings, wallet, orders, order tracking, chats, sign-in, administration, the merchant dashboard, warranty and receipt pages, and pages opened by a private link.
 
-### 7.6 Transfers outside Iraq
-Data may be processed on servers outside Iraq by the nature of these services. The Store undertakes to select providers offering appropriate contractual protection.
+### 7.6 The Meta Pixel: what Meta receives
+The only event sent is a page view ("PageView"). Meta's automatic event collection (button clicks, page metadata) is switched off, and no advanced matching is used: the site sends Meta no name, email address, phone number or account identifier. With each page view, Meta receives:
+- The page address, including its query string.
+- The referring page.
+- The time.
+- Browser and device information.
+- The visitor's IP address, as Meta's servers see it.
+- Meta's own identifiers, from the cookies in article 12.6.
+If the visitor is signed in to Facebook or Instagram in the same browser, Meta may link the visit to that account under Meta's own policies.
+
+### 7.7 The Meta Pixel: purpose and Meta's role
+The purpose is measuring the effect of the Store's advertising on Facebook and Instagram and showing the Store's ads to relevant audiences there. No data is sold, and the platform builds no advertising profile of its own. Meta is not a processor acting for the Store: it processes this data as a separate controller, under its own terms and privacy policy, outside Iraq. The site asks no consent for the pixel and has no switch to turn it off; what the visitor controls is set out in article 12.10.
+
+### 7.8 What does not exist
+Apart from the Meta Pixel of articles 7.5 to 7.7, there is no advertising network, no third-party analytics tool inside the pages, and no sharing of data for external marketing.
+
+### 7.9 Transfers outside Iraq
+Data may be processed on servers outside Iraq by the nature of these services. For the processors of articles 7.1 to 7.4, the Store undertakes to select providers offering appropriate contractual protection. What the Meta Pixel sends is processed by Meta outside Iraq under Meta's own terms and privacy policy, as article 7.7 states.
 
 ## 8. Notifications and marketing
 
@@ -535,7 +620,7 @@ Account data is kept while the account exists, and is deleted or anonymised afte
 All communication with the site is encrypted in transit, and the browser is required to use the secured connection.
 
 ### 11.2 In-page protection
-The site applies a content policy that prevents execution of any code the Store did not itself supply, so that text written by a merchant or a customer cannot be used to harm a visitor.
+The site applies a content policy under which only the Store's own code and the scripts of the outside services it deliberately loads, such as Google sign-in and the Meta Pixel, can run in a page; code injected into a page cannot. Its purpose is that text written by a merchant or a customer cannot be used to harm a visitor.
 
 ### 11.3 The session
 The session is shared between the main domain and merchant domains so that purchasing works there; this grants the merchant no access to visitor data.
@@ -549,7 +634,7 @@ No system is absolutely secure. Should a breach affecting customer data occur, t
 ## 12. Cookies and local storage
 
 ### 12.1 What the Store uses
-The site and the application use one session cookie and a limited amount of local storage inside the customer's browser. There is no marketing cookie and no cross-site tracking cookie on the platform.
+The site and the application use one session cookie and a limited amount of local storage inside the customer's browser. On the main site, Meta's script also sets the advertising cookies of article 12.6; apart from them, there is no marketing cookie on the platform.
 
 ### 12.2 The session cookie
 The session cookie is what keeps the customer signed in from one page to the next. It is strictly necessary to operate the service: the account cannot be browsed and an order cannot be completed without it, and for that reason no separate consent is sought for it.
@@ -563,17 +648,20 @@ The session cookie ends when the session expires, when the customer signs out, o
 ### 12.5 Local storage
 A small amount of preference data is kept inside the browser, such as the chosen layout of a list and the currency format the customer prefers to see. This is convenience data: it is not sent to the Store, is not linked to an identity and is not used for tracking.
 
-### 12.6 No advertising tracking
-The Store places no third-party advertising cookies, does not sell browsing data, does not build an advertising profile of the customer, and does not share their behaviour on the platform with an advertising network.
+### 12.6 Meta's advertising cookies
+On the main site, Meta's script sets first-party cookies on the site's domain: _fbp, a browser identifier kept for up to 90 days and renewed on later visits; and _fbc, the ad click identifier, set when the visitor arrives from a Meta ad link carrying fbclid and kept for up to 90 days. Apart from these two, the Store places no advertising cookie, does not sell browsing data, does not build an advertising profile of the customer, and shares their behaviour on the platform with no advertising network other than Meta, and with Meta only to the extent of article 7.6.
 
 ### 12.7 Deleting them
-The holder of the device may delete cookies and local storage from their browser settings at any time. The effect of deleting the session cookie is being signed out, and nothing more.
+The holder of the device may delete cookies and local storage from their browser settings at any time. The effect of deleting the session cookie is being signed out, and nothing more. Deleting _fbp or _fbc has no effect on using the store.
 
 ### 12.8 Blocking cookies
-A person who blocks cookies in their browser will be unable to sign in to their account, because signing in rests upon them. That is not a fault in the service.
+A person who blocks cookies in their browser will be unable to sign in to their account, because signing in rests upon them. That is not a fault in the service. Blocking only Meta's script or its cookies does not affect using the store.
 
 ### 12.9 Third-party links
 The platform may contain links to sites the Store does not operate. What such a site places on your device after you leave the platform is governed by its own policy and not by this document.
+
+### 12.10 No consent banner and no switch
+The site shows no consent banner for the Meta Pixel and its cookies, and has no switch of its own to turn them off. What the visitor controls is their browser — blocking or deleting cookies and outside scripts, articles 12.7 and 12.8 — and the ad preferences in their Meta account settings.
 
 ## 13. Final provisions
 
@@ -603,7 +691,7 @@ This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COU
 ئەمە یەکێکە لەو دوو بەڵگەنامەیەی پەسەندکردنیان بۆ دانانی داواکارییەک پێویستە؛ ئەویتریان مەرج و ڕێسا گشتییەکانن. پەسەندکردن بە وەشان و زمان و بەرواریەوە تۆمار دەکرێت.
 
 ### 1.5 بنەمای بەڵگەنامەکە
-فرۆشگا ئەو داتایە کۆناکاتەوە کە پێویستی پێی نییە بۆ ئەنجامدانی خزمەتگوزارییەک یان بۆ جێبەجێکردنی ئەرکێکی یاسایی. هەر بڕگەیەکی خوارەوە داتاکە و مەبەستەکەی پێکەوە دەڵێت؛ ئەوەی مەبەستی نییە کۆناکرێتەوە.
+فرۆشگا ئەو داتایە کۆناکاتەوە کە پێویستی پێی نییە بۆ ئەنجامدانی خزمەتگوزارییەک یان بۆ جێبەجێکردنی ئەرکێکی یاسایی. تاکە مەبەستێک لە دەرەوەی ئەم دووانە ڕیکلامە بەپێی بڕگەی 4.7، کە لە پێناویدا ماڵپەڕی سەرەکی ئەوەی لە بڕگەی 7.6دا هاتووە بۆ Meta دەنێرێت. هەر بڕگەیەکی خوارەوە داتاکە و مەبەستەکەی پێکەوە دەڵێت؛ ئەوەی مەبەستی نییە کۆناکرێتەوە.
 
 ## 2. سەرچاوەکان
 
@@ -660,10 +748,13 @@ This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COU
 کلیلەکانی سنووری ڕێژە بە شێوەی هاش هەڵدەگیرێن نەک وەک خودی ناسێنەرەکە، تا خشتەی هەوڵە سەرنەکەوتووەکان نەبێتە لیستی ئەوانەی هەوڵی چوونەژوورەوەیان داوە.
 
 ### 4.5 باشترکردن
-پێوانەکردنی ئەوەی کام لاپەڕەی فرۆشگا بەکاردێت بە شێوەی کۆکراوە، بەبێ فرۆشتنی داتا و بەبێ شوێنکەوتنی ڕیکلامی.
+پێوانەکردنی ئەوەی کام لاپەڕەی فرۆشگا بەکاردێت بە شێوەی کۆکراوە، بەبێ فرۆشتنی داتا. پێوانەکردنی ڕیکلامەکانی فرۆشگا مەبەستێکی جیایە و بڕگەی 4.7 باسی دەکات.
 
 ### 4.6 ئاگادارکردنەوەکان
 ناردنی ئەوەی پەیوەندی بە داواکاری و گەرەنتی و هەژمارەوە هەیە لە ڕێگەی ئەو کەناڵانەی کڕیار هەڵیبژاردوون. نامەی بازاڕگەری بە بەشی 8 ڕێک دەخرێت.
+
+### 4.7 ڕیکلام لە فەیسبووک و ئینستاگرام
+پێوانەکردنی کاریگەریی ڕیکلامەکانی فرۆشگا لە فەیسبووک و ئینستاگرام، و پیشاندانی ڕیکلامەکانی لەوێ بۆ ئەو بینەرانەی پەیوەندییان پێیەوە هەیە، لە ڕێگەی پیکسڵی Meta لە ماڵپەڕی سەرەکیدا. ئەوەی دەینێرێت و بۆ کێ دەینێرێت، لە بڕگەکانی 7.5 تا 7.7دا ڕوون کراوەتەوە.
 
 ## 5. کێ داتاکە دەبینێت
 
@@ -683,7 +774,7 @@ This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COU
 گفتوگۆی کۆمەڵگەی لێڤۆ تەنها لەلایەن دوو لایەنەکەیەوە دەخوێنرێتەوە. هیچ دەرگایەکی پشتەوە لە سیستەمەکەدا نییە کە ڕێگە بە کارمەندێک بدات بیخوێنێتەوە. تاکە جیاوازی ئەوەیە کە لایەنێک خۆی گفتوگۆکە وەک بەڵگە لە ناکۆکییەکدا پێشکەش بکات.
 
 ### 5.6 فرۆشتنی داتا نییە
-فرۆشگا داتای کڕیاران نافرۆشێت، بە کرێی نادات، و بۆ مەبەستی ڕیکلامی هاوبەشی ناکات.
+فرۆشگا داتای کڕیاران نافرۆشێت و بە کرێی نادات. تاکە هاوبەشکردنێک کە بۆ مەبەستی ڕیکلامی هەیە ئەوەیە کە پیکسڵی Meta لە پەڕە گشتییەکانی ماڵپەڕی سەرەکییەوە دەینێرێت، لە سنووری بڕگەکانی 7.5 تا 7.7دا.
 
 ## 6. داتای ناسنامە بۆ ئەندامێتی PRO
 
@@ -719,11 +810,29 @@ This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COU
 ### 7.4 تێلێگرام و گووگڵ
 نامەکانی تێلێگرام تەنها بۆ گفتوگۆی تایبەتی خودی کڕیار دەچن و هەرگیز بۆ گروپێک ئاڕاستە ناکرێن. چوونەژوورەوەی گووگڵ تۆکنێکی ناسنامە لای گووگڵ پشتڕاست دەکاتەوە کاتێک کڕیار هەڵیدەبژێرێت، و گووگڵ لە ڕووداوی چوونەژوورەوەکە ئاگادار دەبێت.
 
-### 7.5 چی بوونی نییە
-هیچ تۆڕێکی ڕیکلام، هیچ ئامرازێکی شیکاری لایەنی سێیەم لە ناو لاپەڕەکاندا، و هیچ هاوبەشکردنی داتا بۆ بازاڕگەریی دەرەکی بوونی نییە.
+### 7.5 پیکسڵی Meta: لە کوێ کار دەکات
+ماڵپەڕی سەرەکی (levonis-iq.com) پیکسڵی Meta بار دەکات، کە کۆدێکە کۆمپانیای Meta Platforms دابینی دەکات. لە ژێردۆمەینەکانی فرۆشگای بازرگانان، وەک ali3d.levonis-iq.com، و لە بەرنامەی Print Cloud بار ناکرێت.
+- تەنها بینینی ئەم پەڕە گشتییانەی کڕین و سەیرکردن ڕاپۆرت دەکات: پەڕەی سەرەکی، لیستەکانی بەرهەم و پەڕەکانی بەرهەم، پۆلەکان، بەراوردکردن، پرینتەرە بەکارهاتووەکان، پاکێجەکان، سەبەتە، تەواوکردنی داواکاری، ئەو پەڕانەی کۆمەڵگە کە هەر کەسێک دەتوانێت سەیریان بکات (فرۆشگاکان، دروستکەران، پڕۆژەکان و پرۆفایلە گشتییەکان)، ئامرازەکان، دۆزەرەوەی پرینتەر، و پەڕەکانی سیاسەت.
+- بینینی هیچ پەڕەیەکی تر ڕاپۆرت ناکات، لەوانە: هەژمار، ڕێکخستنەکان، جزدان، داواکارییەکان، بەدواداچوونی داواکاری، گفتوگۆکان، چوونەژوورەوە، بەشی بەڕێوەبردن، داشبۆردی بازرگان، پەڕەکانی گەرەنتی و پسوولە، و ئەو پەڕانەی بە بەستەرێکی تایبەت دەکرێنەوە.
 
-### 7.6 گواستنەوەی داتا بۆ دەرەوەی عێراق
-لەوانەیە داتا بەهۆی سروشتی ئەم خزمەتگوزارییانەوە لەسەر ڕاژەی دەرەوەی عێراق پرۆسێس بکرێت. فرۆشگا پابەندە بە هەڵبژاردنی دابینکەرانێک کە پاراستنی گونجاوی گرێبەستی پێشکەش دەکەن.
+### 7.6 پیکسڵی Meta: Meta چی وەردەگرێت
+تاکە ڕووداوێک کە دەنێردرێت بینینی پەڕەیە («PageView»). کۆکردنەوەی خۆکاری ڕووداوەکان لای Meta (کرتەکردن لەسەر دوگمەکان و زانیاریی وەسفیی پەڕە) کوژێنراوەتەوە، و هاوتاکردنی پێشکەوتوو بەکار ناهێنرێت: ماڵپەڕەکە هیچ ناو، ئیمەیڵ، ژمارەی مۆبایل یان ناسێنەری هەژمارێک بۆ Meta نانێرێت. لەگەڵ هەر بینینێکی پەڕە، Meta ئەمانە وەردەگرێت:
+- ناونیشانی تەواوی پەڕەکە، تەنانەت ئەو بەشەی دوای نیشانەی «?» دێت.
+- ئەو پەڕەیەی سەردانکەر لێیەوە هاتووە.
+- کاتەکە.
+- زانیاریی وێبگەڕ و ئامێر.
+- ناونیشانی تۆڕی (IP) سەردانکەر، وەک ڕاژەکانی Meta دەیبینن.
+- ناسێنەرە تایبەتەکانی خودی Meta، لەو کوکییانەی لە بڕگەی 12.6دا هاتوون.
+ئەگەر سەردانکەر لە هەمان وێبگەڕدا چووبێتە ناو هەژماری فەیسبووک یان ئینستاگرامەکەی، لەوانەیە Meta سەردانەکە بەو هەژمارەوە ببەستێتەوە، بەپێی سیاسەتەکانی خۆی.
+
+### 7.7 پیکسڵی Meta: مەبەست و ڕۆڵی Meta
+مەبەستەکە پێوانەکردنی کاریگەریی ڕیکلامەکانی فرۆشگایە لە فەیسبووک و ئینستاگرام، و پیشاندانی ڕیکلامەکانی فرۆشگا لەوێ بۆ ئەو بینەرانەی پەیوەندییان پێیەوە هەیە. هیچ داتایەک نافرۆشرێت، و پلاتفۆرمەکە خۆی هیچ پرۆفایلێکی ڕیکلامی دروست ناکات. Meta پرۆسێسکەرێک نییە کە بۆ فرۆشگا کار بکات: ئەم داتایە وەک بەرپرسێکی سەربەخۆی داتا، بەپێی مەرجەکان و سیاسەتی تایبەتمەندێتیی خۆی، لە دەرەوەی عێراق پرۆسێس دەکات. ماڵپەڕەکە بۆ ئەم پیکسڵە داوای ڕەزامەندی ناکات و هیچ دوگمەیەکی بۆ کوژاندنەوەی نییە؛ ئەوەی بە دەستی سەردانکەرە لە بڕگەی 12.10دا هاتووە.
+
+### 7.8 چی بوونی نییە
+جگە لە پیکسڵی Meta کە بڕگەکانی 7.5 تا 7.7 باسی دەکەن، هیچ تۆڕێکی ڕیکلام، هیچ ئامرازێکی شیکاری لایەنی سێیەم لە ناو لاپەڕەکاندا، و هیچ هاوبەشکردنی داتا بۆ بازاڕگەریی دەرەکی بوونی نییە.
+
+### 7.9 گواستنەوەی داتا بۆ دەرەوەی عێراق
+لەوانەیە داتا بەهۆی سروشتی ئەم خزمەتگوزارییانەوە لەسەر ڕاژەی دەرەوەی عێراق پرۆسێس بکرێت. بۆ پرۆسێسکەرانی بڕگەکانی 7.1 تا 7.4، فرۆشگا پابەندە بە هەڵبژاردنی دابینکەرانێک کە پاراستنی گونجاوی گرێبەستی پێشکەش دەکەن. ئەوەی پیکسڵی Meta دەینێرێت، Meta لە دەرەوەی عێراق بەپێی مەرجەکان و سیاسەتی تایبەتمەندێتیی خۆی پرۆسێسی دەکات، وەک بڕگەی 7.7 دەڵێت.
 
 ## 8. ئاگادارکردنەوە و بازاڕگەری
 
@@ -788,7 +897,7 @@ This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COU
 هەموو پەیوەندییەک لەگەڵ ماڵپەڕەکە لە کاتی گواستنەوەدا شێوەکراوە، و وێبگەڕ پابەندە بە بەکارهێنانی پەیوەندیی پارێزراو.
 
 ### 11.2 پاراستن لە ناو لاپەڕە
-ماڵپەڕ سیاسەتێکی ناوەڕۆک جێبەجێ دەکات کە ڕێگر دەبێت لە جێبەجێکردنی هەر کۆدێک کە خودی فرۆشگا دابینی نەکردووە، تا ئەو دەقەی بازرگانێک یان کڕیارێک دەینووسێت نەتوانرێت بۆ زیانگەیاندن بە سەردانکەرێک بەکاربهێنرێت.
+ماڵپەڕ سیاسەتێکی ناوەڕۆک جێبەجێ دەکات کە بەپێی ئەو تەنها کۆدی خودی فرۆشگا و کۆدی ئەو خزمەتگوزارییە دەرەکییانەی بە ئەنقەست باریان دەکات، وەک چوونەژوورەوەی گووگڵ و پیکسڵی Meta، لە پەڕەدا جێبەجێ دەبن؛ کۆدێک کە بخرێتە ناو پەڕەکەوە جێبەجێ نابێت. مەبەست ئەوەیە ئەو دەقەی بازرگانێک یان کڕیارێک دەینووسێت نەتوانرێت بۆ زیانگەیاندن بە سەردانکەرێک بەکاربهێنرێت.
 
 ### 11.3 دانیشتن
 دانیشتن لە نێوان دۆمەینی سەرەکی و دۆمەینی بازرگانەکاندا هاوبەشە تا کڕین لەسەریان کار بکات؛ ئەمە هیچ دەستڕاگەیشتنێک بە داتای سەردانکەر بە بازرگان نادات.
@@ -802,7 +911,7 @@ This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COU
 ## 12. کوکی و هەڵگرتنی ناوخۆیی
 
 ### 12.1 فرۆشگا چی بەکار دەهێنێت
-ماڵپەڕ و بەرنامەکە یەک کوکی دانیشتن و بڕێکی سنووردار لە هەڵگرتنی ناوخۆیی لەناو وێبگەڕی کڕیاردا بەکار دەهێنن. هیچ کوکییەکی بازرگانی و هیچ کوکییەکی بەدواداچوونی نێوان ماڵپەڕەکان لە پلاتفۆرمەکەدا نییە.
+ماڵپەڕ و بەرنامەکە یەک کوکی دانیشتن و بڕێکی سنووردار لە هەڵگرتنی ناوخۆیی لەناو وێبگەڕی کڕیاردا بەکار دەهێنن. لە ماڵپەڕی سەرەکیدا، کۆدی Meta ئەو کوکییە ڕیکلامییانەش دادەنێت کە لە بڕگەی 12.6دا هاتوون؛ جگە لەوان هیچ کوکییەکی بازاڕگەری لە پلاتفۆرمەکەدا نییە.
 
 ### 12.2 کوکی دانیشتن
 کوکی دانیشتن ئەوەیە کە کڕیار لە پەڕەیەکەوە بۆ پەڕەیەکی تر لە هەژمارەکەیدا چووەتەژوورەوە دەهێڵێتەوە. بۆ کارپێکردنی خزمەتگوزارییەکە بەتەواوی پێویستە: بەبێ ئەو نە هەژمارەکە دەگەڕدرێت و نە داواکارییەک تەواو دەکرێت، و لەبەر ئەوە ڕەزامەندییەکی جیاوازی بۆ داوا ناکرێت.
@@ -816,17 +925,20 @@ This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COU
 ### 12.5 هەڵگرتنی ناوخۆیی
 بڕێکی کەم لە داتای پەسەند لەناو وێبگەڕدا هەڵدەگیرێت، وەک شێوازی پیشاندانی لیستێک و شێوەی ئەو دراوەی کڕیار پێی خۆشە بیبینێت. ئەمە داتای ئاسانکارییە: بۆ فرۆشگا نانێردرێت، بە ناسنامەوە نابەسترێت و لە بەدواداچووندا بەکار ناهێنرێت.
 
-### 12.6 بەدواداچوونی ڕیکلامی نییە
-فرۆشگا هیچ کوکییەکی ڕیکلامی لایەنی سێیەم دانانێت، داتای گەڕان نافرۆشێت، پرۆفایلێکی ڕیکلامی بۆ کڕیار دروست ناکات، و ڕەفتاری لە پلاتفۆرمەکەدا لەگەڵ تۆڕێکی ڕیکلامی هاوبەش ناکات.
+### 12.6 کوکییە ڕیکلامییەکانی Meta
+لە ماڵپەڕی سەرەکیدا، کۆدی Meta کوکیی لایەنی یەکەم لەسەر دۆمەینی ماڵپەڕەکە دادەنێت: \u200E_fbp، کە ناسێنەری وێبگەڕە و تا 90 ڕۆژ دەمێنێتەوە و بە سەردانەکانی دواتر نوێ دەبێتەوە؛ و \u200E_fbc، کە ناسێنەری کرتەکردنە لەسەر ڕیکلام و کاتێک دادەنرێت کە سەردانکەر لە ڕێگەی بەستەری ڕیکلامێکی Meta دێت کە fbclid هەڵدەگرێت، و تا 90 ڕۆژ دەمێنێتەوە. جگە لەم دووانە، فرۆشگا هیچ کوکییەکی ڕیکلامی دانانێت، داتای گەڕان نافرۆشێت، پرۆفایلێکی ڕیکلامی بۆ کڕیار دروست ناکات، و ڕەفتاری کڕیار لە پلاتفۆرمەکەدا لەگەڵ هیچ تۆڕێکی ڕیکلامی جگە لە Meta هاوبەش ناکات، ئەویش تەنها بە ئەندازەی بڕگەی 7.6.
 
 ### 12.7 سڕینەوەیان
-خاوەنی ئامێرەکە دەتوانێت هەر کاتێک کوکی و هەڵگرتنی ناوخۆیی لە ڕێکخستنەکانی وێبگەڕەکەیەوە بسڕێتەوە. کاریگەری سڕینەوەی کوکی دانیشتن چوونەدەرەوەیە لە هەژمارەکە، و هیچی تر.
+خاوەنی ئامێرەکە دەتوانێت هەر کاتێک کوکی و هەڵگرتنی ناوخۆیی لە ڕێکخستنەکانی وێبگەڕەکەیەوە بسڕێتەوە. کاریگەری سڕینەوەی کوکی دانیشتن چوونەدەرەوەیە لە هەژمارەکە، و هیچی تر. سڕینەوەی \u200E_fbp یان \u200E_fbc هیچ کاریگەرییەکی لەسەر بەکارهێنانی فرۆشگا نییە.
 
 ### 12.8 ڕێگریکردن لە کوکی
-ئەو کەسەی لە وێبگەڕەکەیدا ڕێگری لە کوکی دەکات ناتوانێت بچێتە ناو هەژمارەکەیەوە، چونکە خودی چوونەژوورەوە لەسەریان دەوەستێت. ئەمە تێکچوونێک لە خزمەتگوزارییەکەدا نییە.
+ئەو کەسەی لە وێبگەڕەکەیدا ڕێگری لە کوکی دەکات ناتوانێت بچێتە ناو هەژمارەکەیەوە، چونکە خودی چوونەژوورەوە لەسەریان دەوەستێت. ئەمە تێکچوونێک لە خزمەتگوزارییەکەدا نییە. بەڵام ڕێگریکردن تەنها لە کۆدی Meta یان لە کوکییەکانی، کاریگەری لەسەر بەکارهێنانی فرۆشگا نییە.
 
 ### 12.9 بەستەری لایەنی سێیەم
 لەوانەیە پلاتفۆرمەکە بەستەری ئەو ماڵپەڕانەی تێدا بێت کە فرۆشگا بەڕێوەیان نابات. ئەوەی ئەو ماڵپەڕە دوای بەجێهێشتنی پلاتفۆرمەکە لەسەر ئامێرەکەت دایدەنێت بە سیاسەتی خۆی ڕێک دەخرێت نەک بەم بەڵگەنامەیە.
+
+### 12.10 نە پەنجەرەی ڕەزامەندی و نە دوگمەی کوژاندنەوە
+ماڵپەڕەکە هیچ پەنجەرەیەک بۆ داوای ڕەزامەندی لەسەر پیکسڵی Meta و کوکییەکانی پیشان نادات، و هیچ دوگمەیەکی خۆی بۆ کوژاندنەوەیان نییە. ئەوەی بە دەستی سەردانکەرە وێبگەڕەکەیەتی — ڕێگریکردن لە کوکی و کۆدی دەرەکی یان سڕینەوەیان، بەپێی بڕگەکانی 12.7 و 12.8 — و ڕێکخستنەکانی ڕیکلام لە هەژمارەکەیدا لای Meta.
 
 ## 13. حوکمە کۆتاییەکان
 

@@ -63,11 +63,18 @@ import type { PolicyDocument } from './types';
  * three languages, as purchase 4.10 does: an active PRO pays none, and a
  * product may have none set — the FAQ never states more than the rule it
  * routes to. Wording only.
+ *
+ * VERSION 6 — WHY IT MOVED (owner, 2026-10-31). The archive keeps version 5
+ * byte for byte. 9.4 answered "Do you sell my data?" with "there is no
+ * advertising network and no third-party analytics tool inside the pages".
+ * The main site now carries the Meta Pixel (privacy 4, articles 7.5–7.7), so
+ * 9.4 names it and keeps the rest as "no other". Wording only; the FAQ is
+ * not a consent document, so nobody is asked to accept anything for it.
  */
 export const faq: PolicyDocument = {
   key: 'faq',
-  version: 5,
-  effective_at: '2026-10-09',
+  version: 6,
+  effective_at: '2026-10-31',
   title: {
     ar: 'الأسئلة الشائعة',
     en: 'Frequently Asked Questions',
@@ -225,7 +232,7 @@ PRO ×2، ومن سواه ×1. ويُحسب لحظة قيد النقاط، لا 
 لأن الحذف يمر بإغلاق الطلبات القائمة وتسوية الأرصدة وحفظ ما يلزم قانوناً. فهو طلب يعالجه إنسان لا زر. انظر سياسة الخصوصية.
 
 ### 9.4 هل تبيعون بياناتي؟
-لا. ولا توجد شبكة إعلانات ولا أداة تحليلات من طرف ثالث داخل الصفحات.
+لا. لكن في الموقع الرئيسي أداة إعلانية واحدة، بكسل Meta، تُبلِّغ Meta بمشاهدات صفحاته العامة لأجل إعلانات المتجر على فيسبوك وإنستغرام؛ ولا توجد شبكة إعلانات غيرها ولا أداة تحليلات أخرى من طرف ثالث داخل الصفحات. انظر سياسة الخصوصية.
 
 ### 9.5 هل تُرسَل هويتي إلى جهة خارجية؟
 لا. ولا يوجد تعرّف على الوجه ولا استعلام من قاعدة بيانات حكومية. القرار قرار موظف مخوّل يُسجَّل باسمه.
@@ -448,7 +455,7 @@ Yes, for a legitimate need. The encryption here is server-side with keys the Sto
 Because deletion passes through closing open orders, settling balances and retaining what the law requires. It is therefore a request handled by a person, not a button. See the Privacy Policy.
 
 ### 9.4 Do you sell my data?
-No. There is no advertising network and no third-party analytics tool inside the pages.
+No. The main site does carry one advertising tool, the Meta Pixel, which reports views of its public pages to Meta for the Store's advertising on Facebook and Instagram; there is no other advertising network and no other third-party analytics tool inside the pages. See the Privacy Policy.
 
 ### 9.5 Is my identity sent to an outside party?
 No. There is no face recognition and no government-database query. The decision is made by an authorised staff member and recorded in their name.
@@ -671,7 +678,7 @@ PRO بە شێوەیەکی کاتی ڕاگیراوە — بەم زووانە، س
 چونکە سڕینەوە بە داخستنی داواکارییە کراوەکان و یەکلاییکردنەوەی باڵانسەکان و پاراستنی ئەوەی یاسا داوای دەکات تێدەپەڕێت. بۆیە داواکارییەکە کە مرۆڤێک مامەڵەی لەگەڵ دەکات، نەک دوگمە. بڕوانە سیاسەتی تایبەتمەندێتی.
 
 ### 9.4 داتاکەم دەفرۆشن؟
-نەخێر. هیچ تۆڕێکی ڕیکلام و هیچ ئامرازێکی شیکاری لایەنی سێیەم لە ناو لاپەڕەکاندا نییە.
+نەخێر. بەڵام ماڵپەڕی سەرەکی یەک ئامرازی ڕیکلامی هەیە، پیکسڵی Meta، کە بینینی پەڕە گشتییەکانی بۆ Meta ڕاپۆرت دەکات لە پێناو ڕیکلامەکانی فرۆشگا لە فەیسبووک و ئینستاگرام؛ هیچ تۆڕێکی ڕیکلامی تر و هیچ ئامرازێکی شیکاری تری لایەنی سێیەم لە ناو لاپەڕەکاندا نییە. بڕوانە سیاسەتی تایبەتمەندێتی.
 
 ### 9.5 ناسنامەم بۆ لایەنێکی دەرەکی دەنێردرێت؟
 نەخێر. هیچ ناسینەوەی ڕوخسار و هیچ پرسیارێکی بنکەدراوەی حکومی نییە. بڕیارەکە لەلایەن کارمەندێکی مۆڵەتپێدراوەوە دەدرێت و بە ناوی ئەو تۆمار دەکرێت.

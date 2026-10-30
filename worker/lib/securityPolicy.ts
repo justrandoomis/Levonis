@@ -44,6 +44,15 @@
  *                         serve fixed first-party code, and add no inline or
  *                         eval allowance. Switching the injection off instead
  *                         is a dashboard setting, i.e. the owner's call.
+ *   connect.facebook.net / www.facebook.com
+ *                         The Meta Pixel (src/lib/metaPixel.ts, owner request
+ *                         2026-10-31): fbevents.js and its configuration load
+ *                         from the first origin, page views are reported to
+ *                         the second (its image fallback is already inside
+ *                         img-src https:). Added by the app's own module, not
+ *                         inline, so script-src gains an origin and no inline
+ *                         or eval allowance. The privacy policy (version 4)
+ *                         states what it sends.
  *
  * The built index.html carries ONE external module script, ONE external
  * stylesheet (its own), one hashed inline script and one inline <style> (the
@@ -78,6 +87,10 @@ export const GOOGLE_FONTS_FILES = 'https://fonts.gstatic.com';
 export const CLOUDFLARE_INSIGHTS_SCRIPT = 'https://static.cloudflareinsights.com';
 /** … and where it reports to. */
 export const CLOUDFLARE_INSIGHTS_BEACON = 'https://cloudflareinsights.com';
+/** The Meta Pixel: where fbevents.js and its configuration load from … */
+export const META_PIXEL_SCRIPT = 'https://connect.facebook.net';
+/** … and where it reports page views. */
+export const META_PIXEL_BEACON = 'https://www.facebook.com';
 
 /**
  * The one inline script the Worker ever emits: opens the browser's print
@@ -147,12 +160,12 @@ export const STATIC_SECURITY_HEADERS: Readonly<Record<string, string>> = {
 export function spaCsp(): string {
   return policy([
     ['default-src', ["'self'"]],
-    ['script-src', ["'self'", `'${THEME_BOOT_SCRIPT_HASH}'`, GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_SCRIPT]],
+    ['script-src', ["'self'", `'${THEME_BOOT_SCRIPT_HASH}'`, GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_SCRIPT, META_PIXEL_SCRIPT]],
     ['style-src', ["'self'", "'unsafe-inline'", GOOGLE_SIGNIN_ORIGIN]],
     ['font-src', ["'self'", 'data:']],
     ['img-src', ["'self'", 'data:', 'blob:', 'https:']],
     ['media-src', ["'self'", 'blob:', 'https:']],
-    ['connect-src', ["'self'", 'blob:', GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_BEACON]],
+    ['connect-src', ["'self'", 'blob:', GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_BEACON, META_PIXEL_BEACON]],
     ['frame-src', [GOOGLE_SIGNIN_ORIGIN]],
     ['worker-src', ["'self'", 'blob:']],
     ['manifest-src', ["'self'"]],
