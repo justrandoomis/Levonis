@@ -11,10 +11,14 @@ import { resolve } from 'node:path';
 
 const packageJsonPath = resolve('node_modules/wrangler/package.json');
 const packageVersion = JSON.parse(readFileSync(packageJsonPath, 'utf8')).version;
-const binary = resolve('node_modules/.bin', process.platform === 'win32' ? 'wrangler.cmd' : 'wrangler');
+const windows = process.platform === 'win32';
+const shim = resolve('node_modules/.bin', windows ? 'wrangler.cmd' : 'wrangler');
+// Node starts a .cmd only through a shell (CVE-2024-27980); the quotes keep a
+// path with a space in it one word. Everywhere else: no shell, as before.
+const binary = windows ? `"${shim}"` : shim;
 const result = spawnSync(binary, ['--version'], {
   encoding: 'utf8',
-  shell: false,
+  shell: windows,
   timeout: 15_000,
   env: { ...process.env, WRANGLER_SEND_METRICS: 'false' },
 });

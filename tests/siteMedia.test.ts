@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -341,8 +342,10 @@ test('no file in src/ spells a logo path for itself — siteLogo.ts is the only 
   // is long comments that name the paths they are explaining, so the scan
   // looks for a QUOTED path (a string a bundler will ship), not a mention.
   const offenders: string[] = [];
-  const root = fileURLToPath(new URL('../src', import.meta.url));
-  const allowed = fileURLToPath(new URL('../src/lib/siteLogo.ts', import.meta.url));
+  // Forward slashes throughout: `full` below is joined with '/', so on Windows
+  // the two anchors must be spelled the same way for the comparison to hold.
+  const root = fileURLToPath(new URL('../src', import.meta.url)).split(sep).join('/');
+  const allowed = fileURLToPath(new URL('../src/lib/siteLogo.ts', import.meta.url)).split(sep).join('/');
 
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {

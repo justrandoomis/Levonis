@@ -19,6 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const dir = new URL('../.github/workflows/', import.meta.url);
 const read = (file: string) => readFileSync(new URL(file, dir), 'utf8');
@@ -399,7 +400,7 @@ function wranglerConfigs(): string[] {
     for (const entry of readdirSync(url, { withFileTypes: true })) {
       if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name.startsWith('.')) continue;
       if (entry.isDirectory()) walk(`${rel}${entry.name}/`, depth + 1);
-      else if (entry.name === 'wrangler.jsonc' || entry.name === 'wrangler.json') out.push(new URL(`${rel}${entry.name}`, REPO).pathname);
+      else if (entry.name === 'wrangler.jsonc' || entry.name === 'wrangler.json') out.push(fileURLToPath(new URL(`${rel}${entry.name}`, REPO)));
     }
   };
   walk('', 0);

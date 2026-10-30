@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { discoverRootTests, parseTestArgs, planRootShards, readRootTimings, runTestSuites, selectRootShard } from '../scripts/test-all.mjs';
+import { discoverRootTests, parseTestArgs, planRootShards, readRootTimings, runTestSuites, selectRootShard, splitTestArgs, WINDOWS_COMMAND_LINE_BUDGET } from '../scripts/test-all.mjs';
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'levonis suite-'));
@@ -73,6 +73,7 @@ test('default runner attempts all three isolated suites even after failures or s
         assert.equal(command, process.execPath);
         assert.equal(options.shell, false, 'file arguments must never be expanded by a shell');
         assert.equal(options.env?.TEST_SENTINEL, 'kept');
+        assert.equal(options.env?.TZ, 'UTC', 'tests run in the Worker\'s time zone unless the developer sets one');
         assert.equal(options.env?.NODE_OPTIONS, `--no-warnings --import=${pathToFileURL(join(f.root, 'scripts/test-no-network.mjs')).href}`);
         attempted.push({ args, cwd: options.cwd });
         if (attempted.length === 1) return { status: 7 };
@@ -86,6 +87,37 @@ test('default runner attempts all three isolated suites even after failures or s
     assert.deepEqual(attempted[1].args, ['scripts/test-workspaces.mjs']);
     assert.deepEqual(attempted[2], { args: ['--test', 'tests/a.test.mjs', 'tests/z.test.mjs'], cwd: join(f.root, 'studio') });
     assert.match(failures.join('\n'), /root \(exit 7\).*workspaces \(Simulated spawn failure\).*All 3 selected suites were attempted/s);
+  } finally { f.cleanup(); }
+});
+
+test('under a command-line budget the root list runs as consecutive parts: every file once, in order, each part within the budget', () => {
+  const prefix = ['--import', 'tsx', '--test'];
+  const real = discoverRootTests();
+  assert.deepEqual(splitTestArgs(prefix, real, Infinity), [[...prefix, ...real]], 'no budget: one process, exactly as before');
+  const windowsParts = splitTestArgs(prefix, real, WINDOWS_COMMAND_LINE_BUDGET);
+  assert.deepEqual(windowsParts.flatMap((args) => args.slice(prefix.length)), real, 'the real root list, split for Windows, still runs every file once in name order');
+  const length = (args: string[]) => [process.execPath, ...args].reduce((sum, arg) => sum + arg.length + 3, 0);
+  assert.ok(windowsParts.every((args) => length(args) <= WINDOWS_COMMAND_LINE_BUDGET), 'every part fits the Windows command line');
+
+  const f = fixture();
+  try {
+    const files = discoverRootTests(f.root);
+    const budget = length([...prefix, ...files.slice(0, 5)]) + 1;
+    const attempted: string[][] = [], lines: string[] = [], failures: string[] = [];
+    const status = runTestSuites(['--suite', 'root'], { root: f.root, commandLineBudget: budget, log: (line) => lines.push(line), error: (line) => failures.push(line),
+      spawn: (command, args, options) => {
+        assert.equal(command, process.execPath);
+        assert.equal(options.shell, false, 'file arguments must never be expanded by a shell');
+        attempted.push(args);
+        return { status: attempted.length === 2 ? 1 : 0 };
+      },
+    });
+    assert.equal(status, 1);
+    assert.ok(attempted.length > 2, 'the fixture is split into several parts');
+    assert.ok(attempted.every((args) => args.slice(0, prefix.length).join(' ') === prefix.join(' ') && length(args) <= budget));
+    assert.deepEqual(attempted.flatMap((args) => args.slice(prefix.length)), files, 'every part ran, the one after a failing part included');
+    assert.match(lines.join('\n'), new RegExp(`running root in ${attempted.length} parts \\(Windows command-line limit\\)`));
+    assert.match(failures.join('\n'), new RegExp(`root part 2/${attempted.length} \\(exit 1\\)`));
   } finally { f.cleanup(); }
 });
 

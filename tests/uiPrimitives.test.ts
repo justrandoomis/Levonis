@@ -16,9 +16,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
 /** Source with comments removed: a rule explained in prose must not satisfy itself. */
 const code = (path: string) =>

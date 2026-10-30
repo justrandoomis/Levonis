@@ -958,7 +958,7 @@ test('CSV resolver: a warranty row on a non-printer section is refused in the PR
 test('no route in the worker writes order_items.warranty_snapshot after the checkout INSERT', () => {
   const files: string[] = [];
   for (const dir of ['worker/routes', 'worker/lib']) {
-    for (const f of readdirSync(join(ROOT, dir)).filter((x) => x.endsWith('.ts'))) files.push(join(dir, f));
+    for (const f of readdirSync(join(ROOT, dir)).filter((x) => x.endsWith('.ts'))) files.push(`${dir}/${f}`);
   }
   const inserts: string[] = [];
   for (const rel of files) {

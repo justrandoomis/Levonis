@@ -20,7 +20,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { ROOT } from './fixtures/d1';
 import { codeOf } from './fixtures/source';
 import { PRIVATE_DELEGATION_ENABLED } from '../worker/lib/adminScope';
@@ -35,7 +35,7 @@ function files(dir: string, out: string[] = []): string[] {
     if (name === 'node_modules' || name === 'dist' || name.startsWith('.')) continue;
     const p = join(abs, name);
     if (statSync(p).isDirectory()) files(relative(ROOT, p), out);
-    else if (/\.(ts|tsx|mjs|js)$/.test(name)) out.push(relative(ROOT, p));
+    else if (/\.(ts|tsx|mjs|js)$/.test(name)) out.push(relative(ROOT, p).split(sep).join('/'));
   }
   return out;
 }

@@ -100,8 +100,11 @@ const subscribe = (a: App, planId: string, key: string, extra: Record<string, un
   post(a, '/api/memberships/subscribe', { planId, idempotencyKey: key, ...extra });
 const json = async (r: Response) => (await r.json()) as Record<string, unknown>;
 
+// created_at has millisecond resolution, and on a fast machine (seen on Windows)
+// a purchase and the upgrade after it can land in the same millisecond. SQLite
+// returns tied rows in no particular order, so rowid — insertion order — breaks the tie.
 const rows = (raw: DatabaseSync, user: string) =>
-  raw.prepare('SELECT * FROM memberships WHERE user_id = ? ORDER BY created_at').all(user) as Array<Record<string, unknown>>;
+  raw.prepare('SELECT * FROM memberships WHERE user_id = ? ORDER BY created_at, rowid').all(user) as Array<Record<string, unknown>>;
 const walletRows = (raw: DatabaseSync, user: string) =>
   raw.prepare("SELECT * FROM wallet_transactions WHERE user_id = ? AND type = 'withdrawal'").all(user) as Array<Record<string, unknown>>;
 

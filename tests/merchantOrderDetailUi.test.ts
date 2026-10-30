@@ -18,6 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { eventText, actorText } from '../src/components/merchant/orders/timelineText';
 import type { TimelineEvent } from '../src/components/merchant/orders/api';
@@ -27,7 +28,7 @@ import { searchTerm } from '../src/components/merchant/customers/api';
 import { merchantHref, parseMerchantPath } from '../packages/contracts/src/merchantRoutes';
 import { resolveWorkspaceRoute } from '../src/components/merchant/shell/routeTable';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 const en = (_ar: string, e: string) => e;
 const ar = (a: string) => a;

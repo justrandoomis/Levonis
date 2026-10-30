@@ -1562,7 +1562,7 @@ test('finding 14: the lock records this boot — a lock of another boot is taken
   assert.throws(() => AgentState.open(dir), (e: unknown) => e instanceof StateError && e.code === 'STATE_LOCKED');
 });
 
-test('finding 5 (CLI): only the agent\'s own user writes a --bed-cleared flag — another user\'s could never be used up', async () => {
+test('finding 5 (CLI): only the agent\'s own user writes a --bed-cleared flag — another user\'s could never be used up', { skip: process.platform === 'win32' && 'no POSIX uids on Windows (process.getuid is absent): flagWriterProblem has no owner to compare and returns null by design' }, async () => {
   assert.match(String(flagWriterProblem(join(TMP, 'no-such-state'))), /does not exist yet/);
   const mine = freshDir('flag-owner');
   assert.equal(flagWriterProblem(mine), null);

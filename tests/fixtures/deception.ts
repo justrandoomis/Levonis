@@ -121,8 +121,10 @@ export const deceptionEvents = (raw: DatabaseSync, code?: string) =>
     ? (raw.prepare('SELECT * FROM security_events WHERE code = ? ORDER BY first_at').all(code) as Record<string, unknown>[])
     : (raw.prepare('SELECT * FROM security_events ORDER BY first_at').all() as Record<string, unknown>[])
   ).map((r) => ({ ...r }));
+// created_at has millisecond resolution, so two bells can tie on a fast machine;
+// rowid (insertion order) keeps "the bells after this point" stable.
 export const ownerBells = (raw: DatabaseSync) =>
-  (raw.prepare("SELECT * FROM user_notifications WHERE user_id = 'usr_owner' AND kind = 'security_alert' ORDER BY created_at").all() as Record<string, unknown>[]).map((r) => ({ ...r }));
+  (raw.prepare("SELECT * FROM user_notifications WHERE user_id = 'usr_owner' AND kind = 'security_alert' ORDER BY created_at, rowid").all() as Record<string, unknown>[]).map((r) => ({ ...r }));
 
 /** A tool: no Sec-Fetch-* header at all (curl, a scanner, a script) — what an incident is made of. */
 export const TOOL: Record<string, string> = {};

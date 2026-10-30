@@ -286,6 +286,8 @@ const ALIAS_READ = /FROM product_external_ids\s+WHERE searchable = 1 AND product
  */
 let template: string | null = null;
 let scratch: string | null = null;
+/** Every copy opened, closed before the scratch directory is removed (Windows cannot unlink an open file). */
+const opened: DatabaseSync[] = [];
 async function copies(opts: { steady: boolean; staff?: boolean }): Promise<{ stale: DatabaseSync; current: DatabaseSync; engine: string[] }> {
   let engine: string[] = [];
   if (!template) {
@@ -304,6 +306,7 @@ async function copies(opts: { steady: boolean; staff?: boolean }): Promise<{ sta
     const file = join(scratch!, `copy_${process.pid}_${Date.now()}_${n++}.db`);
     copyFileSync(template!, file);
     const raw = new DatabaseSync(file);
+    opened.push(raw);
     raw.exec('PRAGMA foreign_keys = ON;');
     if (opts.steady) {
       const done = await backfillSearchIndex(asD1(raw), { limit: 1000 });
@@ -322,6 +325,13 @@ async function copies(opts: { steady: boolean; staff?: boolean }): Promise<{ sta
 }
 
 process.on('exit', () => {
+  for (const db of opened) {
+    try {
+      db.close();
+    } catch {
+      // already closed
+    }
+  }
   if (scratch) rmSync(scratch, { recursive: true, force: true });
 });
 

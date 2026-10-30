@@ -18,7 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { ROOT } from './fixtures/d1';
 import { codeOf } from './fixtures/source';
 import { createElement } from 'react';
@@ -34,7 +34,7 @@ function srcFiles(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) srcFiles(p, out);
-    else if (/\.(ts|tsx)$/.test(name)) out.push(relative(ROOT, p));
+    else if (/\.(ts|tsx)$/.test(name)) out.push(relative(ROOT, p).split(sep).join('/'));
   }
   return out;
 }

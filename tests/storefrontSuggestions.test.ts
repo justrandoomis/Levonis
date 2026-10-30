@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { emailSuggestions } from '../src/components/auth/emailSuggestions';
+import { emailSuggestions } from '../src/components/auth/emailDomainSuggestions';
 import { addressChoices } from '../src/components/address/addressChoices';
 import type { ApiAddress } from '../src/lib/api';
 

@@ -28,7 +28,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { ROOT } from './fixtures/d1';
 import { ENTITIES } from '../worker/lib/printCloud/catalog';
 import { COST_SETTING_KEYS, DEFAULT_CONFIG, MODEL_UPLOAD_CEILING_BYTES } from '../worker/lib/printCloud/settings';
@@ -301,7 +301,7 @@ test('WORDS: every server code a table names exists on the server, and every ser
 test('MONEY DOORS: an Idempotency-Key exactly where the server keys a door — never on the manual payment', () => {
   const keyed = OPERATIONS.filter((o) => o.base === 'admin' && o.idempotent).map((o) => o.path).sort();
   assert.deepEqual([...IDEMPOTENT_DOORS].sort(), keyed, 'the console knows the keyed doors');
-  const minting = FILES.filter((f) => /newIdempotencyKey\(/.test(readFileSync(f, 'utf8'))).map((f) => relative(CONSOLE, f)).sort();
+  const minting = FILES.filter((f) => /newIdempotencyKey\(/.test(readFileSync(f, 'utf8'))).map((f) => relative(CONSOLE, f).split(sep).join('/')).sort();
   assert.deepEqual(minting, ['sections/CustomersSection.tsx', 'sections/OrdersSection.tsx', 'sections/StockSection.tsx'], 'only the balance, refund and stock screens mint a key');
   const orders = readFileSync(join(CONSOLE, 'sections/OrdersSection.tsx'), 'utf8');
   const payment = /pc\.post<PaymentResult>\(`\/orders\/\$\{enc\(o\.id\)\}\/confirm-payment`, (\{[^}]*\})\)/.exec(orders);

@@ -4,8 +4,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { delimiter, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const helper = join(root, 'scripts/apply-remote-migrations.mjs');
@@ -68,6 +68,21 @@ if (commandAt >= 0) {
 } else process.exit(93);
 `;
 
+// Windows only: the helper's spawnSync('npx', …) uses no shell, so it finds
+// only an npx.exe or npx.com on PATH and can start neither the shim above nor
+// an npx.cmd wrapper (Node refuses .cmd without a shell, CVE-2024-27980). This
+// preload hands exactly those calls, arguments and options unchanged, to the
+// shim. Linux runs the helper without it, through PATH, as before.
+const windowsPreload = (shimPath: string) => `
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
+const spawnSync = childProcess.spawnSync;
+childProcess.spawnSync = (file, args, options) => file === 'npx'
+  ? spawnSync(process.execPath, [${JSON.stringify(shimPath)}, ...args], options)
+  : spawnSync(file, args, options);
+syncBuiltinESMExports();
+`;
+
 function fixture(files = sampleFiles, applied = [base], seed = '') {
   const dir = mkdtempSync(join(tmpdir(), 'levonis-import-test-'));
   const dbPath = join(dir, 'remote.sqlite');
@@ -75,6 +90,8 @@ function fixture(files = sampleFiles, applied = [base], seed = '') {
   mkdirSync(join(dir, 'migrations'));
   mkdirSync(join(dir, 'bin'));
   writeFileSync(join(dir, 'bin/npx'), shim, { mode: 0o755 });
+  const nodeOptions = process.platform === 'win32' ? ['--import', pathToFileURL(join(dir, 'windows-npx.mjs')).href] : [];
+  if (nodeOptions.length) writeFileSync(join(dir, 'windows-npx.mjs'), windowsPreload(join(dir, 'bin/npx')));
   const db = new DatabaseSync(dbPath);
   db.exec('PRAGMA foreign_keys=ON; CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY, name TEXT UNIQUE, applied_at TEXT DEFAULT CURRENT_TIMESTAMP)');
   for (const [name, sql] of files) {
@@ -88,9 +105,11 @@ function fixture(files = sampleFiles, applied = [base], seed = '') {
   db.close();
   return {
     dir,
-    run: (env: Record<string, string> = {}, args: string[] = []) => spawnSync(process.execPath, [helper, ...args], {
-      cwd: dir, encoding: 'utf8', timeout: 30_000,
-      env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}`, MOCK_DB: dbPath, MOCK_CALLS: callsPath, ...env },
+    run: (env: Record<string, string> = {}, args: string[] = []) => spawnSync(process.execPath, [...nodeOptions, helper, ...args], {
+      // The real-upgrade cases start one process per pending migration, and
+      // Windows starts processes several times slower: 30 s ran out under a full parallel run.
+      cwd: dir, encoding: 'utf8', timeout: process.platform === 'win32' ? 120_000 : 30_000,
+      env: { ...process.env, PATH: `${join(dir, 'bin')}${delimiter}${process.env.PATH}`, MOCK_DB: dbPath, MOCK_CALLS: callsPath, ...env },
     }),
     calls: (): Call[] => {
       try { return readFileSync(callsPath, 'utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line)); }

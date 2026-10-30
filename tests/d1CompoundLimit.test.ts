@@ -17,10 +17,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { D1_MAX_UNION_TERMS } from '../worker/lib/storeLayout';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const unions = (sql: string) => (sql.replace(/--[^\n]*/g, '').match(/\bUNION\b/gi) ?? []).length;
 
 test('the measured cap is the one the code uses', () => {

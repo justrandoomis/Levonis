@@ -483,7 +483,7 @@ test('every mode runs exactly the steps it needs, in a safe order', () => {
   assert.equal(run(loader).trim(), 'node --import tsx scripts/bambu-import/translations.ts --data data/bambu-import/translations --run "$IN_RUN_ID"');
 });
 
-test('the chain step, run under bash: it validates what it dispatches and sends one dispatch of mode run', () => {
+test('the chain step, run under bash: it validates what it dispatches and sends one dispatch of mode run', { skip: process.platform === 'win32' && 'runs the workflow step under bash with a #! curl stand-in; Windows has no bash on PATH' }, () => {
   const step = CHAIN_STEPS[0];
   assert.deepEqual(Object.keys(envOf(step)).sort(), ['AUTO', 'COUNT', 'DEFAULT_BRANCH', 'GH_TOKEN', 'KEY', 'REF', 'REPO', 'RUN_ID']);
   assert.equal(envOf(step).GH_TOKEN, '${{ github.token }}');
@@ -546,7 +546,7 @@ const GOOD: Record<string, string> = {
 };
 const RUN = 'cir_0123456789abcdef01234567';
 
-test('the validation step accepts the valid dispatches and sets the deadline 330 minutes ahead', () => {
+test('the validation step accepts the valid dispatches and sets the deadline 330 minutes ahead', { skip: process.platform === 'win32' && 'runs the workflow step under bash; Windows has no bash on PATH' }, () => {
   const script = run(STEPS[0]);
   for (const env of [
     GOOD,
@@ -576,7 +576,7 @@ test('the validation step accepts the valid dispatches and sets the deadline 330
   }
 });
 
-test('the validation step refuses every malformed or hostile input, and never echoes it', () => {
+test('the validation step refuses every malformed or hostile input, and never echoes it', { skip: process.platform === 'win32' && 'runs the workflow step under bash; Windows has no bash on PATH' }, () => {
   const script = run(STEPS[0]);
   const marker = join(tmpdir(), `levonis-wf60-evaluated-${process.pid}`);
   const hostile = [`$(touch ${marker})`, `\`touch ${marker}\``, "x'; exit 0; '", '::add-mask::x', 'a\nb', ' snapshot', 'snapshot ', ''];

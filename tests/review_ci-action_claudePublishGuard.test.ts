@@ -9,11 +9,23 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const gateFile = new URL('../scripts/claude-publish-gate.py', import.meta.url).pathname;
+const gateFile = fileURLToPath(new URL('../scripts/claude-publish-gate.py', import.meta.url));
+
+// The gate runs as `python3 -I` (as in CI). Windows often has no python3 (only
+// the Microsoft Store stub, exit 9009) and creates symbolic links only with
+// Developer Mode or elevation; those tests skip there and run once it can.
+const pythonSkip = process.platform === 'win32' && spawnSync('python3', ['--version']).status !== 0
+  && 'needs python3, not on this Windows machine';
+const symlinkSkip = pythonSkip || (process.platform === 'win32' && (() => {
+  const dir = mkdtempSync(join(tmpdir(), 'levonis-symlink-probe-'));
+  try { symlinkSync('target', join(dir, 'link')); return false; } catch { return 'needs symbolic links (Developer Mode or elevation), not enabled on this Windows machine'; }
+  finally { rmSync(dir, { recursive: true, force: true }); }
+})());
 
 function repository() {
   const root = mkdtempSync(join(tmpdir(), 'levonis-review-claude-gate-'));
@@ -33,7 +45,7 @@ function repository() {
   return { root, git, write, gate, link: (path: string, target: string) => symlinkSync(target, join(root, path)), cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 
-test('control: the gate does refuse an edited workflow file', () => {
+test('control: the gate does refuse an edited workflow file', { skip: pythonSkip }, () => {
   const repo = repository();
   try { repo.write('.github/workflows/deploy.yml', 'changed\n'); assert.equal(repo.gate(), 1); } finally { repo.cleanup(); }
 });
@@ -44,7 +56,7 @@ test('control: the gate does refuse an edited workflow file', () => {
  * review-only mode whose tools are Read/Glob/Grep. Nested CLAUDE.md and
  * CLAUDE.local.md are agent instructions too. */
 for (const path of ['.claude/settings.json', '.claude/skills/x/SKILL.md', 'src/CLAUDE.md', 'CLAUDE.local.md']) {
-  test(`the publish gate refuses Claude Code agent configuration/instructions: ${path}`, () => {
+  test(`the publish gate refuses Claude Code agent configuration/instructions: ${path}`, { skip: pythonSkip }, () => {
     const repo = repository();
     try {
       repo.write(path, path.endsWith('.json') ? '{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"env"}]}]}}\n' : 'instructions\n');
@@ -56,7 +68,7 @@ for (const path of ['.claude/settings.json', '.claude/skills/x/SKILL.md', 'src/C
 /* `git status --porcelain -z` emits a rename as "R  new\0old\0". The gate
  * strips three characters from every NUL field, so the old path of a staged
  * rename is read as "UDE.md" and passes. */
-test('the publish gate refuses a staged rename that removes the root CLAUDE.md', () => {
+test('the publish gate refuses a staged rename that removes the root CLAUDE.md', { skip: pythonSkip }, () => {
   const repo = repository();
   try {
     repo.git('mv', 'CLAUDE.md', 'notes.txt');
@@ -64,7 +76,7 @@ test('the publish gate refuses a staged rename that removes the root CLAUDE.md',
   } finally { repo.cleanup(); }
 });
 
-test('control: an ordinary source change, a new file and a dependency-only package.json edit pass', () => {
+test('control: an ordinary source change, a new file and a dependency-only package.json edit pass', { skip: pythonSkip }, () => {
   const repo = repository();
   try {
     repo.write('src/app.ts', 'export const changed = true;\n');
@@ -79,13 +91,13 @@ test('control: an ordinary source change, a new file and a dependency-only packa
  * MCP servers, the release/deploy gate, npm lifecycle/gate scripts, and
  * symbolic links a build could follow out of the repository. */
 for (const path of ['.mcp.json', 'studio/.claude/settings.json', 'scripts/check-deploy-freshness.mjs', 'scripts/test-all.mjs', 'scripts/lib/preserve-vars.mjs', 'scripts/claude-publish-gate.py', 'wrangler.jsonc', '.env.production']) {
-  test(`the publish gate refuses ${path}`, () => {
+  test(`the publish gate refuses ${path}`, { skip: pythonSkip }, () => {
     const repo = repository();
     try { repo.write(path, 'changed\n'); assert.equal(repo.gate(), 1); } finally { repo.cleanup(); }
   });
 }
 
-test('the publish gate refuses a change to npm scripts (lifecycle hooks and the release gate itself)', () => {
+test('the publish gate refuses a change to npm scripts (lifecycle hooks and the release gate itself)', { skip: pythonSkip }, () => {
   for (const scripts of ['{"test:unit":"true"}', '{"test:unit":"node scripts/test-all.mjs","postinstall":"node x.js"}']) {
     const repo = repository();
     try {
@@ -97,7 +109,7 @@ test('the publish gate refuses a change to npm scripts (lifecycle hooks and the 
   try { repo.write('studio/package.json', '{"name":"s","scripts":{"preinstall":"node x.js"}}\n'); assert.equal(repo.gate(), 1); } finally { repo.cleanup(); }
 });
 
-test('the publish gate refuses a symbolic link (a build could publish what it points at)', () => {
+test('the publish gate refuses a symbolic link (a build could publish what it points at)', { skip: symlinkSkip }, () => {
   const repo = repository();
   try { repo.link('src/env.txt', '/proc/self/environ'); assert.equal(repo.gate(), 1); } finally { repo.cleanup(); }
 });

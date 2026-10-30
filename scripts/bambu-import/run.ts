@@ -287,7 +287,8 @@ export function takeToken(file: string | undefined): string {
   const mode = statSync(file).mode & 0o777;
   const text = readFileSync(file, 'utf8');
   rmSync(file, { force: true });
-  if (mode & 0o077) throw new ConfigError('the token file is readable by others');
+  // Windows has no POSIX mode bits (stat reports 0o666 whatever the ACL), so the check holds where they exist.
+  if (process.platform !== 'win32' && mode & 0o077) throw new ConfigError('the token file is readable by others');
   const token = text.trim();
   if (!/^[0-9a-f]{64}$/.test(token)) throw new ConfigError('the token file does not hold a 64-hex token');
   return token;

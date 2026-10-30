@@ -14,6 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -81,19 +82,26 @@ test('the proposed change is verified by the same parts as workflow 7, in parall
 /* Why the prefixes went: each of these, run as the allowlist would have let
  * it run, executes a payload that reads the key from its environment. */
 const KEY = 'sk-ant-review-dummy-not-a-real-key';
-const repoRoot = new URL('..', import.meta.url).pathname;
+const repoRoot = fileURLToPath(new URL('..', import.meta.url));
+// The attempts are bash commands (as in CI). Windows has no bash on PATH unless
+// Git Bash is put there, and bash would read a backslash path as escapes, so
+// Windows paths are handed to it with forward slashes. On Linux both are unchanged.
+const shellPath = (path: string) => (process.platform === 'win32' ? path.replaceAll('\\', '/') : path);
+const bashSkip = process.platform === 'win32'
+  && spawnSync('bash', ['-c', 'test -d "$1"', 'bash', shellPath(tmpdir())]).status !== 0
+  && 'needs bash (with access to this machine\'s temp directory) on PATH, not on this Windows machine';
 const attempts: Array<{ prefix: string; command: (dir: string) => string; cwd?: string }> = [
   { prefix: 'sed', command: (dir) => `sed -n '1e printf %s "$ANTHROPIC_API_KEY"' ${dir}/one-line.txt` },
   { prefix: 'find', command: (dir) => `find ${dir} -maxdepth 0 -exec sh -c 'printf %s "$ANTHROPIC_API_KEY"' \\;` },
   { prefix: 'npx tsx', command: () => `npx tsx -e 'process.stdout.write(process.env.ANTHROPIC_API_KEY ?? "")'`, cwd: repoRoot },
 ];
 for (const attempt of attempts) {
-  test(`"${attempt.prefix} …" executes arbitrary code, so it is not allowlisted`, () => {
+  test(`"${attempt.prefix} …" executes arbitrary code, so it is not allowlisted`, { skip: bashSkip }, () => {
     assert.ok(!ultracode.includes(attempt.prefix) && !apply.includes(attempt.prefix));
     const dir = mkdtempSync(join(tmpdir(), 'levonis-review-allowlist-'));
     try {
       writeFileSync(join(dir, 'one-line.txt'), 'x\n');
-      const result = spawnSync('bash', ['-c', attempt.command(dir)], {
+      const result = spawnSync('bash', ['-c', attempt.command(shellPath(dir))], {
         cwd: attempt.cwd ?? dir, encoding: 'utf8', timeout: 60_000,
         env: { PATH: process.env.PATH, HOME: process.env.HOME, ANTHROPIC_API_KEY: KEY },
       });

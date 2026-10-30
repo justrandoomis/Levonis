@@ -78,7 +78,9 @@ for (const k of kept) console.log(`check-embedded-runners: ${k} already exists o
 
 let failed = false;
 try {
-  execFileSync('npx', ['tsc', '--noEmit', '-p', 'tests/tsconfig.json'], { cwd: root, stdio: 'inherit' });
+  // TypeScript's own entry, run with this Node: `npx` is npx.cmd on Windows,
+  // which execFileSync cannot start without a shell.
+  execFileSync(process.execPath, [join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit', '-p', 'tests/tsconfig.json'], { cwd: root, stdio: 'inherit' });
 } catch {
   failed = true;
 } finally {

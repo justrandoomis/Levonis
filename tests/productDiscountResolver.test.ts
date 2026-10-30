@@ -13,7 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { resolveUnitPrice, type ResolvedPrice, type SkuPriceRow, type Tier } from '../worker/lib/pricing';
 import { applyOfferToResolved, fixedUsdAnswerFor, resolveOfferPrice, windowFromRow, type OfferWindow } from '../worker/lib/offers';
 import { centsOfUsdText, fixedUsdLine, offerSavingPercent, usdTextOfCents, usdToIqdCeil } from '../worker/lib/offerUsd';
@@ -444,7 +444,7 @@ test('every applyOfferToResolved call site passes the line’s document (a missi
     for (const f of readdirSync(dir)) {
       const p = join(dir, f);
       if (statSync(p).isDirectory()) walk(p);
-      else if (p.endsWith('.ts')) files.push(p);
+      else if (p.endsWith('.ts')) files.push(p.split(sep).join('/'));
     }
   };
   walk('worker');

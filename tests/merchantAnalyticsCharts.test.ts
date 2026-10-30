@@ -10,6 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import {
   SERIES,
@@ -28,7 +29,7 @@ import {
   baghdadToday,
 } from '../src/components/merchant/analytics/chartMath';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
 test('niceTicks: clean whole steps from 0 past the maximum; nothing to draw is one empty step, not a fake scale', () => {

@@ -16,6 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { merchantHref } from '../packages/contracts/src/merchantRoutes';
 import { resolveWorkspaceRoute } from '../src/components/merchant/shell/routeTable';
@@ -23,7 +24,7 @@ import { ATTENTION_KINDS, kindIcon } from '../src/components/merchant/notificati
 import { MERCHANT_KINDS, KIND_PREF } from '../worker/lib/merchantNotify';
 import { Bell } from 'lucide-react';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
 test('the custom-order and coupon addresses carry their id to the section', () => {

@@ -18,7 +18,9 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const TSC = join(ROOT, 'node_modules', '.bin', 'tsc');
+// TypeScript's own entry, run with this Node: node_modules/.bin/tsc is a shell
+// script that execFileSync cannot start on Windows (there it is tsc.cmd).
+const TSC = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
 
 export function workspaceDirs(root = ROOT) {
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
@@ -65,7 +67,7 @@ if (process.argv.includes('--list')) {
 }
 
 if (!existsSync(TSC)) {
-  console.error('check-workspaces: node_modules/.bin/tsc is missing — run npm ci first');
+  console.error('check-workspaces: node_modules/typescript/bin/tsc is missing — run npm ci first');
   process.exit(1);
 }
 
@@ -90,7 +92,7 @@ for (const dir of dirs) {
     continue;
   }
   try {
-    execFileSync(TSC, ['--noEmit', '-p', join(dir, 'tsconfig.json')], { cwd: ROOT, stdio: 'inherit' });
+    execFileSync(process.execPath, [TSC, '--noEmit', '-p', join(dir, 'tsconfig.json')], { cwd: ROOT, stdio: 'inherit' });
     console.log(`check-workspaces: ${rel} typechecks clean`);
   } catch {
     console.error(`check-workspaces: ${rel} does not typecheck (see above)`);
@@ -100,7 +102,7 @@ for (const dir of dirs) {
 for (const dir of unlinkedTsProjects()) {
   const rel = dir.slice(ROOT.length + 1);
   try {
-    execFileSync(TSC, ['--noEmit', '-p', join(dir, 'tsconfig.json')], { cwd: ROOT, stdio: 'inherit' });
+    execFileSync(process.execPath, [TSC, '--noEmit', '-p', join(dir, 'tsconfig.json')], { cwd: ROOT, stdio: 'inherit' });
     console.log(`check-workspaces: ${rel} typechecks clean (not a package: tsconfig only)`);
   } catch {
     console.error(`check-workspaces: ${rel} does not typecheck (see above)`);

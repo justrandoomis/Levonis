@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { ROOT } from './fixtures/d1';
 
 function tsFiles(dir: string, out: string[] = []): string[] {
@@ -28,7 +28,7 @@ function tsFiles(dir: string, out: string[] = []): string[] {
   }
   return out;
 }
-const worker = tsFiles(join(ROOT, 'worker')).map((f) => ({ f: relative(ROOT, f), src: readFileSync(f, 'utf8') }));
+const worker = tsFiles(join(ROOT, 'worker')).map((f) => ({ f: relative(ROOT, f).split(sep).join('/'), src: readFileSync(f, 'utf8') }));
 
 const ALLOWED_READERS = (f: string) =>
   f.startsWith('worker/lib/fx/') ||

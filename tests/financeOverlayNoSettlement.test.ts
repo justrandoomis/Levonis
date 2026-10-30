@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { asD1, freshDb, get, json, stubApp } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 import { adminFinanceWorkspaceRoutes } from '../worker/routes/adminFinanceWorkspace';
@@ -87,7 +87,7 @@ test('the report and shared participation calculator use one deduction reader', 
     }
   };
   walk(join(ROOT, 'worker'));
-  const importers = files.filter((f) => /from\s+['"][^'"]*financeReportOverlay['"]/.test(readFileSync(f, 'utf8'))).map((f) => relative(ROOT, f));
+  const importers = files.filter((f) => /from\s+['"][^'"]*financeReportOverlay['"]/.test(readFileSync(f, 'utf8'))).map((f) => relative(ROOT, f).split(sep).join('/'));
   assert.deepEqual(importers.sort(), ['worker/lib/participantProfit.ts', 'worker/routes/adminFinanceWorkspace.ts']);
   for (const f of ['worker/lib/orderProfit.ts', 'worker/lib/investorFinance.ts', 'worker/lib/financeWageCalculation.ts', 'worker/lib/financeParticipants.ts', 'worker/lib/orderFinance.ts', 'worker/lib/financeReconcile.ts']) {
     const src = readFileSync(join(ROOT, f), 'utf8');

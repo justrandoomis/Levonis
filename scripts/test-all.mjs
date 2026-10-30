@@ -173,10 +173,32 @@ export function selectRootShard(files, shard, timings = readRootTimings()) {
   return nonEmpty(shard ? planRootShards(files, shard.total, timings)[shard.index - 1].files : files);
 }
 
+/** Windows caps a whole command line at 32,767 characters, and the unsharded
+ * root list is longer than that: spawn failed with ENAMETOOLONG before a
+ * single test ran. There the list runs as consecutive parts that each fit,
+ * every file exactly once and in name order. Elsewhere the budget is
+ * unlimited and one process runs the whole list, as before. */
+export const WINDOWS_COMMAND_LINE_BUDGET = 30_000;
+
+export function splitTestArgs(prefix, files, budget, command = process.execPath) {
+  if (!Number.isFinite(budget)) return [[...prefix, ...files]];
+  const cost = (arg) => arg.length + 3; // two quotes and a separating space
+  const base = cost(command) + prefix.reduce((sum, arg) => sum + cost(arg), 0);
+  const parts = [];
+  let current = [], used = base;
+  for (const file of files) {
+    if (current.length && used + cost(file) > budget) { parts.push([...prefix, ...current]); current = []; used = base; }
+    current.push(file);
+    used += cost(file);
+  }
+  if (current.length) parts.push([...prefix, ...current]);
+  return parts;
+}
+
 /** Dependencies and file discovery are validated before any suite runs. The
  * injected spawn/log adapters let regression tests prove aggregation without
  * recursively launching the actual repository suites. */
-export function runTestSuites(argv, { root = ROOT, env = process.env, spawn = spawnSync, log = console.log, error = console.error } = {}) {
+export function runTestSuites(argv, { root = ROOT, env = process.env, spawn = spawnSync, log = console.log, error = console.error, commandLineBudget = process.platform === 'win32' ? WINDOWS_COMMAND_LINE_BUDGET : Infinity } = {}) {
   try {
     const options = parseTestArgs(argv), studio = join(root, 'studio');
     requireFile(join(root, 'node_modules', 'tsx', 'package.json'));
@@ -186,13 +208,16 @@ export function runTestSuites(argv, { root = ROOT, env = process.env, spawn = sp
     requireFile(guard);
     // NODE_OPTIONS is inherited by nested Node children too. Absolute URLs
     // keep the preload valid when the Studio child changes its cwd.
-    const testEnv = { ...env, NODE_OPTIONS: `${env.NODE_OPTIONS ?? ''} --import=${pathToFileURL(guard).href}`.trim() };
+    // TZ: the Worker runs in UTC, and so does CI; a developer machine in
+    // Baghdad (UTC+3) printed tomorrow's date on a receipt every evening from
+    // 21:00 UTC. A TZ the developer sets on purpose is kept.
+    const testEnv = { ...env, TZ: env.TZ || 'UTC', NODE_OPTIONS: `${env.NODE_OPTIONS ?? ''} --import=${pathToFileURL(guard).href}`.trim() };
     const suites = options.suite ? [options.suite] : ['root', 'workspaces', 'studio'];
     const runs = suites.map((name) => {
       if (name === 'root') {
         if (!options.shard) {
           const files = discoverRootTests(root);
-          return { name, files, args: ['--import', 'tsx', '--test', ...files], cwd: root };
+          return { name, files, parts: splitTestArgs(['--import', 'tsx', '--test'], files, commandLineBudget), cwd: root };
         }
         const timings = readRootTimings(root);
         const plan = planRootShards(discoverRootTests(root), options.shard.total, timings)[options.shard.index - 1];
@@ -219,14 +244,24 @@ export function runTestSuites(argv, { root = ROOT, env = process.env, spawn = sp
     }
     const failed = [];
     for (const run of runs) {
-      log(`\ntest:unit: running ${run.name}${options.shard ? ` shard ${options.shard.index}/${options.shard.total}` : ''}${run.note ? ` (${run.note})` : ''}`);
+      const parts = run.parts ?? [run.args];
+      const split = parts.length > 1 ? ` in ${parts.length} parts (Windows command-line limit)` : '';
+      log(`\ntest:unit: running ${run.name}${options.shard ? ` shard ${options.shard.index}/${options.shard.total}` : ''}${run.note ? ` (${run.note})` : ''}${split}`);
       try {
         for (const file of run.files) requireFile(join(run.cwd, file));
-        const result = spawn(process.execPath, run.args, { stdio: 'inherit', shell: false, cwd: run.cwd, env: testEnv });
-        if (result.status !== 0 || result.error) failed.push(`${run.name} (${result.error?.message ?? `exit ${result.status ?? `signal ${result.signal}`}`})`);
       } catch (failure) {
         failed.push(`${run.name} (${failure instanceof Error ? failure.message : String(failure)})`);
+        continue;
       }
+      parts.forEach((args, index) => {
+        const label = parts.length > 1 ? `${run.name} part ${index + 1}/${parts.length}` : run.name;
+        try {
+          const result = spawn(process.execPath, args, { stdio: 'inherit', shell: false, cwd: run.cwd, env: testEnv });
+          if (result.status !== 0 || result.error) failed.push(`${label} (${result.error?.message ?? `exit ${result.status ?? `signal ${result.signal}`}`})`);
+        } catch (failure) {
+          failed.push(`${label} (${failure instanceof Error ? failure.message : String(failure)})`);
+        }
+      });
     }
     if (failed.length) {
       error(`\ntest:unit FAILED — ${failed.join(', ')}. All ${runs.length} selected suites were attempted.`);

@@ -16,7 +16,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, dirname, resolve, relative } from 'node:path';
+import { join, dirname, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { languageFlow, languageSwapMode, runLanguageSwap, LANG_SWAP_MS } from '../src/lib/langSwap';
@@ -132,7 +132,7 @@ test('first paint does not load the unopened settings panel or overlay primitive
     }
   }
   visit(join(ROOT, 'src/main.tsx'));
-  const closure = [...seen].map((file) => relative(ROOT, file));
+  const closure = [...seen].map((file) => relative(ROOT, file).split(sep).join('/'));
   assert.ok(closure.includes('src/components/LangThemeSheet.tsx'), 'the header control stays available at first paint');
   for (const deferred of ['LangThemePanel.tsx', 'ui/Overlay.tsx', 'ui/Segmented.tsx']) {
     assert.ok(!closure.includes(`src/components/${deferred}`), `${deferred} re-entered the initial static dependency graph`);

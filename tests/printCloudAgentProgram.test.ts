@@ -44,7 +44,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import http from 'node:http';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { strToU8, zipSync } from 'fflate';
 import { ctx } from './fixtures/app';
 import { ADMIN, AGENT, API, buy, estimatedJob, idem, ok, pcWorld, readyFile, row, rows, seedCatalog, type Catalog, type Json, type World } from './fixtures/printCloud';
@@ -1280,10 +1280,13 @@ test('slicer figures are read from the produced file — G-code comments and a .
 });
 
 test('slicing plans: objects = models × quantity × copies on their variant\'s filament; what v1 cannot slice faithfully is refused with a code', async () => {
+  // An absolute profiles directory on this platform: '/profiles' on POSIX,
+  // '<drive>:\profiles' on Windows (where `resolve` adds the current drive).
+  const PROFILES = resolve('/profiles');
   const cfg = {
     kind: 'orca',
     output: 'gcode',
-    profiles_dir: '/profiles',
+    profiles_dir: PROFILES,
     machines: { M: [{ nozzle_um: 400, machine: 'm4.json', process: 'p.json' }, { nozzle_um: 600, machine: 'm6.json', process: 'p6.json', pause_gcode: 'M400 U1' }] },
     filaments: { by_sku: { 'SKU-W': 'white.json' }, by_material: { PLA: 'pla.json' } },
   };
@@ -1312,8 +1315,8 @@ test('slicing plans: objects = models × quantity × copies on their variant\'s 
     { file_id: 'f2', filament: 1 },
     { file_id: 'f2', filament: 1 },
   ]);
-  assert.deepEqual(planned.plan.slots.map((s) => [s.variant_id, s.profile]), [['v-white', '/profiles/white.json'], ['v-black', '/profiles/pla.json']]);
-  assert.equal(planned.plan.machine.machine, '/profiles/m4.json');
+  assert.deepEqual(planned.plan.slots.map((s) => [s.variant_id, s.profile]), [['v-white', join(PROFILES, 'white.json')], ['v-black', join(PROFILES, 'pla.json')]]);
+  assert.equal(planned.plan.machine.machine, join(PROFILES, 'm4.json'));
   const refuse = (patch: Record<string, unknown>, c: Record<string, unknown> = cfg) => {
     const r = planSlice({ ...input, ...patch }, c);
     return r.ok ? 'ok' : r.error_code;

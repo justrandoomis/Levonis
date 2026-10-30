@@ -17,10 +17,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 // @ts-expect-error - plain ESM helper shared with the workflow, no types
 import { auditDirectory, classify, statements } from '../scripts/check-migrations-additive.mjs';
 
-const STUDIO_MIGRATIONS = new URL('../studio/drizzle', import.meta.url).pathname;
+const STUDIO_MIGRATIONS = fileURLToPath(new URL('../studio/drizzle', import.meta.url));
 
 test('the repo’s Studio migration is additive, foreign keys and all', () => {
   const reports = auditDirectory(STUDIO_MIGRATIONS);

@@ -32,7 +32,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { all, count, get, json, post, put, row } from './fixtures/app';
 import { applyRate, fxEnv, market, pairOf } from './fixtures/fx';
@@ -533,7 +533,7 @@ function tsFiles(dir: string, out: string[] = []): string[] {
 const importersOf = (pattern: RegExp) =>
   [...tsFiles(join(ROOT, 'worker')), ...tsFiles(join(ROOT, 'src')), ...tsFiles(join(ROOT, 'packages')), ...tsFiles(join(ROOT, 'services'))]
     .filter((f) => pattern.test(readFileSync(f, 'utf8')))
-    .map((f) => relative(ROOT, f))
+    .map((f) => relative(ROOT, f).split(sep).join('/'))
     .sort();
 
 test('static: the storefront never imports the repricing or the engine — only the cron, the FX run and the owner door do', () => {

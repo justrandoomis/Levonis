@@ -15,7 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import worker from '../worker/index';
 import { ROOT } from './fixtures/d1';
 import { APEX, asD1, ctx, freshDb, providerFetch } from './fixtures/app';
@@ -88,10 +88,12 @@ function tsFiles(dir: string, out: string[] = []): string[] {
   }
   return out;
 }
+/** ROOT-relative path with forward slashes on every platform. */
+const rel = (f: string) => relative(ROOT, f).split(sep).join('/');
 const importers = (pattern: RegExp) =>
   [...tsFiles(join(ROOT, 'worker')), ...tsFiles(join(ROOT, 'src')), ...tsFiles(join(ROOT, 'packages')), ...tsFiles(join(ROOT, 'services'))]
     .filter((f) => pattern.test(readFileSync(f, 'utf8')))
-    .map((f) => relative(ROOT, f))
+    .map(rel)
     .sort();
 
 test('static: only scheduler.ts imports the providers; only index.ts and adminPricing.ts import the scheduler', () => {
@@ -103,9 +105,9 @@ test('static: only scheduler.ts imports the providers; only index.ts and adminPr
   // menu (plan §13, §14.4 risk 3) — a link the reader follows, never a request.
   for (const f of tsFiles(join(ROOT, 'src'))) {
     const code = readFileSync(f, 'utf8');
-    assert.doesNotMatch(code, /iraqsm\.com\/|eurofxref|ecb\.europa\.eu\/stats|IRAQ_PARALLEL_FX_API_KEY/, relative(ROOT, f));
+    assert.doesNotMatch(code, /iraqsm\.com\/|eurofxref|ecb\.europa\.eu\/stats|IRAQ_PARALLEL_FX_API_KEY/, rel(f));
     if (/iraqsm\.com/.test(code)) {
-      assert.equal(relative(ROOT, f), 'src/components/LangThemePanel.tsx', `${relative(ROOT, f)} names IQWealth's host`);
+      assert.equal(rel(f), 'src/components/LangThemePanel.tsx', `${rel(f)} names IQWealth's host`);
       assert.deepEqual(code.match(/[^'"`\s]*iraqsm\.com[^'"`\s]*/g), ['https://iraqsm.com'], 'only the bare attribution link');
     }
   }

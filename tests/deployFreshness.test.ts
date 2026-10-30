@@ -79,7 +79,18 @@ test('renaming code into the ignored docs directory is still a deployable change
 test('NUL-delimited paths cannot disguise a deployable filename as multiple ignored files', () => {
   const repo = repository();
   try {
-    repo.write('docs-like\nREADME.md\nworker.ts', 'not documentation\n'); repo.publish();
+    const disguised = 'docs-like\nREADME.md\nworker.ts';
+    if (process.platform === 'win32') {
+      // NTFS cannot name a file with a newline, so commit the same tree entry
+      // through the index; Git for Windows also refuses it unless told not to.
+      const blob = join(repo.directory, 'disguised-blob');
+      writeFileSync(blob, 'not documentation\n');
+      const sha = repo.git(['hash-object', '-w', blob]).trim();
+      repo.git(['-c', 'core.protectNTFS=false', 'update-index', '--add', '--cacheinfo', `100644,${sha},${disguised}`]);
+      repo.git(['commit', '-m', 'fixture']); repo.git(['push', 'origin', `HEAD:refs/heads/${branch}`]);
+    } else {
+      repo.write(disguised, 'not documentation\n'); repo.publish();
+    }
     repo.git(['checkout', '--detach', repo.tested]);
     assert.throws(repo.assertFresh, /superseded release/);
   } finally { repo.cleanup(); }

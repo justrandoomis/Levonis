@@ -158,7 +158,7 @@ test('the header version is checked before any key is used', () => {
   }
 });
 
-test('keygen: a 0600 private key outside any git checkout, and only the public key on stdout', () => {
+test('keygen: a 0600 private key outside any git checkout, and only the public key on stdout', { skip: process.platform === 'win32' && 'asserts the key file\'s POSIX 0600 mode and a private directory; Windows reports 0o666 whatever the ACL' }, () => {
   const s = scratch();
   try {
     const keys = join(s.dir, 'keys');
@@ -190,7 +190,7 @@ test('keygen: a 0600 private key outside any git checkout, and only the public k
   }
 });
 
-test('the CLIs: seal deletes the plaintext; unseal refuses the wrong key and a tampered file and never overwrites', () => {
+test('the CLIs: seal deletes the plaintext; unseal refuses the wrong key and a tampered file and never overwrites', { skip: process.platform === 'win32' && 'asserts the opened file\'s POSIX 0600 mode; Windows reports 0o666 whatever the ACL' }, () => {
   const s = scratch();
   try {
     const pub = node(SEAL, ['--keygen', join(s.dir, 'keys')]).stdout.trim();

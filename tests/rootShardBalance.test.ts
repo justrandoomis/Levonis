@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { discoverRootTests, planRootShards, readRootTimings, ROOT_TIMINGS_FILE } from '../scripts/test-all.mjs';
 import testFileTimings, { FILE_SECONDS_PREFIX, fileSecondsFromEvent } from '../scripts/test-file-timings.mjs';
 import { main as updateTimings, mergeTimings, parseFileSeconds } from '../scripts/update-test-timings.mjs';
@@ -119,8 +119,9 @@ test('malformed timings are an error; a missing file only costs balance', () => 
 });
 
 test('the timing reporter reports each file once, from node\'s file-level event only', async () => {
-  const cwd = '/work/repo';
-  const file = `${cwd}/tests/a.test.ts`;
+  // Absolute in this platform's form, as node reports it ('/work/repo' on Linux, 'C:\work\repo' on Windows).
+  const cwd = resolve('/work/repo');
+  const file = join(cwd, 'tests/a.test.ts');
   const event = (type: string, data: object) => ({ type, data });
   assert.deepEqual(fileSecondsFromEvent(event('test:complete', { file, name: 'tests/a.test.ts', nesting: 0, details: { duration_ms: 1234.5 } }), cwd), { file: 'tests/a.test.ts', seconds: 1.2345 });
   for (const ignored of [

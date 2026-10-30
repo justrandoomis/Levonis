@@ -24,7 +24,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { OWNER, asD1, freshDb, get, json, post, put, row, stubApp } from './fixtures/app';
 import { OWNER_ROW_SQL, applyRate, fxEnv, market, pairOf } from './fixtures/fx';
@@ -275,7 +275,7 @@ function tsFiles(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) tsFiles(p, out);
-    else if (name.endsWith('.ts')) out.push(relative(ROOT, p));
+    else if (name.endsWith('.ts')) out.push(relative(ROOT, p).split(sep).join('/'));
   }
   return out;
 }

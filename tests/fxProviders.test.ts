@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { ROOT } from './fixtures/d1';
 import { freshDb } from './fixtures/app';
 import { GOOD_KEY, ecbBody, fakeProviders, fxEnv, iqwealthBody, json200, logsOf, pairOf, xml200, applyRate } from './fixtures/fx';
@@ -210,7 +210,7 @@ test('static: iqwealth.ts is the only reader of IRAQ_PARALLEL_FX_API_KEY and alw
     for (const name of readdirSync(dir)) {
       const p = join(dir, name);
       if (statSync(p).isDirectory()) walk(p);
-      else if (/\.(ts|tsx|mjs|js)$/.test(name) && /(\.|\[['"])IRAQ_PARALLEL_FX_API_KEY\b/.test(readFileSync(p, 'utf8'))) readers.push(relative(ROOT, p));
+      else if (/\.(ts|tsx|mjs|js)$/.test(name) && /(\.|\[['"])IRAQ_PARALLEL_FX_API_KEY\b/.test(readFileSync(p, 'utf8'))) readers.push(relative(ROOT, p).split(sep).join('/'));
     }
   };
   for (const d of ['worker', 'src', 'packages', 'services']) walk(join(ROOT, d));

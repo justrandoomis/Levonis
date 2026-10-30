@@ -33,6 +33,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { freshDb, asD1, stubApp, get, patch, json, row, all } from './fixtures/app';
 import { adminRoutes } from '../worker/routes/admin';
@@ -335,7 +336,7 @@ test('a REVOKE is audited with its value — null is a decision, not an absence'
 // the UI contract — no DOM runner here, so it is asserted over the source
 // =========================================================================
 
-const ROOT = new URL('../', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const src = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
 /**

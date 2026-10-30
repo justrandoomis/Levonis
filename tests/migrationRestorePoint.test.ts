@@ -10,6 +10,14 @@ const readWorkflow = (file: string) =>
   readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8');
 const bookmark = '00000001-00000002-00000003-0123456789abcdef0123456789abcdef';
 
+// The workflow step is bash. Windows has none on PATH unless Git Bash is put
+// there, and bash would read a backslash path as escapes, so Windows paths are
+// handed to it with forward slashes. On Linux both are unchanged.
+const shellPath = (path: string) => (process.platform === 'win32' ? path.replaceAll('\\', '/') : path);
+const bashSkip = process.platform === 'win32'
+  && spawnSync('bash', ['-c', 'test -d "$1"', 'bash', shellPath(tmpdir())]).status !== 0
+  && 'needs bash (with access to this machine\'s temp directory) on PATH, not on this Windows machine';
+
 /** Execute the actual workflow shell with a local npx stub. No Cloudflare
  * command runs: only grep, tee and the guards under test touch temporary files. */
 function bookmarkStep(workflow: string): string {
@@ -28,11 +36,11 @@ for (const file of workflows) {
     { name: 'failed command hidden by tee', output: 'Authentication failed', status: 43, success: false },
     { name: 'failed command that printed a bookmark first', output: bookmark, status: 43, success: false },
   ]) {
-    test(`${file}: ${scenario.name} ${scenario.success ? 'permits' : 'blocks'} migration`, () => {
+    test(`${file}: ${scenario.name} ${scenario.success ? 'permits' : 'blocks'} migration`, { skip: bashSkip }, () => {
       const dir = mkdtempSync(join(tmpdir(), 'levonis-restore-test-'));
       try {
         const outputFile = join(dir, 'github-output');
-        const script = bookmarkStep(readWorkflow(file)).replaceAll('/tmp/tt.txt', join(dir, 'tt.txt'));
+        const script = bookmarkStep(readWorkflow(file)).replaceAll('/tmp/tt.txt', shellPath(join(dir, 'tt.txt')));
         const result = spawnSync('bash', ['-c', `
 npx() {
   [ "$*" = 'wrangler d1 time-travel info levonis-db-staging' ] || return 99

@@ -10,13 +10,20 @@
  * Type-only imports disappear in transpilation, so only real value imports
  * are followed.
  */
+import { rmSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
 const appDir = fileURLToPath(new URL("../../app/", import.meta.url));
-const outDir = fileURLToPath(new URL("../../node_modules/.levo-test-build/", import.meta.url));
+// One directory per test process: `node --test` runs files in parallel, and a
+// shared one let a file import a module another process was half-way through
+// rewriting ("does not provide an export named …"). Removed when it exits.
+const outDir = fileURLToPath(new URL(`../../node_modules/.levo-test-build/${process.pid}/`, import.meta.url));
+process.on("exit", () => {
+  try { rmSync(outDir, { recursive: true, force: true }); } catch { /* best effort */ }
+});
 
 const built = new Set();
 

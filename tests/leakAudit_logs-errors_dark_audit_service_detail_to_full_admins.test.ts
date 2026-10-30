@@ -47,7 +47,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import type { EventEnvelope } from '@levonis/contracts/envelope';
 import type { HopEnvelope } from '@levonis/contracts/rpc/common';
@@ -488,7 +488,7 @@ test('no deployed producer calls the Audit record() path or fills audit_events.d
       const p = join(dir, name);
       if (statSync(p).isDirectory()) walk(p);
       else if (/\.(ts|tsx|js|mjs)$/.test(name) && !/\.test\./.test(name)) {
-        const rel = p.slice(ROOT.length + 1);
+        const rel = p.slice(ROOT.length + 1).split(sep).join('/');
         const src = readFileSync(p, 'utf8');
         if (/\bAUDIT\??\.record\s*\(/.test(src)) offenders.push(`${rel}: AUDIT.record(`);
         if (rel !== 'services/audit/src/index.ts' && rel !== 'services/audit/src/consumer.ts' && /\bdirectEntryStatements\s*\(/.test(src)) offenders.push(`${rel}: directEntryStatements(`);

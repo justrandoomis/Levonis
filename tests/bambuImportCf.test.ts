@@ -30,7 +30,8 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { freshDb } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
@@ -131,6 +132,22 @@ if (/^\\s*SELECT\\b/i.test(sql)) {
 db.close();
 `;
 
+// Windows only: cf.mjs's spawnSync('npx', …) uses no shell, so it finds only an
+// npx.exe or npx.com on PATH and can start neither the #! stand-in above nor an
+// npx.cmd wrapper (Node refuses .cmd without a shell, CVE-2024-27980). This
+// preload (the pattern of tests/remoteMigrationApply.test.ts) hands exactly those
+// calls, arguments and options unchanged, to the stand-in. Linux runs cf.mjs
+// without it, through PATH, as before.
+const windowsPreload = (shimPath: string) => `
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
+const spawnSync = childProcess.spawnSync;
+childProcess.spawnSync = (file, args, options) => file === 'npx'
+  ? spawnSync(process.execPath, [${JSON.stringify(shimPath)}, ...args], options)
+  : spawnSync(file, args, options);
+syncBuiltinESMExports();
+`;
+
 type Call = { args: string[]; config: { d1_databases?: Array<{ database_id: string; database_name: string; binding: string }> } | null; env: Record<string, string | null> };
 
 let template: string | null = null;
@@ -153,6 +170,8 @@ function fixture(seed = SEED) {
   const dir = mkdtempSync(join(tmpdir(), 'levonis-cf-test-'));
   for (const sub of ['bin', 'tmp']) mkdirSync(join(dir, sub));
   writeFileSync(join(dir, 'bin', 'npx'), SHIM, { mode: 0o755 });
+  const nodeOptions = process.platform === 'win32' ? ['--import', pathToFileURL(join(dir, 'bin', 'windows-npx.mjs')).href] : [];
+  if (nodeOptions.length) writeFileSync(join(dir, 'bin', 'windows-npx.mjs'), windowsPreload(join(dir, 'bin', 'npx')));
   const db = join(dir, 'remote.sqlite');
   copyFileSync(templateDb(), db);
   if (seed) {
@@ -170,15 +189,17 @@ function fixture(seed = SEED) {
     out: join(dir, 'out'),
     summary,
     run: (args: string[], env: Record<string, string> = {}) =>
-      spawnSync(process.execPath, [CF, ...args], {
+      spawnSync(process.execPath, [...nodeOptions, CF, ...args], {
         cwd: dir,
         encoding: 'utf8',
         timeout: 120_000,
         env: {
-          PATH: `${join(dir, 'bin')}:${process.env.PATH}`,
+          PATH: `${join(dir, 'bin')}${delimiter}${process.env.PATH}`,
           HOME: dir,
           NODE_OPTIONS: process.env.NODE_OPTIONS ?? '',
           TMPDIR: join(dir, 'tmp'),
+          // os.tmpdir() reads TEMP on Windows, TMPDIR elsewhere.
+          ...(process.platform === 'win32' ? { TEMP: join(dir, 'tmp'), TMP: join(dir, 'tmp') } : {}),
           MOCK_DB: db,
           MOCK_CALLS: callsFile,
           MOCK_UUID: UUID,
@@ -518,7 +539,7 @@ test('preflight: a migration count that differs and a CSV import lease each refu
   }
 });
 
-test('open: a new run row with only the token hash; the token in a 0600 file; never in the log', () => {
+test('open: a new run row with only the token hash; the token in a 0600 file; never in the log', { skip: process.platform === 'win32' && 'asserts the token file\'s POSIX 0600 mode; Windows reports 0o666 whatever the ACL' }, () => {
   const f = fixture();
   try {
     const data = dataDir(f.dir);

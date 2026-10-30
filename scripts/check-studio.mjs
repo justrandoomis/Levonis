@@ -26,7 +26,9 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STUDIO = join(ROOT, 'studio');
-const TSC = join(STUDIO, 'node_modules', '.bin', 'tsc');
+// TypeScript's own entry, run with this Node: node_modules/.bin/tsc is a shell
+// script that execFileSync cannot start on Windows (there it is tsc.cmd).
+const TSC = join(STUDIO, 'node_modules', 'typescript', 'bin', 'tsc');
 
 if (!existsSync(TSC)) {
   console.error(
@@ -39,7 +41,7 @@ if (!existsSync(TSC)) {
 }
 
 try {
-  execFileSync(TSC, ['--noEmit'], { cwd: STUDIO, stdio: 'inherit' });
+  execFileSync(process.execPath, [TSC, '--noEmit'], { cwd: STUDIO, stdio: 'inherit' });
   console.log('check-studio: studio/ typechecks clean');
 } catch {
   console.error('check-studio: the Studio workspace does not typecheck (see above)');

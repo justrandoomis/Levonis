@@ -10,7 +10,12 @@ import { asD1, freshDb } from './fixtures/app';
 import { changeWithdrawalState, participantOverview, payWithdrawal, requestWithdrawal } from '../worker/lib/financeParticipants';
 import type { Env } from '../worker/lib/types';
 
-test('earnings, withdrawal reservations and payouts fit the D1 expression-depth limit', async () => {
+// The depth limit is set through Python's sqlite3 (node:sqlite cannot). Windows
+// often has no python3, only the Microsoft Store stub (exit 9009).
+const pythonSkip = process.platform === 'win32' && spawnSync('python3', ['--version']).status !== 0
+  && 'needs python3, not on this Windows machine';
+
+test('earnings, withdrawal reservations and payouts fit the D1 expression-depth limit', { skip: pythonSkip }, async () => {
   const raw = freshDb();
   const directory = mkdtempSync(join(tmpdir(), 'levonis-earnings-depth-'));
   try {

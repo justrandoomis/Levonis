@@ -80,7 +80,7 @@ test('match candidates: the §E.1 signals; names are evidence only; a slug only 
   assert.equal(src.signals.bambu_image_sources, 1, 'an image taken from Bambu\'s CDN is a signal');
 });
 
-test('match candidates: sandbox only — refused in Actions, refused inside a checkout, never over a file, 0600', () => {
+test('match candidates: sandbox only — refused in Actions, refused inside a checkout, never over a file, 0600', { skip: process.platform === 'win32' && 'asserts the output file\'s POSIX 0600 mode; Windows reports 0o666 whatever the ACL' }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'levonis-candidates-'));
   const logs: string[] = [];
   const log = (s: string) => logs.push(s);

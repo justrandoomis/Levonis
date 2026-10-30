@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Check, Sparkles } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
-import { emailSuggestions } from './emailSuggestions';
+import { emailSuggestions } from './emailDomainSuggestions';
 import './emailSuggestions.css';
 
 export default function EmailSuggestions({ value, onChange, inputId, disabled }: { value: string; onChange: (v: string) => void; inputId: string; disabled?: boolean }) {

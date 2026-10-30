@@ -12,7 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { ROOT } from './fixtures/d1';
 import {
   D1_LIKE_PATTERN_MAX_BYTES,
@@ -95,9 +95,11 @@ test('no route builds a LIKE pattern by hand any more', () => {
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir)) {
       const p = join(dir, entry);
+      // Forward slashes, so the checks below read the same on Windows.
+      const rel = relative(ROOT, p).split(sep).join('/');
       if (statSync(p).isDirectory()) walk(p);
       // The helper itself names the shapes it replaces, in its own note.
-      else if (entry.endsWith('.ts') && !p.endsWith('/lib/sqlLike.ts')) {
+      else if (entry.endsWith('.ts') && !rel.endsWith('/lib/sqlLike.ts')) {
         const src = readFileSync(p, 'utf8');
         const code = src
           .split('\n')
@@ -106,7 +108,7 @@ test('no route builds a LIKE pattern by hand any more', () => {
         // `'%' + term + '%'` and `` `%${term}%` `` in TypeScript, and
         // `'%' || ? || '%'` built inside SQL.
         if (/`%\$\{/.test(code) || /'%'\s*\+/.test(code) || /LIKE\s*'%'\s*\|\|/.test(code)) {
-          offenders.push(p.replace(`${ROOT}/`, ''));
+          offenders.push(rel);
         }
       }
     }

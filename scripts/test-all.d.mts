@@ -20,10 +20,14 @@ export function discoverRootTests(root?: string): string[];
 export function readRootTimings(root?: string): RootTimings;
 export function planRootShards(files: string[], total: number, timings?: RootTimings): RootShardPlan[];
 export function selectRootShard(files: string[], shard: TestOptions['shard'], timings?: RootTimings): string[];
+export const WINDOWS_COMMAND_LINE_BUDGET: number;
+export function splitTestArgs(prefix: string[], files: string[], budget: number, command?: string): string[][];
 export function runTestSuites(argv: string[], options?: {
   root?: string;
   env?: NodeJS.ProcessEnv;
   spawn?: (command: string, args: string[], options: SpawnSyncOptions) => Pick<SpawnSyncReturns<Buffer>, 'status'> & Partial<Pick<SpawnSyncReturns<Buffer>, 'signal' | 'error'>>;
   log?: (message: string) => void;
   error?: (message: string) => void;
+  /** Longest command line one test process may take; unlimited except on Windows. */
+  commandLineBudget?: number;
 }): number;

@@ -19,7 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { ROOT } from './fixtures/d1';
 import { MEDIA, PRINTER_HOUR_IQD, STORE_NAME } from './fixtures/storeLayout';
 import { attributeValues, fixtureData, fixtureStore, renderStore, visibleText } from './fixtures/storefrontRender';
@@ -40,7 +40,7 @@ function filesUnder(rel: string): string[] {
     for (const f of readdirSync(abs)) {
       const p = join(abs, f);
       if (statSync(p).isDirectory()) walk(p);
-      else if (/\.(ts|tsx)$/.test(f)) out.push(relative(ROOT, p));
+      else if (/\.(ts|tsx)$/.test(f)) out.push(relative(ROOT, p).split(sep).join('/'));
     }
   };
   walk(join(ROOT, rel));
