@@ -33,6 +33,7 @@ import {
 import { requireAuth, badRequest, conflict, notFound, int, str, oneOf, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
+import { queueMetaAddToCart } from '../lib/metaCapi';
 import { AddToCartV1 } from '@levonis/contracts/events/v1/AddToCart';
 import { getSetting, getSettings } from '../lib/settings';
 import { resolveDeliveryGroup, type DeliveryPolicy, type DeliveryRuleGroup } from '../lib/storeDelivery';
@@ -1767,6 +1768,8 @@ async function addCompositionLine(
   }
 
   const { items, tier: t, tierActive: ta } = await loadCart(c);
+  // A bundle or mystery line carries no options and no colour.
+  queueCartAddForMeta(c, items, [{ productId, canonical: [], colorId: '', qty }]);
   return c.json({ success: true, items, tier: t, tierActive: ta });
 }
 
@@ -2447,9 +2450,37 @@ cartRoutes.post('/items', async (c) => {
   if (eventsEnabled(c.env)) {
     await emitAddToCart(c, items, productId, canonical, canonicalJson, colorId, qty);
   }
+  queueCartAddForMeta(c, items, [{ productId, canonical, colorId, qty }]);
 
   return c.json({ success: true, items, tier: t, tierActive: ta });
 });
+
+/**
+ * Meta Conversions API: one AddToCart for what this request added, at the
+ * dollar unit price the cart just resolved (the same line `emitAddToCart` reads).
+ * Main site only; nothing waits on it (worker/lib/metaCapi.ts).
+ */
+function queueCartAddForMeta(
+  c: Context<AppContext>,
+  items: Array<Record<string, unknown>>,
+  adds: Array<{ productId: string; canonical: string[]; colorId: string; qty: number }>
+): void {
+  const user = c.get('user');
+  if (!user) return;
+  const lines = adds.map((a) => {
+    const line = items.find(
+      (it) =>
+        String(it.productId) === a.productId &&
+        String(it.kind ?? '') !== 'gift' &&
+        sameOptionValueIds(Array.isArray(it.option_value_ids) ? (it.option_value_ids as string[]) : [], a.canonical) &&
+        String(it.color_id ?? '') === a.colorId
+    );
+    // The shop's own dollar price for the line (DECISIONS row 248); none on a line the cart cannot price in dollars.
+    const cents = Number(line?.unit_price_usd_cents);
+    return { product_id: a.productId, qty: a.qty, unit_usd_cents: line && Number.isInteger(cents) && cents >= 0 ? cents : null };
+  });
+  queueMetaAddToCart(c, user, lines);
+}
 
 /** One `AddToCart` event for one added line (best effort; see the single door). */
 async function emitAddToCart(
@@ -2765,6 +2796,7 @@ cartRoutes.post('/items/batch', async (c) => {
       await emitAddToCart(c, items, productId, j.canonical, j.canonicalJson, lines[i].colorId, lines[i].qty);
     }
   }
+  queueCartAddForMeta(c, items, judged.map((j, i) => ({ productId, canonical: j.canonical, colorId: lines[i].colorId, qty: lines[i].qty })));
 
   return c.json({ success: true, items, tier: t, tierActive: ta, added });
 });

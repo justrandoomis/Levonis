@@ -77,6 +77,20 @@ export interface Env {
    */
   WASENDER_API_KEY?: string;
   /**
+   * Meta Conversions API (worker/lib/metaCapi.ts): the access token generated in
+   * Events Manager for dataset 906446185408755. A dashboard SECRET on the live
+   * Worker (`wrangler secret put META_CAPI_ACCESS_TOKEN --env staging`); sent only
+   * in the POST body to graph.facebook.com, never logged, stored or returned.
+   * Without it no server event leaves.
+   */
+  META_CAPI_ACCESS_TOKEN?: string;
+  /**
+   * Optional: an Events Manager "Test events" code. While set, Meta shows the
+   * server events in its Test events tab and keeps them out of the dataset's
+   * reporting — set it to check the integration, then delete it.
+   */
+  META_CAPI_TEST_EVENT_CODE?: string;
+  /**
    * LEGACY FALLBACK (0080). The single chat the customer bot posted admin
    * notifications into before the admin bot existed. It is still honoured when
    * no admin group has been bound, so nothing goes dark mid-migration — but the

@@ -770,26 +770,41 @@ test('a direct-sale price MAY carry the Direct Sale Extra — purchase 4.10, 6.3
 });
 
 /**
- * THE META PIXEL IS DISCLOSED, NOT DENIED — privacy 4 and faq 6 (owner,
- * 2026-10-31). The main site loads Meta's pixel (src/lib/metaPixel.ts,
- * src/components/MetaPixel.tsx); version 3 of the privacy policy and faq 5
+ * META IS DISCLOSED, NOT DENIED — privacy 4 and faq 6 (owner, 2026-10-31).
+ * The main site loads Meta's pixel (src/lib/metaPixel.ts,
+ * src/components/MetaPixel.tsx), and the Store's server sends Meta events
+ * through the Conversions API with a signed-in customer's email and phone
+ * hashed (tests/metaCapi.test.ts); version 3 of the privacy policy and faq 5
  * said there was no advertising network, no marketing cookie and no sharing
  * for advertising. This pins what the code does to the words a customer
- * accepts: where it runs, the one event, what Meta receives, the two cookies,
- * Meta's role — and that no banner and no on-site switch are promised.
+ * accepts: where the pixel runs and its one event, the five server events,
+ * what Meta receives from each channel, the hashing, the two cookies, Meta's
+ * role — that no banner and no on-site switch are promised, and that the
+ * browser is NOT described as a way to stop the server events.
  */
-test('privacy 7.5–7.7, 12.6 and 12.10 describe the Meta Pixel in every language, and no line still denies it', () => {
+test('privacy 7.5–7.9, 12.6 and 12.10 describe the Meta Pixel and the server events in every language, and no line still denies them', () => {
   const privacy = published('privacy');
   for (const lang of POLICY_LANGS) {
     const body = privacy.body[lang];
-    for (const n of ['4.7', '7.5', '7.6', '7.7', '7.8', '7.9', '12.6', '12.10']) articleOf(body, n);
-    // The names a reader can check against their own browser are the same in every language.
-    for (const token of ['levonis-iq.com', 'ali3d.levonis-iq.com', 'Print Cloud', 'Meta Platforms', 'PageView', '_fbp', '_fbc', 'fbclid', '90']) {
+    for (const n of ['4.7', '7.5', '7.6', '7.7', '7.8', '7.9', '7.10', '7.11', '12.6', '12.10']) articleOf(body, n);
+    // The names a reader can check against their own browser, or against
+    // Meta's own documentation, are the same in every language.
+    for (const token of [
+      'levonis-iq.com', 'ali3d.levonis-iq.com', 'Print Cloud', 'Meta Platforms', 'Conversions API', 'SHA-256', 'user agent',
+      'PageView', 'ViewContent', 'AddToCart', 'InitiateCheckout', 'Purchase', '_fbp', '_fbc', 'fbclid', '90',
+    ]) {
       assert.ok(body.includes(token), `privacy/${lang} does not name «${token}»`);
     }
-    for (const n of ['7.5', '7.6', '7.7', '12.6', '12.10']) {
+    for (const n of ['7.5', '7.6', '7.7', '7.8', '7.9', '12.6', '12.10']) {
       assert.ok(articleOf(body, n).includes('Meta'), `privacy ${n}/${lang} does not name Meta`);
     }
+    // The five server events, one bullet each, in 7.7.
+    const events = articleOf(body, '7.7').split('\n').filter((l) => l.startsWith('- '));
+    assert.deepEqual(
+      events.map((l) => /«?"?(PageView|ViewContent|AddToCart|InitiateCheckout|Purchase)"?»?\)/.exec(l)?.[1]),
+      ['PageView', 'ViewContent', 'AddToCart', 'InitiateCheckout', 'Purchase'],
+      `privacy 7.7/${lang}: the server events`
+    );
   }
 
   const en = (n: string) => articleOf(privacy.body.en, n);
@@ -805,34 +820,50 @@ test('privacy 7.5–7.7, 12.6 and 12.10 describe the Meta Pixel in every languag
     assert.doesNotMatch(line[0], TRADE_IN[lang], `privacy 7.5/${lang} lists trade-in as reported`);
   }
   assert.match(en('7.5'), /^- It reports nothing from any other page, including the account, settings, wallet, orders, order tracking, chats, sign-in, administration, the merchant dashboard, warranty and receipt pages, and pages opened by a private link\.$/m);
-  assert.match(en('7.6'), /The only event sent is a page view \("PageView"\)\. Meta's automatic event collection \(button clicks, page metadata\) is switched off, and no advanced matching is used: the site sends Meta no name, email address, phone number or account identifier\./);
+  // The BROWSER sends no contact detail; the server's hashes are the only ones.
+  assert.match(en('7.6'), /The only event the browser sends is a page view \("PageView"\)\. Meta's automatic event collection \(button clicks, page metadata\) is switched off, and the browser sends Meta no name, email address, phone number or account identifier; what the Store's server sends is set out in articles 7\.7 and 7\.8\./);
   assert.match(en('7.6'), /^- The visitor's IP address, as Meta's servers see it\.$/m);
-  assert.match(en('7.7'), /as a separate controller, under its own terms and privacy policy, outside Iraq/);
+  // The server events: main site only, deduplicated page view, USD, no order number, Quick Buy without IP.
+  assert.match(en('7.7'), /only for activity on the main site — never for merchants' store subdomains and never for the Print Cloud application:/);
+  assert.match(en('7.7'), /carrying the same event identifier so that Meta counts it once; from the same pages as article 7\.5\./);
+  assert.match(en('7.7'), /its Purchase is then sent without the IP address, the browser details or a page address\./);
+  assert.match(en('7.7'), /Amounts are sent in US dollars, converted from Iraqi dinars at the Store's official exchange rate — for a purchase, the rate recorded on the order\. The order number is not sent: each event carries an opaque identifier instead — a random value or, for a checkout or a purchase, a one-way hash\./);
+  // What comes with each server event: the page path without the query string, and hashed contact details only.
+  assert.match(en('7.8'), /^- The site address and the page path, without the query string\.$/m);
+  assert.match(en('7.8'), /^- When the customer is signed in: their email address and phone number, hashed with SHA-256 and never sent in clear\. Before hashing, the email is trimmed and lower-cased, and the phone is written as digits with the country code\. The automatic placeholder email address of an account registered by phone alone is never sent\.$/m);
+  assert.match(en('7.8'), /what Meta calls advanced matching\. Of the customer's identity, the server sends only these two hashes: no name and no account identifier\./);
+  assert.match(en('7.9'), /as a separate controller, under its own terms and privacy policy, outside Iraq/);
   assert.match(en('12.6'), /_fbp, a browser identifier kept for up to 90 days and renewed on later visits; and _fbc, the ad click identifier, set when the visitor arrives from a Meta ad link carrying fbclid and kept for up to 90 days/);
-  assert.match(en('12.8'), /Blocking only Meta's script or its cookies does not affect using the store\./);
-  assert.match(en('12.10'), /The site shows no consent banner for the Meta Pixel and its cookies, and has no switch of its own to turn them off\./);
+  // THE HONESTY POINT: the browser stops the pixel, not the server events.
+  assert.match(en('12.7'), /does not stop the server events of article 7\.7\./);
+  assert.match(en('12.8'), /Blocking only Meta's script or its cookies does not affect using the store\. Nor does it stop the events the Store's server sends to Meta \(article 7\.7\): it removes the browser pixel and the _fbp and _fbc values, and nothing more\./);
+  assert.match(en('12.10'), /The site shows no consent banner for the Meta Pixel, its cookies or the Store's server events, and has no switch of its own to turn any of them off\. The browser controls only the pixel and its cookies \(articles 12\.7 and 12\.8\); the server events of article 7\.7 are sent whatever the browser blocks\./);
+  assert.match(articleOf(privacy.body.ar, '12.10'), /أحداث الخادم في المادة 7\.7 فتُرسَل مهما منع المتصفح/);
+  assert.match(articleOf(privacy.body.ckb, '12.10'), /ڕووداوەکانی ڕاژە[^\n]*دەنێردرێن، هەر شتێک وێبگەڕ ڕێگری لێ بکات/);
 
-  // What version 3 said and the pixel makes false is gone, in every language.
+  // What version 3 said and Meta makes false is gone, in every language —
+  // and so is the earlier draft's "no advanced matching", now untrue.
   const DENIED: Record<(typeof POLICY_LANGS)[number], RegExp[]> = {
-    ar: [/^لا توجد شبكة إعلانات/m, /لا تتبع إعلاني/, /دون تتبع إعلاني/, /ولا يشاركها لغرض إعلاني/, /ولا للتتبع عبر مواقع أخرى/, /تمنع تنفيذ أي شيفرة لم يقدّمها المتجر/],
-    en: [/^There is no advertising network/m, /no advertising tracking/i, /no cross-site tracking cookie/, /share customer data for advertising purposes/, /prevents execution of any code the Store did not itself supply/],
-    ckb: [/^هیچ تۆڕێکی ڕیکلام/m, /بەدواداچوونی ڕیکلامی نییە/, /بەبێ شوێنکەوتنی ڕیکلامی/, /بەدواداچوونی نێوان ماڵپەڕەکان/, /بۆ مەبەستی ڕیکلامی هاوبەشی ناکات/],
+    ar: [/^لا توجد شبكة إعلانات/m, /لا تتبع إعلاني/, /دون تتبع إعلاني/, /ولا يشاركها لغرض إعلاني/, /ولا للتتبع عبر مواقع أخرى/, /تمنع تنفيذ أي شيفرة لم يقدّمها المتجر/, /ولا تُستعمل المطابقة المتقدمة/, /لا يرسل الموقع إلى Meta/],
+    en: [/^There is no advertising network/m, /no advertising tracking/i, /no cross-site tracking cookie/, /share customer data for advertising purposes/, /prevents execution of any code the Store did not itself supply/, /no advanced matching/i, /the site sends Meta no/],
+    ckb: [/^هیچ تۆڕێکی ڕیکلام/m, /بەدواداچوونی ڕیکلامی نییە/, /بەبێ شوێنکەوتنی ڕیکلامی/, /بەدواداچوونی نێوان ماڵپەڕەکان/, /بۆ مەبەستی ڕیکلامی هاوبەشی ناکات/, /هاوتاکردنی پێشکەوتوو بەکار ناهێنرێت/, /ماڵپەڕەکە هیچ ناو/],
   };
   for (const lang of POLICY_LANGS) {
     for (const re of DENIED[lang]) assert.doesNotMatch(privacy.body[lang], re, `privacy/${lang} still says ${re}`);
   }
-  // The absences that remain are scoped to everything BUT the pixel.
-  assert.match(en('7.8'), /^Apart from the Meta Pixel of articles 7\.5 to 7\.7, there is no advertising network/m);
+  // The absences that remain are scoped to everything BUT Meta.
+  assert.match(en('7.10'), /^Apart from Meta's pixel and server events of articles 7\.5 to 7\.9, there is no advertising network/m);
 
   // Real Sorani: its own words, never the Arabic pasted across.
-  for (const n of ['4.7', '7.5', '7.6', '7.7', '12.6', '12.10']) {
+  for (const n of ['4.7', '7.5', '7.6', '7.7', '7.8', '7.9', '12.6', '12.8', '12.10']) {
     assert.notEqual(articleOf(privacy.body.ckb, n), articleOf(privacy.body.ar, n), `privacy ${n}: the ckb is the ar`);
     assert.match(articleOf(privacy.body.ckb, n), /[ێۆڕەڵ]/, `privacy ${n}/ckb is not Sorani`);
   }
 
-  // faq 9.4 routes to the policy and no longer says there is no advertising network.
+  // faq 9.4 routes to the policy, names both channels and no longer says there is no advertising network.
   const faq = published('faq');
-  assert.match(articleOf(faq.body.en, '9.4'), /the Meta Pixel[^\n]*there is no other advertising network and no other third-party analytics tool/);
-  assert.match(articleOf(faq.body.ar, '9.4'), /بكسل Meta/);
-  assert.match(articleOf(faq.body.ckb, '9.4'), /پیکسڵی Meta/);
+  assert.match(articleOf(faq.body.en, '9.4'), /the Meta Pixel[^\n]*the Store's server sends Meta[^\n]*hashed, never in clear\. There is no other advertising network and no other third-party analytics tool/);
+  assert.match(articleOf(faq.body.ar, '9.4'), /بكسل Meta[^\n]*خادم المتجر[^\n]*مجزَّأين/);
+  assert.match(articleOf(faq.body.ckb, '9.4'), /پیکسڵی Meta[^\n]*ڕاژەی فرۆشگا[^\n]*هاشکراوی/);
+  assert.notEqual(articleOf(faq.body.ckb, '9.4'), articleOf(faq.body.ar, '9.4'));
 });

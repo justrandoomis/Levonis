@@ -133,6 +133,7 @@ import {
   type OrderType,
 } from '../lib/inventory';
 import { dailyUserHash, emitFromRequest, eventsEnabled, outboxStatement, pumpAfter, waitUntilFrom } from '../lib/eventBus';
+import { queueMetaInitiateCheckout, queueMetaPurchase } from '../lib/metaCapi';
 import { serverMessage } from '@levonis/contracts/costRefusals';
 import { CheckoutStartedV1 } from '@levonis/contracts/events/v1/CheckoutStarted';
 import { OrderCreatedV1 } from '@levonis/contracts/events/v1/OrderCreated';
@@ -4323,6 +4324,8 @@ orderRoutes.post('/quote', async (c) => {
    * but reports everything is supposed to do.
    */
   if (comp.requiredAdvance > comp.walletApplied) blockers.push('ADVANCE_NOT_COVERED');
+  // Meta Conversions API: InitiateCheckout, once per customer, cart and day, after the response.
+  queueMetaInitiateCheckout(c, user, comp);
 
   return c.json({
     success: true,
@@ -5525,6 +5528,8 @@ export async function placeOrder(
   // Telegram, on whichever of the three can reach them. Until this line the
   // only party told an order existed was the admin group below.
   c.executionCtx.waitUntil(notifyOrderPlaced(c.env, orderId));
+  // Meta Conversions API: the Purchase, main site (and Quick Buy) only, after the response.
+  queueMetaPurchase(c, user, { id: orderId, totalIqd: comp.totalIqd, exchangeRate: comp.exchangeRate, lines: comp.lines }, { quickBuy: !!quickBuy });
   /**
    * THE GROUP HEARS ABOUT IT IN THE QUEUE THE ORDER ACTUALLY BELONGS TO.
    *

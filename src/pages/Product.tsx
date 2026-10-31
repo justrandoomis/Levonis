@@ -1395,6 +1395,8 @@ export default function Product() {
           return;
         }
         setProduct(data.product);
+        // Meta Conversions API: ViewContent, by the server, main site only (src/lib/metaPixel.ts, a lazy chunk).
+        void import('../lib/metaPixel').then((m) => m.reportMetaViewContent(String(data.product.id))).catch(() => {});
         /**
          * Remember this view in THIS BROWSER, for the «مختارات لك» tile on the
          * home page. Nothing is sent anywhere: the list lives in localStorage,

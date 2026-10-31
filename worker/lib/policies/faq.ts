@@ -67,8 +67,9 @@ import type { PolicyDocument } from './types';
  * VERSION 6 — WHY IT MOVED (owner, 2026-10-31). The archive keeps version 5
  * byte for byte. 9.4 answered "Do you sell my data?" with "there is no
  * advertising network and no third-party analytics tool inside the pages".
- * The main site now carries the Meta Pixel (privacy 4, articles 7.5–7.7), so
- * 9.4 names it and keeps the rest as "no other". Wording only; the FAQ is
+ * The main site now carries the Meta Pixel and the Store's server sends Meta
+ * events with hashed email and phone (privacy 4, articles 7.5–7.9), so 9.4
+ * names both and keeps the rest as "no other". Wording only; the FAQ is
  * not a consent document, so nobody is asked to accept anything for it.
  */
 export const faq: PolicyDocument = {
@@ -232,7 +233,7 @@ PRO ×2، ومن سواه ×1. ويُحسب لحظة قيد النقاط، لا 
 لأن الحذف يمر بإغلاق الطلبات القائمة وتسوية الأرصدة وحفظ ما يلزم قانوناً. فهو طلب يعالجه إنسان لا زر. انظر سياسة الخصوصية.
 
 ### 9.4 هل تبيعون بياناتي؟
-لا. لكن في الموقع الرئيسي أداة إعلانية واحدة، بكسل Meta، تُبلِّغ Meta بمشاهدات صفحاته العامة لأجل إعلانات المتجر على فيسبوك وإنستغرام؛ ولا توجد شبكة إعلانات غيرها ولا أداة تحليلات أخرى من طرف ثالث داخل الصفحات. انظر سياسة الخصوصية.
+لا. لكن المتجر يشارك بيانات مع Meta لأجل إعلاناته على فيسبوك وإنستغرام: يُبلِّغ بكسل Meta بمشاهدات الصفحات العامة في الموقع الرئيسي، ويرسل خادم المتجر إلى Meta مشاهدات المنتجات والإضافات إلى السلة وبدء إتمام الطلب والمشتريات في الموقع الرئيسي، مع البريد الإلكتروني ورقم الهاتف للزبون المسجِّل دخوله مجزَّأين، لا نصاً صريحاً أبداً. ولا توجد شبكة إعلانات غيرها ولا أداة تحليلات أخرى من طرف ثالث داخل الصفحات. انظر سياسة الخصوصية.
 
 ### 9.5 هل تُرسَل هويتي إلى جهة خارجية؟
 لا. ولا يوجد تعرّف على الوجه ولا استعلام من قاعدة بيانات حكومية. القرار قرار موظف مخوّل يُسجَّل باسمه.
@@ -455,7 +456,7 @@ Yes, for a legitimate need. The encryption here is server-side with keys the Sto
 Because deletion passes through closing open orders, settling balances and retaining what the law requires. It is therefore a request handled by a person, not a button. See the Privacy Policy.
 
 ### 9.4 Do you sell my data?
-No. The main site does carry one advertising tool, the Meta Pixel, which reports views of its public pages to Meta for the Store's advertising on Facebook and Instagram; there is no other advertising network and no other third-party analytics tool inside the pages. See the Privacy Policy.
+No. But the Store does share data with Meta for its advertising on Facebook and Instagram: the Meta Pixel reports views of the main site's public pages, and the Store's server sends Meta product views, cart additions, checkouts and purchases on the main site, with a signed-in customer's email and phone hashed, never in clear. There is no other advertising network and no other third-party analytics tool inside the pages. See the Privacy Policy.
 
 ### 9.5 Is my identity sent to an outside party?
 No. There is no face recognition and no government-database query. The decision is made by an authorised staff member and recorded in their name.
@@ -678,7 +679,7 @@ PRO بە شێوەیەکی کاتی ڕاگیراوە — بەم زووانە، س
 چونکە سڕینەوە بە داخستنی داواکارییە کراوەکان و یەکلاییکردنەوەی باڵانسەکان و پاراستنی ئەوەی یاسا داوای دەکات تێدەپەڕێت. بۆیە داواکارییەکە کە مرۆڤێک مامەڵەی لەگەڵ دەکات، نەک دوگمە. بڕوانە سیاسەتی تایبەتمەندێتی.
 
 ### 9.4 داتاکەم دەفرۆشن؟
-نەخێر. بەڵام ماڵپەڕی سەرەکی یەک ئامرازی ڕیکلامی هەیە، پیکسڵی Meta، کە بینینی پەڕە گشتییەکانی بۆ Meta ڕاپۆرت دەکات لە پێناو ڕیکلامەکانی فرۆشگا لە فەیسبووک و ئینستاگرام؛ هیچ تۆڕێکی ڕیکلامی تر و هیچ ئامرازێکی شیکاری تری لایەنی سێیەم لە ناو لاپەڕەکاندا نییە. بڕوانە سیاسەتی تایبەتمەندێتی.
+نەخێر. بەڵام فرۆشگا لە پێناو ڕیکلامەکانی لە فەیسبووک و ئینستاگرام داتا لەگەڵ Meta هاوبەش دەکات: پیکسڵی Meta بینینی پەڕە گشتییەکانی ماڵپەڕی سەرەکی ڕاپۆرت دەکات، و ڕاژەی فرۆشگا بینینی بەرهەم و زیادکردن بۆ سەبەتە و دەستپێکردنی پارەدان و کڕینەکانی ماڵپەڕی سەرەکی بۆ Meta دەنێرێت، لەگەڵ ئیمەیڵ و ژمارەی مۆبایلی ئەو کڕیارەی چووەتە ناو هەژمارەکەی بە هاشکراوی، هەرگیز بە دەقی ڕوون نا. هیچ تۆڕێکی ڕیکلامی تر و هیچ ئامرازێکی شیکاری تری لایەنی سێیەم لە ناو لاپەڕەکاندا نییە. بڕوانە سیاسەتی تایبەتمەندێتی.
 
 ### 9.5 ناسنامەم بۆ لایەنێکی دەرەکی دەنێردرێت؟
 نەخێر. هیچ ناسینەوەی ڕوخسار و هیچ پرسیارێکی بنکەدراوەی حکومی نییە. بڕیارەکە لەلایەن کارمەندێکی مۆڵەتپێدراوەوە دەدرێت و بە ناوی ئەو تۆمار دەکرێت.

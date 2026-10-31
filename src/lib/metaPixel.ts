@@ -118,6 +118,39 @@ export function startMetaPixel(): void {
 }
 
 /**
+ * THE SERVER'S COPY (Meta Conversions API, worker/routes/metaEvents.ts). The
+ * same event id goes to the pixel and to the server, so Meta keeps one of the
+ * two; the server adds what a browser script cannot be trusted with. A
+ * beacon: nothing waits for it, and a failure is silent.
+ */
+export const META_EVENTS_PATH = '/api/meta-events';
+
+function newEventId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID().replace(/-/g, '');
+  } catch {
+    // an insecure context has no randomUUID
+  }
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function toServer(event: { event: 'PageView' | 'ViewContent'; id: string; path: string; product?: string }): void {
+  try {
+    const body = JSON.stringify(event);
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      if (navigator.sendBeacon(META_EVENTS_PATH, new Blob([body], { type: 'text/plain' }))) return;
+    }
+    if (typeof fetch === 'function') {
+      void fetch(META_EVENTS_PATH, { method: 'POST', body, keepalive: true, credentials: 'same-origin', headers: { 'Content-Type': 'text/plain' } }).catch(() => {});
+    }
+  } catch {
+    // a beacon that cannot leave is not worth an error
+  }
+}
+
+const currentPath = (): string => (typeof window === 'undefined' ? '' : window.location.pathname);
+
+/**
  * `trackSingle`, NOT `track`: with `disablePushState` set, fbevents accepts
  * ONE `track('PageView')` per document load and silently drops the rest — so
  * every page opened inside the app after the first went unreported (measured
@@ -125,5 +158,32 @@ export function startMetaPixel(): void {
  * `trackSingle` addresses this pixel by id and is not deduplicated that way.
  */
 export function trackMetaPageView(): void {
-  (window as PixelWindow).fbq?.('trackSingle', META_PIXEL_ID, 'PageView');
+  const fbq = (window as PixelWindow).fbq;
+  if (!fbq) return;
+  const id = newEventId();
+  fbq('trackSingle', META_PIXEL_ID, 'PageView', {}, { eventID: id });
+  toServer({ event: 'PageView', id, path: currentPath() });
+}
+
+/**
+ * THE ONE DOOR src/components/MetaPixel.tsx OPENS, on the main site only, for
+ * each page the router opens: a page that is not reported starts nothing, and
+ * a page the browser already left — a guard's redirect (/cart → /auth for a
+ * guest) ran first — is not reported under the address Meta would read.
+ */
+export function reportMetaPage(pathname: string): void {
+  if (!isMetaPixelPath(pathname) || currentPath() !== pathname) return;
+  startMetaPixel();
+  trackMetaPageView();
+}
+
+/**
+ * A product page was opened: reported to the SERVER only, which sends Meta a
+ * ViewContent with the product's id (the browser pixel sends PageView alone).
+ * Nothing before the pixel started — i.e. off the main site — and nothing from
+ * a page that is not reported.
+ */
+export function reportMetaViewContent(productId: string): void {
+  if (!started || !productId || !isMetaPixelPath(currentPath())) return;
+  toServer({ event: 'ViewContent', id: newEventId(), path: currentPath(), product: productId });
 }

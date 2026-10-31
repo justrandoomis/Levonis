@@ -139,6 +139,8 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/admin/security': 'ADMIN',
   // DECISIONS row 270: the Creative Studio is served by the core (worker/routes/adminCreativeStudio.ts) under the generic admin row.
   '/api/admin/creative-studio': 'CORE',
+  // DECISIONS row 277: the Meta Conversions API beacon, served by the core (worker/routes/metaEvents.ts).
+  '/api/meta-events': 'CORE',
 };
 
 /**

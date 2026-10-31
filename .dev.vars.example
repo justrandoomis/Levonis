@@ -36,6 +36,14 @@ CREATIVE_STUDIO_ENC_KEY=
 # it is a dashboard SECRET that no workflow puts or deletes.
 SECURITY_CANARY_KEY=
 
+# Optional: Meta Conversions API (worker/lib/metaCapi.ts) — the server half of
+# the Meta Pixel. Without the token no server event is sent. Locally, set
+# META_CAPI_TEST_EVENT_CODE too (Events Manager → Test events) so test traffic
+# stays out of the shop's reporting. Never commit a real value; on the live
+# Worker the token is a dashboard SECRET.
+# META_CAPI_ACCESS_TOKEN=
+# META_CAPI_TEST_EVENT_CODE=
+
 # Levonis Print Cloud (docs/PRINT_CLOUD.md §13.1). All optional.
 # DEVELOPMENT ONLY: 'on' lets a customer pay their own order from the API
 # (POST /api/print-cloud/v1/orders/:id/dev-pay). Never set it on a deployed Worker.

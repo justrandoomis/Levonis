@@ -130,6 +130,7 @@ export const ROUTES: readonly RouteRule[] = [
   // the main host only, and it stays with the core (the import writes core tables
   // under the 0195 guard triggers and is retired when its run closes).
   { prefix: '/api/ops/catalog-import', hosts: 'main', owner: 'CORE', flipPhase: null, requires: 'none', rateClass: 'webhook', note: 'import token checked by the core; a uniform 404 otherwise' },
+  { prefix: '/api/meta-events', hosts: 'main', owner: 'CORE', flipPhase: null, requires: 'none', rateClass: 'public-read', methods: ['POST'], note: 'POST only, anonymous per-network beacon (core bucket 120/min) — the Meta Conversions API PageView/ViewContent relay (DECISIONS row 277)' },
   // «خبرني لما يرجع». A standing request against ONE product's stock, armed
   // and refused by what the catalogue knows about that product
   // (worker/lib/stockAlertResolve.ts). It is delivered through Notifications

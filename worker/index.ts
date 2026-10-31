@@ -150,6 +150,7 @@ import { merchantAnalyticsRoutes } from './routes/merchantAnalytics';
 import { merchantOrderRoutes } from './routes/merchantOrders';
 import { merchantCustomerRoutes } from './routes/merchantCustomers';
 import { storefrontEventRoutes } from './routes/storefrontEvents';
+import { metaEventRoutes } from './routes/metaEvents';
 import { marketplaceRoutes } from './routes/marketplace';
 import { requestDiscussionRoutes } from './routes/requestDiscussion';
 import { communityOrderTimelineRoutes } from './routes/communityOrderTimeline';
@@ -541,6 +542,8 @@ app.route('/api/price-requests', priceRequestRoutes);
 // (worker/lib/catalogImport/auth.ts). CSRF-exempt by construction: no cookie, no Origin.
 app.route('/api/ops/catalog-import', catalogImportOpsRoutes);
 app.route('/api/admin/catalog-import', adminCatalogImportRoutes);
+// Meta Conversions API: the browser's PageView and ViewContent beacon, main site only (worker/lib/metaCapi.ts).
+app.route('/api/meta-events', metaEventRoutes);
 app.route('/api', miscRoutes);
 app.route('/api/admin', adminRoutes);
 // The farm's balancing console. Under /api/admin/* on purpose: the apex-only

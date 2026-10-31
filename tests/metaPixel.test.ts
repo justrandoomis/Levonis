@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { isMetaPixelPath, META_PIXEL_ID, META_PIXEL_SCRIPT_URL, startMetaPixel, trackMetaPageView } from '../src/lib/metaPixel';
+import { isMetaPixelPath, META_EVENTS_PATH, META_PIXEL_ID, META_PIXEL_SCRIPT_URL, reportMetaViewContent, startMetaPixel, trackMetaPageView } from '../src/lib/metaPixel';
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -34,32 +34,56 @@ test('private pages — and any page not listed — are never reported (Meta rec
   ]) assert.ok(!isMetaPixelPath(path), path);
 });
 
-test('the pixel starts with automatic events and history tracking off, no advanced matching, and loads Meta after the page', () => {
+test('the pixel starts with automatic events and history tracking off, no advanced matching, and loads Meta after the page; the server gets the same event id', async () => {
   const appended: Array<{ src: string; async: boolean }> = [];
-  const win: Record<string, unknown> = { requestIdleCallback: (fn: () => void) => fn(), addEventListener: () => assert.fail('the page had already loaded') };
+  const beacons: Array<{ url: string; body: Record<string, unknown> }> = [];
+  let path = '/products';
+  const win: Record<string, unknown> = {
+    requestIdleCallback: (fn: () => void) => fn(),
+    addEventListener: () => assert.fail('the page had already loaded'),
+    location: { get pathname() { return path; } },
+  };
   const doc = { readyState: 'complete', createElement: () => ({ src: '', async: false }), head: { appendChild: (s: { src: string; async: boolean }) => appended.push(s) } };
   const g = globalThis as Record<string, unknown>;
-  const saved = { window: g.window, document: g.document };
+  const saved = { window: g.window, document: g.document, navigator: Object.getOwnPropertyDescriptor(globalThis, 'navigator') };
   g.window = win;
   g.document = doc;
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: { sendBeacon: (url: string, blob: { text?: () => Promise<string> } & Blob) => { void blob.text().then((t) => beacons.push({ url, body: JSON.parse(t) })); return true; } },
+  });
   try {
+    reportMetaViewContent('p_before'); // before the pixel started (off the main site): nothing
     startMetaPixel();
     startMetaPixel(); // idempotent
     trackMetaPageView();
     const fbq = win.fbq as { queue: unknown[][]; disablePushState?: boolean };
     assert.equal(fbq.disablePushState, true, 'fbevents must not send its own PageView on every history change');
-    assert.deepEqual(fbq.queue, [
-      ['set', 'autoConfig', false, META_PIXEL_ID],
-      ['init', META_PIXEL_ID],
-      ['trackSingle', META_PIXEL_ID, 'PageView'],
-    ], 'autoConfig off BEFORE init; init with the id alone (no advanced matching); PageView only, by trackSingle (track is deduplicated per load)');
+    const [set, init, pageView] = fbq.queue;
+    assert.deepEqual(set, ['set', 'autoConfig', false, META_PIXEL_ID], 'autoConfig off BEFORE init');
+    assert.deepEqual(init, ['init', META_PIXEL_ID], 'init with the id alone: the browser sends no advanced matching');
+    assert.equal(fbq.queue.length, 3, 'PageView is the browser pixel\'s only event');
+    assert.deepEqual(pageView.slice(0, 4), ['trackSingle', META_PIXEL_ID, 'PageView', {}], 'by trackSingle (track is deduplicated per load)');
+    const eventId = (pageView[4] as { eventID: string }).eventID;
+    assert.match(eventId, /^[A-Za-z0-9_-]{8,64}$/);
     assert.equal(win._fbq, win.fbq);
     assert.deepEqual(appended, [{ src: META_PIXEL_SCRIPT_URL, async: true }], 'one async script, once');
+    path = '/product/benchy';
+    reportMetaViewContent('p_1');
+    path = '/orders';
+    reportMetaViewContent('p_2'); // a page that is not reported: nothing
+    await new Promise((r) => setTimeout(r, 10));
+    assert.deepEqual(beacons.map((b) => b.url), [META_EVENTS_PATH, META_EVENTS_PATH]);
+    assert.deepEqual(beacons[0].body, { event: 'PageView', id: eventId, path: '/products' }, 'the server copy carries the pixel\'s own event id');
+    assert.equal(beacons[1].body.event, 'ViewContent');
+    assert.equal(beacons[1].body.product, 'p_1');
+    assert.equal(beacons[1].body.path, '/product/benchy');
     assert.equal(META_PIXEL_ID, '906446185408755');
     assert.equal(META_PIXEL_SCRIPT_URL, 'https://connect.facebook.net/en_US/fbevents.js');
   } finally {
     g.window = saved.window;
     g.document = saved.document;
+    if (saved.navigator) Object.defineProperty(globalThis, 'navigator', saved.navigator);
   }
 });
 
@@ -67,8 +91,12 @@ test('main site only: nothing is decided before the server names the host, and a
   const component = read('src/components/MetaPixel.tsx');
   assert.match(component, /const mainSite = resolved && !store && !unknownStore && !unavailableStore && !system;/);
   assert.match(component, /if \(!resolved \|\| decided\.current === pathname\) return;/);
-  assert.match(component, /if \(!mainSite \|\| !isMetaPixelPath\(pathname\)\) return;[\s\S]*?if \(window\.location\.pathname !== pathname\) return;\s*startMetaPixel\(\);\s*trackMetaPageView\(\);/,
-    'a redirect that already moved the browser (a guest at /cart -> /auth) is not reported under the private address');
+  assert.match(component, /if \(!mainSite\) return;[\s\S]*?import\('\.\.\/lib\/metaPixel'\)\.then\(\(m\) => m\.reportMetaPage\(pathname\)\)/);
+  assert.ok(!/^import .*lib\/metaPixel/m.test(component), 'the pixel module is a lazy chunk: the entry is every store page\'s download too');
+  assert.ok(!/^import .*lib\/metaPixel/m.test(read('src/pages/Product.tsx')), 'the product page loads it lazily too');
+  const lib = read('src/lib/metaPixel.ts');
+  assert.match(lib, /export function reportMetaPage\(pathname: string\): void \{\s*if \(!isMetaPixelPath\(pathname\) \|\| currentPath\(\) !== pathname\) return;\s*startMetaPixel\(\);\s*trackMetaPageView\(\);/,
+    'a page not listed starts nothing, and a redirect that already moved the browser (a guest at /cart -> /auth) is not reported under the private address');
   assert.ok(!component.includes('location.hostname'), 'the host is the server\'s answer (src/StoreContext.tsx)');
   const app = read('src/App.tsx');
   assert.ok(app.indexOf('<MetaPixel />') > app.indexOf('<StoreProvider>') && app.indexOf('<MetaPixel />') < app.indexOf('</StoreProvider>'), 'mounted inside StoreProvider (and so inside the router)');
