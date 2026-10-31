@@ -452,6 +452,12 @@ test('the cancel repair still finds an order paid before the rebase, price-cut a
   const { raw, db } = await walletOrder(L, 3572);
   const before = await balance(db);
   assert.equal((await runWalletRateRebase({ DB: db })).status, 'rebased');
+  // The repair reads a cut as "after the rebase" only when its created_at is
+  // STRICTLY later than rebased_at, both stored to the millisecond. A fast
+  // machine wrote the cut in the rebase's own millisecond about one run in
+  // three, and the order then read as never cut. Live, the one-time rebase is
+  // long past: only this test can tie, so the test lets the clock move on.
+  await new Promise((resolve) => setTimeout(resolve, 5));
   await cutPrice(db, 30_000, 'cut');
   // The historical shape the repair exists for: cancelled with no refund posted.
   raw.exec("UPDATE orders SET status = 'cancelled', stage = 'cancelled' WHERE id = 'ORD1'");
