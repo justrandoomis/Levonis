@@ -226,6 +226,25 @@ jobs:
             *) echo "::notice::ANTHROPIC_API_KEY: binding type $AI_KEY_TYPE" ;;
           esac
 
+          # THE META CONVERSIONS API TOKEN, BY TYPE ONLY (DECISIONS row 277;
+          # owner report 2026-10-31: "No server events"). Read BEFORE this
+          # run's own upload below, so a first upload reads "absent" here and
+          # "uploaded" there. The test-event code is reported because, while it
+          # is set, every server event lands in Test events only.
+          META_KEY_TYPE=$(jq -r '[(.result // [])[] | select(.name == "META_CAPI_ACCESS_TOKEN") | .type] | first // empty' /tmp/secrets.json 2>/dev/null || true)
+          [ -n "$META_KEY_TYPE" ] || META_KEY_TYPE=$(jq -r '[.result.bindings[] | select(.name == "META_CAPI_ACCESS_TOKEN") | .type] | first // "absent"' /tmp/settings.json)
+          case "$META_KEY_TYPE" in
+            secret_text) echo "META_CAPI_ACCESS_TOKEN: secret_text (correct)" ;;
+            absent) echo "::notice::META_CAPI_ACCESS_TOKEN: absent on levonis-staging before this deploy — no Meta server events are sent until the repository secret META_CAPI_ACCESS_TOKEN exists (uploaded below). / رمز Meta غير موجود على الموقع قبل هذا النشر؛ لا تُرسل أحداث الخادم حتى يُضاف السر في GitHub." ;;
+            plain_text) echo "::warning::META_CAPI_ACCESS_TOKEN is a plain_text var: it is visible in the dashboard. Re-create it as a secret, or set the repository secret and let this workflow upload it. / رمز Meta مخزّن كمتغير نصي ظاهر؛ أعد إنشاءه كسرّ." ;;
+            *) echo "::notice::META_CAPI_ACCESS_TOKEN: binding type $META_KEY_TYPE" ;;
+          esac
+          META_TEST_TYPE=$(jq -r '[(.result // [])[] | select(.name == "META_CAPI_TEST_EVENT_CODE") | .type] | first // empty' /tmp/secrets.json 2>/dev/null || true)
+          [ -n "$META_TEST_TYPE" ] || META_TEST_TYPE=$(jq -r '[.result.bindings[] | select(.name == "META_CAPI_TEST_EVENT_CODE") | .type] | first // "absent"' /tmp/settings.json)
+          if [ "$META_TEST_TYPE" != "absent" ]; then
+            echo "::warning::META_CAPI_TEST_EVENT_CODE is set on levonis-staging: Meta server events go to Events Manager → Test events only. Delete it (Workers → levonis-staging → Settings → Variables and Secrets) to send live events. / رمز الاختبار مضبوط؛ الأحداث تظهر في Test events فقط."
+          fi
+
       - name: Resolve the staging database id into wrangler.jsonc
         id: db
         run: |
@@ -574,6 +593,26 @@ jobs:
             echo "::notice::a key is not a linked session; check Admin → Providers for the WhatsApp session status"
           else
             echo "WASENDER_API_KEY not set — WhatsApp stays honestly unavailable"
+          fi
+
+      # THE META CONVERSIONS API TOKEN (DECISIONS row 277), for the same reason
+      # as every block around it: `wrangler deploy` carries plain-text VARS
+      # forward but NOT secrets, so a token kept only as a repository secret
+      # never reaches the running Worker (owner report 2026-10-31: the token
+      # was set, and Events Manager showed no server events). Opt-in: unset
+      # leaves whatever the Worker already has, so a token set in the dashboard
+      # keeps working. The test-event code is deliberately NOT uploaded from
+      # here: deleting a repository secret would not remove it from the Worker,
+      # and a forgotten one silently diverts every live event to Test events.
+      - name: Upload the Meta Conversions API token
+        env:
+          META_CAPI_ACCESS_TOKEN: ${{ secrets.META_CAPI_ACCESS_TOKEN }}
+        run: |
+          if [ -n "$META_CAPI_ACCESS_TOKEN" ]; then
+            printf '%s' "$META_CAPI_ACCESS_TOKEN" | npx wrangler secret put META_CAPI_ACCESS_TOKEN --env staging
+            echo "META_CAPI_ACCESS_TOKEN uploaded — Meta server events can send; Admin → Providers → Check with Meta confirms it"
+          else
+            echo "META_CAPI_ACCESS_TOKEN repository secret not set — the Worker keeps the token it already has, if any"
           fi
 
       - name: Upload the Telegram bot secrets (customer and admin)

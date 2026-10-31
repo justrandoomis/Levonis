@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, Mail, MessageCircle, RefreshCw, Send } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, Loader2, Mail, MessageCircle, RefreshCw, Send } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../LanguageContext';
 
@@ -23,9 +23,14 @@ import { useLanguage } from '../LanguageContext';
  * And it says the one thing every provider integration gets wrong: accepted
  * is not delivered. A green result here means the provider took the message,
  * which is the last thing this software can honestly observe.
+ *
+ * META (server events, DECISIONS row 277) sits beside them for the same
+ * reason: "No server events" in Events Manager looks the same whether the
+ * token is missing, set on another Worker, or refused. Its check is a read of
+ * the dataset with the token, never an event.
  */
 
-type Channel = 'email' | 'whatsapp' | 'telegram';
+type Channel = 'email' | 'whatsapp' | 'telegram' | 'meta';
 
 interface Providers {
   email: {
@@ -44,6 +49,8 @@ interface Providers {
     error: string | null;
     detail?: string | null;
   };
+  /** The Meta Conversions API (server events). Absent from an older Worker's answer. */
+  meta?: { configured: boolean; testMode: boolean; datasetId: string };
 }
 
 interface TestResult {
@@ -85,6 +92,17 @@ const STRINGS = {
     loadFailed: 'تعذّر قراءة حالة القنوات.',
     retry: 'إعادة المحاولة',
     scopeDenied: 'حساب إداري مقيّد لا يمكنه إرسال اختبارات.',
+    meta: 'Meta — أحداث الخادم (Conversions API)',
+    metaDataset: 'مجموعة البيانات',
+    metaNoToken:
+      'لا يوجد META_CAPI_ACCESS_TOKEN على الموقع، فلا تُرسل أحداث الخادم. أضِفه في GitHub ← Settings ← Secrets and variables ← Actions باسم META_CAPI_ACCESS_TOKEN، ويرفعه النشر التالي إلى الموقع.',
+    metaTestMode: 'وضع الاختبار مفعّل (META_CAPI_TEST_EVENT_CODE): أحداث الخادم تظهر في «Test events» فقط.',
+    metaTestBadge: 'وضع الاختبار',
+    metaCheckNote: 'يسأل Meta عن مجموعة البيانات بهذا الرمز، ولا يُنشئ أي حدث.',
+    metaCheck: 'افحص مع Meta',
+    metaChecking: 'جارٍ الفحص…',
+    metaOk: 'Meta قبل الرمز',
+    metaRefused: 'Meta لم يقبل الرمز',
   },
   en: {
     title: 'Customer channels',
@@ -118,6 +136,17 @@ const STRINGS = {
     loadFailed: 'Could not read the channel status.',
     retry: 'Try again',
     scopeDenied: 'A restricted admin account cannot send provider tests.',
+    meta: 'Meta — server events (Conversions API)',
+    metaDataset: 'Dataset',
+    metaNoToken:
+      'No META_CAPI_ACCESS_TOKEN on the live site, so no server events are sent. Add it in GitHub → Settings → Secrets and variables → Actions, named META_CAPI_ACCESS_TOKEN; the next deploy uploads it to the site.',
+    metaTestMode: 'Test mode is on (META_CAPI_TEST_EVENT_CODE): server events appear under Test events only.',
+    metaTestBadge: 'Test mode',
+    metaCheckNote: 'Asks Meta about the dataset with this token; creates no event.',
+    metaCheck: 'Check with Meta',
+    metaChecking: 'Checking…',
+    metaOk: 'Meta accepted the token',
+    metaRefused: 'Meta did not accept the token',
   },
   ckb: {
     title: 'کەناڵەکانی پەیوەندی',
@@ -151,6 +180,17 @@ const STRINGS = {
     loadFailed: 'نەتوانرا دۆخی کەناڵەکان بخوێندرێتەوە.',
     retry: 'هەوڵدانەوە',
     scopeDenied: 'هەژماری بەڕێوەبەری سنووردار ناتوانێت تاقیکردنەوە بنێرێت.',
+    meta: 'Meta — ڕووداوەکانی ڕاژەکار (Conversions API)',
+    metaDataset: 'کۆمەڵەی داتا',
+    metaNoToken:
+      'META_CAPI_ACCESS_TOKEN لەسەر ماڵپەڕەکە نییە، بۆیە هیچ ڕووداوێکی ڕاژەکار نانێردرێت. لە GitHub ← Settings ← Secrets and variables ← Actions بە ناوی META_CAPI_ACCESS_TOKEN زیادی بکە؛ بڵاوکردنەوەی داهاتوو بۆ ماڵپەڕەکەی بەرز دەکاتەوە.',
+    metaTestMode: 'دۆخی تاقیکردنەوە چالاکە (META_CAPI_TEST_EVENT_CODE): ڕووداوەکانی ڕاژەکار تەنها لە «Test events» دەردەکەون.',
+    metaTestBadge: 'دۆخی تاقیکردنەوە',
+    metaCheckNote: 'بەم تۆکنە پرسیار لە Meta دەکات دەربارەی کۆمەڵەی داتاکە، و هیچ ڕووداوێک دروست ناکات.',
+    metaCheck: 'لەگەڵ Meta بیپشکنە',
+    metaChecking: 'پشکنین…',
+    metaOk: 'Meta تۆکنەکەی پەسەند کرد',
+    metaRefused: 'Meta تۆکنەکەی پەسەند نەکرد',
   },
 } as const;
 
@@ -161,10 +201,10 @@ export default function AdminChannels() {
   const [data, setData] = useState<Providers | null>(null);
   const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [to, setTo] = useState<Record<Channel, string>>({ email: '', whatsapp: '', telegram: '' });
+  const [to, setTo] = useState<Record<Channel, string>>({ email: '', whatsapp: '', telegram: '', meta: '' });
   const [busy, setBusy] = useState<Channel | null>(null);
   const [result, setResult] = useState<Record<Channel, TestResult | null>>({
-    email: null, whatsapp: null, telegram: null,
+    email: null, whatsapp: null, telegram: null, meta: null,
   });
 
   const load = useCallback(async () => {
@@ -190,7 +230,9 @@ export default function AdminChannels() {
     try {
       const r = await api.post<{ sent: boolean; detail: string }>('/api/admin/providers/test', {
         channel,
-        ...(channel === 'telegram' ? {} : { to: to[channel].trim() }),
+        // Telegram goes to the bound admin group and Meta is a read of the
+        // dataset: neither has a destination to type.
+        ...(channel === 'telegram' || channel === 'meta' ? {} : { to: to[channel].trim() }),
       });
       setResult((prev) => ({ ...prev, [channel]: { channel, sent: !!r.sent, detail: r.detail } }));
       // The WhatsApp session may have changed state; re-read rather than let
@@ -331,6 +373,33 @@ export default function AdminChannels() {
           </button>
           <Result r={result.telegram} accepted={s.accepted} refused={s.refused} />
         </Card>
+
+        {/* --------------------------------------------------------- meta */}
+        {data.meta ? (
+          <Card
+            icon={<Activity aria-hidden="true" className="w-4 h-4" />}
+            title={s.meta}
+            ok={data.meta.configured && !data.meta.testMode}
+            okLabel={s.on}
+            offLabel={data.meta.configured ? s.metaTestBadge : s.off}
+          >
+            {data.meta.configured ? null : <Line tone="warn">{s.metaNoToken}</Line>}
+            {data.meta.testMode ? <Line tone="warn">{s.metaTestMode}</Line> : null}
+            <Line tone="muted">
+              {s.metaDataset}: <span dir="ltr">{data.meta.datasetId}</span>
+            </Line>
+            <Line tone="muted">{s.metaCheckNote}</Line>
+            <button
+              type="button"
+              onClick={() => void runTest('meta')}
+              disabled={busy === 'meta' || !data.meta.configured}
+              className="lv-button lv-button-secondary lv-button-sm mt-2"
+            >
+              {busy === 'meta' ? s.metaChecking : s.metaCheck}
+            </button>
+            <Result r={result.meta} accepted={s.metaOk} refused={s.metaRefused} />
+          </Card>
+        ) : null}
       </div>
     </div>
   );

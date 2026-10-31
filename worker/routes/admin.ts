@@ -75,6 +75,7 @@ import { classifyOrderSearch } from '../lib/orderSearch';
 import { arabicFoldSql, phoneDigitsSql } from '../lib/sqlFold';
 import { getOrderPointsSnapshots } from '../lib/pointsOps';
 import { telegramConfigured, telegramGetMe } from '../lib/telegram';
+import { checkMetaCapi, META_DATASET_ID, metaCapiConfigured } from '../lib/metaCapi';
 import {
   STAGE_LEGACY_STATUS,
   STAGE_SOURCE,
@@ -271,6 +272,14 @@ adminRoutes.get('/providers', async (c) => {
     origin: {
       appOrigin: (c.env.APP_ORIGIN || '').trim(),
       storeRootDomain: (c.env.STORE_ROOT_DOMAIN || '').trim(),
+    },
+    // The Meta Conversions API (DECISIONS row 277). Presence only here — the
+    // panel's "check with Meta" (POST /providers/test, channel "meta") asks
+    // Meta whether the token actually reaches the dataset.
+    meta: {
+      configured: metaCapiConfigured(c.env),
+      testMode: !!(c.env.META_CAPI_TEST_EVENT_CODE || '').trim(),
+      datasetId: META_DATASET_ID,
     },
   });
 });
@@ -469,7 +478,33 @@ adminRoutes.post('/providers/test', async (c) => {
   await rateLimit(c, 'provider-test', 6, 900);
 
   const body = await c.req.json().catch(() => ({}));
-  const channel = oneOf(body.channel, 'channel', ['email', 'whatsapp', 'telegram'] as const);
+  const channel = oneOf(body.channel, 'channel', ['email', 'whatsapp', 'telegram', 'meta'] as const);
+
+  if (channel === 'meta') {
+    // Not a message: a read of the dataset with the token (checkMetaCapi), so
+    // nothing is sent to anyone and no event is counted. Meta's own verdict
+    // comes back — code 190 is an invalid or expired token.
+    const r = await checkMetaCapi(c.env);
+    await audit(c.env.DB, adminUser.id, 'provider.test', 'channel:meta', {
+      ok: r.ok,
+      status: r.status,
+      code: r.error?.code ?? null,
+    });
+    const refusal = r.error
+      ? `Meta refused (${r.status ?? 'no answer'}${r.error.code != null ? `, code ${r.error.code}` : ''}${r.error.subcode != null ? `/${r.error.subcode}` : ''}): ${r.error.message}`
+      : 'Meta did not confirm the dataset';
+    return c.json({
+      success: true,
+      channel,
+      sent: r.ok,
+      detail: !r.configured
+        ? 'META_CAPI_NOT_CONFIGURED'
+        : r.ok
+          ? `Meta answered: dataset ${META_DATASET_ID}${r.datasetName ? ` (${r.datasetName})` : ''}${r.testMode ? ' — TEST MODE: events go to Test events only' : ''}`
+          : refusal,
+    });
+  }
+
   const stamp = new Date().toISOString();
   const text =
     `LEVONIS\n` +

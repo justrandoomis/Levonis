@@ -78,3 +78,28 @@ test('.dev.vars.example names the keys with no value', () => {
   assert.match(example, /^ANTHROPIC_API_KEY=$/m);
   assert.match(example, /^CREATIVE_STUDIO_ENC_KEY=$/m);
 });
+
+test('workflow 7 uploads the Meta Conversions API token from the repository secret of that name, after the deploy, and reports its type first (DECISIONS row 277)', () => {
+  const yml = workflows.find((w) => w.f === 'deploy-staging-code.yml')!.text;
+  const deploy = yml.indexOf('npx wrangler deploy --env staging');
+  const upload = yml.indexOf('- name: Upload the Meta Conversions API token');
+  assert.ok(deploy > 0 && upload > deploy, 'uploaded after the deploy, like every other secret');
+  assert.match(yml, /META_CAPI_ACCESS_TOKEN: \$\{\{ secrets\.META_CAPI_ACCESS_TOKEN \}\}/);
+  assert.match(yml, /printf '%s' "\$META_CAPI_ACCESS_TOKEN" \| npx wrangler secret put META_CAPI_ACCESS_TOKEN --env staging/);
+  // Opt-in: an unset repository secret leaves the Worker's own token alone.
+  assert.match(yml, /if \[ -n "\$META_CAPI_ACCESS_TOKEN" \]; then/);
+  // Its binding type is reported before anything is migrated — never its text, never a failure.
+  const report = yml.indexOf('META_KEY_TYPE=');
+  const migrate = yml.indexOf('- name: Apply any pending migrations BEFORE the code that needs them');
+  assert.ok(report > 0 && report < migrate);
+  for (const l of yml.split('\n').filter((x) => x.includes('META_KEY_TYPE') || x.includes('META_TEST_TYPE'))) {
+    assert.doesNotMatch(l, /\.text\b|exit 1/, l.trim());
+  }
+  // The test-event code diverts every live event to Test events: no workflow ever uploads it.
+  for (const { f, text } of workflows) {
+    for (const line of text.split('\n')) {
+      if (/wrangler\s+secret\s+(put|bulk)/.test(line)) assert.doesNotMatch(line, /META_CAPI_TEST_EVENT_CODE/, `${f}: ${line.trim()}`);
+    }
+    assert.doesNotMatch(text, /secrets\.META_CAPI_TEST_EVENT_CODE/, f);
+  }
+});

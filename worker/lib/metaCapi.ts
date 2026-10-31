@@ -225,6 +225,70 @@ export async function sendMetaEvents(
   }
 }
 
+/** The dataset's own id and name: what the owner's check asks Meta for. */
+export const META_DATASET_CHECK_URL = `https://graph.facebook.com/${META_GRAPH_VERSION}/${META_DATASET_ID}?fields=id,name`;
+
+/** Meta's answer to the owner's check (Admin → Providers). Never carries the token. */
+export interface MetaCapiCheck {
+  /** The Worker has META_CAPI_ACCESS_TOKEN. */
+  configured: boolean;
+  /** META_CAPI_TEST_EVENT_CODE is set: server events land in Events Manager → Test events only. */
+  testMode: boolean;
+  /** Meta answered with this dataset's id. */
+  ok: boolean;
+  status: number | null;
+  datasetName: string | null;
+  error: { code: number | null; subcode: number | null; type: string | null; message: string } | null;
+}
+
+/**
+ * ASKS META WHETHER THE TOKEN REACHES THE DATASET (owner report 2026-10-31:
+ * "No server events"). A secret can be present and wrong, expired, or set on
+ * another Worker; only Meta can say. This is a READ of the dataset's own id
+ * and name: no event is created and nothing is counted (an event sent with a
+ * test code still counts, so none is sent). The token travels in the
+ * Authorization header, never in a URL, and never comes back in the answer.
+ */
+export async function checkMetaCapi(
+  env: Pick<Env, 'META_CAPI_ACCESS_TOKEN' | 'META_CAPI_TEST_EVENT_CODE'>,
+  opts: { fetchImpl?: typeof fetch } = {}
+): Promise<MetaCapiCheck> {
+  const token = (env.META_CAPI_ACCESS_TOKEN || '').trim();
+  const testMode = (env.META_CAPI_TEST_EVENT_CODE || '').trim().length > 0;
+  const base: MetaCapiCheck = { configured: token.length > 0, testMode, ok: false, status: null, datasetName: null, error: null };
+  if (!token) return base;
+  const clean = (text: string, max: number) => text.split(token).join('***').slice(0, max);
+  try {
+    const res = await fetchWithBudget(
+      META_DATASET_CHECK_URL,
+      { method: 'GET', headers: { Authorization: `Bearer ${token}` } },
+      { timeoutMs: PROVIDER_BUDGETS.ads.timeoutMs, retries: 0, provider: 'meta_capi', fetchImpl: opts.fetchImpl }
+    );
+    const body = (await res.json().catch(() => null)) as {
+      id?: unknown;
+      name?: unknown;
+      error?: { message?: unknown; type?: unknown; code?: unknown; error_subcode?: unknown };
+    } | null;
+    if (res.ok && body && String(body.id ?? '') === META_DATASET_ID) {
+      return { ...base, ok: true, status: res.status, datasetName: typeof body.name === 'string' ? clean(body.name, 120) : null };
+    }
+    const e = body?.error;
+    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+    return {
+      ...base,
+      status: res.status,
+      error: {
+        code: num(e?.code),
+        subcode: num(e?.error_subcode),
+        type: typeof e?.type === 'string' ? clean(e.type, 60) : null,
+        message: clean(typeof e?.message === 'string' ? e.message : `HTTP ${res.status}`, 300),
+      },
+    };
+  } catch (err) {
+    return { ...base, error: { code: null, subcode: null, type: 'unreachable', message: clean(String(err), 200) } };
+  }
+}
+
 /**
  * Sends after the response. Nothing leaves without the secret, and nothing
  * leaves where there is no ExecutionContext (a test's bare request).

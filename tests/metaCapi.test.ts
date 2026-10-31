@@ -13,7 +13,9 @@ import { readFileSync } from 'node:fs';
 import { Hono } from 'hono';
 import {
   META_CAPI_ENDPOINT,
+  META_DATASET_CHECK_URL,
   META_DATASET_ID,
+  checkMetaCapi,
   iqdToUsd,
   isMetaReportedPath,
   metaLinesData,
@@ -220,4 +222,63 @@ test('the server doors send their own figures: AddToCart from the cart, Initiate
   const lib = read('worker/lib/metaCapi.ts');
   assert.match(lib, /event_id: await metaEventId\('purchase', order\.id\)/, 'the order number leaves only as a one-way hash');
   assert.ok(!/console\.\w+\([^)]*token/i.test(lib), 'the token is never logged');
+});
+
+test('the owner\'s check asks Meta about the dataset with the token in a header — never the URL, never an event', async () => {
+  let called = 0;
+  const never = (async () => { called++; return new Response('{}'); }) as typeof fetch;
+  const off = await checkMetaCapi({}, { fetchImpl: never });
+  assert.deepEqual(off, { configured: false, testMode: false, ok: false, status: null, datasetName: null, error: null });
+  assert.equal(called, 0, 'no token, no request');
+
+  const seen: Array<{ url: string; method: string; auth: string; body: unknown }> = [];
+  const ok = (async (url: RequestInfo | URL, init?: RequestInit) => {
+    seen.push({ url: String(url), method: String(init?.method), auth: new Headers(init?.headers).get('authorization') ?? '', body: init?.body });
+    return new Response(JSON.stringify({ id: META_DATASET_ID, name: 'Levonis pixel' }), { status: 200 });
+  }) as typeof fetch;
+  const good = await checkMetaCapi({ META_CAPI_ACCESS_TOKEN: 'tok_SECRET' }, { fetchImpl: ok });
+  assert.equal(good.ok, true);
+  assert.equal(good.datasetName, 'Levonis pixel');
+  assert.equal(good.testMode, false);
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].url, META_DATASET_CHECK_URL);
+  assert.equal(seen[0].url, `https://graph.facebook.com/v26.0/${META_DATASET_ID}?fields=id,name`);
+  assert.equal(seen[0].method, 'GET', 'a read: no event is created');
+  assert.equal(seen[0].auth, 'Bearer tok_SECRET');
+  assert.ok(!seen[0].url.includes('tok_SECRET'), 'the token is never in the URL');
+  assert.equal(seen[0].body, undefined);
+
+  const tested = await checkMetaCapi({ META_CAPI_ACCESS_TOKEN: 'tok', META_CAPI_TEST_EVENT_CODE: 'TEST1' }, { fetchImpl: ok });
+  assert.equal(tested.testMode, true, 'test mode is reported: events land in Test events only');
+
+  // Meta's own verdict comes back, and the token never does — even if an answer echoed it.
+  const expired = (async () =>
+    new Response(JSON.stringify({ error: { message: 'Error validating access token: tok_SECRET has expired', type: 'OAuthException', code: 190, error_subcode: 463 } }), { status: 400 })) as typeof fetch;
+  const bad = await checkMetaCapi({ META_CAPI_ACCESS_TOKEN: 'tok_SECRET' }, { fetchImpl: expired });
+  assert.equal(bad.ok, false);
+  assert.equal(bad.status, 400);
+  assert.deepEqual({ ...bad.error, message: undefined }, { code: 190, subcode: 463, type: 'OAuthException', message: undefined });
+  assert.ok(!JSON.stringify(bad).includes('tok_SECRET'), 'the token never comes back');
+
+  // Another dataset's id is not a pass.
+  const other = (async () => new Response(JSON.stringify({ id: '1', name: 'x' }), { status: 200 })) as typeof fetch;
+  assert.equal((await checkMetaCapi({ META_CAPI_ACCESS_TOKEN: 'tok' }, { fetchImpl: other })).ok, false);
+
+  const down = (async () => { throw new Error('network down tok_SECRET'); }) as typeof fetch;
+  const unreachable = await checkMetaCapi({ META_CAPI_ACCESS_TOKEN: 'tok_SECRET' }, { fetchImpl: down });
+  assert.equal(unreachable.ok, false);
+  assert.equal(unreachable.error?.type, 'unreachable');
+  assert.ok(!JSON.stringify(unreachable).includes('tok_SECRET'));
+});
+
+test('Admin → Providers carries the Meta presence and the "check with Meta" door', () => {
+  const admin = read('worker/routes/admin.ts');
+  assert.match(admin, /meta: \{\s*configured: metaCapiConfigured\(c\.env\),/);
+  assert.match(admin, /\['email', 'whatsapp', 'telegram', 'meta'\] as const/);
+  assert.match(admin, /const r = await checkMetaCapi\(c\.env\);/);
+  const ui = read('src/components/AdminChannels.tsx');
+  assert.match(ui, /runTest\('meta'\)/);
+  for (const key of ['meta:', 'metaNoToken:', 'metaTestMode:', 'metaCheck:', 'metaOk:', 'metaRefused:']) {
+    assert.equal(ui.split(`    ${key}`).length - 1, 3, `${key} exists in ar, en and ckb`);
+  }
 });
